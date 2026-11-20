@@ -2,10 +2,20 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { CatalogModel } from '../platform-models';
-import { isExactModelUnavailableResult, isUnbilledTransientProviderResult } from '../cli-runner';
+import {
+  BenchmarkCaseCancelledError,
+  isExactModelUnavailableResult,
+  isUnbilledTransientProviderResult,
+} from '../cli-runner';
+import { BENCHMARK_CASE_HEADER, issueCaseInferenceCapability } from '../case-inference-capability';
 import { gradeProbeOutput } from '../grading';
 import { PROBE_CASES } from '../datasets/probe-cases';
-import { BenchmarkProbeFamilyError, PROBE_TIMEOUT_MS, runProbeCaseViaGateway } from './executor';
+import {
+  BenchmarkProbeFamilyError,
+  PROBE_TIMEOUT_MS,
+  runCancellableProbeCase,
+  runProbeCaseViaGateway,
+} from './executor';
 import { PROBE_TEMPLATES, probeTemplate } from './request';
 import { probeFamily } from './family';
 
@@ -752,5 +762,102 @@ describe('probe executor — failures keep the paid-call policy', () => {
       stream: true,
       tool_choice: 'auto',
     });
+  });
+});
+
+type RunnerFetch = (request: Request) => Promise<Response>;
+
+function probeEnv(fetchRunner: RunnerFetch): Env {
+  return {
+    BENCH_RUNNER: {
+      idFromName: (name: string) => `id:${name}`,
+      get: () => ({ fetch: fetchRunner }),
+    },
+  } as unknown as Env;
+}
+
+const cancellableExecution = {
+  runId: 'run-1',
+  model,
+  variant: 'high',
+  rep: 0,
+  caseId: probeCase.id,
+  token: 'claim-token',
+  attemptStartedAt: 1_700_000_000_000,
+};
+
+// The real issued pair for this generation, from the same issuer the worker uses, so the
+// fixture cannot drift from the capability format and the executor never sees a provider
+// token.
+const issuedCapability = await issueCaseInferenceCapability('probe-test-secret', {
+  engineIdentity: 'engine-1',
+  runId: cancellableExecution.runId,
+  model: cancellableExecution.model,
+  variant: cancellableExecution.variant,
+  caseId: cancellableExecution.caseId,
+  repetition: cancellableExecution.rep,
+  generation: 1,
+  startedAt: cancellableExecution.attemptStartedAt,
+});
+
+const cancellableInference = {
+  url: 'https://worker.test/case-inference',
+  // The issuer's `invocationHeader` is the encoded value; the envelope names it `invocation`
+  // and reserves `invocationHeader` for the header NAME, matching run.ts' mapping.
+  authorization: issuedCapability.authorization,
+  invocation: issuedCapability.invocationHeader,
+  invocationHeader: BENCHMARK_CASE_HEADER,
+};
+
+function cancellableProbe(env: Env) {
+  return runCancellableProbeCase(env, {
+    instanceName: 'run:model:0',
+    execution: cancellableExecution,
+    inference: cancellableInference,
+    model,
+    variant: 'high',
+    benchCase: probeCase,
+    catalogModel: catalogModel(),
+    kiloToken: 'user-token',
+    kiloApiUrl: 'https://api.test',
+    orgId: 'org-1',
+    now: new Date('2026-11-20T09:00:00.000Z').getTime(),
+  });
+}
+
+describe('runCancellableProbeCase', () => {
+  it('runs the probe through the runner object that owns its generation', async () => {
+    const sent: Request[] = [];
+    const env = probeEnv(async request => {
+      sent.push(request);
+      return new Response(responsesCall(0.0012, 7), {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+      });
+    });
+
+    const result = await cancellableProbe(env);
+
+    expect(result.costUsd).toBe(0.0012);
+    expect(result.tools.calls).toBe(1);
+    expect(sent).toHaveLength(1);
+    const forwarded = JSON.parse(await sent[0].clone().text());
+    expect(forwarded.endpoint).toBe('responses');
+    expect(forwarded.execution).toEqual(cancellableExecution);
+    expect(forwarded.inference).toEqual(cancellableInference);
+    expect(forwarded.timeoutMs).toBe(PROBE_TIMEOUT_MS);
+    expect(JSON.stringify(forwarded)).not.toContain('user-token');
+    expect(JSON.parse(forwarded.body)).toMatchObject({ model });
+  });
+
+  it('reports a cancelled generation as terminal instead of a timed-out probe', async () => {
+    const env = probeEnv(async () =>
+      Response.json(
+        { error: 'case cancelled', cancelled: true },
+        { status: 409, headers: { 'x-benchmark-runner': 'cancelled' } }
+      )
+    );
+
+    await expect(cancellableProbe(env)).rejects.toBeInstanceOf(BenchmarkCaseCancelledError);
   });
 });

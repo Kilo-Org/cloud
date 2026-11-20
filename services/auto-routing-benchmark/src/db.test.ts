@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { rankCandidates, RoutingTableSchema } from '@kilocode/auto-routing-contracts';
 import type { RankedCandidate, RoutingTable } from '@kilocode/auto-routing-contracts';
 import {
+  adoptReusableCaseResult,
   exactPairKey,
   getRoutingCaseResultsForEntries,
   mapRunRow,
@@ -11,6 +12,7 @@ import {
   rowsToRoutingTable,
 } from './db';
 import type { BenchmarkModelSummary } from '@kilocode/auto-routing-contracts';
+import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
 
 describe('routing case results provenance read', () => {
@@ -215,6 +217,8 @@ describe('mapRunRow', () => {
       engine_identity: 'v1:deadbeef',
       measurement_revision: 2,
       purpose: 'platform' as const,
+      // A completed run needs no admission marker: nothing claims it.
+      admission_marker: null,
     };
     const result = mapRunRow(runRow);
     expect(result).toEqual({
@@ -419,6 +423,7 @@ describe('rowsToRoutingTable', () => {
       production_token_profile: null,
       switch_horizon_turns: null,
       low_confidence_threshold: null,
+      desired_pairs: null,
       effort_by_complexity: null,
       source: 'benchmark',
     };
@@ -459,6 +464,7 @@ describe('rowsToRoutingTable', () => {
       production_token_profile: null,
       switch_horizon_turns: null,
       low_confidence_threshold: null,
+      desired_pairs: null,
       effort_by_complexity: null,
       source: 'benchmark',
     };
@@ -485,5 +491,31 @@ describe('rowsToRoutingTable', () => {
     expect(cand?.variant).toBe('max');
     expect(cand).not.toHaveProperty('reasoningEffort');
     expect(RoutingTableSchema.parse(table)).toEqual(table);
+  });
+});
+
+describe('case adoption SQL prepares (production migrations and real SQLite)', () => {
+  it('runs both adoption statements against the real schema', async () => {
+    const sqlite = new DatabaseSync(':memory:');
+    applyBenchmarkMigrations(sqlite);
+    const db = sqliteD1(sqlite);
+    try {
+      // A prepared-statement syntax error (the derived-table/ON CONFLICT trap) rejects here,
+      // which is exactly how a broken adoption blocked every paid case before inference.
+      await expect(
+        adoptReusableCaseResult(db, {
+          runId: 'run-adopt-probe',
+          router: 'efficient',
+          engineIdentity: 'engine-adopt-probe',
+          model: 'vendor/model',
+          variant: '',
+          rep: 0,
+          caseId: 'case-a',
+          minimumRevision: 1,
+        })
+      ).resolves.toBe('none');
+    } finally {
+      sqlite.close();
+    }
   });
 });

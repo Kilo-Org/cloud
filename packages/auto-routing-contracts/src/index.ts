@@ -11,6 +11,7 @@ import {
   CustomRouterClientEntryIdSchema,
   CustomRouterEntryRefSchema,
   CustomRouterReferenceSchema,
+  CustomRouterServingPinSchema,
   refineEntryModelMatch,
 } from './custom-router';
 import { AutoRouterSchema, AutoRoutingModeSchema } from './router';
@@ -151,6 +152,8 @@ export const AutoRoutingDecisionSchema = z
     // Custom router fields (ADR 0005). Optional so decisions from or to a not-yet-redeployed
     // worker or gateway still parse.
     entry: CustomRouterEntryRefSchema.optional(),
+    // The concrete target a pinned gateway entry dispatches instead of its pool model.
+    servingPin: CustomRouterServingPinSchema.optional(),
     stale: z.boolean().optional(),
     fallback: z.boolean().optional(),
   })
@@ -270,3 +273,7 @@ export * from './routing-table';
 export * from './policy-settings';
 export * from './benchmark';
 export * from './custom-router';
+export * from './paid-benchmark';
+export * from './benchmark-inference';
+export * from './benchmark-project';
+export * from './paid-benchmark-admin';

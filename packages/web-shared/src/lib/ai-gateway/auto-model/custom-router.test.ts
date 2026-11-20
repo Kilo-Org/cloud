@@ -173,4 +173,71 @@ describe('decideCustomRouter', () => {
     decide.mockResolvedValueOnce({ kind: 'unavailable' });
     expect(await decideFor({ scope: 'user', slug: 'mine' })).toEqual({ kind: 'unavailable' });
   });
+
+  describe('serving pins', () => {
+    const ALIAS = '~anthropic/latest';
+    const PINNED = 'anthropic/claude-sonnet-4.6';
+    const pin = {
+      model: PINNED,
+      pinnedAt: '2026-11-20T00:00:00.000Z',
+      requestId: '33333333-3333-4333-8333-333333333333',
+      confirmedAt: '2026-11-20T00:00:00.000Z',
+    };
+    const pinnedRouter: CustomRouterDefinition = {
+      ...router,
+      entries: [{ kind: 'gateway', model: ALIAS, servingPin: pin }],
+      defaultEntryKey: `gateway:${ALIAS}`,
+    };
+    const pinnedDecision = (model: string): AutoRoutingDecision => ({
+      ...gatewayDecision(ALIAS),
+      model,
+      entry: { kind: 'gateway', model: ALIAS },
+      ...(model === PINNED ? { servingPin: pin } : {}),
+    });
+
+    beforeEach(() => {
+      mockedFindCustomRouter.mockResolvedValue(pinnedRouter);
+    });
+
+    it('accepts the saved pin and evaluates the policy over the pin too', async () => {
+      decide.mockResolvedValueOnce({
+        kind: 'ok',
+        decision: pinnedDecision(PINNED),
+        costUsd: 0,
+      });
+
+      const result = await decideFor({ scope: 'user', slug: 'mine' }, 'org-1');
+
+      expect(deniedModelIds).toHaveBeenCalledWith([ALIAS, PINNED]);
+      expect(result).toEqual({
+        kind: 'ok',
+        decision: pinnedDecision(PINNED),
+      });
+    });
+
+    it('refuses a dispatch that is neither the pool entry nor its saved pin', async () => {
+      decide.mockResolvedValueOnce({
+        kind: 'ok',
+        decision: pinnedDecision('anthropic/claude-haiku-4.5'),
+        costUsd: 0,
+      });
+
+      expect(await decideFor({ scope: 'user', slug: 'mine' }, 'org-1')).toEqual({
+        kind: 'unavailable',
+      });
+    });
+
+    it('refuses a pin the organization policy denies', async () => {
+      deniedModelIds.mockResolvedValueOnce([PINNED]);
+      decide.mockResolvedValueOnce({
+        kind: 'ok',
+        decision: pinnedDecision(PINNED),
+        costUsd: 0,
+      });
+
+      expect(await decideFor({ scope: 'user', slug: 'mine' }, 'org-1')).toEqual({
+        kind: 'unavailable',
+      });
+    });
+  });
 });

@@ -22,9 +22,31 @@ export function sqliteD1(sqlite: DatabaseSync, onRoundTrip: () => void = () => {
   const executions = new WeakMap<D1PreparedStatement, () => SqliteD1Result>();
 
   function query(sqlText: string, params: SQLInputValue[]) {
+    // D1 rejects a statement whose bind count does not match its placeholders
+    // (`D1_ERROR: wrong number of bindings`). node:sqlite silently treats an unbound
+    // trailing parameter as NULL, which would hide exactly that class of bug, so the
+    // harness enforces the production contract before preparing.
+    const numbered = new Set<number>();
+    let placeholders = 0;
+    for (const match of sqlText.matchAll(
+      /--[^\n]*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'|"(?:""|[^"])*"|`(?:``|[^`])*`|\[[^\]]*\]|\?(\d*)/g
+    )) {
+      const index = match[1];
+      if (index === undefined) continue;
+      if (index === '') {
+        placeholders += 1;
+      } else {
+        const position = Number(index);
+        numbered.add(position);
+        placeholders = Math.max(placeholders, position);
+      }
+    }
+    if (params.length !== placeholders)
+      throw new Error(
+        `statement has ${placeholders} placeholders but ${params.length} values were bound`
+      );
     const statement = sqlite.prepare(sqlText);
     // node:sqlite names ?NNN bindings; D1 binds those same parameters by numeric position.
-    const numbered = new Set([...sqlText.matchAll(/\?(\d+)/g)].map(match => Number(match[1])));
     const named: Record<string, SQLInputValue> = {};
     for (const number of numbered) {
       const value = params[number - 1];

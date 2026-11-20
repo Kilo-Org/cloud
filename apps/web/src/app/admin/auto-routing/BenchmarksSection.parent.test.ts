@@ -80,6 +80,10 @@ jest.mock('@/lib/hooks/use-openrouter-models', () => ({
   },
 }));
 
+jest.mock('@/components/ui/confirm', () => ({
+  useConfirm: () => async () => true,
+}));
+
 jest.mock('@/components/shared/ModelCombobox', () => ({ ModelCombobox: () => null }));
 
 // The text input is presentation. Capturing its props lets the test emit the

@@ -227,6 +227,10 @@ export const SCHEDULER_INSERT_CHUNK_SQL = `
  * whether the run is initialized. Every batch commits on its own, so a later pass
  * resumes after each lane's written prefix instead of rewriting the run. The
  * `scheduler_runs` marker commits with the last batch, once every chunk exists.
+ *
+ * `laneCaseIds` narrows a lane to the exact slots it must measure (a paid request after
+ * reuse). Lanes it does not name are skipped: the run does not wait on cases nobody
+ * admitted. Without it every lane measures the full `caseIds` list.
  */
 export async function scheduleRunChunks(
   db: D1Database,
@@ -236,6 +240,7 @@ export async function scheduleRunChunks(
     repetitions: number;
     caseIds: readonly string[];
     chunkSize: number;
+    laneCaseIds?: ReadonlyMap<string, readonly string[]>;
   }
 ): Promise<boolean> {
   const deadline = Date.now() + SCHEDULER_INIT_BUDGET_MS;
@@ -276,11 +281,14 @@ export async function scheduleRunChunks(
     statements.length = 0;
     return true;
   };
-  const chunks = Math.ceil(run.caseIds.length / run.chunkSize);
   for (const entry of run.entries) {
     const variant = entry.variant ?? '';
     for (let rep = 0; rep < run.repetitions; rep++) {
-      const start = resumeAt.get(JSON.stringify([entry.model, variant, rep])) ?? 0;
+      const laneKey = JSON.stringify([entry.model, variant, rep]);
+      const laneCaseIds = run.laneCaseIds ? run.laneCaseIds.get(laneKey) : run.caseIds;
+      if (!laneCaseIds || laneCaseIds.length === 0) continue;
+      const chunks = Math.ceil(laneCaseIds.length / run.chunkSize);
+      const start = resumeAt.get(laneKey) ?? 0;
       for (let chunk = start; chunk < chunks; chunk++) {
         const offset = chunk * run.chunkSize;
         statements.push(
@@ -293,7 +301,7 @@ export async function scheduleRunChunks(
               variant,
               rep,
               chunk,
-              JSON.stringify(run.caseIds.slice(offset, offset + run.chunkSize))
+              JSON.stringify(laneCaseIds.slice(offset, offset + run.chunkSize))
             )
         );
         if (statements.length < SCHEDULER_MATERIALIZE_BATCH) continue;
@@ -301,6 +309,10 @@ export async function scheduleRunChunks(
       }
     }
   }
+  // A narrowed run with no lane at all has nothing to infer — every slot is already
+  // measured and was copied in by reuse. It still initializes (marker only, no chunks) so
+  // dispatch finalizes it: that is how a fully reused paid request readies its pairs and
+  // assembles the pool's table without calling a provider.
   return writeBatch(true);
 }
 
@@ -354,6 +366,12 @@ export const SCHEDULER_LANE_HEADS_SQL = `
     run.router || '/' || run.purpose AS share, run.started_at
   FROM lane JOIN benchmark_runs AS run ON run.id = lane.run_id
   WHERE run.status = 'running'
+    -- The paid cutover fence. admission_marker is the positive proof: only a Worker that
+    -- owns the paid flow writes it, so a run admitted by an older image during the deploy
+    -- overlap stays NULL however late its started_at is. A missing cutover row also drops
+    -- every lane (fail closed).
+    AND run.admission_marker IS NOT NULL
+    AND (SELECT cutover_at FROM benchmark_cutover WHERE id = 1) IS NOT NULL
     AND EXISTS (SELECT 1 FROM scheduler_runs WHERE scheduler_runs.run_id = run.id)
     AND NOT EXISTS (
       SELECT 1 FROM run_lane_failures AS failure
@@ -873,12 +891,52 @@ export async function listSettledSchedulerRuns(db: D1Database, limit: number): P
   return rows.results.map(row => row.id);
 }
 
-export async function beginPaidCase(
+/**
+ * The per-run paid-execution ledger insert, prepared so it can join the global case fence
+ * in one D1 batch (`beginPaidCaseGeneration`, src/run.ts). It never creates an attempt the
+ * case run did not grant: with `requireClaimedCaseRun`, the row is written only while the
+ * global case run is `running` under this exact run and claim token, and this run holds no
+ * result for the slot yet. Both parts face the same predicates the ledger insert already
+ * enforces, so a batch that loses the fence writes nothing at all.
+ */
+export function beginPaidCaseStatement(
   db: D1Database,
   key: PaidExecutionKey,
-  now: number = Date.now()
-): Promise<boolean> {
-  const result = await db
+  now: number,
+  options: { requireClaimedCaseRun?: boolean } = {}
+): D1PreparedStatement {
+  const claimGuard = options.requireClaimedCaseRun
+    ? `
+      AND EXISTS (
+        SELECT 1 FROM benchmark_case_runs AS case_run
+        JOIN benchmark_runs AS run ON run.id = ? AND run.engine_identity = case_run.engine_identity
+        WHERE case_run.model = ? AND case_run.variant = ? AND case_run.rep = ?
+          AND case_run.case_id = ? AND case_run.executor_run_id = ? AND case_run.executor_token = ?
+          AND case_run.status = 'running'
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM case_results AS held
+        WHERE held.run_id = ? AND held.model = ? AND held.variant = ? AND held.rep = ?
+          AND held.case_id = ?
+      )`
+    : '';
+  const claimBindings = options.requireClaimedCaseRun
+    ? [
+        key.runId,
+        key.model,
+        key.variant,
+        key.rep,
+        key.caseId,
+        key.runId,
+        key.token,
+        key.runId,
+        key.model,
+        key.variant,
+        key.rep,
+        key.caseId,
+      ]
+    : [];
+  return db
     .prepare(`
     INSERT INTO scheduler_executions (run_id, model, variant, rep, case_id, token, started_at,
       prompt_revision)
@@ -893,7 +951,8 @@ export async function beginPaidCase(
           WHERE failure.run_id = scheduler_chunks.run_id AND failure.model = scheduler_chunks.model
             AND failure.variant = scheduler_chunks.variant AND failure.rep = scheduler_chunks.rep
         )
-    ) ON CONFLICT DO NOTHING
+    )${claimGuard}
+    ON CONFLICT DO NOTHING
   `)
     .bind(
       key.runId,
@@ -910,9 +969,17 @@ export async function beginPaidCase(
       key.rep,
       key.token,
       now,
-      key.caseId
-    )
-    .run();
+      key.caseId,
+      ...claimBindings
+    );
+}
+
+export async function beginPaidCase(
+  db: D1Database,
+  key: PaidExecutionKey,
+  now: number = Date.now()
+): Promise<boolean> {
+  const result = await beginPaidCaseStatement(db, key, now).run();
   return result.meta.changes > 0;
 }
 
@@ -956,12 +1023,12 @@ export async function getPaidCaseStartedAt(
 }
 
 /** Moves a ledgered case's start to a further paid call its own token makes. */
-export async function restartPaidCase(
+export function restartPaidCaseStatement(
   db: D1Database,
   key: PaidExecutionKey,
   now: number
-): Promise<boolean> {
-  const result = await db
+): D1PreparedStatement {
+  return db
     .prepare(`UPDATE scheduler_executions SET started_at = ?
     WHERE run_id = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ? AND token = ?
       AND (? IS NULL OR started_at = ?)
@@ -991,8 +1058,15 @@ export async function restartPaidCase(
       key.attemptStartedAt ?? null,
       key.attemptStartedAt ?? null,
       now
-    )
-    .run();
+    );
+}
+
+export async function restartPaidCase(
+  db: D1Database,
+  key: PaidExecutionKey,
+  now: number
+): Promise<boolean> {
+  const result = await restartPaidCaseStatement(db, key, now).run();
   return result.meta.changes > 0;
 }
 

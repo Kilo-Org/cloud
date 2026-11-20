@@ -28,8 +28,15 @@ import {
   getOrganizationsAccessRoles,
 } from '@kilocode/web-shared/routers/organizations/utils';
 import {
+  BENCHMARK_PROJECT_PREFIX,
+  parseBenchmarkProjectId,
+} from '@kilocode/auto-routing-contracts';
+import {
   BreakdownInputSchema,
   BreakdownOutputSchema,
+  BenchmarkChargesInputSchema,
+  BenchmarkChargesOutputSchema,
+  MAX_BENCHMARK_MODELS_PER_POOL,
   MAX_SCOPE_ORGANIZATION_IDS,
   SummaryOutputSchema,
   TableInputSchema,
@@ -47,12 +54,17 @@ import {
 } from '@/routers/usage-analytics-schemas';
 
 export {
+  BenchmarkChargesInputSchema,
+  BenchmarkChargesOutputSchema,
+  BenchmarkPoolChargeSchema,
   BreakdownInputSchema,
   BreakdownDimensionSchema,
   BreakdownOutputSchema,
   CostSourceSchema,
   DimensionSchema,
   GranularitySchema,
+  MAX_BENCHMARK_MODELS_PER_POOL,
+  MAX_BENCHMARK_POOLS,
   MAX_FILTER_VALUES,
   MAX_FILTER_VALUE_LENGTH,
   MAX_SCOPE_ORGANIZATION_IDS,
@@ -65,6 +77,8 @@ export {
   UsageAnalyticsFiltersSchema,
 } from '@/routers/usage-analytics-schemas';
 export type {
+  BenchmarkChargesOutput,
+  BenchmarkPoolCharge,
   BreakdownDimension,
   CostSource,
   Dimension,
@@ -191,6 +205,11 @@ export class WhereBuilder {
 
   addEq(column: string, value: string): void {
     this.push(`${column} = ?`, { type: 'TEXT', value });
+  }
+
+  /** `column LIKE pattern`. Snowflake's default escape character is backslash. */
+  addLike(column: string, pattern: string): void {
+    this.push(`${column} LIKE ?`, { type: 'TEXT', value: pattern });
   }
 
   addIsNull(column: string): void {
@@ -371,6 +390,13 @@ function buildDimensionConditions(where: WhereBuilder, filters: UsageAnalyticsFi
     where.addNotInOrNull('inference_provider', filters.excludedInferenceProviders);
   }
   addNotInIfNonEmpty('project_id', filters.excludedProjects);
+  // Benchmark charges are a billing category, not a scope widening: the
+  // reserved-namespace predicate is ANDed with the scope and date conditions
+  // built above, so it only narrows rows the caller may already see. The prefix
+  // carries no LIKE metacharacters, so no `ESCAPE` clause is needed.
+  if (filters.benchmarkProjects) {
+    where.addLike('project_id', `${BENCHMARK_PROJECT_PREFIX} / %`);
+  }
 }
 
 function buildWhereClause(
@@ -1053,6 +1079,170 @@ export const usageAnalyticsRouter = createTRPCRouter({
           };
         }),
         effectiveGranularity: meta.effectiveGranularity,
+      };
+    }),
+
+  /**
+   * Auto-routing benchmark charges: the reserved benchmark project namespace
+   * grouped into saved pools, each with its concrete-model split.
+   *
+   * This is a narrowed view of the ordinary usage rows (same date window, same
+   * access) rather than a second billing source: it reuses the Project and Model
+   * dimensions the dashboard already reads, so a benchmark charge appears in one
+   * place with one set of numbers. Both queries bound their result: pools by
+   * `poolLimit`, and each pool's models by `MAX_BENCHMARK_MODELS_PER_POOL` with
+   * the remainder folded into `otherModels*`.
+   */
+  getBenchmarkCharges: baseProcedure
+    .input(BenchmarkChargesInputSchema)
+    .output(BenchmarkChargesOutputSchema)
+    .query(async ({ input, ctx }) => {
+      const { poolLimit, ...filtersInput } = input;
+      const filters: UsageAnalyticsFilters = { ...filtersInput, benchmarkProjects: true };
+      await ensureScopeAccess(ctx, filters);
+
+      const config = requireSnowflakeConfig();
+      const meta = resolveTier(filters.granularity, filters.startDate, filters.endDate);
+      const table = getTableName(meta.tier);
+      const scope = isOrgScope(filters) ? 'org' : 'user';
+      const costSumExpr = costSumExprSql(filters.costSource);
+
+      // Read one row past the cap: a non-empty overflow row proves more pools
+      // exist, so the UI can say the list is partial instead of implying it is
+      // complete. Nothing beyond the cap is returned or counted.
+      const poolWhere = buildWhereClause(meta.tier, filters, ctx.user.id, true);
+      const poolStatement = `
+        SELECT
+          project_id AS pool,
+          ${costSumExpr},
+          COALESCE(SUM(request_count), 0)
+        FROM ${table}
+        WHERE ${poolWhere.sql()}
+        GROUP BY 1
+        ORDER BY 2 DESC
+        LIMIT ${Number(poolLimit) + 1}
+      `;
+
+      const poolRows = await timedSnowflakeQuery(
+        {
+          route: 'usageAnalytics.getBenchmarkCharges',
+          queryLabel: `benchmark_pools_${meta.tier}`,
+          scope,
+          period: `${filters.startDate}/${filters.endDate}`,
+        },
+        signal =>
+          executeSnowflakeStatement({
+            config,
+            statement: poolStatement,
+            bindings: poolWhere.bindings,
+            timeoutSeconds: Math.ceil(defaultTimeoutForScope(scope) / 1000),
+            signal,
+          })
+      );
+
+      const pools = poolRows.slice(0, Number(poolLimit)).flatMap(row => {
+        const projectId = typeof row[0] === 'string' ? row[0] : '';
+        const parts = parseBenchmarkProjectId(projectId);
+        if (!parts) return [];
+        return [
+          {
+            projectId,
+            parts,
+            costMicrodollars: toSafeNumber(row[1]),
+            requestCount: toSafeNumber(row[2]),
+          },
+        ];
+      });
+
+      if (pools.length === 0) {
+        return {
+          status: 'empty' as const,
+          totalCostMicrodollars: 0,
+          totalRequestCount: 0,
+          pools: [],
+          hasMorePools: false,
+        };
+      }
+
+      // One bounded follow-up groups each selected pool's concrete models. The
+      // pool ids come from the rows above, so they are bindings, never SQL text.
+      const modelWhere = buildWhereClause(meta.tier, filters, ctx.user.id, true);
+      modelWhere.addIn(
+        'project_id',
+        pools.map(p => p.projectId)
+      );
+      const modelStatement = `
+        SELECT
+          project_id AS pool,
+          model,
+          ${costSumExpr},
+          COALESCE(SUM(request_count), 0)
+        FROM ${table}
+        WHERE ${modelWhere.sql()}
+        GROUP BY 1, 2
+        ORDER BY 1, 3 DESC
+      `;
+
+      const modelRows = await timedSnowflakeQuery(
+        {
+          route: 'usageAnalytics.getBenchmarkCharges',
+          queryLabel: `benchmark_models_${meta.tier}`,
+          scope,
+          period: `${filters.startDate}/${filters.endDate}`,
+        },
+        signal =>
+          executeSnowflakeStatement({
+            config,
+            statement: modelStatement,
+            bindings: modelWhere.bindings,
+            timeoutSeconds: Math.ceil(defaultTimeoutForScope(scope) / 1000),
+            signal,
+          })
+      );
+
+      const modelsByPool = new Map<string, { model: string; cost: number; requests: number }[]>();
+      for (const row of modelRows) {
+        const projectId = typeof row[0] === 'string' ? row[0] : '';
+        const bucket = modelsByPool.get(projectId) ?? [];
+        bucket.push({
+          model: typeof row[1] === 'string' && row[1] !== '' ? row[1] : 'Unknown model',
+          cost: toSafeNumber(row[2]),
+          requests: toSafeNumber(row[3]),
+        });
+        modelsByPool.set(projectId, bucket);
+      }
+
+      const totalCostMicrodollars = pools.reduce((sum, p) => sum + p.costMicrodollars, 0);
+      const totalRequestCount = pools.reduce((sum, p) => sum + p.requestCount, 0);
+
+      return {
+        status: 'ok' as const,
+        totalCostMicrodollars,
+        totalRequestCount,
+        pools: pools.map(pool => {
+          const all = modelsByPool.get(pool.projectId) ?? [];
+          const listed = all.slice(0, MAX_BENCHMARK_MODELS_PER_POOL);
+          // Totals come from the pool row, so a pool whose models were folded
+          // still reconciles exactly with what the pool group reported.
+          return {
+            projectId: pool.projectId,
+            poolSlug: pool.parts.slug,
+            routerId: pool.parts.routerId,
+            poolScope: pool.parts.scope,
+            costMicrodollars: pool.costMicrodollars,
+            requestCount: pool.requestCount,
+            models: listed.map(m => ({
+              model: m.model,
+              costMicrodollars: m.cost,
+              requestCount: m.requests,
+            })),
+            otherModelsCostMicrodollars:
+              pool.costMicrodollars - listed.reduce((sum, m) => sum + m.cost, 0),
+            otherModelsRequestCount:
+              pool.requestCount - listed.reduce((sum, m) => sum + m.requests, 0),
+          };
+        }),
+        hasMorePools: poolRows.length > Number(poolLimit),
       };
     }),
 

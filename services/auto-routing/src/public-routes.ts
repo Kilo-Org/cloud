@@ -141,10 +141,18 @@ export const publicDecideHandler = publicHandler(async c => {
   const router = owner ? await findCustomRouter(c.env, owner, reference.slug) : null;
   if (!router) throw new CustomRouterError('router_not_found', 'Custom router not found');
   // The organization model policy filters gateway entries for any router used in that
-  // organization's context, including a member's personal router.
-  const gatewayModelIds = router.entries.flatMap(entry =>
-    entry.kind === 'gateway' ? [entry.model] : []
-  );
+  // organization's context, including a member's personal router. A pinned entry can dispatch its
+  // concrete target instead of the pool model, so both are evaluated; the target is what actually
+  // runs, and a denied target makes the entry unservable rather than silently unpinning it.
+  const gatewayModelIds = [
+    ...new Set(
+      router.entries.flatMap(entry =>
+        entry.kind === 'gateway'
+          ? [entry.model, ...(entry.servingPin ? [entry.servingPin.model] : [])]
+          : []
+      )
+    ),
+  ];
   const policyDeniedModelIds =
     caller.organizationId === null
       ? []

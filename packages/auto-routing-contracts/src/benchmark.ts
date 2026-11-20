@@ -724,5 +724,9 @@ export type CustomRoutingTableRequest = z.input<typeof CustomRoutingTableRequest
 
 export const CustomRoutingTableResponseSchema = z.object({
   table: CustomRoutingTableSchema.nullable(),
+  // Entry key -> concrete gateway target this pool entry dispatches because its serving pin still
+  // has a usable measurement. A pinned entry whose target is gone is absent: its live alias target
+  // serves instead. Optional so a not-yet-redeployed worker still parses.
+  servingPins: z.record(z.string(), z.string()).optional(),
 });
 export type CustomRoutingTableResponse = z.infer<typeof CustomRoutingTableResponseSchema>;

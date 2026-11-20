@@ -28,6 +28,7 @@ import type {
 import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import { limitHeaderValue } from '@kilocode/web-shared/lib/ai-gateway/header-limits';
 import { normalizeProjectId } from '@kilocode/web-shared/lib/normalizeProjectId';
+import { BENCHMARK_PROJECT_PREFIX } from '@kilocode/auto-routing-contracts';
 import { getXKiloCodeVersionNumber } from '@kilocode/web-shared/lib/userAgent';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import type { EventSourceMessage } from 'eventsource-parser';
@@ -998,10 +999,22 @@ export function extractFraudAndProjectHeaders(request: NextRequest) {
   return {
     fraudHeaders: getFraudDetectionHeaders(request.headers),
     xKiloCodeVersion: request.headers.get('X-KiloCode-Version'),
-    projectId: normalizeProjectId(request.headers.get('X-KiloCode-ProjectId')),
+    projectId: untrustedProjectId(request.headers.get('X-KiloCode-ProjectId')),
     numericKiloCodeVersion:
       getXKiloCodeVersionNumber(request.headers.get('X-KiloCode-Version')) || 0,
   };
+}
+
+/**
+ * A project id a public caller may write. The benchmark project namespace is reserved: an
+ * ordinary request must never attribute usage to a benchmark pool, so anything under the
+ * prefix is dropped here, including a malformed lookalike. Only the authenticated benchmark
+ * assignment writes one, from the signed assignment rather than a header.
+ */
+function untrustedProjectId(header: string | null): string | null {
+  const projectId = normalizeProjectId(header);
+  if (projectId?.startsWith(`${BENCHMARK_PROJECT_PREFIX} `)) return null;
+  return projectId;
 }
 
 const wrapFimSuffixIntoSystemPrompt = (() => {

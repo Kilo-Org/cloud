@@ -78,8 +78,32 @@ import {
   freeModelRateLimitRejection,
   gatewayAccountRateLimitRejection,
   resolveGatewayCaller,
+  resolveBenchmarkCaller,
+  type GatewayCaller,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import { createAiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
+import {
+  benchmarkRefusalResponse,
+  requestBenchmarkAdmission,
+  signedModelViolation,
+} from '@kilocode/web-shared/lib/ai-gateway/benchmark-case-admission';
+import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import type { BenchmarkGatewayAssignment } from '@kilocode/auto-routing-contracts';
+
+/**
+ * A benchmark case request arrives from the Worker with a signed assignment instead of a user
+ * credential. The gateway never mints or accepts a user token for it: it loads the signed
+ * payer/actor row and runs the ordinary admission (membership, allowance, org settings, model
+ * policy, provider privacy) as that account.
+ *
+ * `state.admitted` flips exactly once, immediately before the provider send. Every earlier
+ * answer therefore carries no provider call and is a refusal; every later one may have spent
+ * money and must never be reassigned from its provider status.
+ */
+export type BenchmarkCaseContext = {
+  assignment: BenchmarkGatewayAssignment;
+  state: { admitted: boolean };
+};
 
 function llmProxyPath(url: URL): LlmProxyPath | null {
   switch (url.pathname) {
@@ -95,12 +119,14 @@ function llmProxyPath(url: URL): LlmProxyPath | null {
 }
 
 export async function handleLlmProxyRequest(
-  request: NextRequest
+  request: NextRequest,
+  options?: { benchmark?: BenchmarkCaseContext }
 ): Promise<NextResponseType<unknown>> {
   const requestStartedAt = performance.now();
   // Wall-clock start for bouncer's `occurredAt`; the monotonic clock above
   // cannot date the event.
   const requestStartedAtMs = Date.now();
+  const benchmark = options?.benchmark;
 
   const url = new URL(request.url);
   const path = llmProxyPath(url);
@@ -109,24 +135,36 @@ export async function handleLlmProxyRequest(
   const rawIpAddress = rawClientIp(request);
   const countryCode = requestCountryCode(request.headers);
 
-  // Cap the account before this function starts any database work. Every WAF
-  // rule in front of this route counts per IP, so an actor rotating addresses
-  // buys one allowance per address; this one counts the account itself.
-  //
-  // The cap has to sit above `getUserFromAuth`, not below it. Auth resolves the
-  // account with a read-replica query, so a cap placed after auth still spends a
-  // connection on every flooded request. The key comes from the signed token
-  // instead, which costs no query.
-  const accountRateLimited = await gatewayAccountRateLimitRejection(request, rawIpAddress);
-  if (accountRateLimited) return accountRateLimited;
+  // A benchmark case request is authenticated by its signed assignment and is bounded by the
+  // Worker's per-case concurrency, so it is not subject to the per-account inference cap: its
+  // bearer is not a user token and an IP-keyed allowance would count every case as one account.
+  if (!benchmark) {
+    // Cap the account before this function starts any database work. Every WAF
+    // rule in front of this route counts per IP, so an actor rotating addresses
+    // buys one allowance per address; this one counts the account itself.
+    //
+    // The cap has to sit above `getUserFromAuth`, not below it. Auth resolves the
+    // account with a read-replica query, so a cap placed after auth still spends a
+    // connection on every flooded request. The key comes from the signed token
+    // instead, which costs no query.
+    const accountRateLimited = await gatewayAccountRateLimitRejection(request, rawIpAddress);
+    if (accountRateLimited) return accountRateLimited;
+  }
 
   const requestBodyText = await request.text();
   // Free models also serve anonymous callers, so a missing credential resolves to
   // an anonymous caller here; paid models reject it once the model is known.
-  const callerPromise = getUserFromAuth({
-    adminOnly: false,
-    expectedAudience: KILO_GATEWAY_AUDIENCE,
-  }).then(auth => resolveGatewayCaller(auth, { allowAnonymous: true, ipAddress: rawIpAddress }));
+  // A benchmark request never mints or accepts a user token: its caller is the
+  // signed payer/actor row the Worker named, and the assignment is verified before
+  // this function runs.
+  const callerPromise: Promise<GatewayCaller> = benchmark
+    ? resolveBenchmarkCaller(benchmark.assignment)
+    : getUserFromAuth({
+        adminOnly: false,
+        expectedAudience: KILO_GATEWAY_AUDIENCE,
+      }).then(auth =>
+        resolveGatewayCaller(auth, { allowAnonymous: true, ipAddress: rawIpAddress })
+      );
   // Invalid requests return before anything awaits auth. Keep those paths from
   // surfacing auth failures as unhandled rejections.
   void callerPromise.catch(() => {});
@@ -137,6 +175,13 @@ export async function handleLlmProxyRequest(
   const requestProvider = requestBodyParsed.body.provider;
   const requestedModel = requestBodyParsed.body.model;
   const requestedModelLowerCased = requestedModel.toLowerCase();
+
+  if (benchmark) {
+    // The exact signed concrete model, never a routed alias and never a virtual auto model.
+    if (signedModelViolation(benchmark.assignment, requestedModel)) {
+      return benchmarkRefusalResponse('payer_unavailable', false);
+    }
+  }
 
   const feature = validateFeatureHeader(
     request.headers.get(FEATURE_HEADER) ||
@@ -152,7 +197,12 @@ export async function handleLlmProxyRequest(
   };
   const balanceAndSettingsPromise = callerPromise.then(caller =>
     caller.kind === 'signed-in'
-      ? readGatewayBalance(caller.user, caller.organizationId, requestedModelLowerCased)
+      ? readGatewayBalance(caller.user, caller.organizationId, requestedModelLowerCased, {
+          // A benchmark case never initiates a purchase for its payer, and it reads the
+          // primary: the same payer may have just been debited by an earlier case request.
+          noAutoTopUp: Boolean(benchmark),
+          fresh: Boolean(benchmark),
+        })
       : anonymousBalance
   );
   const organizationGroupContextPromise = callerPromise.then(async caller => {
@@ -171,7 +221,10 @@ export async function handleLlmProxyRequest(
   void organizationGroupPolicyPromise.catch(() => {});
 
   const headers = readLlmProxyHeaders(request);
-  const usageId = randomUUID();
+  // A benchmark case request's usage id is minted by the Worker and signed into the
+  // assignment, so `microdollar_usage.id` is known before the call and a replay cannot
+  // double-charge. Every other request keeps a fresh server-side id.
+  const usageId = benchmark ? benchmark.assignment.usageId : randomUUID();
 
   const enkryptAdmission = await Promise.all([callerPromise, balanceAndSettingsPromise]).then(
     ([caller, account]) =>
@@ -358,6 +411,11 @@ export async function handleLlmProxyRequest(
     effectivePrivacy,
     balanceAndSettingsPromise,
     organizationGroupPolicyPromise,
+    managedRoutesOnly: Boolean(benchmark),
+    // Only a benchmark call may rotate: an ordinary request keeps its generic 402.
+    markPayerRefusal: benchmark
+      ? (reason: 'payment_refused' | 'payer_unavailable') => benchmarkRefusalResponse(reason, false)
+      : undefined,
   });
   if (!providerPolicy.ok) return providerPolicy.response;
   const { route, failoverRoutes, isNonTrialEnterprise, dataRegion } = providerPolicy;
@@ -378,6 +436,10 @@ export async function handleLlmProxyRequest(
   };
   const usageContext: MicrodollarUsageContext = {
     ...usageBase.context,
+    // The signed assignment, not the caller's header, owns the reserved benchmark project
+    // namespace. `extractFraudAndProjectHeaders` strips a caller-supplied one, so this is the
+    // only writer of a benchmark project id.
+    ...(benchmark ? { project_id: benchmark.assignment.projectId } : {}),
     api_kind: requestBodyParsed.kind,
     provider: route.provider.type,
     requested_model: effectiveModelIdLowerCased,
@@ -462,6 +524,22 @@ export async function handleLlmProxyRequest(
     );
   }
 
+  // A benchmark case request makes its one trusted pre-provider check here: the Worker
+  // re-reads the case fence, the selected payer and the platform latch. Everything above this
+  // line has made no provider call, so a refusal is safe; everything below may spend money.
+  if (benchmark) {
+    if (requestCostLimit !== null) {
+      // Bounded spending needs a strict text-only schema and rejects the tool continuations a
+      // benchmark case sends. Refuse instead of silently forwarding an unbounded request.
+      return benchmarkRefusalResponse('pre_upstream_refused', false);
+    }
+    const refusal = await requestBenchmarkAdmission(benchmark.assignment, {
+      secret: INTERNAL_API_SECRET ?? '',
+    });
+    if (refusal) return benchmarkRefusalResponse(refusal.reason, refusal.retryable);
+    benchmark.state.admitted = true;
+  }
+
   const {
     attempt,
     providerContext,
@@ -492,7 +570,9 @@ export async function handleLlmProxyRequest(
             }
           : undefined,
     },
-    failoverRoutes
+    // A benchmark case never fails over to another credential: the measurement transport is
+    // fixed at admission, and a key failover would change it and bill a different account.
+    benchmark ? [] : failoverRoutes
   );
   if (failoverAttempts) providerMetadataCapture?.captureByokFailoverAttempts(failoverAttempts);
   if (attempt.type === 'unknown-gateway-model') {

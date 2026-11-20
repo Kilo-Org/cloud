@@ -16,6 +16,10 @@ import {
   formStateToConfig,
   formatRunProgress,
   BenchmarkRunsTable,
+  BenchmarkRunsCards,
+  runRequesterLabel,
+  runsListEmptyMessage,
+  visibleRuns,
   formatTotalUsd,
   modelTotalsFromSummaries,
   resolveModelTotals,
@@ -587,6 +591,67 @@ describe('readable admin times', () => {
     expect(relativeAge(now - 15 * 86_400_000, now)).toBe('2 w ago');
     // A clock skew never renders a negative age.
     expect(relativeAge(now + 5 * 60_000, now)).toBe('in 5 min');
+  });
+});
+
+describe('runs list requester and narrow layout', () => {
+  const platformRun: BenchmarkRun = {
+    id: 'decider-1',
+    router: 'efficient',
+    kind: 'decider',
+    purpose: 'platform',
+    status: 'completed',
+    startedAt: '2026-11-20T10:00:00.000Z',
+    completedAt: '2026-11-20T10:30:00.000Z',
+    error: null,
+    totals: { totalCostUsd: 0.43, measuredCases: 60, erroredCases: 3 },
+    models: ['vendor/alpha'],
+  };
+
+  it('names Kilo as requester and payer of a platform run', () => {
+    expect(runRequesterLabel(platformRun)).toEqual({
+      requester: 'Kilo platform',
+      payer: 'Kilo pays',
+    });
+    expect(runRequesterLabel({ ...platformRun, kind: 'classifier' })).toEqual({
+      requester: 'Kilo platform',
+      payer: 'Kilo pays',
+    });
+  });
+
+  it('names the owner pools of a legacy user-queue run', () => {
+    expect(runRequesterLabel({ ...platformRun, purpose: 'user' })).toEqual({
+      requester: 'Owner pools',
+      payer: 'Owners pay',
+    });
+  });
+
+  it('filters and explains an empty runs list the same way for both layouts', () => {
+    expect(visibleRuns([platformRun], null)).toHaveLength(1);
+    expect(visibleRuns([platformRun], new Set(['other']))).toHaveLength(0);
+    expect(runsListEmptyMessage([], null)).toBe('No runs yet');
+    expect(runsListEmptyMessage([platformRun], new Set(['other']))).toBe(
+      'No run of this list measured that model'
+    );
+    expect(
+      runsListEmptyMessage([{ ...platformRun, models: undefined }], new Set(['other']))
+    ).toContain('reports its models yet');
+    expect(runsListEmptyMessage([platformRun], new Set(['decider-1']))).toBeNull();
+  });
+
+  it('renders the narrow card list with the same requester and cost facts', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(BenchmarkRunsCards, {
+        runs: [platformRun],
+        router: 'efficient',
+        matchedIds: null,
+      })
+    );
+    expect(html).toContain('Kilo platform');
+    expect(html).toContain('Kilo pays');
+    expect(html).toContain('$0.43');
+    expect(html).toContain('60 cases · 3 errored');
+    expect(html).toContain('aria-expanded="false"');
   });
 });
 

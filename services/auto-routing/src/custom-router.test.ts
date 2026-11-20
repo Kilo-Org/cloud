@@ -6,6 +6,7 @@ import {
   CUSTOM_ROUTER_EVAL_PLAN_PATH,
   CUSTOM_ROUTER_EVAL_RESULT_PATH,
   CUSTOM_ROUTER_TABLE_PATH,
+  CUSTOM_ROUTER_TABLE_VERSION_PATH,
   CustomRouterDecideResponseSchema,
   verifyAutoDecision,
   type AutoRoutingMode,
@@ -431,6 +432,9 @@ beforeEach(() => {
   recordUsage.mockClear();
   cacheIdFromName.mockClear();
   benchmarkFetch.mockReset().mockImplementation(async url => {
+    if (new URL(url).pathname === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
+      return Response.json({ readinessVersion: 'readiness-1' });
+    }
     if (new URL(url).pathname === CUSTOM_ROUTER_TABLE_PATH) {
       return Response.json({ table: customTable });
     }
@@ -577,6 +581,121 @@ describe('public custom router decide', () => {
       subtaskType: null,
       tableVersion: 'custom-table-1',
     });
+  });
+
+  const ALIAS = '~anthropic/latest';
+  const servingPin = {
+    model: SONNET,
+    pinnedAt: '2026-11-20T00:00:00.000Z',
+    requestId: '33333333-3333-4333-8333-333333333333',
+    confirmedAt: '2026-11-20T00:00:00.000Z',
+  };
+  const aliasEntry: CustomRouterEntry = { kind: 'gateway', model: ALIAS, servingPin };
+  const aliasTable = table({
+    [ROUTE]: [
+      { model: ALIAS, accuracy: 0.9, avgCostUsd: 0.01, meetsThreshold: true, variant: null },
+    ],
+  });
+  const usablePin = () =>
+    benchmarkFetch.mockImplementation(async url => {
+      if (new URL(url).pathname === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
+        return Response.json({ readinessVersion: 'readiness-pinned' });
+      }
+      if (new URL(url).pathname === CUSTOM_ROUTER_TABLE_PATH) {
+        return Response.json({
+          table: aliasTable,
+          servingPins: { [`gateway:${ALIAS}`]: SONNET },
+        });
+      }
+      return Response.json({ error: 'unexpected path' }, { status: 500 });
+    });
+
+  it('dispatches the pinned target of a ranked alias entry under its logical key', async () => {
+    findCustomRouter.mockResolvedValue(
+      customRouter({ entries: [aliasEntry], defaultEntryKey: `gateway:${ALIAS}` })
+    );
+    usablePin();
+    const { decision, decisionId } = await decisionOf(
+      await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody())
+    );
+    expect(decision).toMatchObject({
+      entry: { kind: 'gateway', model: ALIAS },
+      model: SONNET,
+      servingPin,
+      fallback: false,
+    });
+    const verified = await verifyAutoDecision(decisionId, DECISION_SECRET, Date.now());
+    expect(verified).toEqual({
+      ok: true,
+      payload: expect.objectContaining({ model: SONNET, routerModelId: 'kilo-auto/custom/mine' }),
+    });
+  });
+
+  it('dispatches the pinned target on the fallback path too', async () => {
+    findCustomRouter.mockResolvedValue(
+      customRouter({ entries: [aliasEntry], defaultEntryKey: `gateway:${ALIAS}` })
+    );
+    classifyNormalizedInput.mockRejectedValue(new Error('classifier down'));
+    usablePin();
+    const { decision } = await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    expect(decision).toMatchObject({
+      entry: { kind: 'gateway', model: ALIAS },
+      model: SONNET,
+      servingPin,
+      fallback: true,
+    });
+  });
+
+  it('does not serve a pinned entry whose target the organization policy denies', async () => {
+    findCustomRouter.mockResolvedValue(
+      customRouter({ entries: [aliasEntry], defaultEntryKey: `gateway:${ALIAS}` })
+    );
+    gatewayDeniedModelIds = [SONNET];
+    usablePin();
+    const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody(), {
+      'X-KiloCode-OrganizationId': ORG_ID,
+    });
+    expect(res.status).toBe(422);
+    expect(await errorCode(res)).toBe('custom_router_unavailable');
+    const [call] = gatewayCalls();
+    const { modelIds } = JSON.parse(call?.[1]?.body as string) as { modelIds: string[] };
+    expect([...modelIds].sort()).toEqual([ALIAS, SONNET].sort());
+  });
+
+  it('rebuilds a cached table as soon as the readiness fingerprint changes', async () => {
+    const realNow = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(realNow);
+    try {
+      await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+      const tableFetches = () =>
+        benchmarkFetch.mock.calls.filter(
+          ([url]) => new URL(String(url)).pathname === CUSTOM_ROUTER_TABLE_PATH
+        ).length;
+      expect(tableFetches()).toBe(1);
+
+      // Inside the check interval the cached table serves without another fetch, even though the
+      // fingerprint would differ: a burst of requests must not probe or rebuild per request.
+      benchmarkFetch.mockImplementation(async url => {
+        if (new URL(String(url)).pathname === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
+          return Response.json({ readinessVersion: 'readiness-2' });
+        }
+        if (new URL(String(url)).pathname === CUSTOM_ROUTER_TABLE_PATH) {
+          return Response.json({ table: rankedTable });
+        }
+        return Response.json({ error: 'unexpected path' }, { status: 500 });
+      });
+      clock.mockReturnValue(realNow + 1_000);
+      await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+      expect(tableFetches()).toBe(1);
+
+      // Past the interval the new fingerprint is observed and the table is rebuilt once, so a
+      // newly ready measurement reaches this pool without a click, a request or a charge.
+      clock.mockReturnValue(realNow + 10_000);
+      await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+      expect(tableFetches()).toBe(2);
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   const imageMessages = [
@@ -986,7 +1105,13 @@ describe('internal custom router decide', () => {
       'decision',
       expect.objectContaining({ model: SONNET })
     );
-    expect(benchmarkFetch).toHaveBeenCalledTimes(1);
+    // Exactly one table build; the readiness probe is a separate, cheap call by design.
+    const benchmarkPaths = () =>
+      benchmarkFetch.mock.calls.map(([url]) => new URL(String(url)).pathname);
+    expect(benchmarkPaths().filter(path => path === CUSTOM_ROUTER_TABLE_PATH)).toHaveLength(1);
+    expect(benchmarkPaths().filter(path => path === CUSTOM_ROUTER_TABLE_VERSION_PATH)).toHaveLength(
+      1
+    );
     expect(
       cacheIdFromName.mock.calls.every(([key]) => key.startsWith(`custom:${ROUTER_ID}:`))
     ).toBe(true);

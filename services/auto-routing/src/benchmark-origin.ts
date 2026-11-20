@@ -2,8 +2,10 @@ import {
   BenchmarkRoutingTableResponseSchema,
   ClassifierWinnerResponseSchema,
   CustomRouterBenchmarkContextSchema,
+  CustomRouterTableVersionResponseSchema,
   CustomRoutingTableResponseSchema,
   CUSTOM_ROUTER_TABLE_PATH,
+  CUSTOM_ROUTER_TABLE_VERSION_PATH,
   DEFAULT_AUTO_ROUTER,
   customRouterEntryKey,
   type AutoRouter,
@@ -32,8 +34,12 @@ async function fetchBenchmark(
   });
 }
 
-async function fetchBenchmarkJson(env: BenchmarkEnv, path: string): Promise<unknown> {
-  const res = await fetchBenchmark(env, path);
+async function fetchBenchmarkJson(
+  env: BenchmarkEnv,
+  path: string,
+  init?: RequestInit
+): Promise<unknown> {
+  const res = await fetchBenchmark(env, path, init);
   if (!res.ok) {
     const detail = (await res.text().catch(() => '')).slice(0, 200);
     throw new Error(`benchmark origin ${path} responded ${res.status} ${detail}`);
@@ -88,10 +94,28 @@ export function customRouterBenchmarkContext(
   });
 }
 
+export async function fetchCustomRouterTableVersion(
+  env: BenchmarkEnv,
+  context: CustomRouterBenchmarkContext
+): Promise<string | null> {
+  try {
+    const body = await fetchBenchmarkJson(env, CUSTOM_ROUTER_TABLE_VERSION_PATH, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(context),
+    });
+    const parsed = CustomRouterTableVersionResponseSchema.safeParse(body);
+    return parsed.success ? parsed.data.readinessVersion : null;
+  } catch {
+    // A version probe failure is not a routing failure: the caller keeps its current table.
+    return null;
+  }
+}
+
 export async function fetchCustomRouterTable(
   env: BenchmarkEnv,
   context: CustomRouterBenchmarkContext
-): Promise<CustomRoutingTable | null> {
+): Promise<{ table: CustomRoutingTable | null; servingPins: ReadonlyMap<string, string> }> {
   const res = await fetchBenchmark(env, CUSTOM_ROUTER_TABLE_PATH, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -109,7 +133,10 @@ export async function fetchCustomRouterTable(
       `benchmark custom router table response invalid: ${parsed.error.issues[0]?.message ?? 'unknown'}`
     );
   }
-  return parsed.data.table;
+  return {
+    table: parsed.data.table,
+    servingPins: new Map(Object.entries(parsed.data.servingPins ?? {})),
+  };
 }
 
 // The benchmark worker owns eval validation and error codes; its status and body pass through.

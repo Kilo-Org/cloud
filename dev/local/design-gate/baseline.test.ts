@@ -124,7 +124,10 @@ test('a formatted native-intent declaration still receives the generated diagnos
   const preparation = await prepareProof(fixture);
   validatePreparedSource(preparation, 'head', preparation.head.directory);
   const generated = fs.readFileSync(path.join(preparation.head.directory, INTENT), 'utf8');
-  assert.match(generated, /export function redirectSystemPath\(\{\n {2}path,\n {2}initial,\n\}: \{/);
+  assert.match(
+    generated,
+    /export function redirectSystemPath\(\{\n {2}path,\n {2}initial,\n\}: \{/
+  );
   const returned = generated.indexOf('return "/(auth)/design-proof-card"');
   assert.ok(returned > generated.indexOf('export function redirectSystemPath('));
   // The branch is the branch's own line inside the body, not a rewrite of the

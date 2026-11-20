@@ -8,13 +8,13 @@ verifies it and deploys the already-built `output/worker.js` with
 here.
 
 The output shell is the Worker that serves the sandboxed iframe in which a
-Page's interactive views (anywidget) run. It lives on its own origin,
+Page's interactive views (module views and anywidget) run. It lives on its own origin,
 `https://pages.kilousercontent.com`, apart from Pages, so widget code never
 shares an origin with a Pages session.
 
 It holds no credentials and no data. `wrangler.jsonc` has no bindings, no
 variables and no secrets, and a test keeps it that way. The Worker is one ES
-module with no imports. It serves the frame HTML at each path in the release's
+module with no imports. It serves the frame bootstrap at each path in the release's
 `output_frame_paths` (today `/frame/v2/`) and answers `GET /health`.
 
 ## Source
@@ -62,11 +62,18 @@ Deployed by `deploy-workers.yml`, like the other Workers, as
 the Pages pin deploys it; a pin move deploys both Workers.
 
 The two Workers deploy separately, so for a short time a new viewer can meet
-an old shell, or the reverse. The frame protocol is versioned for that: a
-change that breaks it adds a new path, such as `/frame/v3/`, and the shell
-keeps serving the previous one for at least one release. The viewer moves to a
-new path only in a release whose shell serves it. Deploy the shell before the
+an old shell, or the reverse. The shell serves a fixed bootstrap that runs the
+frame runtime the viewer sends, so the runtime and its port protocol always
+come from the viewer's build. Only a change to the bootstrap document needs
+the shell: it adds a new path, such as `/frame/v3/`, and the shell keeps
+serving the previous one for at least one release. The viewer moves to a new
+path only in a release whose shell serves it. Deploy the shell before the
 viewer that needs it.
+
+A release that changes the bootstrap at the same path breaks that window.
+Interactive views fail to start until both Workers run the release, and stay
+broken if one deploy job fails. The pin pull request says so, a failed job is
+re-run at once, and a rollback takes both Workers back together.
 
 To confirm a deploy:
 
@@ -103,5 +110,6 @@ pnpm exec wrangler rollback --name nteract-pages-outputs
 ```
 
 The shell is stateless, so a rollback or a revert of the pin change is the
-whole undo. Roll back the shell only to a build that still serves the frame
-path the deployed viewer uses.
+whole undo. Roll back the shell only to a build whose bootstrap the deployed
+viewer can boot, at the frame path it uses. The bootstrap is cached for 300
+seconds, so a rolled-back shell reaches every reader within five minutes.

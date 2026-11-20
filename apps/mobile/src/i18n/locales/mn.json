@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ийн Bitbucket холболтыг компьютерээс вэб дээр удирддаг.",
+      "managedOnWebTitle": "Вэб дээр удирддаг",
+      "managedOnWebShort": "Энэ холболтыг компьютерээс вэб дээр удирддаг.",
+      "managedOnWebRepositories": "{{organization}}-д зориулсан репозиторуудыг компьютерээс вэб дээр сонгоно уу.",
       "description": "{{organization}}-д зориулсан ажлын талбарын хандалтын токен үүсгээд доор буулгана уу.",
       "descriptionReconnect": "{{organization}}-д зориулсан шинэ ажлын талбарын хандалтын токен үүсгээд доор буулгана уу.",
       "descriptionOverview": "{{organization}}-д зориулсан ажлын талбарын хандалтын токен үүсгээд дараагийн дэлгэц дээр буулгана уу.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Шалгаж байна…",
       "statusUnavailable": "Төлөв тодорхойгүй",
+      "needsAttention": "Анхаарал шаардлагатай",
       "platforms": "Платформууд",
       "activity": "Үйл ажиллагаа"
     },

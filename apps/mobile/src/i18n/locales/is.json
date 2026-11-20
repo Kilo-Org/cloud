@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-tengingu við {{organization}} er stjórnað á vefnum í tölvu.",
+      "managedOnWebTitle": "Stjórnað á vefnum",
+      "managedOnWebShort": "Þessari tengingu er stjórnað á vefnum í tölvu.",
+      "managedOnWebRepositories": "Veldu geymslur fyrir {{organization}} á vefnum í tölvu.",
       "description": "Búðu til aðgangstóka vinnusvæðis fyrir {{organization}} og límdu hann hér fyrir neðan.",
       "descriptionReconnect": "Búðu til nýjan aðgangstóka vinnusvæðis fyrir {{organization}} og límdu hann hér fyrir neðan.",
       "descriptionOverview": "Búðu til aðgangstóka vinnusvæðis fyrir {{organization}} og límdu hann á næsta skjá.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Athuga…",
       "statusUnavailable": "Staða ekki tiltæk",
+      "needsAttention": "Þarfnast athygli",
       "platforms": "Vettvangar",
       "activity": "Virkni"
     },

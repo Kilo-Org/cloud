@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} Bitbucket-kapcsolata a weben, számítógépről kezelhető.",
+      "managedOnWebTitle": "A weben kezelve",
+      "managedOnWebShort": "Ezt a kapcsolatot a weben, számítógépről kezelheti.",
+      "managedOnWebRepositories": "Válassza ki {{organization}} tárolóit a weben, számítógépről.",
       "description": "Hozz létre egy hozzáférési tokent a munkaterülethez {{organization}} számára, és illeszd be alább.",
       "descriptionReconnect": "Hozz létre egy új hozzáférési tokent a munkaterülethez {{organization}} számára, és illeszd be alább.",
       "descriptionOverview": "Hozz létre egy hozzáférési tokent a munkaterülethez {{organization}} számára, majd illeszd be a következő képernyőn.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Ellenőrzés…",
       "statusUnavailable": "Az állapot nem érhető el",
+      "needsAttention": "Beavatkozást igényel",
       "platforms": "Platformok",
       "activity": "Tevékenység"
     },

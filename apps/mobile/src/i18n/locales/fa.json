@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "اتصال Bitbucket به {{organization}} از طریق وب و با رایانه مدیریت می‌شود.",
+      "managedOnWebTitle": "از طریق وب مدیریت می‌شود",
+      "managedOnWebShort": "این اتصال از طریق وب و با رایانه مدیریت می‌شود.",
+      "managedOnWebRepositories": "مخزن‌های {{organization}} را از طریق وب و با رایانه انتخاب کنید.",
       "description": "یک توکن دسترسی فضای کاری برای {{organization}} ایجاد کنید و آن را در کادر زیر جای‌گذاری کنید.",
       "descriptionReconnect": "یک توکن دسترسی فضای کاری جدید برای {{organization}} ایجاد کنید و آن را در کادر زیر جای‌گذاری کنید.",
       "descriptionOverview": "یک توکن دسترسی فضای کاری برای {{organization}} ایجاد کنید و آن را در صفحهٔ بعد جای‌گذاری کنید.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "در حال بررسی…",
       "statusUnavailable": "وضعیت در دسترس نیست",
+      "needsAttention": "نیازمند رسیدگی",
       "platforms": "پلتفرم‌ها",
       "activity": "فعالیت"
     },

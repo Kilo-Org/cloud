@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} کا Bitbucket کنکشن کمپیوٹر سے ویب پر منظم کیا جاتا ہے۔",
+      "managedOnWebTitle": "ویب پر منظم کیا جاتا ہے",
+      "managedOnWebShort": "یہ کنکشن کمپیوٹر سے ویب پر منظم کیا جاتا ہے۔",
+      "managedOnWebRepositories": "{{organization}} کے لیے ریپوزٹریز کمپیوٹر سے ویب پر منتخب کریں۔",
       "description": "{{organization}} کے لیے ورک اسپیس تک رسائی کا ٹوکن بنائیں اور اسے نیچے چسپاں کریں۔",
       "descriptionReconnect": "{{organization}} کے لیے ورک اسپیس تک رسائی کا نیا ٹوکن بنائیں اور اسے نیچے چسپاں کریں۔",
       "descriptionOverview": "{{organization}} کے لیے ورک اسپیس تک رسائی کا ٹوکن بنائیں اور اسے اگلی اسکرین پر چسپاں کریں۔",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "جانچ ہو رہی ہے…",
       "statusUnavailable": "حالت دستیاب نہیں",
+      "needsAttention": "توجہ درکار",
       "platforms": "پلیٹ فارمز",
       "activity": "سرگرمی"
     },

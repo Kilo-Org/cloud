@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ren Bitbucket konexioa webean kudeatzen da, ordenagailu batetik.",
+      "managedOnWebTitle": "Webean kudeatzen da",
+      "managedOnWebShort": "Konexio hau webean kudeatzen da, ordenagailu batetik.",
+      "managedOnWebRepositories": "Aukeratu {{organization}}-ren biltegiak webean, ordenagailu batetik.",
       "description": "Sortu lan-eremurako sarbide-token bat {{organization}}-rako eta itsatsi behean.",
       "descriptionReconnect": "Sortu lan-eremurako sarbide-token berri bat {{organization}}-rako eta itsatsi behean.",
       "descriptionOverview": "Sortu lan-eremurako sarbide-token bat {{organization}}-rako eta itsatsi hurrengo pantailan.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Egiaztatzen…",
       "statusUnavailable": "Egoera ez dago erabilgarri",
+      "needsAttention": "Esku-hartze beharra",
       "platforms": "Plataformak",
       "activity": "Jarduera"
     },

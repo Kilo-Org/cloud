@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "A conexión de Bitbucket con {{organization}} xestiónase na web desde un ordenador.",
+      "managedOnWebTitle": "Xestiónase na web",
+      "managedOnWebShort": "Esta conexión xestiónase na web desde un ordenador.",
+      "managedOnWebRepositories": "Escolle os repositorios de {{organization}} na web desde un ordenador.",
       "description": "Crea un token de acceso ao espazo de traballo para {{organization}} e pégao aquí embaixo.",
       "descriptionReconnect": "Crea un novo token de acceso ao espazo de traballo para {{organization}} e pégao aquí embaixo.",
       "descriptionOverview": "Crea un token de acceso ao espazo de traballo para {{organization}} e pégao na seguinte pantalla.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Comprobando…",
       "statusUnavailable": "Estado non dispoñible",
+      "needsAttention": "Atención necesaria",
       "platforms": "Plataformas",
       "activity": "Actividade"
     },

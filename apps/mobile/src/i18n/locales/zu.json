@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Uxhumano lwe-Bitbucket lwe-{{organization}} luphathwa kuwebhu ngekhompyutha.",
+      "managedOnWebTitle": "Iphathwa kuwebhu",
+      "managedOnWebShort": "Luxhumano luphathwa kuwebhu ngekhompyutha.",
+      "managedOnWebRepositories": "Khetha amarekhodi ka-{{organization}} kuwebhu ngekhompyutha.",
       "description": "Dala ithokheni yokufinyelela endaweni yokusebenza ka-{{organization}}, bese uyinamathisela ngezansi.",
       "descriptionReconnect": "Dala ithokheni entsha yokufinyelela endaweni yokusebenza ka-{{organization}}, bese uyinamathisela ngezansi.",
       "descriptionOverview": "Dala ithokheni yokufinyelela endaweni yokusebenza ka-{{organization}}, bese uyinamathisela esikrinini esilandelayo.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Kuyahlolwa…",
       "statusUnavailable": "Isimo asitholakali",
+      "needsAttention": "Kudinga ukunakwa",
       "platforms": "Izinkundla",
       "activity": "Umsebenzi"
     },

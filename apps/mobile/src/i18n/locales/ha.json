@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Ana sarrafa haɗin Bitbucket da {{organization}} a yanar gizo daga kwamfuta.",
+      "managedOnWebTitle": "Ana sarrafa a yanar gizo",
+      "managedOnWebShort": "Ana sarrafa wannan haɗin a yanar gizo daga kwamfuta.",
+      "managedOnWebRepositories": "Zaɓi ma'ajiyoyi don {{organization}} a yanar gizo daga kwamfuta.",
       "description": "Ƙirƙiri lambar izinin shiga muhallin aiki don {{organization}}, sannan ka manna ta a ƙasa.",
       "descriptionReconnect": "Ƙirƙiri sabuwar lambar izinin shiga muhallin aiki don {{organization}}, sannan ka manna ta a ƙasa.",
       "descriptionOverview": "Ƙirƙiri lambar izinin shiga muhallin aiki don {{organization}}, sannan ka manna ta a shafi na gaba.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Ana duba…",
       "statusUnavailable": "Ba a iya samun halin da ake ciki",
+      "needsAttention": "Buƙatar kulawa",
       "platforms": "Dandalai",
       "activity": "Aiki"
     },

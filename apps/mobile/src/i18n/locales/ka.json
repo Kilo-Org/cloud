@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ის Bitbucket-თან კავშირი იმართება ვებში, კომპიუტერიდან.",
+      "managedOnWebTitle": "იმართება ვებში",
+      "managedOnWebShort": "ეს კავშირი იმართება ვებში, კომპიუტერიდან.",
+      "managedOnWebRepositories": "აირჩიე რეპოზიტორიები {{organization}}-ისთვის ვებში, კომპიუტერიდან.",
       "description": "შექმენი სამუშაო სივრცის წვდომის ტოკენი {{organization}}-სთვის და ჩასვი ქვემოთ.",
       "descriptionReconnect": "შექმენი ახალი სამუშაო სივრცის წვდომის ტოკენი {{organization}}-სთვის და ჩასვი ქვემოთ.",
       "descriptionOverview": "შექმენი სამუშაო სივრცის წვდომის ტოკენი {{organization}}-სთვის და ჩასვი შემდეგ ეკრანზე.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "მოწმდება…",
       "statusUnavailable": "სტატუსი ხელმისაწვდომი არ არის",
+      "needsAttention": "ყურადღება სჭირდება",
       "platforms": "პლატფორმები",
       "activity": "აქტივობა"
     },

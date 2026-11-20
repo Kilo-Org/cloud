@@ -1439,6 +1439,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Pripojenie {{organization}} k Bitbucketu sa spravuje na webe z počítača.",
+      "managedOnWebTitle": "Spravuje sa na webe",
+      "managedOnWebShort": "Toto pripojenie sa spravuje na webe z počítača.",
+      "managedOnWebRepositories": "Vyberte repozitáre pre {{organization}} na webe z počítača.",
       "description": "Vytvorte prístupový token pracovného priestoru pre {{organization}} a vložte ho nižšie.",
       "descriptionReconnect": "Vytvorte nový prístupový token pracovného priestoru pre {{organization}} a vložte ho nižšie.",
       "descriptionOverview": "Vytvorte prístupový token pracovného priestoru pre {{organization}} a vložte ho na ďalšej obrazovke.",
@@ -1462,6 +1465,7 @@
     "platformList": {
       "checking": "Kontroluje sa…",
       "statusUnavailable": "Stav nie je dostupný",
+      "needsAttention": "Vyžaduje pozornosť",
       "platforms": "Platformy",
       "activity": "Aktivita"
     },

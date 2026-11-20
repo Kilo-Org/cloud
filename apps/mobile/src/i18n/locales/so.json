@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Xiriirka Bitbucket ee {{organization}} waxaa lagu maamulaa shabakadda iyadoo kombiyuutar la isticmaalayo.",
+      "managedOnWebTitle": "Waxaa lagu maamulaa shabakadda",
+      "managedOnWebShort": "Xiriirkan waxaa lagu maamulaa shabakadda iyadoo kombiyuutar la isticmaalayo.",
+      "managedOnWebRepositories": "Dooro keydadka {{organization}} ee shabakadda adigoo kombiyuutar isticmaalaya.",
       "description": "Abuur summad gelitaan oo goobta shaqada ah oo {{organization}} loogu talagalay, ka dibna hoos ku dheji.",
       "descriptionReconnect": "Abuur summad gelitaan cusub oo goobta shaqada ah oo {{organization}} loogu talagalay, ka dibna hoos ku dheji.",
       "descriptionOverview": "Abuur summad gelitaan oo goobta shaqada ah oo {{organization}} loogu talagalay, ka dibna ku dheji shaashadda xigta.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Waa la hubinayaa…",
       "statusUnavailable": "Xaaladda lama heli karo",
+      "needsAttention": "U baahan fiiro",
       "platforms": "Madalaha",
       "activity": "Hawlaha"
     },

@@ -58,6 +58,7 @@ import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o
 import {
   accountForMicrodollarUsage,
   INVALID_TOKEN_CODE,
+  RESOLVED_MODEL_HEADER,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import {
   ReasoningDetailsTransform,
@@ -4363,6 +4364,39 @@ describe('kilo-auto/efficient classifier billing', () => {
       expect(mockedUpstreamRequest).not.toHaveBeenCalled();
     }
   );
+
+  it.each([{ stream: true }, { stream: false }])(
+    'names the model a kilo-auto/efficient request resolved to (stream: $stream)',
+    async ({ stream }) => {
+      mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
+      mockedUpstreamRequest.mockResolvedValue({
+        type: 'success',
+        response: stream
+          ? new Response('data: {}\n\n', { headers: { 'content-type': 'text/event-stream' } })
+          : upstreamJsonResponse({
+              id: 'chatcmpl-1',
+              model: 'anthropic/claude-haiku-4',
+              choices: [],
+            }),
+      });
+
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(
+        makeRequest({ ...makeBody('kilo-auto/efficient'), stream }) as never
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get(RESOLVED_MODEL_HEADER)).toBe('anthropic/claude-haiku-4');
+    }
+  );
+
+  it('omits the resolved model header for a direct model request', async () => {
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(makeRequest(makeBody('openai/gpt-4o')) as never);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get(RESOLVED_MODEL_HEADER)).toBeNull();
+  });
 });
 
 describe('auto-routing shadow classifier', () => {

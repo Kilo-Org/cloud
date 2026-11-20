@@ -1439,6 +1439,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Падключэнне Bitbucket для {{organization}} кіруецца ў вэб-версіі з камп'ютара.",
+      "managedOnWebTitle": "Кіруецца ў вэб-версіі",
+      "managedOnWebShort": "Гэтае падключэнне кіруецца ў вэб-версіі з камп'ютара.",
+      "managedOnWebRepositories": "Выберыце рэпазіторыі для {{organization}} у вэб-версіі з камп'ютара.",
       "description": "Стварыце токен доступу да працоўнай прасторы для {{organization}} і ўстаўце яго ніжэй.",
       "descriptionReconnect": "Стварыце новы токен доступу да працоўнай прасторы для {{organization}} і ўстаўце яго ніжэй.",
       "descriptionOverview": "Стварыце токен доступу да працоўнай прасторы для {{organization}} і ўстаўце яго на наступным экране.",
@@ -1462,6 +1465,7 @@
     "platformList": {
       "checking": "Праверка…",
       "statusUnavailable": "Стан недаступны",
+      "needsAttention": "Патрабуе ўвагі",
       "platforms": "Платформы",
       "activity": "Актыўнасць"
     },

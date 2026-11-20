@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "A na-elekọta njikọ Bitbucket nke {{organization}} na weebụ site na kọmputa.",
+      "managedOnWebTitle": "A na-elekọta na weebụ",
+      "managedOnWebShort": "A na-elekọta njikọ a na weebụ site na kọmputa.",
+      "managedOnWebRepositories": "Họrọ ebe nchekwa maka {{organization}} na weebụ site na kọmputa.",
       "description": "Mepụta akara ikike ịnweta oghere ọrụ maka {{organization}}, wee mado ya n'okpuru.",
       "descriptionReconnect": "Mepụta akara ikike ọhụrụ ịnweta oghere ọrụ maka {{organization}}, wee mado ya n'okpuru.",
       "descriptionOverview": "Mepụta akara ikike ịnweta oghere ọrụ maka {{organization}}, wee mado ya na ihuenyo na-esote.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Na-enyocha…",
       "statusUnavailable": "Ọnọdụ adịghị",
+      "needsAttention": "Chọrọ nlebara anya",
       "platforms": "Sistemụ",
       "activity": "Ihe omume"
     },

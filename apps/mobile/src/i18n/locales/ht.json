@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Koneksyon Bitbucket pou {{organization}} jere sou entènèt la, apati yon òdinatè.",
+      "managedOnWebTitle": "Jere sou entènèt la",
+      "managedOnWebShort": "Koneksyon sa a jere sou entènèt la, apati yon òdinatè.",
+      "managedOnWebRepositories": "Chwazi depo yo pou {{organization}} sou entènèt la, apati yon òdinatè.",
       "description": "Kreye yon jeton aksè pou espas travay la pou {{organization}}, epi kole li anba a.",
       "descriptionReconnect": "Kreye yon nouvo jeton aksè pou espas travay la pou {{organization}}, epi kole li anba a.",
       "descriptionOverview": "Kreye yon jeton aksè pou espas travay la pou {{organization}}, epi kole li nan pwochen ekran an.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Ap tcheke…",
       "statusUnavailable": "Estati pa disponib",
+      "needsAttention": "Bezwen atansyon",
       "platforms": "Platfòm",
       "activity": "Aktivite"
     },

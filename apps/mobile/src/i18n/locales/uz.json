@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} uchun Bitbucket ulanishi kompyuterdan veb orqali boshqariladi.",
+      "managedOnWebTitle": "Veb orqali boshqariladi",
+      "managedOnWebShort": "Bu ulanish kompyuterdan veb orqali boshqariladi.",
+      "managedOnWebRepositories": "{{organization}} uchun repozitoriylarni kompyuterdan veb orqali tanlang.",
       "description": "{{organization}} uchun ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
       "descriptionReconnect": "{{organization}} uchun yangi ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
       "descriptionOverview": "{{organization}} uchun ish maydoniga kirish tokenini yarating va uni keyingi ekranda joylashtiring.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Tekshirilmoqda…",
       "statusUnavailable": "Holatni aniqlab bo'lmadi",
+      "needsAttention": "E’tibor talab qiladi",
       "platforms": "Platformalar",
       "activity": "Faoliyat"
     },

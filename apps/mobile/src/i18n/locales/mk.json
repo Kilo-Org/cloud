@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Врската со Bitbucket на {{organization}} се управува преку веб од компјутер.",
+      "managedOnWebTitle": "Се управува преку веб",
+      "managedOnWebShort": "Оваа врска се управува преку веб од компјутер.",
+      "managedOnWebRepositories": "Избери ги репозиториумите за {{organization}} преку веб од компјутер.",
       "description": "Создај токен за пристап до работниот простор за {{organization}} и залепи го подолу.",
       "descriptionReconnect": "Создај нов токен за пристап до работниот простор за {{organization}} и залепи го подолу.",
       "descriptionOverview": "Создај токен за пристап до работниот простор за {{organization}} и залепи го на следниот екран.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Се проверува…",
       "statusUnavailable": "Статусот е недостапен",
+      "needsAttention": "Бара внимание",
       "platforms": "Платформи",
       "activity": "Активност"
     },

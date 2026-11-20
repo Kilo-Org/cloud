@@ -699,6 +699,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Підключенням Bitbucket для {{organization}} можна керувати лише у вебверсії з комп'ютера.",
+      "managedOnWebTitle": "Керується у вебверсії",
+      "managedOnWebShort": "Це підключення керується у вебверсії з комп'ютера.",
+      "managedOnWebRepositories": "Виберіть репозиторії для {{organization}} у вебверсії з комп'ютера.",
       "description": "Створіть токен доступу до робочого простору для {{organization}} та вставте його нижче.",
       "descriptionReconnect": "Створіть новий токен доступу до робочого простору для {{organization}} та вставте його нижче.",
       "descriptionOverview": "Створіть токен доступу до робочого простору для {{organization}} та вставте його на наступному екрані.",
@@ -737,6 +740,7 @@
     "platformList": {
       "activity": "Активність",
       "checking": "Перевіряємо…",
+      "needsAttention": "Потребує уваги",
       "platforms": "Платформи",
       "statusUnavailable": "Стан недоступний"
     },

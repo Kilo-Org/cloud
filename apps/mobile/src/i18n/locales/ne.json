@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} को Bitbucket जडान कम्प्युटरबाट वेबमा व्यवस्थापन गरिन्छ।",
+      "managedOnWebTitle": "वेबमा व्यवस्थापन गरिन्छ",
+      "managedOnWebShort": "यो जडान कम्प्युटरबाट वेबमा व्यवस्थापन गरिन्छ।",
+      "managedOnWebRepositories": "कम्प्युटरबाट वेबमा {{organization}} का लागि रिपोजिटरीहरू छान्नुहोस्।",
       "description": "{{organization}} का लागि वर्कस्पेसको पहुँच टोकन बनाउनुहोस् र तल टाँस्नुहोस्।",
       "descriptionReconnect": "{{organization}} का लागि नयाँ वर्कस्पेसको पहुँच टोकन बनाउनुहोस् र तल टाँस्नुहोस्।",
       "descriptionOverview": "{{organization}} का लागि वर्कस्पेसको पहुँच टोकन बनाउनुहोस् र अर्को स्क्रिनमा टाँस्नुहोस्।",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "जाँच गर्दै…",
       "statusUnavailable": "स्थिति उपलब्ध छैन",
+      "needsAttention": "ध्यान आवश्यक",
       "platforms": "प्लेटफर्महरू",
       "activity": "गतिविधि"
     },

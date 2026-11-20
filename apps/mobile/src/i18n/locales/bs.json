@@ -1415,6 +1415,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket vezom s {{organization}} upravlja se na webu s računara.",
+      "managedOnWebTitle": "Upravlja se na webu",
+      "managedOnWebShort": "Ova veza se upravlja na webu s računara.",
+      "managedOnWebRepositories": "Odaberi repozitorije za {{organization}} na webu s računara.",
       "description": "Kreiraj token za pristup radnom prostoru za {{organization}} i zalijepi ga ispod.",
       "descriptionReconnect": "Kreiraj novi token za pristup radnom prostoru za {{organization}} i zalijepi ga ispod.",
       "descriptionOverview": "Kreiraj token za pristup radnom prostoru za {{organization}} i zalijepi ga na sljedećem ekranu.",
@@ -1438,6 +1441,7 @@
     "platformList": {
       "checking": "Provjera…",
       "statusUnavailable": "Status nedostupan",
+      "needsAttention": "Zahtijeva pažnju",
       "platforms": "Platforme",
       "activity": "Aktivnost"
     },

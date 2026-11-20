@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Връзката на {{organization}} с Bitbucket се управлява в уеб версията от компютър.",
+      "managedOnWebTitle": "Управлява се в уеб версията",
+      "managedOnWebShort": "Тази връзка се управлява в уеб версията от компютър.",
+      "managedOnWebRepositories": "Избери хранилищата за {{organization}} в уеб версията от компютър.",
       "description": "Създай токен за достъп до работното пространство за {{organization}} и го постави по-долу.",
       "descriptionReconnect": "Създай нов токен за достъп до работното пространство за {{organization}} и го постави по-долу.",
       "descriptionOverview": "Създай токен за достъп до работното пространство за {{organization}} и го постави на следващия екран.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Проверка…",
       "statusUnavailable": "Състоянието не е достъпно",
+      "needsAttention": "Изисква намеса",
       "platforms": "Платформи",
       "activity": "Активност"
     },

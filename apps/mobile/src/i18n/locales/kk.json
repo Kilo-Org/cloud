@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} үшін Bitbucket қосылымы компьютерден веб арқылы басқарылады.",
+      "managedOnWebTitle": "Веб арқылы басқарылады",
+      "managedOnWebShort": "Бұл қосылым компьютерден веб арқылы басқарылады.",
+      "managedOnWebRepositories": "{{organization}} үшін репозиторийлерді компьютерден веб арқылы таңдаңыз.",
       "description": "Жұмыс кеңістігіне кіру токенін {{organization}} үшін жасап, төмендегі өріске қойыңыз.",
       "descriptionReconnect": "Жұмыс кеңістігіне кіру токенін {{organization}} үшін жаңадан жасап, төмендегі өріске қойыңыз.",
       "descriptionOverview": "Жұмыс кеңістігіне кіру токенін {{organization}} үшін жасап, оны келесі экранда қойыңыз.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Тексерілуде…",
       "statusUnavailable": "Күй қолжетімсіз",
+      "needsAttention": "Назар қажет",
       "platforms": "Платформалар",
       "activity": "Әрекеттер"
     },

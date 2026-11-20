@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "پەیوەندیی Bitbucket بۆ {{organization}} لە وێبدا و لە کۆمپیوتەرێکەوە بەڕێوە دەبرێت.",
+      "managedOnWebTitle": "لە وێبدا بەڕێوە دەبرێت",
+      "managedOnWebShort": "ئەم پەیوەندییە لە وێبدا و لە کۆمپیوتەرێکەوە بەڕێوە دەبرێت.",
+      "managedOnWebRepositories": "لە وێبدا و لە کۆمپیوتەرێکەوە ڕیپۆزیتۆرییەکانی {{organization}} هەڵبژێرە.",
       "description": "بۆ {{organization}} توکنێکی دەستگەیشتن بە بۆشایی کار دروست بکە و لە خوارەوە بیلکێنە.",
       "descriptionReconnect": "بۆ {{organization}} توکنێکی نوێی دەستگەیشتن بە بۆشایی کار دروست بکە و لە خوارەوە بیلکێنە.",
       "descriptionOverview": "بۆ {{organization}} توکنێکی دەستگەیشتن بە بۆشایی کار دروست بکە و لە شاشەی داهاتوودا بیلکێنە.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "لە پشکنیندایە…",
       "statusUnavailable": "دۆخ بەردەست نییە",
+      "needsAttention": "پێویستی بە سەرنج",
       "platforms": "پلاتفۆرمەکان",
       "activity": "چالاکی"
     },

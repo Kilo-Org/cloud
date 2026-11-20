@@ -699,6 +699,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}のBitbucket接続は、パソコンからWebで管理されています。",
+      "managedOnWebTitle": "Webで管理されています",
+      "managedOnWebShort": "この接続は、パソコンからWebで管理されています。",
+      "managedOnWebRepositories": "{{organization}}のリポジトリを、パソコンからWebで選択してください。",
       "description": "{{organization}}用のワークスペースアクセストークンを作成し、下に貼り付けてください。",
       "descriptionReconnect": "{{organization}}用の新しいワークスペースアクセストークンを作成し、下に貼り付けてください。",
       "descriptionOverview": "{{organization}}用のワークスペースアクセストークンを作成し、次の画面で貼り付けてください。",
@@ -737,6 +740,7 @@
     "platformList": {
       "activity": "アクティビティ",
       "checking": "確認中…",
+      "needsAttention": "要対応",
       "platforms": "プラットフォーム",
       "statusUnavailable": "状態を確認できません"
     },

@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} üçün Bitbucket bağlantısı kompüterdən vebdə idarə olunur.",
+      "managedOnWebTitle": "Vebdə idarə olunur",
+      "managedOnWebShort": "Bu bağlantı kompüterdən vebdə idarə olunur.",
+      "managedOnWebRepositories": "{{organization}} üçün repozitoriyaları kompüterdən vebdə seçin.",
       "description": "{{organization}} üçün iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
       "descriptionReconnect": "{{organization}} üçün yeni iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
       "descriptionOverview": "{{organization}} üçün iş sahəsi giriş tokeni yarat və növbəti ekranda yapışdır.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Yoxlanılır…",
       "statusUnavailable": "Status əlçatan deyil",
+      "needsAttention": "Müdaxilə tələb olunur",
       "platforms": "Platformalar",
       "activity": "Fəaliyyət"
     },

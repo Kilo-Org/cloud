@@ -1487,6 +1487,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Caiff cysylltiad Bitbucket ag {{organization}} ei reoli ar y we o gyfrifiadur.",
+      "managedOnWebTitle": "Yn cael ei reoli ar y we",
+      "managedOnWebShort": "Mae'r cysylltiad hwn yn cael ei reoli ar y we o gyfrifiadur.",
+      "managedOnWebRepositories": "Dewiswch ystorfeydd ar gyfer {{organization}} ar y we o gyfrifiadur.",
       "description": "Crëwch docyn mynediad gweithle ar gyfer {{organization}} a'i ludo isod.",
       "descriptionReconnect": "Crëwch docyn mynediad gweithle newydd ar gyfer {{organization}} a'i ludo isod.",
       "descriptionOverview": "Crëwch docyn mynediad gweithle ar gyfer {{organization}} a'i ludo ar y sgrin nesaf.",
@@ -1510,6 +1513,7 @@
     "platformList": {
       "checking": "Yn gwirio…",
       "statusUnavailable": "Statws ddim ar gael",
+      "needsAttention": "Angen sylw",
       "platforms": "Platfformau",
       "activity": "Gweithgaredd"
     },

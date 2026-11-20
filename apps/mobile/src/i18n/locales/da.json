@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-forbindelsen til {{organization}} administreres på nettet fra en computer.",
+      "managedOnWebTitle": "Administreres på nettet",
+      "managedOnWebShort": "Denne forbindelse administreres på nettet fra en computer.",
+      "managedOnWebRepositories": "Vælg repositorier for {{organization}} på nettet fra en computer.",
       "description": "Opret et adgangstoken til arbejdsområdet for {{organization}}, og indsæt det nedenfor.",
       "descriptionReconnect": "Opret et nyt adgangstoken til arbejdsområdet for {{organization}}, og indsæt det nedenfor.",
       "descriptionOverview": "Opret et adgangstoken til arbejdsområdet for {{organization}}, og indsæt det på næste skærm.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Kontrollerer…",
       "statusUnavailable": "Status utilgængelig",
+      "needsAttention": "Kræver opmærksomhed",
       "platforms": "Platforme",
       "activity": "Aktivitet"
     },

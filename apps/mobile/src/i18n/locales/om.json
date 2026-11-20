@@ -1391,6 +1391,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Walqunnamtiin Bitbucket {{organization}}iif weebii irratti kompiitara irraa bulfama.",
+      "managedOnWebTitle": "Weebii irratti bulfama",
+      "managedOnWebShort": "Walqunnamtiin kun weebii irratti kompiitara irraa bulfama.",
+      "managedOnWebRepositories": "{{organization}}iif kuusaalee weebii irratti kompiitara irraa filadhu.",
       "description": "{{organization}}iif tokanii hayyama iddoo hojii uumiitii armaan gaditti maxxansi.",
       "descriptionReconnect": "{{organization}}iif tokanii haaraa hayyama iddoo hojii uumiitii armaan gaditti maxxansi.",
       "descriptionOverview": "{{organization}}iif tokanii hayyama iddoo hojii uumiitii fuula itti aanu irratti maxxansi.",
@@ -1414,6 +1417,7 @@
     "platformList": {
       "checking": "Mirkaneessaa jira…",
       "statusUnavailable": "Haalli hin argamu",
+      "needsAttention": "Xiyyeeffannoo barbaada",
       "platforms": "Waltajjiiwwan",
       "activity": "Sochii"
     },

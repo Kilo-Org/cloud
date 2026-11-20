@@ -3822,11 +3822,11 @@
       "running_many": "In corso",
       "running_other": "In corso",
       "scheduled_one": "Pianificata",
-      "scheduled_many": "Pianificata",
-      "scheduled_other": "Pianificata",
+      "scheduled_many": "Pianificate",
+      "scheduled_other": "Pianificate",
       "idle_one": "Inattivo",
-      "idle_many": "Inattivo",
-      "idle_other": "Inattivo"
+      "idle_many": "Inattivi",
+      "idle_other": "Inattivi"
     },
     "count": {
       "needsInput_one": "{{displayCount}} In attesa di risposta",
@@ -3836,11 +3836,11 @@
       "running_many": "{{displayCount}} In corso",
       "running_other": "{{displayCount}} In corso",
       "scheduled_one": "{{displayCount}} Pianificata",
-      "scheduled_many": "{{displayCount}} Pianificata",
-      "scheduled_other": "{{displayCount}} Pianificata",
+      "scheduled_many": "{{displayCount}} Pianificate",
+      "scheduled_other": "{{displayCount}} Pianificate",
       "idle_one": "{{displayCount}} Inattivo",
-      "idle_many": "{{displayCount}} Inattivo",
-      "idle_other": "{{displayCount}} Inattivo"
+      "idle_many": "{{displayCount}} Inattivi",
+      "idle_other": "{{displayCount}} Inattivi"
     },
     "footer": {
       "checked": "Verificato {{time}}",

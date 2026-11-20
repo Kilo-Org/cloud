@@ -3822,8 +3822,8 @@
       "running_many": "En curs",
       "running_other": "En curs",
       "scheduled_one": "Programada",
-      "scheduled_many": "Programada",
-      "scheduled_other": "Programada",
+      "scheduled_many": "Programades",
+      "scheduled_other": "Programades",
       "idle_one": "En espera",
       "idle_many": "En espera",
       "idle_other": "En espera"
@@ -3836,8 +3836,8 @@
       "running_many": "{{displayCount}} En curs",
       "running_other": "{{displayCount}} En curs",
       "scheduled_one": "{{displayCount}} Programada",
-      "scheduled_many": "{{displayCount}} Programada",
-      "scheduled_other": "{{displayCount}} Programada",
+      "scheduled_many": "{{displayCount}} Programades",
+      "scheduled_other": "{{displayCount}} Programades",
       "idle_one": "{{displayCount}} En espera",
       "idle_many": "{{displayCount}} En espera",
       "idle_other": "{{displayCount}} En espera"

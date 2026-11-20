@@ -65,10 +65,12 @@ const GLANCEABLE_COUNT_NOUN_KEY = {
 } as const satisfies Record<GlanceableCountKind, string>;
 
 /**
- * The whole count line, number included. The surfaces that draw one string —
- * the ongoing notification, the spoken label — read this instead of pasting a
- * formatted number onto a verb, so the catalog owns the word order and the
- * agreement.
+ * The whole count line, number included. The Android Home widget and its
+ * ongoing notification read this instead of pasting a formatted number onto a
+ * verb, so the catalog owns both the word order and the agreement.
+ *
+ * The shared spoken label still joins a bare number to the count's noun, and
+ * the iOS layouts read their own copy, so neither reads this family today.
  */
 const GLANCEABLE_COUNT_MESSAGE_KEY = {
   needsInput: 'glanceable.count.needsInput',

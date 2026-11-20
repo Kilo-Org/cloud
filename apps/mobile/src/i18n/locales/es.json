@@ -3822,8 +3822,8 @@
       "running_many": "Trabajando",
       "running_other": "Trabajando",
       "scheduled_one": "Programada",
-      "scheduled_many": "Programada",
-      "scheduled_other": "Programada",
+      "scheduled_many": "Programadas",
+      "scheduled_other": "Programadas",
       "idle_one": "En espera",
       "idle_many": "En espera",
       "idle_other": "En espera"
@@ -3836,8 +3836,8 @@
       "running_many": "{{displayCount}} Trabajando",
       "running_other": "{{displayCount}} Trabajando",
       "scheduled_one": "{{displayCount}} Programada",
-      "scheduled_many": "{{displayCount}} Programada",
-      "scheduled_other": "{{displayCount}} Programada",
+      "scheduled_many": "{{displayCount}} Programadas",
+      "scheduled_other": "{{displayCount}} Programadas",
       "idle_one": "{{displayCount}} En espera",
       "idle_many": "{{displayCount}} En espera",
       "idle_other": "{{displayCount}} En espera"

@@ -3822,8 +3822,8 @@
       "running_many": "En cours",
       "running_other": "En cours",
       "scheduled_one": "Planifiée",
-      "scheduled_many": "Planifiée",
-      "scheduled_other": "Planifiée",
+      "scheduled_many": "Planifiées",
+      "scheduled_other": "Planifiées",
       "idle_one": "En veille",
       "idle_many": "En veille",
       "idle_other": "En veille"
@@ -3836,8 +3836,8 @@
       "running_many": "{{displayCount}} En cours",
       "running_other": "{{displayCount}} En cours",
       "scheduled_one": "{{displayCount}} Planifiée",
-      "scheduled_many": "{{displayCount}} Planifiée",
-      "scheduled_other": "{{displayCount}} Planifiée",
+      "scheduled_many": "{{displayCount}} Planifiées",
+      "scheduled_other": "{{displayCount}} Planifiées",
       "idle_one": "{{displayCount}} En veille",
       "idle_many": "{{displayCount}} En veille",
       "idle_other": "{{displayCount}} En veille"

@@ -207,6 +207,21 @@ const primary = createDrizzleClient({
 });
 export const pool = primary.pool;
 
+// pg pools open connections on demand. Queued Enkrypt and Exa share two dedicated
+// connections per runtime, preserving their existing combined two-write ceiling.
+// Co-location raises the primary connection envelope from 10 to 12 (plus replicas);
+// N runtimes may add up to 2N connections. This does not isolate PostgreSQL row locks.
+const taggedWriter = createDrizzleClient({
+  connectionString: postgresUrl,
+  poolConfig: { ...sharedPoolConfig, max: 2, application_name: `${appName}-tagged-writer` },
+  logger: !!DEBUG_QUERY_LOGGING,
+});
+export const taggedWriterPool = taggedWriter.pool;
+export const taggedWriterDb = taggedWriter.db;
+taggedWriterPool.on('error', (error: Error) => {
+  console.error('Unexpected error on idle client (tagged writer)', { error_name: error.name });
+});
+
 // Replica pools - US replica in US regions; in EU regions one pool per configured
 // EU replica, with the primary only as fallback. Each pool keeps the full `max`,
 // because a request reads from one replica only and needs the capacity it had
@@ -229,6 +244,7 @@ const replicaPools = usesSeparateReplica ? replicas.map(replica => replica.pool)
 // Skip in test environment as it interferes with Jest's cleanup
 if (process.env.NODE_ENV !== 'test') {
   attachDatabasePool(pool);
+  attachDatabasePool(taggedWriterPool);
   for (const replicaPool of replicaPools) {
     attachDatabasePool(replicaPool);
   }
@@ -372,6 +388,7 @@ export const auto_deleted_at = { deleted_at: drizzleSql`now()` };
  */
 export async function closeAllDrizzleConnections(): Promise<void> {
   await pool.end();
+  await taggedWriterPool.end();
   for (const replicaPool of replicaPools) {
     await replicaPool.end();
   }

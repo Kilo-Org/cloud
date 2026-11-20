@@ -66,6 +66,7 @@ export type ExaUsageWriteOptions = {
    * connection and locks past that deadline.
    */
   deadlineMs?: number;
+  fromDb?: typeof db;
 };
 
 /** The documented server `statement_timeout`; the caller's remaining budget may only tighten it. */
@@ -98,7 +99,7 @@ export async function recordExaUsage(
   const organizationId = record.organizationId ?? undefined;
   const chargedAmount = chargedToBalance ? costMicrodollars : 0;
 
-  const outcome = await db.transaction(async tx => {
+  const outcome = await (options.fromDb ?? db).transaction(async tx => {
     if (options.deadlineMs !== undefined) {
       const budgetMs = Math.max(1_000, Math.floor(options.deadlineMs));
       const activeTimeoutMs = Math.min(budgetMs, WRITE_ACTIVE_TIMEOUT_MS);

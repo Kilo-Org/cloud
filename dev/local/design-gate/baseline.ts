@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { z } from 'zod';
+import { z, type RefinementCtx } from 'zod';
 
 import { evaluate, listPages, openSession, selectPage } from './cdp';
 import type { RunOutcome } from './capture';
@@ -44,6 +44,160 @@ const SourcePath = z
     message:
       'must name a component below apps/mobile/src/components or a screen below apps/mobile/src/app, not a layout and not a + file',
   });
+/**
+ * The one element descriptor a diagnostic may pass. The generated route expands
+ * it into the trailing cluster the header cells need, mirroring
+ * `header-balance-fixture.tsx`'s `SaveCluster`; the shape stays data in the
+ * manifest and never reaches the component as one.
+ */
+const SAVE_ELEMENT = 'save-cluster' as const;
+const ElementDescriptorSchema = z.object({ $element: z.literal(SAVE_ELEMENT) }).strict();
+/**
+ * The prop names that render inside a `View` and therefore refuse a string:
+ * React Native's `Text strings must be rendered within a <Text> component.`
+ * invariant is what the diagnostic's bare strings produced in the LogBox
+ * capture. The header's own string slots (`title`, `eyebrow`, `subtitle`)
+ * render inside a `Text` and stay strings; only these node-slot props are
+ * checked below. The check is keyed on the prop name alone, so it covers any
+ * diagnostic component that declares one of them, not only ScreenHeader.
+ */
+const SCREEN_HEADER_NODE_SLOT_NAMES = [
+  'headerRight',
+  'inlineActions',
+  'titleContent',
+  'titleAccessory',
+  'subtitlePlaceholder',
+  'eyebrowPlaceholder',
+] as const;
+const descriptorMessage =
+  'must be { "$element": "save-cluster" }, an array of those, or null/false, because only an element (or nothing) can be a child of the slot\'s View';
+const descriptorSlotMessage =
+  'is not a node-slot prop name; the diagnostic rule matches these prop names on any component, and a { "$element" } descriptor belongs in one of headerRight, inlineActions, titleContent, titleAccessory, subtitlePlaceholder, eyebrowPlaceholder';
+
+/** A diagnostic prop value: plain JSON, which is all a manifest can carry. */
+type DiagnosticProp =
+  | string
+  | number
+  | boolean
+  | null
+  | DiagnosticProp[]
+  | { [key: string]: DiagnosticProp };
+
+function checkNodeSlotProps(
+  props: { [key: string]: DiagnosticProp },
+  ctx: RefinementCtx,
+  path: (string | number)[]
+): void {
+  const slots: readonly string[] = SCREEN_HEADER_NODE_SLOT_NAMES;
+  const visit = (name: string, value: DiagnosticProp, at: (string | number)[]): void => {
+    const slot = at.find(
+      (step): step is string => typeof step === 'string' && slots.includes(step)
+    );
+    if (slot !== undefined) {
+      // The slot renders its value directly inside a `View`, so React accepts
+      // only an element there: a string and a number trip the `Text` invariant,
+      // a bare object throws `Objects are not valid as a React child`, and
+      // `true` paints nothing but is not a slot value either. A descriptor, an
+      // array of them, and null/false are the whole contract.
+      if (value === null || value === false || value === undefined) return;
+      if (Array.isArray(value)) {
+        for (const [key, item] of value.entries()) {
+          visit(name, item, [...at, key]);
+        }
+        return;
+      }
+      if (typeof value === 'object' && '$element' in value) {
+        if (!ElementDescriptorSchema.safeParse(value).success) {
+          // Rejected in the schema so a descriptor typo fails `prepare` before
+          // any worktree is written, instead of rendering as unknown data.
+          ctx.addIssue({
+            code: 'custom',
+            path: at,
+            message: `Unknown element descriptor; the only supported kind is ${JSON.stringify(
+              SAVE_ELEMENT
+            )}`,
+          });
+        }
+        return;
+      }
+      ctx.addIssue({
+        code: 'custom',
+        path: at,
+        message: `${JSON.stringify(slot)} ${descriptorMessage}`,
+      });
+      return;
+    }
+    if (value === null || typeof value !== 'object') return;
+    if (Array.isArray(value)) {
+      for (const [key, item] of value.entries()) {
+        visit(name, item, [...at, key]);
+      }
+      return;
+    }
+    if ('$element' in value) {
+      ctx.addIssue({
+        code: 'custom',
+        path: at,
+        message: `${JSON.stringify(String(at[at.length - 1]))} ${descriptorSlotMessage}`,
+      });
+      return;
+    }
+    for (const [key, item] of Object.entries(value)) {
+      visit(String(key), item, [...at, key]);
+    }
+  };
+  for (const [name, value] of Object.entries(props)) {
+    visit(name, value, [...path, name]);
+  }
+}
+const SAVE_CLUSTER_BINDING = 'saveCluster';
+/**
+ * The cluster a `{ "$element": "save-cluster" }` descriptor expands to, built
+ * with `createElement` from `header-balance-fixture.tsx`'s `SaveCluster`; its
+ * `ICON_TARGET_BOX_CLASS` box is inlined because the generated file imports no
+ * app constant, and `Text` is the shared component, not the RN primitive, so
+ * the copy carries the script handling every header text gets.
+ */
+const SAVE_CLUSTER_SOURCE = `const ${SAVE_CLUSTER_BINDING} = React.createElement(
+  View,
+  { className: 'flex-row items-center' },
+  React.createElement(
+    Pressable,
+    { accessibilityRole: 'button', accessibilityLabel: 'Fixture secondary', className: 'h-[48px] w-[48px] items-center justify-center' },
+    React.createElement(Text, null, '◦')
+  ),
+  React.createElement(
+    Pressable,
+    { accessibilityRole: 'button', accessibilityLabel: 'Fixture save', className: 'h-[48px] w-[48px] items-center justify-center ms-3 rounded-full bg-accent' },
+    React.createElement(Text, { className: 'text-sm font-semibold text-primary-foreground' }, 'Save')
+  )
+);
+`;
+
+function hasElementDescriptor(value: DiagnosticProp): boolean {
+  if (value === null || typeof value !== 'object') return false;
+  if (Array.isArray(value)) return value.some(hasElementDescriptor);
+  if ('$element' in value) return true;
+  return Object.values(value).some(hasElementDescriptor);
+}
+
+/**
+ * JSON literal of the diagnostic props, element descriptors spliced as element
+ * bindings, for the generated route's `createElement(Component, …)` argument.
+ */
+function propsLiteral(value: DiagnosticProp, indent: number): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  const pad = ' '.repeat(indent);
+  if (Array.isArray(value)) {
+    return `[\n${value.map(item => `${pad}  ${propsLiteral(item, indent + 2)}`).join(',\n')}\n${pad}]`;
+  }
+  if ('$element' in value) return SAVE_CLUSTER_BINDING;
+  const entries = Object.entries(value).map(
+    ([key, item]) => `${pad}  ${JSON.stringify(key)}: ${propsLiteral(item, indent + 2)}`
+  );
+  return `{\n${entries.join(',\n')}\n${pad}}`;
+}
+
 const TargetSchema = z
   .object({
     id: Id,
@@ -94,6 +248,35 @@ export const ProofManifestSchema = z
     targets: z.array(TargetSchema).min(1).max(32),
   })
   .strict()
+  .superRefine((manifest, ctx) => {
+    for (const [index, target] of manifest.targets.entries()) {
+      const diagnostic = target.diagnostic;
+      if (diagnostic === undefined) continue;
+      checkNodeSlotProps(diagnostic.props, ctx, ['targets', String(index), 'diagnostic', 'props']);
+      if ('$element' in diagnostic.props) {
+        // A diagnostic's props must be an object of prop names; a descriptor
+        // at the root would replace the whole props argument in the generated
+        // `createElement(Component, …)` call.
+        ctx.addIssue({
+          code: 'custom',
+          path: ['targets', String(index), 'diagnostic', 'props', '$element'],
+          message: `A diagnostic's props must be an object of prop names, not an element descriptor; ${JSON.stringify(
+            '$element'
+          )} belongs on one of the node-slot props`,
+        });
+      }
+      // The cluster expansion only wires the imports the bare card route
+      // writes; a sheet route would render the binding undefined, so the
+      // descriptor is refused where the author sees it, at prepare.
+      if (diagnostic.presentation === 'picker-sheet' && hasElementDescriptor(diagnostic.props)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['targets', String(index), 'diagnostic', 'presentation'],
+          message: 'An element descriptor needs the bare card presentation, not picker-sheet',
+        });
+      }
+    }
+  })
   .superRefine((manifest, ctx) => {
     const ids = new Set<string>();
     for (const target of manifest.targets) {
@@ -197,6 +380,27 @@ const INSTRUMENT_FILES = [
   'apps/mobile/src/lib/design-gate/sampler.ts',
 ] as const;
 
+/**
+ * The index just after the opening brace of `redirectSystemPath`'s body. The
+ * declaration's own line breaks belong to the formatter — it wraps the
+ * parameters onto separate lines — so the body brace is found by scanning the
+ * signature instead of matching one written form. A parentheses depth of zero
+ * separates the body brace from the destructured parameter and its object type.
+ */
+function redirectSystemPathBodyStart(intent: string): number {
+  const signature = 'export function redirectSystemPath(';
+  const start = intent.indexOf(signature);
+  if (start === -1) throw new Error('Unsupported native-intent diagnostic insertion point');
+  let parens = 0;
+  for (let index = start + signature.length - 1; index < intent.length; index += 1) {
+    const character = intent[index];
+    if (character === '(') parens += 1;
+    else if (character === ')') parens -= 1;
+    else if (character === '{' && parens === 0) return index + 1;
+  }
+  throw new Error('Unsupported native-intent diagnostic insertion point');
+}
+
 function generatedFiles(
   repo: string,
   commit: string,
@@ -242,9 +446,17 @@ function generatedFiles(
     // elsewhere. Without it the screen paints onto the window and its sheet
     // header is measured at the window top, an overlap the product never paints.
     const presents = diagnostic.presentation === 'picker-sheet';
+    // The element descriptor expands to a createElement cluster emitted beside
+    // the component binding; the shared Text keeps the copy off the bare RN
+    // primitive, with the script handling every header text gets.
+    const needsCluster = hasElementDescriptor(diagnostic.props);
     const imports = presents
       ? `import React from 'react';\nimport { Redirect, Stack } from 'expo-router';\nimport { Platform } from 'react-native';\nimport { useFormSheetScreenOptions } from '@/lib/form-sheet';\n`
-      : `import React from 'react';\nimport { View } from 'react-native';\nimport { Redirect } from 'expo-router';\nimport { useSafeAreaInsets } from 'react-native-safe-area-context';\n`;
+      : `import React from 'react';\nimport { ${
+          needsCluster ? 'Pressable, ' : ''
+        }View } from 'react-native';\n${
+          needsCluster ? `import { Text } from '@/components/ui/text';\n` : ''
+        }import { Redirect } from 'expo-router';\nimport { useSafeAreaInsets } from 'react-native-safe-area-context';\n`;
     const presentation = presents
       ? `  const sheetOptions = useFormSheetScreenOptions();\n  const options =\n    Platform.OS === 'android'\n      ? { ...sheetOptions, sheetAllowedDetents: [0.5] }\n      : sheetOptions;\n`
       : '  const insets = useSafeAreaInsets();\n';
@@ -252,12 +464,17 @@ function generatedFiles(
     // would draw into the status-bar inset the product screens keep clear; a
     // hook runs unconditionally first, and the wrapper fills the window while
     // the pad lifts the component inside the safe area.
+    const propsArgument = needsCluster
+      ? propsLiteral(diagnostic.props, 6)
+      : `JSON.parse(${JSON.stringify(JSON.stringify(diagnostic.props))})`;
     const screen = presents
-      ? `React.createElement(\n      React.Fragment,\n      null,\n      React.createElement(Stack.Screen, { options }),\n      React.createElement(Component, JSON.parse(${JSON.stringify(JSON.stringify(diagnostic.props))}))\n    )`
-      : `React.createElement(\n      View,\n      { style: { flex: 1, paddingTop: insets.top } },\n      React.createElement(Component, JSON.parse(${JSON.stringify(JSON.stringify(diagnostic.props))}))\n    )`;
+      ? `React.createElement(\n      React.Fragment,\n      null,\n      React.createElement(Stack.Screen, { options }),\n      React.createElement(Component, ${propsArgument})\n    )`
+      : `React.createElement(\n      View,\n      { style: { flex: 1, paddingTop: insets.top } },\n      React.createElement(Component, ${propsArgument})\n    )`;
     files.set(
       file,
-      `// Temporary generated design-proof diagnostic, not product source.\n${imports}import ComponentBinding from ${JSON.stringify(componentImport)};\nexport default function DesignProofFixture() {\n${presentation}  if (!__DEV__) return React.createElement(Redirect, { href: '/(auth)/login' });\n  return ${screen};\n}\n`.replace(
+      `// Temporary generated design-proof diagnostic, not product source.\n${imports}${
+        needsCluster ? SAVE_CLUSTER_SOURCE : ''
+      }${needsCluster ? '\n' : ''}import ComponentBinding from ${JSON.stringify(componentImport)};\nexport default function DesignProofFixture() {\n${presentation}  if (!__DEV__) return React.createElement(Redirect, { href: '/(auth)/login' });\n  return ${screen};\n}\n`.replace(
         'ComponentBinding',
         binding
       )
@@ -266,12 +483,9 @@ function generatedFiles(
       `  if (__DEV__ && !initial && ${JSON.stringify([target.link, target.route, target.route.slice(1)])}.includes(path)) return ${JSON.stringify(`/${target.screen}`)};`
     );
   }
-  const declaration =
-    'export function redirectSystemPath({ path, initial }: { path: string; initial: boolean }) {';
   if (branches.length > 0) {
-    if (intent.split(declaration).length !== 2)
-      throw new Error('Unsupported native-intent diagnostic insertion point');
-    intent = intent.replace(declaration, `${declaration}\n${branches.join('\n')}`);
+    const bodyStart = redirectSystemPathBodyStart(intent);
+    intent = `${intent.slice(0, bodyStart)}\n${branches.join('\n')}${intent.slice(bodyStart)}`;
   }
   intent += `\n// Temporary diagnostic source receipt; forces stale Metro bundles to fail closed.\nif (__DEV__) (globalThis as typeof globalThis & { ${MARKER}?: string }).${MARKER} = ${JSON.stringify(marker)};\n`;
   files.set(INTENT, intent);
@@ -752,6 +966,22 @@ export async function compareProof(
       ...readiness.map(reason => `${revision}: ${reason}`),
       ...receipt.readiness.map(reason => `${revision}: ${reason}`)
     );
+    // A screen captured under a LogBox error shows the toast, not the screen, so
+    // the two runs were never compared on that screen. Only the head is
+    // blocking: its toast is what the critic would read, and it is a reason to
+    // call the pair inconclusive rather than an introduced finding, which would
+    // present a dev overlay as a product regression. A base toast with a clean
+    // head is a fix, so the pair still compares; the base run's own report and
+    // its exit status already carry that error.
+    if (revision === 'head')
+      reasons.push(
+        ...run.findings
+          .filter(entry => entry.rule === 'dev-overlay' && entry.severity === 'error')
+          .map(
+            entry =>
+              `${revision}: a LogBox error painted over ${entry.cell}/${entry.target}: ${entry.element.text?.trim() || entry.message}`
+          )
+      );
     return run;
   });
   const [base, head] = runs;

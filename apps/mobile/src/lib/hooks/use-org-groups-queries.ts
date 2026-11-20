@@ -52,15 +52,17 @@ export function useOrgGroups(organizationId: string | null, enabled: boolean) {
 /**
  * Create, update and delete for the organization's groups. Every one of these is
  * `organizationAdminMutationProcedure`, so the screens show them to an owner or
- * admin only and the server refuses anyone else.
+ * admin only and the server refuses anyone else. The toast carries no billing
+ * step of its own, so a money role reads the refusal copy that names the
+ * destination instead of one that claims an owner must act.
  */
-export function useOrgGroupMutations(organizationId: string) {
+export function useOrgGroupMutations(organizationId: string, canManageBilling = false) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const groupsFilter = trpc.organizations.groups.pathFilter();
   const scope = { id: `organization-groups:${organizationId}` };
   const onError = (error: unknown) => {
-    announcingToast.error(organizationErrorMessage(error));
+    announcingToast.error(organizationErrorMessage(error, canManageBilling, 'absent'));
   };
   const onSuccess = () => {
     void queryClient.invalidateQueries(groupsFilter);

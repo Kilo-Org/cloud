@@ -19,7 +19,9 @@
     "presenceStatus": "होस्टहरू: {{connection}}",
     "commandStatus": "कमान्ड डेलिभरी: {{status}}",
     "delivered": "पुर्‍याइयो",
-    "expired": "म्याद सकियो"
+    "expired": "म्याद सकियो",
+    "recoveryGaps_one": "यो ट्रान्सक्रिप्टको {{displayCount}} भाग हराइरहेको छ।",
+    "recoveryGaps_other": "यो ट्रान्सक्रिप्टका {{displayCount}} भाग हराइरहेका छन्।"
   },
   "common": {
     "manageOnWeb": "वेबमा व्यवस्थापन गर्नुहोस्",
@@ -138,6 +140,7 @@
     "keepRunning": "चलिरहन दिनुहोस्",
     "newSession": "नयाँ सत्र",
     "noModelsAvailable": "कुनै मोडेल उपलब्ध छैन",
+    "modelRetires": "{{date}} मा अवकाश हुन्छ",
     "notFound": "फेला परेन।",
     "online": "अनलाइन",
     "open": "{{name}} खोल्नुहोस्",
@@ -181,7 +184,9 @@
     "organizationTrialEnded": "संस्थाको परीक्षण अवधि सकिएको छ र यसको कुनै सक्रिय योजना छैन। संस्थाको मालिकले kilo.ai मा बिलिङ अद्यावधिक गर्न सक्छ, त्यसपछि फेरि प्रयास गर्नुहोस्।",
     "privateRepositoryA11y": "{{name}}, निजी रिपोजिटरी",
     "legalDocumentEnglishOnly": "यो कागजात अङ्ग्रेजीमा मात्र उपलब्ध छ।",
-    "organizationTrialEndedBilling": "संस्थाको परीक्षण अवधि सकिएको छ र यसको कुनै सक्रिय योजना छैन। तपाईंले बिलिङ अद्यावधिक गर्न सक्नुहुन्छ, त्यसपछि फेरि प्रयास गर्नुहोस्।"
+    "organizationTrialEndedBilling": "संस्थाको परीक्षण अवधि सकिएको छ र यसको कुनै सक्रिय योजना छैन। तपाईंले बिलिङ अद्यावधिक गर्न सक्नुहुन्छ, त्यसपछि फेरि प्रयास गर्नुहोस्।",
+    "organizationTrialEndedBillingAtKiloAi": "संस्थाको परीक्षण अवधि सकिएको छ र यसको कुनै सक्रिय योजना छैन। तपाईंले kilo.ai मा बिलिङ अद्यावधिक गर्न सक्नुहुन्छ, त्यसपछि फेरि प्रयास गर्नुहोस्।",
+    "viewOnGitHub": "GitHub मा PR हेर्नुहोस्"
   },
   "language": {
     "restarting": "भाषा लागू गर्न पुनः सुरु गर्दै",
@@ -275,6 +280,9 @@
     "credits": "क्रेडिटहरू",
     "failedToLoadBalance": "मौज्दात लोड गर्न सकिएन। पुनः प्रयास गर्न ट्याप गर्नुहोस्।",
     "balanceLoadFailed": "मौज्दात लोड गर्न सकिएन",
+    "balanceUnreachable": "सर्भरमा पुग्न सकिएन। फेरि प्रयास गर्नुहोस्।",
+    "balanceAccessDenied": "यो ब्यालेन्स हेर्न तपाईंलाई अनुमति छैन।",
+    "balanceUnavailable": "ब्यालेन्स लोड गर्न सकिएन।",
     "hideBalance": "मौज्दात लुकाउनुहोस्",
     "showBalance": "मौज्दात देखाउनुहोस्",
     "balanceHidden": "मौज्दात लुकाइएको छ",
@@ -506,7 +514,7 @@
     "changelogFixesPolish": "सम्पूर्ण एपमा समाधान र सुधारहरू।",
     "changelogAreas": {
       "signIn": "साइन इन",
-      "profileOrganizations": "प्रोफाइल र संस्थाहरू"
+      "profileOrganizations": "प्रोफाइल तथा संस्थाहरू"
     }
   },
   "preferences": {
@@ -751,6 +759,9 @@
       "couldNotLoadMore": "थप टिप्पणीहरू लोड गर्न सकिएन।",
       "retryLoadingMore": "थप टिप्पणीहरू लोड गर्न पुनः प्रयास गर्नुहोस्",
       "loadMoreComments": "थप टिप्पणीहरू लोड गर्नुहोस्",
+      "conversationTruncated": "सुरुका {{displayCount}} टिप्पणी मात्र देखाइएका छन्।",
+      "conversationTruncated_one": "सुरुका {{displayCount}} टिप्पणी मात्र देखाइएका छन्।",
+      "conversationTruncated_other": "सुरुका {{displayCount}} टिप्पणी मात्र देखाइएका छन्।",
       "addReaction": "प्रतिक्रिया थप्नुहोस्",
       "reactionPill": "{{emoji}} प्रतिक्रिया, {{displayCount}} {{countLabel}}",
       "reaction_one": "प्रतिक्रिया",
@@ -880,7 +891,6 @@
       "noAccess": "तपाईंसँग यो रिपोजिटरीका जाँचहरू हेर्ने अनुमति छैन।",
       "couldNotLoad": "जाँचहरू लोड गर्न सकिएन।",
       "retryChecks": "जाँचहरू लोड गर्न पुनः प्रयास गर्नुहोस्",
-      "viewOnGitHub": "GitHub मा PR हेर्नुहोस्",
       "noChecksReported": "कुनै जाँचको नतिजा आएको छैन",
       "passed": "{{displayCount}} सफल",
       "passed_one": "{{displayCount}} सफल",
@@ -935,9 +945,9 @@
       "checkFailedTitleGitLab": "GitLab जडान जाँच्न सकिएन।",
       "checkFailedTitleBitbucket": "Bitbucket जडान जाँच्न सकिएन।",
       "providerCheckFailedMessage": "प्रदायकमा पुग्न सकिएन। तपाईंको जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
-      "reconnectTitle": "GitHub मा पुनः जडान",
-      "reconnectTitleGitLab": "GitLab मा पुनः जडान",
-      "reconnectTitleBitbucket": "Bitbucket मा पुनः जडान",
+      "reconnectTitle": "GitHub मा पुनः जडान गर्नुहोस्",
+      "reconnectTitleGitLab": "GitLab मा पुनः जडान गर्नुहोस्",
+      "reconnectTitleBitbucket": "Bitbucket मा पुनः जडान गर्नुहोस्",
       "reconnectDescription": "तपाईंको GitHub जडानको अनुमति रद्द भएको छ।",
       "gitlabDescription": "मोबाइलमा मर्ज रिक्वेस्टहरूको समीक्षा गर्नुहोस्",
       "gitlabInstanceMismatchTitle": "GitLab जडान अर्को इन्स्टेन्सका लागि हो",
@@ -964,6 +974,8 @@
       "pendingComment": "नपठाइएका टिप्पणीहरू",
       "pendingComment_other": "नपठाइएका टिप्पणीहरू",
       "submitCountOfTotal": "{{displayTotalCount}} मध्ये {{displayFreshCount}} टिप्पणी पठाउनुहोस्",
+      "submitCountOfTotal_one": "{{displayTotalCount}} मध्ये {{displayFreshCount}} टिप्पणी पठाउनुहोस्",
+      "submitCountOfTotal_other": "{{displayTotalCount}} मध्ये {{displayFreshCount}} टिप्पणी पठाउनुहोस्",
       "submitReview": "समीक्षा पठाउनुहोस्",
       "partialPostedFresh": "{{displayFreshCount}} टिप्पणी पोस्ट गरियो। ",
       "partialPostedFresh_one": "{{displayFreshCount}} टिप्पणी पोस्ट गरियो। ",
@@ -1388,13 +1400,16 @@
     "followReviewMd": "REVIEW.md का निर्देशन पालना गर्नुहोस्",
     "followReviewMdSubtitle": "हरेक रिपोजिटरीको REVIEW.md फाइलमा भएका निर्देशन पालना गर्नुहोस्",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket जडान भएको छैन। संस्थाका मालिक, प्रशासक र बिलिङ व्यवस्थापकहरूले मात्र यसलाई जडान गर्न सक्छन्।"
+      "notConnectedReadOnlyPlan": "संस्थाको परीक्षण अवधि सकिएको छ, त्यसैले मालिकले kilo.ai मा बिलिङ अद्यावधिक गर्नुपर्छ।"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} को Bitbucket जडान कम्प्युटरबाट वेबमा व्यवस्थापन गरिन्छ।",
+      "managedOnWebTitle": "वेबमा व्यवस्थापन गरिन्छ",
+      "managedOnWebShort": "यो जडान कम्प्युटरबाट वेबमा व्यवस्थापन गरिन्छ।",
+      "managedOnWebRepositories": "कम्प्युटरबाट वेबमा {{organization}} का लागि रिपोजिटरीहरू छान्नुहोस्।",
       "description": "{{organization}} का लागि वर्कस्पेसको पहुँच टोकन बनाउनुहोस् र तल टाँस्नुहोस्।",
       "descriptionReconnect": "{{organization}} का लागि नयाँ वर्कस्पेसको पहुँच टोकन बनाउनुहोस् र तल टाँस्नुहोस्।",
-      "descriptionOverview": "{{organization}} का लागि वर्कस्पेसको पहुँच टोकन बनाउनुहोस् र अर्को स्क्रिनमा टाँस्नुहोस्।",
+      "descriptionOverview": "वर्कस्पेसको पहुँच टोकन बनाउनुहोस् र अर्को स्क्रिनमा टाँस्नुहोस्।",
       "scopes": "खाता: पढ्ने · रिपोजिटरीहरू: पढ्ने/लेख्ने · पुल रिक्वेस्टहरू: पढ्ने · वेबहुकहरू: पढ्ने/लेख्ने",
       "tokenPlaceholder": "वर्कस्पेसको पहुँच टोकन",
       "tokenRefused": "Bitbucket ले यो वर्कस्पेसको पहुँच टोकन स्वीकार गरेन। यसमा माथिका अनुमतिहरू छन् भनी जाँच गर्नुहोस्, त्यसपछि फेरि प्रयास गर्नुहोस्।"
@@ -1415,6 +1430,7 @@
     "platformList": {
       "checking": "जाँच गर्दै…",
       "statusUnavailable": "स्थिति उपलब्ध छैन",
+      "needsAttention": "ध्यान आवश्यक",
       "platforms": "प्लेटफर्महरू",
       "activity": "गतिविधि"
     },
@@ -1717,7 +1733,7 @@
       "dueThisWeekDetail_one": "यसमध्ये {{exploitable}} वटा दुरुपयोग हुन सक्ने पुष्टि भएका",
       "dueThisWeekDetail_other": "यसमध्ये {{exploitable}} वटा दुरुपयोग हुन सक्ने पुष्टि भएका",
       "noDeadline": "म्याद छैन",
-      "reviewSlaAssignment": "तोकिएको SLA समीक्षा गर्नुहोस्",
+      "reviewSlaAssignment": "SLA तोकाईको समीक्षा गर्नुहोस्",
       "allOpenFindingsTracked": "सबै खुला सुरक्षा समस्याको निगरानी भइरहेको"
     },
     "dismiss": {
@@ -2785,7 +2801,9 @@
     "modelPicker": {
       "title": "मोडेल छनोट",
       "favorites": "मनपर्ने",
-      "noModelsDescription": "चयन गर्न कुनै मोडेल उपलब्ध छैन।"
+      "noModelsDescription": "चयन गर्न कुनै मोडेल उपलब्ध छैन।",
+      "allUnavailableTitle": "कुनै पनि मोडेल प्रयोग गर्न सकिँदैन",
+      "allUnavailableDescription": "प्रदायक कुञ्जी थपेर फेरि प्रयास गर्नुहोस्।"
     },
     "modelSelector": {
       "provider": "प्रदायक {{id}}",
@@ -3618,7 +3636,7 @@
     },
     "hub": {
       "renameTitle": "संस्थाको नाम बदल्नुहोस्",
-      "renamePlaceholder": "संस्थाको नाम",
+      "renamePlaceholder": "संस्थाको नाम लेख्नुहोस्",
       "balance": "मौज्दात",
       "plan": "प्लान",
       "planTeams": "Teams",
@@ -4078,7 +4096,13 @@
     "providerUnavailable": "प्रदायक अहिले उपलब्ध छैन। केही बेरमै फेरि पठाउनुहोस्।"
   },
   "settingsTools": {
-    "confirmTitle": "यो परिवर्तन पुष्टि गर्ने?"
+    "confirmTitle": "यो परिवर्तन पुष्टि गर्ने?",
+    "guarded": {
+      "spendAlertsOff": "खर्च सूचनाहरू बन्द गर्ने हो? खर्च सीमा नाघ्दा र घण्टावार अचानक वृद्धि हुँदा तपाईंले सूचनाहरू प्राप्त गर्नुहुने छैन।",
+      "balanceAlertsOff": "ब्यालेन्स सूचनाहरू बन्द गर्ने हो? तपाईंको क्रेडिट कम हुँदा तपाईंले सूचनाहरू प्राप्त गर्नुहुने छैन।",
+      "securityFindingsOff": "सुरक्षा निष्कर्षहरू बन्द गर्ने हो? नयाँ सुरक्षा निष्कर्षहरूबारे तपाईंले सूचनाहरू प्राप्त गर्नुहुने छैन।",
+      "hideBalanceOn": "तपाईंको ब्यालेन्सहरू लुकाउने हो? क्रेडिट ब्यालेन्सहरू अब प्रोफाइल स्क्रिनहरू र संस्था हबमा देखिने छैनन्।"
+    }
   },
   "appActions": {
     "start": {
@@ -4826,7 +4850,7 @@
   },
   "organizationGuardrails": {
     "title": "कृत्रिम बुद्धिमत्ता सुरक्षा सीमाहरू",
-    "permissionDenied": "केवल संस्थाका मालिक र प्रशासकहरूले कृत्रिम बुद्धिमत्ता सुरक्षा सीमाहरू व्यवस्थापन गर्न सक्छन्।",
+    "permissionDenied": "केवल संस्थाका मालिक र प्रशासकहरूले कृत्रिम बुद्धिमत्ता सुरक्षा सीमाहरू व्यवस्थापन गर्न सक्छन्। $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "कृत्रिम बुद्धिमत्ता सुरक्षा सीमाहरू सक्षम गरिएका छैनन्",
     "unavailable": "Kilo ले अनुरोधमा संस्थाका लागि कृत्रिम बुद्धिमत्ता सुरक्षा सीमाहरू सक्षम गर्छ। {{supportEmail}} मा सम्पर्क गर्नुहोस्, र Kilo टोलीले तपाईंको संस्थाको लागि यो सक्रिय गर्नेछ।",
     "contactSupport": "सहायता टोलीलाई सम्पर्क गर्नुहोस्",
@@ -4838,12 +4862,15 @@
     "inputDescription": "प्रत्येक इनपुटलाई Enkrypt AI मार्फत स्क्यान गर्छ, उपकरणका नतिजाहरूसमेत। Enkrypt उपलब्ध नहुँदा अनुरोधहरू अस्वीकार गर्नुको सट्टा स्क्यान नगरी पठाइन्छ।",
     "outputTitle": "आउटपुट सुरक्षा सीमाहरू",
     "outputDescription": "सदस्यहरूले ती प्राप्त गर्नुअघि Enkrypt AI मार्फत प्रतिक्रियाहरू स्क्यान गर्छ। तपाईंले सक्रिय नगरेसम्म बन्द रहन्छ।",
+    "outputUnavailable": "Kilo ले यो संस्थाका लागि आउटपुट स्क्यानिङ सक्षम गरेको छैन, त्यसैले प्रतिक्रियाहरू जाँचिँदैनन् र यहाँ सेट गर्ने केही छैन। यो अनुरोध गर्न {{supportEmail}} मा सम्पर्क गर्नुहोस्।",
     "detectorsHint": "अवरोधले चिन्ह लगाइएको अनुरोध अस्वीकार गर्छ। अभिलेख मात्रले अनुरोधमा ढिलाइ नगरी यसलाई अभिलेख गर्छ।",
     "detectorsHintOutput": "अवरोधले चिन्ह लगाइएको प्रतिक्रिया असफल बनाउँछ। अभिलेख मात्रले प्रतिक्रियामा ढिलाइ नगरी यसलाई अभिलेख गर्छ।",
     "choiceLog": "अभिलेख मात्र",
     "applyTo": "लागू गर्ने",
     "applyToAllMembers": "सबै सदस्यहरू",
     "applyKiloDefault": "Kilo पूर्वनिर्धारित लागू गर्नुहोस्",
+    "applyKiloDefaultEnglishNote": "Kilo को पूर्वनिर्धारित नीतिको पाठ अंग्रेजीमा छ, किनभने Kilo Gateway ले यसलाई लेखिएकै रूपमा लागू गर्छ।",
+    "applyKiloDefaultReplaceMessage": "Kilo को पूर्वनिर्धारित नीति अंग्रेजीमा लेखिएको छ र नीति उल्लङ्घनमा तपाईंले सेट गर्नुभएको कुरा प्रतिस्थापन गर्छ। नीति पाठ फाँटमा तपाईंले हाल्नुभएको पाठ फिर्ता ल्याउन सकिँदैन।",
     "invalidSavedTitle": "सङ्ग्रहित इनपुट डिटेक्टर सेटिङहरू पढ्न सकिएन",
     "invalidSavedBody": "इनपुट डिटेक्टरहरू फेरि सङ्ग्रह नगरेसम्म अनुरोधहरू अवरोधित रहन्छन्। तलका डिटेक्टरहरू Kilo पूर्वनिर्धारितबाट सुरु हुन्छन्।",
     "invalidSavedOutputTitle": "सङ्ग्रहित आउटपुट डिटेक्टर सेटिङहरू पढ्न सकिएन",
@@ -4978,6 +5005,8 @@
     "providersDescription": "यो संस्थाका लागि Kilo ले त्यसमार्फत रुटिङ गर्न रोक्न प्रदायक बन्द गर्नुहोस्।",
     "providersNeedCatalog": "पूर्ण मोडेल क्याटलग लोड नभएसम्म प्रदायक स्विचहरू पढ्न मात्र मिल्ने रहन्छन्। तिनलाई सम्पादन गर्न माथिको फेरि प्रयास गर्नुहोस् मा ट्याप गर्नुहोस्।",
     "providersEmpty": "यो खोजसँग कुनै प्रदायक मेल खाँदैन।",
+    "providersNone": "यो संस्थाका लागि कुनै पनि प्रदायक उपलब्ध छैन।",
+    "providersUnavailable": "प्रदायक सूची लोड गर्न सकिएन।",
     "allowAllShown": "देखाइएका सबैलाई अनुमति दिनुहोस्",
     "denyAllShown": "देखाइएका सबैलाई अस्वीकार गर्नुहोस्",
     "gatewaysDescription": "Kilo ले मोडेल अनुरोधहरू Vercel AI Gateway वा OpenRouter मार्फत रुट गर्छ। अक्षम गरिएको गेटवेले ती अनुरोधहरू असफल बनाउँछ।",

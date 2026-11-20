@@ -3,7 +3,11 @@ import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 
 export const OWNED_BY_USER_DELETE_PAGE_SIZE = 200;
 
-export const OWNED_BY_USER_DELETE_TABLES = ['webhook_events', 'cloud_agent_code_reviews'] as const;
+export const OWNED_BY_USER_DELETE_TABLES = [
+  'webhook_events',
+  'webhook_events_v2',
+  'cloud_agent_code_reviews',
+] as const;
 
 export type OwnedByUserDeleteTable = (typeof OWNED_BY_USER_DELETE_TABLES)[number];
 
@@ -11,6 +15,8 @@ function tableSql(table: OwnedByUserDeleteTable) {
   switch (table) {
     case 'webhook_events':
       return sql.raw('webhook_events');
+    case 'webhook_events_v2':
+      return sql.raw('webhook_events_v2');
     case 'cloud_agent_code_reviews':
       return sql.raw('cloud_agent_code_reviews');
   }

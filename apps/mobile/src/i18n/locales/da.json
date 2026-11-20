@@ -19,7 +19,9 @@
     "presenceStatus": "Værter: {{connection}}",
     "commandStatus": "Kommandolevering: {{status}}",
     "delivered": "Leveret",
-    "expired": "Udløbet"
+    "expired": "Udløbet",
+    "recoveryGaps_one": "{{displayCount}} del af denne transskription mangler.",
+    "recoveryGaps_other": "{{displayCount}} dele af denne transskription mangler."
   },
   "common": {
     "manageOnWeb": "Administrer på nettet",
@@ -138,6 +140,7 @@
     "keepRunning": "Lad køre",
     "newSession": "Ny session",
     "noModelsAvailable": "Ingen modeller tilgængelige",
+    "modelRetires": "Udfases {{date}}",
     "notFound": "Indholdet blev ikke fundet.",
     "online": "Forbundet",
     "open": "Åbn {{name}}",
@@ -181,7 +184,9 @@
     "organizationTrialEnded": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. En ejer af organisationen kan opdatere betalingen på kilo.ai og derefter prøve igen.",
     "privateRepositoryA11y": "{{name}}, privat repository",
     "legalDocumentEnglishOnly": "Dette dokument er kun tilgængeligt på engelsk.",
-    "organizationTrialEndedBilling": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. Du kan opdatere betalingen og derefter prøve igen."
+    "organizationTrialEndedBilling": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. Du kan opdatere betalingen og derefter prøve igen.",
+    "organizationTrialEndedBillingAtKiloAi": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. Du kan opdatere betalingen på kilo.ai og derefter prøve igen.",
+    "viewOnGitHub": "Vis PR på GitHub"
   },
   "language": {
     "restarting": "Genstarter for at skifte sprog",
@@ -275,6 +280,9 @@
     "credits": "Kreditter",
     "failedToLoadBalance": "Kunne ikke indlæse saldoen. Tryk for at prøve igen.",
     "balanceLoadFailed": "Kunne ikke indlæse saldoen",
+    "balanceUnreachable": "Serveren kunne ikke nås. Prøv igen.",
+    "balanceAccessDenied": "Du har ikke tilladelse til at se denne saldo.",
+    "balanceUnavailable": "Saldoen kunne ikke indlæses.",
     "hideBalance": "Skjul saldo",
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",
@@ -506,7 +514,7 @@
     "changelogFixesPolish": "Rettelser og forbedringer i hele appen.",
     "changelogAreas": {
       "signIn": "Log-ind",
-      "profileOrganizations": "Profil og organisationer"
+      "profileOrganizations": "Profil & organisationer"
     }
   },
   "preferences": {
@@ -751,6 +759,9 @@
       "couldNotLoadMore": "Kunne ikke indlæse flere kommentarer.",
       "retryLoadingMore": "Prøv at indlæse flere kommentarer igen",
       "loadMoreComments": "Indlæs flere kommentarer",
+      "conversationTruncated": "Kun de første {{displayCount}} kommentarer vises.",
+      "conversationTruncated_one": "Kun de første {{displayCount}} kommentarer vises.",
+      "conversationTruncated_other": "Kun de første {{displayCount}} kommentarer vises.",
       "addReaction": "Tilføj reaktion",
       "reactionPill": "Reaktion: {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaktion",
@@ -880,7 +891,6 @@
       "noAccess": "Du har ikke adgang til kontroller for dette kodelager.",
       "couldNotLoad": "Kunne ikke indlæse kontroller.",
       "retryChecks": "Prøv at indlæse kontrollerne igen",
-      "viewOnGitHub": "Vis PR på GitHub",
       "noChecksReported": "Ingen kontroller rapporteret",
       "passed": "{{displayCount}} bestået",
       "passed_one": "{{displayCount}} bestået",
@@ -964,6 +974,8 @@
       "pendingComment": "usendte kommentarer",
       "pendingComment_other": "usendte kommentarer",
       "submitCountOfTotal": "Send {{displayFreshCount}} af {{displayTotalCount}} kommentarer",
+      "submitCountOfTotal_one": "Send {{displayFreshCount}} af {{displayTotalCount}} kommentarer",
+      "submitCountOfTotal_other": "Send {{displayFreshCount}} af {{displayTotalCount}} kommentarer",
       "submitReview": "Send gennemgang",
       "partialPostedFresh": "{{displayFreshCount}} kommentar(er) er sendt. ",
       "partialPostedFresh_one": "{{displayFreshCount}} kommentar(er) er sendt. ",
@@ -1388,13 +1400,16 @@
     "followReviewMd": "Følg REVIEW.md",
     "followReviewMdSubtitle": "Følg instruktionerne i hvert kodelagers REVIEW.md-fil",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket er ikke tilsluttet. Kun organisationsejere, administratorer og faktureringsansvarlige kan oprette forbindelsen."
+      "notConnectedReadOnlyPlan": "Organisationens prøveperiode er udløbet, så en ejer skal opdatere betalingen på kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-forbindelsen til {{organization}} administreres på nettet fra en computer.",
+      "managedOnWebTitle": "Administreres på nettet",
+      "managedOnWebShort": "Denne forbindelse administreres på nettet fra en computer.",
+      "managedOnWebRepositories": "Vælg repositorier for {{organization}} på nettet fra en computer.",
       "description": "Opret et adgangstoken til arbejdsområdet for {{organization}}, og indsæt det nedenfor.",
       "descriptionReconnect": "Opret et nyt adgangstoken til arbejdsområdet for {{organization}}, og indsæt det nedenfor.",
-      "descriptionOverview": "Opret et adgangstoken til arbejdsområdet for {{organization}}, og indsæt det på næste skærm.",
+      "descriptionOverview": "Opret et adgangstoken til arbejdsområdet, og indsæt det på næste skærm.",
       "scopes": "Konto: læse · Kodelagre: læse/skrive · Pull requests: læse · Webhooks: læse/skrive",
       "tokenPlaceholder": "Adgangstoken til arbejdsområdet",
       "tokenRefused": "Bitbucket accepterede ikke dette adgangstoken til arbejdsområdet. Kontroller, at det har tilladelserne ovenfor, og prøv derefter igen."
@@ -1415,6 +1430,7 @@
     "platformList": {
       "checking": "Kontrollerer…",
       "statusUnavailable": "Status utilgængelig",
+      "needsAttention": "Kræver opmærksomhed",
       "platforms": "Platforme",
       "activity": "Aktivitet"
     },
@@ -2785,6 +2801,8 @@
     "modelPicker": {
       "title": "Vælg model",
       "noModelsDescription": "Der er ingen modeller at vælge imellem.",
+      "allUnavailableTitle": "Ingen modeller kan bruges",
+      "allUnavailableDescription": "Tilføj en udbydernøgle, og prøv igen.",
       "favorites": "Favoritter"
     },
     "modelSelector": {
@@ -3618,7 +3636,7 @@
     },
     "hub": {
       "renameTitle": "Omdøb organisation",
-      "renamePlaceholder": "Organisationens navn",
+      "renamePlaceholder": "Angiv et navn til organisationen",
       "balance": "Saldo",
       "plan": "Plan",
       "planTeams": "Teams",
@@ -4078,7 +4096,13 @@
     "providerUnavailable": "Udbyderen er utilgængelig lige nu. Send igen om kort tid."
   },
   "settingsTools": {
-    "confirmTitle": "Bekræft denne ændring?"
+    "confirmTitle": "Bekræft denne ændring?",
+    "guarded": {
+      "spendAlertsOff": "Slå forbrugsadvarsler fra? Du vil ikke længere modtage notifikationer om overskridelser af forbrugstærskler og timebaserede stigninger.",
+      "balanceAlertsOff": "Slå saldoadvarsler fra? Du vil ikke længere modtage notifikationer, når du er ved at løbe tør for kreditter.",
+      "securityFindingsOff": "Slå sikkerhedsfund fra? Du vil ikke længere modtage notifikationer om nye sikkerhedsfund.",
+      "hideBalanceOn": "Skjul dine saldi? Kreditsaldi vil ikke længere blive vist på profilskærmene og i organisationshubben."
+    }
   },
   "appActions": {
     "start": {
@@ -4826,7 +4850,7 @@
   },
   "organizationGuardrails": {
     "title": "AI-sikkerhedsgrænser",
-    "permissionDenied": "Kun organisationens ejere og administratorer kan administrere AI-sikkerhedsgrænser.",
+    "permissionDenied": "Kun organisationens ejere og administratorer kan administrere AI-sikkerhedsgrænser. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AI-sikkerhedsgrænser er ikke aktiveret",
     "unavailable": "Kilo aktiverer AI-sikkerhedsgrænser for en organisation efter anmodning. Kontakt {{supportEmail}}, og Kilo-teamet slår dem til for din organisation.",
     "contactSupport": "Kontakt support",
@@ -4838,12 +4862,15 @@
     "inputDescription": "Scanner alt input med Enkrypt AI, inklusive værktøjsresultater. Når Enkrypt ikke er tilgængelig, sendes anmodninger uden scanning i stedet for at blive afvist.",
     "outputTitle": "Sikkerhedsgrænser for output",
     "outputDescription": "Scanner svar med Enkrypt AI, før medlemmerne modtager dem. Er slået fra, medmindre du slår det til.",
+    "outputUnavailable": "Kilo har ikke slået scanning af output til for denne organisation, så svar kontrolleres ikke, og der er intet at indstille her. Kontakt {{supportEmail}} for at anmode om det.",
     "detectorsHint": "Bloker afviser en markeret anmodning. Kun log registrerer den uden at forsinke anmodningen.",
     "detectorsHintOutput": "Bloker får et markeret svar til at mislykkes. Kun log registrerer det uden at forsinke svaret.",
     "choiceLog": "Kun log",
     "applyTo": "Anvend på",
     "applyToAllMembers": "Alle medlemmer",
     "applyKiloDefault": "Anvend Kilo-standard",
+    "applyKiloDefaultEnglishNote": "Teksten i Kilos standardpolitik er på engelsk, fordi Kilo Gateway anvender den præcis som skrevet.",
+    "applyKiloDefaultReplaceMessage": "Kilos standardpolitik er skrevet på engelsk og erstatter det, du har angivet under Politikovertrædelse. Den tekst, du har indtastet i feltet til politiktekst, kan ikke gendannes.",
     "invalidSavedTitle": "Gemte indstillinger for inputdetektorer kan ikke læses",
     "invalidSavedBody": "Anmodninger blokeres, indtil inputdetektorerne gemmes igen. Detektorerne nedenfor starter fra Kilo-standard.",
     "invalidSavedOutputTitle": "Gemte indstillinger for outputdetektorer kan ikke læses",
@@ -4978,6 +5005,8 @@
     "providersDescription": "Slå en udbyder fra for at forhindre, at Kilo dirigerer anmodninger til den for denne organisation.",
     "providersNeedCatalog": "Udbyderkontakterne er skrivebeskyttede, indtil hele modelkataloget er indlæst. Tryk på Prøv igen ovenfor for at redigere dem.",
     "providersEmpty": "Ingen udbydere matcher denne søgning.",
+    "providersNone": "Der er ingen udbydere tilgængelige for denne organisation.",
+    "providersUnavailable": "Udbyderlisten kunne ikke indlæses.",
     "allowAllShown": "Tillad alle viste",
     "denyAllShown": "Afvis alle viste",
     "gatewaysDescription": "Kilo dirigerer modelanmodninger gennem Vercel AI Gateway eller OpenRouter. En deaktiveret gateway får disse anmodninger til at mislykkes.",

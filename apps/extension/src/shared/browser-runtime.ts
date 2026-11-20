@@ -112,6 +112,11 @@ export type BrowserToolRunOutcome =
       readonly kind: 'origin_changed';
       readonly result: EvalTabResult;
       readonly to: string;
+    }
+  // The transport maps this onto JSON-RPC -32005: this browser has no way to run the tool at all.
+  | {
+      readonly kind: 'unsupported';
+      readonly result: EvalTabResult;
     };
 
 export interface BrowserEvalRunInput {
@@ -239,6 +244,11 @@ export interface BrowserRuntime {
   ) => Promise<{ readonly title: string; readonly url: string } | undefined>;
   /** Ends the caller's tab leases. Its refs survive, so the next turn can click by an earlier ref. */
   readonly releaseCaller: (caller: BrowserCaller) => number;
+  /**
+   * Brings back the sessions an earlier service worker stored, once, without
+   * the tabs that closed while no worker ran. Agent calls await it first.
+   */
+  readonly restoreSessions: () => Promise<void>;
   /** Drops this caller's lease on one tab only: one finished call must not free its session's other tabs. */
   readonly releaseTab: (input: { readonly caller: BrowserCaller; readonly tabId: number }) => void;
   readonly runTool: (input: BrowserToolRunInput) => Promise<BrowserToolRunOutcome>;
@@ -2608,6 +2618,13 @@ export const createBrowserRuntime = ({
       return { kind: 'result', result: { error: AGENT_TAB_OUTSIDE_GROUP_ERROR, ok: false } };
     }
 
+    // A tool the platform cannot express is answered before any lease, grant or permission: nothing could run it.
+    const unavailable = sessionFor(tabId).getToolUnavailableError(toolName);
+
+    if (unavailable !== undefined) {
+      return { kind: 'unsupported', result: { error: unavailable, ok: false } };
+    }
+
     const lease = await leases.acquire(tabId, caller, {
       owner: liveSessionOwner(tabId),
       ...(takeOver === undefined ? {} : { takeOver }),
@@ -3506,6 +3523,54 @@ export const createBrowserRuntime = ({
     return tab === undefined ? undefined : { title: tab.title ?? '', url: tab.url ?? '' };
   };
 
+  /** False when the tab is known to exist, or when this browser cannot say. */
+  const tabGone = async (tabId: number): Promise<boolean> => {
+    const get = tabsApi.get?.bind(tabsApi);
+
+    if (get === undefined) {
+      return false;
+    }
+
+    try {
+      return (await get(tabId)) === undefined;
+    } catch {
+      return true;
+    }
+  };
+
+  let restoring: Promise<void> | undefined = undefined;
+
+  /**
+   * The stored sessions, without the tabs closed while no worker ran: the
+   * `tabs.onRemoved` of those closes reached nobody, so the stored copy still
+   * names them.
+   */
+  const restoreSessions = (): Promise<void> => {
+    restoring ??= (async () => {
+      try {
+        if (!(await groups.restore())) {
+          // Storage could not be read: the next session operation reads it again.
+          restoring = undefined;
+          return;
+        }
+
+        const stored = new Set(groups.listSessions().flatMap(session => session.tabs));
+
+        await Promise.all(
+          [...stored].map(async tabId => {
+            if (await tabGone(tabId)) {
+              await disposeTab(tabId);
+            }
+          })
+        );
+      } catch (error) {
+        console.warn('Failed to restore browser agent sessions:', error);
+      }
+    })();
+
+    return restoring;
+  };
+
   return {
     adoptEnded: input => groups.adoptEnded(input),
     claimTab,
@@ -3531,6 +3596,7 @@ export const createBrowserRuntime = ({
     releaseTab: ({ caller, tabId }) => {
       leases.release(tabId, caller);
     },
+    restoreSessions,
     runTool,
     shareActiveTab: input => groups.shareActiveTab(input),
     tabInfo,

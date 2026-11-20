@@ -15,6 +15,7 @@ const mockFindConnectedIntegrationByInstallationId = jest.fn();
 const mockGetIntegrationForOrganization = jest.fn();
 const mockLogWebhookEvent = jest.fn();
 const mockUpdateWebhookEvent = jest.fn();
+const STORED_WEBHOOK_EVENT = { id: 'we_1', createdAt: '2026-11-19T10:00:00.000Z' };
 const mockHandlePullRequest = jest.fn();
 const mockUpsertCliSessionPullRequestsFromWebhook = jest.fn();
 const mockLinkStackedPullRequestsFromWebhook = jest.fn();
@@ -268,7 +269,7 @@ describe('handleGitHubWebhook', () => {
       status: 'claimed',
       githubInstallationId: 'canonical-installation',
     });
-    mockLogWebhookEvent.mockResolvedValue({ id: 'we_1', isDuplicate: false });
+    mockLogWebhookEvent.mockResolvedValue({ event: STORED_WEBHOOK_EVENT, isDuplicate: false });
     mockUpdateWebhookEvent.mockResolvedValue(undefined);
     mockHandlePullRequest.mockResolvedValue(Response.json({ message: 'review queued' }));
     mockUpsertCliSessionPullRequestsFromWebhook.mockResolvedValue(1);
@@ -450,7 +451,7 @@ describe('handleGitHubWebhook', () => {
   });
 
   it('still projects redelivered observations before a legacy duplicate short circuit', async () => {
-    mockLogWebhookEvent.mockResolvedValue({ id: 'we_1', isDuplicate: true });
+    mockLogWebhookEvent.mockResolvedValue({ isDuplicate: true });
     const response = await handleGitHubWebhook(
       signedGitHubRequest('pull_request', pullRequestPayload()),
       'standard'
@@ -564,7 +565,7 @@ describe('handleGitHubWebhook', () => {
       'lite'
     );
     expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
-      'we_1',
+      STORED_WEBHOOK_EVENT,
       expect.objectContaining({ handlers_triggered: ['installation_target_renamed'] })
     );
   });
@@ -655,7 +656,7 @@ describe('handleGitHubWebhook', () => {
       integration
     );
     expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
-      'we_1',
+      STORED_WEBHOOK_EVENT,
       expect.objectContaining({ handlers_triggered: ['code_review', 'cli_session_pr_upsert'] })
     );
   });
@@ -806,7 +807,7 @@ describe('handleGitHubWebhook', () => {
       })
     );
     expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
-      'we_1',
+      STORED_WEBHOOK_EVENT,
       expect.objectContaining({ handlers_triggered: [] })
     );
   });
@@ -885,7 +886,7 @@ describe('handleGitHubWebhook', () => {
     expect(response.status).toBe(200);
     await waitForAfterTask();
     expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
-      'we_1',
+      STORED_WEBHOOK_EVENT,
       expect.objectContaining({
         handlers_triggered: ['review_memory_feedback'],
       })

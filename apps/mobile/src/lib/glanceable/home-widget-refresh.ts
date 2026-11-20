@@ -61,7 +61,8 @@ type HomeWidgetRefreshModule = {
   setFixtureLocale?(locale: string): Promise<void>;
   // oxlint-disable-next-line anti-slop/no-unknown-returns -- raw native payload, parsed by homeWidgetDataSchema in restoreNativeHomeWidgetData
   getData(): Promise<unknown>;
-  getWidgetPushToken(): Promise<string | null>;
+  /** iOS only: the Android module registers no token getter. */
+  getWidgetPushToken?(): Promise<string | null>;
   widgetsChanged(): Promise<void>;
   isCurrent(scopeKey: string, accountEpoch: number, generation: string): Promise<boolean>;
 };

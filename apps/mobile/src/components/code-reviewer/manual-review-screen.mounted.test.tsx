@@ -1024,6 +1024,35 @@ describe('ManualReviewScreen URL validation', () => {
 
     unmount();
   });
+
+  it('starts from a pull request link copied from a sub-page', async () => {
+    platformState.OS = 'android';
+    const { renderer, unmount } = await renderScreen();
+
+    const subPageUrl = `${GITHUB_PR_URL}/files`;
+    const { onChangeText } = findUrlField(renderer.root).props as {
+      onChangeText: (value: string) => void;
+    };
+    act(() => {
+      onChangeText(subPageUrl);
+    });
+    const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
+    const { onPress } = action.props as { onPress: () => void };
+    act(() => {
+      onPress();
+    });
+
+    // A sub-tab link names the same review, so it is a valid draft: no status
+    // line and no error border, and the start carries the URL as copied.
+    expect(findVisibleStatusTexts(renderer.root)).toHaveLength(0);
+    expect(String(findUrlField(renderer.root).props.className)).not.toContain('border-destructive');
+    expect(status.mutate).toHaveBeenCalledWith(
+      expect.objectContaining({ url: subPageUrl }),
+      expect.anything()
+    );
+
+    unmount();
+  });
 });
 
 describe('ManualReviewScreen instructions field', () => {

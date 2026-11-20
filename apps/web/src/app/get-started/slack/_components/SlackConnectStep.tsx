@@ -19,10 +19,9 @@ export function SlackConnectStep({ workspace, onBack }: SlackConnectStepProps) {
 
   const handleConnectSlack = () => {
     setIsStartingSlackConnection(true);
-    window.location.href = getPlatformOAuthConnectPath(
-      PLATFORM.SLACK,
-      workspace.type === 'org' ? workspace.id : undefined
-    );
+    window.location.href = getPlatformOAuthConnectPath(PLATFORM.SLACK, {
+      organizationId: workspace.type === 'org' ? workspace.id : undefined,
+    });
   };
 
   const workspaceName = workspace.type === 'user' ? 'Personal Account' : workspace.name;

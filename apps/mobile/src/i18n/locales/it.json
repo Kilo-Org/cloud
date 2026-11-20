@@ -19,7 +19,10 @@
     "presenceStatus": "Host: {{connection}}",
     "commandStatus": "Consegna comando: {{status}}",
     "delivered": "Consegnato",
-    "expired": "Scaduto"
+    "expired": "Scaduto",
+    "recoveryGaps_one": "Manca {{displayCount}} parte di questa trascrizione.",
+    "recoveryGaps_many": "Mancano {{displayCount}} parti di questa trascrizione.",
+    "recoveryGaps_other": "Mancano {{displayCount}} parti di questa trascrizione."
   },
   "common": {
     "manageOnWeb": "Gestisci sul web",
@@ -138,6 +141,7 @@
     "keepRunning": "Continua l'esecuzione",
     "newSession": "Nuova sessione",
     "noModelsAvailable": "Nessun modello disponibile",
+    "modelRetires": "Ritirato il {{date}}",
     "notFound": "Elemento non trovato.",
     "online": "In linea",
     "open": "Apri {{name}}",
@@ -181,7 +185,9 @@
     "organizationTrialEnded": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Il proprietario dell'organizzazione può aggiornare la fatturazione su kilo.ai, poi riprova.",
     "privateRepositoryA11y": "{{name}}, repository privato",
     "legalDocumentEnglishOnly": "Questo documento è disponibile solo in inglese.",
-    "organizationTrialEndedBilling": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Puoi aggiornare la fatturazione, poi riprova."
+    "organizationTrialEndedBilling": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Puoi aggiornare la fatturazione, poi riprova.",
+    "organizationTrialEndedBillingAtKiloAi": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Puoi aggiornare la fatturazione su kilo.ai, poi riprova.",
+    "viewOnGitHub": "Visualizza la PR su GitHub"
   },
   "language": {
     "restarting": "Riavvio per applicare la lingua selezionata",
@@ -275,6 +281,9 @@
     "credits": "Crediti",
     "failedToLoadBalance": "Impossibile caricare il saldo. Tocca per riprovare.",
     "balanceLoadFailed": "Impossibile caricare il saldo",
+    "balanceUnreachable": "Impossibile raggiungere il server. Riprova.",
+    "balanceAccessDenied": "Non hai il permesso di vedere questo saldo.",
+    "balanceUnavailable": "Impossibile caricare il saldo.",
     "hideBalance": "Nascondi saldo",
     "showBalance": "Mostra saldo",
     "balanceHidden": "Saldo nascosto",
@@ -506,7 +515,7 @@
     "changelogFixesPolish": "Correzioni e miglioramenti in tutta l'app.",
     "changelogAreas": {
       "signIn": "Accesso",
-      "profileOrganizations": "Profilo e organizzazioni"
+      "profileOrganizations": "Profilo & organizzazioni"
     }
   },
   "notifications": {
@@ -663,13 +672,16 @@
     },
     "autoReviews": "Revisioni automatiche",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket non è connesso. Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono connetterlo."
+      "notConnectedReadOnlyPlan": "Il periodo di prova dell'organizzazione è terminato, quindi il proprietario deve aggiornare la fatturazione su kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "La connessione Bitbucket per {{organization}} si gestisce sul web da un computer.",
+      "managedOnWebTitle": "Gestito sul web",
+      "managedOnWebShort": "Questa connessione si gestisce sul web da un computer.",
+      "managedOnWebRepositories": "Scegli i repository per {{organization}} sul web da un computer.",
       "description": "Crea un token di accesso all'area di lavoro per {{organization}} e incollalo qui sotto.",
       "descriptionReconnect": "Crea un nuovo token di accesso all'area di lavoro per {{organization}} e incollalo qui sotto.",
-      "descriptionOverview": "Crea un token di accesso all'area di lavoro per {{organization}} e incollalo nella schermata successiva.",
+      "descriptionOverview": "Crea un token di accesso all'area di lavoro e incollalo nella schermata successiva.",
       "scopes": "Account: lettura · Repository: lettura/scrittura · Pull request: lettura · Webhook: lettura/scrittura",
       "tokenPlaceholder": "Token di accesso all'area di lavoro",
       "tokenRefused": "Bitbucket non ha accettato questo token dell'area di lavoro. Verifica che disponga delle autorizzazioni indicate sopra, quindi riprova."
@@ -705,12 +717,13 @@
     "platformList": {
       "activity": "Attività",
       "checking": "Verifica in corso…",
+      "needsAttention": "Attenzione richiesta",
       "platforms": "Piattaforme",
       "statusUnavailable": "Stato non disponibile"
     },
     "providerConnect": {
       "description": "Connetti {{label}} di Kilo per revisionare automaticamente le pull request.",
-      "githubApp": "l'App GitHub",
+      "githubApp": "l'app GitHub",
       "githubError": "Impossibile aprire la configurazione di GitHub. Riprova.",
       "gitlabAccount": "l'account GitLab",
       "gitlabError": "Impossibile aprire la configurazione di GitLab. Riprova."
@@ -2221,6 +2234,8 @@
     "modelPicker": {
       "title": "Modello",
       "noModelsDescription": "Non ci sono modelli da selezionare.",
+      "allUnavailableTitle": "Nessun modello può essere usato",
+      "allUnavailableDescription": "Aggiungi una chiave del fornitore, poi riprova.",
       "favorites": "Preferiti"
     },
     "modelSelector": {
@@ -2815,7 +2830,6 @@
       "skipped_other": "{{displayCount}} saltati",
       "skipped_many": "{{displayCount}} saltati",
       "title": "Controlli",
-      "viewOnGitHub": "Visualizza la PR su GitHub",
       "checkDetails": "dettagli del controllo"
     },
     "composer": {
@@ -2876,6 +2890,10 @@
       "commentActions": "Azioni sul commento",
       "comment": "{{displayCount}} commenti",
       "comment_other": "{{displayCount}} commenti",
+      "conversationTruncated": "Sono visualizzati solo i primi {{displayCount}} commenti.",
+      "conversationTruncated_one": "Sono visualizzati solo i primi {{displayCount}} commenti.",
+      "conversationTruncated_many": "Sono visualizzati solo i primi {{displayCount}} commenti.",
+      "conversationTruncated_other": "Sono visualizzati solo i primi {{displayCount}} commenti.",
       "couldNotLoad": "Impossibile caricare la discussione.",
       "couldNotLoadMore": "Impossibile caricare altri commenti.",
       "loadMoreComments": "Carica altri commenti",
@@ -3287,6 +3305,9 @@
       "partialPostedStale_many": "I commenti riferiti a un commit precedente restano in attesa di invio: {{displayStaleCount}}.",
       "partialPostedStale_other": "I commenti riferiti a un commit precedente restano in attesa di invio: {{displayStaleCount}}.",
       "submitCountOfTotal": "Invia {{displayFreshCount}} commenti su {{displayTotalCount}}",
+      "submitCountOfTotal_one": "Invia {{displayFreshCount}} commenti su {{displayTotalCount}}",
+      "submitCountOfTotal_many": "Invia {{displayFreshCount}} commenti su {{displayTotalCount}}",
+      "submitCountOfTotal_other": "Invia {{displayFreshCount}} commenti su {{displayTotalCount}}",
       "submitReview": "Invia revisione",
       "pendingComment_many": "commenti in sospeso",
       "blockedRequestChanges": "Aggiungi un riepilogo o almeno un commento per richiedere modifiche.",
@@ -3499,7 +3520,7 @@
       "planStatusLapsed": " · Terminato",
       "planEnded": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo.",
       "manageBilling": "Gestisci la fatturazione",
-      "renamePlaceholder": "Nome dell'organizzazione",
+      "renamePlaceholder": "Inserisci un nome per l'organizzazione",
       "renameTitle": "Rinomina l'organizzazione"
     },
     "inviteMember": {
@@ -4140,7 +4161,13 @@
     "providerUnavailable": "Il fornitore non è disponibile in questo momento. Invia di nuovo a breve."
   },
   "settingsTools": {
-    "confirmTitle": "Confermare questa modifica?"
+    "confirmTitle": "Confermare questa modifica?",
+    "guarded": {
+      "spendAlertsOff": "Disattivare gli avvisi di spesa? Non riceverai più notifiche sul superamento delle soglie di spesa e sui picchi orari.",
+      "balanceAlertsOff": "Disattivare gli avvisi di saldo? Non riceverai più notifiche quando i tuoi crediti stanno per esaurirsi.",
+      "securityFindingsOff": "Disattivare i risultati di sicurezza? Non riceverai più notifiche sui nuovi risultati di sicurezza.",
+      "hideBalanceOn": "Nascondere i tuoi saldi? I saldi dei crediti non appariranno più nelle schermate del profilo e nell'hub dell'organizzazione."
+    }
   },
   "appActions": {
     "start": {
@@ -4902,7 +4929,7 @@
   },
   "organizationGuardrails": {
     "title": "Protezioni AI",
-    "permissionDenied": "Solo i proprietari e gli amministratori dell'organizzazione possono gestire le Protezioni AI.",
+    "permissionDenied": "Solo i proprietari e gli amministratori dell'organizzazione possono gestire le Protezioni AI. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Protezioni AI non abilitate",
     "unavailable": "Kilo abilita le Protezioni AI per un'organizzazione su richiesta. Contatta {{supportEmail}} e il team Kilo le attiva per la tua organizzazione.",
     "contactSupport": "Contatta l'assistenza",
@@ -4914,12 +4941,15 @@
     "inputDescription": "Analizza ogni input con Enkrypt AI, inclusi i risultati degli strumenti. Quando Enkrypt non è disponibile, le richieste vengono inviate senza analisi anziché rifiutate.",
     "outputTitle": "Protezioni per le risposte",
     "outputDescription": "Analizza le risposte con Enkrypt AI prima che i membri le ricevano. Disattivate a meno che tu non le attivi.",
+    "outputUnavailable": "Kilo non ha attivato l'analisi delle risposte per questa organizzazione, quindi le risposte non vengono controllate e qui non c'è nulla da impostare. Contatta {{supportEmail}} per richiederla.",
     "detectorsHint": "L'opzione Blocca rifiuta una richiesta segnalata. L'opzione Solo registrazione la registra senza ritardare la richiesta.",
     "detectorsHintOutput": "L'opzione Blocca fa fallire una risposta segnalata. L'opzione Solo registrazione la registra senza ritardare la risposta.",
     "choiceLog": "Solo registrazione",
     "applyTo": "Applica a",
     "applyToAllMembers": "Tutti i membri",
     "applyKiloDefault": "Applica il predefinito Kilo",
+    "applyKiloDefaultEnglishNote": "Il testo del criterio predefinito di Kilo è in inglese, perché Kilo Gateway lo applica esattamente così com'è scritto.",
+    "applyKiloDefaultReplaceMessage": "Il criterio predefinito di Kilo è scritto in inglese e sostituisce quello che hai impostato in Violazione dei criteri. Il testo inserito nel campo del testo dei criteri non può essere recuperato.",
     "invalidSavedTitle": "Impossibile leggere le impostazioni salvate dei rilevatori di input",
     "invalidSavedBody": "Le richieste vengono bloccate finché i rilevatori di input non vengono salvati di nuovo. I rilevatori seguenti partono dal predefinito Kilo.",
     "invalidSavedOutputTitle": "Impossibile leggere le impostazioni salvate dei rilevatori delle risposte",
@@ -5054,6 +5084,8 @@
     "providersDescription": "Disattiva un fornitore per impedire a Kilo di instradare verso di esso per questa organizzazione.",
     "providersNeedCatalog": "Gli interruttori dei fornitori restano in sola lettura finché non viene caricato il catalogo completo dei modelli. Tocca Riprova qui sopra per modificarli.",
     "providersEmpty": "Nessun fornitore corrisponde a questa ricerca.",
+    "providersNone": "Nessun fornitore è disponibile per questa organizzazione.",
+    "providersUnavailable": "Impossibile caricare l'elenco dei fornitori.",
     "allowAllShown": "Consenti tutti quelli mostrati",
     "denyAllShown": "Nega tutti quelli mostrati",
     "gatewaysDescription": "Kilo instrada le richieste dei modelli tramite Vercel AI Gateway o OpenRouter. Un canale di accesso disattivato fa fallire tali richieste.",

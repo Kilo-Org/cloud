@@ -9,8 +9,8 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { i18n } from '@/i18n';
-
 import { BitbucketOverview } from './bitbucket-overview';
 
 const config = vi.hoisted(() => ({
@@ -28,6 +28,17 @@ const readiness = vi.hoisted(() => ({
   integrationId: 'bitbucket-1' as string | null,
   workspaceSlug: 'ws' as string | undefined,
   fetchStatus: 'idle' as string,
+}));
+
+/** The integration-status read the OAuth verdict comes from. */
+const status = vi.hoisted(() => ({
+  // undefined data = the read is off (no request configured); `null` is not
+  // expressible on this union, so the off state starts as missing.
+  data: undefined as Record<string, unknown> | undefined,
+  isPending: false,
+  isError: false,
+  error: undefined as unknown,
+  refetch: vi.fn(),
 }));
 
 const connectivity = vi.hoisted(() => ({ known: true }));
@@ -117,6 +128,7 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     isLoading: false,
     isError: false,
     isFetching: false,
+    isPending: false,
     fetchStatus: readiness.fetchStatus,
     data: {
       connected: readiness.connected,
@@ -135,6 +147,17 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     refetch: vi.fn(),
   }),
   useSaveReviewConfig: () => ({ isPending: false, mutate: vi.fn() }),
+}));
+vi.mock('@/lib/hooks/use-bitbucket', () => ({
+  useBitbucketIntegrationStatus: () => ({
+    isLoading: false,
+    isPending: status.isPending,
+    isError: status.isError,
+    isFetching: false,
+    data: status.data,
+    error: status.error,
+    refetch: status.refetch,
+  }),
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useCommittedConnectivityStatus: () => (connectivity.known ? 'offline' : 'unknown'),
@@ -207,6 +230,13 @@ beforeEach(() => {
   readiness.integrationId = 'bitbucket-1';
   readiness.workspaceSlug = 'ws';
   readiness.fetchStatus = 'idle';
+  // Default the status read to the token-connection shape its own suite
+  // concerns; the OAuth cases replace this object.
+  status.data = { method: 'workspace_access_token', status: 'connected' };
+  status.isPending = false;
+  status.isError = false;
+  status.error = undefined;
+  status.refetch.mockReset();
   orgBoundaryCalls.length = 0;
   orgBoundary.resolved = true;
   orgBoundary.resolving = false;
@@ -330,21 +360,58 @@ function connectActions(root: TestRenderer.ReactTestRenderer) {
   });
 }
 
+describe('BitbucketOverview OAuth connection card', () => {
+  /** The row title the card paints over the managed-on-web line. */
+  function cardTitle(renderer: TestRenderer.ReactTestRenderer): unknown[] {
+    return renderer.root
+      .findAllByType('Text')
+      .filter(node => node.props.className === 'text-sm font-medium')
+      .map(node => node.props.children);
+  }
+
+  // The granted-name case lives in `bitbucket-overview-connection.mounted.test.tsx`,
+  // which asserts the same row title from the full OAuth status shape; only the
+  // empty-name fallback is new.
+  it('reads Connected when the authorization names an empty workspace', async () => {
+    // The status read passes the server's `displayName` through, so an empty
+    // string reaches the card: a nullish fallback painted a blank title.
+    readiness.connected = false;
+    readiness.integrationId = null;
+    status.data = {
+      method: 'oauth',
+      status: 'connected',
+      workspace: { slug: 'acme', displayName: '' },
+    };
+
+    const renderer = await renderScreen();
+
+    expect(cardTitle(renderer)).toEqual([i18n.t('common.connected')]);
+  });
+});
+
 describe('BitbucketOverview not-connected state', () => {
-  it('names the organization and the next screen in the connect description', async () => {
+  it('states the next step without repeating the organization in the connect description', async () => {
     readiness.connected = false;
     readiness.integrationId = null;
 
     const root = await renderScreen();
     const text = JSON.stringify(root.toJSON());
+    const description = i18n.t('codeReviewer.bitbucketConnect.descriptionOverview');
 
     // The token field lives on the sheet the action opens, so the copy names
     // that step; "paste it below" pointed at a button with no field under it.
-    expect(text).toContain(
-      i18n.t('codeReviewer.bitbucketConnect.descriptionOverview', {
-        organization: 'Acme Robotics',
-      })
-    );
+    // The header subtitle above already names the organization, so the
+    // description leaves the name out instead of naming it a second time.
+    expect(text).toContain(description);
+    expect(description).not.toContain('{{organization}}');
+    expect(description).not.toContain('Acme Robotics');
+    // `ScreenHeader` is stubbed to null here, so the header's one mention is
+    // asserted through the subtitle it receives, and the painted body text stays
+    // free of the name.
+    expect(root.root.findAllByType(ReviewerHeader).map(header => header.props.subtitle)).toEqual([
+      'Acme Robotics',
+    ]);
+    expect(text).not.toContain('Acme Robotics');
     expect(text).not.toContain('{{');
     expect(connectActions(root)).toHaveLength(1);
     expect(orgBoundaryCalls.length).toBeGreaterThan(0);
@@ -359,7 +426,12 @@ describe('BitbucketOverview not-connected state', () => {
     const root = await renderScreen();
     const text = JSON.stringify(root.toJSON());
 
-    expect(text).toContain(i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'));
+    const roleSentence = i18n.t('prReview.connect.adminOnlyConnectDescription');
+    expect(text).toContain(roleSentence);
+    // The who-can-connect sentence appears once, as the screen's own claim: a
+    // second occurrence would be a line restating the not-connected state the
+    // title already names.
+    expect(text.split(roleSentence).length - 1).toBe(1);
     expect(connectActions(root)).toHaveLength(0);
   });
 
@@ -373,7 +445,7 @@ describe('BitbucketOverview not-connected state', () => {
     const text = JSON.stringify(root.toJSON());
 
     expect(skeletonRenders.count).toBeGreaterThan(0);
-    expect(text).not.toContain(i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'));
+    expect(text).not.toContain(i18n.t('prReview.connect.adminOnlyConnectDescription'));
     expect(text).not.toContain('{{');
     expect(connectActions(root)).toHaveLength(0);
   });

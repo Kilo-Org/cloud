@@ -3,8 +3,9 @@ import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
+import { formatGitUrlProject } from '@kilocode/app-shared/git-url-project';
+
 import { SessionPreviewTranscript } from '@/components/agents/session-preview-transcript';
-import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { QueryError } from '@/components/query-error';
 import { type HeaderEyebrow, ScreenHeader } from '@/components/screen-header';
 import { eyebrowHeaderProps } from '@/components/ui/eyebrow-placeholder';

@@ -38,6 +38,7 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { detectContextOverflow } from '@kilocode/web-shared/lib/ai-gateway/context-overflow';
 import {
+  isKiloAutoModel,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_FREE_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
@@ -795,6 +796,18 @@ export function storeAndPreviousResponseIdIsNotSupported() {
     { error, error_type: ProxyErrorType.unsupported_field, message: error },
     { status: 400 }
   );
+}
+
+/** The concrete model an auto model request was served by; absent on direct model responses. */
+export const RESOLVED_MODEL_HEADER = 'x-kilo-resolved-model';
+
+export function setResolvedModelHeader<T extends Response>(
+  response: T,
+  resolvedModel: string,
+  requestedModel: string
+): T {
+  if (isKiloAutoModel(requestedModel)) response.headers.set(RESOLVED_MODEL_HEADER, resolvedModel);
+  return response;
 }
 
 export function getOutputHeaders(response: Response) {

@@ -20,13 +20,7 @@ const exec = promisify(execFile);
 const directory = await mkdtemp(join(tmpdir(), 'scheduler-smoke-'));
 const sqlite = new DatabaseSync(join(directory, 'scheduler.sqlite'));
 const db = sqliteD1(sqlite);
-const config = schedulerConfig(
-  JSON.stringify({
-    slots: 5,
-    modelConcurrency: 1,
-    providerConcurrency: 2,
-  })
-);
+const config = schedulerConfig(JSON.stringify({ slots: 5, modelConcurrency: 1 }));
 const startedAt = Date.now();
 const events: { event: string; run: string; slot: number; elapsedMs: number }[] = [];
 let peak = 0;
@@ -36,10 +30,10 @@ let completed = 0;
 
 try {
   applyBenchmarkMigrations(sqlite);
-  for (const [id, router, purpose, provider, count] of [
-    ['slow', 'efficient', 'platform', 'deepinfra', 3],
-    ['fast', 'frontier', 'platform', 'fireworks', 3],
-    ['owner', 'efficient', 'user', 'together', 8],
+  for (const [id, router, purpose, count] of [
+    ['slow', 'efficient', 'platform', 3],
+    ['fast', 'frontier', 'platform', 3],
+    ['owner', 'efficient', 'user', 8],
   ] as const) {
     sqlite
       .prepare(`INSERT INTO benchmark_runs (
@@ -52,7 +46,6 @@ try {
       entries: Array.from({ length: count }, (_, index) => ({
         model: `${id}-${index}`,
         variant: null,
-        providers: [provider],
       })),
       repetitions: 1,
       caseIds: ['compute-a', 'compute-b'],
@@ -68,9 +61,6 @@ try {
       .all();
     assert(live.length <= config.slots);
     assert.equal(new Set(live.map(row => row.slot)).size, live.length);
-    for (const provider of ['deepinfra', 'fireworks', 'together']) {
-      assert(live.filter(row => JSON.parse(String(row.providers)).includes(provider)).length <= 2);
-    }
     assert.equal(new Set(live.map(row => row.model)).size, live.length);
     peak = Math.max(peak, live.length);
     if (live.filter(row => row.purpose === 'user').length > 1) borrowed = true;
@@ -172,7 +162,6 @@ try {
     entries: Array.from({ length: 200 }, (_, index) => ({
       model: `backlog-${index}`,
       variant: null,
-      providers: [`backlog-provider-${index}`],
     })),
     repetitions: 1,
     caseIds: Array.from({ length: 60 }, (_, index) => `backlog-case-${index}`),

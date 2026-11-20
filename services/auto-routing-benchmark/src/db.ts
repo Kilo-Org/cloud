@@ -2,7 +2,9 @@ import type {
   AutoRouter,
   BenchmarkKind,
   BenchmarkModelSummary,
+  BenchmarkProfileFailureClass,
   BenchmarkProfileStatus,
+  BenchmarkRegistryFailedEntry,
   BenchmarkRun,
   BenchmarkRunPurpose,
   ClassifierWinner,
@@ -14,7 +16,6 @@ import type {
 } from '@kilocode/auto-routing-contracts';
 import { benchmarkPairKey, RoutingTableSchema } from '@kilocode/auto-routing-contracts';
 import type { BenchmarkPair } from '@kilocode/auto-routing-contracts';
-import { BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH } from '@kilocode/auto-routing-contracts';
 import { POLICY_SETTINGS } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
 import {
@@ -28,6 +29,7 @@ import {
   isNotNull,
   isNull,
   lt,
+  lte,
   ne,
   notInArray,
   or,
@@ -58,7 +60,14 @@ import {
 } from './reasoning-effort';
 import type { OfflineSweep } from './scoreboard/schema';
 import { noLiveBenchmarkChunks } from './profile-entry-claims';
-import { PROMPT_TRANSPORT_REVISION } from './prompt-transport';
+import { ACTIVE_MEASUREMENT_REVISION } from './measurement-revision';
+import {
+  parseProfileState,
+  profileFailureAssignments,
+  profileFailureResetAssignments,
+  wireProfileFailure,
+  type ProfileFailure,
+} from './profile-failure';
 
 export type CaseResultRow = typeof caseResults.$inferSelect;
 export type RunRow = typeof benchmarkRuns.$inferSelect;
@@ -136,7 +145,7 @@ export function mapSummaryRowWithRun(row: ModelSummaryRow): BenchmarkModelSummar
   };
 }
 
-export function mapRunRow(row: RunRow, summaries: BenchmarkModelSummary[]): BenchmarkRun {
+export function mapRunRow(row: RunRow): BenchmarkRun {
   return {
     id: row.id,
     router: row.router ?? 'efficient',
@@ -146,7 +155,6 @@ export function mapRunRow(row: RunRow, summaries: BenchmarkModelSummary[]): Benc
     startedAt: row.started_at,
     completedAt: row.completed_at,
     error: row.error,
-    summaries,
   };
 }
 
@@ -183,16 +191,18 @@ const ROLLBACK_SAFE_LEGACY_LANE_BUDGETS = {
 
 // The seven fixed policy columns are legacy: nothing in this worker reads them
 // back, but they are NOT NULL and the previously deployed worker still reads
-// them, so every save writes the canonical fixed policy value.
-const ROLLBACK_SAFE_LEGACY_FIXED_POLICY = {
-  frontier_min_accuracy_delta: POLICY_SETTINGS.frontierMinAccuracyDelta.fixed,
-  switch_cost_factor: POLICY_SETTINGS.switchCostFactor.fixed,
-  best_accuracy_switch_threshold: POLICY_SETTINGS.bestAccuracySwitchThreshold.fixed,
-  low_confidence_threshold: POLICY_SETTINGS.lowConfidenceThreshold.fixed,
-  classifier_repetitions: POLICY_SETTINGS.classifierRepetitions.fixed,
-  decider_repetitions: POLICY_SETTINGS.deciderRepetitions.fixed,
-  classifier_max_p95_latency_ms: POLICY_SETTINGS.classifierMaxP95LatencyMs.fixed,
-};
+// them, so every save writes the canonical fixed policy value for its router.
+function rollbackSafeLegacyFixedPolicy(router: AutoRouter) {
+  return {
+    frontier_min_accuracy_delta: POLICY_SETTINGS.frontierMinAccuracyDelta.fixed,
+    switch_cost_factor: POLICY_SETTINGS.switchCostFactor.fixed,
+    best_accuracy_switch_threshold: POLICY_SETTINGS.bestAccuracySwitchThreshold.fixed,
+    low_confidence_threshold: POLICY_SETTINGS.lowConfidenceThreshold.fixed,
+    classifier_repetitions: POLICY_SETTINGS.classifierRepetitions.fixed,
+    decider_repetitions: POLICY_SETTINGS.deciderRepetitions.fixedByRouter[router],
+    classifier_max_p95_latency_ms: POLICY_SETTINGS.classifierMaxP95LatencyMs.fixed,
+  };
+}
 
 export async function replaceConfig(
   db: D1Database,
@@ -212,6 +222,7 @@ export async function replaceConfig(
   router: AutoRouter = 'efficient'
 ): Promise<void> {
   const orm = drizzle(db);
+  const legacyFixedPolicy = rollbackSafeLegacyFixedPolicy(router);
   const stmts: [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]] = [
     orm
       .insert(benchmarkConfig)
@@ -219,7 +230,7 @@ export async function replaceConfig(
         id: router === 'efficient' ? 1 : 2,
         ...config,
         ...ROLLBACK_SAFE_LEGACY_LANE_BUDGETS,
-        ...ROLLBACK_SAFE_LEGACY_FIXED_POLICY,
+        ...legacyFixedPolicy,
         router,
       })
       .onConflictDoUpdate({
@@ -227,7 +238,7 @@ export async function replaceConfig(
         set: {
           ...config,
           ...ROLLBACK_SAFE_LEGACY_LANE_BUDGETS,
-          ...ROLLBACK_SAFE_LEGACY_FIXED_POLICY,
+          ...legacyFixedPolicy,
         },
       }),
     orm.delete(configClassifierModels).where(eq(configClassifierModels.router, router)),
@@ -285,6 +296,7 @@ export async function insertRun(
     repetitions: number;
     classifier_max_p95_latency_ms: number | null;
     engine_identity: string;
+    measurement_revision?: number;
     purpose?: BenchmarkRunPurpose;
   },
   models: RunModelRow[],
@@ -308,6 +320,7 @@ export async function insertRun(
     repetitions: run.repetitions,
     classifier_max_p95_latency_ms: run.classifier_max_p95_latency_ms,
     engine_identity: run.engine_identity,
+    measurement_revision: run.measurement_revision ?? ACTIVE_MEASUREMENT_REVISION,
     purpose: run.purpose ?? 'platform',
   });
 
@@ -398,6 +411,10 @@ export async function upsertCaseResult(db: D1Database, row: CaseResultRow): Prom
         output_prefix: row.output_prefix,
         event_count: row.event_count,
         last_event_types: row.last_event_types,
+        tool_calls: row.tool_calls,
+        tool_names: row.tool_names,
+        step_count: row.step_count,
+        final_finish_reason: row.final_finish_reason,
         rep: row.rep,
         timed_out: row.timed_out,
         prompt_revision: row.prompt_revision,
@@ -410,9 +427,102 @@ export async function upsertCaseResult(db: D1Database, row: CaseResultRow): Prom
 }
 
 /**
+ * Statement {@link reuseDeciderCaseResults} runs per entry; exported for the query-plan test.
+ * D1 keeps no planner statistics, so with a plain JOIN SQLite may scan every case_results
+ * row per entry. CROSS JOIN pins the order: filter the runs, then seek each run's pair.
+ */
+export const PRIOR_CASE_RESULTS_REUSE_SQL = `
+  WITH ranked AS (
+    SELECT source.*,
+      ROW_NUMBER() OVER (
+        PARTITION BY source.case_id, source.rep
+        ORDER BY run.started_at DESC, run.id DESC
+      ) AS reuse_rank
+    FROM benchmark_runs AS run
+    CROSS JOIN case_results AS source
+    WHERE run.id = source.run_id
+      AND run.kind = 'decider' AND run.status IN ('completed', 'failed')
+      AND run.router = ? AND run.engine_identity = ? AND run.repetitions = ?
+      AND source.model = ? AND source.variant = ?
+      AND source.error IS NULL AND source.timed_out = 0 AND source.exit_code = 0
+      AND NOT EXISTS (
+        SELECT 1 FROM benchmark_profiles AS profile
+        WHERE profile.router = run.router AND profile.engine_identity = run.engine_identity
+          AND profile.repetitions = run.repetitions AND profile.model = source.model
+          AND profile.variant = source.variant AND profile.invalidated_at IS NOT NULL
+          AND run.started_at < profile.invalidated_at
+      )
+      AND NOT EXISTS (SELECT 1 FROM json_each(?) AS minimum
+        WHERE minimum.key = source.case_id AND source.prompt_revision < minimum.value)
+  )
+  INSERT INTO case_results (
+    run_id, model, variant, case_id, route_key, score, latency_ms, cost_usd,
+    input_tokens, cached_input_tokens, output_tokens, reasoning_tokens,
+    error, fallback_reason, route_hit, retried, exit_code, output_prefix,
+    event_count, last_event_types, tool_calls, tool_names, step_count,
+    final_finish_reason, rep, timed_out, prompt_revision
+  )
+  SELECT ?, model, variant, case_id, route_key, score, latency_ms, cost_usd,
+    input_tokens, cached_input_tokens, output_tokens, reasoning_tokens,
+    error, fallback_reason, route_hit, retried, exit_code, output_prefix,
+    event_count, last_event_types, tool_calls, tool_names, step_count,
+    final_finish_reason, rep, timed_out, prompt_revision
+  FROM ranked WHERE reuse_rank = 1
+  ON CONFLICT (run_id, model, variant, case_id, rep) DO NOTHING
+`;
+
+/** Pending-output twin of {@link PRIOR_CASE_RESULTS_REUSE_SQL}, with the same join order. */
+export const PRIOR_PENDING_OUTPUTS_REUSE_SQL = `
+  WITH ranked AS (
+    SELECT source.*,
+      ROW_NUMBER() OVER (
+        PARTITION BY source.case_id, source.rep
+        ORDER BY run.started_at DESC, run.id DESC
+      ) AS reuse_rank
+    FROM benchmark_runs AS run
+    CROSS JOIN pending_decider_outputs AS source
+    WHERE run.id = source.run_id
+      AND run.kind = 'decider' AND run.status IN ('completed', 'failed')
+      AND run.router = ? AND run.engine_identity = ? AND run.repetitions = ?
+      AND source.model = ? AND source.variant = ?
+      AND NOT EXISTS (
+        SELECT 1 FROM benchmark_profiles AS profile
+        WHERE profile.router = run.router AND profile.engine_identity = run.engine_identity
+          AND profile.repetitions = run.repetitions AND profile.model = source.model
+          AND profile.variant = source.variant AND profile.invalidated_at IS NOT NULL
+          AND run.started_at < profile.invalidated_at
+      )
+      AND CASE WHEN json_valid(source.payload) THEN
+        json_type(source.payload, '$.result.exitCode') = 'integer'
+        AND json_extract(source.payload, '$.result.exitCode') = 0
+        AND json_type(source.payload, '$.result.timedOut') = 'false'
+        AND json_extract(source.payload, '$.result.unavailableModelId') IS NULL
+      ELSE 0 END
+      AND NOT EXISTS (SELECT 1 FROM json_each(?) AS minimum
+        WHERE minimum.key = source.case_id AND source.prompt_revision < minimum.value)
+      AND NOT EXISTS (
+        SELECT 1 FROM case_results AS graded
+        WHERE graded.run_id = source.run_id AND graded.model = source.model
+          AND graded.variant = source.variant AND graded.case_id = source.case_id
+          AND graded.rep = source.rep
+      )
+  )
+  INSERT INTO pending_decider_outputs (run_id, model, variant, case_id, rep, payload,
+    prompt_revision)
+  SELECT ?, model, variant, case_id, rep, payload, prompt_revision FROM ranked
+  WHERE reuse_rank = 1 AND NOT EXISTS (
+    SELECT 1 FROM case_results AS destination
+    WHERE destination.run_id = ? AND destination.model = ranked.model
+      AND destination.variant = ranked.variant AND destination.case_id = ranked.case_id
+      AND destination.rep = ranked.rep
+  )
+  ON CONFLICT (run_id, model, variant, case_id, rep) DO NOTHING
+`;
+
+/**
  * Copy each pair's newest compatible graded case (and recoverable pending output) from
- * earlier runs into this run. A result for one of `skipOldCaseIds` measured under an
- * older prompt transport is never copied, so those cases run again.
+ * earlier runs into this run. A result measured below its case's entry in
+ * `minimumRevisions` (src/measurement-revision.ts) is never copied, so that case runs again.
  */
 export async function reuseDeciderCaseResults(
   db: D1Database,
@@ -422,11 +532,10 @@ export async function reuseDeciderCaseResults(
     engineIdentity: string;
     repetitions: number;
     entries: readonly BenchmarkPair[];
-    skipOldCaseIds: readonly string[];
-    promptRevision: number;
+    minimumRevisions: Readonly<Record<string, number>>;
   }
 ): Promise<number> {
-  const skipCaseIds = JSON.stringify(params.skipOldCaseIds);
+  const minimumRevisions = JSON.stringify(params.minimumRevisions);
   let copied = 0;
   for (let offset = 0; offset < params.entries.length; offset += 10) {
     const statements: D1PreparedStatement[] = [];
@@ -438,96 +547,12 @@ export async function reuseDeciderCaseResults(
         params.repetitions,
         entry.model,
         variantToStorage(entry.variant),
-        params.promptRevision,
-        skipCaseIds,
+        minimumRevisions,
         params.runId,
       ];
       statements.push(
-        db
-          .prepare(`
-          WITH ranked AS (
-            SELECT source.*,
-              ROW_NUMBER() OVER (
-                PARTITION BY source.case_id, source.rep
-                ORDER BY run.started_at DESC, run.id DESC
-              ) AS reuse_rank
-            FROM case_results AS source
-            JOIN benchmark_runs AS run ON run.id = source.run_id
-            WHERE run.kind = 'decider' AND run.status IN ('completed', 'failed')
-              AND run.router = ? AND run.engine_identity = ? AND run.repetitions = ?
-              AND source.model = ? AND source.variant = ?
-              AND source.error IS NULL AND source.timed_out = 0 AND source.exit_code = 0
-              AND NOT EXISTS (
-                SELECT 1 FROM benchmark_profiles AS profile
-                WHERE profile.router = run.router AND profile.engine_identity = run.engine_identity
-                  AND profile.repetitions = run.repetitions AND profile.model = source.model
-                  AND profile.variant = source.variant AND profile.invalidated_at IS NOT NULL
-                  AND run.started_at < profile.invalidated_at
-              )
-              AND NOT (source.prompt_revision < ?
-                AND source.case_id IN (SELECT value FROM json_each(?)))
-          )
-          INSERT INTO case_results (
-            run_id, model, variant, case_id, route_key, score, latency_ms, cost_usd,
-            input_tokens, cached_input_tokens, output_tokens, reasoning_tokens,
-            error, fallback_reason, route_hit, retried, exit_code, output_prefix,
-            event_count, last_event_types, rep, timed_out, prompt_revision
-          )
-          SELECT ?, model, variant, case_id, route_key, score, latency_ms, cost_usd,
-            input_tokens, cached_input_tokens, output_tokens, reasoning_tokens,
-            error, fallback_reason, route_hit, retried, exit_code, output_prefix,
-            event_count, last_event_types, rep, timed_out, prompt_revision
-          FROM ranked WHERE reuse_rank = 1
-          ON CONFLICT (run_id, model, variant, case_id, rep) DO NOTHING
-        `)
-          .bind(...bindings),
-        db
-          .prepare(`
-          WITH ranked AS (
-            SELECT source.*,
-              ROW_NUMBER() OVER (
-                PARTITION BY source.case_id, source.rep
-                ORDER BY run.started_at DESC, run.id DESC
-              ) AS reuse_rank
-            FROM pending_decider_outputs AS source
-            JOIN benchmark_runs AS run ON run.id = source.run_id
-            WHERE run.kind = 'decider' AND run.status IN ('completed', 'failed')
-              AND run.router = ? AND run.engine_identity = ? AND run.repetitions = ?
-              AND source.model = ? AND source.variant = ?
-              AND NOT EXISTS (
-                SELECT 1 FROM benchmark_profiles AS profile
-                WHERE profile.router = run.router AND profile.engine_identity = run.engine_identity
-                  AND profile.repetitions = run.repetitions AND profile.model = source.model
-                  AND profile.variant = source.variant AND profile.invalidated_at IS NOT NULL
-                  AND run.started_at < profile.invalidated_at
-              )
-              AND CASE WHEN json_valid(source.payload) THEN
-                json_type(source.payload, '$.result.exitCode') = 'integer'
-                AND json_extract(source.payload, '$.result.exitCode') = 0
-                AND json_type(source.payload, '$.result.timedOut') = 'false'
-                AND json_extract(source.payload, '$.result.unavailableModelId') IS NULL
-              ELSE 0 END
-              AND NOT (source.prompt_revision < ?
-                AND source.case_id IN (SELECT value FROM json_each(?)))
-              AND NOT EXISTS (
-                SELECT 1 FROM case_results AS graded
-                WHERE graded.run_id = source.run_id AND graded.model = source.model
-                  AND graded.variant = source.variant AND graded.case_id = source.case_id
-                  AND graded.rep = source.rep
-              )
-          )
-          INSERT INTO pending_decider_outputs (run_id, model, variant, case_id, rep, payload,
-            prompt_revision)
-          SELECT ?, model, variant, case_id, rep, payload, prompt_revision FROM ranked
-          WHERE reuse_rank = 1 AND NOT EXISTS (
-            SELECT 1 FROM case_results AS destination
-            WHERE destination.run_id = ? AND destination.model = ranked.model
-              AND destination.variant = ranked.variant AND destination.case_id = ranked.case_id
-              AND destination.rep = ranked.rep
-          )
-          ON CONFLICT (run_id, model, variant, case_id, rep) DO NOTHING
-        `)
-          .bind(...bindings, params.runId),
+        db.prepare(PRIOR_CASE_RESULTS_REUSE_SQL).bind(...bindings),
+        db.prepare(PRIOR_PENDING_OUTPUTS_REUSE_SQL).bind(...bindings, params.runId),
         db
           .prepare(`
             DELETE FROM pending_decider_outputs
@@ -632,6 +657,32 @@ export async function getRoutingCaseResultsForEntries(
   return [...pairs.values()];
 }
 
+export type ProbeCaseCount = { model: string; variant: string; run_id: string; probes: number };
+
+/**
+ * Probe results each pair's provenance run holds at `revision` or newer. A pair counts as
+ * probe-complete only when `probes` reaches the number of probe cases (src/probe/eligibility.ts);
+ * run completion already guarantees every repetition produced a row.
+ */
+export async function countProbeCaseResults(
+  db: D1Database,
+  params: { runIds: readonly string[]; caseIds: readonly string[]; revision: number }
+): Promise<ProbeCaseCount[]> {
+  if (params.runIds.length === 0 || params.caseIds.length === 0) return [];
+  const { results } = await db
+    .prepare(
+      `SELECT run_id, model, variant, COUNT(DISTINCT case_id) AS probes
+       FROM case_results
+       WHERE run_id IN (SELECT value FROM json_each(?))
+         AND case_id IN (SELECT value FROM json_each(?))
+         AND prompt_revision >= ?
+       GROUP BY run_id, model, variant`
+    )
+    .bind(JSON.stringify(params.runIds), JSON.stringify(params.caseIds), params.revision)
+    .all<ProbeCaseCount>();
+  return results;
+}
+
 export async function getExistingCaseResultIds(
   db: D1Database,
   params: {
@@ -681,17 +732,27 @@ const PendingDeciderOutputSchema = z.object({
     stderrTail: z.string(),
     eventCount: z.number(),
     lastEventTypes: z.array(z.string()),
+    // Absent from outputs saved before tool evidence was recorded.
+    tools: z
+      .object({
+        calls: z.number().int().nonnegative(),
+        names: z.array(z.string()),
+        steps: z.number().int().nonnegative(),
+        finalFinishReason: z.string().nullable(),
+      })
+      .nullable()
+      .default(null),
     timedOut: z.boolean(),
     unavailableModelId: z.string().min(1).optional(),
   }),
   retried: z.boolean(),
-  // From the row's prompt_revision column; absent when the output is about to be saved by
-  // this worker, which uses PROMPT_TRANSPORT_REVISION.
-  promptRevision: z.number().int().optional(),
   attemptStartedAt: z.number().int().nonnegative().optional(),
 });
 
 export type PendingDeciderOutput = z.infer<typeof PendingDeciderOutputSchema>;
+
+/** A pending output with the measurement revision of the paid call that produced it. */
+export type StoredDeciderOutput = PendingDeciderOutput & { promptRevision: number };
 
 function pendingDeciderOutputPredicate(key: PendingDeciderOutputKey) {
   return and(
@@ -706,7 +767,7 @@ function pendingDeciderOutputPredicate(key: PendingDeciderOutputKey) {
 export async function getPendingDeciderOutput(
   db: D1Database,
   key: PendingDeciderOutputKey
-): Promise<PendingDeciderOutput | null> {
+): Promise<StoredDeciderOutput | null> {
   const row = await drizzle(db)
     .select({
       payload: pendingDeciderOutputs.payload,
@@ -723,7 +784,7 @@ export async function getPendingDeciderOutput(
 export async function savePendingDeciderOutput(
   db: D1Database,
   key: PendingDeciderOutputKey,
-  output: PendingDeciderOutput,
+  output: StoredDeciderOutput,
   execution?: { token: string; attemptStartedAt?: number }
 ): Promise<boolean> {
   const { promptRevision, ...payload } = output;
@@ -749,7 +810,7 @@ export async function savePendingDeciderOutput(
       key.case_id,
       key.rep,
       JSON.stringify(payload),
-      promptRevision ?? PROMPT_TRANSPORT_REVISION,
+      promptRevision,
       execution?.token ?? null,
       execution?.attemptStartedAt ?? null
     )
@@ -916,6 +977,29 @@ export async function getSummaries(
   return rows.map(mapSummaryRow);
 }
 
+/**
+ * One run's summaries for the admin run list, or null when the run is not
+ * visible under `router`. Classifier runs are shared by every router.
+ */
+export async function getRunSummariesForRouter(
+  db: D1Database,
+  runId: string,
+  router: AutoRouter
+): Promise<BenchmarkModelSummary[] | null> {
+  const run = await drizzle(db)
+    .select({ id: benchmarkRuns.id })
+    .from(benchmarkRuns)
+    .where(
+      and(
+        eq(benchmarkRuns.id, runId),
+        or(eq(benchmarkRuns.router, router), eq(benchmarkRuns.kind, 'classifier'))
+      )
+    )
+    .get();
+  if (!run) return null;
+  return getSummaries(db, runId);
+}
+
 export async function listRuns(
   db: D1Database,
   limit: number,
@@ -924,8 +1008,7 @@ export async function listRuns(
   // filters server-side instead of slicing a mixed page client-side.
   filter: { router?: AutoRouter; kind?: BenchmarkKind; purpose?: BenchmarkRunPurpose } = {}
 ): Promise<BenchmarkRun[]> {
-  const orm = drizzle(db);
-  const runRows = await orm
+  const runRows = await drizzle(db)
     .select()
     .from(benchmarkRuns)
     .where(
@@ -937,32 +1020,16 @@ export async function listRuns(
     )
     .orderBy(desc(benchmarkRuns.started_at))
     .limit(limit);
+  return runRows.map(mapRunRow);
+}
 
-  if (runRows.length === 0) {
-    return [];
-  }
-
-  const summaryRows = await orm
-    .select()
-    .from(modelSummaries)
-    .where(
-      inArray(
-        modelSummaries.run_id,
-        runRows.map(r => r.id)
-      )
-    );
-
-  const summariesByRunId = new Map<string, BenchmarkModelSummary[]>();
-  for (const row of summaryRows) {
-    const existing = summariesByRunId.get(row.run_id);
-    if (existing) {
-      existing.push(mapSummaryRow(row));
-    } else {
-      summariesByRunId.set(row.run_id, [mapSummaryRow(row)]);
-    }
-  }
-
-  return runRows.map(row => mapRunRow(row, summariesByRunId.get(row.id) ?? []));
+export async function existsRunningRun(db: D1Database, router: AutoRouter): Promise<boolean> {
+  const run = await drizzle(db)
+    .select({ id: benchmarkRuns.id })
+    .from(benchmarkRuns)
+    .where(and(eq(benchmarkRuns.router, router), eq(benchmarkRuns.status, 'running')))
+    .get();
+  return run !== undefined;
 }
 
 export type RunProgressCountRow = {
@@ -971,6 +1038,7 @@ export type RunProgressCountRow = {
   router: AutoRouter;
   repetitions: number;
   engineIdentity: string;
+  measurementRevision: number;
   enqueuedModels: number;
   completedCases: number;
   failedCases: number;
@@ -993,6 +1061,7 @@ export async function listRunProgressCounts(
       router: benchmarkRuns.router,
       repetitions: benchmarkRuns.repetitions,
       engineIdentity: benchmarkRuns.engine_identity,
+      measurementRevision: benchmarkRuns.measurement_revision,
       enqueuedModels: sql<number>`(
         SELECT COUNT(*) FROM ${runModels}
         WHERE ${runModels.run_id} = ${benchmarkRuns.id} AND ${runModels.enqueued} = 1
@@ -1014,6 +1083,7 @@ export async function listRunProgressCounts(
     router: row.router,
     repetitions: row.repetitions,
     engineIdentity: row.engineIdentity,
+    measurementRevision: row.measurementRevision,
     enqueuedModels: Number(row.enqueuedModels),
     completedCases: Number(row.completedCases),
     failedCases: Number(row.failedCases),
@@ -1101,11 +1171,6 @@ export async function markRunFailed(db: D1Database, runId: string, error: string
     .where(and(eq(benchmarkRuns.id, runId), eq(benchmarkRuns.status, 'running')));
 }
 
-function boundProfileFailureReason(reason: string): string {
-  if (reason.length <= BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH) return reason;
-  return reason.slice(0, BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH);
-}
-
 /**
  * Mark Benchmark-profile rows claimed by this run as running. Only touches rows
  * still pending (or already running for this run_id) under the exact PK — never
@@ -1186,13 +1251,13 @@ function readyProfileForRemeasure() {
 }
 
 /**
- * Copy every result of each claimed re-measure's previous run into this run, except the
- * `skipOldCaseIds` results measured under an older prompt transport. Failed and timed-out
- * results are copied too: only the skipped cases run again.
+ * Copy every result of each claimed re-measure's previous run into this run, except results
+ * measured below their case's entry in `minimumRevisions`. Failed and timed-out results are
+ * copied too: only the cases below their minimum, and cases the previous run never had, run.
  */
 export async function copyRemeasureBaselines(
   db: D1Database,
-  params: { runId: string; skipOldCaseIds: readonly string[]; promptRevision: number }
+  params: { runId: string; minimumRevisions: Readonly<Record<string, number>> }
 ): Promise<number> {
   const result = await db
     .prepare(`
@@ -1200,14 +1265,16 @@ export async function copyRemeasureBaselines(
         run_id, model, variant, case_id, route_key, score, latency_ms, cost_usd,
         input_tokens, cached_input_tokens, output_tokens, reasoning_tokens,
         error, fallback_reason, route_hit, retried, exit_code, output_prefix,
-        event_count, last_event_types, rep, timed_out, prompt_revision
+        event_count, last_event_types, tool_calls, tool_names, step_count,
+        final_finish_reason, rep, timed_out, prompt_revision
       )
       SELECT r.run_id, source.model, source.variant, source.case_id, source.route_key,
         source.score, source.latency_ms, source.cost_usd, source.input_tokens,
         source.cached_input_tokens, source.output_tokens, source.reasoning_tokens,
         source.error, source.fallback_reason,
         source.route_hit, source.retried, source.exit_code, source.output_prefix,
-        source.event_count, source.last_event_types, source.rep, source.timed_out,
+        source.event_count, source.last_event_types, source.tool_calls, source.tool_names,
+        source.step_count, source.final_finish_reason, source.rep, source.timed_out,
         source.prompt_revision
       FROM profile_remeasures AS r
       JOIN benchmark_profiles AS p ON p.router = r.router AND p.model = r.model
@@ -1216,11 +1283,11 @@ export async function copyRemeasureBaselines(
       JOIN case_results AS source ON source.run_id = p.run_id
         AND source.model = p.model AND source.variant = p.variant
       WHERE r.run_id = ?
-        AND NOT (source.prompt_revision < ?
-          AND source.case_id IN (SELECT value FROM json_each(?)))
+        AND NOT EXISTS (SELECT 1 FROM json_each(?) AS minimum
+          WHERE minimum.key = source.case_id AND source.prompt_revision < minimum.value)
       ON CONFLICT (run_id, model, variant, case_id, rep) DO NOTHING
     `)
-    .bind(params.runId, params.promptRevision, JSON.stringify(params.skipOldCaseIds))
+    .bind(params.runId, JSON.stringify(params.minimumRevisions))
     .run();
   return result.meta.changes ?? 0;
 }
@@ -1284,8 +1351,8 @@ export function markProfilesReadyForRunStatement(
   return orm
     .update(benchmarkProfiles)
     .set({
+      ...profileFailureResetAssignments,
       status: 'ready',
-      failure_reason: null,
       updated_at: nowIso,
       completed_at: nowIso,
     })
@@ -1311,34 +1378,29 @@ export async function markProfilesReadyForRun(
 export function markProfilesFailedForRunStatement(
   orm: ReturnType<typeof drizzle>,
   runId: string,
-  failureReason: string,
+  failure: ProfileFailure,
   nowIso: string
 ) {
   return orm
     .update(benchmarkProfiles)
-    .set({
-      status: 'failed',
-      failure_reason: boundProfileFailureReason(failureReason),
-      updated_at: nowIso,
-      completed_at: nowIso,
-    })
+    .set(profileFailureAssignments(failure, nowIso))
     .where(and(eq(benchmarkProfiles.run_id, runId), eq(benchmarkProfiles.status, 'running')));
 }
 
 /**
- * Transition profiles claimed by this run to failed with a bounded reason. Only rows
- * still pointing at this run_id and still running are updated. This run's re-measure
- * claims are dropped; those profiles keep serving their previous measurement.
+ * Transition profiles claimed by this run to failed. Only rows still pointing at this
+ * run_id and still running are updated. This run's re-measure claims are dropped; those
+ * profiles keep serving their previous measurement.
  */
 export async function markProfilesFailedForRun(
   db: D1Database,
   runId: string,
-  failureReason: string,
+  failure: ProfileFailure,
   nowIso: string = new Date().toISOString()
 ): Promise<void> {
   const orm = drizzle(db);
   await orm.batch([
-    markProfilesFailedForRunStatement(orm, runId, failureReason, nowIso),
+    markProfilesFailedForRunStatement(orm, runId, failure, nowIso),
     orm.delete(profileRemeasures).where(eq(profileRemeasures.run_id, runId)),
   ]);
 }
@@ -1353,7 +1415,7 @@ export function markProfilesFailedForEntriesStatement(
   runId: string,
   /** Storage-form variant keys ('' = default variant). */
   entries: readonly { model: string; variant: string }[],
-  failureReason: string,
+  failure: ProfileFailure,
   nowIso: string
 ) {
   // or(...[]) evaluates to undefined and the WHERE would degrade to run_id +
@@ -1364,12 +1426,7 @@ export function markProfilesFailedForEntriesStatement(
   }
   return orm
     .update(benchmarkProfiles)
-    .set({
-      status: 'failed',
-      failure_reason: boundProfileFailureReason(failureReason),
-      updated_at: nowIso,
-      completed_at: nowIso,
-    })
+    .set(profileFailureAssignments(failure, nowIso))
     .where(
       and(
         eq(benchmarkProfiles.run_id, runId),
@@ -1391,7 +1448,7 @@ export async function markProfilesFailedForEntries(
   db: D1Database,
   runId: string,
   entries: readonly { model: string; variant: string }[],
-  failureReason: string,
+  failure: ProfileFailure,
   nowIso: string = new Date().toISOString()
 ): Promise<void> {
   if (entries.length === 0) return;
@@ -1403,10 +1460,40 @@ export async function markProfilesFailedForEntries(
       orm,
       runId,
       entries.slice(i, i + PROFILE_ENTRY_FILTER_BATCH_SIZE),
-      failureReason,
+      failure,
       nowIso
     );
   }
+}
+
+/**
+ * Fail pending current rows the drain found it cannot benchmark, before any paid call.
+ * Only rows still pending are touched, so a concurrent claim or re-admit wins.
+ */
+export async function failPendingProfiles(
+  db: D1Database,
+  current: { router: AutoRouter; engineIdentity: string; repetitions: number },
+  /** Storage-form variant keys ('' = default variant). */
+  entries: readonly { model: string; variant: string; failure: ProfileFailure }[],
+  nowIso: string = new Date().toISOString()
+): Promise<void> {
+  const orm = drizzle(db);
+  const [first, ...rest] = entries.map(entry =>
+    orm
+      .update(benchmarkProfiles)
+      .set(profileFailureAssignments(entry.failure, nowIso))
+      .where(
+        and(
+          eq(benchmarkProfiles.router, current.router),
+          eq(benchmarkProfiles.model, entry.model),
+          eq(benchmarkProfiles.variant, entry.variant),
+          eq(benchmarkProfiles.engine_identity, current.engineIdentity),
+          eq(benchmarkProfiles.repetitions, current.repetitions),
+          eq(benchmarkProfiles.status, 'pending')
+        )
+      )
+  );
+  if (first !== undefined) await orm.batch([first, ...rest]);
 }
 
 export type RunLaneFailureRow = typeof runLaneFailures.$inferSelect;
@@ -1426,6 +1513,7 @@ export function recordLaneFailureStatement(
     rep: number;
     chunk: number;
     shard: number;
+    failureClass: BenchmarkProfileFailureClass;
     failedAtIso: string;
   }
 ) {
@@ -1439,11 +1527,12 @@ export function recordLaneFailureStatement(
       chunk: row.chunk,
       shard: row.shard,
       failed_at: row.failedAtIso,
+      failure_class: row.failureClass,
     })
     .onConflictDoNothing();
 }
 
-/** Record that a run's lane chunk dead-lettered. Variant in storage form. */
+/** Record that a run's lane died, and why. Variant in storage form. */
 export async function recordLaneFailure(
   db: D1Database,
   row: {
@@ -1454,6 +1543,7 @@ export async function recordLaneFailure(
     rep: number;
     chunk: number;
     shard: number;
+    failureClass: BenchmarkProfileFailureClass;
   },
   failedAtIso: string = new Date().toISOString()
 ): Promise<void> {
@@ -1546,7 +1636,7 @@ export async function listQueuedRemeasures(
     );
 }
 
-/** Registry row counts per status for one queue's current-engine rows. */
+/** Registry row counts per wire status for one queue's current-engine rows. */
 export async function countCurrentProfilesByStatus(
   db: D1Database,
   current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
@@ -1566,7 +1656,12 @@ export async function countCurrentProfilesByStatus(
       )
     )
     .groupBy(benchmarkProfiles.status);
-  return rows.map(row => ({ status: row.status, count: row.n }));
+  const counts = new Map<BenchmarkProfileStatus, number>();
+  for (const row of rows) {
+    const status = row.status === 'unavailable' ? 'failed' : row.status;
+    counts.set(status, (counts.get(status) ?? 0) + row.n);
+  }
+  return [...counts].map(([status, n]) => ({ status, count: n }));
 }
 
 /** Exact platform-pair coverage for the currently measured engine and repetitions. */
@@ -1590,15 +1685,21 @@ export async function listCurrentPlatformProfileStatuses(
       )
     )
     .orderBy(asc(benchmarkProfiles.model), asc(benchmarkProfiles.variant));
-  return rows.map(row => ({ ...row, variant: variantFromStorage(row.variant) }));
+  return rows.map(row => ({
+    model: row.model,
+    variant: variantFromStorage(row.variant),
+    status: row.status === 'unavailable' ? 'failed' : row.status,
+  }));
 }
 
 /**
- * Admin requeue: put failed current-engine rows of a queue back to `pending`.
- * Charges no owner quota — this is the admin's own escape hatch, distinct from
- * an owner's Retry. Returns how many rows moved.
+ * Admin requeue: put retryable failed current-engine rows of a queue whose retry window
+ * has passed back to `pending`. Permanently failed rows are never bulk re-admitted. The
+ * failure history stays so the retry budgets keep counting. Charges no owner quota —
+ * this is the admin's own escape hatch, distinct from an owner's Retry. Returns how
+ * many rows moved.
  */
-export async function requeueFailedCurrentProfiles(
+export async function requeueRetryableCurrentProfiles(
   db: D1Database,
   current: { router?: AutoRouter; engineIdentity: string; repetitions: number },
   queue: BenchmarkRunPurpose | 'both',
@@ -1619,6 +1720,7 @@ export async function requeueFailedCurrentProfiles(
       status: 'pending',
       run_id: null,
       failure_reason: null,
+      retry_after: null,
       requested_at: nowIso,
       updated_at: nowIso,
       completed_at: null,
@@ -1626,6 +1728,7 @@ export async function requeueFailedCurrentProfiles(
     .where(
       and(
         eq(benchmarkProfiles.status, 'failed'),
+        or(isNull(benchmarkProfiles.retry_after), lte(benchmarkProfiles.retry_after, nowIso)),
         eq(benchmarkProfiles.router, current.router ?? 'efficient'),
         eq(benchmarkProfiles.engine_identity, current.engineIdentity),
         eq(benchmarkProfiles.repetitions, current.repetitions),
@@ -1640,6 +1743,49 @@ export async function requeueFailedCurrentProfiles(
       )
     );
   return result.meta.changes ?? 0;
+}
+
+/**
+ * Failed current-engine rows, retryable and permanent, that a queue still wants. Rows in
+ * neither queue are left out: no drain would measure them again, so no action applies.
+ */
+export async function listCurrentFailedProfiles(
+  db: D1Database,
+  current: { router?: AutoRouter; engineIdentity: string; repetitions: number }
+): Promise<BenchmarkRegistryFailedEntry[]> {
+  const rows = await drizzle(db)
+    .select()
+    .from(benchmarkProfiles)
+    .where(
+      and(
+        inArray(benchmarkProfiles.status, ['failed', 'unavailable']),
+        eq(benchmarkProfiles.router, current.router ?? 'efficient'),
+        eq(benchmarkProfiles.engine_identity, current.engineIdentity),
+        eq(benchmarkProfiles.repetitions, current.repetitions),
+        or(
+          eq(benchmarkProfiles.platform_requested, true),
+          eq(benchmarkProfiles.user_requested, true)
+        )
+      )
+    )
+    .orderBy(asc(benchmarkProfiles.model), asc(benchmarkProfiles.variant));
+  return rows.flatMap(row => {
+    const failure = wireProfileFailure(parseProfileState(row));
+    if (!failure) return [];
+    const queues: BenchmarkRunPurpose[] = [
+      ...(row.platform_requested ? ['platform' as const] : []),
+      ...(row.user_requested ? ['user' as const] : []),
+    ];
+    return [
+      {
+        model: row.model,
+        variant: variantFromStorage(row.variant),
+        queues,
+        runId: row.run_id,
+        failure,
+      },
+    ];
+  });
 }
 
 /**
@@ -1842,12 +1988,9 @@ export function failOrphanedRunningProfilesStatement(
 ) {
   return orm
     .update(benchmarkProfiles)
-    .set({
-      status: 'failed',
-      failure_reason: boundProfileFailureReason(failureReason),
-      updated_at: nowIso,
-      completed_at: nowIso,
-    })
+    .set(
+      profileFailureAssignments({ failureClass: 'orphaned_claim', reason: failureReason }, nowIso)
+    )
     .where(
       and(
         eq(benchmarkProfiles.status, 'running'),

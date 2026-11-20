@@ -19,7 +19,10 @@
     "presenceStatus": "Resursdatori: {{connection}}",
     "commandStatus": "Komandas piegāde: {{status}}",
     "delivered": "Piegādāts",
-    "expired": "Termiņš beidzies"
+    "expired": "Termiņš beidzies",
+    "recoveryGaps_zero": "Nav pazudušu šī ieraksta daļu.",
+    "recoveryGaps_one": "Trūkst {{displayCount}} šī ieraksta daļas.",
+    "recoveryGaps_other": "Trūkst {{displayCount}} šī ieraksta daļu."
   },
   "common": {
     "manageOnWeb": "Pārvaldi tīmeklī",
@@ -138,6 +141,7 @@
     "keepRunning": "Turpināt izpildi",
     "newSession": "Jauna sesija",
     "noModelsAvailable": "Nav pieejamu modeļu",
+    "modelRetires": "Tiks pārtraukts {{date}}",
     "notFound": "Neizdevās atrast meklēto.",
     "online": "Tiešsaistē",
     "open": "Atvērt {{name}}",
@@ -181,7 +185,9 @@
     "organizationTrialEnded": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Organizācijas īpašnieks var atjaunināt norēķinu informāciju vietnē kilo.ai un pēc tam mēģināt vēlreiz.",
     "privateRepositoryA11y": "{{name}}, privāts repozitorijs",
     "legalDocumentEnglishOnly": "Šis dokuments ir pieejams tikai angļu valodā.",
-    "organizationTrialEndedBilling": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Jūs varat atjaunināt norēķinu informāciju un pēc tam mēģināt vēlreiz."
+    "organizationTrialEndedBilling": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Jūs varat atjaunināt norēķinu informāciju un pēc tam mēģināt vēlreiz.",
+    "organizationTrialEndedBillingAtKiloAi": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Jūs varat atjaunināt norēķinu informāciju vietnē kilo.ai un pēc tam mēģināt vēlreiz.",
+    "viewOnGitHub": "Skatīt PR GitHub"
   },
   "language": {
     "restarting": "Notiek restartēšana, lai lietotu izvēlēto valodu",
@@ -275,6 +281,9 @@
     "credits": "Kredīti",
     "failedToLoadBalance": "Neizdevās ielādēt atlikumu. Pieskaries, lai mēģinātu vēlreiz.",
     "balanceLoadFailed": "Neizdevās ielādēt atlikumu",
+    "balanceUnreachable": "Neizdevās sazināties ar serveri. Mēģiniet vēlreiz.",
+    "balanceAccessDenied": "Jums nav atļaujas skatīt šo atlikumu.",
+    "balanceUnavailable": "Atlikumu neizdevās ielādēt.",
     "hideBalance": "Slēpt atlikumu",
     "showBalance": "Rādīt atlikumu",
     "balanceHidden": "Atlikums ir paslēpts",
@@ -506,7 +515,7 @@
     "changelogFixesPolish": "Labojumi un uzlabojumi visā lietotnē.",
     "changelogAreas": {
       "signIn": "Pierakstīšanās",
-      "profileOrganizations": "Profils un organizācijas"
+      "profileOrganizations": "Profils & organizācijas"
     }
   },
   "preferences": {
@@ -761,6 +770,10 @@
       "couldNotLoadMore": "Neizdevās ielādēt vairāk komentāru.",
       "retryLoadingMore": "Mēģināt ielādēt vairāk komentāru vēlreiz",
       "loadMoreComments": "Ielādēt vairāk komentāru",
+      "conversationTruncated": "Tiek rādīti tikai pirmie {{displayCount}} komenti.",
+      "conversationTruncated_zero": "Tiek rādīti tikai pirmie {{displayCount}} komenti.",
+      "conversationTruncated_one": "Tiek rādīti tikai pirmie {{displayCount}} komenti.",
+      "conversationTruncated_other": "Tiek rādīti tikai pirmie {{displayCount}} komenti.",
       "addReaction": "Pievienot reakciju",
       "reactionPill": "{{emoji}} reakcija, {{displayCount}} {{countLabel}}",
       "reaction_one": "reakcija",
@@ -893,7 +906,6 @@
       "noAccess": "Tev nav piekļuves šī repozitorija pārbaudēm.",
       "couldNotLoad": "Neizdevās ielādēt pārbaudes.",
       "retryChecks": "Mēģināt vēlreiz ielādēt pārbaudes",
-      "viewOnGitHub": "Skatīt PR GitHub",
       "noChecksReported": "Nav informācijas par pārbaudēm",
       "passed": "sekmīgas: {{displayCount}}",
       "passed_one": "sekmīgas: {{displayCount}}",
@@ -981,6 +993,9 @@
       "pendingComment": "neiesniegti komentāri",
       "pendingComment_other": "neiesniegti komentāri",
       "submitCountOfTotal": "Iesniegt {{displayFreshCount}} no {{displayTotalCount}} komentāriem",
+      "submitCountOfTotal_zero": "Iesniegt {{displayFreshCount}} no {{displayTotalCount}} komentāriem",
+      "submitCountOfTotal_one": "Iesniegt {{displayFreshCount}} no {{displayTotalCount}} komentāriem",
+      "submitCountOfTotal_other": "Iesniegt {{displayFreshCount}} no {{displayTotalCount}} komentāriem",
       "submitReview": "Iesniegt pārskatīšanas rezultātus",
       "partialPostedFresh": "Publicēto komentāru skaits: {{displayFreshCount}}. ",
       "partialPostedFresh_zero": "Publicēto komentāru skaits: {{displayFreshCount}}. ",
@@ -1412,13 +1427,16 @@
     "followReviewMd": "Ievērot REVIEW.md norādījumus",
     "followReviewMdSubtitle": "Ievērot katra repozitorija REVIEW.md failā sniegtos norādījumus",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nav pievienots. To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki."
+      "notConnectedReadOnlyPlan": "Organizācijas izmēģinājuma periods ir beidzies, tāpēc īpašniekam ir jāatjaunina norēķini vietnē kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} Bitbucket savienojums tiek pārvaldīts tīmeklī no datora.",
+      "managedOnWebTitle": "Pārvaldīts tīmeklī",
+      "managedOnWebShort": "Šis savienojums tiek pārvaldīts tīmeklī no datora.",
+      "managedOnWebRepositories": "Izvēlies repozitorijus priekš {{organization}} tīmeklī no datora.",
       "description": "Izveido darbvietas piekļuves pilnvaru priekš {{organization}} un ielīmē to zemāk.",
       "descriptionReconnect": "Izveido jaunu darbvietas piekļuves pilnvaru priekš {{organization}} un ielīmē to zemāk.",
-      "descriptionOverview": "Izveido darbvietas piekļuves pilnvaru priekš {{organization}} un ielīmē to nākamajā ekrānā.",
+      "descriptionOverview": "Izveido darbvietas piekļuves pilnvaru un ielīmē to nākamajā ekrānā.",
       "scopes": "Konts: lasīšana · Repozitoriji: lasīšana/rakstīšana · Izmaiņu pieprasījumi: lasīšana · Tīmekļa aizķeres: lasīšana/rakstīšana",
       "tokenPlaceholder": "Darbvietas piekļuves pilnvara",
       "tokenRefused": "Bitbucket nepieņēma šo darbvietas piekļuves pilnvaru. Pārbaudi, vai tai ir iepriekš norādītās atļaujas, un pēc tam mēģini vēlreiz."
@@ -1439,6 +1457,7 @@
     "platformList": {
       "checking": "Pārbauda…",
       "statusUnavailable": "Statuss nav pieejams",
+      "needsAttention": "Nepieciešama rīcība",
       "platforms": "Platformas",
       "activity": "Darbības"
     },
@@ -2835,6 +2854,8 @@
     "modelPicker": {
       "title": "Modeļa izvēle",
       "noModelsDescription": "Nav pieejamu modeļu, ko izvēlēties.",
+      "allUnavailableTitle": "Nevienu modeli nevar izmantot",
+      "allUnavailableDescription": "Pievieno nodrošinātāja atslēgu un mēģini vēlreiz.",
       "favorites": "Izlase"
     },
     "modelSelector": {
@@ -3678,7 +3699,7 @@
     },
     "hub": {
       "renameTitle": "Pārdēvēt organizāciju",
-      "renamePlaceholder": "Organizācijas nosaukums",
+      "renamePlaceholder": "Ievadiet organizācijas nosaukumu",
       "balance": "Atlikums",
       "plan": "Plāns",
       "planTeams": "Teams",
@@ -4140,7 +4161,13 @@
     "providerUnavailable": "Pakalpojumu sniedzējs šobrīd nav pieejams. Nosūti vēlreiz pēc brīža."
   },
   "settingsTools": {
-    "confirmTitle": "Apstiprināt šo izmaiņu?"
+    "confirmTitle": "Apstiprināt šo izmaiņu?",
+    "guarded": {
+      "spendAlertsOff": "Vai izslēgt tēriņu brīdinājumus? Jūs vairs nesaņemsit paziņojumus par tēriņu sliekšņu pārsniegšanu un pēkšņiem tēriņu kāpumiem stundas laikā.",
+      "balanceAlertsOff": "Vai izslēgt atlikuma brīdinājumus? Jūs vairs nesaņemsit paziņojumus, kad jūsu kredītu atlikums kļūs zems.",
+      "securityFindingsOff": "Vai izslēgt drošības atklājumus? Jūs vairs nesaņemsit paziņojumus par jauniem drošības atklājumiem.",
+      "hideBalanceOn": "Vai paslēpt savus atlikumus? Kredītu atlikumi vairs neparādīsies profila ekrānos un organizācijas centrā."
+    }
   },
   "appActions": {
     "start": {
@@ -4902,7 +4929,7 @@
   },
   "organizationGuardrails": {
     "title": "MI aizsargbarjeras",
-    "permissionDenied": "MI aizsargbarjeras var pārvaldīt tikai organizācijas īpašnieki un administratori.",
+    "permissionDenied": "MI aizsargbarjeras var pārvaldīt tikai organizācijas īpašnieki un administratori. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "MI aizsargbarjeras nav iespējotas",
     "unavailable": "Kilo pēc pieprasījuma iespējo MI aizsargbarjeras organizācijai. Sazinieties ar {{supportEmail}}, un Kilo komanda tās ieslēdz jūsu organizācijai.",
     "contactSupport": "Sazināties ar atbalsta dienestu",
@@ -4914,12 +4941,15 @@
     "inputDescription": "Pārbauda katru ievadi ar Enkrypt AI, tostarp rīku rezultātus. Kad Enkrypt nav pieejams, pieprasījumi tiek nosūtīti bez pārbaudes, nevis noraidīti.",
     "outputTitle": "Izvades aizsargbarjeras",
     "outputDescription": "Pārbauda atbildes ar Enkrypt AI, pirms dalībnieki tās saņem. Izslēgts, ja vien to neieslēdzat.",
+    "outputUnavailable": "Kilo šai organizācijai nav iespējojis izvades skenēšanu, tāpēc atbildes netiek pārbaudītas un šeit nav ko iestatīt. Lai to pieprasītu, sazinieties ar {{supportEmail}}.",
     "detectorsHint": "Bloķēt noraida atzīmētu pieprasījumu. Tikai reģistrēt to ieraksta, neaizkavējot pieprasījumu.",
     "detectorsHintOutput": "Bloķēt noraida atzīmētu atbildi. Tikai reģistrēt to ieraksta, neaizkavējot atbildi.",
     "choiceLog": "Tikai reģistrēt",
     "applyTo": "Attiecināt uz",
     "applyToAllMembers": "Visiem dalībniekiem",
     "applyKiloDefault": "Lietot Kilo noklusējumu",
+    "applyKiloDefaultEnglishNote": "Kilo noklusējuma politikas teksts ir angļu valodā, jo Kilo Gateway to piemēro tieši tā, kā tas uzrakstīts.",
+    "applyKiloDefaultReplaceMessage": "Kilo noklusējuma politika ir rakstīta angļu valodā un aizstāj to, ko iestatījāt sadaļā Politikas pārkāpums. Politikas teksta laukā ievadīto tekstu nevar atjaunot.",
     "invalidSavedTitle": "Saglabātos ievades detektora iestatījumus nevar nolasīt",
     "invalidSavedBody": "Pieprasījumi tiek bloķēti, līdz ievades detektori tiek saglabāti vēlreiz. Tālāk esošie detektori sāk no Kilo noklusējuma.",
     "invalidSavedOutputTitle": "Saglabātos izvades detektora iestatījumus nevar nolasīt",
@@ -5054,6 +5084,8 @@
     "providersDescription": "Izslēdziet nodrošinātāju, lai Kilo pārtrauktu maršrutēšanu uz to šai organizācijai.",
     "providersNeedCatalog": "Nodrošinātāju slēdži paliek tikai lasāmi, līdz tiek ielādēts pilns modeļu katalogs. Lai tos rediģētu, augstāk nospiediet Mēģināt vēlreiz.",
     "providersEmpty": "Neviens nodrošinātājs neatbilst šim meklējumam.",
+    "providersNone": "Šai organizācijai nav pieejams neviens nodrošinātājs.",
+    "providersUnavailable": "Neizdevās ielādēt nodrošinātāju sarakstu.",
     "allowAllShown": "Atļaut visus redzamos",
     "denyAllShown": "Liegt visus redzamos",
     "gatewaysDescription": "Kilo maršrutē modeļu pieprasījumus caur Vercel AI Gateway vai OpenRouter. Atspējota vārteja liek šiem pieprasījumiem neizdoties.",

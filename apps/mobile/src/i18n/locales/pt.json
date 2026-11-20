@@ -19,7 +19,11 @@
     "presenceStatus": "Hosts: {{connection}}",
     "commandStatus": "Entrega do comando: {{status}}",
     "delivered": "Entregue",
-    "expired": "Expirado"
+    "expired": "Expirado",
+    "recoveryGaps_one": "Falta {{displayCount}} parte desta transcrição.",
+    "recoveryGaps_many": "Faltam {{displayCount}} partes desta transcrição.",
+    "recoveryGaps_other": "Faltam {{displayCount}} partes desta transcrição.",
+    "recoveryGaps_zero": "Faltam {{displayCount}} partes desta transcrição."
   },
   "common": {
     "manageOnWeb": "Gerir na web",
@@ -138,10 +142,12 @@
     "keepRunning": "Continuar em execução",
     "newSession": "Nova sessão",
     "noModelsAvailable": "Sem modelos disponíveis",
+    "modelRetires": "Descontinuado em {{date}}",
     "notFound": "Conteúdo não encontrado.",
     "online": "Em linha",
     "open": "Abrir {{name}}",
     "openPullRequest": "Abrir PR",
+    "viewOnGitHub": "Ver PR no GitHub",
     "completed": "Concluída",
     "pending": "Pendente",
     "running": "Em execução",
@@ -181,7 +187,8 @@
     "organizationTrialEnded": "O período de teste da organização terminou e esta não tem um plano ativo. O proprietário da organização pode atualizar a faturação em kilo.ai e, em seguida, tentar novamente.",
     "privateRepositoryA11y": "{{name}}, repositório privado",
     "legalDocumentEnglishOnly": "Este documento está disponível apenas em inglês.",
-    "organizationTrialEndedBilling": "O período de teste da organização terminou e esta não tem um plano ativo. Pode atualizar a faturação e, em seguida, tentar novamente."
+    "organizationTrialEndedBilling": "O período de teste da organização terminou e esta não tem um plano ativo. Pode atualizar a faturação e, em seguida, tentar novamente.",
+    "organizationTrialEndedBillingAtKiloAi": "O período de teste da organização terminou e esta não tem um plano ativo. Pode atualizar a faturação em kilo.ai e, em seguida, tentar novamente."
   },
   "language": {
     "restarting": "A reiniciar para aplicar o idioma",
@@ -275,6 +282,9 @@
     "credits": "Créditos",
     "failedToLoadBalance": "Não foi possível carregar o saldo. Toque para tentar novamente.",
     "balanceLoadFailed": "Não foi possível carregar o saldo",
+    "balanceUnreachable": "Não foi possível contactar o servidor. Tente novamente.",
+    "balanceAccessDenied": "Não tem permissão para ver este saldo.",
+    "balanceUnavailable": "Não foi possível carregar o saldo.",
     "hideBalance": "Ocultar saldo",
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
@@ -506,7 +516,7 @@
     "changelogFixesPolish": "Correções e melhorias em toda a aplicação.",
     "changelogAreas": {
       "signIn": "Início de sessão",
-      "profileOrganizations": "Perfil e organizações"
+      "profileOrganizations": "Perfil & organizações"
     }
   },
   "preferences": {
@@ -772,6 +782,11 @@
       "couldNotLoadMore": "Não foi possível carregar mais comentários.",
       "retryLoadingMore": "Tentar carregar mais comentários novamente",
       "loadMoreComments": "Carregar mais comentários",
+      "conversationTruncated": "São apresentados apenas os primeiros {{displayCount}} comentários.",
+      "conversationTruncated_zero": "São apresentados apenas os primeiros {{displayCount}} comentários.",
+      "conversationTruncated_one": "São apresentados apenas os primeiros {{displayCount}} comentários.",
+      "conversationTruncated_other": "São apresentados apenas os primeiros {{displayCount}} comentários.",
+      "conversationTruncated_many": "São apresentados apenas os primeiros {{displayCount}} comentários.",
       "addReaction": "Adicionar reação",
       "reactionPill": "reação {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reação",
@@ -906,7 +921,6 @@
       "noAccess": "Não tens acesso às verificações deste repositório.",
       "couldNotLoad": "Não foi possível carregar as verificações.",
       "retryChecks": "Tentar carregar as verificações novamente",
-      "viewOnGitHub": "Ver PR no GitHub",
       "noChecksReported": "Nenhuma verificação comunicada",
       "passed": "{{displayCount}} com êxito",
       "passed_one": "{{displayCount}} com êxito",
@@ -999,6 +1013,10 @@
       "pendingComment_other": "comentários pendentes",
       "pendingComment_zero": "comentários pendentes",
       "submitCountOfTotal": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_one": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_zero": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_many": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
+      "submitCountOfTotal_other": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
       "submitReview": "Enviar revisão",
       "partialPostedFresh": "Comentários publicados: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Comentários publicados: {{displayFreshCount}}. ",
@@ -1436,13 +1454,16 @@
     "followReviewMd": "Seguir REVIEW.md",
     "followReviewMdSubtitle": "Respeitar as instruções do ficheiro REVIEW.md de cada repositório",
     "bitbucket": {
-      "notConnectedReadOnly": "O Bitbucket não está ligado. Apenas os proprietários da organização, os administradores e os gestores de faturação o podem ligar."
+      "notConnectedReadOnlyPlan": "O período de teste da organização terminou, por isso um proprietário tem de atualizar a faturação em kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "A ligação ao Bitbucket para {{organization}} é gerida na Web, a partir de um computador.",
+      "managedOnWebTitle": "Gerida na Web",
+      "managedOnWebShort": "Esta ligação é gerida na Web, a partir de um computador.",
+      "managedOnWebRepositories": "Escolhe os repositórios de {{organization}} na Web, a partir de um computador.",
       "description": "Cria um token de acesso ao espaço de trabalho para {{organization}} e cola-o abaixo.",
       "descriptionReconnect": "Cria um novo token de acesso ao espaço de trabalho para {{organization}} e cola-o abaixo.",
-      "descriptionOverview": "Cria um token de acesso ao espaço de trabalho para {{organization}} e cola-o no ecrã seguinte.",
+      "descriptionOverview": "Cria um token de acesso ao espaço de trabalho e cola-o no ecrã seguinte.",
       "scopes": "Conta: leitura · Repositórios: leitura/escrita · Pedidos de integração: leitura · Webhooks: leitura/escrita",
       "tokenPlaceholder": "Token de acesso ao espaço de trabalho",
       "tokenRefused": "O Bitbucket não aceitou este token de acesso ao espaço de trabalho. Verifica se tem as permissões acima e tenta novamente."
@@ -1463,13 +1484,14 @@
     "platformList": {
       "checking": "A verificar…",
       "statusUnavailable": "Estado indisponível",
+      "needsAttention": "Requer atenção",
       "platforms": "Plataformas",
       "activity": "Atividade"
     },
     "providerConnect": {
-      "githubApp": "Aplicação do GitHub",
+      "githubApp": "aplicação do GitHub",
       "githubError": "Não foi possível abrir a configuração do GitHub. Tenta novamente.",
-      "gitlabAccount": "Conta do GitLab",
+      "gitlabAccount": "conta do GitLab",
       "gitlabError": "Não foi possível abrir a configuração do GitLab. Tenta novamente.",
       "description": "Liga a {{label}} ao Kilo para rever pedidos de integração automaticamente."
     },
@@ -2885,7 +2907,9 @@
     "modelPicker": {
       "title": "Selecionar modelo",
       "favorites": "Favoritos",
-      "noModelsDescription": "Não há modelos disponíveis para selecionar."
+      "noModelsDescription": "Não há modelos disponíveis para selecionar.",
+      "allUnavailableTitle": "Não é possível utilizar nenhum modelo",
+      "allUnavailableDescription": "Adiciona uma chave de fornecedor e tenta novamente."
     },
     "modelSelector": {
       "provider": "Fornecedor {{id}}",
@@ -3738,7 +3762,7 @@
     },
     "hub": {
       "renameTitle": "Renomear organização",
-      "renamePlaceholder": "Nome da organização",
+      "renamePlaceholder": "Introduza um nome para a organização",
       "balance": "Saldo",
       "plan": "Plano",
       "planTeams": "Teams",
@@ -4202,7 +4226,13 @@
     "providerUnavailable": "O fornecedor está indisponível neste momento. Volta a enviar dentro de instantes."
   },
   "settingsTools": {
-    "confirmTitle": "Confirmar esta alteração?"
+    "confirmTitle": "Confirmar esta alteração?",
+    "guarded": {
+      "spendAlertsOff": "Desativar alertas de gastos? Deixaria de receber notificações sobre ultrapassagens dos limites de gastos e picos horários.",
+      "balanceAlertsOff": "Desativar alertas de saldo? Deixaria de receber notificações quando os seus créditos estiverem quase esgotados.",
+      "securityFindingsOff": "Desativar deteções de segurança? Deixaria de receber notificações sobre novas deteções de segurança.",
+      "hideBalanceOn": "Ocultar os seus saldos? Os saldos de créditos deixariam de aparecer nos ecrãs de perfil e no hub da organização."
+    }
   },
   "appActions": {
     "start": {
@@ -4978,7 +5008,7 @@
   },
   "organizationGuardrails": {
     "title": "Proteções de IA",
-    "permissionDenied": "Apenas os proprietários e administradores da organização podem gerir as Proteções de IA.",
+    "permissionDenied": "Apenas os proprietários e administradores da organização podem gerir as Proteções de IA. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "As Proteções de IA não estão ativadas",
     "unavailable": "A Kilo ativa as Proteções de IA para uma organização a pedido. Contacte {{supportEmail}}, e a equipa do Kilo as ativa para a sua organização.",
     "contactSupport": "Contactar o suporte",
@@ -4990,12 +5020,15 @@
     "inputDescription": "Analisa cada entrada com a Enkrypt AI, incluindo os resultados das ferramentas. Quando a Enkrypt AI não está disponível, os pedidos são enviados sem análise em vez de rejeitados.",
     "outputTitle": "Proteções de saída",
     "outputDescription": "Analisa as respostas com a Enkrypt AI antes de os membros as receberem. Desativadas, a menos que as ative.",
+    "outputUnavailable": "O Kilo não ativou a análise de saída para esta organização, por isso as respostas não são verificadas e não há nada para configurar aqui. Contacte {{supportEmail}} para o pedir.",
     "detectorsHint": "Bloquear rejeita um pedido sinalizado. A opção Registar apenas regista-o sem atrasar o pedido.",
     "detectorsHintOutput": "Bloquear faz falhar uma resposta sinalizada. A opção Registar apenas regista-a sem atrasar a resposta.",
     "choiceLog": "Registar apenas",
     "applyTo": "Aplicar a",
     "applyToAllMembers": "Todos os membros",
     "applyKiloDefault": "Aplicar predefinição do Kilo",
+    "applyKiloDefaultEnglishNote": "O texto da política predefinida do Kilo está em inglês, porque o Kilo Gateway aplica-o exatamente como está escrito.",
+    "applyKiloDefaultReplaceMessage": "A política predefinida do Kilo está escrita em inglês e substitui o que definiu em Violação da política. O texto que introduziu no campo de texto da política não pode ser recuperado.",
     "invalidSavedTitle": "Não é possível ler as definições guardadas dos detetores de entrada",
     "invalidSavedBody": "Os pedidos são bloqueados até que os detetores de entrada sejam guardados novamente. Os detetores abaixo partem da predefinição do Kilo.",
     "invalidSavedOutputTitle": "Não é possível ler as definições guardadas dos detetores de saída",
@@ -5130,6 +5163,8 @@
     "providersDescription": "Desative um fornecedor para impedir o Kilo de encaminhar pedidos para ele nesta organização.",
     "providersNeedCatalog": "Os interruptores dos fornecedores ficam só de leitura até o catálogo completo de modelos ser carregado. Toque em Tentar novamente acima para os editar.",
     "providersEmpty": "Nenhum fornecedor corresponde a esta pesquisa.",
+    "providersNone": "Nenhum fornecedor está disponível para esta organização.",
+    "providersUnavailable": "Não foi possível carregar a lista de fornecedores.",
     "allowAllShown": "Permitir todos os apresentados",
     "denyAllShown": "Negar todos os apresentados",
     "gatewaysDescription": "O Kilo encaminha os pedidos de modelos através do Vercel AI Gateway ou do OpenRouter. Uma passarela desativada faz falhar esses pedidos.",

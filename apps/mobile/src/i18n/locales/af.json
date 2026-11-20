@@ -19,7 +19,9 @@
     "presenceStatus": "Gashere: {{connection}}",
     "commandStatus": "Bevelaflewering: {{status}}",
     "delivered": "Afgelewer",
-    "expired": "Verval"
+    "expired": "Verval",
+    "recoveryGaps_one": "{{displayCount}} deel van hierdie transkripsie ontbreek.",
+    "recoveryGaps_other": "{{displayCount}} dele van hierdie transkripsie ontbreek."
   },
   "common": {
     "manageOnWeb": "Bestuur op die web",
@@ -138,6 +140,7 @@
     "keepRunning": "Laat voortgaan",
     "newSession": "Nuwe sessie",
     "noModelsAvailable": "Geen modelle beskikbaar nie",
+    "modelRetires": "Tree af op {{date}}",
     "notFound": "Die item is nie gevind nie.",
     "online": "Aanlyn",
     "open": "Maak {{name}} oop",
@@ -181,7 +184,9 @@
     "organizationTrialEnded": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. 'n Organisasie-eienaar kan die fakturering by kilo.ai opdateer en dan weer probeer.",
     "privateRepositoryA11y": "{{name}}, privaat bewaarplek",
     "legalDocumentEnglishOnly": "Hierdie dokument is slegs in Engels beskikbaar.",
-    "organizationTrialEndedBilling": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. Jy kan die fakturering opdateer en dan weer probeer."
+    "organizationTrialEndedBilling": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. Jy kan die fakturering opdateer en dan weer probeer.",
+    "organizationTrialEndedBillingAtKiloAi": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. Jy kan die fakturering by kilo.ai opdateer en dan weer probeer.",
+    "viewOnGitHub": "Bekyk PR op GitHub"
   },
   "language": {
     "restarting": "Herbegin om die taal toe te pas",
@@ -275,6 +280,9 @@
     "credits": "Krediete",
     "failedToLoadBalance": "Die saldo kon nie gelaai word nie. Tik om weer te probeer.",
     "balanceLoadFailed": "Kon nie saldo laai nie",
+    "balanceUnreachable": "Kon nie die bediener bereik nie. Probeer weer.",
+    "balanceAccessDenied": "Jy het nie toegang om hierdie saldo te sien nie.",
+    "balanceUnavailable": "Die saldo kan nie gelaai word nie.",
     "hideBalance": "Versteek saldo",
     "showBalance": "Wys saldo",
     "balanceHidden": "Saldo versteek",
@@ -506,7 +514,7 @@
     "changelogFixesPolish": "Regstellings en verbeterings regdeur die app.",
     "changelogAreas": {
       "signIn": "Aanmelding",
-      "profileOrganizations": "Profiel en organisasies"
+      "profileOrganizations": "Profiel & organisasies"
     }
   },
   "preferences": {
@@ -751,6 +759,9 @@
       "couldNotLoadMore": "Kon nie meer kommentare laai nie.",
       "retryLoadingMore": "Probeer weer om meer kommentare te laai",
       "loadMoreComments": "Laai meer kommentare",
+      "conversationTruncated": "Slegs die eerste {{displayCount}} kommentare word vertoon.",
+      "conversationTruncated_one": "Slegs die eerste {{displayCount}} kommentare word vertoon.",
+      "conversationTruncated_other": "Slegs die eerste {{displayCount}} kommentare word vertoon.",
       "addReaction": "Voeg reaksie by",
       "reactionPill": "{{emoji}}-reaksie, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaksie",
@@ -880,7 +891,6 @@
       "noAccess": "Jy het nie toegang tot kontroles vir hierdie bewaarplek nie.",
       "couldNotLoad": "Kon nie die kontroles laai nie.",
       "retryChecks": "Probeer die kontroles weer",
-      "viewOnGitHub": "Bekyk PR op GitHub",
       "noChecksReported": "Geen kontroles gerapporteer nie",
       "passed": "{{displayCount}} geslaag",
       "passed_one": "{{displayCount}} geslaag",
@@ -964,6 +974,8 @@
       "pendingComment": "hangende kommentare",
       "pendingComment_other": "hangende kommentare",
       "submitCountOfTotal": "Dien {{displayFreshCount}} van {{displayTotalCount}} kommentare in",
+      "submitCountOfTotal_one": "Dien {{displayFreshCount}} van {{displayTotalCount}} kommentare in",
+      "submitCountOfTotal_other": "Dien {{displayFreshCount}} van {{displayTotalCount}} kommentare in",
       "submitReview": "Dien hersiening in",
       "partialPostedFresh": "{{displayFreshCount}} kommentaar(e) is geplaas. ",
       "partialPostedFresh_one": "{{displayFreshCount}} kommentaar(e) is geplaas. ",
@@ -1388,13 +1400,16 @@
     "followReviewMd": "Volg REVIEW.md",
     "followReviewMdSubtitle": "Volg die REVIEW.md-instruksielêer in elke bewaarplek",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket is nie gekoppel nie. Slegs organisasie-eienaars, administrateurs en faktureringsbestuurders kan dit koppel."
+      "notConnectedReadOnlyPlan": "Die organisasie se proeftydperk het geëindig, so 'n eienaar moet die fakturering by kilo.ai opdateer."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Die Bitbucket-verbinding vir {{organization}} word op die web vanaf 'n rekenaar bestuur.",
+      "managedOnWebTitle": "Op die web bestuur",
+      "managedOnWebShort": "Hierdie verbinding word op die web vanaf 'n rekenaar bestuur.",
+      "managedOnWebRepositories": "Kies die repositories vir {{organization}} op die web vanaf 'n rekenaar.",
       "description": "Skep vir {{organization}} 'n toegangstoken vir die werkruimte en plak dit hieronder.",
       "descriptionReconnect": "Skep weer vir {{organization}} 'n toegangstoken vir die werkruimte en plak dit hieronder.",
-      "descriptionOverview": "Skep vir {{organization}} 'n toegangstoken vir die werkruimte en plak dit op die volgende skerm.",
+      "descriptionOverview": "Skep 'n toegangstoken vir die werkruimte en plak dit op die volgende skerm.",
       "scopes": "Rekening: lees · Bewaarplekke: lees/skryf · Trekversoeke: lees · Webhake: lees/skryf",
       "tokenPlaceholder": "Toegangstoken vir die werkruimte",
       "tokenRefused": "Bitbucket het nie hierdie toegangstoken vir die werkruimte aanvaar nie. Kontroleer dat dit die toestemmings hierbo het en probeer dan weer."
@@ -1415,6 +1430,7 @@
     "platformList": {
       "checking": "Besig om na te gaan…",
       "statusUnavailable": "Status onbeskikbaar",
+      "needsAttention": "Aandag nodig",
       "platforms": "Kodeplatforms",
       "activity": "Aktiwiteit"
     },
@@ -2785,7 +2801,9 @@
     "modelPicker": {
       "title": "Kies model",
       "favorites": "Gunstelinge",
-      "noModelsDescription": "Geen modelle is beskikbaar om te kies nie."
+      "noModelsDescription": "Geen modelle is beskikbaar om te kies nie.",
+      "allUnavailableTitle": "Geen modelle kan gebruik word nie",
+      "allUnavailableDescription": "Voeg 'n verskaffersleutel by en probeer dan weer."
     },
     "modelSelector": {
       "provider": "Verskaffer {{id}}",
@@ -3618,7 +3636,7 @@
     },
     "hub": {
       "renameTitle": "Hernoem organisasie",
-      "renamePlaceholder": "Organisasienaam",
+      "renamePlaceholder": "Voer 'n organisasienaam in",
       "balance": "Saldo",
       "plan": "Plan",
       "planTeams": "Teams",
@@ -4078,7 +4096,13 @@
     "providerUnavailable": "Die verskaffer is tans onbeskikbaar. Stuur binnekort weer."
   },
   "settingsTools": {
-    "confirmTitle": "Bevestig hierdie verandering?"
+    "confirmTitle": "Bevestig hierdie verandering?",
+    "guarded": {
+      "spendAlertsOff": "Skakel bestedingswaarskuwings af? Jy sal ophou om kennisgewings te ontvang oor die oorskryding van bestedingsdrempels en uurlikse pieke.",
+      "balanceAlertsOff": "Skakel balanswaarskuwings af? Jy sal ophou om kennisgewings te ontvang wanneer jou krediete laag raak.",
+      "securityFindingsOff": "Skakel sekuriteitsbevindings af? Jy sal ophou om kennisgewings te ontvang oor nuwe sekuriteitsbevindings.",
+      "hideBalanceOn": "Versteek jou balanse? Kredietbalanse sal nie meer op die profielskerms en die organisasiehub verskyn nie."
+    }
   },
   "appActions": {
     "start": {
@@ -4826,7 +4850,7 @@
   },
   "organizationGuardrails": {
     "title": "KI-veiligheidsreëls",
-    "permissionDenied": "Slegs organisasie-eienaars en -administrateurs kan KI-veiligheidsreëls bestuur.",
+    "permissionDenied": "Slegs organisasie-eienaars en -administrateurs kan KI-veiligheidsreëls bestuur. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "KI-veiligheidsreëls is nie geaktiveer nie",
     "unavailable": "Kilo aktiveer KI-veiligheidsreëls vir 'n organisasie op versoek. Kontak {{supportEmail}}, en die Kilo-span skakel dit vir jou organisasie aan.",
     "contactSupport": "Kontak ondersteuning",
@@ -4838,12 +4862,15 @@
     "inputDescription": "Skandeer elke invoer met Enkrypt AI, insluitend gereedskapresultate. Wanneer Enkrypt nie beskikbaar is nie, word versoeke ongeskandeer gestuur in plaas daarvan om verwerp te word.",
     "outputTitle": "Veiligheidsreëls vir uitvoer",
     "outputDescription": "Skandeer antwoorde met Enkrypt AI voordat lede dit ontvang. Af tensy jy dit aanskakel.",
+    "outputUnavailable": "Kilo het nie uitvoerskandering vir hierdie organisasie geaktiveer nie, so antwoorde word nie nagegaan nie en daar is niks om hier te stel nie. Kontak {{supportEmail}} om dit aan te vra.",
     "detectorsHint": "Blokkeer verwerp 'n gevlagde versoek. Slegs aanteken hou rekord daarvan sonder om die versoek te vertraag.",
     "detectorsHintOutput": "Blokkeer laat 'n gevlagde antwoord misluk. Slegs aanteken hou rekord daarvan sonder om die antwoord te vertraag.",
     "choiceLog": "Slegs aanteken",
     "applyTo": "Pas toe op",
     "applyToAllMembers": "Alle lede",
     "applyKiloDefault": "Pas Kilo-verstek toe",
+    "applyKiloDefaultEnglishNote": "Kilo se verstekbeleidsteks is in Engels, want die Kilo Gateway pas dit presies toe soos dit geskryf is.",
+    "applyKiloDefaultReplaceMessage": "Kilo se verstekbeleid is in Engels geskryf en vervang wat jy by Beleidsoortreding gestel het. Die teks wat jy in die beleidsteks-veld ingevul het, kan nie herwin word nie.",
     "invalidSavedTitle": "Gestoorde instellings vir invoerdetektors kan nie gelees word nie",
     "invalidSavedBody": "Versoeke word geblokkeer totdat die invoerdetektors weer gestoor word. Die detektors hieronder begin by Kilo-verstek.",
     "invalidSavedOutputTitle": "Gestoorde instellings vir uitvoerdetektors kan nie gelees word nie",
@@ -4978,6 +5005,8 @@
     "providersDescription": "Skakel 'n verskaffer af sodat Kilo nie meer vir hierdie organisasie daarheen roeteer nie.",
     "providersNeedCatalog": "Verskafferskakelaars bly leesalleen totdat die volledige modelkatalogus gelaai het. Tik hierbo op Probeer weer om hulle te wysig.",
     "providersEmpty": "Geen verskaffers pas by hierdie soektog nie.",
+    "providersNone": "Geen verskaffers is vir hierdie organisasie beskikbaar nie.",
+    "providersUnavailable": "Die verskafferslys kon nie laai nie.",
     "allowAllShown": "Laat almal wat gewys word toe",
     "denyAllShown": "Weier almal wat gewys word",
     "gatewaysDescription": "Kilo roeteer modelversoeke deur Vercel AI Gateway of OpenRouter. 'n Afgeskakelde gateway laat daardie versoeke misluk.",

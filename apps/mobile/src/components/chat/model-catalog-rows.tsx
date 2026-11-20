@@ -17,6 +17,7 @@ import { type CatalogModel } from '@/lib/chat/gguf-catalog';
 import { useGgufModels } from '@/lib/chat/gguf-models';
 import { type HfListedModel, hfModelName } from '@/lib/chat/hf-catalog';
 import { useHfSmallestDownload } from '@/lib/chat/use-hf-catalog';
+import { useIsLargeFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { formatFileSize } from '@/lib/format';
 
 import { GgufDownloadControls } from './gguf-model-section';
@@ -122,6 +123,10 @@ export function ModelRow({
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const smallest = useHfSmallestDownload(model.id, model.parameters);
+  // The row title rule: one line, and a second one at a large font scale, where
+  // a model name such as "HyperCLOVAX SEED Text Instruct 1.5B Q4_K_M" lost its
+  // distinguishing tail.
+  const nameLines = useIsLargeFontScale() ? 2 : 1;
   const sizeBytes = smallest.data ?? undefined;
   const fit = sizeBytes === undefined ? undefined : deviceFit(sizeBytes, budget);
   if (fitsOnly) {
@@ -148,7 +153,7 @@ export function ModelRow({
     >
       <View className="min-w-0 flex-1 gap-1">
         <View className="flex-row items-center gap-2">
-          <Text className="min-w-0 shrink text-sm font-medium" numberOfLines={1}>
+          <Text className="min-w-0 shrink text-sm font-medium" numberOfLines={nameLines}>
             {name}
           </Text>
           {smallest.isFetched && <FitBadge fit={fit} />}

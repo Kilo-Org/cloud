@@ -348,6 +348,21 @@ const openSession = async (
   return messageOf(rpcWith(socket.sent, 'id', 1));
 };
 
+const sendSnapshotCall = (socket: FakeSocket, id: number, sessionHandle: string | undefined) => {
+  socket.handlers.onText(
+    JSON.stringify({
+      controllerId: CONTROLLER_ID,
+      message: {
+        id,
+        jsonrpc: '2.0',
+        method: 'tools.call',
+        params: { arguments: {}, authorized: [], name: 'browser_snapshot', sessionHandle },
+      },
+      type: 'rpc',
+    })
+  );
+};
+
 describe('local agents host over a loopback endpoint', () => {
   it('pairs, handshakes, announces ext.hello, opens a session, and revokes on switch off', async () => {
     const harness = createHarness();
@@ -365,6 +380,7 @@ describe('local agents host over a loopback endpoint', () => {
       console: true,
       dialogs: true,
       fileUpload: true,
+      keepalive: true,
       network: false,
       tabGroups: false,
       trustedInput: false,
@@ -523,6 +539,76 @@ describe('local agents host over a loopback endpoint', () => {
     host.stop();
   });
 
+  it('keeps a session and a Stop all through a service-worker restart', async () => {
+    const first = createHarness();
+    seedEnabledWithEndpoint(first.storage);
+    const before = startHost(first);
+    await before.ready;
+    const socket = await connectSocketIfNeeded(first);
+
+    await completeHandshake(socket);
+    const kept = sessionHandleOf(
+      await openSession(socket, { cliVersion: '1', cwd: '/tmp', title: 'kept' })
+    );
+
+    // The worker dies without a word: no state change runs, only storage.session survives.
+    const second = createHarness();
+
+    for (const [key, value] of first.storage.items) {
+      second.storage.items.set(key, value);
+    }
+
+    const after = startHost(second);
+    await after.ready;
+    const resocket = await connectSocketIfNeeded(second);
+
+    await completeHandshake(resocket);
+    resocket.handlers.onText(
+      JSON.stringify({ controllerId: CONTROLLER_ID, type: 'controller.connected' })
+    );
+
+    // The same CLI's next call reaches the browser under the handle it already has.
+    sendSnapshotCall(resocket, 2, kept);
+    await vi.waitFor(() => {
+      expect(rpcWith(resocket.sent, 'id', 2)).toBeDefined();
+    });
+    expect(messageOf(rpcWith(resocket.sent, 'id', 2))?.['error']).toBeUndefined();
+    expect(second.bridge.callTool).toHaveBeenCalledWith(
+      CONTROLLER_ID,
+      expect.objectContaining({ sessionHandle: kept })
+    );
+
+    // A Stop all before the next restart is still a stop after it.
+    second.listeners.command?.('stop-all-local-agents');
+    await vi.waitFor(() => {
+      expect(rpcWith(resocket.sent, 'method', 'session.revoked')).toBeDefined();
+    });
+
+    const third = createHarness();
+
+    for (const [key, value] of second.storage.items) {
+      third.storage.items.set(key, value);
+    }
+
+    const last = startHost(third);
+    await last.ready;
+    const lastSocket = await connectSocketIfNeeded(third);
+
+    await completeHandshake(lastSocket);
+    sendSnapshotCall(lastSocket, 3, kept);
+    await vi.waitFor(() => {
+      expect(rpcWith(lastSocket.sent, 'id', 3)).toBeDefined();
+    });
+    expect(messageOf(rpcWith(lastSocket.sent, 'id', 3))?.['error']).toStrictEqual({
+      code: -32_004,
+      message: 'The user stopped this agent session.',
+    });
+    expect(third.bridge.callTool).not.toHaveBeenCalled();
+    before.stop();
+    after.stop();
+    last.stop();
+  });
+
   it('forwards the structured error data the CLI reads', async () => {
     const harness = createHarness();
     seedEnabledWithEndpoint(harness.storage);
@@ -557,6 +643,78 @@ describe('local agents host over a loopback endpoint', () => {
       },
       message: 'Permission needed.',
     });
+    host.stop();
+  });
+
+  it('answers an unexpected failure of a tool call with what failed, in words the model can act on', async () => {
+    const harness = createHarness();
+    seedEnabledWithEndpoint(harness.storage);
+    const host = startHost(harness);
+    await host.ready;
+    const socket = await connectSocketIfNeeded(harness);
+
+    await completeHandshake(socket);
+    // The call must reach the bridge, so the session it names is the one this controller opened.
+    const opened = z
+      .object({ result: z.object({ sessionHandle: z.string() }) })
+      .parse(await openSession(socket, { cliVersion: '1', cwd: '/tmp', title: 'Work' }));
+    const { sessionHandle } = opened.result;
+
+    harness.bridge.callTool.mockRejectedValueOnce(new Error('No tab with id: 42.'));
+    socket.handlers.onText(
+      JSON.stringify({
+        controllerId: CONTROLLER_ID,
+        message: {
+          id: 8,
+          jsonrpc: '2.0',
+          method: 'tools.call',
+          params: { arguments: {}, name: 'browser_snapshot', sessionHandle },
+        },
+        type: 'rpc',
+      })
+    );
+
+    await vi.waitFor(() => {
+      expect(rpcWith(socket.sent, 'id', 8)).toBeDefined();
+    });
+    expect(messageOf(rpcWith(socket.sent, 'id', 8))?.['error']).toStrictEqual({
+      code: -32_603,
+      message:
+        'The browser could not finish the call: No tab with id: 42. Part of it may have run; take a new page snapshot before retrying.',
+    });
+    host.stop();
+  });
+
+  it('does not send the model after a snapshot when the failed method ran no page step', async () => {
+    const harness = createHarness();
+    seedEnabledWithEndpoint(harness.storage);
+    // `tools.list` reads the contract in memory: no page step ran, and a snapshot could not help.
+    harness.bridge.listTools.mockRejectedValueOnce(new Error('No tab with id: 42.'));
+    const host = startHost(harness);
+    await host.ready;
+    const socket = await connectSocketIfNeeded(harness);
+
+    await completeHandshake(socket);
+    socket.handlers.onText(
+      JSON.stringify({
+        controllerId: CONTROLLER_ID,
+        message: { id: 9, jsonrpc: '2.0', method: 'tools.list', params: {} },
+        type: 'rpc',
+      })
+    );
+
+    await vi.waitFor(() => {
+      expect(rpcWith(socket.sent, 'id', 9)).toBeDefined();
+    });
+    const answered = messageOf(rpcWith(socket.sent, 'id', 9))?.['error'];
+
+    expect(answered).toStrictEqual({
+      code: -32_603,
+      message:
+        'The browser could not finish the call: No tab with id: 42. Nothing on the page changed; retrying the call is safe.',
+    });
+    // The advice a tool call needs must not leak into a method that never touched the page.
+    expect(JSON.stringify(answered)).not.toContain('snapshot');
     host.stop();
   });
 
@@ -745,6 +903,56 @@ describe('pairing admission', () => {
       expect(harness.removeTab).toHaveBeenCalledWith(55);
     });
     expect(harness.sockets).toHaveLength(1);
+    host.stop();
+  });
+
+  it('shows the unreachable hint when a redeemed endpoint cannot connect', async () => {
+    const harness = createHarness();
+    harness.storage.items.set(LOCAL_AGENT_SETTINGS_STORAGE_KEY, { enabled: true });
+    const host = startHost(harness);
+    await host.ready;
+
+    harness.listeners.tabUpdated?.(56, { url: PAIRING_URL }, { url: PAIRING_URL });
+    const socket = await connectSocketIfNeeded(harness);
+    socket.handlers.onError();
+
+    await vi.waitFor(async () => {
+      await expect(loadPairingNotice(harness.storage)).resolves.toBe('unreachable');
+    });
+    host.stop();
+  });
+
+  it('clears the unreachable hint once the redeemed endpoint connects on a retry', async () => {
+    const harness = createHarness();
+    let clock = 1000;
+    harness.hostOptions.now = () => clock;
+    harness.storage.items.set(LOCAL_AGENT_SETTINGS_STORAGE_KEY, { enabled: true });
+    const host = startHost(harness);
+    await host.ready;
+
+    harness.listeners.tabUpdated?.(57, { url: PAIRING_URL }, { url: PAIRING_URL });
+    const socket = await connectSocketIfNeeded(harness);
+    socket.handlers.onError();
+    await vi.waitFor(async () => {
+      await expect(loadPairingNotice(harness.storage)).resolves.toBe('unreachable');
+    });
+
+    clock += 60_000;
+    harness.listeners.alarm?.({ name: 'kilo-local-agents-watchdog' });
+    await vi.waitFor(() => {
+      expect(harness.sockets).toHaveLength(2);
+    });
+    const [, retry] = harness.sockets;
+
+    if (retry === undefined) {
+      throw new Error('expected the retry socket');
+    }
+
+    await completeHandshake(retry);
+
+    await vi.waitFor(async () => {
+      await expect(loadPairingNotice(harness.storage)).resolves.toBeNull();
+    });
     host.stop();
   });
 
@@ -999,6 +1207,17 @@ describe('disconnecting one CLI', () => {
       reason: 'disconnect',
       sessionHandle,
     });
+
+    // A call that raced the click is told the user stopped it, not that the session was lost.
+    sendSnapshotCall(socket, 2, sessionHandle);
+    await vi.waitFor(() => {
+      expect(rpcWith(socket.sent, 'id', 2)).toBeDefined();
+    });
+    expect(messageOf(rpcWith(socket.sent, 'id', 2))?.['error']).toStrictEqual({
+      code: -32_004,
+      message: 'The user stopped this agent session.',
+    });
+    expect(harness.bridge.callTool).not.toHaveBeenCalled();
 
     // The hub announces the same CLI again after a reconnect, and its next conversation asks for a session.
     socket.handlers.onText(

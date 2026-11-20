@@ -230,6 +230,20 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const BALANCE_KEY = [['user', 'getContextBalance'], { input: {}, type: 'query' }] as const;
+
+/** A tRPC client rejection, as `readTrpcErrorField` reads it. */
+function trpcError(code: string): Error {
+  return Object.assign(new Error(code), { data: { code, message: code } });
+}
+
+/**
+ * A read that never reached the server: a fetch rejection carries no tRPC code
+ * and no HTTP status, which is what names the connection rather than the
+ * server.
+ */
+function getConnectionBalanceFailure(): void {
+  getContextBalanceQueryFn.mockRejectedValue(new TypeError('Network request failed'));
+}
 const savedMetadata = new Map<string, string>();
 let saveCompletion: Promise<undefined> | undefined = undefined;
 
@@ -983,27 +997,32 @@ describe('CreditsCard organization balance source', () => {
     },
   ] as OrgListEntry[];
 
-  it('paints the organization balance for a billing manager instead of the member read', async () => {
-    currentUser.userId = 'user-1';
-    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
-    // The member spend balance answers zero for a billing manager — the defect
-    // was painting it under the organization's name.
-    getContextBalanceQueryFn.mockResolvedValue({ balance: 0 });
-    listState.payload = billingManagerOrgs;
+  // Every money role manages the organization's money, so every one of them
+  // paints the organization's own balance. The member read answers zero for
+  // them — the defect was painting that figure under the organization's name.
+  it.each(['owner', 'admin', 'billing_manager'])(
+    'paints the organization balance for a %s instead of the member read',
+    async role => {
+      currentUser.userId = 'user-1';
+      savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+      const moneyRoleOrgs = [{ ...billingManagerOrgs[0], role }] as OrgListEntry[];
+      getContextBalanceQueryFn.mockResolvedValue({ balance: 0 });
+      listState.payload = moneyRoleOrgs;
 
-    const { texts, unmount } = await mountCard(createTestQueryClient(), undefined, {
-      status: 'ready',
-      orgs: billingManagerOrgs,
-    });
-    try {
-      await waitFor(() => texts().includes('$36.12'));
-      expect(texts()).not.toContain('$0.00');
-      // The amount is the organization's own balance, so no member-scope copy.
-      expect(texts()).not.toContain('Available to spend in this organization');
-    } finally {
-      unmount();
+      const { texts, unmount } = await mountCard(createTestQueryClient(), undefined, {
+        status: 'ready',
+        orgs: moneyRoleOrgs,
+      });
+      try {
+        await waitFor(() => texts().includes('$36.12'));
+        expect(texts()).not.toContain('$0.00');
+        // The amount is the organization's own balance, so no member-scope copy.
+        expect(texts()).not.toContain('Available to spend in this organization');
+      } finally {
+        unmount();
+      }
     }
-  });
+  );
 
   it("paints a plain member's spend balance with its scope caption", async () => {
     currentUser.userId = 'user-1';
@@ -1220,15 +1239,18 @@ describe('CreditsCard add-credits entry point', () => {
     onlineManager.setOnline(true);
   });
 
-  it('settles an unreachable balance read to the retry surface while offline', async () => {
+  it('settles an unreachable balance read to the connection state while offline', async () => {
     currentUser.userId = 'user-1';
-    getContextBalanceQueryFn.mockRejectedValue(new Error('Network request failed'));
+    getConnectionBalanceFailure();
     onlineManager.setOnline(false);
 
     const { labels, texts, unmount } = await mountCard();
-    await waitFor(() => labels().includes('Failed to load balance. Tap to retry.'));
+    // A read that never reached the server names the connection, not a
+    // server-side failure, and keeps the Retry that a restored network makes
+    // useful.
+    await waitFor(() => labels().includes('Could not reach the server. Try again.'));
 
-    expect(texts()).toContain("Couldn't load balance");
+    expect(texts()).toContain('Could not reach the server. Try again.');
     expect(texts()).toContain('Retry');
     expect(texts()).not.toContain('SKELETON');
     expect(texts()).not.toContain('$0.00');
@@ -1238,10 +1260,10 @@ describe('CreditsCard add-credits entry point', () => {
 
   it('keeps personal Buy credits actionable when the balance request fails', async () => {
     currentUser.userId = 'user-1';
-    getContextBalanceQueryFn.mockRejectedValue(new Error('Balance unavailable'));
+    getConnectionBalanceFailure();
 
     const { renderer, labels, texts, unmount } = await mountCard();
-    await waitFor(() => labels().includes('Failed to load balance. Tap to retry.'));
+    await waitFor(() => labels().includes('Could not reach the server. Try again.'));
 
     expect(addCreditsAction(renderer).props.accessibilityRole).toBe('button');
     expect(texts()).not.toContain('$0.00');
@@ -1250,6 +1272,52 @@ describe('CreditsCard add-credits entry point', () => {
     });
     expect(routerPush).toHaveBeenCalledWith('/(app)/credits');
 
+    unmount();
+  });
+
+  it('names a permission refusal without offering Retry', async () => {
+    currentUser.userId = 'user-1';
+    getContextBalanceQueryFn.mockRejectedValue(trpcError('FORBIDDEN'));
+
+    const { renderer, labels, texts, unmount } = await mountCard();
+    const PERMISSION_COPY = "You don't have permission to view this balance.";
+    await waitFor(() => labels().includes(PERMISSION_COPY));
+
+    expect(texts()).toContain(PERMISSION_COPY);
+    // A refusal cannot be fixed by asking again, so the card offers no action.
+    expect(texts()).not.toContain('Retry');
+    const retrySurface = renderer.root.findAll(
+      node => node.type === Pressable && node.props.accessibilityRole === 'button'
+    );
+    expect(
+      retrySurface.some(node =>
+        String(node.props.accessibilityLabel ?? '').includes('Tap to retry')
+      )
+    ).toBe(false);
+    unmount();
+  });
+
+  it('describes a terminal balance failure as an explanation with no Retry', async () => {
+    currentUser.userId = 'user-1';
+    getContextBalanceQueryFn.mockRejectedValue(trpcError('NOT_FOUND'));
+
+    const { labels, texts, unmount } = await mountCard();
+    await waitFor(() => labels().includes("Balance couldn't be loaded."));
+
+    expect(texts()).toContain("Balance couldn't be loaded.");
+    expect(texts()).not.toContain('Retry');
+    unmount();
+  });
+
+  it('keeps the retry line for a transient balance failure', async () => {
+    currentUser.userId = 'user-1';
+    getContextBalanceQueryFn.mockRejectedValue(trpcError('INTERNAL_SERVER_ERROR'));
+
+    const { labels, texts, unmount } = await mountCard();
+    await waitFor(() => labels().includes('Failed to load balance. Tap to retry.'));
+
+    expect(texts()).toContain("Couldn't load balance");
+    expect(texts()).toContain('Retry');
     unmount();
   });
 

@@ -119,11 +119,16 @@ export function PrReviewOverview({
   }, [t]);
 
   const state = pr.isError ? classifyPrReviewQueryState(pr.error) : null;
-  // A retryable gateway-class failure (retryable or service-unavailable)
-  // with cached data keeps it on screen: a failed background refetch of a
-  // previously loaded PR must not blank the overview. Every other state, or
-  // a first load with no data, renders the error states below.
-  const keepCachedData = state?.kind === 'retryable' || state?.kind === 'service-unavailable';
+  // A recoverable failure (transient, gateway, or a read that never reached
+  // the server) with cached data keeps it on screen: a failed background
+  // refetch of a previously loaded PR must not blank the overview — and a
+  // reader who went offline has even less reason to lose what they had.
+  // Every other state, or a first load with no data, renders the error states
+  // below.
+  const keepCachedData =
+    state?.kind === 'retryable' ||
+    state?.kind === 'service-unavailable' ||
+    state?.kind === 'offline';
   if (state && (!pr.data || !keepCachedData)) {
     if (state.kind === 'not-found') {
       return (
@@ -210,6 +215,20 @@ export function PrReviewOverview({
               }}
             />
           }
+        />
+      );
+    }
+    // The read never reached the server: name the connection, not the backend,
+    // and keep the Retry a restored network makes useful.
+    if (state.kind === 'offline') {
+      return (
+        <QueryError
+          refreshControl={refreshControl}
+          variant="offline"
+          onRetry={() => {
+            void pr.refetch();
+          }}
+          isRetrying={pr.isFetching}
         />
       );
     }

@@ -7,6 +7,8 @@ import {
   authorizedGrantsSchema,
   NEEDS_PERMISSION_ERROR,
   ORIGIN_CHANGED_ERROR,
+  RUN_CODE_UNSUPPORTED_ERROR,
+  UNSERVED_BROWSER_TOOL_NAMES,
 } from '../browser-agent-checks';
 import type { BrowserCaller } from '../browser-caller';
 import { TAB_BUSY_ERROR, TAB_TAKEN_ERROR } from '../browser-caller';
@@ -16,7 +18,7 @@ import { BROWSER_TOOL_CONTRACT } from '../browser-tool-contract';
 import { boundBrowserToolText } from '../browser-tool-snapshot';
 import type { EvalTabResult } from '../tab-debugger';
 import { BROWSER_TOOL_CONTRACT_SHA } from './envelope';
-import { LocalAgentRpcError, LOCAL_AGENT_ERROR_CODES } from './jsonrpc';
+import { LocalAgentRpcError, LOCAL_AGENT_ERROR_CODES, SESSION_LOST_MESSAGE } from './jsonrpc';
 import type { JsonRpcParams, JsonRpcResult } from './jsonrpc';
 
 /*
@@ -38,6 +40,7 @@ export type LocalAgentBrowserRuntime = Pick<
   | 'openSessionTab'
   | 'releaseCaller'
   | 'releaseTab'
+  | 'restoreSessions'
   | 'runTool'
   | 'shareActiveTab'
   | 'tabInfo'
@@ -262,9 +265,10 @@ export const createRuntimeBrowserBridge = ({
       return;
     }
 
+    // A session the bridge never ended and the runtime does not hold was lost; the CLI may open a new one.
     throw isEnded(sessionHandle)
       ? new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.userStopped, SESSION_STOPPED_ERROR)
-      : new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.blocked, SESSION_NOT_OPEN_ERROR);
+      : new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.sessionLost, SESSION_LOST_MESSAGE);
   };
 
   /** The tab one call runs on: the active tab when the session owns it, else the newest group tab. */
@@ -323,6 +327,14 @@ export const createRuntimeBrowserBridge = ({
         tabId,
         toolName: parsed.name,
       })
+      // A take-over that lands before the tool runs surfaces as the tab session's thrown guard error: same answer as a result.
+      .catch((error: unknown) => {
+        if (error instanceof Error && error.message === TAB_TAKEN_ERROR) {
+          throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.tabTaken, TAB_TAKEN_ERROR);
+        }
+
+        throw error;
+      })
       // Turn end: the lease goes with the session's last call on this tab, its refs stay, and its other tabs keep theirs.
       .finally(() => {
         const remaining = (callsInFlight.get(flightKey) ?? 1) - 1;
@@ -367,6 +379,13 @@ export const createRuntimeBrowserBridge = ({
     if (outcome.kind === 'needs_take_over') {
       // An agent never takes a tab; a held tab is a `tab_busy` after the wait.
       throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.tabBusy, TAB_BUSY_ERROR);
+    }
+
+    if (outcome.kind === 'unsupported') {
+      throw new LocalAgentRpcError(
+        LOCAL_AGENT_ERROR_CODES.unsupportedInBrowser,
+        outcome.result.ok ? 'This browser cannot run the tool.' : outcome.result.error
+      );
     }
 
     if (outcome.result.ok) {
@@ -511,8 +530,10 @@ export const createRuntimeBrowserBridge = ({
     return runOnTab(parsed, input, { tabId: opened.tabId });
   };
 
+  // Every session operation first waits for the sessions an earlier service worker stored: a CLI keeps its handle and its group across a restart.
   return {
-    adopt: input => {
+    adopt: async input => {
+      await runtime().restoreSessions();
       ended.delete(input.sessionHandle);
 
       return runtime().adoptEnded({ sessionHandle: input.sessionHandle });
@@ -530,7 +551,16 @@ export const createRuntimeBrowserBridge = ({
 
       const input = { controllerId, sessionHandle: parsed.data.sessionHandle };
 
+      await runtime().restoreSessions();
       assertLive(input.sessionHandle);
+
+      // Nothing can run it here: answered before the gate, so the CLI never asks for a grant it could not use.
+      if (parsed.data.name === 'browser_run_code_unsafe') {
+        throw new LocalAgentRpcError(
+          LOCAL_AGENT_ERROR_CODES.unsupportedInBrowser,
+          RUN_CODE_UNSUPPORTED_ERROR
+        );
+      }
 
       const existing = await targetTab(input.sessionHandle);
 
@@ -543,16 +573,24 @@ export const createRuntimeBrowserBridge = ({
       return runOnTab(parsed.data, input, { tabId: existing });
     },
 
-    closeSession: closeOne,
+    closeSession: async input => {
+      await runtime().restoreSessions();
+      await closeOne(input);
+    },
 
     endSessions: async sessions => {
+      await runtime().restoreSessions();
       await Promise.all(sessions.map(session => closeOne(session)));
     },
 
     listTools: () =>
       Promise.resolve({
         contractSha: BROWSER_TOOL_CONTRACT_SHA,
-        tools: BROWSER_TOOL_CONTRACT.map(tool => ({
+        // The contract stays verbatim — its SHA is of the pinned upstream `tools/list` and the handshake compares it —
+        // But a tool no backend here can run is not offered: an offer costs a turn the call can only refuse.
+        tools: BROWSER_TOOL_CONTRACT.filter(
+          tool => !UNSERVED_BROWSER_TOOL_NAMES.has(tool.name)
+        ).map(tool => ({
           inputSchema: tool.inputSchema,
           name: tool.name,
           readOnly: tool.readOnly,
@@ -560,6 +598,7 @@ export const createRuntimeBrowserBridge = ({
       }),
 
     openSession: async input => {
+      await runtime().restoreSessions();
       ended.delete(input.sessionHandle);
       await runtime().openSession({
         controllerId: input.controllerId,
@@ -569,6 +608,7 @@ export const createRuntimeBrowserBridge = ({
     },
 
     shareActiveTab: async input => {
+      await runtime().restoreSessions();
       assertLive(input.sessionHandle);
 
       const shared = await runtime().shareActiveTab({ sessionHandle: input.sessionHandle });

@@ -338,8 +338,10 @@ export async function restoreSharePayloads(userId: string): Promise<void> {
   // retained share is the one a pending-share hint is most likely to name.
   const free = SHARE_PAYLOAD_MAX_ENTRIES - payloads.size;
   const retained = draft.order.filter(id => draft.entries[id] !== undefined && !payloads.has(id));
+  // `slice(-0)` is `slice(0)`, so no room must select nothing explicitly.
+  const room = Math.max(free, 0);
   const restored: SharePayload[] = [];
-  for (const id of retained.slice(-Math.max(free, 0))) {
+  for (const id of room === 0 ? [] : retained.slice(-room)) {
     const entry = draft.entries[id];
     if (entry !== undefined) {
       const payload: SharePayload = {

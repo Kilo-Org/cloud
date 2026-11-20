@@ -594,6 +594,30 @@ describe('share payload durable persistence', () => {
     expect(draft?.entries[owned]?.text).toBe('staged-by-a');
   });
 
+  it('restores nothing when other owners already fill the store', async () => {
+    // The store is full of captures no account staged, so this account owns no
+    // entry yet and there is no room for its retained ones.
+    const live: string[] = [];
+    for (let i = 0; i < SHARE_PAYLOAD_MAX_ENTRIES; i += 1) {
+      live.push(putSharePayload({ text: `capture-${i}`, files: [], failedFiles: [] }));
+    }
+    saveDraft('userA', SHARE_PAYLOADS_DRAFT_KEY, {
+      order: ['retained-1', 'retained-2'],
+      entries: {
+        'retained-1': { text: 'retained-1', files: [], failedFiles: [] },
+        'retained-2': { text: 'retained-2', files: [], failedFiles: [] },
+      },
+    });
+    await flushDraft('userA', SHARE_PAYLOADS_DRAFT_KEY);
+
+    setSharePersistUserId('userA');
+    await restoreSharePayloads('userA');
+
+    expect(peekSharePayload('retained-1')).toBeNull();
+    expect(peekSharePayload('retained-2')).toBeNull();
+    expect(live.every(id => peekSharePayload(id) !== null)).toBe(true);
+  });
+
   it('restores the newest retained entries that fit beside a live capture', async () => {
     // The account's draft holds more entries than the store can take, left by
     // that account's previous session.

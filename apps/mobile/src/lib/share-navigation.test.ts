@@ -301,6 +301,34 @@ describe('share navigation durable persistence', () => {
     expect(takePendingShareNavigation()).toBeNull();
   });
 
+  it('restores nothing when the queue already holds the cap', async () => {
+    // The queue is full of destinations this process staged, so the account's
+    // retained destinations have no room and the cap must hold.
+    for (let i = 0; i < SHARE_PAYLOAD_MAX_ENTRIES; i += 1) {
+      stageDestination(`live-${i}`);
+    }
+    saveDraft('userA', SHARE_NAV_DRAFT_KEY, [
+      { href: '/(app)/pr-review/acme/repo/1', shareId: null },
+      { href: '/(app)/pr-review/acme/repo/2', shareId: null },
+    ]);
+    await flushDraft('userA', SHARE_NAV_DRAFT_KEY);
+
+    setSharePersistUserId('userA');
+    await restoreShareNavigation('userA');
+
+    const queued: (string | null)[] = [];
+    for (let i = 0; i < SHARE_PAYLOAD_MAX_ENTRIES + 1; i += 1) {
+      const next = takePendingShareNavigation();
+      if (next === null) {
+        break;
+      }
+      queued.push(next.shareId);
+    }
+    // Only the live destinations remain: the cap held and nothing was dropped.
+    expect(queued).toHaveLength(SHARE_PAYLOAD_MAX_ENTRIES);
+    expect(queued.every(shareId => shareId !== null)).toBe(true);
+  });
+
   it('does not restore a destination whose payload was not restored', async () => {
     // The payload restore stops at the cap, so a destination past that room has
     // nothing to deliver. It must not queue, or delivery would clear the share

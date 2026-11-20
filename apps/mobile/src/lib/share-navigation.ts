@@ -121,7 +121,9 @@ export async function restoreShareNavigation(userId: string): Promise<void> {
   const deliverable = draft.filter(
     entry => entry.shareId === null || peekSharePayload(entry.shareId) !== null
   );
-  for (const entry of deliverable.slice(-Math.max(free, 0))) {
+  // `slice(-0)` is `slice(0)`, so no room must select nothing explicitly.
+  const room = Math.max(free, 0);
+  for (const entry of room === 0 ? [] : deliverable.slice(-room)) {
     pendingQueue.push({
       pending: { href: entry.href, shareId: entry.shareId },
       stagedUserId: userId,

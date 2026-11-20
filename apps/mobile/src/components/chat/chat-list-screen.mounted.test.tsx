@@ -7,6 +7,7 @@ import { ChatListScreen } from '@/components/chat/chat-list-screen';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { type StoredChatBackend } from '@/lib/chat/backend-store';
 import { backendTargetId } from '@/lib/chat/backend-target';
+import { type BannerState } from '@/lib/offline-banner-state';
 
 /**
  * Starting a chat from the list.
@@ -23,6 +24,16 @@ const state = vi.hoisted(() => ({
   toastDismiss: vi.fn<(id?: string | number) => void>(),
   chats: [] as { sessionId: string; model: string; title: string; updatedAt: number }[],
   backends: [] as StoredChatBackend[],
+  // The list read's own answer: only an answered list may say there are no
+  // chats (see `selectChatListSurface`).
+  listAnswered: true,
+  listFailed: false,
+  listLoading: false,
+  // The catalog read's answer, and the device's confirmed connectivity.
+  catalogAnswered: true,
+  catalogLoading: false,
+  catalogFailed: false,
+  connectivity: 'online' as BannerState,
 }));
 
 vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
@@ -31,8 +42,9 @@ vi.mock('@/lib/chat/use-chat', () => ({
   newChat: state.newChat,
   useChatList: () => ({
     chats: state.chats,
-    isLoading: false,
-    isError: false,
+    isLoading: state.listLoading,
+    isError: state.listFailed,
+    isSuccess: state.listAnswered,
     refetch: () => undefined,
     remove: async () => {
       await Promise.resolve();
@@ -47,10 +59,14 @@ vi.mock('@/lib/organization-context', () => ({
 vi.mock('@/lib/hooks/use-available-models', () => ({
   useAvailableModels: () => ({
     models: [{ id: 'm1', name: 'One', isPreferred: true }],
-    isLoading: false,
-    isError: false,
+    isLoading: state.catalogLoading,
+    isError: state.catalogFailed,
+    isFetched: state.catalogAnswered,
     refetch: () => undefined,
   }),
+}));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => state.connectivity,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ primaryForeground: '#fff' }),
@@ -114,6 +130,13 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.chats = [];
   state.backends = [];
+  state.listAnswered = true;
+  state.listFailed = false;
+  state.listLoading = false;
+  state.catalogAnswered = true;
+  state.catalogLoading = false;
+  state.catalogFailed = false;
+  state.connectivity = 'online';
   state.newChat.mockResolvedValue('session-1');
 });
 afterEach(() => {
@@ -156,6 +179,67 @@ async function pressFab(tree: ReactTestRenderer): Promise<void> {
     await Promise.resolve();
   });
 }
+
+describe('the list body names what it knows', () => {
+  function bodyNodes(tree: ReactTestRenderer, type: string) {
+    return tree.root.findAll(node => (node.type as string) === type);
+  }
+
+  it('waits instead of claiming there are no chats until the list answers', async () => {
+    // A read that has not answered says nothing about the rows: the empty state
+    // would tell the person they have no chats while the load is still running.
+    state.listAnswered = false;
+    state.listLoading = true;
+    const waiting = await mount();
+    expect(bodyNodes(waiting, 'EmptyState')).toHaveLength(0);
+    expect(bodyNodes(waiting, 'QueryError')).toHaveLength(0);
+    expect(bodyNodes(waiting, 'RowSkeleton').length).toBeGreaterThan(0);
+
+    view?.unmount();
+    state.listAnswered = true;
+    state.listLoading = false;
+    const answered = await mount();
+    expect(bodyNodes(answered, 'EmptyState')).toHaveLength(1);
+  });
+
+  it('draws the offline card, not the empty state, when the catalog cannot answer offline', async () => {
+    // Offline is not loading: the catalog never answered, so a chat cannot
+    // start and the tab must say why instead of offering an inert empty state.
+    state.connectivity = 'offline';
+    state.catalogAnswered = false;
+    const tree = await mount();
+    const [error] = bodyNodes(tree, 'QueryError');
+    expect(error?.props.variant).toBe('offline');
+    expect(typeof error?.props.onRetry).toBe('function');
+    expect(bodyNodes(tree, 'EmptyState')).toHaveLength(0);
+    // A New chat button that cannot start anything is not offered either.
+    expect(tree.root.findAllByProps({ testID: 'chat-new-fab' })).toHaveLength(0);
+  });
+
+  it('names a catalog failure with Retry', async () => {
+    state.catalogFailed = true;
+    const tree = await mount();
+    const [error] = bodyNodes(tree, 'QueryError');
+    expect(error?.props.variant).toBe('server');
+    expect(typeof error?.props.onRetry).toBe('function');
+    expect(bodyNodes(tree, 'EmptyState')).toHaveLength(0);
+  });
+
+  it('keeps the empty state for a list that answered with no chats', async () => {
+    const tree = await mount();
+    expect(bodyNodes(tree, 'EmptyState')).toHaveLength(1);
+    expect(bodyNodes(tree, 'QueryError')).toHaveLength(0);
+  });
+
+  it('names a failed list with Retry', async () => {
+    state.listFailed = true;
+    const tree = await mount();
+    const [error] = bodyNodes(tree, 'QueryError');
+    expect(error?.props.variant).toBe('server');
+    expect(typeof error?.props.onRetry).toBe('function');
+    expect(bodyNodes(tree, 'EmptyState')).toHaveLength(0);
+  });
+});
 
 describe('starting a chat from the list', () => {
   it('creates the chat and opens it', async () => {

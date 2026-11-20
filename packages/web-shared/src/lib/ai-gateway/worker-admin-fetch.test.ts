@@ -136,6 +136,35 @@ describe('createWorkerAdminFetch', () => {
     timeout.mockRestore();
   });
 
+  test.each([200, 500])(
+    'reports a %i response whose body stalls past the default deadline as a 504',
+    async status => {
+      const deadline = new AbortController();
+      const timeout = jest.spyOn(AbortSignal, 'timeout').mockReturnValue(deadline.signal);
+      const reading = Promise.withResolvers<void>();
+      const body = new ReadableStream<Uint8Array>({
+        start(stream) {
+          deadline.signal.addEventListener('abort', () => stream.error(deadline.signal.reason));
+        },
+        pull() {
+          reading.resolve();
+        },
+      });
+      mockFetch.mockResolvedValue(new Response(body, { status }));
+      const fetchAdmin = configuredFetch('https://worker.example.com');
+
+      const result = fetchAdmin('/admin/x', { method: 'GET' }, responseSchema);
+      await reading.promise;
+      deadline.abort(new DOMException('The operation timed out.', 'TimeoutError'));
+
+      await expect(result).resolves.toEqual({
+        status: 504,
+        body: { error: 'Worker request timed out' },
+      });
+      timeout.mockRestore();
+    }
+  );
+
   test('rethrows when the caller signal aborts', async () => {
     const controller = new AbortController();
     controller.abort();

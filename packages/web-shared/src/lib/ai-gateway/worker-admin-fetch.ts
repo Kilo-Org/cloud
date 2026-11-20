@@ -21,11 +21,6 @@ type WorkerAdminRequestInit = Omit<RequestInit, 'headers'> & {
   headers?: Record<string, string>;
 };
 
-async function readErrorBody(response: Response): Promise<ErrorBody> {
-  const parsed = ErrorBodySchema.safeParse(await response.json().catch(() => undefined));
-  return parsed.success ? parsed.data : { error: `Request failed: ${response.status}` };
-}
-
 export function createWorkerAdminFetch(options: {
   workerUrl: string | undefined;
   unconfiguredError: string;
@@ -43,31 +38,34 @@ export function createWorkerAdminFetch(options: {
       };
     }
 
-    const signal = init.signal ?? AbortSignal.timeout(WORKER_ADMIN_TIMEOUT_MS);
-    let response: Response;
+    const deadline = init.signal ? null : AbortSignal.timeout(WORKER_ADMIN_TIMEOUT_MS);
     try {
-      response = await fetch(endpoint.toString(), {
+      const response = await fetch(endpoint.toString(), {
         ...init,
-        signal,
+        signal: init.signal ?? deadline,
         headers: {
           authorization: `Bearer ${INTERNAL_API_SECRET}`,
           ...init.headers,
         },
       });
+      if (!response.ok) {
+        const parsed = ErrorBodySchema.safeParse(
+          await response.json().catch((error: unknown) => {
+            if (deadline?.aborted) throw error;
+            return undefined;
+          })
+        );
+        return {
+          status: response.status,
+          body: parsed.success ? parsed.data : { error: `Request failed: ${response.status}` },
+        };
+      }
+      return { status: response.status, body: schema.parse(await response.json()) };
     } catch (error) {
-      if (signal !== init.signal && signal.aborted) {
+      if (deadline?.aborted) {
         return { status: 504, body: { error: 'Worker request timed out' } };
       }
       throw error;
     }
-
-    if (!response.ok) {
-      return { status: response.status, body: await readErrorBody(response) };
-    }
-
-    return {
-      status: response.status,
-      body: schema.parse(await response.json()),
-    };
   };
 }

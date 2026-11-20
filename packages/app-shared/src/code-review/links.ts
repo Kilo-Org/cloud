@@ -4,7 +4,7 @@ import type { CodeReviewPlatform } from './enums';
 // optionally a sub-page of that review: GitHub `/pull/<n>/files`, GitLab
 // `/-/merge_requests/<n>/diffs`, Bitbucket `/pull-requests/<n>/diff`. Only the
 // URL path may hold the review segment; the same text inside a query string or
-// fragment is page state, not the review. Any single trailing path segment is
+// fragment is page state, not the review. Any trailing path segments are
 // accepted rather than an allow-list, because providers keep adding sub-tabs
 // and the server re-reads the review from the provider, so a wrong segment
 // costs a lookup, not a wrong review.

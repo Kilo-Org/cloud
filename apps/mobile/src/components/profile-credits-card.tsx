@@ -227,8 +227,11 @@ export function CreditsCard({ enabled, orgList }: Readonly<CreditsCardProps>) {
   const orgListError = selectedOrgId != null && orgList.status === 'error';
   // The list's own error, so the failure kind below names the list's cause too:
   // a refused or terminal list read is not a transient failure, and offering
-  // Retry for one could never succeed.
-  const orgListFailure = orgList.status === 'error' ? orgList.error : undefined;
+  // Retry for one could never succeed. Only an organization context reads its
+  // balance from the list, so a Personal context never lets the membership
+  // read's error rewrite the personal balance failure's kind.
+  const orgListFailure =
+    selectedOrgId != null && orgList.status === 'error' ? orgList.error : undefined;
 
   const balanceFailed =
     orgListError || (!orgListLoading && !paintsOrgListBalance && balanceReadFailed);

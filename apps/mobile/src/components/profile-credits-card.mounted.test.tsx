@@ -1172,6 +1172,36 @@ describe('CreditsCard organization balance source', () => {
     }
   });
 
+  it('keeps a Personal balance failure out of the membership list error', async () => {
+    // A Personal balance comes from `getContextBalance` alone; the membership
+    // read stands for an organization context only. A failed list must not
+    // rename the personal failure's kind or drop its Retry. The empty settled
+    // membership list is what leaves the provider on Personal.
+    currentUser.userId = 'user-1';
+    savedMetadata.delete(ORGANIZATION_STORAGE_KEY);
+    getContextBalanceQueryFn.mockRejectedValue(trpcError('INTERNAL_SERVER_ERROR'));
+    listState.payload = [];
+
+    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), undefined, {
+      status: 'error',
+      error: trpcError('FORBIDDEN'),
+      retry: vi.fn<() => void>(),
+    });
+    try {
+      await waitFor(() => texts().includes("Couldn't load balance"));
+      expect(texts()).not.toContain("You don't have permission to view this balance.");
+
+      const retry = renderer.root.findAll(
+        node =>
+          node.type === Pressable &&
+          node.props.accessibilityLabel === 'Failed to load balance. Tap to retry.'
+      );
+      expect(retry).toHaveLength(1);
+    } finally {
+      unmount();
+    }
+  });
+
   it('names a refused membership list instead of offering a retry', async () => {
     // The list is where this context's balance comes from, so its refusal is
     // the balance's own refusal: the retryable line beside a Retry could never

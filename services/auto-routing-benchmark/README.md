@@ -996,12 +996,26 @@ row is global, so the pair is benchmarked once and serves both.
 | Trigger | Admin `POST /admin/runs`, daily cron, any decider terminal state | Admin `POST /admin/runs`, one-minute cron, any decider terminal state |
 | `benchmark_runs.purpose` | `platform` | `user` |
 | Execution share | Efficient and frontier each have default weight 2 | Efficient and frontier each have default weight 1 |
-| Run lifecycle | One active run per router/queue | One active owner run per router |
+| Run lifecycle | Up to 4 active runs per router/queue, one of them starting | Up to 4 active owner runs per router, one of them starting |
 
 All four shares use the same bounded chunk scheduler and borrow unused capacity.
 `benchmark_runs.max_concurrency` is retained for storage compatibility but new decider
 runs write zero: it is not an execution reservation. Registry admission is still atomic
 per exact pair, and the per-router/queue run lifecycle gate remains independent of slots.
+
+A drain of one router/queue starts a new run for the oldest pending entries while earlier
+runs of that queue are still measuring, so a newly added model does not wait for the
+active run to finish. The drain skips the queue while one of its runs is still starting
+(it has no `scheduler_runs` marker yet: reuse copies and chunk creation are still in
+progress), logging `benchmark_queue_drain_skipped_run_starting`, and while
+`MAX_RUNNING_RUNS_PER_QUEUE` (4) runs are active, logging
+`benchmark_queue_drain_skipped_queue_full`. Concurrent drains claim disjoint pairs; a
+drain that finds every pair claimed logs `benchmark_queue_drain_batch_already_claimed`.
+Runs of one router/queue share its execution share. Within the share the scheduler
+prefers the model with the fewest live chunks, then the older run, so a small new run
+gets its first chunks as soon as its models hold fewer slots than the earlier run's
+models. Classifier runs stay one at a time: `POST /admin/runs` answers 409 while one
+is active.
 
 After any decider run completes, the worker assembles the platform table from ready, current registry entries for the current catalog pairs.
 If a desired pair remains pending or running, the previous table stays live.

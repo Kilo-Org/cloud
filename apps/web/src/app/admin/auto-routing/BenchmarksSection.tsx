@@ -1582,7 +1582,7 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
             : `Classifier benchmark started — ${data.enqueuedModels} models enqueued, ${data.skippedModels.length} skipped`
         );
       } else if (data.startedRuns.length === 0) {
-        // Honest empty result: nothing pending, or the queue's slot is busy.
+        // Honest empty result: nothing pending, or the queue is starting a run or full.
         toast.success('Nothing to run — no pending registry entries for that queue');
       } else {
         toast.success(
@@ -1747,7 +1747,8 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
               </Button>
             </div>
             <p className="text-muted-foreground text-xs">
-              Queues also drain on a timer. A queue whose run is already active is skipped.
+              Queues also drain on a timer. A queue starts one run at a time and holds up to 4
+              active runs.
             </p>
           </CardContent>
         </Card>

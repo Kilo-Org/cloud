@@ -136,7 +136,10 @@ export function OrganizationBillingScreen({
   // action.
   const changePlanOnBanner = planEnded && canLinkBilling;
 
-  const subscriptionState = subscription.data ? getOrgSubscriptionState(subscription.data) : null;
+  // The boundary row's trial readout states the trial the seats never bought.
+  const subscriptionState = subscription.data
+    ? getOrgSubscriptionState(subscription.data, org)
+    : null;
   const scheduledSeatChange = subscription.data ? getScheduledSeatChange(subscription.data) : null;
   // The list entry already carries the same seat numbers, so the row paints
   // settled on the first frame and the query only corrects it if they moved.
@@ -154,13 +157,13 @@ export function OrganizationBillingScreen({
 
   // A child organization has no Kilo Pass of its own; an unknown parent link
   // keeps the row, which renders its loading state.
-  const isChildOrganization = parentLink != null;
-  const kiloPassRowState = isChildOrganization
-    ? null
-    : getOrgKiloPassRowState({
-        data: kiloPassSummary.data,
-        isError: kiloPassSummary.isError,
-      });
+  const kiloPassRowState =
+    parentLink != null
+      ? null
+      : getOrgKiloPassRowState({
+          data: kiloPassSummary.data,
+          isError: kiloPassSummary.isError,
+        });
 
   const renderSubscriptionState = (): ReactNode => {
     if (subscription.isPending) {

@@ -9,6 +9,7 @@ import {
   reads,
   resetBillingQueries,
   seatsReadout,
+  stateReadout,
   subscriptionReadout,
   SUBSCRIPTIONS_URL,
   texts,
@@ -17,6 +18,45 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 beforeEach(() => {
   resetBillingQueries();
+});
+
+describe('OrganizationBillingScreen state row', () => {
+  /** The subscription read of an organization that has bought no seats. */
+  function seatlessReadout() {
+    return {
+      subscription: null,
+      seatsUsed: 3,
+      totalSeats: 3,
+      nextSeatCount: null,
+      nextSeatCountEffectiveAt: null,
+      paidSeatItemId: null,
+      latestSeatPurchaseStatus: null,
+    };
+  }
+
+  it('states the running trial when Stripe has no seat subscription', async () => {
+    // An organization inside its Enterprise trial has bought no seats, so the
+    // subscription read answers null and the row used to claim there was none.
+    boundary.trialStatus = 'trial_active';
+    boundary.trialEndsAt = '2026-11-24T00:00:00.000Z';
+    queries.subscription.data = seatlessReadout();
+
+    const { renderer, unmount } = await mount();
+
+    expect(String(stateReadout(renderer)).startsWith('Trial ends on ')).toBe(true);
+    const row = renderer.root.findAllByType('KvRow').find(node => node.props.label === 'State');
+    expect(row?.props.valueTone).toBe('default');
+    unmount();
+  });
+
+  it('keeps "No subscription" for an organization with no trial and no subscription', async () => {
+    queries.subscription.data = seatlessReadout();
+
+    const { renderer, unmount } = await mount();
+
+    expect(stateReadout(renderer)).toBe('No subscription');
+    unmount();
+  });
 });
 
 describe('OrganizationBillingScreen seats row', () => {

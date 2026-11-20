@@ -18,7 +18,6 @@ import type { AuthProviderId } from '@kilocode/db/schema-types';
 import {
   DEVICE_AUTH_PENDING_LIMIT_MESSAGE,
   DEVICE_AUTH_REFUSAL_CODES,
-  refusalCopyFor,
   type DeviceAuthRefusalCode,
 } from './refusal-codes';
 import { normalizeDeviceAuthUserCode } from './user-code';
@@ -43,7 +42,10 @@ export class DeviceAuthRefusalError extends Error {
   readonly code: DeviceAuthRefusalCode;
 
   constructor(code: DeviceAuthRefusalCode) {
-    super(refusalCopyFor(code));
+    // The message is the diagnostic a log line or a test reads; the copy a person
+    // sees travels separately in `refusalCopyFor`. Naming the code in the message
+    // keeps a stack trace readable without leaking presentation text.
+    super(`Device authorization refused: ${code}`);
     this.name = 'DeviceAuthRefusalError';
     this.code = code;
   }

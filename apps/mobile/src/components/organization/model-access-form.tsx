@@ -186,7 +186,10 @@ export function ModelAccessForm({
     savedAllowList: providerAllowList,
     baseline,
     draft,
-    providerCatalogLoaded: !catalogUnavailable,
+    // An empty row set is the gateway's provider data missing, not a policy of
+    // no providers: a save made then must not write a list derived from it, the
+    // same way a save made before the catalog loads leaves the list alone.
+    providerCatalogLoaded: !catalogUnavailable && !providersEmpty,
     models: [...catalog, ...models],
   });
   const blockingIssue =

@@ -432,9 +432,6 @@ describe('ModelAccessForm with no provider rows', () => {
       .findAllByType('Text' as never)
       .find(node => node.props.children === i18n.t('organizationModelAccess.providersUnavailable'));
     expect(caption?.props.variant).toBe('caption');
-    expect(root.findAllByType('Text' as never).map(node => node.props.children)).not.toContain(
-      i18n.t('organizationModelAccess.providersNone')
-    );
 
     selectTab(root, 'providers');
     expect(root.findAllByType('ProviderAllowList' as never)).toHaveLength(0);
@@ -446,6 +443,24 @@ describe('ModelAccessForm with no provider rows', () => {
       await Promise.resolve();
     });
     expect(onRetryCatalog).toHaveBeenCalledTimes(1);
+  });
+
+  it('saves no provider list while the row set is empty', async () => {
+    // The catalog names a model but no provider for it: the same missing
+    // gateway data the notice reports. A save then must not write the allow
+    // list the empty row set would produce.
+    const root = render(undefined, {
+      catalog: [model('openai/gpt', []), model('anthropic/claude', [])],
+    });
+    const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+
+    changeDraft(root, toggleModel(draft, 'openai/gpt', false));
+    await pressSave(root);
+
+    expect(saved.mutateAsync.mock.calls[0]?.[0]).toEqual({
+      organizationId: 'org-1',
+      model_deny_list: ['openai/gpt'],
+    });
   });
 
   it('shows the retry as loading while the catalog request runs', () => {

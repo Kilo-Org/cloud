@@ -178,8 +178,12 @@ test('rewrites every service URL the mobile env example declares', () => {
   // and the app calls a port nothing listens on. Measured on a worktree stack:
   // KILO_MCP_URL stayed at the offset-0 port, so the chat reported
   // "Couldn't reach Kilo tools" while the MCP worker was up on its own offset.
+  // Resolve from this file, not process.cwd(): the suite runs from the repository
+  // root today, but a cwd-relative read fails or reads another checkout as soon
+  // as the runner is invoked from anywhere else.
+  const repoRoot = path.resolve(import.meta.dirname, '..', '..');
   const exampleUrlKeys = fs
-    .readFileSync(path.join(process.cwd(), 'apps/mobile/.env.local.example'), 'utf8')
+    .readFileSync(path.join(repoRoot, 'apps/mobile/.env.local.example'), 'utf8')
     .split('\n')
     .map(line => /^([A-Z_0-9]+_(?:URL|WS_URL))=/.exec(line)?.[1])
     .filter((key): key is string => key !== undefined);

@@ -25,6 +25,7 @@ import {
   providerRows,
 } from '@/lib/organization/model-access';
 import { type SettingsSaveFailure, settingsSaveStatus } from '@/lib/organization/settings-save';
+import { type FormState, syncedFormState } from '@/lib/organization/model-access-form-state';
 
 type Tab = 'models' | 'providers' | 'gateways';
 
@@ -33,83 +34,6 @@ const BLOCKING_ISSUE_KEYS = {
   'empty-provider-list': 'organizationModelAccess.emptyProviderList',
   'empty-model-list': 'organizationModelAccess.emptyModelList',
 } as const;
-
-/**
- * The form's own state: the saved lists it is synced to, the baseline a cancel
- * returns to, the draft on screen, and whether the provider rows came from the
- * policy-filtered list while the catalog was unavailable. It is one object
- * because one render can move both the saved lists and the provider rows, and
- * two setters rebasing from that render's values would let the second write back
- * the deny list the first had just synced.
- */
-type FormState = Readonly<{
-  /** The `serverKey` the form's baseline was last synced to. */
-  syncedKey: string;
-  baseline: ModelAccessDraft;
-  draft: ModelAccessDraft;
-  providerRowsProvisional: boolean;
-}>;
-
-/**
- * Rebases the form onto the lists the server answered.
- *
- * A refetch that moved the saved lists rebases the baseline, and the draft too
- * unless the admin holds edits of its own: those win, and the next save replaces
- * the newer policy.
- *
- * The provider rows are provisional while the catalog is unavailable or names
- * no provider: they hold only the providers the organization's own models name,
- * and no provider toggle is possible then. When the rows arrive the baseline
- * rebases to the whole gateway catalog, deny edits stay, and an empty provider
- * list — the missing rows — takes the arriving one, while a list the admin built
- * survives. Without this the first toggle after a retry would write the
- * provisional rows as the organization's whole allow list.
- *
- * Both rebases compose here, so a catalog that arrives in the same render as a
- * newer deny list keeps that deny list instead of restoring the values the
- * render started from.
- */
-function syncedFormState(params: {
-  state: FormState;
-  serverKey: string;
-  serverDraft: ModelAccessDraft;
-  providerRowsIncomplete: boolean;
-}): FormState {
-  const { state } = params;
-  const savedListsMoved = params.serverKey !== state.syncedKey;
-  const rowsArrived = state.providerRowsProvisional && !params.providerRowsIncomplete;
-  if (
-    !savedListsMoved &&
-    !rowsArrived &&
-    state.providerRowsProvisional === params.providerRowsIncomplete
-  ) {
-    return state;
-  }
-  const clean = draftsEqual(state.draft, state.baseline);
-  let baseline = savedListsMoved ? params.serverDraft : state.baseline;
-  let draft = savedListsMoved && clean ? params.serverDraft : state.draft;
-  if (rowsArrived) {
-    baseline = {
-      providerAllowList: params.serverDraft.providerAllowList,
-      modelDenyList: baseline.modelDenyList,
-    };
-    // An empty draft list came from the missing rows. A non-empty one is the
-    // admin's own choice from when the rows were complete, so it stays.
-    draft =
-      draft.providerAllowList.length === 0
-        ? {
-            providerAllowList: params.serverDraft.providerAllowList,
-            modelDenyList: draft.modelDenyList,
-          }
-        : draft;
-  }
-  return {
-    syncedKey: savedListsMoved ? params.serverKey : state.syncedKey,
-    baseline,
-    draft,
-    providerRowsProvisional: params.providerRowsIncomplete,
-  };
-}
 
 /**
  * The two lists the organization's routing policy is: which providers may
@@ -179,6 +103,7 @@ export function ModelAccessForm({
     baseline: serverDraft,
     draft: serverDraft,
     providerRowsProvisional: providerRowsIncomplete,
+    providerListEdited: false,
   }));
   const synced = syncedFormState({ state: form, serverKey, serverDraft, providerRowsIncomplete });
   if (synced !== form) {
@@ -199,9 +124,23 @@ export function ModelAccessForm({
   const blockingIssue =
     savePayload.kind === 'ready' ? null : t(BLOCKING_ISSUE_KEYS[savePayload.kind]);
   const cannotSave = !dirty || saving || savePayload.kind !== 'ready';
+  // One notice covers both missing-data states: the catalog failed to load, or it
+  // loaded without naming any provider.
+  let notice: string | null = null;
+  if (catalogUnavailable) {
+    notice = t('organizationModelAccess.catalogUnavailable');
+  } else if (providersEmpty) {
+    notice = t('organizationModelAccess.providersUnavailable');
+  }
   const onDraftChange = (next: ModelAccessDraft) => {
     clearWhere(() => true);
-    setForm(previous => ({ ...previous, draft: next }));
+    setForm(previous => ({
+      ...previous,
+      draft: next,
+      providerListEdited:
+        previous.providerListEdited ||
+        next.providerAllowList.join('\n') !== previous.draft.providerAllowList.join('\n'),
+    }));
   };
 
   const onSave = async () => {
@@ -256,10 +195,10 @@ export function ModelAccessForm({
   return (
     <View className="flex-1">
       <View className="gap-3 px-4 pt-3">
-        {catalogUnavailable ? (
+        {notice === null ? null : (
           <View className="flex-row items-center gap-3 rounded-md bg-muted-soft px-3 py-2">
             <Text variant="caption" className="flex-1">
-              {t('organizationModelAccess.catalogUnavailable')}
+              {notice}
             </Text>
             <Button
               variant="outline"
@@ -270,22 +209,7 @@ export function ModelAccessForm({
               <Text>{t('common.retry')}</Text>
             </Button>
           </View>
-        ) : null}
-        {!catalogUnavailable && providersEmpty ? (
-          <View className="flex-row items-center gap-3 rounded-md bg-muted-soft px-3 py-2">
-            <Text variant="caption" className="flex-1">
-              {t('organizationModelAccess.providersUnavailable')}
-            </Text>
-            <Button
-              variant="outline"
-              size="sm"
-              loading={catalogIsFetching}
-              onPress={onRetryCatalog}
-            >
-              <Text>{t('common.retry')}</Text>
-            </Button>
-          </View>
-        ) : null}
+        )}
         <SegmentedControl
           options={[
             { value: 'models' as const, label: t('organizationModelAccess.tabModels') },

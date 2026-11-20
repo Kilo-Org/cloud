@@ -18,6 +18,7 @@ import { removeBuildCredentials, stopOtherProcesses, stopOwnedProcesses } from '
 import { createBuildReporter } from './reporter.js';
 import { runEnvironmentBuild } from './run.js';
 import { takeRunner } from './runner-file.js';
+import { installInterceptTrustIfEnabled } from '../control/cert.js';
 
 /**
  * Environment builder entry point: the main process of a dedicated builder
@@ -45,6 +46,7 @@ function idleUntilStopped(): Promise<never> {
 }
 
 async function main(): Promise<void> {
+  await installInterceptTrustIfEnabled(log);
   const runner = await takeRunner();
   if (runner === null) {
     log('environment builder received no endpoint or credential');

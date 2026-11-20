@@ -69,6 +69,63 @@ the adapter's optional members, because a stub adapter has none.
 
 ## 3. Topology and identities
 
+### Network secrets
+
+Environment and profile rows can use `delivery: 'network'`. Existing rows keep `env` delivery.
+Network values store `{ "network": <RSA+AES envelope> }`, not an ordinary envelope.
+Older Workers reject this wrapper instead of delivering plaintext during a rollout or rollback.
+The profile merge carries encrypted `networkSecrets` separately from environment values.
+Only Cloudflare Containers can prepare a workspace with network secrets. Other providers fail
+with `Network secrets require a Cloudflare sandbox`; no plaintext fallback exists.
+
+The Sandbox DO stores one encrypted network-secret snapshot per workspace scope in
+`network_secret_snapshots`. Each entry has a `kcp1` alias with purpose `secret`.
+Allocation changes retire active grants, not this snapshot. Reissued grants reuse its aliases.
+Route release keeps the snapshot. Workspace or standalone session deletion removes it.
+The spec and wrapper receive only `KEY=<alias>`.
+Workspace setup commands and agent commands use the same aliases.
+
+Cloudflare snapshot builders also receive aliases in their setup environment. The environment
+coordinator stores encrypted, build-scoped grants and owns their allocation and deadline.
+Builder aliases use the same `kcp1` purpose and resolver RPC contract. Every fresh Cloudflare
+builder installs outbound interception, with or without network secrets, because a refused start
+can retain interception rules. All builder HTTP(S) egress therefore invokes `ContainersOutbound`
+once per request. Build tools must trust the injected CA; a client with pinned certificates fails.
+The shared resolver routes
+their `environment-build:<id>` scope to that coordinator, and uses the same admission helper.
+The proxy still authenticates the platform container identity. Only an active `preparing` build
+can resolve its aliases. Capture, cancellation, expiry, and terminal cleanup revoke them.
+Vercel builders refuse network secrets. Build aliases expire with the build; saved tool configuration
+should reference the variable name rather than persist an expanded build alias.
+
+`ContainersOutbound` checks egress policy, then routes network aliases before SCM forwarding.
+Restricted egress includes the snapshot's exact secret hosts. The existing credential admission
+checks the live allocation, container binding, owner, scope membership, and grant expiry.
+The existing `resolveCredential` RPC decrypts a network value only for an admitted request.
+The provider-neutral substitution module supports header values and Basic passwords.
+It replaces exact alias tokens only, pins the Host header, and never follows redirects.
+
+Network secrets require HTTPS on port 443. IP literals, local or metadata names, Kilo endpoints,
+and managed SCM endpoints cannot receive them. `npm.pkg.github.com` is an explicit exception.
+Configured Kilo and GitLab hosts are checked again at grant creation and resolution.
+An unknown alias, wrong host, unsupported URL placement, or mixed SCM/network request receives
+a specific `403 network_secret_*` response. Temporary resolver faults return retryable
+`503 network_secret_unavailable`, not an unknown-secret error. The retry flag follows the resolver's
+classification; permanent policy failures return a value-free denial. No upstream request follows a denial.
+Bodies and responses are not substituted. Header echoes and exchanged tokens can expose values.
+Clients that validate token formats locally can fail because they see an alias.
+
+Egress audit records include `credentialKey` and `credentialDecision` for one credential, or a
+`credentialDecisions` list on the same record for multiple credentials. They never include values,
+aliases, request paths, or query strings. A wrong host fails immediately instead of producing
+an unclear upstream authentication error. Token-format checks can fail before a request exists.
+
+Feature-era private route and audit records are not backward-compatible with pre-feature Workers.
+A rollback must retain a Worker version that understands these records. The PostgreSQL wrapper
+still prevents an older reader from projecting a network value as a plaintext environment variable.
+
+### Ownership
+
 - One Session DO per `sessionId` (`workspace_*`). One Sandbox DO per `sandboxId`.
 - Sandbox ownership has exactly two supported forms: **one standalone session without a workspace
   per sandbox**, or **one workspace per sandbox, containing any number of sessions**. Sessions in

@@ -4,6 +4,8 @@ import { EgressAuditRequestSchema } from '../shared/egress-audit.js';
 import { getSentryConfig } from '../shared/sentry.js';
 import { nativeEgressAllowlistSchema } from '../sandbox-control/egress-policy.js';
 import { egressAuditStore, proxySandboxEgress } from '../egress/sandbox-egress.js';
+import { substituteNetworkSecrets } from '../network-secrets/substitution.js';
+import { resolveOutboundCredential } from '../sandbox-control/resolve-outbound-credential.js';
 
 type SentryEnv = Parameters<typeof getSentryConfig>[0];
 
@@ -61,6 +63,10 @@ export class ContainersOutbound extends WorkerEntrypoint<
       this.env,
       {
         ...(allowlist === undefined ? {} : { allowlist }),
+        routeNetworkSecrets: request =>
+          substituteNetworkSecrets(request, { containerId }, input =>
+            resolveOutboundCredential(this.env, input)
+          ),
         ...(egressAudit === true && allocationRef !== undefined
           ? {
               audit: {

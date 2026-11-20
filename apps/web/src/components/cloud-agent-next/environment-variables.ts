@@ -112,7 +112,7 @@ export function buildEnvironmentVariableChanges(
   for (const variable of entered) {
     if (variable.unchanged) {
       if (!savedSecrets.has(variable.key))
-        throw new Error(`${variable.key} has no saved secret. Enter its value.`);
+        throw new Error(`${variable.key} has no saved value. Enter its value.`);
       continue;
     }
     if (savedPlain.has(variable.key) && savedPlain.get(variable.key) === variable.value) {

@@ -11,6 +11,7 @@ import {
 export * from '../shared/runtime-profile.js';
 import * as z from 'zod';
 import { webSearchProviderSchema } from '../shared/web-search-provider.js';
+import { networkSecretsSchema } from '@kilocode/worker-utils/network-secrets';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 import { AgentVariantSchema, Limits } from '../schema.js';
 import { isValidSandboxId } from '../sandbox-id.js';
@@ -267,6 +268,7 @@ const SharedSessionProfileFields = {
 
 export const SessionProfileBundleSchema = z.object({
   ...SharedSessionProfileFields,
+  networkSecrets: networkSecretsSchema.optional(),
   /**
    * The environment's start commands. They run after setup in every prepared
    * workspace, including one whose environment snapshot already ran setup.

@@ -33,7 +33,7 @@ type AuthorizationClass =
 function classifyCapability(capability: string): AuthorizationExtraction {
   if (isControlPlaneCredential(capability)) {
     const parsed = parseControlPlaneCredential(capability);
-    return parsed && parsed.purpose !== 'kilo'
+    return parsed && parsed.purpose !== 'kilo' && parsed.purpose !== 'secret'
       ? { type: 'capability', value: { provider: parsed.purpose, capability } }
       : { type: 'unsupported_capability' };
   }

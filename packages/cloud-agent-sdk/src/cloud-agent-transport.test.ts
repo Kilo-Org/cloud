@@ -2113,8 +2113,6 @@ describe('CloudAgentTransport page-seam', () => {
       } as MessageEvent);
       await jest.advanceTimersByTimeAsync(0);
 
-      await jest.advanceTimersByTimeAsync(0);
-
       // The retry timer fires and asks for the page now that live state exists.
       const retry = jest.advanceTimersByTimeAsync(500);
       heldPage.resolve(page);

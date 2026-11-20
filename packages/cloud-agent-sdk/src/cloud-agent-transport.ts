@@ -630,9 +630,9 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
      * Record a superseded snapshot page without replaying its message rows.
      * A reconnect dropped the read that fetched this page, so its rows may be
      * older than the live replay already delivered — but the manager still
-     * needs the page's metadata: seeding the first page sets the
-     * older-messages cursor and emits the queued and failed turns, which
-     * nothing else does for this connection.
+     * needs the page's metadata: seeding the first page sets the older-messages
+     * cursor. Its turns are not restated, because a page that reaches this path
+     * settles after a frame and the live replay already carried them.
      */
     function recordInitialPageOnly(page: SessionSnapshotPage): void {
       seedPageState(page);

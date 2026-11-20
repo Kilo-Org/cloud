@@ -213,6 +213,18 @@ try {
   );
   process.exit(2);
 }
+// JSON.parse accepts `null`, a number or an array, and the first contract read
+// would then throw a TypeError that Node reports as exit 1 — the drift code. A
+// document that is not a config object never reached the checks, so it belongs
+// with the other exit-2 inputs.
+if (typeof config !== 'object' || config === null || Array.isArray(config)) {
+  console.error(
+    configPath === undefined
+      ? '"npx expo config --json" returned no config object'
+      : `Expo config ${configPath} holds no config object`
+  );
+  process.exit(2);
+}
 
 const { check, report } = createContractFailures();
 

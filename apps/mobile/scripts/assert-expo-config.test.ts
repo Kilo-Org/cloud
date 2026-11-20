@@ -136,6 +136,18 @@ describe('assert-expo-config', () => {
     expect(output).toContain(path);
   });
 
+  it('exits 2 for a config file that holds no object', () => {
+    for (const contents of ['null', '[]', '42']) {
+      const dir = mkdtempSync(join(tmpdir(), 'expo-config-'));
+      tempDirs.push(dir);
+      const path = join(dir, 'not-an-object.json');
+      writeFileSync(path, contents);
+      const { status, output } = run(['--config', path]);
+      expect(status).toBe(2);
+      expect(output).toContain('holds no config object');
+    }
+  });
+
   it('exits 2 for an unknown flag', () => {
     const { status, output } = run(['--config', fixturePath, '--unknown-flag', 'x']);
     expect(status).toBe(2);

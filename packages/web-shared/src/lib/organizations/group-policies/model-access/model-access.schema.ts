@@ -32,7 +32,12 @@ function allowListNounsIn(path: readonly PropertyKey[]): AllowListNouns | undefi
 
 /**
  * An allow-list entry. A maximum length selects the bounded write entry, whose
- * refinement names the list it applies to; the stored reader passes no length.
+ * refinements name the list they apply to; the stored reader passes no length.
+ *
+ * The write entry requires well-formed text because the policy is stored in a
+ * `jsonb` column, and Postgres rejects a lone surrogate in JSON input with a
+ * data exception rather than a validation error. Refusing it here keeps the
+ * refusal a client error with a sentence that names the rule.
  */
 const allowListEntry = (maxLength: number | undefined, nouns: AllowListNouns) => {
   const entry = z.string().trim().min(1);
@@ -42,7 +47,8 @@ const allowListEntry = (maxLength: number | undefined, nouns: AllowListNouns) =>
     .refine(
       value => !/\p{Cc}/u.test(value),
       `A ${nouns.singular} must not contain control characters.`
-    );
+    )
+    .refine(value => value.isWellFormed(), `A ${nouns.singular} must be well-formed text.`);
 };
 
 /**

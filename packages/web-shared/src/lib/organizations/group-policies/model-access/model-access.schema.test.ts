@@ -200,9 +200,7 @@ describe('model access policy catalog limits', () => {
 
   it('accepts the largest documented selection made of three-byte characters', () => {
     const policy = selectionAtLimits('\u20ac');
-    const bytes = new TextEncoder().encode(JSON.stringify(policy.data)).length;
 
-    expect(bytes).toBeLessThan(MAX_ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_BYTES);
     expect(OrganizationGroupModelAccessPolicyWriteSchema.parse(policy)).toEqual(policy);
   });
 
@@ -271,33 +269,57 @@ describe('model access policy catalog limits', () => {
     expect(selectedMemberDescription(OrganizationGroupModelAccessPolicySchema)).toBeUndefined();
   });
 
-  it('names the serialized size bound in the write schema refusal itself', () => {
-    // Well-formed JSON escapes each lone surrogate as six ASCII bytes, so a
-    // selection at the entry and count limits still exceeds the byte bound.
-    const policy = {
+  it('refuses an entry whose text is not well-formed, because the policy is stored as JSON', () => {
+    const modelResult = OrganizationGroupModelAccessPolicyWriteSchema.safeParse({
       type: 'model_access',
       data: {
         mode: 'selected',
-        model_allow_list: Array.from({ length: MAX_ORGANIZATION_GROUP_MODEL_IDS }, () =>
-          '\ud800'.repeat(MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH)
-        ),
-        provider_allow_list: Array.from({ length: MAX_ORGANIZATION_GROUP_PROVIDER_SLUGS }, () =>
-          'p'.repeat(MAX_ORGANIZATION_GROUP_PROVIDER_SLUG_LENGTH)
-        ),
+        model_allow_list: ['vendor/m\uD800del'],
+        provider_allow_list: [],
       },
-    } satisfies OrganizationGroupModelAccessPolicy;
+    } satisfies OrganizationGroupModelAccessPolicy);
 
-    const result = OrganizationGroupModelAccessPolicyWriteSchema.safeParse(policy);
-
-    expect(result.success).toBe(false);
-    if (result.success) throw new Error('Expected an over-large serialized policy to be refused');
-    expect(result.error.issues).toEqual([
+    expect(modelResult.success).toBe(false);
+    if (modelResult.success) throw new Error('Expected a lone surrogate model id to be refused');
+    expect(modelResult.error.issues).toEqual([
       expect.objectContaining({
         code: 'custom',
-        path: ['data'],
-        message: `Together the allow lists must serialize to at most ${MAX_ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_BYTES} bytes of UTF-8 JSON.`,
+        path: ['data', 'model_allow_list', 0],
+        message: 'A model id must be well-formed text.',
       }),
     ]);
+
+    const providerResult = OrganizationGroupModelAccessPolicyWriteSchema.safeParse({
+      type: 'model_access',
+      data: {
+        mode: 'selected',
+        model_allow_list: [],
+        provider_allow_list: ['p\uDC00p'],
+      },
+    } satisfies OrganizationGroupModelAccessPolicy);
+
+    expect(providerResult.success).toBe(false);
+    if (providerResult.success)
+      throw new Error('Expected a lone surrogate provider slug to be refused');
+    expect(providerResult.error.issues).toEqual([
+      expect.objectContaining({
+        code: 'custom',
+        path: ['data', 'provider_allow_list', 0],
+        message: 'A provider slug must be well-formed text.',
+      }),
+    ]);
+  });
+
+  it('keeps the whole serialized size bound above every well-formed selection the entry bounds allow', () => {
+    // The entry rules admit only printable, well-formed text, so the widest
+    // entry is a three-byte character per UTF-16 unit. At the documented counts
+    // and lengths that selection serializes below the bound, which therefore
+    // never refuses a selection the entry rules accept.
+    const policy = selectionAtLimits('\u20ac');
+    const bytes = new TextEncoder().encode(JSON.stringify(policy.data)).length;
+
+    expect(bytes).toBeLessThan(MAX_ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_BYTES);
+    expect(OrganizationGroupModelAccessPolicyWriteSchema.parse(policy)).toEqual(policy);
   });
 
   it('parses every policy mode through both schemas', () => {
@@ -409,10 +431,20 @@ describe('model access policy write refusal sentences', () => {
     ).toBe('A provider slug must not contain control characters.');
   });
 
-  it('names the serialized size bound when the allow lists exceed it', () => {
-    // Well-formed JSON escapes each lone surrogate as six ASCII bytes, so a
-    // selection at the entry and count limits still exceeds the byte bound.
-    expect(writeRefusal(selectionAtLimits('\ud800'))).toBe(
+  it('names the serialized size bound when the byte bound refuses the document', () => {
+    // The entry rules admit only printable, well-formed text, so the byte bound
+    // sits above every selection those rules allow. Its refusal sentence is
+    // still exercised through the mapper that produces it.
+    const error = new z.ZodError([
+      {
+        code: 'custom',
+        path: ['data'],
+        message: `Together the allow lists must serialize to at most ${MAX_ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_BYTES} bytes of UTF-8 JSON.`,
+        input: undefined,
+      },
+    ]);
+
+    expect(describeModelAccessPolicyWriteRefusal(error)).toBe(
       'Together the allow lists must serialize to at most 2097152 bytes of UTF-8 JSON.'
     );
   });

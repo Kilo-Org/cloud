@@ -1084,6 +1084,47 @@ describe('CreditsCard organization balance source', () => {
     }
   });
 
+  it('hides the member scope caption while the balance block paints its failure', async () => {
+    // The caption describes the amount under it, so the failure window keeps
+    // its row and takes it out of sight and out of the reading order: the card
+    // must not explain an amount that is not on screen.
+    currentUser.userId = 'user-1';
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    getContextBalanceQueryFn.mockRejectedValue(trpcError('INTERNAL_SERVER_ERROR'));
+    const orgs = [
+      {
+        organizationId: 'org-a',
+        organizationName: 'Acme',
+        role: 'member',
+        balance: organizationBalance,
+      },
+    ] as OrgListEntry[];
+    listState.payload = orgs;
+
+    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+    try {
+      await waitFor(() => texts().includes("Couldn't load balance"));
+
+      const captions = renderer.root.findAll(
+        node =>
+          Object.is(node.type, 'Text') &&
+          node.children.some(
+            child =>
+              typeof child === 'string' && child === 'Available to spend in this organization'
+          )
+      );
+      // The row stays in the tree, so the block keeps the height the amount
+      // paints at; no other copy of the caption can be visible beside it.
+      expect(captions).toHaveLength(1);
+      const [caption] = captions;
+      expect(hasClasses(caption, ['text-xs', 'opacity-0'])).toBe(true);
+      expect(caption.props.accessibilityElementsHidden).toBe(true);
+      expect(caption.props.importantForAccessibility).toBe('no');
+    } finally {
+      unmount();
+    }
+  });
+
   it('turns a failed membership list into the balance retry surface', async () => {
     currentUser.userId = 'user-1';
     savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');

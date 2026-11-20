@@ -290,12 +290,20 @@ export function CreditsCard({ enabled, orgList }: Readonly<CreditsCardProps>) {
   // balance — a plain member's daily allowance, capped by the organization's
   // balance — not the organization's balance, so the row says which figure it
   // paints. It waits for the settled membership entry, because until the role
-  // is known the caption would claim a scope the amount may not paint. Once the
-  // role settles, the member branch keeps a row in this slot in its skeleton and
-  // failure states too, so the slot never changes height as the amount lands.
+  // is known the caption would claim a scope the amount may not paint.
+  //
+  // The caption describes the amount it sits under, so it never paints over the
+  // block's own failure. That window keeps the row, invisible to the eye and to
+  // a screen reader, so the card holds the height it has while the amount
+  // paints.
   const organizationScopeNote =
     selectedEntry !== undefined && !isMoneyRole(selectedEntry.role) ? (
-      <Text className="text-xs text-muted-foreground">
+      <Text
+        className={cn('text-xs text-muted-foreground', balanceFailed && 'opacity-0')}
+        {...(balanceFailed
+          ? { accessibilityElementsHidden: true, importantForAccessibility: 'no' as const }
+          : {})}
+      >
         {t('profile.availableToSpendInOrganization')}
       </Text>
     ) : null;

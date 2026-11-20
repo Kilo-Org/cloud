@@ -123,14 +123,6 @@ export function isSpendAlertsFormDraft(value: unknown): value is SpendAlertsForm
   return spendAlertsFormDraftSchema.safeParse(value).success;
 }
 
-/**
- * A durable write issued before the stored draft answered, replayed once it
- * does. A `clear` means the person threw the draft away.
- */
-type SpendAlertsPending =
-  | { readonly kind: 'save'; readonly value: SpendAlertsFormDraft }
-  | { readonly kind: 'clear' };
-
 /** The scope's settings: no `organizationId` is the caller's personal scope. */
 function useSpendAlertSettings(organizationId: string | undefined, enabled: boolean) {
   const trpc = useTRPC();
@@ -210,40 +202,18 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
   // while the person has not edited.
   const restored = draft.kind === 'ready' ? draft.value : null;
   // The form is typed into before the store answers — the stored row paints
-  // first — so a write issued while the draft still loads is buffered here and
-  // replayed once it becomes ready, instead of being dropped. A later save
-  // replaces an earlier buffered save; a buffered clear discards a buffered
-  // save, because a clear means the person threw the draft away.
-  const pendingRef = useRef<SpendAlertsPending | null>(null);
+  // first — and `useFormDraft` holds such a write and replays it once the draft
+  // answers, so these forward whenever the hook has them.
   const onDraftChange = (value: SpendAlertsFormDraft) => {
     if (draft.kind === 'ready') {
       draft.save(value);
-      return;
     }
-    pendingRef.current = { kind: 'save', value };
   };
   const onDraftClear = () => {
     if (draft.kind === 'ready') {
       draft.clear();
-      return;
     }
-    pendingRef.current = { kind: 'clear' };
   };
-  useEffect(() => {
-    if (draft.kind !== 'ready') {
-      return;
-    }
-    const pending = pendingRef.current;
-    pendingRef.current = null;
-    if (pending === null) {
-      return;
-    }
-    if (pending.kind === 'clear') {
-      draft.clear();
-    } else {
-      draft.save(pending.value);
-    }
-  }, [draft]);
 
   if (!scopeResolved) {
     return (

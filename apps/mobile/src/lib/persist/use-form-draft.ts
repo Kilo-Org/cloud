@@ -1,8 +1,15 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 import { clearDraft, type DraftShapeValidator, saveDraft } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
+
+/**
+ * A write a form issued before its stored draft answered, replayed once it
+ * does. A later save replaces an earlier held save; a clear discards a held
+ * save, because a clear means the person threw the draft away.
+ */
+type PendingWrite<T> = { readonly kind: 'save'; readonly value: T } | { readonly kind: 'clear' };
 
 /** What a durable form draft reports to its form. */
 export type FormDraftState<T> =
@@ -11,9 +18,14 @@ export type FormDraftState<T> =
        * The stored draft has not loaded yet. A form mounts its fields only in
        * this state's absence: the fields are uncontrolled and read
        * `defaultValue` once, so seeding them before the load settles would
-       * drop the restored text.
+       * drop the restored text. `save` and `clear` are still offered here: an
+       * edit form is on screen before the load settles, and a write it takes
+       * then must reach the store rather than be dropped, so the hook holds it
+       * and replays it once the draft answers.
        */
       readonly kind: 'loading';
+      readonly save: (value: T) => void;
+      readonly clear: () => void;
     }
   | {
       readonly kind: 'ready';
@@ -60,27 +72,56 @@ export function useFormDraft<T>(input: {
   const keyRef = useRef({ userId, entityKey });
   keyRef.current = { userId, entityKey };
 
-  const save = useCallback((value: T) => {
+  // A form can be typed into before its stored draft answers (an edit form
+  // paints the server row at once). The write goes straight to `saveDraft`, the
+  // store's own layer, as soon as the identity gives it a key: that is what the
+  // pre-reload flush and the unmount flush read, so a reload inside the load
+  // window still keeps the keystroke. Only an identity that has not resolved
+  // yet has nowhere to write, and that write is held until it does.
+  const pendingRef = useRef<PendingWrite<T> | null>(null);
+  const write = useCallback((entry: PendingWrite<T>) => {
     const { userId: currentUserId, entityKey: currentKey } = keyRef.current;
     if (currentUserId === undefined) {
-      return;
+      return false;
     }
-    saveDraft(currentUserId, currentKey, value);
+    if (entry.kind === 'save') {
+      saveDraft(currentUserId, currentKey, entry.value);
+    } else {
+      void clearDraft(currentUserId, currentKey);
+    }
+    return true;
   }, []);
+
+  const save = useCallback(
+    (value: T) => {
+      if (!write({ kind: 'save', value })) {
+        pendingRef.current = { kind: 'save', value };
+      }
+    },
+    [write]
+  );
 
   const clear = useCallback(() => {
-    const { userId: currentUserId, entityKey: currentKey } = keyRef.current;
-    if (currentUserId === undefined) {
+    if (!write({ kind: 'clear' })) {
+      pendingRef.current = { kind: 'clear' };
+    }
+  }, [write]);
+
+  const ready = userId !== undefined && draft.settled;
+  // The identity resolving is the one event that can release a held write.
+  const identity = userId ?? '';
+  useEffect(() => {
+    const pending = pendingRef.current;
+    if (pending === null) {
       return;
     }
-    void clearDraft(currentUserId, currentKey);
-  }, []);
+    if (write(pending)) {
+      pendingRef.current = null;
+    }
+  }, [identity, write]);
 
-  if (userId === undefined) {
-    return { kind: 'loading' };
-  }
-  if (!draft.settled) {
-    return { kind: 'loading' };
-  }
-  return { kind: 'ready', value: draft.value, save, clear };
+  const state: FormDraftState<T> = ready
+    ? { kind: 'ready', value: draft.value, save, clear }
+    : { kind: 'loading', save, clear };
+  return state;
 }

@@ -19,14 +19,14 @@ const mutations = vi.hoisted(() => ({
 // The durable draft the wrapper reads: its state is swapped per test, and its
 // write and clear are the suite's spies.
 type DraftState =
-  | { kind: 'loading' }
+  | { kind: 'loading'; save: (value: unknown) => void; clear: () => void }
   | { kind: 'ready'; value: unknown; save: (value: unknown) => void; clear: () => void };
 
 const draft = vi.hoisted(
   (): { save: (value: unknown) => void; clear: () => void; state: DraftState } => ({
     save: vi.fn<(value: unknown) => void>(),
     clear: vi.fn<() => void>(),
-    state: { kind: 'loading' },
+    state: { kind: 'loading', save: () => undefined, clear: () => undefined },
   })
 );
 
@@ -514,7 +514,7 @@ describe('ModeForm identifier hint', () => {
 
 describe('ModeForm durable draft', () => {
   it('holds a create back until the stored draft settles, then seeds every field', async () => {
-    draft.state = { kind: 'loading' };
+    draft.state = { kind: 'loading', save: draft.save, clear: draft.clear };
     const { renderer, box, unmount } = await mountGatedForm(undefined);
 
     // No server record exists, so the form shows its loading state rather than
@@ -534,7 +534,7 @@ describe('ModeForm durable draft', () => {
   });
 
   it('applies a late draft to an edit form the person has not touched', async () => {
-    draft.state = { kind: 'loading' };
+    draft.state = { kind: 'loading', save: draft.save, clear: draft.clear };
     const { renderer, box, unmount } = await mountGatedForm(existingModes[0]);
 
     // The server row is the content while the stored draft loads.
@@ -549,7 +549,7 @@ describe('ModeForm durable draft', () => {
   });
 
   it('never overwrites an edit form the person already typed into', async () => {
-    draft.state = { kind: 'loading' };
+    draft.state = { kind: 'loading', save: draft.save, clear: draft.clear };
     const { renderer, box, unmount } = await mountGatedForm(existingModes[0]);
 
     changeField(renderer.root, nameLabel, 'Typed now');
@@ -564,27 +564,6 @@ describe('ModeForm durable draft', () => {
     changeField(renderer.root, nameLabel, 'Typed now!');
     expect(draft.save).toHaveBeenLastCalledWith(
       expect.objectContaining({ name: 'Typed now!', slug: 'architect' })
-    );
-
-    unmount();
-  });
-
-  it('stores an edit typed before the stored draft answered', async () => {
-    draft.state = { kind: 'loading' };
-    const { renderer, box, unmount } = await mountGatedForm(existingModes[0]);
-
-    changeField(renderer.root, nameLabel, 'Typed before ready');
-
-    // The stand-in buffers the write instead of dropping it, so nothing has
-    // reached the store yet.
-    expect(draft.save).not.toHaveBeenCalled();
-
-    box.settle(null);
-
-    // The replay hands the buffered snapshot to the real draft once.
-    expect(draft.save).toHaveBeenCalledOnce();
-    expect(draft.save).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Typed before ready' })
     );
 
     unmount();

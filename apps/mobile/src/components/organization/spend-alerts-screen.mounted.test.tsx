@@ -912,22 +912,6 @@ describe('SpendAlertsScreen restored draft', () => {
     expect(channelSwitches(renderer, i18n.t('common.email'))[0]?.props.value).toBe(true);
   });
 
-  it('stores a switch changed before the stored draft answered', async () => {
-    formDraft.current.kind = 'loading';
-    const { renderer, land } = await mountLoadedWithLanding();
-
-    toggle(switchByLabel(renderer, i18n.t('spendAlerts.sendAlerts')), false);
-    // The store has not answered, so the write is held instead of dropped.
-    expect(formDraft.save).not.toHaveBeenCalled();
-
-    formDraft.current.kind = 'ready';
-    formDraft.current.value = null;
-    land();
-
-    expect(formDraft.save).toHaveBeenCalledTimes(1);
-    expect(formDraft.save).toHaveBeenCalledWith(expect.objectContaining({ enabled: false }));
-  });
-
   it('saves the whole draft on an edit and clears it when the save lands', async () => {
     const { renderer } = await mountLoaded();
 

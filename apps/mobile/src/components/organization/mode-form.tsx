@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- one form: the wrapper that owns the durable draft, the loading shape it gates a create on, and the body that seeds from it */
 import { MODE_SLUG_MAX_LENGTH, modeSlugFromName } from '@kilocode/app-shared/organizations';
 import { type Href, useRouter } from 'expo-router';
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -71,12 +71,7 @@ const EMPTY_VALUES: OrgModeFormValues = {
 };
 
 /** The branch of `useFormDraft` a mounted body reads. */
-type ReadyFormDraft<T> = Extract<FormDraftState<T>, { kind: 'ready' }>;
-
-/** A write the stand-in draft holds until the stored one answers. */
-type PendingDraftWrite<T> =
-  | { readonly kind: 'save'; readonly value: T }
-  | { readonly kind: 'clear' };
+type FormDraft<T> = Extract<FormDraftState<T>, { kind: 'ready' }>;
 
 export type ModeFormProps = Readonly<{
   organizationId: string;
@@ -103,59 +98,6 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
     entityKey: orgModeFormDraftKey(organizationId, mode?.id ?? null),
     validate: isOrgModeFormDraft,
   });
-  // The body reads a ready draft, and an edit form is on screen before the
-  // stored one loads. This stand-in keeps that contract: its value is null (the
-  // server row is the content) and its writes reach the hook's own `save` and
-  // `clear` once the load settles.
-  const latestDraftRef = useRef<ReadyFormDraft<OrgModeFormDraft> | null>(null);
-  if (draft.kind === 'ready') {
-    latestDraftRef.current = draft;
-  }
-  // The form can be typed into, and cleared, before the store answers, so the
-  // stand-in buffers those writes and replays them into the real draft; a
-  // stand-in that only forwarded would drop the keystroke's snapshot.
-  const pendingRef = useRef<PendingDraftWrite<OrgModeFormDraft> | null>(null);
-  const standbyDraft = useMemo<ReadyFormDraft<OrgModeFormDraft>>(
-    () => ({
-      kind: 'ready',
-      value: null,
-      save: value => {
-        const current = latestDraftRef.current;
-        if (current !== null) {
-          current.save(value);
-          return;
-        }
-        pendingRef.current = { kind: 'save', value };
-      },
-      clear: () => {
-        const current = latestDraftRef.current;
-        if (current !== null) {
-          current.clear();
-          return;
-        }
-        pendingRef.current = { kind: 'clear' };
-      },
-    }),
-    []
-  );
-  // A later save replaces an earlier buffered one, and a buffered clear
-  // discards a buffered save: a clear means the person threw the draft away.
-  useEffect(() => {
-    if (draft.kind !== 'ready') {
-      return;
-    }
-    const pending = pendingRef.current;
-    pendingRef.current = null;
-    if (pending === null) {
-      return;
-    }
-    if (pending.kind === 'clear') {
-      draft.clear();
-    } else {
-      draft.save(pending.value);
-    }
-  }, [draft]);
-
   // A create gated on the draft and an edit does not: a create has nothing to
   // show without it — there is no server record — so it holds its loading state
   // until the store answers and its uncontrolled fields seed once, never
@@ -170,7 +112,12 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
       organizationId={organizationId}
       mode={mode}
       existingModes={existingModes}
-      draft={draft.kind === 'ready' ? draft : standbyDraft}
+      draft={{
+        kind: 'ready',
+        value: draft.kind === 'ready' ? draft.value : null,
+        save: draft.save,
+        clear: draft.clear,
+      }}
     />
   );
 }
@@ -199,7 +146,7 @@ type ModeFormBodyProps = Readonly<{
   organizationId: string;
   mode: OrgMode | undefined;
   existingModes: readonly OrgMode[];
-  draft: ReadyFormDraft<OrgModeFormDraft>;
+  draft: FormDraft<OrgModeFormDraft>;
 }>;
 
 /**

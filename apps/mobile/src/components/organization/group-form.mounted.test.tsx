@@ -64,7 +64,7 @@ const guard = vi.hoisted(
 // The durable draft the wrapper reads: its state is swapped per test, and its
 // write and clear are the suite's spies.
 type GroupDraftState =
-  | { kind: 'loading' }
+  | { kind: 'loading'; save: (value: unknown) => void; clear: () => void }
   | { kind: 'ready'; value: unknown; save: (value: unknown) => void; clear: () => void };
 
 type GroupDraftMock = {
@@ -76,7 +76,7 @@ type GroupDraftMock = {
 const draft = vi.hoisted((): GroupDraftMock => ({
   save: vi.fn<(value: unknown) => void>(),
   clear: vi.fn<() => void>(),
-  state: { kind: 'loading' },
+  state: { kind: 'loading', save: () => undefined, clear: () => undefined },
 }));
 const confirmMock = vi.hoisted(() => vi.fn());
 // The picker's toggles, handed to the suite through the double's props.
@@ -625,7 +625,7 @@ describe('GroupForm durable draft', () => {
   const descriptionLabel = i18n.t('organization.groups.descriptionLabel');
 
   it('holds a create back until the stored draft settles, then seeds its fields', async () => {
-    draft.state = { kind: 'loading' };
+    draft.state = { kind: 'loading', save: draft.save, clear: draft.clear };
     const { renderer, box, unmountOnce } = await mountGatedForm(undefined);
 
     // No server record exists, so the form shows its loading state rather than
@@ -644,7 +644,7 @@ describe('GroupForm durable draft', () => {
   });
 
   it('applies a late draft to an edit form the person has not touched', async () => {
-    draft.state = { kind: 'loading' };
+    draft.state = { kind: 'loading', save: draft.save, clear: draft.clear };
     const { renderer, box, unmountOnce } = await mountGatedForm(storedGroup());
 
     // The server group is the content while the stored draft loads.
@@ -659,7 +659,7 @@ describe('GroupForm durable draft', () => {
   });
 
   it('never overwrites an edit form the person already typed into', async () => {
-    draft.state = { kind: 'loading' };
+    draft.state = { kind: 'loading', save: draft.save, clear: draft.clear };
     const { renderer, box, unmountOnce } = await mountGatedForm(storedGroup());
 
     changeName(renderer.root, 'Typed now');
@@ -676,27 +676,6 @@ describe('GroupForm durable draft', () => {
       memberIds: [],
       memberQuery: '',
     });
-
-    unmountOnce();
-  });
-
-  it('stores an edit typed before the stored draft answered', async () => {
-    draft.state = { kind: 'loading' };
-    const { renderer, box, unmountOnce } = await mountGatedForm(storedGroup());
-
-    changeName(renderer.root, 'Typed before ready');
-
-    // The stand-in buffers the write instead of dropping it, so nothing has
-    // reached the store yet.
-    expect(draft.save).not.toHaveBeenCalled();
-
-    box.settle(null);
-
-    // The replay hands the buffered snapshot to the real draft once.
-    expect(draft.save).toHaveBeenCalledOnce();
-    expect(draft.save).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Typed before ready' })
-    );
 
     unmountOnce();
   });

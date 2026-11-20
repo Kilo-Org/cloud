@@ -119,7 +119,7 @@ const spendAlertsFormDraftSchema = z.object({
 });
 
 /** Shape guard for a stored draft; a value another build wrote stays stored. */
-export function isSpendAlertsFormDraft(value: unknown): value is SpendAlertsFormDraft {
+function isSpendAlertsFormDraft(value: unknown): value is SpendAlertsFormDraft {
   return spendAlertsFormDraftSchema.safeParse(value).success;
 }
 

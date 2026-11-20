@@ -43,10 +43,16 @@ function caseSplit(caseId: string): SweepResult['split'] {
   return createHash('sha256').update(caseId).digest().readUInt8(0) % 2 === 0 ? 'train' : 'heldOut';
 }
 
+export type OfflineSweepRun = {
+  sweep: OfflineSweep;
+  out: string;
+  mode: 'sweep' | 'summarize';
+};
+
 export async function runOfflineSweep(
   argv: string[],
   env: NodeJS.ProcessEnv = process.env
-): Promise<{ sweep: OfflineSweep; out: string }> {
+): Promise<OfflineSweepRun> {
   const { values } = parseArgs({
     args: argv,
     options: {
@@ -75,7 +81,7 @@ export async function runOfflineSweep(
     sweep.summaries = summarizeSweep(sweep.pairs);
     await writeFile(`${values.out}.partial`, `${JSON.stringify(sweep, null, 2)}\n`);
     await rename(`${values.out}.partial`, values.out);
-    return { sweep, out: values.out };
+    return { sweep, out: values.out, mode: 'summarize' };
   }
   if (!values.pairs || !values.out || values['max-usd'] === undefined) {
     throw new Error(
@@ -361,5 +367,5 @@ export async function runOfflineSweep(
   for (const result of results) {
     if (result.status === 'rejected') throw result.reason;
   }
-  return { sweep, out };
+  return { sweep, out, mode: 'sweep' };
 }

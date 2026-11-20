@@ -14,7 +14,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { CreditsCard, type CreditsCardOrgList } from './profile-credits-card';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import {
+  ICON_TARGET_BOX_CLASS,
+  LINE_ACTION_BOX_CLASS,
+  STATE_ACTION_CLASS,
+} from '@/lib/a11y/tap-target';
 import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { OrganizationProvider, useOrganization } from '@/lib/organization-context';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
@@ -370,6 +374,25 @@ function amountRow(renderer: ReactTestRenderer): ReactTestInstance {
       Object.is(node.type, 'View') &&
       String(node.props.className) === 'min-w-0 flex-row items-center gap-1'
   );
+}
+
+/** The note's fixed box: the one View the card tags as the expiry slot. */
+function noteSlot(renderer: ReactTestRenderer): ReactTestInstance {
+  const [slot] = renderer.root.findAll(node => node.props.testID === 'credits-expiry-slot');
+  if (slot === undefined) {
+    throw new Error('The card painted no expiry slot');
+  }
+  return slot;
+}
+
+/** The height the slot reserves, in dp, at the test's font scale of 1. */
+function slotHeight(slot: ReactTestInstance): number {
+  const style: unknown = slot.props.style;
+  if (style === null || typeof style !== 'object' || !('minHeight' in style)) {
+    return 0;
+  }
+  const { minHeight } = style;
+  return typeof minHeight === 'number' ? minHeight : 0;
 }
 
 beforeEach(() => {
@@ -1183,6 +1206,15 @@ describe('CreditsCard organization balance source', () => {
       expect(texts()).not.toContain('SKELETON');
       expect(labels()).not.toContain('Failed to load balance. Tap to retry.');
       expect(labels()).toContain('Retry');
+      // The retryable branch is one `text-sm` line in the slot's
+      // two-caption-line reserve: the failure status is capped to a single
+      // line and the action's 28 dp box cancels its own overflow, so the card
+      // keeps its height when the exit paints.
+      expect(slotHeight(noteSlot(renderer))).toBeCloseTo(CAPTION_LINE_DP * 2, 5);
+      const [failureLine] = renderer.root.findAll(
+        node => Object.is(node.type, 'Text') && node.props.children === 'Credit expiry unavailable.'
+      );
+      expect(failureLine?.props.numberOfLines).toBe(1);
       expect(texts()).toContain('Credit expiry unavailable.');
 
       const retry = renderer.root.find(
@@ -1191,6 +1223,9 @@ describe('CreditsCard organization balance source', () => {
           node.props.accessibilityRole === 'button' &&
           node.props.accessibilityLabel === 'Retry'
       );
+      expect(hasClasses(retry, LINE_ACTION_BOX_CLASS.split(' '))).toBe(true);
+      expect(classesOf(retry)).not.toContain(STATE_ACTION_CLASS);
+
       await act(async () => {
         (retry.props.onPress as () => void)();
         await Promise.resolve();
@@ -1550,25 +1585,6 @@ describe('CreditsCard balance row', () => {
       pending.resolve({ balance: 1 });
     }
   });
-
-  /** The note's fixed box: the one View the card tags as the expiry slot. */
-  function noteSlot(renderer: ReactTestRenderer): ReactTestInstance {
-    const [slot] = renderer.root.findAll(node => node.props.testID === 'credits-expiry-slot');
-    if (slot === undefined) {
-      throw new Error('The card painted no expiry slot');
-    }
-    return slot;
-  }
-
-  /** The height the slot reserves, in dp, at the test's font scale of 1. */
-  function slotHeight(slot: ReactTestInstance): number {
-    const style: unknown = slot.props.style;
-    if (style === null || typeof style !== 'object' || !('minHeight' in style)) {
-      return 0;
-    }
-    const { minHeight } = style;
-    return typeof minHeight === 'number' ? minHeight : 0;
-  }
 
   it('reserves the funded note’s two lines while the credits load', async () => {
     currentUser.userId = 'user-a';

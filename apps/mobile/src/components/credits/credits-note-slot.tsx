@@ -6,7 +6,7 @@ import { CreditExpiryNote } from '@/components/credits/credit-expiry-note';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { LINE_ACTION_BOX_CLASS, LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 /** One `caption` line at scale 1, the height the design gate measured in dp. */
@@ -52,6 +52,12 @@ type CreditsNoteSlotProps = Readonly<{
  * takes about four at Android's largest scale. Reserving only `2 × scale` lines
  * left the box one line short from about scale 1.5 and grew the card when a
  * funded note landed — the shift this slot exists to prevent.
+ *
+ * The retryable branch fits the same reserve: it is one `text-sm` line, the
+ * failure status beside the card's line-action box. The 28 dp box cancels its
+ * own overflow with `-my-[7px]`, so the branch stays as tall as that line and
+ * the two-caption-line reserve holds it — the card does not grow when the
+ * branch paints.
  */
 export function CreditsNoteSlot({
   scope,
@@ -72,16 +78,29 @@ export function CreditsNoteSlot({
   );
   if (retryable) {
     failure = (
-      <View>
-        <AccessibleStatus message={t('credits.expiryUnavailable')} className="text-sm" />
+      // One `text-sm` line: the status is capped to a single line and the
+      // action's 28 dp box cancels its own overflow with `-my-[7px]`, so the
+      // branch fits the slot's two-caption-line reserve and the card does not
+      // grow when it paints.
+      <View className="flex-row items-center gap-1">
+        <AccessibleStatus
+          message={t('credits.expiryUnavailable')}
+          className="shrink text-sm"
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('common.retry')}
           accessibilityHint={t('credits.expiryUnavailable')}
           onPress={onRetry}
-          className={cn(STATE_ACTION_CLASS, 'flex-row items-center gap-2 active:opacity-70')}
+          hitSlop={LINE_ACTION_HIT_SLOP}
+          className={cn(
+            LINE_ACTION_BOX_CLASS,
+            'shrink-0 flex-row items-center px-1 active:opacity-70'
+          )}
         >
-          <Text className="text-sm text-primary">{t('common.retry')}</Text>
+          <Text className="text-sm font-semibold text-primary">{t('common.retry')}</Text>
         </Pressable>
       </View>
     );

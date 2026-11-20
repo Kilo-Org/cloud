@@ -1,8 +1,12 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import {
+  MAX_ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_BYTES,
+  MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH,
   MAX_ORGANIZATION_GROUP_MODEL_IDS,
+  MAX_ORGANIZATION_GROUP_PROVIDER_SLUG_LENGTH,
   MAX_ORGANIZATION_GROUP_PROVIDER_SLUGS,
   OrganizationGroupModelAccessPolicySchema,
+  OrganizationGroupModelAccessPolicyWriteSchema,
 } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.schema';
 import {
   OrganizationGroupPoliciesSchema,
@@ -71,5 +75,117 @@ describe('model access policy catalog limits', () => {
     expect(result.error.issues).toEqual([
       expect.objectContaining({ code: 'too_big', path: ['data', 'provider_allow_list'] }),
     ]);
+  });
+
+  it('accepts a model id of the documented maximum length', () => {
+    const policy = {
+      type: 'model_access',
+      data: {
+        mode: 'selected',
+        model_allow_list: ['m'.repeat(MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH)],
+        provider_allow_list: [],
+      },
+    } satisfies OrganizationGroupModelAccessPolicy;
+
+    expect(OrganizationGroupModelAccessPolicyWriteSchema.parse(policy)).toEqual(policy);
+  });
+
+  it('requires a model id to fit the documented maximum length', () => {
+    const policy = {
+      type: 'model_access',
+      data: {
+        mode: 'selected',
+        model_allow_list: ['m'.repeat(MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH + 1)],
+        provider_allow_list: [],
+      },
+    } satisfies OrganizationGroupModelAccessPolicy;
+
+    const result = OrganizationGroupModelAccessPolicyWriteSchema.safeParse(policy);
+
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error('Expected a model id above the documented maximum to fail');
+    expect(result.error.issues).toEqual([
+      expect.objectContaining({ code: 'too_big', path: ['data', 'model_allow_list', 0] }),
+    ]);
+  });
+
+  it('accepts a provider slug of the documented maximum length', () => {
+    const policy = {
+      type: 'model_access',
+      data: {
+        mode: 'selected',
+        model_allow_list: [],
+        provider_allow_list: ['p'.repeat(MAX_ORGANIZATION_GROUP_PROVIDER_SLUG_LENGTH)],
+      },
+    } satisfies OrganizationGroupModelAccessPolicy;
+
+    expect(OrganizationGroupModelAccessPolicyWriteSchema.parse(policy)).toEqual(policy);
+  });
+
+  it('requires a provider slug to fit the documented maximum length', () => {
+    const policy = {
+      type: 'model_access',
+      data: {
+        mode: 'selected',
+        model_allow_list: [],
+        provider_allow_list: ['p'.repeat(MAX_ORGANIZATION_GROUP_PROVIDER_SLUG_LENGTH + 1)],
+      },
+    } satisfies OrganizationGroupModelAccessPolicy;
+
+    const result = OrganizationGroupModelAccessPolicyWriteSchema.safeParse(policy);
+
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error('Expected a provider slug above the documented maximum to fail');
+    expect(result.error.issues).toEqual([
+      expect.objectContaining({ code: 'too_big', path: ['data', 'provider_allow_list', 0] }),
+    ]);
+  });
+
+  it('accepts a selection at the documented count limits', () => {
+    const policy = selectedPolicy(
+      MAX_ORGANIZATION_GROUP_MODEL_IDS,
+      MAX_ORGANIZATION_GROUP_PROVIDER_SLUGS
+    );
+
+    expect(OrganizationGroupModelAccessPolicyWriteSchema.parse(policy)).toEqual(policy);
+  });
+
+  it('requires a selection to fit the documented serialized size', () => {
+    const policy = {
+      type: 'model_access',
+      data: {
+        mode: 'selected',
+        model_allow_list: Array.from({ length: MAX_ORGANIZATION_GROUP_MODEL_IDS }, () =>
+          'm'.repeat(MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH)
+        ),
+        provider_allow_list: Array.from({ length: MAX_ORGANIZATION_GROUP_PROVIDER_SLUGS }, () =>
+          'p'.repeat(MAX_ORGANIZATION_GROUP_PROVIDER_SLUG_LENGTH)
+        ),
+      },
+    } satisfies OrganizationGroupModelAccessPolicy;
+    expect(new TextEncoder().encode(JSON.stringify(policy.data)).length).toBeGreaterThan(
+      MAX_ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_BYTES
+    );
+
+    const result = OrganizationGroupModelAccessPolicyWriteSchema.safeParse(policy);
+
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error('Expected a selection above the documented size to fail');
+    expect(result.error.issues).toEqual([
+      expect.objectContaining({ code: 'custom', message: 'Policy too large', path: ['data'] }),
+    ]);
+  });
+
+  it('parses a stored policy independently of the write bounds', () => {
+    const policy = {
+      type: 'model_access',
+      data: {
+        mode: 'selected',
+        model_allow_list: [`vendor/${'m'.repeat(MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH)}`],
+        provider_allow_list: ['p'.repeat(MAX_ORGANIZATION_GROUP_PROVIDER_SLUG_LENGTH + 1)],
+      },
+    } satisfies OrganizationGroupModelAccessPolicy;
+
+    expect(OrganizationGroupModelAccessPolicySchema.parse(policy)).toEqual(policy);
   });
 });

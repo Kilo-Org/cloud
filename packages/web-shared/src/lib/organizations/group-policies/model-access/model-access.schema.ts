@@ -4,6 +4,10 @@ import * as z from 'zod';
 export const ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_TYPE = 'model_access';
 export const MAX_ORGANIZATION_GROUP_MODEL_IDS = 2_000;
 export const MAX_ORGANIZATION_GROUP_PROVIDER_SLUGS = 500;
+export const MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH = 200;
+export const MAX_ORGANIZATION_GROUP_PROVIDER_SLUG_LENGTH = 64;
+export const MAX_ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_BYTES = 256 * 1024;
+const utf8 = new TextEncoder();
 
 export const OrganizationGroupModelAccessPolicyDataSchema = z.discriminatedUnion('mode', [
   z.object({ mode: z.literal('all') }).strict(),
@@ -43,6 +47,35 @@ export type _AssertModelAccessMatchesDb = AssertTrue<
       : false
     : false
 >;
+
+export const OrganizationGroupModelAccessPolicyWriteDataSchema = z.discriminatedUnion('mode', [
+  z.object({ mode: z.literal('all') }).strict(),
+  z.object({ mode: z.literal('none') }).strict(),
+  z
+    .object({
+      mode: z.literal('selected'),
+      model_allow_list: z
+        .array(z.string().trim().min(1).max(MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH))
+        .max(MAX_ORGANIZATION_GROUP_MODEL_IDS),
+      provider_allow_list: z
+        .array(z.string().trim().min(1).max(MAX_ORGANIZATION_GROUP_PROVIDER_SLUG_LENGTH))
+        .max(MAX_ORGANIZATION_GROUP_PROVIDER_SLUGS),
+    })
+    .strict()
+    .refine(
+      data =>
+        utf8.encode(JSON.stringify(data)).length <=
+        MAX_ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_BYTES,
+      'Policy too large'
+    ),
+]);
+
+export const OrganizationGroupModelAccessPolicyWriteSchema = z
+  .object({
+    type: z.literal(ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_TYPE),
+    data: OrganizationGroupModelAccessPolicyWriteDataSchema,
+  })
+  .strict();
 
 export const DEFAULT_GROUP_MODEL_ACCESS_POLICY = {
   type: ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_TYPE,

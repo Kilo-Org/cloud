@@ -13,6 +13,7 @@ import {
 import { MAX_ORGANIZATION_GROUPS, OrganizationSettingsSchema } from '@kilocode/db/schema-types';
 import {
   OrganizationGroupPoliciesSchema,
+  OrganizationGroupModelAccessPolicyWriteSchema,
   OrganizationGroupPolicySchema,
   ORGANIZATION_GROUPS_ENTERPRISE_ONLY_MESSAGE,
   type OrganizationGroupPolicies,
@@ -57,7 +58,17 @@ export function normalizeOrganizationGroupPolicy(
   policyInput: OrganizationGroupPolicy
 ): OrganizationGroupPolicy {
   const policy = OrganizationGroupPolicySchema.parse(policyInput);
-  return normalizeRegisteredOrganizationGroupPolicy(policy);
+  const normalized = normalizeRegisteredOrganizationGroupPolicy(policy);
+  if (normalized.type !== 'model_access') return normalized;
+  const parsed = OrganizationGroupModelAccessPolicyWriteSchema.safeParse(normalized);
+  if (!parsed.success) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message:
+        'An organization model access policy entry or size is over the maximum. Remove or shorten allow-list entries before saving.',
+    });
+  }
+  return normalized;
 }
 
 function upsertPolicy(

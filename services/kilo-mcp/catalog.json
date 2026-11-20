@@ -22136,7 +22136,8 @@
                                 "type": "array",
                                 "items": {
                                   "type": "string",
-                                  "minLength": 1
+                                  "minLength": 1,
+                                  "maxLength": 200
                                 }
                               },
                               "provider_allow_list": {
@@ -22144,7 +22145,8 @@
                                 "type": "array",
                                 "items": {
                                   "type": "string",
-                                  "minLength": 1
+                                  "minLength": 1,
+                                  "maxLength": 64
                                 }
                               }
                             },
@@ -22581,7 +22583,8 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "minLength": 1
+                                "minLength": 1,
+                                "maxLength": 200
                               }
                             },
                             "provider_allow_list": {
@@ -22589,7 +22592,8 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "minLength": 1
+                                "minLength": 1,
+                                "maxLength": 64
                               }
                             }
                           },
@@ -22833,7 +22837,8 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "minLength": 1
+                                "minLength": 1,
+                                "maxLength": 200
                               }
                             },
                             "provider_allow_list": {
@@ -22841,7 +22846,8 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "minLength": 1
+                                "minLength": 1,
+                                "maxLength": 64
                               }
                             }
                           },

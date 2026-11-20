@@ -12,7 +12,7 @@ import {
   shellLabels,
   shellOptions,
   type AgentDraft,
-  type AgentPermissions,
+  type AgentPermissionSource,
   type PolicyRule,
   type ToolDecision,
 } from './permission-policy-ui';
@@ -28,17 +28,25 @@ const knownTools: Readonly<Record<string, string>> = {
 
 export function AgentPermissionFields({
   draft,
-  inherited,
+  sources,
   disabled,
   onChange,
 }: {
   draft: AgentDraft;
-  inherited?: AgentPermissions;
+  sources: AgentPermissionSource[];
   disabled: boolean;
   onChange: (draft: AgentDraft) => void;
 }) {
-  const unrestrictedBlocked = inherited?.unrestricted_mode === 'deny';
-  const autoApproveBlocked = inherited?.auto_approve === 'deny';
+  const unrestrictedBlocker = sources.find(
+    source => source.permissions.unrestricted_mode === 'deny'
+  );
+  const unrestrictedAllow = sources.find(
+    source => source.permissions.unrestricted_mode === 'allow'
+  );
+  const autoApproveBlocker = sources.find(source => source.permissions.auto_approve === 'deny');
+  const shellSources = sources.flatMap(({ name, permissions }) =>
+    permissions.shell === undefined ? [] : [{ name, shell: permissions.shell }]
+  );
   return (
     <Tabs defaultValue="tools">
       <TabsList aria-label="Agent permission sections">
@@ -51,16 +59,20 @@ export function AgentPermissionFields({
           value={draft.unrestricted_mode ?? 'inherit'}
           options={[
             { value: 'inherit', label: 'Use inherited policy' },
-            { ...actionOptions[0], disabled: unrestrictedBlocked },
-            { ...actionOptions[2], disabled: unrestrictedBlocked },
+            { ...actionOptions[0], disabled: Boolean(unrestrictedBlocker) },
+            { ...actionOptions[2], disabled: Boolean(unrestrictedBlocker) },
           ]}
-          disabled={disabled || (unrestrictedBlocked && draft.unrestricted_mode === undefined)}
+          disabled={
+            disabled || (Boolean(unrestrictedBlocker) && draft.unrestricted_mode === undefined)
+          }
           description={
-            unrestrictedBlocked
+            unrestrictedBlocker?.name === 'Organization default'
               ? 'Blocked by the organization default. A group cannot change this restriction.'
-              : inherited?.unrestricted_mode === 'allow'
-                ? 'The organization default does not block unrestricted mode.'
-                : 'An Allow decision does not override stricter settings.'
+              : unrestrictedBlocker
+                ? `Blocked by ${unrestrictedBlocker.name}. This set cannot change the restriction.`
+                : unrestrictedAllow?.name === 'Organization default'
+                  ? 'The organization default does not block unrestricted mode.'
+                  : 'An Allow decision does not override stricter settings.'
           }
           onChange={mode =>
             onChange({ ...draft, unrestricted_mode: mode === 'inherit' ? undefined : mode })
@@ -71,24 +83,21 @@ export function AgentPermissionFields({
           value={draft.auto_approve ?? 'inherit'}
           options={[
             { value: 'inherit', label: 'No additional restriction' },
-            { value: 'deny', label: 'Disable auto-approve', disabled: autoApproveBlocked },
+            { value: 'deny', label: 'Disable auto-approve', disabled: Boolean(autoApproveBlocker) },
           ]}
-          disabled={disabled || (autoApproveBlocked && draft.auto_approve === undefined)}
+          disabled={disabled || (Boolean(autoApproveBlocker) && draft.auto_approve === undefined)}
           description={
-            autoApproveBlocked
+            autoApproveBlocker?.name === 'Organization default'
               ? 'Disabled by the organization default. A group cannot re-enable it.'
-              : 'Requires manual approval when a managed action needs approval. Members can still auto-approve eligible actions outside managed policy.'
+              : autoApproveBlocker
+                ? `Disabled by ${autoApproveBlocker.name}. This permission set cannot re-enable it.`
+                : 'Requires manual approval when a managed action needs approval. Members can still auto-approve eligible actions outside managed policy.'
           }
           onChange={mode =>
             onChange({ ...draft, auto_approve: mode === 'deny' ? mode : undefined })
           }
         />
-        <ToolPermissions
-          draft={draft}
-          inherited={inherited}
-          disabled={disabled}
-          onChange={onChange}
-        />
+        <ToolPermissions draft={draft} sources={sources} disabled={disabled} onChange={onChange} />
       </TabsContent>
       <TabsContent value="shell" className="grid gap-4 pt-2">
         <PolicySelect
@@ -102,32 +111,43 @@ export function AgentPermissionFields({
           description="Inherit adds no shell restriction here. Configuring profiles blocks every shell kind without a profile, including unconfigured Bash or PowerShell."
           onChange={mode => onChange({ ...draft, shell: mode === 'configure' ? {} : undefined })}
         />
-        {inherited?.shell !== undefined && (
-          <div className="type-label text-muted-foreground grid gap-1 border-l pl-3">
-            <p className="text-foreground font-medium">Organization default shell restrictions</p>
+        {shellSources.map(({ name, shell }) => (
+          <div key={name} className="type-label text-muted-foreground grid gap-1 border-l pl-3">
+            <p className="text-foreground font-medium">{name} shell restrictions</p>
             {shellKinds.map(kind => {
-              const profile = inherited.shell?.[kind];
+              const profile = shell[kind];
               return (
                 <p key={kind}>
                   {shellLabels[kind]}:{' '}
                   {profile
-                    ? `${actionLabels[profile.fallback]} for unlisted commands · ${profile.rules.length} rules`
+                    ? `${profile.fallback ? actionLabels[profile.fallback] : 'No fallback selected'} for unlisted commands · ${profile.rules.length} rules`
                     : 'Blocked (no profile)'}
                 </p>
               );
             })}
           </div>
-        )}
+        ))}
         {draft.shell !== undefined &&
           shellKinds.map(kind => {
             const profile = draft.shell?.[kind];
-            const blockedByDefault = inherited?.shell !== undefined && !inherited.shell[kind];
+            const blocker = shellSources.find(({ shell }) => {
+              const inherited = shell[kind];
+              return !inherited || (inherited.rules.length === 0 && inherited.fallback === 'deny');
+            });
+            const requiresApproval = shellSources.some(({ shell }) => {
+              const inherited = shell[kind];
+              return inherited?.fallback === 'ask' && inherited.rules.length === 0;
+            });
             return (
               <fieldset key={kind} className="grid min-w-0 gap-3 border-t pt-3" disabled={disabled}>
                 <legend className="type-body font-medium pr-2">{shellLabels[kind]}</legend>
-                {blockedByDefault && (
+                {blocker && (
                   <p className="type-label text-muted-foreground">
-                    Blocked by the organization default (no profile).
+                    Blocked by{' '}
+                    {blocker.name === 'Organization default'
+                      ? 'the organization default'
+                      : blocker.name}{' '}
+                    ({blocker.shell[kind] ? 'no command exceptions' : 'no profile'}).
                   </p>
                 )}
                 {!profile ? (
@@ -135,7 +155,7 @@ export function AgentPermissionFields({
                     variant="outline"
                     size="sm"
                     className="w-fit"
-                    disabled={blockedByDefault}
+                    disabled={Boolean(blocker)}
                     onClick={() =>
                       onChange({ ...draft, shell: { ...draft.shell, [kind]: { rules: [] } } })
                     }
@@ -144,7 +164,7 @@ export function AgentPermissionFields({
                   </Button>
                 ) : (
                   <>
-                    <fieldset disabled={blockedByDefault} className="grid min-w-0 gap-3">
+                    <fieldset disabled={Boolean(blocker)} className="grid min-w-0 gap-3">
                       <PolicySelect
                         label="Unlisted commands"
                         value={profile.fallback ?? ''}
@@ -163,6 +183,7 @@ export function AgentPermissionFields({
                       <RuleList
                         rules={profile.rules}
                         patternLabel="Command pattern"
+                        allowDisabled={requiresApproval}
                         onChange={rules =>
                           onChange({
                             ...draft,
@@ -195,12 +216,12 @@ export function AgentPermissionFields({
 
 function ToolPermissions({
   draft,
-  inherited,
+  sources,
   disabled,
   onChange,
 }: {
   draft: AgentDraft;
-  inherited?: AgentPermissions;
+  sources: AgentPermissionSource[];
   disabled: boolean;
   onChange: (draft: AgentDraft) => void;
 }) {
@@ -213,21 +234,28 @@ function ToolPermissions({
     ...new Set([
       ...Object.keys(knownTools),
       ...Object.keys(tools),
-      ...Object.keys(inherited?.tools ?? {}),
+      ...sources.flatMap(source => Object.keys(source.permissions.tools ?? {})),
       tool,
     ]),
   ];
   const decision = Object.hasOwn(tools, tool) ? tools[tool] : undefined;
-  const parentTools = inherited?.tools ?? {};
-  const parentDecision = Object.hasOwn(parentTools, tool) ? parentTools[tool] : undefined;
-  const inheritedDefault =
-    typeof parentDecision === 'object' ? parentDecision.fallback : parentDecision;
-  const blockedByDefault =
-    inheritedDefault === 'deny' &&
-    (typeof parentDecision !== 'object' || parentDecision.rules.length === 0);
-  const inheritedText = inheritedDefault
-    ? `Organization default: ${actionLabels[inheritedDefault]}. A group policy cannot relax it.`
-    : 'No decision from the organization default for unmatched calls.';
+  const inheritedDecisions = sources.map(source => {
+    const sourceTools = source.permissions.tools ?? {};
+    const decision = Object.hasOwn(sourceTools, tool) ? sourceTools[tool] : undefined;
+    const fallback = typeof decision === 'object' ? decision.fallback : decision;
+    const ruleCount = typeof decision === 'object' ? decision.rules.length : 0;
+    return { name: source.name, fallback, ruleCount };
+  });
+  const blockedByInherited = inheritedDecisions.some(
+    ({ fallback, ruleCount }) => fallback === 'deny' && ruleCount === 0
+  );
+  const requiresApproval = inheritedDecisions.some(
+    ({ fallback, ruleCount }) => fallback === 'ask' && ruleCount === 0
+  );
+  const availableActions = actionOptions.map(option => ({
+    ...option,
+    disabled: blockedByInherited || (requiresApproval && option.value === 'allow'),
+  }));
 
   function updateTool(value?: ToolDecision) {
     if (value !== undefined) {
@@ -257,24 +285,32 @@ function ToolPermissions({
         onChange={setTool}
       />
       <fieldset aria-label={tool} className="grid min-w-0 gap-3" disabled={disabled}>
-        {inherited && (
-          <p className="type-label text-muted-foreground">
-            {inheritedText}
-            {typeof parentDecision === 'object' && parentDecision.rules.length > 0
-              ? ` The organization also defines ${parentDecision.rules.length} ${parentDecision.rules.length === 1 ? 'resource rule' : 'resource rules'}.`
+        {inheritedDecisions.map(({ name, fallback, ruleCount }) => (
+          <p key={name} className="type-label text-muted-foreground">
+            {fallback
+              ? `${name}: ${actionLabels[fallback]}.${ruleCount ? ' Applies to unmatched calls.' : ''} ${name === 'Organization default' ? 'A group policy cannot relax it.' : 'This permission set cannot relax it.'}`
+              : `No decision from ${name === 'Organization default' ? 'the organization default' : name} for unmatched calls.`}
+            {ruleCount
+              ? ` ${name} also defines ${ruleCount} ${ruleCount === 1 ? 'resource rule' : 'resource rules'}.`
               : ''}
           </p>
-        )}
+        ))}
         <PolicySelect
           label="Tool decision"
           value={typeof decision === 'object' ? 'rules' : (decision ?? 'inherit')}
-          disabled={blockedByDefault && decision === undefined}
+          disabled={blockedByInherited && decision === undefined}
           options={[
             { value: 'inherit', label: 'Use inherited policy' },
-            ...actionOptions.map(option => ({ ...option, disabled: blockedByDefault })),
+            ...availableActions,
             ...(tool === 'bash'
               ? []
-              : [{ value: 'rules', label: 'Resource rules', disabled: blockedByDefault } as const]),
+              : [
+                  {
+                    value: 'rules',
+                    label: 'Resource rules',
+                    disabled: blockedByInherited,
+                  } as const,
+                ]),
           ]}
           onChange={value => {
             if (value === 'rules')
@@ -286,11 +322,11 @@ function ToolPermissions({
           }}
         />
         {typeof decision === 'object' && (
-          <fieldset disabled={blockedByDefault} className="grid min-w-0 gap-3">
+          <fieldset disabled={blockedByInherited} className="grid min-w-0 gap-3">
             <PolicySelect
               label="Unmatched calls"
               value={decision.fallback ?? 'inherit'}
-              options={[{ value: 'inherit', label: 'Use inherited policy' }, ...actionOptions]}
+              options={[{ value: 'inherit', label: 'Use inherited policy' }, ...availableActions]}
               onChange={value =>
                 updateTool({ ...decision, fallback: value === 'inherit' ? undefined : value })
               }
@@ -298,6 +334,7 @@ function ToolPermissions({
             <RuleList
               rules={decision.rules}
               patternLabel="Resource pattern"
+              allowDisabled={requiresApproval}
               onChange={rules => updateTool({ ...decision, rules })}
             />
           </fieldset>
@@ -347,10 +384,12 @@ function RuleList({
   rules,
   onChange,
   patternLabel,
+  allowDisabled,
 }: {
   rules: PolicyRule[];
   onChange: (rules: PolicyRule[]) => void;
   patternLabel: string;
+  allowDisabled: boolean;
 }) {
   const id = useId();
 
@@ -391,7 +430,10 @@ function RuleList({
             </div>
             <PolicySelect
               label={`Rule ${index + 1} decision`}
-              options={actionOptions}
+              options={actionOptions.map(option => ({
+                ...option,
+                disabled: allowDisabled && option.value === 'allow',
+              }))}
               value={rule.action}
               onChange={action =>
                 onChange(

@@ -3,12 +3,28 @@ import { useQuery } from '@tanstack/react-query';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { Badge } from '@/components/ui/badge';
 import { useTRPC } from '@/lib/trpc/utils';
-import type { OrganizationPermissionPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.schema';
-import { policyJson, PolicySelect, policySummary } from './permission-policy-ui';
+import type {
+  AgentPermissionsPolicy,
+  OrganizationPermissionPolicy,
+  PermissionPolicyExecutionOs,
+} from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.schema';
+import {
+  agentPermissionSummary,
+  allOsPermissions,
+  permissionSetLabels,
+  permissionSetOptions,
+  policyJson,
+  PolicySelect,
+  policySummary,
+} from './permission-policy-ui';
+
+const executionOsOptions = [...permissionSetOptions, { value: 'other', label: 'Other' }] as const;
 
 export function PermissionPolicyDiagnostics({ organizationId }: { organizationId: string }) {
   const trpc = useTRPC();
   const [userId, setUserId] = useState('');
+  const [os, setOs] = useState<PermissionPolicyExecutionOs | 'all'>('all');
+  const executionOs = os === 'all' ? undefined : os;
   const organization = useOrganizationWithMembers(organizationId);
   const groups = useQuery(trpc.organizations.groups.list.queryOptions({ organizationId }));
   const members =
@@ -30,16 +46,16 @@ export function PermissionPolicyDiagnostics({ organizationId }: { organizationId
     ...trpc.organizations.groups.adminPermissionPolicy.diagnostics.queryOptions({
       organizationId,
       userId,
+      ...(executionOs && { executionOs }),
     }),
     enabled: Boolean(selectedMember),
   });
   const groupNames = new Map(groups.data?.groups.map(group => [group.id, group.name]));
   const inspection = diagnostics.data;
-  const autoApproveBlocked =
-    inspection?.response.managed &&
-    inspection.response.policy.agent_permissions?.layers.some(
-      layer => layer.auto_approve === 'deny'
-    );
+  const policy = inspection?.response.managed ? inspection.response.policy : undefined;
+  const autoApproveBlocked = policy?.agent_permissions?.layers.some(
+    layer => layer.auto_approve === 'deny'
+  );
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-4 p-5">
@@ -71,6 +87,13 @@ export function PermissionPolicyDiagnostics({ organizationId }: { organizationId
           onChange={setUserId}
         />
       )}
+      <PolicySelect
+        label="Execution OS"
+        value={os}
+        options={executionOsOptions}
+        description="All OS and Other show the baseline only. A named OS also includes its additions."
+        onChange={setOs}
+      />
       {selectedMember &&
         (diagnostics.isError ? (
           <p role="alert" className="type-body text-status-destructive">
@@ -99,9 +122,18 @@ export function PermissionPolicyDiagnostics({ organizationId }: { organizationId
                 {autoApproveBlocked ? 'Disabled' : 'No organization restriction'}
               </dd>
             </dl>
+            <dl className="type-label flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2">
+              <dt className="font-medium">Session dollar visibility</dt>
+              <dd className="text-muted-foreground">
+                {policy?.client_configuration?.show_session_dollar_values === false
+                  ? 'Hidden'
+                  : 'Visible'}
+              </dd>
+            </dl>
             <PolicySource
               name="Organization default"
               policies={inspection.sources.defaultPolicies}
+              executionOs={executionOs}
             />
             {inspection.sources.groups.length === 0 ? (
               <p className="type-label text-muted-foreground">No group policy contributions.</p>
@@ -111,6 +143,7 @@ export function PermissionPolicyDiagnostics({ organizationId }: { organizationId
                   key={source.groupId}
                   name={groupNames.get(source.groupId) ?? `Group ${source.groupId}`}
                   policies={source.policies}
+                  executionOs={executionOs}
                 />
               ))
             )}
@@ -131,28 +164,81 @@ export function PermissionPolicyDiagnostics({ organizationId }: { organizationId
 function PolicySource({
   name,
   policies,
+  executionOs,
 }: {
   name: string;
   policies: OrganizationPermissionPolicy[];
+  executionOs?: PermissionPolicyExecutionOs;
 }) {
   return (
     <section className="grid grid-cols-[minmax(0,1fr)] gap-2 rounded-md border p-3">
       <h4 className="type-body font-medium break-words">{name}</h4>
       {policies.length ? (
-        policies.map(policy => (
-          <details key={policy.type} className="type-label rounded border px-3 py-2">
-            <summary className="cursor-pointer">
-              <span className="font-medium">Agent permissions</span>
-              <span className="text-muted-foreground"> · {policySummary(policy)}</span>
-            </summary>
-            <pre className="bg-background mt-2 max-h-56 overflow-auto rounded border p-2">
-              {policyJson(policy)}
-            </pre>
-          </details>
-        ))
+        policies.map(policy =>
+          policy.type === 'agent_permissions' ? (
+            <AgentPolicySource key={policy.type} policy={policy} executionOs={executionOs} />
+          ) : (
+            <PolicySourceDetails
+              key={policy.type}
+              name="Client Configuration"
+              summary={policySummary(policy)}
+              policy={policy}
+            />
+          )
+        )
       ) : (
         <p className="type-label text-muted-foreground">No permission policies at this scope.</p>
       )}
     </section>
+  );
+}
+
+function AgentPolicySource({
+  policy,
+  executionOs,
+}: {
+  policy: AgentPermissionsPolicy;
+  executionOs?: PermissionPolicyExecutionOs;
+}) {
+  const allOs = allOsPermissions(policy.data);
+  const additionOs = executionOs === 'other' ? undefined : executionOs;
+  const addition = additionOs ? policy.data.by_os?.[additionOs] : undefined;
+  return (
+    <>
+      <PolicySourceDetails
+        name="Agent permissions"
+        summary={`${additionOs ? 'All OS · ' : ''}${agentPermissionSummary(allOs)}`}
+        policy={{ ...policy, data: { schema_version: 1, ...allOs } }}
+      />
+      {additionOs && addition && (
+        <PolicySourceDetails
+          name={`${permissionSetLabels[additionOs]} permissions`}
+          summary={agentPermissionSummary(addition)}
+          policy={{ ...policy, data: { schema_version: 1, by_os: { [additionOs]: addition } } }}
+        />
+      )}
+    </>
+  );
+}
+
+function PolicySourceDetails({
+  name,
+  summary,
+  policy,
+}: {
+  name: string;
+  summary: string;
+  policy: OrganizationPermissionPolicy;
+}) {
+  return (
+    <details className="type-label rounded border px-3 py-2">
+      <summary className="cursor-pointer">
+        <span className="font-medium">{name}</span>
+        <span className="text-muted-foreground"> · {summary}</span>
+      </summary>
+      <pre className="bg-background mt-2 max-h-56 overflow-auto rounded border p-2">
+        {policyJson(policy)}
+      </pre>
+    </details>
   );
 }

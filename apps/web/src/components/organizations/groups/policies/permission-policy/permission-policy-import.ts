@@ -1,23 +1,32 @@
 import {
-  OrganizationPermissionPolicySchema,
-  type OrganizationPermissionPolicy,
+  OrganizationGroupAgentPermissionsPolicySchema,
+  PERMISSION_POLICY_OS_ADDITIONS,
+  type AgentPermissionSet,
+  type AgentPermissionsPolicy,
 } from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.schema';
 import { createScanner, getNodeValue, parseTree, type Node, type ParseError } from 'jsonc-parser';
 
-type ToolRule = NonNullable<OrganizationPermissionPolicy['data']['tools']>[string];
+type ToolRule = NonNullable<AgentPermissionSet['tools']>[string];
 type PermissionRule = NonNullable<
-  NonNullable<OrganizationPermissionPolicy['data']['shell']>['bash']
+  NonNullable<AgentPermissionSet['shell']>['bash']
 >['rules'][number];
 type ShellChoice = { kind: 'bash' | 'powershell'; fallback: 'ask' | 'deny' };
 
 type Invalid = { status: 'invalid'; errors: string[] };
-type Valid = { status: 'valid'; policy: OrganizationPermissionPolicy; warnings: string[] };
+type ImportSource = 'native' | 'local';
+type Valid = {
+  status: 'valid';
+  source: ImportSource;
+  policy: AgentPermissionsPolicy;
+  warnings: string[];
+};
 type PermissionPolicyImportResult =
   | Invalid
   | Valid
   | {
       status: 'needs-shell';
-      policy: OrganizationPermissionPolicy;
+      source: 'local';
+      policy: AgentPermissionsPolicy;
       rules: PermissionRule[];
       warnings: string[];
     };
@@ -100,6 +109,8 @@ const policyFields = new Set([
   'type',
   'data',
   'schema_version',
+  'by_os',
+  ...PERMISSION_POLICY_OS_ADDITIONS,
   'unrestricted_mode',
   'auto_approve',
   'tools',
@@ -115,7 +126,11 @@ const policyFields = new Set([
 function policyPath(path: PropertyKey[]): string {
   return (
     path.reduce<string>((location, part, index) => {
-      if (index === 2 && path[0] === 'data' && path[1] === 'tools') return `${location}[tool]`;
+      const toolsPath =
+        path[0] === 'data' &&
+        ((index === 2 && path[1] === 'tools') ||
+          (index === 4 && path[1] === 'by_os' && path[3] === 'tools'));
+      if (toolsPath) return `${location}[tool]`;
       if (typeof part === 'number') return `${location}[${part}]`;
       const field = typeof part === 'string' && policyFields.has(part) ? part : '[field]';
       return location ? `${location}.${field}` : field;
@@ -130,8 +145,12 @@ const safeSchemaMessages = new Set([
   'Use shell profiles for Bash command rules',
 ]);
 
-function validatePolicy(value: unknown, warnings: string[] = []): Invalid | Valid {
-  const parsed = OrganizationPermissionPolicySchema.safeParse(value);
+export function validateAgentPermissionPolicy(
+  value: unknown,
+  source: ImportSource = 'native',
+  warnings: string[] = []
+): Invalid | Valid {
+  const parsed = OrganizationGroupAgentPermissionsPolicySchema.safeParse(value);
   if (!parsed.success) {
     const errors = parsed.error.issues.map(issue => {
       if (issue.code === 'custom' && issue.message === 'Policy too large')
@@ -140,6 +159,13 @@ function validatePolicy(value: unknown, warnings: string[] = []): Invalid | Vali
       if (safeSchemaMessages.has(issue.message)) return `${location}: ${issue.message}.`;
       if (issue.code === 'invalid_value' && location === 'type') {
         return 'type: Expected an agent_permissions policy document.';
+      }
+      if (
+        issue.code === 'invalid_value' &&
+        location.endsWith('.fallback') &&
+        location.includes('.shell.')
+      ) {
+        return `${location}: Choose an explicit fallback for unlisted shell commands.`;
       }
       switch (issue.code) {
         case 'unrecognized_keys':
@@ -158,13 +184,13 @@ function validatePolicy(value: unknown, warnings: string[] = []): Invalid | Vali
     });
     return { status: 'invalid', errors: [...new Set(errors)] };
   }
-  return { status: 'valid', policy: parsed.data, warnings };
+  return { status: 'valid', source, policy: parsed.data, warnings };
 }
 
 export function parsePermissionPolicyDocument(text: string): Invalid | Valid {
   const document = parseDocument(text);
   if (document.status === 'invalid') return document;
-  return validatePolicy(getNodeValue(document.root));
+  return validateAgentPermissionPolicy(getNodeValue(document.root));
 }
 
 function isAction(value: unknown): value is PermissionRule['action'] {
@@ -180,7 +206,7 @@ export function reviewPermissionPolicyImport(
   const { root } = document;
   const config = new Map(objectEntries(root));
   if (config.has('type') || config.has('data') || config.has('schema_version')) {
-    return validatePolicy(getNodeValue(root));
+    return validateAgentPermissionPolicy(getNodeValue(root));
   }
 
   const permission = config.get('permission');
@@ -245,11 +271,11 @@ export function reviewPermissionPolicyImport(
       'A wildcard stays in the ordered shell rules. It does not set the unmatched-command action.'
     );
   }
-  const policy: OrganizationPermissionPolicy = {
+  const policy: AgentPermissionsPolicy = {
     type: 'agent_permissions',
     data: { schema_version: 1, ...(tools.length > 0 && { tools: Object.fromEntries(tools) }) },
   };
-  if (!shellRules) return validatePolicy(policy, warnings);
+  if (!shellRules) return validateAgentPermissionPolicy(policy, 'local', warnings);
   if (
     shell &&
     ((shell.kind !== 'bash' && shell.kind !== 'powershell') ||
@@ -260,11 +286,12 @@ export function reviewPermissionPolicyImport(
 
   // The placeholder validates the complete rule list and size but never becomes part of the preview.
   const { kind, fallback } = shell ?? { kind: 'bash', fallback: 'ask' };
-  const resolved = validatePolicy(
+  const resolved = validateAgentPermissionPolicy(
     {
       ...policy,
       data: { ...policy.data, shell: { [kind]: { fallback, rules: shellRules } } },
     },
+    'local',
     warnings
   );
   if (shell) return resolved;
@@ -276,7 +303,13 @@ export function reviewPermissionPolicyImport(
       ),
     };
   }
-  const base = validatePolicy(policy, warnings);
+  const base = validateAgentPermissionPolicy(policy, 'local', warnings);
   if (base.status === 'invalid') return base;
-  return { status: 'needs-shell', policy: base.policy, rules: shellRules, warnings };
+  return {
+    status: 'needs-shell',
+    source: 'local',
+    policy: base.policy,
+    rules: shellRules,
+    warnings,
+  };
 }

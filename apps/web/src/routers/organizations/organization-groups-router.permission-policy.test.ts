@@ -29,6 +29,20 @@ const denyAutoApprovePolicy = {
   type: 'agent_permissions',
   data: { schema_version: 1, auto_approve: 'deny' },
 } satisfies OrganizationPermissionPolicy;
+const defaultAgentLayer = { ...denyAutoApprovePolicy.data, tools: policy.data.tools };
+const windowsAddition = { tools: { browser_open: 'deny' } } as const;
+const scopedAgentPolicy = {
+  type: 'agent_permissions',
+  data: { ...defaultAgentLayer, by_os: { windows: windowsAddition } },
+} satisfies OrganizationPermissionPolicy;
+const showSessionDollarsPolicy = {
+  type: 'client_configuration',
+  data: { schema_version: 1, show_session_dollar_values: true },
+} satisfies OrganizationPermissionPolicy;
+const hideSessionDollarsPolicy = {
+  ...showSessionDollarsPolicy,
+  data: { ...showSessionDollarsPolicy.data, show_session_dollar_values: false },
+} satisfies OrganizationPermissionPolicy;
 const retiredClientPolicy = {
   type: 'client_access',
   data: { schema_version: 1, mode: 'blocklist', clients: [] },
@@ -36,20 +50,24 @@ const retiredClientPolicy = {
 const modelPolicy = { type: 'model_access', data: { mode: 'none' } } as const;
 const originalWriteSwitch = process.env.ORG_PERMISSION_POLICY_WRITES_ENABLED;
 
-function largePolicy(index: number): OrganizationPermissionPolicy {
+function largePolicy(
+  index: number,
+  executionOs?: 'linux' | 'windows'
+): OrganizationPermissionPolicy {
   const padding = 'x'.repeat(480);
+  const tools = {
+    webfetch: {
+      rules: Array.from({ length: 60 }, (_, rule) => ({
+        pattern: `${padding}-${index}-${rule}`,
+        action: 'allow' as const,
+      })),
+    },
+  };
   return {
     type: 'agent_permissions',
     data: {
       schema_version: 1,
-      tools: {
-        webfetch: {
-          rules: Array.from({ length: 60 }, (_, rule) => ({
-            pattern: `${padding}-${index}-${rule}`,
-            action: 'allow' as const,
-          })),
-        },
-      },
+      ...(executionOs ? { by_os: { [executionOs]: { tools } } } : { tools }),
     },
   };
 }
@@ -133,112 +151,164 @@ describe('organization groups permission-policy administration', () => {
     return { groups, organizationId, groupId: group.id };
   }
 
-  it('commits and audits default and group auto-approve writes without mutating state on invalid values', async () => {
-    const { groups, organizationId, groupId } = await fixture();
-    await addUserToOrganization(organizationId, admin.id, 'admin');
-    await enableFor(organizationId);
-    const adminCaller = await createSessionCallerForUser(admin.id);
-    const adminPolicy = adminCaller.organizations.groups.adminPermissionPolicy;
-    const { policyRevision: previousRevision } = await groups.getPolicySettings({ organizationId });
-    const defaultPolicy = {
-      ...denyAutoApprovePolicy,
-      data: { ...denyAutoApprovePolicy.data, tools: policy.data.tools },
-    };
+  it.each([
+    {
+      defaultPolicy: scopedAgentPolicy,
+      groupPolicy: denyAutoApprovePolicy,
+      resolvedPolicy: { agent_permissions: { layers: [defaultAgentLayer] } },
+      invalidPolicies: [
+        ...['allow', true, false, null].map(auto_approve => ({
+          ...denyAutoApprovePolicy,
+          data: { ...denyAutoApprovePolicy.data, auto_approve },
+        })),
+        {
+          ...scopedAgentPolicy,
+          data: { ...defaultAgentLayer, by_os: { other: windowsAddition } },
+        },
+        {
+          ...scopedAgentPolicy,
+          data: { ...defaultAgentLayer, by_os: { windows: { by_os: { linux: windowsAddition } } } },
+        },
+      ],
+    },
+    {
+      defaultPolicy: showSessionDollarsPolicy,
+      groupPolicy: hideSessionDollarsPolicy,
+      resolvedPolicy: { client_configuration: { show_session_dollar_values: true } },
+      invalidPolicies: [
+        ...['false', null].map(show_session_dollar_values => ({
+          ...hideSessionDollarsPolicy,
+          data: { ...hideSessionDollarsPolicy.data, show_session_dollar_values },
+        })),
+        { ...hideSessionDollarsPolicy, data: { schema_version: 1 } },
+        {
+          ...hideSessionDollarsPolicy,
+          data: {
+            ...hideSessionDollarsPolicy.data,
+            by_os: { windows: { show_session_dollar_values: true } },
+          },
+        },
+      ],
+    },
+  ])(
+    'commits and audits $defaultPolicy.type writes without mutating state on invalid payloads',
+    async ({ defaultPolicy, groupPolicy, resolvedPolicy, invalidPolicies }) => {
+      const { groups, organizationId, groupId } = await fixture();
+      await addUserToOrganization(organizationId, admin.id, 'admin');
+      await enableFor(organizationId);
+      const adminCaller = await createSessionCallerForUser(admin.id);
+      const adminPolicy = adminCaller.organizations.groups.adminPermissionPolicy;
+      const { policyRevision: previousRevision } = await groups.getPolicySettings({
+        organizationId,
+      });
+      const policyType = defaultPolicy.type;
 
-    const defaultWrite = await groups.adminPermissionPolicy.set({
-      organizationId,
-      policy: defaultPolicy,
-    });
-    const groupWrite = await adminPolicy.set({
-      organizationId,
-      groupId,
-      policy: denyAutoApprovePolicy,
-    });
-    expect(defaultWrite).toEqual({ result: [defaultPolicy], policyRevision: previousRevision + 1 });
-    expect(groupWrite).toEqual({
-      result: [denyAutoApprovePolicy],
-      policyRevision: previousRevision + 2,
-    });
-
-    const committed = await policyState(organizationId);
-    expect(committed.settings).toEqual([
-      expect.objectContaining({
-        policy_revision: groupWrite.policyRevision,
-        default_policies: [expect.objectContaining({ type: 'model_access' }), defaultPolicy],
-      }),
-    ]);
-    expect(committed.groups).toEqual([
-      expect.objectContaining({ id: groupId, policies: [modelPolicy, denyAutoApprovePolicy] }),
-    ]);
-    await expect(
-      groups.adminPermissionPolicy.diagnostics({ organizationId, userId: owner.id })
-    ).resolves.toMatchObject({
-      response: {
+      const defaultWrite = await groups.adminPermissionPolicy.set({
+        organizationId,
+        policy: defaultPolicy,
+      });
+      const groupWrite = await adminPolicy.set({
+        organizationId,
+        groupId,
+        policy: groupPolicy,
+      });
+      expect(defaultWrite).toEqual({
+        result: [defaultPolicy],
+        policyRevision: previousRevision + 1,
+      });
+      expect(groupWrite).toEqual({
+        result: [groupPolicy],
+        policyRevision: previousRevision + 2,
+      });
+      await expect(groups.adminPermissionPolicy.settings({ organizationId })).resolves.toEqual({
         managed: true,
-        revision: groupWrite.policyRevision,
-        policy: { agent_permissions: { layers: [defaultPolicy.data] } },
-      },
-      sources: { defaultPolicies: [defaultPolicy], groups: [] },
-    });
+        writesEnabled: true,
+        policies: [defaultPolicy],
+        policyRevision: groupWrite.policyRevision,
+      });
+      await expect(adminPolicy.settings({ organizationId, groupId })).resolves.toEqual({
+        managed: true,
+        writesEnabled: true,
+        policies: [groupPolicy],
+        policyRevision: groupWrite.policyRevision,
+      });
 
-    for (const value of ['allow', true, false, null]) {
-      const invalidPolicy = {
-        ...denyAutoApprovePolicy,
-        data: { ...denyAutoApprovePolicy.data, auto_approve: value as never },
-      };
-      for (const target of [{ organizationId }, { organizationId, groupId }]) {
-        await expect(
-          groups.adminPermissionPolicy.set({ ...target, policy: invalidPolicy })
-        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      const committed = await policyState(organizationId);
+      expect(committed.settings).toEqual([
+        expect.objectContaining({
+          policy_revision: groupWrite.policyRevision,
+          default_policies: [expect.objectContaining({ type: 'model_access' }), defaultPolicy],
+        }),
+      ]);
+      expect(committed.groups).toEqual([
+        expect.objectContaining({ id: groupId, policies: [modelPolicy, groupPolicy] }),
+      ]);
+      await expect(
+        groups.adminPermissionPolicy.diagnostics({ organizationId, userId: owner.id })
+      ).resolves.toMatchObject({
+        response: {
+          managed: true,
+          revision: groupWrite.policyRevision,
+          policy: resolvedPolicy,
+        },
+        sources: { defaultPolicies: [defaultPolicy], groups: [] },
+      });
+
+      for (const invalidPolicy of invalidPolicies) {
+        for (const target of [{ organizationId }, { organizationId, groupId }]) {
+          await expect(
+            groups.adminPermissionPolicy.set({ ...target, policy: invalidPolicy as never })
+          ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+        }
       }
+      expect(await policyState(organizationId)).toEqual(committed);
+
+      const groupRemove = await adminPolicy.remove({
+        organizationId,
+        groupId,
+        policyType,
+      });
+      const defaultRemove = await groups.adminPermissionPolicy.remove({
+        organizationId,
+        policyType,
+      });
+
+      expect(groupRemove).toEqual({ result: [], policyRevision: previousRevision + 3 });
+      expect(defaultRemove).toEqual({ result: [], policyRevision: previousRevision + 4 });
+      const { settings, groups: persistedGroups, audit } = await policyState(organizationId);
+      expect(settings).toEqual([
+        expect.objectContaining({
+          policy_revision: defaultRemove.policyRevision,
+          default_policies: [expect.objectContaining({ type: 'model_access' })],
+        }),
+      ]);
+      expect(persistedGroups).toEqual([expect.objectContaining({ policies: [modelPolicy] })]);
+      expect(audit).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            action: 'organization.group.default_policy.set',
+            actor_id: owner.id,
+            message: `Set default ${policyType} group policy at revision ${defaultWrite.policyRevision}`,
+          }),
+          expect.objectContaining({
+            action: 'organization.group.policy.set',
+            actor_id: admin.id,
+            message: `Set ${policyType} policy for group "Engineering" (${groupId}) at revision ${groupWrite.policyRevision}`,
+          }),
+          expect.objectContaining({
+            action: 'organization.group.policy.remove',
+            actor_id: admin.id,
+            message: `Removed ${policyType} policy from group "Engineering" (${groupId}) at revision ${groupRemove.policyRevision}`,
+          }),
+          expect.objectContaining({
+            action: 'organization.group.default_policy.remove',
+            actor_id: owner.id,
+            message: `Removed default ${policyType} group policy at revision ${defaultRemove.policyRevision}`,
+          }),
+        ])
+      );
     }
-    expect(await policyState(organizationId)).toEqual(committed);
-
-    const groupRemove = await adminPolicy.remove({
-      organizationId,
-      groupId,
-      policyType: denyAutoApprovePolicy.type,
-    });
-    const defaultRemove = await groups.adminPermissionPolicy.remove({
-      organizationId,
-      policyType: defaultPolicy.type,
-    });
-
-    expect(groupRemove).toEqual({ result: [], policyRevision: previousRevision + 3 });
-    expect(defaultRemove).toEqual({ result: [], policyRevision: previousRevision + 4 });
-    const { settings, groups: persistedGroups, audit } = await policyState(organizationId);
-    expect(settings).toEqual([
-      expect.objectContaining({
-        policy_revision: defaultRemove.policyRevision,
-        default_policies: [expect.objectContaining({ type: 'model_access' })],
-      }),
-    ]);
-    expect(persistedGroups).toEqual([expect.objectContaining({ policies: [modelPolicy] })]);
-    expect(audit).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          action: 'organization.group.default_policy.set',
-          actor_id: owner.id,
-          message: `Set default agent_permissions group policy at revision ${defaultWrite.policyRevision}`,
-        }),
-        expect.objectContaining({
-          action: 'organization.group.policy.set',
-          actor_id: admin.id,
-          message: `Set agent_permissions policy for group "Engineering" (${groupId}) at revision ${groupWrite.policyRevision}`,
-        }),
-        expect.objectContaining({
-          action: 'organization.group.policy.remove',
-          actor_id: admin.id,
-          message: `Removed agent_permissions policy from group "Engineering" (${groupId}) at revision ${groupRemove.policyRevision}`,
-        }),
-        expect.objectContaining({
-          action: 'organization.group.default_policy.remove',
-          actor_id: owner.id,
-          message: `Removed default agent_permissions group policy at revision ${defaultRemove.policyRevision}`,
-        }),
-      ])
-    );
-  });
+  );
 
   it('rejects new client-access writes and omits legacy entries without losing active policies', async () => {
     const { groups, organizationId, groupId } = await fixture();
@@ -295,39 +365,46 @@ describe('organization groups permission-policy administration', () => {
     ]);
   });
 
-  it('leaves the policy, revision and audit untouched when either rollout gate rejects a write', async () => {
-    const { groups, organizationId, groupId } = await fixture();
-    const previous = await policyState(organizationId);
+  it.each([policy, hideSessionDollarsPolicy])(
+    'leaves state untouched when a rollout gate rejects a $type write',
+    async managedPolicy => {
+      const { groups, organizationId, groupId } = await fixture();
+      const previous = await policyState(organizationId);
 
-    const disabled = {
-      code: 'FORBIDDEN',
-      message: 'Organization permission policy writes are disabled.',
-    };
-    await expect(
-      groups.adminPermissionPolicy.set({ organizationId, policy })
-    ).rejects.toMatchObject(disabled);
-    await expect(
-      createOrganizationGroup({
-        organizationId,
-        name: 'Internal group create',
-        policies: [policy],
-        permissionPolicyAdmin: true,
-        actor: { id: owner.id, email: owner.google_user_email, name: owner.google_user_name },
-      })
-    ).rejects.toMatchObject(disabled);
-    expect(await policyState(organizationId)).toEqual(previous);
+      const disabled = {
+        code: 'FORBIDDEN',
+        message: 'Organization permission policy writes are disabled.',
+      };
+      await expect(
+        groups.adminPermissionPolicy.set({ organizationId, policy: managedPolicy })
+      ).rejects.toMatchObject(disabled);
+      await expect(
+        createOrganizationGroup({
+          organizationId,
+          name: 'Internal group create',
+          policies: [managedPolicy],
+          permissionPolicyAdmin: true,
+          actor: { id: owner.id, email: owner.google_user_email, name: owner.google_user_name },
+        })
+      ).rejects.toMatchObject(disabled);
+      expect(await policyState(organizationId)).toEqual(previous);
 
-    await enableFor(organizationId);
-    await groups.adminPermissionPolicy.set({ organizationId, groupId, policy });
-    const enabled = await policyState(organizationId);
-    delete process.env.ORG_PERMISSION_POLICY_WRITES_ENABLED;
+      await enableFor(organizationId);
+      await groups.adminPermissionPolicy.set({ organizationId, groupId, policy: managedPolicy });
+      const enabled = await policyState(organizationId);
+      delete process.env.ORG_PERMISSION_POLICY_WRITES_ENABLED;
 
-    await expect(
-      groups.adminPermissionPolicy.remove({ organizationId, groupId, policyType: policy.type })
-    ).rejects.toMatchObject(disabled);
-    await expect(groups.delete({ organizationId, groupId })).rejects.toMatchObject(disabled);
-    expect(await policyState(organizationId)).toEqual(enabled);
-  });
+      await expect(
+        groups.adminPermissionPolicy.remove({
+          organizationId,
+          groupId,
+          policyType: managedPolicy.type,
+        })
+      ).rejects.toMatchObject(disabled);
+      await expect(groups.delete({ organizationId, groupId })).rejects.toMatchObject(disabled);
+      expect(await policyState(organizationId)).toEqual(enabled);
+    }
+  );
 
   it('loads defaults or an unassigned group for the editor without admitting another tenant', async () => {
     const { groups, organizationId, groupId } = await fixture();
@@ -377,17 +454,24 @@ describe('organization groups permission-policy administration', () => {
     await enableFor(organizationId, teamsOrgId);
     const previous = await policyState(organizationId);
 
-    await expect(
-      groups.adminPermissionPolicy.set({ organizationId: teamsOrgId, policy })
-    ).rejects.toMatchObject({
-      code: 'FORBIDDEN',
-      message: 'Groups are available to Enterprise organizations.',
-    });
+    for (const managedPolicy of [policy, hideSessionDollarsPolicy]) {
+      await expect(
+        groups.adminPermissionPolicy.set({ organizationId: teamsOrgId, policy: managedPolicy })
+      ).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        message: 'Groups are available to Enterprise organizations.',
+      });
+    }
     for (const user of [billingManager, member]) {
       const caller = await createSessionCallerForUser(user.id);
-      await expect(
-        caller.organizations.groups.adminPermissionPolicy.set({ organizationId, policy })
-      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+      for (const managedPolicy of [policy, hideSessionDollarsPolicy]) {
+        await expect(
+          caller.organizations.groups.adminPermissionPolicy.set({
+            organizationId,
+            policy: managedPolicy,
+          })
+        ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+      }
     }
     expect(await policyState(organizationId)).toEqual(previous);
   });
@@ -411,6 +495,9 @@ describe('organization groups permission-policy administration', () => {
       const forbidden = { code: 'FORBIDDEN', message: expect.stringContaining('browser session') };
       await expect(
         agentGroups.adminPermissionPolicy.set({ organizationId, policy })
+      ).rejects.toMatchObject(forbidden);
+      await expect(
+        agentGroups.adminPermissionPolicy.set({ organizationId, policy: hideSessionDollarsPolicy })
       ).rejects.toMatchObject(forbidden);
       await expect(
         agentGroups.adminPermissionPolicy.remove({
@@ -461,29 +548,36 @@ describe('organization groups permission-policy administration', () => {
   it('keeps legacy router inputs and outputs model-only while preserving mixed policy arrays', async () => {
     const { groups, organizationId, groupId } = await fixture();
     await enableFor(organizationId);
-    await groups.adminPermissionPolicy.set({ organizationId, policy });
-    await groups.adminPermissionPolicy.set({ organizationId, groupId, policy });
+    const managedPolicies = [policy, hideSessionDollarsPolicy];
+    for (const managedPolicy of managedPolicies) {
+      await groups.adminPermissionPolicy.set({ organizationId, policy: managedPolicy });
+      await groups.adminPermissionPolicy.set({ organizationId, groupId, policy: managedPolicy });
+    }
     const previous = await policyState(organizationId);
     const badRequest = { code: 'BAD_REQUEST' };
 
-    await expect(
-      groups.create({ organizationId, name: 'Invalid', policies: [policy as never] })
-    ).rejects.toMatchObject(badRequest);
-    await expect(
-      groups.setPolicy({ organizationId, groupId, policy: policy as never })
-    ).rejects.toMatchObject(badRequest);
-    await expect(
-      groups.setDefaultPolicy({ organizationId, policy: policy as never })
-    ).rejects.toMatchObject(badRequest);
-    await expect(
-      groups.removePolicy({ organizationId, groupId, policyType: policy.type as never })
-    ).rejects.toMatchObject(badRequest);
-    await expect(
-      groups.removeDefaultPolicy({ organizationId, policyType: policy.type as never })
-    ).rejects.toMatchObject(badRequest);
-    await expect(
-      groups.getPolicyEditorData({ organizationId, policyType: policy.type as never })
-    ).rejects.toMatchObject(badRequest);
+    for (const managedPolicy of managedPolicies) {
+      const legacyPolicy = managedPolicy as never;
+      const policyType = managedPolicy.type as never;
+      await expect(
+        groups.create({ organizationId, name: 'Invalid', policies: [legacyPolicy] })
+      ).rejects.toMatchObject(badRequest);
+      await expect(
+        groups.setPolicy({ organizationId, groupId, policy: legacyPolicy })
+      ).rejects.toMatchObject(badRequest);
+      await expect(
+        groups.setDefaultPolicy({ organizationId, policy: legacyPolicy })
+      ).rejects.toMatchObject(badRequest);
+      await expect(
+        groups.removePolicy({ organizationId, groupId, policyType })
+      ).rejects.toMatchObject(badRequest);
+      await expect(
+        groups.removeDefaultPolicy({ organizationId, policyType })
+      ).rejects.toMatchObject(badRequest);
+      await expect(
+        groups.getPolicyEditorData({ organizationId, policyType })
+      ).rejects.toMatchObject(badRequest);
+    }
     expect(await policyState(organizationId)).toEqual(previous);
 
     delete process.env.ORG_PERMISSION_POLICY_WRITES_ENABLED;
@@ -516,8 +610,8 @@ describe('organization groups permission-policy administration', () => {
     ).resolves.toMatchObject({ result: [] });
 
     const state = await policyState(organizationId);
-    expect(state.settings).toMatchObject([{ default_policies: [policy] }]);
-    expect(state.groups).toMatchObject([{ policies: [policy] }]);
+    expect(state.settings).toMatchObject([{ default_policies: managedPolicies }]);
+    expect(state.groups).toMatchObject([{ policies: managedPolicies }]);
   });
 
   it('limits source diagnostics to privileged sessions and a selected direct member of the same organization', async () => {
@@ -525,29 +619,42 @@ describe('organization groups permission-policy administration', () => {
     await addUserToOrganization(organizationId, billingManager.id, 'billing_manager');
     await addUserToOrganization(organizationId, member.id, 'member');
     await enableFor(organizationId);
-    await groups.adminPermissionPolicy.set({ organizationId, policy: denyAutoApprovePolicy });
+    await groups.adminPermissionPolicy.set({ organizationId, policy: scopedAgentPolicy });
     await groups.adminPermissionPolicy.set({ organizationId, groupId, policy });
     await groups.setMembers({ organizationId, groupId, userIds: [member.id] });
     const billing = await createSessionCallerForUser(billingManager.id);
     const ordinary = await createSessionCallerForUser(member.id);
     const bearer = await createBearerCallerForUser(owner.id);
-    const input = { organizationId, userId: member.id };
+    const subject = { organizationId, userId: member.id };
+    const input = { ...subject, executionOs: 'windows' } as const;
+    const genericLayers = [defaultAgentLayer, policy.data];
+    const diagnostics = billing.organizations.groups.adminPermissionPolicy.diagnostics;
 
-    await expect(
-      billing.organizations.groups.adminPermissionPolicy.diagnostics(input)
-    ).resolves.toMatchObject({
+    await expect(diagnostics(input)).resolves.toMatchObject({
       response: {
         organization_id: organizationId,
         managed: true,
-        policy: { agent_permissions: { layers: [denyAutoApprovePolicy.data, policy.data] } },
+        policy: {
+          agent_permissions: {
+            layers: [...genericLayers, { schema_version: 1, ...windowsAddition }],
+          },
+        },
       },
       sources: {
-        defaultPolicies: [denyAutoApprovePolicy],
+        defaultPolicies: [scopedAgentPolicy],
         groups: [{ groupId, policies: [policy] }],
       },
     });
+    await expect(diagnostics(subject)).resolves.toMatchObject({
+      response: { policy: { agent_permissions: { layers: genericLayers } } },
+    });
     await expect(
-      groups.adminPermissionPolicy.diagnostics({ organizationId, userId: admin.id })
+      diagnostics({ ...subject, executionOs: 'Windows' as never })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    await expect(
+      groups.adminPermissionPolicy.diagnostics({ ...input, userId: admin.id })
     ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     await expect(
       ordinary.organizations.groups.adminPermissionPolicy.diagnostics(input)
@@ -617,6 +724,33 @@ describe('organization groups permission-policy administration', () => {
         groupId: target.id,
         policy: largePolicy(9),
       })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: expect.stringContaining('maximum size'),
+    });
+    expect(await policyState(organizationId)).toEqual(previous);
+  });
+
+  it('checks the response size of each OS independently before accepting an addition', async () => {
+    const { groups, organizationId } = await fixture();
+    await enableFor(organizationId);
+    const { result: target } = await groups.create({ organizationId, name: 'OS addition' });
+    await db.insert(organization_groups).values(
+      Array.from({ length: 8 }, (_, index) => ({
+        organization_id: organizationId,
+        name: `Scoped budget ${index}`,
+        policies: [largePolicy(index, index < 4 ? undefined : 'windows')],
+      }))
+    );
+    const destination = { organizationId, groupId: target.id };
+    const linuxPolicy = largePolicy(8, 'linux');
+    await expect(
+      groups.adminPermissionPolicy.set({ ...destination, policy: linuxPolicy })
+    ).resolves.toMatchObject({ result: [linuxPolicy] });
+    const previous = await policyState(organizationId);
+
+    await expect(
+      groups.adminPermissionPolicy.set({ ...destination, policy: largePolicy(8, 'windows') })
     ).rejects.toMatchObject({
       code: 'BAD_REQUEST',
       message: expect.stringContaining('maximum size'),

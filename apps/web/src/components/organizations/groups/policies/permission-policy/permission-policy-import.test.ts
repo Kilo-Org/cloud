@@ -2,6 +2,7 @@ import fixtures from '@kilocode/web-shared/lib/organizations/group-policies/perm
 import {
   parsePermissionPolicyDocument,
   reviewPermissionPolicyImport,
+  validateAgentPermissionPolicy,
 } from './permission-policy-import';
 
 const agentType = 'agent_permissions';
@@ -23,7 +24,54 @@ describe.each([parsePermissionPolicyDocument, reviewPermissionPolicyImport])('%p
       "type": "${agentType}",
       "data": ${JSON.stringify(data)},
     }`;
-    expect(parse(text)).toStrictEqual({ status: 'valid', policy, warnings: [] });
+    expect(parse(text)).toStrictEqual({ status: 'valid', source: 'native', policy, warnings: [] });
+  });
+
+  test('round trips All OS and every authored OS set in one native document', () => {
+    const data = {
+      schema_version: 1,
+      tools: { browser_open: 'ask' },
+      shell: {},
+      by_os: {
+        linux: {},
+        macos: { auto_approve: 'deny' },
+        windows: {
+          tools: { browser_open: 'deny' },
+          shell: {
+            powershell: {
+              fallback: 'ask',
+              rules: [
+                { pattern: '*', action: 'deny' },
+                { pattern: 'Get-ChildItem*', action: 'allow' },
+              ],
+            },
+          },
+        },
+      },
+    };
+    expect(parse(agentDocument(data))).toStrictEqual({
+      status: 'valid',
+      source: 'native',
+      policy: { type: agentType, data },
+      warnings: [],
+    });
+  });
+
+  test.each([
+    { other: {} },
+    { windows: { schema_version: 1 } },
+    { windows: { by_os: { linux: {} } } },
+  ])('rejects unsupported OS set shapes: %j', by_os => {
+    expect(parse(agentDocument({ by_os }))).toMatchObject({ status: 'invalid' });
+  });
+
+  test('rejects duplicate decoded OS keys', () => {
+    const text =
+      '{"type":"agent_permissions","data":{"schema_version":1,"by_os":{"windows":{},"wind\\u006fws":{}}}}';
+    expect(parse(text)).toEqual({
+      status: 'invalid',
+      errors: [expect.stringMatching(/^Duplicate property at line 1, column \d+\.$/)],
+    });
   });
 
   test.each(['allow', true, null])('rejects invalid scoped auto-approval: %j', auto_approve => {
@@ -76,14 +124,31 @@ describe.each([parsePermissionPolicyDocument, reviewPermissionPolicyImport])('%p
     });
   });
 
+  test('checks the total size of independently valid All OS and OS-specific sets', () => {
+    const rules = Array.from({ length: 40 }, (_, index) => ({
+      pattern: `${index}${'x'.repeat(499)}`,
+      action: 'allow',
+    }));
+    const set = { shell: { bash: { fallback: 'ask', rules } } };
+    const by_os = { linux: set };
+    expect(parse(agentDocument(set))).toMatchObject({ status: 'valid' });
+    expect(parse(agentDocument({ by_os }))).toMatchObject({ status: 'valid' });
+    expect(parse(agentDocument({ ...set, by_os }))).toEqual({
+      status: 'invalid',
+      errors: ['Policy too large.'],
+    });
+  });
+
   test('keeps an omitted shell map distinct from an explicit empty shell map', () => {
     expect(parse(agentDocument({}))).toStrictEqual({
       status: 'valid',
+      source: 'native',
       policy: { type: agentType, data: { schema_version: 1 } },
       warnings: [],
     });
     expect(parse(agentDocument({ shell: {} }))).toStrictEqual({
       status: 'valid',
+      source: 'native',
       policy: { type: agentType, data: { schema_version: 1, shell: {} } },
       warnings: [],
     });
@@ -100,6 +165,18 @@ describe.each([parsePermissionPolicyDocument, reviewPermissionPolicyImport])('%p
 
   test('rejects a well-formed retired client access policy', () => {
     expect(parse(JSON.stringify(retiredPolicy))).toMatchObject({
+      status: 'invalid',
+      errors: expect.arrayContaining(['type: Expected an agent_permissions policy document.']),
+    });
+  });
+
+  test('rejects the valid client configuration policy type without falling back to local import', () => {
+    const text = JSON.stringify({
+      type: 'client_configuration',
+      data: { schema_version: 1, show_session_dollar_values: false },
+      permission: { edit: 'deny' },
+    });
+    expect(parse(text)).toMatchObject({
       status: 'invalid',
       errors: expect.arrayContaining(['type: Expected an agent_permissions policy document.']),
     });
@@ -151,10 +228,38 @@ describe.each([parsePermissionPolicyDocument, reviewPermissionPolicyImport])('%p
     const data = { tools: { edit: { rules: [{ pattern: '__proto__', action: 'deny' }] } } };
     expect(parse(agentDocument(data))).toEqual({
       status: 'valid',
+      source: 'native',
       policy: { type: agentType, data: { schema_version: 1, ...data } },
       warnings: [],
     });
   });
+});
+
+test('formats OS-set draft validation like import without disclosing tool keys or values', () => {
+  const draft = {
+    type: agentType,
+    data: {
+      schema_version: 1,
+      by_os: {
+        windows: {
+          tools: {
+            'secret-tool': { rules: [{ pattern: 'secret-pattern', action: 'secret-action' }] },
+          },
+          shell: { powershell: { rules: [] } },
+        },
+      },
+    },
+  };
+  const validation = validateAgentPermissionPolicy(draft);
+  expect(validation).toStrictEqual(parsePermissionPolicyDocument(JSON.stringify(draft)));
+  expect(validation).toMatchObject({
+    status: 'invalid',
+    errors: expect.arrayContaining([
+      expect.stringContaining('data.by_os.windows.tools[tool]'),
+      'data.by_os.windows.shell.powershell.fallback: Choose an explicit fallback for unlisted shell commands.',
+    ]),
+  });
+  expect(JSON.stringify(validation)).not.toContain('secret-');
 });
 
 describe('legacy Kilo configuration', () => {
@@ -163,6 +268,7 @@ describe('legacy Kilo configuration', () => {
       reviewPermissionPolicyImport('{"autoApprove": true, "permission": {"edit": "ask"}}')
     ).toEqual({
       status: 'valid',
+      source: 'local',
       policy: { type: agentType, data: { schema_version: 1, tools: { edit: 'ask' } } },
       warnings: [expect.stringMatching(/other configuration fields were ignored/i)],
     });
@@ -208,6 +314,7 @@ describe('legacy Kilo configuration', () => {
     const result = reviewPermissionPolicyImport(text);
     expect(result).toStrictEqual({
       status: 'needs-shell',
+      source: 'local',
       policy: base,
       rules,
       warnings: [
@@ -219,6 +326,7 @@ describe('legacy Kilo configuration', () => {
     expect(JSON.stringify(result)).not.toContain('secret-');
     expect(parsePermissionPolicyDocument(JSON.stringify(base))).toStrictEqual({
       status: 'valid',
+      source: 'native',
       policy: base,
       warnings: [],
     });
@@ -231,6 +339,7 @@ describe('legacy Kilo configuration', () => {
     const result = reviewPermissionPolicyImport(text, shell);
     expect(result).toStrictEqual({
       status: 'valid',
+      source: 'local',
       policy: {
         ...base,
         data: { ...base.data, shell: { [shell.kind]: { fallback: shell.fallback, rules } } },
@@ -271,6 +380,7 @@ describe('legacy Kilo configuration', () => {
   test('does not infer a shell profile from a scalar Bash tool permission', () => {
     expect(reviewPermissionPolicyImport('{"permission":{"bash":"ask"}}')).toStrictEqual({
       status: 'valid',
+      source: 'local',
       policy: { type: agentType, data: { schema_version: 1, tools: { bash: 'ask' } } },
       warnings: [],
     });

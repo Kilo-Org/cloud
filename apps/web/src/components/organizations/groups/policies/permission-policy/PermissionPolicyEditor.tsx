@@ -1,22 +1,27 @@
 import { useId, useState } from 'react';
 import { toast } from 'sonner';
-import {
-  OrganizationPermissionPolicySchema,
-  type OrganizationPermissionPolicy,
-} from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.schema';
+import type { AgentPermissionsPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.schema';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { PolicyEditorFooter } from '../PolicyEditorFooter';
 import { AgentPermissionFields } from './AgentPermissionFields';
 import {
   parsePermissionPolicyDocument,
   reviewPermissionPolicyImport,
+  validateAgentPermissionPolicy,
 } from './permission-policy-import';
 import {
+  agentPermissionSummary,
+  allOsPermissions,
+  PermissionPolicyEditorActions,
+  permissionSetLabels,
+  permissionSetOptions,
   policyJson,
   PolicySelect,
   shellOptions,
+  type AgentDraft,
+  type AgentPermissionSource,
+  type PermissionSetSelection,
   type PolicyDraft,
   type ShellKind,
   type ShellProfile,
@@ -27,41 +32,77 @@ type JsonEditor = { mode: 'advanced' | 'import'; source: string };
 export function PermissionPolicyEditor({
   initial,
   inherited,
+  isGroup,
   canEdit,
-  lockReason,
   isSaving,
   isRemoving,
   onSave,
   onRemove,
   onClose,
 }: {
-  initial: OrganizationPermissionPolicy;
-  inherited?: OrganizationPermissionPolicy;
+  initial: AgentPermissionsPolicy;
+  inherited?: AgentPermissionsPolicy;
+  isGroup: boolean;
   canEdit: boolean;
-  lockReason: string;
   isSaving: boolean;
   isRemoving: boolean;
-  onSave: (policy: OrganizationPermissionPolicy) => Promise<boolean>;
+  onSave: (policy: AgentPermissionsPolicy) => Promise<boolean>;
   onRemove?: () => Promise<boolean>;
   onClose: () => void;
 }) {
   const [edited, setEdited] = useState<PolicyDraft | null>(null);
-  const draft = edited ?? initial;
+  const [permissionSet, setPermissionSet] = useState<PermissionSetSelection>('all');
   const [jsonEditor, setJsonEditor] = useState<JsonEditor | null>(null);
-  const validated = OrganizationPermissionPolicySchema.safeParse(draft);
+  const draft = edited ?? initial;
+  const allOs = allOsPermissions(draft.data);
+  const selected = permissionSet === 'all' ? allOs : draft.data.by_os?.[permissionSet];
+  const setLabel = permissionSetLabels[permissionSet];
+  const sources: AgentPermissionSource[] = [];
+  if (inherited) {
+    sources.push({
+      name: permissionSet === 'all' ? 'Organization default' : 'Organization default (All OS)',
+      permissions: allOsPermissions(inherited.data),
+    });
+  }
+  if (permissionSet !== 'all') {
+    sources.push({ name: isGroup ? 'Group All OS' : 'All OS baseline', permissions: allOs });
+    const matchingDefault = inherited?.data.by_os?.[permissionSet];
+    if (matchingDefault) {
+      sources.push({ name: `Organization default (${setLabel})`, permissions: matchingDefault });
+    }
+  }
+
+  const validated = validateAgentPermissionPolicy(draft);
   const busy = isSaving || isRemoving;
   const canSave =
     canEdit &&
     !jsonEditor &&
     !busy &&
     edited !== null &&
-    validated.success &&
-    policyJson(validated.data) !== policyJson(initial);
+    validated.status === 'valid' &&
+    policyJson(validated.policy) !== policyJson(initial);
+
+  function updatePermissionSet(permissions: AgentDraft | undefined) {
+    if (permissionSet === 'all') {
+      setEdited({
+        ...draft,
+        data: { schema_version: 1, ...permissions, by_os: draft.data.by_os },
+      });
+      return;
+    }
+    const by_os = { ...draft.data.by_os };
+    if (permissions) by_os[permissionSet] = permissions;
+    else delete by_os[permissionSet];
+    setEdited({
+      ...draft,
+      data: { ...draft.data, by_os: Object.keys(by_os).length ? by_os : undefined },
+    });
+  }
 
   function exportPolicy() {
-    if (!validated.success) return;
+    if (validated.status !== 'valid') return;
     const url = URL.createObjectURL(
-      new Blob([`${policyJson(validated.data)}\n`], { type: 'application/json' })
+      new Blob([`${policyJson(validated.policy)}\n`], { type: 'application/json' })
     );
     const link = document.createElement('a');
     link.href = url;
@@ -73,10 +114,48 @@ export function PermissionPolicyEditor({
   return (
     <div className="flex min-h-full flex-col">
       <div className="flex-1 space-y-4 p-5">
-        {!canEdit && (
-          <p className="type-body text-muted-foreground rounded-md border px-3 py-2">
-            {lockReason}
-          </p>
+        <PolicySelect
+          label="Permission set"
+          value={permissionSet}
+          options={permissionSetOptions}
+          disabled={busy || jsonEditor !== null}
+          description={
+            permissionSet === 'all'
+              ? 'The All OS set applies to every execution OS. OS-specific sets can add restrictions, never relax them.'
+              : `This set adds restrictions for ${setLabel}. The All OS rules and any applicable organization restrictions still apply.`
+          }
+          onChange={setPermissionSet}
+        />
+        {permissionSet !== 'all' && (
+          <div className="grid gap-2 rounded-md border p-3">
+            <p className="type-label font-medium">Inherited permission sets</p>
+            <dl className="type-label grid gap-2">
+              {sources.map(source => (
+                <div key={source.name}>
+                  <dt className="font-medium">{source.name}</dt>
+                  <dd className="text-muted-foreground">
+                    {agentPermissionSummary(source.permissions)}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            {!selected && (
+              <p className="type-label text-muted-foreground">
+                No {setLabel} permissions added at this scope.
+              </p>
+            )}
+            {canEdit && (
+              <Button
+                className="w-fit"
+                variant={selected ? 'ghost' : 'outline'}
+                size="sm"
+                disabled={busy || jsonEditor !== null}
+                onClick={() => updatePermissionSet(selected ? undefined : {})}
+              >
+                {selected ? 'Remove' : 'Add'} {setLabel} permissions
+              </Button>
+            )}
+          </div>
         )}
         <div className="flex flex-wrap gap-2">
           {canEdit && (
@@ -102,7 +181,7 @@ export function PermissionPolicyEditor({
           <Button
             variant="ghost"
             size="sm"
-            disabled={!validated.success || jsonEditor !== null}
+            disabled={validated.status !== 'valid' || jsonEditor !== null}
             onClick={exportPolicy}
           >
             Export JSON
@@ -112,73 +191,76 @@ export function PermissionPolicyEditor({
           <PolicyJsonEditor
             key={jsonEditor.mode}
             editor={jsonEditor}
+            setLabel={setLabel}
             onClose={() => setJsonEditor(null)}
-            onApply={policy => {
-              setEdited(policy);
+            onApply={(policy, source) => {
+              if (source === 'local') {
+                updatePermissionSet({
+                  ...selected,
+                  tools: policy.data.tools,
+                  shell: policy.data.shell,
+                });
+              } else {
+                setEdited(policy);
+                if (permissionSet !== 'all' && !policy.data.by_os?.[permissionSet]) {
+                  setPermissionSet('all');
+                }
+              }
               setJsonEditor(null);
               toast.success('Draft updated. Save policy to apply it.');
             }}
           />
-        ) : (
+        ) : selected ? (
           <AgentPermissionFields
-            draft={draft.data}
-            inherited={inherited?.data}
+            draft={selected}
+            sources={sources}
             disabled={!canEdit || busy}
-            onChange={data => setEdited({ type: 'agent_permissions', data })}
+            onChange={updatePermissionSet}
           />
-        )}
-        {!jsonEditor && canEdit && !validated.success && (
+        ) : null}
+        {!jsonEditor && canEdit && validated.status === 'invalid' && (
           <div className="type-label text-status-destructive grid gap-1" role="status">
-            {validated.error.issues.slice(0, 5).map((issue, index) => {
-              const path = issue.path.slice(1).map(String).join('.') || 'Policy';
-              const message =
-                issue.path.at(-1) === 'fallback'
-                  ? 'Choose an explicit fallback for unlisted shell commands.'
-                  : issue.message;
-              return (
-                <p key={index}>
-                  {path}: {message}
-                </p>
-              );
-            })}
+            {validated.errors.slice(0, 5).map(error => (
+              <p key={error}>{error.replace(/^data\./, '')}</p>
+            ))}
           </div>
         )}
       </div>
-      {canEdit ? (
-        <PolicyEditorFooter
-          isSaving={isSaving}
-          isDeleting={isRemoving}
-          canSave={canSave}
-          onCancel={onClose}
-          onDelete={
-            jsonEditor || isSaving || !onRemove
-              ? undefined
-              : async () => {
-                  if (await onRemove()) setEdited(null);
+      <PermissionPolicyEditorActions
+        canEdit={canEdit}
+        isSaving={isSaving}
+        isDeleting={isRemoving}
+        canSave={canSave}
+        onCancel={onClose}
+        onDelete={
+          jsonEditor || isSaving || !onRemove
+            ? undefined
+            : async () => {
+                if (await onRemove()) {
+                  setEdited(null);
+                  setPermissionSet('all');
                 }
+              }
+        }
+        onSave={async () => {
+          if (canSave && validated.status === 'valid' && (await onSave(validated.policy))) {
+            setEdited(null);
           }
-          onSave={async () => {
-            if (canSave && validated.success && (await onSave(validated.data))) setEdited(null);
-          }}
-        />
-      ) : (
-        <div className="sticky bottom-0 flex justify-end border-t bg-surface-raised px-5 py-3">
-          <Button variant="outline" onClick={onClose}>
-            Close
-          </Button>
-        </div>
-      )}
+        }}
+      />
     </div>
   );
 }
 
 function PolicyJsonEditor({
   editor,
+  setLabel,
   onApply,
   onClose,
 }: {
   editor: JsonEditor;
-  onApply: (policy: OrganizationPermissionPolicy) => void;
+  setLabel: string;
+  onApply: (policy: AgentPermissionsPolicy, source: 'local' | 'native') => void;
   onClose: () => void;
 }) {
   const id = useId();
@@ -216,7 +298,7 @@ function PolicyJsonEditor({
         <p className="type-label text-muted-foreground">
           {isImport
             ? 'Paste a versioned policy or the contents of kilo.json or kilo.jsonc. Only supported permission settings are imported. Do not paste credentials.'
-            : 'Edit the versioned agent permissions document. Reviewing JSON does not save it.'}
+            : 'Edit the whole versioned agent permissions document, including all OS sets. Reviewing JSON does not save it.'}
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -270,6 +352,11 @@ function PolicyJsonEditor({
               ? 'Validated policy preview'
               : 'Incomplete policy preview'}
           </h3>
+          <p className="type-label text-muted-foreground">
+            {interpreted.source === 'local'
+              ? `Replaces tool permissions and shell profiles in ${setLabel} only. Other sets and managed mode restrictions stay unchanged.`
+              : 'Replaces the whole agent permissions draft, including all OS sets.'}
+          </p>
           {interpreted.warnings.length > 0 && (
             <ul className="type-label text-muted-foreground list-disc space-y-1 break-words pl-4">
               {interpreted.warnings.map((warning, index) => (
@@ -293,7 +380,7 @@ function PolicyJsonEditor({
             variant="outline"
             disabled={interpreted.status !== 'valid'}
             onClick={() => {
-              if (interpreted.status === 'valid') onApply(interpreted.policy);
+              if (interpreted.status === 'valid') onApply(interpreted.policy, interpreted.source);
             }}
           >
             Use in editor

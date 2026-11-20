@@ -1,24 +1,47 @@
-import { useId } from 'react';
+import { useId, type ComponentProps } from 'react';
+import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import type { OrganizationPermissionPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.schema';
+import {
+  PERMISSION_POLICY_OS_ADDITIONS,
+  type AgentPermissionSet,
+  type AgentPermissionsPolicy,
+  type OrganizationPermissionPolicy,
+} from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.schema';
+import { PolicyEditorFooter } from '../PolicyEditorFooter';
 
-export type AgentPermissions = OrganizationPermissionPolicy['data'];
-export type ShellKind = keyof NonNullable<AgentPermissions['shell']>;
-export type ShellProfile = NonNullable<NonNullable<AgentPermissions['shell']>[ShellKind]>;
+export type ShellKind = keyof NonNullable<AgentPermissionSet['shell']>;
+export type ShellProfile = NonNullable<NonNullable<AgentPermissionSet['shell']>[ShellKind]>;
 export type PolicyRule = ShellProfile['rules'][number];
 export type PolicyAction = PolicyRule['action'];
-export type ToolDecision = NonNullable<AgentPermissions['tools']>[string];
-export type AgentDraft = Omit<AgentPermissions, 'shell'> & {
+export type ToolDecision = NonNullable<AgentPermissionSet['tools']>[string];
+export type AgentDraft = Omit<AgentPermissionSet, 'shell'> & {
   shell?: Partial<
     Record<ShellKind, Omit<ShellProfile, 'fallback'> & { fallback?: ShellProfile['fallback'] }>
   >;
 };
-export type PolicyDraft = { type: OrganizationPermissionPolicy['type']; data: AgentDraft };
+export type PermissionSetOs = (typeof PERMISSION_POLICY_OS_ADDITIONS)[number];
+export type PermissionSetSelection = 'all' | PermissionSetOs;
+export type PolicyDraft = {
+  type: 'agent_permissions';
+  data: AgentDraft & { schema_version: 1; by_os?: Partial<Record<PermissionSetOs, AgentDraft>> };
+};
+export type AgentPermissionSource = { name: string; permissions: AgentDraft };
 
 export const emptyAgentPolicy = {
   type: 'agent_permissions',
   data: { schema_version: 1 },
-} satisfies OrganizationPermissionPolicy;
+} satisfies AgentPermissionsPolicy;
+
+export const permissionSetLabels = {
+  all: 'All OS',
+  linux: 'Linux',
+  macos: 'macOS',
+  windows: 'Windows',
+} satisfies Record<PermissionSetSelection, string>;
+
+export const permissionSetOptions = (['all', ...PERMISSION_POLICY_OS_ADDITIONS] as const).map(
+  value => ({ value, label: permissionSetLabels[value] })
+);
 
 export const actionLabels = {
   allow: 'Allow',
@@ -35,12 +58,35 @@ export const shellKinds = ['bash', 'powershell'] as const;
 export const shellLabels = { bash: 'Bash', powershell: 'PowerShell' };
 export const shellOptions = [actionOptions[1], actionOptions[2]] as const;
 
-export function policyJson(policy: PolicyDraft) {
+export function allOsPermissions<T extends PolicyDraft['data']>({
+  schema_version: _version,
+  by_os: _additions,
+  ...permissions
+}: T) {
+  return permissions;
+}
+
+export function policyJson(policy: OrganizationPermissionPolicy | PolicyDraft) {
   return JSON.stringify(policy, null, 2);
 }
 
 export function policySummary(policy: OrganizationPermissionPolicy) {
-  const { tools, shell, unrestricted_mode, auto_approve } = policy.data;
+  if (policy.type === 'client_configuration') {
+    return `Session dollar values ${policy.data.show_session_dollar_values ? 'visible' : 'hidden'}`;
+  }
+  const osCount = Object.keys(policy.data.by_os ?? {}).length;
+  return [
+    agentPermissionSummary(policy.data),
+    ...(osCount ? [`${osCount} OS ${osCount === 1 ? 'addition' : 'additions'}`] : []),
+  ].join(' · ');
+}
+
+export function agentPermissionSummary({
+  tools,
+  shell,
+  unrestricted_mode,
+  auto_approve,
+}: AgentDraft) {
   const toolCount = Object.keys(tools ?? {}).length;
   return [
     `${toolCount} ${toolCount === 1 ? 'tool' : 'tools'}`,
@@ -52,6 +98,21 @@ export function policySummary(policy: OrganizationPermissionPolicy) {
     ...(unrestricted_mode === 'deny' ? ['Unrestricted mode blocked'] : []),
     ...(auto_approve === 'deny' ? ['Auto-approve disabled for managed actions'] : []),
   ].join(' · ');
+}
+
+export function PermissionPolicyEditorActions({
+  canEdit,
+  ...actions
+}: ComponentProps<typeof PolicyEditorFooter> & { canEdit: boolean }) {
+  return canEdit ? (
+    <PolicyEditorFooter {...actions} />
+  ) : (
+    <div className="sticky bottom-0 flex justify-end border-t bg-surface-raised px-5 py-3">
+      <Button variant="outline" onClick={actions.onCancel}>
+        Close
+      </Button>
+    </div>
+  );
 }
 
 export function PolicySelect<T extends string>({

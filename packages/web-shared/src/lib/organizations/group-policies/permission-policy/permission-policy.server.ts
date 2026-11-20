@@ -3,10 +3,7 @@ import 'server-only';
 import { TRPCError } from '@trpc/server';
 import { and, eq } from 'drizzle-orm';
 import { organization_groups } from '@kilocode/db/schema';
-import type {
-  OrganizationGroupAgentPermissionsPolicy,
-  OrganizationGroupPolicy,
-} from '@kilocode/db/schema-types';
+import type { OrganizationGroupPolicy } from '@kilocode/db/schema-types';
 import {
   isOrganizationFeatureEnabled,
   readOrganizationFeatures,
@@ -15,8 +12,13 @@ import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
 import { parseOrganizationGroupPolicies } from '../organization-group-policies.server';
 import {
+  type AgentPermissionSet,
+  type MemberPermissionPolicy,
   MemberPermissionPolicySchema,
+  type OrganizationPermissionPolicy,
   PERMISSION_POLICY_MAX_AGE_SECONDS,
+  PERMISSION_POLICY_OS_ADDITIONS,
+  type PermissionPolicyExecutionOs,
 } from './permission-policy.schema';
 
 export async function assertOrganizationPermissionPolicyWriteEnabled(
@@ -38,7 +40,7 @@ export async function assertOrganizationPermissionPolicyWriteEnabled(
   }
 }
 
-function permissionPolicies(policies: OrganizationGroupPolicy[]) {
+function permissionPolicies(policies: OrganizationGroupPolicy[]): OrganizationPermissionPolicy[] {
   return policies.filter(policy => policy.type !== 'model_access');
 }
 
@@ -63,17 +65,41 @@ function buildMemberPolicyResponse(params: {
   organizationId: string;
   managed: boolean;
   revision: number;
-  policies: OrganizationGroupAgentPermissionsPolicy[];
-}) {
-  const agentLayers = orderLayers(dedupeLayers(params.policies.map(policy => policy.data)));
-  return {
+  policies: OrganizationPermissionPolicy[];
+  executionOs?: PermissionPolicyExecutionOs;
+}): MemberPermissionPolicy {
+  const envelope = {
     schema_version: 1 as const,
     organization_id: params.organizationId,
-    managed: params.managed,
     revision: params.revision,
     max_age_seconds: PERMISSION_POLICY_MAX_AGE_SECONDS,
+  };
+  if (!params.managed) return { ...envelope, managed: false, policy: {} };
+
+  const generic: (AgentPermissionSet & { schema_version: 1 })[] = [];
+  const additions: typeof generic = [];
+  const os = params.executionOs;
+  let showSessionDollarValues: boolean | undefined;
+  for (const policy of params.policies) {
+    if (policy.type === 'client_configuration') {
+      showSessionDollarValues =
+        (showSessionDollarValues ?? true) && policy.data.show_session_dollar_values;
+    } else {
+      const { by_os, ...allOs } = policy.data;
+      generic.push(allOs);
+      const addition = os && os !== 'other' ? by_os?.[os] : undefined;
+      if (addition) additions.push({ schema_version: 1, ...addition });
+    }
+  }
+  const layers = dedupeLayers([...orderLayers(generic), ...orderLayers(additions)]);
+  return {
+    ...envelope,
+    managed: true,
     policy: {
-      ...(agentLayers.length ? { agent_permissions: { layers: agentLayers } } : {}),
+      ...(layers.length ? { agent_permissions: { layers } } : {}),
+      ...(showSessionDollarValues !== undefined
+        ? { client_configuration: { show_session_dollar_values: showSessionDollarValues } }
+        : {}),
     },
   };
 }
@@ -96,7 +122,7 @@ export async function assertOrganizationPermissionPolicyFits(
     .select({ id: organization_groups.id, policies: organization_groups.policies })
     .from(organization_groups)
     .where(eq(organization_groups.organization_id, organizationId));
-  const policies = [
+  const policies = permissionPolicies([
     ...context.defaultPolicies,
     ...groups.flatMap(group =>
       parseOrganizationGroupPolicies(group.policies, {
@@ -105,16 +131,20 @@ export async function assertOrganizationPermissionPolicyFits(
         source: 'group',
       })
     ),
-  ];
-  const parsed = MemberPermissionPolicySchema.safeParse(
-    buildMemberPolicyResponse({
-      organizationId,
-      managed: true,
-      revision: context.policyRevision,
-      policies: permissionPolicies(policies),
-    })
+  ]);
+  const fits = [undefined, ...PERMISSION_POLICY_OS_ADDITIONS].every(
+    executionOs =>
+      MemberPermissionPolicySchema.safeParse(
+        buildMemberPolicyResponse({
+          organizationId,
+          managed: true,
+          revision: context.policyRevision,
+          policies,
+          executionOs,
+        })
+      ).success
   );
-  if (!parsed.success) {
+  if (!fits) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message:
@@ -172,7 +202,11 @@ export async function getStoredOrganizationPermissionPolicy(
   );
 }
 
-export async function getOrganizationPermissionPolicy(organizationId: string, kiloUserId: string) {
+export async function getOrganizationPermissionPolicy(
+  organizationId: string,
+  kiloUserId: string,
+  executionOs?: PermissionPolicyExecutionOs
+) {
   return await db.transaction(
     async tx => {
       const context = await getOrganizationGroupPolicyContext({
@@ -200,6 +234,7 @@ export async function getOrganizationPermissionPolicy(organizationId: string, ki
           managed,
           revision: context.policyRevision,
           policies: [...defaultPolicies, ...groups.flatMap(group => group.policies)],
+          executionOs,
         })
       );
       if (!validated.success) {

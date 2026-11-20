@@ -1,131 +1,111 @@
--- Measurement revision 3 activation (data only; no schema change).
+-- Measurement revision 3 activation: the staged one-shot activation queue.
 --
 -- `ACTIVE_MEASUREMENT_REVISION` is 3 in the same deploy, so from the next drain every
 -- efficient run measures the probe cuts. This migration decides which pairs that happens
--- to, and it is the whole bound: 29 agentic-route pairs, nothing else.
+-- to, and it is the whole bound: 30 pairs (24 queued re-measures and 6 Ember re-admits), nothing else.
 --
--- 1. The 23 pairs that are `ready` at `efficient:v1:6649fed2`, repetitions 3 are queued in
---    `profile_remeasures`, exactly as the `remeasure-prompt-transport` `request` action
---    queues them. The profile stays ready on its current run and keeps serving; the drain
---    claims the row, copies every result that is still reusable, and measures the 21 probe
---    cuts plus `supp-agent-term-pwd-base` per repetition. A pair that already holds a
---    revision-3 result for every one of those cases is not queued, so re-running this
---    statement never re-measures a pair.
+-- The rows are staged in `probe_activations` instead of being written straight into
+-- `profile_remeasures` and `benchmark_profiles` because a migration applies while the
+-- previous image is still serving. That worker claims `profile_remeasures` rows and
+-- `pending` profiles directly (`src/run.ts` drainQueue -> startRun ->
+-- markProfilesRunningForRun), so a queue row or a re-admitted `pending` row would be
+-- measured under revision 2 during the drain-to-deploy window: the queued pairs would run
+-- nothing they lack and lose their queue row, and the six re-admitted Ember rows would be
+-- measured without the probes and settle ineligible on the agentic routes. The old worker
+-- never reads `probe_activations`; the drain of the deploy that raises the revision
+-- consumes it once (`applyProbeActivations`, `src/probe-activation.ts`):
 --
--- 2. `meta/muse-ember` has no ready rep-3 profile: its 2026-11-11 run lost a lane and all
---    six variants were left `failed` (class `unknown`, retryable). It is the model this
---    grading exists for, so the six rows are re-admitted the way the per-row Re-admit does
---    it (`src/profile-refresh.ts`): back to `pending`, failure history cleared, retry
---    budgets reset. The next platform drain measures a full revision-3 run for them,
---    reusing every compatible stored result.
+-- 1. `remeasure`: the 24 pairs that are `ready` at `efficient:v1:6649fed2`, repetitions 3 and
+--    queued in `profile_remeasures`, exactly as the `remeasure-prompt-transport` `request`
+--    action queues them. The profile stays ready on its current run and keeps serving; the
+--    drain claims the row, copies every result that is still reusable, and measures the 21
+--    probe cuts plus `supp-agent-term-pwd-base` per repetition. A pair that already holds a
+--    revision-3 result for every one of those cases is skipped when the row is applied, so
+--    it is never re-measured. `meta/muse-spark-1.2-contributor` `high` is the 24th: a user-owned
+--    rep-3 pair whose provenance run has no probe rows, so it drains on the user queue.
 --
--- Both statements are idempotent: the queue insert conflicts on its primary key and skips
--- pairs already measured at revision 3; the re-admit only touches rows still `failed`.
+-- 2. `readmit`: `meta/muse-ember` has no ready rep-3 profile: its 2026-11-11 run lost a
+--    lane and all six variants were left `failed` (class `unknown`, retryable). It is the
+--    model this grading exists for, so the six rows are re-admitted the way the per-row
+--    Re-admit does it (`src/profile-refresh.ts`): back to `pending`, failure history
+--    cleared, retry budgets reset, `invalidated_at` stamped, so the next platform drain
+--    measures a full revision-3 run for them and does not reuse the failed run's rows.
 --
--- The pair and case lists are mirrored in `src/probe-activation.ts`, and
+-- The pair list is mirrored in `src/probe-activation.ts`, and
 -- `src/probe-activation-sql.test.ts` fails when the two drift apart.
 
-WITH `remeasure`(`model`, `variant`) AS (
-  VALUES
-    ('anthropic/claude-haiku-5.5', 'high'),
-    ('anthropic/claude-haiku-5.5', 'low'),
-    ('anthropic/claude-haiku-5.5', 'max'),
-    ('anthropic/claude-haiku-5.5', 'medium'),
-    ('anthropic/claude-haiku-5.5', 'none'),
-    ('anthropic/claude-haiku-5.5', 'xhigh'),
-    ('deepseek/deepseek-v4.1-flash-1017', 'high'),
-    ('deepseek/deepseek-v4.1-flash-1017', 'low'),
-    ('deepseek/deepseek-v4.1-flash-1017', 'max'),
-    ('deepseek/deepseek-v4.1-flash-1017', 'none'),
-    ('inclusionai/ling-3.1-flash', 'thinking'),
-    ('openai/gpt-6-luna', 'high'),
-    ('openai/gpt-6-luna', 'low'),
-    ('openai/gpt-6-luna', 'max'),
-    ('openai/gpt-6-luna', 'medium'),
-    ('openai/gpt-6-luna', 'none'),
-    ('qwen/qwen3.8-flash', 'instant'),
-    ('qwen/qwen3.8-flash', 'thinking'),
-    ('qwen/qwen3.8-max-0902', 'low'),
-    ('stepfun/step-5-preview', 'high'),
-    ('stepfun/step-5-preview', 'medium'),
-    ('xiaomi/mimo-v2.6-pro', 'instant'),
-    ('z-ai/glm-5.3-flash', 'high')
-),
-`probe_cases`(`case_id`) AS (
-  VALUES
-    ('probe-cont-agent-tool-invoice-rollup-step-1'),
-    ('probe-cont-agent-tool-invoice-rollup-step-2'),
-    ('probe-cont-agent-tool-invoice-rollup-step-3'),
-    ('probe-cont-agent-tool-access-latency-step-1'),
-    ('probe-cont-agent-tool-access-latency-step-2'),
-    ('probe-cont-agent-tool-i18n-sync-step-1'),
-    ('probe-cont-agent-tool-i18n-sync-step-2'),
-    ('probe-cont-agent-tool-i18n-sync-step-3'),
-    ('probe-cont-agent-term-env-rollout-step-1'),
-    ('probe-cont-agent-term-env-rollout-step-2'),
-    ('probe-cont-agent-term-log-split-step-1'),
-    ('probe-cont-agent-term-log-split-step-2'),
-    ('probe-cont-agent-term-migration-renumber-step-1'),
-    ('probe-cont-agent-term-migration-renumber-step-2'),
-    ('probe-cont-agent-term-migration-renumber-step-3'),
-    ('probe-cont-agent-multi-pricing-fix-step-1'),
-    ('probe-cont-agent-multi-pricing-fix-step-2'),
-    ('probe-cont-agent-multi-user-migration-step-1'),
-    ('probe-cont-agent-multi-user-migration-step-2'),
-    ('probe-cont-agent-multi-etl-dedupe-step-1'),
-    ('probe-cont-agent-multi-etl-dedupe-step-2'),
-    ('supp-agent-term-pwd-base')
-)
-INSERT INTO `profile_remeasures`
-  (`router`, `model`, `variant`, `engine_identity`, `repetitions`, `run_id`, `requested_at`,
-    `claimed_at`)
-SELECT
-  'efficient', `remeasure`.`model`, `remeasure`.`variant`, 'efficient:v1:6649fed2', 3, NULL,
-  '2026-11-20T00:00:00.000Z', NULL
-FROM `remeasure`
-JOIN `benchmark_profiles` AS `p`
-  ON `p`.`router` = 'efficient'
-  AND `p`.`model` = `remeasure`.`model`
-  AND `p`.`variant` = `remeasure`.`variant`
-  AND `p`.`engine_identity` = 'efficient:v1:6649fed2'
-  AND `p`.`repetitions` = 3
-  AND `p`.`status` = 'ready'
-  AND `p`.`run_id` IS NOT NULL
-WHERE EXISTS (
-  SELECT 1 FROM `probe_cases` AS `probe`
-  WHERE NOT EXISTS (
-    SELECT 1 FROM `case_results` AS `measured`
-    WHERE `measured`.`run_id` = `p`.`run_id`
-      AND `measured`.`model` = `p`.`model`
-      AND `measured`.`variant` = `p`.`variant`
-      AND `measured`.`case_id` = `probe`.`case_id`
-      AND `measured`.`prompt_revision` >= 3
-  )
-)
-ON CONFLICT DO NOTHING;--> statement-breakpoint
-UPDATE `benchmark_profiles` SET
-  `status` = 'pending',
-  `failure_reason` = NULL,
-  `failure_class` = NULL,
-  `failure_attempts` = 0,
-  `model_failure_attempts` = 0,
-  `first_failed_at` = NULL,
-  `retry_after` = NULL,
-  `run_id` = NULL,
-  `completed_at` = NULL,
-  `requested_at` = '2026-11-20T00:00:00.000Z',
-  `updated_at` = '2026-11-20T00:00:00.000Z',
-  `invalidated_at` = '2026-11-20T00:00:00.000Z'
-WHERE `router` = 'efficient'
-  AND `model` = 'meta/muse-ember'
-  AND `variant` IN ('high', 'low', 'max', 'medium', 'minimal', 'xhigh')
-  AND `engine_identity` = 'efficient:v1:6649fed2'
-  AND `repetitions` = 3
-  AND `status` = 'failed'
-  AND `failure_class` = 'unknown'
-  AND NOT EXISTS (
-    SELECT 1 FROM `scheduler_chunks` AS `chunk`
-    WHERE `chunk`.`model` = `benchmark_profiles`.`model`
-      AND `chunk`.`variant` = `benchmark_profiles`.`variant`
-      AND `chunk`.`status` IN ('queued', 'active')
-  );
+CREATE TABLE `probe_activations` (
+	`router` text NOT NULL,
+	`action` text NOT NULL,
+	`model` text NOT NULL,
+	`variant` text DEFAULT '' NOT NULL,
+	`engine_identity` text NOT NULL,
+	`repetitions` integer NOT NULL,
+	`requested_at` text NOT NULL,
+	PRIMARY KEY(`router`, `action`, `model`, `variant`, `engine_identity`, `repetitions`)
+);
+--> statement-breakpoint
+INSERT INTO `probe_activations`
+  (`router`, `action`, `model`, `variant`, `engine_identity`, `repetitions`, `requested_at`)
+VALUES
+  ('efficient', 'remeasure', 'anthropic/claude-haiku-5.5', 'high', 'efficient:v1:6649fed2', 3,
+    '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'remeasure', 'anthropic/claude-haiku-5.5', 'low', 'efficient:v1:6649fed2', 3,
+    '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'remeasure', 'anthropic/claude-haiku-5.5', 'max', 'efficient:v1:6649fed2', 3,
+    '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'remeasure', 'anthropic/claude-haiku-5.5', 'medium', 'efficient:v1:6649fed2', 3,
+    '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'remeasure', 'anthropic/claude-haiku-5.5', 'none', 'efficient:v1:6649fed2', 3,
+    '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'remeasure', 'anthropic/claude-haiku-5.5', 'xhigh', 'efficient:v1:6649fed2', 3,
+    '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'remeasure', 'deepseek/deepseek-v4.1-flash-1017', 'high', 'efficient:v1:6649fed2',
+    3, '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'remeasure', 'deepseek/deepseek-v4.1-flash-1017', 'low', 'efficient:v1:6649fed2',
+    3, '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'remeasure', 'deepseek/deepseek-v4.1-flash-1017', 'max', 'efficient:v1:6649fed2',
+    3, '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'remeasure', 'deepseek/deepseek-v4.1-flash-1017', 'none', 'efficient:v1:6649fed2',
+    3, '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'remeasure', 'inclusionai/ling-3.1-flash', 'thinking', 'efficient:v1:6649fed2', 3,
+    '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'remeasure', 'meta/muse-spark-1.2-contributor', 'high', 'efficient:v1:6649fed2',
+    3, '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'remeasure', 'openai/gpt-6-luna', 'high', 'efficient:v1:6649fed2', 3,
+    '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'remeasure', 'openai/gpt-6-luna', 'low', 'efficient:v1:6649fed2', 3,
+    '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'remeasure', 'openai/gpt-6-luna', 'max', 'efficient:v1:6649fed2', 3,
+    '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'remeasure', 'openai/gpt-6-luna', 'medium', 'efficient:v1:6649fed2', 3,
+    '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'remeasure', 'openai/gpt-6-luna', 'none', 'efficient:v1:6649fed2', 3,
+    '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'remeasure', 'qwen/qwen3.8-flash', 'instant', 'efficient:v1:6649fed2', 3,
+    '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'remeasure', 'qwen/qwen3.8-flash', 'thinking', 'efficient:v1:6649fed2', 3,
+    '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'remeasure', 'qwen/qwen3.8-max-0902', 'low', 'efficient:v1:6649fed2', 3,
+    '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'remeasure', 'stepfun/step-5-preview', 'high', 'efficient:v1:6649fed2', 3,
+    '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'remeasure', 'stepfun/step-5-preview', 'medium', 'efficient:v1:6649fed2', 3,
+    '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'remeasure', 'xiaomi/mimo-v2.6-pro', 'instant', 'efficient:v1:6649fed2', 3,
+    '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'remeasure', 'z-ai/glm-5.3-flash', 'high', 'efficient:v1:6649fed2', 3,
+    '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'readmit', 'meta/muse-ember', 'high', 'efficient:v1:6649fed2', 3,
+    '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'readmit', 'meta/muse-ember', 'low', 'efficient:v1:6649fed2', 3,
+    '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'readmit', 'meta/muse-ember', 'max', 'efficient:v1:6649fed2', 3,
+    '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'readmit', 'meta/muse-ember', 'medium', 'efficient:v1:6649fed2', 3,
+    '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'readmit', 'meta/muse-ember', 'minimal', 'efficient:v1:6649fed2', 3,
+    '2026-11-20T00:00:00.000Z'),
+  ('efficient', 'readmit', 'meta/muse-ember', 'xhigh', 'efficient:v1:6649fed2', 3,
+    '2026-11-20T00:00:00.000Z')
+ON CONFLICT DO NOTHING;

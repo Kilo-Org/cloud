@@ -521,6 +521,44 @@ export const profileRemeasures = sqliteTable(
 );
 
 /**
+ * One-shot activation queue for a measurement revision: `remeasure` rows to queue in
+ * `profile_remeasures` and `readmit` rows to move back to `pending`, both written by the
+ * activating migration and consumed by the drain of the worker that ships with it
+ * (`applyProbeActivations` in `src/probe-activation.ts`).
+ *
+ * The rows exist only so the activation can ship as reviewed data before the new image
+ * is live: a migration applies before the container deploy, and the worker still serving
+ * during that window claims `profile_remeasures` rows and `pending` profiles directly, so
+ * a queue row written by the migration itself would be measured at the old revision. That
+ * worker never reads this table.
+ */
+export const probeActivations = sqliteTable(
+  'probe_activations',
+  {
+    router: text('router').$type<AutoRouter>().notNull(),
+    /** `remeasure` queues the pair in `profile_remeasures`; `readmit` re-admits it. */
+    action: text('action').$type<'remeasure' | 'readmit'>().notNull(),
+    model: text('model').notNull(),
+    variant: text('variant').notNull().default(''),
+    engine_identity: text('engine_identity').notNull(),
+    repetitions: integer('repetitions').notNull(),
+    requested_at: text('requested_at').notNull(),
+  },
+  table => [
+    primaryKey({
+      columns: [
+        table.router,
+        table.action,
+        table.model,
+        table.variant,
+        table.engine_identity,
+        table.repetitions,
+      ],
+    }),
+  ]
+);
+
+/**
  * Rolling owner admission ledger for the 24h profile request quota, counted per
  * base router. One row per charged model admission (new under current engine, or
  * explicit failed retry). Stale engine-drift re-admissions are free and do not

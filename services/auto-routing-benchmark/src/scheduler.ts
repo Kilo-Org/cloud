@@ -478,6 +478,20 @@ export function releaseInitializationLease(db: D1Database, token: string): Promi
 }
 
 /**
+ * True while a dispatcher pass or a container deploy holds the dispatch lock row. The
+ * deploy takes it before it applies migrations and holds it through the rollout, so an
+ * activation that must not be visible to the previous image waits for this to be false:
+ * until the lock is free, no instance of that image can be told apart from this one.
+ */
+export async function dispatchLockHeld(db: D1Database, now: number): Promise<boolean> {
+  const row = await db
+    .prepare('SELECT 1 FROM scheduler_dispatch_lock WHERE id = ? AND lease_until > ?')
+    .bind(DISPATCH_LEASE_ID, now)
+    .first();
+  return row !== null;
+}
+
+/**
  * Claims up to the free slot budget in one pass, holding the dispatch lease while
  * it reads live occupancy, so slot and model caps are applied to a
  * stable snapshot. A dispatcher that finds the lease held returns no claims

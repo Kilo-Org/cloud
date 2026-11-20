@@ -3,7 +3,13 @@ import { URL } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
-import { copyRemeasureBaselines, markProfilesRunningForRun, reuseDeciderCaseResults } from './db';
+import {
+  copyRemeasureBaselines,
+  listPendingCurrentProfiles,
+  listQueuedRemeasures,
+  markProfilesRunningForRun,
+  reuseDeciderCaseResults,
+} from './db';
 import { DECIDER_CASES } from './datasets/decider-cases';
 import {
   ACTIVE_MEASUREMENT_REVISION,
@@ -19,6 +25,7 @@ import {
   PROBE_ACTIVATION_REPETITIONS,
   PROBE_ACTIVATION_REQUESTED_AT,
   PROBE_ACTIVATION_ROUTER,
+  applyProbeActivations,
 } from './probe-activation';
 import { scheduleRunChunks } from './scheduler';
 
@@ -26,36 +33,19 @@ const MIGRATION = readFileSync(
   new URL('../migrations/0035_probe_activation.sql', import.meta.url),
   'utf8'
 );
-const ACTIVATION_STATEMENTS = MIGRATION.split('--> statement-breakpoint');
-
-/** The pieces of the migration that name which rows it touches. */
-const remeasureSection = section('`remeasure`(`model`, `variant`) AS (', '`probe_cases`');
-const caseSection = section('`probe_cases`(`case_id`) AS (', 'INSERT INTO');
-const readmitSection = section('UPDATE `benchmark_profiles` SET', ');');
-const readmitVariantsSection = section('AND `variant` IN (', ')');
-
-function section(start: string, end: string): string {
-  const from = MIGRATION.indexOf(start);
-  const to = MIGRATION.indexOf(end, from + start.length);
-  if (from === -1 || to === -1) throw new Error(`migration lacks the ${start} section`);
-  return MIGRATION.slice(from + start.length, to);
-}
+/** The `VALUES` rows the migration stages, as `action|model|variant`. */
+const stagedRows = [
+  ...MIGRATION.replace(/\s+/g, ' ').matchAll(
+    /\('efficient', '([a-z]+)', '([^']+)', '([^']+)', 'efficient:v1:6649fed2', 3,/g
+  ),
+].map(match => `${match[1]}|${match[2]}|${match[3]}`);
 
 const pairKey = (model: string, variant: string) => `${model}|${variant}`;
-const sqlPairs = [...remeasureSection.matchAll(/\('([^']+)', '([^']+)'\)/g)].map(match =>
-  pairKey(match[1], match[2])
-);
-
-function applyActivation(sqlite: DatabaseSync): void {
-  for (const statement of ACTIVATION_STATEMENTS) {
-    if (statement.trim() === '') continue;
-    sqlite.exec(statement);
-  }
-}
 
 const MODEL = 'anthropic/claude-haiku-5.5';
 const VARIANT = 'low';
 const OUTSIDE = { model: 'vendor/outside', variant: 'low' };
+const PROBE_RUN_STARTED_AT = '2026-10-01T00:00:00.000Z';
 
 describe('probe activation migration (real SQLite)', () => {
   let sqlite: DatabaseSync;
@@ -67,21 +57,31 @@ describe('probe activation migration (real SQLite)', () => {
     db = sqliteD1(sqlite);
   });
 
-  function insertRun(id: string, status = 'completed') {
+  function insertRun(id: string, { status = 'completed', startedAt = PROBE_RUN_STARTED_AT } = {}) {
     sqlite
       .prepare(
         `INSERT OR IGNORE INTO benchmark_runs (id, router, kind, purpose, status, started_at, min_accuracy,
           switch_cost_factor, max_concurrency, repetitions, engine_identity, measurement_revision)
-         VALUES (?, 'efficient', 'decider', 'platform', ?, '2026-10-01T00:00:00.000Z',
-          0.7, 3, 0, ?, ?, ?)`
+         VALUES (?, 'efficient', 'decider', 'platform', ?, ?, 0.7, 3, 0, ?, ?, ?)`
       )
       .run(
         id,
         status,
+        startedAt,
         PROBE_ACTIVATION_REPETITIONS,
         PROBE_ACTIVATION_ENGINE_IDENTITY,
         ACTIVE_MEASUREMENT_REVISION
       );
+  }
+
+  function insertChunk(runId: string, model: string, variant: string, status = 'queued') {
+    sqlite
+      .prepare(
+        `INSERT INTO scheduler_chunks (id, run_id, model, variant, providers, rep, chunk, case_ids,
+          status, lease_until)
+         VALUES (?, ?, ?, ?, '[]', 0, 0, '["probe-cont-agent-tool-invoice-rollup-step-1"]', ?, 0)`
+      )
+      .run(`chunk-${runId}-${model}-${variant}-${status}`, runId, model, variant, status);
   }
 
   function insertResult(
@@ -107,7 +107,17 @@ describe('probe activation migration (real SQLite)', () => {
       status = 'ready',
       runId = 'old',
       failureClass = null as string | null,
-    }: { status?: string; runId?: string | null; failureClass?: string | null } = {}
+      repetitions = PROBE_ACTIVATION_REPETITIONS,
+      engineIdentity = PROBE_ACTIVATION_ENGINE_IDENTITY,
+      router = PROBE_ACTIVATION_ROUTER,
+    }: {
+      status?: string;
+      runId?: string | null;
+      failureClass?: string | null;
+      repetitions?: number;
+      engineIdentity?: string;
+      router?: string;
+    } = {}
   ) {
     sqlite
       .prepare(
@@ -119,11 +129,11 @@ describe('probe activation migration (real SQLite)', () => {
           '2026-10-01T00:00:00.000Z', ?, 1, 1)`
       )
       .run(
-        PROBE_ACTIVATION_ROUTER,
+        router,
         model,
         variant,
-        PROBE_ACTIVATION_ENGINE_IDENTITY,
-        PROBE_ACTIVATION_REPETITIONS,
+        engineIdentity,
+        repetitions,
         status,
         runId,
         status === 'failed' ? 'Benchmark lane did not finish' : null,
@@ -145,6 +155,24 @@ describe('probe activation migration (real SQLite)', () => {
     }
   }
 
+  /** The six Ember rows as production left them: failed, class `unknown`, retryable. */
+  function seedFailedEmber() {
+    insertRun('ember-failed', { status: 'failed' });
+    for (const pair of PROBE_ACTIVATION_READMIT_PAIRS) {
+      insertProfile(pair.model, pair.variant, {
+        status: 'failed',
+        runId: 'ember-failed',
+        failureClass: 'unknown',
+      });
+    }
+  }
+
+  const current = {
+    router: PROBE_ACTIVATION_ROUTER,
+    engineIdentity: PROBE_ACTIVATION_ENGINE_IDENTITY,
+    repetitions: PROBE_ACTIVATION_REPETITIONS,
+  };
+
   const queuedPairs = () =>
     sqlite
       .prepare(
@@ -157,42 +185,41 @@ describe('probe activation migration (real SQLite)', () => {
       .prepare('SELECT * FROM benchmark_profiles WHERE model = ? AND variant = ?')
       .get(model, variant);
 
-  it('mirrors the pair and case lists the code names', () => {
-    expect(PROBE_ACTIVATION_PAIRS).toHaveLength(29);
+  it('mirrors the pair list and actions the code names', () => {
+    expect(PROBE_ACTIVATION_PAIRS).toHaveLength(30);
     expect(PROBE_ACTIVATION_CASE_IDS).toHaveLength(22);
-    expect(new Set(PROBE_ACTIVATION_PAIRS.map(p => pairKey(p.model, p.variant))).size).toBe(29);
-    expect(sqlPairs).toEqual(
-      PROBE_ACTIVATION_REMEASURE_PAIRS.map(p => pairKey(p.model, p.variant))
-    );
-    const sqlCaseIds = [...caseSection.matchAll(/'([a-z0-9-]+)'/g)].map(match => match[1]);
-    expect(sqlCaseIds).toEqual([...PROBE_ACTIVATION_CASE_IDS]);
-    const readmitVariants = [...readmitVariantsSection.matchAll(/'([a-z]+)'/g)].map(
-      match => match[1]
-    );
-    expect(readmitVariants).toEqual(PROBE_ACTIVATION_READMIT_PAIRS.map(p => p.variant));
-    expect(readmitSection).toContain(`'meta/muse-ember'`);
-    expect(readmitSection).toContain(`AND \`status\` = 'failed'`);
+    expect(new Set(PROBE_ACTIVATION_PAIRS.map(p => pairKey(p.model, p.variant))).size).toBe(30);
+    expect(stagedRows).toEqual([
+      ...PROBE_ACTIVATION_REMEASURE_PAIRS.map(p => `remeasure|${pairKey(p.model, p.variant)}`),
+      ...PROBE_ACTIVATION_READMIT_PAIRS.map(p => `readmit|${pairKey(p.model, p.variant)}`),
+    ]);
     expect(MIGRATION).toContain(`'${PROBE_ACTIVATION_ENGINE_IDENTITY}'`);
     expect(MIGRATION).toContain(`'${PROBE_ACTIVATION_REQUESTED_AT}'`);
   });
 
-  it('queues the 23 ready pairs and re-admits the six Ember rows, and nothing else', () => {
+  it('stages nothing the live worker can claim, then applies it once', async () => {
     for (const pair of PROBE_ACTIVATION_REMEASURE_PAIRS) seedReadyPair(pair);
-    for (const pair of PROBE_ACTIVATION_READMIT_PAIRS) {
-      insertProfile(pair.model, pair.variant, {
-        status: 'failed',
-        runId: 'ember-failed',
-        failureClass: 'unknown',
-      });
-    }
-    seedReadyPair(OUTSIDE);
-    insertProfile('vendor/broken', 'low', {
-      status: 'failed',
-      runId: 'broken-failed',
-      failureClass: 'unknown',
-    });
+    seedFailedEmber();
 
-    applyActivation(sqlite);
+    // The migration only stages rows in `probe_activations`. The worker serving during the
+    // drain-to-deploy window claims `profile_remeasures` rows and `pending` profiles
+    // directly (`src/run.ts` drainQueue -> startRun -> markProfilesRunningForRun, and its
+    // read sides listQueuedRemeasures / listPendingCurrentProfiles — none of them changed
+    // from origin/main), so nothing it reads exists yet.
+    expect(queuedPairs()).toEqual([]);
+    expect(await listQueuedRemeasures(db, current, 'platform')).toEqual([]);
+    expect(await listPendingCurrentProfiles(db, current, 'platform')).toEqual([]);
+    expect(
+      await markProfilesRunningForRun(db, 'live-worker-run', PROBE_ACTIVATION_PAIRS, current)
+    ).toEqual([]);
+    expect(profileRow('meta/muse-ember', 'low')).toMatchObject({
+      status: 'failed',
+      failure_class: 'unknown',
+      run_id: 'ember-failed',
+    });
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM probe_activations').get()).toEqual({ n: 30 });
+
+    expect(await applyProbeActivations(db)).toEqual({ queued: 24, readmitted: 6 });
 
     expect(queuedPairs()).toEqual(
       PROBE_ACTIVATION_REMEASURE_PAIRS.map(pair => ({
@@ -218,44 +245,149 @@ describe('probe activation migration (real SQLite)', () => {
         completed_at: null,
       });
     }
-    expect(profileRow(OUTSIDE.model, OUTSIDE.variant)).toMatchObject({
-      status: 'ready',
-      run_id: 'old',
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM probe_activations').get()).toEqual({ n: 0 });
+    expect(await applyProbeActivations(db)).toEqual({ queued: 0, readmitted: 0 });
+    expect(queuedPairs()).toHaveLength(24);
+  });
+
+  it('waits for the deploy holding the dispatch lock before it applies anything', async () => {
+    for (const pair of PROBE_ACTIVATION_REMEASURE_PAIRS) seedReadyPair(pair);
+    seedFailedEmber();
+    const deployLease = Date.parse('2026-11-20T00:00:00.000Z') + 120_000;
+    sqlite
+      .prepare(
+        `INSERT INTO scheduler_dispatch_lock (id, token, lease_until) VALUES (1, ?, ?)
+         ON CONFLICT (id) DO UPDATE SET token = excluded.token, lease_until = excluded.lease_until`
+      )
+      .run('deploy', deployLease);
+
+    expect(await applyProbeActivations(db, PROBE_ACTIVATION_ROUTER, deployLease - 1)).toEqual({
+      queued: 0,
+      readmitted: 0,
     });
-    expect(profileRow('vendor/broken', 'low')).toMatchObject({
-      status: 'failed',
-      failure_class: 'unknown',
+    expect(queuedPairs()).toEqual([]);
+    expect(profileRow('meta/muse-ember', 'low')).toMatchObject({ status: 'failed' });
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM probe_activations').get()).toEqual({ n: 30 });
+
+    expect(await applyProbeActivations(db, PROBE_ACTIVATION_ROUTER, deployLease + 1)).toEqual({
+      queued: 24,
+      readmitted: 6,
     });
   });
 
-  it('is a no-op on a second run', () => {
-    for (const pair of PROBE_ACTIVATION_REMEASURE_PAIRS) seedReadyPair(pair);
-    for (const pair of PROBE_ACTIVATION_READMIT_PAIRS) {
+  it('re-admit matches the per-row Re-admit and so does not reuse invalidated results', async () => {
+    const pair = PROBE_ACTIVATION_READMIT_PAIRS[0];
+    insertRun('ember-failed', { status: 'failed' });
+    for (const benchCase of DECIDER_CASES) {
+      for (let rep = 0; rep < PROBE_ACTIVATION_REPETITIONS; rep++) {
+        insertResult('ember-failed', pair.model, pair.variant, benchCase.id, { rep });
+      }
+    }
+    insertProfile(pair.model, pair.variant, {
+      status: 'failed',
+      runId: 'ember-failed',
+      failureClass: 'unknown',
+    });
+    await applyProbeActivations(db);
+
+    insertRun('ember-new', { status: 'running', startedAt: PROBE_ACTIVATION_REQUESTED_AT });
+    const claimed = await markProfilesRunningForRun(db, 'ember-new', [pair], current);
+    expect(claimed).toEqual([pair]);
+    const minimumRevisions = minimumCaseRevisions(
+      PROBE_ACTIVATION_ROUTER,
+      ACTIVE_MEASUREMENT_REVISION
+    );
+    expect(await copyRemeasureBaselines(db, { runId: 'ember-new', minimumRevisions })).toBe(0);
+    expect(
+      await reuseDeciderCaseResults(db, {
+        runId: 'ember-new',
+        router: PROBE_ACTIVATION_ROUTER,
+        engineIdentity: PROBE_ACTIVATION_ENGINE_IDENTITY,
+        repetitions: PROBE_ACTIVATION_REPETITIONS,
+        entries: [pair],
+        minimumRevisions,
+      })
+    ).toBe(0);
+    // The whole case list runs: the re-admit invalidated the failed run's rows, which is
+    // what `src/profile-refresh.ts` does, and what the Ember forecast prices.
+    expect(
+      sqlite.prepare('SELECT COUNT(*) AS n FROM case_results WHERE run_id = ?').get('ember-new')
+    ).toEqual({ n: 0 });
+  });
+
+  it('does not re-admit a row that is not a retryable failure, or that has a live chunk', async () => {
+    const [permanent, otherClass, sameIdentity, otherIdentity, live] =
+      PROBE_ACTIVATION_READMIT_PAIRS;
+    // Permanent failure: same class, but the row is `unavailable`.
+    insertProfile(permanent.model, permanent.variant, {
+      status: 'unavailable',
+      runId: 'permanent',
+      failureClass: 'unknown',
+    });
+    // Retryable failure, but the class says the model is the cause.
+    insertProfile(otherClass.model, otherClass.variant, {
+      status: 'failed',
+      runId: 'other-class',
+      failureClass: 'grader',
+    });
+    // Three identical retryable failures; one has a live chunk under this identity, one
+    // has a live chunk from another identity, one has none.
+    for (const pair of [sameIdentity, otherIdentity, live]) {
       insertProfile(pair.model, pair.variant, {
         status: 'failed',
-        runId: 'ember-failed',
+        runId: 'lane',
         failureClass: 'unknown',
       });
     }
-    applyActivation(sqlite);
-    const first = queuedPairs();
-    const emberAfterFirst = profileRow('meta/muse-ember', 'low');
+    insertRun('lane', { status: 'running' });
+    insertChunk('lane', live.model, live.variant);
+    // A live chunk of another identity is not this pair's measurement.
+    insertRun('other-engine', { status: 'failed' });
+    sqlite
+      .prepare(
+        `UPDATE benchmark_runs SET engine_identity = 'efficient:v0:legacy' WHERE id = 'other-engine'`
+      )
+      .run();
+    insertChunk('other-engine', otherIdentity.model, otherIdentity.variant);
 
-    applyActivation(sqlite);
+    await applyProbeActivations(db);
 
-    expect(queuedPairs()).toEqual(first);
-    expect(profileRow('meta/muse-ember', 'low')).toEqual(emberAfterFirst);
+    expect(profileRow(permanent.model, permanent.variant)).toMatchObject({
+      status: 'unavailable',
+      invalidated_at: null,
+    });
+    expect(profileRow(otherClass.model, otherClass.variant)).toMatchObject({
+      status: 'failed',
+      failure_class: 'grader',
+      invalidated_at: null,
+    });
+    expect(profileRow(sameIdentity.model, sameIdentity.variant)).toMatchObject({
+      status: 'pending',
+    });
+    expect(profileRow(live.model, live.variant)).toMatchObject({
+      status: 'failed',
+      invalidated_at: null,
+    });
+    expect(profileRow(otherIdentity.model, otherIdentity.variant)).toMatchObject({
+      status: 'pending',
+    });
   });
 
-  it('does not queue a pair whose provenance run already measured the probes at revision 3', () => {
-    const [measured, pending] = PROBE_ACTIVATION_REMEASURE_PAIRS;
+  it('queues no pair that is not ready, and none already measured at revision 3', async () => {
+    const [measured, pending, notReady] = PROBE_ACTIVATION_REMEASURE_PAIRS;
     seedReadyPair(measured);
     seedReadyPair(pending);
+    seedReadyPair(notReady);
+    sqlite
+      .prepare(`UPDATE benchmark_profiles SET status = 'running' WHERE model = ? AND variant = ?`)
+      .run(notReady.model, notReady.variant);
     for (const caseId of PROBE_ACTIVATION_CASE_IDS) {
       insertResult('old', measured.model, measured.variant, caseId, { revision: 3 });
     }
+    seedReadyPair(OUTSIDE);
+    seedFailedEmber();
 
-    applyActivation(sqlite);
+    const report = await applyProbeActivations(db);
 
     expect(queuedPairs()).toEqual([
       {
@@ -265,16 +397,17 @@ describe('probe activation migration (real SQLite)', () => {
         requested_at: PROBE_ACTIVATION_REQUESTED_AT,
       },
     ]);
+    expect(report).toEqual({ queued: 1, readmitted: 6 });
   });
 
-  it('leaves a revision-2 probe result queued, since the case wants revision 3', () => {
+  it('leaves a revision-2 probe result queued, since the case wants revision 3', async () => {
     const [pair] = PROBE_ACTIVATION_REMEASURE_PAIRS;
     seedReadyPair(pair);
     for (const caseId of PROBE_ACTIVATION_CASE_IDS) {
       insertResult('old', pair.model, pair.variant, caseId, { revision: 2 });
     }
 
-    applyActivation(sqlite);
+    await applyProbeActivations(db);
 
     expect(queuedPairs()).toHaveLength(1);
   });
@@ -282,20 +415,16 @@ describe('probe activation migration (real SQLite)', () => {
   it('schedules exactly the probe and pwd cases for a queued pair', async () => {
     const pair = { model: MODEL, variant: VARIANT };
     seedReadyPair(pair);
-    applyActivation(sqlite);
+    await applyProbeActivations(db);
 
     const runId = 'remeasure';
-    insertRun(runId, 'running');
+    insertRun(runId, { status: 'running' });
     const claimed = await markProfilesRunningForRun(
       db,
       runId,
       [pair],
-      {
-        router: PROBE_ACTIVATION_ROUTER,
-        engineIdentity: PROBE_ACTIVATION_ENGINE_IDENTITY,
-        repetitions: PROBE_ACTIVATION_REPETITIONS,
-      },
-      '2026-11-20T00:00:00.000Z'
+      current,
+      PROBE_ACTIVATION_REQUESTED_AT
     );
     expect(claimed).toEqual([pair]);
     const minimumRevisions = minimumCaseRevisions(

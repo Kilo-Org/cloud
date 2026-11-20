@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "c03222a4-982a-47ce-b9fc-3b777cd08318",
+  "id": "889c6a30-adc2-4f86-a7d7-642294d08f5a",
   "prevId": "9bdd7829-0931-402d-b458-24cf80f0697f",
   "tables": {
     "benchmark_config": {
@@ -1590,6 +1590,78 @@
             "rep"
           ],
           "name": "pending_decider_outputs_run_id_model_variant_case_id_rep_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "probe_activations": {
+      "name": "probe_activations",
+      "columns": {
+        "router": {
+          "name": "router",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "variant": {
+          "name": "variant",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "engine_identity": {
+          "name": "engine_identity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "repetitions": {
+          "name": "repetitions",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "requested_at": {
+          "name": "requested_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "probe_activations_router_action_model_variant_engine_identity_repetitions_pk": {
+          "columns": [
+            "router",
+            "action",
+            "model",
+            "variant",
+            "engine_identity",
+            "repetitions"
+          ],
+          "name": "probe_activations_router_action_model_variant_engine_identity_repetitions_pk"
         }
       },
       "uniqueConstraints": {},

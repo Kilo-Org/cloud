@@ -81,7 +81,9 @@ try {
     }
     const sql = flag('--command');
     let kind;
-    if (sql.startsWith('INSERT INTO scheduler_dispatch_lock')) kind = 'acquire';
+    if (sql.includes('VALUES (3,')) kind = 'intent';
+    else if (sql.includes('WHERE id = 3 AND token')) kind = 'intent_cleared';
+    else if (sql.startsWith('INSERT INTO scheduler_dispatch_lock')) kind = 'acquire';
     else if (sql.startsWith('UPDATE scheduler_dispatch_lock SET lease_until')) kind = 'renew';
     else if (sql.startsWith('UPDATE scheduler_dispatch_lock SET token = NULL')) kind = 'release';
     else if (sql.startsWith('SELECT token, lease_until FROM scheduler_dispatch_lock'))

@@ -18,7 +18,13 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { load } from 'js-yaml';
-import { claimScheduledChunks, scheduleRunChunks, schedulerConfig } from '../src/scheduler.ts';
+import {
+  claimScheduledChunks,
+  scheduleRunChunks,
+  schedulerConfig,
+  SCHEDULER_DISPATCH_LEASE_MS,
+  SCHEDULER_LIVE_SQL,
+} from '../src/scheduler.ts';
 import { sqliteD1 } from '../test/sqlite-d1.ts';
 
 const deployScript = fileURLToPath(new URL('./deploy.mjs', import.meta.url));
@@ -312,6 +318,95 @@ test(
     assert.equal(state.count('deploy_completed'), 1);
     diagnostics(result);
     released(state);
+  }
+);
+
+function intentRow(state) {
+  return {
+    ...state.db
+      .prepare('SELECT token, lease_until FROM scheduler_dispatch_lock WHERE id = 3')
+      .get(),
+  };
+}
+
+/** A D1 whose dispatch passes hold the lease while their occupancy read takes `holdMs`. */
+function slowPasses(d1, holdMs, onHold) {
+  return new Proxy(d1, {
+    get(target, property) {
+      if (property !== 'prepare') {
+        const value = target[property];
+        return typeof value === 'function' ? value.bind(target) : value;
+      }
+      return sql => {
+        const statement = target.prepare(sql);
+        if (sql !== SCHEDULER_LIVE_SQL) return statement;
+        return {
+          ...statement,
+          async all() {
+            onHold();
+            await sleep(holdMs);
+            return statement.all();
+          },
+        };
+      };
+    },
+  });
+}
+
+test(
+  'takes the lease from back-to-back dispatch passes within one dispatch lease',
+  { timeout: 30_000 },
+  async t => {
+    const state = fixture(t, { BENCHMARK_DEPLOY_LOCK_TIMEOUT_MS: '8000' });
+    let holds = 0;
+    let stopped = false;
+    const dispatcher = slowPasses(sqliteD1(state.db), 300, () => {
+      holds += 1;
+    });
+    const config = schedulerConfig('{"slots":8}');
+    const passes = (async () => {
+      for (let pass = 0; !stopped; pass++) {
+        const before = holds;
+        await claimScheduledChunks(dispatcher, config, Date.now(), `dispatch-pass-${pass}`);
+        if (holds === before) await sleep(5);
+      }
+    })();
+    await until(() => holds >= 2);
+    const result = await state.start();
+    stopped = true;
+    await passes;
+    assert.equal(result.code, 0, result.stdout);
+    const at = (kind, order) =>
+      state.db
+        .prepare(`SELECT at FROM fixture_events WHERE kind = ? ORDER BY rowid ${order} LIMIT 1`)
+        .get(kind).at;
+    assert.ok(at('acquire', 'DESC') - at('intent', 'ASC') <= SCHEDULER_DISPATCH_LEASE_MS);
+    assert.equal(state.count('intent_cleared'), 1);
+    assert.deepEqual(intentRow(state), { token: null, lease_until: 0 });
+    assert.equal(state.count('unguarded_deploy'), 0);
+    released(state);
+  }
+);
+
+test(
+  'bounds the deploy intent by the lock wait so a dead deploy cannot hold dispatch',
+  { timeout: 15_000 },
+  async t => {
+    const state = fixture(t, { BENCHMARK_DEPLOY_LOCK_TIMEOUT_MS: '2000' });
+    state.db
+      .prepare(
+        "UPDATE scheduler_dispatch_lock SET token = 'replacement-owner', lease_until = ? WHERE id = 1"
+      )
+      .run(Date.now() + 60_000);
+    const startedAt = Date.now();
+    const result = state.start();
+    await until(() => state.count('intent') === 1);
+    state.kill('SIGKILL');
+    assert.equal((await result).signal, 'SIGKILL');
+    const intent = intentRow(state);
+    assert.match(intent.token, /^deploy-intent-/);
+    assert.ok(intent.lease_until <= Date.now() + 2000);
+    assert.ok(intent.lease_until >= startedAt);
   }
 );
 

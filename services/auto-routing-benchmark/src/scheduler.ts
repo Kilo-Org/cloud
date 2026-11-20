@@ -172,6 +172,7 @@ const SCHEDULER_CLAIM_BATCH = 50;
 const SCHEDULER_MATERIALIZE_BATCH = 50;
 const DISPATCH_LEASE_ID = 1;
 const INIT_LEASE_ID = 2;
+const DEPLOY_INTENT_ID = 3;
 
 export type SchedulerClaim = {
   id: string;
@@ -458,7 +459,11 @@ function selectScheduledChunks(input: {
   return selected;
 }
 
-/** Takes a scheduler lease row, or reports that another pass holds it. */
+/**
+ * Takes a scheduler lease row, or reports that another pass holds it. The dispatch
+ * lease is not taken while a deploy's intent row is unexpired, so a deploy waiting
+ * for the lease gets it once the current pass ends.
+ */
 async function acquireLease(
   db: D1Database,
   id: number,
@@ -471,9 +476,11 @@ async function acquireLease(
     INSERT INTO scheduler_dispatch_lock (id, token, lease_until) VALUES (?1, ?2, ?3)
     ON CONFLICT (id) DO UPDATE SET token = ?2, lease_until = ?3
     WHERE scheduler_dispatch_lock.lease_until <= ?4
+      AND (?1 != ?5 OR NOT EXISTS (
+        SELECT 1 FROM scheduler_dispatch_lock WHERE id = ?6 AND lease_until > ?4))
     RETURNING token
   `)
-    .bind(id, token, until, now)
+    .bind(id, token, until, now, DISPATCH_LEASE_ID, DEPLOY_INTENT_ID)
     .first<{ token: string }>();
   return acquired !== null;
 }

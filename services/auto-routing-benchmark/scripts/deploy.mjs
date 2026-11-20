@@ -112,6 +112,7 @@ const ownerRows = z
   .array(z.object({ token: z.string().nullable(), lease_until: z.number().int() }))
   .max(1);
 const OPERATOR_PAUSE_PREFIX = 'operator-pause-';
+const DEPLOY_INTENT_ID = 3;
 const CONTAINER_INPUTS_PREFIX = 'container-inputs:';
 const MAX_TIMER_MS = 2_147_483_647;
 const sqlString = value => `'${value.replaceAll("'", "''")}'`;
@@ -245,10 +246,27 @@ async function deploy() {
   const migrationNames = readdirSync(migrationsDirectory).filter(name => name.endsWith('.sql'));
   let attempted = false;
   let deployed = false;
+  let intentSet = false;
+  const intentToken = `deploy-intent-${token}`;
   let pauseToken;
   let maintenance;
   let renewal;
   const maintenanceAbort = new AbortController();
+  const clearIntent = async () => {
+    if (!intentSet) return;
+    intentSet = false;
+    try {
+      await execute(
+        `UPDATE scheduler_dispatch_lock SET token = NULL, lease_until = 0
+        WHERE id = ${DEPLOY_INTENT_ID} AND token = ${sqlString(intentToken)}`,
+        commandTimeoutMs,
+        new AbortController().signal
+      );
+      report('deploy_intent_cleared');
+    } catch {
+      report('deploy_intent_clear_failed', { recovery: 'intent_expiry' });
+    }
+  };
   const lossCode = () => {
     if (pauseToken === undefined) return deployed ? 'deployed_lease_unverified' : 'lease_lost';
     return deployed ? 'deployed_operator_pause_unverified' : 'operator_pause_lost';
@@ -462,6 +480,21 @@ async function deploy() {
     phase = 'lock';
     report('waiting_for_lock', { timeoutMs: lockTimeoutMs });
     const lockDeadline = Date.now() + lockTimeoutMs;
+    try {
+      await executeBeforeDeadline(
+        `INSERT INTO scheduler_dispatch_lock (id, token, lease_until)
+        VALUES (${DEPLOY_INTENT_ID}, ${sqlString(intentToken)}, ${lockDeadline})
+        ON CONFLICT (id) DO UPDATE SET token = excluded.token, lease_until = excluded.lease_until`,
+        lockDeadline,
+        'lock_timeout'
+      );
+      intentSet = true;
+      report('deploy_intent_set');
+    } catch (error) {
+      if (abort.signal.aborted || !(error instanceof DeploymentError)) throw error;
+      if (error.code === 'lock_timeout') throw error;
+      report('deploy_intent_failed', { reason: error.code });
+    }
     while (true) {
       if (Date.now() >= lockDeadline) throw new DeploymentError('lock_timeout');
       const now = Date.now();
@@ -490,11 +523,15 @@ async function deploy() {
         break;
       }
       report('lock_contended');
-      await sleep(Math.min(pollMs, Math.max(1, lockDeadline - Date.now())), undefined, {
-        signal: abort.signal,
-      });
+      const holderRemainingMs = Math.max(1, (current?.lease_until ?? 0) - Date.now());
+      await sleep(
+        Math.min(pollMs, holderRemainingMs, Math.max(1, lockDeadline - Date.now())),
+        undefined,
+        { signal: abort.signal }
+      );
     }
     report(pauseToken === undefined ? 'lock_acquired' : 'operator_pause_retained');
+    await clearIntent();
     maintenance = (async () => {
       while (!maintenanceAbort.signal.aborted) {
         try {
@@ -570,6 +607,7 @@ async function deploy() {
     await maintenance;
     await renewal?.catch(() => {});
     clearTimeout(deadlineTimer);
+    await clearIntent();
     if (attempted && pauseToken === undefined) {
       phase = 'release';
       try {

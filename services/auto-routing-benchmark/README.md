@@ -247,6 +247,16 @@ lease. A queued claim whose queue lease expired cannot start, so it does not hol
 `recoverChunks` returns it to pending. It renews the lease throughout and fails closed when
 draining exceeds its limit. It never pauses or resumes operator-controlled queues.
 
+Busy dispatch takes the lease back as soon as each pass releases it, so the wrapper first writes
+a deploy intent: `scheduler_dispatch_lock` row 3 with a `deploy-intent-` token and a lease that
+ends with the wrapper's lock wait (`BENCHMARK_DEPLOY_LOCK_TIMEOUT_MS`, 60 seconds by default).
+While that lease is unexpired, no dispatch pass takes row 1, so the wrapper takes it when the
+current pass ends, at most one dispatch lease (20 seconds) later. It retries at the poll interval
+(`BENCHMARK_DEPLOY_POLL_INTERVAL_MS`, 5 seconds), or sooner when the holder's lease ends, and
+clears the intent once it holds row 1 or gives up; a dead wrapper's intent expires with its lock
+wait. A worker deployed before this change ignores the intent: if dispatch is busy, deploy it
+under an operator pause.
+
 Each deploy records a hash of the container inputs (the `containers` configuration and every
 file in each local image's build context) as the Worker version message
 `container-inputs:<sha256>`. The rolled-out hash is the message of the Worker version that was

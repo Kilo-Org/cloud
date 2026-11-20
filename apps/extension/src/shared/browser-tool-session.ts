@@ -99,8 +99,28 @@ export const MAX_BROWSER_TOOL_REFS = 5000;
 const SCRIPTING_ACTION_TIMEOUT_MS = 20_000;
 /** Longest a navigation waits for the browser to report the new page complete; the debugger path waits as long. */
 const SCRIPTING_NAVIGATION_TIMEOUT_MS = 15_000;
+/**
+ * How long a scripting navigation waits for the browser to report anything at
+ * all: an action that changed nothing (back with no history entry) never
+ * reports, and a short grace ends that wait instead of the full timeout.
+ */
+const SCRIPTING_NAVIGATION_QUIET_MS = 1000;
 /** URL schemes a navigation refuses: they would run code or carry a whole page inline instead of loading one. */
 const REFUSED_NAVIGATION_SCHEMES: ReadonlySet<string> = new Set(['data', 'javascript']);
+
+/** A tab's url before an action, so the wait can tell a navigation from an action that changed nothing. */
+const readTabUrl = async (
+  getTab: (tabId: number) => Promise<{ readonly url?: string }> | { readonly url?: string },
+  tabId: number
+): Promise<string | undefined> => {
+  try {
+    const tab = await getTab(tabId);
+
+    return tab.url;
+  } catch {
+    return undefined;
+  }
+};
 /** Lines of aria-snapshot context `find` reports around each match. */
 const FIND_CONTEXT_LINES = 3;
 
@@ -2796,13 +2816,17 @@ export const createBrowserToolSession = ({
   /**
    * Starts a navigation and answers with the tab's title and url once the
    * browser reports the new document complete, like the debugger path does. A
-   * same-document navigation (a hash change) reports only its new url while
-   * the tab stays complete, so that url change ends the wait too. The wait is
-   * bounded: a page that never finishes loading answers with what the tab
-   * shows then.
+   * same-document navigation (a fragment change) reports only its new url
+   * while the tab keeps the previous document as its own, so the pre-navigation
+   * url decides it: any other url-only update is a document still committing,
+   * and a tab that reports complete before the new document commits is not done.
+   * The wait is bounded: a page that never finishes loading answers with what
+   * the tab shows then, and an action the browser never reports on answers
+   * `nothingHappened` instead of claiming a navigation that did not run.
    */
   const loadInTab = async (
-    start: () => Promise<{ readonly error?: string }>
+    start: () => Promise<{ readonly error?: string }>,
+    nothingHappened: string
   ): Promise<BrowserToolCallResult> => {
     const { onUpdated } = tabsApi;
     const getTab = tabsApi.get?.bind(tabsApi);
@@ -2811,20 +2835,11 @@ export const createBrowserToolSession = ({
       return { error: 'The browser tab API cannot report a page load.', ok: false };
     }
 
+    const before = await readTabUrl(getTab, tabId);
     const loaded = Promise.withResolvers<void>();
     let loading = false;
-    // A url-only update while the tab stays complete is a same-document navigation; a loading tab is not done yet.
-    const settleIfSameDocument = async (): Promise<void> => {
-      try {
-        const tab = await getTab(tabId);
-
-        if (!loading && tab.status === 'complete') {
-          loaded.resolve();
-        }
-      } catch {
-        // The tab is gone: the bounded wait ends the call.
-      }
-    };
+    let quiet = false;
+    let grace: ReturnType<typeof setTimeout> | undefined = undefined;
     const listener = (
       updatedTabId: number,
       changeInfo: { readonly status?: string; readonly url?: string }
@@ -2840,8 +2855,15 @@ export const createBrowserToolSession = ({
         return;
       }
 
-      if (!loading && changeInfo.url !== undefined && changeInfo.status === undefined) {
-        void settleIfSameDocument();
+      // Only a fragment change on the document the tab already showed is a same-document navigation; any other url is a document still committing.
+      if (
+        !loading &&
+        changeInfo.status === undefined &&
+        changeInfo.url !== undefined &&
+        before !== undefined &&
+        before.split('#')[0] === changeInfo.url.split('#')[0]
+      ) {
+        loaded.resolve();
       }
     };
     const timer = setTimeout(loaded.resolve, SCRIPTING_NAVIGATION_TIMEOUT_MS);
@@ -2855,8 +2877,19 @@ export const createBrowserToolSession = ({
         return { error: started.error, ok: false };
       }
 
+      // Nothing the browser reports arrives for an action that changed nothing (back with no history entry); a short grace ends that wait instead of the full timeout.
+      grace = setTimeout(() => {
+        quiet = true;
+        loaded.resolve();
+      }, SCRIPTING_NAVIGATION_QUIET_MS);
       await loaded.promise;
+      clearTimeout(grace);
       const tab = await getTab(tabId);
+
+      // A url the action left alone is no navigation: report it rather than a page the call never reached.
+      if (quiet && (tab.url ?? '') === (before ?? '')) {
+        return { error: nothingHappened, ok: false };
+      }
 
       return { ok: true, value: { title: tab.title ?? '', url: tab.url ?? '' } };
     } catch (error) {
@@ -2866,6 +2899,7 @@ export const createBrowserToolSession = ({
       };
     } finally {
       clearTimeout(timer);
+      clearTimeout(grace);
       onUpdated.removeListener(listener);
     }
   };
@@ -2897,7 +2931,7 @@ export const createBrowserToolSession = ({
       await update(tabId, { url: href });
 
       return {};
-    });
+    }, 'The page did not navigate.');
   };
 
   const discoverPageWebMcpTools = async (): Promise<BrowserToolCallResult> => {
@@ -3254,7 +3288,7 @@ export const createBrowserToolSession = ({
           const back = await runPageTool(buildNavigateBackPageScript());
 
           return back.ok ? {} : { error: back.error };
-        });
+        }, 'The page has no history entry to go back to.');
       }
 
       case 'browser_press_key': {

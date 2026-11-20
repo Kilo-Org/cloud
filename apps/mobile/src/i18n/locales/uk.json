@@ -751,9 +751,9 @@
     },
     "providerConnect": {
       "description": "Підключіть {{label}} до Kilo, щоб автоматично перевіряти запити на злиття.",
-      "githubApp": "Застосунок GitHub",
+      "githubApp": "застосунок GitHub",
       "githubError": "Не вдалося відкрити налаштування GitHub. Спробуйте ще раз.",
-      "gitlabAccount": "Обліковий запис GitLab",
+      "gitlabAccount": "обліковий запис GitLab",
       "gitlabError": "Не вдалося відкрити налаштування GitLab. Спробуйте ще раз."
     },
     "reviewDetail": {

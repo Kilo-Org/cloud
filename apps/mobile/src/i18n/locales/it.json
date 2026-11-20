@@ -717,7 +717,7 @@
     },
     "providerConnect": {
       "description": "Connetti {{label}} di Kilo per revisionare automaticamente le pull request.",
-      "githubApp": "l'App GitHub",
+      "githubApp": "l'app GitHub",
       "githubError": "Impossibile aprire la configurazione di GitHub. Riprova.",
       "gitlabAccount": "l'account GitLab",
       "gitlabError": "Impossibile aprire la configurazione di GitLab. Riprova."

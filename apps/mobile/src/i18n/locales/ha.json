@@ -1427,9 +1427,9 @@
       "activity": "Aiki"
     },
     "providerConnect": {
-      "githubApp": "Manhajar GitHub",
+      "githubApp": "manhajar GitHub",
       "githubError": "An kasa buɗe saitin GitHub. Sake gwadawa.",
-      "gitlabAccount": "Asusun GitLab",
+      "gitlabAccount": "asusun GitLab",
       "gitlabError": "An kasa buɗe saitin GitLab. Sake gwadawa.",
       "description": "Haɗa {{label}} na Kilo don yin bitar buƙatun haɗa canje-canje ta atomatik."
     },

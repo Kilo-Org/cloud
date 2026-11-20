@@ -1427,9 +1427,9 @@
       "activity": "Активност"
     },
     "providerConnect": {
-      "githubApp": "Приложението за GitHub",
+      "githubApp": "приложението за GitHub",
       "githubError": "Не успяхме да отворим настройката на GitHub. Опитай отново.",
-      "gitlabAccount": "Акаунта в GitLab",
+      "gitlabAccount": "акаунта в GitLab",
       "gitlabError": "Не успяхме да отворим настройката на GitLab. Опитай отново.",
       "description": "Свържи {{label}} на Kilo, за да се преглеждат автоматично заявките за сливане."
     },

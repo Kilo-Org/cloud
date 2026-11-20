@@ -1427,9 +1427,9 @@
       "activity": "Umsebenzi"
     },
     "providerConnect": {
-      "githubApp": "Uhlelo lokusebenza lwe-GitHub",
+      "githubApp": "uhlelo lokusebenza lwe-GitHub",
       "githubError": "Asikwazanga ukuvula ukusetha i-GitHub. Sicela uzame futhi.",
-      "gitlabAccount": "I-akhawunti ye-GitLab",
+      "gitlabAccount": "i-akhawunti ye-GitLab",
       "gitlabError": "Asikwazanga ukuvula ukusetha i-GitLab. Sicela uzame futhi.",
       "description": "Xhuma ne-Kilo usebenzisa {{label}} ukuze kuhlolwe izicelo zokuhlanganisa ikhodi ngokuzenzakalelayo."
     },

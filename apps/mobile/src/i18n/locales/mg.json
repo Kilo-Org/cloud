@@ -1427,9 +1427,9 @@
       "activity": "Asa"
     },
     "providerConnect": {
-      "githubApp": "Rindranasa GitHub",
+      "githubApp": "rindranasa GitHub",
       "githubError": "Tsy nety nosokafana ny fametrahana ny GitHub. Andramo indray azafady.",
-      "gitlabAccount": "Kaonty GitLab",
+      "gitlabAccount": "kaonty GitLab",
       "gitlabError": "Tsy nety nosokafana ny fametrahana ny GitLab. Andramo indray azafady.",
       "description": "Ampifandraiso amin'i Kilo ny {{label}} mba hanamarinana PR ho azy."
     },

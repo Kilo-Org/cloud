@@ -88,7 +88,17 @@ import {
   type WorkspaceMcpBinding,
 } from '../../cloud-agent-authority.js';
 import { getWorkspaceStub } from '../workspace/workspace-stub.js';
-import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
+import {
+  isInteractiveSessionOrigin,
+  NATIVE_WAKEUP_DENIALS,
+} from '../../shared/control-plane-permission.js';
+import {
+  CLOUD_WAKEUP_CAPABILITY,
+  CLOUD_WAKEUP_HEADER,
+  type CloudWakeupCommand,
+  type CloudWakeupReply,
+} from '../../shared/cloud-wakeup.js';
+import { createSandboxWakeupPolicy } from './wakeup-policy.js';
 import { getContainerCapacityFailureReason } from '../../container-concurrency.js';
 import {
   generateSandboxCredential,
@@ -529,6 +539,7 @@ const wrapperSocketAttachmentSchema = z.object({
   wrapperId: z.string().optional(),
   heartbeatAck: z.literal(true).optional(),
   workspaceSnapshots: z.literal(true).optional(),
+  cloudWakeups: z.literal(true).optional(),
   redactsNamedSecrets: z.literal(true).optional(),
   installsSkillsSh: z.literal(true).optional(),
   worktreeGit: z.literal(true).optional(),
@@ -703,6 +714,15 @@ function materializationStage(error: unknown): PrepareFrameMaterializationStage 
 export type CloudAgentMcpGrant = { url: string; token: string; expiresAt: number };
 
 export type ControlPlaneSessionPeer = HistoryPageSession & {
+  changeWakeup?(
+    command: CloudWakeupCommand,
+    scope: {
+      sandboxId: string;
+      kiloSessionId: string;
+      directory: string;
+      capability: 'snapshot' | 'stay-awake';
+    }
+  ): Promise<CloudWakeupReply>;
   onRoute(update: ControlPlaneRouteUpdate): Promise<void>;
   /** The whole workspace stopped during preparation; settle this chat. */
   onWorkspaceStopped(payload: ControlPlaneWorkspaceStoppedPayload): Promise<void>;
@@ -1396,6 +1416,50 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
   }
 
+  private wakeupEligibility(
+    route: RouteRecord,
+    socket: WebSocket
+  ): ControlPlaneRouteSpec['cloudWakeup'] {
+    const attachment = this.readAttachment(socket);
+    const source = route.credentialSource;
+    if (
+      attachment?.cloudWakeups !== true ||
+      attachment.runtimeHarness !== 'kilo2' ||
+      this.currentProvider() !== 'cloudflare-containers' ||
+      source?.workspaceId === undefined ||
+      !isInteractiveSessionOrigin(source.createdOnPlatform) ||
+      workspaceSnapshotIdentity(this.sandboxId, route.spec.directory, source) === null
+    )
+      return undefined;
+    if (attachment.workspaceSnapshots === true && this.workspaceSnapshotRouteEligible(route))
+      return 'snapshot';
+    if (this.env.ENVIRONMENT === 'development' && this.env.LOCAL_CLOUD_WAKEUPS === '1')
+      return 'stay-awake';
+    return undefined;
+  }
+
+  private wakeupPolicy() {
+    return createSandboxWakeupPolicy(this.ctx.storage.kv);
+  }
+
+  async endWakeup(sessionId: string, id: string): Promise<void> {
+    await this.initialized;
+    await this.enqueue(async () => {
+      this.wakeupPolicy().end(sessionId, id);
+      const state = await this.readAllocation();
+      const socket = this.boundWrapperSocket(state);
+      if (socket && this.readAttachment(socket)?.cloudWakeups)
+        this.trySendFrame(socket, { type: 'wakeup.end', sessionId, id });
+      await this.armAlarm(state);
+    });
+  }
+
+  private snapshotIdleForWakeup(): number {
+    return this.wakeupPolicy().read(Date.now()).earlyCapture
+      ? Math.min(this.sandboxTimers().unattendedIdleMs, this.workspaceSnapshotIdleMs)
+      : this.workspaceSnapshotIdleMs;
+  }
+
   private async captureIdleWorkspaceSnapshot(): Promise<void> {
     const provider = this.provider.workspaceSnapshots;
     if (provider === undefined || this.workspaceSnapshotCapturePending) return;
@@ -1405,7 +1469,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         db: this.db,
         sandboxId: this.sandboxId,
         provider,
-        idleMs: this.workspaceSnapshotIdleMs,
+        idleMs: () => this.snapshotIdleForWakeup(),
         enqueue: operation =>
           this.enqueue(async () => {
             const result = await operation();
@@ -1413,7 +1477,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
             return result;
           }),
         eligible: route => this.workspaceSnapshotRouteEligible(route),
-        stored: async () => this.broadcastStatusSnapshots(await this.readAllocation()),
+        stored: async () => {
+          if (this.wakeupPolicy().read(Date.now()).earlyCapture) {
+            await this.applyEvent({
+              type: 'stop-requested',
+              at: Date.now(),
+              reason: 'sandbox_stopped',
+            });
+          } else this.broadcastStatusSnapshots(await this.readAllocation());
+        },
         read: async () => {
           const state = await this.readAllocation();
           const socket = this.boundWrapperSocket(state);
@@ -2965,6 +3037,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(request.headers.get(RUNTIME_WEB_SEARCH_HEADER) === RUNTIME_WEB_SEARCH_VERSION
           ? { runtimeWebSearch: true as const }
           : {}),
+        ...(request.headers.get(CLOUD_WAKEUP_HEADER) === CLOUD_WAKEUP_CAPABILITY
+          ? { cloudWakeups: true as const }
+          : {}),
         ...runtimeHarnessField(parseRuntimeHarness(request.headers.get(RUNTIME_HARNESS_HEADER))),
         ...(observedRuntime.kiloCliVersion === null
           ? {}
@@ -3998,10 +4073,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
       this.fenceWorkspaceSnapshot('prompt', payload.sessionId);
       const withNote =
         pendingNote === null ? null : promptWithCommandFailureNote(message, pendingNote);
+      const prompt = { ...(withNote ?? message) };
+      if (this.readAttachment(socket)?.cloudWakeups !== true) delete prompt.wakeup;
       const sent = this.trySendFrame(socket, {
         type: 'session.prompt',
         sessionId: payload.sessionId,
-        payload: withNote ?? message,
+        payload: prompt,
       });
       if (!sent) return 'not_ready';
       if (withNote !== null) {
@@ -4816,6 +4893,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ),
       ...snapshotFrame,
     };
+    const wakeup = this.wakeupEligibility(route, socket);
+    if (wakeup) wireSpec.cloudWakeup = wakeup;
+    else wireSpec.permission = { ...wireSpec.permission, ...NATIVE_WAKEUP_DENIALS };
     // Pre-deploy wrappers reject unknown fields in both prepare and attach frames.
     if (attachment?.runtimeInstructions !== true) delete wireSpec.runtimeInstructions;
     if (attachment?.runtimeWebSearch !== true) {
@@ -7185,6 +7265,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(attachment?.workspaceConfiguration ? { workspaceConfiguration: true } : {}),
         ...(attachment?.runtimeInstructions ? { runtimeInstructions: true } : {}),
         ...(attachment?.runtimeWebSearch ? { runtimeWebSearch: true } : {}),
+        ...(attachment?.cloudWakeups ? { cloudWakeups: true } : {}),
         ...runtimeHarnessField(attachment?.runtimeHarness),
       });
       logControlDiagnostic('workspace_snapshot_capability', {
@@ -7425,6 +7506,62 @@ export class SandboxControlV2 extends DurableObject<Env> {
       case 'events_dropped':
         if (current) this.notifications.wrapperDropped(frame.dropped);
         return;
+      case 'wakeup.request': {
+        if (!current) return;
+        const route = await readRoute(this.db, frame.sessionId);
+        const eligible = route && this.wakeupEligibility(route, ws);
+        const owner = route?.credentialSource?.userId;
+        const reply = (result: CloudWakeupReply) =>
+          this.trySendFrame(ws, { type: 'wakeup.result', requestId: frame.requestId, result });
+        if (
+          !route ||
+          route.state !== 'ready' ||
+          route.spec.kiloSessionId !== frame.kiloSessionId ||
+          !eligible ||
+          owner === undefined
+        ) {
+          reply({ ok: false, error: 'Cloud wakeups are unavailable for this chat.' });
+          return;
+        }
+        this.ctx.waitUntil(
+          (async () => {
+            try {
+              const scope = {
+                sandboxId: this.sandboxId,
+                kiloSessionId: frame.kiloSessionId,
+                directory: route.spec.directory,
+                capability: eligible,
+              };
+              const result = await withDORetry(
+                () => {
+                  const peer = this.sessionPeerFor(owner, frame.sessionId);
+                  if (!peer) throw new Error('Session unavailable');
+                  return peer;
+                },
+                async peer => {
+                  if (!peer.changeWakeup)
+                    return {
+                      ok: false,
+                      error: 'The session does not support Cloud wakeups.',
+                    } as const;
+                  return peer.changeWakeup(frame.command, scope);
+                },
+                'sandbox.wakeup'
+              );
+              if (result.ok && result.wakeup.state === 'pending') {
+                await this.enqueue(async () => {
+                  this.wakeupPolicy().add(frame.sessionId, result.wakeup);
+                  await this.armAlarm(await this.readAllocation());
+                });
+              }
+              reply(result);
+            } catch {
+              reply({ ok: false, error: 'Could not confirm the Cloud wakeup.' });
+            }
+          })()
+        );
+        return;
+      }
       case 'history.recent':
         if (current)
           this.ctx.waitUntil(
@@ -7932,7 +8069,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       snapshotReason = 'already_attempted';
     else {
       snapshotReason = 'scheduled';
-      snapshotAt = workspaceSnapshotIdleAt(state, disk) + this.workspaceSnapshotIdleMs;
+      snapshotAt = workspaceSnapshotIdleAt(state, disk) + this.snapshotIdleForWakeup();
     }
     logControlDiagnostic(
       'workspace_snapshot_schedule',
@@ -8015,10 +8152,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
       })
       .from(routesTable)
       .all();
-    return routes.some(route => route.state === 'preparing' || route.readable === 0) ||
+    const normal =
+      routes.some(route => route.state === 'preparing' || route.readable === 0) ||
       sandboxIdlePolicyForOrigins(routes.map(route => route.origin)) === 'interactive'
-      ? timers.idleMs
-      : timers.unattendedIdleMs;
+        ? timers.idleMs
+        : timers.unattendedIdleMs;
+    return Math.max(
+      normal,
+      this.wakeupPolicy().read(Date.now()).holdUntil - (state.lastActivityAt ?? Date.now())
+    );
   }
 
   private enqueue<T>(task: () => Promise<T>): Promise<T> {

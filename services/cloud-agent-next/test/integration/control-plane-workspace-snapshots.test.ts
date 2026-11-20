@@ -35,9 +35,14 @@ import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
 import { seedRegistration } from './helpers/seed-registration.js';
 import { readRoute, writeRoute } from '../../src/control-plane/sandbox/routes.js';
+import { createSandboxWakeupPolicy } from '../../src/control-plane/sandbox/wakeup-policy.js';
+import { RUNTIME_AUTHORIZATION_KEY } from '../../src/session/runtime-authorization-persistence.js';
+import { cloudWakeups } from '../../src/control-plane/session/sqlite-schema.js';
+import { eq } from 'drizzle-orm';
 import { workspaceDiskSnapshots } from '../../src/control-plane/sandbox/sqlite-schema.js';
 import { DEADLINE_MS } from '../../src/sandbox-control/deadlines.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
+import { cloudWakeupReplySchema } from '../../src/shared/cloud-wakeup.js';
 import { waitFor } from './wait-for.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import {
@@ -74,6 +79,7 @@ async function setup(
     origin?: string;
     startCommands?: string[];
     standalone?: boolean;
+    cloudWakeups?: boolean;
   } = {}
 ) {
   const workspaceId = `worktree_${crypto.randomUUID()}` as const;
@@ -174,6 +180,7 @@ async function setup(
     const wrapper = await FakeWrapper.connect({
       sandboxId,
       credential: launch.SANDBOX_CONTROL_CREDENTIAL,
+      ...(options.cloudWakeups ? { cloudWakeups: true, runtimeHarness: 'kilo2' } : {}),
     });
     wrappers.push(wrapper);
     expect(
@@ -876,6 +883,154 @@ describe('idle workspace disk checkpoint', () => {
     expect(test.captures).toHaveLength(0);
     test.wrappers.forEach(wrapper => wrapper.close());
   });
+
+  it('keeps a wakeup through a follow-up, then admits its next wakeup only once', async () => {
+    const test = await setup({ cloudWakeups: true });
+    const wrapper = await test.start();
+    const issued = Date.now();
+    await runInDurableObject(test.session, async (instance, ctx) => {
+      instance['metadata'] = parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: {
+          sessionId: test.sessionId,
+          userId: USER,
+          orgId: test.registration.credentials.orgId,
+        },
+        auth: { kiloSessionId: KILO, kilocodeToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN },
+        agent: { mode: 'code', model: 'test/model' },
+        workspace: {
+          sandboxId: test.sandboxId,
+          sandboxKind: 'isolated',
+          sandboxProvider: 'cloudflare-containers',
+        },
+        lifecycle: { version: 1, timestamp: issued },
+      });
+      await ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, {
+        version: 1,
+        id: crypto.randomUUID(),
+        resourceKind: 'cloud-agent-next',
+        resourceId: test.sessionId,
+        userId: USER,
+        authorizationUserId: USER,
+        organizationId: test.registration.credentials.orgId,
+        issuedAt: new Date(issued).toISOString(),
+        delegationExpiresAt: new Date(issued + 60_000).toISOString(),
+        state: 'active',
+        bindings: { userPepperDigest: 'null', authorizationPepperDigest: 'null' },
+        source: { admissionSource: 'user' },
+      });
+    });
+    const received = vi.fn();
+    wrapper.onFrame(received);
+    const schedule = async (callId: string) => {
+      const requestId = crypto.randomUUID();
+      wrapper.send({
+        type: 'wakeup.request',
+        requestId,
+        sessionId: test.sessionId,
+        kiloSessionId: KILO,
+        command: { action: 'schedule', callId, delay: '20s', prompt: 'wake up' },
+      });
+      const frame = await wrapper.nextSkipping([
+        'session.abort',
+        'session.prompt',
+        'worktree.snapshot',
+        'worktree.summary',
+        'wakeup.end',
+      ]);
+      expect(frame).toMatchObject({ type: 'wakeup.result', requestId });
+      if (frame?.type !== 'wakeup.result') throw new Error('Missing wakeup reply');
+      const result = cloudWakeupReplySchema.parse(frame.result);
+      if (!result.ok) throw new Error(result.error);
+      return result.wakeup;
+    };
+    const scheduled = await schedule('first');
+    const sibling = await test.attachSibling(wrapper);
+    await sibling.session.stop();
+    await test.session.send(prompt('follow-up'));
+    await test.messageState('follow-up', 'accepted');
+    expect(received).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'session.prompt',
+        sessionId: test.sessionId,
+        payload: expect.objectContaining({
+          messageId: 'follow-up',
+          wakeup: { instruction: expect.stringContaining(scheduled.id) },
+        }),
+      })
+    );
+    expect(await test.session.getWakeup()).toMatchObject({
+      id: scheduled.id,
+      state: 'pending',
+    });
+    await test.session.changeWakeup({ action: 'cancel', id: scheduled.id });
+    expect(await test.session.getWakeup()).toMatchObject({
+      id: scheduled.id,
+      state: 'cancelled',
+    });
+    const next = await schedule('second');
+    await runInDurableObject(test.session, async instance => {
+      instance['db']
+        .update(cloudWakeups)
+        .set({ nextAttemptAt: Date.now() - 1 })
+        .where(eq(cloudWakeups.id, next.id))
+        .run();
+      await instance.alarm();
+      await instance.alarm();
+    });
+    expect(await test.session.getWakeup()).toMatchObject({ id: next.id, state: 'fired' });
+    await waitFor(() =>
+      expect(received).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'session.prompt',
+          sessionId: test.sessionId,
+          payload: expect.objectContaining({
+            turn: { type: 'prompt', prompt: 'wake up' },
+            wakeup: { firing: true, instruction: null },
+          }),
+        })
+      )
+    );
+    const state = await test.session.getSession();
+    if (state.type !== 'found') throw new Error('session missing');
+    expect(state.messages).toHaveLength(3);
+    test.wrappers.forEach(candidate => candidate.close());
+  });
+
+  it.each(['stored', 'failed', 'too-close'] as const)(
+    'only stops before the normal idle deadline after a fresh wakeup capture (%s)',
+    async outcome => {
+      const test = await setup();
+      const wrapper = await test.start();
+      await test.attachSibling(wrapper);
+      await runInDurableObject(test.sandbox, (instance, ctx) => {
+        instance.workspaceSnapshotIdleMs = 2 * CONTROL_PLANE_TIMERS.sandbox.unattendedIdleMs;
+        createSandboxWakeupPolicy(ctx.storage.kv).add(test.sessionId, {
+          id: 'wku_test',
+          dueAt: Date.now() + (outcome === 'too-close' ? 9 : 20) * 60_000,
+          mode: 'sleep',
+          state: 'pending',
+          prompt: 'Read the report.',
+          failure: null,
+        });
+      });
+      if (outcome === 'failed')
+        test.controls.capture = async () => ({ status: 'failed', reason: 'snapshot_failed' });
+      await test.idle(wrapper, CONTROL_PLANE_TIMERS.sandbox.unattendedIdleMs + 1_000);
+      await test.alarm();
+      expect(test.captures).toHaveLength(outcome === 'too-close' ? 0 : 1);
+      if (outcome === 'stored') {
+        await waitFor(async () =>
+          expect((await test.sandbox.getAllocationState()).kind).toBe('stopped')
+        );
+        expect(await test.snapshot()).toMatchObject({ snapshotId: 'session-snapshot' });
+      } else {
+        expect((await test.sandbox.getAllocationState()).kind).toBe('connected');
+        expect(await test.snapshot()).toBeUndefined();
+      }
+      test.wrappers.forEach(candidate => candidate.close());
+    }
+  );
 
   it('does not capture while a sibling remains active', async () => {
     const test = await setup();

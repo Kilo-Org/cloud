@@ -16,12 +16,12 @@ export const CONTROL_PLANE_SANDBOX_PERMISSION = {
   todoread: 'allow',
   doom_loop: 'allow',
   suggest: 'deny',
-  schedule_wakeup: 'deny',
-  cancel_wakeup: 'deny',
   cron_create: 'deny',
   cron_list: 'deny',
   cron_delete: 'deny',
 } as const;
+
+export const NATIVE_WAKEUP_DENIALS = { schedule_wakeup: 'deny', cancel_wakeup: 'deny' } as const;
 
 /**
  * Only interactive Cloud Agent clients have a person who can answer a question

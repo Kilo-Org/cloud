@@ -649,7 +649,23 @@ function normalizeCloudAgentProtocolError(error: unknown): unknown {
  * Minimal TRPC client interface for cloud-agent-next API
  * Note: This uses only V2 procedures (WebSocket streaming)
  */
+type ChatWakeup = {
+  id: string;
+  dueAt: number;
+  prompt: string;
+  mode: 'stay-awake' | 'sleep';
+  state: 'pending' | 'fired' | 'cancelled' | 'failed';
+  failure: string | null;
+};
+
 type CloudAgentNextTRPCClient = {
+  getWakeup: { query: (input: { sessionId: string }) => Promise<ChatWakeup | null> };
+  cancelWakeup: {
+    mutate: (input: {
+      sessionId: string;
+      id: string;
+    }) => Promise<{ ok: true; wakeup: ChatWakeup } | { ok: false; error: string }>;
+  };
   health: {
     query: () => Promise<HealthOutput>;
   };
@@ -904,6 +920,18 @@ export class CloudAgentNextClient {
    * environment snapshot or the base image. This discards workspace changes
    * made since the snapshot was captured.
    */
+  async getWakeup(sessionId: string) {
+    return this.request('getWakeup', () => this.client.getWakeup.query({ sessionId }), {
+      sessionId,
+    });
+  }
+
+  async cancelWakeup(sessionId: string, id: string) {
+    return this.request('cancelWakeup', () => this.client.cancelWakeup.mutate({ sessionId, id }), {
+      sessionId,
+    });
+  }
+
   async removeWorkspaceSnapshot(sessionId: string): Promise<{ success: true }> {
     return this.request(
       'removeWorkspaceSnapshot',

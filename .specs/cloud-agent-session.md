@@ -380,6 +380,14 @@ repository.
     creation or their last restore; each restore resets this TTL. Snapshots preserve disk,
     not running processes, terminals or memory.
 
+### Scheduled wakeups
+
+Eligible Kilo v2 chats in registered Cloudflare workspaces can schedule one pending wakeup without approval. A wakeup runs in the same chat, even with the browser closed. A new user message does not cancel it. Stop in another chat does not cancel it either. The agent cannot schedule a Cloud wakeup during an active `/goal`.
+
+The pending wakeup shows its due time, prompt, mode and a Cancel action. Delays below ten minutes keep the sandbox awake. Longer waits can stop the sandbox early only after a fresh snapshot. Active sibling work and open terminals can prevent early stop. The sandbox reports **Sleeping** only after a confirmed stop. A snapshot saves files and chat history, not running processes, terminals or memory.
+
+Deleting the chat or workspace cancels its wakeup. If runtime authorization expires before the wakeup runs, the chat tells the user to send a message to continue. A failed snapshot restore offers **Start fresh** and does not run the wakeup on a clean checkout.
+
 ### Turn
 
 1. The agent MUST stream text, reasoning, and tool calls in the same chat.

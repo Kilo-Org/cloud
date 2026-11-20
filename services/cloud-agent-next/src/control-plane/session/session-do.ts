@@ -5,6 +5,15 @@ import {
 } from '../sandbox/workspace-snapshot.js';
 import { readCustomerBillingFailure } from '../../persistence/customer-billing-failure.js';
 import { DurableObject } from 'cloudflare:workers';
+import { eq } from 'drizzle-orm';
+import {
+  cloudWakeupCommandSchema,
+  cloudWakeupInstruction,
+  type CloudWakeup,
+  type CloudWakeupCommand,
+  type CloudWakeupReply,
+} from '../../shared/cloud-wakeup.js';
+import { createCloudWakeups } from './wakeups.js';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
 import {
@@ -540,6 +549,7 @@ export type ControlPlaneSessionMetadataSummary = {
  * `SANDBOX_CONTROL` binding; tests may inject a fake through `sandboxPeerFor`.
  */
 export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
+  endWakeup?(sessionId: string, id: string): Promise<void>;
   status(payload: ControlPlaneSessionRefPayload): Promise<ControlPlaneStatusResult>;
   prepare(input: ControlPlanePrepareInputWithSelection): Promise<ControlPlaneRouteView>;
   deliver(payload: ControlPlaneDeliverPayload): Promise<ControlPlaneDeliverResult>;
@@ -765,6 +775,7 @@ function unavailableStatusSnapshot(): SandboxStatusSnapshot {
 export class SandboxSessionV2 extends DurableObject<Env> {
   readonly sessionId: SessionId;
   private readonly db: DrizzleSqliteDODatabase;
+  private readonly wakeups: ReturnType<typeof createCloudWakeups>;
   private readonly eventQueries: SessionEventQueries;
   /** Streamed part text not yet in its row. Flush it before reading stored history. */
   private readonly partText: PartTextBuffer;
@@ -827,6 +838,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     super(ctx, env);
     this.sessionId = sessionIdFromDoName(ctx.id.name ?? ctx.id.toString()) as SessionId;
     this.db = drizzle(ctx.storage, { logger: false });
+    this.wakeups = createCloudWakeups(this.db);
     this.eventQueries = createSessionEventQueries(this.db, ctx.storage);
     this.partText = createPartTextBuffer({
       queries: this.eventQueries,
@@ -1869,6 +1881,67 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return { type: 'ok', authorization };
   }
 
+  async getWakeup(): Promise<CloudWakeup | null> {
+    await this.initialized;
+    return this.registration === null ? null : this.wakeups.latest();
+  }
+
+  async changeWakeup(
+    input: CloudWakeupCommand,
+    scope?: {
+      sandboxId: string;
+      kiloSessionId: string;
+      directory: string;
+      capability: 'snapshot' | 'stay-awake';
+    }
+  ): Promise<CloudWakeupReply> {
+    await this.initialized;
+    const command = cloudWakeupCommandSchema.parse(input);
+    return this.enqueue(async () => {
+      if (this.registration === null || (scope && !this.runtimeProxyScopeMatches(scope)))
+        return { ok: false, error: 'Cloud wakeups require an active workspace chat.' };
+      const result =
+        command.action === 'schedule'
+          ? scope === undefined
+            ? { ok: false as const, error: 'Schedule wakeups from the workspace chat.' }
+            : this.wakeups.schedule(
+                command,
+                Date.now(),
+                await this.wakeupAuthorizationExpiry(),
+                scope.capability
+              )
+          : this.wakeups.cancel(command.id);
+      if (result.ok) {
+        await this.armAlarm();
+        if (result.wakeup.state === 'cancelled') this.publishWakeupEnd(result.wakeup.id);
+      }
+      return result;
+    });
+  }
+
+  private async wakeupAuthorizationExpiry(): Promise<number | null> {
+    const { data: authorization } = RuntimeAuthorizationSchema.safeParse(
+      await this.ctx.storage.get(RUNTIME_AUTHORIZATION_KEY)
+    );
+    const expiresAt =
+      authorization?.state === 'active' ? Date.parse(authorization.delegationExpiresAt) : NaN;
+    return Number.isFinite(expiresAt) ? expiresAt : null;
+  }
+
+  private publishWakeupEnd(id: string): void {
+    const peer = this.sandboxPeer();
+    if (peer)
+      this.ctx.waitUntil(
+        withDORetry(
+          () => this.sandboxPeer() ?? peer,
+          async stub => {
+            await stub.endWakeup?.(this.sessionId, id);
+          },
+          'session.end_wakeup'
+        ).catch(() => undefined)
+      );
+  }
+
   async send(intent: ControlPlanePromptPayload): Promise<ControlPlaneSendResult> {
     await this.initialized;
     if (this.registration === null) return { type: 'session-not-found' };
@@ -2577,6 +2650,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.enqueue(async () => {
       // The alarm can wake an evicted instance; storage is authoritative.
       this.messages = await this.loadMessages();
+      if (this.registration === null) return;
       // Retry any report/callback obligation a previous attempt could not send.
       await this.repairOutboxes();
       const now = Date.now();
@@ -2609,6 +2683,31 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       } else if (reconciled && this.messages.some(message => message.state === 'queued')) {
         await this.recoverQueued(this.transportPass(false));
       }
+      const wakeup = await this.wakeups.fire({
+        now: Date.now(),
+        expiresAt: this.wakeups.nextAt() === null ? null : await this.wakeupAuthorizationExpiry(),
+        isAdmitted: messageId =>
+          this.db
+            .select({ id: controlPlaneMessages.message_id })
+            .from(controlPlaneMessages)
+            .where(eq(controlPlaneMessages.message_id, messageId))
+            .get() !== undefined,
+        admit: async (messageId, prompt) => {
+          const agent = this.messages.findLast(message => message.intent.turn.type === 'prompt')
+            ?.intent.agent;
+          if (agent?.model === undefined) return false;
+          return (
+            (await this.admitMessage(
+              await this.withSessionCallbackContext({
+                messageId,
+                turn: { type: 'prompt', prompt },
+                agent: { ...agent, model: agent.model },
+              })
+            )) === 'ok'
+          );
+        },
+      });
+      if (wakeup) this.publishWakeupEnd(wakeup.id);
       await this.armAlarm();
     });
   }
@@ -2666,6 +2765,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       this.messageCallbacks.nextCallbackDueAt() ?? null,
       statusDueAt,
       harnessDueAt,
+      this.wakeups.nextAt(),
     ].filter((value): value is number => value !== null);
     if (candidates.length === 0) {
       await this.ctx.storage.deleteAlarm();
@@ -3305,6 +3405,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private async tearDownSession(): Promise<void> {
     const parentSessionId = this.metadata?.parentCloudAgentSessionId;
     const ownerId = this.metadata?.identity.userId;
+    const wakeup = this.wakeups.latest();
+    if (wakeup?.state === 'pending') {
+      this.wakeups.cancel(wakeup.id);
+      this.publishWakeupEnd(wakeup.id);
+    }
     for (const socket of this.ctx.getWebSockets()) socket.close(1001, 'Session deleted');
     // A late capture after this must not write the deleted worktree's diff.
     this.worktreeChanges.suppress();
@@ -3816,6 +3921,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       return;
     }
     const routeContainer = this.route.state === 'unknown' ? undefined : this.route.container;
+    const wakeup = this.wakeups.latest();
+    const pendingWakeupMessageId =
+      wakeup?.state === 'pending' ? this.wakeups.pendingMessageId() : null;
+    const wakeupInstruction = wakeup?.state === 'pending' ? cloudWakeupInstruction(wakeup) : null;
     let result: ControlPlaneDeliverResult;
     try {
       result = await withDORetry(
@@ -3823,7 +3932,18 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         stub =>
           stub.deliver({
             sessionId: this.sessionId,
-            messages: queued.map(message => message.intent),
+            messages: queued.map(message => {
+              if (wakeup === null) return message.intent;
+              const firing = this.wakeups.isWakeupMessage(message.messageId);
+              return {
+                ...message.intent,
+                wakeup: {
+                  instruction:
+                    message.messageId === pendingWakeupMessageId ? null : wakeupInstruction,
+                  ...(firing ? { firing: true as const } : {}),
+                },
+              };
+            }),
             ...(routeContainer?.allocationId === undefined
               ? {}
               : { allocationId: routeContainer.allocationId }),

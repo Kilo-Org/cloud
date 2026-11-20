@@ -14,6 +14,7 @@ import { useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
+import { ChatWakeup } from './ChatWakeup';
 import { toast } from 'sonner';
 import { ArrowDown, MessageSquare, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -1953,6 +1954,16 @@ export default function CloudChatPage({
                           </div>
 
                           <div hidden={!chatTabActive} className={chatTabActive ? '' : 'hidden'}>
+                            {chatTabActive &&
+                              isCurrentSession &&
+                              selectedWorktreeId &&
+                              sessionIdFromParams && (
+                                <ChatWakeup
+                                  sessionId={sessionIdFromParams}
+                                  organizationId={organizationId}
+                                  readOnly={isReadOnly}
+                                />
+                              )}
                             {transcriptPhase !== 'opening' && (
                               <div className="flex min-w-0 items-center gap-3 px-[max(1rem,calc(50%_-_27rem))] has-[button]:mb-1">
                                 <CurrentTaskList

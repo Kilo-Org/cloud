@@ -1259,6 +1259,42 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
    * The capture time of the session's workspace snapshot, or null when the
    * workspace has none (organization context).
    */
+  getWakeup: organizationMemberProcedure
+    .input(z.object({ sessionId: z.string().min(1), organizationId: z.uuid() }).strict())
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.sessionId,
+      });
+      const client = createCloudAgentNextClient(
+        await createCloudAgentControlToken(ctx.user, ctx.headersList, input.organizationId)
+      );
+      return client.getWakeup(input.sessionId);
+    }),
+
+  cancelWakeup: organizationMemberMutationProcedure
+    .input(
+      z
+        .object({
+          sessionId: z.string().min(1),
+          organizationId: z.uuid(),
+          id: z.string().min(1).max(128),
+        })
+        .strict()
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.sessionId,
+      });
+      const client = createCloudAgentNextClient(
+        await createCloudAgentControlToken(ctx.user, ctx.headersList, input.organizationId)
+      );
+      return client.cancelWakeup(input.sessionId, input.id);
+    }),
+
   getWorkspaceSnapshotRecovery: organizationMemberProcedure
     .input(z.object({ sessionId: z.string().min(1), organizationId: z.uuid() }).strict())
     .output(

@@ -153,6 +153,10 @@ export type PrepareDeps = {
   log?: (message: string) => void;
   onNativeDiagnostic?: ControlDiagnosticReporter;
   onPreparedRoute?: (spec: ControlPlaneRouteSpec) => void;
+  runtimeEnvironment?: (
+    spec: ControlPlaneRouteSpec,
+    env: Record<string, string>
+  ) => Promise<Record<string, string>>;
   runGit?: (args: string[], options?: ProcessOptions) => Promise<ExecResult>;
   runSetup?: (
     command: string,
@@ -1316,8 +1320,12 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         const client = await withRuntimeStartRetry(
           key,
           () =>
-            withinStep('kilo_runtime', timers.kiloRuntimeStartMs, () =>
-              deps.runtimes.ensure({ key, directory, env: builtEnv })
+            withinStep('kilo_runtime', timers.kiloRuntimeStartMs, async () =>
+              deps.runtimes.ensure({
+                key,
+                directory,
+                env: (await deps.runtimeEnvironment?.(spec, builtEnv)) ?? builtEnv,
+              })
             ),
           () => !owner.released
         );
@@ -1602,7 +1610,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       ),
       route.spec
     );
-    await deps.runtimes.installCredentials(route.key, nextEnv, cloudAgentMcp);
+    await deps.runtimes.installCredentials(
+      route.key,
+      (await deps.runtimeEnvironment?.(route.spec, nextEnv)) ?? nextEnv,
+      cloudAgentMcp
+    );
     commitWorkspaceMcpGrant(route.key, cloudAgentMcp);
     if (credentials.git?.token && route.spec.git) {
       // The helper re-reads the record on the next git command, so the agent's

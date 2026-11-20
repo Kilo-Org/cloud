@@ -1330,6 +1330,8 @@ them through one development-only override.
 |---|---|---|---|
 | Session DO | Queued backstop | From send: reconnect window + one preparation attempt + 3 min | `failed` (`preparation_timeout`) |
 | Session DO | Accepted backstop | 12 h 5 min from accept | `failed` (`no_outcome`) |
+| Session DO | Cloud wakeup | 10 s minimum, 7 days maximum, due before delegation expiry | Admit a platform prompt with a reserved message ID; retry admission every 5 s for up to 2 min |
+| Sandbox DO | Cloud wakeup idle hold | Delays under 10 min: due time plus 30 s | Resume normal idle policy |
 | Session DO | Sandbox transport pass / best-effort abort | 2 s including RPC retries, not scaled | Retain queued intent / return from abort |
 | Session DO | Queued transport recovery | 15 s after exhaustion; development-only scaling | Consume once; passive status then bounded prepare/deliver, no self-rearm |
 | Sandbox DO | Provider create call | 2 min | Retry after the pause below while a route deadline remains |
@@ -1362,10 +1364,17 @@ them through one development-only override.
 | Wrapper | Connect attempt (upgrade, `hello`, `welcome`, outbox flush) | 30 s from socket creation | Detach the socket and use the reconnect backoff; Kilo keeps running |
 | Supervisor | Wrapper restarts | 5 in 10 min | Stop restarting |
 
+The Kilo v2 wrapper replaces the native timers only for eligible workspace chats. The Session DO owns one durable pending wakeup per chat and serializes fire, cancel and deletion. A wakeup enters normal message admission with a fixed ID and uses native queue delivery. A later user prompt sees the pending wakeup in the Kilo instruction entry; it does not cancel it. Active `/goal` turns cannot schedule one in v1.
+
+**Wakeup early stop.** Unlike normal idle capture, a sleep-mode wakeup can use the unattended idle window even when an idle sibling has an interactive origin. Early stop still requires at least ten minutes until the wakeup and a fresh published capture. The existing allocation, connection, activity and workspace mutation fences apply. Active sibling work, open terminals, preparation or a rejected capture leave the normal idle policy in place. A short wakeup's hold takes precedence over early stop.
+
 ## 9. Failures
 
 | Failure | Detected by | Recovery | Message effect |
 |---|---|---|---|
+| Wakeup authorization expired | Session DO | Send a message to continue | Wakeup failed; no message admitted |
+| Wakeup admission retries exhausted | Session DO | Send a message to continue | Wakeup failed; no message admitted |
+| Wakeup early capture failed or was fenced | Sandbox DO | Keep normal idle policy | Wakeup stays pending |
 | Transient provider create error | Sandbox DO | One retry after a 10 s pause, within the unchanged route deadline | A second create error fails queued promptly (`sandbox_create_failed`) |
 | Native billing meter or database unavailable | Sandbox DO | Retry within one minute; new message after service recovery | Queued fail (`billing_unavailable`) |
 | Actual compute credit denial | Provider adapter / existing Vercel billing admission | New message after adding credits | Queued fail promptly (`billing_blocked`) |

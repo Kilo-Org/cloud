@@ -67,6 +67,19 @@ export function kilo2RuntimeEnvironment(env: Record<string, string>): Record<str
     .record(z.string(), z.unknown())
     .parse(JSON.parse(env.KILO_CONFIG_CONTENT ?? '{}'));
   delete config.indexing;
+  if (env.KILO_CLOUD_WAKEUP_PLUGIN !== undefined) {
+    const plugin = z
+      .object({
+        package: z.string(),
+        options: z.object({ url: z.url(), secret: z.string().min(1) }),
+      })
+      .parse(JSON.parse(env.KILO_CLOUD_WAKEUP_PLUGIN));
+    config.plugins = [...z.array(z.unknown()).parse(config.plugins ?? []), plugin];
+    config.permission = {
+      ...z.record(z.string(), z.unknown()).parse(config.permission ?? {}),
+      'cloud-wakeup': 'allow',
+    };
+  }
   if (env[CLOUD_WEB_SEARCH_DISABLED_ENV] === '1') config.websearch = false;
   else if (env[CLOUD_WEB_SEARCH_PROVIDER_ENV]) {
     config.websearch = {
@@ -126,6 +139,7 @@ export function kilo2RuntimeEnvironment(env: Record<string, string>): Record<str
   };
   // V1 disables background subagents; V2 uses its native default.
   delete runtimeEnv.KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS;
+  delete runtimeEnv.KILO_CLOUD_WAKEUP_PLUGIN;
   delete runtimeEnv[CLOUD_WEB_SEARCH_DISABLED_ENV];
   delete runtimeEnv[CLOUD_WEB_SEARCH_PROVIDER_ENV];
   return runtimeEnv;

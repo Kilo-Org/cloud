@@ -404,7 +404,7 @@ export async function captureIdleWorkspaceSnapshot(input: {
   db: RouteDatabase;
   sandboxId: string;
   provider: NonNullable<ProviderAdapter['workspaceSnapshots']>;
-  idleMs: number;
+  idleMs: number | (() => number);
   read(): Promise<CaptureContext>;
   enqueue<T>(operation: () => Promise<T>): Promise<T>;
   eligible(route: RouteRecord): boolean;
@@ -445,7 +445,8 @@ export async function captureIdleWorkspaceSnapshot(input: {
     if (disk === undefined) return reject('untracked');
     if (disk.allocationId !== state.allocationId) return reject('allocation_mismatch');
     if (disk.idleConnectionId !== state.connectionId) return reject('idle_connection_mismatch');
-    if (Date.now() < workspaceSnapshotIdleAt(state, disk) + input.idleMs) return reject('not_idle');
+    const idleMs = typeof input.idleMs === 'function' ? input.idleMs() : input.idleMs;
+    if (Date.now() < workspaceSnapshotIdleAt(state, disk) + idleMs) return reject('not_idle');
     if (!capable) return reject('not_capable');
     if (live.length === 0) return reject('no_routes');
     if (live.some(route => route.state !== 'ready')) return reject('route_not_ready');

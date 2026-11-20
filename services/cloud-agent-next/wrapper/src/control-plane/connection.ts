@@ -22,6 +22,7 @@ import type {
   NativeConnectionPhase,
 } from '../../../src/shared/control-diagnostics.js';
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
+import { CLOUD_WAKEUP_HEADER, CLOUD_WAKEUP_CAPABILITY } from '../../../src/shared/cloud-wakeup.js';
 
 /** Spec §7 Connection: the bounded outbound buffer holds at most this many frames. */
 export const CONTROL_PLANE_OUTBOX_MAX_FRAMES = 1_000;
@@ -443,6 +444,9 @@ export function createControlPlaneConnection(
           [WORKSPACE_CONFIGURATION_HEADER]: WORKSPACE_CONFIGURATION_VERSION,
           [RUNTIME_INSTRUCTIONS_HEADER]: RUNTIME_INSTRUCTIONS_VERSION,
           [RUNTIME_WEB_SEARCH_HEADER]: RUNTIME_WEB_SEARCH_VERSION,
+          ...(options.runtimeHarness === 'kilo2'
+            ? { [CLOUD_WAKEUP_HEADER]: CLOUD_WAKEUP_CAPABILITY }
+            : {}),
           ...(options.runtimeHarness ? { [RUNTIME_HARNESS_HEADER]: options.runtimeHarness } : {}),
           ...(options.runtimeVersions?.kiloCliVersion
             ? { [KILO_CLI_VERSION_HEADER]: options.runtimeVersions.kiloCliVersion }

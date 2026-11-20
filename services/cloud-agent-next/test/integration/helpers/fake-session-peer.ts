@@ -143,6 +143,9 @@ export function installFakeRuntimeProxyPeer(
     const peer = peerFor(ownerId, sessionId);
     if (peer === null) return null;
     return {
+      changeWakeup: (command, scope) =>
+        peer.changeWakeup?.(command, scope) ??
+        Promise.resolve({ ok: false, error: 'No wakeup peer' }),
       onRoute: update => peer.onRoute(update),
       onWorkspaceStopped: payload => peer.onWorkspaceStopped(payload),
       onEvents: notification => peer.onEvents(notification),

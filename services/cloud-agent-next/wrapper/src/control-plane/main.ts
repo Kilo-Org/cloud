@@ -1,5 +1,6 @@
 import { constants } from 'node:fs';
 import fsp from 'node:fs/promises';
+import { createWrapperWakeups } from './cloud-wakeups.js';
 import {
   CONTROL_PLANE_ALLOCATION_ID_ENV,
   type ControlPlaneWrapperFrame,
@@ -321,6 +322,7 @@ export function createControlPlaneSessionHost(options: {
  * construction order does not change behavior.
  */
 export type ControlPlaneFrameDispatcherDeps = {
+  wakeups?: ReturnType<typeof createWrapperWakeups>;
   preparation: { current?: PreparationManager };
   turns: { current?: TurnManager };
   terminals: { current?: ControlPlaneTerminalRuntime };
@@ -341,6 +343,14 @@ export function createControlPlaneFrameDispatcher(
 ): (frame: ControlPlaneWrapperFrame) => void {
   return function onFrame(frame: ControlPlaneWrapperFrame): void {
     switch (frame.type) {
+      case 'wakeup.result':
+        deps.wakeups?.result(frame);
+        return;
+      case 'wakeup.end':
+        void deps.wakeups
+          ?.end(frame.sessionId, frame.id)
+          .catch(() => deps.log('control-plane wakeup instruction cleanup failed'));
+        return;
       case 'worktree.git':
         void deps.worktreeGit?.current?.handle(frame);
         return;
@@ -398,6 +408,7 @@ export function createControlPlaneFrameDispatcher(
         void deps.turns.current?.answer(frame.sessionId, frame.reply);
         return;
       case 'session.release':
+        deps.wakeups?.release(frame.sessionId);
         deps.turns.current?.release(frame.sessionId);
         deps.preparation.current?.release(frame.sessionId);
         void deps.terminals.current?.forgetSession(frame.sessionId);
@@ -617,6 +628,13 @@ async function main(
   turnsRef.current = host.turns;
   const harness = runtimeHarness(env);
   const kiloCliVersion = await readKiloCliVersion(harness.cli);
+  const wakeups = createWrapperWakeups({
+    send: frame => connection.send(frame),
+    clear: spec =>
+      liveRuntimeClient(runtimes.get(runtimeKey(spec)))?.clearWakeupInstruction?.(
+        spec.kiloSessionId
+      ),
+  });
   const connection = createControlPlaneConnection({
     url,
     credential,
@@ -629,6 +647,7 @@ async function main(
     onNativeDiagnostic: projector,
     getHeartbeat: host.getHeartbeat,
     onFrame: createControlPlaneFrameDispatcher({
+      wakeups,
       preparation: preparationRef,
       turns: turnsRef,
       terminals: terminalsRef,
@@ -651,6 +670,7 @@ async function main(
       diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'ready', ok: true });
     },
     onDisconnected: reason => {
+      wakeups.disconnected();
       historyRequestsRef.current?.disconnected();
       transferGrantsRef.current?.disconnected();
       transferClientRef.current?.setConnected(false);
@@ -696,7 +716,12 @@ async function main(
     timers,
     onNativeDiagnostic: projector,
     allocationId,
-    onPreparedRoute: spec => turnsRef.current?.registerRoute(spec),
+    onPreparedRoute: spec => {
+      turnsRef.current?.registerRoute(spec);
+      wakeups.register(spec, runtimeKey(spec));
+    },
+    runtimeEnvironment: (spec, runtimeEnv) =>
+      wakeups.environment(spec, runtimeKey(spec), runtimeEnv),
     runtimes: {
       ensure: input => runtimes.ensure(input),
       installCredentials: async (key, nextEnv, cloudAgentMcp) => {
@@ -782,6 +807,7 @@ async function main(
       refusedPorts: () => [
         ...(sandboxProvider === undefined ? [] : reservedPreviewPorts(sandboxProvider)),
         ...runtimes.serverPorts(),
+        ...wakeups.ports(),
       ],
       headTimeoutMs: PREVIEW_TUNNEL_HEAD_TIMEOUT_MS,
       socketTimeoutMs: PREVIEW_TUNNEL_SOCKET_TIMEOUT_MS,
@@ -843,6 +869,7 @@ async function main(
       previewTunnelRef.current?.stop();
       turnsRef.current?.shutdown();
       terminalsRef.current?.shutdown();
+      await wakeups.stop();
       await runtimes.shutdown();
       closeControlWorkload(workload);
     },

@@ -461,6 +461,7 @@ export type Env = {
    * production with the top-level config and development with `env.dev`.
    */
   ENVIRONMENT?: string;
+  LOCAL_CLOUD_WAKEUPS?: string;
   CLOUD_AGENT_SENTRY_DSN?: string;
   CLOUD_AGENT_SENTRY_ENVIRONMENT?: string;
   CF_VERSION_METADATA?: { id: string };

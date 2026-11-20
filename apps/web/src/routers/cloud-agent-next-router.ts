@@ -904,6 +904,26 @@ export const cloudAgentNextRouter = createTRPCRouter({
    * workspace has none. A non-null value is what makes "Start fresh" available
    * on the failure state of a workspace snapshot start.
    */
+  getWakeup: baseProcedure
+    .input(z.object({ sessionId: z.string().min(1) }).strict())
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.sessionId);
+      const client = createCloudAgentNextClient(
+        await createCloudAgentControlToken(ctx.user, ctx.headersList)
+      );
+      return client.getWakeup(input.sessionId);
+    }),
+
+  cancelWakeup: baseProcedure
+    .input(z.object({ sessionId: z.string().min(1), id: z.string().min(1).max(128) }).strict())
+    .mutation(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.sessionId);
+      const client = createCloudAgentNextClient(
+        await createCloudAgentControlToken(ctx.user, ctx.headersList)
+      );
+      return client.cancelWakeup(input.sessionId, input.id);
+    }),
+
   getWorkspaceSnapshotRecovery: baseProcedure
     .input(z.object({ sessionId: z.string().min(1) }).strict())
     .output(

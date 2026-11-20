@@ -54,9 +54,12 @@ import {
   getSessionToolPartDetail,
 } from './router/handlers/session-history.js';
 import { getAnalysisCreditAdmission } from './router/handlers/analysis-credit-admission.js';
+import { getWakeup, cancelWakeup } from './router/handlers/session-wakeups.js';
 
 export const appRouter = router({
   getAnalysisCreditAdmission,
+  getWakeup,
+  cancelWakeup,
   getSessionMessagesPage,
   getSessionToolPartDetail,
   deleteWorktree,

@@ -1,4 +1,13 @@
-import { index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { sql } from 'drizzle-orm';
+import {
+  index,
+  integer,
+  primaryKey,
+  real,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from 'drizzle-orm/sqlite-core';
 import { SESSION_MESSAGE_STATES } from './messages.js';
 
 export const events = sqliteTable(
@@ -78,3 +87,23 @@ export const controlPlaneMessages = sqliteTable('control_plane_messages', {
   billing_failure: text('billing_failure'),
   container: text('container'),
 });
+
+export const cloudWakeups = sqliteTable(
+  'cloud_wakeups',
+  {
+    id: text('id').primaryKey(),
+    callId: text('call_id').notNull().unique(),
+    messageId: text('message_id').notNull().unique(),
+    dueAt: integer('due_at').notNull(),
+    nextAttemptAt: integer('next_attempt_at').notNull(),
+    prompt: text('prompt').notNull(),
+    mode: text('mode', { enum: ['stay-awake', 'sleep'] }).notNull(),
+    state: text('state', { enum: ['pending', 'fired', 'cancelled', 'failed'] }).notNull(),
+    failure: text('failure'),
+  },
+  table => [
+    uniqueIndex('cloud_wakeups_one_pending')
+      .on(table.state)
+      .where(sql`${table.state} = 'pending'`),
+  ]
+);

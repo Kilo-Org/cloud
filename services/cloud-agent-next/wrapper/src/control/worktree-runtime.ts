@@ -1,6 +1,9 @@
 import path from 'node:path';
 
-import { CONTROL_PLANE_SANDBOX_PERMISSION } from '../../../src/shared/control-plane-permission.js';
+import {
+  CONTROL_PLANE_SANDBOX_PERMISSION,
+  NATIVE_WAKEUP_DENIALS,
+} from '../../../src/shared/control-plane-permission.js';
 import type {
   ControlPlaneRouteSpec,
   ControlPlaneSessionCredentialsPayload,
@@ -144,7 +147,11 @@ export function buildWorktreeKiloEnvironment(
   let config = JSON.stringify({
     autoupdate: false,
     snapshot: false,
-    permission: { ...CONTROL_PLANE_SANDBOX_PERMISSION, ...runtimeConfig?.permission },
+    permission: {
+      ...CONTROL_PLANE_SANDBOX_PERMISSION,
+      ...runtimeConfig?.permission,
+      ...NATIVE_WAKEUP_DENIALS,
+    },
     provider: {
       kilo: {
         options: {

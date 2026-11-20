@@ -13,6 +13,7 @@ import type {
   WorkspaceFailureSubtype,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import { z } from 'zod';
+import { cloudWakeupCommandSchema, cloudWakeupReplySchema } from './cloud-wakeup.js';
 import { webSearchProviderSchema } from './web-search-provider.js';
 import { customerBillingFailureSchema } from './cloud-agent-billing.js';
 import type { CloudAgentRunContainer } from '@kilocode/worker-utils/cloud-agent-queue-report';
@@ -437,6 +438,7 @@ const routeSpecObjectSchema = z
       .regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/)
       .optional(),
     worktreeRecovery: worktreeRecoverySchema.optional(),
+    cloudWakeup: z.enum(['stay-awake', 'snapshot']).optional(),
     workspaceSnapshot: z
       .object({
         sourceAllocationId: z.string().min(1).max(256),
@@ -825,6 +827,10 @@ const controlPlanePromptAgentSchema = z
 const controlPlanePromptPayloadBaseSchema = z
   .object({
     messageId: z.string().min(1).max(128),
+    wakeup: z
+      .object({ instruction: z.string().nullable(), firing: z.literal(true).optional() })
+      .strict()
+      .optional(),
     /** Server-owned context injected as a synthetic prompt part. */
     context: z.string().max(2000).optional(),
     attachments: z
@@ -1743,6 +1749,25 @@ const controlPlaneHistoryResultFrameSchema = z.discriminatedUnion('ok', [
 ]);
 
 export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
+  z
+    .object({
+      type: z.literal('wakeup.request'),
+      requestId: z.uuid(),
+      sessionId: z.string().min(1),
+      kiloSessionId: z.string().min(1),
+      command: cloudWakeupCommandSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('wakeup.result'),
+      requestId: z.uuid(),
+      result: cloudWakeupReplySchema,
+    })
+    .strict(),
+  z
+    .object({ type: z.literal('wakeup.end'), sessionId: z.string().min(1), id: z.string().min(1) })
+    .strict(),
   controlPlaneHelloFrameSchema,
   controlPlaneWelcomeFrameSchema,
   controlPlaneShutdownFrameSchema,

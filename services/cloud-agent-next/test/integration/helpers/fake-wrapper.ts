@@ -9,6 +9,7 @@ import {
   WORKTREE_RUNTIME_HEADER,
   WORKTREE_RUNTIME_VERSION,
 } from '../../../src/shared/control-plane-runtime-contract.js';
+import { CLOUD_WAKEUP_CAPABILITY, CLOUD_WAKEUP_HEADER } from '../../../src/shared/cloud-wakeup.js';
 import {
   KILO_CLI_VERSION_HEADER,
   WRAPPER_VERSION_HEADER,
@@ -28,6 +29,7 @@ export type FakeWrapperConnectInput = {
   workspaceConfiguration?: boolean;
   runtimeInstructions?: boolean;
   runtimeWebSearch?: boolean;
+  cloudWakeups?: boolean;
   /** Raw `x-kilo-runtime-harness` value, so a test can also send an unknown one. */
   runtimeHarness?: string;
   kiloCliVersion?: string;
@@ -113,6 +115,7 @@ export class FakeWrapper {
         ...(input.runtimeWebSearch
           ? { [RUNTIME_WEB_SEARCH_HEADER]: RUNTIME_WEB_SEARCH_VERSION }
           : {}),
+        ...(input.cloudWakeups ? { [CLOUD_WAKEUP_HEADER]: CLOUD_WAKEUP_CAPABILITY } : {}),
         ...(input.runtimeHarness === undefined
           ? {}
           : { [RUNTIME_HARNESS_HEADER]: input.runtimeHarness }),

@@ -22,6 +22,7 @@ export type HarnessPrompt = HarnessSession & {
   variant?: string;
   /** Server-owned context the model reads before the prompt. */
   context?: string;
+  wakeup?: { instruction: string | null; firing?: true };
 };
 export type HarnessObservationInput = {
   directory: string;
@@ -73,6 +74,7 @@ export type HarnessReads = Pick<
 };
 
 export type Harness = {
+  clearWakeupInstruction?(sessionId: string): Promise<void>;
   /** Safe to open siblings without suppressing later session-ingest file restoration. */
   supportsHistoryPreload?: boolean;
   open(

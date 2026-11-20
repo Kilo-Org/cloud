@@ -730,6 +730,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
           ...(message.prompt === undefined ? {} : { prompt: message.prompt }),
           ...(message.parts === undefined ? {} : { parts: message.parts }),
           ...(pending.payload.context === undefined ? {} : { context: pending.payload.context }),
+          ...(pending.payload.wakeup === undefined ? {} : { wakeup: pending.payload.wakeup }),
           ...(model === undefined ? {} : { model }),
         });
       } else if (pending.payload.turn.command === 'compact') {

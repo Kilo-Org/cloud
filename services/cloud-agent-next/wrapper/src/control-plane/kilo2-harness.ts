@@ -51,6 +51,8 @@ export function createKilo2Harness(options: {
       `/api/experimental/session/${encodeURIComponent(input.sessionId)}/instructions/entries/cloud-agent-context`,
       { method: 'PUT', body: { value: context }, signal: input.signal }
     );
+  const wakeupEntry = (sessionId: string) =>
+    `/api/experimental/session/${encodeURIComponent(sessionId)}/instructions/entries/cloud-wakeup`;
   // A harness lives for one runtime. After a location's catalog matched or its
   // retries ran out, its plugins have started; later turns skip the lookup.
   const startedModelLocations = new Set<string>();
@@ -249,6 +251,12 @@ export function createKilo2Harness(options: {
     },
   };
   return {
+    async clearWakeupInstruction(sessionId) {
+      await api.request(wakeupEntry(sessionId), {
+        method: 'DELETE',
+        signal: AbortSignal.timeout(5_000),
+      });
+    },
     supportsHistoryPreload: true,
     async open(input) {
       try {
@@ -275,6 +283,14 @@ export function createKilo2Harness(options: {
       await select(input);
       await options.lifecycle.waitForInterrupt(input.sessionId, input.signal);
       await replaceCloudAgentContext(input, input.context);
+      if (input.wakeup) {
+        await api.request(
+          wakeupEntry(input.sessionId),
+          input.wakeup.instruction === null
+            ? { method: 'DELETE', signal: input.signal }
+            : { method: 'PUT', body: { value: input.wakeup.instruction }, signal: input.signal }
+        );
+      }
       await post(
         `${kilo2SessionPath(input.sessionId)}/prompt`,
         {
@@ -288,7 +304,7 @@ export function createKilo2Harness(options: {
           files: input.parts
             ?.filter(part => part.type === 'file')
             .map(part => ({ uri: part.url, name: part.filename })),
-          delivery: 'steer',
+          delivery: input.wakeup?.firing ? 'queue' : 'steer',
         },
         input.signal
       );

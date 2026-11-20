@@ -14,10 +14,10 @@
  * is registered on the session through `updateSession` right after start.
  *
  * The linked-child and background-child scenarios require a drain-capable v2 stack.
- * The cron and wakeup scenarios are disabled because the control-plane
- * permission map denies those tools until scheduled work is supported.
+ * Cron remains disabled. Cloud wakeups need an eligible registered workspace.
  */
 import {
+  createHostedWorkspace,
   fakeDirective,
   interruptSession,
   openStream,
@@ -27,6 +27,7 @@ import {
   waitForGateEngaged,
   type StreamConnection,
   type StreamEvent,
+  type StartSessionResult,
 } from './client.js';
 import type { LifecycleArgs, LifecycleResult } from './lifecycle.js';
 import type { SharedScenario } from './scenarios-shared.js';
@@ -118,16 +119,16 @@ async function openDrainSession(
 }> {
   const { config, api = 'unified' } = args;
   if (!args.env) throw new Error('scenario environment is required');
-  const session = await deadline.within('start', signal =>
-    startSession(
-      trackStartedSession(config, onSessionStarted),
-      {
-        prompt: fakeDirective(directive),
-        signal,
-      },
-      api
-    )
-  );
+  const tracked = trackStartedSession(config, onSessionStarted);
+  const prompt = fakeDirective(directive);
+  const session = await deadline.within<
+    Pick<StartSessionResult, 'cloudAgentSessionId' | 'kiloSessionId' | 'messageId'>
+  >('start', signal => {
+    if (!directive.startsWith('wakeup:')) return startSession(tracked, { prompt, signal }, api);
+    const profileId = process.env.E2E_WAKEUP_PROFILE_ID;
+    if (!profileId) throw new Error('Set E2E_WAKEUP_PROFILE_ID to the test organization profile.');
+    return createHostedWorkspace(tracked, { profileId, prompt }, signal);
+  });
   await deadline.within('callback target', signal =>
     registerSessionCallback(config, session.cloudAgentSessionId, { url: sink.callbackUrl }, signal)
   );
@@ -439,12 +440,10 @@ export const DRAIN_SHARED_SCENARIOS: Record<string, SharedScenario> = {
   },
   'drain-scheduled-wakeup': {
     name: 'drain-scheduled-wakeup',
-    requires: ['callbacks', 'sessionSandbox'],
+    requires: ['callbacks', 'sessionSandbox', 'kilo2Drain'],
     defaultConversation: `wakeup:drainwake:${SCHEDULE_DELAY}`,
     defaultApi: 'unified',
     defaultTimeoutMs: DRAIN_SCENARIO_TIMEOUT_MS,
-    disabled:
-      'the control-plane permission map denies schedule_wakeup, so the scenario cannot schedule the resume it asserts',
     run: (args, env) => {
       const directive = chosenDirective(args.conversation, `wakeup:drainwake:${SCHEDULE_DELAY}`);
       return runScheduledResume(

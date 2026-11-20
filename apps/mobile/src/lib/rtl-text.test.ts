@@ -307,6 +307,14 @@ describe('pinsTextDirection', () => {
     expect(pinsTextDirection({ textAlign: 'right', letterSpacing: 0 })).toBe(false);
   });
 
+  // Neither value names a direction: `inherit` follows the parent's layout and
+  // `auto` resolves from the first strong character, which is what the mark
+  // decides. A shared style carrying either must not suppress the mark.
+  it('reports no pin for a value that leaves the direction open', () => {
+    expect(pinsTextDirection({ direction: 'inherit' })).toBe(false);
+    expect(pinsTextDirection({ writingDirection: 'auto' })).toBe(false);
+  });
+
   // A style array is flattened before the read, so a pin in any entry counts.
   it('reads a pin inside a style array', () => {
     expect(pinsTextDirection([{ letterSpacing: 0 }, [{ direction: 'ltr' }]])).toBe(true);

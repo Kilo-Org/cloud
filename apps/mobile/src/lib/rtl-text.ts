@@ -231,9 +231,12 @@ const RIGHT_TO_LEFT_MARK = '\u200F';
  * `writingDirection`. A caller that names one has said what the paragraph's
  * direction is: a value that names a path, a command or an identifier pins left
  * to right (`LTR_TEXT_DIRECTION`), and appending a right-to-left mark would lay
- * that value out in an order its reader did not ask for. Naming the property
- * with either value counts, because the mark only decides the direction the
- * caller left open.
+ * that value out in an order its reader did not ask for.
+ *
+ * Only a value that names a direction counts. `direction: 'inherit'` leaves the
+ * direction to the parent's layout and `writingDirection: 'auto'` resolves it
+ * from the first strong character — the default this mark exists to override
+ * on Android — so neither is a caller's choice of base direction.
  *
  * The style is flattened so the test sees the same single object React Native
  * draws, and an array of style entries, an inline object and a registered sheet
@@ -247,7 +250,12 @@ export function pinsTextDirection(style: StyleProp<TextStyle> | undefined): bool
   if (!flat) {
     return false;
   }
-  return flat.direction !== undefined || flat.writingDirection !== undefined;
+  return (
+    flat.direction === 'ltr' ||
+    flat.direction === 'rtl' ||
+    flat.writingDirection === 'ltr' ||
+    flat.writingDirection === 'rtl'
+  );
 }
 
 /**

@@ -3,10 +3,7 @@ import { glanceableAgentsSnapshotSchema } from '@kilocode/app-shared/glanceable-
 import { homeWidgetDetailsSchema } from '@kilocode/app-shared/home-widget';
 
 import { NEEDS_INPUT_ATTENTION_KINDS } from './needs-input-actions';
-import {
-  securityFindingPayloadShape,
-  securityLifecyclePayloadShape,
-} from './notification-events';
+import { securityFindingPayloadShape, securityLifecyclePayloadShape } from './notification-events';
 import { sessionLiveActivityContentStateSchema } from './session-live-content';
 import { nonEmptyStringSchema } from './non-empty-string';
 import { refineSpendAlertScope, spendAlertScopeShape } from './spend-alert-scope';

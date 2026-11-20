@@ -1,9 +1,6 @@
 import { z } from 'zod';
 
-import {
-  securityFindingPayloadShape,
-  securityLifecyclePayloadShape,
-} from './notification-events';
+import { securityFindingPayloadShape, securityLifecyclePayloadShape } from './notification-events';
 import { nonEmptyStringSchema } from './non-empty-string';
 import { pushDataSchema, cloudAgentSessionRaiseShape } from './push-data';
 import { refineSpendAlertScope, spendAlertScopeShape } from './spend-alert-scope';

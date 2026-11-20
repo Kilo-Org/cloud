@@ -1169,7 +1169,11 @@ export async function drainQueue(
   options: { skipPlatformSync?: boolean; skipped?: DrainSkipReason[] } = {}
 ): Promise<{ runId: string; entryCount: number } | null> {
   const config = await getBenchmarkConfig(env.BENCH_DB, router);
-  if (!config) return null;
+  if (!config) {
+    // No saved config means no registry rows to claim: nothing is pending.
+    options.skipped?.push('nothing_pending');
+    return null;
+  }
 
   const active = await getRunningRun(env.BENCH_DB, 'decider', queue, router);
   if (active) {

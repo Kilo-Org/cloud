@@ -12,7 +12,7 @@ import {
   useOrganization,
 } from '@/lib/organization-context';
 import { ORGANIZATION_PERSONAL_STORAGE_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
-import { renderWithProviders, waitFor } from '@/test/render-with-providers';
+import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 const ORG_KEY = ORGANIZATION_STORAGE_KEY;
 /**
@@ -99,8 +99,17 @@ function tree() {
   );
 }
 
-async function mount(): Promise<Mounted> {
-  const ui = await renderWithProviders(createElement(Probe), { wrapper: OrganizationProvider });
+/**
+ * Pass `queryClient` to mount over a cache seeded before the tree exists — what
+ * the encrypted read-cache restore does on a cold start. A seeded query is
+ * `isFetched` while `isFetchedAfterMount` stays false, because the observer's
+ * initial state already holds that data.
+ */
+async function mount(queryClient?: QueryClient): Promise<Mounted> {
+  const ui = await renderWithProviders(createElement(Probe), {
+    wrapper: OrganizationProvider,
+    queryClient,
+  });
   client = ui.queryClient;
   mounted.push(ui);
   return ui;
@@ -571,7 +580,7 @@ describe('OrganizationProvider deleted membership', () => {
     expect(savedMetadata.has(MARKER_KEY)).toBe(false);
   });
 
-  it('lands on Personal when the thrown-away selection is the only membership', async () => {
+  it('switches to the first remaining membership when the stored organization is gone', async () => {
     savedMetadata.set(ORG_KEY, 'org-gone');
     const names = Promise.withResolvers<OrgEntry[]>();
     list.mockReturnValue(names.promise);
@@ -584,6 +593,70 @@ describe('OrganizationProvider deleted membership', () => {
       organizationId: 'org-a',
       selection: { status: 'organization', organizationId: 'org-a' },
     });
+  });
+
+  it('does not confirm a restored organization from a hydrated list snapshot', async () => {
+    savedMetadata.set(ORG_KEY, 'org-b');
+    // The encrypted read cache restored this query: it answers from a previous
+    // run, so it is `isFetched` without being an answer to this mount.
+    const seeded = createTestQueryClient();
+    seeded.setQueryData(['organizations-list'], [orgA, orgB]);
+    const names = Promise.withResolvers<OrgEntry[]>();
+    list.mockReset().mockReturnValue(names.promise);
+
+    await mount(seeded);
+
+    // The snapshot names the stored organization, and it still cannot confirm
+    // it: the selection waits for a read that answers after this mount.
+    await waitFor(() => scope().selection.status === 'restored');
+    expect(scope()).toMatchObject({ organizationId: 'org-b', isLoaded: false, error: null });
+    expect(publications.some(value => value.status === 'organization')).toBe(false);
+    // The provider asks for that answer exactly once, because the query's own
+    // staleness would have served the hydrated snapshot without a request.
+    expect(list).toHaveBeenCalledTimes(1);
+
+    await act(() => {
+      names.resolve([orgA, orgB]);
+    });
+
+    await waitFor(() => scope().isLoaded);
+    expect(scope()).toMatchObject({
+      organizationId: 'org-b',
+      isLoaded: true,
+      selection: { status: 'organization', organizationId: 'org-b' },
+    });
+  });
+
+  it('does not recover from a hydrated list snapshot that misses the restored organization', async () => {
+    savedMetadata.set(ORG_KEY, 'org-b');
+    // A stale snapshot from the previous run that does not name the stored
+    // organization. Acting on it would switch the person off a membership the
+    // server still serves.
+    const seeded = createTestQueryClient();
+    seeded.setQueryData(['organizations-list'], [orgA]);
+    const names = Promise.withResolvers<OrgEntry[]>();
+    list.mockReset().mockReturnValue(names.promise);
+
+    await mount(seeded);
+
+    await waitFor(() => scope().selection.status === 'restored');
+    expect(scope()).toMatchObject({ organizationId: 'org-b', isLoaded: false, error: null });
+    // No switch to the snapshot's only membership, and no write of it.
+    expect(publications.some(value => value.id === 'org-a')).toBe(false);
+    expect(savedMetadata.get(ORG_KEY)).toBe('org-b');
+    expect(list).toHaveBeenCalledTimes(1);
+
+    await act(() => {
+      names.resolve([orgA, orgB]);
+    });
+
+    await waitFor(() => scope().isLoaded);
+    // The server still serves the membership, so the selection stands.
+    expect(scope()).toMatchObject({
+      organizationId: 'org-b',
+      selection: { status: 'organization', organizationId: 'org-b' },
+    });
+    expect(publications.some(value => value.id === 'org-a')).toBe(false);
   });
 
   it('publishes the stored id as unverified when the list fails, and promotes it after Retry', async () => {

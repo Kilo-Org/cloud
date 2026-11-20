@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  BENCHMARK_PLATFORM_PROJECT_ID,
   CustomRouterPoolPinsRequestSchema,
   PAID_BENCHMARK_PATH,
   benchmarkProjectId,
@@ -19,6 +20,7 @@ import type { HonoEnv } from './hono-env';
 import { ACTIVE_MEASUREMENT_REVISION, deciderCasesForRouter } from './measurement-revision';
 import {
   pauseUnfundedPaidRequests,
+  reconcilePaidBenchmarkRequests,
   reconcilePaidUsageReceipts,
   registerPaidBenchmarkRoutes,
 } from './paid-benchmark';
@@ -286,6 +288,33 @@ describe('paid benchmark endpoint', () => {
     );
     expect(result.status).toBe('quote_mismatch');
     expect(countRows('SELECT COUNT(*) AS count FROM paid_benchmark_requests')).toBe(0);
+  });
+
+  it('accepts a pin-only context change when the pool identity is unchanged', async () => {
+    // A settlement published a serving pin between quote and start: the context now carries
+    // it, but the measurement identity (and so `pool_version`) did not change. That must not
+    // invalidate a valid quote.
+    const quoted = await quote();
+    if (quoted.status !== 'ready') throw new Error('quote not ready');
+    const withPin = {
+      ...CONTEXT,
+      entries: [
+        {
+          kind: 'gateway' as const,
+          model: 'vendor/alpha',
+          servingPin: {
+            model: 'vendor/alpha',
+            pinnedAt: '2026-01-01T00:00:00.000Z',
+            confirmedAt: '2026-01-01T00:00:00.000Z',
+          },
+        },
+      ],
+    };
+    const started = await startResult(
+      await post(startRequest(quoted.id, { context: withPin as typeof CONTEXT }))
+    );
+    expect(started.status).toBe('started');
+    expect(countRows('SELECT COUNT(*) AS count FROM paid_benchmark_requests')).toBe(1);
   });
 
   it('rejects an expired quote', async () => {
@@ -649,12 +678,14 @@ describe('pause durability', () => {
     const raw = (await response.clone().json()) as { status?: string };
     expect(raw.status).toBe('paused');
     expect(requestRow()?.status).toBe('paused');
-    // The durable intent survives for the cron to redeliver.
+    // This request paused before any case run was claimed, so there is no running generation
+    // to cancel: the delivery attempt fails for its own reason and the committed pause stands
+    // with nothing to redeliver. No intent is invented for a generation that never started.
     expect(
       countRows(
         "SELECT COUNT(*) AS count FROM paid_benchmark_cancellations WHERE status = 'pending'"
       )
-    ).toBeGreaterThanOrEqual(0);
+    ).toBe(0);
   });
 
   it('pauses the latest live request without a request id and never stages on the read path', async () => {
@@ -782,6 +813,116 @@ describe('receipt reconciliation', () => {
     expect(seen).toHaveLength(0);
   });
 
+  it('books a platform-covered receipt through the reconciler and credits no owner', async () => {
+    // A covered call has no paying pool request; the reconciler must still book it (its
+    // native read reports the run's benchmark organization) and must not add to any owner's
+    // charged total.
+    const platformOrg = 'org-benchmark-platform';
+    sqlite
+      .prepare(
+        `INSERT INTO paid_model_requests
+          (id, engine_identity, model, variant, rep, case_id, generation, pool_request_id,
+            state, assignment_id, owner_type, owner_id, platform_covered, reason, api,
+            executor_user_id, project_id, usage_id, platform_organization_id,
+            created_at, updated_at)
+        VALUES ('cov-1', 'engine-test', ?, '', 0, 'case-a', 1, NULL, 'admitted', ?,
+          'user', 'user-1', 1, NULL, 'chat/completions', 'bot-internal-1', ?, ?, ?, ?, ?)`
+      )
+      .run(
+        MIXED_CASE_MODEL,
+        'ffff9999-9999-4999-8999-999999999999',
+        BENCHMARK_PLATFORM_PROJECT_ID,
+        'aaaa8888-8888-4888-8888-888888888888',
+        platformOrg,
+        '2026-01-01T00:00:00.000Z',
+        '2026-01-01T00:00:00.000Z'
+      );
+    // Two owners each staged this exact case, so the receipt has real round-trip owners it
+    // could be miscredited to. Any arbitrary-owner fallback would move one of these totals.
+    // Each owner saves their own pool, so each request carries its own active router id.
+    for (const [requestId, owner, routerId] of [
+      ['owner-req', 'user-1', '33333333-3333-4333-8333-333333333331'],
+      ['owner-req-2', 'user-2', '33333333-3333-4333-8333-333333333332'],
+    ]) {
+      sqlite
+        .prepare(
+          `INSERT INTO paid_benchmark_requests
+            (id, owner_type, owner_id, organization_id, router, router_id, pool_version,
+              engine_identity, status, quote_id, estimate_microdollars, maximum_microdollars,
+              charged_microdollars, plan_cases, staged_cases, pause_reason, actor_user_id,
+              context, created_at, updated_at, activated_at)
+          VALUES (?, 'user', ?, NULL, 'efficient', ?, 'v',
+            'engine-test', 'active', 'q', 100, 100, 0, 1, 1, NULL, ?, '{}',
+            '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z',
+            '2026-01-01T00:00:00.000Z')`
+        )
+        .run(requestId, owner, routerId, owner);
+      sqlite
+        .prepare(
+          `INSERT INTO paid_benchmark_request_cases
+            (request_id, engine_identity, model, variant, rep, case_id, status,
+              covered_by_kilo, charged_microdollars, reason, updated_at)
+          VALUES (?, 'engine-test', ?, '', 0, 'case-a', 'running', 0, 0, NULL,
+            '2026-01-01T00:00:00.000Z')`
+        )
+        .run(requestId, MIXED_CASE_MODEL);
+    }
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const request = new Request(input, init);
+      const body = BenchmarkUsageReceiptRequestSchema.parse(await request.json());
+      return new Response(
+        JSON.stringify({
+          receipts: body.usageIds.map(usageId => ({
+            usageId,
+            status: 'recorded',
+            microdollars: 90,
+            payerType: 'organization',
+            payerId: platformOrg,
+            projectId: BENCHMARK_PLATFORM_PROJECT_ID,
+            requestedModel: MIXED_CASE_MODEL.toLowerCase(),
+            model: MIXED_CASE_MODEL,
+            createdAt: '2026-01-01T00:00:00.000Z',
+          })),
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      );
+    };
+
+    const summary = await reconcilePaidUsageReceipts(paidBindings(db), { fetchImpl });
+    expect(summary).toMatchObject({ recorded: 1, mismatched: 0, pending: 0 });
+    const usage = sqlite
+      .prepare('SELECT usage_id, request_id, platform_covered, microdollars FROM paid_attempt_usage')
+      .all() as Array<Record<string, unknown>>;
+    expect(usage).toEqual([
+      {
+        usage_id: 'aaaa8888-8888-4888-8888-888888888888',
+        request_id: '',
+        platform_covered: 1,
+        microdollars: 90,
+      },
+    ]);
+    // Neither linked owner is credited: Kilo paid it, and the covered receipt carries no
+    // owning request at all.
+    expect(
+      sqlite
+        .prepare('SELECT id, charged_microdollars FROM paid_benchmark_requests ORDER BY id')
+        .all()
+    ).toEqual([
+      { id: 'owner-req', charged_microdollars: 0 },
+      { id: 'owner-req-2', charged_microdollars: 0 },
+    ]);
+    expect(
+      sqlite
+        .prepare(
+          'SELECT request_id, charged_microdollars FROM paid_benchmark_request_cases ORDER BY request_id'
+        )
+        .all()
+    ).toEqual([
+      { request_id: 'owner-req', charged_microdollars: 0 },
+      { request_id: 'owner-req-2', charged_microdollars: 0 },
+    ]);
+  });
+
   it('scans least-recently-checked first so older pending receipts are not starved', async () => {
     const projectId = benchmarkProjectId({ scope: 'user', slug: 'pool-one', routerId: ROUTER_ID });
     const oldUsage = 'cccc3333-3333-4333-8333-333333333333';
@@ -867,9 +1008,122 @@ describe('receipt reconciliation', () => {
     expect(countRows('SELECT COUNT(*) AS count FROM paid_attempt_usage')).toBe(
       countRows('SELECT COUNT(DISTINCT usage_id) AS count FROM paid_attempt_usage')
     );
+  });
+});
+
+describe('permanent launch refusal', () => {
+  /**
+   * A second, genuinely launchable request on its own saved pool: its own quote carrying the
+   * unchanged frozen plan, its own router id, and a real staged slot. It exists so a failure
+   * of the first request can be proven not to touch funded sibling work.
+   */
+  function seedLaunchableSibling(planJson: string) {
+    const requestId = 'sibling-request';
+    const quoteId = 'sibling-quote';
+    const at = '2026-01-01T00:00:00.000Z';
+    sqlite
+      .prepare(
+        `INSERT INTO paid_benchmark_quotes
+          (id, owner_type, owner_id, organization_id, router, router_id, pool_version,
+            engine_identity, context, plan, estimate_microdollars, maximum_microdollars,
+            plan_cases, expires_at, started_request_id, created_at, updated_at)
+        VALUES (?, 'user', 'user-2', NULL, 'efficient', ?, 'pool-v1', ?, '{}', ?, 100, 100, 0,
+          '2027-01-01T00:00:00.000Z', ?, ?, ?)`
+      )
+      .run(quoteId, '22222222-2222-4222-8222-222222222222', ENGINE, planJson, requestId, at, at);
+    sqlite
+      .prepare(
+        `INSERT INTO paid_benchmark_requests
+          (id, owner_type, owner_id, organization_id, router, router_id, pool_version,
+            engine_identity, status, quote_id, estimate_microdollars, maximum_microdollars,
+            charged_microdollars, plan_cases, staged_cases, pause_reason, actor_user_id,
+            context, created_at, updated_at, activated_at)
+        VALUES (?, 'user', 'user-2', NULL, 'efficient', ?, 'pool-v1', ?, 'active', ?, 100, 100,
+          0, 0, 0, NULL, 'user-2', '{}', ?, ?, ?)`
+      )
+      .run(requestId, '22222222-2222-4222-8222-222222222222', ENGINE, quoteId, at, at, at);
+    return requestId;
+  }
+
+  it('fails only the refused request and leaves a funded sibling untouched', async () => {
+    const quoted = await quote();
+    if (quoted.status !== 'ready') throw new Error('quote not ready');
+    const started = await startResult(await post(startRequest(quoted.id)));
+    if (started.status !== 'started' || started.request.status === 'empty')
+      throw new Error('start refused');
+    const requestId = started.request.id;
+    const planJson = (
+      sqlite.prepare('SELECT plan FROM paid_benchmark_quotes WHERE id = ?').get(quoted.id) as {
+        plan: string;
+      }
+    ).plan;
+    const siblingId = seedLaunchableSibling(planJson);
+    // Freeze a plan the engine will refuse: 1 repetition while it now runs 3.
+    const plan = JSON.parse(planJson) as Record<string, unknown>;
+    sqlite
+      .prepare('UPDATE paid_benchmark_quotes SET plan = ? WHERE id = ?')
+      .run(JSON.stringify({ ...plan, repetitions: 1 }), quoted.id);
+    sqlite
+      .prepare(`UPDATE paid_benchmark_requests SET status = 'active', updated_at = ? WHERE id = ?`)
+      .run('2026-01-01T00:00:00.000Z', requestId);
+    // A valid bot identity, so the refusal below is THIS plan's, not a deployment-wide config
+    // error (which stays retryable by design and is asserted separately).
+    sqlite.prepare(`UPDATE benchmark_config SET benchmark_user_id = 'bot-internal-1'`).run();
+
+    const summary = await reconcilePaidBenchmarkRequests(paidBindings(db));
+    expect(summary.failed).toEqual([requestId]);
+    const refused = sqlite
+      .prepare(
+        'SELECT status, failure_reason, failure_retryable FROM paid_benchmark_requests WHERE id = ?'
+      )
+      .get(requestId) as { status: string; failure_reason: string; failure_retryable: number };
+    expect(refused.status).toBe('failed');
+    expect(refused.failure_reason).toMatch(/confirmed for 1 repetitions but the engine now runs/);
+    expect(refused.failure_retryable).toBe(0);
+
+    // The sibling is untouched: still active, no charge, and it got its own run.
+    const sibling = sqlite
+      .prepare(
+        'SELECT status, charged_microdollars FROM paid_benchmark_requests WHERE id = ?'
+      )
+      .get(siblingId) as { status: string; charged_microdollars: number };
+    expect(sibling).toEqual({ status: 'active', charged_microdollars: 0 });
+    expect(countRows('SELECT COUNT(*) AS count FROM paid_attempt_usage')).toBe(0);
     expect(
-      countRows("SELECT COUNT(*) AS count FROM benchmark_case_runs WHERE status = 'running'")
-    ).toBeGreaterThanOrEqual(0);
+      sqlite
+        .prepare('SELECT COUNT(*) AS count FROM benchmark_runs WHERE purpose = ?')
+        .get('user')
+    ).not.toEqual({ count: 0 });
+  });
+
+  it('keeps a request active on a transient configuration fault', async () => {
+    const quoted = await quote();
+    if (quoted.status !== 'ready') throw new Error('quote not ready');
+    const started = await startResult(await post(startRequest(quoted.id)));
+    if (started.status !== 'started' || started.request.status === 'empty')
+      throw new Error('start refused');
+    const requestId = started.request.id;
+    sqlite
+      .prepare(`UPDATE paid_benchmark_requests SET status = 'active', updated_at = ? WHERE id = ?`)
+      .run('2026-01-01T00:00:00.000Z', requestId);
+    // A deployment-wide fault (non-bot executor override), not this request's plan: the request
+    // must stay active and retry, never be failed by a launch classification.
+    sqlite.prepare(`UPDATE benchmark_config SET benchmark_user_id = 'bench-user'`).run();
+
+    const summary = await reconcilePaidBenchmarkRequests(paidBindings(db));
+    expect(summary.failed).toEqual([]);
+    const request = sqlite
+      .prepare('SELECT status, failure_reason FROM paid_benchmark_requests WHERE id = ?')
+      .get(requestId) as { status: string; failure_reason: string | null };
+    expect(request).toEqual({ status: 'active', failure_reason: null });
+
+    // And once the fault is fixed the same request launches, so nothing was stranded.
+    sqlite.prepare(`UPDATE benchmark_config SET benchmark_user_id = 'bot-internal-1'`).run();
+    const retry = await reconcilePaidBenchmarkRequests(paidBindings(db));
+    expect(retry.failed).toEqual([]);
+    expect(
+      sqlite.prepare('SELECT status FROM paid_benchmark_requests WHERE id = ?').get(requestId)
+    ).toEqual({ status: 'active' });
   });
 });
 

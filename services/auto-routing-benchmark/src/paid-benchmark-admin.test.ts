@@ -93,6 +93,8 @@ function insertModelRequest(
     ownerId?: string;
     platformCovered?: boolean;
     state?: 'selecting' | 'admitted' | 'refused' | 'completed';
+    /** The pool request that pays this call; defaults to the fixture's main request. */
+    requestId?: string;
   } = {}
 ) {
   sqlite
@@ -107,7 +109,7 @@ function insertModelRequest(
       modelRequestId,
       ENGINE,
       caseId,
-      options.platformCovered ? null : REQUEST,
+      options.platformCovered ? null : (options.requestId ?? REQUEST),
       options.state ?? 'completed',
       options.ownerId ? `assignment-${modelRequestId}` : null,
       options.platformCovered ? null : (options.ownerType ?? 'user'),
@@ -306,6 +308,67 @@ describe('admin request reads', () => {
         { kind: 'platform', kiloCoveredModelRequests: 1, kiloCoveredMicrodollars: 300 },
       ])
     );
+  });
+
+  it('scopes a shared case to each payer without duplicating or hiding Kilo coverage', async () => {
+    // One case shared by a personal request (A) and a second personal request (B), plus a
+    // platform-covered call on it. Each admin row must show only its own payer's spend.
+    insertRequest();
+    insertRequest({ id: 'request-b', ownerId: 'u2', routerId: 'router-2' });
+    insertCase(REQUEST, 'case-shared', 'done');
+    insertCase('request-b', 'case-shared', 'done');
+    // A owns the pool call; B owns a separate call of its own on the same shared case.
+    insertModelRequest('model-request-a', 'case-shared', { ownerId: 'u1' });
+    insertModelRequest('model-request-b', 'case-shared', {
+      ownerId: 'u2',
+      requestId: 'request-b',
+    });
+    insertUsage('usage-a', 'model-request-a', 'case-shared', {
+      microdollars: 400,
+      ownerId: 'u1',
+    });
+    insertUsage('usage-b', 'model-request-b', 'case-shared', {
+      microdollars: 70,
+      ownerId: 'u2',
+      requestId: 'request-b',
+    });
+    // Kilo covered one call of the shared case: neither owner is charged for it, and both
+    // requests still see that the case was covered.
+    insertModelRequest('model-request-cov', 'case-shared', {
+      platformCovered: true,
+      state: 'completed',
+      requestId: 'request-b',
+    });
+    insertUsage('usage-cov', 'model-request-cov', 'case-shared', {
+      microdollars: 250,
+      platformCovered: true,
+      // A covered call belongs to no pool request.
+      requestId: '',
+    });
+
+    const listed = await listPaidBenchmarkAdminRequests(db, { router: 'efficient' });
+    const a = listed.requests.find(entry => entry.id === REQUEST);
+    const b = listed.requests.find(entry => entry.id === 'request-b');
+    if (!a || !b) throw new Error('expected both requests');
+
+    // Alpha sees its own 400 only; Bravo's 70 is not duplicated onto it, and neither is
+    // the shared case's spend multiplied by the number of staged requests.
+    expect(a.chargedMicrodollars).toBe(400);
+    expect(a.billedModelRequests).toBe(1);
+    // Only A's own model request is a payer of A; B's request is not in A's list.
+    expect(a.payers.filter(payer => payer.kind === 'user')).toHaveLength(1);
+    expect(a.payers[0]).toMatchObject({ ownerId: 'u1', chargedMicrodollars: 400 });
+    // Alpha's own call was the paid one, so it shows no Kilo coverage.
+    expect(a.kiloCoveredMicrodollars).toBe(0);
+
+    expect(b.chargedMicrodollars).toBe(70);
+    expect(b.billedModelRequests).toBe(1);
+    expect(b.payers.filter(payer => payer.kind === 'user')).toHaveLength(1);
+    expect(b.payers[0]).toMatchObject({ ownerId: 'u2', chargedMicrodollars: 70 });
+    // A covered call has no paying pool request, so it is not attributed to either owner's
+    // payer rows: neither request gains a platform payer row of its own.
+    expect(a.payers.map(payer => payer.kind)).not.toContain('platform');
+    expect(b.payers.map(payer => payer.kind)).not.toContain('platform');
   });
 
   it('maps an organization owner to the shared org kind', async () => {

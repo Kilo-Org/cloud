@@ -2438,6 +2438,70 @@ describe('progress', () => {
   });
 });
 
+describe('review regressions', () => {
+  let sqlite: DatabaseSync;
+  let db: D1Database;
+
+  beforeEach(async () => {
+    sqlite = new DatabaseSync(':memory:');
+    applyBenchmarkMigrations(sqlite);
+    db = sqliteD1(sqlite);
+    seedRun(sqlite, 'run-1');
+    seedChunk(sqlite, { chunkId: 'chunk-1', runId: 'run-1', token: 'token-1', slot: 1 });
+    await seedRequest(db, 'request-a', alice);
+    await enqueue(db, 'request-a');
+    await claim(db, { runId: 'run-1', token: 'token-1' });
+  });
+
+  it('books a platform-covered receipt and leaves every owner total untouched', async () => {
+    const run = await caseRun(db);
+    await db.batch(platformCoverageStatements(db, { key: key() }));
+    const paid = await payModelRequest(db, {
+      generation: run.generation,
+      modelRequestId: UUID_1,
+      assignmentId: ASSIGNMENT_1,
+      platformOrganizationId: 'org-benchmark',
+    });
+    await acceptUsage(db, {
+      assignmentId: paid.assignmentId,
+      usageId: USAGE_1,
+      owner: alice,
+      microdollars: 90,
+      generation: run.generation,
+      projectId: PLATFORM_PROJECT_ID,
+      platformOrganizationId: 'org-benchmark',
+    });
+    const usage = usageOf(sqlite);
+    expect(usage).toHaveLength(1);
+    // A covered call belongs to no pool request, so it can never credit an owner's total.
+    expect(usage[0]).toMatchObject({ request_id: '', platform_covered: 1 });
+    expect(
+      sqlite.prepare('SELECT SUM(charged_microdollars) AS total FROM paid_benchmark_requests').get()
+    ).toEqual({ total: 0 });
+  });
+
+  it('rotates the ordinal on this model request only, not other requests trails', async () => {
+    const run = await caseRun(db);
+    // Another model request with a long trail must not inflate this one's ordinal.
+    await payModelRequest(db, {
+      generation: run.generation,
+      modelRequestId: UUID_2,
+      assignmentId: ASSIGNMENT_2,
+    });
+    const selected = await selectModelRequest(db, {
+      generation: run.generation,
+      modelRequestId: UUID_1,
+      assignmentId: ASSIGNMENT_1,
+    });
+    expect(selected?.state).toBe('selecting');
+    const trail = sqlite
+      .prepare(`SELECT ordinal, status FROM paid_model_request_attempts WHERE model_request_id = ?`)
+      .get(UUID_1) as Record<string, unknown>;
+    // First attempt for this request: ordinal 0, regardless of the other trail.
+    expect(trail).toEqual({ ordinal: 0, status: 'selected' });
+  });
+});
+
 describe('shared case progress attribution', () => {
   let sqlite: DatabaseSync;
   let db: D1Database;

@@ -166,7 +166,13 @@ FROM paid_attempt_usage u`;
  * refused candidate keeps its trail in `paid_model_request_attempts`: that is where the
  * detach / no-funds reason comes from, and it never bills.
  */
-const MODEL_REQUEST_KEYS = `m.engine_identity = rc.engine_identity
+/**
+ * A model request belongs to the request that actually pays it (`pool_request_id`), never
+ * to every request that staged the same shared case. Joining by case key duplicated a
+ * shared case's payer and spend across unrelated owner rows; this correlation is exact.
+ */
+const MODEL_REQUEST_KEYS = `m.pool_request_id = rc.request_id
+  AND m.engine_identity = rc.engine_identity
   AND m.model = rc.model
   AND m.variant = rc.variant
   AND m.rep = rc.rep

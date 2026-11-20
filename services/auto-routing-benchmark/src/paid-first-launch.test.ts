@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { ACTIVE_MEASUREMENT_REVISION, deciderCasesForRouter } from './measurement-revision';
-import { computeEngineIdentity, startPaidRequestRun } from './run';
+import { BenchmarkPaidPlanError, computeEngineIdentity, startPaidRequestRun } from './run';
 
 /**
  * A first paid request for a pool the platform has never measured — the R09 case. On real
@@ -397,6 +397,9 @@ describe('first paid request for an unmeasured pair (production migrations)', ()
       .prepare('UPDATE paid_benchmark_quotes SET plan = ? WHERE id = ?')
       .run(JSON.stringify({ ...frozenPlan, repetitions: 1 }), 'quote-first');
 
+    // A typed refusal, not a message match: callers classify by class so a deployment-wide
+    // config error can never be mistaken for a permanent plan refusal.
+    await expect(startPaidRequestRun(env, requestId)).rejects.toThrow(BenchmarkPaidPlanError);
     await expect(startPaidRequestRun(env, requestId)).rejects.toThrow(
       /confirmed for 1 repetitions but the engine now runs 3/
     );

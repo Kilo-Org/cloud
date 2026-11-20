@@ -32,7 +32,12 @@ import {
 import type { Hono } from 'hono';
 import { fetchBenchmarkModelCatalog, catalogModelVariants } from './platform-models';
 import type { HonoEnv } from './hono-env';
-import { computeEngineIdentity, deliverPaidCaseCancellations, startPaidRequestRun } from './run';
+import {
+  BenchmarkPaidPlanError,
+  computeEngineIdentity,
+  deliverPaidCaseCancellations,
+  startPaidRequestRun,
+} from './run';
 import {
   acceptPaidAttemptUsageStatements,
   activatePaidBenchmarkRequestStatements,
@@ -397,19 +402,82 @@ async function activateIfFullyStaged(
   if (activated.status !== 'active') return activated;
   // Activation is what admits the pre-planned work: the paid run measures exactly the staged
   // slots of this explicitly confirmed request. Idempotent by its deterministic run id, so a
-  // failure here is retried by the next reconcile instead of starting anything twice.
+  // retryable failure is retried by the next reconcile instead of starting anything twice.
+  await launchPaidRun(env, activated.id);
+  return (await readPaidBenchmarkRequest(env.BENCH_DB, activated.id)) ?? activated;
+}
+
+/**
+ * Start one paid request's run and classify a failure, so an `active` request can never sit
+ * forever with no run and no reason.
+ *
+ * - `started`: a run exists for this request.
+ * - `attached`: every pair is claimed by another live run (`pairs_claimed`); the cases are
+ *   being measured and this request will reuse them. Not a failure.
+ * - `retryable`: the launch threw. That is infrastructure (storage, queue wake), so the
+ *   request stays `active` and the next reconcile retries the same deterministic run id.
+ * - `failed`: the launcher declined to create the run for a reason retrying cannot fix. The
+ *   request is failed with a non-retryable reason so the owner sees it.
+ *
+ * The launch is scoped to this request's own deterministic run id, so no sibling request's
+ * funded work is touched by any of these outcomes.
+ */
+async function launchPaidRun(
+  env: PaidBenchmarkEnv,
+  requestId: string
+): Promise<'started' | 'attached' | 'retryable' | 'failed'> {
+  let outcome: Awaited<ReturnType<typeof startPaidRequestRun>>;
   try {
-    await startPaidRequestRun(env, activated.id);
+    outcome = await startPaidRequestRun(env, requestId);
   } catch (error) {
+    // Only a typed refusal of THIS request's frozen plan is permanent: the same plan will be
+    // refused forever, so retrying only hides it. Missing config, a non-bot executor override
+    // and storage faults are NOT this type, so they stay retryable until they are fixed.
+    if (error instanceof BenchmarkPaidPlanError) {
+      console.warn(
+        JSON.stringify({
+          event: 'benchmark_paid_run_config_refused',
+          requestId,
+          error: error.message,
+        })
+      );
+      // The refusal is only visible if the row actually transitions. A failed write leaves the
+      // request active with its durable work intact, so report retryable and let the next pass
+      // retry both the write and the classification.
+      const written = await env.BENCH_DB.batch(
+        failPaidBenchmarkRequestStatements(env.BENCH_DB, {
+          requestId,
+          reason: error.message,
+          retryable: false,
+        })
+      ).then(
+        result => Number(result[0]?.meta.changes ?? 0) > 0,
+        () => false
+      );
+      if (!written) {
+        console.warn(
+          JSON.stringify({ event: 'benchmark_paid_plan_refusal_unsaved', requestId })
+        );
+        return 'retryable';
+      }
+      return 'failed';
+    }
     console.warn(
       JSON.stringify({
         event: 'benchmark_paid_run_start_failed',
-        requestId: activated.id,
+        requestId,
         error: error instanceof Error ? error.message : 'unknown',
       })
     );
+    return 'retryable';
   }
-  return (await readPaidBenchmarkRequest(env.BENCH_DB, activated.id)) ?? activated;
+  if (outcome.runId !== null) return 'started';
+  if (outcome.skipped.includes('pairs_claimed')) return 'attached';
+  // Every other skip is benign for this request: it is already settled (`nothing_left`,
+  // `already_ready`), not live (`request_not_active`), already launched (`run_exists`), or
+  // waiting on capacity (`queue_full`). None of them strand the request, so none of them is
+  // a failure — a later reconcile resumes or the request settles on its own.
+  return 'attached';
 }
 
 /**
@@ -536,7 +604,16 @@ async function startPaidBenchmark(
     return { status: 'quote_mismatch', reason: 'plan_unreadable' };
   if (planSlotCount(plan) !== quote.plan_cases)
     return { status: 'quote_mismatch', reason: 'plan_cases_changed' };
-  if (quote.pool_version !== input.poolVersion || quote.context !== stableStringify(input.context))
+  // Identity only: `pool_version` is `customRouterPoolIdentity`, a hash of exactly the
+  // measurement identity (base router, default entry, and each entry's model / measuredAs /
+  // provider / variants, sorted by entry key). Owner and router id are NOT part of it; they
+  // are checked independently above, before this comparison. It deliberately excludes
+  // `servingPin`, pricing, capabilities and `updated_at`, so a settlement publishing a pin
+  // (or a no-op client re-registration) no longer invalidates a valid quote. The raw
+  // context is still stored for progress and table reads; comparing it here would make a
+  // pin-only write read as `pool_changed`. A genuine alias → concrete move changes the
+  // identity, so that mismatch is preserved.
+  if (quote.pool_version !== input.poolVersion)
     return { status: 'quote_mismatch', reason: 'pool_changed' };
   // The project id is frozen in the plan; the authenticated slug and router must still derive
   // exactly it, so a replayed quote can never attribute usage to another pool's project.
@@ -849,6 +926,9 @@ export async function reconcilePaidUsageReceipts(
           caseId: row.case_id,
           generation: row.generation,
           projectId: row.project_id,
+          // The store's covered branch compares the signed paying organization exactly;
+          // omitting it makes every covered receipt match zero rows and never book.
+          platformOrganizationId: platformCovered ? platformOrgId : null,
         },
         now: options.now,
       })
@@ -1087,15 +1167,9 @@ export async function reconcilePaidBenchmarkRequests(
       // An active request must have its (deterministic, idempotent) paid run. A crash between
       // activation and run creation, or a lost run, is repaired here; a paused or failed
       // request never reaches this branch, so nothing auto-resumes a user or credit pause.
-      await startPaidRequestRun(env, current.id).catch(error => {
-        console.warn(
-          JSON.stringify({
-            event: 'benchmark_paid_run_resume_failed',
-            requestId: current.id,
-            error: error instanceof Error ? error.message : 'unknown',
-          })
-        );
-      });
+      // The same classification as the click path: a permanent plan refusal becomes a visible
+      // failed request instead of an `active` row that silently does nothing forever.
+      await launchPaidRun(env, current.id);
       current = (await readPaidBenchmarkRequest(env.BENCH_DB, current.id)) ?? current;
       summary.staged += 1;
       // A resumed run may already have finished every slot (or the run may have completed

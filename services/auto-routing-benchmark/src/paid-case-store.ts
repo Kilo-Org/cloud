@@ -953,8 +953,10 @@ export function selectPaidModelRequestPayerStatements(
         SELECT model.id, ?, COALESCE(model.owner_type, 'user'),
           COALESCE(model.owner_id, ''), COALESCE(model.pool_request_id, ''),
           'selected', NULL,
+          -- Rotation is by this model request's own attempts: counting other requests'
+          -- trails would make the ordinal depend on unrelated traffic.
           (SELECT COUNT(*) FROM paid_model_request_attempts AS prior
-           WHERE prior.model_request_id <> model.id), ?, ?
+           WHERE prior.model_request_id = model.id), ?, ?
         FROM paid_model_requests AS model
         WHERE model.id = ? AND model.state = 'selecting'
         ON CONFLICT DO NOTHING`
@@ -1218,15 +1220,8 @@ export function acceptPaidAttemptUsageStatements(
     )
     AND NOT EXISTS (SELECT 1 FROM paid_attempt_usage AS prior
       WHERE prior.model_request_id = model.id)
-    AND (
-      model.pool_request_id IS NOT NULL
-      OR EXISTS (
-        SELECT 1 FROM paid_benchmark_request_cases AS staged
-        WHERE staged.engine_identity = model.engine_identity
-          AND staged.model = model.model AND staged.variant = model.variant
-          AND staged.rep = model.rep AND staged.case_id = model.case_id
-      )
-    )`;
+    -- A pool call must belong to a request; a covered call is Kilo's and belongs to none.
+    AND (model.platform_covered = 1 OR model.pool_request_id IS NOT NULL)`;
   return [
     db
       .prepare(
@@ -1235,13 +1230,10 @@ export function acceptPaidAttemptUsageStatements(
           case_id, generation, owner_type, owner_id, microdollars, platform_covered, created_at
         )
         SELECT model.usage_id, model.id,
-          COALESCE(model.pool_request_id, (
-            SELECT staged.request_id FROM paid_benchmark_request_cases AS staged
-            WHERE staged.engine_identity = model.engine_identity
-              AND staged.model = model.model AND staged.variant = model.variant
-              AND staged.rep = model.rep AND staged.case_id = model.case_id
-            ORDER BY staged.request_id LIMIT 1
-          )), model.engine_identity,
+          -- A covered call has no paying pool request: it carries the empty request id so
+          -- it can never credit any owner's charged total (attribution for progress reads
+          -- this row by case key, not by request).
+          COALESCE(model.pool_request_id, ''), model.engine_identity,
           model.model, model.variant, model.rep, model.case_id, model.generation,
           COALESCE(model.owner_type, 'organization'),
           COALESCE(model.owner_id, model.platform_organization_id, 'platform'),
@@ -1283,7 +1275,7 @@ export function acceptPaidAttemptUsageStatements(
             ), 0),
           updated_at = ?
         WHERE id = (
-          SELECT request_id FROM paid_attempt_usage WHERE usage_id = ?
+          SELECT NULLIF(request_id, '') FROM paid_attempt_usage WHERE usage_id = ?
         )`
       )
       .bind(at, input.usageId),

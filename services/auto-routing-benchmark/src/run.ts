@@ -1104,6 +1104,20 @@ export class BenchmarkRunConfigError extends Error {
   }
 }
 
+/**
+ * This request's frozen plan can never be launched: its repetitions, engine identity,
+ * measurement revision or plan payload no longer match the engine. Distinct from
+ * {@link BenchmarkRunConfigError}, which also covers deployment-wide misconfiguration
+ * (missing config, a non-bot executor override) that an operator can fix and that must
+ * stay retryable for the request.
+ */
+export class BenchmarkPaidPlanError extends BenchmarkRunConfigError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BenchmarkPaidPlanError';
+  }
+}
+
 // A saved non-bot identity override is an admin configuration error (400),
 // resolved before any claim or run row so nothing has to be rolled back.
 export function resolveRunIdentity(config: BenchmarkIdentityOverrides): BenchmarkIdentity {
@@ -4720,7 +4734,7 @@ export async function startPaidRequestRun(
   const identity = resolveRunIdentity(config);
   const engineIdentity = computeEngineIdentity('decider', router);
   if (request.engine_identity !== engineIdentity) {
-    throw new BenchmarkRunConfigError(
+    throw new BenchmarkPaidPlanError(
       'Paid benchmark request was quoted for a different engine identity.'
     );
   }
@@ -4732,21 +4746,21 @@ export async function startPaidRequestRun(
     .first<{ plan: string }>();
   const frozenPlan = planRow ? PaidBenchmarkPlanSchema.safeParse(JSON.parse(planRow.plan)) : null;
   if (!frozenPlan?.success) {
-    throw new BenchmarkRunConfigError('Paid benchmark request has no readable frozen plan.');
+    throw new BenchmarkPaidPlanError('Paid benchmark request has no readable frozen plan.');
   }
   if (frozenPlan.data.repetitions !== policy.deciderRepetitions) {
-    throw new BenchmarkRunConfigError(
+    throw new BenchmarkPaidPlanError(
       `Paid benchmark request was confirmed for ${frozenPlan.data.repetitions} repetitions but the engine now runs ${policy.deciderRepetitions}.`
     );
   }
   if (frozenPlan.data.engineIdentity !== engineIdentity) {
-    throw new BenchmarkRunConfigError('Paid benchmark request was quoted for a stale engine.');
+    throw new BenchmarkPaidPlanError('Paid benchmark request was quoted for a stale engine.');
   }
   // The plan's measurement revision is what its reuse and case slots were priced against. A
   // launch under a different active revision would measure a different case set, so it is
   // rejected before any claim: the owner must take a fresh quote.
   if (frozenPlan.data.revision !== ACTIVE_MEASUREMENT_REVISION) {
-    throw new BenchmarkRunConfigError(
+    throw new BenchmarkPaidPlanError(
       `Paid benchmark request was confirmed at measurement revision ${frozenPlan.data.revision} but the engine now measures revision ${ACTIVE_MEASUREMENT_REVISION}.`
     );
   }

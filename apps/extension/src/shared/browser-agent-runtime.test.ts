@@ -5965,7 +5965,7 @@ describe('the download hold on a real call', () => {
 
     // Both files of the measured gesture are `Document` requests, so the set of this call's documents names neither:
     // Only their order does. The click's own link is requested first, and the page script's file follows. Here the
-    // browser stops the script's file first, which is what the failing trace showed.
+    // Browser stops the script's file first, which is what the failing trace showed.
     cdp.setHandlers({
       'Input.dispatchMouseEvent': params => {
         if (params?.['type'] === 'mousePressed') {
@@ -6036,7 +6036,9 @@ describe('the download hold on a real call', () => {
       target: { kind: 'url', url: own.url },
     });
     // The sibling was stopped on both gestures; the step's own file was cancelled only on the guarded one.
-    expect([...downloads.cancelled].sort()).toStrictEqual([81, 82, 84]);
+    expect([...downloads.cancelled].toSorted((left, right) => left - right)).toStrictEqual([
+      81, 82, 84,
+    ]);
     // The approved file was let through, never stopped, and the sibling was stopped again and reported.
     expect(suggested).toStrictEqual([83, 84]);
     expect(String(approved.result.ok ? approved.result.value : '')).toContain('second.txt');

@@ -5053,7 +5053,7 @@
   },
   "organizationGuardrails": {
     "title": "Ráillí Cosanta AI",
-    "permissionDenied": "Ní féidir ach le húinéirí agus riarthóirí na heagraíochta Ráillí Cosanta AI a bhainistiú.",
+    "permissionDenied": "Ní féidir ach le húinéirí agus riarthóirí na heagraíochta Ráillí Cosanta AI a bhainistiú. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Níl Ráillí Cosanta AI cumasaithe",
     "unavailable": "Cumasaíonn Kilo Ráillí Cosanta AI d'eagraíocht ar iarratas. Déan teagmháil le {{supportEmail}}, agus déanfaidh foireann Kilo iad a chur ar siúl d'eagraíocht.",
     "contactSupport": "Déan teagmháil leis an bhfoireann tacaíochta",

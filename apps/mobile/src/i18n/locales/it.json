@@ -4901,7 +4901,7 @@
   },
   "organizationGuardrails": {
     "title": "Protezioni AI",
-    "permissionDenied": "Solo i proprietari e gli amministratori dell'organizzazione possono gestire le Protezioni AI.",
+    "permissionDenied": "Solo i proprietari e gli amministratori dell'organizzazione possono gestire le Protezioni AI. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Protezioni AI non abilitate",
     "unavailable": "Kilo abilita le Protezioni AI per un'organizzazione su richiesta. Contatta {{supportEmail}} e il team Kilo le attiva per la tua organizzazione.",
     "contactSupport": "Contatta l'assistenza",

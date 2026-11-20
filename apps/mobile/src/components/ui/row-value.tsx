@@ -42,7 +42,9 @@ export type RowValueSpec = Readonly<{
 
 /**
  * The value text a row paints at its trailing edge, shared by the row frame and
- * `KvRow`.
+ * `KvRow`. `below` is the value under its label (a `KvRow` at a large font
+ * scale): it has the row's full width, reads from the start edge and may take a
+ * second line.
  */
 export function RowValue({
   text,
@@ -55,12 +57,17 @@ export function RowValue({
   accessibilityLabel,
   className,
   status,
-}: RowValueSpec) {
+  placement = 'trailing',
+}: RowValueSpec & Readonly<{ placement?: 'trailing' | 'below' }>) {
+  const below = placement === 'below';
   // Android's `selectable` routes the value through ReactTextView, which drops
   // the `maxLines` clamp on attach; a clamped selectable value then wraps past
   // the row and paints a clipped second line. A selectable value therefore
   // wraps inside the row instead of being clamped.
-  const lineLimit = selectable ? undefined : 1;
+  let lineLimit: number | undefined = below ? 2 : 1;
+  if (selectable) {
+    lineLimit = undefined;
+  }
   return (
     <Text
       variant={face === 'mono' ? 'mono' : 'default'}
@@ -70,7 +77,8 @@ export function RowValue({
       ellipsizeMode={lineLimit === undefined ? undefined : ellipsizeMode}
       style={direction === 'ltr' ? LTR_TEXT_DIRECTION : undefined}
       className={cn(
-        'min-w-0 text-right text-[13px]',
+        'min-w-0 text-[13px]',
+        !below && 'text-right',
         shrink ? 'shrink' : 'shrink-0',
         face === 'numeric' && 'tabular-nums',
         ROW_VALUE_TONE[tone],

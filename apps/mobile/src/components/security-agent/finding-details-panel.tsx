@@ -4,6 +4,7 @@ import {
   getFindingSeverityPresentation,
   getSecurityDeadlinePresentation,
   getSupersedingFindingId,
+  isSupersededFinding,
 } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
 import { ExternalLink, GitMerge } from '@/components/ui/icons';
@@ -153,7 +154,12 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
     (deadline.state.kind === 'fixed' && !deadline.state.beforeDeadline)
       ? null
       : deadlineCopy;
-  const supersedingFindingId = getSupersedingFindingId(finding);
+  // A superseding reference only counts while the row is still ignored, so the
+  // badge, the date row and the note below cannot disagree with the rest of the
+  // panel about the same finding.
+  const supersedingFindingId = isSupersededFinding(finding)
+    ? getSupersedingFindingId(finding)
+    : null;
   // A code the app does not know yet reads as the raw code, the same way
   // packages/app-shared renders it for web. A word like "Unknown" would hide
   // which value the backend actually sent.

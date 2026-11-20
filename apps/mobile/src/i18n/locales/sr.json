@@ -4901,7 +4901,7 @@
   },
   "organizationGuardrails": {
     "title": "VI zaštitne mere",
-    "permissionDenied": "Samo vlasnici i administratori organizacije mogu da upravljaju VI zaštitnim merama.",
+    "permissionDenied": "Samo vlasnici i administratori organizacije mogu da upravljaju VI zaštitnim merama. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "VI zaštitne mere nisu omogućene",
     "unavailable": "Kilo omogućava VI zaštitne mere za organizaciju na zahtev. Kontaktirajte {{supportEmail}}, a Kilo tim ih uključuje za vašu organizaciju.",
     "contactSupport": "Kontaktiraj podršku",

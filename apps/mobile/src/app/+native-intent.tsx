@@ -272,9 +272,9 @@ export function redirectSystemPath({
       return profilePickerRoute;
     }
     // Dev-only Buy credits rows against fixed store answers
-    // (`dev/credits-pack-prices-fixture/<priced|partly-priced|completing|unresolved|legacy-unresolved|refused-unresolved|waiting|pending|failed>`).
+    // (`dev/credits-pack-prices-fixture/<priced|partly-priced|priced-expiring|completing|unresolved|legacy-unresolved|refused-unresolved|waiting|pending|failed>`).
     const creditsPackPrices =
-      /(?:^|\/)dev\/credits-pack-prices-fixture\/(priced|partly-priced|completing|unresolved|legacy-unresolved|refused-unresolved|waiting|pending|failed)\/?$/.exec(
+      /(?:^|\/)dev\/credits-pack-prices-fixture\/(priced|partly-priced|priced-expiring|completing|unresolved|legacy-unresolved|refused-unresolved|waiting|pending|failed)\/?$/.exec(
         path
       );
     if (creditsPackPrices) {

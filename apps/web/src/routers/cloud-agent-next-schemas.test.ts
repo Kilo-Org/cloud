@@ -707,6 +707,52 @@ describe('basePrepareSessionNextSchema cloneFromKiloSessionId union', () => {
     expect(result.success).toBe(true);
   });
 
+  it.each(['   ', '\n'])('rejects a blank launch prompt %j as required', prompt => {
+    for (const schema of [
+      basePrepareSessionNextSchema,
+      personalPrepareSessionNextSchema,
+      organizationPrepareSessionNextSchema,
+    ]) {
+      const input = {
+        githubRepo: 'acme/repo',
+        prompt,
+        mode: 'code',
+        model: 'kilo/test-model',
+        organizationId: MESSAGE_UUID,
+      };
+      const result = schema.safeParse(input);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const issue = result.error.issues.find(entry => entry.message === 'Prompt is required');
+        expect(issue?.path).toEqual(['prompt']);
+      }
+    }
+  });
+
+  it('rejects a blank prompt-type initialPayload and accepts a real one', () => {
+    const baseInput = {
+      githubRepo: 'acme/repo',
+      prompt: 'Continue',
+      mode: 'code',
+      model: 'kilo/test-model',
+    };
+    const blank = basePrepareSessionNextSchema.safeParse({
+      ...baseInput,
+      initialPayload: { type: 'prompt', prompt: '  ', mode: 'code', model: 'm' },
+    });
+    expect(blank.success).toBe(false);
+    if (!blank.success) {
+      const issue = blank.error.issues.find(entry => entry.message === 'Prompt is required');
+      expect(issue?.path).toEqual(['initialPayload', 'prompt']);
+    }
+    expect(
+      basePrepareSessionNextSchema.safeParse({
+        ...baseInput,
+        initialPayload: { type: 'prompt', prompt: 'Do the work', mode: 'code', model: 'm' },
+      }).success
+    ).toBe(true);
+  });
+
   it('drops a client environmentId: the server resolves the environment from the repository', () => {
     const result = personalPrepareSessionNextSchema.parse({
       githubRepo: 'acme/repo',

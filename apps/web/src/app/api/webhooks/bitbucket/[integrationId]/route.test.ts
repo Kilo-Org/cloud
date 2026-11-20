@@ -62,7 +62,9 @@ import {
   organization_memberships,
   organizations,
   platform_integrations,
+  webhook_event_signatures,
   webhook_events,
+  webhook_events_v2,
   type Organization,
   type PlatformIntegration,
   type User,
@@ -289,8 +291,8 @@ async function organizationReviews() {
 async function organizationWebhookEvents() {
   return db
     .select()
-    .from(webhook_events)
-    .where(eq(webhook_events.owned_by_organization_id, organization.id));
+    .from(webhook_events_v2)
+    .where(eq(webhook_events_v2.owned_by_organization_id, organization.id));
 }
 
 function readinessFor(integration: PlatformIntegration) {
@@ -360,6 +362,18 @@ describe('POST /api/webhooks/bitbucket/[integrationId]', () => {
         )
       );
     }
+    const storedEvents = await organizationWebhookEvents();
+    if (storedEvents.length > 0) {
+      await db.delete(webhook_event_signatures).where(
+        inArray(
+          webhook_event_signatures.event_signature,
+          storedEvents.map(event => event.event_signature)
+        )
+      );
+    }
+    await db
+      .delete(webhook_events_v2)
+      .where(eq(webhook_events_v2.owned_by_organization_id, organization.id));
     await db
       .delete(webhook_events)
       .where(eq(webhook_events.owned_by_organization_id, organization.id));
@@ -610,6 +624,81 @@ describe('POST /api/webhooks/bitbucket/[integrationId]', () => {
     expect(reviews.map(review => review.id)).toEqual([existingReviewId]);
     expect((await organizationWebhookEvents())[0]?.processed).toBe(true);
     expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+  });
+
+  // Until the pre-partitioning table ages out, a delivery first accepted before
+  // the switch is only stored there.
+  async function insertLegacyEvent(
+    integration: PlatformIntegration,
+    options: { eventSignature: string; processed: boolean; updatedOn?: string }
+  ) {
+    const identity = {
+      integrationId: integration.id,
+      workspaceUuid: WORKSPACE_UUID,
+      repositoryUuid: REPOSITORY_UUID,
+      pullRequestNumber: PULL_REQUEST_ID,
+    };
+    const [event] = await db
+      .insert(webhook_events)
+      .values({
+        owned_by_organization_id: organization.id,
+        owned_by_user_id: null,
+        platform: 'bitbucket',
+        event_type: 'pullrequest',
+        event_action: 'created',
+        payload: options.updatedOn ? { ...identity, updatedOn: options.updatedOn } : identity,
+        headers: {},
+        processed: options.processed,
+        event_signature: options.eventSignature,
+      })
+      .returning();
+    if (!event) throw new Error('legacy webhook event insert returned no row');
+    return event;
+  }
+
+  it('completes a redelivery whose event is only in the pre-partitioning table', async () => {
+    const integration = await insertIntegrationAndConfig();
+    const hookUuid = randomUUID();
+    const requestUuid = randomUUID();
+    const legacyEvent = await insertLegacyEvent(integration, {
+      eventSignature: `bitbucket:${hookUuid}:${requestUuid}`,
+      processed: false,
+    });
+    mockFetchBitbucketPullRequest.mockResolvedValueOnce(providerPullRequest());
+
+    const response = await callWebhook(
+      integration,
+      webhookRequest(integration, { hookUuid, requestUuid })
+    );
+
+    expect(response.status).toBe(202);
+    const [storedLegacyEvent] = await db
+      .select()
+      .from(webhook_events)
+      .where(eq(webhook_events.id, legacyEvent.id));
+    expect(storedLegacyEvent).toEqual(expect.objectContaining({ processed: true, errors: null }));
+    await expect(organizationWebhookEvents()).resolves.toHaveLength(0);
+    await expect(organizationReviews()).resolves.toHaveLength(1);
+  });
+
+  it('ignores a delayed observation older than one processed in the pre-partitioning table', async () => {
+    const integration = await insertIntegrationAndConfig();
+    await insertLegacyEvent(integration, {
+      eventSignature: `bitbucket:${randomUUID()}:${randomUUID()}`,
+      processed: true,
+      updatedOn: '2026-06-24T14:00:00.000Z',
+    });
+    mockFetchBitbucketPullRequest.mockResolvedValueOnce(
+      providerPullRequest({ updatedOn: '2026-06-24T13:00:00.000Z' })
+    );
+
+    const response = await callWebhook(integration, webhookRequest(integration));
+
+    expect(response.status).toBe(200);
+    await expect(organizationReviews()).resolves.toHaveLength(0);
+    const events = await organizationWebhookEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0]?.processed).toBe(true);
   });
 
   it('keeps the newer processed observation when a delayed older observation arrives', async () => {

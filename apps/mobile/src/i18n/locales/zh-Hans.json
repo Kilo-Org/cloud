@@ -4825,7 +4825,7 @@
   },
   "organizationGuardrails": {
     "title": "人工智能护栏",
-    "permissionDenied": "只有组织所有者和管理员可以管理人工智能护栏。",
+    "permissionDenied": "只有组织所有者和管理员可以管理人工智能护栏。$t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "未启用人工智能护栏",
     "unavailable": "Kilo 可根据请求为组织启用人工智能护栏。请联系 {{supportEmail}}，Kilo 团队会为你的组织开启。",
     "contactSupport": "联系技术支持",

@@ -176,7 +176,6 @@ function classifyOutcome(state: AdmissionState, status: number): NativeTokenOutc
         : 'request_rejected';
     case 'passed':
       if (status === 200) return 'token_issued';
-      if (status === 400) return 'request_rejected';
       if (status >= 500) return 'failed_after_admission';
       return 'refused_after_admission';
     case 'none':

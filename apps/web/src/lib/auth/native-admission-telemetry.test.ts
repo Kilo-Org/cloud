@@ -234,6 +234,14 @@ describe('startNativeTokenTelemetry', () => {
     });
   });
 
+  test('classifies a bad request after proof acceptance as a later refusal', () => {
+    const telemetry = startNativeTokenTelemetry(mobileRequest());
+    telemetry.admissionPassed('android');
+    telemetry.emit(400);
+
+    expect(lines()[0]).toMatchObject({ admission: 'passed', outcome: 'refused_after_admission' });
+  });
+
   test('an unrecorded stage surfaces as a wiring regression, not a refusal', () => {
     const telemetry = startNativeTokenTelemetry(mobileRequest());
     telemetry.emit(200);

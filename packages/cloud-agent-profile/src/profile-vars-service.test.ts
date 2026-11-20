@@ -8,9 +8,9 @@ const OWNER: ProfileOwner = { type: 'user', id: 'user_test' };
 const PUBLIC_KEY = '';
 
 const { publicKey: rsaPublicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
-const RSA_PUBLIC_KEY = Buffer.from(
-  rsaPublicKey.export({ type: 'spki', format: 'pem' })
-).toString('base64');
+const RSA_PUBLIC_KEY = Buffer.from(rsaPublicKey.export({ type: 'spki', format: 'pem' })).toString(
+  'base64'
+);
 
 function storedKeys(count: number): string[] {
   return Array.from({ length: count }, (_, index) => `VAR_${String(index)}`);

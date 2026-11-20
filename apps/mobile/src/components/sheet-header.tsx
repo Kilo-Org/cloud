@@ -9,6 +9,7 @@ import {
   type ViewInstance,
 } from 'react-native';
 
+import { useSheetToastHeader } from '@/components/sheet-toast-host';
 import { Share, X } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import {
@@ -150,6 +151,8 @@ export function SheetHeader({
   const clearance = useSheetHeaderTopClearance(topInset);
   const { clearance: topInsetHeight, onLayout: handleSurfaceLayout } =
     useSettledSheetHeaderTopClearance({ topInset, clearance, surfaceRef });
+  // The sheet's toast sits below this header, so it never covers its actions.
+  const reportToastHeaderLayout = useSheetToastHeader(surfaceRef);
   // Resolved at render so each platform reads its own pair, through the same
   // helper the sheets that draw their own title row use.
   const underHandlePadding = sheetUnderHandlePaddingClass('header');
@@ -196,7 +199,10 @@ export function SheetHeader({
     // flattened header breaks that native pass and the list paints over it.
     <View
       ref={surfaceRef}
-      onLayout={handleSurfaceLayout}
+      onLayout={() => {
+        handleSurfaceLayout();
+        reportToastHeaderLayout?.();
+      }}
       collapsable={false}
       className={cn(
         'border-b border-border px-4',

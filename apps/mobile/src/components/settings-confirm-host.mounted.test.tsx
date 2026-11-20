@@ -1,5 +1,5 @@
 import { Effect, Fiber } from 'effect';
-import { createElement, Fragment, type ReactNode } from 'react';
+import { createElement, Fragment } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -18,61 +18,6 @@ import {
 
 import { PortalHost } from '@rn-primitives/portal';
 import { SettingsConfirmHost } from './settings-confirm-host';
-
-// `@rn-primitives/portal@1.5.3` ships untranspiled JSX (`dist/index.mjs`), which
-// no Node-side test transformer parses — the same limit `vitest.setup.ts`
-// records for `@rn-primitives/dialog`. This stand-in keeps the module's
-// contract instead of passing children straight through: `Portal` renders
-// nothing and hands its children to the host from an effect, and `PortalHost`
-// renders what that store holds. A pass-through would put the dialog back in
-// its caller's subtree and hide the placement this suite pins.
-vi.mock('@rn-primitives/portal', async () => {
-  const React = await import('react');
-
-  const entries = new Map<string, ReactNode>();
-  const listeners = new Set<() => void>();
-  let snapshot: ReactNode[] = [];
-
-  function emit(): void {
-    snapshot = [...entries.values()];
-    for (const listener of listeners) {
-      listener();
-    }
-  }
-
-  function subscribe(listener: () => void): () => void {
-    listeners.add(listener);
-    return () => {
-      listeners.delete(listener);
-    };
-  }
-
-  function getSnapshot(): ReactNode[] {
-    return snapshot;
-  }
-
-  function Portal({ name = 'default', children }: { name?: string; children?: ReactNode }) {
-    React.useEffect(() => {
-      entries.set(name, children);
-      emit();
-    }, [name, children]);
-    React.useEffect(
-      () => () => {
-        entries.delete(name);
-        emit();
-      },
-      [name]
-    );
-    return null;
-  }
-
-  function Host() {
-    const children = React.useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-    return children.length === 0 ? null : React.createElement(React.Fragment, null, ...children);
-  }
-
-  return { Portal, PortalHost: Host };
-});
 
 vi.mock('react-native', () => ({
   // Sheet registers the app-level Android Back listener while it is visible.

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { User, Building2, Plus, Users, AlertCircle, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useCreateOrganization } from '@/app/api/organizations/hooks';
+import { FIRST_ORGANIZATION_TRIAL_OFFER } from '@/lib/organization-trial-offer';
 import type { WorkspaceSelection } from './types';
 
 type WorkspaceSelectorProps = {
@@ -174,7 +175,7 @@ export function WorkspaceSelector({ onSelect }: WorkspaceSelectorProps) {
                       Create New Organization
                     </CardTitle>
                     <CardDescription className="text-sm">
-                      Share Kilo for Slack with your team
+                      {FIRST_ORGANIZATION_TRIAL_OFFER}
                     </CardDescription>
                   </div>
                 </CardContent>

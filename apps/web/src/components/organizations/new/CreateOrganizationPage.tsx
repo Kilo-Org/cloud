@@ -26,6 +26,7 @@ import { hasVisibleText } from '@kilocode/app-shared/text';
 import { motion, AnimatePresence } from 'motion/react';
 import { useCreateOrganization } from '@/app/api/organizations/hooks';
 import { SubscriptionsSeatQuantitySchema } from '@/app/payments/subscriptions/types';
+import { FIRST_ORGANIZATION_TRIAL_OFFER } from '@/lib/organization-trial-offer';
 import Link from 'next/link';
 
 const CreateOrganizationSchema = z.object({
@@ -144,6 +145,7 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
         <h1 className="mb-2 text-3xl font-bold lg:text-4xl">
           Create an organization for Kilo Enterprise
         </h1>
+        <p className="text-muted-foreground mb-2">{FIRST_ORGANIZATION_TRIAL_OFFER}</p>
         <Link
           href="/get-started/personal"
           className="text-foreground text-lg underline underline-offset-4 hover:opacity-80"

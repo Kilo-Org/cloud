@@ -2,6 +2,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 import { Building2, Users, PiggyBank } from 'lucide-react';
 import { NewOrganizationButton } from '@/components/organizations/new/NewOrganizationButton';
+import { FIRST_ORGANIZATION_TRIAL_OFFER } from '@/lib/organization-trial-offer';
 import { OrganizationsList } from './OrganizationsList';
 import type { OrganizationCardOrg } from '@/components/organizations/OrganizationCard';
 
@@ -80,7 +81,7 @@ export function NoOrganizationsState() {
 
             {canMakeOrgs ? (
               <div>
-                <p className="mb-4 text-center">Set up Kilo for your team</p>
+                <p className="mb-4 text-center">{FIRST_ORGANIZATION_TRIAL_OFFER}</p>
                 <div className="flex justify-center">
                   <NewOrganizationButton />
                 </div>

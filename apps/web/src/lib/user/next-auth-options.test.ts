@@ -382,6 +382,8 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
         )
       );
     expect(row?.is_enabled).toBe(true);
+    expect(row?.chatgpt_account_fingerprint).toMatch(/^[a-f0-9]{64}$/);
+    expect(token).not.toHaveProperty('chatgpt_account_fingerprint');
   });
 
   test('persists an organization connection when the profile carries the organization', async () => {

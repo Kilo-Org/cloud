@@ -10,7 +10,7 @@ import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { removeUserClaudeBillingGrants } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { WORKOS_API_KEY } from '@kilocode/web-shared/lib/config.server';
-import { clearOpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
+import { disconnectOpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import { deleteUserClaudeProfiles } from '@/lib/claude-billing/delete';
 import { WorkOS } from '@workos-inc/node';
 import type { User } from '@kilocode/db/schema';
@@ -1018,7 +1018,9 @@ export async function linkAccountToExistingUser(
         extra: {
           existing_user_id: existingKiloUserId,
           provider_email: authProviderData.google_user_email,
-          provider_account_id: authProviderData.provider_account_id,
+          ...(authProviderData.provider === 'openai'
+            ? {}
+            : { provider_account_id: authProviderData.provider_account_id }),
           error_code: linkResult.error,
         },
       });
@@ -1685,9 +1687,8 @@ export async function anonymizeCloudUserData(
   await tx.delete(user_github_app_tokens).where(eq(user_github_app_tokens.kilo_user_id, userId));
   await tx.delete(byok_api_keys).where(eq(byok_api_keys.kilo_user_id, userId));
   // Only the connections this person owns: the organization's shared-services
-  // row is the organization's connection, so it stays behind and only loses the
-  // reference to the connector who is being deleted. `created_by` keeps the
-  // record of who connected it, and the next reconnect names the new connector.
+  // row belongs to the organization, so it stays behind without the connector's
+  // user reference or ChatGPT fingerprint. The next reconnect names the new connector.
   // Until an owner reconnects it, the organization's shared connection reports
   // that it needs a reconnect.
   await tx
@@ -1700,7 +1701,7 @@ export async function anonymizeCloudUserData(
     );
   await tx
     .update(openai_chatgpt_connections)
-    .set({ kilo_user_id: null })
+    .set({ kilo_user_id: null, chatgpt_account_fingerprint: null })
     .where(
       and(
         eq(openai_chatgpt_connections.kilo_user_id, userId),
@@ -2628,7 +2629,7 @@ export async function unlinkAuthProviderFromUser(
   // account's BYOK setting and survives this unlink; the member disconnects it
   // from the organization BYOK page.
   if (provider === 'openai') {
-    await clearOpenAiChatGptConnection({ kiloUserId, organizationId: null });
+    await disconnectOpenAiChatGptConnection({ kiloUserId, organizationId: null });
   }
 
   return successResult();

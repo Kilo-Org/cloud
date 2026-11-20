@@ -7895,7 +7895,8 @@ export const openai_chatgpt_connections = pgTable(
     organization_id: uuid().references(() => organizations.id, {
       onDelete: 'cascade',
     }),
-    encrypted_connection: jsonb().$type<EncryptedData>().notNull(),
+    encrypted_connection: jsonb().$type<EncryptedData>(),
+    chatgpt_account_fingerprint: text(),
     is_enabled: boolean().default(true).notNull(),
     /**
      * True for the organization's shared-services connection: one row per
@@ -7935,6 +7936,9 @@ export const openai_chatgpt_connections = pgTable(
       .on(table.organization_id)
       .where(sql`${table.is_shared_services} = true`),
     index('IDX_openai_chatgpt_connections_organization_id').on(table.organization_id),
+    index('IDX_openai_chatgpt_connections_account_fingerprint').on(
+      table.chatgpt_account_fingerprint
+    ),
   ]
 );
 

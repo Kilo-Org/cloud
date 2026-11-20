@@ -9,7 +9,7 @@ import {
   type TRPCContext,
 } from '@kilocode/web-shared/lib/trpc/init';
 import {
-  clearOpenAiChatGptConnection,
+  disconnectOpenAiChatGptConnection,
   readOpenAiChatGptUsageLimit,
   getOpenAiChatGptConnection,
   getOpenAiChatGptStoredConnectionFromPrimary,
@@ -167,7 +167,7 @@ export const openAiChatGptRouter = createTRPCRouter({
     .output(OpenAiChatGptStatusSchema)
     .mutation(async ({ ctx, input }): Promise<OpenAiChatGptStatus> => {
       const owner = await resolveOwner(ctx, input.organizationId, input.scope);
-      await clearOpenAiChatGptConnection(owner);
+      await disconnectOpenAiChatGptConnection(owner);
       return readStatus(owner);
     }),
 });

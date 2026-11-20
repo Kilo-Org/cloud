@@ -91,12 +91,19 @@ describe('stripQueryString', () => {
     );
   });
 
-  it('keeps a single-label host with a port and drops a query value carrying an at-sign', () => {
-    const procedure = ['x', 'y'].join('.');
-    const url = `https://host:3000${TRPC_PATH}${procedure}?email=${MEMBER}`;
+  it('reads a single-label authority with a port as userinfo', () => {
+    // A single label with a numeric port is also the shape a numeric-leading
+    // userinfo pair takes, so it keeps the reading that removes userinfo.
+    const url = `https://host:3000${TRPC_PATH}${['x', 'y'].join('.')}?email=${MEMBER}`;
 
-    expect(stripQueryString(url)).toBe(`https://host:3000${TRPC_PATH}${procedure}`);
-    expect(trpcProcedureText(url)).toBe(procedure);
+    expect(stripQueryString(url)).toBe(`https://${HOST}`);
+  });
+
+  it('keeps origin and path when the userinfo spans a separator and a delimiter', () => {
+    const userinfo = ['user', ['ab', 'cd'].join('/')].join(':');
+    const url = `https://${userinfo}?${['ef', HOST].join('@')}${TRPC_PATH_FIXTURE}`;
+
+    expect(stripQueryString(url)).toBe(`https://${HOST}${TRPC_PATH_FIXTURE}`);
   });
 
   it('keeps an IPv4 authority with a port and drops a query value carrying an at-sign', () => {

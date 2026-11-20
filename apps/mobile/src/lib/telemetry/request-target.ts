@@ -36,8 +36,9 @@ const REGISTERED_NAME =
 /**
  * Whether an authority segment reads as a host: a bracketed IPv6 literal, an
  * IPv4 literal, `localhost`, or a dotted registered name, each with an optional
- * port. A single label is not a host here: it reads as a userinfo pair just as
- * easily, and the value that reaches telemetry must not depend on that guess.
+ * port. A single label, with or without a numeric port, is not a host here: it
+ * reads as a userinfo pair just as easily, so the authority keeps the reading
+ * that removes the userinfo rather than the one that reports it.
  */
 function isHostLike(text: string): boolean {
   return (
@@ -67,10 +68,9 @@ export function stripQueryString(url: string): string {
     // the text is a plain origin and path.
     //
     // A run that carries a ':' may be either userinfo or an authority with a
-    // port, so the delimiter is read against the run's shape. The authority
-    // closes at a delimiter when the run before it reads as a host, and a query
-    // or fragment closes it once a path has begun. Any other run is userinfo,
-    // so the authority continues past the delimiter.
+    // port. The first delimiter decides which: a run that reads as a host there
+    // closes the authority at every delimiter, and any other run is userinfo, so
+    // the authority continues past the delimiter and ends at its last `@`.
     let lastAt = -1;
     let colonBefore = false;
     for (let i = schemeEnd; i < url.length; i += 1) {
@@ -79,14 +79,11 @@ export function stripQueryString(url: string): string {
         lastAt = i;
       } else if (c === ':') {
         colonBefore = true;
-      } else if (c === '/' || c === '?' || c === '#') {
-        const candidate = url.slice(schemeEnd, i);
-        // A path has already begun, so a query or fragment after it is a query
-        // or fragment, whatever an `@` inside it looks like.
-        const pastPath = c !== '/' && candidate.includes('/');
-        if (lastAt !== -1 || !colonBefore || pastPath || isHostLike(candidate)) {
-          break;
-        }
+      } else if (
+        (c === '/' || c === '?' || c === '#') &&
+        (lastAt !== -1 || !colonBefore || isHostLike(url.slice(schemeEnd, i)))
+      ) {
+        break;
       }
     }
     if (lastAt === -1) {

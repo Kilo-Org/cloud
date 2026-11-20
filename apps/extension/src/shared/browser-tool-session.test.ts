@@ -1918,7 +1918,8 @@ describe('browser tool session scripting backend', () => {
     expect(isolatedKinds).toStrictEqual(['frame']);
   });
 
-  it('splices from the call’s frame inventory instead of probing the frames again', async () => {
+  it('resolves the hosted frame from the frames read after the snapshot, not the call’s earlier inventory', async () => {
+    // The inventory was read before the snapshot ran; this fake says it saw no iframe at all.
     const { isolatedKinds, session } = createFramedScriptingSession();
     const readFrames = vi.fn(() =>
       Promise.resolve({
@@ -1929,7 +1930,7 @@ describe('browser tool session scripting backend', () => {
           { id: '4', origin: PAY_ORIGIN, parentId: '0', url: `${PAY_ORIGIN}/` },
         ],
         owners: new Map<string, readonly (string | undefined)[]>([
-          ['0', ['4']],
+          ['0', []],
           ['4', []],
         ]),
       })
@@ -1950,8 +1951,8 @@ describe('browser tool session scripting backend', () => {
         '  - textbox [ref=e4]',
       ].join('\n'),
     });
-    expect(readFrames.mock.calls).toStrictEqual([[]]);
-    expect(isolatedKinds).toStrictEqual([]);
+    // Frame owners come from a read taken after the snapshot, so they align with the lines it printed.
+    expect(isolatedKinds).toStrictEqual(['frame']);
   });
 
   it('makes every scripting ref stale once the tab starts loading another document', async () => {

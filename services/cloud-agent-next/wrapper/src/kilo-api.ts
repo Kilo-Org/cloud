@@ -273,9 +273,17 @@ export async function hasOutstandingRuleset(sessionId: string): Promise<boolean>
  * The native session update appends rules instead of replacing them, so a
  * ruleset a record already holds must not be sent again.
  */
-const storedRulesetSchema = z.array(
-  z.object({ permission: z.string(), pattern: z.string(), action: z.string() })
-);
+const permissionRuleSchema = z.object({
+  permission: z.string(),
+  pattern: z.string(),
+  action: z.string(),
+});
+
+/** The parts of a session read that decide whether an apply is still owed. */
+const storedSessionSchema = z.object({
+  directory: z.string(),
+  permission: z.array(permissionRuleSchema).optional(),
+});
 
 /** True when every rule of `permission` is already present in `stored`. */
 function rulesetCovers(
@@ -293,25 +301,39 @@ function rulesetCovers(
 }
 
 /**
+ * What a session read says about a ruleset the caller wants to apply. The
+ * record's directory is part of the answer: an update scoped to this route's
+ * directory does not reach a record stored under another one.
+ */
+type StoredRuleset = 'absent' | 'holds' | 'missing';
+
+/**
  * A record that does not exist, and a read that cannot answer, leave the caller
  * free to update: the update reports the real failure itself.
  */
-async function recordCarriesRuleset(
+async function storedRulesetFor(
   sessionId: string,
-  read: () => Promise<{ data?: { permission?: unknown }; error?: unknown; response?: Response }>,
+  directory: string,
+  read: () => Promise<{ data?: unknown; error?: unknown; response?: Response }>,
   permission: PermissionRuleset
-): Promise<boolean> {
+): Promise<StoredRuleset> {
   try {
     const current = await read();
-    if (current.response?.status === 404) return false;
-    const data = requireSdkData(current, `Session get for ${sessionId}`);
-    // The read is unvalidated JSON, so a stored ruleset is parsed before any
-    // rule of it is compared.
-    const stored = storedRulesetSchema.safeParse(data.permission);
-    if (!stored.success) return false;
-    return rulesetCovers(stored.data, permission);
+    if (current.response?.status === 404) return 'absent';
+    // The read is unvalidated JSON, so the parts the decision uses are parsed.
+    const record = storedSessionSchema.safeParse(
+      requireSdkData(current, `Session get for ${sessionId}`)
+    );
+    // A record under another directory is not this route's session: its rules
+    // belong to that directory, and the import re-points it separately.
+    if (!record.success || !(await sameDirectory(record.data.directory, directory))) {
+      return 'absent';
+    }
+    const stored = record.data.permission;
+    if (stored === undefined) return 'missing';
+    return rulesetCovers(stored, permission) ? 'holds' : 'missing';
   } catch {
-    return false;
+    return 'missing';
   }
 }
 
@@ -773,10 +795,11 @@ export function createWrapperKiloClient(
         // A marker that cannot be cleared is retried by the next prepare, whose
         // check finds the stored rules and does not duplicate them.
         const clearMarker = () => forgetOutstandingRuleset(sessionId).catch(() => undefined);
-        const carriesRuleset = () => {
+        const settled = () => {
           const readTimeout = AbortSignal.timeout(8_000);
-          return recordCarriesRuleset(
+          return storedRulesetFor(
             sessionId,
+            directory,
             () =>
               v2Client.session.get(
                 { sessionID: sessionId, directory },
@@ -785,7 +808,7 @@ export function createWrapperKiloClient(
             permission
           );
         };
-        if (await carriesRuleset()) {
+        if ((await settled()) === 'holds') {
           await clearMarker();
           return;
         }
@@ -800,7 +823,7 @@ export function createWrapperKiloClient(
             if (signal?.aborted) break;
             // A failed attempt may still have applied the update, so check the
             // record before repeating it and never store the ruleset twice.
-            if (await carriesRuleset()) {
+            if ((await settled()) === 'holds') {
               await clearMarker();
               return;
             }
@@ -921,23 +944,23 @@ export function createWrapperKiloClient(
           { sessionID: sessionId, directory },
           { signal: signal ? AbortSignal.any([signal, readTimeout]) : readTimeout }
         );
-      // A record that already holds the rules is not updated again, because
-      // the update appends them; the marker is cleared instead. A marker that
-      // cannot be cleared is retried by the next prepare, which then finds the
-      // stored rules and does not duplicate them.
-      if (await recordCarriesRuleset(sessionId, read, owed)) {
-        await forgetOutstandingRuleset(sessionId).catch(() => undefined);
-        return;
+      const stored = await storedRulesetFor(sessionId, directory, read, owed);
+      // A record under another directory belongs to that directory until the
+      // import re-points it, and an absent record has nothing to apply to, so
+      // the marker stays for the create path in both cases.
+      if (stored === 'absent') return;
+      // A record that already holds the rules is not updated again, because the
+      // update appends them; the marker is cleared instead. A marker that cannot
+      // be cleared is retried by the next prepare, which then finds the stored
+      // rules and does not duplicate them.
+      if (stored === 'missing') {
+        const restoreTimeout = AbortSignal.timeout(8_000);
+        const restored = await v2Client.session.update(
+          { sessionID: sessionId, directory, permission: owed },
+          { signal: signal ? AbortSignal.any([signal, restoreTimeout]) : restoreTimeout }
+        );
+        requireSdkData(restored, `Session permission restore for ${sessionId}`);
       }
-      const restoreTimeout = AbortSignal.timeout(8_000);
-      const restored = await v2Client.session.update(
-        { sessionID: sessionId, directory, permission: owed },
-        { signal: signal ? AbortSignal.any([signal, restoreTimeout]) : restoreTimeout }
-      );
-      // The record does not exist, so there is nothing to apply to; the marker
-      // stays for the create path that re-imports the record.
-      if (restored.response?.status === 404) return;
-      requireSdkData(restored, `Session permission restore for ${sessionId}`);
       await forgetOutstandingRuleset(sessionId).catch(() => undefined);
     },
 

@@ -1225,7 +1225,7 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       }
     });
 
-    it('keeps the marker when the settle finds no record', async () => {
+    it('keeps the marker when the settle finds no record under the route directory', async () => {
       const sessionId = 'ses_record_permission_settle_absent';
       const directory = temporaryDirectory('kilo-api-permission-settle-absent-');
       const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
@@ -1235,7 +1235,32 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
 
         await createClient(stub.url).settleOutstandingRuleset(sessionId, directory);
 
-        expect(stub.updates).toHaveLength(1);
+        // There is nothing to apply to, so the create path keeps the obligation.
+        expect(stub.updates).toHaveLength(0);
+        expect(await readOutstandingRuleset(sessionId)).toEqual(permission);
+      } finally {
+        await forgetOutstandingRuleset(sessionId);
+      }
+    });
+
+    it('keeps the marker when the record belongs to another directory', async () => {
+      const sessionId = 'ses_record_permission_settle_foreign';
+      const directory = temporaryDirectory('kilo-api-permission-settle-foreign-');
+      const otherDirectory = temporaryDirectory('kilo-api-permission-settle-foreign-other-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      await rememberOutstandingRuleset(sessionId, permission);
+      try {
+        // The record still names the other directory and carries the rules, but
+        // it is not this route's record, so the obligation is not yet met.
+        const stub = startEnsureSessionStub(sessionId, {
+          id: sessionId,
+          directory: otherDirectory,
+          permission,
+        });
+
+        await createClient(stub.url).settleOutstandingRuleset(sessionId, directory);
+
+        expect(stub.updates).toHaveLength(0);
         expect(await readOutstandingRuleset(sessionId)).toEqual(permission);
       } finally {
         await forgetOutstandingRuleset(sessionId);

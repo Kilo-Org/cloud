@@ -72,7 +72,7 @@
     "findings": "Problèmes détectés",
     "mergeRequest": "requête de fusion",
     "notConnected": "Non connecté",
-    "notifications": "Alertes et notifications",
+    "notifications": "Alertes & notifications",
     "pullRequest": "PR",
     "repositories": "Dépôts",
     "securityAgent": "Agent de sécurité",
@@ -508,7 +508,7 @@
     "changelogFixesPolish": "Corrections et améliorations dans toute l'application.",
     "changelogAreas": {
       "signIn": "Connexion",
-      "profileOrganizations": "Profil et organisations"
+      "profileOrganizations": "Profil & organisations"
     }
   },
   "notifications": {

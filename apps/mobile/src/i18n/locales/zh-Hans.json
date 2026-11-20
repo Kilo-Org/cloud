@@ -507,7 +507,7 @@
     "changelogFixesPolish": "全应用范围的修复与改进。",
     "changelogAreas": {
       "signIn": "登录",
-      "profileOrganizations": "个人资料和组织"
+      "profileOrganizations": "个人资料与组织"
     }
   },
   "preferences": {

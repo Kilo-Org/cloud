@@ -504,10 +504,10 @@
     "changelogVersionPending": "वर्शन {{version}} के नोट्स अगले ऐप अपडेट के साथ आएंगे।",
     "changelogGroupNew": "नया",
     "changelogFixesIn": "{{areas}} में त्रुटि-सुधार और बेहतरी।",
-    "changelogFixesPolish": "पूरे ऐप में त्रुटि-सुधार और बेहतरी।",
+    "changelogFixesPolish": "त्रुटि-सुधार और बेहतरी।",
     "changelogAreas": {
       "signIn": "साइन-इन",
-      "profileOrganizations": "प्रोफ़ाइल और संगठन"
+      "profileOrganizations": "प्रोफ़ाइल व संगठन"
     }
   },
   "preferences": {
@@ -1753,7 +1753,7 @@
       "profileSaved": "प्रोफ़ाइल \"{{name}}\" सहेजी गई",
       "organizationProfiles": "संगठन प्रोफ़ाइल",
       "personalProfiles": "व्यक्तिगत प्रोफ़ाइल",
-      "yourProfiles": "आपकी प्रोफ़ाइल",
+      "yourProfiles": "आपकी प्रोफ़ाइलें",
       "nameTooLong": "प्रोफ़ाइल नाम बहुत लंबा है",
       "descriptionTooLong": "विवरण बहुत लंबा है",
       "secretsEncrypted": "भंडारण से पहले रहस्य एन्क्रिप्ट किए जाते हैं।",
@@ -1892,11 +1892,11 @@
       "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
     },
     "modeOptions": {
-      "code": "कोड लिखें",
+      "code": "कोड",
       "plan": "योजना",
-      "debug": "डीबग करें",
+      "debug": "डीबग",
       "orchestrator": "समन्वयक",
-      "ask": "पूछें",
+      "ask": "प्रश्न",
       "codeDescription": "कोड लिखें और बदलें",
       "planDescription": "समाधानों की योजना और डिज़ाइन बनाएँ",
       "debugDescription": "समस्याएँ खोजें और ठीक करें",
@@ -1967,7 +1967,7 @@
       "deliveryInterrupted": "आपने यह संदेश रोक दिया।",
       "deliveryExhausted": "कई कोशिशों के बाद भी हम यह संदेश नहीं पहुँचा सके।",
       "deliveryExecution": "एजेंट इस संदेश पर काम नहीं कर सका।",
-      "assistantTitle": "उत्तर नहीं मिल सका।",
+      "assistantTitle": "उत्तर विफल रहा।",
       "assistantProviderRejected": "प्रदाता ने अनुरोध अस्वीकार कर दिया।",
       "assistantStopped": "उत्तर देना रोक दिया गया।",
       "assistantContextOverflow": "मॉडल के लिए बातचीत बहुत लंबी है।",
@@ -1976,7 +1976,7 @@
       "assistantCreditsRefusal": "इस अनुरोध के लिए पर्याप्त क्रेडिट नहीं हैं।",
       "assistantOutputLimit": "उत्तर मॉडल की आउटपुट सीमा तक पहुँच गया।",
       "assistantStructuredOutput": "उत्तर आवश्यक फ़ॉर्मैट से मेल नहीं खाता।",
-      "assistantFailed": "उत्तर नहीं मिल सका।"
+      "assistantFailed": "उत्तर विफल रहा।"
     },
     "filePart": {
       "loadingImage": "छवि लोड हो रही है",
@@ -2054,7 +2054,7 @@
       "detailRestoreIncompleteMore": "{{listed}} और {{omitted}} और",
       "detailReasonPatchFailed": "पैच लागू नहीं हुआ",
       "detailReasonOutsideWorkspace": "पाथ वर्कस्पेस के बाहर है",
-      "detailReasonMissingContent": "स्नैपशॉट में फ़ाइल की कोई कंटेंट नहीं थी",
+      "detailReasonMissingContent": "स्नैपशॉट में फ़ाइल का कोई कंटेंट नहीं था",
       "detailReasonIndexResetFailed": "विफल एप्लाई के बाद इंडेक्स रीसेट नहीं हो सका",
       "detailReasonUnlinkFailed": "फ़ाइल हटाई नहीं जा सकी",
       "detailReasonWriteFailed": "फ़ाइल लिखी नहीं जा सकी",
@@ -2081,10 +2081,10 @@
     "permissionCard": {
       "title": "अनुमति आवश्यक",
       "allowQuestion": "{{permission}} की अनुमति दें?",
-      "subjectExternalDirectory": "प्रोजेक्ट के बाहर की निर्देशिका",
-      "subjectDoomLoop": "एक ही टूल कॉल दोहराना",
+      "subjectExternalDirectory": "प्रोजेक्ट के बाहर की निर्देशिका तक पहुँच",
+      "subjectDoomLoop": "एक ही टूल कॉल का दोहराव",
       "subjectAgentManager": "सबएजेंट प्रबंधन",
-      "subjectSandboxEscalation": "सैंडबॉक्स के बाहर आदेश चलाना",
+      "subjectSandboxEscalation": "होस्ट एक्सेस",
       "appliesTo": "इन पर लागू:",
       "denyPermission": "अनुमति न दें",
       "deny": "अस्वीकार करें",
@@ -2130,7 +2130,7 @@
     },
     "childSession": {
       "accessibilityLabel": "एजेंट {{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "सत्रों के भीतर सत्र बनाने की अधिकतम सीमा पूरी हो गई है।",
+      "maxNestingDepth": "अधिकतम नेस्टिंग गहराई पूरी हो गई है।",
       "modelAccessibility": "मॉडल: {{modelLabel}}",
       "openHint": "सबएजेंट का सत्र खोलें",
       "subagent": "सबएजेंट",
@@ -2220,7 +2220,7 @@
       "onlyAddingFiles": "{{total}} में से केवल {{accepted}} फ़ाइलें जोड़ी जा रही हैं (अधिकतम {{max}})",
       "maxFilesAllowed_one": "ज़्यादा से ज़्यादा {{displayCount}} फ़ाइल जोड़ सकते हैं।",
       "maxFilesAllowed_other": "ज़्यादा से ज़्यादा {{displayCount}} फ़ाइलें जोड़ सकते हैं।",
-      "onlyAddingFiles_one": "{{total}} में से केवल {{accepted}} फ़ाइलें जोड़ी जा रही हैं (अधिकतम {{max}})",
+      "onlyAddingFiles_one": "{{total}} में से केवल {{accepted}} फ़ाइल जोड़ी जा रही है (अधिकतम {{max}})",
       "onlyAddingFiles_other": "{{total}} में से केवल {{accepted}} फ़ाइलें जोड़ी जा रही हैं (अधिकतम {{max}})"
     },
     "composer": {
@@ -2301,7 +2301,7 @@
       "windowUnavailable": "संदर्भ विंडो का आकार उपलब्ध नहीं",
       "tapToViewDetails": " संदर्भ का विवरण देखने के लिए टैप करें।",
       "costClause": ", लागत {{cost}}",
-      "loadingCostSpoken": "लागत {{cost}}।",
+      "loadingCostSpoken": "अब तक की लागत {{cost}}।",
       "tokensWindowUnavailable": "संदर्भ में {{used}} टोकन, विंडो का आकार उपलब्ध नहीं{{costClause}}।",
       "tokensUsage": "संदर्भ में {{window}} में से {{used}} टोकन, {{percentage}} उपयोग हुआ{{costClause}}।",
       "cacheRate": "कैश दर",
@@ -2326,7 +2326,7 @@
       "totalCost": "कुल लागत",
       "usageReflectsLatest": "यह उपयोग सहायक के सबसे हाल में पूरे हुए उत्तर पर आधारित है।",
       "usageUnavailable": "संदर्भ उपयोग अनुपलब्ध है{{costClause}}।",
-      "used": "उपयोग हुआ",
+      "used": "उपयोग किया गया",
       "modelsCount_one": "मॉडल ({{displayCount}})",
       "modelsCount_other": "मॉडल ({{displayCount}})"
     },
@@ -2416,7 +2416,7 @@
       "unavailable": "यह सत्र अनुमति अनुरोध प्राप्त नहीं कर सकता।"
     },
     "prBadge": {
-      "open": "पुल रिक्वेस्ट खोलें",
+      "open": "खुली पुल रिक्वेस्ट",
       "closed": "बंद पुल रिक्वेस्ट",
       "merged": "मर्ज की गई पुल रिक्वेस्ट",
       "draft": "ड्राफ़्ट पुल रिक्वेस्ट",

@@ -598,7 +598,7 @@
     "changelogFixesPolish": "Bug fixes and polish.",
     "changelogAreas": {
       "signIn": "Sign-in",
-      "profileOrganizations": "Profile and organizations"
+      "profileOrganizations": "Profile & organizations"
     },
     "changelogVersionPending": "The notes for {{version}} arrive with the next app update."
   },

@@ -26,8 +26,10 @@ import {
   LEGAL_LINK_ROW_CLASS,
 } from '@/lib/a11y/tap-target';
 import { isolateLtrBidiText } from '@/lib/bidi';
+import { getNextCreditExpiry } from '@/lib/credits/credit-expiry';
 import { getStoreUnavailableCopyKeys } from '@/lib/credits/store-products-loader';
 import {
+  getStoreCreditExpiryCaption,
   getStoreCreditExpiryMessageKey,
   type StoreCreditProduct,
 } from '@/lib/credits/store-products';
@@ -206,17 +208,26 @@ export function CreditPurchaseScreen() {
   const showRows = !isLoading && !identityUnavailable && !packsEmpty && !storeUnavailable;
   // The store's credit-expiry policy belongs to the pack group, so the screen
   // states it once under the rows instead of repeating the same sentence under
-  // every pack. A catalogue whose packs differ (one expiring, the rest not)
-  // contributes one caption per distinct policy, still once each.
-  const expiryNotes = showRows
-    ? [
-        ...new Set(
-          products
-            .map(pack => getStoreCreditExpiryMessageKey(pack.backend, storefront))
-            .filter((key): key is NonNullable<typeof key> => key !== undefined)
-        ),
-      ].map(key => t(key))
-    : [];
+  // every pack. Only a catalogue whose packs share one policy has a sentence to
+  // state; a mixed one is disclosed per row instead.
+  const expiryCaption = showRows
+    ? getStoreCreditExpiryCaption(
+        products.map(pack => pack.backend),
+        storefront
+      )
+    : undefined;
+  // The balance card states non-expiry in exactly one state: its read settled
+  // with no future expiry, which is when it paints `credits.noExpiringCredits`.
+  // While it paints its skeleton, `credits.expiryUnavailable`, or the next
+  // expiring block, it says nothing about the purchase terms, so the pack group
+  // must state them itself.
+  const balanceStatesNoExpiry =
+    creditBlocksQuery.isSuccess &&
+    getNextCreditExpiry(creditBlocksQuery.data.creditBlocks) === undefined;
+  const expiryNote =
+    expiryCaption !== undefined && !(balanceStatesNoExpiry && !expiryCaption.expires)
+      ? t(expiryCaption.key)
+      : null;
   const balancePending = balanceQuery.isPending;
   const balanceFailed = balanceQuery.isError;
   // The card's title and its default body come from one per-store source, so
@@ -534,8 +545,9 @@ export function CreditPurchaseScreen() {
                         // the state phrase never wraps into a second line, so
                         // no row changes height when a purchase or the store
                         // state changes. The expiry policy is stated once for
-                        // the group below the rows; the row's accessible label
-                        // still carries it per pack.
+                        // the group below the rows, and only when the balance
+                        // card does not already state it; the row's accessible
+                        // label still carries it per pack.
                         subtitleNumberOfLines={1}
                         variant="action"
                         disabled={disabled}
@@ -558,11 +570,7 @@ export function CreditPurchaseScreen() {
               </RowGroup>
             )}
 
-            {expiryNotes.map(note => (
-              <Text key={note} variant="caption">
-                {note}
-              </Text>
-            ))}
+            {expiryNote !== null && <Text variant="caption">{expiryNote}</Text>}
           </View>
 
           {/* The purchase state is its own slot after the pack rows: a request

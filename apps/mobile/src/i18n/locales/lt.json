@@ -2892,6 +2892,8 @@
     "modelPicker": {
       "title": "Modelio pasirinkimas",
       "noModelsDescription": "Nėra modelių, kuriuos galėtumėte pasirinkti.",
+      "allUnavailableTitle": "Nė vieno modelio negalima naudoti",
+      "allUnavailableDescription": "Pridėkite teikėjo raktą ir bandykite dar kartą.",
       "favorites": "Mėgstamiausi"
     },
     "modelSelector": {

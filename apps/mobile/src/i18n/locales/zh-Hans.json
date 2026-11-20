@@ -2233,6 +2233,8 @@
     "modelPicker": {
       "title": "选择模型",
       "noModelsDescription": "没有可选择的模型。",
+      "allUnavailableTitle": "无法使用任何模型",
+      "allUnavailableDescription": "添加提供商密钥，然后重试。",
       "favorites": "收藏"
     },
     "modelSelector": {

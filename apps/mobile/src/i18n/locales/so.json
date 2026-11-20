@@ -2790,6 +2790,8 @@
     "modelPicker": {
       "title": "Dooro moodeel",
       "noModelsDescription": "Ma jiraan moodeello aad dooran karto.",
+      "allUnavailableTitle": "Ma jiro moodeel la isticmaali karo",
+      "allUnavailableDescription": "Ku dar fure bixiye, ka dibna isku day mar kale.",
       "favorites": "Kuwa la jecel yahay"
     },
     "modelSelector": {

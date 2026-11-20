@@ -2892,7 +2892,9 @@
     "modelPicker": {
       "title": "Výběr modelu",
       "favorites": "Oblíbené",
-      "noModelsDescription": "K výběru nejsou k dispozici žádné modely."
+      "noModelsDescription": "K výběru nejsou k dispozici žádné modely.",
+      "allUnavailableTitle": "Žádný model nelze použít",
+      "allUnavailableDescription": "Přidejte klíč poskytovatele a poté to zkuste znovu."
     },
     "modelSelector": {
       "provider": "Poskytovatel {{id}}",

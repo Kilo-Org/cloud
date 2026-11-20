@@ -2790,6 +2790,8 @@
     "modelPicker": {
       "title": "మోడల్‌ను ఎంచుకోండి",
       "noModelsDescription": "ఎంచుకోవడానికి మోడళ్లు అందుబాటులో లేవు.",
+      "allUnavailableTitle": "ఏ మోడల్‌ను ఉపయోగించలేము",
+      "allUnavailableDescription": "ప్రొవైడర్ కీని జోడించి మళ్లీ ప్రయత్నించండి.",
       "favorites": "ఇష్టమైనవి"
     },
     "modelSelector": {

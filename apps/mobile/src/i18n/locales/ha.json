@@ -2790,6 +2790,8 @@
     "modelPicker": {
       "title": "Zaɓi samfuri",
       "noModelsDescription": "Babu samfuran da za a zaɓa.",
+      "allUnavailableTitle": "Babu wani samfuri da za a iya amfani da shi",
+      "allUnavailableDescription": "Ƙara maɓallin mai samarwa ka sake gwadawa.",
       "favorites": "Waɗanda ka fi so"
     },
     "modelSelector": {

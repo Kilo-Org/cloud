@@ -2790,6 +2790,8 @@
     "modelPicker": {
       "title": "Kōwhiria te tauira",
       "noModelsDescription": "Kāore he tauira e wātea ana hei kōwhiri.",
+      "allUnavailableTitle": "Kāore he tauira e taea te whakamahi",
+      "allUnavailableDescription": "Tāpirihia he kī kaiwhakarato, kātahi ka whakamātau anō.",
       "favorites": "Ngā makau"
     },
     "modelSelector": {

@@ -2790,6 +2790,8 @@
     "modelPicker": {
       "title": "เลือกโมเดล",
       "noModelsDescription": "ไม่มีโมเดลให้เลือก",
+      "allUnavailableTitle": "ไม่มีโมเดลใดใช้งานได้",
+      "allUnavailableDescription": "เพิ่มคีย์ผู้ให้บริการ แล้วลองอีกครั้ง",
       "favorites": "รายการโปรด"
     },
     "modelSelector": {

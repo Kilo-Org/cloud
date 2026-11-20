@@ -2790,7 +2790,9 @@
     "modelPicker": {
       "title": "ମଡେଲ୍ ବାଛନ୍ତୁ",
       "favorites": "ପସନ୍ଦର ମଡେଲ୍",
-      "noModelsDescription": "ବାଛିବାକୁ କୌଣସି ମଡେଲ୍ ଉପଲବ୍ଧ ନାହିଁ।"
+      "noModelsDescription": "ବାଛିବାକୁ କୌଣସି ମଡେଲ୍ ଉପଲବ୍ଧ ନାହିଁ।",
+      "allUnavailableTitle": "କୌଣସି ମଡେଲ୍ ବ୍ୟବହାର କରାଯାଇପାରିବ ନାହିଁ",
+      "allUnavailableDescription": "ଏକ ପ୍ରଦାନକାରୀ କୀ ଯୋଡ଼ନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
     },
     "modelSelector": {
       "provider": "ସେବା ପ୍ରଦାନକାରୀ {{id}}",

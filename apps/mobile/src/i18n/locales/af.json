@@ -2790,7 +2790,9 @@
     "modelPicker": {
       "title": "Kies model",
       "favorites": "Gunstelinge",
-      "noModelsDescription": "Geen modelle is beskikbaar om te kies nie."
+      "noModelsDescription": "Geen modelle is beskikbaar om te kies nie.",
+      "allUnavailableTitle": "Geen modelle kan gebruik word nie",
+      "allUnavailableDescription": "Voeg 'n verskaffersleutel by en probeer dan weer."
     },
     "modelSelector": {
       "provider": "Verskaffer {{id}}",

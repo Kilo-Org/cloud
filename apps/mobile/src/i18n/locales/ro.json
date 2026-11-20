@@ -2841,7 +2841,9 @@
     "modelPicker": {
       "title": "Model",
       "favorites": "Favorite",
-      "noModelsDescription": "Nu este disponibil niciun model."
+      "noModelsDescription": "Nu este disponibil niciun model.",
+      "allUnavailableTitle": "Niciun model nu poate fi folosit",
+      "allUnavailableDescription": "Adaugă o cheie de furnizor, apoi încearcă din nou."
     },
     "modelSelector": {
       "provider": "Furnizor {{id}}",

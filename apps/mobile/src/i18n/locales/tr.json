@@ -2233,6 +2233,8 @@
     "modelPicker": {
       "title": "Model seçimi",
       "noModelsDescription": "Seçilebilecek model yok.",
+      "allUnavailableTitle": "Hiçbir model kullanılamıyor",
+      "allUnavailableDescription": "Bir sağlayıcı anahtarı ekle, sonra tekrar dene.",
       "favorites": "Favoriler"
     },
     "modelSelector": {

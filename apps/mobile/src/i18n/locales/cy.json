@@ -2994,6 +2994,8 @@
     "modelPicker": {
       "title": "Dewis model",
       "noModelsDescription": "Does dim modelau ar gael i'w dewis.",
+      "allUnavailableTitle": "Ni ellir defnyddio unrhyw fodel",
+      "allUnavailableDescription": "Ychwanegwch allwedd darparwr, yna rhowch gynnig arall arni.",
       "favorites": "Ffefrynnau"
     },
     "modelSelector": {

@@ -2287,6 +2287,8 @@
     "modelPicker": {
       "title": "Вибір моделі",
       "noModelsDescription": "Немає доступних моделей.",
+      "allUnavailableTitle": "Жодну модель не можна використати",
+      "allUnavailableDescription": "Додайте ключ постачальника, а потім спробуйте ще раз.",
       "favorites": "Обране"
     },
     "modelSelector": {

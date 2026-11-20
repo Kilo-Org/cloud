@@ -2790,6 +2790,8 @@
     "modelPicker": {
       "title": "მოდელის არჩევა",
       "noModelsDescription": "ამჟამად ასარჩევი მოდელები არ არის.",
+      "allUnavailableTitle": "არცერთი მოდელის გამოყენება შეუძლებელია",
+      "allUnavailableDescription": "დაამატეთ პროვაიდერის გასაღები და სცადეთ ხელახლა.",
       "favorites": "რჩეულები"
     },
     "modelSelector": {

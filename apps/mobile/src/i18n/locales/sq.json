@@ -2790,6 +2790,8 @@
     "modelPicker": {
       "title": "Zgjidh modelin",
       "noModelsDescription": "Nuk ka modele të disponueshme për të zgjedhur.",
+      "allUnavailableTitle": "Asnjë model nuk mund të përdoret",
+      "allUnavailableDescription": "Shto një çelës ofruesi, pastaj provo përsëri.",
       "favorites": "Të preferuarat"
     },
     "modelSelector": {

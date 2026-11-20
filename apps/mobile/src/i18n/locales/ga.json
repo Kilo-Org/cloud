@@ -2943,6 +2943,8 @@
     "modelPicker": {
       "title": "Roghnaigh samhail",
       "noModelsDescription": "Níl aon samhail ar fáil le roghnú.",
+      "allUnavailableTitle": "Ní féidir aon samhail a úsáid",
+      "allUnavailableDescription": "Cuir eochair soláthraí leis, ansin bain triail as arís.",
       "favorites": "Cinn is fearr leat"
     },
     "modelSelector": {

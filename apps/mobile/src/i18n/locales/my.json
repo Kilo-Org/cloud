@@ -2790,6 +2790,8 @@
     "modelPicker": {
       "title": "မော်ဒယ်ရွေးချယ်ခြင်း",
       "noModelsDescription": "ရွေးချယ်ရန် မော်ဒယ်များ မရှိပါ။",
+      "allUnavailableTitle": "အသုံးပြုနိုင်သည့် မော်ဒယ် မရှိပါ",
+      "allUnavailableDescription": "ဝန်ဆောင်မှုပေးသူ၏ ကီးတစ်ခု ထည့်ပြီး ထပ်စမ်းကြည့်ပါ။",
       "favorites": "စိတ်ကြိုက်များ"
     },
     "modelSelector": {

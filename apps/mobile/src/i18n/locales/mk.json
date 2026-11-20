@@ -2790,6 +2790,8 @@
     "modelPicker": {
       "title": "Избор на модел",
       "noModelsDescription": "Нема достапни модели за избор.",
+      "allUnavailableTitle": "Ниту еден модел не може да се користи",
+      "allUnavailableDescription": "Додај клуч за давател и обиди се повторно.",
       "favorites": "Омилени"
     },
     "modelSelector": {

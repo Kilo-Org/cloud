@@ -2841,7 +2841,9 @@
     "modelPicker": {
       "title": "Model",
       "favorites": "Preferits",
-      "noModelsDescription": "No hi ha cap model per seleccionar."
+      "noModelsDescription": "No hi ha cap model per seleccionar.",
+      "allUnavailableTitle": "No es pot utilitzar cap model",
+      "allUnavailableDescription": "Afegeix una clau de proveïdor i torna-ho a provar."
     },
     "modelSelector": {
       "provider": "Proveïdor {{id}}",

@@ -2287,7 +2287,9 @@
     "modelPicker": {
       "title": "Выбор модели",
       "favorites": "Избранное",
-      "noModelsDescription": "Нет доступных моделей."
+      "noModelsDescription": "Нет доступных моделей.",
+      "allUnavailableTitle": "Ни одну модель нельзя использовать",
+      "allUnavailableDescription": "Добавьте ключ провайдера и попробуйте снова."
     },
     "modelSelector": {
       "provider": "Провайдер {{id}}",

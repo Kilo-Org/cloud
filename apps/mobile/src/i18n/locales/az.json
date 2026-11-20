@@ -2790,7 +2790,9 @@
     "modelPicker": {
       "title": "Model seç",
       "favorites": "Sevimlilər",
-      "noModelsDescription": "Seçim üçün heç bir model əlçatan deyil."
+      "noModelsDescription": "Seçim üçün heç bir model əlçatan deyil.",
+      "allUnavailableTitle": "Heç bir model istifadə edilə bilməz",
+      "allUnavailableDescription": "Provayder açarı əlavə et, sonra yenidən cəhd et."
     },
     "modelSelector": {
       "provider": "Təminatçı {{id}}",

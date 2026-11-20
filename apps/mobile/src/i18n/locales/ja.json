@@ -2233,6 +2233,8 @@
     "modelPicker": {
       "title": "モデルの選択",
       "noModelsDescription": "選択できるモデルはありません。",
+      "allUnavailableTitle": "使用できるモデルはありません",
+      "allUnavailableDescription": "プロバイダーキーを追加してから、もう一度お試しください。",
       "favorites": "お気に入り"
     },
     "modelSelector": {

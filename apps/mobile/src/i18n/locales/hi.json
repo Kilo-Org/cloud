@@ -2182,6 +2182,8 @@
     "modelPicker": {
       "title": "मॉडल चुनें",
       "noModelsDescription": "चुनने के लिए कोई मॉडल उपलब्ध नहीं है।",
+      "allUnavailableTitle": "कोई भी मॉडल उपयोग नहीं किया जा सकता",
+      "allUnavailableDescription": "प्रदाता कुंजी जोड़ें और फिर से कोशिश करें।",
       "favorites": "पसंदीदा"
     },
     "modelSelector": {

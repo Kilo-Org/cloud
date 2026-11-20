@@ -2790,6 +2790,8 @@
     "modelPicker": {
       "title": "Välj modell",
       "noModelsDescription": "Det finns inga modeller att välja mellan.",
+      "allUnavailableTitle": "Inga modeller kan användas",
+      "allUnavailableDescription": "Lägg till en leverantörsnyckel och försök igen.",
       "favorites": "Favoriter"
     },
     "modelSelector": {

@@ -2943,6 +2943,8 @@
     "modelPicker": {
       "title": "Agħżel il-mudell",
       "noModelsDescription": "M'hemm l-ebda mudell disponibbli biex tagħżel.",
+      "allUnavailableTitle": "L-ebda mudell ma jista' jintuża",
+      "allUnavailableDescription": "Żid ċavetta tal-fornitur, imbagħad erġa' pprova.",
       "favorites": "Favoriti"
     },
     "modelSelector": {

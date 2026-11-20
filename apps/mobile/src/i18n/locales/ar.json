@@ -2341,7 +2341,9 @@
     "modelPicker": {
       "title": "اختيار النموذج",
       "favorites": "المفضلة",
-      "noModelsDescription": "لا توجد نماذج متاحة للاختيار."
+      "noModelsDescription": "لا توجد نماذج متاحة للاختيار.",
+      "allUnavailableTitle": "لا يمكن استخدام أي نموذج",
+      "allUnavailableDescription": "أضف مفتاح مزوّد، ثم أعد المحاولة."
     },
     "modelSelector": {
       "provider": "المزود {{id}}",

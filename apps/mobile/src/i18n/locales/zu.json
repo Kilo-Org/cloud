@@ -2790,6 +2790,8 @@
     "modelPicker": {
       "title": "Khetha imodeli",
       "noModelsDescription": "Awekho amamodeli ongawakhetha.",
+      "allUnavailableTitle": "Awekho amamodeli angasetshenziswa",
+      "allUnavailableDescription": "Engeza ukhiye womhlinzeki bese uzama futhi.",
       "favorites": "Okuthandwayo"
     },
     "modelSelector": {

@@ -2790,6 +2790,8 @@
     "modelPicker": {
       "title": "මාදිලිය තෝරන්න",
       "noModelsDescription": "තේරීමට මාදිලි නොමැත.",
+      "allUnavailableTitle": "කිසිදු මාදිලියක් භාවිත කළ නොහැක",
+      "allUnavailableDescription": "සපයන්නාගේ යතුරක් එක් කර නැවත උත්සාහ කරන්න.",
       "favorites": "ප්‍රියතමයන්"
     },
     "modelSelector": {

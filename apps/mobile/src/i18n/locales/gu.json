@@ -2790,6 +2790,8 @@
     "modelPicker": {
       "title": "મોડલ પસંદ કરો",
       "noModelsDescription": "પસંદ કરવા માટે કોઈ મોડલ ઉપલબ્ધ નથી.",
+      "allUnavailableTitle": "કોઈ પણ મોડલનો ઉપયોગ કરી શકાતો નથી",
+      "allUnavailableDescription": "પ્રદાતાની કી ઉમેરો, પછી ફરી પ્રયાસ કરો.",
       "favorites": "મનપસંદ"
     },
     "modelSelector": {

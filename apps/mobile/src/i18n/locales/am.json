@@ -2790,7 +2790,9 @@
     "modelPicker": {
       "title": "የሞዴል ምርጫ",
       "favorites": "ተወዳጆች",
-      "noModelsDescription": "ለመምረጥ ምንም ሞዴሎች የሉም።"
+      "noModelsDescription": "ለመምረጥ ምንም ሞዴሎች የሉም።",
+      "allUnavailableTitle": "ምንም ሞዴል መጠቀም አይቻልም",
+      "allUnavailableDescription": "የአቅራቢ ቁልፍ ጨምረው እንደገና ይሞክሩ።"
     },
     "modelSelector": {
       "provider": "አቅራቢ {{id}}",

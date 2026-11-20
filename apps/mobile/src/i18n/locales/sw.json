@@ -2790,6 +2790,8 @@
     "modelPicker": {
       "title": "Chagua modeli",
       "noModelsDescription": "Hakuna modeli zinazopatikana za kuchagua.",
+      "allUnavailableTitle": "Hakuna modeli zinazoweza kutumika",
+      "allUnavailableDescription": "Ongeza ufunguo wa mtoa huduma na ujaribu tena.",
       "favorites": "Vipendwa"
     },
     "modelSelector": {

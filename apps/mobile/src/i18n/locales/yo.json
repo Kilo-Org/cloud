@@ -2790,6 +2790,8 @@
     "modelPicker": {
       "title": "Yan àwòṣe",
       "noModelsDescription": "Kò sí àwòṣe tí o lè yàn.",
+      "allUnavailableTitle": "Kò sí àwòṣe tí a lè lò",
+      "allUnavailableDescription": "Fi kọ́kọ́rọ́ olùpèsè kún, lẹ́yìn náà tún gbìyànjú.",
       "favorites": "Àwọn àyànfẹ́"
     },
     "modelSelector": {

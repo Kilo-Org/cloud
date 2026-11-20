@@ -2790,7 +2790,9 @@
     "modelPicker": {
       "title": "মডেল নির্বাচন",
       "favorites": "পছন্দের তালিকা",
-      "noModelsDescription": "বেছে নেওয়ার মতো কোনো মডেল নেই।"
+      "noModelsDescription": "বেছে নেওয়ার মতো কোনো মডেল নেই।",
+      "allUnavailableTitle": "কোনো মডেল ব্যবহার করা যাবে না",
+      "allUnavailableDescription": "একটি প্রোভাইডার কী যোগ করুন, তারপর আবার চেষ্টা করুন।"
     },
     "modelSelector": {
       "provider": "প্রোভাইডার {{id}}",

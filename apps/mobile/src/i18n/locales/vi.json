@@ -2233,6 +2233,8 @@
     "modelPicker": {
       "title": "Chọn mô hình",
       "noModelsDescription": "Không có mô hình nào để chọn.",
+      "allUnavailableTitle": "Không có mô hình nào dùng được",
+      "allUnavailableDescription": "Thêm khóa nhà cung cấp rồi thử lại.",
       "favorites": "Mục yêu thích"
     },
     "modelSelector": {

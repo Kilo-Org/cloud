@@ -19,8 +19,12 @@ export function getInitialsFromName(name: string): string {
     .slice(0, 2);
 }
 
+/**
+ * Formats a Unix timestamp in seconds as a US date, so the server render and the
+ * browser render the same text whatever locale each runtime carries.
+ */
 export function formatDate(timestamp: number) {
-  return new Date(timestamp * 1000).toLocaleDateString();
+  return new Date(timestamp * 1000).toLocaleDateString('en-US');
 }
 
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -100,26 +104,35 @@ export function formatIsoDateTime_IsoOrderNoSeconds(dateString: string | Date | 
   return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
 
+const US_GROUPED_NUMBER = new Intl.NumberFormat('en-US');
+
+// Long and short compact displays of one locale, so the digits and the
+// magnitude word ("million", "M") always come from the same locale data.
+const US_COMPACT_NUMBER = {
+  long: new Intl.NumberFormat('en-US', {
+    notation: 'compact',
+    compactDisplay: 'long',
+    maximumFractionDigits: 1,
+  }),
+  short: new Intl.NumberFormat('en-US', {
+    notation: 'compact',
+    compactDisplay: 'short',
+    maximumFractionDigits: 1,
+  }),
+} as const;
+
+/**
+ * Formats a count for a stat tile: grouped below one million ("742,318") and
+ * compact at or above it ("1.8 million", or "1.8M" when shortened). The locale
+ * is pinned, so the digits and the magnitude word agree and the server render
+ * matches the browser render.
+ */
 export function formatLargeNumber(num: number, shorten: boolean = false): string {
   if (num < 1000000) {
-    return num.toLocaleString();
+    return US_GROUPED_NUMBER.format(num);
   }
 
-  const units = [
-    { value: 1e15, label: 'quadrillion', short: 'quadrillion' },
-    { value: 1e12, label: 'trillion', short: 'T' },
-    { value: 1e9, label: 'billion', short: 'B' },
-    { value: 1e6, label: 'million', short: 'M' },
-  ];
-
-  for (const unit of units) {
-    if (num >= unit.value) {
-      const formatted = (num / unit.value).toFixed(1);
-      return `${formatted} ${shorten ? unit.short : unit.label}`;
-    }
-  }
-
-  return num.toLocaleString();
+  return US_COMPACT_NUMBER[shorten ? 'short' : 'long'].format(num);
 }
 
 export function formatBytes(value: number | null): string {

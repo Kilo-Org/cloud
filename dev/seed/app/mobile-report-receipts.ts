@@ -165,7 +165,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     .where(eq(content_moderation_reports.kilo_user_id, user.id));
 
   console.log(
-    'This fixture represents: one reader whose reports list holds one row per triage state, the newest one appealed.'
+    'This fixture represents: one reader whose reports list holds one row per triage state, the oldest one appealed.'
   );
 
   return {

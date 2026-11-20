@@ -65,7 +65,9 @@ import {
   SECTION_ACTION_HIT_SLOP_DP,
   SECTION_ACTION_LABEL_LINE_DP,
   SETTINGS_HEADING_LINE_DP,
-  SETTINGS_SWITCH_HOST_CLASS,
+  SETTINGS_SWITCH_ROW_CLASS,
+  SETTINGS_SWITCH_ROW_DP,
+  SETTINGS_SWITCH_ROW_PULL_DP,
   STATE_ACTION_CLASS,
   STATE_ACTION_TARGET_DP,
   SWITCH_HOST_CLASS,
@@ -291,26 +293,33 @@ describe('shared tap-target geometry', () => {
     expect(SWITCH_HOST_CLASS).toContain('items-center');
   });
 
-  it('cancels a settings header switch to the heading line', async () => {
-    // The regression this guards: a settings section header lays its title and
-    // its master switch on one row, and a header row sized by the switch's box
-    // put the description half a box further from the title than a section
-    // without a switch. The switch's own node is the target, so the box stays;
-    // the host cancels it to the heading's own line instead.
-    const height = await compiledDp(SETTINGS_SWITCH_HOST_CLASS, 'height');
-    const margin = await compiledDp(SETTINGS_SWITCH_HOST_CLASS, 'marginBlock');
-    expect(height).toBe(TOUCH_TARGET_DP);
-    expect(height).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
-    expect(margin).toBe(-11.5);
-    expect(margin).toBe(-(TOUCH_TARGET_DP - SETTINGS_HEADING_LINE_DP) / 2);
-    // The host contributes the heading line and no more, so the row cannot be
-    // sized by the switch box and the title-to-description gap matches a
-    // section without a switch.
-    expect(height + 2 * margin).toBe(SETTINGS_HEADING_LINE_DP);
-    expect(height + 2 * margin).toBeLessThanOrEqual(SETTINGS_HEADING_LINE_DP);
-    // Centring has no dp value to compile, so it stays a class check.
-    expect(SETTINGS_SWITCH_HOST_CLASS).toContain('items-center');
-    expect(SETTINGS_SWITCH_HOST_CLASS).toContain('justify-center');
+  it('keeps a settings header switch row on the control-size floor', async () => {
+    // The regression this guards, in both directions: a header row sized by the
+    // switch pushed the description half a box further from the title than a
+    // section without a switch, and a row shrunk to the heading line clipped the
+    // switch's own box — the row is the switch's parent, and a touch is
+    // delivered only inside each ancestor's bounds.
+    const height = await compiledDp(SETTINGS_SWITCH_ROW_CLASS, 'minHeight');
+    const marginBottom = await compiledDp(SETTINGS_SWITCH_ROW_CLASS, 'marginBottom');
+    expect(height).toBe(MIN_TAP_TARGET_DP);
+    expect(height).toBe(SETTINGS_SWITCH_ROW_DP);
+    expect(marginBottom).toBe(-3.5);
+    expect(marginBottom).toBe(-SETTINGS_SWITCH_ROW_PULL_DP);
+    expect(SETTINGS_SWITCH_ROW_PULL_DP).toBe(
+      (SETTINGS_SWITCH_ROW_DP - SETTINGS_HEADING_LINE_DP) / 2
+    );
+    // The pull is the row's only vertical margin, and it is below the row: a
+    // negative top margin would start the row above the header group's top,
+    // where the group clips it. A class with no top margin compiles to no
+    // declaration, which React Native lays out as 0.
+    const marginTop = await compiledDp(SETTINGS_SWITCH_ROW_CLASS, 'marginTop').catch(() => 0);
+    expect(marginTop).toBe(0);
+    expect(
+      SETTINGS_SWITCH_ROW_CLASS.split(/\s+/).filter(token => /^-?m(?:[btxyse])?-/.test(token))
+    ).toEqual(['-mb-[3.5px]']);
+    // The band plus the pull is the heading line plus twice the half line the
+    // switch's centred box adds, so the row's band is the whole difference.
+    expect(SETTINGS_HEADING_LINE_DP + 2 * SETTINGS_SWITCH_ROW_PULL_DP).toBe(SETTINGS_SWITCH_ROW_DP);
   });
 
   it('renders a screen header title control on its own 48dp node', async () => {

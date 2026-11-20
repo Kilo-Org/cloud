@@ -262,24 +262,42 @@ export const SWITCH_HOST_CLASS = 'h-[44px] -my-[8.5px] shrink-0 items-center jus
 /**
  * The line a settings section's `Text variant="heading"` lays out on, in dp:
  * `text-base` at this app's 14dp rem, measured at 21.33dp in the design gate's
- * Android dump. A header row carrying no switch is one heading line, so a row
- * that carries one must not lay out taller.
+ * Android dump. A header row carrying a switch lands on a taller band, and this
+ * line is the half of that band's excess the row's pull is measured from.
  */
 export const SETTINGS_HEADING_LINE_DP = 21;
 
 /**
- * The host a settings section header gives its master switch. The box stays a
- * full {@link TOUCH_TARGET_DP}, because the switch's own node is the target a
- * control-size audit reads and `hitSlop` does not move that rect; the vertical
- * margin then cancels `(44 - 21) / 2 = 11.5` a side, so the header row lays
- * out one {@link SETTINGS_HEADING_LINE_DP}-tall heading line instead of the
- * {@link ROW_FRAME_CONTENT_DP} band a settings row keeps. Without the
- * cancellation the row grew to the box, and the title-to-description gap of a
- * section with a switch measured half a box more than one without it; with it
- * both gaps are the header group's `gap-3` (10.5dp).
+ * The band a settings section header's title row renders, in dp: the
+ * control-size audit's floor rather than one heading line, because the row is
+ * the switch's parent and a touch is delivered only inside each ancestor's
+ * bounds. A row shrunk to the heading line clipped the switch's box, and the
+ * band a touch could land in fell under {@link MIN_TAP_TARGET_DP}.
  */
-export const SETTINGS_SWITCH_HOST_CLASS =
-  'h-[44px] -my-[11.5px] shrink-0 items-center justify-center';
+export const SETTINGS_SWITCH_ROW_DP = MIN_TAP_TARGET_DP;
+
+/**
+ * The pull a settings section header takes below its title row, in dp:
+ * `(28 - 21) / 2 = 3.5`. The switch's box is centred in the row, so half of the
+ * band it adds over the heading line sits under the title's own line; the row's
+ * bottom margin cancels exactly that half, and the title-to-description gap
+ * stays the header group's `gap-3` (10.5dp) — the gap a section without a
+ * switch has. A row sized by the switch instead pushed the description half a
+ * box further from the title.
+ */
+export const SETTINGS_SWITCH_ROW_PULL_DP = (SETTINGS_SWITCH_ROW_DP - SETTINGS_HEADING_LINE_DP) / 2;
+
+/**
+ * The title row of a settings section header with a switch, as
+ * {@link SETTINGS_SWITCH_ROW_DP} plus the pull below it: `min-h-[28px]` for the
+ * row's own band, `-mb-[3.5px]` for the bottom margin. The row's
+ * `items-center` centres both the heading and the switch in that band, so the
+ * switch's visible track (about 27dp) sits fully inside the delivered area
+ * while its node keeps {@link TOUCH_TARGET_DP}. The row carries no negative top
+ * margin: it starts at the header group's top, and anything above it is clipped
+ * by the group.
+ */
+export const SETTINGS_SWITCH_ROW_CLASS = 'min-h-[28px] -mb-[3.5px]';
 
 /**
  * The label pressable inside a `ROW_FRAME_CLASS` row cancels the frame's

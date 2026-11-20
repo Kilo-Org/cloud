@@ -244,7 +244,7 @@ export function NotificationHistoryScreen() {
       </View>
     );
   } else if (query.isFetchingNextPage) {
-    footer = <RowSkeleton subtitle handBuilt />;
+    footer = <RowSkeleton subtitle />;
   }
 
   return (
@@ -314,9 +314,9 @@ export function NotificationHistoryScreen() {
         <View className="mt-3 flex-1">
           {loading ? (
             <View>
-              <RowSkeleton subtitle handBuilt />
-              <RowSkeleton subtitle handBuilt />
-              <RowSkeleton subtitle handBuilt />
+              <RowSkeleton subtitle />
+              <RowSkeleton subtitle />
+              <RowSkeleton subtitle />
             </View>
           ) : null}
 

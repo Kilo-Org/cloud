@@ -33,7 +33,7 @@ const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = { flexGrow: 1 } satisfies ViewStyle;
 
 function HistoryRowSkeleton({ last }: Readonly<{ last: boolean }>) {
-  return <RowSkeleton subtitle last={last} handBuilt />;
+  return <RowSkeleton subtitle last={last} />;
 }
 
 /**

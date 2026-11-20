@@ -144,27 +144,6 @@ describe('RowSkeleton', () => {
     expect(classesOf(first(subtitle))).toEqual(expect.arrayContaining(['h-4', 'bg-muted-soft']));
   });
 
-  it('spaces its lines like the loaded RowFrame by default, at the subtitle margin', () => {
-    // The row variant draws `ROW_FRAME_CLASS`, so it stands in for a `RowFrame`
-    // row: that row's subtitle carries `mt-0.5` (1.75pt), and a column at
-    // `gap-1` would make the placeholder taller than the row it becomes.
-    const [title] = skeletons(renderSkeleton({ lines: 2 }));
-    const column = first(first(title).parent ?? undefined);
-    expect(classesOf(column)).toEqual(expect.arrayContaining(['gap-0.5']));
-    expect(classesOf(column)).not.toContain('gap-1');
-  });
-
-  it('keeps the gap of the hand-built row it stands in for', () => {
-    // `SectionCardSkeleton`'s Act-first row, the credit-history, invoice and
-    // notification rows space their own title and subtitle by `gap-1`; those
-    // call sites ask for `handBuilt`, and a `gap-0.5` placeholder would be
-    // 1.75pt shorter than the row it becomes.
-    const [title] = skeletons(renderSkeleton({ lines: 2, handBuilt: true }));
-    const column = first(first(title).parent ?? undefined);
-    expect(classesOf(column)).toEqual(expect.arrayContaining(['gap-1']));
-    expect(classesOf(column)).not.toContain('gap-0.5');
-  });
-
   it('keeps the flat-list session shape', () => {
     const root = renderSkeleton({ variant: 'session', last: false });
     const classes = classesOf(frameOf(root));
@@ -172,5 +151,30 @@ describe('RowSkeleton', () => {
     expect(classes).toEqual(expect.arrayContaining(['flex-row', 'px-4', 'py-3']));
     // The strip, the eyebrow, the title and the meta bar.
     expect(skeletons(root)).toHaveLength(3);
+  });
+
+  it('keeps main’s one-step line gap unless the row it becomes is a measured RowFrame', () => {
+    // `RowFrame`'s subtitle carries its own `mt-0.5` (1.75 pt), so a placeholder
+    // for one only reserves that row's height when it asks for `rowFrame`. Every
+    // other placeholder — the Act-first finding row, the invoice, notification
+    // and credit-history rows — keeps the `gap-1` those loaded rows use.
+    const gapOf = (classes: string[]): string => {
+      const gap = classes.find(token => token.startsWith('gap-'));
+      if (gap === undefined) {
+        throw new Error('placeholder row has no column gap');
+      }
+      return gap;
+    };
+    const columnOf = (props: Readonly<Record<string, unknown>>): string[] => {
+      const [title] = skeletons(renderSkeleton(props));
+      const column = first(title).parent;
+      if (column === null) {
+        throw new Error('placeholder row has no text column');
+      }
+      return classesOf(column);
+    };
+
+    expect(gapOf(columnOf({ lines: 2 }))).toBe('gap-1');
+    expect(gapOf(columnOf({ lines: 2, rowFrame: true }))).toBe('gap-0.5');
   });
 });

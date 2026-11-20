@@ -1025,6 +1025,10 @@ export async function autoCompleteInstallation(
       )
       .limit(1);
     if (peer) return { ok: false, reason: 'installation_claimed' };
+    // The peer check above refuses any other association that carries this
+    // installation, disconnected or not, so this writer never creates the
+    // shared (agent_only) role and the shared-connection entitlement that
+    // connectVerifiedGitHubInstallation applies has nothing to admit here.
     // An organization that is not entitled to multiple installations holds one
     // live installation slot, and completion must not take a second one. Same
     // rule, lock key, and lock order as connectVerifiedGitHubInstallation and

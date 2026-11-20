@@ -508,7 +508,26 @@ export const agentProfilesRouter = createTRPCRouter({
         await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
-      return profileService.createProfileWithContent(db, publicKey, owner, ctx.user.id, input);
+      try {
+        return await profileService.createProfileWithContent(
+          db,
+          publicKey,
+          owner,
+          ctx.user.id,
+          input
+        );
+      } catch (error) {
+        // The per-owner profile name unique index: `UQ_agent_env_profiles_org_name`
+        // for an organization, `UQ_agent_env_profiles_user_name` for a user. The
+        // dialog shows this sentence as the reason the name was refused.
+        if (isUniqueViolation(error)) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'A profile with this name already exists',
+          });
+        }
+        throw error;
+      }
     }),
 
   /**

@@ -4237,7 +4237,7 @@
     "personalDefaultDescription": "Automatski se učitava kada nijedno spremište nema zakačeni profil.",
     "organizationDefaultDescription": "Automatski se učitava za članove koji nemaju lične podrazumevane vrednosti.",
     "setAsDefault": "Postavi kao podrazumevano",
-    "saveFailed": "Nije moguće sačuvati profil, pa ništa nije sačuvano",
+    "saveFailed": "Nije moguće sačuvati profil. Proverite internet vezu i pokušajte ponovo.",
     "organizationRoleRequired": "Samo vlasnici organizacije i administratori mogu da promene profil organizacije.",
     "deleteTitle": "Izbriši profil",
     "deleteMessage": "Ovo trajno uklanja profil i njegova podešavanja. Ovo se ne može poništiti.",

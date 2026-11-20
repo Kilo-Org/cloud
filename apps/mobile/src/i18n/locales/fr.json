@@ -4237,7 +4237,7 @@
     "personalDefaultDescription": "Chargé automatiquement lorsqu'aucun dépôt n'a de profil épinglé.",
     "organizationDefaultDescription": "Chargé automatiquement pour les membres qui n’ont aucun défaut personnel.",
     "setAsDefault": "Définir par défaut",
-    "saveFailed": "Impossible d'enregistrer le profil, donc rien n'a été enregistré",
+    "saveFailed": "Impossible d'enregistrer le profil. Vérifiez votre connexion et réessayez.",
     "organizationRoleRequired": "Seuls les propriétaires et les administrateurs de l'organisation peuvent modifier les profils de l'organisation.",
     "deleteTitle": "Supprimer le profil",
     "deleteMessage": "Cela supprime définitivement le profil et ses paramètres. Cela ne peut pas être annulé.",

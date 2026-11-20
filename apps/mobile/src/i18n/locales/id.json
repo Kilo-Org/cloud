@@ -4168,7 +4168,7 @@
     "personalDefaultDescription": "Dimuat secara otomatis ketika tidak ada repositori yang memiliki profil yang disematkan.",
     "organizationDefaultDescription": "Dimuat otomatis untuk anggota yang tidak memiliki default pribadi.",
     "setAsDefault": "Tetapkan sebagai bawaan",
-    "saveFailed": "Tidak dapat menyimpan profil, jadi tidak ada yang tersimpan",
+    "saveFailed": "Tidak dapat menyimpan profil. Periksa koneksi Anda dan coba lagi.",
     "organizationRoleRequired": "Hanya pemilik organisasi dan admin yang dapat mengubah profil organisasi.",
     "deleteTitle": "Hapus profil",
     "deleteMessage": "Tindakan ini akan menghapus profil dan pengaturannya secara permanen. Hal ini tidak dapat dibatalkan.",

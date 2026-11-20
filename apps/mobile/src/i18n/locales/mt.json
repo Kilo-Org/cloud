@@ -4375,7 +4375,7 @@
     "personalDefaultDescription": "Imgħabba awtomatikament meta l-ebda repożitorju ma jkollu profil ippinjat.",
     "organizationDefaultDescription": "Auto-loaded għal membri li m'għandhom l-ebda default personali.",
     "setAsDefault": "Issettja bħala default",
-    "saveFailed": "Ma setax isalva l-profil, allura ma ġie salvat xejn",
+    "saveFailed": "Ma setax isalva l-profil. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
     "organizationRoleRequired": "Is-sidien u l-amministraturi tal-organizzazzjoni biss jistgħu jibdlu l-profil tal-organizzazzjoni.",
     "deleteTitle": "Ħassar il-profil",
     "deleteMessage": "Dan ineħħi b'mod permanenti l-profil u s-settings tiegħu. Dan ma jistax jitneħħa.",

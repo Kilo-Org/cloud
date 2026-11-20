@@ -4168,7 +4168,7 @@
     "personalDefaultDescription": "Laaditakse automaatselt, kui ühelgi hoidlal pole kinnitatud profiili.",
     "organizationDefaultDescription": "Laaditakse automaatselt liikmetele, kellel pole isiklikku vaikeprofiili.",
     "setAsDefault": "Määra vaikeväärtuseks",
-    "saveFailed": "Profiili ei saanud salvestada, seega midagi ei salvestatud",
+    "saveFailed": "Profiili ei saanud salvestada. Kontrolli oma ühendust ja proovi uuesti.",
     "organizationRoleRequired": "Organisatsiooni profiile saavad muuta ainult organisatsiooni omanikud ja administraatorid.",
     "deleteTitle": "Kustuta profiil",
     "deleteMessage": "See eemaldab jäädavalt profiili ja selle seaded. Seda ei saa tagasi võtta.",

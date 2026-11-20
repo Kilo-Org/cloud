@@ -4306,7 +4306,7 @@
     "personalDefaultDescription": "Carregado automaticamente quando nenhum repositório tem um perfil fixado.",
     "organizationDefaultDescription": "Carregado automaticamente para membros que não têm predefinição pessoal.",
     "setAsDefault": "Definir como predefinido",
-    "saveFailed": "Não foi possível guardar o perfil, por isso nada foi guardado",
+    "saveFailed": "Não foi possível guardar o perfil. Verifica a tua ligação e tenta novamente.",
     "organizationRoleRequired": "Apenas os proprietários da organização e os administradores podem alterar os perfis da organização.",
     "deleteTitle": "Eliminar perfil",
     "deleteMessage": "Elimina permanentemente o perfil e as respetivas definições. Esta ação não pode ser anulada.",

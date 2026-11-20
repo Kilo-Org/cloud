@@ -418,7 +418,13 @@ export async function setDefaultProfile(
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, owner);
 
-  await db.transaction(async tx => applyDefaultProfile(tx, profileId, owner));
+  await db.transaction(async tx => {
+    // Owner-wide serialization: a create that also sets the default does its own
+    // clear-then-set under this lock, and two interleaved pairs would collide on
+    // the one-default-per-owner partial unique index.
+    await lockProfileCreation(tx, owner);
+    await applyDefaultProfile(tx, profileId, owner);
+  });
 }
 
 /**

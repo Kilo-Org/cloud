@@ -4168,7 +4168,7 @@
     "personalDefaultDescription": "ምንም ማከማቻ የተሰካ መገለጫ ከሌለው በራስ-ሰር የሚጫን።",
     "organizationDefaultDescription": "ምንም የግል ነባሪ ለሌላቸው አባላት በራስ-የተጫነ።",
     "setAsDefault": "እንደ ነባሪ አዘጋጅ",
-    "saveFailed": "መገለጫ ማስቀመጥ አልተቻለም፣ ስለዚህ ምንም አልተቀመጠም",
+    "saveFailed": "መገለጫ ማስቀመጥ አልተቻለም። ግንኙነትህን ፍተሽ እና እንደገና ሞክር።",
     "organizationRoleRequired": "የድርጅት መገለጫዎችን መቀየር የሚችሉት የድርጅት ባለቤቶች እና አስተዳዳሪዎች ብቻ ናቸው።",
     "deleteTitle": "መገለጫን ሰርዝ",
     "deleteMessage": "ይሄ መገለጫውን እና ቅንብሮቹን እስከመጨረሻው ያስወግዳል። ይህ ሊቀለበስ አይችልም።",

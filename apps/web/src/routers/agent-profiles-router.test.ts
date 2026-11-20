@@ -13,7 +13,7 @@ import {
   cloud_agent_webhook_triggers,
   cli_sessions_v2,
 } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
   bindProfileToRepo,
   createProfileWithContent,
@@ -227,6 +227,15 @@ describe('Agent Profiles Router', () => {
           return rows.length;
         }
 
+        /** The var rows one profile holds, keyed by nothing else. */
+        async function countProfileVars(profileId: string): Promise<number> {
+          const rows = await db
+            .select({ id: agent_environment_profile_vars.id })
+            .from(agent_environment_profile_vars)
+            .where(eq(agent_environment_profile_vars.profile_id, profileId));
+          return rows.length;
+        }
+
         test('stores vars, commands and the default flag in one create', async () => {
           const caller = await createCallerForUser(ownerUser.id);
 
@@ -359,6 +368,80 @@ describe('Agent Profiles Router', () => {
           const listed = await caller.agentProfiles.list({});
           expect(listed.some(profile => profile.name === 'Over Cap Profile')).toBe(false);
           expect(await countOwnerVars(ownerUser.id)).toBe(varsBefore);
+        });
+
+        test('refuses a duplicate name with CONFLICT and leaves the first profile intact', async () => {
+          const caller = await createCallerForUser(ownerUser.id);
+
+          const { id: firstId } = await caller.agentProfiles.create({
+            name: 'Duplicate Name Profile',
+            vars: [
+              { key: 'PLAIN_VAR', value: 'plain-value', isSecret: false },
+              { key: 'OTHER_VAR', value: 'other-value', isSecret: false },
+            ],
+            commands: ['npm ci'],
+          });
+          const varsBefore = await countProfileVars(firstId);
+
+          await expect(
+            caller.agentProfiles.create({
+              name: 'Duplicate Name Profile',
+              vars: [{ key: 'DIFFERENT_VAR', value: 'different-value', isSecret: false }],
+              commands: ['npm run build'],
+              setAsDefault: true,
+            })
+          ).rejects.toMatchObject({
+            code: 'CONFLICT',
+            message: 'A profile with this name already exists',
+          });
+
+          const listed = await caller.agentProfiles.list({});
+          expect(listed.filter(profile => profile.name === 'Duplicate Name Profile')).toHaveLength(
+            1
+          );
+          expect(await countProfileVars(firstId)).toBe(varsBefore);
+
+          const firstProfile = await caller.agentProfiles.get({ profileId: firstId });
+          expect(firstProfile.vars.map(variable => variable.key)).toEqual([
+            'OTHER_VAR',
+            'PLAIN_VAR',
+          ]);
+          expect(firstProfile.commands.map(row => row.command)).toEqual(['npm ci']);
+        });
+
+        test('replaces an existing default when a create sets the default', async () => {
+          const caller = await createCallerForUser(ownerUser.id);
+
+          const { id: previousDefaultId } = await caller.agentProfiles.create({
+            name: 'Existing Default',
+            setAsDefault: true,
+          });
+
+          const { id: newDefaultId } = await caller.agentProfiles.create({
+            name: 'New Default',
+            setAsDefault: true,
+          });
+
+          // One default per owner, enforced by the partial unique index; the
+          // count asserts the create's clear-then-set left exactly one.
+          const defaults = await db
+            .select({ id: agent_environment_profiles.id })
+            .from(agent_environment_profiles)
+            .where(
+              and(
+                eq(agent_environment_profiles.owned_by_user_id, ownerUser.id),
+                eq(agent_environment_profiles.is_default, true)
+              )
+            );
+          expect(defaults.map(row => row.id)).toEqual([newDefaultId]);
+
+          const listed = await caller.agentProfiles.list({});
+          const defaultProfiles = listed.filter(profile => profile.isDefault);
+          expect(defaultProfiles).toHaveLength(1);
+          expect(defaultProfiles[0]?.id).toBe(newDefaultId);
+
+          const previousDefault = await caller.agentProfiles.get({ profileId: previousDefaultId });
+          expect(previousDefault.isDefault).toBe(false);
         });
       });
     });

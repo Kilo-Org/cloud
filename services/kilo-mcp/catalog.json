@@ -563,7 +563,7 @@
   "agentProfiles.create": {
     "path": "agentProfiles.create",
     "kind": "mutation",
-    "summary": "Create a new agent profile with a name and optional description, owned by the current user or an organization.",
+    "summary": "Create a new agent profile with a name and optional description, owned by the current user or an organization. The same call can store the profile's environment variables, with secret values encrypted, its setup commands, and whether it becomes the owner's default.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -634,7 +634,7 @@
       "commands",
       "setasdefault"
     ],
-    "searchBlob": "agentProfiles.create Create a new agent profile with a name and optional description, owned by the current user or an organization. agentprofiles create name description organizationid vars commands setasdefault name description organizationId vars commands setAsDefault"
+    "searchBlob": "agentProfiles.create Create a new agent profile with a name and optional description, owned by the current user or an organization. The same call can store the profile's environment variables, with secret values encrypted, its setup commands, and whether it becomes the owner's default. agentprofiles create name description organizationid vars commands setasdefault name description organizationId vars commands setAsDefault"
   },
   "agentProfiles.createAgent": {
     "path": "agentProfiles.createAgent",

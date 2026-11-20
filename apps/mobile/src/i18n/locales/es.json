@@ -4237,7 +4237,7 @@
     "personalDefaultDescription": "Se carga automáticamente cuando ningún repositorio tiene un perfil fijado.",
     "organizationDefaultDescription": "Cargado automáticamente para miembros que no tienen valores predeterminados personales.",
     "setAsDefault": "Establecer como predeterminado",
-    "saveFailed": "No se pudo guardar el perfil, así que no se guardó nada",
+    "saveFailed": "No se pudo guardar el perfil. Comprueba tu conexión e inténtalo de nuevo.",
     "organizationRoleRequired": "Solo los propietarios de la organización y los administradores pueden cambiar los perfiles de la organización.",
     "deleteTitle": "Eliminar perfil",
     "deleteMessage": "Esto elimina permanentemente el perfil y su configuración. Esto no se puede deshacer.",

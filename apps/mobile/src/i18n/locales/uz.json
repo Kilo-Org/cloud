@@ -4168,7 +4168,7 @@
     "personalDefaultDescription": "Hech bir omborda mahkamlangan profil bo'lmasa, avtomatik yuklanadi.",
     "organizationDefaultDescription": "Shaxsiy standarti bo'lmagan a'zolar uchun avtomatik yuklanadi.",
     "setAsDefault": "Standart sifatida o'rnating",
-    "saveFailed": "Profilni saqlab bo‘lmadi, shuning uchun hech narsa saqlanmadi",
+    "saveFailed": "Profilni saqlab bo‘lmadi. Internetingizni tekshirib, qayta urinib ko‘ring.",
     "organizationRoleRequired": "Faqat tashkilot egalar va administratorlar tashkilot profilini o'zgartirishi mumkin.",
     "deleteTitle": "Profilni o'chirish",
     "deleteMessage": "Bu profil va uning sozlamalarini butunlay olib tashlaydi. Buni ortga qaytarib bo‘lmaydi.",

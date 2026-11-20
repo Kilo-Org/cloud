@@ -49,6 +49,8 @@ const h = vi.hoisted(() => ({
   routeFocused: true,
   /** The edit callback the stubbed deny list forwards to the form. */
   listOnChange: null as ((next: ModelAccessDraft) => void) | null,
+  /** The stored draft's own clear, so a Discard can be asserted against it. */
+  draftClear: vi.fn(),
   /** Assigned by the harness; moves the props a refetch would deliver. */
   moveProps: null as ((next: FormProps) => void) | null,
 }));
@@ -88,7 +90,7 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
 // The durable draft is the account-scoped encrypted store, which mounts its own
 // providers; this suite drives the guard the form reports to, not the store.
 vi.mock('@/lib/persist/use-form-draft', () => ({
-  useFormDraft: () => ({ kind: 'loading', save: vi.fn(), clear: vi.fn() }),
+  useFormDraft: () => ({ kind: 'loading', save: vi.fn(), clear: h.draftClear }),
 }));
 // The real module opens the encrypted SQLCipher store, which this Node project
 // cannot import; the form reads only its key helper.
@@ -357,6 +359,25 @@ describe('ModelAccessForm leave guard', () => {
     expect(h.repeat).toHaveBeenCalledTimes(1);
     expect(h.repeatSawEnabled).toEqual([false]);
     expect(h.guard.enabled).toBe(false);
+  });
+
+  it('a confirmed Discard drops the stored draft, so the edits do not come back', async () => {
+    const root = await mountForm();
+
+    denyOneModel(root);
+    pressBack();
+    // Nothing has cleared the stored draft while the prompt is open: Keep
+    // editing and Cancel both leave the person's work in place.
+    expect(h.draftClear).not.toHaveBeenCalled();
+
+    await act(async () => {
+      discardRequest().onConfirm?.();
+      await Promise.resolve();
+    });
+
+    // Confirming Discard is the person throwing the edit away, so the draft the
+    // next mount would restore goes with it.
+    expect(h.draftClear).toHaveBeenCalledTimes(1);
   });
 
   it('Cancel disarms the guard, so a later Back leaves without a prompt', async () => {

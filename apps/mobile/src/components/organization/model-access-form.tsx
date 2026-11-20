@@ -244,6 +244,10 @@ export function ModelAccessForm({
     enabled: canEdit,
     isDirty: () => dirty,
     saving,
+    // A confirmed Discard is the person dropping the edits on purpose, so the
+    // stored draft goes with them; Cancel drops it the same way. Without this
+    // the next mount would restore exactly what they threw away.
+    onDiscard: formDraft.clear,
   });
   const savePayload = modelAccessSave({
     savedAllowList: providerAllowList,

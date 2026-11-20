@@ -6373,6 +6373,67 @@ describe('the download hold on a real call', () => {
     expect(hold.needOf('session-1')?.kind).toBe('armed');
     expect(downloads.cancelled).toStrictEqual([52]);
   });
+
+  /**
+   * Chrome names a download up to 25 ms after the tool's own command answered, which is the whole reason the hold's
+   * no-referrer wait and the settle's sign grace exist. A watch that stopped with the tool would drop that
+   * announcement: the hold's map stays empty, its attribution wait expires, and a no-referrer file is saved.
+   */
+  it('hears an announcement that lands after the tool answered but inside the settle', async () => {
+    const downloads = createFakeDownloads();
+    const { hold: real } = holdOver(downloads);
+    /** Resolves the first time the runtime opens a settle, so the announcement lands squarely inside it. */
+    const { promise: settling, resolve: settleOpened } = Promise.withResolvers<void>();
+    const hold: DownloadHold = {
+      ...real,
+      settle: async (session, window) => {
+        settleOpened();
+
+        return real.settle(session, window);
+      },
+    };
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+    const url = `${MAIN_ORIGIN}/report.txt`;
+
+    // The tool answers without naming a file: on real Chrome the announcement follows the command it caused.
+    cdp.setHandlers({ 'Input.dispatchMouseEvent': () => ({}) });
+
+    const call = runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#pay' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_click',
+    });
+
+    // Once the call is in its settle, the browser names the file — the late case a watch stopped with the tool drops.
+    await settling;
+
+    try {
+      cdp.emit('Browser.downloadWillBegin', {
+        guid: 'late-announcement',
+        suggestedFilename: 'report.txt',
+        url,
+      });
+
+      // The item carries no referrer, so the announcement just emitted is the only attribution it has.
+      hold.handle({ filename: 'report.txt', id: 71, referrer: undefined, url }, () => {});
+
+      const outcome = await call;
+
+      // The hold claimed the late announcement, so the file was stopped and named rather than saved as the user's.
+      expect(downloads.cancelled).toStrictEqual([71]);
+      expect(outcome.kind).toBe('needs_permission');
+      expect(
+        outcome.kind === 'needs_permission' && !outcome.result.ok ? outcome.result.error : ''
+      ).toContain('report.txt');
+    } finally {
+      await call;
+    }
+  });
 });
 
 /**

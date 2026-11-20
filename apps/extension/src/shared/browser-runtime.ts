@@ -3740,6 +3740,46 @@ export const createBrowserRuntime = ({
                 request.failure === undefined
             );
 
+        /**
+         * The hold's settle for this call, plus the navigation expectation re-dated to it. Both windows are measured
+         * from the tool's answer rather than the call's start, so a slow tool keeps the full budget it needs.
+         */
+        const settleHoldCall = async (settleSession: string): Promise<DownloadSettle | null> => {
+          // The tool answered, so the window a download of this call may land in starts now: a navigation that
+          // Took longer than the expectation's first span still produces its file inside the settle it owns.
+          const settleEnteredAt = Date.now();
+
+          if (downloadHold !== undefined && navigateExpectation !== null) {
+            navigateExpectation = {
+              ...navigateExpectation,
+              until: settleEnteredAt + DOWNLOAD_HOLD_SETTLE_MS + ATTRIBUTION_WAIT_MS,
+            };
+            downloadHold.navigate(navigateExpectation);
+          }
+
+          // A call with no sign of a download answers after the short grace; one that saw its tab announce a file
+          // (or a load the browser answered as one) waits the bounded item wait for the hold's decision.
+          return (
+            (await downloadHold?.settle(settleSession, {
+              graceMs: DOWNLOAD_START_GRACE_MS,
+              sign: (): DownloadSign => {
+                if (signedDownload() !== null || navigatedToFile) {
+                  return 'download';
+                }
+
+                // A Document this call started that the browser has not answered can still become a file: the
+                // Item it would produce arrives after the announcement, so the call may not answer "nothing" yet.
+                return hasUnansweredDocument() ? 'pending' : 'none';
+              },
+              since: callStartedAt,
+              // An approved call waits for the one file its approval bought: the browser creates its item a moment
+              // After the command returns, and a re-download of a delayed attachment was measured 13 ms past the
+              // Announcement bound. Every other call pays the shorter bound.
+              timeoutMs: downloadApproved ? DOWNLOAD_HOLD_SETTLE_MS : DOWNLOAD_ITEM_WAIT_MS,
+            })) ?? null
+          );
+        };
+
         try {
           dispatched = true;
 
@@ -3830,42 +3870,15 @@ export const createBrowserRuntime = ({
           // The announcement for a file no response could stop is read before the watch goes: a blob that lands
           // While the call is still answering is still this call's to report.
           stopUnguardedWatch?.();
-          stopSignWatch?.();
 
-          if (holdGuards) {
-            // The tool answered, so the window a download of this call may land in starts now: a navigation that
-            // Took longer than the expectation's first span still produces its file inside the settle it owns, and
-            // The settle's own bound is measured from here rather than from a call start it may have already spent.
-            const settleEnteredAt = Date.now();
-
-            if (downloadHold !== undefined && navigateExpectation !== null) {
-              navigateExpectation = {
-                ...navigateExpectation,
-                until: settleEnteredAt + DOWNLOAD_HOLD_SETTLE_MS + ATTRIBUTION_WAIT_MS,
-              };
-              downloadHold.navigate(navigateExpectation);
-            }
-
-            // A call with no sign of a download answers after the short grace; one that saw its tab announce a file
-            // (or a load the browser answered as one) waits the bounded item wait for the hold's decision.
-            settleState =
-              (await downloadHold?.settle(sessionKey, {
-                graceMs: DOWNLOAD_START_GRACE_MS,
-                sign: (): DownloadSign => {
-                  if (signedDownload() !== null || navigatedToFile) {
-                    return 'download';
-                  }
-
-                  // A Document this call started that the browser has not answered can still become a file: the
-                  // Item it would produce arrives after the announcement, so the call may not answer "nothing" yet.
-                  return hasUnansweredDocument() ? 'pending' : 'none';
-                },
-                since: callStartedAt,
-                // An approved call waits for the one file its approval bought: the browser creates its item a moment
-                // After the command returns, and a re-download of a delayed attachment was measured 13 ms past the
-                // Announcement bound. Every other call pays the shorter bound.
-                timeoutMs: downloadApproved ? DOWNLOAD_HOLD_SETTLE_MS : DOWNLOAD_ITEM_WAIT_MS,
-              })) ?? null;
+          // The sign watch outlives the tool by the settle, which is the window it exists to cover: Chrome names a
+          // Download up to 25 ms after the command answered, so a watch stopped with the tool would drop that
+          // Announcement. The hold's map would stay empty, its 250 ms wait would expire, and a no-referrer file would
+          // Land unapproved. The `finally` releases it on every exit, including a settle that throws.
+          try {
+            settleState = holdGuards ? await settleHoldCall(sessionKey) : null;
+          } finally {
+            stopSignWatch?.();
           }
         }
 

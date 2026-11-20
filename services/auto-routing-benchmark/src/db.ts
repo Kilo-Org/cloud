@@ -782,28 +782,70 @@ export async function getRoutingCaseResultsForEntries(
 
 export type ProbeCaseCount = { model: string; variant: string; run_id: string; probes: number };
 
+/** One pair whose provenance run may hold probe results. `variant` is the storage form. */
+export type ProbeCasePair = { runId: string; model: string; variant: string };
+
+// Three bound variables per pair plus the case list and the revision. 30 triples bind 92
+// variables, inside the same 100-variable ceiling `PROFILE_ENTRY_FILTER_BATCH_SIZE` respects.
+const PROBE_CASE_PAIR_BATCH_SIZE = 30;
+
+/**
+ * The statement that counts one batch of pairs' probe results.
+ *
+ * Exported so a test can assert the plan it produces: the composite primary key of
+ * `case_results` is `(run_id, model, variant, case_id, rep)`, so the `ON` clause must name
+ * all three leading columns or SQLite seeks each pair's whole run instead of the pair.
+ */
+export function probeCaseCountStatement(pairCount: number): string {
+  return `WITH pair(run_id, model, variant) AS (VALUES ${Array.from(
+    { length: pairCount },
+    () => '(?, ?, ?)'
+  ).join(', ')})
+         SELECT pair.run_id, pair.model, pair.variant, COUNT(DISTINCT measured.case_id) AS probes
+         FROM pair
+         LEFT JOIN case_results AS measured
+           ON measured.run_id = pair.run_id
+          AND measured.model = pair.model
+          AND measured.variant = pair.variant
+          AND measured.case_id IN (SELECT value FROM json_each(?))
+          AND measured.prompt_revision >= ?
+         GROUP BY pair.run_id, pair.model, pair.variant`;
+}
+
 /**
  * Probe results each pair's provenance run holds at `revision` or newer. A pair counts as
  * probe-complete only when `probes` reaches the number of probe cases (src/probe/eligibility.ts);
  * run completion already guarantees every repetition produced a row.
+ *
+ * The pairs are named, not their runs. `case_results` is keyed
+ * `(run_id, model, variant, case_id, rep)`, so a statement that constrains only `run_id`
+ * seeks each pair's whole run — every model, every case, every repetition — and filters
+ * the probe cuts out of it row by row. Naming the pair turns that into one composite-PK
+ * range per pair, which is what makes this affordable on a table of a few million rows.
+ * A pair with no result at all still comes back (`LEFT JOIN`) with `probes = 0`.
  */
 export async function countProbeCaseResults(
   db: D1Database,
-  params: { runIds: readonly string[]; caseIds: readonly string[]; revision: number }
+  params: { pairs: readonly ProbeCasePair[]; caseIds: readonly string[]; revision: number }
 ): Promise<ProbeCaseCount[]> {
-  if (params.runIds.length === 0 || params.caseIds.length === 0) return [];
-  const { results } = await db
-    .prepare(
-      `SELECT run_id, model, variant, COUNT(DISTINCT case_id) AS probes
-       FROM case_results
-       WHERE run_id IN (SELECT value FROM json_each(?))
-         AND case_id IN (SELECT value FROM json_each(?))
-         AND prompt_revision >= ?
-       GROUP BY run_id, model, variant`
-    )
-    .bind(JSON.stringify(params.runIds), JSON.stringify(params.caseIds), params.revision)
-    .all<ProbeCaseCount>();
-  return results;
+  if (params.pairs.length === 0 || params.caseIds.length === 0) return [];
+  const caseIds = JSON.stringify(params.caseIds);
+  const counts = new Map<string, ProbeCaseCount>();
+  for (let offset = 0; offset < params.pairs.length; offset += PROBE_CASE_PAIR_BATCH_SIZE) {
+    const batch = params.pairs.slice(offset, offset + PROBE_CASE_PAIR_BATCH_SIZE);
+    const { results } = await db
+      .prepare(probeCaseCountStatement(batch.length))
+      .bind(
+        ...batch.flatMap(pair => [pair.runId, pair.model, pair.variant]),
+        caseIds,
+        params.revision
+      )
+      .all<ProbeCaseCount>();
+    for (const row of results) {
+      counts.set(`${row.run_id}\u0000${row.model}\u0000${row.variant}`, row);
+    }
+  }
+  return [...counts.values()];
 }
 
 export async function getExistingCaseResultIds(

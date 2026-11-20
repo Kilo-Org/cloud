@@ -850,6 +850,22 @@ function joinWithAnd(fragments: SQL[]): SQL {
 }
 
 /**
+ * The percent-encoded form of a search needle, for the arm that matches a
+ * stored branch. A ref with non-ASCII text is stored percent-encoded while the
+ * row paints the decoded branch, so the encoded needle finds the row a person
+ * reads. `encodeURI` keeps `/` literal and leaves ASCII alone, so a plain
+ * needle is unchanged. A needle that cannot be encoded (a lone surrogate) keeps
+ * its own text, which only repeats the raw arm and never fails the query.
+ */
+function encodedBranchNeedle(needle: string): string {
+  try {
+    return encodeURI(needle).toLowerCase();
+  } catch {
+    return needle;
+  }
+}
+
+/**
  * Router for cli_sessions_v2 table operations.
  * Used by cloud-agent-next for session storage and retrieval.
  *
@@ -1139,6 +1155,7 @@ export const cliSessionsV2Router = createTRPCRouter({
   listWorkspaces: baseProcedure.input(WorkspaceListInputSchema).query(async ({ ctx, input }) => {
     const rawSearch = input.search?.trim().toLowerCase() ?? '';
     const needle = rawSearch.startsWith('#') ? rawSearch.slice(1) : rawSearch;
+    const encodedNeedle = encodedBranchNeedle(needle);
     const searchActive = needle.length > 0;
     const sortMode = await resolveWorkspaceSortMode(ctx.user.id, input.sortMode);
     const limit = input.limit ?? 100;
@@ -1443,10 +1460,16 @@ export const cliSessionsV2Router = createTRPCRouter({
         )
     );
 
+    // The branch is stored percent-encoded while the row paints the decoded
+    // branch, so the branch also matches the encoded form of the needle and a
+    // person searching the branch they read (`fix/請求書`) finds the row. This
+    // arm keeps `/` literal and leaves ASCII alone; the raw arm below still
+    // matches someone typing the stored form.
     const searchCondition = searchActive
       ? sql`(
             position(${needle} in lower(coalesce(${base.name}, ''))) > 0
             OR position(${needle} in lower(coalesce(${base.branch}, ''))) > 0
+            OR position(${encodedNeedle} in lower(coalesce(${base.branch}, ''))) > 0
             OR position(${needle} in lower(coalesce(${base.firstTitle}, ''))) > 0
             OR position(${needle} in lower(coalesce(${base.pr_title}, ''))) > 0
             OR cast(${base.pr_number} as text) = ${needle}
@@ -1836,6 +1859,7 @@ export const cliSessionsV2Router = createTRPCRouter({
     // literally without any escaping dance.
     const trimmed = search_string.trim().toLowerCase();
     const needle = trimmed.startsWith('#') ? trimmed.slice(1) : trimmed;
+    const encodedNeedle = encodedBranchNeedle(needle);
     // `SearchInputSchema` only enforces `min(1)`, so `'#'` and `'  '` reduce
     // to an empty needle after the trim and leading-`#` strip. In PostgreSQL
     // `position('' in …)` is always > 0, so an empty needle would match every
@@ -1848,6 +1872,11 @@ export const cliSessionsV2Router = createTRPCRouter({
         sql`position(${needle} in lower(${cli_sessions_v2.session_id}::text)) > 0`,
         sql`position(${needle} in lower(COALESCE(${cli_sessions_v2.git_url}, ''))) > 0`,
         sql`position(${needle} in lower(COALESCE(${cli_sessions_v2.git_branch}, ''))) > 0`,
+        // The ref is stored percent-encoded while the row paints the decoded
+        // branch, so a person searching the branch they read (`fix/請求書`)
+        // must still find the row. `encodeURI` keeps `/` literal and leaves
+        // ASCII alone; the arm above still matches the stored form.
+        sql`position(${encodedNeedle} in lower(COALESCE(${cli_sessions_v2.git_branch}, ''))) > 0`,
         sql`position(${needle} in lower(COALESCE(${sessionAssociatedPr.pr_title}, ''))) > 0`,
         sql`EXISTS (
           SELECT 1 FROM ${cloud_agent_worktrees}

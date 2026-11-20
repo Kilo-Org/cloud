@@ -1,11 +1,10 @@
-import { cli_sessions_v2, kilocode_users } from '@kilocode/db/schema';
+import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
-import { and, eq, inArray, or } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
-import { normalizeSeedEmail } from '../lib/email';
-import { isValidEmail } from '../lib/users';
+import { isValidEmail, resolveSeedUserId } from '../lib/users';
 
 export const usage = '<email>';
 
@@ -89,40 +88,15 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
   assertLocalSeedDatabase('app:encoded-branch-name');
   const db = getSeedDb();
-  const matches = await db
-    .select({ userId: kilocode_users.id, email: kilocode_users.google_user_email })
-    .from(kilocode_users)
-    .where(
-      or(
-        eq(kilocode_users.google_user_email, email),
-        eq(kilocode_users.normalized_email, normalizeSeedEmail(email))
-      )
-    );
-
-  if (matches.length === 0) {
-    throw new Error(
-      `No user found for email ${email}. Sign in locally first, or seed a user (pnpm dev:seed app:create-user).`
-    );
-  }
-
-  const exactMatches = matches.filter(match => match.email === email);
-  const resolvedMatches = exactMatches.length > 0 ? exactMatches : matches;
-  if (resolvedMatches.length > 1) {
-    throw new Error(
-      `Multiple users matched ${email}: ${resolvedMatches.map(match => `${match.email} (${match.userId})`).join(', ')}`
-    );
-  }
-
-  const [user] = resolvedMatches;
+  // `resolveSeedUserId` refuses a missing or ambiguous account, so the fixture
+  // never guesses which signed-in user owns the sessions.
+  const userId = await resolveSeedUserId(email);
   const sessionIds = ENCODED_BRANCH_SESSIONS.map(session => session.sessionId);
 
   await db
     .delete(cli_sessions_v2)
     .where(
-      and(
-        eq(cli_sessions_v2.kilo_user_id, user.userId),
-        inArray(cli_sessions_v2.session_id, sessionIds)
-      )
+      and(eq(cli_sessions_v2.kilo_user_id, userId), inArray(cli_sessions_v2.session_id, sessionIds))
     );
 
   const now = Date.now();
@@ -131,7 +105,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       const at = new Date(now - session.ageHours * 60 * 60 * 1000).toISOString();
       return {
         session_id: session.sessionId,
-        kilo_user_id: user.userId,
+        kilo_user_id: userId,
         title: session.title,
         created_on_platform: 'cli',
         git_url: normalizeGitUrl(GIT_URL),
@@ -156,8 +130,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   console.log(`  ${HISTORY_DEEP_LINK}`);
 
   return {
-    userId: user.userId,
-    email: user.email,
+    userId,
+    email,
     sessionIds: sessionIds.join(','),
     encodedBranch: ENCODED_BRANCH_SESSIONS[0].gitBranch,
     plainBranch: ENCODED_BRANCH_SESSIONS[1].gitBranch,

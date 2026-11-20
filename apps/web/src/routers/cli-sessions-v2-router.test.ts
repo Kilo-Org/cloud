@@ -3548,6 +3548,67 @@ describe('cli-sessions-v2-router', () => {
       const result = await caller.cliSessionsV2.search({ search_string: '  ' });
       expect(result.results).toEqual([]);
     });
+
+    describe('stored branch needle', () => {
+      const encodedBranchId = 'ses_search_branch_encoded_0001';
+      const plainBranchId = 'ses_search_branch_plain_0001';
+      const malformedBranchId = 'ses_search_branch_malformed_0001';
+      const branchIds = [encodedBranchId, plainBranchId, malformedBranchId];
+
+      beforeEach(async () => {
+        await db.insert(cli_sessions_v2).values([
+          {
+            session_id: encodedBranchId,
+            kilo_user_id: regularUser.id,
+            created_on_platform: 'cloud-agent',
+            title: 'encoded branch row',
+            git_url: 'https://github.com/kilo/branch-decode-repo',
+            git_branch: 'fix/%E8%AB%8B%E6%B1%82%E6%9B%B8',
+          },
+          {
+            session_id: plainBranchId,
+            kilo_user_id: regularUser.id,
+            created_on_platform: 'cloud-agent',
+            title: 'plain branch row',
+            git_url: 'https://github.com/kilo/branch-decode-repo',
+            git_branch: 'fix/checkout-retries',
+          },
+          {
+            session_id: malformedBranchId,
+            kilo_user_id: regularUser.id,
+            created_on_platform: 'cloud-agent',
+            title: 'malformed branch row',
+            git_url: 'https://github.com/kilo/branch-decode-repo',
+            git_branch: 'fix/100%',
+          },
+        ]);
+      });
+
+      afterEach(async () => {
+        await db.delete(cli_sessions_v2).where(inArray(cli_sessions_v2.session_id, branchIds));
+      });
+
+      it('matches the decoded branch the row paints, and the stored branch', async () => {
+        const caller = await createCallerForUser(regularUser.id);
+
+        // The row paints `fix/請求書`, so both the branch text a person reads
+        // and the stored percent-encoded ref must find the row.
+        const decoded = await caller.cliSessionsV2.search({ search_string: '請求書' });
+        expect(decoded.results.map(s => s.session_id)).toEqual([encodedBranchId]);
+        const readable = await caller.cliSessionsV2.search({ search_string: 'fix/請求書' });
+        expect(readable.results.map(s => s.session_id)).toEqual([encodedBranchId]);
+
+        // The unrelated branch stays out of both, and still matches its own.
+        expect(decoded.results.map(s => s.session_id)).not.toContain(plainBranchId);
+        expect(readable.results.map(s => s.session_id)).not.toContain(plainBranchId);
+        const plain = await caller.cliSessionsV2.search({ search_string: 'checkout' });
+        expect(plain.results.map(s => s.session_id)).toEqual([plainBranchId]);
+
+        // A lone `%` is stored literally, so the raw arm still matches it.
+        const malformed = await caller.cliSessionsV2.search({ search_string: '100%' });
+        expect(malformed.results.map(s => s.session_id)).toEqual([malformedBranchId]);
+      });
+    });
   });
 
   describe('refreshAssociatedPullRequest', () => {

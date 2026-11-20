@@ -177,7 +177,7 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Dəyişikliklər",
-    "organizationTrialEnded": "Təşkilatın sınaq müddəti başa çıxıb və aktiv planı yoxdur. Təşkilat sahibi kilo.ai ünvanında billinqi yeniləyə bilər.",
+    "organizationTrialEnded": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Təşkilat sahibi kilo.ai ünvanında billinqi yeniləyə və sonra yenidən cəhd edə bilər.",
     "privateRepositoryA11y": "{{name}}, şəxsi repozitoriya",
     "legalDocumentEnglishOnly": "Bu sənəd yalnız ingilis dilində mövcuddur.",
     "organizationTrialEndedBilling": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Billinqi yeniləyə və sonra yenidən cəhd edə bilərsiniz."
@@ -1383,7 +1383,8 @@
     "followReviewMd": "REVIEW.md təlimatlarına əməl et",
     "followReviewMdSubtitle": "Hər repozitoriyanın REVIEW.md faylındakı təlimatlara əməl et",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket qoşulmayıb. Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər."
+      "notConnectedReadOnly": "Bitbucket qoşulmayıb. Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər.",
+      "notConnectedReadOnlyPlan": "Təşkilatın sınaq müddəti başa çıxıb və aktiv planı yoxdur. Təşkilat sahibi kilo.ai ünvanında billinqi yeniləyə bilər."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} üçün Bitbucket bağlantısı kompüterdən vebdə idarə olunur.",

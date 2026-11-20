@@ -177,7 +177,7 @@
     "durationMinuteShort": "daq",
     "durationHourShort": "saac",
     "changes": "Isbeddellada",
-    "organizationTrialEnded": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Milkiilaha ururku wuxuu cusboonaysiin karaa biilasha kilo.ai.",
+    "organizationTrialEnded": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Milkiilaha ururku wuxuu cusboonaysiin karaa biilasha kilo.ai, ka dibna isku day mar kale.",
     "privateRepositoryA11y": "{{name}}, kaydka gaar ah",
     "legalDocumentEnglishOnly": "Dukumeentigan waxaa laga heli karaa af Ingiriisi oo keliya.",
     "organizationTrialEndedBilling": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Waxaad cusboonaysiin kartaa biilasha, ka dibna isku day mar kale."
@@ -1383,7 +1383,8 @@
     "followReviewMd": "Raac REVIEW.md",
     "followReviewMdSubtitle": "Raac tilmaamaha ku jira faylka REVIEW.md ee kayd kasta",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket kuma xidhna. Milkiilayaasha ururka, maamulayaasha iyo maareeyayaasha biilasha oo keliya ayaa ku xidhi kara."
+      "notConnectedReadOnly": "Bitbucket kuma xidhna. Milkiilayaasha ururka, maamulayaasha iyo maareeyayaasha biilasha oo keliya ayaa ku xidhi kara.",
+      "notConnectedReadOnlyPlan": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Milkiilaha ururku wuxuu cusboonaysiin karaa biilasha kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Xiriirka Bitbucket ee {{organization}} waxaa lagu maamulaa shabakadda iyadoo kombiyuutar la isticmaalayo.",

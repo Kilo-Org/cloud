@@ -24,7 +24,6 @@ import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { joinSentences } from '@/lib/i18n/join-sentences';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { isPermissionDeniedError, trpcErrorVariant } from '@/lib/trpc-error';
-import { trialRefusalMessage } from '@/lib/trial-refusal-copy';
 
 /**
  * The one form that connects the organization's Bitbucket workspace, in the
@@ -118,11 +117,14 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
       const roleDenial = t('codeReviewer.bitbucket.notConnectedReadOnly');
       // The same organization's lapsed plan refuses every organization change,
       // so a member must not read the role as the only blocker: the second
-      // sentence names the owner and the billing step that unblocks it. The
-      // retry re-reads the organization, the readiness and the status, because
-      // all three decide whether the plan still blocks the connection.
+      // sentence names the owner and the billing step that unblocks it. It is
+      // this sheet's own key because the retry below carries the step the
+      // shared ended-plan sentence keeps for the surfaces that have no control.
       if (org?.isTrialExpiredForEnforcement === true) {
-        deniedDescription = joinSentences([roleDenial, trialRefusalMessage(false)]);
+        deniedDescription = joinSentences([
+          roleDenial,
+          t('codeReviewer.bitbucket.notConnectedReadOnlyPlan'),
+        ]);
         deniedAction = (
           <StateAction
             label={t('common.retry')}

@@ -177,7 +177,7 @@
     "durationMinuteShort": "daq",
     "durationHourShort": "soat",
     "changes": "O'zgarishlar",
-    "organizationTrialEnded": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Tashkilot egasi kilo.ai saytida hisob-kitobni yangilashi mumkin.",
+    "organizationTrialEnded": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Tashkilot egasi kilo.ai saytida hisob-kitobni yangilab, so'ng qayta urinib ko'rishi mumkin.",
     "privateRepositoryA11y": "{{name}}, shaxsiy repozitoriya",
     "legalDocumentEnglishOnly": "Ushbu hujjat faqat ingliz tilida mavjud.",
     "organizationTrialEndedBilling": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Siz hisob-kitobni yangilab, so'ng qayta urinib ko'rishingiz mumkin."
@@ -1383,7 +1383,8 @@
     "followReviewMd": "REVIEW.md fayliga amal qilish",
     "followReviewMdSubtitle": "Har bir repozitoriyaning REVIEW.md faylidagi ko'rsatmalarga amal qilish",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ulanmagan. Faqat tashkilot egalar, administratorlar va to'lov menejerlari uni ulashi mumkin."
+      "notConnectedReadOnly": "Bitbucket ulanmagan. Faqat tashkilot egalar, administratorlar va to'lov menejerlari uni ulashi mumkin.",
+      "notConnectedReadOnlyPlan": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Tashkilot egasi kilo.ai saytida hisob-kitobni yangilashi mumkin."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} uchun Bitbucket ulanishi kompyuterdan veb orqali boshqariladi.",

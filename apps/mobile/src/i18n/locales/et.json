@@ -177,7 +177,7 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Muudatused",
-    "organizationTrialEnded": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Organisatsiooni omanik saab arveldust kilo.ai keskkonnas uuendada.",
+    "organizationTrialEnded": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Organisatsiooni omanik saab arveldust kilo.ai keskkonnas uuendada ja seejärel uuesti proovida.",
     "privateRepositoryA11y": "{{name}}, privaatne repositoorium",
     "legalDocumentEnglishOnly": "See dokument on saadaval ainult inglise keeles.",
     "organizationTrialEndedBilling": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Saad arveldust uuendada ja seejärel uuesti proovida."
@@ -1383,7 +1383,8 @@
     "followReviewMd": "Järgi faili REVIEW.md juhiseid",
     "followReviewMdSubtitle": "Järgi iga hoidla failis REVIEW.md olevaid juhiseid",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket pole ühendatud. Selle saavad ühendada ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid."
+      "notConnectedReadOnly": "Bitbucket pole ühendatud. Selle saavad ühendada ainult organisatsiooni omanikud, administraatorid ja arveldushaldurid.",
+      "notConnectedReadOnlyPlan": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Organisatsiooni omanik saab arveldust kilo.ai keskkonnas uuendada."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucketi ühendust {{organization}}-ga hallatakse arvutis veebi kaudu.",

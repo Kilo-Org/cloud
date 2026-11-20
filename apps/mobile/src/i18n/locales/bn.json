@@ -177,7 +177,7 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "পরিবর্তন",
-    "organizationTrialEnded": "সংস্থার ট্রায়াল শেষ হয়েছে এবং এর কোনো সক্রিয় প্ল্যান নেই। একজন সংস্থার মালিক kilo.ai-এ বিলিং আপডেট করতে পারেন।",
+    "organizationTrialEnded": "সংস্থার ট্রায়াল শেষ হয়েছে এবং এর কোনো সক্রিয় প্ল্যান নেই। একজন সংস্থা মালিক kilo.ai-এ বিলিং আপডেট করতে পারেন, তারপর আবার চেষ্টা করুন।",
     "privateRepositoryA11y": "{{name}}, ব্যক্তিগত রিপোজিটরি",
     "legalDocumentEnglishOnly": "এই নথিটি কেবল ইংরেজিতে উপলব্ধ।",
     "organizationTrialEndedBilling": "সংস্থার ট্রায়াল শেষ হয়েছে এবং এর কোনো সক্রিয় প্ল্যান নেই। আপনি বিলিং আপডেট করতে পারেন, তারপর আবার চেষ্টা করুন।"
@@ -1383,7 +1383,8 @@
     "followReviewMd": "REVIEW.md অনুসরণ করুন",
     "followReviewMdSubtitle": "প্রতিটি রিপোজিটরির REVIEW.md ফাইলের নির্দেশনা অনুসরণ করুন",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket সংযুক্ত নয়। শুধুমাত্র সংস্থার মালিক, অ্যাডমিন এবং বিলিং ম্যানেজাররা এটি সংযুক্ত করতে পারেন।"
+      "notConnectedReadOnly": "Bitbucket সংযুক্ত নয়। শুধুমাত্র সংস্থার মালিক, অ্যাডমিন এবং বিলিং ম্যানেজাররা এটি সংযুক্ত করতে পারেন।",
+      "notConnectedReadOnlyPlan": "সংস্থার ট্রায়াল শেষ হয়েছে এবং এর কোনো সক্রিয় প্ল্যান নেই। একজন সংস্থার মালিক kilo.ai-এ বিলিং আপডেট করতে পারেন।"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-এর Bitbucket সংযোগ কম্পিউটার থেকে ওয়েবে পরিচালনা করা হয়।",

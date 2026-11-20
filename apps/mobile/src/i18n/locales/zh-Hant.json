@@ -177,7 +177,7 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "變更",
-    "organizationTrialEnded": "組織的試用期已結束，且沒有使用中的方案。組織擁有者可以在 kilo.ai 更新帳單資訊。",
+    "organizationTrialEnded": "組織的試用期已結束，且沒有使用中的方案。組織擁有者可以在 kilo.ai 更新帳單資訊，然後再試一次。",
     "privateRepositoryA11y": "{{name}}，私有儲存庫",
     "legalDocumentEnglishOnly": "本文件僅提供英文版本。",
     "organizationTrialEndedBilling": "組織的試用期已結束，且沒有使用中的方案。您可以更新帳單資訊，然後再試一次。"
@@ -694,7 +694,8 @@
     },
     "autoReviews": "自動審查",
     "bitbucket": {
-      "notConnectedReadOnly": "尚未連結 Bitbucket。只有組織擁有者、管理員和帳單管理員可以設定連結。"
+      "notConnectedReadOnly": "尚未連結 Bitbucket。只有組織擁有者、管理員和帳單管理員可以設定連結。",
+      "notConnectedReadOnlyPlan": "組織的試用期已結束，且沒有使用中的方案。組織擁有者可以在 kilo.ai 更新帳單資訊。"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} 的 Bitbucket 連線需在電腦上透過網頁版管理。",

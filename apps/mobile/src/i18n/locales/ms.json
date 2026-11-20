@@ -177,7 +177,7 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Perubahan",
-    "organizationTrialEnded": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Pemilik organisasi boleh mengemas kini bil di kilo.ai.",
+    "organizationTrialEnded": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Pemilik organisasi boleh mengemas kini bil di kilo.ai, kemudian cuba lagi.",
     "privateRepositoryA11y": "{{name}}, repositori persendirian",
     "legalDocumentEnglishOnly": "Dokumen ini hanya tersedia dalam bahasa Inggeris.",
     "organizationTrialEndedBilling": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Anda boleh mengemas kini bil, kemudian cuba lagi."
@@ -1383,7 +1383,8 @@
     "followReviewMd": "Ikuti REVIEW.md",
     "followReviewMdSubtitle": "Patuhi fail arahan REVIEW.md dalam setiap repositori",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket tidak disambungkan. Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menyambungkannya."
+      "notConnectedReadOnly": "Bitbucket tidak disambungkan. Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh menyambungkannya.",
+      "notConnectedReadOnlyPlan": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Pemilik organisasi boleh mengemas kini bil di kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Sambungan Bitbucket untuk {{organization}} diurus di web melalui komputer.",

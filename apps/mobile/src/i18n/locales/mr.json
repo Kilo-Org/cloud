@@ -177,7 +177,7 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "बदल",
-    "organizationTrialEnded": "संस्थेची चाचणी संपली आहे आणि तिच्याकडे कोणतीही सक्रिय योजना नाही. संस्थेचा मालक kilo.ai वर बिलिंग अपडेट करू शकतो.",
+    "organizationTrialEnded": "संस्थेची चाचणी संपली आहे आणि तिच्याकडे कोणतीही सक्रिय योजना नाही. संस्थेचा मालक kilo.ai वर बिलिंग अपडेट करू शकतो, त्यानंतर पुन्हा प्रयत्न करा.",
     "privateRepositoryA11y": "{{name}}, खाजगी रेपॉजिटरी",
     "legalDocumentEnglishOnly": "हा दस्तऐवज फक्त इंग्रजीत उपलब्ध आहे.",
     "organizationTrialEndedBilling": "संस्थेची चाचणी संपली आहे आणि तिच्याकडे कोणतीही सक्रिय योजना नाही. तुम्ही बिलिंग अपडेट करू शकता, त्यानंतर पुन्हा प्रयत्न करा."
@@ -1383,7 +1383,8 @@
     "followReviewMd": "REVIEW.md मधील सूचना पाळा",
     "followReviewMdSubtitle": "प्रत्येक रिपॉझिटरीतील REVIEW.md फाइलमधील सूचना पाळा",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket जोडलेले नाही. केवळ संस्थेचे मालक, प्रशासक आणि बिलिंग व्यवस्थापक ते जोडू शकतात."
+      "notConnectedReadOnly": "Bitbucket जोडलेले नाही. केवळ संस्थेचे मालक, प्रशासक आणि बिलिंग व्यवस्थापक ते जोडू शकतात.",
+      "notConnectedReadOnlyPlan": "संस्थेची चाचणी संपली आहे आणि तिच्याकडे कोणतीही सक्रिय योजना नाही. संस्थेचा मालक kilo.ai वर बिलिंग अपडेट करू शकतो."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} चे Bitbucket कनेक्शन संगणकावरून वेबवर व्यवस्थापित केले जाते.",

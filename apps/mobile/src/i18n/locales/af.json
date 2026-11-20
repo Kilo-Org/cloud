@@ -177,7 +177,7 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Wysigings",
-    "organizationTrialEnded": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. 'n Organisasie-eienaar kan die fakturering by kilo.ai opdateer.",
+    "organizationTrialEnded": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. 'n Organisasie-eienaar kan die fakturering by kilo.ai opdateer en dan weer probeer.",
     "privateRepositoryA11y": "{{name}}, privaat bewaarplek",
     "legalDocumentEnglishOnly": "Hierdie dokument is slegs in Engels beskikbaar.",
     "organizationTrialEndedBilling": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. Jy kan die fakturering opdateer en dan weer probeer."
@@ -1383,7 +1383,8 @@
     "followReviewMd": "Volg REVIEW.md",
     "followReviewMdSubtitle": "Volg die REVIEW.md-instruksielêer in elke bewaarplek",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket is nie gekoppel nie. Slegs organisasie-eienaars, administrateurs en faktureringsbestuurders kan dit koppel."
+      "notConnectedReadOnly": "Bitbucket is nie gekoppel nie. Slegs organisasie-eienaars, administrateurs en faktureringsbestuurders kan dit koppel.",
+      "notConnectedReadOnlyPlan": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. 'n Organisasie-eienaar kan die fakturering by kilo.ai opdateer."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Die Bitbucket-verbinding vir {{organization}} word op die web vanaf 'n rekenaar bestuur.",

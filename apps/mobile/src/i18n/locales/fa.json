@@ -177,7 +177,7 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "تغییرات",
-    "organizationTrialEnded": "دوره آزمایشی سازمان به پایان رسیده است و هیچ طرح فعالی ندارد. مالک سازمان می‌تواند صورتحساب را در ⁨kilo.ai⁩ به‌روزرسانی کند.",
+    "organizationTrialEnded": "دوره آزمایشی سازمان به پایان رسیده است و هیچ طرح فعالی ندارد. مالک سازمان می‌تواند صورتحساب را در kilo.ai به‌روزرسانی کند و سپس دوباره تلاش کند.",
     "privateRepositoryA11y": "{{name}}، مخزن خصوصی",
     "legalDocumentEnglishOnly": "این سند تنها به زبان انگلیسی در دسترس است.",
     "organizationTrialEndedBilling": "دوره آزمایشی سازمان به پایان رسیده است و هیچ طرح فعالی ندارد. شما می‌توانید صورتحساب را به‌روزرسانی کنید و سپس دوباره تلاش کنید."
@@ -1383,7 +1383,8 @@
     "followReviewMd": "پیروی از REVIEW.md",
     "followReviewMdSubtitle": "رعایت دستورالعمل‌های فایل REVIEW.md در هر مخزن",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket متصل نیست. فقط مالکان سازمان، مدیران و مدیران صورتحساب می‌توانند آن را متصل کنند."
+      "notConnectedReadOnly": "Bitbucket متصل نیست. فقط مالکان سازمان، مدیران و مدیران صورتحساب می‌توانند آن را متصل کنند.",
+      "notConnectedReadOnlyPlan": "دوره آزمایشی سازمان به پایان رسیده است و هیچ طرح فعالی ندارد. مالک سازمان می‌تواند صورتحساب را در ⁨kilo.ai⁩ به‌روزرسانی کند."
     },
     "bitbucketConnect": {
       "managedOnWeb": "اتصال Bitbucket به {{organization}} از طریق وب و با رایانه مدیریت می‌شود.",

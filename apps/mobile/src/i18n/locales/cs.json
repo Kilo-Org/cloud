@@ -177,7 +177,7 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Změny",
-    "organizationTrialEnded": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Vlastník organizace může aktualizovat fakturaci na kilo.ai.",
+    "organizationTrialEnded": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Vlastník organizace může aktualizovat fakturaci na kilo.ai a poté to zkuste znovu.",
     "privateRepositoryA11y": "{{name}}, soukromý repozitář",
     "legalDocumentEnglishOnly": "Tento dokument je k dispozici pouze v angličtině.",
     "organizationTrialEndedBilling": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Fakturaci můžete aktualizovat a poté to zkuste znovu."
@@ -1429,7 +1429,8 @@
     "followReviewMd": "Řídit se pokyny v REVIEW.md",
     "followReviewMdSubtitle": "Dodržovat pokyny ze souboru REVIEW.md v každém repozitáři",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket není připojen. Připojit ho mohou pouze vlastníci organizace, správci a správci fakturace."
+      "notConnectedReadOnly": "Bitbucket není připojen. Připojit ho mohou pouze vlastníci organizace, správci a správci fakturace.",
+      "notConnectedReadOnlyPlan": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Vlastník organizace může aktualizovat fakturaci na kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Připojení Bitbucket k {{organization}} se spravuje na webu z počítače.",

@@ -177,7 +177,7 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Athruithe",
-    "organizationTrialEnded": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir le húinéir eagraíochta an billeáil a nuashonrú ag kilo.ai.",
+    "organizationTrialEnded": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir le húinéir eagraíochta an billeáil a nuashonrú ag kilo.ai agus ansin triail a bhaint as arís.",
     "privateRepositoryA11y": "{{name}}, stór príobháideach",
     "legalDocumentEnglishOnly": "Tá an doiciméad seo ar fáil i mBéarla amháin.",
     "organizationTrialEndedBilling": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir leat an billeáil a nuashonrú agus ansin triail a bhaint as arís."
@@ -1452,7 +1452,8 @@
     "followReviewMd": "Lean REVIEW.md",
     "followReviewMdSubtitle": "Lean na treoracha sna comhaid REVIEW.md i ngach stór",
     "bitbucket": {
-      "notConnectedReadOnly": "Níl Bitbucket nasctha. Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta é a cheangal."
+      "notConnectedReadOnly": "Níl Bitbucket nasctha. Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta é a cheangal.",
+      "notConnectedReadOnlyPlan": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir le húinéir eagraíochta an billeáil a nuashonrú ag kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bainistítear nasc Bitbucket le {{organization}} ar an ngréasán ó ríomhaire.",

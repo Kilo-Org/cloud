@@ -177,7 +177,7 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Өзгерістер",
-    "organizationTrialEnded": "Ұйымның сынақ мерзімі аяқталды және оның белсенді жоспары жоқ. Ұйым иесі kilo.ai сайтында төлем ақпаратын жаңарта алады.",
+    "organizationTrialEnded": "Ұйымның сынақ мерзімі аяқталды және оның белсенді жоспары жоқ. Ұйым иесі kilo.ai сайтында төлем ақпаратын жаңартып, содан кейін қайталап көре алады.",
     "privateRepositoryA11y": "{{name}}, жеке репозиторий",
     "legalDocumentEnglishOnly": "Бұл құжат тек ағылшын тілінде қолжетімді.",
     "organizationTrialEndedBilling": "Ұйымның сынақ мерзімі аяқталды және оның белсенді жоспары жоқ. Төлем ақпаратын жаңартып, содан кейін қайталап көре аласыз."
@@ -1383,7 +1383,8 @@
     "followReviewMd": "REVIEW.md нұсқауларын орындау",
     "followReviewMdSubtitle": "Әр репозиторийдегі REVIEW.md файлының нұсқауларын орындау",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket қосылмаған. Оны тек ұйым иелері, әкімшілері мен төлем менеджерлері қоса алады."
+      "notConnectedReadOnly": "Bitbucket қосылмаған. Оны тек ұйым иелері, әкімшілері мен төлем менеджерлері қоса алады.",
+      "notConnectedReadOnlyPlan": "Ұйымның сынақ мерзімі аяқталды және оның белсенді жоспары жоқ. Ұйым иесі kilo.ai сайтында төлем ақпаратын жаңарта алады."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} үшін Bitbucket қосылымы компьютерден веб арқылы басқарылады.",

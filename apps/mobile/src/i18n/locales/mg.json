@@ -177,7 +177,7 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Fiovana",
-    "organizationTrialEnded": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Ny tompon'ny fikambanana dia afaka manavao ny faktiora ao amin'ny kilo.ai.",
+    "organizationTrialEnded": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Ny tompon'ny fikambanana dia afaka manavao ny faktiora ao amin'ny kilo.ai, ary hanandrana indray.",
     "privateRepositoryA11y": "{{name}}, tahirin-kaody manokana",
     "legalDocumentEnglishOnly": "Ity antontan-taratasy ity dia tsy misy afa-tsy amin'ny teny anglisy.",
     "organizationTrialEndedBilling": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Afaka manavao ny faktiora ianao, ary hanandrana indray."
@@ -1383,7 +1383,8 @@
     "followReviewMd": "Araho ny REVIEW.md",
     "followReviewMdSubtitle": "Araho ny torolalana ao amin'ny rakitra REVIEW.md isaky ny tahirin-kaody",
     "bitbucket": {
-      "notConnectedReadOnly": "Tsy mifandray ny Bitbucket. Ny tompon'ny fikambanana, ny mpitantana, ary ny mpitantana ny faktiora ihany no afaka mampifandray azy."
+      "notConnectedReadOnly": "Tsy mifandray ny Bitbucket. Ny tompon'ny fikambanana, ny mpitantana, ary ny mpitantana ny faktiora ihany no afaka mampifandray azy.",
+      "notConnectedReadOnlyPlan": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Ny tompon'ny fikambanana dia afaka manavao ny faktiora ao amin'ny kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Ny fifandraisana Bitbucket amin'ny {{organization}} dia tantanana amin'ny tranonkala, avy amin'ny solosaina.",

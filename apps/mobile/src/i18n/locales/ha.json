@@ -177,7 +177,7 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Canje-canje",
-    "organizationTrialEnded": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Mai mallakar ƙungiyar zai iya sabunta lissafin kuɗi a kilo.ai.",
+    "organizationTrialEnded": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Mai mallakar ƙungiyar zai iya sabunta lissafin kuɗi a kilo.ai, sannan ya sake gwadawa.",
     "privateRepositoryA11y": "{{name}}, ma'ajiya na sirri",
     "legalDocumentEnglishOnly": "Wannan takarda tana samuwa cikin Turanci kawai.",
     "organizationTrialEndedBilling": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Za ka iya sabunta lissafin kuɗi, sannan ka sake gwadawa."
@@ -1383,7 +1383,8 @@
     "followReviewMd": "Bi REVIEW.md",
     "followReviewMdSubtitle": "Bi umarnin fayil ɗin REVIEW.md na kowace ma'ajiya",
     "bitbucket": {
-      "notConnectedReadOnly": "Ba a haɗa Bitbucket ba. Masu ƙungiya, masu gudanarwa, da manajannin biyan kuɗi kawai za su iya haɗa shi."
+      "notConnectedReadOnly": "Ba a haɗa Bitbucket ba. Masu ƙungiya, masu gudanarwa, da manajannin biyan kuɗi kawai za su iya haɗa shi.",
+      "notConnectedReadOnlyPlan": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Mai mallakar ƙungiyar zai iya sabunta lissafin kuɗi a kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Ana sarrafa haɗin Bitbucket da {{organization}} a yanar gizo daga kwamfuta.",

@@ -177,7 +177,7 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Chanjman",
-    "organizationTrialEnded": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Yon pwopriyetè òganizasyon ka mete ajou faktirasyon sou kilo.ai.",
+    "organizationTrialEnded": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Yon pwopriyetè òganizasyon ka mete ajou faktirasyon sou kilo.ai, epi eseye ankò.",
     "privateRepositoryA11y": "{{name}}, repòsitwa prive",
     "legalDocumentEnglishOnly": "Dokiman sa a disponib nan lang angle sèlman.",
     "organizationTrialEndedBilling": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Ou ka mete ajou faktirasyon, epi eseye ankò."
@@ -1383,7 +1383,8 @@
     "followReviewMd": "Swiv REVIEW.md",
     "followReviewMdSubtitle": "Respekte fichye enstriksyon REVIEW.md nan chak depo",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket pa konekte. Se sèlman pwopriyetè òganizasyon an, administratè yo ak responsab faktirasyon yo ki ka konekte li."
+      "notConnectedReadOnly": "Bitbucket pa konekte. Se sèlman pwopriyetè òganizasyon an, administratè yo ak responsab faktirasyon yo ki ka konekte li.",
+      "notConnectedReadOnlyPlan": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Yon pwopriyetè òganizasyon ka mete ajou faktirasyon sou kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Koneksyon Bitbucket pou {{organization}} jere sou entènèt la, apati yon òdinatè.",

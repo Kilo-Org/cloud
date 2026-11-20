@@ -177,7 +177,7 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Breytingar",
-    "organizationTrialEnded": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Eigandi fyrirtækis getur uppfært greiðsluupplýsingar á kilo.ai.",
+    "organizationTrialEnded": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Eigandi fyrirtækis getur uppfært greiðsluupplýsingar á kilo.ai og reynir síðan aftur.",
     "privateRepositoryA11y": "{{name}}, einkakóðasafn",
     "legalDocumentEnglishOnly": "Þetta skjal er aðeins tiltækt á ensku.",
     "organizationTrialEndedBilling": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Þú getur uppfært greiðsluupplýsingar og reynir síðan aftur."
@@ -1383,7 +1383,8 @@
     "followReviewMd": "Fylgja REVIEW.md",
     "followReviewMdSubtitle": "Fylgja leiðbeiningum í REVIEW.md-skrá hverrar geymslu",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket er ekki tengt. Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta tengt það."
+      "notConnectedReadOnly": "Bitbucket er ekki tengt. Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta tengt það.",
+      "notConnectedReadOnlyPlan": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Eigandi fyrirtækis getur uppfært greiðsluupplýsingar á kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-tengingu við {{organization}} er stjórnað á vefnum í tölvu.",

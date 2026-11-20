@@ -268,7 +268,7 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Changes",
-    "organizationTrialEnded": "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai.",
+    "organizationTrialEnded": "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again.",
     "privateRepositoryA11y": "{{name}}, private repository",
     "legalDocumentEnglishOnly": "This document is available in English only.",
     "organizationTrialEndedBilling": "The organization's trial has ended and it has no active plan. You can update billing, then try again."
@@ -1474,7 +1474,8 @@
     "followReviewMd": "Follow REVIEW.md",
     "followReviewMdSubtitle": "Honor per-repo REVIEW.md instruction files",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket isn't connected. Only organization owners, admins, and billing managers can connect it."
+      "notConnectedReadOnly": "Bitbucket isn't connected. Only organization owners, admins, and billing managers can connect it.",
+      "notConnectedReadOnlyPlan": "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "The Bitbucket connection for {{organization}} is managed on the web from a computer.",

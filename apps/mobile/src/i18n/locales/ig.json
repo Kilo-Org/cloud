@@ -177,7 +177,7 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Mgbanwe",
-    "organizationTrialEnded": "Oge nnwale nke òtù ahụ agwụla na o nweghị atụmatụ na-arụ ọrụ. Onye nwe òtù nwere ike imelite nhazi ụgwọ na kilo.ai.",
+    "organizationTrialEnded": "Oge nnwale nke òtù ahụ agwụla na o nweghị atụmatụ na-arụ ọrụ. Onye nwe òtù nwere ike imelite nhazi ụgwọ na kilo.ai, wee nwaa ọzọ.",
     "privateRepositoryA11y": "{{name}}, ebe nchekwa koodu nkeonwe",
     "legalDocumentEnglishOnly": "Akwụkwọ a dị naanị n'asụsụ Bekee.",
     "organizationTrialEndedBilling": "Oge nnwale nke òtù ahụ agwụla na o nweghị atụmatụ na-arụ ọrụ. Ị nwere ike imelite nhazi ụgwọ, wee nwaa ọzọ."
@@ -1383,7 +1383,8 @@
     "followReviewMd": "Soro REVIEW.md",
     "followReviewMdSubtitle": "Soro ntụziaka faịlụ REVIEW.md dị n'ebe nchekwa ọ bụla",
     "bitbucket": {
-      "notConnectedReadOnly": "E jikọghị Bitbucket. Naanị ndị nwe nzukọ, ndị nchịkwa, na ndị njikwa ịgba ụgwọ nwere ike ijikọ ya."
+      "notConnectedReadOnly": "E jikọghị Bitbucket. Naanị ndị nwe nzukọ, ndị nchịkwa, na ndị njikwa ịgba ụgwọ nwere ike ijikọ ya.",
+      "notConnectedReadOnlyPlan": "Oge nnwale nke òtù ahụ agwụla na o nweghị atụmatụ na-arụ ọrụ. Onye nwe òtù nwere ike imelite nhazi ụgwọ na kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "A na-elekọta njikọ Bitbucket nke {{organization}} na weebụ site na kọmputa.",

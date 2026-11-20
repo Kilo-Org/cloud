@@ -121,10 +121,12 @@ describe('BitbucketConnectSheet', () => {
     const [denied] = root.findAll(node => Object.is(node.type, PERMISSION_DENIED));
     // The role is not the only blocker: the same organization's lapsed plan
     // refuses the connection too, so the description carries both sentences.
+    // The second one is this sheet's own key: the shared ended-plan sentence
+    // keeps the "then try again" clause for the surfaces with no control.
     expect(denied?.props.description).toBe(
       joinSentences([
         i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'),
-        i18n.t('common.organizationTrialEnded'),
+        i18n.t('codeReviewer.bitbucket.notConnectedReadOnlyPlan'),
       ])
     );
     // The plan is the blocker the reader cannot clear by role, so the denial

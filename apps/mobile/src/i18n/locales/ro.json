@@ -177,7 +177,7 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Modificări",
-    "organizationTrialEnded": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Un proprietar al organizației poate actualiza facturarea pe kilo.ai.",
+    "organizationTrialEnded": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Un proprietar al organizației poate actualiza facturarea pe kilo.ai, apoi poate încerca din nou.",
     "privateRepositoryA11y": "{{name}}, repository privat",
     "legalDocumentEnglishOnly": "Acest document este disponibil doar în engleză.",
     "organizationTrialEndedBilling": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Poți actualiza facturarea, apoi poți încerca din nou."
@@ -1406,7 +1406,8 @@
     "followReviewMd": "Respectă REVIEW.md",
     "followReviewMdSubtitle": "Respectă instrucțiunile din fișierul REVIEW.md al fiecărui depozit",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nu este conectat. Doar proprietarii, administratorii și managerii de facturare ai organizației îl pot conecta."
+      "notConnectedReadOnly": "Bitbucket nu este conectat. Doar proprietarii, administratorii și managerii de facturare ai organizației îl pot conecta.",
+      "notConnectedReadOnlyPlan": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Un proprietar al organizației poate actualiza facturarea pe kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Conexiunea Bitbucket pentru {{organization}} se gestionează pe web, de pe un computer.",

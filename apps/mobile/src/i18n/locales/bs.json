@@ -177,7 +177,7 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Izmjene",
-    "organizationTrialEnded": "Probni period organizacije je završen i ona nema aktivan plan. Vlasnik organizacije može ažurirati naplatu na kilo.ai.",
+    "organizationTrialEnded": "Probni period organizacije je završen i ona nema aktivan plan. Vlasnik organizacije može ažurirati naplatu na kilo.ai, a zatim pokušati ponovo.",
     "privateRepositoryA11y": "{{name}}, privatno spremište",
     "legalDocumentEnglishOnly": "Ovaj dokument je dostupan samo na engleskom jeziku.",
     "organizationTrialEndedBilling": "Probni period organizacije je završen i ona nema aktivan plan. Možete ažurirati naplatu, a zatim pokušati ponovo."
@@ -1406,7 +1406,8 @@
     "followReviewMd": "Slijedi upute iz REVIEW.md",
     "followReviewMdSubtitle": "Poštuj upute iz datoteke REVIEW.md u svakom repozitoriju",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu ga povezati."
+      "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu ga povezati.",
+      "notConnectedReadOnlyPlan": "Probni period organizacije je završen i ona nema aktivan plan. Vlasnik organizacije može ažurirati naplatu na kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket vezom s {{organization}} upravlja se na webu s računara.",

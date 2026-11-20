@@ -177,7 +177,7 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Modifiche",
-    "organizationTrialEnded": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Il proprietario dell'organizzazione può aggiornare la fatturazione su kilo.ai.",
+    "organizationTrialEnded": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Il proprietario dell'organizzazione può aggiornare la fatturazione su kilo.ai, poi riprova.",
     "privateRepositoryA11y": "{{name}}, repository privato",
     "legalDocumentEnglishOnly": "Questo documento è disponibile solo in inglese.",
     "organizationTrialEndedBilling": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Puoi aggiornare la fatturazione, poi riprova."
@@ -661,7 +661,8 @@
     },
     "autoReviews": "Revisioni automatiche",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket non è connesso. Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono connetterlo."
+      "notConnectedReadOnly": "Bitbucket non è connesso. Solo i proprietari dell'organizzazione, gli amministratori e i responsabili della fatturazione possono connetterlo.",
+      "notConnectedReadOnlyPlan": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Il proprietario dell'organizzazione può aggiornare la fatturazione su kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "La connessione Bitbucket per {{organization}} si gestisce sul web da un computer.",

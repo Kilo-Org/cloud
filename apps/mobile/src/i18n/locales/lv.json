@@ -177,7 +177,7 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Izmaiņas",
-    "organizationTrialEnded": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Organizācijas īpašnieks var atjaunināt norēķinu informāciju vietnē kilo.ai.",
+    "organizationTrialEnded": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Organizācijas īpašnieks var atjaunināt norēķinu informāciju vietnē kilo.ai un pēc tam mēģināt vēlreiz.",
     "privateRepositoryA11y": "{{name}}, privāts repozitorijs",
     "legalDocumentEnglishOnly": "Šis dokuments ir pieejams tikai angļu valodā.",
     "organizationTrialEndedBilling": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Jūs varat atjaunināt norēķinu informāciju un pēc tam mēģināt vēlreiz."
@@ -1406,7 +1406,8 @@
     "followReviewMd": "Ievērot REVIEW.md norādījumus",
     "followReviewMdSubtitle": "Ievērot katra repozitorija REVIEW.md failā sniegtos norādījumus",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nav pievienots. To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki."
+      "notConnectedReadOnly": "Bitbucket nav pievienots. To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki.",
+      "notConnectedReadOnlyPlan": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Organizācijas īpašnieks var atjaunināt norēķinu informāciju vietnē kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} Bitbucket savienojums tiek pārvaldīts tīmeklī no datora.",

@@ -177,7 +177,7 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Änderungen",
-    "organizationTrialEnded": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Ein Inhaber der Organisation kann die Abrechnung unter kilo.ai aktualisieren.",
+    "organizationTrialEnded": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Ein Inhaber der Organisation kann die Abrechnung unter kilo.ai aktualisieren und es dann erneut versuchen.",
     "privateRepositoryA11y": "{{name}}, privates Repository",
     "legalDocumentEnglishOnly": "Dieses Dokument ist nur auf Englisch verfügbar.",
     "organizationTrialEndedBilling": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Sie können die Abrechnung aktualisieren und es dann erneut versuchen."
@@ -694,7 +694,8 @@
     },
     "autoReviews": "Automatische Reviews",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ist nicht verbunden. Nur Organisationsinhaber, Admins und Abrechnungsmanager können die Verbindung herstellen."
+      "notConnectedReadOnly": "Bitbucket ist nicht verbunden. Nur Organisationsinhaber, Admins und Abrechnungsmanager können die Verbindung herstellen.",
+      "notConnectedReadOnlyPlan": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Ein Inhaber der Organisation kann die Abrechnung unter kilo.ai aktualisieren."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Die Bitbucket-Verbindung für {{organization}} wird im Web über einen Computer verwaltet.",

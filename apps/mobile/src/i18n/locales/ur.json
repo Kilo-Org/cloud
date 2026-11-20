@@ -177,7 +177,7 @@
     "durationMinuteShort": "منٹ",
     "durationHourShort": "گھنٹہ",
     "changes": "تبدیلیاں",
-    "organizationTrialEnded": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ تنظیم کا مالک ⁨kilo.ai⁩ پر بلنگ اپ ڈیٹ کر سکتا ہے۔",
+    "organizationTrialEnded": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ تنظیم کا مالک kilo.ai پر بلنگ اپ ڈیٹ کر سکتا ہے، پھر دوبارہ کوشش کریں۔",
     "privateRepositoryA11y": "{{name}}، نجی ریپوزٹری",
     "legalDocumentEnglishOnly": "یہ دستاویز صرف انگریزی میں دستیاب ہے۔",
     "organizationTrialEndedBilling": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ آپ بلنگ اپ ڈیٹ کر سکتے ہیں، پھر دوبارہ کوشش کریں۔"
@@ -1383,7 +1383,8 @@
     "followReviewMd": "REVIEW.md کی پیروی کریں",
     "followReviewMdSubtitle": "ہر ریپوزٹری کی REVIEW.md فائل میں دی گئی ہدایات پر عمل کریں",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket منسلک نہیں ہے۔ صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔"
+      "notConnectedReadOnly": "Bitbucket منسلک نہیں ہے۔ صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔",
+      "notConnectedReadOnlyPlan": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ تنظیم کا مالک ⁨kilo.ai⁩ پر بلنگ اپ ڈیٹ کر سکتا ہے۔"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} کا Bitbucket کنکشن کمپیوٹر سے ویب پر منظم کیا جاتا ہے۔",

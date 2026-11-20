@@ -29,6 +29,13 @@ export type SessionPreviewTranscriptState = {
   /** The failed read's error; undefined before the first failure. */
   error: unknown;
   onRetry: () => void;
+  /**
+   * Where an empty transcript sits. The default `'static'` keeps the card's
+   * reserved layout, so the state cannot move the card it renders in; `'center'`
+   * is for a caller whose transcript is the whole surface below a screen header,
+   * and lets the state centre itself in the free space below that header.
+   */
+  emptyPlacement?: 'center' | 'static';
 };
 
 /**
@@ -45,6 +52,7 @@ export function SessionPreviewTranscript({
   isError,
   error,
   onRetry,
+  emptyPlacement = 'static',
 }: Readonly<SessionPreviewTranscriptState>) {
   const { t } = useTranslation();
   const empty = messages.length === 0;
@@ -75,7 +83,7 @@ export function SessionPreviewTranscript({
       <EmptyState
         icon={MessageCircle}
         title={t('agentChat.session.emptyTitle')}
-        placement="static"
+        placement={emptyPlacement}
         inset="gutter"
         className="w-full"
       />

@@ -1,4 +1,7 @@
-import { BenchmarkRoutingTableResponseSchema, type AutoRouter } from '@kilocode/auto-routing-contracts';
+import {
+  BenchmarkRoutingTableResponseSchema,
+  type AutoRouter,
+} from '@kilocode/auto-routing-contracts';
 import { formatError } from '@kilocode/worker-utils';
 import { getLatestRoutingTable } from './db';
 

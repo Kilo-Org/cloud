@@ -1312,7 +1312,7 @@ const resolveScriptingTarget = (
 
   if (entry?.selector === undefined) {
     return {
-      error: `Unknown element reference ${ref}. Take a fresh kilo_browser_snapshot and use a ref from it.`,
+      error: `Unknown element reference ${ref}. Take a new page snapshot and use a ref from it.`,
       kind: 'error',
     };
   }
@@ -2147,7 +2147,24 @@ export const createBrowserToolSession = ({
     // Counted before the attach request so a detach that lands while the domains are being enabled is not overwritten by `attached = true` below.
     const detachCountBeforeAttach = detachCount;
 
-    await debuggerApi.attach(target, DEBUGGER_PROTOCOL_VERSION);
+    try {
+      await debuggerApi.attach(target, DEBUGGER_PROTOCOL_VERSION);
+    } catch (error) {
+      /*
+       * Chrome keeps this extension's debugger on the tab when it stops the service worker, and refuses the new
+       * worker's attach while it is there. That attachment is the extension's own: release it and attach again.
+       * Another debugger's attachment cannot be released from here, so the second attach reports it as before.
+       */
+      const message = error instanceof Error ? error.message : '';
+
+      if (!message.startsWith('Another debugger is already attached')) {
+        throw error;
+      }
+
+      // Chrome sends no `onDetach` for the extension's own `detach` (only for a closed target or a cancelled infobar), so `detachCount` still counts browser detaches only.
+      await detachQuietly();
+      await debuggerApi.attach(target, DEBUGGER_PROTOCOL_VERSION);
+    }
 
     try {
       for (const method of ENABLED_CDP_DOMAINS) {
@@ -2828,8 +2845,7 @@ export const createBrowserToolSession = ({
 
       if (request === undefined) {
         return {
-          error:
-            'No matching network request. Use kilo_browser_network_requests for the numbered list.',
+          error: 'No matching network request. List the network requests for the numbered list.',
           ok: false,
         };
       }
@@ -3424,7 +3440,7 @@ export const createBrowserToolSession = ({
 
         if (list === undefined || tool === undefined) {
           return {
-            error: `WebMCP tool "${parsed.data.name}" is not available. Call kilo_browser_webmcp_list first.`,
+            error: `WebMCP tool "${parsed.data.name}" is not available. List the page's WebMCP tools first.`,
             ok: false,
           };
         }

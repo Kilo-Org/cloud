@@ -19,7 +19,9 @@
     "presenceStatus": "Værter: {{connection}}",
     "commandStatus": "Kommandolevering: {{status}}",
     "delivered": "Leveret",
-    "expired": "Udløbet"
+    "expired": "Udløbet",
+    "recoveryGaps_one": "{{displayCount}} del af denne transskription mangler.",
+    "recoveryGaps_other": "{{displayCount}} dele af denne transskription mangler."
   },
   "common": {
     "manageOnWeb": "Administrer på nettet",
@@ -172,6 +174,7 @@
     "generating": "Genererer…",
     "working": "I gang",
     "yourOwnRepositories": "Dine egne kodelagre",
+    "organizationRepositories": "Organisationens kodelagre",
     "dismissed": "Afvist",
     "agent": "Agent",
     "durationMinuteShort": "min",
@@ -962,6 +965,8 @@
       "pendingComment": "usendte kommentarer",
       "pendingComment_other": "usendte kommentarer",
       "submitCountOfTotal": "Send {{displayFreshCount}} af {{displayTotalCount}} kommentarer",
+      "submitCountOfTotal_one": "Send {{displayFreshCount}} af {{displayTotalCount}} kommentarer",
+      "submitCountOfTotal_other": "Send {{displayFreshCount}} af {{displayTotalCount}} kommentarer",
       "submitReview": "Send gennemgang",
       "partialPostedFresh": "{{displayFreshCount}} kommentar(er) er sendt. ",
       "partialPostedFresh_one": "{{displayFreshCount}} kommentar(er) er sendt. ",
@@ -1026,7 +1031,10 @@
     "tabs": {
       "overview": "Oversigt",
       "files": "Filer",
-      "discussion": "Diskussion"
+      "discussion": "Diskussion",
+      "discussionAccessibility_one": "{{title}}: 1 kommentar",
+      "discussionAccessibility": "{{title}}: {{displayCount}} kommentarer",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} kommentarer"
     },
     "fileStatus": {
       "modified": "Ændret",
@@ -1223,7 +1231,7 @@
     },
     "instructions": {
       "title": "Brugerdefinerede instruktioner",
-      "deprecation": "Brugerdefinerede instruktioner er planlagt til udfasning. Flyt i stedet retningslinjerne til en REVIEW.md-fil i dit kodelager.",
+      "deprecation": "Brugerdefinerede instruktioner bliver fjernet. Flyt i stedet retningslinjerne til en REVIEW.md-fil i dit kodelager.",
       "placeholder": "f.eks. overhold vores regler for fejlhåndtering…",
       "clearTitle": "Fjern brugerdefinerede instruktioner?",
       "clearMessage": "Når du gemmer et tomt felt, slettes de brugerdefinerede instruktioner, der er gemt for denne anmelder."
@@ -1387,8 +1395,12 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-forbindelsen til {{organization}} administreres på nettet fra en computer.",
+      "managedOnWebTitle": "Administreres på nettet",
+      "managedOnWebShort": "Denne forbindelse administreres på nettet fra en computer.",
+      "managedOnWebRepositories": "Vælg repositorier for {{organization}} på nettet fra en computer.",
       "description": "Opret et adgangstoken til arbejdsområdet for {{organization}}, og indsæt det nedenfor.",
       "descriptionReconnect": "Opret et nyt adgangstoken til arbejdsområdet for {{organization}}, og indsæt det nedenfor.",
+      "descriptionOverview": "Opret et adgangstoken til arbejdsområdet for {{organization}}, og indsæt det på næste skærm.",
       "scopes": "Konto: læse · Kodelagre: læse/skrive · Pull requests: læse · Webhooks: læse/skrive",
       "tokenPlaceholder": "Adgangstoken til arbejdsområdet",
       "tokenRefused": "Bitbucket accepterede ikke dette adgangstoken til arbejdsområdet. Kontroller, at det har tilladelserne ovenfor, og prøv derefter igen."
@@ -1409,6 +1421,7 @@
     "platformList": {
       "checking": "Kontrollerer…",
       "statusUnavailable": "Status utilgængelig",
+      "needsAttention": "Kræver opmærksomhed",
       "platforms": "Platforme",
       "activity": "Aktivitet"
     },
@@ -2779,6 +2792,8 @@
     "modelPicker": {
       "title": "Vælg model",
       "noModelsDescription": "Der er ingen modeller at vælge imellem.",
+      "allUnavailableTitle": "Ingen modeller kan bruges",
+      "allUnavailableDescription": "Tilføj en udbydernøgle, og prøv igen.",
       "favorites": "Favoritter"
     },
     "modelSelector": {
@@ -3183,6 +3198,8 @@
     "retryHint": "Prøver at indlæse status for Kilo Pass igen.",
     "endedOn": "Afsluttet {{date}}",
     "notAvailableInApp": "Kilo Pass er ikke tilgængeligt i appen.",
+    "notAvailableTitle": "Kilo Pass findes ikke i appen",
+    "noPassDescription": "Denne konto har ikke Kilo Pass.",
     "statusActive": "Aktiv",
     "statusTrialing": "Prøveperiode",
     "statusPastDue": "Betaling forfalden",
@@ -3465,7 +3482,7 @@
       "retentionLimit": "Viser de seneste fakturaer."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Aktivér advarsel om lav saldo",
+      "subtitle": "Send en advarsel via e-mail til de adresser, du angiver, når organisationens saldo falder under det beløb, du har angivet.",
       "notifyEmailsLabel": "Modtagernes e-mailadresser",
       "permissionDenied": "Du har ikke tilladelse til at administrere advarsler om fakturering.",
       "separateEmailsHint": "Adskil e-mailadresser med kommaer.",
@@ -3612,8 +3629,7 @@
       "renameTitle": "Omdøb organisation",
       "renamePlaceholder": "Organisationens navn",
       "balance": "Saldo",
-      "organizationSeats": "Pladser i organisationen",
-      "plan": "Organisationsplan",
+      "plan": "Plan",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Udløbet",
@@ -3647,7 +3663,8 @@
     "signupStepUp": "Brug '$t(login.moreSignInOptions)' for at færdiggøre oprettelsen af din konto.",
     "signupStepUpApple": "Brug '$t(login.signInWithApple)' for at færdiggøre oprettelsen af din konto.",
     "signupStepUpGoogle": "Brug '$t(login.signInWithGoogle)' for at færdiggøre oprettelsen af din konto.",
-    "invalidCode": "Koden er forkert. Prøv igen.",
+    "signupStepUpBack": "Gå tilbage og brug '$t(login.moreSignInOptions)' for at færdiggøre oprettelsen af din konto.",
+    "invalidCode": "Koden er forkert eller udløbet. Prøv igen eller brug '$t(login.resendCode)'.",
     "codeInProgress": "Din kode behandles. Vent et øjeblik, og prøv igen.",
     "tooManyAttempts": "For mange forsøg. Bed om en ny kode.",
     "invalidToken": "Det lykkedes ikke at logge ind. Prøv igen.",
@@ -3916,6 +3933,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) sender en kort inferensforespørgsel til dette endepunkt med den valgte protokol og model. Udbyderen kan opkræve betaling for det.",
       "connectionSucceeded": "Modellen gennemførte en forespørgsel med denne protokol.",
       "connectionFailed": "Modellen kunne ikke gennemføre en forespørgsel. Tjek API-roden, protokollen, loginoplysningerne og model-ID'et.",
+      "requestTimedOut": "Endepunktet svarede ikke i tide. Tjek API-roden og din forbindelse, og prøv igen.",
+      "requestUnauthorized": "Endepunktet afviste loginoplysningerne. Tjek API-nøglen og de tilpassede headere, og prøv igen.",
+      "requestNotFound": "Endepunktet eller modellen blev ikke fundet. Tjek API-roden og model-ID'et.",
+      "requestRateLimited": "Endepunktet begrænser forespørgsler. Vent et øjeblik, og prøv igen.",
+      "requestUnavailable": "Endepunktet er utilgængeligt lige nu. Prøv igen om et øjeblik.",
+      "requestUnreachable": "Der kunne ikke opnås forbindelse til endepunktet. Tjek API-roden og din forbindelse.",
+      "requestInvalidResponse": "Endepunktet svarede ikke i det forventede format. Tjek, at API-roden og protokollen svarer til serveren, og prøv igen.",
+      "discoveryNoModels": "Endepunktet angav ingen modeller. Tilføj modeller manuelt.",
+      "connectionIncomplete": "Modellen svarede, men blev ikke færdig. Prøv igen, eller tjek model-ID'et og protokollen.",
       "invalidInput": "Indtast et servernavn, gyldige headere og mindst én model med et entydigt ID og navn. Tokengrænser skal være positive heltal.",
       "invalidUrl": "Indtast en HTTP- eller HTTPS-API-rod uden loginoplysninger, forespørgselsparametre eller et fragment.",
       "publicHttp": "Offentlige HTTP-endepunkter er ikke tilladt. Brug HTTPS eller et privat lokalt endepunkt.",
@@ -4054,10 +4080,20 @@
     "reasoningEffort": {
       "modelFlag": "Denne model understøtter ræsonnementsniveau"
     },
-    "creditsRequired": "Ikke nok kreditter til at sende denne besked."
+    "creditsRequired": "Ikke nok kreditter til at sende denne besked.",
+    "providerKeyRefused": "Udbyderen afviste loginoplysningerne. Tjek dens API-nøgle, og send igen.",
+    "providerModelMissing": "Denne server leverer ikke længere denne model. Vælg en anden.",
+    "providerRateLimited": "Udbyderen begrænser forespørgsler. Vent et øjeblik, og send igen.",
+    "providerUnavailable": "Udbyderen er utilgængelig lige nu. Send igen om kort tid."
   },
   "settingsTools": {
-    "confirmTitle": "Bekræft denne ændring?"
+    "confirmTitle": "Bekræft denne ændring?",
+    "guarded": {
+      "spendAlertsOff": "Slå forbrugsadvarsler fra? Du vil ikke længere modtage notifikationer om overskridelser af forbrugstærskler og timebaserede stigninger.",
+      "balanceAlertsOff": "Slå saldoadvarsler fra? Du vil ikke længere modtage notifikationer, når du er ved at løbe tør for kreditter.",
+      "securityFindingsOff": "Slå sikkerhedsfund fra? Du vil ikke længere modtage notifikationer om nye sikkerhedsfund.",
+      "hideBalanceOn": "Skjul dine saldi? Kreditsaldi vil ikke længere blive vist på profilskærmene og i organisationshubben."
+    }
   },
   "appActions": {
     "start": {
@@ -4429,6 +4465,7 @@
     "pickPackToBuyAgain": "Vælg en pakke ovenfor for at starte et nyt køb.",
     "purchasePending": "Butikken behandler stadig denne betaling. Dine kreditter kommer, så snart den godkender opkrævningen.",
     "buyAgain": "Køb igen",
+    "checkPurchase": "Tjek købet",
     "purchaseOwnedByAnotherAccount": "Kreditterne på denne Apple-konto tilhører en anden Kilo-konto. Log ind på den Kilo-konto for at bruge dem.",
     "purchaseOwnedByAnotherAccountPlay": "Kreditterne på denne Google Play-konto tilhører en anden Kilo-konto. Log ind på den Kilo-konto for at bruge dem."
   },
@@ -4522,7 +4559,9 @@
     },
     "saveSheet": {
       "title": "Gem på liste",
-      "saved": "Gemt på {{list}}"
+      "saved": "Gemt på {{list}}",
+      "saveFailed": "Kunne ikke gemme opgaven. Tjek din forbindelse, og prøv igen.",
+      "saveRefused": "Kunne ikke gemme opgaven på denne liste. Vælg en anden liste."
     }
   },
   "agentBriefing": {
@@ -4534,6 +4573,7 @@
     "empty": "Ingen aktivitet i dette briefingvindue",
     "emptyHint": "Dine cloud- og CLI-kodesessioner vises her, når en planlagt briefing har aktivitet.",
     "loadError": "Kunne ikke indlæse briefinger",
+    "estimateLoadError": "Kunne ikke indlæse estimatet.",
     "view": "Læs briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4801,7 +4841,7 @@
   },
   "organizationGuardrails": {
     "title": "AI-sikkerhedsgrænser",
-    "permissionDenied": "Kun organisationens ejere og administratorer kan administrere AI-sikkerhedsgrænser.",
+    "permissionDenied": "Kun organisationens ejere og administratorer kan administrere AI-sikkerhedsgrænser. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AI-sikkerhedsgrænser er ikke aktiveret",
     "unavailable": "Kilo aktiverer AI-sikkerhedsgrænser for en organisation efter anmodning. Kontakt {{supportEmail}}, og Kilo-teamet slår dem til for din organisation.",
     "contactSupport": "Kontakt support",
@@ -4939,7 +4979,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Enterprise-funktion",
-    "enterpriseOnly": "Denne funktion er kun tilgængelig for Enterprise.",
+    "enterpriseOnly": "Udbydere og modeller er tilgængelige på Enterprise-planen.",
     "readOnly": "Kun organisationens ejere og administratorer kan ændre disse indstillinger.",
     "loadError": "Udbydere og modeller kunne ikke indlæses",
     "tabModels": "Modeller",
@@ -4953,6 +4993,7 @@
     "providersDescription": "Slå en udbyder fra for at forhindre, at Kilo dirigerer anmodninger til den for denne organisation.",
     "providersNeedCatalog": "Udbyderkontakterne er skrivebeskyttede, indtil hele modelkataloget er indlæst. Tryk på Prøv igen ovenfor for at redigere dem.",
     "providersEmpty": "Ingen udbydere matcher denne søgning.",
+    "providersNone": "Der er ingen udbydere tilgængelige for denne organisation.",
     "allowAllShown": "Tillad alle viste",
     "denyAllShown": "Afvis alle viste",
     "gatewaysDescription": "Kilo dirigerer modelanmodninger gennem Vercel AI Gateway eller OpenRouter. En deaktiveret gateway får disse anmodninger til at mislykkes.",

@@ -409,6 +409,8 @@ export interface ScopedSnapshotInput {
    */
   readonly childSessionFrameIds?: ReadonlySet<string>;
   readonly depth?: number | undefined;
+  /** Lines rendered before the walk stops; a snapshot prints `MAX_BROWSER_TOOL_SNAPSHOT_LINES`, a search reads `MAX_BROWSER_TOOL_FIND_LINES`. */
+  readonly maxLines?: number | undefined;
 }
 
 export interface ScopedSnapshot {
@@ -458,7 +460,7 @@ export const buildScopedSnapshot = (input: ScopedSnapshotInput): ScopedSnapshot 
     }
 
     const visit = (node: AxNode, atDepth: number): void => {
-      if (lines.length >= MAX_BROWSER_TOOL_SNAPSHOT_LINES) {
+      if (lines.length >= (input.maxLines ?? MAX_BROWSER_TOOL_SNAPSHOT_LINES)) {
         truncated = true;
 
         return;
@@ -473,6 +475,7 @@ export const buildScopedSnapshot = (input: ScopedSnapshotInput): ScopedSnapshot 
       const interactive = INTERACTIVE_ROLES.has(role);
       const textRole = TEXT_ROLES.has(role);
       const ignored = node.ignored === true;
+      const linesBefore = lines.length;
 
       if (!ignored && withheldOrigin === undefined) {
         if (textRole) {
@@ -496,7 +499,9 @@ export const buildScopedSnapshot = (input: ScopedSnapshotInput): ScopedSnapshot 
         }
       }
 
-      if (depthBudget !== undefined && atDepth >= depthBudget) {
+      const childDepth = lines.length > linesBefore ? atDepth + 1 : atDepth;
+
+      if (depthBudget !== undefined && childDepth > depthBudget) {
         return;
       }
 
@@ -529,7 +534,7 @@ export const buildScopedSnapshot = (input: ScopedSnapshotInput): ScopedSnapshot 
                 input.childSessionFrameIds?.has(ownerFrameId) === true ? EMPTY_OWNERS : owners,
             },
             depthBudget,
-            atDepth + 1
+            childDepth
           );
           return;
         }
@@ -539,7 +544,7 @@ export const buildScopedSnapshot = (input: ScopedSnapshotInput): ScopedSnapshot 
         const child = byId.get(childId);
 
         if (child !== undefined) {
-          visit(child, atDepth + 1);
+          visit(child, childDepth);
         }
       }
     };
@@ -748,7 +753,11 @@ export const renderAgentSnapshotLine = renderLine;
 export const captureAgentAriaSnapshot = async (
   session: AgentFrameSession,
   scope: AgentReadScope,
-  options: { readonly depth?: number | undefined; readonly rootFrameId?: string | undefined } = {}
+  options: {
+    readonly depth?: number | undefined;
+    readonly maxLines?: number | undefined;
+    readonly rootFrameId?: string | undefined;
+  } = {}
 ): Promise<AgentSnapshotCapture> => {
   const inventory = await readAgentFrames(session);
   const { frames } = inventory;
@@ -779,6 +788,7 @@ export const captureAgentAriaSnapshot = async (
     }
 
     const unframed = buildScopedSnapshot({
+      maxLines: options.maxLines,
       ownerFrameByBackendNodeId: new Map(),
       readableTrees: new Map(),
       topNodes,
@@ -872,6 +882,7 @@ export const captureAgentAriaSnapshot = async (
   const snapshot = buildScopedSnapshot({
     childSessionFrameIds: new Set(inventory.childSessions.keys()),
     depth: options.depth,
+    maxLines: options.maxLines,
     ownerFrameByBackendNodeId,
     readableTrees,
     topNodes,
@@ -901,7 +912,7 @@ export const captureAgentAriaSnapshot = async (
       ? '(no accessibility nodes)'
       : lines.map(line => renderLine(line)).join('\n');
   const text = snapshot.truncated
-    ? `${body}\n... (snapshot truncated at ${String(MAX_BROWSER_TOOL_SNAPSHOT_LINES)} lines)`
+    ? `${body}\n... (snapshot truncated at ${String(options.maxLines ?? MAX_BROWSER_TOOL_SNAPSHOT_LINES)} lines)`
     : body;
 
   return {
@@ -1162,6 +1173,8 @@ export const captureAgentSnapshotView = async (
   scope: AgentReadScope,
   options: {
     readonly depth?: number | undefined;
+    /** See `ScopedSnapshotInput.maxLines`. */
+    readonly maxLines?: number | undefined;
     readonly mergeRefs?: boolean;
     /** The frame a targeted snapshot starts from; defaults to the tab's main frame. */
     readonly rootFrameId?: string | undefined;
@@ -1169,8 +1182,13 @@ export const captureAgentSnapshotView = async (
 ): Promise<AgentSnapshotView> => {
   const capture = await captureAgentAriaSnapshot(session, scope, {
     depth: options.depth,
+    maxLines: options.maxLines,
     ...(options.rootFrameId === undefined ? {} : { rootFrameId: options.rootFrameId }),
   });
+  // The hidden-text filter only ever asks about the names these lines print, so the probe checks those and no other text.
+  const candidates = [
+    ...new Set(capture.lines.map(line => line.name.trim()).filter(name => name !== '')),
+  ];
   const hiddenText = new Set<string>();
   const sensitiveValues = new Set<string>();
 
@@ -1178,7 +1196,7 @@ export const captureAgentSnapshotView = async (
     const channel = frameChannel(session, capture.childSessions ?? new Map(), frameId);
 
     // eslint-disable-next-line no-await-in-loop -- one probe pair per frame; a frame probe is two CDP round trips
-    const hidden = await readFrameHiddenText({ send: channel.send }, frameId);
+    const hidden = await readFrameHiddenText({ send: channel.send }, frameId, candidates);
 
     for (const text of hidden) {
       hiddenText.add(text);
@@ -1209,7 +1227,7 @@ export const captureAgentSnapshotView = async (
       ? '(no accessibility nodes)'
       : lines.map(line => renderLine(line)).join('\n');
   const text = capture.truncated
-    ? `${body}\n... (snapshot truncated at ${String(MAX_BROWSER_TOOL_SNAPSHOT_LINES)} lines)`
+    ? `${body}\n... (snapshot truncated at ${String(options.maxLines ?? MAX_BROWSER_TOOL_SNAPSHOT_LINES)} lines)`
     : body;
 
   return {

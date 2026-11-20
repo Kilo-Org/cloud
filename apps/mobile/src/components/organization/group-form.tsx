@@ -5,6 +5,7 @@ import { View } from 'react-native';
 
 import { GroupMemberPicker } from '@/components/organization/group-member-picker';
 import {
+  filterOrgGroupMembers,
   isOrgGroupFormDirty,
   ORG_GROUP_DESCRIPTION_MAX_LENGTH,
   ORG_GROUP_NAME_MAX_LENGTH,
@@ -87,7 +88,10 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
   const [nameError, setNameError] = useState<'required' | 'tooLong' | null>(null);
   const [dirty, setDirty] = useState(false);
   const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<'name'>();
-  const guard = useMetadataLeaveGuard({ enabled: true });
+  const saving = mutations.create.isPending || mutations.updateDetails.isPending;
+  const removing = mutations.remove.isPending;
+  const busy = saving || removing;
+  const guard = useMetadataLeaveGuard({ enabled: true, saving: busy });
   const { confirm, dialog } = useConfirmDialog();
   const initial =
     group === undefined
@@ -107,10 +111,14 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
       },
       initial
     );
-    if (next !== dirty) {
-      setDirty(next);
-      guard.handleDirtyChange(next);
-    }
+    setDirty(next);
+    // Reported on every edit, not only on a change of this form's own verdict: a
+    // caller-driven leave whose pop the navigator dropped leaves the form mounted
+    // with `dirty` still true while the guard stands down, so a gated report would
+    // never re-arm it and a later Back would leave silently with the draft. The
+    // hook's `setState` bails out on an unchanged value, so repeating the verdict
+    // costs nothing.
+    guard.handleDirtyChange(next);
   };
 
   const leaveToList = () => {
@@ -153,13 +161,7 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
   const activeMembers: readonly ActiveOrgMember[] = (orgWithMembers.data?.members ?? []).filter(
     member => isActiveOrgMember(member)
   );
-  const query = memberQuery.trim().toLowerCase();
-  const visibleMembers =
-    query.length === 0
-      ? activeMembers
-      : activeMembers.filter(member =>
-          `${member.name} ${member.email}`.toLowerCase().includes(query)
-        );
+  const visibleMembers = filterOrgGroupMembers(activeMembers, memberQuery);
   const visibleMemberIds = visibleMembers.map(member => member.id);
   const selectedVisibleCount = visibleMemberIds.filter(id => memberIds.includes(id)).length;
   const allVisibleSelected =
@@ -219,10 +221,6 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
       },
     });
   };
-
-  const saving = mutations.create.isPending || mutations.updateDetails.isPending;
-  const removing = mutations.remove.isPending;
-  const busy = saving || removing;
 
   return (
     <View className="flex-1 bg-background">

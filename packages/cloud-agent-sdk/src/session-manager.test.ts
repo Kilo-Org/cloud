@@ -5,11 +5,10 @@ import {
   formatError,
   INTERRUPT_ABORT_SUPPRESSION_MS,
   type SessionManagerConfig,
-  type FetchedSessionData,
-  type AssociatedPrData,
   type StoredMessage,
   type SnapshotHistoryFailure,
 } from './session-manager';
+import type { FetchedSessionData, AssociatedPrData } from './types';
 import {
   createCloudAgentSession,
   REMOTE_SESSION_EXIT_NOT_SUPPORTED,
@@ -159,8 +158,8 @@ const mockSessionCallbacks: {
   onResolved?: (resolved: ResolvedSession) => void;
   onRemoteModelStateChange?: (state: RemoteModelState) => void;
   onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
-  onTransportCapabilityChange?: () => void;
-  onTransportCapabilitiesChange?: (capabilities: { attachments?: boolean } | undefined) => void;
+  onCliCapabilitiesReported?: (capabilities: { attachments?: boolean } | undefined) => void;
+  onComposerCapabilityChange?: () => void;
   onEvent?: (event: NormalizedEvent) => void;
   onMessageQueued?: (messageId: string) => void;
   onMessageCompleted?: (messageId: string) => void;
@@ -198,8 +197,8 @@ jest.mock('./session', () => ({
       onResolved?: (resolved: ResolvedSession) => void;
       onRemoteModelStateChange?: (state: RemoteModelState) => void;
       onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
-      onTransportCapabilityChange?: () => void;
-      onTransportCapabilitiesChange?: (capabilities: { attachments?: boolean } | undefined) => void;
+      onCliCapabilitiesReported?: (capabilities: { attachments?: boolean } | undefined) => void;
+      onComposerCapabilityChange?: () => void;
       onEvent?: (event: NormalizedEvent) => void;
       onMessageQueued?: (messageId: string) => void;
       onMessageCompleted?: (messageId: string) => void;
@@ -265,9 +264,8 @@ jest.mock('./session', () => ({
       mockSessionCallbacks.onResolved = sessionConfig.onResolved;
       mockSessionCallbacks.onRemoteModelStateChange = sessionConfig.onRemoteModelStateChange;
       mockSessionCallbacks.onRemoteCommandStateChange = sessionConfig.onRemoteCommandStateChange;
-      mockSessionCallbacks.onTransportCapabilityChange = sessionConfig.onTransportCapabilityChange;
-      mockSessionCallbacks.onTransportCapabilitiesChange =
-        sessionConfig.onTransportCapabilitiesChange;
+      mockSessionCallbacks.onComposerCapabilityChange = sessionConfig.onComposerCapabilityChange;
+      mockSessionCallbacks.onCliCapabilitiesReported = sessionConfig.onCliCapabilitiesReported;
       mockSessionCallbacks.onEvent = sessionConfig.onEvent;
       mockSessionCallbacks.onMessageQueued = sessionConfig.onMessageQueued;
       mockSessionCallbacks.onMessageCompleted = sessionConfig.onMessageCompleted;
@@ -469,8 +467,8 @@ describe('createSessionManager', () => {
     mockSessionCallbacks.onReplayComplete = undefined;
     mockSessionCallbacks.onResolved = undefined;
     mockSessionCallbacks.onRemoteModelStateChange = undefined;
-    mockSessionCallbacks.onTransportCapabilityChange = undefined;
-    mockSessionCallbacks.onTransportCapabilitiesChange = undefined;
+    mockSessionCallbacks.onComposerCapabilityChange = undefined;
+    mockSessionCallbacks.onCliCapabilitiesReported = undefined;
     mockSessionCallbacks.onEvent = undefined;
     mockSessionCallbacks.onMessageQueued = undefined;
     mockSessionCallbacks.onMessageCompleted = undefined;
@@ -2094,7 +2092,7 @@ describe('createSessionManager', () => {
         expect(mockSession.send).toHaveBeenCalledTimes(1);
 
         mockSession.canSend = false;
-        mockSessionCallbacks.onTransportCapabilityChange?.();
+        mockSessionCallbacks.onComposerCapabilityChange?.();
         expect(config.store.get(mgr.atoms.canSend)).toBe(false);
         mockSession.canSend = true;
         mockSessionCallbacks.onResolved?.({ type: 'read-only', kiloSessionId: kiloId('ses-1') });
@@ -2355,12 +2353,12 @@ describe('createSessionManager', () => {
       mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
 
       mockSession.canSend = false;
-      mockSessionCallbacks.onTransportCapabilityChange?.();
+      mockSessionCallbacks.onComposerCapabilityChange?.();
       expect(atomValue(config.store, mgr.atoms.canSend)).toBe(false);
       expect(atomValue(config.store, mgr.atoms.isReadOnly)).toBe(false);
 
       mockSession.canSend = true;
-      mockSessionCallbacks.onTransportCapabilityChange?.();
+      mockSessionCallbacks.onComposerCapabilityChange?.();
       expect(atomValue(config.store, mgr.atoms.canSend)).toBe(true);
     });
 
@@ -2998,7 +2996,7 @@ describe('createSessionManager', () => {
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
 
       // Only an explicit negative downgrades.
-      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: false });
+      mockSessionCallbacks.onCliCapabilitiesReported?.({ attachments: false });
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
 
       mockSessionCallbacks.onResolved?.({ type: 'read-only', kiloSessionId: kiloId('ses-1') });
@@ -5506,6 +5504,44 @@ describe('createSessionManager', () => {
       expect((streamingAfter?.parts[0] as TextPart | undefined)?.text).toBe('hello');
     });
 
+    it('a row-only update republishes the list without touching the unrelated row', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      mockSession.connect.mockImplementation(() => {
+        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-root' });
+      });
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+
+      const updated = createStoredMessage('msg-updated', 'ses-root', 'assistant', 1);
+      const untouched = createStoredMessage('msg-untouched', 'ses-root', 'assistant', 2);
+      latestStorage.upsertMessage(updated.info);
+      latestStorage.upsertMessage(untouched.info);
+
+      const before = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+      const updatedBefore = before.find(m => m.info.id === updated.info.id);
+      const untouchedBefore = before.find(m => m.info.id === untouched.info.id);
+      if (updatedBefore?.info.role !== 'assistant') throw new Error('expected an assistant row');
+
+      // A `message.updated` that only rewrites the row's own fields stores a new
+      // info object and leaves every parts array alone. Without a messages
+      // revision read, the stable messages map would make the atom return the
+      // stale array and the new cost would never reach the reader.
+      latestStorage.upsertMessage({ ...updatedBefore.info, cost: 7 });
+
+      const after = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+      const updatedAfter = after.find(m => m.info.id === updated.info.id);
+      const untouchedAfter = after.find(m => m.info.id === untouched.info.id);
+      if (updatedAfter?.info.role !== 'assistant') throw new Error('expected an assistant row');
+
+      expect(updatedAfter.info.cost).toBe(7);
+      expect(updatedAfter).not.toBe(updatedBefore);
+      expect(untouchedAfter).toBe(untouchedBefore);
+      expect(atomValue<number>(config.store, mgr.atoms.totalCost)).toBe(8);
+    });
+
     it('a no-parts row keeps object identity across a delta on another row', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
@@ -6685,6 +6721,66 @@ describe('createSessionManager', () => {
       expect(
         atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
       ).toBeNull();
+    });
+
+    it('loadOlderChildMessages clears isLoadingOlder and reports a retryable error when the child page replay throws', async () => {
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const fetchSnapshotPage = createPageFetchMock(async (id, options) => {
+          if (id === 'ses-root') return makePage({ kiloSessionId: id, nextCursor: null });
+          if (!options.cursor) return makePage({ kiloSessionId: id, nextCursor: 'cursor-A' });
+          return {
+            ...makePage({ kiloSessionId: id, nextCursor: null }),
+            messages: new Proxy([], {
+              get(target, property, receiver) {
+                if (property === Symbol.iterator || property === 'map') {
+                  throw new Error('poisoned child page');
+                }
+                return Reflect.get(target, property, receiver);
+              },
+            }) as unknown as SessionSnapshotPage['messages'],
+          };
+        });
+
+        const config = createMockConfig({ fetchSnapshotPage });
+        const mgr = createSessionManager(config);
+
+        await mgr.switchSession(kiloId('ses-root'));
+        await mgr.hydrateChildSession(kiloId('child-poisoned'));
+        await mgr.loadOlderChildMessages(kiloId('child-poisoned'));
+
+        const state = atomValue<
+          (childSessionId: string) => {
+            status: string;
+            cursor?: string | null;
+            hasOlder?: boolean;
+            isLoadingOlder?: boolean;
+            olderError?: unknown;
+          }
+        >(config.store, mgr.atoms.childSessionHydrationState);
+        expect(state('child-poisoned')).toEqual({
+          status: 'ready',
+          cursor: 'cursor-A',
+          hasOlder: true,
+          isLoadingOlder: false,
+          olderError: { kind: 'retryable' },
+          omittedItemCount: 0,
+        });
+        expect(errorSpy).toHaveBeenCalledWith(
+          expect.stringContaining('Failed to apply an older child page'),
+          expect.any(Error)
+        );
+
+        // Retryable: the cursor survives, so a retry re-fetches the same page.
+        await mgr.loadOlderChildMessages(kiloId('child-poisoned'));
+        const childCalls = fetchSnapshotPage.mock.calls.filter(([id]) => id === 'child-poisoned');
+        expect(childCalls[childCalls.length - 1]).toEqual([
+          kiloId('child-poisoned'),
+          { cursor: 'cursor-A' },
+        ]);
+      } finally {
+        errorSpy.mockRestore();
+      }
     });
 
     it('loadOlderChildMessages surfaces invalid_data as a non-retryable older error', async () => {
@@ -11194,6 +11290,175 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
     expect(atomValue<boolean>(config.store, mgr.atoms.isLoadingOlderMessages)).toBe(false);
   });
 
+  it('loadOlderMessages keeps the rest of a page when one replayed row throws', async () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const fetchSnapshotPage = createPageFetchMock(async (_id, options) =>
+        options.cursor
+          ? makePage({
+              messages: [
+                makePageMessage('msg-old-1', 'ses-1', 'first older row'),
+                makePageMessage('msg-old-2', 'ses-1', 'poisoned older row'),
+                makePageMessage('msg-old-3', 'ses-1', 'third older row'),
+              ],
+              nextCursor: 'cursor-C',
+            })
+          : makePage({
+              messages: [makePageMessage('msg-initial', 'ses-1', 'initial row')],
+              nextCursor: 'cursor-A',
+            })
+      );
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const storage = latestStorage;
+      if (!storage) throw new Error('expected session storage');
+      // The manager replays through the storage instance it holds on
+      // `sessionStorageAtom`, which is this same object: overriding the method
+      // in place is what its chat processor calls for each row.
+      expect(storage).toBe(mockSession.storage);
+      const realUpsertMessage = storage.upsertMessage.bind(storage);
+      let replayedRows = 0;
+      storage.upsertMessage = info => {
+        replayedRows += 1;
+        if (info.id === 'msg-old-2') throw new Error('storage exploded');
+        realUpsertMessage(info);
+      };
+
+      await mgr.loadOlderMessages();
+
+      // The override is the path the replay takes: every page row reached it,
+      // and the poisoned one is the only row it refused.
+      const rows = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+      expect(rows.map(row => row.info.id).sort()).toEqual([
+        'msg-initial',
+        'msg-old-1',
+        'msg-old-3',
+      ]);
+      expect(replayedRows).toBe(3);
+      expect(rows.find(row => row.info.id === 'msg-old-1')?.parts.map(part => part.id)).toEqual([
+        'msg-old-1-text',
+      ]);
+      // Rows after the refused one still arrive.
+      expect(rows.find(row => row.info.id === 'msg-old-3')?.parts.map(part => part.id)).toEqual([
+        'msg-old-3-text',
+      ]);
+
+      expect(atomValue<boolean>(config.store, mgr.atoms.isLoadingOlderMessages)).toBe(false);
+      expect(
+        atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
+      ).toBeNull();
+      expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to replay'),
+        expect.any(Error)
+      );
+      // The page advanced past itself: the next load continues from its cursor.
+      await mgr.loadOlderMessages();
+      expect(fetchSnapshotPage).toHaveBeenLastCalledWith('ses-1', { cursor: 'cursor-C' });
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it('loadOlderMessages clears the loader and keeps the cursor when applying a page throws', async () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const fetchSnapshotPage = createPageFetchMock(async (_id, options) =>
+        options.cursor
+          ? {
+              ...makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-B' }),
+              // A page the replay cannot iterate at all: `for…of` throws out of
+              // `replayMessagesIntoStorage`, so `applyPage` never applies it.
+              messages: new Proxy([], {
+                get(target, property, receiver) {
+                  if (property === Symbol.iterator || property === 'map') {
+                    throw new Error('poisoned page');
+                  }
+                  return Reflect.get(target, property, receiver);
+                },
+              }) as unknown as SessionSnapshotPage['messages'],
+            }
+          : makePage({
+              messages: [makePageMessage('msg-initial', 'ses-1', 'initial row')],
+              nextCursor: 'cursor-A',
+            })
+      );
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      await expect(mgr.loadOlderMessages()).resolves.toBeUndefined();
+
+      expect(atomValue<boolean>(config.store, mgr.atoms.isLoadingOlderMessages)).toBe(false);
+      expect(
+        atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
+      ).toEqual({ kind: 'retryable' });
+      // A failed page must not claim the history is exhausted.
+      expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+      expect(fetchSnapshotPage).toHaveBeenLastCalledWith('ses-1', { cursor: 'cursor-A' });
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to apply an older page'),
+        expect.any(Error)
+      );
+
+      await expect(mgr.loadOlderMessages()).resolves.toBeUndefined();
+      expect(fetchSnapshotPage).toHaveBeenLastCalledWith('ses-1', { cursor: 'cursor-A' });
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it('keeps a page whose row the replay skips and stores the rest', async () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const fetchSnapshotPage = createPageFetchMock(async (_id, options) =>
+        options.cursor
+          ? {
+              ...makePage({ kiloSessionId: 'ses-1', nextCursor: 'cursor-B' }),
+              // A row with no info is one the replay deliberately skips. It
+              // must not abort the page, and it must not be named in the
+              // retained-history entry either.
+              messages: [
+                makePageMessage('msg-good-1', 'ses-1', 'good row one'),
+                { parts: [] } as unknown as SessionSnapshotPage['messages'][number],
+                makePageMessage('msg-good-2', 'ses-1', 'good row two'),
+              ],
+            }
+          : makePage({
+              messages: [makePageMessage('msg-initial', 'ses-1', 'initial row')],
+              nextCursor: 'cursor-A',
+            })
+      );
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      await expect(mgr.loadOlderMessages()).resolves.toBeUndefined();
+
+      expect(atomValue<boolean>(config.store, mgr.atoms.isLoadingOlderMessages)).toBe(false);
+      // The page was applied: both readable rows are stored and no error is
+      // reported for the row the transcript cannot describe.
+      expect(
+        atomValue<{ kind: string } | null>(config.store, mgr.atoms.olderMessagesError)
+      ).toBeNull();
+      expect(
+        atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(m => m.info.id)
+      ).toEqual(['msg-good-1', 'msg-good-2', 'msg-initial']);
+      // The page was applied, so its cursor is consumed and the next load
+      // continues past it instead of retrying it.
+      expect(atomValue<boolean>(config.store, mgr.atoms.hasOlderMessages)).toBe(true);
+      expect(fetchSnapshotPage).toHaveBeenLastCalledWith('ses-1', { cursor: 'cursor-A' });
+
+      await mgr.loadOlderMessages();
+      expect(fetchSnapshotPage).toHaveBeenLastCalledWith('ses-1', { cursor: 'cursor-B' });
+      expect(errorSpy).not.toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
   it('does not let a late initial page from an earlier switchSession clobber the active session when both target the same session id', async () => {
     // Regression: the initial-page callback used to read `loadOlderGeneration`
     // at invocation time. A second `switchSession` to the same session id
@@ -11788,7 +12053,7 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
 
       // An absent heartbeat / sessions.list capability stays supported.
-      mockSessionCallbacks.onTransportCapabilitiesChange?.(undefined);
+      mockSessionCallbacks.onCliCapabilitiesReported?.(undefined);
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
     });
 
@@ -11815,7 +12080,7 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
 
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
 
-      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: false });
+      mockSessionCallbacks.onCliCapabilitiesReported?.({ attachments: false });
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
     });
 
@@ -11825,10 +12090,10 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
 
       await mgr.switchSession(kiloId('ses-1'));
       mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
-      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: false });
+      mockSessionCallbacks.onCliCapabilitiesReported?.({ attachments: false });
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
 
-      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: true });
+      mockSessionCallbacks.onCliCapabilitiesReported?.({ attachments: true });
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
     });
 
@@ -11839,10 +12104,10 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       await mgr.switchSession(kiloId('ses-1'));
       mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
 
-      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: true });
+      mockSessionCallbacks.onCliCapabilitiesReported?.({ attachments: true });
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
 
-      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: false });
+      mockSessionCallbacks.onCliCapabilitiesReported?.({ attachments: false });
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
     });
 
@@ -11853,10 +12118,10 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       await mgr.switchSession(kiloId('ses-1'));
       mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
 
-      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: true });
+      mockSessionCallbacks.onCliCapabilitiesReported?.({ attachments: true });
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
 
-      mockSessionCallbacks.onTransportCapabilitiesChange?.(undefined);
+      mockSessionCallbacks.onCliCapabilitiesReported?.(undefined);
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(true);
     });
 
@@ -11897,9 +12162,9 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
 
       // No capability value makes it supported for that consumer.
-      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: true });
+      mockSessionCallbacks.onCliCapabilitiesReported?.({ attachments: true });
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
-      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: false });
+      mockSessionCallbacks.onCliCapabilitiesReported?.({ attachments: false });
       expect(atomValue<boolean>(config.store, mgr.atoms.supportsAttachments)).toBe(false);
 
       // cloud-agent still flows through the cloud-only field it does know.
@@ -11981,7 +12246,7 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
 
       await mgr.switchSession(kiloId('ses-1'));
       mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
-      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: false });
+      mockSessionCallbacks.onCliCapabilitiesReported?.({ attachments: false });
       mockSession.send.mockResolvedValue(undefined);
 
       const attachmentParts: RemoteAttachmentPart[] = [
@@ -12023,7 +12288,7 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
 
       await mgr.switchSession(kiloId('ses-1'));
       mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
-      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: true });
+      mockSessionCallbacks.onCliCapabilitiesReported?.({ attachments: true });
       mockSession.send.mockResolvedValue(undefined);
 
       const attachmentParts: RemoteAttachmentPart[] = [
@@ -12156,7 +12421,7 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
 
       await mgr.switchSession(kiloId('ses-1'));
       mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
-      mockSessionCallbacks.onTransportCapabilitiesChange?.({ attachments: true });
+      mockSessionCallbacks.onCliCapabilitiesReported?.({ attachments: true });
       mockSession.send.mockResolvedValue(undefined);
 
       const attachmentParts: RemoteAttachmentPart[] = [

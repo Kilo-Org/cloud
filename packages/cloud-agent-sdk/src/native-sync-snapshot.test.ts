@@ -1,5 +1,10 @@
 import { fetchNativeSnapshot, projectNativeSnapshot } from './native-sync-snapshot';
-import { readKilo2Messages, kilo2ToolFileId, kilo2AssetKey } from './kilo2-source-messages';
+import {
+  readKilo2Messages,
+  hasUnresolvedKilo2Assets,
+  kilo2ToolFileId,
+  kilo2AssetKey,
+} from './kilo2-source-messages';
 import {
   kilo2MessageSchema,
   kilo2PartId,
@@ -1093,13 +1098,20 @@ describe('canonical native snapshot projection', () => {
       displayable.filter(message => message.type !== 'shell').map(message => message.id)
     );
     expect(JSON.stringify(projection.messages)).not.toContain('https://fixture.invalid/image.png');
-    expect(projection.messages[0]?.parts).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ type: 'file', url: 'data:text/plain;base64,aGVsbG8=' }),
-        // Bytes display as inline data; the remote source uri is never the display url.
-        expect.objectContaining({ type: 'file', url: 'data:image/png;base64,' }),
-      ])
-    );
+    // Empty bytes are absent bytes: the header-only file has no part at all, and the
+    // sibling file with real bytes keeps its own part and id.
+    const userParts = projection.messages[0]?.parts ?? [];
+    expect(userParts.filter(part => part.type === 'file')).toEqual([
+      expect.objectContaining({
+        id: kilo2PartId('msg_user', 1),
+        type: 'file',
+        mime: 'text/plain',
+        url: 'data:text/plain;base64,aGVsbG8=',
+      }),
+    ]);
+    expect(
+      userParts.some(part => part.type === 'file' && part.url === 'data:image/png;base64,')
+    ).toBe(false);
     expect(projection.messages[1]?.info).toMatchObject({
       parentID: 'msg_user',
       cost: 0.25,
@@ -1178,6 +1190,80 @@ describe('canonical native snapshot projection', () => {
   });
 });
 
+describe('native user file display fallbacks', () => {
+  const session = {
+    id: sessionID,
+    location: { directory: '/workspace' },
+    time: { created: 1, updated: 2 },
+  };
+
+  it('emits a part only for bytes or an inline source uri, keyed to the file index', () => {
+    const message = kilo2MessageSchema.parse({
+      id: 'msg_fallback_files',
+      type: 'user',
+      time: { created: 1 },
+      text: 'attached',
+      files: [
+        {
+          mime: 'text/plain',
+          name: 'inline.txt',
+          data: '',
+          source: { type: 'uri', uri: 'data:text/plain;base64,aGVsbG8=' },
+        },
+        {
+          mime: 'image/png',
+          name: 'remote.png',
+          data: '',
+          source: { type: 'uri', uri: 'https://example.test/image.png' },
+        },
+        { mime: 'image/png', name: 'empty.png', data: '', source: { type: 'inline' } },
+        {
+          mime: 'image/png',
+          name: 'inline-source.png',
+          data: '',
+          source: { type: 'uri', uri: 'data:image/png;base64,AQID' },
+        },
+      ],
+    });
+    // Empty bytes are absent bytes: files 1 and 2 emit no part, and skipping them
+    // leaves the surviving parts on their own file indexes.
+    expect(readKilo2Messages(session, [message])[0]?.parts).toMatchObject([
+      { id: kilo2PartId(message.id, 0), type: 'text', text: 'attached' },
+      {
+        id: kilo2PartId(message.id, 1),
+        type: 'file',
+        mime: 'text/plain',
+        filename: 'inline.txt',
+        url: 'data:text/plain;base64,aGVsbG8=',
+      },
+      {
+        id: kilo2PartId(message.id, 4),
+        type: 'file',
+        mime: 'image/png',
+        filename: 'inline-source.png',
+        url: 'data:image/png;base64,AQID',
+      },
+    ]);
+  });
+
+  it('emits no part for an empty-bytes media reference, and still reports it as recoverable', () => {
+    const message = kilo2MessageSchema.parse({
+      id: 'msg_empty_media',
+      type: 'user',
+      time: { created: 1 },
+      files: [
+        { mime: 'image/png', data: '', uri: `media:${'a'.repeat(64)}`, source: { type: 'inline' } },
+      ],
+    });
+    // Empty bytes are absent bytes, so the reference is a real position: it waits on
+    // recovery, and the display gate omits the message until then, so no text is shown.
+    expect(hasUnresolvedKilo2Assets(message)).toBe(true);
+    expect(readKilo2Messages(session, [message])[0]?.parts).toMatchObject([
+      { id: kilo2PartId(message.id, 0), type: 'text' },
+    ]);
+  });
+});
+
 describe('authorized native snapshot attachments', () => {
   const mediaHash = 'c'.repeat(64);
   const pdfHash = 'd'.repeat(64);
@@ -1223,6 +1309,81 @@ describe('authorized native snapshot attachments', () => {
     mediaHash,
     3,
     'image/png'
+  );
+
+  // Mirrors BASE64_CHUNK_BYTES in native-sync-snapshot.ts: the largest multiple
+  // of 3 that fills one 0x8000-byte 8-bit string step.
+  const BASE64_CHUNK_BYTES = 0x8000 - (0x8000 % 3);
+  const streamHash = 'f'.repeat(64);
+  const streamUser = {
+    ...storedUser,
+    id: 'msg_media_stream',
+    files: [
+      {
+        mime: 'image/png',
+        name: 'image.png',
+        uri: `media:${streamHash}`,
+        source: { type: 'inline' },
+      },
+    ],
+  };
+
+  function bytePattern(length: number): Uint8Array {
+    const bytes = new Uint8Array(length);
+    for (let index = 0; index < length; index++) bytes[index] = index % 251;
+    return bytes;
+  }
+
+  /** Resolve one stored user attachment of `bytes` and return its data URL. */
+  async function streamUserAssetURL(bytes: Uint8Array): Promise<string | undefined> {
+    const { request } = snapshotFetch([
+      entity('message', streamUser.id, { seq: 0, message: streamUser }),
+      asset(
+        'stream-image',
+        'message',
+        streamUser.id,
+        '/message/files/0',
+        `media:${streamHash}`,
+        streamHash,
+        bytes.byteLength,
+        'image/png'
+      ),
+    ]);
+    const readAsset = jest.fn(async (path: string, advertisedBytes: number) => {
+      expect(path).toBe(`${sessionPath}/blobs/${streamHash}`);
+      expect(advertisedBytes).toBe(bytes.byteLength);
+      // Hand over a fresh buffer: the encoder must own the bytes it reads.
+      const buffer = new ArrayBuffer(bytes.byteLength);
+      new Uint8Array(buffer).set(bytes);
+      return buffer;
+    });
+    const snapshot = await fetchNativeSnapshot(request, sessionID, undefined, readAsset);
+    expect(readAsset).toHaveBeenCalledTimes(1);
+    return snapshot.assetURLs?.[
+      kilo2AssetKey(kilo2PartId(streamUser.id, 1), `media:${streamHash}`, 'image/png')
+    ];
+  }
+
+  it('base64-encodes a multi-chunk attachment byte-identically to the canonical encoder', async () => {
+    // One full chunk plus two bytes: the encoder has to join chunks and pad the
+    // final one (the total is not a multiple of 3).
+    const bytes = bytePattern(BASE64_CHUNK_BYTES + 2);
+    expect(bytes.byteLength).toBeGreaterThan(BASE64_CHUNK_BYTES);
+    expect(bytes.byteLength % 3).not.toBe(0);
+
+    expect(await streamUserAssetURL(bytes)).toBe(
+      `data:image/png;base64,${Buffer.from(bytes).toString('base64')}`
+    );
+  });
+
+  it.each([0, 1, 2, 3, BASE64_CHUNK_BYTES])(
+    'base64-encodes a %i-byte attachment byte-identically to the canonical encoder',
+    async length => {
+      const bytes = bytePattern(length);
+      expect(await streamUserAssetURL(bytes)).toBe(
+        `data:image/png;base64,${Buffer.from(bytes).toString('base64')}`
+      );
+    }
   );
 
   it('accepts stored media without invented inline data and resolves exact authorized user/tool positions', async () => {

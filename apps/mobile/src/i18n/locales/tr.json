@@ -19,7 +19,9 @@
     "presenceStatus": "Ana makineler: {{connection}}",
     "commandStatus": "Komut iletimi: {{status}}",
     "delivered": "İletildi",
-    "expired": "Süresi doldu"
+    "expired": "Süresi doldu",
+    "recoveryGaps_one": "Bu dökümün {{displayCount}} bölümü eksik.",
+    "recoveryGaps_other": "Bu dökümün {{displayCount}} bölümü eksik."
   },
   "common": {
     "manageOnWeb": "Web'de yönet",
@@ -172,6 +174,7 @@
     "generating": "Oluşturuluyor…",
     "working": "Çalışıyor",
     "yourOwnRepositories": "Kendi depoların",
+    "organizationRepositories": "Kuruluşun depoları",
     "dismissed": "Yok sayıldı",
     "agent": "Ajan",
     "durationMinuteShort": "dk",
@@ -669,7 +672,7 @@
     },
     "instructions": {
       "title": "Özel talimatlar",
-      "deprecation": "Özel talimatlar özelliğinin kullanımdan kaldırılması planlanıyor. Bu yönergeleri depondaki bir REVIEW.md dosyasına taşı.",
+      "deprecation": "Özel talimatlar özelliği kaldırılacak. Bu yönergeleri depondaki bir REVIEW.md dosyasına taşı.",
       "placeholder": "örn. Hata işleme kurallarımıza uy…",
       "clearTitle": "Özel talimatlar kaldırılsın mı?",
       "clearMessage": "Boş bir alanı kaydetmek, bu inceleyici için depolanan özel talimatları siler."
@@ -698,8 +701,12 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} için Bitbucket bağlantısı bir bilgisayardan web üzerinden yönetilir.",
+      "managedOnWebTitle": "Web üzerinden yönetilir",
+      "managedOnWebShort": "Bu bağlantı bir bilgisayardan web üzerinden yönetilir.",
+      "managedOnWebRepositories": "{{organization}} için depoları bir bilgisayardan web üzerinden seç.",
       "description": "{{organization}} için bir çalışma alanı erişim belirteci oluştur ve aşağıya yapıştır.",
       "descriptionReconnect": "{{organization}} için yeni bir çalışma alanı erişim belirteci oluştur ve aşağıya yapıştır.",
+      "descriptionOverview": "{{organization}} için bir çalışma alanı erişim belirteci oluştur ve sonraki ekranda yapıştır.",
       "scopes": "İzinler: Hesap okuma · Depo okuma/yazma · Çekme isteği okuma · Webhook okuma/yazma.",
       "tokenPlaceholder": "Çalışma alanı erişim belirteci",
       "tokenRefused": "Bitbucket bu çalışma alanı erişim belirtecini kabul etmedi. Yukarıdaki izinlere sahip olduğunu kontrol et ve yeniden dene."
@@ -735,6 +742,7 @@
     "platformList": {
       "activity": "Etkinlik",
       "checking": "Kontrol ediliyor…",
+      "needsAttention": "İşlem gerekiyor",
       "platforms": "Platformlar",
       "statusUnavailable": "Durum alınamıyor"
     },
@@ -2225,6 +2233,8 @@
     "modelPicker": {
       "title": "Model seçimi",
       "noModelsDescription": "Seçilebilecek model yok.",
+      "allUnavailableTitle": "Hiçbir model kullanılamıyor",
+      "allUnavailableDescription": "Bir sağlayıcı anahtarı ekle, sonra tekrar dene.",
       "favorites": "Favoriler"
     },
     "modelSelector": {
@@ -2629,6 +2639,8 @@
     "retryHint": "Kilo Pass durumunu almayı tekrar dener.",
     "endedOn": "{{date}} tarihinde sona erdi",
     "notAvailableInApp": "Kilo Pass uygulamada kullanılamıyor.",
+    "notAvailableTitle": "Kilo Pass uygulamada sunulmuyor",
+    "noPassDescription": "Bu hesabın Kilo Pass'i yok.",
     "statusActive": "Aktif",
     "statusTrialing": "Deneme döneminde",
     "statusPastDue": "Ödeme gecikti",
@@ -3226,6 +3238,8 @@
       "partialPostedStale_one": "{{displayStaleCount}} yorum eski bir işlemeyle ilgili olduğu için kuyrukta kaldı.",
       "partialPostedStale_other": "{{displayStaleCount}} yorum eski bir işlemeyle ilgili olduğu için kuyrukta kaldı.",
       "submitCountOfTotal": "{{displayTotalCount}} yorumun {{displayFreshCount}} tanesini gönder",
+      "submitCountOfTotal_one": "{{displayTotalCount}} yorumun {{displayFreshCount}} tanesini gönder",
+      "submitCountOfTotal_other": "{{displayTotalCount}} yorumun {{displayFreshCount}} tanesini gönder",
       "submitReview": "İncelemeyi gönder",
       "blockedRequestChanges": "Değişiklik istemek için bir özet veya en az bir yorum ekle.",
       "blockedComment": "İncelemeni yorum olarak göndermek için bir özet veya en az bir yorum ekle."
@@ -3238,6 +3252,9 @@
     },
     "tabs": {
       "discussion": "Tartışma",
+      "discussionAccessibility": "{{title}}: {{displayCount}} yorum",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} yorum",
+      "discussionAccessibility_one": "{{title}}: 1 yorum",
       "files": "Dosyalar",
       "overview": "Genel bakış"
     },
@@ -3426,8 +3443,7 @@
     "hub": {
       "balance": "Bakiye",
       "lowBalanceBelow": "{{amount}} altı",
-      "organizationSeats": "Kuruluş lisansları",
-      "plan": "Kuruluş planı",
+      "plan": "Plan",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Sona erdi",
@@ -3470,7 +3486,7 @@
       "retentionLimit": "En son faturalar gösteriliyor."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Düşük bakiye uyarısını etkinleştir",
+      "subtitle": "Bu kuruluşun bakiyesi belirlediğin tutarın altına düştüğünde listelediğin adreslere e-posta ile uyarı gönder.",
       "notifyEmailsLabel": "Bildirim gönderilecek e-posta adresleri",
       "permissionDenied": "Faturalandırma uyarılarını yönetme iznin yok.",
       "separateEmailsHint": "Birden fazla e-posta adresini virgülle ayır.",
@@ -3647,7 +3663,8 @@
     "signupStepUp": "Hesabını oluşturmayı tamamlamak için '$t(login.moreSignInOptions)' seçeneğini kullan.",
     "signupStepUpApple": "Hesabını oluşturmayı tamamlamak için '$t(login.signInWithApple)' seçeneğini kullan.",
     "signupStepUpGoogle": "Hesabını oluşturmayı tamamlamak için '$t(login.signInWithGoogle)' seçeneğini kullan.",
-    "invalidCode": "Bu kod yanlış. Lütfen tekrar dene.",
+    "signupStepUpBack": "Hesabını oluşturmayı tamamlamak için geri dön ve '$t(login.moreSignInOptions)' seçeneğini kullan.",
+    "invalidCode": "Bu kod yanlış veya süresi dolmuş. Tekrar dene ya da '$t(login.resendCode)' seçeneğini kullan.",
     "codeInProgress": "Kodun işleniyor. Biraz bekle ve tekrar dene.",
     "tooManyAttempts": "Çok fazla deneme yapıldı. Lütfen yeni bir kod iste.",
     "invalidToken": "Oturum açılamadı. Lütfen tekrar dene.",
@@ -3916,6 +3933,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection), seçilen protokolü ve modeli kullanarak bu uç noktaya kısa bir çıkarım isteği gönderir. Sağlayıcı bunun için ücret alabilir.",
       "connectionSucceeded": "Model bu protokolü kullanarak bir isteği tamamladı.",
       "connectionFailed": "Model isteği tamamlayamadı. API kök adresini, protokolü, kimlik bilgilerini ve model ID'sini kontrol edin.",
+      "requestTimedOut": "Uç nokta zamanında yanıt vermedi. API kök adresini ve bağlantınızı kontrol edin, sonra tekrar deneyin.",
+      "requestUnauthorized": "Uç nokta kimlik bilgilerini reddetti. API anahtarını ve özel başlıkları kontrol edin, sonra tekrar deneyin.",
+      "requestNotFound": "Uç nokta veya model bulunamadı. API kök adresini ve model ID'sini kontrol edin.",
+      "requestRateLimited": "Uç nokta istekleri sınırlıyor. Kısa bir süre bekleyip tekrar deneyin.",
+      "requestUnavailable": "Uç nokta şu anda kullanılamıyor. Birazdan tekrar deneyin.",
+      "requestUnreachable": "Uç noktaya ulaşılamadı. API kök adresini ve bağlantınızı kontrol edin.",
+      "requestInvalidResponse": "Uç nokta beklenen biçimde yanıt vermedi. API kök adresinin ve protokolün sunucuyla eşleştiğini kontrol edin, ardından yeniden deneyin.",
+      "discoveryNoModels": "Uç nokta hiçbir model listelemedi. Modelleri elle girin.",
+      "connectionIncomplete": "Model yanıt verdi ancak tamamlamadı. Tekrar deneyin veya model ID'sini ve protokolü kontrol edin.",
       "invalidInput": "Bir arka uç adı, geçerli başlıklar ve benzersiz bir ID'ye ve ada sahip en az bir model girin. Belirteç sınırları pozitif tam sayılar olmalıdır.",
       "invalidUrl": "Kimlik bilgileri, sorgu veya parça tanımlayıcısı içermeyen bir HTTP veya HTTPS API kök adresi girin.",
       "publicHttp": "Herkese açık HTTP uç noktalarına izin verilmez. HTTPS veya özel bir yerel uç nokta kullanın.",
@@ -4054,10 +4080,20 @@
     "reasoningEffort": {
       "modelFlag": "Bu model düşünme düzeyini destekler"
     },
-    "creditsRequired": "Bu mesajı göndermek için yeterli kredi yok."
+    "creditsRequired": "Bu mesajı göndermek için yeterli kredi yok.",
+    "providerKeyRefused": "Sağlayıcı kimlik bilgilerini reddetti. API anahtarını kontrol edin, sonra tekrar gönderin.",
+    "providerModelMissing": "Bu arka uç artık bu modeli sunmuyor. Başka birini seçin.",
+    "providerRateLimited": "Sağlayıcı istekleri sınırlıyor. Kısa bir süre bekleyip tekrar gönderin.",
+    "providerUnavailable": "Sağlayıcı şu anda kullanılamıyor. Kısa süre sonra tekrar gönderin."
   },
   "settingsTools": {
-    "confirmTitle": "Bu değişiklik onaylansın mı?"
+    "confirmTitle": "Bu değişiklik onaylansın mı?",
+    "guarded": {
+      "spendAlertsOff": "Harcama uyarıları kapatılsın mı? Harcama eşiği aşımları ve saatlik ani artışlar hakkında bildirim almayı bırakırsınız.",
+      "balanceAlertsOff": "Bakiye uyarıları kapatılsın mı? Kredileriniz azaldığında bildirim almayı bırakırsınız.",
+      "securityFindingsOff": "Güvenlik bulguları kapatılsın mı? Yeni güvenlik bulguları hakkında bildirim almayı bırakırsınız.",
+      "hideBalanceOn": "Bakiyeleriniz gizlensin mi? Kredi bakiyeleri artık profil ekranlarında ve kuruluş merkezinde görünmeyecek."
+    }
   },
   "appActions": {
     "start": {
@@ -4429,6 +4465,7 @@
     "pickPackToBuyAgain": "Yeni bir satın alma başlatmak için yukarıdan bir paket seçin.",
     "purchasePending": "Mağaza bu ödemeyi hâlâ işliyor. Kredileriniz, mağaza ödemeyi onayladığında hesabınıza yüklenir.",
     "buyAgain": "Yeniden satın al",
+    "checkPurchase": "Satın almayı kontrol et",
     "purchaseOwnedByAnotherAccount": "Bu Apple Account üzerindeki krediler farklı bir Kilo hesabına ait. Kullanmak için o Kilo hesabıyla oturum aç.",
     "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hesabındaki krediler farklı bir Kilo hesabına ait. Kullanmak için o Kilo hesabıyla oturum açın."
   },
@@ -4522,7 +4559,9 @@
     },
     "saveSheet": {
       "title": "Listeye kaydet",
-      "saved": "{{list}} listesine kaydedildi"
+      "saved": "{{list}} listesine kaydedildi",
+      "saveFailed": "Görev kaydedilemedi. Bağlantınızı kontrol edip tekrar deneyin.",
+      "saveRefused": "Görev bu listeye kaydedilemedi. Başka bir liste seçin."
     }
   },
   "agentBriefing": {
@@ -4534,6 +4573,7 @@
     "empty": "Bu rapor aralığında etkinlik yok",
     "emptyHint": "Bulut ve CLI kodlama oturumlarınız, planlanmış bir raporda etkinlik olduğunda burada görünür.",
     "loadError": "Raporlar yüklenemedi",
+    "estimateLoadError": "Tahmin yüklenemedi.",
     "view": "Raporu oku",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4801,7 +4841,7 @@
   },
   "organizationGuardrails": {
     "title": "Yapay Zeka Korkulukları",
-    "permissionDenied": "Yapay Zeka Korkuluklarını yalnızca kuruluş sahipleri ve yöneticileri yönetebilir.",
+    "permissionDenied": "Yapay Zeka Korkuluklarını yalnızca kuruluş sahipleri ve yöneticileri yönetebilir. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Yapay Zeka Korkulukları etkin değil",
     "unavailable": "Kilo, talep üzerine bir kuruluş için Yapay Zeka Korkuluklarını etkinleştirir. {{supportEmail}} ile iletişime geçin; Kilo ekibi bunları kuruluşunuz için açar.",
     "contactSupport": "Destekle iletişime geç",
@@ -4939,7 +4979,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Kurumsal özellik",
-    "enterpriseOnly": "Bu yalnızca kurumsal bir özelliktir.",
+    "enterpriseOnly": "Sağlayıcılar ve modeller Enterprise planında kullanılabilir.",
     "readOnly": "Bu ayarları yalnızca kuruluş sahipleri ve yöneticileri değiştirebilir.",
     "loadError": "Sağlayıcılar ve modeller yüklenemedi",
     "tabModels": "Modeller",
@@ -4953,6 +4993,7 @@
     "providersDescription": "Kilo'nun bu kuruluş için o sağlayıcıya yönlendirme yapmasını durdurmak üzere bir sağlayıcıyı kapatın.",
     "providersNeedCatalog": "Tam model kataloğu yüklenene kadar sağlayıcı anahtarları salt okunur kalır. Bunları düzenlemek için yukarıdaki Tekrar dene düğmesine dokunun.",
     "providersEmpty": "Bu aramayla eşleşen sağlayıcı yok.",
+    "providersNone": "Bu kuruluş için kullanılabilir sağlayıcı yok.",
     "allowAllShown": "Gösterilenlerin tümüne izin ver",
     "denyAllShown": "Gösterilenlerin tümünü reddet",
     "gatewaysDescription": "Kilo, model isteklerini Vercel AI Gateway veya OpenRouter üzerinden yönlendirir. Devre dışı bırakılan bir ağ geçidi bu istekleri başarısız kılar.",

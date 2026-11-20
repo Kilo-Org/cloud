@@ -91,7 +91,10 @@ export function GlanceableActiveCard({
         'overflow-hidden',
         // The frame reserves the counts card's height, so the zero state fills
         // that height with its one message instead of leaving a band below it.
-        empty && 'flex-1'
+        // `grow`, not `flex-1`: a zero basis let the frame keep the counts
+        // height at the largest font, and the description ended 49.3 dp below
+        // the card's bottom edge.
+        empty && 'grow'
       )}
     >
       {empty ? null : (
@@ -170,7 +173,7 @@ export function GlanceableActiveCard({
           </View>
         </CardControl>
       ) : (
-        <View key="no-session" className="flex-1 justify-center">
+        <View key="no-session" className="grow justify-center">
           {/* The card keeps its reserved frame with nothing live, so the zero
               state fills that frame with the shared empty state's icon, title
               and one-line hint instead of a lone line in a blank card. */}

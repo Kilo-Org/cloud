@@ -191,8 +191,8 @@ function createTransportWithSinks(opts?: {
   onError?: (message: string, failure?: SessionSnapshotFailure) => void;
   onRemoteModelStateChange?: (state: RemoteModelState) => void;
   onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
-  onCapabilityChange?: () => void;
-  onCapabilitiesChange?: (capabilities: { attachments?: boolean } | undefined) => void;
+  onComposerCapabilityChange?: () => void;
+  onCliCapabilitiesReported?: (capabilities: { attachments?: boolean } | undefined) => void;
 }) {
   const userWebConnection = opts?.connection ?? createConnection();
   const chatEvents: ChatEvent[] = [];
@@ -205,8 +205,8 @@ function createTransportWithSinks(opts?: {
     onError: opts?.onError,
     onRemoteModelStateChange: opts?.onRemoteModelStateChange,
     onRemoteCommandStateChange: opts?.onRemoteCommandStateChange,
-    onCapabilityChange: opts?.onCapabilityChange,
-    onCapabilitiesChange: opts?.onCapabilitiesChange,
+    onComposerCapabilityChange: opts?.onComposerCapabilityChange,
+    onCliCapabilitiesReported: opts?.onCliCapabilitiesReported,
   })({
     onChatEvent: event => chatEvents.push(event),
     onServiceEvent: event => serviceEvents.push(event),
@@ -903,7 +903,7 @@ describe('CliLiveTransport unified user web connection', () => {
     const capabilityChanges = jest.fn();
     const { transport } = createTransportWithSinks({
       connection,
-      onCapabilityChange: capabilityChanges,
+      onComposerCapabilityChange: capabilityChanges,
     });
 
     transport.connect();
@@ -936,6 +936,62 @@ describe('CliLiveTransport unified user web connection', () => {
       data: { sessions: [] },
     });
     expect(transport.canSend?.()).toBe(false);
+    transport.destroy();
+  });
+
+  it('drops the owner when catalog discovery is fenced by SESSION_OWNER_CHANGED', async () => {
+    const connection = createConnection();
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      return Promise.reject(
+        new UserWebCommandError({ code: 'SESSION_OWNER_CHANGED', message: 'Session owner changed' })
+      );
+    });
+    const modelStates: RemoteModelState[] = [];
+    const commandStates: RemoteCommandState[] = [];
+    const { transport, serviceEvents } = createTransportWithSinks({
+      connection,
+      onRemoteModelStateChange: state => modelStates.push(state),
+      onRemoteCommandStateChange: state => commandStates.push(state),
+    });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Command discovery is fenced: the owner is dropped instead of the fence
+    // being published as a catalog error.
+    expect(commandStates.at(-1)?.ownerConnectionId).toBeNull();
+    expect(commandStates.some(state => state.refresh === 'error')).toBe(false);
+
+    // The same fence on model discovery. `sendCommand` runs synchronously when
+    // the owner is adopted, so the new implementation must be in place before
+    // the second owner is emitted.
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') {
+        return Promise.reject(
+          new UserWebCommandError({
+            code: 'SESSION_OWNER_CHANGED',
+            message: 'Session owner changed',
+          })
+        );
+      }
+      return Promise.resolve(COMMAND_WIRE_CATALOG);
+    });
+    const modelStatesBeforeModelFence = modelStates.length;
+
+    emitOwner(connection, 'second-owner');
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(modelStates.at(-1)?.ownerConnectionId).toBeNull();
+    expect(
+      modelStates.slice(modelStatesBeforeModelFence).some(state => state.refresh === 'error')
+    ).toBe(false);
+    expect(serviceEvents.some(event => event.type === 'stopped' && event.reason === 'error')).toBe(
+      false
+    );
     transport.destroy();
   });
 
@@ -4109,7 +4165,7 @@ describe('CliLiveTransport page-seam + reconnect', () => {
 });
 
 describe('CliLiveTransport remote attachment capabilities', () => {
-  it('publishes heartbeat attachments: true via onCapabilitiesChange', async () => {
+  it('publishes heartbeat attachments: true via onCliCapabilitiesReported', async () => {
     const connection = createConnection();
     jest
       .mocked(connection.sendCommand)
@@ -4119,7 +4175,7 @@ describe('CliLiveTransport remote attachment capabilities', () => {
     const capabilities: ({ attachments?: boolean } | undefined)[] = [];
     const { transport, userWebConnection } = createTransportWithSinks({
       connection,
-      onCapabilitiesChange: capability => capabilities.push(capability),
+      onCliCapabilitiesReported: capability => capabilities.push(capability),
     });
 
     transport.connect();
@@ -4151,7 +4207,7 @@ describe('CliLiveTransport remote attachment capabilities', () => {
     transport.destroy();
   });
 
-  it('publishes sessions.list capability changes via onCapabilitiesChange', async () => {
+  it('publishes sessions.list capability changes via onCliCapabilitiesReported', async () => {
     const connection = createConnection();
     jest
       .mocked(connection.sendCommand)
@@ -4161,7 +4217,7 @@ describe('CliLiveTransport remote attachment capabilities', () => {
     const capabilities: ({ attachments?: boolean } | undefined)[] = [];
     const { transport, userWebConnection } = createTransportWithSinks({
       connection,
-      onCapabilitiesChange: capability => capabilities.push(capability),
+      onCliCapabilitiesReported: capability => capabilities.push(capability),
     });
 
     transport.connect();
@@ -4213,7 +4269,7 @@ describe('CliLiveTransport remote attachment capabilities', () => {
     const capabilities: ({ attachments?: boolean } | undefined)[] = [];
     const { transport, userWebConnection } = createTransportWithSinks({
       connection,
-      onCapabilitiesChange: capability => capabilities.push(capability),
+      onCliCapabilitiesReported: capability => capabilities.push(capability),
     });
 
     transport.connect();

@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- one preflight case per grant, sensitive-step and redirect branch */
 /* eslint-disable require-await -- a fake CDP channel is async by contract */
+import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
 import {
   createStepTokenStore,
@@ -73,6 +74,8 @@ const createSession = (
     readonly presentFieldFrames?: readonly string[];
     readonly probe?: Record<string, unknown>;
     readonly probeByObject?: Record<string, Record<string, unknown>>;
+    /** Elements of a real DOM the probe function itself runs against, by object id. */
+    readonly probeElements?: Record<string, Element>;
     readonly ambiguousSelectors?: Record<string, number>;
     readonly selectors?: Record<string, { readonly nodeId: number }>;
     /** The node name `DOM.describeNode` reports for a ref target (e.g. `IFRAME`). */
@@ -198,6 +201,18 @@ const createSession = (
         return { result: { value: nodeFrame === objectWorlds.get(String(objectId)) } };
       }
 
+      const probeElement =
+        typeof objectId === 'string' ? options.probeElements?.[objectId] : undefined;
+
+      if (probeElement !== undefined && typeof functionDeclaration === 'string') {
+        // eslint-disable-next-line eslint/no-new-func, typescript-eslint/no-implied-eval, typescript-eslint/no-unsafe-type-assertion -- runs the page-side probe source against a real DOM element
+        const declare = new Function(`return (${functionDeclaration});`) as () => (
+          this: Element
+        ) => unknown;
+
+        return { result: { value: declare().call(probeElement) } };
+      }
+
       const probeForObject =
         typeof objectId === 'string' ? options.probeByObject?.[objectId] : undefined;
 
@@ -298,6 +313,17 @@ const run = (
     toolName: input.toolName,
   });
 
+/** One element of a real DOM, for the page-side probe source to classify. */
+const fixtureElement = (html: string, id: string): Element => {
+  const element = new JSDOM(html).window.document.querySelector(`#${id}`);
+
+  if (element === null) {
+    throw new Error(`no fixture element #${id}`);
+  }
+
+  return element;
+};
+
 describe('origin grants', () => {
   it('refuses a read on an origin the CLI did not approve', async () => {
     const result = await run({
@@ -382,6 +408,151 @@ describe('origin grants', () => {
     expect(failureOf(result)).toStrictEqual({
       items: [{ class: 'act', frame: true, origin: 'https://pay.example.com' }],
       kind: 'needs_permission',
+    });
+  });
+
+  describe('a call on an iframe element', () => {
+    const iframeSession = () =>
+      createSession({
+        nestedFrames: [
+          {
+            frameId: 'f1',
+            ownerBackendNodeId: 12,
+            securityOrigin: 'https://pay.example.com',
+            url: FRAME_URL,
+          },
+        ],
+        targetNodeName: 'IFRAME',
+      });
+
+    it('needs act on the owner document for an evaluate granted only on the hosted frame', async () => {
+      const result = await run({
+        args: { function: '() => document.cookie', target: 'e12' },
+        authorized: [{ class: 'act', origin: 'https://pay.example.com' }],
+        session: iframeSession(),
+        toolName: 'browser_evaluate',
+      });
+
+      expect(failureOf(result)).toStrictEqual({
+        items: [{ class: 'act', origin: 'https://app.example.com' }],
+        kind: 'needs_permission',
+      });
+    });
+
+    it('allows an evaluate granted on both the owner document and the hosted frame', async () => {
+      const result = await run({
+        args: { function: '() => 1', target: 'e12' },
+        authorized: [
+          { class: 'act', origin: 'https://app.example.com' },
+          { class: 'act', origin: 'https://pay.example.com' },
+        ],
+        session: iframeSession(),
+        toolName: 'browser_evaluate',
+      });
+
+      expect(result).toMatchObject({ class: 'act', ok: true, origin: 'https://pay.example.com' });
+    });
+
+    it('needs read on the owner document for a screenshot granted only on the hosted frame', async () => {
+      const result = await run({
+        args: { target: 'e12' },
+        authorized: [{ class: 'read', origin: 'https://pay.example.com' }],
+        session: iframeSession(),
+        toolName: 'browser_take_screenshot',
+      });
+
+      expect(failureOf(result)).toStrictEqual({
+        items: [{ class: 'read', origin: 'https://app.example.com' }],
+        kind: 'needs_permission',
+      });
+    });
+
+    it('leaves a plain element of the main document needing only the main grant', async () => {
+      const result = await run({
+        args: { function: '() => 1', target: 'e5' },
+        authorized: [{ class: 'act', origin: 'https://app.example.com' }],
+        session: createSession(),
+        toolName: 'browser_evaluate',
+      });
+
+      expect(result).toMatchObject({ class: 'act', ok: true, origin: 'https://app.example.com' });
+    });
+
+    // The <iframe> e12 sits in frame f1 (shop) and hosts frame f2 (pay).
+    const nestedOwnerSession = () =>
+      createSession({
+        frameIdForBackendNode: backendNodeId => (backendNodeId === 12 ? 'f1' : 'main'),
+        nestedFrames: [
+          {
+            frameId: 'f1',
+            ownerBackendNodeId: 30,
+            securityOrigin: 'https://shop.example.com',
+            url: 'https://shop.example.com/cart',
+          },
+          {
+            frameId: 'f2',
+            ownerBackendNodeId: 12,
+            parentId: 'f1',
+            securityOrigin: 'https://pay.example.com',
+            url: FRAME_URL,
+          },
+        ],
+        targetNodeName: 'IFRAME',
+      });
+
+    it('needs the grants of a nested owner frame and its hosted frame, both labelled frames', async () => {
+      const result = await run({
+        args: { function: '() => 1', target: 'e12' },
+        authorized: [],
+        session: nestedOwnerSession(),
+        toolName: 'browser_evaluate',
+      });
+
+      expect(failureOf(result)).toStrictEqual({
+        items: [
+          { class: 'act', frame: true, origin: 'https://shop.example.com' },
+          { class: 'act', frame: true, origin: 'https://pay.example.com' },
+        ],
+        kind: 'needs_permission',
+      });
+    });
+
+    it('allows an element in a nested owner frame granted on both frames', async () => {
+      const result = await run({
+        args: { function: '() => 1', target: 'e12' },
+        authorized: [
+          { class: 'act', origin: 'https://shop.example.com' },
+          { class: 'act', origin: 'https://pay.example.com' },
+        ],
+        session: nestedOwnerSession(),
+        toolName: 'browser_evaluate',
+      });
+
+      expect(result).toMatchObject({ class: 'act', ok: true, origin: 'https://pay.example.com' });
+    });
+
+    it('asks once, as the top-level page, for a same-site iframe whose owner shares its origin', async () => {
+      const result = await run({
+        args: { function: '() => 1', target: 'e12' },
+        authorized: [],
+        session: createSession({
+          nestedFrames: [
+            {
+              frameId: 'f1',
+              ownerBackendNodeId: 12,
+              securityOrigin: 'https://app.example.com',
+              url: 'https://app.example.com/embedded',
+            },
+          ],
+          targetNodeName: 'IFRAME',
+        }),
+        toolName: 'browser_evaluate',
+      });
+
+      expect(failureOf(result)).toStrictEqual({
+        items: [{ class: 'act', origin: 'https://app.example.com' }],
+        kind: 'needs_permission',
+      });
     });
   });
 
@@ -531,19 +702,36 @@ describe('origin grants', () => {
 });
 
 describe('origin changed after redirects', () => {
-  it('reports the origin a navigation landed on', async () => {
-    const approved = 'https://other.example.com';
+  const approved = 'https://other.example.com';
+  const landed = 'https://accounts.example.org';
+  const redirected = () => createSession({ mainUrl: `${landed}/login` });
 
+  it('reports the origin a navigation landed on', async () => {
     await expect(
-      postAgentNavigate(createSession({ mainUrl: approved }), approved)
+      postAgentNavigate(createSession({ mainUrl: approved }), approved, [])
     ).resolves.toBeUndefined();
-    await expect(
-      postAgentNavigate(createSession({ mainUrl: 'https://accounts.example.org/login' }), approved)
-    ).resolves.toStrictEqual({
+    await expect(postAgentNavigate(redirected(), approved, [])).resolves.toStrictEqual({
       from: approved,
       kind: 'origin_changed',
-      to: 'https://accounts.example.org',
+      to: landed,
     });
+  });
+
+  it('lets a redirect land on an origin the call may already open or read', async () => {
+    await expect(
+      postAgentNavigate(redirected(), approved, [{ class: 'navigate', origin: landed }])
+    ).resolves.toBeUndefined();
+    await expect(
+      postAgentNavigate(redirected(), approved, [
+        { class: 'read', origin: 'https://*.example.org' },
+      ])
+    ).resolves.toBeUndefined();
+  });
+
+  it('still reports a redirect whose landing origin is granted only to act on', async () => {
+    await expect(
+      postAgentNavigate(redirected(), approved, [{ class: 'act', origin: landed }])
+    ).resolves.toStrictEqual({ from: approved, kind: 'origin_changed', to: landed });
   });
 });
 
@@ -598,6 +786,40 @@ describe('sensitive steps', () => {
       origin: 'https://app.example.com',
       reason: SENSITIVE_REASON.password,
     });
+  });
+
+  it('refuses typing through a label into the password field it names without a step token', async () => {
+    const label = fixtureElement(
+      '<form><label id="pw-label" for="pw">Password</label><input id="pw" type="password"></form>',
+      'pw-label'
+    );
+
+    const result = await run({
+      args: { target: 'e12', text: 'hunter2' },
+      session: createSession({ probeElements: { 'obj-12': label } }),
+      toolName: 'browser_type',
+    });
+
+    expect(sensitiveOf(result)).toStrictEqual({
+      element: 'e12',
+      origin: 'https://app.example.com',
+      reason: SENSITIVE_REASON.password,
+    });
+  });
+
+  it('lets a label for an ordinary field through without a step token', async () => {
+    const label = fixtureElement(
+      '<label id="email-label" for="email">Email</label><input id="email" type="email">',
+      'email-label'
+    );
+
+    const result = await run({
+      args: { target: 'e12', text: 'ada@example.com' },
+      session: createSession({ probeElements: { 'obj-12': label } }),
+      toolName: 'browser_type',
+    });
+
+    expect(result.ok).toBe(true);
   });
 
   it('binds the token to the sensitive element, not the first target', async () => {

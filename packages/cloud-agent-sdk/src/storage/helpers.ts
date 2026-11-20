@@ -33,7 +33,7 @@ function insertSortedBy<T>(arr: readonly T[], item: T, key: (value: T) => string
 /**
  * Ordering evidence of the last accepted update for a stored part: the event
  * time it was accepted on (or the settle time that ordered it), keyed by the
- * part's message and id.
+ * message id the backend buckets the part under and the part id.
  *
  * The backend owns this store next to its parts. Keeping the evidence off the
  * part matters: a part is plain data the UI renders and `structuredClone`
@@ -47,30 +47,66 @@ type PartOrderingEvidence = Map<string, number>;
 /** Per-message cached part views: the views, an invalidation marker, or nothing. */
 type PartsSnapshot = Map<string, readonly ReadonlyPart[] | null>;
 
-function partOrderingKey(messageID: string, partId: string): string {
-  return `${messageID}\u0000${partId}`;
+/**
+ * Immutable views of the stored parts of one backend, keyed by message and
+ * then by part id, so a rebuild only visits the parts of the message it is
+ * rebuilding.
+ *
+ * A view wraps a clone of the part it was built from, so it may be reused only
+ * while the part now stored is the very object the view was built from. Every
+ * storage path replaces a part object instead of mutating it (`applyTextDeltas`
+ * returns a new object and `upsertPart` stores a clone), so a replaced part
+ * always misses this cache and is rebuilt, and a reused view can never show
+ * content the store has already moved past.
+ */
+type PartViewCache = Map<string, Map<string, { source: Part; view: ReadonlyPart }>>;
+
+function createPartViewCache(): PartViewCache {
+  return new Map<string, Map<string, { source: Part; view: ReadonlyPart }>>();
 }
 
+/**
+ * Key of one part's ordering evidence. The message id is the one the storage
+ * keeps the parts under, not the label the part object carries, so the insert,
+ * the stale check and `forgetPartUpdateTime` all address the same entry.
+ */
+function partOrderingKey(messageId: string, partId: string): string {
+  return `${messageId}\u0000${partId}`;
+}
+
+/**
+ * Record the event time of an accepted update under the bucket the part is
+ * stored in.
+ */
 function rememberPartUpdateTime(
   evidence: PartOrderingEvidence,
-  part: Part,
+  messageId: string,
+  partId: string,
   eventTime: number | undefined
 ): void {
   if (eventTime === undefined) return;
-  evidence.set(partOrderingKey(part.messageID, part.id), eventTime);
+  evidence.set(partOrderingKey(messageId, partId), eventTime);
 }
 
-function storedPartUpdateTime(evidence: PartOrderingEvidence, part: Part): number | undefined {
-  return evidence.get(partOrderingKey(part.messageID, part.id));
+function storedPartUpdateTime(
+  evidence: PartOrderingEvidence,
+  messageId: string,
+  partId: string
+): number | undefined {
+  return evidence.get(partOrderingKey(messageId, partId));
 }
 
-/** Drop the ordering evidence of a part the backend no longer keeps. */
+/**
+ * Drop the ordering evidence of a part the backend no longer keeps. It takes
+ * the same message id the upsert keyed the evidence with, so the delete always
+ * finds the entry.
+ */
 function forgetPartUpdateTime(
   evidence: PartOrderingEvidence,
-  messageID: string,
+  messageId: string,
   partId: string
 ): void {
-  evidence.delete(partOrderingKey(messageID, partId));
+  evidence.delete(partOrderingKey(messageId, partId));
 }
 
 function toolLifecycleRank(part: Part): number | null {
@@ -212,6 +248,7 @@ function isStaleToolLifecycleUpdate(
 }
 
 function upsertPartDroppingStaleSyntheticParts(
+  messageId: string,
   arr: Part[],
   part: Part,
   eventTime: number | undefined,
@@ -228,7 +265,7 @@ function upsertPartDroppingStaleSyntheticParts(
     ? arr.filter(
         existing =>
           existing.id === part.id ||
-          existing.messageID !== part.messageID ||
+          existing.messageID !== messageId ||
           existing.type !== part.type ||
           Reflect.get(existing, 'synthetic') !== true
       )
@@ -238,7 +275,7 @@ function upsertPartDroppingStaleSyntheticParts(
   if (idx >= 0) {
     const existing = filtered[idx];
     const storedEventTime =
-      existing === undefined ? undefined : storedPartUpdateTime(evidence, existing);
+      existing === undefined ? undefined : storedPartUpdateTime(evidence, messageId, existing.id);
     if (
       existing !== undefined &&
       !authoritative &&
@@ -260,14 +297,15 @@ function upsertPartDroppingStaleSyntheticParts(
     // terminal whose event time falls between the two win.
     rememberPartUpdateTime(
       evidence,
-      nextPart,
+      messageId,
+      nextPart.id,
       eventTime ?? partSettledAt(nextPart) ?? storedEventTime
     );
     return nextArr;
   }
 
   const nextPart = clonePart(part);
-  rememberPartUpdateTime(evidence, nextPart, eventTime);
+  rememberPartUpdateTime(evidence, messageId, nextPart.id, eventTime);
   return insertSortedBy(filtered, nextPart, partIdKey);
 }
 
@@ -362,21 +400,53 @@ function publishPartsChanged(
 
 /**
  * One parts read for the whole message: the cached snapshot when this message
- * already has one, `EMPTY_PARTS` when it stores nothing, else the per-part
- * clone-plus-readonly-view snapshot recorded for later reads. A `null` marker
- * (a change that dropped the snapshot) is falsy, so it rebuilds.
+ * already has one, `EMPTY_PARTS` when it stores nothing, else the snapshot
+ * recorded for later reads, assembled from the immutable views `views` already
+ * holds for the parts that did not change and fresh clone-plus-view builds for
+ * the ones that did. A `null` marker (a change that dropped the snapshot) is
+ * falsy, so it rebuilds.
+ *
+ * The cache is per message, so a rebuild costs one visit to this message's own
+ * parts: a part whose stored object is still the one its cached view came from
+ * is reused as is, and a streamed delta batch that replaced a single part
+ * clones only that part. Entries are swept after each build to the ids the
+ * message still stores, so a deleted part cannot leak its view.
  */
 function readPartsSnapshot(
   messageId: string,
   arr: Part[] | undefined,
-  snapshot: PartsSnapshot
+  snapshot: PartsSnapshot,
+  views: PartViewCache
 ): readonly ReadonlyPart[] {
   const cached = snapshot.get(messageId);
   if (cached) return cached;
 
-  if (!arr || arr.length === 0) return EMPTY_PARTS;
+  if (!arr || arr.length === 0) {
+    views.delete(messageId);
+    return EMPTY_PARTS;
+  }
 
-  const built = arr.map(part => createReadonlyPartView(clonePart(part)));
+  let byPart = views.get(messageId);
+  if (!byPart) {
+    byPart = new Map<string, { source: Part; view: ReadonlyPart }>();
+    views.set(messageId, byPart);
+  }
+
+  const built = arr.map(part => {
+    const entry = byPart.get(part.id);
+    if (entry && entry.source === part) return entry.view;
+    const view = createReadonlyPartView(clonePart(part));
+    byPart.set(part.id, { source: part, view });
+    return view;
+  });
+
+  if (byPart.size !== built.length) {
+    const stored = new Set(built.map(part => part.id));
+    for (const partId of [...byPart.keys()]) {
+      if (!stored.has(partId)) byPart.delete(partId);
+    }
+  }
+
   snapshot.set(messageId, built);
   return built;
 }
@@ -452,6 +522,7 @@ export {
   appendPartTextChunks,
   applyTextDeltas,
   clonePart,
+  createPartViewCache,
   createReadonlyPartView,
   createSeedTextPart,
   createSubscriberRegistry,
@@ -467,4 +538,10 @@ export {
   upsertPartDroppingStaleSyntheticParts,
 };
 export { orderMessageIds } from './message-order';
-export type { PartOrderingEvidence, PartsSnapshot, SessionSubscriptionKey, SubscriberRegistry };
+export type {
+  PartOrderingEvidence,
+  PartViewCache,
+  PartsSnapshot,
+  SessionSubscriptionKey,
+  SubscriberRegistry,
+};

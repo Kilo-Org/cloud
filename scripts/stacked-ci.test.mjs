@@ -527,19 +527,25 @@ test('only the shards and the typecheck skip a lint-only change', () => {
       `${name} must skip exactly a lint-only change`
     );
   }
-  for (const name of [
-    'prepare-harness-sdk',
-    'prepare-trpc',
-    'mobile-lint',
-    'i18n-leftover',
-    'check-unused',
-  ]) {
+  for (const name of ['prepare-trpc', 'mobile-lint', 'i18n-leftover', 'check-unused']) {
     assert.equal(
       mobile.jobs[name].if,
       "needs.mobile-changes.outputs.mobile == 'true'",
       `${name} must keep running for a lint-only change`
     );
   }
+  // The harness producer reads no detection output, so it starts beside change
+  // detection instead of behind it.
+  assert.equal(
+    mobile.jobs['prepare-harness-sdk'].needs,
+    undefined,
+    'the harness producer starts beside change detection'
+  );
+  assert.equal(
+    mobile.jobs['prepare-harness-sdk'].if,
+    undefined,
+    'the harness producer starts beside change detection'
+  );
   assert.equal(
     mobile.jobs['mobile-test-result'].if,
     '${{ !cancelled() }}',

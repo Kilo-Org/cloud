@@ -56,10 +56,10 @@ export type {
   StoredMessage,
   DeliveredFailedPrompt,
   PendingSendConfirmation,
-  FetchedSessionData,
-  AssociatedPrData,
   PrepareInput,
 } from './session-manager';
+
+export type { FetchedSessionData, AssociatedPrData } from './types';
 
 export { createCloudAgentSession, REMOTE_SESSION_EXIT_NOT_SUPPORTED } from './session';
 export type {

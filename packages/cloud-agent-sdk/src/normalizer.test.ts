@@ -4,8 +4,11 @@ import {
   preparingDataSchema,
   REMOTE_COMMAND_MAX_COMMANDS,
   REMOTE_COMMAND_MAX_HINTS,
+  SESSION_INTERACTION_MAX_STRING_LENGTH,
   SESSION_QUEUE_MAX_IDS,
+  SESSION_QUESTION_MAX_OPTIONS,
   SESSION_QUESTION_MAX_QUESTIONS,
+  SESSION_SUGGESTION_MAX_ACTIONS,
 } from './schemas';
 import type { CloudAgentEvent } from './schemas';
 
@@ -1214,6 +1217,54 @@ describe('normalize', () => {
       });
     });
 
+    it('keeps every option of a question exactly at the maximum', () => {
+      const options = Array.from({ length: SESSION_QUESTION_MAX_OPTIONS }, (_, index) => ({
+        label: `Option ${index}`,
+        description: `Runs option ${index}`,
+      }));
+      const questions = [{ question: 'Which option?', header: 'Options', options }];
+      const result = normalize(createRaw('question.asked', { id: 'q-1', questions }));
+      expect(result).toEqual({
+        type: 'question.asked',
+        requestId: 'q-1',
+        questions: [{ question: 'Which option?', header: 'Options', options }],
+      });
+    });
+
+    it('drops a question whose options exceed the maximum and keeps the earlier ones', () => {
+      const overLimitOptions = Array.from(
+        { length: SESSION_QUESTION_MAX_OPTIONS + 1 },
+        (_, index) => ({ label: `Option ${index}`, description: `Runs option ${index}` })
+      );
+      const questions = [
+        question,
+        { question: 'Which option?', header: 'Options', options: overLimitOptions },
+      ];
+      const result = normalize(createRaw('question.asked', { id: 'q-1', questions }));
+      expect(result).toEqual({
+        type: 'question.asked',
+        requestId: 'q-1',
+        questions: [question],
+      });
+    });
+
+    it('treats an over-limit first question as carrying no questions', () => {
+      const overLimitOptions = Array.from(
+        { length: SESSION_QUESTION_MAX_OPTIONS + 1 },
+        (_, index) => ({ label: `Option ${index}`, description: `Runs option ${index}` })
+      );
+      const questions = [
+        { question: 'Which option?', header: 'Options', options: overLimitOptions },
+        question,
+      ];
+      const result = normalize(createRaw('question.asked', { id: 'q-1', questions }));
+      expect(result).toEqual({
+        type: 'question.asked',
+        requestId: 'q-1',
+        questions: undefined,
+      });
+    });
+
     it('drops an over-limit question list but keeps the prompt', () => {
       const questions = Array.from({ length: SESSION_QUESTION_MAX_QUESTIONS + 1 }, () => ({
         question: 'Continue?',
@@ -1414,6 +1465,71 @@ describe('normalize', () => {
       });
     });
 
+    it('keeps every action exactly at the maximum', () => {
+      const actions = Array.from({ length: SESSION_SUGGESTION_MAX_ACTIONS }, (_, index) => ({
+        label: `Action ${index}`,
+        description: `Runs action ${index}`,
+        prompt: `/action-${index}`,
+      }));
+      const data = { id: 'sug-4', text: 'Pick an action', actions };
+      const result = normalize(createRaw('suggestion.shown', data));
+      expect(result).toEqual({
+        type: 'suggestion.shown',
+        requestId: 'sug-4',
+        text: 'Pick an action',
+        actions,
+        callId: undefined,
+      });
+    });
+
+    it('drops the over-limit action list but keeps the suggestion text', () => {
+      const actions = Array.from({ length: SESSION_SUGGESTION_MAX_ACTIONS + 1 }, (_, index) => ({
+        label: `Action ${index}`,
+        prompt: `/action-${index}`,
+      }));
+      const data = { id: 'sug-5', text: 'Pick an action', actions };
+      const result = normalize(createRaw('suggestion.shown', data));
+      expect(result).toEqual({
+        type: 'suggestion.shown',
+        requestId: 'sug-5',
+        text: 'Pick an action',
+        actions: [],
+        callId: undefined,
+      });
+    });
+
+    it('drops an action whose prompt exceeds the string maximum', () => {
+      const data = {
+        id: 'sug-6',
+        text: 'Pick an action',
+        actions: [
+          { label: 'Review', prompt: 'x'.repeat(SESSION_INTERACTION_MAX_STRING_LENGTH + 1) },
+        ],
+      };
+      const result = normalize(createRaw('suggestion.shown', data));
+      expect(result).toEqual({
+        type: 'suggestion.shown',
+        requestId: 'sug-6',
+        text: 'Pick an action',
+        actions: [],
+        callId: undefined,
+      });
+    });
+
+    it('keeps an action string exactly at the maximum', () => {
+      const atLimit = 'x'.repeat(SESSION_INTERACTION_MAX_STRING_LENGTH);
+      const action = { label: atLimit, description: atLimit, prompt: atLimit };
+      const data = { id: 'sug-7', text: 'Pick an action', actions: [action] };
+      const result = normalize(createRaw('suggestion.shown', data));
+      expect(result).toEqual({
+        type: 'suggestion.shown',
+        requestId: 'sug-7',
+        text: 'Pick an action',
+        actions: [action],
+        callId: undefined,
+      });
+    });
+
     it('returns null when id is missing', () => {
       expect(normalize(createRaw('suggestion.shown', { text: 'hi', actions: [] }))).toBeNull();
     });
@@ -1446,6 +1562,21 @@ describe('normalize', () => {
         type: 'suggestion.accepted',
         requestId: 'sug-2',
         index: 1,
+        action: undefined,
+      });
+    });
+
+    it('keeps the accepted event when the echoed action exceeds the string maximum', () => {
+      const data = {
+        requestID: 'sug-3',
+        index: 0,
+        action: { label: 'Review', prompt: 'x'.repeat(SESSION_INTERACTION_MAX_STRING_LENGTH + 1) },
+      };
+      const result = normalize(createRaw('suggestion.accepted', data));
+      expect(result).toEqual({
+        type: 'suggestion.accepted',
+        requestId: 'sug-3',
+        index: 0,
         action: undefined,
       });
     });

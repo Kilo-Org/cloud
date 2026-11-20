@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process';
 
-import { cli_sessions_v2, kilocode_users } from '@kilocode/db/schema';
+import { cli_sessions_v2, kilocode_users, platform_integrations } from '@kilocode/db/schema';
 import { signKiloToken } from '@kilocode/worker-utils';
-import { and, eq, inArray, or } from 'drizzle-orm';
+import { and, eq, inArray, isNull, or } from 'drizzle-orm';
 
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
@@ -16,6 +16,7 @@ import {
   buildChildIngestItems,
   buildChildPerformanceFixtures,
   buildEmptyIngestItems,
+  buildFixtureIntegrationValues,
   buildMobileSheetFixtureResult,
   buildRootIngestItems,
   buildUnsupportedIngestItems,
@@ -24,7 +25,9 @@ import {
   EMPTY_SESSION_ID,
   EMPTY_SESSION_TITLE,
   expectedPartIdsFor,
+  FIXTURE_REPOSITORY,
   fixtureCleanupSessionIds,
+  fixtureInstallationId,
   fixtureSessionIds,
   parseSessionIngestServiceStatus,
   pollForChildPerformanceFixture,
@@ -50,6 +53,8 @@ function printUsage(): void {
   console.log('through the local cloudflare-session-ingest worker.');
   console.log('Use --child-performance to also reset and seed a separate tree');
   console.log('with 24 direct children, paged history, and one nested child.');
+  console.log('An account with no GitHub integration of its own gets a fake one that lists');
+  console.log('the root session repository; no GitHub App is contacted.');
   console.log('');
   console.log('Examples:');
   console.log('  pnpm dev:seed app:mobile-sheet-fixtures ada@example.com');
@@ -61,6 +66,39 @@ function printUsage(): void {
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * The repository the root session names. An account with a GitHub integration
+ * of its own must hold the frequent-repository-order fixture installation, as
+ * before; an account with none (a fresh fake account) gets a fake integration
+ * that only this topic writes and replaces, so no GitHub App is needed.
+ */
+async function fixtureRepository(userId: string): Promise<string> {
+  const db = getSeedDb();
+  const fixtureRow = and(
+    eq(platform_integrations.owned_by_user_id, userId),
+    eq(platform_integrations.platform, 'github'),
+    eq(platform_integrations.platform_installation_id, fixtureInstallationId(userId))
+  );
+  await db.delete(platform_integrations).where(fixtureRow);
+  const owned = await db
+    .select({ id: platform_integrations.id })
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.owned_by_user_id, userId),
+        isNull(platform_integrations.owned_by_organization_id),
+        eq(platform_integrations.platform, 'github')
+      )
+    );
+  if (owned.length > 0) {
+    return (await readFixtureIntegration(userId)).usedRepository;
+  }
+  await db
+    .insert(platform_integrations)
+    .values(buildFixtureIntegrationValues(userId, new Date().toISOString()));
+  return FIXTURE_REPOSITORY;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -217,7 +255,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
   const [user] = resolvedMatches;
 
-  const { usedRepository } = await readFixtureIntegration(user.userId);
+  const usedRepository = await fixtureRepository(user.userId);
   const rootGitUrl = normalizedGitHubUrl(usedRepository);
   const unsupportedGitUrl = normalizedGitHubUrl('kilo-org/missing-e2e-repo');
 

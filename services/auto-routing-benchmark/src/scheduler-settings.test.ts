@@ -3,9 +3,11 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as z from 'zod';
 import {
   BENCHMARK_CONTAINER_BUDGET,
   BenchmarkSchedulerConfigResponseSchema,
+  BenchmarkSchedulerSettingSchema,
   type BenchmarkSchedulerOverrides,
 } from '@kilocode/auto-routing-contracts';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
@@ -13,12 +15,17 @@ import { app } from './index';
 import { dispatchScheduler } from './run';
 import { getSchedulerOverrides, resolveSchedulerConfig, scheduleRunChunks } from './scheduler';
 
-const NO_OVERRIDES: BenchmarkSchedulerOverrides = {
-  slots: null,
-  modelConcurrency: null,
-  providerConcurrency: null,
-  unknownProviderConcurrency: null,
-};
+const NO_OVERRIDES: BenchmarkSchedulerOverrides = { slots: null, modelConcurrency: null };
+
+/** The scheduler-config response as the previous web release parses it. */
+const PreviousWebSchedulerConfigResponseSchema = z.object({
+  settings: z.record(
+    z.enum(['slots', 'modelConcurrency', 'providerConcurrency', 'unknownProviderConcurrency']),
+    BenchmarkSchedulerSettingSchema
+  ),
+  updatedAt: z.string().nullable(),
+  updatedBy: z.string().nullable(),
+});
 
 describe('resolveSchedulerConfig', () => {
   it('prefers the admin override, then BENCHMARK_SCHEDULER_CONFIG, then the default', () => {
@@ -29,15 +36,17 @@ describe('resolveSchedulerConfig', () => {
     expect(settings).toEqual({
       slots: { effective: 250, source: 'default', override: null, fallback: 250 },
       modelConcurrency: { effective: 30, source: 'admin', override: 30, fallback: 4 },
-      providerConcurrency: { effective: 20, source: 'env', override: null, fallback: 20 },
-      unknownProviderConcurrency: { effective: 2, source: 'default', override: null, fallback: 2 },
     });
-    expect(config).toMatchObject({
+    expect(config).toEqual({
       slots: 250,
       modelConcurrency: 30,
-      providerConcurrency: 20,
-      unknownProviderConcurrency: 2,
       modelLimits: { 'slow/model': 1 },
+      shares: {
+        'efficient/platform': 2,
+        'frontier/platform': 2,
+        'efficient/user': 1,
+        'frontier/user': 1,
+      },
     });
   });
 
@@ -103,7 +112,7 @@ describe('scheduler settings (admin API, dispatch, real SQLite)', () => {
       .run(new Date().toISOString());
     await scheduleRunChunks(db, {
       runId: 'run',
-      entries: [{ model: 'deep/model', variant: '', providers: ['deepinfra'] }],
+      entries: [{ model: 'deep/model', variant: '' }],
       repetitions: 1,
       caseIds: Array.from({ length: chunks }, (_, index) => `case-${index}`),
       chunkSize: 1,
@@ -154,10 +163,11 @@ describe('scheduler settings (admin API, dispatch, real SQLite)', () => {
 
   it.each([
     ['below 1', { modelConcurrency: 0 }],
-    ['non-integer', { providerConcurrency: 1.5 }],
+    ['non-integer', { modelConcurrency: 1.5 }],
     ['above the container budget', { slots: BENCHMARK_CONTAINER_BUDGET + 1 }],
-    ['a numeric string', { unknownProviderConcurrency: '3' }],
+    ['a numeric string', { slots: '3' }],
     ['an unknown setting', { modelConcurency: 12 }],
+    ['an invalid retired provider limit', { providerConcurrency: 0 }],
   ])('rejects %s without changing the stored overrides', async (_label, body) => {
     expect((await put({ modelConcurrency: 8 })).status).toBe(200);
     const response = await put(body);
@@ -166,6 +176,38 @@ describe('scheduler settings (admin API, dispatch, real SQLite)', () => {
       ...NO_OVERRIDES,
       modelConcurrency: 8,
     });
+  });
+
+  it('saves a previous web release body with the retired provider limits, ignoring them', async () => {
+    const saved = await put({
+      slots: 200,
+      modelConcurrency: 24,
+      providerConcurrency: 48,
+      unknownProviderConcurrency: null,
+    });
+    expect(saved.status).toBe(200);
+    expect((await getSchedulerOverrides(db)).overrides).toEqual({
+      slots: 200,
+      modelConcurrency: 24,
+    });
+
+    const retired = {
+      effective: BENCHMARK_CONTAINER_BUDGET,
+      source: 'default',
+      override: null,
+      fallback: BENCHMARK_CONTAINER_BUDGET,
+    };
+    const read = await request({ headers: { authorization: 'Bearer bench-token' } });
+    for (const response of [saved, read]) {
+      const previousWeb = PreviousWebSchedulerConfigResponseSchema.parse(await response.json());
+      expect(previousWeb.settings).toEqual({
+        slots: { effective: 200, source: 'admin', override: 200, fallback: 250 },
+        modelConcurrency: { effective: 24, source: 'admin', override: 24, fallback: 12 },
+        providerConcurrency: retired,
+        unknownProviderConcurrency: retired,
+      });
+    }
+    expect(Object.keys((await get()).settings)).toEqual(['slots', 'modelConcurrency']);
   });
 
   it('claims up to 12 chunks of one model per dispatch under the default cap', async () => {

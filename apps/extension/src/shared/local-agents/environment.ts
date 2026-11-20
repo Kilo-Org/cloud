@@ -81,7 +81,7 @@ export const parsePlatformFromUserAgent = (userAgent: string): string => {
 
 export const deriveCapabilities = (
   availability: LocalAgentApiAvailability
-): LocalAgentCapabilities => ({
+): Omit<LocalAgentCapabilities, 'keepalive'> => ({
   console: availability.hasDebugger || availability.hasScripting,
   dialogs: availability.hasDebugger || availability.hasScripting,
   fileUpload: availability.hasDebugger || availability.hasScripting,
@@ -103,7 +103,7 @@ export const createLocalAgentHello = ({
 
   return buildExtensionHello({
     browser,
-    capabilities: deriveCapabilities(availability),
+    capabilities: { ...deriveCapabilities(availability), keepalive: true },
     extensionVersion: extensionVersion ?? UNKNOWN_VERSION,
     profileLabel: `${browser.name} on ${parsePlatformFromUserAgent(userAgent)}`,
   });

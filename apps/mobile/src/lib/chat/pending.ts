@@ -56,7 +56,7 @@ const askedSchema = z.object({
   images: imagesSchema,
   // A question remembered before failures were kept says nothing about one.
   failureKey: z.string().nullable().default(null),
-  // The words a stopped answer had reached; absent for every other question.
+  // The words a stopped or failed answer had reached; absent for every other question.
   answer: z.string().optional(),
 });
 const keptEntrySchema = z.object({
@@ -73,7 +73,7 @@ const keptEntrySchema = z.object({
   /* Why it failed, so its bubble can state the same cause after the slot moved
      on. A question kept before this was written says nothing about one. */
   failureKey: z.string().nullable().default(null),
-  // The words its answer had reached when the person stopped it.
+  // The words its answer had reached when it was stopped or failed.
   answer: z.string().optional(),
 });
 /** The stored list, before any entry is read: one broken entry is dropped alone. */
@@ -108,7 +108,7 @@ export type Asked = Question &
     readonly after?: number;
     /** Why the last answer ended without one, or null when nothing says why. */
     readonly failureKey: string | null;
-    /** The words the answer had reached when the person stopped it, if any arrived. */
+    /** The words the answer had reached when it was stopped or failed, if any arrived. */
     readonly answer?: string;
   };
 
@@ -142,7 +142,7 @@ export async function recordAskedFailure(sessionId: string, failureKey: string):
 }
 
 /**
- * Keeps the words the person stopped the answer at beside the question, so a
+ * Keeps the words a stopped or failed answer had reached beside the question, so a
  * reopened chat still shows them under it. Like a failure, a question nobody
  * remembers has nowhere to keep them.
  */

@@ -7,7 +7,7 @@
     "directory": "دليل العمل",
     "createSession": "إنشاء جلسة ببروتوكول CLI الأصلي",
     "queueIfOffline": "إضافة المطالبة إلى قائمة الانتظار إذا كان المضيف غير متصل",
-    "prompt": "مطالبة أو /command",
+    "prompt": "مطالبة أو \u2066/command\u2069",
     "localClear": "مسح العرض المحلي",
     "abort": "إيقاف الدور",
     "failed": "فشل إجراء التحكم عن بُعد ببروتوكول CLI الأصلي",
@@ -19,7 +19,13 @@
     "presenceStatus": "المضيفون: {{connection}}",
     "commandStatus": "تسليم الأمر: {{status}}",
     "delivered": "تم التسليم",
-    "expired": "انتهت الصلاحية"
+    "expired": "انتهت الصلاحية",
+    "recoveryGaps_zero": "لا توجد أجزاء مفقودة من هذا السجل.",
+    "recoveryGaps_one": "الجزء {{displayCount}} من هذا السجل مفقود.",
+    "recoveryGaps_two": "جزآن من هذا السجل مفقودان.",
+    "recoveryGaps_few": "{{displayCount}} أجزاء من هذا السجل مفقودة.",
+    "recoveryGaps_many": "{{displayCount}} جزءًا من هذا السجل مفقود.",
+    "recoveryGaps_other": "{{displayCount}} جزء من هذا السجل مفقود."
   },
   "common": {
     "manageOnWeb": "الإدارة عبر الويب",
@@ -172,6 +178,7 @@
     "generating": "جارٍ الإنشاء…",
     "working": "جارٍ العمل",
     "yourOwnRepositories": "مستودعاتك الخاصة",
+    "organizationRepositories": "مستودعات المؤسسة",
     "dismissed": "مستبعدة",
     "agent": "عامل",
     "durationMinuteShort": "min",
@@ -669,7 +676,7 @@
     },
     "instructions": {
       "title": "تعليمات مخصصة",
-      "deprecation": "من المقرر إيقاف ميزة التعليمات المخصصة. انقل هذه الإرشادات إلى ملف REVIEW.md في مستودعك بدلًا منها.",
+      "deprecation": "ستتم إزالة ميزة التعليمات المخصصة. انقل هذه الإرشادات إلى ملف REVIEW.md في مستودعك بدلًا منها.",
       "placeholder": "مثال: الالتزام بقواعد معالجة الأخطاء المتبعة لدينا…",
       "clearTitle": "إزالة التعليمات المخصصة؟",
       "clearMessage": "سيؤدي حفظ الحقل فارغًا إلى حذف التعليمات المخصصة المخزّنة لهذا المراجع."
@@ -698,8 +705,12 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "تتم إدارة اتصال Bitbucket الخاص بالمؤسسة {{organization}} عبر الويب من جهاز كمبيوتر.",
+      "managedOnWebTitle": "تتم الإدارة على الويب",
+      "managedOnWebShort": "تتم إدارة هذا الاتصال عبر الويب من جهاز كمبيوتر.",
+      "managedOnWebRepositories": "اختر المستودعات الخاصة بالمؤسسة {{organization}} عبر الويب من جهاز كمبيوتر.",
       "description": "أنشئ رمز وصول لمساحة العمل للمؤسسة {{organization}} ثم الصقه أدناه.",
       "descriptionReconnect": "أنشئ رمز وصول جديدًا لمساحة العمل للمؤسسة {{organization}} ثم الصقه أدناه.",
+      "descriptionOverview": "أنشئ رمز وصول لمساحة العمل للمؤسسة {{organization}} ثم الصقه في الشاشة التالية.",
       "scopes": "الصلاحيات المطلوبة: الحساب: قراءة · المستودعات: قراءة/كتابة · طلبات السحب: قراءة · خطافات الويب: قراءة/كتابة.",
       "tokenPlaceholder": "رمز وصول مساحة العمل",
       "tokenRefused": "لم يقبل Bitbucket رمز وصول مساحة العمل هذا. تحقق من أنه يتضمن الصلاحيات المذكورة أعلاه، ثم أعد المحاولة."
@@ -735,6 +746,7 @@
     "platformList": {
       "activity": "النشاط",
       "checking": "جارٍ التحقق…",
+      "needsAttention": "يتطلب الانتباه",
       "platforms": "المنصات",
       "statusUnavailable": "الحالة غير متاحة"
     },
@@ -2329,7 +2341,9 @@
     "modelPicker": {
       "title": "اختيار النموذج",
       "favorites": "المفضلة",
-      "noModelsDescription": "لا توجد نماذج متاحة للاختيار."
+      "noModelsDescription": "لا توجد نماذج متاحة للاختيار.",
+      "allUnavailableTitle": "لا يمكن استخدام أي نموذج",
+      "allUnavailableDescription": "أضف مفتاح مزوّد، ثم أعد المحاولة."
     },
     "modelSelector": {
       "provider": "المزود {{id}}",
@@ -2769,6 +2783,8 @@
     "retryHint": "يعيد محاولة التحقق من حالة Kilo Pass.",
     "endedOn": "انتهى في {{date}}",
     "notAvailableInApp": "Kilo Pass غير متاح في التطبيق.",
+    "notAvailableTitle": "Kilo Pass غير موجود في التطبيق",
+    "noPassDescription": "لا يملك هذا الحساب Kilo Pass.",
     "statusActive": "نشط",
     "statusTrialing": "تجريبي",
     "statusPastDue": "الدفع متأخر",
@@ -3450,6 +3466,12 @@
       "partialPostedStale_many": "بقيت في قائمة الانتظار تعليقات مرتبطة بإيداع أقدم، وعددها {{displayStaleCount}}.",
       "partialPostedStale_other": "بقيت في قائمة الانتظار تعليقات مرتبطة بإيداع أقدم، وعددها {{displayStaleCount}}.",
       "submitCountOfTotal": "إرسال التعليقات: {{displayFreshCount}} من {{displayTotalCount}}",
+      "submitCountOfTotal_zero": "إرسال التعليقات: {{displayFreshCount}} من {{displayTotalCount}}",
+      "submitCountOfTotal_one": "إرسال التعليقات: {{displayFreshCount}} من {{displayTotalCount}}",
+      "submitCountOfTotal_two": "إرسال التعليقات: {{displayFreshCount}} من {{displayTotalCount}}",
+      "submitCountOfTotal_few": "إرسال التعليقات: {{displayFreshCount}} من {{displayTotalCount}}",
+      "submitCountOfTotal_many": "إرسال التعليقات: {{displayFreshCount}} من {{displayTotalCount}}",
+      "submitCountOfTotal_other": "إرسال التعليقات: {{displayFreshCount}} من {{displayTotalCount}}",
       "submitReview": "إرسال المراجعة",
       "pendingComment_zero": "تعليق معلّق",
       "pendingComment_two": "تعليقان معلّقان",
@@ -3466,6 +3488,13 @@
     },
     "tabs": {
       "discussion": "المناقشة",
+      "discussionAccessibility": "{{title}}: التعليقات: {{displayCount}}",
+      "discussionAccessibility_other": "{{title}}: التعليقات: {{displayCount}}",
+      "discussionAccessibility_one": "{{title}}: تعليق واحد",
+      "discussionAccessibility_zero": "{{title}}: عدد التعليقات: {{displayCount}}",
+      "discussionAccessibility_two": "{{title}}: تعليقان",
+      "discussionAccessibility_few": "{{title}}: {{displayCount}} تعليقات",
+      "discussionAccessibility_many": "{{title}}: {{displayCount}} تعليقًا",
       "files": "الملفات",
       "overview": "نظرة عامة"
     },
@@ -3658,8 +3687,7 @@
     "hub": {
       "balance": "الرصيد",
       "lowBalanceBelow": "أقل من {{amount}}",
-      "organizationSeats": "مقاعد المؤسسة",
-      "plan": "خطة المؤسسة",
+      "plan": "الخطة",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · منتهية",
@@ -3702,7 +3730,7 @@
       "retentionLimit": "يتم عرض أحدث الفواتير."
     },
     "lowBalanceAlert": {
-      "enableA11y": "تفعيل تنبيه انخفاض الرصيد",
+      "subtitle": "أرسل تنبيهًا بالبريد الإلكتروني إلى العناوين التي تدرجها عندما ينخفض رصيد هذه المؤسسة عن المبلغ الذي تحدده.",
       "notifyEmailsLabel": "عناوين البريد الإلكتروني للتنبيهات",
       "permissionDenied": "ليست لديك صلاحية لإدارة تنبيهات الفوترة.",
       "separateEmailsHint": "افصل بين عناوين البريد الإلكتروني بفواصل.",
@@ -3887,7 +3915,8 @@
     "signupStepUp": "لإكمال إنشاء حسابك، استخدم \"$t(login.moreSignInOptions)\".",
     "signupStepUpApple": "لإكمال إنشاء حسابك، استخدم \"$t(login.signInWithApple)\".",
     "signupStepUpGoogle": "لإكمال إنشاء حسابك، استخدم \"$t(login.signInWithGoogle)\".",
-    "invalidCode": "هذا الرمز غير صحيح. حاول مرة أخرى.",
+    "signupStepUpBack": "لإكمال إنشاء حسابك، ارجع ثم استخدم \"$t(login.moreSignInOptions)\".",
+    "invalidCode": "هذا الرمز غير صحيح أو منتهي الصلاحية. حاول مرة أخرى أو استخدم \"$t(login.resendCode)\".",
     "codeInProgress": "جارٍ معالجة رمزك. انتظر قليلًا وحاول مرة أخرى.",
     "tooManyAttempts": "تجاوزت الحد المسموح للمحاولات. اطلب رمزًا جديدًا.",
     "invalidToken": "فشل تسجيل الدخول. حاول مرة أخرى.",
@@ -4160,6 +4189,15 @@
       "checkHelp": "يرسل $t(modelChat.backends.checkConnection) طلب استدلال قصيرًا إلى نقطة النهاية هذه باستخدام البروتوكول والنموذج المحددين. قد يفرض المزوّد رسومًا عليه.",
       "connectionSucceeded": "أكمل النموذج طلبًا باستخدام هذا البروتوكول.",
       "connectionFailed": "تعذّر على النموذج إكمال الطلب. تحقق من العنوان الأساسي لـ API والبروتوكول وبيانات الاعتماد ومعرّف النموذج.",
+      "requestTimedOut": "لم تستجب نقطة النهاية في الوقت المناسب. تحقق من العنوان الأساسي لـ API واتصالك، ثم حاول مرة أخرى.",
+      "requestUnauthorized": "رفضت نقطة النهاية بيانات الاعتماد. تحقق من مفتاح API والترويسات المخصصة، ثم حاول مرة أخرى.",
+      "requestNotFound": "لم يُعثر على نقطة النهاية أو النموذج. تحقق من العنوان الأساسي لـ API ومعرّف النموذج.",
+      "requestRateLimited": "تحدّ نقطة النهاية من الطلبات. انتظر لحظة وحاول مرة أخرى.",
+      "requestUnavailable": "نقطة النهاية غير متاحة الآن. حاول مرة أخرى بعد لحظة.",
+      "requestUnreachable": "تعذّر الوصول إلى نقطة النهاية. تحقق من العنوان الأساسي لـ API واتصالك.",
+      "requestInvalidResponse": "ردّت نقطة النهاية بتنسيق غير متوقع. تحقق من أن العنوان الأساسي لـ API والبروتوكول يطابقان الخادم، ثم أعد المحاولة.",
+      "discoveryNoModels": "لم تُدرج نقطة النهاية أي نماذج. أدخل النماذج يدويًا.",
+      "connectionIncomplete": "أجاب النموذج لكنه لم يكمل. حاول مرة أخرى، أو تحقق من معرّف النموذج والبروتوكول.",
       "invalidInput": "أدخل اسمًا للخادم وترويسات صالحة ونموذجًا واحدًا على الأقل بمعرّف واسم فريدين. يجب أن تكون حدود الرموز أعدادًا صحيحة موجبة.",
       "invalidUrl": "أدخل عنوانًا أساسيًا لـ API يستخدم HTTP أو HTTPS دون بيانات اعتماد أو معلمات استعلام أو جزء مرجعي.",
       "publicHttp": "لا يُسمح بنقاط نهاية HTTP العامة. استخدم HTTPS أو نقطة نهاية محلية خاصة.",
@@ -4298,10 +4336,20 @@
     "reasoningEffort": {
       "modelFlag": "يدعم هذا النموذج جهد التفكير"
     },
-    "creditsRequired": "لا يوجد رصيد كافٍ لإرسال هذه الرسالة."
+    "creditsRequired": "لا يوجد رصيد كافٍ لإرسال هذه الرسالة.",
+    "providerKeyRefused": "رفض المزوّد بيانات الاعتماد. تحقق من مفتاح API الخاص به، ثم أعد الإرسال.",
+    "providerModelMissing": "لم يعد هذا الخادم يقدّم هذا النموذج. اختر آخر.",
+    "providerRateLimited": "يحدّ المزوّد من الطلبات. انتظر لحظة وأعد الإرسال.",
+    "providerUnavailable": "المزوّد غير متاح الآن. أعد الإرسال بعد قليل."
   },
   "settingsTools": {
-    "confirmTitle": "تأكيد هذا التغيير؟"
+    "confirmTitle": "تأكيد هذا التغيير؟",
+    "guarded": {
+      "spendAlertsOff": "هل تريد إيقاف تنبيهات الإنفاق؟ لن تصلك إشعارات عند تجاوز حدود الإنفاق أو الارتفاعات الساعية.",
+      "balanceAlertsOff": "هل تريد إيقاف تنبيهات الرصيد؟ لن تصلك إشعارات عند انخفاض رصيدك.",
+      "securityFindingsOff": "هل تريد إيقاف النتائج الأمنية؟ لن تصلك إشعارات حول النتائج الأمنية الجديدة.",
+      "hideBalanceOn": "هل تريد إخفاء أرصدتك؟ لن تظهر أرصدة الاعتمادات بعد الآن على شاشات الملف الشخصي ومركز المؤسسة."
+    }
   },
   "appActions": {
     "start": {
@@ -4697,6 +4745,7 @@
     "pickPackToBuyAgain": "اختر حزمة من الأعلى لبدء عملية شراء جديدة.",
     "purchasePending": "لا يزال المتجر يعالج هذه الدفعة. ستصلك أرصدتك بمجرد موافقته على عملية الدفع.",
     "buyAgain": "شراء مجددًا",
+    "checkPurchase": "التحقق من الشراء",
     "purchaseOwnedByAnotherAccount": "الرصيد على حساب Apple Account هذا يخص حساب Kilo آخر. سجّل الدخول إلى حساب Kilo ذلك لاستخدامه.",
     "purchaseOwnedByAnotherAccountPlay": "الرصيد على حساب Google Play هذا يخص حساب Kilo مختلف. سجّل الدخول إلى حساب Kilo ذلك لاستخدامه."
   },
@@ -4806,7 +4855,9 @@
     },
     "saveSheet": {
       "title": "حفظ في قائمة",
-      "saved": "تم الحفظ في {{list}}"
+      "saved": "تم الحفظ في {{list}}",
+      "saveFailed": "تعذّر حفظ المهمة. تحقّق من اتصالك وحاول مرة أخرى.",
+      "saveRefused": "تعذّر حفظ المهمة في هذه القائمة. اختر قائمة أخرى."
     }
   },
   "agentBriefing": {
@@ -4818,6 +4869,7 @@
     "empty": "لا يوجد نشاط في نافذة هذا التقرير",
     "emptyHint": "ستظهر هنا جلسات البرمجة السحابية وجلسات CLI عندما يحتوي تقرير مجدول على نشاط.",
     "loadError": "تعذّر تحميل التقارير",
+    "estimateLoadError": "تعذّر تحميل التقدير.",
     "view": "قراءة التقرير",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}، $t(agentBriefing.snapshotPullRequests) {{pullRequests}}، $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -5101,7 +5153,7 @@
   },
   "organizationGuardrails": {
     "title": "ضوابط حماية الذكاء الاصطناعي",
-    "permissionDenied": "يمكن لمالكي المؤسسة ومسؤوليها فقط إدارة ضوابط حماية الذكاء الاصطناعي.",
+    "permissionDenied": "يمكن لمالكي المؤسسة ومسؤوليها فقط إدارة ضوابط حماية الذكاء الاصطناعي. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "ضوابط حماية الذكاء الاصطناعي غير مفعّلة",
     "unavailable": "تُمكّن Kilo ضوابط حماية الذكاء الاصطناعي لمؤسسة عند الطلب. تواصل مع {{supportEmail}}، وفريق Kilo يفعّلها لمؤسستك.",
     "contactSupport": "التواصل مع الدعم",
@@ -5239,7 +5291,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "ميزة خطة الشركات",
-    "enterpriseOnly": "هذه الميزة متاحة لخطة الشركات فقط.",
+    "enterpriseOnly": "المزوّدون والنماذج متاحون في خطة Enterprise.",
     "readOnly": "يمكن لمالكي المؤسسة ومسؤوليها فقط تغيير هذه الإعدادات.",
     "loadError": "تعذّر تحميل المزوّدين والنماذج",
     "tabModels": "النماذج",
@@ -5253,6 +5305,7 @@
     "providersDescription": "عطّل مزوّدًا ليتوقف Kilo عن توجيه الطلبات إليه في هذه المؤسسة.",
     "providersNeedCatalog": "تبقى مفاتيح المزوّدين للقراءة فقط حتى يكتمل تحميل كتالوج النماذج بالكامل. اضغط على إعادة المحاولة في الأعلى لتعديلها.",
     "providersEmpty": "لا يوجد مزوّدون يطابقون هذا البحث.",
+    "providersNone": "لا يوجد أي مزوّد متاح لهذه المؤسسة.",
     "allowAllShown": "السماح بكل المعروض",
     "denyAllShown": "رفض كل المعروض",
     "gatewaysDescription": "يوجّه Kilo طلبات النماذج عبر Vercel AI Gateway أو OpenRouter. تفشل هذه الطلبات إذا كانت البوابة معطّلة.",

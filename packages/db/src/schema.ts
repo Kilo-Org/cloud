@@ -3465,9 +3465,11 @@ export const organizations = pgTable(
       .where(
         sql`(${table.settings}->>'is_sales_demo')::boolean = true AND ${table.deleted_at} IS NULL`
       ),
-    // Creator-scoped organization lookups.
+    // Creator-scoped organization lookups always probe by value, so rows without a
+    // creator stay out of the index.
     index('IDX_organizations_created_by_kilo_user_id')
       .on(table.created_by_kilo_user_id)
+      .where(sql`${table.created_by_kilo_user_id} IS NOT NULL`)
       .concurrently(),
     // Directory Sync lookups resolve an organization from a webhook payload, so each
     // binding column is probed by value. The predicates keep these indexes to the few

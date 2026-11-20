@@ -305,12 +305,18 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       // A failed or pending mount-time mint keeps this setup screen up; the
       // button resolves (re-mints) the URL on press. An error-only page here
       // made the landing permanently unusable on a transient backend failure.
+      //
+      // The audit action resolves after the capability read, so its column is
+      // reserved and the icon cannot push the subtitle and the body down when
+      // it lands.
       return (
         <View className="flex-1 bg-background">
           <ScreenHeader
             title={t('common.securityAgent')}
             subtitle={scopeTitle}
             headerRight={auditAction}
+            headerRightWidth={48}
+            reserveHeaderRightSpace
           />
           {!connectUrl && isMinting ? (
             <ScopeEntryBodySkeleton />
@@ -351,6 +357,8 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
             title={t('common.securityAgent')}
             subtitle={scopeTitle}
             headerRight={auditAction}
+            headerRightWidth={48}
+            reserveHeaderRightSpace
           />
           {!reauthUrl && !connectUrl && isMinting ? (
             <ScopeEntryBodySkeleton />

@@ -459,13 +459,15 @@ describe('ScreenHeader mounted', () => {
     const cluster = findHeaderRight(renderer.root);
     const inline = findInlineActionsWrapper(renderer.root);
 
-    // Both trailing slots sit in the title row beside the heading, so the
+    // Both trailing slots are the band's own children, beside the title, so the
     // heading keeps `flex-1 min-w-0` and the title keeps its tail ellipsis.
     expect(inline.parent).toBe(cluster.parent);
     expect(inline.children).toHaveLength(1);
     expect(inline.parent?.props.className).toContain('flex-row');
-    const heading = inline.parent?.children[0] as TestInstance;
-    expect(heading.props.className).toContain('min-w-0 flex-1');
+    // The title paints in that same band, whatever the fit check wraps it in.
+    expect(inline.parent?.findAll(node => node.props.accessibilityRole === 'header')).toHaveLength(
+      1
+    );
     // Neither trailing slot clamps itself: `headerRight` sizes to its content
     // and `inlineActions` keeps its full width instead of wrapping the controls.
     expect(cluster.children).toHaveLength(1);
@@ -1357,6 +1359,39 @@ describe('ScreenHeader mounted', () => {
     expect(band?.props.className).toContain('items-center');
     expect(title.parent?.parent).toBe(band);
     expect(band?.children[0]).toBe(control);
+  });
+
+  it('keeps the trailing action on the title line above a subtitle', () => {
+    // As a sibling of the whole heading block, the trailing slot centred
+    // between the title line and the subtitle: measured on the Security Agent
+    // entry header, its 48dp icon centred at 93.3 in a 67.4dp block whose title
+    // centred at 84.0, 9.3dp below the line the icon belongs to. The title band
+    // owns the slot now, so the band's `items-center` seats the icon on the
+    // title's own line and the heading block's height no longer moves it.
+    const renderer = renderHeader({
+      title: 'Security agent',
+      subtitle: 'kilo-org/cloud',
+      headerRight: slotView(),
+    });
+
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    const band = title.parent?.parent;
+    if (!band) {
+      throw new Error('title band not found');
+    }
+
+    const headerRight = findHeaderRight(renderer.root);
+    // The trailing wrapper is one of the band's own children, beside the title.
+    expect(headerRight.parent).toBe(band);
+    expect(band.findAll(node => node === headerRight)).toHaveLength(1);
+
+    // The subtitle keeps a row of its own, a sibling of the band inside the
+    // heading block rather than a child of the band.
+    const subtitle = renderer.root.findByProps({ variant: 'muted', ellipsizeMode: 'tail' });
+    const subtitleRow = subtitle.parent?.parent?.parent;
+    expect(subtitleRow?.parent).toBe(band.parent);
+    expect(subtitleRow).not.toBe(band);
+    expect(band.findAll(node => node === subtitleRow)).toHaveLength(0);
   });
 
   it('keeps the modal close control on the centered title row with a mirroring filler', () => {

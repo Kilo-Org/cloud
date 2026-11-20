@@ -337,12 +337,18 @@ async function reportLogBox(probe: ProbeClient, log: (line: string) => void): Pr
     }
     if (result.exposing === 0) {
       log(
-        'design-gate: no module of the app runtime exposed LogBox setDisabled; a dev toast still painting is reported as a dev-overlay finding at the level LogBox painted (an error fails the run)'
+        'design-gate: no module of the app runtime exposed LogBox setDisabled; a dev toast' +
+          ' still painting is reported as a dev-overlay finding at the level LogBox' +
+          ' painted, or by its message text when the dump carries no level chrome (an' +
+          ' error fails the run)'
       );
       return;
     }
     log(
-      `design-gate: ${result.exposing} module(s) exposed LogBox setDisabled but none accepted the switch; a dev toast still painting is reported as a dev-overlay finding at the level LogBox painted (an error fails the run)`
+      `design-gate: ${result.exposing} module(s) exposed LogBox setDisabled but none accepted` +
+        ' the switch; a dev toast still painting is reported as a dev-overlay finding at' +
+        ' the level LogBox painted, or by its message text when the dump carries no level' +
+        ' chrome (an error fails the run)'
     );
   } catch (error) {
     log(`design-gate: LogBox disable unavailable: ${String(error)}`);

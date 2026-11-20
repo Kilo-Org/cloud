@@ -190,7 +190,7 @@ function warningDump(text: string): ProbeDump {
   };
 }
 
-test('a toast painted after disabling is an environment warning, not a screen defect', () => {
+test('a warning-level toast painted after disabling is reported, not graded', () => {
   const dump = warningDump(WARNING);
   // The toast's owners are the ignored overlay's: the layout rules never see it,
   // so the rule has to read the dump.
@@ -211,7 +211,7 @@ test('a toast painted after disabling is an environment warning, not a screen de
   assert.equal(overlay?.element.testID, 'logbox_notification_message_text');
   assert.equal(overlay?.element.index, 7);
   assert.equal(overlay?.measured, 22.86);
-  assert.match(overlay?.message ?? '', /Disabling failed in this runtime/);
+  assert.match(overlay?.message ?? '', /disabling failed in this runtime/);
 });
 
 test('a dump whose LogBox node carries no text has no overlay finding', () => {
@@ -284,8 +284,26 @@ test('an error-level notification makes any message an error, not a screen defec
   assert.equal(overlay.element.text, RENDER_ERROR);
   assert.equal(overlay.measured, 22.86);
   assert.equal(overlay.expected, 'no LogBox toast painted over the screen');
-  assert.match(overlay.message, /cannot grade what it covers/);
+  assert.match(overlay.message, /an error this run fails on/);
+  assert.match(overlay.message, /the run fails until the overlay is gone/);
+  assert.match(overlay.message, /the level chrome LogBox painted says error/);
+  // An error never hides behind the environment wording: the run fails.
+  assert.doesNotMatch(overlay.message, /environment problem/);
+  assert.doesNotMatch(overlay.message, /reported and not graded/);
   assert.match(overlay.message, new RegExp(RENDER_ERROR.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+});
+
+test('an error-level not-yet-mounted toast fails the run: React logs it through console.error', () => {
+  // The realistic shape: LogBox paints this toast at error level, so the
+  // wording must say the run fails until the overlay is gone, never that the
+  // toast goes ungraded or excused as an environment problem.
+  const [overlay] = checkDevLogOverlay(toastDump('error', WARNING));
+  assert.equal(overlay.severity, 'error');
+  assert.match(overlay.message, /an error this run fails on/);
+  assert.match(overlay.message, /the run fails until the overlay is gone/);
+  assert.doesNotMatch(overlay.message, /environment problem/);
+  assert.doesNotMatch(overlay.message, /reported and not graded/);
+  assert.doesNotMatch(overlay.message, /message text/);
 });
 
 test('LogBox decides the severity: an error-level unlock of an arbitrary message still fails the run', () => {
@@ -294,12 +312,16 @@ test('LogBox decides the severity: an error-level unlock of an arbitrary message
   const [overlay] = checkDevLogOverlay(toastDump('error', ARBITRARY));
   assert.equal(overlay.severity, 'error');
   assert.equal(overlay.element.text, ARBITRARY);
+  assert.match(overlay.message, /an error this run fails on/);
+  assert.doesNotMatch(overlay.message, /environment problem/);
 });
 
 test('LogBox decides the severity: a warn-level notification stays a warning whatever it says', () => {
   const [overlay] = checkDevLogOverlay(toastDump('warn', RENDER_ERROR));
   assert.equal(overlay.severity, 'warning');
   assert.equal(overlay.element.text, RENDER_ERROR);
+  assert.match(overlay.message, /reported and not graded/);
+  assert.match(overlay.message, /the level chrome LogBox painted says warn/);
   // The quoted text stays in the finding, so the run says what painted over it.
   assert.match(overlay.message, new RegExp(RENDER_ERROR.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 });
@@ -307,21 +329,41 @@ test('LogBox decides the severity: a warn-level notification stays a warning wha
 test('a warn-level not-yet-mounted toast keeps its environment wording', () => {
   const [overlay] = checkDevLogOverlay(toastDump('warn', WARNING));
   assert.equal(overlay.severity, 'warning');
-  assert.match(overlay.message, /Disabling failed in this runtime/);
+  assert.match(overlay.message, /disabling failed in this runtime/);
+  assert.match(overlay.message, /environment problem the run log names/);
+  assert.match(overlay.message, /reported and not graded/);
 });
 
 test('without level chrome the message text is the only classification left', () => {
   // A dump from a runtime whose LogBox chrome the probe did not model: the one
   // message the gate knows is an environment warning stays a warning, and
-  // anything else is assumed to be the error it would be.
+  // anything else is assumed to be the error it would be. Both wording carry
+  // the marker the fallback clause, so severity and wording stay paired.
   assert.deepEqual(
     checkDevLogOverlay(toastDump(undefined, WARNING, RENDER_ERROR)).map(entry => [
       entry.severity,
       entry.element.text,
+      entry.message.includes('no level chrome'),
     ]),
     [
-      ['warning', WARNING],
-      ['error', RENDER_ERROR],
+      ['warning', WARNING, true],
+      ['error', RENDER_ERROR, true],
     ]
   );
+});
+
+test('without level chrome each wording names the text as the fallback classifier', () => {
+  // The fallback wordings must say the message text classified the toast: a
+  // future change that classifies by one signal and words by another read as a
+  // failure here, the split kilobot flagged on this rule.
+  const [fallbackWarning] = checkDevLogOverlay(toastDump(undefined, WARNING));
+  assert.equal(fallbackWarning.severity, 'warning');
+  assert.match(fallbackWarning.message, /no level chrome/);
+  assert.match(fallbackWarning.message, /message text/);
+  assert.match(fallbackWarning.message, /keeps it a warning/);
+  const [fallbackError] = checkDevLogOverlay(toastDump(undefined, ARBITRARY));
+  assert.equal(fallbackError.severity, 'error');
+  assert.match(fallbackError.message, /no level chrome/);
+  assert.match(fallbackError.message, /message text classifies it/);
+  assert.match(fallbackError.message, /must be assumed to be/);
 });

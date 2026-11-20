@@ -112,8 +112,7 @@ export function GuardrailsForm({
   // rules still on screen have to be confirmed, because the preset replaces
   // them.
   const applyKiloDefault = (afterApply: () => void) => {
-    const head: GuardrailsDraft['detectors']['policy_violation'] =
-      draft.detectors.policy_violation;
+    const head: GuardrailsDraft['detectors']['policy_violation'] = draft.detectors.policy_violation;
     const replacesRules = head.format === 'rules' && head.rules.length > 0;
     const replacesText =
       head.policy_text.trim().length > 0 && head.policy_text !== KILO_DEFAULT_POLICY_TEXT;

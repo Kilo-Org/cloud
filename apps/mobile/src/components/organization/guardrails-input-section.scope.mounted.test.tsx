@@ -8,10 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { InputGuardrailsSection } from './guardrails-input-section';
 import { i18n } from '@/i18n';
-import {
-  type GuardrailsDraft,
-  type OrgGuardrailsGroup,
-} from '@/lib/organization/guardrails-draft';
+import { type GuardrailsDraft, type OrgGuardrailsGroup } from '@/lib/organization/guardrails-draft';
 import { act } from '@/test/renderer';
 import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 

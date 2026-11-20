@@ -268,9 +268,7 @@ describe('GuardrailsForm apply Kilo Default', () => {
   });
 
   it('applies the preset without asking when the field already holds it', async () => {
-    await mountForm(
-      payload({ policyText: KILO_DEFAULT_POLICY_TEXT, policyFormat: 'policy_text' })
-    );
+    await mountForm(payload({ policyText: KILO_DEFAULT_POLICY_TEXT, policyFormat: 'policy_text' }));
     const afterApply = vi.fn<() => void>();
 
     applyKiloDefault(afterApply);

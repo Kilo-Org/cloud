@@ -127,6 +127,17 @@ describe('OpenRouterModelsResponseSchema', () => {
     });
     expect(parsed.data[0]).toEqual({ id: 'a', name: 'A', retires_on: '2026-07-01' });
   });
+
+  it('drops a non-string retires_on instead of rejecting the catalog', () => {
+    const parsed = OpenRouterModelsResponseSchema.parse({
+      data: [
+        { id: 'a', name: 'A', retires_on: null },
+        { id: 'b', name: 'B', retires_on: 42 },
+      ],
+    });
+    expect(parsed.data.map(entry => entry.id)).toEqual(['a', 'b']);
+    expect(parsed.data.map(entry => entry.retires_on)).toEqual([undefined, undefined]);
+  });
 });
 
 describe('OrganizationDefaultsResponseSchema', () => {

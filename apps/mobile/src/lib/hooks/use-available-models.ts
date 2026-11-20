@@ -176,9 +176,12 @@ export const OpenRouterModelsResponseSchema = z.object({
         .optional(),
       opencode: z.object({ variants: z.record(z.string(), z.unknown()).optional() }).optional(),
       architecture: z.object({ input_modalities: z.array(z.string()).optional() }).optional(),
-      // An off-contract value drops only the note, never the catalog body: `toModelOptions` reads it
-      // through the date-only guard below.
-      retires_on: z.string().optional(),
+      // A value off the contract drops only the note, never the catalog body: any non-string reads
+      // as absent here, and `toModelOptions` keeps only the date-only shape.
+      retires_on: z
+        .string()
+        .optional()
+        .or(z.unknown().transform(() => undefined)),
     })
   ),
 });

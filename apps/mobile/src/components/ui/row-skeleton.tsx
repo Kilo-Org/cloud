@@ -10,17 +10,18 @@ const STRIP_CLASS = 'w-[3px] self-stretch rounded-[2px] bg-muted-soft';
 /** The bars hold the height of the lines they stand in for (`text-sm` 17.5pt, `text-xs` 14pt), so the swap to real rows never shifts the screen. */
 const TITLE_BAR_CLASS = 'h-5 w-40 max-w-full rounded bg-muted-soft';
 /**
- * The distance between a title and its subtitle for a placeholder that stands
- * in for a `RowFrame` row: `RowFrame`'s subtitle carries its own `mt-0.5`
- * (1.75pt), so a `gap-1` column stacks the bars 1.75pt further apart than the
- * loaded row and makes every such placeholder taller than the row it becomes.
+ * The distance between a title and its subtitle under a `RowFrame` row, which
+ * is what the row variant's own frame becomes: `RowFrame`'s subtitle carries
+ * its own `mt-0.5` (1.75pt), so a `gap-1` column stacks the bars 1.75pt further
+ * apart than the loaded row and makes every such placeholder taller than the
+ * row it becomes.
  */
 const ROW_FRAME_LINE_GAP_CLASS = 'gap-0.5';
 /**
- * The column gap of a placeholder that stands in for one of the hand-built rows
- * (`SectionCardSkeleton`'s Act-first target, the credit-history, invoice and
- * notification rows): they space their own title and subtitle by `gap-1`, so
- * their placeholder keeps `gap-1` and the same height as the row it becomes.
+ * The column gap under one of the hand-built rows — `SectionCardSkeleton`'s
+ * Act-first target, the credit-history, invoice and notification rows — which
+ * space their own title and subtitle by `gap-1` instead of a subtitle margin.
+ * Their placeholders keep `gap-1`, the height those rows hand over to.
  */
 const PLAIN_LINE_GAP_CLASS = 'gap-1';
 const SUBTITLE_BAR_CLASS = 'h-4 w-56 max-w-full rounded bg-muted-soft';
@@ -85,12 +86,13 @@ type RowSkeletonProps = {
   /** The last flat-list row draws no divider under it. */
   last?: boolean;
   /**
-   * The placeholder stands in for a `RowFrame` row, whose subtitle carries its
-   * own `mt-0.5` instead of a one-step gap. Callers of the hand-built rows leave
-   * it off: those rows space their two lines by `gap-1`, and a placeholder that
-   * shortened the gap would be shorter than the row it becomes.
+   * The placeholder stands in for a hand-built row — one that spaces its title
+   * and subtitle by `gap-1` rather than through `RowFrame`'s `mt-0.5` subtitle.
+   * The row variant draws `ROW_FRAME_CLASS`, so it matches a `RowFrame` row by
+   * default; only a placeholder for `SectionCardSkeleton`'s Act-first target or
+   * the credit-history, invoice and notification rows asks for this.
    */
-  rowFrame?: boolean;
+  handBuilt?: boolean;
   className?: string;
 };
 
@@ -115,11 +117,11 @@ export function RowSkeleton({
   stack = false,
   variant = 'row',
   last = false,
-  rowFrame = false,
+  handBuilt = false,
   className,
 }: Readonly<RowSkeletonProps>) {
   const lineCount = lines ?? (subtitle ? 2 : 1);
-  const lineGapClass = rowFrame ? ROW_FRAME_LINE_GAP_CLASS : PLAIN_LINE_GAP_CLASS;
+  const lineGapClass = handBuilt ? PLAIN_LINE_GAP_CLASS : ROW_FRAME_LINE_GAP_CLASS;
 
   if (variant === 'session') {
     return (

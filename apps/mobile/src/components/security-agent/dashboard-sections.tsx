@@ -440,7 +440,7 @@ function SectionCardSkeleton({ rows }: Readonly<{ rows: readonly SkeletonRow[] }
       <SectionHeaderSkeleton />
       <RowGroup>
         {rows.map((lines, index) => (
-          <RowSkeleton key={index} subtitle={lines === 2} />
+          <RowSkeleton key={index} subtitle={lines === 2} handBuilt />
         ))}
       </RowGroup>
     </View>

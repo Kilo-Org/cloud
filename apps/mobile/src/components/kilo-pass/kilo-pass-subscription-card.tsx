@@ -65,7 +65,7 @@ export function KiloPassSubscriptionCard({
           className={cn(hideLoadingSkeleton && 'opacity-0')}
         >
           <RowGroup>
-            <RowSkeleton stack={stack} tile subtitle rowFrame />
+            <RowSkeleton stack={stack} tile subtitle />
           </RowGroup>
         </View>
       ) : null}

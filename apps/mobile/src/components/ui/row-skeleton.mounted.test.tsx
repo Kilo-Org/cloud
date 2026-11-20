@@ -144,12 +144,11 @@ describe('RowSkeleton', () => {
     expect(classesOf(first(subtitle))).toEqual(expect.arrayContaining(['h-4', 'bg-muted-soft']));
   });
 
-  it('spaces its lines like the loaded RowFrame, at the subtitle margin', () => {
-    // `RowFrame`'s subtitle carries `mt-0.5` (1.75pt), so a column at `gap-1`
-    // would make every placeholder row with a subtitle taller than the row it
-    // becomes. Only the `RowFrame` callers ask for that frame: the hand-built
-    // rows keep `gap-1`, and the next case holds them to it.
-    const [title] = skeletons(renderSkeleton({ lines: 2, rowFrame: true }));
+  it('spaces its lines like the loaded RowFrame by default, at the subtitle margin', () => {
+    // The row variant draws `ROW_FRAME_CLASS`, so it stands in for a `RowFrame`
+    // row: that row's subtitle carries `mt-0.5` (1.75pt), and a column at
+    // `gap-1` would make the placeholder taller than the row it becomes.
+    const [title] = skeletons(renderSkeleton({ lines: 2 }));
     const column = first(first(title).parent ?? undefined);
     expect(classesOf(column)).toEqual(expect.arrayContaining(['gap-0.5']));
     expect(classesOf(column)).not.toContain('gap-1');
@@ -157,9 +156,10 @@ describe('RowSkeleton', () => {
 
   it('keeps the gap of the hand-built row it stands in for', () => {
     // `SectionCardSkeleton`'s Act-first row, the credit-history, invoice and
-    // notification rows space their own title and subtitle by `gap-1`; a
-    // placeholder at `gap-0.5` would be 1.75pt shorter than the row it becomes.
-    const [title] = skeletons(renderSkeleton({ lines: 2 }));
+    // notification rows space their own title and subtitle by `gap-1`; those
+    // call sites ask for `handBuilt`, and a `gap-0.5` placeholder would be
+    // 1.75pt shorter than the row it becomes.
+    const [title] = skeletons(renderSkeleton({ lines: 2, handBuilt: true }));
     const column = first(first(title).parent ?? undefined);
     expect(classesOf(column)).toEqual(expect.arrayContaining(['gap-1']));
     expect(classesOf(column)).not.toContain('gap-0.5');

@@ -57,7 +57,7 @@ function InvoiceListSkeleton() {
   return (
     <View>
       {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
-        <RowSkeleton key={index} subtitle />
+        <RowSkeleton key={index} subtitle handBuilt />
       ))}
     </View>
   );

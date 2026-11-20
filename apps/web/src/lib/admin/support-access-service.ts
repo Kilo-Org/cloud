@@ -697,6 +697,9 @@ export async function listMySupportGrants(actorKiloUserId: string): Promise<Supp
  * The pending queue answers with the requests whose window is still ahead: a
  * row counts as pending only while `request_expires_at` is still ahead, the
  * same rule `deriveGrantStatus` applies when a grant is presented.
+ *
+ * A request outside its window is left out of this queue on purpose; its
+ * requester still sees it, marked expired, in `listMySupportGrants`.
  */
 export async function listPendingSupportGrants(): Promise<SupportAccessGrant[]> {
   return db
@@ -715,6 +718,9 @@ export async function listPendingSupportGrants(): Promise<SupportAccessGrant[]> 
  * The active queue answers with the grants whose window is still ahead: a row
  * counts as active only while `expires_at` is still ahead, the same rule
  * `deriveGrantStatus` applies when a grant is presented.
+ *
+ * A grant outside its window is left out of this queue on purpose; its holder
+ * still sees it, marked expired, in `listMySupportGrants`.
  */
 export async function listActiveSupportGrants(): Promise<SupportAccessGrant[]> {
   return db

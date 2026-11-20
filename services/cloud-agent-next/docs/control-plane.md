@@ -839,7 +839,9 @@ keep environment snapshots and existing history/worktree recovery.
   update, because the retried step reads the same durable state and the native update appends. A
   marker that cannot be written before the import fails as retryable too, because no record is
   committed yet; a marker that reads but is not a ruleset, and a record whose permission is not a
-  ruleset, fail as the permanent session-import reason.
+  ruleset, fail as the permanent session-import reason. A settle whose permission update fails
+  fails retryably and reports the same session-import reason, because the marker is intact and the
+  retried step reads it again.
   New chats and later siblings share that runtime and directory without resetting files.
 
   On a shared-workspace Kilo v2 runtime start without a workspace snapshot, the wrapper also preloads

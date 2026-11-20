@@ -966,6 +966,30 @@ function listConjunctionOf(tag) {
 }
 
 /**
+ * The catalog keys the changelog sentence names as areas. `changelog-screen.ts`
+ * maps eight areas; three are product names it writes itself, and the rest
+ * render from these keys, so each of them becomes one item of the list.
+ */
+const CHANGELOG_AREA_KEYS = [
+  'common.chat',
+  'common.notifications',
+  'integrations.title',
+  'profile.changelogAreas.signIn',
+  'profile.changelogAreas.profileOrganizations',
+];
+
+/**
+ * The tag the app builds its formatters with. `lib/intl-cache.ts` names the
+ * script or the region for two catalogs whose bare tag resolves to other data,
+ * so a rule that reads the raw catalog name would judge the wrong conjunction
+ * for them.
+ */
+const FORMATTER_TAGS = new Map([
+  ['pt', 'pt-PT'],
+  ['sr', 'sr-Latn'],
+]);
+
+/**
  * The changelog screen names the areas a release's fixes touched as one
  * `Intl.ListFormat` sentence, so each area label is one item of that list. A
  * label that carries the catalog's own list conjunction doubles it and the
@@ -976,12 +1000,13 @@ function listConjunctionOf(tag) {
  */
 function checkChangelogAreaLabels(tag, values, label) {
   const problems = [];
-  const conjunction = listConjunctionOf(tag);
+  const conjunction = listConjunctionOf(FORMATTER_TAGS.get(tag) ?? tag);
   if (conjunction === null) {
     return problems;
   }
-  for (const [key, value] of values) {
-    if (!key.startsWith('profile.changelogAreas.') || !value.includes(conjunction)) {
+  for (const key of CHANGELOG_AREA_KEYS) {
+    const value = values.get(key);
+    if (value === undefined || !value.includes(conjunction)) {
       continue;
     }
     problems.push(

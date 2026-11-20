@@ -3074,3 +3074,70 @@ test('rejects the English source label that carries "and"', () => {
     /^mobile\/ru: "profile\.changelogAreas\.profileOrganizations" contains the list conjunction "и"/m
   );
 });
+
+// The sentence also joins the areas that render from shared keys, so those
+// labels obey the same rule: a notification or chat name that carries the
+// conjunction splits one area into two.
+const CHANGELOG_SHARED_AREAS = {
+  common: { chat: 'Chat', notifications: 'Notifications' },
+  integrations: { title: 'Integrations' },
+  profile: {
+    changelogFixesIn: 'Fixes and improvements in {{areas}}.',
+    changelogAreas: { signIn: 'Sign-in', profileOrganizations: 'Profile & organizations' },
+  },
+};
+const CHANGELOG_SHARED_SOURCE = [
+  "t('profile.changelogFixesIn', { areas });",
+  "t('common.chat');",
+  "t('common.notifications');",
+  "t('integrations.title');",
+  "t('profile.changelogAreas.signIn');",
+  "t('profile.changelogAreas.profileOrganizations');",
+].join('\n');
+
+test('rejects a shared area label that carries the list conjunction', () => {
+  const found = run({
+    language: 'fr',
+    english: CHANGELOG_SHARED_AREAS,
+    translated: {
+      common: { chat: 'Discussion', notifications: 'Alertes et notifications' },
+      integrations: { title: 'Intégrations' },
+      profile: {
+        changelogFixesIn: 'Corrections et améliorations dans {{areas}}.',
+        changelogAreas: { signIn: 'Connexion', profileOrganizations: 'Profil & organisations' },
+      },
+    },
+    source: CHANGELOG_SHARED_SOURCE,
+  });
+  assert.match(
+    found.join('\n'),
+    /^mobile\/fr: "common\.notifications" contains the list conjunction "et"; the changelog sentence joins the areas itself/m
+  );
+});
+
+// The app builds its formatters with a named script or region for two
+// catalogs, so the rule has to read the same tag the screen formats with: the
+// Serbian catalog is Latin, while a bare `sr` tag resolves to Cyrillic data.
+test('reads the Serbian conjunction from the Latin script the app formats with', () => {
+  const found = run({
+    language: 'sr',
+    english: CHANGELOG_SHARED_AREAS,
+    translated: {
+      common: { chat: 'Ćaskanje', notifications: 'Obaveštenja' },
+      integrations: { title: 'Integracije' },
+      profile: {
+        changelogFixesIn: 'Ispravke i poboljšanja u {{areas}}.',
+        changelogAreas: { signIn: 'Prijavljivanje', profileOrganizations: 'Profil i organizacije' },
+      },
+    },
+    source: CHANGELOG_SHARED_SOURCE,
+  });
+  const text = found.join('\n');
+  assert.match(
+    text,
+    /^mobile\/sr: "profile\.changelogAreas\.profileOrganizations" contains the list conjunction "i"/m
+  );
+  // The Cyrillic conjunction is not what this catalog renders, so a label that
+  // happens to contain it is no finding.
+  assert.doesNotMatch(text, /contains the list conjunction "и"/);
+});

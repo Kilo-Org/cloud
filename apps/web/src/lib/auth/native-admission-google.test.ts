@@ -201,6 +201,24 @@ describe('verifyPlayIntegrity decode endpoint', () => {
     expect(result).toEqual({ ok: false, error: 'NONCE_MISMATCH' });
   });
 
+  test('classifies an unevaluated app without a certificate as unrecognized', async () => {
+    mockFetch.mockResolvedValueOnce(Response.json({ access_token: 'test-access-token' }));
+    const requestHash = createHash('sha256').update('challenge-value').digest('base64');
+    mockFetch.mockResolvedValueOnce(
+      Response.json({
+        tokenPayloadExternal: {
+          requestDetails: { requestPackageName: 'com.kilocode.kiloapp', requestHash },
+          appIntegrity: { appRecognitionVerdict: 'UNEVALUATED' },
+        },
+      })
+    );
+
+    await expect(verifyPlayIntegrity('test-integrity-token', 'challenge-value')).resolves.toEqual({
+      ok: false,
+      error: 'APP_NOT_RECOGNIZED',
+    });
+  });
+
   test('surfaces an API status error without exposing the configured package name', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,

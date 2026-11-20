@@ -1,8 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
 import { postAuth } from '@/lib/auth/auth-fetch';
 import { type AdmissionPayload, clearAttestKeyOnRefusal, getAdmission } from '@/lib/auth/admission';
+import { ADMISSION_RECOVERY_FAILED } from '@/lib/auth/auth-error-messages';
+import { type AuthTerminalRoute, resetAuthTerminalReports } from '@/lib/auth/auth-response-class';
 import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
 
 // Mock @/lib/config to avoid pulling in react-native at module import time.
@@ -31,6 +33,16 @@ vi.mock('expo-application', () => ({
  * one attempt, a new attestation, and no retry for any other refusal.
  */
 describe('postAuth unknown-key recovery', () => {
+  afterEach(() => {
+    // The module mocks are one `vi.fn()` for the whole file, the terminal
+    // report is process-wide, and the sink is module state: each of them leaks
+    // a call, a claim or an event into the next test unless it starts empty.
+    vi.resetAllMocks();
+    vi.restoreAllMocks();
+    resetAuthTerminalReports();
+    setTelemetrySink(null);
+  });
+
   const storedKeyAdmission: AdmissionPayload = {
     platform: 'ios',
     kind: 'assertion',
@@ -59,11 +71,12 @@ describe('postAuth unknown-key recovery', () => {
         status: 403,
       }
     );
-  // A proof that cannot repair the refusal stays retryable and unnamed, so it
-  // reads as the generic retry message, never the browser-only admission copy.
-  const unnamedRetryableRefusal = {
+  // A proof that cannot repair the refusal stays retryable, with its own
+  // client-side code: it reads as the retryable message, never the
+  // browser-only admission copy, and never as a cancelled ceremony.
+  const unrepairableRetryableRefusal = {
     ok: false,
-    errorCode: undefined,
+    errorCode: ADMISSION_RECOVERY_FAILED,
     ssoOrganizationId: undefined,
     terminal: false,
   };
@@ -100,7 +113,7 @@ describe('postAuth unknown-key recovery', () => {
     expect(mockGetAdmission).toHaveBeenCalledTimes(1);
   });
 
-  it.each<[string, string, unknown]>([
+  it.each<[string, AuthTerminalRoute, unknown]>([
     ['no hint', '/api/auth/native/token', tokenBodyWithProof],
     [
       'an attestation body',
@@ -128,7 +141,7 @@ describe('postAuth unknown-key recovery', () => {
           : unknownKeyRefusal()
       );
 
-    const result = await postAuth(path as never, body);
+    const result = await postAuth(path, body);
 
     expect(result).toMatchObject({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
     expect(fetchSpy).toHaveBeenCalledTimes(1);
@@ -170,13 +183,22 @@ describe('postAuth unknown-key recovery', () => {
     ],
     ['a producer that throws', () => Promise.reject(new Error('admission_challenge_failed'))],
   ])('never sends the retry when the fresh proof is %s', async (_label, produce) => {
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
     mockGetAdmission.mockImplementation(produce);
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(unknownKeyRefusal());
 
     const result = await postAuth('/api/auth/native/token', tokenBodyWithProof);
 
-    expect(result).toEqual(unnamedRetryableRefusal);
+    expect(result).toEqual(unrepairableRetryableRefusal);
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+    // The terminal 403 the client could not repair is still filed, once — and
+    // no second event rides along with the synthesized failure.
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['auth-terminal', '/api/auth/native/token', '403'],
+    ]);
   });
 
   it('files no terminal event for a refusal it repaired', async () => {

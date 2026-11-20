@@ -297,6 +297,13 @@ export async function verifyPlayIntegrity(
     return { ok: false, error: 'PACKAGE_MISMATCH' };
   }
 
+  // ── App recognition ─────────────────────────────────────────────────────
+  const appVerdict = payload.appIntegrity?.appRecognitionVerdict;
+  if (appVerdict !== 'PLAY_RECOGNIZED') {
+    captureMessage(`play_integrity_app_unrecognized: ${appVerdict ?? 'null'}`);
+    return { ok: false, error: 'APP_NOT_RECOGNIZED' };
+  }
+
   // ── Signing certificate digest ──────────────────────────────────────────
   const certDigests = payload.appIntegrity?.certificateSha256Digest ?? [];
   const hasMatch = config.expectedCertDigests.some(expected =>
@@ -307,13 +314,6 @@ export async function verifyPlayIntegrity(
       `play_integrity_cert_digest_mismatch: expected=[${config.expectedCertDigests.join(',')}] got=[${certDigests.join(',')}]`
     );
     return { ok: false, error: 'CERT_DIGEST_MISMATCH' };
-  }
-
-  // ── App recognition ─────────────────────────────────────────────────────
-  const appVerdict = payload.appIntegrity?.appRecognitionVerdict;
-  if (appVerdict !== 'PLAY_RECOGNIZED') {
-    captureMessage(`play_integrity_app_unrecognized: ${appVerdict ?? 'null'}`);
-    return { ok: false, error: 'APP_NOT_RECOGNIZED' };
   }
 
   // ── Device integrity: must contain MEETS_DEVICE_INTEGRITY in the array ──

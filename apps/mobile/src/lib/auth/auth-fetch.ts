@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { API_BASE_URL } from '@/lib/config';
 import { clearAttestKeyOnRefusal, getAdmission } from '@/lib/auth/admission';
+import { ADMISSION_RECOVERY_FAILED } from '@/lib/auth/auth-error-messages';
 import {
   type AuthTerminalRoute,
   classifyAuthResponse,
@@ -190,8 +191,9 @@ export async function postAuth(
 
   // The refusal dropped the stored key id, so this is a new attestation against
   // a fresh challenge. Failing to build one is a provider or transport fault,
-  // not a device refusal: it stays retryable and names no error code, so it
-  // never reads as the terminal browser-only admission message.
+  // not a device refusal: it stays retryable and reads as the retryable
+  // admission message, never the terminal browser-only one. Its own code keeps
+  // a failed proof rebuild from reading downstream as a cancelled ceremony.
   const fresh = await getAdmission().catch(() => undefined);
   if (
     fresh?.platform !== 'ios' ||
@@ -199,9 +201,12 @@ export async function postAuth(
     !fresh.keyId ||
     fresh.keyId === parsed.data.admission.keyId
   ) {
+    // The attempt that got here was a terminal 403; an unrepairable refusal is
+    // still the one report that refusal earns.
+    reportIfTerminal(path, attempt.failure);
     return {
       ok: false,
-      errorCode: undefined,
+      errorCode: ADMISSION_RECOVERY_FAILED,
       ssoOrganizationId: undefined,
       terminal: false,
     };

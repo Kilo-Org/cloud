@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatDollarsFromMicrodollars } from './format';
+import { formatMicrodollarsAdaptive } from '@/lib/admin-utils';
 import { formatLargeNumber } from '@/lib/utils';
 import type { BenchmarkChargesOutput } from './types';
 
@@ -147,7 +147,9 @@ export function BenchmarkChargesCard({
                       )}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {formatDollarsFromMicrodollars(row.costMicrodollars)}
+                      {/* Benchmark requests are routinely sub-cent, so plain
+                          2-decimal money would show every row as $0.00. */}
+                      {formatMicrodollarsAdaptive(row.costMicrodollars)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {formatLargeNumber(row.requestCount)}

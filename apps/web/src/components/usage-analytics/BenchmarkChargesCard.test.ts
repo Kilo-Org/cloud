@@ -159,6 +159,8 @@ describe('BenchmarkChargesCard markup', () => {
     expect(html).toContain('my-pool');
     expect(html).toContain('openai/gpt-5');
     expect(html).toContain('Other models');
+    // Ordinary amounts keep the familiar two decimals; only sub-cent values
+    // reveal extra precision (covered in benchmark-charge-format.test.ts).
     expect(html).toContain('$5.00');
     expect(html).toContain('Pool');
   });

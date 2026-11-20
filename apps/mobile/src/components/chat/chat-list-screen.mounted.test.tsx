@@ -264,6 +264,18 @@ describe('the list body names what it knows', () => {
     expect(tree.root.findAllByProps({ testID: 'chat-new-fab' }).length).toBeGreaterThan(0);
   });
 
+  it('keeps answered rows while the catalog has not answered', async () => {
+    // A catalog that never answered (paused offline, or a first read the app has
+    // not reached) says nothing about the chats the device already holds.
+    state.chats = [{ sessionId: 's1', model: 'm1', title: 'First chat', updatedAt: 1 }];
+    state.catalogAnswered = false;
+    state.catalogLoading = true;
+    const tree = await mount();
+    expect(bodyNodes(tree, 'FlashList')[0]?.props.data).toHaveLength(1);
+    expect(bodyNodes(tree, 'QueryError')).toHaveLength(0);
+    expect(tree.root.findAllByProps({ testID: 'chat-new-fab' }).length).toBeGreaterThan(0);
+  });
+
   it('keeps the empty state and its action when the catalog fails but a model is known', async () => {
     // Cached catalog rows, a configured backend or an on-device model still
     // start a chat, so the empty state keeps the one thing it offers.

@@ -19,6 +19,7 @@ const state = vi.hoisted(() => ({
     org: undefined as Org | undefined,
     isResolving: false,
     isError: false,
+    isFetching: false,
   },
   live: {
     activeSessions: [] as ActiveSession[],
@@ -549,6 +550,36 @@ describe('Home live presentation', () => {
     expect(text()).not.toContain('Connecting…');
     expect(text()).not.toContain('No internet connection');
     expect(text()).not.toContain('Updating');
+  });
+
+  it('names the offline state instead of a load that cannot start', async () => {
+    // A confirmed-offline device pauses the first reads: the pending card and
+    // its skeletons can never settle, so Home owes the person the offline state
+    // with its own Retry instead of a wait that cannot end.
+    state.internet = 'offline';
+    state.connection.isConnected = false;
+    state.live.isPaused = true;
+    state.boundary.isResolving = true;
+    await renderHome();
+    expect(nodes('Skeleton')).toHaveLength(0);
+    expect(text()).not.toContain('Loading…');
+    expect(text()).toContain(i18n.t('queryError.offlineTitle'));
+    expect(text()).toContain(i18n.t('queryError.offlineDescription'));
+    expect(nodes('Pressable').some(node => node.props.accessibilityLabel === 'Retry')).toBe(true);
+    // The card already names the connection, so the header notice does not
+    // repeat it beside the same state.
+    expect(text()).not.toContain(i18n.t('offline.noInternet'));
+
+    // The connection returns: the paused read resumes by itself and the card
+    // gives way to the confirmed empty section without a press.
+    state.internet = 'online';
+    state.connection.isConnected = true;
+    state.live.isPaused = false;
+    state.live.hasAcceptedSuccess = true;
+    state.boundary.isResolving = false;
+    await renderHome();
+    expect(text()).not.toContain(i18n.t('queryError.offlineTitle'));
+    expect(text()).toContain('Nothing running right now');
   });
 
   it.each([

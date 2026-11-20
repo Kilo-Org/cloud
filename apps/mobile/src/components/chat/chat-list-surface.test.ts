@@ -73,6 +73,19 @@ describe('selectChatListSurface', () => {
     ).toEqual({ kind: 'rows' });
   });
 
+  it('keeps answered rows while the catalog is still loading', () => {
+    // The rows are the device's own answer, and a catalog read that is still in
+    // flight says nothing about them.
+    expect(
+      selectChatListSurface({
+        ...answered,
+        chatCount: 1,
+        catalogAnswered: false,
+        catalogLoading: true,
+      })
+    ).toEqual({ kind: 'rows' });
+  });
+
   it('keeps the empty state when a model is already known', () => {
     // Cached rows, a backend or an on-device model still start a chat, so the
     // catalog's failure changes nothing the person can do.

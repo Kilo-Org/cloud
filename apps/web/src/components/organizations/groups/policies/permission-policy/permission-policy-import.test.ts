@@ -65,7 +65,7 @@ describe.each([parsePermissionPolicyDocument, reviewPermissionPolicyImport])('%p
     }));
     expect(parse(agentDocument({ shell: { bash: { fallback: 'ask', rules } } }))).toEqual({
       status: 'invalid',
-      errors: ['data: Policy too large.'],
+      errors: ['Policy too large.'],
     });
   });
 
@@ -114,12 +114,38 @@ describe.each([parsePermissionPolicyDocument, reviewPermissionPolicyImport])('%p
     expect(JSON.stringify(result)).toContain('data.tools[tool]');
   });
 
-  test('rejects a tool key the shared schema would silently remove', () => {
-    const text =
-      '{"type":"agent_permissions","data":{"schema_version":1,"tools":{"__proto__":"deny"}}}';
+  test.each([
+    [
+      'the document root',
+      '{"type":"agent_permissions","data":{"schema_version":1},"__proto__":null}',
+    ],
+    ['policy data', '{"type":"agent_permissions","data":{"schema_version":1,"__proto__":null}}'],
+    ['the tool map', agentDocument({ tools: { ['__proto__']: 'deny' } })],
+    ['a tool decision', agentDocument({ tools: { edit: { rules: [], ['__proto__']: null } } })],
+    [
+      'a rule object in an array',
+      agentDocument({
+        shell: {
+          bash: {
+            fallback: 'ask',
+            rules: [{ pattern: 'example', action: 'deny', ['__proto__']: null }],
+          },
+        },
+      }).replace('"__proto__"', '"__pr\\u006fto__"'),
+    ],
+  ])('rejects a reserved property in %s', (_, text) => {
     expect(parse(text)).toEqual({
       status: 'invalid',
-      errors: ['data.tools: Contains an unsupported tool key.'],
+      errors: [expect.stringMatching(/^Unsupported property at line \d+, column \d+\.$/)],
+    });
+  });
+
+  test('allows a reserved key name as a string value', () => {
+    const data = { tools: { edit: { rules: [{ pattern: '__proto__', action: 'deny' }] } } };
+    expect(parse(agentDocument(data))).toEqual({
+      status: 'valid',
+      policy: { type: agentType, data: { schema_version: 1, ...data } },
+      warnings: [],
     });
   });
 });
@@ -266,6 +292,26 @@ describe('legacy Kilo configuration', () => {
         errors: [expect.stringMatching(/^permission\.bash\.rules/)],
       });
     }
+  });
+
+  test('rejects reserved properties in ignored legacy configuration without echoing their values', () => {
+    const text = '{"permission":{"edit":"deny"},"provider":[{"__proto__":"secret-value"}]}';
+    expect(reviewPermissionPolicyImport(text)).toEqual({
+      status: 'invalid',
+      errors: [expect.stringMatching(/^Unsupported property at line 1, column \d+\.$/)],
+    });
+  });
+
+  test('reports oversized legacy shell policies without a native document path', () => {
+    const bash = Object.fromEntries(
+      Array.from({ length: 90 }, (_, index) => [`command ${index}${'x'.repeat(490)}`, 'deny'])
+    );
+    const text = JSON.stringify({ permission: { bash } });
+    const expected = { status: 'invalid', errors: ['Policy too large.'] };
+    expect(reviewPermissionPolicyImport(text)).toEqual(expected);
+    expect(reviewPermissionPolicyImport(text, { kind: 'powershell', fallback: 'ask' })).toEqual(
+      expected
+    );
   });
 
   test('does not fall back to legacy permissions when the document has a retired policy type', () => {

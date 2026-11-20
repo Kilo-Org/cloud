@@ -2,14 +2,7 @@ import {
   OrganizationPermissionPolicySchema,
   type OrganizationPermissionPolicy,
 } from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.schema';
-import {
-  createScanner,
-  findNodeAtLocation,
-  getNodeValue,
-  parseTree,
-  type Node,
-  type ParseError,
-} from 'jsonc-parser';
+import { createScanner, getNodeValue, parseTree, type Node, type ParseError } from 'jsonc-parser';
 
 type ToolRule = NonNullable<OrganizationPermissionPolicy['data']['tools']>[string];
 type PermissionRule = NonNullable<
@@ -87,10 +80,10 @@ function parseDocument(text: string): Invalid | { status: 'parsed'; root: Node }
     if (node.type === 'object') {
       const names = new Set<string>();
       for (const [name, value] of objectEntries(node)) {
-        if (names.has(name)) {
-          return invalid(
-            `Duplicate property at ${position(text, value.parent?.offset ?? value.offset)}.`
-          );
+        const reserved = name === '__proto__';
+        if (reserved || names.has(name)) {
+          const issue = reserved ? 'Unsupported property' : 'Duplicate property';
+          return invalid(`${issue} at ${position(text, value.parent?.offset ?? value.offset)}.`);
         }
         names.add(name);
         pending.push(value);
@@ -132,7 +125,6 @@ function policyPath(path: PropertyKey[]): string {
 const safeSchemaMessages = new Set([
   'Control characters are not allowed',
   'Invalid tool key',
-  'Policy too large',
   'Too many tool permissions',
   'Use shell profiles for Bash command rules',
 ]);
@@ -141,6 +133,8 @@ function validatePolicy(value: unknown, warnings: string[] = []): Invalid | Vali
   const parsed = OrganizationPermissionPolicySchema.safeParse(value);
   if (!parsed.success) {
     const errors = parsed.error.issues.map(issue => {
+      if (issue.code === 'custom' && issue.message === 'Policy too large')
+        return 'Policy too large.';
       const location = policyPath(issue.path);
       if (safeSchemaMessages.has(issue.message)) return `${location}: ${issue.message}.`;
       if (issue.code === 'invalid_value' && location === 'type') {
@@ -166,17 +160,10 @@ function validatePolicy(value: unknown, warnings: string[] = []): Invalid | Vali
   return { status: 'valid', policy: parsed.data, warnings };
 }
 
-function validateVersionedDocument(root: Node): Invalid | Valid {
-  if (findNodeAtLocation(root, ['data', 'tools', '__proto__'])) {
-    return invalid('data.tools: Contains an unsupported tool key.');
-  }
-  return validatePolicy(getNodeValue(root));
-}
-
 export function parsePermissionPolicyDocument(text: string): Invalid | Valid {
   const document = parseDocument(text);
   if (document.status === 'invalid') return document;
-  return validateVersionedDocument(document.root);
+  return validatePolicy(getNodeValue(document.root));
 }
 
 function isAction(value: unknown): value is PermissionRule['action'] {
@@ -192,7 +179,7 @@ export function reviewPermissionPolicyImport(
   const { root } = document;
   const config = new Map(objectEntries(root));
   if (config.has('type') || config.has('data') || config.has('schema_version')) {
-    return validateVersionedDocument(root);
+    return validatePolicy(getNodeValue(root));
   }
 
   const permission = config.get('permission');
@@ -208,8 +195,6 @@ export function reviewPermissionPolicyImport(
         'Tool name wildcards in local permission settings cannot be imported without changing precedence. Use exact tool names or a versioned policy document.'
       );
     }
-    if (key === '__proto__') return invalid('permission: Contains an unsupported tool key.');
-
     const action: unknown = entry.value;
     if (isAction(action)) {
       tools.push([key, action]);

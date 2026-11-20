@@ -120,6 +120,27 @@ describe('setCommands command bounds', () => {
     expect(state.commands).toEqual(stored);
   });
 
+  test('refuses an over-cap list from a foreign owner with NOT_FOUND', async () => {
+    const stored = ['npm ci'];
+    const { db, state } = createLimitTestDb(
+      1,
+      [],
+      [{ id: TEST_PROFILE_ID, ownerType: 'user', ownerId: 'other_user', isDefault: false }],
+      stored
+    );
+    const overCap = Array.from({ length: MAX_PROFILE_COMMANDS + 1 }, () => 'npm ci');
+
+    // The ownership check runs first, so a caller without the profile learns
+    // that instead of a verdict on the list.
+    await expect(setCommands(db, TEST_PROFILE_ID, overCap, OWNER)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'Profile not found',
+    });
+
+    expect(state.commandDeletes).toBe(0);
+    expect(state.commands).toEqual(stored);
+  });
+
   test('refuses a command over the length cap and leaves the stored list', async () => {
     const stored = ['npm ci'];
     const { db, state } = createLimitTestDb(0, [], [], stored);

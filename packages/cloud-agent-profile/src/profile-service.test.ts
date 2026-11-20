@@ -46,15 +46,31 @@ describe('applyDefaultProfile', () => {
       ]
     );
 
-    await applyDefaultProfile(db, 'profile-foreign', OWNER);
-
     // An id-only set-true claimed the foreign row: the other owner silently
     // gained this owner's default flag, which the one-default-per-owner index
-    // then reports as a unique violation on the next write.
+    // then reports as a unique violation on the next write. The set-true
+    // update asserts one affected row, so this call fails loudly instead.
+    await expect(applyDefaultProfile(db, 'profile-foreign', OWNER)).rejects.toThrow(/no profile/i);
+
     const setTrue = state.defaultWrites.filter(write => write.isDefault);
     expect(setTrue).toHaveLength(1);
     expect(setTrue[0].matchedProfileIds).toEqual([]);
     expect(state.profileRows.some(row => row.isDefault)).toBe(false);
+  });
+
+  test('resolves when the set-true update reaches exactly one profile', async () => {
+    const { db, state } = createLimitTestDb(
+      1,
+      [],
+      [{ id: 'profile-solo', ownerType: 'user', ownerId: 'user_test', isDefault: false }]
+    );
+
+    await expect(applyDefaultProfile(db, 'profile-solo', OWNER)).resolves.toBeUndefined();
+
+    const setTrue = state.defaultWrites.filter(write => write.isDefault);
+    expect(setTrue).toHaveLength(1);
+    expect(setTrue[0].matchedProfileIds).toEqual(['profile-solo']);
+    expect(state.profileRows.find(row => row.id === 'profile-solo')?.isDefault).toBe(true);
   });
 
   test('scopes an organization owner to the organization column', async () => {

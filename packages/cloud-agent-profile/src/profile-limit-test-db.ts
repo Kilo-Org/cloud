@@ -153,7 +153,11 @@ function keyOf(row: unknown): string | undefined {
  * `update` models the profile default flag: `initialProfiles` seeds the stored
  * rows, and every `update` matches rows by the equalities of its condition. That
  * is what makes an owner-scoped `where` observable: a condition without the
- * owner column matches another owner's row.
+ * owner column matches another owner's row. The chain after `where` is
+ * production-shaped: a plain `await` finishes the statement, and `.returning()`
+ * resolves to the matched row ids, so a service that asserts its affected row
+ * count is testable. A profile read that names one id also answers from the
+ * seeded rows, so an ownership lookup can miss.
  *
  * `state.lockCalls` counts the profile row locks, `state.advisoryLocks` the
  * `execute`d statements, `state.rowCount` tracks the stored rows,
@@ -218,11 +222,32 @@ export function createLimitTestDb(
 
   const select = () => ({
     from: (table: unknown) => ({
-      where: () => {
-        const resolve = () =>
-          table === agent_environment_profile_vars
-            ? [...varKeys].map(key => ({ key, delivery: 'env' }))
-            : resolveRowsFor(table, rowCount);
+      where: (condition?: unknown) => {
+        const resolve = () => {
+          if (table === agent_environment_profile_vars) {
+            return [...varKeys].map(key => ({ key, delivery: 'env' }));
+          }
+          // A profile read that names one id answers from the seeded rows, so
+          // an ownership lookup can miss. Every other read, such as the owner
+          // cap count, keeps the single profile the limit tests expect.
+          const equalities =
+            table === agent_environment_profiles && profileRows.length > 0
+              ? equalitiesOf(condition)
+              : [];
+          if (equalities.some(equality => equality.column === 'id')) {
+            return profileRows
+              .filter(row =>
+                equalities.every(equality => readRowField(row, equality.column) === equality.value)
+              )
+              .map(row => ({
+                id: row.id,
+                is_default: row.isDefault,
+                owned_by_user_id: row.ownerType === 'user' ? row.ownerId : null,
+                owned_by_organization_id: row.ownerType === 'organization' ? row.ownerId : null,
+              }));
+          }
+          return resolveRowsFor(table, rowCount);
+        };
         const then = (
           onFulfilled?: (value: unknown) => unknown,
           onRejected?: (error: unknown) => unknown
@@ -302,7 +327,7 @@ export function createLimitTestDb(
 
   const update = () => ({
     set: (values: { is_default?: boolean }) => ({
-      where: (condition: unknown): Promise<void> => {
+      where: (condition: unknown) => {
         const equalities = equalitiesOf(condition);
         const matched = profileRows.filter(row =>
           equalities.every(equality => readRowField(row, equality.column) === equality.value)
@@ -317,7 +342,16 @@ export function createLimitTestDb(
           });
         }
 
-        return Promise.resolve();
+        // Production shape of the chain: a plain `await` sees the statement
+        // finish, and `.returning()` sees the rows the condition matched.
+        const ids = matched.map(row => row.id);
+        return {
+          returning: () => Promise.resolve(ids.map(id => ({ id }))),
+          then: (
+            onFulfilled?: (value: unknown) => unknown,
+            onRejected?: (error: unknown) => unknown
+          ) => Promise.resolve().then(onFulfilled, onRejected),
+        };
       },
     }),
   });

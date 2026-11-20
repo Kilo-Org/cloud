@@ -134,7 +134,7 @@ describe('readTrpcServerMessage', () => {
     expect(readTrpcServerMessage(unconfigured)).toBeUndefined();
   });
 
-  it('yields no sentence for a context auth failure', () => {
+  it('yields no sentence for a context auth failure, whatever the envelope carries', () => {
     // The session failure carries the server's diagnostic text and is handled
     // by the sign-out path, so it is not a sentence for this sheet.
     const signedOut = Object.assign(
@@ -150,6 +150,44 @@ describe('readTrpcServerMessage', () => {
       }
     );
     expect(readTrpcServerMessage(signedOut)).toBeUndefined();
+    expect(
+      readTrpcServerMessage({
+        shape: {
+          data: {
+            code: 'UNAUTHORIZED',
+            message: 'User not authenticated - no user to set on context',
+            authRequired: true,
+          },
+        },
+      })
+    ).toBeUndefined();
+  });
+
+  it('yields no sentence for a procedure-level auth denial', () => {
+    // Every procedure-level denial carries an org-access diagnostic, so the
+    // caller states its own line instead of showing that text.
+    const denied = Object.assign(
+      new Error('You do not have the required organizational role to access this feature'),
+      {
+        name: 'TRPCClientError',
+        data: {
+          code: 'UNAUTHORIZED',
+          httpStatus: 401,
+          path: 'agentProfiles.create',
+        },
+      }
+    );
+    expect(readTrpcServerMessage(denied)).toBeUndefined();
+    expect(
+      readTrpcServerMessage({
+        shape: {
+          data: {
+            code: 'UNAUTHORIZED',
+            message: 'You do not have the required organizational role to access this feature',
+          },
+        },
+      })
+    ).toBeUndefined();
   });
 
   it('yields no sentence for a validation payload', () => {
@@ -198,7 +236,6 @@ describe('readTrpcServerMessage', () => {
       ['TOO_MANY_REQUESTS', 'Too many attempts. Wait a moment.'],
       ['FORBIDDEN', 'You cannot change this profile.'],
       ['CONFLICT', 'A profile with this name already exists'],
-      ['UNAUTHORIZED', 'Sign in again to continue.'],
     ];
     for (const [code, sentence] of cases) {
       const answered = Object.assign(new Error(sentence), {

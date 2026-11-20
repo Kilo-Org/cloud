@@ -15,7 +15,6 @@ const DirectErrorSchema = z.looseObject({
     message: z.string().optional(),
     upstreamCode: z.string().optional(),
     zodError: z.unknown().optional(),
-    authRequired: z.boolean().optional(),
   }),
 });
 const ShapedErrorSchema = z.looseObject({
@@ -25,7 +24,6 @@ const ShapedErrorSchema = z.looseObject({
       message: z.string().optional(),
       upstreamCode: z.string().optional(),
       zodError: z.unknown().optional(),
-      authRequired: z.boolean().optional(),
     }),
   }),
 });
@@ -94,7 +92,6 @@ const AUTHORED_REFUSAL_CODES = [
   'FORBIDDEN',
   'NOT_FOUND',
   'TOO_MANY_REQUESTS',
-  'UNAUTHORIZED',
 ] as const;
 
 type AuthoredRefusalCode = (typeof AUTHORED_REFUSAL_CODES)[number];
@@ -113,26 +110,23 @@ type AuthoredRefusalCode = (typeof AUTHORED_REFUSAL_CODES)[number];
  *   sentence written for the person, so the caller shows it.
  * - `INTERNAL_SERVER_ERROR`, and every other code outside the allowlist,
  *   carries diagnostic text, so the caller states its own neutral line.
- * - A context auth failure is `UNAUTHORIZED` with `authRequired: true`; it
- *   carries the session's diagnostic text and signs the person out, so it
- *   yields no sentence either.
+ * - `UNAUTHORIZED` is outside the allowlist. The one context-level auth
+ *   failure is already handled by the sign-out path, and every
+ *   procedure-level one carries an org-access diagnostic, so the caller
+ *   states its own line for both.
  * - A non-null `zodError` names an input contract failure, which has no
  *   reading for the person, so the caller states the neutral line too.
  *
  * An envelope without a code is not a server answer, so it yields no sentence.
  */
-function isAuthoredRefusal(
-  code: string | undefined,
-  zodError: unknown,
-  authRequired: boolean | undefined
-): boolean {
+function isAuthoredRefusal(code: string | undefined, zodError: unknown): boolean {
   if (code === undefined || !AUTHORED_REFUSAL_CODES.includes(code as AuthoredRefusalCode)) {
     return false;
   }
   if (zodError !== undefined && zodError !== null) {
     return false;
   }
-  return !(code === 'UNAUTHORIZED' && authRequired === true);
+  return true;
 }
 
 /**
@@ -150,16 +144,16 @@ function isAuthoredRefusal(
 export function readTrpcServerMessage(error: unknown): string | undefined {
   const direct = DirectErrorSchema.safeParse(error);
   if (direct.success) {
-    const { code, zodError, authRequired } = direct.data.data;
-    if (!isAuthoredRefusal(code, zodError, authRequired)) {
+    const { code, zodError } = direct.data.data;
+    if (!isAuthoredRefusal(code, zodError)) {
       return undefined;
     }
     return error instanceof Error ? error.message : undefined;
   }
   const shaped = ShapedErrorSchema.safeParse(error);
   if (shaped.success) {
-    const { code, message, zodError, authRequired } = shaped.data.shape.data;
-    return isAuthoredRefusal(code, zodError, authRequired) ? message : undefined;
+    const { code, message, zodError } = shaped.data.shape.data;
+    return isAuthoredRefusal(code, zodError) ? message : undefined;
   }
   return undefined;
 }

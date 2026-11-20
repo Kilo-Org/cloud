@@ -382,7 +382,10 @@ export async function getProfile(
  * composite write can flip the default in the same unit as the profile insert.
  *
  * Both statements are owner-scoped, so the pair moves the flag only between
- * profiles the owner holds. Callers still authorize the profile themselves.
+ * profiles the owner holds. Callers still authorize the profile themselves. The
+ * set-true update asserts one affected row, so a call site that passes an id
+ * outside the owner's profiles fails loudly instead of leaving the owner with no
+ * default.
  */
 export async function applyDefaultProfile(
   db: ProfileDatabase,
@@ -394,10 +397,19 @@ export async function applyDefaultProfile(
     .set({ is_default: false })
     .where(and(buildOwnershipCondition(owner), eq(agent_environment_profiles.is_default, true)));
 
-  await db
+  const flipped = await db
     .update(agent_environment_profiles)
     .set({ is_default: true })
-    .where(and(buildOwnershipCondition(owner), eq(agent_environment_profiles.id, profileId)));
+    .where(and(buildOwnershipCondition(owner), eq(agent_environment_profiles.id, profileId)))
+    .returning({ id: agent_environment_profiles.id });
+
+  if (flipped.length !== 1) {
+    throw new Error(
+      `applyDefaultProfile: the default flip reached no profile for the owner (${String(
+        flipped.length
+      )} rows)`
+    );
+  }
 }
 
 /**

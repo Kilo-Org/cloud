@@ -51,11 +51,12 @@ export async function setCommands(
   commands: string[],
   owner: ProfileOwner
 ): Promise<void> {
-  // Before the delete: an over-cap list must never clear the stored commands
-  // and then fail, leaving the profile with none.
-  const stored = writableCommands(commands);
-
+  // The ownership check runs first, so a caller without this profile learns
+  // that before any verdict on the list. Before the delete: an over-cap list
+  // must never clear the stored commands and then fail, leaving the profile
+  // with none.
   await verifyProfileOwnership(db, profileId, owner);
+  const stored = writableCommands(commands);
 
   await db.transaction(async tx => {
     await tx

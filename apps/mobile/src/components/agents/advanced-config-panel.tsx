@@ -8,8 +8,15 @@ import {
   ManualSetupCommandsEditor,
 } from '@/components/agents/advanced-config-editors';
 import {
+  lostSaveProfile,
+  PROFILE_NAME_TAKEN_MESSAGE,
+  profileIds,
+  type UnknownSaveAttempt,
+} from '@/components/agents/lost-save-recovery';
+import { type ProfileListRow, toSelectorProfile } from '@/components/agents/profile-list-row';
+import { profileSaveCreateInput } from '@/components/agents/profile-save-request';
+import {
   buildProfileSelectorState,
-  type ProfileSelectorOwnerType,
   type ProfileSelectorProfile,
 } from '@/components/agents/profile-selector-model';
 import {
@@ -29,30 +36,6 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { draftProfileCountItems, formatProfileCountItems } from '@/lib/profile-count-labels';
 import { readTrpcServerMessage } from '@/lib/trpc-error';
 import { cn } from '@/lib/utils';
-
-/** Structural view of a list row, so both the personal and combined shapes fit. */
-type ProfileListRow = Readonly<{
-  id: string;
-  name: string;
-  varCount: number;
-  commandCount: number;
-  isDefault: boolean;
-  ownerType?: ProfileSelectorOwnerType;
-}>;
-
-function toSelectorProfile(
-  profile: ProfileListRow,
-  fallbackOwnerType: ProfileSelectorOwnerType
-): ProfileSelectorProfile {
-  return {
-    id: profile.id,
-    name: profile.name,
-    varCount: profile.varCount,
-    commandCount: profile.commandCount,
-    isDefault: profile.isDefault,
-    ownerType: profile.ownerType ?? fallbackOwnerType,
-  };
-}
 
 type AdvancedConfigPanelProps = Readonly<{
   /** The route's organization scope; `undefined` is a personal session. */
@@ -137,6 +120,10 @@ export function AdvancedConfigPanel({
   // Set on expand, cleared by the reveal, so later in-panel layouts (a new
   // variable or command row) never scroll the composer under the reader again.
   const revealPendingRef = useRef(false);
+  // The last attempt whose response never arrived. A retry that collides on the
+  // name can then tell this flow's own commit from a profile that already held
+  // it, because only the former appears as an id the panel did not know.
+  const lostSaveAttemptRef = useRef<UnknownSaveAttempt | null>(null);
 
   const orgProfiles = useMemo(() => {
     const base = (list.orgProfiles as readonly ProfileListRow[]).map(profile =>
@@ -189,44 +176,71 @@ export function AdvancedConfigPanel({
     [t, effectiveVars, effectiveCommands]
   );
 
+  /**
+   * Complete a save for `profile`: record it for the selector, pick it, and
+   * clear the manual draft it now carries. The saved profile is the draft's new
+   * home, so the two must not disagree: the profile's setup commands are
+   * appended to the inline ones, and a draft left behind would run them twice.
+   */
+  const finishSave = (profile: ProfileSelectorProfile) => {
+    lostSaveAttemptRef.current = null;
+    // Keep resource counts current before the invalidated list refetch lands.
+    setCreatedProfile(profile);
+    onSelectProfile(profile.id);
+    onManualVarsChange([]);
+    onManualCommandsChange([]);
+    toast.success(t('agentChat.newSession.profileSaved', { name: profile.name }));
+  };
+
+  /**
+   * The profile a lost attempt created, or null when the collision belongs to
+   * somebody else. The list is the server's own record of the write, so only a
+   * refetched row counts; see `lostSaveProfile` for why the id diff decides.
+   */
+  const recoverLostSave = async (name: string): Promise<ProfileSelectorProfile | null> => {
+    const attempt = lostSaveAttemptRef.current;
+    if (attempt === null || attempt.name !== name) {
+      return null;
+    }
+    const refetched = await list.refetch();
+    if (refetched.data === undefined) {
+      return null;
+    }
+    return lostSaveProfile(refetched.data, organizationId, attempt);
+  };
+
   const handleSaveProfile = async (
     submission: SaveProfileSubmission
   ): Promise<SaveProfileOutcome> => {
+    // The server compares the trimmed name against the stored one, so every
+    // reading here uses the trimmed form too.
+    const name = submission.name.trim();
+    // A recorded attempt belongs to the name it submitted: a corrected name
+    // drops it, so a later collision cannot be credited to the old one.
+    if (lostSaveAttemptRef.current !== null && lostSaveAttemptRef.current.name !== name) {
+      lostSaveAttemptRef.current = null;
+    }
+    // The ids this owner scope holds before the write leaves. The diff against
+    // the rows a lost attempt leaves behind is the one evidence that separates
+    // that attempt's own commit from a profile which already had the name.
+    const knownIds = profileIds(
+      organizationId === undefined ? list.personalProfiles : list.orgProfiles
+    );
     try {
       // One server write: the profile, its vars, its commands and the default
       // flag commit together, so a refusal leaves nothing behind and a retry
       // cannot create a second profile holding only part of the config.
-      const { id: profileId } = await create.mutateAsync({
-        name: submission.name,
-        description: submission.description === '' ? undefined : submission.description,
-        ...(manualVars.length > 0
-          ? {
-              vars: manualVars.map(variable => ({
-                key: variable.key,
-                value: variable.value,
-                isSecret: variable.isSecret,
-              })),
-            }
-          : {}),
-        ...(setupCommands.length > 0 ? { commands: setupCommands } : {}),
-        ...(submission.setAsDefault ? { setAsDefault: true } : {}),
-      });
-      // Keep resource counts current before the invalidated list refetch lands.
-      setCreatedProfile({
+      const { id: profileId } = await create.mutateAsync(
+        profileSaveCreateInput({ vars: manualVars, commands: setupCommands, submission, name })
+      );
+      finishSave({
         id: profileId,
-        name: submission.name,
+        name,
         varCount: manualVars.length,
         commandCount: setupCommands.length,
         isDefault: submission.setAsDefault,
         ownerType: organizationId === undefined ? 'user' : 'organization',
       });
-      onSelectProfile(profileId);
-      // The saved profile now carries these values, so the draft must not stay
-      // behind: the profile's setup commands are appended to the inline ones,
-      // and leaving the draft populated would run every saved command twice.
-      onManualVarsChange([]);
-      onManualCommandsChange([]);
-      toast.success(t('agentChat.newSession.profileSaved', { name: submission.name }));
       return { saved: true };
     } catch (error) {
       // The open sheet is this flow's only failure surface, so the hook's error
@@ -238,6 +252,22 @@ export function AdvancedConfigPanel({
       // TRPCClientError too but carry no payload, so a timeout or a lost connection
       // reaches the person as the neutral line rather than engineering text.
       const refusal = readTrpcServerMessage(error)?.trim() ?? '';
+      // A duplicate name after a lost attempt can be that attempt's own commit:
+      // the retry collided with the profile the unanswered write already stored.
+      // Only a row this panel did not know may complete the save, so a name that
+      // was genuinely taken keeps the draft with the person.
+      if (refusal === PROFILE_NAME_TAKEN_MESSAGE) {
+        const recovered = await recoverLostSave(name);
+        if (recovered !== null) {
+          finishSave(recovered);
+          return { saved: true };
+        }
+      }
+      // No answer arrived, so this attempt may have committed: remember what it
+      // submitted and what the scope held before it, for a later collision.
+      if (refusal === '') {
+        lostSaveAttemptRef.current = { name, knownIds };
+      }
       return { saved: false, refusal: refusal === '' ? null : refusal };
     }
   };

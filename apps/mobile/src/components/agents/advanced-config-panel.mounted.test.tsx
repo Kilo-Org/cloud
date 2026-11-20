@@ -862,6 +862,103 @@ describe('AdvancedConfigPanel', () => {
     expect(mocks.create.mutateAsync.mock.calls[1]).toEqual(mocks.create.mutateAsync.mock.calls[0]);
   });
 
+  it('converges a retry that collides on the name onto the lost attempt that created it', async () => {
+    const mocks = mutations();
+    const refusal = 'A profile with this name already exists';
+    // The first attempt's response never arrives: a transport wrapper named like
+    // a client error, carrying no envelope, so the outcome is unknown.
+    mocks.create.mutateAsync
+      .mockRejectedValueOnce(
+        Object.assign(new Error('Network request failed'), { name: 'TRPCClientError' })
+      )
+      .mockRejectedValueOnce(
+        Object.assign(new Error(refusal), {
+          name: 'TRPCClientError',
+          data: { code: 'CONFLICT', httpStatus: 409, path: 'agentProfiles.create', zodError: null },
+        })
+      );
+    const created: ProfileSelectorProfile = {
+      id: 'prod-1',
+      name: 'prod',
+      varCount: 1,
+      commandCount: 1,
+      isDefault: false,
+      ownerType: 'user',
+    };
+    // The list the retry reads holds the profile the unanswered write stored.
+    const refetch = vi.fn().mockResolvedValue({ data: [BACKEND, created] });
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({ mocks, list: { refetch }, onSelectProfile });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'prod');
+    await act(async () => {
+      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+      await Promise.resolve();
+    });
+
+    expect(mocks.create.mutateAsync).toHaveBeenCalledTimes(2);
+    // The row was absent before the attempt, so it is that attempt's own commit.
+    expect(refetch).toHaveBeenCalled();
+    expect(onSelectProfile).toHaveBeenCalledWith('prod-1');
+    expect(toast.success).toHaveBeenCalledTimes(1);
+    // The save completed, so the sheet closed, the draft it carried cleared and
+    // the duplicate sentence never reached the person.
+    expect(renderer.root.findAll(node => node.type === SaveProfileSheet)).toHaveLength(0);
+    expect(texts(renderer)).not.toContain('API_KEY');
+    expect(texts(renderer)).not.toContain(refusal);
+    expect(buttonByText(renderer, 'Save as profile')).toBeUndefined();
+  });
+
+  it('states the duplicate sentence when the name was taken before any attempt', async () => {
+    const mocks = mutations();
+    const refusal = 'A profile with this name already exists';
+    mocks.create.mutateAsync
+      .mockRejectedValueOnce(
+        Object.assign(new Error('Network request failed'), { name: 'TRPCClientError' })
+      )
+      .mockRejectedValueOnce(
+        Object.assign(new Error(refusal), {
+          name: 'TRPCClientError',
+          data: { code: 'CONFLICT', httpStatus: 409, path: 'agentProfiles.create', zodError: null },
+        })
+      );
+    const taken: ProfileSelectorProfile = {
+      id: 'prod-taken',
+      name: 'prod',
+      varCount: 0,
+      commandCount: 0,
+      isDefault: false,
+      ownerType: 'user',
+    };
+    // The only `prod` row the retry finds is one the panel already had, so the
+    // collision belongs to somebody else's profile, not to a lost commit.
+    const refetch = vi.fn().mockResolvedValue({ data: [BACKEND, taken] });
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({
+      mocks,
+      list: { personalProfiles: [BACKEND, taken], refetch },
+      onSelectProfile,
+    });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'prod');
+    await act(async () => {
+      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+      await Promise.resolve();
+    });
+
+    // The draft is only cleared on a match: an unrelated profile must never take
+    // the person's configuration, so the sheet keeps both the sentence and the
+    // rows they entered.
+    expect(saveSheetMessage(renderer)).toBe(refusal);
+    expect(texts(renderer)).toContain('API_KEY');
+    expect(onSelectProfile).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
   it('a late onClose from a closed save sheet leaves the reopened sheet open', () => {
     const renderer = mount();
     press(byLabel(renderer, 'Advanced Configuration'));

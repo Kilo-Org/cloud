@@ -360,7 +360,7 @@ describe('app_startup validation', () => {
       // @ts-expect-error `unknown_key` is not part of the strict app_startup schema
       unknown_key: 1,
     };
-    expect(withUnknownKey).toBeDefined();
+    void withUnknownKey;
   });
 
   it('rejects an invalid startup outcome', () => {

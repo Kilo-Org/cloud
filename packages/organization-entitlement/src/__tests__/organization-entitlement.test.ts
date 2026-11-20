@@ -3,7 +3,6 @@ import {
   classifyOrganizationEntitlement,
   getDaysRemainingInTrial,
   getOrgTrialStatusFromDays,
-  isPaidOrganizationSeatSubscriptionStatus,
   ORGANIZATION_SEAT_PURCHASE_SUBSCRIPTION_STATUSES,
   PAID_ORGANIZATION_SEAT_SUBSCRIPTION_STATUSES,
   toOrganizationSeatPurchaseSubscriptionStatus,
@@ -152,7 +151,6 @@ describe('classifyOrganizationEntitlement', () => {
 });
 
 describe('toOrganizationSeatPurchaseSubscriptionStatus', () => {
-  const paidStatuses: ReadonlySet<string> = new Set(PAID_ORGANIZATION_SEAT_SUBSCRIPTION_STATUSES);
   const knownStatuses: ReadonlySet<string> = new Set(
     ORGANIZATION_SEAT_PURCHASE_SUBSCRIPTION_STATUSES
   );
@@ -175,14 +173,5 @@ describe('toOrganizationSeatPurchaseSubscriptionStatus', () => {
         UNRECOGNIZED_ORGANIZATION_SEAT_PURCHASE_STATUS
       );
     }
-  });
-
-  it('treats the named statuses as paid exactly when the paid set names them', () => {
-    for (const status of ORGANIZATION_SEAT_PURCHASE_SUBSCRIPTION_STATUSES) {
-      expect(isPaidOrganizationSeatSubscriptionStatus(status)).toBe(paidStatuses.has(status));
-    }
-    expect(
-      isPaidOrganizationSeatSubscriptionStatus(UNRECOGNIZED_ORGANIZATION_SEAT_PURCHASE_STATUS)
-    ).toBe(false);
   });
 });

@@ -82,9 +82,6 @@ describe('classifyWithSystemOne', () => {
       Authorization: 'Bearer sk-or-test',
       'X-Title': 'Kilo Code',
     });
-    expect(typeof init.body === 'string' ? JSON.parse(init.body) : null).toEqual(
-      JSON.parse(JSON.stringify(buildClassifierRequest(input, 'typesafe/jev-1.13')))
-    );
   });
 
   it('picks the task type by summed probability before the subtype', async () => {

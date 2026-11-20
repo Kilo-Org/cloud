@@ -24,3 +24,33 @@ export function decodePercentEncodedSegments(value: string): string {
     })
     .join('/');
 }
+
+/**
+ * Encode a value as the exact inverse of `decodePercentEncodedSegments`:
+ * decoding the result gives back the original value.
+ *
+ * Splitting before encoding keeps `/` a separator. `encodeURIComponent` would
+ * turn a slash inside the value into `%2F`, which the decoder then decodes
+ * within one segment: the value would still decode, but every consumer that
+ * splits a stored ref on `/` would see one segment instead of several. Each
+ * segment is encoded once, so a name holding a literal `%` round-trips.
+ *
+ * `encodeURIComponent` escapes more ASCII characters than `encodeURI` does: it
+ * also escapes `; / ? : @ & = + $ , #`. A stored ref that escapes any of them
+ * (`fix/a%26b` for `fix/a&b`) is therefore matched by the text a person reads
+ * off the row, which `encodeURI` misses. A segment that cannot be encoded (a
+ * lone surrogate) keeps its raw text instead of throwing, mirroring the
+ * decoder keeping a segment it cannot decode.
+ */
+export function encodePercentEncodedSegments(value: string): string {
+  return value
+    .split('/')
+    .map(segment => {
+      try {
+        return encodeURIComponent(segment);
+      } catch {
+        return segment;
+      }
+    })
+    .join('/');
+}

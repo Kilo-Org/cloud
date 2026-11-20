@@ -3553,7 +3553,8 @@ describe('cli-sessions-v2-router', () => {
       const encodedBranchId = 'ses_search_branch_encoded_0001';
       const plainBranchId = 'ses_search_branch_plain_0001';
       const malformedBranchId = 'ses_search_branch_malformed_0001';
-      const branchIds = [encodedBranchId, plainBranchId, malformedBranchId];
+      const ampBranchId = 'ses_search_branch_amp_0001';
+      const branchIds = [encodedBranchId, plainBranchId, malformedBranchId, ampBranchId];
 
       beforeEach(async () => {
         await db.insert(cli_sessions_v2).values([
@@ -3581,6 +3582,14 @@ describe('cli-sessions-v2-router', () => {
             git_url: 'https://github.com/kilo/branch-decode-repo',
             git_branch: 'fix/100%',
           },
+          {
+            session_id: ampBranchId,
+            kilo_user_id: regularUser.id,
+            created_on_platform: 'cloud-agent',
+            title: 'encoded ampersand branch row',
+            git_url: 'https://github.com/kilo/branch-decode-repo',
+            git_branch: 'fix/a%26b',
+          },
         ]);
       });
 
@@ -3607,6 +3616,23 @@ describe('cli-sessions-v2-router', () => {
         // A lone `%` is stored literally, so the raw arm still matches it.
         const malformed = await caller.cliSessionsV2.search({ search_string: '100%' });
         expect(malformed.results.map(s => s.session_id)).toEqual([malformedBranchId]);
+      });
+
+      it('matches a stored escape of an ASCII character the row paints decoded', async () => {
+        const caller = await createCallerForUser(regularUser.id);
+
+        // The row paints `fix/a&b` while the ref stores `fix/a%26b`, so the
+        // encoded arm must be the decoder's inverse, not `encodeURI`, which
+        // leaves `&` literal and would miss this row.
+        const amp = await caller.cliSessionsV2.search({ search_string: 'a&b' });
+        expect(amp.results.map(s => s.session_id)).toEqual([ampBranchId]);
+
+        const readable = await caller.cliSessionsV2.search({ search_string: 'fix/a&b' });
+        expect(readable.results.map(s => s.session_id)).toEqual([ampBranchId]);
+
+        // The stored form still matches through the raw arm.
+        const stored = await caller.cliSessionsV2.search({ search_string: 'a%26b' });
+        expect(stored.results.map(s => s.session_id)).toEqual([ampBranchId]);
       });
     });
   });

@@ -64,6 +64,7 @@ import {
 import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
 import { projectSessionGoal } from '@kilocode/cloud-agent-sdk';
 import { SESSION_ID_RE } from '@cloud-agent-shared/protocol';
+import { encodePercentEncodedSegments } from '@kilocode/app-shared/percent-encoded-segments';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { isSupportAccessEnabled } from '@kilocode/web-shared/lib/admin/support-access';
@@ -851,18 +852,23 @@ function joinWithAnd(fragments: SQL[]): SQL {
 
 /**
  * The percent-encoded form of a search needle, for the arm that matches a
- * stored branch. A ref with non-ASCII text is stored percent-encoded while the
- * row paints the decoded branch, so the encoded needle finds the row a person
- * reads. `encodeURI` keeps `/` literal and leaves ASCII alone, so a plain
- * needle is unchanged. A needle that cannot be encoded (a lone surrogate) keeps
- * its own text, which only repeats the raw arm and never fails the query.
+ * stored branch. A ref is stored percent-encoded while the row paints the
+ * decoded branch, so the encoded needle finds the row a person reads.
+ *
+ * This is the inverse of the decoder that paints those rows
+ * (`decodePercentEncodedSegments`), so every escape the decoder can undo is
+ * found: a stored branch that escapes `&`, `;`, `+`, `$`, `,`, `=` or `@`
+ * (`fix/a%26b` for `fix/a&b`) matches the text a person types, which
+ * `encodeURI` misses because it leaves those characters literal. A plain
+ * needle is unchanged, because none of those characters has an escape. `/`
+ * stays literal, so the encoded needle keeps the segment boundaries the stored
+ * ref has.
  */
 function encodedBranchNeedle(needle: string): string {
-  try {
-    return encodeURI(needle).toLowerCase();
-  } catch {
-    return needle;
-  }
+  // Lowercase after encoding: `encodeURIComponent` writes hex digits in upper
+  // case while the SQL compares against `lower(git_branch)`, so lowercasing
+  // first would break the non-ASCII arm that the stored branch already matched.
+  return encodePercentEncodedSegments(needle).toLowerCase();
 }
 
 /**
@@ -1461,10 +1467,12 @@ export const cliSessionsV2Router = createTRPCRouter({
     );
 
     // The branch is stored percent-encoded while the row paints the decoded
-    // branch, so the branch also matches the encoded form of the needle and a
-    // person searching the branch they read (`fix/請求書`) finds the row. This
-    // arm keeps `/` literal and leaves ASCII alone; the raw arm below still
-    // matches someone typing the stored form.
+    // branch, so the branch also matches the decoder's inverse of the needle
+    // and a person searching the branch they read (`fix/請求書`) finds the row.
+    // The inverse escapes `&`, `;`, `+`, `$`, `,`, `=`, `@` as well as
+    // non-ASCII, so a stored escape of any of them matches too, while `/` stays
+    // literal and a plain needle is unchanged; the raw arm above still matches
+    // someone typing the stored form.
     const searchCondition = searchActive
       ? sql`(
             position(${needle} in lower(coalesce(${base.name}, ''))) > 0
@@ -1873,9 +1881,11 @@ export const cliSessionsV2Router = createTRPCRouter({
         sql`position(${needle} in lower(COALESCE(${cli_sessions_v2.git_url}, ''))) > 0`,
         sql`position(${needle} in lower(COALESCE(${cli_sessions_v2.git_branch}, ''))) > 0`,
         // The ref is stored percent-encoded while the row paints the decoded
-        // branch, so a person searching the branch they read (`fix/請求書`)
-        // must still find the row. `encodeURI` keeps `/` literal and leaves
-        // ASCII alone; the arm above still matches the stored form.
+        // branch, so a person searching the branch they read (`fix/請求書`,
+        // `fix/a&b`) must still find the row. This arm is the decoder's
+        // inverse: it escapes `&`, `;`, `+`, `$`, `,`, `=`, `@` along with
+        // non-ASCII, keeps `/` literal, and leaves a plain needle unchanged;
+        // the arm above still matches the stored form.
         sql`position(${encodedNeedle} in lower(COALESCE(${cli_sessions_v2.git_branch}, ''))) > 0`,
         sql`position(${needle} in lower(COALESCE(${sessionAssociatedPr.pr_title}, ''))) > 0`,
         sql`EXISTS (

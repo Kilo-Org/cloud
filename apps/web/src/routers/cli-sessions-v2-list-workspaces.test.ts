@@ -327,6 +327,30 @@ describe('cliSessionsV2 listWorkspaces', () => {
     expect(plain.workspaces.map(workspace => workspace.worktreeId)).toEqual([plainWorktree]);
   });
 
+  it('finds a workspace by a stored escape of an ASCII character the row paints decoded', async () => {
+    const ampWorktree = worktreeId();
+    await insertWorktree(ampWorktree);
+    await db.insert(cli_sessions_v2).values([
+      makeSession('ses_ws_amp_branch_0001', ampWorktree, {
+        git_branch: 'fix/a%26b',
+      }),
+    ]);
+
+    // The row paints `fix/a&b`, so the decoder's inverse — not `encodeURI`,
+    // which leaves `&` literal — must find the stored `fix/a%26b`.
+    const amp = await sessionCaller().listWorkspaces({
+      organizationId: null,
+      search: 'a&b',
+    });
+    expect(amp.workspaces.map(workspace => workspace.worktreeId)).toEqual([ampWorktree]);
+
+    const readable = await sessionCaller().listWorkspaces({
+      organizationId: null,
+      search: 'fix/a&b',
+    });
+    expect(readable.workspaces.map(workspace => workspace.worktreeId)).toEqual([ampWorktree]);
+  });
+
   it.each(['merged', 'closed'] as const)(
     'includes existing old %s workspaces only when Done is enabled in the same owner scope',
     async state => {

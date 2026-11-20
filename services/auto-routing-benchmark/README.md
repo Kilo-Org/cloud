@@ -336,6 +336,7 @@ measurements are included in routing-table version hashes.
 - Platform and owner pools share measurements for identical concrete model, variant, engine, and repetition settings.
 - Variants must contain explicit `reasoning.enabled` or `reasoning.effort` controls. Unrelated presets do not create benchmark entries.
 - A model without reasoning controls creates one `(model, null)` entry.
+- Models in the shared non-enrollable list (`NON_ENROLLABLE_BENCHMARK_MODEL_IDS` in `@kilocode/auto-routing-contracts`) never enroll: the platform registry, owner subscriptions, admin register/refresh, queued re-measures, custom-router entries, and the run start all skip them and log `benchmark_model_enrollment_blocked`. A drain-refused pair stays `unavailable` with a `failure_class: 'unsupported'` refusal, and its already measured rows stay readable. `openai/gpt-6.2-astra-fast` is listed because it costs twice `openai/gpt-6.2-astra` for the same accuracy and is not faster; removing it from the list restores enrollment.
 - An unavailable model fails its profile without blocking unrelated entries. Catalog request failures leave the existing snapshots intact.
 - Catalog requests have a bounded deadline, including body reads.
 - Manual and automatic selections use the same expansion. Existing saved effort selections no longer restrict platform measurements.

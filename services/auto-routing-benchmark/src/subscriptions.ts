@@ -1,6 +1,8 @@
 import * as z from 'zod';
 import {
   benchmarkPairKey,
+  isBenchmarkEnrollmentBlocked,
+  NON_ENROLLABLE_BENCHMARK_MODEL_REASON,
   resolveBenchmarkIdentity,
   resolveEffectivePolicy,
   type AutoRouter,
@@ -9,6 +11,7 @@ import {
   type BenchmarkProfileEntryStatus,
 } from '@kilocode/auto-routing-contracts';
 import { fetchExecutableBenchmarkModelCatalog } from './executable-models';
+import { logBlockedBenchmarkEnrollment } from './enrollment-block';
 import { platformRegistryEntries, type BenchmarkModelCatalogSchema } from './platform-models';
 import { getBenchmarkConfig } from './config';
 import { listReadyCurrentProfilesForEntries } from './db';
@@ -98,6 +101,19 @@ export function resolveSubscriptionSnapshot(
   const oldByModel = new Map(previous.map(entry => [entry.model, entry]));
   return models.map(({ model }) => {
     const old = oldByModel.get(model);
+    // A blocked model keeps its measured rows readable and keeps serving the result it
+    // already has; it only stops taking new work. This runs before the unchanged-target
+    // short circuit, so an already saved snapshot for a model added to the list stops
+    // following it on the next sync. Removing the ID restores enrollment from scratch.
+    if (isBenchmarkEnrollmentBlocked(model)) {
+      logBlockedBenchmarkEnrollment({ model, variant: null }, 'subscription');
+      return {
+        model,
+        pairs: [],
+        servingPairs: old?.servingPairs ?? [],
+        resolutionError: NON_ENROLLABLE_BENCHMARK_MODEL_REASON,
+      };
+    }
     if (old && !daily && !(retryUnresolved && old.pairs.length === 0)) return old;
     try {
       if (!catalog) throw new Error('Model resolution is unavailable.');

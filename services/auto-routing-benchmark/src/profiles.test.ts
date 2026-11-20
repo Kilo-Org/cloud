@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { MAX_POOL_ENTRIES, type BenchmarkPair } from '@kilocode/auto-routing-contracts';
+import {
+  MAX_POOL_ENTRIES,
+  NON_ENROLLABLE_BENCHMARK_MODEL_REASON,
+  type BenchmarkPair,
+} from '@kilocode/auto-routing-contracts';
 import type * as DbSchemaModule from './db-schema';
 import type * as DrizzleOrmModule from 'drizzle-orm';
 import type { ProfileRow } from './profiles';
@@ -680,6 +684,20 @@ describe('classifyProfileAdmission', () => {
         false
       )
     ).toEqual({ kind: 'admit', charged: false });
+  });
+
+  it('refuses a non-enrollable model even on an explicit retry, admitting the plain model', () => {
+    const blocked = entry('openai/gpt-6.2-astra-fast');
+    const plain = entry('openai/gpt-6.2-astra');
+    expect(classifyProfileAdmission([], current, blocked, true)).toEqual({
+      kind: 'report',
+      status: 'failed',
+      failureReason: NON_ENROLLABLE_BENCHMARK_MODEL_REASON,
+    });
+    expect(classifyProfileAdmission([], current, plain, false)).toEqual({
+      kind: 'admit',
+      charged: true,
+    });
   });
 });
 

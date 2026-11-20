@@ -1,11 +1,14 @@
 import {
   BenchmarkCatalogVariantsSchema,
   getReasoningVariantKeys,
+  isBenchmarkEnrollmentBlocked,
+  NON_ENROLLABLE_BENCHMARK_MODEL_REASON,
   type BenchmarkConfig,
   type CandidatePricing,
 } from '@kilocode/auto-routing-contracts';
 import * as z from 'zod';
 import { exactPairKey } from './db';
+import { logBlockedBenchmarkEnrollment } from './enrollment-block';
 import type { ProfileFailure } from './profile-failure';
 import type { RunModelEntry } from './run';
 
@@ -93,6 +96,7 @@ export function catalogSupportsBenchmarkPair(
   catalog: z.infer<typeof BenchmarkModelCatalogSchema>,
   pair: { model: string; variant: string | null }
 ): boolean {
+  if (isBenchmarkEnrollmentBlocked(pair.model)) return false;
   const model = catalog.data.find(model => model.id === pair.model);
   if (!model || model.id.startsWith('~') || !catalogModelSupportsTools(model)) return false;
   const variants = getReasoningVariantKeys(model.opencode?.variants);
@@ -107,6 +111,9 @@ export function benchmarkPairUnavailability(
   catalog: z.infer<typeof BenchmarkModelCatalogSchema>,
   pair: { model: string; variant: string | null }
 ): ProfileFailure | null {
+  if (isBenchmarkEnrollmentBlocked(pair.model)) {
+    return { failureClass: 'unsupported', reason: NON_ENROLLABLE_BENCHMARK_MODEL_REASON };
+  }
   const model = catalog.data.find(model => model.id === pair.model);
   if (!model || model.id.startsWith('~')) {
     return { failureClass: 'catalog_absent', reason: CATALOG_PAIR_UNAVAILABLE_REASON };
@@ -151,6 +158,12 @@ export function platformRegistryEntries(
       ? modelsById.get(selectedModel.alias_target ?? '')
       : selectedModel;
     if (!model || model.id.startsWith('~') || !catalogModelSupportsTools(model)) continue;
+    // An explicit selection of a blocked model, or an alias retargeted onto one, enters
+    // no run. It is logged once here, where the platform registry expands the pool.
+    if (isBenchmarkEnrollmentBlocked(model.id)) {
+      logBlockedBenchmarkEnrollment({ model: model.id, variant: null }, 'platform_registry');
+      continue;
+    }
     const variants = getReasoningVariantKeys(model.opencode?.variants);
     for (const variant of variants.length > 0 ? variants : [null]) {
       const key = exactPairKey(model.id, variant);
@@ -168,7 +181,7 @@ export function catalogModelVariants(
   modelId: string
 ): { model: string; variants: (string | null)[] } | null {
   const model = resolveCatalogModel(modelId, new Map(catalog.data.map(m => [m.id, m])));
-  if (!model) return null;
+  if (!model || isBenchmarkEnrollmentBlocked(model.id)) return null;
   const variants = getReasoningVariantKeys(model.opencode?.variants);
   return { model: model.id, variants: variants.length > 0 ? variants : [null] };
 }

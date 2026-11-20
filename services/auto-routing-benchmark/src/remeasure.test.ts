@@ -481,4 +481,22 @@ describe('prompt transport re-measure (real SQLite)', () => {
     expect((await plan(false)).affectedResults).toBe(1);
     expect((await plan(true)).affectedResults).toBe(2);
   });
+
+  it('never queues a re-measure for a non-enrollable model, but still queues the plain model', async () => {
+    insertRun('old');
+    seedMeasuredPair('openai/gpt-6.2-astra-fast');
+    seedMeasuredPair('openai/gpt-6.2-astra');
+    const report = await planPromptTransportRemeasure(db, {
+      ...newest,
+      action: 'request',
+      prices: new Map(),
+    });
+    // The blocked pair is neither reported nor queued; the plain pair still is.
+    expect(report.pairDetails.map(pair => pair.model)).toEqual(['openai/gpt-6.2-astra']);
+    expect((await listQueuedRemeasures(db, current, 'platform')).map(row => row.model)).toEqual([
+      'openai/gpt-6.2-astra',
+    ]);
+    // The blocked row keeps its ready measurement, readable.
+    expect(profileRunId('openai/gpt-6.2-astra-fast')).toEqual({ run_id: 'old', status: 'ready' });
+  });
 });

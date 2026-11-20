@@ -3,7 +3,9 @@ import {
   benchmarkPairKey,
   customRouterCandidateModel,
   customRouterEntryKey,
+  isBenchmarkEnrollmentBlocked,
   linkedAvgCostUsd,
+  NON_ENROLLABLE_BENCHMARK_MODEL_REASON,
   resolveEffectivePolicy,
   toCustomRouterEntryRef,
   type AutoRouter,
@@ -32,6 +34,7 @@ import {
 } from './client-profiles';
 import caseComplexity from './datasets/case-complexity.json';
 import { getRoutingCaseResultsForEntries, getSummariesForRuns } from './db';
+import { logBlockedBenchmarkEnrollment } from './enrollment-block';
 import {
   catalogCandidatePrices,
   catalogModelVariants,
@@ -78,7 +81,13 @@ export type ResolvedCustomRouterEntry =
       variants: (string | null)[];
       linkedVariants?: Map<string | null, BenchmarkPair>;
     }
-  | { measuredBy: 'platform'; entry: GatewayCustomRouterEntry; pairs: BenchmarkPair[] | null };
+  | {
+      measuredBy: 'platform';
+      entry: GatewayCustomRouterEntry;
+      pairs: BenchmarkPair[] | null;
+      /** Set when the entry names (or aliases to) a non-enrollable model. */
+      blocked?: true;
+    };
 
 export async function resolveCustomRouterEntries(
   entries: readonly CustomRouterEntry[],
@@ -92,9 +101,29 @@ export async function resolveCustomRouterEntries(
   const clientEval = new Set(clientEvalEntryKeys);
   const resolved = await Promise.all(
     entries.map(async (entry): Promise<ResolvedCustomRouterEntry> => {
+      const clientMeasured = entry.kind === 'client' || clientEval.has(customRouterEntryKey(entry));
+      if (
+        entry.kind === 'gateway' &&
+        !clientMeasured &&
+        isBenchmarkEnrollmentBlocked(entry.model)
+      ) {
+        // A blocked model gets no platform pairs, so it never enrolls a profile through a
+        // custom router. The owner reads the reason on the entry's status instead. An
+        // owner-run client eval is its own path and still proceeds below.
+        logBlockedBenchmarkEnrollment({ model: entry.model, variant: null }, 'custom_router');
+        return { measuredBy: 'platform', entry, pairs: null, blocked: true };
+      }
       const concrete =
         entry.kind === 'gateway' && catalog ? catalogModelVariants(catalog, entry.model) : null;
-      if (entry.kind === 'client' || clientEval.has(customRouterEntryKey(entry))) {
+      if (entry.kind === 'gateway' && !clientMeasured && concrete === null && catalog !== null) {
+        // An alias whose concrete target is blocked resolves to no pairs.
+        const target = catalog.data.find(model => model.id === entry.model)?.alias_target;
+        if (target && isBenchmarkEnrollmentBlocked(target)) {
+          logBlockedBenchmarkEnrollment({ model: target, variant: null }, 'custom_router');
+          return { measuredBy: 'platform', entry, pairs: null, blocked: true };
+        }
+      }
+      if (clientMeasured) {
         const variants =
           entry.kind === 'client'
             ? entry.variants.length > 0
@@ -103,6 +132,11 @@ export async function resolveCustomRouterEntries(
             : (concrete?.variants ?? [null]);
         const measuredAs = entry.measuredAs;
         if (!measuredAs) return { measuredBy: 'client', entry, variants };
+        // A blocked model is never linked: the entry stays on the owner's client eval.
+        if (isBenchmarkEnrollmentBlocked(measuredAs)) {
+          logBlockedBenchmarkEnrollment({ model: measuredAs, variant: null }, 'custom_router_link');
+          return { measuredBy: 'client', entry, variants };
+        }
         // Same-name variants link only when the platform has measured them: the catalog lists
         // variants it has not benchmarked yet, and those stay on the owner's client eval.
         const measuredRows = await loadProfileRowsForPairs(
@@ -527,7 +561,9 @@ export async function lookupCustomRouterStatuses(
               variant: null,
               linked: false,
               status: 'failed' as const,
-              failureReason: CATALOG_UNAVAILABLE_FAILURE_REASON,
+              failureReason: item.blocked
+                ? NON_ENROLLABLE_BENCHMARK_MODEL_REASON
+                : CATALOG_UNAVAILABLE_FAILURE_REASON,
             },
           ],
         };

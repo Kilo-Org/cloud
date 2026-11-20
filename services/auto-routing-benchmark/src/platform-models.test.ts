@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
 import { describe, expect, it, vi } from 'vitest';
+import { NON_ENROLLABLE_BENCHMARK_MODEL_REASON } from '@kilocode/auto-routing-contracts';
 import {
   BenchmarkModelCatalogSchema,
   benchmarkPairUnavailability,
@@ -7,6 +8,7 @@ import {
   CATALOG_PAIR_UNAVAILABLE_REASON,
   MIN_BENCHMARK_INPUT_TOKENS,
   catalogCandidatePrices,
+  catalogModelVariants,
   fetchBenchmarkModelCatalog,
   catalogSupportsBenchmarkPair,
   platformRegistryEntries,
@@ -277,6 +279,53 @@ describe('platform catalog expansion', () => {
         })
       )
     ).toEqual([]);
+  });
+
+  it('refuses a non-enrollable model on every expansion and admission path', () => {
+    const executable = BenchmarkModelCatalogSchema.parse({
+      data: [
+        { id: 'openai/gpt-6.2-astra-fast', supported_parameters: ['tools'] },
+        { id: 'openai/gpt-6.2-astra', supported_parameters: ['tools'] },
+        { id: '~openai/astra-latest', alias_target: 'openai/gpt-6.2-astra-fast' },
+      ],
+    });
+    // A direct selection enters no run; the plain model beside it still does.
+    expect(
+      platformRegistryEntries(
+        {
+          deciderModels: [{ id: 'openai/gpt-6.2-astra-fast' }, { id: 'openai/gpt-6.2-astra' }],
+        },
+        executable
+      )
+    ).toEqual([{ model: 'openai/gpt-6.2-astra', variant: null }]);
+    expect(
+      platformRegistryEntries({ deciderModels: [{ id: '~openai/astra-latest' }] }, executable)
+    ).toEqual([]);
+    // Exact admission and the drain's unavailability reason both refuse it.
+    expect(
+      catalogSupportsBenchmarkPair(executable, {
+        model: 'openai/gpt-6.2-astra-fast',
+        variant: null,
+      })
+    ).toBe(false);
+    expect(
+      catalogSupportsBenchmarkPair(executable, { model: 'openai/gpt-6.2-astra', variant: null })
+    ).toBe(true);
+    expect(
+      benchmarkPairUnavailability(executable, {
+        model: 'openai/gpt-6.2-astra-fast',
+        variant: null,
+      })
+    ).toEqual({ failureClass: 'unsupported', reason: NON_ENROLLABLE_BENCHMARK_MODEL_REASON });
+    expect(
+      benchmarkPairUnavailability(executable, { model: 'openai/gpt-6.2-astra', variant: null })
+    ).toBeNull();
+    // The concrete variant lookup used by custom routers resolves no pair for it.
+    expect(catalogModelVariants(executable, 'openai/gpt-6.2-astra-fast')).toBeNull();
+    expect(catalogModelVariants(executable, 'openai/gpt-6.2-astra')).toEqual({
+      model: 'openai/gpt-6.2-astra',
+      variants: [null],
+    });
   });
 
   it('validates catalog reasoning control values at runtime', () => {

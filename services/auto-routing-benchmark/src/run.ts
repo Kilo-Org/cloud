@@ -11,6 +11,7 @@ import {
   type BenchmarkIdentity,
   BenchmarkIdentityError,
   type BenchmarkIdentityOverrides,
+  isBenchmarkEnrollmentBlocked,
   resolveBenchmarkIdentity,
   resolveEffectivePolicy,
   ComplexityLabelsSchema,
@@ -116,6 +117,7 @@ import {
   warmUpCliContainer,
 } from './cli-runner';
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
+import { logBlockedBenchmarkEnrollment } from './enrollment-block';
 import {
   benchmarkPairUnavailability,
   catalogCandidatePrices,
@@ -976,10 +978,20 @@ export async function startRun(
 
   // Decider entries always come from the registry queue snapshot (which may
   // include two variants of one model). Classifier still measures its own list.
-  const modelEntries: RunModelEntry[] =
+  const selectedEntries: RunModelEntry[] =
     kind === 'decider'
       ? normalizeRunModelEntries(options.entries ?? [])
       : config.classifierModels.map(model => ({ model, variant: null }));
+  // Last gate before a claim or a paid call: no run ever measures a blocked model,
+  // whichever list (registry queue, classifier config, operator request) named it.
+  const modelEntries = selectedEntries.filter(entry => {
+    if (!isBenchmarkEnrollmentBlocked(entry.model)) return true;
+    logBlockedBenchmarkEnrollment(entry, 'run_start');
+    return false;
+  });
+  if (kind === 'decider' && modelEntries.length === 0) {
+    throw new BenchmarkRunConfigError('decider runs require a non-empty registry entry snapshot');
+  }
 
   const engineIdentity = computeEngineIdentity(kind, router);
 
@@ -1266,7 +1278,17 @@ export async function drainQueue(
 
   const current = { router, engineIdentity, repetitions };
   const pending = await listPendingCurrentProfiles(env.BENCH_DB, current, queue);
-  const remeasures = await listQueuedRemeasures(env.BENCH_DB, current, queue);
+  const queuedRemeasures = await listQueuedRemeasures(env.BENCH_DB, current, queue);
+  // A queued re-measure of a blocked model must not be scheduled either; its ready
+  // measurement stays readable. The pair is dropped here, before any claim or paid call.
+  const remeasures = queuedRemeasures.filter(row => {
+    if (!isBenchmarkEnrollmentBlocked(row.model)) return true;
+    logBlockedBenchmarkEnrollment(
+      { model: row.model, variant: variantFromStorage(row.variant) },
+      'queue_remeasure'
+    );
+    return false;
+  });
   if (pending.length === 0 && remeasures.length === 0) {
     options.skipped?.push('nothing_pending');
     return null;

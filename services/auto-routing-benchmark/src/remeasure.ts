@@ -1,4 +1,8 @@
-import type { AutoRouter, CandidatePricing } from '@kilocode/auto-routing-contracts';
+import {
+  isBenchmarkEnrollmentBlocked,
+  type AutoRouter,
+  type CandidatePricing,
+} from '@kilocode/auto-routing-contracts';
 import type { DeciderCase } from './datasets/decider-cases';
 import { isProbeCase } from './datasets/probe-cases';
 import {
@@ -6,6 +10,7 @@ import {
   minimumCaseRevisions,
   type MeasuredCase,
 } from './measurement-revision';
+import { logBlockedBenchmarkEnrollment } from './enrollment-block';
 import { REMEASURE_FRONTIER_INNER_QUOTE_CASES, snapshotPromptTokens } from './prompt-transport';
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
 
@@ -121,7 +126,7 @@ export async function planPromptTransportRemeasure(
         ),
       ]
     : [];
-  const [{ results }, { results: measured }] = await Promise.all([
+  const [{ results: affectedResults }, { results: measuredRows }] = await Promise.all([
     db
       .prepare(`
         SELECT ${PAIR_COLUMNS}, source.case_id, source.cost_usd
@@ -159,6 +164,24 @@ export async function planPromptTransportRemeasure(
   ]);
 
   const pairs = new Map<string, RemeasurePairReport>();
+  // A blocked model's ready rows stay readable, but the plan neither reports nor queues
+  // them; `cancel` below still removes a row queued before the model was listed. One log
+  // per blocked pair, not one per result row.
+  const blockedPairs = new Set<string>();
+  const enrollmentFilter = (row: { model: string; variant: string }): boolean => {
+    if (!isBenchmarkEnrollmentBlocked(row.model)) return true;
+    const key = JSON.stringify([row.model, row.variant]);
+    if (!blockedPairs.has(key)) {
+      blockedPairs.add(key);
+      logBlockedBenchmarkEnrollment(
+        { model: row.model, variant: variantFromStorage(row.variant) },
+        'remeasure'
+      );
+    }
+    return false;
+  };
+  const results = affectedResults.filter(enrollmentFilter);
+  const measured = measuredRows.filter(enrollmentFilter);
   const pairOf = (row: PairRow) => {
     const key = JSON.stringify([row.model, row.variant]);
     const existing = pairs.get(key);

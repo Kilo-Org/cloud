@@ -413,6 +413,29 @@ export type BenchmarkProfileStatus = z.infer<typeof BenchmarkProfileStatusSchema
 /** Bounded failure text stored on failed profile rows. */
 export const BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH = 500;
 
+/**
+ * Model IDs the benchmark refuses to enroll or admit, whatever pool or operator asks
+ * for them. Removing an ID from this list restores enrollment; already measured rows
+ * stay readable. `openai/gpt-6.2-astra-fast` costs twice `openai/gpt-6.2-astra` for the
+ * same accuracy and is not faster, so it is measured through the plain model instead.
+ */
+export const NON_ENROLLABLE_BENCHMARK_MODEL_IDS: readonly string[] = Object.freeze([
+  'openai/gpt-6.2-astra-fast',
+]);
+
+/**
+ * True when the benchmark must not enroll `model` (an exact concrete ID, never an alias).
+ * Aliases resolve to their concrete target first, so an alias retargeted onto a blocked
+ * model is refused at admission time as well.
+ */
+export function isBenchmarkEnrollmentBlocked(model: string): boolean {
+  return NON_ENROLLABLE_BENCHMARK_MODEL_IDS.includes(model);
+}
+
+/** The refusal reason stored on, or returned for, a blocked pair. */
+export const NON_ENROLLABLE_BENCHMARK_MODEL_REASON =
+  'Model is excluded from the auto-routing benchmark (cost without an accuracy or latency gain).';
+
 export const BenchmarkProfileFailureClassSchema = z.enum([
   'catalog_absent',
   'context_too_small',

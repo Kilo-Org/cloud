@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  NON_ENROLLABLE_BENCHMARK_MODEL_REASON,
   PLATFORM_MEASUREMENTS_PATH,
   PlatformMeasurementsResponseSchema,
 } from '@kilocode/auto-routing-contracts';
@@ -442,5 +443,42 @@ describe('custom router tables and statuses (real SQLite)', () => {
       baseRouter: 'efficient',
       models: [{ model: 'vendor/gw', variants: [null] }],
     });
+  });
+
+  it('resolves no platform pairs for a non-enrollable gateway entry and reports why', async () => {
+    const blockedModel = 'openai/gpt-6.2-astra-fast';
+    const blockedSource = {
+      ...source,
+      fetchImpl: (async () =>
+        Response.json({
+          data: [
+            { id: blockedModel, supported_parameters: ['tools'] },
+            { id: 'openai/gpt-6.2-astra', supported_parameters: ['tools'] },
+          ],
+        })) satisfies typeof fetch,
+    };
+    const context: CustomRouterBenchmarkContext = {
+      ...clientOnly,
+      entries: [
+        { kind: 'gateway', model: blockedModel },
+        { kind: 'gateway', model: 'openai/gpt-6.2-astra' },
+      ],
+    };
+    // The blocked entry contributes no pair; the plain one still asks for a measurement.
+    const { table } = await assembleCustomRouterTable(db, CONFIG, context, blockedSource);
+    expect(table).toBeNull();
+
+    const statuses = await lookupCustomRouterStatuses(db, CONFIG, context, blockedSource);
+    const byKey = new Map(statuses.entries.map(entry => [entry.key, entry]));
+    expect(byKey.get(`gateway:${blockedModel}`)?.variants).toEqual([
+      {
+        variant: null,
+        linked: false,
+        status: 'failed',
+        failureReason: NON_ENROLLABLE_BENCHMARK_MODEL_REASON,
+      },
+    ]);
+    // The plain model is admitted for measurement (missing until a drain picks it up).
+    expect(byKey.get('gateway:openai/gpt-6.2-astra')?.variants[0]?.status).not.toBe('failed');
   });
 });

@@ -17,6 +17,7 @@ import type {
 import { benchmarkPairKey, RoutingTableSchema } from '@kilocode/auto-routing-contracts';
 import type { BenchmarkPair } from '@kilocode/auto-routing-contracts';
 import { POLICY_SETTINGS } from '@kilocode/auto-routing-contracts';
+import { isBenchmarkEnrollmentBlocked } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
 import {
   and,
@@ -68,6 +69,7 @@ import {
   wireProfileFailure,
   type ProfileFailure,
 } from './profile-failure';
+import { logBlockedBenchmarkEnrollment } from './enrollment-block';
 
 export type CaseResultRow = typeof caseResults.$inferSelect;
 export type RunRow = typeof benchmarkRuns.$inferSelect;
@@ -1907,6 +1909,13 @@ export async function syncPlatformRegistryRows(
   nowIso: string = new Date().toISOString()
 ): Promise<void> {
   const orm = drizzle(db);
+  // A non-enrollable model gets no pending row, whichever list named it. Existing rows
+  // (a ready measurement) stay, so its results remain readable.
+  const enrollable = desired.filter(entry => {
+    if (!isBenchmarkEnrollmentBlocked(entry.model)) return true;
+    logBlockedBenchmarkEnrollment(entry, 'platform_registry_rows');
+    return false;
+  });
 
   // Clear every flag first, then re-set it per desired pair. Naming the desired
   // set in one NOT(...) clause instead would bind two variables per model and
@@ -1916,7 +1925,7 @@ export async function syncPlatformRegistryRows(
     clearPlatformRequestedStatement(orm, current),
   ];
 
-  for (const entry of desired) {
+  for (const entry of enrollable) {
     stmts.push(claimPlatformRequestedStatement(orm, entry, current, nowIso));
   }
 

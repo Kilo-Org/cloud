@@ -1,6 +1,10 @@
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { resolveEffectivePolicy, type AutoRouter } from '@kilocode/auto-routing-contracts';
+import {
+  NON_ENROLLABLE_BENCHMARK_MODEL_REASON,
+  resolveEffectivePolicy,
+  type AutoRouter,
+} from '@kilocode/auto-routing-contracts';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { saveBenchmarkConfig } from './config';
 import { DECIDER_CASES } from './datasets/decider-cases';
@@ -396,7 +400,6 @@ describe('decider queue admission (production migrations and real SQLite)', () =
     const firstResult = await first;
     secondRelease.resolve();
     const secondResult = await second;
-
     expect(firstResult).toBeNull();
     if (!secondResult) throw new Error('Expected the second drain to start a run');
     expect(runningUserRuns()).toEqual([secondResult.runId]);
@@ -410,5 +413,32 @@ describe('decider queue admission (production migrations and real SQLite)', () =
         startingRunId: secondResult.runId,
       })
     );
+  });
+  it('drains a non-enrollable pending pair to an unsupported refusal and still runs the plain model', async () => {
+    const blocked = 'openai/gpt-6.2-astra-fast';
+    insertProfile(blocked, 'pending', null);
+    insertProfile(NEW_MODEL, 'pending', null);
+
+    const started = await drainQueue(env, 'user');
+
+    if (!started) throw new Error('Expected the drain to start a run');
+    // Only the plain model enters the run.
+    const runModels = sqlite
+      .prepare('SELECT model FROM run_models WHERE run_id = ?')
+      .all(started.runId)
+      .map(row => String(row.model));
+    expect(runModels).toEqual([NEW_MODEL]);
+    // The blocked row is refused before any paid call, as a terminal `unsupported`.
+    expect(
+      sqlite
+        .prepare(
+          'SELECT status, failure_class, failure_reason FROM benchmark_profiles WHERE model = ?'
+        )
+        .get(blocked)
+    ).toEqual({
+      status: 'unavailable',
+      failure_class: 'unsupported',
+      failure_reason: NON_ENROLLABLE_BENCHMARK_MODEL_REASON,
+    });
   });
 });

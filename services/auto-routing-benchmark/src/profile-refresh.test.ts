@@ -1,5 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { NON_ENROLLABLE_BENCHMARK_MODEL_REASON } from '@kilocode/auto-routing-contracts';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { reuseDeciderCaseResults } from './db';
 import { BenchmarkModelCatalogSchema } from './platform-models';
@@ -364,5 +365,46 @@ describe('targeted benchmark refresh', () => {
         minimumRevisions: {},
       })
     ).toBe(1);
+  });
+
+  it('refuses a non-enrollable model and keeps its measured row readable', async () => {
+    const blocked = 'openai/gpt-6.2-astra-fast';
+    const plain = 'openai/gpt-6.2-astra';
+    const wide = BenchmarkModelCatalogSchema.parse({
+      data: [{ id: blocked }, { id: plain }],
+    });
+    seedProfile(blocked);
+    seedProfile(plain);
+    const result = await refreshCurrentProfiles(
+      db,
+      {
+        ...current,
+        mode: 'refresh',
+        entries: [
+          { model: blocked, variant: null },
+          { model: plain, variant: null },
+        ],
+      },
+      wide,
+      refreshedAt
+    );
+    // The plain model refreshes; the blocked one is refused with the list's reason.
+    expect(result.refreshed).toEqual([{ model: plain, variant: null }]);
+    expect(result.unavailable).toEqual([{ model: blocked, variant: null }]);
+    expect(result.refusals).toEqual([
+      {
+        entry: { model: blocked, variant: null },
+        failureClass: 'unsupported',
+        reason: NON_ENROLLABLE_BENCHMARK_MODEL_REASON,
+      },
+    ]);
+    // Its measured results stay readable: the row is unavailable, not deleted, and its
+    // case results are untouched.
+    expect(
+      sqlite.prepare('SELECT status FROM benchmark_profiles WHERE model = ?').get(blocked)
+    ).toEqual({ status: 'unavailable' });
+    expect(
+      sqlite.prepare('SELECT status FROM benchmark_profiles WHERE model = ?').get(plain)
+    ).toEqual({ status: 'pending' });
   });
 });

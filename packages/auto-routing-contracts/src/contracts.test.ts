@@ -27,9 +27,12 @@ import {
   CustomRoutingTableRequestSchema,
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
+  NON_ENROLLABLE_BENCHMARK_MODEL_IDS,
+  NON_ENROLLABLE_BENCHMARK_MODEL_REASON,
   RegisterBenchmarkProfilesRequestSchema,
   RefreshBenchmarkProfilesRequestSchema,
   SyncBenchmarkSubscriptionsRequestSchema,
+  isBenchmarkEnrollmentBlocked,
   resolveBenchmarkIdentity,
 } from './benchmark';
 import { POLICY_SETTING_VALUE_DEFAULTS } from './policy-settings';
@@ -903,5 +906,15 @@ describe('RefreshBenchmarkProfilesRequestSchema duplicate pairs', () => {
         ])
       ).success
     ).toBe(true);
+  });
+});
+
+describe('non-enrollable benchmark model list', () => {
+  it('blocks only the listed model, by exact id', () => {
+    expect(isBenchmarkEnrollmentBlocked('openai/gpt-6.2-astra-fast')).toBe(true);
+    expect(isBenchmarkEnrollmentBlocked('openai/gpt-6.2-astra')).toBe(false);
+    expect(isBenchmarkEnrollmentBlocked('~openai/astra-latest')).toBe(false);
+    expect(NON_ENROLLABLE_BENCHMARK_MODEL_IDS).toEqual(['openai/gpt-6.2-astra-fast']);
+    expect(NON_ENROLLABLE_BENCHMARK_MODEL_REASON).toMatch(/excluded from the auto-routing/);
   });
 });

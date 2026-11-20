@@ -13,6 +13,8 @@ import {
   MAX_POOL_ENTRIES,
   MeasuredAsModelIdSchema,
   benchmarkPairKey,
+  isBenchmarkEnrollmentBlocked,
+  NON_ENROLLABLE_BENCHMARK_MODEL_REASON,
   resolveEffectivePolicy,
 } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
@@ -23,6 +25,7 @@ import { variantFromStorage, variantToStorage } from './reasoning-effort';
 import { computeEngineIdentity } from './run';
 import { noLiveBenchmarkChunks } from './profile-entry-claims';
 import { parseProfileState, wireProfileFailure, wireProfileStatus } from './profile-failure';
+import { logBlockedBenchmarkEnrollment } from './enrollment-block';
 
 /** Rolling 24h owner admission limit per base router (charged new/retry only). */
 export const PROFILE_ADMISSION_LIMIT = 20;
@@ -93,6 +96,17 @@ export function classifyProfileAdmission(
   entry: BenchmarkPair,
   retry: boolean
 ): AdmissionClass {
+  // A blocked model is never admitted, however the owner asked (including an explicit
+  // retry). It reports `failed` with the refusal reason, and any measured row stays
+  // readable through the status lookup.
+  if (isBenchmarkEnrollmentBlocked(entry.model)) {
+    logBlockedBenchmarkEnrollment(entry, 'profile_admission');
+    return {
+      kind: 'report',
+      status: 'failed',
+      failureReason: NON_ENROLLABLE_BENCHMARK_MODEL_REASON,
+    };
+  }
   const currentRow = entryRows.find(row => isCurrentBenchmarkProfile(row, current, entry));
   if (currentRow) {
     const state = parseProfileState(currentRow);
@@ -627,8 +641,10 @@ export async function registerProfiles(
     }
 
     // Runs for reported pairs too, so an existing platform row records that
-    // an owner wants it.
-    stmts.push(claimUserRequestedStatement(orm, input.pairs, current, nowIso));
+    // an owner wants it. A blocked model is never claimed, so it cannot enter a queue.
+    const claimable = input.pairs.filter(pair => !isBenchmarkEnrollmentBlocked(pair.model));
+    if (claimable.length > 0)
+      stmts.push(claimUserRequestedStatement(orm, claimable, current, nowIso));
 
     if (chargedModels.size > 0) {
       stmts.push(admissionQuotaGuardStatement(orm, quotaScope));
@@ -715,6 +731,17 @@ export async function lookupProfileStatuses(
     const currentRow = rows.find(row => isCurrentBenchmarkProfile(row, current, entry));
     if (currentRow) {
       preStatuses.push(statusFromRow(entry, currentRow));
+      continue;
+    }
+    // A blocked model is never admitted from a read path either. A current measured row
+    // above still reports its status; with none, the entry reports the refusal.
+    if (isBenchmarkEnrollmentBlocked(entry.model)) {
+      logBlockedBenchmarkEnrollment(entry, 'profile_status');
+      preStatuses.push({
+        entry,
+        status: 'failed',
+        failureReason: NON_ENROLLABLE_BENCHMARK_MODEL_REASON,
+      });
       continue;
     }
     if (rows.length > 0) {

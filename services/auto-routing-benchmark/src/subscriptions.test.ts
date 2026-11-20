@@ -1,6 +1,9 @@
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { BenchmarkConfig } from '@kilocode/auto-routing-contracts';
+import {
+  NON_ENROLLABLE_BENCHMARK_MODEL_REASON,
+  type BenchmarkConfig,
+} from '@kilocode/auto-routing-contracts';
 import { BenchmarkModelCatalogSchema } from './platform-models';
 import {
   continueDailyReconcile,
@@ -753,5 +756,93 @@ describe('saved daily benchmark subscriptions', () => {
         .prepare("SELECT COUNT(*) AS count FROM benchmark_profiles WHERE model = 'vendor/N'")
         .get()
     ).toEqual({ count: 0 });
+  });
+
+  it('refuses a non-enrollable model as a subscription target while admitting the plain model', async () => {
+    const blocked = 'openai/gpt-6.2-astra-fast';
+    const plain = 'openai/gpt-6.2-astra';
+    const both = BenchmarkModelCatalogSchema.parse({
+      data: [
+        { id: blocked, supported_parameters: ['tools'] },
+        { id: plain, supported_parameters: ['tools'] },
+      ],
+    });
+    vi.mocked(fetchExecutableBenchmarkModelCatalog).mockResolvedValue(both);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const snapshot = await syncSubscriptionSnapshot(env, config, owner, [
+      { model: blocked },
+      { model: plain },
+    ]);
+    // The blocked model resolves no pairs and carries the refusal reason; the plain
+    // model still enrolls its pending row.
+    expect(snapshot).toEqual([
+      {
+        model: blocked,
+        pairs: [],
+        servingPairs: [],
+        resolutionError: NON_ENROLLABLE_BENCHMARK_MODEL_REASON,
+      },
+      {
+        model: plain,
+        pairs: [{ model: plain, variant: null }],
+        servingPairs: [],
+        resolutionError: null,
+      },
+    ]);
+    const rows = sqlite
+      .prepare('SELECT model FROM benchmark_profiles ORDER BY model')
+      .all()
+      .map(row => String(row.model));
+    expect(rows).toEqual([plain]);
+    expect(warn.mock.calls.map(([message]) => JSON.parse(String(message)).event)).toContain(
+      'benchmark_model_enrollment_blocked'
+    );
+    warn.mockRestore();
+  });
+
+  it('drops an already saved target of a model added to the non-enrollable list', async () => {
+    // Simulate a target saved before the model joined the list: write the snapshot
+    // directly, with a ready measurement backing it, bypassing resolution.
+    const blocked = 'openai/gpt-6.2-astra-fast';
+    const saved = [
+      {
+        model: blocked,
+        pairs: [{ model: blocked, variant: null }],
+        servingPairs: [{ model: blocked, variant: null }],
+        resolutionError: null,
+      },
+    ];
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_subscriptions (router, owner_type, owner_id, revision, snapshot, updated_at)
+         VALUES ('efficient', ?, ?, 'rev-1', ?, '2026-01-01T00:00:00.000Z')`
+      )
+      .run(owner.ownerType, owner.ownerId, JSON.stringify({ entries: saved, previousEntries: [] }));
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles (router, model, variant, engine_identity, repetitions, status, run_id, requested_at, updated_at, platform_requested, user_requested)
+         VALUES ('efficient', ?, '', 'engine', 1, 'ready', 'run-x', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', 0, 1)`
+      )
+      .run(blocked);
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const reconciled = await syncSubscriptionSnapshot(env, config, owner, [{ model: blocked }], {
+      daily: true,
+      catalog: catalog('vendor/M'),
+    });
+    // No target follows it; the measured row and the served pair stay readable.
+    expect(reconciled[0]).toEqual({
+      model: blocked,
+      pairs: [],
+      servingPairs: [{ model: blocked, variant: null }],
+      resolutionError: NON_ENROLLABLE_BENCHMARK_MODEL_REASON,
+    });
+    expect(
+      sqlite.prepare('SELECT status FROM benchmark_profiles WHERE model = ?').get(blocked)
+    ).toEqual({ status: 'ready' });
+    expect(warn.mock.calls.map(([message]) => JSON.parse(String(message)).event)).toContain(
+      'benchmark_model_enrollment_blocked'
+    );
+    warn.mockRestore();
   });
 });

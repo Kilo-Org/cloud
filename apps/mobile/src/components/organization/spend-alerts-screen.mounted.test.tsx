@@ -946,4 +946,28 @@ describe('SpendAlertsScreen restored draft', () => {
     await waitFor(() => formDraft.clear.mock.calls.length === 1);
     expect(formDraft.clear).toHaveBeenCalledTimes(1);
   });
+
+  it('keeps an edit typed while the save was in flight', async () => {
+    // The save answers late, so the person types again before it lands. The
+    // request only holds the earlier values, and dropping the draft on its
+    // success would throw the newer text away. The saved confirmation proves
+    // the request settled, so the assertion below is not a race with it.
+    const pendingSave = Promise.withResolvers<unknown>();
+    saveMutationFn.mockReturnValueOnce(pendingSave.promise);
+    const { renderer } = await mountLoaded();
+
+    type(renderer, LIMIT, '40');
+    press(buttonByVariant(renderer));
+    type(renderer, LIMIT, '55');
+
+    pendingSave.resolve(undefined);
+    // Let the mutation settle and flush its own success path before asserting:
+    // the request itself is the proof, not a paint.
+    await act(async () => {
+      await pendingSave.promise;
+    });
+    await waitFor(() => saveMutationFn.mock.calls.length === 1);
+
+    expect(formDraft.clear).not.toHaveBeenCalled();
+  });
 });

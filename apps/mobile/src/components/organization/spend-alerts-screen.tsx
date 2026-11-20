@@ -144,17 +144,19 @@ function useSpendAlertSettings(organizationId: string | undefined, enabled: bool
  * `spendAlerts.saveError` inline with a Retry and keeps the draft, the
  * inline-error pattern (P2) the low-balance sheet uses for org settings.
  */
-function useSaveSpendAlerts(onSaved: () => void) {
+function useSaveSpendAlerts(onSaved: (posted: SpendAlertSaveInput) => void) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const settingsFilter = trpc.spendAlerts.get.pathFilter();
   return useMutation(
     trpc.spendAlerts.save.mutationOptions({
-      onSuccess: async () => {
+      // The posted input travels to `onSaved`, so the form can tell whether the
+      // draft it sent is still the one on screen.
+      onSuccess: async (_data, posted) => {
         // The row now holds what the draft held, so the draft is dropped before
         // the refetch settles: a restored copy could otherwise outlive the
         // record it was typed over.
-        onSaved();
+        onSaved(posted);
         await queryClient.invalidateQueries(settingsFilter);
       },
     })
@@ -345,8 +347,6 @@ function SpendAlertsForm({
 }: SpendAlertsFormProps) {
   const router = useRouter();
   const { t } = useTranslation();
-  const save = useSaveSpendAlerts(onDraftClear);
-
   // The screen serves both the caller's own account and an organization; the
   // copy alone never says which one an alert watches, so the scope line names
   // the owner. The labels are the shared Account / Organization keys.
@@ -544,6 +544,18 @@ function SpendAlertsForm({
     };
   };
 
+  const save = useSaveSpendAlerts(posted => {
+    // Only a save whose draft is still the one on screen may drop it: an edit
+    // made while the request was in flight belongs to the person, and clearing
+    // would throw that away on the request's success. `buildInput` reads the
+    // live refs and state, so comparing what the form would post now with what
+    // it did post is exact.
+    const current = buildInput();
+    if (current !== null && JSON.stringify(current) === JSON.stringify(posted)) {
+      onDraftClear();
+    }
+  });
+
   const onSave = () => {
     const input = buildInput();
     if (input == null) {
@@ -561,7 +573,6 @@ function SpendAlertsForm({
       },
     });
   };
-
   const onPushChange = ({
     target,
     next,

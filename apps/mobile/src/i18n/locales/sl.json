@@ -1459,7 +1459,7 @@
       "managedOnWebRepositories": "Izberite repozitorije za {{organization}} v spletu z računalnika.",
       "description": "Ustvari žeton za dostop do delovnega prostora za {{organization}} in ga prilepi spodaj.",
       "descriptionReconnect": "Ustvari nov žeton za dostop do delovnega prostora za {{organization}} in ga prilepi spodaj.",
-      "descriptionOverview": "Ustvari žeton za dostop do delovnega prostora za {{organization}} in ga prilepi na naslednjem zaslonu.",
+      "descriptionOverview": "Ustvari žeton za dostop do delovnega prostora in ga prilepi na naslednjem zaslonu.",
       "scopes": "Račun: branje · Skladišča: branje/pisanje · Zahteve za združitev: branje · Spletni povratni klici: branje/pisanje",
       "tokenPlaceholder": "Žeton za dostop do delovnega prostora",
       "tokenRefused": "Bitbucket ni sprejel tega žetona za dostop do delovnega prostora. Preveri, ali ima zgoraj navedena dovoljenja, nato poskusi znova."

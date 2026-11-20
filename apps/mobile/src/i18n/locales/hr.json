@@ -1432,7 +1432,7 @@
       "managedOnWebRepositories": "Odaberite repozitorije za {{organization}} na webu s računala.",
       "description": "Stvori token za pristup radnom prostoru za {{organization}} i zalijepi ga u nastavku.",
       "descriptionReconnect": "Stvori novi token za pristup radnom prostoru za {{organization}} i zalijepi ga u nastavku.",
-      "descriptionOverview": "Stvori token za pristup radnom prostoru za {{organization}} i zalijepi ga na sljedećem zaslonu.",
+      "descriptionOverview": "Stvori token za pristup radnom prostoru i zalijepi ga na sljedećem zaslonu.",
       "scopes": "Račun: čitanje · Repozitoriji: čitanje/pisanje · Zahtjevi za spajanje: čitanje · Webhookovi: čitanje/pisanje",
       "tokenPlaceholder": "Token za pristup radnom prostoru",
       "tokenRefused": "Bitbucket nije prihvatio ovaj token za pristup radnom prostoru. Provjeri ima li gore navedena dopuštenja, pa pokušaj ponovno."

@@ -678,7 +678,7 @@
       "managedOnWebRepositories": "Escolha os repositórios de {{organization}} na web, em um computador.",
       "description": "Crie um token de acesso do espaço de trabalho para {{organization}} e cole-o abaixo.",
       "descriptionReconnect": "Crie um novo token de acesso do espaço de trabalho para {{organization}} e cole-o abaixo.",
-      "descriptionOverview": "Crie um token de acesso do espaço de trabalho para {{organization}} e cole-o na próxima tela.",
+      "descriptionOverview": "Crie um token de acesso do espaço de trabalho e cole-o na próxima tela.",
       "scopes": "Conta: leitura · Repositórios: leitura/gravação · PRs: leitura · Webhooks: leitura/gravação",
       "tokenPlaceholder": "Token de acesso do espaço de trabalho",
       "tokenRefused": "O Bitbucket não aceitou este token de acesso do espaço de trabalho. Verifique se ele tem os escopos acima e tente novamente."

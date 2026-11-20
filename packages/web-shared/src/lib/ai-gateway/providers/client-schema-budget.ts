@@ -4,16 +4,17 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import { CACHE_CONTROL_NODE_BUDGET } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 
-/** The node budget every walk over a client-supplied schema uses. */
+/** The node budget shared by the walks over a client-supplied schema. */
 export const CLIENT_SCHEMA_NODE_BUDGET = CACHE_CONTROL_NODE_BUDGET;
 
-/** The depth bound every walk over a client-supplied schema uses. */
+/** The depth bound shared by the walks over a client-supplied schema. */
 export const CLIENT_SCHEMA_MAX_DEPTH = 64;
 
 /**
- * Reports whether a client-supplied schema fits inside both walk bounds. A
- * schema over either bound is left unchanged rather than partially rewritten,
- * so every walk over one stays proportional to its size.
+ * Reports whether a client-supplied schema fits inside both walk bounds. Each
+ * walk that uses these bounds leaves a schema over either of them unchanged
+ * rather than partially rewriting it, so its cost stays proportional to the
+ * size of the schema it was given.
  */
 export function withinSchemaBudget(schema: unknown): boolean {
   const pending: { node: unknown; depth: number }[] = [{ node: schema, depth: 0 }];

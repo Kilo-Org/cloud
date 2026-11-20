@@ -8,6 +8,7 @@ import {
   bar,
   baselineAbove,
   centredBaseline,
+  centredLineBaseline,
   estimateWidth,
   type Frame,
   insideBand,
@@ -50,6 +51,9 @@ function agentLine(f: Frame): string | null {
 function header(f: Frame) {
   const { copy } = f;
   const phase = phaseOf(copy);
+  // A fixed design slot, and the footer is separately clamped by `insideBand`
+  // below, so its centring stays the design's 12pt header line rather than the
+  // drawn line's own box.
   const baseline = centredBaseline(12, HEADER_CY);
   const nodes = [logo(f, { x: PAD, y: HEADER_CY - 7, size: 14 })];
   if ((phase === 'content' || phase === 'empty') && copy.footer !== null) {
@@ -158,7 +162,8 @@ function blocksFor(f: Frame): Block[] {
         draw: dy => [
           label(f, 'status', {
             x: PAD,
-            baseline: centredBaseline(17, STATUS_CY) + dy,
+            // The empty wording's own box centred on the status band, not Roboto's.
+            baseline: centredLineBaseline(value, 17, STATUS_CY) + dy,
             width: end - PAD,
             value,
             size: 17,
@@ -179,7 +184,8 @@ function blocksFor(f: Frame): Block[] {
       draw: dy => [
         statusRow(f, {
           x: PAD,
-          baseline: centredBaseline(26, STATUS_CY) + dy,
+          // The count's own box centred on the band: Arabic-Indic digits draw taller.
+          baseline: centredLineBaseline(copy.primaryCount, 26, STATUS_CY) + dy,
           width: end - PAD,
           countSize: 26,
           labelSize: 15,

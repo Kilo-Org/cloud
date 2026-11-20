@@ -102,28 +102,69 @@ type BandSpec = {
 
 /**
  * A design baseline moved inside its band. A fallback font's taller box would
- * otherwise rise above the top edge or end below the bottom one; the overflow
- * comes out of the slack on the other side, and Latin text — whose box is the
- * design's own — keeps the baseline it was given, to the tenth of a dp.
+ * otherwise rise above the top edge or end below the bottom one, and one box
+ * can overflow both at once, so both edges are corrected: down off the top edge
+ * first, then up off the bottom edge, and the top edge is checked again last —
+ * lifting a box clear of the bottom can raise it back through the top. When the
+ * band is shorter than the box no baseline clears both edges, so the top edge
+ * wins: a clipped first line is worse than a last line that ends a little below
+ * the band. Latin text, whose box is the design's own, keeps the baseline it
+ * was given, to the tenth of a dp.
  */
 export function insideBand(spec: BandSpec): number {
   const { value, size, baseline } = spec;
-  if (spec.top !== undefined) {
-    const floor = baselineIn(value, size, spec.top);
-    if (floor - baseline > BAND_SLACK) {
-      return floor;
-    }
+  const lines = spec.lines ?? 1;
+  // The lowest baseline whose box starts on the top edge, and the highest whose
+  // box ends on the bottom one.
+  const floor = spec.top === undefined ? null : baselineIn(value, size, spec.top);
+  const ceiling =
+    spec.bottom === undefined
+      ? null
+      : baselineAbove(value, size, spec.bottom) - lineBox(value, size) * (lines - 1);
+  let placed = baseline;
+  if (floor !== null && floor - placed > BAND_SLACK) {
+    placed = floor;
   }
-  if (spec.bottom !== undefined) {
-    const end = boxTop(value, size, baseline) + lineBox(value, size) * (spec.lines ?? 1);
-    if (end - spec.bottom > BAND_SLACK) {
-      return baseline - (end - spec.bottom);
-    }
+  if (ceiling !== null && placed - ceiling > BAND_SLACK) {
+    placed = ceiling;
   }
-  return baseline;
+  // A band too short for the box cannot hold both edges: the top one wins.
+  if (floor !== null && placed < floor) {
+    placed = floor;
+  }
+  return placed;
 }
 
-/** The baseline that centres a line of `size` on `cy`; a taller script grows evenly about it. */
+/**
+ * The baseline that centres `value`'s own line box on `cy`. `boxTop` splits a
+ * taller box's extra height around the design line, so the box centre sits
+ * `ascent(value, size) - ceil(size * LATIN_LINE) / 2` below the baseline, for
+ * every script. Latin text gets exactly the number `centredBaseline` gives.
+ */
+export function centredLineBaseline(value: string, size: number, cy: number): number {
+  return cy + ascent(value, size) - Math.ceil(size * LATIN_LINE) / 2;
+}
+
+/** The baseline that centres a shared row on `cy`: its box is its tallest part's. */
+export function centredRowBaseline(parts: readonly string[], size: number, cy: number): number {
+  let tallest = '';
+  let height = 0;
+  for (const part of parts) {
+    const box = lineBox(part, size);
+    if (box > height) {
+      tallest = part;
+      height = box;
+    }
+  }
+  return centredLineBaseline(tallest, size, cy);
+}
+
+/**
+ * The design's own centred slot: a `size` line on `cy`, whose box grows evenly
+ * about the design line whatever script draws in it. The extra ascent of a
+ * taller fallback then lifts the box centre off `cy`, so a label that must be
+ * centred in its own box uses `centredLineBaseline`.
+ */
 export function centredBaseline(size: number, cy: number): number {
   return cy + BASELINE * size - Math.ceil(size * LATIN_LINE) / 2;
 }

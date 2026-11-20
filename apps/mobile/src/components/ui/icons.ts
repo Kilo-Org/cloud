@@ -125,6 +125,7 @@ export { default as Smartphone } from 'lucide-react-native/icons/smartphone';
 export { default as SmilePlus } from 'lucide-react-native/icons/face-slightly-smiling-plus';
 export { default as Sparkles } from 'lucide-react-native/icons/sparkles';
 export { default as Square } from 'lucide-react-native/icons/square';
+export { default as SquareCheck } from 'lucide-react-native/icons/square-check';
 export { default as Star } from 'lucide-react-native/icons/star';
 export { default as Terminal } from 'lucide-react-native/icons/terminal';
 export { default as Trash2 } from 'lucide-react-native/icons/trash';

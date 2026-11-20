@@ -3,8 +3,9 @@ import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 
+import { formatGitUrlProject } from '@kilocode/app-shared/git-url-project';
+
 import { namedSessionTitle } from '@/components/agents/session-detail-rename-state';
-import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { QueryError } from '@/components/query-error';
 import { SheetTitleRow } from '@/components/sheet-title-row';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';

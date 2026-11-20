@@ -216,6 +216,10 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   const repositoriesFailed =
     repositoriesBody.status === 'error' ||
     (repositoriesBody.status === 'rows' && repositories.isError);
+  // A settled empty grant leaves nothing to choose between: both modes select
+  // from the same empty list, so the pair stays visible (it says what the
+  // setting is) but no longer claims a choice the reader cannot make.
+  const noRepositoriesAvailable = repositoriesBody.status === 'empty';
 
   // An empty grant is the one repository state that is not about the mode: with
   // nothing accessible there is nothing to select and nothing to sync whichever
@@ -263,7 +267,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
                 option === 'all' ? t('common.allRepositories') : t('common.selectedRepositories')
               }
               selected={mode === option}
-              disabled={!canManage}
+              disabled={!canManage || noRepositoriesAvailable}
               onPress={() => {
                 setMode(option);
               }}
@@ -301,7 +305,6 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
               icon={FolderGit2}
               title={t('securityAgent.repositories.noRepositories')}
               description={t('securityAgent.repositories.noRepositoriesDescription')}
-              iconContainerClassName="h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card dark:border-input dark:bg-secondary"
               action={
                 <StateAction
                   label={t('securityAgent.repositories.manageAccess')}

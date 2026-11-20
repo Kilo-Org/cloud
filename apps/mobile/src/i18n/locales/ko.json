@@ -172,6 +172,7 @@
     "generating": "생성 중…",
     "working": "작업 중",
     "yourOwnRepositories": "내 저장소",
+    "organizationRepositories": "조직 저장소",
     "dismissed": "무시됨",
     "agent": "대리인",
     "durationMinuteShort": "min",
@@ -669,7 +670,7 @@
     },
     "instructions": {
       "title": "사용자 지정 지침",
-      "deprecation": "사용자 지정 지침 기능은 지원이 중단될 예정입니다. 이 지침을 저장소의 REVIEW.md 파일로 옮기세요.",
+      "deprecation": "사용자 지정 지침 기능은 제거될 예정입니다. 이 지침을 저장소의 REVIEW.md 파일로 옮기세요.",
       "placeholder": "예: 오류 처리 규칙 적용…",
       "clearTitle": "사용자 지정 지침을 제거하시겠습니까?",
       "clearMessage": "빈 필드를 저장하면 이 검토자에 대해 저장된 사용자 지정 지침이 삭제됩니다."
@@ -698,8 +699,12 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}의 Bitbucket 연결은 컴퓨터에서 웹으로 관리됩니다.",
+      "managedOnWebTitle": "웹에서 관리됨",
+      "managedOnWebShort": "이 연결은 컴퓨터에서 웹으로 관리됩니다.",
+      "managedOnWebRepositories": "컴퓨터에서 웹에 접속해 {{organization}}의 리포지토리를 선택하세요.",
       "description": "{{organization}}용 작업 영역 액세스 토큰을 생성하여 아래에 붙여넣으세요.",
       "descriptionReconnect": "{{organization}}용 새 작업 영역 액세스 토큰을 생성하여 아래에 붙여넣으세요.",
+      "descriptionOverview": "{{organization}}용 작업 영역 액세스 토큰을 생성한 다음 다음 화면에서 붙여넣으세요.",
       "scopes": "계정: 읽기 · 저장소: 읽기/쓰기 · 풀 리퀘스트: 읽기 · 웹훅: 읽기/쓰기",
       "tokenPlaceholder": "작업 영역 액세스 토큰",
       "tokenRefused": "Bitbucket에서 이 작업 영역 토큰을 수락하지 않았습니다. 위의 권한이 포함되어 있는지 확인한 후 다시 시도하세요."
@@ -735,6 +740,7 @@
     "platformList": {
       "activity": "활동",
       "checking": "확인 중…",
+      "needsAttention": "조치 필요",
       "platforms": "플랫폼",
       "statusUnavailable": "상태 확인 불가"
     },
@@ -2629,6 +2635,8 @@
     "retryHint": "Kilo Pass 상태를 다시 확인합니다.",
     "endedOn": "{{date}}에 종료됨",
     "notAvailableInApp": "Kilo Pass는 앱에서 사용할 수 없습니다.",
+    "notAvailableTitle": "Kilo Pass는 앱에서 제공되지 않습니다",
+    "noPassDescription": "이 계정에는 Kilo Pass가 없습니다.",
     "statusActive": "활성",
     "statusTrialing": "체험 중",
     "statusPastDue": "결제 연체",
@@ -3429,8 +3437,7 @@
     "hub": {
       "balance": "잔액",
       "lowBalanceBelow": "{{amount}} 미만",
-      "organizationSeats": "조직 라이선스",
-      "plan": "조직 요금제",
+      "plan": "요금제",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · 종료됨",
@@ -3473,7 +3480,7 @@
       "retentionLimit": "최근 청구서를 표시합니다."
     },
     "lowBalanceAlert": {
-      "enableA11y": "잔액 부족 알림 켜기",
+      "subtitle": "이 조직의 잔액이 설정한 금액 아래로 떨어지면 입력한 주소로 이메일 알림을 보냅니다.",
       "notifyEmailsLabel": "알림 수신 이메일 주소",
       "permissionDenied": "결제 알림을 관리할 권한이 없습니다.",
       "separateEmailsHint": "이메일 주소를 여러 개 입력할 때는 쉼표로 구분하세요.",
@@ -3650,7 +3657,8 @@
     "signupStepUp": "계정 생성을 완료하려면 '$t(login.moreSignInOptions)' 항목을 선택하세요.",
     "signupStepUpApple": "계정 생성을 완료하려면 '$t(login.signInWithApple)' 항목을 선택하세요.",
     "signupStepUpGoogle": "계정 생성을 완료하려면 '$t(login.signInWithGoogle)' 항목을 선택하세요.",
-    "invalidCode": "코드가 올바르지 않습니다. 다시 시도하세요.",
+    "signupStepUpBack": "계정 생성을 완료하려면 뒤로 돌아가서 '$t(login.moreSignInOptions)' 항목을 선택하세요.",
+    "invalidCode": "코드가 올바르지 않거나 만료되었습니다. 다시 시도하거나 '$t(login.resendCode)' 버튼을 누르세요.",
     "codeInProgress": "코드를 처리 중입니다. 잠시 기다린 후 다시 시도하세요.",
     "tooManyAttempts": "시도 횟수가 너무 많습니다. 새 코드를 요청하세요.",
     "invalidToken": "로그인에 실패했습니다. 다시 시도하세요.",
@@ -3919,6 +3927,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection)은 선택한 프로토콜과 모델을 사용하여 이 엔드포인트에 짧은 추론 요청을 보냅니다. 제공업체에서 요금을 청구할 수 있습니다.",
       "connectionSucceeded": "모델이 이 프로토콜을 사용하여 요청을 완료했습니다.",
       "connectionFailed": "모델이 요청을 완료하지 못했습니다. API 루트, 프로토콜, 인증 정보 및 모델 ID를 확인하세요.",
+      "requestTimedOut": "엔드포인트가 시간 안에 응답하지 않았습니다. API 루트와 연결을 확인한 후 다시 시도하세요.",
+      "requestUnauthorized": "엔드포인트가 인증 정보를 거부했습니다. API 키와 사용자 지정 헤더를 확인한 후 다시 시도하세요.",
+      "requestNotFound": "엔드포인트 또는 모델을 찾을 수 없습니다. API 루트와 모델 ID를 확인하세요.",
+      "requestRateLimited": "엔드포인트가 요청을 제한하고 있습니다. 잠시 기다린 후 다시 시도하세요.",
+      "requestUnavailable": "엔드포인트를 지금 사용할 수 없습니다. 잠시 후 다시 시도하세요.",
+      "requestUnreachable": "엔드포인트에 연결할 수 없습니다. API 루트와 연결을 확인하세요.",
+      "requestInvalidResponse": "엔드포인트가 예상한 형식이 아닌 응답을 반환했습니다. API 루트와 프로토콜이 서버와 일치하는지 확인한 후 다시 시도하세요.",
+      "discoveryNoModels": "엔드포인트에 모델이 없습니다. 모델을 직접 입력하세요.",
+      "connectionIncomplete": "모델이 응답했지만 완료하지 못했습니다. 다시 시도하거나 모델 ID와 프로토콜을 확인하세요.",
       "invalidInput": "백엔드 이름, 유효한 헤더, 고유한 ID와 이름이 있는 모델을 하나 이상 입력하세요. 토큰 한도는 양의 정수여야 합니다.",
       "invalidUrl": "인증 정보, 쿼리 또는 프래그먼트가 없는 HTTP 또는 HTTPS API 루트를 입력하세요.",
       "publicHttp": "공개 HTTP 엔드포인트는 허용되지 않습니다. HTTPS 또는 비공개 로컬 엔드포인트를 사용하세요.",
@@ -4057,10 +4074,20 @@
     "reasoningEffort": {
       "modelFlag": "이 모델은 추론 강도를 지원합니다"
     },
-    "creditsRequired": "이 메시지를 보낼 크레딧이 부족합니다."
+    "creditsRequired": "이 메시지를 보낼 크레딧이 부족합니다.",
+    "providerKeyRefused": "제공자가 인증 정보를 거부했습니다. 제공자의 API 키를 확인한 후 다시 보내세요.",
+    "providerModelMissing": "이 백엔드에서 더 이상 이 모델을 제공하지 않습니다. 다른 것을 선택하세요.",
+    "providerRateLimited": "제공자가 요청을 제한하고 있습니다. 잠시 기다린 후 다시 보내세요.",
+    "providerUnavailable": "제공자를 지금 사용할 수 없습니다. 잠시 후 다시 보내세요."
   },
   "settingsTools": {
-    "confirmTitle": "이 변경 사항을 확인할까요?"
+    "confirmTitle": "이 변경 사항을 확인할까요?",
+    "guarded": {
+      "spendAlertsOff": "지출 알림을 끌까요? 지출 임계값 초과 및 시간별 급증에 대한 알림을 더 이상 받지 않게 됩니다.",
+      "balanceAlertsOff": "잔액 알림을 끌까요? 크레딧이 부족해질 때 오는 알림을 더 이상 받지 않게 됩니다.",
+      "securityFindingsOff": "보안 발견 사항 알림을 끌까요? 새로운 보안 발견 사항에 대한 알림을 더 이상 받지 않게 됩니다.",
+      "hideBalanceOn": "잔액을 숨길까요? 크레딧 잔액이 더 이상 프로필 화면과 조직 허브에 표시되지 않습니다."
+    }
   },
   "appActions": {
     "start": {
@@ -4432,6 +4459,7 @@
     "pickPackToBuyAgain": "새 구매를 시작하려면 위에서 팩을 선택하세요.",
     "purchasePending": "스토어에서 아직 이 결제를 처리하고 있습니다. 결제가 승인되면 크레딧이 지급됩니다.",
     "buyAgain": "다시 구매",
+    "checkPurchase": "구매 확인",
     "purchaseOwnedByAnotherAccount": "이 Apple Account의 크레딧은 다른 Kilo 계정에 속해 있습니다. 사용하려면 해당 Kilo 계정에 로그인하세요.",
     "purchaseOwnedByAnotherAccountPlay": "이 Google Play 계정의 크레딧은 다른 Kilo 계정에 속합니다. 사용하려면 해당 Kilo 계정으로 로그인하세요."
   },
@@ -4525,7 +4553,9 @@
     },
     "saveSheet": {
       "title": "목록에 저장",
-      "saved": "{{list}}에 저장됨"
+      "saved": "{{list}}에 저장됨",
+      "saveFailed": "할 일을 저장할 수 없습니다. 연결을 확인한 후 다시 시도해 주세요.",
+      "saveRefused": "할 일을 이 목록에 저장할 수 없습니다. 다른 목록을 선택해 주세요."
     }
   },
   "agentBriefing": {
@@ -4537,6 +4567,7 @@
     "empty": "이 브리핑 기간 동안 활동 없음",
     "emptyHint": "예약된 브리핑에 활동이 있으면 클라우드 및 CLI 코딩 세션이 여기에 표시됩니다.",
     "loadError": "브리핑을 불러올 수 없습니다",
+    "estimateLoadError": "예상 비용을 불러올 수 없습니다.",
     "view": "브리핑 읽기",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4804,7 +4835,7 @@
   },
   "organizationGuardrails": {
     "title": "인공지능 가드레일",
-    "permissionDenied": "조직 소유자와 관리자만 인공지능 가드레일을 관리할 수 있습니다.",
+    "permissionDenied": "조직 소유자와 관리자만 인공지능 가드레일을 관리할 수 있습니다. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "인공지능 가드레일이 활성화되어 있지 않습니다",
     "unavailable": "Kilo는 요청에 따라 조직에 인공지능 가드레일을 활성화합니다. {{supportEmail}}로 문의하시면 Kilo 팀이 조직을 위해 활성화해 드립니다.",
     "contactSupport": "지원팀에 문의",
@@ -4942,7 +4973,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "엔터프라이즈 기능",
-    "enterpriseOnly": "이 기능은 엔터프라이즈 전용 기능입니다.",
+    "enterpriseOnly": "공급자와 모델은 엔터프라이즈 요금제에서 사용할 수 있습니다.",
     "readOnly": "조직 소유자와 관리자만 이 설정을 변경할 수 있습니다.",
     "loadError": "공급자와 모델을 불러오지 못했습니다",
     "tabModels": "모델",

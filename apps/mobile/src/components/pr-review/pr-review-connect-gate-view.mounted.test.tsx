@@ -125,6 +125,7 @@ vi.mock('expo-web-browser', () => ({
   WebBrowserResultType: { OPENED: 'opened', DISMISS: 'dismiss', CANCEL: 'cancel' },
 }));
 vi.mock('@/components/ui/icons', () => ({
+  GitMerge: 'GitMerge',
   PlugZap: 'PlugZap',
   RefreshCcw: 'RefreshCcw',
   ShieldAlert: 'ShieldAlert',

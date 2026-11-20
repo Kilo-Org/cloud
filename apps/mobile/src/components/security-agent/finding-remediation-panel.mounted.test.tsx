@@ -17,6 +17,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as SecurityAgentModule from '@kilocode/app-shared/security-agent';
+
 import { FindingRemediationPanel } from './finding-remediation-panel';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 
@@ -96,15 +98,19 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     mutedForeground: '#666',
   }),
 }));
-vi.mock('@kilocode/app-shared/security-agent', () => ({
-  getRemediationStatusPresentation: () => ({
-    label: 'Not started',
-    tone: 'neutral',
-    icon: 'clock',
-    spinning: false,
-  }),
-  getRemediationUnavailableCopy: () => null,
-}));
+vi.mock('@kilocode/app-shared/security-agent', async importOriginal => {
+  const actual = await importOriginal<typeof SecurityAgentModule>();
+  return {
+    ...actual,
+    getRemediationStatusPresentation: () => ({
+      label: 'Not started',
+      tone: 'neutral',
+      icon: 'clock',
+      spinning: false,
+    }),
+    getRemediationUnavailableCopy: () => null,
+  };
+});
 
 type R = TestRenderer.ReactTestRenderer;
 

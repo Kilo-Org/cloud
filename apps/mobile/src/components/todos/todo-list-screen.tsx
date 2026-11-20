@@ -20,6 +20,7 @@ import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { ChevronDown, Settings2 } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import {
   PENDING_TODO_ID_PREFIX,
   useTodoItemMutations,
@@ -32,6 +33,7 @@ import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { selectTodoQueryErrorView } from '@/lib/todos/todo-query-error';
 import { todoItemPath, todoListSettingsPath } from '@/lib/todos/todo-routes';
 import { type TodoItem, type TodoList } from '@/lib/todos/todo-types';
+import { cn } from '@/lib/utils';
 
 const LISTS_HREF = '/(app)/(tabs)/(2_agents)' as Href;
 
@@ -215,7 +217,10 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
             }}
             accessibilityRole="button"
             accessibilityState={{ expanded: showCompleted }}
-            className="mt-4 flex-row items-center gap-2 px-4 py-3 active:opacity-70"
+            className={cn(
+              ROW_TARGET_CLASS,
+              'mt-4 flex-row items-center gap-2 px-4 active:opacity-70'
+            )}
           >
             {showCompleted ? (
               <ChevronDown size={16} color={colors.mutedForeground} />

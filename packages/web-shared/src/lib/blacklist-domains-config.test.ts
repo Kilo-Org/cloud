@@ -173,6 +173,12 @@ describe('getBlockedSignupTlds', () => {
     await expect(getBlockedSignupTlds()).resolves.toEqual([]);
   });
 
+  test('strips a trailing dot from a stored TLD', async () => {
+    await db.insert(blacklisted_domains_settings).values(settings(['.ASIA.']));
+
+    await expect(getBlockedSignupTlds()).resolves.toEqual(['asia']);
+  });
+
   test('falls back to the deployment default only when no row exists', async () => {
     mockedRedisGet.mockResolvedValue(JSON.stringify(settings(['asia'])));
 
@@ -236,6 +242,19 @@ describe('normalizeSignupTlds', () => {
       'top',
       'shop',
     ]);
+  });
+
+  test('strips trailing dots and stores the bare label', () => {
+    expect(normalizeSignupTlds(['shop.', '.shop.', 'SHOP.', '..shop..'])).toEqual(['shop']);
+  });
+
+  test('collapses a trailing-dot duplicate into one label', () => {
+    expect(normalizeSignupTlds(['asia.', 'asia'])).toEqual(['asia']);
+  });
+
+  test('drops a lone dot and keeps an entry that only had a trailing dot', () => {
+    expect(normalizeSignupTlds(['.', ' . '])).toEqual([]);
+    expect(normalizeSignupTlds(['asia.'])).toEqual(['asia']);
   });
 });
 

@@ -97,6 +97,7 @@ const dismissDraft = vi.hoisted(() => ({
 // header props the screen passes instead of looking for an inline button.
 const sheetHeader = vi.hoisted((): { props: Record<string, unknown> } => ({ props: {} }));
 const sideInsets = vi.hoisted(() => ({ left: 0, right: 0 }));
+const keyboard = vi.hoisted(() => ({ height: 0 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
@@ -113,6 +114,11 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: sideInsets.left, right: sideInsets.right }),
 }));
+vi.mock('react-native-keyboard-controller', () => ({
+  useKeyboardState: (select: (state: { height: number }) => number) =>
+    select({ height: keyboard.height }),
+}));
+vi.mock('@/lib/tab-bar-clearance', () => ({ useEffectiveTabBarHeight: () => 0 }));
 vi.mock('@/lib/haptics', () => ({ selectionHaptic: () => undefined }));
 vi.mock('@/components/ui/icons', () => ({ ShieldOff: 'ShieldOff' }));
 vi.mock('expo-router', () => ({
@@ -310,10 +316,24 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     finding.isLoading = false;
     finding.data = { status: 'open', ...FINDING_IDENTITY };
     const loaded = renderScreen();
-    expect(loaded.root.findByType(ScrollView).props.style).toEqual({
-      marginLeft: 47,
-      marginRight: 59,
-    });
+    expect(loaded.root.findByType(ScrollView).props.style).toEqual([
+      undefined,
+      { marginBottom: 0, marginLeft: 47, marginRight: 59 },
+    ]);
+  });
+
+  it('ends the Android scroll frame at the keyboard top so the comment field can clear it', () => {
+    finding.data = { status: 'open', ...FINDING_IDENTITY };
+    keyboard.height = 883;
+    try {
+      const tree = renderScreen();
+      expect(tree.root.findByType(ScrollView).props.style).toEqual([
+        undefined,
+        { marginBottom: 883 },
+      ]);
+    } finally {
+      keyboard.height = 0;
+    }
   });
 
   it.each(['finding', 'permissions'] as const)(

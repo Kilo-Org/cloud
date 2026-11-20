@@ -172,6 +172,7 @@
     "generating": "Yaradılır…",
     "working": "İşləyir",
     "yourOwnRepositories": "Öz repozitoriyaların",
+    "organizationRepositories": "Təşkilatın repozitoriyaları",
     "dismissed": "Rədd edilib",
     "agent": "Agent",
     "durationMinuteShort": "min",
@@ -1226,7 +1227,7 @@
     },
     "instructions": {
       "title": "Xüsusi təlimatlar",
-      "deprecation": "Xüsusi təlimatlar funksiyasının istifadədən çıxarılması planlaşdırılır. Bu təlimatları repozitoriyandakı REVIEW.md faylına köçür.",
+      "deprecation": "Xüsusi təlimatlar funksiyası silinəcək. Bu təlimatları repozitoriyandakı REVIEW.md faylına köçür.",
       "placeholder": "məsələn: xətaların emalı qaydalarımıza uyğunluq…",
       "clearTitle": "Xüsusi təlimatlar silinsin?",
       "clearMessage": "Boş sahənin yadda saxlanması bu rəyçi üçün saxlanılmış xüsusi təlimatları siləcək."
@@ -1390,8 +1391,12 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} üçün Bitbucket bağlantısı kompüterdən vebdə idarə olunur.",
+      "managedOnWebTitle": "Vebdə idarə olunur",
+      "managedOnWebShort": "Bu bağlantı kompüterdən vebdə idarə olunur.",
+      "managedOnWebRepositories": "{{organization}} üçün repozitoriyaları kompüterdən vebdə seçin.",
       "description": "{{organization}} üçün iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
       "descriptionReconnect": "{{organization}} üçün yeni iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
+      "descriptionOverview": "{{organization}} üçün iş sahəsi giriş tokeni yarat və növbəti ekranda yapışdır.",
       "scopes": "Hesab: oxuma · Repozitoriyalar: oxuma/yazma · PR-lər: oxuma · Vebhuklar: oxuma/yazma",
       "tokenPlaceholder": "İş sahəsinin giriş tokeni",
       "tokenRefused": "Bitbucket bu iş sahəsi tokenini qəbul etmədi. Yuxarıdakı icazələrin olduğunu yoxla, sonra yenidən cəhd et."
@@ -1412,6 +1417,7 @@
     "platformList": {
       "checking": "Yoxlanılır…",
       "statusUnavailable": "Status əlçatan deyil",
+      "needsAttention": "Müdaxilə tələb olunur",
       "platforms": "Platformalar",
       "activity": "Fəaliyyət"
     },
@@ -3186,6 +3192,8 @@
     "retryHint": "Kilo Pass-ın vəziyyətini yenidən yoxlayır.",
     "endedOn": "{{date}} tarixində bitdi",
     "notAvailableInApp": "Kilo Pass tətbiqdə əlçatan deyil.",
+    "notAvailableTitle": "Kilo Pass tətbiqdə yoxdur",
+    "noPassDescription": "Bu hesabda Kilo Pass yoxdur.",
     "statusActive": "Aktiv",
     "statusTrialing": "Sınaq müddətində",
     "statusPastDue": "Ödəniş vaxtı keçib",
@@ -3468,7 +3476,7 @@
       "retentionLimit": "Ən son hesab-fakturalar göstərilir."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Aşağı balans xəbərdarlığını aktivləşdir",
+      "subtitle": "Bu təşkilatın balansı təyin etdiyin məbləğdən aşağı düşdükdə qeyd etdiyin ünvanlara e-poçt ilə xəbərdarlıq göndər.",
       "notifyEmailsLabel": "Bildiriş üçün e-poçt ünvanları",
       "permissionDenied": "Ödəniş xəbərdarlıqlarını idarə etmək icazən yoxdur.",
       "separateEmailsHint": "Bir neçə e-poçt ünvanını vergüllə ayır.",
@@ -3615,8 +3623,7 @@
       "renameTitle": "Təşkilatın adını dəyiş",
       "renamePlaceholder": "Təşkilatın adı",
       "balance": "Balans",
-      "organizationSeats": "Təşkilatın istifadəçi yerləri",
-      "plan": "Təşkilat planı",
+      "plan": "Plan",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Başa çatıb",
@@ -3650,7 +3657,8 @@
     "signupStepUp": "Hesabının yaradılmasını tamamlamaq üçün “$t(login.moreSignInOptions)” seçimini aç.",
     "signupStepUpApple": "Hesabının yaradılmasını tamamlamaq üçün “$t(login.signInWithApple)” seçimini aç.",
     "signupStepUpGoogle": "Hesabının yaradılmasını tamamlamaq üçün “$t(login.signInWithGoogle)” seçimini aç.",
-    "invalidCode": "Bu kod yanlışdır. Yenidən cəhd et.",
+    "signupStepUpBack": "Hesabının yaradılmasını tamamlamaq üçün geri qayıt və “$t(login.moreSignInOptions)” seçimini aç.",
+    "invalidCode": "Bu kod yanlışdır və ya müddəti bitib. Yenidən cəhd et və ya “$t(login.resendCode)” düyməsindən istifadə et.",
     "codeInProgress": "Kodun emal edilir. Bir az gözlə və yenidən cəhd et.",
     "tooManyAttempts": "Həddindən çox cəhd edilib. Yeni kod istə.",
     "invalidToken": "Hesaba daxil olmaq mümkün olmadı. Yenidən cəhd et.",
@@ -3919,6 +3927,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) seçilmiş protokol və modeldən istifadə edərək bu son nöqtəyə qısa nəticə çıxarma sorğusu göndərir. Təchizatçı buna görə ödəniş tuta bilər.",
       "connectionSucceeded": "Model bu protokoldan istifadə edərək sorğunu tamamladı.",
       "connectionFailed": "Model sorğunu tamamlaya bilmədi. API-nin kök ünvanını, protokolu, giriş məlumatlarını və model ID-sini yoxlayın.",
+      "requestTimedOut": "Son nöqtə vaxtında cavab vermədi. API-nin kök ünvanını və bağlantınızı yoxlayın, sonra yenidən cəhd edin.",
+      "requestUnauthorized": "Son nöqtə giriş məlumatlarını rədd etdi. API açarını və fərdi başlıqları yoxlayın, sonra yenidən cəhd edin.",
+      "requestNotFound": "Son nöqtə və ya model tapılmadı. API-nin kök ünvanını və model ID-sini yoxlayın.",
+      "requestRateLimited": "Son nöqtə sorğuları məhdudlaşdırır. Bir az gözləyin və yenidən cəhd edin.",
+      "requestUnavailable": "Son nöqtə hazırda əlçatan deyil. Bir azdan yenidən cəhd edin.",
+      "requestUnreachable": "Son nöqtə ilə əlaqə qurula bilmədi. API-nin kök ünvanını və bağlantınızı yoxlayın.",
+      "requestInvalidResponse": "Son nöqtə gözlənilən formatda cavab qaytarmadı. API-nin kök ünvanının və protokolun serverə uyğun olduğunu yoxlayın, sonra yenidən cəhd edin.",
+      "discoveryNoModels": "Son nöqtə heç bir model siyahılamadı. Modelləri əl ilə daxil edin.",
+      "connectionIncomplete": "Model cavab verdi, lakin tamamlamadı. Yenidən cəhd edin və ya model ID-sini və protokolu yoxlayın.",
       "invalidInput": "Arxa xidmətin adını, etibarlı başlıqları və unikal ID-si və adı olan ən azı bir modeli daxil edin. Token limitləri müsbət tam ədədlər olmalıdır.",
       "invalidUrl": "Giriş məlumatları, sorğu parametrləri və ya fraqment olmadan HTTP və ya HTTPS API kök ünvanını daxil edin.",
       "publicHttp": "İctimai HTTP son nöqtələrinə icazə verilmir. HTTPS və ya özəl yerli son nöqtədən istifadə edin.",
@@ -4057,10 +4074,20 @@
     "reasoningEffort": {
       "modelFlag": "Bu model düşünmə səviyyəsini dəstəkləyir"
     },
-    "creditsRequired": "Bu mesajı göndərmək üçün kifayət qədər kredit yoxdur."
+    "creditsRequired": "Bu mesajı göndərmək üçün kifayət qədər kredit yoxdur.",
+    "providerKeyRefused": "Provayder giriş məlumatlarını rədd etdi. Onun API açarını yoxlayın, sonra yenidən göndərin.",
+    "providerModelMissing": "Bu arxa xidmət artıq bu modeli təqdim etmir. Başqasını seçin.",
+    "providerRateLimited": "Provayder sorğuları məhdudlaşdırır. Bir az gözləyin və yenidən göndərin.",
+    "providerUnavailable": "Provayder hazırda əlçatan deyil. Bir az sonra yenidən göndərin."
   },
   "settingsTools": {
-    "confirmTitle": "Bu dəyişiklik təsdiqlənsin?"
+    "confirmTitle": "Bu dəyişiklik təsdiqlənsin?",
+    "guarded": {
+      "spendAlertsOff": "Xərc bildirişlərini söndürəsiniz? Xərc həddinin aşılması və saatlıq kəskin artımlar barədə bildirişlər almağı dayandırardınız.",
+      "balanceAlertsOff": "Balans bildirişlərini söndürəsiniz? Kreditləriniz azaldıqda bildirişlər almağı dayandırardınız.",
+      "securityFindingsOff": "Təhlükəsizlik tapıntılarını söndürəsiniz? Yeni təhlükəsizlik tapıntıları barədə bildirişlər almağı dayandırardınız.",
+      "hideBalanceOn": "Balanslarınızı gizlədirsiniz? Kredit balansları artıq profil ekranlarında və təşkilat mərkəzində görünməyəcək."
+    }
   },
   "appActions": {
     "start": {
@@ -4432,6 +4459,7 @@
     "pickPackToBuyAgain": "Yeni alışa başlamaq üçün yuxarıdan bir paket seçin.",
     "purchasePending": "Mağaza bu ödənişi hələ emal edir. Mağaza ödənişi təsdiqlədikdən sonra kreditləriniz əlavə olunacaq.",
     "buyAgain": "Yenidən al",
+    "checkPurchase": "Alışı yoxla",
     "purchaseOwnedByAnotherAccount": "Bu Apple Account hesabındakı kreditlər başqa Kilo hesabına aiddir. Onlardan istifadə etmək üçün həmin Kilo hesabına daxil ol.",
     "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hesabındakı kreditlər başqa Kilo hesabına aiddir. Onlardan istifadə etmək üçün həmin Kilo hesabına daxil olun."
   },
@@ -4525,7 +4553,9 @@
     },
     "saveSheet": {
       "title": "Siyahıya yadda saxla",
-      "saved": "{{list}} siyahısına yadda saxlanıldı"
+      "saved": "{{list}} siyahısına yadda saxlanıldı",
+      "saveFailed": "Tapşırığı yadda saxlamaq alınmadı. Bağlantınızı yoxlayın və yenidən cəhd edin.",
+      "saveRefused": "Tapşırığı bu siyahıya yadda saxlamaq alınmadı. Başqa siyahı seçin."
     }
   },
   "agentBriefing": {
@@ -4537,6 +4567,7 @@
     "empty": "Bu hesabat pəncərəsində fəaliyyət yoxdur.",
     "emptyHint": "Bulud və CLI kodlaşdırma sessiyalarınız planlaşdırılmış hesabatda fəaliyyət olduqda burada görünəcək.",
     "loadError": "Hesabatları yükləmək mümkün olmadı",
+    "estimateLoadError": "Təxmini yükləmək mümkün olmadı.",
     "view": "Hesabatı oxu",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4804,7 +4835,7 @@
   },
   "organizationGuardrails": {
     "title": "Süni intellekt qoruyucu qaydaları",
-    "permissionDenied": "Süni intellekt qoruyucu qaydalarını yalnız təşkilat sahibləri və adminlər idarə edə bilər.",
+    "permissionDenied": "Süni intellekt qoruyucu qaydalarını yalnız təşkilat sahibləri və adminlər idarə edə bilər. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Süni intellekt qoruyucu qaydaları aktivləşdirilməyib",
     "unavailable": "Kilo təşkilat üçün Süni intellekt qoruyucu qaydalarını sorğu əsasında aktivləşdirir. {{supportEmail}} ilə əlaqə saxlayın və Kilo komandası onu təşkilatınız üçün aktivləşdirir.",
     "contactSupport": "Dəstək xidməti ilə əlaqə saxla",
@@ -4942,7 +4973,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Enterprise funksiyası",
-    "enterpriseOnly": "Bu funksiya yalnız Enterprise üçündür.",
+    "enterpriseOnly": "Provayderlər və modellər Enterprise planında əlçatandır.",
     "readOnly": "Bu ayarları yalnız təşkilat sahibləri və adminlər dəyişə bilər.",
     "loadError": "Provayderlər və modellər yüklənmədi",
     "tabModels": "Modellər",

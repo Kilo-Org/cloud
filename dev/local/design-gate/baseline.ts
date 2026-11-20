@@ -916,6 +916,22 @@ export async function compareProof(
       ...readiness.map(reason => `${revision}: ${reason}`),
       ...receipt.readiness.map(reason => `${revision}: ${reason}`)
     );
+    // A screen captured under a LogBox error shows the toast, not the screen, so
+    // the two runs were never compared on that screen. Only the head is
+    // blocking: its toast is what the critic would read, and it is a reason to
+    // call the pair inconclusive rather than an introduced finding, which would
+    // present a dev overlay as a product regression. A base toast with a clean
+    // head is a fix, so the pair still compares; the base run's own report and
+    // its exit status already carry that error.
+    if (revision === 'head')
+      reasons.push(
+        ...run.findings
+          .filter(entry => entry.rule === 'dev-overlay' && entry.severity === 'error')
+          .map(
+            entry =>
+              `${revision}: a LogBox error painted over ${entry.cell}/${entry.target}: ${entry.element.text?.trim() || entry.message}`
+          )
+      );
     return run;
   });
   const [base, head] = runs;

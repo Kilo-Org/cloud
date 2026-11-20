@@ -214,7 +214,7 @@ export async function handleGitHubWebhook(
           ? { type: 'org' as const, id: integration.owned_by_organization_id }
           : ({ type: 'user' as const, id: integration.owned_by_user_id } as Owner);
 
-        const { id, isDuplicate } = await logWebhookEvent({
+        const { event, isDuplicate } = await logWebhookEvent({
           owner,
           platform: PLATFORM.GITHUB,
           event_type: eventType,
@@ -226,16 +226,16 @@ export async function handleGitHubWebhook(
 
         if (isDuplicate) {
           logExceptInTest(`Duplicate webhook event detected${logSuffix}`);
-          return { isDuplicate: true, webhookEventId: id };
+          return { isDuplicate: true, webhookEvent: event };
         }
-        return { isDuplicate: false, webhookEventId: id };
+        return { isDuplicate: false, webhookEvent: event };
       } catch (error) {
         logExceptInTest(`Error logging webhook event${logSuffix}:`, error);
         captureException(error, {
           tags: { source: 'webhook_event_logging', ...(appType === 'lite' ? { app: 'lite' } : {}) },
           extra: { event_type: eventType, event_action: action },
         });
-        return { isDuplicate: false, webhookEventId: undefined };
+        return { isDuplicate: false, webhookEvent: undefined };
       }
     };
     const dispatchSharedOnce = async (
@@ -388,9 +388,9 @@ export async function handleGitHubWebhook(
 
           const result = await handleInstallationSuspend(parseResult.data, appType);
 
-          if (logResult.webhookEventId) {
+          if (logResult.webhookEvent) {
             try {
-              await updateWebhookEvent(logResult.webhookEventId, {
+              await updateWebhookEvent(logResult.webhookEvent, {
                 processed: true,
                 processed_at: new Date().toISOString(),
                 handlers_triggered: ['installation_suspend'],
@@ -443,9 +443,9 @@ export async function handleGitHubWebhook(
 
           const result = await handleInstallationUnsuspend(parseResult.data, appType);
 
-          if (logResult.webhookEventId) {
+          if (logResult.webhookEvent) {
             try {
-              await updateWebhookEvent(logResult.webhookEventId, {
+              await updateWebhookEvent(logResult.webhookEvent, {
                 processed: true,
                 processed_at: new Date().toISOString(),
                 handlers_triggered: ['installation_unsuspend'],
@@ -518,9 +518,9 @@ export async function handleGitHubWebhook(
         return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
       }
 
-      if (logResult.webhookEventId) {
+      if (logResult.webhookEvent) {
         try {
-          await updateWebhookEvent(logResult.webhookEventId, {
+          await updateWebhookEvent(logResult.webhookEvent, {
             processed: true,
             processed_at: new Date().toISOString(),
             handlers_triggered: ['installation_target_renamed'],
@@ -580,9 +580,9 @@ export async function handleGitHubWebhook(
       const result = await handleInstallationRepositories(parseResult.data, appType);
 
       // Mark webhook event as processed
-      if (logResult.webhookEventId) {
+      if (logResult.webhookEvent) {
         try {
-          await updateWebhookEvent(logResult.webhookEventId, {
+          await updateWebhookEvent(logResult.webhookEvent, {
             processed: true,
             processed_at: new Date().toISOString(),
             handlers_triggered: ['installation_repositories'],
@@ -716,9 +716,9 @@ export async function handleGitHubWebhook(
           after(async () => {
             if (!(await isAvailableForDeferredGitHubDispatch(integration))) return;
             await upsertCliSessionPullRequestsFromWebhook(parseResult.data, upsertOwner);
-            if (logResult.webhookEventId) {
+            if (logResult.webhookEvent) {
               try {
-                await updateWebhookEvent(logResult.webhookEventId, {
+                await updateWebhookEvent(logResult.webhookEvent, {
                   processed: true,
                   processed_at: new Date().toISOString(),
                   handlers_triggered: ['cli_session_pr_upsert'],
@@ -754,9 +754,9 @@ export async function handleGitHubWebhook(
       // optimistically — the upsert runs in after() so it may not have
       // completed yet, but errors are swallowed internally and the dedup entry
       // was already committed by logWebhook above.
-      if (logResult.webhookEventId) {
+      if (logResult.webhookEvent) {
         try {
-          await updateWebhookEvent(logResult.webhookEventId, {
+          await updateWebhookEvent(logResult.webhookEvent, {
             processed: true,
             processed_at: new Date().toISOString(),
             handlers_triggered: ['code_review', 'cli_session_pr_upsert'],
@@ -798,8 +798,8 @@ export async function handleGitHubWebhook(
           try {
             if (!(await isAvailableForDeferredGitHubDispatch(integration))) return;
             await upsertCliSessionPullRequestReviewFromWebhook(parseResult.data, upsertOwner);
-            if (logResult.webhookEventId) {
-              await updateWebhookEvent(logResult.webhookEventId, {
+            if (logResult.webhookEvent) {
+              await updateWebhookEvent(logResult.webhookEvent, {
                 processed: true,
                 processed_at: new Date().toISOString(),
                 handlers_triggered: ['cli_session_pr_review_upsert'],
@@ -811,9 +811,9 @@ export async function handleGitHubWebhook(
             captureException(error, {
               tags: { source: `${sentryPrefix}webhook_pr_review` },
             });
-            if (logResult.webhookEventId) {
+            if (logResult.webhookEvent) {
               try {
-                await updateWebhookEvent(logResult.webhookEventId, {
+                await updateWebhookEvent(logResult.webhookEvent, {
                   processed: true,
                   processed_at: new Date().toISOString(),
                   handlers_triggered: ['cli_session_pr_review_upsert'],
@@ -886,8 +886,8 @@ export async function handleGitHubWebhook(
               tags: { source: `${sentryPrefix}webhook_review_memory_feedback` },
             });
           }
-          if (logResult.webhookEventId) {
-            await updateWebhookEvent(logResult.webhookEventId, {
+          if (logResult.webhookEvent) {
+            await updateWebhookEvent(logResult.webhookEvent, {
               processed: true,
               processed_at: new Date().toISOString(),
               handlers_triggered: handlersTriggered,
@@ -899,9 +899,9 @@ export async function handleGitHubWebhook(
           captureException(error, {
             tags: { source: `${sentryPrefix}webhook_pr_review_comment` },
           });
-          if (logResult.webhookEventId) {
+          if (logResult.webhookEvent) {
             try {
-              await updateWebhookEvent(logResult.webhookEventId, {
+              await updateWebhookEvent(logResult.webhookEvent, {
                 processed: true,
                 processed_at: new Date().toISOString(),
                 handlers_triggered: handlersTriggered,

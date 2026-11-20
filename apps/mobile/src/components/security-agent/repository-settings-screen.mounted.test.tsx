@@ -386,7 +386,17 @@ describe('RepositorySettingsScreen repository picker', () => {
 
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(1);
     expect(repoRows(renderer)).toHaveLength(0);
-    expect(renderer.root.findAll(node => String(node.type) === 'ChoiceRow')).toHaveLength(2);
+    const modeRows = renderer.root.findAll(node => String(node.type) === 'ChoiceRow');
+    expect(modeRows).toHaveLength(2);
+    // Nothing to choose between with an empty grant: both modes stay visible so
+    // the setting keeps its two names, but neither claims a choice the reader
+    // cannot make.
+    expect(modeRows.map(row => row.props.disabled)).toEqual([true, true]);
+    // The state keeps the shared bubble: a rounded-square tile was the only
+    // off-contract empty state in the app.
+    expect(
+      renderer.root.find(node => String(node.type) === 'EmptyState').props.iconContainerClassName
+    ).toBeUndefined();
   });
 
   it('keeps the loading and error branches out of all mode', async () => {

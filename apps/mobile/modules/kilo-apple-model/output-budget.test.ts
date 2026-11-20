@@ -6,8 +6,10 @@ import { fileURLToPath, URL } from 'node:url';
 
 import { expect, it } from 'vitest';
 
+import { swiftToolchain, type SwiftToolchain } from '../../src/test/swift-toolchain';
+
 const moduleSource = readFileSync(
-  new URL('./ios/KiloAppleModelModule.swift', import.meta.url),
+  new URL('ios/KiloAppleModelModule.swift', import.meta.url),
   'utf8'
 );
 
@@ -20,17 +22,30 @@ const normalizedModuleSource = moduleSource.replaceAll(/\s+/g, ' ').replaceAll(/
 function swiftFunctionSource(name: string): string {
   const anchor = `func ${name}(`;
   const start = normalizedModuleSource.indexOf(anchor);
-  if (start === -1) throw new Error(`module has no func ${name}(`);
+  if (start === -1) {
+    throw new Error(`module has no func ${name}(`);
+  }
   const end = normalizedModuleSource.indexOf('func ', start + anchor.length);
   return normalizedModuleSource.slice(start, end === -1 ? normalizedModuleSource.length : end);
 }
 
-function runSwiftChecks(prefix: string, binaryName: string, sources: readonly string[]): void {
+const toolchain = swiftToolchain();
+
+type SwiftCheck = {
+  readonly prefix: string;
+  readonly binaryName: string;
+  readonly sources: readonly string[];
+};
+
+function runSwiftChecks(
+  [command, ...compilerArgs]: SwiftToolchain,
+  { prefix, binaryName, sources }: SwiftCheck
+): void {
   const directory = mkdtempSync(join(tmpdir(), prefix));
   const binary = join(directory, binaryName);
   try {
-    execFileSync('xcrun', [
-      'swiftc',
+    execFileSync(command, [
+      ...compilerArgs,
       '-parse-as-library',
       ...sources.map(source => fileURLToPath(new URL(source, import.meta.url))),
       '-o',
@@ -57,16 +72,25 @@ it('uses the counted transcript budget for generation and reported truncation', 
   expect(inferSource).toContain('completion.stop = "maxTokens"');
 });
 
-it.runIf(process.platform === 'darwin')('executes the native budget boundary checks', () => {
-  runSwiftChecks('apple-model-budget-', 'budget-tests', [
-    './ios/AppleModelBudget.swift',
-    './tests/AppleModelBudgetTests.swift',
-  ]);
-});
+// The skip decision and the compiler the body receives come from the one probe
+// result, so a host with no usable toolchain skips instead of throwing.
+if (toolchain === undefined) {
+  it.skip('executes the native budget boundary checks');
+  it.skip('executes bounded native recovery checks');
+} else {
+  it('executes the native budget boundary checks', () => {
+    runSwiftChecks(toolchain, {
+      prefix: 'apple-model-budget-',
+      binaryName: 'budget-tests',
+      sources: ['ios/AppleModelBudget.swift', 'tests/AppleModelBudgetTests.swift'],
+    });
+  });
 
-it.runIf(process.platform === 'darwin')('executes bounded native recovery checks', () => {
-  runSwiftChecks('apple-model-retry-', 'retry-tests', [
-    './ios/AppleModelRetry.swift',
-    './tests/AppleModelRetryTests.swift',
-  ]);
-});
+  it('executes bounded native recovery checks', () => {
+    runSwiftChecks(toolchain, {
+      prefix: 'apple-model-retry-',
+      binaryName: 'retry-tests',
+      sources: ['ios/AppleModelRetry.swift', 'tests/AppleModelRetryTests.swift'],
+    });
+  });
+}

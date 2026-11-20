@@ -193,12 +193,14 @@ describe('KiloPassSubscriptionScreen', () => {
     renderer.unmount();
   });
 
-  it('tells an account without a pass that the app does not offer one', async () => {
+  it('names the reason an account without a pass cannot buy one here', async () => {
     const renderer = await renderScreen();
     const emptyState = nodesOfType(renderer, 'EmptyState');
     expect(emptyState).toHaveLength(1);
-    expect(emptyState[0]?.props.title).toBe(i18n.t('organization.kiloPass.notSubscribed'));
-    expect(emptyState[0]?.props.description).toBe(i18n.t('kiloPass.notAvailableInApp'));
+    // The title is the reason, not a status: "Not subscribed" beside "isn't
+    // available in the app" left the reader with nothing to act on.
+    expect(emptyState[0]?.props.title).toBe(i18n.t('kiloPass.notAvailableTitle'));
+    expect(emptyState[0]?.props.description).toBe(i18n.t('kiloPass.noPassDescription'));
     // A finished message with no action: the app sells nothing here.
     expect(emptyState[0]?.props.action).toBeUndefined();
     renderer.unmount();

@@ -1,7 +1,9 @@
+/* eslint-disable no-literal-copy/no-literal-copy -- Development-only preparation copy fixture; its title never ships. */
 import { ScrollView, View } from 'react-native';
 import { type PreparationAttempt } from '@kilocode/cloud-agent-sdk';
 
-import { useScreenInsets, useSideInsetMarginStyle } from '@/lib/screen-insets';
+import { ScreenHeader } from '@/components/screen-header';
+import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 
 import { PreparationGroup } from './preparation-group';
 
@@ -13,9 +15,10 @@ import { PreparationGroup } from './preparation-group';
  * snapshots shaped exactly like the ones `@kilocode/cloud-agent-sdk` emits. It
  * sends no requests.
  *
- * The screen draws no title of its own: each group already states its attempt's
- * status, and in the app these rows sit under the session's header, not under
- * the preparation status itself.
+ * In the app these rows sit under the session's header, so a plain screen
+ * header stands in for it: it gives a reader that navigates by headings the
+ * screen's heading, and it names the fixture rather than an attempt, because
+ * each group already states its attempt's status.
  */
 const ATTEMPTS: PreparationAttempt[] = [
   {
@@ -269,11 +272,11 @@ const ATTEMPTS: PreparationAttempt[] = [
 ];
 
 export function PreparationCopyFixture() {
-  const { top } = useScreenInsets();
   const sideInsetMarginStyle = useSideInsetMarginStyle();
 
   return (
-    <View className="flex-1 bg-background" style={{ paddingTop: top }}>
+    <View className="flex-1 bg-background">
+      <ScreenHeader title="Preparation copy" />
       <ScrollView style={sideInsetMarginStyle} contentContainerClassName="pb-8">
         {ATTEMPTS.map(attempt => (
           <PreparationGroup key={attempt.id} attempt={attempt} />

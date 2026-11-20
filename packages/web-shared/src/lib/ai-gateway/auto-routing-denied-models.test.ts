@@ -91,8 +91,8 @@ describe('policyNeedsCandidateEvaluation', () => {
           memberGrant: {
             mode: 'selected',
             includeOrganizationBaseline: false,
-            modelAllowList: ['anthropic/claude'],
-            providerAllowList: [],
+            modelAllowList: new Set(['anthropic/claude']),
+            providerAllowList: new Set<string>(),
           },
         })
       )
@@ -135,8 +135,8 @@ describe('collectDeniedAutoRoutingModelIds', () => {
           memberGrant: {
             mode: 'selected',
             includeOrganizationBaseline: false,
-            modelAllowList: ['anthropic/claude-sonnet-4.6'],
-            providerAllowList: [],
+            modelAllowList: new Set(['anthropic/claude-sonnet-4.6']),
+            providerAllowList: new Set<string>(),
           },
         }),
         'efficient'
@@ -261,8 +261,8 @@ describe('deniedAutoRoutingCandidates with organization inference provider keys'
         memberGrant: {
           mode: 'selected',
           includeOrganizationBaseline: false,
-          modelAllowList: ['anthropic/claude'],
-          providerAllowList: [],
+          modelAllowList: new Set(['anthropic/claude']),
+          providerAllowList: new Set<string>(),
         },
         organizationProviderCeiling: ['anthropic'],
       }),
@@ -293,8 +293,8 @@ describe('deniedAutoRoutingCandidates with organization inference provider keys'
         memberGrant: {
           mode: 'selected',
           includeOrganizationBaseline: false,
-          modelAllowList: [],
-          providerAllowList: ['z-ai'],
+          modelAllowList: new Set<string>(),
+          providerAllowList: new Set(['z-ai']),
         },
       }),
       ['moonshotai/kimi-k2.6', 'z-ai/glm-5.2']
@@ -418,8 +418,8 @@ describe('deniedAutoRoutingModelIdsForMember', () => {
         memberGrant: {
           mode: 'selected',
           includeOrganizationBaseline: false,
-          modelAllowList: ['anthropic/claude-sonnet-4.6'],
-          providerAllowList: [],
+          modelAllowList: new Set(['anthropic/claude-sonnet-4.6']),
+          providerAllowList: new Set<string>(),
         },
       })
     );
@@ -527,8 +527,8 @@ describe('deniedModelIdsForCandidates', () => {
           memberGrant: {
             mode: 'selected',
             includeOrganizationBaseline: false,
-            modelAllowList: ['anthropic/claude'],
-            providerAllowList: [],
+            modelAllowList: new Set(['anthropic/claude']),
+            providerAllowList: new Set<string>(),
           },
         }),
         ['other/model', 'anthropic/claude'],

@@ -801,7 +801,8 @@ keep environment snapshots and existing history/worktree recovery.
   and the next prepare settles that obligation without running the create path again, so a restore
   placed after the apply would never reach the record. `agent` and `model` stay cleared on purpose:
   every prompt sends its own agent and model from the route payload, so the stored pair is a mirror
-  that no turn reads. `path` stays cleared because the native server derives it.
+  that no turn reads. `path` is not restored either: no wrapper code reads it, and the import leaves
+  it empty.
   The native import also cannot carry a session permission ruleset, so the obligation is remembered
   beside the wrapper's durable state before the import commits the row, and the ruleset is applied
   right after the metadata restore. Writing the marker before the import is what makes the guarantee

@@ -783,6 +783,10 @@ export async function reconcilePaidUsageReceipts(
     now?: number;
     /** Exact model requests to inspect (the bounded per-payer path); omitted = fair scan. */
     modelRequestIds?: readonly string[];
+    /** Caller's abort, e.g. a disconnected request: stops the pass, including awaits. */
+    signal?: AbortSignal;
+    /** Hard wall-clock budget for this pass, awaited reads included. */
+    deadline?: number;
   } = {}
 ): Promise<{ recorded: number; pending: number; mismatched: number }> {
   const db = env.BENCH_DB;
@@ -831,15 +835,24 @@ export async function reconcilePaidUsageReceipts(
   const summary = { recorded: 0, pending: 0, mismatched: 0 };
   if (admitted.results.length === 0) return summary;
   // The native writer commits the usage row in a deferred task after the response body
-  // closes, so a first miss is `pending`, not free. Poll a bounded few times.
+  // closes, so a first miss is `pending`, not free. Poll a bounded few times — bounded by the
+  // caller's abort and budget too, so this never outlives the request that asked for it and
+  // never sleeps past its deadline.
   const usageIds = admitted.results.map(row => row.usage_id);
   const fetchImpl = options.fetchImpl ?? fetch;
-  let receipts = await readUsageReceipts(env, usageIds, fetchImpl);
+  const readOptions = { signal: options.signal, deadline: options.deadline };
+  const remainingMs = () => (options.deadline ?? Number.POSITIVE_INFINITY) - Date.now();
+  const spent = () => options.signal?.aborted === true || remainingMs() <= 0;
+  let receipts = await readUsageReceipts(env, usageIds, fetchImpl, readOptions);
   for (const delayMs of RECEIPT_POLL_DELAYS_MS) {
     if (receipts === null) break;
     if (receipts.every(receipt => receipt.status === 'recorded')) break;
-    await new Promise(resolve => setTimeout(resolve, delayMs));
-    receipts = await readUsageReceipts(env, usageIds, fetchImpl);
+    if (spent()) break;
+    const slept = Promise.withResolvers<void>();
+    setTimeout(slept.resolve, Math.min(delayMs, Math.max(1, remainingMs())));
+    await slept.promise;
+    if (spent()) break;
+    receipts = await readUsageReceipts(env, usageIds, fetchImpl, readOptions);
   }
   if (receipts === null) {
     // The receipt read is unavailable: nothing is booked and nothing is free, but every row
@@ -973,6 +986,10 @@ export async function reconcilePaidPayerReceipts(
     limit?: number;
     fetchImpl?: typeof fetch;
     now?: number;
+    /** Caller's abort: a disconnected request must not keep reading receipts. */
+    signal?: AbortSignal;
+    /** Hard wall-clock budget for this pass, the native read included. */
+    deadline?: number;
   }
 ): Promise<{ recorded: number; pending: number; mismatched: number }> {
   const limit = Math.min(Math.max(input.limit ?? 5, 1), 20);
@@ -990,6 +1007,8 @@ export async function reconcilePaidPayerReceipts(
     fetchImpl: input.fetchImpl,
     now: input.now,
     modelRequestIds: ids.results.map(row => row.id),
+    signal: input.signal,
+    deadline: input.deadline,
   });
 }
 
@@ -1009,8 +1028,15 @@ type UsageReceipt = {
 async function readUsageReceipts(
   env: Pick<PaidBenchmarkEnv, 'BENCH_DB' | 'KILO_WEB_API_BASE_URL' | 'INTERNAL_API_SECRET_PROD'>,
   usageIds: readonly string[],
-  fetchImpl: typeof fetch
+  fetchImpl: typeof fetch,
+  limits: { signal?: AbortSignal; deadline?: number } = {}
 ): Promise<UsageReceipt[] | null> {
+  // The read itself is bounded by the caller's abort *and* whatever budget is left, so a slow
+  // native read cannot outlive the request that asked for it. Without a caller budget the
+  // original 10 s ceiling still applies.
+  const remaining = (limits.deadline ?? Date.now() + 10_000) - Date.now();
+  const timeout = AbortSignal.timeout(Math.max(1, Math.min(10_000, remaining)));
+  const signal = limits.signal ? AbortSignal.any([limits.signal, timeout]) : timeout;
   const secret = await env.INTERNAL_API_SECRET_PROD.get();
   let response: Response;
   try {
@@ -1018,7 +1044,7 @@ async function readUsageReceipts(
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-internal-api-key': secret },
       body: JSON.stringify({ usageIds }),
-      signal: AbortSignal.timeout(10_000),
+      signal,
     });
   } catch {
     return null;

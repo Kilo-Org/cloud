@@ -18,6 +18,7 @@ import {
   type CaseInferenceBindings,
   type CaseInferencePayer,
 } from './case-inference';
+import { reconcilePaidPayerReceipts } from './paid-benchmark';
 
 const SECRET = 'synthetic-case-inference-secret';
 const GATEWAY = 'https://gateway.test';
@@ -480,7 +481,7 @@ describe('one signed permit per logical call', () => {
     });
     expect(await refused.json()).toEqual({
       decision: 'refuse',
-      reason: 'admission_unavailable',
+      reason: 'outstanding_receipt',
       retryable: true,
     });
     // Exactly one permit exists for the case.
@@ -899,7 +900,7 @@ describe('one payer, two consecutive model requests, no cron', () => {
     const staleAttempt = await handleCaseAdmit(bindings, `Bearer ${SECRET}`, secondBody);
     expect(await staleAttempt.json()).toEqual({
       decision: 'refuse',
-      reason: 'admission_unavailable',
+      reason: 'outstanding_receipt',
       retryable: true,
     });
     // …and the row stays `selecting`, so no provider call was authorized and the original
@@ -1014,4 +1015,454 @@ describe('case inference route drain under a real execution context', () => {
     expect(finished).toBe(true);
     expect(pulled).toBeGreaterThan(3);
   });
+});
+
+describe('outstanding receipt: one payer chains two logical calls', () => {
+  const RECEIPTS_PATH = '/api/internal/usage/receipts';
+
+  /**
+   * A stand-in for the real gateway. It consults the real admit callback for every forward,
+   * exactly as production does, so the store's own gates decide each answer instead of a
+   * canned reply. Only the native receipt read is synthetic.
+   */
+  function simulateGateway(options: {
+    /** `read` is 1-based, so a test can make the receipt appear on a later actual read. */
+    receipt: (read: number) => Record<string, unknown>;
+    onRefusal?: (reason: string) => void;
+  }) {
+    const forwarded: string[] = [];
+    let receiptReads = 0;
+    vi.stubGlobal('fetch', async (url: string | URL, init?: RequestInit) => {
+      const href = String(url);
+      if (href.includes(RECEIPTS_PATH)) {
+        if (typeof init?.body !== 'string') throw new Error('receipt body was not a string');
+        const asked = JSON.parse(init.body) as { usageIds: string[] };
+        receiptReads += 1;
+        const receipt = options.receipt(receiptReads);
+        return Response.json({
+          receipts: asked.usageIds.map(usageId => ({ ...receipt, usageId })),
+        });
+      }
+      const headers = init?.headers as Record<string, string>;
+      const assignment = JSON.parse(
+        Buffer.from(
+          headers['x-kilo-benchmark-assignment'].replace(/-/g, '+').replace(/_/g, '/'),
+          'base64'
+        ).toString('utf8')
+      ) as { modelRequestId: string; usageId: string };
+      forwarded.push(assignment.modelRequestId);
+      const admit = await handleCaseAdmit(bindings, `Bearer ${SECRET}`, {
+        phase: 'admit',
+        assignment,
+        usageId: assignment.usageId,
+      });
+      const decision = (await admit.json()) as
+        | { decision: 'admit' }
+        | { decision: 'refuse'; reason: string; retryable: boolean };
+      if (decision.decision === 'admit')
+        return new Response('data: ok\n\n', {
+          status: 200,
+          headers: {
+            'content-type': 'text/event-stream',
+            'x-kilo-benchmark-admission': 'admitted',
+          },
+        });
+      options.onRefusal?.(decision.reason);
+      return new Response(
+        JSON.stringify({
+          error: {
+            code: 'benchmark_payer_refused',
+            reason: decision.reason,
+            retryable: decision.retryable,
+          },
+        }),
+        {
+          status: decision.retryable ? 409 : 402,
+          headers: {
+            'content-type': 'application/json',
+            'x-kilo-benchmark-admission': 'refused',
+          },
+        }
+      );
+    });
+    return forwarded;
+  }
+
+  /** The receipt for whichever permit is currently admitted, in the shape the reader expects. */
+  function pendingOrRecorded(recorded: boolean): Record<string, unknown> {
+    const row = sqlite
+      .prepare(
+        `SELECT usage_id, owner_type, owner_id, project_id FROM paid_model_requests
+        WHERE state IN ('admitted', 'completed') ORDER BY created_at, id LIMIT 1`
+      )
+      .get() as {
+      usage_id: string;
+      owner_type: string;
+      owner_id: string;
+      project_id: string;
+    } | null;
+    if (row === null) throw new Error('no permit to receipt');
+    return {
+      usageId: row.usage_id,
+      status: recorded ? 'recorded' : 'pending',
+      microdollars: recorded ? 2_000 : null,
+      payerType: row.owner_type,
+      payerId: row.owner_id,
+      projectId: row.project_id,
+      requestedModel: 'vendor/alpha',
+      model: 'vendor/alpha',
+      createdAt: AT,
+    };
+  }
+
+  function permitCounts() {
+    const one = <T>(sql: string, ...args: string[]): T => sqlite.prepare(sql).get(...args) as T;
+    return {
+      usage: one<{ c: number }>('SELECT COUNT(*) AS c FROM paid_attempt_usage').c,
+      admitted: one<{ c: number }>(
+        "SELECT COUNT(*) AS c FROM paid_model_requests WHERE state = 'admitted'"
+      ).c,
+      detached: one<{ c: number }>(
+        "SELECT COUNT(*) AS c FROM benchmark_case_payers WHERE status = 'detached'"
+      ).c,
+    };
+  }
+
+  /**
+   * Insert an already-admitted permit directly, so a test can place one outside the case under
+   * test — the guard is the pool account's row set, not a per-case one.
+   */
+  function seedAdmittedPermit(
+    input: {
+      caseId?: string;
+      ownerId?: string;
+      platform?: boolean;
+    } = {}
+  ): void {
+    const platform = input.platform === true;
+    sqlite
+      .prepare(
+        `INSERT INTO paid_model_requests (
+          id, engine_identity, model, variant, rep, case_id, generation, pool_request_id, state,
+          assignment_id, owner_type, owner_id, platform_covered, platform_organization_id,
+          usage_id, project_id, api, executor_user_id, created_at, updated_at
+        ) VALUES (?, 'engine-test', 'vendor/alpha', 'high', 0, ?, 1, ?, 'admitted', ?, ?, ?, ?, ?, ?,
+          ?, 'chat/completions', 'bench-user', ?, ?)`
+      )
+      .run(
+        crypto.randomUUID(),
+        input.caseId ?? 'case-a',
+        platform ? null : POOL_REQUEST,
+        crypto.randomUUID(),
+        platform ? null : 'user',
+        platform ? null : (input.ownerId ?? 'user-1'),
+        platform ? 1 : 0,
+        platform ? ORG_ID : null,
+        crypto.randomUUID(),
+        platform
+          ? BENCHMARK_PLATFORM_PROJECT_ID
+          : benchmarkProjectId({ scope: 'user', slug: 'pool-one', routerId: ROUTER_ID }),
+        AT,
+        AT
+      );
+  }
+
+  it('blocks on the same payer outstanding permit from a different slot', async () => {
+    // The authoritative guard is the pool account's own row set, not this case's: an unspent
+    // permit from any slot would still let the gateway fund two calls against one balance.
+    seedPool();
+    seedAdmittedPermit({ caseId: 'case-from-another-slot' });
+    const resolved = await createCaseInferenceDeps(bindings);
+    const payer = await resolved.resolvePayer!({
+      invocation: INVOCATION,
+      api: 'chat/completions',
+      modelRequestId: crypto.randomUUID(),
+    });
+    if (!payer || 'refused' in payer) throw new Error('expected a signed payer');
+
+    expect(
+      await (
+        await handleCaseAdmit(bindings, `Bearer ${SECRET}`, {
+          phase: 'admit',
+          assignment: assignmentHeader(payer),
+          usageId: payer.usageId,
+        })
+      ).json()
+    ).toEqual({ decision: 'refuse', reason: 'outstanding_receipt', retryable: true });
+  });
+
+  it('never blocks on a platform-covered permit, so Kilo multi-call work is untouched', async () => {
+    // Platform coverage bypasses the pool-account guard, so an unbooked platform permit must
+    // not make a platform call wait — that is automatic Kilo-paid work.
+    sqlite.prepare('UPDATE benchmark_case_runs SET platform_covered = 1').run();
+    seedAdmittedPermit({ platform: true });
+    const resolved = await createCaseInferenceDeps(bindings);
+    const payer = await resolved.resolvePayer!({
+      invocation: INVOCATION,
+      api: 'chat/completions',
+      modelRequestId: crypto.randomUUID(),
+    });
+    if (!payer || 'refused' in payer) throw new Error('expected a signed platform payer');
+    expect(payer.platformOrganizationId).toBe(ORG_ID);
+
+    expect(
+      await (
+        await handleCaseAdmit(bindings, `Bearer ${SECRET}`, {
+          phase: 'admit',
+          assignment: assignmentHeader(payer),
+          usageId: payer.usageId,
+        })
+      ).json()
+    ).toEqual({ decision: 'admit' });
+  });
+
+  it('never blocks a distinct payer on someone else permit', async () => {
+    // An outstanding permit belongs to user-1; the pool under test is funded by user-2.
+    seedPool({ ownerId: 'user-2' });
+    seedAdmittedPermit({ ownerId: 'user-1' });
+    const resolved = await createCaseInferenceDeps(bindings);
+    const payer = await resolved.resolvePayer!({
+      invocation: INVOCATION,
+      api: 'chat/completions',
+      modelRequestId: crypto.randomUUID(),
+    });
+    if (!payer || 'refused' in payer) throw new Error('expected a signed payer');
+    expect(payer.ownerId).toBe('user-2');
+
+    expect(
+      await (
+        await handleCaseAdmit(bindings, `Bearer ${SECRET}`, {
+          phase: 'admit',
+          assignment: assignmentHeader(payer),
+          usageId: payer.usageId,
+        })
+      ).json()
+    ).toEqual({ decision: 'admit' });
+  });
+
+  it('aborts the native receipt read when the caller aborts', async () => {
+    // The read is bounded by the caller's abort, so a hung native fetch cannot outlive the
+    // request. The fake never resolves on its own: only the abort can settle this test, so it
+    // cannot pass by timing luck and it needs no fixed sleep.
+    seedPool();
+    seedAdmittedPermit();
+    const controller = new AbortController();
+    const started = Promise.withResolvers<void>();
+    let seen: AbortSignal | undefined;
+    const hangingFetch = (async (_url: unknown, init?: RequestInit) => {
+      seen = init?.signal ?? undefined;
+      const settled = Promise.withResolvers<Response>();
+      const fail = () => settled.reject(new Error('aborted'));
+      if (init?.signal?.aborted === true) fail();
+      else init?.signal?.addEventListener('abort', fail, { once: true });
+      started.resolve();
+      return settled.promise;
+    }) as unknown as typeof fetch;
+
+    const pending = reconcilePaidPayerReceipts(bindings, {
+      ownerType: 'user',
+      ownerId: 'user-1',
+      fetchImpl: hangingFetch,
+      signal: controller.signal,
+      deadline: Date.now() + 60_000,
+    });
+    await started.promise;
+    controller.abort();
+    const summary = await pending;
+
+    // The abort reached the actual native request, and nothing was booked from a read that
+    // never completed.
+    expect(seen?.aborted).toBe(true);
+    expect(summary).toEqual({ recorded: 0, pending: 0, mismatched: 0 });
+  });
+
+  it('answers outstanding_receipt only when a prior unbooked permit really blocks', async () => {
+    seedPool();
+    const resolved = await createCaseInferenceDeps(bindings);
+    const first = await resolved.resolvePayer!({
+      invocation: INVOCATION,
+      api: 'chat/completions',
+      modelRequestId: crypto.randomUUID(),
+    });
+    if (!first || 'refused' in first) throw new Error('expected the first permit');
+    // Admit the first call so it holds an unbooked permit for this payer.
+    expect(
+      await (
+        await handleCaseAdmit(bindings, `Bearer ${SECRET}`, {
+          phase: 'admit',
+          assignment: assignmentHeader(first),
+          usageId: first.usageId,
+        })
+      ).json()
+    ).toEqual({ decision: 'admit' });
+
+    const second = await resolved.resolvePayer!({
+      invocation: INVOCATION,
+      api: 'chat/completions',
+      modelRequestId: crypto.randomUUID(),
+    });
+    if (!second || 'refused' in second) throw new Error('expected the second selection');
+    expect(
+      await (
+        await handleCaseAdmit(bindings, `Bearer ${SECRET}`, {
+          phase: 'admit',
+          assignment: assignmentHeader(second),
+          usageId: second.usageId,
+        })
+      ).json()
+    ).toEqual({ decision: 'refuse', reason: 'outstanding_receipt', retryable: true });
+  });
+
+  it('answers admission_unavailable, not outstanding_receipt, for an unrelated block', async () => {
+    // Same code path, no prior permit: the pool stopped being active, so nothing about a
+    // receipt explains the refusal and the caller must not reconcile for it.
+    seedPool();
+    const resolved = await createCaseInferenceDeps(bindings);
+    const payer = await resolved.resolvePayer!({
+      invocation: INVOCATION,
+      api: 'chat/completions',
+      modelRequestId: crypto.randomUUID(),
+    });
+    if (!payer || 'refused' in payer) throw new Error('expected a signed payer');
+    sqlite.prepare("UPDATE paid_benchmark_requests SET status = 'paused'").run();
+
+    expect(
+      await (
+        await handleCaseAdmit(bindings, `Bearer ${SECRET}`, {
+          phase: 'admit',
+          assignment: assignmentHeader(payer),
+          usageId: payer.usageId,
+        })
+      ).json()
+    ).toEqual({ decision: 'refuse', reason: 'admission_unavailable', retryable: true });
+  });
+
+  it('waits for the earlier receipt, then forwards the same logical call once', async () => {
+    seedPool();
+    const resolved = await createCaseInferenceDeps(bindings);
+    // The native usage is absent on the first actual read and available on the second: the
+    // gating this test exists for. Nothing flips it on a refusal — only a real re-read can.
+    const forwarded = simulateGateway({
+      receipt: read => pendingOrRecorded(read > 1),
+    });
+
+    const firstCall = await handleCaseInference(
+      { ...resolved, fetchImpl: fetch },
+      { api: 'chat/completions', request: await caseRequest(crypto.randomUUID()), db }
+    );
+    expect(firstCall.headers.get('x-kilo-benchmark-admission')).toBe('admitted');
+    await firstCall.text();
+    // Admitted but unbooked: exactly the state that would block the next call.
+    expect(permitCounts()).toEqual({ usage: 0, admitted: 1, detached: 0 });
+
+    const secondModelRequest = crypto.randomUUID();
+    const secondCall = await handleCaseInference(
+      { ...resolved, fetchImpl: fetch },
+      { api: 'chat/completions', request: await caseRequest(secondModelRequest), db }
+    );
+
+    // The second call is admitted after a single forward: the receipt was booked while
+    // waiting, so the gateway never saw a stale refusal and nothing was replayed.
+    expect(secondCall.headers.get('x-kilo-benchmark-admission')).toBe('admitted');
+    expect(secondCall.headers.get('x-kilo-benchmark-stop')).toBeNull();
+    await secondCall.text();
+    expect(forwarded).toHaveLength(2);
+    expect(forwarded.filter(id => id === secondModelRequest)).toHaveLength(1);
+
+    // The earlier receipt is booked exactly once and closed; the new call is the only live
+    // permit; nobody was detached for a lagging receipt.
+    expect(permitCounts()).toEqual({ usage: 1, admitted: 1, detached: 0 });
+    expect(
+      sqlite
+        .prepare("SELECT COUNT(*) AS c FROM paid_model_requests WHERE state = 'completed'")
+        .get()
+    ).toEqual({ c: 1 });
+  }, 30_000);
+
+  it('never forwards while the prior receipt is unbooked, and keeps it pending', async () => {
+    seedPool();
+    const resolved = await createCaseInferenceDeps(bindings);
+    const forwarded = simulateGateway({ receipt: () => pendingOrRecorded(false) });
+
+    const firstCall = await handleCaseInference(
+      { ...resolved, fetchImpl: fetch },
+      { api: 'chat/completions', request: await caseRequest(crypto.randomUUID()), db }
+    );
+    await firstCall.text();
+    const forwardsAfterFirst = forwarded.length;
+
+    const secondCall = await handleCaseInference(
+      { ...resolved, fetchImpl: fetch },
+      { api: 'chat/completions', request: await caseRequest(crypto.randomUUID()), db }
+    );
+
+    // Zero forwards for the blocked call: waiting never opens a provider call, and there is
+    // no replay to fall back on.
+    expect(forwarded).toHaveLength(forwardsAfterFirst);
+    expect(secondCall.headers.get('x-kilo-benchmark-stop')).toBe('infra_unavailable');
+    expect(await secondCall.json()).toMatchObject({ error: { code: 'receipt_unconfirmed' } });
+    // The old call stays pending and un-detached; nothing was graded or charged twice.
+    expect(permitCounts()).toEqual({ usage: 0, admitted: 1, detached: 0 });
+  }, 60_000);
+
+  it('never retries when the refusal is an ordinary admission_unavailable', async () => {
+    // A lost or unclassifiable reply proves nothing about the payer, so it must not trigger
+    // the receipt retry: exactly one forward, then a stop.
+    seedPool();
+    const resolved = await createCaseInferenceDeps(bindings);
+    let forwards = 0;
+    vi.stubGlobal('fetch', async () => {
+      // Count every gateway forward so a retry would be visible.
+      forwards += 1;
+      return new Response(
+        JSON.stringify({
+          error: {
+            code: 'benchmark_payer_refused',
+            reason: 'admission_unavailable',
+            retryable: true,
+          },
+        }),
+        {
+          status: 409,
+          headers: {
+            'content-type': 'application/json',
+            'x-kilo-benchmark-admission': 'refused',
+          },
+        }
+      );
+    });
+
+    const response = await handleCaseInference(
+      { ...resolved, fetchImpl: fetch },
+      { api: 'chat/completions', request: await caseRequest(crypto.randomUUID()), db }
+    );
+
+    // Exactly one attempt: no receipt retry for an unprovable refusal.
+    expect(forwards).toBe(1);
+    expect(response.headers.get('x-kilo-benchmark-stop')).toBe('infra_unavailable');
+    expect(permitCounts()).toEqual({ usage: 0, admitted: 0, detached: 0 });
+  }, 30_000);
+
+  it('keeps the pause latch authoritative instead of retrying through it', async () => {
+    seedPool();
+    const resolved = await createCaseInferenceDeps(bindings);
+    const forwarded = simulateGateway({ receipt: () => pendingOrRecorded(false) });
+    const firstCall = await handleCaseInference(
+      { ...resolved, fetchImpl: fetch },
+      { api: 'chat/completions', request: await caseRequest(crypto.randomUUID()), db }
+    );
+    await firstCall.text();
+    const forwardsBefore = forwarded.length;
+
+    // The case is paused: the retry must not be a way around the latch.
+    sqlite.prepare("UPDATE benchmark_case_runs SET status = 'paused'").run();
+
+    const response = await handleCaseInference(
+      { ...resolved, fetchImpl: fetch },
+      { api: 'chat/completions', request: await caseRequest(crypto.randomUUID()), db }
+    );
+
+    expect(response.headers.get('x-kilo-benchmark-stop')).toBe('not_live');
+    expect(forwarded).toHaveLength(forwardsBefore);
+  }, 30_000);
 });

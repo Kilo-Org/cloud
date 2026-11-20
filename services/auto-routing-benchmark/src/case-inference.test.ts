@@ -887,10 +887,10 @@ describe('a reply that never reached admission', () => {
     expect(response.headers.get('x-kilo-benchmark-stop')).toBe('not_live');
   });
 
-  it('stops an unconfirmed prior receipt as infrastructure, never as model output', async () => {
-    // A previous attempt's receipt has not landed. This reply is not a measurement and must
-    // not be graded, but it must also never be read as "the payer is free to call again":
-    // whether this generation may be requeued is the D1 admit/attempt guard's decision.
+  it('stops a lagging receipt as infrastructure without replaying the call', async () => {
+    // The gateway reports the payer's earlier permit as unbooked. There is no prior permit in
+    // this fixture's store, so nothing can be waited for; the route must still not replay the
+    // request — a second forward would open a provider call nobody re-checked.
     gatewayReplies = [
       new Response(
         JSON.stringify({
@@ -908,9 +908,34 @@ describe('a reply that never reached admission', () => {
       db,
     });
 
+    expect(upstream).toHaveLength(1);
     expect(response.status).toBe(409);
     expect(response.headers.get('x-kilo-benchmark-stop')).toBe('infra_unavailable');
     expect(await response.json()).toMatchObject({ error: { code: 'receipt_unconfirmed' } });
+  });
+
+  it('stops immediately for an ambiguous receipt state without retrying', async () => {
+    // `receipt_unconfirmed` is not the recoverable "my own earlier permit blocks me" case, so
+    // it must never trigger a second dispatch.
+    gatewayReplies = [
+      new Response(
+        JSON.stringify({
+          error: { code: 'benchmark_payer_refused', reason: 'receipt_unconfirmed' },
+        }),
+        {
+          status: 409,
+          headers: { 'content-type': 'application/json', ...admissionHeaders('refused') },
+        }
+      ),
+    ];
+    const response = await handleCaseInference(deps(), {
+      api: 'chat/completions',
+      request: await request(),
+      db,
+    });
+
+    expect(upstream).toHaveLength(1);
+    expect(response.headers.get('x-kilo-benchmark-stop')).toBe('infra_unavailable');
   });
 
   it('never forwards an unclassifiable refusal body for the runner to interpret', async () => {

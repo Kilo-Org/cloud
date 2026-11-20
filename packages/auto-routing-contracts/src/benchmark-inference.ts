@@ -212,6 +212,14 @@ export const BenchmarkAdmissionRefusalReasonSchema = z.enum([
    * credential instead.
    */
   'assignment_invalid',
+  /**
+   * This exact attempt was not admitted because the same payer still has an *earlier* admitted
+   * permit for this case whose native usage has not been booked yet. Nothing was dispatched for
+   * this attempt and the account is not at fault, so the caller reconciles that prior receipt and
+   * retries the same logical model request against a fresh credit read. Never a detach, never a
+   * pause, and never a second permit for the earlier call.
+   */
+  'outstanding_receipt',
 ]);
 export type BenchmarkAdmissionRefusalReason = z.infer<typeof BenchmarkAdmissionRefusalReasonSchema>;
 

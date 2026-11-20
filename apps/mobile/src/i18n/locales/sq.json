@@ -188,27 +188,27 @@
     "organizationTrialEndedBilling": "Periudha e provës e organizatës ka përfunduar dhe nuk ka asnjë plan aktiv. Ju mund të përditësoni faturimin dhe më pas të provoni përsëri.",
     "organizationTrialEndedBillingAtKiloAi": "Periudha e provës e organizatës ka përfunduar dhe nuk ka asnjë plan aktiv. Ju mund të përditësoni faturimin në kilo.ai dhe më pas të provoni përsëri.",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "Pikë liste",
-      "nestedBulletPoint": "Pikë liste e mbivendosur",
-      "orderedItem": "Element liste {n}",
-      "nestedOrderedItem": "Element liste i mbivendosur {n}"
-    },
-    "blockquote": {
-      "quote": "Citat",
-      "nestedQuote": "Citat i mbivendosur"
-    },
-    "table": {
-      "row": "Rresht {n}: {content}"
-    },
-    "math": {
-      "equation": "Matematikë: {latex}"
-    },
-    "rotor": {
-      "headings": "Titujt",
-      "links": "Lidhjet",
-      "images": "Imazhet"
-    }
+      "list": {
+        "bulletPoint": "Pikë liste",
+        "nestedBulletPoint": "Pikë liste e mbivendosur",
+        "orderedItem": "Element liste {n}",
+        "nestedOrderedItem": "Element liste i mbivendosur {n}"
+      },
+      "blockquote": {
+        "quote": "Citat",
+        "nestedQuote": "Citat i mbivendosur"
+      },
+      "table": {
+        "row": "Rresht {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematikë: {latex}"
+      },
+      "rotor": {
+        "headings": "Titujt",
+        "links": "Lidhjet",
+        "images": "Imazhet"
+      }
     }
   },
   "language": {

@@ -190,27 +190,27 @@
     "organizationTrialEndedBilling": "Пробный период организации закончился, и у неё нет активного плана. Вы можете обновить данные об оплате, после чего повторите попытку.",
     "organizationTrialEndedBillingAtKiloAi": "Пробный период организации закончился, и у неё нет активного плана. Вы можете обновить данные об оплате на kilo.ai, после чего повторите попытку.",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "Маркер списка",
-      "nestedBulletPoint": "Вложенный маркер списка",
-      "orderedItem": "Элемент списка {n}",
-      "nestedOrderedItem": "Вложенный элемент списка {n}"
-    },
-    "blockquote": {
-      "quote": "Цитата",
-      "nestedQuote": "Вложенная цитата"
-    },
-    "table": {
-      "row": "Строка {n}: {content}"
-    },
-    "math": {
-      "equation": "Математика: {latex}"
-    },
-    "rotor": {
-      "headings": "Заголовки",
-      "links": "Ссылки",
-      "images": "Изображения"
-    }
+      "list": {
+        "bulletPoint": "Маркер списка",
+        "nestedBulletPoint": "Вложенный маркер списка",
+        "orderedItem": "Элемент списка {n}",
+        "nestedOrderedItem": "Вложенный элемент списка {n}"
+      },
+      "blockquote": {
+        "quote": "Цитата",
+        "nestedQuote": "Вложенная цитата"
+      },
+      "table": {
+        "row": "Строка {n}: {content}"
+      },
+      "math": {
+        "equation": "Математика: {latex}"
+      },
+      "rotor": {
+        "headings": "Заголовки",
+        "links": "Ссылки",
+        "images": "Изображения"
+      }
     }
   },
   "language": {

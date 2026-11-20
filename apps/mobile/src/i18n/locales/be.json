@@ -190,27 +190,27 @@
     "organizationTrialEndedBillingAtKiloAi": "Пробны перыяд арганізацыі скончыўся, і ў яе няма актыўнага плана. Вы можаце абнавіць плацежныя даныя на kilo.ai, а затым паспрабаваць яшчэ раз.",
     "viewOnGitHub": "Прагледзець PR на GitHub",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "Пункт спіса",
-      "nestedBulletPoint": "Укладзены пункт спіса",
-      "orderedItem": "Элемент спіса {n}",
-      "nestedOrderedItem": "Укладзены элемент спіса {n}"
-    },
-    "blockquote": {
-      "quote": "Цытата",
-      "nestedQuote": "Укладзеная цытата"
-    },
-    "table": {
-      "row": "Радок {n}: {content}"
-    },
-    "math": {
-      "equation": "Матэматыка: {latex}"
-    },
-    "rotor": {
-      "headings": "Загалоўкі",
-      "links": "Спасылкі",
-      "images": "Выявы"
-    }
+      "list": {
+        "bulletPoint": "Пункт спіса",
+        "nestedBulletPoint": "Укладзены пункт спіса",
+        "orderedItem": "Элемент спіса {n}",
+        "nestedOrderedItem": "Укладзены элемент спіса {n}"
+      },
+      "blockquote": {
+        "quote": "Цытата",
+        "nestedQuote": "Укладзеная цытата"
+      },
+      "table": {
+        "row": "Радок {n}: {content}"
+      },
+      "math": {
+        "equation": "Матэматыка: {latex}"
+      },
+      "rotor": {
+        "headings": "Загалоўкі",
+        "links": "Спасылкі",
+        "images": "Выявы"
+      }
     }
   },
   "language": {

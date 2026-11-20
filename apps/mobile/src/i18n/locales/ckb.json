@@ -188,27 +188,27 @@
     "organizationTrialEndedBillingAtKiloAi": "تاقیکردنەوەی ڕێکخراوەکە کۆتایی هاتووە و هیچ پلانێکی چالاکی نییە. دەتوانیت لە kilo.ai پارەدان نوێ بکەیتەوە، پاشان دووبارە هەوڵ بدەیتەوە.",
     "viewOnGitHub": "PR لە GitHub ببینە",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "خاڵی لیست",
-      "nestedBulletPoint": "خاڵی لیستی ناوەکی",
-      "orderedItem": "بڕگەی لیست {n}",
-      "nestedOrderedItem": "بڕگەی لیستی ناوەکی {n}"
-    },
-    "blockquote": {
-      "quote": "وتە",
-      "nestedQuote": "وتەی ناوەکی"
-    },
-    "table": {
-      "row": "ڕیز {n}: {content}"
-    },
-    "math": {
-      "equation": "بیرکاری: {latex}"
-    },
-    "rotor": {
-      "headings": "سەردێڕەکان",
-      "links": "بەستەرەکان",
-      "images": "وێنەکان"
-    }
+      "list": {
+        "bulletPoint": "خاڵی لیست",
+        "nestedBulletPoint": "خاڵی لیستی ناوەکی",
+        "orderedItem": "بڕگەی لیست {n}",
+        "nestedOrderedItem": "بڕگەی لیستی ناوەکی {n}"
+      },
+      "blockquote": {
+        "quote": "وتە",
+        "nestedQuote": "وتەی ناوەکی"
+      },
+      "table": {
+        "row": "ڕیز {n}: {content}"
+      },
+      "math": {
+        "equation": "بیرکاری: {latex}"
+      },
+      "rotor": {
+        "headings": "سەردێڕەکان",
+        "links": "بەستەرەکان",
+        "images": "وێنەکان"
+      }
     }
   },
   "language": {

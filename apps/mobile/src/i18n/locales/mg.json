@@ -188,27 +188,27 @@
     "organizationTrialEndedBillingAtKiloAi": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Afaka manavao ny faktiora ao amin'ny kilo.ai ianao, ary hanandrana indray.",
     "viewOnGitHub": "Jereo ao amin'ny GitHub ny PR",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "Teboka",
-      "nestedBulletPoint": "Teboka ao anaty",
-      "orderedItem": "Singa lisitra {n}",
-      "nestedOrderedItem": "Singa lisitra ao anaty {n}"
-    },
-    "blockquote": {
-      "quote": "Teny nalaina",
-      "nestedQuote": "Teny nalaina ao anaty"
-    },
-    "table": {
-      "row": "Andalana {n}: {content}"
-    },
-    "math": {
-      "equation": "Matematika: {latex}"
-    },
-    "rotor": {
-      "headings": "Lohateny",
-      "links": "Rohy",
-      "images": "Sary"
-    }
+      "list": {
+        "bulletPoint": "Teboka",
+        "nestedBulletPoint": "Teboka ao anaty",
+        "orderedItem": "Singa lisitra {n}",
+        "nestedOrderedItem": "Singa lisitra ao anaty {n}"
+      },
+      "blockquote": {
+        "quote": "Teny nalaina",
+        "nestedQuote": "Teny nalaina ao anaty"
+      },
+      "table": {
+        "row": "Andalana {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Lohateny",
+        "links": "Rohy",
+        "images": "Sary"
+      }
     }
   },
   "language": {

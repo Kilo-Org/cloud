@@ -188,27 +188,27 @@
     "organizationTrialEndedBillingAtKiloAi": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. Jy kan die fakturering by kilo.ai opdateer en dan weer probeer.",
     "viewOnGitHub": "Bekyk PR op GitHub",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "Kolpunt",
-      "nestedBulletPoint": "Ingeneste kolpunt",
-      "orderedItem": "Lysitem {n}",
-      "nestedOrderedItem": "Ingeneste lysitem {n}"
-    },
-    "blockquote": {
-      "quote": "Aanhaling",
-      "nestedQuote": "Ingeneste aanhaling"
-    },
-    "table": {
-      "row": "Ry {n}: {content}"
-    },
-    "math": {
-      "equation": "Wiskunde: {latex}"
-    },
-    "rotor": {
-      "headings": "Opskrifte",
-      "links": "Skakels",
-      "images": "Prente"
-    }
+      "list": {
+        "bulletPoint": "Kolpunt",
+        "nestedBulletPoint": "Ingeneste kolpunt",
+        "orderedItem": "Lysitem {n}",
+        "nestedOrderedItem": "Ingeneste lysitem {n}"
+      },
+      "blockquote": {
+        "quote": "Aanhaling",
+        "nestedQuote": "Ingeneste aanhaling"
+      },
+      "table": {
+        "row": "Ry {n}: {content}"
+      },
+      "math": {
+        "equation": "Wiskunde: {latex}"
+      },
+      "rotor": {
+        "headings": "Opskrifte",
+        "links": "Skakels",
+        "images": "Prente"
+      }
     }
   },
   "language": {

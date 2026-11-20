@@ -188,27 +188,27 @@
     "organizationTrialEndedBilling": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Unaweza kusasisha malipo, kisha ujaribu tena.",
     "organizationTrialEndedBillingAtKiloAi": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Unaweza kusasisha malipo kwenye kilo.ai, kisha ujaribu tena.",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "Nukta ya orodha",
-      "nestedBulletPoint": "Nukta ya orodha ya ndani",
-      "orderedItem": "Kipengee cha orodha {n}",
-      "nestedOrderedItem": "Kipengee cha orodha ya ndani {n}"
-    },
-    "blockquote": {
-      "quote": "Nukuu",
-      "nestedQuote": "Nukuu ya ndani"
-    },
-    "table": {
-      "row": "Safu {n}: {content}"
-    },
-    "math": {
-      "equation": "Hesabu: {latex}"
-    },
-    "rotor": {
-      "headings": "Vichwa",
-      "links": "Viungo",
-      "images": "Picha"
-    }
+      "list": {
+        "bulletPoint": "Nukta ya orodha",
+        "nestedBulletPoint": "Nukta ya orodha ya ndani",
+        "orderedItem": "Kipengee cha orodha {n}",
+        "nestedOrderedItem": "Kipengee cha orodha ya ndani {n}"
+      },
+      "blockquote": {
+        "quote": "Nukuu",
+        "nestedQuote": "Nukuu ya ndani"
+      },
+      "table": {
+        "row": "Safu {n}: {content}"
+      },
+      "math": {
+        "equation": "Hesabu: {latex}"
+      },
+      "rotor": {
+        "headings": "Vichwa",
+        "links": "Viungo",
+        "images": "Picha"
+      }
     }
   },
   "language": {

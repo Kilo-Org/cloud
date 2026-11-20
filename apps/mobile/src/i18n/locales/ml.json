@@ -188,27 +188,27 @@
     "organizationTrialEndedBillingAtKiloAi": "സ്ഥാപനത്തിന്റെ ട്രയൽ അവസാനിച്ചു, അതിന് സജീവമായ പ്ലാൻ ഇല്ല. നിങ്ങൾക്ക് kilo.ai-ൽ ബില്ലിംഗ് അപ്ഡേറ്റ് ചെയ്യാനും തുടർന്ന് വീണ്ടും ശ്രമിക്കാനും കഴിയും.",
     "viewOnGitHub": "GitHub-ൽ PR കാണുക",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "ബുള്ളറ്റ് പോയിന്റ്",
-      "nestedBulletPoint": "നെസ്റ്റഡ് ബുള്ളറ്റ് പോയിന്റ്",
-      "orderedItem": "പട്ടിക ഇനം {n}",
-      "nestedOrderedItem": "നെസ്റ്റഡ് പട്ടിക ഇനം {n}"
-    },
-    "blockquote": {
-      "quote": "ഉദ്ധരണി",
-      "nestedQuote": "നെസ്റ്റഡ് ഉദ്ധരണി"
-    },
-    "table": {
-      "row": "വരി {n}: {content}"
-    },
-    "math": {
-      "equation": "ഗണിതം: {latex}"
-    },
-    "rotor": {
-      "headings": "തലക്കെട്ടുകൾ",
-      "links": "ലിങ്കുകൾ",
-      "images": "ചിത്രങ്ങൾ"
-    }
+      "list": {
+        "bulletPoint": "ബുള്ളറ്റ് പോയിന്റ്",
+        "nestedBulletPoint": "നെസ്റ്റഡ് ബുള്ളറ്റ് പോയിന്റ്",
+        "orderedItem": "പട്ടിക ഇനം {n}",
+        "nestedOrderedItem": "നെസ്റ്റഡ് പട്ടിക ഇനം {n}"
+      },
+      "blockquote": {
+        "quote": "ഉദ്ധരണി",
+        "nestedQuote": "നെസ്റ്റഡ് ഉദ്ധരണി"
+      },
+      "table": {
+        "row": "വരി {n}: {content}"
+      },
+      "math": {
+        "equation": "ഗണിതം: {latex}"
+      },
+      "rotor": {
+        "headings": "തലക്കെട്ടുകൾ",
+        "links": "ലിങ്കുകൾ",
+        "images": "ചിത്രങ്ങൾ"
+      }
     }
   },
   "language": {

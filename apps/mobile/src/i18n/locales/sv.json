@@ -188,27 +188,27 @@
     "organizationTrialEndedBilling": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. Du kan uppdatera faktureringen och sedan försöka igen.",
     "organizationTrialEndedBillingAtKiloAi": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. Du kan uppdatera faktureringen på kilo.ai och sedan försöka igen.",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "Punkt",
-      "nestedBulletPoint": "Indragen punkt",
-      "orderedItem": "Listobjekt {n}",
-      "nestedOrderedItem": "Indraget listobjekt {n}"
-    },
-    "blockquote": {
-      "quote": "Citat",
-      "nestedQuote": "Indraget citat"
-    },
-    "table": {
-      "row": "Rad {n}: {content}"
-    },
-    "math": {
-      "equation": "Matematik: {latex}"
-    },
-    "rotor": {
-      "headings": "Rubriker",
-      "links": "Länkar",
-      "images": "Bilder"
-    }
+      "list": {
+        "bulletPoint": "Punkt",
+        "nestedBulletPoint": "Indragen punkt",
+        "orderedItem": "Listobjekt {n}",
+        "nestedOrderedItem": "Indraget listobjekt {n}"
+      },
+      "blockquote": {
+        "quote": "Citat",
+        "nestedQuote": "Indraget citat"
+      },
+      "table": {
+        "row": "Rad {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematik: {latex}"
+      },
+      "rotor": {
+        "headings": "Rubriker",
+        "links": "Länkar",
+        "images": "Bilder"
+      }
     }
   },
   "language": {

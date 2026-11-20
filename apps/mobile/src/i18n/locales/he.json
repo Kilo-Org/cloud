@@ -189,27 +189,27 @@
     "organizationTrialEndedBillingAtKiloAi": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. תוכל לעדכן את החיוב ב-kilo.ai, ואז לנסות שוב.",
     "viewOnGitHub": "הצגת ה-PR ב-GitHub",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "נקודת תבליט",
-      "nestedBulletPoint": "נקודת תבליט מקוננת",
-      "orderedItem": "פריט ברשימה {n}",
-      "nestedOrderedItem": "פריט מקונן ברשימה {n}"
-    },
-    "blockquote": {
-      "quote": "ציטוט",
-      "nestedQuote": "ציטוט מקונן"
-    },
-    "table": {
-      "row": "שורה {n}: {content}"
-    },
-    "math": {
-      "equation": "מתמטיקה: {latex}"
-    },
-    "rotor": {
-      "headings": "כותרות",
-      "links": "קישורים",
-      "images": "תמונות"
-    }
+      "list": {
+        "bulletPoint": "נקודת תבליט",
+        "nestedBulletPoint": "נקודת תבליט מקוננת",
+        "orderedItem": "פריט ברשימה {n}",
+        "nestedOrderedItem": "פריט מקונן ברשימה {n}"
+      },
+      "blockquote": {
+        "quote": "ציטוט",
+        "nestedQuote": "ציטוט מקונן"
+      },
+      "table": {
+        "row": "שורה {n}: {content}"
+      },
+      "math": {
+        "equation": "מתמטיקה: {latex}"
+      },
+      "rotor": {
+        "headings": "כותרות",
+        "links": "קישורים",
+        "images": "תמונות"
+      }
     }
   },
   "language": {

@@ -188,27 +188,27 @@
     "organizationTrialEndedBilling": "සංවිධානයේ පරීක්ෂණ කාලය අවසන් වී ඇති අතර එයට සක්‍රීය සැලැස්මක් නොමැත. ඔබට බිල්පත් යාවත්කාලීන කර නැවත උත්සාහ කළ හැක.",
     "organizationTrialEndedBillingAtKiloAi": "සංවිධානයේ පරීක්ෂණ කාලය අවසන් වී ඇති අතර එයට සක්‍රීය සැලැස්මක් නොමැත. ඔබට kilo.ai හි බිල්පත් යාවත්කාලීන කර නැවත උත්සාහ කළ හැක.",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "බුලට් ලක්ෂ්‍යය",
-      "nestedBulletPoint": "කැදැලි බුලට් ලක්ෂ්‍යය",
-      "orderedItem": "ලැයිස්තු අයිතමය {n}",
-      "nestedOrderedItem": "කැදැලි ලැයිස්තු අයිතමය {n}"
-    },
-    "blockquote": {
-      "quote": "උද්ධෘතය",
-      "nestedQuote": "කැදැලි උද්ධෘතය"
-    },
-    "table": {
-      "row": "පේළිය {n}: {content}"
-    },
-    "math": {
-      "equation": "ගණිතය: {latex}"
-    },
-    "rotor": {
-      "headings": "ශීර්ෂ",
-      "links": "සබැඳි",
-      "images": "රූප"
-    }
+      "list": {
+        "bulletPoint": "බුලට් ලක්ෂ්‍යය",
+        "nestedBulletPoint": "කැදැලි බුලට් ලක්ෂ්‍යය",
+        "orderedItem": "ලැයිස්තු අයිතමය {n}",
+        "nestedOrderedItem": "කැදැලි ලැයිස්තු අයිතමය {n}"
+      },
+      "blockquote": {
+        "quote": "උද්ධෘතය",
+        "nestedQuote": "කැදැලි උද්ධෘතය"
+      },
+      "table": {
+        "row": "පේළිය {n}: {content}"
+      },
+      "math": {
+        "equation": "ගණිතය: {latex}"
+      },
+      "rotor": {
+        "headings": "ශීර්ෂ",
+        "links": "සබැඳි",
+        "images": "රූප"
+      }
     }
   },
   "language": {

@@ -188,27 +188,27 @@
     "organizationTrialEndedBillingAtKiloAi": "Байгууллагын туршилтын хугацаа дууссан бөгөөд идэвхтэй төлөвлөгөө байхгүй байна. Та kilo.ai дээр төлбөрийн мэдээллээ шинэчлээд, дараа нь дахин оролдоно уу.",
     "viewOnGitHub": "PR-ыг GitHub дээр үзэх",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "Жагсаалтын цэг",
-      "nestedBulletPoint": "Дотоод жагсаалтын цэг",
-      "orderedItem": "Жагсаалтын элемент {n}",
-      "nestedOrderedItem": "Дотоод жагсаалтын элемент {n}"
-    },
-    "blockquote": {
-      "quote": "Ишлэл",
-      "nestedQuote": "Дотоод ишлэл"
-    },
-    "table": {
-      "row": "Мөр {n}: {content}"
-    },
-    "math": {
-      "equation": "Математик: {latex}"
-    },
-    "rotor": {
-      "headings": "Гарчигууд",
-      "links": "Холбоосууд",
-      "images": "Зургууд"
-    }
+      "list": {
+        "bulletPoint": "Жагсаалтын цэг",
+        "nestedBulletPoint": "Дотоод жагсаалтын цэг",
+        "orderedItem": "Жагсаалтын элемент {n}",
+        "nestedOrderedItem": "Дотоод жагсаалтын элемент {n}"
+      },
+      "blockquote": {
+        "quote": "Ишлэл",
+        "nestedQuote": "Дотоод ишлэл"
+      },
+      "table": {
+        "row": "Мөр {n}: {content}"
+      },
+      "math": {
+        "equation": "Математик: {latex}"
+      },
+      "rotor": {
+        "headings": "Гарчигууд",
+        "links": "Холбоосууд",
+        "images": "Зургууд"
+      }
     }
   },
   "language": {

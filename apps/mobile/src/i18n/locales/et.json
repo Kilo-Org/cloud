@@ -188,27 +188,27 @@
     "organizationTrialEndedBillingAtKiloAi": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Saad arveldust kilo.ai keskkonnas uuendada ja seejärel uuesti proovida.",
     "viewOnGitHub": "Vaata PR-i GitHubis",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "Punkt",
-      "nestedBulletPoint": "Pesastatud punkt",
-      "orderedItem": "Loendi üksus {n}",
-      "nestedOrderedItem": "Pesastatud loendi üksus {n}"
-    },
-    "blockquote": {
-      "quote": "Tsitaat",
-      "nestedQuote": "Pesastatud tsitaat"
-    },
-    "table": {
-      "row": "Rida {n}: {content}"
-    },
-    "math": {
-      "equation": "Matemaatika: {latex}"
-    },
-    "rotor": {
-      "headings": "Pealkirjad",
-      "links": "Veebilingid",
-      "images": "Pildid"
-    }
+      "list": {
+        "bulletPoint": "Punkt",
+        "nestedBulletPoint": "Pesastatud punkt",
+        "orderedItem": "Loendi üksus {n}",
+        "nestedOrderedItem": "Pesastatud loendi üksus {n}"
+      },
+      "blockquote": {
+        "quote": "Tsitaat",
+        "nestedQuote": "Pesastatud tsitaat"
+      },
+      "table": {
+        "row": "Rida {n}: {content}"
+      },
+      "math": {
+        "equation": "Matemaatika: {latex}"
+      },
+      "rotor": {
+        "headings": "Pealkirjad",
+        "links": "Veebilingid",
+        "images": "Pildid"
+      }
     }
   },
   "language": {

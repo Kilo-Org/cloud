@@ -189,27 +189,27 @@
     "organizationTrialEndedBillingAtKiloAi": "Probni period organizacije je završen i ona nema aktivan plan. Možete ažurirati naplatu na kilo.ai, a zatim pokušati ponovo.",
     "viewOnGitHub": "Pogledaj PR na GitHubu",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "Točka liste",
-      "nestedBulletPoint": "Ugniježđena točka liste",
-      "orderedItem": "Stavka liste {n}",
-      "nestedOrderedItem": "Ugniježđena stavka liste {n}"
-    },
-    "blockquote": {
-      "quote": "Citat",
-      "nestedQuote": "Ugniježđeni citat"
-    },
-    "table": {
-      "row": "Red {n}: {content}"
-    },
-    "math": {
-      "equation": "Matematika: {latex}"
-    },
-    "rotor": {
-      "headings": "Naslovi",
-      "links": "Poveznice",
-      "images": "Slike"
-    }
+      "list": {
+        "bulletPoint": "Točka liste",
+        "nestedBulletPoint": "Ugniježđena točka liste",
+        "orderedItem": "Stavka liste {n}",
+        "nestedOrderedItem": "Ugniježđena stavka liste {n}"
+      },
+      "blockquote": {
+        "quote": "Citat",
+        "nestedQuote": "Ugniježđeni citat"
+      },
+      "table": {
+        "row": "Red {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Naslovi",
+        "links": "Poveznice",
+        "images": "Slike"
+      }
     }
   },
   "language": {

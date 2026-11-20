@@ -188,27 +188,27 @@
     "organizationTrialEndedBillingAtKiloAi": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. kilo.ai에서 결제 정보를 업데이트한 후 다시 시도할 수 있습니다.",
     "viewOnGitHub": "GitHub에서 PR 보기",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "글머리 기호",
-      "nestedBulletPoint": "중첩 글머리 기호",
-      "orderedItem": "목록 항목 {n}",
-      "nestedOrderedItem": "중첩 목록 항목 {n}"
-    },
-    "blockquote": {
-      "quote": "인용",
-      "nestedQuote": "중첩 인용"
-    },
-    "table": {
-      "row": "행 {n}: {content}"
-    },
-    "math": {
-      "equation": "수학: {latex}"
-    },
-    "rotor": {
-      "headings": "제목",
-      "links": "링크",
-      "images": "이미지"
-    }
+      "list": {
+        "bulletPoint": "글머리 기호",
+        "nestedBulletPoint": "중첩 글머리 기호",
+        "orderedItem": "목록 항목 {n}",
+        "nestedOrderedItem": "중첩 목록 항목 {n}"
+      },
+      "blockquote": {
+        "quote": "인용",
+        "nestedQuote": "중첩 인용"
+      },
+      "table": {
+        "row": "행 {n}: {content}"
+      },
+      "math": {
+        "equation": "수학: {latex}"
+      },
+      "rotor": {
+        "headings": "제목",
+        "links": "링크",
+        "images": "이미지"
+      }
     }
   },
   "language": {

@@ -189,27 +189,27 @@
     "organizationTrialEndedBilling": "Probni period organizacije je završen i ona nema aktivan plan. Možete da ažurirate naplatu, a zatim pokušajte ponovo.",
     "organizationTrialEndedBillingAtKiloAi": "Probni period organizacije je završen i ona nema aktivan plan. Možete da ažurirate naplatu na kilo.ai, a zatim pokušajte ponovo.",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "Tačka spiska",
-      "nestedBulletPoint": "Ugnježđena tačka spiska",
-      "orderedItem": "Stavka spiska {n}",
-      "nestedOrderedItem": "Ugnježđena stavka spiska {n}"
-    },
-    "blockquote": {
-      "quote": "Citat",
-      "nestedQuote": "Ugnježđeni citat"
-    },
-    "table": {
-      "row": "Red {n}: {content}"
-    },
-    "math": {
-      "equation": "Matematika: {latex}"
-    },
-    "rotor": {
-      "headings": "Naslovi",
-      "links": "Veze",
-      "images": "Slike"
-    }
+      "list": {
+        "bulletPoint": "Tačka spiska",
+        "nestedBulletPoint": "Ugnježđena tačka spiska",
+        "orderedItem": "Stavka spiska {n}",
+        "nestedOrderedItem": "Ugnježđena stavka spiska {n}"
+      },
+      "blockquote": {
+        "quote": "Citat",
+        "nestedQuote": "Ugnježđeni citat"
+      },
+      "table": {
+        "row": "Red {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Naslovi",
+        "links": "Veze",
+        "images": "Slike"
+      }
     }
   },
   "language": {

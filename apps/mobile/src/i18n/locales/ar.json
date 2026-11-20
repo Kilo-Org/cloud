@@ -192,27 +192,27 @@
     "organizationTrialEndedBillingAtKiloAi": "انتهت الفترة التجريبية للمؤسسة ولم تعد لديها خطة نشطة. يمكنك تحديث الفوترة على kilo.ai، ثم المحاولة مرة أخرى.",
     "viewOnGitHub": "عرض PR على GitHub",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "نقطة تعداد",
-      "nestedBulletPoint": "نقطة تعداد متداخلة",
-      "orderedItem": "عنصر قائمة {n}",
-      "nestedOrderedItem": "عنصر قائمة متداخل {n}"
-    },
-    "blockquote": {
-      "quote": "اقتباس",
-      "nestedQuote": "اقتباس متداخل"
-    },
-    "table": {
-      "row": "صف {n}: {content}"
-    },
-    "math": {
-      "equation": "رياضيات: {latex}"
-    },
-    "rotor": {
-      "headings": "العناوين",
-      "links": "الروابط",
-      "images": "الصور"
-    }
+      "list": {
+        "bulletPoint": "نقطة تعداد",
+        "nestedBulletPoint": "نقطة تعداد متداخلة",
+        "orderedItem": "عنصر قائمة {n}",
+        "nestedOrderedItem": "عنصر قائمة متداخل {n}"
+      },
+      "blockquote": {
+        "quote": "اقتباس",
+        "nestedQuote": "اقتباس متداخل"
+      },
+      "table": {
+        "row": "صف {n}: {content}"
+      },
+      "math": {
+        "equation": "رياضيات: {latex}"
+      },
+      "rotor": {
+        "headings": "العناوين",
+        "links": "الروابط",
+        "images": "الصور"
+      }
     }
   },
   "language": {

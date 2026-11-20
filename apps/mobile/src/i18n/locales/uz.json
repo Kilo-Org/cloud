@@ -188,27 +188,27 @@
     "organizationTrialEndedBilling": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Siz hisob-kitobni yangilab, so'ng qayta urinib ko'rishingiz mumkin.",
     "organizationTrialEndedBillingAtKiloAi": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Siz kilo.ai saytida hisob-kitobni yangilab, so'ng qayta urinib ko'rishingiz mumkin.",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "Ro‘yxat belgisi",
-      "nestedBulletPoint": "Ichma-ich ro‘yxat belgisi",
-      "orderedItem": "Ro‘yxat elementi {n}",
-      "nestedOrderedItem": "Ichma-ich ro‘yxat elementi {n}"
-    },
-    "blockquote": {
-      "quote": "Iqtibos",
-      "nestedQuote": "Ichma-ich iqtibos"
-    },
-    "table": {
-      "row": "Qator {n}: {content}"
-    },
-    "math": {
-      "equation": "Matematika: {latex}"
-    },
-    "rotor": {
-      "headings": "Sarlavhalar",
-      "links": "Havolalar",
-      "images": "Rasmlar"
-    }
+      "list": {
+        "bulletPoint": "Ro‘yxat belgisi",
+        "nestedBulletPoint": "Ichma-ich ro‘yxat belgisi",
+        "orderedItem": "Ro‘yxat elementi {n}",
+        "nestedOrderedItem": "Ichma-ich ro‘yxat elementi {n}"
+      },
+      "blockquote": {
+        "quote": "Iqtibos",
+        "nestedQuote": "Ichma-ich iqtibos"
+      },
+      "table": {
+        "row": "Qator {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Sarlavhalar",
+        "links": "Havolalar",
+        "images": "Rasmlar"
+      }
     }
   },
   "language": {

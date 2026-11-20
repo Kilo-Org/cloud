@@ -188,27 +188,27 @@
     "organizationTrialEndedBillingAtKiloAi": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. Du kan oppdatere faktureringen på kilo.ai og deretter prøve igjen.",
     "viewOnGitHub": "Vis PR på GitHub",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "Punktmerke",
-      "nestedBulletPoint": "Nestet punktmerke",
-      "orderedItem": "Listeelement {n}",
-      "nestedOrderedItem": "Nestet listeelement {n}"
-    },
-    "blockquote": {
-      "quote": "Sitat",
-      "nestedQuote": "Nestet sitat"
-    },
-    "table": {
-      "row": "Rad {n}: {content}"
-    },
-    "math": {
-      "equation": "Matematikk: {latex}"
-    },
-    "rotor": {
-      "headings": "Overskrifter",
-      "links": "Lenker",
-      "images": "Bilder"
-    }
+      "list": {
+        "bulletPoint": "Punktmerke",
+        "nestedBulletPoint": "Nestet punktmerke",
+        "orderedItem": "Listeelement {n}",
+        "nestedOrderedItem": "Nestet listeelement {n}"
+      },
+      "blockquote": {
+        "quote": "Sitat",
+        "nestedQuote": "Nestet sitat"
+      },
+      "table": {
+        "row": "Rad {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematikk: {latex}"
+      },
+      "rotor": {
+        "headings": "Overskrifter",
+        "links": "Lenker",
+        "images": "Bilder"
+      }
     }
   },
   "language": {

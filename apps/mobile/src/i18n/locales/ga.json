@@ -191,27 +191,27 @@
     "organizationTrialEndedBillingAtKiloAi": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir leat an billeáil a nuashonrú ag kilo.ai agus ansin triail a bhaint as arís.",
     "viewOnGitHub": "Féach ar an PR ar GitHub",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "Urphointe",
-      "nestedBulletPoint": "Urphointe neadaithe",
-      "orderedItem": "Mír liosta {n}",
-      "nestedOrderedItem": "Mír liosta neadaithe {n}"
-    },
-    "blockquote": {
-      "quote": "Lua",
-      "nestedQuote": "Lua neadaithe"
-    },
-    "table": {
-      "row": "Ró {n}: {content}"
-    },
-    "math": {
-      "equation": "Matamaitic: {latex}"
-    },
-    "rotor": {
-      "headings": "Ceannteidil",
-      "links": "Naisc",
-      "images": "Íomhánna"
-    }
+      "list": {
+        "bulletPoint": "Urphointe",
+        "nestedBulletPoint": "Urphointe neadaithe",
+        "orderedItem": "Mír liosta {n}",
+        "nestedOrderedItem": "Mír liosta neadaithe {n}"
+      },
+      "blockquote": {
+        "quote": "Lua",
+        "nestedQuote": "Lua neadaithe"
+      },
+      "table": {
+        "row": "Ró {n}: {content}"
+      },
+      "math": {
+        "equation": "Matamaitic: {latex}"
+      },
+      "rotor": {
+        "headings": "Ceannteidil",
+        "links": "Naisc",
+        "images": "Íomhánna"
+      }
     }
   },
   "language": {

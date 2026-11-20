@@ -188,27 +188,27 @@
     "organizationTrialEndedBilling": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Ungabuyekeza ukukhokhela, bese uzama futhi.",
     "organizationTrialEndedBillingAtKiloAi": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Ungabuyekeza ukukhokhela ku-kilo.ai, bese uzama futhi.",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "Iphuzu lohlu",
-      "nestedBulletPoint": "Iphuzu lohlu olungaphakathi",
-      "orderedItem": "Into yohlu {n}",
-      "nestedOrderedItem": "Into yohlu engaphakathi {n}"
-    },
-    "blockquote": {
-      "quote": "Isicaphucaphu",
-      "nestedQuote": "Isicaphucaphu esingaphakathi"
-    },
-    "table": {
-      "row": "Umugqa {n}: {content}"
-    },
-    "math": {
-      "equation": "Izibalo: {latex}"
-    },
-    "rotor": {
-      "headings": "Izihloko",
-      "links": "Izixhumanisi",
-      "images": "Izithombe"
-    }
+      "list": {
+        "bulletPoint": "Iphuzu lohlu",
+        "nestedBulletPoint": "Iphuzu lohlu olungaphakathi",
+        "orderedItem": "Into yohlu {n}",
+        "nestedOrderedItem": "Into yohlu engaphakathi {n}"
+      },
+      "blockquote": {
+        "quote": "Isicaphucaphu",
+        "nestedQuote": "Isicaphucaphu esingaphakathi"
+      },
+      "table": {
+        "row": "Umugqa {n}: {content}"
+      },
+      "math": {
+        "equation": "Izibalo: {latex}"
+      },
+      "rotor": {
+        "headings": "Izihloko",
+        "links": "Izixhumanisi",
+        "images": "Izithombe"
+      }
     }
   },
   "language": {

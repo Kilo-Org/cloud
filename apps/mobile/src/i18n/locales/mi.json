@@ -188,27 +188,27 @@
     "organizationTrialEndedBillingAtKiloAi": "Kua mutu te whakamātautau o te rōpū, ā, kāore ōna mahere kaha. Ka taea e koe te whakahou i te nama i kilo.ai, kātahi ka whakamātau anō.",
     "viewOnGitHub": "Tirohia te PR i GitHub",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "Tohu rārangi",
-      "nestedBulletPoint": "Tohu rārangi whakauru",
-      "orderedItem": "Tūemi rārangi {n}",
-      "nestedOrderedItem": "Tūemi rārangi whakauru {n}"
-    },
-    "blockquote": {
-      "quote": "Whakahua",
-      "nestedQuote": "Whakahua whakauru"
-    },
-    "table": {
-      "row": "Rārangi {n}: {content}"
-    },
-    "math": {
-      "equation": "Pāngarau: {latex}"
-    },
-    "rotor": {
-      "headings": "Upoko",
-      "links": "Hono",
-      "images": "Whakaahua"
-    }
+      "list": {
+        "bulletPoint": "Tohu rārangi",
+        "nestedBulletPoint": "Tohu rārangi whakauru",
+        "orderedItem": "Tūemi rārangi {n}",
+        "nestedOrderedItem": "Tūemi rārangi whakauru {n}"
+      },
+      "blockquote": {
+        "quote": "Whakahua",
+        "nestedQuote": "Whakahua whakauru"
+      },
+      "table": {
+        "row": "Rārangi {n}: {content}"
+      },
+      "math": {
+        "equation": "Pāngarau: {latex}"
+      },
+      "rotor": {
+        "headings": "Upoko",
+        "links": "Hono",
+        "images": "Whakaahua"
+      }
     }
   },
   "language": {

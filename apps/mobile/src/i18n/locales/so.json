@@ -188,27 +188,27 @@
     "organizationTrialEndedBilling": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Waxaad cusboonaysiin kartaa biilasha, ka dibna isku day mar kale.",
     "organizationTrialEndedBillingAtKiloAi": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Waxaad cusboonaysiin kartaa biilasha kilo.ai, ka dibna isku day mar kale.",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "Dhibic liis",
-      "nestedBulletPoint": "Dhibic liis gudaha ah",
-      "orderedItem": "Shay liis {n}",
-      "nestedOrderedItem": "Shay liis gudaha ah {n}"
-    },
-    "blockquote": {
-      "quote": "Xigasho",
-      "nestedQuote": "Xigasho gudaha ah"
-    },
-    "table": {
-      "row": "Saf {n}: {content}"
-    },
-    "math": {
-      "equation": "Xisaab: {latex}"
-    },
-    "rotor": {
-      "headings": "Cinwaanno",
-      "links": "Xiriiriyeyaal",
-      "images": "Sawirro"
-    }
+      "list": {
+        "bulletPoint": "Dhibic liis",
+        "nestedBulletPoint": "Dhibic liis gudaha ah",
+        "orderedItem": "Shay liis {n}",
+        "nestedOrderedItem": "Shay liis gudaha ah {n}"
+      },
+      "blockquote": {
+        "quote": "Xigasho",
+        "nestedQuote": "Xigasho gudaha ah"
+      },
+      "table": {
+        "row": "Saf {n}: {content}"
+      },
+      "math": {
+        "equation": "Xisaab: {latex}"
+      },
+      "rotor": {
+        "headings": "Cinwaanno",
+        "links": "Xiriiriyeyaal",
+        "images": "Sawirro"
+      }
     }
   },
   "language": {

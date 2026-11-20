@@ -190,27 +190,27 @@
     "organizationTrialEndedBillingAtKiloAi": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Galite atnaujinti atsiskaitymo duomenis adresu kilo.ai, tada bandykite dar kartą.",
     "viewOnGitHub": "Peržiūrėti PR GitHub platformoje",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "Sąrašo punktas",
-      "nestedBulletPoint": "Įdėtasis sąrašo punktas",
-      "orderedItem": "Sąrašo elementas {n}",
-      "nestedOrderedItem": "Įdėtasis sąrašo elementas {n}"
-    },
-    "blockquote": {
-      "quote": "Citata",
-      "nestedQuote": "Įdėtoji citata"
-    },
-    "table": {
-      "row": "Eilutė {n}: {content}"
-    },
-    "math": {
-      "equation": "Matematika: {latex}"
-    },
-    "rotor": {
-      "headings": "Antraštės",
-      "links": "Nuorodos",
-      "images": "Paveikslėliai"
-    }
+      "list": {
+        "bulletPoint": "Sąrašo punktas",
+        "nestedBulletPoint": "Įdėtasis sąrašo punktas",
+        "orderedItem": "Sąrašo elementas {n}",
+        "nestedOrderedItem": "Įdėtasis sąrašo elementas {n}"
+      },
+      "blockquote": {
+        "quote": "Citata",
+        "nestedQuote": "Įdėtoji citata"
+      },
+      "table": {
+        "row": "Eilutė {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Antraštės",
+        "links": "Nuorodos",
+        "images": "Paveikslėliai"
+      }
     }
   },
   "language": {

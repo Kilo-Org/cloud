@@ -188,27 +188,27 @@
     "organizationTrialEndedBillingAtKiloAi": "Yeroon yaalii dhaabbataa xumurameera, karoora socho'aa hin qabu. Kaffaltii kilo.ai irratti haaromsuu danda'aa, sana booda irra deebi'ii yaali.",
     "viewOnGitHub": "PR GitHub irratti ilaali",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "Tuqaa tarree",
-      "nestedBulletPoint": "Tuqaa tarree keessaa",
-      "orderedItem": "Qabiyyee tarree {n}",
-      "nestedOrderedItem": "Qabiyyee tarree keessaa {n}"
-    },
-    "blockquote": {
-      "quote": "Wabii",
-      "nestedQuote": "Wabii keessaa"
-    },
-    "table": {
-      "row": "Tarree {n}: {content}"
-    },
-    "math": {
-      "equation": "Herrega: {latex}"
-    },
-    "rotor": {
-      "headings": "Mata dureewwan",
-      "links": "Liinkiiwwan",
-      "images": "Suuraawwan"
-    }
+      "list": {
+        "bulletPoint": "Tuqaa tarree",
+        "nestedBulletPoint": "Tuqaa tarree keessaa",
+        "orderedItem": "Qabiyyee tarree {n}",
+        "nestedOrderedItem": "Qabiyyee tarree keessaa {n}"
+      },
+      "blockquote": {
+        "quote": "Wabii",
+        "nestedQuote": "Wabii keessaa"
+      },
+      "table": {
+        "row": "Tarree {n}: {content}"
+      },
+      "math": {
+        "equation": "Herrega: {latex}"
+      },
+      "rotor": {
+        "headings": "Mata dureewwan",
+        "links": "Liinkiiwwan",
+        "images": "Suuraawwan"
+      }
     }
   },
   "language": {

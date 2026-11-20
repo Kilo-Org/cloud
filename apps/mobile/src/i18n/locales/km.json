@@ -188,27 +188,27 @@
     "organizationTrialEndedBillingAtKiloAi": "ការសាកល្បងរបស់ស្ថាប័នបានបញ្ចប់ ហើយវាមិនមានគម្រោងសកម្មទេ។ អ្នកអាចធ្វើបច្ចុប្បន្នភាពវិក្កយបត្រនៅ kilo.ai បន្ទាប់មកព្យាយាមម្តងទៀត។",
     "viewOnGitHub": "មើល PR នៅលើ GitHub",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "ចំណុចបញ្ជី",
-      "nestedBulletPoint": "ចំណុចបញ្ជីជាប់",
-      "orderedItem": "ធាតុបញ្ជី {n}",
-      "nestedOrderedItem": "ធាតុបញ្ជីជាប់ {n}"
-    },
-    "blockquote": {
-      "quote": "សម្រង់",
-      "nestedQuote": "សម្រង់ជាប់"
-    },
-    "table": {
-      "row": "ជួរដេក {n}៖ {content}"
-    },
-    "math": {
-      "equation": "គណិតវិទ្យា៖ {latex}"
-    },
-    "rotor": {
-      "headings": "ចំណងជើង",
-      "links": "តំណ",
-      "images": "រូបភាព"
-    }
+      "list": {
+        "bulletPoint": "ចំណុចបញ្ជី",
+        "nestedBulletPoint": "ចំណុចបញ្ជីជាប់",
+        "orderedItem": "ធាតុបញ្ជី {n}",
+        "nestedOrderedItem": "ធាតុបញ្ជីជាប់ {n}"
+      },
+      "blockquote": {
+        "quote": "សម្រង់",
+        "nestedQuote": "សម្រង់ជាប់"
+      },
+      "table": {
+        "row": "ជួរដេក {n}៖ {content}"
+      },
+      "math": {
+        "equation": "គណិតវិទ្យា៖ {latex}"
+      },
+      "rotor": {
+        "headings": "ចំណងជើង",
+        "links": "តំណ",
+        "images": "រូបភាព"
+      }
     }
   },
   "language": {

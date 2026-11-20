@@ -188,27 +188,27 @@
     "organizationTrialEndedBillingAtKiloAi": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Þú getur uppfært greiðsluupplýsingar á kilo.ai og reynir síðan aftur.",
     "viewOnGitHub": "Skoða PR á GitHub",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "Punktur",
-      "nestedBulletPoint": "Feltur punktur",
-      "orderedItem": "Listaatriði {n}",
-      "nestedOrderedItem": "Fellt listaatriði {n}"
-    },
-    "blockquote": {
-      "quote": "Tilvitnun",
-      "nestedQuote": "Feld tilvitnun"
-    },
-    "table": {
-      "row": "Röð {n}: {content}"
-    },
-    "math": {
-      "equation": "Stærðfræði: {latex}"
-    },
-    "rotor": {
-      "headings": "Fyrirsagnir",
-      "links": "Tenglar",
-      "images": "Myndir"
-    }
+      "list": {
+        "bulletPoint": "Punktur",
+        "nestedBulletPoint": "Feltur punktur",
+        "orderedItem": "Listaatriði {n}",
+        "nestedOrderedItem": "Fellt listaatriði {n}"
+      },
+      "blockquote": {
+        "quote": "Tilvitnun",
+        "nestedQuote": "Feld tilvitnun"
+      },
+      "table": {
+        "row": "Röð {n}: {content}"
+      },
+      "math": {
+        "equation": "Stærðfræði: {latex}"
+      },
+      "rotor": {
+        "headings": "Fyrirsagnir",
+        "links": "Tenglar",
+        "images": "Myndir"
+      }
     }
   },
   "language": {

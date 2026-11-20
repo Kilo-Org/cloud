@@ -188,27 +188,27 @@
     "organizationTrialEndedBillingAtKiloAi": "संस्थेची चाचणी संपली आहे आणि तिच्याकडे कोणतीही सक्रिय योजना नाही. तुम्ही kilo.ai वर बिलिंग अपडेट करू शकता, त्यानंतर पुन्हा प्रयत्न करा.",
     "viewOnGitHub": "GitHub वर PR पहा",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "बुलेट पॉइंट",
-      "nestedBulletPoint": "नेस्टेड बुलेट पॉइंट",
-      "orderedItem": "यादी आयटम {n}",
-      "nestedOrderedItem": "नेस्टेड यादी आयटम {n}"
-    },
-    "blockquote": {
-      "quote": "अवतरण",
-      "nestedQuote": "नेस्टेड अवतरण"
-    },
-    "table": {
-      "row": "ओळ {n}: {content}"
-    },
-    "math": {
-      "equation": "गणित: {latex}"
-    },
-    "rotor": {
-      "headings": "शीर्षके",
-      "links": "लिंक",
-      "images": "प्रतिमा"
-    }
+      "list": {
+        "bulletPoint": "बुलेट पॉइंट",
+        "nestedBulletPoint": "नेस्टेड बुलेट पॉइंट",
+        "orderedItem": "यादी आयटम {n}",
+        "nestedOrderedItem": "नेस्टेड यादी आयटम {n}"
+      },
+      "blockquote": {
+        "quote": "अवतरण",
+        "nestedQuote": "नेस्टेड अवतरण"
+      },
+      "table": {
+        "row": "ओळ {n}: {content}"
+      },
+      "math": {
+        "equation": "गणित: {latex}"
+      },
+      "rotor": {
+        "headings": "शीर्षके",
+        "links": "लिंक",
+        "images": "प्रतिमा"
+      }
     }
   },
   "language": {

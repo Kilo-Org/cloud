@@ -189,27 +189,27 @@
     "organizationTrialEndedBillingAtKiloAi": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Puoi aggiornare la fatturazione su kilo.ai, poi riprova.",
     "viewOnGitHub": "Visualizza la PR su GitHub",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "Punto elenco",
-      "nestedBulletPoint": "Punto elenco annidato",
-      "orderedItem": "Elemento elenco {n}",
-      "nestedOrderedItem": "Elemento elenco annidato {n}"
-    },
-    "blockquote": {
-      "quote": "Citazione",
-      "nestedQuote": "Citazione annidata"
-    },
-    "table": {
-      "row": "Riga {n}: {content}"
-    },
-    "math": {
-      "equation": "Matematica: {latex}"
-    },
-    "rotor": {
-      "headings": "Intestazioni",
-      "links": "Collegamenti",
-      "images": "Immagini"
-    }
+      "list": {
+        "bulletPoint": "Punto elenco",
+        "nestedBulletPoint": "Punto elenco annidato",
+        "orderedItem": "Elemento elenco {n}",
+        "nestedOrderedItem": "Elemento elenco annidato {n}"
+      },
+      "blockquote": {
+        "quote": "Citazione",
+        "nestedQuote": "Citazione annidata"
+      },
+      "table": {
+        "row": "Riga {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematica: {latex}"
+      },
+      "rotor": {
+        "headings": "Intestazioni",
+        "links": "Collegamenti",
+        "images": "Immagini"
+      }
     }
   },
   "language": {

@@ -190,27 +190,27 @@
     "organizationTrialEndedBilling": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Obračun lahko posodobiš, nato poskusi znova.",
     "organizationTrialEndedBillingAtKiloAi": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Obračun lahko posodobiš na kilo.ai, nato poskusi znova.",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "Alineja",
-      "nestedBulletPoint": "Gnezdena alineja",
-      "orderedItem": "Element seznama {n}",
-      "nestedOrderedItem": "Gnezdeni element seznama {n}"
-    },
-    "blockquote": {
-      "quote": "Citat",
-      "nestedQuote": "Gnezdeni citat"
-    },
-    "table": {
-      "row": "Vrstica {n}: {content}"
-    },
-    "math": {
-      "equation": "Matematika: {latex}"
-    },
-    "rotor": {
-      "headings": "Naslovi",
-      "links": "Povezave",
-      "images": "Slike"
-    }
+      "list": {
+        "bulletPoint": "Alineja",
+        "nestedBulletPoint": "Gnezdena alineja",
+        "orderedItem": "Element seznama {n}",
+        "nestedOrderedItem": "Gnezdeni element seznama {n}"
+      },
+      "blockquote": {
+        "quote": "Citat",
+        "nestedQuote": "Gnezdeni citat"
+      },
+      "table": {
+        "row": "Vrstica {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Naslovi",
+        "links": "Povezave",
+        "images": "Slike"
+      }
     }
   },
   "language": {

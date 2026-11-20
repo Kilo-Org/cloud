@@ -188,27 +188,27 @@
     "organizationTrialEndedBilling": "நிறுவனத்தின் சோதனைக் காலம் முடிந்துவிட்டது, மேலும் செயலில் உள்ள திட்டம் எதுவும் இல்லை. நீங்கள் பில்லிங்கைப் புதுப்பித்து, பின்னர் மீண்டும் முயற்சிக்கலாம்.",
     "organizationTrialEndedBillingAtKiloAi": "நிறுவனத்தின் சோதனைக் காலம் முடிந்துவிட்டது, மேலும் செயலில் உள்ள திட்டம் எதுவும் இல்லை. நீங்கள் kilo.ai இல் பில்லிங்கைப் புதுப்பித்து, பின்னர் மீண்டும் முயற்சிக்கலாம்.",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "புல்லெட் புள்ளி",
-      "nestedBulletPoint": "உள்ளமை புல்லெட் புள்ளி",
-      "orderedItem": "பட்டியல் உருப்படி {n}",
-      "nestedOrderedItem": "உள்ளமை பட்டியல் உருப்படி {n}"
-    },
-    "blockquote": {
-      "quote": "மேற்கோள்",
-      "nestedQuote": "உள்ளமை மேற்கோள்"
-    },
-    "table": {
-      "row": "வரிசை {n}: {content}"
-    },
-    "math": {
-      "equation": "கணிதம்: {latex}"
-    },
-    "rotor": {
-      "headings": "தலைப்புகள்",
-      "links": "இணைப்புகள்",
-      "images": "படங்கள்"
-    }
+      "list": {
+        "bulletPoint": "புல்லெட் புள்ளி",
+        "nestedBulletPoint": "உள்ளமை புல்லெட் புள்ளி",
+        "orderedItem": "பட்டியல் உருப்படி {n}",
+        "nestedOrderedItem": "உள்ளமை பட்டியல் உருப்படி {n}"
+      },
+      "blockquote": {
+        "quote": "மேற்கோள்",
+        "nestedQuote": "உள்ளமை மேற்கோள்"
+      },
+      "table": {
+        "row": "வரிசை {n}: {content}"
+      },
+      "math": {
+        "equation": "கணிதம்: {latex}"
+      },
+      "rotor": {
+        "headings": "தலைப்புகள்",
+        "links": "இணைப்புகள்",
+        "images": "படங்கள்"
+      }
     }
   },
   "language": {

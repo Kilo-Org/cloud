@@ -188,27 +188,27 @@
     "organizationTrialEndedBillingAtKiloAi": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Sie können die Abrechnung unter kilo.ai aktualisieren und es dann erneut versuchen.",
     "viewOnGitHub": "PR auf GitHub ansehen",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "Aufzählungspunkt",
-      "nestedBulletPoint": "Verschachtelter Aufzählungspunkt",
-      "orderedItem": "Listeneintrag {n}",
-      "nestedOrderedItem": "Verschachtelter Listeneintrag {n}"
-    },
-    "blockquote": {
-      "quote": "Zitatblock",
-      "nestedQuote": "Verschachtelter Zitatblock"
-    },
-    "table": {
-      "row": "Zeile {n}: {content}"
-    },
-    "math": {
-      "equation": "Mathematik: {latex}"
-    },
-    "rotor": {
-      "headings": "Überschriften",
-      "links": "Links",
-      "images": "Bilder"
-    }
+      "list": {
+        "bulletPoint": "Aufzählungspunkt",
+        "nestedBulletPoint": "Verschachtelter Aufzählungspunkt",
+        "orderedItem": "Listeneintrag {n}",
+        "nestedOrderedItem": "Verschachtelter Listeneintrag {n}"
+      },
+      "blockquote": {
+        "quote": "Zitatblock",
+        "nestedQuote": "Verschachtelter Zitatblock"
+      },
+      "table": {
+        "row": "Zeile {n}: {content}"
+      },
+      "math": {
+        "equation": "Mathematik: {latex}"
+      },
+      "rotor": {
+        "headings": "Überschriften",
+        "links": "Links",
+        "images": "Bilder"
+      }
     }
   },
   "language": {

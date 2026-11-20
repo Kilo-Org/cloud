@@ -188,27 +188,27 @@
     "organizationTrialEndedBillingAtKiloAi": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም። በkilo.ai ላይ የክፍያ መረጃን ማዘመን ይችላሉ፣ ከዚያ እንደገና ይሞክሩ።",
     "viewOnGitHub": "PRን በGitHub እይ",
     "markdownA11y": {
-    "list": {
-      "bulletPoint": "የዝርዝር ነጥብ",
-      "nestedBulletPoint": "የጎጆ ዝርዝር ነጥብ",
-      "orderedItem": "የዝርዝር ንጥል {n}",
-      "nestedOrderedItem": "የጎጆ ዝርዝር ንጥል {n}"
-    },
-    "blockquote": {
-      "quote": "ጥቅስ",
-      "nestedQuote": "የጎጆ ጥቅስ"
-    },
-    "table": {
-      "row": "ረድፍ {n}፦ {content}"
-    },
-    "math": {
-      "equation": "ሒሳብ፦ {latex}"
-    },
-    "rotor": {
-      "headings": "አርዕስቶች",
-      "links": "አገናኞች",
-      "images": "ምስሎች"
-    }
+      "list": {
+        "bulletPoint": "የዝርዝር ነጥብ",
+        "nestedBulletPoint": "የጎጆ ዝርዝር ነጥብ",
+        "orderedItem": "የዝርዝር ንጥል {n}",
+        "nestedOrderedItem": "የጎጆ ዝርዝር ንጥል {n}"
+      },
+      "blockquote": {
+        "quote": "ጥቅስ",
+        "nestedQuote": "የጎጆ ጥቅስ"
+      },
+      "table": {
+        "row": "ረድፍ {n}፦ {content}"
+      },
+      "math": {
+        "equation": "ሒሳብ፦ {latex}"
+      },
+      "rotor": {
+        "headings": "አርዕስቶች",
+        "links": "አገናኞች",
+        "images": "ምስሎች"
+      }
     }
   },
   "language": {

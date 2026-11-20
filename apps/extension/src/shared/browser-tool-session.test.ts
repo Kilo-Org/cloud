@@ -523,6 +523,16 @@ const createFramedScriptingSession = () => {
   ];
   const isolatedKinds: string[] = [];
   const mainWorldFrames: (number | undefined)[] = [];
+  const pressedIn = new Set<string>();
+
+  for (const [name, dom] of [
+    ['shop', shop],
+    ['pay', pay],
+  ] as const) {
+    dom.window.document.addEventListener('keydown', () => {
+      pressedIn.add(name);
+    });
+  }
   const updatedListeners: TabUpdatedListener[] = [];
   const scriptingApi: BrowserScriptingApi = {
     executeScript: async details => {
@@ -550,6 +560,10 @@ const createFramedScriptingSession = () => {
         });
         await withPageGlobals(
           {
+            Event: dom.window.Event,
+            HTMLInputElement: dom.window.HTMLInputElement,
+            HTMLSelectElement: dom.window.HTMLSelectElement,
+            HTMLTextAreaElement: dom.window.HTMLTextAreaElement,
             KeyboardEvent: dom.window.KeyboardEvent,
             MouseEvent: dom.window.MouseEvent,
             document: dom.window.document,
@@ -587,6 +601,8 @@ const createFramedScriptingSession = () => {
     isolatedKinds,
     mainWorldFrames,
     pay,
+    // Where a dispatched key landed, by document name: the tab's own document versus the frame's.
+    pressedIn: () => [...pressedIn].toSorted(),
     session: createBrowserToolSession({ scriptingApi, tabId: 7, tabsApi }),
     shop,
   };
@@ -2039,34 +2055,51 @@ describe('browser tool session scripting backend', () => {
     });
   });
 
-  it('presses a key in the frame a typed ref focused, not the top document', async () => {
-    const { mainWorldFrames, pay, session, shop } = createFramedScriptingSession();
-    const pressed: string[] = [];
+  it('presses a key in the frame a typed ref focused, across the separate calls the runtime makes', async () => {
+    const { mainWorldFrames, pressedIn, session } = createFramedScriptingSession();
 
-    for (const [name, dom] of [
-      ['shop', shop],
-      ['pay', pay],
-    ] as const) {
-      dom.window.document.addEventListener('keydown', () => {
-        pressed.push(name);
-      });
-    }
+    // The runtime binds a fresh view per tool message; only the caller key is the same.
+    const typeCall = session.bindCaller('cli-session');
+    const pressCall = session.bindCaller('cli-session');
 
-    await session.callTool('browser_snapshot', {}, { readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] });
-    await session.callTool(
+    await typeCall.callTool('browser_snapshot', {}, { readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] });
+    const typed = await typeCall.callTool(
       'browser_type',
       { target: 'e4', text: 'igor@example.com' },
       { readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] }
     );
+
+    expect(typed).toMatchObject({ ok: true });
     mainWorldFrames.length = 0;
 
-    await expect(session.callTool('browser_press_key', { key: 'Enter' })).resolves.toStrictEqual({
+    await expect(pressCall.callTool('browser_press_key', { key: 'Enter' })).resolves.toStrictEqual({
       ok: true,
       value: 'Pressed Enter.',
     });
     // Enter must reach the field's own document: the top document's <iframe> element would swallow it.
-    expect(pressed).toStrictEqual(['pay']);
+    expect(pressedIn()).toStrictEqual(['pay']);
     expect(mainWorldFrames).toStrictEqual([4]);
+  });
+
+  it('keeps the previous focus when a type call fails', async () => {
+    const { mainWorldFrames, pressedIn, session } = createFramedScriptingSession();
+
+    const typeCall = session.bindCaller('cli-session');
+    const pressCall = session.bindCaller('cli-session');
+
+    const failed = await typeCall.callTool(
+      'browser_type',
+      { target: 'e404', text: 'x' },
+      { readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] }
+    );
+
+    expect(failed.ok).toBe(false);
+    mainWorldFrames.length = 0;
+
+    await pressCall.callTool('browser_press_key', { key: 'Enter' });
+
+    expect(pressedIn()).toStrictEqual(['shop']);
+    expect(mainWorldFrames).toStrictEqual([undefined]);
   });
 
   it('caps a caller’s merged refs, dropping the oldest earlier refs first', async () => {

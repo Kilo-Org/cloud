@@ -95,6 +95,8 @@ export const getFirefoxUnsupportedToolError = (tool: string): string | undefined
 export const MAX_BROWSER_TOOL_WAIT_MS = 15_000;
 /** Refs one caller's registry keeps: merged snapshots and finds would otherwise grow it for as long as a document lives. */
 export const MAX_BROWSER_TOOL_REFS = 5000;
+/** The key the session's own (unbound) view uses for its refs and focus. */
+const UNBOUND_CALLER_KEY = '';
 /** Soft timeout for one scripting tool action; larger than the debugger's default for snapshot-sized results. */
 const SCRIPTING_ACTION_TIMEOUT_MS = 20_000;
 /** Longest a navigation waits for the browser to report the new page complete; the debugger path waits as long. */
@@ -1245,9 +1247,9 @@ interface FocusedFrame {
 }
 
 interface ScriptingCallContext {
+  /** The caller's focus for this tab; kept beside its refs so it outlives one call's view. */
+  readonly callerKey: string;
   readonly refs: Map<string, BrowserToolRefEntry>;
-  /** The frame the last `browser_type` focused, so a following `browser_press_key` types into it. */
-  readonly focusedFrame: FocusedFrame;
   readonly scope?: BrowserToolCallScope | undefined;
 }
 
@@ -1613,8 +1615,6 @@ export const createBrowserToolSession = ({
   // Refs belong to a caller, not a tab: two side-panel conversations (or a workflow and a panel) must not invalidate each other's snapshots.
   const refsByCaller = new Map<string, Map<string, BrowserToolRefEntry>>();
   const defaultRefs = new Map<string, BrowserToolRefEntry>();
-  // The unbound view's focused frame, kept beside its refs.
-  const defaultFocusedFrame: FocusedFrame = { frameId: undefined };
   let attached = false;
   let disposed = false;
   let focusEmulated = false;
@@ -1647,6 +1647,21 @@ export const createBrowserToolSession = ({
   let webMcpDiscovery: { documentId: string; tools: readonly WebMcpToolDescriptor[] } | undefined =
     undefined;
 
+  // The frame each caller's last successful `browser_type` focused, so its next `browser_press_key` types there. It lives beside the caller's refs because a view is rebuilt per call.
+  const focusedFrames = new Map<string, FocusedFrame>();
+
+  const callerFocus = (callerKey: string): FocusedFrame => {
+    const existing = focusedFrames.get(callerKey);
+
+    if (existing !== undefined) {
+      return existing;
+    }
+
+    const created: FocusedFrame = { frameId: undefined };
+    focusedFrames.set(callerKey, created);
+    return created;
+  };
+
   const callerRefs = (callerKey: string): Map<string, BrowserToolRefEntry> => {
     const existing = refsByCaller.get(callerKey);
 
@@ -1666,6 +1681,8 @@ export const createBrowserToolSession = ({
       refs.clear();
     }
     refsByCaller.clear();
+    // A new document has no focus to inherit: the next press belongs to the tab's own document until a type focuses a frame again.
+    focusedFrames.clear();
   };
 
   const clearState = (): void => {
@@ -3394,9 +3411,9 @@ export const createBrowserToolSession = ({
           return { error: 'browser_press_key needs a key.', ok: false };
         }
 
-        // The key goes to the document that holds the focus: the frame of the last typed ref, else the tab's own.
+        // The key goes to the document that holds the focus: the frame of the last successful type, else the tab's own.
         return runPageTool(buildPressKeyPageScript({ key: parsed.data.key }), {
-          frameId: call.focusedFrame.frameId,
+          frameId: callerFocus(call.callerKey).frameId,
         });
       }
 
@@ -3537,10 +3554,7 @@ export const createBrowserToolSession = ({
           return { error: resolved.error, ok: false };
         }
 
-        // A following `browser_press_key` (Enter to submit, Tab to move on) belongs to this field's document, not the top one.
-        call.focusedFrame.frameId = resolved.frameId;
-
-        return runPageTool(
+        const typed = await runPageTool(
           buildTypePageScript({
             selector: resolved.selector,
             slowly: parsed.data.slowly ?? false,
@@ -3549,6 +3563,13 @@ export const createBrowserToolSession = ({
           }),
           { frameId: resolved.frameId }
         );
+
+        // A following `browser_press_key` (Enter to submit, Tab to move on) belongs to this field's document, not the top one. A type that failed moved no focus, so the previous target stands.
+        if (typed.ok) {
+          callerFocus(call.callerKey).frameId = resolved.frameId;
+        }
+
+        return typed;
       }
 
       case 'browser_wait_for': {
@@ -3720,8 +3741,6 @@ export const createBrowserToolSession = ({
     refs: Map<string, BrowserToolRefEntry>,
     guard?: BrowserToolCallGuard
   ): BrowserToolSession => {
-    // The frame the caller's last `browser_type` focused; a later call of the same caller presses its keys there.
-    const focusedFrame: FocusedFrame = { frameId: undefined };
     const throwIfCancelled = (): void => {
       if (guard?.cancelled() === true) {
         throw new Error(TAB_TAKEN_ERROR);
@@ -3736,7 +3755,7 @@ export const createBrowserToolSession = ({
       callTool: (toolName, args, scope) => {
         throwIfCancelled();
 
-        return runCallTool(toolName, args ?? {}, { focusedFrame, refs, scope });
+        return runCallTool(toolName, args ?? {}, { callerKey, refs, scope });
       },
       captureViewportImage: (format, options, callGuard) => {
         throwIfCancelled();
@@ -3749,11 +3768,13 @@ export const createBrowserToolSession = ({
       dispose: () => {
         refs.clear();
         refsByCaller.delete(callerKey);
+        focusedFrames.delete(callerKey);
         return Promise.resolve();
       },
       disposeCaller: key => {
         refsByCaller.get(key)?.clear();
         refsByCaller.delete(key);
+        focusedFrames.delete(key);
       },
       downloads: () => [...downloadBuffer],
       evaluateInTab,
@@ -3795,7 +3816,7 @@ export const createBrowserToolSession = ({
     bindCaller: (callerKey, guard) => createCallerView(callerKey, callerRefs(callerKey), guard),
     callTool: (toolName, args, scope) =>
       runCallTool(toolName, args ?? {}, {
-        focusedFrame: defaultFocusedFrame,
+        callerKey: UNBOUND_CALLER_KEY,
         refs: defaultRefs,
         scope,
       }),
@@ -3806,6 +3827,7 @@ export const createBrowserToolSession = ({
     disposeCaller: callerKey => {
       refsByCaller.get(callerKey)?.clear();
       refsByCaller.delete(callerKey);
+      focusedFrames.delete(callerKey);
     },
     downloads: () => [...downloadBuffer],
     evaluateInTab,

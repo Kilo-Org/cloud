@@ -49,6 +49,13 @@ export type GlanceableCountFormat = (value: number) => string;
  * split layouts draw the number and its noun as two separately styled text
  * nodes — the hero's numeral beside its label — where a whole sentence cannot
  * be one string, and each node still has to agree with the other.
+ *
+ * The Android Home widget and its notification read these. The iOS widget
+ * layouts still draw the uninflected noun: its native store rebuilds every
+ * count label from a kind-to-copy map (`HomeWidgetRefreshStore.swift`), so a
+ * plural-selected label chosen here would not survive the write. The
+ * cross-platform props therefore keep `translate(key)` for the count labels
+ * until that native map carries a form per number.
  */
 export const GLANCEABLE_COUNT_NOUN_KEY = {
   needsInput: 'glanceable.countNoun.needsInput',

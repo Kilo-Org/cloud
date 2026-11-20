@@ -73,6 +73,12 @@ const ACTION_FEEDBACK_KEYS = {
  * The card's wake line, and whether it states a wake already behind us. One
  * read of the clock decides both, so the copy and its muted ink cannot
  * disagree about which case the line draws.
+ *
+ * The line is one message, so its wording and the place of the time belong to
+ * the translator. The shared prefix keys (`glanceable.nextRun`, `wasDue`,
+ * `checked`, `lastKnown`) stay for the surfaces that still paste a prefix onto
+ * a clock: the iOS layout draws the time as its own SwiftUI text node, and the
+ * in-app Home card and the native copy payload read them unchanged.
  */
 function wakeLine(
   home: HomeWidgetPresentation,

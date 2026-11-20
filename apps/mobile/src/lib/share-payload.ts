@@ -332,17 +332,16 @@ export async function restoreSharePayloads(userId: string): Promise<void> {
   }
 
   // Merge in recorded order, never clearing an entry staged by another owner.
-  // The store is one bounded FIFO, so the merge stops at the cap instead of
-  // evicting: what this process already staged stays readable to the delivery
-  // that is about to consume it, and the account's oldest retained entries
-  // fill the room that is left.
+  // The store is one bounded FIFO, so the restore takes the NEWEST retained
+  // entries that fit instead of evicting: what this process already staged
+  // stays readable to the delivery that is about to consume it, and the newest
+  // retained share is the one a pending-share hint is most likely to name.
+  const free = SHARE_PAYLOAD_MAX_ENTRIES - payloads.size;
+  const retained = draft.order.filter(id => draft.entries[id] !== undefined && !payloads.has(id));
   const restored: SharePayload[] = [];
-  for (const id of draft.order) {
-    if (payloads.size >= SHARE_PAYLOAD_MAX_ENTRIES) {
-      break;
-    }
+  for (const id of retained.slice(-Math.max(free, 0))) {
     const entry = draft.entries[id];
-    if (entry && !payloads.has(id)) {
+    if (entry !== undefined) {
       const payload: SharePayload = {
         text: entry.text,
         files: entry.files.map(file => ({ name: file.name, uri: file.uri })),

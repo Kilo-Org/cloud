@@ -546,7 +546,7 @@ describe('share payload durable persistence', () => {
   it('writes no account draft for a capture staged before an account resolved', async () => {
     const stagedOut = putSharePayload({ text: 'captured-out', files: [], failedFiles: [] });
 
-    // The identity resolves and the flush that follows it runs.
+    // The identity resolves and the account's snapshot is written.
     setSharePersistUserId('u1');
     await persistSharePayloadsNow();
 
@@ -594,16 +594,15 @@ describe('share payload durable persistence', () => {
     expect(draft?.entries[owned]?.text).toBe('staged-by-a');
   });
 
-  it('keeps a live capture when the account draft alone fills the cap', async () => {
-    // A full account draft: the cap is reached by the account's own entries.
-    setSharePersistUserId('userA');
-    const owned: string[] = [];
-    for (let i = 0; i < SHARE_PAYLOAD_MAX_ENTRIES; i += 1) {
-      owned.push(putSharePayload({ text: `a-${i}`, files: [], failedFiles: [] }));
-    }
-    await persistSharePayloadsNow();
-    clearAccountStagedSharePayloads();
-    setSharePersistUserId(null);
+  it('restores the newest retained entries that fit beside a live capture', async () => {
+    // The account's draft holds more entries than the store can take, left by
+    // that account's previous session.
+    const owned = Array.from({ length: SHARE_PAYLOAD_MAX_ENTRIES + 1 }, (_, i) => `a-${i}`);
+    saveDraft('userA', SHARE_PAYLOADS_DRAFT_KEY, {
+      order: owned,
+      entries: Object.fromEntries(owned.map(id => [id, { text: id, files: [], failedFiles: [] }])),
+    });
+    await flushDraft('userA', SHARE_PAYLOADS_DRAFT_KEY);
 
     // A capture the person is about to deliver, staged before the account resolved.
     const captureUri = 'file:///cache/capture.jpg';
@@ -620,10 +619,12 @@ describe('share payload durable persistence', () => {
     setSharePersistUserId('userA');
     await restoreSharePayloads('userA');
 
-    // The capture stays readable and its cache copy intact, and the store holds
-    // the cap rather than the cap plus one.
+    // The capture stays readable with its cache copy intact, the store holds the
+    // cap, and the newest retained entries are the ones that fit.
     expect(peekSharePayload(stagedOut)?.text).toBe('captured-out');
     expect(deleted).toEqual([]);
+    expect(peekSharePayload(owned.at(-1) ?? '')?.text).toBe(owned.at(-1));
+    expect(peekSharePayload(owned[0] ?? '')).toBeNull();
     const live = owned.filter(id => peekSharePayload(id) !== null);
     expect(live.length).toBe(SHARE_PAYLOAD_MAX_ENTRIES - 1);
   });

@@ -111,23 +111,21 @@ export async function restoreShareNavigation(userId: string): Promise<void> {
   if (!draft) {
     return;
   }
-  // Merge in recorded order, and stop at the cap instead of dropping from the
-  // front: a destination this process staged stays deliverable, and the
-  // account's oldest retained destinations fill the room that is left. A
+  // Merge in recorded order without evicting: a destination this process staged
+  // stays deliverable, and the NEWEST retained destinations that fit fill the
+  // room that is left, matching the store's drop-the-oldest policy. A
   // payload-bearing destination is queued only when its payload is staged, so
   // delivery never receives an id the store cannot resolve; a destination with
   // no payload (a Review PR route) has nothing to resolve and always queues.
-  for (const entry of draft) {
-    if (pendingQueue.length >= SHARE_PAYLOAD_MAX_ENTRIES) {
-      break;
-    }
-    const deliverable = entry.shareId === null || peekSharePayload(entry.shareId) !== null;
-    if (deliverable) {
-      pendingQueue.push({
-        pending: { href: entry.href, shareId: entry.shareId },
-        stagedUserId: userId,
-      });
-    }
+  const free = SHARE_PAYLOAD_MAX_ENTRIES - pendingQueue.length;
+  const deliverable = draft.filter(
+    entry => entry.shareId === null || peekSharePayload(entry.shareId) !== null
+  );
+  for (const entry of deliverable.slice(-Math.max(free, 0))) {
+    pendingQueue.push({
+      pending: { href: entry.href, shareId: entry.shareId },
+      stagedUserId: userId,
+    });
   }
 }
 

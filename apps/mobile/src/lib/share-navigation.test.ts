@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  __resetSharePayloadStoreForTests,
   putSharePayload,
   restoreSharePayload,
   setSharePersistUserId,
@@ -181,9 +182,14 @@ describe('share navigation durable persistence', () => {
     );
   });
 
+  beforeEach(() => {
+    __resetSharePayloadStoreForTests();
+  });
+
   afterEach(() => {
     __resetPendingShareNavigationForTests();
     setSharePersistUserId(null);
+    __resetSharePayloadStoreForTests();
   });
 
   // A delivery always names a staged payload: the cold start restores the
@@ -379,11 +385,13 @@ describe('share navigation account boundary', () => {
   beforeEach(() => {
     __resetPendingShareNavigationForTests();
     setSharePersistUserId(null);
+    __resetSharePayloadStoreForTests();
   });
 
   afterEach(() => {
     __resetPendingShareNavigationForTests();
     setSharePersistUserId(null);
+    __resetSharePayloadStoreForTests();
   });
 
   it('drops a destination staged under an account, with its payload id and organization scope', () => {

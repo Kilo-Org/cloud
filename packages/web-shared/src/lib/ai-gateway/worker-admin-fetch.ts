@@ -7,12 +7,24 @@ export type WorkerAdminResult<T> = {
   body: T;
 };
 
-export type ErrorBody = { error: string };
-export const ErrorBodySchema = z.object({ error: z.string() });
+export const ErrorBodySchema = z.object({ error: z.string(), message: z.string().optional() });
+export type ErrorBody = z.infer<typeof ErrorBodySchema>;
+
+/**
+ * Default deadline for a worker admin call without its own signal. The slowest admin
+ * route observed in production, starting a benchmark run, took up to 22 s before run
+ * initialization left the request.
+ */
+export const WORKER_ADMIN_TIMEOUT_MS = 30_000;
 
 type WorkerAdminRequestInit = Omit<RequestInit, 'headers'> & {
   headers?: Record<string, string>;
 };
+
+async function readErrorBody(response: Response): Promise<ErrorBody> {
+  const parsed = ErrorBodySchema.safeParse(await response.json().catch(() => undefined));
+  return parsed.success ? parsed.data : { error: `Request failed: ${response.status}` };
+}
 
 export function createWorkerAdminFetch(options: {
   workerUrl: string | undefined;
@@ -31,28 +43,31 @@ export function createWorkerAdminFetch(options: {
       };
     }
 
-    const response = await fetch(endpoint.toString(), {
-      ...init,
-      headers: {
-        authorization: `Bearer ${INTERNAL_API_SECRET}`,
-        ...init.headers,
-      },
-    });
+    const signal = init.signal ?? AbortSignal.timeout(WORKER_ADMIN_TIMEOUT_MS);
+    let response: Response;
+    try {
+      response = await fetch(endpoint.toString(), {
+        ...init,
+        signal,
+        headers: {
+          authorization: `Bearer ${INTERNAL_API_SECRET}`,
+          ...init.headers,
+        },
+      });
+    } catch (error) {
+      if (signal !== init.signal && signal.aborted) {
+        return { status: 504, body: { error: 'Worker request timed out' } };
+      }
+      throw error;
+    }
 
-    const body: unknown = await response.json();
     if (!response.ok) {
-      const parsedError = ErrorBodySchema.safeParse(body);
-      return {
-        status: response.status,
-        body: parsedError.success
-          ? parsedError.data
-          : { error: `Request failed: ${response.status}` },
-      };
+      return { status: response.status, body: await readErrorBody(response) };
     }
 
     return {
       status: response.status,
-      body: schema.parse(body),
+      body: schema.parse(await response.json()),
     };
   };
 }

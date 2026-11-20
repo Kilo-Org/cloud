@@ -80,6 +80,7 @@ describe('auto routing benchmark admin client', () => {
       'https://benchmark-worker.example.com/admin/config?router=efficient',
       {
         method: 'PUT',
+        signal: expect.any(AbortSignal),
         headers: {
           authorization: 'Bearer test-internal-secret',
           'content-type': 'application/json',
@@ -106,6 +107,7 @@ describe('auto routing benchmark admin client', () => {
       'https://benchmark-worker.example.com/admin/runs?router=efficient',
       {
         method: 'GET',
+        signal: expect.any(AbortSignal),
         headers: {
           authorization: 'Bearer test-internal-secret',
         },
@@ -148,6 +150,7 @@ describe('auto routing benchmark admin client', () => {
       'https://benchmark-worker.example.com/admin/runs?router=efficient',
       {
         method: 'POST',
+        signal: expect.any(AbortSignal),
         headers: {
           authorization: 'Bearer test-internal-secret',
           'content-type': 'application/json',
@@ -184,6 +187,7 @@ describe('auto routing benchmark admin client', () => {
       'https://benchmark-worker.example.com/admin/runs?router=efficient',
       {
         method: 'POST',
+        signal: expect.any(AbortSignal),
         headers: {
           authorization: 'Bearer test-internal-secret',
           'content-type': 'application/json',
@@ -215,6 +219,7 @@ describe('auto routing benchmark admin client', () => {
       'https://benchmark-worker.example.com/admin/routing-table?router=efficient',
       {
         method: 'GET',
+        signal: expect.any(AbortSignal),
         headers: {
           authorization: 'Bearer test-internal-secret',
         },

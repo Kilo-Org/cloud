@@ -49,7 +49,17 @@ import {
   type ProfileRow,
 } from './profiles';
 import { variantFromStorage } from './reasoning-effort';
-import { CLIENT_EVAL_REVISION, deciderCasesForRouter } from './measurement-revision';
+import {
+  ACTIVE_MEASUREMENT_REVISION,
+  CLIENT_EVAL_REVISION,
+  deciderCasesForRouter,
+  PROBE_REVISION,
+} from './measurement-revision';
+import {
+  dropIneligibleAgenticResults,
+  dropIneligibleAgenticSummaries,
+  pairsMissingProbeResults,
+} from './probe/eligibility';
 import { buildCustomRoutingTable, filterSummariesByProvenance } from './routing-table-builder';
 
 type ModelCatalog = z.infer<typeof BenchmarkModelCatalogSchema>;
@@ -324,7 +334,7 @@ export async function assembleCustomRouterTable(
     return { table: null };
   }
 
-  const [platformSummaries, platformCases, clientCases] = await Promise.all([
+  const [allPlatformSummaries, allPlatformCases, clientCases] = await Promise.all([
     getSummariesForRuns(db, [...new Set([...platformReady, ...linkedReady].map(r => r.runId))]),
     getRoutingCaseResultsForEntries(db, [...platformReady, ...linkedReady]),
     getClientRoutingCaseResults(
@@ -332,6 +342,19 @@ export async function assembleCustomRouterTable(
       clientReady.map(r => r.profile)
     ),
   ]);
+  // Same route-scoped rule as the platform table (src/probe/eligibility.ts): a platform pair
+  // whose run lacks complete probe results keeps every route the owner chose except the
+  // agentic ones, and a route it alone covered is omitted from this sparse table.
+  const probesActive =
+    context.baseRouter === 'efficient' && ACTIVE_MEASUREMENT_REVISION >= PROBE_REVISION;
+  const ineligible = probesActive
+    ? await pairsMissingProbeResults(db, {
+        entries: [...platformReady, ...linkedReady],
+        revision: PROBE_REVISION,
+      })
+    : new Set<string>();
+  const platformSummaries = dropIneligibleAgenticSummaries(allPlatformSummaries, ineligible);
+  const platformCases = dropIneligibleAgenticResults(allPlatformCases, ineligible);
   // A profile's run id changes with every upload, so new results produce a new table version.
   const clientEntries = clientReady.map(({ profile, stale }) => {
     const runId = `client-profile:${profile.id}:${profile.results}`;

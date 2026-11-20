@@ -87,6 +87,11 @@ falls back to the system value. Publishing reads effective values only.
   scores single requests, so session-economics and measurement-effort knobs have no measured
   basis for a daily recomputation. The Policy tab shows each value and the reason it is fixed,
   read-only. A stored config that still carries one keeps parsing, and its value is ignored.
+- Decider repetitions are fixed per router: Efficient measures every case three times, because
+  with a few dozen cases per route one repetition lets noise decide which candidates clear the
+  accuracy floor; Frontier measures once. Registry admission, run creation, profile currency,
+  publish and client eval all read the same router value, and a profile is current only at
+  its router's count.
 
 An omitted Frontier pool uses its router-specific alias preset.
 The worker benchmarks that pool before it publishes a complete Frontier table.
@@ -1167,7 +1172,7 @@ context; schemas live in `@kilocode/auto-routing-contracts`. Errors use
 
 - An upload for another engine identity returns `stale_engine_identity` (409); the CLI
   requests a new plan. Unknown cases, variants outside the entry, and repetitions beyond
-  the fixed decider repetitions constant (1) return `invalid_request`.
+  the base router's fixed decider repetitions return `invalid_request`.
 - Grading matches the platform: a nonzero exit, a timeout, or empty output scores 0;
   otherwise the case's mechanical check or the System One judge grades it.
 - Judged grading cost is billed to `billing.userId` and `billing.organizationId` as usage

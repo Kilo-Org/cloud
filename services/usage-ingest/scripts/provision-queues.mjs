@@ -155,8 +155,8 @@ export async function prepareQueues(
   }
   for (const name of hedgeNames) hedgeExisting.push(await find(name));
   // The dedicated Enkrypt pair is only ever created or retained, never detached. Its DLQ must
-  // stay unconsumed so failed records remain visible, and its source must deliver and keep the
-  // default retention so records reach the consumer and outlive the retry budget.
+  // stay unconsumed so failed records remain visible, and its source must keep at least the
+  // default retention so records outlive the retry budget.
   const enkryptNames = [enkryptDlq, enkryptSource];
   const verifyEnkrypt = (queue, name) => {
     verify(queue, name);
@@ -170,7 +170,12 @@ export async function prepareQueues(
       (!Number.isFinite(retention) || retention < SOURCE_MESSAGE_RETENTION_SECONDS)
     )
       throw new Error(`Cannot confirm ${name} keeps four-day retention; stop deployment.`);
-    if (name === enkryptSource && queue.settings.delivery_paused !== false)
+    // Get Queue may omit this optional boolean; omission is not proof of active delivery.
+    if (
+      name === enkryptSource &&
+      Object.hasOwn(queue.settings, 'delivery_paused') &&
+      queue.settings.delivery_paused !== false
+    )
       throw new Error(`Cannot confirm ${name} delivery is unpaused; stop deployment.`);
   };
   const enkryptExisting = [];

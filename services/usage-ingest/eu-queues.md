@@ -87,9 +87,13 @@ When the config declares the dedicated tagged pair (`USAGE_INGEST_ENKRYPT_QUEUE`
 `USAGE_INGEST_ENKRYPT_DLQ` producers on that environment's exact Enkrypt names, plus one
 consumer on the source that dead-letters into that DLQ), preparation also inspects both
 before any write, requires `jurisdiction: "eu"`, verifies consumer ownership of an
-existing source, and stops if the DLQ has any consumer or the source cannot be confirmed
-to deliver unpaused and keep at least the default four-day retention; it changes none of
-these. After the other pairs it creates a missing DLQ (maximum retention) and
+existing source, and stops if the DLQ has any consumer, the source cannot be confirmed
+to keep at least the default four-day retention, or its `delivery_paused` value is explicitly
+`true` or malformed. Preparation accepts an omitted `delivery_paused` response or explicit
+`false`; omission is API-shape compatibility, not proof of active delivery. Operator verification
+of attachment, staging processing and the production source stall alert still gates production
+cutover. Preparation changes none of these settings. After the other pairs it creates a missing
+DLQ (maximum retention) and
 then a missing source, each in EU and read back, raises the DLQ's retention like the
 others, and never detaches the tagged consumer. Any other tagged-pair shape fails the config
 check before API access. Because this revision's tagged ingress publishes to the pair whenever

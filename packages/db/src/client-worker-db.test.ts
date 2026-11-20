@@ -2,7 +2,13 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { EventEmitter } from 'node:events';
 import { sql } from 'drizzle-orm';
 import type pg from 'pg';
-import { getWorkerDb, workerTransactionBoundsSql, type GetWorkerDbOptions } from './client';
+import {
+  createDrizzleClient,
+  getWorkerDb,
+  releaseConnectionsOnFailedTransactionStart,
+  workerTransactionBoundsSql,
+  type GetWorkerDbOptions,
+} from './client';
 
 type QueryCallback = (error: Error | null, result: unknown) => void;
 
@@ -236,5 +242,48 @@ describe('getWorkerDb connection lifetime', () => {
       ['select 2'],
     ]);
     expect(db.$client.totalCount).toBe(0);
+  });
+});
+
+describe('releaseConnectionsOnFailedTransactionStart', () => {
+  function recordingPoolDb() {
+    return createDrizzleClient({
+      connectionString: 'postgres://pool.example/db',
+      poolConfig: { max: 1, Client: RecordingClient as unknown as new () => pg.ClientBase },
+      ssl: false,
+    });
+  }
+
+  it('without it, a failed BEGIN keeps the connection checked out', async () => {
+    const { db, pool } = recordingPoolDb();
+    RecordingClient.failingStatement = { prefix: 'begin', error: new Error('connection lost') };
+
+    await expect(db.transaction(async tx => tx.execute(sql`select 1`))).rejects.toThrow();
+
+    expect(pool.totalCount).toBe(1);
+    expect(pool.idleCount).toBe(0);
+  });
+
+  it('releases and closes the connection when BEGIN fails, so the slot is reused', async () => {
+    const { db, pool } = recordingPoolDb();
+    releaseConnectionsOnFailedTransactionStart(pool);
+    const failure = new Error('connection lost');
+    RecordingClient.failingStatement = { prefix: 'begin', error: failure };
+
+    await expect(db.transaction(async tx => tx.execute(sql`select 1`))).rejects.toMatchObject({
+      cause: failure,
+    });
+
+    expect(RecordingClient.created.map(client => client.ended)).toEqual([true]);
+    expect(pool.totalCount).toBe(0);
+
+    RecordingClient.failingStatement = undefined;
+    await db.transaction(async tx => tx.execute(sql`select 2`), { accessMode: 'read only' });
+
+    expect(RecordingClient.created.map(client => client.queries)).toEqual([
+      ['begin'],
+      ['begin read only', 'select 2', 'commit'],
+    ]);
+    await pool.end();
   });
 });

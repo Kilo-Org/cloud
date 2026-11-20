@@ -111,23 +111,45 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
   );
 }
 
+function isTransactionStart(config: unknown): boolean {
+  if (typeof config === 'string') return transactionStart.test(config);
+  return isTextQueryConfig(config) && transactionStart.test(config.text);
+}
+
 /**
  * drizzle sends `BEGIN` before the `try` block that releases the connection, so a failed `BEGIN`
- * leaves the pool's only connection checked out and every later query on the client waits for
- * it. The forwarder releases the connection with the error, and the pool closes it.
+ * leaves the connection checked out, and every later query waits for a pool slot it never returns.
+ * The forwarder releases the connection with the error, and the pool closes it. `rewrite` may change
+ * the text of a transaction start.
  */
-function boundTransactionStarts(client: pg.PoolClient): void {
+function forwardTransactionStarts(
+  client: pg.PoolClient,
+  rewrite: (config: unknown) => unknown = config => config
+): void {
   // pg types `query` as overloads. This forwarder changes only the text of a transaction start.
   const query = client.query.bind(client) as (config: unknown, ...rest: unknown[]) => unknown;
   client.query = ((config: unknown, ...rest: unknown[]) => {
-    const boundedConfig = withTransactionBounds(config);
-    const result = query(boundedConfig, ...rest);
-    if (boundedConfig === config || !isThenable(result)) return result;
+    const startsTransaction = isTransactionStart(config);
+    const result = query(startsTransaction ? rewrite(config) : config, ...rest);
+    if (!startsTransaction || !isThenable(result)) return result;
     return result.then(undefined, (error: unknown) => {
       client.release(error instanceof Error ? error : true);
       throw error;
     });
   }) as typeof client.query;
+}
+
+function boundTransactionStarts(client: pg.PoolClient): void {
+  forwardTransactionStarts(client, withTransactionBounds);
+}
+
+/**
+ * Releases a pool connection whose `BEGIN` fails, which drizzle leaves checked out (see
+ * `forwardTransactionStarts`). Without it, failed transaction starts on broken connections use
+ * up the pool's slots one by one.
+ */
+export function releaseConnectionsOnFailedTransactionStart(pool: pg.Pool): void {
+  pool.on('connect', client => forwardTransactionStarts(client));
 }
 
 /**

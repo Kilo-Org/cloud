@@ -1,5 +1,9 @@
 import { getEnvVariable, requireEnv } from '@kilocode/web-shared/lib/dotenvx';
-import { createDrizzleClient, pg } from '@kilocode/db/client';
+import {
+  createDrizzleClient,
+  pg,
+  releaseConnectionsOnFailedTransactionStart,
+} from '@kilocode/db/client';
 import { computeDatabaseUrl } from '@kilocode/db';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { attachDatabasePool } from '@vercel/functions';
@@ -116,6 +120,9 @@ const replica = usesSeparateReplica
     })
   : primary;
 const replicaPool = replica.pool;
+// The AI gateway opens a transaction for each bounded admission read (see
+// `ai-gateway/gateway-replica-read.ts`), so a failed `BEGIN` must not keep a replica slot.
+releaseConnectionsOnFailedTransactionStart(replicaPool);
 
 // Attach pools to ensure idle connections close before suspension
 // Skip in test environment as it interferes with Jest's cleanup

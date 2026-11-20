@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ChevronDown } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
@@ -111,8 +112,8 @@ export function RepositoryBranchSelector({
   return (
     // The branch block is a nested section inside the repository group, so it
     // keeps the form's section break above the label in every branch-row state.
-    <View className={NESTED_SECTION_GAP_CLASS}>
-      <Text className="mb-2 text-sm font-medium text-muted-foreground">{t('common.branch')}</Text>
+    <View className={cn(NESTED_SECTION_GAP_CLASS, 'gap-2')}>
+      <FormFieldLabel label={t('common.branch')} />
       {/*
         Each state is its own native view. React would otherwise recycle the
         loading wrapper — the only one that carries an accessibility label —

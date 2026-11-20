@@ -229,8 +229,22 @@
     {
       "idx": 32,
       "version": "6",
-      "when": 1795133825045,
-      "tag": "0032_concurrent_decider_runs",
+      "when": 1795133175213,
+      "tag": "0032_profile_failure_state",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1795152485834,
+      "tag": "0033_daily_alias_sync",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1795155674212,
+      "tag": "0034_concurrent_decider_runs",
       "breakpoints": true
     }
   ]

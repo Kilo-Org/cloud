@@ -140,6 +140,7 @@
     "keepRunning": "Hayaang tumakbo",
     "newSession": "Bagong sesyon",
     "noModelsAvailable": "Walang magagamit na modelo",
+    "modelRetires": "Magreretiro sa {{date}}",
     "notFound": "Hindi mahanap.",
     "online": "Nakakonekta",
     "open": "Buksan ang {{name}}",
@@ -183,7 +184,9 @@
     "organizationTrialEnded": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update ng may-ari ng organisasyon ang billing sa kilo.ai, pagkatapos ay subukan muli.",
     "privateRepositoryA11y": "{{name}}, pribadong repositoryo",
     "legalDocumentEnglishOnly": "Ang dokumentong ito ay makukuha lamang sa Ingles.",
-    "organizationTrialEndedBilling": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update mo ang billing, pagkatapos ay subukan muli."
+    "organizationTrialEndedBilling": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update mo ang billing, pagkatapos ay subukan muli.",
+    "organizationTrialEndedBillingAtKiloAi": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update mo ang billing sa kilo.ai, pagkatapos ay subukan muli.",
+    "viewOnGitHub": "Tingnan ang PR sa GitHub"
   },
   "language": {
     "restarting": "Ini-restart para ilapat ang wika",
@@ -507,7 +510,7 @@
     "changelogFixesPolish": "Mga pag-aayos at pagpapahusay sa buong aplikasyon.",
     "changelogAreas": {
       "signIn": "Pagpasok",
-      "profileOrganizations": "Propayl at mga organisasyon"
+      "profileOrganizations": "Propayl pati mga organisasyon"
     }
   },
   "preferences": {
@@ -752,6 +755,9 @@
       "couldNotLoadMore": "Hindi ma-load ang iba pang komento.",
       "retryLoadingMore": "Subukang i-load muli ang iba pang komento",
       "loadMoreComments": "I-load ang iba pang komento",
+      "conversationTruncated": "Ipinapakita lang ang unang {{displayCount}} komento.",
+      "conversationTruncated_one": "Ipinapakita lang ang unang {{displayCount}} komento.",
+      "conversationTruncated_other": "Ipinapakita lang ang unang {{displayCount}} komento.",
       "addReaction": "Magdagdag ng reaksiyon",
       "reactionPill": "reaksiyong {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaksiyon",
@@ -881,7 +887,6 @@
       "noAccess": "Wala kang access sa mga pagsusuri para sa repository na ito.",
       "couldNotLoad": "Hindi ma-load ang mga pagsusuri.",
       "retryChecks": "Subukang muli ang mga pagsusuri",
-      "viewOnGitHub": "Tingnan ang PR sa GitHub",
       "noChecksReported": "Walang naiulat na pagsusuri",
       "passed": "{{displayCount}} ang pumasa",
       "passed_one": "{{displayCount}} ang pumasa",
@@ -1391,7 +1396,7 @@
     "followReviewMd": "Sundin ang REVIEW.md",
     "followReviewMdSubtitle": "Sundin ang mga tagubilin sa REVIEW.md file ng bawat repository",
     "bitbucket": {
-      "notConnectedReadOnly": "Hindi nakakonekta ang Bitbucket. Mga may-ari ng organisasyon, admin, at tagapamahala ng pagsingil lang ang maaaring magkonekta nito."
+      "notConnectedReadOnlyPlan": "Natapos na ang trial ng organisasyon, kaya kailangang i-update ng may-ari ang billing sa kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Pinamamahalaan sa web gamit ang computer ang koneksyon sa Bitbucket ng {{organization}}.",
@@ -1400,7 +1405,7 @@
       "managedOnWebRepositories": "Pumili ng mga repository para sa {{organization}} sa web gamit ang computer.",
       "description": "Gumawa ng token para sa access sa workspace para sa {{organization}} at i-paste ito sa ibaba.",
       "descriptionReconnect": "Gumawa ng bagong token para sa access sa workspace para sa {{organization}} at i-paste ito sa ibaba.",
-      "descriptionOverview": "Gumawa ng token para sa access sa workspace para sa {{organization}} at i-paste ito sa susunod na screen.",
+      "descriptionOverview": "Gumawa ng token para sa access sa workspace at i-paste ito sa susunod na screen.",
       "scopes": "Account: pagbasa · Mga repository: pagbasa/pagsulat · Mga pull request: pagbasa · Mga webhook: pagbasa/pagsulat",
       "tokenPlaceholder": "Token para sa access sa workspace",
       "tokenRefused": "Hindi tinanggap ng Bitbucket ang token para sa access sa workspace na ito. Tiyakin na taglay nito ang mga saklaw ng pahintulot sa itaas, pagkatapos ay subukan muli."
@@ -1428,7 +1433,7 @@
     "providerConnect": {
       "githubApp": "GitHub App",
       "githubError": "Hindi mabuksan ang setup ng GitHub. Pakisubukang muli.",
-      "gitlabAccount": "Account sa GitLab",
+      "gitlabAccount": "account sa GitLab",
       "gitlabError": "Hindi mabuksan ang setup ng GitLab. Pakisubukang muli.",
       "description": "Ikonekta ang Kilo {{label}} para awtomatikong suriin ang mga pull request."
     },
@@ -4853,12 +4858,15 @@
     "inputDescription": "Ini-scan ang bawat input gamit ang Enkrypt AI, kasama ang mga resulta ng tool. Kapag hindi available ang Enkrypt, ipinapadala ang mga request nang hindi na-scan sa halip na tanggihan.",
     "outputTitle": "Mga output guardrail",
     "outputDescription": "Ini-scan ang mga sagot gamit ang Enkrypt AI bago ito matanggap ng mga miyembro. Naka-off maliban kung i-on mo.",
+    "outputUnavailable": "Hindi pa na-enable ng Kilo ang pag-scan ng output para sa organisasyong ito, kaya hindi sinusuri ang mga sagot at wala nang dapat itakda dito. Makipag-ugnayan sa {{supportEmail}} para hilingin ito.",
     "detectorsHint": "Tinatanggihan ng Harangin ang na-flag na request. Itinatala lang ito ng Log lang nang hindi naaantala ang request.",
     "detectorsHintOutput": "Pinapalya ng Harangin ang na-flag na sagot. Itinatala lang ito ng Log lang nang hindi naaantala ang sagot.",
     "choiceLog": "Log lang",
     "applyTo": "Ilapat sa",
     "applyToAllMembers": "Lahat ng miyembro",
     "applyKiloDefault": "Ilapat ang Kilo Default",
+    "applyKiloDefaultEnglishNote": "Ang teksto ng Kilo Default na patakaran ay nasa Ingles, dahil inilalapat ito ng Kilo Gateway nang eksakto ayon sa pagkakasulat.",
+    "applyKiloDefaultReplaceMessage": "Ang Kilo Default na patakaran ay nakasulat sa Ingles at pinapalitan ang itinakda mo sa Paglabag sa patakaran. Hindi na mababawi ang tekstong inilagay mo sa field ng teksto ng patakaran.",
     "invalidSavedTitle": "Hindi mabasa ang na-save na setting ng input detector",
     "invalidSavedBody": "Haharangin ang mga request hanggang ma-save muli ang mga input detector. Nagsisimula sa Kilo Default ang mga detector sa ibaba.",
     "invalidSavedOutputTitle": "Hindi mabasa ang na-save na setting ng output detector",

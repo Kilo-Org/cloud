@@ -73,6 +73,7 @@ import {
 } from '@/components/ui/table';
 import { parseAdminResponse } from './admin-fetch';
 import { SchedulerConfigCard } from './SchedulerConfigCard';
+import { FailedModels } from './FailedModelsTable';
 import { useSystemOneModelOptions } from './system-one-models';
 
 export function formatAccuracy(n: number): string {
@@ -1693,8 +1694,8 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
     onSuccess: data => {
       toast.success(
         data.requeued === 0
-          ? 'No failed entries to requeue'
-          : `${data.requeued} failed ${data.requeued === 1 ? 'entry' : 'entries'} requeued`
+          ? 'No retryable entries are due for a retry'
+          : `${data.requeued} retryable ${data.requeued === 1 ? 'entry' : 'entries'} requeued`
       );
       void queryClient.invalidateQueries({
         queryKey: ['auto-routing', 'benchmark-registry', router],
@@ -1780,7 +1781,13 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
                   : 'Failed to load registry'}
               </div>
             ) : registryQuery.data ? (
-              <RegistrySummary data={registryQuery.data} router={router} />
+              <>
+                <RegistrySummary data={registryQuery.data} router={router} />
+                <div className="flex flex-col gap-2">
+                  <h3 className="text-sm font-medium">Failed models</h3>
+                  <FailedModels router={router} entries={registryQuery.data.failedEntries ?? []} />
+                </div>
+              </>
             ) : null}
             <div className="flex flex-wrap gap-2">
               <Button
@@ -1827,7 +1834,7 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
                 onClick={() => requeueMutation.mutate(router === 'efficient' ? 'both' : 'platform')}
               >
                 <RotateCcw className="size-4" />
-                Requeue failed
+                Requeue retryable
               </Button>
             </div>
             <p className="text-muted-foreground text-xs">

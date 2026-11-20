@@ -169,8 +169,8 @@ export const REPOSITORY_SELECTION = {
  * Used for repository operations, cloud sessions, code reviews, etc.
  */
 export const GIT_PLATFORM = {
-  GITHUB: 'github',
-  GITLAB: 'gitlab',
+  GITHUB: PLATFORM.GITHUB,
+  GITLAB: PLATFORM.GITLAB,
 } as const;
 
 /**

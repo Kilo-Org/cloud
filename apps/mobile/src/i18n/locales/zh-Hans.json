@@ -140,10 +140,12 @@
     "keepRunning": "继续运行",
     "newSession": "新建会话",
     "noModelsAvailable": "暂无可用模型",
+    "modelRetires": "{{date}} 退役",
     "notFound": "未找到此内容",
     "online": "在线",
     "open": "打开 {{name}}",
     "openPullRequest": "打开拉取请求",
+    "viewOnGitHub": "在 GitHub 上查看 PR",
     "completed": "已完成",
     "pending": "待处理",
     "running": "运行中",
@@ -183,7 +185,8 @@
     "organizationTrialEnded": "组织的试用期已结束，且没有生效的套餐。组织所有者可以在 kilo.ai 更新账单信息，然后重试。",
     "privateRepositoryA11y": "{{name}}，私有仓库",
     "legalDocumentEnglishOnly": "本文件仅提供英文版本。",
-    "organizationTrialEndedBilling": "组织的试用期已结束，且没有生效的套餐。您可以更新账单信息，然后重试。"
+    "organizationTrialEndedBilling": "组织的试用期已结束，且没有生效的套餐。您可以更新账单信息，然后重试。",
+    "organizationTrialEndedBillingAtKiloAi": "组织的试用期已结束，且没有生效的套餐。您可以在 kilo.ai 更新账单信息，然后重试。"
   },
   "language": {
     "restarting": "正在重启以应用语言设置",
@@ -507,7 +510,7 @@
     "changelogFixesPolish": "全应用范围的修复与改进。",
     "changelogAreas": {
       "signIn": "登录",
-      "profileOrganizations": "个人资料和组织"
+      "profileOrganizations": "个人资料与组织"
     }
   },
   "preferences": {
@@ -697,7 +700,7 @@
     },
     "autoReviews": "自动审查",
     "bitbucket": {
-      "notConnectedReadOnly": "尚未连接 Bitbucket。只有组织所有者、管理员和账单管理员可以完成连接。"
+      "notConnectedReadOnlyPlan": "组织的试用期已结束，因此所有者必须前往 kilo.ai 更新账单信息。"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} 的 Bitbucket 连接需在电脑上通过网页版进行管理。",
@@ -706,7 +709,7 @@
       "managedOnWebRepositories": "请在电脑上通过网页版为 {{organization}} 选择仓库。",
       "description": "为 {{organization}} 创建工作区访问令牌，然后粘贴到下方。",
       "descriptionReconnect": "为 {{organization}} 创建新的工作区访问令牌，然后粘贴到下方。",
-      "descriptionOverview": "为 {{organization}} 创建工作区访问令牌，然后在下一个页面中粘贴。",
+      "descriptionOverview": "创建工作区访问令牌，然后在下一个页面中粘贴。",
       "scopes": "账户：读取 · 仓库：读/写 · 拉取请求：读取 · Webhook：读/写",
       "tokenPlaceholder": "工作区访问令牌",
       "tokenRefused": "Bitbucket 未接受此工作区访问令牌。请检查其是否具有上述权限范围，然后重试。"
@@ -2783,7 +2786,6 @@
       "skipped_one": "{{displayCount}} 项已跳过",
       "skipped_other": "{{displayCount}} 项已跳过",
       "title": "检查",
-      "viewOnGitHub": "在 GitHub 上查看 PR",
       "checkDetails": "检查详情"
     },
     "composer": {
@@ -2847,6 +2849,9 @@
       "couldNotLoad": "无法加载讨论",
       "couldNotLoadMore": "无法加载更多评论。",
       "loadMoreComments": "加载更多评论",
+      "conversationTruncated": "仅显示前 {{displayCount}} 条评论。",
+      "conversationTruncated_one": "仅显示前 {{displayCount}} 条评论。",
+      "conversationTruncated_other": "仅显示前 {{displayCount}} 条评论。",
       "loading": "正在加载讨论",
       "moderation": {
         "block": {
@@ -4853,12 +4858,15 @@
     "inputDescription": "使用 Enkrypt AI 扫描每个输入，包括工具结果。当 Enkrypt 不可用时，请求不会被拒绝，而是在未经扫描的情况下发送。",
     "outputTitle": "输出护栏",
     "outputDescription": "在成员收到响应之前，使用 Enkrypt AI 扫描响应。除非你将其开启，否则处于关闭状态。",
+    "outputUnavailable": "Kilo 尚未为这个组织启用输出扫描，因此响应不会被检查，这里也没有可设置的内容。如需申请启用，请联系 {{supportEmail}}。",
     "detectorsHint": "阻止会拒绝被标记的请求。仅记录会将其记录下来，但不会延迟请求。",
     "detectorsHintOutput": "阻止会让被标记的响应失败。仅记录会将其记录下来，但不会延迟响应。",
     "choiceLog": "仅记录",
     "applyTo": "应用于",
     "applyToAllMembers": "所有成员",
     "applyKiloDefault": "应用 Kilo 默认设置",
+    "applyKiloDefaultEnglishNote": "Kilo 的默认策略文本是英文，因为 Kilo Gateway 会完全按原文应用。",
+    "applyKiloDefaultReplaceMessage": "Kilo 的默认策略以英文编写，并替换你在违反策略中设置的内容。你在策略文本字段中输入的文本无法恢复。",
     "invalidSavedTitle": "无法读取已保存的输入检测器设置",
     "invalidSavedBody": "在重新保存输入检测器之前，请求会被阻止。下面的检测器将从 Kilo 默认设置开始。",
     "invalidSavedOutputTitle": "无法读取已保存的输出检测器设置",

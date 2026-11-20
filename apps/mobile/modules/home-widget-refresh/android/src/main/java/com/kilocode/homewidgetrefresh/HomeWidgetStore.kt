@@ -73,15 +73,18 @@ internal object HomeWidgetStore {
   }
   fun hasWidgets(context: Context): Boolean = AppWidgetManager.getInstance(context)
     .getAppWidgetIds(ComponentName(context.packageName, "${context.packageName}.widget.ActiveAgentsWidget")).isNotEmpty()
+  /** The two reasons a scheduled refresh stands down: no placed widget, or fixture mode holding it. */
+  private fun suspended(context: Context): Boolean =
+    !hasWidgets(context) || prefs(context).getBoolean("fixture", false)
   @Synchronized fun generation(context: Context) = prefs(context).getString("generation", "")!!
   @Synchronized fun current(context: Context, scope: String, epoch: Long, generation: String): Boolean {
-    if (!hasWidgets(context) || prefs(context).getBoolean("fixture", false) || generation(context) != generation) return false
+    if (suspended(context) || generation(context) != generation) return false
     val config = config(context) ?: prefs(context).getString("terminalFence", null)?.let { JSONObject(it) } ?: return false
     return config.text("scopeKey") == scope && config.number("accountEpoch") == epoch
   }
   @Synchronized fun data(context: Context): JSONObject? = prefs(context).getString("data", null)?.let { JSONObject(it) }
   @Synchronized fun schedule(context: Context, replace: Boolean = false) {
-    if (config(context) == null || !hasWidgets(context) || prefs(context).getBoolean("fixture", false)) {
+    if (config(context) == null || suspended(context)) {
       WorkManager.getInstance(context).cancelUniqueWork(WORK)
       return
     }
@@ -95,16 +98,29 @@ internal object HomeWidgetStore {
     WorkManager.getInstance(context).enqueueUniqueWork(WORK,
       if (replace) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.APPEND_OR_REPLACE, request)
   }
+  /**
+   * Every refusal is a `null` return: no placed widget, fixture mode, a missing endpoint,
+   * token, scope or epoch, a disallowed endpoint host, a non-200 answer, a body over the
+   * cap, a response that names another scope, a response with no `home` object, a
+   * snapshot without `updatedAt` or older than the retained one, or a stored state that
+   * is no longer current when the request finishes. A current 401 is the exception: it
+   * clears the stored content and returns the terminal fence the widget draws instead.
+   * It still throws what the JDK throws on a malformed URL or transport failure, and
+   * `JSONException` when the body does not parse or lacks the `snapshot`, `details` or
+   * `refreshAt` member, when a retained payload is not the expected JSON type, or when
+   * `accountEpoch` is not a number. The caller (`HomeWidgetRefreshWorker.doWork`) catches
+   * every one of those.
+   */
   fun fetch(context: Context): JSONObject? {
     val config: JSONObject
     val generation: String
     synchronized(this) {
-      if (!hasWidgets(context) || prefs(context).getBoolean("fixture", false)) return null
+      if (suspended(context)) return null
       config = config(context) ?: return null
       generation = generation(context)
     }
     val endpoint = config.text("endpoint")?.let { URL(it) } ?: return null
-    require(endpoint.protocol == "https" || endpoint.host == "localhost" || endpoint.host == "127.0.0.1" || endpoint.host == "10.0.2.2")
+    if (endpoint.protocol != "https" && endpoint.host != "localhost" && endpoint.host != "127.0.0.1" && endpoint.host != "10.0.2.2") return null
     val token = config.text("token") ?: return null
     val scopeKey = config.text("scopeKey") ?: return null
     val accountEpoch = config.number("accountEpoch") ?: return null
@@ -142,7 +158,8 @@ internal object HomeWidgetStore {
       val response = JSONObject(String(bytes, Charsets.UTF_8))
       val snapshot = response.getJSONObject("snapshot")
       if (snapshot.text("scopeKey") != scopeKey) return null
-      response.getJSONObject("home")
+      // The widget draws `home`; a response without its object is not a complete snapshot.
+      if (response.optJSONObject("home") == null) return null
       val data = JSONObject().put("snapshot", snapshot).put("details", response.getJSONObject("details"))
       synchronized(this) {
         if (!current(context, scopeKey, accountEpoch, generation)) return null

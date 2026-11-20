@@ -140,10 +140,12 @@
     "keepRunning": "جاری رہنے دیں",
     "newSession": "نیا سیشن",
     "noModelsAvailable": "کوئی ماڈل دستیاب نہیں",
+    "modelRetires": "{{date}} کو ریٹائر ہوگا",
     "notFound": "نہیں ملا۔",
     "online": "آن لائن",
     "open": "{{name}} کھولیں",
     "openPullRequest": "پل ریکویسٹ کھولیں",
+    "viewOnGitHub": "GitHub پر PR دیکھیں",
     "completed": "مکمل",
     "pending": "زیر التوا",
     "running": "چل رہا ہے",
@@ -183,7 +185,8 @@
     "organizationTrialEnded": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ تنظیم کا مالک kilo.ai پر بلنگ اپ ڈیٹ کر سکتا ہے، پھر دوبارہ کوشش کریں۔",
     "privateRepositoryA11y": "{{name}}، نجی ریپوزٹری",
     "legalDocumentEnglishOnly": "یہ دستاویز صرف انگریزی میں دستیاب ہے۔",
-    "organizationTrialEndedBilling": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ آپ بلنگ اپ ڈیٹ کر سکتے ہیں، پھر دوبارہ کوشش کریں۔"
+    "organizationTrialEndedBilling": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ آپ بلنگ اپ ڈیٹ کر سکتے ہیں، پھر دوبارہ کوشش کریں۔",
+    "organizationTrialEndedBillingAtKiloAi": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ آپ kilo.ai پر بلنگ اپ ڈیٹ کر سکتے ہیں، پھر دوبارہ کوشش کریں۔"
   },
   "language": {
     "restarting": "منتخب زبان لاگو کرنے کے لیے ایپ دوبارہ شروع ہو رہی ہے",
@@ -507,7 +510,7 @@
     "changelogFixesPolish": "پوری ایپ میں اصلاحات اور بہتریاں۔",
     "changelogAreas": {
       "signIn": "سائن ان",
-      "profileOrganizations": "پروفائل اور تنظیمیں"
+      "profileOrganizations": "پروفائل و تنظیمیں"
     }
   },
   "preferences": {
@@ -752,6 +755,9 @@
       "couldNotLoadMore": "مزید تبصرے لوڈ نہیں ہو سکے۔",
       "retryLoadingMore": "مزید تبصرے لوڈ کرنے کی دوبارہ کوشش کریں",
       "loadMoreComments": "مزید تبصرے لوڈ کریں",
+      "conversationTruncated": "صرف پہلی {{displayCount}} تبصرے دکھائے جا رہے ہیں۔",
+      "conversationTruncated_one": "صرف پہلی {{displayCount}} تبصرے دکھائے جا رہے ہیں۔",
+      "conversationTruncated_other": "صرف پہلی {{displayCount}} تبصرے دکھائے جا رہے ہیں۔",
       "addReaction": "ردعمل شامل کریں",
       "reactionPill": "{{emoji}} ردعمل، {{displayCount}} {{countLabel}}",
       "reaction_one": "ردعمل",
@@ -881,7 +887,6 @@
       "noAccess": "اس ریپوزٹری کی جانچوں تک آپ کی رسائی نہیں ہے۔",
       "couldNotLoad": "جانچیں لوڈ نہیں ہو سکیں۔",
       "retryChecks": "جانچیں لوڈ کرنے کی دوبارہ کوشش کریں",
-      "viewOnGitHub": "GitHub پر PR دیکھیں",
       "noChecksReported": "کوئی جانچ رپورٹ نہیں ہوئی",
       "passed": "{{displayCount}} کامیاب",
       "passed_one": "{{displayCount}} کامیاب",
@@ -936,9 +941,9 @@
       "checkFailedTitleGitLab": "GitLab کنکشن چیک نہیں ہو سکا۔",
       "checkFailedTitleBitbucket": "Bitbucket کنکشن چیک نہیں ہو سکا۔",
       "providerCheckFailedMessage": "پرووائیڈر تک رسائی نہیں ہو سکی۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
-      "reconnectTitle": "GitHub سے دوبارہ رابطہ",
-      "reconnectTitleGitLab": "GitLab سے دوبارہ رابطہ",
-      "reconnectTitleBitbucket": "Bitbucket سے دوبارہ رابطہ",
+      "reconnectTitle": "GitHub کو دوبارہ منسلک کریں",
+      "reconnectTitleGitLab": "GitLab کو دوبارہ منسلک کریں",
+      "reconnectTitleBitbucket": "Bitbucket کو دوبارہ منسلک کریں",
       "reconnectDescription": "آپ کا GitHub کنکشن منسوخ کر دیا گیا ہے۔",
       "gitlabDescription": "موبائل پر مرج ریکویسٹس کا جائزہ لیں",
       "gitlabInstanceMismatchTitle": "GitLab کنکشن کسی دوسرے انسٹینس کے لیے ہے",
@@ -1391,7 +1396,7 @@
     "followReviewMd": "REVIEW.md کی پیروی کریں",
     "followReviewMdSubtitle": "ہر ریپوزٹری کی REVIEW.md فائل میں دی گئی ہدایات پر عمل کریں",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket منسلک نہیں ہے۔ صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔"
+      "notConnectedReadOnlyPlan": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے، اس لیے مالک کو ⁨kilo.ai⁩ پر بلنگ اپ ڈیٹ کرنی ہوگی۔"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} کا Bitbucket کنکشن کمپیوٹر سے ویب پر منظم کیا جاتا ہے۔",
@@ -1400,7 +1405,7 @@
       "managedOnWebRepositories": "{{organization}} کے لیے ریپوزٹریز کمپیوٹر سے ویب پر منتخب کریں۔",
       "description": "{{organization}} کے لیے ورک اسپیس تک رسائی کا ٹوکن بنائیں اور اسے نیچے چسپاں کریں۔",
       "descriptionReconnect": "{{organization}} کے لیے ورک اسپیس تک رسائی کا نیا ٹوکن بنائیں اور اسے نیچے چسپاں کریں۔",
-      "descriptionOverview": "{{organization}} کے لیے ورک اسپیس تک رسائی کا ٹوکن بنائیں اور اسے اگلی اسکرین پر چسپاں کریں۔",
+      "descriptionOverview": "ورک اسپیس تک رسائی کا ٹوکن بنائیں اور اسے اگلی اسکرین پر چسپاں کریں۔",
       "scopes": "اکاؤنٹ: پڑھنے کی اجازت · ریپوزٹریز: پڑھنے اور لکھنے کی اجازت · پل ریکویسٹس: پڑھنے کی اجازت · ویب ہکس: پڑھنے اور لکھنے کی اجازت",
       "tokenPlaceholder": "ورک اسپیس تک رسائی کا ٹوکن",
       "tokenRefused": "Bitbucket نے یہ ورک اسپیس تک رسائی کا ٹوکن قبول نہیں کیا۔ چیک کریں کہ اس میں اوپر دی گئی اجازتیں موجود ہیں، پھر دوبارہ کوشش کریں۔"
@@ -1843,7 +1848,7 @@
       "couldNotLoadMore": "مزید مسائل لوڈ نہیں ہو سکے۔",
       "noMatchesTitle": "منتخب فلٹرز کے مطابق کوئی مسئلہ نہیں ملا",
       "noMatchesDescription": "منتخب فلٹرز تبدیل کر کے یا ہٹا کر دیکھیں۔",
-      "emptyTitle": "کوئی غیر حل شدہ مسئلہ نہیں",
+      "emptyTitle": "کوئی کھلا مسئلہ نہیں",
       "emptyDescription": "اس وقت کوئی غیر حل شدہ مسئلہ توجہ طلب نہیں ہے۔"
     },
     "findingRow": {
@@ -2034,7 +2039,7 @@
     "remediationUnavailable": {
       "findingNotFound": "سکیورٹی مسئلہ اب موجود نہیں ہے۔",
       "approvalRequired": "خودکار اصلاح کے لیے منظوری درکار ہے۔ منظوری دینے کے لیے اصلاح دستی طور پر شروع کریں۔",
-      "findingNotOpen": "مسئلہ اب غیر حل شدہ حالت میں نہیں ہے۔",
+      "findingNotOpen": "مسئلہ اب کھلا نہیں ہے۔",
       "repoNotInScope": "ریپوزٹری سیکیورٹی ایجنٹ کے لیے منتخب نہیں ہے۔",
       "analysisRequired": "اصلاح شروع کرنے سے پہلے کوڈ بیس کا تجزیہ کریں۔",
       "staleAnalysis": "تجزیے کے بعد مسئلہ تبدیل ہو گیا۔ اصلاح شروع کرنے سے پہلے دوبارہ تجزیہ کریں۔",
@@ -4853,12 +4858,15 @@
     "inputDescription": "Enkrypt AI کے ساتھ ہر ان پٹ اسکین کرتا ہے، بشمول ٹول کے نتائج۔ جب Enkrypt دستیاب نہ ہو تو درخواستیں مسترد کیے جانے کے بجائے اسکین کیے بغیر بھیج دی جاتی ہیں۔",
     "outputTitle": "آؤٹ پٹ گارڈ ریلز",
     "outputDescription": "اراکین کو ملنے سے پہلے Enkrypt AI کے ساتھ جوابات اسکین کرتا ہے۔ جب تک آپ اسے آن نہ کریں یہ بند رہتا ہے۔",
+    "outputUnavailable": "Kilo نے اس تنظیم کے لیے آؤٹ پٹ اسکیننگ فعال نہیں کی، اس لیے جوابات کی جانچ نہیں ہوتی اور یہاں مقرر کرنے کے لیے کچھ نہیں ہے۔ اس کی درخواست کے لیے {{supportEmail}} سے رابطہ کریں۔",
     "detectorsHint": "بلاک نشان زدہ درخواست مسترد کرتا ہے۔ صرف لاگ کرنا درخواست میں تاخیر کیے بغیر اسے ریکارڈ کرتا ہے۔",
     "detectorsHintOutput": "بلاک نشان زدہ جواب کو ناکام کرتا ہے۔ صرف لاگ کرنا جواب میں تاخیر کیے بغیر اسے ریکارڈ کرتا ہے۔",
     "choiceLog": "صرف لاگ",
     "applyTo": "کس پر لاگو کریں",
     "applyToAllMembers": "تمام اراکین",
     "applyKiloDefault": "Kilo ڈیفالٹ لاگو کریں",
+    "applyKiloDefaultEnglishNote": "Kilo کی ڈیفالٹ پالیسی کا متن انگریزی میں ہے، کیونکہ Kilo Gateway اسے بالکل ویسے ہی لاگو کرتا ہے جیسے لکھا گیا ہے۔",
+    "applyKiloDefaultReplaceMessage": "Kilo کی ڈیفالٹ پالیسی انگریزی میں لکھی گئی ہے اور پالیسی کی خلاف ورزی میں آپ کا مقرر کردہ بدل دیتی ہے۔ پالیسی متن والے خانے میں آپ کا درج کردہ متن واپس نہیں لایا جا سکتا۔",
     "invalidSavedTitle": "محفوظ شدہ ان پٹ ڈیٹیکٹر کی ترتیبات پڑھی نہیں جا سکتیں",
     "invalidSavedBody": "جب تک ان پٹ ڈیٹیکٹرز دوبارہ محفوظ نہ ہوں درخواستیں بلاک رہتی ہیں۔ نیچے دیے گئے ڈیٹیکٹرز Kilo ڈیفالٹ سے شروع ہوتے ہیں۔",
     "invalidSavedOutputTitle": "محفوظ شدہ آؤٹ پٹ ڈیٹیکٹر کی ترتیبات پڑھی نہیں جا سکتیں",

@@ -140,6 +140,7 @@
     "keepRunning": "実行を続ける",
     "newSession": "新しいセッション",
     "noModelsAvailable": "利用可能なモデルはありません",
+    "modelRetires": "{{date}}に廃止",
     "notFound": "見つかりません。",
     "online": "オンライン",
     "open": "{{name}}を開く",
@@ -183,7 +184,9 @@
     "organizationTrialEnded": "組織のトライアルは終了し、有効なプランがありません。組織のオーナーは kilo.ai で請求情報を更新してから、もう一度お試しください。",
     "privateRepositoryA11y": "{{name}}、プライベートリポジトリ",
     "legalDocumentEnglishOnly": "この文書は英語でのみご利用いただけます。",
-    "organizationTrialEndedBilling": "組織のトライアルは終了し、有効なプランがありません。請求情報を更新してから、もう一度お試しください。"
+    "organizationTrialEndedBilling": "組織のトライアルは終了し、有効なプランがありません。請求情報を更新してから、もう一度お試しください。",
+    "organizationTrialEndedBillingAtKiloAi": "組織のトライアルは終了し、有効なプランがありません。kilo.ai で請求情報を更新してから、もう一度お試しください。",
+    "viewOnGitHub": "GitHubでPRを表示"
   },
   "language": {
     "restarting": "言語設定を適用するために再起動中",
@@ -697,7 +700,7 @@
     },
     "autoReviews": "自動レビュー",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucketが接続されていません。接続できるのは組織のオーナー、管理者、請求管理者のみです。"
+      "notConnectedReadOnlyPlan": "組織のトライアルは終了したため、オーナーが kilo.ai で請求情報を更新する必要があります。"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}のBitbucket接続は、パソコンからWebで管理されています。",
@@ -706,7 +709,7 @@
       "managedOnWebRepositories": "{{organization}}のリポジトリを、パソコンからWebで選択してください。",
       "description": "{{organization}}用のワークスペースアクセストークンを作成し、下に貼り付けてください。",
       "descriptionReconnect": "{{organization}}用の新しいワークスペースアクセストークンを作成し、下に貼り付けてください。",
-      "descriptionOverview": "{{organization}}用のワークスペースアクセストークンを作成し、次の画面で貼り付けてください。",
+      "descriptionOverview": "ワークスペースアクセストークンを作成し、次の画面で貼り付けてください。",
       "scopes": "アカウント：読み取り、リポジトリ：読み取り・書き込み、プルリクエスト：読み取り、Webhook：読み取り・書き込み",
       "tokenPlaceholder": "ワークスペースアクセストークン",
       "tokenRefused": "Bitbucketはこのワークスペースアクセストークンを受け付けませんでした。上記のスコープが付与されていることを確認してから、もう一度お試しください。"
@@ -1272,7 +1275,7 @@
       "couldNotLoad": "検出結果を読み込めませんでした。",
       "couldNotLoadMore": "検出結果を追加で読み込めませんでした。",
       "emptyDescription": "現在、対応が必要な未解決の検出結果はありません。",
-      "emptyTitle": "未解決の検出結果はありません",
+      "emptyTitle": "オープンな検出結果はありません",
       "noMatchesDescription": "フィルター条件を変更するか、解除してください。",
       "noMatchesTitle": "フィルター条件に一致する検出結果はありません"
     },
@@ -1475,7 +1478,7 @@
     "remediationUnavailable": {
       "findingNotFound": "このセキュリティの検出結果は存在しません。",
       "approvalRequired": "自動修復には承認が必要です。手動で修復を開始して承認してください。",
-      "findingNotOpen": "この検出結果は未解決の状態ではなくなりました。",
+      "findingNotOpen": "この検出結果はオープンではなくなりました。",
       "repoNotInScope": "このリポジトリはセキュリティエージェントの監視対象に選択されていません。",
       "analysisRequired": "修正を開始する前に、コードベースの分析を実行してください。",
       "staleAnalysis": "分析後に検出結果が変わりました。修復を開始する前に分析を再実行してください。",
@@ -1856,8 +1859,8 @@
       "updatedFileCount_other": "{{displayCount}}件のファイルを更新しました。"
     },
     "toolCard": {
-      "accessibility": "{{label}}ツール、{{status}}",
-      "accessibilityLabel": "{{name}}ツール、{{status}}",
+      "accessibility": "{{label}}、ツール、{{status}}",
+      "accessibilityLabel": "{{name}}、ツール、{{status}}",
       "noTasks": "タスクはありません。",
       "toolRead": "読み取り",
       "toolEdit": "編集",
@@ -2783,7 +2786,6 @@
       "skipped_one": "{{displayCount}}件スキップ",
       "skipped_other": "{{displayCount}}件スキップ",
       "title": "チェック",
-      "viewOnGitHub": "GitHubでPRを表示",
       "checkDetails": "チェックの詳細"
     },
     "composer": {
@@ -2844,6 +2846,9 @@
       "commentActions": "コメントの操作",
       "comment": "{{displayCount}}件のコメント",
       "comment_other": "{{displayCount}}件のコメント",
+      "conversationTruncated": "最初の{{displayCount}}件のコメントのみを表示しています。",
+      "conversationTruncated_other": "最初の{{displayCount}}件のコメントのみを表示しています。",
+      "conversationTruncated_one": "最初の{{displayCount}}件のコメントのみを表示しています。",
       "couldNotLoad": "ディスカッションを読み込めませんでした。",
       "couldNotLoadMore": "追加のコメントを読み込めませんでした。",
       "loadMoreComments": "さらにコメントを読み込む",
@@ -4853,12 +4858,15 @@
     "inputDescription": "Enkrypt AIで、ツールの結果を含むすべての入力をスキャンします。Enkryptが利用できない場合、リクエストは拒否されず、スキャンされないまま送信されます。",
     "outputTitle": "出力ガードレール",
     "outputDescription": "メンバーが受け取る前に、Enkrypt AIで応答をスキャンします。オンにしない限りオフです。",
+    "outputUnavailable": "Kiloはこの組織の出力スキャンを有効にしていないため、応答は検査されず、ここで設定する項目はありません。有効化を希望する場合は {{supportEmail}} までご連絡ください。",
     "detectorsHint": "ブロックは、フラグが付いたリクエストを拒否します。ログのみは、リクエストを遅延させずに記録だけを行います。",
     "detectorsHintOutput": "ブロックは、フラグが付いた応答を失敗させます。ログのみは、応答を遅延させずに記録だけを行います。",
     "choiceLog": "ログのみ",
     "applyTo": "適用先",
     "applyToAllMembers": "すべてのメンバー",
     "applyKiloDefault": "Kiloのデフォルトを適用",
+    "applyKiloDefaultEnglishNote": "Kiloのデフォルトポリシーのテキストは英語です。Kilo Gatewayが書かれたとおりにそのまま適用するためです。",
+    "applyKiloDefaultReplaceMessage": "Kiloのデフォルトポリシーは英語で書かれており、ポリシー違反で設定した内容を置き換えます。ポリシーテキスト欄に入力したテキストは復元できません。",
     "invalidSavedTitle": "保存された入力検出器の設定を読み取れません",
     "invalidSavedBody": "入力検出器が再度保存されるまで、リクエストはブロックされます。以下の検出器はKiloのデフォルトから開始します。",
     "invalidSavedOutputTitle": "保存された出力検出器の設定を読み取れません",

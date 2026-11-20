@@ -687,6 +687,12 @@ describe('legacy skill writing', () => {
           files: {
             '../outside.txt': 'unsafe',
             'SKILL.md': 'override',
+            './SKILL.md': 'override',
+            './skill.md': 'override',
+            'a/./SKILL.md': 'override',
+            '.': 'empty name',
+            'A.md': 'first',
+            'a.md': 'second',
             '': 'empty path',
             ['x'.repeat(201)]: 'overlong path',
             ['x'.repeat(200)]: 'valid boundary',
@@ -696,6 +702,10 @@ describe('legacy skill writing', () => {
       ]);
       const skillDir = path.join(home, '.kilocode/skills/review');
       expect(await fs.readFile(path.join(skillDir, 'SKILL.md'), 'utf8')).toBe('# Review');
+      expect(await fs.readFile(path.join(skillDir, 'A.md'), 'utf8')).toBe('first');
+      expect((await fs.readdir(skillDir)).filter(name => name.toLowerCase() === 'a.md')).toEqual([
+        'A.md',
+      ]);
       expect(await fs.readFile(path.join(skillDir, 'nested/guide.txt'), 'utf8')).toBe('safe');
       expect(await fs.readFile(path.join(skillDir, 'x'.repeat(200)), 'utf8')).toBe(
         'valid boundary'

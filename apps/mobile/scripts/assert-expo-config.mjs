@@ -9,14 +9,20 @@ import {
   CREATED_ANDROID_NOTIFICATION_CHANNEL_IDS,
   SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS,
 } from '../src/lib/android-notification-channels.js';
+import {
+  SPLASH_BACKGROUND_COLOR,
+  SPLASH_LOGO_IMAGE,
+  SPLASH_LOGO_SIZE,
+} from '../src/lib/splash-branding.js';
 
 // Contract values mirrored from app.config.ts (bundle id, package, scheme,
 // orientation, associated domain, blocked and requested permissions, and
-// Sentry plugin). ENV_KEYS is imported live from src/lib/env-keys.js, and the
+// Sentry plugin). ENV_KEYS is imported live from src/lib/env-keys.js, the
 // silent and created channel lists from
-// src/lib/android-notification-channels.js. The script runs the full evaluated
-// config, so these must match the resolved build-time output, not the raw
-// app.config.ts source.
+// src/lib/android-notification-channels.js, and the splash branding from
+// src/lib/splash-branding.js. The script runs the full evaluated config, so
+// these must match the resolved build-time output, not the raw app.config.ts
+// source.
 const BUNDLE_IDENTIFIER = 'com.kilocode.kiloapp';
 const ANDROID_PACKAGE = 'com.kilocode.kiloapp';
 const SCHEME = 'kiloapp';
@@ -320,10 +326,10 @@ check(
   'the shared branded splash must own native splash registration and mod ordering'
 );
 check(
-  splashOptions?.image === './assets/images/logo-mark.png' &&
-    splashOptions.backgroundColor === '#FFDD00' &&
-    splashOptions.imageWidth === 100,
-  'the shared native splash must match AnimatedSplashOverlay: yellow with the 100dp Kilo mark'
+  splashOptions?.image === SPLASH_LOGO_IMAGE &&
+    splashOptions.backgroundColor === SPLASH_BACKGROUND_COLOR &&
+    splashOptions.imageWidth === SPLASH_LOGO_SIZE,
+  'the native splash and AnimatedSplashOverlay must read the same mark, colour and size from src/lib/splash-branding.js'
 );
 check(
   splashOptions?.ios === undefined && splashOptions?.android === undefined,

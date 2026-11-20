@@ -3,7 +3,6 @@ package com.kilocode.homewidgetrefresh
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import org.json.JSONObject
-import org.json.JSONArray
 
 class HomeWidgetRefreshModule : Module() {
   private val operationLock = Any()
@@ -37,7 +36,6 @@ class HomeWidgetRefreshModule : Module() {
     AsyncFunction("clear") { epoch: Long -> withEpoch(epoch) { HomeWidgetStore.clear(context) } }
     AsyncFunction("setFixtureMode") { enabled: Boolean -> HomeWidgetStore.fixture(context, enabled) }
     AsyncFunction("getData") { HomeWidgetStore.data(context)?.let { jsonMap(it) } }
-    AsyncFunction("getWidgetPushToken") { null as String? }
     AsyncFunction("widgetsChanged") { HomeWidgetStore.schedule(context, replace = true) }
     AsyncFunction("isCurrent") { scope: String, epoch: Long, generation: String -> HomeWidgetStore.current(context, scope, epoch, generation) }
     OnDestroy {
@@ -48,11 +46,3 @@ class HomeWidgetRefreshModule : Module() {
     }
   }
 }
-
-internal fun jsonValue(value: Any?): Any? = when (value) {
-  JSONObject.NULL -> null
-  is JSONObject -> jsonMap(value)
-  is JSONArray -> (0 until value.length()).map { jsonValue(value.get(it)) }
-  else -> value
-}
-internal fun jsonMap(value: JSONObject): Map<String, Any?> = value.keys().asSequence().associateWith { jsonValue(value.get(it)) }

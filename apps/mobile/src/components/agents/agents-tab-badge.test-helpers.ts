@@ -71,9 +71,10 @@ vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshCont
 // the minimal `react-native` mock below.
 vi.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
 vi.mock('react-native', () => ({
-  // The live Agents header reads the interface direction for its action
-  // label's LTR-only letterspacing (session-list-screen.tsx), so the mock
-  // needs the export to exist.
+  // The live Agents header follows the copy's script for its action label's
+  // capitals and tracking — right-to-left script copy drops them inside an RTL
+  // interface (`keepsLatinDisplay`, session-list-screen.tsx) — so the mock needs
+  // the export to exist.
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   AppState: { addEventListener: () => ({ remove: () => undefined }) },

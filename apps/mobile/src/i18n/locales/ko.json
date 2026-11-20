@@ -140,6 +140,7 @@
     "keepRunning": "계속 실행",
     "newSession": "새 세션",
     "noModelsAvailable": "사용 가능한 모델 없음",
+    "modelRetires": "{{date}}에 단종",
     "notFound": "항목을 찾을 수 없습니다.",
     "online": "온라인",
     "open": "{{name}} 열기",
@@ -183,7 +184,9 @@
     "organizationTrialEnded": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. 조직 소유자는 kilo.ai에서 결제 정보를 업데이트한 후 다시 시도하세요.",
     "privateRepositoryA11y": "{{name}}, 비공개 저장소",
     "legalDocumentEnglishOnly": "이 문서는 영어로만 제공됩니다.",
-    "organizationTrialEndedBilling": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. 결제 정보를 업데이트한 후 다시 시도할 수 있습니다."
+    "organizationTrialEndedBilling": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. 결제 정보를 업데이트한 후 다시 시도할 수 있습니다.",
+    "organizationTrialEndedBillingAtKiloAi": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. kilo.ai에서 결제 정보를 업데이트한 후 다시 시도할 수 있습니다.",
+    "viewOnGitHub": "GitHub에서 PR 보기"
   },
   "language": {
     "restarting": "언어 적용을 위해 다시 시작 중",
@@ -507,7 +510,7 @@
     "changelogFixesPolish": "앱 전반의 수정 및 개선 사항.",
     "changelogAreas": {
       "signIn": "로그인",
-      "profileOrganizations": "프로필 및 조직"
+      "profileOrganizations": "프로필과 조직"
     }
   },
   "preferences": {
@@ -697,7 +700,7 @@
     },
     "autoReviews": "자동 리뷰",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket이 연결되지 않았습니다. 조직 소유자, 관리자, 결제 관리자만 연결할 수 있습니다."
+      "notConnectedReadOnlyPlan": "조직의 체험이 종료되었으므로 소유자가 kilo.ai에서 결제 정보를 업데이트해야 합니다."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}의 Bitbucket 연결은 컴퓨터에서 웹으로 관리됩니다.",
@@ -706,7 +709,7 @@
       "managedOnWebRepositories": "컴퓨터에서 웹에 접속해 {{organization}}의 리포지토리를 선택하세요.",
       "description": "{{organization}}용 작업 영역 액세스 토큰을 생성하여 아래에 붙여넣으세요.",
       "descriptionReconnect": "{{organization}}용 새 작업 영역 액세스 토큰을 생성하여 아래에 붙여넣으세요.",
-      "descriptionOverview": "{{organization}}용 작업 영역 액세스 토큰을 생성한 다음 다음 화면에서 붙여넣으세요.",
+      "descriptionOverview": "작업 영역 액세스 토큰을 생성한 다음 다음 화면에서 붙여넣으세요.",
       "scopes": "계정: 읽기 · 저장소: 읽기/쓰기 · 풀 리퀘스트: 읽기 · 웹훅: 읽기/쓰기",
       "tokenPlaceholder": "작업 영역 액세스 토큰",
       "tokenRefused": "Bitbucket에서 이 작업 영역 토큰을 수락하지 않았습니다. 위의 권한이 포함되어 있는지 확인한 후 다시 시도하세요."
@@ -1272,7 +1275,7 @@
       "couldNotLoad": "발견된 문제를 불러올 수 없습니다.",
       "couldNotLoadMore": "발견된 문제를 추가로 불러올 수 없습니다.",
       "emptyDescription": "현재 조치가 필요한 미해결 문제가 없습니다.",
-      "emptyTitle": "미해결 문제 없음",
+      "emptyTitle": "오픈 문제 없음",
       "noMatchesDescription": "선택한 필터를 변경하거나 초기화해 보세요.",
       "noMatchesTitle": "필터 조건에 맞는 문제 없음"
     },
@@ -1475,7 +1478,7 @@
     "remediationUnavailable": {
       "findingNotFound": "보안 문제가 더 이상 존재하지 않습니다.",
       "approvalRequired": "자동 수정에는 승인이 필요합니다. 승인하려면 수정을 수동으로 시작하세요.",
-      "findingNotOpen": "이 문제는 더 이상 미해결 상태가 아닙니다.",
+      "findingNotOpen": "이 문제는 더 이상 오픈 상태가 아닙니다.",
       "repoNotInScope": "이 저장소는 보안 에이전트의 모니터링 대상으로 선택되지 않았습니다.",
       "analysisRequired": "수정을 시작하기 전에 코드베이스 분석을 실행하세요.",
       "staleAnalysis": "분석 후 문제가 변경되었습니다. 수정을 시작하기 전에 분석을 다시 실행하세요.",
@@ -2783,7 +2786,6 @@
       "skipped_one": "{{displayCount}}개 건너뜀",
       "skipped_other": "{{displayCount}}개 건너뜀",
       "title": "검사",
-      "viewOnGitHub": "GitHub에서 PR 보기",
       "checkDetails": "검사 세부 정보"
     },
     "composer": {
@@ -2844,6 +2846,9 @@
       "commentActions": "댓글 작업",
       "comment": "댓글 {{displayCount}}개",
       "comment_other": "댓글 {{displayCount}}개",
+      "conversationTruncated": "처음 {{displayCount}}개의 댓글만 표시합니다.",
+      "conversationTruncated_other": "처음 {{displayCount}}개의 댓글만 표시합니다.",
+      "conversationTruncated_one": "처음 {{displayCount}}개의 댓글만 표시합니다.",
       "couldNotLoad": "토론을 불러오지 못했습니다.",
       "couldNotLoadMore": "댓글을 더 불러오지 못했습니다.",
       "loadMoreComments": "댓글 더 불러오기",
@@ -4853,12 +4858,15 @@
     "inputDescription": "도구 결과를 포함하여 모든 입력을 Enkrypt AI로 검사합니다. Enkrypt AI를 사용할 수 없을 때 요청은 거부되지 않고 검사 없이 전송됩니다.",
     "outputTitle": "출력 가드레일",
     "outputDescription": "구성원이 응답을 받기 전에 Enkrypt AI로 응답을 검사합니다. 직접 켜지 않는 한 꺼져 있습니다.",
+    "outputUnavailable": "Kilo가 이 조직의 출력 스캔을 활성화하지 않아 응답이 검사되지 않으며 여기에서 설정할 항목이 없습니다. 활성화를 요청하려면 {{supportEmail}}로 문의하세요.",
     "detectorsHint": "차단은 표시된 요청을 거부합니다. 기록만은 요청을 지연시키지 않고 기록합니다.",
     "detectorsHintOutput": "차단은 표시된 응답을 실패 처리합니다. 기록만은 응답을 지연시키지 않고 기록합니다.",
     "choiceLog": "기록만",
     "applyTo": "적용 대상",
     "applyToAllMembers": "모든 구성원",
     "applyKiloDefault": "Kilo 기본값 적용",
+    "applyKiloDefaultEnglishNote": "Kilo 기본 정책 텍스트는 영어입니다. Kilo Gateway가 기록된 그대로 적용하기 때문입니다.",
+    "applyKiloDefaultReplaceMessage": "Kilo 기본 정책은 영어로 작성되어 있으며 정책 위반에서 설정한 내용을 대체합니다. 정책 텍스트 필드에 입력한 텍스트는 복구할 수 없습니다.",
     "invalidSavedTitle": "저장된 입력 탐지기 설정을 읽을 수 없습니다",
     "invalidSavedBody": "입력 탐지기를 다시 저장할 때까지 요청이 차단됩니다. 아래 탐지기는 Kilo 기본값에서 시작합니다.",
     "invalidSavedOutputTitle": "저장된 출력 탐지기 설정을 읽을 수 없습니다",

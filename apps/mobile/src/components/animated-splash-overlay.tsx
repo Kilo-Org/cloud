@@ -17,7 +17,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 import logo from '@/../assets/images/logo-mark.png';
 import { Image } from '@/components/ui/image';
 import { SPLASH_CONTENT_OVERSCAN, splashContentScale } from '@/components/splash-reveal';
-import { SPLASH_DISC_SIZE, SPLASH_LOGO_SIZE } from '@/lib/splash-branding';
+import { SPLASH_BACKGROUND_COLOR, SPLASH_DISC_SIZE, SPLASH_LOGO_SIZE } from '@/lib/splash-branding';
 import { isStartupComplete, subscribeStartupComplete } from '@/lib/startup-timing';
 import { useMotionPolicy } from '@/lib/a11y/motion';
 
@@ -30,6 +30,11 @@ const logoBox = { width: SPLASH_LOGO_SIZE, height: SPLASH_LOGO_SIZE } satisfies 
 
 /** The reveal disc's box: the mark's size plus its ring. */
 const discBox = { width: SPLASH_DISC_SIZE, height: SPLASH_DISC_SIZE } satisfies ViewStyle;
+
+/** The field behind the mark: the same colour the native splash paints, taken
+ *  from the shared module rather than a class because NativeWind cannot
+ *  interpolate a constant into the animated style beside it. */
+const splashBackground = { backgroundColor: SPLASH_BACKGROUND_COLOR } satisfies ViewStyle;
 
 // Reveal timeline. The logo dips, punches through the viewer and clears the
 // frame, and only then does a disc of the app's own background wipe the yellow
@@ -201,14 +206,15 @@ export function AnimatedSplashOverlay() {
       <TimeToFullDisplay ready={dismissed} />
       {dismissed ? null : (
         <>
-          {/* The overlay is yellow, so the status bar needs dark icons whatever the
-              theme is. Mounted after the root `style="auto"` bar, it wins the merge
-              until the reveal ends and this unmounts. */}
+          {/* The overlay paints SPLASH_BACKGROUND_COLOR, so the status bar needs
+              dark icons whatever the theme is. Mounted after the root
+              `style="auto"` bar, it wins the merge until the reveal ends and
+              this unmounts. */}
           <StatusBar style="dark" />
           <Animated.View
             pointerEvents="none"
-            className="absolute inset-0 items-center justify-center bg-[#FFDD00]"
-            style={overlayStyle}
+            className="absolute inset-0 items-center justify-center"
+            style={[overlayStyle, splashBackground]}
           >
             <Animated.View
               className="absolute rounded-full bg-background"

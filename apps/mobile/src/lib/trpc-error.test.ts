@@ -111,18 +111,15 @@ describe('readTrpcServerMessage', () => {
   it('yields no sentence for an internal server error', () => {
     // An unexpected failure carries diagnostic text. Only a sentence the
     // application wrote for a person reaches the sheet.
-    const failed = Object.assign(
-      new Error('probe diagnostic text'),
-      {
-        name: 'TRPCClientError',
-        data: {
-          code: 'INTERNAL_SERVER_ERROR',
-          httpStatus: 500,
-          path: 'agentProfiles.create',
-          stack: 'probe stack',
-        },
-      }
-    );
+    const failed = Object.assign(new Error('probe diagnostic text'), {
+      name: 'TRPCClientError',
+      data: {
+        code: 'INTERNAL_SERVER_ERROR',
+        httpStatus: 500,
+        path: 'agentProfiles.create',
+        stack: 'probe stack',
+      },
+    });
     expect(readTrpcServerMessage(failed)).toBeUndefined();
   });
 

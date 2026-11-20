@@ -2116,7 +2116,7 @@ describe('GitLab encrypted credential persistence', () => {
     controller.abort();
 
     await expect(
-      settleStoredProjectTokens(integration, { userId: user.id }, 'glpat-primary-token', {
+      settleStoredProjectTokens(integration, 'glpat-primary-token', {
         signal: controller.signal,
       })
     ).resolves.toEqual({ revoked: 0, scrubbed: 0, retained: 1, unattempted: 1 });
@@ -2154,7 +2154,7 @@ describe('GitLab encrypted credential persistence', () => {
     });
 
     await expect(
-      settleStoredProjectTokens(integration, { userId: user.id }, 'glpat-primary-token', {
+      settleStoredProjectTokens(integration, 'glpat-primary-token', {
         signal: controller.signal,
       })
     ).resolves.toEqual({ revoked: 0, scrubbed: 0, retained: 1, unattempted: 0 });
@@ -2280,9 +2280,12 @@ describe('GitLab encrypted credential persistence', () => {
       .where(eq(platform_integrations.id, integration.id));
     mockFetchGitLabCredential.mockClear();
 
-    await expect(
-      settleStoredProjectTokens(withLegacy, { userId: user.id }, undefined)
-    ).resolves.toEqual({ revoked: 0, scrubbed: 1, retained: 1, unattempted: 1 });
+    await expect(settleStoredProjectTokens(withLegacy, undefined)).resolves.toEqual({
+      revoked: 0,
+      scrubbed: 1,
+      retained: 1,
+      unattempted: 1,
+    });
 
     expect(mockRevokeProjectAccessToken).not.toHaveBeenCalled();
     expect(mockFetchGitLabCredential).not.toHaveBeenCalled();

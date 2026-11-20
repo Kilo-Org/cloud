@@ -470,7 +470,6 @@ type ProjectTokenSettlement = {
  */
 export async function settleStoredProjectTokens(
   integration: Pick<PlatformIntegration, 'id' | 'metadata'>,
-  actor: GitLabCredentialActor,
   userToken: string | undefined,
   options: { signal?: AbortSignal } = {}
 ): Promise<ProjectTokenSettlement | null> {
@@ -579,7 +578,7 @@ export async function ensureStoredProjectTokensSettledBeforeInstanceChange(
     );
   }
 
-  const settlement = await settleStoredProjectTokens(integration, actor, userToken);
+  const settlement = await settleStoredProjectTokens(integration, userToken);
   if (settlement === null || settlement.retained > 0) {
     throw new TRPCError({
       code: 'PRECONDITION_FAILED',
@@ -700,7 +699,7 @@ export async function disconnectGitLabIntegration(owner: Owner, actingUserId: st
   // between the first credential lookup and the suspension. The integration is
   // suspended already, so an unreadable project list cannot fail the disconnect;
   // the kept handles stay unusable through it.
-  const settlement = await settleStoredProjectTokens(integration, actor, userToken);
+  const settlement = await settleStoredProjectTokens(integration, userToken);
 
   logExceptInTest(
     '[disconnectGitLabIntegration] Integration suspended (preserved webhook config)',
@@ -1384,11 +1383,7 @@ export async function connectWithPAT(
       ) &&
       (existingAccountId === null || existingAccountId === connectedAccountId)
     ) {
-      const settlement = await settleStoredProjectTokens(
-        existingIntegration,
-        gitLabCredentialActor(owner, authorizedByUserId),
-        token
-      );
+      const settlement = await settleStoredProjectTokens(existingIntegration, token);
       logExceptInTest('[connectWithPAT] Reconnect settled retained project tokens', {
         integrationId: existingIntegration.id,
         settledProjectTokens: settlement === null ? null : settlement,

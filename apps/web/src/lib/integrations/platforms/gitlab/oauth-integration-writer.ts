@@ -145,11 +145,7 @@ export async function storeGitLabOAuthIntegration(
       (previousStoredAccountId === null || previousStoredAccountId === input.providerUser.id) &&
       input.scopes.includes('api')
     ) {
-      const settlement = await settleStoredProjectTokens(
-        existing,
-        gitLabCredentialActor(input.owner, input.authorizedByUserId),
-        input.accessToken
-      );
+      const settlement = await settleStoredProjectTokens(existing, input.accessToken);
       logExceptInTest('[storeGitLabOAuthIntegration] Reconnect settled retained project tokens', {
         integrationId: existing.id,
         settledProjectTokens: settlement,

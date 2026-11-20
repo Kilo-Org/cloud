@@ -59,6 +59,8 @@ vi.mock('react-native-reanimated', () => ({
 }));
 
 const BODY_CLASSES = 'gap-3 pt-3';
+const SURFACE_CLASSES = 'rounded-xl bg-secondary overflow-hidden';
+const SURFACE_BODY_CLASSES = 'gap-3 -mt-1.5 pb-3';
 const SECTION_BODY = 'section body';
 
 let mounted: ReactTestRenderer | undefined = undefined;
@@ -249,12 +251,23 @@ describe('CollapsibleSection controlled expanded state and class overrides', () 
   });
 
   it('draws the body on the header surface only with bodyOnSurface', () => {
-    const bodyNodesInGroup = (bodyOnSurface: boolean) =>
-      mountSection({ expanded: true, bodyOnSurface })
-        .root.findByType(RowGroup)
-        .findAll(node => node.children.includes(SECTION_BODY)).length;
-    expect(bodyNodesInGroup(false)).toBe(0);
-    expect(bodyNodesInGroup(true)).toBeGreaterThan(0);
+    // Default: the header is a row group of its own and the body sits on the
+    // page below it, because those children bring their own surface.
+    const pageSection = mountSection({ expanded: true });
+    expect(pageSection.root.findAllByType(RowGroup)).toHaveLength(1);
+    expect(animatedView(pageSection, BODY_CLASSES)).toBeDefined();
+
+    // A surface body belongs to the header's card: one surface holds both, so
+    // no row group and no hairline splits them, and the body pulls up to the
+    // header's own bottom inset under its title.
+    const surfaceSection = mountSection({ expanded: true, bodyOnSurface: true });
+    expect(surfaceSection.root.findAllByType(RowGroup)).toHaveLength(0);
+    const [surface] = surfaceSection.root.findAll(
+      node => node.type === ('View' as ElementType) && node.props.className === SURFACE_CLASSES
+    );
+    expect(surface.findAllByType('Pressable' as ElementType)).toHaveLength(1);
+    expect(surface.findAll(node => node.children.includes(SECTION_BODY)).length).toBeGreaterThan(0);
+    expect(animatedView(surfaceSection, SURFACE_BODY_CLASSES)).toBeDefined();
   });
 });
 

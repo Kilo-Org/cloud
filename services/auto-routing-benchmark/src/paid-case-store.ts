@@ -737,9 +737,24 @@ export function claimPaidCaseStatements(
         `UPDATE paid_benchmark_request_cases
         SET generation = (SELECT generation FROM benchmark_case_runs WHERE ${caseKeyPredicate()}),
           updated_at = ?
-        WHERE ${caseKeyPredicate()} AND status IN ('queued', 'running')`
+        WHERE ${caseKeyPredicate()} AND status IN ('queued', 'running')
+          -- Only a live request participates: a paused, completed or failed request keeps
+          -- its recorded generation even if a child row still says queued, and this also
+          -- drives the write from the request index then a link-PK seek instead of a scan
+          -- over closed history on every case claim.
+          AND request_id IN (
+            SELECT live.id FROM paid_benchmark_requests AS live
+            WHERE live.status IN ('preparing', 'active')
+          )
+          -- Only the claim that actually owns the running generation writes it: a fenced,
+          -- attached or stale claim leaves every row exactly as it was.
+          AND EXISTS (
+            SELECT 1 FROM benchmark_case_runs
+            WHERE ${caseKeyPredicate()} AND status = 'running'
+              AND executor_run_id = ? AND executor_token = ?
+          )`
       )
-      .bind(...key, at, ...key),
+      .bind(...key, at, ...key, ...key, input.executor.runId, input.executor.token),
   );
   statements.push(
     db.prepare(`SELECT * FROM benchmark_case_runs WHERE ${caseKeyPredicate()}`).bind(...key)
@@ -2242,7 +2257,6 @@ type ProgressCaseRow = {
   case_id: string;
   status: PaidBenchmarkRequestCaseRowStatus;
   covered_by_kilo: number;
-  charged_microdollars: number;
   reason: string | null;
 };
 
@@ -2315,8 +2329,7 @@ export async function readPaidBenchmarkProgress(
       .all<{ status: PaidBenchmarkRequestCaseRowStatus; count: number }>(),
     db
       .prepare(
-        `SELECT engine_identity, model, variant, rep, case_id, status, covered_by_kilo,
-          charged_microdollars, reason
+        `SELECT engine_identity, model, variant, rep, case_id, status, covered_by_kilo, reason
         FROM paid_benchmark_request_cases
         WHERE request_id = ? ${cursorPredicate}
         ORDER BY engine_identity, model, variant, rep, case_id LIMIT ?`
@@ -2330,7 +2343,9 @@ export async function readPaidBenchmarkProgress(
     db
       .prepare(
         `SELECT usage.engine_identity, usage.model, usage.variant, usage.rep,
-          usage.case_id, COUNT(*) AS billed, 0 AS covered, 0 AS covered_microdollars
+          usage.case_id, COUNT(*) AS billed,
+          COALESCE(SUM(usage.microdollars), 0) AS billed_microdollars,
+          0 AS covered, 0 AS covered_microdollars
         FROM paid_attempt_usage AS usage
         WHERE usage.request_id = ? AND usage.platform_covered = 0
         GROUP BY usage.engine_identity, usage.model, usage.variant, usage.rep, usage.case_id
@@ -2340,7 +2355,7 @@ export async function readPaidBenchmarkProgress(
         -- must not be 'reused' (a historical result is not live coverage), and the partial
         -- index keeps this a seek.
         SELECT usage.engine_identity, usage.model, usage.variant, usage.rep,
-          usage.case_id, 0, COUNT(*), SUM(usage.microdollars)
+          usage.case_id, 0, 0, COUNT(*), SUM(usage.microdollars)
         FROM paid_benchmark_request_cases AS staged
         JOIN paid_attempt_usage AS usage
           ON usage.engine_identity = staged.engine_identity
@@ -2362,6 +2377,7 @@ export async function readPaidBenchmarkProgress(
         rep: number;
         case_id: string;
         billed: number;
+        billed_microdollars: number;
         covered: number;
         covered_microdollars: number;
       }>(),
@@ -2395,6 +2411,7 @@ export async function readPaidBenchmarkProgress(
       continue;
     }
     existing.billed += Number(row.billed);
+    existing.billed_microdollars += Number(row.billed_microdollars);
     existing.covered += Number(row.covered);
     existing.covered_microdollars += Number(row.covered_microdollars);
   }
@@ -2441,8 +2458,12 @@ export async function readPaidBenchmarkProgress(
         billedModelRequests: Number(caseUsage?.billed ?? 0),
         kiloCoveredModelRequests: Number(caseUsage?.covered ?? 0),
         kiloCoveredMicrodollars: Number(caseUsage?.covered_microdollars ?? 0),
-        coveredByKilo: row.covered_by_kilo === 1,
-        chargedMicrodollars: row.charged_microdollars,
+        // The quote's promise or a covered receipt this row actually shares. A case that
+        // only carries the staged default was never covered.
+        coveredByKilo: row.covered_by_kilo === 1 || Number(caseUsage?.covered ?? 0) > 0,
+        // This owner's own receipts for this case, never the Kilo amount: `charged` and
+        // `covered` are disjoint branches, so nothing is counted twice.
+        chargedMicrodollars: Number(caseUsage?.billed_microdollars ?? 0),
         reason: row.reason,
       };
     }),

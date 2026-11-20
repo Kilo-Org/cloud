@@ -2621,6 +2621,46 @@ describe('coverage generation participation', () => {
     expect(bravo.chargedMicrodollars).toBe(0);
   });
 
+  it('freezes a closed parent\'s stale child during a live claim', async () => {
+    // A live request claims the case while a closed request still holds a `queued` child row
+    // (a crash or an older write path left it behind). The claim joins the live request to
+    // the new generation and must leave the closed history byte-identical.
+    await db.batch(enqueuePaidCaseStatements(db, { key: key(), requestId: 'request-a' }));
+    await db.batch(activatePaidBenchmarkRequestStatements(db, { requestId: 'request-a' }));
+    sqlite
+      .prepare(`UPDATE paid_benchmark_requests SET status = 'completed' WHERE id = 'request-b'`)
+      .run();
+    sqlite
+      .prepare(
+        `INSERT INTO paid_benchmark_request_cases (
+          request_id, engine_identity, model, variant, rep, case_id, status, generation,
+          covered_by_kilo, charged_microdollars, reason, updated_at
+        ) VALUES ('request-b', ?, ?, '', 0, ?, 'queued', NULL, 0, 0, NULL,
+          '2026-01-01T00:00:00.000Z')`
+      )
+      .run(ENGINE, MODEL, CASE);
+    const closed = () =>
+      sqlite
+        .prepare(
+          `SELECT status, generation, updated_at FROM paid_benchmark_request_cases
+          WHERE request_id = 'request-b'`
+        )
+        .get();
+    const before = closed();
+
+    const claimA = await claim(db, { runId: 'run-1', token: 'token-1' });
+    expect(claimA.outcome).toBe('started');
+    const generation = claimA.run?.generation ?? 0;
+    expect(
+      sqlite
+        .prepare(
+          `SELECT generation FROM paid_benchmark_request_cases WHERE request_id = 'request-a'`
+        )
+        .get()
+    ).toEqual({ generation });
+    expect(closed()).toEqual(before);
+  });
+
   it('reports Kilo cover to a request first staged onto an already running covered case', async () => {
     // The platform run owns the execution and Kilo covers it; a user request stages onto
     // that same running generation. It participates in that generation, so it sees the cover.
@@ -2746,6 +2786,123 @@ describe('shared case progress attribution', () => {
     expect(other.billedModelRequests).toBe(0);
     expect(other.chargedMicrodollars).toBe(0);
     expect(other.pendingModelRequests).toBe(0);
+  });
+
+  it('projects exact per-case owner amounts and never charges Kilo to the owner', async () => {
+    // Two cases: one is billed to this owner, the other is not. A covered receipt lands on
+    // the billed case (Kilo paid a later call on it) and an admitted Kilo call has no
+    // receipt yet. Only the owner's own billed amount may appear per case.
+    const run = await caseRun(db);
+    const secondKey = key({ caseId: 'case-2' });
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_case_runs (
+          engine_identity, model, variant, rep, case_id, status, generation, executor_run_id,
+          executor_token, platform_covered, result_usable, created_at, updated_at, started_at
+        ) VALUES (?, ?, '', 0, 'case-2', 'running', ?, 'run-1', 'token-1', 0, 0, ?, ?, ?)`
+      )
+      .run(
+        ENGINE,
+        MODEL,
+        run.generation,
+        '2026-01-01T00:00:00.000Z',
+        '2026-01-01T00:00:00.000Z',
+        '2026-01-01T00:00:00.000Z'
+      );
+    await db.batch(
+      enqueuePaidCaseStatements(db, { key: secondKey, requestId: 'request-a' })
+    );
+
+    // The owner pays 40 for case-1 and 7 for case-2, each through the real selection,
+    // admission and receipt path keyed by its own case.
+    for (const [caseKey, modelRequestId, usageId, assignmentId, microdollars] of [
+      [key(), UUID_1, USAGE_1, ASSIGNMENT_1, 40],
+      [secondKey, UUID_2, USAGE_2, ASSIGNMENT_2, 7],
+    ] as const) {
+      const selected = await selectModelRequest(db, {
+        key: caseKey,
+        generation: run.generation,
+        modelRequestId,
+        assignmentId,
+        usageId,
+      });
+      expect(selected?.state).toBe('selecting');
+      await admitModelRequest(db, {
+        key: caseKey,
+        generation: run.generation,
+        modelRequestId,
+        assignmentId,
+      });
+      await db.batch(
+        acceptPaidAttemptUsageStatements(db, {
+          assignmentId,
+          usageId,
+          microdollars,
+          expected: {
+            owner: alice,
+            model: MODEL,
+            variant: '',
+            caseId: caseKey.caseId,
+            generation: run.generation,
+            projectId: POOL_PROJECT_ID,
+          },
+        })
+      );
+    }
+
+    const progress = await readPaidBenchmarkProgress(db, { requestId: 'request-a' });
+    if (progress.status === 'empty') throw new Error('expected progress');
+    expect(progress.chargedMicrodollars).toBe(47);
+    const byCase = new Map(progress.cases.map(entry => [entry.caseId, entry]));
+    expect(byCase.get('case-1')).toMatchObject({
+      chargedMicrodollars: 40,
+      billedModelRequests: 1,
+      kiloCoveredMicrodollars: 0,
+      coveredByKilo: false,
+    });
+    expect(byCase.get('case-2')).toMatchObject({
+      chargedMicrodollars: 7,
+      billedModelRequests: 1,
+      kiloCoveredMicrodollars: 0,
+    });
+
+    // Kilo covers a later call on case-1 only. That amount is Kilo's, and the case is now
+    // labelled covered because a covered receipt really exists for its generation.
+    await db.batch(platformCoverageStatements(db, { key: key() }));
+    const covered = await payModelRequest(db, {
+      generation: run.generation,
+      modelRequestId: UUID_3,
+      assignmentId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      usageId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+      platformOrganizationId: 'org-benchmark',
+    });
+    await acceptUsage(db, {
+      assignmentId: covered.assignmentId,
+      usageId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+      owner: alice,
+      microdollars: 90,
+      generation: run.generation,
+      projectId: PLATFORM_PROJECT_ID,
+      platformOrganizationId: 'org-benchmark',
+    });
+
+    const after = await readPaidBenchmarkProgress(db, { requestId: 'request-a' });
+    if (after.status === 'empty') throw new Error('expected progress');
+    const afterByCase = new Map(after.cases.map(entry => [entry.caseId, entry]));
+    // The owner's charge is unchanged by Kilo's spend, and the Kilo amount is separate.
+    expect(afterByCase.get('case-1')).toMatchObject({
+      chargedMicrodollars: 40,
+      kiloCoveredModelRequests: 1,
+      kiloCoveredMicrodollars: 90,
+      coveredByKilo: true,
+    });
+    expect(afterByCase.get('case-2')).toMatchObject({
+      chargedMicrodollars: 7,
+      kiloCoveredMicrodollars: 0,
+      coveredByKilo: false,
+    });
+    expect(after.chargedMicrodollars).toBe(47);
+    expect(after.kiloCoveredMicrodollars).toBe(90);
   });
 
   it('still shows genuine live Kilo coverage on a shared case', async () => {

@@ -5053,6 +5053,7 @@
     "providersDescription": "Isključite pružaoca da Kilo prestane usmjeravati zahtjeve prema njemu za ovu organizaciju.",
     "providersNeedCatalog": "Prekidači pružalaca ostaju samo za čitanje dok se ne učita kompletan katalog modela. Dodirnite Pokušaj ponovo iznad da ih uredite.",
     "providersEmpty": "Nijedan pružalac ne odgovara ovoj pretrazi.",
+    "providersNone": "Nijedan pružalac nije dostupan za ovu organizaciju.",
     "allowAllShown": "Dozvoli sve prikazane",
     "denyAllShown": "Zabrani sve prikazane",
     "gatewaysDescription": "Kilo usmjerava zahtjeve modelima putem Vercel AI Gatewaya ili OpenRoutera. Ako je gateway onemogućen, ti zahtjevi neće uspjeti.",

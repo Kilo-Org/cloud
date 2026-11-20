@@ -4977,6 +4977,7 @@
     "providersDescription": "Fikni një ofrues për të ndaluar Kilo që të rrugëzojë drejt tij për këtë organizatë.",
     "providersNeedCatalog": "Çelësat e ofruesve mbeten vetëm për lexim derisa të ngarkohet i gjithë katalogu i modeleve. Për t'i ndryshuar, prekni Riprovo më lart.",
     "providersEmpty": "Nuk ka ofrues që përputhen me këtë kërkim.",
+    "providersNone": "Nuk ka ofrues të disponueshëm për këtë organizatë.",
     "allowAllShown": "Lejo çdo gjë të shfaqur",
     "denyAllShown": "Ndal çdo gjë të shfaqur",
     "gatewaysDescription": "Kilo i rrugëzon kërkesat e modeleve përmes Vercel AI Gateway ose OpenRouter. Një portë e çaktivizuar i bën ato kërkesa të dështojnë.",

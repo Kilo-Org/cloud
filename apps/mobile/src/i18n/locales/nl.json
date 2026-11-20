@@ -4977,6 +4977,7 @@
     "providersDescription": "Schakel een aanbieder uit om te voorkomen dat Kilo voor deze organisatie naar die aanbieder routeert.",
     "providersNeedCatalog": "De schakelaars voor aanbieders blijven alleen-lezen totdat de volledige modelcatalogus is geladen. Tik hierboven op Opnieuw proberen om ze te bewerken.",
     "providersEmpty": "Geen aanbieders komen overeen met deze zoekopdracht.",
+    "providersNone": "Er zijn geen aanbieders beschikbaar voor deze organisatie.",
     "allowAllShown": "Alle getoonde toestaan",
     "denyAllShown": "Alle getoonde weigeren",
     "gatewaysDescription": "Kilo routeert modelverzoeken via Vercel AI Gateway of OpenRouter. Een uitgeschakelde toegangspoort laat die verzoeken mislukken.",

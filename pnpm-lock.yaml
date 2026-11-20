@@ -1317,8 +1317,8 @@ importers:
         specifier: 4.0.6
         version: 4.0.6
       ghostty-web:
-        specifier: 0.4.0
-        version: 0.4.0
+        specifier: 0.4.0-next.21.g640db46
+        version: 0.4.0-next.21.g640db46
       google-auth-library:
         specifier: 10.6.2
         version: 10.6.2
@@ -15877,8 +15877,8 @@ packages:
     resolution: {integrity: sha512-VilgtJj/ALgGY77fiLam5iD336eSWi96Q15JSAG1zi8NRBysm3LXKdGnHb4m5cuyxvOLQQKWpBZAT6ni4FI2iQ==}
     engines: {node: '>=6'}
 
-  ghostty-web@0.4.0:
-    resolution: {integrity: sha512-0puDBik2qapbD/QQBW9o5ZHfXnZBqZWx/ctBiVtKZ6ZLds4NYb+wZuw1cRLXZk9zYovIQ908z3rvFhexAvc5Hg==}
+  ghostty-web@0.4.0-next.21.g640db46:
+    resolution: {integrity: sha512-YxJYIo+Frc+HsJOeyyZVBMSke3TsiQ9yyl+Cu8sI7oEBINYUxP6Z9AxBehst20AZOP255z6S7rpORu0JJzHtEw==}
 
   giget@3.3.0:
     resolution: {integrity: sha512-gzi2D96p+AMfDcmJHGDj3KJ9NRiwvlFAU5yfa3ROwWZmFUjX4P43x3BcyRaOMMLto1vUo7C+86+MFhYTl6Ryiw==}
@@ -36615,7 +36615,7 @@ snapshots:
 
   getenv@2.0.0: {}
 
-  ghostty-web@0.4.0: {}
+  ghostty-web@0.4.0-next.21.g640db46: {}
 
   giget@3.3.0: {}
 

@@ -72,6 +72,23 @@ describe('parseWorkspaceTabsByScope', () => {
     expect(parseWorkspaceTabsByScope(JSON.stringify(state))).toEqual(state.tabsByScope);
   });
 
+  it('round-trips the PTY a terminal tab attaches to after a page load', () => {
+    const state = {
+      tabsByScope: {
+        'worktree:wt-1': tabs({
+          activeTabId: terminalTabId('tty-1'),
+          terminals: [
+            { id: 'tty-1', title: 'Terminal 1', cloudAgentSessionId: 'ses-1', ptyId: 'pty_1' },
+            { id: 'tty-2', title: 'Terminal 2', cloudAgentSessionId: 'ses-1' },
+          ],
+          nextTerminalNumber: 3,
+        }),
+      },
+    };
+
+    expect(parseWorkspaceTabsByScope(JSON.stringify(state))).toEqual(state.tabsByScope);
+  });
+
   it('round-trips scoped file selection and modes alongside unchanged legacy file tabs', () => {
     const state = tabs({
       activeTabId: fileTabId('src/main.ts', 'against-base-branch'),

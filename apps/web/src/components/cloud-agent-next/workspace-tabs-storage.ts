@@ -22,6 +22,7 @@ const terminalTabSchema = z.object({
   id: z.string(),
   title: z.string(),
   cloudAgentSessionId: z.string(),
+  ptyId: z.string().optional(),
 });
 const fileTabSchema = z.object({
   path: z.string(),

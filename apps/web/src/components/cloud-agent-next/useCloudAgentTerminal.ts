@@ -18,6 +18,11 @@ import {
   isPtyControlFrame,
   resolveCloudAgentTerminalWsUrl,
 } from './terminal-utils';
+import {
+  createPersistentTerminalProtocol,
+  isPersistentTerminalGreeting,
+  type PersistentTerminalEffect,
+} from './persistent-terminal-protocol';
 
 export type TerminalStatus =
   | 'connecting'
@@ -37,17 +42,29 @@ type CloudAgentTerminalResult = {
 };
 
 const RESIZE_DEBOUNCE_MS = 150;
+const MAX_PENDING_RAW_INPUT = 1024;
+
+/**
+ * How one connection streams. A Kilo v2 terminal opens with a snapshot and
+ * speaks the persistent PTY protocol; any other first message is raw output.
+ */
+type TerminalStreamMode = 'pending' | 'raw' | 'persistent';
 
 export function useCloudAgentTerminal({
   cloudAgentSessionId,
   organizationId,
   enabled,
   active,
+  restoredPtyId,
+  onPtyIdChange,
 }: {
   cloudAgentSessionId: string | null | undefined;
   organizationId?: string;
   enabled: boolean;
   active: boolean;
+  /** A PTY from an earlier page, which the terminal attaches to before it creates one. */
+  restoredPtyId?: string;
+  onPtyIdChange?: (ptyId: string | null) => void;
 }): CloudAgentTerminalResult {
   const trpc = useTRPC();
   const [status, setStatus] = useState<TerminalStatus>('disconnected');
@@ -64,11 +81,17 @@ export function useCloudAgentTerminal({
   const ptyIdRef = useRef<string | null>(null);
   const activeRef = useRef(active);
   const reconnectNowRef = useRef<() => void>(() => {});
+  const refitRef = useRef<() => void>(() => {});
   const applySandboxStatusRef = useRef<(status: SandboxLifecycleStatus) => void>(() => {});
   const sleepingRef = useRef(false);
   const resumeWhenActiveRef = useRef(false);
 
+  const restoredPtyIdRef = useRef(restoredPtyId);
+  const onPtyIdChangeRef = useRef(onPtyIdChange);
+
   activeRef.current = active;
+  restoredPtyIdRef.current = restoredPtyId;
+  onPtyIdChangeRef.current = onPtyIdChange;
 
   const personalCreate = useMutation(trpc.cloudAgentNext.createTerminal.mutationOptions());
   const orgCreate = useMutation(trpc.organizations.cloudAgentNext.createTerminal.mutationOptions());
@@ -150,22 +173,10 @@ export function useCloudAgentTerminal({
   useEffect(() => {
     if (!active || !cloudAgentSessionId) return;
 
-    const frame = requestAnimationFrame(() => {
-      fitAddonRef.current?.fit();
-      const dims = fitAddonRef.current?.proposeDimensions();
-      const ptyId = ptyIdRef.current;
-      if (dims && ptyId) {
-        resizeTerminal({
-          cloudAgentSessionId,
-          ptyId,
-          cols: dims.cols,
-          rows: dims.rows,
-        });
-      }
-    });
+    const frame = requestAnimationFrame(() => refitRef.current());
 
     return () => cancelAnimationFrame(frame);
-  }, [active, cloudAgentSessionId, resizeTerminal]);
+  }, [active, cloudAgentSessionId]);
 
   useEffect(() => {
     if (!enabled || !cloudAgentSessionId) return;
@@ -216,6 +227,13 @@ export function useCloudAgentTerminal({
     let disposed = false;
     const capturedSessionId = cloudAgentSessionId;
     intentionalCloseRef.current = false;
+    const encoder = new TextEncoder();
+    let mode: TerminalStreamMode = 'pending';
+    let protocol = createPersistentTerminalProtocol();
+    let pendingRawInput: string[] = [];
+    let writing = false;
+    let restoredPty: string | null = null;
+    let reachedPty: string | null = null;
 
     function updateStatus(next: TerminalStatus, text: string) {
       if (disposed) return;
@@ -225,10 +243,72 @@ export function useCloudAgentTerminal({
 
     updateStatus('connecting', 'Connecting terminal');
 
+    function setPtyId(ptyId: string | null) {
+      ptyIdRef.current = ptyId;
+      onPtyIdChangeRef.current?.(ptyId);
+    }
+
+    /**
+     * A restored PTY that never answered is gone, for example after a sandbox
+     * restart, so the terminal starts a new one instead of an error.
+     */
+    function replaceUnreachedRestoredPty(term: Terminal, fitAddon: FitAddon): boolean {
+      const ptyId = ptyIdRef.current;
+      if (!ptyId || ptyId !== restoredPty || reachedPty === ptyId) return false;
+      restoredPty = null;
+      closeTerminal({ cloudAgentSessionId: capturedSessionId, ptyId });
+      setPtyId(null);
+      reconnectAttemptsRef.current = 0;
+      void createAndConnect(term, fitAddon);
+      return true;
+    }
+
     function sendResize(cols: number, rows: number) {
+      // A persistent PTY takes its size from input frames instead.
+      if (mode !== 'raw') return;
       const ptyId = ptyIdRef.current;
       if (!ptyId) return;
       resizeTerminal({ cloudAgentSessionId: capturedSessionId, ptyId, cols, rows });
+    }
+
+    function sendFrame(frame: Uint8Array<ArrayBuffer>) {
+      const ws = wsRef.current;
+      if (ws?.readyState === WebSocket.OPEN) ws.send(frame);
+    }
+
+    function writeOutput(term: Terminal, data: Uint8Array) {
+      // ghostty-web answers terminal queries while it writes; the PTY service already answered them.
+      writing = true;
+      try {
+        term.write(data);
+      } finally {
+        writing = false;
+      }
+    }
+
+    function applyEffects(term: Terminal, effects: PersistentTerminalEffect[]) {
+      for (const effect of effects) {
+        if (effect.type === 'resize') term.resize(effect.size.cols, effect.size.rows);
+        else if (effect.type === 'write') writeOutput(term, effect.data);
+        else if (effect.type === 'send') sendFrame(effect.frame);
+        else {
+          term.options.disableStdin = true;
+          updateStatus('error', 'Terminal service is outdated');
+        }
+      }
+    }
+
+    /**
+     * A raw terminal fits the emulator to the pane. A persistent PTY owns the
+     * emulator size, so the pane only asks for its measured size.
+     */
+    function fitPane(term: Terminal, fitAddon: FitAddon) {
+      if (mode !== 'persistent') {
+        fitAddon.fit();
+        return;
+      }
+      const dims = fitAddon.proposeDimensions();
+      if (dims) applyEffects(term, protocol.size(dims));
     }
 
     function scheduleResizeFit() {
@@ -236,9 +316,28 @@ export function useCloudAgentTerminal({
       if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
       resizeTimerRef.current = setTimeout(() => {
         resizeTimerRef.current = null;
-        if (disposed || !activeRef.current) return;
-        fitAddonRef.current?.fit();
+        const term = terminalInstanceRef.current;
+        const fitAddon = fitAddonRef.current;
+        if (disposed || !activeRef.current || !term || !fitAddon) return;
+        fitPane(term, fitAddon);
       }, RESIZE_DEBOUNCE_MS);
+    }
+
+    /** Chooses the stream mode from a connection's first message. */
+    function startStream(term: Terminal, fitAddon: FitAddon, first: string | ArrayBuffer) {
+      const dims = fitAddon.proposeDimensions();
+      const held = pendingRawInput;
+      pendingRawInput = [];
+      if (isPersistentTerminalGreeting(first)) {
+        mode = 'persistent';
+        if (dims) applyEffects(term, protocol.size(dims));
+        for (const data of held) applyEffects(term, protocol.input(encoder.encode(data)));
+        return;
+      }
+      mode = 'raw';
+      if (dims) sendResize(dims.cols, dims.rows);
+      const ws = wsRef.current;
+      if (ws?.readyState === WebSocket.OPEN) for (const data of held) ws.send(data);
     }
 
     function scheduleReconnect(term: Terminal, fitAddon: FitAddon, text: string) {
@@ -260,7 +359,7 @@ export function useCloudAgentTerminal({
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = null;
       reconnectAttemptsRef.current = 0;
-      ptyIdRef.current = null;
+      setPtyId(null);
       term.options.disableStdin = true;
       const ws = wsRef.current;
       wsRef.current = null;
@@ -293,6 +392,9 @@ export function useCloudAgentTerminal({
       const ws = new WebSocket(resolveCloudAgentTerminalWsUrl(wsUrl, CLOUD_AGENT_NEXT_WS_URL));
       ws.binaryType = 'arraybuffer';
       wsRef.current = ws;
+      mode = 'pending';
+      protocol = createPersistentTerminalProtocol();
+      pendingRawInput = [];
 
       ws.onopen = () => {
         if (disposed) return;
@@ -301,12 +403,20 @@ export function useCloudAgentTerminal({
         resumeWhenActiveRef.current = false;
         term.options.disableStdin = false;
         updateStatus('connected', 'Connected');
-        const dims = fitAddon.proposeDimensions();
-        if (dims) sendResize(dims.cols, dims.rows);
       };
 
       ws.onmessage = event => {
-        if (disposed || isPtyControlFrame(event.data)) return;
+        if (disposed || wsRef.current !== ws) return;
+        if (mode === 'pending') {
+          reachedPty = ptyIdRef.current;
+          startStream(term, fitAddon, event.data);
+        }
+        if (mode === 'persistent') {
+          if (typeof event.data === 'string') applyEffects(term, protocol.message(event.data));
+          else if (protocol.acceptsOutput()) writeOutput(term, new Uint8Array(event.data));
+          return;
+        }
+        if (isPtyControlFrame(event.data)) return;
         if (event.data instanceof ArrayBuffer) {
           term.write(new Uint8Array(event.data));
           return;
@@ -325,6 +435,7 @@ export function useCloudAgentTerminal({
           updateStatus('disconnected', 'Disconnected');
           return;
         }
+        if (replaceUnreachedRestoredPty(term, fitAddon)) return;
 
         const decision = classifyTerminalSocketClose({
           code: event.code,
@@ -337,7 +448,7 @@ export function useCloudAgentTerminal({
         }
 
         const previousPtyId = ptyIdRef.current;
-        ptyIdRef.current = null;
+        setPtyId(null);
         if (previousPtyId) {
           closeTerminal({ cloudAgentSessionId: capturedSessionId, ptyId: previousPtyId });
         }
@@ -358,7 +469,11 @@ export function useCloudAgentTerminal({
       }
 
       if (reconnectAttemptsRef.current === 0 && !sleepingRef.current) {
-        updateStatus('reconnecting', 'Retrying terminal');
+        if (ptyId === restoredPty && reachedPty !== ptyId) {
+          updateStatus('connecting', 'Connecting terminal');
+        } else {
+          updateStatus('reconnecting', 'Retrying terminal');
+        }
       }
       try {
         const result = await refreshTerminalTicket({
@@ -373,6 +488,7 @@ export function useCloudAgentTerminal({
           enterSleeping(term);
           return;
         }
+        if (replaceUnreachedRestoredPty(term, fitAddon)) return;
         if (decision.kind === 'retry') {
           scheduleReconnect(term, fitAddon, decision.statusText);
           return;
@@ -397,7 +513,7 @@ export function useCloudAgentTerminal({
           return;
         }
 
-        ptyIdRef.current = result.ptyId;
+        setPtyId(result.ptyId);
         connectWs(term, fitAddon, result.wsUrl);
       } catch (error) {
         if (disposed) return;
@@ -452,6 +568,12 @@ export function useCloudAgentTerminal({
       applySandboxStatusRef.current = status => {
         if (!disposed) applySandboxStatus(term, fitAddon, status);
       };
+      refitRef.current = () => {
+        if (disposed) return;
+        fitPane(term, fitAddon);
+        const dims = fitAddon.proposeDimensions();
+        if (dims) sendResize(dims.cols, dims.rows);
+      };
       reconnectNowRef.current = () => {
         if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
@@ -463,6 +585,14 @@ export function useCloudAgentTerminal({
       term.onResize(({ cols, rows }) => sendResize(cols, rows));
       term.onData(data => {
         if (sleepingRef.current) return;
+        if (mode === 'persistent') {
+          if (!writing) applyEffects(term, protocol.input(encoder.encode(data)));
+          return;
+        }
+        if (mode === 'pending') {
+          if (pendingRawInput.length < MAX_PENDING_RAW_INPUT) pendingRawInput.push(data);
+          return;
+        }
         const ws = wsRef.current;
         if (ws?.readyState === WebSocket.OPEN) ws.send(data);
       });
@@ -471,6 +601,12 @@ export function useCloudAgentTerminal({
       observer.observe(container);
       resizeObserverRef.current = observer;
 
+      restoredPty = restoredPtyIdRef.current ?? null;
+      if (restoredPty) {
+        ptyIdRef.current = restoredPty;
+        await reconnectTerminal(term, fitAddon);
+        return;
+      }
       await createAndConnect(term, fitAddon);
     }
 
@@ -494,6 +630,7 @@ export function useCloudAgentTerminal({
       fitAddonRef.current = null;
       resizeObserverRef.current = null;
       reconnectNowRef.current = () => {};
+      refitRef.current = () => {};
       applySandboxStatusRef.current = () => {};
       sleepingRef.current = false;
       resumeWhenActiveRef.current = false;

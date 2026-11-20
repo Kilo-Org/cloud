@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { boundSlashCommandCatalog } from '../../../src/shared/slash-commands.js';
 import { createMessageId } from '../../../src/shared/message-id.js';
-import { fetchKiloServer, kiloServerHeaders, type KiloServer } from '../kilo-server-auth.js';
+import { fetchKiloServer, type KiloServer } from '../kilo-server-auth.js';
 import { DrainSessionError, isKiloServerUnreachableError } from '../kilo-api.js';
 import { logToFile } from '../utils.js';
 import type { Harness, HarnessSession } from './harness.js';
@@ -13,16 +13,7 @@ import { restoreKilo2History } from './kilo2-history.js';
 import type { Kilo2Lifecycle } from './kilo2-lifecycle.js';
 import { readKilo2BackgroundActivity } from './kilo2-background.js';
 import { readKilo2AgentBoard } from './kilo2-board.js';
-
-const ptySchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  command: z.string(),
-  args: z.array(z.string()),
-  cwd: z.string(),
-  status: z.enum(['running', 'exited']),
-  pid: z.number(),
-});
+import { createKilo2Terminals } from './kilo2-terminals.js';
 
 const MCP_SERVER_NAME = 'kilo-cloud-agent';
 const MODEL_NOT_FOUND_RETRY_DELAYS_MS = [
@@ -169,19 +160,13 @@ export function createKilo2Harness(options: {
       if (!(error instanceof Kilo2HttpError && error.status === 404)) throw error;
     }
   }
-  async function stopSessionProcesses(sessionId: string, signal?: AbortSignal) {
-    const endpoint = `/api/experimental/session/${encodeURIComponent(sessionId)}/terminal`;
-    const terminals = z
-      .array(z.object({ id: z.string(), sessionID: z.string() }))
-      .parse(await api.data(endpoint, { signal }));
-    if (terminals.length > 64)
-      throw new Error('Kilo v2 terminal cleanup exceeded its bounded window');
-    for (const terminal of terminals) {
-      if (terminal.sessionID !== sessionId)
-        throw new Error('Kilo v2 terminal belongs to another session');
-      await remove(`/api/experimental/persistent-pty/${encodeURIComponent(terminal.id)}`, signal);
-    }
-  }
+  const kilo2Terminals = createKilo2Terminals({
+    api,
+    server: options.server,
+    listSessionIds: async (directory, signal) =>
+      (await list(directory, signal)).map(info => info.id),
+  });
+  const { terminals, removeSessionTerminals: stopSessionProcesses } = kilo2Terminals;
   async function updateCloudAgentMcp(
     credential: Parameters<Harness['updateCloudAgentMcp']>[0],
     signal?: AbortSignal
@@ -213,42 +198,6 @@ export function createKilo2Harness(options: {
     }
     throw new Error('Cloud Agent MCP credential refresh failed');
   }
-  const terminals: Harness['terminals'] = {
-    async createPty(input) {
-      return ptySchema.parse(
-        await api.data(`/api/pty?${locationQuery(input.cwd)}`, { method: 'POST', body: input })
-      );
-    },
-    async resizePty(id, size, directory = options.directory) {
-      return ptySchema.parse(
-        await api.data(`/api/pty/${encodeURIComponent(id)}?${locationQuery(directory)}`, {
-          method: 'PUT',
-          body: { size },
-        })
-      );
-    },
-    async deletePty(id, directory = options.directory) {
-      await remove(`/api/pty/${encodeURIComponent(id)}?${locationQuery(directory)}`);
-      return true;
-    },
-    connectPty(id, directory) {
-      const url = new URL(
-        `/api/pty/${encodeURIComponent(id)}/connect?${locationQuery(directory)}`,
-        options.server.url
-      );
-      url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-      const Socket = WebSocket as typeof WebSocket & {
-        new (url: string, options: { headers: Record<string, string> }): WebSocket;
-      };
-      return new Socket(url.toString(), { headers: kiloServerHeaders(options.server) });
-    },
-    async isIdle(directory, signal) {
-      return z
-        .array(ptySchema)
-        .parse(await api.data(`/api/pty?${locationQuery(directory)}`, { signal }))
-        .every(pty => pty.status === 'exited');
-    },
-  };
   return {
     supportsHistoryPreload: true,
     async open(input) {
@@ -506,10 +455,7 @@ export function createKilo2Harness(options: {
         await remove(kilo2SessionPath(id));
       },
       async closeTerminals(directory) {
-        const ptys = z
-          .array(ptySchema)
-          .parse(await api.data(`/api/pty?${locationQuery(directory)}`));
-        for (const pty of ptys) await terminals.deletePty(pty.id, directory);
+        await kilo2Terminals.closeDirectory(directory);
       },
       async disposeDirectory(directory) {
         // V2 locations are process-owned caches. Cloud removes the directory after

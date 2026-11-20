@@ -116,6 +116,7 @@ import {
   openFileTab,
   selectWorkspaceTab,
   setFileTabMode,
+  setTerminalTabPty,
   terminalIdFromTabId,
   terminalTabId,
 } from './workspace-tabs';
@@ -185,18 +186,26 @@ function TerminalPaneSlot({
   terminalId,
   active,
   sessionId,
+  ptyId,
   organizationId,
   onStatusChange,
+  onPtyIdChange,
 }: {
   terminalId: string;
   active: boolean;
   sessionId: string | null | undefined;
+  ptyId: string | undefined;
   organizationId?: string;
   onStatusChange: (terminalId: string, status: TerminalStatusSummary) => void;
+  onPtyIdChange: (terminalId: string, ptyId: string | null) => void;
 }) {
   const handleStatusChange = useCallback(
     (status: TerminalStatusSummary) => onStatusChange(terminalId, status),
     [onStatusChange, terminalId]
+  );
+  const handlePtyIdChange = useCallback(
+    (nextPtyId: string | null) => onPtyIdChange(terminalId, nextPtyId),
+    [onPtyIdChange, terminalId]
   );
 
   return (
@@ -206,7 +215,9 @@ function TerminalPaneSlot({
           cloudAgentSessionId={sessionId}
           organizationId={organizationId}
           active={active}
+          restoredPtyId={ptyId}
           onStatusChange={handleStatusChange}
+          onPtyIdChange={handlePtyIdChange}
         />
       )}
     </div>
@@ -1163,6 +1174,13 @@ export default function CloudChatPage({
     []
   );
 
+  const handleTerminalPtyIdChange = useCallback(
+    (terminalId: string, ptyId: string | null) => {
+      setWorkspaceTabs(state => setTerminalTabPty(state, terminalId, ptyId));
+    },
+    [setWorkspaceTabs]
+  );
+
   const terminalPaneMap = workspaceTabs.terminals.map(tab => {
     const active = terminalTabId(tab.id) === workspaceTabs.activeTabId;
     return (
@@ -1171,8 +1189,10 @@ export default function CloudChatPage({
         terminalId={tab.id}
         active={active}
         sessionId={tab.cloudAgentSessionId}
+        ptyId={tab.ptyId}
         organizationId={organizationId}
         onStatusChange={handleTerminalStatusChange}
+        onPtyIdChange={handleTerminalPtyIdChange}
       />
     );
   });

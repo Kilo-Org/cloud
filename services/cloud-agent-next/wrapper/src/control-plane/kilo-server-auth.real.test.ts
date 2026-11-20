@@ -75,7 +75,12 @@ suite('pinned Kilo server password', () => {
         })
       ).toEqual([]);
 
-      const pty = await client.terminals.createPty({ cwd: root, title: 'auth', env: {} });
+      const pty = await client.terminals.createPty({
+        sessionId: 'ses_auth',
+        cwd: root,
+        title: 'auth',
+        env: {},
+      });
       const connect = new URL(`/pty/${encodeURIComponent(pty.id)}/connect`, server.url);
       connect.protocol = 'ws:';
       connect.searchParams.set('directory', root);

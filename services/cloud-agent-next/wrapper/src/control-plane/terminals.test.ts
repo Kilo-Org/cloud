@@ -108,6 +108,8 @@ function fakeRuntimes(runtime: KiloRuntime | undefined): KiloRuntimes {
 let server: Bun.Server<{ path: string }>;
 let serverUrl: string;
 const sockets: { reverse?: Bun.ServerWebSocket<{ path: string }> } = {};
+/** Messages the fake Cloud side received from the wrapper, in order. */
+const reverseMessages: string[] = [];
 /** The `Authorization` header of each PTY upgrade that reached the fake Kilo. */
 const ptyAuthorizations: Array<string | null> = [];
 
@@ -123,8 +125,12 @@ beforeAll(() => {
     websocket: {
       open(socket) {
         if (socket.data.path.startsWith('/sandbox-terminal/')) sockets.reverse = socket;
+        else if (socket.data.path.endsWith('/greeted/connect')) socket.send('live output');
       },
-      message() {},
+      message(socket, message) {
+        if (socket.data.path.startsWith('/sandbox-terminal/'))
+          reverseMessages.push(typeof message === 'string' ? message : message.toString());
+      },
       close() {},
     },
   });
@@ -376,6 +382,37 @@ describe('control-plane terminal adapter (B10)', () => {
     } finally {
       setSystemTime();
     }
+    terminals.shutdown();
+  });
+
+  it('sends the harness greeting to the browser before any PTY output', async () => {
+    sockets.reverse = undefined;
+    reverseMessages.length = 0;
+    const client = fakeClient(serverUrl);
+    const attachments: string[] = [];
+    client.terminals.connectPty = async (_id, _directory, attachmentId) => {
+      attachments.push(attachmentId);
+      const url = new URL('/greeted/connect', serverUrl);
+      return { socket: new WebSocket(url), greeting: '{"type":"snapshot"}' };
+    };
+    const terminals = attachedTerminals(client);
+    await terminals.handle({
+      type: 'terminal.create',
+      requestId: 'request_create',
+      session,
+      payload: { operationId: '00000000-0000-4000-8000-000000000005' },
+    });
+    const bridgeGeneration = crypto.randomUUID();
+    const connected = await terminals.handle({
+      type: 'terminal.connect',
+      requestId: 'request_connect',
+      session,
+      payload: { ownerId: 'user_1', ptyId, bridgeGeneration, capability: 'a'.repeat(64) },
+    });
+    expect(connected).toMatchObject({ ok: true, result: { connected: true } });
+    await waitFor(() => reverseMessages.length === 2);
+    expect(reverseMessages).toEqual(['{"type":"snapshot"}', 'live output']);
+    expect(attachments).toEqual([bridgeGeneration]);
     terminals.shutdown();
   });
 });

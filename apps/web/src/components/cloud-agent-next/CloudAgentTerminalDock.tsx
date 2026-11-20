@@ -11,18 +11,24 @@ export function CloudAgentTerminalPane({
   cloudAgentSessionId,
   organizationId,
   active,
+  restoredPtyId,
   onStatusChange,
+  onPtyIdChange,
 }: {
   cloudAgentSessionId: string;
   organizationId?: string;
   active: boolean;
+  restoredPtyId?: string;
   onStatusChange?: (status: { status: TerminalStatus; statusText: string }) => void;
+  onPtyIdChange?: (ptyId: string | null) => void;
 }) {
   const terminal = useCloudAgentTerminal({
     cloudAgentSessionId,
     organizationId,
     enabled: true,
     active,
+    restoredPtyId,
+    onPtyIdChange,
   });
 
   useEffect(() => {
@@ -67,7 +73,7 @@ export function CloudAgentTerminalPane({
         )}
         <div
           ref={terminal.terminalRef}
-          className="h-full w-full overflow-hidden"
+          className="h-full w-full overflow-hidden caret-transparent"
           aria-disabled={terminalSleeping}
         />
       </div>

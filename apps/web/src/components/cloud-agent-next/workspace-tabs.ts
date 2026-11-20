@@ -12,6 +12,8 @@ export type TerminalWorkspaceTab = {
   id: string;
   title: string;
   cloudAgentSessionId: string;
+  /** The PTY the tab shows, so that a page load attaches to it again. */
+  ptyId?: string;
 };
 
 export type FileWorkspaceTab = {
@@ -76,6 +78,24 @@ export function addTerminalTab(
     activeTabId: terminalTabId(terminalId),
     terminals: [...state.terminals, { id: terminalId, title, cloudAgentSessionId }],
     nextTerminalNumber: state.nextTerminalNumber + 1,
+  };
+}
+
+export function setTerminalTabPty(
+  state: WorkspaceTabsState,
+  terminalId: string,
+  ptyId: string | null
+): WorkspaceTabsState {
+  const terminal = state.terminals.find(tab => tab.id === terminalId);
+  if (!terminal || terminal.ptyId === (ptyId ?? undefined)) return state;
+
+  return {
+    ...state,
+    terminals: state.terminals.map(tab => {
+      if (tab.id !== terminalId) return tab;
+      const { ptyId: _previous, ...rest } = tab;
+      return ptyId === null ? rest : { ...rest, ptyId };
+    }),
   };
 }
 

@@ -28,6 +28,7 @@ import {
 } from '@/lib/integrations/platforms/bitbucket/webhook-signing';
 import {
   completeBitbucketWebhookEventInTransaction,
+  type BitbucketWebhookEventKey,
   getGreatestProcessedBitbucketObservation,
   insertOrLoadBitbucketWebhookEvent,
   loadBitbucketWebhookEventInTransaction,
@@ -187,9 +188,12 @@ async function selectedRepositoryFromCurrentLifecycleState(
   return selectedRepository?.fullName === input.repositoryFullName ? selectedRepository : null;
 }
 
-async function safelyRecordFailure(eventId: string, safeCode: string): Promise<void> {
+async function safelyRecordFailure(
+  event: BitbucketWebhookEventKey,
+  safeCode: string
+): Promise<void> {
   try {
-    await recordBitbucketWebhookFailure(eventId, safeCode);
+    await recordBitbucketWebhookFailure(event, safeCode);
   } catch {
     return;
   }
@@ -348,11 +352,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
   try {
     codeReviewerBot = await getUnblockedBotUserForOrg(organizationId, 'code-review');
   } catch {
-    await safelyRecordFailure(event.id, 'bot_unavailable');
+    await safelyRecordFailure(event, 'bot_unavailable');
     return NextResponse.json({ error: 'Code Reviewer bot unavailable' }, { status: 503 });
   }
   if (!codeReviewerBot) {
-    await safelyRecordFailure(event.id, 'bot_unavailable');
+    await safelyRecordFailure(event, 'bot_unavailable');
     return NextResponse.json({ error: 'Code Reviewer bot unavailable' }, { status: 503 });
   }
 
@@ -373,11 +377,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
       pullRequestId: payload.pullrequest.id,
     });
   } catch {
-    await safelyRecordFailure(event.id, 'temporarily_unavailable');
+    await safelyRecordFailure(event, 'temporarily_unavailable');
     return NextResponse.json({ error: 'Provider read failed' }, { status: 503 });
   }
   if (!providerResult.success) {
-    await safelyRecordFailure(event.id, providerResult.reason);
+    await safelyRecordFailure(event, providerResult.reason);
     return NextResponse.json({ error: 'Provider read failed' }, { status: 503 });
   }
 
@@ -389,7 +393,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     pullRequest.source.repositoryFullName !== selectedRepository.fullName ||
     pullRequest.destination.repositoryFullName !== selectedRepository.fullName
   ) {
-    await safelyRecordFailure(event.id, 'invalid_provider_state');
+    await safelyRecordFailure(event, 'invalid_provider_state');
     return NextResponse.json({ error: 'Provider state invalid' }, { status: 503 });
   }
 
@@ -416,7 +420,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       const lifecycleLockKey = bitbucketCodeReviewerLifecycleLockKey(integration.id);
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${lifecycleLockKey}, 0))`);
 
-      const currentEvent = await loadBitbucketWebhookEventInTransaction(tx, event.id);
+      const currentEvent = await loadBitbucketWebhookEventInTransaction(tx, event);
       if (!currentEvent) throw new Error('Bitbucket webhook event not found');
       if (currentEvent.processed) {
         return { cancelledReviews: [], created: false };
@@ -431,7 +435,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         repositoryFullName: selectedRepository.fullName,
       });
       if (!currentSelectedRepository) {
-        await completeBitbucketWebhookEventInTransaction(tx, event.id, observation);
+        await completeBitbucketWebhookEventInTransaction(tx, event, observation);
         return { cancelledReviews: [], created: false };
       }
 
@@ -453,19 +457,19 @@ export async function POST(request: NextRequest, context: RouteContext) {
         identity
       );
       if (isOlderObservation(observation.updatedOn, greatestProcessed)) {
-        await completeBitbucketWebhookEventInTransaction(tx, event.id, observation);
+        await completeBitbucketWebhookEventInTransaction(tx, event, observation);
         return { cancelledReviews: [], created: false };
       }
 
       const providerIsReady = pullRequest.state === 'OPEN' && !pullRequest.draft;
       if (!providerIsReady) {
         const cancelledReviews = await cancelActiveReviewsForPRInTransaction(tx, reviewScope);
-        await completeBitbucketWebhookEventInTransaction(tx, event.id, observation);
+        await completeBitbucketWebhookEventInTransaction(tx, event, observation);
         return { cancelledReviews, created: false };
       }
 
       if (BITBUCKET_TERMINAL_DELIVERY_EVENTS.has(eventKey)) {
-        await completeBitbucketWebhookEventInTransaction(tx, event.id, observation);
+        await completeBitbucketWebhookEventInTransaction(tx, event, observation);
         return { cancelledReviews: [], created: false };
       }
 
@@ -475,7 +479,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         pullRequest.source.sha
       );
       if (existingReview) {
-        await completeBitbucketWebhookEventInTransaction(tx, event.id, observation);
+        await completeBitbucketWebhookEventInTransaction(tx, event, observation);
         return {
           cancelledReviews: [],
           reviewId: existingReview.id,
@@ -502,7 +506,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         platform: 'bitbucket',
         triggerSource: 'webhook',
       });
-      await completeBitbucketWebhookEventInTransaction(tx, event.id, observation);
+      await completeBitbucketWebhookEventInTransaction(tx, event, observation);
       return {
         cancelledReviews,
         reviewId: createdReview.reviewId,
@@ -510,7 +514,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       };
     });
   } catch {
-    await safelyRecordFailure(event.id, 'processing_failed');
+    await safelyRecordFailure(event, 'processing_failed');
     return NextResponse.json({ error: 'Webhook processing failed' }, { status: 503 });
   }
 

@@ -6,6 +6,7 @@ import {
   user_deletion_requests,
   user_deletion_steps,
   webhook_events,
+  webhook_events_v2,
   type UserDeletionRequest,
   type UserDeletionStep,
 } from '@kilocode/db/schema';
@@ -168,6 +169,14 @@ describe('handleAnonymize', () => {
       `anon-drain-${crypto.randomUUID()}@example.com`
     );
     await insertWebhookEvents(user.id, 2);
+    await db.insert(webhook_events_v2).values({
+      owned_by_user_id: user.id,
+      platform: 'github',
+      event_type: 'push',
+      payload: {},
+      headers: {},
+      event_signature: `sig-v2-${crypto.randomUUID()}`,
+    });
     await insertCodeReviews(user.id, 1);
 
     const outcome = await handleAnonymize({
@@ -176,8 +185,13 @@ describe('handleAnonymize', () => {
       context: handlerContext(request.id, claimToken),
     });
 
-    expect(outcome).toEqual({ kind: 'succeeded', progress: { processed_count: 3 } });
+    expect(outcome).toEqual({ kind: 'succeeded', progress: { processed_count: 4 } });
     expect(await countOwnedWebhookEvents(user.id)).toBe(0);
+    const remainingPartitioned = await db
+      .select({ id: webhook_events_v2.id })
+      .from(webhook_events_v2)
+      .where(eq(webhook_events_v2.owned_by_user_id, user.id));
+    expect(remainingPartitioned).toHaveLength(0);
     expect(await countOwnedCodeReviews(user.id)).toBe(0);
   });
 

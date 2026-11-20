@@ -179,6 +179,26 @@ for (let index = 0; index < argv.length; index += 2) {
 // local run can name the set without changing what the config evaluates to.
 const profile = args.profile ?? (process.env.EAS_BUILD_PROFILE || null);
 
+// A misspelled profile (`productionn`, `prod`) would select the development set
+// and still print OK, which is the failure a strict parse exists to prevent. EAS
+// resolves every build profile from eas.json, so that file is the list a name
+// has to come from.
+if (profile !== null) {
+  let buildProfiles;
+  try {
+    buildProfiles = Object.keys(
+      JSON.parse(readFileSync(join(mobileDir, 'eas.json'), 'utf8')).build ?? {}
+    );
+  } catch (error) {
+    console.error(`Failed to read eas.json in ${mobileDir}: ${error.message}`);
+    process.exit(2);
+  }
+  if (!buildProfiles.includes(profile)) {
+    console.error(`Unknown profile "${profile}": eas.json defines ${buildProfiles.join(', ')}`);
+    process.exit(2);
+  }
+}
+
 let configPath;
 let raw;
 if (args.config !== undefined) {
@@ -227,6 +247,15 @@ if (typeof config !== 'object' || config === null || Array.isArray(config)) {
 }
 
 const { check, report } = createContractFailures();
+
+// A document with a malformed nested member (a string or a number where the
+// checks read a list) throws while the checks run. It never produced a verdict,
+// so it belongs with the exit-2 inputs; Node's default would report it as exit
+// 1, the code that means contract drift.
+process.on('uncaughtException', error => {
+  console.error(`The Expo config could not be checked: ${error.message}`);
+  process.exit(2);
+});
 
 /** True when `actual` holds exactly the members of `expected`, in any order. */
 const sameMembers = (actual, expected) =>

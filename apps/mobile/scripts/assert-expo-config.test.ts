@@ -28,6 +28,8 @@ afterEach(() => {
 type MutableFixture = {
   ios: { entitlements: Record<string, unknown> };
   extra: Record<string, unknown>;
+  /** Replaced with a value no check can read, to prove the exit-2 classification. */
+  plugins: unknown;
 };
 
 /** Writes a mutated fixture into a fresh temp dir and returns its path. */
@@ -41,12 +43,12 @@ function writeVariant(mutate: (config: MutableFixture) => void): string {
   return path;
 }
 
-function run(argv: string[], env: Record<string, string | undefined> = {}) {
+function run(argv: string[], env: Record<string, string | undefined> = {}, cwd = appDir) {
   const childEnv: NodeJS.ProcessEnv = { ...process.env };
   delete childEnv.EAS_BUILD_PROFILE;
   Object.assign(childEnv, env);
   const result = spawnSync(process.execPath, [scriptPath, ...argv], {
-    cwd: appDir,
+    cwd,
     encoding: 'utf8',
     env: childEnv,
   });
@@ -146,6 +148,31 @@ describe('assert-expo-config', () => {
       expect(status).toBe(2);
       expect(output).toContain('holds no config object');
     }
+  });
+
+  it('resolves a relative --config from the app directory, not the caller cwd', () => {
+    const { status, output } = run(
+      ['--config', 'scripts/fixtures/expo-config.json', '--profile', 'production'],
+      {},
+      join(appDir, '..')
+    );
+    expect(status).toBe(0);
+    expect(output).toContain('profile: production');
+  });
+
+  it('exits 2 for a profile eas.json does not define', () => {
+    const { status, output } = run(['--config', fixturePath, '--profile', 'productionn']);
+    expect(status).toBe(2);
+    expect(output).toContain('productionn');
+  });
+
+  it('exits 2 for a config whose nested member throws a check', () => {
+    const path = writeVariant(config => {
+      config.plugins = {};
+    });
+    const { status, output } = run(['--config', path, '--profile', 'production']);
+    expect(status).toBe(2);
+    expect(output).toContain('could not be checked');
   });
 
   it('exits 2 for an unknown flag', () => {

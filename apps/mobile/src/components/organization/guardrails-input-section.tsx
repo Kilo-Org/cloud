@@ -18,7 +18,6 @@ import { MenuSheet } from '@/components/ui/menu-sheet';
 import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import {
-  applyKiloDefaultPreset,
   detectorChoice,
   type GuardrailsDraft,
   INPUT_DETECTOR_IDS,
@@ -36,11 +35,13 @@ export function InputGuardrailsSection({
   groups,
   disabled,
   onChange,
+  applyKiloDefault,
 }: Readonly<{
   draft: GuardrailsDraft;
   groups: readonly OrgGuardrailsGroup[];
   disabled: boolean;
   onChange: (update: (current: GuardrailsDraft) => GuardrailsDraft) => void;
+  applyKiloDefault: (afterApply: () => void) => void;
 }>) {
   const { t } = useTranslation();
   const [groupPickerOpen, setGroupPickerOpen] = useState(false);
@@ -79,18 +80,20 @@ export function InputGuardrailsSection({
         onChange(current => ({ ...current, inputEnabled: next }));
       }}
     >
-      {groups.length > 0 || draft.groupId != null ? (
-        <RowGroup>
-          <SettingsValueRow
-            label={t('organizationGuardrails.applyTo')}
-            value={selectedGroupName}
-            disabled={disabled}
-            onPress={() => {
-              setGroupPickerOpen(true);
-            }}
-          />
-        </RowGroup>
-      ) : null}
+      <RowGroup>
+        <SettingsValueRow
+          label={t('organizationGuardrails.applyTo')}
+          value={selectedGroupName}
+          disabled={disabled}
+          onPress={
+            groups.length > 0 || draft.groupId != null
+              ? () => {
+                  setGroupPickerOpen(true);
+                }
+              : undefined
+          }
+        />
+      </RowGroup>
       <Text variant="caption">{t('organizationGuardrails.detectorsHint')}</Text>
       {INPUT_DETECTOR_IDS.map(id => {
         const copy = INPUT_DETECTOR_COPY[id];
@@ -145,15 +148,14 @@ export function InputGuardrailsSection({
         className="self-start"
         disabled={disabled}
         onPress={() => {
-          onChange(current => ({
-            ...current,
-            detectors: applyKiloDefaultPreset(current.detectors),
-          }));
-          setPolicyGeneration(generation => generation + 1);
+          applyKiloDefault(() => {
+            setPolicyGeneration(generation => generation + 1);
+          });
         }}
       >
         <Text>{t('organizationGuardrails.applyKiloDefault')}</Text>
       </Button>
+      <Text variant="caption">{t('organizationGuardrails.applyKiloDefaultEnglishNote')}</Text>
 
       <MenuSheet
         visible={groupPickerOpen}

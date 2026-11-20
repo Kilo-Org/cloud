@@ -2,18 +2,24 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
+import { KILO_DEFAULT_POLICY_TEXT } from '@kilocode/app-shared/organizations';
 import { issueMessage } from '@/components/organization/guardrails-copy';
 import { InputGuardrailsSection } from '@/components/organization/guardrails-input-section';
-import { OutputGuardrailsSection } from '@/components/organization/guardrails-output-section';
+import {
+  OutputGuardrailsSection,
+  OutputGuardrailsUnavailableSection,
+} from '@/components/organization/guardrails-output-section';
 import { useMetadataLeaveGuard } from '@/components/profiles/use-metadata-leave-guard';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
 import { useSaveOrgGuardrails } from '@/lib/hooks/use-org-settings-queries';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { configKey, draftsEqual } from '@/lib/organization/guardrails-config-key';
 import {
+  applyKiloDefaultPreset,
   buildUpdateInput,
   type GuardrailsDraft,
   type OrgGuardrails,
@@ -69,6 +75,7 @@ export function GuardrailsForm({
   // Declared before the rebase block below, which reports on every render that
   // takes it.
   const guard = useMetadataLeaveGuard({ enabled: true, saving });
+  const { confirm, dialog: presetDialog } = useConfirmDialog();
 
   // A refetch that moved the server's configuration rebases the form, unless
   // the form holds edits of its own: those win, and the next save replaces the
@@ -94,6 +101,36 @@ export function GuardrailsForm({
     const next = update(draft);
     setDraft(next);
     guard.handleDirtyChange(!draftsEqual(next, baseline, outputAvailable));
+  };
+
+  const applyKiloDefaultPresetNow = () => {
+    editDraft(current => ({ ...current, detectors: applyKiloDefaultPreset(current.detectors) }));
+  };
+  // The preset overwrites the policy violation detector with Kilo's English
+  // text, and the field reads its draft only on mount. A reader who left the
+  // detector empty loses nothing, so that press applies straight away; text or
+  // rules still on screen have to be confirmed, because the preset replaces
+  // them.
+  const applyKiloDefault = (afterApply: () => void) => {
+    const head: GuardrailsDraft['detectors']['policy_violation'] =
+      draft.detectors.policy_violation;
+    const replacesRules = head.format === 'rules' && head.rules.length > 0;
+    const replacesText =
+      head.policy_text.trim().length > 0 && head.policy_text !== KILO_DEFAULT_POLICY_TEXT;
+    if (!replacesRules && !replacesText) {
+      applyKiloDefaultPresetNow();
+      afterApply();
+      return;
+    }
+    confirm({
+      title: t('organizationGuardrails.applyKiloDefault'),
+      message: t('organizationGuardrails.applyKiloDefaultReplaceMessage'),
+      confirmLabel: t('common.apply'),
+      onConfirm: () => {
+        applyKiloDefaultPresetNow();
+        afterApply();
+      },
+    });
   };
 
   const onSave = async () => {
@@ -161,6 +198,7 @@ export function GuardrailsForm({
         groups={groups}
         disabled={saving}
         onChange={editDraft}
+        applyKiloDefault={applyKiloDefault}
       />
 
       {outputAvailable ? (
@@ -170,7 +208,9 @@ export function GuardrailsForm({
           disabled={saving}
           onChange={editDraft}
         />
-      ) : null}
+      ) : (
+        <OutputGuardrailsUnavailableSection />
+      )}
 
       <View className="gap-2">
         {/* The slot keeps its height whether or not a message shows, so the
@@ -206,6 +246,7 @@ export function GuardrailsForm({
         </View>
       </View>
       {guard.dialog}
+      {presetDialog}
     </View>
   );
 }

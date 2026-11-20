@@ -77,6 +77,7 @@ vi.mock('@/components/organization/guardrails-input-section', () => ({
 }));
 vi.mock('@/components/organization/guardrails-output-section', () => ({
   OutputGuardrailsSection: () => null,
+  OutputGuardrailsUnavailableSection: () => null,
 }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 // The real Button renders the actions the suite presses; its spinner's motion

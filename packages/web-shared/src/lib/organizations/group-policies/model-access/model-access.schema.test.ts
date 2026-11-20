@@ -205,7 +205,20 @@ describe('model access policy catalog limits', () => {
     expect(OrganizationGroupModelAccessPolicyWriteSchema.parse(policy)).toEqual(policy);
   });
 
-  it('accepts a model id and a provider slug made of printable text only', () => {
+  it('requires a model id and a provider slug to be printable text', () => {
+    const printablePolicy = {
+      type: 'model_access',
+      data: {
+        mode: 'selected',
+        model_allow_list: ['vendor/model-1:free'],
+        provider_allow_list: ['fixture-provider'],
+      },
+    } satisfies OrganizationGroupModelAccessPolicy;
+
+    expect(OrganizationGroupModelAccessPolicyWriteSchema.parse(printablePolicy)).toEqual(
+      printablePolicy
+    );
+
     const modelPolicy = {
       type: 'model_access',
       data: {

@@ -918,6 +918,13 @@ export const paidBenchmarkRequestCases = sqliteTable(
     rep: integer('rep').notNull(),
     case_id: text('case_id').notNull(),
     status: text('status').$type<PaidBenchmarkRequestCaseRowStatus>().notNull(),
+    /**
+     * The canonical case-run generation this request's row joined, written at staging from
+     * the run's current generation and corrected in the same claim batch. Nullable because
+     * rows staged before the column existed never recorded one; a null row matches no
+     * receipt, so it can never claim another generation's coverage.
+     */
+    generation: integer('generation'),
     covered_by_kilo: integer('covered_by_kilo', { mode: 'boolean' }).notNull().default(false),
     charged_microdollars: integer('charged_microdollars').notNull().default(0),
     reason: text('reason'),

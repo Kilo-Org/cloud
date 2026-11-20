@@ -506,7 +506,7 @@ export function enqueuePaidCaseBatchStatements(
     db
       .prepare(
         `INSERT INTO paid_benchmark_request_cases (
-          request_id, engine_identity, model, variant, rep, case_id, status,
+          request_id, engine_identity, model, variant, rep, case_id, status, generation,
           covered_by_kilo, charged_microdollars, reason, updated_at
         )
         SELECT ?, run.engine_identity, run.model, run.variant, run.rep, run.case_id,
@@ -519,6 +519,9 @@ export function enqueuePaidCaseBatchStatements(
             WHEN run.status IN ('cancelled', 'paused') THEN 'paused'
             ELSE 'queued'
           END,
+          -- The generation this row joins. Exact while the run is running (a mid-run
+          -- join); a queued run's pre-claim value is corrected by the claim batch below.
+          run.generation,
           -- The approved covered bit from the quote is monotonic: once a slot is
           -- promised Kilo-paid it never becomes a user payer, even after removal.
           MAX(
@@ -532,6 +535,9 @@ export function enqueuePaidCaseBatchStatements(
         -- stage left paused; only a genuinely reopened case may move off 'paused'.
         ON CONFLICT DO UPDATE SET
           status = excluded.status,
+          -- A reclaimed row belongs to the generation being reopened, never to the one it
+          -- paused in: coverage is matched per generation.
+          generation = excluded.generation,
           covered_by_kilo = MAX(paid_benchmark_request_cases.covered_by_kilo,
             excluded.covered_by_kilo),
           updated_at = excluded.updated_at
@@ -721,6 +727,20 @@ export function claimPaidCaseStatements(
   if (input.platform) {
     statements.push(...platformCoverageStatements(db, { key: input.key, now: nowMs }));
   }
+  // Every request that participates in this exact execution joins the generation the claim
+  // just established, in the same batch, so the recorded participation is exact rather than
+  // inferred from the run's later state. `paused`, `done` and `reused` rows are not touched:
+  // an old request whose generation was paused (or finished) never retargets a newer one.
+  statements.push(
+    db
+      .prepare(
+        `UPDATE paid_benchmark_request_cases
+        SET generation = (SELECT generation FROM benchmark_case_runs WHERE ${caseKeyPredicate()}),
+          updated_at = ?
+        WHERE ${caseKeyPredicate()} AND status IN ('queued', 'running')`
+      )
+      .bind(...key, at, ...key),
+  );
   statements.push(
     db.prepare(`SELECT * FROM benchmark_case_runs WHERE ${caseKeyPredicate()}`).bind(...key)
   );
@@ -2322,18 +2342,15 @@ export async function readPaidBenchmarkProgress(
         SELECT usage.engine_identity, usage.model, usage.variant, usage.rep,
           usage.case_id, 0, COUNT(*), SUM(usage.microdollars)
         FROM paid_benchmark_request_cases AS staged
-        JOIN benchmark_case_runs AS run
-          ON run.engine_identity = staged.engine_identity
-          AND run.model = staged.model AND run.variant = staged.variant
-          AND run.rep = staged.rep AND run.case_id = staged.case_id
         JOIN paid_attempt_usage AS usage
           ON usage.engine_identity = staged.engine_identity
           AND usage.model = staged.model AND usage.variant = staged.variant
           AND usage.rep = staged.rep AND usage.case_id = staged.case_id
           AND usage.platform_covered = 1
-          -- Only the run's current generation: a reclaimed generation's Kilo receipts are
-          -- not cover for the newer exclusive user generation on the same slot.
-          AND usage.generation = run.generation
+          -- The generation THIS request's row joined, never the run's current one: a
+          -- reclaimed generation's Kilo receipts are not cover for the newer exclusive user
+          -- generation on the same slot, and an old paused row keeps its own generation.
+          AND usage.generation = staged.generation
         WHERE staged.request_id = ? AND staged.status <> 'reused'
         GROUP BY usage.engine_identity, usage.model, usage.variant, usage.rep, usage.case_id`
       )

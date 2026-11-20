@@ -26,6 +26,7 @@ import {
   enqueuePaidPoolPinsStatement,
   failPaidBillingOutbox,
   markPaidBillingOutboxDelivered,
+  markPaidCaseCancellationDelivered,
   paidCaseClaimOutcome,
   paidCaseEnqueueOutcome,
   paidModelRequestAdmission,
@@ -2499,6 +2500,201 @@ describe('review regressions', () => {
       .get(UUID_1) as Record<string, unknown>;
     // First attempt for this request: ordinal 0, regardless of the other trail.
     expect(trail).toEqual({ ordinal: 0, status: 'selected' });
+  });
+});
+
+describe('coverage generation participation', () => {
+  let sqlite: DatabaseSync;
+  let db: D1Database;
+
+  beforeEach(async () => {
+    sqlite = new DatabaseSync(':memory:');
+    applyBenchmarkMigrations(sqlite);
+    db = sqliteD1(sqlite);
+    seedRun(sqlite, 'run-1');
+    seedRun(sqlite, 'run-2');
+    seedChunk(sqlite, { chunkId: 'chunk-1', runId: 'run-1', token: 'token-1', slot: 1 });
+    seedChunk(sqlite, { chunkId: 'chunk-2', runId: 'run-2', token: 'token-2', slot: 2 });
+    await seedRequest(db, 'request-a', alice);
+    await seedRequest(db, 'request-b', bob);
+  });
+
+  /** Pause A's generation as unfunded and confirm the cancel, which unblocks a reclaim. */
+  async function pauseAndConfirm(requestId: string, generation: number) {
+    await db.batch(
+      pausePaidUnfundedCaseStatements(db, {
+        key: key(),
+        generation: { runId: 'run-1', token: 'token-1', generation },
+        funderRequestId: requestId,
+        transitionId: `stop-${requestId}`,
+      })
+    );
+    await markPaidCaseCancellationDelivered(db, { key: key(), generation });
+  }
+
+  it('never reports a reclaimed generation\'s Kilo cover on the old paused request', async () => {
+    // A measures generation 2 and is paused unfunded. B reclaims the slot, Kilo joins the
+    // new generation and pays for a call on it. A must not report that cover.
+    await db.batch(enqueuePaidCaseStatements(db, { key: key(), requestId: 'request-a' }));
+    await db.batch(activatePaidBenchmarkRequestStatements(db, { requestId: 'request-a' }));
+    const first = await claim(db, { runId: 'run-1', token: 'token-1' });
+    expect(first.outcome).toBe('started');
+    await pauseAndConfirm('request-a', first.run?.generation ?? 0);
+
+    await db.batch(
+      enqueuePaidCaseBatchStatements(db, {
+        requestId: 'request-b',
+        cases: [key()],
+        reclaim: true,
+      })
+    );
+    await db.batch(activatePaidBenchmarkRequestStatements(db, { requestId: 'request-b' }));
+    const second = await claim(db, { runId: 'run-2', token: 'token-2' });
+    expect(second.outcome).toBe('started');
+    const coveredGeneration = second.run?.generation ?? 0;
+    expect(coveredGeneration).toBeGreaterThan(first.run?.generation ?? 0);
+
+    await db.batch(platformCoverageStatements(db, { key: key() }));
+    const paid = await payModelRequest(db, {
+      generation: coveredGeneration,
+      modelRequestId: UUID_1,
+      assignmentId: ASSIGNMENT_1,
+      platformOrganizationId: 'org-benchmark',
+    });
+    await acceptUsage(db, {
+      assignmentId: paid.assignmentId,
+      usageId: USAGE_1,
+      owner: alice,
+      microdollars: 90,
+      generation: coveredGeneration,
+      projectId: PLATFORM_PROJECT_ID,
+      platformOrganizationId: 'org-benchmark',
+    });
+
+    const old = await readPaidBenchmarkProgress(db, { requestId: 'request-a' });
+    const current = await readPaidBenchmarkProgress(db, { requestId: 'request-b' });
+    if (old.status === 'empty' || current.status === 'empty') throw new Error('expected progress');
+    // The old request keeps its own generation: no cover, no spend, nothing of B's.
+    expect(old.kiloCoveredModelRequests).toBe(0);
+    expect(old.kiloCoveredMicrodollars).toBe(0);
+    expect(old.billedModelRequests).toBe(0);
+    expect(old.chargedMicrodollars).toBe(0);
+    // The generation that actually ran under Kilo sees it.
+    expect(current.kiloCoveredModelRequests).toBe(1);
+    expect(current.kiloCoveredMicrodollars).toBe(90);
+    expect(current.chargedMicrodollars).toBe(0);
+  });
+
+  it('never reports a receipt for a generation the request did not join', async () => {
+    // Guard direction of the same invariant, seeded directly: a covered receipt exists for
+    // generation 1 (the reclaim fence keeps that out of a real reclaim today, because an
+    // admitted covered call blocks it), and request B joins generation 3. The join is by
+    // recorded participation, so the older receipt is never inherited no matter what a
+    // future transition allows.
+    await db.batch(enqueuePaidCaseStatements(db, { key: key(), requestId: 'request-a' }));
+    await db.batch(activatePaidBenchmarkRequestStatements(db, { requestId: 'request-a' }));
+    const first = await claim(db, { runId: 'run-1', token: 'token-1' });
+    const oldGeneration = first.run?.generation ?? 0;
+    sqlite
+      .prepare(
+        `INSERT INTO paid_attempt_usage (
+          usage_id, model_request_id, request_id, engine_identity, model, variant, rep,
+          case_id, generation, owner_type, owner_id, microdollars, platform_covered, created_at
+        ) VALUES (?, 'prior-covered', '', ?, ?, '', 0, ?, ?, 'organization', 'org-benchmark',
+          90, 1, '2026-01-01T00:00:00.000Z')`
+      )
+      .run(UUID_3, ENGINE, MODEL, CASE, oldGeneration);
+    // Move the canonical run on and let B join that newer generation.
+    sqlite
+      .prepare(
+        `UPDATE benchmark_case_runs SET generation = generation + 2, status = 'running',
+          executor_run_id = 'run-2', executor_token = 'token-2', platform_covered = 0`
+      )
+      .run();
+    await db.batch(enqueuePaidCaseStatements(db, { key: key(), requestId: 'request-b' }));
+    await db.batch(activatePaidBenchmarkRequestStatements(db, { requestId: 'request-b' }));
+
+    const bravo = await readPaidBenchmarkProgress(db, { requestId: 'request-b' });
+    if (bravo.status === 'empty') throw new Error('expected progress');
+    expect(bravo.kiloCoveredModelRequests).toBe(0);
+    expect(bravo.kiloCoveredMicrodollars).toBe(0);
+    expect(bravo.chargedMicrodollars).toBe(0);
+  });
+
+  it('reports Kilo cover to a request first staged onto an already running covered case', async () => {
+    // The platform run owns the execution and Kilo covers it; a user request stages onto
+    // that same running generation. It participates in that generation, so it sees the cover.
+    await db.batch(enqueuePaidCaseStatements(db, { key: key(), requestId: 'request-a' }));
+    const platformClaim = await claim(db, { runId: 'run-1', token: 'token-1', platform: true });
+    expect(platformClaim.outcome).toBe('started');
+    const generation = platformClaim.run?.generation ?? 0;
+
+    const staged = await stage(db, 'request-b');
+    expect(staged).toBeDefined();
+    const joined = sqlite
+      .prepare(
+        `SELECT generation, status FROM paid_benchmark_request_cases WHERE request_id = 'request-b'`
+      )
+      .get() as { generation: number; status: string };
+    expect(joined).toEqual({ generation, status: 'queued' });
+
+    const paid = await payModelRequest(db, {
+      generation,
+      modelRequestId: UUID_1,
+      assignmentId: ASSIGNMENT_1,
+      platformOrganizationId: 'org-benchmark',
+    });
+    await acceptUsage(db, {
+      assignmentId: paid.assignmentId,
+      usageId: USAGE_1,
+      owner: alice,
+      microdollars: 90,
+      generation,
+      projectId: PLATFORM_PROJECT_ID,
+      platformOrganizationId: 'org-benchmark',
+    });
+
+    const progress = await readPaidBenchmarkProgress(db, { requestId: 'request-b' });
+    if (progress.status === 'empty') throw new Error('expected progress');
+    expect(progress.kiloCoveredModelRequests).toBe(1);
+    expect(progress.kiloCoveredMicrodollars).toBe(90);
+    expect(progress.chargedMicrodollars).toBe(0);
+  });
+
+  it('keeps a late covered receipt for the generation a paused request participated in', async () => {
+    // A joins generation 2, Kilo covers it and a call is admitted, then A is paused before
+    // the receipt lands. The late receipt still belongs to A's own generation, so A sees it
+    // after the pause and no other request gains it.
+    await db.batch(enqueuePaidCaseStatements(db, { key: key(), requestId: 'request-a' }));
+    await db.batch(activatePaidBenchmarkRequestStatements(db, { requestId: 'request-a' }));
+    const claimA = await claim(db, { runId: 'run-1', token: 'token-1' });
+    const generation = claimA.run?.generation ?? 0;
+    await db.batch(platformCoverageStatements(db, { key: key() }));
+    const paid = await payModelRequest(db, {
+      generation,
+      modelRequestId: UUID_1,
+      assignmentId: ASSIGNMENT_1,
+      platformOrganizationId: 'org-benchmark',
+    });
+    await db.batch(
+      pausePaidBenchmarkRequestStatements(db, { requestId: 'request-a', reason: 'owner' })
+    );
+
+    await acceptUsage(db, {
+      assignmentId: paid.assignmentId,
+      usageId: USAGE_1,
+      owner: alice,
+      microdollars: 90,
+      generation,
+      projectId: PLATFORM_PROJECT_ID,
+      platformOrganizationId: 'org-benchmark',
+    });
+
+    const paused = await readPaidBenchmarkProgress(db, { requestId: 'request-a' });
+    if (paused.status !== 'paused') throw new Error(`expected paused, got ${paused.status}`);
+    expect(paused.kiloCoveredModelRequests).toBe(1);
+    expect(paused.kiloCoveredMicrodollars).toBe(90);
+    expect(paused.chargedMicrodollars).toBe(0);
   });
 });
 

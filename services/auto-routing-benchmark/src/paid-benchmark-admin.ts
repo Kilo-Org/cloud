@@ -218,19 +218,17 @@ const PLATFORM_COVERAGE_SQL = `SELECT rc.request_id AS request_id,
   COUNT(DISTINCT u.model_request_id) AS kilo_covered_requests,
   COALESCE(SUM(u.microdollars), 0) AS kilo_covered_spend
 FROM paid_benchmark_request_cases rc
-JOIN benchmark_case_runs run
-  ON run.engine_identity = rc.engine_identity
-  AND run.model = rc.model AND run.variant = rc.variant
-  AND run.rep = rc.rep AND run.case_id = rc.case_id
 JOIN paid_attempt_usage u
   ON u.platform_covered = 1
   AND u.engine_identity = rc.engine_identity
   AND u.model = rc.model AND u.variant = rc.variant
   AND u.rep = rc.rep AND u.case_id = rc.case_id
-  -- Only the run's CURRENT generation. A cancelled generation that was later reclaimed
-  -- bumps the run's generation counter, so its Kilo receipts can never be reported as
-  -- cover for the newer exclusive user generation paying the same slot.
-  AND u.generation = run.generation
+  -- The generation THIS request's row joined, never the run's current one. A cancelled
+  -- generation that was later reclaimed bumps the run's counter, so the old request's
+  -- paused row must not pick up cover billed to the newer generation, and the newer
+  -- generation's request must not inherit the old one's receipts. A row that joined no
+  -- generation (staged before the column existed) matches nothing.
+  AND u.generation = rc.generation
 WHERE rc.status <> 'reused'`;
 
 /**

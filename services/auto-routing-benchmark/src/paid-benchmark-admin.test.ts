@@ -77,11 +77,19 @@ function insertCase(
   sqlite
     .prepare(
       `INSERT INTO paid_benchmark_request_cases (
-        request_id, engine_identity, model, variant, rep, case_id, status,
+        request_id, engine_identity, model, variant, rep, case_id, status, generation,
         covered_by_kilo, charged_microdollars, reason, updated_at
-      ) VALUES (?, ?, 'openai/gpt-test', '', 0, ?, ?, ?, ?, NULL, '2026-11-20T12:00:00.000Z')`
+      ) VALUES (?, ?, 'openai/gpt-test', '', 0, ?, ?, ?, ?, ?, NULL, '2026-11-20T12:00:00.000Z')`
     )
-    .run(requestId, ENGINE, caseId, status, options.covered ?? 0, options.charged ?? 0);
+    .run(
+      requestId,
+      ENGINE,
+      caseId,
+      status,
+      options.generation ?? 1,
+      options.covered ?? 0,
+      options.charged ?? 0
+    );
   // A staged case always has its case run: the store cannot write a covered receipt
   // without one, and the admin reads align Kilo cover to the run's current generation.
   sqlite
@@ -587,6 +595,95 @@ describe('admin request reads', () => {
       }),
     ]);
     expect(b?.chargedMicrodollars).toBe(0);
+  });
+
+  it('never reports a reclaimed generation\'s Kilo cover on the old paused request', async () => {
+    // The exact reclaim shape: A's row joined generation 1 and paused there; the run moved
+    // on and generation 3 is Kilo covered. The old request must not show that cover, while
+    // the request that joined generation 3 must.
+    insertRequest();
+    insertRequest({ id: 'request-b', ownerId: 'u2', routerId: 'router-2' });
+    insertCase(REQUEST, 'case-shared', 'paused', { generation: 1 });
+    insertCase('request-b', 'case-shared', 'running', { generation: 3, covered: 1 });
+    insertModelRequest('model-request-cov', 'case-shared', {
+      platformCovered: true,
+      state: 'completed',
+    });
+    sqlite
+      .prepare(`UPDATE paid_model_requests SET generation = 3 WHERE id = 'model-request-cov'`)
+      .run();
+    insertUsage('usage-cov', 'model-request-cov', 'case-shared', {
+      microdollars: 90,
+      platformCovered: true,
+      requestId: '',
+    });
+    sqlite.prepare(`UPDATE paid_attempt_usage SET generation = 3 WHERE usage_id = 'usage-cov'`).run();
+
+    const a = await readPaidBenchmarkAdminRequest(db, REQUEST);
+    const b = await readPaidBenchmarkAdminRequest(db, 'request-b');
+    expect(a?.kiloCoveredModelRequests).toBe(0);
+    expect(a?.kiloCoveredMicrodollars).toBe(0);
+    expect(a?.chargedMicrodollars).toBe(0);
+    expect(a?.payers).toEqual([]);
+    expect(b?.kiloCoveredModelRequests).toBe(1);
+    expect(b?.kiloCoveredMicrodollars).toBe(90);
+    expect(b?.chargedMicrodollars).toBe(0);
+  });
+
+  it('never reports a receipt for a generation the request did not join', async () => {
+    // Mirror guard: the receipt belongs to generation 1 and this request joined 2, so the
+    // per-generation join excludes it even though the case key matches exactly.
+    insertRequest();
+    insertCase(REQUEST, 'case-shared', 'running', { generation: 2 });
+    insertModelRequest('model-request-cov', 'case-shared', {
+      platformCovered: true,
+      state: 'completed',
+    });
+    sqlite
+      .prepare(`UPDATE paid_model_requests SET generation = 1 WHERE id = 'model-request-cov'`)
+      .run();
+    insertUsage('usage-cov', 'model-request-cov', 'case-shared', {
+      microdollars: 90,
+      platformCovered: true,
+      requestId: '',
+    });
+    sqlite.prepare(`UPDATE paid_attempt_usage SET generation = 1 WHERE usage_id = 'usage-cov'`).run();
+
+    const request = await readPaidBenchmarkAdminRequest(db, REQUEST);
+    expect(request?.kiloCoveredModelRequests).toBe(0);
+    expect(request?.kiloCoveredMicrodollars).toBe(0);
+    // The list read agrees.
+    const listed = await listPaidBenchmarkAdminRequests(db, { router: 'efficient' });
+    expect(listed.requests[0]?.kiloCoveredModelRequests).toBe(0);
+  });
+
+  it('reports the cover a request shares on the generation it joined', async () => {
+    // Positive control for the same join: both rows joined generation 2 and the cover is
+    // for generation 2, so both see it (mid-run join and first-staged cases).
+    insertRequest();
+    insertRequest({ id: 'request-b', ownerId: 'u2', routerId: 'router-2' });
+    insertCase(REQUEST, 'case-shared', 'running', { generation: 2, covered: 1 });
+    insertCase('request-b', 'case-shared', 'queued', { generation: 2, covered: 1 });
+    insertModelRequest('model-request-cov', 'case-shared', {
+      platformCovered: true,
+      state: 'completed',
+    });
+    sqlite
+      .prepare(`UPDATE paid_model_requests SET generation = 2 WHERE id = 'model-request-cov'`)
+      .run();
+    insertUsage('usage-cov', 'model-request-cov', 'case-shared', {
+      microdollars: 90,
+      platformCovered: true,
+      requestId: '',
+    });
+    sqlite.prepare(`UPDATE paid_attempt_usage SET generation = 2 WHERE usage_id = 'usage-cov'`).run();
+
+    for (const id of [REQUEST, 'request-b']) {
+      const request = await readPaidBenchmarkAdminRequest(db, id);
+      expect(request?.kiloCoveredModelRequests).toBe(1);
+      expect(request?.kiloCoveredMicrodollars).toBe(90);
+      expect(request?.chargedMicrodollars).toBe(0);
+    }
   });
 
   it('maps an organization owner to the shared org kind', async () => {

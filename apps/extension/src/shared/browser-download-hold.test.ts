@@ -903,6 +903,28 @@ describe('a sign-gated settle', () => {
     expect(outcome).toBe('no_sign');
   });
 
+  it('answers waiting, never no_sign, when its Document is still unanswered at the bound', async () => {
+    const downloads = makeDownloads();
+    const { hold } = makeHold(downloads);
+    let sign: DownloadSign = 'pending';
+
+    hold.tab(agentTab());
+
+    const settled = hold.settle('session-1', {
+      graceMs: 40,
+      sign: () => sign,
+      since: Date.now(),
+      timeoutMs: 300,
+    });
+
+    // The call's Document stays unanswered past its whole bound: the file it may have started never exists as an
+    // Item, so only the bound ends the settle — and it may not read as "nothing happened".
+    await vi.advanceTimersByTimeAsync(320);
+
+    await expect(settled).resolves.toBe('waiting_for_item');
+    expect(hold.drain('session-1')).toStrictEqual([]);
+  });
+
   it('hears the announcement that lands after the tool answered, on that same call', async () => {
     const downloads = makeDownloads();
     const { hold } = makeHold(downloads);

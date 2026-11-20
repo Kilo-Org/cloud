@@ -83,6 +83,33 @@ describe('VoiceLanguagePickerSheet search', () => {
     renderer.unmount();
   });
 
+  it('finds a gateway language by its name in the UI language', async () => {
+    preferenceState.gatewayEnabled = true;
+    const renderer = await mountSheet();
+
+    setQuery(renderer, 'Arabisch');
+
+    expect(rowLabels(renderer)).toEqual(['العربية']);
+
+    renderer.unmount();
+  });
+
+  it('finds a device language by its name in the UI language', async () => {
+    deviceState.current = {
+      languages: ['de-DE', 'ar-SA'],
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
+    const renderer = await mountSheet();
+
+    setQuery(renderer, 'Arabisch');
+
+    expect(rowLabels(renderer)).toEqual(['العربية']);
+
+    renderer.unmount();
+  });
+
   it('collates the gateway language list by endonym', async () => {
     preferenceState.gatewayEnabled = true;
     const renderer = await mountSheet();

@@ -37,6 +37,8 @@ vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'Activ
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
+  // EmptyState reads the scheme for its dark disc and glyph ink.
+  useColorScheme: () => 'light',
   // Sheet registers the app-level Android Back listener while it is visible.
   BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   ActivityIndicator: 'ActivityIndicator',

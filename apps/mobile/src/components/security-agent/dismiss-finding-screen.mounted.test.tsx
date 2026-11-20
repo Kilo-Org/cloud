@@ -441,6 +441,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       query.isError = true;
       if (source === 'finding') {
         finding.data = undefined;
+        finding.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
       } else {
         capability.status = 'error';
       }
@@ -448,7 +449,15 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       expect(tree.root.findAllByType(ScrollView)).toHaveLength(0);
       expect(tree.root.findAllByType(SettingsRecoveryStatus)).toHaveLength(0);
       const error = renderFailure(tree);
-      expect(error.props.variant).toBeUndefined();
+      if (source === 'finding') {
+        // The sheet's own failure keeps its screen title, and the description
+        // comes from the classified variant rather than a repeated message.
+        expect(error.props.title).toBe(i18n.t('securityAgent.dismiss.couldNotLoad'));
+        expect(error.props.message).toBeUndefined();
+        expect(error.props.variant).toBe('server');
+      } else {
+        expect(error.props.variant).toBeUndefined();
+      }
       act(error.props.onRetry as () => void);
       expect(query.refetch).toHaveBeenCalledOnce();
     }

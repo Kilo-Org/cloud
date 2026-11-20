@@ -187,29 +187,30 @@
     "privateRepositoryA11y": "{{name}}, prywatne repozytorium",
     "legalDocumentEnglishOnly": "Ten dokument jest dostępny wyłącznie w języku angielskim.",
     "organizationTrialEndedBilling": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia, a następnie spróbować ponownie.",
+    "organizationTrialEndedBillingAtKiloAi": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia na kilo.ai, a następnie spróbować ponownie.",
     "viewOnGitHub": "Zobacz PR w serwisie GitHub",
     "markdownA11y": {
-      "list": {
-        "bulletPoint": "Punkt listy",
-        "nestedBulletPoint": "Zagnieżdżony punkt listy",
-        "orderedItem": "Element listy {n}",
-        "nestedOrderedItem": "Zagnieżdżony element listy {n}"
-      },
-      "blockquote": {
-        "quote": "Cytat",
-        "nestedQuote": "Zagnieżdżony cytat"
-      },
-      "table": {
-        "row": "Wiersz {n}: {content}"
-      },
-      "math": {
-        "equation": "Matematyka: {latex}"
-      },
-      "rotor": {
-        "headings": "Nagłówki",
-        "links": "Odnośniki",
-        "images": "Obrazy"
-      }
+    "list": {
+      "bulletPoint": "Punkt listy",
+      "nestedBulletPoint": "Zagnieżdżony punkt listy",
+      "orderedItem": "Element listy {n}",
+      "nestedOrderedItem": "Zagnieżdżony element listy {n}"
+    },
+    "blockquote": {
+      "quote": "Cytat",
+      "nestedQuote": "Zagnieżdżony cytat"
+    },
+    "table": {
+      "row": "Wiersz {n}: {content}"
+    },
+    "math": {
+      "equation": "Matematyka: {latex}"
+    },
+    "rotor": {
+      "headings": "Nagłówki",
+      "links": "Odnośniki",
+      "images": "Obrazy"
+    }
     }
   },
   "language": {
@@ -724,7 +725,6 @@
     },
     "autoReviews": "Automatyczne przeglądy",
     "bitbucket": {
-      "notConnectedReadOnly": "Brak połączenia z Bitbucket. Tylko właściciele organizacji, administratorzy i osoby zarządzające rozliczeniami mogą je skonfigurować.",
       "notConnectedReadOnlyPlan": "Okres próbny organizacji zakończył się, więc właściciel musi zaktualizować rozliczenia na kilo.ai."
     },
     "bitbucketConnect": {
@@ -734,7 +734,7 @@
       "managedOnWebRepositories": "Wybierz repozytoria dla {{organization}} w przeglądarce na komputerze.",
       "description": "Utwórz token dostępu do obszaru roboczego dla {{organization}} i wklej go poniżej.",
       "descriptionReconnect": "Utwórz nowy token dostępu do obszaru roboczego dla {{organization}} i wklej go poniżej.",
-      "descriptionOverview": "Utwórz token dostępu do obszaru roboczego dla {{organization}} i wklej go na następnym ekranie.",
+      "descriptionOverview": "Utwórz token dostępu do obszaru roboczego i wklej go na następnym ekranie.",
       "scopes": "Konto: odczyt · Repozytoria: odczyt/zapis · PR: odczyt · Webhooki: odczyt/zapis",
       "tokenPlaceholder": "Token dostępu do obszaru roboczego",
       "tokenRefused": "Bitbucket nie zaakceptował tego tokenu dostępu do obszaru roboczego. Sprawdź, czy ma powyższe uprawnienia, a następnie spróbuj ponownie."
@@ -5039,12 +5039,15 @@
     "inputDescription": "Skanuje wszystkie dane wejściowe za pomocą Enkrypt AI, w tym wyniki narzędzi. Gdy Enkrypt jest niedostępny, żądania są wysyłane bez skanowania zamiast być odrzucane.",
     "outputTitle": "Zabezpieczenia danych wyjściowych",
     "outputDescription": "Skanuje odpowiedzi za pomocą Enkrypt AI, zanim członkowie je otrzymają. Wyłączone, chyba że je włączysz.",
+    "outputUnavailable": "Kilo nie włączył skanowania danych wyjściowych dla tej organizacji, więc odpowiedzi nie są sprawdzane i nie ma tu nic do ustawienia. Skontaktuj się z {{supportEmail}}, aby o to poprosić.",
     "detectorsHint": "Blokuj odrzuca oznaczone żądanie. Tylko rejestruj zapisuje je bez opóźniania żądania.",
     "detectorsHintOutput": "Blokuj powoduje niepowodzenie oznaczonej odpowiedzi. Tylko rejestruj zapisuje ją bez opóźniania odpowiedzi.",
     "choiceLog": "Tylko rejestruj",
     "applyTo": "Zastosuj do",
     "applyToAllMembers": "Wszyscy członkowie",
     "applyKiloDefault": "Zastosuj domyślne ustawienia Kilo",
+    "applyKiloDefaultEnglishNote": "Tekst domyślnej polityki Kilo jest w języku angielskim, ponieważ Kilo Gateway stosuje go dokładnie tak, jak został zapisany.",
+    "applyKiloDefaultReplaceMessage": "Domyślna polityka Kilo jest napisana w języku angielskim i zastępuje to, co ustawiono w Naruszenie polityki. Tekstu wpisanego w polu tekstu polityki nie można odzyskać.",
     "invalidSavedTitle": "Nie można odczytać zapisanych ustawień detektora danych wejściowych",
     "invalidSavedBody": "Żądania są blokowane, dopóki detektory danych wejściowych nie zostaną zapisane ponownie. Poniższe detektory zaczynają od domyślnych ustawień Kilo.",
     "invalidSavedOutputTitle": "Nie można odczytać zapisanych ustawień detektora danych wyjściowych",

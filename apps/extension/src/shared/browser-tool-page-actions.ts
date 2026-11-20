@@ -109,7 +109,10 @@ export interface BrowserToolPageActionSession {
 /** `chrome.tabs` plus the create/remove calls the browser_tabs actions need. */
 export interface BrowserToolPageTabsApi extends BrowserTabsApi {
   readonly create?:
-    | ((properties: { readonly url?: string }) => Promise<BrowserTabInfo> | BrowserTabInfo)
+    | ((properties: {
+        readonly active?: boolean;
+        readonly url?: string;
+      }) => Promise<BrowserTabInfo> | BrowserTabInfo)
     | undefined;
   readonly remove?: ((tabId: number) => Promise<void> | void) | undefined;
 }
@@ -680,7 +683,8 @@ const runTabs = async (
       return fail(`Opening a tab at ${url} needs a navigate grant for that origin (blocked).`);
     }
 
-    const tab = await create(url === undefined ? {} : { url });
+    // A tool call never takes the user's foreground: the tab opens behind the one they are looking at (D9).
+    const tab = await create(url === undefined ? { active: false } : { active: false, url });
 
     if (tab?.id !== undefined) {
       options.noteTabCreated?.(tab.id, options.tabId);

@@ -186,29 +186,30 @@
     "privateRepositoryA11y": "{{name}}, מאגר פרטי",
     "legalDocumentEnglishOnly": "מסמך זה זמין באנגלית בלבד.",
     "organizationTrialEndedBilling": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. תוכל לעדכן את החיוב, ואז לנסות שוב.",
+    "organizationTrialEndedBillingAtKiloAi": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. תוכל לעדכן את החיוב ב-kilo.ai, ואז לנסות שוב.",
     "viewOnGitHub": "הצגת ה-PR ב-GitHub",
     "markdownA11y": {
-      "list": {
-        "bulletPoint": "נקודת תבליט",
-        "nestedBulletPoint": "נקודת תבליט מקוננת",
-        "orderedItem": "פריט ברשימה {n}",
-        "nestedOrderedItem": "פריט מקונן ברשימה {n}"
-      },
-      "blockquote": {
-        "quote": "ציטוט",
-        "nestedQuote": "ציטוט מקונן"
-      },
-      "table": {
-        "row": "שורה {n}: {content}"
-      },
-      "math": {
-        "equation": "מתמטיקה: {latex}"
-      },
-      "rotor": {
-        "headings": "כותרות",
-        "links": "קישורים",
-        "images": "תמונות"
-      }
+    "list": {
+      "bulletPoint": "נקודת תבליט",
+      "nestedBulletPoint": "נקודת תבליט מקוננת",
+      "orderedItem": "פריט ברשימה {n}",
+      "nestedOrderedItem": "פריט מקונן ברשימה {n}"
+    },
+    "blockquote": {
+      "quote": "ציטוט",
+      "nestedQuote": "ציטוט מקונן"
+    },
+    "table": {
+      "row": "שורה {n}: {content}"
+    },
+    "math": {
+      "equation": "מתמטיקה: {latex}"
+    },
+    "rotor": {
+      "headings": "כותרות",
+      "links": "קישורים",
+      "images": "תמונות"
+    }
     }
   },
   "language": {
@@ -723,7 +724,6 @@
     },
     "autoReviews": "סקירות אוטומטיות",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket לא מחובר. רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לחבר אותו.",
       "notConnectedReadOnlyPlan": "תקופת הניסיון של הארגון הסתיימה, ולכן הבעלים חייבים לעדכן את החיוב ב-⁨kilo.ai⁩."
     },
     "bitbucketConnect": {
@@ -733,7 +733,7 @@
       "managedOnWebRepositories": "בחר את המאגרים עבור {{organization}} באתר דרך מחשב.",
       "description": "צור אסימון גישה לסביבת העבודה עבור {{organization}} והדבק אותו למטה.",
       "descriptionReconnect": "צור אסימון גישה חדש לסביבת העבודה עבור {{organization}} והדבק אותו למטה.",
-      "descriptionOverview": "צור אסימון גישה לסביבת העבודה עבור {{organization}} והדבק אותו במסך הבא.",
+      "descriptionOverview": "צור אסימון גישה לסביבת העבודה והדבק אותו במסך הבא.",
       "scopes": "חשבון: קריאה · מאגרים: קריאה/כתיבה · בקשות משיכה: קריאה · התראות אוטומטיות: קריאה/כתיבה",
       "tokenPlaceholder": "אסימון גישה לסביבת העבודה",
       "tokenRefused": "Bitbucket לא קיבל את אסימון הגישה לסביבת העבודה הזה. בדוק שיש לו את ההרשאות שלמעלה, ולאחר מכן נסה שוב."
@@ -4960,12 +4960,15 @@
     "inputDescription": "סורק כל קלט עם Enkrypt AI, כולל תוצאות כלים. כאשר Enkrypt אינו זמין, בקשות נשלחות ללא סריקה במקום להידחות.",
     "outputTitle": "מעקות בטיחות לפלט",
     "outputDescription": "סורק תגובות עם Enkrypt AI לפני שחברי הארגון מקבלים אותן. כבוי אלא אם תפעיל אותו.",
+    "outputUnavailable": "Kilo לא הפעילה סריקת פלט עבור הארגון הזה, לכן התגובות אינן נבדקות ואין כאן מה להגדיר. צרו קשר עם {{supportEmail}} כדי לבקש זאת.",
     "detectorsHint": "חסימה דוחה בקשה שסומנה. רישום בלבד מתעד אותה בלי לעכב את הבקשה.",
     "detectorsHintOutput": "חסימה מכשילה תגובה שסומנה. רישום בלבד מתעד אותה בלי לעכב את התגובה.",
     "choiceLog": "רישום בלבד",
     "applyTo": "החל על",
     "applyToAllMembers": "כל החברים",
     "applyKiloDefault": "החל את ברירת המחדל של Kilo",
+    "applyKiloDefaultEnglishNote": "טקסט מדיניות ברירת המחדל של Kilo הוא באנגלית, מפני ש-Kilo Gateway מחיל אותו בדיוק כפי שנכתב.",
+    "applyKiloDefaultReplaceMessage": "מדיניות ברירת המחדל של Kilo כתובה באנגלית ומחליפה את מה שהגדרת בהפרת מדיניות. אי אפשר לשחזר את הטקסט שהזנת בשדה טקסט המדיניות.",
     "invalidSavedTitle": "לא ניתן לקרוא את הגדרות גלאי הקלט השמורות",
     "invalidSavedBody": "בקשות חסומות עד שגלאי הקלט יישמרו מחדש. הגלאים שלמטה מתחילים מברירת המחדל של Kilo.",
     "invalidSavedOutputTitle": "לא ניתן לקרוא את הגדרות גלאי הפלט השמורות",

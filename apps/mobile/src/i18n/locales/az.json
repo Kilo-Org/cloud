@@ -185,29 +185,30 @@
     "privateRepositoryA11y": "{{name}}, şəxsi repozitoriya",
     "legalDocumentEnglishOnly": "Bu sənəd yalnız ingilis dilində mövcuddur.",
     "organizationTrialEndedBilling": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Billinqi yeniləyə və sonra yenidən cəhd edə bilərsiniz.",
+    "organizationTrialEndedBillingAtKiloAi": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Billinqi kilo.ai ünvanında yeniləyə və sonra yenidən cəhd edə bilərsiniz.",
     "viewOnGitHub": "GitHub-da PR-ə bax",
     "markdownA11y": {
-      "list": {
-        "bulletPoint": "Büllet işarəsi",
-        "nestedBulletPoint": "İç-içə büllet işarəsi",
-        "orderedItem": "Siyahı elementi {n}",
-        "nestedOrderedItem": "İç-içə siyahı elementi {n}"
-      },
-      "blockquote": {
-        "quote": "Sitat",
-        "nestedQuote": "İç-içə sitat"
-      },
-      "table": {
-        "row": "Sətir {n}: {content}"
-      },
-      "math": {
-        "equation": "Riyaziyyat: {latex}"
-      },
-      "rotor": {
-        "headings": "Başlıqlar",
-        "links": "Keçidlər",
-        "images": "Şəkillər"
-      }
+    "list": {
+      "bulletPoint": "Büllet işarəsi",
+      "nestedBulletPoint": "İç-içə büllet işarəsi",
+      "orderedItem": "Siyahı elementi {n}",
+      "nestedOrderedItem": "İç-içə siyahı elementi {n}"
+    },
+    "blockquote": {
+      "quote": "Sitat",
+      "nestedQuote": "İç-içə sitat"
+    },
+    "table": {
+      "row": "Sətir {n}: {content}"
+    },
+    "math": {
+      "equation": "Riyaziyyat: {latex}"
+    },
+    "rotor": {
+      "headings": "Başlıqlar",
+      "links": "Keçidlər",
+      "images": "Şəkillər"
+    }
     }
   },
   "language": {
@@ -1418,7 +1419,6 @@
     "followReviewMd": "REVIEW.md təlimatlarına əməl et",
     "followReviewMdSubtitle": "Hər repozitoriyanın REVIEW.md faylındakı təlimatlara əməl et",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket qoşulmayıb. Onu yalnız təşkilat sahibləri, inzibatçılar və ödəniş menecerləri qoşa bilər.",
       "notConnectedReadOnlyPlan": "Təşkilatın sınaq müddəti başa çıxıb, ona görə də sahib kilo.ai ünvanında billinqi yeniləməlidir."
     },
     "bitbucketConnect": {
@@ -1428,7 +1428,7 @@
       "managedOnWebRepositories": "{{organization}} üçün repozitoriyaları kompüterdən vebdə seçin.",
       "description": "{{organization}} üçün iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
       "descriptionReconnect": "{{organization}} üçün yeni iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
-      "descriptionOverview": "{{organization}} üçün iş sahəsi giriş tokeni yarat və növbəti ekranda yapışdır.",
+      "descriptionOverview": "İş sahəsi giriş tokeni yarat və növbəti ekranda yapışdır.",
       "scopes": "Hesab: oxuma · Repozitoriyalar: oxuma/yazma · PR-lər: oxuma · Vebhuklar: oxuma/yazma",
       "tokenPlaceholder": "İş sahəsinin giriş tokeni",
       "tokenRefused": "Bitbucket bu iş sahəsi tokenini qəbul etmədi. Yuxarıdakı icazələrin olduğunu yoxla, sonra yenidən cəhd et."
@@ -4881,12 +4881,15 @@
     "inputDescription": "Alət nəticələri daxil olmaqla hər girişi Enkrypt AI ilə yoxlayır. Enkrypt əlçatan olmadıqda sorğular rədd edilmək əvəzinə yoxlanılmadan göndərilir.",
     "outputTitle": "Çıxış üçün qoruyucu qaydalar",
     "outputDescription": "Cavabları üzvlərə çatmazdan əvvəl Enkrypt AI ilə yoxlayır. Siz aktivləşdirməyincə söndürülüdür.",
+    "outputUnavailable": "Kilo bu təşkilat üçün çıxış yoxlamasını aktivləşdirməyib, ona görə cavablar yoxlanmır və burada qurulacaq heç nə yoxdur. Bunu istəmək üçün {{supportEmail}} ilə əlaqə saxlayın.",
     "detectorsHint": "\"Blokla\" işarələnmiş sorğunu rədd edir. \"Yalnız qeydə al\" sorğunu ləngitmədən onu sadəcə qeydə alır.",
     "detectorsHintOutput": "\"Blokla\" işarələnmiş cavabı uğursuz edir. \"Yalnız qeydə al\" cavabı ləngitmədən onu sadəcə qeydə alır.",
     "choiceLog": "Yalnız qeydə al",
     "applyTo": "Kimlərə tətbiq olunur",
     "applyToAllMembers": "Bütün üzvlər",
     "applyKiloDefault": "Kilo standartını tətbiq et",
+    "applyKiloDefaultEnglishNote": "Kilo standart siyasət mətni ingilis dilindədir, çünki Kilo Gateway onu yazıldığı kimi tətbiq edir.",
+    "applyKiloDefaultReplaceMessage": "Kilo standart siyasəti ingilis dilində yazılıb və Siyasət pozuntusunda təyin etdiyinizi əvəz edir. Siyasət mətni sahəsinə daxil etdiyiniz mətn bərpa edilə bilməz.",
     "invalidSavedTitle": "Giriş detektorlarının yadda saxlanılmış ayarlarını oxumaq mümkün deyil",
     "invalidSavedBody": "Giriş detektorları yenidən yadda saxlanılana qədər sorğular bloklanır. Aşağıdakı detektorlar Kilo standartı ilə başlayır.",
     "invalidSavedOutputTitle": "Çıxış detektorlarının yadda saxlanılmış ayarlarını oxumaq mümkün deyil",

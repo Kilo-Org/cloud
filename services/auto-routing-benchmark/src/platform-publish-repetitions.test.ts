@@ -27,7 +27,7 @@ describe('platform publish under router decider repetitions (migrated SQLite)', 
     applyBenchmarkMigrations(sqlite);
     env = {
       BENCH_DB: sqliteD1(sqlite),
-      AUTO_ROUTING_CONFIG: { delete: vi.fn() },
+      AUTO_ROUTING_CONFIG: { delete: vi.fn(), put: vi.fn() },
       KILO_WEB_API_BASE_URL: 'https://app.test',
     } as unknown as Env;
   });

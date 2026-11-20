@@ -84,7 +84,7 @@ describe('LanguagePickerRow section titles', () => {
     const renderer = mountRow({
       kind: 'language',
       key: 'es',
-      row: { tag: 'es', endonym: 'Español', englishName: 'Spanish' },
+      row: { tag: 'es', endonym: 'Español', englishName: 'Spanish', searchNames: [] },
     });
 
     const texts = mountedTexts(renderer);
@@ -100,7 +100,7 @@ describe('LanguagePickerRow section titles', () => {
     const item = {
       kind: 'language',
       key: 'es',
-      row: { tag: 'es', endonym: 'Español', englishName: 'Spanish' },
+      row: { tag: 'es', endonym: 'Español', englishName: 'Spanish', searchNames: [] },
     } as const;
     const row = (disabled: boolean) => {
       const renderer = mountRow(item, disabled);

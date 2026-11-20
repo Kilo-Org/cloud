@@ -34,6 +34,8 @@ vi.mock('react-native', () => ({
   PixelRatio: { roundToNearestPixel: (value: number) => Math.round(value * 2) / 2 },
   Platform: { OS: 'android' },
   useWindowDimensions: () => ({ width: 400, height: 800 }),
+  // EmptyState reads the scheme for its dark disc and glyph ink.
+  useColorScheme: () => 'light',
   View: 'View',
   ScrollView: (props: ComponentPropsWithRef<typeof ScrollView>) => {
     const { ref, ...rest } = props;

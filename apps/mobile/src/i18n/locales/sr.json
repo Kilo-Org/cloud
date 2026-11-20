@@ -187,28 +187,29 @@
     "privateRepositoryA11y": "{{name}}, privatno spremište",
     "legalDocumentEnglishOnly": "Ovaj dokument je dostupan samo na engleskom jeziku.",
     "organizationTrialEndedBilling": "Probni period organizacije je završen i ona nema aktivan plan. Možete da ažurirate naplatu, a zatim pokušajte ponovo.",
+    "organizationTrialEndedBillingAtKiloAi": "Probni period organizacije je završen i ona nema aktivan plan. Možete da ažurirate naplatu na kilo.ai, a zatim pokušajte ponovo.",
     "markdownA11y": {
-      "list": {
-        "bulletPoint": "Tačka spiska",
-        "nestedBulletPoint": "Ugnježđena tačka spiska",
-        "orderedItem": "Stavka spiska {n}",
-        "nestedOrderedItem": "Ugnježđena stavka spiska {n}"
-      },
-      "blockquote": {
-        "quote": "Citat",
-        "nestedQuote": "Ugnježđeni citat"
-      },
-      "table": {
-        "row": "Red {n}: {content}"
-      },
-      "math": {
-        "equation": "Matematika: {latex}"
-      },
-      "rotor": {
-        "headings": "Naslovi",
-        "links": "Veze",
-        "images": "Slike"
-      }
+    "list": {
+      "bulletPoint": "Tačka spiska",
+      "nestedBulletPoint": "Ugnježđena tačka spiska",
+      "orderedItem": "Stavka spiska {n}",
+      "nestedOrderedItem": "Ugnježđena stavka spiska {n}"
+    },
+    "blockquote": {
+      "quote": "Citat",
+      "nestedQuote": "Ugnježđeni citat"
+    },
+    "table": {
+      "row": "Red {n}: {content}"
+    },
+    "math": {
+      "equation": "Matematika: {latex}"
+    },
+    "rotor": {
+      "headings": "Naslovi",
+      "links": "Veze",
+      "images": "Slike"
+    }
     }
   },
   "language": {
@@ -1445,7 +1446,6 @@
     "followReviewMd": "Sledi uputstva iz REVIEW.md",
     "followReviewMdSubtitle": "Poštuj uputstva iz datoteke REVIEW.md u svakom repozitorijumu",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije, administratori i menadžeri naplate mogu da ga povežu.",
       "notConnectedReadOnlyPlan": "Probni period organizacije je završen, pa vlasnik mora da ažurira naplatu na kilo.ai."
     },
     "bitbucketConnect": {
@@ -1455,7 +1455,7 @@
       "managedOnWebRepositories": "Izaberi repozitorijume za {{organization}} na vebu, sa računara.",
       "description": "Kreiraj token za pristup radnom prostoru za {{organization}} i nalepi ga ispod.",
       "descriptionReconnect": "Kreiraj novi token za pristup radnom prostoru za {{organization}} i nalepi ga ispod.",
-      "descriptionOverview": "Kreiraj token za pristup radnom prostoru za {{organization}} i nalepi ga na sledećem ekranu.",
+      "descriptionOverview": "Kreiraj token za pristup radnom prostoru i nalepi ga na sledećem ekranu.",
       "scopes": "Nalog: čitanje · Repozitorijumi: čitanje/pisanje · PR-ovi: čitanje · Veb-dojavnici: čitanje/pisanje",
       "tokenPlaceholder": "Token za pristup radnom prostoru",
       "tokenRefused": "Bitbucket nije prihvatio ovaj token za pristup radnom prostoru. Proveri da li ima dozvole navedene iznad, pa pokušaj ponovo."
@@ -4960,12 +4960,15 @@
     "inputDescription": "Skenira svaki ulaz pomoću Enkrypt AI, uključujući rezultate alata. Kada Enkrypt nije dostupan, zahtevi se šalju bez skeniranja umesto da budu odbijeni.",
     "outputTitle": "Zaštitne mere za izlaz",
     "outputDescription": "Skenira odgovore pomoću Enkrypt AI pre nego što ih članovi prime. Isključene su osim ako ih uključite.",
+    "outputUnavailable": "Kilo nije omogućio skeniranje izlaza za ovu organizaciju, pa se odgovori ne proveravaju i ovde nema šta da se podesi. Kontaktirajte {{supportEmail}} da to zatražite.",
     "detectorsHint": "Režim Blokiraj odbija označeni zahtev. Režim Samo evidentiraj beleži ga bez odlaganja zahteva.",
     "detectorsHintOutput": "Režim Blokiraj proglašava označeni odgovor neuspešnim. Režim Samo evidentiraj beleži ga bez odlaganja odgovora.",
     "choiceLog": "Samo evidentiraj",
     "applyTo": "Primeni na",
     "applyToAllMembers": "Svi članovi",
     "applyKiloDefault": "Primeni Kilo podrazumevane vrednosti",
+    "applyKiloDefaultEnglishNote": "Tekst Kilo podrazumevane politike je na engleskom, jer ga Kilo Gateway primenjuje tačno onako kako je napisan.",
+    "applyKiloDefaultReplaceMessage": "Kilo podrazumevana politika napisana je na engleskom i zamenjuje ono što ste postavili u Kršenje politike. Tekst koji ste uneli u polje teksta politike ne može se vratiti.",
     "invalidSavedTitle": "Sačuvana podešavanja ulaznih detektora ne mogu da se pročitaju",
     "invalidSavedBody": "Zahtevi su blokirani dok se ulazni detektori ponovo ne sačuvaju. Detektori ispod počinju od Kilo podrazumevanih vrednosti.",
     "invalidSavedOutputTitle": "Sačuvana podešavanja izlaznih detektora ne mogu da se pročitaju",

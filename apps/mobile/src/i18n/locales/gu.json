@@ -185,29 +185,30 @@
     "privateRepositoryA11y": "{{name}}, ખાનગી રિપોઝિટરી",
     "legalDocumentEnglishOnly": "આ દસ્તાવેજ ફક્ત અંગ્રેજીમાં ઉપલબ્ધ છે.",
     "organizationTrialEndedBilling": "સંસ્થાનો ટ્રાયલ સમાપ્ત થઈ ગયો છે અને તેની પાસે કોઈ સક્રિય પ્લાન નથી. તમે બિલિંગ અપડેટ કરી શકો છો, પછી ફરીથી પ્રયાસ કરો.",
+    "organizationTrialEndedBillingAtKiloAi": "સંસ્થાનો ટ્રાયલ સમાપ્ત થઈ ગયો છે અને તેની પાસે કોઈ સક્રિય પ્લાન નથી. તમે બિલિંગ kilo.ai પર અપડેટ કરી શકો છો, પછી ફરીથી પ્રયાસ કરો.",
     "viewOnGitHub": "GitHub પર PR જુઓ",
     "markdownA11y": {
-      "list": {
-        "bulletPoint": "બુલેટ પોઇન્ટ",
-        "nestedBulletPoint": "નેસ્ટેડ બુલેટ પોઇન્ટ",
-        "orderedItem": "યાદીની આઇટમ {n}",
-        "nestedOrderedItem": "નેસ્ટેડ યાદીની આઇટમ {n}"
-      },
-      "blockquote": {
-        "quote": "અવતરણ",
-        "nestedQuote": "નેસ્ટેડ અવતરણ"
-      },
-      "table": {
-        "row": "પંક્તિ {n}: {content}"
-      },
-      "math": {
-        "equation": "ગણિત: {latex}"
-      },
-      "rotor": {
-        "headings": "શીર્ષકો",
-        "links": "લિંક્સ",
-        "images": "છબીઓ"
-      }
+    "list": {
+      "bulletPoint": "બુલેટ પોઇન્ટ",
+      "nestedBulletPoint": "નેસ્ટેડ બુલેટ પોઇન્ટ",
+      "orderedItem": "યાદીની આઇટમ {n}",
+      "nestedOrderedItem": "નેસ્ટેડ યાદીની આઇટમ {n}"
+    },
+    "blockquote": {
+      "quote": "અવતરણ",
+      "nestedQuote": "નેસ્ટેડ અવતરણ"
+    },
+    "table": {
+      "row": "પંક્તિ {n}: {content}"
+    },
+    "math": {
+      "equation": "ગણિત: {latex}"
+    },
+    "rotor": {
+      "headings": "શીર્ષકો",
+      "links": "લિંક્સ",
+      "images": "છબીઓ"
+    }
     }
   },
   "language": {
@@ -1418,7 +1419,6 @@
     "followReviewMd": "REVIEW.md અનુસરો",
     "followReviewMdSubtitle": "દરેક રિપોઝિટરીની REVIEW.md ફાઇલમાં આપેલી સૂચનાઓનું પાલન કરો",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket જોડાયેલું નથી. માત્ર સંસ્થાના માલિકો, એડમિનો અને બિલિંગ મેનેજરો જ તેને જોડી શકે છે.",
       "notConnectedReadOnlyPlan": "સંસ્થાનો ટ્રાયલ સમાપ્ત થઈ ગયો છે, તેથી માલિકે kilo.ai પર બિલિંગ અપડેટ કરવું પડશે."
     },
     "bitbucketConnect": {
@@ -1428,7 +1428,7 @@
       "managedOnWebRepositories": "કમ્પ્યુટર પરથી વેબ પર {{organization}} માટે રિપોઝિટરીઝ પસંદ કરો.",
       "description": "{{organization}} માટે વર્કસ્પેસ ઍક્સેસ ટોકન બનાવો અને નીચે પેસ્ટ કરો.",
       "descriptionReconnect": "{{organization}} માટે નવો વર્કસ્પેસ ઍક્સેસ ટોકન બનાવો અને નીચે પેસ્ટ કરો.",
-      "descriptionOverview": "{{organization}} માટે વર્કસ્પેસ ઍક્સેસ ટોકન બનાવો અને પછીની સ્ક્રીન પર પેસ્ટ કરો.",
+      "descriptionOverview": "વર્કસ્પેસ ઍક્સેસ ટોકન બનાવો અને પછીની સ્ક્રીન પર પેસ્ટ કરો.",
       "scopes": "એકાઉન્ટ: વાંચવાની · રિપોઝિટરીઓ: વાંચવાની/લખવાની · પુલ રિક્વેસ્ટ: વાંચવાની · વેબહુક: વાંચવાની/લખવાની પરવાનગી.",
       "tokenPlaceholder": "વર્કસ્પેસ ઍક્સેસ ટોકન",
       "tokenRefused": "Bitbucket એ આ વર્કસ્પેસ ઍક્સેસ ટોકન સ્વીકાર્યું નથી. ચકાસો કે તેમાં ઉપરની પરવાનગીઓ છે, પછી ફરી પ્રયાસ કરો."
@@ -4881,12 +4881,15 @@
     "inputDescription": "Enkrypt AI સાથે દરેક ઇનપુટ સ્કેન કરે છે, જેમાં ટૂલ પરિણામોનો સમાવેશ થાય છે. Enkrypt ઉપલબ્ધ ન હોય ત્યારે વિનંતીઓ અસ્વીકારવાને બદલે સ્કેન કર્યા વિના મોકલવામાં આવે છે.",
     "outputTitle": "આઉટપુટ ગાર્ડરેલ્સ",
     "outputDescription": "સભ્યોને મળતા પહેલાં Enkrypt AI સાથે પ્રતિસાદ સ્કેન કરે છે. તમે તેને ચાલુ ન કરો ત્યાં સુધી બંધ.",
+    "outputUnavailable": "Kilo એ આ સંસ્થા માટે આઉટપુટ સ્કેનિંગ સક્ષમ કર્યું નથી, તેથી પ્રતિસાદ ચકાસવામાં આવતા નથી અને અહીં સેટ કરવા માટે કંઈ નથી. તેની વિનંતી કરવા {{supportEmail}} નો સંપર્ક કરો.",
     "detectorsHint": "બ્લોક ફ્લેગ કરેલી વિનંતીને અસ્વીકારે છે. ફક્ત લોગ તેને વિનંતીમાં વિલંબ કર્યા વિના નોંધે છે.",
     "detectorsHintOutput": "બ્લોક ફ્લેગ કરેલા પ્રતિસાદને નિષ્ફળ કરે છે. ફક્ત લોગ તેને પ્રતિસાદમાં વિલંબ કર્યા વિના નોંધે છે.",
     "choiceLog": "ફક્ત લોગ",
     "applyTo": "લાગુ કરો",
     "applyToAllMembers": "બધા સભ્યો",
     "applyKiloDefault": "Kilo ડિફોલ્ટ લાગુ કરો",
+    "applyKiloDefaultEnglishNote": "Kilo ના ડિફોલ્ટ નીતિનો ટેક્સ્ટ અંગ્રેજીમાં છે, કારણ કે Kilo Gateway તેને લખ્યા મુજબ જ લાગુ કરે છે.",
+    "applyKiloDefaultReplaceMessage": "Kilo ની ડિફોલ્ટ નીતિ અંગ્રેજીમાં લખાયેલી છે અને નીતિ ઉલ્લંઘનમાં તમે સેટ કરેલું બદલે છે. નીતિ ટેક્સ્ટ ફીલ્ડમાં તમે દાખલ કરેલો ટેક્સ્ટ પુનઃપ્રાપ્ત કરી શકાશે નહીં.",
     "invalidSavedTitle": "સાચવેલા ઇનપુટ ડિટેક્ટર સેટિંગ્સ વાંચી શકાતા નથી",
     "invalidSavedBody": "ઇનપુટ ડિટેક્ટર્સ ફરી સાચવાય ત્યાં સુધી વિનંતીઓ બ્લોક થાય છે. નીચેના ડિટેક્ટર્સ Kilo ડિફોલ્ટથી શરૂ થાય છે.",
     "invalidSavedOutputTitle": "સાચવેલા આઉટપુટ ડિટેક્ટર સેટિંગ્સ વાંચી શકાતા નથી",

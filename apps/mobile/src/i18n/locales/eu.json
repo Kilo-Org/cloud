@@ -185,29 +185,30 @@
     "privateRepositoryA11y": "{{name}}, biltegi pribatua",
     "legalDocumentEnglishOnly": "Dokumentu hau ingelesez bakarrik dago eskuragarri.",
     "organizationTrialEndedBilling": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Fakturazioa egunera dezakezu, eta gero berriro saiatu.",
+    "organizationTrialEndedBillingAtKiloAi": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Fakturazioa kilo.ai-n egunera dezakezu, eta gero berriro saiatu.",
     "viewOnGitHub": "Ikusi PR-a GitHub-en",
     "markdownA11y": {
-      "list": {
-        "bulletPoint": "Buleta",
-        "nestedBulletPoint": "Buleta habiaratua",
-        "orderedItem": "Zerrendako elementua {n}",
-        "nestedOrderedItem": "Zerrendako elementu habiaratua {n}"
-      },
-      "blockquote": {
-        "quote": "Aipua",
-        "nestedQuote": "Aipu habiaratua"
-      },
-      "table": {
-        "row": "Lerroa {n}: {content}"
-      },
-      "math": {
-        "equation": "Matematika: {latex}"
-      },
-      "rotor": {
-        "headings": "Izenburuak",
-        "links": "Estekak",
-        "images": "Irudiak"
-      }
+    "list": {
+      "bulletPoint": "Buleta",
+      "nestedBulletPoint": "Buleta habiaratua",
+      "orderedItem": "Zerrendako elementua {n}",
+      "nestedOrderedItem": "Zerrendako elementu habiaratua {n}"
+    },
+    "blockquote": {
+      "quote": "Aipua",
+      "nestedQuote": "Aipu habiaratua"
+    },
+    "table": {
+      "row": "Lerroa {n}: {content}"
+    },
+    "math": {
+      "equation": "Matematika: {latex}"
+    },
+    "rotor": {
+      "headings": "Izenburuak",
+      "links": "Estekak",
+      "images": "Irudiak"
+    }
     }
   },
   "language": {
@@ -1418,7 +1419,6 @@
     "followReviewMd": "Bete REVIEW.md fitxategiko jarraibideak",
     "followReviewMdSubtitle": "Bete biltegi bakoitzeko REVIEW.md fitxategiko jarraibideak",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ez dago konektatuta. Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik konekta dezakete.",
       "notConnectedReadOnlyPlan": "Erakundearen probaldia amaitu da, beraz jabe batek fakturazioa eguneratu behar du kilo.ai-n."
     },
     "bitbucketConnect": {
@@ -1428,7 +1428,7 @@
       "managedOnWebRepositories": "Aukeratu {{organization}}-ren biltegiak webean, ordenagailu batetik.",
       "description": "Sortu lan-eremurako sarbide-token bat {{organization}}-rako eta itsatsi behean.",
       "descriptionReconnect": "Sortu lan-eremurako sarbide-token berri bat {{organization}}-rako eta itsatsi behean.",
-      "descriptionOverview": "Sortu lan-eremurako sarbide-token bat {{organization}}-rako eta itsatsi hurrengo pantailan.",
+      "descriptionOverview": "Sortu lan-eremurako sarbide-token bat eta itsatsi hurrengo pantailan.",
       "scopes": "Kontua: irakurtzea · Biltegiak: irakurtzea/idaztea · Bateratze-eskaerak: irakurtzea · Webhook-ak: irakurtzea/idaztea",
       "tokenPlaceholder": "Lan-eremurako sarbide-tokena",
       "tokenRefused": "Bitbucketek ez du lan-eremurako sarbide-token hau onartu. Egiaztatu goiko baimenak dituela, eta saiatu berriro."
@@ -4881,12 +4881,15 @@
     "inputDescription": "Sarrera guztiak Enkrypt AI-rekin eskaneatzen ditu, tresnen emaitzak barne. Enkrypt erabilgarri ez dagoenean, eskaerak eskaneatu gabe bidaltzen dira, baztertu beharrean.",
     "outputTitle": "Irteerako babes-mugak",
     "outputDescription": "Erantzunak Enkrypt AI-rekin eskaneatzen ditu kideek jaso aurretik. Desaktibatuta dago zuk aktibatu arte.",
+    "outputUnavailable": "Kilok ez du erakunde honetarako irteera eskaneatzea gaitu, beraz erantzunak ez dira egiaztatzen eta hemen ez dago ezer ezartzeko. Horren eskaera egiteko, jarri harremanetan {{supportEmail}}-rekin.",
     "detectorsHint": "Blokeatu aukerak markatutako eskaera baztertzen du. Erregistratu soilik aukerak erregistratu egiten du, eskaera atzeratu gabe.",
     "detectorsHintOutput": "Blokeatu aukerarekin, markatutako erantzunak huts egiten du. Erregistratu soilik aukerak erregistratu egiten du, erantzuna atzeratu gabe.",
     "choiceLog": "Erregistratu soilik",
     "applyTo": "Aplikatu hauei",
     "applyToAllMembers": "Kide guztiak",
     "applyKiloDefault": "Aplikatu Kiloren balio lehenetsiak",
+    "applyKiloDefaultEnglishNote": "Kiloren politika lehenetsiaren testua ingelesez dago, Kilo Gateway-k idatzita dagoen bezala aplikatzen duelako.",
+    "applyKiloDefaultReplaceMessage": "Kiloren politika lehenetsia ingelesez dago idatzita eta Politika-urraketa atalean ezarri duzuna ordezkatzen du. Politikaren testu-eremuan idatzi duzun testua ezin da berreskuratu.",
     "invalidSavedTitle": "Ezin dira irakurri gordetako sarrera-detektatzaileen ezarpenak",
     "invalidSavedBody": "Eskaerak blokeatuta daude sarrera-detektatzaileak berriro gorde arte. Beheko detektatzaileak Kiloren balio lehenetsietatik abiatzen dira.",
     "invalidSavedOutputTitle": "Ezin dira irakurri gordetako irteera-detektatzaileen ezarpenak",

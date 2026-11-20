@@ -118,7 +118,7 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
       deniedDescription = t('integrations.managedByOwner');
     } else if (integrationId === null) {
       title = t('common.connectBitbucket');
-      const roleDenial = t('codeReviewer.bitbucket.notConnectedReadOnly');
+      const roleDenial = t('prReview.connect.adminOnlyConnectDescription');
       // The same organization's lapsed plan refuses every organization change,
       // so a member must not read the role as the only blocker: the plan line
       // under the role names the owner and the billing step that unblocks it.

@@ -185,29 +185,30 @@
     "privateRepositoryA11y": "{{name}}, yksityinen tietovarasto",
     "legalDocumentEnglishOnly": "Tämä asiakirja on saatavilla vain englanniksi.",
     "organizationTrialEndedBilling": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Voit päivittää laskutuksen ja yrittää sitten uudelleen.",
+    "organizationTrialEndedBillingAtKiloAi": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Voit päivittää laskutuksen osoitteessa kilo.ai ja yrittää sitten uudelleen.",
     "viewOnGitHub": "Katso PR GitHubissa",
     "markdownA11y": {
-      "list": {
-        "bulletPoint": "Luettelomerkki",
-        "nestedBulletPoint": "Sisennetty luettelomerkki",
-        "orderedItem": "Luettelon kohta {n}",
-        "nestedOrderedItem": "Sisennetty luettelon kohta {n}"
-      },
-      "blockquote": {
-        "quote": "Lainaus",
-        "nestedQuote": "Sisennetty lainaus"
-      },
-      "table": {
-        "row": "Rivi {n}: {content}"
-      },
-      "math": {
-        "equation": "Matematiikka: {latex}"
-      },
-      "rotor": {
-        "headings": "Otsikot",
-        "links": "Linkit",
-        "images": "Kuvat"
-      }
+    "list": {
+      "bulletPoint": "Luettelomerkki",
+      "nestedBulletPoint": "Sisennetty luettelomerkki",
+      "orderedItem": "Luettelon kohta {n}",
+      "nestedOrderedItem": "Sisennetty luettelon kohta {n}"
+    },
+    "blockquote": {
+      "quote": "Lainaus",
+      "nestedQuote": "Sisennetty lainaus"
+    },
+    "table": {
+      "row": "Rivi {n}: {content}"
+    },
+    "math": {
+      "equation": "Matematiikka: {latex}"
+    },
+    "rotor": {
+      "headings": "Otsikot",
+      "links": "Linkit",
+      "images": "Kuvat"
+    }
     }
   },
   "language": {
@@ -1418,7 +1419,6 @@
     "followReviewMd": "Noudata REVIEW.md-ohjeita",
     "followReviewMdSubtitle": "Noudata koodivarastokohtaisia REVIEW.md-ohjeita",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucketia ei ole yhdistetty. Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat yhdistää sen.",
       "notConnectedReadOnlyPlan": "Organisaation kokeilujakso on päättynyt, joten omistajan on päivitettävä laskutus osoitteessa kilo.ai."
     },
     "bitbucketConnect": {
@@ -1428,7 +1428,7 @@
       "managedOnWebRepositories": "Valitse {{organization}}-organisaation repositoriot verkossa tietokoneella.",
       "description": "Luo työtilan käyttöoikeustunnus {{organization}}-organisaatiolle ja liitä se alla olevaan kenttään.",
       "descriptionReconnect": "Luo uusi työtilan käyttöoikeustunnus {{organization}}-organisaatiolle ja liitä se alla olevaan kenttään.",
-      "descriptionOverview": "Luo työtilan käyttöoikeustunnus {{organization}}-organisaatiolle ja liitä se seuraavalla näytöllä.",
+      "descriptionOverview": "Luo työtilan käyttöoikeustunnus ja liitä se seuraavalla näytöllä.",
       "scopes": "Tili: luku · Koodivarastot: luku/kirjoitus · Muutospyynnöt: luku · Webhookit: luku/kirjoitus",
       "tokenPlaceholder": "Työtilan käyttöoikeustunnus",
       "tokenRefused": "Bitbucket ei hyväksynyt tätä työtilan käyttöoikeustunnusta. Tarkista, että siinä on yllä olevat oikeudet, ja yritä sitten uudelleen."
@@ -4881,12 +4881,15 @@
     "inputDescription": "Tarkistaa jokaisen syötteen Enkrypt AI:lla, myös työkalujen tulokset. Kun Enkrypt ei ole käytettävissä, pyynnöt lähetetään tarkistamatta sen sijaan, että ne hylättäisiin.",
     "outputTitle": "Tulosteen suojakaiteet",
     "outputDescription": "Tarkistaa vastaukset Enkrypt AI:lla ennen kuin jäsenet saavat ne. Ei käytössä, ellet ota sitä käyttöön.",
+    "outputUnavailable": "Kilo ei ole ottanut tulosteen skannausta käyttöön tälle organisaatiolle, joten vastauksia ei tarkisteta eikä täällä ole mitään asetettavaa. Voit pyytää sitä ottamalla yhteyttä osoitteeseen {{supportEmail}}.",
     "detectorsHint": "Estä hylkää merkityn pyynnön. Vain kirjaus tallentaa sen viivästyttämättä pyyntöä.",
     "detectorsHintOutput": "Estä hylkää merkityn vastauksen. Vain kirjaus tallentaa sen viivästyttämättä vastausta.",
     "choiceLog": "Vain kirjaus",
     "applyTo": "Koskee",
     "applyToAllMembers": "Kaikki jäsenet",
     "applyKiloDefault": "Käytä Kilo-oletusta",
+    "applyKiloDefaultEnglishNote": "Kilon oletuskäytännön teksti on englanniksi, koska Kilo Gateway soveltaa sitä täsmälleen sellaisena kuin se on kirjoitettu.",
+    "applyKiloDefaultReplaceMessage": "Kilon oletuskäytäntö on kirjoitettu englanniksi ja korvaa sen, mitä asetit kohtaan Käytäntörikkomus. Käytäntötekstin kenttään syöttämääsi tekstiä ei voi palauttaa.",
     "invalidSavedTitle": "Tallennettuja syötetunnistimien asetuksia ei voi lukea",
     "invalidSavedBody": "Pyynnöt estetään, kunnes syötetunnistimet tallennetaan uudelleen. Alla olevat tunnistimet perustuvat Kilo-oletukseen.",
     "invalidSavedOutputTitle": "Tallennettuja tulostetunnistimien asetuksia ei voi lukea",

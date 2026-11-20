@@ -98,7 +98,7 @@ const inspectableTab = (id: number, title: string, url: string): BrowserTabInfo 
 
 const createFakeTabsApi = (initialTabs: BrowserTabInfo[]) => {
   const tabs = [...initialTabs];
-  const creates: { url?: string }[] = [];
+  const creates: { active?: boolean; url?: string }[] = [];
   const removes: number[] = [];
   const updates: { active: boolean; tabId: number }[] = [];
 
@@ -126,7 +126,7 @@ const createFakeTabsApi = (initialTabs: BrowserTabInfo[]) => {
       }
     },
     update: async (tabId, updateProperties) => {
-      updates.push({ active: updateProperties.active, tabId });
+      updates.push({ active: updateProperties.active === true, tabId });
 
       return tabs.find(tab => tab.id === tabId) ?? {};
     },
@@ -299,7 +299,7 @@ describe('browser-tool-page-actions', () => {
       });
     });
 
-    it('opens a new tab at the requested url', async () => {
+    it('opens a new tab at the requested url without taking the foreground', async () => {
       const tabs = tabsWithOnePage();
 
       const result = await runPageBrowserTool(
@@ -309,7 +309,7 @@ describe('browser-tool-page-actions', () => {
         { tabId: 1, tabsApi: tabs.tabsApi }
       );
 
-      expect(tabs.creates).toStrictEqual([{ url: 'https://new.example.com/' }]);
+      expect(tabs.creates).toStrictEqual([{ active: false, url: 'https://new.example.com/' }]);
       expect(result).toStrictEqual({
         ok: true,
         value: { selected: true, tabId: 99, title: 'New tab', url: 'https://new.example.com/' },

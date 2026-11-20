@@ -189,29 +189,30 @@
     "privateRepositoryA11y": "{{name}}، مستودع خاص",
     "legalDocumentEnglishOnly": "هذا المستند متوفر باللغة الإنجليزية فقط.",
     "organizationTrialEndedBilling": "انتهت الفترة التجريبية للمؤسسة ولم تعد لديها خطة نشطة. يمكنك تحديث الفوترة، ثم المحاولة مرة أخرى.",
+    "organizationTrialEndedBillingAtKiloAi": "انتهت الفترة التجريبية للمؤسسة ولم تعد لديها خطة نشطة. يمكنك تحديث الفوترة على kilo.ai، ثم المحاولة مرة أخرى.",
     "viewOnGitHub": "عرض PR على GitHub",
     "markdownA11y": {
-      "list": {
-        "bulletPoint": "نقطة تعداد",
-        "nestedBulletPoint": "نقطة تعداد متداخلة",
-        "orderedItem": "عنصر قائمة {n}",
-        "nestedOrderedItem": "عنصر قائمة متداخل {n}"
-      },
-      "blockquote": {
-        "quote": "اقتباس",
-        "nestedQuote": "اقتباس متداخل"
-      },
-      "table": {
-        "row": "صف {n}: {content}"
-      },
-      "math": {
-        "equation": "رياضيات: {latex}"
-      },
-      "rotor": {
-        "headings": "العناوين",
-        "links": "الروابط",
-        "images": "الصور"
-      }
+    "list": {
+      "bulletPoint": "نقطة تعداد",
+      "nestedBulletPoint": "نقطة تعداد متداخلة",
+      "orderedItem": "عنصر قائمة {n}",
+      "nestedOrderedItem": "عنصر قائمة متداخل {n}"
+    },
+    "blockquote": {
+      "quote": "اقتباس",
+      "nestedQuote": "اقتباس متداخل"
+    },
+    "table": {
+      "row": "صف {n}: {content}"
+    },
+    "math": {
+      "equation": "رياضيات: {latex}"
+    },
+    "rotor": {
+      "headings": "العناوين",
+      "links": "الروابط",
+      "images": "الصور"
+    }
     }
   },
   "language": {
@@ -726,7 +727,6 @@
     },
     "autoReviews": "مراجعات تلقائية",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket غير متصل. يمكن لمالكي المؤسسة والمشرفين ومديري الفوترة فقط ربطه.",
       "notConnectedReadOnlyPlan": "انتهت الفترة التجريبية للمؤسسة، لذا يجب على المالك تحديث الفوترة على ⁨kilo.ai⁩."
     },
     "bitbucketConnect": {
@@ -736,7 +736,7 @@
       "managedOnWebRepositories": "اختر المستودعات الخاصة بالمؤسسة {{organization}} عبر الويب من جهاز كمبيوتر.",
       "description": "أنشئ رمز وصول لمساحة العمل للمؤسسة {{organization}} ثم الصقه أدناه.",
       "descriptionReconnect": "أنشئ رمز وصول جديدًا لمساحة العمل للمؤسسة {{organization}} ثم الصقه أدناه.",
-      "descriptionOverview": "أنشئ رمز وصول لمساحة العمل للمؤسسة {{organization}} ثم الصقه في الشاشة التالية.",
+      "descriptionOverview": "أنشئ رمز وصول لمساحة العمل ثم الصقه في الشاشة التالية.",
       "scopes": "الصلاحيات المطلوبة: الحساب: قراءة · المستودعات: قراءة/كتابة · طلبات السحب: قراءة · خطافات الويب: قراءة/كتابة.",
       "tokenPlaceholder": "رمز وصول مساحة العمل",
       "tokenRefused": "لم يقبل Bitbucket رمز وصول مساحة العمل هذا. تحقق من أنه يتضمن الصلاحيات المذكورة أعلاه، ثم أعد المحاولة."
@@ -5197,12 +5197,15 @@
     "inputDescription": "يفحص كل المدخلات باستخدام Enkrypt AI، بما فيها نتائج الأدوات. عندما تكون Enkrypt غير متاحة، تُرسَل الطلبات دون فحص بدلًا من رفضها.",
     "outputTitle": "ضوابط حماية المخرجات",
     "outputDescription": "يفحص الردود باستخدام Enkrypt AI قبل أن يتلقاها الأعضاء. يبقى معطّلًا ما لم تفعّله.",
+    "outputUnavailable": "لم تفعّل Kilo فحص المخرجات لهذه المؤسسة، لذا لا تُفحص الردود ولا يوجد شيء يمكن ضبطه هنا. تواصل مع {{supportEmail}} لطلب ذلك.",
     "detectorsHint": "يرفض خيار «حظر» الطلب المُبلَّغ عنه. أما «تسجيل فقط» فيسجّله دون تأخير الطلب.",
     "detectorsHintOutput": "يُفشل خيار «حظر» الرد المُبلَّغ عنه. أما «تسجيل فقط» فيسجّله دون تأخير الرد.",
     "choiceLog": "تسجيل فقط",
     "applyTo": "تطبيق على",
     "applyToAllMembers": "كل الأعضاء",
     "applyKiloDefault": "تطبيق إعدادات Kilo الافتراضية",
+    "applyKiloDefaultEnglishNote": "نص السياسة الافتراضي من Kilo مكتوب بالإنجليزية، لأن Kilo Gateway يطبقه تمامًا كما هو مكتوب.",
+    "applyKiloDefaultReplaceMessage": "سياسة Kilo الافتراضية مكتوبة بالإنجليزية وتحل محل ما ضبطته في انتهاك السياسة. لا يمكن استعادة النص الذي أدخلته في حقل نص السياسة.",
     "invalidSavedTitle": "تتعذّر قراءة إعدادات كواشف المدخلات المحفوظة",
     "invalidSavedBody": "تُحظر الطلبات إلى أن تُحفظ كواشف المدخلات مجددًا. تبدأ الكواشف أدناه من إعدادات Kilo الافتراضية.",
     "invalidSavedOutputTitle": "تتعذّر قراءة إعدادات كواشف المخرجات المحفوظة",

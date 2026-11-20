@@ -13,6 +13,7 @@ import type {
   ChromeDebuggerEventListener,
   TabDebuggerRequest,
 } from '@/src/shared/tab-debugger';
+import { startDownloadHold } from '@/src/shared/browser-download-hold-host';
 
 /*
  * The WXT `defineBackground` global only exists inside the bundler. Stubbing
@@ -322,7 +323,6 @@ describe('the cached browser runtime', () => {
         closed.push(session);
       },
       drain: () => [],
-      escape: () => undefined,
       handle: () => false,
       navigate: () => undefined,
       needOf: () => undefined,
@@ -356,6 +356,40 @@ describe('the cached browser runtime', () => {
 
     expect(response).toMatchObject({ ok: true, type: DISPOSE_BROWSER_CALLER_MESSAGE });
     expect(closed).toStrictEqual(['session-1']);
+  });
+});
+
+describe('the hold a browser is given', () => {
+  /**
+   * The defect this covers: the request handler was handed a hold unconditionally, and `downloadTierOf` reads
+   * `hasHold: downloadHold !== undefined`. A browser whose `chrome.downloads` has no `onDeterminingFilename` — Firefox —
+   * was therefore given the hold tier, where nothing was ever registered, and `legacy` — the cancel-after-start guard
+   * the extension keeps there — was unreachable from the agent bridge.
+   */
+  it('gives a browser without the event no hold, so the legacy guard is the one that arms', () => {
+    const downloads = { cancel: async () => undefined };
+
+    // A Firefox extension: its own origin is `moz-extension://`, and its downloads API has no hold event at all.
+    expect(
+      startDownloadHold({
+        downloads: () => downloads,
+        extensionOrigin: () => 'moz-extension://kilo-test-extension-id/',
+        sessionStorage: () => undefined,
+      })
+    ).toBeUndefined();
+
+    // Chrome keeps the hold, whether or not the optional permission has been granted yet: the grant is what makes the
+    // Event exist there, and the listener is installed again from `permissions.onAdded` when it arrives.
+    expect(
+      startDownloadHold({
+        downloads: () => ({
+          cancel: async () => undefined,
+          onDeterminingFilename: { addListener: () => undefined },
+        }),
+        extensionOrigin: () => 'chrome-extension://kilo-test-extension-id/',
+        sessionStorage: () => undefined,
+      })
+    ).toBeDefined();
   });
 });
 

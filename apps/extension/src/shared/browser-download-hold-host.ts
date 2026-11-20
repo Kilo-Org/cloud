@@ -251,7 +251,6 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
         url: report.url,
       }));
     },
-    escape: hold.escape,
     handle: decide,
     navigate: navigation => {
       hold.navigate(navigation);

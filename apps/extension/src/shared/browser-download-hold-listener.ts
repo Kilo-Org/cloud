@@ -61,8 +61,15 @@ export const installDownloadHoldListener = ({
     return false;
   }
 
+  try {
+    event.addListener((item, suggest) => handle(item, suggest));
+  } catch {
+    // A registration that threw installed nothing: the flag stays clear, so the grant edge can try again rather than
+    // Leaving the profile unguarded for the rest of the worker's life.
+    return false;
+  }
+
   registered = true;
-  event.addListener((item, suggest) => handle(item, suggest));
 
   return true;
 };

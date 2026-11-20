@@ -67,6 +67,7 @@ interface FakeDownloads {
   readonly listenerCount: () => number;
   readonly order: string[];
   readonly refuseCancel: () => void;
+  readonly refuseRegistrationOnce: () => void;
   readonly run: (item: DownloadHoldItem) => EmissionAnswer;
   readonly searchThrows: () => void;
   readonly states: Map<number, string>;
@@ -82,6 +83,7 @@ const makeDownloads = (): FakeDownloads => {
   const listeners: Listener[] = [];
   const grantListeners: ((added: { readonly permissions?: string[] }) => void)[] = [];
   let cancelRefused = false;
+  let registrationRefused = false;
   let searchThrows = false;
 
   const api = {
@@ -102,6 +104,12 @@ const makeDownloads = (): FakeDownloads => {
     },
     onDeterminingFilename: {
       addListener: (listener: Listener): void => {
+        // The browser can refuse the registration itself: a throwing `addListener` installs nothing.
+        if (registrationRefused) {
+          registrationRefused = false;
+          throw new Error('the browser refused the registration');
+        }
+
         listeners.push(listener);
       },
     },
@@ -141,6 +149,9 @@ const makeDownloads = (): FakeDownloads => {
     order,
     refuseCancel: (): void => {
       cancelRefused = true;
+    },
+    refuseRegistrationOnce: (): void => {
+      registrationRefused = true;
     },
     /** One `onDeterminingFilename` dispatch, and what the listener answered. */
     run: (item: DownloadHoldItem) => {
@@ -274,6 +285,41 @@ afterEach(() => {
 });
 
 describe('the listener', () => {
+  /**
+   * The defect this covers: `registered` was set before `addListener`, so a browser that threw from the registration
+   * left the flag set and no later call ever retried — the `permissions.onAdded` install included — and the profile
+   * stayed unguarded for the rest of the worker's life.
+   */
+  it('retries the registration after one the browser refused', async () => {
+    // The install flag lives in the module, and every other case in this file has already set it, so only a fresh
+    // Copy of the module starts uninstalled. A static import is the one instance the whole file shares, so this case
+    // Cannot use it: it exercises the module-loading boundary itself.
+    vi.resetModules();
+    const { installDownloadHoldOnGrant: installFresh } =
+      await import('./browser-download-hold-listener');
+    const downloads = makeDownloads();
+    let handled = 0;
+
+    downloads.refuseRegistrationOnce();
+    installFresh({
+      downloads: downloads.globals.downloads,
+      handle: () => {
+        handled += 1;
+
+        return false;
+      },
+      permissions: downloads.globals.permissions(),
+    });
+
+    // The refused registration installed nothing, and the grant is what tries again.
+    expect(downloads.listenerCount()).toBe(0);
+    downloads.grant(['downloads']);
+    expect(downloads.listenerCount()).toBe(1);
+
+    downloads.run({ id: 1 });
+    expect(handled).toBe(1);
+  });
+
   it('registers exactly one listener, even after the download grant fires twice', () => {
     const downloads = makeDownloads();
     let handled = 0;

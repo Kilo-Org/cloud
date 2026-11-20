@@ -6458,7 +6458,6 @@ describe('a download call slower than its settle window', () => {
         needs.delete(session);
       },
       drain: () => [],
-      escape: () => {},
       handle: () => false,
       navigate: navigation => {
         navigations.push(navigation);

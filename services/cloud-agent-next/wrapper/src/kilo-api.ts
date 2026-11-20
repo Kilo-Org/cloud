@@ -994,15 +994,20 @@ export function createWrapperKiloClient(
       // without the record's rules; retry within this call, because the step
       // retry above would find the record in place and return before reaching
       // this point again.
-      if (owed !== undefined) await applyRuleset(owed);
+      //
+      // The metadata goes back first. A ruleset that cannot be applied throws,
+      // and the next prepare settles the marker without calling this function
+      // again, so a restore placed after it would never run. This one swallows
+      // its own failure, so moving it first changes no error precedence.
+      //
       // The import body cannot carry metadata: the key is accepted and dropped
       // silently, which leaves the column NULL. Metadata holds the session goal
       // the UI shows, so it is restored from the pre-import read. The update
       // replaces the object wholesale, so the whole value goes back. The
       // record's agent and model are not restored: they are only a mirror, and
-      // every prompt carries its own from the turn payload. The import has
-      // already committed the record and metadata carries no authorization
-      // decision, so a failed restore is skipped rather than failing the route.
+      // every prompt carries its own from the turn payload. Metadata carries no
+      // authorization decision, so a failed restore is skipped rather than
+      // failing a route whose record the import already committed.
       if (record?.metadata !== undefined) {
         try {
           const restoreTimeout = AbortSignal.timeout(8_000);
@@ -1015,6 +1020,7 @@ export function createWrapperKiloClient(
           // The record is committed and this route may proceed without it.
         }
       }
+      if (owed !== undefined) await applyRuleset(owed);
     },
 
     settleOutstandingRuleset: async (sessionId, directory, signal) => {

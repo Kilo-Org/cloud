@@ -796,18 +796,21 @@ keep environment snapshots and existing history/worktree recovery.
   diff, and the record read back returns the patch diff unchanged and each diff entry with its file,
   additions, deletions and status. The import body cannot carry the record's own `metadata`, `agent`,
   `model` or `path`: it accepts those keys and silently drops them, and it clears the stored values.
-  The wrapper restores `metadata` with an update right after the import, because it holds the session
-  goal a user sees. `agent` and `model` stay cleared on purpose: every prompt sends its own agent and
-  model from the route payload, so the stored pair is a mirror that no turn reads. `path` stays
-  cleared because the native server derives it.
+  The wrapper restores `metadata` with an update right after the import and before it applies the
+  ruleset, because it holds the session goal a user sees: a ruleset that cannot be applied throws,
+  and the next prepare settles that obligation without running the create path again, so a restore
+  placed after the apply would never reach the record. `agent` and `model` stay cleared on purpose:
+  every prompt sends its own agent and model from the route payload, so the stored pair is a mirror
+  that no turn reads. `path` stays cleared because the native server derives it.
   The native import also cannot carry a session permission ruleset, so the obligation is remembered
   beside the wrapper's durable state before the import commits the row, and the ruleset is applied
-  right after it. Writing the marker before the import is what makes the guarantee hold: a marker
-  written only after a failed apply would leave a window where the process dies between the import
-  and the write, and the committed record owes rules that nothing remembers. A create path that finds
-  the obligation already remembered does not rewrite it. Every prepare settles a remembered ruleset
-  before the probe and again after a successful history restore; a settle that finds no record leaves
-  the remembered ruleset in place for the create path, which applies it to the record it imports.
+  right after the metadata restore. Writing the marker before the import is what makes the guarantee
+  hold: a marker written only after a failed apply would leave a window where the process dies
+  between the import and the write, and the committed record then owes rules that nothing remembers.
+  A create path that finds the obligation already remembered does not rewrite it. Every prepare
+  settles a remembered ruleset before the probe and again after a successful history restore; a
+  settle that finds no record leaves the remembered ruleset in place for the create path, which
+  applies it to the record it imports.
   The ruleset is cleared only after the apply succeeds, and the apply is skipped when the record
   already holds every rule, because the native update appends rather than replaces; a marker that
   cannot be cleared is therefore not a failure, since the next prepare finds the stored rules and

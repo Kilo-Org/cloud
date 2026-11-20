@@ -1153,10 +1153,36 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
 
       await createClient(stub.url).ensureSession(sessionId, directory);
 
-      // The import cannot carry metadata, so it is restored after the ruleset.
+      // The import cannot carry metadata, so it is restored after the import.
+      // It goes before the ruleset so a refused ruleset cannot drop it: the
+      // next prepare settles that marker without calling ensureSession again.
       expect(stub.imports).toHaveLength(1);
       expect(stub.updates).toEqual([
+        { queryDirectory: directory, body: { metadata } },
         { queryDirectory: directory, body: { permission } },
+      ]);
+    });
+
+    it('still restores the metadata when the ruleset cannot be applied', async () => {
+      const sessionId = 'ses_record_metadata_with_stuck_ruleset';
+      const directory = temporaryDirectory('kilo-api-metadata-stuck-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-metadata-stuck-other-');
+      const metadata = { 'kilo.goal': { text: 'survive a stuck ruleset', updatedAt: 7 } };
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' }];
+      const stub = startEnsureSessionStub(
+        sessionId,
+        { id: sessionId, directory: otherDirectory, metadata, permission },
+        { updateStatus: 503 }
+      );
+
+      const outcome = await createClient(stub.url)
+        .ensureSession(sessionId, directory)
+        .catch(error => error);
+      // The ruleset failure is still the route's failure.
+      expect(outcome).toBeInstanceOf(Error);
+      // The metadata went back before the ruleset attempts, so a later prepare
+      // finds it on the record even though the ruleset still fails.
+      expect(stub.updates.filter(update => update.body.metadata !== undefined)).toEqual([
         { queryDirectory: directory, body: { metadata } },
       ]);
     });

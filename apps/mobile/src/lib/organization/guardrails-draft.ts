@@ -146,9 +146,10 @@ export type GuardrailsDraft = {
 // and not a policy check: `guardrailsIssues` owns the limits (a keyword too
 // long, a rule with no text), so a draft that arrived from another build and
 // breaks a limit still loads and the form reports the reason on Save. Every
-// detector's `enabled` flag and every action a detector chooses are checked; the
-// remaining fields are checked for presence and type only.
-const formDraftActionSchema = z.string();
+// detector's `enabled` flag and every action a detector chooses are checked
+// against the server's own two actions; the remaining fields are checked for
+// presence and type only.
+const formDraftActionSchema = z.enum(['log', 'block']);
 const formDraftToggleDetectorSchema = z.object({ enabled: z.boolean() });
 const formDraftActionDetectorSchema = z.object({
   enabled: z.boolean(),

@@ -73,6 +73,11 @@ const EMPTY_VALUES: OrgModeFormValues = {
 /** The branch of `useFormDraft` a mounted body reads. */
 type ReadyFormDraft<T> = Extract<FormDraftState<T>, { kind: 'ready' }>;
 
+/** A write the stand-in draft holds until the stored one answers. */
+type PendingDraftWrite<T> =
+  | { readonly kind: 'save'; readonly value: T }
+  | { readonly kind: 'clear' };
+
 export type ModeFormProps = Readonly<{
   organizationId: string;
   /** The mode being edited, or undefined to create one. */
@@ -106,15 +111,50 @@ export function ModeForm({ organizationId, mode, existingModes }: ModeFormProps)
   if (draft.kind === 'ready') {
     latestDraftRef.current = draft;
   }
+  // The form can be typed into, and cleared, before the store answers, so the
+  // stand-in buffers those writes and replays them into the real draft; a
+  // stand-in that only forwarded would drop the keystroke's snapshot.
+  const pendingRef = useRef<PendingDraftWrite<OrgModeFormDraft> | null>(null);
   const standbyDraft = useMemo<ReadyFormDraft<OrgModeFormDraft>>(
     () => ({
       kind: 'ready',
       value: null,
-      save: value => latestDraftRef.current?.save(value),
-      clear: () => latestDraftRef.current?.clear(),
+      save: value => {
+        const current = latestDraftRef.current;
+        if (current !== null) {
+          current.save(value);
+          return;
+        }
+        pendingRef.current = { kind: 'save', value };
+      },
+      clear: () => {
+        const current = latestDraftRef.current;
+        if (current !== null) {
+          current.clear();
+          return;
+        }
+        pendingRef.current = { kind: 'clear' };
+      },
     }),
     []
   );
+  // A later save replaces an earlier buffered one, and a buffered clear
+  // discards a buffered save: a clear means the person threw the draft away.
+  useEffect(() => {
+    if (draft.kind !== 'ready') {
+      return;
+    }
+    const pending = pendingRef.current;
+    pendingRef.current = null;
+    if (pending === null) {
+      return;
+    }
+    if (pending.kind === 'clear') {
+      draft.clear();
+    } else {
+      draft.save(pending.value);
+    }
+  }, [draft]);
 
   // A create gated on the draft and an edit does not: a create has nothing to
   // show without it — there is no server record — so it holds its loading state

@@ -680,6 +680,27 @@ describe('GroupForm durable draft', () => {
     unmountOnce();
   });
 
+  it('stores an edit typed before the stored draft answered', async () => {
+    draft.state = { kind: 'loading' };
+    const { renderer, box, unmountOnce } = await mountGatedForm(storedGroup());
+
+    changeName(renderer.root, 'Typed before ready');
+
+    // The stand-in buffers the write instead of dropping it, so nothing has
+    // reached the store yet.
+    expect(draft.save).not.toHaveBeenCalled();
+
+    box.settle(null);
+
+    // The replay hands the buffered snapshot to the real draft once.
+    expect(draft.save).toHaveBeenCalledOnce();
+    expect(draft.save).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Typed before ready' })
+    );
+
+    unmountOnce();
+  });
+
   it('writes the whole form into the draft on every edit', async () => {
     const { unmountOnce } = await mountForm(storedGroup());
 

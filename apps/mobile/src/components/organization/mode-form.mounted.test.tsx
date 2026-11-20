@@ -569,6 +569,27 @@ describe('ModeForm durable draft', () => {
     unmount();
   });
 
+  it('stores an edit typed before the stored draft answered', async () => {
+    draft.state = { kind: 'loading' };
+    const { renderer, box, unmount } = await mountGatedForm(existingModes[0]);
+
+    changeField(renderer.root, nameLabel, 'Typed before ready');
+
+    // The stand-in buffers the write instead of dropping it, so nothing has
+    // reached the store yet.
+    expect(draft.save).not.toHaveBeenCalled();
+
+    box.settle(null);
+
+    // The replay hands the buffered snapshot to the real draft once.
+    expect(draft.save).toHaveBeenCalledOnce();
+    expect(draft.save).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Typed before ready' })
+    );
+
+    unmount();
+  });
+
   it('writes the whole form into the draft on every edit', async () => {
     const { renderer, unmount } = await mountGatedForm(undefined);
 

@@ -506,6 +506,22 @@ describe('ModelAccessForm durable draft', () => {
     });
   });
 
+  it('keeps a restored provider list when the catalog arrives afterwards', () => {
+    // The store answers before the catalog does: the draft restores onto the
+    // provisional rows, and the catalog's arrival must not overwrite it with
+    // the saved list.
+    draftStore.kind = 'ready';
+    draftStore.value = { providerAllowList: ['openai'], modelDenyList: [] };
+    render(['anthropic'], { catalogUnavailable: true });
+
+    const root = renderWithCatalog(['anthropic']);
+    selectTab(root, 'providers');
+    const providers = list(root, 'ProviderAllowList');
+
+    expect(providers.props.providers).toEqual(['anthropic', 'openai']);
+    expect((providers.props.draft as ModelAccessDraft).providerAllowList).toEqual(['openai']);
+  });
+
   it('saves the whole draft on every edit', () => {
     draftStore.kind = 'ready';
     draftStore.value = null;

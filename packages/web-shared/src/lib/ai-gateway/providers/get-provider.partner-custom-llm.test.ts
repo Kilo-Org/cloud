@@ -48,6 +48,11 @@ import {
   partnerCustomLlmDefinition,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  hasRecentPartnerUpstreamError,
+  rememberPartnerUpstreamError,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/partner-upstream-error-cache';
+import type * as partnerUpstreamErrorCacheModule from '@kilocode/web-shared/lib/ai-gateway/providers/partner-upstream-error-cache';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   ...jest.requireActual<typeof directByokModule>(
@@ -78,6 +83,13 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
   canRouteToVercel: jest.fn(),
   shouldRouteToVercel: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/partner-upstream-error-cache', () => ({
+  ...jest.requireActual<typeof partnerUpstreamErrorCacheModule>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/partner-upstream-error-cache'
+  ),
+  hasRecentPartnerUpstreamError: jest.fn(),
+  rememberPartnerUpstreamError: jest.fn(),
 }));
 
 const MODEL = 'moonshotai/kimi-k2.6';
@@ -215,6 +227,8 @@ beforeEach(async () => {
   jest.mocked(checkOpenAiChatGptByok).mockReset().mockResolvedValue(null);
   jest.mocked(canRouteToVercel).mockResolvedValue(true);
   jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
+  jest.mocked(hasRecentPartnerUpstreamError).mockReset().mockResolvedValue(false);
+  jest.mocked(rememberPartnerUpstreamError).mockReset();
   jest.spyOn(console, 'debug').mockImplementation(() => {});
   jest.spyOn(console, 'warn').mockImplementation(() => {});
 });
@@ -418,6 +432,68 @@ describe('getProvider skips the partner', () => {
 
     expect(result.routes).toHaveLength(2);
     expect((await result.routes[0]()).provider.type).toBe('partner');
+  });
+
+  test('for a session whose partner upstream failed recently', async () => {
+    await insertPartner();
+    jest.mocked(hasRecentPartnerUpstreamError).mockResolvedValue(true);
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: { model: MODEL, messages: [], prompt_cache_key: 'session-1' },
+    };
+
+    await expectKiloRouteOnly({ request }, 'recent-upstream-error');
+
+    expect(hasRecentPartnerUpstreamError).toHaveBeenCalledWith({
+      userId: user.id,
+      partnerId: MODEL,
+      promptCacheKey: 'session-1',
+    });
+  });
+
+  test('identifies the session by the task id the upstream prompt cache key derives from', async () => {
+    await insertPartner();
+    jest.mocked(hasRecentPartnerUpstreamError).mockResolvedValue(true);
+
+    await expectKiloRouteOnly({ taskId: 'task-1' }, 'recent-upstream-error');
+
+    expect(hasRecentPartnerUpstreamError).toHaveBeenCalledWith({
+      userId: user.id,
+      partnerId: MODEL,
+      promptCacheKey: 'task-1',
+    });
+  });
+
+  test('a request without a prompt cache key never reads the session cache', async () => {
+    await insertPartner();
+    jest.mocked(hasRecentPartnerUpstreamError).mockResolvedValue(true);
+
+    const { result } = await routeAndRecord();
+
+    expect((await result.routes[0]()).provider.type).toBe('partner');
+    expect((await result.routes[0]()).onUpstreamFailure).toBeUndefined();
+    expect(hasRecentPartnerUpstreamError).not.toHaveBeenCalled();
+  });
+
+  test('remembers the session when the partner upstream fails', async () => {
+    await insertPartner();
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: { model: MODEL, messages: [], prompt_cache_key: 'session-1' },
+    };
+
+    const { result } = await routeAndRecord({ request });
+    const partnerRoute = await result.routes[0]();
+    expect(partnerRoute.provider.type).toBe('partner');
+    expect(rememberPartnerUpstreamError).not.toHaveBeenCalled();
+    partnerRoute.onUpstreamFailure?.();
+
+    expect(rememberPartnerUpstreamError).toHaveBeenCalledWith({
+      userId: user.id,
+      partnerId: MODEL,
+      promptCacheKey: 'session-1',
+    });
+    expect((await result.routes[1]()).onUpstreamFailure).toBeUndefined();
   });
 
   test('for a request with a spend ceiling', async () => {

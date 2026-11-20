@@ -2,7 +2,7 @@ import { createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { SaveProfileSheet, type SaveProfileSheetProps } from './save-profile-sheet';
 
@@ -233,8 +233,8 @@ describe('SaveProfileSheet', () => {
 
     // The sheet is the primary channel for a refused save: a toast would paint
     // behind it. Save is live again, so the reader can correct and retry.
-    expect(texts(renderer)).toContain("Couldn't save profile");
-    expect(liveMessage(renderer)).toBe("Couldn't save profile");
+    expect(texts(renderer)).toContain(i18n.t('profiles.saveFailed'));
+    expect(liveMessage(renderer)).toBe(i18n.t('profiles.saveFailed'));
     expect(header(renderer).props.doneDisabled).toBe(false);
   });
 
@@ -258,7 +258,7 @@ describe('SaveProfileSheet', () => {
 
     // The refusal is the body's last block: every field above it keeps its place.
     expect(lastBlock()?.type).toBe(AccessibleStatus);
-    expect(liveMessage(renderer)).toBe("Couldn't save profile");
+    expect(liveMessage(renderer)).toBe(i18n.t('profiles.saveFailed'));
   });
 
   it('closes a sheet with a save in flight without asking to discard', async () => {

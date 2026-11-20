@@ -16,7 +16,7 @@ export const MAX_PROFILE_VARS = ENVIRONMENT_LIMITS.MAX_VARS;
 /**
  * Encrypt a value using the agent env vars public key (base64-encoded).
  */
-function encryptValue(publicKeyBase64: string, value: string): string {
+export function encryptProfileSecret(publicKeyBase64: string, value: string): string {
   if (!publicKeyBase64) {
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
@@ -48,7 +48,7 @@ export async function setVar(
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, owner);
 
-  const storedValue = isSecret ? encryptValue(publicKeyBase64, value) : value;
+  const storedValue = isSecret ? encryptProfileSecret(publicKeyBase64, value) : value;
 
   await db.transaction(async tx => {
     // Lock the owning profile row so the key lookup, the cap check and the

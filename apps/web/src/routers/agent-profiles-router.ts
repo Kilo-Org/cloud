@@ -486,18 +486,29 @@ export const agentProfilesRouter = createTRPCRouter({
   /**
    * Create a new profile.
    *
+   * A caller may create the profile together with its content in one call: the
+   * variables, the setup commands, and the default flag are written in the same
+   * transaction as the profile row, so a rejected payload stores nothing.
+   *
    * The service refuses a create past `MAX_OWNER_PROFILES` with
    * `PRECONDITION_FAILED`, whose sentence the dialog shows as the reason.
    */
   create: baseProcedure
-    .input(ProfileNameSchema.extend({ organizationId: z.uuid().optional() }))
+    .input(
+      ProfileNameSchema.extend({
+        organizationId: z.uuid().optional(),
+        vars: z.array(VarSchema).max(profileVarsService.MAX_PROFILE_VARS).optional(),
+        commands: CommandsSchema.shape.commands.optional(),
+        setAsDefault: z.boolean().optional(),
+      })
+    )
     .output(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
         await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
-      return profileService.createProfile(db, owner, ctx.user.id, input.name, input.description);
+      return profileService.createProfileWithContent(db, publicKey, owner, ctx.user.id, input);
     }),
 
   /**

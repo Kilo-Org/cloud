@@ -4237,7 +4237,7 @@
     "personalDefaultDescription": "Caricato automaticamente quando nessun repository ha un profilo bloccato.",
     "organizationDefaultDescription": "Caricamento automatico per i membri che non hanno impostazioni predefinite personali.",
     "setAsDefault": "Imposta come predefinito",
-    "saveFailed": "Impossibile salvare il profilo",
+    "saveFailed": "Impossibile salvare il profilo, quindi non è stato salvato nulla",
     "organizationRoleRequired": "Solo i proprietari dell'organizzazione e gli amministratori possono modificare il profilo dell'organizzazione.",
     "deleteTitle": "Elimina profilo",
     "deleteMessage": "Ciò rimuove permanentemente il profilo e le sue impostazioni. Questa operazione non può essere annullata.",

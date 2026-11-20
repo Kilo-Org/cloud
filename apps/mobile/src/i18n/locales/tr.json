@@ -4168,7 +4168,7 @@
     "personalDefaultDescription": "Hiçbir deponun sabitlenmiş profili olmadığında otomatik olarak yüklenir.",
     "organizationDefaultDescription": "Kişisel varsayılanı olmayan üyeler için otomatik olarak yüklenir.",
     "setAsDefault": "Varsayılan olarak ayarla",
-    "saveFailed": "Profil kaydedilemedi",
+    "saveFailed": "Profil kaydedilemedi, bu yüzden hiçbir şey kaydedilmedi",
     "organizationRoleRequired": "Kuruluş profillerini yalnızca kuruluş sahipleri ve yöneticiler değiştirebilir.",
     "deleteTitle": "Profili sil",
     "deleteMessage": "Bu, profili ve ayarlarını kalıcı olarak kaldırır. Bu geri alınamaz.",

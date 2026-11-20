@@ -4260,7 +4260,7 @@
     "personalDefaultDescription": "Auto-loaded when no repository has a pinned profile.",
     "organizationDefaultDescription": "Auto-loaded for members who have no personal default.",
     "setAsDefault": "Set as default",
-    "saveFailed": "Couldn't save profile",
+    "saveFailed": "Couldn't save the profile, so nothing was saved",
     "organizationRoleRequired": "Only organization owners and admins can change organization profiles.",
     "deleteTitle": "Delete profile",
     "deleteMessage": "This permanently removes the profile and its settings. This cannot be undone.",

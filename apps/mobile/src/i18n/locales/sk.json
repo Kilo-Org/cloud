@@ -4306,7 +4306,7 @@
     "personalDefaultDescription": "Automaticky načítané, keď žiadne úložisko nemá pripnutý profil.",
     "organizationDefaultDescription": "Automaticky načítané pre členov, ktorí nemajú žiadne osobné predvolené nastavenia.",
     "setAsDefault": "Nastaviť ako predvolené",
-    "saveFailed": "Profil sa nepodarilo uložiť",
+    "saveFailed": "Profil sa nepodarilo uložiť, takže sa nič neuložilo",
     "organizationRoleRequired": "Profil organizácie môžu zmeniť iba vlastníci organizácie a správcovia.",
     "deleteTitle": "Odstrániť profil",
     "deleteMessage": "Tým sa natrvalo odstráni profil a jeho nastavenia. Toto sa nedá vrátiť späť.",

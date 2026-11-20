@@ -39,9 +39,10 @@ export type SaveProfileSheetProps = Readonly<{
   setupCommands: readonly string[];
   onClose: () => void;
   /**
-   * Persist the profile. The caller owns create/setVar/setCommands/
-   * setAsDefault and returns `true` on success (the sheet closes) or `false`
-   * on failure (the sheet stays open with the entered values).
+   * Persist the profile. The caller owns the write, which now carries the
+   * vars, the setup commands and the default flag in the one create, so a
+   * refusal stores nothing. Returns `true` on success (the sheet closes) or
+   * `false` on failure (the sheet stays open with the entered values).
    */
   onSave: (submission: SaveProfileSubmission) => Promise<boolean>;
 }>;

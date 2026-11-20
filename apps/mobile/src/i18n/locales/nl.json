@@ -4168,7 +4168,7 @@
     "personalDefaultDescription": "Automatisch geladen wanneer geen enkele repository een vastgezet profiel heeft.",
     "organizationDefaultDescription": "Automatisch geladen voor leden die geen persoonlijke standaard hebben.",
     "setAsDefault": "Als standaard instellen",
-    "saveFailed": "Kan profiel niet opslaan",
+    "saveFailed": "Kan profiel niet opslaan, dus er is niets opgeslagen",
     "organizationRoleRequired": "Alleen organisatie-eigenaren en beheerders kunnen organisatieprofielen wijzigen.",
     "deleteTitle": "Profiel verwijderen",
     "deleteMessage": "Hierdoor worden het profiel en de instellingen ervan permanent verwijderd. Dit kan niet ongedaan worden gemaakt.",

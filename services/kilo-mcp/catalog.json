@@ -581,6 +581,43 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "vars": {
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "value": {
+                "type": "string",
+                "maxLength": 10000
+              },
+              "isSecret": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "key",
+              "value",
+              "isSecret"
+            ]
+          }
+        },
+        "commands": {
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "setAsDefault": {
+          "type": "boolean"
         }
       },
       "required": [
@@ -592,9 +629,12 @@
       "create",
       "name",
       "description",
-      "organizationid"
+      "organizationid",
+      "vars",
+      "commands",
+      "setasdefault"
     ],
-    "searchBlob": "agentProfiles.create Create a new agent profile with a name and optional description, owned by the current user or an organization. agentprofiles create name description organizationid name description organizationId"
+    "searchBlob": "agentProfiles.create Create a new agent profile with a name and optional description, owned by the current user or an organization. agentprofiles create name description organizationid vars commands setasdefault name description organizationId vars commands setAsDefault"
   },
   "agentProfiles.createAgent": {
     "path": "agentProfiles.createAgent",

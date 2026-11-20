@@ -54,20 +54,30 @@ export { buildOwnershipCondition, verifyProfileOwnership } from './profile-utils
 export { MAX_OWNER_PROFILES } from './contracts/profiles';
 export {
   createProfile,
+  insertProfileRow,
   updateProfile,
   deleteProfile,
   listProfiles,
   getProfile,
   getProfileOverview,
   setDefaultProfile,
+  applyDefaultProfile,
   clearDefaultProfile,
   getDefaultProfile,
   getEffectiveDefaultProfileId,
 } from './profile-service';
 
+// Composite profile creation (profile + vars + commands + default in one transaction)
+export {
+  createProfileWithContent,
+  type ProfileCreateInput,
+  type ProfileCreateVar,
+} from './profile-create-service';
+
 // Var CRUD
 export {
   MAX_PROFILE_VARS,
+  encryptProfileSecret,
   setVar,
   deleteVar,
   listVars,

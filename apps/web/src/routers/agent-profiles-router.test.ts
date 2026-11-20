@@ -16,11 +16,13 @@ import {
 import { eq } from 'drizzle-orm';
 import {
   bindProfileToRepo,
+  createProfileWithContent,
   MASKED_SECRET_VALUE,
   MAX_OWNER_PROFILES,
   MAX_PROFILE_KILO_COMMANDS,
   MAX_PROFILE_VARS,
 } from '@kilocode/cloud-agent-profile';
+import { AGENT_ENV_VARS_PUBLIC_KEY } from '@kilocode/web-shared/lib/config.server';
 import type { User, Organization } from '@kilocode/db/schema';
 import type { PoolClient } from 'pg';
 
@@ -204,6 +206,160 @@ describe('Agent Profiles Router', () => {
 
         expect(dbProfile.owned_by_user_id).toBe(memberUser.id);
         expect(dbProfile.owned_by_organization_id).toBeNull();
+      });
+
+      /**
+       * Creating a profile together with its content is one transaction: the
+       * vars, the commands and the default flag land with the profile row, or
+       * a rejected payload leaves nothing behind.
+       */
+      describe('with content', () => {
+        /** Every var row held by any profile this owner has. */
+        async function countOwnerVars(userId: string): Promise<number> {
+          const rows = await db
+            .select({ id: agent_environment_profile_vars.id })
+            .from(agent_environment_profile_vars)
+            .innerJoin(
+              agent_environment_profiles,
+              eq(agent_environment_profile_vars.profile_id, agent_environment_profiles.id)
+            )
+            .where(eq(agent_environment_profiles.owned_by_user_id, userId));
+          return rows.length;
+        }
+
+        test('stores vars, commands and the default flag in one create', async () => {
+          const caller = await createCallerForUser(ownerUser.id);
+
+          const { id } = await caller.agentProfiles.create({
+            name: 'Composite Profile',
+            vars: [
+              { key: 'PLAIN_VAR', value: 'plain-value', isSecret: false },
+              { key: 'SECRET_VAR', value: 'the-plaintext', isSecret: true },
+            ],
+            commands: ['npm ci', 'npm run build'],
+            setAsDefault: true,
+          });
+
+          const profile = await caller.agentProfiles.get({ profileId: id });
+          expect(profile.vars.map(variable => variable.key)).toEqual(['PLAIN_VAR', 'SECRET_VAR']);
+          expect(profile.vars.find(variable => variable.key === 'PLAIN_VAR')?.value).toBe(
+            'plain-value'
+          );
+          expect(profile.vars.find(variable => variable.key === 'SECRET_VAR')?.value).toBe('***');
+          expect(profile.commands.map(row => row.command)).toEqual(['npm ci', 'npm run build']);
+          expect(profile.isDefault).toBe(true);
+
+          const storedSecret = await db
+            .select({
+              value: agent_environment_profile_vars.value,
+              isSecret: agent_environment_profile_vars.is_secret,
+            })
+            .from(agent_environment_profile_vars)
+            .where(eq(agent_environment_profile_vars.profile_id, id));
+          const secretRow = storedSecret.find(row => row.isSecret);
+          expect(secretRow).toBeDefined();
+          expect(secretRow?.value).not.toBe('the-plaintext');
+          expect(() => JSON.parse(secretRow?.value ?? '')).not.toThrow();
+          expect(JSON.parse(secretRow?.value ?? '{}')).toMatchObject({
+            algorithm: expect.any(String),
+            encryptedData: expect.any(String),
+            encryptedDEK: expect.any(String),
+          });
+        });
+
+        test('leaves no profile when a var key is invalid or duplicated', async () => {
+          const caller = await createCallerForUser(ownerUser.id);
+          const varsBefore = await countOwnerVars(ownerUser.id);
+
+          await expect(
+            caller.agentProfiles.create({
+              name: 'Invalid Key Profile',
+              vars: [
+                { key: 'GOOD_KEY', value: 'value', isSecret: false },
+                { key: 'bad-key', value: 'value', isSecret: false },
+              ],
+            })
+          ).rejects.toThrow('Invalid environment variable key');
+
+          await expect(
+            caller.agentProfiles.create({
+              name: 'Duplicate Key Profile',
+              vars: [
+                { key: 'SAME_KEY', value: 'first', isSecret: false },
+                { key: 'SAME_KEY', value: 'second', isSecret: true },
+              ],
+            })
+          ).rejects.toMatchObject({
+            code: 'BAD_REQUEST',
+            message: 'Duplicate environment variable key',
+          });
+
+          const listed = await caller.agentProfiles.list({});
+          expect(listed.some(profile => profile.name === 'Invalid Key Profile')).toBe(false);
+          expect(listed.some(profile => profile.name === 'Duplicate Key Profile')).toBe(false);
+          expect(await countOwnerVars(ownerUser.id)).toBe(varsBefore);
+        });
+
+        test('leaves the previous default intact when a var write fails', async () => {
+          const caller = await createCallerForUser(ownerUser.id);
+
+          const { id: previousDefaultId } = await caller.agentProfiles.create({
+            name: 'Previous Default',
+            setAsDefault: true,
+          });
+
+          // A secret with no configured public key throws after the profile row
+          // is inserted, so only the transaction rollback can keep the old state.
+          await expect(
+            createProfileWithContent(db, '', { type: 'user', id: ownerUser.id }, ownerUser.id, {
+              name: 'Broken Default',
+              vars: [{ key: 'SECRET_VAR', value: 'the-plaintext', isSecret: true }],
+              setAsDefault: true,
+            })
+          ).rejects.toThrow('Agent environment encryption key not configured');
+
+          const previousDefault = await caller.agentProfiles.get({
+            profileId: previousDefaultId,
+          });
+          expect(previousDefault.isDefault).toBe(true);
+
+          const listed = await caller.agentProfiles.list({});
+          expect(listed.some(profile => profile.name === 'Broken Default')).toBe(false);
+        });
+
+        test('refuses an over-cap var list without storing a profile', async () => {
+          const caller = await createCallerForUser(ownerUser.id);
+          const varsBefore = await countOwnerVars(ownerUser.id);
+          const overCapVars = Array.from({ length: MAX_PROFILE_VARS + 1 }, (_, index) => ({
+            key: `VAR_${String(index)}`,
+            value: 'value',
+            isSecret: false,
+          }));
+
+          // The routing schema bounds the payload, so a list this long never
+          // reaches the service through the procedure.
+          await expect(
+            caller.agentProfiles.create({ name: 'Over Cap Profile', vars: overCapVars })
+          ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+          // The service holds the same cap for callers that bypass the schema.
+          await expect(
+            createProfileWithContent(
+              db,
+              AGENT_ENV_VARS_PUBLIC_KEY,
+              { type: 'user', id: ownerUser.id },
+              ownerUser.id,
+              { name: 'Over Cap Profile', vars: overCapVars }
+            )
+          ).rejects.toMatchObject({
+            code: 'PRECONDITION_FAILED',
+            message: `Profiles are limited to ${String(MAX_PROFILE_VARS)} variables`,
+          });
+
+          const listed = await caller.agentProfiles.list({});
+          expect(listed.some(profile => profile.name === 'Over Cap Profile')).toBe(false);
+          expect(await countOwnerVars(ownerUser.id)).toBe(varsBefore);
+        });
       });
     });
 

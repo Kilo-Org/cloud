@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- one mounted case per panel state: both manual editors, the save flow, and the retryable save failure */
+/* eslint-disable max-lines -- one mounted case per panel state: both manual editors, the one atomic save, the refusal that must leave the draft intact, and the retry that must reissue the same payload */
 import { createElement, type ReactNode, useState } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -87,20 +87,14 @@ const BACKEND: ProfileSelectorProfile = {
   ownerType: 'user',
 };
 
+// The panel's save is one atomic `create`, so there is no other mutation to
+// stub: a save that needed a follow-up write would throw here.
 type Mutations = {
   create: { mutateAsync: ReturnType<typeof vi.fn> };
-  setVar: { mutateAsync: ReturnType<typeof vi.fn> };
-  setCommands: { mutateAsync: ReturnType<typeof vi.fn> };
-  setAsDefault: { mutateAsync: ReturnType<typeof vi.fn> };
 };
 
 function mutations(): Mutations {
-  return {
-    create: { mutateAsync: vi.fn().mockResolvedValue({ id: 'new-1' }) },
-    setVar: { mutateAsync: vi.fn().mockResolvedValue({}) },
-    setCommands: { mutateAsync: vi.fn().mockResolvedValue({}) },
-    setAsDefault: { mutateAsync: vi.fn().mockResolvedValue({}) },
-  };
+  return { create: { mutateAsync: vi.fn().mockResolvedValue({ id: 'new-1' }) } };
 }
 
 type ListState = {
@@ -308,17 +302,37 @@ function typeInto(renderer: TestRenderer.ReactTestRenderer, label: string, value
   });
 }
 
-/** First call position of a mock, for ordering assertions. */
-function callOrder(mock: ReturnType<typeof vi.fn>): number {
-  return mock.mock.invocationCallOrder[0] ?? 0;
-}
-
 function addVariable(renderer: TestRenderer.ReactTestRenderer, key: string, value: string) {
   press(buttonByText(renderer, 'Add variable'));
   typeInto(renderer, 'Key', key);
   typeInto(renderer, 'Value', value);
   press(buttonByText(renderer, 'Save'));
 }
+
+/** Expand the panel and fill one manual variable and one setup command. */
+function fillManualConfig(renderer: TestRenderer.ReactTestRenderer) {
+  press(byLabel(renderer, 'Advanced Configuration'));
+  addVariable(renderer, 'API_KEY', 'abc');
+  press(buttonByText(renderer, 'Add command'));
+  typeInto(renderer, 'Command 1', 'pnpm install');
+}
+
+/** Submit the open save sheet as `name` and let the save settle. */
+async function submitSave(renderer: TestRenderer.ReactTestRenderer, name: string) {
+  typeInto(renderer, 'Profile name', name);
+  await act(async () => {
+    (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+    await Promise.resolve();
+  });
+}
+
+/** The one payload the manual draft must travel in, whatever the attempt. */
+const MANUAL_PAYLOAD = {
+  name: 'My Setup',
+  description: undefined,
+  vars: [{ key: 'API_KEY', value: 'abc', isSecret: false }],
+  commands: ['pnpm install'],
+};
 
 /** Add a variable marked secret, so its row offers the reveal control. */
 function addSecretVariable(renderer: TestRenderer.ReactTestRenderer, key: string, value: string) {
@@ -616,17 +630,12 @@ describe('AdvancedConfigPanel', () => {
     expect(texts(renderer)).toContain('3 vars · 1 setup cmd');
   });
 
-  it('saves the manual config in the web order and selects the new profile', async () => {
+  it('saves the manual config as one atomic create and selects the new profile', async () => {
     const mocks = mutations();
     const onSelectProfile = vi.fn<(id: string | null) => void>();
     const renderer = mount({ mocks, onSelectProfile });
-    press(byLabel(renderer, 'Advanced Configuration'));
-    addVariable(renderer, 'API_KEY', 'abc');
-    // A setup command.
-    press(buttonByText(renderer, 'Add command'));
-    typeInto(renderer, 'Command 1', 'pnpm install');
+    fillManualConfig(renderer);
     press(buttonByText(renderer, 'Save as profile'));
-
     typeInto(renderer, 'Profile name', 'My Setup');
     act(() => {
       (renderer.root.findByType('Switch' as never).props.onValueChange as (value: boolean) => void)(
@@ -638,28 +647,12 @@ describe('AdvancedConfigPanel', () => {
       await Promise.resolve();
     });
 
-    expect(callOrder(mocks.create.mutateAsync)).toBeLessThan(callOrder(mocks.setVar.mutateAsync));
-    expect(callOrder(mocks.setVar.mutateAsync)).toBeLessThan(
-      callOrder(mocks.setCommands.mutateAsync)
-    );
-    expect(callOrder(mocks.setCommands.mutateAsync)).toBeLessThan(
-      callOrder(mocks.setAsDefault.mutateAsync)
-    );
-    expect(mocks.create.mutateAsync).toHaveBeenCalledWith({
-      name: 'My Setup',
-      description: undefined,
+    // The vars, the commands and the default flag travel inside the create, so
+    // the server commits them together: nothing is left for a follow-up write.
+    expect(mocks.create.mutateAsync).toHaveBeenCalledExactlyOnceWith({
+      ...MANUAL_PAYLOAD,
+      setAsDefault: true,
     });
-    expect(mocks.setVar.mutateAsync).toHaveBeenCalledWith({
-      profileId: 'new-1',
-      key: 'API_KEY',
-      value: 'abc',
-      isSecret: false,
-    });
-    expect(mocks.setCommands.mutateAsync).toHaveBeenCalledWith({
-      profileId: 'new-1',
-      commands: ['pnpm install'],
-    });
-    expect(mocks.setAsDefault.mutateAsync).toHaveBeenCalledWith({ profileId: 'new-1' });
     expect(toast.success).toHaveBeenCalledTimes(1);
     expect(onSelectProfile).toHaveBeenCalledWith('new-1');
     // The profile carries the draft now, and the server appends a profile's
@@ -686,6 +679,48 @@ describe('AdvancedConfigPanel', () => {
 
     expect(field(renderer, 'Profile name')).toBeTruthy();
     expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it('a refused save leaves the draft intact and writes nothing else', async () => {
+    const mocks = mutations();
+    mocks.create.mutateAsync.mockRejectedValue(new Error('Took too long'));
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({ mocks, onSelectProfile });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'My Setup');
+
+    // The whole config travels in the refused call, so a partial profile was
+    // never possible and no follow-up write can be left to run.
+    expect(mocks.create.mutateAsync).toHaveBeenCalledExactlyOnceWith(MANUAL_PAYLOAD);
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(onSelectProfile).not.toHaveBeenCalled();
+    // The draft is still the person's: the save did not clear it, and Save is
+    // still offered.
+    expect(texts(renderer)).toContain('API_KEY');
+    expect(buttonByText(renderer, 'Save as profile')).toBeDefined();
+  });
+
+  it('a retry after a refusal reissues the same complete payload once more', async () => {
+    const mocks = mutations();
+    mocks.create.mutateAsync.mockRejectedValueOnce(new Error('Took too long'));
+    const renderer = mount({ mocks });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'My Setup');
+    // The sheet stays open with the typed name, so the retry is another submit.
+    await act(async () => {
+      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+      await Promise.resolve();
+    });
+
+    expect(mocks.create.mutateAsync).toHaveBeenCalledTimes(2);
+    // Both attempts carry every var, every command and the same name: the
+    // retry cannot create a second profile holding only part of the config.
+    expect(mocks.create.mutateAsync.mock.calls[0]).toEqual([MANUAL_PAYLOAD]);
+    expect(mocks.create.mutateAsync.mock.calls[1]).toEqual(mocks.create.mutateAsync.mock.calls[0]);
   });
 
   it('a late onClose from a closed save sheet leaves the reopened sheet open', () => {

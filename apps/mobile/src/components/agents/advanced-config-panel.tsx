@@ -109,12 +109,7 @@ export function AdvancedConfigPanel({
   const { t } = useTranslation();
   const colors = useThemeColors();
   const list = useAgentProfileList(organizationId);
-  const {
-    create,
-    setVar,
-    setCommands: saveCommands,
-    setAsDefault,
-  } = useAgentProfileMutations(organizationId);
+  const { create } = useAgentProfileMutations(organizationId);
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [createdProfile, setCreatedProfile] = useState<ProfileSelectorProfile | null>(null);
@@ -192,28 +187,24 @@ export function AdvancedConfigPanel({
 
   const handleSaveProfile = async (submission: SaveProfileSubmission): Promise<boolean> => {
     try {
-      // Web's order: create the profile, then its vars (in parallel), then the
-      // commands, then the default flag.
+      // One server write: the profile, its vars, its commands and the default
+      // flag commit together, so a refusal leaves nothing behind and a retry
+      // cannot create a second profile holding only part of the config.
       const { id: profileId } = await create.mutateAsync({
         name: submission.name,
         description: submission.description === '' ? undefined : submission.description,
+        ...(manualVars.length > 0
+          ? {
+              vars: manualVars.map(variable => ({
+                key: variable.key,
+                value: variable.value,
+                isSecret: variable.isSecret,
+              })),
+            }
+          : {}),
+        ...(setupCommands.length > 0 ? { commands: setupCommands } : {}),
+        ...(submission.setAsDefault ? { setAsDefault: true } : {}),
       });
-      await Promise.all(
-        manualVars.map(async variable => {
-          await setVar.mutateAsync({
-            profileId,
-            key: variable.key,
-            value: variable.value,
-            isSecret: variable.isSecret,
-          });
-        })
-      );
-      if (setupCommands.length > 0) {
-        await saveCommands.mutateAsync({ profileId, commands: setupCommands });
-      }
-      if (submission.setAsDefault) {
-        await setAsDefault.mutateAsync({ profileId });
-      }
       // Keep resource counts current before the invalidated list refetch lands.
       setCreatedProfile({
         id: profileId,

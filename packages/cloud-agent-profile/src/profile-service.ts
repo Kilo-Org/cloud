@@ -46,23 +46,38 @@ export async function createProfile(
   name: string,
   description?: string
 ): Promise<{ id: string }> {
-  return await db.transaction(async tx => {
-    await lockProfileCreation(tx, owner);
-    await assertOwnerProfileLimit(tx, owner);
+  return await db.transaction(async tx => ({
+    id: await insertProfileRow(tx, owner, createdByUserId, name, description),
+  }));
+}
 
-    const [profile] = await tx
-      .insert(agent_environment_profiles)
-      .values({
-        owned_by_organization_id: owner.type === 'organization' ? owner.id : null,
-        owned_by_user_id: owner.type === 'user' ? owner.id : null,
-        created_by_user_id: createdByUserId,
-        name,
-        description: description ?? null,
-      })
-      .returning({ id: agent_environment_profiles.id });
+/**
+ * Insert one profile under the owner's creation lock and inside the owner's
+ * profile cap. Takes the caller's open transaction so a create that also
+ * writes vars, commands or the default flag stays one atomic unit.
+ */
+export async function insertProfileRow(
+  db: ProfileDatabase,
+  owner: ProfileOwner,
+  createdByUserId: string,
+  name: string,
+  description?: string
+): Promise<string> {
+  await lockProfileCreation(db, owner);
+  await assertOwnerProfileLimit(db, owner);
 
-    return { id: profile.id };
-  });
+  const [profile] = await db
+    .insert(agent_environment_profiles)
+    .values({
+      owned_by_organization_id: owner.type === 'organization' ? owner.id : null,
+      owned_by_user_id: owner.type === 'user' ? owner.id : null,
+      created_by_user_id: createdByUserId,
+      name,
+      description: description ?? null,
+    })
+    .returning({ id: agent_environment_profiles.id });
+
+  return profile.id;
 }
 
 /**
@@ -371,6 +386,28 @@ export async function getProfile(
 }
 
 /**
+ * Make one profile the owner's default: clear whichever profile holds the flag
+ * for that owner, then set this one. Accepts a pool or an open transaction so a
+ * composite write can flip the default in the same unit as the profile insert.
+ * Callers authorize the profile themselves.
+ */
+export async function applyDefaultProfile(
+  db: ProfileDatabase,
+  profileId: string,
+  owner: ProfileOwner
+): Promise<void> {
+  await db
+    .update(agent_environment_profiles)
+    .set({ is_default: false })
+    .where(and(buildOwnershipCondition(owner), eq(agent_environment_profiles.is_default, true)));
+
+  await db
+    .update(agent_environment_profiles)
+    .set({ is_default: true })
+    .where(eq(agent_environment_profiles.id, profileId));
+}
+
+/**
  * Set a profile as the default for an owner.
  * Clears any existing default first.
  */
@@ -381,17 +418,7 @@ export async function setDefaultProfile(
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, owner);
 
-  await db.transaction(async tx => {
-    await tx
-      .update(agent_environment_profiles)
-      .set({ is_default: false })
-      .where(and(buildOwnershipCondition(owner), eq(agent_environment_profiles.is_default, true)));
-
-    await tx
-      .update(agent_environment_profiles)
-      .set({ is_default: true })
-      .where(eq(agent_environment_profiles.id, profileId));
-  });
+  await db.transaction(async tx => applyDefaultProfile(tx, profileId, owner));
 }
 
 /**

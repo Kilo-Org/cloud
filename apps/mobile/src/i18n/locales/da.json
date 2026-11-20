@@ -1391,7 +1391,8 @@
     "followReviewMd": "Følg REVIEW.md",
     "followReviewMdSubtitle": "Følg instruktionerne i hvert kodelagers REVIEW.md-fil",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket er ikke tilsluttet. Kun organisationsejere, administratorer og faktureringsansvarlige kan oprette forbindelsen."
+      "notConnectedReadOnly": "Bitbucket er ikke tilsluttet. Kun organisationsejere, administratorer og faktureringsansvarlige kan oprette forbindelsen.",
+      "notConnectedReadOnlyPlan": "Organisationens prøveperiode er udløbet, så en ejer skal opdatere betalingen på kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-forbindelsen til {{organization}} administreres på nettet fra en computer.",

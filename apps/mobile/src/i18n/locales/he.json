@@ -698,7 +698,8 @@
     },
     "autoReviews": "סקירות אוטומטיות",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket לא מחובר. רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לחבר אותו."
+      "notConnectedReadOnly": "Bitbucket לא מחובר. רק בעלי הארגון, המנהלים ומנהלי החיובים יכולים לחבר אותו.",
+      "notConnectedReadOnlyPlan": "תקופת הניסיון של הארגון הסתיימה, ולכן הבעלים חייבים לעדכן את החיוב ב-⁨kilo.ai⁩."
     },
     "bitbucketConnect": {
       "managedOnWeb": "החיבור של {{organization}} ל-Bitbucket מנוהל באתר דרך מחשב.",
@@ -1235,7 +1236,7 @@
       "dueThisWeekDetail_two": "{{exploitable}} מהם אושרו כניתנים לניצול",
       "dueThisWeekDetail_other": "{{exploitable}} מהם אושרו כניתנים לניצול",
       "noDeadline": "אין מועד אחרון",
-      "reviewSlaAssignment": "בדיקת המועדים שנקבעו לפי SLA",
+      "reviewSlaAssignment": "בדיקת הקצאת ה-SLA",
       "allOpenFindingsTracked": "כל הממצאים הפתוחים במעקב"
     },
     "dismiss": {

@@ -1391,7 +1391,8 @@
     "followReviewMd": "REVIEW.mdን ይከተሉ",
     "followReviewMdSubtitle": "በእያንዳንዱ ማከማቻ ውስጥ ያሉትን የREVIEW.md መመሪያ ፋይሎች ይከተሉ",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket አልተገናኘም። ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።"
+      "notConnectedReadOnly": "Bitbucket አልተገናኘም። ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
+      "notConnectedReadOnlyPlan": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ስለዚህ ባለቤት በkilo.ai ላይ የክፍያ መረጃውን ማዘመን አለበት።"
     },
     "bitbucketConnect": {
       "managedOnWeb": "የ{{organization}} የBitbucket ግንኙነት ከኮምፒውተር በድር ላይ ይተዳደራል።",
@@ -1724,7 +1725,7 @@
       "dueThisWeekDetail_one": "ከእነዚህ ውስጥ {{exploitable}} ለጥቃት ሊውሉ እንደሚችሉ ተረጋግጠዋል",
       "dueThisWeekDetail_other": "ከእነዚህ ውስጥ {{exploitable}} ለጥቃት ሊውሉ እንደሚችሉ ተረጋግጠዋል",
       "noDeadline": "ምንም ጊዜ ገደብ የለም",
-      "reviewSlaAssignment": "የተወሰኑትን የSLA ጊዜ ገደቦች ይገምግሙ",
+      "reviewSlaAssignment": "የSLA ምደባን ይገምግሙ",
       "allOpenFindingsTracked": "ሁሉም ክፍት ግኝቶች በክትትል ላይ ናቸው"
     },
     "dismiss": {

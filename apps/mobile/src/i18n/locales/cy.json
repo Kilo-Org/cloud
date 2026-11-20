@@ -1495,7 +1495,8 @@
     "followReviewMd": "Dilyn REVIEW.md",
     "followReviewMdSubtitle": "Dilyn y cyfarwyddiadau yn ffeil REVIEW.md pob ystorfa",
     "bitbucket": {
-      "notConnectedReadOnly": "Nid yw Bitbucket wedi'i gysylltu. Dim ond perchnogion, gweinyddwyr a rheolwyr bilio'r sefydliad sy'n gallu ei gysylltu."
+      "notConnectedReadOnly": "Nid yw Bitbucket wedi'i gysylltu. Dim ond perchnogion, gweinyddwyr a rheolwyr bilio'r sefydliad sy'n gallu ei gysylltu.",
+      "notConnectedReadOnlyPlan": "Mae treial y sefydliad wedi dod i ben, felly rhaid i berchnogydd ddiweddaru bilio ar kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Caiff cysylltiad Bitbucket ag {{organization}} ei reoli ar y we o gyfrifiadur.",
@@ -1880,7 +1881,7 @@
       "dueThisWeekDetail_many": "{{exploitable}} o'r rhain y cadarnhawyd y gellir manteisio arnynt",
       "dueThisWeekDetail_other": "{{exploitable}} o'r rhain y cadarnhawyd y gellir manteisio arnynt",
       "noDeadline": "Dim dyddiad terfyn",
-      "reviewSlaAssignment": "Adolygu'r dyddiadau terfyn SLA a bennwyd",
+      "reviewSlaAssignment": "Adolygu aseinio'r SLA",
       "allOpenFindingsTracked": "Pob canfyddiad agored yn cael ei olrhain"
     },
     "dismiss": {

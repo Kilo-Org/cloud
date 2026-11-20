@@ -1391,7 +1391,8 @@
     "followReviewMd": "REVIEW.md fayliga amal qilish",
     "followReviewMdSubtitle": "Har bir repozitoriyaning REVIEW.md faylidagi ko'rsatmalarga amal qilish",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ulanmagan. Faqat tashkilot egalar, administratorlar va to'lov menejerlari uni ulashi mumkin."
+      "notConnectedReadOnly": "Bitbucket ulanmagan. Faqat tashkilot egalar, administratorlar va to'lov menejerlari uni ulashi mumkin.",
+      "notConnectedReadOnlyPlan": "Tashkilotning sinov muddati tugadi, shuning uchun egasi kilo.ai saytida hisob-kitobni yangilashi kerak."
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} uchun Bitbucket ulanishi kompyuterdan veb orqali boshqariladi.",
@@ -1985,7 +1986,7 @@
       "failedDescription": "Xavfsizlik agenti tahlilni yakunlay olmadi.",
       "extractionFailedDescription": "Texnik hisobotni tuzilmali natijaga aylantirib bo'lmadi.",
       "exploitableDescription": "Ilova kodi zaiflik mavjud funksiyani chaqira oladi.",
-      "notExploitable": "Kodga yetib borib bo‘lmaydi",
+      "notExploitable": "Yetib bo'lmaydigan yo'l",
       "notExploitableDescription": "Bu repozitoriyada zaiflik mavjud funksiyaga olib boradigan kod yo'li topilmadi.",
       "unknown": "Ko‘rib chiqish kerak",
       "unknownDescription": "Tahlil zaiflik mavjud funksiyani chaqirish mumkinligini tasdiqlay olmadi.",

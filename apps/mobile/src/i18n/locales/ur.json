@@ -1391,7 +1391,8 @@
     "followReviewMd": "REVIEW.md کی پیروی کریں",
     "followReviewMdSubtitle": "ہر ریپوزٹری کی REVIEW.md فائل میں دی گئی ہدایات پر عمل کریں",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket منسلک نہیں ہے۔ صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔"
+      "notConnectedReadOnly": "Bitbucket منسلک نہیں ہے۔ صرف تنظیم کے مالک، منتظم اور بلنگ مینیجر اسے منسلک کر سکتے ہیں۔",
+      "notConnectedReadOnlyPlan": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے، اس لیے مالک کو ⁨kilo.ai⁩ پر بلنگ اپ ڈیٹ کرنی ہوگی۔"
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} کا Bitbucket کنکشن کمپیوٹر سے ویب پر منظم کیا جاتا ہے۔",
@@ -1843,7 +1844,7 @@
       "couldNotLoadMore": "مزید مسائل لوڈ نہیں ہو سکے۔",
       "noMatchesTitle": "منتخب فلٹرز کے مطابق کوئی مسئلہ نہیں ملا",
       "noMatchesDescription": "منتخب فلٹرز تبدیل کر کے یا ہٹا کر دیکھیں۔",
-      "emptyTitle": "کوئی غیر حل شدہ مسئلہ نہیں",
+      "emptyTitle": "کوئی کھلا مسئلہ نہیں",
       "emptyDescription": "اس وقت کوئی غیر حل شدہ مسئلہ توجہ طلب نہیں ہے۔"
     },
     "findingRow": {
@@ -2034,7 +2035,7 @@
     "remediationUnavailable": {
       "findingNotFound": "سکیورٹی مسئلہ اب موجود نہیں ہے۔",
       "approvalRequired": "خودکار اصلاح کے لیے منظوری درکار ہے۔ منظوری دینے کے لیے اصلاح دستی طور پر شروع کریں۔",
-      "findingNotOpen": "مسئلہ اب غیر حل شدہ حالت میں نہیں ہے۔",
+      "findingNotOpen": "مسئلہ اب کھلا نہیں ہے۔",
       "repoNotInScope": "ریپوزٹری سیکیورٹی ایجنٹ کے لیے منتخب نہیں ہے۔",
       "analysisRequired": "اصلاح شروع کرنے سے پہلے کوڈ بیس کا تجزیہ کریں۔",
       "staleAnalysis": "تجزیے کے بعد مسئلہ تبدیل ہو گیا۔ اصلاح شروع کرنے سے پہلے دوبارہ تجزیہ کریں۔",

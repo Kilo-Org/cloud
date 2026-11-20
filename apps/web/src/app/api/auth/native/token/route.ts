@@ -575,7 +575,6 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         // Bind key persistence and session creation in one transaction.
         try {
           const combined = await createDeviceSessionWithAttestedKey({
-            userId: result.user.id,
             userAgent: request.headers.get('user-agent') ?? undefined,
             user: result.user,
             verification: admissionVerification,
@@ -728,7 +727,6 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
       // Bind key persistence and session creation in one transaction.
       try {
         const combined = await createDeviceSessionWithAttestedKey({
-          userId: result.user.id,
           userAgent: request.headers.get('user-agent') ?? undefined,
           user: result.user,
           verification: admissionVerification,

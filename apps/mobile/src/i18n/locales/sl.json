@@ -1443,7 +1443,8 @@
     "followReviewMd": "Upoštevaj REVIEW.md",
     "followReviewMdSubtitle": "Upoštevaj navodila iz datotek REVIEW.md v posameznih skladiščih",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket ni povezan. Povežejo ga lahko samo lastniki organizacije, skrbniki in skrbniki obračunavanja."
+      "notConnectedReadOnly": "Bitbucket ni povezan. Povežejo ga lahko samo lastniki organizacije, skrbniki in skrbniki obračunavanja.",
+      "notConnectedReadOnlyPlan": "Preizkusna doba organizacije se je končala, zato mora lastnik posodobiti obračun na kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Povezava Bitbucket za {{organization}} se upravlja v spletu z računalnika.",
@@ -1802,7 +1803,7 @@
       "dueThisWeekDetail_few": "{{exploitable}} od teh je potrjeno izkoristljivih",
       "dueThisWeekDetail_other": "{{exploitable}} od teh je potrjeno izkoristljivih",
       "noDeadline": "Brez roka",
-      "reviewSlaAssignment": "Preglej dodeljene roke SLA",
+      "reviewSlaAssignment": "Preglej dodeljevanje rokov SLA",
       "allOpenFindingsTracked": "Spremljajo se vse odprte ugotovitve"
     },
     "dismiss": {

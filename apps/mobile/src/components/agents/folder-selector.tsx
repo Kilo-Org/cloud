@@ -3,6 +3,7 @@ import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown } from '@/components/ui/icons';
 
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { InlineCodeText } from '@/components/ui/inline-code-text';
 import { Text } from '@/components/ui/text';
 import { FIELD_TRIGGER_BODY_CLASS, FIELD_TRIGGER_FRAME_CLASS } from '@/lib/a11y/tap-target';
@@ -92,10 +93,8 @@ export function LaunchFolderField({
     // remote surface's Folder row but inert, since there is no connection to
     // list folders on. The setup hint under Start names the recovery.
     return (
-      <View>
-        <Text className="mb-2 text-sm font-medium text-muted-foreground">
-          {t('agentChat.folderPicker.fieldLabel')}
-        </Text>
+      <View className="gap-2">
+        <FormFieldLabel label={t('agentChat.folderPicker.fieldLabel')} />
         <InlineCodeText
           className="text-sm text-muted-foreground"
           codeClassName="text-muted-foreground"
@@ -105,10 +104,8 @@ export function LaunchFolderField({
     );
   }
   return (
-    <View>
-      <Text className="mb-2 text-sm font-medium text-muted-foreground">
-        {t('agentChat.folderPicker.fieldLabel')}
-      </Text>
+    <View className="gap-2">
+      <FormFieldLabel label={t('agentChat.folderPicker.fieldLabel')} />
       <FolderSelector
         folderPath={folderPath}
         projectName={runOnInstance.projectName}

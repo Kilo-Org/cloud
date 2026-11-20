@@ -871,7 +871,6 @@ describe('expanded run summaries', () => {
     expect(html).toContain('150');
   });
 });
-||||||| 24662c58a0
 
 describe('benchmark run completion refresh', () => {
   it('refreshes when one run ends while another of the router keeps running', () => {

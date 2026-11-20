@@ -140,6 +140,7 @@
     "keepRunning": "Остави да работи",
     "newSession": "Нова сесија",
     "noModelsAvailable": "Нема достапни модели",
+    "modelRetires": "Се повлекува на {{date}}",
     "notFound": "Не е пронајдено.",
     "online": "Онлајн",
     "open": "Отвори {{name}}",

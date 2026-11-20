@@ -140,6 +140,7 @@
     "keepRunning": "To‘xtatmaslik",
     "newSession": "Yangi seans",
     "noModelsAvailable": "Modellar mavjud emas",
+    "modelRetires": "Tugatiladi {{date}}",
     "notFound": "Topilmadi.",
     "online": "Onlayn",
     "open": "{{name}}ni ochish",

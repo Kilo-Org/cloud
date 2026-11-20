@@ -142,6 +142,7 @@
     "keepRunning": "Продолжить выполнение",
     "newSession": "Новый сеанс",
     "noModelsAvailable": "Нет доступных моделей",
+    "modelRetires": "Снимается {{date}}",
     "notFound": "Не найдено.",
     "online": "В сети",
     "open": "Открыть {{name}}",

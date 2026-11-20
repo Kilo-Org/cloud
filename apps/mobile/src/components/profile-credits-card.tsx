@@ -4,7 +4,7 @@ import { type Href, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { Eye, EyeOff } from '@/components/ui/icons';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 
@@ -24,6 +24,7 @@ import { formatPrefixedMoney } from '@/lib/format';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_GUTTER_DP } from '@/lib/layout';
 import { isMoneyRole, type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { useOrganization } from '@/lib/organization-context';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
@@ -56,7 +57,19 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // 157 dp of the card, so the one-row layout holds from about 372 scaled card
   // dp. The threshold stacks below 370 of them and uses the card's width rather
   // than the display's; below it the note takes a row of its own at full width.
-  const stackBalance = availableWidth === null || availableWidth / fontScale < 370;
+  //
+  // The container reports that width one frame after it mounts, and the two
+  // arms are not the same height: stacked reserves a 48pt value column, the
+  // one-row arm takes the visibility control's own height. A first frame that
+  // guessed "stacked" therefore shrank by 5.7 dp when the width landed and
+  // moved every row below it (the held-loading gate run measured it on
+  // `(3_profile)`). The body's width is the card's width here, so the first
+  // frame reads it from the window and `onLayout` still owns the settled
+  // answer for any container narrower than the body.
+  const window = useWindowDimensions();
+  const bodyWidth = window.width - SCREEN_GUTTER_DP * 2;
+  const measuredWidth = availableWidth ?? bodyWidth;
+  const stackBalance = measuredWidth / fontScale < 370;
   const { t, i18n } = useTranslation();
   const { organizationId, error, isSaving, retry } = useOrganization();
   const selectedOrgId = organizationId ?? undefined;

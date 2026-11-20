@@ -9,6 +9,13 @@ export type OrganizationGroupsDrawerRef =
   | { type: 'policy-list'; target: OrganizationGroupPolicyTarget }
   | { type: 'policy-type-picker'; target: OrganizationGroupPolicyTarget }
   | {
+      type: 'permission-policy-editor';
+      target: OrganizationGroupPolicyTarget;
+      appliesTo: string;
+      canEdit: boolean;
+    }
+  | { type: 'permission-policy-diagnostics' }
+  | {
       type: 'policy-editor';
       target: OrganizationGroupPolicyTarget;
       policyType: EditableOrganizationGroupPolicyType;

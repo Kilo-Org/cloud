@@ -10,6 +10,7 @@ import {
 } from './model-access/model-access.schema';
 import {
   OrganizationGroupAgentPermissionsPolicySchema,
+  OrganizationGroupClientConfigurationPolicySchema,
   OrganizationPermissionPolicyTypeSchema,
 } from './permission-policy/permission-policy.schema';
 
@@ -37,6 +38,7 @@ export const OrganizationGroupPolicyTypeSchema = z.enum([
 export const OrganizationGroupPolicySchema = z.discriminatedUnion('type', [
   OrganizationGroupModelAccessPolicySchema,
   OrganizationGroupAgentPermissionsPolicySchema,
+  OrganizationGroupClientConfigurationPolicySchema,
 ]);
 
 export const OrganizationGroupPoliciesSchema = z

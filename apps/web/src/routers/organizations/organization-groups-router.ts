@@ -14,6 +14,7 @@ import {
 import {
   OrganizationPermissionPolicySchema,
   OrganizationPermissionPolicyTypeSchema,
+  PermissionPolicyExecutionOsSchema,
 } from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.schema';
 import {
   getOrganizationPermissionPolicy,
@@ -181,10 +182,19 @@ export const organizationGroupsRouter = createTRPCRouter({
       }),
 
     diagnostics: organizationBillingProcedure
-      .input(OrganizationIdInputSchema.extend({ userId: z.string().min(1) }).strict())
+      .input(
+        OrganizationIdInputSchema.extend({
+          userId: z.string().min(1),
+          executionOs: PermissionPolicyExecutionOsSchema.optional(),
+        }).strict()
+      )
       .query(async ({ input, ctx }) => {
         assertPermissionPolicyAdminSession(ctx);
-        return await getOrganizationPermissionPolicy(input.organizationId, input.userId);
+        return await getOrganizationPermissionPolicy(
+          input.organizationId,
+          input.userId,
+          input.executionOs
+        );
       }),
   }),
 

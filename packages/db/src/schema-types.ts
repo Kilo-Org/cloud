@@ -1716,28 +1716,39 @@ export type OrganizationGroupModelAccessPolicy = {
 type OrganizationPermissionAction = 'allow' | 'ask' | 'deny';
 type OrganizationPermissionRule = { pattern: string; action: OrganizationPermissionAction };
 
+type AgentPermissionSet = {
+  unrestricted_mode?: 'allow' | 'deny';
+  auto_approve?: 'deny';
+  tools?: Record<
+    string,
+    | OrganizationPermissionAction
+    | { rules: OrganizationPermissionRule[]; fallback?: OrganizationPermissionAction }
+  >;
+  shell?: Partial<
+    Record<'bash' | 'powershell', { fallback: 'ask' | 'deny'; rules: OrganizationPermissionRule[] }>
+  >;
+};
+
 export type OrganizationGroupAgentPermissionsPolicy = {
   type: 'agent_permissions';
+  data: AgentPermissionSet & {
+    schema_version: 1;
+    by_os?: Partial<Record<'linux' | 'macos' | 'windows', AgentPermissionSet>>;
+  };
+};
+
+export type OrganizationGroupClientConfigurationPolicy = {
+  type: 'client_configuration';
   data: {
     schema_version: 1;
-    unrestricted_mode?: 'allow' | 'deny';
-    tools?: Record<
-      string,
-      | OrganizationPermissionAction
-      | { rules: OrganizationPermissionRule[]; fallback?: OrganizationPermissionAction }
-    >;
-    shell?: Partial<
-      Record<
-        'bash' | 'powershell',
-        { fallback: 'ask' | 'deny'; rules: OrganizationPermissionRule[] }
-      >
-    >;
+    show_session_dollar_values: boolean;
   };
 };
 
 export type OrganizationGroupPolicy =
   | OrganizationGroupModelAccessPolicy
-  | OrganizationGroupAgentPermissionsPolicy;
+  | OrganizationGroupAgentPermissionsPolicy
+  | OrganizationGroupClientConfigurationPolicy;
 export type OrganizationGroupPolicyType = OrganizationGroupPolicy['type'];
 export type OrganizationGroupPolicies = OrganizationGroupPolicy[];
 

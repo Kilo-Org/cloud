@@ -110,14 +110,16 @@ afterEach(async () => {
 });
 
 function request(
-  options: { id?: string; token?: string; headers?: HeadersInit; tag?: string } = {}
+  options: { id?: string; token?: string; headers?: HeadersInit; tag?: string; query?: string } = {}
 ) {
-  const { id = organizationId, token, tag } = options;
+  const { id = organizationId, token, tag, query = '' } = options;
   const headers = new Headers(options.headers);
   if (token !== undefined) headers.set('Authorization', `Bearer ${token}`);
   if (tag !== undefined) headers.set('If-None-Match', tag);
   return GET(
-    new NextRequest(`https://example.test/api/organizations/${id}/policy/permission`, { headers }),
+    new NextRequest(`https://example.test/api/organizations/${id}/policy/permission${query}`, {
+      headers,
+    }),
     {
       params: Promise.resolve({ id }),
     }
@@ -203,6 +205,60 @@ test('does not match a validator from another account with an identical body or 
   expect(otherOrgResponse.status).toBe(200);
   expect(requireTag(otherOrgResponse)).not.toBe(tag);
   expect(await otherOrgResponse.json()).toMatchObject({ organization_id: otherOrganization });
+});
+
+test('scopes validators to the execution OS even when the serialized member policies are identical', async () => {
+  await setPermissionPolicyFlag([organizationId]);
+  const token = generateApiToken(user);
+  const windows = await request({ token, query: '?os=windows' });
+  expect(windows.status).toBe(200);
+  const body = await windows.text();
+  const windowsTag = requireTag(windows);
+
+  const linux = await request({ token, query: '?os=linux', tag: windowsTag });
+  expect(linux.status).toBe(200);
+  expect(await linux.text()).toBe(body);
+  const linuxTag = requireTag(linux);
+
+  const omitted = await request({ token, tag: linuxTag });
+  expect(omitted.status).toBe(200);
+  expect(await omitted.text()).toBe(body);
+  const omittedTag = requireTag(omitted);
+
+  const other = await request({ token, query: '?os=other', tag: omittedTag });
+  expect(other.status).toBe(200);
+  expect(await other.text()).toBe(body);
+  expect(new Set([windowsTag, linuxTag, omittedTag, requireTag(other)]).size).toBe(4);
+
+  const conditional = await request({ token, query: '?os=linux', tag: linuxTag });
+  expect(conditional.status).toBe(304);
+  expect(conditional.headers.get('ETag')).toBe(linuxTag);
+  expect(conditional.headers.get('Cache-Control')).toBe('private, no-store');
+  expect(await conditional.text()).toBe('');
+  expectDenied(await request({ query: '?os=windows', tag: windowsTag }), 401);
+});
+
+test('rejects malformed, repeated, and unexpected query parameters without issuing a validator', async () => {
+  const token = generateApiToken(user);
+  const tag = requireTag(await request({ token }));
+
+  for (const query of [
+    '?os',
+    '?os=',
+    '?os=Windows',
+    '?os=darwin',
+    '?os=linux%20',
+    '?os=%ZZ',
+    '?os=windows&os=windows',
+    '?os=linux&os=windows',
+    '?os[]=windows',
+    '?OS=windows',
+    '?os=windows&extra=1',
+  ]) {
+    const response = await request({ token, query, tag });
+    expectDenied(response, 400);
+    expect(await response.json()).toEqual({ error: 'Invalid execution OS selector' });
+  }
 });
 
 test('honors legacy and modern account organization bindings independently of mutable headers', async () => {
@@ -309,6 +365,8 @@ test('does not grant policy access through inherited membership, platform admin,
 test('conditional requests fail immediately after membership revocation, account blocking, or token rotation', async () => {
   const token = generateApiToken(user);
   const tag = requireTag(await request({ token }));
+  const query = '?os=windows';
+  const windowsTag = requireTag(await request({ token, query }));
   await db
     .delete(organization_memberships)
     .where(
@@ -318,6 +376,7 @@ test('conditional requests fail immediately after membership revocation, account
       )
     );
   expectDenied(await request({ token, tag }), 403);
+  expectDenied(await request({ token, query, tag: windowsTag }), 403);
 
   await addMember(user, organizationId);
   await db
@@ -393,39 +452,154 @@ test('ignores retired stored policy and does not renew a tag for its old represe
   expect((await request({ token, tag: requireTag(stale) })).status).toBe(304);
 });
 
-test('serves only anonymous applicable policy layers and invalidates a tag after a same-revision policy change', async () => {
+test('serves only the selected flat OS layers and hides session dollar values when either group requires it', async () => {
   await setPermissionPolicyFlag([organizationId]);
   const token = generateApiToken(user);
-  const memberLayer = { schema_version: 1, tools: { websearch: 'deny' } } as const;
-  const otherLayer = { schema_version: 1, tools: { external_directory: 'ask' } } as const;
-  const groupId = crypto.randomUUID();
+  const genericAsk = { schema_version: 1, tools: { browser_open: 'ask' } } as const;
+  const groupAllow = { schema_version: 1, tools: { browser_open: 'allow' } } as const;
+  const windowsOnly = { tools: { browser_open: 'deny' } } as const;
+  const macosOnly = { tools: { websearch: 'deny' } } as const;
+  const revision = 17;
+  await db.insert(organization_group_policy_settings).values({
+    organization_id: organizationId,
+    policy_revision: revision,
+    default_policies: [
+      {
+        type: 'agent_permissions',
+        data: { ...genericAsk, by_os: { windows: windowsOnly, macos: macosOnly } },
+      },
+    ],
+  });
+  const groups = await db
+    .insert(organization_groups)
+    .values([
+      {
+        organization_id: organizationId,
+        name: 'Private billing group',
+        policies: [
+          {
+            type: 'client_configuration',
+            data: { schema_version: 1, show_session_dollar_values: false },
+          },
+        ],
+      },
+      {
+        organization_id: organizationId,
+        name: 'Engineering',
+        policies: [
+          { type: 'agent_permissions', data: groupAllow },
+          {
+            type: 'client_configuration',
+            data: { schema_version: 1, show_session_dollar_values: true },
+          },
+        ],
+      },
+    ])
+    .returning({ groupId: organization_groups.id });
+  await db.insert(organization_group_memberships).values(
+    groups.map(({ groupId }) => ({
+      organization_id: organizationId,
+      kilo_user_id: user.id,
+      group_id: groupId,
+    }))
+  );
+
+  const genericLayers = [groupAllow, genericAsk];
+  for (const [query, layers] of [
+    ['', genericLayers],
+    ['?os=linux', genericLayers],
+    ['?os=other', genericLayers],
+    ['?os=windows', [...genericLayers, { schema_version: 1, ...windowsOnly }]],
+    ['?os=macos', [...genericLayers, { schema_version: 1, ...macosOnly }]],
+  ] as const) {
+    const response = await request({ token, query });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      schema_version: 1,
+      organization_id: organizationId,
+      managed: true,
+      revision,
+      max_age_seconds: expect.any(Number),
+      policy: {
+        agent_permissions: { layers },
+        client_configuration: { show_session_dollar_values: false },
+      },
+    });
+  }
+});
+
+test('scopes anonymous policy layers by membership and invalidates a tag when auto_approve changes at the same revision', async () => {
+  await setPermissionPolicyFlag([organizationId]);
+  const token = generateApiToken(user);
+  const toolLayer = { schema_version: 1, tools: { websearch: 'deny' } } as const;
+  const neutralLayer = { schema_version: 1 } as const;
+  const flagOnlyLayer = { ...neutralLayer, auto_approve: 'deny' } as const;
+  const toolGroupId = crypto.randomUUID();
+  const scopedGroupId = crypto.randomUUID();
+  const revision = 5;
+  await db.insert(organization_group_policy_settings).values({
+    organization_id: organizationId,
+    policy_revision: revision,
+  });
   await db.insert(organization_groups).values([
     {
-      id: groupId,
+      id: toolGroupId,
       organization_id: organizationId,
-      name: 'Private group name',
-      policies: [{ type: 'agent_permissions', data: memberLayer }],
+      name: 'Tool policy group',
+      policies: [{ type: 'agent_permissions', data: toolLayer }],
     },
     {
+      id: scopedGroupId,
       organization_id: organizationId,
-      name: 'Unassigned group',
-      policies: [{ type: 'agent_permissions', data: otherLayer }],
+      name: 'Private restricted group',
+      policies: [{ type: 'agent_permissions', data: flagOnlyLayer }],
     },
   ]);
-  const original = await request({ token });
-  const before = await original.json();
-  expect(before.policy).toEqual({});
+  const ungrouped = await request({ token });
+  expect(ungrouped.status).toBe(200);
+  const ungroupedBody = await ungrouped.json();
+  expect(ungroupedBody).toMatchObject({ managed: true, revision });
+  expect(ungroupedBody.policy).toEqual({});
+
+  const membership = { organization_id: organizationId, kilo_user_id: user.id };
+  await db.insert(organization_group_memberships).values({ ...membership, group_id: toolGroupId });
+  const ungroupedTag = requireTag(ungrouped);
+  const toolOnly = await request({ token, tag: ungroupedTag });
+  expect(toolOnly.status).toBe(200);
+  expect(requireTag(toolOnly)).not.toBe(ungroupedTag);
+  expect(await toolOnly.json()).toEqual({
+    ...ungroupedBody,
+    policy: { agent_permissions: { layers: [toolLayer] } },
+  });
 
   await db
     .insert(organization_group_memberships)
-    .values({ organization_id: organizationId, group_id: groupId, kilo_user_id: user.id });
-  const updated = await request({ token, tag: requireTag(original) });
-  expect(updated.status).toBe(200);
-  expect(requireTag(updated)).not.toBe(requireTag(original));
-  expect(await updated.json()).toEqual({
-    ...before,
-    policy: { agent_permissions: { layers: [memberLayer] } },
+    .values({ ...membership, group_id: scopedGroupId });
+  const scoped = await request({ token });
+  expect(scoped.status).toBe(200);
+  expect(await scoped.json()).toEqual({
+    ...ungroupedBody,
+    policy: { agent_permissions: { layers: [flagOnlyLayer, toolLayer] } },
   });
+  const oldTag = requireTag(scoped);
+
+  await db
+    .update(organization_groups)
+    .set({ policies: [{ type: 'agent_permissions', data: neutralLayer }] })
+    .where(eq(organization_groups.id, scopedGroupId));
+  const updated = await request({ token, tag: oldTag });
+  expect(updated.status).toBe(200);
+  const newTag = requireTag(updated);
+  expect(newTag).not.toBe(oldTag);
+  expect(await updated.json()).toEqual({
+    ...ungroupedBody,
+    policy: { agent_permissions: { layers: [toolLayer, neutralLayer] } },
+  });
+
+  const conditional = await request({ token, tag: newTag });
+  expect(conditional.status).toBe(304);
+  expect(conditional.headers.get('ETag')).toBe(newTag);
+  expect(await conditional.text()).toBe('');
 });
 
 test('fails closed instead of renewing an authorized tag when stored policy or feature config is invalid', async () => {

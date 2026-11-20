@@ -101,6 +101,10 @@ import {
 import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
 import { readJsonBody } from '@kilocode/web-shared/tests/helpers/request-body.helper';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
+import {
+  GATEWAY_REPLICA_READ_RETRY_AFTER_SECONDS,
+  GatewayReplicaReadUnavailableError,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-replica-read';
 import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
 import { GEMMA_4_26B_A4B_IT_FREE_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import {
@@ -171,6 +175,12 @@ jest.mock('@kilocode/web-shared/lib/creditTransactions', () => ({
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   ...jest.requireActual<Record<string, unknown>>('@kilocode/web-shared/lib/drizzle'),
   readDb: {},
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-replica-read', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/gateway-replica-read'
+  ),
+  gatewayReplicaReader: jest.fn((operation: string) => ({ replicaReader: operation })),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
   ...(jest.requireActual(
@@ -667,6 +677,7 @@ describe('POST /api/v1/chat/completions bearer audiences', () => {
     expect(mockedGetUserFromAuth).toHaveBeenCalledWith({
       adminOnly: false,
       expectedAudience: KILO_GATEWAY_AUDIENCE,
+      runReplicaRead: { replicaReader: 'auth' },
     });
     await expect(response.json()).resolves.toMatchObject({
       error: { code: INVALID_TOKEN_CODE },
@@ -790,12 +801,13 @@ describe('POST /api/v1/chat/completions bearer audiences', () => {
     expect(mockedGetUserFromAuth).toHaveBeenCalledWith({
       adminOnly: false,
       expectedAudience: KILO_GATEWAY_AUDIENCE,
+      runReplicaRead: { replicaReader: 'auth' },
     });
     expect(mockedGetBalanceAndOrgSettings).toHaveBeenCalledTimes(1);
     const balanceCall = mockedGetBalanceAndOrgSettings.mock.calls[0];
     expect(balanceCall?.[0]).toBe('org-123');
     expect(balanceCall?.[1]).toBe(authenticatedUser);
-    expect(balanceCall?.[2]).toBe(readDb);
+    expect(balanceCall?.[2]).toEqual({ replicaReader: 'balance' });
     expect(mockedGetProvider).toHaveBeenCalledWith(
       expect.objectContaining({
         user: authenticatedUser,
@@ -836,6 +848,7 @@ describe('POST /api/v1/chat/completions bearer audiences', () => {
     expect(mockedGetUserFromAuth).toHaveBeenCalledWith({
       adminOnly: false,
       expectedAudience: KILO_GATEWAY_AUDIENCE,
+      runReplicaRead: { replicaReader: 'auth' },
     });
     expect(mockedGetProvider).not.toHaveBeenCalled();
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
@@ -1655,14 +1668,31 @@ describe('POST /api/v1/chat/completions request handling', () => {
     );
   });
 
-  it('uses the read replica for balance and organization settings', async () => {
+  it('reads balance and organization settings through the bounded replica reader', async () => {
     const { handleLlmProxyRequest } = await import('./llm-proxy');
 
     const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
 
     expect(response.status).toBe(200);
     expect(mockedGetBalanceAndOrgSettings).toHaveBeenCalledTimes(1);
-    expect(mockedGetBalanceAndOrgSettings.mock.calls[0]?.[2]).toBe(readDb);
+    expect(mockedGetBalanceAndOrgSettings.mock.calls[0]?.[2]).toEqual({
+      replicaReader: 'balance',
+    });
+  });
+
+  it('answers a bounded replica read that hit its bound with a retryable 503', async () => {
+    mockedGetBalanceAndOrgSettings.mockRejectedValueOnce(
+      new GatewayReplicaReadUnavailableError('balance', '57014', new Error('statement timeout'))
+    );
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('Retry-After')).toBe(
+      String(GATEWAY_REPLICA_READ_RETRY_AFTER_SECONDS)
+    );
+    expect(mockedGetProvider).not.toHaveBeenCalled();
   });
 
   it('selects the provider after applying the organization provider allow-list', async () => {
@@ -1695,7 +1725,10 @@ describe('POST /api/v1/chat/completions request handling', () => {
     expect(getRoutingProviderConfig).toBeDefined();
     expect((await getRoutingProviderConfig?.())?.only).toEqual(['amazon-bedrock']);
     expect(jest.mocked(getOrganizationGroupPolicyContext)).toHaveBeenCalledWith(
-      expect.objectContaining({ organizationId: 'org-1', fromDb: readDb })
+      expect.objectContaining({
+        organizationId: 'org-1',
+        runReadTransaction: { replicaReader: 'organization-group-policy' },
+      })
     );
   });
 

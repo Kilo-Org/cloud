@@ -3,7 +3,10 @@ import { z } from 'zod';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import {
+  gatewayReplicaReader,
+  withReplicaReadUnavailableResponse,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-replica-read';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
   extractHeaderAndLimitLength,
@@ -147,14 +150,21 @@ async function isSystemOneModel(modelId: string) {
   return systemOneModelIds.has(modelId);
 }
 
-export async function handleSystemOneRequest(request: NextRequest) {
+/** Answers a bounded admission read that hit its bound with a retryable 503. */
+export const handleSystemOneRequest = withReplicaReadUnavailableResponse(serveSystemOneRequest);
+
+async function serveSystemOneRequest(request: NextRequest) {
   const startedAt = performance.now();
   const startedAtMs = Date.now();
   const ipAddress = rawClientIp(request);
   const accountRateLimited = await gatewayAccountRateLimitRejection(request, ipAddress);
   if (accountRateLimited) return accountRateLimited;
   const caller = resolveGatewayCaller(
-    await getUserFromAuth({ adminOnly: false, expectedAudience: KILO_GATEWAY_AUDIENCE }),
+    await getUserFromAuth({
+      adminOnly: false,
+      expectedAudience: KILO_GATEWAY_AUDIENCE,
+      runReplicaRead: gatewayReplicaReader('auth'),
+    }),
     { allowAnonymous: false, passThroughAuthFailure: true }
   );
   if (caller.kind === 'rejected') return caller.response;
@@ -197,7 +207,12 @@ export async function handleSystemOneRequest(request: NextRequest) {
 
   // Unlike `readGatewayBalance`, System One funds free models from usage and
   // blocks them at a zero balance too.
-  const account = await getBalanceAndOrgSettings(organizationId, user, readDb, 'usage');
+  const account = await getBalanceAndOrgSettings(
+    organizationId,
+    user,
+    gatewayReplicaReader('balance'),
+    'usage'
+  );
   const { balance, settings, plan, payer } = account;
   const gatewaySettings = await resolveOrganizationGatewaySettings({
     organizationId,
@@ -212,7 +227,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
           kiloUserId: user.id,
           modelId: resolvedModel,
           providerLookup: getProviderSlugsForModel,
-          fromDb: readDb,
+          runReadTransaction: gatewayReplicaReader('organization-group-policy'),
         })
       ).decision
     : undefined;

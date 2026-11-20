@@ -11,7 +11,6 @@ import { after, NextRequest, NextResponse } from 'next/server';
 import type * as NextServer from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
   gatewayRateLimitKey,
@@ -99,6 +98,13 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
   getOpenRouterSystemOneModelIdsFromDatabase: jest.fn(),
   resolveOpenRouterModelAlias: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-replica-read', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/gateway-replica-read'
+  ),
+  // A plain function: `jest.resetAllMocks` in `beforeEach` would clear a `jest.fn` implementation.
+  gatewayReplicaReader: (operation: string) => ({ replicaReader: operation }),
 }));
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
@@ -475,6 +481,7 @@ describe('handleSystemOneRequest', () => {
     expect(getUserFromAuth).toHaveBeenCalledWith({
       adminOnly: false,
       expectedAudience: KILO_GATEWAY_AUDIENCE,
+      runReplicaRead: { replicaReader: 'auth' },
     });
     expect(resolveOrganizationMemberModelDecision).not.toHaveBeenCalled();
   });
@@ -764,6 +771,7 @@ describe('handleSystemOneRequest', () => {
     expect(getUserFromAuth).toHaveBeenCalledWith({
       adminOnly: false,
       expectedAudience: KILO_GATEWAY_AUDIENCE,
+      runReplicaRead: { replicaReader: 'auth' },
     });
     expect(getBalanceAndOrgSettings).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();
@@ -997,11 +1005,11 @@ describe('handleSystemOneRequest', () => {
     jest.mocked(creditsBlockedResponse).mockResolvedValue(blockedResponse);
 
     expect(await handleSystemOneRequest(makeRequest())).toBe(blockedResponse);
-    const [organizationId, balanceUser, fromDb, funding] =
+    const [organizationId, balanceUser, balanceReader, funding] =
       jest.mocked(getBalanceAndOrgSettings).mock.lastCall ?? [];
     expect(organizationId).toBe('org-123');
     expect(balanceUser).toEqual(user);
-    expect(fromDb).toBe(readDb);
+    expect(balanceReader).toEqual({ replicaReader: 'balance' });
     expect(funding).toBe('usage');
     expect(creditsBlockedResponse).toHaveBeenCalledWith({
       user,
@@ -1022,7 +1030,7 @@ describe('handleSystemOneRequest', () => {
     });
 
     expect((await handleSystemOneRequest(makeRequest())).status).toBe(404);
-    const { fromDb, ...decisionParams } =
+    const { runReadTransaction, ...decisionParams } =
       jest.mocked(resolveOrganizationMemberModelDecision).mock.lastCall?.[0] ?? {};
     expect(decisionParams).toEqual({
       organizationId: 'org-123',
@@ -1030,7 +1038,7 @@ describe('handleSystemOneRequest', () => {
       modelId: TYPESAFE_MODEL,
       providerLookup: getProviderSlugsForModel,
     });
-    expect(fromDb).toBe(readDb);
+    expect(runReadTransaction).toEqual({ replicaReader: 'organization-group-policy' });
     expect(modelNotAllowedResponse).toHaveBeenCalledTimes(1);
     expect(mockedFetch).not.toHaveBeenCalled();
     expect(deferredUsageCallbacks()).toHaveLength(0);

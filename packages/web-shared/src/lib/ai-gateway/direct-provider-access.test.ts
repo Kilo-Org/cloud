@@ -4,7 +4,6 @@ import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { checkDirectProviderAccess } from '@kilocode/web-shared/lib/ai-gateway/direct-provider-access';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
@@ -19,9 +18,8 @@ jest.mock(
     resolveOrganizationMemberModelDecision: jest.fn(),
   })
 );
-jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
-  db: { name: 'primary' },
-  readDb: { name: 'replica' },
+jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-replica-read', () => ({
+  gatewayReplicaReader: jest.fn((operation: string) => ({ replicaReader: operation })),
 }));
 
 const mockedIsFreeModel = jest.mocked(isFreeModel);
@@ -57,12 +55,17 @@ describe('checkDirectProviderAccess', () => {
     decide({ allowed: true });
   });
 
-  it('reads paid balance from the replica with usage funding', async () => {
+  it('reads paid balance through the bounded replica reader with usage funding', async () => {
     const result = await checkDirectProviderAccess(params());
     expect(mockedIsFreeModel).toHaveBeenCalledWith('vendor/model');
-    expect(mockedGetBalance.mock.calls).toEqual([['org-1', user, readDb, 'usage']]);
+    expect(mockedGetBalance.mock.calls).toEqual([
+      ['org-1', user, { replicaReader: 'balance' }, 'usage'],
+    ]);
     const [decisionParams] = mockedDecision.mock.calls[0];
-    expect(decisionParams.fromDb).toBe(readDb);
+    expect(decisionParams.runReadTransaction).toEqual({
+      replicaReader: 'organization-group-policy',
+    });
+    expect(decisionParams.fromDb).toBeUndefined();
     expect(decisionParams).toMatchObject({
       organizationId: 'org-1',
       kiloUserId: 'user-1',
@@ -74,7 +77,9 @@ describe('checkDirectProviderAccess', () => {
   it('omits usage funding for free models', async () => {
     mockedIsFreeModel.mockReturnValue(true);
     await checkDirectProviderAccess(params({ organizationId: undefined }));
-    expect(mockedGetBalance.mock.calls).toEqual([[undefined, user, readDb, undefined]]);
+    expect(mockedGetBalance.mock.calls).toEqual([
+      [undefined, user, { replicaReader: 'balance' }, undefined],
+    ]);
   });
 
   it('rejects insufficient paid balance with a plain 402 before the model decision', async () => {

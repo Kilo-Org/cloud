@@ -1,4 +1,8 @@
 import { MISTRAL_API_KEY, INCEPTION_API_KEY } from '@kilocode/web-shared/lib/config.server';
+import {
+  gatewayReplicaReader,
+  withReplicaReadUnavailableResponse,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-replica-read';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import z from 'zod';
@@ -97,14 +101,23 @@ const FIMRequestBody = z.object({
   stream: z.boolean().optional(),
 });
 
-export async function handleFimCompletionsRequest(request: NextRequest) {
+/** Answers a bounded admission read that hit its bound with a retryable 503. */
+export const handleFimCompletionsRequest = withReplicaReadUnavailableResponse(
+  serveFimCompletionsRequest
+);
+
+async function serveFimCompletionsRequest(request: NextRequest) {
   const requestStartedAt = performance.now();
   const requestStartedAtMs = Date.now();
   const requesBodyTextPromise = request.text();
 
   const authSpan = startInactiveSpan({ name: 'auth-check' });
   const caller = resolveGatewayCaller(
-    await getUserFromAuth({ adminOnly: false, expectedAudience: KILO_GATEWAY_AUDIENCE }),
+    await getUserFromAuth({
+      adminOnly: false,
+      expectedAudience: KILO_GATEWAY_AUDIENCE,
+      runReplicaRead: gatewayReplicaReader('auth'),
+    }),
     { allowAnonymous: false, passThroughAuthFailure: true }
   );
   authSpan.end();

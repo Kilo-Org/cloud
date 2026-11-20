@@ -127,7 +127,7 @@ describe('organization group policies', () => {
     if (!(refused instanceof TRPCError)) throw new Error('Expected a TRPCError refusal');
     expect(refused.code).toBe('BAD_REQUEST');
     expect(refused.message).toBe(
-      `Each model id must be at most ${MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH} characters long.`
+      `A model id at index 0 ("${'m'.repeat(32)}…") must be at most ${MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH} characters long.`
     );
     expect(refused.cause).toBeInstanceOf(z.ZodError);
   });

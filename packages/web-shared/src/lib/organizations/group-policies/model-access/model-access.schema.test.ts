@@ -7,6 +7,7 @@ import {
   MAX_ORGANIZATION_GROUP_MODEL_IDS,
   MAX_ORGANIZATION_GROUP_PROVIDER_SLUG_LENGTH,
   MAX_ORGANIZATION_GROUP_PROVIDER_SLUGS,
+  modelAccessPolicyData,
   OrganizationGroupModelAccessPolicySchema,
   OrganizationGroupModelAccessPolicyWriteSchema,
 } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.schema';
@@ -234,7 +235,7 @@ describe('model access policy catalog limits', () => {
     expect(modelResult.error.issues).toEqual([
       expect.objectContaining({
         code: 'custom',
-        message: 'A model id must not contain control characters.',
+        message: `A model id at index 0 ("${'\\u0001'.repeat(32)}…") must not contain control characters.`,
         path: ['data', 'model_allow_list', 0],
       }),
     ]);
@@ -256,7 +257,7 @@ describe('model access policy catalog limits', () => {
     expect(providerResult.error.issues).toEqual([
       expect.objectContaining({
         code: 'custom',
-        message: 'A provider slug must not contain control characters.',
+        message: `A provider slug at index 0 ("${'p'.repeat(30)}\\u0001p…") must not contain control characters.`,
         path: ['data', 'provider_allow_list', 0],
       }),
     ]);
@@ -285,7 +286,7 @@ describe('model access policy catalog limits', () => {
       expect.objectContaining({
         code: 'custom',
         path: ['data', 'model_allow_list', 0],
-        message: 'A model id must be well-formed text.',
+        message: 'A model id at index 0 ("vendor/m\\ud800del") must be well-formed text.',
       }),
     ]);
 
@@ -305,7 +306,7 @@ describe('model access policy catalog limits', () => {
       expect.objectContaining({
         code: 'custom',
         path: ['data', 'provider_allow_list', 0],
-        message: 'A provider slug must be well-formed text.',
+        message: 'A provider slug at index 0 ("p\\udc00p") must be well-formed text.',
       }),
     ]);
   });
@@ -379,7 +380,9 @@ describe('model access policy write refusal sentences', () => {
           provider_allow_list: [],
         },
       })
-    ).toBe('Each model id must be at most 200 characters long.');
+    ).toBe(
+      `A model id at index 0 ("${'m'.repeat(32)}…") must be at most ${MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH} characters long.`
+    );
   });
 
   it('names the provider slug length bound for an over-long provider slug', () => {
@@ -392,13 +395,29 @@ describe('model access policy write refusal sentences', () => {
           provider_allow_list: ['p'.repeat(MAX_ORGANIZATION_GROUP_PROVIDER_SLUG_LENGTH + 1)],
         },
       })
-    ).toBe('Each provider slug must be at most 64 characters long.');
+    ).toBe(
+      `A provider slug at index 0 ("${'p'.repeat(32)}…") must be at most ${MAX_ORGANIZATION_GROUP_PROVIDER_SLUG_LENGTH} characters long.`
+    );
   });
 
   it('names the model id count bound for a selection above it', () => {
-    expect(writeRefusal(selectedPolicy(MAX_ORGANIZATION_GROUP_MODEL_IDS + 1))).toBe(
-      'At most 2000 model ids are allowed in one policy.'
-    );
+    // The list-count rule authors the same sentence as the issue message, so a
+    // caller reading `data.zodError` sees it without the mapper.
+    const policy = selectedPolicy(MAX_ORGANIZATION_GROUP_MODEL_IDS + 1);
+    const result = OrganizationGroupModelAccessPolicyWriteSchema.safeParse(policy);
+
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error('Expected an over-count selection to be refused');
+    expect(result.error.issues).toHaveLength(1);
+    expect(result.error.issues).toEqual([
+      expect.objectContaining({
+        code: 'too_big',
+        path: ['data', 'model_allow_list'],
+        message: 'At most 2000 model ids are allowed in one policy.',
+      }),
+    ]);
+
+    expect(writeRefusal(policy)).toBe('At most 2000 model ids are allowed in one policy.');
   });
 
   it('names the provider slug count bound for a selection above it', () => {
@@ -417,7 +436,9 @@ describe('model access policy write refusal sentences', () => {
           provider_allow_list: [],
         },
       })
-    ).toBe('A model id must not contain control characters.');
+    ).toBe(
+      `A model id at index 0 ("${'\\u0001'.repeat(32)}…") must not contain control characters.`
+    );
 
     expect(
       writeRefusal({
@@ -428,25 +449,41 @@ describe('model access policy write refusal sentences', () => {
           provider_allow_list: [`${'p'.repeat(30)}\u0001${'p'.repeat(30)}`],
         },
       })
-    ).toBe('A provider slug must not contain control characters.');
+    ).toBe(
+      `A provider slug at index 0 ("${'p'.repeat(30)}\\u0001p…") must not contain control characters.`
+    );
   });
 
   it('names the serialized size bound when the byte bound refuses the document', () => {
-    // The entry rules admit only printable, well-formed text, so the byte bound
-    // sits above every selection those rules allow. Its refusal sentence is
-    // still exercised through the mapper that produces it.
-    const error = new z.ZodError([
-      {
-        code: 'custom',
-        path: ['data'],
-        message: `Together the allow lists must serialize to at most ${MAX_ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_BYTES} bytes of UTF-8 JSON.`,
-        input: undefined,
-      },
-    ]);
+    // The entry rules set a maximum length and a maximum count, so the shipped
+    // byte bound is a backstop. A builder with a small bound exercises the same
+    // rule through a real parse.
+    const bounds = {
+      modelIdLength: MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH,
+      providerSlugLength: MAX_ORGANIZATION_GROUP_PROVIDER_SLUG_LENGTH,
+    };
+    const data = {
+      mode: 'selected',
+      model_allow_list: Array.from({ length: 8 }, () =>
+        'm'.repeat(MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH)
+      ),
+      provider_allow_list: [],
+    };
+    const sentence = 'Together the allow lists must serialize to at most 1024 bytes of UTF-8 JSON.';
 
-    expect(describeModelAccessPolicyWriteRefusal(error)).toBe(
-      'Together the allow lists must serialize to at most 2097152 bytes of UTF-8 JSON.'
-    );
+    expect(new TextEncoder().encode(JSON.stringify(data)).length).toBeGreaterThan(1024);
+
+    const refused = modelAccessPolicyData({ ...bounds, maxBytes: 1024 }).safeParse(data);
+
+    expect(refused.success).toBe(false);
+    if (refused.success) throw new Error('Expected the byte bound to refuse this document');
+    expect(refused.error.issues).toHaveLength(1);
+    expect(refused.error.issues).toEqual([
+      expect.objectContaining({ code: 'custom', message: sentence }),
+    ]);
+    expect(describeModelAccessPolicyWriteRefusal(refused.error)).toBe(sentence);
+
+    expect(modelAccessPolicyData({ ...bounds, maxBytes: 4096 }).safeParse(data).success).toBe(true);
   });
 
   it('names the empty model id entry when a model id is blank', () => {
@@ -455,16 +492,58 @@ describe('model access policy write refusal sentences', () => {
         type: 'model_access',
         data: { mode: 'selected', model_allow_list: [''], provider_allow_list: [] },
       })
-    ).toBe('Each model id must not be empty.');
+    ).toBe('A model id at index 0 ("") must not be empty.');
   });
 
   it('names the empty provider slug entry when a provider slug is blank', () => {
+    // `trim()` runs before the emptiness rule, so the sentence quotes the blank
+    // entry as the empty string it became.
     expect(
       writeRefusal({
         type: 'model_access',
         data: { mode: 'selected', model_allow_list: [], provider_allow_list: ['  '] },
       })
-    ).toBe('Each provider slug must not be empty.');
+    ).toBe('A provider slug at index 0 ("") must not be empty.');
+  });
+
+  it('names the index of an over-long model id beyond the first entry', () => {
+    const sentence = writeRefusal({
+      type: 'model_access',
+      data: {
+        mode: 'selected',
+        model_allow_list: [
+          'vendor/one',
+          'vendor/two',
+          'vendor/three',
+          'm'.repeat(MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH + 1),
+        ],
+        provider_allow_list: [],
+      },
+    });
+
+    expect(sentence).toBe(
+      `A model id at index 3 ("${'m'.repeat(32)}…") must be at most ${MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH} characters long.`
+    );
+
+    const excerpt = /at index 3 \("([^"]*)"\)/.exec(sentence)?.[1];
+    expect(Array.from(excerpt ?? '')).toHaveLength(33);
+    expect(excerpt?.endsWith('…')).toBe(true);
+  });
+
+  it('quotes a control character as an escape and names the provider slug index', () => {
+    const sentence = writeRefusal({
+      type: 'model_access',
+      data: {
+        mode: 'selected',
+        model_allow_list: [],
+        provider_allow_list: ['provider-one', 'provider-two', 'p\u0002pp'],
+      },
+    });
+
+    expect(sentence).toBe(
+      'A provider slug at index 2 ("p\\u0002pp") must not contain control characters.'
+    );
+    expect(/\p{Cc}/u.test(sentence)).toBe(false);
   });
 
   it('falls back to the generic refusal for a too_small issue outside the allow lists', () => {

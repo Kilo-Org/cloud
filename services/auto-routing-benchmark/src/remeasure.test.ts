@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { AutoRouter } from '@kilocode/auto-routing-contracts';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { deciderCliPrompt } from './cli-runner';
+import { CONTINUATION_CASES } from './datasets/continuation-cases';
 import { DECIDER_CASES, FRONTIER_CASES, type DeciderCase } from './datasets/decider-cases';
 import {
   copyRemeasureBaselines,
@@ -15,6 +16,11 @@ import {
   reuseDeciderCaseResults,
   settleRemeasuresForRun,
 } from './db';
+import {
+  deciderCasesForRouter,
+  MEASUREMENT_REVISION,
+  minimumCaseRevisions,
+} from './measurement-revision';
 import {
   argvAffectedCases,
   PROMPT_TRANSPORT_REVISION,
@@ -203,8 +209,7 @@ describe('prompt transport re-measure (real SQLite)', () => {
       runId: 'dest',
       ...current,
       entries: [entry],
-      skipOldCaseIds: affectedIds('efficient'),
-      promptRevision: PROMPT_TRANSPORT_REVISION,
+      minimumRevisions: minimumCaseRevisions('efficient', PROMPT_TRANSPORT_REVISION),
     });
 
     expect(caseIds('dest')).toEqual([plainCase.id, quotedExact.id, quotedStructured.id].sort());
@@ -235,11 +240,13 @@ describe('prompt transport re-measure (real SQLite)', () => {
         ],
       ]),
     });
-    const affected = argvAffectedCases('efficient');
+    const minimums = minimumCaseRevisions('efficient', MEASUREMENT_REVISION);
+    const affected = DECIDER_CASES.filter(c => c.id in minimums);
     const snapshotTokens = affected.reduce((total, c) => total + snapshotPromptTokens(c), 0);
     expect(report).toMatchObject({
       pairs: 1,
       affectedResults: affected.length,
+      unmeasuredResults: CONTINUATION_CASES.length,
       unknownCostResults: 0,
       changed: 0,
       pairDetails: [{ model: MODEL, queues: ['platform'], state: null }],
@@ -249,7 +256,7 @@ describe('prompt transport re-measure (real SQLite)', () => {
     expect(tableDump()).toEqual(before);
   });
 
-  it('re-measures only affected cases while the pair keeps serving its previous run', async () => {
+  it('re-measures only affected and added cases while the pair keeps serving', async () => {
     if (!plainCase) throw new Error('dataset needs a plain case');
     insertRun('old');
     seedMeasuredPair();
@@ -278,21 +285,21 @@ describe('prompt transport re-measure (real SQLite)', () => {
     });
 
     insertRun('remeasure', { status: 'running', startedAt: '2026-10-05T00:00:00.000Z' });
-    const skipOldCaseIds = affectedIds('efficient');
-    await copyRemeasureBaselines(db, {
-      runId: 'remeasure',
-      skipOldCaseIds,
-      promptRevision: PROMPT_TRANSPORT_REVISION,
-    });
+    const minimumRevisions = minimumCaseRevisions('efficient', MEASUREMENT_REVISION);
+    await copyRemeasureBaselines(db, { runId: 'remeasure', minimumRevisions });
     await reuseDeciderCaseResults(db, {
       runId: 'remeasure',
       ...current,
       entries: [entry],
-      skipOldCaseIds,
-      promptRevision: PROMPT_TRANSPORT_REVISION,
+      minimumRevisions,
     });
-    const unaffected = DECIDER_CASES.filter(c => !skipOldCaseIds.includes(c.id)).map(c => c.id);
-    expect(caseIds('remeasure')).toEqual([...unaffected].sort());
+    const cases = deciderCasesForRouter('efficient', MEASUREMENT_REVISION);
+    const rerun = cases.filter(c => c.id in minimumRevisions).map(c => c.id);
+    expect(caseIds('remeasure')).toEqual(
+      DECIDER_CASES.filter(c => !rerun.includes(c.id))
+        .map(c => c.id)
+        .sort()
+    );
     expect(
       sqlite
         .prepare('SELECT error FROM case_results WHERE run_id = ? AND case_id = ?')
@@ -303,22 +310,54 @@ describe('prompt transport re-measure (real SQLite)', () => {
       runId: 'remeasure',
       entries: [{ ...entry, providers: [] }],
       repetitions: 1,
-      caseIds: DECIDER_CASES.map(c => c.id),
+      caseIds: cases.map(c => c.id),
       chunkSize: 1,
     });
     const scheduled = sqlite
       .prepare("SELECT case_ids FROM scheduler_chunks WHERE run_id = ? AND status = 'pending'")
       .all('remeasure')
       .flatMap(row => JSON.parse(String(row.case_ids)) as string[]);
-    expect(scheduled.sort()).toEqual([...skipOldCaseIds].sort());
+    expect(scheduled.sort()).toEqual([...rerun].sort());
 
-    for (const caseId of skipOldCaseIds) {
-      insertResult('remeasure', caseId, { revision: PROMPT_TRANSPORT_REVISION });
+    for (const caseId of rerun) {
+      insertResult('remeasure', caseId, { revision: MEASUREMENT_REVISION });
     }
     await settleRemeasuresForRun(db, 'remeasure', []);
     expect(profileRunId()).toEqual({ run_id: 'remeasure', status: 'ready' });
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM profile_remeasures').get()).toEqual({ n: 0 });
     expect((await request()).pairs).toBe(0);
+  });
+
+  it('schedules only the tool-evidence cases for a pool pair measured under revision 2', async () => {
+    insertRun('old');
+    for (const benchCase of DECIDER_CASES) {
+      insertResult('old', benchCase.id, { revision: PROMPT_TRANSPORT_REVISION });
+    }
+    insertProfile('old');
+    insertRun('next', { status: 'running', startedAt: '2026-10-05T00:00:00.000Z' });
+
+    await reuseDeciderCaseResults(db, {
+      runId: 'next',
+      ...current,
+      entries: [entry],
+      minimumRevisions: minimumCaseRevisions('efficient', MEASUREMENT_REVISION),
+    });
+    await scheduleRunChunks(db, {
+      runId: 'next',
+      entries: [{ ...entry, providers: [] }],
+      repetitions: 1,
+      caseIds: deciderCasesForRouter('efficient', MEASUREMENT_REVISION).map(c => c.id),
+      chunkSize: 1,
+    });
+
+    const scheduled = sqlite
+      .prepare("SELECT case_ids FROM scheduler_chunks WHERE run_id = ? AND status = 'pending'")
+      .all('next')
+      .flatMap(row => JSON.parse(String(row.case_ids)) as string[]);
+    const agenticIds = DECIDER_CASES.filter(c => c.taskType === 'agentic_execution').map(c => c.id);
+    expect(scheduled.sort()).toEqual([...agenticIds, ...CONTINUATION_CASES.map(c => c.id)].sort());
+    expect(agenticIds).toHaveLength(90);
+    expect(scheduled.length).toBeLessThan(DECIDER_CASES.length / 5);
   });
 
   it('queues owner-only pairs for the owner queue', async () => {

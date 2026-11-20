@@ -49,7 +49,7 @@ import {
   type ProfileRow,
 } from './profiles';
 import { variantFromStorage } from './reasoning-effort';
-import { deciderCasesForRouter } from './run';
+import { CLIENT_EVAL_REVISION, deciderCasesForRouter } from './measurement-revision';
 import { buildCustomRoutingTable, filterSummariesByProvenance } from './routing-table-builder';
 
 type ModelCatalog = z.infer<typeof BenchmarkModelCatalogSchema>;
@@ -154,7 +154,7 @@ const platformMeasuredAt = (row: ProfileRow) => row.completed_at ?? row.updated_
 const clientMeasuredAt = (row: ClientProfileRow) => row.updated_at;
 
 function clientProfileComplete(router: AutoRouter, repetitions: number) {
-  const planned = deciderCasesForRouter(router).length * repetitions;
+  const planned = deciderCasesForRouter(router, CLIENT_EVAL_REVISION).length * repetitions;
   return (row: ClientProfileRow) => row.results >= planned;
 }
 

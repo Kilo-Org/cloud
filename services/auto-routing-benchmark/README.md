@@ -1106,6 +1106,38 @@ Runbook, after the whole stack is merged and deployed (the migration applies on 
    `GET /admin/routing-table` shows a new version.
 4. Stop: `"action":"cancel"` deletes queued claims. A claimed pair finishes or drops with
    its run.
+
+### Measurement revision 3: tool evidence
+
+Every run records the revision it started under (`benchmark_runs.measurement_revision`,
+`MEASUREMENT_REVISION` in `src/measurement-revision.ts`), and every result stores the
+revision that measured it in `prompt_revision`, with the CLI's tool evidence (`tool_calls`,
+`tool_names`, `step_count`, `final_finish_reason`). Revision 3 changes only the efficient
+router: every `agentic_execution` case requires at least one tool call (a turn that ends
+with narration and no tool call scores 0), `supp-agent-term-pwd-base` accepts only `other`,
+and the 9 continuation cases (`src/datasets/continuation-cases.ts`) join the case set. The
+engine identity still hashes the revision-2 cases, so frontier results and efficient
+non-agentic results stay reusable.
+
+`minimumCaseRevisions(router, revision)` maps each case to the oldest result revision a run
+may reuse: 2 for the argv-affected cases above, 3 for every efficient agentic and
+continuation case. Prior-case reuse and the re-measure baseline copy skip results below
+their case's minimum, so a re-measure schedules only those cases plus the added ones. The
+same `remeasure-prompt-transport` endpoint queues them; its dry run also reports
+`unmeasuredResults`, the current cases a provenance run never measured, which the spend
+projection leaves out because they have no measured cost.
+
+While ready platform pairs of one router mix grading revisions (`gradingRevision`), the
+platform table keeps serving its last version and logs
+`routing_table_publish_skipped_mixed_grading`; it republishes once every pair is measured
+under the newest grading. Revisions 2 and 3 grade frontier cases the same way, so the
+frontier table never waits.
+
+In the container, a case that requires a tool call runs with `isolated: true`: the CLI's
+working directory (`PWD`) is a fresh temp workspace instead of the shared `/app`. A
+continuation case writes its seeded files into that workspace, imports its seeded CLI
+session and resumes it, so the model continues a task in progress instead of starting one.
+
 ## Custom routers and client measurements
 
 ADR 0005 custom routers rank a pool of gateway and client entries against one base

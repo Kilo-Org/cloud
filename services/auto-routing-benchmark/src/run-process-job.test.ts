@@ -69,6 +69,7 @@ vi.mock('./db', async importOriginal => {
     countCurrentProfilesByStatus: vi.fn(),
     listCurrentPlatformProfileStatuses: vi.fn(),
     getSummariesForRuns: vi.fn(),
+    getRunMeasurementRevisions: vi.fn(),
     getRoutingCaseResultsForEntries: vi.fn().mockResolvedValue([]),
     listReadyCurrentProfilesForEntries: vi.fn(),
     markRunCompleted: vi.fn(),
@@ -119,7 +120,7 @@ import {
   needsPendingOutputRecovery,
   listPendingOutputRecoveries,
   savePendingDeciderOutput,
-  type PendingDeciderOutput,
+  type StoredDeciderOutput,
   getRunWithModels,
   getLiveContainerLanes,
   listPendingCurrentProfiles,
@@ -129,6 +130,7 @@ import {
   countCurrentProfilesByStatus,
   listCurrentPlatformProfileStatuses,
   getSummariesForRuns,
+  getRunMeasurementRevisions,
   listReadyCurrentProfilesForEntries,
   listLaneFailures,
   listStaleRunningDeciderRuns,
@@ -149,6 +151,7 @@ import {
 import { createDeciderJudge } from './decider-judge';
 import { createSystemOneClient } from './openrouter';
 import type { DeciderJudge } from './grading';
+import { deciderCasesForRouter, MEASUREMENT_REVISION } from './measurement-revision';
 import {
   beginPaidCase,
   getPaidCasePromptRevision,
@@ -203,6 +206,7 @@ const successfulCliResult = {
   stderrTail: '',
   eventCount: 1,
   lastEventTypes: ['session.created'],
+  tools: { calls: 0, names: [], steps: 1, finalFinishReason: 'stop' },
   timedOut: false,
 } satisfies CliRunResult;
 
@@ -244,12 +248,14 @@ function mockRunSnapshot(
     variant: string;
     enqueued?: boolean;
     reasoning_effort?: string | null;
-  }> = [{ model, variant: '', enqueued: true, reasoning_effort: null }]
+  }> = [{ model, variant: '', enqueued: true, reasoning_effort: null }],
+  measurementRevision: number = MEASUREMENT_REVISION
 ): void {
   vi.mocked(getRunWithModels).mockResolvedValue({
     run: {
       router: 'efficient',
       engine_identity: computeEngineIdentity('decider', 'efficient'),
+      measurement_revision: measurementRevision,
       max_concurrency: 4,
       status: 'running',
       min_accuracy: 0.7,
@@ -535,6 +541,69 @@ describe('processJob — scheduler-owned execution', () => {
     );
   });
 
+  describe('tool-required cases', () => {
+    const printfCase = deciderCasesForRouter('efficient', MEASUREMENT_REVISION).find(
+      candidate => candidate.id === 'supp2-agent-term-printf'
+    );
+    if (!printfCase) throw new Error('dataset lacks supp2-agent-term-printf');
+
+    it('scores a correct answer 0 when the turn narrated and stopped without a tool call', async () => {
+      mockClaim({ case_ids: JSON.stringify([printfCase.id]) });
+      vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
+        ...successfulCliResult,
+        text: 'kilo',
+        tools: { calls: 0, names: [], steps: 1, finalFinishReason: 'stop' },
+      });
+
+      await processJob(env, deciderMessage());
+
+      expect(upsertCaseResult).toHaveBeenCalledWith(
+        env.BENCH_DB,
+        expect.objectContaining({
+          case_id: printfCase.id,
+          score: 0,
+          tool_calls: 0,
+          tool_names: '[]',
+          step_count: 1,
+          final_finish_reason: 'stop',
+          prompt_revision: MEASUREMENT_REVISION,
+        })
+      );
+    });
+
+    it('grades the answer once the run made the required tool call', async () => {
+      mockClaim({ case_ids: JSON.stringify([printfCase.id]) });
+      vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
+        ...successfulCliResult,
+        text: 'kilo',
+        tools: { calls: 1, names: ['bash'], steps: 2, finalFinishReason: 'stop' },
+      });
+
+      await processJob(env, deciderMessage());
+
+      expect(upsertCaseResult).toHaveBeenCalledWith(
+        env.BENCH_DB,
+        expect.objectContaining({ case_id: printfCase.id, score: 1, tool_names: '["bash"]' })
+      );
+    });
+
+    it('keeps revision-2 grading for a run that started before revision 3', async () => {
+      mockRunSnapshot(undefined, 2);
+      mockClaim({ case_ids: JSON.stringify([printfCase.id]) });
+      vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
+        ...successfulCliResult,
+        text: 'kilo',
+      });
+
+      await processJob(env, deciderMessage());
+
+      expect(upsertCaseResult).toHaveBeenCalledWith(
+        env.BENCH_DB,
+        expect.objectContaining({ case_id: printfCase.id, score: 1, prompt_revision: 2 })
+      );
+    });
+  });
+
   it('defers a claim whose exact pair is missing rather than executing another variant', async () => {
     mockRunSnapshot([{ model, variant: 'high', reasoning_effort: 'high' }]);
     mockClaim({ variant: 'medium' });
@@ -691,7 +760,7 @@ describe('processJob — legacy whole-run migration', () => {
         { model, variant: 'low', providers: [] },
       ],
       repetitions: 3,
-      caseIds: DECIDER_CASES.map(c => c.id),
+      caseIds: deciderCasesForRouter('efficient', MEASUREMENT_REVISION).map(c => c.id),
       chunkSize: 1,
     });
     expect(destroyDeciderCliContainer).toHaveBeenCalledTimes(2);
@@ -782,6 +851,7 @@ describe('processJob — scheduler waits and paid-call safety', () => {
           result,
           retried: false,
           attemptStartedAt: persistedStartedAt,
+          promptRevision: MEASUREMENT_REVISION,
         });
       } else {
         vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce(result);
@@ -978,7 +1048,11 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce(result);
     vi.mocked(markProfilesFailedForEntries).mockRejectedValueOnce(new Error('D1 unavailable'));
     await expect(processJob(env, deciderMessage())).rejects.toThrow('D1 unavailable');
-    vi.mocked(getPendingDeciderOutput).mockResolvedValueOnce({ result, retried: false });
+    vi.mocked(getPendingDeciderOutput).mockResolvedValueOnce({
+      result,
+      retried: false,
+      promptRevision: MEASUREMENT_REVISION,
+    });
 
     await processJob(env, deciderMessage());
 
@@ -1092,6 +1166,7 @@ describe('processJob — scheduler waits and paid-call safety', () => {
           result,
           retried: false,
           attemptStartedAt: persistedStartedAt,
+          promptRevision: MEASUREMENT_REVISION,
         });
       } else {
         vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce(result);
@@ -1421,7 +1496,7 @@ describe('processJob — scheduler waits and paid-call safety', () => {
       ],
       stderrTail: '',
     };
-    let pending: PendingDeciderOutput | null = null;
+    let pending: StoredDeciderOutput | null = null;
     vi.mocked(savePendingDeciderOutput).mockImplementation(async (_db, _key, output) => {
       pending = output;
       return true;
@@ -1571,11 +1646,12 @@ describe('processJob — canonical registry publication', () => {
   function mockPublishHarness(variant: string, reasoningEffort: string | null) {
     mockRunSnapshot([{ model, variant, enqueued: true, reasoning_effort: reasoningEffort }]);
     mockClaim({ variant });
+    const cases = deciderCasesForRouter('efficient', MEASUREMENT_REVISION);
     vi.mocked(countCaseResultsByLane).mockResolvedValue([
-      { model, variant, rep: 0, n: DECIDER_CASES.length },
+      { model, variant, rep: 0, n: cases.length },
     ]);
     vi.mocked(getCaseResults).mockResolvedValue(
-      DECIDER_CASES.map(c => ({
+      cases.map(c => ({
         run_id: runId,
         model,
         variant,
@@ -1596,14 +1672,21 @@ describe('processJob — canonical registry publication', () => {
         output_prefix: 'ok',
         event_count: 1,
         last_event_types: 'x',
+        tool_calls: 1,
+        tool_names: '["bash"]',
+        step_count: 2,
+        final_finish_reason: 'stop',
         rep: 0,
         timed_out: 0,
-        prompt_revision: 2,
+        prompt_revision: MEASUREMENT_REVISION,
       }))
     );
     vi.mocked(getExistingCaseResultIds).mockResolvedValue(new Set([benchCase.id]));
     vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
       { model, variant, run_id: runId },
+    ]);
+    vi.mocked(getRunMeasurementRevisions).mockResolvedValue([
+      { runId, measurementRevision: MEASUREMENT_REVISION },
     ]);
     vi.mocked(countCurrentProfilesByStatus).mockResolvedValue([{ status: 'ready', count: 1 }]);
     vi.mocked(getLatestRoutingTable).mockResolvedValue(null);
@@ -1673,7 +1756,7 @@ describe('processJob — retryable rubric grading', () => {
     vi.mocked(runDeciderCaseViaCli)
       .mockResolvedValueOnce({ ...successfulCliResult, text: '', costUsd: 0.01 })
       .mockResolvedValueOnce({ ...successfulCliResult, text: 'A complete answer', costUsd: 0.02 });
-    let pending: PendingDeciderOutput | null = null;
+    let pending: StoredDeciderOutput | null = null;
     vi.mocked(savePendingDeciderOutput).mockImplementation(async (_db, _key, output) => {
       pending = output;
       return true;

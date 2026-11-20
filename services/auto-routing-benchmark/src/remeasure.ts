@@ -1,11 +1,11 @@
 import type { AutoRouter, CandidatePricing } from '@kilocode/auto-routing-contracts';
 import type { DeciderCase } from './datasets/decider-cases';
 import {
-  argvAffectedCases,
-  PROMPT_TRANSPORT_REVISION,
-  REMEASURE_FRONTIER_INNER_QUOTE_CASES,
-  snapshotPromptTokens,
-} from './prompt-transport';
+  deciderCasesForRouter,
+  MEASUREMENT_REVISION,
+  minimumCaseRevisions,
+} from './measurement-revision';
+import { REMEASURE_FRONTIER_INNER_QUOTE_CASES, snapshotPromptTokens } from './prompt-transport';
 import { variantFromStorage } from './reasoning-effort';
 
 export type RemeasureAction = 'dry-run' | 'request' | 'cancel';
@@ -18,6 +18,8 @@ export type RemeasurePairReport = {
   state: 'queued' | 'running' | null;
   runId: string | null;
   affectedResults: number;
+  /** Results of current cases the provenance run never measured; not in the projection. */
+  unmeasuredResults: number;
   projectedCostUsd: number;
 };
 
@@ -30,6 +32,7 @@ export type RemeasureRouterReport = {
   affectedCaseIds: string[];
   pairs: number;
   affectedResults: number;
+  unmeasuredResults: number;
   projectedCostUsd: number;
   /** Results without a measured cost, or long-context results of a model without a catalog price. */
   unknownCostResults: number;
@@ -38,23 +41,38 @@ export type RemeasureRouterReport = {
   pairDetails: RemeasurePairReport[];
 };
 
-type AffectedRow = {
+type PairRow = {
   model: string;
   variant: string;
   platform_requested: number;
   user_requested: number;
-  case_id: string;
-  cost_usd: number | null;
   remeasure_run_id: string | null;
   remeasure_queued: number;
 };
 
+type AffectedRow = PairRow & { case_id: string; cost_usd: number | null };
+
+type MeasuredRow = PairRow & { measured: number };
+
+const PAIR_COLUMNS = `p.model, p.variant, p.platform_requested, p.user_requested,
+  r.run_id AS remeasure_run_id, (r.router IS NOT NULL) AS remeasure_queued`;
+
+const REMEASURE_JOIN = `LEFT JOIN profile_remeasures AS r ON r.router = p.router
+  AND r.model = p.model AND r.variant = p.variant AND r.engine_identity = p.engine_identity
+  AND r.repetitions = p.repetitions`;
+
+const READY_PAIR_FILTER = `p.router = ? AND p.engine_identity = ? AND p.repetitions = ?
+  AND p.status = 'ready' AND (p.platform_requested = 1 OR p.user_requested = 1)`;
+
 /**
- * Current-identity ready pairs of one router whose provenance run holds results of
- * affected cases measured under an older prompt transport, with projected spend: each
- * result's measured cost, plus the snapshot prompt tokens at the model's catalog prompt
- * price for long-context cases. `request` queues them in `profile_remeasures`; `cancel`
- * removes queued rows that no run has claimed. A dry run reads only.
+ * Current-identity ready pairs of one router whose provenance run lacks a valid measurement
+ * of a current case: a result below its case's minimum revision (src/measurement-revision.ts),
+ * or no result at all for a case added since. Projected spend covers the results below their
+ * minimum: each one's measured cost, plus the snapshot prompt tokens at the model's catalog
+ * prompt price for long-context cases. Added cases have no measured cost, so the projection
+ * leaves them out and `unmeasuredResults` counts them. `request` queues the pairs in
+ * `profile_remeasures`; `cancel` removes queued rows that no run has claimed. A dry run reads
+ * only.
  */
 export async function planPromptTransportRemeasure(
   db: D1Database,
@@ -69,7 +87,11 @@ export async function planPromptTransportRemeasure(
   }
 ): Promise<RemeasureRouterReport> {
   const frontierInnerQuotes = params.frontierInnerQuotes ?? REMEASURE_FRONTIER_INNER_QUOTE_CASES;
-  const affected = argvAffectedCases(params.router, { frontierInnerQuotes });
+  const minimums = minimumCaseRevisions(params.router, MEASUREMENT_REVISION, {
+    frontierInnerQuotes,
+  });
+  const cases = deciderCasesForRouter(params.router, MEASUREMENT_REVISION);
+  const affected = cases.filter(benchCase => benchCase.id in minimums);
   const casesById = new Map<string, DeciderCase>(affected.map(c => [c.id, c]));
   // Materializing a snapshot builds a few hundred KB, so price each case once.
   const snapshotTokensByCase = new Map(
@@ -77,53 +99,63 @@ export async function planPromptTransportRemeasure(
       .filter(benchCase => benchCase.longContext)
       .map(benchCase => [benchCase.id, snapshotPromptTokens(benchCase)])
   );
-  const { results } = await db
-    .prepare(`
-      SELECT p.model, p.variant, p.platform_requested, p.user_requested,
-        source.case_id, source.cost_usd,
-        r.run_id AS remeasure_run_id, (r.router IS NOT NULL) AS remeasure_queued
-      FROM benchmark_profiles AS p
-      JOIN case_results AS source ON source.run_id = p.run_id
-        AND source.model = p.model AND source.variant = p.variant
-      LEFT JOIN profile_remeasures AS r ON r.router = p.router AND r.model = p.model
-        AND r.variant = p.variant AND r.engine_identity = p.engine_identity
-        AND r.repetitions = p.repetitions
-      WHERE p.router = ? AND p.engine_identity = ? AND p.repetitions = ?
-        AND p.status = 'ready' AND (p.platform_requested = 1 OR p.user_requested = 1)
-        AND source.prompt_revision < ?
-        AND source.case_id IN (SELECT value FROM json_each(?))
-      ORDER BY p.model, p.variant
-    `)
-    .bind(
-      params.router,
-      params.engineIdentity,
-      params.repetitions,
-      PROMPT_TRANSPORT_REVISION,
-      JSON.stringify([...casesById.keys()])
-    )
-    .all<AffectedRow>();
+  const pairBindings = [params.router, params.engineIdentity, params.repetitions];
+  const [{ results }, { results: measured }] = await Promise.all([
+    db
+      .prepare(`
+        SELECT ${PAIR_COLUMNS}, source.case_id, source.cost_usd
+        FROM benchmark_profiles AS p
+        JOIN case_results AS source ON source.run_id = p.run_id
+          AND source.model = p.model AND source.variant = p.variant
+        ${REMEASURE_JOIN}
+        WHERE ${READY_PAIR_FILTER}
+          AND EXISTS (SELECT 1 FROM json_each(?) AS minimum
+            WHERE minimum.key = source.case_id AND source.prompt_revision < minimum.value)
+        ORDER BY p.model, p.variant
+      `)
+      .bind(...pairBindings, JSON.stringify(minimums))
+      .all<AffectedRow>(),
+    db
+      .prepare(`
+        SELECT ${PAIR_COLUMNS},
+          (SELECT COUNT(*) FROM case_results AS source
+            WHERE source.run_id = p.run_id AND source.model = p.model
+              AND source.variant = p.variant
+              AND source.case_id IN (SELECT value FROM json_each(?))) AS measured
+        FROM benchmark_profiles AS p
+        ${REMEASURE_JOIN}
+        WHERE ${READY_PAIR_FILTER}
+        ORDER BY p.model, p.variant
+      `)
+      .bind(JSON.stringify(cases.map(benchCase => benchCase.id)), ...pairBindings)
+      .all<MeasuredRow>(),
+  ]);
 
   const pairs = new Map<string, RemeasurePairReport>();
+  const pairOf = (row: PairRow) => {
+    const key = JSON.stringify([row.model, row.variant]);
+    const existing = pairs.get(key);
+    if (existing) return existing;
+    const pair: RemeasurePairReport = {
+      model: row.model,
+      variant: variantFromStorage(row.variant),
+      queues: [
+        ...(row.platform_requested ? ['platform' as const] : []),
+        ...(row.user_requested ? ['user' as const] : []),
+      ],
+      state: row.remeasure_run_id ? 'running' : row.remeasure_queued ? 'queued' : null,
+      runId: row.remeasure_run_id,
+      affectedResults: 0,
+      unmeasuredResults: 0,
+      projectedCostUsd: 0,
+    };
+    pairs.set(key, pair);
+    return pair;
+  };
   let projectedCostUsd = 0;
   let unknownCostResults = 0;
   for (const row of results) {
-    const key = JSON.stringify([row.model, row.variant]);
-    let pair = pairs.get(key);
-    if (!pair) {
-      pair = {
-        model: row.model,
-        variant: variantFromStorage(row.variant),
-        queues: [
-          ...(row.platform_requested ? ['platform' as const] : []),
-          ...(row.user_requested ? ['user' as const] : []),
-        ],
-        state: row.remeasure_run_id ? 'running' : row.remeasure_queued ? 'queued' : null,
-        runId: row.remeasure_run_id,
-        affectedResults: 0,
-        projectedCostUsd: 0,
-      };
-      pairs.set(key, pair);
-    }
+    const pair = pairOf(row);
     pair.affectedResults += 1;
     const snapshotTokens = snapshotTokensByCase.get(row.case_id) ?? 0;
     const promptPrice = params.prices.get(row.model)?.promptUsdPerToken;
@@ -134,6 +166,13 @@ export async function planPromptTransportRemeasure(
     const cost = row.cost_usd + snapshotTokens * (promptPrice ?? 0);
     pair.projectedCostUsd += cost;
     projectedCostUsd += cost;
+  }
+  let unmeasuredResults = 0;
+  for (const row of measured) {
+    const missing = cases.length * params.repetitions - row.measured;
+    if (missing <= 0) continue;
+    pairOf(row).unmeasuredResults += missing;
+    unmeasuredResults += missing;
   }
 
   const pairDetails = [...pairs.values()];
@@ -148,11 +187,12 @@ export async function planPromptTransportRemeasure(
     router: params.router,
     engineIdentity: params.engineIdentity,
     repetitions: params.repetitions,
-    promptRevision: PROMPT_TRANSPORT_REVISION,
+    promptRevision: MEASUREMENT_REVISION,
     frontierInnerQuotes,
     affectedCaseIds: [...casesById.keys()],
     pairs: pairDetails.length,
     affectedResults: results.length,
+    unmeasuredResults,
     projectedCostUsd,
     unknownCostResults,
     changed,

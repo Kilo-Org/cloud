@@ -57,7 +57,7 @@ import { gradeDeciderOutput, type DeciderJudge } from './grading';
 import type { HonoEnv } from './hono-env';
 import { createSystemOneClient } from './openrouter';
 import { currentProfileContextFromConfig } from './profiles';
-import { deciderCasesForRouter } from './run';
+import { CLIENT_EVAL_REVISION, deciderCasesForRouter } from './measurement-revision';
 
 export class ClientEvalError extends Error {
   constructor(
@@ -77,7 +77,7 @@ export type ClientEvalDeps = {
 };
 
 function findCase(router: AutoRouter, caseId: string) {
-  const benchCase = deciderCasesForRouter(router).find(c => c.id === caseId);
+  const benchCase = deciderCasesForRouter(router, CLIENT_EVAL_REVISION).find(c => c.id === caseId);
   if (!benchCase) {
     throw new ClientEvalError('invalid_request', `Unknown ${router} case: ${caseId}`);
   }
@@ -119,7 +119,7 @@ export async function planClientEval(
     })
   );
   const uploaded = await listClientCaseKeys(db, [...currentProfileIds.values()]);
-  const cases = deciderCasesForRouter(request.baseRouter);
+  const cases = deciderCasesForRouter(request.baseRouter, CLIENT_EVAL_REVISION);
   const items: ClientEvalPlanItem[] = [];
   const staleEntries: ClientEvalPair[] = [];
   for (const { entry, variant, rows } of pairs) {
@@ -225,7 +225,8 @@ export async function gradeClientEvalResult(
     nowIso
   );
   const caseKey = { profileId: profile.id, caseId: request.caseId, rep: request.rep };
-  const plannedResults = deciderCasesForRouter(request.baseRouter).length * current.repetitions;
+  const plannedResults =
+    deciderCasesForRouter(request.baseRouter, CLIENT_EVAL_REVISION).length * current.repetitions;
   const stored = await getClientCase(db, caseKey);
   if (stored?.ran) {
     return settleStoredClientCase(db, profile, caseKey, stored, plannedResults, nowIso, deps);

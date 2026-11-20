@@ -23,7 +23,7 @@ import { chunkArray } from '@kilocode/worker-utils/chunk-array';
 import * as z from 'zod';
 import { getBenchmarkConfig } from './config';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
-import { DECIDER_CASES, FRONTIER_CASES, type DeciderCase } from './datasets/decider-cases';
+import type { DeciderCase } from './datasets/decider-cases';
 import caseComplexity from './datasets/case-complexity.json';
 import type { RunModelRow, RunRow } from './db';
 import {
@@ -48,6 +48,7 @@ import {
   getLatestRoutingTable,
   getSummaries,
   getSummariesForRuns,
+  getRunMeasurementRevisions,
   getRoutingCaseResultsForEntries,
   insertRun,
   listLaneFailures,
@@ -73,12 +74,13 @@ import {
   upsertCaseResult,
   type BenchmarkRunPurpose,
   type CaseResultRow,
-  type PendingDeciderOutput,
+  type StoredDeciderOutput,
   type PriorModelResult,
 } from './db';
 import {
   gradeClassifierOutput,
   gradeDeciderOutput,
+  lacksRequiredToolCalls,
   DeciderGraderRetryError,
   type DeciderJudge,
 } from './grading';
@@ -150,7 +152,13 @@ import {
   type SchedulerConfig,
 } from './scheduler';
 import { catalogModelProviders } from './platform-models';
-import { argvAffectedCases, PROMPT_TRANSPORT_REVISION } from './prompt-transport';
+import {
+  deciderCasesForRouter,
+  ENGINE_IDENTITY_REVISION,
+  gradingRevision,
+  MEASUREMENT_REVISION,
+  minimumCaseRevisions,
+} from './measurement-revision';
 
 /** One exact Pool entry identity used throughout a decider/classifier run. */
 export type RunModelEntry = {
@@ -197,17 +205,19 @@ export const BenchmarkJobMessageSchema = z.object({
   recoverOutput: z.boolean().optional(),
 });
 
-export function deciderCasesForRouter(router: AutoRouter = 'efficient') {
-  return router === 'frontier' ? FRONTIER_CASES : DECIDER_CASES;
-}
-
 /**
  * Cases one model repetition runs for a run kind: the length of the dataset
- * that kind selects. Shared with run progress so a displayed total cannot
- * disagree with the count run completion waits for.
+ * that kind and the run's measurement revision select. Shared with run progress so a
+ * displayed total cannot disagree with the count run completion waits for.
  */
-export function expectedCaseCount(kind: BenchmarkKind, router: AutoRouter): number {
-  return kind === 'classifier' ? CLASSIFIER_CASES.length : deciderCasesForRouter(router).length;
+export function expectedCaseCount(
+  kind: BenchmarkKind,
+  router: AutoRouter,
+  measurementRevision: number
+): number {
+  return kind === 'classifier'
+    ? CLASSIFIER_CASES.length
+    : deciderCasesForRouter(router, measurementRevision).length;
 }
 
 const DECIDER_CHUNK_SIZE = 1;
@@ -329,7 +339,7 @@ async function salvageTimedOutDeciderRun(env: Env, runId: string): Promise<void>
     env.BENCH_DB,
     runId,
     state,
-    deciderCasesForRouter(state.router).length
+    expectedCaseCount('decider', state.router, state.measurementRevision)
   );
   for (const lane of unfinished) {
     if (deadLaneKeys.has(laneKey(lane.model, lane.variant, lane.rep))) continue;
@@ -473,6 +483,10 @@ export async function syncPlatformRegistry(
  * This still refuses to publish a table thinner than the live one. After an
  * engine bump every row is re-requested under the new engine, so `desired` keeps
  * the previous serving pairs, no ready row matches them, and publishing waits.
+ *
+ * Nor does it rank pairs graded differently: while some served pairs were measured under
+ * an older grading revision (src/measurement-revision.ts) than others, the live table,
+ * built from one grading, keeps serving until the last pair is re-measured.
  */
 export async function publishPlatformRoutingTable(
   env: Env,
@@ -565,6 +579,29 @@ export async function publishPlatformRoutingTable(
     return null;
   }
 
+  const runRevisions = await getRunMeasurementRevisions(env.BENCH_DB, [
+    ...new Set(readyEntries.map(r => r.runId)),
+  ]);
+  const newestGrading = Math.max(
+    ...runRevisions.map(run => gradingRevision(router, run.measurementRevision))
+  );
+  const lagging = runRevisions.filter(
+    run => gradingRevision(router, run.measurementRevision) < newestGrading
+  );
+  if (lagging.length > 0) {
+    const laggingRunIds = new Set(lagging.map(run => run.runId));
+    console.log(
+      JSON.stringify({
+        event: 'routing_table_publish_skipped_mixed_grading',
+        gradingRevision: newestGrading,
+        laggingPairs: readyEntries
+          .filter(r => laggingRunIds.has(r.runId))
+          .map(r => exactPairKey(r.entry.model, r.entry.variant)),
+      })
+    );
+    return null;
+  }
+
   const [summaries, perCaseResults] = await Promise.all([
     getSummariesForRuns(env.BENCH_DB, [...new Set(readyEntries.map(r => r.runId))]),
     getRoutingCaseResultsForEntries(env.BENCH_DB, readyEntries),
@@ -637,7 +674,9 @@ export async function publishPlatformRoutingTable(
 // Bump when grading logic, the CLI invocation/variant handling, the container
 // image's pinned CLI, or any other execution input NOT captured by the dataset
 // hash changes in a way that invalidates prior measurements. Forces every
-// carried summary to be re-benchmarked on the next run.
+// carried summary to be re-benchmarked on the next run. A change confined to some
+// cases raises MEASUREMENT_REVISION instead (src/measurement-revision.ts), which
+// re-measures only those cases.
 const BENCHMARK_ENGINE_VERSION = 1;
 
 function fnv1aHex(input: string): string {
@@ -654,7 +693,8 @@ function fnv1aHex(input: string): string {
 // the dataset contents (ids + grading checks/expectations) and an engine
 // version for code-level execution changes. Two runs sharing this identity
 // (plus repetitions + reasoning_effort) produced comparable measurements, so a
-// model's prior summaries can be carried instead of re-run.
+// model's prior summaries can be carried instead of re-run. The hash covers the
+// cases of ENGINE_IDENTITY_REVISION; later measurement revisions keep it.
 export function computeEngineIdentity(
   kind: BenchmarkKind,
   router: AutoRouter = 'efficient'
@@ -663,7 +703,7 @@ export function computeEngineIdentity(
   const datasetSignature =
     kind === 'classifier'
       ? { engine: 'system-one', cases: CLASSIFIER_CASES }
-      : deciderCasesForRouter(selectedRouter);
+      : deciderCasesForRouter(selectedRouter, ENGINE_IDENTITY_REVISION);
   return `${selectedRouter}:v${BENCHMARK_ENGINE_VERSION}:${fnv1aHex(JSON.stringify(datasetSignature))}`;
 }
 
@@ -914,6 +954,7 @@ export async function startRun(
         classifier_max_p95_latency_ms:
           kind === 'classifier' ? policy.classifierMaxP95LatencyMs : null,
         engine_identity: engineIdentity,
+        measurement_revision: MEASUREMENT_REVISION,
         purpose,
       },
       runModelRows,
@@ -941,23 +982,18 @@ export async function startRun(
     throw error;
   }
   if (kind === 'decider') {
-    // Re-measured pairs start from their previous run's results; only the cases the old
-    // prompt transport measured unreliably are left to run.
-    const skipOldCaseIds = argvAffectedCases(router).map(benchCase => benchCase.id);
+    // Re-measured pairs start from their previous run's results; only the cases measured
+    // below their minimum revision are left to run.
+    const minimumRevisions = minimumCaseRevisions(router, MEASUREMENT_REVISION);
     try {
-      await copyRemeasureBaselines(env.BENCH_DB, {
-        runId,
-        skipOldCaseIds,
-        promptRevision: PROMPT_TRANSPORT_REVISION,
-      });
+      await copyRemeasureBaselines(env.BENCH_DB, { runId, minimumRevisions });
       await reuseDeciderCaseResults(env.BENCH_DB, {
         runId,
         router,
         engineIdentity,
         repetitions,
         entries: enqueuedRunEntries,
-        skipOldCaseIds,
-        promptRevision: PROMPT_TRANSPORT_REVISION,
+        minimumRevisions,
       });
     } catch (error) {
       const reason = `case reuse failed: ${formatError(error).error}`;
@@ -997,6 +1033,7 @@ export async function startRun(
       startedAt,
       purpose,
       engineIdentity,
+      measurementRevision: MEASUREMENT_REVISION,
     });
     return { runId, enqueuedModels: 0, skippedModels };
   }
@@ -1161,7 +1198,9 @@ async function initializeScheduledRun(env: Env, runId: string): Promise<boolean>
         providers: catalogModelProviders(catalog, model.model),
       })),
     repetitions: run.repetitions,
-    caseIds: deciderCasesForRouter(run.router).map(benchCase => benchCase.id),
+    caseIds: deciderCasesForRouter(run.router, run.measurement_revision).map(
+      benchCase => benchCase.id
+    ),
     chunkSize: DECIDER_CHUNK_SIZE,
   });
 }
@@ -1374,7 +1413,7 @@ async function recordDeciderOutput(
   env: Env,
   key: OutputRecoveryKey,
   benchCase: DeciderCase,
-  output: PendingDeciderOutput,
+  output: StoredDeciderOutput,
   judge: DeciderJudge | null
 ): Promise<number> {
   const pendingKey = {
@@ -1398,14 +1437,17 @@ async function recordDeciderOutput(
   }
   try {
     const { result, retried } = output;
-    const grade =
-      result.exitCode === 0 && result.text.length > 0
-        ? await gradeDeciderOutput(benchCase.check, {
-            userPrompt: benchCase.userPrompt,
-            output: result.text,
-            judge,
-          })
-        : { score: 0, costUsd: 0, graderError: null };
+    const answered =
+      result.exitCode === 0 &&
+      result.text.length > 0 &&
+      !lacksRequiredToolCalls(benchCase.requiredToolCalls, result.tools?.calls ?? null);
+    const grade = answered
+      ? await gradeDeciderOutput(benchCase.check, {
+          userPrompt: benchCase.userPrompt,
+          output: result.text,
+          judge,
+        })
+      : { score: 0, costUsd: 0, graderError: null };
     if (grade.score === null) {
       throw new DeciderGraderRetryError(grade.graderError ?? 'Decider judge failed');
     }
@@ -1430,9 +1472,13 @@ async function recordDeciderOutput(
       output_prefix: result.text.slice(0, 200),
       event_count: result.eventCount,
       last_event_types: result.lastEventTypes.join(' '),
+      tool_calls: result.tools?.calls ?? null,
+      tool_names: result.tools ? JSON.stringify(result.tools.names) : null,
+      step_count: result.tools?.steps ?? null,
+      final_finish_reason: result.tools?.finalFinishReason ?? null,
       rep: key.rep,
       timed_out: result.timedOut ? 1 : 0,
-      prompt_revision: output.promptRevision ?? PROMPT_TRANSPORT_REVISION,
+      prompt_revision: output.promptRevision,
     });
     return grade.costUsd;
   } finally {
@@ -1461,7 +1507,9 @@ async function recoverPendingOutputJob(env: Env, message: BenchmarkJobMessage): 
     return;
   }
   const variant = variantToStorage(message.variant);
-  const benchCase = deciderCasesForRouter(state.router).find(candidate => candidate.id === caseId);
+  const benchCase = deciderCasesForRouter(state.router, state.measurementRevision).find(
+    candidate => candidate.id === caseId
+  );
   if (
     !benchCase ||
     !state.models.some(row => row.model === message.model && row.variant === variant)
@@ -1899,9 +1947,13 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
             output_prefix: null,
             event_count: null,
             last_event_types: null,
+            tool_calls: null,
+            tool_names: null,
+            step_count: null,
+            final_finish_reason: null,
             rep,
             timed_out: 0,
-            prompt_revision: PROMPT_TRANSPORT_REVISION,
+            prompt_revision: MEASUREMENT_REVISION,
           });
         } catch (error) {
           await upsertCaseResult(
@@ -2002,6 +2054,7 @@ type RunState = {
   startedAt: string;
   purpose: BenchmarkRunPurpose;
   engineIdentity: string;
+  measurementRevision: number;
 };
 
 async function getRunState(env: Env, runId: string): Promise<RunState> {
@@ -2023,6 +2076,7 @@ async function getRunState(env: Env, runId: string): Promise<RunState> {
     startedAt: run.started_at,
     purpose: run.purpose === 'user' ? 'user' : 'platform',
     engineIdentity: run.engine_identity,
+    measurementRevision: run.measurement_revision,
   };
 }
 
@@ -2034,7 +2088,9 @@ async function processDeciderJob(
 ): Promise<void> {
   if (!message.caseIds?.length) throw new Error('Scheduler chunk has no cases');
   const caseIds = new Set(message.caseIds);
-  const cases = deciderCasesForRouter(state.router).filter(c => caseIds.has(c.id));
+  const cases = deciderCasesForRouter(state.router, state.measurementRevision).filter(c =>
+    caseIds.has(c.id)
+  );
   if (cases.length !== message.caseIds.length) throw new Error('Scheduler chunk has unknown cases');
 
   const { benchmarkUserId, benchmarkOrgId } = state;
@@ -2150,7 +2206,8 @@ async function processDeciderJob(
         token: claim.token,
       };
       let attemptStartedAt: number | undefined;
-      const runPaidCase = async (): Promise<PendingDeciderOutput> => {
+      const runPaidCase = async (): Promise<StoredDeciderOutput> => {
+        const promptRevision = state.measurementRevision;
         const priorStartedAt = await getPaidCaseStartedAt(env.BENCH_DB, execution);
         if (priorStartedAt !== null) throw new AmbiguousBenchmarkExecutionError(priorStartedAt);
         const kiloToken = await cliToken();
@@ -2174,7 +2231,7 @@ async function processDeciderJob(
             caseId: benchCase.id,
             slot: claim.slot,
             chunk,
-            promptRevision: PROMPT_TRANSPORT_REVISION,
+            promptRevision,
             outputDeadline: startedAt + PAID_OUTPUT_WAIT_MS,
           })
         );
@@ -2214,11 +2271,11 @@ async function processDeciderJob(
           !(emptyCompletion || isKilledBeforeEventsResult(first)) ||
           hasThrottleDiagnostic(first)
         ) {
-          return { result: first, retried: false, attemptStartedAt: startedAt };
+          return { result: first, retried: false, attemptStartedAt: startedAt, promptRevision };
         }
         startedAt = Math.max(Date.now(), startedAt + 1);
         if (!(await restartPaidCase(env.BENCH_DB, { ...execution, attemptStartedAt }, startedAt))) {
-          return { result: first, retried: false };
+          return { result: first, retried: false, promptRevision };
         }
         attemptStartedAt = startedAt;
         retried = true;
@@ -2246,14 +2303,14 @@ async function processDeciderJob(
         );
         const retry = await invokeCli();
         addPriorAttempt(retry, first);
-        return { result: retry, retried: true, attemptStartedAt: startedAt };
+        return { result: retry, retried: true, attemptStartedAt: startedAt, promptRevision };
       };
       try {
         const pending = await getPendingDeciderOutput(env.BENCH_DB, pendingKey).catch(() => {
           throw new DeciderGraderRetryError('Pending decider output could not be read');
         });
         const output = pending ?? (await runPaidCase());
-        const { result, retried } = output;
+        const { result } = output;
         attemptStartedAt = output.attemptStartedAt;
         const throttled = isUnbilledTransientProviderResult(result);
         const unsupported = isUnsupportedModelResult(result, message.model);
@@ -2295,7 +2352,7 @@ async function processDeciderJob(
             caseId: benchCase.id,
           },
           benchCase,
-          { result, retried, promptRevision: pending?.promptRevision },
+          output,
           judge
         );
       } catch (error) {
@@ -2356,9 +2413,13 @@ function failedRow(
     output_prefix: null,
     event_count: null,
     last_event_types: null,
+    tool_calls: null,
+    tool_names: null,
+    step_count: null,
+    final_finish_reason: null,
     rep,
     timed_out: 0,
-    prompt_revision: PROMPT_TRANSPORT_REVISION,
+    prompt_revision: MEASUREMENT_REVISION,
   };
 }
 
@@ -2435,7 +2496,7 @@ async function finalizeRunIfComplete(
   state: RunState
 ): Promise<void> {
   const enqueuedModels = state.models.filter(m => m.enqueued);
-  const caseCount = expectedCaseCount(kind, state.router);
+  const caseCount = expectedCaseCount(kind, state.router, state.measurementRevision);
 
   // The run finalizes once every lane is accounted for, so one dead lane no
   // longer wedges the run until the stale sweep.

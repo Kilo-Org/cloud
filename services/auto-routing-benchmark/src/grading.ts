@@ -57,6 +57,18 @@ export class DeciderGraderRetryError extends Error {
   }
 }
 
+/**
+ * A tool-required case scores 0 when the measured run made fewer tool calls than required,
+ * whatever its final text says: an answer without them is a guess, and a turn that narrates
+ * its next step and stops never took it. Unknown evidence counts as no calls.
+ */
+export function lacksRequiredToolCalls(
+  requiredToolCalls: number | undefined,
+  toolCalls: number | null
+): boolean {
+  return (toolCalls ?? 0) < (requiredToolCalls ?? 0);
+}
+
 export async function gradeDeciderOutput(
   check: DeciderCheck,
   ctx: { userPrompt: string; output: string; judge: DeciderJudge | null }

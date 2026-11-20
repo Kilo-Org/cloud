@@ -9,6 +9,29 @@ import { REFACTORING_V2_CASES } from './decider-cases-v2/refactoring';
 import { FRONTIER_V1_CASES } from './frontier-cases';
 import { FRONTIER_LONG_CONTEXT_CASES, LONG_CONTEXT_CASES } from './long-context/cases';
 
+/** One bash call an earlier assistant step made, with exactly what the tool returned. */
+export type ContinuationToolCall = {
+  tool: 'bash';
+  command: string;
+  description: string;
+  output: string;
+};
+
+export type ContinuationStep = {
+  text?: string;
+  calls: readonly ContinuationToolCall[];
+};
+
+/**
+ * A session already in progress: the CLI imports these assistant steps after the task's user
+ * message, the workspace holds `files`, and `message` resumes the session.
+ */
+export type DeciderContinuation = {
+  files: Readonly<Record<string, string>>;
+  steps: readonly ContinuationStep[];
+  message: string;
+};
+
 export type DeciderCase = {
   id: string;
   taskType: ClassifierTaskType;
@@ -18,6 +41,9 @@ export type DeciderCase = {
   check: DeciderCheck;
   tier?: 'efficient' | 'frontier';
   longContext?: { generator: string; seed: number; targetTokens: number };
+  /** Fewer tool calls in the measured run than this scores 0, whatever the answer. */
+  requiredToolCalls?: number;
+  continuation?: DeciderContinuation;
 };
 
 const CODE_SYS =

@@ -105,14 +105,20 @@ const REPORT_RECEIPTS_MAX_PAGE_SIZE = 50;
 /**
  * Cursor for one page of report receipts: the last row's `(created_at, id)`
  * verbatim, in the same `created_at|id` shape the notification history uses.
- * `created_at` is a timestamptz returned as text with microsecond precision, so
- * it travels through the cursor untouched: normalizing it through
- * `new Date(...).toISOString()` would truncate microseconds and silently skip
- * rows that share a millisecond.
+ * `created_at` reaches this read as Postgres `timestamptz` text, for example
+ * `2026-03-01 00:00:00.123456+00`: a space between date and time, fractional
+ * seconds only when they are nonzero (up to microseconds), and the connection's
+ * numeric zone. The cursor carries that text untouched, because normalizing it
+ * through `new Date(...).toISOString()` would drop microseconds to milliseconds
+ * and silently skip rows that share a millisecond. The keyset compares the text
+ * against the column, so `decodeReportReceiptCursor` accepts only this shape and
+ * never hands Postgres a timestamp it would refuse to parse.
  */
 const REPORT_RECEIPT_CURSOR_SEPARATOR = '|';
 const REPORT_RECEIPT_ROW_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const REPORT_RECEIPT_TIMESTAMP_PATTERN =
+  /^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]) ([01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,6})?[+-](?:0\d|1[0-5])(?::[0-5]\d)?$/;
 
 function encodeReportReceiptCursor(row: { created_at: string; id: string }): string {
   return `${row.created_at}${REPORT_RECEIPT_CURSOR_SEPARATOR}${row.id}`;
@@ -124,7 +130,21 @@ function decodeReportReceiptCursor(cursor: string): { createdAt: string; id: str
   const createdAt = cursor.slice(0, separatorIndex);
   const id = cursor.slice(separatorIndex + 1);
   if (!REPORT_RECEIPT_ROW_ID_PATTERN.test(id)) return null;
-  if (Number.isNaN(new Date(createdAt).getTime())) return null;
+  const timestamp = REPORT_RECEIPT_TIMESTAMP_PATTERN.exec(createdAt);
+  if (!timestamp) return null;
+  const year = Number(timestamp[1]);
+  const month = Number(timestamp[2]);
+  const day = Number(timestamp[3]);
+  // Postgres rejects a day that does not exist in its month, so the day range in
+  // the pattern is not enough: `2026-02-30` would fail inside the keyset.
+  const calendarDay = new Date(Date.UTC(year, month - 1, day));
+  if (
+    calendarDay.getUTCFullYear() !== year ||
+    calendarDay.getUTCMonth() !== month - 1 ||
+    calendarDay.getUTCDate() !== day
+  ) {
+    return null;
+  }
   return { createdAt, id };
 }
 

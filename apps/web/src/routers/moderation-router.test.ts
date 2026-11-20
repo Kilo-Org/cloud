@@ -539,8 +539,28 @@ describe('moderation-router', () => {
       });
 
       await expect(
-        caller.moderation.listReportReceipts({ cursor: '2026-01-01T00:00:00.000Z|not-a-uuid' })
-      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+        caller.moderation.listReportReceipts({ cursor: '2026-01-01 00:00:00+00|not-a-uuid' })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: 'Invalid report receipt cursor.',
+      });
+    });
+
+    it('rejects a cursor whose timestamp Postgres would refuse to parse', async () => {
+      const caller = await createCallerForUser(user.id);
+      const rowId = '8f14e45f-4a1a-4d3c-9b0e-2c6d5a7f1b93';
+      // JavaScript parses all three: `0` and `12` as years, and `2026-02-30` by
+      // rolling into March. Postgres rejects the impossible day.
+      const rejectedTimestamps = ['0', '12', '2026-02-30 00:00:00+00'];
+
+      for (const createdAt of rejectedTimestamps) {
+        await expect(
+          caller.moderation.listReportReceipts({ cursor: `${createdAt}|${rowId}` })
+        ).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+          message: 'Invalid report receipt cursor.',
+        });
+      }
     });
 
     it('returns an empty page when the caller has no reports', async () => {

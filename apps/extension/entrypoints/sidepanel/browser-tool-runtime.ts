@@ -14,6 +14,12 @@ type BrowserToolCallOutcome =
   | { readonly kind: 'result'; readonly result: EvalTabResult }
   | { readonly kind: 'takeOver'; readonly request: BrowserTabTakeOverRequest };
 
+/** One call's identity and mode: the caller, and whether its tool set is read-only. */
+interface BrowserToolCallTarget {
+  readonly caller: BrowserCaller;
+  readonly safeMode: boolean;
+}
+
 /**
  * The browser tools run behind the background's per-tab runtime; the side
  * panel sends the model-facing tool name, the upstream arguments and its caller
@@ -21,12 +27,6 @@ type BrowserToolCallOutcome =
  * message resolve to an error result — never a rejected promise — so a
  * transport failure becomes a tool error the turn loop can show.
  */
-/** One call's identity and mode: the tab the model addressed, and whether its tool set is read-only. */
-interface BrowserToolCallTarget {
-  readonly caller: BrowserCaller;
-  readonly safeMode: boolean;
-}
-
 const sendBrowserToolCall = async (
   event: KiloBrowserToolCallEvent,
   { caller, safeMode }: BrowserToolCallTarget,

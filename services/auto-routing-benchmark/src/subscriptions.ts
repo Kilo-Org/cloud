@@ -706,11 +706,13 @@ export async function continueDailyReconcile(
   const day = utcDay(options.now ?? new Date());
   const progress = await readDailyAliasProgress(env.BENCH_DB, router, day);
   if (!progress) return null;
-  // A day of catalog failures ends the day: there is nothing to reconcile owners against.
-  if (progress.platformStatus === 'failed' || progress.attempts >= DAILY_ALIAS_ATTEMPT_LIMIT)
-    return null;
-  const ownersDone = progress.ownersDone || progress.ownerPages >= DAILY_OWNER_PAGE_LIMIT;
-  if (progress.platformStatus === 'ok' && ownersDone) return null;
+  // Each step has its own budget: a platform step that failed or spent its attempts ends
+  // platform resolution, not the day. The owner pass still owes its keyset pages, and it
+  // runs on the first tick that can fetch a catalog again.
+  const platformSettled =
+    progress.platformStatus !== 'pending' || progress.attempts >= DAILY_ALIAS_ATTEMPT_LIMIT;
+  const ownersSettled = progress.ownersDone || progress.ownerPages >= DAILY_OWNER_PAGE_LIMIT;
+  if (platformSettled && ownersSettled) return null;
   return reconcileDailyAliases(env, router, day, progress, options);
 }
 export async function servingSubscriptionSnapshot(

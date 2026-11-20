@@ -521,7 +521,14 @@ describe('saved daily benchmark subscriptions', () => {
     expect(sqlite.prepare('SELECT attempts FROM benchmark_daily_alias_sync').get()).toEqual({
       attempts: 30,
     });
-    expect(await continueDailyReconcile(env, 'efficient', { now })).toBeNull();
+    // Platform resolution stops for the day; the owner pass does not, so a tick still
+    // runs and the platform attempts stay spent instead of incrementing.
+    const next = await continueDailyReconcile(env, 'efficient', { now });
+    expect(next?.platform.status).toBe('failed');
+    expect(next?.owners.status).toBe('pending');
+    expect(sqlite.prepare('SELECT attempts FROM benchmark_daily_alias_sync').get()).toEqual({
+      attempts: 30,
+    });
   });
 
   it('does not reconcile a new day before its daily run', async () => {
@@ -618,6 +625,53 @@ describe('saved daily benchmark subscriptions', () => {
 
     // A pool past the page budget ends the day without a platform attempt.
     sqlite.prepare('UPDATE benchmark_daily_alias_sync SET owner_pages = 100, owner_done = 0').run();
+    expect(await continueDailyReconcile(env, 'efficient', { now })).toBeNull();
+  });
+
+  it('finishes the owner pages on the same day after the catalog recovers', async () => {
+    await initialReady();
+    for (let index = 0; index < 250; index++)
+      await syncSubscriptionSnapshot(
+        env,
+        config,
+        { ownerType: 'user', ownerId: `user-${String(index).padStart(3, '0')}` },
+        pool
+      );
+    const now = new Date('2026-11-20T05:00:00.000Z');
+    vi.mocked(fetchExecutableBenchmarkModelCatalog).mockRejectedValue(
+      new Error('Catalog unavailable')
+    );
+    let result = await dailyReconcileSubscriptions(env, 'efficient', { now });
+    for (let tick = 0; tick < 40 && result.platform.status === 'pending'; tick++) {
+      const next = await continueDailyReconcile(env, 'efficient', { now });
+      if (!next) break;
+      result = next;
+    }
+    expect(result.platform.status).toBe('failed');
+    expect(result.owners.status).toBe('pending');
+    expect(
+      sqlite.prepare('SELECT attempts, owner_pages FROM benchmark_daily_alias_sync').get()
+    ).toEqual({ attempts: 30, owner_pages: 0 });
+
+    // The catalog recovers: the platform budget is spent, the owner pages are not.
+    vi.mocked(fetchExecutableBenchmarkModelCatalog).mockResolvedValue(catalog('vendor/N'));
+    let owners = await continueDailyReconcile(env, 'efficient', { now });
+    expect(owners?.platform.status).toBe('failed');
+    expect(owners?.owners.pages).toBe(2);
+    for (let tick = 0; tick < 10 && owners?.owners.status === 'pending'; tick++)
+      owners = await continueDailyReconcile(env, 'efficient', { now });
+    expect(owners?.owners.status).toBe('ok');
+    expect(
+      snapshotPairs(
+        await loadSubscriptionSnapshot(env.BENCH_DB, 'efficient', {
+          ownerType: 'user',
+          ownerId: 'user-249',
+        })
+      )
+    ).toEqual([{ model: 'vendor/N', variant: null }]);
+    expect(sqlite.prepare('SELECT attempts FROM benchmark_daily_alias_sync').get()).toEqual({
+      attempts: 30,
+    });
     expect(await continueDailyReconcile(env, 'efficient', { now })).toBeNull();
   });
 

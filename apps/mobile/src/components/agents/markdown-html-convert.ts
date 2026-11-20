@@ -134,45 +134,65 @@ export function convertHtmlToMarkdown(value: string): string {
   if (!nodes.some(node => node.kind === 'element')) {
     return value;
   }
-  let markdown = '';
+  // The output and its last two characters. Reading a character back from the
+  // output copies it, so a value with many root nodes would copy the whole
+  // converted message once per node; the tail answers those reads instead.
+  const out: ConvertedOutput = { text: '', tail: '' };
   let skip = 0;
   const cache: LineCache = { line: null };
   for (const node of nodes) {
     const skipped = skip;
     skip = 0;
     if (node.kind === 'text') {
-      markdown += value.slice(node.start + Math.min(skipped, node.end - node.start), node.end);
+      appendOutput(
+        out,
+        value.slice(node.start + Math.min(skipped, node.end - node.start), node.end)
+      );
     } else if (node.name === 'br') {
       const lineBreak = rootBreak(value, node, cache);
-      markdown += lineBreak?.text ?? value.slice(node.start, node.end);
+      appendOutput(out, lineBreak?.text ?? value.slice(node.start, node.end));
       skip = lineBreak?.skip ?? 0;
     } else if (MARKDOWN_BLOCK_TAGS.has(node.name)) {
       const lines = rootBlock(context, node);
-      markdown =
-        lines === null
-          ? markdown + value.slice(node.start, node.end)
-          : appendBlock(markdown, lines, node.end < value.length);
+      if (lines === null) {
+        appendOutput(out, value.slice(node.start, node.end));
+      } else {
+        appendBlock(out, lines, node.end < value.length);
+      }
     } else {
       const inline = inlineContent(context, [node], {
         allowBreak: false,
         inLink: false,
-        before: markdown.at(-1),
+        before: out.tail.at(-1),
         after: value[node.end],
       });
-      markdown += inline ?? value.slice(node.start, node.end);
+      appendOutput(out, inline ?? value.slice(node.start, node.end));
     }
   }
-  return markdown;
+  return out.text;
+}
+
+/** The converted output and the tail that stands in for reading its last characters. */
+type ConvertedOutput = { text: string; tail: string };
+
+function appendOutput(out: ConvertedOutput, part: string): void {
+  if (part === '') {
+    return;
+  }
+  out.text += part;
+  out.tail = part.length >= 2 ? part.slice(-2) : `${out.tail}${part}`.slice(-2);
 }
 
 /**
  * A converted block is its own markdown block: blank lines on both sides keep
  * it from joining the paragraph or list around it.
  */
-function appendBlock(markdown: string, lines: readonly string[], more: boolean): string {
-  let joined = markdown;
-  if (joined !== '' && !joined.endsWith('\n\n')) {
-    joined += joined.endsWith('\n') ? '\n' : '\n\n';
+function appendBlock(out: ConvertedOutput, lines: readonly string[], more: boolean): void {
+  if (out.text !== '' && out.tail !== '\n\n') {
+    appendOutput(out, out.tail.endsWith('\n') ? '\n' : '\n\n');
   }
-  return joined + lines.join('\n') + (more ? '\n' : '');
+  appendOutput(out, lines.join('\n'));
+  if (more) {
+    appendOutput(out, '\n');
+  }
 }

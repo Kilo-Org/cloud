@@ -67,6 +67,17 @@ describe('convertHtmlToMarkdown generated fixtures', () => {
     expect(converted).toBe(`${'x\\\n'.repeat(breaks)}tail`);
   });
 
+  it('converts many root-level siblings within its processing budget', () => {
+    const siblings = 48_000;
+    const value = '<b>t</b>'.repeat(siblings);
+    convertHtmlToMarkdown('<b>t</b>');
+    const start = performance.now();
+    const converted = convertHtmlToMarkdown(value);
+    const elapsed = performance.now() - start;
+    expect(elapsed).toBeLessThan(750);
+    expect(converted).toBe('**t**'.repeat(siblings));
+  });
+
   it('gates many distinct images within its processing budget', () => {
     const count = 12_000;
     const value = Array.from(

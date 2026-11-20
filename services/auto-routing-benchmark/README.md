@@ -1361,14 +1361,14 @@ in `skipped`.
   to hold the whole table (fixed 2026-11-20: a settled failure now leaves the table instead
   of blocking it).
 
-### Measurement revision 3: agentic probes (active)
+### Measurement revision 3: agentic probes (defined, on hold at active revision 2)
 
 Every run records the revision it started under (`benchmark_runs.measurement_revision`),
 and every result stores the revision that measured it in `prompt_revision`, with the CLI's
 tool evidence (`tool_calls`, `tool_names`, `step_count`, `final_finish_reason`). Tool
 evidence is recorded at every revision. `src/measurement-revision.ts` separates two
 constants: `MEASUREMENT_REVISION` (3) is the newest defined revision, and
-`ACTIVE_MEASUREMENT_REVISION` (3) is the revision every new run starts under. `startRun`,
+`ACTIVE_MEASUREMENT_REVISION` (2, on hold) is the revision every new run starts under. `startRun`,
 `insertRun`'s default, case reuse and the `remeasure-prompt-transport` planner all use
 the active revision. Revision 3 was activated with migration `0035_probe_activation`, which
 also decides which pairs measure it now (below); nothing else in the deploy schedules
@@ -1450,9 +1450,74 @@ probes later, through the normal queue or an admin re-measure, makes it eligible
 `supp-agent-term-pwd-base` is the one revision-2 case that changes: revision 3 keeps it
 tool-required and accepts only `other`, the answer its isolated workspace produces.
 
-Revision 3 is active from the deploy that raises `ACTIVE_MEASUREMENT_REVISION` to 3.
-Migration `0035_probe_activation` is the whole activation scope, and it is what keeps the
-spend bounded:
+### Measurement revision 3 is on hold (active revision 2)
+
+`ACTIVE_MEASUREMENT_REVISION` is **2**. Revision 3 stays defined — `MEASUREMENT_REVISION` is
+still 3, `PROBE_REVISION` is still 3, the probe cases, their grading, their templates and
+`supp-agent-term-pwd-base`'s revision-3 check are all unchanged — and every revision-3 result
+already stored in `case_results` is kept. Lowering the constant stops *starting* revision-3
+work, it does not undo anything measured:
+
+- `probesActive` in `src/run.ts`'s publish is `router === 'efficient' && ACTIVE_MEASUREMENT_REVISION >= PROBE_REVISION`
+  (src/run.ts:684), so at 2 no pair is dropped from an agentic route for lacking probe
+  results and `pairsMissingProbeResults` is not queried at all. The table ranks exactly the
+  pairs it ranked before the activation, on every route, in the same order:
+  `src/platform-publish-revision-hold.test.ts` publishes a registry whose provenance is part
+  revision 2 and part revision 3 and asserts the candidate list per agentic route is
+  identical before and after.
+- `applyProbeActivations` applies no staged row: every row `0035_probe_activation` staged
+  carries `required_revision = 3`, and the apply selects `required_revision <= ?` with the
+  active revision (src/probe-activation.ts:124-130). A drain's default call therefore
+  consumes nothing and queues nothing.
+- No run starts at revision 3 any more: the per-minute cron drain, the 05:00Z platform sync
+  drain, run-completion drains and admin re-measures all insert
+  `measurement_revision = ACTIVE_MEASUREMENT_REVISION`.
+
+**The state the hold leaves behind.** The 2026-11-20 activation did run before the hold, so:
+
+- `probe_activations` is empty. The deploy that raised the revision applied the whole staged
+  scope and deleted every row. Nothing re-stages them — no code in `src/` inserts into
+  `probe_activations`; only migration `0035_probe_activation` does, and it is already
+  applied — so a later deploy that raised the revision back would find nothing to apply and
+  would not re-queue the pairs or re-admit Ember on its own.
+- The 24 queued `profile_remeasures` rows are spent: the run the activation started claimed
+  them.
+- `meta/muse-ember` ×6 has no ready rep-3 profile. The re-admit moved its six rows from
+  `failed` to `pending`, and the stalled revision-3 run holds them `pending`/`running`, so
+  the pair has no candidate on any route: a `pending`/`running` row is a measurement in
+  flight, and its rep-1 provenance is not the current rep-3 identity, so it is neither
+  published nor claimable. This is the same absence the pre-activation table showed, and
+  `src/platform-publish-revision-hold.test.ts` names it.
+- Every revision-3 result the stalled run stored stays in `case_results` and is still read
+  for grading; it simply does not publish a table while its run is unfinished.
+
+**Re-activation preconditions.** Raising the constant to 3 again needs all three in the same
+change:
+
+1. **A per-route minimum-coverage guard.** An activation re-measures pairs one at a time and
+   the publish drops a re-measured pair from the agentic routes until its probes land, so
+   activating can lower a route's candidate count for as long as it runs — in the 2026-11-20
+   scope, every pair the activation had not measured yet. The guard must fail the publish
+   (or refuse the activation) whenever a route's candidate count would fall.
+2. **A priced estimate that counts the cases a provenance really runs.** A pair whose
+   provenance is revision 1 cannot reuse its argv-affected base cases, so its run measures
+   **109 fresh cases per repetition** — 87 argv-affected cases, the 21 probe cuts and
+   `supp-agent-term-pwd-base` — not the 22 a revision-2 provenance needs. Long-context cost
+   goes on its own line: the long-context cases bill far above the plain ones and the
+   `remeasure-prompt-transport` dry run leaves unmeasured cases out of its projection
+   because they have no measured cost. The 2026-11-20 forecast priced 22 cases for every
+   pair, and the pairs with revision-1 provenance ran the full list instead.
+3. **A spend cap.** Nothing in the worker stops a run on cost today; the cap must stop a
+   decider run (and every queue that feeds it) at a set budget.
+
+The design of the activation itself — migration `0035_probe_activation` as the whole scope,
+the staging in `probe_activations` behind the deploy lock, the Ember re-admit, the per-pair
+case counts and the forecast — follows. It describes what the activation does when it is
+applied, not the current state.
+
+**If and when the revision is raised back to 3**, `ACTIVE_MEASUREMENT_REVISION` returns to 3.
+Migration `0035_probe_activation` was the whole activation scope the last time, and it is
+what keeps the spend bounded:
 
 - The migration only *stages* the scope: it writes `probe_activations` rows, one per pair,
   with the action to take. It cannot write `profile_remeasures` rows or `pending` profiles
@@ -1500,11 +1565,11 @@ spend bounded:
   missing non-agentic case-reps at $5.25, and its probes — a full run, because the re-admit
   invalidates the failed run's results. Activation total $29.99 / $30.20 / $30.92,
   $20.79 / $21.00 / $21.72 at 50 % cache.
-- Rolling back is lowering `ACTIVE_MEASUREMENT_REVISION` to 2 and deploying: every staged
-  row carries its `required_revision` (3), and `applyProbeActivations` skips — and leaves
-  staged — every row the worker's revision does not reach. A deploy at revision 2 therefore
-  neither queues the pairs nor re-admits the Ember rows; a later deploy that raises the
-  revision back to 3 applies whatever is still staged. An activation already applied is
+- Rolling back is lowering `ACTIVE_MEASUREMENT_REVISION` to 2 and deploying (the state above):
+  every staged row carries its `required_revision` (3), and `applyProbeActivations` skips —
+  and leaves staged — every row the worker's revision does not reach. A deploy at revision 2
+  therefore neither queues the pairs nor re-admits the Ember rows; a later deploy that raises
+  the revision back to 3 applies whatever is still staged. An activation already applied is
   cancelled by deleting the queued `profile_remeasures` rows, and the six Ember rows can go
   back to `failed` with their lane failure. The new table is additive and every stored
   result stays.

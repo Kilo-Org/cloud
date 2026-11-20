@@ -29,11 +29,31 @@ export const MEASUREMENT_REVISION = 3;
  * starts afterwards measures that revision's cases, and the platform table holds publication
  * until every ready pair is measured under its grading.
  *
- * 3 was activated with migration `0035_probe_activation`, which queues the agentic-route
- * pairs in `profile_remeasures`: a run for one of those pairs reuses its other results and
- * measures only the 21 probe cuts and `supp-agent-term-pwd-base` per repetition.
+ * 2 is the hold. Revision 3, its probe cases, `PROBE_REVISION` and every definition it needs
+ * stay defined above, and the revision-3 results already stored stay in `case_results`: the
+ * publish path reads them as soon as a later deploy raises this constant again
+ * (`deciderCasesForRouter(_, 3)` still returns the probe case list, `minimumCaseRevisions` and
+ * `gradingRevision` still name revision 3 for it). What revision 2 does is stop *starting*
+ * revision-3 work: `probesActive` in `src/run.ts`'s publish is false, so a ready pair without
+ * probe results keeps every agentic route, and `applyProbeActivations` applies no staged row.
+ *
+ * Migration `0035_probe_activation` activated 3 in one reviewed batch. The run it started is
+ * still unfinished because most of its pairs' provenance was revision 1: such a pair cannot
+ * reuse the 87 argv-affected base cases, so it measures 109 fresh cases per repetition — those
+ * 87, the 21 probe cuts and `supp-agent-term-pwd-base` — where the forecast priced 22. That
+ * made the run cost several times its estimate. Re-activation needs, in the same change that
+ * raises this constant:
+ *
+ * 1. a per-route minimum-coverage guard, so activating can never lower an agentic route's
+ *    candidate count (an activation re-measures pairs one at a time, and the publish drops
+ *    every re-measured pair from the agentic routes until its probes land);
+ * 2. a priced estimate that counts those 109 fresh cases per repetition for a revision-1
+ *    provenance, with the long-context cases on their own line;
+ * 3. a spend cap that stops the run.
+ *
+ * The README's rollback section states this state and those preconditions.
  */
-export const ACTIVE_MEASUREMENT_REVISION = 3;
+export const ACTIVE_MEASUREMENT_REVISION = 2;
 
 export const ENGINE_IDENTITY_REVISION = PROMPT_TRANSPORT_REVISION;
 

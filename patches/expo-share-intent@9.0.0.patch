@@ -1,10 +1,19 @@
 diff --git a/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt b/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt
-index ff5b100..d39feb0 100644
+index ff5b100..06e2692 100644
 --- a/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt
 +++ b/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt
-@@ -66,11 +66,15 @@ class ExpoShareIntentModule : Module() {
-                     "filePath" to instance?.getAbsolutePath(uri),
-                 )
+@@ -60,17 +60,19 @@
+             val resolver: ContentResolver? = instance?.currentActivity?.contentResolver
+                     ?: instance?.context?.contentResolver
+             if (resolver == null) {
+-                notifyError("Cannot get resolver (getFileInfo)")
+-                return mapOf(
+-                    "contentUri" to uri.toString(),
+-                    "filePath" to instance?.getAbsolutePath(uri),
+-                )
++                // Nothing can be read without a resolver, and a file map with no
++                // path only fails again later in JS: report the share instead.
++                throw IllegalStateException("Cannot get resolver (getFileInfo)")
              }
 -            val queryResult: Cursor = resolver.query(uri, null, null, null, null)!!
 -            queryResult.moveToFirst()
@@ -23,7 +32,7 @@ index ff5b100..d39feb0 100644
  
              val mimeType = resolver.getType(uri)!!
  
-@@ -142,14 +146,14 @@ class ExpoShareIntentModule : Module() {
+@@ -142,14 +144,14 @@
                  if (intent.action == Intent.ACTION_SEND) {
                      val uri = intent.parcelable<Uri>(Intent.EXTRA_STREAM);
                      if (uri != null) {
@@ -40,13 +49,13 @@ index ff5b100..d39feb0 100644
                      } else {
                          notifyError("empty uris array for file sharing: " + intent.action)
                      }
-@@ -159,6 +163,19 @@ class ExpoShareIntentModule : Module() {
+@@ -159,6 +161,19 @@
              }
          }
  
 +        // Reading a shared file runs on the main thread inside onNewIntent, so
-+        // any provider failure (no metadata, no permission, no mime type) would
-+        // crash the app. Send it to JS as a share error instead.
++        // any provider failure (no resolver, no metadata, no permission, no mime
++        // type) would crash the app. Send it to JS as a share error instead.
 +        private fun notifyFileShare(uris: List<Uri>) {
 +            val files = try {
 +                uris.map { getFileInfo(it) }

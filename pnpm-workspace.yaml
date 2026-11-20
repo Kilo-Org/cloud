@@ -357,11 +357,12 @@ patchedDependencies:
   # includeEnded instance reads, factory-registered push-to-start URL.
   expo-router@58.0.31: patches/expo-router@58.0.31.patch
   expo-widgets@58.0.28: patches/expo-widgets@58.0.28.patch
-  # Android: a shared content URI whose provider answers with an empty cursor
-  # (a deleted media row, a revoked grant), no permission or no mime type threw
-  # on the main thread inside onNewIntent and crashed the app. The module now
-  # reports such a share through its onError event, which the app shows as the
-  # "Couldn't read the shared content" toast.
+  # Android: a shared content URI whose provider answers with no resolver, an
+  # empty cursor (a deleted media row, a revoked grant), no permission or no
+  # mime type threw on the main thread inside onNewIntent and crashed the app —
+  # or published a file entry with no path. The module now reports such a share
+  # through its onError event, which the app shows as the "Couldn't read the
+  # shared content" toast.
   expo-share-intent@9.0.0: patches/expo-share-intent@9.0.0.patch
   # Typed-routes generation must skip colocated tests, exactly like the Metro
   # blockList in apps/mobile/metro.config.js already does for the runtime

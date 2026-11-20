@@ -615,6 +615,32 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
     expect(tree.root.findAllByProps({ children: 'org/recovered' })).toHaveLength(1);
   });
 
+  it('returns to the paused face when the read re-pauses after a failed retry', () => {
+    // The deliberate retry runs even while offline, so it can fail and stamp
+    // the failure hold. Its own Retry is a plain refetch, which only re-pauses
+    // the read; the hold must not keep the paused card off the screen then,
+    // because that card holds the only attempt that can run while offline.
+    finding.isError = true;
+    finding.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+    finding.data = undefined;
+    const tree = renderScreen();
+    expect(tree.root.findByType(QueryError).props.variant).toBeUndefined();
+
+    finding.isError = false;
+    finding.error = null;
+    finding.isPending = true;
+    finding.fetchStatus = 'paused';
+    finding.isFetching = false;
+    connectivity.status = 'offline';
+    renderScreen();
+
+    const error = tree.root.findByType(QueryError);
+    expect(error.props.variant).toBe('offline');
+    expect(error.props.message).toBe('securityAgent.dismiss.couldNotLoad');
+    act(error.props.onRetry as () => void);
+    expect(findingRetry.retry).toHaveBeenCalledOnce();
+  });
+
   it('does not carry a failed load onto another finding', () => {
     finding.isError = true;
     finding.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };

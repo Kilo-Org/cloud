@@ -177,25 +177,26 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   const showLoadFailure = !findingQuery.data && (loadFailed || failedFindingId === findingId);
 
   // No payload on screen is one state, not four flags: a removed or refused
-  // finding, a failed read the retry surface holds, a first read the online
-  // manager paused, and a read still running. Each renders its own body; the
-  // paused state is the one the read status alone cannot tell apart, so it is
-  // named before the loading frame a plain `isLoading` gate would leave it in
-  // forever.
+  // finding, a first read the online manager paused, a failed read the retry
+  // surface holds, and a read still running. The paused face comes before the
+  // failure hold: a deliberate retry that fails while the connection is still
+  // down stamps that hold, and the plain `refetch` the failure face offers only
+  // re-pauses the read — so the hold must not keep the paused face, whose retry
+  // is the one that can run while the online manager is offline, off the screen.
   let undelivered: FindingDetailUndelivered | null = null;
   if (notFound) {
     undelivered = { kind: 'not-found' };
-  } else if (showLoadFailure) {
-    undelivered = {
-      kind: 'failed',
-      isRetrying: findingQuery.isFetching,
-      onRetry: () => void findingQuery.refetch(),
-    };
   } else if (isReadPausedBeforeData({ ...findingQuery, connectivity })) {
     undelivered = {
       kind: 'paused',
       isRetrying: findingRetry.isRetrying,
       onRetry: () => void findingRetry.retry(),
+    };
+  } else if (showLoadFailure) {
+    undelivered = {
+      kind: 'failed',
+      isRetrying: findingQuery.isFetching,
+      onRetry: () => void findingQuery.refetch(),
     };
   }
   // The loading frame keeps the header's placeholder bar while its read runs;

@@ -64,8 +64,11 @@ function analyzableFinding(id: string): FindingFixture {
   return { id, status: 'open', analysis_status: null, remediationSummary: null };
 }
 
+// The row the server keeps open after the analysis completed: the one shape
+// that fails if `isSecurityFindingAnalyzable` stops checking the analysis
+// state, because its status alone would let it through.
 function analyzedFinding(id: string): FindingFixture {
-  return { id, status: 'fixed', analysis_status: 'completed', remediationSummary: null };
+  return { id, status: 'open', analysis_status: 'completed', remediationSummary: null };
 }
 
 /** The rendered capacity line for `securityAgent.analysis.<key>`, if any. */

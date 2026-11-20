@@ -795,11 +795,14 @@ keep environment snapshots and existing history/worktree recovery.
   hold: the import accepts a summary that carries file diffs and a revert that carries a patch diff,
   and the record read back returns the patch diff unchanged and each diff entry with its file,
   additions, deletions and status. The native import cannot carry a session permission ruleset, so
-  the ruleset is applied right after it and, when that could not complete, remembered beside the
-  wrapper's durable state. A create path that finds the obligation already remembered does not
-  rewrite it. Every prepare settles a remembered ruleset before the probe and again after a
-  successful history restore; a settle that finds no record leaves the remembered ruleset in place
-  for the create path, which applies it to the record it imports.
+  the obligation is remembered beside the wrapper's durable state before the import commits the row,
+  and the ruleset is applied right after it. Writing the marker before the import is what makes the
+  guarantee hold: a marker written only after a failed apply would leave a window where the process
+  dies between the import and the write, and the committed record owes rules that nothing
+  remembers. A create path that finds the obligation already remembered does not rewrite it. Every
+  prepare settles a remembered ruleset before the probe and again after a successful history
+  restore; a settle that finds no record leaves the remembered ruleset in place for the create path,
+  which applies it to the record it imports.
   The ruleset is cleared only after the apply succeeds, and the apply is skipped when the record
   already holds every rule, because the native update appends rather than replaces; a marker that
   cannot be cleared is therefore not a failure, since the next prepare finds the stored rules and

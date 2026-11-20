@@ -546,8 +546,7 @@ async function collect(
     ]),
   ];
   if (runBlocked.length > 0) {
-    const reason =
-      `the run reported a readiness failure covering every cell: ${runBlocked.join('; ')}`;
+    const reason = `the run reported a readiness failure covering every cell: ${runBlocked.join('; ')}`;
     const emitted = new Set<string>();
     for (const run of [options.head, options.base]) {
       for (const cell of run.cells) {

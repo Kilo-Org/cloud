@@ -389,6 +389,10 @@ describe('BitbucketOverview not-connected state', () => {
     const text = JSON.stringify(root.toJSON());
 
     expect(text).toContain(i18n.t('prReview.connect.adminOnlyConnectDescription'));
+    // The who-can-connect sentence is a substring of the read-only sentence that
+    // restates the title, so only the absence of that sentence proves the screen
+    // stopped repeating itself.
+    expect(text).not.toContain(i18n.t('codeReviewer.bitbucket.notConnectedReadOnly'));
     expect(connectActions(root)).toHaveLength(0);
   });
 

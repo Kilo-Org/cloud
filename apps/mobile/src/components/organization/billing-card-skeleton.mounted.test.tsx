@@ -1,6 +1,6 @@
 /* eslint-disable typescript-eslint/no-deprecated -- DOM-free mounted React Native layout regression tests. */
 import { createElement } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
 
@@ -10,20 +10,30 @@ vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('@/components/ui/row-group', () => ({ RowGroup: 'RowGroup' }));
 vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));
 
-function renderSkeleton(rows: number | undefined): TestRenderer.ReactTestInstance {
-  let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+
+function renderSkeleton(rows?: number): TestRenderer.ReactTestInstance {
   act(() => {
-    renderer = TestRenderer.create(
+    const element =
       rows === undefined
         ? createElement(BillingCardSkeleton)
-        : createElement(BillingCardSkeleton, { rows })
-    );
+        : createElement(BillingCardSkeleton, { rows });
+    if (renderer) {
+      renderer.update(element);
+    } else {
+      renderer = TestRenderer.create(element);
+    }
   });
   if (!renderer) {
     throw new Error('Missing BillingCardSkeleton renderer');
   }
   return renderer.root;
 }
+
+afterEach(() => {
+  act(() => renderer?.unmount());
+  renderer = undefined;
+});
 
 describe('BillingCardSkeleton', () => {
   // The placeholder must reserve the rows the loaded card paints: a card that

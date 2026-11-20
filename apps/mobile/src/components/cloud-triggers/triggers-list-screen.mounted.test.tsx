@@ -114,7 +114,10 @@ vi.mock('@/components/ui/row-group', () => ({ RowGroup: 'RowGroup' }));
 vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));
 vi.mock('@/components/ui/icon-tile', () => ({ IconTile: 'IconTile' }));
 vi.mock('@/components/ui/row-chevron', () => ({ RowChevron: 'RowChevron' }));
-vi.mock('@/lib/font-scale/system-font-scale-context', () => ({ useLiveFontScale: () => 1 }));
+vi.mock('@/lib/font-scale/system-font-scale-context', async importOriginal => ({
+  ...(await importOriginal<object>()),
+  useLiveFontScale: () => 1,
+}));
 vi.mock('@/lib/narrow-layout', () => ({ isNarrowLayout: () => false }));
 
 const SWITCH = 'Switch' as ElementType;

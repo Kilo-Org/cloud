@@ -102,6 +102,12 @@ export function ProviderAllowList({
     [draft, disabled, onChange, shown.length]
   );
 
+  // Two causes leave the list empty: a query filtered every provider out, or
+  // the catalog names no provider at all.
+  const emptyLabel = search.trim()
+    ? t('organizationModelAccess.providersEmpty')
+    : t('organizationModelAccess.providersNone');
+
   return (
     <FlashList
       data={shown}
@@ -143,7 +149,7 @@ export function ProviderAllowList({
           }
         />
       }
-      ListEmptyComponent={<NoMatch label={t('organizationModelAccess.providersEmpty')} />}
+      ListEmptyComponent={<NoMatch label={emptyLabel} />}
     />
   );
 }

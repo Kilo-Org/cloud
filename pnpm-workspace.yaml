@@ -448,6 +448,10 @@ patchedDependencies:
   # `undefined`, which breaks the whole module that imports it. Forward the rest from
   # the real module. Remove once upstream forwards them itself.
   react-native-css@3.1.0-rc.1: patches/react-native-css@3.1.0-rc.1.patch
+  # A toast's action and cancel buttons render a bare `Pressable`, so TalkBack
+  # read "Try again" as a clickable group with no role. Give the button its
+  # role. Remove once upstream sets it.
+  sonner-native@0.27.0: patches/sonner-native@0.27.0.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

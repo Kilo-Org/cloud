@@ -19,7 +19,9 @@
     "presenceStatus": "Hostid: {{connection}}",
     "commandStatus": "Käsu edastamine: {{status}}",
     "delivered": "Edastatud",
-    "expired": "Aegunud"
+    "expired": "Aegunud",
+    "recoveryGaps_one": "{{displayCount}} osa sellest transkriptsioonist on puudu.",
+    "recoveryGaps_other": "{{displayCount}} osa sellest transkriptsioonist on puudu."
   },
   "common": {
     "manageOnWeb": "Halda veebis",
@@ -1391,6 +1393,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucketi ühendust {{organization}}-ga hallatakse arvutis veebi kaudu.",
+      "managedOnWebTitle": "Hallatakse veebis",
+      "managedOnWebShort": "Seda ühendust hallatakse arvutis veebi kaudu.",
+      "managedOnWebRepositories": "Vali {{organization}} jaoks hoidlaid veebi kaudu arvutis.",
       "description": "Loo tööruumi juurdepääsutunnus {{organization}} jaoks ja kleebi see allolevale väljale.",
       "descriptionReconnect": "Loo uus tööruumi juurdepääsutunnus {{organization}} jaoks ja kleebi see allolevale väljale.",
       "descriptionOverview": "Loo tööruumi juurdepääsutunnus {{organization}} jaoks ja kleebi see järgmisel ekraanil.",
@@ -1414,6 +1419,7 @@
     "platformList": {
       "checking": "Kontrollimine…",
       "statusUnavailable": "Olek pole saadaval",
+      "needsAttention": "Vajab tähelepanu",
       "platforms": "Platvormid",
       "activity": "Tegevus"
     },
@@ -2784,6 +2790,8 @@
     "modelPicker": {
       "title": "Vali mudel",
       "noModelsDescription": "Valimiseks pole ühtegi mudelit saadaval.",
+      "allUnavailableTitle": "Ühtegi mudelit ei saa kasutada",
+      "allUnavailableDescription": "Lisa teenusepakkuja võti ja proovi seejärel uuesti.",
       "favorites": "Lemmikud"
     },
     "modelSelector": {
@@ -4077,7 +4085,13 @@
     "providerUnavailable": "Teenusepakkuja pole praegu saadaval. Saada varsti uuesti."
   },
   "settingsTools": {
-    "confirmTitle": "Kas kinnitada see muudatus?"
+    "confirmTitle": "Kas kinnitada see muudatus?",
+    "guarded": {
+      "spendAlertsOff": "Kas lülitada kulutusteated välja? Te ei saaks enam teavitusi kulutuste lävendi ületamiste ja tunniste kulutippude kohta.",
+      "balanceAlertsOff": "Kas lülitada saldoteated välja? Te ei saaks enam teavitusi, kui teie krediit hakkab otsa saama.",
+      "securityFindingsOff": "Kas lülitada turvaprobleemid välja? Te ei saaks enam teavitusi uute turvaprobleemide kohta.",
+      "hideBalanceOn": "Kas peita oma saldod? Krediidisaldod ei ilmuks enam profiilivaadetes ja organisatsiooni keskuses."
+    }
   },
   "appActions": {
     "start": {
@@ -4977,6 +4991,7 @@
     "providersDescription": "Lülita teenusepakkuja välja, et Kilo ei suunaks selle organisatsiooni päringuid sellele.",
     "providersNeedCatalog": "Teenusepakkujate lülitid on kirjutuskaitstud, kuni kogu mudelikataloog on laaditud. Nende muutmiseks puuduta ülal nuppu Proovi uuesti.",
     "providersEmpty": "Sellele otsingule ei vasta ükski teenusepakkuja.",
+    "providersNone": "Sellele organisatsioonile ei ole ühtegi teenusepakkujat saadaval.",
     "allowAllShown": "Luba kõik kuvatud",
     "denyAllShown": "Keela kõik kuvatud",
     "gatewaysDescription": "Kilo suunab mudelipäringud läbi Vercel AI Gateway või OpenRouteri. Kui lüüs on välja lülitatud, need päringud nurjuvad.",

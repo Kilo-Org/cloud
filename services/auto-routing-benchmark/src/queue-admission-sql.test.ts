@@ -173,11 +173,7 @@ describe('decider queue admission (production migrations and real SQLite)', () =
     expect(
       await scheduleRunChunks(env.BENCH_DB, {
         runId,
-        entries: models.map((model, index) => ({
-          model,
-          variant: null,
-          providers: [`provider-${index}`],
-        })),
+        entries: models.map(model => ({ model, variant: null })),
         repetitions,
         caseIds: DECIDER_CASES.slice(0, 3).map(benchCase => benchCase.id),
         chunkSize: 1,

@@ -190,7 +190,7 @@ function warningDump(text: string): ProbeDump {
   };
 }
 
-test('a toast painted after disabling is an environment warning, not a screen defect', () => {
+test('a warning-level toast painted after disabling is reported, not graded', () => {
   const dump = warningDump(WARNING);
   // The toast's owners are the ignored overlay's: the layout rules never see it,
   // so the rule has to read the dump.
@@ -211,9 +211,260 @@ test('a toast painted after disabling is an environment warning, not a screen de
   assert.equal(overlay?.element.testID, 'logbox_notification_message_text');
   assert.equal(overlay?.element.index, 7);
   assert.equal(overlay?.measured, 22.86);
-  assert.match(overlay?.message ?? '', /Disabling failed in this runtime/);
+  assert.match(overlay?.message ?? '', /disabling failed in this runtime/);
 });
 
-test('a dump without the not-yet-mounted warning has no overlay finding', () => {
-  assert.deepEqual(checkDevLogOverlay(warningDump('Loaded 4 items')), []);
+test('a dump whose LogBox node carries no text has no overlay finding', () => {
+  // LogBox chrome is in the dump with nothing painted into it: no message, no
+  // finding.
+  assert.deepEqual(checkDevLogOverlay(warningDump('   ')), []);
+  assert.deepEqual(checkDevLogOverlay(warningDump('')), []);
+});
+
+const RENDER_ERROR = 'Text strings must be rendered within a <Text> component.';
+const ARBITRARY = 'Loaded 4 items';
+type Level = 'warn' | 'error' | undefined;
+
+/**
+ * A dump holding one LogBox toast in the hierarchy the runtime really paints:
+ * the `logbox_notification` root, the open button under it carrying the level
+ * test ID, and the message, the count badge, the dismiss button and the chrome
+ * that repeats the text all under that button (measured from an emulator dump;
+ * see `LogBoxNotification.js`). A toast whose chrome the dump does not model
+ * keeps the button but no level test ID, so the message text classifies it.
+ */
+function toastDump(level: Level, ...texts: readonly string[]): ProbeDump {
+  const dump = warningDump(texts[0] ?? '');
+  // LogBox paints the same string twice: the message paragraph, and the
+  // notification chrome that renders it. One notification must read as one
+  // finding, and the paragraph names the message, so it wins.
+  const message = dump.nodes[7];
+  // The open button is the message's own container, under the one toast root
+  // the message belongs to: the level can only be read from this toast's
+  // chrome, never from a sibling toast's.
+  const button = dump.nodes[6];
+  if (level !== undefined) button.testID = `logbox_open_button_${level}`;
+  dump.nodes.push(
+    // The chrome that repeats the message text, under the same toast.
+    {
+      parent: 6,
+      tag: 'View',
+      rect: [9.9, 556.19, 340.19, 48],
+      testID: 'logbox',
+      text: texts[0] ?? '',
+    },
+    // The badge carries the count, never a message: it must not read as one.
+    {
+      parent: 6,
+      tag: 'Paragraph',
+      rect: [27.81, 832.38, 10.29, 18.29],
+      testID: 'logbox_notification_count_text',
+      text: '!',
+    },
+    ...(level === undefined
+      ? []
+      : [
+          {
+            parent: 6,
+            tag: 'View',
+            rect: [369.52, 831.62, 19.81, 19.81],
+            testID: `logbox_dismiss_button_${level}`,
+          },
+        ]),
+    ...texts.slice(1).map(text => ({ ...message, text }))
+  );
+  return dump;
+}
+
+test('an error-level notification makes any message an error, not a screen defect', () => {
+  const findings = checkDevLogOverlay(toastDump('error', RENDER_ERROR));
+  // The chrome repeats the message; the notification still yields one finding.
+  assert.equal(findings.length, 1);
+  const [overlay] = findings;
+  assert.equal(overlay.rule, 'dev-overlay');
+  assert.equal(overlay.severity, 'error');
+  assert.equal(overlay.element.testID, 'logbox_notification_message_text');
+  assert.equal(overlay.element.index, 7);
+  assert.equal(overlay.element.text, RENDER_ERROR);
+  assert.equal(overlay.measured, 22.86);
+  assert.equal(overlay.expected, 'no LogBox toast painted over the screen');
+  assert.match(overlay.message, /an error this run fails on/);
+  assert.match(overlay.message, /the run fails until the overlay is gone/);
+  assert.match(overlay.message, /the level chrome LogBox painted says error/);
+  // An error never hides behind the environment wording: the run fails.
+  assert.doesNotMatch(overlay.message, /environment problem/);
+  assert.doesNotMatch(overlay.message, /reported and not graded/);
+  assert.match(overlay.message, new RegExp(RENDER_ERROR.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+});
+
+test('an error-level not-yet-mounted toast fails the run: React logs it through console.error', () => {
+  // The realistic shape: LogBox paints this toast at error level, so the
+  // wording must say the run fails until the overlay is gone, never that the
+  // toast goes ungraded or excused as an environment problem.
+  const [overlay] = checkDevLogOverlay(toastDump('error', WARNING));
+  assert.equal(overlay.severity, 'error');
+  assert.match(overlay.message, /an error this run fails on/);
+  assert.match(overlay.message, /the run fails until the overlay is gone/);
+  assert.doesNotMatch(overlay.message, /environment problem/);
+  assert.doesNotMatch(overlay.message, /reported and not graded/);
+  assert.doesNotMatch(overlay.message, /message text/);
+});
+
+test('LogBox decides the severity: an error-level unlock of an arbitrary message still fails the run', () => {
+  // The message says nothing the gate could recognize; the notification's own
+  // level does, which is why the text is never the classifier.
+  const [overlay] = checkDevLogOverlay(toastDump('error', ARBITRARY));
+  assert.equal(overlay.severity, 'error');
+  assert.equal(overlay.element.text, ARBITRARY);
+  assert.match(overlay.message, /an error this run fails on/);
+  assert.doesNotMatch(overlay.message, /environment problem/);
+});
+
+test('LogBox decides the severity: a warn-level notification stays a warning whatever it says', () => {
+  const [overlay] = checkDevLogOverlay(toastDump('warn', RENDER_ERROR));
+  assert.equal(overlay.severity, 'warning');
+  assert.equal(overlay.element.text, RENDER_ERROR);
+  assert.match(overlay.message, /reported and not graded/);
+  assert.match(overlay.message, /the level chrome LogBox painted says warn/);
+  // The quoted text stays in the finding, so the run says what painted over it.
+  assert.match(overlay.message, new RegExp(RENDER_ERROR.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+});
+
+test('a warn-level not-yet-mounted toast keeps its environment wording', () => {
+  const [overlay] = checkDevLogOverlay(toastDump('warn', WARNING));
+  assert.equal(overlay.severity, 'warning');
+  assert.match(overlay.message, /disabling failed in this runtime/);
+  assert.match(overlay.message, /environment problem the run log names/);
+  assert.match(overlay.message, /reported and not graded/);
+});
+
+test('without level chrome the message text is the only classification left', () => {
+  // A dump from a runtime whose LogBox chrome the probe did not model: the one
+  // message the gate knows is an environment warning stays a warning, and
+  // anything else is assumed to be the error it would be. Both wording carry
+  // the marker the fallback clause, so severity and wording stay paired.
+  assert.deepEqual(
+    checkDevLogOverlay(toastDump(undefined, WARNING, RENDER_ERROR)).map(entry => [
+      entry.severity,
+      entry.element.text,
+      entry.message.includes('no level chrome'),
+    ]),
+    [
+      ['warning', WARNING, true],
+      ['error', RENDER_ERROR, true],
+    ]
+  );
+});
+
+test('without level chrome each wording names the text as the fallback classifier', () => {
+  // The fallback wordings must say the message text classified the toast: a
+  // future change that classifies by one signal and words by another read as a
+  // failure here, the split kilobot flagged on this rule.
+  const [fallbackWarning] = checkDevLogOverlay(toastDump(undefined, WARNING));
+  assert.equal(fallbackWarning.severity, 'warning');
+  assert.match(fallbackWarning.message, /no level chrome/);
+  assert.match(fallbackWarning.message, /message text/);
+  assert.match(fallbackWarning.message, /keeps it a warning/);
+  const [fallbackError] = checkDevLogOverlay(toastDump(undefined, ARBITRARY));
+  assert.equal(fallbackError.severity, 'error');
+  assert.match(fallbackError.message, /no level chrome/);
+  assert.match(fallbackError.message, /message text classifies it/);
+  assert.match(fallbackError.message, /must be assumed to be/);
+});
+
+/**
+ * The two toasts a runtime paints when one warning and one error land together:
+ * LogBox stacks one notification per level, so the dump holds two toast roots,
+ * each with its own open button and level.
+ */
+function twoToastDump(warnText: string, errorText: string): ProbeDump {
+  const dump = toastDump('warn', warnText);
+  // The second toast hangs off the same notification container (node 4) as the
+  // first, with its own root, open button, message and chrome — the shape the
+  // runtime paints when one warning and one error land together.
+  const root = dump.nodes.length;
+  const open = root + 1;
+  const message = open + 1;
+  const chrome = message + 1;
+  const badge = message + 2;
+  const dismiss = message + 3;
+  dump.nodes.push(
+    {
+      parent: 4,
+      tag: 'View',
+      rect: [9.9, 606.86, 340.19, 48],
+      testID: 'logbox_notification',
+      owners: ['View', 'LogBoxNotification', 'View', 'LogBoxNotificationContainer', 'View'],
+    },
+    {
+      parent: root,
+      tag: 'View',
+      rect: [9.9, 606.86, 340.19, 48],
+      testID: 'logbox_open_button_error',
+      owners: ['View', 'LogBoxNotification', 'View', 'LogBoxNotificationContainer', 'View'],
+    },
+    {
+      parent: open,
+      tag: 'Paragraph',
+      rect: [60.95, 620.19, 252.19, 22.86],
+      testID: 'logbox_notification_message_text',
+      owners: ['Text', 'View', 'LogBoxNotificationMessage', 'View', 'LogBoxButton', 'View'],
+      text: errorText,
+    },
+    {
+      parent: open,
+      tag: 'View',
+      rect: [9.9, 620.19, 340.19, 48],
+      testID: 'logbox',
+      text: errorText,
+    },
+    {
+      parent: open,
+      tag: 'Paragraph',
+      rect: [27.81, 620.19, 10.29, 18.29],
+      testID: 'logbox_notification_count_text',
+      text: '!',
+    },
+    {
+      parent: open,
+      tag: 'View',
+      rect: [369.52, 620.19, 19.81, 19.81],
+      testID: 'logbox_dismiss_button_error',
+    }
+  );
+  return dump;
+}
+
+test('two toasts at different levels are classified by their own chrome, not the dump', () => {
+  // Reading the level once for the whole dump reported the warn toast as an
+  // error whose wording named a level it never painted: the defect kilobot
+  // found on this rule.
+  const findings = checkDevLogOverlay(twoToastDump(WARNING, RENDER_ERROR));
+  assert.equal(findings.length, 2);
+  const warn = findings.find(entry => entry.element.text === WARNING);
+  const error = findings.find(entry => entry.element.text === RENDER_ERROR);
+  assert.equal(warn?.severity, 'warning');
+  assert.match(warn?.message ?? '', /the level chrome LogBox painted says warn/);
+  assert.doesNotMatch(warn?.message ?? '', /says error/);
+  assert.equal(error?.severity, 'error');
+  assert.match(error?.message ?? '', /the level chrome LogBox painted says error/);
+  assert.doesNotMatch(error?.message ?? '', /says warn/);
+});
+
+test('a message whose parent chain is malformed falls back instead of hanging', () => {
+  // A dump the probe assembled badly must not hang the rule or invent a level.
+  const past = toastDump('error', RENDER_ERROR);
+  past.nodes[7].parent = 999;
+  assert.deepEqual(
+    checkDevLogOverlay(past).map(entry => entry.severity),
+    ['error']
+  );
+  // A two-node cycle: the walk stops and the message text decides.
+  const cycle = toastDump(undefined, WARNING);
+  cycle.nodes[7].parent = 8;
+  cycle.nodes[8].parent = 7;
+  assert.deepEqual(
+    checkDevLogOverlay(cycle).map(entry => entry.severity),
+    ['warning']
+  );
 });

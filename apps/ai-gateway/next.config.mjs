@@ -6,6 +6,7 @@ const monorepoRoot = resolve(import.meta.dirname, '../..');
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  env: { KILO_GATEWAY_EU_REPLICA_AFFINITY: '1' },
 
   // Both values MUST be set to the monorepo root and kept in sync; see
   // apps/web/next.config.mjs. The routes are served from packages/web-shared.

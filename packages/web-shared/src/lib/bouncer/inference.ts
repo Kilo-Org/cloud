@@ -2,7 +2,7 @@ import 'server-only';
 
 import { isIP } from 'net';
 
-import { after, NextResponse, type NextRequest } from 'next/server';
+import { after, NextResponse } from 'next/server';
 
 import { isCloudflareIP } from '@kilocode/web-shared/lib/cloudflare-ip';
 import {
@@ -34,7 +34,7 @@ const logBouncerVerdict = sentryLogger('bouncer', 'info');
  * hop can be the caller; later hops are proxies. Returns the raw value, which
  * may still carry a port, brackets, or a scope id.
  */
-export function rawClientIp(request: NextRequest): string | undefined {
+export function rawClientIp(request: Pick<Request, 'headers'>): string | undefined {
   return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || undefined;
 }
 

@@ -342,7 +342,7 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 
 - `POSTGRES_URL` - Primary Postgres connection string. `[SECRET]`
 - `POSTGRES_REPLICA_US_URL` - US read replica used by `readDb` in US Vercel regions (`sfo1`); see `packages/web-shared/src/lib/drizzle.ts`. When unset, `readDb` falls back to the primary, so it must be set on every project that runs in `sfo1`, including `kilocode-ai-gateway`. `[SECRET]`
-- `POSTGRES_REPLICA_EU_URL`, `POSTGRES_REPLICA_EU_URL_2` - EU read replicas; `readDb` picks one at random in EU regions and falls back to the primary when neither is set. `[SECRET]`
+- `POSTGRES_REPLICA_EU_URL`, `POSTGRES_REPLICA_EU_URL_2` - EU read replicas. In Frankfurt gateway requests with both configured, `readDb` hashes the verified user ID (or anonymous client IP) to a preferred replica. Other EU reads use one process-local replica. Falls back to the primary when neither is set. `[SECRET]`
 - `POSTGRES_SCRIPT_URL` - Alternate Postgres URL used by one-off scripts/backfills in `src/scripts/` and tests. `[SECRET]`
 - `POSTGRES_URL_PRODUCTION` - Production Postgres connection string override; used by `packages/db/src/database-url.ts`. `[SECRET]`
 - `POSTGRES_CONNECT_TIMEOUT` - Postgres connect timeout in ms (required; typical: 10000). [SERVER]

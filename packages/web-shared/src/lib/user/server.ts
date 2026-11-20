@@ -17,6 +17,7 @@ import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/domain-gates';
 import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
+import { setVerifiedReplicaUser } from '@kilocode/web-shared/lib/read-replica-affinity';
 import type { NextAuthOptions, JWT, LoggerInstance, Session } from 'next-auth';
 import { getServerSession } from 'next-auth';
 import { IS_DEVELOPMENT, ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
@@ -574,6 +575,7 @@ async function resolveUserFromAuth(
         cloudAgentAuthority: scope,
       });
     }
+    setVerifiedReplicaUser(authorizationValidationResult.kiloUserId);
     const fromDb = scope ? db : readDb;
     const user = await findUserById(authorizationValidationResult.kiloUserId, fromDb);
 
@@ -647,6 +649,7 @@ async function resolveUserFromSession(
 
   if (!maybeKiloUserId) return authError(401, 'Unauthorized', '?');
 
+  setVerifiedReplicaUser(maybeKiloUserId);
   const user = await findUserById(maybeKiloUserId, fromDb);
   if (!user) return authError(401, 'Unauthorized (D)', maybeKiloUserId);
 

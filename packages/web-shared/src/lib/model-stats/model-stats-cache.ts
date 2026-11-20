@@ -2,6 +2,7 @@ import 'server-only';
 
 import { ENKRYPT_PUBLICATION_ENABLED } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { readReplicaCacheKey } from '@kilocode/web-shared/lib/read-replica-affinity';
 import { enkrypt_sync_state, modelStats, type ModelStats } from '@kilocode/db/schema';
 import { desc, eq, sql } from 'drizzle-orm';
 import { requireCustomLlmsById } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
@@ -33,17 +34,18 @@ type CacheState = {
  * One snapshot per read client. The web app invalidates this cache right after a
  * model-stats write and must load the primary, while the AI gateway handlers run in
  * `sfo1` and must load the replica. A shared snapshot would serve replica rows to a
- * web request that just invalidated, or primary rows to a gateway request. A process
- * serves one app, so this holds one entry there.
+ * web request that just invalidated, or primary rows to a gateway request. Each
+ * gateway replica also needs independent snapshots and error backoff.
  */
-const cacheByClient = new Map<ModelStatsLoadClient, CacheState>();
+const cacheByClient = new Map<object, CacheState>();
 let generation = 0;
 
 function cacheFor(fromDb: ModelStatsLoadClient): CacheState {
-  const existing = cacheByClient.get(fromDb);
+  const key = readReplicaCacheKey(fromDb);
+  const existing = cacheByClient.get(key);
   if (existing) return existing;
   const state: CacheState = { cached: null, inFlight: null, failure: null };
-  cacheByClient.set(fromDb, state);
+  cacheByClient.set(key, state);
   return state;
 }
 

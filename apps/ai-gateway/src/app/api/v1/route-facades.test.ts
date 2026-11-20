@@ -1,4 +1,5 @@
-import { describe, expect, test } from '@jest/globals';
+import { afterEach, describe, expect, test } from '@jest/globals';
+import { NextRequest, NextResponse } from 'next/server';
 import * as llmProxy from './[...path]/route';
 import * as audioTranscriptions from './audio/transcriptions/route';
 import * as editCompletions from './edit/completions/route';
@@ -30,46 +31,159 @@ import { handleProvidersRequest } from '@kilocode/web-shared/lib/ai-gateway/hand
 import { handleTranscriptionModelsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/transcription-models';
 import { handleAudioTranscriptionsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/audio-transcriptions';
 import { handleLlmProxyRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy';
+import { handleSystemOneRequest } from '@kilocode/web-shared/lib/ai-gateway/typesafe/handler';
 import {
   UPSTREAM_DURATION_BUDGET_MS,
   UPSTREAM_POST_RESPONSE_HEADROOM_MS,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
+import { runWithReplicaAffinity } from '@kilocode/web-shared/lib/read-replica-affinity';
+
+jest.mock('@kilocode/web-shared/lib/read-replica-affinity', () => ({
+  runWithReplicaAffinity: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/handlers/audio-transcriptions', () => ({
+  handleAudioTranscriptionsRequest: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/handlers/auto-routing-denied-models', () => ({
+  handleAutoRoutingDeniedModelsRequest: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/handlers/edit-completions', () => ({
+  handleEditCompletionsRequest: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/handlers/embedding-models', () => ({
+  handleEmbeddingModelsRequest: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/handlers/embeddings', () => ({
+  handleEmbeddingsRequest: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/handlers/fim-completions', () => ({
+  handleFimCompletionsRequest: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy', () => ({
+  handleLlmProxyRequest: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/handlers/model-endpoints', () => ({
+  handleModelEndpointsRequest: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/handlers/model-validation', () => ({
+  handleModelValidationRequest: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/handlers/models', () => ({
+  handleModelsRequest: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/handlers/models-by-provider', () => ({
+  handleModelsByProviderRequest: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/handlers/organization-models', () => ({
+  handleOrganizationModelsRequest: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/handlers/organization-model-validation', () => ({
+  handleOrganizationModelValidationRequest: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/handlers/providers', () => ({
+  handleProvidersRequest: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/handlers/transcription-models', () => ({
+  handleTranscriptionModelsRequest: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/typesafe/handler', () => ({
+  handleSystemOneRequest: jest.fn(),
+}));
+
+type Facade = (
+  request: NextRequest,
+  context: { params: Promise<{ id: string; provider: string; model: string }> }
+) => Promise<Response>;
 
 describe('ai-gateway route facades', () => {
-  test.each([
-    ['embeddings', embeddings.POST, handleEmbeddingsRequest],
-    ['embedding-models', embeddingModels.GET, handleEmbeddingModelsRequest],
-    ['models/[provider]/[model]/endpoints', modelEndpoints.GET, handleModelEndpointsRequest],
-    ['models/validate', modelValidation.POST, handleModelValidationRequest],
-    ['edit/completions', editCompletions.POST, handleEditCompletionsRequest],
-    ['fim/completions', fimCompletions.POST, handleFimCompletionsRequest],
-    ['organizations/[id]/models', organizationModels.GET, handleOrganizationModelsRequest],
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+
+  test.each<[string, string, Facade, Facade, boolean?]>([
+    ['POST', 'responses', llmProxy.POST, handleLlmProxyRequest],
+    ['POST', 'audio/transcriptions', audioTranscriptions.POST, handleAudioTranscriptionsRequest],
+    ['POST', 'embeddings', embeddings.POST, handleEmbeddingsRequest],
+    ['GET', 'embedding-models', embeddingModels.GET, handleEmbeddingModelsRequest],
+    ['GET', 'models', models.GET, handleModelsRequest],
+    ['GET', 'models-by-provider', modelsByProvider.GET, handleModelsByProviderRequest],
+    ['GET', 'providers', providers.GET, handleProvidersRequest],
+    ['GET', 'transcription-models', transcriptionModels.GET, handleTranscriptionModelsRequest],
     [
-      'organizations/[id]/models/validate',
-      organizationModelValidation.POST,
-      handleOrganizationModelValidationRequest,
+      'GET',
+      'models/example/model/endpoints',
+      modelEndpoints.GET,
+      handleModelEndpointsRequest,
+      true,
+    ],
+    ['POST', 'models/validate', modelValidation.POST, handleModelValidationRequest],
+    ['POST', 'edit/completions', editCompletions.POST, handleEditCompletionsRequest],
+    ['POST', 'fim/completions', fimCompletions.POST, handleFimCompletionsRequest],
+    ['POST', 'systemone', systemOne.POST, handleSystemOneRequest],
+    [
+      'GET',
+      'organizations/org/models',
+      organizationModels.GET,
+      handleOrganizationModelsRequest,
+      true,
     ],
     [
+      'POST',
+      'organizations/org/models/validate',
+      organizationModelValidation.POST,
+      handleOrganizationModelValidationRequest,
+      true,
+    ],
+    [
+      'POST',
       'internal/auto-routing/denied-models',
       autoRoutingDeniedModels.POST,
       handleAutoRoutingDeniedModelsRequest,
     ],
-  ])('%s exports the implementation handler by identity', (_route, routeHandler, handler) => {
-    expect(routeHandler).toBe(handler);
-  });
-
-  test.each<[string, unknown, unknown]>([
-    ['[...path]', llmProxy.POST, handleLlmProxyRequest],
-    ['audio/transcriptions', audioTranscriptions.POST, handleAudioTranscriptionsRequest],
-    ['models', models.GET, handleModelsRequest],
-    ['models-by-provider', modelsByProvider.GET, handleModelsByProviderRequest],
-    ['providers', providers.GET, handleProvidersRequest],
-    ['transcription-models', transcriptionModels.GET, handleTranscriptionModelsRequest],
   ])(
-    '%s wraps the implementation handler with its timing pattern',
-    (_route, routeHandler, handler) => {
-      expect(typeof routeHandler).toBe('function');
-      expect(routeHandler).not.toBe(handler);
+    '%s /api/v1/%s delegates to its handler inside replica affinity',
+    async (method, path, routeHandler, handler, usesParams = false) => {
+      const request = new NextRequest(`https://ai-gateway.kilo.ai/api/v1/${path}`, {
+        method,
+        headers: { 'x-forwarded-for': '192.0.2.42:8000, 198.51.100.7' },
+      });
+      const context = {
+        params: Promise.resolve({ id: 'org', provider: 'example', model: 'model' }),
+      };
+      const response = new NextResponse(null, { status: 204 });
+      const mockHandler = jest.mocked(handler).mockResolvedValue(response);
+      const mockAffinity = jest.mocked(runWithReplicaAffinity).mockImplementation((_ip, run) => {
+        expect(mockHandler).not.toHaveBeenCalled();
+        const result = run();
+        expect(mockHandler).toHaveBeenCalledTimes(1);
+        return result;
+      });
+
+      await expect(routeHandler(request, context)).resolves.toBe(response);
+      expect(mockAffinity).toHaveBeenCalledTimes(1);
+      expect(mockAffinity).toHaveBeenCalledWith('192.0.2.42', expect.any(Function));
+      expect(mockHandler.mock.calls[0]?.[0]).toBe(request);
+      if (usesParams) {
+        expect(mockHandler.mock.calls[0]?.[1]).toBe(context);
+      }
+    }
+  );
+
+  test.each([undefined, 'not-an-ip, 198.51.100.7'])(
+    'does not use a later hop when the client IP is missing or invalid (%s)',
+    async forwardedFor => {
+      const headers = forwardedFor === undefined ? undefined : { 'x-forwarded-for': forwardedFor };
+      const request = new NextRequest('https://ai-gateway.kilo.ai/api/v1/embedding-models', {
+        headers,
+      });
+      const response = new NextResponse(null, { status: 204 });
+      jest.mocked(handleEmbeddingModelsRequest).mockResolvedValue(response);
+      const mockAffinity = jest
+        .mocked(runWithReplicaAffinity)
+        .mockImplementation((_ip, run) => run());
+
+      await expect(embeddingModels.GET(request)).resolves.toBe(response);
+      expect(mockAffinity).toHaveBeenCalledWith(undefined, expect.any(Function));
     }
   );
 

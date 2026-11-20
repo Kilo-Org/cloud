@@ -3,6 +3,10 @@ import { createDrizzleClient, pg } from '@kilocode/db/client';
 import { computeDatabaseUrl } from '@kilocode/db';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { attachDatabasePool } from '@vercel/functions';
+import {
+  createReadReplicaFacade,
+  replicaAffinityHash,
+} from '@kilocode/web-shared/lib/read-replica-affinity';
 export const { Client, Pool } = pg;
 const { DEBUG_QUERY_LOGGING, VERCEL_REGION, NODE_ENV } = process.env;
 
@@ -58,25 +62,23 @@ export function selectReplicaUrl({
   return euReplicaUrls.at(Math.floor(random() * euReplicaUrls.length)) ?? primaryUrl;
 }
 
-/**
- * Get the read replica URL based on deployment region.
- * - US deployments use the US replica (POSTGRES_REPLICA_US_URL) for lower latency
- * - EU deployments randomly select one of two EU replicas to split read traffic
- *   across ~2,200 concurrent Vercel instances (~50/50 statistical distribution)
- * - Falls back to primary if no replica URL is configured for the region
- */
-function getReplicaUrl(): string {
-  return selectReplicaUrl({
-    primaryUrl: postgresUrl,
-    nodeEnv: NODE_ENV,
-    vercelRegion: VERCEL_REGION,
-    usReplicaUrl: getEnvVariable('POSTGRES_REPLICA_US_URL'),
-    euReplicaUrls: [
-      getEnvVariable('POSTGRES_REPLICA_EU_URL'),
-      getEnvVariable('POSTGRES_REPLICA_EU_URL_2'),
-    ].filter(Boolean),
-  });
-}
+const euReplicaUrls = [
+  getEnvVariable('POSTGRES_REPLICA_EU_URL'),
+  getEnvVariable('POSTGRES_REPLICA_EU_URL_2'),
+].filter(Boolean);
+const replicaUrl = selectReplicaUrl({
+  primaryUrl: postgresUrl,
+  nodeEnv: NODE_ENV,
+  vercelRegion: VERCEL_REGION,
+  usReplicaUrl: getEnvVariable('POSTGRES_REPLICA_US_URL'),
+  euReplicaUrls,
+});
+const affinityUrls = [...new Set(euReplicaUrls.filter(url => url !== postgresUrl))];
+const useReplicaAffinity =
+  process.env.KILO_GATEWAY_EU_REPLICA_AFFINITY === '1' &&
+  VERCEL_REGION === 'fra1' &&
+  NODE_ENV !== 'development' &&
+  affinityUrls.length === 2;
 
 // 48h of production pool metrics show most instances use 2-5 connections with zero
 // waiting, but the aggregate across ~2,200 concurrent Vercel instances exhausts
@@ -100,26 +102,32 @@ const primary = createDrizzleClient({
 });
 export const pool = primary.pool;
 
-// Replica pool - US replica in US regions; in EU regions the configured EU
-// replica, with the primary only as fallback
-const replicaUrl = getReplicaUrl();
 export const usesSeparateReplica = replicaUrl !== postgresUrl;
 
-const replica = usesSeparateReplica
-  ? createDrizzleClient({
-      connectionString: replicaUrl,
-      poolConfig: { ...sharedPoolConfig, application_name: `${appName}-replica` },
-      logger: !!DEBUG_QUERY_LOGGING,
-    })
-  : primary;
-const replicaPool = replica.pool;
+const replicaClients = (
+  useReplicaAffinity ? affinityUrls : usesSeparateReplica ? [replicaUrl] : []
+).map(connectionString =>
+  createDrizzleClient({
+    connectionString,
+    // Keep the existing total replica connection budget when a gateway instance uses both pools.
+    poolConfig: {
+      ...sharedPoolConfig,
+      max: useReplicaAffinity ? max / 2 : max,
+      application_name: `${appName}-replica`,
+    },
+    logger: !!DEBUG_QUERY_LOGGING,
+  })
+);
+const defaultReplica =
+  (useReplicaAffinity ? replicaClients[affinityUrls.indexOf(replicaUrl)] : replicaClients[0]) ??
+  primary;
 
 // Attach pools to ensure idle connections close before suspension
 // Skip in test environment as it interferes with Jest's cleanup
 if (process.env.NODE_ENV !== 'test') {
   attachDatabasePool(pool);
-  if (usesSeparateReplica) {
-    attachDatabasePool(replicaPool);
+  for (const replica of replicaClients) {
+    attachDatabasePool(replica.pool);
   }
 }
 
@@ -159,8 +167,8 @@ pool.on('error', (err: Error) => {
   }
 });
 
-if (usesSeparateReplica) {
-  replicaPool.on('error', (err: Error) => {
+for (const replica of replicaClients) {
+  replica.pool.on('error', (err: Error) => {
     console.error('Unexpected error on idle client (replica)', err);
     if (shouldExitOnPoolError('replica')) {
       process.exit(-1);
@@ -185,10 +193,18 @@ const primaryDb = primary.db;
  * tolerate slight replication lag (typically <100ms).
  *
  * In US regions, this connects to the US replica for lower latency.
- * In EU regions, this connects to the EU replica to split read traffic off the primary.
+ * In Frankfurt gateway requests, this picks a preferred EU replica by verified user or IP.
+ * Other EU consumers continue to use one process-local replica.
  * Falls back to the primary if no replica URL is configured for the region.
  */
-export const readDb = replica.db;
+export const readDb = useReplicaAffinity
+  ? createReadReplicaFacade(defaultReplica.db, () => {
+      const hash = replicaAffinityHash();
+      return hash === undefined
+        ? defaultReplica.db
+        : (replicaClients[hash % replicaClients.length]?.db ?? defaultReplica.db);
+    })
+  : defaultReplica.db;
 
 /**
  * Default database instance - connects to the primary database.
@@ -230,9 +246,7 @@ export const auto_deleted_at = { deleted_at: drizzleSql`now()` };
  */
 export async function closeAllDrizzleConnections(): Promise<void> {
   await pool.end();
-  if (usesSeparateReplica) {
-    await replicaPool.end();
-  }
+  await Promise.all(replicaClients.map(replica => replica.pool.end()));
 }
 
 export type DrizzleTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];

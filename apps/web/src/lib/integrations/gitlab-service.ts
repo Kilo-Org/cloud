@@ -995,6 +995,21 @@ export async function getOrCreateProjectAccessToken(
       }
 
       if (replacedTokenUnsettled) {
+        const current = await getStoredProjectCredential(integration.id, projectIdStr);
+        if (current === null || current.tokenId !== replacedTokenUnsettled.tokenId) {
+          logExceptInTest(
+            '[getOrCreateProjectAccessToken] Replaced credential changed before settlement',
+            {
+              projectId,
+              expectedTokenId: replacedTokenUnsettled.tokenId,
+              currentTokenId: current?.tokenId ?? null,
+            }
+          );
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: GITLAB_PROJECT_TOKEN_REPLACEMENT_UNSETTLED_MESSAGE,
+          });
+        }
         const removal = await removeStoredProjectAccessToken(integration, projectIdStr, {
           userToken,
         });
@@ -1412,8 +1427,12 @@ export async function connectWithPAT(
       );
       isAccountChange =
         !isInstanceChange && existingAccountId !== null && existingAccountId !== connectedAccountId;
-      if (isInstanceChange !== instanceChangeRequested) {
-        throw new Error('GitLab integration changed while reconnecting');
+      if (!instanceChangeRequested && isInstanceChange) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message:
+            'GitLab integration changed while connecting. Reload the integration and try again.',
+        });
       }
       if (isInstanceChange) {
         const remaining = await listProjectIdsWithStoredTokens({

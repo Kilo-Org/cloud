@@ -93,19 +93,41 @@ function checkNodeSlotProps(
     const slot = at.find(
       (step): step is string => typeof step === 'string' && slots.includes(step)
     );
-    if (value === null || typeof value !== 'object') {
-      // React rejects a string, a number or a bare object as a child of the
-      // slot's `View` exactly as it rejects the string; only a descriptor (or
-      // null/false, which paint nothing) is a value the slot can render.
-      if (slot !== undefined && value !== null && value !== false && value !== undefined) {
-        ctx.addIssue({
-          code: 'custom',
-          path: at,
-          message: `${JSON.stringify(slot)} ${descriptorMessage}`,
-        });
+    if (slot !== undefined) {
+      // The slot renders its value directly inside a `View`, so React accepts
+      // only an element there: a string and a number trip the `Text` invariant,
+      // a bare object throws `Objects are not valid as a React child`, and
+      // `true` paints nothing but is not a slot value either. A descriptor, an
+      // array of them, and null/false are the whole contract.
+      if (value === null || value === false || value === undefined) return;
+      if (Array.isArray(value)) {
+        for (const [key, item] of value.entries()) {
+          visit(name, item, [...at, key]);
+        }
+        return;
       }
+      if (typeof value === 'object' && '$element' in value) {
+        if (!ElementDescriptorSchema.safeParse(value).success) {
+          // Rejected in the schema so a descriptor typo fails `prepare` before
+          // any worktree is written, instead of rendering as unknown data.
+          ctx.addIssue({
+            code: 'custom',
+            path: at,
+            message: `Unknown element descriptor; the only supported kind is ${JSON.stringify(
+              SAVE_ELEMENT
+            )}`,
+          });
+        }
+        return;
+      }
+      ctx.addIssue({
+        code: 'custom',
+        path: at,
+        message: `${JSON.stringify(slot)} ${descriptorMessage}`,
+      });
       return;
     }
+    if (value === null || typeof value !== 'object') return;
     if (Array.isArray(value)) {
       for (const [key, item] of value.entries()) {
         visit(name, item, [...at, key]);
@@ -113,23 +135,11 @@ function checkNodeSlotProps(
       return;
     }
     if ('$element' in value) {
-      if (slot === undefined) {
-        ctx.addIssue({
-          code: 'custom',
-          path: at,
-          message: `${JSON.stringify(String(at[at.length - 1]))} ${descriptorSlotMessage}`,
-        });
-      } else if (!ElementDescriptorSchema.safeParse(value).success) {
-        // Rejected in the schema so a descriptor typo fails `prepare` before
-        // any worktree is written, instead of rendering as unknown data.
-        ctx.addIssue({
-          code: 'custom',
-          path: at,
-          message: `Unknown element descriptor; the only supported kind is ${JSON.stringify(
-            SAVE_ELEMENT
-          )}`,
-        });
-      }
+      ctx.addIssue({
+        code: 'custom',
+        path: at,
+        message: `${JSON.stringify(String(at[at.length - 1]))} ${descriptorSlotMessage}`,
+      });
       return;
     }
     for (const [key, item] of Object.entries(value)) {

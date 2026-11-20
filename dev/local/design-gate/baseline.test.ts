@@ -104,8 +104,25 @@ test('a descriptor is legal only under a documented node slot', () => {
   const foreignMessage = foreign.error.issues.map(issue => issue.message).join('\n');
   assert.match(foreignMessage, /"trailing" is not a node-slot prop name/u);
   assert.match(foreignMessage, /matches these prop names on any component/u);
-  // Nested under a slot the same descriptor stays legal, and the walker still
-  // decides per value, not per shell.
+  // A plain object under a slot is refused even when the descriptor sits inside
+  // it: the slot paints its value directly in a `View`, so a shell object with a
+  // descriptor anywhere below it renders as an object child, not as the cluster.
+  for (const props of [
+    { headerRight: { row: [{ $element: 'save-cluster' }] } },
+    { headerRight: {} },
+  ]) {
+    const shell = ProofManifestSchema.safeParse({
+      version: 1,
+      targets: [{ ...SLOT_TARGET, diagnostic: { component: PRODUCT, props } }],
+    });
+    assert.equal(shell.success, false, JSON.stringify(props));
+    assert.match(
+      shell.error.issues[0]?.message ?? '',
+      /"headerRight" must be \{ "\$element": "save-cluster" \}/u
+    );
+  }
+  // An array of descriptors is the allowed composition, so the same descriptor
+  // in a list stays legal.
   assert.equal(
     ProofManifestSchema.safeParse({
       version: 1,
@@ -114,7 +131,7 @@ test('a descriptor is legal only under a documented node slot', () => {
           ...SLOT_TARGET,
           diagnostic: {
             component: PRODUCT,
-            props: { headerRight: { row: [{ $element: 'save-cluster' }] }, title: 'Review' },
+            props: { headerRight: [{ $element: 'save-cluster' }, null], title: 'Review' },
           },
         },
       ],
@@ -273,7 +290,7 @@ test('an element descriptor in a picker-sheet diagnostic is refused at the schem
   );
 });
 
-test('a nested string in a node slot names its full path', () => {
+test('a plain object under a node slot names the slot path', () => {
   const result = ProofManifestSchema.safeParse({
     version: 1,
     targets: [
@@ -284,10 +301,7 @@ test('a nested string in a node slot names its full path', () => {
     ],
   });
   assert.equal(result.success, false);
-  assert.equal(
-    result.error.issues[0]?.path.join('/'),
-    'targets/0/diagnostic/props/headerRight/row/0'
-  );
+  assert.equal(result.error.issues[0]?.path.join('/'), 'targets/0/diagnostic/props/headerRight');
   assert.match(result.error.issues[0]?.message ?? '', /"headerRight" must be/u);
 });
 

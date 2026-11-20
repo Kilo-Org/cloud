@@ -21,14 +21,21 @@ type BrowserToolCallOutcome =
  * message resolve to an error result — never a rejected promise — so a
  * transport failure becomes a tool error the turn loop can show.
  */
+/** One call's identity and mode: the tab the model addressed, and whether its tool set is read-only. */
+interface BrowserToolCallTarget {
+  readonly caller: BrowserCaller;
+  readonly safeMode: boolean;
+}
+
 const sendBrowserToolCall = async (
   event: KiloBrowserToolCallEvent,
-  caller: BrowserCaller,
+  { caller, safeMode }: BrowserToolCallTarget,
   takeOver: boolean
 ): Promise<BrowserToolCallOutcome> => {
   const response: unknown = await browser.runtime.sendMessage({
     arguments: event.arguments,
     caller,
+    safeMode,
     tabId: event.tabId,
     takeOver,
     tool: event.name,
@@ -54,13 +61,25 @@ const sendBrowserToolCall = async (
   return { kind: 'result', result: response.result };
 };
 
+/** The caller's identity and mode: the panel's conversation, and whether its tool set is read-only. */
+export interface BrowserToolCaller {
+  readonly caller: BrowserCaller;
+  readonly safeMode?: boolean | undefined;
+}
+
 export const executeKiloBrowserToolCall = async (
   event: KiloBrowserToolCallEvent,
-  caller: BrowserCaller,
+  browserCaller: BrowserCaller | BrowserToolCaller,
   signal?: AbortSignal
 ): Promise<EvalTabResult> => {
+  // A bare caller is a caller that has no mode: danger mode, whose tool set always has the dialog handler.
+  const target: BrowserToolCallTarget =
+    'caller' in browserCaller
+      ? { caller: browserCaller.caller, safeMode: browserCaller.safeMode === true }
+      : { caller: browserCaller, safeMode: false };
+
   try {
-    const first = await sendBrowserToolCall(event, caller, false);
+    const first = await sendBrowserToolCall(event, target, false);
 
     if (first.kind === 'result') {
       return first.result;
@@ -84,7 +103,7 @@ export const executeKiloBrowserToolCall = async (
       };
     }
 
-    const second = await sendBrowserToolCall(event, caller, true);
+    const second = await sendBrowserToolCall(event, target, true);
 
     return second.kind === 'result'
       ? second.result

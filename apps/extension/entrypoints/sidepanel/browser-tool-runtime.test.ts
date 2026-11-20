@@ -79,6 +79,7 @@ describe('side panel browser tool caller', () => {
     expect(mocks.sendMessage).toHaveBeenCalledWith({
       arguments: { target: 'e5' },
       caller,
+      safeMode: false,
       tabId: 7,
       takeOver: false,
       tool: 'kilo_browser_click',
@@ -135,6 +136,7 @@ describe('side panel browser tool caller', () => {
     expect(mocks.sendMessage).toHaveBeenLastCalledWith({
       arguments: { target: 'e5' },
       caller,
+      safeMode: false,
       tabId: 7,
       takeOver: true,
       tool: 'kilo_browser_click',

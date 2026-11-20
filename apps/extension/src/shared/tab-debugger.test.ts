@@ -871,6 +871,17 @@ describe('tab debugger helpers', () => {
         type: BROWSER_TOOL_MESSAGE,
       })
     ).toBe(true);
+    // A panel carries its mode, so a modal state never names a tool safe mode lacks.
+    expect(
+      isTabDebuggerRequest({
+        arguments: { element: 'e5' },
+        caller: { conversationId: 'conversation-1', kind: 'panel', panelId: 'panel-1' },
+        safeMode: true,
+        tabId: 7,
+        tool: 'kilo_browser_snapshot',
+        type: BROWSER_TOOL_MESSAGE,
+      })
+    ).toBe(true);
     expect(
       isTabDebuggerResponse({
         ok: true,

@@ -473,6 +473,7 @@ export const handleTabDebuggerRequest = async ({
         arguments: request.arguments,
         caller: request.caller,
         options: webMcpDispatchOptions(scriptingApi),
+        ...(request.safeMode === undefined ? {} : { safeMode: request.safeMode }),
         tabId: request.tabId,
         ...(request.takeOver === undefined ? {} : { takeOver: request.takeOver }),
         toolName: request.tool,

@@ -118,7 +118,7 @@ export async function recordGitHubInstallRequest(params: {
       and(
         ownerCondition(owner),
         eq(platform_integrations.platform, PLATFORM.GITHUB),
-        eq(platform_integrations.github_app_type, githubAppType),
+        effectiveAppTypeCondition(githubAppType),
         eq(platform_integrations.integration_status, INTEGRATION_STATUS.PENDING),
         isNull(platform_integrations.platform_installation_id)
       )

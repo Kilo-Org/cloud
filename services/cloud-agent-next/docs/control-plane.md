@@ -807,6 +807,9 @@ keep environment snapshots and existing history/worktree recovery.
   ruleset widens what the agent may do. A marker that is present but not a ruleset fails the prepare
   with a permanent session-import reason instead of reading as nothing owed, since reading it as
   nothing owed would drop rules the record never received.
+  A record whose own permission is present but not a ruleset fails the create path the same way,
+  before the import, and the record is left unchanged: no rules are applied, so a later prepare in
+  the same allocation reads that record again and fails the same way until the record is replaced.
   New chats and later siblings share that runtime and directory without resetting files.
 
   On a shared-workspace Kilo v2 runtime start without a workspace snapshot, the wrapper also preloads

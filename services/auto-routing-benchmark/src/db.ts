@@ -58,7 +58,7 @@ import {
 } from './reasoning-effort';
 import type { OfflineSweep } from './scoreboard/schema';
 import { noLiveBenchmarkChunks } from './profile-entry-claims';
-import { PROMPT_TRANSPORT_REVISION } from './prompt-transport';
+import { MEASUREMENT_REVISION } from './measurement-revision';
 
 export type CaseResultRow = typeof caseResults.$inferSelect;
 export type RunRow = typeof benchmarkRuns.$inferSelect;
@@ -285,6 +285,7 @@ export async function insertRun(
     repetitions: number;
     classifier_max_p95_latency_ms: number | null;
     engine_identity: string;
+    measurement_revision?: number;
     purpose?: BenchmarkRunPurpose;
   },
   models: RunModelRow[],
@@ -308,6 +309,7 @@ export async function insertRun(
     repetitions: run.repetitions,
     classifier_max_p95_latency_ms: run.classifier_max_p95_latency_ms,
     engine_identity: run.engine_identity,
+    measurement_revision: run.measurement_revision ?? MEASUREMENT_REVISION,
     purpose: run.purpose ?? 'platform',
   });
 
@@ -398,6 +400,10 @@ export async function upsertCaseResult(db: D1Database, row: CaseResultRow): Prom
         output_prefix: row.output_prefix,
         event_count: row.event_count,
         last_event_types: row.last_event_types,
+        tool_calls: row.tool_calls,
+        tool_names: row.tool_names,
+        step_count: row.step_count,
+        final_finish_reason: row.final_finish_reason,
         rep: row.rep,
         timed_out: row.timed_out,
         prompt_revision: row.prompt_revision,
@@ -411,8 +417,8 @@ export async function upsertCaseResult(db: D1Database, row: CaseResultRow): Prom
 
 /**
  * Copy each pair's newest compatible graded case (and recoverable pending output) from
- * earlier runs into this run. A result for one of `skipOldCaseIds` measured under an
- * older prompt transport is never copied, so those cases run again.
+ * earlier runs into this run. A result measured below its case's entry in
+ * `minimumRevisions` (src/measurement-revision.ts) is never copied, so that case runs again.
  */
 export async function reuseDeciderCaseResults(
   db: D1Database,
@@ -422,11 +428,10 @@ export async function reuseDeciderCaseResults(
     engineIdentity: string;
     repetitions: number;
     entries: readonly BenchmarkPair[];
-    skipOldCaseIds: readonly string[];
-    promptRevision: number;
+    minimumRevisions: Readonly<Record<string, number>>;
   }
 ): Promise<number> {
-  const skipCaseIds = JSON.stringify(params.skipOldCaseIds);
+  const minimumRevisions = JSON.stringify(params.minimumRevisions);
   let copied = 0;
   for (let offset = 0; offset < params.entries.length; offset += 10) {
     const statements: D1PreparedStatement[] = [];
@@ -438,8 +443,7 @@ export async function reuseDeciderCaseResults(
         params.repetitions,
         entry.model,
         variantToStorage(entry.variant),
-        params.promptRevision,
-        skipCaseIds,
+        minimumRevisions,
         params.runId,
       ];
       statements.push(
@@ -464,19 +468,21 @@ export async function reuseDeciderCaseResults(
                   AND profile.variant = source.variant AND profile.invalidated_at IS NOT NULL
                   AND run.started_at < profile.invalidated_at
               )
-              AND NOT (source.prompt_revision < ?
-                AND source.case_id IN (SELECT value FROM json_each(?)))
+              AND NOT EXISTS (SELECT 1 FROM json_each(?) AS minimum
+                WHERE minimum.key = source.case_id AND source.prompt_revision < minimum.value)
           )
           INSERT INTO case_results (
             run_id, model, variant, case_id, route_key, score, latency_ms, cost_usd,
             input_tokens, cached_input_tokens, output_tokens, reasoning_tokens,
             error, fallback_reason, route_hit, retried, exit_code, output_prefix,
-            event_count, last_event_types, rep, timed_out, prompt_revision
+            event_count, last_event_types, tool_calls, tool_names, step_count,
+            final_finish_reason, rep, timed_out, prompt_revision
           )
           SELECT ?, model, variant, case_id, route_key, score, latency_ms, cost_usd,
             input_tokens, cached_input_tokens, output_tokens, reasoning_tokens,
             error, fallback_reason, route_hit, retried, exit_code, output_prefix,
-            event_count, last_event_types, rep, timed_out, prompt_revision
+            event_count, last_event_types, tool_calls, tool_names, step_count,
+            final_finish_reason, rep, timed_out, prompt_revision
           FROM ranked WHERE reuse_rank = 1
           ON CONFLICT (run_id, model, variant, case_id, rep) DO NOTHING
         `)
@@ -507,8 +513,8 @@ export async function reuseDeciderCaseResults(
                 AND json_type(source.payload, '$.result.timedOut') = 'false'
                 AND json_extract(source.payload, '$.result.unavailableModelId') IS NULL
               ELSE 0 END
-              AND NOT (source.prompt_revision < ?
-                AND source.case_id IN (SELECT value FROM json_each(?)))
+              AND NOT EXISTS (SELECT 1 FROM json_each(?) AS minimum
+                WHERE minimum.key = source.case_id AND source.prompt_revision < minimum.value)
               AND NOT EXISTS (
                 SELECT 1 FROM case_results AS graded
                 WHERE graded.run_id = source.run_id AND graded.model = source.model
@@ -681,17 +687,27 @@ const PendingDeciderOutputSchema = z.object({
     stderrTail: z.string(),
     eventCount: z.number(),
     lastEventTypes: z.array(z.string()),
+    // Absent from outputs saved before tool evidence was recorded.
+    tools: z
+      .object({
+        calls: z.number().int().nonnegative(),
+        names: z.array(z.string()),
+        steps: z.number().int().nonnegative(),
+        finalFinishReason: z.string().nullable(),
+      })
+      .nullable()
+      .default(null),
     timedOut: z.boolean(),
     unavailableModelId: z.string().min(1).optional(),
   }),
   retried: z.boolean(),
-  // From the row's prompt_revision column; absent when the output is about to be saved by
-  // this worker, which uses PROMPT_TRANSPORT_REVISION.
-  promptRevision: z.number().int().optional(),
   attemptStartedAt: z.number().int().nonnegative().optional(),
 });
 
 export type PendingDeciderOutput = z.infer<typeof PendingDeciderOutputSchema>;
+
+/** A pending output with the measurement revision of the paid call that produced it. */
+export type StoredDeciderOutput = PendingDeciderOutput & { promptRevision: number };
 
 function pendingDeciderOutputPredicate(key: PendingDeciderOutputKey) {
   return and(
@@ -706,7 +722,7 @@ function pendingDeciderOutputPredicate(key: PendingDeciderOutputKey) {
 export async function getPendingDeciderOutput(
   db: D1Database,
   key: PendingDeciderOutputKey
-): Promise<PendingDeciderOutput | null> {
+): Promise<StoredDeciderOutput | null> {
   const row = await drizzle(db)
     .select({
       payload: pendingDeciderOutputs.payload,
@@ -723,7 +739,7 @@ export async function getPendingDeciderOutput(
 export async function savePendingDeciderOutput(
   db: D1Database,
   key: PendingDeciderOutputKey,
-  output: PendingDeciderOutput,
+  output: StoredDeciderOutput,
   execution?: { token: string; attemptStartedAt?: number }
 ): Promise<boolean> {
   const { promptRevision, ...payload } = output;
@@ -749,7 +765,7 @@ export async function savePendingDeciderOutput(
       key.case_id,
       key.rep,
       JSON.stringify(payload),
-      promptRevision ?? PROMPT_TRANSPORT_REVISION,
+      promptRevision,
       execution?.token ?? null,
       execution?.attemptStartedAt ?? null
     )
@@ -971,6 +987,7 @@ export type RunProgressCountRow = {
   router: AutoRouter;
   repetitions: number;
   engineIdentity: string;
+  measurementRevision: number;
   enqueuedModels: number;
   completedCases: number;
   failedCases: number;
@@ -993,6 +1010,7 @@ export async function listRunProgressCounts(
       router: benchmarkRuns.router,
       repetitions: benchmarkRuns.repetitions,
       engineIdentity: benchmarkRuns.engine_identity,
+      measurementRevision: benchmarkRuns.measurement_revision,
       enqueuedModels: sql<number>`(
         SELECT COUNT(*) FROM ${runModels}
         WHERE ${runModels.run_id} = ${benchmarkRuns.id} AND ${runModels.enqueued} = 1
@@ -1014,6 +1032,7 @@ export async function listRunProgressCounts(
     router: row.router,
     repetitions: row.repetitions,
     engineIdentity: row.engineIdentity,
+    measurementRevision: row.measurementRevision,
     enqueuedModels: Number(row.enqueuedModels),
     completedCases: Number(row.completedCases),
     failedCases: Number(row.failedCases),
@@ -1186,13 +1205,13 @@ function readyProfileForRemeasure() {
 }
 
 /**
- * Copy every result of each claimed re-measure's previous run into this run, except the
- * `skipOldCaseIds` results measured under an older prompt transport. Failed and timed-out
- * results are copied too: only the skipped cases run again.
+ * Copy every result of each claimed re-measure's previous run into this run, except results
+ * measured below their case's entry in `minimumRevisions`. Failed and timed-out results are
+ * copied too: only the cases below their minimum, and cases the previous run never had, run.
  */
 export async function copyRemeasureBaselines(
   db: D1Database,
-  params: { runId: string; skipOldCaseIds: readonly string[]; promptRevision: number }
+  params: { runId: string; minimumRevisions: Readonly<Record<string, number>> }
 ): Promise<number> {
   const result = await db
     .prepare(`
@@ -1200,14 +1219,16 @@ export async function copyRemeasureBaselines(
         run_id, model, variant, case_id, route_key, score, latency_ms, cost_usd,
         input_tokens, cached_input_tokens, output_tokens, reasoning_tokens,
         error, fallback_reason, route_hit, retried, exit_code, output_prefix,
-        event_count, last_event_types, rep, timed_out, prompt_revision
+        event_count, last_event_types, tool_calls, tool_names, step_count,
+        final_finish_reason, rep, timed_out, prompt_revision
       )
       SELECT r.run_id, source.model, source.variant, source.case_id, source.route_key,
         source.score, source.latency_ms, source.cost_usd, source.input_tokens,
         source.cached_input_tokens, source.output_tokens, source.reasoning_tokens,
         source.error, source.fallback_reason,
         source.route_hit, source.retried, source.exit_code, source.output_prefix,
-        source.event_count, source.last_event_types, source.rep, source.timed_out,
+        source.event_count, source.last_event_types, source.tool_calls, source.tool_names,
+        source.step_count, source.final_finish_reason, source.rep, source.timed_out,
         source.prompt_revision
       FROM profile_remeasures AS r
       JOIN benchmark_profiles AS p ON p.router = r.router AND p.model = r.model
@@ -1216,11 +1237,11 @@ export async function copyRemeasureBaselines(
       JOIN case_results AS source ON source.run_id = p.run_id
         AND source.model = p.model AND source.variant = p.variant
       WHERE r.run_id = ?
-        AND NOT (source.prompt_revision < ?
-          AND source.case_id IN (SELECT value FROM json_each(?)))
+        AND NOT EXISTS (SELECT 1 FROM json_each(?) AS minimum
+          WHERE minimum.key = source.case_id AND source.prompt_revision < minimum.value)
       ON CONFLICT (run_id, model, variant, case_id, rep) DO NOTHING
     `)
-    .bind(params.runId, params.promptRevision, JSON.stringify(params.skipOldCaseIds))
+    .bind(params.runId, JSON.stringify(params.minimumRevisions))
     .run();
   return result.meta.changes ?? 0;
 }
@@ -1814,6 +1835,27 @@ export async function getSummariesForRuns(
     summaries.push(...rows.map(mapSummaryRowWithRun));
   }
   return summaries;
+}
+
+export async function getRunMeasurementRevisions(
+  db: D1Database,
+  runIds: readonly string[]
+): Promise<{ runId: string; measurementRevision: number }[]> {
+  const orm = drizzle(db);
+  const ids = [...runIds];
+  const revisions: { runId: string; measurementRevision: number }[] = [];
+  for (let i = 0; i < ids.length; i += PROFILE_ENTRY_FILTER_BATCH_SIZE) {
+    revisions.push(
+      ...(await orm
+        .select({
+          runId: benchmarkRuns.id,
+          measurementRevision: benchmarkRuns.measurement_revision,
+        })
+        .from(benchmarkRuns)
+        .where(inArray(benchmarkRuns.id, ids.slice(i, i + PROFILE_ENTRY_FILTER_BATCH_SIZE))))
+    );
+  }
+  return revisions;
 }
 
 /**

@@ -212,6 +212,7 @@ describe('atomic run lifecycle admission', () => {
       repetitions INTEGER NOT NULL DEFAULT 1,
       classifier_max_p95_latency_ms INTEGER,
       engine_identity TEXT NOT NULL DEFAULT '',
+      measurement_revision INTEGER NOT NULL DEFAULT 2,
       purpose TEXT NOT NULL DEFAULT 'platform'
     );
     CREATE UNIQUE INDEX one_running_slot ON benchmark_runs(router, kind, purpose)

@@ -29,6 +29,7 @@ const SCHEMA_SQL = `
     input_tokens INTEGER, cached_input_tokens INTEGER, output_tokens INTEGER, reasoning_tokens INTEGER,
     fallback_reason TEXT, route_hit INTEGER, retried INTEGER, exit_code INTEGER,
     output_prefix TEXT, event_count INTEGER, last_event_types TEXT,
+    tool_calls INTEGER, tool_names TEXT, step_count INTEGER, final_finish_reason TEXT,
     rep INTEGER NOT NULL, timed_out INTEGER NOT NULL, prompt_revision INTEGER NOT NULL DEFAULT 1,
     PRIMARY KEY (run_id, model, variant, case_id, rep)
   );
@@ -155,6 +156,7 @@ function pendingPayload(text: string): PendingDeciderOutput {
       stderrTail: 'diagnostic tail',
       eventCount: 3,
       lastEventTypes: ['text', 'completion'],
+      tools: null,
       timedOut: false,
     },
     retried: true,
@@ -185,8 +187,7 @@ const reuseParams = {
   engineIdentity: 'dataset:engine',
   repetitions: 2,
   entries: [{ model: 'concrete/model', variant: 'high' }],
-  skipOldCaseIds: [],
-  promptRevision: 2,
+  minimumRevisions: {},
 } as const;
 
 const gradedCaseResult: CaseResultRow = {
@@ -210,6 +211,10 @@ const gradedCaseResult: CaseResultRow = {
   output_prefix: 'graded output',
   event_count: 2,
   last_event_types: '["text","completion"]',
+  tool_calls: null,
+  tool_names: null,
+  step_count: null,
+  final_finish_reason: null,
   rep: 0,
   timed_out: 0,
   prompt_revision: 2,
@@ -426,6 +431,23 @@ describe('reuseDeciderCaseResults (real SQLite)', () => {
     expect(pending(sqlite, 'old')).toEqual(originalPending);
   });
 
+  it('skips results and payloads measured below their case minimum revision only', async () => {
+    insertRun(sqlite, 'old');
+    insertCase(sqlite, 'old', 'stale', { prompt_revision: 2 });
+    insertCase(sqlite, 'old', 'current', { prompt_revision: 3 });
+    insertCase(sqlite, 'old', 'unlisted', { prompt_revision: 1 });
+    insertPending(sqlite, 'old', 'stale-pending', undefined, { prompt_revision: 2 });
+    insertPending(sqlite, 'old', 'current-pending', undefined, { prompt_revision: 3 });
+
+    await reuseDeciderCaseResults(adapter.binding, {
+      ...reuseParams,
+      minimumRevisions: { stale: 3, current: 3, 'stale-pending': 3, 'current-pending': 3 },
+    });
+
+    expect(results(sqlite, 'destination').map(row => row.case_id)).toEqual(['current', 'unlisted']);
+    expect(pending(sqlite, 'destination').map(row => row.case_id)).toEqual(['current-pending']);
+  });
+
   it('copies latest successful ungraded payloads without destination or source graded duplicates', async () => {
     insertRun(sqlite, 'old');
     insertRun(sqlite, 'new-a', { status: 'failed', started_at: '2026-10-02T00:00:00.000Z' });
@@ -515,6 +537,7 @@ describe('reuseDeciderCaseResults (real SQLite)', () => {
         cachedInputTokens: null,
         outputTokens: null,
         reasoningTokens: null,
+        tools: null,
       },
       promptRevision: 1,
     });

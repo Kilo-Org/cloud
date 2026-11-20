@@ -20,7 +20,7 @@ export type AndroidWidgetCount = { label: string; kind: GlanceableCountKind; cou
  * the numeral and its noun in separate styled nodes — and adds the whole
  * sentence, which the card draws where one string is enough.
  */
-export type AndroidWidgetHomeCount = AndroidWidgetCount & { text: string };
+type AndroidWidgetHomeCount = AndroidWidgetCount & { text: string };
 /** A clock time, with the date added when `at` is not today. */
 export type GlanceableClockFormat = (at: string) => string;
 

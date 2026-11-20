@@ -57,7 +57,7 @@ export type GlanceableCountFormat = (value: number) => string;
  * cross-platform props therefore keep `translate(key)` for the count labels
  * until that native map carries a form per number.
  */
-export const GLANCEABLE_COUNT_NOUN_KEY = {
+const GLANCEABLE_COUNT_NOUN_KEY = {
   needsInput: 'glanceable.countNoun.needsInput',
   running: 'glanceable.countNoun.running',
   scheduled: 'glanceable.countNoun.scheduled',
@@ -70,7 +70,7 @@ export const GLANCEABLE_COUNT_NOUN_KEY = {
  * formatted number onto a verb, so the catalog owns the word order and the
  * agreement.
  */
-export const GLANCEABLE_COUNT_MESSAGE_KEY = {
+const GLANCEABLE_COUNT_MESSAGE_KEY = {
   needsInput: 'glanceable.count.needsInput',
   running: 'glanceable.count.running',
   scheduled: 'glanceable.count.scheduled',

@@ -69,6 +69,21 @@ export function hasRtlScript(node: ReactNode): boolean {
 }
 
 /**
+ * Whether copy keeps its capitalised, letterspaced display treatment. Latin
+ * copy keeps it in either direction; right-to-left-script copy drops it in a
+ * right-to-left interface, where capitals mean nothing and the tracking breaks
+ * the script's joins. The interface direction alone never decides it, so the
+ * same Latin copy takes one look in both directions.
+ *
+ * The caller passes `hasRtlScript` of its own copy because the shared `Text`
+ * primitive already scans its children once and memoizes the result; taking the
+ * boolean keeps that scan out of this rule's callers.
+ */
+export function keepsLatinDisplay(isRtlScriptCopy: boolean): boolean {
+  return !(I18nManager.isRTL && isRtlScriptCopy);
+}
+
+/**
  * JetBrains Mono ships no Arabic or Hebrew glyphs, so a fallback renders the
  * word one character at a time (`ا س ت ك ش ف`); the system font the app draws
  * its other copy with keeps the joins. The font ships the glyphs of neither

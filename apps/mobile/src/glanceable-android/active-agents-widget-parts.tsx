@@ -83,7 +83,7 @@ export function baselineAbove(value: string, size: number, bottom: number): numb
 }
 
 /** The baseline whose line box (Latin or taller script) starts at `top`. */
-export function baselineIn(value: string, size: number, top: number): number {
+function baselineIn(value: string, size: number, top: number): number {
   return top + ascent(value, size) + (lineBox(value, size) - Math.ceil(size * LATIN_LINE)) / 2;
 }
 

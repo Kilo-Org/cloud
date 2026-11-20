@@ -2815,11 +2815,6 @@ export const createBrowserRuntime = ({
   };
 
   /**
-   * The frames the answer to a dialog is checked against. The page cannot
-   * answer `Page.getFrameTree` while its dialog is open, so the tab's own
-   * document comes from the tab: answering the dialog acts on that tab.
-   */
-  /**
    * The frames a dialog answer is judged by. The page cannot report them while
    * its dialog is open, but the session recorded the frame that opened the
    * dialog and the security origin the browser computed for that frame — an

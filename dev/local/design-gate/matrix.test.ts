@@ -101,11 +101,23 @@ test('iOS landscape expects the base height as width', () => {
   assert.ok(landscape);
   const portrait = { width: 402, height: 874 };
   assert.deepEqual(
-    envMismatches(landscape, { ...env, platform: 'ios', window: { width: 874, height: 402 } }, portrait, undefined, 'ios'),
+    envMismatches(
+      landscape,
+      { ...env, platform: 'ios', window: { width: 874, height: 402 } },
+      portrait,
+      undefined,
+      'ios'
+    ),
     []
   );
   assert.deepEqual(
-    envMismatches(landscape, { ...env, platform: 'ios', window: portrait }, portrait, undefined, 'ios'),
+    envMismatches(
+      landscape,
+      { ...env, platform: 'ios', window: portrait },
+      portrait,
+      undefined,
+      'ios'
+    ),
     ['window width 402 dp, expected 874 dp']
   );
 });

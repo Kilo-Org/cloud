@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import {
   copyFileSync,
   mkdirSync,
@@ -153,6 +153,29 @@ function cli(root) {
   });
   assert.ifError(result.error);
   return result;
+}
+
+/**
+ * The command with its stderr read while it runs, as a pipeline consumer reads
+ * it. `spawnSync` drains every write as it blocks, so only this shape shows a
+ * report that the command abandons when it exits: the pipe holds one buffer.
+ */
+function cliStreamed(root, options = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [join(root, 'tools/i18n/check-catalogs.mjs')], {
+      cwd: root,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      ...options,
+    });
+    let stderr = '';
+    child.stdout.resume();
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', chunk => {
+      stderr += chunk;
+    });
+    child.on('error', reject);
+    child.on('close', status => resolve({ status, stderr }));
+  });
 }
 
 for (const callee of ['t', 'i18n.t']) {
@@ -2260,6 +2283,25 @@ test('reports a broken catalog through the command and exits non-zero', () => {
   assert.equal(result.status, 1);
   assert.match(result.stderr, /mobile\/ru: missing key "agents\.title"/);
   assert.match(result.stderr, /check-catalogs: \d+ problem\(s\)/);
+});
+
+test('writes the whole report before it sets the failing exit status', async () => {
+  // The report must survive the pipe: the reader here takes the output while
+  // the command runs, so a forced exit abandons everything past one pipe
+  // buffer and the tail of a long report never arrives. Every generated key is
+  // missing from the Russian catalog and used by no source.
+  const english = { ...ENGLISH };
+  for (let index = 0; index < 10_000; index += 1) {
+    english[`problem${index}`] = `Unused copy ${index}`;
+  }
+  const root = cliFixture(standardFiles({ english }));
+  const result = await cliStreamed(root, {
+    env: { ...process.env, I18N_CHECK_LIMIT: '100000' },
+  });
+  assert.equal(result.status, 1);
+  assert.ok(result.stderr.length > 1_000_000, `stderr was ${result.stderr.length} bytes`);
+  assert.match(result.stderr, /mobile\/ru: missing key "problem9999"/);
+  assert.match(result.stderr, /check-catalogs: \d+ problem\(s\)\n$/);
 });
 
 test('reports a directory named like a catalog through the command and skips it', () => {

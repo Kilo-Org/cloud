@@ -37,7 +37,8 @@
     "./home-widget": "./src/home-widget.ts",
     "./display-text": "./src/display-text.ts",
     "./tool-detail": "./src/tool-detail/index.ts",
-    "./worktree-review": "./src/worktree-review/index.ts"
+    "./worktree-review": "./src/worktree-review/index.ts",
+    "./local-fake-llm": "./src/local-fake-llm.ts"
   },
   "scripts": {
     "typecheck": "tsgo",

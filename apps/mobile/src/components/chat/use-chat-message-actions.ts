@@ -10,7 +10,7 @@ import {
 import { CREDITS_FAILURE_KEY } from '@/lib/chat/backend-target';
 import { type AddCreditsDestination } from '@/lib/credits/add-credits-destination';
 import { type ChatState, type Displaced } from '@/lib/chat/state';
-import { askedMessageId, displacedMessageId, stoppedAnswerMessageId } from '@/lib/chat/turns';
+import { askedMessageId, displacedMessageId, partialAnswerMessageId } from '@/lib/chat/turns';
 
 /**
  * The bubble the slot's question is drawn as: its own, or the kept one it asks
@@ -32,12 +32,13 @@ function slotBubbleId(
 }
 
 /**
- * The bubble a question's recovery hangs off: the words its stopped answer had
- * reached when there are any, so the stop is stated under what it stopped and
- * not between the question and its words, and the question itself otherwise.
+ * The bubble a question's recovery hangs off: the words its answer had reached
+ * before it was stopped or failed, when there are any, so how it ended is
+ * stated under what the person read and not between the question and its
+ * words, and the question itself otherwise.
  */
 const recoveryHost = (questionId: string, answer: string | null | undefined): string =>
-  answer == null ? questionId : stoppedAnswerMessageId(questionId);
+  answer == null ? questionId : partialAnswerMessageId(questionId);
 
 /**
  * What a question's bubble states about an answer that did not come, from the
@@ -80,6 +81,8 @@ type BubbleActions = {
   onRetryMessage?: () => void;
   addCredits?: AddCreditsDestination;
   onCopyToComposer?: (text: string) => void;
+  /** The question's words, when its recovery hangs off the words its answer had reached. */
+  composerText?: string;
 };
 
 /**
@@ -126,6 +129,9 @@ export function useChatMessageActions(
   const slotQuestion = slotBubbleId(state);
   const unanswered =
     slotQuestion === undefined ? undefined : recoveryHost(slotQuestion, state.askedAnswer);
+  /* The words Copy to composer puts back when the recovery hangs off the
+     answer's words: the bubble's own text is the answer, not the question. */
+  const slotComposerText = state.askedAnswer === null ? null : state.asked;
   // A question whose answer failed states why on its bubble. A question with no
   // failure was stopped, and one the balance refused offers Add credits.
   const credits = state.failureKey === CREDITS_FAILURE_KEY;
@@ -186,6 +192,7 @@ export function useChatMessageActions(
                 },
               }),
           onCopyToComposer: copyToComposer,
+          ...(slotComposerText === null ? {} : { composerText: slotComposerText }),
         };
       }
       const earlier = kept.get(message.info.id);
@@ -205,11 +212,23 @@ export function useChatMessageActions(
                 },
               }),
           onCopyToComposer: copyToComposer,
+          ...(earlier.question.answer === undefined ? {} : { composerText: earlier.question.text }),
         };
       }
       return { onLongPressDetails: openDetails };
     },
-    [addCredits, asking, copyToComposer, credits, delivery, kept, openDetails, retry, unanswered]
+    [
+      addCredits,
+      asking,
+      copyToComposer,
+      credits,
+      delivery,
+      kept,
+      openDetails,
+      retry,
+      slotComposerText,
+      unanswered,
+    ]
   );
 
   // A message can leave the transcript while its details are open: a model

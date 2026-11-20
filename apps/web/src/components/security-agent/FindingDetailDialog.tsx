@@ -83,6 +83,9 @@ import {
   getFindingSeverityPresentation,
   getFindingSourceLabel,
   getSupersedingFindingId as getSharedSupersedingFindingId,
+  hasRegisteredRemediationAttempt as hasRegisteredRemediationAttemptShared,
+  isSupersededFinding,
+  remediationNeedsAnalysisRefresh as remediationNeedsAnalysisRefreshShared,
 } from '@kilocode/app-shared/security-agent';
 
 type FindingAnalysis = SecurityFinding['analysis'];
@@ -266,8 +269,11 @@ function formatSource(source: string): string {
   return getFindingSourceLabel(source);
 }
 
+// The reference only counts while the row is still ignored: the shared
+// predicate owns that rule, so the hero, the actions and the facts below cannot
+// disagree with the retirement badge about the same finding.
 function getSupersedingFindingId(finding: SecurityFinding): string | null {
-  return getSharedSupersedingFindingId(finding);
+  return isSupersededFinding(finding) ? getSharedSupersedingFindingId(finding) : null;
 }
 
 function getDismissalReason(reason: string | null): string {
@@ -3071,9 +3077,11 @@ export function FindingDetailDialog({
   const effectiveRemediationOutcomeSummary = isEffectiveRemediationActive
     ? null
     : (remediationSummary?.outcomeSummary ?? null);
-  const hasRegisteredRemediationAttempt =
-    remediationAttempts.length > 0 ||
-    Boolean(remediationSummary?.latestAttemptId ?? remediationSummary?.latestAttempt?.id);
+  const hasRegisteredRemediationAttempt = hasRegisteredRemediationAttemptShared({
+    remediationAttempts,
+    remediationCapability,
+    remediationSummary,
+  });
   const activeRemediationAttemptId = isEffectiveRemediationActive
     ? (remediationCapability?.cancelAttemptId ??
       latestHistoryAttempt?.id ??
@@ -3095,10 +3103,11 @@ export function FindingDetailDialog({
     effectiveRemediationStatus === 'pr_opened'
       ? getRemediationUnavailableCopy('pr_already_opened')
       : remediationUnavailableCopy;
-  const remediationNeedsAnalysisRefresh =
-    !hasRegisteredRemediationAttempt &&
-    (remediationCapability?.startReason === 'stale_analysis' ||
-      remediationCapability?.retryReason === 'stale_analysis');
+  const remediationNeedsAnalysisRefresh = remediationNeedsAnalysisRefreshShared({
+    remediationAttempts,
+    remediationCapability,
+    remediationSummary,
+  });
   const remediationNeedsCodebaseAnalysis =
     !hasRegisteredRemediationAttempt &&
     !isEffectiveRemediationActive &&

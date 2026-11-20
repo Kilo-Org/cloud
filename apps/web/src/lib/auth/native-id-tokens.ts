@@ -77,13 +77,13 @@ function hasResponse(error: unknown): boolean {
 export type VerifiedAppleIdToken = { sub: string; email: string };
 
 /**
- * Lifetime of an acceptance record: as long as the identity token it binds,
- * bounded by the longest Apple ID-token lifetime.
+ * Lifetime of a single-use acceptance record: as long as the identity token it
+ * binds, clamped to [1, capSeconds]. Both providers share this rule.
  */
-function recordTtlSeconds(exp: number | undefined): number {
-  if (typeof exp !== 'number') return NONCE_TTL_CAP_SECONDS;
+function recordTtlSeconds(exp: number | undefined, capSeconds: number): number {
+  if (typeof exp !== 'number') return capSeconds;
   const remaining = Math.floor(exp - Date.now() / 1000);
-  return Math.max(1, Math.min(remaining, NONCE_TTL_CAP_SECONDS));
+  return Math.max(1, Math.min(remaining, capSeconds));
 }
 
 /** The claims every native Apple path requires from a verified identity token. */
@@ -116,7 +116,7 @@ async function recordSingleUseAppleToken(idToken: string, exp: number | undefine
   try {
     recorded = await redisClient.set(appleTokenRecordKey(idToken), '1', {
       nx: true,
-      ex: recordTtlSeconds(exp),
+      ex: recordTtlSeconds(exp, NONCE_TTL_CAP_SECONDS),
     });
   } catch {
     throw new NonceStoreUnavailableError('Apple token record unavailable');
@@ -137,7 +137,7 @@ async function recordSingleUseAppleNonceAcceptance(
   idToken: string,
   exp: number | undefined
 ): Promise<void> {
-  const ex = recordTtlSeconds(exp);
+  const ex = recordTtlSeconds(exp, NONCE_TTL_CAP_SECONDS);
   let results: [string | null, string | null] = [null, null];
   try {
     results = (await redisClient
@@ -230,11 +230,7 @@ async function recordSingleUseGoogleToken(
   expiresAt: number | undefined
 ): Promise<void> {
   const digest = createHash('sha256').update(idToken).digest('hex');
-  const ttlSeconds = (() => {
-    if (typeof expiresAt !== 'number') return GOOGLE_TOKEN_TTL_CAP_SECONDS;
-    const remaining = Math.floor(expiresAt - Date.now() / 1000);
-    return Math.max(1, Math.min(remaining, GOOGLE_TOKEN_TTL_CAP_SECONDS));
-  })();
+  const ttlSeconds = recordTtlSeconds(expiresAt, GOOGLE_TOKEN_TTL_CAP_SECONDS);
   let recorded: string | null = null;
   try {
     recorded = await redisClient.set(`auth:google-signin-token:${digest}`, '1', {

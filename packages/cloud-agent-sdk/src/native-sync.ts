@@ -33,6 +33,11 @@ const envelopeSchema = z.object({
 const ticketSchema = z.object({ ticket: z.string(), expiresAt: z.iso.datetime() });
 const grantSchema = z.object({ token: z.string(), expiresAt: z.iso.datetime() });
 const commandStatusSchema = z.enum(['queued', 'delivered', 'expired']);
+const commandStatusRank: Record<z.infer<typeof commandStatusSchema>, number> = {
+  queued: 0,
+  delivered: 1,
+  expired: 2,
+};
 const commandAckSchema = z.object({ commandID: z.string(), status: commandStatusSchema });
 const instanceSchema = z.object({
   instanceID: z.string(),
@@ -889,11 +894,16 @@ export class NativeSyncClient {
       state = { ...state, ...patch, error };
       listener(state);
     };
+    // Status moves only forward: a late POST/poll answer must not regress a frame-reported delivery.
     const recordCommandStatus = (
       commandID: string,
       status: z.infer<typeof commandStatusSchema>
-    ) => {
+    ): z.infer<typeof commandStatusSchema> => {
+      const current = state.commands[commandID];
+      if (current !== undefined && commandStatusRank[current] >= commandStatusRank[status])
+        return current;
       publish({ commands: { ...state.commands, [commandID]: status } });
+      return status;
     };
     const visible = (messages: NativeSnapshotMessage[]) =>
       clearedIDs.size === 0 ? messages : messages.filter(item => !clearedIDs.has(item.message.id));
@@ -1411,8 +1421,7 @@ export class NativeSyncClient {
             organizationID
           )
         );
-        recordCommandStatus(result.commandID, result.status);
-        return result.status;
+        return recordCommandStatus(result.commandID, result.status);
       },
       clear: () => {
         for (const item of state.messages) clearedIDs.add(item.message.id);

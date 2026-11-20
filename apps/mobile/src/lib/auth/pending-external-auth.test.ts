@@ -7,7 +7,6 @@ import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sin
 import {
   _resetPendingExternalAuthForTests,
   clearPendingExternalAuth,
-  PENDING_EXTERNAL_AUTH_TTL_MS,
   readPendingExternalAuth,
   writePendingExternalAuth,
 } from '@/lib/auth/pending-external-auth';
@@ -26,7 +25,7 @@ const record = {
   deviceCode: 'device-secret',
   userCode: 'UC-1234',
   verificationUrl: 'https://example.com/device-auth?code=UC-1234',
-  startedAt: Date.now(),
+  expiresAt: Date.now() + 600_000,
 };
 
 beforeEach(() => {
@@ -85,8 +84,8 @@ describe('pending-external-auth', () => {
     }
   });
 
-  it('returns stale for a record past the TTL without deleting', async () => {
-    const expired = { ...record, startedAt: Date.now() - PENDING_EXTERNAL_AUTH_TTL_MS - 1000 };
+  it('returns stale for a record past the server code expiry without deleting', async () => {
+    const expired = { ...record, expiresAt: Date.now() - 1000 };
     vi.mocked(SecureStore.getItemAsync).mockResolvedValue(JSON.stringify(expired));
     await expect(readPendingExternalAuth()).resolves.toEqual({ kind: 'stale' });
     expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();

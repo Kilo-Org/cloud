@@ -1,7 +1,7 @@
 import { ScrollView, View } from 'react-native';
 import { type PreparationAttempt } from '@kilocode/cloud-agent-sdk';
 
-import { useScreenInsets } from '@/lib/screen-insets';
+import { useScreenInsets, useSideInsetMarginStyle } from '@/lib/screen-insets';
 
 import { PreparationGroup } from './preparation-group';
 
@@ -270,10 +270,11 @@ const ATTEMPTS: PreparationAttempt[] = [
 
 export function PreparationCopyFixture() {
   const { top } = useScreenInsets();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: top }}>
-      <ScrollView contentContainerClassName="pb-8">
+      <ScrollView style={sideInsetMarginStyle} contentContainerClassName="pb-8">
         {ATTEMPTS.map(attempt => (
           <PreparationGroup key={attempt.id} attempt={attempt} />
         ))}

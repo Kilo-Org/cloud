@@ -73,7 +73,7 @@ export function ChoiceRow({
     <RowFrame
       testID={testID}
       className={className}
-      trailing={{ kind: 'check', selected, disabled }}
+      trailing={{ kind: 'check', selected, disabled, multi }}
       disabled={disabled}
       onPress={() => {
         const applied = onPress();

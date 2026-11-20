@@ -15,6 +15,7 @@ import { renderWithProviders } from '@/test/render-with-providers';
 
 const onSelect = vi.hoisted(() => vi.fn());
 const onDone = vi.hoisted(() => vi.fn());
+const onCancel = vi.hoisted(() => vi.fn());
 
 vi.mock('react-native', async () => {
   // `vi.mock` factories are hoisted above the file's static imports, so the
@@ -74,6 +75,9 @@ async function mount(
       },
       onDone: () => {
         onDone();
+      },
+      onCancel: () => {
+        onCancel();
       },
       expired: props.expired ?? false,
     })
@@ -161,6 +165,7 @@ beforeEach(() => {
   }
   onSelect.mockReset();
   onDone.mockReset();
+  onCancel.mockReset();
   scrollTo.mockClear();
 });
 
@@ -188,7 +193,25 @@ describe('ContextPickerSheet', () => {
     expect(labels).toHaveLength(2);
     for (const label of labels) {
       expect(label.props.ellipsizeMode).toBe('middle');
+      // The shared row title's weight: an Arabic label in an RTL interface
+      // inks like the Latin org names it sits beside.
+      expect(label.props.className).toContain('font-medium');
     }
+  });
+
+  it('brackets the header title with Cancel and Done, like the sibling sheets', async () => {
+    const renderer = await mount();
+    const header = renderer.root.findByType('SheetHeader' as ElementType);
+
+    // A leading Cancel is what centers the title: without it the header lays
+    // the title against the sheet edge and shows no way out but Done.
+    expect(typeof header.props.onCancel).toBe('function');
+    expect(typeof header.props.onDone).toBe('function');
+    act(() => {
+      (header.props.onCancel as () => void)();
+    });
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onDone).not.toHaveBeenCalled();
   });
 
   it('checks nothing when the stored account is not in the list', async () => {

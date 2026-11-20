@@ -172,6 +172,7 @@
     "generating": "正在產生…",
     "working": "處理中",
     "yourOwnRepositories": "你自己的存放庫",
+    "organizationRepositories": "組織的存放庫",
     "dismissed": "已忽略",
     "agent": "代理人",
     "durationMinuteShort": "min",
@@ -669,7 +670,7 @@
     },
     "instructions": {
       "title": "自訂指示",
-      "deprecation": "自訂指示功能預計將停止使用。請改將這些準則移至存放庫中的 REVIEW.md 檔案。",
+      "deprecation": "自訂指示功能即將移除。請改將這些準則移至存放庫中的 REVIEW.md 檔案。",
       "placeholder": "例如：確保程式碼符合我們的錯誤處理規範…",
       "clearTitle": "移除自訂指示？",
       "clearMessage": "儲存空白欄位將刪除此檢閱者所儲存的自訂指示。"
@@ -700,6 +701,7 @@
       "managedOnWeb": "{{organization}} 的 Bitbucket 連線需在電腦上透過網頁版管理。",
       "description": "為 {{organization}} 建立工作區存取權杖，然後貼到下方。",
       "descriptionReconnect": "為 {{organization}} 建立新的工作區存取權杖，然後貼到下方。",
+      "descriptionOverview": "為 {{organization}} 建立工作區存取權杖，然後在下一個畫面貼上。",
       "scopes": "帳戶：讀取 · 存放庫：讀取／寫入 · PR：讀取 · Webhook：讀取／寫入",
       "tokenPlaceholder": "工作區存取權杖",
       "tokenRefused": "Bitbucket 未接受此工作區存取權杖。請確認其具有上方列出的權限範圍，然後再試一次。"
@@ -2629,6 +2631,8 @@
     "retryHint": "重新取得 Kilo Pass 狀態。",
     "endedOn": "已於 {{date}} 結束",
     "notAvailableInApp": "Kilo Pass 無法在應用程式內使用。",
+    "notAvailableTitle": "應用程式內未提供 Kilo Pass",
+    "noPassDescription": "此帳號沒有 Kilo Pass。",
     "statusActive": "使用中",
     "statusTrialing": "試用中",
     "statusPastDue": "付款逾期",
@@ -3238,6 +3242,9 @@
     },
     "tabs": {
       "discussion": "討論",
+      "discussionAccessibility": "{{title}}：{{displayCount}} 則留言",
+      "discussionAccessibility_other": "{{title}}：{{displayCount}} 則留言",
+      "discussionAccessibility_one": "{{title}}：1 則留言",
       "files": "檔案",
       "overview": "總覽"
     },
@@ -3426,8 +3433,7 @@
     "hub": {
       "balance": "餘額",
       "lowBalanceBelow": "低於 {{amount}}",
-      "organizationSeats": "組織席次",
-      "plan": "組織套餐",
+      "plan": "套餐",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · 已結束",
@@ -3470,7 +3476,7 @@
       "retentionLimit": "顯示最近的發票。"
     },
     "lowBalanceAlert": {
-      "enableA11y": "啟用餘額不足提醒",
+      "subtitle": "當此組織的餘額低於您設定的金額時，透過電子郵件向您列出的地址發送提醒。",
       "notifyEmailsLabel": "通知收件地址",
       "permissionDenied": "你沒有管理帳單提醒的權限。",
       "separateEmailsHint": "請以逗號分隔多個電子郵件地址。",
@@ -3647,7 +3653,8 @@
     "signupStepUp": "如要完成帳戶建立，請選擇「$t(login.moreSignInOptions)」。",
     "signupStepUpApple": "如要完成帳戶建立，請選擇「$t(login.signInWithApple)」。",
     "signupStepUpGoogle": "如要完成帳戶建立，請選擇「$t(login.signInWithGoogle)」。",
-    "invalidCode": "該驗證碼不正確。請再試一次。",
+    "signupStepUpBack": "如要完成帳戶建立，請返回上一步並選擇「$t(login.moreSignInOptions)」。",
+    "invalidCode": "該驗證碼不正確或已過期。請再試一次，或使用「$t(login.resendCode)」。",
     "codeInProgress": "正在處理你的驗證碼。請稍候再試一次。",
     "tooManyAttempts": "嘗試次數過多。請重新索取驗證碼。",
     "invalidToken": "登入失敗。請再試一次。",
@@ -3916,6 +3923,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) 會使用所選的協定與模型，向此端點傳送簡短的推論請求。供應商可能會對此收費。",
       "connectionSucceeded": "模型已使用此協定完成請求。",
       "connectionFailed": "模型無法完成請求。請檢查 API 根 URL、協定、驗證憑證與模型 ID。",
+      "requestTimedOut": "端點未及時回應。請檢查 API 根 URL 與網路連線，然後再試一次。",
+      "requestUnauthorized": "端點拒絕了驗證憑證。請檢查 API 金鑰與自訂標頭，然後再試一次。",
+      "requestNotFound": "找不到端點或模型。請檢查 API 根 URL 與模型 ID。",
+      "requestRateLimited": "端點正在限制請求。請稍候片刻再試一次。",
+      "requestUnavailable": "端點目前無法使用。請稍後再試一次。",
+      "requestUnreachable": "無法連線至端點。請檢查 API 根 URL 與網路連線。",
+      "requestInvalidResponse": "端點回應的格式不符預期，無法使用。請確認 API 根 URL 與協定符合該伺服器，然後再試一次。",
+      "discoveryNoModels": "端點未列出任何模型。請手動輸入模型。",
+      "connectionIncomplete": "模型已回應但未完成。請再試一次，或檢查模型 ID 與協定。",
       "invalidInput": "請輸入後端名稱、有效的標頭，以及至少一個具有唯一 ID 和名稱的模型。詞元上限必須為正整數。",
       "invalidUrl": "請輸入 HTTP 或 HTTPS API 根 URL，且不得包含驗證憑證、查詢參數或片段識別碼。",
       "publicHttp": "不允許使用公開的 HTTP 端點。請使用 HTTPS 或私有的本機端點。",
@@ -4054,7 +4070,11 @@
     "reasoningEffort": {
       "modelFlag": "此模型支援思考程度"
     },
-    "creditsRequired": "點數不足，無法傳送此訊息。"
+    "creditsRequired": "點數不足，無法傳送此訊息。",
+    "providerKeyRefused": "供應商拒絕了驗證憑證。請檢查其 API 金鑰，然後重新傳送。",
+    "providerModelMissing": "此後端已不再提供此模型。請選擇其他。",
+    "providerRateLimited": "供應商正在限制請求。請稍候片刻再重新傳送。",
+    "providerUnavailable": "供應商目前無法使用。請稍後再重新傳送。"
   },
   "settingsTools": {
     "confirmTitle": "確認此變更？"
@@ -4429,6 +4449,7 @@
     "pickPackToBuyAgain": "請在上方選擇一個方案以開始新的購買。",
     "purchasePending": "商店仍在處理這筆付款。商店核准扣款後，你的點數就會入帳。",
     "buyAgain": "再次購買",
+    "checkPurchase": "檢查購買",
     "purchaseOwnedByAnotherAccount": "此 Apple 帳戶上的點數屬於另一個 Kilo 帳戶。請登入該 Kilo 帳戶以使用。",
     "purchaseOwnedByAnotherAccountPlay": "此 Google Play 帳戶上的點數屬於另一個 Kilo 帳戶。請登入該 Kilo 帳戶以使用。"
   },
@@ -4522,7 +4543,9 @@
     },
     "saveSheet": {
       "title": "儲存至清單",
-      "saved": "已儲存至 {{list}}"
+      "saved": "已儲存至 {{list}}",
+      "saveFailed": "無法儲存待辦事項。請檢查您的連線，然後再試一次。",
+      "saveRefused": "無法將待辦事項儲存至此清單。請選擇其他清單。"
     }
   },
   "agentBriefing": {
@@ -4534,6 +4557,7 @@
     "empty": "此簡報時段無活動",
     "emptyHint": "當排定的簡報有活動時，你的雲端與 CLI 程式設計工作階段會顯示在這裡。",
     "loadError": "無法載入簡報",
+    "estimateLoadError": "無法載入預估。",
     "view": "閱讀簡報",
     "viewWithPreview": "$t(agentBriefing.view)。{{preview}}",
     "scorecardLabel": "$t(agentBriefing.view)：$t(agentBriefing.selectedSessions) {{sessions}}，$t(agentBriefing.snapshotPullRequests) {{pullRequests}}，$t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4801,7 +4825,7 @@
   },
   "organizationGuardrails": {
     "title": "AI 護欄",
-    "permissionDenied": "只有組織擁有者與管理員可以管理 AI 護欄。",
+    "permissionDenied": "只有組織擁有者與管理員可以管理 AI 護欄。$t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "未啟用 AI 護欄",
     "unavailable": "Kilo 可依請求為組織啟用 AI 護欄。請聯絡 {{supportEmail}}，Kilo 團隊會為你的組織開啟。",
     "contactSupport": "聯絡客服",
@@ -4939,7 +4963,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "企業版功能",
-    "enterpriseOnly": "這是僅限企業版的功能。",
+    "enterpriseOnly": "供應商與模型僅適用於 Enterprise 方案。",
     "readOnly": "只有組織擁有者與管理員可以變更這些設定。",
     "loadError": "無法載入供應商與模型",
     "tabModels": "模型",

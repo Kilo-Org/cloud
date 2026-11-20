@@ -339,6 +339,9 @@ describe('SessionPreviewTranscript part detail', () => {
 });
 
 describe('SessionPreviewTranscript empty placement', () => {
+  // These cases assert the rendered structure only: `CenteredState` is a host
+  // element here, so where the band lands is `CenteredState`'s own suite's job,
+  // and the device run measures the painted gap between the two placements.
   it('centres an empty transcript only when the caller asks', () => {
     const title = i18n.t('agentChat.session.emptyTitle');
     const titled = (node: TestRenderer.ReactTestInstance): boolean =>

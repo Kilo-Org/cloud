@@ -10,7 +10,6 @@ import { resetAccessTokenCacheForTests, verifyPlayIntegrity } from './native-adm
 // Values are read lazily (via getters) so tests can vary the configuration.
 const mockConfig = {
   GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME: 'com.kilocode.kiloapp',
-  GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER: '123456789',
   GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY: '',
   GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS: 'test-cert-digest',
 };
@@ -18,9 +17,6 @@ const mockConfig = {
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME() {
     return mockConfig.GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME;
-  },
-  get GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER() {
-    return mockConfig.GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER;
   },
   get GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY() {
     return mockConfig.GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY;
@@ -115,50 +111,6 @@ describe('verifyPlayIntegrity decode endpoint', () => {
         body: JSON.stringify({ integrityToken: 'test-integrity-token' }),
       })
     );
-  });
-
-  test('reaches the decode endpoint without a project number configured', async () => {
-    const originalProjectNumber = mockConfig.GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER;
-    mockConfig.GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER = '';
-    try {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ access_token: 'test-access-token' }),
-      });
-      const expectedNonce = createHash('sha256').update('challenge-value').digest('base64');
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          tokenPayloadExternal: {
-            requestDetails: {
-              requestPackageName: 'com.kilocode.kiloapp',
-              nonce: expectedNonce,
-            },
-            appIntegrity: {
-              appRecognitionVerdict: 'PLAY_RECOGNIZED',
-              certificateSha256Digest: ['test-cert-digest'],
-              packageName: 'com.kilocode.kiloapp',
-            },
-            deviceIntegrity: {
-              deviceRecognitionVerdict: ['MEETS_DEVICE_INTEGRITY'],
-            },
-          },
-        }),
-      });
-
-      const result = await verifyPlayIntegrity('test-integrity-token', 'challenge-value');
-
-      expect(result).toEqual({ ok: true, packageName: 'com.kilocode.kiloapp' });
-      // The project number is no longer part of the configuration, so the
-      // request path must stay keyed on the package name alone.
-      expect(mockFetch).toHaveBeenNthCalledWith(
-        2,
-        'https://playintegrity.googleapis.com/v1/com.kilocode.kiloapp:decodeIntegrityToken',
-        expect.objectContaining({ method: 'POST' })
-      );
-    } finally {
-      mockConfig.GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER = originalProjectNumber;
-    }
   });
 
   test('accepts a standard request bound through requestHash', async () => {

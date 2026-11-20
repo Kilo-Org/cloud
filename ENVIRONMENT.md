@@ -329,7 +329,6 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `NATIVE_APPLE_NONCE_REQUIRED_SINCE` - ISO 8601 instant; the native Apple sign-in nonce requirement applies from this instant onward. Before it, requests are accepted without the field while the `native-apple-signin-nonce-relaxed-path` release toggle is enabled. Unset, invalid, or past ⇒ the requirement applies unconditionally. [SERVER]
 - `NATIVE_APPLE_NONCE_TRANSITION_LOCAL` - When `true` in a development environment outside Vercel, the transition window opens without the release toggle, for local verification runs without PostHog credentials. [SERVER]
 - `NATIVE_ADMISSION_DEV_SENTINEL` - When `true`, non-production accepts the fixed device-attestation sentinel from devices that cannot attest (simulator, emulator without Play Services). Ignored when `NODE_ENV=production`. The mobile build reads the same name. [SERVER]
-- `GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER` - Google Cloud project number for Play Integrity API. Also read by the mobile build, where it ships in the bundle; it is an identifier, not a secret. [SERVER]
 - `GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY` - Service account JSON key for Play Integrity API. `[SECRET]`
 - `GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME` - Expected Android package name (e.g., `com.kilocode.app`), verified against the Play Integrity verdict. [SERVER]
 - `GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS` - Comma-separated SHA-256 signing certificate digests (hex) accepted for the Android app. [SERVER]
@@ -655,6 +654,7 @@ Abrupt OOM/SIGKILL failures and synthetic session failure events are not capture
 - `EVENT_SERVICE_URL` - WebSocket URL for the event service from mobile. Bundled into the binary. [PUBLIC]
 - `NOTIFICATIONS_URL` - HTTP URL for the push-notifications backend from mobile. [PUBLIC]
 - `POSTHOG_API_KEY` - PostHog public project key for the mobile app's analytics and feature-flag evaluation, read as `posthogApiKey` in `apps/mobile/src/lib/env-keys.js` and required at startup by `apps/mobile/src/lib/config.ts`. Use the same PostHog project as the web app's `NEXT_PUBLIC_POSTHOG_KEY`: one person's flag then evaluates identically on both clients. [PUBLIC]
+- `GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER` - Google Cloud project number for Play Integrity, read only by the mobile build (`apps/mobile/app.config.ts` and `apps/mobile/src/lib/env-keys.js`); it ships in the bundle and is an identifier, not a secret. The web app's Play Integrity verifier does not read it. Required for a production mobile build, and an EAS production environment without it fails the release workflow check. [PUBLIC]
 - `EXPO_PUBLIC_POSTHOG_DEV_HOST` - Development-only PostHog API host for flag evaluation, such as a local mock. A development build contacts no PostHog project and resolves every flag to its default unless this is set; a release build ignores it. Read in `apps/mobile/src/lib/analytics/posthog.ts`, inlined into the bundle. [PUBLIC]
 - `MOBILE_DEV_HOST` - LAN host override for mobile dev (replaces `localhost` on physical devices); read in `dev/local/mobile-env.ts`. [SERVER]
 

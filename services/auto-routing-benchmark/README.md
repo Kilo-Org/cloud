@@ -1229,7 +1229,7 @@ everything else is automatic. **Wait** is the delay the flow itself imposes.
 | 8 | Cases execute in the runner container; each result posts to `/container/case-result` | automatic | **the measurement itself** — this dominates: minutes to hours depending on the entry count and model latency | `beginPaidCase` (`src/scheduler.ts`), `acceptContainerCaseResult` (`src/run.ts`) |
 | 9 | Finalization: aggregate summaries, flip entries ready/failed, mark the run completed | automatic, on the dispatch pass that sees the run settled | none | `finalizeRunIfComplete` (`src/run.ts`) |
 | 10 | Profile ready: the registry row carries `run_id` provenance | automatic, same pass | none | `markProfilesReadyForRun` (`src/db.ts`), `src/profile-failure.ts` |
-| 11 | Routing table publish with the new pair | automatic, same pass (and any save) | refuses until **every** serving pair has a ready current-engine row | `publishPlatformRoutingTable`, `finalizeRunIfComplete` (`src/run.ts`) |
+| 11 | Routing table publish with the new pair | automatic, same pass (and any save) | refuses while a serving pair's measurement is in flight (or it has no current-engine registry row yet); a settled failure leaves the table and is named in the publish log | `publishPlatformRoutingTable`, `finalizeRunIfComplete` (`src/run.ts`) |
 | 12 | Console: runs list, per-model cost table and routing table show the result | automatic on page load / refetch | none | `apps/web/src/app/admin/auto-routing/BenchmarksSection.tsx` |
 
 ### Expected time per step
@@ -1298,9 +1298,13 @@ A failed entry is `failed` (retryable) or `unavailable` (permanent), classified 
 
 Recovery: **Requeue retryable** (admin, `POST /admin/registry/requeue`) puts every retryable
 row of a queue back to `pending` once its retry window has passed, charging no owner quota.
-A permanent row moves only through its own **Re-admit** (`POST /admin/registry/refresh`,
-`mode: repair_unavailable`), which is also how a confirmed provider fix re-admits a model
-whose budget ran out.
+A permanent row moves only through its own **Re-admit**: the console posts
+`POST /admin/registry/refresh` for that one pair with `mode: 'refresh'`, which clears its
+failure history and puts it back to `pending` as soon as the catalog can run it. That covers
+both a model whose budget ran out and one whose provider has since been fixed. The narrower
+`mode: 'repair_unavailable'` (see "Unavailable models and targeted refresh") selects only
+pairs with a recorded exact model-lookup failure, so it would leave a budget-exhausted row
+in `skipped`.
 
 ### The remaining waits, and why they stay
 

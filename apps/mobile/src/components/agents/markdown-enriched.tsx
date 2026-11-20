@@ -1,8 +1,8 @@
 import { useMemo, useState, useSyncExternalStore } from 'react';
 import { I18nManager, Platform } from 'react-native';
 import {
-  EnrichedMarkdownText,
   type AccessibilityLabels,
+  EnrichedMarkdownText,
   type MarkdownStyle,
 } from 'react-native-enriched-markdown';
 import { useTranslation } from 'react-i18next';

@@ -254,8 +254,7 @@ describe('refusalMessage', () => {
 });
 
 describe('DeviceAuthAppReturn', () => {
-  const renderReturn = () =>
-    renderToStaticMarkup(React.createElement(DeviceAuthAppReturn, {}));
+  const renderReturn = () => renderToStaticMarkup(React.createElement(DeviceAuthAppReturn, {}));
 
   test('names the app as the destination of the control', () => {
     const html = renderReturn();

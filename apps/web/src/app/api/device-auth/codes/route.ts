@@ -128,9 +128,7 @@ export const POST = withRestTiming('/api/device-auth/codes', async (request: Req
       userAgent,
       ipAddress,
       ...(pairingBody.client ? { requestingClient: pairingBody.client } : {}),
-      ...(pairingBody.pendingLinkToken
-        ? { pendingLinkToken: pairingBody.pendingLinkToken }
-        : {}),
+      ...(pairingBody.pendingLinkToken ? { pendingLinkToken: pairingBody.pendingLinkToken } : {}),
     });
 
     const verificationUrl = buildDeviceAuthVerificationUrl(APP_URL, userCode, {

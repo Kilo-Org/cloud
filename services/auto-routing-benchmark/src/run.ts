@@ -126,7 +126,7 @@ import {
   claimScheduledChunks,
   clearUnbilledCase,
   getPaidCasePromptRevision,
-  cooldownProviders,
+  cooldownModel,
   deferChunk,
   deferThrottledChunk,
   failChunk,
@@ -149,7 +149,6 @@ import {
   type SchedulerClaim,
   type SchedulerConfig,
 } from './scheduler';
-import { catalogModelProviders } from './platform-models';
 import { argvAffectedCases, PROMPT_TRANSPORT_REVISION } from './prompt-transport';
 
 /** One exact Pool entry identity used throughout a decider/classifier run. */
@@ -1139,27 +1138,19 @@ async function initializeScheduledRun(env: Env, runId: string): Promise<boolean>
   if (initialized) return true;
   const { run, models } = (await getRunWithModels(env.BENCH_DB, runId)) ?? {};
   if (!run || !models || run.status !== 'running') return false;
-  // The catalog mint requires an org; only rows written before the org
-  // snapshot existed lack one.
+  // Execution mints each case's token for this identity; only rows written before
+  // the org snapshot existed lack one.
   if (!run.benchmark_user_id || !run.benchmark_org_id) {
     const reason = 'Benchmark run is missing its execution identity.';
     await markProfilesFailedForRun(env.BENCH_DB, runId, reason);
     await markRunFailed(env.BENCH_DB, runId, reason);
     return false;
   }
-  const catalog = await fetchExecutableBenchmarkModelCatalog(env, {
-    benchmarkUserId: run.benchmark_user_id,
-    benchmarkOrgId: run.benchmark_org_id,
-  });
   return scheduleRunChunks(env.BENCH_DB, {
     runId,
     entries: models
       .filter(model => model.enqueued)
-      .map(model => ({
-        model: model.model,
-        variant: variantFromStorage(model.variant),
-        providers: catalogModelProviders(catalog, model.model),
-      })),
+      .map(model => ({ model: model.model, variant: variantFromStorage(model.variant) })),
     repetitions: run.repetitions,
     caseIds: deciderCasesForRouter(run.router).map(benchCase => benchCase.id),
     chunkSize: DECIDER_CHUNK_SIZE,
@@ -1698,7 +1689,7 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
     ) {
       const delaySeconds = schedulerBackoffSeconds(claim.throttle_deferrals + 1);
       await deferThrottledChunk(env.BENCH_DB, id, token, Date.now() + delaySeconds * 1000);
-      await cooldownProviders(env.BENCH_DB, claim, Date.now() + delaySeconds * 1000);
+      await cooldownModel(env.BENCH_DB, claim.model, Date.now() + delaySeconds * 1000);
       await env.BENCH_QUEUE.send(
         { runId: claim.run_id, kind: 'decider', model: claim.model, schedulerWake: true },
         { delaySeconds }
@@ -1729,7 +1720,7 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
       const delaySeconds = schedulerBackoffSeconds(claim.attempts);
       await deferChunk(env.BENCH_DB, id, token, Date.now() + delaySeconds * 1000);
       if (error instanceof BenchmarkThrottleError) {
-        await cooldownProviders(env.BENCH_DB, claim, Date.now() + delaySeconds * 1000);
+        await cooldownModel(env.BENCH_DB, claim.model, Date.now() + delaySeconds * 1000);
       }
       await env.BENCH_QUEUE.send(
         {

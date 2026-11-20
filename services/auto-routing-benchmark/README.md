@@ -109,28 +109,29 @@ One-case chunks leave room for warmup, the existing empty-output retry, and grad
 the queue invocation deadline; prompts, variants, CLI timeouts, repetitions, cost accounting,
 and CLI-reported latency remain unchanged.
 
-`BENCHMARK_SCHEDULER_CONFIG` is a JSON object. Defaults are `slots: 250`,
-`modelConcurrency: 12`, `providerConcurrency: 16`, and `unknownProviderConcurrency: 2`.
-Optional `modelLimits` and `providerLimits` objects override those defaults by exact identity.
-`shares` defaults to
+`BENCHMARK_SCHEDULER_CONFIG` is a JSON object. Defaults are `slots: 250` and
+`modelConcurrency: 12`. An optional `modelLimits` object overrides the model cap by exact
+model id. `shares` defaults to
 `{"efficient/platform":2,"frontier/platform":2,"efficient/user":1,"frontier/user":1}`.
 The least-occupied weighted share receives the next eligible claim; unused shares are
 borrowed without reservations or preempting active work. Model caps span variants and runs.
-Provider identities come from the catalog's optional `inference_provider_ids`, which uses
-the existing gateway provider index. Every possible provider is conservatively counted;
-missing metadata shares a small unknown-provider bucket. Model-name prefixes are never
-treated as serving providers. Each router has an owner queue with its own share.
+Only slots and model caps bound a claim. There is no per-provider limit: the gateway sends
+each request to one aggregator (Vercel AI Gateway, else OpenRouter), which picks one
+upstream, so the catalog's `inference_provider_ids` list says nothing about which provider a
+chunk loads. Each router has an owner queue with its own share.
 
-Admins can override `slots`, `modelConcurrency`, `providerConcurrency`, and
-`unknownProviderConcurrency` at runtime, without a deploy, from the Scheduler card on the
-admin panel's Benchmarks tab or with `PUT /admin/scheduler-config`. Each limit resolves
-admin override, then `BENCHMARK_SCHEDULER_CONFIG`, then the default. Overrides live in the
-single-row `scheduler_settings` D1 table; each dispatch pass reads it once by primary key, so
-a change applies on the next completion or one-minute tick. The PUT body replaces the whole
-override set: a missing or `null` limit clears that override. Values must be integers from 1
-to `BENCHMARK_CONTAINER_BUDGET`; anything else, including an unknown key, is a 400.
-`modelLimits` and `providerLimits` still come only from the env config and take precedence
-over `modelConcurrency` and `providerConcurrency` for their exact identities.
+Admins can override `slots` and `modelConcurrency` at runtime, without a deploy, from the
+Scheduler card on the admin panel's Benchmarks tab or with `PUT /admin/scheduler-config`.
+Each limit resolves admin override, then `BENCHMARK_SCHEDULER_CONFIG`, then the default.
+Overrides live in the single-row `scheduler_settings` D1 table; each dispatch pass reads it
+once by primary key, so a change applies on the next completion or one-minute tick. The PUT
+body replaces the whole override set: a missing or `null` limit clears that override. Values
+must be integers from 1 to `BENCHMARK_CONTAINER_BUDGET`; anything else, including an unknown
+key, is a 400. Until the web release after the provider-limit removal is promoted (ADR 0003,
+invariant 7), the PUT also accepts and ignores the retired `providerConcurrency` and
+`unknownProviderConcurrency`, and the response serves both as the container budget.
+`modelLimits` still comes only from the env config and takes precedence over
+`modelConcurrency` for its exact models.
 `GET /admin/scheduler-config` returns each limit's `effective` value, its `source`
 (`admin`, `env`, or `default`), the `override`, and the `fallback` used without one.
 
@@ -166,8 +167,9 @@ held returns immediately, because the holding pass has already read that wake's
 completions. The per-minute tick is the backstop if a lease expires without a release, and
 the `(status, run_id, model, variant, repetition, chunk)` index bounds lane reads.
 
-A provider or model throttle records a cooldown deadline rather than stamping every
-pending row, so one throttle event costs a bounded write instead of rewriting the backlog.
+A throttle cools only its own model: other models stay claimable, because a throttle names
+no upstream. The cooldown is a deadline row rather than a stamp on every pending row, so one
+throttle event costs a bounded write instead of rewriting the backlog.
 
 Materialization writes chunks in bounded batches and checks the run's status once per batch
 rather than per row. A chunk is inserted already completed when all of its cases have
@@ -214,7 +216,7 @@ its first event gets the same single retry as an empty completion; a timeout, a 
 events, or an invalid-request rejection stays a measured failure.
 
 A chunk that finds a ledgered case without output waits for it instead of failing its lane.
-It keeps its slot and provider lease, so the wait cannot oversubscribe providers, and its
+It keeps its slot, so the wait cannot oversubscribe the model or slot caps, and its
 claim is redelivered every 30 seconds to recheck. The wait ends when the output arrives,
 which the chunk then grades, or once the decider case timeout (180 seconds) plus the
 container's delivery window (90 seconds) has passed since the case's latest paid call started
@@ -959,7 +961,7 @@ The client eval routes (`/v1/eval/*`, below) use the same bearer secret.
 | Endpoint | Purpose |
 |---|---|
 | `GET/PUT /admin/config` | Read / save benchmark config (model lists, thresholds, `benchmarkUserId`, optional `benchmarkOrgId`). The response also carries the seven fixed policy settings, projected from the resolved policy, because the web release promoted after a worker deploy parses them (ADR 0003, invariant 7); the saved config and the accepted request body do not carry them |
-| `GET/PUT /admin/scheduler-config` | Read effective scheduler limits with their source / replace admin overrides of `slots`, `modelConcurrency`, `providerConcurrency`, `unknownProviderConcurrency` |
+| `GET/PUT /admin/scheduler-config` | Read effective scheduler limits with their source / replace admin overrides of `slots` and `modelConcurrency` (the retired provider limits are accepted and ignored for one web release) |
 | `GET /admin/runs` | List runs (sweeps stale `running` runs to `failed` first) |
 | `POST /admin/runs` | Classifier: start a run (`{kind: 'classifier', force}`). Decider: reconcile + drain the registry queues (`{kind: 'decider', queue: 'platform' \| 'user' \| 'both'}`) |
 | `GET /admin/registry` | Queue counts and exact platform entry statuses under the current engine identity and repetitions |

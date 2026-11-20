@@ -264,7 +264,6 @@ beforeEach(() => {
     );
     CREATE TABLE scheduler_settings (
       id INTEGER PRIMARY KEY, slots INTEGER, model_concurrency INTEGER,
-      provider_concurrency INTEGER, unknown_provider_concurrency INTEGER,
       updated_at TEXT, updated_by TEXT
     );
     CREATE TABLE benchmark_runs (id TEXT, kind TEXT, status TEXT);
@@ -957,7 +956,7 @@ describe('POST /admin/runs', () => {
     expect(vi.mocked(insertRun).mock.calls[0][1].purpose).toBe('user');
     expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
       runId: expect.any(String),
-      entries: [{ model: 'owner/a', variant: 'high', providers: [] }],
+      entries: [{ model: 'owner/a', variant: 'high' }],
       repetitions: 1,
       caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
       chunkSize: 1,
@@ -1025,7 +1024,7 @@ describe('POST /admin/runs', () => {
     expect(modelRows[0].model).toBe('m/0');
     expect(scheduleRunChunks).toHaveBeenCalledWith(env.BENCH_DB, {
       runId: run.id,
-      entries: modelRows.map(row => ({ model: row.model, variant: null, providers: [] })),
+      entries: modelRows.map(row => ({ model: row.model, variant: null })),
       repetitions: 1,
       caseIds: DECIDER_CASES.map(benchCase => benchCase.id),
       chunkSize: 1,

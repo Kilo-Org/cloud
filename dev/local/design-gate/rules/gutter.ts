@@ -322,9 +322,18 @@ function centered(node: LayoutNode, page: Page): boolean {
  * centres a stack of content, and the text inside that stack begins where the
  * stack does. That is the block's own placement, not the page column, and the
  * stack's own padding is an inner inset the block owns.
+ *
+ * A centred block only explains content aligned with the column the block
+ * itself started: the description paragraph under a centred heading, not a card
+ * painted flush to the page edge somewhere below it. So a candidate qualifies
+ * only when it is the centred box, or when every box between this node and it
+ * begins where that box's column begins — which is what a stack of left-aligned
+ * children inside a centred container looks like.
  */
 function insideCenteredBlock(nodes: readonly LayoutNode[], page: Page): boolean {
-  return nodes.some(candidate => centered(candidate, page));
+  const block = nodes.findIndex(candidate => centered(candidate, page));
+  if (block < 0) return false;
+  return nodes.slice(0, block).every(candidate => alignedToContentStart(candidate, page));
 }
 
 /**

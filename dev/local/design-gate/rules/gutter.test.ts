@@ -375,6 +375,31 @@ test('gutter: a centred block inside a landscape inset is not inside the gutter'
   assert.ok(findings.every(finding => finding.measured === 0));
 });
 
+test('gutter: a centred block does not excuse a child that leaves its column', () => {
+  // The exemption covers the block's own column: the text a centred empty state
+  // stacks inside it. A card painted flush to the page edge below that block is
+  // its own column, and the centred ancestor must not accept it — before the
+  // exemption moved ahead of the inside-gutter test, the rule reported this at
+  // 0 dp.
+  assert.deepEqual(
+    run(
+      [
+        { parent: 0, tag: 'RNSScreen', rect: [0, 0, 900, 400] },
+        {
+          parent: 1,
+          tag: 'View',
+          rect: [0, 0, 900, 400],
+          style: { backgroundColor: '#ffffff' },
+        },
+        { parent: 2, tag: 'View', rect: [48, 120, 804, 200] },
+        { parent: 3, tag: 'Paragraph', rect: [47, 140, 700, 40], text: 'Flush child' },
+      ],
+      LANDSCAPE
+    ).map(finding => [finding.element.path, finding.measured]),
+    [['Paragraph', 0]]
+  );
+});
+
 test('gutter: chips in a horizontal scroller keep their scroll offset', () => {
   assert.deepEqual(
     run([

@@ -79,9 +79,13 @@ export function isLandscape(display: IosDisplay): boolean {
   return display.orientation === 'landscapeLeft' || display.orientation === 'landscapeRight';
 }
 
-/** Whether the display is showing an upright portrait window. */
-export function isPortrait(display: IosDisplay): boolean {
-  return display.orientation === 'portrait';
+/**
+ * Whether the display is portrait in either direction. The gate only asks for
+ * `portrait`, but a restore puts back the orientation it found, and a simulator
+ * left upside down reports `portraitUpsideDown`.
+ */
+export function isPortraitAxis(display: IosDisplay): boolean {
+  return display.orientation === 'portrait' || display.orientation === 'portraitUpsideDown';
 }
 
 export type Simulator = { udid: string; name: string };
@@ -191,8 +195,12 @@ export function createIosDevice(options: {
     // Compare by axis, not by side: a `landscapeLeft` request reaches the
     // display as `Landscape Right` (measured on an iPhone 17 Pro, iOS 26.5 —
     // BackBoard and the display name the two ends of one rotation differently),
-    // and a 180° flip is not what any cell asks for.
-    const wanted = target === 'portrait' ? isPortrait : isLandscape;
+    // and a 180° flip is not what any cell asks for. A restore can ask for
+    // `portraitUpsideDown`, which is the one other target the display reports
+    // by name, so the predicate is the target's own axis rather than "not
+    // portrait": otherwise a restore the device honoured never satisfies it.
+    const wanted =
+      target === 'portrait' || target === 'portraitUpsideDown' ? isPortraitAxis : isLandscape;
     let after = display();
     while (!wanted(after)) {
       if (Date.now() > deadline) {

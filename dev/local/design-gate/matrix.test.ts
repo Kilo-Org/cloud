@@ -136,6 +136,17 @@ test('iOS compact expects a phone at or below the cap, not an exact width', () =
     envMismatches(compact, { ...env, platform: 'ios', window: pro }, pro, undefined, 'ios'),
     ['window width 402 dp, expected at most 380 dp']
   );
+  // A window narrower than any iPhone is a bad display read, not a small phone.
+  assert.deepEqual(
+    envMismatches(
+      compact,
+      { ...env, platform: 'ios', window: { width: 250, height: 445 } },
+      se,
+      undefined,
+      'ios'
+    ),
+    ['window width 250 dp, expected at least 320 dp']
+  );
   // Android keeps its exact 360 dp target.
   const androidCompact = matrixCells('android', 'standard')[2];
   assert.ok(androidCompact);

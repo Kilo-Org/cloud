@@ -3,8 +3,25 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { matrixCells } from '../matrix';
+import { envMismatches, matrixCells } from '../matrix';
+import type { ProbeEnv } from '../tree';
 import { createIosDevice, parseBootedSimulators, parseDisplay, resolveSimulator } from './ios';
+
+/** The env a 402 pt iOS phone reports in portrait, for the cells' env check. */
+const phoneEnv: ProbeEnv = {
+  platform: 'ios',
+  osVersion: '26.5',
+  route: '/',
+  window: { width: 402, height: 874 },
+  pixelRatio: 3,
+  fontScale: 1,
+  colorScheme: 'light',
+  isRTL: false,
+  language: 'en',
+  languagePreference: 'system',
+  safeArea: { top: 62, right: 0, bottom: 34, left: 0 },
+  tapTarget: { min: 28, touch: 44 },
+};
 
 // The display report `simctl io <udid> enumerate` prints for a 402x874 pt phone.
 const ENUMERATE_PORTRAIT = `
@@ -153,8 +170,15 @@ function flippingDevice(options: { flip?: boolean; compact?: boolean } = {}) {
       commands.push(line);
       const sub = args.join(' ');
       if (line === 'xcrun simctl io A enumerate') {
+        // A 3rd-generation SE: 750x1334 px at UI scale 2, i.e. 375x667 pt. The
+        // scale has to move with the pixel size — replacing only the pixels
+        // reports 250 pt, a window no iPhone has, which would confirm the cap
+        // even if it were lowered past the real 375 pt width.
         const portrait = compact
-          ? ENUMERATE_PORTRAIT.replace('Pixel Size: {1206, 2622}', 'Pixel Size: {750, 1334}')
+          ? ENUMERATE_PORTRAIT.replace(
+              'Pixel Size: {1206, 2622}',
+              'Pixel Size: {750, 1334}'
+            ).replace('Preferred UI Scale: 3', 'Preferred UI Scale: 2')
           : ENUMERATE_PORTRAIT;
         return Buffer.from(landscape ? unfold(portrait) : portrait);
       }
@@ -218,5 +242,55 @@ test('ios compact accepts an SE-sized device', () => {
   const compact = matrixCells('ios', 'standard', ['compact']).find(cell => cell.id === 'compact');
   assert.ok(compact);
   device.apply(compact);
+  device.restore();
+  // The fixture is a real SE, so the env check confirms it rather than only
+  // accepting whatever the pixel size happened to divide to.
+  assert.deepEqual(
+    envMismatches(
+      compact,
+      { ...phoneEnv, window: { width: 375, height: 667 } },
+      phoneEnv.window,
+      'en',
+      'ios'
+    ),
+    []
+  );
+});
+
+test('ios restore puts back an upside-down display without waiting for landscape', () => {
+  // A simulator left upside down is the one case where the restore's target is
+  // neither `portrait` nor a landscape side: a predicate that treats "not
+  // portrait" as landscape would let the command succeed and then throw after
+  // the whole rotation budget.
+  let orientation = 'Portrait Upside Down';
+  const device = createIosDevice({
+    exec: (command, args) => {
+      const line = [command, ...args].join(' ');
+      if (line === 'xcrun simctl io A enumerate') {
+        return Buffer.from(
+          ENUMERATE_PORTRAIT.replace('UI Orientation: Portrait', `UI Orientation: ${orientation}`)
+        );
+      }
+      if (args.join(' ').startsWith('devicectl device orientation set')) {
+        const target = args[args.length - 1];
+        orientation =
+          target === 'landscapeLeft' || target === 'landscapeRight'
+            ? 'Landscape Right'
+            : target === 'portrait'
+              ? 'Portrait'
+              : 'Portrait Upside Down';
+        return Buffer.from('');
+      }
+      return Buffer.from('');
+    },
+    spawn: () => ({ signal: () => undefined, exited: Promise.resolve(0) }),
+    simulator: { udid: 'A', name: 'iPhone 17' },
+    rotateTimeoutMs: 200,
+  });
+  const landscape = matrixCells('ios', 'standard', ['landscape']).find(
+    cell => cell.id === 'landscape'
+  );
+  assert.ok(landscape);
+  device.apply(landscape);
   device.restore();
 });

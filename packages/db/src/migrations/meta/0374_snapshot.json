@@ -28668,6 +28668,7 @@
             }
           ],
           "isUnique": false,
+          "where": "\"organizations\".\"created_by_kilo_user_id\" IS NOT NULL",
           "concurrently": true,
           "method": "btree",
           "with": {}

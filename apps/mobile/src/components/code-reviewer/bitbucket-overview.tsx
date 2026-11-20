@@ -99,12 +99,24 @@ export function BitbucketOverview({
   // An organization connected through Bitbucket OAuth reads as one with no
   // token integration: the connection lives on the web page that ran its
   // consent, so this surface renders read-only — no connect action, no toggle,
-  // no config rows, and no repositories button. The header above already names
-  // the platform and the organization, so the card's line only says where the
-  // connection is managed. It waits for the membership read that decides
-  // whether the header can paint at all.
+  // no config rows, and no repositories button. The card still states the
+  // connection itself: the workspace it authorized at row-title size, or
+  // "Connected" when the authorization has not named one, over the muted line
+  // that says where the connection is managed. The footnote alone left a reader
+  // unable to tell whether Bitbucket was connected at all. It waits for the
+  // membership read that decides whether the header can paint at all.
   if (connection.kind === 'oauth-connected' || connection.kind === 'oauth-attention') {
     const workspaceName = connection.kind === 'oauth-connected' ? connection.workspace : null;
+    // The authorization's own verdict, at row-title size: the workspace it
+    // granted, "Connected" while it has not named one, or the attention state
+    // the platform list paints for the same authorization.
+    const statusLabel =
+      workspaceName?.displayName ??
+      t(
+        connection.kind === 'oauth-connected'
+          ? 'common.connected'
+          : 'codeReviewer.platformList.needsAttention'
+      );
     return (
       <View className="flex-1 bg-background">
         <ReviewerHeader title={capabilities.label} subtitle={scopeTitle} />
@@ -113,12 +125,8 @@ export function BitbucketOverview({
             <PlatformOverviewSkeleton />
           ) : (
             <Card>
-              {workspaceName?.displayName ? (
-                <Text className="text-sm font-medium">{workspaceName.displayName}</Text>
-              ) : null}
-              <Text variant="muted" className="text-xs">
-                {t('codeReviewer.bitbucketConnect.managedOnWebShort')}
-              </Text>
+              <Text className="text-sm font-medium">{statusLabel}</Text>
+              <Text variant="muted">{t('codeReviewer.bitbucketConnect.managedOnWebShort')}</Text>
             </Card>
           )}
         </TabScreenScrollView>

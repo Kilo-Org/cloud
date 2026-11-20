@@ -279,36 +279,36 @@ export function ReviewDetailScreen({
               author: review.pr_author,
             })}
           </Text>
+          {/* Conclusion: the outcome leads and belongs to the title it
+              describes. As its own block at the body's section gap it floated
+              equidistant from the PR title above it and FINDINGS below. */}
+          <View className="mt-2 gap-2">
+            <Text className={cn('text-sm font-semibold', meta.className)}>{meta.label}</Text>
+            {reviewMessage ? (
+              // A failure keeps the danger tile under it: the red ink alone on
+              // the card surface read as ordinary copy, and the tint is the
+              // palette's own danger token, not a hand-built card fill.
+              <Card className={cancellationLabel ? undefined : 'bg-danger-tile-bg'}>
+                <Text
+                  variant={cancellationLabel ? 'muted' : undefined}
+                  className={cn('text-xs', !cancellationLabel && 'text-destructive')}
+                  numberOfLines={4}
+                >
+                  {reviewMessage}
+                </Text>
+              </Card>
+            ) : null}
+          </View>
         </Animated.View>
-
-        {/* Conclusion: the outcome leads — status first, then the reason. */}
-        <View className="gap-2">
-          <Text className={cn('text-sm font-semibold', meta.className)}>{meta.label}</Text>
-          {reviewMessage ? (
-            // A failure keeps the danger tile under it: the red ink alone on
-            // the card surface read as ordinary copy, and the tint is the
-            // palette's own danger token, not a hand-built card fill.
-            <Card className={cancellationLabel ? undefined : 'bg-danger-tile-bg'}>
-              <Text
-                variant={cancellationLabel ? 'muted' : undefined}
-                className={cn('text-xs', !cancellationLabel && 'text-destructive')}
-                numberOfLines={4}
-              >
-                {reviewMessage}
-              </Text>
-            </Card>
-          ) : null}
-        </View>
 
         {/* Findings: flattened from the council result, paginated in memory. */}
         <Section label={t('common.findings')}>
           {visibleFindings.length === 0 ? (
             // The empty result sits in the same card as every other section's
             // body, so an ended review reads as a filled section, not a caption.
+            // Its line takes the muted body size the GATE card's rows read at.
             <Card>
-              <Text variant="muted" className="text-xs">
-                {t(findingsEmptyCopyKey(review.status))}
-              </Text>
+              <Text variant="muted">{t(findingsEmptyCopyKey(review.status))}</Text>
             </Card>
           ) : (
             <View className="gap-3">

@@ -1493,3 +1493,40 @@ test('an unconfirmed reset on the last target skips the next cell and fails the 
   // Two sends after the capture, two at the next cell, two in the restore.
   assert.equal(sends.filter(url => url === CLEAR).length, 6);
 });
+
+test('a held target is judged by the loading rules, an ordinary target is not', () => {
+  const blank: ProbeDump = {
+    version: 1,
+    env: {
+      platform: 'android',
+      osVersion: '15',
+      route: '/agents',
+      screen: '(app)/(tabs)/(2_agents)',
+      window: { width: 400, height: 800 },
+      pixelRatio: 2,
+      fontScale: 1,
+      colorScheme: 'light',
+      isRTL: false,
+      language: 'en',
+      languagePreference: 'system',
+      safeArea: { top: 0, right: 0, bottom: 0, left: 0 },
+      tapTarget: { min: 28, touch: 44 },
+    },
+    nodes: [{ parent: -1, tag: 'View', rect: [0, 0, 400, 800] }],
+  };
+  const args = { cell: 'base', target: 'held', dump: blank, tree: normalize(blank) };
+  assert.ok(
+    !screenFindings(args).some(finding => finding.rule === 'loading-placeholder'),
+    'the loading rules are opt-in: a capture of a loaded screen is not judged as a wait'
+  );
+  const findings = screenFindings({ ...args, held: true });
+  assert.ok(findings.some(finding => finding.rule === 'loading-placeholder'));
+  // A held capture is settled: the placeholder is the state the target names, so
+  // the unsettled warning that a placeholder normally raises must not fire.
+  const settled = screenFindings({
+    ...args,
+    held: true,
+    sampled: { dump: blank, timeline: [blank], settled: true, elapsedMs: 0 },
+  });
+  assert.ok(!settled.some(finding => finding.rule === 'unsettled'));
+});

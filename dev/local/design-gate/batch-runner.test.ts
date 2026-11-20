@@ -4,8 +4,20 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { groupBatches, MANIFEST_COLUMNS, parseManifest, type SeedMap } from './batch-manifest';
-import { batchTaker, parseDeviceSpec, runBatches, type RunDevice } from './batch-runner';
+import {
+  FORCE_CLEAR_LINK,
+  groupBatches,
+  MANIFEST_COLUMNS,
+  parseManifest,
+  type SeedMap,
+} from './batch-manifest';
+import {
+  batchTaker,
+  batchTargets,
+  parseDeviceSpec,
+  runBatches,
+  type RunDevice,
+} from './batch-runner';
 
 test('a device spec may carry the seed map of its own account', () => {
   assert.deepEqual(parseDeviceSpec('ios1@http://127.0.0.1:28081@/tmp/ios1.json', 'ios'), {
@@ -104,4 +116,33 @@ test('a seeded batch goes to the device whose own map resolves it', () => {
   const onlyPartial = batchTaker(batches, [partial, none]);
   assert.equal(onlyPartial(partial, sessionsBatch), true);
   assert.equal(onlyPartial(none, sessionsBatch), false);
+});
+
+test('a loading row is held, then released back onto its own screen', () => {
+  const [batch] = groupBatches(
+    parseManifest(
+      [
+        MANIFEST_COLUMNS.join('\t'),
+        'L1\tT1\tsigned-in\tbase\tandroid\tloading\tloading\tkiloapp:///(app)/(tabs)/(2_agents)\tscreen\t(app)/(tabs)/(2_agents)',
+        'L1\tT1\tsigned-in\tbase\tandroid\tretryable-error\tretryable\tkiloapp:///(app)/(tabs)/(2_agents)\tscreen\t(app)/(tabs)/(2_agents)',
+      ].join('\n')
+    )
+  );
+  assert.ok(batch);
+  const [held, retryable] = batchTargets(batch, undefined);
+  const link = 'kiloapp:///(app)/(tabs)/(2_agents)';
+  assert.equal(
+    held?.link,
+    `kiloapp:///dev/force-state/loading?next=${encodeURIComponent(link)}`
+  );
+  // A held target releases onto the same screen: the landing is what the jump is
+  // measured against, and Home is not where the content lands.
+  assert.equal(
+    held?.after,
+    `kiloapp:///dev/force-state/clear?next=${encodeURIComponent(link)}`
+  );
+  assert.equal(held?.hold, true);
+  // Every other forced state resets to Home, unchanged.
+  assert.equal(retryable?.after, FORCE_CLEAR_LINK);
+  assert.equal(retryable?.hold, undefined);
 });

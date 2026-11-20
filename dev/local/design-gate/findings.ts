@@ -18,6 +18,7 @@ export const RULE_IDS = [
   'gutter',
   'unsettled',
   'loading-placeholder',
+  'loading-unlabelled',
   'capture-alignment',
   'blank-frame',
   'env-mismatch',

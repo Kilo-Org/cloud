@@ -15,7 +15,14 @@ import { enterTouchMode } from './input-mode';
 import { checkDevLogOverlay } from './logbox';
 import { envMismatches, isRtlLanguage, mirrorReference, type CellConfig } from './matrix';
 import type { Rgba } from './pixels';
-import { checkMirror, checkScreen, checkShift, normalize } from './rules';
+import {
+  checkLoadingAffordance,
+  checkLoadingLabels,
+  checkMirror,
+  checkScreen,
+  checkShift,
+  normalize,
+} from './rules';
 import type { LayoutTree, ProbeDump, ProbeEnv } from './tree';
 
 export type Exec = (command: string, args: readonly string[]) => Buffer;
@@ -59,8 +66,13 @@ export class InfraError extends Error {
  * `after` is a link opened once the target is captured: the reset of a state
  * the target link forced (`kiloapp:///dev/force-state/clear`), so the next
  * target does not inherit it.
+ *
+ * `hold` marks a target whose link holds the screen's data pending (the dev
+ * `loading` force mode). Such a target is measured in its loading state, then
+ * released through `after` while the same sampler runs, so the jump to the
+ * landed content is one timeline the shift rule reads.
  */
-export type Target = Readonly<{ id: string; link: string; after?: string }>;
+export type Target = Readonly<{ id: string; link: string; after?: string; hold?: boolean }>;
 
 export type Screen = {
   target: string;
@@ -372,12 +384,21 @@ export function screenFindings(args: {
   tree: LayoutTree;
   image?: Rgba;
   sampled?: Sampled;
+  /** The target names its own loading state, so the placeholder is the screen. */
+  held?: boolean;
 }): Finding[] {
   const alignment = args.sampled?.alignment;
   const image =
     alignment === undefined || alignment.status === 'bracketed' ? args.image : undefined;
   const findings: Finding[] = [];
-  if (args.sampled?.settled !== false) findings.push(...checkScreen(args.tree, image));
+  if (args.sampled?.settled !== false) {
+    findings.push(...checkScreen(args.tree, image));
+    // A held target measures the loading frame, so the loading rules judge it:
+    // a screen that says nothing while it waits, and a wait a reader cannot name.
+    if (args.held === true) {
+      findings.push(...checkLoadingAffordance(args.tree), ...checkLoadingLabels(args.tree));
+    }
+  }
   findings.push(...checkDevLogOverlay(args.dump));
   if (alignment !== undefined && alignment.status !== 'bracketed') {
     findings.push({
@@ -575,7 +596,15 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
       );
     }
   };
-  await waitForPlaceholder();
+  // A held target's link keeps its data pending: the placeholder is the state
+  // being measured, so waiting for it to clear would spend the whole bound on the
+  // screen the target asked for. Its wait runs after the hold is released, in the
+  // release pass below.
+  if (target.hold === true) {
+    ctx.log(`design-gate: ${target.id} opens held in its loading state`);
+  } else {
+    await waitForPlaceholder();
+  }
   // Sampling starts only once the placeholder is gone. The in-app sampler
   // traverses and serializes the whole tree on the app's own JS thread every
   // interval, so a sampler ticking through a cold open competes with the very
@@ -705,6 +734,28 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     layoutSignature,
     screenshotObservation(dump, image)
   );
+  // A held target is measured twice in one timeline: the loading frame above,
+  // then the screen the content lands on once the hold is released. One timeline
+  // is what lets the shift rule report the jump a person sees between the two,
+  // instead of comparing two captures and guessing which rect answers for which.
+  if (target.hold === true && target.after !== undefined) {
+    ctx.log(`design-gate: ${target.id} releasing the loading hold`);
+    await startSampling(ctx, samplingMs);
+    const releaseFailure = await openResetLink(ctx, target.after);
+    if (releaseFailure !== undefined) {
+      ctx.log(`design-gate: ${target.id} release link not confirmed: ${releaseFailure}`);
+    }
+    await waitForLoadingPlaceholder(ctx.probe, ctx.clock);
+    const landed = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
+    const released = await ctx.probe.stopSampling();
+    samples = joinPasses(samples, released.samples, spacingMs);
+    truncated = truncated || released.truncated;
+    reportTruncation();
+    ctx.log(
+      `design-gate: ${target.id} released onto ${landed.dump.env.screen ?? landed.dump.env.route}` +
+        `${landed.settled ? '' : ' (still moving)'}`
+    );
+  }
   const stillLoading = loadingPlaceholder(normalize(dump));
   const sampled: Sampled = {
     ...settled,
@@ -715,9 +766,10 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     // A screen that still paints its loading placeholder is never the settled
     // screen the target describes. The settle loop only saw the sampled window, so
     // work that landed after it counts as settled only when the quiet wait above
-    // proved the layout held still before the bracket opened.
-    settled: settled.settled && !stillLoading && quiet,
-    ...(stillLoading ? { blockedBy: 'loading-placeholder' as const } : {}),
+    // proved the layout held still before the bracket opened. A held target is the
+    // exception: its placeholder is the state the target names.
+    settled: settled.settled && (!stillLoading || target.hold === true) && quiet,
+    ...(stillLoading && target.hold !== true ? { blockedBy: 'loading-placeholder' as const } : {}),
     ...(placeholderWaitedMs > 0 ? { loadingWaitMs: placeholderWaitedMs } : {}),
   };
   writeJson(files.absolute(files.capture), alignment);
@@ -1167,6 +1219,7 @@ export async function runMatrix(
               tree,
               image,
               sampled,
+              held: target.hold === true,
             })
           );
           if (!sampled.settled) continue;

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ATTRIBUTION_WAIT_MS,
   createDownloadHold,
+  SETTLE_QUIET_MS,
   targetOf,
   TRIPWIRE_MS,
 } from './browser-download-hold';
@@ -820,7 +821,8 @@ describe('a sign-gated settle', () => {
     hold.handle({ id: 1, referrer: page, url: attachment }, () => {
       downloads.order.push('suggest');
     });
-    await vi.advanceTimersByTimeAsync(20);
+    // The decision is written, and the call stays open for the gesture's other files until the window is quiet.
+    await vi.advanceTimersByTimeAsync(SETTLE_QUIET_MS + 20);
 
     await expect(settled).resolves.toBe('decided');
     // The item's own decision is the block path every other case covers; here the point is that the call waited
@@ -929,5 +931,56 @@ describe('a sign-gated settle', () => {
     // A signed call that decided nothing inside the bound: the call answers the refusal itself, not the next one.
     await expect(settled).resolves.toBe('waiting_for_item');
     expect(hold.drain('session-1')).toStrictEqual([]);
+  });
+
+  /**
+   * One click that starts two attachments hands the browser two items a few milliseconds apart. The first refusal
+   * must not end the call: the sibling is the same gesture's file, and its report is that call's to carry. Ending on
+   * the first decision leaves the sibling's refusal to be read as news from an earlier call by whichever call comes
+   * next, which then answers a refusal for a file it never started.
+   */
+  it('keeps the call open for the sibling item of the same gesture', async () => {
+    const downloads = makeDownloads();
+    const { hold, reports } = makeHold(downloads);
+    let sign: DownloadSign = 'none';
+
+    hold.tab(agentTab());
+
+    const callStartedAt = Date.now();
+    const settled = hold.settle('session-1', {
+      graceMs: 40,
+      sign: () => sign,
+      since: callStartedAt,
+      timeoutMs: 2000,
+    });
+    let outcome: DownloadSettle | 'pending' = 'pending';
+    const consuming = (async (): Promise<void> => {
+      outcome = await settled;
+    })();
+
+    // The click answered with nothing yet: the browser announces one file, then creates its item.
+    sign = 'download';
+    await vi.advanceTimersByTimeAsync(20);
+    hold.handle({ id: 1, referrer: page, url: `${page}/report.txt` }, () => {
+      downloads.order.push('suggest');
+    });
+    await vi.advanceTimersByTimeAsync(40);
+
+    // The first item is refused, and the call is still open: the gesture's next file may be seconds behind, and its
+    // Refusal is this call's to carry.
+    expect(hold.tracked(1)?.kind).toBe('blocked');
+    expect(outcome).toBe('pending');
+
+    await vi.advanceTimersByTimeAsync(10);
+    hold.handle({ id: 2, referrer: page, url: `${page}/second.txt` }, () => {
+      downloads.order.push('suggest');
+    });
+
+    // Both refusals are this call's: the settle ended only once the gesture was quiet.
+    await vi.advanceTimersByTimeAsync(500);
+    await consuming;
+
+    expect(outcome).toBe('decided');
+    expect(reports).toStrictEqual(['stopped:report.txt', 'stopped:second.txt']);
   });
 });

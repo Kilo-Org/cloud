@@ -268,6 +268,13 @@ export const ATTRIBUTION_WAIT_MS = 250;
 export const TRIPWIRE_MS = 1500;
 
 /**
+ * How long a settling call that already has a decision keeps listening for the gesture's other files. One click
+ * that hands the browser two attachments produces two items milliseconds apart, and the first refusal must not end
+ * the call: the sibling's own refusal belongs to that call, not to whichever call happens to come next.
+ */
+export const SETTLE_QUIET_MS = 400;
+
+/**
  * How long a settle that entered with no sign keeps listening for one: measured on real Chrome, a click's
  * `downloadWillBegin` landed at most 25 ms after the tool answered, so a grace measured from the call start misses it.
  */
@@ -1040,14 +1047,30 @@ export const createDownloadHold = ({
       // The grace is measured from this settle: the tab's announcement lands after the tool answered, and a grace
       // Spent before the settle began would miss it. Nothing is released early while the call still has a Document.
       const graceUntil = now() + window.graceMs;
-      let state: DownloadSettle = 'no_sign';
+      /** Whether the browser announced a file for this call: the item then exists a moment later. */
+      let signed = false;
+      /** When this call's decided set last grew: the gesture's next item restarts the quiet window. */
+      let decidedAt: number | undefined = 0;
+      let decidedSeen = '';
 
       for (;;) {
         const states = [...tracked.values()].filter(
           one => one.need.session === session && one.since >= window.since
         );
+        const decided = states.filter(one => one.kind !== 'held');
+        const signature = decided.map(one => `${String(one.itemId)}:${one.kind}`).join(',');
 
-        if (!states.some(one => one.kind === 'held') && states.length > 0) {
+        if (signature !== decidedSeen) {
+          decidedSeen = signature;
+          decidedAt = decided.length === 0 ? undefined : now();
+        }
+
+        // One gesture can hand the browser several files: a decision that stopped the first is not the whole answer
+        // While the click's other item is still on its way, so the call keeps listening until the gesture has been
+        // Quiet for the window, or the call's own bound is spent.
+        const quiet = decidedAt !== undefined && now() - decidedAt >= SETTLE_QUIET_MS;
+
+        if (decided.length > 0 && decided.length === states.length && (now() >= until || quiet)) {
           return 'decided';
         }
 
@@ -1055,26 +1078,28 @@ export const createDownloadHold = ({
 
         // A download started: the browser creates the item a moment after it announces the file, so the call
         // Waits for that item instead of answering before it exists.
-        if (state === 'no_sign' && sign === 'download') {
-          state = 'waiting_for_item';
+        if (sign === 'download') {
+          signed = true;
         }
 
-        if (state === 'waiting_for_item' && now() >= until) {
-          // Signed, and nothing was decided inside the bound: the caller reports the file as possibly saved.
-          return state;
+        if (now() >= until) {
+          // A decision this call owns is its answer; an item of its own it could not decide, or a file the browser
+          // Announced and never created, may exist; nothing at all is a call that started no download.
+          if (decided.length > 0) {
+            return 'decided';
+          }
+
+          return states.length > 0 || signed ? 'waiting_for_item' : 'no_sign';
         }
 
-        // A Document the call started has no answer yet: it can still become the file, so the call waits for it
-        // Rather than answering "nothing happened" over a download it has already saved. The item bound still caps it.
-        if (state === 'no_sign' && sign === 'pending' && now() < until) {
-          // eslint-disable-next-line no-await-in-loop -- one bounded poll for the response this call is owed
-          await waitFor(HOLD_POLL_MS);
-        } else if (state === 'no_sign' && now() >= graceUntil) {
-          return state;
-        } else {
-          // eslint-disable-next-line no-await-in-loop -- one bounded poll for this call's own decision
-          await waitFor(HOLD_POLL_MS);
+        // An item of this call exists and its decision is not written yet: the call may not answer over it, however
+        // The announcement fared — the item itself is proof the browser started the file.
+        if (states.length === 0 && !signed && sign !== 'pending' && now() >= graceUntil) {
+          return 'no_sign';
         }
+
+        // eslint-disable-next-line no-await-in-loop -- one bounded poll for this call's own decision
+        await waitFor(HOLD_POLL_MS);
       }
     },
     tab: input => {

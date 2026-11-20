@@ -29,7 +29,11 @@ type ConfirmRequest = {
 type PolicyProps = {
   draft: {
     detectors: {
-      policy_violation: { format: 'rules' | 'policy_text'; policy_text: string };
+      policy_violation: {
+        format: 'rules' | 'policy_text';
+        policy_text: string;
+        rules: readonly unknown[];
+      };
     };
   };
   applyKiloDefault: (afterApply: () => void) => void;
@@ -121,8 +125,12 @@ function payload({
         policy_text: policyText,
         rules: Array.from({ length: policyRules }, (_, index) => ({
           id: `rule-${index}`,
-          name: '',
+          display_text: '',
           text: 'Do not reveal secrets.',
+          risk_category: 'security_fraud' as const,
+          applicability: 'user' as const,
+          severity: 'high' as const,
+          frameworks: [],
         })),
       },
       toxicity: { enabled: false },

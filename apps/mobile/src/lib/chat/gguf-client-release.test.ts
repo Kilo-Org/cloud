@@ -3,7 +3,7 @@ import { type ModelEvent, type ModelRequest } from '@kilocode/harness-sdk';
 import { Effect, Stream } from 'effect';
 import { expect, it, vi } from 'vitest';
 
-import { type GgufContext, ggufModelClient } from './gguf-client';
+import { type GgufContext, ggufModelClient, RELEASE_WAIT_MS } from './gguf-client';
 import { type GgufModelFile } from './gguf-records';
 
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key } }));
@@ -268,4 +268,41 @@ it('keeps loading after a native release throws as it is called', async () => {
   expect(answered.at(-1)?.kind).toBe('done');
   expect(init).toHaveBeenCalledTimes(2);
   expect(timeline).toEqual(['open 1', 'open 2']);
+});
+
+it('reports a teardown that never settles instead of waiting on it forever', async () => {
+  const timeline: Timeline = [];
+  const gate = Promise.withResolvers<undefined>();
+  const first = contextOf(timeline, 'first', () => gate.promise);
+  const second = contextOf(timeline, 'second', () => Promise.resolve());
+  const { client, release, init } = clientWith([first, second], timeline);
+  await collect(client.stream(request));
+
+  // A native release that never settles leaves the shared teardown pending.
+  const stuck = release();
+  vi.useFakeTimers();
+  let outcome: unknown = undefined;
+  try {
+    const refused = settle(collect(client.stream(request)));
+    await vi.advanceTimersByTimeAsync(RELEASE_WAIT_MS);
+    outcome = await refused;
+  } finally {
+    vi.useRealTimers();
+  }
+
+  // The send fails as unavailable rather than spinning forever, and the stalled
+  // teardown still owns the chain: nothing opened a second context beside it.
+  expect(Array.isArray(outcome)).toBe(false);
+  expect(outcome).toMatchObject({ reason: 'unsupported' });
+  expect(init).toHaveBeenCalledTimes(1);
+  expect(timeline).toEqual(['open 1']);
+
+  // The teardown finally finishes, and the chain it held is intact: the next
+  // send opens its context after the freed one and completes.
+  gate.resolve(undefined);
+  await stuck;
+  const next = await collect(client.stream(request));
+  expect(next.at(-1)?.kind).toBe('done');
+  expect(init).toHaveBeenCalledTimes(2);
+  expect(timeline).toEqual(['open 1', 'freed first', 'open 2']);
 });

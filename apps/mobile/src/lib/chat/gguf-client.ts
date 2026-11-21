@@ -74,6 +74,32 @@ function failure(problem: LocalModelProblem, started: boolean): ModelError {
   });
 }
 
+/**
+ * How long a load waits for a teardown. A native release that never settles
+ * would otherwise leave every later send spinning with no failure row, while
+ * the stalled teardown stays pending so no second context opens beside it.
+ */
+export const RELEASE_WAIT_MS = 30_000;
+
+/**
+ * Waits for `teardown`, and throws once `RELEASE_WAIT_MS` passes without it:
+ * the promise itself is left running, since a context may still be freeing.
+ */
+async function waitForTeardown(teardown: Promise<void>): Promise<void> {
+  const stalled = Symbol('teardown stalled');
+  const { promise, resolve } = Promise.withResolvers<symbol>();
+  const timer = setTimeout(() => {
+    resolve(stalled);
+  }, RELEASE_WAIT_MS);
+  try {
+    if ((await Promise.race([teardown, promise])) === stalled) {
+      throw new Error('teardown stalled');
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export type GgufModelClient = {
   readonly client: ModelClientService;
   /**
@@ -139,6 +165,10 @@ export function ggufModelClient({
       if (stopped.ok) {
         await settled(running);
       } else {
+        // llama.rn 0.12.9: a throw here means the id is already gone from
+        // `g_llamaContexts`, and `llamaReleaseContext` waits on
+        // `TaskManager::waitForContext` before deleting, so freeing now cannot pull
+        // the weights out from under a running native completion.
         abandon?.();
       }
     }
@@ -183,7 +213,10 @@ export function ggufModelClient({
     if (loaded?.fileId === fileId) {
       return loaded.context;
     }
-    await release();
+    // A teardown that never settles rejects this load rather than waiting
+    // forever, which takes the caller's `unavailable` path; the teardown itself
+    // stays pending, so it still keeps the next context from opening beside it.
+    await waitForTeardown(release());
     const context = open(file);
     loaded = { fileId, context };
     return context;

@@ -48,7 +48,8 @@ describe('BYOK provider lists', () => {
     // owns it, so no picker lists it. A reader who is shown the stored row
     // still has to get a name instead of the raw id.
     expect(getByokProviderDisplayName('openai-chatgpt')).toBe('OpenAI (Sign in with ChatGPT)');
-    expect(BYOK_PROVIDERS.filter(provider => provider.name === 'OpenAI (Sign in with ChatGPT)'))
-      .toEqual([]);
+    expect(
+      BYOK_PROVIDERS.filter(provider => provider.name === 'OpenAI (Sign in with ChatGPT)')
+    ).toEqual([]);
   });
 });

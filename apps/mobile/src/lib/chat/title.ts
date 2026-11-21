@@ -28,6 +28,29 @@ export const DERIVED_CHAT_TEXT_MAX_LENGTH = 80;
  */
 export const DERIVED_CHAT_TEXT_SOURCE_WINDOW = 4096;
 
+/**
+ * The start of `text`, cut at the window.
+ *
+ * The cut is widened by one code unit when it would land between the two halves
+ * of a surrogate pair, so the lexer never receives an unpaired half. Cutting
+ * through one would turn a digit outside the BMP at the window edge into the
+ * replacement character, which the 80-character cut guards against in the
+ * label itself.
+ */
+function windowStart(text: string): string {
+  if (text.length <= DERIVED_CHAT_TEXT_SOURCE_WINDOW) {
+    return text;
+  }
+  const cut = text.slice(0, DERIVED_CHAT_TEXT_SOURCE_WINDOW);
+  // A lone high surrogate at the end of the cut is the first half of a pair the
+  // cut split; take the second half with it. With the `u` flag the class matches
+  // only a half with no partner, never a complete pair.
+  if (/[\uD800-\uDBFF]$/u.test(cut)) {
+    return text.slice(0, DERIVED_CHAT_TEXT_SOURCE_WINDOW + 1);
+  }
+  return cut;
+}
+
 const ELLIPSIS = '…';
 
 /**
@@ -138,10 +161,7 @@ function markedTokenText(token: MarkedToken): string {
  * window is labelled from the start of its body, and the rest is never read.
  */
 export function derivedChatText(text: string): string {
-  const source =
-    text.length <= DERIVED_CHAT_TEXT_SOURCE_WINDOW
-      ? text
-      : text.slice(0, DERIVED_CHAT_TEXT_SOURCE_WINDOW);
+  const source = windowStart(text);
   const oneLine = chatPlainText(source).replaceAll(/\s+/gu, ' ').trim();
   // A string no longer than the cap in code units holds no more characters
   // than that, so the common short message never reaches the segmenter.

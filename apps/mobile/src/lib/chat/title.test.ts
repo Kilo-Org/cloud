@@ -106,12 +106,21 @@ describe('derivedChatText over a message longer than the source window', () => {
     const derived = derivedChatText(body);
 
     expect(lexedLengths.length).toBeGreaterThan(0);
-    expect(Math.max(...lexedLengths)).toBeLessThanOrEqual(DERIVED_CHAT_TEXT_SOURCE_WINDOW);
+    // The window, plus the one code unit that keeps a surrogate pair whole.
+    expect(Math.max(...lexedLengths)).toBeLessThanOrEqual(DERIVED_CHAT_TEXT_SOURCE_WINDOW + 1);
     expect(derived).toHaveLength(DERIVED_CHAT_TEXT_MAX_LENGTH);
     expect(derived.endsWith('…')).toBe(true);
     expect(derived.startsWith('tell me about the composer')).toBe(true);
     // The same label the window alone produces: the rest of the body is never read.
     expect(derived).toBe(derivedChatText(body.slice(0, DERIVED_CHAT_TEXT_SOURCE_WINDOW)));
+  });
+
+  it('keeps a digit outside the BMP whole when the window ends on its first half', () => {
+    // The window's last code unit is the high half of a surrogate pair, and the
+    // visible text inside it fits the cap, so the pair decides the whole label.
+    const body = `${' '.repeat(DERIVED_CHAT_TEXT_SOURCE_WINDOW - 1)}😀tail`;
+
+    expect(derivedChatText(body)).toBe('😀');
   });
 
   it('hands a short message to the lexer unchanged', () => {

@@ -35,8 +35,10 @@ import {
   useStartSecurityRemediation,
 } from '@/lib/hooks/use-security-remediation';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
+import { useRetrySecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useSideInsetStyle } from '@/lib/screen-insets';
+import { isReadPausedBeforeData } from '@/lib/query/read-failure-variant';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 import { getRemediationUnavailableKey } from '@/lib/security-agent-copy';
 import { openFindingLink } from '@/lib/security-agent-link';
@@ -48,6 +50,9 @@ type FindingRemediationPanelProps = {
   analysis: SecurityAnalysis | undefined;
   isLoading: boolean;
   isError: boolean;
+  isPending: boolean;
+  fetchStatus: 'fetching' | 'paused' | 'idle';
+  connectivity: 'online' | 'offline' | 'unknown';
   onRetry: () => void;
 };
 
@@ -176,6 +181,9 @@ export function FindingRemediationPanel({
   analysis,
   isLoading,
   isError,
+  isPending,
+  fetchStatus,
+  connectivity,
   onRetry,
 }: Readonly<FindingRemediationPanelProps>) {
   const colors = useThemeColors();
@@ -188,10 +196,28 @@ export function FindingRemediationPanel({
   const startRemediation = useStartSecurityRemediation(scope);
   const retryRemediation = useRetrySecurityRemediation(scope);
   const cancelRemediation = useCancelSecurityRemediation(scope);
+  const analysisRetry = useRetrySecurityAnalysis(scope, findingId);
 
   const openPullRequest = (url: string) => {
     openFindingLink(router, url, t('common.pullRequest'));
   };
+
+  // A paused first read never reaches the loading gate: name the connection and
+  // offer the deliberate retry, which retires the paused promise a plain
+  // `refetch` would only join.
+  if (!analysis && isReadPausedBeforeData({ isPending, fetchStatus, connectivity })) {
+    return (
+      <>
+        <QueryError
+          variant="offline"
+          message={t('securityAgent.remediation.couldNotLoad')}
+          onRetry={() => void analysisRetry.retry()}
+          isRetrying={analysisRetry.isRetrying}
+        />
+        {dialog}
+      </>
+    );
+  }
 
   if (isLoading && !analysis) {
     return (

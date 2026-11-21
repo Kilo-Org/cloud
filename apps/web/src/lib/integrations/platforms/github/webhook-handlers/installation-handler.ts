@@ -207,11 +207,14 @@ export async function handleInstallationCreated(
   }
   if (pending) {
     // The decision, the pending-row completion, and the canonical binding run
-    // as one serialized unit under the installation identity lock, the same
-    // lock connectVerifiedGitHubInstallation and
-    // bindGitHubIntegrationToCanonicalInstallation take. Admission therefore
-    // holds under concurrency for every writer of this installation identity.
+    // as one serialized unit under the installation identity lock and, for an
+    // organization, the owner's installation slot lock. Admission therefore
+    // holds under concurrency for every writer of that state. Both locks are
+    // contended by other deliveries, so the transaction is bounded like the
+    // other lock-taking paths: a delivery that cannot proceed fails fast and
+    // GitHub redelivers it.
     const completed = await db.transaction(async tx => {
+      await boundRepairTransaction(tx);
       await lockGitHubInstallationIdentity(tx, appType, installationData.installation_id);
       // A live association may be bound or unbound, so peers are counted by
       // status rather than by whether they already carry a canonical binding.

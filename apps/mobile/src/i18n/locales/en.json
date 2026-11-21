@@ -4021,7 +4021,8 @@
         "space": "There isn't enough free storage for this model. Free up space and try again.",
         "network": "The download didn't finish. Check your connection and try again.",
         "invalidFile": "The downloaded file isn't a model this app can run, so it was removed.",
-        "checksum": "The downloaded file doesn't match its published checksum, so it was removed. Try the download again."
+        "checksum": "The downloaded file doesn't match its published checksum, so it was removed. Try the download again.",
+        "writeFailed": "This device couldn't save the model. Try the download again."
       }
     },
     "catalog": {

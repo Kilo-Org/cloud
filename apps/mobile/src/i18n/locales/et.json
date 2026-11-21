@@ -3998,7 +3998,8 @@
         "space": "Selle mudeli jaoks pole piisavalt vaba salvestusruumi. Vabasta ruumi ja proovi uuesti.",
         "network": "Allalaadimine ei lõppenud. Kontrolli ühendust ja proovi uuesti.",
         "invalidFile": "Allalaaditud fail ei ole mudel, mida see rakendus saab käivitada, seega see eemaldati.",
-        "checksum": "Allalaaditud fail ei vasta avaldatud kontrollsummale, seega see eemaldati. Proovi uuesti alla laadida."
+        "checksum": "Allalaaditud fail ei vasta avaldatud kontrollsummale, seega see eemaldati. Proovi uuesti alla laadida.",
+        "writeFailed": "See seade ei suutnud mudelit salvestada. Proovi uuesti alla laadida."
       }
     },
     "catalog": {

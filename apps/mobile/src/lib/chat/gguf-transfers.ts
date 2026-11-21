@@ -12,6 +12,7 @@ import {
   removeQuietly,
   type Settled,
   settled,
+  STORAGE_HEADROOM_BYTES,
 } from './gguf-records';
 
 /** One file of a model: the model itself, then its projector when it has one. */
@@ -127,9 +128,32 @@ export function transferResult(
   return size < expected ? 'short' : 'long';
 }
 
+/** Whether a model of this size fits, counting the room a finished model needs. */
+export function fitsOnDevice(storage: GgufStorage, expected: number | undefined): boolean {
+  return expected === undefined || storage.freeBytes() >= expected + STORAGE_HEADROOM_BYTES;
+}
+
 /** Whether a finished transfer may run once more before the download is called failed. */
 export function mayRetryTransfer(download: GgufActiveDownload): boolean {
   return download.attempts < ATTEMPTS;
+}
+
+/** Drops every partial file an earlier attempt at these transfers left behind. */
+export function clearPartials(storage: GgufStorage, transfers: readonly GgufTransfer[]): void {
+  for (const transfer of transfers) {
+    removeQuietly(storage, transfer.part);
+  }
+}
+
+/**
+ * Moves the download on to the next transfer, which starts from zero with its
+ * own attempts: the finished file's bytes join the running total.
+ */
+export function advanceTransfer(download: GgufActiveDownload, size: number): void {
+  download.done += size;
+  download.step += 1;
+  download.restarted = false;
+  download.attempts = 1;
 }
 
 /** A transfer that stopped short is started from zero once more, and a file that was refused is read once more. */
@@ -259,6 +283,24 @@ export function transferStart(download: GgufActiveDownload): GgufTransfer {
   return transfer;
 }
 
+/**
+ * Opens one transfer file. The device can refuse the call — a permission or
+ * input/output refusal, which says nothing about free space — so a refusal is
+ * answered here and the caller reports it as the download's failure. Both the
+ * first transfer and every later one open through this.
+ */
+export function openTransfer(
+  storage: GgufStorage,
+  transfer: { readonly url: string; readonly part: string },
+  report: (progress: { readonly bytesWritten: number; readonly totalBytes: number }) => void
+): GgufDownloadTask | undefined {
+  try {
+    return storage.createDownload(transfer.url, transfer.part, report);
+  } catch {
+    return undefined;
+  }
+}
+
 /** Moves a paused download back to downloading. False when it cannot resume. */
 export function requestResume(download: GgufActiveDownload): boolean {
   if (!resumable(download)) {
@@ -267,6 +309,12 @@ export function requestResume(download: GgufActiveDownload): boolean {
   download.phase = 'downloading';
   download.resuming = true;
   return true;
+}
+
+/** The task answered its pause: the download is paused and no request is in flight. */
+export function markPaused(download: GgufActiveDownload): void {
+  download.phase = 'paused';
+  download.pausing = false;
 }
 
 /** One bar for the whole model: the finished transfers, the current one, and those to come. */

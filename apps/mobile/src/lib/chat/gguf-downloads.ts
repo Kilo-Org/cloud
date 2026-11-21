@@ -10,16 +10,20 @@ import {
   recordFileNames,
   removeQuietly,
   settled,
-  STORAGE_HEADROOM_BYTES,
 } from './gguf-records';
 import { loadSavedModels, writeSavedModels } from './gguf-model-index';
 import {
   type GgufActiveDownload as Active,
   activeDownload,
+  advanceTransfer,
+  clearPartials,
   currentTransfer,
   downloadProgress,
   expectedBytes,
+  fitsOnDevice,
+  markPaused,
   mayRetryTransfer,
+  openTransfer,
   requestPause,
   requestResume,
   transferResult,
@@ -89,22 +93,35 @@ export function ggufDownloads({
     }
   };
 
+  /** Publishes a failure for a download row; the partial files go with it. */
   const fail = (download: Active, problem: GgufDownloadProblem) => {
     discard(download);
-    failure = { fileId: download.fileId, problem };
-    publish();
+    refuse(download.fileId, problem);
   };
 
-  /** Starts the transfer at the current step from zero. */
+  /** Publishes a refusal that no download row owns yet, and answers `start`. */
+  const refuse = (fileId: string, problem: GgufDownloadProblem): false => {
+    failure = { fileId, problem };
+    publish();
+    return false;
+  };
+
+  /**
+   * Opens the transfer at the current step. A device that refuses the call is
+   * the download's failure, not a rejection nobody awaits, and no row may be
+   * left asking to verify.
+   */
   const begin = (download: Active) => {
     const { url, part } = transferStart(download);
-    download.task = storage.createDownload(
-      url,
-      part,
-      onProgress(() => download)
-    );
+    const report = onProgress(() => download);
+    const task = openTransfer(storage, { url, part }, report);
+    if (task === undefined) {
+      fail(download, 'writeFailed');
+      return;
+    }
+    download.task = task;
     publish();
-    void settle(download, download.task.downloadAsync());
+    void settle(download, task.downloadAsync());
   };
 
   /** Every file is whole, sized and hashed; llama.cpp has to read them before they are a model. */
@@ -156,10 +173,7 @@ export function ggufDownloads({
       return;
     }
     if (!last) {
-      download.done += size;
-      download.step += 1;
-      download.restarted = false;
-      download.attempts = 1;
+      advanceTransfer(download, size);
       begin(download);
       return;
     }
@@ -213,17 +227,18 @@ export function ggufDownloads({
       return;
     }
     if (outcome.value === null) {
-      download.phase = 'paused';
-      download.pausing = false;
+      markPaused(download);
       publish();
       return;
     }
     try {
       await complete(download);
     } catch {
-      // A storage call the OS refused at the last step is the download's failure,
-      // not a rejection nobody awaits and a row left asking to verify.
-      fail(download, 'space');
+      // A storage call the OS refused at the last step (a size read, or a
+      // transfer it would not open) is the download's failure, not a rejection
+      // nobody awaits and a row left asking to verify. It is a refusal, not a
+      // verdict about free space, so it reads as its own problem.
+      fail(download, 'writeFailed');
     }
   };
   return {
@@ -272,27 +287,23 @@ export function ggufDownloads({
         return false;
       }
       const transfers = transfersOf(source, fileId);
-      const expected = expectedBytes(transfers);
       failure = null;
-      if (expected !== undefined && storage.freeBytes() < expected + STORAGE_HEADROOM_BYTES) {
-        failure = { fileId, problem: 'space' };
-        publish();
-        return false;
+      if (!fitsOnDevice(storage, expectedBytes(transfers))) {
+        return refuse(fileId, 'space');
       }
-      for (const transfer of transfers) {
-        // No partial file from an earlier attempt survives.
-        removeQuietly(storage, transfer.part);
-      }
+      // No partial file from an earlier attempt survives.
+      clearPartials(storage, transfers);
       const [first] = transfers;
       if (first === undefined) {
         return false;
       }
       let download: Active | undefined = undefined;
-      const task = storage.createDownload(
-        first.url,
-        first.part,
-        onProgress(() => download)
-      );
+      const report = onProgress(() => download);
+      const task = openTransfer(storage, first, report);
+      if (task === undefined) {
+        // A device that refused the transfer is a reported failure; no row starts.
+        return refuse(fileId, 'writeFailed');
+      }
       download = activeDownload({
         fileId,
         name: source.kind === 'catalog' ? source.model.name : source.name,

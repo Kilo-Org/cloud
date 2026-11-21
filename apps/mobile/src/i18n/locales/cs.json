@@ -4128,7 +4128,8 @@
         "space": "Pro tento model není dostatek volného úložiště. Uvolněte místo a zkuste to znovu.",
         "network": "Stahování se nedokončilo. Zkontrolujte připojení a zkuste to znovu.",
         "invalidFile": "Stažený soubor není model, který by tato aplikace mohla spustit, proto byl odstraněn.",
-        "checksum": "Stažený soubor neodpovídá zveřejněnému kontrolnímu součtu, proto byl odstraněn. Zkuste jej stáhnout znovu."
+        "checksum": "Stažený soubor neodpovídá zveřejněnému kontrolnímu součtu, proto byl odstraněn. Zkuste jej stáhnout znovu.",
+        "writeFailed": "Toto zařízení nemohlo model uložit. Zkuste jej stáhnout znovu."
       }
     },
     "catalog": {

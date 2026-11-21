@@ -8,7 +8,7 @@ import { Cause, Effect, Queue, Stream } from 'effect';
 import { type ContextParams, type LlamaContext, type TokenData } from 'llama.rn';
 
 import { LocalModelError, type LocalModelProblem } from './local-model-error';
-import { type GgufModelFile, settled } from './gguf-records';
+import { attempt, type GgufModelFile, settled } from './gguf-records';
 import { answerOf, type CompletionResult, paramsOf, readCompletion, stopOf } from './gguf-template';
 
 /** The part of a llama.rn context this client drives. */
@@ -112,23 +112,22 @@ export function ggufModelClient({
     previous: Promise<void>,
     current: { readonly context: Promise<GgufContext> }
   ) => {
-    try {
-      await settled(previous);
-      const context = await settled(current.context);
-      if (!context.ok) {
-        return;
-      }
-      const running = inflight;
-      if (running !== undefined) {
-        await settled(context.value.stopCompletion());
-        await settled(running);
-      }
-      await settled(context.value.release());
-    } catch {
-      // A native handle that was already freed throws as the call is made,
-      // rather than rejecting a promise. The teardown ends here, so the chain
-      // every later load waits on never stays rejected.
+    // Every await is a `settled`/`attempt`, so nothing here rejects: the chain
+    // every later load waits on never stays rejected.
+    await settled(previous);
+    const context = await settled(current.context);
+    if (!context.ok) {
+      return;
     }
+    const running = inflight;
+    if (running !== undefined) {
+      // A freed handle throws where the method is called, so the stop is a
+      // thunk. It must not skip the release below, which frees the context the
+      // one-context invariant depends on.
+      await attempt(() => context.value.stopCompletion());
+      await settled(running);
+    }
+    await attempt(() => context.value.release());
   };
 
   const release = (fileId?: string): Promise<void> => {
@@ -239,8 +238,11 @@ export function ggufModelClient({
         Queue.endUnsafe(queue);
       };
       const interrupt = async () => {
-        if (handle !== undefined) {
-          await settled(handle.stopCompletion());
+        const context = handle;
+        if (context !== undefined) {
+          // A freed handle throws where the method is called; the finalizer
+          // runs this as a void promise, so the throw must not reject it.
+          await attempt(() => context.stopCompletion());
         }
       };
       const run = async () => {

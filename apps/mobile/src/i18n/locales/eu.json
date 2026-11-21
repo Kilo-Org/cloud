@@ -3998,7 +3998,8 @@
         "space": "Ez dago nahikoa biltegiratze libre modelo honetarako. Askatu lekua eta saiatu berriro.",
         "network": "Deskarga ez da amaitu. Egiaztatu zure konexioa eta saiatu berriro.",
         "invalidFile": "Deskargatutako fitxategia ez da aplikazio honek exekutatu dezakeen modeloa, beraz, kendu egin da.",
-        "checksum": "Deskargatutako fitxategia ez dator bat argitaratutako kontrol-baturarekin, beraz, kendu egin da. Saiatu berriro deskargatzen."
+        "checksum": "Deskargatutako fitxategia ez dator bat argitaratutako kontrol-baturarekin, beraz, kendu egin da. Saiatu berriro deskargatzen.",
+        "writeFailed": "Gailu honek ezin izan du modeloa gorde. Saiatu berriro deskargatzen."
       }
     },
     "catalog": {

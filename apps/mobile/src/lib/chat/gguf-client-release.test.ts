@@ -145,6 +145,54 @@ it('reuses the context a finished release left, without opening a third', async 
   expect(timeline).toEqual(['open 1', 'freed first', 'open 2']);
 });
 
+it('frees a context whose native stop throws as it is called, and still answers', async () => {
+  const timeline: Timeline = [];
+  const started = Promise.withResolvers<undefined>();
+  const done = Promise.withResolvers<{
+    text: string;
+    tokens_evaluated: number;
+    tokens_predicted: number;
+    stopped_eos: boolean;
+  }>();
+  const result = { text: 'ok', tokens_evaluated: 1, tokens_predicted: 1, stopped_eos: true };
+  const stopping = {
+    model: { chatTemplates: { llamaChat: true, jinja: { default: false } } },
+    completion: () => {
+      started.resolve(undefined);
+      return done.promise;
+    },
+    // A handle that was already freed throws where the method is called, so the
+    // stop never becomes a promise.
+    stopCompletion: vi.fn(() => {
+      done.resolve(result);
+      throw new Error('context already released');
+    }),
+    release: vi.fn(() => {
+      timeline.push('freed stopping');
+      return Promise.resolve();
+    }),
+  } as unknown as GgufContext;
+  const second = contextOf(timeline, 'second', () => Promise.resolve());
+  const { client, release, init } = clientWith([stopping, second], timeline);
+  const answered = collect(client.stream(request));
+  await started.promise;
+
+  // The release stops the answer in progress first, and that stop throws. The
+  // context must still be freed, and the teardown every later load waits on
+  // must not stay rejected.
+  const freeing = release();
+  await expect(freeing).resolves.toBeUndefined();
+  expect(stopping.release).toHaveBeenCalledTimes(1);
+  const events = await answered;
+  expect(events.at(-1)?.kind).toBe('done');
+
+  // The next answer still loads and completes, on a freed-then-released context.
+  const next = await collect(client.stream(request));
+  expect(next.at(-1)?.kind).toBe('done');
+  expect(init).toHaveBeenCalledTimes(2);
+  expect(timeline).toEqual(['open 1', 'freed stopping', 'open 2']);
+});
+
 it('keeps loading after a native release throws as it is called', async () => {
   const timeline: Timeline = [];
   const broken = throwingContext();

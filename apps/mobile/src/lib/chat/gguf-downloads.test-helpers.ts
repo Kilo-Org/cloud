@@ -45,6 +45,10 @@ export function harness(
     readonly refusePause?: boolean;
     /** A task whose cancel loses to a pause already under way: it reports itself paused. */
     readonly cancelRacesPause?: boolean;
+    /** A file name whose size read the OS refuses at the end of the download. */
+    readonly sizeFails?: string;
+    /** The transfer number whose open the device refuses; 1 is the first. */
+    readonly createDownloadFailsAt?: number;
   } = {}
 ) {
   const freeBytes = options.freeBytes ?? 8_000_000_000;
@@ -56,11 +60,17 @@ export function harness(
   const released: string[] = [];
   const projectors: (string | undefined)[] = [];
   let failedMoveOnce = false;
+  let opened = 0;
 
   const storage: GgufStorage = {
     freeBytes: () => freeBytes,
     list: () => [...files.keys()],
-    size: name => files.get(name) ?? 0,
+    size: name => {
+      if (name === options.sizeFails) {
+        throw new Error('file size unavailable');
+      }
+      return files.get(name) ?? 0;
+    },
     sha256: async name => {
       hashed.push(name);
       if (name === options.unreadable) {
@@ -97,6 +107,10 @@ export function harness(
       index.text = text;
     },
     createDownload: (url, name, report) => {
+      opened += 1;
+      if (opened === options.createDownloadFailsAt) {
+        throw new Error('could not open the file');
+      }
       const progress: Progress = bytes => {
         files.set(name, bytes.bytesWritten);
         report(bytes);

@@ -49,7 +49,12 @@ export type GgufDownload = {
   readonly retrying: boolean;
 };
 
-export type GgufDownloadProblem = 'space' | 'network' | 'invalidFile' | 'checksum';
+/**
+ * `space` is the device running out of room. `writeFailed` is the device
+ * refusing a storage call at the end of a download - a permission or I/O
+ * refusal, which says nothing about free space.
+ */
+export type GgufDownloadProblem = 'space' | 'network' | 'invalidFile' | 'checksum' | 'writeFailed';
 
 export type GgufDownloadsSnapshot = {
   readonly models: readonly GgufModelRecord[];
@@ -118,6 +123,20 @@ export type Settled<T> = { readonly ok: true; readonly value: T } | { readonly o
 export async function settled<T>(operation: Promise<T>): Promise<Settled<T>> {
   try {
     return { ok: true, value: await operation };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/**
+ * Calls a native method and settles it, whichever way it fails. llama.rn frees
+ * a JSI handle in place, so a context that was already released throws where
+ * the method is read or invoked, before any promise exists; only a thunk can
+ * catch that. `settled` alone would let the throw escape its caller.
+ */
+export async function attempt<T>(call: () => Promise<T>): Promise<Settled<T>> {
+  try {
+    return await settled(call());
   } catch {
     return { ok: false };
   }

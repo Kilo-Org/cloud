@@ -859,7 +859,7 @@ export async function setOrganizationMemberGroups(params: {
         params.permissionPolicyAdmin,
         namedPolicies
       );
-      let auditTarget = 'an organization member';
+      let auditTarget = `organization member (${params.userId})`;
       if (namedPolicies.length === 0) {
         const [member] = await tx
           .select({ email: kilocode_users.google_user_email })

@@ -28,16 +28,15 @@ import { TRPCError } from '@trpc/server';
 import { and, asc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import {
+  EffectiveNamedClientConfigurationSchema,
   NAMED_POLICY_EXECUTION_OSES,
   NAMED_POLICY_SCHEMA_VERSION,
+  NamedMemberPermissionPolicySchema,
   NamedPolicyDocumentSchema,
   NamedPolicyKindSchema,
   type NamedPolicyDocument,
 } from './named-policy.schema';
-import {
-  MAX_MEMBER_PERMISSION_POLICY_BYTES,
-  PERMISSION_POLICY_MAX_AGE_SECONDS,
-} from './permission-policy.schema';
+import { PERMISSION_POLICY_MAX_AGE_SECONDS } from './permission-policy.schema';
 import { assertOrganizationPermissionPolicyWriteEnabled } from './permission-policy.server';
 
 type StoredPolicy = typeof organization_named_policies.$inferSelect;
@@ -55,11 +54,7 @@ const editSchema = z.strictObject({
   name: nameSchema.optional(),
   document: z.unknown().optional(),
 });
-const clientConfigurationKeys = [
-  'disable_auto_approve',
-  'disable_telemetry',
-  'hide_session_dollar_values',
-] as const;
+const clientConfigurationKeys = EffectiveNamedClientConfigurationSchema.keyof().options;
 
 function parse<T>(schema: z.ZodType<T>, input: unknown, message: string): T {
   const result = schema.safeParse(input);
@@ -188,7 +183,7 @@ function memberPolicy(
   policies: NamedPolicyDocument[],
   os?: (typeof NAMED_POLICY_EXECUTION_OSES)[number]
 ) {
-  const configuration: Partial<Record<(typeof clientConfigurationKeys)[number], true>> = {};
+  const configuration: z.infer<typeof EffectiveNamedClientConfigurationSchema> = {};
   const layers = policies.flatMap(policy => {
     if (policy.kind === 'client_configuration') {
       for (const key of clientConfigurationKeys) {
@@ -209,20 +204,20 @@ function memberPolicy(
   };
 }
 
-function memberPolicyFits(
+function validateMemberPolicy(
   organizationId: string,
   revision: number,
+  managed: boolean,
   policy: ReturnType<typeof memberPolicy>
 ) {
-  const response = {
+  return NamedMemberPermissionPolicySchema.safeParse({
     schema_version: NAMED_POLICY_SCHEMA_VERSION,
     organization_id: organizationId,
-    managed: true,
+    managed,
     revision,
     max_age_seconds: PERMISSION_POLICY_MAX_AGE_SECONDS,
     policy,
-  };
-  return Buffer.byteLength(JSON.stringify(response)) <= MAX_MEMBER_PERMISSION_POLICY_BYTES;
+  });
 }
 
 async function assertAttachedPoliciesFit(tx: DrizzleTransaction, organizationId: string) {
@@ -230,10 +225,12 @@ async function assertAttachedPoliciesFit(tx: DrizzleTransaction, organizationId:
   const attachments = await readAttachments(tx, organizationId);
   const policies = await readAttachedPolicies(tx, organizationId, attachments);
   for (const os of [undefined, ...NAMED_POLICY_EXECUTION_OSES]) {
-    if (!memberPolicyFits(organizationId, 2_147_483_647, memberPolicy(policies, os))) {
+    if (
+      !validateMemberPolicy(organizationId, 2_147_483_647, true, memberPolicy(policies, os)).success
+    ) {
       throw new TRPCError({
         code: 'BAD_REQUEST',
-        message: 'Linked named policies exceed the member policy size limit.',
+        message: 'Linked named policies exceed the member policy size limit or layer limit.',
       });
     }
   }
@@ -254,30 +251,33 @@ export async function getNamedPolicyMemberSnapshot(params: {
       });
     const policyRevision = await getRevision(tx, organizationId);
     const managed = membership.plan === 'enterprise' && (await isManaged(tx, organizationId));
-    if (!managed) return { managed, policyRevision, policy: {} };
-    const groups = await tx
-      .select({ id: organization_group_memberships.group_id })
-      .from(organization_group_memberships)
-      .where(
-        and(
-          eq(organization_group_memberships.organization_id, organizationId),
-          eq(organization_group_memberships.kilo_user_id, kiloUserId)
-        )
+    let policy: ReturnType<typeof memberPolicy> = {};
+    if (managed) {
+      const groups = await tx
+        .select({ id: organization_group_memberships.group_id })
+        .from(organization_group_memberships)
+        .where(
+          and(
+            eq(organization_group_memberships.organization_id, organizationId),
+            eq(organization_group_memberships.kilo_user_id, kiloUserId)
+          )
+        );
+      const attachments = await readAttachments(
+        tx,
+        organizationId,
+        groups.map(({ id }) => id)
       );
-    const attachments = await readAttachments(
-      tx,
-      organizationId,
-      groups.map(({ id }) => id)
-    );
-    const policies = await readAttachedPolicies(tx, organizationId, attachments);
-    const policy = memberPolicy(policies, params.executionOs);
-    if (!memberPolicyFits(organizationId, policyRevision, policy)) {
+      const policies = await readAttachedPolicies(tx, organizationId, attachments);
+      policy = memberPolicy(policies, params.executionOs);
+    }
+    const validated = validateMemberPolicy(organizationId, policyRevision, managed, policy);
+    if (!validated.success) {
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
-        message: 'Effective named policy exceeds the size limit.',
+        message: 'Effective named policy does not meet the member policy contract.',
       });
     }
-    return { managed, policyRevision, policy };
+    return { managed: validated.data.managed, policyRevision, policy: validated.data.policy };
   }, snapshot);
 }
 

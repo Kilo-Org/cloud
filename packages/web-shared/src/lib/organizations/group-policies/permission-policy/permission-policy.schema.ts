@@ -66,11 +66,15 @@ export const OrganizationPermissionPolicySchema = OrganizationGroupAgentPermissi
 
 export type OrganizationPermissionPolicy = z.infer<typeof OrganizationPermissionPolicySchema>;
 
-const permissionPolicyEnvelope = z.strictObject({
+export const permissionPolicyEnvelope = z.strictObject({
   schema_version: z.literal(1),
   organization_id: z.guid(),
   revision: z.int().nonnegative(),
   max_age_seconds: z.int().positive().max(PERMISSION_POLICY_MAX_AGE_SECONDS),
+});
+
+export const MemberAgentPermissionsSchema = z.strictObject({
+  layers: z.array(AgentPermissionsDataSchema).min(1).max(MAX_LAYERS),
 });
 
 export const MemberPermissionPolicySchema = z
@@ -79,9 +83,7 @@ export const MemberPermissionPolicySchema = z
     permissionPolicyEnvelope.extend({
       managed: z.literal(true),
       policy: z.strictObject({
-        agent_permissions: z
-          .strictObject({ layers: z.array(AgentPermissionsDataSchema).min(1).max(MAX_LAYERS) })
-          .optional(),
+        agent_permissions: MemberAgentPermissionsSchema.optional(),
       }),
     }),
   ])

@@ -329,13 +329,17 @@ describe('named organization policy group guard', () => {
       expect.any(String),
       `agent_permissions ${agentPolicy.id}, client_configuration ${clientPolicy.id} (revision ${policyRevision})`,
     ]);
+    if (writer.action === 'organization.group.member_groups.set') {
+      expect(audit.message).toContain(`for organization member (${member.id});`);
+    } else {
+      expect(audit.message).not.toContain(member.id);
+    }
     for (const privateValue of [
       agentPolicy.name,
       clientPolicy.name,
       'private_tool_rule',
       'disable_auto_approve',
       member.google_user_email,
-      member.id,
     ]) {
       expect(audit.message).not.toContain(privateValue);
     }

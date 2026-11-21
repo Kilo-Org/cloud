@@ -13,7 +13,10 @@ import {
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, inArray, sql } from 'drizzle-orm';
-import { NamedPolicyDocumentSchema } from './named-policy.schema';
+import {
+  NamedMemberPermissionPolicySchema,
+  NamedPolicyDocumentSchema,
+} from './named-policy.schema';
 import {
   createNamedOrganizationPolicy,
   deleteNamedOrganizationPolicy,
@@ -22,6 +25,7 @@ import {
   setNamedOrganizationPolicyLink,
   updateNamedOrganizationPolicy,
 } from './named-policy.server';
+import { MemberPermissionPolicySchema } from './permission-policy.schema';
 import { getOrganizationPermissionPolicy } from './permission-policy.server';
 
 const owner = 'named-policy-owner';
@@ -92,6 +96,28 @@ describe('named policy JSON', () => {
     { ...clientConfiguration, document: { by_os: { windows: {} } } },
   ])('rejects invalid named policy JSON %#', input => {
     expect(NamedPolicyDocumentSchema.safeParse(input).success).toBe(false);
+  });
+
+  it('validates effective client configuration without widening the legacy member contract', () => {
+    const response = {
+      schema_version: 1,
+      organization_id: '00000000-0000-4000-8000-000000000001',
+      revision: 1,
+      max_age_seconds: 300,
+      managed: true,
+      policy: { client_configuration: { disable_auto_approve: true } },
+    };
+    expect(NamedMemberPermissionPolicySchema.safeParse(response).success).toBe(true);
+    expect(MemberPermissionPolicySchema.safeParse(response).success).toBe(false);
+    expect(
+      NamedMemberPermissionPolicySchema.safeParse({ ...response, managed: false }).success
+    ).toBe(false);
+    expect(
+      NamedMemberPermissionPolicySchema.safeParse({
+        ...response,
+        policy: { client_configuration: { disable_auto_approve: false } },
+      }).success
+    ).toBe(false);
   });
 });
 
@@ -445,6 +471,90 @@ describe('named organization policy storage', () => {
       message: expect.stringContaining('size limit'),
     });
     expect(await listNamedOrganizationPolicies(access)).toEqual(before);
+    expect(await namedAudit(organizationId)).toEqual(audit);
+  });
+
+  it('accepts exactly 101 layers but rolls back a link or edit that adds a 102nd OS layer', async () => {
+    const access = await createOrganization();
+    const { organizationId } = access;
+    await enableFor(organizationId);
+    const windowsDocument = {
+      ...agentPermissions.document,
+      by_os: { windows: { tools: { browser_open: 'deny' } } },
+    };
+    const [groups, policies] = await Promise.all([
+      db
+        .insert(organization_groups)
+        .values(
+          Array.from({ length: 51 }, (_, i) => ({
+            organization_id: organizationId,
+            name: `Group ${i}`,
+          }))
+        )
+        .returning({ id: organization_groups.id }),
+      db
+        .insert(organization_named_policies)
+        .values(
+          Array.from({ length: 51 }, (_, i) => ({
+            organization_id: organizationId,
+            kind: agentPermissions.kind,
+            name: `Policy ${i}`,
+            schema_version: 1,
+            document: i === 50 ? agentPermissions.document : windowsDocument,
+          }))
+        )
+        .returning({ id: organization_named_policies.id }),
+    ]);
+    await db
+      .insert(organization_group_memberships)
+      .values(
+        groups.map(group => ({
+          organization_id: organizationId,
+          group_id: group.id,
+          kilo_user_id: member,
+        }))
+      );
+    await db.insert(organization_group_policy_links).values(
+      groups.slice(0, 50).map((group, i) => ({
+        organization_id: organizationId,
+        group_id: group.id,
+        kind: agentPermissions.kind,
+        policy_id: policies[i].id,
+      }))
+    );
+    const { result: defaultPolicy } = await createNamedOrganizationPolicy(access, {
+      ...agentPermissions,
+      name: 'Default policy',
+    });
+    const { policyRevision } = await setNamedOrganizationPolicyLink(access, {
+      scope: defaultScope,
+      kind: agentPermissions.kind,
+      policyId: defaultPolicy.id,
+    });
+    const snapshot = { organizationId, kiloUserId: member, executionOs: 'windows' } as const;
+    const before = await getNamedPolicyMemberSnapshot(snapshot);
+    expect(before).toMatchObject({ managed: true, policyRevision });
+    expect(before.policy).toHaveProperty('agent_permissions.layers.length', 101);
+    const audit = await namedAudit(organizationId);
+    await expect(
+      setNamedOrganizationPolicyLink(access, {
+        scope: { type: 'group', groupId: groups[50].id },
+        kind: agentPermissions.kind,
+        policyId: policies[50].id,
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: expect.stringContaining('layer limit'),
+    });
+    await expect(
+      updateNamedOrganizationPolicy(access, defaultPolicy.id, {
+        document: windowsDocument,
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: expect.stringContaining('layer limit'),
+    });
+    expect(await getNamedPolicyMemberSnapshot(snapshot)).toEqual(before);
     expect(await namedAudit(organizationId)).toEqual(audit);
   });
 

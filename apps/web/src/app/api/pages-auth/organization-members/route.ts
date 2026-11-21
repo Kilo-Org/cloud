@@ -12,11 +12,23 @@ import { isPagesMemberSearchProofFor } from '@/lib/pages-auth/pages-member-searc
 
 /**
  * Vercel Firewall rules this route counts against. Both must exist in the
- * project's firewall configuration before Pages calls the route: a missing
- * rule answers 503.
+ * project's firewall configuration before this route deploys: the exchange
+ * hands out proofs from then on, and a missing rule answers 503.
+ *
+ * The searcher's rule is checked first, so a request it refuses never spends
+ * the deployment's shared budget. One person looping searches is cut off alone
+ * instead of locking every owner on the deployment out of search and grants.
  */
-const DEPLOYMENT_RATE_LIMIT_ID = 'pages-member-search-deployment';
 const SEARCHER_RATE_LIMIT_ID = 'pages-member-search-searcher';
+const DEPLOYMENT_RATE_LIMIT_ID = 'pages-member-search-deployment';
+
+/**
+ * The window both firewall rules count over; keep it equal to theirs. The
+ * firewall answers only "limited", with no reset time, so a 429's
+ * `Retry-After` is this whole window: never too early, at most one window
+ * late.
+ */
+const RATE_LIMIT_WINDOW_SECONDS = 60;
 
 const UserIdSchema = z.string().min(1).max(500);
 
@@ -60,8 +72,9 @@ function refuse(status: number, error: string) {
  * caller that is not a configured deployment; 401 `invalid_proof` for a proof
  * that is forged, expired, or minted for another person or deployment; 403
  * `not_a_member` when the searcher's account is missing or blocked, or holds no
- * membership of its own in a live organization. 429 and 503 come from the rate
- * limits, per deployment before the proof is checked and per searcher after.
+ * membership of its own in a live organization. 429, with `Retry-After`, and
+ * 503 come from the rate limits, checked after the proof: per searcher first,
+ * then per deployment.
  */
 export const POST = withRestTiming(
   '/api/pages-auth/organization-members',
@@ -75,15 +88,6 @@ export const POST = withRestTiming(
     const secret = extractBearerToken(request.headers.get('authorization'));
     if (!isPagesAuthClient(audience, secret)) return refuse(401, 'invalid_client');
 
-    const deploymentRefusal = firewallRateLimitRefusal(
-      await checkFirewallRateLimit(DEPLOYMENT_RATE_LIMIT_ID, {
-        source: 'pages_member_search_deployment',
-        request,
-        rateLimitKey: audience,
-      })
-    );
-    if (deploymentRefusal) return deploymentRefusal;
-
     if (!isPagesMemberSearchProofFor(input.proof, { userId: searcherId, audience })) {
       return refuse(401, 'invalid_proof');
     }
@@ -93,9 +97,20 @@ export const POST = withRestTiming(
         source: 'pages_member_search_searcher',
         request,
         rateLimitKey: `${audience}:${searcherId}`,
-      })
+      }),
+      { retryAfterSeconds: RATE_LIMIT_WINDOW_SECONDS }
     );
     if (searcherRefusal) return searcherRefusal;
+
+    const deploymentRefusal = firewallRateLimitRefusal(
+      await checkFirewallRateLimit(DEPLOYMENT_RATE_LIMIT_ID, {
+        source: 'pages_member_search_deployment',
+        request,
+        rateLimitKey: audience,
+      }),
+      { retryAfterSeconds: RATE_LIMIT_WINDOW_SECONDS }
+    );
+    if (deploymentRefusal) return deploymentRefusal;
 
     const members = await findOrganizationMembers(
       searcherId,

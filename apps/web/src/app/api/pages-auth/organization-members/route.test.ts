@@ -152,26 +152,42 @@ describe('POST /api/pages-auth/organization-members', () => {
     expect(await response.json()).toEqual({ error: 'not_a_member' });
   });
 
-  test('counts per deployment, then per searcher on that deployment', async () => {
+  test('counts per searcher on the deployment, then per deployment', async () => {
     await call(searchBody());
 
     expect(mockCheckRateLimit.mock.calls).toEqual([
-      ['pages-member-search-deployment', expect.objectContaining({ rateLimitKey: PAGES })],
       [
         'pages-member-search-searcher',
         expect.objectContaining({ rateLimitKey: `${PAGES}:${searcher.id}` }),
       ],
+      ['pages-member-search-deployment', expect.objectContaining({ rateLimitKey: PAGES })],
     ]);
   });
 
-  test('answers 429 when either limit is exceeded', async () => {
+  test('a request the searcher limit refuses never spends the deployment budget', async () => {
     mockCheckRateLimit.mockResolvedValueOnce({ rateLimited: true });
-    expect((await call(searchBody())).status).toBe(429);
+
+    const response = await call(searchBody());
+
+    expect(response.status).toBe(429);
+    expect(mockCheckRateLimit.mock.calls.map(([id]) => id)).toEqual([
+      'pages-member-search-searcher',
+    ]);
+  });
+
+  test('answers 429 with Retry-After when either limit is exceeded', async () => {
+    mockCheckRateLimit.mockResolvedValueOnce({ rateLimited: true });
+    const searcherLimited = await call(searchBody());
+    expect(searcherLimited.status).toBe(429);
+    expect(searcherLimited.headers.get('retry-after')).toBe('60');
+    expect(await searcherLimited.json()).toEqual({ error: 'RATE_LIMITED' });
 
     mockCheckRateLimit
       .mockResolvedValueOnce({ rateLimited: false })
       .mockResolvedValueOnce({ rateLimited: true });
-    expect((await call(searchBody())).status).toBe(429);
+    const deploymentLimited = await call(searchBody());
+    expect(deploymentLimited.status).toBe(429);
+    expect(deploymentLimited.headers.get('retry-after')).toBe('60');
   });
 
   test('fails closed with 503 when a firewall rule is missing', async () => {
@@ -183,9 +199,10 @@ describe('POST /api/pages-auth/organization-members', () => {
     expect(await response.json()).toEqual({ error: 'RATE_LIMIT_UNAVAILABLE' });
   });
 
-  test('does not check the per-searcher limit for an invalid proof', async () => {
-    await call(searchBody({ proof: 'forged.proof' }));
+  test('spends no rate limit on an invalid proof', async () => {
+    const response = await call(searchBody({ proof: 'forged.proof' }));
 
-    expect(mockCheckRateLimit).toHaveBeenCalledTimes(1);
+    expect(response.status).toBe(401);
+    expect(mockCheckRateLimit).not.toHaveBeenCalled();
   });
 });

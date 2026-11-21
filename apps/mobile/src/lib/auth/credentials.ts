@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import { fetch as streamingFetch } from 'expo/fetch';
 
 import { API_BASE_URL } from '@/lib/config';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
@@ -393,7 +394,13 @@ async function doRefresh(): Promise<RefreshOutcome> {
     const { response, refusalText, successBody } = await withDeadline(
       CONTROL_PLANE_DEADLINE_MS,
       async (signal): Promise<RefreshResponseBodies> => {
-        const res = await fetch(`${API_BASE_URL}${REFRESH_PATH}`, {
+        // React Native's global fetch is `whatwg-fetch`, which resolves only in
+        // `xhr.onload` — after the whole body. A refusal whose body never
+        // completes would then never resolve at all, so the status could never
+        // decide the refusal and the call would expire as retryable. The
+        // runtime's streaming fetch resolves at the response head, which is
+        // what makes the status available before any body is read.
+        const res = await streamingFetch(`${API_BASE_URL}${REFRESH_PATH}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refreshToken: storedRefreshToken }),

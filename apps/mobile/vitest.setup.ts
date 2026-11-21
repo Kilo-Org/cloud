@@ -183,6 +183,14 @@ vi.mock('expo', () => ({
   },
 }));
 
+// `expo/fetch` is the runtime's streaming fetch, and its module loads the Expo
+// native runtime that a Node test worker has no binary for. The stub delegates
+// to the global fetch these workers do provide, so a suite that spies on
+// `globalThis.fetch` still sees the request it answers.
+vi.mock('expo/fetch', () => ({
+  fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args),
+}));
+
 // Haptics are decoration, and the app's wrapper already settles a rejected
 // call; the stub resolves like a device with a haptic engine. The enums keep
 // the library's values so a caller's argument is the same one it sends on a

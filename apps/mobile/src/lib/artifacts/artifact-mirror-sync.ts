@@ -299,7 +299,14 @@ async function runSyncOnce(
     // the bytes-on-disk guard in `writeManifest` then keeps the file untouched
     // too. Notifying on an unchanged tree makes an open browser re-query a listing
     // that cannot have changed.
-    if (changed) {
+    //
+    // A run that rewrote a file counts as a change even when the index bytes are
+    // identical: the disk reconcile can drop a file whose bytes the device removed
+    // and the crawl then materializes it again under the same id, size and name, so
+    // the listing is unchanged while the file behind it is new. That repair is
+    // invisible to an open browser until it re-reads, which is what the notify is
+    // for.
+    if (changed || advanced.files > 0) {
       deps.notify();
     }
     return {

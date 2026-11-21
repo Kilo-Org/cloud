@@ -444,6 +444,7 @@ async function downloadAllowedArtifact(url: string, target: File): Promise<File>
   const controller = new AbortController();
   const clearDeadline = abortAfter(controller, ARTIFACT_DOWNLOAD_TIMEOUT_MS);
   let response: Response | null = null;
+  let destination: WritableStream<Uint8Array> | null = null;
   try {
     response = await raceAgainstAbort(
       fetchAllowedArtifact(url, { method: 'GET', signal: controller.signal }),
@@ -464,9 +465,13 @@ async function downloadAllowedArtifact(url: string, target: File): Promise<File>
     // the staging path a fresh empty file, so a leftover of the same name cannot
     // leave a tail behind the new bytes.
     target.create({ intermediates: true, overwrite: true });
-    // `pipeTo` accepts no signal, so the transfer is raced against the abort.
+    destination = target.writableStream();
+    // `pipeTo` accepts no signal, so the transfer is raced against the abort. The
+    // destination is held here because a raced-out pipe is abandoned: the deadline
+    // errors the body, and the catch below then aborts the write stream so its
+    // file handle is released instead of being left to the abandoned pipe.
     await raceAgainstAbort(
-      (response.body ?? new Blob([]).stream()).pipeTo(target.writableStream()),
+      (response.body ?? new Blob([]).stream()).pipeTo(destination),
       controller.signal,
       'Artifact download timed out'
     );
@@ -475,7 +480,12 @@ async function downloadAllowedArtifact(url: string, target: File): Promise<File>
     try {
       await response?.body?.cancel();
     } catch {
-      // A failed pipe already released the stream, so nothing is left to cancel.
+      // A failed pipe already released the body stream, so nothing is left to cancel.
+    }
+    try {
+      await destination?.abort();
+    } catch {
+      // A pipe that already aborted the destination released its handle there.
     }
     deleteQuietly(target);
     throw error;

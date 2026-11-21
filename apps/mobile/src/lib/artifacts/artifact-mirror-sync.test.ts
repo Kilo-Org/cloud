@@ -467,6 +467,8 @@ describe('syncArtifactMirror crawling', () => {
     await syncArtifactMirror({ deps: h.deps });
     expect(h.downloadFile).toHaveBeenCalledTimes(2);
     fakeFs.remove('file:///mirror/sessions/f1');
+    // Only the first run announced the tree so far.
+    expect(h.notify).toHaveBeenCalledOnce();
 
     h.setNow(NOW + MIRROR_SYNC_MIN_INTERVAL_MS);
     await syncArtifactMirror({ deps: h.deps });
@@ -476,6 +478,36 @@ describe('syncArtifactMirror crawling', () => {
       h.downloadFile.mock.calls.filter(([url]) => url === `${STORAGE_ORIGIN}/f2`)
     ).toHaveLength(1);
     expect(sessionFiles(h.lastManifest(), 's1').toSorted()).toEqual(['f1', 'f2']);
+    // The re-materialized file may land in a different index position, which is
+    // itself a change; either way the provider is told, because the run wrote
+    // bytes and the browser has to re-read them.
+    expect(h.notify).toHaveBeenCalledTimes(2);
+  });
+
+  it('notifies when a repair rewrites a file without changing the index', async () => {
+    // The reconcile drops a file whose bytes the device removed, and the crawl
+    // materializes it again. When the lost file is the last one in the session,
+    // restoring it appends to the same position the index already holds, so the
+    // published content is byte-identical while the file behind it is new. The
+    // provider still has to be told, which the content comparison alone misses.
+    const h = harness();
+    h.sessions.push({ id: 's1', updatedAt: T1 });
+    setFiles(h, 's1', [
+      { id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` },
+      { id: 'f2', size: 20, url: `${STORAGE_ORIGIN}/f2` },
+    ]);
+
+    await syncArtifactMirror({ deps: h.deps });
+    const beforeRepair = h.lastManifest();
+    expect(h.notify).toHaveBeenCalledOnce();
+
+    fakeFs.remove('file:///mirror/sessions/f2');
+    h.setNow(NOW + MIRROR_SYNC_MIN_INTERVAL_MS);
+    await syncArtifactMirror({ deps: h.deps });
+
+    // Same index, new bytes: only the new condition announces it.
+    expect(h.lastManifest()).toEqual(beforeRepair);
+    expect(h.notify).toHaveBeenCalledTimes(2);
   });
 
   it('keeps reconciling the other sessions when one cannot be inspected', async () => {

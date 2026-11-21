@@ -40,6 +40,10 @@ import { ShareIntentProvider } from 'expo-share-intent';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
+import {
+  type LoginRedirectLatch,
+  shouldDispatchLoginRedirect,
+} from '@/lib/navigation/login-redirect-latch';
 import { useRootNavigationReady } from '@/lib/navigation-ready';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewInstance } from 'react-native';
@@ -554,12 +558,24 @@ function RootLayoutNav({
     [shellGate, onLegalRoute, languageReloadFailed, restoreFailed]
   );
 
+  // The login redirect this process already dispatched and has not yet seen
+  // land. The decision comes from `useSegments()`, which only updates after the
+  // router commits, so a sign-out re-emits `redirect-login` on every render
+  // while the segments still name the group being left. A second replace
+  // replaces the login route again — it unmounts and remounts, and the reader
+  // sees the destination arrive twice. The other redirects of the same
+  // decision are left alone.
+  const loginRedirectRef = useRef<LoginRedirectLatch | null>(null);
+
   useEffect(() => {
     // Every settled tag ends startup the same way: record the outcome once and
     // hand the splash over to the reveal.
     const settle = (reason: StartupOutcome) => {
       markStartupComplete(reason);
       setStartupFinished(true);
+      // The decision settled: the next login redirect is a new one, for this
+      // process's next sign-out.
+      loginRedirectRef.current = null;
     };
     // Every redirecting tag navigates only once the root navigator accepts it.
     const redirect = (href: Href) => {
@@ -567,6 +583,19 @@ function RootLayoutNav({
         return;
       }
       router.replace(href);
+    };
+    // `redirect-login` alone is held to one dispatch per sign-out, with the
+    // latch's bound covering a replace the router dropped.
+    const redirectToLogin = () => {
+      if (!navigationReady) {
+        return;
+      }
+      const now = Date.now();
+      if (!shouldDispatchLoginRedirect(loginRedirectRef.current, now)) {
+        return;
+      }
+      loginRedirectRef.current = { dispatchedAt: now };
+      router.replace('/(auth)/login');
     };
 
     switch (decision.tag) {
@@ -599,7 +628,7 @@ function RootLayoutNav({
         return;
       }
       case 'redirect-login': {
-        redirect('/(auth)/login');
+        redirectToLogin();
         return;
       }
       case 'settle-user-error': {

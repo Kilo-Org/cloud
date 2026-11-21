@@ -19,6 +19,7 @@ import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { foldForSearch } from '@/i18n/fold-for-search';
 import { formatNumber } from '@/lib/format';
+import { sessionBranchLabel } from '@/lib/session-branch-label';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { type ShareCliSpawnRow } from './share-cli-spawn';
@@ -138,9 +139,14 @@ export function ShareDestinationList({
       // so an unaccented query finds `Revisão do fluxo` and an accented query
       // still matches an accented branch: folding is a superset of the plain
       // lowercase comparison, so no match it found is lost.
+      //
+      // The branch appears twice on purpose: both the stored (percent-encoded)
+      // branch and the decoded branch the row paints, so a person finds the
+      // destination by typing either form.
       const title = foldForSearch(row.title ?? '');
       const branch = foldForSearch(row.git_branch ?? '');
-      return title.includes(q) || branch.includes(q);
+      const paintedBranch = foldForSearch(sessionBranchLabel(row.git_branch) ?? '');
+      return title.includes(q) || branch.includes(q) || paintedBranch.includes(q);
     });
   }, [destinations, search]);
 

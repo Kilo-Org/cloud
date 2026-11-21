@@ -8,7 +8,7 @@ import { Pressable, View } from 'react-native';
 import Sortable, { type SortableGridRenderItemInfo } from 'react-native-sortables';
 
 import { EmptyState, StateAction } from '@/components/empty-state';
-import { ContextControl } from '@/components/context-control';
+import { CONTEXT_CONTROL_INLINE_MIN_DP, ContextControl } from '@/components/context-control';
 import { useLiveSessionContext } from '@/components/home/live-session-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -25,7 +25,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { cn } from '@/lib/utils';
 import { useSideInsetStyle } from '@/lib/screen-insets';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_DP, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { todoListPath, todoListSettingsPath } from '@/lib/todos/todo-routes';
 import { type TodoList } from '@/lib/todos/todo-types';
 import { useTRPC } from '@/lib/trpc';
@@ -224,6 +224,9 @@ export function TodoListsScreen({ tabHeader }: Readonly<{ tabHeader: ReactNode }
           </View>
         }
         allowInlineActionsStacking={false}
+        // The history button and the picker's chevron cannot shrink; the
+        // picker's label truncates.
+        inlineActionsMinWidth={ICON_TARGET_DP + CONTEXT_CONTROL_INLINE_MIN_DP}
       />
       <View style={sideInsetStyle} className={SCREEN_GUTTER_CLASS}>
         <View

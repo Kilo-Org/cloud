@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- this suite pins the list, the move, the record and both deletes against the real migrations of the two schemas the store spans, so it grows a case at a time and a smaller split would separate each case from the fixtures it needs. */
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 
@@ -38,13 +39,61 @@ const CHATS = [
   .map(file => readFileSync(new URL(`../../../drizzle/${file}`, import.meta.url), 'utf8'))
   .join('--> statement-breakpoint');
 
-const chatDatabase = (database: DatabaseSync): ChatDatabase => ({
-  getAllSync: <T>(source: string, params: (string | number)[]) =>
-    database.prepare(source).all(...params) as T[],
-  runSync: (source: string, params: (string | number)[]) => {
-    database.prepare(source).run(...params);
-  },
-});
+const chatDatabase = (database: DatabaseSync): ChatDatabase => {
+  const db: ChatDatabase = {
+    getAllSync: <T>(source: string, params: (string | number)[]) =>
+      database.prepare(source).all(...params) as T[],
+    runSync: (source: string, params: (string | number)[]) => {
+      database.prepare(source).run(...params);
+    },
+    withTransactionSync: (work: () => void) => {
+      database.exec('begin');
+      try {
+        work();
+        database.exec('commit');
+      } catch (error) {
+        database.exec('rollback');
+        throw error;
+      }
+    },
+    isInTransactionSync: () => database.isTransaction,
+  };
+  return db;
+};
+
+/**
+ * The same database with a `runSync` a test can count and refuse at a chosen
+ * statement. The wipe runs its own transaction, so the rollback it takes on a
+ * refusal is the wipe's own.
+ */
+const watchedDatabase = (database: DatabaseSync, refuseAt?: number) => {
+  const counts = { statements: [] as string[], transactions: 0, reads: [] as number[] };
+  const plain = chatDatabase(database);
+  const db: ChatDatabase = {
+    ...plain,
+    getAllSync: <T>(source: string, params: (string | number)[]) => {
+      /* The transaction count at the moment of the read, so a test can tell
+         whether the ids were read inside the unit that deletes them. */
+      counts.reads.push(counts.transactions);
+      return plain.getAllSync<T>(source, params);
+    },
+    runSync: (source: string, params: (string | number)[]) => {
+      counts.statements.push(source);
+      if (counts.statements.length === refuseAt) {
+        throw new Error('the database refused the statement');
+      }
+      plain.runSync(source, params);
+    },
+    withTransactionSync: (work: () => void) => {
+      counts.transactions += 1;
+      plain.withTransactionSync(work);
+    },
+  };
+  return { db, counts };
+};
+
+/** How many rows one of the store's count queries answers, read back as a number. */
+const tally = (source: string): number => db.getAllSync<{ n: number }>(source, [])[0]?.n ?? 0;
 
 /**
  * Part ids order by insertion in the store's own schema — an id is a ULID — and
@@ -298,7 +347,7 @@ describe('wipeChats', () => {
     rememberChat(db, { sessionId: 'mine', scope: 'me:personal', at: 100 });
     rememberChat(db, { sessionId: 'theirs', scope: 'you:personal', at: 100 });
 
-    wipeChats(db, 'me');
+    await wipeChats(db, 'me');
 
     expect(listChats(db, 'me:personal')).toEqual([]);
     expect(listChats(db, 'you:personal')).toHaveLength(1);
@@ -311,7 +360,7 @@ describe('wipeChats', () => {
     rememberChat(db, { sessionId: 'mine', scope: 'me:acme', at: 100 });
     rememberChat(db, { sessionId: 'theirs', scope: 'you:personal', at: 100 });
 
-    wipeChats(db, null);
+    await wipeChats(db, null);
 
     expect(database.prepare('select count(*) as n from chats').get()).toEqual({ n: 0 });
     expect(database.prepare('select count(*) as n from sessions').get()).toEqual({ n: 0 });
@@ -323,7 +372,7 @@ describe('wipeChats', () => {
     rememberChat(db, { sessionId: 'mine', scope: 'me:personal', at: 100 });
     rememberChat(db, { sessionId: 'theirs', scope: 'mendel:personal', at: 100 });
 
-    wipeChats(db, 'me');
+    await wipeChats(db, 'me');
 
     expect(listChats(db, 'mendel:personal')).toHaveLength(1);
   });
@@ -334,6 +383,125 @@ describe('wipeChats', () => {
     rememberChat(db, { sessionId: 'mine', scope: 'me:personal', at: 100 });
     rememberChat(db, { sessionId: 'theirs', scope: 'you:personal', at: 100 });
 
-    expect(wipeChats(db, 'me')).toEqual(['mine']);
+    expect(await wipeChats(db, 'me')).toEqual(['mine']);
+  });
+
+  it('takes every row under both chats of the account, down to their parts', async () => {
+    await write(conversation('one', 'kilo/one', 'first'));
+    await write(conversation('two', 'kilo/one', 'second'));
+    await write(conversation('theirs', 'kilo/one', 'not mine'));
+    rememberChat(db, { sessionId: 'one', scope: 'me:personal', at: 100 });
+    rememberChat(db, { sessionId: 'two', scope: 'me:acme', at: 200 });
+    rememberChat(db, { sessionId: 'theirs', scope: 'you:personal', at: 300 });
+    const watched = watchedDatabase(database);
+
+    expect(await wipeChats(watched.db, 'me')).toEqual(['one', 'two']);
+
+    for (const table of ['parts', 'turns']) {
+      const wiped = `select count(*) as n from ${table} where session_id in ('one', 'two')`;
+      expect(tally(wiped)).toBe(0);
+      expect(tally(`select count(*) as n from ${table}`)).toBe(2);
+    }
+    expect(listChats(db, 'you:personal')).toHaveLength(1);
+  });
+
+  it('rolls the whole account back when the database refuses a statement', async () => {
+    await write(conversation('one', 'kilo/one', 'first'));
+    await write(conversation('two', 'kilo/one', 'second'));
+    rememberChat(db, { sessionId: 'one', scope: 'me:personal', at: 100 });
+    rememberChat(db, { sessionId: 'two', scope: 'me:personal', at: 200 });
+    const rowCounts = () =>
+      ['parts', 'turns', 'sessions', 'chats'].map(table =>
+        tally(`select count(*) as n from ${table}`)
+      );
+
+    await expect(wipeChats(watchedDatabase(database, 3).db, 'me')).rejects.toThrow(
+      'the database refused the statement'
+    );
+
+    // The refusal landed on the third statement, with the parts of both chats
+    // already deleted, and the wipe's own transaction put every row back.
+    expect(rowCounts()).toEqual([4, 4, 2, 2]);
+    expect(await wipeChats(db, 'me')).toEqual(['one', 'two']);
+    expect(rowCounts()).toEqual([0, 0, 0, 0]);
+  });
+
+  it('waits for a unit the store left open, and its deletes survive that unit rolling back', async () => {
+    await write(conversation('one', 'kilo/one', 'first'));
+    await write(conversation('two', 'kilo/one', 'second'));
+    rememberChat(db, { sessionId: 'one', scope: 'me:personal', at: 100 });
+    rememberChat(db, { sessionId: 'two', scope: 'me:personal', at: 200 });
+    /* The store writes an exchange between a `BEGIN` and its `COMMIT`, and an
+       interrupted answer stops the fiber waiting on that write without stopping
+       the write. What is left is an open transaction on the connection the wipe
+       uses. The wipe waits for it to close, so what it deletes is its own unit
+       and not a passenger of that write. */
+    database.exec('begin');
+    database
+      .prepare('insert into turns (id, session_id, role) values (?, ?, ?)')
+      .run('trn_pending', 'one', 'user');
+    const storeUnit = Promise.withResolvers<undefined>();
+    const closing = (async () => {
+      await storeUnit.promise;
+      database.exec('rollback');
+    })();
+
+    const wiping = wipeChats(db, 'me');
+    /* The store's write is unfinished while the wipe is asked, so the wipe has
+       not deleted anything yet: a delete inside that unit would be undone with
+       it, and the account's conversations would come back on the next launch. */
+    expect(database.isTransaction).toBe(true);
+    storeUnit.resolve(undefined);
+    await closing;
+    /* A chat started in the window between the store closing its unit and the
+       wipe deleting is deleted by the same subquery as the rest, so it must be
+       in the answer too: the caller drops its pending question and its settings
+       from the ids, and one missing there outlives the account. */
+    rememberChat(db, { sessionId: 'late', scope: 'me:personal', at: 300 });
+
+    expect(await wiping).toEqual(['one', 'two', 'late']);
+    for (const table of ['chats', 'sessions', 'turns', 'parts']) {
+      expect(tally(`select count(*) as n from ${table}`)).toBe(0);
+    }
+  });
+
+  it('refuses to wipe inside a store unit that never closes', async () => {
+    await write(conversation('one', 'kilo/one', 'first'));
+    rememberChat(db, { sessionId: 'one', scope: 'me:personal', at: 100 });
+    database.exec('begin');
+    try {
+      await expect(wipeChats(db, 'me')).rejects.toThrow(
+        'the store did not finish its write, so the chats were not wiped'
+      );
+      // Nothing was deleted, so the account is whole and the next sign-out
+      // retries it.
+      expect(tally('select count(*) as n from chats')).toBe(1);
+    } finally {
+      database.exec('rollback');
+    }
+  });
+
+  it('runs one statement per table however many chats the account has', async () => {
+    await write(conversation('a', 'kilo/one', 'hello'));
+    await write(conversation('b', 'kilo/one', 'hello'));
+    await write(conversation('c', 'kilo/one', 'hello'));
+    for (const sessionId of ['a', 'b', 'c']) {
+      rememberChat(db, { sessionId, scope: 'me:personal', at: 100 });
+    }
+    const watched = watchedDatabase(database);
+
+    // A statement per table, not per chat, is what keeps a sign-out from
+    // blocking the thread in proportion to how much history the account has.
+    expect(await wipeChats(watched.db, 'me')).toEqual(['a', 'b', 'c']);
+    expect(watched.counts.statements).toHaveLength(4);
+    expect(watched.counts.transactions).toBe(1);
+    /* The ids are read inside the unit that deletes them, so a chat that lands
+       between the read and the deletes cannot be deleted without being named —
+       its pending question and its settings are dropped by the ids the wipe
+       answers, and one missing there outlives the account. */
+    expect(watched.counts.reads).toEqual([1]);
+    for (const table of ['chats', 'sessions', 'turns', 'parts']) {
+      expect(tally(`select count(*) as n from ${table}`)).toBe(0);
+    }
   });
 });

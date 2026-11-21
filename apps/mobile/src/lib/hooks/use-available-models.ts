@@ -59,6 +59,8 @@ export type ModelOption = {
   pricing?: ModelPricing;
   /** The catalog lists image input for this model. */
   supportsImages?: boolean;
+  /** The `yyyy-MM-dd` the model retires, when the catalog entry dates it. */
+  retires_on?: string;
 };
 
 type ModelResponse = {
@@ -75,6 +77,7 @@ type ModelResponse = {
     opencode?: {
       variants?: Record<string, unknown>;
     };
+    retires_on?: string;
   }[];
 };
 
@@ -102,6 +105,14 @@ export function sortModelOptions<
   });
 }
 
+/**
+ * The `yyyy-MM-dd` a catalog value names, or `undefined` when it is not one. A value off the
+ * contract (`2026-11-22T00:00:00Z`, say) loses only its note: the row and the catalog stay.
+ */
+function retirementDay(value: string | undefined): string | undefined {
+  return value !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
+}
+
 export function toModelOptions(data: ModelResponse | undefined, language: string): ModelOption[] {
   if (!data?.data) {
     return [];
@@ -120,6 +131,7 @@ export function toModelOptions(data: ModelResponse | undefined, language: string
       pricing: model.pricing,
       context_length: model.context_length ?? null,
       supportsImages: model.architecture?.input_modalities?.includes('image') === true,
+      retires_on: retirementDay(model.retires_on),
       ...(model.preferredIndex === undefined ? {} : { preferredIndex: model.preferredIndex }),
     })
   );
@@ -164,6 +176,12 @@ export const OpenRouterModelsResponseSchema = z.object({
         .optional(),
       opencode: z.object({ variants: z.record(z.string(), z.unknown()).optional() }).optional(),
       architecture: z.object({ input_modalities: z.array(z.string()).optional() }).optional(),
+      // A value off the contract drops only the note, never the catalog body: any non-string reads
+      // as absent here, and `toModelOptions` keeps only the date-only shape.
+      retires_on: z
+        .string()
+        .optional()
+        .or(z.unknown().transform(() => undefined)),
     })
   ),
 });
@@ -337,5 +355,19 @@ export function useAvailableModels(
   // least once, letting a caller keep the error state through a retry: v5
   // downgrades a no-data refetch back to pending and clears `error`, so
   // `isError` alone would drop the error block. See `use-current-user-id`.
-  return { models, isLoading, isError, isFetching, fetchStatus, isFetched, error, refetch };
+  //
+  // `hasDeliveredData` is the different question a body classifier asks: has
+  // the catalogue ever answered with a list? `isFetched` is true after a failed
+  // read too, so only `data !== undefined` may claim the list is empty.
+  return {
+    models,
+    isLoading,
+    isError,
+    isFetching,
+    fetchStatus,
+    isFetched,
+    hasDeliveredData: data !== undefined,
+    error,
+    refetch,
+  };
 }

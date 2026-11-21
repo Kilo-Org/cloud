@@ -319,7 +319,14 @@ export function useSettledSheetHeaderTopClearance(input: {
   // The burst in flight: a newer one retires every sample of the older ones, so
   // a moving sheet is only ever measured by the burst that followed its move.
   const burstRef = useRef(0);
-  const readable = topInset !== undefined && Platform.OS === 'android' && insetTop > 0;
+  // 'never' is the caller's promise that the surface can never reach the window
+  // top, and the header reserves no inset for it (`sheetHeaderTopClearance`).
+  // The settled read must not top one up: it measures where the header landed
+  // inside its own surface, so a surface that places its content at its own
+  // origin reads as the window top and would push a floating card's title down
+  // by the whole inset.
+  const readable =
+    topInset !== undefined && topInset !== 'never' && Platform.OS === 'android' && insetTop > 0;
 
   const sample = useCallback(() => {
     // `getBoundingClientRect` is the transform-aware read: React Native's

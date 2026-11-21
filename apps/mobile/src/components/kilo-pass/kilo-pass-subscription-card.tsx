@@ -9,18 +9,11 @@ import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { KiloPassIcon } from '@/components/kilo-pass/kilo-pass-icon';
-import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
+import { LARGE_FONT_SCALE, useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { getKiloPassCardContentState } from '@/lib/kilo-pass/state';
 import { isNarrowLayout } from '@/lib/narrow-layout';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
-
-/**
- * The scale at which `ConfigureRow` stacks its tile above the copy, shared with
- * the loading row here so the reservation and the row it stands in for take the
- * same shape. `configure-row.tsx` keeps the number itself.
- */
-const CONFIGURE_ROW_STACK_FONT_SCALE = 1.8;
 
 export function KiloPassSubscriptionCard({
   hideLoadingSkeleton = false,
@@ -41,7 +34,7 @@ export function KiloPassSubscriptionCard({
   // The same presentation `ConfigureRow` picks: a narrow window or a large
   // Dynamic Type scale hands the copy the row's full width, so the loading row
   // and the description's line cap follow it.
-  const stack = fontScale >= CONFIGURE_ROW_STACK_FONT_SCALE || isNarrowLayout(width);
+  const stack = fontScale >= LARGE_FONT_SCALE || isNarrowLayout(width);
   const stateQuery = useQuery(trpc.kiloPass.getState.queryOptions());
   const contentState = getKiloPassCardContentState({
     subscription: stateQuery.data?.subscription,
@@ -72,7 +65,7 @@ export function KiloPassSubscriptionCard({
           className={cn(hideLoadingSkeleton && 'opacity-0')}
         >
           <RowGroup>
-            <RowSkeleton stack={stack} tile subtitle />
+            <RowSkeleton stack={stack} tile subtitle rowFrame />
           </RowGroup>
         </View>
       ) : null}

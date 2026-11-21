@@ -202,6 +202,10 @@ type CloudAgentApi = {
     sessionId: CloudAgentSessionId;
     signal?: AbortSignal;
   }) => Promise<unknown>;
+  getAgentBoard?: (payload: {
+    sessionId: CloudAgentSessionId;
+    signal?: AbortSignal;
+  }) => Promise<unknown>;
   send: (payload: {
     sessionId: CloudAgentSessionId;
     payload: CloudAgentSendPayload;

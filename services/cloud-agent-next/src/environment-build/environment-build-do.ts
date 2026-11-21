@@ -41,6 +41,11 @@ import type { EnvironmentScope } from './reference.js';
 import type { BuildTrigger } from './sqlite-schema.js';
 import { BuildStore } from './store.js';
 import migrations from './drizzle/migrations';
+import { networkSecretInfrastructureUrls } from '../network-secrets/grants.js';
+import { builderNetworkSecretEnvironmentId } from '../network-secrets/builder-scope.js';
+import { parseControlPlaneCredential } from '../shared/control-plane-credential.js';
+import { resolveBuilderNetworkSecret } from './network-secrets.js';
+import type { NetworkSecretResolution } from '../network-secrets/contract.js';
 
 /**
  * One coordinator per environment id (`idFromName(environmentId)`). The DO is a
@@ -108,6 +113,7 @@ export class EnvironmentBuild extends DurableObject<Env> {
       return secret;
     };
     return {
+      networkSecretExcludedUrls: () => networkSecretInfrastructureUrls(env),
       now: () => Date.now(),
       uuid: () => crypto.randomUUID(),
       store: this.store,
@@ -239,6 +245,33 @@ export class EnvironmentBuild extends DurableObject<Env> {
 
   async runnerInput(auth: RunnerAuth): Promise<EnvironmentBuildInput | RunnerRefusal> {
     return (await this.coordinatorFor(auth.environmentId)).runnerInput(auth);
+  }
+
+  async resolveCredential(input: {
+    credential: string;
+    outboundContainerId: string;
+    url: string;
+    method: string;
+  }): Promise<NetworkSecretResolution | null> {
+    await this.initialized;
+    const alias = parseControlPlaneCredential(input.credential);
+    const environmentId =
+      alias?.purpose === 'secret' ? builderNetworkSecretEnvironmentId(alias.sandboxId) : null;
+    if (environmentId === null || this.store.environment()?.environmentId !== environmentId)
+      return null;
+    try {
+      return await resolveBuilderNetworkSecret({
+        env: this.env,
+        store: this.store,
+        environmentId,
+        physicalSandboxId: await builderSandboxId(environmentId),
+        request: input,
+      });
+    } catch (error) {
+      throw Object.assign(new Error('Network secret resolution unavailable'), {
+        retryable: error instanceof Error && Reflect.get(error, 'retryable') === true,
+      });
+    }
   }
 
   async runnerEvents(

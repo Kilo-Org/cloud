@@ -8,6 +8,13 @@ import type { SandboxBillingInput } from '../container-usage-context.js';
 import { getContainerCapacityFailureReason } from '../container-concurrency.js';
 import { ProviderCreationError } from '../sandbox-control/provider.js';
 import { RUNTIME_BASE_ABI } from '../sandbox-control/runtime-release.js';
+import { NetworkSecretConfigurationError } from '../network-secrets/errors.js';
+import {
+  buildNetworkSecretGrants,
+  buildNetworkSecretEnvironment,
+  readBuildNetworkSecretGrants,
+  networkSecretBuildRejection,
+} from './network-secrets.js';
 import {
   ENVIRONMENT_BUILD_WORKSPACE,
   environmentBuildPinGroupSchema,
@@ -99,6 +106,7 @@ export type CoordinatorEnvironment = {
 };
 
 export type CoordinatorDeps = {
+  networkSecretExcludedUrls(): readonly string[];
   now(): number;
   uuid(): string;
   store: BuildStore;
@@ -156,6 +164,7 @@ export type SnapshotAdmission =
         | 'backoff'
         | 'container_limit_reached'
         | 'unsupported'
+        | 'network_secret_configuration_invalid'
         | 'unavailable';
       retryAt?: number;
     }
@@ -283,13 +292,22 @@ export class EnvironmentBuildCoordinator {
       egressMode: input.egressMode,
     });
     if (!target.ok) return { status: 'rejected', reason: 'unsupported_provider' };
-    const buildId = await this.admit(
-      input,
-      target.target,
-      request.requestId,
-      request.trigger,
-      request.actorUserId
-    );
+    const networkRejection = networkSecretBuildRejection(input.networkSecrets, target.target);
+    if (networkRejection) return { status: 'rejected', reason: networkRejection };
+    let buildId: string | null;
+    try {
+      buildId = await this.admit(
+        input,
+        target.target,
+        request.requestId,
+        request.trigger,
+        request.actorUserId
+      );
+    } catch (error) {
+      if (error instanceof NetworkSecretConfigurationError)
+        return { status: 'rejected', reason: 'network_secret_configuration_invalid' };
+      throw error;
+    }
     if (buildId === null) {
       // Another request admitted a build between the read and the insert.
       const raced = store.activeBuild();
@@ -314,6 +332,9 @@ export class EnvironmentBuildCoordinator {
   ): Promise<string | null> {
     const now = this.deps.now();
     const buildId = this.deps.uuid();
+    const networkSecretGrants = buildNetworkSecretGrants(this.environmentId, input, target, () =>
+      this.deps.networkSecretExcludedUrls()
+    );
     const record: BuildInputRecord = { ...buildInputRecordOf(input), target };
     const runtimeRelease = await this.deps.provider.runtimeReleaseId();
     const admitted = this.deps.transaction(() => {
@@ -326,6 +347,7 @@ export class EnvironmentBuildCoordinator {
         actor_user_id: actorUserId,
         input: JSON.stringify(record),
         encrypted_secrets: JSON.stringify(input.encryptedSecrets),
+        network_secret_grants: networkSecretGrants,
         instance: target.instance,
         runtime_release: runtimeRelease,
         state: 'queued',
@@ -501,13 +523,22 @@ export class EnvironmentBuildCoordinator {
       egressMode: input.egressMode,
     });
     if (!target.ok) return { status: 'skipped', reason: 'unsupported' };
-    const buildId = await this.admit(
-      input,
-      target.target,
-      `session:${reference.configurationRevision}:${this.deps.uuid()}`,
-      'session',
-      actorUserId
-    );
+    if (networkSecretBuildRejection(input.networkSecrets, target.target))
+      return { status: 'skipped', reason: 'unsupported' };
+    let buildId: string | null;
+    try {
+      buildId = await this.admit(
+        input,
+        target.target,
+        `session:${reference.configurationRevision}:${this.deps.uuid()}`,
+        'session',
+        actorUserId
+      );
+    } catch (error) {
+      if (error instanceof NetworkSecretConfigurationError)
+        return { status: 'skipped', reason: 'network_secret_configuration_invalid' };
+      throw error;
+    }
     if (buildId === null) {
       const raced = store.activeBuild();
       return raced !== null && raced.revision === reference.configurationRevision
@@ -639,6 +670,7 @@ export class EnvironmentBuildCoordinator {
       state: 'canceled',
       outcome: 'canceled',
       encrypted_secrets: null,
+      network_secret_grants: null,
       finished_at: now,
     });
     if (queued !== null) return { status: 'canceled' };
@@ -673,6 +705,7 @@ export class EnvironmentBuildCoordinator {
         outcome: 'obsolete',
         failure_reason: 'environment_deleted',
         encrypted_secrets: null,
+        network_secret_grants: null,
         finished_at: this.deps.now(),
       });
       return;
@@ -712,6 +745,7 @@ export class EnvironmentBuildCoordinator {
       return { refused: 'gone' };
     }
     let secrets: Record<string, string>;
+    let networkEnv: Record<string, string>;
     try {
       secrets =
         build.encrypted_secrets === null
@@ -719,6 +753,7 @@ export class EnvironmentBuildCoordinator {
           : this.deps.decryptSecrets(
               JSON.parse(build.encrypted_secrets) as Record<string, unknown>
             );
+      networkEnv = buildNetworkSecretEnvironment(build);
     } catch {
       await this.failRunning(build.id, 'input_unavailable', 'secrets could not be decrypted');
       return { refused: 'gone' };
@@ -728,8 +763,8 @@ export class EnvironmentBuildCoordinator {
       buildId: build.id,
       allocationId: auth.allocationId,
       commands: input.commands,
-      env: { ...input.plainVars, ...secrets },
-      secretKeys: Object.keys(secrets),
+      env: { ...input.plainVars, ...secrets, ...networkEnv },
+      secretKeys: [...Object.keys(secrets), ...Object.keys(networkEnv)],
       deadlineAt: build.deadline_at,
     };
     // The layout comes from the same owner a session asks: the build's directory,
@@ -920,6 +955,7 @@ export class EnvironmentBuildCoordinator {
       failure_reason: reason,
       failure_detail: detail ?? null,
       encrypted_secrets: null,
+      network_secret_grants: null,
       finished_at: now,
     });
     if (done !== null) this.recordAutomaticOutcome(done);
@@ -1026,6 +1062,9 @@ export class EnvironmentBuildCoordinator {
         allocation,
         {
           runner: { url, credential },
+          networkSecretHosts: readBuildNetworkSecretGrants(build).flatMap(
+            secret => secret.allowedHosts
+          ),
           deadlineAt: build.deadline_at,
         },
         state
@@ -1248,6 +1287,7 @@ export class EnvironmentBuildCoordinator {
     const done = this.deps.store.transition(build.id, ['stopping'], {
       state: outcome,
       encrypted_secrets: null,
+      network_secret_grants: null,
       cleanup_error: null,
       next_cleanup_at: null,
       finished_at: this.deps.now(),

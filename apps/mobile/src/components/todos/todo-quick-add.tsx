@@ -10,6 +10,7 @@ import { Text } from '@/components/ui/text';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { TODO_TITLE_MAX_LENGTH } from '@/lib/todos/todo-model';
+import { REWRITTEN_INPUT_AUTO_CORRECT } from '@/lib/input-suggestions';
 
 type AddFailure = { readonly kind: 'add-failed'; readonly message: string };
 
@@ -68,6 +69,10 @@ export function TodoQuickAdd({ onAdd }: Readonly<{ onAdd: (title: string) => Pro
           ref={inputRef}
           placeholder={t('todos.list.addPlaceholder')}
           accessibilityLabel={t('todos.list.addPlaceholder')}
+          // Submit clears this field once the add confirms, so Android keeps
+          // the framework suggestion popup off — it crashes against rewritten
+          // text (see REWRITTEN_INPUT_AUTO_CORRECT).
+          autoCorrect={REWRITTEN_INPUT_AUTO_CORRECT}
           onChangeText={text => {
             textRef.current = text;
             const next = text.trim().length > 0;

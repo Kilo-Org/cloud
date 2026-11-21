@@ -39,7 +39,6 @@ jobs:
       NODE_ENV: development
       POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/postgres
       POSTGRES_CONNECT_TIMEOUT: 30000
-      POSTGRES_MAX_QUERY_TIME: 30000
       DEBUG_SHOW_DEV_UI: 'true' # Enable fake login for E2E tests
       PORT: '3000'
       DOTENV_PRIVATE_KEY_DEVELOPMENT: ${{ secrets.DOTENV_PRIVATE_KEY_DEVELOPMENT }}

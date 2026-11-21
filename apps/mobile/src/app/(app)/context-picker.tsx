@@ -40,6 +40,7 @@ export default function ContextPickerScreen() {
         close();
       }}
       onDone={close}
+      onCancel={close}
       expired={bridge === undefined}
     />
   );

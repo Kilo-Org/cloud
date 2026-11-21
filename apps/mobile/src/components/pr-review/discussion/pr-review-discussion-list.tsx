@@ -7,16 +7,14 @@ import { useQuery } from '@tanstack/react-query';
 import { type ReactNode, type RefObject, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
 import { CommentRow } from '@/components/pr-review/discussion/comment-row';
 import { DiscussionThread } from '@/components/pr-review/discussion/discussion-thread';
-import { Button } from '@/components/ui/button';
+import { ListFooter } from '@/components/pr-review/discussion/pr-review-discussion-list-footer';
+import { ProviderViewAction } from '@/components/pr-review/discussion/provider-view-action';
 import { Card } from '@/components/ui/card';
 import { MessageSquarePlus } from '@/components/ui/icons';
-import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { commentAuthorRowTopPadding } from '@/lib/pr-review/comment-trailing-controls';
 import {
   type DiscussionListItem,
@@ -27,7 +25,7 @@ import {
 import { expandedForThread } from '@/lib/pr-review/discussion/thread-expansion';
 import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
 import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
-import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
+import { useStyleSideInsets } from '@/lib/screen-insets';
 import { useTRPC } from '@/lib/trpc';
 
 const noopReactionToggle = () => {
@@ -50,6 +48,13 @@ type PrReviewDiscussionListProps = {
   readonly hasNextPage: boolean;
   readonly isFetchingNextPage: boolean;
   readonly laterPageError: boolean;
+  /**
+   * How many conversation comments the first page carried when the server cut
+   * the conversation at its page ceiling. Absent or null means the discussion
+   * is complete, so no notice renders. The tab owns the number: a notice that
+   * stated a count of its own would be a second, drifting fact.
+   */
+  readonly truncatedConversationCount?: number | null;
   readonly onLoadMore: () => void;
   readonly onRetryLoadMore: () => void;
   /**
@@ -95,6 +100,7 @@ export function PrReviewDiscussionList({
   hasNextPage,
   isFetchingNextPage,
   laterPageError,
+  truncatedConversationCount,
   onLoadMore,
   onRetryLoadMore,
   onReplyInputFocus,
@@ -154,12 +160,20 @@ export function PrReviewDiscussionList({
     }
     return result;
   }, [listItems, hiddenLogins]);
+  // The counted notice describes rows the body actually carries. An empty body
+  // carries none, so handing the count down would have "No discussion yet" and
+  // a "500 were cut" claim side by side; the empty state's action is that
+  // body's way out instead.
+  const visibleEmpty = visibleItems.length === 0;
+  // Both footer mounts read this: the counted notice never renders under a
+  // body that carries no rows.
+  const footerTruncatedCount = visibleEmpty ? null : truncatedConversationCount;
 
   // Landscape: side insets keep comment/thread cards clear of the sensor
   // housing (rows keep their px-4 gutter, so the insets add to it); portrait
   // insets are zero, so the style carries explicit zeros and nothing else
   // changes.
-  const insets = useSafeAreaInsets();
+  const insets = useStyleSideInsets();
   const contentContainerStyle = useMemo<ViewStyle>(
     () => ({ paddingTop: 12, paddingLeft: insets.left, paddingRight: insets.right }),
     [insets.left, insets.right]
@@ -170,14 +184,16 @@ export function PrReviewDiscussionList({
   // tab hands down the empty state it already owns for this surface; the
   // footer stays mounted so later pages (whose rows may be visible) and a
   // later-page retry stay reachable from the filtered body.
-  if (visibleItems.length === 0 && emptyState) {
+  if (visibleEmpty && emptyState) {
     return (
       <View className="flex-1">
         {emptyState}
         <ListFooter
+          prRef={ref}
           hasNextPage={hasNextPage}
           isFetchingNextPage={isFetchingNextPage}
           laterPageError={laterPageError}
+          truncatedConversationCount={footerTruncatedCount}
           onLoadMore={onLoadMore}
           onRetryLoadMore={onRetryLoadMore}
         />
@@ -276,13 +292,22 @@ export function PrReviewDiscussionList({
               ? t('prReview.terms.noDiscussionDescription')
               : t('prReview.discussion.noDiscussionDescription')
           }
+          // A cut conversation has more to read on the provider's page, and
+          // with no rows to count the state's action is the body's one way out.
+          action={
+            visibleEmpty && (truncatedConversationCount ?? 0) > 0 ? (
+              <ProviderViewAction prRef={ref} />
+            ) : null
+          }
         />
       }
       ListFooterComponent={
         <ListFooter
+          prRef={ref}
           hasNextPage={hasNextPage}
           isFetchingNextPage={isFetchingNextPage}
           laterPageError={laterPageError}
+          truncatedConversationCount={footerTruncatedCount}
           onLoadMore={onLoadMore}
           onRetryLoadMore={onRetryLoadMore}
         />
@@ -295,60 +320,4 @@ function keyForItem(item: DiscussionListItem): string {
   return item.kind === 'thread'
     ? `thread:${item.thread.threadId}`
     : `comment:${item.comment.nodeId}`;
-}
-
-type ListFooterProps = {
-  readonly hasNextPage: boolean;
-  readonly isFetchingNextPage: boolean;
-  readonly laterPageError: boolean;
-  readonly onLoadMore: () => void;
-  readonly onRetryLoadMore: () => void;
-};
-
-function ListFooter({
-  hasNextPage,
-  isFetchingNextPage,
-  laterPageError,
-  onLoadMore,
-  onRetryLoadMore,
-}: Readonly<ListFooterProps>) {
-  // The footer is the last list content, so it owns the bottom clearance
-  // that keeps the final row and every next action above the system bar.
-  const { t } = useTranslation();
-  const paddingBottom = useDetailScreenBottomPadding();
-
-  if (laterPageError) {
-    return (
-      <View className="items-center gap-2 px-4 pt-2" style={{ paddingBottom }}>
-        <Text variant="muted" className="text-center text-xs">
-          {t('prReview.discussion.couldNotLoadMore')}
-        </Text>
-        <Button
-          size="sm"
-          variant="outline"
-          className={STATE_ACTION_CLASS}
-          onPress={onRetryLoadMore}
-          accessibilityLabel={t('prReview.discussion.retryLoadingMore')}
-        >
-          <Text>{t('common.retry')}</Text>
-        </Button>
-      </View>
-    );
-  }
-  if (!hasNextPage) {
-    return <View style={{ height: paddingBottom }} />;
-  }
-  return (
-    <View className="items-center px-4 pt-2" style={{ paddingBottom }}>
-      <Button
-        size="sm"
-        variant="outline"
-        loading={isFetchingNextPage}
-        onPress={onLoadMore}
-        accessibilityLabel={t('prReview.discussion.loadMoreComments')}
-      >
-        <Text>{t('common.loadMore')}</Text>
-      </Button>
-    </View>
-  );
 }

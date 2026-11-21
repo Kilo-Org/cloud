@@ -4,6 +4,7 @@ import { View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { showSystemSearchUnresolvedFeedback } from '@/lib/system-search-route';
 
 /**
@@ -26,6 +27,7 @@ function showFixtureToast(): void {
  * real device tap, which no link can produce.
  */
 export function SystemSearchUnresolvedFixture() {
+  const sideInsetStyle = useSideInsetStyle();
   useEffect(() => {
     // A tick after the first frame: the toast positions itself against the
     // window the screen is laid out in.
@@ -38,9 +40,11 @@ export function SystemSearchUnresolvedFixture() {
   return (
     <View className="flex-1 bg-background" testID="system-search-unresolved-fixture">
       <ScreenHeader title="System search toast fixture" />
-      <View className="gap-2 px-4 pt-4">
-        <Text className="text-sm text-muted-foreground">Toast under test</Text>
-        <Text className="text-base text-foreground">Unresolved search result</Text>
+      <View style={sideInsetStyle}>
+        <View className="gap-2 px-4 pt-4">
+          <Text className="text-sm text-muted-foreground">Toast under test</Text>
+          <Text className="text-base text-foreground">Unresolved search result</Text>
+        </View>
       </View>
     </View>
   );

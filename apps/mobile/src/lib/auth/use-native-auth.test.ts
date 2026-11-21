@@ -122,7 +122,7 @@ vi.mock('@/lib/auth/auth-fetch', async importOriginal => {
 
 // ── Imports (all after vi.mock hoisting) ───────────────────────────────
 
-const { defaultErrorMessage, mapError, mapErrorKey, retryableAdmissionError } =
+const { defaultErrorMessage, mapError, mapErrorKey, retryableAdmissionError, signupStepUpMessage } =
   await import('@/lib/auth/auth-error-messages');
 
 const { resolveAdmission } = await import('@/lib/auth/resolve-admission');
@@ -227,7 +227,7 @@ describe('use-native-auth error mapping', () => {
   });
 
   it.each([
-    ['INVALID_CODE', 'That code is incorrect. Please try again.'],
+    ['INVALID_CODE', "That code is incorrect or expired. Try again or use 'Resend code'."],
     ['TOO_MANY_ATTEMPTS', 'Too many attempts. Please request a new code.'],
     ['RATE_LIMITED', 'Too many sign-in attempts. Please wait and try again.'],
     ['CODE_IN_PROGRESS', 'Your code is being processed. Wait a moment and try again.'],
@@ -659,8 +659,28 @@ describe('useNativeAuth signup step-up', () => {
     [['apple', 'passkey'], true, 'authErrors.signupStepUpApple'],
     [undefined, true, 'authErrors.signupStepUp'],
   ] as const)(
-    'names only an allowed button on this screen: methods %j, Apple shown %s',
-    async (signupMethods, appleShown, key) => {
+    'names only an allowed button on the sign-in screen: methods %j, Apple shown %s',
+    (signupMethods, appleShown, key) => {
+      // The sign-in screen shows the provider buttons and the options link, so
+      // it may name whichever of them this build offers.
+      expect(
+        signupStepUpMessage(signupMethods && [...signupMethods], {
+          apple: appleShown,
+          google: true,
+        })
+      ).toBe(i18n.t(key));
+    }
+  );
+
+  // The reported dead end: the code step named "More sign-in options", which
+  // only exists on the screen behind Back, and no provider button either.
+  it.each([
+    [['google', 'apple'], true],
+    [['apple'], false],
+    [undefined, true],
+  ] as const)(
+    'points the code step back to the options: methods %j, Apple shown %s',
+    async (signupMethods, appleShown) => {
       appleMock.isAvailableAsync.mockResolvedValue(appleShown);
       mockPostAuth.mockResolvedValue({
         ok: false,
@@ -673,7 +693,7 @@ describe('useNativeAuth signup step-up', () => {
 
       await act(async () => {
         const outcome = await resultRef.current?.verifyEmailCode('user@example.com', '123456');
-        expect(outcome).toEqual({ ok: false, message: i18n.t(key) });
+        expect(outcome).toEqual({ ok: false, message: i18n.t('authErrors.signupStepUpBack') });
       });
 
       expect(toast.error).not.toHaveBeenCalled();

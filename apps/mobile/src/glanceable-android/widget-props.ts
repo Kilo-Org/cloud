@@ -8,14 +8,16 @@ import {
   type HomeWidgetData,
   type HomeWidgetPresentation,
 } from '@kilocode/app-shared/home-widget';
+import { type TOptions } from 'i18next';
 
-import { type GlanceableCountFormat } from '@/lib/glanceable/count-format';
 import {
+  type GlanceableCountFormat,
   glanceableCountLines,
   glanceableScheduledAt,
   glanceableSpokenLabel,
   glanceableStatusCopyKey,
   type GlanceableSurfaceFlags,
+  type GlanceableTranslate,
   primaryGlanceableCount,
   resolveGlanceableStatus,
 } from '@/lib/glanceable/presentation';
@@ -72,7 +74,7 @@ function homeSnapshotFor(
 export function buildAndroidWidgetProps(
   snapshot: GlanceableAgentsSnapshot,
   flags: GlanceableSurfaceFlags,
-  translate: (key: string) => string,
+  translate: GlanceableTranslate,
   formatCount: GlanceableCountFormat = String,
   _formatAgo: GlanceableAgoFormat = String,
   formatClock: GlanceableClockFormat = String,
@@ -90,8 +92,8 @@ export function buildAndroidWidgetProps(
   const feedback = home.status === 'content' ? getSurfaceExtras().actionFeedback : null;
   const scheduledAt = showCounts ? glanceableScheduledAt(snapshot) : null;
   // Both platforms name the empty state by its New agent action.
-  const copy = (key: string): string =>
-    translate(key === 'glanceable.empty' ? 'glanceable.noneWaiting' : key);
+  const copy = (key: string, options?: TOptions): string =>
+    translate(key === 'glanceable.empty' ? 'glanceable.noneWaiting' : key, options);
   return {
     home,
     homeCopy: buildAndroidHomeCopy(home, translate, formatCount, formatClock, feedback),
@@ -118,7 +120,7 @@ export function buildAndroidWidgetProps(
 // eslint-disable-next-line max-params -- preserve existing injected-format API and separate Home-only data
 export function buildCurrentWidgetProps(
   snapshot: GlanceableAgentsSnapshot,
-  translate: (key: string) => string,
+  translate: GlanceableTranslate,
   formatCount: GlanceableCountFormat,
   formatAgo: GlanceableAgoFormat,
   formatClock: GlanceableClockFormat,

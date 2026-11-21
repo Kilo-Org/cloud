@@ -87,7 +87,10 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   ActivityIndicator: 'ActivityIndicator',
   RefreshControl: 'RefreshControl',
+  I18nManager: { isRTL: false, doLeftAndRightSwapInRTL: true },
   Platform: platform,
+  // EmptyState reads the scheme for its dark disc and glyph ink.
+  useColorScheme: () => 'light',
   useWindowDimensions: () => ({ fontScale: 1, height: 844 }),
 }));
 vi.mock('expo-router', async () => {

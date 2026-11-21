@@ -90,7 +90,7 @@ export const runSafeLlmTurn = ({
   ...options
 }: RunSafeLlmTurnOptions): Promise<void> => {
   // One executor per turn: a fresh unchanged-snapshot memory, so a new conversation's first snapshot is served in full.
-  const executeSafeToolCall = createSafeToolExecutor(browserCaller);
+  const executeSafeToolCall = createSafeToolExecutor(browserCaller, options.signal);
   // One executor per turn: it carries the abort signal and caps the searches this turn may bill.
   const runWebSearch = createWebSearchExecutor({
     apiBaseUrl: options.apiBaseUrl,
@@ -110,7 +110,12 @@ export const runSafeLlmTurn = ({
     // eslint-disable-next-line require-await -- async normalizes the sync no-executor error branch into the Promise<EvalTabResult> the runner expects.
     executeToolCall: async (toolCall): Promise<EvalTabResult> => {
       if (isKiloBrowserToolCallEvent(toolCall)) {
-        return executeKiloBrowserToolCall(toolCall, browserCaller);
+        // Safe mode exposes only the read-only tools, so a dialog answer it cannot call is not offered.
+        return executeKiloBrowserToolCall(
+          toolCall,
+          { caller: browserCaller, safeMode: true },
+          options.signal
+        );
       }
 
       if (isWebMcpToolCallEvent(toolCall)) {

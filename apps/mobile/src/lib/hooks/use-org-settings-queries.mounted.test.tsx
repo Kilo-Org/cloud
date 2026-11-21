@@ -24,6 +24,11 @@ import {
 const toastError = vi.hoisted(() => vi.fn());
 
 vi.mock('sonner-native', () => ({ toast: { error: toastError, success: vi.fn() } }));
+// The hooks take the reader's role as an argument; this harness passes the
+// money role, because these are organizationAdmin writes, so every refusal
+// reaches a reader who can change the plan, and this suite's subject is the
+// toast copy that reader gets — the sentence that names the destination,
+// because no billing step is rendered here.
 
 type MutationOptions = ReactQuery.MutationOptions<unknown, Error, unknown>;
 
@@ -128,7 +133,7 @@ describe("organization settings refusal toasts — the localization hook's contr
     rpc.guardrailsUpdate.mockRejectedValue(
       rejection('Organization trial has expired.', 'FORBIDDEN')
     );
-    const { renderer, unmount } = await mountWith(useSaveOrgGuardrails, {
+    const { renderer, unmount } = await mountWith(() => useSaveOrgGuardrails('org-1', true), {
       organizationId: 'org-1',
       enabled: false,
       detectors: {
@@ -151,13 +156,13 @@ describe("organization settings refusal toasts — the localization hook's contr
     });
     await pressFire(renderer);
 
-    expect(toastError).toHaveBeenCalledWith(i18n.t('common.organizationTrialEnded'));
+    expect(toastError).toHaveBeenCalledWith(i18n.t('common.organizationTrialEndedBillingAtKiloAi'));
     unmount();
   });
 
   it('model access toasts the generic line for an unrecognized refusal', async () => {
     rpc.updateAllowLists.mockRejectedValue(rejection('Failed to update guardrails', 'PATCH'));
-    const { renderer, unmount } = await mountWith(useSaveOrgModelAccess, {
+    const { renderer, unmount } = await mountWith(() => useSaveOrgModelAccess('org-1', true), {
       organizationId: 'org-1',
     });
     await pressFire(renderer);
@@ -170,7 +175,7 @@ describe("organization settings refusal toasts — the localization hook's contr
     rpc.updateGatewaySettings.mockRejectedValue(
       rejection('Failed to update gateway settings', 'PATCH')
     );
-    const { renderer, unmount } = await mountWith(useSaveOrgGatewaySettings, {
+    const { renderer, unmount } = await mountWith(() => useSaveOrgGatewaySettings('org-1', true), {
       organizationId: 'org-1',
     });
     await pressFire(renderer);

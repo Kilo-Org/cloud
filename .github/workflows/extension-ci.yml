@@ -287,8 +287,15 @@ jobs:
         # No --with-deps: the runner image already ships the Chromium system libraries, and the apt-get behind --with-deps hangs until the job timeout whenever the runner fleet's apt egress degrades (measured: four 20-minute hangs on 2026-08-12). A missing library would fail the browser launch with an explicit list instead.
         run: pnpm --filter kilo-extension exec playwright install chromium
 
+      # The download specs start Chrome itself, as a child process with a real
+      # download folder, because Playwright's own launch sends
+      # `Browser.setDownloadBehavior` and Chrome then never dispatches
+      # `chrome.downloads.onDeterminingFilename`. That browser is headed — an
+      # extension's background worker and the download manager are the states
+      # those specs measure — so a shard needs an X server. xvfb-run supplies
+      # one; every other spec keeps its own headless launch and does not use it.
       - name: Run Chrome e2e shard
-        run: pnpm --filter kilo-extension run e2e:chrome:shard --shard=${{ matrix.shard }}/2
+        run: xvfb-run -a pnpm --filter kilo-extension run e2e:chrome:shard --shard=${{ matrix.shard }}/2
 
       # One artifact name per shard: two uploads under one name collide.
       - name: Upload Playwright report on failure

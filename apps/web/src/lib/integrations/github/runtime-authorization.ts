@@ -44,7 +44,16 @@ export class GitHubRuntimeAuthorizationError extends Error {
   }
 }
 
-type RuntimeAssociation = {
+/** Owner and association eligibility of a row that can act for an installation. */
+export type GitHubInstallationHolderRejectionReason = Exclude<
+  GitHubRuntimeAuthorizationRejectionReason,
+  | 'missing_association'
+  | 'ambiguous_association'
+  | 'installation_unavailable'
+  | 'sharing_not_allowed'
+>;
+
+export type GitHubInstallationHolderState = {
   integration: {
     owned_by_user_id: string | null;
     owned_by_organization_id: string | null;
@@ -52,6 +61,15 @@ type RuntimeAssociation = {
     suspended_at: string | null;
     auth_invalid_at: string | null;
     github_disconnected_at: string | null;
+  };
+  organizationDeletedAt: string | null;
+  userRecordId: string | null;
+  userBlockedAt: string | null;
+  userBlockedReason: string | null;
+};
+
+type RuntimeAssociation = GitHubInstallationHolderState & {
+  integration: GitHubInstallationHolderState['integration'] & {
     github_installation_id: string | null;
     github_connection_role: 'workflow' | 'agent_only' | null;
   };
@@ -84,20 +102,22 @@ type RuntimeAuthorizationOptions = {
   resolvedOrganizationWorkflowConnection?: boolean;
 };
 
-export function getGitHubRuntimeAssociationRejectionReason(
-  association: RuntimeAssociation | null | undefined,
-  options?: RuntimeAuthorizationOptions
-): GitHubRuntimeAuthorizationRejectionReason | null {
-  if (!association) return 'missing_association';
+/**
+ * Why a row cannot act for its installation, judged by owner and lifecycle
+ * health alone.
+ *
+ * Role and sharing checks stay out because a roleless organization row is a
+ * legitimate holder: the organization workflow connection definition matches
+ * it. The canonical installation check also stays out because the connect path
+ * validates it separately. A null row has no holder to reject.
+ */
+export function getGitHubInstallationHolderRejectionReason(
+  association: GitHubInstallationHolderState | null | undefined
+): GitHubInstallationHolderRejectionReason | null {
+  if (!association) return null;
 
-  const {
-    integration,
-    installation,
-    organizationDeletedAt,
-    userRecordId,
-    userBlockedAt,
-    userBlockedReason,
-  } = association;
+  const { integration, organizationDeletedAt, userRecordId, userBlockedAt, userBlockedReason } =
+    association;
   const hasUserOwner = integration.owned_by_user_id !== null;
   const hasOrganizationOwner = integration.owned_by_organization_id !== null;
   if (hasUserOwner === hasOrganizationOwner) return 'malformed_owner';
@@ -115,6 +135,19 @@ export function getGitHubRuntimeAssociationRejectionReason(
   if (integration.auth_invalid_at !== null) return 'auth_invalid';
   if (integration.github_disconnected_at != null) return 'disconnected';
 
+  return null;
+}
+
+export function getGitHubRuntimeAssociationRejectionReason(
+  association: RuntimeAssociation | null | undefined,
+  options?: RuntimeAuthorizationOptions
+): GitHubRuntimeAuthorizationRejectionReason | null {
+  if (!association) return 'missing_association';
+
+  const holderRejection = getGitHubInstallationHolderRejectionReason(association);
+  if (holderRejection !== null) return holderRejection;
+
+  const { integration, installation } = association;
   const isWorkflowConnection =
     integration.github_connection_role === 'workflow' ||
     (integration.github_connection_role === null &&

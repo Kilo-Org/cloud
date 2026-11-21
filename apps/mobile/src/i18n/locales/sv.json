@@ -19,7 +19,9 @@
     "presenceStatus": "Värdar: {{connection}}",
     "commandStatus": "Kommandoleverans: {{status}}",
     "delivered": "Levererat",
-    "expired": "Utgånget"
+    "expired": "Utgånget",
+    "recoveryGaps_one": "{{displayCount}} del av den här transkriptionen saknas.",
+    "recoveryGaps_other": "{{displayCount}} delar av den här transkriptionen saknas."
   },
   "common": {
     "manageOnWeb": "Hantera på webben",
@@ -138,10 +140,12 @@
     "keepRunning": "Fortsätt köra",
     "newSession": "Ny session",
     "noModelsAvailable": "Inga modeller tillgängliga",
+    "modelRetires": "Utgår {{date}}",
     "notFound": "Hittades inte",
     "online": "Uppkopplad",
     "open": "Öppna {{name}}",
     "openPullRequest": "Öppna PR",
+    "viewOnGitHub": "Visa PR på GitHub",
     "completed": "Slutförd",
     "pending": "Väntar",
     "running": "Körs",
@@ -172,6 +176,7 @@
     "generating": "Genererar…",
     "working": "Arbetar",
     "yourOwnRepositories": "Dina egna kodarkiv",
+    "organizationRepositories": "Organisationens kodarkiv",
     "dismissed": "Avfärdad",
     "agent": "Agent",
     "durationMinuteShort": "min",
@@ -180,7 +185,31 @@
     "organizationTrialEnded": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. En organisationsägare kan uppdatera faktureringen på kilo.ai och sedan försöka igen.",
     "privateRepositoryA11y": "{{name}}, privat kodarkiv",
     "legalDocumentEnglishOnly": "Det här dokumentet finns endast på engelska.",
-    "organizationTrialEndedBilling": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. Du kan uppdatera faktureringen och sedan försöka igen."
+    "organizationTrialEndedBilling": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. Du kan uppdatera faktureringen och sedan försöka igen.",
+    "organizationTrialEndedBillingAtKiloAi": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. Du kan uppdatera faktureringen på kilo.ai och sedan försöka igen.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Punkt",
+        "nestedBulletPoint": "Indragen punkt",
+        "orderedItem": "Listobjekt {n}",
+        "nestedOrderedItem": "Indraget listobjekt {n}"
+      },
+      "blockquote": {
+        "quote": "Citat",
+        "nestedQuote": "Indraget citat"
+      },
+      "table": {
+        "row": "Rad {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematik: {latex}"
+      },
+      "rotor": {
+        "headings": "Rubriker",
+        "links": "Länkar",
+        "images": "Bilder"
+      }
+    }
   },
   "language": {
     "restarting": "Startar om för att byta språk",
@@ -274,6 +303,9 @@
     "credits": "Krediter",
     "failedToLoadBalance": "Kunde inte läsa in saldot. Tryck för att försöka igen.",
     "balanceLoadFailed": "Kunde inte läsa in saldot",
+    "balanceUnreachable": "Kunde inte nå servern. Försök igen.",
+    "balanceAccessDenied": "Du har inte behörighet att se detta saldo.",
+    "balanceUnavailable": "Saldot kunde inte laddas.",
     "hideBalance": "Dölj saldo",
     "showBalance": "Visa saldo",
     "balanceHidden": "Saldo dolt",
@@ -497,6 +529,14 @@
       "nextStepFinal": "Överklagandebeslutet är slutgiltigt. Det går inte att överklaga igen.",
       "viewReceipt": "Visa kvitto"
     },
+    "reportReceipts": {
+      "title": "Anmälningar",
+      "rowSubtitle": "Anmälningar du skickat in och deras utfall",
+      "emptyTitle": "Inga anmälningar än",
+      "emptyDescription": "Anmälningar du skickar in från en kommentar eller ett AI-svar visas här.",
+      "couldNotLoad": "Det gick inte att läsa in dina anmälningar",
+      "capped": "Visar dina senaste anmälningar."
+    },
     "changelog": "Nyheter",
     "changelogVersionPending": "Nyheter för version {{version}} kommer med nästa appuppdatering.",
     "changelogGroupNew": "Nytt",
@@ -504,7 +544,7 @@
     "changelogFixesPolish": "Korrigeringar och förbättringar i hela appen.",
     "changelogAreas": {
       "signIn": "Inloggning",
-      "profileOrganizations": "Profil och organisationer"
+      "profileOrganizations": "Profil & organisationer"
     }
   },
   "preferences": {
@@ -749,6 +789,9 @@
       "couldNotLoadMore": "Kunde inte läsa in fler kommentarer.",
       "retryLoadingMore": "Försök läsa in fler kommentarer igen",
       "loadMoreComments": "Läs in fler kommentarer",
+      "conversationTruncated": "Visar bara de första {{displayCount}} kommentarerna.",
+      "conversationTruncated_one": "Visar bara de första {{displayCount}} kommentarerna.",
+      "conversationTruncated_other": "Visar bara de första {{displayCount}} kommentarerna.",
       "addReaction": "Lägg till en reaktion",
       "reactionPill": "{{emoji}}-reaktion, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaktion",
@@ -878,7 +921,6 @@
       "noAccess": "Du har inte åtkomst till kontrollerna för det här kodarkivet.",
       "couldNotLoad": "Kunde inte läsa in kontrollerna.",
       "retryChecks": "Försök läsa in kontrollerna igen",
-      "viewOnGitHub": "Visa PR på GitHub",
       "noChecksReported": "Inga kontroller rapporterade",
       "passed": "Godkänt: {{displayCount}}",
       "passed_one": "Godkänt: {{displayCount}}",
@@ -962,6 +1004,8 @@
       "pendingComment": "oskickade kommentarer",
       "pendingComment_other": "oskickade kommentarer",
       "submitCountOfTotal": "Skicka {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
+      "submitCountOfTotal_one": "Skicka {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
+      "submitCountOfTotal_other": "Skicka {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
       "submitReview": "Skicka granskning",
       "partialPostedFresh": "Antal publicerade kommentarer: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Antal publicerade kommentarer: {{displayFreshCount}}. ",
@@ -1026,7 +1070,10 @@
     "tabs": {
       "overview": "Översikt",
       "files": "Filer",
-      "discussion": "Diskussion"
+      "discussion": "Diskussion",
+      "discussionAccessibility_one": "{{title}}: 1 kommentar",
+      "discussionAccessibility": "{{title}}: {{displayCount}} kommentarer",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} kommentarer"
     },
     "fileStatus": {
       "modified": "Ändrad",
@@ -1223,7 +1270,7 @@
     },
     "instructions": {
       "title": "Anpassade instruktioner",
-      "deprecation": "Funktionen för anpassade instruktioner ska fasas ut. Flytta riktlinjerna till en REVIEW.md-fil i kodarkivet i stället.",
+      "deprecation": "Funktionen för anpassade instruktioner kommer att tas bort. Flytta riktlinjerna till en REVIEW.md-fil i kodarkivet i stället.",
       "placeholder": "t.ex. följ våra regler för felhantering…",
       "clearTitle": "Ta bort anpassade instruktioner?",
       "clearMessage": "Om du sparar ett tomt fält tas de anpassade instruktioner som sparats för den här granskaren bort."
@@ -1261,7 +1308,7 @@
       "couldNotGetLatest": "Kunde inte hämta de senaste uppgifterna.",
       "byline": "#{{number}} av {{author}}",
       "noFindings": "Inga fynd",
-      "findingsUnavailable": "Resultaten är inte tillgängliga eftersom den här granskningen misslyckades.",
+      "findingsUnavailable": "Resultaten är inte tillgängliga.",
       "findingsInProgress": "Den här granskningen pågår fortfarande. Fynden visas här när den är klar.",
       "findingsEndedWithoutResults": "Den här granskningen avslutades innan den gav några fynd.",
       "serviceUnavailable": "Kunde inte ansluta till tjänsten för kodgranskning. Gör om granskningen när tjänsten är tillgänglig.",
@@ -1383,12 +1430,16 @@
     "followReviewMd": "Följ REVIEW.md",
     "followReviewMdSubtitle": "Följ instruktionerna i varje kodarkivs REVIEW.md-fil",
     "bitbucket": {
-      "notConnectedReadOnly": "Det finns ingen anslutning till Bitbucket. Endast organisationsägare, administratörer och faktureringsansvariga kan skapa anslutningen."
+      "notConnectedReadOnlyPlan": "Organisationens provperiod har löpt ut, så en ägare måste uppdatera faktureringen på kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-anslutningen för {{organization}} hanteras på webben från en dator.",
+      "managedOnWebTitle": "Hanteras på webben",
+      "managedOnWebShort": "Den här anslutningen hanteras på webben från en dator.",
+      "managedOnWebRepositories": "Välj repositorier för {{organization}} på webben från en dator.",
       "description": "Skapa en åtkomsttoken för arbetsytan åt {{organization}} och klistra in den nedan.",
       "descriptionReconnect": "Skapa en ny åtkomsttoken för arbetsytan åt {{organization}} och klistra in den nedan.",
+      "descriptionOverview": "Skapa en åtkomsttoken för arbetsytan och klistra in den på nästa skärm.",
       "scopes": "Behörigheter som krävs: läsa kontouppgifter, läsa och skriva i kodarkiv, läsa pull-begäranden samt läsa och skriva webbhookar.",
       "tokenPlaceholder": "Åtkomsttoken för arbetsytan",
       "tokenRefused": "Bitbucket accepterade inte den här åtkomsttoken för arbetsytan. Kontrollera att den har behörigheterna ovan och försök igen."
@@ -1409,6 +1460,7 @@
     "platformList": {
       "checking": "Kontrollerar…",
       "statusUnavailable": "Status inte tillgänglig",
+      "needsAttention": "Kräver åtgärd",
       "platforms": "Plattformar",
       "activity": "Aktivitet"
     },
@@ -1920,7 +1972,7 @@
       "githubAppSettings": "Inställningarna för GitHub-appen",
       "manageAccess": "Hantera GitHub-appens åtkomst",
       "noRepositories": "Inga kodarkiv",
-      "noRepositoriesDescription": "Ge Kilos GitHub-app åtkomst till kodarkiv",
+      "noRepositoriesDescription": "Ge Kilos GitHub-app åtkomst till kodarkiv.",
       "selectAtLeastOne": "Välj minst ett kodarkiv."
     },
     "scopeEntry": {
@@ -2779,6 +2831,8 @@
     "modelPicker": {
       "title": "Välj modell",
       "noModelsDescription": "Det finns inga modeller att välja mellan.",
+      "allUnavailableTitle": "Inga modeller kan användas",
+      "allUnavailableDescription": "Lägg till en leverantörsnyckel och försök igen.",
       "favorites": "Favoriter"
     },
     "modelSelector": {
@@ -3183,6 +3237,8 @@
     "retryHint": "Försöker läsa in Kilo Pass-status igen.",
     "endedOn": "Avslutad {{date}}",
     "notAvailableInApp": "Kilo Pass är inte tillgängligt i appen.",
+    "notAvailableTitle": "Kilo Pass finns inte i appen",
+    "noPassDescription": "Det här kontot har inget Kilo Pass.",
     "statusActive": "Aktiv",
     "statusTrialing": "Provperiod",
     "statusPastDue": "Betalning förfallen",
@@ -3465,7 +3521,7 @@
       "retentionLimit": "Visar de senaste fakturorna."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Aktivera varning för lågt saldo",
+      "subtitle": "Skicka en varning via e-post till de adresser du anger när organisationens saldo understiger det belopp du ställer in.",
       "notifyEmailsLabel": "E-postadresser för varningar",
       "permissionDenied": "Du har inte behörighet att hantera faktureringsvarningar.",
       "separateEmailsHint": "Separera flera e-postadresser med kommatecken.",
@@ -3566,6 +3622,7 @@
       "identifierLabel": "Identifierare",
       "identifierRequired": "Ange en identifierare.",
       "identifierTaken": "Ett annat läge använder redan den här identifieraren.",
+      "identifierTooLong": "Håll identifieraren till {{max}} tecken eller färre.",
       "nameLabel": "Lägesnamn",
       "nameRequired": "Ange ett lägesnamn.",
       "notFound": "Det här läget finns inte längre.",
@@ -3610,10 +3667,9 @@
     },
     "hub": {
       "renameTitle": "Byt namn på organisation",
-      "renamePlaceholder": "Organisationens namn",
+      "renamePlaceholder": "Ange ett namn på organisationen",
       "balance": "Saldo",
-      "organizationSeats": "Platser i organisationen",
-      "plan": "Organisationsplan",
+      "plan": "Plan",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Har löpt ut",
@@ -3647,7 +3703,8 @@
     "signupStepUp": "Välj ”$t(login.moreSignInOptions)” för att slutföra skapandet av ditt konto.",
     "signupStepUpApple": "Välj ”$t(login.signInWithApple)” för att slutföra skapandet av ditt konto.",
     "signupStepUpGoogle": "Välj ”$t(login.signInWithGoogle)” för att slutföra skapandet av ditt konto.",
-    "invalidCode": "Koden är felaktig. Försök igen.",
+    "signupStepUpBack": "Gå tillbaka och välj ”$t(login.moreSignInOptions)” för att slutföra skapandet av ditt konto.",
+    "invalidCode": "Koden är felaktig eller har gått ut. Försök igen eller välj ”$t(login.resendCode)”.",
     "codeInProgress": "Din kod behandlas. Vänta en stund och försök igen.",
     "tooManyAttempts": "För många försök. Begär en ny kod.",
     "invalidToken": "Inloggningen misslyckades. Försök igen.",
@@ -3728,6 +3785,34 @@
     "nextScheduled": "Nästa schemalagda",
     "answerNeeded": "Väntar på svar",
     "waitingToRetry": "Väntar på nytt försök",
+    "countNoun": {
+      "needsInput_one": "Behöver inmatning",
+      "needsInput_other": "Behöver inmatning",
+      "running_one": "Arbetar",
+      "running_other": "Arbetar",
+      "scheduled_one": "Schemalagd",
+      "scheduled_other": "Schemalagda",
+      "idle_one": "Vilande",
+      "idle_other": "Vilande"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Behöver inmatning",
+      "needsInput_other": "{{displayCount}} Behöver inmatning",
+      "running_one": "{{displayCount}} Arbetar",
+      "running_other": "{{displayCount}} Arbetar",
+      "scheduled_one": "{{displayCount}} Schemalagd",
+      "scheduled_other": "{{displayCount}} Schemalagda",
+      "idle_one": "{{displayCount}} Vilande",
+      "idle_other": "{{displayCount}} Vilande"
+    },
+    "footer": {
+      "checked": "Kontrollerad {{time}}",
+      "lastKnown": "Senast kända · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Nästa körning {{time}}",
+      "wasDue": "Förväntades {{time}}"
+    },
     "step": {
       "editing": "Redigerar",
       "reading": "Läser",
@@ -3916,6 +4001,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) skickar en kort inferensbegäran till den här slutpunkten med valt protokoll och vald modell. Leverantören kan ta betalt för den.",
       "connectionSucceeded": "Modellen slutförde en begäran med det här protokollet.",
       "connectionFailed": "Modellen kunde inte slutföra en begäran. Kontrollera API-roten, protokollet, inloggningsuppgifterna och modell-ID:t.",
+      "requestTimedOut": "Slutpunkten svarade inte i tid. Kontrollera API-roten och din anslutning och försök igen.",
+      "requestUnauthorized": "Slutpunkten nekade inloggningsuppgifterna. Kontrollera API-nyckeln och de anpassade rubrikerna och försök igen.",
+      "requestNotFound": "Slutpunkten eller modellen hittades inte. Kontrollera API-roten och modell-ID:t.",
+      "requestRateLimited": "Slutpunkten begränsar antalet förfrågningar. Vänta ett ögonblick och försök igen.",
+      "requestUnavailable": "Slutpunkten är inte tillgänglig just nu. Försök igen om en stund.",
+      "requestUnreachable": "Det gick inte att nå slutpunkten. Kontrollera API-roten och din anslutning.",
+      "requestInvalidResponse": "Slutpunkten svarade inte i det förväntade formatet. Kontrollera att API-roten och protokollet matchar servern och försök igen.",
+      "discoveryNoModels": "Slutpunkten listade inga modeller. Ange modeller manuellt.",
+      "connectionIncomplete": "Modellen svarade men slutförde inte. Försök igen eller kontrollera modell-ID:t och protokollet.",
       "invalidInput": "Ange ett backendnamn, giltiga headers och minst en modell med unikt ID och namn. Tokengränser måste vara positiva heltal.",
       "invalidUrl": "Ange en HTTP- eller HTTPS-API-rot utan inloggningsuppgifter, frågesträng eller fragment.",
       "publicHttp": "Publika HTTP-slutpunkter är inte tillåtna. Använd HTTPS eller en privat lokal slutpunkt.",
@@ -4054,10 +4148,20 @@
     "reasoningEffort": {
       "modelFlag": "Den här modellen stöder resonemangsnivå"
     },
-    "creditsRequired": "Det räcker inte med krediter för att skicka det här meddelandet."
+    "creditsRequired": "Det räcker inte med krediter för att skicka det här meddelandet.",
+    "providerKeyRefused": "Leverantören nekade inloggningsuppgifterna. Kontrollera dess API-nyckel och skicka igen.",
+    "providerModelMissing": "Den här backenden tillhandahåller inte längre den här modellen. Välj en annan.",
+    "providerRateLimited": "Leverantören begränsar antalet förfrågningar. Vänta ett ögonblick och skicka igen.",
+    "providerUnavailable": "Leverantören är inte tillgänglig just nu. Skicka igen om en stund."
   },
   "settingsTools": {
-    "confirmTitle": "Bekräfta denna ändring?"
+    "confirmTitle": "Bekräfta denna ändring?",
+    "guarded": {
+      "spendAlertsOff": "Stänga av förbrukningsvarningar? Du skulle sluta få aviseringar om överskridna förbrukningströsklar och timtoppar.",
+      "balanceAlertsOff": "Stänga av saldovarningar? Du skulle sluta få aviseringar när dina krediter börjar ta slut.",
+      "securityFindingsOff": "Stänga av säkerhetsfynd? Du skulle sluta få aviseringar om nya säkerhetsfynd.",
+      "hideBalanceOn": "Dölja dina saldon? Kreditsaldon visas inte längre på profilsidorna och organisationshubben."
+    }
   },
   "appActions": {
     "start": {
@@ -4132,7 +4236,7 @@
     "personalDefaultDescription": "Laddas automatiskt när inget kodarkiv har en fäst profil.",
     "organizationDefaultDescription": "Laddas automatiskt för medlemmar som inte har någon personlig standard.",
     "setAsDefault": "Ställ in som standard",
-    "saveFailed": "Det gick inte att spara profilen",
+    "saveFailed": "Det gick inte att spara profilen. Försök igen.",
     "organizationRoleRequired": "Endast organisationsägare och administratörer kan ändra organisationsprofiler.",
     "deleteTitle": "Ta bort profil",
     "deleteMessage": "Detta tar bort profilen och dess inställningar permanent. Detta kan inte ångras.",
@@ -4396,6 +4500,7 @@
         "balanceNeutral": "Saldoneutral",
         "deduction": "Avdrag",
         "grant": "Kredittilldelning",
+        "welcomeCredits": "Välkomstkrediter",
         "purchase": "Köp"
       },
       "purchaseFallback": "Kreditköp",
@@ -4429,6 +4534,7 @@
     "pickPackToBuyAgain": "Välj ett paket ovan för att starta ett nytt köp.",
     "purchasePending": "Butiken behandlar fortfarande betalningen. Dina krediter kommer så snart den godkänner debiteringen.",
     "buyAgain": "Köp igen",
+    "checkPurchase": "Kontrollera köpet",
     "purchaseOwnedByAnotherAccount": "Krediterna på detta Apple-konto tillhör ett annat Kilo-konto. Logga in på det Kilo-kontot för att använda dem.",
     "purchaseOwnedByAnotherAccountPlay": "Krediterna på detta Google Play-konto tillhör ett annat Kilo-konto. Logga in på det Kilo-kontot för att använda dem."
   },
@@ -4522,7 +4628,9 @@
     },
     "saveSheet": {
       "title": "Spara i lista",
-      "saved": "Sparat i {{list}}"
+      "saved": "Sparat i {{list}}",
+      "saveFailed": "Det gick inte att spara uppgiften. Kontrollera din anslutning och försök igen.",
+      "saveRefused": "Det gick inte att spara uppgiften i den här listan. Välj en annan lista."
     }
   },
   "agentBriefing": {
@@ -4534,6 +4642,7 @@
     "empty": "Ingen aktivitet under den här rapportperioden",
     "emptyHint": "Dina kodningssessioner i molnet och CLI visas här när en schemalagd rapport har aktivitet.",
     "loadError": "Det gick inte att läsa in rapporter",
+    "estimateLoadError": "Det gick inte att läsa in uppskattningen.",
     "view": "Läs rapport",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4647,6 +4756,8 @@
     "connectedTo": "Ansluten till {{account}}",
     "disconnected": "{{provider}} har kopplats från",
     "disconnectFailed": "Det gick inte att koppla från {{provider}}",
+    "disconnectRetry": "Slack kunde inte bekräfta frånkopplingen. Försök igen.",
+    "disconnectNeedsSupport": "Kilo kunde inte läsa den sparade Slack-åtkomsten för den här anslutningen. Kontakta supporten för att slutföra frånkopplingen.",
     "couldNotLoad": "Det gick inte att läsa in integrationerna",
     "permissionDenied": "Du har inte behörighet att hantera de här integrationerna.",
     "managedByOwner": "Be en ägare i organisationen att ändra en anslutning som du inte kan ändra.",
@@ -4801,7 +4912,7 @@
   },
   "organizationGuardrails": {
     "title": "AI-skyddsräcken",
-    "permissionDenied": "Endast organisationsägare och administratörer kan hantera AI-skyddsräcken.",
+    "permissionDenied": "Endast organisationsägare och administratörer kan hantera AI-skyddsräcken. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "AI-skyddsräcken är inte aktiverade",
     "unavailable": "Kilo aktiverar AI-skyddsräcken för en organisation på begäran. Kontakta {{supportEmail}}, och Kilo-teamet slår på dem för din organisation.",
     "contactSupport": "Kontakta supporten",
@@ -4813,12 +4924,15 @@
     "inputDescription": "Skannar varje indata med Enkrypt AI, inklusive verktygsresultat. När Enkrypt AI inte är tillgängligt skickas begäranden utan skanning i stället för att avvisas.",
     "outputTitle": "Skyddsräcken för utdata",
     "outputDescription": "Skannar svar med Enkrypt AI innan medlemmar får dem. Avstängt om du inte aktiverar det.",
+    "outputUnavailable": "Kilo har inte slagit på skanning av utdata för den här organisationen, så svar kontrolleras inte och det finns inget att ställa in här. Kontakta {{supportEmail}} för att begära det.",
     "detectorsHint": "Blockera avvisar en flaggad begäran. Endast logga registrerar den utan att fördröja begäran.",
     "detectorsHintOutput": "Blockera underkänner ett flaggat svar. Endast logga registrerar det utan att fördröja svaret.",
     "choiceLog": "Endast logga",
     "applyTo": "Tillämpa på",
     "applyToAllMembers": "Alla medlemmar",
     "applyKiloDefault": "Tillämpa Kilo-standard",
+    "applyKiloDefaultEnglishNote": "Texten i Kilos standardpolicy är på engelska, eftersom Kilo Gateway tillämpar den exakt som den är skriven.",
+    "applyKiloDefaultReplaceMessage": "Kilos standardpolicy är skriven på engelska och ersätter det du har angett under Policyöverträdelse. Texten du skrev i fältet för policytext kan inte återställas.",
     "invalidSavedTitle": "Sparade inställningar för indatadetektorer kan inte läsas",
     "invalidSavedBody": "Begäranden blockeras tills indatadetektorerna har sparats igen. Detektorerna nedan utgår från Kilo-standard.",
     "invalidSavedOutputTitle": "Sparade inställningar för utdatadetektorer kan inte läsas",
@@ -4939,7 +5053,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Företagsfunktion",
-    "enterpriseOnly": "Det här är en funktion som endast är tillgänglig för företag.",
+    "enterpriseOnly": "Leverantörer och modeller är tillgängliga på Enterprise-planen.",
     "readOnly": "Endast organisationsägare och administratörer kan ändra dessa inställningar.",
     "loadError": "Leverantörer och modeller kunde inte läsas in",
     "tabModels": "Modeller",
@@ -4953,6 +5067,8 @@
     "providersDescription": "Stäng av en leverantör för att stoppa Kilo från att dirigera till den för den här organisationen.",
     "providersNeedCatalog": "Leverantörsreglagen är skrivskyddade tills hela modellkatalogen har lästs in. Tryck på Försök igen ovan för att ändra dem.",
     "providersEmpty": "Inga leverantörer matchar den här sökningen.",
+    "providersNone": "Inga leverantörer är tillgängliga för den här organisationen.",
+    "providersUnavailable": "Leverantörslistan kunde inte läsas in.",
     "allowAllShown": "Tillåt alla som visas",
     "denyAllShown": "Neka alla som visas",
     "gatewaysDescription": "Kilo dirigerar modellbegäranden via Vercel AI Gateway eller OpenRouter. En inaktiverad nätbrygga gör att dessa begäranden misslyckas.",

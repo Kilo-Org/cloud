@@ -13,6 +13,7 @@ import { RowChevron } from '@/components/ui/row-chevron';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { SearchField } from '@/components/ui/search-field';
 import { Text } from '@/components/ui/text';
+import { foldForSearch } from '@/i18n/fold-for-search';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
@@ -23,6 +24,7 @@ import {
   providerKeyScopeInput,
 } from '@/lib/byok/provider-key-scope';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -76,6 +78,7 @@ export function ProviderKeyProviderPickerScreen({
   organizationId,
 }: Readonly<{ organizationId?: string }>) {
   const { t, i18n } = useTranslation();
+  const sideInsetStyle = useSideInsetStyle();
   const trpc = useTRPC();
   const listRef = useRef<FlashListRef<ProviderOption>>(null);
   const [query, setQuery] = useState('');
@@ -94,9 +97,15 @@ export function ProviderKeyProviderPickerScreen({
     // would otherwise stop matching the `…-ai-…` id it used to.
     const nameNeedle = trimmed.toLocaleLowerCase(i18n.language);
     const idNeedle = trimmed.toLocaleLowerCase(ID_FOLD_LOCALE);
+    // A display name is folded as well, so "cafe" finds "Café": the accented
+    // spelling is what the row shows, and the typist may offer the plain letter.
+    // A query that folds to nothing is all diacritics and keeps the raw
+    // comparison alone, rather than matching every name.
+    const foldedNeedle = foldForSearch(trimmed);
     return rows.filter(
       provider =>
         provider.name.toLocaleLowerCase(i18n.language).includes(nameNeedle) ||
+        (foldedNeedle !== '' && foldForSearch(provider.name).includes(foldedNeedle)) ||
         provider.id.toLocaleLowerCase(ID_FOLD_LOCALE).includes(idNeedle)
     );
   }, [providers.data, query, i18n.language]);
@@ -171,16 +180,18 @@ export function ProviderKeyProviderPickerScreen({
         title={t('profile.providerKeys.chooseProvider')}
         backFallback={PROFILE_TAB_HREF}
       />
-      <View className={cn(SCREEN_GUTTER_CLASS, 'pb-1 pt-2')}>
-        {/* The page gutter, not a hand-picked inset: the field's edges sit on
-            the same 14pt line as the rows below it. */}
-        <SearchField
-          placeholder={t('profile.providerKeys.searchProviders')}
-          hasText={query !== ''}
-          onChangeText={setQuery}
-        />
+      <View className="flex-1" style={sideInsetStyle}>
+        <View className={cn(SCREEN_GUTTER_CLASS, 'pb-1 pt-2')}>
+          {/* The page gutter, not a hand-picked inset: the field's edges sit on
+              the same 14pt line as the rows below it. */}
+          <SearchField
+            placeholder={t('profile.providerKeys.searchProviders')}
+            hasText={query !== ''}
+            onChangeText={setQuery}
+          />
+        </View>
+        {body}
       </View>
-      {body}
     </View>
   );
 }

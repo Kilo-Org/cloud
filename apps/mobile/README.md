@@ -215,6 +215,19 @@ Login, splash, unopened, or mismatched targets make the comparison inconclusive.
 They do not establish an introduced defect.
 The runtime marker binds the loaded source to the preparation receipt.
 
+Add `--pixel-diff` to `compare` to write an advisory `pixel-diff.json` and before/after/diff images.
+It uses only screenshot pairs that pass the preparation and capture receipt checks.
+The report counts changed pixels at fixed coordinates and lists their bounding boxes.
+If `regionsTruncated` is true, the list is partial. The pixel counts and full comparison still cover the entire capture.
+It retains the full comparison when a focus crop would not help.
+Add `--pixel-diff-explain-shift` to report vertical row moves separately from the fixed-coordinate counts.
+
+Keep the original status bar pixels. The report counts changes in system inset bands separately.
+`changedPixels` includes those bands. A change inside a band still reports `changed`.
+App content can overlap those bands, so inspect the full comparison for safe-area defects.
+An unavailable pixel comparison is inconclusive. The pixel report does not change the gate verdict.
+Inspect the original device screenshots for assertions about what the app shows.
+
 Captures retain the original screenshot and a `.capture.json` alignment record.
 Matching probe states bracket the screenshot but do not certify native paint.
 Uncertain alignment skips pixel-to-tree rules; unsettled state skips single-frame geometry rules.

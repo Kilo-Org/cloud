@@ -1,8 +1,10 @@
+/* eslint-disable max-lines -- the form's refused saves, its identifier hint and its durable draft share one mock harness. */
 import { createElement, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { MODE_SLUG_MAX_LENGTH, modeSlugFromName } from '@kilocode/app-shared/organizations';
 import { ModeForm } from '@/components/organization/mode-form';
-import { type OrgMode } from '@/components/organization/org-mode-form-model';
+import { type OrgMode, type OrgModeFormDraft } from '@/components/organization/org-mode-form-model';
 import { FormField } from '@/components/ui/form-field';
 import { i18n } from '@/i18n';
 import { act, type ReactTestInstance } from '@/test/renderer';
@@ -14,6 +16,25 @@ const mutations = vi.hoisted(() => ({
   update: { isPending: false, mutate: vi.fn() },
   remove: { isPending: false, mutate: vi.fn() },
 }));
+
+// The durable draft the wrapper reads: its state is swapped per test, and its
+// write and clear are the suite's spies.
+type DraftState =
+  | { kind: 'loading'; save: (value: unknown) => void; clear: () => void }
+  | { kind: 'ready'; value: unknown; save: (value: unknown) => void; clear: () => void };
+
+const draft = vi.hoisted(
+  (): { save: (value: unknown) => void; clear: () => void; state: DraftState } => ({
+    save: vi.fn<(value: unknown) => void>(),
+    clear: vi.fn<() => void>(),
+    state: { kind: 'loading', save: () => undefined, clear: () => undefined },
+  })
+);
+
+// The guard's props, so the suite reads the `onDiscard` the form handed it.
+const leaveGuard = vi.hoisted((): { props: Record<string, unknown> } => ({ props: {} }));
+// The removal confirmation, so a delete test can run its `onConfirm`.
+const confirmMock = vi.hoisted(() => vi.fn());
 
 // The real Save control loads its spinner policy through the Expo runtime
 // (battery level and reanimated), which this Node project cannot import.
@@ -48,7 +69,7 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/dialog', () => ({
-  useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
+  useConfirmDialog: () => ({ confirm: confirmMock, dialog: null }),
 }));
 vi.mock('@/lib/hooks/use-org-modes-queries', () => ({
   useOrgModeMutations: () => mutations,
@@ -58,12 +79,29 @@ vi.mock('@/lib/navigation/stack-safe-replace', () => ({
   useStackSafeReplace: () => ({ replace: vi.fn() }),
 }));
 vi.mock('@/components/profiles/use-metadata-leave-guard', () => ({
-  useMetadataLeaveGuard: () => ({
-    handleDirtyChange: vi.fn(),
-    leaveWithoutAsking: vi.fn(),
-    dialog: null,
-  }),
+  useMetadataLeaveGuard: (props: Record<string, unknown>) => {
+    leaveGuard.props = props;
+    return {
+      handleDirtyChange: vi.fn(),
+      leaveWithoutAsking: vi.fn(),
+      dialog: null,
+    };
+  },
 }));
+// The draft store, the account id and the key helper are the wrapper's inputs:
+// the store is a controllable state, so a test can hold the form in its loading
+// phase and then settle it.
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'user-1', isLoading: false }),
+}));
+vi.mock('@/lib/persist/use-form-draft', () => ({ useFormDraft: () => draft.state }));
+// The real module opens the encrypted SQLite store, which this Node project
+// cannot import; the form reads only its key helper.
+vi.mock('@/lib/persist/drafts', () => ({
+  orgModeFormDraftKey: (organizationId: string, modeId: string | null) =>
+    `org-mode-form:${organizationId}:${modeId ?? 'new'}`,
+}));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/organization/mode-tools-fields', () => ({
   ModeToolsFields: 'ModeToolsFields',
 }));
@@ -83,6 +121,9 @@ const nameLabel = i18n.t('organization.modes.nameLabel');
 const identifierLabel = i18n.t('organization.modes.identifierLabel');
 const roleLabel = i18n.t('organization.modes.roleLabel');
 const identifierHint = i18n.t('organization.modes.identifierHint');
+
+/** 99 characters: 25 three-letter words joined by hyphens, twice the bound. */
+const LONG_MODE_NAME = Array.from({ length: 25 }, () => 'abc').join('-');
 
 function storedMode(id: string, name: string, slug: string): OrgMode {
   return {
@@ -230,8 +271,112 @@ function mountCreateForm(modes: readonly OrgMode[] = existingModes) {
   }));
 }
 
+/** The draft state the mounted form reads, settled through `settle`. */
+type DraftBox = { settle: (value: OrgModeFormDraft | null) => void };
+
+/**
+ * A form whose draft state the test can settle: the mocked store is a plain
+ * object, so swapping it needs a render of the same form instance.
+ */
+function DraftHarness({ box, mode }: Readonly<{ box: DraftBox; mode: OrgMode | undefined }>) {
+  const [, setVersion] = useState(0);
+  box.settle = value => {
+    draft.state = { kind: 'ready', value, save: draft.save, clear: draft.clear };
+    act(() => {
+      setVersion(version => version + 1);
+    });
+  };
+  return createElement(ModeForm, { organizationId: 'org-1', mode, existingModes });
+}
+
+// eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
+function mountGatedForm(mode: OrgMode | undefined) {
+  const box: DraftBox = {
+    // Overwritten by the harness on mount; typed as a real body so the lint
+    // rule for empty functions stays quiet.
+    settle: () => undefined,
+  };
+  return renderWithProviders(createElement(DraftHarness, { box, mode })).then(result => ({
+    ...result,
+    box,
+  }));
+}
+
+/** Run the mutation's success callback, the way a landed write does. */
+function settleMutation(
+  mutation: { mutate: { mock: { calls: unknown[][] } } },
+  result?: unknown
+): void {
+  const call = mutation.mutate.mock.calls.at(-1);
+  if (call === undefined) {
+    throw new Error('the mutation never ran');
+  }
+  const options: unknown = call[1];
+  if (
+    options === null ||
+    typeof options !== 'object' ||
+    !('onSuccess' in options) ||
+    typeof options.onSuccess !== 'function'
+  ) {
+    throw new Error('the mutation carried no success callback');
+  }
+  // Narrowing of a mutable property does not survive into a closure, and the
+  // property's type here is the wide `Function`, so the callback is captured
+  // through a typed cast after the runtime check above.
+  const onSuccess = options.onSuccess as (value: unknown) => void;
+  act(() => {
+    onSuccess(result);
+  });
+}
+
+/** Press the destructive action and confirm the dialog it raises. */
+function pressDelete(root: ReactTestInstance): void {
+  const deleteButton = root
+    .findAll(node => node.type === PRESSABLE && (node.props as WidgetProps).role === 'button')
+    .at(1);
+  if (deleteButton === undefined) {
+    throw new Error('the delete button was not rendered');
+  }
+  act(() => {
+    pressHandler((deleteButton.props as WidgetProps).onPress)();
+  });
+  const request: unknown = confirmMock.mock.calls.at(-1)?.[0];
+  if (
+    request === null ||
+    request === undefined ||
+    typeof request !== 'object' ||
+    !('onConfirm' in request) ||
+    typeof request.onConfirm !== 'function'
+  ) {
+    throw new Error('the removal confirmation was not raised');
+  }
+  const onConfirm = request.onConfirm as () => void;
+  act(() => {
+    onConfirm();
+  });
+}
+
+/** A whole restored draft, with the one field a test cares about replaced. */
+function restoredDraft(overrides: Partial<OrgModeFormDraft> = {}): OrgModeFormDraft {
+  return {
+    name: 'Drafted',
+    slug: 'drafted',
+    roleDefinition: 'Drafted role.',
+    description: '',
+    whenToUse: '',
+    customInstructions: '',
+    groups: [],
+    editFileRegex: '',
+    editRestrictionLabel: '',
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  // Every case starts with the store answering no draft, so the form renders
+  // its fields at once; a case that needs the loading phase sets it first.
+  draft.state = { kind: 'ready', value: null, save: draft.save, clear: draft.clear };
 });
 
 describe('ModeForm refused save', () => {
@@ -274,6 +419,31 @@ describe('ModeForm refused save', () => {
     );
     expect(scrollTo).toHaveBeenCalledOnce();
     expect(scrollTo).toHaveBeenCalledWith({ y: ROLE_OFFSET - FIELD_TOP_MARGIN, animated: true });
+    expect(mutations.create.mutate).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('refuses a restored identifier past the bound, naming the bound', async () => {
+    // A draft written by a build whose suggestion was not clamped can hold an
+    // identifier the server refuses; Save reports the length, not the set.
+    draft.state = {
+      kind: 'ready',
+      value: restoredDraft({
+        name: 'Long',
+        slug: 'a'.repeat(MODE_SLUG_MAX_LENGTH + 1),
+        roleDefinition: 'Reviews every change.',
+      }),
+      save: draft.save,
+      clear: draft.clear,
+    };
+    const { renderer, unmount } = await mountCreateForm();
+
+    pressSave(renderer.root);
+
+    expect(fieldProps(renderer.root, identifierLabel).error).toBe(
+      i18n.t('organization.modes.identifierTooLong', { max: MODE_SLUG_MAX_LENGTH })
+    );
     expect(mutations.create.mutate).not.toHaveBeenCalled();
 
     unmount();
@@ -328,6 +498,42 @@ describe('ModeForm identifier hint', () => {
     unmount();
   });
 
+  it('suggests an identifier inside the bound for a name far past it', async () => {
+    const { renderer, unmount } = await mountCreateForm();
+
+    changeField(renderer.root, nameLabel, LONG_MODE_NAME);
+
+    const suffix = ` · ${identifierHint}`;
+    const line = hintLines(renderer.root).find(text => text.endsWith(suffix));
+    expect(line).toBeDefined();
+    const suggested = (line ?? '').slice(0, -suffix.length);
+    expect(suggested).not.toBe('');
+    expect(suggested.length).toBeLessThanOrEqual(MODE_SLUG_MAX_LENGTH);
+
+    unmount();
+  });
+
+  it('saves a create with an identifier inside the bound for a name far past it', async () => {
+    const { renderer, unmount } = await mountCreateForm();
+
+    changeField(renderer.root, nameLabel, LONG_MODE_NAME);
+    changeField(renderer.root, roleLabel, 'Reviews every change.');
+
+    pressSave(renderer.root);
+
+    // The slugs `existingModes` holds, spelled out: the derived slug is far from
+    // either, so the count branch never runs and the fixture stays read-only here.
+    const expected = modeSlugFromName(LONG_MODE_NAME, ['architect', 'reviewer']);
+    expect(expected.length).toBeLessThanOrEqual(MODE_SLUG_MAX_LENGTH);
+    expect(mutations.create.mutate).toHaveBeenCalledOnce();
+    expect(mutations.create.mutate).toHaveBeenCalledWith(
+      { name: LONG_MODE_NAME, slug: expected, config: expect.anything() },
+      expect.anything()
+    );
+
+    unmount();
+  });
+
   it('re-derives the suggestion when the modes list arrives after the name was typed', async () => {
     const { renderer, box, unmount } = await mountCreateForm([]);
 
@@ -366,6 +572,118 @@ describe('ModeForm identifier hint', () => {
       { name: 'مراجع الأمن', slug: 'mode', config: expect.anything() },
       expect.anything()
     );
+
+    unmount();
+  });
+});
+
+describe('ModeForm durable draft', () => {
+  it('holds a create back until the stored draft settles, then seeds every field', async () => {
+    draft.state = { kind: 'loading', save: draft.save, clear: draft.clear };
+    const { renderer, box, unmount } = await mountGatedForm(undefined);
+
+    // No server record exists, so the form shows its loading state rather than
+    // an empty body a restored draft could no longer seed.
+    expect(renderer.root.findAll(node => node.type === FormField)).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton').length).toBeGreaterThan(
+      0
+    );
+
+    box.settle(restoredDraft());
+
+    expect(fieldProps(renderer.root, nameLabel).defaultValue).toBe('Drafted');
+    expect(fieldProps(renderer.root, identifierLabel).defaultValue).toBe('drafted');
+    expect(fieldProps(renderer.root, roleLabel).defaultValue).toBe('Drafted role.');
+
+    unmount();
+  });
+
+  it('applies a late draft to an edit form the person has not touched', async () => {
+    draft.state = { kind: 'loading', save: draft.save, clear: draft.clear };
+    const { renderer, box, unmount } = await mountGatedForm(existingModes[0]);
+
+    // The server row is the content while the stored draft loads.
+    expect(fieldProps(renderer.root, nameLabel).defaultValue).toBe('Architect');
+
+    box.settle(restoredDraft());
+
+    expect(fieldProps(renderer.root, nameLabel).defaultValue).toBe('Drafted');
+    expect(fieldProps(renderer.root, identifierLabel).defaultValue).toBe('drafted');
+
+    unmount();
+  });
+
+  it('never overwrites an edit form the person already typed into', async () => {
+    draft.state = { kind: 'loading', save: draft.save, clear: draft.clear };
+    const { renderer, box, unmount } = await mountGatedForm(existingModes[0]);
+
+    changeField(renderer.root, nameLabel, 'Typed now');
+    box.settle(restoredDraft());
+
+    // The person's text survives the late draft: the field still carries what
+    // they typed, and the identifier stays the server row's, never the draft's
+    // `drafted`. (`defaultValue` re-reads the mutated ref, so the assertion is
+    // that the draft's value never replaced it.)
+    expect(fieldProps(renderer.root, nameLabel).defaultValue).toBe('Typed now');
+    expect(fieldProps(renderer.root, identifierLabel).defaultValue).toBe('architect');
+    changeField(renderer.root, nameLabel, 'Typed now!');
+    expect(draft.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({ name: 'Typed now!', slug: 'architect' })
+    );
+
+    unmount();
+  });
+
+  it('writes the whole form into the draft on every edit', async () => {
+    const { renderer, unmount } = await mountGatedForm(undefined);
+
+    changeField(renderer.root, nameLabel, 'Security Reviewer');
+    changeField(renderer.root, roleLabel, 'Reviews every change.');
+
+    expect(draft.save).toHaveBeenCalledTimes(2);
+    expect(draft.save).toHaveBeenLastCalledWith({
+      name: 'Security Reviewer',
+      slug: '',
+      roleDefinition: 'Reviews every change.',
+      description: '',
+      whenToUse: '',
+      customInstructions: '',
+      groups: [],
+      editFileRegex: '',
+      editRestrictionLabel: '',
+    });
+
+    unmount();
+  });
+
+  it('clears the stored draft once the create lands', async () => {
+    const { renderer, unmount } = await mountGatedForm(undefined);
+
+    changeField(renderer.root, nameLabel, 'Security Reviewer');
+    changeField(renderer.root, roleLabel, 'Reviews every change.');
+    pressSave(renderer.root);
+    settleMutation(mutations.create);
+
+    expect(draft.clear).toHaveBeenCalledOnce();
+
+    unmount();
+  });
+
+  it('clears the stored draft once the removal lands', async () => {
+    const { renderer, unmount } = await mountGatedForm(existingModes[0]);
+
+    pressDelete(renderer.root);
+    settleMutation(mutations.remove);
+
+    expect(draft.clear).toHaveBeenCalledOnce();
+
+    unmount();
+  });
+
+  it('hands the leave guard the draft clear for a confirmed Discard', async () => {
+    const { unmount } = await mountGatedForm(undefined);
+
+    expect(leaveGuard.props.onDiscard).toBe(draft.clear);
 
     unmount();
   });

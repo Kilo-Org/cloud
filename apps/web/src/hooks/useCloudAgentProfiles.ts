@@ -33,6 +33,9 @@ export type ProfileSummaryWithOwner = ProfileSummary & {
 };
 
 export type ProfileVar = {
+  delivery?: 'env' | 'network';
+  allowedHosts?: string[] | null;
+  locations?: string[] | null;
   key: string;
   value: string;
   isSecret: boolean;

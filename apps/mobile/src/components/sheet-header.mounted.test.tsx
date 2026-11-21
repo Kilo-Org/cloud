@@ -6,17 +6,24 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PickerSheet } from './picker-sheet';
 import { SheetHeader } from './sheet-header';
+import { SurfaceClearsSideInsets } from '@/lib/screen-insets';
 import '@/i18n';
 
 const safeArea = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 const rn = vi.hoisted(() => ({ os: 'ios', statusHeight: 0 }));
+const i18nManager = vi.hoisted(() => ({
+  allowRTL: vi.fn(),
+  forceRTL: vi.fn(),
+  isRTL: false,
+  doLeftAndRightSwapInRTL: true,
+}));
 
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
-  I18nManager: { allowRTL: vi.fn(), isRTL: false, forceRTL: vi.fn() },
+  I18nManager: i18nManager,
   Platform: {
     get OS() {
       return rn.os;
@@ -161,6 +168,7 @@ describe('SheetHeader', () => {
     Object.assign(safeArea, { top: 0, bottom: 0, left: 0, right: 0 });
     rn.os = 'ios';
     rn.statusHeight = 0;
+    i18nManager.isRTL = false;
   });
 
   it('renders a Share pressable in the leading slot when onShare is provided', async () => {
@@ -283,6 +291,25 @@ describe('SheetHeader', () => {
     const classes = String(findHeaderContainer(renderer.root).props.className).split(' ');
     expect(classes).toContain('pt-4');
     expect(classes).toContain('pb-3');
+
+    renderer.unmount();
+  });
+
+  it('spends the body inset above a card that draws its own top edge', async () => {
+    // The content-sized confirm card has no handle and no page chrome over the
+    // header, so the header's padding is the whole band above the title. The
+    // body's `pt-3` gives the title the same room over it as the divider
+    // leaves under it, instead of the `pt-4` the default keeps.
+    const renderer = await mount({
+      title: 'Discard draft?',
+      onDone: () => undefined,
+      padTopToBody: true,
+    });
+
+    const classes = String(findHeaderContainer(renderer.root).props.className).split(' ');
+    expect(classes).toContain('pt-3');
+    expect(classes).toContain('pb-3');
+    expect(classes).not.toContain('pt-4');
 
     renderer.unmount();
   });
@@ -602,6 +629,68 @@ describe('SheetHeader', () => {
     expect(done?.parent?.parent).toBe(wrapper);
 
     renderer.unmount();
+  });
+
+  it('keeps each landscape inset on its own physical side in right-to-left', async () => {
+    // React Native rewrites a Left/Right padding to start/end in a
+    // right-to-left tree, so the cutout's left inset is written as the right
+    // padding there and lands back on the left edge of the glass.
+    i18nManager.isRTL = true;
+    safeArea.left = 47;
+    safeArea.right = 59;
+    const renderer = await mount({
+      title: 'report.pdf',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+    });
+
+    expect(findSafeAreaWrapper(renderer.root).props.style).toEqual({
+      paddingLeft: 59,
+      paddingRight: 47,
+    });
+
+    renderer.unmount();
+  });
+
+  it('adds no side inset inside a surface that clears the window sides', async () => {
+    // Measured on the iOS simulator at 874x402 in landscape (62 pt insets):
+    // the app's imperative sheet hosts its content in a view that spans
+    // 62..812, so the window's side insets are already spent and the sheet's
+    // own 14 pt gutter is the only one left. Android's Material3 dialog clears
+    // them the same way. Content that added the window inset again sat a whole
+    // cutout width off that gutter: the sheet header read 76 pt inside a
+    // 750 pt surface while its body read 14 pt.
+    safeArea.left = 62;
+    safeArea.right = 62;
+    const sheet = (os: string) => {
+      rn.os = os;
+      return createElement(
+        SurfaceClearsSideInsets,
+        { value: true },
+        createElement(SheetHeader, { title: 'Save as profile', onDone: () => undefined })
+      );
+    };
+    // Both platforms: the surface clears the sides, so the header adds nothing.
+    const android = await mountElement(sheet('android'));
+    expect(findSafeAreaWrapper(android.root).props.style).toBeUndefined();
+    android.unmount();
+    const ios = await mountElement(sheet('ios'));
+    expect(findSafeAreaWrapper(ios.root).props.style).toBeUndefined();
+    ios.unmount();
+
+    // A page sheet is a route, not this surface: it spans the window in
+    // landscape and still pays the inset.
+    rn.os = 'ios';
+    const pageSheet = await mount({
+      title: 'report.pdf',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+    });
+    expect(findSafeAreaWrapper(pageSheet.root).props.style).toEqual({
+      paddingLeft: 62,
+      paddingRight: 62,
+    });
+    pageSheet.unmount();
   });
 
   it('clears the status bar when the sheet reaches the top safe area', async () => {

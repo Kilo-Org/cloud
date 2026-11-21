@@ -3,6 +3,7 @@ import path from 'node:path';
 import { createKiloClient } from '@kilocode/sdk/v2';
 import { z } from 'zod';
 import { kiloClientConfig, type KiloServer } from '../kilo-server-auth.js';
+import { forgetSessionObligations } from '../kilo-api.js';
 import {
   worktreeDeletePayloadSchema,
   type WorktreeDeletePayload,
@@ -90,6 +91,13 @@ export function createWorktreeKiloCleanupClient(server: KiloServer): WorktreeKil
     async deleteSession(directory, sessionId) {
       const result = await client.session.delete({ sessionID: sessionId, directory }, options());
       if (result.response?.status !== 404) requireTrue(result);
+      // The outstanding-obligation marker ends with the record it names: nothing
+      // can ever apply a ruleset or metadata to a deleted session, so the marker
+      // would only outlive it. A 404 delete removes the marker too, because the
+      // record is gone either way. Removal is best effort: a marker that cannot
+      // be removed must not fail a worktree deletion, since the create path
+      // consumes or repairs it.
+      await forgetSessionObligations(sessionId).catch(() => undefined);
     },
     async closeTerminals(directory) {
       const ptys = requireData(await client.pty.list({ directory }, options()));

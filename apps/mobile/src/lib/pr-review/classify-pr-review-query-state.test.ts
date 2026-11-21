@@ -72,11 +72,27 @@ describe('classifyPrReviewQueryState', () => {
     });
   });
 
-  it('falls back to retryable for unknown / non-tRPC errors', () => {
-    expect(classifyPrReviewQueryState(new Error('network down'))).toEqual({ kind: 'retryable' });
-    expect(classifyPrReviewQueryState('string error')).toEqual({ kind: 'retryable' });
-    expect(classifyPrReviewQueryState(null)).toEqual({ kind: 'retryable' });
-    expect(classifyPrReviewQueryState(undefined)).toEqual({ kind: 'retryable' });
+  // D5: an error with no tRPC code never reached the server, so the inbox said
+  // "Something went wrong on our end" for a missing network. The connection
+  // now owns that case, with its own copy and the Retry that fixes it.
+  it('names the connection for an error that reached no server', () => {
+    expect(classifyPrReviewQueryState(new Error('network down'))).toEqual({ kind: 'offline' });
+    expect(classifyPrReviewQueryState('string error')).toEqual({ kind: 'offline' });
+    expect(classifyPrReviewQueryState(null)).toEqual({ kind: 'offline' });
+    expect(classifyPrReviewQueryState(undefined)).toEqual({ kind: 'offline' });
+    // The device shape: tRPC wraps a failed fetch in a TRPCClientError whose
+    // `data` carries no code, so it IS a tRPC error and still reached no
+    // server. Reading only "not a tRPC error" left the server copy on screen
+    // for a missing network (offline force state, iOS simulator).
+    expect(classifyPrReviewQueryState({ name: 'TRPCClientError' })).toEqual({ kind: 'offline' });
+  });
+
+  // The app's own control-plane deadline rejects with no code and no status,
+  // but the server was reachable: it is a retry, not the connection.
+  it('classifies a client-side deadline as retryable, not offline', () => {
+    expect(classifyPrReviewQueryState({ name: 'RequestDeadlineError' })).toEqual({
+      kind: 'retryable',
+    });
   });
 
   it('falls back to retryable for tRPC 5xx-class codes', () => {

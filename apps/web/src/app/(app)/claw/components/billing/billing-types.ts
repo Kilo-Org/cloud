@@ -294,6 +294,7 @@ export type KiloPassHostingRecoveryReason =
   | 'enrollment_failed'
   | 'requires_reprovision'
   | 'signup_unavailable'
+  | 'hosting_ended'
   | 'missing_instance'
   | 'destroyed_instance'
   | 'stale_intent'
@@ -346,6 +347,15 @@ export function getKiloPassHostingRecoveryCopy(reason: KiloPassHostingRecoveryRe
         title: 'New KiloClaw instances are unavailable',
         description:
           'Your Kilo Pass credits are ready, but a current KiloClaw subscription is required to provision an instance.',
+        destination: '/profile',
+        destinationLabel: 'Go to profile',
+        canRetry: false,
+        showSupport: false,
+      };
+    case 'hosting_ended':
+      return {
+        title: 'KiloClaw hosting is no longer available',
+        description: 'KiloClaw hosting was not activated. Your Kilo Pass credits remain available.',
         destination: '/profile',
         destinationLabel: 'Go to profile',
         canRetry: false,

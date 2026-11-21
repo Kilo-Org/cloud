@@ -10,12 +10,14 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CheckCircle2, XCircle, Loader2, Shield, LogOut } from 'lucide-react';
 import {
+  closeDeviceAuthWindow,
   closeDeviceAuthWindowIfAppMode,
   getDeviceAuthOutcomeHeaderClassName,
   getDeviceAuthShellClassName,
   getDeviceAuthSignInUrl,
 } from './device-auth-url';
 import type { RequestingClient } from '@/lib/device-auth/requesting-client';
+import { deviceAuthRefusalCopy } from '@/lib/device-auth/refusal-codes';
 import { displaySafeText } from '@kilocode/app-shared/display-text';
 import type { DeviceAuthPendingLink } from '@/lib/device-auth/device-auth';
 import { getProviderById } from '@/lib/auth/provider-metadata';
@@ -37,12 +39,39 @@ type DeviceAuthClientProps = {
 
 const apiErrorSchema = z.object({
   error: z.string().optional(),
+  message: z.string().optional(),
 });
 
-async function getApiErrorMessage(response: Response, fallback: string): Promise<string> {
+/**
+ * The refusal a route answered with: the stable code and the diagnostic copy.
+ * The code decides the page's copy, so the same refusal reads the same way here
+ * whatever sentence the server happened to carry.
+ */
+export type ApiRefusal = { code?: string; message?: string };
+
+async function readApiRefusal(response: Response): Promise<ApiRefusal> {
   const data: unknown = await response.json().catch(() => null);
   const parsed = apiErrorSchema.safeParse(data);
-  return parsed.success ? (parsed.data.error ?? fallback) : fallback;
+  if (!parsed.success) return {};
+  return {
+    ...(parsed.data.error ? { code: parsed.data.error } : {}),
+    ...(parsed.data.message ? { message: parsed.data.message } : {}),
+  };
+}
+
+/**
+ * The sentence the error card shows for a route refusal. The shared copy for a
+ * known code wins, so the same refusal always reads the same way; a route that
+ * still answers prose in `error` keeps its own sentence.
+ */
+export function refusalMessage(refusal: ApiRefusal, fallback: string): string {
+  if (refusal.code) {
+    const copy = deviceAuthRefusalCopy(refusal.code);
+    if (copy) return copy;
+  }
+  // A route that still answers prose in `error` has no code to map, so show the
+  // sentence it sent before falling back to the caller's own copy.
+  return refusal.message ?? refusal.code ?? fallback;
 }
 
 function getUserInitials(name: string): string {
@@ -53,6 +82,24 @@ function getUserInitials(name: string): string {
     return `${first}${last}`.toUpperCase();
   }
   return name.slice(0, 2).toUpperCase();
+}
+
+/**
+ * The end of an app-mode outcome. The request came from the Kilo app, which
+ * opened this page in a browser, so closing it returns the person to where they
+ * started. A browser is free to ignore `window.close()` on a tab that a script
+ * did not open, so the control stays on screen: it retries the close, and it
+ * tells the person they can dismiss the page themselves.
+ */
+export function DeviceAuthAppReturn() {
+  return (
+    <CardContent className="flex flex-col items-center gap-2">
+      <Button variant="outline" className="pointer-coarse:min-h-11" onClick={closeDeviceAuthWindow}>
+        Return to the app
+      </Button>
+      <p className="text-muted-foreground text-sm">You can close this window</p>
+    </CardContent>
+  );
 }
 
 export function DeviceAuthClient({
@@ -116,7 +163,9 @@ export function DeviceAuthClient({
           return;
         }
         setStatus('error');
-        setErrorMessage(await getApiErrorMessage(response, 'Failed to authorize device'));
+        setErrorMessage(
+          refusalMessage(await readApiRefusal(response), 'Failed to authorize device')
+        );
         return;
       }
     } else {
@@ -134,7 +183,7 @@ export function DeviceAuthClient({
           return;
         }
         setStatus('error');
-        setErrorMessage(await getApiErrorMessage(response, 'Failed to deny device'));
+        setErrorMessage(refusalMessage(await readApiRefusal(response), 'Failed to deny device'));
         return;
       }
       setStatus('denied');
@@ -154,8 +203,11 @@ export function DeviceAuthClient({
               <CheckCircle2 className="h-10 w-10 text-green-600 dark:text-green-400" />
             </div>
             <CardTitle>Authorization Successful</CardTitle>
-            <CardDescription>You can now close this window</CardDescription>
+            <CardDescription>
+              {isAppMode ? 'Return to the app to continue.' : 'You can now close this window'}
+            </CardDescription>
           </CardHeader>
+          {isAppMode ? <DeviceAuthAppReturn /> : null}
         </Card>
       </div>
     );
@@ -170,8 +222,11 @@ export function DeviceAuthClient({
               <XCircle className="h-10 w-10 text-red-600 dark:text-red-400" />
             </div>
             <CardTitle>Authorization Denied</CardTitle>
-            <CardDescription>You can now close this window</CardDescription>
+            <CardDescription>
+              {isAppMode ? 'Return to the app to try again.' : 'You can now close this window'}
+            </CardDescription>
           </CardHeader>
+          {isAppMode ? <DeviceAuthAppReturn /> : null}
         </Card>
       </div>
     );
@@ -188,6 +243,7 @@ export function DeviceAuthClient({
             <CardTitle>Authorization Failed</CardTitle>
             <CardDescription>{errorMessage}</CardDescription>
           </CardHeader>
+          {isAppMode ? <DeviceAuthAppReturn /> : null}
         </Card>
       </div>
     );

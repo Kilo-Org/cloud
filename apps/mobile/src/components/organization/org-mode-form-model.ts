@@ -4,6 +4,7 @@ import {
   type inferRouterOutputs,
   type MobileRouter,
 } from '@kilocode/trpc/mobile';
+import * as z from 'zod';
 
 type OrgModeOutput =
   inferRouterOutputs<MobileRouter>['organizations']['modes']['list']['modes'][number];
@@ -45,10 +46,39 @@ export type OrgModeFormValues = Readonly<{
   editRestrictionLabel: string;
 }>;
 
+/**
+ * A mode form's durable draft: the whole typed form, so a restored draft seeds
+ * every field — not a per-field patch a person would have to reconcile.
+ */
+export type OrgModeFormDraft = OrgModeFormValues;
+
+/**
+ * The draft's stored shape. Strict on purpose: a value that carries any other
+ * key was written by a build with a different form, so the caller reads it as no
+ * draft and leaves it stored rather than coercing a shape it does not know.
+ */
+const orgModeFormDraftSchema = z.strictObject({
+  name: z.string(),
+  slug: z.string(),
+  roleDefinition: z.string(),
+  description: z.string(),
+  whenToUse: z.string(),
+  customInstructions: z.string(),
+  groups: z.array(z.enum(MODE_TOOL_GROUPS)),
+  editFileRegex: z.string(),
+  editRestrictionLabel: z.string(),
+});
+
+/** Shape guard for a stored mode form draft; another build's value is refused. */
+export function isOrgModeFormDraft(value: unknown): value is OrgModeFormDraft {
+  return orgModeFormDraftSchema.safeParse(value).success;
+}
+
 export type OrgModeFormErrorCode =
   | 'nameRequired'
   | 'identifierRequired'
   | 'identifierInvalid'
+  | 'identifierTooLong'
   | 'identifierTaken'
   | 'roleRequired'
   | 'restrictionInvalid';
@@ -83,7 +113,9 @@ function isValidRegExp(source: string): boolean {
 
 /**
  * What the form refuses before it reaches the server: the required strings, the
- * slug's shape, a slug another mode in this organization already holds, and a
+ * slug's shape, a slug longer than the server's bound (reported apart from the
+ * character set, so a long suggestion reads as too long rather than as invalid
+ * characters), a slug another mode in this organization already holds, and a
  * file pattern that is not a regular expression. The server repeats the bounds,
  * so this only makes the refusal local. The pattern belongs to the `edit` group,
  * so it is checked only while that group is on — the same rule
@@ -99,8 +131,10 @@ export function validateOrgModeForm(
   let slugError: OrgModeFormErrorCode | undefined = undefined;
   if (slug.length === 0) {
     slugError = 'identifierRequired';
-  } else if (!SLUG_PATTERN.test(slug) || slug.length > MODE_SLUG_MAX_LENGTH) {
+  } else if (!SLUG_PATTERN.test(slug)) {
     slugError = 'identifierInvalid';
+  } else if (slug.length > MODE_SLUG_MAX_LENGTH) {
+    slugError = 'identifierTooLong';
   } else if (existingModes.some(mode => mode.slug === slug && mode.id !== editingModeId)) {
     slugError = 'identifierTaken';
   }

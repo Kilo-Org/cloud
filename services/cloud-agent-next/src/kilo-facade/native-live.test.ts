@@ -95,6 +95,23 @@ describe('readNativeLiveOperation', () => {
     expect(outcome).toEqual({ kind: 'ok', body: {} });
   });
 
+  it('returns only the board owned by the requested session', async () => {
+    const board = { ownerSessionID: kiloSessionId, revision: 0, messages: [], hasMore: false };
+    await expect(
+      readNativeLiveOperation(
+        readParams({ name: 'session.board' }, async () => ({ ok: true, result: board }))
+      )
+    ).resolves.toEqual({ kind: 'ok', body: board });
+    await expect(
+      readNativeLiveOperation(
+        readParams({ name: 'session.board' }, async () => ({
+          ok: true,
+          result: { ...board, ownerSessionID: 'ses_ffffffffffffffffffffffffff' },
+        }))
+      )
+    ).resolves.toMatchObject({ kind: 'failed', code: 'KILO_UPSTREAM_RESPONSE_INVALID' });
+  });
+
   it('rejects a native session detail that names a different session', async () => {
     const outcome = await readNativeLiveOperation(
       readParams({ name: 'session.get' }, async () => ({

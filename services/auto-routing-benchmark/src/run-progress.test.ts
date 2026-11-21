@@ -2,6 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 import { DECIDER_CASES } from './datasets/decider-cases';
+import { deciderCasesForRouter, MEASUREMENT_REVISION } from './measurement-revision';
 import { computeEngineIdentity } from './run';
 import { loadRunProgress } from './run-progress';
 
@@ -29,7 +30,7 @@ function seed(sqlite: DatabaseSync): void {
   sqlite.exec(`
     CREATE TABLE benchmark_runs (
       id TEXT, kind TEXT, router TEXT, repetitions INTEGER,
-      engine_identity TEXT, status TEXT
+      engine_identity TEXT, status TEXT, measurement_revision INTEGER
     );
     CREATE TABLE run_models (run_id TEXT, model TEXT, variant TEXT, enqueued INTEGER);
     CREATE TABLE case_results (
@@ -37,12 +38,12 @@ function seed(sqlite: DatabaseSync): void {
     );
 
     INSERT INTO benchmark_runs VALUES
-      ('run-classifier', 'classifier', 'efficient', 2, '${classifierIdentity}', 'running'),
-      ('run-just-started', 'decider', 'efficient', 1, '${deciderIdentity}', 'running'),
-      ('run-drifted', 'decider', 'frontier', 1, 'frontier:v1:stale-dataset', 'running'),
-      ('run-old-engine', 'decider', 'efficient', 1, '${deciderIdentity.replace(/:v\d+:/, ':v0:')}', 'running'),
-      ('run-terminal', 'classifier', 'efficient', 1, '${classifierIdentity}', 'completed'),
-      ('run-unlisted', 'decider', 'efficient', 1, '${deciderIdentity}', 'running');
+      ('run-classifier', 'classifier', 'efficient', 2, '${classifierIdentity}', 'running', 2),
+      ('run-just-started', 'decider', 'efficient', 1, '${deciderIdentity}', 'running', ${MEASUREMENT_REVISION}),
+      ('run-drifted', 'decider', 'frontier', 1, 'frontier:v1:stale-dataset', 'running', 2),
+      ('run-old-engine', 'decider', 'efficient', 1, '${deciderIdentity.replace(/:v\d+:/, ':v0:')}', 'running', 2),
+      ('run-terminal', 'classifier', 'efficient', 1, '${classifierIdentity}', 'completed', 2),
+      ('run-unlisted', 'decider', 'efficient', 1, '${deciderIdentity}', 'running', 2);
 
     INSERT INTO run_models VALUES
       ('run-classifier', 'classifier/a', '', 1),
@@ -87,7 +88,7 @@ describe('run progress counts', () => {
       expect(progress.get('run-just-started')).toEqual({
         completedCases: 0,
         failedCases: 0,
-        totalCases: DECIDER_CASES.length,
+        totalCases: deciderCasesForRouter('efficient', MEASUREMENT_REVISION).length,
       });
     } finally {
       sqlite.close();

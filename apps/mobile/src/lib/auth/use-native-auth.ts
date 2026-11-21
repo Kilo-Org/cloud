@@ -18,6 +18,7 @@ import {
   mapError,
   mapErrorKey,
   signupStepUpMessage,
+  type SignupStepUpSurface,
 } from '@/lib/auth/auth-error-messages';
 import { hasStringCode, postAuth, type PostAuthFailure } from '@/lib/auth/auth-fetch';
 import {
@@ -69,10 +70,15 @@ function ensureGoogleConfigured() {
  */
 async function tokenRefusalMessage(
   result: PostAuthFailure,
-  googleConfigured: boolean
+  googleConfigured: boolean,
+  surface: SignupStepUpSurface = 'sign-in'
 ): Promise<string> {
   if (result.errorCode !== 'SIGNUP-STEP-UP') {
     return mapError(result.errorCode);
+  }
+  if (surface === 'code') {
+    // No Apple, Google, or options control is on the code step to name.
+    return signupStepUpMessage(result.signupMethods, { apple: false, google: false }, 'code');
   }
   const apple =
     Platform.OS === 'ios' && (await AppleAuthentication.isAvailableAsync().catch(() => false));
@@ -81,8 +87,14 @@ async function tokenRefusalMessage(
 
 export type BusyAction = 'apple' | 'google' | 'passkey' | 'otp-send' | 'otp-verify' | undefined;
 
-/** Outcome of an email-code verification attempt: a token, or an inline refusal message. */
-type EmailCodeVerifyResult = { ok: true } | { ok: false; message: string };
+/**
+ * An inline refusal on the code step. `browserSignIn` marks `ADMISSION_REQUIRED`: no further
+ * code can clear it, so the step offers the browser sign-in its copy names.
+ */
+export type EmailCodeRefusal = { ok: false; message: string; browserSignIn?: true };
+
+/** Outcome of an email-code verification attempt: a token, or an inline refusal. */
+type EmailCodeVerifyResult = { ok: true } | EmailCodeRefusal;
 
 /** The email-field error keys the inline slot can carry; translated at render. */
 type EmailErrorKey = 'login.pleaseEnterEmail' | AuthErrorMessageKey;
@@ -494,7 +506,10 @@ export function useNativeAuth(binding?: PendingLinkBinding): NativeAuthResult {
           // active language right where the input is. A toast here was the
           // reported dead end — the screen kept its silence while the toast
           // could land behind the keyboard or expire unnoticed.
-          return { ok: false, message: await tokenRefusalMessage(result, googleConfigured) };
+          const message = await tokenRefusalMessage(result, googleConfigured, 'code');
+          return result.errorCode === 'ADMISSION_REQUIRED'
+            ? { ok: false, message, browserSignIn: true }
+            : { ok: false, message };
         }
         const parsed = parseTokenPair(result.data);
         if (!parsed) {

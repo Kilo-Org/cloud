@@ -151,6 +151,30 @@ export async function clearPendingShareIdDraft(id: ShareId): Promise<void> {
   await clearDraftIfStill(userId, PENDING_SHARE_ID_DRAFT_KEY, JSON.stringify(id));
 }
 
+/**
+ * Persists the pending-share-id draft for `userId` and flushes it so a
+ * process death before the gate opens still restores the share. This module
+ * owns the draft key (`PENDING_SHARE_ID_DRAFT_KEY`, lazily loaded with the
+ * other drafts helpers), the value shape (a JSON string holding the
+ * {@link ShareId}), and the flush requirement; `clearPendingShareIdDraft` is
+ * the matching clear.
+ */
+export async function persistPendingShareIdDraft(userId: string, shareId: ShareId): Promise<void> {
+  const { saveDraft, flushDraft, PENDING_SHARE_ID_DRAFT_KEY } = await getDrafts();
+  saveDraft(userId, PENDING_SHARE_ID_DRAFT_KEY, shareId);
+  await flushDraft(userId, PENDING_SHARE_ID_DRAFT_KEY);
+}
+
+/**
+ * Reads the pending-share-id draft for `userId` and returns it, or null when
+ * nothing usable is stored. Same owner as `persistPendingShareIdDraft` and
+ * `clearPendingShareIdDraft`: only this module touches the key.
+ */
+export async function loadPendingShareIdDraft(userId: string): Promise<ShareId | null> {
+  const { loadDraft, isStringDraft, PENDING_SHARE_ID_DRAFT_KEY } = await getDrafts();
+  return loadDraft(userId, PENDING_SHARE_ID_DRAFT_KEY, isStringDraft);
+}
+
 function evictOldestIfNeeded(): void {
   while (payloads.size > SHARE_PAYLOAD_MAX_ENTRIES && insertionOrder.length > 0) {
     const oldest = insertionOrder.shift();

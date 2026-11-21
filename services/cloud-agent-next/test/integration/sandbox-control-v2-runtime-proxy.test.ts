@@ -13,8 +13,6 @@ import {
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import {
-  createRuntimeProxyGrant,
-  issueRuntimeCredentialProxyHandle,
   runtimeCredentialProxyFacadeBaseUrl,
   runtimeProxyHandleGrantId,
   RUNTIME_PROXY_GRANT_KEY,
@@ -25,6 +23,7 @@ import {
   renewStoredRuntimeAuthorization,
 } from '../../src/session/runtime-authorization-persistence.js';
 import worker from '../../src/server.js';
+import { SessionSyncAuthorization } from '../../src/session-sync-authorization.js';
 import { logger } from '../../src/logger.js';
 import type { AgentSandboxProvider, Env } from '../../src/types.js';
 import type { ProviderAdapter, StopResult } from '../../src/sandbox-control/provider.js';
@@ -37,6 +36,7 @@ import {
 import {
   createFakeCredentialBroker,
   fakeOutboundContainerId,
+  fakeRuntimeProxyOrigin,
   FAKE_SANDBOX_CONTAINERS_NAMESPACE,
   installFakeSandboxEnv,
 } from './helpers/fake-credentials.js';
@@ -693,6 +693,28 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     const fence = vi.spyOn(SandboxControlV2.prototype, 'getRuntimeCredentialProxyFence');
     expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle ?? '')).not.toBeNull();
     expect(fence).toHaveBeenCalledOnce();
+
+    // Compatibility release: readers accept proof, but allocations do not require it yet.
+    const originProof = await fakeRuntimeProxyOrigin(sandboxId, 'vercel');
+    fence.mockClear();
+    expect(
+      await sessionStub.resolveRuntimeCredentialProxyGrant(handle ?? '', originProof)
+    ).not.toBeNull();
+    expect(fence).toHaveBeenCalledWith(expect.objectContaining({ handle, originProof }));
+    const sync = new SessionSyncAuthorization(createExecutionContext(), env as Env);
+    const upload = { handle: handle ?? '', sessionID: frame.spec.kiloSessionId };
+    expect(await sync.authorizeUpload(upload)).toMatchObject({ userID: USER_ID });
+    fence.mockClear();
+    expect(await sync.authorizeUpload({ ...upload, originProof })).toMatchObject({
+      userID: USER_ID,
+    });
+    expect(fence).toHaveBeenCalledWith(expect.objectContaining({ handle, originProof }));
+    // A joined duplicate header is not one proof, so it reaches the DO as absent.
+    fence.mockClear();
+    expect(
+      await sync.authorizeUpload({ ...upload, originProof: `forged, ${originProof}` })
+    ).toMatchObject({ userID: USER_ID });
+    expect(fence).toHaveBeenCalledWith(expect.objectContaining({ originProof: undefined }));
 
     let tokenRead = false;
     const releaseToken = Promise.withResolvers<void>();

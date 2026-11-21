@@ -15,6 +15,7 @@ import {
 } from '@/lib/security-agent-ledger';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import { reconcileFirstPage, withInfiniteRetention } from '@/lib/query/infinite-retention';
+import { usePausedReadRetry } from '@/lib/query/retry-paused-read';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
@@ -84,6 +85,15 @@ export function useSecurityFinding(scope: string, id: string) {
     enabled: !isPersonalSecurityScope(scope),
   });
   return isPersonalSecurityScope(scope) ? personal : organization;
+}
+
+/** Deliberate retry for the one paused finding read, keyed exactly as above. */
+export function useRetrySecurityFinding(scope: string, id: string) {
+  const trpc = useTRPC();
+  const queryKey = isPersonalSecurityScope(scope)
+    ? trpc.securityAgent.getFinding.queryKey({ id })
+    : trpc.organizations.securityAgent.getFinding.queryKey({ organizationId: scope, id });
+  return usePausedReadRetry(queryKey);
 }
 
 const ANALYSIS_POLL_INTERVAL_MS = 3000;

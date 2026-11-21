@@ -34,6 +34,9 @@ const slotState = vi.hoisted(() => ({ bridge: undefined as unknown }));
 const safeAreaInsets = vi.hoisted(() => ({ bottom: 0 }));
 
 const routerBack = vi.hoisted(() => vi.fn());
+// The provider-key flow the all-unavailable state opens instead of leaving the
+// picker a dead end. Recorded so a test can prove the sheet closes first.
+const routerPush = vi.hoisted(() => vi.fn());
 // The keyboard the applied pick closes. Recorded so a test can prove the pick
 // takes the search field's keyboard with it instead of leaving it up.
 const keyboardDismiss = vi.hoisted(() => vi.fn());
@@ -73,8 +76,9 @@ vi.mock('@/lib/hooks/use-model-preferences', () => ({
 }));
 
 // FlashList renders through a callback; this mock mirrors the real list (rows
-// via renderItem, key via keyExtractor, item type via getItemType) so row
-// assertions see real content, and records each commit's data length.
+// via renderItem, key via keyExtractor, item type via getItemType, the header
+// above the rows) so row and header assertions see real content, and records
+// each commit's data length.
 vi.mock('@shopify/flash-list', async () => {
   const React = await import('react');
   return {
@@ -83,6 +87,7 @@ vi.mock('@shopify/flash-list', async () => {
       renderItem?: (info: { item: ModelPickerRow; index: number }) => ReactNode;
       keyExtractor?: (item: ModelPickerRow, index: number) => string;
       getItemType?: (item: ModelPickerRow | undefined) => string | undefined;
+      ListHeaderComponent?: ReactNode;
       style?: unknown;
       contentContainerStyle?: unknown;
     }) => {
@@ -101,9 +106,11 @@ vi.mock('@shopify/flash-list', async () => {
           getItemType: props.getItemType,
           renderItem: props.renderItem,
           keyExtractor: props.keyExtractor,
+          ListHeaderComponent: props.ListHeaderComponent,
           style: props.style,
           contentContainerStyle: props.contentContainerStyle,
         },
+        props.ListHeaderComponent,
         ...rows
       );
     },
@@ -119,7 +126,7 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ back: routerBack, push: vi.fn() }),
+  useRouter: () => ({ back: routerBack, push: routerPush }),
   useLocalSearchParams: () => ({}),
   useFocusEffect: vi.fn(),
 }));
@@ -142,18 +149,23 @@ vi.mock('@/components/picker-sheet', () => ({
     ),
 }));
 // EmptyState renders its `action` node (as the real component does) so the
-// empty state's clear CTA is reachable from the tree; `title` stays a prop for
-// the existing assertions.
+// empty state's clear CTA is reachable from the tree; `title` and `description`
+// stay props for the copy assertions.
 vi.mock('@/components/empty-state', () => ({
   StateAction: 'StateAction',
-  EmptyState: (props: { title: string; action?: ReactNode }) =>
-    createElement('EmptyState', { title: props.title }, props.action),
+  EmptyState: (props: { title: string; description?: ReactNode; action?: ReactNode }) =>
+    createElement(
+      'EmptyState',
+      { title: props.title, description: props.description },
+      props.action
+    ),
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
   Info: 'Info',
+  Plus: 'Plus',
   Search: 'Search',
   SearchX: 'SearchX',
   X: 'X',
@@ -642,6 +654,96 @@ describe('ModelPickerContent deferred search', () => {
   });
 });
 
+// A remote session whose CLI reports no models projects its current selection
+// as one row carrying `unavailable: true`, so the catalog has rows but nothing
+// selectable. The sheet must explain that state above the rows — the row and
+// the search field keep their places — instead of drawing a dead row with no
+// reason. The zero-rows branch keeps its own copy and is not this state. The
+// state is not a dead end: its one action closes the sheet and opens the
+// provider-key form, the only place a missing credential can be added.
+describe('ModelPickerContent all models unavailable', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    buildSearchCalls.values.length = 0;
+    listCommitLengths.values.length = 0;
+    safeAreaInsets.bottom = 0;
+    routerBack.mockClear();
+    routerPush.mockClear();
+  });
+
+  it('explains the dead row above the list when every model is unavailable', async () => {
+    slotState.bridge = {
+      ...makeBridge(),
+      options: [{ ...makeOption(0), unavailable: true }],
+    };
+    const renderer = await mount();
+
+    // The row stays: it is the session's current model, so the state explains
+    // why the picker offers nothing to change it to rather than hiding it.
+    expect(listedDisplayIds(renderer)).toEqual(['model-0']);
+
+    const headers = findByType(renderer.root, 'EmptyState');
+    expect(headers).toHaveLength(1);
+    /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+    expect(headers[0]?.props.title).toBe(i18n.t('agentChat.modelPicker.allUnavailableTitle'));
+    expect(headers[0]?.props.description).toBe(
+      i18n.t('agentChat.modelPicker.allUnavailableDescription')
+    );
+    /* eslint-enable typescript-eslint/no-unsafe-member-access */
+
+    // The state's one way out: the existing "Add key" copy, a press that
+    // closes the sheet first (its blur clears the model slot, so pushing on
+    // top of it would come back to an expired picker) and then opens the
+    // provider-key form that can make a model pickable again.
+    const actions = findByType(renderer.root, 'StateAction');
+    expect(actions).toHaveLength(1);
+    const action = actions[0];
+    if (!action) {
+      throw new Error('provider key action not found');
+    }
+    /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+    expect(action.props.label).toBe(i18n.t('profile.providerKeys.add'));
+    const onPress = action.props.onPress as (() => void) | undefined;
+    /* eslint-enable typescript-eslint/no-unsafe-member-access */
+    if (typeof onPress !== 'function') {
+      throw new TypeError('provider key action is not pressable');
+    }
+
+    act(() => {
+      onPress();
+    });
+
+    expect(routerBack).toHaveBeenCalledTimes(1);
+    expect(routerPush).toHaveBeenCalledTimes(1);
+    // A personal-scope href is its bare route; `providerKeyAddHref` hands an
+    // object only to the organization scope, so the pushed target is the path
+    // `provider-keys-screen`'s own test asserts.
+    expect(routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/provider-key-add');
+    expect(routerBack.mock.invocationCallOrder[0]).toBeLessThan(
+      routerPush.mock.invocationCallOrder[0] ?? 0
+    );
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('leaves the header off when any model can be picked', async () => {
+    slotState.bridge = {
+      ...makeBridge(),
+      options: [{ ...makeOption(0), unavailable: true }, makeOption(1)],
+    };
+    const renderer = await mount();
+
+    expect(findByType(renderer.root, 'EmptyState')).toHaveLength(0);
+    expect(listedDisplayIds(renderer)).toEqual(['model-0', 'model-1']);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
 // A row press taken from filtered results must apply in one press, with the
 // search field's keyboard closed as part of the pick — the same outcome as a
 // pick taken with the keyboard already dismissed.
@@ -716,8 +818,8 @@ describe('ModelPickerContent thinking effort availability', () => {
     variants: ['low', 'high'],
   };
 
-  // The commit itself runs on the sheet's focus-effect cleanup, which this
-  // harness mocks out (see `expo-router`); the close is what the route owns.
+  // Done is the one close that commits a pick; this harness mocks the focus
+  // effect out (see `expo-router`), so the commit is whatever the close does.
   function mountWith(acceptsVariant: boolean) {
     slotState.bridge = {
       ...makeBridge(),
@@ -797,8 +899,9 @@ describe('ModelPickerContent thinking effort availability', () => {
   });
 
   // The sheet stays open after a tap on a model with several efforts, so that
-  // pick is pending until the sheet closes. The focus cleanup commits it only
-  // after Done; this block runs that cleanup for real to tell the exits apart.
+  // pick is pending until the sheet closes. Done is the one close that commits
+  // it, and this block runs the route's focus effect for real so the exits can
+  // be told apart.
   describe('closing with a pending pick', () => {
     const otherOption: SessionModelOption = { ...makeOption(1), id: 'other-model' };
 

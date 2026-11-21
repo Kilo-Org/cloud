@@ -3,9 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { StateAction } from '@/components/empty-state';
 import { Button } from '@/components/ui/button';
+import { PlugZap, RotateCcw } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { gitlabInstanceMismatch } from '@/lib/pr-review/pr-review-connect-gate-view';
 import { useProviderPrScopeOrNull } from '@/lib/pr-review/provider-pr-ref';
 import { useCheckProviderConnection } from '@/lib/pr-review/use-check-provider-connection';
@@ -32,11 +35,12 @@ import { useTRPC } from '@/lib/trpc';
  * CTA and its connectivity is the GitHub App authorization, not an
  * integration status this hook can check.
  *
- * The retry is the state's one filled primary, as on the connect gate and the
- * GitHub install CTA: it is the action that can recover the item from here.
- * The connection check stays the outlined secondary below it, because it
- * answers a different question — whether the account is still connected — and
- * a state with two equally weighted buttons has no primary at all.
+ * The retry is the state's one primary, the shared `StateAction`, as on the
+ * connect gate and the GitHub install CTA: it is the action that can recover
+ * the item from here. The connection check stays the outlined secondary below
+ * it, at the same compact size with its own leading icon, because it answers a
+ * different question — whether the account is still connected — and a state
+ * with two equally weighted buttons has no primary at all.
  */
 export function PrReviewUnavailableActions({
   onRetry,
@@ -46,6 +50,7 @@ export function PrReviewUnavailableActions({
   isRetrying: boolean;
 }>) {
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const scope = useProviderPrScopeOrNull();
   const providerConnection = useCheckProviderConnection();
   const queryClient = useQueryClient();
@@ -120,11 +125,15 @@ export function PrReviewUnavailableActions({
   }
 
   return (
-    <View className="mt-3 w-full gap-2">
-      <Button className={STATE_ACTION_CLASS} onPress={onRetry} loading={isRetrying}>
-        <Text>{t('common.retry')}</Text>
-      </Button>
+    <View className="mt-3 items-center gap-2">
+      <StateAction
+        label={t('common.retry')}
+        icon={RotateCcw}
+        onPress={onRetry}
+        loading={isRetrying}
+      />
       <Button
+        size="sm"
         className={STATE_ACTION_CLASS}
         variant="outline"
         onPress={() => {
@@ -133,6 +142,7 @@ export function PrReviewUnavailableActions({
         loading={providerConnection.isPending}
         accessibilityLabel={t('prReview.checkConnection')}
       >
+        <PlugZap size={16} color={colors.foreground} />
         <Text>{t('prReview.checkConnection')}</Text>
       </Button>
     </View>

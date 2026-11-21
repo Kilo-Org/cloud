@@ -1,3 +1,4 @@
+import { type TOptions } from 'i18next';
 import { AppState, Linking } from 'react-native';
 import {
   getWidgetInfo,
@@ -6,7 +7,6 @@ import {
 } from 'react-native-android-widget';
 import { z } from 'zod';
 
-import { i18n } from '@/i18n';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
 import { getTerminalBlankEpoch, subscribeGlanceableTerminalEnd } from '@/lib/glanceable/cleanup';
@@ -32,6 +32,7 @@ import {
 } from '@/lib/glanceable/persist';
 import { registerGlanceableSink } from '@/lib/glanceable/sink-registry';
 import { getSurfaceExtras, setSurfaceExtras } from '@/lib/glanceable/surface-extras';
+import { glanceableTranslate } from '@/lib/glanceable/translate';
 import { runWidgetApprove } from '@/lib/glanceable/widget-actions';
 
 import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
@@ -106,8 +107,8 @@ subscribeLiveActivityEnabled(() => {
   liveUpdateAllowed = next;
 });
 
-function translate(key: string): string {
-  return i18n.t(key);
+function translate(key: string, options?: TOptions): string {
+  return glanceableTranslate(key, options);
 }
 
 /**

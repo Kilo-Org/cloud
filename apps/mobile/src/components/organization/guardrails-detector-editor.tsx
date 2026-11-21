@@ -1,8 +1,7 @@
-import { type ReactNode } from 'react';
+import { isValidElement, type ReactNode } from 'react';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { Card } from '@/components/ui/card';
 import { FilterChip } from '@/components/ui/filter-chip';
 import { FormField } from '@/components/ui/form-field';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -34,6 +33,19 @@ const POLICY_FORMAT_KEYS = {
   policy_text: 'organizationGuardrails.policyFormatText',
 } satisfies Record<PolicyFormat, string>;
 
+/**
+ * Whether the children hold anything to paint. A caller that passes one
+ * conditional child per option hands this card an array, and an array of
+ * `null`s looks like content to a plain truthiness test. Every options body is
+ * an element.
+ */
+function hasBody(children: ReactNode): boolean {
+  if (Array.isArray(children)) {
+    return children.some((child: ReactNode) => hasBody(child));
+  }
+  return isValidElement(children);
+}
+
 /** One detector: its name and description, the Off / Log only / Block choice, and its options. */
 export function DetectorCard({
   label,
@@ -57,7 +69,7 @@ export function DetectorCard({
     { value: 'block' as const, label: t('codeReviewer.decision.block') },
   ];
   return (
-    <Card>
+    <View className="gap-3">
       <View className="gap-1">
         <Text className="text-sm font-medium text-foreground">{label}</Text>
         <Text variant="caption">{description}</Text>
@@ -69,10 +81,10 @@ export function DetectorCard({
         disabled={disabled}
         accessibilityLabel={label}
       />
-      {choice === 'off' ? null : (
+      {choice !== 'off' && hasBody(children) ? (
         <View className={disabled ? 'pointer-events-none opacity-50' : undefined}>{children}</View>
-      )}
-    </Card>
+      ) : null}
+    </View>
   );
 }
 

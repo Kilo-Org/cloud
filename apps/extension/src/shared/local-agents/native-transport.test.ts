@@ -15,6 +15,7 @@ const HELLO: LocalAgentExtensionHello = {
     console: true,
     dialogs: true,
     fileUpload: true,
+    keepalive: true,
     network: true,
     tabGroups: true,
     trustedInput: false,

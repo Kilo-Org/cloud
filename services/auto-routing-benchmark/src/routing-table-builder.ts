@@ -106,6 +106,11 @@ export function buildRoutingTable(params: {
   summaries: BenchmarkModelSummary[];
   perCaseResults?: OfflineSweep['pairs'];
   complexityLabels?: ComplexityLabels;
+  /**
+   * Candidates a route serves when this build ranks none of its own, so a held route keeps
+   * the live table's entries instead of emptying (src/probe/eligibility.ts).
+   */
+  fallbackRoutes?: Partial<Record<TaxonomyRouteKey, RoutingTable['routes'][TaxonomyRouteKey]>>;
 }): RoutingTable {
   const {
     version,
@@ -156,7 +161,11 @@ export function buildRoutingTable(params: {
     );
 
   const routes = Object.fromEntries(
-    TAXONOMY_ROUTE_KEYS.map(routeKey => [routeKey, routeCandidates(routeKey)] as const)
+    TAXONOMY_ROUTE_KEYS.map(routeKey => {
+      const ranked = routeCandidates(routeKey);
+      const fallback = params.fallbackRoutes?.[routeKey];
+      return [routeKey, ranked.length > 0 || !fallback ? ranked : fallback] as const;
+    })
   );
 
   const table: RoutingTable = {

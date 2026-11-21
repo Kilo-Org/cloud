@@ -107,6 +107,7 @@ function createUserWebConnection() {
     disconnect: jest.fn(),
     destroy: jest.fn(),
     isConnected: jest.fn(() => false),
+    socketPhase: jest.fn(() => 'absent' as const),
     onConnectionChange: jest.fn(() => jest.fn()),
     isReconnectExhausted: jest.fn(() => false),
     onReconnectExhaustionChange: jest.fn(() => jest.fn()),

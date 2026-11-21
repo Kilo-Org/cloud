@@ -34,10 +34,13 @@
     "./cloud-agent-error": "./src/cloud-agent-error.ts",
     "./byok-credentials": "./src/byok-credentials.ts",
     "./byok-errors": "./src/byok-errors.ts",
+    "./integrations-errors": "./src/integrations-errors.ts",
     "./home-widget": "./src/home-widget.ts",
     "./display-text": "./src/display-text.ts",
+    "./git-url-project": "./src/git-url-project.ts",
     "./tool-detail": "./src/tool-detail/index.ts",
-    "./worktree-review": "./src/worktree-review/index.ts"
+    "./worktree-review": "./src/worktree-review/index.ts",
+    "./local-fake-llm": "./src/local-fake-llm.ts"
   },
   "scripts": {
     "typecheck": "tsgo",
@@ -45,6 +48,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@kilocode/organization-entitlement": "workspace:*",
     "@kilocode/session-ingest-contracts": "workspace:*",
     "zod": "catalog:"
   },

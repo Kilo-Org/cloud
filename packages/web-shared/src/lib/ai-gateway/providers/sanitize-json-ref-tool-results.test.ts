@@ -1,5 +1,11 @@
 import { describe, expect, jest, test } from '@jest/globals';
 import type OpenAI from 'openai';
+import { PROMPT_WALK_MAX_DEPTH } from '@kilocode/auto-routing-contracts';
+import {
+  CLIENT_SCHEMA_MAX_DEPTH,
+  CLIENT_SCHEMA_NODE_BUDGET,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/client-schema-budget';
+import { CACHE_CONTROL_NODE_BUDGET } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { sanitizeJsonRefToolResults } from '@kilocode/web-shared/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
@@ -134,5 +140,10 @@ describe('sanitizeJsonRefToolResults', () => {
     const parsed = JSON.parse(result) as Record<string, unknown>;
     expect(parsed._ref).toBe('#/$defs/root');
     expect(parsed.$ref).toBeUndefined();
+  });
+
+  test('keeps the traversal budgets equal to the modules that own them', () => {
+    expect(CLIENT_SCHEMA_MAX_DEPTH).toBe(PROMPT_WALK_MAX_DEPTH);
+    expect(CLIENT_SCHEMA_NODE_BUDGET).toBe(CACHE_CONTROL_NODE_BUDGET);
   });
 });

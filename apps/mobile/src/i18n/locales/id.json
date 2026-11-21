@@ -19,7 +19,9 @@
     "presenceStatus": "Host: {{connection}}",
     "commandStatus": "Pengiriman perintah: {{status}}",
     "delivered": "Terkirim",
-    "expired": "Kedaluwarsa"
+    "expired": "Kedaluwarsa",
+    "recoveryGaps_one": "{{displayCount}} bagian transkrip ini tidak ada.",
+    "recoveryGaps_other": "{{displayCount}} bagian transkrip ini tidak ada."
   },
   "common": {
     "manageOnWeb": "Kelola di web",
@@ -138,6 +140,7 @@
     "keepRunning": "Biarkan berjalan",
     "newSession": "Sesi baru",
     "noModelsAvailable": "Tidak ada model yang tersedia",
+    "modelRetires": "Dihentikan pada {{date}}",
     "notFound": "Tidak ditemukan.",
     "online": "Daring",
     "open": "Buka {{name}}",
@@ -172,6 +175,7 @@
     "generating": "Membuat…",
     "working": "Bekerja",
     "yourOwnRepositories": "Repositori milikmu",
+    "organizationRepositories": "Repositori organisasi",
     "dismissed": "Diabaikan",
     "agent": "Agen",
     "durationMinuteShort": "min",
@@ -180,7 +184,32 @@
     "organizationTrialEnded": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Pemilik organisasi dapat memperbarui penagihan di kilo.ai, lalu coba lagi.",
     "privateRepositoryA11y": "{{name}}, repositori pribadi",
     "legalDocumentEnglishOnly": "Dokumen ini hanya tersedia dalam bahasa Inggris.",
-    "organizationTrialEndedBilling": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Anda dapat memperbarui penagihan, lalu coba lagi."
+    "organizationTrialEndedBilling": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Anda dapat memperbarui penagihan, lalu coba lagi.",
+    "organizationTrialEndedBillingAtKiloAi": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Anda dapat memperbarui penagihan di kilo.ai, lalu coba lagi.",
+    "viewOnGitHub": "Lihat PR di GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Poin butir",
+        "nestedBulletPoint": "Poin butir bersarang",
+        "orderedItem": "Item daftar {n}",
+        "nestedOrderedItem": "Item daftar bersarang {n}"
+      },
+      "blockquote": {
+        "quote": "Kutipan",
+        "nestedQuote": "Kutipan bersarang"
+      },
+      "table": {
+        "row": "Baris {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Judul",
+        "links": "Tautan",
+        "images": "Gambar"
+      }
+    }
   },
   "language": {
     "restarting": "Memulai ulang untuk menerapkan bahasa",
@@ -274,6 +303,9 @@
     "credits": "Kredit",
     "failedToLoadBalance": "Gagal memuat saldo. Ketuk untuk mencoba lagi.",
     "balanceLoadFailed": "Gagal memuat saldo",
+    "balanceUnreachable": "Tidak dapat menghubungi server. Coba lagi.",
+    "balanceAccessDenied": "Anda tidak memiliki izin untuk melihat saldo ini.",
+    "balanceUnavailable": "Saldo tidak dapat dimuat.",
     "hideBalance": "Sembunyikan saldo",
     "showBalance": "Tampilkan saldo",
     "balanceHidden": "Saldo tersembunyi",
@@ -497,6 +529,14 @@
       "nextStepFinal": "Keputusan banding bersifat final. Banding lebih lanjut tidak dapat diajukan.",
       "viewReceipt": "Lihat tanda terima"
     },
+    "reportReceipts": {
+      "title": "Laporan",
+      "rowSubtitle": "Laporan yang Anda ajukan dan hasilnya",
+      "emptyTitle": "Belum ada laporan",
+      "emptyDescription": "Laporan yang Anda ajukan dari komentar atau respons AI akan muncul di sini.",
+      "couldNotLoad": "Tidak dapat memuat laporan Anda",
+      "capped": "Menampilkan laporan terbaru Anda."
+    },
     "changelog": "Yang baru",
     "changelogVersionPending": "Catatan versi {{version}} hadir di pembaruan aplikasi berikutnya.",
     "changelogGroupNew": "Baru",
@@ -504,7 +544,7 @@
     "changelogFixesPolish": "Perbaikan dan peningkatan di seluruh aplikasi.",
     "changelogAreas": {
       "signIn": "Masuk",
-      "profileOrganizations": "Profil dan organisasi"
+      "profileOrganizations": "Profil & organisasi"
     }
   },
   "preferences": {
@@ -669,7 +709,7 @@
     },
     "instructions": {
       "title": "Instruksi kustom",
-      "deprecation": "Fitur instruksi khusus akan dihentikan. Pindahkan panduan ini ke berkas REVIEW.md di repositorimu.",
+      "deprecation": "Fitur instruksi khusus akan dihapus. Pindahkan panduan ini ke berkas REVIEW.md di repositorimu.",
       "placeholder": "contoh: Terapkan aturan penanganan kesalahan kami…",
       "clearTitle": "Hapus instruksi kustom?",
       "clearMessage": "Menyimpan kolom yang kosong akan menghapus instruksi kustom yang tersimpan untuk peninjau ini."
@@ -694,12 +734,16 @@
     },
     "autoReviews": "Tinjauan otomatis",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket tidak terhubung. Hanya pemilik organisasi, admin, dan manajer penagihan yang dapat menghubungkannya."
+      "notConnectedReadOnlyPlan": "Masa percobaan organisasi telah berakhir, jadi pemilik harus memperbarui penagihan di kilo.ai."
     },
     "bitbucketConnect": {
       "managedOnWeb": "Koneksi Bitbucket untuk {{organization}} dikelola di web melalui komputer.",
+      "managedOnWebTitle": "Dikelola di web",
+      "managedOnWebShort": "Koneksi ini dikelola di web melalui komputer.",
+      "managedOnWebRepositories": "Pilih repositori untuk {{organization}} di web dari komputer.",
       "description": "Buat token akses ruang kerja untuk {{organization}}, lalu tempelkan di bawah.",
       "descriptionReconnect": "Buat token akses ruang kerja baru untuk {{organization}}, lalu tempelkan di bawah.",
+      "descriptionOverview": "Buat token akses ruang kerja, lalu tempelkan di layar berikutnya.",
       "scopes": "Akun: baca · Repositori: baca/tulis · PR: baca · Webhook: baca/tulis",
       "tokenPlaceholder": "Token akses ruang kerja",
       "tokenRefused": "Bitbucket tidak menerima token akses ruang kerja ini. Periksa bahwa token tersebut memiliki cakupan izin di atas, lalu coba lagi."
@@ -735,14 +779,15 @@
     "platformList": {
       "activity": "Aktivitas",
       "checking": "Memeriksa…",
+      "needsAttention": "Perlu perhatian",
       "platforms": "Platform",
       "statusUnavailable": "Status tidak tersedia"
     },
     "providerConnect": {
       "description": "Hubungkan {{label}} Kilo untuk meninjau PR secara otomatis.",
-      "githubApp": "Aplikasi GitHub",
+      "githubApp": "aplikasi GitHub",
       "githubError": "Tidak dapat membuka penyiapan GitHub. Coba lagi.",
-      "gitlabAccount": "Akun GitLab",
+      "gitlabAccount": "akun GitLab",
       "gitlabError": "Tidak dapat membuka penyiapan GitLab. Coba lagi."
     },
     "reviewDetail": {
@@ -760,7 +805,7 @@
       "gateHidden": "Tersembunyi",
       "gateNone": "Tidak ada",
       "noFindings": "Tidak ada temuan.",
-      "findingsUnavailable": "Hasil tidak tersedia karena tinjauan ini gagal.",
+      "findingsUnavailable": "Hasil tidak tersedia.",
       "findingsInProgress": "Tinjauan ini masih berlangsung. Temuan akan muncul di sini setelah selesai.",
       "findingsEndedWithoutResults": "Tinjauan ini berakhir sebelum menghasilkan temuan apa pun.",
       "serviceUnavailable": "Tidak dapat terhubung ke layanan tinjauan kode. Coba tinjauan lagi saat layanan tersedia.",
@@ -2225,6 +2270,8 @@
     "modelPicker": {
       "title": "Pilih model",
       "noModelsDescription": "Tidak ada model yang dapat dipilih.",
+      "allUnavailableTitle": "Tidak ada model yang dapat digunakan",
+      "allUnavailableDescription": "Tambah kunci penyedia, lalu coba lagi.",
       "favorites": "Favorit"
     },
     "modelSelector": {
@@ -2629,6 +2676,8 @@
     "retryHint": "Mencoba memuat ulang status Kilo Pass.",
     "endedOn": "Berakhir pada {{date}}",
     "notAvailableInApp": "Kilo Pass tidak tersedia di aplikasi.",
+    "notAvailableTitle": "Kilo Pass tidak ada di aplikasi",
+    "noPassDescription": "Akun ini tidak memiliki Kilo Pass.",
     "statusActive": "Aktif",
     "statusTrialing": "Uji coba",
     "statusPastDue": "Pembayaran terlambat",
@@ -2771,7 +2820,6 @@
       "skipped_one": "{{displayCount}} dilewati",
       "skipped_other": "{{displayCount}} dilewati",
       "title": "Pemeriksaan",
-      "viewOnGitHub": "Lihat PR di GitHub",
       "checkDetails": "detail pemeriksaan"
     },
     "composer": {
@@ -2832,6 +2880,9 @@
       "commentActions": "Tindakan pada komentar",
       "comment": "{{displayCount}} komentar",
       "comment_other": "{{displayCount}} komentar",
+      "conversationTruncated": "Hanya {{displayCount}} komentar pertama yang ditampilkan.",
+      "conversationTruncated_other": "Hanya {{displayCount}} komentar pertama yang ditampilkan.",
+      "conversationTruncated_one": "Hanya {{displayCount}} komentar pertama yang ditampilkan.",
       "couldNotLoad": "Tidak dapat memuat diskusi.",
       "couldNotLoadMore": "Tidak dapat memuat komentar lainnya.",
       "loadMoreComments": "Muat komentar lainnya",
@@ -3226,6 +3277,8 @@
       "partialPostedStale_one": "{{displayStaleCount}} komentar merujuk ke commit lama dan tetap berada di antreanmu.",
       "partialPostedStale_other": "{{displayStaleCount}} komentar merujuk ke commit lama dan tetap berada di antreanmu.",
       "submitCountOfTotal": "Kirim {{displayFreshCount}} dari {{displayTotalCount}} komentar",
+      "submitCountOfTotal_one": "Kirim {{displayFreshCount}} dari {{displayTotalCount}} komentar",
+      "submitCountOfTotal_other": "Kirim {{displayFreshCount}} dari {{displayTotalCount}} komentar",
       "submitReview": "Kirim tinjauan",
       "blockedRequestChanges": "Tambahkan ringkasan atau setidaknya satu komentar untuk meminta perubahan.",
       "blockedComment": "Tambahkan ringkasan atau setidaknya satu komentar untuk mengirim tinjauan berupa komentar."
@@ -3238,6 +3291,9 @@
     },
     "tabs": {
       "discussion": "Diskusi",
+      "discussionAccessibility": "{{title}}: {{displayCount}} komentar",
+      "discussionAccessibility_other": "{{title}}: {{displayCount}} komentar",
+      "discussionAccessibility_one": "{{title}}: 1 komentar",
       "files": "Berkas",
       "overview": "Ringkasan"
     },
@@ -3426,14 +3482,13 @@
     "hub": {
       "balance": "Saldo",
       "lowBalanceBelow": "Di bawah {{amount}}",
-      "organizationSeats": "Lisensi pengguna organisasi",
-      "plan": "Paket organisasi",
+      "plan": "Paket",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · Berakhir",
       "planEnded": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif.",
       "manageBilling": "Kelola penagihan",
-      "renamePlaceholder": "Nama organisasi",
+      "renamePlaceholder": "Masukkan nama organisasi",
       "renameTitle": "Ganti nama organisasi"
     },
     "inviteMember": {
@@ -3470,7 +3525,7 @@
       "retentionLimit": "Menampilkan faktur terbaru."
     },
     "lowBalanceAlert": {
-      "enableA11y": "Aktifkan peringatan saldo rendah",
+      "subtitle": "Kirim peringatan lewat email ke alamat yang kamu cantumkan saat saldo organisasi ini turun di bawah jumlah yang kamu tetapkan.",
       "notifyEmailsLabel": "Alamat email penerima",
       "permissionDenied": "Kamu tidak memiliki izin untuk mengelola peringatan penagihan.",
       "separateEmailsHint": "Pisahkan setiap alamat email dengan koma.",
@@ -3571,6 +3626,7 @@
       "identifierLabel": "Pengenal",
       "identifierRequired": "Masukkan pengenal.",
       "identifierTaken": "Mode lain sudah menggunakan pengenal ini.",
+      "identifierTooLong": "Jaga pengenal tetap {{max}} karakter atau kurang.",
       "nameLabel": "Nama mode",
       "nameRequired": "Masukkan nama mode.",
       "notFound": "Mode ini sudah tidak ada.",
@@ -3647,7 +3703,8 @@
     "signupStepUp": "Untuk menyelesaikan pembuatan akunmu, gunakan '$t(login.moreSignInOptions)'.",
     "signupStepUpApple": "Untuk menyelesaikan pembuatan akunmu, gunakan '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Untuk menyelesaikan pembuatan akunmu, gunakan '$t(login.signInWithGoogle)'.",
-    "invalidCode": "Kode tersebut salah. Coba lagi.",
+    "signupStepUpBack": "Untuk menyelesaikan pembuatan akunmu, kembali lalu gunakan '$t(login.moreSignInOptions)'.",
+    "invalidCode": "Kode tersebut salah atau sudah kedaluwarsa. Coba lagi atau gunakan '$t(login.resendCode)'.",
     "codeInProgress": "Kodemu sedang diproses. Tunggu sebentar dan coba lagi.",
     "tooManyAttempts": "Terlalu banyak percobaan. Silakan minta kode baru.",
     "invalidToken": "Gagal masuk. Coba lagi.",
@@ -3728,6 +3785,34 @@
     "nextScheduled": "Jadwal berikutnya",
     "answerNeeded": "Perlu jawaban",
     "waitingToRetry": "Menunggu percobaan ulang",
+    "countNoun": {
+      "needsInput_one": "Perlu masukan",
+      "needsInput_other": "Perlu masukan",
+      "running_one": "Bekerja",
+      "running_other": "Bekerja",
+      "scheduled_one": "Terjadwal",
+      "scheduled_other": "Terjadwal",
+      "idle_one": "Siaga",
+      "idle_other": "Siaga"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Perlu masukan",
+      "needsInput_other": "{{displayCount}} Perlu masukan",
+      "running_one": "{{displayCount}} Bekerja",
+      "running_other": "{{displayCount}} Bekerja",
+      "scheduled_one": "{{displayCount}} Terjadwal",
+      "scheduled_other": "{{displayCount}} Terjadwal",
+      "idle_one": "{{displayCount}} Siaga",
+      "idle_other": "{{displayCount}} Siaga"
+    },
+    "footer": {
+      "checked": "Diperiksa {{time}}",
+      "lastKnown": "Terakhir diketahui · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Eksekusi berikutnya {{time}}",
+      "wasDue": "Seharusnya {{time}}"
+    },
     "step": {
       "editing": "Mengedit",
       "reading": "Membaca",
@@ -3916,6 +4001,15 @@
       "checkHelp": "$t(modelChat.backends.checkConnection) mengirim permintaan inferensi singkat ke titik akhir ini menggunakan protokol dan model yang dipilih. Penyedia mungkin mengenakan biaya untuk permintaan ini.",
       "connectionSucceeded": "Model berhasil menyelesaikan permintaan menggunakan protokol ini.",
       "connectionFailed": "Model tidak dapat menyelesaikan permintaan. Periksa URL dasar API, protokol, kredensial, dan ID model.",
+      "requestTimedOut": "Titik akhir tidak menjawab tepat waktu. Periksa URL dasar API dan koneksi Anda, lalu coba lagi.",
+      "requestUnauthorized": "Titik akhir menolak kredensial. Periksa kunci API dan tajuk kustom, lalu coba lagi.",
+      "requestNotFound": "Titik akhir atau model tidak ditemukan. Periksa URL dasar API dan ID model.",
+      "requestRateLimited": "Titik akhir membatasi permintaan. Tunggu sebentar dan coba lagi.",
+      "requestUnavailable": "Titik akhir tidak tersedia saat ini. Coba lagi sebentar lagi.",
+      "requestUnreachable": "Titik akhir tidak dapat dijangkau. Periksa URL dasar API dan koneksi Anda.",
+      "requestInvalidResponse": "Titik akhir tidak menjawab dalam format yang diharapkan. Periksa apakah URL dasar API dan protokol cocok dengan server, lalu coba lagi.",
+      "discoveryNoModels": "Titik akhir tidak mencantumkan model apa pun. Masukkan model secara manual.",
+      "connectionIncomplete": "Model menjawab tetapi tidak menyelesaikan permintaan. Coba lagi, atau periksa ID model dan protokol.",
       "invalidInput": "Masukkan nama layanan, tajuk yang valid, dan setidaknya satu model dengan ID dan nama yang unik. Batas token harus berupa bilangan bulat positif.",
       "invalidUrl": "Masukkan URL dasar API HTTP atau HTTPS tanpa kredensial, kueri, atau fragmen.",
       "publicHttp": "Titik akhir HTTP publik tidak diizinkan. Gunakan HTTPS atau titik akhir lokal privat.",
@@ -4054,10 +4148,20 @@
     "reasoningEffort": {
       "modelFlag": "Model ini mendukung tingkat penalaran"
     },
-    "creditsRequired": "Kredit tidak cukup untuk mengirim pesan ini."
+    "creditsRequired": "Kredit tidak cukup untuk mengirim pesan ini.",
+    "providerKeyRefused": "Penyedia menolak kredensial. Periksa kunci API-nya, lalu kirim lagi.",
+    "providerModelMissing": "Layanan ini tidak lagi menyediakan model ini. Pilih yang lain.",
+    "providerRateLimited": "Penyedia membatasi permintaan. Tunggu sebentar dan kirim lagi.",
+    "providerUnavailable": "Penyedia tidak tersedia saat ini. Kirim lagi sebentar lagi."
   },
   "settingsTools": {
-    "confirmTitle": "Konfirmasi perubahan ini?"
+    "confirmTitle": "Konfirmasi perubahan ini?",
+    "guarded": {
+      "spendAlertsOff": "Matikan peringatan pengeluaran? Anda tidak akan lagi menerima notifikasi saat melewati ambang batas pengeluaran dan saat terjadi lonjakan per jam.",
+      "balanceAlertsOff": "Matikan peringatan saldo? Anda tidak akan lagi menerima notifikasi saat kredit Anda menipis.",
+      "securityFindingsOff": "Matikan temuan keamanan? Anda tidak akan lagi menerima notifikasi tentang temuan keamanan baru.",
+      "hideBalanceOn": "Sembunyikan saldo Anda? Saldo kredit tidak akan lagi muncul di layar profil dan hub organisasi."
+    }
   },
   "appActions": {
     "start": {
@@ -4132,7 +4236,7 @@
     "personalDefaultDescription": "Dimuat secara otomatis ketika tidak ada repositori yang memiliki profil yang disematkan.",
     "organizationDefaultDescription": "Dimuat otomatis untuk anggota yang tidak memiliki default pribadi.",
     "setAsDefault": "Tetapkan sebagai bawaan",
-    "saveFailed": "Tidak dapat menyimpan profil",
+    "saveFailed": "Tidak dapat menyimpan profil. Coba lagi.",
     "organizationRoleRequired": "Hanya pemilik organisasi dan admin yang dapat mengubah profil organisasi.",
     "deleteTitle": "Hapus profil",
     "deleteMessage": "Tindakan ini akan menghapus profil dan pengaturannya secara permanen. Hal ini tidak dapat dibatalkan.",
@@ -4396,6 +4500,7 @@
         "balanceNeutral": "Saldo tetap",
         "deduction": "Pengurangan",
         "grant": "Kredit gratis",
+        "welcomeCredits": "Kredit selamat datang",
         "purchase": "Pembelian"
       },
       "purchaseFallback": "Pembelian kredit",
@@ -4429,6 +4534,7 @@
     "pickPackToBuyAgain": "Pilih paket di atas untuk memulai pembelian baru.",
     "purchasePending": "Toko masih memproses pembayaran ini. Kredit Anda akan masuk setelah toko menyetujui tagihannya.",
     "buyAgain": "Beli lagi",
+    "checkPurchase": "Periksa pembelian",
     "purchaseOwnedByAnotherAccount": "Kredit pada Apple Account ini milik akun Kilo yang berbeda. Masuk ke akun Kilo tersebut untuk menggunakannya.",
     "purchaseOwnedByAnotherAccountPlay": "Kredit di akun Google Play ini milik akun Kilo yang berbeda. Masuk ke akun Kilo tersebut untuk menggunakannya."
   },
@@ -4522,7 +4628,9 @@
     },
     "saveSheet": {
       "title": "Simpan ke daftar",
-      "saved": "Disimpan ke {{list}}"
+      "saved": "Disimpan ke {{list}}",
+      "saveFailed": "Tidak dapat menyimpan tugas. Periksa koneksi Anda dan coba lagi.",
+      "saveRefused": "Tidak dapat menyimpan tugas ke daftar ini. Pilih daftar lain."
     }
   },
   "agentBriefing": {
@@ -4534,6 +4642,7 @@
     "empty": "Tidak ada aktivitas dalam periode laporan ini",
     "emptyHint": "Sesi coding cloud dan CLI Anda muncul di sini saat laporan terjadwal memiliki aktivitas.",
     "loadError": "Tidak dapat memuat laporan",
+    "estimateLoadError": "Tidak dapat memuat estimasi.",
     "view": "Baca laporan",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
@@ -4647,6 +4756,8 @@
     "connectedTo": "Terhubung ke {{account}}",
     "disconnected": "{{provider}} telah diputuskan",
     "disconnectFailed": "Tidak dapat memutuskan {{provider}}",
+    "disconnectRetry": "Slack tidak dapat mengonfirmasi pemutusan. Coba lagi.",
+    "disconnectNeedsSupport": "Kilo tidak dapat membaca akses Slack yang disimpan untuk koneksi ini. Hubungi tim dukungan untuk menyelesaikan pemutusan.",
     "couldNotLoad": "Tidak dapat memuat integrasi",
     "permissionDenied": "Anda tidak memiliki izin untuk mengelola integrasi ini.",
     "managedByOwner": "Minta pemilik organisasi untuk mengubah koneksi yang tidak dapat Anda ubah.",
@@ -4801,7 +4912,7 @@
   },
   "organizationGuardrails": {
     "title": "Pagar Pengaman Kecerdasan Artifisial",
-    "permissionDenied": "Hanya pemilik dan administrator organisasi yang dapat mengelola Pagar Pengaman Kecerdasan Artifisial.",
+    "permissionDenied": "Hanya pemilik dan administrator organisasi yang dapat mengelola Pagar Pengaman Kecerdasan Artifisial. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Pagar Pengaman Kecerdasan Artifisial tidak diaktifkan",
     "unavailable": "Kilo mengaktifkan Pagar Pengaman Kecerdasan Artifisial untuk sebuah organisasi atas permintaan. Hubungi {{supportEmail}}, dan tim Kilo mengaktifkannya untuk organisasi Anda.",
     "contactSupport": "Hubungi tim dukungan",
@@ -4813,12 +4924,15 @@
     "inputDescription": "Memindai setiap masukan dengan Enkrypt AI, termasuk hasil alat. Saat Enkrypt tidak tersedia, permintaan dikirim tanpa dipindai alih-alih ditolak.",
     "outputTitle": "Pagar pengaman keluaran",
     "outputDescription": "Memindai respons dengan Enkrypt AI sebelum anggota menerimanya. Nonaktif kecuali Anda mengaktifkannya.",
+    "outputUnavailable": "Kilo belum mengaktifkan pemindaian keluaran untuk organisasi ini, jadi respons tidak diperiksa dan tidak ada yang perlu diatur di sini. Hubungi {{supportEmail}} untuk memintanya.",
     "detectorsHint": "Blokir menolak permintaan yang ditandai. Mode Catat saja hanya merekamnya tanpa menunda permintaan.",
     "detectorsHintOutput": "Blokir menggagalkan respons yang ditandai. Mode Catat saja hanya merekamnya tanpa menunda respons.",
     "choiceLog": "Catat saja",
     "applyTo": "Terapkan ke",
     "applyToAllMembers": "Semua anggota",
     "applyKiloDefault": "Terapkan Bawaan Kilo",
+    "applyKiloDefaultEnglishNote": "Teks kebijakan bawaan Kilo dalam bahasa Inggris, karena Kilo Gateway menerapkannya persis seperti yang tertulis.",
+    "applyKiloDefaultReplaceMessage": "Kebijakan bawaan Kilo ditulis dalam bahasa Inggris dan menggantikan yang Anda atur di Pelanggaran kebijakan. Teks yang Anda masukkan di kolom teks kebijakan tidak dapat dipulihkan.",
     "invalidSavedTitle": "Pengaturan detektor masukan tersimpan tidak dapat dibaca",
     "invalidSavedBody": "Permintaan diblokir hingga detektor masukan disimpan kembali. Detektor di bawah dimulai dari Bawaan Kilo.",
     "invalidSavedOutputTitle": "Pengaturan detektor keluaran tersimpan tidak dapat dibaca",
@@ -4939,7 +5053,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Fitur perusahaan",
-    "enterpriseOnly": "Ini adalah fitur khusus perusahaan.",
+    "enterpriseOnly": "Penyedia dan model tersedia di paket Enterprise.",
     "readOnly": "Hanya pemilik dan administrator organisasi yang dapat mengubah pengaturan ini.",
     "loadError": "Penyedia dan model tidak dapat dimuat",
     "tabModels": "Model",
@@ -4953,6 +5067,8 @@
     "providersDescription": "Nonaktifkan penyedia untuk menghentikan Kilo merutekan ke penyedia itu untuk organisasi ini.",
     "providersNeedCatalog": "Sakelar penyedia tetap hanya-baca hingga katalog model lengkap dimuat. Coba lagi di atas untuk mengeditnya.",
     "providersEmpty": "Tidak ada penyedia yang cocok dengan pencarian ini.",
+    "providersNone": "Tidak ada penyedia yang tersedia untuk organisasi ini.",
+    "providersUnavailable": "Daftar penyedia tidak dapat dimuat.",
     "allowAllShown": "Izinkan semua yang ditampilkan",
     "denyAllShown": "Tolak semua yang ditampilkan",
     "gatewaysDescription": "Kilo merutekan permintaan model melalui Vercel AI Gateway atau OpenRouter. Gerbang yang dinonaktifkan menggagalkan permintaan tersebut.",

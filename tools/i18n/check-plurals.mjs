@@ -43,7 +43,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { isTranslateCallee, propertyName, unwrap, walk } from '../lib/ast.mjs';
+import { isTranslateCallee, propertyName, stringLiteralValue, unwrap, walk } from '../lib/ast.mjs';
 import {
   catalogTags,
   declaresPluralFamily,
@@ -175,8 +175,9 @@ export const NO_AGREEMENT = new Map([
  * written the way the source writes it with its whitespace collapsed.
  */
 function countedKey(argument, text) {
-  if (argument.type === 'Literal' && typeof argument.value === 'string') {
-    return { key: argument.value };
+  const key = stringLiteralValue(argument);
+  if (key !== null) {
+    return { key };
   }
   if (argument.type === 'TemplateLiteral' && argument.expressions.length === 0) {
     const [chunk] = argument.quasis;
@@ -391,6 +392,36 @@ export const DYNAMIC_COUNTED_KEYS = new Map([
         'BUCKET_KEYS map in severity-count-phrase.ts; each bucket of a dashboard line agrees with its own count',
     },
   ],
+  [
+    'GLANCEABLE_COUNT_NOUN_KEY[kind]',
+    {
+      keys: [
+        'glanceable.countNoun.needsInput',
+        'glanceable.countNoun.running',
+        'glanceable.countNoun.scheduled',
+        'glanceable.countNoun.idle',
+      ],
+      source: 'apps/mobile/src/lib/glanceable/presentation.ts',
+      declaration: 'GLANCEABLE_COUNT_NOUN_KEY',
+      reason:
+        'GLANCEABLE_COUNT_NOUN_KEY map in presentation.ts; the count noun inflects with its own number on the split layouts',
+    },
+  ],
+  [
+    'GLANCEABLE_COUNT_MESSAGE_KEY[kind]',
+    {
+      keys: [
+        'glanceable.count.needsInput',
+        'glanceable.count.running',
+        'glanceable.count.scheduled',
+        'glanceable.count.idle',
+      ],
+      source: 'apps/mobile/src/lib/glanceable/presentation.ts',
+      declaration: 'GLANCEABLE_COUNT_MESSAGE_KEY',
+      reason:
+        'GLANCEABLE_COUNT_MESSAGE_KEY map in presentation.ts; each whole count line inflects with its own count',
+    },
+  ],
 ]);
 
 /**
@@ -405,9 +436,9 @@ function typeKeys(typeNode) {
     if (node.type !== 'TSLiteralType') {
       return;
     }
-    const literal = unwrap(node.literal);
-    if (literal.type === 'Literal' && typeof literal.value === 'string') {
-      keys.push(literal.value);
+    const key = stringLiteralValue(node.literal);
+    if (key !== null) {
+      keys.push(key);
     }
   });
   return keys;
@@ -429,29 +460,60 @@ function objectKeys(initializer) {
     if (property.type !== 'Property') {
       continue;
     }
-    const value = unwrap(property.value);
-    if (value.type === 'Literal' && typeof value.value === 'string') {
-      keys.push(value.value);
+    const key = stringLiteralValue(property.value);
+    if (key !== null) {
+      keys.push(key);
     }
   }
   return keys;
 }
 
 /**
+ * The noun phrase naming the initialiser shape `objectKeys` could not read.
+ * `unwrap` already reads through the TypeScript wrappers, so the shape is the
+ * node the check actually saw; spelling the node type as words keeps an
+ * unlisted expression readable in the diagnostic.
+ */
+function initializerShape(initializer) {
+  if (initializer === null) {
+    return 'no initializer';
+  }
+  const node = unwrap(initializer);
+  if (node.type === 'Identifier') {
+    return 'an identifier';
+  }
+  if (node.type === 'CallExpression') {
+    return 'a call expression';
+  }
+  if (node.type === 'TemplateLiteral') {
+    return 'a template literal';
+  }
+  if (node.type === 'MemberExpression') {
+    return 'a member expression';
+  }
+  if (node.type === 'ArrayExpression') {
+    return 'an array literal';
+  }
+  const words = node.type.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase();
+  return `${/^[aeiou]/.test(words) ? 'an' : 'a'} ${words}`;
+}
+
+/**
  * The keys one declaration names, read from the syntax tree of the module that
  * owns it: a union alias's members, or a const object's values, in the order
- * the declaration writes them. Null when the module declares no such alias or
- * const, so a renamed declaration is reported instead of passing as an empty
- * set.
+ * the declaration writes them. `found` is false when the module declares no
+ * such alias or const, so a renamed declaration is reported instead of passing
+ * as an empty set; when it is declared but its initialiser is not a string-key
+ * object, `keys` is null and `shape` names what the check found instead.
  */
 function declaredKeys(entry, declaration) {
-  let keys = null;
+  let result = { found: false };
   walk(entry.program, node => {
-    if (keys !== null) {
+    if (result.found) {
       return;
     }
     if (node.type === 'TSTypeAliasDeclaration' && node.id.name === declaration) {
-      keys = typeKeys(node.typeAnnotation);
+      result = { found: true, keys: typeKeys(node.typeAnnotation), shape: null };
       return;
     }
     if (
@@ -461,21 +523,20 @@ function declaredKeys(entry, declaration) {
     ) {
       return;
     }
-    // A declarator without an initialiser does not declare the keys either,
-    // and objectKeys would read through null, so it stays the same null the
-    // missing-alias case reports.
-    if (node.init !== null) {
-      keys = objectKeys(node.init);
-    }
+    // objectKeys reads through an initialiser, so a declarator without one is
+    // named by the shape helper rather than handed to it.
+    const keys = node.init === null ? null : objectKeys(node.init);
+    result = { found: true, keys, shape: keys === null ? initializerShape(node.init) : null };
   });
-  return keys;
+  return result;
 }
 
 /**
  * One declaration module, read and parsed once: the normalised path its
  * diagnostics name it by, the syntax tree its declarations are read from, the
- * lines that say the parser refused it, and the keys read from each declaration
- * so far — the two `McpStatusKey` entries share one read.
+ * lines that say the parser refused it, and the read of each declaration so
+ * far — whether it is declared, the keys it names, and the shape that stopped
+ * the read when it names none — the two `McpStatusKey` entries share one read.
  *
  * The read is the tree walk's own step, `readSourceEntry`, so a refused read
  * yields that step's single line instead of a copy of its wording. The module
@@ -523,13 +584,20 @@ export function checkDynamicCountedKeySources(rootDir = ROOT, reported = new Set
     if (!source.declarations.has(listed.declaration)) {
       source.declarations.set(listed.declaration, declaredKeys(source.entry, listed.declaration));
     }
-    const keys = source.declarations.get(listed.declaration);
-    if (keys === null) {
+    const read = source.declarations.get(listed.declaration);
+    if (!read.found) {
       problems.push(
         `${source.path}: ${listed.declaration} is not declared in this module, so ${expression} cannot be checked against it`
       );
       continue;
     }
+    if (read.keys === null) {
+      problems.push(
+        `${source.path}: ${listed.declaration} is declared with ${read.shape}, so the string keys ${expression} relies on cannot be read; ${expression} is left unchecked`
+      );
+      continue;
+    }
+    const keys = read.keys;
     const listedKeys = new Set(listed.keys);
     for (const key of new Set(keys)) {
       if (!listedKeys.has(key)) {
@@ -709,7 +777,10 @@ function run() {
       counts.push(`${report.length} language(s) with missing plural categories`);
     }
     console.error(`\ncheck-plurals: ${counts.join('; ')}`);
-    process.exit(1);
+    // The exit status is kept while Node drains the pending writes: a forced
+    // exit can lose the tail of a report piped to a slow reader.
+    process.exitCode = 1;
+    return;
   }
 
   console.log(

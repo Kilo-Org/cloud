@@ -1,10 +1,10 @@
 /* eslint-disable max-lines -- The live list keeps its query, pull-refresh, keyboard container, and FAB orchestration together on one screen. */
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
-import { AppState, Keyboard, Pressable, View } from 'react-native';
+import { AppState, Keyboard, View } from 'react-native';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { RefreshControl } from '@/components/ui/refresh-control';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useStyleSideInsets } from '@/lib/screen-insets';
 import { useTranslation } from 'react-i18next';
 import { Bot, History, SlidersHorizontal, X } from '@/components/ui/icons';
 
@@ -38,15 +38,13 @@ import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-
 import { useAgentsListChrome } from '@/components/agents/use-agents-list-chrome';
 import { useOwnedKeyboard } from '@/components/agents/use-owned-keyboard';
 import { OwnedKeyboardLift, useKeyboardLiftPad } from '@/components/agents/owned-keyboard-lift';
-import { Text } from '@/components/ui/text';
 import { IconButton } from '@/components/ui/icon-button';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { textActionTargetClass } from '@/lib/a11y/tap-target';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { holdSessionListTouch } from '@/lib/session-list-touch-gate';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
-import { cn } from '@/lib/utils';
 
 import {
   type Href,
@@ -63,7 +61,7 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   const navigation = useNavigation();
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const { left, right } = useSafeAreaInsets();
+  const { left, right } = useStyleSideInsets();
   // The tabs layout's width-aware label decision rides along, so this screen's
   // clearance (list frame, FAB and state-surface insets) tracks the bar height.
   const tabBarHeight = useEffectiveTabBarHeight();
@@ -76,8 +74,12 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   const { organizationId, isError: isContextError, refetch: refetchContext } = context;
   const sessions = useLiveAgentSessions({ organizationId, enabled: context.isReady });
   const { activeSessions, refetch } = sessions;
-  const content = liveSessionContent(context, sessions);
+  const connectivity = useCommittedConnectivityStatus();
+  const content = liveSessionContent(context, sessions, connectivity);
   const hasLiveRows = content === 'rows';
+  // The offline state owns the whole surface: the feedback band centers its
+  // card, and the body (skeletons or rows) stands down for it.
+  const offlineSurface = content === 'offline';
   // A status link from the Home `Live now` card narrows the live list to one
   // state. The parameter is transient: it is not stored, so it cannot silently
   // narrow a later visit. The active filter is drawn by
@@ -91,6 +93,9 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   const retryableRowsFailure = hasLiveRows && sessions.terminalError?.kind === 'retryable';
 
   const query = useLiveSessionQuery(activeSessions);
+  // A failure or the offline state owns the whole surface: its centered card
+  // takes the space the body would have used.
+  const centeredSurface = offlineSurface || (query.hasLoaded && content === 'error');
   const { visibleSessions: filteredSessions, isSearching } = query;
   // The status narrowing applies after the search and persisted filters, so the
   // filter picker still offers every option the live set contains and
@@ -230,27 +235,14 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
     router.setParams({ status: undefined });
   }, [router]);
 
-  // Both routes into the stored-session list — the header control and the
-  // accepted-empty body link — name that surface: a bare `home.seeAll` here
-  // claimed a longer live list that is not on screen (finding live-now-all),
-  // and two names for one destination read as two different surfaces.
+  // The header control names the stored-session list: a bare `home.seeAll`
+  // here claimed a longer live list that is not on screen (finding
+  // live-now-all). The accepted-empty body carries no second route to it, so
+  // one destination keeps one name.
   const historyLabel = t('agents.sessionList.pastSessions');
   const openHistory = () => {
     router.push('/(app)/(tabs)/(2_agents)/history' as Href);
   };
-  const emptyStateHistoryAction = (
-    <Pressable
-      onPress={openHistory}
-      accessibilityRole="button"
-      accessibilityLabel={historyLabel}
-      testID="agents-view-history-empty"
-      className={cn(textActionTargetClass(), 'min-w-0 shrink justify-center active:opacity-70')}
-    >
-      <Text className="text-sm text-primary" numberOfLines={1}>
-        {historyLabel}
-      </Text>
-    </Pressable>
-  );
   const historyAction = (
     <IconButton
       accessibilityLabel={historyLabel}
@@ -389,7 +381,10 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   );
 
   let body: ReactNode = null;
-  if (!query.hasLoaded || content === 'pending') {
+  // Offline is not a load: the paused first read cannot land, so the centered
+  // feedback band draws the offline card (with Retry) and no body follows it —
+  // skeletons would keep promising a load that cannot start.
+  if (!offlineSurface && (!query.hasLoaded || content === 'pending')) {
     body = <SessionListSkeletonRows insets={{ left, right }} />;
   } else if (hasLiveRows && visibleSessions.length === 0) {
     // The reserved band is mounted here too (the sessions exist behind the
@@ -421,7 +416,6 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
         organizationId={organizationId}
         refreshControl={refreshControl}
         compact={compactLiveEmptyState}
-        historyAction={emptyStateHistoryAction}
       />
     );
   } else if (hasLiveRows) {
@@ -459,15 +453,15 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   const region = (
     <>
       <View
-        className={query.hasLoaded && content === 'error' ? 'flex-1' : 'min-h-5'}
-        style={query.hasLoaded && content === 'error' ? undefined : sidePadding}
+        className={centeredSurface ? 'flex-1' : 'min-h-5'}
+        style={centeredSurface ? undefined : sidePadding}
       >
         <LiveSessionFeedback
           context={context}
           sessions={sessions}
           failureLabel={t('agents.sessionList.couldNotLoadActive')}
           compact
-          centered={query.hasLoaded && content === 'error'}
+          centered={centeredSurface}
           refresh={{
             busy: pull.refreshing || pull.busy,
             failed: pull.failed || retryableRowsFailure,

@@ -56,6 +56,18 @@ describe('GET /api/private/users', () => {
     expect(response).toBe(authFailedResponse);
   });
 
+  test('exempts only human bearer keys from the step-up guard', async () => {
+    await setAdminAuth();
+
+    await GET(makeRequest('someone@example.com'));
+
+    expect(mockedGetUserFromAuth).toHaveBeenCalledWith({
+      adminOnly: true,
+      requestMethod: 'GET',
+      stepUpExemptCredentials: ['human_bearer'],
+    });
+  });
+
   test('returns empty list when search term is missing', async () => {
     await setAdminAuth();
 

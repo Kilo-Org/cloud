@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import {
   copyFileSync,
   mkdirSync,
@@ -20,7 +20,13 @@ import { checkCatalogs } from './check-catalogs.mjs';
 // The checker parses with oxc through the shared scanner, so the import-only
 // probe links the repository's dependency tree at its own root.
 const REPO = realpathSync(new URL('../..', import.meta.url).pathname);
-const SHARED_MODULES = ['ast.mjs', 'catalogs.mjs', 'entry-point.mjs', 'source-files.mjs'];
+const SHARED_MODULES = [
+  'ast.mjs',
+  'catalogs.mjs',
+  'entry-point.mjs',
+  'fs-entries.mjs',
+  'source-files.mjs',
+];
 const WORDING_EXCEPTIONS = readFileSync(
   new URL('./wording-exceptions.json', import.meta.url),
   'utf8'
@@ -147,6 +153,41 @@ function cli(root) {
   });
   assert.ifError(result.error);
   return result;
+}
+
+/** A streamed read has no built-in deadline, so the helper sets one. */
+const CHILD_TIMEOUT_MS = 60_000;
+
+/**
+ * The command with its stderr read while it runs, as a pipeline consumer reads
+ * it. `spawnSync` drains every write as it blocks, so only this shape shows a
+ * report that the command abandons when it exits: the pipe holds one buffer.
+ * The reader owns the wait, so the child needs its own limit: a command that
+ * never exits would otherwise hold the test run open forever.
+ */
+function cliStreamed(root, options = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [join(root, 'tools/i18n/check-catalogs.mjs')], {
+      cwd: root,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      ...options,
+    });
+    let stderr = '';
+    child.stdout.resume();
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', chunk => {
+      stderr += chunk;
+    });
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      reject(new Error(`the command did not exit within ${CHILD_TIMEOUT_MS} ms`));
+    }, CHILD_TIMEOUT_MS);
+    child.on('error', reject);
+    child.on('close', status => {
+      clearTimeout(timer);
+      resolve({ status, stderr });
+    });
+  });
 }
 
 for (const callee of ['t', 'i18n.t']) {
@@ -440,6 +481,18 @@ test('ignores a mounted-harness helper while a source file still reports its key
   ]) {
     assert.deepEqual(run({ extraFiles: { [helper]: source } }), []);
   }
+});
+
+test('folds a Devanagari danda as sentence-final punctuation', () => {
+  // The Hindi imperative and its error-message twin differ only by the danda,
+  // so the shared-wording rule must read them as one wording.
+  const found = run({
+    language: 'hi',
+    english: { label: 'Choose a model', error: 'Choose a model.' },
+    translated: { label: 'मॉडल चुनें', error: 'मॉडल चुनें।' },
+    source: "t('label'); t('error');",
+  });
+  assert.deepEqual(found, []);
 });
 
 for (const [language, title, badge] of [
@@ -1919,6 +1972,51 @@ test('rejects two push keys that hold one piece of copy', () => {
   );
 });
 
+// The prefix expansion reads one snapshot of the literals: `b.` then `a.` over
+// the literal `c` builds `b.c` and `a.c`, never `a.b.c`.
+test('rejects a push key that only a second prefix pass would synthesize', () => {
+  const found = run({
+    pushEnglish: { a: { b: { c: 'Translated elsewhere' } } },
+    pushTranslated: { a: { b: { c: 'Переведено' } } },
+    pushSource: [
+      "const leaf = 'c';",
+      'translatePush(locale, `b.${leaf}`, undefined, stored);',
+      'translatePush(locale, `a.${leaf}`, undefined, stored);',
+    ].join('\n'),
+  });
+  assert.match(
+    found.join('\n'),
+    /^notifications: en\.json defines "a\.b\.c", which no source file uses$/m
+  );
+});
+
+// The exemption is looked up through wording(), so the remedy has to print that
+// same folded form: adding the raw copy would leave the duplicate in place.
+test('names the folded copy in the duplicate-copy remedy', () => {
+  const found = run({
+    english: { agents: { title: 'Cancel' }, profile: { action: 'Cancel' } },
+    translated: { agents: { title: 'Отмена' }, profile: { action: 'Отменить' } },
+    source: "t('agents.title');\nt('profile.action');",
+  });
+  const text = found.join('\n');
+  assert.match(text, /or add "cancel" to TWO_SENSE_COPY in tools\/i18n\/check-catalogs\.mjs/);
+  assert.ok(
+    text.includes(
+      ' (entries are compared after trimming, case folding and dropping trailing sentence punctuation)'
+    ),
+    'the remedy explains how the entry is compared'
+  );
+
+  // A copy the fold leaves alone is printed as it stands, with no explanation.
+  const plain = run({
+    english: { agents: { title: 'not now' }, profile: { action: 'not now' } },
+    translated: { agents: { title: 'не сейчас' }, profile: { action: 'не сейчас' } },
+    source: "t('agents.title');\nt('profile.action');",
+  }).join('\n');
+  assert.match(plain, /or add "not now" to TWO_SENSE_COPY/);
+  assert.ok(!plain.includes('entries are compared after trimming'), 'no note when nothing folds');
+});
+
 test('accepts push producers that read one shared key', () => {
   // Both session producers state the session title, so one entry carries it and
   // each payload names its own base.
@@ -2197,6 +2295,27 @@ test('reports a broken catalog through the command and exits non-zero', () => {
   assert.equal(result.status, 1);
   assert.match(result.stderr, /mobile\/ru: missing key "agents\.title"/);
   assert.match(result.stderr, /check-catalogs: \d+ problem\(s\)/);
+});
+
+test('writes the whole report before it sets the failing exit status', async () => {
+  // The report must survive the pipe: the reader here takes the output while
+  // the command runs, so a forced exit abandons everything past one pipe
+  // buffer and the tail of a long report never arrives. Every generated key is
+  // missing from the Russian catalog and used by no source.
+  const english = { ...ENGLISH };
+  for (let index = 0; index < 10_000; index += 1) {
+    english[`problem${index}`] = `Unused copy ${index}`;
+  }
+  const root = cliFixture(standardFiles({ english }));
+  const result = await cliStreamed(root, {
+    env: { ...process.env, I18N_CHECK_LIMIT: '100000' },
+  });
+  assert.equal(result.status, 1);
+  // The floor asks for several pipe buffers, not for this fixture's exact size:
+  // the case is about the tail of a report that no single buffer can hold.
+  assert.ok(result.stderr.length > 256 * 1024, `stderr was ${result.stderr.length} bytes`);
+  assert.match(result.stderr, /mobile\/ru: missing key "problem9999"/);
+  assert.match(result.stderr, /check-catalogs: \d+ problem\(s\)\n$/);
 });
 
 test('reports a directory named like a catalog through the command and skips it', () => {
@@ -2939,4 +3058,154 @@ test('rejects an added form that drops the family count its reference lacks', ()
   );
   // One line for the value: the specific count message replaces the general one.
   assert.doesNotMatch(text, /"agents\.items_few" placeholders differ from English/);
+});
+
+// The changelog sentence joins the areas a release touched with
+// `Intl.ListFormat`, so an area label that carries the catalog's own list
+// conjunction doubles it and the reader cannot tell the areas apart.
+const CHANGELOG_AREAS = {
+  profile: {
+    changelogFixesIn: 'Fixes and improvements in {{areas}}.',
+    changelogAreas: {
+      signIn: 'Sign-in',
+      profileOrganizations: 'Profile & organizations',
+    },
+  },
+};
+const CHANGELOG_AREAS_SOURCE = [
+  "t('profile.changelogFixesIn', { areas });",
+  "t('profile.changelogAreas.signIn');",
+  "t('profile.changelogAreas.profileOrganizations');",
+].join('\n');
+
+test('accepts a changelog area label that joins its nouns without the list conjunction', () => {
+  const found = run({
+    language: 'hi',
+    english: CHANGELOG_AREAS,
+    translated: {
+      profile: {
+        changelogFixesIn: '{{areas}} में त्रुटि-सुधार और बेहतरी।',
+        changelogAreas: { signIn: 'साइन-इन', profileOrganizations: 'प्रोफ़ाइल व संगठन' },
+      },
+    },
+    source: CHANGELOG_AREAS_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects a changelog area label that carries the catalog list conjunction', () => {
+  const found = run({
+    language: 'hi',
+    english: CHANGELOG_AREAS,
+    translated: {
+      profile: {
+        changelogFixesIn: '{{areas}} में त्रुटि-सुधार और बेहतरी।',
+        changelogAreas: { signIn: 'साइन-इन', profileOrganizations: 'प्रोफ़ाइल और संगठन' },
+      },
+    },
+    source: CHANGELOG_AREAS_SOURCE,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /^mobile\/hi: "profile\.changelogAreas\.profileOrganizations" contains the list conjunction "और"; the changelog sentence joins the areas itself, so join this label's nouns another way$/m
+  );
+});
+
+// The rule reads the conjunction from the platform formatter, so a catalog
+// whose conjunction is a word of its own is caught as well, and one whose
+// label legitimately contains the same letters in another role is not.
+test('rejects the English source label that carries "and"', () => {
+  const found = run({
+    language: 'ru',
+    english: {
+      profile: {
+        changelogFixesIn: 'Fixes and improvements in {{areas}}.',
+        changelogAreas: { signIn: 'Sign-in', profileOrganizations: 'Profile and organizations' },
+      },
+    },
+    translated: {
+      profile: {
+        changelogFixesIn: 'Исправления и улучшения: {{areas}}.',
+        changelogAreas: { signIn: 'Вход', profileOrganizations: 'Профиль и организации' },
+      },
+    },
+    source: CHANGELOG_AREAS_SOURCE,
+  });
+  const text = found.join('\n');
+  assert.match(
+    text,
+    /^mobile\/en: "profile\.changelogAreas\.profileOrganizations" contains the list conjunction "and"/m
+  );
+  assert.match(
+    text,
+    /^mobile\/ru: "profile\.changelogAreas\.profileOrganizations" contains the list conjunction "и"/m
+  );
+});
+
+// The sentence also joins the areas that render from shared keys, so those
+// labels obey the same rule: a notification or chat name that carries the
+// conjunction splits one area into two.
+const CHANGELOG_SHARED_AREAS = {
+  common: { chat: 'Chat', notifications: 'Notifications' },
+  integrations: { title: 'Integrations' },
+  profile: {
+    changelogFixesIn: 'Fixes and improvements in {{areas}}.',
+    changelogAreas: { signIn: 'Sign-in', profileOrganizations: 'Profile & organizations' },
+  },
+};
+const CHANGELOG_SHARED_SOURCE = [
+  "t('profile.changelogFixesIn', { areas });",
+  "t('common.chat');",
+  "t('common.notifications');",
+  "t('integrations.title');",
+  "t('profile.changelogAreas.signIn');",
+  "t('profile.changelogAreas.profileOrganizations');",
+].join('\n');
+
+test('rejects a shared area label that carries the list conjunction', () => {
+  const found = run({
+    language: 'fr',
+    english: CHANGELOG_SHARED_AREAS,
+    translated: {
+      common: { chat: 'Discussion', notifications: 'Alertes et notifications' },
+      integrations: { title: 'Intégrations' },
+      profile: {
+        changelogFixesIn: 'Corrections et améliorations dans {{areas}}.',
+        changelogAreas: { signIn: 'Connexion', profileOrganizations: 'Profil & organisations' },
+      },
+    },
+    source: CHANGELOG_SHARED_SOURCE,
+  });
+  assert.match(
+    found.join('\n'),
+    /^mobile\/fr: "common\.notifications" contains the list conjunction "et"; the changelog sentence joins the areas itself/m
+  );
+});
+
+// The app builds its formatters with a named script or region for two
+// catalogs, so the rule has to read the same tag the screen formats with: the
+// Serbian catalog is Latin, while a bare `sr` tag resolves to Cyrillic data.
+test('reads the Serbian conjunction from the Latin script the app formats with', () => {
+  const found = run({
+    language: 'sr',
+    english: CHANGELOG_SHARED_AREAS,
+    translated: {
+      common: { chat: 'Ćaskanje', notifications: 'Obaveštenja' },
+      integrations: { title: 'Integracije' },
+      profile: {
+        changelogFixesIn: 'Ispravke i poboljšanja u {{areas}}.',
+        changelogAreas: { signIn: 'Prijavljivanje', profileOrganizations: 'Profil i organizacije' },
+      },
+    },
+    source: CHANGELOG_SHARED_SOURCE,
+  });
+  const text = found.join('\n');
+  assert.match(
+    text,
+    /^mobile\/sr: "profile\.changelogAreas\.profileOrganizations" contains the list conjunction "i"/m
+  );
+  // The Cyrillic conjunction is not what this catalog renders, so a label that
+  // happens to contain it is no finding.
+  assert.doesNotMatch(text, /contains the list conjunction "и"/);
 });

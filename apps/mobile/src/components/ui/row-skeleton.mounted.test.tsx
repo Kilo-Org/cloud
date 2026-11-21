@@ -6,7 +6,7 @@ import { SWITCH_HOST_CLASS } from '@/lib/a11y/tap-target';
 import { act, TestRenderer } from '@/test/renderer';
 
 import { ROW_FRAME_CLASS, ROW_TILE_CLASS } from './row-frame';
-import { RowSkeleton } from './row-skeleton';
+import { RowSkeleton, SwitchPlaceholder } from './row-skeleton';
 
 vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('react-native', () => ({ View: 'View' }));
@@ -113,6 +113,20 @@ describe('RowSkeleton', () => {
     expect(classesOf(host)).toEqual(expect.arrayContaining(SWITCH_HOST_CLASS.split(' ')));
   });
 
+  it('paints the switch pill inside the host the loaded control occupies', () => {
+    act(() => {
+      renderer = TestRenderer.create(createElement(SwitchPlaceholder, {}));
+    });
+    const host = first(renderer?.root).findByType('View' as never);
+    const [pill] = skeletons(host);
+
+    expect(classesOf(host)).toEqual(expect.arrayContaining(SWITCH_HOST_CLASS.split(' ')));
+    expect(skeletons(host)).toHaveLength(1);
+    expect(classesOf(first(pill))).toEqual(
+      expect.arrayContaining(['h-[31px]', 'w-[51px]', 'rounded-full'])
+    );
+  });
+
   it('stacks the leading cell above the text block in a narrow window', () => {
     const classes = classesOf(
       frameOf(renderSkeleton({ stack: true, tile: true, trailingControl: true }))
@@ -137,5 +151,30 @@ describe('RowSkeleton', () => {
     expect(classes).toEqual(expect.arrayContaining(['flex-row', 'px-4', 'py-3']));
     // The strip, the eyebrow, the title and the meta bar.
     expect(skeletons(root)).toHaveLength(3);
+  });
+
+  it('keeps main’s one-step line gap unless the row it becomes is a measured RowFrame', () => {
+    // `RowFrame`'s subtitle carries its own `mt-0.5` (1.75 pt), so a placeholder
+    // for one only reserves that row's height when it asks for `rowFrame`. Every
+    // other placeholder — the Act-first finding row, the invoice, notification
+    // and credit-history rows — keeps the `gap-1` those loaded rows use.
+    const gapOf = (classes: string[]): string => {
+      const gap = classes.find(token => token.startsWith('gap-'));
+      if (gap === undefined) {
+        throw new Error('placeholder row has no column gap');
+      }
+      return gap;
+    };
+    const columnOf = (props: Readonly<Record<string, unknown>>): string[] => {
+      const [title] = skeletons(renderSkeleton(props));
+      const column = first(title).parent;
+      if (column === null) {
+        throw new Error('placeholder row has no text column');
+      }
+      return classesOf(column);
+    };
+
+    expect(gapOf(columnOf({ lines: 2 }))).toBe('gap-1');
+    expect(gapOf(columnOf({ lines: 2, rowFrame: true }))).toBe('gap-0.5');
   });
 });

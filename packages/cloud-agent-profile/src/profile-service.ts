@@ -1,4 +1,5 @@
 import type { WorkerDb } from '@kilocode/db';
+import { listVarsForProfile } from './profile-vars-service';
 import {
   agent_environment_profiles,
   agent_environment_profile_vars,
@@ -12,7 +13,13 @@ import {
   type AgentEnvironmentProfile,
 } from '@kilocode/db/schema';
 import { eq, and, sql, count, inArray } from 'drizzle-orm';
-import type { ProfileDatabase, ProfileOwner, ProfileSummary, ProfileResponse } from './types';
+import type {
+  ProfileDatabase,
+  ProfileTransaction,
+  ProfileOwner,
+  ProfileSummary,
+  ProfileResponse,
+} from './types';
 import {
   assertOwnerProfileLimit,
   buildOwnershipCondition,
@@ -46,23 +53,38 @@ export async function createProfile(
   name: string,
   description?: string
 ): Promise<{ id: string }> {
-  return await db.transaction(async tx => {
-    await lockProfileCreation(tx, owner);
-    await assertOwnerProfileLimit(tx, owner);
+  return await db.transaction(async tx => ({
+    id: await insertProfileRow(tx, owner, createdByUserId, name, description),
+  }));
+}
 
-    const [profile] = await tx
-      .insert(agent_environment_profiles)
-      .values({
-        owned_by_organization_id: owner.type === 'organization' ? owner.id : null,
-        owned_by_user_id: owner.type === 'user' ? owner.id : null,
-        created_by_user_id: createdByUserId,
-        name,
-        description: description ?? null,
-      })
-      .returning({ id: agent_environment_profiles.id });
+/**
+ * Insert one profile under the owner's creation lock and inside the owner's
+ * profile cap. Takes the caller's open transaction, so the lock, the cap check
+ * and the insert are one unit and read one snapshot.
+ */
+export async function insertProfileRow(
+  db: ProfileTransaction,
+  owner: ProfileOwner,
+  createdByUserId: string,
+  name: string,
+  description?: string
+): Promise<string> {
+  await lockProfileCreation(db, owner);
+  await assertOwnerProfileLimit(db, owner);
 
-    return { id: profile.id };
-  });
+  const [profile] = await db
+    .insert(agent_environment_profiles)
+    .values({
+      owned_by_organization_id: owner.type === 'organization' ? owner.id : null,
+      owned_by_user_id: owner.type === 'user' ? owner.id : null,
+      created_by_user_id: createdByUserId,
+      name,
+      description: description ?? null,
+    })
+    .returning({ id: agent_environment_profiles.id });
+
+  return profile.id;
 }
 
 /**
@@ -312,23 +334,7 @@ export async function getProfile(
 
   const [vars, commands, mcpServers, skills, agents, kiloCommands, instructions, [usage]] =
     await Promise.all([
-      db
-        .select({
-          key: agent_environment_profile_vars.key,
-          value: sql<string>`
-          CASE
-            WHEN ${agent_environment_profile_vars.is_secret} = true
-            THEN '***'
-            ELSE ${agent_environment_profile_vars.value}
-          END
-        `.as('value'),
-          isSecret: agent_environment_profile_vars.is_secret,
-          createdAt: agent_environment_profile_vars.created_at,
-          updatedAt: agent_environment_profile_vars.updated_at,
-        })
-        .from(agent_environment_profile_vars)
-        .where(eq(agent_environment_profile_vars.profile_id, profileId))
-        .orderBy(agent_environment_profile_vars.key),
+      listVarsForProfile(db, profileId),
       db
         .select({
           sequence: agent_environment_profile_commands.sequence,
@@ -371,6 +377,44 @@ export async function getProfile(
 }
 
 /**
+ * Make one profile the owner's default: clear whichever profile holds the flag
+ * for that owner, then set this one.
+ *
+ * Takes the caller's open transaction, so the clear and the set-true commit or
+ * roll back together: a clear that ran on its own would leave the owner with no
+ * default when the set-true finds no profile. The set-true update asserts one
+ * affected row, so a bad id throws and the rollback leaves the owner's default
+ * untouched, instead of silently holding no default.
+ *
+ * Both statements are owner-scoped, so the pair moves the flag only between
+ * profiles the owner holds. Callers still authorize the profile themselves.
+ */
+export async function applyDefaultProfile(
+  db: ProfileTransaction,
+  profileId: string,
+  owner: ProfileOwner
+): Promise<void> {
+  await db
+    .update(agent_environment_profiles)
+    .set({ is_default: false })
+    .where(and(buildOwnershipCondition(owner), eq(agent_environment_profiles.is_default, true)));
+
+  const flipped = await db
+    .update(agent_environment_profiles)
+    .set({ is_default: true })
+    .where(and(buildOwnershipCondition(owner), eq(agent_environment_profiles.id, profileId)))
+    .returning({ id: agent_environment_profiles.id });
+
+  if (flipped.length !== 1) {
+    throw new Error(
+      `applyDefaultProfile: the default flip reached no profile for the owner (${String(
+        flipped.length
+      )} rows)`
+    );
+  }
+}
+
+/**
  * Set a profile as the default for an owner.
  * Clears any existing default first.
  */
@@ -382,15 +426,11 @@ export async function setDefaultProfile(
   await verifyProfileOwnership(db, profileId, owner);
 
   await db.transaction(async tx => {
-    await tx
-      .update(agent_environment_profiles)
-      .set({ is_default: false })
-      .where(and(buildOwnershipCondition(owner), eq(agent_environment_profiles.is_default, true)));
-
-    await tx
-      .update(agent_environment_profiles)
-      .set({ is_default: true })
-      .where(eq(agent_environment_profiles.id, profileId));
+    // Owner-wide serialization: a create that also sets the default does its own
+    // clear-then-set under this lock, and two interleaved pairs would collide on
+    // the one-default-per-owner partial unique index.
+    await lockProfileCreation(tx, owner);
+    await applyDefaultProfile(tx, profileId, owner);
   });
 }
 

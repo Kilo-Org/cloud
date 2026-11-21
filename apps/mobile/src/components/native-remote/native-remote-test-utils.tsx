@@ -7,7 +7,9 @@ import { type NativeRemoteClient } from '@/lib/native-remote/use-native-inventor
 import { useOpenPartDetail } from '@/components/agents/open-part-detail-context';
 
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key } }));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
+}));
 vi.mock('react-native', () => ({
   Platform: { OS: 'android' },
   View: 'View',

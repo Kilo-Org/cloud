@@ -184,38 +184,30 @@ export function buildGcpVertexUpstream(
     supportedChatApis: [GCP_VERTEX_ENDPOINTS[endpoint]],
   } as const;
   const baseUrl = getGcpVertexBaseUrl(credentials);
-  if (endpoint === 'anthropic') {
+  if (endpoint === 'anthropic' || endpoint === 'mistral') {
     if (!MODEL_ID_PATTERN.test(model.id)) throw new Error('Invalid Vertex AI model id');
+    const publisher = endpoint === 'anthropic' ? 'anthropic' : 'mistralai';
+    const location =
+      endpoint === 'mistral'
+        ? getGcpVertexMistralLocation(credentials.location)
+        : credentials.location;
     return {
       ...auth,
-      apiUrl: `${baseUrl}/publishers/anthropic/models/${model.id}:${stream ? 'streamRawPredict' : 'rawPredict'}`,
+      apiUrl: `${getGcpVertexBaseUrl({ ...credentials, location })}/publishers/${publisher}/models/${model.id}:${stream ? 'streamRawPredict' : 'rawPredict'}`,
       disableUrlSuffix: true,
       responseTransforms: null,
     };
   }
-  if (endpoint === 'mistral') {
-    if (!MODEL_ID_PATTERN.test(model.id)) throw new Error('Invalid Vertex AI model id');
-    const location = getGcpVertexMistralLocation(credentials.location);
-    const mistralBaseUrl = getGcpVertexBaseUrl({ ...credentials, location });
-    return {
-      ...auth,
-      apiUrl: `${mistralBaseUrl}/publishers/mistralai/models/${model.id}:${stream ? 'streamRawPredict' : 'rawPredict'}`,
-      disableUrlSuffix: true,
-      responseTransforms: null,
-    };
-  }
+  const openApiUpstream = {
+    apiUrl: `${baseUrl}/endpoints/openapi`,
+    disableUrlSuffix: false,
+  } as const;
   if (endpoint === 'openapi-responses') {
-    return {
-      ...auth,
-      apiUrl: `${baseUrl}/endpoints/openapi`,
-      disableUrlSuffix: false,
-      responseTransforms: null,
-    };
+    return { ...auth, ...openApiUpstream, responseTransforms: null };
   }
   return {
     ...auth,
-    apiUrl: `${baseUrl}/endpoints/openapi`,
-    disableUrlSuffix: false,
+    ...openApiUpstream,
     // Gemini returns thoughts in Google's extra content; the managed open models in `reasoning_content`.
     responseTransforms: isGeminiModel(model.id)
       ? ReasoningDetailsTransform.GeminiThought

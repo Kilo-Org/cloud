@@ -1,10 +1,12 @@
 import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
-import { type GlanceableCountFormat } from '@/lib/glanceable/count-format';
 import {
+  type GlanceableCountFormat,
   glanceableCountLines,
+  glanceableCountMessage,
   glanceableScheduledAt,
   glanceableStatusCopyKey,
+  type GlanceableTranslate,
   primaryGlanceableCount,
   resolveGlanceableStatus,
 } from '@/lib/glanceable/presentation';
@@ -32,7 +34,7 @@ export type OngoingNotificationContent = {
 };
 
 export type NotificationFormat = {
-  translate: (key: string) => string;
+  translate: GlanceableTranslate;
   formatCount: GlanceableCountFormat;
   formatClock: GlanceableClockFormat;
 };
@@ -47,10 +49,11 @@ function checkedLine(
   if (!Number.isFinite(Date.parse(snapshot.updatedAt))) {
     return null;
   }
-  const at = format.formatClock(snapshot.updatedAt);
-  return snapshot.status === 'stale'
-    ? `${format.translate('glanceable.lastKnown')} · ${at}`
-    : `${format.translate('glanceable.checked')} ${at}`;
+  const time = format.formatClock(snapshot.updatedAt);
+  return format.translate(
+    snapshot.status === 'stale' ? 'glanceable.footer.lastKnown' : 'glanceable.footer.checked',
+    { time }
+  );
 }
 
 export function buildOngoingNotificationContent(
@@ -74,18 +77,20 @@ export function buildOngoingNotificationContent(
   }
   const others = glanceableCountLines(snapshot)
     .filter(line => line.kind !== primary.kind && line.count > 0)
-    .map(line => `${formatCount(line.count)} ${translate(line.key)}`)
+    .map(line => glanceableCountMessage(line.kind, line.count, formatCount, translate))
     .join(' · ');
   const scheduledAt = glanceableScheduledAt(snapshot);
   const wakeOnly = primary.kind === 'scheduled' && others === '' && scheduledAt !== null;
-  let text = wakeOnly ? `${translate('glanceable.nextRun')} ${formatClock(scheduledAt)}` : others;
+  let text = wakeOnly
+    ? translate('glanceable.wake.nextRun', { time: formatClock(scheduledAt) })
+    : others;
   if (action.failure !== null) {
     text = action.failure;
   } else if (action.approving) {
     text = translate('glanceable.approving');
   }
   return {
-    title: `${formatCount(primary.count)} ${translate(primary.key)}`,
+    title: glanceableCountMessage(primary.kind, primary.count, formatCount, translate),
     text,
     textIsError: action.failure !== null,
     subText: checkedLine(snapshot, format),

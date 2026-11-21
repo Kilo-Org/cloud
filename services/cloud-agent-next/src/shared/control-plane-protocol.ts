@@ -191,6 +191,7 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'container_limit_reached',
   'account_blocked',
   'invalid_configuration',
+  'network_secret_configuration_invalid',
   'sandbox_create_failed',
   'runtime_artifact_unauthorized',
   'runtime_artifact_invalid',
@@ -676,6 +677,7 @@ export const controlPlaneCredentialSourceSchema = z
      * may be up to 128 characters (`EncryptedSecretsSchema`).
      */
     encryptedSecrets: z.record(z.string().min(1).max(128), z.unknown()).optional(),
+    networkSecrets: z.record(z.string().min(1).max(128), z.unknown()).optional(),
     /** Credential scope (worktree id); defaults to the route's session id. */
     scopeId: z.string().min(1).max(256).optional(),
     workspaceId: cloudAgentWorktreeIdSchema.optional(),
@@ -1578,6 +1580,7 @@ export const controlPlaneNativeOperationSchema = z.discriminatedUnion('name', [
   z.object({ name: z.literal('session.status') }).strict(),
   z.object({ name: z.literal('session.todo') }).strict(),
   z.object({ name: z.literal('session.background') }).strict(),
+  z.object({ name: z.literal('session.board') }).strict(),
   z
     .object({
       name: z.literal('session.diff'),

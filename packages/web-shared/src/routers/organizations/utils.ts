@@ -138,15 +138,32 @@ async function selectCallerRoleRows(
   return [...directRows, ...inheritedRows];
 }
 
+/** The allowed-roles default: an absent or empty filter means the full priority order. */
+function defaultedAllowedRoles(roles?: readonly OrganizationRole[]): readonly OrganizationRole[] {
+  return roles && roles.length > 0 ? roles : ORGANIZATION_ROLE_PRIORITY;
+}
+
+/**
+ * The one highest-role rule: the first role in ORGANIZATION_ROLE_PRIORITY that
+ * the caller holds and the caller's allowed-role filter permits.
+ */
+function highestOrganizationRole(
+  roles: readonly OrganizationRole[],
+  allowedRoles?: readonly OrganizationRole[]
+): OrganizationRole | null {
+  const allowed = defaultedAllowedRoles(allowedRoles);
+  return (
+    ORGANIZATION_ROLE_PRIORITY.find(role => allowed.includes(role) && roles.includes(role)) ?? null
+  );
+}
+
 export function effectiveMembershipRole(
   rows: { role: OrganizationRole }[],
   roles?: readonly OrganizationRole[]
 ): OrganizationRole | null {
-  const allowedRoles = roles && roles.length > 0 ? roles : ORGANIZATION_ROLE_PRIORITY;
-  return (
-    ORGANIZATION_ROLE_PRIORITY.find(
-      role => allowedRoles.includes(role) && rows.some(row => row.role === role)
-    ) ?? null
+  return highestOrganizationRole(
+    rows.map(row => row.role),
+    roles
   );
 }
 
@@ -286,7 +303,12 @@ function supportAccessReasonFor(params: {
   if (params.decision === 'deny_not_allowlisted' || params.decision === 'deny_never_list') {
     return 'support_access_not_allowlisted';
   }
-  if (params.decision === 'deny_action_class') return 'support_access_action_class';
+  // Both a too-weak grant and a grant whose role cannot stand in for the
+  // request are reported to the client as the action-class refusal; a distinct
+  // client code is deliberately not added.
+  if (params.decision === 'deny_action_class' || params.decision === 'deny_actor_permission') {
+    return 'support_access_action_class';
+  }
   return 'support_grant_required';
 }
 
@@ -312,6 +334,27 @@ function deniedAccessError(params: {
         grantStatus: params.grantStatus,
       }),
     },
+  });
+}
+
+/**
+ * The single refusal for a caller that holds no effective membership role: a
+ * soft-deleted organization reads as missing, and a caller that is a member of
+ * a live organization gets the role-specific sentence.
+ */
+async function organizationRoleDeniedError(
+  rows: { role: OrganizationRole }[],
+  organizationId: Organization['id']
+): Promise<TRPCError> {
+  if (rows.length === 0 && (await organizationState(organizationId)) === 'deleted') {
+    return new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+  }
+  return new TRPCError({
+    code: 'UNAUTHORIZED',
+    message:
+      rows.length > 0
+        ? 'You do not have the required organizational role to access this feature'
+        : 'You do not have access to this organization',
   });
 }
 
@@ -355,16 +398,7 @@ export async function resolveOrganizationAccess(
   }
 
   if (!isAdmin) {
-    if (rows.length === 0 && (await organizationState(organizationId)) === 'deleted') {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
-    }
-    throw new TRPCError({
-      code: 'UNAUTHORIZED',
-      message:
-        rows.length > 0
-          ? 'You do not have the required organizational role to access this feature'
-          : 'You do not have access to this organization',
-    });
+    throw await organizationRoleDeniedError(rows, organizationId);
   }
 
   if (!enabled) {
@@ -554,16 +588,7 @@ export async function ensureMemberOrganizationAccess(
   const rows = await loadEffectiveMembershipRows(user.id, organizationId);
   const role = effectiveMembershipRole(rows, roles);
   if (role) return role;
-  if (rows.length === 0 && (await organizationState(organizationId)) === 'deleted') {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
-  }
-  throw new TRPCError({
-    code: 'UNAUTHORIZED',
-    message:
-      rows.length > 0
-        ? 'You do not have the required organizational role to access this feature'
-        : 'You do not have access to this organization',
-  });
+  throw await organizationRoleDeniedError(rows, organizationId);
 }
 
 export async function requireLiveOrganization(organizationId: Organization['id']): Promise<void> {
@@ -666,7 +691,7 @@ export async function getOrganizationsAccessRoles(
       )
     );
     for (const [organizationId, roles] of rolesByOrg) {
-      const best = ORGANIZATION_ROLE_PRIORITY.find(role => roles.includes(role));
+      const best = highestOrganizationRole(roles);
       if (best) result.set(organizationId, best);
     }
     return result;
@@ -702,13 +727,7 @@ export async function getOrganizationsAccessRoles(
       wouldPassWithoutAdmin:
         rolesByOrg === null
           ? null
-          : liveIds.every(
-              id =>
-                effectiveMembershipRole(
-                  (rolesByOrg.get(id) ?? []).map(role => ({ role })),
-                  roles
-                ) !== null
-            ),
+          : liveIds.every(id => highestOrganizationRole(rolesByOrg.get(id) ?? [], roles) !== null),
     });
     for (const id of liveIds) result.set(id, grant);
     return result;
@@ -718,7 +737,7 @@ export async function getOrganizationsAccessRoles(
     await selectCallerRoleRows(ctx.user.id, column => inArray(column, uniqueIds), callerRoleFields)
   );
   for (const [organizationId, roles] of rolesByOrg) {
-    const best = ORGANIZATION_ROLE_PRIORITY.find(role => roles.includes(role));
+    const best = highestOrganizationRole(roles);
     if (best) result.set(organizationId, best);
   }
   return result;
@@ -735,7 +754,7 @@ export async function ensureOrganizationsAccess(
   roles?: readonly OrganizationRole[]
 ): Promise<void> {
   const accessByOrg = await getOrganizationsAccessRoles(ctx, organizationIds, roles);
-  const allowedRoles = roles && roles.length > 0 ? roles : ORGANIZATION_ROLE_PRIORITY;
+  const allowedRoles = defaultedAllowedRoles(roles);
   for (const organizationId of new Set(organizationIds)) {
     const role = accessByOrg.get(organizationId);
     if (!role || !allowedRoles.includes(role)) {
@@ -798,16 +817,7 @@ export async function ensureOrganizationAccessAndFetchOrg(
     return organization;
   }
 
-  if (rows.length === 0 && (await organizationState(organizationId)) === 'deleted') {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
-  }
-  throw new TRPCError({
-    code: 'UNAUTHORIZED',
-    message:
-      rows.length > 0
-        ? 'You do not have the required organizational role to access this feature'
-        : 'You do not have access to this organization',
-  });
+  throw await organizationRoleDeniedError(rows, organizationId);
 }
 
 /**

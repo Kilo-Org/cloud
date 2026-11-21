@@ -70,28 +70,92 @@ export interface BrowserShareTabInput extends BrowserSessionRef {
 export interface BrowserTabGroupOpenResult {
   readonly groupId?: number | undefined;
 }
-export interface BrowserShareTabResult {
-  readonly groupId?: number | undefined;
-  readonly tabId: number;
-}
+/** `shareActiveTab`'s outcome; only `shared` grouped and recorded the tab. */
+export type BrowserShareTabResult =
+  | { readonly kind: 'shared'; readonly groupId?: number | undefined; readonly tabId: number }
+  /** The browser reported no active tab. */
+  | { readonly kind: 'no_tab' }
+  /** The tab is in another live session's reach (D9). */
+  | { readonly kind: 'held'; readonly tabId: number }
+  | { readonly kind: 'no_session' };
+/** `adoptEnded`'s outcome: `kept` is a session that already owns tabs, `none` means nothing had ended. */
+export type BrowserTabGroupAdoptResult =
+  | { readonly groupId?: number | undefined; readonly kind: 'adopted' }
+  | { readonly kind: 'kept' }
+  | { readonly kind: 'none' };
 
 export interface BrowserTabGroupController {
-  readonly adoptEnded: (input: BrowserSessionRef) => Promise<BrowserTabGroupOpenResult>;
+  readonly adoptEnded: (input: BrowserSessionRef) => Promise<BrowserTabGroupAdoptResult>;
   readonly closeSession: (input: BrowserSessionRef) => Promise<void>;
   readonly isTabAllowed: (sessionHandle: string, tabId: number) => boolean;
   readonly listSessions: () => BrowserTabGroupSessionSummary[];
   readonly noteTabAdded: (tabId: number, groupId?: number) => void;
   readonly noteTabRemoved: (tabId: number) => void;
   readonly openSession: (input: BrowserOpenSessionInput) => Promise<BrowserTabGroupOpenResult>;
+  /**
+   * Reads the sessions an earlier service worker stored. A session this worker
+   * already knows wins over its stored copy, and a tab removed before the read
+   * finished stays removed. Never rejects: it answers false when storage could
+   * not be read, and the next call reads again; nothing is written until a read
+   * succeeds, so the stored sessions survive a failed read.
+   */
+  readonly restore: () => Promise<boolean>;
   readonly sessionForTab: (tabId: number) => string | undefined;
   readonly shareActiveTab: (input: BrowserShareTabInput) => Promise<BrowserShareTabResult>;
   readonly tabsForSession: (sessionHandle: string) => number[];
 }
 
+/** Where sessions and their groups outlive the service worker (SPEC: state in `storage.session`). */
+export const TAB_GROUP_SESSIONS_STORAGE_KEY = 'session:kiloBrowserTabGroupSessions';
+/** Ended groups kept for `/browser adopt`; every conversation leaves one, and they now outlive the worker. */
+const ENDED_SESSION_LIMIT = 64;
+
 const tabGroupIdSchema = z.number().int().nonnegative();
 const activeTabInfosSchema = z.array(
   z.object({ active: z.boolean().optional(), id: z.number().optional() })
 );
+const persistedTabGroupSessionSchema = z.object({
+  ended: z.boolean(),
+  endedAt: z.number().optional(),
+  groupId: tabGroupIdSchema.optional(),
+  sessionHandle: z.string().min(1),
+  tabs: z.array(z.number().int()),
+  title: z.string(),
+});
+const persistedTabGroupSessionsSchema = z.array(persistedTabGroupSessionSchema);
+
+export type PersistedTabGroupSession = z.infer<typeof persistedTabGroupSessionSchema>;
+
+export interface BrowserTabGroupPersistence {
+  /** `undefined` when storage held nothing usable: no session survives. */
+  readonly read: () => Promise<PersistedTabGroupSession[] | undefined>;
+  readonly write: (sessions: readonly PersistedTabGroupSession[]) => Promise<void>;
+}
+
+/**
+ * Sessions survive a service-worker restart in `storage.session`: a CLI whose
+ * worker restarted keeps its handle, its group and its tabs, and an ended
+ * group stays adoptable (D12).
+ */
+export const createStorageSessionTabGroupPersistence = (storageArea: {
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- storage hands back whatever an earlier write left; `read` parses it with the session schema.
+  readonly getItem: (key: typeof TAB_GROUP_SESSIONS_STORAGE_KEY) => unknown;
+  readonly setItem: (
+    key: typeof TAB_GROUP_SESSIONS_STORAGE_KEY,
+    value: PersistedTabGroupSession[]
+  ) => Promise<void> | void;
+}): BrowserTabGroupPersistence => ({
+  read: async () => {
+    const parsed = persistedTabGroupSessionsSchema.safeParse(
+      await storageArea.getItem(TAB_GROUP_SESSIONS_STORAGE_KEY)
+    );
+
+    return parsed.success ? parsed.data : undefined;
+  },
+  write: async sessions => {
+    await storageArea.setItem(TAB_GROUP_SESSIONS_STORAGE_KEY, [...sessions]);
+  },
+});
 
 interface SessionState {
   ended: boolean;
@@ -110,12 +174,134 @@ interface SessionState {
 export const createBrowserTabGroupController = ({
   api,
   now,
+  persistence,
 }: {
   readonly api: BrowserTabGroupsApi;
   readonly now?: (() => number) | undefined;
+  readonly persistence?: BrowserTabGroupPersistence | undefined;
 }): BrowserTabGroupController => {
   const sessions = new Map<string, SessionState>();
   let clock = 0;
+  let restoring: Promise<boolean> | undefined = undefined;
+  let restored = persistence === undefined;
+  /* Tabs closed while the stored sessions are read: the stored copy must not bring them back. */
+  const removedBeforeRestore = new Set<number>();
+  /* A write is owed; a burst of changes writes only the newest state. */
+  let dirty = false;
+  let writing = false;
+
+  const snapshotSessions = (): PersistedTabGroupSession[] =>
+    [...sessions.values()].map(session => {
+      const stored: PersistedTabGroupSession = {
+        ended: session.ended,
+        sessionHandle: session.sessionHandle,
+        tabs: [...session.tabs],
+        title: session.title,
+      };
+
+      if (session.endedAt !== undefined) {
+        stored.endedAt = session.endedAt;
+      }
+
+      if (session.groupId !== undefined) {
+        stored.groupId = session.groupId;
+      }
+
+      return stored;
+    });
+
+  /** Only the newest ended sessions stay; adoption always takes the newest first. */
+  const pruneEnded = (): void => {
+    const ended = [...sessions.values()]
+      .filter(session => session.ended)
+      .toSorted((first, second) => (first.endedAt ?? 0) - (second.endedAt ?? 0));
+
+    for (const session of ended.slice(0, Math.max(0, ended.length - ENDED_SESSION_LIMIT))) {
+      sessions.delete(session.sessionHandle);
+    }
+  };
+
+  const merge = (stored: readonly PersistedTabGroupSession[]): void => {
+    for (const entry of stored) {
+      // A session this worker already changed is newer than anything an earlier worker stored.
+      if (!sessions.has(entry.sessionHandle)) {
+        sessions.set(entry.sessionHandle, {
+          ended: entry.ended,
+          ...(entry.endedAt === undefined ? {} : { endedAt: entry.endedAt }),
+          ...(entry.groupId === undefined ? {} : { groupId: entry.groupId }),
+          sessionHandle: entry.sessionHandle,
+          tabs: entry.tabs.filter(tabId => !removedBeforeRestore.has(tabId)),
+          title: entry.title,
+        });
+        clock = Math.max(clock, entry.endedAt ?? 0);
+      }
+    }
+  };
+
+  const restore = (): Promise<boolean> => {
+    if (persistence === undefined) {
+      return Promise.resolve(true);
+    }
+
+    restoring ??= (async () => {
+      try {
+        merge((await persistence.read()) ?? []);
+      } catch (error) {
+        console.warn('Failed to read browser tab group sessions:', error);
+        // Unread is not empty: forget this attempt so the next call reads again.
+        restoring = undefined;
+        return false;
+      }
+
+      restored = true;
+      removedBeforeRestore.clear();
+
+      // Changes made while the stored sessions were unreadable are written now.
+      if (dirty) {
+        persist();
+      }
+
+      return true;
+    })();
+
+    return restoring;
+  };
+
+  const drain = async (store: BrowserTabGroupPersistence): Promise<void> => {
+    try {
+      // The first write waits for the read: writing this worker's sessions first would erase the stored ones.
+      // A failed read writes nothing; `dirty` stays set for the next attempt.
+      if (!(await restore())) {
+        return;
+      }
+
+      while (dirty) {
+        dirty = false;
+
+        try {
+          // eslint-disable-next-line no-await-in-loop -- one write at a time, always the newest state
+          await store.write(snapshotSessions());
+        } catch (error) {
+          console.warn('Failed to persist browser tab group sessions:', error);
+        }
+      }
+    } finally {
+      writing = false;
+    }
+  };
+
+  const persist = (): void => {
+    if (persistence === undefined) {
+      return;
+    }
+
+    dirty = true;
+
+    if (!writing) {
+      writing = true;
+      void drain(persistence);
+    }
+  };
 
   const attempt = async <Value>(run: () => MaybeAsync<Value>): Promise<Value | undefined> => {
     try {
@@ -132,11 +318,19 @@ export const createBrowserTabGroupController = ({
     }
     const created: SessionState = { ended: false, sessionHandle, tabs: [], title: sessionHandle };
     sessions.set(sessionHandle, created);
+    persist();
     return created;
   };
+  /** A tab sits in one group at a time: joining this session's group takes it out of every other session's record. */
   const recordTab = (session: SessionState, tabId: number): void => {
+    for (const other of sessions.values()) {
+      if (other !== session) {
+        other.tabs = other.tabs.filter(id => id !== tabId);
+      }
+    }
     if (!session.tabs.includes(tabId)) {
       session.tabs.push(tabId);
+      persist();
     }
   };
   const createGroup = async (tabIds: number[], groupId?: number): Promise<number | undefined> => {
@@ -201,6 +395,7 @@ export const createBrowserTabGroupController = ({
     session.ended = false;
     delete session.endedAt;
     session.title = input.title;
+    persist();
     // Chrome rejects an empty tabs.group, so the group is created with the first tab.
     return Promise.resolve(session.groupId === undefined ? {} : { groupId: session.groupId });
   };
@@ -213,6 +408,8 @@ export const createBrowserTabGroupController = ({
     clock = now === undefined ? clock + 1 : Math.max(clock + 1, now());
     session.ended = true;
     session.endedAt = clock;
+    pruneEnded();
+    persist();
     const props = {
       collapsed: true,
       color: BROWSER_TAB_GROUP_COLOR,
@@ -224,6 +421,7 @@ export const createBrowserTabGroupController = ({
     }
     // The group outlives the session; its tab ids stay targetable only after adoption.
     session.groupId = groupId;
+    persist();
     if (await updateGroup(groupId, props)) {
       return;
     }
@@ -231,6 +429,7 @@ export const createBrowserTabGroupController = ({
     const recovered = await liveGroupId({ ...session, groupId: undefined });
     if (recovered !== undefined && recovered !== groupId) {
       session.groupId = recovered;
+      persist();
       await updateGroup(recovered, props);
     }
   };
@@ -245,6 +444,7 @@ export const createBrowserTabGroupController = ({
 
     if (session.groupId === undefined) {
       session.groupId = groupId;
+      persist();
       await updateGroup(groupId, {
         color: BROWSER_TAB_GROUP_COLOR,
         title: browserTabGroupTitle(session.title),
@@ -261,7 +461,7 @@ export const createBrowserTabGroupController = ({
    */
   const adoptEnded = async ({
     sessionHandle,
-  }: BrowserSessionRef): Promise<BrowserTabGroupOpenResult> => {
+  }: BrowserSessionRef): Promise<BrowserTabGroupAdoptResult> => {
     const ended = [...sessions.values()].filter(session => session.ended);
     const adopted = ended.reduce<SessionState | undefined>(
       (best, session) =>
@@ -270,9 +470,12 @@ export const createBrowserTabGroupController = ({
     );
     const existing = sessions.get(sessionHandle);
 
-    if (adopted === undefined || (existing !== undefined && existing.tabs.length > 0)) {
+    if (existing !== undefined && existing.tabs.length > 0) {
+      return { kind: 'kept' };
+    }
+    if (adopted === undefined) {
       ensureSession(sessionHandle);
-      return {};
+      return { kind: 'none' };
     }
 
     // The group outlives its session's handle: re-key it to the caller, or the caller could not reach a single tab in it.
@@ -281,34 +484,40 @@ export const createBrowserTabGroupController = ({
     sessions.set(sessionHandle, adopted);
     adopted.ended = false;
     delete adopted.endedAt;
+    persist();
     if (adopted.groupId === undefined) {
-      return {};
+      return { kind: 'adopted' };
     }
     // `update` cannot clear a colour, so the collapsed state alone reports "live".
     await updateGroup(adopted.groupId, {
       collapsed: false,
       title: browserTabGroupTitle(adopted.title),
     });
-    return { groupId: adopted.groupId };
+    return { groupId: adopted.groupId, kind: 'adopted' };
   };
 
   const shareActiveTab = async (input: BrowserShareTabInput): Promise<BrowserShareTabResult> => {
     const session = sessions.get(input.sessionHandle);
     const resolved = input.tabId ?? (await activeTabId());
-    // 0 is not a tab id: no tab was known, so nothing was grouped or recorded.
     if (resolved === undefined) {
-      return session?.groupId === undefined ? { tabId: 0 } : { groupId: session.groupId, tabId: 0 };
+      return { kind: 'no_tab' };
     }
     if (session === undefined) {
-      return { tabId: resolved };
+      return { kind: 'no_session' };
+    }
+    // `/browser share` names no tab: the user's active tab must not reach into another live session's group (D9).
+    // A tab the runtime names itself (a session's new tab, a popup of its own tab) is the caller's already.
+    const holder = input.tabId === undefined ? sessionForTab(resolved) : undefined;
+    if (holder !== undefined && holder !== input.sessionHandle) {
+      return { kind: 'held', tabId: resolved };
     }
     recordTab(session, resolved);
     if (api.group !== undefined) {
       await groupTab(session, resolved);
     }
     return session.groupId === undefined
-      ? { tabId: resolved }
-      : { groupId: session.groupId, tabId: resolved };
+      ? { kind: 'shared', tabId: resolved }
+      : { groupId: session.groupId, kind: 'shared', tabId: resolved };
   };
 
   const tabsForSession = (sessionHandle: string): number[] => {
@@ -335,8 +544,15 @@ export const createBrowserTabGroupController = ({
     return summaries;
   };
   const noteTabRemoved = (tabId: number): void => {
+    if (!restored) {
+      removedBeforeRestore.add(tabId);
+    }
+
     for (const session of sessions.values()) {
-      session.tabs = session.tabs.filter(id => id !== tabId);
+      if (session.tabs.includes(tabId)) {
+        session.tabs = session.tabs.filter(id => id !== tabId);
+        persist();
+      }
     }
   };
   const noteTabAdded = (tabId: number, groupId?: number): void => {
@@ -352,6 +568,9 @@ export const createBrowserTabGroupController = ({
     }
   };
 
+  // The read starts with the controller, so only tabs closed while it runs need remembering.
+  void restore();
+
   return {
     adoptEnded,
     closeSession,
@@ -360,6 +579,7 @@ export const createBrowserTabGroupController = ({
     noteTabAdded,
     noteTabRemoved,
     openSession,
+    restore,
     sessionForTab,
     shareActiveTab,
     tabsForSession,

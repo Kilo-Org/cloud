@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- The gate renders the connect, wrong-instance and org-only states, each with its own copy, for two providers with different browser hand-offs. */
 import { useQuery } from '@tanstack/react-query';
-import { PlugZap, RefreshCcw, ShieldAlert } from '@/components/ui/icons';
+import { GitMerge, PlugZap, RefreshCcw, ShieldAlert } from '@/components/ui/icons';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -404,7 +404,9 @@ export function ProviderConnectGate({
               {action === 'connect' ? (
                 <StateAction
                   label={reconnect ? reconnectActionTitle : connectTitle}
-                  icon={RefreshCcw}
+                  // A first connect carries the provider's mark, as the Code
+                  // Reviewer connect actions do; only a reconnection refreshes.
+                  icon={reconnect ? RefreshCcw : GitMerge}
                   loading={connecting}
                   disabled={connecting}
                   onPress={() => {

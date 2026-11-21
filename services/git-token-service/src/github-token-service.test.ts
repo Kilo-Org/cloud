@@ -343,6 +343,39 @@ describe('GitHubTokenService', () => {
     );
   });
 
+  it('bypasses token caches and requests only metadata for live repository verification', async () => {
+    const tokenCache = createTokenCache();
+    const auth = vi.fn().mockResolvedValue({
+      token: 'fresh-token',
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    });
+    vi.mocked(createAppAuth).mockReturnValue(Object.assign(auth, { hook: vi.fn() }));
+    const service = new GitHubTokenService({
+      GITHUB_APP_ID: 'app-id',
+      GITHUB_APP_PRIVATE_KEY: 'private-key',
+      TOKEN_CACHE: tokenCache,
+    } as unknown as CloudflareEnv);
+    const signal = new AbortController().signal;
+
+    await expect(
+      service.getFreshTokenForRepositorySelection(
+        '123',
+        'standard',
+        { repositoryNames: ['repo'] },
+        signal
+      )
+    ).resolves.toBe('fresh-token');
+    expect(Octokit).toHaveBeenCalledWith({ request: { signal } });
+    expect(auth).toHaveBeenCalledWith({
+      type: 'installation',
+      repositoryNames: ['repo'],
+      permissions: { metadata: 'read' },
+      refresh: true,
+    });
+    expect(tokenCache.get).not.toHaveBeenCalled();
+    expect(tokenCache.put).not.toHaveBeenCalled();
+  });
+
   it('refreshes installation account login and stores a fifteen minute cooldown marker', async () => {
     const tokenCache = createTokenCache();
     vi.mocked(createAppAuth).mockReturnValue(

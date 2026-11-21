@@ -72,6 +72,7 @@ export type Directive = {
  *   file:write:<opTag>:<path>:<contents>       literal contents; real write call
  *   file:seed:<opTag>:<path>:<bytes>:<nonce>   fake-generated fixture; real write call
  *   file:read:<opTag>:<path>                   real read call; echo the parsed result
+ *   file-read-pair:<tag>:<path1>:<path2>       read both paths in one turn; echo both results
  *
  * `opTag` is `[A-Za-z0-9_-]+` and is the attribution key: `directiveTag` returns
  * it, never the op. The scenario mints a fresh `opTag` per turn, so a reused
@@ -743,6 +744,7 @@ function directiveTag(directive: Directive | null): string | undefined {
       'write-then-gate',
       'read-edit-then-gate',
       'read-then-write',
+      'file-read-pair',
       'tool-stream',
       'question',
       'first-token',
@@ -1406,6 +1408,23 @@ function runToolScenario(
   writeToolCall(ctx, tag, kind, resolved);
 }
 
+function readToolResultBody(
+  result: ToolResult,
+  path: string
+): { ok: true; body: string } | { ok: false; message: string } {
+  const normalization = normalizeToolResult(result.content);
+  if (!normalization.ok) return normalization;
+  const normalized = normalization.result;
+  const resultPath = readResultPath(normalized);
+  if (!resultPath.ok || normalized.error || !readResultMatchesRequest(resultPath.path, path)) {
+    return { ok: false, message: 'read tool did not return file contents for the requested path' };
+  }
+  const body = stripPromptContext(readFileContents(normalized.output));
+  return body === ''
+    ? { ok: false, message: 'read tool did not return file contents' }
+    : { ok: true, body };
+}
+
 /**
  * Scenario registry. Each handler writes SSE chunks through `ctx.emit` and is
  * responsible for closing the response (or leaving it open for `hang`/`gate`).
@@ -1666,6 +1685,44 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
     parkGate(ctx, tag, `done-${tag}`);
   },
 
+  'file-read-pair'(args, ctx) {
+    const parsed = stripPromptContext(args[0] ?? '').match(
+      /^([A-Za-z0-9_-]+):([^:\n]+):([^:\n]+)$/
+    );
+    if (!parsed || parsed[2] === parsed[3]) {
+      writeJsonError(
+        ctx.emit,
+        402,
+        'file-read-pair requires a tag and two distinct paths',
+        'invalid_request'
+      );
+      return;
+    }
+    const [, tag, firstPath, secondPath] = parsed;
+    const bodies: string[] = [];
+    for (const [index, path] of [firstPath, secondPath].entries()) {
+      const readTag = `${tag}-${index + 1}`;
+      const status = scenarioStatus(ctx.state, readTag);
+      const result =
+        status.toolCalls.read > 0
+          ? toolResults(ctx.body, readTag, ctx.state).find(
+              entry => entry.id === toolCallId(readTag, 'read')
+            )
+          : undefined;
+      if (!result) {
+        runToolScenario(ctx, readTag, 'read', { path });
+        return;
+      }
+      const read = readToolResultBody(result, path);
+      if (!read.ok) {
+        writeJsonError(ctx.emit, 422, read.message, 'invalid_tool_result');
+        return;
+      }
+      bodies.push(read.body.trim());
+    }
+    writeAssistantResponse(ctx, `file-read-pair:${JSON.stringify(bodies)}`);
+  },
+
   /**
    * `file:<op>:<opTag>:...` — one real tool turn per request, attributed to the
    * fresh per-turn `opTag`. `toolResults()` matches `(tag, kind)` across the
@@ -1741,38 +1798,13 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
       return;
     }
 
-    const normalization = normalizeToolResult(toolResultContent(result.content));
-    if (!normalization.ok) {
-      writeJsonError(ctx.emit, 422, normalization.message, 'invalid_tool_result');
-      return;
-    }
-    const normalized = normalization.result;
-    const resultPath = readResultPath(normalized);
-    if (
-      !resultPath.ok ||
-      normalized.error ||
-      !readResultMatchesRequest(resultPath.path, directive.path)
-    ) {
-      writeJsonError(
-        ctx.emit,
-        422,
-        'read tool did not return file contents for the requested path',
-        'invalid_tool_result'
-      );
-      return;
-    }
-    const body = stripPromptContext(readFileContents(normalized.output));
-    if (body === '') {
-      writeJsonError(
-        ctx.emit,
-        422,
-        'read tool did not return file contents',
-        'invalid_tool_result'
-      );
+    const read = readToolResultBody(result, directive.path);
+    if (!read.ok) {
+      writeJsonError(ctx.emit, 422, read.message, 'invalid_tool_result');
       return;
     }
     status.fileCompleted = true;
-    writeAssistantResponse(ctx, `file-read:${directive.path}\n${body}`);
+    writeAssistantResponse(ctx, `file-read:${directive.path}\n${read.body}`);
   },
 
   'tool-stream'(args, ctx) {

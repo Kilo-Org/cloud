@@ -36,6 +36,7 @@ import {
 } from '../../session/validate-repository-access.js';
 import type { TRPCContext } from '../../types.js';
 import { isBuiltinMode } from '../schemas.js';
+import { resolveHostedWorkspaceRepositories } from './hosted-workspace-repositories.js';
 import { assertOrganizationMembership } from './organization-membership.js';
 import { assertRequestedRepositories } from './requested-environment-repositories.js';
 import { getWorkspaceStub } from '../../control-plane/workspace/workspace-stub.js';
@@ -451,11 +452,12 @@ export function resolveContinuationMode(
  * continuation first session), instead of widening the global origin allowlist.
  * `continuationModeResolution` replaces an unavailable local mode with `code`
  * after resolution, so the following `assertModeAvailableForProfile` passes.
- * Only the continuation handler sets these.
+ * The two profile flags are only used by the continuation handler.
  */
 export type SessionCreationPolicyOptions = {
   includeWebDefaults?: boolean;
   continuationModeResolution?: boolean;
+  hostedAdditionalRepositoryIds?: number[] | undefined;
 };
 
 type SessionCreationContext = Pick<
@@ -538,13 +540,21 @@ export async function preflightSessionCreation(
     await assertOrganizationMembership(db, ctx.userId, organizationId);
   }
 
-  await assertRepositoryAccessBeforeSessionCreation({
-    env: ctx.env,
-    userId: ctx.userId,
-    orgId: organizationId,
-    createdOnPlatform: request.options?.createdOnPlatform,
-    repository: request.repository,
-  });
+  if (policyOptions?.hostedAdditionalRepositoryIds?.length) {
+    request = await resolveHostedWorkspaceRepositories(
+      ctx,
+      request,
+      policyOptions.hostedAdditionalRepositoryIds
+    );
+  } else {
+    await assertRepositoryAccessBeforeSessionCreation({
+      env: ctx.env,
+      userId: ctx.userId,
+      orgId: organizationId,
+      createdOnPlatform: request.options?.createdOnPlatform,
+      repository: request.repository,
+    });
+  }
 
   const policy: ProfileResolutionPolicy = policyOptions?.includeWebDefaults
     ? { defaultProfileResolution: 'include-web-defaults' }

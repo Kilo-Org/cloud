@@ -127,7 +127,9 @@ export class GitHubTokenService {
     }
 
     const credentials = this.getCredentials(appType);
-    const { token, expiresAt } = await this.generateToken(numericId, credentials, [repoName]);
+    const { token, expiresAt } = await this.generateToken(numericId, credentials, {
+      repositoryNames: [repoName],
+    });
     await this.cacheToken(cacheKey, token, expiresAt);
 
     return token;
@@ -161,12 +163,10 @@ export class GitHubTokenService {
     const cacheKey = `${installationId}:${appType}:${repoName}:repository-only:v1:${permissionKey}`;
     const cached = await this.getCachedToken(cacheKey);
     if (cached) return cached;
-    const { token, expiresAt } = await this.generateToken(
-      numericId,
-      this.getCredentials(appType),
-      [repoName],
-      permissions
-    );
+    const { token, expiresAt } = await this.generateToken(numericId, this.getCredentials(appType), {
+      repositoryNames: [repoName],
+      permissions,
+    });
     await this.cacheToken(cacheKey, token, expiresAt);
     return token;
   }
@@ -183,14 +183,24 @@ export class GitHubTokenService {
     const cacheKey = `${installationId}:${appType}:repository-ids:${ids.join(',')}`;
     const cached = await this.getCachedToken(cacheKey);
     if (cached) return cached;
-    const { token, expiresAt } = await this.generateToken(
-      numericId,
-      this.getCredentials(appType),
-      undefined,
-      undefined,
-      ids
-    );
+    const { token, expiresAt } = await this.generateToken(numericId, this.getCredentials(appType), {
+      repositoryIds: ids,
+    });
     await this.cacheToken(cacheKey, token, expiresAt);
+    return token;
+  }
+
+  async getFreshTokenForRepositorySelection(
+    installationId: string,
+    appType: GitHubAppType,
+    selection: { repositoryNames: string[] } | { repositoryIds: number[] },
+    signal: AbortSignal
+  ): Promise<string> {
+    const { token } = await this.generateToken(
+      this.validateInstallationId(installationId),
+      this.getCredentials(appType),
+      { ...selection, permissions: { metadata: 'read' }, signal, refresh: true }
+    );
     return token;
   }
 
@@ -248,7 +258,11 @@ export class GitHubTokenService {
    * Get a token for the entire installation (not scoped to a specific repo).
    * Use getTokenForRepo when you know the specific repository.
    */
-  async getToken(installationId: string, appType: GitHubAppType = 'standard'): Promise<string> {
+  async getToken(
+    installationId: string,
+    appType: GitHubAppType = 'standard',
+    signal?: AbortSignal
+  ): Promise<string> {
     const numericId = this.validateInstallationId(installationId);
 
     const cacheKey = `${installationId}:${appType}`;
@@ -258,7 +272,7 @@ export class GitHubTokenService {
     }
 
     const credentials = this.getCredentials(appType);
-    const { token, expiresAt } = await this.generateToken(numericId, credentials);
+    const { token, expiresAt } = await this.generateToken(numericId, credentials, { signal });
     await this.cacheToken(cacheKey, token, expiresAt);
 
     return token;
@@ -321,15 +335,26 @@ export class GitHubTokenService {
   private async generateToken(
     installationId: number,
     credentials: GitHubAppCredentials,
-    repositoryNames?: string[],
-    permissions?: RepositoryPermissions,
-    repositoryIds?: number[]
+    {
+      repositoryNames,
+      permissions,
+      repositoryIds,
+      signal,
+      refresh,
+    }: {
+      repositoryNames?: string[];
+      permissions?: RepositoryPermissions;
+      repositoryIds?: number[];
+      signal?: AbortSignal;
+      refresh?: true;
+    }
   ): Promise<Token> {
     try {
       const auth = createAppAuth({
         appId: credentials.appId,
         privateKey: credentials.privateKey,
         installationId,
+        ...(signal ? { request: new Octokit({ request: { signal } }).request } : {}),
       });
 
       const result = await auth({
@@ -337,6 +362,7 @@ export class GitHubTokenService {
         repositoryNames,
         ...(permissions ? { permissions } : {}),
         ...(repositoryIds ? { repositoryIds } : {}),
+        ...(refresh ? { refresh } : {}),
       });
       return {
         token: result.token,

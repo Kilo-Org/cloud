@@ -30,6 +30,10 @@ import {
   listHostedWorkspacesOutput,
 } from '../../src/router/handlers/hosted-workspace-list.js';
 import {
+  listHostedWorkspaceRepositoriesInput,
+  listHostedWorkspaceRepositoriesOutput,
+} from '../../src/router/handlers/hosted-workspace-repositories.js';
+import {
   refreshHostedWorkspacePullRequestInput,
   refreshHostedWorkspacePullRequestOutput,
 } from '../../src/router/handlers/hosted-workspace-pull-request-refresh.js';
@@ -120,12 +124,22 @@ const fixtureSchema = z
 type Fixture = z.infer<typeof fixtureSchema>;
 type FixtureEntry = Fixture['requests'][number];
 
+const repositorySelectionFixtureSchema = fixtureSchema
+  .pick({ procedures: true, requests: true, responses: true })
+  .extend({
+    contractVersion: z.literal(5),
+    baseContractVersion: z.literal(4),
+    errors: z.array(z.strictObject({ code: z.string(), message: z.string() })),
+  })
+  .strict();
+
 type SchemaLike = {
   parse(value: unknown): unknown;
 };
 
 const requestSchemas: Record<string, unknown> = {
   listHostedWorkspaces: listHostedWorkspacesInput,
+  listHostedWorkspaceRepositories: listHostedWorkspaceRepositoriesInput,
   getHostedWorkspace: getHostedWorkspaceInput,
   getHostedWorkspaceStatus: getHostedWorkspaceStatusInput,
   createHostedWorkspace: CreateHostedWorkspaceInput,
@@ -146,6 +160,7 @@ const requestSchemas: Record<string, unknown> = {
 
 const responseSchemas: Record<string, unknown> = {
   listHostedWorkspaces: listHostedWorkspacesOutput,
+  listHostedWorkspaceRepositories: listHostedWorkspaceRepositoriesOutput,
   getHostedWorkspace: getHostedWorkspaceOutput,
   getHostedWorkspaceStatus: getHostedWorkspaceStatusOutput,
   createHostedWorkspace: CreateHostedWorkspaceOutput,
@@ -199,6 +214,7 @@ async function loadFixture(
     readFile(path.join(handlerDir, 'hosted-workspace-mutations.ts'), 'utf8'),
     readFile(path.join(handlerDir, 'hosted-workspace-status.ts'), 'utf8'),
     readFile(path.join(handlerDir, 'hosted-workspace-list.ts'), 'utf8'),
+    readFile(path.join(handlerDir, 'hosted-workspace-repositories.ts'), 'utf8'),
     readFile(path.join(handlerDir, 'session-worktree.ts'), 'utf8'),
     readFile(path.join(handlerDir, 'worktree-deletion.ts'), 'utf8'),
     readFile(path.join(handlerDir, 'hosted-workspace-changes.ts'), 'utf8'),
@@ -225,21 +241,41 @@ function expectFieldLists(entries: FixtureEntry[], schemas: Record<string, unkno
 }
 
 describe('hosted workspace contract fixture', () => {
+  async function loadRepositorySelectionFixture() {
+    return repositorySelectionFixtureSchema.parse(
+      JSON.parse(await readFile(path.join(fixtureDir, 'v5.json'), 'utf8'))
+    );
+  }
+
+  function applyFixtureEntries(base: FixtureEntry[], overrides: FixtureEntry[]) {
+    const replacements = new Set(overrides.map(entry => entry.procedure));
+    return [...base.filter(entry => !replacements.has(entry.procedure)), ...overrides];
+  }
+
   it('covers every registered workspace procedure exactly once in the latest contract', async () => {
-    const { fixture } = await loadFixture(4);
-    expect(fixture.contractVersion).toBe(4);
-    const expected = Object.keys(fixture.procedures).sort();
+    const selection = await loadRepositorySelectionFixture();
+    const { fixture } = await loadFixture(selection.baseContractVersion);
+    const procedures = { ...fixture.procedures, ...selection.procedures };
+    const expected = Object.keys(procedures).sort();
     const registered = Object.entries(appRouter._def.procedures)
       .filter(([name]) => name.includes('HostedWorkspace') || name === 'deleteWorktree')
       .map(([name]) => name)
       .sort();
     expect(registered).toEqual(expected);
-    expect([...fixture.requests.map(entry => entry.procedure)].sort()).toEqual(expected);
-    expect([...fixture.responses.map(entry => entry.procedure)].sort()).toEqual(expected);
+    expect(
+      applyFixtureEntries(fixture.requests, selection.requests)
+        .map(entry => entry.procedure)
+        .sort()
+    ).toEqual(expected);
+    expect(
+      applyFixtureEntries(fixture.responses, selection.responses)
+        .map(entry => entry.procedure)
+        .sort()
+    ).toEqual(expected);
     for (const name of expected) {
       const procedure = appRouter._def.procedures[name];
       expect(procedure, `${name} must be registered`).toBeDefined();
-      expect(procedure?._def.type, `${name} procedure kind drift`).toBe(fixture.procedures[name]);
+      expect(procedure?._def.type, `${name} procedure kind drift`).toBe(procedures[name]);
     }
   });
 
@@ -257,7 +293,14 @@ describe('hosted workspace contract fixture', () => {
     async version => {
       const { fixture } = await loadFixture(version);
       expect(fixture.contractVersion).toBe(version);
-      expectFieldLists(fixture.requests, requestSchemas);
+      expectFieldLists(fixture.requests, {
+        ...requestSchemas,
+        createHostedWorkspace: CreateHostedWorkspaceInput.omit({ additionalRepositoryIds: true }),
+      });
+      const create = fixture.requests.find(entry => entry.procedure === 'createHostedWorkspace');
+      expect(
+        CreateHostedWorkspaceInput.parse(create?.example).additionalRepositoryIds
+      ).toBeUndefined();
     }
   );
 
@@ -303,6 +346,16 @@ describe('hosted workspace contract fixture', () => {
     const { fixture, source } = await loadFixture(4);
     for (const code of fixture.errorCodes) {
       expect(source.includes(code), `${code} must remain a literal contract code`).toBe(true);
+    }
+  });
+
+  it('validates the v5 catalog capability, promptless create example and typed error identifiers', async () => {
+    const selection = await loadRepositorySelectionFixture();
+    const { source } = await loadFixture(selection.baseContractVersion);
+    expectFieldLists(selection.requests, requestSchemas);
+    expectFieldLists(selection.responses, responseSchemas);
+    for (const { code, message } of selection.errors) {
+      expect(source, `${code}: ${message}`).toContain(message);
     }
   });
 

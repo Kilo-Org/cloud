@@ -255,3 +255,160 @@ describe('mandatory credential containment', () => {
     await expect(prepareCredentialGrant({ ...input, existing: grant })).rejects.toThrow();
   });
 });
+
+describe('hosted multi-repository grants', () => {
+  const integrationId = '123e4567-e89b-42d3-a456-426614174022';
+  const primary = { id: 101, fullName: 'acme/widgets' };
+  const additional = { id: 102, fullName: 'acme/docs' };
+  const primaryScope = {
+    userId: 'user-1',
+    organizationId: 'org-session',
+    integrationId,
+    primaryRepo: primary.fullName,
+    additionalRepositoryIds: [additional.id],
+  };
+
+  function hostedPreparation() {
+    const input = localPreparation();
+    input.directory = '/workspace';
+    input.source.orgId = primaryScope.organizationId;
+    input.source.repository = {
+      type: 'github',
+      repo: primary.fullName,
+      hostedRepositoryId: primary.id,
+      githubIntegrationId: integrationId,
+      githubAccessPurpose: 'workflow',
+      allowUserAuthorization: false,
+    };
+    input.source.additionalHostedGitHubRepositories = [additional];
+    const resolve = vi.fn().mockResolvedValue({ success: true, primary, additional: [additional] });
+    const issue = vi.fn(async ({ githubRepo }: { githubRepo: string }) => ({
+      success: true,
+      capability: `kgh2.${githubRepo}`,
+      source: 'installation',
+      installationId: '123',
+      appType: 'standard',
+      gitAuthor: { name: 'Kilo', email: 'bot@example.com' },
+    }));
+    Object.assign(input.env, {
+      GIT_TOKEN_SERVICE: {
+        resolveHostedWorkspaceGitHubRepositories: resolve,
+        issueGitHubSessionCapability: issue,
+      },
+    });
+    return { input, resolve, issue };
+  }
+
+  it('checks the whole stable set on preparation and does not pass identity into runtime credentials', async () => {
+    const { input, resolve, issue } = hostedPreparation();
+    const { grant } = await prepareCredentialGrant(input);
+    expect(resolve).toHaveBeenCalledExactlyOnceWith(primaryScope);
+    expect(issue.mock.calls.map(([request]) => request)).toEqual(
+      [primary, additional].map(repository => ({
+        userId: primaryScope.userId,
+        orgId: primaryScope.organizationId,
+        outboundContainerId: 'allocation-binding',
+        githubRepo: repository.fullName,
+        accessPurpose: 'workflow',
+        allowUserAuthorization: false,
+        expectedIntegrationId: integrationId,
+      }))
+    );
+    const persisted = persistedSessionCredentialGrantSchema.parse(
+      JSON.parse(JSON.stringify(grant))
+    );
+    expect(persisted.repository).toMatchObject({ hostedRepositoryId: primary.id });
+    expect(persisted.additionalRepositories?.[0]?.repository).toMatchObject({
+      hostedRepositoryId: additional.id,
+    });
+    const payload = sessionCredentialsPayloadFromGrant(grant, sessionId);
+    expect(payload.git?.token).toBe(persisted.additionalRepositories?.[0]?.scm.alias);
+    expect(JSON.stringify(payload)).not.toContain(integrationId);
+    expect(JSON.stringify(payload)).not.toContain('hostedRepositoryId');
+    expect(JSON.stringify(payload)).not.toContain('kgh2.');
+  });
+
+  it('denies renamed members on recovery and replacement IDs when reusing a cached capability', async () => {
+    const { input, resolve, issue } = hostedPreparation();
+    const { grant } = await prepareCredentialGrant(input);
+    issue.mockClear();
+    resolve.mockResolvedValueOnce({
+      success: true,
+      primary,
+      additional: [{ ...additional, fullName: 'acme/renamed' }],
+    });
+    await expect(prepareCredentialGrant({ ...input, existing: grant })).rejects.toMatchObject({
+      repoFullName: additional.fullName,
+      cause: new Error('repository_unavailable'),
+    });
+    expect(resolve).toHaveBeenLastCalledWith(primaryScope);
+
+    const request = {
+      env: input.env,
+      grant,
+      credential: grant.scm?.alias ?? '',
+      url: `https://github.com/${additional.fullName}.git/info/refs?service=git-upload-pack`,
+      method: 'GET',
+      outboundContainerId: 'allocation-binding',
+      now: 1001,
+    };
+    resolve.mockResolvedValueOnce({ success: true, primary: additional, additional: [] });
+    await expect(resolveSessionCredential(request)).resolves.toMatchObject({
+      credential: `kgh2.${additional.fullName}`,
+    });
+    resolve.mockResolvedValueOnce({
+      success: true,
+      primary: { ...additional, id: additional.id + 100 },
+      additional: [],
+    });
+    await expect(resolveSessionCredential(request)).resolves.toBeNull();
+    expect(resolve).toHaveBeenLastCalledWith({
+      ...primaryScope,
+      primaryRepo: additional.fullName,
+      additionalRepositoryIds: [],
+    });
+    expect(issue).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the hosted authorization RPC is missing', async () => {
+    const { input, issue } = hostedPreparation();
+    Object.assign(input.env, { GIT_TOKEN_SERVICE: { issueGitHubSessionCapability: issue } });
+    await expect(prepareCredentialGrant(input)).rejects.toMatchObject({
+      cause: new Error('temporarily_unavailable'),
+    });
+    expect(issue).not.toHaveBeenCalled();
+  });
+
+  it('retries a temporary authorization error but fails fast on a definitive denial', async () => {
+    const { input, resolve, issue } = hostedPreparation();
+    resolve.mockResolvedValueOnce({ success: false, reason: 'temporarily_unavailable' });
+    await expect(prepareCredentialGrant(input)).resolves.toMatchObject({
+      grant: { additionalRepositories: [expect.anything()] },
+    });
+    expect(resolve.mock.calls).toEqual([[primaryScope], [primaryScope]]);
+    resolve.mockClear();
+    issue.mockClear();
+    resolve.mockResolvedValueOnce({ success: false, reason: 'access_denied' });
+    await expect(prepareCredentialGrant(input)).rejects.toMatchObject({
+      cause: new Error('access_denied'),
+    });
+    expect(resolve).toHaveBeenCalledExactlyOnceWith(primaryScope);
+    expect(issue).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-installation capability even after confirming access', async () => {
+    const { input, issue } = hostedPreparation();
+    issue.mockImplementationOnce(async () => ({
+      success: true,
+      capability: 'kgh2.user',
+      source: 'user',
+      installationId: '123',
+      appType: 'standard',
+      gitAuthor: { name: 'Kilo', email: 'bot@example.com' },
+    }));
+    await expect(prepareCredentialGrant(input)).rejects.toThrow(
+      'GitHub capability issuance is unavailable'
+    );
+    expect(issue).toHaveBeenCalledTimes(1);
+  });
+});

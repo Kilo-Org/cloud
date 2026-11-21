@@ -80,6 +80,13 @@ import {
   type InstallationLookupFailure,
 } from './installation-lookup-service.js';
 import {
+  HostedWorkspaceGitHubRepositories,
+  type ListHostedWorkspaceGitHubRepositoriesParams,
+  type ListHostedWorkspaceGitHubRepositoriesResult,
+  type ResolveHostedWorkspaceGitHubRepositoriesParams,
+  type ResolveHostedWorkspaceGitHubRepositoriesResult,
+} from './hosted-workspace-github-repositories.js';
+import {
   GitHubSessionCapabilityCodec,
   GitHubSessionCapabilityError,
   normalizeGitHubRepository,
@@ -511,6 +518,7 @@ function validateBitbucketCapabilityUpstream(
 export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   private githubService: GitHubTokenService;
   private installationLookupService: InstallationLookupService;
+  private hostedWorkspaceGitHubRepositories: HostedWorkspaceGitHubRepositories;
   private gitlabLookupService: GitLabLookupService;
   private gitlabCredentialResolver: GitLabCredentialBroker;
   private githubUserAuthorizationService: GitHubUserAuthorizationService;
@@ -519,6 +527,10 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     super(ctx, env);
     this.githubService = new GitHubTokenService(env);
     this.installationLookupService = new InstallationLookupService(env);
+    this.hostedWorkspaceGitHubRepositories = new HostedWorkspaceGitHubRepositories(
+      this.installationLookupService,
+      this.githubService
+    );
     this.gitlabLookupService = new GitLabLookupService(env);
     this.gitlabCredentialResolver = createGitLabCredentialBroker(env);
     this.githubUserAuthorizationService = new GitHubUserAuthorizationService(env);
@@ -676,6 +688,18 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       };
     }
     return { success: true };
+  }
+
+  async listHostedWorkspaceGitHubRepositories(
+    params: ListHostedWorkspaceGitHubRepositoriesParams
+  ): Promise<ListHostedWorkspaceGitHubRepositoriesResult> {
+    return this.hostedWorkspaceGitHubRepositories.list(params);
+  }
+
+  async resolveHostedWorkspaceGitHubRepositories(
+    params: ResolveHostedWorkspaceGitHubRepositoriesParams
+  ): Promise<ResolveHostedWorkspaceGitHubRepositoriesResult> {
+    return this.hostedWorkspaceGitHubRepositories.resolve(params);
   }
 
   async getCloudAgentAuthForRepo(

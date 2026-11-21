@@ -1,4 +1,4 @@
-# Hosted workspace contract fixture (v4)
+# Hosted workspace contract fixtures
 
 Versioned request/response examples, procedure list, status enums and stable
 error codes for the Cloud workspace-first surface an Agent Manager Session Host
@@ -9,6 +9,7 @@ consumes.
 | `listHostedWorkspaces` | query | Owner-scoped workspace catalog with passive PR summaries |
 | `getHostedWorkspace` | query | One workspace with its root sessions and passive PR summary |
 | `getHostedWorkspaceStatus` | query | Passive compute/activity/wake/billing/deletion projection |
+| `listHostedWorkspaceRepositories` | query | Eligible additional GitHub repositories for the current organization, primary and pinned integration |
 | `createHostedWorkspace` | mutation | Create a workspace and its first root |
 | `createHostedWorkspaceSession` | mutation | Add a root session to an existing workspace |
 | `continueHostedWorkspace` | mutation | Continue imported sessions in a hosted workspace |
@@ -34,13 +35,18 @@ consumes.
 - `v3.json` added the workspace-scoped change reads and verified linked-PR
   reads. This published fixture remains frozen byte-for-byte, including its
   workspace summaries without `pullRequest`.
-- `v4.json` is the current contract. It retains every v3 procedure and adds the
+- `v4.json` retains every v3 procedure and adds the
   nullable workspace-level `pullRequest` projection to list/get and the explicit
   `refreshHostedWorkspacePullRequest` mutation. The PR summary carries its own
   availability/partial flags; `null` means no verified PR, and a failed refresh
   is reported separately so it is not confused with `no_pr`.
+- `v5.json` is a delta on `v4.json`: merge the procedures by name and replace the
+  request and response examples by procedure. The catalog returns
+  `hostedAdditionalRepositoriesVersion: 1` on success. The optional create list
+  contains up to five stable numeric GitHub repository IDs; omission or an empty
+  array retains the previous single-repository behavior.
 - The fixture test validates v1/v2/v3 examples with the historical workspace
-  summary shape and v4 with the current schemas. It also asserts that each
+  summary shape and verifies the additive v5 catalog and create contracts. It asserts that each
   released version stays an append-only subset of the registered router and
   that the latest fixture covers every workspace procedure exactly once.
 - Further breaking or additive contract changes create a new fixture plus a new
@@ -51,6 +57,20 @@ consumes.
   new version, not to edit an existing one.
 - `deletionManifestVersion` is the `cloudAgentWorktreeDeletionManifestSchema`
   version stored on a completed workspace tombstone.
+
+## Additional repository selection
+
+Probe the passive catalog with the active organization, Kilo GitHub integration
+ID and primary `owner/repo`. Follow `nextPage` until omitted, even if a page has
+no eligible repositories. Only a successful response with the supported version
+enables selection; an absent route, unsupported response, or error is not a
+signal to retry a multi-repository create as a single-repository create.
+
+Pass the same organization, primary, and `repository.githubIntegrationId` to
+`createHostedWorkspace`. A nonempty selection is resolved again before admission.
+Do not change the operation key to retry an ambiguous response, and do not reuse
+the key for a different selection. The create response has the same shape as
+before, including the absence of a message ID for a promptless create.
 
 ## Workspace change and linked-PR authority
 

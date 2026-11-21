@@ -1,4 +1,5 @@
 import { environmentReferenceSchema } from '../environment-build/reference.js';
+import { hostedGitHubRepositoriesSchema } from './hosted-github-repositories.js';
 import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { egressRequestSupported } from '@kilocode/worker-utils/sandbox-provider-capabilities';
@@ -337,10 +338,8 @@ const MetadataWorkspaceSchema = egressPolicySchema
     sessionHome: z.string().optional(),
     branchName: z.string().optional(),
     /**
-     * The generated `kilo/<slug>` branch of a session on a V2 environment. The
-     * launch repository can run on `repository.branch` instead, so `branchName`
-     * is not always this value. A repository of the environment without a
-     * requested branch uses it.
+     * The generated `kilo/<slug>` branch for repositories without an explicit
+     * branch in a multi-repository workspace. The primary may run on `branchName` instead.
      */
     generatedBranchName: branchNameSchema.optional(),
     shallow: z.boolean().optional(),
@@ -496,12 +495,29 @@ export const CurrentSessionMetadataSchema = z
     profile: SessionProfileBundleSchema.optional(),
     /** The repository environment this session admitted, for snapshot selection. */
     environment: environmentReferenceSchema.optional(),
+    hostedGitHubRepositories: hostedGitHubRepositoriesSchema.optional(),
     callback: MetadataCallbackSchema.optional(),
     workspace: MetadataWorkspaceSchema.optional(),
     devcontainer: MetadataDevContainerSchema.optional(),
     lifecycle: MetadataLifecycleSchema,
   })
   .strip()
+  .refine(
+    ({ hostedGitHubRepositories: hosted, environment, identity, repository, workspace }) =>
+      hosted === undefined ||
+      (environment === undefined &&
+        Boolean(identity.orgId) &&
+        identity.botId === undefined &&
+        workspace?.worktreeId !== undefined &&
+        workspace.generatedBranchName !== undefined &&
+        !isLegacySharedSandboxWorkspace(workspace) &&
+        repository?.type === 'github' &&
+        repository.repo.toLowerCase() === hosted.primary.fullName.toLowerCase() &&
+        repository.githubIntegrationId === hosted.integrationId &&
+        (repository.githubAccessPurpose ?? 'workflow') === 'workflow' &&
+        repository.token === undefined),
+    'Hosted repositories require an organization workspace with a matching pinned GitHub primary'
+  )
   .refine(
     metadata =>
       (metadata.workspace?.sandboxProvider ?? 'cloudflare') === 'cloudflare' ||

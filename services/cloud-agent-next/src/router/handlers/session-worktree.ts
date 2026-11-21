@@ -33,6 +33,7 @@ import { and, asc, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { getPgDb } from '../../db/pg.js';
+import { sameHostedGitHubRepositories } from '../../persistence/hosted-github-repositories.js';
 import {
   CurrentSessionMetadataSchema,
   getSandboxProviderBinding,
@@ -754,6 +755,9 @@ function buildRegistrationInput(
     repository,
     ...(source.metadata.profile ? { profile: source.metadata.profile } : {}),
     ...(source.metadata.environment ? { environment: source.metadata.environment } : {}),
+    ...(source.metadata.hostedGitHubRepositories
+      ? { hostedGitHubRepositories: source.metadata.hostedGitHubRepositories }
+      : {}),
     ...(source.metadata.finalization ? { finalization: source.metadata.finalization } : {}),
     workspace,
     ...(continuation ? { continuation: true as const } : {}),
@@ -814,6 +818,12 @@ function assertRegisteredMetadata(
       getSandboxProviderBinding(source.metadata)
     ) ||
     workspace.branchName !== sourceWorktreeBranchName(source) ||
+    !sameHostedGitHubRepositories(
+      metadata.hostedGitHubRepositories,
+      source.metadata.hostedGitHubRepositories
+    ) ||
+    (source.metadata.hostedGitHubRepositories !== undefined &&
+      workspace.generatedBranchName !== source.workspace.generatedBranchName) ||
     JSON.stringify(workspace.sandboxRoute) !== JSON.stringify(source.workspace.sandboxRoute) ||
     workspace.sandboxKind !== source.workspace.sandboxKind ||
     !metadata.repository ||
@@ -1486,7 +1496,21 @@ export type SiblingCreateRun = {
 export async function runSiblingCreate(
   run: SiblingCreateRun
 ): Promise<WorktreeResult | HostedWorkspaceSessionResult> {
-  const { db, ctx, source, intent, operationKey, organizationId, options } = run;
+  const { db, ctx, source, intent, operationKey, organizationId } = run;
+  const hostedGitHubRepositories = source.metadata.hostedGitHubRepositories;
+  const options =
+    hostedGitHubRepositories === undefined
+      ? run.options
+      : {
+          ...run.options,
+          fingerprint: await sha256Hex(
+            JSON.stringify({
+              fingerprint: run.options.fingerprint,
+              hostedGitHubRepositories,
+              generatedBranchName: source.workspace.generatedBranchName,
+            })
+          ),
+        };
   const preissuedRuntimeAuthorization = run.preissuedRuntimeAuthorization;
   const startedAt = Date.now();
   const admission = await admitOperation(db, {

@@ -21,13 +21,8 @@ import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { getSandboxProvider } from '../persistence/session-metadata.js';
 import type { AgentSandboxProvider } from '../types.js';
 import type { HostedWorkspaceChangeState } from '../shared/hosted-workspace-changes.js';
-import { sameRepositoryIdentity } from '@kilocode/cloud-agent-profile';
-import { launchRepositoryIdentity } from '../session/environment-launch.js';
-import {
-  ISOLATED_CONTAINER_WORKSPACE_PATH,
-  environmentWorkspace,
-  isMultiRepositoryEnvironment,
-} from '../shared/environment-workspace.js';
+import { sessionWorkspaceLayout } from '../control-plane/session/workspace-roots.js';
+import { ISOLATED_CONTAINER_WORKSPACE_PATH } from '../shared/environment-workspace.js';
 import { WORKTREE_CHANGED_EVENT, worktreeChangesBaseRef } from '../shared/worktree-changes-wire.js';
 import { parseReportedSnapshot, type RouteRepository } from '../shared/worktree-groups.js';
 import {
@@ -62,7 +57,7 @@ export type WorktreeChangesContext = {
   providerRuntime?: NonNullable<SessionMetadata['workspace']>['providerRuntime'];
   repository: { type: string; source: string };
   baseRef?: string;
-  /** The repositories of a V2 route, which is what its wrapper reports on. Absent for a V1 route. */
+  /** The explicit repository roots reported by the wrapper. */
   roots?: RouteRepository[];
 };
 
@@ -99,27 +94,6 @@ type WorktreeChangesDependencies = {
 
 const idleStatusSchema = z.object({ status: z.object({ type: z.literal('idle') }) });
 
-function environmentRoots(metadata: SessionMetadata): RouteRepository[] | undefined {
-  if (!isMultiRepositoryEnvironment(metadata.environment)) return undefined;
-  const launch =
-    metadata.repository === undefined ? undefined : launchRepositoryIdentity(metadata.repository);
-  return environmentWorkspace({
-    sessionDirectory: ISOLATED_CONTAINER_WORKSPACE_PATH,
-    environment: metadata.environment,
-    isLaunch: member => launch !== undefined && sameRepositoryIdentity(member.identity, launch),
-  }).roots.flatMap(root =>
-    root.repository === null
-      ? []
-      : [
-          {
-            directory: root.directory,
-            repoFullName: root.repository.repoFullName,
-            launch: root.launch,
-          },
-        ]
-  );
-}
-
 export function worktreeChangesContext(
   metadata: SessionMetadata,
   directory: string
@@ -128,7 +102,20 @@ export function worktreeChangesContext(
   const kiloSessionId = metadata.auth.kiloSessionId;
   const repository = metadata.repository;
   if (!sandboxId || !kiloSessionId || !repository || !directory) return null;
-  const roots = environmentRoots(metadata);
+  const roots =
+    metadata.hostedGitHubRepositories || metadata.environment?.repositories
+      ? sessionWorkspaceLayout(metadata, ISOLATED_CONTAINER_WORKSPACE_PATH).roots.flatMap(root =>
+          root.repository === null
+            ? []
+            : [
+                {
+                  directory: root.directory,
+                  repoFullName: root.repository.repoFullName,
+                  launch: root.launch,
+                },
+              ]
+        )
+      : undefined;
   return {
     session: { sessionId: metadata.identity.sessionId, kiloSessionId, directory },
     ownerId: metadata.identity.userId,
@@ -141,11 +128,10 @@ export function worktreeChangesContext(
       type: repository.type,
       source: repository.type === 'github' ? repository.repo : repository.url,
     },
-    // A V2 route compares each repository with its own base, which the wrapper chooses.
-    baseRef: isMultiRepositoryEnvironment(metadata.environment)
-      ? undefined
-      : worktreeChangesBaseRef(repository.baseBranch),
-    ...(roots === undefined ? {} : { roots }),
+    // A multi-root route compares each repository with its own base, which the wrapper chooses.
+    ...(roots === undefined
+      ? { baseRef: worktreeChangesBaseRef(repository.baseBranch) }
+      : { roots }),
   };
 }
 

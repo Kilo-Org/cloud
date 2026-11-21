@@ -8,7 +8,7 @@ import { Cause, Effect, Queue, Stream } from 'effect';
 import { type ContextParams, type LlamaContext, type TokenData } from 'llama.rn';
 
 import { LocalModelError, type LocalModelProblem } from './local-model-error';
-import { type GgufModelFile, settled } from './gguf-records';
+import { attempt, type GgufModelFile, settled } from './gguf-records';
 import { answerOf, type CompletionResult, paramsOf, readCompletion, stopOf } from './gguf-template';
 
 /** The part of a llama.rn context this client drives. */
@@ -24,20 +24,46 @@ export type GgufRuntime = {
 };
 
 /**
- * Loads a projector into an open context. True only when llama.cpp reports
- * that the model now reads images; the projector's own release runs with the
+ * What loading a projector said about the model. `refused` is llama.cpp failing
+ * to load the projector at all, which says nothing about the bytes: the device
+ * can be short of memory or its GPU stack can fail, so the read runs again.
+ * `noVision` is a projector that loaded and reported no image support, which is
+ * a property of these bytes and cannot change between reads.
+ */
+export type ProjectorLoad = 'vision' | 'noVision' | 'refused';
+
+/**
+ * Loads a projector into an open context, and reports which of the two
+ * verdicts llama.cpp gave; the projector's own release runs with the
  * context's.
  */
 export async function loadProjector(
   context: Pick<GgufContext, 'initMultimodal' | 'getMultimodalSupport'>,
   projector: string,
   gpu: boolean
-): Promise<boolean> {
+): Promise<ProjectorLoad> {
   if (!(await context.initMultimodal({ path: projector, use_gpu: gpu }))) {
-    return false;
+    return 'refused';
   }
   const support = await context.getMultimodalSupport();
-  return support.vision;
+  return support.vision ? 'vision' : 'noVision';
+}
+
+/**
+ * Whether a model's projector reads images, as verification needs it. A refused
+ * load throws, so the caller treats it as a refused read rather than the
+ * deterministic verdict that removes the model.
+ */
+export async function projectorReadsImages(
+  context: Pick<GgufContext, 'initMultimodal' | 'getMultimodalSupport'>,
+  projector: string,
+  gpu: boolean
+): Promise<boolean> {
+  const load = await loadProjector(context, projector, gpu);
+  if (load === 'refused') {
+    throw new Error('projector');
+  }
+  return load === 'vision';
 }
 
 /** Fixed copy only: llama.cpp errors are never shown or logged. */
@@ -46,6 +72,30 @@ function failure(problem: LocalModelProblem, started: boolean): ModelError {
     reason: started ? 'stream' : 'unsupported',
     cause: new LocalModelError(problem),
   });
+}
+
+/**
+ * How long a load waits for a teardown. A native release that never settles
+ * would otherwise leave every later send spinning with no failure row, while
+ * the stalled teardown stays pending so no second context opens beside it.
+ */
+export const RELEASE_WAIT_MS = 30_000;
+
+/**
+ * Waits for `teardown`, and reports whether `RELEASE_WAIT_MS` passed without
+ * it: the promise itself is left running, since a context may still be freeing.
+ */
+async function waitForTeardown(teardown: Promise<void>): Promise<'settled' | 'stalled'> {
+  const stalled = Symbol('teardown stalled');
+  const { promise, resolve } = Promise.withResolvers<symbol>();
+  const timer = setTimeout(() => {
+    resolve(stalled);
+  }, RELEASE_WAIT_MS);
+  try {
+    return (await Promise.race([teardown, promise])) === stalled ? 'stalled' : 'settled';
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export type GgufModelClient = {
@@ -73,24 +123,85 @@ export function ggufModelClient({
   let loaded: { readonly fileId: string; readonly context: Promise<GgufContext> } | undefined =
     undefined;
   let inflight: Promise<unknown> | undefined = undefined;
+  /**
+   * The teardown under way. Nothing opens a context until it settles, so two
+   * multi-gigabyte models are never resident at once: the entry leaves `loaded`
+   * first, and every caller that would open one waits here.
+   */
+  let freeing: Promise<void> = Promise.resolve();
+  /**
+   * The teardown whose own wait timed out, while it is still pending. Every send
+   * would otherwise await it and pay the whole wait again before reporting
+   * `unavailable`. The number is the teardown's, so a chain that settles late
+   * clears only its own record and never a newer stall.
+   */
+  let freeingGeneration = 0;
+  let stalledGeneration: number | undefined = undefined;
   let busy = false;
   let sequence = 0;
+  /**
+   * Ends the answer the client cannot interrupt. A stop that throws never
+   * reaches its completion, so that promise can stay pending forever: waiting
+   * for it would wedge the teardown, and leaving it owned would keep the client
+   * busy for the rest of the session.
+   */
+  let abandon: (() => void) | undefined = undefined;
 
-  const release = async (fileId?: string) => {
+  const free = async (
+    previous: Promise<void>,
+    current: { readonly context: Promise<GgufContext> },
+    generation: number
+  ) => {
+    // Every await is a `settled`/`attempt`, so nothing here rejects: the chain
+    // every later load waits on never stays rejected.
+    try {
+      await settled(previous);
+      const context = await settled(current.context);
+      if (!context.ok) {
+        return;
+      }
+      const running = inflight;
+      if (running !== undefined) {
+        // A freed handle throws where the method is called, so the stop is a
+        // thunk. It must not skip the release below, which frees the context the
+        // one-context invariant depends on.
+        const stopped = await attempt(() => context.value.stopCompletion());
+        // A stop that never ran cannot interrupt the answer: its completion may
+        // never settle, so waiting for it would hold the chain every later load
+        // waits on, and the answer has to give up its ownership of the client.
+        // The release below still frees the weights.
+        if (stopped.ok) {
+          await settled(running);
+        } else {
+          // llama.rn 0.12.9: a throw here means the id is already gone from
+          // `g_llamaContexts`, and `llamaReleaseContext` waits on
+          // `TaskManager::waitForContext` before deleting, so freeing now cannot pull
+          // the weights out from under a running native completion.
+          abandon?.();
+        }
+      }
+      await attempt(() => context.value.release());
+    } finally {
+      // This chain has done its work, so its stall is over. Clearing inside the
+      // body runs before the promise settles, so the send that settlement wakes
+      // waits on a finished chain instead of a stale record.
+      if (stalledGeneration === generation) {
+        stalledGeneration = undefined;
+      }
+    }
+  };
+
+  const release = (fileId?: string): Promise<void> => {
     const current = loaded;
     if (current === undefined || (fileId !== undefined && current.fileId !== fileId)) {
-      return;
+      // Nothing of this model is loaded, but a release the background listener
+      // started may still be freeing one, and the caller waits for it.
+      return freeing;
     }
     loaded = undefined;
-    const context = await settled(current.context);
-    if (!context.ok) {
-      return;
-    }
-    if (inflight !== undefined) {
-      await settled(context.value.stopCompletion());
-      await settled(inflight);
-    }
-    await settled(context.value.release());
+    freeingGeneration += 1;
+    freeing = free(freeing, current, freeingGeneration);
+    return freeing;
   };
 
   /** A vision model whose projector does not load is not the model that was verified. */
@@ -105,9 +216,12 @@ export function ggufModelClient({
     if (file.projector === undefined) {
       return context;
     }
+    // Both a refused load and a projector that reads no images mean this context
+    // cannot do what the record promised, so it is freed and the answer fails.
     const vision = await settled(loadProjector(context, file.projector, runtime.gpu));
-    if (!vision.ok || !vision.value) {
-      await settled(context.release());
+    if (!vision.ok || vision.value !== 'vision') {
+      // A freed handle throws where the method is called, before a promise exists.
+      await attempt(() => context.release());
       throw new Error('projector');
     }
     return context;
@@ -117,7 +231,21 @@ export function ggufModelClient({
     if (loaded?.fileId === fileId) {
       return loaded.context;
     }
-    await release();
+    const teardown = release();
+    const generation = freeingGeneration;
+    // This teardown already timed out and is still pending, so it cannot settle
+    // while this send runs: refusing at once is the same `unavailable` answer
+    // without paying the whole wait again. Nothing opens beside it either way.
+    if (stalledGeneration === generation) {
+      throw new Error('teardown stalled');
+    }
+    // A teardown that never settles rejects this load rather than waiting
+    // forever, which takes the caller's `unavailable` path; the teardown itself
+    // stays pending, so it still keeps the next context from opening beside it.
+    if ((await waitForTeardown(teardown)) === 'stalled') {
+      stalledGeneration = generation;
+      throw new Error('teardown stalled');
+    }
     const context = open(file);
     loaded = { fileId, context };
     return context;
@@ -187,11 +315,36 @@ export function ggufModelClient({
         Queue.endUnsafe(queue);
       };
       const interrupt = async () => {
-        if (handle !== undefined) {
-          await settled(handle.stopCompletion());
+        const context = handle;
+        if (context !== undefined) {
+          // A freed handle throws where the method is called; the finalizer
+          // runs this as a void promise, so the throw must not reject it.
+          await attempt(() => context.stopCompletion());
         }
       };
       const run = async () => {
+        /**
+         * Gives up this answer's ownership of the client, once. A release that
+         * cannot stop the answer calls it while the answer is still pending, and
+         * the answer calls it again when it settles or fails: whichever happens
+         * first ends the turn, and the second call must not clear state a newer
+         * answer has taken over.
+         */
+        let released = false;
+        const giveUp = () => {
+          if (released) {
+            return;
+          }
+          released = true;
+          if (running()) {
+            stop('failed', streamed !== '');
+          }
+          if (abandon === giveUp) {
+            abandon = undefined;
+          }
+          busy = false;
+          inflight = undefined;
+        };
         try {
           const opened = await settled(load(request.model, file));
           if (!opened.ok) {
@@ -207,6 +360,7 @@ export function ggufModelClient({
           }
           const completion = opened.value.completion(paramsOf(request, file), onToken);
           inflight = completion;
+          abandon = giveUp;
           const finished = await settled(completion);
           if (!finished.ok) {
             stop('failed', streamed !== '');
@@ -226,8 +380,7 @@ export function ggufModelClient({
         } catch {
           stop('failed', streamed !== '');
         } finally {
-          busy = false;
-          inflight = undefined;
+          giveUp();
         }
       };
       return Effect.andThen(

@@ -4058,7 +4058,8 @@
         "space": "Hakuna nafasi ya kutosha ya kuhifadhi kwa modeli hii. Toa nafasi na ujaribu tena.",
         "network": "Upakuaji haukukamilika. Angalia muunganisho wako na ujaribu tena.",
         "invalidFile": "Faili iliyopakuliwa si modeli ambayo programu hii inaweza kuendesha, kwa hivyo iliondolewa.",
-        "checksum": "Faili iliyopakuliwa hailingani na checksum yake iliyochapishwa, kwa hivyo iliondolewa. Jaribu kupakua tena."
+        "checksum": "Faili iliyopakuliwa hailingani na checksum yake iliyochapishwa, kwa hivyo iliondolewa. Jaribu kupakua tena.",
+        "writeFailed": "Kifaa hiki hakikuweza kuhifadhi modeli. Jaribu kupakua tena."
       }
     },
     "catalog": {

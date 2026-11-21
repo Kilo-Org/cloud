@@ -4058,7 +4058,8 @@
         "space": "Enweghị ebe nchekwa zuru ezu maka ihe nlereanya a. Hapụ ohere ma nwaa ọzọ.",
         "network": "Ibudata ahụ agwụchaghị. Lelee njikọ gị ma nwaa ọzọ.",
         "invalidFile": "Faịlụ e budatara abụghị ihe nlereanya ngwa a nwere ike ịgba, ya mere ewepụrụ ya.",
-        "checksum": "Faịlụ e budatara adabaghị na checksum e bipụtara maka ya, ya mere ewepụrụ ya. Gbalịa ibudata ya ọzọ."
+        "checksum": "Faịlụ e budatara adabaghị na checksum e bipụtara maka ya, ya mere ewepụrụ ya. Gbalịa ibudata ya ọzọ.",
+        "writeFailed": "Ngwaọrụ a enweghị ike ichekwa ihe nlereanya ahụ. Gbalịa ibudata ya ọzọ."
       }
     },
     "catalog": {

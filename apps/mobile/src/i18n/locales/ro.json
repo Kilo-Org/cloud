@@ -4131,7 +4131,8 @@
         "space": "Nu există suficient spațiu liber pentru acest model. Eliberează spațiu și încearcă din nou.",
         "network": "Descărcarea nu s-a finalizat. Verifică conexiunea și încearcă din nou.",
         "invalidFile": "Fișierul descărcat nu este un model pe care această aplicație îl poate rula, așa că a fost eliminat.",
-        "checksum": "Fișierul descărcat nu corespunde sumei de control publicate, așa că a fost eliminat. Încercați din nou descărcarea."
+        "checksum": "Fișierul descărcat nu corespunde sumei de control publicate, așa că a fost eliminat. Încercați din nou descărcarea.",
+        "writeFailed": "Acest dispozitiv nu a putut salva modelul. Încercați din nou descărcarea."
       }
     },
     "catalog": {

@@ -4131,7 +4131,8 @@
         "space": "Nema dovoljno slobodnog prostora za ovaj model. Oslobodite prostor i pokušajte ponovo.",
         "network": "Preuzimanje nije završeno. Proverite vezu i pokušajte ponovo.",
         "invalidFile": "Preuzeti fajl nije model koji ova aplikacija može da pokrene, pa je uklonjen.",
-        "checksum": "Preuzeti fajl se ne poklapa sa objavljenom kontrolnom sumom, pa je uklonjen. Pokušajte ponovo da ga preuzmete."
+        "checksum": "Preuzeti fajl se ne poklapa sa objavljenom kontrolnom sumom, pa je uklonjen. Pokušajte ponovo da ga preuzmete.",
+        "writeFailed": "Ovaj uređaj nije mogao da sačuva model. Pokušajte ponovo da ga preuzmete."
       }
     },
     "catalog": {

@@ -4058,7 +4058,8 @@
         "space": "Laitteessa ei ole tarpeeksi vapaata tallennustilaa tälle mallille. Vapauta tilaa ja yritä uudelleen.",
         "network": "Lataus ei valmistunut. Tarkista yhteytesi ja yritä uudelleen.",
         "invalidFile": "Ladattu tiedosto ei ole malli, jota tämä sovellus voi ajaa, joten se poistettiin.",
-        "checksum": "Ladattu tiedosto ei vastaa julkaistua tarkistussummaansa, joten se poistettiin. Yritä latausta uudelleen."
+        "checksum": "Ladattu tiedosto ei vastaa julkaistua tarkistussummaansa, joten se poistettiin. Yritä latausta uudelleen.",
+        "writeFailed": "Tämä laite ei voinut tallentaa mallia. Yritä latausta uudelleen."
       }
     },
     "catalog": {

@@ -4277,7 +4277,8 @@
         "space": "Níl go leor stórála saor don tsamhail seo. Saor roinnt spáis agus triail arís.",
         "network": "Níor críochnaíodh an íoslódáil. Seiceáil do cheangal agus triail arís.",
         "invalidFile": "Ní samhail é an comhad íoslódáilte ar féidir leis an aip seo a rith, mar sin baineadh é.",
-        "checksum": "Ní mheaitseálann an comhad íoslódáilte a shuim seiceála foilsithe, mar sin baineadh é. Bain triail as an íoslódáil arís."
+        "checksum": "Ní mheaitseálann an comhad íoslódáilte a shuim seiceála foilsithe, mar sin baineadh é. Bain triail as an íoslódáil arís.",
+        "writeFailed": "Níorbh fhéidir leis an ngléas seo an tsamhail a shábháil. Bain triail as an íoslódáil arís."
       }
     },
     "catalog": {

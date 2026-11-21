@@ -740,6 +740,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Połączeniem {{organization}} z Bitbucket zarządza się w przeglądarce na komputerze.",
+      "deniedManagedByOwner": "Poproś właściciela {{organization}} o zmianę połączenia, którego nie możesz zmienić.",
+      "deniedConnectRole": "Tylko właściciele {{organization}}, administratorzy i osoby zarządzające rozliczeniami mogą je połączyć.",
+      "deniedReconnectRole": "Poproś właściciela {{organization}}, administratora lub osobę zarządzającą rozliczeniami, aby je ponownie połączyć.",
       "managedOnWebTitle": "Zarządzane w przeglądarce",
       "managedOnWebShort": "To połączenie jest zarządzane w przeglądarce na komputerze.",
       "managedOnWebRepositories": "Wybierz repozytoria dla {{organization}} w przeglądarce na komputerze.",

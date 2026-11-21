@@ -115,6 +115,7 @@ describe('BitbucketSetupRecovery', () => {
         canManage: true,
         canTriggerManualReview: false,
       } as unknown as Parameters<typeof BitbucketSetupRecovery>[0]['readiness'],
+      organizationName: 'Acme',
       message: 'Bitbucket is not connected',
     });
 

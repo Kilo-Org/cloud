@@ -1434,6 +1434,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Xiriirka Bitbucket ee {{organization}} waxaa lagu maamulaa shabakadda iyadoo kombiyuutar la isticmaalayo.",
+      "deniedManagedByOwner": "Weydii milkiile ka mid ah {{organization}} si uu u beddelo isku-xidhka aadan beddeli karin.",
+      "deniedConnectRole": "Milkiilayaasha, maamulayaasha iyo maareeyayaasha biilasha ee {{organization}} oo keliya ayaa ku xidhi kara.",
+      "deniedReconnectRole": "Weydii milkiile, maamule ama maareeyaha biilasha ee {{organization}} si ay dib ugu xidhaan.",
       "managedOnWebTitle": "Waxaa lagu maamulaa shabakadda",
       "managedOnWebShort": "Xiriirkan waxaa lagu maamulaa shabakadda iyadoo kombiyuutar la isticmaalayo.",
       "managedOnWebRepositories": "Dooro keydadka {{organization}} ee shabakadda adigoo kombiyuutar isticmaalaya.",

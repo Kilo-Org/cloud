@@ -1434,6 +1434,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ის Bitbucket-თან კავშირი იმართება ვებში, კომპიუტერიდან.",
+      "deniedManagedByOwner": "მიმართეთ {{organization}}-ის მფლობელს იმ კავშირის შესაცვლელად, რომლის შეცვლაც თქვენ არ შეგიძლიათ.",
+      "deniedConnectRole": "მისი დაკავშირება მხოლოდ {{organization}}-ის მფლობელებს, ადმინისტრატორებსა და ანგარიშსწორების მენეჯერებს შეუძლიათ.",
+      "deniedReconnectRole": "სთხოვეთ {{organization}}-ის მფლობელს, ადმინისტრატორს ან ანგარიშსწორების მენეჯერს, რომ დააკავშიროს ის.",
       "managedOnWebTitle": "იმართება ვებში",
       "managedOnWebShort": "ეს კავშირი იმართება ვებში, კომპიუტერიდან.",
       "managedOnWebRepositories": "აირჩიე რეპოზიტორიები {{organization}}-ისთვის ვებში, კომპიუტერიდან.",

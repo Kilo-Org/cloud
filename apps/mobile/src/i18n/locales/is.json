@@ -1434,6 +1434,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-tengingu við {{organization}} er stjórnað á vefnum í tölvu.",
+      "deniedManagedByOwner": "Biddu eiganda {{organization}} um að breyta tengingu sem þú getur ekki breytt.",
+      "deniedConnectRole": "Aðeins eigendur {{organization}}, stjórnendur og innheimtustjórar geta tengt það.",
+      "deniedReconnectRole": "Biddu eiganda, stjórnanda eða innheimtustjóra {{organization}} um að tengja það aftur.",
       "managedOnWebTitle": "Stjórnað á vefnum",
       "managedOnWebShort": "Þessari tengingu er stjórnað á vefnum í tölvu.",
       "managedOnWebRepositories": "Veldu geymslur fyrir {{organization}} á vefnum í tölvu.",

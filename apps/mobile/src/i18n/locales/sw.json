@@ -1434,6 +1434,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Muunganisho wa Bitbucket wa {{organization}} unasimamiwa kwenye wavuti kutoka kwenye kompyuta.",
+      "deniedManagedByOwner": "Mwombe mmiliki wa {{organization}} abadilishe muunganisho ambao huwezi kubadilisha.",
+      "deniedConnectRole": "Wamiliki, wasimamizi, na wasimamizi wa bili wa {{organization}} pekee wanaweza kuiunganisha.",
+      "deniedReconnectRole": "Omba mmiliki wa {{organization}}, msimamizi, au msimamizi wa bili aiunganishe upya.",
       "managedOnWebTitle": "Inasimamiwa kwenye wavuti",
       "managedOnWebShort": "Muunganisho huu unasimamiwa kwenye wavuti kutoka kwenye kompyuta.",
       "managedOnWebRepositories": "Chagua hazina za {{organization}} kwenye wavuti ukitumia kompyuta.",

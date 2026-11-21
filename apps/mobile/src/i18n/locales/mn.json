@@ -1434,6 +1434,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-ийн Bitbucket холболтыг компьютерээс вэб дээр удирддаг.",
+      "deniedManagedByOwner": "Өөрчилж чадахгүй байгаа холболтоо өөрчлөхийг {{organization}}-ийн эзэмшигчээс хүснэ үү.",
+      "deniedConnectRole": "Зөвхөн {{organization}}-ийн эзэмшигч, админ болон төлбөрийн менежер үүнийг холбох эрхтэй.",
+      "deniedReconnectRole": "Дахин холбуулахын тулд {{organization}}-ийн эзэмшигч, админ эсвэл төлбөрийн менежерт хандана уу.",
       "managedOnWebTitle": "Вэб дээр удирддаг",
       "managedOnWebShort": "Энэ холболтыг компьютерээс вэб дээр удирддаг.",
       "managedOnWebRepositories": "{{organization}}-д зориулсан репозиторуудыг компьютерээс вэб дээр сонгоно уу.",

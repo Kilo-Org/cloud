@@ -1434,6 +1434,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucketi ühendust {{organization}}-ga hallatakse arvutis veebi kaudu.",
+      "deniedManagedByOwner": "Palu {{organization}}-i omanikul muuta ühendust, mida sa ise muuta ei saa.",
+      "deniedConnectRole": "Selle saavad ühendada ainult {{organization}}-i omanikud, administraatorid ja arveldushaldurid.",
+      "deniedReconnectRole": "Palu {{organization}}-i omanikul, administraatoril või arveldushalduril see uuesti ühendada.",
       "managedOnWebTitle": "Hallatakse veebis",
       "managedOnWebShort": "Seda ühendust hallatakse arvutis veebi kaudu.",
       "managedOnWebRepositories": "Vali {{organization}} jaoks hoidlaid veebi kaudu arvutis.",

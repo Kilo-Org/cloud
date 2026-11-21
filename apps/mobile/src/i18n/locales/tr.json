@@ -738,6 +738,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} için Bitbucket bağlantısı bir bilgisayardan web üzerinden yönetilir.",
+      "deniedManagedByOwner": "Değiştiremediğiniz bir bağlantıyı değiştirmesi için bir {{organization}} sahibine başvurun.",
+      "deniedConnectRole": "Yalnızca {{organization}} sahipleri, yöneticileri ve faturalandırma yöneticileri bağlayabilir.",
+      "deniedReconnectRole": "Yeniden bağlaması için bir {{organization}} sahibi, yönetici veya faturalandırma yöneticisinden istekte bulunun.",
       "managedOnWebTitle": "Web üzerinden yönetilir",
       "managedOnWebShort": "Bu bağlantı bir bilgisayardan web üzerinden yönetilir.",
       "managedOnWebRepositories": "{{organization}} için depoları bir bilgisayardan web üzerinden seç.",

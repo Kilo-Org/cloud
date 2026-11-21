@@ -1434,6 +1434,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "ການເຊື່ອມຕໍ່ Bitbucket ຂອງ {{organization}} ຖືກຈັດການຢູ່ໃນເວັບຈາກຄອມພິວເຕີ.",
+      "deniedManagedByOwner": "ກະລຸນາຂໍໃຫ້ເຈົ້າຂອງອົງກອນ {{organization}} ປ່ຽນການເຊື່ອມຕໍ່ທີ່ທ່ານບໍ່ສາມາດປ່ຽນໄດ້.",
+      "deniedConnectRole": "ມີພຽງເຈົ້າຂອງອົງກອນ {{organization}}, ຜູ້ດູແລລະບົບ ແລະ ຜູ້ຈັດການການຮຽກເກັບເງິນທີ່ສາມາດເຊື່ອມຕໍ່ໄດ້.",
+      "deniedReconnectRole": "ຂໍໃຫ້ເຈົ້າຂອງອົງກອນ {{organization}}, ຜູ້ດູແລລະບົບ ຫຼື ຜູ້ຈັດການການຮຽກເກັບເງິນເຊື່ອມຕໍ່.",
       "managedOnWebTitle": "ຈັດການຢູ່ໃນເວັບ",
       "managedOnWebShort": "ການເຊື່ອມຕໍ່ນີ້ຖືກຈັດການຢູ່ໃນເວັບຈາກຄອມພິວເຕີ.",
       "managedOnWebRepositories": "ເລືອກບ່ອນເກັບໂຄດສຳລັບ {{organization}} ຢູ່ໃນເວັບຈາກຄອມພິວເຕີ.",

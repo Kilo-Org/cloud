@@ -1434,6 +1434,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Koneksyon Bitbucket pou {{organization}} jere sou entènèt la, apati yon òdinatè.",
+      "deniedManagedByOwner": "Mande yon pwopriyetè {{organization}} pou chanje yon koneksyon ou pa ka chanje.",
+      "deniedConnectRole": "Se sèlman pwopriyetè, administratè ak responsab faktirasyon nan {{organization}} ki ka konekte li.",
+      "deniedReconnectRole": "Mande yon Pwopriyetè, yon Administratè, oswa yon Responsab faktirasyon nan {{organization}} pou rekonekte l.",
       "managedOnWebTitle": "Jere sou entènèt la",
       "managedOnWebShort": "Koneksyon sa a jere sou entènèt la, apati yon òdinatè.",
       "managedOnWebRepositories": "Chwazi depo yo pou {{organization}} sou entènèt la, apati yon òdinatè.",

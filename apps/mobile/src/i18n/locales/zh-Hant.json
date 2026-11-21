@@ -738,6 +738,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} 的 Bitbucket 連線需在電腦上透過網頁版管理。",
+      "deniedManagedByOwner": "請洽詢 {{organization}} 的擁有者來變更您無法變更的連結。",
+      "deniedConnectRole": "只有 {{organization}} 的擁有者、管理員和帳單管理員可以設定連結。",
+      "deniedReconnectRole": "請要求 {{organization}} 的擁有者、管理員或帳單管理員重新連結。",
       "managedOnWebTitle": "在網頁版管理",
       "managedOnWebShort": "此連線需在電腦上透過網頁版管理。",
       "managedOnWebRepositories": "請在電腦上透過網頁版為 {{organization}} 選擇儲存庫。",

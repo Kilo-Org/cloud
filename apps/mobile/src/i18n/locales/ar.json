@@ -742,6 +742,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "تتم إدارة اتصال Bitbucket الخاص بالمؤسسة {{organization}} عبر الويب من جهاز كمبيوتر.",
+      "deniedManagedByOwner": "اطلب من مالك {{organization}} تغيير اتصال لا يمكنك تغييره.",
+      "deniedConnectRole": "يمكن لمالكي {{organization}} والمشرفين ومديري الفوترة فقط ربطه.",
+      "deniedReconnectRole": "اطلب من مالك {{organization}} أو مشرف أو مدير الفوترة إعادة ربطه.",
       "managedOnWebTitle": "تتم الإدارة على الويب",
       "managedOnWebShort": "تتم إدارة هذا الاتصال عبر الويب من جهاز كمبيوتر.",
       "managedOnWebRepositories": "اختر المستودعات الخاصة بالمؤسسة {{organization}} عبر الويب من جهاز كمبيوتر.",

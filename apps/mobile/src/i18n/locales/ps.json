@@ -1434,6 +1434,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "د {{organization}} د Bitbucket اړیکه له کمپیوټر څخه په وېب کې اداره کېږي.",
+      "deniedManagedByOwner": "د {{organization}} له مالک څخه وغواړئ چې هغه اړیکه بدله کړي چې تاسو یې نشئ کولی بدله کړئ.",
+      "deniedConnectRole": "یوازې د {{organization}} مالکان، مدیران او د بلونو مدیران کولی شي دا ونښلوي.",
+      "deniedReconnectRole": "د {{organization}} له یو مالک، مدیر، یا د بلونو مدیر څخه وغواړئ چې دا بیا ونښلوي.",
       "managedOnWebTitle": "په وېب کې اداره کېږي",
       "managedOnWebShort": "دا اړیکه له کمپیوټر څخه په وېب کې اداره کېږي.",
       "managedOnWebRepositories": "له کمپیوټر څخه په وېب کې د {{organization}} لپاره مخزنونه وټاکئ.",

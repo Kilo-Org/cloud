@@ -1434,6 +1434,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}}-organisaation Bitbucket-yhteyttä hallitaan verkossa tietokoneella.",
+      "deniedManagedByOwner": "Pyydä {{organization}}-organisaation omistajaa muuttamaan yhteyttä, jota et voi muuttaa.",
+      "deniedConnectRole": "Vain {{organization}}-organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat yhdistää sen.",
+      "deniedReconnectRole": "Pyydä {{organization}}-organisaation omistajaa, ylläpitäjää tai laskutusvastaavaa yhdistämään se.",
       "managedOnWebTitle": "Hallitaan verkossa",
       "managedOnWebShort": "Tätä yhteyttä hallitaan verkossa tietokoneella.",
       "managedOnWebRepositories": "Valitse {{organization}}-organisaation repositoriot verkossa tietokoneella.",

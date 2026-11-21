@@ -1488,6 +1488,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Povezava Bitbucket za {{organization}} se upravlja v spletu z računalnika.",
+      "deniedManagedByOwner": "Za spremembo povezave, ki je ne morete spremeniti, prosite lastnika {{organization}}.",
+      "deniedConnectRole": "Povežejo ga lahko samo lastniki {{organization}}, skrbniki in skrbniki obračunavanja.",
+      "deniedReconnectRole": "Prosite lastnika {{organization}}, skrbnika ali skrbnika obračunavanja, da jo ponovno poveže.",
       "managedOnWebTitle": "Upravlja se v spletu",
       "managedOnWebShort": "Ta povezava se upravlja v spletu z računalnika.",
       "managedOnWebRepositories": "Izberite repozitorije za {{organization}} v spletu z računalnika.",

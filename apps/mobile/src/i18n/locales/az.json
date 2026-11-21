@@ -1434,6 +1434,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} üçün Bitbucket bağlantısı kompüterdən vebdə idarə olunur.",
+      "deniedManagedByOwner": "Dəyişə bilmədiyiniz bağlantını dəyişmək üçün {{organization}} təşkilatının sahibinə müraciət edin.",
+      "deniedConnectRole": "Onu yalnız {{organization}} təşkilatının sahibləri, inzibatçıları və ödəniş menecerləri qoşa bilər.",
+      "deniedReconnectRole": "Onu yenidən qoşmaq üçün {{organization}} təşkilatının sahibindən, inzibatçısından və ya ödəniş menecerindən xahiş edin.",
       "managedOnWebTitle": "Vebdə idarə olunur",
       "managedOnWebShort": "Bu bağlantı kompüterdən vebdə idarə olunur.",
       "managedOnWebRepositories": "{{organization}} üçün repozitoriyaları kompüterdən vebdə seçin.",

@@ -1434,6 +1434,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "پەیوەندیی Bitbucket بۆ {{organization}} لە وێبدا و لە کۆمپیوتەرێکەوە بەڕێوە دەبرێت.",
+      "deniedManagedByOwner": "بۆ گۆڕینی پەیوەندییەک کە تۆ ناتوانیت بگۆڕیت، داوا لە خاوەنێکی {{organization}} بکە.",
+      "deniedConnectRole": "تەنها خاوەنەکانی {{organization}}، بەڕێوەبەران و بەڕێوەبەرانی پارەدان دەتوانن بیبەستن.",
+      "deniedReconnectRole": "داوای لە خاوەنێکی {{organization}}، بەڕێوەبەرێک، یان بەڕێوەبەرێکی پارەدان بکە کە بیبەستێتەوە.",
       "managedOnWebTitle": "لە وێبدا بەڕێوە دەبرێت",
       "managedOnWebShort": "ئەم پەیوەندییە لە وێبدا و لە کۆمپیوتەرێکەوە بەڕێوە دەبرێت.",
       "managedOnWebRepositories": "لە وێبدا و لە کۆمپیوتەرێکەوە ڕیپۆزیتۆرییەکانی {{organization}} هەڵبژێرە.",

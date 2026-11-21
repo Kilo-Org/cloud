@@ -1434,6 +1434,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "การเชื่อมต่อ Bitbucket ของ {{organization}} ได้รับการจัดการบนเว็บจากคอมพิวเตอร์",
+      "deniedManagedByOwner": "โปรดขอให้เจ้าของ {{organization}} เปลี่ยนแปลงการเชื่อมต่อที่คุณไม่สามารถเปลี่ยนแปลงได้",
+      "deniedConnectRole": "เฉพาะเจ้าของ ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินของ {{organization}} เท่านั้นที่สามารถเชื่อมต่อได้",
+      "deniedReconnectRole": "ขอให้เจ้าของ ผู้ดูแลระบบ หรือผู้ดูแลการเรียกเก็บเงินของ {{organization}} เชื่อมต่อใหม่",
       "managedOnWebTitle": "จัดการบนเว็บ",
       "managedOnWebShort": "การเชื่อมต่อนี้ได้รับการจัดการบนเว็บจากคอมพิวเตอร์",
       "managedOnWebRepositories": "เลือกที่เก็บสำหรับ {{organization}} บนเว็บจากคอมพิวเตอร์",

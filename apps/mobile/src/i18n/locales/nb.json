@@ -1434,6 +1434,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-tilkoblingen for {{organization}} administreres på nettet fra en datamaskin.",
+      "deniedManagedByOwner": "Be en eier i {{organization}} om å endre tilkoblingen du ikke kan redigere.",
+      "deniedConnectRole": "Bare eiere, administratorer og faktureringsansvarlige i {{organization}} kan opprette tilkoblingen.",
+      "deniedReconnectRole": "Be en eier, administrator eller faktureringsansvarlig i {{organization}} om å koble den til på nytt.",
       "managedOnWebTitle": "Administreres på nettet",
       "managedOnWebShort": "Denne tilkoblingen administreres på nettet fra en datamaskin.",
       "managedOnWebRepositories": "Velg repositorier for {{organization}} på nettet fra en datamaskin.",

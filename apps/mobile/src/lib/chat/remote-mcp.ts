@@ -196,12 +196,6 @@ async function discover(
     return;
   }
   attempts.delete(server.id);
-  /* The store changed the server and its subscription has not reconciled yet:
-     drop the row and publish the change rather than this discovery's tools. */
-  if (observedConfigs.get(server.id) !== attempt.config) {
-    publish();
-    return;
-  }
   discovered.set(
     server.id,
     outcome.ok ? discoveryOf(server.id, outcome.tools) : failureOf(server, outcome.error)
@@ -370,6 +364,7 @@ export async function ensureRemoteMcp(
     forgetCache();
     discovered = new Map();
     forgetCallResults();
+    inFlight = undefined;
     publish();
   }
   dropStaleAnswers();

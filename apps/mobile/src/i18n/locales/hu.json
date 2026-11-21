@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Ez a dokumentum csak angol nyelven érhető el.",
     "organizationTrialEndedBilling": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. Frissítheti a számlázást, majd próbálja újra.",
     "organizationTrialEndedBillingAtKiloAi": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. Frissítheti a számlázást a kilo.ai oldalon, majd próbálja újra.",
-    "viewOnGitHub": "PR megtekintése a GitHubon"
+    "viewOnGitHub": "PR megtekintése a GitHubon",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Felsorolásjel",
+        "nestedBulletPoint": "Beágyazott felsorolásjel",
+        "orderedItem": "Listaelem {n}",
+        "nestedOrderedItem": "Beágyazott listaelem {n}"
+      },
+      "blockquote": {
+        "quote": "Idézet",
+        "nestedQuote": "Beágyazott idézet"
+      },
+      "table": {
+        "row": "Sor {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Címsorok",
+        "links": "Hivatkozások",
+        "images": "Képek"
+      }
+    }
   },
   "language": {
     "restarting": "Újraindítás a nyelv beállításához",

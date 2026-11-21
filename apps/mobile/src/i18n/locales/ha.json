@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Wannan takarda tana samuwa cikin Turanci kawai.",
     "organizationTrialEndedBilling": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Za ka iya sabunta lissafin kuɗi, sannan ka sake gwadawa.",
     "organizationTrialEndedBillingAtKiloAi": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Za ka iya sabunta lissafin kuɗi a kilo.ai, sannan ka sake gwadawa.",
-    "viewOnGitHub": "Duba PR a GitHub"
+    "viewOnGitHub": "Duba PR a GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Dige",
+        "nestedBulletPoint": "Dige na ciki",
+        "orderedItem": "Abu na jeri {n}",
+        "nestedOrderedItem": "Abu na jeri na ciki {n}"
+      },
+      "blockquote": {
+        "quote": "Ambato",
+        "nestedQuote": "Ambato na ciki"
+      },
+      "table": {
+        "row": "Layi {n}: {content}"
+      },
+      "math": {
+        "equation": "Lissafi: {latex}"
+      },
+      "rotor": {
+        "headings": "Kanuna",
+        "links": "Mahaɗa",
+        "images": "Hotuna"
+      }
+    }
   },
   "language": {
     "restarting": "Ana sake kunnawa don amfani da harshen da aka zaɓa",

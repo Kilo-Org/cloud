@@ -187,7 +187,30 @@
     "legalDocumentEnglishOnly": "Aquest document només està disponible en anglès.",
     "organizationTrialEndedBilling": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. Pots actualitzar la facturació i tornar-ho a provar.",
     "organizationTrialEndedBillingAtKiloAi": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. Pots actualitzar la facturació a kilo.ai i tornar-ho a provar.",
-    "viewOnGitHub": "Mostra la PR a GitHub"
+    "viewOnGitHub": "Mostra la PR a GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Punt de llista",
+        "nestedBulletPoint": "Punt de llista niuat",
+        "orderedItem": "Element de la llista {n}",
+        "nestedOrderedItem": "Element de la llista niuat {n}"
+      },
+      "blockquote": {
+        "quote": "Cita",
+        "nestedQuote": "Cita niuada"
+      },
+      "table": {
+        "row": "Fila {n}: {content}"
+      },
+      "math": {
+        "equation": "Matemàtiques: {latex}"
+      },
+      "rotor": {
+        "headings": "Encapçalaments",
+        "links": "Enllaços",
+        "images": "Imatges"
+      }
+    }
   },
   "language": {
     "restarting": "S'està reiniciant per aplicar l'idioma",

@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "यो कागजात अङ्ग्रेजीमा मात्र उपलब्ध छ।",
     "organizationTrialEndedBilling": "संस्थाको परीक्षण अवधि सकिएको छ र यसको कुनै सक्रिय योजना छैन। तपाईंले बिलिङ अद्यावधिक गर्न सक्नुहुन्छ, त्यसपछि फेरि प्रयास गर्नुहोस्।",
     "organizationTrialEndedBillingAtKiloAi": "संस्थाको परीक्षण अवधि सकिएको छ र यसको कुनै सक्रिय योजना छैन। तपाईंले kilo.ai मा बिलिङ अद्यावधिक गर्न सक्नुहुन्छ, त्यसपछि फेरि प्रयास गर्नुहोस्।",
-    "viewOnGitHub": "GitHub मा PR हेर्नुहोस्"
+    "viewOnGitHub": "GitHub मा PR हेर्नुहोस्",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "बुलेट बिन्दु",
+        "nestedBulletPoint": "नेस्टेड बुलेट बिन्दु",
+        "orderedItem": "सूची वस्तु {n}",
+        "nestedOrderedItem": "नेस्टेड सूची वस्तु {n}"
+      },
+      "blockquote": {
+        "quote": "उद्धरण",
+        "nestedQuote": "नेस्टेड उद्धरण"
+      },
+      "table": {
+        "row": "पङ्क्ति {n}: {content}"
+      },
+      "math": {
+        "equation": "गणित: {latex}"
+      },
+      "rotor": {
+        "headings": "शीर्षकहरू",
+        "links": "लिङ्कहरू",
+        "images": "तस्बिरहरू"
+      }
+    }
   },
   "language": {
     "restarting": "भाषा लागू गर्न पुनः सुरु गर्दै",

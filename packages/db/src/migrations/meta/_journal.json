@@ -2619,13 +2619,6 @@
       "when": 1795171985676,
       "tag": "0373_cloud_agent_network_secrets",
       "breakpoints": true
-    },
-    {
-      "idx": 374,
-      "version": "7",
-      "when": 1795226286297,
-      "tag": "0374_alias_promotion_entries_index",
-      "breakpoints": true
     }
   ]
 }

@@ -12,10 +12,23 @@ import { recordReplyFeedbackEvent, type ReviewMemoryOwner } from './db';
 import {
   REVIEW_MEMORY_PROPOSAL_LIMITS,
   ReviewMemoryProposalOutputSchema,
+  generateReviewMemoryProposalWithGateway,
   runReviewMemoryAnalysis,
   validateReviewMemoryProposalDraft,
 } from './aggregation';
+import * as llm from './llm';
 import { createReviewMemoryGatewayProvider, generateReviewMemoryStructuredOutput } from './llm';
+
+// The llm exports are swc getters, so spyOn cannot redefine them; wrap them in jest.fn
+// instead. The call-through default keeps the real gateway path for the other tests.
+jest.mock('./llm', () => {
+  const actual = jest.requireActual('./llm');
+  return {
+    ...actual,
+    createReviewMemoryGatewayForOwner: jest.fn(actual.createReviewMemoryGatewayForOwner),
+    generateReviewMemoryStructuredOutput: jest.fn(actual.generateReviewMemoryStructuredOutput),
+  };
+});
 
 describe('review memory aggregation', () => {
   afterEach(async () => {
@@ -84,6 +97,110 @@ describe('review memory aggregation', () => {
       runReviewMemoryAnalysis({ owner, platform: 'github', repoFullName: 'acme/empty' })
     ).resolves.toEqual({ status: 'no_feedback' });
     await expect(db.select().from(code_review_memory_proposals)).resolves.toHaveLength(0);
+  });
+
+  it('caps the fallback evidence at the proposal evidence limit', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    for (let index = 0; index < 25; index++) {
+      await recordReplyFeedbackEvent({
+        owner,
+        platform: 'github',
+        repoFullName: 'acme/widgets',
+        prNumber: 100 + index,
+        kiloCommentId: `fallback-${index}`,
+        replyExcerpt: `Fallback excerpt ${index}.`,
+      });
+    }
+
+    const result = await runReviewMemoryAnalysis({
+      owner,
+      platform: 'github',
+      repoFullName: 'acme/widgets',
+      generate: async () => ({
+        draft: {
+          status: 'propose',
+          title: 'Bounded evidence',
+          rationale: 'Maintainers repeatedly asked for the same correction.',
+          proposedMarkdown: '- Prefer the shared helper over a local copy.',
+          positiveCount: 0,
+          negativeCount: 25,
+          neutralCount: 0,
+          evidenceEventIds: [],
+        },
+      }),
+    });
+
+    expect(result.status).toBe('proposed');
+    const proposals = await db.select().from(code_review_memory_proposals);
+    expect(proposals).toHaveLength(1);
+    expect(proposals[0].evidence).toHaveLength(REVIEW_MEMORY_PROPOSAL_LIMITS.evidenceEventIds);
+    expect(proposals[0].evidence[0]).toEqual(
+      expect.objectContaining({ excerpt: expect.any(String), prNumber: expect.any(Number) })
+    );
+  });
+
+  it('arms a default deadline when the caller supplies no signal', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    const events = await seedFeedback(owner);
+    let capturedSignal: AbortSignal | undefined;
+
+    const result = await runReviewMemoryAnalysis({
+      owner,
+      platform: 'github',
+      repoFullName: 'acme/widgets',
+      generate: async input => {
+        capturedSignal = input.signal;
+        return {
+          draft: {
+            status: 'propose',
+            title: 'Deadline response',
+            rationale: 'Maintainers repeatedly corrected generated fixture comments.',
+            proposedMarkdown: '- Do not flag generated fixtures.',
+            positiveCount: 0,
+            negativeCount: 2,
+            neutralCount: 0,
+            evidenceEventIds: [events[0].id],
+          },
+        };
+      },
+    });
+
+    expect(result.status).toBe('proposed');
+    expect(capturedSignal).toBeInstanceOf(AbortSignal);
+    expect(capturedSignal?.aborted).toBe(false);
+  });
+
+  it('forwards a caller supplied signal to the gateway call', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    // One-shot stubs keep the call-through defaults intact for the remaining tests.
+    jest.mocked(llm.createReviewMemoryGatewayForOwner).mockResolvedValueOnce({
+      modelSlug: 'test/model',
+      // Only the signal hand-off matters here, so the provider stub needs one model getter.
+      provider: { chatModel: () => 'test/model' },
+    } as never);
+    const structuredOutput = jest.mocked(llm.generateReviewMemoryStructuredOutput);
+    structuredOutput.mockResolvedValueOnce({
+      output: { proposal: { status: 'no_change' } },
+      tokensIn: null,
+      tokensOut: null,
+    } as never);
+    const controller = new AbortController();
+
+    const result = await generateReviewMemoryProposalWithGateway({
+      owner,
+      platform: 'github',
+      repoFullName: 'acme/widgets',
+      events: [],
+      signal: controller.signal,
+    });
+
+    expect(result.draft).toEqual({ status: 'no_change' });
+    expect(structuredOutput).toHaveBeenCalledWith(
+      expect.objectContaining({ abortSignal: controller.signal })
+    );
   });
 });
 

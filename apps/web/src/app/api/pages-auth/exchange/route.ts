@@ -10,6 +10,7 @@ import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token'
 import { verifyKiloTokenForPolicy } from '@kilocode/worker-utils/kilo-token-policy';
 import { isPagesAuthClient } from '@/lib/pages-auth/pages-auth-clients';
 import { PAGES_AUTH_STATE_PATTERN, verifyPagesAuthCode } from '@/lib/pages-auth/pages-auth-code';
+import { createPagesMemberSearchProof } from '@/lib/pages-auth/pages-member-search-proof';
 import { getUserAuthProviders } from '@/lib/user';
 import { hasVerifiedPrimaryAddress } from '@/lib/user/verified-address';
 
@@ -96,7 +97,13 @@ async function userIdFromPagesToken(token: string, audience: string): Promise<st
  *
  * The answer is identity only, and no Kilo token is issued:
  *
- *     { "user": { "id", "name", "verified_email"? }, "organizations": [...] }
+ *     { "user": { "id", "name", "verified_email"? }, "organizations": [...],
+ *       "member_search_proof" }
+ *
+ * `member_search_proof` is what Pages sends to
+ * `POST /api/pages-auth/organization-members` to search on this person's
+ * behalf. It is bound to this deployment and person, and good for one Pages
+ * session.
  *
  * `verified_email` is the account's primary address, present only when a
  * sign-in method that verifies addresses carries it
@@ -158,6 +165,7 @@ export const POST = withRestTiming('/api/pages-auth/exchange', async (request: R
         ...(verified ? { verified_email: user.google_user_email } : {}),
       },
       organizations,
+      member_search_proof: createPagesMemberSearchProof({ userId: user.id, audience }),
     },
     { headers: { 'Cache-Control': 'no-store' } }
   );

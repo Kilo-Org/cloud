@@ -179,10 +179,7 @@ describe('PreferencesScreen hub', () => {
       throw new Error('appearance control missing');
     }
     const [controlTarget] = settingsTargetAncestors(control);
-    expect(
-      controlTarget,
-      'the appearance control renders without a SettingsTarget'
-    ).toBeDefined();
+    expect(controlTarget, 'the appearance control renders without a SettingsTarget').toBeDefined();
     const options = control.props.options as { label: string }[];
     for (const option of options) {
       const setting = sourceByLabel.get(option.label);

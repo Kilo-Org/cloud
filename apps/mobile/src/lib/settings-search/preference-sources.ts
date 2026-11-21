@@ -24,16 +24,8 @@ const PREFERENCES_HUB_SETTINGS = {
     'preferences.appearanceSystem',
     'appearance'
   ),
-  appearanceLight: defineSetting(
-    'appearance.light',
-    'preferences.appearanceLight',
-    'appearance'
-  ),
-  appearanceDark: defineSetting(
-    'appearance.dark',
-    'preferences.appearanceDark',
-    'appearance'
-  ),
+  appearanceLight: defineSetting('appearance.light', 'preferences.appearanceLight', 'appearance'),
+  appearanceDark: defineSetting('appearance.dark', 'preferences.appearanceDark', 'appearance'),
   account: defineSetting('account', 'preferences.account', 'language'),
   notifications: defineSetting('notifications', 'common.notifications', 'notifications'),
   notificationHistory: defineSetting(
@@ -41,11 +33,7 @@ const PREFERENCES_HUB_SETTINGS = {
     'notifications.history.title',
     'notifications'
   ),
-  spendAlerts: defineSetting(
-    'spend-alerts',
-    'notifications.channel.spend',
-    'notifications'
-  ),
+  spendAlerts: defineSetting('spend-alerts', 'notifications.channel.spend', 'notifications'),
 } as const;
 
 const GENERAL_SETTINGS = {
@@ -55,10 +43,7 @@ const GENERAL_SETTINGS = {
     'preferences.autoExpandThinking'
   ),
   hideThinking: defineSetting('general.hide-thinking', 'preferences.hideThinking'),
-  condenseToolCalls: defineSetting(
-    'general.condense-tool-calls',
-    'preferences.condenseToolCalls'
-  ),
+  condenseToolCalls: defineSetting('general.condense-tool-calls', 'preferences.condenseToolCalls'),
   keepScreenOn: defineSetting('general.keep-screen-on', 'preferences.keepScreenOn'),
   prReviewAttribution: defineSetting(
     'general.pr-review-attribution',
@@ -75,10 +60,7 @@ const VOICE_INPUT_SETTINGS = {
     'voice-input.gateway-transcription',
     'preferences.gatewayTranscription'
   ),
-  transcriptionModel: defineSetting(
-    'voice-input.model',
-    'preferences.transcriptionModel'
-  ),
+  transcriptionModel: defineSetting('voice-input.model', 'preferences.transcriptionModel'),
   language: defineSetting('voice-input.language', 'common.language', 'language'),
 } as const;
 
@@ -99,26 +81,14 @@ const ACCOUNT_SETTINGS = {
   passkeys: defineSetting('account.passkeys', 'profile.passkeysTitle', 'privacy'),
   providerKeys: defineSetting('account.provider-keys', 'profile.providerKeys.title'),
   dataExport: defineSetting('account.data-export', 'profile.dataExport.title', 'privacy'),
-  blockedPeople: defineSetting(
-    'account.blocked-people',
-    'profile.blockedPeople.title',
-    'privacy'
-  ),
+  blockedPeople: defineSetting('account.blocked-people', 'profile.blockedPeople.title', 'privacy'),
   reportReceipts: defineSetting(
     'account.report-receipts',
     'profile.reportReceipts.title',
     'privacy'
   ),
-  deviceSessions: defineSetting(
-    'account.device-sessions',
-    'common.deviceSessions',
-    'privacy'
-  ),
-  browserSignOut: defineSetting(
-    'account.browser-sign-out',
-    'profile.signOutWeb.title',
-    'signOut'
-  ),
+  deviceSessions: defineSetting('account.device-sessions', 'common.deviceSessions', 'privacy'),
+  browserSignOut: defineSetting('account.browser-sign-out', 'profile.signOutWeb.title', 'signOut'),
 } as const;
 
 const PREFERENCES_HUB_SOURCE: SettingsSearchSource = {

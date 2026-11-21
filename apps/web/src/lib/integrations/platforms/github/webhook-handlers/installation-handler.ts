@@ -76,9 +76,11 @@ async function hasOtherLiveAssociation(
 }
 
 /**
- * Bounds how long a repair transaction waits on a contended installation
- * identity lock, so a delivery that cannot proceed fails fast and GitHub
- * redelivers it. Matches the bounds of connectVerifiedGitHubInstallation.
+ * Bounds every lock-taking transaction of this handler. The installation
+ * repair serializes on the installation identity lock; the pending completion
+ * serializes on that lock and then on the owner slot lock. A delivery that
+ * cannot take a contended lock fails fast and GitHub redelivers it. Matches
+ * the bounds of connectVerifiedGitHubInstallation.
  */
 async function boundRepairTransaction(tx: DbTransaction): Promise<void> {
   await tx.execute(sql`SET LOCAL lock_timeout = '5s'`);
@@ -207,11 +209,14 @@ export async function handleInstallationCreated(
   }
   if (pending) {
     // The decision, the pending-row completion, and the canonical binding run
-    // as one serialized unit under the installation identity lock, the same
-    // lock connectVerifiedGitHubInstallation and
-    // bindGitHubIntegrationToCanonicalInstallation take. Admission therefore
-    // holds under concurrency for every writer of this installation identity.
+    // as one serialized unit under the installation identity lock and, for an
+    // organization, the owner's installation slot lock. Admission therefore
+    // holds under concurrency for every writer of that state. Both locks are
+    // contended by other deliveries, so the transaction is bounded like the
+    // other lock-taking paths: a delivery that cannot proceed fails fast and
+    // GitHub redelivers it.
     const completed = await db.transaction(async tx => {
+      await boundRepairTransaction(tx);
       await lockGitHubInstallationIdentity(tx, appType, installationData.installation_id);
       // A live association may be bound or unbound, so peers are counted by
       // status rather than by whether they already carry a canonical binding.

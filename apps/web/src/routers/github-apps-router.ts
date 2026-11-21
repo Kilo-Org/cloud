@@ -41,6 +41,7 @@ import {
   type GitHubAppType,
 } from '@/lib/integrations/platforms/github/app-selector';
 import { requireNumericPlatformRepositories } from '@/lib/integrations/core/types';
+import { PendingInstallationMetadataWrapperSchema } from '@/lib/integrations/core/schemas';
 import { createGitHubUserAuthorizationState } from '@/lib/integrations/platforms/github/user-authorization-state';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import {
@@ -301,6 +302,7 @@ export const githubAppsRouter = createTRPCRouter({
                 role === 'admin' ||
                 integration.kilo_requester_user_id === ctx.user.id);
             const metadata = integration.metadata as Record<string, unknown> | null;
+            const pendingMetadata = PendingInstallationMetadataWrapperSchema.safeParse(metadata);
             const hasConnectionRole =
               integration.github_connection_role === 'workflow' ||
               integration.github_connection_role === 'agent_only';
@@ -324,6 +326,11 @@ export const githubAppsRouter = createTRPCRouter({
                   role === 'admin') &&
                 (await canUninstallGitHubInstallation(integration)),
               canCancel,
+              // Why a pending request cannot complete, so the organization list
+              // can name the remedy. Null for every other row.
+              pendingApprovalStatus: pendingMetadata.success
+                ? pendingMetadata.data.pending_approval.status
+                : null,
               modelSlug: (metadata?.model_slug as string) || null,
               canManageModel,
             };
@@ -526,8 +533,17 @@ export const githubAppsRouter = createTRPCRouter({
           hasPending: false,
           pendingOrganizationId: null,
           pendingIntegrationId: null,
+          pendingApprovalStatus: null,
         };
       }
+
+      // Why the request cannot complete, so the requester's own view can name
+      // the remedy: `getInstallation` returns the owner's live association, so
+      // it never shows this row's status once another installation holds the
+      // slot. A row whose metadata does not parse reports no status.
+      const pendingMetadata = PendingInstallationMetadataWrapperSchema.safeParse(
+        pendingInstallation.metadata
+      );
 
       return {
         hasPending: true,
@@ -535,6 +551,9 @@ export const githubAppsRouter = createTRPCRouter({
         // Names the exact pending row this response describes, so a cancel is
         // pinned to it instead of to whichever pending row matches the owner.
         pendingIntegrationId: pendingInstallation.id,
+        pendingApprovalStatus: pendingMetadata.success
+          ? pendingMetadata.data.pending_approval.status
+          : null,
       };
     }),
 

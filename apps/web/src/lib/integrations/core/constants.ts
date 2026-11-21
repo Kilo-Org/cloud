@@ -17,6 +17,13 @@ export const INTEGRATION_STATUS = {
  */
 export const PENDING_APPROVAL_STATUS = {
   AWAITING_INSTALLATION: 'awaiting_installation',
+  /**
+   * The request is still awaiting completion, and completion is refused while
+   * the organization holds its one live installation. The row only resolves
+   * once that installation is removed in Kilo and the connection is started
+   * again.
+   */
+  BLOCKED_BY_EXISTING_INSTALLATION: 'blocked_by_existing_installation',
 } as const;
 
 /**

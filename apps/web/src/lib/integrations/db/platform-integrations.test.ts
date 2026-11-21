@@ -27,6 +27,7 @@ import {
   upsertPlatformIntegrationForOwner,
 } from './platform-integrations';
 import type { Owner } from '../core/types';
+import { PENDING_APPROVAL_STATUS } from '../core/constants';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { disconnectGitHubInstallation } from './github-installations';
 import {
@@ -1827,5 +1828,268 @@ describe('findGitLabIntegrationByWebhookToken', () => {
     await insertGitLabIntegration({ metadata: { auth_type: 'oauth' } });
 
     expect(await findGitLabIntegrationByWebhookToken('secret-known')).toBeNull();
+  });
+});
+
+describe('autoCompleteInstallation organization installation policy', () => {
+  const organizationId = crypto.randomUUID();
+  const liveInstallationId = `org-policy-live-${Date.now()}`;
+  const githubRequesterId = 'org-policy-github-requester';
+  const userId = `test-org-policy-user-${Date.now()}`;
+
+  beforeEach(async () => {
+    process.env.GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS = '';
+    await insertTestUser({ id: userId });
+    await db.insert(organizations).values({ id: organizationId, name: `Org policy ${Date.now()}` });
+    await db.insert(platform_integrations).values({
+      owned_by_organization_id: organizationId,
+      platform: 'github',
+      integration_type: 'app',
+      integration_status: 'active',
+      github_connection_role: 'workflow',
+      github_app_type: 'standard',
+      platform_installation_id: liveInstallationId,
+      repository_access: 'all',
+    });
+  });
+
+  afterEach(async () => {
+    process.env.GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS = '';
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_organization_id, organizationId));
+    await db.delete(organizations).where(eq(organizations.id, organizationId));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
+  });
+
+  async function createPendingOrganizationInstallation(accountId: string) {
+    const pending = await createPendingIntegration({
+      organizationId,
+      requester: {
+        kilo_user_id: userId,
+        kilo_user_email: 'requester@example.com',
+        kilo_user_name: 'Requester',
+        requested_at: new Date().toISOString(),
+      },
+      githubRequester: { id: githubRequesterId, login: 'requester' },
+      githubRequest: {
+        id: `org-policy-request-${accountId}`,
+        accountId,
+        accountLogin: 'org-policy-account',
+      },
+      githubAppType: 'standard',
+    });
+    if (!pending) throw new Error('Expected a pending row to be created');
+    return pending;
+  }
+
+  test('keeps the pending installation pending when the organization holds one slot', async () => {
+    const accountId = `org-policy-account-a-${Date.now()}`;
+    const pendingInstallationId = `org-policy-pending-a-${Date.now()}`;
+    const pending = await createPendingOrganizationInstallation(accountId);
+
+    const outcome = await autoCompleteInstallation({
+      integrationId: pending.id,
+      installationData: {
+        installation_id: pendingInstallationId,
+        account_id: accountId,
+        account_login: 'org-policy-account',
+        repository_selection: 'all',
+        permissions: {},
+        events: [],
+        created_at: new Date().toISOString(),
+      },
+      existingMetadata: pending.metadata as Record<string, unknown>,
+      authorizedRequesterAccountIds: [githubRequesterId],
+    });
+
+    expect(outcome).toEqual({ ok: false, reason: 'multiple_installations_disabled' });
+
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.owned_by_organization_id, organizationId));
+    expect(rows.find(row => row.id === pending.id)).toMatchObject({
+      integration_status: 'pending',
+      platform_installation_id: null,
+    });
+    const liveWorkflowRows = rows.filter(
+      row => row.integration_status === 'active' && row.github_connection_role === 'workflow'
+    );
+    expect(liveWorkflowRows).toHaveLength(1);
+    expect(liveWorkflowRows[0]?.platform_installation_id).toBe(liveInstallationId);
+  });
+
+  test('records the refusal on the pending request and a later completion clears it', async () => {
+    const accountId = `org-policy-account-blocked-${Date.now()}`;
+    const pendingInstallationId = `org-policy-pending-blocked-${Date.now()}`;
+    const pending = await createPendingOrganizationInstallation(accountId);
+    await db
+      .update(platform_integrations)
+      .set({
+        metadata: {
+          ...(pending.metadata as Record<string, unknown>),
+          model_slug: 'kept-model',
+        },
+      })
+      .where(eq(platform_integrations.id, pending.id));
+
+    const blocked = await autoCompleteInstallation({
+      integrationId: pending.id,
+      installationData: {
+        installation_id: pendingInstallationId,
+        account_id: accountId,
+        account_login: 'org-policy-account',
+        repository_selection: 'all',
+        permissions: {},
+        events: [],
+        created_at: new Date().toISOString(),
+      },
+      existingMetadata: pending.metadata as Record<string, unknown>,
+      authorizedRequesterAccountIds: [githubRequesterId],
+    });
+
+    expect(blocked).toEqual({ ok: false, reason: 'multiple_installations_disabled' });
+
+    const [blockedRow] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, pending.id));
+    expect(blockedRow).toMatchObject({
+      integration_status: 'pending',
+      platform_installation_id: null,
+    });
+    expect(blockedRow?.metadata).toEqual({
+      model_slug: 'kept-model',
+      pending_approval: {
+        requester: {
+          kilo_user_id: userId,
+          kilo_user_email: 'requester@example.com',
+          kilo_user_name: 'Requester',
+          requested_at: expect.any(String),
+        },
+        github_requester: { id: githubRequesterId, login: 'requester' },
+        github_request_id: `org-policy-request-${accountId}`,
+        status: PENDING_APPROVAL_STATUS.BLOCKED_BY_EXISTING_INSTALLATION,
+      },
+    });
+
+    // The organization relinquishes its slot, and the same request completes:
+    // completion replaces the metadata, so the marker cannot linger.
+    await db
+      .update(platform_integrations)
+      .set({ github_disconnected_at: new Date().toISOString() })
+      .where(
+        and(
+          eq(platform_integrations.owned_by_organization_id, organizationId),
+          eq(platform_integrations.platform_installation_id, liveInstallationId)
+        )
+      );
+
+    const completed = await autoCompleteInstallation({
+      integrationId: pending.id,
+      installationData: {
+        installation_id: pendingInstallationId,
+        account_id: accountId,
+        account_login: 'org-policy-account',
+        repository_selection: 'all',
+        permissions: {},
+        events: [],
+        created_at: new Date().toISOString(),
+      },
+      existingMetadata: blockedRow?.metadata as Record<string, unknown>,
+      authorizedRequesterAccountIds: [githubRequesterId],
+    });
+
+    expect(completed).toEqual({ ok: true });
+
+    const [completedRow] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, pending.id));
+    expect(completedRow).toMatchObject({
+      integration_status: 'active',
+      platform_installation_id: pendingInstallationId,
+    });
+    expect(completedRow?.metadata).toEqual({
+      completed_installation: {
+        requester: {
+          kilo_user_id: userId,
+          kilo_user_email: 'requester@example.com',
+          kilo_user_name: 'Requester',
+          requested_at: expect.any(String),
+        },
+        github_requester: { id: githubRequesterId, login: 'requester' },
+        completed_at: expect.any(String),
+      },
+    });
+    expect(completedRow?.metadata).not.toHaveProperty('pending_approval');
+  });
+
+  test('completes a second installation for an entitled organization', async () => {
+    process.env.GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS = organizationId;
+    const accountId = `org-policy-account-b-${Date.now()}`;
+    const pendingInstallationId = `org-policy-pending-b-${Date.now()}`;
+    const pending = await createPendingOrganizationInstallation(accountId);
+
+    const outcome = await autoCompleteInstallation({
+      integrationId: pending.id,
+      installationData: {
+        installation_id: pendingInstallationId,
+        account_id: accountId,
+        account_login: 'org-policy-account',
+        repository_selection: 'all',
+        permissions: {},
+        events: [],
+        created_at: new Date().toISOString(),
+      },
+      existingMetadata: pending.metadata as Record<string, unknown>,
+      authorizedRequesterAccountIds: [githubRequesterId],
+    });
+
+    expect(outcome).toEqual({ ok: true });
+
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.owned_by_organization_id, organizationId));
+    expect(rows.find(row => row.id === pending.id)).toMatchObject({
+      integration_status: 'active',
+      github_connection_role: 'workflow',
+      platform_installation_id: pendingInstallationId,
+    });
+    expect(rows.filter(row => row.github_disconnected_at === null)).toHaveLength(2);
+  });
+
+  test('completes when the organization already relinquished its slot by disconnecting', async () => {
+    const accountId = `org-policy-account-c-${Date.now()}`;
+    const pendingInstallationId = `org-policy-pending-c-${Date.now()}`;
+    await db
+      .update(platform_integrations)
+      .set({ github_disconnected_at: new Date().toISOString() })
+      .where(
+        and(
+          eq(platform_integrations.owned_by_organization_id, organizationId),
+          eq(platform_integrations.platform_installation_id, liveInstallationId)
+        )
+      );
+    const pending = await createPendingOrganizationInstallation(accountId);
+
+    const outcome = await autoCompleteInstallation({
+      integrationId: pending.id,
+      installationData: {
+        installation_id: pendingInstallationId,
+        account_id: accountId,
+        account_login: 'org-policy-account',
+        repository_selection: 'all',
+        permissions: {},
+        events: [],
+        created_at: new Date().toISOString(),
+      },
+      existingMetadata: pending.metadata as Record<string, unknown>,
+      authorizedRequesterAccountIds: [githubRequesterId],
+    });
+
+    expect(outcome).toEqual({ ok: true });
   });
 });

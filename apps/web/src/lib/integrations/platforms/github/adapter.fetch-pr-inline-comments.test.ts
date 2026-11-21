@@ -29,6 +29,7 @@ import {
   fetchPRInlineComments,
   GITHUB_LISTING_TIMEOUT_MS,
   GitHubListingBudgetExceededError,
+  MAX_GITHUB_LISTING_BYTES,
 } from './adapter';
 
 const PER_PAGE = 100;
@@ -226,6 +227,30 @@ describe('fetchPRInlineComments', () => {
     expect(mockListReviewComments.mock.calls.length).toBeLessThan(MAX_PAGES);
     const totalBytes = comments.reduce((sum, c) => sum + Buffer.byteLength(c.body), 0);
     expect(totalBytes).toBeGreaterThanOrEqual(512 * 1024);
+  });
+
+  it('rejects a listing whose retained pages pass the byte budget', async () => {
+    const rawBody = 'x'.repeat(60_000);
+    mockListReviewComments.mockImplementation(async ({ page }: { page: number }) => ({
+      data: Array.from({ length: PER_PAGE }, (_, index) => ({
+        id: page * PER_PAGE + index + 1,
+        path: 'src/file.ts',
+        line: index + 1,
+        body: rawBody,
+        position: index,
+        user: { login: 'reviewer' },
+      })),
+    }));
+
+    const thrown: unknown = await fetchPRInlineComments('42', 'acme', 'widgets', 7).catch(
+      (error: unknown) => error
+    );
+
+    expect(thrown).toBeInstanceOf(GitHubListingBudgetExceededError);
+    expect((thrown as Error).message).toBe(
+      `GitHub pagination limit exceeded: PR inline comment listing returned more than ${MAX_GITHUB_LISTING_BYTES / (1024 * 1024)} MiB`
+    );
+    expect(mockListReviewComments).toHaveBeenCalledTimes(3);
   });
 
   it('covers every page of one listing with the same deadline', async () => {

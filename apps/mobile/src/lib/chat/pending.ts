@@ -159,9 +159,42 @@ export async function forgetAsked(sessionId: string): Promise<void> {
   await removeItem(LEGACY_SCOPE, sessionId);
 }
 
+/**
+ * The question a chat is waiting on an answer to, or null when nothing is
+ * stored or what is stored cannot be read.
+ *
+ * A record written by another version, or one whose write was cut short, is
+ * answered absent rather than thrown out of: every open of the chat awaits
+ * this, and one value nothing can read would otherwise leave the chat
+ * unopenable for good.
+ */
 export async function askedIn(sessionId: string): Promise<Asked | null> {
-  const asked = await getItem(SCOPE, sessionId);
-  return asked === null ? null : askedSchema.parse(JSON.parse(asked));
+  const stored = await getItem(SCOPE, sessionId);
+  if (stored === null) {
+    return null;
+  }
+  let reason = 'it is not json';
+  try {
+    const read = askedSchema.safeParse(JSON.parse(stored));
+    if (read.success) {
+      return read.data;
+    }
+    reason = 'it is not written as a question';
+  } catch {
+    // Not JSON at all, which the reason already says.
+  }
+  /* The question's own words are not in the log, because they are the person's:
+     only what is wrong with the record is. It is dropped so the next open reads
+     a chat instead of failing on the same value again, and only the record this
+     reader owns is removed, since the legacy text is what upgrades the chat. */
+  // eslint-disable-next-line no-console -- the record is gone by the time a screen could mention it
+  console.warn(`[chat] a stored question could not be read: ${reason}`);
+  try {
+    await removeItem(SCOPE, sessionId);
+  } catch {
+    // A store that refuses the delete is still read as absent.
+  }
+  return null;
 }
 
 /** Writes the questions a later send took the slot from, in the order they were asked. */

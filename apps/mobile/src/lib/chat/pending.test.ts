@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   askedIn,
   forgetAsked,
   keptIn,
+  migrateAsked,
   newKeptId,
   recordAskedFailure,
   rememberAsked,
@@ -85,6 +86,77 @@ describe('the reason a question failed', () => {
     );
 
     expect(await askedIn('older')).toMatchObject({ text: 'older question', failureKey: null });
+  });
+});
+
+describe('a stored question nothing can read', () => {
+  const question = { text: 'a second try', model: 'kilo/one', effort: null, images: [] };
+  const reported: string[] = [];
+
+  beforeEach(() => {
+    // The unreadable read reports itself; the test that cares asserts the report.
+    reported.length = 0;
+    vi.spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
+      reported.push(args.map(String).join(' '));
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('is answered as no question and dropped from the store', async () => {
+    stored.set('chat-asked-target:broken', 'not json');
+    expect(await askedIn('broken')).toBeNull();
+    // Kept, it would fail every later open of the chat on the same value.
+    expect(stored.has('chat-asked-target:broken')).toBe(false);
+  });
+
+  it('is answered the same when it is json of the wrong shape', async () => {
+    stored.set('chat-asked-target:shapeless', JSON.stringify({ text: 5 }));
+    expect(await askedIn('shapeless')).toBeNull();
+    expect(stored.has('chat-asked-target:shapeless')).toBe(false);
+  });
+
+  it('is replaced by the next question the chat asks', async () => {
+    stored.set('chat-asked-target:recovering', 'not json');
+    // Read first, so the recovery is about the record that nothing could read.
+    expect(await askedIn('recovering')).toBeNull();
+
+    await rememberAsked('recovering', question);
+
+    expect(await askedIn('recovering')).toMatchObject(question);
+  });
+
+  it('leaves a row it cannot name untitled instead of rejecting the listing', async () => {
+    stored.set('chat-asked-target:unnamed', 'not json');
+    expect(await titledByAsked([row('unnamed', '')])).toEqual([row('unnamed', '')]);
+  });
+
+  it('is dropped without the legacy text that still upgrades the chat', async () => {
+    stored.set('chat-asked:legacy', 'a question from before targets');
+    stored.set('chat-asked-target:legacy', 'not json');
+    expect(await askedIn('legacy')).toBeNull();
+
+    await migrateAsked('legacy', 'kilo/one');
+
+    expect(await askedIn('legacy')).toMatchObject({
+      text: 'a question from before targets',
+      model: 'kilo/one',
+    });
+    expect(stored.has('chat-asked:legacy')).toBe(false);
+  });
+
+  it('says once that it could not be read, without the words it held', async () => {
+    const words = 'the words nobody may log';
+    stored.set('chat-asked-target:quiet', JSON.stringify({ text: words, model: 5 }));
+
+    expect(await askedIn('quiet')).toBeNull();
+
+    expect(reported).toHaveLength(1);
+    expect(reported[0]).toContain('could not be read');
+    // What the person asked is in the store, not in the log.
+    expect(reported[0]).not.toContain(words);
   });
 });
 

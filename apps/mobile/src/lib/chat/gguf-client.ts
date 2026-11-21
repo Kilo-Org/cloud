@@ -107,6 +107,13 @@ export function ggufModelClient({
   let freeing: Promise<void> = Promise.resolve();
   let busy = false;
   let sequence = 0;
+  /**
+   * Ends the answer the client cannot interrupt. A stop that throws never
+   * reaches its completion, so that promise can stay pending forever: waiting
+   * for it would wedge the teardown, and leaving it owned would keep the client
+   * busy for the rest of the session.
+   */
+  let abandon: (() => void) | undefined = undefined;
 
   const free = async (
     previous: Promise<void>,
@@ -126,10 +133,13 @@ export function ggufModelClient({
       // one-context invariant depends on.
       const stopped = await attempt(() => context.value.stopCompletion());
       // A stop that never ran cannot interrupt the answer: its completion may
-      // never settle, and waiting for it would hold the chain every later load
-      // waits on. The release below still frees the weights.
+      // never settle, so waiting for it would hold the chain every later load
+      // waits on, and the answer has to give up its ownership of the client.
+      // The release below still frees the weights.
       if (stopped.ok) {
         await settled(running);
+      } else {
+        abandon?.();
       }
     }
     await attempt(() => context.value.release());
@@ -266,6 +276,15 @@ export function ggufModelClient({
           }
           const completion = opened.value.completion(paramsOf(request, file), onToken);
           inflight = completion;
+          // A release that could not stop this answer ends it here: the queue
+          // gets its failure, and the client is free for the next request.
+          abandon = () => {
+            if (running()) {
+              stop('failed', streamed !== '');
+            }
+            busy = false;
+            inflight = undefined;
+          };
           const finished = await settled(completion);
           if (!finished.ok) {
             stop('failed', streamed !== '');
@@ -287,6 +306,7 @@ export function ggufModelClient({
         } finally {
           busy = false;
           inflight = undefined;
+          abandon = undefined;
         }
       };
       return Effect.andThen(

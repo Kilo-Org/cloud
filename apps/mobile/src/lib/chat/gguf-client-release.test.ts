@@ -95,6 +95,15 @@ function collect(stream: Stream.Stream<ModelEvent, unknown>) {
   return Effect.runPromise(Stream.runCollect(stream));
 }
 
+/** The stream's result, or the failure it ended with, for a refusal under test. */
+async function settle(stream: Promise<unknown>): Promise<unknown> {
+  try {
+    return await stream;
+  } catch (error) {
+    return error;
+  }
+}
+
 it('opens no second context while a release the app did not await is still freeing one', async () => {
   const timeline: Timeline = [];
   const gate = Promise.withResolvers<undefined>();
@@ -166,8 +175,11 @@ it('frees a context whose native stop throws as it is called, without wedging th
       return Promise.resolve();
     }),
   } as unknown as GgufContext;
-  const { client, release, init } = clientWith([stopping], timeline);
-  void collect(client.stream(request));
+  const second = contextOf(timeline, 'second', () => Promise.resolve());
+  const { client, release, init } = clientWith([stopping, second], timeline);
+  // The abandoned answer rejects, so it is awaited as a settled result here: a
+  // stray rejection after the test passed would hide what it is proving.
+  const answered = settle(collect(client.stream(request)));
   await started.promise;
 
   // The release stops the answer in progress first, and that stop throws. The
@@ -181,6 +193,14 @@ it('frees a context whose native stop throws as it is called, without wedging th
   await expect(release()).resolves.toBeUndefined();
   expect(init).toHaveBeenCalledTimes(1);
   expect(timeline).toEqual(['open 1', 'freed stopping']);
+
+  // The abandoned answer ends as a reported failure rather than holding the
+  // client: the next request loads its own context instead of being refused as
+  // busy, which is what the app would show until a restart.
+  expect(await answered).toMatchObject({ reason: 'unsupported' });
+  const next = await collect(client.stream(request));
+  expect(next.at(-1)?.kind).toBe('done');
+  expect(init).toHaveBeenCalledTimes(2);
 });
 
 it('keeps loading after a native release throws as it is called', async () => {

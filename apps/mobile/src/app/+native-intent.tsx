@@ -160,6 +160,9 @@ export function redirectSystemPath({
     if (/(?:^|\/)dev\/save-profile-sheet-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/save-profile-sheet-fixture';
     }
+    if (/(?:^|\/)dev\/mcp-form-sheet-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/mcp-form-sheet-fixture';
+    }
     if (/(?:^|\/)dev\/account-picker-sheet-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/account-picker-sheet-fixture';
     }

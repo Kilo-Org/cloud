@@ -529,6 +529,14 @@
       "nextStepFinal": "Die Entscheidung über den Einspruch ist endgültig. Ein weiterer Einspruch ist nicht möglich.",
       "viewReceipt": "Bestätigung anzeigen"
     },
+    "reportReceipts": {
+      "title": "Meldungen",
+      "rowSubtitle": "Eingereichte Meldungen und ihre Ergebnisse",
+      "emptyTitle": "Noch keine Meldungen",
+      "emptyDescription": "Meldungen, die du zu einem Kommentar oder einer KI-Antwort einreichst, erscheinen hier.",
+      "couldNotLoad": "Deine Meldungen konnten nicht geladen werden",
+      "capped": "Deine neuesten Meldungen werden angezeigt."
+    },
     "changelog": "Neuigkeiten",
     "changelogVersionPending": "Neuigkeiten zu Version {{version}} folgen im nächsten Update.",
     "changelogGroupNew": "Neu",

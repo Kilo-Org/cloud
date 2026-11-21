@@ -529,6 +529,14 @@
       "nextStepFinal": "የይግባኙ ውሳኔ የመጨረሻ ነው። ተጨማሪ ይግባኝ ማቅረብ አይቻልም።",
       "viewReceipt": "ደረሰኙን ይመልከቱ"
     },
+    "reportReceipts": {
+      "title": "ሪፖርቶች",
+      "rowSubtitle": "ያቀረቧቸው ሪፖርቶች እና ውጤቶቻቸው",
+      "emptyTitle": "እስካሁን ምንም ሪፖርት የለም",
+      "emptyDescription": "ከአስተያየት ወይም ከ AI ምላሽ የሚያቀርቧቸው ሪፖርቶች እዚህ ይታያሉ።",
+      "couldNotLoad": "ሪፖርቶችዎን መጫን አልተቻለም",
+      "capped": "የቅርብ ጊዜ ሪፖርቶችዎን ያሳያል።"
+    },
     "changelog": "አዲስ ነገር",
     "changelogVersionPending": "የስሪት {{version}} ማስታወሻዎች ከሚቀጥለው የመተግበሪያ ዝማኔ ጋር ይመጣሉ።",
     "changelogGroupNew": "አዲስ",

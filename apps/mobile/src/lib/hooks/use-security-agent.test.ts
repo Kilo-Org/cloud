@@ -25,8 +25,13 @@ const queryState = vi.hoisted(() => ({
   isFetching: false,
   isPending: false,
   fetchStatus: 'idle' as 'idle' | 'fetching' | 'paused',
+  error: undefined as unknown,
   refetch: vi.fn(),
-  options: [] as { refetchInterval?: unknown }[],
+  options: [] as {
+    refetchInterval?: unknown;
+    networkMode?: unknown;
+    enabled?: unknown;
+  }[],
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -46,6 +51,11 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 
+// The role read observes `organizations.list` through the hook that owns that
+// entry's options, and that hook reads the auth token. Only the token matters
+// here, so the auth module stays out of this node project.
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
+
 function capabilityFor(scope: string) {
   // eslint-disable-next-line react-hooks/rules-of-hooks -- the mocked hooks have no React state; this mirrors use-code-reviewer.test.ts
   return useSecurityAgentCapability(scope);
@@ -58,6 +68,7 @@ beforeEach(() => {
   queryState.isFetching = false;
   queryState.isPending = false;
   queryState.fetchStatus = 'idle';
+  queryState.error = undefined;
   queryState.refetch.mockReset();
   queryState.options.length = 0;
 });
@@ -102,20 +113,58 @@ describe('useSecurityAgentCapability status derivation', () => {
     expect(capability.status).toBe('error');
   });
 
-  it('keeps a paused uncached org role unresolved and exposes its recovery state', () => {
+  it('settles an offline uncached org role read into the error state', () => {
+    // The read comes through the hook that owns the shared options, which ask
+    // for `networkMode: 'always'`: an offline read fails once its request
+    // deadline lands instead of pausing with no data, so the surface gets a
+    // settled failure with a cause to name.
+    const failure = new Error('Network request failed');
     queryState.data = undefined;
-    queryState.isError = false;
-    queryState.isPending = true;
-    queryState.fetchStatus = 'paused';
+    queryState.isError = true;
+    queryState.isPending = false;
+    queryState.fetchStatus = 'idle';
+    queryState.error = failure;
     const capability = capabilityFor('org_123');
 
-    expect(capability.status).toBe('loading');
-    expect(capability.fetchStatus).toBe('paused');
+    expect(capability.status).toBe('error');
+    expect(capability.isError).toBe(true);
+    expect(capability.error).toBe(failure);
+    expect(capability.isPending).toBe(false);
+    expect(capability.fetchStatus).toBe('idle');
     expect(capability.canManage).toBe(false);
   });
 
+  it('observes the org role through the options that own the shared entry', () => {
+    capabilityFor('org_123');
+
+    // One cache entry serves every consumer, and React Query keeps the last
+    // observer's options for all of them. An observer with defaulted options
+    // would strip the offline settle for every other consumer, so this read
+    // must pass the owning options.
+    const sharedOptions = queryState.options.filter(options => 'networkMode' in options);
+    expect(sharedOptions).not.toHaveLength(0);
+    for (const options of sharedOptions) {
+      expect(options.networkMode).toBe('always');
+      expect(options.enabled).toBe(true);
+    }
+  });
+
+  it('keeps the personal scope off the shared entry while still reading its options', () => {
+    queryState.data = undefined;
+    queryState.isError = false;
+    queryState.isPending = true;
+    queryState.fetchStatus = 'fetching';
+    const capability = capabilityFor('personal');
+
+    expect(capability.status).toBe('allowed');
+    expect(capability.fetchStatus).toBe('idle');
+    expect(capability.error).toBeUndefined();
+    const sharedOptions = queryState.options.filter(options => 'networkMode' in options);
+    expect(sharedOptions.at(-1)).toMatchObject({ networkMode: 'always', enabled: false });
+  });
+
   it.each([
-    { fetchStatus: 'paused', isPending: true, isError: false },
+    { fetchStatus: 'fetching', isPending: true, isError: false },
     { fetchStatus: 'idle', isPending: false, isError: true },
   ] as const)('ignores an unavailable shared org query in personal scope: %j', state => {
     Object.assign(queryState, state);

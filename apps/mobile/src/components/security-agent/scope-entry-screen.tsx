@@ -105,10 +105,11 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   const isError = configSettled
     ? !isEnabledResolved && (isGithubStatusUnknown || capability.status === 'error')
     : isConfigUnread || capability.status === 'error' || permission.isError;
+  // The config and GitHub status reads report a pause; the capability read
+  // settles offline through the hook that owns the shared options, so it
+  // never contributes a pause here.
   const isPaused =
-    permission.fetchStatus === 'paused' ||
-    config.fetchStatus === 'paused' ||
-    capability.fetchStatus === 'paused';
+    permission.fetchStatus === 'paused' || config.fetchStatus === 'paused';
 
   const hasIntegration = permission.data?.hasIntegration ?? false;
   const hasPermissions = permission.data?.hasPermissions ?? false;

@@ -1,5 +1,4 @@
 import { PERSONAL_SECURITY_SCOPE } from '@kilocode/app-shared/security-agent';
-import { useQuery } from '@tanstack/react-query';
 import { Building2, User } from '@/components/ui/icons';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -10,26 +9,23 @@ import { ConfigureRow } from '@/components/ui/configure-row';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { classifyListBody } from '@/lib/query/list-body-state';
 import { getSecurityAgentPath } from '@/lib/security-agent';
-import { useTRPC } from '@/lib/trpc';
 
 // Diverges from the Code Reviewer scope list: current server policy allows
 // org members to operate Security Agent, so members are not labeled "View only".
 export function ScopeListScreen() {
   const pushOnce = useSinglePushRoute();
-  const trpc = useTRPC();
   const { t } = useTranslation();
-  const {
-    data: orgs,
-    isError,
-    isFetching,
-    fetchStatus,
-    refetch,
-  } = useQuery(trpc.organizations.list.queryOptions());
+  // The membership read comes through the hook that owns the shared entry's
+  // options. A second observer with defaulted options would replace those
+  // options while this screen is mounted and leave every other consumer's read
+  // paused with no data.
+  const { data: orgs, isError, isFetching, fetchStatus, refetch } = useOrganizationsList();
   const connectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
 
   const openScope = (scope: string) => {

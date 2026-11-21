@@ -6,6 +6,7 @@ import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-q
 import { useCallback, useState } from 'react';
 
 import { type SecurityAgentConfig } from '@/lib/security-agent';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { retryPausedRead, usePausedReadRetry } from '@/lib/query/retry-paused-read';
 import {
   getSecurityAnalysisCapacityState,
@@ -115,26 +116,14 @@ export function useRetrySecurityAgentSettings(scope: string) {
   return { retry, isRetrying, lastAttemptFailed, clearLastAttemptFailed };
 }
 
-// Per-read retries for the one query a paused surface waits on, vs the
-// settings-wide attempt above. Each mirrors the query key its read uses.
+// Per-read retry for the one paused surface: the settings config read, vs the
+// settings-wide attempt above. It mirrors the query key that read uses.
 export function useRetrySecurityAgentConfig(scope: string) {
   const trpc = useTRPC();
   const queryKey = isPersonalSecurityScope(scope)
     ? trpc.securityAgent.getConfig.queryKey()
     : trpc.organizations.securityAgent.getConfig.queryKey({ organizationId: scope });
   return usePausedReadRetry(queryKey);
-}
-
-export function useRetrySecurityAgentCapability(scope: string) {
-  const trpc = useTRPC();
-  const isPersonal = isPersonalSecurityScope(scope);
-  const retry = usePausedReadRetry(trpc.organizations.list.queryKey());
-  if (isPersonal) {
-    // The personal scope never reads the org list (see useSecurityAgentOrgRoleQuery's
-    // masking): a role query key would name a query this scope never fetches.
-    return { retry: () => undefined, isRetrying: false };
-  }
-  return retry;
 }
 
 export function useSecurityAgentDashboardStats(scope: string, repoFullName?: string) {
@@ -179,17 +168,14 @@ export function useSecurityAgentLastSyncTime(scope: string, repoFullName?: strin
 // callers used to read as permission-denied. `useSecurityAgentCapability`
 // below tells those apart; it's the only exported consumer of this query.
 //
-// This observer writes defaulted options over the shared `organizations.list`
-// entry while mounted, so the owning hook's offline settle is not guaranteed
-// for other observers then. Accepted: the settings screen reports a paused
-// read as a connection failure; new observers belong in `useOrganizationsList`.
+// This read comes through the hook that owns the `organizations.list` options.
+// One cache entry serves every consumer, and React Query keeps the last
+// observer's options for all of them. An observer with defaulted options would
+// therefore drop the offline settle for every other consumer while it is
+// mounted, and leave their reads paused with no data.
 function useSecurityAgentOrgRoleQuery(scope: string) {
-  const trpc = useTRPC();
   const isPersonal = isPersonalSecurityScope(scope);
-  const query = useQuery({
-    ...trpc.organizations.list.queryOptions(),
-    enabled: !isPersonal,
-  });
+  const query = useOrganizationsList({ enabled: !isPersonal });
   if (isPersonal) {
     // The org list is irrelevant to the personal scope, but even a disabled
     // observer surfaces the SHARED cache entry's error state (populated
@@ -239,7 +225,8 @@ export function useSecurityAgentCapability(scope: string) {
   } else if (isError) {
     status = 'error';
   } else if (isPending) {
-    // Covers an offline-paused cold launch: pending with no data yet.
+    // Covers a cold launch whose read is still in flight: pending with no
+    // data yet.
     status = 'loading';
   }
   // Any other unresolved combination keeps the initial 'loading'.
@@ -252,7 +239,7 @@ export function useSecurityAgentCapability(scope: string) {
     isLoading,
     isError,
     isFetching,
-    /** A role read paused by the online manager: pending with no data yet. */
+    /** A role read with no data yet: in flight, or not started. */
     isPending,
     refetch,
     fetchStatus,

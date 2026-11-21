@@ -24,7 +24,12 @@ export type BoundedStatusLog = {
 
 function truncateLine(line: string): string {
   if (line.length <= STATUS_LOG_MAX_LINE_LENGTH) return line;
-  return line.slice(0, STATUS_LOG_MAX_LINE_LENGTH - TRUNCATION_MARKER.length) + TRUNCATION_MARKER;
+  const keep = STATUS_LOG_MAX_LINE_LENGTH - TRUNCATION_MARKER.length;
+  // A cut between the two halves of a surrogate pair leaves a lone half, which
+  // no reader can render. Give up one more unit so the cut lands on a boundary.
+  const beforeCut = line.charCodeAt(keep - 1);
+  const splitsSurrogatePair = beforeCut >= 0xd800 && beforeCut <= 0xdbff;
+  return line.slice(0, splitsSurrogatePair ? keep - 1 : keep) + TRUNCATION_MARKER;
 }
 
 export function createBoundedStatusLog(): BoundedStatusLog {

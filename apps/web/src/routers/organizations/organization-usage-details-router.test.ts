@@ -4,7 +4,7 @@ import {
   createOrganization,
   addUserToOrganization,
 } from '@kilocode/web-shared/lib/organizations/organizations';
-import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
+import { db, getReadDbTarget } from '@kilocode/web-shared/lib/drizzle';
 import {
   getAgentInteractionsPerDay,
   getCloudAgentSessionsPerDay,
@@ -493,12 +493,17 @@ describe('organizations usage details trpc router', () => {
     });
 
     it('reads usage through replica transactions that receive a transaction handle', async () => {
-      const transaction = jest.spyOn(readDb, 'transaction');
+      const info = jest.spyOn(console, 'info').mockImplementation(() => undefined);
+      const transaction = jest.spyOn(getReadDbTarget().db, 'transaction');
       const caller = await createCallerForUser(memberUser.id);
 
       const result = await caller.organizations.usageDetails.getAIAdoptionTimeseries(input());
 
       expect(result.unavailable).toBe(false);
+      expect(info).toHaveBeenCalledWith('AI adoption timeseries result', {
+        outcome: 'available',
+        cacheHit: false,
+      });
       // Members plus the three per-day reads each run in their own bounded transaction.
       expect(transaction).toHaveBeenCalledTimes(4);
       for (const read of [
@@ -533,6 +538,7 @@ describe('organizations usage details trpc router', () => {
     });
 
     it('returns a cached result without querying', async () => {
+      const info = jest.spyOn(console, 'info').mockImplementation(() => undefined);
       const cached = {
         timeseries: [],
         weeklyTrends: null,
@@ -541,24 +547,30 @@ describe('organizations usage details trpc router', () => {
         unavailable: false,
       };
       jest.mocked(readCachedAIAdoption).mockResolvedValueOnce(cached);
-      const transaction = jest.spyOn(readDb, 'transaction');
+      const transaction = jest.spyOn(getReadDbTarget().db, 'transaction');
       const caller = await createCallerForUser(memberUser.id);
 
       const result = await caller.organizations.usageDetails.getAIAdoptionTimeseries(input());
 
       expect(result).toEqual(cached);
       expect(transaction).not.toHaveBeenCalled();
+      expect(info).toHaveBeenCalledWith('AI adoption timeseries result', {
+        outcome: 'available',
+        cacheHit: true,
+      });
     });
 
     it.each([
-      ['statement timeout', { code: '57014' }],
-      ['lock timeout', { code: '55P03' }],
-      ['replica recovery conflict', { code: '40001' }],
-    ])('degrades instead of failing on %s, including a wrapped error', async (_name, cause) => {
+      ['statement_timeout', '57014', 'canceling statement due to statement timeout'],
+      ['lock_timeout', '55P03', 'canceling statement due to lock timeout'],
+      ['replica_recovery_conflict', '40001', 'canceling statement due to conflict with recovery'],
+    ])('degrades and logs only safe diagnostics on %s', async (reason, code, message) => {
       const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
       jest
         .mocked(getAgentInteractionsPerDay)
-        .mockRejectedValueOnce(new Error('Failed query', { cause }));
+        .mockRejectedValueOnce(
+          new Error('Failed query: raw SQL and params', { cause: { code, message } })
+        );
       jest.mocked(writeCachedAIAdoption).mockClear();
       const caller = await createCallerForUser(memberUser.id);
 
@@ -572,10 +584,34 @@ describe('organizations usage details trpc router', () => {
         unavailable: true,
       });
       expect(writeCachedAIAdoption).not.toHaveBeenCalled();
-      expect(warn).toHaveBeenCalledWith(
-        'AI adoption reads exceeded the replica bounds',
-        expect.objectContaining({ organizationId: testOrganization.id })
-      );
+      expect(
+        warn.mock.calls.filter(([message]) => message === 'AI adoption timeseries result')
+      ).toEqual([
+        [
+          'AI adoption timeseries result',
+          {
+            outcome: 'unavailable',
+            query: 'agent_interactions',
+            replica: getReadDbTarget().name,
+            elapsedMs: expect.any(Number),
+            sqlstate: code,
+            reason,
+          },
+        ],
+      ]);
+    });
+
+    it('still rejects on an unexpected database failure', async () => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+      jest
+        .mocked(getAgentInteractionsPerDay)
+        .mockRejectedValueOnce(new Error('unexpected failure'));
+      const caller = await createCallerForUser(memberUser.id);
+
+      await expect(
+        caller.organizations.usageDetails.getAIAdoptionTimeseries(input())
+      ).rejects.toThrow('unexpected failure');
+      expect(warn).toHaveBeenCalledWith('AI adoption timeseries result', { outcome: 'error' });
     });
 
     it('does not add a day that has not started when the end rounds up to midnight', async () => {

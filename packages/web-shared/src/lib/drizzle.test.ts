@@ -165,6 +165,16 @@ describe('drizzle', () => {
       disabled: string,
       overrides: Record<string, string> = {}
     ) {
+      return (await readTargetAtStartup(vercelRegion, disabled, overrides)).proxyHost;
+    }
+
+    async function readTargetAtStartup(
+      vercelRegion: string,
+      disabled: string,
+      overrides: Record<string, string> = {},
+      headers?: Record<string, string>,
+      afterTarget?: () => void
+    ) {
       jest.replaceProperty(process, 'env', {
         ...process.env,
         VERCEL_REGION: vercelRegion,
@@ -179,14 +189,37 @@ describe('drizzle', () => {
       });
       jest.spyOn(Math, 'random').mockReturnValue(0.75);
 
-      let host: string | undefined;
-      await jest.isolateModulesAsync(async () => {
-        const { readDb, closeAllDrizzleConnections } =
-          await import('@kilocode/web-shared/lib/drizzle');
-        host = readDb.$client.options.host;
-        await closeAllDrizzleConnections();
-      });
-      return host;
+      const contextSymbol = Symbol.for('@vercel/request-context');
+      const global = globalThis as typeof globalThis & {
+        [contextSymbol]?: { get: () => { headers?: Record<string, string> } };
+      };
+      const previousContext = global[contextSymbol];
+      global[contextSymbol] = { get: () => ({ headers }) };
+      const results: { name: string; host: string | undefined; proxyHost: string | undefined }[] =
+        [];
+      try {
+        await jest.isolateModulesAsync(async () => {
+          const { readDb, getReadDbTarget, closeAllDrizzleConnections } =
+            await import('@kilocode/web-shared/lib/drizzle');
+          try {
+            const target = getReadDbTarget();
+            afterTarget?.();
+            results.push({
+              name: target.name,
+              host: target.db.$client.options.host,
+              proxyHost: readDb.$client.options.host,
+            });
+          } finally {
+            await closeAllDrizzleConnections();
+          }
+        });
+      } finally {
+        if (previousContext) global[contextSymbol] = previousContext;
+        else delete global[contextSymbol];
+      }
+      const result = results[0];
+      if (!result) throw new Error('failed to read the selected target');
+      return result;
     }
 
     it.each([
@@ -196,6 +229,66 @@ describe('drizzle', () => {
       ['fra1', 'eu-central-2', 'eu-1.example'],
     ])('routes %s with disabled list "%s" to %s', async (region, disabled, host) => {
       await expect(readHostAtStartup(region, disabled)).resolves.toBe(host);
+    });
+
+    it.each([
+      ['sfo1', '', 'us-west', 'us.example'],
+      ['sfo1', 'us-west', 'primary', 'primary.example'],
+      ['fra1', '', 'eu-central-2', 'eu-2.example'],
+      ['fra1', 'eu-central-2', 'eu-central-1', 'eu-1.example'],
+      ['fra1', 'eu-central-1,eu-central-2', 'primary', 'primary.example'],
+    ])(
+      'reports the exact target in %s with disabled list "%s"',
+      async (region, disabled, name, host) => {
+        await expect(readTargetAtStartup(region, disabled)).resolves.toEqual({
+          name,
+          host,
+          proxyHost: host,
+        });
+      }
+    );
+
+    it('reports the request-selected database, not the instance fallback', async () => {
+      const firstIp = Array.from({ length: 50 }, (_, i) => `198.51.100.${i}`).find(
+        ip => selectReplicaIndex(ip, 2, 1) === 0
+      );
+      if (!firstIp) throw new Error('no address hashes to the first replica');
+      await expect(readTargetAtStartup('fra1', '', {}, { 'x-real-ip': firstIp })).resolves.toEqual({
+        name: 'eu-central-1',
+        host: 'eu-1.example',
+        proxyHost: 'eu-1.example',
+      });
+    });
+
+    it('shares the proxy selection cache for the same headers object', async () => {
+      const addresses = Array.from({ length: 50 }, (_, i) => `198.51.100.${i}`);
+      const firstIp = addresses.find(ip => selectReplicaIndex(ip, 2, 1) === 0);
+      const secondIp = addresses.find(ip => selectReplicaIndex(ip, 2, 1) === 1);
+      if (!firstIp || !secondIp) throw new Error('need addresses for both replicas');
+      const headers = { 'x-real-ip': firstIp };
+      await expect(
+        readTargetAtStartup('fra1', '', {}, headers, () => {
+          headers['x-real-ip'] = secondIp;
+        })
+      ).resolves.toEqual({ name: 'eu-central-1', host: 'eu-1.example', proxyHost: 'eu-1.example' });
+    });
+
+    it('labels a primary URL as primary, matching the existing pool fallback', async () => {
+      await expect(
+        readTargetAtStartup('fra1', '', {
+          POSTGRES_REPLICA_EU_URL: `postgres://primary.example/db-${process.env.JEST_WORKER_ID || '1'}`,
+        })
+      ).resolves.toEqual({
+        name: 'primary',
+        host: 'primary.example',
+        proxyHost: 'primary.example',
+      });
+    });
+
+    it('keeps distinct labels when two inventory entries share a URL', async () => {
+      await expect(
+        readTargetAtStartup('fra1', '', { POSTGRES_REPLICA_EU_URL_2: 'postgres://eu-1.example/db' })
+      ).resolves.toEqual({ name: 'eu-central-2', host: 'eu-1.example', proxyHost: 'eu-1.example' });
     });
 
     it('warns about unknown names without changing routing', async () => {
@@ -214,8 +307,8 @@ describe('drizzle', () => {
       const invalidUrl = 'postgres://user:secret@eu-2.example:notaport/db';
 
       await expect(
-        readHostAtStartup('fra1', '', { POSTGRES_REPLICA_EU_URL_2: invalidUrl })
-      ).resolves.toBe('eu-1.example');
+        readTargetAtStartup('fra1', '', { POSTGRES_REPLICA_EU_URL_2: invalidUrl })
+      ).resolves.toEqual({ name: 'eu-central-1', host: 'eu-1.example', proxyHost: 'eu-1.example' });
 
       expect(warn).toHaveBeenCalledWith('Skipping read replica eu-central-2: its URL is invalid');
       expect(JSON.stringify(warn.mock.calls)).not.toContain('secret');

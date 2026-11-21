@@ -58,6 +58,7 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
 
 import * as Sentry from '@sentry/react-native';
 import * as SecureStore from 'expo-secure-store';
+import { CONTROL_PLANE_DEADLINE_MS } from '@kilocode/event-service';
 
 import {
   type LogoutCleanupRecord,
@@ -210,7 +211,10 @@ describe('runLogoutCleanup', () => {
     await expect(runLogoutCleanup()).resolves.toBeUndefined();
 
     expect(trpcMock.revokeCurrentDeviceSession.mutate).toHaveBeenCalledTimes(1);
-    expect(trpcMock.unregisterPushToken.mutate).toHaveBeenCalledWith({ token: 'push-1' });
+    expect(trpcMock.unregisterPushToken.mutate).toHaveBeenCalledWith(
+      { token: 'push-1' },
+      { signal: expect.any(AbortSignal) }
+    );
     expect(store.has(LOGOUT_CLEANUP_TOMBSTONE_KEY)).toBe(false);
   });
 
@@ -384,6 +388,34 @@ describe('runLogoutCleanup', () => {
       needsActivityUnregister: true,
       activityTokens: ['activity-token-1'],
     });
+  });
+
+  it('keeps the push token for retry when the shared pair deadline stalls the unregister', async () => {
+    seedRecords([]);
+    pushOutcome('token');
+    trpcMock.unregisterPushToken.mutate.mockReturnValue(new Promise<never>(() => undefined));
+
+    vi.useFakeTimers();
+    try {
+      const run = runLogoutCleanup();
+      // Let the chain reach the stalled unregister before spending the budget.
+      await vi.advanceTimersByTimeAsync(0);
+      expect(trpcMock.unregisterPushToken.mutate).toHaveBeenCalledTimes(1);
+
+      // The one budget the pair shares expires: the push step spent it, so the
+      // revoke is never sent and its own budget is not granted.
+      await vi.advanceTimersByTimeAsync(CONTROL_PLANE_DEADLINE_MS);
+      await expect(run).resolves.toBeUndefined();
+
+      expect(trpcMock.revokeCurrentDeviceSession.mutate).not.toHaveBeenCalled();
+      expect(await storedRecordFor('u1')).toMatchObject({
+        userId: 'u1',
+        pushTokens: ['push-1'],
+        pushLookupPending: false,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('still resolves when a record write fails and reports it to Sentry', async () => {

@@ -14,7 +14,7 @@ import { readCachedUserId } from '@/lib/persist/read-cache';
 import { queryClient } from '@/lib/query-client';
 import { LOGOUT_CLEANUP_TOMBSTONE_KEY } from '@/lib/storage-keys';
 import { isKeychainInteractionRefused } from '@/lib/telemetry/secure-store-events';
-import { trpcClient } from '@/lib/trpc';
+import { retireDeviceRemoteState } from '@/lib/auth/device-retire';
 
 /**
  * Safe-retry records for remote cleanup that failed at logout (DEC-01).
@@ -294,10 +294,12 @@ function uniqueTokens(tokens: readonly string[]): string[] {
  *   session is revoked. The order is required, not cosmetic: the revoke ends
  *   this credential's auth, so a deletion that lands after it is refused with
  *   "Device session is no longer active", and an account that cannot sign back
- *   in never retries it. Both calls are serial, each bounded at 15 s by the
- *   tRPC client's `deadlineFetch`, so a stalled first call can hold local
- *   sign-out for up to 30 s; the alternative — running them concurrently —
- *   loses the deletion to the race.
+ *   in never retries it. Both calls are serial but share ONE
+ *   `CONTROL_PLANE_DEADLINE_MS` budget, so local sign-out waits at most 15 s
+ *   for the pair; the alternative — running them concurrently — loses the
+ *   deletion to the race. A stalled push step therefore spends the same budget
+ *   the revoke would have used: the push is retried from its record and the
+ *   revoke is skipped.
  * - A failed revoke is not recorded: see the record type for why. A failed
  *   push or activity-token unregister is merged into this account's record; a
  *   fully successful one leaves this account's record only when no earlier
@@ -335,20 +337,9 @@ export async function runLogoutCleanup(): Promise<void> {
     const activityResult = await getGlanceableDelivery().unregisterTokens();
     const needsActivityUnregister = !activityResult.ok;
 
-    // The device push token goes before the revoke for the same reason: once
-    // the session is revoked, the same credential can only answer "Device
-    // session is no longer active". Racing the two left the row in place for
-    // an account that cannot sign back in to retry it.
-    const unregister = pushToken
-      ? await trpcClient.user.unregisterPushToken.mutate({ token: pushToken }).then(
-          () => ({ status: 'fulfilled' as const }),
-          () => ({ status: 'rejected' as const })
-        )
-      : { status: 'fulfilled' as const };
-
-    // Last, and its failure is not recorded: the device has already destroyed
-    // the refresh token, so an orphaned session row dies with the access token.
-    await trpcClient.user.revokeCurrentDeviceSession.mutate().catch(() => undefined);
+    // The device push token goes before the revoke, and the pair shares ONE
+    // control-plane budget; see `retireDeviceRemoteState`.
+    const unregister = await retireDeviceRemoteState(pushToken);
 
     // A fulfilled unregister for a real token is a definitive outcome; emit
     // it. No emit when there is no token (nothing was unregistered).

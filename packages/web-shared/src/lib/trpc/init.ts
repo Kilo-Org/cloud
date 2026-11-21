@@ -1,5 +1,6 @@
 import 'server-only';
 import { headers } from 'next/headers';
+import { isSelfCleanupProcedure } from '@kilocode/app-shared/auth';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { initTRPC, TRPCError } from '@trpc/server';
 import type { ProcedureType } from '@trpc/server';
@@ -66,34 +67,16 @@ import {
 
 export { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
 
-/**
- * The only procedures a refused account may still call: the three cleanups its
- * sign-out issues. A blocked account's sign-out must end the session
- * server-side *and* delete the device's own push and activity token rows; a
- * device that skips the latter keeps receiving notifications for an account it
- * was just told it cannot use. The web logout route admits a blocked account
- * for the same session cleanup
- * (`apps/web/src/app/api/auth/revoke-web-session/route.ts`).
- *
- * Each of the three only deletes rows where `user_id` is the caller's own
- * (`apps/web/src/routers/user-router.ts` `revokeCurrentDeviceSession` /
- * `unregisterPushToken` / `unregisterActivityToken`), so the admission cannot
- * carry a read or reach another account.
- *
- * The admission is keyed on the whole request, never on the first call: a
- * batch that mixes a cleanup with any other call is refused as before, so the
- * exemption cannot carry another procedure through the gate.
- */
-const SELF_CLEANUP_PATHS: ReadonlySet<string> = new Set([
-  'user.revokeCurrentDeviceSession',
-  'user.unregisterPushToken',
-  'user.unregisterActivityToken',
-]);
-
+// The admission is keyed on the whole request, never on the first call: a
+// batch that mixes a cleanup with any other call is refused as before, so the
+// exemption cannot carry another procedure through the gate. Which procedures
+// count as a cleanup, and why, is the shared list the mobile client also reads
+// (`@kilocode/app-shared/auth`): it keeps those calls out of its batch, so the
+// two sides cannot drift.
 function admitsRefusedAccount(info: ControlPlaneRequestInfo | null | undefined): boolean {
   const calls = info?.calls;
   if (!calls || calls.length === 0) return false;
-  return calls.every(call => SELF_CLEANUP_PATHS.has(call.path.split('?')[0]));
+  return calls.every(call => isSelfCleanupProcedure(call.path));
 }
 
 // Define the context type

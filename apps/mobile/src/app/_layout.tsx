@@ -975,10 +975,13 @@ function RootLayoutNav({
   // blocked overlay explains a "could not load your account" whose retry can
   // never succeed (every authenticated call refuses), and a blocked read can
   // also fail the consent check, so the consent surface must not outrank it.
-  // Each visible error surface here is an early return that unmounts Slot —
-  // the blocked flag's jump to the overlay is the exception because its Sign
-  // out actions clear the flag and the surface can only appear once the
-  // person's account read has already failed, never over settled app state.
+  // Each visible error surface here is an early return that unmounts Slot, and
+  // the blocked flag is raised mid-session by any procedure's blocked refusal
+  // (the query and mutation caches' `onError`), so it can arrive while the app
+  // tree is settled and in use. That is why it is an overlay and never one of
+  // these branches: an early return would unmount the tree under the person,
+  // while the overlay's Sign out actions clear the flag and let the bootstrap's
+  // settled route show again.
   if (hasUserBootstrapError && bootstrapErrorOwnsScreen && !showBlockedAccountError) {
     return (
       <BootstrapErrorScreen

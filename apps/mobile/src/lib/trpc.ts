@@ -1,4 +1,5 @@
 import { type MobileRouter } from '@kilocode/trpc/mobile';
+import { type SelfCleanupProcedure } from '@kilocode/app-shared/auth';
 import { createTRPCClient, httpBatchLink, httpLink, splitLink } from '@trpc/client';
 import { createTRPCContext } from '@trpc/tanstack-react-query';
 import { CONTROL_PLANE_DEADLINE_MS, withDeadline } from '@kilocode/event-service';
@@ -37,7 +38,7 @@ const trpcUrl = `${API_BASE_URL}/api/trpc`;
  * 3,475 batches / 5,836 caller-seconds lost, activeSessions.list 2,129,
  * cliSessionsV2.getSessionMessagesPage 1,597.
  */
-export const UNBATCHED_PROCEDURES = new Set([
+const UNBATCHED_PROCEDURE_PATHS = [
   'user.getMe',
   'activeSessions.list',
   'cliSessionsV2.getSessionMessagesPage',
@@ -47,10 +48,28 @@ export const UNBATCHED_PROCEDURES = new Set([
   // batched cleanup would share its request with whatever else is pending and
   // the whole request — cleanup included — would be refused. Keeping each on
   // its own request means the gate only ever sees cleanup calls there.
+  //
+  // These three are the shared list the server reads
+  // (`@kilocode/app-shared/auth`), and the assertion below fails the typecheck
+  // when one of them is missing here.
   'user.revokeCurrentDeviceSession',
   'user.unregisterPushToken',
   'user.unregisterActivityToken',
-]);
+] as const;
+
+type UnbatchedProcedure = (typeof UNBATCHED_PROCEDURE_PATHS)[number];
+
+export const UNBATCHED_PROCEDURES: ReadonlySet<string> = new Set(UNBATCHED_PROCEDURE_PATHS);
+
+/** Fails to compile with the offending name when `T` is not `never`. */
+type AssertNever<T extends never> = T;
+
+// A shared self-cleanup left out above would ride the batch, and the server
+// refuses every call in a mixed request, so the cleanup itself would fail.
+type UnlistedSelfCleanup = Exclude<SelfCleanupProcedure, UnbatchedProcedure>;
+
+/** Typecheck-only: every shared self-cleanup must be unbatched. */
+export type AssertEverySelfCleanupIsUnbatched = AssertNever<UnlistedSelfCleanup>;
 
 /**
  * E2E-only artificial backend latency (repro for latency-dependent UI states,

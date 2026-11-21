@@ -137,26 +137,26 @@ export function getCreditBlocks(
   };
 }
 
-export const CreditGrantReasonSchema = z.enum(['referral', 'welcome', 'kilo_pass', 'grant']);
+export const CreditGrantReasonSchema = z.enum([
+  'referral',
+  'welcome',
+  'kilo_pass',
+  'grant',
+  'adjustment',
+]);
 export type CreditGrantReason = z.infer<typeof CreditGrantReasonSchema>;
 
-export type CreditGrant = {
-  readonly id: string;
-  readonly date: string;
-  readonly amount_mUsd: number;
-  readonly kind: CreditGrantReason;
-};
-
 /**
- * Ledger-cache reconciliation and the Orb migration write these positive free
- * rows to mirror accounting state, so they never funded the user's balance.
+ * Ledger-cache reconciliation and the Orb migration write their corrections as
+ * positive free rows that never funded the balance, so they are their own kind.
  */
-const INTERNAL_ACCOUNTING_CATEGORIES: readonly string[] = [
-  'accounting_adjustment',
-  'orb_migration_accounting_adjustment',
-];
-
-function grantKindOf(creditCategory: string | null): CreditGrantReason {
+export function creditGrantReasonOf(creditCategory: string | null): CreditGrantReason {
+  if (
+    creditCategory === 'accounting_adjustment' ||
+    creditCategory === 'orb_migration_accounting_adjustment'
+  ) {
+    return 'adjustment';
+  }
   // `referral` is the admin Referral/Review grant; the two self-service bonuses
   // carry the `referral-` prefix.
   if (creditCategory === 'referral' || creditCategory?.startsWith('referral-')) {
@@ -169,37 +169,4 @@ function grantKindOf(creditCategory: string | null): CreditGrantReason {
     return 'kilo_pass';
   }
   return 'grant';
-}
-
-/**
- * The free credit rows a purchase history cannot list: its predicate requires
- * `is_free = false`, so a balance funded by a welcome grant or a referral bonus
- * has a row here instead.
- */
-export function getCreditGrants(
-  transactions: readonly CreditTransactionForBlocks[]
-): CreditGrant[] {
-  return transactions
-    .filter(
-      transaction =>
-        transaction.amount_microdollars > 0 &&
-        transaction.is_free &&
-        // A row that restores an earlier deduction is the second half of a
-        // ledger correction, not new credit.
-        (transaction.source_transaction_id ?? null) === null &&
-        !(
-          transaction.credit_category !== null &&
-          INTERNAL_ACCOUNTING_CATEGORIES.includes(transaction.credit_category)
-        )
-    )
-    .sort((a, b) => {
-      const byDate = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      return byDate !== 0 ? byDate : b.id.localeCompare(a.id);
-    })
-    .map(transaction => ({
-      id: transaction.id,
-      date: transaction.created_at,
-      amount_mUsd: transaction.amount_microdollars,
-      kind: grantKindOf(transaction.credit_category),
-    }));
 }

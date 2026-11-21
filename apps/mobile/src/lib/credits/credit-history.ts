@@ -13,9 +13,10 @@ export type CreditDeduction = RouterOutputs['user']['getCreditBlocks']['deductio
 
 /**
  * One positive credit grant the person did not buy: a welcome grant, a
- * referral bonus, a Kilo Pass month, or an admin grant.
+ * referral bonus, a Kilo Pass month, an admin grant, or an accounting
+ * adjustment.
  */
-export type CreditGrant = RouterOutputs['user']['getCreditBlocks']['grants'][number];
+export type CreditGrant = RouterOutputs['user']['getCreditGrantHistory']['grants'][number];
 
 /**
  * Where a paid credit grant came from. The web credits page reads the same

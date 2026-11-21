@@ -71,6 +71,7 @@ const GRANT_TITLE_KEYS = {
   welcome: 'credits.history.kind.welcomeCredits',
   kilo_pass: 'kiloPass.title',
   grant: 'credits.history.kind.grant',
+  adjustment: 'credits.history.kind.adjustment',
 } satisfies Record<CreditGrant['kind'], string>;
 
 /** A signed credit amount, kept in its own left-to-right run. */
@@ -259,8 +260,8 @@ export const LedgerHistoryRow = memo(function LedgerHistoryRow({
 
 /**
  * One positive grant the person did not buy: a welcome grant, a referral bonus,
- * a Kilo Pass month, or an admin grant. The title already names the kind, so
- * the row carries no type caption.
+ * a Kilo Pass month, an admin grant, or an accounting adjustment. The title
+ * already names the kind, so the row carries no type caption.
  */
 export const GrantHistoryRow = memo(function GrantHistoryRow({
   grant,

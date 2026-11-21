@@ -78,7 +78,11 @@ import {
   AutoTopUpAmountCentsSchema,
   DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS,
 } from '@kilocode/web-shared/lib/autoTopUpConstants';
-import { getCreditBlocks, getCreditGrants, CreditGrantReasonSchema } from '@/lib/getCreditBlocks';
+import {
+  getCreditBlocks,
+  creditGrantReasonOf,
+  CreditGrantReasonSchema,
+} from '@/lib/getCreditBlocks';
 import { resolveStripeReceiptUrl } from '@kilocode/web-shared/lib/credits';
 import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
@@ -88,6 +92,7 @@ import { refreshGlanceableScope } from '@kilocode/web-shared/lib/notifications-w
 
 const ACCOUNT_DELETION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 const CREDIT_PURCHASE_HISTORY_PAGE_SIZE = 25;
+const CREDIT_GRANT_HISTORY_LIMIT = 100;
 /** The description a Stripe automatic top-up writes on its own grant row. */
 const AUTO_TOP_UP_DESCRIPTION = 'Auto top-up via stripe';
 const PERSONAL_TOP_UP_DESCRIPTIONS = ['Top-up via stripe', AUTO_TOP_UP_DESCRIPTION];
@@ -249,10 +254,14 @@ const CreditGrantSchema = z.object({
 const GetCreditBlocksOutputSchema = z.object({
   creditBlocks: z.array(CreditBlockSchema),
   deductions: z.array(CreditDeductionSchema),
-  grants: z.array(CreditGrantSchema),
   totalBalance_mUsd: z.number(),
   isFirstPurchase: z.boolean(),
   autoTopUpEnabled: z.boolean(),
+});
+
+const CreditGrantHistoryOutputSchema = z.object({
+  grants: z.array(CreditGrantSchema),
+  hasMore: z.boolean(),
 });
 
 const CreditPurchaseHistoryInputSchema = z.object({
@@ -969,10 +978,47 @@ export const userRouter = createTRPCRouter({
 
       return {
         ...result,
-        grants: getCreditGrants(transactions),
         deductions: enrichedDeductions,
         autoTopUpEnabled: ctx.user.auto_top_up_enabled,
       };
+    }),
+
+  // The positive free rows a purchase history cannot list: its predicate
+  // requires `is_free = false`, so a balance funded by a welcome grant or a
+  // referral bonus has a row here instead.
+  getCreditGrantHistory: baseProcedure
+    .input(z.object({}))
+    .output(CreditGrantHistoryOutputSchema)
+    .query(async ({ ctx }) => {
+      const rows = await db
+        .select({
+          id: credit_transactions.id,
+          date: credit_transactions.created_at,
+          amount_mUsd: credit_transactions.amount_microdollars,
+          creditCategory: credit_transactions.credit_category,
+        })
+        .from(credit_transactions)
+        .where(
+          and(
+            eq(credit_transactions.kilo_user_id, ctx.user.id),
+            isNull(credit_transactions.organization_id),
+            gt(credit_transactions.amount_microdollars, 0),
+            eq(credit_transactions.is_free, true),
+            isNull(credit_transactions.source_transaction_id)
+          )
+        )
+        .orderBy(desc(credit_transactions.created_at), desc(credit_transactions.id))
+        // One newest page, so the payload does not grow with the account's age.
+        .limit(CREDIT_GRANT_HISTORY_LIMIT + 1);
+
+      const hasMore = rows.length > CREDIT_GRANT_HISTORY_LIMIT;
+      const grants = rows.slice(0, CREDIT_GRANT_HISTORY_LIMIT).map(row => ({
+        id: row.id,
+        date: new Date(row.date).toISOString(),
+        amount_mUsd: row.amount_mUsd,
+        kind: creditGrantReasonOf(row.creditCategory),
+      }));
+      return { grants, hasMore };
     }),
 
   getCreditPurchaseHistory: baseProcedure

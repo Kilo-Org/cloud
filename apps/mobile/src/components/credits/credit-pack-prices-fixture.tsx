@@ -133,10 +133,14 @@ const EXPIRING_BACKENDS: typeof backends = {
 const creditBlocks: RouterOutputs['user']['getCreditBlocks'] = {
   creditBlocks: [],
   deductions: [],
-  grants: [],
   totalBalance_mUsd: 0,
   isFirstPurchase: true,
   autoTopUpEnabled: false,
+};
+
+const grantHistory: RouterOutputs['user']['getCreditGrantHistory'] = {
+  grants: [],
+  hasMore: false,
 };
 
 const meResponse: RouterOutputs['user']['getMe'] = {
@@ -212,6 +216,9 @@ function createFixtureClient(state: CreditPackPricesFixtureState) {
           }
           if (url.includes('/user.getCreditBlocks')) {
             return fixtureResponse(creditBlocks);
+          }
+          if (url.includes('/user.getCreditGrantHistory')) {
+            return fixtureResponse(grantHistory);
           }
           if (url.includes('/credits.getMobileStoreProducts')) {
             return fixtureResponse(catalog);

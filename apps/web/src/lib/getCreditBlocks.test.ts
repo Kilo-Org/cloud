@@ -1,5 +1,5 @@
 import type { CreditTransactionForBlocks } from '@kilocode/web-shared/lib/creditExpiration';
-import { getCreditBlocks, getCreditGrants } from './getCreditBlocks';
+import { getCreditBlocks, creditGrantReasonOf } from './getCreditBlocks';
 
 const makeTransaction = (
   id: string,
@@ -267,103 +267,31 @@ describe('getCreditBlocks', () => {
   });
 });
 
-describe('getCreditGrants', () => {
-  it('lists a free grant with its amount and date, newest first', () => {
-    const transactions = [
-      makeTransaction('welcome', 0, 500_000, {
-        credit_category: 'automatic-welcome-credits',
-        created_at: '2024-01-02',
-      }),
-      makeTransaction('referral', 0, 1_000_000, {
-        credit_category: 'referral-referring-bonus',
-        created_at: '2024-01-05',
-      }),
-    ];
-
-    expect(getCreditGrants(transactions)).toEqual([
-      { id: 'referral', date: '2024-01-05', amount_mUsd: 1_000_000, kind: 'referral' },
-      { id: 'welcome', date: '2024-01-02', amount_mUsd: 500_000, kind: 'welcome' },
-    ]);
+describe('creditGrantReasonOf', () => {
+  it('maps the referral grant categories to referral', () => {
+    // `referral` is the admin Referral/Review grant, which carries no prefix.
+    expect(creditGrantReasonOf('referral')).toBe('referral');
+    expect(creditGrantReasonOf('referral-redeeming-bonus')).toBe('referral');
   });
 
-  it('leaves out a paid row and a negative row', () => {
-    const transactions = [
-      makeTransaction('paid', 0, 1_000_000, { is_free: false, created_at: '2024-01-03' }),
-      makeTransaction('deduction', 0, -200_000, { is_free: true, created_at: '2024-01-04' }),
-      makeTransaction('grant', 0, 100_000, { created_at: '2024-01-05' }),
-    ];
-
-    expect(getCreditGrants(transactions).map(grant => grant.id)).toEqual(['grant']);
+  it('maps the welcome grant to welcome', () => {
+    expect(creditGrantReasonOf('automatic-welcome-credits')).toBe('welcome');
   });
 
-  it('maps each credit category to its grant kind', () => {
-    const transactions = [
-      makeTransaction('referral', 0, 100, {
-        credit_category: 'referral-referring-bonus',
-        created_at: '2024-01-01',
-      }),
-      makeTransaction('welcome', 0, 100, {
-        credit_category: 'automatic-welcome-credits',
-        created_at: '2024-01-02',
-      }),
-      makeTransaction('kilo-pass', 0, 100, {
-        credit_category: 'kilo-pass-bonus',
-        created_at: '2024-01-03',
-      }),
-      makeTransaction('other', 0, 100, { created_at: '2024-01-04' }),
-      // The admin Referral/Review grant: its category has no prefix.
-      makeTransaction('admin-referral', 0, 100, {
-        credit_category: 'referral',
-        created_at: '2024-01-05',
-      }),
-    ];
-
-    expect(getCreditGrants(transactions).map(grant => grant.kind)).toEqual([
-      'referral',
-      'grant',
-      'kilo_pass',
-      'welcome',
-      'referral',
-    ]);
+  it('maps the Pass bonus to kilo_pass', () => {
+    expect(creditGrantReasonOf('kilo-pass-bonus')).toBe('kilo_pass');
   });
 
-  it('leaves out the internal accounting rows the ledger cache and Orb migration write', () => {
-    const transactions = [
-      makeTransaction('reconciliation', 0, 400_000, {
-        credit_category: 'accounting_adjustment',
-        created_at: '2024-01-02',
-      }),
-      makeTransaction('orb-migration', 0, 900_000, {
-        credit_category: 'orb_migration_accounting_adjustment',
-        created_at: '2024-01-03',
-      }),
-    ];
-
-    expect(getCreditGrants(transactions)).toEqual([]);
+  it('maps the ledger reconciliation row to adjustment', () => {
+    expect(creditGrantReasonOf('accounting_adjustment')).toBe('adjustment');
   });
 
-  it('leaves out a positive free row that restores an earlier deduction', () => {
-    const transactions = [
-      makeTransaction('refund-restore', 0, 250_000, {
-        credit_category: 'refund_debt_restored:tx-1',
-        source_transaction_id: 'tx-1',
-        created_at: '2024-01-04',
-      }),
-    ];
-
-    expect(getCreditGrants(transactions)).toEqual([]);
+  it('maps the Orb migration row to adjustment', () => {
+    expect(creditGrantReasonOf('orb_migration_accounting_adjustment')).toBe('adjustment');
   });
 
-  it('keeps a positive free promo grant without a source transaction', () => {
-    const transactions = [
-      makeTransaction('promo', 0, 750_000, {
-        credit_category: 'referral-redeeming-bonus',
-        created_at: '2024-01-06',
-      }),
-    ];
-
-    expect(getCreditGrants(transactions)).toEqual([
-      { id: 'promo', date: '2024-01-06', amount_mUsd: 750_000, kind: 'referral' },
-    ]);
+  it('maps everything else to grant', () => {
+    expect(creditGrantReasonOf(null)).toBe('grant');
+    expect(creditGrantReasonOf('some-other-credit')).toBe('grant');
   });
 });

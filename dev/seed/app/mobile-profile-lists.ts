@@ -44,7 +44,10 @@ export const usage = '<email>';
  * grant appears through the expiry row that closes it: that grant is seeded with
  * a past expiry date and an expiry row that names it, which is the shape
  * `computeExpiration` writes. The two unspent grants carry no expiry date, so no
- * expiry row closes them and they are rows of their own.
+ * expiry row closes them and they are rows of their own. The ledger-cache
+ * reconciliation row is seeded too, with the shape `recompute-balances` writes,
+ * so the list shows the one positive free row the history labels as an
+ * adjustment instead of a grant.
  *
  * The passkey rows carry generated credential ids and a placeholder COSE key:
  * they render in the list, and the device cannot sign in with them, because
@@ -60,7 +63,7 @@ export const usage = '<email>';
  *
  * A rerun deletes the rows this topic owns — the two derived passkey credential
  * ids, the four moderation logins, the five idempotency keys, the two derived
- * provider ids and the seven credit transaction ids — then inserts them again.
+ * provider ids and the eight credit transaction ids — then inserts them again.
  */
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -86,6 +89,7 @@ const CREDIT_KEYS = [
   'usage',
   'welcome-grant',
   'referral-grant',
+  'accounting-adjustment',
 ] as const;
 
 /** Stable UUID for one account's fixture key: a rerun replaces the same rows. */
@@ -434,6 +438,15 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       credit_category: 'referral-referring-bonus',
       credit_source: 'promotion',
       created_at: iso(-60 * DAY_MS),
+    },
+    {
+      id: creditIds[7],
+      kilo_user_id: userId,
+      amount_microdollars: 500_000,
+      is_free: true,
+      description: 'Correction to match cached balance during recomputation',
+      credit_category: 'accounting_adjustment',
+      created_at: iso(-150 * DAY_MS),
     },
   ]);
 

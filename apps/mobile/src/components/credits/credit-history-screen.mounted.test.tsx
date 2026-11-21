@@ -58,6 +58,14 @@ const state = vi.hoisted(() => ({
     error: null as unknown,
     refetch: vi.fn(),
   },
+  grants: {
+    data: undefined as unknown,
+    isError: false,
+    isPending: false,
+    isFetching: false,
+    error: null as unknown,
+    refetch: vi.fn(),
+  },
 }));
 
 vi.mock('@shopify/flash-list', () => ({ FlashList: flashListMock }));
@@ -93,6 +101,7 @@ vi.mock('@/components/credits/credit-history-rows', () => ({
 vi.mock('@/lib/hooks/use-personal-credits', () => ({
   useCreditPurchaseHistory: () => state.purchases,
   usePersonalCreditBlocks: () => state.blocks,
+  useCreditGrantHistory: () => state.grants,
 }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
@@ -156,6 +165,12 @@ beforeEach(() => {
   state.blocks.isFetching = false;
   state.blocks.error = null;
   state.blocks.refetch.mockClear();
+  state.grants.data = undefined;
+  state.grants.isError = false;
+  state.grants.isPending = false;
+  state.grants.isFetching = false;
+  state.grants.error = null;
+  state.grants.refetch.mockClear();
 });
 
 describe('PersonalCreditHistoryScreen', () => {
@@ -270,10 +285,8 @@ describe('PersonalCreditHistoryScreen', () => {
     unmount();
   });
 
-  it('renders a positive grant from the credit blocks as its own row', async () => {
-    state.blocks.data = {
-      creditBlocks: [],
-      deductions: [],
+  it('renders a positive grant from the grant history as its own row', async () => {
+    state.grants.data = {
       grants: [
         {
           id: 'grant-1',
@@ -282,9 +295,7 @@ describe('PersonalCreditHistoryScreen', () => {
           kind: 'referral',
         },
       ],
-      totalBalance_mUsd: 12_500_000,
-      isFirstPurchase: true,
-      autoTopUpEnabled: false,
+      hasMore: false,
     };
     const { renderer, unmount } = await renderWithProviders(
       createElement(PersonalCreditHistoryScreen)
@@ -296,6 +307,33 @@ describe('PersonalCreditHistoryScreen', () => {
     // A balance funded only by a grant still lists it, so the empty state
     // cannot swallow the one row the account has.
     expect(nodesOfType(renderer, 'EmptyState')).toHaveLength(0);
+    unmount();
+  });
+
+  it('names the grants that failed and keeps the loaded purchases under it', async () => {
+    state.purchases.entries = [purchase()];
+    state.grants.isError = true;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PersonalCreditHistoryScreen)
+    );
+
+    // The purchases answered, so their rows stay; the failed grants read says so
+    // instead of vanishing from the list without a word.
+    expect(nodesOfType(renderer, 'PurchaseHistoryRow')).toHaveLength(1);
+    expect(texts(renderer)).toContain(i18n.t('credits.history.activityUnavailable'));
+
+    const retry = nodesOfType(renderer, 'Button').find(
+      node => node.props.accessibilityLabel === 'Retry'
+    );
+    if (!retry) {
+      throw new Error('the grants retry action did not render');
+    }
+    act(() => {
+      (retry.props.onPress as () => void)();
+    });
+    expect(state.grants.refetch).toHaveBeenCalledTimes(1);
+    // Only the part that failed is re-read; the loaded purchases stay put.
+    expect(state.purchases.query.refetch).not.toHaveBeenCalled();
     unmount();
   });
 });

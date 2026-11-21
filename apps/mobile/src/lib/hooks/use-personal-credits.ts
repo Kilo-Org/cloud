@@ -31,6 +31,19 @@ export function usePersonalCreditBlocks(enabled: boolean) {
 }
 
 /**
+ * The positive free grants the personal credit history lists. They are their
+ * own bounded read, so a screen that never renders history does not fetch them.
+ */
+export function useCreditGrantHistory(enabled: boolean) {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.user.getCreditGrantHistory.queryOptions({}),
+    enabled,
+    ...SETTLE_WHILE_OFFLINE,
+  });
+}
+
+/**
  * Build the purchase-history infinite-query options. Kept as a pure builder so
  * the offset paging and the retention bound are testable without mounting the
  * hook.

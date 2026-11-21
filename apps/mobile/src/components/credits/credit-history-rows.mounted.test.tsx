@@ -285,6 +285,15 @@ describe('GrantHistoryRow', () => {
     welcome.unmount();
   });
 
+  it('titles an accounting adjustment grant from the catalog', async () => {
+    const renderer = await renderGrantRow(grant({ kind: 'adjustment' }));
+
+    // The ledger correction is its own kind, so the row cannot fall back to the
+    // generic grant title as if it were credit the person received.
+    expect(texts(renderer)).toContain(i18n.t('credits.history.kind.adjustment'));
+    renderer.unmount();
+  });
+
   it('paints the amount as a positive run and the grant date under it', async () => {
     const renderer = await renderGrantRow(grant({ amount_mUsd: 12_500_000 }));
 

@@ -8,6 +8,9 @@
  *   pnpm --filter web script src/scripts/d2026-11-21_remove-unreadable-slack-integration.ts \
  *     --integration-id=<uuid> --execute
  *
+ * Before running it: remove the Kilo app in the Slack workspace named in the output, then
+ * confirm the integration row is still present. The command prints that workspace id.
+ *
  * Requires SLACK_CREDENTIAL_KEYSET_JSON and POSTGRES_SCRIPT_URL. Prints no credential
  * material: no token, ciphertext, key id, or key data.
  */
@@ -161,6 +164,8 @@ async function main(): Promise<void> {
   }
 
   console.log('Action: remove');
+  console.log(`Before running: remove the Kilo app in the Slack workspace ${workspaceId} and`);
+  console.log('then confirm this integration row is still present.');
 
   if (!execute) {
     console.log('Dry run: nothing deleted');

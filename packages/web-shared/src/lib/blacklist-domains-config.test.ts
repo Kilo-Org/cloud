@@ -5,9 +5,16 @@ jest.mock('@kilocode/web-shared/lib/redis', () => ({
 // The Sentry client is the reporting boundary: the mock counts reports without sending them.
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
+// `errorExceptInTest` is a no-op under IS_IN_AUTOMATED_TEST, so spy on it to count log lines.
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@kilocode/web-shared/lib/utils.server'),
+  errorExceptInTest: jest.fn(),
+}));
+
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import { captureException } from '@sentry/nextjs';
 import { blacklisted_domains, blacklisted_domains_settings } from '@kilocode/db/schema';
+import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { eq } from 'drizzle-orm';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
@@ -19,12 +26,13 @@ import {
   listBlacklistedDomains,
   normalizeSignupTlds,
   readBlacklistDomainsSettings,
-  resetSignupTldReportWindowForTest,
+  resetSignupTldStateForTest,
 } from '@kilocode/web-shared/lib/blacklist-domains-config';
 
 const mockedRedisGet = jest.mocked(redisClient.get);
 const mockedRedisSet = jest.mocked(redisClient.set);
 const mockedCaptureException = jest.mocked(captureException);
+const mockedErrorLog = jest.mocked(errorExceptInTest);
 const settings = (blocked_signup_tlds: string[]) => ({
   blocked_signup_tlds,
   updated_at: '2026-04-29 01:16:12.945+00',
@@ -39,10 +47,11 @@ async function insertBlacklistedDomains(domains: string[]): Promise<void> {
 beforeEach(async () => {
   await cleanupDbForTest();
   clearEmailBlacklistCache();
-  resetSignupTldReportWindowForTest();
+  resetSignupTldStateForTest();
   mockedRedisGet.mockReset();
   mockedRedisSet.mockReset();
   mockedCaptureException.mockReset();
+  mockedErrorLog.mockReset();
 });
 
 afterEach(() => {
@@ -209,37 +218,79 @@ describe('getBlockedSignupTlds', () => {
     await expect(getBlockedSignupTlds()).resolves.toEqual(['shop', 'top']);
   });
 
-  test('reports a database failure and serves the deployment list, retrying after recovery', async () => {
+  test('an outage after a successful read keeps the admin list and reports once per window', async () => {
     await db.insert(blacklisted_domains_settings).values(settings(['asia']));
+    await expect(getBlockedSignupTlds()).resolves.toEqual(['asia']);
+
     const failure = new Error('database unavailable');
     const select = jest.spyOn(db, 'select').mockImplementation(() => {
       throw failure;
     });
     mockedRedisGet.mockResolvedValue(JSON.stringify(settings(['shop'])));
-
-    // Pre-#11609 the cached read caught the same reported error and served its null default, so
-    // the gate relaxed to the deployment list instead of refusing every new signup.
-    await expect(getBlockedSignupTlds()).resolves.toEqual(['shop', 'top']);
-    expect(mockedCaptureException).toHaveBeenCalledTimes(1);
-    expect(mockedCaptureException).toHaveBeenCalledWith(failure, {
-      tags: { source: 'blacklist_domains_config' },
-    });
-
-    select.mockRestore();
-    await expect(getBlockedSignupTlds()).resolves.toEqual(['asia']);
-
-    const failingSelect = jest.spyOn(db, 'select').mockImplementation(() => {
-      throw failure;
-    });
     try {
-      // Inside the window, a repeated failure still falls back but reports nothing new.
-      await expect(getBlockedSignupTlds()).resolves.toEqual(['shop', 'top']);
+      // Pre-#11609 createCachedFetch caught the reported error and served the last-known-good
+      // settings, so an outage left the admin's list in force instead of relaxing the gate.
+      await expect(getBlockedSignupTlds()).resolves.toEqual(['asia']);
       expect(mockedCaptureException).toHaveBeenCalledTimes(1);
+      expect(mockedCaptureException).toHaveBeenCalledWith(failure, {
+        tags: { source: 'blacklist_domains_config' },
+      });
+      expect(mockedErrorLog).toHaveBeenCalledTimes(1);
+      expect(mockedErrorLog).toHaveBeenCalledWith(
+        '[blacklist-domains] Failed to read the signup TLD settings:',
+        failure
+      );
+
+      // Inside the window a repeated failure serves the same remembered settings, and neither
+      // the Sentry event nor the console line repeats: one signup attempt is not one log line.
+      await expect(getBlockedSignupTlds()).resolves.toEqual(['asia']);
+      expect(mockedCaptureException).toHaveBeenCalledTimes(1);
+      expect(mockedErrorLog).toHaveBeenCalledTimes(1);
       expect(mockedRedisGet).not.toHaveBeenCalled();
       expect(mockedRedisSet).not.toHaveBeenCalled();
     } finally {
-      failingSelect.mockRestore();
+      select.mockRestore();
     }
+  });
+
+  test('an outage before any successful read uses the deployment list', async () => {
+    const failure = new Error('database unavailable');
+    const select = jest.spyOn(db, 'select').mockImplementation(() => {
+      throw failure;
+    });
+    try {
+      // The cold-start case: createCachedFetch's `null` default, where the gate used the
+      // deployment list because no admin list had been read in this process yet.
+      await expect(getBlockedSignupTlds()).resolves.toEqual(['shop', 'top']);
+      expect(mockedCaptureException).toHaveBeenCalledWith(failure, {
+        tags: { source: 'blacklist_domains_config' },
+      });
+    } finally {
+      select.mockRestore();
+    }
+  });
+
+  test('recovery reads fresh settings again after an outage', async () => {
+    await db.insert(blacklisted_domains_settings).values(settings(['asia']));
+    await expect(getBlockedSignupTlds()).resolves.toEqual(['asia']);
+
+    const failure = new Error('database unavailable');
+    const select = jest.spyOn(db, 'select').mockImplementation(() => {
+      throw failure;
+    });
+    try {
+      await expect(getBlockedSignupTlds()).resolves.toEqual(['asia']);
+    } finally {
+      select.mockRestore();
+    }
+
+    // A save during the outage is picked up by the next successful read, not the remembered value.
+    await db
+      .update(blacklisted_domains_settings)
+      .set({ blocked_signup_tlds: ['top'] })
+      .where(eq(blacklisted_domains_settings.id, 1));
+
+    await expect(getBlockedSignupTlds()).resolves.toEqual(['top']);
   });
 
   test('reports a later failure again once the report window passes', async () => {
@@ -252,10 +303,12 @@ describe('getBlockedSignupTlds', () => {
 
     await expect(getBlockedSignupTlds()).resolves.toEqual(['shop', 'top']);
     expect(mockedCaptureException).toHaveBeenCalledTimes(1);
+    expect(mockedErrorLog).toHaveBeenCalledTimes(1);
 
     clock.mockReturnValue(now + 30_000);
     await expect(getBlockedSignupTlds()).resolves.toEqual(['shop', 'top']);
     expect(mockedCaptureException).toHaveBeenCalledTimes(2);
+    expect(mockedErrorLog).toHaveBeenCalledTimes(2);
   });
 
   test('does not report a successful read', async () => {
@@ -263,6 +316,7 @@ describe('getBlockedSignupTlds', () => {
 
     await expect(getBlockedSignupTlds()).resolves.toEqual(['asia']);
     expect(mockedCaptureException).not.toHaveBeenCalled();
+    expect(mockedErrorLog).not.toHaveBeenCalled();
   });
 
   test('uses BLOCKED_SIGNUP_TLDS as the fallback when it is set', async () => {

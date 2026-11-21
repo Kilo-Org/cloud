@@ -11,7 +11,7 @@ import { blacklisted_domains, blacklisted_domains_settings } from '@kilocode/db/
 import { eq } from 'drizzle-orm';
 import {
   clearEmailBlacklistCache,
-  resetSignupTldReportWindowForTest,
+  resetSignupTldStateForTest,
 } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
@@ -24,7 +24,7 @@ describe('signup TLD settings', () => {
   beforeEach(async () => {
     await cleanupDbForTest();
     clearEmailBlacklistCache();
-    resetSignupTldReportWindowForTest();
+    resetSignupTldStateForTest();
     mockedCaptureException.mockReset();
     jest.mocked(redisClient.get).mockReset();
     jest.mocked(redisClient.get).mockImplementation(async <T>(key: string) =>
@@ -91,16 +91,38 @@ describe('signup TLD settings', () => {
     ).resolves.toBe(false);
   });
 
-  test('reports an unreadable settings row and still decides signups from the deployment list', async () => {
+  test('an outage before any successful read decides signups from the deployment list', async () => {
     const failure = new Error('database unavailable');
     const select = jest.spyOn(db, 'select').mockImplementation(() => {
       throw failure;
     });
     try {
-      // A settings outage must not reject every new signup: the gate reports and applies the
-      // deployment default, which is what the cached read did before the Postgres rewrite.
+      // A settings outage must not reject every new signup: with nothing read yet, the gate
+      // reports and applies the deployment default, as the cached read's null default did.
       await expect(isBlockedTLD('new@example.shop')).resolves.toBe(true);
       await expect(isBlockedTLD('new@example.com')).resolves.toBe(false);
+      expect(mockedCaptureException).toHaveBeenCalledWith(failure, {
+        tags: { source: 'blacklist_domains_config' },
+      });
+    } finally {
+      select.mockRestore();
+    }
+  });
+
+  test('an outage keeps the admin list the last successful read returned', async () => {
+    await insertSettings(['asia']);
+    await expect(isBlockedTLD('new@example.asia')).resolves.toBe(true);
+    await expect(isBlockedTLD('new@example.shop')).resolves.toBe(false);
+
+    const failure = new Error('database unavailable');
+    const select = jest.spyOn(db, 'select').mockImplementation(() => {
+      throw failure;
+    });
+    try {
+      // The admin's list stays in force, so an outage neither relaxes the gate to the deployment
+      // default (which blocks .shop) nor rejects the signup.
+      await expect(isBlockedTLD('new@example.asia')).resolves.toBe(true);
+      await expect(isBlockedTLD('new@example.shop')).resolves.toBe(false);
       expect(mockedCaptureException).toHaveBeenCalledWith(failure, {
         tags: { source: 'blacklist_domains_config' },
       });

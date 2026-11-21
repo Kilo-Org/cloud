@@ -87,29 +87,49 @@ export async function readBlacklistDomainsSettings(
 const SIGNUP_TLD_REPORT_INTERVAL_MS = 30_000;
 let lastSignupTldReportAt = Number.NEGATIVE_INFINITY;
 
-/** Tests clear the window between cases; production keeps it for the process. */
-export function resetSignupTldReportWindowForTest(): void {
+/**
+ * The last settings a read in this process returned, so a failed read can serve them. `read`
+ * with `settings: null` is a successful read of an absent row, which is itself last-known-good;
+ * `none` means no read has succeeded yet, where the deployment list applies instead.
+ */
+type SignupTldSnapshot =
+  | { state: 'none' }
+  | { state: 'read'; settings: StoredBlacklistDomainsSettings | null };
+let lastSignupTldSnapshot: SignupTldSnapshot = { state: 'none' };
+
+/** Tests clear the failure window and the remembered settings; production keeps both. */
+export function resetSignupTldStateForTest(): void {
   lastSignupTldReportAt = Number.NEGATIVE_INFINITY;
+  lastSignupTldSnapshot = { state: 'none' };
 }
 
 /**
- * Reads the signup TLD settings, reporting a failure and falling back to the deployment list.
+ * Reads the signup TLD settings, reporting a failure and serving the last-known-good value.
  * Before #11609 the read sat behind `createCachedFetch`, which caught the same reported error and
- * served its `null` default, so the gate fell open to the deployment default (or
- * BLOCKED_SIGNUP_TLDS) instead of rejecting every new signup. The catch keeps that behaviour, so
- * an unreadable settings row relaxes the admin's extra blocks rather than blocking all signups.
+ * returned `cached?.value ?? defaultValue`: the settings of the last successful read, or its
+ * `null` default when no read had succeeded yet. This keeps that behaviour, so an outage leaves
+ * the admin's saved TLDs in force instead of relaxing the gate to the deployment list; only a
+ * failure before any successful read falls back to the deployment list (or BLOCKED_SIGNUP_TLDS).
+ *
+ * Remembering the value does not delay an update: every check still reads Postgres, and the
+ * remembered settings are used only once a read has failed. That keeps an admin save immediate,
+ * which is what #11609 wanted.
  */
 async function readSignupTldSettingsOrReport(): Promise<StoredBlacklistDomainsSettings | null> {
   try {
-    return await readBlacklistDomainsSettings();
+    const settings = await readBlacklistDomainsSettings();
+    lastSignupTldSnapshot = { state: 'read', settings };
+    return settings;
   } catch (error) {
-    errorExceptInTest('[blacklist-domains] Failed to read the signup TLD settings:', error);
     const now = Date.now();
     if (now - lastSignupTldReportAt >= SIGNUP_TLD_REPORT_INTERVAL_MS) {
       lastSignupTldReportAt = now;
+      // The log line and the Sentry event describe one failure, so they share the window;
+      // leaving the log outside it would emit a line per signup attempt during an outage.
+      errorExceptInTest('[blacklist-domains] Failed to read the signup TLD settings:', error);
       captureException(error, { tags: { source: 'blacklist_domains_config' } });
     }
-    return null;
+    return lastSignupTldSnapshot.state === 'read' ? lastSignupTldSnapshot.settings : null;
   }
 }
 
@@ -117,9 +137,9 @@ async function readSignupTldSettingsOrReport(): Promise<StoredBlacklistDomainsSe
  * The admin-configured signup TLD blocklist. An absent row keeps the deployment default (or
  * BLOCKED_SIGNUP_TLDS); an explicit empty array disables TLD blocking.
  *
- * The read happens on every check, so an admin save is immediate. When the read fails, the gate
- * reports and serves the deployment list — an outage relaxes the admin's extra blocks rather than
- * refusing every new signup.
+ * The read happens on every check, so an admin save is immediate. When a read fails, the gate
+ * reports and keeps the settings the last successful read returned, so an outage does not change
+ * which TLDs are blocked.
  */
 export async function getBlockedSignupTlds(): Promise<string[]> {
   const settings = await readSignupTldSettingsOrReport();

@@ -37,6 +37,14 @@ vi.mock('react-native', () => ({
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+
+// The reduced-motion band's own paint needs the motion policy and a palette;
+// this suite asserts where the screen mounts it and which control it carries.
+vi.mock('@/components/ui/refresh-progress', () => ({ RefreshProgress: 'RefreshProgress' }));
+// The pull's hook announces under reduced motion through this adapter, whose
+// real module reaches `react-native`'s `AccessibilityInfo`; this suite stubs
+// only the hosts it renders.
+vi.mock('@/lib/a11y/announce', () => ({ announceForA11y: vi.fn() }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', () => ({
@@ -388,5 +396,35 @@ describe('device session sign-out controls', () => {
     });
     expect(query.refetch).toHaveBeenCalledTimes(1);
     unmount();
+  });
+
+  it('draws the static band above the scroller with the same control', async () => {
+    // The band is the pull's visible half under reduced motion. It sits beside
+    // the scroller, not inside it: the scroller's content container carries a
+    // section gap that would push the first row down even with motion on, and
+    // an in-flow band would scroll away with the rows.
+    query.data = [session({ id: 'current', kind: 'app', platform: 'android', isCurrent: true })];
+    const { renderer, unmount } = await renderWithProviders(createElement(DeviceSessionsScreen));
+    const bands = renderer.root.findAll(node => String(node.type) === 'RefreshProgress');
+    expect(bands).toHaveLength(1);
+    const scroller = renderer.root.find(node => String(node.type) === 'TabScreenScrollView');
+    expect(bands[0]?.props.refreshControl).toBe(scroller.props.refreshControl);
+    unmount();
+  });
+
+  it('draws no band while the error or empty state is the body', async () => {
+    query.isError = true;
+    const failed = await renderWithProviders(createElement(DeviceSessionsScreen));
+    expect(
+      failed.renderer.root.findAll(node => String(node.type) === 'RefreshProgress')
+    ).toHaveLength(0);
+    failed.unmount();
+
+    query.isError = false;
+    const empty = await renderWithProviders(createElement(DeviceSessionsScreen));
+    expect(
+      empty.renderer.root.findAll(node => String(node.type) === 'RefreshProgress')
+    ).toHaveLength(0);
+    empty.unmount();
   });
 });

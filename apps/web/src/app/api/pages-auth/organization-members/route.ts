@@ -8,6 +8,7 @@ import {
   OrganizationMemberSearchQuerySchema,
 } from '@/lib/organizations/organization-member-search';
 import { isPagesAuthClient } from '@/lib/pages-auth/pages-auth-clients';
+import { isPagesMemberSearchEnabled } from '@/lib/pages-auth/pages-directory';
 import { isPagesMemberSearchProofFor } from '@/lib/pages-auth/pages-member-search-proof';
 
 /**
@@ -67,7 +68,10 @@ function refuse(status: number, error: string) {
  * and empty when nobody matches. `image_url` is null when the account has
  * none. Ids are raw Kilo user ids.
  *
- * Refusals, in the order they are checked: 400 `invalid_request` for a body
+ * While `PAGES_MEMBER_SEARCH_ENABLED` is off, every call answers 404
+ * `not_found`, and the exchange advertises no `member_search`.
+ *
+ * Otherwise, refusals in the order they are checked: 400 `invalid_request` for a body
  * that is not exactly one of the shapes above; 401 `invalid_client` for a
  * caller that is not a configured deployment; 401 `invalid_proof` for a proof
  * that is forged, expired, or minted for another person or deployment; 403
@@ -79,6 +83,8 @@ function refuse(status: number, error: string) {
 export const POST = withRestTiming(
   '/api/pages-auth/organization-members',
   async (request: Request) => {
+    if (!isPagesMemberSearchEnabled()) return refuse(404, 'not_found');
+
     const body: unknown = await request.json().catch(() => null);
     const parsed = RequestSchema.safeParse(body);
     if (!parsed.success) return refuse(400, 'invalid_request');

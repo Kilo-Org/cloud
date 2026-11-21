@@ -68,7 +68,31 @@ describe('POST /api/pages-auth/organization-members', () => {
     jest.clearAllMocks();
     rateLimitTest.resetReportThrottle();
     mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
+    process.env.PAGES_MEMBER_SEARCH_ENABLED = 'true';
   });
+
+  afterEach(() => {
+    delete process.env.PAGES_MEMBER_SEARCH_ENABLED;
+  });
+
+  test.each([undefined, 'false', '1'])(
+    'answers 404 to every call while the setting is %j',
+    async value => {
+      if (value === undefined) delete process.env.PAGES_MEMBER_SEARCH_ENABLED;
+      else process.env.PAGES_MEMBER_SEARCH_ENABLED = value;
+
+      for (const [body, secret] of [
+        [searchBody(), SECRET],
+        [searchBody(), null],
+        ['not json', SECRET],
+      ] as const) {
+        const response = await call(body, secret);
+        expect(response.status).toBe(404);
+        expect(await response.json()).toEqual({ error: 'not_found' });
+      }
+      expect(mockCheckRateLimit).not.toHaveBeenCalled();
+    }
+  );
 
   test('searches the organization for the person the proof names', async () => {
     const response = await call(searchBody());

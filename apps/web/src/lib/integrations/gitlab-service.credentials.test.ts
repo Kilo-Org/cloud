@@ -3260,9 +3260,16 @@ describe('GitLab encrypted credential persistence', () => {
       new GitLabProjectAccessTokenPermissionError(42, 403, 'x')
     );
 
-    await expect(
-      getOrCreateProjectAccessToken(integration, 42, { userId: user.id })
-    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+    const refusal = await getOrCreateProjectAccessToken(integration, 42, {
+      userId: user.id,
+    }).catch((error: unknown) => error);
+
+    expect(refusal).toMatchObject({ code: 'PRECONDITION_FAILED' });
+    const refusalMessage = refusal instanceof Error ? refusal.message : '';
+    expect(refusalMessage).toContain('GitLab refused the connected credential');
+    expect(refusalMessage).toContain(
+      'Disconnect the integration, then reconnect the current instance with a credential that can revoke them.'
+    );
 
     const [credential] = await db
       .select()
@@ -3276,6 +3283,60 @@ describe('GitLab encrypted credential persistence', () => {
     expect(credential.provider_metadata).toEqual(
       expect.objectContaining({ providerCredentialId: '777' })
     );
+    expect(mockCreateProjectAccessToken).not.toHaveBeenCalled();
+  });
+
+  it('refuses a replacement when the stored instance record cannot be read', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    let [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await getOrCreateProjectAccessToken(integration, 42, { userId: user.id });
+    const nearExpiry = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    await db
+      .update(platform_access_token_credentials)
+      .set({
+        provider_metadata: {
+          providerCredentialId: '777',
+          expiresOn: nearExpiry,
+          authorizedAccountId: '123',
+        },
+      })
+      .where(
+        and(
+          eq(platform_access_token_credentials.platform_integration_id, connected.integration.id),
+          eq(platform_access_token_credentials.provider_resource_id, '42')
+        )
+      );
+    await db
+      .update(platform_integrations)
+      .set({ metadata: null })
+      .where(eq(platform_integrations.id, connected.integration.id));
+    [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    mockRotateProjectAccessToken.mockRejectedValueOnce(new Error('rotation failed'));
+    mockCreateProjectAccessToken.mockClear();
+
+    const refusal = await getOrCreateProjectAccessToken(integration, 42, {
+      userId: user.id,
+    }).catch((error: unknown) => error);
+
+    expect(refusal).toMatchObject({ code: 'PRECONDITION_FAILED' });
+    const refusalMessage = refusal instanceof Error ? refusal.message : '';
+    expect(refusalMessage).toContain('the stored GitLab instance address could not be used');
+    expect(refusalMessage).toContain(
+      'Ask Kilo support to repair the stored integration record, then reconnect.'
+    );
+    expect(mockRevokeProjectAccessToken).not.toHaveBeenCalled();
     expect(mockCreateProjectAccessToken).not.toHaveBeenCalled();
   });
 
@@ -3327,8 +3388,8 @@ describe('GitLab encrypted credential persistence', () => {
 
     expect(refusal).toMatchObject({ code: 'PRECONDITION_FAILED' });
     const refusalMessage = refusal instanceof Error ? refusal.message : '';
-    expect(refusalMessage).toContain('could not be confirmed as revoked');
-    expect(refusalMessage).toContain('Try again in a moment');
+    expect(refusalMessage).toContain('a revocation could not be confirmed');
+    expect(refusalMessage).toContain('Try again in a moment.');
     expect(mockRevokeProjectAccessToken).toHaveBeenCalledTimes(2);
     expect(mockCreateProjectAccessToken).not.toHaveBeenCalled();
     const [credential] = await db

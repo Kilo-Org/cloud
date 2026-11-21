@@ -61,10 +61,9 @@ import {
   type StoredProjectCredential,
 } from '@/lib/integrations/platforms/gitlab/project-credential-lifecycle';
 import {
-  GITLAB_PROJECT_TOKEN_REPLACEMENT_UNCONFIRMED_MESSAGE,
-  GITLAB_PROJECT_TOKEN_REPLACEMENT_UNSETTLED_MESSAGE,
   GITLAB_PROJECT_TOKENS_LIST_UNREADABLE_MESSAGE,
   describeInstanceChangeBlockers,
+  describeProjectTokenReplacementBlocker,
   dropUnrevokableProjectTokenEntry,
   getStoredProjectCredential,
   gitlabProjectTokensUnsettledMessage,
@@ -1093,9 +1092,7 @@ export async function getOrCreateProjectAccessToken(
           );
           throw new TRPCError({
             code: 'PRECONDITION_FAILED',
-            message: removal.retryable
-              ? GITLAB_PROJECT_TOKEN_REPLACEMENT_UNCONFIRMED_MESSAGE
-              : GITLAB_PROJECT_TOKEN_REPLACEMENT_UNSETTLED_MESSAGE,
+            message: describeProjectTokenReplacementBlocker(removal.reason),
           });
         }
       }

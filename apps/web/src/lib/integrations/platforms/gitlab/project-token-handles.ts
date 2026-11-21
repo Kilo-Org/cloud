@@ -324,13 +324,19 @@ export function describeInstanceChangeBlockers(
   );
 }
 
-/** Refusal for a replacement while the replaced project token is not settled. */
-export const GITLAB_PROJECT_TOKEN_REPLACEMENT_UNSETTLED_MESSAGE =
-  'The GitLab project token for this project must be revoked before a replacement is created. Reconnect the GitLab integration and retry.';
-
-/** Refusal for a replacement whose replaced token could not be confirmed revoked. */
-export const GITLAB_PROJECT_TOKEN_REPLACEMENT_UNCONFIRMED_MESSAGE =
-  'The GitLab project token for this project could not be confirmed as revoked, so no replacement was created. Try again in a moment.';
+/**
+ * Refusal for a replacement whose replaced project token is not settled. It
+ * names the cause and the step that applies to that cause: an unusable stored
+ * integration record needs a repair, a refused or unresolvable credential needs
+ * a disconnect and reconnect, and an unconfirmed answer or a changed handle can
+ * be retried.
+ */
+export function describeProjectTokenReplacementBlocker(
+  reason: ProjectTokenRetentionReason
+): string {
+  const { cause, remedy } = BLOCKER_MESSAGES[reason];
+  return `The GitLab project token for this project could not be replaced because ${cause}, and it must be revoked before a replacement is created. ${remedy}`;
+}
 
 /**
  * Removes the stored Project Access Token for a project

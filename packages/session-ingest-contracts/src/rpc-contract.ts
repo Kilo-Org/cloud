@@ -949,7 +949,8 @@ export const kiloSdkAssistantMessageSchema = z.object({
   role: z.literal('assistant'),
   time: z.object({ created: z.number(), completed: z.number().optional() }),
   error: sdkAssistantErrorSchema.optional(),
-  parentID: messageIdSchema,
+  // The v2 display projection uses an empty parent for unparented system messages.
+  parentID: z.union([messageIdSchema, z.literal('')]),
   modelID: z.string(),
   providerID: z.string(),
   mode: z.string(),
@@ -971,7 +972,11 @@ export const kiloSdkMessageSchema = z.discriminatedUnion('role', [
 export type KiloSdkMessageInfo = z.infer<typeof kiloSdkMessageSchema>;
 
 const sdkPartBaseShape = {
-  id: partIdSchema,
+  // Native v2 display parts retain the identity shared by history and live replay.
+  id: z.union([
+    partIdSchema,
+    createIdSchema('msg_', 'native display part IDs').regex(/_[0-9]{6}(?:_summary|_file_[0-9]+)?$/),
+  ]),
   /** Same stored-session rule as the stored messages. */
   sessionID: storedSessionIdSchema,
   messageID: messageIdSchema,
@@ -991,7 +996,7 @@ export type KiloSdkPartBase = z.infer<typeof sdkPartBaseSchema>;
  * understand.
  */
 const persistedSdkPartIdentitySchema = z.object({
-  id: sdkPartBaseShape.id,
+  id: partIdSchema,
   messageID: sdkPartBaseShape.messageID,
 });
 

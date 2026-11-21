@@ -4728,6 +4728,8 @@
     "connectedTo": "Bağlı hesap: {{account}}",
     "disconnected": "{{provider}} bağlantısı kesildi",
     "disconnectFailed": "{{provider}} bağlantısı kesilemedi",
+    "disconnectRetry": "Slack bağlantı kesme işlemini doğrulayamadı. Tekrar dene.",
+    "disconnectNeedsSupport": "Kilo bu bağlantı için kaydedilen Slack erişimini okuyamadı. Bağlantı kesmeyi tamamlamak için destekle iletişime geç.",
     "couldNotLoad": "Entegrasyonlar yüklenemedi",
     "permissionDenied": "Bu entegrasyonları yönetme izniniz yok.",
     "managedByOwner": "Değiştiremediğiniz bir bağlantıyı değiştirmesi için bir kuruluş sahibine başvurun.",

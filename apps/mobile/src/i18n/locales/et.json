@@ -4728,6 +4728,8 @@
     "connectedTo": "Ühendatud kontoga {{account}}",
     "disconnected": "Ühendus teenusega {{provider}} katkestati",
     "disconnectFailed": "Ühendust teenusega {{provider}} ei õnnestunud katkestada",
+    "disconnectRetry": "Slack ei õnnestunud ühenduse katkestamist kinnitada. Proovi uuesti.",
+    "disconnectNeedsSupport": "Kilo ei saanud selle ühenduse jaoks salvestatud Slacki juurdepääsu lugeda. Ühenduse katkestamise lõpuleviimiseks võta ühendust toega.",
     "couldNotLoad": "Integratsioone ei õnnestunud laadida",
     "permissionDenied": "Sul pole õigust neid integratsioone hallata.",
     "managedByOwner": "Kui sa ei saa ühendust muuta, pöördu selle muutmiseks organisatsiooni omaniku poole.",

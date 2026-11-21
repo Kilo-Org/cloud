@@ -4886,6 +4886,8 @@
     "connectedTo": "Połączono z kontem {{account}}",
     "disconnected": "Odłączono usługę {{provider}}",
     "disconnectFailed": "Nie udało się odłączyć usługi {{provider}}",
+    "disconnectRetry": "Slack nie mógł potwierdzić odłączenia. Spróbuj ponownie.",
+    "disconnectNeedsSupport": "Kilo nie mógł odczytać zapisanego dostępu do Slacka dla tego połączenia. Skontaktuj się z pomocą techniczną, aby dokończyć odłączanie.",
     "couldNotLoad": "Nie udało się wczytać integracji",
     "permissionDenied": "Nie masz uprawnień do zarządzania tymi integracjami.",
     "managedByOwner": "Poproś właściciela organizacji o zmianę połączenia, którego nie możesz zmienić.",

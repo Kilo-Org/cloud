@@ -4965,6 +4965,8 @@
     "connectedTo": "Konness ma' {{account}}",
     "disconnected": "{{provider}} ġie skonnettjat",
     "disconnectFailed": "L-iskonnettjar ta' {{provider}} ma rnexxiex",
+    "disconnectRetry": "Slack ma setgħetx tikkonferma l-iskonnettjar. Erġa' pprova.",
+    "disconnectNeedsSupport": "Kilo ma setgħetx taqra l-aċċess għal Slack li nħażen għal din il-konnessjoni. Ikkuntattja l-appoġġ biex tlesti l-iskonnettjar.",
     "couldNotLoad": "L-integrazzjonijiet ma setgħux jitgħabbew",
     "permissionDenied": "M'għandekx permess timmaniġġja dawn l-integrazzjonijiet.",
     "managedByOwner": "Itlob lil sid tal-organizzazzjoni biex ibiddel konnessjoni li ma tistax tbiddel.",

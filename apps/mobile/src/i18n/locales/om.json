@@ -4728,6 +4728,8 @@
     "connectedTo": "{{account}} waliin walitti hidhameera",
     "disconnected": "{{provider}} addaan cite",
     "disconnectFailed": "{{provider}} addaan kutuun hin danda'amne",
+    "disconnectRetry": "Slack addaan kutamuu mirkaneessuu hin dandeenye. Irra deebi'ii yaali.",
+    "disconnectNeedsSupport": "Kilon walitti hidhamiinsa kanaaf galmeeffame dhaqqabummaa Slack dubbisuu hin dandeenye. Addaan kutuu xumuruuf deeggarsa qunnami.",
     "couldNotLoad": "Walitti hidhamiinsota fe'uun hin danda'amne",
     "permissionDenied": "Walitti hidhamiinsota kana bulchuuf hayyama hin qabdu.",
     "managedByOwner": "Walitti hidhamiinsa ati jijjiiruu hin dandeenye jijjiiruuf abbaa dhaabbataa gaafadhu.",

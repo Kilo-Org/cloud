@@ -4728,6 +4728,8 @@
     "connectedTo": "An haɗa da {{account}}",
     "disconnected": "An cire haɗin {{provider}}",
     "disconnectFailed": "Ba a iya cire haɗin {{provider}} ba",
+    "disconnectRetry": "Slack ya kasa tabbatar da cire haɗin. Sake gwadawa.",
+    "disconnectNeedsSupport": "Kilo ya kasa karanta damar Slack da aka ajiye don wannan haɗin. Tuntuɓi masu tallafi don kammala cire haɗin.",
     "couldNotLoad": "Ba a iya loda haɗe-haɗe ba",
     "permissionDenied": "Ba ka da izinin sarrafa waɗannan haɗe-haɗe.",
     "managedByOwner": "Ka roƙi mamallakin ƙungiya ya canza haɗin da ba za ka iya canza ba.",

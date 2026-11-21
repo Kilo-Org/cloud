@@ -4807,6 +4807,8 @@
     "connectedTo": "מחובר ל-{{account}}",
     "disconnected": "החיבור ל-{{provider}} נותק",
     "disconnectFailed": "לא ניתן לנתק את {{provider}}",
+    "disconnectRetry": "Slack לא הצליח לאשר את הניתוק. נסה שוב.",
+    "disconnectNeedsSupport": "Kilo לא הצליח לקרוא את הגישה ל-Slack השמורה עבור החיבור הזה. צור קשר עם התמיכה כדי להשלים את הניתוק.",
     "couldNotLoad": "לא ניתן לטעון את האינטגרציות",
     "permissionDenied": "אין לך הרשאה לנהל את האינטגרציות האלה.",
     "managedByOwner": "כדי לשנות חיבור שאין באפשרותך לשנות, יש לפנות לבעלים של הארגון.",

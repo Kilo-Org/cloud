@@ -4886,6 +4886,8 @@
     "connectedTo": "Pripojené k účtu {{account}}",
     "disconnected": "Služba {{provider}} bola odpojená",
     "disconnectFailed": "Službu {{provider}} sa nepodarilo odpojiť",
+    "disconnectRetry": "Slack nevedel potvrdiť odpojenie. Skús to znova.",
+    "disconnectNeedsSupport": "Kilo nedokázalo prečítať uložený prístup k Slacku pre toto pripojenie. Kontaktuj podporu, aby sa odpojenie dokončilo.",
     "couldNotLoad": "Integrácie sa nepodarilo načítať",
     "permissionDenied": "Nemáte oprávnenie spravovať tieto integrácie.",
     "managedByOwner": "Požiadajte vlastníka organizácie, aby zmenil pripojenie, ktoré nemôžete zmeniť.",

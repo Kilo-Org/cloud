@@ -4728,6 +4728,8 @@
     "connectedTo": "Verbunden mit {{account}}",
     "disconnected": "{{provider}} getrennt",
     "disconnectFailed": "{{provider}} konnte nicht getrennt werden",
+    "disconnectRetry": "Slack konnte das Trennen nicht bestätigen. Versuche es erneut.",
+    "disconnectNeedsSupport": "Kilo konnte den gespeicherten Slack-Zugang für diese Verbindung nicht lesen. Wende dich an den Support, um das Trennen abzuschließen.",
     "couldNotLoad": "Integrationen konnten nicht geladen werden",
     "permissionDenied": "Du hast keine Berechtigung, diese Integrationen zu verwalten.",
     "managedByOwner": "Bitte einen Inhaber der Organisation, eine Verbindung zu ändern, die du nicht ändern kannst.",

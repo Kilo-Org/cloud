@@ -4728,6 +4728,8 @@
     "connectedTo": "Mifandray amin'i {{account}}",
     "disconnected": "Tapaka ny fifandraisana amin'i {{provider}}",
     "disconnectFailed": "Tsy afaka nanapaka ny fifandraisana amin'i {{provider}}",
+    "disconnectRetry": "Tsy afaka nanamarina ny fanapahana ny fifandraisana ny Slack. Andramo indray.",
+    "disconnectNeedsSupport": "Tsy afaka namaky ny fidirana Slack voatahiry ho an'ity fifandraisana ity ny Kilo. Mifandraisa amin'ny mpanohana hamita ny fanapahana ny fifandraisana.",
     "couldNotLoad": "Tsy afaka nampiditra ireo fampifandraisana",
     "permissionDenied": "Tsy manana alalana hitantana ireo fampifandraisana ireo ianao.",
     "managedByOwner": "Angataho amin'ny tompon'ny fikambanana hanova fifandraisana izay tsy azonao ovaina.",

@@ -5044,6 +5044,8 @@
     "connectedTo": "Wedi cysylltu â {{account}}",
     "disconnected": "Wedi datgysylltu {{provider}}",
     "disconnectFailed": "Methu datgysylltu {{provider}}",
+    "disconnectRetry": "Ni allai Slack gadarnhau'r datgysylltiad. Ceisiwch eto.",
+    "disconnectNeedsSupport": "Ni allai Kilo ddarllen y mynediad Slack a arbedwyd ar gyfer y cysylltiad hwn. Cysylltwch â'r tîm cymorth i orffen datgysylltu.",
     "couldNotLoad": "Methu llwytho'r integreiddiadau",
     "permissionDenied": "Does gennych chi ddim caniatâd i reoli'r integreiddiadau hyn.",
     "managedByOwner": "Gofynnwch i berchennog y sefydliad newid cysylltiad na allwch ei newid.",

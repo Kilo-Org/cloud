@@ -4965,6 +4965,8 @@
     "connectedTo": "Ceangailte le {{account}}",
     "disconnected": "Dícheanglaíodh {{provider}}",
     "disconnectFailed": "Níorbh fhéidir {{provider}} a dhícheangal",
+    "disconnectRetry": "Níorbh fhéidir le Slack an dícheangal a dhearbhú. Bain triail as arís.",
+    "disconnectNeedsSupport": "Níorbh fhéidir le Kilo an rochtain Slack a sábháladh don cheangal seo a léamh. Déan teagmháil leis an bhfoireann tacaíochta chun an dícheangal a chríochnú.",
     "couldNotLoad": "Níorbh fhéidir na comhtháthuithe a lódáil",
     "permissionDenied": "Níl cead agat na comhtháthuithe seo a bhainistiú.",
     "managedByOwner": "Iarr ar úinéir eagraíochta ceangal nach féidir leat a athrú.",

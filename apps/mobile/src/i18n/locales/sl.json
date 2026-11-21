@@ -4886,6 +4886,8 @@
     "connectedTo": "Povezano z računom {{account}}",
     "disconnected": "Povezava s storitvijo {{provider}} je prekinjena",
     "disconnectFailed": "Povezave s storitvijo {{provider}} ni bilo mogoče prekiniti",
+    "disconnectRetry": "Slack ni mogel potrditi prekinitve povezave. Poskusi znova.",
+    "disconnectNeedsSupport": "Kilo ni mogel prebrati shranjene dostopa do Slacka za to povezavo. Za dokončanje prekinitve se obrni na podporo.",
     "couldNotLoad": "Integracij ni bilo mogoče naložiti",
     "permissionDenied": "Nimate dovoljenja za upravljanje teh integracij.",
     "managedByOwner": "Za spremembo povezave, ki je ne morete spremeniti, prosite lastnika organizacije.",

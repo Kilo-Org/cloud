@@ -228,12 +228,12 @@ interface BlockerRecord {
   readonly startedAtIso: string;
   readonly wallClockSeconds: number;
   /**
-   * `survivingProfilePath` is the profile directory of the run. It is still
-   * present when `outcome` is `profile-unverified`; when `outcome` is
-   * `browser-unsettled` the absence check passed, but an unsettled browser can
-   * write it again, so it is the location to re-check.
+   * The profile directory of this run. It is still present when `outcome` is
+   * `profile-unverified`; when `outcome` is `browser-unsettled` the absence check
+   * passed, so it is the location to re-check in case an unsettled browser writes
+   * it again.
    */
-  readonly survivingProfilePath?: string;
+  readonly profilePath?: string;
   readonly outcome?: CleanupOutcome;
 }
 
@@ -296,16 +296,13 @@ export type CleanupOutcome = 'browser-unsettled' | 'profile-unverified';
 
 export class CleanupBlockerError extends BatchBlockerError {
   readonly outcome: CleanupOutcome;
-  readonly survivingProfilePath: string | null;
+  readonly profilePath: string | null;
 
-  constructor(
-    reason: string,
-    input: { outcome: CleanupOutcome; survivingProfilePath: string | null }
-  ) {
+  constructor(reason: string, input: { outcome: CleanupOutcome; profilePath: string | null }) {
     super('cleanup', reason);
     this.name = 'CleanupBlockerError';
     this.outcome = input.outcome;
-    this.survivingProfilePath = input.survivingProfilePath;
+    this.profilePath = input.profilePath;
   }
 }
 
@@ -614,7 +611,7 @@ const makeBlockerRecord = (input: {
   httpStatus: number | null;
   gitHead: string;
   batchStartedAtMs: number;
-  survivingProfilePath?: string;
+  profilePath?: string;
   outcome?: CleanupOutcome;
 }): BlockerRecord => ({
   kind: 'blocker',
@@ -625,9 +622,7 @@ const makeBlockerRecord = (input: {
   gitHead: input.gitHead,
   startedAtIso: new Date(input.batchStartedAtMs).toISOString(),
   wallClockSeconds: Math.round((Date.now() - input.batchStartedAtMs) / 1000),
-  ...(input.survivingProfilePath === undefined
-    ? {}
-    : { survivingProfilePath: input.survivingProfilePath }),
+  ...(input.profilePath === undefined ? {} : { profilePath: input.profilePath }),
   ...(input.outcome === undefined ? {} : { outcome: input.outcome }),
 });
 
@@ -2022,7 +2017,7 @@ export const cleanupAttempt = async (
   if (removalFailure !== null) {
     throw new CleanupBlockerError(`${cleanupOperatorAction}: ${removalFailure}`, {
       outcome: 'profile-unverified',
-      survivingProfilePath: userDataDir,
+      profilePath: userDataDir,
     });
   }
   if (settlementFailure !== null) {
@@ -2030,7 +2025,7 @@ export const cleanupAttempt = async (
     // close failed during setup), so the token session it held is still live.
     throw new CleanupBlockerError(`${cleanupOperatorAction}: ${settlementFailure}`, {
       outcome: 'browser-unsettled',
-      survivingProfilePath: userDataDir,
+      profilePath: userDataDir,
     });
   }
 };
@@ -2465,7 +2460,7 @@ const runAttempt = async (input: {
       // An unexpected cleanup failure proves nothing about the directory.
       throw new CleanupBlockerError(`${cleanupOperatorAction}: ${errorToReason(error)}`, {
         outcome: 'profile-unverified',
-        survivingProfilePath: userDataDir,
+        profilePath: userDataDir,
       });
     }
   }
@@ -2736,7 +2731,7 @@ const main = async (): Promise<number> => {
   } catch (error) {
     if (error instanceof BatchBlockerError) {
       const cleanupError = error instanceof CleanupBlockerError ? error : null;
-      const survivingProfilePath = cleanupError?.survivingProfilePath ?? null;
+      const profilePath = cleanupError?.profilePath ?? null;
       const blocker = makeBlockerRecord({
         stage: error.stage,
         reason: error.message,
@@ -2744,22 +2739,21 @@ const main = async (): Promise<number> => {
         httpStatus: error.httpStatus,
         gitHead,
         batchStartedAtMs,
-        ...(survivingProfilePath === null ? {} : { survivingProfilePath }),
+        ...(profilePath === null ? {} : { profilePath }),
         ...(cleanupError === null ? {} : { outcome: cleanupError.outcome }),
       });
       await writeBlockerArtifact(outDir, blocker);
       // blocker.json caps the reason; stderr keeps the full path actionable and
       // names which half of cleanup failed, so the operator never chases a
       // directory that was already verified absent.
-      if (error instanceof CleanupBlockerError && error.survivingProfilePath !== null) {
-        const profilePath = error.survivingProfilePath;
+      if (error instanceof CleanupBlockerError && error.profilePath !== null) {
         if (error.outcome === 'profile-unverified') {
           console.error(
-            `cleanup could not verify the throwaway profile was removed: ${profilePath}; ${cleanupOperatorAction}`
+            `cleanup could not verify the throwaway profile was removed: ${error.profilePath}; ${cleanupOperatorAction}`
           );
         } else {
           console.error(
-            `cleanup did not confirm the browser stopped: ${profilePath} was verified absent, but the run's session may still be live; ${cleanupOperatorAction}`
+            `cleanup did not confirm the browser stopped: ${error.profilePath} was verified absent, but the run's session may still be live; ${cleanupOperatorAction}`
           );
         }
       }

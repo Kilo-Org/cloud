@@ -474,7 +474,9 @@ async function requestPlatformBenchmarks(params: {
   owner: CustomRouterOwner;
   plan: BenchmarkAdmissionPlan;
 }): Promise<void> {
-  const models = params.plan.models.map(model => ({ model }));
+  const measurements = await platformMeasurements(params.plan.baseRouter);
+  const measured = new Set(measurements.models.map(entry => entry.model));
+  const models = params.plan.models.filter(model => measured.has(model)).map(model => ({ model }));
   if (models.length === 0) return;
   const signal = AbortSignal.timeout(BENCHMARK_ADMISSION_TIMEOUT_MS);
   for (let start = 0; start < models.length; start += BENCHMARK_REGISTER_BATCH_SIZE) {

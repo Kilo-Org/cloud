@@ -209,10 +209,10 @@ describe('/api/auto-routing/custom-routers', () => {
     signIn(user);
     mockedRequireActiveSubscription.mockResolvedValue({ isReadOnly: false, daysRemaining: 30 });
     mockedRegister.mockResolvedValue({ ok: true });
-    mockedGetPlatformMeasurements.mockResolvedValue({
+    mockedGetPlatformMeasurements.mockImplementation(async baseRouter => ({
       status: 200,
-      body: { baseRouter: 'efficient', models: [{ model: SONNET, variants: [null] }] },
-    });
+      body: { baseRouter, models: [SONNET, FLASH].map(model => ({ model, variants: [null] })) },
+    }));
     mockedGetEnhanced.mockResolvedValue({ data: [model(SONNET), model(FLASH), model(DENIED)] });
     mockedGetByokUser.mockResolvedValue([model(BYOK)] as never);
     mockedGetByokOrg.mockResolvedValue([]);
@@ -535,8 +535,8 @@ describe('/api/auto-routing/custom-routers', () => {
       expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(1);
     });
 
-    test('admits only platform-servable gateway entries for platform benchmarks', async () => {
-      const entries = [gateway(SONNET), gateway(BYOK), clientEntry('qwen3:8b')];
+    test('admits only measured, platform-servable gateway entries for platform benchmarks', async () => {
+      const entries = [gateway(SONNET), gateway(DENIED), gateway(BYOK), clientEntry('qwen3:8b')];
 
       const created = await create(
         routerBody({
@@ -547,6 +547,7 @@ describe('/api/auto-routing/custom-routers', () => {
       );
 
       expect(created.status).toBe(201);
+      expect(mockedGetPlatformMeasurements).toHaveBeenCalledWith('frontier');
       expect(mockedRegister).toHaveBeenCalledTimes(1);
       expect(mockedRegister).toHaveBeenCalledWith(
         {
@@ -561,6 +562,13 @@ describe('/api/auto-routing/custom-routers', () => {
 
     test('uses one deadline across benchmark registration batches', async () => {
       const entries = Array.from({ length: 11 }, (_, index) => gateway(`vendor/model-${index}`));
+      mockedGetPlatformMeasurements.mockResolvedValue({
+        status: 200,
+        body: {
+          baseRouter: 'efficient',
+          models: entries.map(({ model }) => ({ model, variants: [null] })),
+        },
+      });
       mockedGetEnhanced.mockResolvedValue({
         data: entries.map(entry => model(entry.model)),
       });

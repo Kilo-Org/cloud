@@ -133,6 +133,8 @@ The benchmark worker stays the only writer of measurements and routing tables.
 | Linked gateway or client entry | No new eval; live platform measurement | No new inference | Referenced global measurement, repriced for the entry |
 | Any other entry, including Kilo-stored direct-BYOK IDs | Owner's CLI | Owner | Owner-scoped client profiles |
 
+- Custom pool saves request platform benchmarks only for models with a ready measurement for
+  the selected base router. Saving an unmeasured model does not start its first eval.
 - Platform-paid admission is limited to 20 new models per base router per owner per rolling 24
   hours. Ready and pending models do not count. A save over the limit gets `quota_exceeded`
   (HTTP 429) with `retryAt`, and every other validation runs before admission.

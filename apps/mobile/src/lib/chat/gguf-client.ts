@@ -24,20 +24,46 @@ export type GgufRuntime = {
 };
 
 /**
- * Loads a projector into an open context. True only when llama.cpp reports
- * that the model now reads images; the projector's own release runs with the
+ * What loading a projector said about the model. `refused` is llama.cpp failing
+ * to load the projector at all, which says nothing about the bytes: the device
+ * can be short of memory or its GPU stack can fail, so the read runs again.
+ * `noVision` is a projector that loaded and reported no image support, which is
+ * a property of these bytes and cannot change between reads.
+ */
+export type ProjectorLoad = 'vision' | 'noVision' | 'refused';
+
+/**
+ * Loads a projector into an open context, and reports which of the two
+ * verdicts llama.cpp gave; the projector's own release runs with the
  * context's.
  */
 export async function loadProjector(
   context: Pick<GgufContext, 'initMultimodal' | 'getMultimodalSupport'>,
   projector: string,
   gpu: boolean
-): Promise<boolean> {
+): Promise<ProjectorLoad> {
   if (!(await context.initMultimodal({ path: projector, use_gpu: gpu }))) {
-    return false;
+    return 'refused';
   }
   const support = await context.getMultimodalSupport();
-  return support.vision;
+  return support.vision ? 'vision' : 'noVision';
+}
+
+/**
+ * Whether a model's projector reads images, as verification needs it. A refused
+ * load throws, so the caller treats it as a refused read rather than the
+ * deterministic verdict that removes the model.
+ */
+export async function projectorReadsImages(
+  context: Pick<GgufContext, 'initMultimodal' | 'getMultimodalSupport'>,
+  projector: string,
+  gpu: boolean
+): Promise<boolean> {
+  const load = await loadProjector(context, projector, gpu);
+  if (load === 'refused') {
+    throw new Error('projector');
+  }
+  return load === 'vision';
 }
 
 /** Fixed copy only: llama.cpp errors are never shown or logged. */
@@ -123,8 +149,10 @@ export function ggufModelClient({
     if (file.projector === undefined) {
       return context;
     }
+    // Both a refused load and a projector that reads no images mean this context
+    // cannot do what the record promised, so it is freed and the answer fails.
     const vision = await settled(loadProjector(context, file.projector, runtime.gpu));
-    if (!vision.ok || !vision.value) {
+    if (!vision.ok || vision.value !== 'vision') {
       await settled(context.release());
       throw new Error('projector');
     }

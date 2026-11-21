@@ -1,4 +1,4 @@
-import { createElement } from 'react';
+import { createElement, type ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
@@ -28,17 +28,10 @@ function entry(overrides: Partial<CreditPurchaseEntry> = {}): CreditPurchaseEntr
   };
 }
 
-async function renderRow(purchase: CreditPurchaseEntry) {
+async function render(element: ReactElement) {
   const holder: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
-    holder.current = TestRenderer.create(
-      createElement(PurchaseHistoryRow, {
-        entry: purchase,
-        isOpeningReceipt: false,
-        last: false,
-        onOpenReceipt: () => undefined,
-      })
-    );
+    holder.current = TestRenderer.create(element);
     await Promise.resolve();
   });
   const renderer = holder.current;
@@ -48,19 +41,19 @@ async function renderRow(purchase: CreditPurchaseEntry) {
   return renderer;
 }
 
-async function renderGrantRow(grantRow: CreditGrant) {
-  const holder: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
-  await act(async () => {
-    holder.current = TestRenderer.create(
-      createElement(GrantHistoryRow, { grant: grantRow, last: false })
-    );
-    await Promise.resolve();
-  });
-  const renderer = holder.current;
-  if (!renderer) {
-    throw new Error('Failed to create test renderer');
-  }
-  return renderer;
+function renderRow(purchase: CreditPurchaseEntry) {
+  return render(
+    createElement(PurchaseHistoryRow, {
+      entry: purchase,
+      isOpeningReceipt: false,
+      last: false,
+      onOpenReceipt: () => undefined,
+    })
+  );
+}
+
+function renderGrantRow(grantRow: CreditGrant) {
+  return render(createElement(GrantHistoryRow, { grant: grantRow, last: false }));
 }
 
 function grant(overrides: Partial<CreditGrant> = {}): CreditGrant {
@@ -69,6 +62,7 @@ function grant(overrides: Partial<CreditGrant> = {}): CreditGrant {
     date: '2026-11-12T10:00:00.000Z',
     amount_mUsd: 12_500_000,
     kind: 'referral',
+    expiryDate: null,
     ...overrides,
   };
 }
@@ -303,6 +297,25 @@ describe('GrantHistoryRow', () => {
     // prefer: this row has nothing else to print.
     expect(date).toBe('11/12/2026');
     renderer.unmount();
+  });
+
+  it('prints when a grant runs out beside its date, and only the date with no term', async () => {
+    const expiring = await renderGrantRow(grant({ expiryDate: '2027-11-12T00:00:00.000Z' }));
+    const painted = texts(expiring).map(text => readable(text));
+    // The expiry follows the date, the order the purchase row paints the pair.
+    expect(painted.slice(-2)).toEqual([
+      '11/12/2026',
+      expect.stringMatching(/^Expires .+ \(UTC\)$/),
+    ]);
+    expiring.unmount();
+
+    const openEnded = await renderGrantRow(grant({ expiryDate: null }));
+    expect(
+      texts(openEnded)
+        .map(text => readable(text))
+        .at(-1)
+    ).toBe('11/12/2026');
+    openEnded.unmount();
   });
 
   it('keeps the amount in its own left-to-right run in Arabic', async () => {

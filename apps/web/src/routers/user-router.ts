@@ -249,6 +249,12 @@ const CreditGrantSchema = z.object({
   date: z.string(),
   amount_mUsd: z.number().positive(),
   kind: CreditGrantReasonSchema,
+  /**
+   * When the grant runs out, null for a category that never expires. A client
+   * prints it as the caption the purchase list already uses, so a reader can
+   * tell a grant that closes on a date from one that stays.
+   */
+  expiryDate: z.iso.datetime().nullable(),
 });
 
 const GetCreditBlocksOutputSchema = z.object({
@@ -996,6 +1002,7 @@ export const userRouter = createTRPCRouter({
           date: credit_transactions.created_at,
           amount_mUsd: credit_transactions.amount_microdollars,
           creditCategory: credit_transactions.credit_category,
+          expiryDate: credit_transactions.expiry_date,
         })
         .from(credit_transactions)
         .where(
@@ -1017,6 +1024,7 @@ export const userRouter = createTRPCRouter({
         date: new Date(row.date).toISOString(),
         amount_mUsd: row.amount_mUsd,
         kind: creditGrantReasonOf(row.creditCategory),
+        expiryDate: row.expiryDate ? new Date(row.expiryDate).toISOString() : null,
       }));
       return { grants, hasMore };
     }),

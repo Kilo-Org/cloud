@@ -39,6 +39,7 @@ function creditGrant(overrides: Partial<CreditGrant>): CreditGrant {
     date: '2026-02-03T00:00:00.000Z',
     amount_mUsd: 5_000_000,
     kind: 'welcome',
+    expiryDate: null,
     ...overrides,
   };
 }

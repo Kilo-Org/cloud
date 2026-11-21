@@ -188,6 +188,7 @@ function LedgerLine({
   typeLabel,
   amountMicrodollars,
   date,
+  expiryDate,
   muted,
 }: Readonly<{
   title: string;
@@ -195,8 +196,24 @@ function LedgerLine({
   typeLabel?: string;
   amountMicrodollars: number;
   date: string | null;
+  /**
+   * When the credit this line records runs out. The caption follows the date,
+   * the order the purchase row paints its own two lines.
+   */
+  expiryDate?: string | null;
   muted?: boolean;
 }>) {
+  const { t } = useTranslation();
+  // The same sentence, zone, and isolation the purchase row prints: both rows
+  // count down to an instant the account records in UTC.
+  const expiryLabel = expiryDate
+    ? keepZoneWithDate(
+        t('organization.creditActivity.expiresUtc', {
+          date: formatDate(parseTimestamp(expiryDate), i18n.language, { timeZone: 'UTC' }),
+        })
+      )
+    : null;
+
   return (
     <View className={muted ? 'gap-1 pl-4' : 'gap-1'}>
       <View className="flex-row items-center justify-between gap-3">
@@ -212,6 +229,7 @@ function LedgerLine({
           <Text variant="caption">{formatDate(parseTimestamp(date), i18n.language)}</Text>
         )}
         {typeLabel != null && <Text variant="caption">{typeLabel}</Text>}
+        {expiryLabel != null && <Text variant="caption">{expiryLabel}</Text>}
       </View>
     </View>
   );
@@ -262,7 +280,9 @@ export const LedgerHistoryRow = memo(function LedgerHistoryRow({
 /**
  * One positive grant the person did not buy: a welcome grant, a referral bonus,
  * a Kilo Pass month, an admin grant, or an accounting adjustment. The title
- * already names the kind, so the row carries no type caption.
+ * already names the kind, so the row carries no type caption. A category with a
+ * term prints when it runs out beside the date; a grant that never expires
+ * prints the date alone.
  */
 export const GrantHistoryRow = memo(function GrantHistoryRow({
   grant,
@@ -277,7 +297,12 @@ export const GrantHistoryRow = memo(function GrantHistoryRow({
 
   return (
     <View className={cn('gap-2 px-4 py-3', !last && 'border-b-[0.5px] border-hair-soft')}>
-      <LedgerLine title={title} amountMicrodollars={grant.amount_mUsd} date={grant.date} />
+      <LedgerLine
+        title={title}
+        amountMicrodollars={grant.amount_mUsd}
+        date={grant.date}
+        expiryDate={grant.expiryDate}
+      />
     </View>
   );
 });

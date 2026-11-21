@@ -28,8 +28,8 @@ export const usage = '<email>';
  * - provider keys: an Anthropic key and an OpenAI key, both wrapped by the
  *   local `byok-kms` service with a placeholder secret upstream rejects.
  * - credit history: two paid purchases, an expiring grant with its expiry row,
- *   two unspent free grants, and one usage deduction, so the purchase list and
- *   the ledger both have rows.
+ *   a welcome grant that still expires and an open-ended referral grant, and
+ *   one usage deduction, so the purchase list and the ledger both have rows.
  *
  * Two screens need no seed for their empty state, and two cannot be seeded: a
  * fresh account already shows the empty blocked-people list and the empty
@@ -43,11 +43,13 @@ export const usage = '<email>';
  * negative rows (`buildCreditHistoryItems` merges the three sources). An expired
  * grant appears through the expiry row that closes it: that grant is seeded with
  * a past expiry date and an expiry row that names it, which is the shape
- * `computeExpiration` writes. The two unspent grants carry no expiry date, so no
- * expiry row closes them and they are rows of their own. The ledger-cache
- * reconciliation row is seeded too, with the shape `recompute-balances` writes,
- * so the list shows the one positive free row the history labels as an
- * adjustment instead of a grant.
+ * `computeExpiration` writes. The welcome grant carries a live expiry date, as
+ * the category's own 30-day term writes it, so its row prints when it runs out;
+ * the referral grant has no term, so its row prints the date alone. Neither
+ * unspent grant has an expiry row closing it, so both are rows of their own. The
+ * ledger-cache reconciliation row is seeded too, with the shape
+ * `recompute-balances` writes, so the list shows the one positive free row the
+ * history labels as an adjustment instead of a grant.
  *
  * The passkey rows carry generated credential ids and a placeholder COSE key:
  * they render in the list, and the device cannot sign in with them, because
@@ -427,7 +429,12 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       description: 'Welcome credits',
       credit_category: 'automatic-welcome-credits',
       credit_source: 'promotion',
-      created_at: iso(-120 * DAY_MS),
+      // The category's own term (`WELCOME_CREDIT_EXPIRY_HRS`, 30 days, in
+      // `promoCreditCategoriesOld.ts`) runs from when the grant was written, so
+      // this unspent grant still prints the date it runs out. The referral
+      // grant below has no term and stays without one.
+      created_at: iso(-5 * DAY_MS),
+      expiry_date: iso(25 * DAY_MS),
     },
     {
       id: creditIds[6],
@@ -452,7 +459,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
   console.log('This fixture represents:');
   console.log('  Passkeys, blocked and muted people, recorded notifications, two provider keys');
-  console.log('  and a credit ledger with purchases, an expired grant and a deduction.');
+  console.log('  and a credit ledger with purchases, an expired grant, an unspent grant');
+  console.log('  that still expires, and a deduction.');
   console.log('  The passkey rows list but cannot sign in: no device holds their private key.');
   console.log('The empty states of the blocked-people and passkey lists need no seed: a fresh');
   console.log('account already shows them. Data export needs the cloud-data-export-ui release');

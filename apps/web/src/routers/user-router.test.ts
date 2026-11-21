@@ -781,9 +781,13 @@ describe('user router - credit grant history', () => {
     grantOrganizationId = organization.id;
 
     await db.insert(credit_transactions).values([
+      // The welcome category carries a 30-day term
+      // (`WELCOME_CREDIT_EXPIRY_HRS`), so its row holds a real expiry date; the
+      // referral category never expires and holds none.
       grantRow(welcomeGrantId, viewer.id, Date.UTC(2026, 6, 1, 10), {
         amount_microdollars: 15_000_000,
         credit_category: 'automatic-welcome-credits',
+        expiry_date: '2026-07-31T10:00:00.000Z',
       }),
       grantRow(referralGrantId, viewer.id, Date.UTC(2026, 6, 2, 10), {
         amount_microdollars: 2_000_000,
@@ -845,15 +849,31 @@ describe('user router - credit grant history', () => {
         date: '2026-07-02T10:00:00.000Z',
         amount_mUsd: 2_000_000,
         kind: 'referral',
+        expiryDate: null,
       },
       {
         id: welcomeGrantId,
         date: '2026-07-01T10:00:00.000Z',
         amount_mUsd: 15_000_000,
         kind: 'welcome',
+        expiryDate: '2026-07-31T10:00:00.000Z',
       },
     ]);
     expect(result.hasMore).toBe(false);
+  });
+
+  it('returns a grant expiry as the ISO instant the column stores, and null for none', async () => {
+    const caller = await createCallerForUser(viewer.id);
+
+    const result = await caller.user.getCreditGrantHistory({});
+
+    const welcome = result.grants.find(grant => grant.id === welcomeGrantId);
+    const referral = result.grants.find(grant => grant.id === referralGrantId);
+    // The column is a timestamp the driver hands back as a string, so the row
+    // has to carry one instant both clients can parse; a category without a
+    // term must say null instead of an empty string.
+    expect(welcome?.expiryDate).toBe('2026-07-31T10:00:00.000Z');
+    expect(referral?.expiryDate).toBeNull();
   });
 
   it('excludes an organization-scoped row that is otherwise identical', async () => {

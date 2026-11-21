@@ -96,6 +96,7 @@ describe('creditGrantHistoryQueryFn', () => {
           date: '2026-11-01T00:00:00.000Z',
           amount_mUsd: 5_000_000,
           kind: 'welcome',
+          expiryDate: '2026-12-01T00:00:00.000Z',
         },
       ],
       hasMore: false,

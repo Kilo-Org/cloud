@@ -48,10 +48,12 @@ import { CLI_SNAPSHOT_BUFFER_MAX_EVENTS, CLI_SNAPSHOT_REPLAY_DEADLINE_MS } from 
 type CliLiveTransportConfig = {
   kiloSessionId: KiloSessionId;
   userWebConnection: UserWebConnection;
-  fetchSnapshot?: (
-    kiloSessionId: KiloSessionId,
-    options?: { signal?: AbortSignal }
-  ) => Promise<SessionSnapshot>;
+  fetchSnapshot?:
+    | ((
+        kiloSessionId: KiloSessionId,
+        options?: { signal?: AbortSignal }
+      ) => Promise<SessionSnapshot>)
+    | undefined;
   /**
    * Page-aware root snapshot fetch. When provided, every `replayCurrentSnapshot`
    * (initial bounded read AND reconnect immediate + delayed resync) uses it
@@ -65,10 +67,12 @@ type CliLiveTransportConfig = {
    *
    * `null` represents an access-not-found outcome (worker returns 404).
    */
-  fetchSnapshotPage?: (
-    kiloSessionId: KiloSessionId,
-    options: { cursor?: string; signal?: AbortSignal }
-  ) => Promise<SessionSnapshotPageOutcome | null>;
+  fetchSnapshotPage?:
+    | ((
+        kiloSessionId: KiloSessionId,
+        options: { cursor?: string; signal?: AbortSignal }
+      ) => Promise<SessionSnapshotPageOutcome | null>)
+    | undefined;
   /**
    * Called once per attach with the first successful page that applies — the
    * connect() read, a reconnect catch-up that supersedes it, or the delayed

@@ -1,6 +1,6 @@
 import { unstable_readConfig } from 'wrangler';
 import { fileURLToPath } from 'node:url';
-import { expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { usageRetryDelaySeconds } from './retry-policy';
 
 it.each([
@@ -132,3 +132,47 @@ it.each([undefined, null, '1', 0, -1, 1.5, NaN, Infinity, Number.MAX_VALUE])(
     }
   }
 );
+
+describe('class-only non-LLM admission retries', () => {
+  it.each([
+    [1, 15, 30],
+    [2, 15, 30],
+    [3, 15, 30],
+    [4, 15, 30],
+    [5, 16, 32],
+    [6, 32, 64],
+    [9, 256, 512],
+    [10, 300, 600],
+    [20, 300, 600],
+    [21, 300, 600],
+  ])(
+    'uses a 15-second floor with bounded integer jitter at native attempt %s',
+    (attempt, min, max) => {
+      expect(usageRetryDelaySeconds(attempt, true, () => 0, true)).toBe(min);
+      expect(usageRetryDelaySeconds(attempt, true, () => 1 - Number.EPSILON, true)).toBe(max);
+    }
+  );
+
+  it.each([undefined, null, '20', 0, -1, 1.5, NaN, Infinity, Number.MAX_VALUE])(
+    'normalizes invalid metadata %s to the first-attempt class-only window',
+    attempts => {
+      expect(usageRetryDelaySeconds(attempts, true, () => 0, true)).toBe(15);
+      expect(usageRetryDelaySeconds(attempts, true, () => 1 - Number.EPSILON, true)).toBe(30);
+    }
+  );
+
+  it('keeps conservative scheduling when the class-only flag arrives without admission', () => {
+    for (const attempt of [1, 2, 3, 4, 5, 6]) {
+      expect(usageRetryDelaySeconds(attempt, false, () => 0, true)).toBe(60);
+      expect(usageRetryDelaySeconds(attempt, false, () => 1 - Number.EPSILON, true)).toBe(120);
+    }
+  });
+
+  it('consumes exactly one RNG draw per class-only helper call', () => {
+    for (const attempt of [1, 2, 3, 4, 5, 9, 10, 21]) {
+      const random = vi.fn(() => 0.5);
+      usageRetryDelaySeconds(attempt, true, random, true);
+      expect(random).toHaveBeenCalledTimes(1);
+    }
+  });
+});

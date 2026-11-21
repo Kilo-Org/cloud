@@ -90,6 +90,9 @@ vi.mock('@/lib/hooks/use-security-agent-mutations', () => ({
   useSetSecurityAgentEnabled: () => ({ mutate: vi.fn(), isPending: false }),
   useTrackSecurityAgentInteraction: () => ({ mutate: vi.fn() }),
 }));
+// The capability read reaches the hook that owns the shared memberships
+// options, and that hook reads the auth token; only the token matters here.
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
 vi.mock('@/components/security-agent/audit-report-button', () => ({
   AuditReportButton: 'AuditReportButton',
 }));
@@ -293,7 +296,16 @@ describe('OfflineBanner mounted with confirmed connectivity', () => {
       const screen = await mountTree(<SettingsOverviewScreen scope={scope} />);
       const activeQueries = harness.queryClient.getQueryCache().findAll({ type: 'active' });
       expect(activeQueries).toHaveLength(scope === 'personal' ? 2 : 3);
-      expect(activeQueries.every(query => query.state.fetchStatus === 'paused')).toBe(true);
+      // On an organization scope the capability read comes through the hook
+      // that owns the shared memberships options, which settle instead of
+      // pausing: it runs, while the other reads stay paused.
+      const settled = activeQueries.filter(query => query.state.fetchStatus === 'fetching');
+      expect(settled).toHaveLength(scope === 'personal' ? 0 : 1);
+      expect(
+        activeQueries
+          .filter(query => !settled.includes(query))
+          .every(query => query.state.fetchStatus === 'paused')
+      ).toBe(true);
       expect(activeQueries.every(query => query.state.data === undefined)).toBe(true);
       // The loading body is the skeleton, not the controls: how many blocks it
       // draws is its own shape, so only their presence matters here.

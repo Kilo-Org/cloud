@@ -1,9 +1,8 @@
-import { type Href } from 'expo-router';
-
 import { type NotificationCategoryKey } from '@/lib/hooks/agent-push-preference';
 import {
   defineSetting,
   type SettingDefinition,
+  type SettingsPath,
   type SettingsSearchSource,
 } from '@/lib/settings-search/definitions';
 
@@ -29,10 +28,10 @@ import {
  */
 
 /** The Notifications screen, shared by every definition below. */
-const NOTIFICATIONS_PATH = '/(app)/notifications' as Extract<Href, string>;
+const NOTIFICATIONS_PATH = '/(app)/notifications' satisfies SettingsPath;
 
 /** The personal Spend Alerts screen in the Profile tab. */
-const SPEND_ALERTS_PATH = '/(app)/(tabs)/(3_profile)/spend-alerts' as Extract<Href, string>;
+const SPEND_ALERTS_PATH = '/(app)/(tabs)/(3_profile)/spend-alerts' satisfies SettingsPath;
 
 /** The screen's own name as the first breadcrumb of each source below it. */
 const NOTIFICATIONS_CONTEXT = 'common.notifications';
@@ -117,54 +116,51 @@ export const SPEND_ALERT_MASTER_SETTING = defineSetting(
   'notifications'
 );
 
-/** The threshold rule's enable switch, in its card header. */
-export const SPEND_ALERT_THRESHOLD_SETTING = defineSetting(
-  'spendAlerts.threshold.enabled',
-  'spendAlerts.thresholdTitle',
-  'notifications'
-);
+/**
+ * One definition per control of the threshold rule, in card order: its header
+ * switch, its editable limit, its window choice list and its two channel rows.
+ * The card renders and the index lists this same object, so a control added
+ * here needs no second registration anywhere.
+ */
+export const SPEND_ALERT_THRESHOLD_SETTINGS = {
+  /** The rule's enable switch, in its card header. */
+  enabled: defineSetting(
+    'spendAlerts.threshold.enabled',
+    'spendAlerts.thresholdTitle',
+    'notifications'
+  ),
+  /** The rule's editable limit field. */
+  limit: defineSetting('spendAlerts.threshold.limit', 'spendAlerts.limitLabel', 'notifications'),
+  /** The rule's rolling-window choice list. */
+  window: defineSetting('spendAlerts.threshold.window', 'spendAlerts.windowLabel', 'notifications'),
+  /** The rule's email channel row. */
+  email: defineSetting('spendAlerts.threshold.email', 'common.email', 'notifications'),
+  /** The rule's push channel row. */
+  push: defineSetting('spendAlerts.threshold.push', 'notifications.push', 'notifications'),
+} satisfies Record<string, SettingDefinition>;
 
-/** The threshold rule's rolling-window choice list. */
-export const SPEND_ALERT_WINDOW_SETTING = defineSetting(
-  'spendAlerts.threshold.window',
-  'spendAlerts.windowLabel',
-  'notifications'
-);
-
-/** The threshold rule's email channel row. */
-export const SPEND_ALERT_THRESHOLD_EMAIL_SETTING = defineSetting(
-  'spendAlerts.threshold.email',
-  'common.email',
-  'notifications'
-);
-
-/** The threshold rule's push channel row. */
-export const SPEND_ALERT_THRESHOLD_PUSH_SETTING = defineSetting(
-  'spendAlerts.threshold.push',
-  'notifications.push',
-  'notifications'
-);
-
-/** The hourly-spike rule's enable switch, in its card header. */
-export const SPEND_ALERT_ANOMALY_SETTING = defineSetting(
-  'spendAlerts.anomaly.enabled',
-  'spendAlerts.anomalyTitle',
-  'notifications'
-);
-
-/** The hourly-spike rule's email channel row. */
-export const SPEND_ALERT_ANOMALY_EMAIL_SETTING = defineSetting(
-  'spendAlerts.anomaly.email',
-  'common.email',
-  'notifications'
-);
-
-/** The hourly-spike rule's push channel row. */
-export const SPEND_ALERT_ANOMALY_PUSH_SETTING = defineSetting(
-  'spendAlerts.anomaly.push',
-  'notifications.push',
-  'notifications'
-);
+/**
+ * One definition per control of the hourly-spike rule, in card order. Same
+ * contract as the threshold rule's object above.
+ */
+export const SPEND_ALERT_ANOMALY_SETTINGS = {
+  /** The rule's enable switch, in its card header. */
+  enabled: defineSetting(
+    'spendAlerts.anomaly.enabled',
+    'spendAlerts.anomalyTitle',
+    'notifications'
+  ),
+  /** The rule's editable multiplier field. */
+  multiplier: defineSetting(
+    'spendAlerts.anomaly.multiplier',
+    'spendAlerts.multiplierLabel',
+    'notifications'
+  ),
+  /** The rule's email channel row. */
+  email: defineSetting('spendAlerts.anomaly.email', 'common.email', 'notifications'),
+  /** The rule's push channel row. */
+  push: defineSetting('spendAlerts.anomaly.push', 'notifications.push', 'notifications'),
+} satisfies Record<string, SettingDefinition>;
 
 /**
  * The index sources, in screen order. A source is one section of one screen:
@@ -186,15 +182,9 @@ export const NOTIFICATION_SETTINGS_SOURCES: readonly SettingsSearchSource[] = [
   {
     context: [NOTIFICATIONS_CONTEXT, 'notifications.categories'],
     path: NOTIFICATIONS_PATH,
-    settings: [
-      NOTIFICATION_CATEGORY_SETTINGS.agentAttention,
-      NOTIFICATION_CATEGORY_SETTINGS.agentUpdates,
-      NOTIFICATION_CATEGORY_SETTINGS.sessionStatus,
-      NOTIFICATION_CATEGORY_SETTINGS.balanceAlerts,
-      NOTIFICATION_CATEGORY_SETTINGS.spendAlerts,
-      NOTIFICATION_CATEGORY_SETTINGS.securityFindings,
-      NOTIFICATION_AGENT_BRIEF_SETTING,
-    ],
+    // One source of truth for the category order: the object lists the rows in
+    // screen order, and the agent brief follows the category group.
+    settings: [...Object.values(NOTIFICATION_CATEGORY_SETTINGS), NOTIFICATION_AGENT_BRIEF_SETTING],
   },
   {
     context: [NOTIFICATIONS_CONTEXT, 'notifications.messagePreviews'],
@@ -209,20 +199,11 @@ export const NOTIFICATION_SETTINGS_SOURCES: readonly SettingsSearchSource[] = [
   {
     context: ['notifications.channel.spend', 'spendAlerts.thresholdTitle'],
     path: SPEND_ALERTS_PATH,
-    settings: [
-      SPEND_ALERT_THRESHOLD_SETTING,
-      SPEND_ALERT_WINDOW_SETTING,
-      SPEND_ALERT_THRESHOLD_EMAIL_SETTING,
-      SPEND_ALERT_THRESHOLD_PUSH_SETTING,
-    ],
+    settings: Object.values(SPEND_ALERT_THRESHOLD_SETTINGS),
   },
   {
     context: ['notifications.channel.spend', 'spendAlerts.anomalyTitle'],
     path: SPEND_ALERTS_PATH,
-    settings: [
-      SPEND_ALERT_ANOMALY_SETTING,
-      SPEND_ALERT_ANOMALY_EMAIL_SETTING,
-      SPEND_ALERT_ANOMALY_PUSH_SETTING,
-    ],
+    settings: Object.values(SPEND_ALERT_ANOMALY_SETTINGS),
   },
 ];

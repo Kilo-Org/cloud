@@ -277,13 +277,16 @@ describe('findingsEmptyCopyKey', () => {
     );
   });
 
-  it('names no results for a failed review without repeating the failure', () => {
+  it('says the results are unavailable without repeating the failure', () => {
     expect(findingsEmptyCopyKey('failed')).toBe('codeReviewer.reviewDetail.findingsUnavailable');
     const line = i18n.t('codeReviewer.reviewDetail.findingsUnavailable');
     // The badge and the reason card state the failure, so this line only says
-    // that the review produced no results.
+    // that the section has nothing to show and its results are unavailable.
     expect(line).not.toBe(i18n.t('codeReviewer.reviewDetail.reviewFailed'));
     expect(line).not.toMatch(/fail/i);
+    // "No findings" is the result of a review that finished clean, so a failed
+    // review may never read as one.
+    expect(line).not.toBe(i18n.t('codeReviewer.reviewDetail.noFindings'));
   });
 
   it('reports an ended review with no findings as a result', () => {

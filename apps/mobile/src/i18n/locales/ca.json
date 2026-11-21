@@ -1301,7 +1301,7 @@
       "couldNotGetLatest": "No s'han pogut obtenir les dades més recents.",
       "byline": "#{{number}} · Autor: {{author}}",
       "noFindings": "No hi ha incidències.",
-      "findingsUnavailable": "No hi ha resultats",
+      "findingsUnavailable": "Els resultats no estan disponibles.",
       "findingsInProgress": "Aquesta revisió encara està en curs. Les incidències apareixeran aquí quan finalitzi.",
       "findingsEndedWithoutResults": "Aquesta revisió ha finalitzat abans de produir cap incidència.",
       "serviceUnavailable": "No s'ha pogut connectar amb el servei de revisió de codi. Torna a provar la revisió quan el servei estigui disponible.",

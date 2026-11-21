@@ -771,7 +771,7 @@
       "gateHidden": "非表示",
       "gateNone": "なし",
       "noFindings": "指摘はありません。",
-      "findingsUnavailable": "結果はありません",
+      "findingsUnavailable": "結果を表示できません。",
       "findingsInProgress": "このレビューはまだ進行中です。完了すると、ここに指摘が表示されます。",
       "findingsEndedWithoutResults": "このレビューは、指摘が生成される前に終了しました。",
       "serviceUnavailable": "コードレビューサービスに接続できませんでした。サービスが利用可能になったら、レビューを再試行してください。",

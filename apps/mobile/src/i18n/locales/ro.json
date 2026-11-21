@@ -1301,7 +1301,7 @@
       "couldNotGetLatest": "Nu s-au putut obține cele mai recente date.",
       "byline": "#{{number}}, autor: {{author}}",
       "noFindings": "Nu există constatări.",
-      "findingsUnavailable": "Nu există rezultate",
+      "findingsUnavailable": "Rezultatele nu sunt disponibile.",
       "findingsInProgress": "Această revizuire este încă în desfășurare. Constatările vor apărea aici la finalizarea ei.",
       "findingsEndedWithoutResults": "Această revizuire s-a încheiat înainte de a produce constatări.",
       "serviceUnavailable": "Nu s-a putut stabili conexiunea cu serviciul de revizuire a codului. Reîncearcă revizuirea când serviciul este disponibil.",

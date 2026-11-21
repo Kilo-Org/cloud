@@ -12,9 +12,11 @@ import { ACTION_REQUIRED_KEYS } from '@/components/code-reviewer/action-required
  * claim one. A review still in flight has not produced findings yet and a
  * cancelled or interrupted review ended before it could, so the screen never
  * reports a clean run for a review that has not finished. A failed review
- * reads "No results": the line says only that the review produced no results,
+ * reads "Results are unavailable": the line says that this section has nothing
+ * to show and that results are unavailable, without restating the failure,
  * because the status badge and the failure reason card above it already carry
- * the failure, and the findings section never repeats an outcome.
+ * it, and the findings section never repeats an outcome. It must not read
+ * "No findings" either, which is the result of a review that finished clean.
  */
 export function findingsEmptyCopyKey(status: string): string {
   if (status === 'failed') {

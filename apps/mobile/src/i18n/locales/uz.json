@@ -1274,7 +1274,7 @@
       "couldNotGetLatest": "Eng so'nggi ma'lumotlarni olib bo'lmadi.",
       "byline": "#{{number}}, muallif: {{author}}",
       "noFindings": "Muammolar topilmadi.",
-      "findingsUnavailable": "Natijalar yo'q",
+      "findingsUnavailable": "Natijalar mavjud emas.",
       "findingsInProgress": "Bu ko'rib chiqish hali davom etmoqda. Tugagach, muammolar shu yerda paydo bo'ladi.",
       "findingsEndedWithoutResults": "Bu ko'rib chiqish hech qanday muammo aniqlamaydan tugadi.",
       "serviceUnavailable": "Kodni ko'rib chiqish xizmatiga ulanib bo'lmadi. Xizmat mavjud bo'lganda ko'rib chiqishni qayta urinib ko'ring.",

@@ -1274,7 +1274,7 @@
       "couldNotGetLatest": "دریافت آخرین اطلاعات ممکن نشد.",
       "byline": "#{{number}} توسط {{author}}",
       "noFindings": "یافته‌ای وجود ندارد.",
-      "findingsUnavailable": "نتیجه‌ای وجود ندارد",
+      "findingsUnavailable": "نتایج در دسترس نیستند.",
       "findingsInProgress": "این بررسی هنوز در جریان است. پس از پایان آن، یافته‌ها در این بخش نمایش داده می‌شوند.",
       "findingsEndedWithoutResults": "این بررسی پیش از ایجاد هر یافته‌ای به پایان رسید.",
       "serviceUnavailable": "اتصال به سرویس بررسی کد ممکن نشد. وقتی سرویس در دسترس بود، بررسی را دوباره انجام دهید.",

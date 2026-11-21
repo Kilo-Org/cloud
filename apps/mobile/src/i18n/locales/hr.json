@@ -1301,7 +1301,7 @@
       "couldNotGetLatest": "Nije moguće dohvatiti najnovije podatke.",
       "byline": "#{{number}} · autor: {{author}}",
       "noFindings": "Nema nalaza.",
-      "findingsUnavailable": "Nema rezultata",
+      "findingsUnavailable": "Rezultati nisu dostupni.",
       "findingsInProgress": "Ovaj pregled je još u tijeku. Nalazi će se ovdje pojaviti kada završi.",
       "findingsEndedWithoutResults": "Ovaj pregled je završio prije nego što je dao bilo kakve nalaze.",
       "serviceUnavailable": "Nije moguće povezati se s uslugom za pregled koda. Ponovi pregled kada usluga bude dostupna.",

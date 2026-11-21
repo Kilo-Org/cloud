@@ -739,7 +739,7 @@
       "gateHidden": "Nascosto",
       "gateNone": "Nessuno",
       "noFindings": "Non ci sono segnalazioni.",
-      "findingsUnavailable": "Nessun risultato",
+      "findingsUnavailable": "I risultati non sono disponibili.",
       "findingsInProgress": "Questa revisione è ancora in corso. Le segnalazioni compariranno qui al termine.",
       "findingsEndedWithoutResults": "Questa revisione è terminata prima di produrre segnalazioni.",
       "serviceUnavailable": "Impossibile contattare il servizio di revisione del codice. Ripeti la revisione quando il servizio sarà disponibile.",

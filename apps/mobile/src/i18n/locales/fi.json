@@ -1274,7 +1274,7 @@
       "couldNotGetLatest": "Uusimpia tietoja ei voitu hakea.",
       "byline": "#{{number}}, tekijä {{author}}",
       "noFindings": "Havaintoja ei ole.",
-      "findingsUnavailable": "Tuloksia ei ole",
+      "findingsUnavailable": "Tulokset eivät ole saatavilla.",
       "findingsInProgress": "Tämä katselmointi on vielä kesken. Havainnot näkyvät tässä, kun se valmistuu.",
       "findingsEndedWithoutResults": "Tämä katselmointi päättyi ennen kuin se tuotti havaintoja.",
       "serviceUnavailable": "Koodin katselmointipalveluun ei saatu yhteyttä. Yritä katselmointia uudelleen, kun palvelu on käytettävissä.",

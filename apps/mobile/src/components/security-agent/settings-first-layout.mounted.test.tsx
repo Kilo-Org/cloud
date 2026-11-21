@@ -110,9 +110,10 @@ vi.mock('@/lib/hooks/use-available-models', () => ({
     models: [],
     isLoading: false,
     isError: false,
-    // The screen's catalogue classifier treats a delivered read as rows-empty
-    // rather than loading, so the fixture must say the read finished.
+    // The screen's catalogue classifier asks whether the read delivered a list,
+    // which is what keeps a delivered-empty catalogue out of its loading state.
     isFetched: true,
+    hasDeliveredData: true,
     refetch: vi.fn(),
   }),
 }));

@@ -100,8 +100,10 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     models,
     isError: modelsUnavailableFlag,
     error: modelsError,
+    isLoading: modelsLoading,
     isFetched: modelsFetched,
     isFetching: modelsFetching,
+    hasDeliveredData: modelsDelivered,
     fetchStatus: modelsFetchStatus,
     refetch: refetchModels,
   } = useAvailableModels(isPersonalSecurityScope(scope) ? undefined : scope);
@@ -213,10 +215,16 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   // `rows` whenever the catalogue delivered any, so an offline visit with a warm
   // list keeps the current slugs readable and pickable, as the new-session
   // picker does. Only a failure with nothing delivered names its cause and Retry.
+  //
+  // v5 downgrades a no-data refetch back to `pending` and clears `error`, so the
+  // failure has to survive the Retry's own request: `isError || (isLoading &&
+  // isFetched)` is the idiom `tool-summary-translation-settings-screen.tsx` uses,
+  // and `hasDeliveredData` must be the delivered list, not `isFetched` (true
+  // after a failed read too).
   const modelsBody = classifyListBody({
     rowCount: models.length,
-    hasDeliveredData: modelsFetched,
-    isError: modelsUnavailableFlag,
+    hasDeliveredData: modelsDelivered,
+    isError: modelsUnavailableFlag || (modelsLoading && modelsFetched),
     isFetching: modelsFetching,
     fetchStatus: modelsFetchStatus,
     connectivityKnown: connectivity !== 'unknown',

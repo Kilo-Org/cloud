@@ -14,6 +14,11 @@ import {
   hasInferenceProviderUserByokForModel,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { getDirectByokCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { inferenceRegionIneligibleCandidates } from '@kilocode/web-shared/lib/ai-gateway/inference-region-candidates';
+import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import { DEFAULT_ORGANIZATION_FEATURES } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import {
   customLlmDefinition,
   deleteCustomLlmForTest,
@@ -47,6 +52,13 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'),
   getDirectByokCatalogModelIds: jest.fn(async () => new Set()),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/inference-region-candidates', () => ({
+  inferenceRegionIneligibleCandidates: jest.fn(async () => []),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/organization-features', () => ({
+  ...jest.requireActual<object>('@kilocode/web-shared/lib/ai-gateway/organization-features'),
+  getRuntimeOrganizationFeatures: jest.fn(),
 }));
 jest.mock(
   '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
@@ -469,6 +481,104 @@ describe('deniedAutoRoutingModelIdsForMember', () => {
       })
     ).resolves.toEqual([]);
     expect(getDataCollectionRequiredModelIds).not.toHaveBeenCalled();
+  });
+});
+
+describe('deniedAutoRoutingModelIdsForMember with an inference region', () => {
+  const regionDenied = ['openai/gpt-5'];
+  const modelIds = ['anthropic/claude', 'openai/gpt-5', 'kilo-auto/frontier'];
+
+  async function setUp({
+    settings,
+    teams = false,
+    featureEnabled = true,
+  }: {
+    settings: object;
+    teams?: boolean;
+    featureEnabled?: boolean;
+  }) {
+    const user = await insertTestUser();
+    const organization = await createTestOrganization(
+      `inference-region-${user.id}`,
+      user.id,
+      0,
+      settings,
+      teams
+    );
+    jest.mocked(getRuntimeOrganizationFeatures).mockResolvedValue({
+      ...DEFAULT_ORGANIZATION_FEATURES,
+      gateway_settings: featureEnabled ? [organization.id] : [],
+    });
+    return { userId: user.id, organizationId: organization.id };
+  }
+
+  beforeEach(() => {
+    jest.mocked(resolveOrganizationMemberModelPolicy).mockResolvedValue(policy());
+    jest.mocked(inferenceRegionIneligibleCandidates).mockReset();
+    jest
+      .mocked(inferenceRegionIneligibleCandidates)
+      .mockImplementation(async ({ candidateIds }) =>
+        candidateIds.filter(id => regionDenied.includes(id))
+      );
+  });
+
+  it('denies candidates outside the region of an enterprise organization with the feature', async () => {
+    const member = await setUp({ settings: { data_region: 'eu' } });
+
+    await expect(deniedAutoRoutingModelIdsForMember({ ...member, modelIds })).resolves.toEqual(
+      regionDenied
+    );
+    expect(inferenceRegionIneligibleCandidates).toHaveBeenCalledWith({
+      region: 'eu',
+      candidateIds: ['anthropic/claude', 'openai/gpt-5'],
+      byokOwner: { type: 'organization', id: member.organizationId },
+    });
+  });
+
+  it('merges region denials with the group policy denials without duplicates', async () => {
+    const member = await setUp({ settings: { data_region: 'eu' } });
+    jest.mocked(resolveOrganizationMemberModelPolicy).mockResolvedValue(
+      policy({
+        memberGrant: {
+          mode: 'selected',
+          includeOrganizationBaseline: false,
+          modelAllowList: new Set(['anthropic/claude']),
+          providerAllowList: new Set<string>(),
+        },
+      })
+    );
+
+    await expect(deniedAutoRoutingModelIdsForMember({ ...member, modelIds })).resolves.toEqual(
+      regionDenied
+    );
+  });
+
+  it.each([
+    ['the organization has no data region', { settings: {} }],
+    [
+      'the gateway settings feature is off',
+      { settings: { data_region: 'eu' }, featureEnabled: false },
+    ],
+    [
+      'the organization is not on the enterprise plan',
+      { settings: { data_region: 'eu' }, teams: true },
+    ],
+  ])('adds no region denial when %s', async (_name, options) => {
+    const member = await setUp(options);
+
+    await expect(deniedAutoRoutingModelIdsForMember({ ...member, modelIds })).resolves.toEqual([]);
+    expect(inferenceRegionIneligibleCandidates).not.toHaveBeenCalled();
+  });
+
+  it('adds no region denial for an unknown organization', async () => {
+    await expect(
+      deniedAutoRoutingModelIdsForMember({
+        userId: 'user-1',
+        organizationId: '33333333-3333-4333-8333-333333333333',
+        modelIds,
+      })
+    ).resolves.toEqual([]);
+    expect(inferenceRegionIneligibleCandidates).not.toHaveBeenCalled();
   });
 });
 

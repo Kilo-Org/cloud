@@ -27,6 +27,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import {
   getCachedVercelInferenceProviderIdsForModel,
+  getCachedVercelInferenceRegionsForModel,
   getOpenRouterModelsMetadataFromDatabase,
   getVercelLanguageModelIdsFromDatabase,
   isValidOpenRouterModelId,
@@ -252,6 +253,21 @@ async function resolveVercelModel(requestedModel: string): Promise<{
 export async function isVercelModel(requestedModel: string) {
   const { vercelModels, vercelModelId } = await resolveVercelModel(requestedModel);
   return vercelModels.has(vercelModelId);
+}
+
+/**
+ * Whether Vercel serves the model at an endpoint it can pin to the inference region. Kilo-paid
+ * requests of an organization with an inference region go only to Vercel, pinned to that region,
+ * so any other model fails there.
+ */
+export async function isVercelModelInInferenceRegion(
+  requestedModel: string,
+  region: OrganizationDataRegion
+) {
+  const regions = await getCachedVercelInferenceRegionsForModel(
+    await mapModelIdToVercel(requestedModel)
+  );
+  return regions?.has(region) ?? false;
 }
 
 /**

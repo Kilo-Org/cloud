@@ -90,7 +90,11 @@ truth for which function regions actually run those deployments.
 apply only to enterprise organizations in the `gateway_settings` feature, and only to
 Kilo-paid routes. A region pins Kilo's Vercel route, refuses other routes, and implies
 OpenRouter off. BYOK, ChatGPT and Claude billing routes, FIM and edit are exempt.
-OpenRouter off also lifts the Vercel opt-out list.
+OpenRouter off also lifts the Vercel opt-out list. With a region, auto routing (the
+classifier tiers, custom routers, and `kilo-auto/free`) denies candidates Vercel cannot pin
+to it unless the owner's BYOK key serves them (`inference-region-candidates.ts`). Fixed
+targets (`kilo-auto/small`, Organization Auto routes, static fallbacks) are not filtered and
+get the region refusal.
 
 Deliberate limitations until users ask:
 

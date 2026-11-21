@@ -683,6 +683,75 @@ describe('canRouteToVercel', () => {
   });
 });
 
+describe('isVercelModelInInferenceRegion', () => {
+  async function loadIsVercelModelInInferenceRegion(
+    regionsByVercelModelId: Record<string, OrganizationDataRegion[]>
+  ) {
+    jest.resetModules();
+    const getCachedVercelInferenceRegionsForModel = jest.fn(async (vercelModelId: string) => {
+      const regions = regionsByVercelModelId[vercelModelId];
+      return regions ? new Set(regions) : null;
+    });
+    jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+      getVercelLanguageModelIdsFromDatabase: jest.fn(async () => new Set()),
+      getCachedVercelInferenceRegionsForModel,
+    }));
+    jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => {
+      const actual = jest.requireActual<typeof MapModelIdToVercelModule>(
+        '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel'
+      );
+      return {
+        ...actual,
+        mapModelIdToVercel: jest.fn(async (modelId: string) =>
+          actual.mapResolvedModelIdToVercel(modelId, new Map())
+        ),
+      };
+    });
+    return {
+      getCachedVercelInferenceRegionsForModel,
+      isVercelModelInInferenceRegion: (
+        await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel')
+      ).isVercelModelInInferenceRegion,
+    };
+  }
+
+  it('accepts a model Vercel can pin to the region', async () => {
+    const { isVercelModelInInferenceRegion } = await loadIsVercelModelInInferenceRegion({
+      'anthropic/claude-sonnet-4.5': ['eu', 'us'],
+    });
+
+    await expect(isVercelModelInInferenceRegion('anthropic/claude-sonnet-4.5', 'eu')).resolves.toBe(
+      true
+    );
+  });
+
+  it('rejects a model Vercel cannot pin to the region', async () => {
+    const { isVercelModelInInferenceRegion } = await loadIsVercelModelInInferenceRegion({
+      'anthropic/claude-sonnet-4.5': ['us'],
+      'vendor/unpinnable': [],
+    });
+
+    await expect(isVercelModelInInferenceRegion('anthropic/claude-sonnet-4.5', 'jp')).resolves.toBe(
+      false
+    );
+    await expect(isVercelModelInInferenceRegion('vendor/unpinnable', 'us')).resolves.toBe(false);
+  });
+
+  it('rejects a model Vercel does not list', async () => {
+    const { isVercelModelInInferenceRegion } = await loadIsVercelModelInInferenceRegion({});
+
+    await expect(isVercelModelInInferenceRegion('vendor/unknown', 'eu')).resolves.toBe(false);
+  });
+
+  it('looks the model up under its Vercel id', async () => {
+    const { isVercelModelInInferenceRegion, getCachedVercelInferenceRegionsForModel } =
+      await loadIsVercelModelInInferenceRegion({ 'zai/glm-5.2': ['au'] });
+
+    await expect(isVercelModelInInferenceRegion('z-ai/glm-5.2', 'au')).resolves.toBe(true);
+    expect(getCachedVercelInferenceRegionsForModel).toHaveBeenCalledWith('zai/glm-5.2');
+  });
+});
+
 describe('isValidVercelModelId', () => {
   async function loadIsValidVercelModelId({
     vercelModelIds,

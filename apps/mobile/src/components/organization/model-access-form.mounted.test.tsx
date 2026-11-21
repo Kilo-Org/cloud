@@ -767,7 +767,11 @@ describe('ModelAccessForm with a catalog that names no provider', () => {
     selectTab(root, 'providers');
     changeProviders(
       root,
-      toggleProvider(list(root, 'ProviderAllowList').props.draft as ModelAccessDraft, 'openai', false)
+      toggleProvider(
+        list(root, 'ProviderAllowList').props.draft as ModelAccessDraft,
+        'openai',
+        false
+      )
     );
     await pressSave(root);
     expect(saved.mutateAsync).toHaveBeenCalledTimes(1);

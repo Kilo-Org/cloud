@@ -8,6 +8,7 @@ import {
   startFixtureServer,
 } from './extension-context-fixture';
 import { mockKiloApi } from './kilo-api-fixture';
+import { getSelectedTargetTabLabel } from './tab-selection-e2e-helpers';
 
 const errorTitle = 'The server is busy. Try again in a moment.';
 
@@ -77,8 +78,13 @@ test('retry waits for the model catalog to offer the conversation model', async 
 
     const alert = sidePanel.getByRole('alert').filter({ hasText: errorTitle });
     await expect(alert).toBeVisible();
-    // The target tab resolves to the fixture page, so the catalog is the only gate left.
-    await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo extension fixture');
+    /*
+     * The target tab resolves to the fixture page, so the catalog is the only gate left.
+     * Read the select's selected option: matching its text would also match every option.
+     */
+    await expect
+      .poll(() => getSelectedTargetTabLabel(sidePanel))
+      .toContain('Kilo extension fixture');
     await expect(sidePanel.getByText('Could not load models.')).toBeVisible();
 
     await alert.getByRole('button', { exact: true, name: 'Retry' }).click();

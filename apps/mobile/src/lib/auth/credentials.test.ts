@@ -126,6 +126,7 @@ vi.mock('@/lib/telemetry/posthog-storage', () => ({
 }));
 vi.mock('react-native', () => ({
   AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+  Platform: { OS: 'ios' },
 }));
 // sonner-native is imported by secure-store-preference, which the remote MCP
 // store and the settings-tools switch warm at module scope. It resolves
@@ -186,6 +187,17 @@ vi.mock('@/lib/agent-attachments/clipboard-image', () => ({
 
 vi.mock('@/lib/temp-file-registry', () => ({
   reapTempFiles: vi.fn(),
+}));
+
+// The staged share deliveries read expo-file-system / expo-crypto on import.
+// This suite asserts the credential deletes; the boundary behavior lives in
+// `lib/share-*.test.ts`.
+vi.mock('@/lib/share-payload', () => ({
+  clearAccountStagedSharePayloads: vi.fn(),
+}));
+
+vi.mock('@/lib/share-navigation', () => ({
+  clearAccountStagedShareNavigation: vi.fn(),
 }));
 
 // The artifact mirror members of the same teardown read expo-file-system and

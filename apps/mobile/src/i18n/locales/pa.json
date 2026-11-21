@@ -450,6 +450,17 @@
       "location": "Vertex ਟਿਕਾਣਾ",
       "clientEmail": "ਸੇਵਾ ਖਾਤਾ ਈਮੇਲ",
       "privateKey": "ਸੇਵਾ ਖਾਤੇ ਦੀ ਨਿੱਜੀ ਕੁੰਜੀ",
+      "privateKeyBlockRequired": "ਪੂਰਾ ਕੁੰਜੀ ਬਲਾਕ ਪੇਸਟ ਕਰੋ, BEGIN ਲਾਈਨ ਤੋਂ END ਲਾਈਨ ਤੱਕ।",
+      "privateKeyEncrypted": "ਇਹ ਕੁੰਜੀ ਬਲਾਕ ਪਾਸਫ਼ਰੇਜ਼ ਨਾਲ ਸੁਰੱਖਿਅਤ ਹੈ। ਸੇਵਾ ਖਾਤੇ ਦੀ ਅਜਿਹੀ ਕੁੰਜੀ ਪੇਸਟ ਕਰੋ ਜਿਸ ਵਿੱਚ ਕੋਈ ਪਾਸਫ਼ਰੇਜ਼ ਨਹੀਂ ਹੈ।",
+      "names": {
+        "codestral": "ਸਿਰਫ਼ ਪੁਰਾਣਾ Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT ਨਾਲ ਸਾਈਨ ਇਨ ਕਰੋ)",
+        "xiaomi": "Xiaomi (ਵਰਤੋਂ ਅਨੁਸਾਰ ਭੁਗਤਾਨ)",
+        "zai": "Z.ai (ਵਰਤੋਂ ਅਨੁਸਾਰ ਭੁਗਤਾਨ)",
+        "bedrockByok": "Amazon Bedrock (ਸਿੱਧਾ)",
+        "vertexByok": "Google Vertex AI (ਸਿੱਧਾ)"
+      },
       "modelMappings": "ਮਾਡਲ ਮੈਪਿੰਗਾਂ",
       "modelMappingsDescription": "ਗੇਟਵੇ ਮਾਡਲ ਨੂੰ ਕਸਟਮ ਡਿਪਲੌਇਮੈਂਟ ਨਾਮ ਤੇ ਭੇਜੋ।",
       "mappingTitle": "ਮੈਪਿੰਗ {{number}}",
@@ -1308,7 +1319,7 @@
       "couldNotGetLatest": "ਤਾਜ਼ਾ ਜਾਣਕਾਰੀ ਨਹੀਂ ਮਿਲ ਸਕੀ।",
       "byline": "#{{number}} — {{author}} ਦੁਆਰਾ",
       "noFindings": "ਕੋਈ ਸਮੱਸਿਆ ਨਹੀਂ ਮਿਲੀ।",
-      "findingsUnavailable": "ਇਹ ਸਮੀਖਿਆ ਅਸਫਲ ਹੋਣ ਕਾਰਨ ਨਤੀਜੇ ਉਪਲਬਧ ਨਹੀਂ ਹਨ।",
+      "findingsUnavailable": "ਨਤੀਜੇ ਉਪਲਬਧ ਨਹੀਂ ਹਨ।",
       "findingsInProgress": "ਇਹ ਸਮੀਖਿਆ ਹਾਲੇ ਚੱਲ ਰਹੀ ਹੈ। ਪੂਰੀ ਹੋਣ 'ਤੇ ਸਮੱਸਿਆਵਾਂ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੀਆਂ।",
       "findingsEndedWithoutResults": "ਇਹ ਸਮੀਖਿਆ ਸਮੇਂ ਤੋਂ ਪਹਿਲਾਂ ਖ਼ਤਮ ਹੋ ਗਈ — ਇਸ ਨੇ ਕੋਈ ਸਮੱਸਿਆ ਨਹੀਂ ਮਿਲੀ।",
       "serviceUnavailable": "ਕੋਡ ਸਮੀਖਿਆ ਸੇਵਾ ਨਾਲ ਸੰਪਰਕ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਸੇਵਾ ਉਪਲਬਧ ਹੋਣ 'ਤੇ ਸਮੀਖਿਆ ਦੁਬਾਰਾ ਕਰੋ।",
@@ -3628,6 +3639,7 @@
       "identifierLabel": "ਪਛਾਣਕਰਤਾ",
       "identifierRequired": "ਪਛਾਣਕਰਤਾ ਦਰਜ ਕਰੋ।",
       "identifierTaken": "ਕੋਈ ਹੋਰ ਮੋਡ ਪਹਿਲਾਂ ਹੀ ਇਹ ਪਛਾਣਕਰਤਾ ਵਰਤ ਰਿਹਾ ਹੈ।",
+      "identifierTooLong": "ਪਛਾਣਕਰਤਾ ਨੂੰ {{max}} ਅੱਖਰ ਜਾਂ ਇਸ ਤੋਂ ਘੱਟ ਤੱਕ ਰੱਖੋ।",
       "nameLabel": "ਮੋਡ ਦਾ ਨਾਮ",
       "nameRequired": "ਮੋਡ ਦਾ ਨਾਮ ਦਰਜ ਕਰੋ।",
       "notFound": "ਇਹ ਮੋਡ ਹੁਣ ਮੌਜੂਦ ਨਹੀਂ ਹੈ।",
@@ -3718,7 +3730,7 @@
     "emailDeliveryFailed": "ਇਸ ਵੇਲੇ ਈਮੇਲ ਭੇਜਣ ਦੀ ਸਹੂਲਤ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਬਾਅਦ ਵਿੱਚ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "admissionRequired": "ਤੁਹਾਡੀ ਡਿਵਾਈਸ ਦੀ ਪੁਸ਼ਟੀ ਨਹੀਂ ਹੋ ਸਕਦੀ। ਕਿਸੇ ਹੋਰ ਡਿਵਾਈਸ 'ਤੇ ਜਾਂ ਵੈੱਬ ਰਾਹੀਂ ਸਾਈਨ-ਇਨ ਕਰਨ ਲਈ '$t(login.moreSignInOptions)' ਵਰਤੋ।",
     "default": "ਕੋਈ ਗੜਬੜ ਹੋ ਗਈ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-    "retryableAdmission": "ਅਸੀਂ ਇਸ ਡਿਵਾਈਸ ਦੀ ਪੁਸ਼ਟੀ ਨਹੀਂ ਕਰ ਸਕੇ। ਆਪਣੇ ਕਨੈਕਸ਼ਨ ਦੀ ਜਾਂਚ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "retryableAdmission": "ਇਸ ਡਿਵਾਈਸ ਦੀ ਪੁਸ਼ਟੀ ਨਹੀਂ ਹੋ ਸਕੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "startSignInFailed": "ਸਾਈਨ-ਇਨ ਸ਼ੁਰੂ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "couldNotOpenBrowser": "ਬ੍ਰਾਊਜ਼ਰ ਨਹੀਂ ਖੋਲ੍ਹਿਆ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "signInTimedOut": "ਸਾਈਨ-ਇਨ ਲਈ ਦਿੱਤਾ ਸਮਾਂ ਲੰਘ ਗਿਆ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
@@ -3790,6 +3802,34 @@
     "nextScheduled": "ਅਗਲਾ ਨਿਰਧਾਰਿਤ",
     "answerNeeded": "ਜਵਾਬ ਚਾਹੀਦਾ ਹੈ",
     "waitingToRetry": "ਮੁੜ ਕੋਸ਼ਿਸ਼ ਦੀ ਉਡੀਕ",
+    "countNoun": {
+      "needsInput_one": "ਜਵਾਬ ਦੀ ਉਡੀਕ",
+      "needsInput_other": "ਜਵਾਬ ਦੀ ਉਡੀਕ",
+      "running_one": "ਕੰਮ ਜਾਰੀ",
+      "running_other": "ਕੰਮ ਜਾਰੀ",
+      "scheduled_one": "ਨਿਰਧਾਰਿਤ",
+      "scheduled_other": "ਨਿਰਧਾਰਿਤ",
+      "idle_one": "ਵਿਹਲਾ",
+      "idle_other": "ਵਿਹਲਾ"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} ਜਵਾਬ ਦੀ ਉਡੀਕ",
+      "needsInput_other": "{{displayCount}} ਜਵਾਬ ਦੀ ਉਡੀਕ",
+      "running_one": "{{displayCount}} ਕੰਮ ਜਾਰੀ",
+      "running_other": "{{displayCount}} ਕੰਮ ਜਾਰੀ",
+      "scheduled_one": "{{displayCount}} ਨਿਰਧਾਰਿਤ",
+      "scheduled_other": "{{displayCount}} ਨਿਰਧਾਰਿਤ",
+      "idle_one": "{{displayCount}} ਵਿਹਲਾ",
+      "idle_other": "{{displayCount}} ਵਿਹਲਾ"
+    },
+    "footer": {
+      "checked": "ਜਾਂਚ ਕੀਤੀ {{time}}",
+      "lastKnown": "ਆਖਰੀ ਜਾਣੀ ਸਥਿਤੀ · {{time}}"
+    },
+    "wake": {
+      "nextRun": "ਅਗਲੀ ਵਾਰ ਚੱਲੇਗਾ {{time}}",
+      "wasDue": "ਉਮੀਦ ਸੀ {{time}}"
+    },
     "step": {
       "editing": "ਸੰਪਾਦਨ ਕਰ ਰਿਹਾ",
       "reading": "ਪੜ੍ਹ ਰਿਹਾ",
@@ -4035,7 +4075,8 @@
         "space": "ਇਸ ਮਾਡਲ ਲਈ ਲੋੜੀਂਦੀ ਖਾਲੀ ਸਟੋਰੇਜ ਨਹੀਂ ਹੈ। ਥਾਂ ਖਾਲੀ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
         "network": "ਡਾਊਨਲੋਡ ਪੂਰਾ ਨਹੀਂ ਹੋਇਆ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
         "invalidFile": "ਡਾਊਨਲੋਡ ਕੀਤੀ ਫ਼ਾਈਲ ਅਜਿਹਾ ਮਾਡਲ ਨਹੀਂ ਹੈ ਜੋ ਇਹ ਐਪ ਚਲਾ ਸਕੇ, ਇਸ ਲਈ ਇਸਨੂੰ ਹਟਾ ਦਿੱਤਾ ਗਿਆ।",
-        "checksum": "ਡਾਊਨਲੋਡ ਕੀਤੀ ਫ਼ਾਈਲ ਆਪਣੇ ਪ੍ਰਕਾਸ਼ਿਤ ਚੈੱਕਸਮ ਨਾਲ ਮੇਲ ਨਹੀਂ ਖਾਂਦੀ, ਇਸ ਲਈ ਇਸਨੂੰ ਹਟਾ ਦਿੱਤਾ ਗਿਆ। ਦੁਬਾਰਾ ਡਾਊਨਲੋਡ ਕਰਕੇ ਦੇਖੋ।"
+        "checksum": "ਡਾਊਨਲੋਡ ਕੀਤੀ ਫ਼ਾਈਲ ਆਪਣੇ ਪ੍ਰਕਾਸ਼ਿਤ ਚੈੱਕਸਮ ਨਾਲ ਮੇਲ ਨਹੀਂ ਖਾਂਦੀ, ਇਸ ਲਈ ਇਸਨੂੰ ਹਟਾ ਦਿੱਤਾ ਗਿਆ। ਦੁਬਾਰਾ ਡਾਊਨਲੋਡ ਕਰਕੇ ਦੇਖੋ।",
+        "writeFailed": "ਇਹ ਡਿਵਾਈਸ ਮਾਡਲ ਨੂੰ ਸੰਭਾਲ ਨਹੀਂ ਸਕੀ। ਦੁਬਾਰਾ ਡਾਊਨਲੋਡ ਕਰਕੇ ਦੇਖੋ।"
       }
     },
     "catalog": {
@@ -4477,6 +4518,7 @@
         "balanceNeutral": "ਬਕਾਇਆ ਅਪਰਿਵਰਤਿਤ",
         "deduction": "ਕਟੌਤੀ",
         "grant": "ਕ੍ਰੈਡਿਟ ਗ੍ਰਾਂਟ",
+        "welcomeCredits": "ਸੁਆਗਤ ਕ੍ਰੈਡਿਟ",
         "purchase": "ਖਰੀਦ"
       },
       "purchaseFallback": "ਕ੍ਰੈਡਿਟ ਖਰੀਦ",
@@ -4732,6 +4774,8 @@
     "connectedTo": "{{account}} ਨਾਲ ਕਨੈਕਟ ਹੈ",
     "disconnected": "{{provider}} ਡਿਸਕਨੈਕਟ ਹੋ ਗਿਆ",
     "disconnectFailed": "{{provider}} ਨੂੰ ਡਿਸਕਨੈਕਟ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
+    "disconnectRetry": "Slack ਡਿਸਕਨੈਕਟ ਹੋਣ ਦੀ ਪੁਸ਼ਟੀ ਨਹੀਂ ਕਰ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "disconnectNeedsSupport": "Kilo ਇਸ ਕਨੈਕਸ਼ਨ ਲਈ ਸੰਭਾਲਿਆ ਗਿਆ Slack ਪਹੁੰਚ ਪੜ੍ਹ ਨਹੀਂ ਸਕਿਆ। ਡਿਸਕਨੈਕਟ ਪੂਰਾ ਕਰਨ ਲਈ ਸਹਾਇਤਾ ਟੀਮ ਨਾਲ ਸੰਪਰਕ ਕਰੋ।",
     "couldNotLoad": "ਇੰਟੀਗ੍ਰੇਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ",
     "permissionDenied": "ਤੁਹਾਡੇ ਕੋਲ ਇਹਨਾਂ ਇੰਟੀਗ੍ਰੇਸ਼ਨਾਂ ਦਾ ਪ੍ਰਬੰਧਨ ਕਰਨ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
     "managedByOwner": "ਜੋ ਕਨੈਕਸ਼ਨ ਤੁਸੀਂ ਨਹੀਂ ਬਦਲ ਸਕਦੇ, ਉਸ ਨੂੰ ਬਦਲਣ ਲਈ ਸੰਸਥਾ ਦੇ ਮਾਲਕ ਨੂੰ ਕਹੋ।",

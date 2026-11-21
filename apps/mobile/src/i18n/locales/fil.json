@@ -450,6 +450,17 @@
       "location": "Lokasyon ng Vertex",
       "clientEmail": "Email ng service account",
       "privateKey": "Private key ng service account",
+      "privateKeyBlockRequired": "I-paste ang buong key block, mula sa linyang BEGIN hanggang sa linyang END.",
+      "privateKeyEncrypted": "Protektado ng passphrase ang key block na ito. I-paste ang service account key na walang passphrase.",
+      "names": {
+        "codestral": "Codestral na luma lamang",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Mag-sign in gamit ang ChatGPT)",
+        "xiaomi": "Xiaomi (bayad sa bawat paggamit)",
+        "zai": "Z.ai (bayad sa bawat paggamit)",
+        "bedrockByok": "Amazon Bedrock (direkta)",
+        "vertexByok": "Google Vertex AI (direkta)"
+      },
       "modelMappings": "Mga model mapping",
       "modelMappingsDescription": "Ipadala ang isang gateway model sa isang custom na deployment name.",
       "mappingTitle": "Mapping {{number}}",
@@ -1308,7 +1319,7 @@
       "couldNotGetLatest": "Hindi makuha ang pinakabagong data.",
       "byline": "#{{number}} ni {{author}}",
       "noFindings": "Walang natukoy na isyu.",
-      "findingsUnavailable": "Hindi available ang mga resulta dahil nabigo ang pagsusuring ito.",
+      "findingsUnavailable": "Hindi available ang mga resulta.",
       "findingsInProgress": "Nagpapatuloy pa ang pagsusuri. Lalabas dito ang mga resulta kapag natapos na ito.",
       "findingsEndedWithoutResults": "Natapos ang pagsusuri nang hindi nakalikha ng anumang resulta.",
       "serviceUnavailable": "Hindi makakonekta sa serbisyo ng pagsusuri ng code. Subukang muli ang pagsusuri kapag available na ang serbisyo.",
@@ -3628,6 +3639,7 @@
       "identifierLabel": "Identifier",
       "identifierRequired": "Maglagay ng identifier.",
       "identifierTaken": "Ginagamit na ng ibang modo ang identifier na ito.",
+      "identifierTooLong": "Panatilihin ang identifier sa {{max}} character o mas kaunti.",
       "nameLabel": "Pangalan ng modo",
       "nameRequired": "Maglagay ng pangalan ng modo.",
       "notFound": "Wala na ang modong ito.",
@@ -3718,7 +3730,7 @@
     "emailDeliveryFailed": "Pansamantalang hindi makapagpadala ng email. Pakisubukan muli mamaya.",
     "admissionRequired": "Hindi ma-verify ang iyong device. Gamitin ang '$t(login.moreSignInOptions)' para mag-sign in sa ibang device o sa pamamagitan ng web.",
     "default": "Nagkaroon ng problema. Pakisubukan muli.",
-    "retryableAdmission": "Hindi namin ma-verify ang device na ito. Suriin ang iyong koneksyon at subukan muli.",
+    "retryableAdmission": "Hindi mapatunayan ang device na ito. Subukan muli.",
     "startSignInFailed": "Hindi masimulan ang pag-sign in. Pakisubukan muli.",
     "couldNotOpenBrowser": "Hindi mabuksan ang browser. Pakisubukan muli.",
     "signInTimedOut": "Naubos ang oras para sa pag-sign in. Pakisubukan muli.",
@@ -3790,6 +3802,34 @@
     "nextScheduled": "Susunod na naka-iskedyul",
     "answerNeeded": "Kailangan ng sagot",
     "waitingToRetry": "Naghihintay ng muling pagsubok",
+    "countNoun": {
+      "needsInput_one": "Naghihintay ng sagot",
+      "needsInput_other": "Naghihintay ng sagot",
+      "running_one": "Nagtatrabaho",
+      "running_other": "Nagtatrabaho",
+      "scheduled_one": "Naka-iskedyul",
+      "scheduled_other": "Naka-iskedyul",
+      "idle_one": "Walang ginagawa",
+      "idle_other": "Walang ginagawa"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Naghihintay ng sagot",
+      "needsInput_other": "{{displayCount}} Naghihintay ng sagot",
+      "running_one": "{{displayCount}} Nagtatrabaho",
+      "running_other": "{{displayCount}} Nagtatrabaho",
+      "scheduled_one": "{{displayCount}} Naka-iskedyul",
+      "scheduled_other": "{{displayCount}} Naka-iskedyul",
+      "idle_one": "{{displayCount}} Walang ginagawa",
+      "idle_other": "{{displayCount}} Walang ginagawa"
+    },
+    "footer": {
+      "checked": "Nakumpirma {{time}}",
+      "lastKnown": "Huling nalaman · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Susunod na pagpapatakbo {{time}}",
+      "wasDue": "Inasahan {{time}}"
+    },
     "step": {
       "editing": "Nag-e-edit",
       "reading": "Nagbabasa",
@@ -4035,7 +4075,8 @@
         "space": "Walang sapat na libreng storage para sa modelong ito. Magbakante ng espasyo at subukan muli.",
         "network": "Hindi natapos ang pag-download. Suriin ang iyong koneksyon at subukan muli.",
         "invalidFile": "Ang na-download na file ay hindi modelong kayang patakbuhin ng app na ito, kaya inalis ito.",
-        "checksum": "Ang na-download na file ay hindi tumutugma sa nakalathalang checksum nito, kaya inalis ito. Subukang i-download itong muli."
+        "checksum": "Ang na-download na file ay hindi tumutugma sa nakalathalang checksum nito, kaya inalis ito. Subukang i-download itong muli.",
+        "writeFailed": "Hindi na-save ng device na ito ang modelo. Subukang i-download itong muli."
       }
     },
     "catalog": {
@@ -4477,6 +4518,7 @@
         "balanceNeutral": "Walang epekto sa balanse",
         "deduction": "Bawas",
         "grant": "Libreng credit",
+        "welcomeCredits": "Panimulang credit",
         "purchase": "Pagbili"
       },
       "purchaseFallback": "Pagbili ng credit",
@@ -4732,6 +4774,8 @@
     "connectedTo": "Nakakonekta sa {{account}}",
     "disconnected": "Nadiskonekta ang {{provider}}",
     "disconnectFailed": "Hindi ma-diskonekta ang {{provider}}",
+    "disconnectRetry": "Hindi makumpirma ng Slack ang pagdiskonekta. Subukan muli.",
+    "disconnectNeedsSupport": "Hindi mabasa ng Kilo ang naka-save na access sa Slack para sa koneksyong ito. Makipag-ugnayan sa suporta para tapusin ang pagdiskonekta.",
     "couldNotLoad": "Hindi ma-load ang mga integration",
     "permissionDenied": "Wala kang pahintulot na pamahalaan ang mga integration na ito.",
     "managedByOwner": "Hilingin sa isang may-ari ng organisasyon na baguhin ang isang koneksyong hindi mo mababago.",

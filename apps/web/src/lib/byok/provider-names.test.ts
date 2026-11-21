@@ -42,4 +42,21 @@ describe('BYOK provider lists', () => {
     expect(getByokProviderDisplayName('codestral')).toBe(legacyOnlyName);
     expect(getByokProviderDisplayName('not-a-provider')).toBe('not-a-provider');
   });
+
+  test('names a stored-only key the lists never offer', () => {
+    // The ChatGPT connection is stored under its own provider id and its card
+    // owns it, so no picker lists it. A reader who is shown the stored row
+    // still has to get a name instead of the raw id.
+    expect(getByokProviderDisplayName('openai-chatgpt')).toBe('OpenAI (Sign in with ChatGPT)');
+    expect(
+      BYOK_PROVIDERS.filter(provider => provider.name === 'OpenAI (Sign in with ChatGPT)')
+    ).toEqual([]);
+  });
+
+  test('falls back to the id for a name inherited from the object prototype', () => {
+    // A stored provider id is an unconstrained string, so an id like
+    // "constructor" must reach the id itself and never an inherited member.
+    expect(getByokProviderDisplayName('constructor')).toBe('constructor');
+    expect(getByokProviderDisplayName('toString')).toBe('toString');
+  });
 });

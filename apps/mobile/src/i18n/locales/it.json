@@ -451,6 +451,17 @@
       "location": "Località Vertex",
       "clientEmail": "Email dell'account di servizio",
       "privateKey": "Chiave privata dell'account di servizio",
+      "privateKeyBlockRequired": "Incolla l'intero blocco della chiave, dalla riga BEGIN alla riga END.",
+      "privateKeyEncrypted": "Questo blocco della chiave è protetto da passphrase. Incolla una chiave dell'account di servizio senza passphrase.",
+      "names": {
+        "codestral": "Solo Codestral obsoleto",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Accedi con ChatGPT)",
+        "xiaomi": "Xiaomi (a consumo)",
+        "zai": "Z.ai (a consumo)",
+        "bedrockByok": "Amazon Bedrock (diretto)",
+        "vertexByok": "Google Vertex AI (diretto)"
+      },
       "modelMappings": "Mappature dei modelli",
       "modelMappingsDescription": "Indirizza un modello del gateway verso un nome di deployment personalizzato.",
       "mappingTitle": "Mappatura {{number}}",
@@ -773,7 +784,7 @@
       "gateHidden": "Nascosto",
       "gateNone": "Nessuno",
       "noFindings": "Non ci sono segnalazioni.",
-      "findingsUnavailable": "I risultati non sono disponibili perché questa revisione non è riuscita.",
+      "findingsUnavailable": "I risultati non sono disponibili.",
       "findingsInProgress": "Questa revisione è ancora in corso. Le segnalazioni compariranno qui al termine.",
       "findingsEndedWithoutResults": "Questa revisione è terminata prima di produrre segnalazioni.",
       "serviceUnavailable": "Impossibile contattare il servizio di revisione del codice. Ripeti la revisione quando il servizio sarà disponibile.",
@@ -3694,6 +3705,7 @@
       "identifierLabel": "Identificatore",
       "identifierRequired": "Inserisci un identificatore.",
       "identifierTaken": "Un'altra modalità usa già questo identificatore.",
+      "identifierTooLong": "Mantieni l'identificatore entro {{max}} caratteri.",
       "nameLabel": "Nome modalità",
       "nameRequired": "Inserisci un nome per la modalità.",
       "notFound": "Questa modalità non esiste più.",
@@ -3782,7 +3794,7 @@
     "emailDeliveryFailed": "L'invio delle email è temporaneamente non disponibile. Riprova più tardi.",
     "admissionRequired": "Impossibile verificare il tuo dispositivo. Usa \"$t(login.moreSignInOptions)\" per accedere da un altro dispositivo o tramite il web.",
     "default": "Si è verificato un errore. Riprova.",
-    "retryableAdmission": "Non siamo riusciti a verificare questo dispositivo. Controlla la connessione e riprova.",
+    "retryableAdmission": "Impossibile verificare questo dispositivo. Riprova.",
     "startSignInFailed": "Impossibile avviare l'accesso. Riprova.",
     "couldNotOpenBrowser": "Impossibile aprire il browser. Riprova.",
     "signInTimedOut": "Il tempo disponibile per accedere è scaduto. Riprova.",
@@ -3854,6 +3866,42 @@
     "nextScheduled": "Prossime pianificate",
     "answerNeeded": "In attesa di risposta",
     "waitingToRetry": "In attesa di riprovare",
+    "countNoun": {
+      "needsInput_one": "In attesa di risposta",
+      "needsInput_many": "In attesa di risposta",
+      "needsInput_other": "In attesa di risposta",
+      "running_one": "In corso",
+      "running_many": "In corso",
+      "running_other": "In corso",
+      "scheduled_one": "Pianificata",
+      "scheduled_many": "Pianificate",
+      "scheduled_other": "Pianificate",
+      "idle_one": "Inattivo",
+      "idle_many": "Inattivi",
+      "idle_other": "Inattivi"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} In attesa di risposta",
+      "needsInput_many": "{{displayCount}} In attesa di risposta",
+      "needsInput_other": "{{displayCount}} In attesa di risposta",
+      "running_one": "{{displayCount}} In corso",
+      "running_many": "{{displayCount}} In corso",
+      "running_other": "{{displayCount}} In corso",
+      "scheduled_one": "{{displayCount}} Pianificata",
+      "scheduled_many": "{{displayCount}} Pianificate",
+      "scheduled_other": "{{displayCount}} Pianificate",
+      "idle_one": "{{displayCount}} Inattivo",
+      "idle_many": "{{displayCount}} Inattivi",
+      "idle_other": "{{displayCount}} Inattivi"
+    },
+    "footer": {
+      "checked": "Verificato {{time}}",
+      "lastKnown": "Ultimo stato noto · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Prossima esecuzione {{time}}",
+      "wasDue": "Era previsto {{time}}"
+    },
     "step": {
       "editing": "Modifica",
       "reading": "Lettura",
@@ -4100,7 +4148,8 @@
         "space": "Non c'è abbastanza spazio di archiviazione libero per questo modello. Libera spazio e riprova.",
         "network": "Il download non è terminato. Controlla la connessione e riprova.",
         "invalidFile": "Il file scaricato non è un modello che questa app può eseguire, quindi è stato rimosso.",
-        "checksum": "Il file scaricato non corrisponde al checksum pubblicato, quindi è stato rimosso. Riprova a scaricarlo."
+        "checksum": "Il file scaricato non corrisponde al checksum pubblicato, quindi è stato rimosso. Riprova a scaricarlo.",
+        "writeFailed": "Questo dispositivo non è riuscito a salvare il modello. Riprova a scaricarlo."
       }
     },
     "catalog": {
@@ -4548,6 +4597,7 @@
         "balanceNeutral": "Saldo invariato",
         "deduction": "Detrazione",
         "grant": "Crediti omaggio",
+        "welcomeCredits": "Crediti di benvenuto",
         "purchase": "Acquisto"
       },
       "purchaseFallback": "Acquisto crediti",
@@ -4811,6 +4861,8 @@
     "connectedTo": "Collegato a {{account}}",
     "disconnected": "{{provider}} scollegato",
     "disconnectFailed": "Impossibile scollegare {{provider}}",
+    "disconnectRetry": "Slack non è riuscito a confermare lo scollegamento. Riprova.",
+    "disconnectNeedsSupport": "Kilo non è riuscito a leggere l'accesso a Slack salvato per questo collegamento. Contatta l'assistenza per completare lo scollegamento.",
     "couldNotLoad": "Impossibile caricare le integrazioni",
     "permissionDenied": "Non hai l'autorizzazione per gestire queste integrazioni.",
     "managedByOwner": "Chiedi a un proprietario dell'organizzazione di modificare un collegamento che non puoi modificare.",

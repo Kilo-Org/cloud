@@ -450,6 +450,17 @@
       "location": "Lokasi Vertex",
       "clientEmail": "Email akun layanan",
       "privateKey": "Kunci pribadi akun layanan",
+      "privateKeyBlockRequired": "Tempel seluruh blok kunci, dari baris BEGIN sampai baris END.",
+      "privateKeyEncrypted": "Blok kunci ini dilindungi frasa sandi. Tempel kunci akun layanan yang tidak memiliki frasa sandi.",
+      "names": {
+        "codestral": "Hanya Codestral lama",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Masuk dengan ChatGPT)",
+        "xiaomi": "Xiaomi (bayar sesuai pemakaian)",
+        "zai": "Z.ai (bayar sesuai pemakaian)",
+        "bedrockByok": "Amazon Bedrock (langsung)",
+        "vertexByok": "Google Vertex AI (langsung)"
+      },
       "modelMappings": "Pemetaan model",
       "modelMappingsDescription": "Arahkan model gateway ke nama deployment kustom.",
       "mappingTitle": "Pemetaan {{number}}",
@@ -805,7 +816,7 @@
       "gateHidden": "Tersembunyi",
       "gateNone": "Tidak ada",
       "noFindings": "Tidak ada temuan.",
-      "findingsUnavailable": "Hasil tidak tersedia karena tinjauan ini gagal.",
+      "findingsUnavailable": "Hasil tidak tersedia.",
       "findingsInProgress": "Tinjauan ini masih berlangsung. Temuan akan muncul di sini setelah selesai.",
       "findingsEndedWithoutResults": "Tinjauan ini berakhir sebelum menghasilkan temuan apa pun.",
       "serviceUnavailable": "Tidak dapat terhubung ke layanan tinjauan kode. Coba tinjauan lagi saat layanan tersedia.",
@@ -3632,6 +3643,7 @@
       "identifierLabel": "Pengenal",
       "identifierRequired": "Masukkan pengenal.",
       "identifierTaken": "Mode lain sudah menggunakan pengenal ini.",
+      "identifierTooLong": "Jaga pengenal tetap {{max}} karakter atau kurang.",
       "nameLabel": "Nama mode",
       "nameRequired": "Masukkan nama mode.",
       "notFound": "Mode ini sudah tidak ada.",
@@ -3718,7 +3730,7 @@
     "emailDeliveryFailed": "Email belum dapat dikirim untuk sementara waktu. Coba lagi nanti.",
     "admissionRequired": "Perangkatmu tidak dapat diverifikasi. Gunakan '$t(login.moreSignInOptions)' untuk masuk di perangkat lain atau melalui web.",
     "default": "Terjadi kesalahan. Coba lagi.",
-    "retryableAdmission": "Kami tidak dapat memverifikasi perangkat ini. Periksa koneksimu dan coba lagi.",
+    "retryableAdmission": "Tidak dapat memverifikasi perangkat ini. Coba lagi.",
     "startSignInFailed": "Gagal memulai proses masuk. Silakan coba lagi.",
     "couldNotOpenBrowser": "Tidak dapat membuka peramban. Coba lagi.",
     "signInTimedOut": "Waktu untuk masuk telah habis. Coba lagi.",
@@ -3790,6 +3802,34 @@
     "nextScheduled": "Jadwal berikutnya",
     "answerNeeded": "Perlu jawaban",
     "waitingToRetry": "Menunggu percobaan ulang",
+    "countNoun": {
+      "needsInput_one": "Perlu masukan",
+      "needsInput_other": "Perlu masukan",
+      "running_one": "Bekerja",
+      "running_other": "Bekerja",
+      "scheduled_one": "Terjadwal",
+      "scheduled_other": "Terjadwal",
+      "idle_one": "Siaga",
+      "idle_other": "Siaga"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Perlu masukan",
+      "needsInput_other": "{{displayCount}} Perlu masukan",
+      "running_one": "{{displayCount}} Bekerja",
+      "running_other": "{{displayCount}} Bekerja",
+      "scheduled_one": "{{displayCount}} Terjadwal",
+      "scheduled_other": "{{displayCount}} Terjadwal",
+      "idle_one": "{{displayCount}} Siaga",
+      "idle_other": "{{displayCount}} Siaga"
+    },
+    "footer": {
+      "checked": "Diperiksa {{time}}",
+      "lastKnown": "Terakhir diketahui · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Eksekusi berikutnya {{time}}",
+      "wasDue": "Seharusnya {{time}}"
+    },
     "step": {
       "editing": "Mengedit",
       "reading": "Membaca",
@@ -4035,7 +4075,8 @@
         "space": "Ruang penyimpanan tidak cukup untuk model ini. Kosongkan ruang dan coba lagi.",
         "network": "Unduhan tidak selesai. Periksa koneksi Anda dan coba lagi.",
         "invalidFile": "File yang diunduh bukan model yang dapat dijalankan aplikasi ini, sehingga file tersebut dihapus.",
-        "checksum": "File yang diunduh tidak cocok dengan checksum yang dipublikasikan, sehingga file tersebut dihapus. Coba unduh lagi."
+        "checksum": "File yang diunduh tidak cocok dengan checksum yang dipublikasikan, sehingga file tersebut dihapus. Coba unduh lagi.",
+        "writeFailed": "Perangkat ini tidak dapat menyimpan model. Coba unduh lagi."
       }
     },
     "catalog": {
@@ -4477,6 +4518,7 @@
         "balanceNeutral": "Saldo tetap",
         "deduction": "Pengurangan",
         "grant": "Kredit gratis",
+        "welcomeCredits": "Kredit selamat datang",
         "purchase": "Pembelian"
       },
       "purchaseFallback": "Pembelian kredit",
@@ -4732,6 +4774,8 @@
     "connectedTo": "Terhubung ke {{account}}",
     "disconnected": "{{provider}} telah diputuskan",
     "disconnectFailed": "Tidak dapat memutuskan {{provider}}",
+    "disconnectRetry": "Slack tidak dapat mengonfirmasi pemutusan. Coba lagi.",
+    "disconnectNeedsSupport": "Kilo tidak dapat membaca akses Slack yang disimpan untuk koneksi ini. Hubungi tim dukungan untuk menyelesaikan pemutusan.",
     "couldNotLoad": "Tidak dapat memuat integrasi",
     "permissionDenied": "Anda tidak memiliki izin untuk mengelola integrasi ini.",
     "managedByOwner": "Minta pemilik organisasi untuk mengubah koneksi yang tidak dapat Anda ubah.",

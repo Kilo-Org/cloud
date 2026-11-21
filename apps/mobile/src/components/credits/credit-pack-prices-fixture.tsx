@@ -138,6 +138,11 @@ const creditBlocks: RouterOutputs['user']['getCreditBlocks'] = {
   autoTopUpEnabled: false,
 };
 
+const grantHistory: RouterOutputs['user']['getCreditGrantHistory'] = {
+  grants: [],
+  hasMore: false,
+};
+
 const meResponse: RouterOutputs['user']['getMe'] = {
   success: true,
   id: 'credits-price-fixture',
@@ -211,6 +216,9 @@ function createFixtureClient(state: CreditPackPricesFixtureState) {
           }
           if (url.includes('/user.getCreditBlocks')) {
             return fixtureResponse(creditBlocks);
+          }
+          if (url.includes('/user.getCreditGrantHistory')) {
+            return fixtureResponse(grantHistory);
           }
           if (url.includes('/credits.getMobileStoreProducts')) {
             return fixtureResponse(catalog);

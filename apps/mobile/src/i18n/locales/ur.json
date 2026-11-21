@@ -450,6 +450,17 @@
       "location": "Vertex مقام",
       "clientEmail": "سروس اکاؤنٹ ای میل",
       "privateKey": "سروس اکاؤنٹ کی نجی کلید",
+      "privateKeyBlockRequired": "پورا کلید بلاک پیسٹ کریں، BEGIN لائن سے END لائن تک۔",
+      "privateKeyEncrypted": "یہ کلید بلاک پاس فریز سے محفوظ ہے۔ ایسی سروس اکاؤنٹ کلید پیسٹ کریں جس میں کوئی پاس فریز نہ ہو۔",
+      "names": {
+        "codestral": "صرف پرانا Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT سے سائن ان کریں)",
+        "xiaomi": "Xiaomi (استعمال کے مطابق ادائیگی)",
+        "zai": "Z.ai (استعمال کے مطابق ادائیگی)",
+        "bedrockByok": "Amazon Bedrock (براہ راست)",
+        "vertexByok": "Google Vertex AI (براہ راست)"
+      },
       "modelMappings": "ماڈل میپنگز",
       "modelMappingsDescription": "گیٹ وے ماڈل کو حسب ضرورت ڈیپلائمنٹ نام پر بھیجیں۔",
       "mappingTitle": "میپنگ {{number}}",
@@ -1308,7 +1319,7 @@
       "couldNotGetLatest": "تازہ ترین معلومات حاصل نہیں ہو سکیں۔",
       "byline": "#{{number}}، مصنف: {{author}}",
       "noFindings": "کوئی مسئلہ نہیں ملا۔",
-      "findingsUnavailable": "اس جائزے کی ناکامی کی وجہ سے نتائج دستیاب نہیں ہیں۔",
+      "findingsUnavailable": "نتائج دستیاب نہیں ہیں۔",
       "findingsInProgress": "یہ جائزہ ابھی جاری ہے۔ مکمل ہونے پر مسائل یہاں نظر آئیں گے۔",
       "findingsEndedWithoutResults": "یہ جائزہ کوئی مسئلہ سامنے لانے سے پہلے ہی ختم ہو گیا۔",
       "serviceUnavailable": "کوڈ کے جائزے کی سروس سے رابطہ نہیں ہو سکا۔ سروس دستیاب ہونے پر جائزے کی دوبارہ کوشش کریں۔",
@@ -3628,6 +3639,7 @@
       "identifierLabel": "شناخت کنندہ",
       "identifierRequired": "شناخت کنندہ درج کریں۔",
       "identifierTaken": "ایک اور موڈ پہلے ہی یہ شناخت کنندہ استعمال کرتا ہے۔",
+      "identifierTooLong": "شناخت کنندہ کو {{max}} حروف یا اس سے کم تک رکھیں۔",
       "nameLabel": "موڈ کا نام",
       "nameRequired": "موڈ کا نام درج کریں۔",
       "notFound": "یہ موڈ اب موجود نہیں ہے۔",
@@ -3718,7 +3730,7 @@
     "emailDeliveryFailed": "ای میل کی ترسیل فی الحال دستیاب نہیں ہے۔ براہ کرم بعد میں دوبارہ کوشش کریں۔",
     "admissionRequired": "آپ کی ڈیوائس کی تصدیق نہیں ہو سکتی۔ کسی دوسری ڈیوائس پر یا ویب کے ذریعے سائن ان کرنے کے لیے '$t(login.moreSignInOptions)' استعمال کریں۔",
     "default": "کوئی خرابی پیش آ گئی۔ دوبارہ کوشش کریں۔",
-    "retryableAdmission": "ہم اس ڈیوائس کی تصدیق نہیں کر سکے۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
+    "retryableAdmission": "اس ڈیوائس کی تصدیق نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
     "startSignInFailed": "سائن ان شروع نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔",
     "couldNotOpenBrowser": "براؤزر نہیں کھل سکا۔ براہ کرم دوبارہ کوشش کریں۔",
     "signInTimedOut": "سائن ان کا وقت ختم ہو گیا۔ براہ کرم دوبارہ کوشش کریں۔",
@@ -3790,6 +3802,34 @@
     "nextScheduled": "آئندہ شیڈول",
     "answerNeeded": "جواب درکار",
     "waitingToRetry": "دوبارہ کوشش کا انتظار",
+    "countNoun": {
+      "needsInput_one": "ان پٹ درکار",
+      "needsInput_other": "ان پٹ درکار",
+      "running_one": "کام جاری ہے",
+      "running_other": "کام جاری ہے",
+      "scheduled_one": "شیڈول شدہ",
+      "scheduled_other": "شیڈول شدہ",
+      "idle_one": "فارغ",
+      "idle_other": "فارغ"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} ان پٹ درکار",
+      "needsInput_other": "{{displayCount}} ان پٹ درکار",
+      "running_one": "{{displayCount}} کام جاری ہے",
+      "running_other": "{{displayCount}} کام جاری ہے",
+      "scheduled_one": "{{displayCount}} شیڈول شدہ",
+      "scheduled_other": "{{displayCount}} شیڈول شدہ",
+      "idle_one": "{{displayCount}} فارغ",
+      "idle_other": "{{displayCount}} فارغ"
+    },
+    "footer": {
+      "checked": "آخری تصدیق {{time}}",
+      "lastKnown": "آخری معلوم حالت · {{time}}"
+    },
+    "wake": {
+      "nextRun": "اگلا اجرا {{time}}",
+      "wasDue": "متوقع تھا {{time}}"
+    },
     "step": {
       "editing": "ترمیم",
       "reading": "پڑھ رہا ہے",
@@ -4035,7 +4075,8 @@
         "space": "اس ماڈل کے لیے کافی خالی اسٹوریج نہیں ہے۔ جگہ خالی کریں اور دوبارہ کوشش کریں۔",
         "network": "ڈاؤن لوڈ مکمل نہیں ہوا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
         "invalidFile": "ڈاؤن لوڈ شدہ فائل ایسا ماڈل نہیں ہے جو یہ ایپ چلا سکے، اس لیے اسے ہٹا دیا گیا۔",
-        "checksum": "ڈاؤن لوڈ شدہ فائل اپنے شائع شدہ چیک سم سے مطابقت نہیں رکھتی، اس لیے اسے ہٹا دیا گیا۔ دوبارہ ڈاؤن لوڈ کرنے کی کوشش کریں۔"
+        "checksum": "ڈاؤن لوڈ شدہ فائل اپنے شائع شدہ چیک سم سے مطابقت نہیں رکھتی، اس لیے اسے ہٹا دیا گیا۔ دوبارہ ڈاؤن لوڈ کرنے کی کوشش کریں۔",
+        "writeFailed": "یہ ڈیوائس ماڈل محفوظ نہیں کر سکی۔ دوبارہ ڈاؤن لوڈ کرنے کی کوشش کریں۔"
       }
     },
     "catalog": {
@@ -4477,6 +4518,7 @@
         "balanceNeutral": "بیلنس پر اثر نہیں",
         "deduction": "کٹوتی",
         "grant": "مفت کریڈٹ",
+        "welcomeCredits": "خوش آمدید کریڈٹ",
         "purchase": "خریداری"
       },
       "purchaseFallback": "کریڈٹ کی خریداری",
@@ -4732,6 +4774,8 @@
     "connectedTo": "{{account}} سے منسلک",
     "disconnected": "{{provider}} منقطع ہو گیا",
     "disconnectFailed": "{{provider}} کو منقطع نہیں کیا جا سکا",
+    "disconnectRetry": "Slack منقطع ہونے کی تصدیق نہیں کر سکا۔ دوبارہ کوشش کریں۔",
+    "disconnectNeedsSupport": "Kilo اس کنکشن کے لیے محفوظ Slack رسائی نہیں پڑھ سکا۔ منقطع کرنے کا عمل مکمل کرنے کے لیے معاونت کی ٹیم سے رابطہ کریں۔",
     "couldNotLoad": "انٹیگریشنز لوڈ نہیں ہو سکیں",
     "permissionDenied": "آپ کو ان انٹیگریشنز کا انتظام کرنے کی اجازت نہیں ہے۔",
     "managedByOwner": "آپ جو کنکشن تبدیل نہیں کر سکتے، اسے تبدیل کرنے کے لیے تنظیم کے کسی مالک سے کہیں۔",

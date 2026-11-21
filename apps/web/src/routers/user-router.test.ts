@@ -738,6 +738,205 @@ describe('user router - credit purchase history', () => {
   });
 });
 
+describe('user router - credit grant history', () => {
+  let viewer: User;
+  let pageUser: User;
+  let overflowUser: User;
+  let stranger: User;
+  let grantOrganizationId: string;
+
+  const welcomeGrantId = crypto.randomUUID();
+  const referralGrantId = crypto.randomUUID();
+  const organizationGrantId = crypto.randomUUID();
+  const paidGrantId = crypto.randomUUID();
+  const negativeGrantId = crypto.randomUUID();
+  const restoredGrantId = crypto.randomUUID();
+  const strangerGrantId = crypto.randomUUID();
+
+  // `pageGrantIds[i]` is created `i` seconds after `pageStartMs`, so the last
+  // id is the newest row the procedure must return first.
+  const pageGrantIds = Array.from({ length: 100 }, () => crypto.randomUUID());
+  const overflowGrantIds = Array.from({ length: 101 }, () => crypto.randomUUID());
+  const pageStartMs = Date.UTC(2026, 7, 1);
+  const overflowStartMs = Date.UTC(2026, 8, 1);
+
+  const grantRow = (
+    id: string,
+    kiloUserId: string,
+    createdAtMs: number,
+    overrides: Partial<typeof credit_transactions.$inferInsert> = {}
+  ): typeof credit_transactions.$inferInsert => ({
+    id,
+    kilo_user_id: kiloUserId,
+    amount_microdollars: 1_000_000,
+    is_free: true,
+    created_at: new Date(createdAtMs).toISOString(),
+    ...overrides,
+  });
+
+  beforeAll(async () => {
+    viewer = await insertTestUser();
+    pageUser = await insertTestUser();
+    overflowUser = await insertTestUser();
+    stranger = await insertTestUser();
+    const organization = await createTestOrganization('credit-grant-history-org', viewer.id, 0);
+    grantOrganizationId = organization.id;
+
+    await db.insert(credit_transactions).values([
+      // The welcome category carries a 30-day term
+      // (`WELCOME_CREDIT_EXPIRY_HRS`), so its row holds a real expiry date; the
+      // referral category never expires and holds none.
+      grantRow(welcomeGrantId, viewer.id, Date.UTC(2026, 6, 1, 10), {
+        amount_microdollars: 15_000_000,
+        credit_category: 'automatic-welcome-credits',
+        expiry_date: '2026-07-31T10:00:00.000Z',
+      }),
+      grantRow(referralGrantId, viewer.id, Date.UTC(2026, 6, 2, 10), {
+        amount_microdollars: 2_000_000,
+        credit_category: 'referral-redeeming-bonus',
+      }),
+      // Identically shaped to the referral row, but organization-scoped.
+      grantRow(organizationGrantId, viewer.id, Date.UTC(2026, 6, 3, 10), {
+        organization_id: organization.id,
+      }),
+      grantRow(paidGrantId, viewer.id, Date.UTC(2026, 6, 4, 10), {
+        is_free: false,
+        description: 'Top-up via stripe',
+        stripe_payment_id: `ch_${crypto.randomUUID()}`,
+      }),
+      grantRow(negativeGrantId, viewer.id, Date.UTC(2026, 6, 5, 10), {
+        amount_microdollars: -3_000_000,
+        credit_category: 'refund_debt_restored:probe',
+      }),
+      grantRow(restoredGrantId, viewer.id, Date.UTC(2026, 6, 6, 10), {
+        credit_category: 'refund_debt_restored:probe',
+        source_transaction_id: crypto.randomUUID(),
+      }),
+      grantRow(strangerGrantId, stranger.id, Date.UTC(2026, 6, 7, 10)),
+      ...pageGrantIds.map((id, index) => grantRow(id, pageUser.id, pageStartMs + index * 1000)),
+      ...overflowGrantIds.map((id, index) =>
+        grantRow(id, overflowUser.id, overflowStartMs + index * 1000)
+      ),
+    ]);
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(credit_transactions)
+      .where(
+        inArray(credit_transactions.kilo_user_id, [
+          viewer.id,
+          pageUser.id,
+          overflowUser.id,
+          stranger.id,
+        ])
+      );
+    await db
+      .delete(organization_memberships)
+      .where(eq(organization_memberships.organization_id, grantOrganizationId));
+    await db.delete(organizations).where(eq(organizations.id, grantOrganizationId));
+    await db
+      .delete(kilocode_users)
+      .where(inArray(kilocode_users.id, [viewer.id, pageUser.id, overflowUser.id, stranger.id]));
+  });
+
+  it('returns personal free grants newest first and maps their category to a kind', async () => {
+    const caller = await createCallerForUser(viewer.id);
+
+    const result = await caller.user.getCreditGrantHistory({});
+
+    expect(result.grants).toEqual([
+      {
+        id: referralGrantId,
+        date: '2026-07-02T10:00:00.000Z',
+        amount_mUsd: 2_000_000,
+        kind: 'referral',
+        expiryDate: null,
+      },
+      {
+        id: welcomeGrantId,
+        date: '2026-07-01T10:00:00.000Z',
+        amount_mUsd: 15_000_000,
+        kind: 'welcome',
+        expiryDate: '2026-07-31T10:00:00.000Z',
+      },
+    ]);
+    expect(result.hasMore).toBe(false);
+  });
+
+  it('returns a grant expiry as the ISO instant the column stores, and null for none', async () => {
+    const caller = await createCallerForUser(viewer.id);
+
+    const result = await caller.user.getCreditGrantHistory({});
+
+    const welcome = result.grants.find(grant => grant.id === welcomeGrantId);
+    const referral = result.grants.find(grant => grant.id === referralGrantId);
+    // The column is a timestamp the driver hands back as a string, so the row
+    // has to carry one instant both clients can parse; a category without a
+    // term must say null instead of an empty string.
+    expect(welcome?.expiryDate).toBe('2026-07-31T10:00:00.000Z');
+    expect(referral?.expiryDate).toBeNull();
+  });
+
+  it('excludes an organization-scoped row that is otherwise identical', async () => {
+    const caller = await createCallerForUser(viewer.id);
+
+    const result = await caller.user.getCreditGrantHistory({});
+
+    expect(result.grants.map(grant => grant.id)).not.toContain(organizationGrantId);
+    expect(result.grants.map(grant => grant.id)).toEqual([referralGrantId, welcomeGrantId]);
+  });
+
+  it('excludes paid rows and negative rows', async () => {
+    const caller = await createCallerForUser(viewer.id);
+
+    const result = await caller.user.getCreditGrantHistory({});
+
+    const ids = result.grants.map(grant => grant.id);
+    expect(ids).not.toContain(paidGrantId);
+    expect(ids).not.toContain(negativeGrantId);
+    expect(ids).toEqual([referralGrantId, welcomeGrantId]);
+  });
+
+  it('excludes restored refund rows linked to a source transaction', async () => {
+    const caller = await createCallerForUser(viewer.id);
+
+    const result = await caller.user.getCreditGrantHistory({});
+
+    expect(result.grants.map(grant => grant.id)).not.toContain(restoredGrantId);
+    expect(result.grants.map(grant => grant.id)).toEqual([referralGrantId, welcomeGrantId]);
+  });
+
+  it("never returns another user's grant", async () => {
+    const viewerCaller = await createCallerForUser(viewer.id);
+    const strangerCaller = await createCallerForUser(stranger.id);
+
+    const viewerResult = await viewerCaller.user.getCreditGrantHistory({});
+    expect(viewerResult.grants.map(grant => grant.id)).not.toContain(strangerGrantId);
+
+    const strangerResult = await strangerCaller.user.getCreditGrantHistory({});
+    expect(strangerResult.grants.map(grant => grant.id)).toEqual([strangerGrantId]);
+  });
+
+  it('returns one 100-row page and reports hasMore only past the boundary', async () => {
+    const pageCaller = await createCallerForUser(pageUser.id);
+    const page = await pageCaller.user.getCreditGrantHistory({});
+
+    expect(page.grants).toHaveLength(100);
+    expect(page.hasMore).toBe(false);
+    expect(page.grants[0].id).toBe(pageGrantIds[99]);
+    expect(page.grants[99].id).toBe(pageGrantIds[0]);
+
+    const overflowCaller = await createCallerForUser(overflowUser.id);
+    const overflow = await overflowCaller.user.getCreditGrantHistory({});
+
+    expect(overflow.grants).toHaveLength(100);
+    expect(overflow.hasMore).toBe(true);
+    expect(overflow.grants[0].id).toBe(overflowGrantIds[100]);
+    expect(overflow.grants[99].id).toBe(overflowGrantIds[1]);
+  });
+});
+
 describe('user router - notification preferences', () => {
   let firstUser: User;
   let secondUser: User;

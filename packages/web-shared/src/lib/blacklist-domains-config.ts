@@ -1,10 +1,12 @@
 import 'server-only';
 import * as z from 'zod';
+import { captureException } from '@sentry/nextjs';
 import { asc } from 'drizzle-orm';
 import { blacklisted_domains, blacklisted_domains_settings } from '@kilocode/db/schema';
 import { createEmailDomainBlacklistCache } from '@kilocode/worker-utils/account-access';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /**
  * TLDs refused for new signups until an admin changes the stored list. These are
@@ -25,6 +27,8 @@ export type BlacklistDomainsSettings = z.infer<typeof BlacklistDomainsSettingsSc
 const StoredBlacklistDomainsSettingsSchema = BlacklistDomainsSettingsSchema.required({
   blocked_signup_tlds: true,
 });
+/** A settings row that exists: the admin saved a list, possibly explicitly empty. */
+type StoredBlacklistDomainsSettings = z.infer<typeof StoredBlacklistDomainsSettingsSchema>;
 
 export const DEFAULT_BLACKLIST_DOMAINS_SETTINGS: BlacklistDomainsSettings = {
   updated_at: null,
@@ -63,7 +67,7 @@ export const envFallbackSignupTlds = getEnvFallbackSignupTlds();
 
 export async function readBlacklistDomainsSettings(
   fromDb: Pick<typeof db, 'select'> = db
-): Promise<(BlacklistDomainsSettings & { blocked_signup_tlds: string[] }) | null> {
+): Promise<StoredBlacklistDomainsSettings | null> {
   const [row] = await fromDb.select().from(blacklisted_domains_settings).limit(1);
   if (!row) return null;
 
@@ -76,11 +80,69 @@ export async function readBlacklistDomainsSettings(
 }
 
 /**
+ * One outage reports at most once per window per instance. The retired cache negatively cached a
+ * failure for its 30 s backoff window, which capped reporting at this rate; reading without a
+ * cache would otherwise spend the Sentry quota on one event per signup attempt.
+ */
+const SIGNUP_TLD_REPORT_INTERVAL_MS = 30_000;
+let lastSignupTldReportAt = Number.NEGATIVE_INFINITY;
+
+/**
+ * The last settings a read in this process returned, so a failed read can serve them. `read`
+ * with `settings: null` is a successful read of an absent row, which is itself last-known-good;
+ * `none` means no read has succeeded yet, where the deployment list applies instead.
+ */
+type SignupTldSnapshot =
+  | { state: 'none' }
+  | { state: 'read'; settings: StoredBlacklistDomainsSettings | null };
+let lastSignupTldSnapshot: SignupTldSnapshot = { state: 'none' };
+
+/** Tests clear the failure window and the remembered settings; production keeps both. */
+export function resetSignupTldStateForTest(): void {
+  lastSignupTldReportAt = Number.NEGATIVE_INFINITY;
+  lastSignupTldSnapshot = { state: 'none' };
+}
+
+/**
+ * Reads the signup TLD settings, reporting a failure and serving the last-known-good value.
+ * Before #11609 the read sat behind `createCachedFetch`, which caught the same reported error and
+ * returned `cached?.value ?? defaultValue`: the settings of the last successful read, or its
+ * `null` default when no read had succeeded yet. This keeps that behaviour, so an outage leaves
+ * the admin's saved TLDs in force instead of relaxing the gate to the deployment list; only a
+ * failure before any successful read falls back to the deployment list (or BLOCKED_SIGNUP_TLDS).
+ *
+ * Remembering the value does not delay an update: every check still reads Postgres, and the
+ * remembered settings are used only once a read has failed. That keeps an admin save immediate,
+ * which is what #11609 wanted.
+ */
+async function readSignupTldSettingsOrReport(): Promise<StoredBlacklistDomainsSettings | null> {
+  try {
+    const settings = await readBlacklistDomainsSettings();
+    lastSignupTldSnapshot = { state: 'read', settings };
+    return settings;
+  } catch (error) {
+    const now = Date.now();
+    if (now - lastSignupTldReportAt >= SIGNUP_TLD_REPORT_INTERVAL_MS) {
+      lastSignupTldReportAt = now;
+      // The log line and the Sentry event describe one failure, so they share the window;
+      // leaving the log outside it would emit a line per signup attempt during an outage.
+      errorExceptInTest('[blacklist-domains] Failed to read the signup TLD settings:', error);
+      captureException(error, { tags: { source: 'blacklist_domains_config' } });
+    }
+    return lastSignupTldSnapshot.state === 'read' ? lastSignupTldSnapshot.settings : null;
+  }
+}
+
+/**
  * The admin-configured signup TLD blocklist. An absent row keeps the deployment default (or
  * BLOCKED_SIGNUP_TLDS); an explicit empty array disables TLD blocking.
+ *
+ * The read happens on every check, so an admin save is immediate. When a read fails, the gate
+ * reports and keeps the settings the last successful read returned, so an outage does not change
+ * which TLDs are blocked.
  */
 export async function getBlockedSignupTlds(): Promise<string[]> {
-  const settings = await readBlacklistDomainsSettings();
+  const settings = await readSignupTldSettingsOrReport();
   return normalizeSignupTlds(settings ? settings.blocked_signup_tlds : envFallbackSignupTlds);
 }
 

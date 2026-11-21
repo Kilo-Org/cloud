@@ -450,6 +450,17 @@
       "location": "Ibi Vertex",
       "clientEmail": "Ímeèlì service account",
       "privateKey": "Kọ́kọ́rọ́ àdáni service account",
+      "privateKeyBlockRequired": "Lẹ gbogbo àkójọ kọ́kọ́rọ́ náà síbí, láti ìlà BEGIN sí ìlà END.",
+      "privateKeyEncrypted": "Àkójọ kọ́kọ́rọ́ yìí wà lábẹ́ ààbò passphrase. Lẹ kọ́kọ́rọ́ service account kan tí kò ní passphrase síbí.",
+      "names": {
+        "codestral": "Àtijọ́ Codestral nìkan",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Wọlé pẹ̀lú ChatGPT)",
+        "xiaomi": "Xiaomi (sanwó ní ìbámu pẹ̀lú ìlò)",
+        "zai": "Z.ai (sanwó ní ìbámu pẹ̀lú ìlò)",
+        "bedrockByok": "Amazon Bedrock (tààrà)",
+        "vertexByok": "Google Vertex AI (tààrà)"
+      },
       "modelMappings": "Àwọn ìsopọ̀ àwòṣe",
       "modelMappingsDescription": "Darí àwòṣe gateway kan sí orúkọ deployment àdáni.",
       "mappingTitle": "Ìsopọ̀ {{number}}",
@@ -1308,7 +1319,7 @@
       "couldNotGetLatest": "A kò lè gba dátà tuntun.",
       "byline": "#{{number}} láti ọwọ́ {{author}}",
       "noFindings": "Kò sí àbùkù.",
-      "findingsUnavailable": "Àwọn àbájáde kò sí nítorí pé àtúnyẹ̀wò yìí kùnà.",
+      "findingsUnavailable": "Àwọn àbájáde kò sí.",
       "findingsInProgress": "Àtúnyẹ̀wò yìí ń tẹ̀ síwájú sì. Àwọn àbùkù yóò fara hàn níbí nígbà tí ó bá parí.",
       "findingsEndedWithoutResults": "Àtúnyẹ̀wò yìí parí ṣáájú kí ó tó gbé àbùkù kan jáde.",
       "serviceUnavailable": "A kò lè sopọ̀ mọ́ iṣẹ́ àtúnyẹ̀wò kóòdù. Tún gbìyànjú àtúnyẹ̀wò nígbà tí iṣẹ́ náà bá wà.",
@@ -3628,6 +3639,7 @@
       "identifierLabel": "Ìdánimọ̀",
       "identifierRequired": "Tẹ ìdánimọ̀ kan.",
       "identifierTaken": "Ipò mìíràn ti ń lo ìdánimọ̀ yìí.",
+      "identifierTooLong": "Jẹ́ kí ìdánimọ̀ wà ní {{max}} lẹ́tà tàbí kéré sí i.",
       "nameLabel": "Orúkọ ipò",
       "nameRequired": "Tẹ orúkọ ipò kan.",
       "notFound": "Ipò yìí kò sí mọ́.",
@@ -3718,7 +3730,7 @@
     "emailDeliveryFailed": "A kò lè fi iméèlì ránṣẹ́ fún ìgbà díẹ̀. Jọ̀wọ́ tún gbìyànjú nígbà mìíràn.",
     "admissionRequired": "A kò lè jẹ́rìí sí ẹ̀rọ rẹ. Lo '$t(login.moreSignInOptions)' láti wọlé lórí ẹ̀rọ mìíràn tàbí nípasẹ̀ wẹ́ẹ̀bù.",
     "default": "Àṣìṣe kan ṣẹlẹ̀. Jọ̀wọ́ tún gbìyànjú.",
-    "retryableAdmission": "A kò lè jẹ́rìí sí ẹ̀rọ yìí. Ṣàyẹ̀wò àsopọ̀ rẹ kí o tún gbìyànjú.",
+    "retryableAdmission": "A kò lè jẹ́rìí ẹ̀rọ yìí. Gbìyànjú lẹ́ẹ̀kan sí i.",
     "startSignInFailed": "A kò lè bẹ̀rẹ̀ ìwọlé. Jọ̀wọ́ tún gbìyànjú.",
     "couldNotOpenBrowser": "A kò lè ṣí aṣàwákiri. Jọ̀wọ́ tún gbìyànjú.",
     "signInTimedOut": "Àkókò ìwọlé ti parí. Jọ̀wọ́ tún gbìyànjú.",
@@ -3790,6 +3802,34 @@
     "nextScheduled": "Àwọn ètò tó kàn",
     "answerNeeded": "Nílò èsì",
     "waitingToRetry": "Ń dúró láti tún gbìyànjú",
+    "countNoun": {
+      "needsInput_one": "Nílò èsì rẹ",
+      "needsInput_other": "Nílò èsì rẹ",
+      "running_one": "Ń ṣiṣẹ́",
+      "running_other": "Ń ṣiṣẹ́",
+      "scheduled_one": "Ti ṣètò",
+      "scheduled_other": "Ti ṣètò",
+      "idle_one": "Kò ṣiṣẹ́ lọ́wọ́",
+      "idle_other": "Kò ṣiṣẹ́ lọ́wọ́"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Nílò èsì rẹ",
+      "needsInput_other": "{{displayCount}} Nílò èsì rẹ",
+      "running_one": "{{displayCount}} Ń ṣiṣẹ́",
+      "running_other": "{{displayCount}} Ń ṣiṣẹ́",
+      "scheduled_one": "{{displayCount}} Ti ṣètò",
+      "scheduled_other": "{{displayCount}} Ti ṣètò",
+      "idle_one": "{{displayCount}} Kò ṣiṣẹ́ lọ́wọ́",
+      "idle_other": "{{displayCount}} Kò ṣiṣẹ́ lọ́wọ́"
+    },
+    "footer": {
+      "checked": "Ti ṣàyẹ̀wò {{time}}",
+      "lastKnown": "Tí a mọ̀ kẹ́yìn · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Ìṣiṣẹ́ tó kàn {{time}}",
+      "wasDue": "A retí {{time}}"
+    },
     "step": {
       "editing": "Ṣíṣe àtúnṣe",
       "reading": "Kíkà",
@@ -4035,7 +4075,8 @@
         "space": "Kò sí ààyè tó pọ̀ tó fún awoṣe yìí. Ṣí ààyè kúrò kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
         "network": "Gbígbà sílẹ̀ kò parí. Yẹ ìsopọ̀ rẹ wò kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
         "invalidFile": "Fáìlì tí a gbà sílẹ̀ kì í ṣe awoṣe tí app yìí lè ṣiṣẹ́, nítorí náà a yọ ọ́ kúrò.",
-        "checksum": "Fáìlì tí a gbà sílẹ̀ kò bá checksum rẹ̀ tí a tẹ̀ jáde mu, nítorí náà a yọ ọ́ kúrò. Tún gbìyànjú láti gbà á sílẹ̀."
+        "checksum": "Fáìlì tí a gbà sílẹ̀ kò bá checksum rẹ̀ tí a tẹ̀ jáde mu, nítorí náà a yọ ọ́ kúrò. Tún gbìyànjú láti gbà á sílẹ̀.",
+        "writeFailed": "Ẹ̀rọ yìí kò lè fipamọ́ awoṣe náà. Tún gbìyànjú láti gbà á sílẹ̀."
       }
     },
     "catalog": {
@@ -4477,6 +4518,7 @@
         "balanceNeutral": "Kò yí ìyókù padà",
         "deduction": "Ìyọkúrò",
         "grant": "Ẹ̀bùn kírẹ́dítì",
+        "welcomeCredits": "Kírẹ́dítì ìkáàbọ̀",
         "purchase": "Ìrajà"
       },
       "purchaseFallback": "Ìrajà kírẹ́dítì",
@@ -4732,6 +4774,8 @@
     "connectedTo": "Ti so pọ̀ mọ́ {{account}}",
     "disconnected": "A ti já ìsopọ̀ {{provider}}",
     "disconnectFailed": "Kò ṣeé ṣe láti já ìsopọ̀ {{provider}}",
+    "disconnectRetry": "Slack kò lè jẹ́rìí pípa ìsopọ̀ náà. Gbìyànjú lẹ́ẹ̀kan sí i.",
+    "disconnectNeedsSupport": "Kilo kò lè kà àwọn àǹfààní Slack tí a fipamọ́ fún ìsopọ̀ yìí. Kàn sí ẹgbẹ́ ìrànlọ́wọ́ láti parí pípa ìsopọ̀ náà.",
     "couldNotLoad": "Kò ṣeé ṣe láti gbé àwọn ìsopọ̀ wá",
     "permissionDenied": "O kò ní àṣẹ láti ṣàkóso àwọn ìsopọ̀ wọ̀nyí.",
     "managedByOwner": "Bèèrè lọ́wọ́ ẹni tó ni àjọ náà láti yí ìsopọ̀ kan tí o kò lè yí padà.",

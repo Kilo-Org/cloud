@@ -1,19 +1,16 @@
-import { z } from 'zod';
-
 /**
  * The small derived summary of one session that the session card shows
  * (`.specs/mobile-session-live-activity.md` "Card data contract"). The ingest
  * service derives it from the tool, todo, diff and error items and stores only
  * this summary, never the raw text. It never carries assistant message text.
- *
- * It also owns the creation-title placeholder, the machine name the backend
- * seeds before a person names a session: every surface that decides whether a
- * session has a name yet reads it from here.
  */
+
+import { z } from 'zod';
 
 /**
  * The title the backend seeds at creation: `New session - <ISO>` for a root
- * session and `Child session - <ISO>` for a child.
+ * session and `Child session - <ISO>` for a child. Every surface that decides
+ * whether a session has a name yet reads the creation-title rule from here.
  */
 export const DEFAULT_SESSION_TITLE_PATTERN =
   /^(New session - |Child session - )\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;

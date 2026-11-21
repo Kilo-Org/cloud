@@ -17753,6 +17753,7 @@
               "organization.group.default_policy.remove",
               "organization.group.policy_type.enable",
               "organization.group.policy_type.disable",
+              "organization.named_policy.change",
               "organization.created",
               "organization.token.generate",
               "organization.funds.distribute_to_children",
@@ -37961,6 +37962,21 @@
       "getcreditblocks"
     ],
     "searchBlob": "user.getCreditBlocks Get the current user's credit balance breakdown, including credit blocks, deductions enriched with instance names, and auto top-up status. user getcreditblocks"
+  },
+  "user.getCreditGrantHistory": {
+    "path": "user.getCreditGrantHistory",
+    "kind": "query",
+    "summary": "List the free bonus credits and promotional credit grants added to the current user's account, newest first, with each grant's date, amount, and reason plus a flag for whether older grants exist beyond the returned page.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {}
+    },
+    "tags": [
+      "user",
+      "getcreditgranthistory"
+    ],
+    "searchBlob": "user.getCreditGrantHistory List the free bonus credits and promotional credit grants added to the current user's account, newest first, with each grant's date, amount, and reason plus a flag for whether older grants exist beyond the returned page. user getcreditgranthistory"
   },
   "user.getCreditPurchaseConfirmation": {
     "path": "user.getCreditPurchaseConfirmation",

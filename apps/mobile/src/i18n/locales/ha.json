@@ -450,6 +450,17 @@
       "location": "Wurin Vertex",
       "clientEmail": "Imel na asusun sabis",
       "privateKey": "Maɓallin sirri na asusun sabis",
+      "privateKeyBlockRequired": "Liƙa dukan shingen maɓallin, daga layin BEGIN zuwa layin END.",
+      "privateKeyEncrypted": "Wannan shingen maɓallin yana da kariya ta kalmar sirri. Liƙa maɓallin asusun sabis wanda ba shi da kalmar sirri.",
+      "names": {
+        "codestral": "Tsohon Codestral kawai",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Shiga da ChatGPT)",
+        "xiaomi": "Xiaomi (biya gwargwadon amfani)",
+        "zai": "Z.ai (biya gwargwadon amfani)",
+        "bedrockByok": "Amazon Bedrock (kai tsaye)",
+        "vertexByok": "Google Vertex AI (kai tsaye)"
+      },
       "modelMappings": "Taswirorin samfura",
       "modelMappingsDescription": "Tura samfurin gateway zuwa sunan deployment na musamman.",
       "mappingTitle": "Taswira {{number}}",
@@ -1308,7 +1319,7 @@
       "couldNotGetLatest": "An kasa samun sabbin bayanai.",
       "byline": "#{{number}} daga {{author}}",
       "noFindings": "Ba a gano wata matsala ba.",
-      "findingsUnavailable": "Babu sakamako saboda wannan bita ta gaza.",
+      "findingsUnavailable": "Sakamako ba su samuwa.",
       "findingsInProgress": "Wannan bitar na ci gaba har yanzu. Sakamakon zai bayyana a nan a lokacin da ta kammala.",
       "findingsEndedWithoutResults": "Wannan bitar ta ƙare kafin ta samar da wani sakamako.",
       "serviceUnavailable": "An kasa haɗawa da sabis ɗin bitar lambar shiri. Sake gwada bitar lokacin da sabis ɗin ya samu.",
@@ -3628,6 +3639,7 @@
       "identifierLabel": "Alamar ganowa",
       "identifierRequired": "Shigar da alamar ganowa.",
       "identifierTaken": "Wani yanayi ya riga ya yi amfani da wannan alamar ganowa.",
+      "identifierTooLong": "Ka riƙe alamar ganowa a cikin haruffa {{max}} ko ƙasa da haka.",
       "nameLabel": "Sunan yanayi",
       "nameRequired": "Shigar da sunan yanayi.",
       "notFound": "Wannan yanayin ba ya wanzu kuma.",
@@ -3718,7 +3730,7 @@
     "emailDeliveryFailed": "Ba a iya aika imel a yanzu. Sake gwadawa daga baya.",
     "admissionRequired": "Ba a iya tabbatar da na'urarka ba. Yi amfani da '$t(login.moreSignInOptions)' don shiga a wata na'ura ko ta yanar gizo.",
     "default": "An samu matsala. Da fatan za ka sake gwadawa.",
-    "retryableAdmission": "Ba mu iya tabbatar da wannan na'urar ba. Duba haɗinka na intanet ka sake gwadawa.",
+    "retryableAdmission": "Ba a iya tabbatar da wannan na'urar ba. Sake gwadawa.",
     "startSignInFailed": "An kasa fara shiga. Sake gwadawa.",
     "couldNotOpenBrowser": "Ba a iya buɗe burauza ba. Sake gwadawa.",
     "signInTimedOut": "Wa'adin shiga ya ƙare. Sake gwadawa.",
@@ -3790,6 +3802,34 @@
     "nextScheduled": "Na gaba da aka tsara",
     "answerNeeded": "Ana buƙatar amsa",
     "waitingToRetry": "Ana jiran sake gwadawa",
+    "countNoun": {
+      "needsInput_one": "Ana buƙatar bayani",
+      "needsInput_other": "Ana buƙatar bayani",
+      "running_one": "Ana aiki",
+      "running_other": "Ana aiki",
+      "scheduled_one": "An tsara",
+      "scheduled_other": "An tsara",
+      "idle_one": "A jiran aiki",
+      "idle_other": "A jiran aiki"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Ana buƙatar bayani",
+      "needsInput_other": "{{displayCount}} Ana buƙatar bayani",
+      "running_one": "{{displayCount}} Ana aiki",
+      "running_other": "{{displayCount}} Ana aiki",
+      "scheduled_one": "{{displayCount}} An tsara",
+      "scheduled_other": "{{displayCount}} An tsara",
+      "idle_one": "{{displayCount}} A jiran aiki",
+      "idle_other": "{{displayCount}} A jiran aiki"
+    },
+    "footer": {
+      "checked": "An duba {{time}}",
+      "lastKnown": "Na ƙarshe da aka sani · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Aiki na gaba {{time}}",
+      "wasDue": "An tsammanin {{time}}"
+    },
     "step": {
       "editing": "Ana gyarawa",
       "reading": "Ana karatu",
@@ -4035,7 +4075,8 @@
         "space": "Babu isasshen sarari kyauta don wannan samfurin. Ka yantar da sarari sannan ka sake gwadawa.",
         "network": "Saukarwar ba ta kammala ba. Duba haɗin ka sannan ka sake gwadawa.",
         "invalidFile": "Fayil ɗin da aka sauke ba samfurin da wannan manhajar za ta iya gudanarwa ba ne, don haka an cire shi.",
-        "checksum": "Fayil ɗin da aka sauke bai yi daidai da checksum ɗinsa da aka wallafa ba, don haka an cire shi. Sake gwada saukewa."
+        "checksum": "Fayil ɗin da aka sauke bai yi daidai da checksum ɗinsa da aka wallafa ba, don haka an cire shi. Sake gwada saukewa.",
+        "writeFailed": "Wannan na'urar ba ta iya adana samfurin ba. Ka sake gwada saukewa."
       }
     },
     "catalog": {
@@ -4477,6 +4518,7 @@
         "balanceNeutral": "Ba ya canja ma'auni",
         "deduction": "Cirewa",
         "grant": "Kyautar kiredit",
+        "welcomeCredits": "Kiredit na maraba",
         "purchase": "Saye"
       },
       "purchaseFallback": "Sayen kiredit",
@@ -4732,6 +4774,8 @@
     "connectedTo": "An haɗa da {{account}}",
     "disconnected": "An cire haɗin {{provider}}",
     "disconnectFailed": "Ba a iya cire haɗin {{provider}} ba",
+    "disconnectRetry": "Slack ya kasa tabbatar da cire haɗin. Sake gwadawa.",
+    "disconnectNeedsSupport": "Kilo ya kasa karanta damar Slack da aka ajiye don wannan haɗin. Tuntuɓi masu tallafi don kammala cire haɗin.",
     "couldNotLoad": "Ba a iya loda haɗe-haɗe ba",
     "permissionDenied": "Ba ka da izinin sarrafa waɗannan haɗe-haɗe.",
     "managedByOwner": "Ka roƙi mamallakin ƙungiya ya canza haɗin da ba za ka iya canza ba.",

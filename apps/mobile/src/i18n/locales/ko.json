@@ -450,6 +450,17 @@
       "location": "Vertex 위치",
       "clientEmail": "서비스 계정 이메일",
       "privateKey": "서비스 계정 비공개 키",
+      "privateKeyBlockRequired": "BEGIN 줄부터 END 줄까지 전체 키 블록을 붙여넣으세요.",
+      "privateKeyEncrypted": "이 키 블록은 패스프레이즈로 보호되어 있습니다. 패스프레이즈가 없는 서비스 계정 키를 붙여넣으세요.",
+      "names": {
+        "codestral": "이전 버전 Codestral 전용",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI(ChatGPT로 로그인)",
+        "xiaomi": "Xiaomi(종량제)",
+        "zai": "Z.ai(종량제)",
+        "bedrockByok": "Amazon Bedrock(직접)",
+        "vertexByok": "Google Vertex AI(직접)"
+      },
       "modelMappings": "모델 매핑",
       "modelMappingsDescription": "게이트웨이 모델을 사용자 지정 배포 이름으로 보냅니다.",
       "mappingTitle": "매핑 {{number}}",
@@ -805,7 +816,7 @@
       "gateHidden": "숨김",
       "gateNone": "없음",
       "noFindings": "발견된 문제가 없습니다.",
-      "findingsUnavailable": "이 리뷰가 실패하여 결과를 확인할 수 없습니다.",
+      "findingsUnavailable": "결과를 확인할 수 없습니다.",
       "findingsInProgress": "이 리뷰는 아직 진행 중입니다. 완료되면 발견된 문제가 여기에 표시됩니다.",
       "findingsEndedWithoutResults": "이 리뷰는 발견된 문제가 만들어지기 전에 종료되었습니다.",
       "serviceUnavailable": "코드 리뷰 서비스에 연결할 수 없습니다. 서비스를 사용할 수 있게 되면 리뷰를 다시 시도해 주세요.",
@@ -3632,6 +3643,7 @@
       "identifierLabel": "식별자",
       "identifierRequired": "식별자를 입력하세요.",
       "identifierTaken": "다른 모드에서 이미 이 식별자를 사용합니다.",
+      "identifierTooLong": "식별자를 {{max}}자 이하로 유지하세요.",
       "nameLabel": "모드 이름",
       "nameRequired": "모드 이름을 입력하세요.",
       "notFound": "이 모드는 더 이상 존재하지 않습니다.",
@@ -3718,7 +3730,7 @@
     "emailDeliveryFailed": "일시적으로 이메일을 보낼 수 없습니다. 잠시 후 다시 시도하세요.",
     "admissionRequired": "기기를 인증할 수 없습니다. '$t(login.moreSignInOptions)' 항목을 선택해 다른 기기나 웹에서 로그인하세요.",
     "default": "문제가 발생했습니다. 다시 시도하세요.",
-    "retryableAdmission": "이 기기를 인증하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
+    "retryableAdmission": "이 기기를 확인하지 못했습니다. 다시 시도하세요.",
     "startSignInFailed": "로그인을 시작하지 못했습니다. 다시 시도하세요.",
     "couldNotOpenBrowser": "브라우저를 열지 못했습니다. 다시 시도하세요.",
     "signInTimedOut": "로그인 제한 시간이 초과되었습니다. 다시 시도하세요.",
@@ -3790,6 +3802,34 @@
     "nextScheduled": "다음 예약",
     "answerNeeded": "답변 필요",
     "waitingToRetry": "재시도 대기",
+    "countNoun": {
+      "needsInput_one": "입력 필요",
+      "needsInput_other": "입력 필요",
+      "running_one": "작업 중",
+      "running_other": "작업 중",
+      "scheduled_one": "예약됨",
+      "scheduled_other": "예약됨",
+      "idle_one": "대기 중",
+      "idle_other": "대기 중"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} 입력 필요",
+      "needsInput_other": "{{displayCount}} 입력 필요",
+      "running_one": "{{displayCount}} 작업 중",
+      "running_other": "{{displayCount}} 작업 중",
+      "scheduled_one": "{{displayCount}} 예약됨",
+      "scheduled_other": "{{displayCount}} 예약됨",
+      "idle_one": "{{displayCount}} 대기 중",
+      "idle_other": "{{displayCount}} 대기 중"
+    },
+    "footer": {
+      "checked": "마지막 확인 {{time}}",
+      "lastKnown": "마지막 알려진 상태 · {{time}}"
+    },
+    "wake": {
+      "nextRun": "다음 실행 {{time}}",
+      "wasDue": "예정이었음 {{time}}"
+    },
     "step": {
       "editing": "편집 중",
       "reading": "읽는 중",
@@ -4035,7 +4075,8 @@
         "space": "이 모델을 저장할 공간이 부족합니다. 공간을 확보한 후 다시 시도하세요.",
         "network": "다운로드가 완료되지 않았습니다. 연결을 확인한 후 다시 시도하세요.",
         "invalidFile": "다운로드한 파일은 이 앱에서 실행할 수 있는 모델이 아니므로 삭제되었습니다.",
-        "checksum": "다운로드한 파일이 게시된 체크섬과 일치하지 않으므로 삭제되었습니다. 다시 다운로드해 보세요."
+        "checksum": "다운로드한 파일이 게시된 체크섬과 일치하지 않으므로 삭제되었습니다. 다시 다운로드해 보세요.",
+        "writeFailed": "이 기기에서는 모델을 저장하지 못했습니다. 다시 다운로드해 보세요."
       }
     },
     "catalog": {
@@ -4477,6 +4518,7 @@
         "balanceNeutral": "잔액 변동 없음",
         "deduction": "차감",
         "grant": "크레딧 지급",
+        "welcomeCredits": "환영 크레딧",
         "purchase": "구매"
       },
       "purchaseFallback": "크레딧 구매",
@@ -4732,6 +4774,8 @@
     "connectedTo": "{{account}}에 연결됨",
     "disconnected": "{{provider}} 연결이 해제되었습니다",
     "disconnectFailed": "{{provider}} 연결을 해제하지 못했습니다",
+    "disconnectRetry": "Slack에서 연결 해제를 확인하지 못했습니다. 다시 시도하세요.",
+    "disconnectNeedsSupport": "Kilo가 이 연결에 저장된 Slack 액세스를 읽지 못했습니다. 연결 해제를 마치려면 지원팀에 문의하세요.",
     "couldNotLoad": "연동 목록을 불러오지 못했습니다",
     "permissionDenied": "이 연동을 관리할 권한이 없습니다.",
     "managedByOwner": "변경할 수 없는 연결은 조직 소유자에게 변경을 요청하세요.",

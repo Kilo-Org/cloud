@@ -451,6 +451,17 @@
       "location": "Locație Vertex",
       "clientEmail": "E-mailul contului de serviciu",
       "privateKey": "Cheia privată a contului de serviciu",
+      "privateKeyBlockRequired": "Lipește întregul bloc de cheie, de la linia BEGIN până la linia END.",
+      "privateKeyEncrypted": "Acest bloc de cheie este protejat cu o frază de acces. Lipește o cheie de cont de serviciu fără frază de acces.",
+      "names": {
+        "codestral": "Doar Codestral vechi",
+        "openai": "API OpenAI",
+        "openaiChatgpt": "OpenAI (Autentifică-te cu ChatGPT)",
+        "xiaomi": "Xiaomi (plata pe utilizare)",
+        "zai": "Z.ai (plata pe utilizare)",
+        "bedrockByok": "Amazon Bedrock (facturare directă)",
+        "vertexByok": "Google Vertex AI (facturare directă)"
+      },
       "modelMappings": "Mapări de modele",
       "modelMappingsDescription": "Direcționează un model din gateway către un deployment name personalizat.",
       "mappingTitle": "Maparea {{number}}",
@@ -1335,7 +1346,7 @@
       "couldNotGetLatest": "Nu s-au putut obține cele mai recente date.",
       "byline": "#{{number}}, autor: {{author}}",
       "noFindings": "Nu există constatări.",
-      "findingsUnavailable": "Rezultatele nu sunt disponibile deoarece această revizuire a eșuat.",
+      "findingsUnavailable": "Rezultatele nu sunt disponibile.",
       "findingsInProgress": "Această revizuire este încă în desfășurare. Constatările vor apărea aici la finalizarea ei.",
       "findingsEndedWithoutResults": "Această revizuire s-a încheiat înainte de a produce constatări.",
       "serviceUnavailable": "Nu s-a putut stabili conexiunea cu serviciul de revizuire a codului. Reîncearcă revizuirea când serviciul este disponibil.",
@@ -3690,6 +3701,7 @@
       "identifierLabel": "Identificator",
       "identifierRequired": "Introdu un identificator.",
       "identifierTaken": "Un alt mod folosește deja acest identificator.",
+      "identifierTooLong": "Păstrează identificatorul la {{max}} caractere sau mai puțin.",
       "nameLabel": "Nume mod",
       "nameRequired": "Introdu un nume pentru mod.",
       "notFound": "Acest mod nu mai există.",
@@ -3782,7 +3794,7 @@
     "emailDeliveryFailed": "Trimiterea mesajelor prin e-mail este temporar indisponibilă. Încearcă din nou mai târziu.",
     "admissionRequired": "Dispozitivul tău nu poate fi verificat. Folosește „$t(login.moreSignInOptions)” pentru a te autentifica pe alt dispozitiv sau în browser.",
     "default": "A apărut o eroare. Încearcă din nou.",
-    "retryableAdmission": "Nu am putut verifica acest dispozitiv. Verifică conexiunea și încearcă din nou.",
+    "retryableAdmission": "Nu s-a putut verifica acest dispozitiv. Încearcă din nou.",
     "startSignInFailed": "Nu s-a putut începe autentificarea. Încearcă din nou.",
     "couldNotOpenBrowser": "Nu s-a putut deschide browserul. Încearcă din nou.",
     "signInTimedOut": "Timpul alocat autentificării a expirat. Încearcă din nou.",
@@ -3854,6 +3866,42 @@
     "nextScheduled": "Următoarele programate",
     "answerNeeded": "Așteaptă un răspuns",
     "waitingToRetry": "Așteaptă reîncercarea",
+    "countNoun": {
+      "needsInput_one": "Așteaptă un răspuns",
+      "needsInput_other": "Așteaptă un răspuns",
+      "needsInput_few": "Așteaptă un răspuns",
+      "running_one": "În lucru",
+      "running_other": "În lucru",
+      "running_few": "În lucru",
+      "scheduled_one": "Programată",
+      "scheduled_other": "Programate",
+      "scheduled_few": "Programate",
+      "idle_one": "Inactiv",
+      "idle_other": "Inactive",
+      "idle_few": "Inactive"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Așteaptă un răspuns",
+      "needsInput_other": "{{displayCount}} Așteaptă un răspuns",
+      "needsInput_few": "{{displayCount}} Așteaptă un răspuns",
+      "running_one": "{{displayCount}} În lucru",
+      "running_other": "{{displayCount}} În lucru",
+      "running_few": "{{displayCount}} În lucru",
+      "scheduled_one": "{{displayCount}} Programată",
+      "scheduled_other": "{{displayCount}} Programate",
+      "scheduled_few": "{{displayCount}} Programate",
+      "idle_one": "{{displayCount}} Inactiv",
+      "idle_other": "{{displayCount}} Inactive",
+      "idle_few": "{{displayCount}} Inactive"
+    },
+    "footer": {
+      "checked": "Verificat {{time}}",
+      "lastKnown": "Ultima stare cunoscută · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Următoarea rulare {{time}}",
+      "wasDue": "Era programat {{time}}"
+    },
     "step": {
       "editing": "Editare",
       "reading": "Citire",
@@ -4100,7 +4148,8 @@
         "space": "Nu există suficient spațiu liber pentru acest model. Eliberează spațiu și încearcă din nou.",
         "network": "Descărcarea nu s-a finalizat. Verifică conexiunea și încearcă din nou.",
         "invalidFile": "Fișierul descărcat nu este un model pe care această aplicație îl poate rula, așa că a fost eliminat.",
-        "checksum": "Fișierul descărcat nu corespunde sumei de control publicate, așa că a fost eliminat. Încercați din nou descărcarea."
+        "checksum": "Fișierul descărcat nu corespunde sumei de control publicate, așa că a fost eliminat. Încercați din nou descărcarea.",
+        "writeFailed": "Acest dispozitiv nu a putut salva modelul. Încercați din nou descărcarea."
       }
     },
     "catalog": {
@@ -4548,6 +4597,7 @@
         "balanceNeutral": "Fără impact asupra soldului",
         "deduction": "Deducere",
         "grant": "Credite acordate",
+        "welcomeCredits": "Credite de bun venit",
         "purchase": "Achiziție"
       },
       "purchaseFallback": "Achiziție de credite",
@@ -4811,6 +4861,8 @@
     "connectedTo": "Conectat la {{account}}",
     "disconnected": "{{provider}} a fost deconectat",
     "disconnectFailed": "{{provider}} nu a putut fi deconectat",
+    "disconnectRetry": "Slack nu a putut confirma deconectarea. Încearcă din nou.",
+    "disconnectNeedsSupport": "Kilo nu a putut citi accesul la Slack salvat pentru această conexiune. Contactează asistența pentru a finaliza deconectarea.",
     "couldNotLoad": "Integrările nu au putut fi încărcate",
     "permissionDenied": "Nu ai permisiunea de a gestiona aceste integrări.",
     "managedByOwner": "Cere unui proprietar al organizației să modifice o conexiune pe care nu o poți modifica.",

@@ -189,8 +189,10 @@ describe('Home widget states', () => {
 
   it.each(CELLS)('keeps German and Arabic/RTL copy inside the band at %dx%d', (width, height) => {
     for (const language of ['de', 'ar']) {
-      const translated = (key: string) =>
-        language === 'ar' ? `العربية ${translate(key)}` : `Deutsch ${translate(key)}`;
+      const translated = (key: string, options?: Record<string, unknown>) =>
+        language === 'ar'
+          ? `العربية ${translate(key, options)}`
+          : `Deutsch ${translate(key, options)}`;
       for (const [name, state] of Object.entries(STATES) as [string, State][]) {
         const props = stateProps(state, translated);
         const root = render(props, [width, height], language === 'ar').light;

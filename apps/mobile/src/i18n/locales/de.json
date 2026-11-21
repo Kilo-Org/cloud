@@ -450,6 +450,17 @@
       "location": "Vertex-Standort",
       "clientEmail": "E-Mail-Adresse des Dienstkontos",
       "privateKey": "Privater Schlüssel des Dienstkontos",
+      "privateKeyBlockRequired": "Füge den gesamten Schlüsselblock ein, von der BEGIN-Zeile bis zur END-Zeile.",
+      "privateKeyEncrypted": "Dieser Schlüsselblock ist mit einer Passphrase geschützt. Füge einen Schlüssel des Dienstkontos ein, der keine Passphrase hat.",
+      "names": {
+        "codestral": "Nur veraltetes Codestral",
+        "openai": "OpenAI-API",
+        "openaiChatgpt": "OpenAI (Mit ChatGPT anmelden)",
+        "xiaomi": "Xiaomi (Nutzungsbasierte Abrechnung)",
+        "zai": "Z.ai (Nutzungsbasierte Abrechnung)",
+        "bedrockByok": "Amazon Bedrock (direkt)",
+        "vertexByok": "Google Vertex AI (direkt)"
+      },
       "modelMappings": "Modellzuordnungen",
       "modelMappingsDescription": "Leite ein Gateway-Modell an einen benutzerdefinierten Deployment-Namen weiter.",
       "mappingTitle": "Zuordnung {{number}}",
@@ -805,7 +816,7 @@
       "gateHidden": "Ausgeblendet",
       "gateNone": "Ohne",
       "noFindings": "Es liegen keine Befunde vor.",
-      "findingsUnavailable": "Die Ergebnisse sind nicht verfügbar, weil dieses Review fehlgeschlagen ist.",
+      "findingsUnavailable": "Die Ergebnisse sind nicht verfügbar.",
       "findingsInProgress": "Dieses Review läuft noch. Befunde erscheinen hier, sobald es abgeschlossen ist.",
       "findingsEndedWithoutResults": "Dieses Review wurde beendet, bevor Befunde entstanden sind.",
       "serviceUnavailable": "Der Code-Review-Dienst konnte nicht erreicht werden. Führe das Review erneut aus, wenn der Dienst verfügbar ist.",
@@ -3632,6 +3643,7 @@
       "identifierLabel": "Bezeichner",
       "identifierRequired": "Bezeichner eingeben.",
       "identifierTaken": "Ein anderer Modus verwendet diesen Bezeichner bereits.",
+      "identifierTooLong": "Bezeichner auf {{max}} Zeichen oder weniger beschränken.",
       "nameLabel": "Modusname",
       "nameRequired": "Modusnamen eingeben.",
       "notFound": "Dieser Modus existiert nicht mehr.",
@@ -3718,7 +3730,7 @@
     "emailDeliveryFailed": "Die E-Mail-Zustellung ist vorübergehend nicht verfügbar. Bitte versuche es später erneut.",
     "admissionRequired": "Dein Gerät kann nicht verifiziert werden. Wähle „$t(login.moreSignInOptions)“, um dich auf einem anderen Gerät oder im Browser anzumelden.",
     "default": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
-    "retryableAdmission": "Wir konnten dieses Gerät nicht verifizieren. Prüfe deine Verbindung und versuche es erneut.",
+    "retryableAdmission": "Dieses Gerät konnte nicht bestätigt werden. Versuche es erneut.",
     "startSignInFailed": "Die Anmeldung konnte nicht gestartet werden. Bitte versuche es erneut.",
     "couldNotOpenBrowser": "Der Browser konnte nicht geöffnet werden. Bitte versuche es erneut.",
     "signInTimedOut": "Die Zeit für die Anmeldung ist abgelaufen. Bitte versuche es erneut.",
@@ -3790,6 +3802,34 @@
     "nextScheduled": "Als Nächstes geplant",
     "answerNeeded": "Antwort erforderlich",
     "waitingToRetry": "Wartet auf erneuten Versuch",
+    "countNoun": {
+      "needsInput_one": "Eingabe erforderlich",
+      "needsInput_other": "Eingabe erforderlich",
+      "running_one": "In Bearbeitung",
+      "running_other": "In Bearbeitung",
+      "scheduled_one": "Geplant",
+      "scheduled_other": "Geplant",
+      "idle_one": "Inaktiv",
+      "idle_other": "Inaktiv"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Eingabe erforderlich",
+      "needsInput_other": "{{displayCount}} Eingabe erforderlich",
+      "running_one": "{{displayCount}} In Bearbeitung",
+      "running_other": "{{displayCount}} In Bearbeitung",
+      "scheduled_one": "{{displayCount}} Geplant",
+      "scheduled_other": "{{displayCount}} Geplant",
+      "idle_one": "{{displayCount}} Inaktiv",
+      "idle_other": "{{displayCount}} Inaktiv"
+    },
+    "footer": {
+      "checked": "Geprüft {{time}}",
+      "lastKnown": "Zuletzt bekannt · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Nächste Ausführung {{time}}",
+      "wasDue": "War fällig {{time}}"
+    },
     "step": {
       "editing": "Bearbeiten",
       "reading": "Lesen",
@@ -4035,7 +4075,8 @@
         "space": "Es ist nicht genügend freier Speicherplatz für dieses Modell vorhanden. Gib Speicherplatz frei und versuche es erneut.",
         "network": "Der Download wurde nicht abgeschlossen. Prüfe deine Verbindung und versuche es erneut.",
         "invalidFile": "Die heruntergeladene Datei ist kein Modell, das diese App ausführen kann, und wurde daher entfernt.",
-        "checksum": "Die heruntergeladene Datei stimmt nicht mit ihrer veröffentlichten Prüfsumme überein und wurde daher entfernt. Versuche den Download erneut."
+        "checksum": "Die heruntergeladene Datei stimmt nicht mit ihrer veröffentlichten Prüfsumme überein und wurde daher entfernt. Versuche den Download erneut.",
+        "writeFailed": "Dieses Gerät konnte das Modell nicht speichern. Versuche den Download erneut."
       }
     },
     "catalog": {
@@ -4477,6 +4518,7 @@
         "balanceNeutral": "Saldoneutral",
         "deduction": "Abzug",
         "grant": "Credit-Gutschrift",
+        "welcomeCredits": "Willkommens-Credits",
         "purchase": "Kauf"
       },
       "purchaseFallback": "Credit-Kauf",
@@ -4732,6 +4774,8 @@
     "connectedTo": "Verbunden mit {{account}}",
     "disconnected": "{{provider}} getrennt",
     "disconnectFailed": "{{provider}} konnte nicht getrennt werden",
+    "disconnectRetry": "Slack konnte das Trennen nicht bestätigen. Versuche es erneut.",
+    "disconnectNeedsSupport": "Kilo konnte den gespeicherten Slack-Zugang für diese Verbindung nicht lesen. Wende dich an den Support, um das Trennen abzuschließen.",
     "couldNotLoad": "Integrationen konnten nicht geladen werden",
     "permissionDenied": "Du hast keine Berechtigung, diese Integrationen zu verwalten.",
     "managedByOwner": "Bitte einen Inhaber der Organisation, eine Verbindung zu ändern, die du nicht ändern kannst.",

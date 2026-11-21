@@ -452,6 +452,17 @@
       "location": "Local do Vertex",
       "clientEmail": "E-mail da conta de serviço",
       "privateKey": "Chave privada da conta de serviço",
+      "privateKeyBlockRequired": "Cole o bloco inteiro da chave, da linha BEGIN até a linha END.",
+      "privateKeyEncrypted": "Este bloco de chave está protegido por frase secreta. Cole uma chave de conta de serviço que não tenha frase secreta.",
+      "names": {
+        "codestral": "Somente Codestral antigo",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Entrar com o ChatGPT)",
+        "xiaomi": "Xiaomi (pagamento conforme o uso)",
+        "zai": "Z.ai (pagamento conforme o uso)",
+        "bedrockByok": "Amazon Bedrock (direto)",
+        "vertexByok": "Google Vertex AI (direto)"
+      },
       "modelMappings": "Mapeamentos de modelos",
       "modelMappingsDescription": "Encaminhe um modelo do gateway para um nome de implantação personalizado.",
       "mappingTitle": "Mapeamento {{number}}",
@@ -774,7 +785,7 @@
       "gateHidden": "Não exibido",
       "gateNone": "Nenhum",
       "noFindings": "Nenhuma ocorrência foi encontrada.",
-      "findingsUnavailable": "Os resultados não estão disponíveis porque esta revisão falhou.",
+      "findingsUnavailable": "Os resultados não estão disponíveis.",
       "findingsInProgress": "Esta revisão ainda está em andamento. As ocorrências aparecerão aqui quando ela terminar.",
       "findingsEndedWithoutResults": "Esta revisão foi encerrada antes de encontrar qualquer ocorrência.",
       "serviceUnavailable": "Não foi possível conectar ao serviço de revisão de código. Tente revisar novamente quando o serviço estiver disponível.",
@@ -3756,6 +3767,7 @@
       "identifierLabel": "Identificador",
       "identifierRequired": "Insira um identificador.",
       "identifierTaken": "Outro modo já usa este identificador.",
+      "identifierTooLong": "Mantenha o identificador com {{max}} caracteres ou menos.",
       "nameLabel": "Nome do modo",
       "nameRequired": "Insira um nome para o modo.",
       "notFound": "Este modo não existe mais.",
@@ -3846,7 +3858,7 @@
     "emailDeliveryFailed": "O envio de e-mails está temporariamente indisponível. Tente novamente mais tarde.",
     "admissionRequired": "Seu dispositivo não pode ser verificado. Use '$t(login.moreSignInOptions)' para entrar em outro dispositivo ou pela web.",
     "default": "Algo deu errado. Tente novamente.",
-    "retryableAdmission": "Não foi possível verificar este dispositivo. Verifique sua conexão e tente novamente.",
+    "retryableAdmission": "Não foi possível verificar este dispositivo. Tente novamente.",
     "startSignInFailed": "Não foi possível iniciar o login. Tente novamente.",
     "couldNotOpenBrowser": "Não foi possível abrir o navegador. Tente novamente.",
     "signInTimedOut": "O tempo para fazer login esgotou. Tente novamente.",
@@ -3918,6 +3930,50 @@
     "nextScheduled": "Próximas agendadas",
     "answerNeeded": "Aguardando resposta",
     "waitingToRetry": "Aguardando nova tentativa",
+    "countNoun": {
+      "needsInput_one": "Aguardando resposta",
+      "needsInput_zero": "Aguardando resposta",
+      "needsInput_many": "Aguardando resposta",
+      "needsInput_other": "Aguardando resposta",
+      "running_one": "Em execução",
+      "running_zero": "Em execução",
+      "running_many": "Em execução",
+      "running_other": "Em execução",
+      "scheduled_one": "Agendada",
+      "scheduled_zero": "Agendadas",
+      "scheduled_many": "Agendadas",
+      "scheduled_other": "Agendadas",
+      "idle_one": "Em espera",
+      "idle_zero": "Em espera",
+      "idle_many": "Em espera",
+      "idle_other": "Em espera"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Aguardando resposta",
+      "needsInput_zero": "{{displayCount}} Aguardando resposta",
+      "needsInput_many": "{{displayCount}} Aguardando resposta",
+      "needsInput_other": "{{displayCount}} Aguardando resposta",
+      "running_one": "{{displayCount}} Em execução",
+      "running_zero": "{{displayCount}} Em execução",
+      "running_many": "{{displayCount}} Em execução",
+      "running_other": "{{displayCount}} Em execução",
+      "scheduled_one": "{{displayCount}} Agendada",
+      "scheduled_zero": "{{displayCount}} Agendadas",
+      "scheduled_many": "{{displayCount}} Agendadas",
+      "scheduled_other": "{{displayCount}} Agendadas",
+      "idle_one": "{{displayCount}} Em espera",
+      "idle_zero": "{{displayCount}} Em espera",
+      "idle_many": "{{displayCount}} Em espera",
+      "idle_other": "{{displayCount}} Em espera"
+    },
+    "footer": {
+      "checked": "Verificado {{time}}",
+      "lastKnown": "Último status conhecido · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Próxima execução {{time}}",
+      "wasDue": "Estava previsto {{time}}"
+    },
     "step": {
       "editing": "Editando",
       "reading": "Lendo",
@@ -4165,7 +4221,8 @@
         "space": "Não há espaço livre suficiente para este modelo. Libere espaço e tente novamente.",
         "network": "O download não foi concluído. Verifique sua conexão e tente novamente.",
         "invalidFile": "O arquivo baixado não é um modelo que este app pode executar, então ele foi removido.",
-        "checksum": "O arquivo baixado não corresponde à soma de verificação publicada, então ele foi removido. Tente baixar novamente."
+        "checksum": "O arquivo baixado não corresponde à soma de verificação publicada, então ele foi removido. Tente baixar novamente.",
+        "writeFailed": "Este dispositivo não conseguiu salvar o modelo. Tente baixar novamente."
       }
     },
     "catalog": {
@@ -4619,6 +4676,7 @@
         "balanceNeutral": "Sem efeito no saldo",
         "deduction": "Dedução",
         "grant": "Créditos concedidos",
+        "welcomeCredits": "Créditos de boas-vindas",
         "purchase": "Compra"
       },
       "purchaseFallback": "Compra de créditos",
@@ -4890,6 +4948,8 @@
     "connectedTo": "Conectado a {{account}}",
     "disconnected": "{{provider}} desconectado",
     "disconnectFailed": "Não foi possível desconectar {{provider}}",
+    "disconnectRetry": "Não foi possível confirmar a desconexão do Slack. Tente novamente.",
+    "disconnectNeedsSupport": "O Kilo não conseguiu ler o acesso ao Slack salvo para esta conexão. Fale com o suporte para concluir a desconexão.",
     "couldNotLoad": "Não foi possível carregar as integrações",
     "permissionDenied": "Você não tem permissão para gerenciar estas integrações.",
     "managedByOwner": "Peça a um proprietário da organização para alterar uma conexão que você não pode alterar.",

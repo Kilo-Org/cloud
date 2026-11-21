@@ -71,11 +71,57 @@ export type MaterializedArtifact = {
   size: number;
 };
 
-type ArtifactMaterializeFailure = 'download-failed' | 'too-large' | 'unsupported';
+/**
+ * Why an artifact attempt produced no bytes, in the two classes the mirror's
+ * crawl state acts on differently.
+ *
+ * `terminal` cannot succeed on a later run of the same session revision: a
+ * permanent status (401, 403, 404, 410), a presign that names a missing object,
+ * an over-cap size, or a URL shape this module never fetches. `temporary` may
+ * succeed later: a transport error, a timeout, a retryable status (408, 429,
+ * 5xx), or a presign error that does not prove absence.
+ */
+type ArtifactMaterializeFailure =
+  | { cause: 'missing'; kind: 'terminal'; status: number | null }
+  | { cause: 'too-large'; kind: 'terminal'; status: null }
+  | { kind: 'temporary'; status: number | null };
 
 export type ArtifactMaterializeResult =
   | { ok: true; size: number }
   | { ok: false; reason: ArtifactMaterializeFailure };
+
+/**
+ * The statuses that name a definitive refusal or a missing object. Everything
+ * else a response can answer is retried: 408 and 429 are explicitly retryable,
+ * and a 5xx is the origin's own bad moment, not a fact about the artifact.
+ */
+const TERMINAL_STATUSES = new Set([401, 403, 404, 410]);
+
+/** The failure one response status stands for. */
+function failureForStatus(status: number): ArtifactMaterializeFailure {
+  return TERMINAL_STATUSES.has(status)
+    ? { cause: 'missing', kind: 'terminal', status }
+    : { kind: 'temporary', status };
+}
+
+/**
+ * A download address this module refused to fetch, or a status it will not
+ * keep. Carries the classification so `materializeArtifact` never has to
+ * re-derive it from a message.
+ */
+class ArtifactFetchFailure extends Error {
+  readonly failure: ArtifactMaterializeFailure;
+
+  constructor(failure: ArtifactMaterializeFailure) {
+    super(
+      failure.kind === 'terminal'
+        ? `Artifact download refused permanently (${failure.cause})`
+        : `Artifact download failed with status ${failure.status ?? 'unknown'}`
+    );
+    this.name = 'ArtifactFetchFailure';
+    this.failure = failure;
+  }
+}
 
 /** A session row reduced to the fields the mirror's index needs. */
 export type MirrorSessionRow = {
@@ -348,13 +394,15 @@ async function fetchAllowedArtifact(
 async function downloadAllowedArtifact(url: string, target: File): Promise<File> {
   const response = await fetchAllowedArtifact(url, { method: 'GET' });
   if (response === null) {
-    throw new Error('Artifact download address is not an allowed origin');
+    // A refused hop or an address the allowlist never admitted: the mirror will
+    // never fetch this shape, so no later run can succeed for it.
+    throw new ArtifactFetchFailure({ cause: 'missing', kind: 'terminal', status: null });
   }
   if (!response.ok) {
     // The caller keeps no bytes from a failed status, so release the body rather
     // than leaving the connection's stream unread.
     await response.body?.cancel();
-    throw new Error(`Artifact download failed with status ${response.status}`);
+    throw new ArtifactFetchFailure(failureForStatus(response.status));
   }
   try {
     // `writableStream()` opens a write-only handle: iOS throws when the file does
@@ -423,8 +471,8 @@ function loosePartsOf(message: unknown): LoosePart[] {
  * Write one artifact's bytes into `target` and report its size. An artifact
  * over {@link MAX_ARTIFACT_BYTES} is rejected from its declared length before
  * the transfer, and from the received size when the length was not declared.
- * Never throws: one unreachable artifact must not end the run, and the next run
- * retries it.
+ * Never throws: one unreachable artifact must not end the run, and a temporary
+ * failure is retried by the next run.
  */
 export async function materializeArtifact(
   artifact: CrawledArtifact,
@@ -447,18 +495,25 @@ export async function materializeArtifact(
   // reason to skip the download; the size check still catches it afterwards.
   const declaredSize = await resolved.probeContentLength(downloadUrl.url);
   if (declaredSize !== null && declaredSize > MAX_ARTIFACT_BYTES) {
-    return { ok: false, reason: 'too-large' };
+    return { ok: false, reason: { cause: 'too-large', kind: 'terminal', status: null } };
   }
 
   try {
     const downloaded = await resolved.downloadFile(downloadUrl.url, target);
     if (downloaded.size > MAX_ARTIFACT_BYTES) {
       deleteQuietly(target);
-      return { ok: false, reason: 'too-large' };
+      return { ok: false, reason: { cause: 'too-large', kind: 'terminal', status: null } };
     }
     return { ok: true, size: downloaded.size };
-  } catch {
-    return { ok: false, reason: 'download-failed' };
+  } catch (error) {
+    // The status is a fact about the artifact when it is a definitive refusal or
+    // a missing object, and a moment of the origin's time otherwise. A failure
+    // that carries no classification is the transport's: retry it.
+    return {
+      ok: false,
+      reason:
+        error instanceof ArtifactFetchFailure ? error.failure : { kind: 'temporary', status: null },
+    };
   }
 }
 
@@ -550,8 +605,13 @@ function resolveDeps(deps?: Partial<ArtifactCrawlDeps>): ArtifactCrawlDeps {
 /**
  * Turn a stored URL into something downloadable: presign a sandbox reference,
  * accept a URL on the artifact storage origin family, and report any other value
- * as unsupported. A failed presign is a download failure, not an unsupported
- * URL. Those two sources are the hosted artifacts the mirror materializes.
+ * as terminal. Those other values name a shape this module never fetches, so no
+ * later run can materialize them.
+ *
+ * A failed presign is usually the moment's fault, not the artifact's: signing a
+ * key proves nothing about whether the object exists, so it stays temporary. The
+ * exception is the backend saying the attachment is absent, which is the same
+ * fact a 404 on the GET would report.
  */
 async function resolveDownloadUrl(
   url: string,
@@ -565,14 +625,19 @@ async function resolveDownloadUrl(
         messageUuid: ref.messageUuid,
       });
       return { url: signed.signedUrl };
-    } catch {
-      return { failure: 'download-failed' };
+    } catch (error) {
+      // A tRPC client error carries the server's code on `data.code`, the way
+      // `classifyUploadFailure` reads the upload side of the same router.
+      const code = (error as { data?: { code?: string } } | null)?.data?.code;
+      return code === 'NOT_FOUND'
+        ? { failure: { cause: 'missing', kind: 'terminal', status: null } }
+        : { failure: { kind: 'temporary', status: null } };
     }
   }
   if (isAllowedArtifactUrl(url)) {
     return { url };
   }
-  return { failure: 'unsupported' };
+  return { failure: { cause: 'missing', kind: 'terminal', status: null } };
 }
 
 function collectPartArtifacts(part: LoosePart, artifacts: CrawledArtifact[]): void {
@@ -620,16 +685,18 @@ async function writeDataUrlArtifact(
 ): Promise<ArtifactMaterializeResult> {
   const payload = stripDataUrlBase64Prefix(artifact.url, artifact.mime);
   if (payload === undefined) {
-    return { ok: false, reason: 'unsupported' };
+    // The payload shape is fixed in the stored message, so re-reading it cannot
+    // produce a decodable one.
+    return { ok: false, reason: { cause: 'missing', kind: 'terminal', status: null } };
   }
   const size = base64DecodedByteLength(payload);
   if (size > MAX_ARTIFACT_BYTES) {
-    return { ok: false, reason: 'too-large' };
+    return { ok: false, reason: { cause: 'too-large', kind: 'terminal', status: null } };
   }
   try {
     await target.write(payload, { encoding: 'base64' });
   } catch {
-    return { ok: false, reason: 'download-failed' };
+    return { ok: false, reason: { kind: 'temporary', status: null } };
   }
   return { ok: true, size };
 }

@@ -450,6 +450,17 @@
       "location": "Vertex स्थान",
       "clientEmail": "सेवा खात्याचा ईमेल",
       "privateKey": "सेवा खात्याची खाजगी की",
+      "privateKeyBlockRequired": "BEGIN ओळीपासून END ओळीपर्यंत संपूर्ण की ब्लॉक पेस्ट करा.",
+      "privateKeyEncrypted": "हा की ब्लॉक पासफ्रेजद्वारे संरक्षित आहे. पासफ्रेज नसलेली सेवा खात्याची की पेस्ट करा.",
+      "names": {
+        "codestral": "फक्त जुने Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT वापरून साइन इन करा)",
+        "xiaomi": "Xiaomi (वापरानुसार पैसे द्या)",
+        "zai": "Z.ai (वापरानुसार पैसे द्या)",
+        "bedrockByok": "Amazon Bedrock (थेट)",
+        "vertexByok": "Google Vertex AI (थेट)"
+      },
       "modelMappings": "मॉडेल मॅपिंग",
       "modelMappingsDescription": "गेटवे मॉडेल कस्टम डिप्लॉयमेंट नावाकडे पाठवा.",
       "mappingTitle": "मॅपिंग {{number}}",
@@ -1308,7 +1319,7 @@
       "couldNotGetLatest": "सध्याची माहिती मिळवता आली नाही.",
       "byline": "#{{number}} — {{author}} यांनी तयार केलेली",
       "noFindings": "कोणतेही निष्कर्ष आढळले नाहीत.",
-      "findingsUnavailable": "हे पुनरावलोकन अयशस्वी झाल्यामुळे परिणाम उपलब्ध नाहीत.",
+      "findingsUnavailable": "परिणाम उपलब्ध नाहीत.",
       "findingsInProgress": "हे पुनरावलोकन अजून सुरू आहे. ते पूर्ण झाल्यावर निष्कर्ष येथे दिसतील.",
       "findingsEndedWithoutResults": "हे पुनरावलोकन कोणतेही निष्कर्ष निर्माण होण्यापूर्वीच संपले.",
       "serviceUnavailable": "कोड पुनरावलोकन सेवेशी संपर्क साधता आला नाही. सेवा उपलब्ध झाल्यावर पुनरावलोकन पुन्हा करा.",
@@ -3628,6 +3639,7 @@
       "identifierLabel": "ओळखकर्ता",
       "identifierRequired": "ओळखकर्ता प्रविष्ट करा.",
       "identifierTaken": "हा ओळखकर्ता दुसरा मोड आधीच वापरत आहे.",
+      "identifierTooLong": "ओळखकर्ता {{max}} वर्णांपर्यंत किंवा त्यापेक्षा कमी ठेवा.",
       "nameLabel": "मोडचे नाव",
       "nameRequired": "मोडचे नाव प्रविष्ट करा.",
       "notFound": "हा मोड आता अस्तित्वात नाही.",
@@ -3718,7 +3730,7 @@
     "emailDeliveryFailed": "सध्या ईमेल पाठवता येत नाही. कृपया नंतर पुन्हा प्रयत्न करा.",
     "admissionRequired": "तुमच्या डिव्हाइसची पडताळणी करता येत नाही. दुसऱ्या डिव्हाइसवर किंवा वेबवर साइन इन करण्यासाठी '$t(login.moreSignInOptions)' वापरा.",
     "default": "काहीतरी चूक झाली. कृपया पुन्हा प्रयत्न करा.",
-    "retryableAdmission": "या डिव्हाइसची पडताळणी करता आली नाही. इंटरनेट कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
+    "retryableAdmission": "या डिव्हाइसची पडताळणी करता आली नाही. पुन्हा प्रयत्न करा.",
     "startSignInFailed": "साइन-इन प्रक्रिया सुरू करता आली नाही. कृपया पुन्हा प्रयत्न करा.",
     "couldNotOpenBrowser": "ब्राउझर उघडता आला नाही. कृपया पुन्हा प्रयत्न करा.",
     "signInTimedOut": "साइन इन करण्याची वेळमर्यादा संपली. कृपया पुन्हा प्रयत्न करा.",
@@ -3790,6 +3802,34 @@
     "nextScheduled": "पुढील नियोजित",
     "answerNeeded": "उत्तर आवश्यक",
     "waitingToRetry": "पुन्हा प्रयत्नाची प्रतीक्षा",
+    "countNoun": {
+      "needsInput_one": "प्रतिसाद आवश्यक",
+      "needsInput_other": "प्रतिसाद आवश्यक",
+      "running_one": "काम सुरू आहे",
+      "running_other": "काम सुरू आहे",
+      "scheduled_one": "नियोजित",
+      "scheduled_other": "नियोजित",
+      "idle_one": "निष्क्रिय",
+      "idle_other": "निष्क्रिय"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} प्रतिसाद आवश्यक",
+      "needsInput_other": "{{displayCount}} प्रतिसाद आवश्यक",
+      "running_one": "{{displayCount}} काम सुरू आहे",
+      "running_other": "{{displayCount}} काम सुरू आहे",
+      "scheduled_one": "{{displayCount}} नियोजित",
+      "scheduled_other": "{{displayCount}} नियोजित",
+      "idle_one": "{{displayCount}} निष्क्रिय",
+      "idle_other": "{{displayCount}} निष्क्रिय"
+    },
+    "footer": {
+      "checked": "तपासले {{time}}",
+      "lastKnown": "शेवटची ज्ञात स्थिती · {{time}}"
+    },
+    "wake": {
+      "nextRun": "पुढील कार्यारंभ {{time}}",
+      "wasDue": "अपेक्षित होते {{time}}"
+    },
     "step": {
       "editing": "संपादन",
       "reading": "वाचन",
@@ -4035,7 +4075,8 @@
         "space": "या मॉडेलसाठी पुरेशी मोकळी जागा नाही. जागा मोकळी करा आणि पुन्हा प्रयत्न करा.",
         "network": "डाउनलोड पूर्ण झाले नाही. तुमचे कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
         "invalidFile": "डाउनलोड केलेली फाइल हे अ‍ॅप चालवू शकते असे मॉडेल नाही, म्हणून ती हटवली गेली.",
-        "checksum": "डाउनलोड केलेली फाइल तिच्या प्रकाशित चेकसमशी जुळत नाही, म्हणून ती हटवली गेली. पुन्हा डाउनलोड करून पहा."
+        "checksum": "डाउनलोड केलेली फाइल तिच्या प्रकाशित चेकसमशी जुळत नाही, म्हणून ती हटवली गेली. पुन्हा डाउनलोड करून पहा.",
+        "writeFailed": "हे डिव्हाइस मॉडेल जतन करू शकले नाही. पुन्हा डाउनलोड करून पहा."
       }
     },
     "catalog": {
@@ -4477,6 +4518,7 @@
         "balanceNeutral": "शिलकीवर परिणाम नाही",
         "deduction": "वजावट",
         "grant": "क्रेडिट अनुदान",
+        "welcomeCredits": "स्वागत क्रेडिट",
         "purchase": "खरेदी"
       },
       "purchaseFallback": "क्रेडिट खरेदी",
@@ -4732,6 +4774,8 @@
     "connectedTo": "{{account}} शी कनेक्ट केलेले",
     "disconnected": "{{provider}} डिस्कनेक्ट झाले",
     "disconnectFailed": "{{provider}} डिस्कनेक्ट करता आले नाही",
+    "disconnectRetry": "Slack डिस्कनेक्ट झाल्याची पुष्टी करू शकले नाही. पुन्हा प्रयत्न करा.",
+    "disconnectNeedsSupport": "Kilo या कनेक्शनसाठी जतन केलेला Slack प्रवेश वाचू शकले नाही. डिस्कनेक्ट पूर्ण करण्यासाठी मदत पथकाशी संपर्क साधा.",
     "couldNotLoad": "इंटिग्रेशन्स लोड करता आली नाहीत",
     "permissionDenied": "तुम्हाला ही इंटिग्रेशन्स व्यवस्थापित करण्याची परवानगी नाही.",
     "managedByOwner": "जे कनेक्शन तुम्ही बदलू शकत नाही ते बदलण्यासाठी संस्थेच्या मालकाला विचारा.",

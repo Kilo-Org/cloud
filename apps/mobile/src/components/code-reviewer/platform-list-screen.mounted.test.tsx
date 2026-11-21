@@ -74,6 +74,9 @@ vi.mock('@tanstack/react-query', () => ({
   }),
 }));
 
+// The reviewer permission hook now observes the shared memberships read, whose
+// owner gates it on the auth token; this suite exercises the platform list.
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: router.push, replace: vi.fn() }),
   useFocusEffect: () => undefined,

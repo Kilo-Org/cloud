@@ -450,6 +450,17 @@
       "location": "Vertex 位置",
       "clientEmail": "服务账号邮箱",
       "privateKey": "服务账号私钥",
+      "privateKeyBlockRequired": "请粘贴完整密钥块，从 BEGIN 行到 END 行。",
+      "privateKeyEncrypted": "此密钥块受口令保护。请粘贴不含口令的服务账号密钥。",
+      "names": {
+        "codestral": "旧版仅 Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI（使用 ChatGPT 登录）",
+        "xiaomi": "Xiaomi（按量付费）",
+        "zai": "Z.ai（按量付费）",
+        "bedrockByok": "Amazon Bedrock（直连）",
+        "vertexByok": "Google Vertex AI（直连）"
+      },
       "modelMappings": "模型映射",
       "modelMappingsDescription": "将网关模型映射到自定义部署名称。",
       "mappingTitle": "映射 {{number}}",
@@ -805,7 +816,7 @@
       "gateHidden": "已隐藏",
       "gateNone": "无",
       "noFindings": "未发现问题",
-      "findingsUnavailable": "由于本次审查失败，结果不可用。",
+      "findingsUnavailable": "结果不可用。",
       "findingsInProgress": "本次审查仍在进行中，完成后问题将显示在这里。",
       "findingsEndedWithoutResults": "本次审查提前结束，未产生任何问题。",
       "serviceUnavailable": "无法连接到代码审查服务。请在服务可用时重试审查。",
@@ -3632,6 +3643,7 @@
       "identifierLabel": "标识符",
       "identifierRequired": "请输入标识符。",
       "identifierTaken": "另一个模式已使用此标识符。",
+      "identifierTooLong": "标识符请保持在 {{max}} 个字符以内。",
       "nameLabel": "模式名称",
       "nameRequired": "请输入模式名称。",
       "notFound": "此模式已不存在。",
@@ -3718,7 +3730,7 @@
     "emailDeliveryFailed": "暂时无法发送邮件。请稍后重试。",
     "admissionRequired": "无法验证你的设备。请选择“$t(login.moreSignInOptions)”，在其他设备或网页端登录。",
     "default": "出了点问题。请重试。",
-    "retryableAdmission": "无法验证此设备。请检查网络连接后重试。",
+    "retryableAdmission": "无法验证此设备。请重试。",
     "startSignInFailed": "无法发起登录。请重试。",
     "couldNotOpenBrowser": "无法打开浏览器。请重试。",
     "signInTimedOut": "登录超时。请重试。",
@@ -3790,6 +3802,34 @@
     "nextScheduled": "下次计划",
     "answerNeeded": "等待回答",
     "waitingToRetry": "等待重试",
+    "countNoun": {
+      "needsInput_one": "等待输入",
+      "needsInput_other": "等待输入",
+      "running_one": "处理中",
+      "running_other": "处理中",
+      "scheduled_one": "已计划",
+      "scheduled_other": "已计划",
+      "idle_one": "空闲",
+      "idle_other": "空闲"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} 等待输入",
+      "needsInput_other": "{{displayCount}} 等待输入",
+      "running_one": "{{displayCount}} 处理中",
+      "running_other": "{{displayCount}} 处理中",
+      "scheduled_one": "{{displayCount}} 已计划",
+      "scheduled_other": "{{displayCount}} 已计划",
+      "idle_one": "{{displayCount}} 空闲",
+      "idle_other": "{{displayCount}} 空闲"
+    },
+    "footer": {
+      "checked": "上次确认 {{time}}",
+      "lastKnown": "上次已知状态 · {{time}}"
+    },
+    "wake": {
+      "nextRun": "下次运行 {{time}}",
+      "wasDue": "原定 {{time}}"
+    },
     "step": {
       "editing": "编辑中",
       "reading": "读取中",
@@ -4035,7 +4075,8 @@
         "space": "没有足够的可用存储空间来存放此模型。请释放空间后重试。",
         "network": "下载未完成。请检查你的网络连接后重试。",
         "invalidFile": "下载的文件不是此应用可以运行的模型，因此已被移除。",
-        "checksum": "下载的文件与其公布的校验和不匹配，因此已被移除。请重新下载。"
+        "checksum": "下载的文件与其公布的校验和不匹配，因此已被移除。请重新下载。",
+        "writeFailed": "此设备无法保存该模型。请重试下载。"
       }
     },
     "catalog": {
@@ -4477,6 +4518,7 @@
         "balanceNeutral": "余额不变",
         "deduction": "扣除",
         "grant": "赠送积分",
+        "welcomeCredits": "欢迎积分",
         "purchase": "购买"
       },
       "purchaseFallback": "积分购买",
@@ -4732,6 +4774,8 @@
     "connectedTo": "已连接到 {{account}}",
     "disconnected": "已断开 {{provider}} 的连接",
     "disconnectFailed": "无法断开 {{provider}} 的连接",
+    "disconnectRetry": "Slack 无法确认已断开连接。请重试。",
+    "disconnectNeedsSupport": "Kilo 无法读取为此连接保存的 Slack 访问权限。请联系技术支持以完成断开连接。",
     "couldNotLoad": "无法加载集成",
     "permissionDenied": "你没有管理这些集成的权限。",
     "managedByOwner": "请联系组织所有者更改你无法更改的连接。",

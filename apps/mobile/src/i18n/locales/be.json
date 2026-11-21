@@ -452,6 +452,17 @@
       "location": "Размяшчэнне Vertex",
       "clientEmail": "Электронная пошта сэрвіснага ўліковага запісу",
       "privateKey": "Закрыты ключ сэрвіснага ўліковага запісу",
+      "privateKeyBlockRequired": "Устаўце ўвесь блок ключа, ад радка BEGIN да радка END.",
+      "privateKeyEncrypted": "Гэты блок ключа абаронены парольнай фразай. Устаўце ключ сэрвіснага ўліковага запісу без парольнай фразы.",
+      "names": {
+        "codestral": "Толькі састарэлы Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Увайсці праз ChatGPT)",
+        "xiaomi": "Xiaomi (аплата па меры выкарыстання)",
+        "zai": "Z.ai (аплата па меры выкарыстання)",
+        "bedrockByok": "Amazon Bedrock (напрамую)",
+        "vertexByok": "Google Vertex AI (напрамую)"
+      },
       "modelMappings": "Супастаўленні мадэляў",
       "modelMappingsDescription": "Перанакіроўвайце мадэль шлюза на ўласную назву разгортвання.",
       "mappingTitle": "Супастаўленне {{number}}",
@@ -1362,7 +1373,7 @@
       "couldNotGetLatest": "Не атрымалася атрымаць актуальныя даныя.",
       "byline": "#{{number}} · Аўтар: {{author}}",
       "noFindings": "Праблем не выяўлена.",
-      "findingsUnavailable": "Вынікі недаступныя, бо гэтая праверка завяршылася няўдала.",
+      "findingsUnavailable": "Вынікі недаступныя.",
       "findingsInProgress": "Гэтая праверка яшчэ працягваецца. Вынікі з’явяцца тут пасля яе завяршэння.",
       "findingsEndedWithoutResults": "Гэтая праверка завяршылася, не давесучы ніякіх вынікаў.",
       "serviceUnavailable": "Не атрымалася злучыцца з сэрвісам праверкі кода. Паўтарыце праверку, калі сэрвіс будзе даступны.",
@@ -3752,6 +3763,7 @@
       "identifierLabel": "Ідэнтыфікатар",
       "identifierRequired": "Увядзіце ідэнтыфікатар.",
       "identifierTaken": "Іншы рэжым ужо выкарыстоўвае гэты ідэнтыфікатар.",
+      "identifierTooLong": "Трымайце ідэнтыфікатар у межах {{max}} сімвалаў або менш.",
       "nameLabel": "Назва рэжыму",
       "nameRequired": "Увядзіце назву рэжыму.",
       "notFound": "Гэты рэжым больш не існуе.",
@@ -3846,7 +3858,7 @@
     "emailDeliveryFailed": "Адпраўка лістоў часова недаступная. Паспрабуй яшчэ раз пазней.",
     "admissionRequired": "Немагчыма праверыць тваю прыладу. Выберы «$t(login.moreSignInOptions)», каб увайсці з іншай прылады або на сайце.",
     "default": "Адбылася памылка. Паспрабуй яшчэ раз.",
-    "retryableAdmission": "Не атрымалася праверыць гэтую прыладу. Правер падключэнне да інтэрнэту і паспрабуй яшчэ раз.",
+    "retryableAdmission": "Не ўдалося праверыць гэтую прыладу. Паспрабуй яшчэ раз.",
     "startSignInFailed": "Не атрымалася пачаць уваход. Паспрабуй яшчэ раз.",
     "couldNotOpenBrowser": "Не атрымалася адкрыць браўзер. Паспрабуй яшчэ раз.",
     "signInTimedOut": "Час чакання ўваходу скончыўся. Паспрабуй яшчэ раз.",
@@ -3918,6 +3930,50 @@
     "nextScheduled": "Наступныя запланаваныя",
     "answerNeeded": "Патрэбны адказ",
     "waitingToRetry": "Чакае паўторнай спробы",
+    "countNoun": {
+      "needsInput_one": "Чакае адказу",
+      "needsInput_other": "Чакае адказу",
+      "needsInput_few": "Чакае адказу",
+      "needsInput_many": "Чакае адказу",
+      "running_one": "Працуе",
+      "running_other": "Працуе",
+      "running_few": "Працуе",
+      "running_many": "Працуе",
+      "scheduled_one": "Запланавана",
+      "scheduled_other": "Запланавана",
+      "scheduled_few": "Запланавана",
+      "scheduled_many": "Запланавана",
+      "idle_one": "Чакае",
+      "idle_other": "Чакае",
+      "idle_few": "Чакае",
+      "idle_many": "Чакае"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Чакае адказу",
+      "needsInput_other": "{{displayCount}} Чакае адказу",
+      "needsInput_few": "{{displayCount}} Чакае адказу",
+      "needsInput_many": "{{displayCount}} Чакае адказу",
+      "running_one": "{{displayCount}} Працуе",
+      "running_other": "{{displayCount}} Працуе",
+      "running_few": "{{displayCount}} Працуе",
+      "running_many": "{{displayCount}} Працуе",
+      "scheduled_one": "{{displayCount}} Запланавана",
+      "scheduled_other": "{{displayCount}} Запланавана",
+      "scheduled_few": "{{displayCount}} Запланавана",
+      "scheduled_many": "{{displayCount}} Запланавана",
+      "idle_one": "{{displayCount}} Чакае",
+      "idle_other": "{{displayCount}} Чакае",
+      "idle_few": "{{displayCount}} Чакае",
+      "idle_many": "{{displayCount}} Чакае"
+    },
+    "footer": {
+      "checked": "Праверана {{time}}",
+      "lastKnown": "Апошні вядомы стан · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Наступны запуск {{time}}",
+      "wasDue": "Чакалася {{time}}"
+    },
     "step": {
       "editing": "Рэдагаванне",
       "reading": "Чытанне",
@@ -4165,7 +4221,8 @@
         "space": "Не хапае вольнага месца для гэтай мадэлі. Вызваліце месца і паспрабуйце зноў.",
         "network": "Спампоўванне не завяршылася. Праверце злучэнне і паспрабуйце зноў.",
         "invalidFile": "Спампаваны файл не з'яўляецца мадэллю, якую можа запусціць гэта праграма, таму ён быў выдалены.",
-        "checksum": "Спампаваны файл не адпавядае апублікаванай кантрольнай суме, таму ён быў выдалены. Паспрабуйце спампаваць яго яшчэ раз."
+        "checksum": "Спампаваны файл не адпавядае апублікаванай кантрольнай суме, таму ён быў выдалены. Паспрабуйце спампаваць яго яшчэ раз.",
+        "writeFailed": "Гэта прылада не змагла захаваць мадэль. Паспрабуйце спампаваць яе яшчэ раз."
       }
     },
     "catalog": {
@@ -4619,6 +4676,7 @@
         "balanceNeutral": "Без змены балансу",
         "deduction": "Спісанне",
         "grant": "Начысленне крэдытаў",
+        "welcomeCredits": "Вітальныя крэдыты",
         "purchase": "Пакупка"
       },
       "purchaseFallback": "Пакупка крэдытаў",
@@ -4890,6 +4948,8 @@
     "connectedTo": "Падключана да {{account}}",
     "disconnected": "Адключана: {{provider}}",
     "disconnectFailed": "Не ўдалося адключыць {{provider}}",
+    "disconnectRetry": "Не ўдалося пацвердзіць адключэнне Slack. Паспрабуйце яшчэ раз.",
+    "disconnectNeedsSupport": "Не ўдалося прачытаць захаваны доступ да Slack для гэтага падключэння. Каб завяршыць адключэнне, звярніцеся ў падтрымку.",
     "couldNotLoad": "Не ўдалося загрузіць інтэграцыі",
     "permissionDenied": "У вас няма правоў на кіраванне гэтымі інтэграцыямі.",
     "managedByOwner": "Папрасіце ўладальніка арганізацыі змяніць падключэнне, якое вы не можаце змяніць.",

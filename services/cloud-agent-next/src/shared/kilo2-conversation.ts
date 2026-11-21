@@ -2,15 +2,10 @@
 import { z } from 'zod';
 
 import { KILO_SESSION_ID_PREFIX } from './kilo-session-id';
+import { tokenUsageSchema } from './token-usage';
 
 const timestamp = z.number().finite();
 const model = z.object({ id: z.string(), providerID: z.string(), variant: z.string().optional() });
-const tokens = z.object({
-  input: z.number(),
-  output: z.number(),
-  reasoning: z.number(),
-  cache: z.object({ read: z.number(), write: z.number() }),
-});
 const error = z.object({ type: z.string(), message: z.string(), status: z.number().optional() });
 /** Native tool results carry files by URI, including stored media references. */
 export const kilo2FileContentSchema = z
@@ -78,7 +73,7 @@ export const kilo2MessageSchema = z
     agent: z.string().optional(),
     model: model.optional(),
     cost: z.number().optional(),
-    tokens: tokens.optional(),
+    tokens: tokenUsageSchema.optional(),
     finish: z.string().optional(),
     status: z.string().optional(),
     summary: z.string().optional(),
@@ -90,8 +85,8 @@ export type Kilo2Message = z.infer<typeof kilo2MessageSchema>;
 
 /**
  * The sibling import resolves in both copies: `scripts/sync-kilo2-contracts.mjs`
- * writes `kilo-session-id` and `base62` beside this file for the service whose
- * Docker build context holds no workspace packages.
+ * writes `token-usage`, `kilo-session-id` and `base62` beside this file for the
+ * service whose Docker build context holds no workspace packages.
  */
 export const kilo2SessionSchema = z.object({
   id: z.string().startsWith(KILO_SESSION_ID_PREFIX),

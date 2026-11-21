@@ -450,6 +450,17 @@
       "location": "Indawo ye-Vertex",
       "clientEmail": "I-imeyili ye-service account",
       "privateKey": "Ukhiye oyimfihlo we-service account",
+      "privateKeyBlockRequired": "Namathisela ukhiye wonke, kusukela emugqeni othi BEGIN kuya emugqeni othi END.",
+      "privateKeyEncrypted": "Le ngxenye yokhiye ivikelwe nge-passphrase. Namathisela ukhiye we-service account ongenayo i-passphrase.",
+      "names": {
+        "codestral": "Codestral yakudala kuphela",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Ngena nge-ChatGPT)",
+        "xiaomi": "Xiaomi (khokha njengoba usebenzisa)",
+        "zai": "Z.ai (khokha njengoba usebenzisa)",
+        "bedrockByok": "Amazon Bedrock (ngqo)",
+        "vertexByok": "Google Vertex AI (ngqo)"
+      },
       "modelMappings": "Ukufanisa amamodeli",
       "modelMappingsDescription": "Thumela imodeli ye-gateway kugama le-deployment langokwezifiso.",
       "mappingTitle": "Ukufanisa {{number}}",
@@ -1308,7 +1319,7 @@
       "couldNotGetLatest": "Asikwazanga ukuthola imininingwane yakamuva.",
       "byline": "#{{number}} ngu-{{author}}",
       "noFindings": "Akukho okutholakele.",
-      "findingsUnavailable": "Imiphumela ayitholakali ngoba lokhu kuhlolwa kuhlulekile.",
+      "findingsUnavailable": "Imiphumela ayitholakali.",
       "findingsInProgress": "Lokhu kuhlolwa kusaqhubeka. Okutholakele kuzovela lapha uma kuqedile.",
       "findingsEndedWithoutResults": "Lokhu kuhlolwa kuphelile ngaphambi kokuthi kukhiqize noma yikuphi okutholakele.",
       "serviceUnavailable": "Asikwazanga ukuxhumana nesevisi yokuhlola ikhodi. Phinda uzame ukuhlola uma isevisi isitholakala.",
@@ -3628,6 +3639,7 @@
       "identifierLabel": "Isihlonzi",
       "identifierRequired": "Faka isihlonzi.",
       "identifierTaken": "Enye imodi isivele isebenzisa lesi sihlonzi.",
+      "identifierTooLong": "Gcina isihlonzi sibe yizinhlamvu ezingu-{{max}} noma ngaphansi.",
       "nameLabel": "Igama lemodi",
       "nameRequired": "Faka igama lemodi.",
       "notFound": "Le modi ayisekho.",
@@ -3718,7 +3730,7 @@
     "emailDeliveryFailed": "Ukulethwa kwe-imeyili akutholakali okwesikhashana. Sicela uzame futhi kamuva.",
     "admissionRequired": "Idivayisi yakho ayikwazi ukuqinisekiswa. Sebenzisa '$t(login.moreSignInOptions)' ukuze ungene kwenye idivayisi noma ngewebhu.",
     "default": "Kukhona okungahambanga kahle. Sicela uzame futhi.",
-    "retryableAdmission": "Asikwazanga ukuqinisekisa le divayisi. Hlola ukuxhumana kwakho bese uzama futhi.",
+    "retryableAdmission": "Le divayisi ayikwazanga ukuqinisekiswa. Zama futhi.",
     "startSignInFailed": "Asikwazanga ukuqala ukungena. Sicela uzame futhi.",
     "couldNotOpenBrowser": "Asikwazanga ukuvula isiphequluli. Sicela uzame futhi.",
     "signInTimedOut": "Ukungena kuphelelwe yisikhathi. Sicela uzame futhi.",
@@ -3790,6 +3802,34 @@
     "nextScheduled": "Okulandelayo okuhleliwe",
     "answerNeeded": "Kudinga impendulo",
     "waitingToRetry": "Kulinde ukuzama futhi",
+    "countNoun": {
+      "needsInput_one": "Kudinga impendulo",
+      "needsInput_other": "Kudinga impendulo",
+      "running_one": "Kuyasebenza",
+      "running_other": "Kuyasebenza",
+      "scheduled_one": "Kuhleliwe",
+      "scheduled_other": "Kuhleliwe",
+      "idle_one": "Akumatasa",
+      "idle_other": "Akumatasa"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Kudinga impendulo",
+      "needsInput_other": "{{displayCount}} Kudinga impendulo",
+      "running_one": "{{displayCount}} Kuyasebenza",
+      "running_other": "{{displayCount}} Kuyasebenza",
+      "scheduled_one": "{{displayCount}} Kuhleliwe",
+      "scheduled_other": "{{displayCount}} Kuhleliwe",
+      "idle_one": "{{displayCount}} Akumatasa",
+      "idle_other": "{{displayCount}} Akumatasa"
+    },
+    "footer": {
+      "checked": "Kuhloliwe {{time}}",
+      "lastKnown": "Okwagcina kwaziwa · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Ukuqalisa okulandelayo {{time}}",
+      "wasDue": "Bekulindele {{time}}"
+    },
     "step": {
       "editing": "Kuhlelwa",
       "reading": "Kufundwa",
@@ -4035,7 +4075,8 @@
         "space": "Asikho isikhala esanele saleli modeli. Khulula isikhala bese uzama futhi.",
         "network": "Ukulanda akuphelanga. Hlola ukuxhumana kwakho bese uzama futhi.",
         "invalidFile": "Ifayela elilandiwe akusiyo imodeli le app engayisebenzisa, ngakho isusiwe.",
-        "checksum": "Ifayela elilandiwe alihambisani ne-checksum yalo eshicilelwe, ngakho isusiwe. Zama ukulanda futhi."
+        "checksum": "Ifayela elilandiwe alihambisani ne-checksum yalo eshicilelwe, ngakho isusiwe. Zama ukulanda futhi.",
+        "writeFailed": "Le divayisi alikwazanga ukugcina imodeli. Zama ukulanda futhi."
       }
     },
     "catalog": {
@@ -4477,6 +4518,7 @@
         "balanceNeutral": "Akuthinti ibhalansi",
         "deduction": "Ukudonswa",
         "grant": "Isibonelelo samakhredithi",
+        "welcomeCredits": "Amakhredithi okwamukela",
         "purchase": "Ukuthenga"
       },
       "purchaseFallback": "Ukuthengwa kwamakhredithi",
@@ -4732,6 +4774,8 @@
     "connectedTo": "Ixhunywe ku-{{account}}",
     "disconnected": "I-{{provider}} inqanyuliwe",
     "disconnectFailed": "Akukwazekanga ukunqamula i-{{provider}}",
+    "disconnectRetry": "I-Slack ayikwazanga ukuqinisekisa ukunqanyulwa koxhumano. Zama futhi.",
+    "disconnectNeedsSupport": "I-Kilo ayikwazanga ukufunda ukufinyelela kwe-Slack okugciniwe kwalokhu kuxhumana. Xhumana nethimba losizo ukuze kuqedwe ukunqamula.",
     "couldNotLoad": "Akukwazekanga ukulayisha ukuhlanganiswa",
     "permissionDenied": "Awunayo imvume yokuphatha lokhu kuhlanganiswa.",
     "managedByOwner": "Cela umnikazi wenhlangano ukuthi ashintshe ukuxhumana ongakwazi ukukushintsha.",

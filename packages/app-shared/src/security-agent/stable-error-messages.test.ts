@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  SECURITY_ANALYSIS_REJECTED_MESSAGE,
   SECURITY_REMEDIATION_REJECTED_MESSAGE,
   SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
 } from './stable-error-messages';
@@ -16,6 +17,12 @@ describe('stable error sentences', () => {
   it('pins the exact wire sentence for the remediation-rejection marker', () => {
     expect(SECURITY_REMEDIATION_REJECTED_MESSAGE).toBe(
       'Security remediation service request was rejected'
+    );
+  });
+
+  it('pins the exact wire sentence for the analysis-rejection marker', () => {
+    expect(SECURITY_ANALYSIS_REJECTED_MESSAGE).toBe(
+      'Security analysis service request was rejected'
     );
   });
 });

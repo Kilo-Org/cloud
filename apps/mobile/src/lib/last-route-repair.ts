@@ -15,10 +15,10 @@ import { type Href } from 'expo-router';
  * route inside the app is a screen this launch was started for, and the pending
  * consumer opens it above the shell instead.
  *
- * The root layouts' groups (`(app)`, `(tabs)`) are routing groups and are
- * stripped from both sides. A parenthesized tab (`(3_profile)`) or nested
- * layout is a destination and stays, so two sides that differ only by which
- * tab is focused are still different screens.
+ * The groups that add no URL segment (`(app)`, `(auth)`, `(edit)`, `(tabs)`)
+ * are stripped from both sides. A parenthesized tab (`(3_profile)`) is a
+ * destination and stays, so two sides that differ only by which tab is focused
+ * are still different screens.
  */
 export function shouldRepairRestoredRoute(input: {
   readonly recordedHref: string | null;
@@ -40,10 +40,17 @@ export function shouldRepairRestoredRoute(input: {
  */
 export const RESTORED_ROUTE_FALLBACK_HREF = '/(app)/(tabs)/(0_home)' as Href;
 
-/** Route groups that name a layout, not a destination. */
+/**
+ * Route groups that name a layout, not a destination: they add no URL segment,
+ * so a route inside one is addressed without the group and only the focused
+ * route's own segment list carries it. Every other parenthesised segment is a
+ * destination — a tab names which tab is open — so it stays and keeps two
+ * screens apart.
+ */
 const LAYOUT_GROUPS = {
   '(app)': true,
   '(auth)': true,
+  '(edit)': true,
   '(tabs)': true,
 } as const;
 

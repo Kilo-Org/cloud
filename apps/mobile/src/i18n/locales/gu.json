@@ -450,6 +450,17 @@
       "location": "Vertex સ્થાન",
       "clientEmail": "સર્વિસ એકાઉન્ટ ઇમેઇલ",
       "privateKey": "સર્વિસ એકાઉન્ટ પ્રાઇવેટ કી",
+      "privateKeyBlockRequired": "BEGIN લીટીથી END લીટી સુધીનો આખો કી બ્લોક પેસ્ટ કરો.",
+      "privateKeyEncrypted": "આ કી બ્લોક પાસફ્રેઝથી સુરક્ષિત છે. પાસફ્રેઝ વગરની સર્વિસ એકાઉન્ટ કી પેસ્ટ કરો.",
+      "names": {
+        "codestral": "ફક્ત જૂનું Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT વડે સાઇન ઇન કરો)",
+        "xiaomi": "Xiaomi (વપરાશ મુજબ ચુકવણી)",
+        "zai": "Z.ai (વપરાશ મુજબ ચુકવણી)",
+        "bedrockByok": "Amazon Bedrock (સીધું)",
+        "vertexByok": "Google Vertex AI (સીધું)"
+      },
       "modelMappings": "મોડેલ મેપિંગ",
       "modelMappingsDescription": "ગેટવે મોડેલને કસ્ટમ ડિપ્લોયમેન્ટ નામ પર મોકલો.",
       "mappingTitle": "મેપિંગ {{number}}",
@@ -1308,7 +1319,7 @@
       "couldNotGetLatest": "નવીનતમ માહિતી મેળવી શકાઈ નહીં.",
       "byline": "{{author}} દ્વારા #{{number}}",
       "noFindings": "કોઈ તારણ મળ્યું નથી.",
-      "findingsUnavailable": "આ સમીક્ષા નિષ્ફળ ગઈ હોવાથી પરિણામો ઉપલબ્ધ નથી.",
+      "findingsUnavailable": "પરિણામો ઉપલબ્ધ નથી.",
       "findingsInProgress": "આ સમીક્ષા હજુ પ્રગતિમાં છે. તે પૂર્ણ થતાં તારણ અહીં દેખાશે.",
       "findingsEndedWithoutResults": "આ સમીક્ષા કોઈ તારણ આપી શકે તે પહેલાં જ સમાપ્ત થઈ ગઈ.",
       "serviceUnavailable": "કોડ સમીક્ષા સેવા સાથે જોડાઈ શકાયું નહીં. સેવા ઉપલબ્ધ થાય ત્યારે સમીક્ષાનો ફરી પ્રયાસ કરો.",
@@ -3628,6 +3639,7 @@
       "identifierLabel": "ઓળખક",
       "identifierRequired": "ઓળખક દાખલ કરો.",
       "identifierTaken": "બીજો મોડ પહેલેથી આ ઓળખકનો ઉપયોગ કરે છે.",
+      "identifierTooLong": "ઓળખકને {{max}} અક્ષરો કે તેથી ઓછા સુધી રાખો.",
       "nameLabel": "મોડ નામ",
       "nameRequired": "મોડ નામ દાખલ કરો.",
       "notFound": "આ મોડ હવે અસ્તિત્વમાં નથી.",
@@ -3718,7 +3730,7 @@
     "emailDeliveryFailed": "હમણાં ઇમેઇલ મોકલી શકાતો નથી. કૃપા કરીને પછીથી ફરી પ્રયત્ન કરો.",
     "admissionRequired": "તમારા ઉપકરણની ચકાસણી થઈ શકતી નથી. બીજા ઉપકરણ પર અથવા વેબ દ્વારા સાઇન ઇન કરવા માટે '$t(login.moreSignInOptions)' વાપરો.",
     "default": "કંઈક ભૂલ થઈ છે. કૃપા કરીને ફરી પ્રયત્ન કરો.",
-    "retryableAdmission": "આ ઉપકરણની ચકાસણી કરી શકાઈ નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો.",
+    "retryableAdmission": "આ ઉપકરણ ચકાસી શકાયું નથી. ફરી પ્રયાસ કરો.",
     "startSignInFailed": "સાઇન ઇનની પ્રક્રિયા શરૂ કરી શકાઈ નહીં. કૃપા કરીને ફરી પ્રયત્ન કરો.",
     "couldNotOpenBrowser": "બ્રાઉઝર ખોલી શકાયું નહીં. કૃપા કરીને ફરી પ્રયત્ન કરો.",
     "signInTimedOut": "સાઇન ઇન કરવાની સમયમર્યાદા પૂરી થઈ ગઈ છે. કૃપા કરીને ફરી પ્રયત્ન કરો.",
@@ -3790,6 +3802,34 @@
     "nextScheduled": "આગામી નિર્ધારિત",
     "answerNeeded": "જવાબ જરૂરી",
     "waitingToRetry": "ફરી પ્રયાસની રાહમાં",
+    "countNoun": {
+      "needsInput_one": "જવાબ જરૂરી",
+      "needsInput_other": "જવાબ જરૂરી",
+      "running_one": "કામ ચાલુ છે",
+      "running_other": "કામ ચાલુ છે",
+      "scheduled_one": "નિર્ધારિત",
+      "scheduled_other": "નિર્ધારિત",
+      "idle_one": "નિષ્ક્રિય",
+      "idle_other": "નિષ્ક્રિય"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} જવાબ જરૂરી",
+      "needsInput_other": "{{displayCount}} જવાબ જરૂરી",
+      "running_one": "{{displayCount}} કામ ચાલુ છે",
+      "running_other": "{{displayCount}} કામ ચાલુ છે",
+      "scheduled_one": "{{displayCount}} નિર્ધારિત",
+      "scheduled_other": "{{displayCount}} નિર્ધારિત",
+      "idle_one": "{{displayCount}} નિષ્ક્રિય",
+      "idle_other": "{{displayCount}} નિષ્ક્રિય"
+    },
+    "footer": {
+      "checked": "ચકાસ્યું {{time}}",
+      "lastKnown": "છેલ્લે જાણીતું · {{time}}"
+    },
+    "wake": {
+      "nextRun": "આગામી રન {{time}}",
+      "wasDue": "અપેક્ષિત હતું {{time}}"
+    },
     "step": {
       "editing": "સંપાદન",
       "reading": "વાંચન",
@@ -4035,7 +4075,8 @@
         "space": "આ મોડેલ માટે પૂરતી ખાલી સ્ટોરેજ નથી. જગ્યા ખાલી કરો અને ફરી પ્રયાસ કરો.",
         "network": "ડાઉનલોડ પૂર્ણ થયું નથી. તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો.",
         "invalidFile": "ડાઉનલોડ કરેલ ફાઇલ એ મોડેલ નથી જે આ એપ ચલાવી શકે, તેથી તેને દૂર કરવામાં આવી છે.",
-        "checksum": "ડાઉનલોડ કરેલ ફાઇલ તેના પ્રકાશિત ચેકસમ સાથે મેળ ખાતી નથી, તેથી તેને દૂર કરવામાં આવી છે. ફરીથી ડાઉનલોડ કરવાનો પ્રયાસ કરો."
+        "checksum": "ડાઉનલોડ કરેલ ફાઇલ તેના પ્રકાશિત ચેકસમ સાથે મેળ ખાતી નથી, તેથી તેને દૂર કરવામાં આવી છે. ફરીથી ડાઉનલોડ કરવાનો પ્રયાસ કરો.",
+        "writeFailed": "આ ઉપકરણ આ મોડેલને સાચવી શક્યું નથી. ડાઉનલોડ ફરીથી કરવાનો પ્રયાસ કરો."
       }
     },
     "catalog": {
@@ -4477,6 +4518,7 @@
         "balanceNeutral": "બેલેન્સ પર અસર નહીં",
         "deduction": "કપાત",
         "grant": "ક્રેડિટ અનુદાન",
+        "welcomeCredits": "સ્વાગત ક્રેડિટ",
         "purchase": "ખરીદી"
       },
       "purchaseFallback": "ક્રેડિટ ખરીદી",
@@ -4732,6 +4774,8 @@
     "connectedTo": "{{account}} સાથે કનેક્ટ થયેલ",
     "disconnected": "{{provider}} ડિસ્કનેક્ટ થયું",
     "disconnectFailed": "{{provider}} ડિસ્કનેક્ટ કરી શકાયું નહીં",
+    "disconnectRetry": "Slack ડિસ્કનેક્શનની પુષ્ટિ કરી શક્યું નહીં. ફરી પ્રયાસ કરો.",
+    "disconnectNeedsSupport": "Kilo આ કનેક્શન માટે સાચવેલ Slack ઍક્સેસ વાંચી શક્યું નહીં. ડિસ્કનેક્ટ પૂર્ણ કરવા સહાય ટીમનો સંપર્ક કરો.",
     "couldNotLoad": "ઇન્ટિગ્રેશન્સ લોડ કરી શકાયા નહીં",
     "permissionDenied": "તમને આ ઇન્ટિગ્રેશન્સ મેનેજ કરવાની પરવાનગી નથી.",
     "managedByOwner": "તમે ન બદલી શકો એવું કનેક્શન બદલવા માટે સંસ્થાના માલિકને કહો.",

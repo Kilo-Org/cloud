@@ -23,6 +23,7 @@ import {
   providerKeyScope,
   providerKeyScopeInput,
 } from '@/lib/byok/provider-key-scope';
+import { providerKeyName } from '@/lib/byok/provider-key-name';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useSideInsetStyle } from '@/lib/screen-insets';
 import { useTRPC } from '@/lib/trpc';
@@ -43,6 +44,7 @@ function ProviderRow({
   last,
 }: Readonly<{ provider: ProviderOption; scope: ProviderKeyScope; last: boolean }>) {
   const router = useRouter();
+  const name = providerKeyName(provider.id, provider.name);
 
   return (
     <Pressable
@@ -52,13 +54,13 @@ function ProviderRow({
         !last && 'border-b-[0.5px] border-hair-soft'
       )}
       accessibilityRole="button"
-      accessibilityLabel={provider.name}
+      accessibilityLabel={name}
       onPress={() => {
         router.push(providerKeyNewHref(scope, provider.id));
       }}
     >
       <Text className="min-w-0 flex-1 text-sm text-foreground" numberOfLines={1}>
-        {provider.name}
+        {name}
       </Text>
       <RowChevron />
     </Pressable>
@@ -102,12 +104,19 @@ export function ProviderKeyProviderPickerScreen({
     // A query that folds to nothing is all diacritics and keeps the raw
     // comparison alone, rather than matching every name.
     const foldedNeedle = foldForSearch(trimmed);
-    return rows.filter(
-      provider =>
-        provider.name.toLocaleLowerCase(i18n.language).includes(nameNeedle) ||
-        (foldedNeedle !== '' && foldForSearch(provider.name).includes(foldedNeedle)) ||
-        provider.id.toLocaleLowerCase(ID_FOLD_LOCALE).includes(idNeedle)
-    );
+    return rows.filter(provider => {
+      // The row shows the resolved name, so the search matches what the reader
+      // sees; the server's English name keeps answering a query typed from it,
+      // so switching the row to the catalog name does not break that habit.
+      // Both names fold the same way, accents included.
+      const names = [providerKeyName(provider.id, provider.name), provider.name];
+      const matchesName = names.some(
+        name =>
+          name.toLocaleLowerCase(i18n.language).includes(nameNeedle) ||
+          (foldedNeedle !== '' && foldForSearch(name).includes(foldedNeedle))
+      );
+      return matchesName || provider.id.toLocaleLowerCase(ID_FOLD_LOCALE).includes(idNeedle);
+    });
   }, [providers.data, query, i18n.language]);
 
   // A query change draws a shorter list under the current offset, so a deep

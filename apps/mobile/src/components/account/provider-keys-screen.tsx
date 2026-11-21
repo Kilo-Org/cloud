@@ -26,6 +26,7 @@ import {
   providerKeyScopeInput,
 } from '@/lib/byok/provider-key-scope';
 import { announceTestOutcome } from '@/lib/byok/key-test-outcome';
+import { providerKeyName } from '@/lib/byok/provider-key-name';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
@@ -122,7 +123,9 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
 
   const confirmRemove = (providerKey: ProviderKey) => {
     confirm({
-      title: t('profile.providerKeys.removeTitle', { provider: providerKey.provider_name }),
+      title: t('profile.providerKeys.removeTitle', {
+        provider: providerKeyName(providerKey.provider_id, providerKey.provider_name),
+      }),
       message: t('profile.providerKeys.removeMessage'),
       confirmLabel: t('common.remove'),
       onConfirm: () => {

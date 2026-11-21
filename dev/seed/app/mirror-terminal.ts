@@ -381,7 +381,11 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     .select({ sessionId: cli_sessions_v2.session_id, updatedAt: cli_sessions_v2.updated_at })
     .from(cli_sessions_v2)
     .where(eq(cli_sessions_v2.kilo_user_id, user.userId));
-  const actual = [...ordered]
+  // Scoped to this fixture's ids: the user may own other sessions, and only the
+  // relative order of the seven below decides what the crawl meets first.
+  const fixtureIds = new Set(sessionIds);
+  const actual = ordered
+    .filter(row => fixtureIds.has(row.sessionId))
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .map(row => row.sessionId);
   const expected = [...sessionIds];

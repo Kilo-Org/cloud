@@ -1,6 +1,6 @@
 import { VercelModelIdOverridesConfigSchema } from '@kilocode/db/schema-types';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
-import { readAiGatewayConfigRow } from '@kilocode/web-shared/lib/ai-gateway/providers/ai-gateway-config-row';
+import { readVercelModelIdOverridesConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/ai-gateway-config-row';
 import {
   AUTO_SMALL_FREE_MODEL_UPSTREAM_ID,
   isAutoSmallFreeModel,
@@ -25,9 +25,9 @@ const openRouterModelPrefixMapping: Record<string, string | undefined> = Object.
 
 /** Throws on an invalid stored config, so the cached getter keeps its last valid value. */
 export async function readVercelModelIdOverrides(): Promise<VercelModelIdOverrides> {
-  const row = await readAiGatewayConfigRow();
-  if (!row?.vercelModelIdOverrides) return new Map();
-  const { overrides } = VercelModelIdOverridesConfigSchema.parse(row.vercelModelIdOverrides);
+  const stored = await readVercelModelIdOverridesConfig();
+  if (!stored) return new Map();
+  const { overrides } = VercelModelIdOverridesConfigSchema.parse(stored);
   return new Map(overrides.map(o => [o.openrouter_model_id, o.vercel_model_id]));
 }
 

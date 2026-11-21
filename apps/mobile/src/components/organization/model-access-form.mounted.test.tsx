@@ -741,6 +741,15 @@ describe('ModelAccessForm with a catalog that names no provider', () => {
 
     expect(saved.mutateAsync).not.toHaveBeenCalled();
     expect(statusMessage(root)).toBe(i18n.t('organizationModelAccess.providersNeedCatalog'));
+    // The status line under the tabs carries that sentence, so the list must
+    // not print the same sentence again as its caption. The status is stubbed
+    // to a non-Text node here, so no Text may hold the sentence at all.
+    const rendered = root
+      .findAllByType('Text' as never)
+      .filter(
+        node => node.props.children === i18n.t('organizationModelAccess.providersNeedCatalog')
+      );
+    expect(rendered).toHaveLength(0);
   });
 });
 

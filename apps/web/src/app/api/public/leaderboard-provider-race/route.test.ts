@@ -18,6 +18,10 @@ jest.mock('@/lib/snowflake', () => ({
   executeSnowflakeStatement: jest.fn(),
 }));
 
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  resolveOpenRouterModelAlias: jest.fn(async (model: string) => model),
+}));
+
 type SnowflakeConfig = ReturnType<typeof resolveSnowflakeConfig>;
 
 const FAKE_CONFIG = {
@@ -250,7 +254,7 @@ describe('GET /api/public/leaderboard-model-usage', () => {
   });
 });
 
-describe('leaderboard model alias attribution', () => {
+describe('leaderboard model attribution', () => {
   test.each([
     {
       route: 'leaderboard-model-usage',
@@ -260,52 +264,101 @@ describe('leaderboard model alias attribution', () => {
       route: 'leaderboard-model-provider-usage',
       loadRoute: () => import('../leaderboard-model-provider-usage/route'),
     },
-  ])('$route attributes aliases and router ids to the model that served each request', async ({ loadRoute }) => {
-    await jest.isolateModulesAsync(async () => {
-      const snowflake = await import('@/lib/snowflake');
-      jest.mocked(snowflake.resolveSnowflakeConfig).mockReturnValue(FAKE_CONFIG);
-      const executeStatement = jest.mocked(snowflake.executeSnowflakeStatement);
-      executeStatement.mockReset().mockResolvedValue([]);
-      const { GET } = await loadRoute();
+  ])(
+    '$route attributes OpenRouter router ids to the served model and keeps aliases as requested',
+    async ({ loadRoute }) => {
+      await jest.isolateModulesAsync(async () => {
+        const snowflake = await import('@/lib/snowflake');
+        jest.mocked(snowflake.resolveSnowflakeConfig).mockReturnValue(FAKE_CONFIG);
+        const executeStatement = jest.mocked(snowflake.executeSnowflakeStatement);
+        executeStatement.mockReset().mockResolvedValue([]);
+        const { GET } = await loadRoute();
 
-      expect((await GET()).status).toBe(200);
-      const statement = executeStatement.mock.calls[0][0].statement;
-      const modelExpression = statement.match(
-        /(case[\s\S]*?end) as "model"/
-      )?.[1];
-      if (!modelExpression) {
-        throw new Error('Missing leaderboard model projection');
-      }
+        expect((await GET()).status).toBe(200);
+        const statement = executeStatement.mock.calls[0][0].statement;
+        const modelExpression = statement.match(/(case[\s\S]*?end) as "model"/)?.[1];
+        if (!modelExpression) {
+          throw new Error('Missing leaderboard model projection');
+        }
 
-      const usage = await db.execute<{ model: string; tokens: number }>(sql`
-        select ${sql.raw(modelExpression)} as model, sum(mu.tokens)::integer as tokens
-        from (values
-          ('~deepseek/deepseek-pro-latest', 'deepseek/deepseek-v4-pro-0813', 6000000),
-          ('deepseek/deepseek-v4-pro-0813', 'deepseek/deepseek-v4-pro-0813', 6000000),
-          ('~deepseek/deepseek-pro-latest', 'deepseek/deepseek-v4-pro-1101', 12000000),
-          ('deepseek/deepseek-v4-pro-0813:free', 'deepseek/deepseek-v4-pro-0813', 3000000),
-          ('~deepseek/unresolved-latest', null, 2000000),
-          ('openrouter/auto', 'anthropic/claude-sonnet-4.5', 1500000),
-          ('openrouter/free', null, 1200000),
-          ('~acme/model', 'upstream/model', 1100000),
-          ('acme/model~latest', 'upstream/model', 1000000)
-        ) as mu(requested_model, model, tokens)
-        group by 1
-        order by 2 desc, 1
-      `);
+        const usage = await db.execute<{ model: string; tokens: number }>(sql`
+          select ${sql.raw(modelExpression)} as model, sum(mu.tokens)::integer as tokens
+          from (values
+            ('~deepseek/deepseek-pro-latest', 'deepseek/deepseek-v4-pro-0813', 6000000),
+            ('~deepseek/deepseek-pro-latest', 'deepseek-v4-pro', 12000000),
+            ('deepseek/deepseek-v4-pro-0813', 'deepseek-v4-pro', 5000000),
+            ('openrouter/auto', 'anthropic/claude-sonnet-4.5', 1500000),
+            ('openrouter/free', null, 1200000),
+            (null, 'upstream/model', 1000000)
+          ) as mu(requested_model, model, tokens)
+          group by 1
+          order by 2 desc, 1
+        `);
 
-      expect(usage.rows).toEqual([
-        { model: 'deepseek/deepseek-v4-pro-0813', tokens: 12000000 },
-        { model: 'deepseek/deepseek-v4-pro-1101', tokens: 12000000 },
-        { model: 'deepseek/deepseek-v4-pro-0813:free', tokens: 3000000 },
-        { model: '~deepseek/unresolved-latest', tokens: 2000000 },
-        { model: 'anthropic/claude-sonnet-4.5', tokens: 1500000 },
-        { model: 'openrouter/free', tokens: 1200000 },
-        { model: '~acme/model', tokens: 1100000 },
-        { model: 'acme/model~latest', tokens: 1000000 },
-      ]);
-    });
-  });
+        expect(usage.rows).toEqual([
+          { model: '~deepseek/deepseek-pro-latest', tokens: 18000000 },
+          { model: 'deepseek/deepseek-v4-pro-0813', tokens: 5000000 },
+          { model: 'anthropic/claude-sonnet-4.5', tokens: 1500000 },
+          { model: 'openrouter/free', tokens: 1200000 },
+          { model: 'upstream/model', tokens: 1000000 },
+        ]);
+      });
+    }
+  );
+
+  test.each([
+    {
+      route: 'leaderboard-model-usage',
+      loadRoute: () => import('../leaderboard-model-usage/route'),
+      rows: [
+        ['2026-11-01', '~deepseek/deepseek-pro-latest', 'code', '6000000'],
+        ['2026-11-01', 'deepseek/deepseek-v4-pro-0813', 'code', '6000000'],
+        ['2026-11-01', '~deepseek/unresolved-latest', 'code', '2000000'],
+      ],
+      expected: [
+        { usageDate: '2026-11-01', model: 'deepseek-v4-pro-0813', mode: 'code', tokens: 12_000_000 },
+        { usageDate: '2026-11-01', model: 'unresolved-latest', mode: 'code', tokens: 2_000_000 },
+      ],
+    },
+    {
+      route: 'leaderboard-model-provider-usage',
+      loadRoute: () => import('../leaderboard-model-provider-usage/route'),
+      rows: [
+        ['~deepseek/deepseek-pro-latest', 'deepseek', '0', '6000000', '1', '0', '1', '0'],
+        ['deepseek/deepseek-v4-pro-0813', 'deepseek', '0', '6000000', '1', '0', '1', '0'],
+      ],
+      expected: [
+        expect.objectContaining({
+          model: 'deepseek-v4-pro-0813',
+          provider: 'DeepSeek',
+          sumTokens: 12_000_000,
+        }),
+      ],
+    },
+  ])(
+    '$route resolves latest aliases to their current gateway target',
+    async ({ loadRoute, rows, expected }) => {
+      await jest.isolateModulesAsync(async () => {
+        const snowflake = await import('@/lib/snowflake');
+        jest.mocked(snowflake.resolveSnowflakeConfig).mockReturnValue(FAKE_CONFIG);
+        jest.mocked(snowflake.executeSnowflakeStatement).mockReset().mockResolvedValue(rows);
+        const gatewayModels = await import(
+          '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'
+        );
+        jest
+          .mocked(gatewayModels.resolveOpenRouterModelAlias)
+          .mockImplementation(async model =>
+            model === '~deepseek/deepseek-pro-latest' ? 'deepseek/deepseek-v4-pro-0813' : model
+          );
+        const { GET } = await loadRoute();
+
+        const response = await GET();
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual(expected);
+      });
+    }
+  );
 });
 
 describe('public custom model leaderboard usage', () => {

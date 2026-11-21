@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { LEADERBOARD_MODEL_SQL, normalizeLeaderboardModel } from '@/lib/leaderboard-model';
+import { LEADERBOARD_MODEL_SQL, resolveLeaderboardModel } from '@/lib/leaderboard-model';
 import {
   createPublicSnowflakeReport,
   publicSnowflakeReportOptions,
@@ -45,12 +45,12 @@ const modelUsageSchema = z.array(
 
 type ModelUsage = z.infer<typeof modelUsageSchema>[number];
 
-function parseModelUsage(rows: string[][]): ModelUsage[] {
+async function parseModelUsage(rows: string[][]): Promise<ModelUsage[]> {
   const usageByKey = new Map<string, ModelUsage>();
 
   for (const row of rows) {
     const [usageDate, rawModel, modeValue, tokenValue] = row;
-    const model = normalizeLeaderboardModel(rawModel || '');
+    const model = await resolveLeaderboardModel(rawModel || '');
     const tokens = Number(tokenValue);
     const mode = modeValue || null;
 

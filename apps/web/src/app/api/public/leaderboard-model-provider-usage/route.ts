@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { LEADERBOARD_MODEL_SQL, normalizeLeaderboardModel } from '@/lib/leaderboard-model';
+import { LEADERBOARD_MODEL_SQL, resolveLeaderboardModel } from '@/lib/leaderboard-model';
 import { normalizePublicInferenceProvider } from '@/lib/public-inference-provider';
 import {
   createPublicSnowflakeReport,
@@ -67,14 +67,14 @@ function ratio(numerator: number, denominator: number): number {
   return denominator === 0 ? 0 : numerator / denominator;
 }
 
-function parseAndAggregateUsage(rows: string[][]): ModelProviderUsage[] {
+async function parseAndAggregateUsage(rows: string[][]): Promise<ModelProviderUsage[]> {
   const usageByModelAndProvider = new Map<string, AggregatedUsage>();
 
   for (const row of rows) {
     const [rawModel, rawProvider, ...rawAggregates] = row;
     const [sumCost, sumTokens, sumInputTokens, sumCacheHitTokens, sumRequestCount, sumErrorCount] =
       rawAggregates.map(Number);
-    const model = normalizeLeaderboardModel(rawModel || '');
+    const model = await resolveLeaderboardModel(rawModel || '');
     const provider = normalizePublicInferenceProvider(rawProvider?.trim() || 'unknown');
 
     if (

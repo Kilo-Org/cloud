@@ -112,17 +112,23 @@ export function ggufModelClient({
     previous: Promise<void>,
     current: { readonly context: Promise<GgufContext> }
   ) => {
-    await settled(previous);
-    const context = await settled(current.context);
-    if (!context.ok) {
-      return;
+    try {
+      await settled(previous);
+      const context = await settled(current.context);
+      if (!context.ok) {
+        return;
+      }
+      const running = inflight;
+      if (running !== undefined) {
+        await settled(context.value.stopCompletion());
+        await settled(running);
+      }
+      await settled(context.value.release());
+    } catch {
+      // A native handle that was already freed throws as the call is made,
+      // rather than rejecting a promise. The teardown ends here, so the chain
+      // every later load waits on never stays rejected.
     }
-    const running = inflight;
-    if (running !== undefined) {
-      await settled(context.value.stopCompletion());
-      await settled(running);
-    }
-    await settled(context.value.release());
   };
 
   const release = (fileId?: string): Promise<void> => {

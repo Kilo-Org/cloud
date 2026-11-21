@@ -52,6 +52,25 @@ function contextOf(timeline: Timeline, name: string, freeing: () => Promise<void
   } as unknown as GgufContext;
 }
 
+/** A context whose native release throws as it is called, like a handle freed twice. */
+function throwingContext(): GgufContext {
+  const release = vi.fn(() => {
+    throw new Error('context already released');
+  });
+  return {
+    model: { chatTemplates: { llamaChat: true, jinja: { default: false } } },
+    completion: () =>
+      Promise.resolve({
+        text: 'ok',
+        tokens_evaluated: 1,
+        tokens_predicted: 1,
+        stopped_eos: true,
+      }),
+    stopCompletion: vi.fn(() => Promise.resolve()),
+    release,
+  } as unknown as GgufContext;
+}
+
 function clientWith(contexts: readonly GgufContext[], timeline: Timeline) {
   let index = 0;
   const init = vi.fn(() => {
@@ -124,4 +143,24 @@ it('reuses the context a finished release left, without opening a third', async 
   await collect(client.stream(request));
 
   expect(timeline).toEqual(['open 1', 'freed first', 'open 2']);
+});
+
+it('keeps loading after a native release throws as it is called', async () => {
+  const timeline: Timeline = [];
+  const broken = throwingContext();
+  const second = contextOf(timeline, 'second', () => Promise.resolve());
+  const third = contextOf(timeline, 'third', () => Promise.resolve());
+  const { client, release, init } = clientWith([broken, second, third], timeline);
+  await collect(client.stream(request));
+
+  // A synchronous throw from the native object must not leave the shared teardown
+  // chain rejected: the next answer would then fail as unavailable until restart.
+  await expect(release()).resolves.toBeUndefined();
+  expect(broken.release).toHaveBeenCalledTimes(1);
+  // The answer after the failed teardown still loads and finishes, and the context
+  // it replaces is freed through the same chain.
+  const answered = await collect(client.stream(request));
+  expect(answered.at(-1)?.kind).toBe('done');
+  expect(init).toHaveBeenCalledTimes(2);
+  expect(timeline).toEqual(['open 1', 'open 2']);
 });

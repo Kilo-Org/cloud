@@ -223,45 +223,31 @@ describe('classifyConfigBody', () => {
 });
 
 describe('classifyPermission', () => {
+  const base = {
+    isPersonal: false,
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    hasData: true,
+    role: undefined,
+    refetch: vi.fn<() => void>(),
+  };
+
   it('is always ready+editable for a personal scope, regardless of query state', () => {
     expect(
-      classifyPermission({
-        isPersonal: true,
-        isLoading: true,
-        isError: true,
-        isFetching: true,
-        hasData: true,
-        role: undefined,
-        refetch: vi.fn<() => void>(),
-      })
+      classifyPermission({ ...base, isPersonal: true, isLoading: true, isError: true })
     ).toEqual({ status: 'ready', canEdit: true, canManage: true });
   });
 
   it('is loading while the org list query is loading', () => {
-    expect(
-      classifyPermission({
-        isPersonal: false,
-        isLoading: true,
-        isError: false,
-        isFetching: true,
-        hasData: true,
-        role: undefined,
-        refetch: vi.fn<() => void>(),
-      })
-    ).toEqual({ status: 'loading' });
+    expect(classifyPermission({ ...base, isLoading: true, isFetching: true })).toEqual({
+      status: 'loading',
+    });
   });
 
-  it('is an error when the org list query fails', () => {
+  it('is an error when the org list query fails with no cached list', () => {
     const refetch = vi.fn<() => void>();
-    const result = classifyPermission({
-      isPersonal: false,
-      isLoading: false,
-      isError: true,
-      isFetching: false,
-      hasData: true,
-      role: undefined,
-      refetch,
-    });
+    const result = classifyPermission({ ...base, isError: true, hasData: false, refetch });
     expect(result.status).toBe('error');
     if (result.status === 'error') {
       result.refetch();
@@ -269,62 +255,47 @@ describe('classifyPermission', () => {
     }
   });
 
+  it('keeps the cached role through a failed background refetch', () => {
+    // A refetch that fails over a cached list is not a reason to blank the
+    // screen: the cached role still says what the caller may do.
+    expect(classifyPermission({ ...base, isError: true, role: 'admin' })).toEqual({
+      status: 'ready',
+      canEdit: true,
+      canManage: true,
+    });
+  });
+
   it('grants edit for owner and billing_manager roles once loaded', () => {
     for (const role of ['owner', 'billing_manager'] as const) {
-      expect(
-        classifyPermission({
-          isPersonal: false,
-          isLoading: false,
-          isError: false,
-          isFetching: false,
-          hasData: true,
-          role,
-          refetch: vi.fn<() => void>(),
-        })
-      ).toEqual({ status: 'ready', canEdit: true, canManage: role === 'owner' });
+      expect(classifyPermission({ ...base, role })).toEqual({
+        status: 'ready',
+        canEdit: true,
+        canManage: role === 'owner',
+      });
     }
   });
 
   it('grants manage (provider app install) to owner and admin only', () => {
     for (const role of ['owner', 'admin'] as const) {
-      expect(
-        classifyPermission({
-          isPersonal: false,
-          isLoading: false,
-          isError: false,
-          isFetching: false,
-          hasData: true,
-          role,
-          refetch: vi.fn<() => void>(),
-        })
-      ).toEqual({ status: 'ready', canEdit: true, canManage: true });
+      expect(classifyPermission({ ...base, role })).toEqual({
+        status: 'ready',
+        canEdit: true,
+        canManage: true,
+      });
     }
     for (const role of ['billing_manager', 'member'] as const) {
-      expect(
-        classifyPermission({
-          isPersonal: false,
-          isLoading: false,
-          isError: false,
-          isFetching: false,
-          hasData: true,
-          role,
-          refetch: vi.fn<() => void>(),
-        })
-      ).toMatchObject({ status: 'ready', canManage: false });
+      expect(classifyPermission({ ...base, role })).toMatchObject({
+        status: 'ready',
+        canManage: false,
+      });
     }
   });
 
   it('denies edit for a member role', () => {
-    expect(
-      classifyPermission({
-        isPersonal: false,
-        isLoading: false,
-        isError: false,
-        isFetching: false,
-        hasData: true,
-        role: 'member',
-        refetch: vi.fn<() => void>(),
-      })
-    ).toEqual({ status: 'ready', canEdit: false, canManage: false });
+    expect(classifyPermission({ ...base, role: 'member' })).toEqual({
+      status: 'ready',
+      canEdit: false,
+      canManage: false,
+    });
   });
 });

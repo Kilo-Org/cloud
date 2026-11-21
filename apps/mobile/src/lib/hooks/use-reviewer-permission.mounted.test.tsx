@@ -167,6 +167,59 @@ describe('code reviewer permission read', () => {
     view.unmount();
   });
 
+  it('keeps the cached role when a refetch fails offline', async () => {
+    // The read settles while offline, so an offline device refetches the cached
+    // list. When that refetch rejects, the cached role is still the answer: a
+    // blank error in its place would drop an owner's editor controls.
+    authState.token = 'tok';
+    onlineManager.setOnline(true);
+    respondWithMembership();
+    const { view, queryClient, holder } = await mountPermission(PermissionProbe);
+    await waitFor(() => holder.state?.status === 'ready' && holder.state.canEdit);
+    const served = callsTo('organizations.list');
+
+    onlineManager.setOnline(false);
+    transport.mockImplementation(() => Promise.reject(new TypeError('Network request failed')));
+    await act(async () => {
+      await queryClient.refetchQueries();
+    });
+    await waitFor(() => callsTo('organizations.list') > served);
+    await flush();
+
+    expect(callsTo('organizations.list')).toBe(served + 1);
+    expect(holder.state).toEqual({ status: 'ready', canEdit: true, canManage: true });
+    view.unmount();
+  });
+
+  it('reports a failed first read as a retryable error', async () => {
+    // With no cached list there is no role to fall back on, so the failure must
+    // stay an error with a retry rather than reading as a plain member.
+    authState.token = 'tok';
+    onlineManager.setOnline(true);
+    transport.mockImplementation(() => Promise.reject(new TypeError('Network request failed')));
+    const { view, holder } = await mountPermission(PermissionProbe);
+    await waitFor(() => holder.state?.status === 'error');
+
+    const failed = holder.state;
+    if (failed?.status !== 'error') {
+      throw new Error('expected a failed first read');
+    }
+    const served = callsTo('organizations.list');
+    await act(() => {
+      failed.refetch();
+    });
+    // The retry must reach the backend and leave the surface retryable again.
+    await waitFor(
+      () =>
+        callsTo('organizations.list') === served + 1 &&
+        holder.state?.status === 'error' &&
+        !holder.state.isRetrying
+    );
+
+    expect(holder.state).toMatchObject({ status: 'error', isRetrying: false });
+    view.unmount();
+  });
+
   it('keeps the personal scope ready without a memberships read', async () => {
     // A personal scope's capabilities are its own account's, so a memberships
     // read there answers nothing: it would only delay the personal editor behind

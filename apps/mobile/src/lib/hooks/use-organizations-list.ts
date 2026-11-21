@@ -23,6 +23,12 @@ import { useTRPC } from '@/lib/trpc';
  * token gate and the offline settle stay here, so every observer of the one
  * cache entry uses the same options — the query's own options are
  * last-writer-wins across observers.
+ *
+ * Two Security Agent role reads (`use-security-agent.ts` and its scope list)
+ * still build their own options on purpose: their settings screen reports a
+ * paused read as a connection failure, and its own suite pins that. Any new
+ * observer of this key must come through this hook, because one built with
+ * defaulted options drops the offline settle for every other consumer.
  */
 export function useOrganizationsList(options: { enabled?: boolean } = {}) {
   const trpc = useTRPC();

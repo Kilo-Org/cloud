@@ -11,7 +11,7 @@ import { type GgufTransfer, moveIntoPlace, PASSES, readVerified } from './gguf-t
  * the caller can report it unchecked. The store decides when space or the
  * network failed; a check only ever judges the files.
  */
-export type GgufVerificationProblem = Extract<
+type GgufVerificationProblem = Extract<
   GgufDownloadProblem,
   'checksum' | 'invalidFile' | 'writeFailed'
 >;

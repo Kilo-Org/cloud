@@ -1,8 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 // The mock harness registers every product-module mock before the screen loads.
 import {
+  confirmFn,
   findConfigureRows,
+  keyboardDismissFn,
   mountProfile,
   providersQueryFn,
   routerPush,
@@ -11,22 +13,6 @@ import {
 import { SettingsTarget } from '@/components/settings-search/settings-target';
 import { i18n } from '@/i18n';
 import { act, type ReactTestInstance } from '@/test/renderer';
-
-// Root search runs through the real hook (index, folding, ranking), the real
-// target reveal wiring and the real route build; the two presentational pieces
-// are the surface's own contract and are covered by its suite. Keeping them as
-// markers lets this spec compare what the screen renders with what the index
-// answers.
-vi.mock('@/components/settings-search/settings-search', async () => {
-  const actual = await vi.importActual<Record<string, unknown>>(
-    '@/components/settings-search/settings-search'
-  );
-  return {
-    ...actual,
-    SettingsSearchField: 'SettingsSearchField',
-    SettingsSearchResults: 'SettingsSearchResults',
-  };
-});
 
 type SearchResult = {
   entry: { id: string; label: string; path?: string; params?: Readonly<Record<string, string>> };
@@ -73,6 +59,8 @@ function targetHighlights(root: ReactTestInstance): ReactTestInstance[] {
  */
 describe('ProfileScreen settings search', () => {
   beforeEach(() => {
+    confirmFn.mockClear();
+    keyboardDismissFn.mockClear();
     routerPush.mockClear();
     signOutFn.mockClear();
     // Linked providers are account data, not settings: the section stays hidden
@@ -105,11 +93,15 @@ describe('ProfileScreen settings search', () => {
         const item: { id: string; label: string } = node.props.item;
         return item;
       });
-    expect(new Set(targetItems.map(item => item.id)).size).toBe(new Set(titles).size);
-    for (const item of targetItems) {
-      expect(titles).toContain(i18n.t(item.label));
-    }
+    const indexedTitles = targetItems.map(item => i18n.t(item.label));
+    expect(new Set(indexedTitles)).toEqual(new Set(titles));
+    expect(indexedTitles).toHaveLength(titles.length);
     expect(renderedRowTitles(root)).toEqual(titles);
+    // Every rendered settings row is a control the person can press, which is
+    // what the search result promises to locate.
+    for (const row of byType(root, 'ConfigureRow')) {
+      expect(row.props.onPress).toBeTypeOf('function');
+    }
   });
 
   it('highlights the sign-out row without signing out', async () => {
@@ -128,7 +120,9 @@ describe('ProfileScreen settings search', () => {
     });
 
     expect(signOutFn).not.toHaveBeenCalled();
+    expect(confirmFn).not.toHaveBeenCalled();
     expect(routerPush).not.toHaveBeenCalled();
+    expect(keyboardDismissFn).toHaveBeenCalledTimes(1);
 
     // The highlight is painted over the control the row renders, not a copy of
     // the result: exactly the sign-out row's target is active.
@@ -168,6 +162,7 @@ describe('ProfileScreen settings search', () => {
       pathname: nested.path,
       params: { mode: 'review', settingsTarget: nested.id },
     });
+    expect(keyboardDismissFn).toHaveBeenCalledTimes(1);
     expect(signOutFn).not.toHaveBeenCalled();
   });
 });

@@ -23,7 +23,7 @@ import {
   Users,
   Workflow,
 } from '@/components/ui/icons';
-import { type LayoutChangeEvent, type ScrollViewInstance, View } from 'react-native';
+import { type LayoutChangeEvent, Keyboard, type ScrollViewInstance, View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
 
 import { useConfirmDialog } from '@/components/ui/dialog';
@@ -82,8 +82,10 @@ import {
   type SettingsSearchSource,
   type SettingsTargetProps,
 } from '@/lib/settings-search/definitions';
+import { useIntegrationSearchSource } from '@/lib/settings-search/integration-source';
 import { NOTIFICATION_SETTINGS_SOURCES } from '@/lib/settings-search/notification-sources';
 import { PREFERENCE_SETTINGS_SOURCES } from '@/lib/settings-search/preference-sources';
+import { PRIVACY_SETTINGS_SOURCE } from '@/lib/settings-search/privacy-source';
 import { useTRPC } from '@/lib/trpc';
 
 type AuthProvider =
@@ -236,6 +238,7 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
   const showNativeRemote = __DEV__ && Boolean(SESSION_SYNC_URL);
   const showOrganizationRow = organizationId != null || hasOrganizations;
   const organizationRowSetting = organizationSetting(organizationId, orgRole);
+  const integrationSettingsSource = useIntegrationSearchSource();
   const searchSources = useMemo<readonly SettingsSearchSource[]>(() => {
     const sources: SettingsSearchSource[] = [
       { settings: [PROFILE_SETTINGS.usage] },
@@ -281,9 +284,14 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
         PROFILE_SETTINGS.deleteAccount,
       ],
     });
+    sources.push(PRIVACY_SETTINGS_SOURCE);
+    if (integrationSettingsSource) {
+      sources.push(integrationSettingsSource);
+    }
     sources.push(...PREFERENCE_SETTINGS_SOURCES, ...NOTIFICATION_SETTINGS_SOURCES);
     return sources;
   }, [
+    integrationSettingsSource,
     organizationsError,
     showNativeRemote,
     showOrganizationRow,
@@ -300,6 +308,10 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
 
   const selectSetting = useCallback(
     (entry: SettingsSearchResult['entry']) => {
+      // An accepted result ends the search interaction: the keyboard goes away
+      // before the row is revealed or the destination opens, so neither lands
+      // behind the IME. The results list keeps the first tap (`handled` taps).
+      Keyboard.dismiss();
       settingsSearch.clear();
       if (entry.path) {
         router.push({

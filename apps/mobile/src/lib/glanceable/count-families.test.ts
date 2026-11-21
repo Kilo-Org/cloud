@@ -63,9 +63,9 @@ describe('glanceable count families', () => {
 
 /**
  * The same families in a language with more than two categories, through the
- * order a headless widget takes: `prewarmIntl` first, then the language change.
- * A rule cached before the polyfill would answer one/other forever, which is
- * the failure that order exists to prevent.
+ * real instance and the real Russian catalog. This exercises the category
+ * selection itself; the call order that keeps the rules from being cached
+ * before the polyfill is pinned in `apply-stored-language.test.ts`.
  */
 describe('glanceable count families in a multi-category language', () => {
   it('resolves one, few and many for the two families that inflect', async () => {

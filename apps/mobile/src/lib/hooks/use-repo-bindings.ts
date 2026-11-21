@@ -45,6 +45,7 @@ export function useRepoBindings(organizationId?: string) {
     bindings: query.data ?? NO_BINDINGS,
     isLoading: query.isPending,
     isError: query.isError,
+    error: query.error,
     isRefetching: query.isRefetching,
     refetch: query.refetch,
   };

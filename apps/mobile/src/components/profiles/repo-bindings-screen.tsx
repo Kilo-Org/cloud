@@ -7,6 +7,7 @@ import { toast } from 'sonner-native';
 import { EmptyState } from '@/components/empty-state';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
 import { type ProfileOwnerChoice } from '@/components/profiles/profile-owner-model';
+import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
 import { RepoBindingsAddForm } from '@/components/profiles/repo-bindings-add-form';
 import {
   chosenProfileOf,
@@ -29,6 +30,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { RowGroup } from '@/components/ui/row-group';
 import { useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import {
   useRepoBindingMutations,
   useRepoBindings,
@@ -73,6 +75,11 @@ export function RepoBindingsScreen({
   const { t } = useTranslation();
   const colors = useThemeColors();
   const bindingsQuery = useRepoBindings(organizationId);
+  const committedConnectivity = useCommittedConnectivityStatus();
+  const readError = selectProfileReadErrorView({
+    error: bindingsQuery.error,
+    connectivity: committedConnectivity,
+  });
   const { bind, unbind } = useRepoBindingMutations(organizationId);
   const profileList = useAgentProfileList(organizationId);
   // Personal scope is always manageable; an organization bind, unbind or
@@ -227,10 +234,10 @@ export function RepoBindingsScreen({
         >
           {bindingsQuery.isError ? (
             <QueryError
-              variant="server"
+              variant={readError.variant}
               placement="top"
-              title={t('profiles.loadFailed')}
-              onRetry={() => void bindingsQuery.refetch()}
+              title={readError.titleKey ? t(readError.titleKey) : undefined}
+              onRetry={readError.showRetry ? () => void bindingsQuery.refetch() : undefined}
               isRetrying={bindingsQuery.isRefetching}
             />
           ) : null}

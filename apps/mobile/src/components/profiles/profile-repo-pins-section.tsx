@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { RepoPickerSheet } from '@/components/profiles/repo-picker-sheet';
+import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
 import { ProfileRowIdentity, profileRowLabel } from '@/components/profiles/profile-row-identity';
 import {
   bindingsForProfile,
@@ -28,6 +29,7 @@ import {
   useRepoOptions,
 } from '@/lib/hooks/use-repo-bindings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import {
   COMPACT_CONTROL_BOX_CLASS,
   COMPACT_CONTROL_HIT_SLOP_DP,
@@ -70,6 +72,11 @@ export function ProfileRepoPinsSection({
   const { t } = useTranslation();
   const colors = useThemeColors();
   const bindingsQuery = useRepoBindings(organizationId);
+  const committedConnectivity = useCommittedConnectivityStatus();
+  const readError = selectProfileReadErrorView({
+    error: bindingsQuery.error,
+    connectivity: committedConnectivity,
+  });
   const { bind, unbind } = useRepoBindingMutations(organizationId);
   const [pickerOpen, setPickerOpen] = useState(false);
   const repoOptions = useRepoOptions(organizationId, pickerOpen);
@@ -113,10 +120,10 @@ export function ProfileRepoPinsSection({
   if (bindingsQuery.isError) {
     body = (
       <QueryError
-        variant="server"
+        variant={readError.variant}
         placement="top"
-        title={t('profiles.loadFailed')}
-        onRetry={() => void bindingsQuery.refetch()}
+        title={readError.titleKey ? t(readError.titleKey) : undefined}
+        onRetry={readError.showRetry ? () => void bindingsQuery.refetch() : undefined}
         isRetrying={bindingsQuery.isRefetching}
       />
     );

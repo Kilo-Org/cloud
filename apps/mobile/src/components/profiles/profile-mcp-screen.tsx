@@ -13,6 +13,7 @@ import {
   type McpServerSource,
 } from '@/components/profiles/profile-mcp-model';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
+import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -29,6 +30,7 @@ import {
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { MAX_PROFILE_MCP_SERVERS } from '@/lib/agent-profile-forms';
 import { isolateLtrBidiText } from '@/lib/bidi';
@@ -68,6 +70,11 @@ export function ProfileMcpScreen({
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const profileQuery = useAgentProfileMcpServers(profileId, organizationId);
+  const committedConnectivity = useCommittedConnectivityStatus();
+  const readError = selectProfileReadErrorView({
+    error: profileQuery.error,
+    connectivity: committedConnectivity,
+  });
   const { createMcp, updateMcp, deleteMcp, setMcpEnabled } =
     useAgentProfileSectionMutations(organizationId);
   const permission = useOrganizationProfilePermission(organizationId);
@@ -155,10 +162,10 @@ export function ProfileMcpScreen({
   if (profileQuery.isError) {
     content = (
       <QueryError
-        variant="server"
+        variant={readError.variant}
         placement="top"
-        title={t('profiles.loadFailed')}
-        onRetry={() => void profileQuery.refetch()}
+        title={readError.titleKey ? t(readError.titleKey) : undefined}
+        onRetry={readError.showRetry ? () => void profileQuery.refetch() : undefined}
         isRetrying={profileQuery.isRefetching}
       />
     );

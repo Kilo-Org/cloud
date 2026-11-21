@@ -6,7 +6,7 @@ import { EmptyState, StateAction } from '@/components/empty-state';
 import { buildProfileSections, isEffectiveDefault } from '@/components/profiles/profile-list-model';
 import { useProfileOwnerLabel } from '@/components/profiles/profile-owner-heading';
 import { profileOrganizationId, profileOwnerType } from '@/components/profiles/profile-owner-model';
-import { selectProfilesListErrorView } from '@/components/profiles/profiles-list-error-view';
+import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -90,7 +90,7 @@ export function ProfilesListScreen({
   const committedConnectivity = useCommittedConnectivityStatus();
   // An access outcome is terminal: naming it keeps the screen from reporting a
   // server fault and offering a Retry that cannot succeed.
-  const listError = selectProfilesListErrorView({
+  const listError = selectProfileReadErrorView({
     error: isError ? error : undefined,
     connectivity: committedConnectivity,
   });

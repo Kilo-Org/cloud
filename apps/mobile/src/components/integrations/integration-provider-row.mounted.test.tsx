@@ -50,8 +50,12 @@ vi.mock('@/components/ui/text', () => ({
 // The shared row is a host element here; its trailing cell is the only control
 // the row renders, so the suite reads the cell rather than the row.
 vi.mock('@/components/ui/configure-row', () => ({
-  ConfigureRow: (props: { title?: string; trailing?: ReactNode }) =>
-    createElement('RowMock', { title: props.title }, props.trailing ?? null),
+  ConfigureRow: (props: { title?: string; trailing?: ReactNode; trailingIsTarget?: boolean }) =>
+    createElement(
+      'RowMock',
+      { title: props.title, trailingIsTarget: props.trailingIsTarget },
+      props.trailing ?? null
+    ),
 }));
 vi.mock('@/components/ui/icons', () => ({
   Bot: 'Bot',
@@ -133,6 +137,15 @@ function press(node: TestRenderer.ReactTestInstance) {
   act(() => {
     onPress();
   });
+}
+
+/** The shared row the provider row rendered, before its trailing cell is unwrapped. */
+function sharedRow(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+  const [row] = root.findAll(node => String(node.type) === 'RowMock');
+  if (!row) {
+    throw new Error('the provider row rendered no shared row');
+  }
+  return row;
 }
 
 describe('IntegrationProviderRow action cell', () => {
@@ -236,6 +249,10 @@ describe('IntegrationProviderRow action cell', () => {
     // row does not shrink when the read lands.
     expect(root.findAllByType('Skeleton')[0]?.props.className).toBe(TEXT_ACTION_SKELETON_CLASS);
     expect(TEXT_ACTION_SKELETON_CLASS).toContain('h-[27px]');
+    // The placeholder is not a control, so a stacked frame keeps the plain
+    // wrapper: the host would take the target back out of the height the
+    // placeholder exists to hold.
+    expect(sharedRow(root).props.trailingIsTarget).toBe(false);
   });
 
   // The outline buttons rendered their `sm` 36pt frame, a box a control-size
@@ -253,7 +270,10 @@ describe('IntegrationProviderRow action cell', () => {
         canDisconnectNatively: true,
       },
     },
-    { name: 'retry', row: { provider: 'bitbucket', installed: true, canDisconnectNatively: false } },
+    {
+      name: 'retry',
+      row: { provider: 'bitbucket', installed: true, canDisconnectNatively: false },
+    },
   ])('gives the $name button the platform touch target on the row band', async ({ name, row }) => {
     const root = renderRow({
       row: integrationRow(row),
@@ -272,6 +292,12 @@ describe('IntegrationProviderRow action cell', () => {
     }
     const margin: unknown = 'marginVertical' in style ? style.marginVertical : undefined;
     expect(margin).toBe(-textActionRowOverhangDp());
+
+    // The cell is the row's only target-sized control, and the row marks it as
+    // such: without that, a stacked frame lays the wrapper out on the row's
+    // 27pt band and Android delivers the button's touches through 27pt, while a
+    // control-size audit still reads the button's own 44/48pt rect.
+    expect(sharedRow(root).props.trailingIsTarget).toBe(true);
 
     const declarations = (await compiledDimensions(button.props.className as string)) as {
       minHeight?: number;

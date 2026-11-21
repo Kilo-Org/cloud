@@ -504,6 +504,35 @@ export function textActionRowOverhangDp(): number {
 }
 
 /**
+ * The host a stacked row wraps a target-sized trailing control in, so the
+ * control's own box is reachable through its ancestor.
+ *
+ * A stacked row puts the leading cell and the trailing cell on a line of their
+ * own, above the text column, and that line lays its children out on the row's
+ * {@link ROW_FRAME_CONTENT_DP} band. The control still carries
+ * {@link textActionTargetClass}'s box on its own node and cancels
+ * {@link textActionRowOverhangDp} per side, which is right for a flat row: the
+ * control overhangs the frame's own `py-3` padding, inside the row's bounds.
+ * Stacked, the control's touches are delivered through the wrapper this class
+ * names, not through the row, and Android delivers a touch only inside every
+ * ancestor view: a 27pt wrapper held the delivered target at 27pt — under the
+ * 36pt frame the platform target replaced — while a control-size audit still
+ * read the control's own 44/48pt rect.
+ *
+ * The host takes the target as its own height and cancels exactly the overhang
+ * the control cancels, so it contributes the same 27pt band to the line and the
+ * row does not grow. Its `justify-center` keeps the control on that band's
+ * centre. The values are {@link textActionTargetDp} and
+ * {@link textActionRowOverhangDp} spelled as classes, because NativeWind reads
+ * literals at build time.
+ */
+export function rowTargetHostClass(): string {
+  return Platform.OS === 'android'
+    ? 'min-h-[48px] -my-[10.5px] justify-center'
+    : 'min-h-[44px] -my-[8.5px] justify-center';
+}
+
+/**
  * The box an action renders when it sits on its own row under a line of copy —
  * the billing step under a notice tile's message — with the per-side vertical
  * margin that cancels what the box holds above and below its own `text-sm` line.

@@ -118,6 +118,9 @@ export function IntegrationProviderRow({
     action = canDisconnect
       ? {
           kind: 'node',
+          // The cell is a control whose own box is the platform target, so a
+          // stacked frame hosts it at the target instead of on its 27pt band.
+          target: true,
           node: (
             <Button
               size="sm"
@@ -136,6 +139,8 @@ export function IntegrationProviderRow({
     action = canDisconnect
       ? {
           kind: 'node',
+          // Target-sized like the web-managed cell: a stacked frame hosts it.
+          target: true,
           node: (
             <Button
               size="sm"
@@ -158,6 +163,8 @@ export function IntegrationProviderRow({
     action = canDisconnect
       ? {
           kind: 'node',
+          // Target-sized like the other two cells: a stacked frame hosts it.
+          target: true,
           node: (
             <Button
               size="sm"
@@ -210,6 +217,10 @@ export function IntegrationProviderRow({
       subtitle={subtitle}
       subtitleNumberOfLines={1}
       trailing={action === undefined ? undefined : renderRowTrailing(action)}
+      // The outline cells carry the platform target on their own node, so a
+      // stacked frame must host them at the target (the pending placeholder
+      // does not, and takes the band it settles on).
+      trailingIsTarget={action?.kind === 'node' && action.target === true}
       onPress={opensProviderPage ? onOpenOnWeb : undefined}
       accessibilityLabel={opensProviderPage ? blockedRowName : undefined}
     />

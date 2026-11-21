@@ -233,6 +233,28 @@ describe('runLogoutCleanup', () => {
     expect(calls).toEqual(['activity', 'revoke']);
   });
 
+  it('unregisters the device push token before the revoke ends its auth', async () => {
+    pushOutcome('token');
+    const calls: string[] = [];
+    trpcMock.unregisterPushToken.mutate.mockImplementation(async () => {
+      calls.push('push');
+      await Promise.resolve();
+      return { success: true };
+    });
+    trpcMock.revokeCurrentDeviceSession.mutate.mockImplementation(async () => {
+      calls.push('revoke');
+      await Promise.resolve();
+      return { outcome: 'revoked' };
+    });
+
+    await runLogoutCleanup();
+
+    // The revoke is the last authenticated call: a delete after it can only
+    // be refused, and an account that cannot sign back in never retries.
+    expect(calls).toEqual(['push', 'revoke']);
+    expect(store.has(LOGOUT_CLEANUP_TOMBSTONE_KEY)).toBe(false);
+  });
+
   it('treats a fulfilled no_identifiable_session revoke as done', async () => {
     pushOutcome('none');
     trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({

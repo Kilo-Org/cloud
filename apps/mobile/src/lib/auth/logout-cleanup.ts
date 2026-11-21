@@ -329,14 +329,20 @@ export async function runLogoutCleanup(): Promise<void> {
     const activityResult = await getGlanceableDelivery().unregisterTokens();
     const needsActivityUnregister = !activityResult.ok;
 
-    const results = await Promise.allSettled([
-      trpcClient.user.revokeCurrentDeviceSession.mutate(),
-      pushToken
-        ? trpcClient.user.unregisterPushToken.mutate({ token: pushToken })
-        : Promise.resolve(),
-    ]);
+    // The device push token goes before the revoke for the same reason: once
+    // the session is revoked, the same credential can only answer "Device
+    // session is no longer active". Racing the two left the row in place for
+    // an account that cannot sign back in to retry it.
+    const unregister = pushToken
+      ? await trpcClient.user.unregisterPushToken.mutate({ token: pushToken }).then(
+          () => ({ status: 'fulfilled' as const }),
+          () => ({ status: 'rejected' as const })
+        )
+      : ({ status: 'fulfilled' as const });
 
-    const unregister = results[1];
+    // Last, and its failure is not recorded: the device has already destroyed
+    // the refresh token, so an orphaned session row dies with the access token.
+    await trpcClient.user.revokeCurrentDeviceSession.mutate().catch(() => undefined);
 
     // A fulfilled unregister for a real token is a definitive outcome; emit
     // it. No emit when there is no token (nothing was unregistered).

@@ -11,8 +11,18 @@
 /** The path prefix a tRPC HTTP call is served under. */
 export const TRPC_PATH = '/api/trpc/';
 
-/** A URL's scheme and its `//` authority marker, at the start of the string. */
-const SCHEME_PREFIX = /^[a-z][\da-z+.-]*:\/\//iu;
+/**
+ * A URL's scheme, then the run of `/` and `\` that starts its authority. A
+ * parser reads an authority for these schemes even without `//`, and skips any
+ * run of separators when it finds one.
+ */
+const SCHEME_PREFIX = /^([a-z][\da-z+.-]*):([/\\]*)/iu;
+
+/** The schemes a URL parser reads as always carrying an authority. */
+const SPECIAL_SCHEME = /^(?:https?|wss?|ftp)$/iu;
+
+/** Leading control characters and spaces, which a URL parser ignores. */
+const LEADING_IGNORED = /^[\u0000-\u0020]+/u; // eslint-disable-line no-control-regex
 
 /** The text before the first `?` or `#`. */
 function cutAtQueryOrFragment(text: string): string {
@@ -83,11 +93,25 @@ function nextDelimiter(text: string, from: number): number {
  */
 export function stripQueryString(url: string): string {
   try {
-    const scheme = SCHEME_PREFIX.exec(url);
+    // A parser skips leading control characters and spaces, so the same value is
+    // read from the trimmed text; its indices match the original's from the
+    // scheme on, which is all this walk consults.
+    const text = url.replace(LEADING_IGNORED, '');
+    const scheme = SCHEME_PREFIX.exec(text);
     if (scheme === null) {
-      return cutAtQueryOrFragment(url);
+      return cutAtQueryOrFragment(text);
+    }
+    // A special scheme carries an authority even with no `//` separator, and a
+    // run of separators is skipped when one is present: `https:`, `https:/` and
+    // `https:///` all reach the same authority. Any other scheme reads its
+    // authority only after `//`, as the format requires.
+    const isSpecial = SPECIAL_SCHEME.test(scheme[1] ?? '');
+    if (!isSpecial && (scheme[2] ?? '') === '') {
+      return cutAtQueryOrFragment(text);
     }
     const schemeEnd = scheme[0].length;
+    // A reported authority keeps the scheme and the `//` a parser normalizes to.
+    const prefix = `${scheme[1] ?? ''}://`;
     // A delimiter ends the authority once the userinfo is terminated, or when
     // the run since the scheme carries no ':' and so cannot be userinfo: then
     // the text is a plain origin and path.
@@ -98,40 +122,41 @@ export function stripQueryString(url: string): string {
     // the authority continues past the delimiter and ends at its last `@`.
     let lastAt = -1;
     let colonBefore = false;
-    for (let i = schemeEnd; i < url.length; i += 1) {
-      const c = url[i];
+    for (let i = schemeEnd; i < text.length; i += 1) {
+      const c = text[i];
       if (c === '@') {
         lastAt = i;
       } else if (c === ':') {
         colonBefore = true;
       } else if (
         (c === '/' || c === '?' || c === '#') &&
-        (lastAt !== -1 || !colonBefore || isHostLike(url.slice(schemeEnd, i)))
+        (lastAt !== -1 || !colonBefore || isHostLike(text.slice(schemeEnd, i)))
       ) {
         break;
       }
     }
     if (lastAt === -1) {
-      return cutAtQueryOrFragment(url);
+      return cutAtQueryOrFragment(text);
     }
     // The text after the last `@` stands for the authority's host, port and path,
     // so it must read as a host. A single label with no colon qualifies, because
     // nothing after the last `@` can be userinfo — unless the `@` sits after a
     // query or fragment, where a single label is that text rather than a host.
     const tailStart = lastAt + 1;
-    const tail = url.slice(tailStart, nextDelimiter(url, tailStart));
-    const crossedQuery = url.search(/[?#]/u) !== -1 && url.search(/[?#]/u) < lastAt;
+    const tail = text.slice(tailStart, nextDelimiter(text, tailStart));
+    const queryStart = text.search(/[?#]/u);
+    const crossedQuery = queryStart !== -1 && queryStart < lastAt;
     if (isHostLike(tail) || (!crossedQuery && SINGLE_LABEL.test(tail))) {
-      return url.slice(0, schemeEnd) + cutAtQueryOrFragment(url.slice(tailStart));
+      return prefix + cutAtQueryOrFragment(text.slice(tailStart));
     }
     if (!crossedQuery) {
-      return url.slice(0, schemeEnd);
+      return prefix;
     }
     // The `@` belongs to the query or fragment. A path before it settles that the
     // authority ended at the first delimiter, so the text before the query is
     // kept only when it reads as a host: otherwise it may still be userinfo.
-    const run = url.slice(schemeEnd, nextDelimiter(url, schemeEnd));
-    return isHostLike(run) ? url.slice(0, schemeEnd) + run : url.slice(0, schemeEnd);
+    const run = text.slice(schemeEnd, nextDelimiter(text, schemeEnd));
+    return isHostLike(run) ? prefix + run : prefix;
   } catch {
     return '';
   }

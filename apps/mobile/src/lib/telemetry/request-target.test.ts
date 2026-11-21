@@ -279,4 +279,28 @@ describe('stripQueryString', () => {
     expect(stripQueryString(url)).toBe(`https://${HOST}${TRPC_PATH_FIXTURE}`);
     expect(trpcProcedureText(url)).toBe('a.b');
   });
+
+  it('keeps origin and path when the separator is a single slash', () => {
+    for (const separator of ['/', '///', '////', '\\', '/\\']) {
+      const url = `https:${separator}${USERINFO}@${HOST}${TRPC_PATH_FIXTURE}`;
+
+      expect(stripQueryString(url)).toBe(`https://${HOST}${TRPC_PATH_FIXTURE}`);
+      expect(trpcProcedureText(url)).toBe('a.b');
+    }
+  });
+
+  it('keeps origin and path when the separator is absent', () => {
+    const url = `https:${USERINFO}@${HOST}${TRPC_PATH_FIXTURE}`;
+
+    expect(stripQueryString(url)).toBe(`https://${HOST}${TRPC_PATH_FIXTURE}`);
+    expect(trpcProcedureText(url)).toBe('a.b');
+  });
+
+  it('keeps origin and path when the value starts with ignored characters', () => {
+    for (const lead of [' ', '\t', '\n', '\r']) {
+      const url = `${lead}https://${USERINFO}@${HOST}${TRPC_PATH_FIXTURE}`;
+
+      expect(stripQueryString(url)).toBe(`https://${HOST}${TRPC_PATH_FIXTURE}`);
+    }
+  });
 });

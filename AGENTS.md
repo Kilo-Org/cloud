@@ -55,6 +55,11 @@ Read root and relevant package manifests before running repository JavaScript or
 package scripts. Load `repository-verification` to select narrow checks and
 prepare test dependencies.
 
+## Markdown Tables
+
+Use `|---|---|` for separator rows. Use at most one space on each side of a content cell.
+To fix padding in one file, run `bun run script/check-md-table-padding.ts --fix path/to/file.md`.
+
 ## Guidance Map
 
 | Task | Source |

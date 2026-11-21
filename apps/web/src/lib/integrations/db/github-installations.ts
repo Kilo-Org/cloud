@@ -307,11 +307,17 @@ export async function connectVerifiedGitHubInstallation(
 
     if (role === 'workflow') {
       // The workflow role is single per installation identity
-      // (`UQ_platform_integrations_github_workflow_identity`), so the other
-      // associations of the identity become secondary when this one takes the
-      // role. A secondary association keeps its canonical link, which is the
-      // authority its owner has when it connects again; an unbound association
-      // carries no role.
+      // (`UQ_platform_integrations_github_workflow_identity`, a unique index on
+      // `COALESCE(github_app_type, 'standard')` plus `platform_installation_id`
+      // restricted to `github_connection_role = 'workflow'`), so the loop below
+      // demotes only the peers that still store the role and fail the health
+      // condition runtime authorization requires. A healthy peer is never met:
+      // this association reached `workflow` either because it already stored
+      // that role, which the same unique index denies to every peer of the
+      // identity, or because no other association of the identity passes
+      // `isPlatformIntegrationHealthy`. A demoted association keeps its
+      // canonical link, which is the authority its owner has when it connects
+      // again; an unbound association carries no role instead.
       for (const association of otherOwnerAssociations) {
         if (association.github_connection_role !== 'workflow') continue;
         if (isPlatformIntegrationHealthy(association)) continue;

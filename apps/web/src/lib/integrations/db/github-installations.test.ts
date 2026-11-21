@@ -1903,6 +1903,49 @@ describe('GitHub installation persistence', () => {
     expect(rows.filter(row => row.github_connection_role === 'workflow')).toHaveLength(1);
   });
 
+  test('drops the workflow role of an unbound disconnected peer instead of giving it secondary access', async () => {
+    const legacyOwner = await createTestOrganization('Demoted unbound workflow peer', ownerId, 0);
+    const successor = await createTestOrganization(
+      'Unbound workflow peer successor',
+      otherOwnerId,
+      0
+    );
+    const [peer] = await db
+      .insert(platform_integrations)
+      .values({
+        ...legacyUnboundDisconnectedAssociation(legacyOwner.id, '990109'),
+        github_connection_role: 'workflow',
+      })
+      .returning();
+    if (!peer) throw new Error('Expected the unbound workflow peer');
+
+    const connected = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: successor.id },
+      { ...data('990109'), kiloUserId: otherOwnerId }
+    );
+    expect(connected).toEqual({ ok: true, integrationId: expect.any(String) });
+    if (!connected.ok) throw new Error('Expected the successor organization to connect');
+
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, '990109'));
+    expect(rows).toHaveLength(2);
+    expect(rows.find(row => row.id === connected.integrationId)).toMatchObject({
+      github_connection_role: 'workflow',
+      integration_status: 'active',
+      github_disconnected_at: null,
+    });
+    // The demoted peer stays unbound, and the connection-role check constraint
+    // forbids `agent_only` without a canonical link, so the demotion writes no
+    // role instead of secondary access.
+    expect(rows.find(row => row.id === peer.id)).toMatchObject({
+      github_connection_role: null,
+      github_installation_id: null,
+    });
+    expect(rows.filter(row => row.github_connection_role === 'workflow')).toHaveLength(1);
+  });
+
   test('reconnects an earlier shared-installation organization as a secondary association', async () => {
     const organizationA = await createTestOrganization('Takeover predecessor org', ownerId, 0);
     const organizationB = await createTestOrganization('Takeover successor org', otherOwnerId, 0);

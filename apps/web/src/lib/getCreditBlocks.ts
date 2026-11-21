@@ -137,17 +137,26 @@ export function getCreditBlocks(
   };
 }
 
-export const CreditGrantKindSchema = z.enum(['referral', 'welcome', 'kilo_pass', 'grant']);
-export type CreditGrantKind = z.infer<typeof CreditGrantKindSchema>;
+export const CreditGrantReasonSchema = z.enum(['referral', 'welcome', 'kilo_pass', 'grant']);
+export type CreditGrantReason = z.infer<typeof CreditGrantReasonSchema>;
 
 export type CreditGrant = {
   readonly id: string;
   readonly date: string;
   readonly amount_mUsd: number;
-  readonly kind: CreditGrantKind;
+  readonly kind: CreditGrantReason;
 };
 
-function grantKindOf(creditCategory: string | null): CreditGrantKind {
+/**
+ * Ledger-cache reconciliation and the Orb migration write these positive free
+ * rows to mirror accounting state, so they never funded the user's balance.
+ */
+const INTERNAL_ACCOUNTING_CATEGORIES: readonly string[] = [
+  'accounting_adjustment',
+  'orb_migration_accounting_adjustment',
+];
+
+function grantKindOf(creditCategory: string | null): CreditGrantReason {
   // `referral` is the admin Referral/Review grant; the two self-service bonuses
   // carry the `referral-` prefix.
   if (creditCategory === 'referral' || creditCategory?.startsWith('referral-')) {
@@ -171,7 +180,18 @@ export function getCreditGrants(
   transactions: readonly CreditTransactionForBlocks[]
 ): CreditGrant[] {
   return transactions
-    .filter(transaction => transaction.amount_microdollars > 0 && transaction.is_free)
+    .filter(
+      transaction =>
+        transaction.amount_microdollars > 0 &&
+        transaction.is_free &&
+        // A row that restores an earlier deduction is the second half of a
+        // ledger correction, not new credit.
+        (transaction.source_transaction_id ?? null) === null &&
+        !(
+          transaction.credit_category !== null &&
+          INTERNAL_ACCOUNTING_CATEGORIES.includes(transaction.credit_category)
+        )
+    )
     .sort((a, b) => {
       const byDate = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       return byDate !== 0 ? byDate : b.id.localeCompare(a.id);

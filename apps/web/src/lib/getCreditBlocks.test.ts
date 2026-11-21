@@ -326,4 +326,44 @@ describe('getCreditGrants', () => {
       'referral',
     ]);
   });
+
+  it('leaves out the internal accounting rows the ledger cache and Orb migration write', () => {
+    const transactions = [
+      makeTransaction('reconciliation', 0, 400_000, {
+        credit_category: 'accounting_adjustment',
+        created_at: '2024-01-02',
+      }),
+      makeTransaction('orb-migration', 0, 900_000, {
+        credit_category: 'orb_migration_accounting_adjustment',
+        created_at: '2024-01-03',
+      }),
+    ];
+
+    expect(getCreditGrants(transactions)).toEqual([]);
+  });
+
+  it('leaves out a positive free row that restores an earlier deduction', () => {
+    const transactions = [
+      makeTransaction('refund-restore', 0, 250_000, {
+        credit_category: 'refund_debt_restored:tx-1',
+        source_transaction_id: 'tx-1',
+        created_at: '2024-01-04',
+      }),
+    ];
+
+    expect(getCreditGrants(transactions)).toEqual([]);
+  });
+
+  it('keeps a positive free promo grant without a source transaction', () => {
+    const transactions = [
+      makeTransaction('promo', 0, 750_000, {
+        credit_category: 'referral-redeeming-bonus',
+        created_at: '2024-01-06',
+      }),
+    ];
+
+    expect(getCreditGrants(transactions)).toEqual([
+      { id: 'promo', date: '2024-01-06', amount_mUsd: 750_000, kind: 'referral' },
+    ]);
+  });
 });

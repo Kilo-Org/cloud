@@ -3,6 +3,7 @@ import { type ReactNode, type RefObject, useCallback, useEffect, useMemo, useRef
 import { useTranslation } from 'react-i18next';
 import { Platform, type TextInput, View } from 'react-native';
 
+import { clearComposerInput } from '@/components/agents/composer-input-clear';
 import { EmptyState } from '@/components/empty-state';
 import { SearchX } from '@/components/ui/icons';
 import { RowFrame } from '@/components/ui/row-frame';
@@ -64,15 +65,22 @@ const CONTEXT_SEPARATOR = ' · ';
 /** How long a changing result count waits before the reader is told it. */
 const STATUS_ANNOUNCEMENT_DELAY_MS = 500;
 
+/** No entries while the query is empty; a stable identity for the idle state. */
+const NO_ENTRIES: readonly SettingsSearchEntry[] = [];
+
 /** No results while the query is empty; a stable identity for the idle state. */
 const NO_RESULTS: readonly SettingsSearchResult[] = [];
 
-/** Split one localized keyword entry (`biometrics|face ID|fingerprint`) into its terms. */
+/**
+ * Split one localized keyword entry (`biometrics|face ID|fingerprint`) into its
+ * distinct terms.
+ */
 function keywordTerms(t: TFunction, keyword: SettingsKeyword): readonly string[] {
-  return t(KEYWORD_COPY[keyword])
+  const terms = t(KEYWORD_COPY[keyword])
     .split('|')
     .map(term => term.trim())
     .filter(term => term.length > 0);
+  return [...new Set(terms)];
 }
 
 /**
@@ -91,33 +99,52 @@ export function useSettingsSearch(sources: readonly SettingsSearchSource[]) {
   const locale = i18n.resolvedLanguage ?? i18n.language;
   const active = query.trim().length > 0;
 
-  const results = useMemo(() => {
+  // The translated index changes with the language, the sources and entering
+  // search — not with each keystroke; each keyword's synonyms are resolved once
+  // and shared by every setting that names it.
+  const entries = useMemo(() => {
     if (!active) {
-      return NO_RESULTS;
+      return NO_ENTRIES;
     }
-    const entries: SettingsSearchEntry[] = [];
+    const resolved: SettingsSearchEntry[] = [];
+    const keywordsById = new Map<SettingsKeyword, readonly string[]>();
     for (const source of sources) {
       const context = source.context?.map(key => t(key)).join(CONTEXT_SEPARATOR);
       for (const setting of source.settings) {
         if (setting.available === false) {
           continue;
         }
-        entries.push({
+        let keywords: readonly string[] | undefined;
+        if (setting.keyword !== undefined) {
+          keywords = keywordsById.get(setting.keyword);
+          if (keywords === undefined) {
+            keywords = keywordTerms(t, setting.keyword);
+            keywordsById.set(setting.keyword, keywords);
+          }
+        }
+        resolved.push({
           id: setting.id,
           label: t(setting.label),
           context: context === undefined || context === '' ? undefined : context,
-          keywords: setting.keyword === undefined ? undefined : keywordTerms(t, setting.keyword),
+          keywords,
           path: source.path,
           params: source.params,
         });
       }
     }
-    return searchSettings(entries, query, locale);
-  }, [active, locale, query, sources, t]);
+    return resolved;
+  }, [active, sources, t]);
+
+  const results = useMemo(
+    () => (active ? searchSettings(entries, query, locale) : NO_RESULTS),
+    [active, entries, locale, query]
+  );
 
   const clear = useCallback(() => {
     setQuery('');
-    inputRef.current?.clear();
+    // `clear()` alone is dropped on Android once a programmatic write moved the
+    // native text; the shared helper writes the empty text too.
+    clearComposerInput(inputRef.current);
   }, []);
 
   return { query, active, setQuery, clear, inputRef, results };
@@ -256,7 +283,7 @@ function renderHighlightedLabel(
     }
     if (end > start) {
       segments.push(
-        <Text key={`${start}-${end}`} className="font-semibold">
+        <Text key={`${start}-${end}`} className="text-sm font-semibold">
           {label.slice(start, end)}
         </Text>
       );

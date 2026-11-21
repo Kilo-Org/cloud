@@ -20,11 +20,8 @@ const fake = vi.hoisted(() => {
   };
   return { content, scroll };
 });
-const focus = vi.hoisted(() => vi.fn());
 
 vi.mock('react-native', () => ({
-  AccessibilityInfo: { setAccessibilityFocus: focus },
-  findNodeHandle: () => 41,
   View: 'View',
 }));
 // Stands in for the wrapper: it hands the scope the instance the real scroll
@@ -42,8 +39,8 @@ vi.mock('@/components/tab-screen', () => ({
   },
 }));
 
-const system = defineSetting('appearance.system', 'profile.themeSystem');
-const dark = defineSetting('appearance.dark', 'profile.themeDark');
+const system = defineSetting('appearance.system', 'preferences.appearanceSystem');
+const dark = defineSetting('appearance.dark', 'preferences.appearanceDark');
 
 let renderer: ReactTestRenderer | undefined = undefined;
 
@@ -76,7 +73,6 @@ function overlays(root: ReactTestInstance) {
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
-  focus.mockReset();
 });
 
 describe('SettingsTarget', () => {
@@ -106,7 +102,6 @@ describe('SettingsTarget', () => {
     )[0];
     expect(wrapper?.props.accessibilityRole).toBeUndefined();
     expect(wrapper?.props.accessible).toBeUndefined();
-    expect(wrapper?.props.focusable).toBe(false);
   });
 
   it('leaves a non-matching row and its group geometry alone', () => {
@@ -137,26 +132,6 @@ describe('SettingsTarget', () => {
     );
 
     expect(overlays(root)).toHaveLength(1);
-  });
-
-  it('keeps the row role when the optional assistive focus is on', () => {
-    const root = mount(
-      createElement(
-        SettingsSearchTargetScope,
-        {
-          settingsTarget: 'appearance.dark',
-          scrollRef: scrollTarget(fake.scroll),
-          focusTarget: true,
-        },
-        createElement(SettingsTarget, { item: dark }, row())
-      )
-    );
-
-    const wrapper = root.findAll(
-      node => Object.is(node.type, 'View') && node.props.className === 'relative'
-    )[0];
-    expect(wrapper?.props.focusable).toBe(true);
-    expect(wrapper?.props.accessibilityRole).toBeUndefined();
   });
 });
 

@@ -10,8 +10,6 @@ import {
   useRef,
 } from 'react';
 import {
-  AccessibilityInfo,
-  findNodeHandle,
   type Ref,
   type RefObject,
   type ScrollViewInstance,
@@ -28,8 +26,6 @@ const REVEAL_TOP_GAP = 12;
 type SettingsTargetContextValue = {
   /** The route's target id, as forwarded by the destination screen. */
   readonly target: string | undefined;
-  /** Whether a reveal also moves the assistive focus onto the row. */
-  readonly focus: boolean;
   /** Scroll the row into view once; later calls for the same target are ignored. */
   readonly reveal: (ids: readonly string[], node: ViewInstance) => void;
 };
@@ -40,8 +36,6 @@ type SettingsSearchTargetScopeProps = {
   settingsTarget?: string;
   /** The scrolling ancestor a target is measured and revealed inside. */
   scrollRef: RefObject<ScrollViewInstance | null>;
-  /** Keep the row's own accessibility role but move assistive focus to it. */
-  focusTarget?: boolean;
   children: ReactNode;
 };
 
@@ -54,15 +48,30 @@ type SettingsSearchTargetScopeProps = {
 export function SettingsSearchTargetScope({
   settingsTarget,
   scrollRef,
-  focusTarget = false,
   children,
 }: Readonly<SettingsSearchTargetScopeProps>) {
   // The target a reveal was already performed for. Claiming it before the
   // measurement keeps a row that lays out repeatedly from scrolling the screen
-  // again, and a failed measurement releases the claim for the next layout.
+  // again; the claim names its target, so a new target reveals independently.
   const revealedRef = useRef<string | null>(null);
+  // The latest target and mounted state, read when an asynchronous measurement
+  // lands: an old measurement must never scroll after a target change or after
+  // the screen is gone.
+  const targetRef = useRef(settingsTarget);
+  targetRef.current = settingsTarget;
+  const mountedRef = useRef(true);
+  useEffect(
+    () => () => {
+      mountedRef.current = false;
+    },
+    []
+  );
   useEffect(() => {
-    revealedRef.current = null;
+    // Release only a claim left by a previous target. A layout may already have
+    // claimed the current target before this effect runs; that claim must stay.
+    if (revealedRef.current !== settingsTarget) {
+      revealedRef.current = null;
+    }
   }, [settingsTarget]);
 
   const reveal = useCallback(
@@ -85,25 +94,25 @@ export function SettingsSearchTargetScope({
       node.measureLayout(
         content,
         (_left, top) => {
-          scroll.scrollTo({ y: Math.max(0, top - REVEAL_TOP_GAP), animated: true });
-          if (focusTarget) {
-            const handle = findNodeHandle<typeof View>(node);
-            if (handle !== undefined) {
-              AccessibilityInfo.setAccessibilityFocus(handle);
-            }
+          if (!mountedRef.current || targetRef.current !== target) {
+            return;
           }
+          scroll.scrollTo({ y: Math.max(0, top - REVEAL_TOP_GAP), animated: true });
         },
         () => {
-          revealedRef.current = null;
+          // Release only our own claim; a newer target may have claimed already.
+          if (revealedRef.current === target) {
+            revealedRef.current = null;
+          }
         }
       );
     },
-    [focusTarget, scrollRef, settingsTarget]
+    [scrollRef, settingsTarget]
   );
 
   const value = useMemo<SettingsTargetContextValue>(
-    () => ({ target: settingsTarget, focus: focusTarget, reveal }),
-    [settingsTarget, focusTarget, reveal]
+    () => ({ target: settingsTarget, reveal }),
+    [settingsTarget, reveal]
   );
 
   return <SettingsTargetContext.Provider value={value}>{children}</SettingsTargetContext.Provider>;
@@ -111,7 +120,6 @@ export function SettingsSearchTargetScope({
 
 type SettingsSearchScrollViewProps = ComponentProps<typeof TabScreenScrollView> & {
   settingsTarget?: string;
-  focusTarget?: boolean;
   ref?: Ref<ScrollViewInstance>;
 };
 
@@ -122,7 +130,6 @@ type SettingsSearchScrollViewProps = ComponentProps<typeof TabScreenScrollView> 
  */
 export function SettingsSearchScrollView({
   settingsTarget,
-  focusTarget = false,
   ref,
   children,
   ...props
@@ -136,11 +143,7 @@ export function SettingsSearchScrollView({
     []
   );
   return (
-    <SettingsSearchTargetScope
-      settingsTarget={settingsTarget}
-      scrollRef={scrollRef}
-      focusTarget={focusTarget}
-    >
+    <SettingsSearchTargetScope settingsTarget={settingsTarget} scrollRef={scrollRef}>
       <TabScreenScrollView {...props} ref={scrollRef}>
         {children}
       </TabScreenScrollView>
@@ -185,13 +188,7 @@ export function SettingsTarget({ item, targetIds, children }: Readonly<SettingsT
     return children;
   }
   return (
-    <View
-      ref={nodeRef}
-      collapsable={false}
-      focusable={context?.focus === true}
-      onLayout={reveal}
-      className="relative"
-    >
+    <View ref={nodeRef} collapsable={false} onLayout={reveal} className="relative">
       {children}
       <View pointerEvents="none" className="absolute inset-0 rounded-xl border-2 border-primary" />
     </View>

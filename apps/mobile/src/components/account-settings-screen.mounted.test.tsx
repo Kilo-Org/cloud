@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { AccountSettingsScreen } from '@/components/account-settings-screen';
+import { PREFERENCE_SETTINGS_SOURCES } from '@/lib/settings-search/preference-sources';
 import { renderWithProviders } from '@/test/render-with-providers';
 import type * as ReactQuery from '@tanstack/react-query';
 
@@ -43,6 +44,10 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/components/settings-search/settings-target', () => ({
+  SettingsSearchScrollView: 'ScrollView',
+  SettingsTarget: 'SettingsTarget',
+}));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));
@@ -263,5 +268,23 @@ describe('AccountSettingsScreen', () => {
     ]);
     expect(findStateNodes(renderer, 'QueryError')).toEqual([]);
     expect(findStateNodes(renderer, 'RowSkeleton')).toEqual([]);
+  });
+
+  it('renders a search target for every indexed Account row but the sign-out action', async () => {
+    const renderer = await mountAccount();
+    const source = PREFERENCE_SETTINGS_SOURCES.find(
+      candidate => candidate.path === '/(app)/(tabs)/(3_profile)/account'
+    );
+    if (!source) {
+      throw new Error('account settings source missing');
+    }
+
+    const renderedIds = renderer.root
+      .findAll(node => typeof node.type === 'string' && node.type === 'SettingsTarget')
+      .map(node => node.props.item.id);
+
+    expect(renderedIds).toEqual(source.settings.map(setting => setting.id));
+    // Signing out mutates the session, so it is not a search destination.
+    expect(renderedIds).not.toContain('account.sign-out');
   });
 });

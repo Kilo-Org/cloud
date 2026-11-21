@@ -9,11 +9,13 @@ import type * as AuthContextModule from './auth-context';
 import type * as ContextScopeModule from '../context-scope';
 import type * as TokenOwnerModule from './token-owner';
 import {
+  ATTEST_KEY_ID_KEY,
   AUTH_TOKEN_KEY,
   CHAT_BACKENDS_KEY,
   ORGANIZATION_PERSONAL_STORAGE_KEY,
   REFRESH_TOKEN_KEY,
 } from '@/lib/storage-keys';
+import { type AuthSignOutCause } from './sign-out-telemetry';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
 
 // The mobile-app gate runs `vitest related` over ~170 files concurrently with
@@ -492,6 +494,7 @@ vi.mock('@/lib/pr-review/viewed-files', () => ({
 
 vi.mock('@/lib/storage-keys', () => ({
   ACTIVE_USER_ID_KEY: 'active-user-id',
+  ATTEST_KEY_ID_KEY: 'auth-attest-key-id',
   AUTH_TOKEN_KEY: 'auth-token',
   CHAT_BACKENDS_KEY: 'chat-backends',
   KEEP_SCREEN_ON_KEY: 'keep-session-screen-on',
@@ -523,6 +526,7 @@ vi.mock('@/lib/config', () => ({
 
 vi.mock('react-native', () => ({
   AppState: hoisted.appState,
+  Platform: { OS: 'ios' },
 }));
 
 // ---- helpers ----
@@ -536,7 +540,7 @@ type AuthContextValue = {
   restoreFailed: boolean;
   retryRestore: () => void;
   signIn: (token: string, refreshToken?: string, expiresIn?: number) => Promise<void>;
-  signOut: (ended?: boolean) => Promise<void>;
+  signOut: (ended?: boolean, cause?: AuthSignOutCause) => Promise<void>;
 };
 
 /** Build a Kilo JWT whose payload carries `kiloUserId` (same shape as
@@ -829,6 +833,49 @@ describe('sign-out teardown ordering', () => {
 
     expect(hoisted.deepLinkLaunch.setCurrentDeepLinkUserId).toHaveBeenCalledWith(null);
 
+    unmount();
+  });
+
+  it.each([
+    ['user', true],
+    ['session_ended', false],
+  ] as const)('handles the stored App Attest key on %s sign-out', async (cause, retiresKey) => {
+    const { ctx, unmount } = await mountAndGetContext();
+
+    await act(async () => {
+      await ctx.signOut(cause !== 'user', cause);
+    });
+
+    expect(
+      hoisted.secureStore.deleteItemAsync.mock.calls.some(([key]) => key === ATTEST_KEY_ID_KEY)
+    ).toBe(retiresKey);
+    unmount();
+  });
+
+  it('retries a transient App Attest key deletion before sign-out completes', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    let storedAttestId: string | undefined = 'previous-account-key';
+    let refused = false;
+
+    await hoisted.secureStore.deleteItemAsync.withImplementation(
+      (key: string) => {
+        if (key === ATTEST_KEY_ID_KEY) {
+          if (!refused) {
+            refused = true;
+            return Promise.reject(new Error('Keychain temporarily unavailable'));
+          }
+          storedAttestId = undefined;
+        }
+        return Promise.resolve();
+      },
+      async () => {
+        await act(async () => {
+          await ctx.signOut();
+        });
+      }
+    );
+
+    expect(storedAttestId).toBeUndefined();
     unmount();
   });
 

@@ -451,6 +451,17 @@
       "location": "Locație Vertex",
       "clientEmail": "E-mailul contului de serviciu",
       "privateKey": "Cheia privată a contului de serviciu",
+      "privateKeyBlockRequired": "Lipește întregul bloc de cheie, de la linia BEGIN până la linia END.",
+      "privateKeyEncrypted": "Acest bloc de cheie este protejat cu o frază de acces. Lipește o cheie de cont de serviciu fără frază de acces.",
+      "names": {
+        "codestral": "Doar Codestral vechi",
+        "openai": "API OpenAI",
+        "openaiChatgpt": "OpenAI (Autentifică-te cu ChatGPT)",
+        "xiaomi": "Xiaomi (plata pe utilizare)",
+        "zai": "Z.ai (plata pe utilizare)",
+        "bedrockByok": "Amazon Bedrock (facturare directă)",
+        "vertexByok": "Google Vertex AI (facturare directă)"
+      },
       "modelMappings": "Mapări de modele",
       "modelMappingsDescription": "Direcționează un model din gateway către un deployment name personalizat.",
       "mappingTitle": "Maparea {{number}}",

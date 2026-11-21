@@ -450,6 +450,17 @@
       "location": "Vertex орналасуы",
       "clientEmail": "Service account электрондық поштасы",
       "privateKey": "Service account жеке кілті",
+      "privateKeyBlockRequired": "Бүкіл кілт блогын BEGIN жолынан END жолына дейін қойыңыз.",
+      "privateKeyEncrypted": "Бұл кілт блогы құпия сөз тіркесімен қорғалған. Құпия сөз тіркесі жоқ Service account кілтін қойыңыз.",
+      "names": {
+        "codestral": "Ескірген тек Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT арқылы кіру)",
+        "xiaomi": "Xiaomi (пайдаланғанына қарай төлеу)",
+        "zai": "Z.ai (пайдаланғанына қарай төлеу)",
+        "bedrockByok": "Amazon Bedrock (тікелей)",
+        "vertexByok": "Google Vertex AI (тікелей)"
+      },
       "modelMappings": "Модель сәйкестіктері",
       "modelMappingsDescription": "Шлюз моделін теңшелген deployment атауына бағыттаңыз.",
       "mappingTitle": "{{number}}-сәйкестік",

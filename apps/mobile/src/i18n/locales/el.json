@@ -450,6 +450,17 @@
       "location": "Τοποθεσία Vertex",
       "clientEmail": "Email λογαριασμού υπηρεσίας",
       "privateKey": "Ιδιωτικό κλειδί λογαριασμού υπηρεσίας",
+      "privateKeyBlockRequired": "Επικόλλησε ολόκληρο το μπλοκ του κλειδιού, από τη γραμμή BEGIN έως τη γραμμή END.",
+      "privateKeyEncrypted": "Αυτό το μπλοκ κλειδιού είναι προστατευμένο με φράση πρόσβασης. Επικόλλησε κλειδί λογαριασμού υπηρεσίας που δεν έχει φράση πρόσβασης.",
+      "names": {
+        "codestral": "Παλαιό Codestral μόνο",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Σύνδεση με ChatGPT)",
+        "xiaomi": "Xiaomi (χρέωση ανά χρήση)",
+        "zai": "Z.ai (χρέωση ανά χρήση)",
+        "bedrockByok": "Amazon Bedrock (απευθείας)",
+        "vertexByok": "Google Vertex AI (απευθείας)"
+      },
       "modelMappings": "Αντιστοιχίσεις μοντέλων",
       "modelMappingsDescription": "Δρομολόγησε ένα μοντέλο του gateway σε ένα προσαρμοσμένο όνομα deployment.",
       "mappingTitle": "Αντιστοίχιση {{number}}",

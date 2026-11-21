@@ -450,6 +450,17 @@
       "location": "Ebe Vertex",
       "clientEmail": "Email nke service account",
       "privateKey": "Igodo nkeonwe nke service account",
+      "privateKeyBlockRequired": "Mado ngalaba igodo ahụ dum, site n'ahịrị BEGIN ruo n'ahịrị END.",
+      "privateKeyEncrypted": "Pasfres na-echebe ngalaba igodo a. Mado igodo nke service account na-enweghị pasfres.",
+      "names": {
+        "codestral": "Codestral naanị nke oge gara aga",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Jiri ChatGPT banye)",
+        "xiaomi": "Xiaomi (kwụọ ụgwọ ka ị na-eji)",
+        "zai": "Z.ai (kwụọ ụgwọ ka ị na-eji)",
+        "bedrockByok": "Amazon Bedrock (kpọmkwem)",
+        "vertexByok": "Google Vertex AI (kpọmkwem)"
+      },
       "modelMappings": "Njikọ model",
       "modelMappingsDescription": "Zipu model gateway gaa n'aha deployment ahaziri ahazi.",
       "mappingTitle": "Njikọ {{number}}",

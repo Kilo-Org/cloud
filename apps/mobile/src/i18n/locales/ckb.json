@@ -450,6 +450,17 @@
       "location": "شوێنی Vertex",
       "clientEmail": "ئیمەیڵی service account",
       "privateKey": "کلیلی تایبەتی service account",
+      "privateKeyBlockRequired": "تەواوی بلۆکی کلیلەکە بلکێنە، لە هێڵی BEGIN تا هێڵی END.",
+      "privateKeyEncrypted": "ئەم بلۆکی کلیلە بە پاسفرێز پارێزراوە. کلیلی service account بلکێنە کە پاسفرێزی نییە.",
+      "names": {
+        "codestral": "تەنها Codestralی کۆن",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (بە ChatGPT بچۆ ژوورەوە)",
+        "xiaomi": "Xiaomi (بەپێی بەکارهێنان)",
+        "zai": "Z.ai (بەپێی بەکارهێنان)",
+        "bedrockByok": "Amazon Bedrock (ڕاستەوخۆ)",
+        "vertexByok": "Google Vertex AI (ڕاستەوخۆ)"
+      },
       "modelMappings": "بەستنەوەکانی مۆدێل",
       "modelMappingsDescription": "مۆدێلێکی gateway بنێرە بۆ deployment nameێکی تایبەت.",
       "mappingTitle": "بەستنەوەی {{number}}",

@@ -450,6 +450,17 @@
       "location": "Vertex இருப்பிடம்",
       "clientEmail": "சேவைக் கணக்கு மின்னஞ்சல்",
       "privateKey": "சேவைக் கணக்கின் தனிப்பட்ட விசை",
+      "privateKeyBlockRequired": "முழு விசைத் தொகுதியையும் BEGIN வரியிலிருந்து END வரி வரை ஒட்டவும்.",
+      "privateKeyEncrypted": "இந்த விசைத் தொகுதி கடவுச்சொற்றொடரால் பாதுகாக்கப்பட்டுள்ளது. கடவுச்சொற்றொடர் இல்லாத சேவைக் கணக்கு விசையை ஒட்டவும்.",
+      "names": {
+        "codestral": "பழைய Codestral-மட்டும்",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT மூலம் உள்நுழையவும்)",
+        "xiaomi": "Xiaomi (பயன்பாட்டின் அடிப்படையில் கட்டணம்)",
+        "zai": "Z.ai (பயன்பாட்டின் அடிப்படையில் கட்டணம்)",
+        "bedrockByok": "Amazon Bedrock (நேரடி)",
+        "vertexByok": "Google Vertex AI (நேரடி)"
+      },
       "modelMappings": "மாடல் மேப்பிங்குகள்",
       "modelMappingsDescription": "gateway மாடலை ஒரு தனிப்பயன் deployment பெயருக்கு அனுப்பவும்.",
       "mappingTitle": "மேப்பிங் {{number}}",

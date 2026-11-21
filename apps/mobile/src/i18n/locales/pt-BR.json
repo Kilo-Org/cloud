@@ -452,6 +452,17 @@
       "location": "Local do Vertex",
       "clientEmail": "E-mail da conta de serviço",
       "privateKey": "Chave privada da conta de serviço",
+      "privateKeyBlockRequired": "Cole o bloco inteiro da chave, da linha BEGIN até a linha END.",
+      "privateKeyEncrypted": "Este bloco de chave está protegido por frase secreta. Cole uma chave de conta de serviço que não tenha frase secreta.",
+      "names": {
+        "codestral": "Somente Codestral antigo",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Entrar com o ChatGPT)",
+        "xiaomi": "Xiaomi (pagamento conforme o uso)",
+        "zai": "Z.ai (pagamento conforme o uso)",
+        "bedrockByok": "Amazon Bedrock (direto)",
+        "vertexByok": "Google Vertex AI (direto)"
+      },
       "modelMappings": "Mapeamentos de modelos",
       "modelMappingsDescription": "Encaminhe um modelo do gateway para um nome de implantação personalizado.",
       "mappingTitle": "Mapeamento {{number}}",

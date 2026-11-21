@@ -450,6 +450,17 @@
       "location": "د Vertex ځای",
       "clientEmail": "د service account برېښنالیک",
       "privateKey": "د service account خصوصي کیلي",
+      "privateKeyBlockRequired": "د کیلي ټول بلاک پیسټ کړئ، له BEGIN کرښې څخه تر END کرښې پورې.",
+      "privateKeyEncrypted": "دا د کیلي بلاک په پاسفریز خوندي شوی دی. د service account هغه کیلي پیسټ کړئ چې پاسفریز نه لري.",
+      "names": {
+        "codestral": "پخوانی یوازې Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (د ChatGPT له لارې ننوځئ)",
+        "xiaomi": "Xiaomi (د کارونې پر بنسټ تادیه)",
+        "zai": "Z.ai (د کارونې پر بنسټ تادیه)",
+        "bedrockByok": "Amazon Bedrock (مستقیم)",
+        "vertexByok": "Google Vertex AI (مستقیم)"
+      },
       "modelMappings": "د ماډلونو نښلونې",
       "modelMappingsDescription": "د gateway یو ماډل یو دودیز deployment name ته واستوئ.",
       "mappingTitle": "نښلونه {{number}}",

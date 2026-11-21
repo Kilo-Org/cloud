@@ -450,6 +450,17 @@
       "location": "Vertex लोकेशन",
       "clientEmail": "सर्विस अकाउंट ईमेल",
       "privateKey": "सर्विस अकाउंट प्राइवेट कुंजी",
+      "privateKeyBlockRequired": "BEGIN पंक्ति से END पंक्ति तक पूरा कुंजी ब्लॉक पेस्ट करें।",
+      "privateKeyEncrypted": "यह कुंजी ब्लॉक पासफ़्रेज़ से सुरक्षित है। ऐसी सर्विस अकाउंट कुंजी पेस्ट करें जिसमें कोई पासफ़्रेज़ न हो।",
+      "names": {
+        "codestral": "केवल पुराना Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT से साइन इन करें)",
+        "xiaomi": "Xiaomi (उपयोग के अनुसार भुगतान)",
+        "zai": "Z.ai (उपयोग के अनुसार भुगतान)",
+        "bedrockByok": "Amazon Bedrock (सीधा)",
+        "vertexByok": "Google Vertex AI (सीधा)"
+      },
       "modelMappings": "मॉडल मैपिंग",
       "modelMappingsDescription": "किसी गेटवे मॉडल को कस्टम डिप्लॉयमेंट नाम पर भेजें।",
       "mappingTitle": "मैपिंग {{number}}",

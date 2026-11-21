@@ -7,14 +7,12 @@ import { type TextInputProps } from 'react-native';
  * stays `none` for the same reason: offering to save a provider secret in
  * iCloud Keychain is not a favour to the reader.
  *
- * A single-line credential is also masked with `secureTextEntry`. Android
- * ignores that on a multiline input and iOS has no masked text view at all, so
- * the multiline value — the Vertex private key — is visible in the field that
- * holds it on both platforms. Android also takes no soft-keyboard input for it:
- * it is pasted, and an input method that never opens cannot suggest or learn
- * it. iOS honours none of `showSoftInputOnFocus`, so its keyboard does open
- * there; what keeps it from suggesting, correcting, or learning the value is
- * the rest of these props, which both platforms do apply.
+ * Every credential input is single-line, so `secureTextEntry` masks it on both
+ * platforms: React Native obscures a single-line input and cannot obscure a
+ * multiline one (its own prop documentation says so, and iOS backs a multiline
+ * input with a text view that has no masking at all). A multiline secret would
+ * therefore show its value on screen and read it out to assistive technology,
+ * which is why no credential field asks for one.
  */
 export const CREDENTIAL_INPUT_PROPS = {
   autoCapitalize: 'none',

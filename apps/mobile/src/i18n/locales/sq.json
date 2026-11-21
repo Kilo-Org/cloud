@@ -450,6 +450,17 @@
       "location": "Vendndodhja Vertex",
       "clientEmail": "Email-i i llogarisë së shërbimit",
       "privateKey": "Çelësi privat i llogarisë së shërbimit",
+      "privateKeyBlockRequired": "Ngjit të gjithë bllokun e çelësit, nga rreshti BEGIN deri në rreshtin END.",
+      "privateKeyEncrypted": "Ky bllok i çelësit është i mbrojtur me frazëkalim. Ngjit një çelës të llogarisë së shërbimit që nuk ka frazëkalim.",
+      "names": {
+        "codestral": "Vetëm Codestral i vjetëruar",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Hyr me ChatGPT)",
+        "xiaomi": "Xiaomi (paguaj sipas përdorimit)",
+        "zai": "Z.ai (paguaj sipas përdorimit)",
+        "bedrockByok": "Amazon Bedrock (direkt)",
+        "vertexByok": "Google Vertex AI (direkt)"
+      },
       "modelMappings": "Hartëzimet e modeleve",
       "modelMappingsDescription": "Drejto një model të gateway-t te një emër i personalizuar deployment-i.",
       "mappingTitle": "Hartëzimi {{number}}",

@@ -450,6 +450,17 @@
       "location": "Vertex məkanı",
       "clientEmail": "Xidmət hesabının e-poçtu",
       "privateKey": "Xidmət hesabının şəxsi açarı",
+      "privateKeyBlockRequired": "Bütün açar blokunu BEGIN sətrindən END sətrinə qədər yapışdır.",
+      "privateKeyEncrypted": "Bu açar bloku parol ifadəsi ilə qorunur. Parol ifadəsi olmayan xidmət hesabı açarını yapışdır.",
+      "names": {
+        "codestral": "Yalnız köhnə Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT ilə daxil ol)",
+        "xiaomi": "Xiaomi (istifadəyə görə ödəniş)",
+        "zai": "Z.ai (istifadəyə görə ödəniş)",
+        "bedrockByok": "Amazon Bedrock (birbaşa)",
+        "vertexByok": "Google Vertex AI (birbaşa)"
+      },
       "modelMappings": "Model uyğunlaşdırmaları",
       "modelMappingsDescription": "Gateway modelini xüsusi deployment adına yönləndir.",
       "mappingTitle": "Uyğunlaşdırma {{number}}",

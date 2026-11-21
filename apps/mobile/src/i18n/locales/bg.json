@@ -450,6 +450,17 @@
       "location": "Местоположение във Vertex",
       "clientEmail": "Имейл на акаунта за услуга",
       "privateKey": "Частен ключ на акаунта за услуга",
+      "privateKeyBlockRequired": "Постави целия блок на ключа, от реда BEGIN до реда END.",
+      "privateKeyEncrypted": "Този блок на ключа е защитен с парола. Постави ключ на акаунт за услуга без парола.",
+      "names": {
+        "codestral": "Само за стар Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Влез с ChatGPT)",
+        "xiaomi": "Xiaomi (плащане според използването)",
+        "zai": "Z.ai (плащане според използването)",
+        "bedrockByok": "Amazon Bedrock (директно)",
+        "vertexByok": "Google Vertex AI (директно)"
+      },
       "modelMappings": "Съпоставяния на модели",
       "modelMappingsDescription": "Насочи gateway модел към персонализирано име на внедряване.",
       "mappingTitle": "Съпоставяне {{number}}",

@@ -450,6 +450,17 @@
       "location": "Vertex-helyszín",
       "clientEmail": "Szolgáltatásfiók e-mail-címe",
       "privateKey": "Szolgáltatásfiók privát kulcsa",
+      "privateKeyBlockRequired": "Illeszd be a teljes kulcsblokkot, a BEGIN sortól az END sorig.",
+      "privateKeyEncrypted": "Ez a kulcsblokk jelmondattal védett. Illessz be egy jelmondat nélküli szolgáltatásfiók-kulcsot.",
+      "names": {
+        "codestral": "Csak a régi Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Bejelentkezés ChatGPT-fiókkal)",
+        "xiaomi": "Xiaomi (használat alapú fizetés)",
+        "zai": "Z.ai (használat alapú fizetés)",
+        "bedrockByok": "Amazon Bedrock (közvetlen)",
+        "vertexByok": "Google Vertex AI (közvetlen)"
+      },
       "modelMappings": "Modell-megfeleltetések",
       "modelMappingsDescription": "Gateway-modell átirányítása egyéni deployment névre.",
       "mappingTitle": "{{number}}. megfeleltetés",

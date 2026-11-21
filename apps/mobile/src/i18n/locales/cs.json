@@ -531,6 +531,14 @@
       "nextStepFinal": "Rozhodnutí o odvolání je konečné. Další odvolání již nelze podat.",
       "viewReceipt": "Zobrazit potvrzení"
     },
+    "reportReceipts": {
+      "title": "Nahlášení",
+      "rowSubtitle": "Vámi podaná nahlášení a jejich výsledky",
+      "emptyTitle": "Zatím žádná nahlášení",
+      "emptyDescription": "Nahlášení, která podáte z komentáře nebo z odpovědi AI, se zobrazí zde.",
+      "couldNotLoad": "Nepodařilo se načíst vaše nahlášení",
+      "capped": "Zobrazují se vaše nejnovější nahlášení."
+    },
     "changelog": "Co je nového",
     "changelogVersionPending": "Poznámky k verzi {{version}} přijdou s další aktualizací aplikace.",
     "changelogGroupNew": "Novinky",
@@ -4339,7 +4347,7 @@
     "personalDefaultDescription": "Automaticky načteno, když žádné úložiště nemá připnutý profil.",
     "organizationDefaultDescription": "Automaticky načteno pro členy, kteří nemají žádné osobní výchozí nastavení.",
     "setAsDefault": "Nastavit jako výchozí",
-    "saveFailed": "Profil se nepodařilo uložit",
+    "saveFailed": "Profil se nepodařilo uložit. Zkuste to znovu.",
     "organizationRoleRequired": "Profily organizace mohou měnit pouze vlastníci organizace a správci.",
     "deleteTitle": "Smazat profil",
     "deleteMessage": "Tím se profil a jeho nastavení trvale odstraní. Toto nelze vrátit zpět.",

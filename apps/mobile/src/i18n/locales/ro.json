@@ -530,6 +530,14 @@
       "nextStepFinal": "Decizia privind contestația este definitivă. Nu se mai poate depune nicio contestație.",
       "viewReceipt": "Vezi confirmarea"
     },
+    "reportReceipts": {
+      "title": "Raportări",
+      "rowSubtitle": "Raportările trimise de tine și rezultatele lor",
+      "emptyTitle": "Nicio raportare încă",
+      "emptyDescription": "Raportările pe care le trimiți dintr-un comentariu sau dintr-un răspuns AI apar aici.",
+      "couldNotLoad": "Nu am putut încărca raportările tale",
+      "capped": "Sunt afișate cele mai recente raportări ale tale."
+    },
     "changelog": "Noutăți",
     "changelogVersionPending": "Notele versiunii {{version}} vin cu următoarea actualizare a aplicației.",
     "changelogGroupNew": "Nou",
@@ -4269,7 +4277,7 @@
     "personalDefaultDescription": "Se încarcă automat când niciun depozit nu are un profil fixat.",
     "organizationDefaultDescription": "Încărcat automat pentru membrii care nu au o valoare implicită personală.",
     "setAsDefault": "Setați ca implicit",
-    "saveFailed": "Profilul nu a putut fi salvat",
+    "saveFailed": "Nu s-a putut salva profilul. Încearcă din nou.",
     "organizationRoleRequired": "Doar proprietarii și administratorii organizației pot modifica profilurile organizației.",
     "deleteTitle": "Ștergeți profilul",
     "deleteMessage": "Acest lucru elimină definitiv profilul și setările acestuia. Acest lucru nu poate fi anulat.",

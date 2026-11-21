@@ -529,6 +529,14 @@
       "nextStepFinal": "Afgørelsen om klagen er endelig. Der kan ikke indsendes flere klager.",
       "viewReceipt": "Se kvittering"
     },
+    "reportReceipts": {
+      "title": "Anmeldelser",
+      "rowSubtitle": "Dine indsendte anmeldelser og deres resultater",
+      "emptyTitle": "Ingen anmeldelser endnu",
+      "emptyDescription": "Anmeldelser, du indsender fra en kommentar eller et AI-svar, vises her.",
+      "couldNotLoad": "Kunne ikke indlæse dine anmeldelser",
+      "capped": "Viser dine seneste anmeldelser."
+    },
     "changelog": "Nyheder",
     "changelogVersionPending": "Noterne til version {{version}} kommer med næste appopdatering.",
     "changelogGroupNew": "Nyt",
@@ -4199,7 +4207,7 @@
     "personalDefaultDescription": "Automatisk indlæst, når intet lager har en fastgjort profil.",
     "organizationDefaultDescription": "Automatisk indlæst for medlemmer, der ikke har nogen personlig standard.",
     "setAsDefault": "Indstil som standard",
-    "saveFailed": "Profilen kunne ikke gemmes",
+    "saveFailed": "Profilen kunne ikke gemmes. Prøv igen.",
     "organizationRoleRequired": "Kun organisationsejere og administratorer kan ændre organisationens profiler.",
     "deleteTitle": "Slet profil",
     "deleteMessage": "Dette fjerner permanent profilen og dens indstillinger. Dette kan ikke fortrydes.",

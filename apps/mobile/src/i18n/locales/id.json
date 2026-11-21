@@ -529,6 +529,14 @@
       "nextStepFinal": "Keputusan banding bersifat final. Banding lebih lanjut tidak dapat diajukan.",
       "viewReceipt": "Lihat tanda terima"
     },
+    "reportReceipts": {
+      "title": "Laporan",
+      "rowSubtitle": "Laporan yang Anda ajukan dan hasilnya",
+      "emptyTitle": "Belum ada laporan",
+      "emptyDescription": "Laporan yang Anda ajukan dari komentar atau respons AI akan muncul di sini.",
+      "couldNotLoad": "Tidak dapat memuat laporan Anda",
+      "capped": "Menampilkan laporan terbaru Anda."
+    },
     "changelog": "Yang baru",
     "changelogVersionPending": "Catatan versi {{version}} hadir di pembaruan aplikasi berikutnya.",
     "changelogGroupNew": "Baru",
@@ -4199,7 +4207,7 @@
     "personalDefaultDescription": "Dimuat secara otomatis ketika tidak ada repositori yang memiliki profil yang disematkan.",
     "organizationDefaultDescription": "Dimuat otomatis untuk anggota yang tidak memiliki default pribadi.",
     "setAsDefault": "Tetapkan sebagai bawaan",
-    "saveFailed": "Tidak dapat menyimpan profil",
+    "saveFailed": "Tidak dapat menyimpan profil. Coba lagi.",
     "organizationRoleRequired": "Hanya pemilik organisasi dan admin yang dapat mengubah profil organisasi.",
     "deleteTitle": "Hapus profil",
     "deleteMessage": "Tindakan ini akan menghapus profil dan pengaturannya secara permanen. Hal ini tidak dapat dibatalkan.",

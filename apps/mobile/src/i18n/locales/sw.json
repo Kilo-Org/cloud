@@ -529,6 +529,14 @@
       "nextStepFinal": "Uamuzi wa rufaa ni wa mwisho. Hakuna rufaa nyingine inayoweza kuwasilishwa.",
       "viewReceipt": "Angalia risiti"
     },
+    "reportReceipts": {
+      "title": "Ripoti",
+      "rowSubtitle": "Ripoti ulizowasilisha na matokeo yake",
+      "emptyTitle": "Hakuna ripoti bado",
+      "emptyDescription": "Ripoti unazowasilisha kutoka kwa maoni au jibu la AI zinaonekana hapa.",
+      "couldNotLoad": "Imeshindwa kupakia ripoti zako",
+      "capped": "Inaonyesha ripoti zako za hivi karibuni."
+    },
     "changelog": "Mapya",
     "changelogVersionPending": "Maelezo ya toleo {{version}} yatakuja na sasisho lijalo la programu.",
     "changelogGroupNew": "Mpya",
@@ -4199,7 +4207,7 @@
     "personalDefaultDescription": "Imepakia kiotomatiki wakati hakuna hazina iliyo na wasifu uliobandikwa.",
     "organizationDefaultDescription": "Imepakiwa kiotomatiki kwa wanachama ambao hawana chaguo-msingi la kibinafsi.",
     "setAsDefault": "Weka kama chaguomsingi",
-    "saveFailed": "Haikuweza kuhifadhi wasifu",
+    "saveFailed": "Haikuweza kuhifadhi wasifu. Jaribu tena.",
     "organizationRoleRequired": "Wamiliki na wasimamizi wa shirika pekee wanaweza kubadilisha wasifu wa shirika.",
     "deleteTitle": "Futa wasifu",
     "deleteMessage": "Hii huondoa kabisa wasifu na mipangilio yake. Hili haliwezi kutenduliwa.",

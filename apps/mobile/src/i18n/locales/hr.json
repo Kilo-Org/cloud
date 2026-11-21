@@ -530,6 +530,14 @@
       "nextStepFinal": "Odluka o žalbi je konačna. Žalba se više ne može podnijeti.",
       "viewReceipt": "Prikaži potvrdu"
     },
+    "reportReceipts": {
+      "title": "Prijave",
+      "rowSubtitle": "Prijave koje ste podnijeli i njihovi ishodi",
+      "emptyTitle": "Još nema prijava",
+      "emptyDescription": "Prijave koje podnesete na komentar ili AI odgovor pojavljuju se ovdje.",
+      "couldNotLoad": "Nije moguće učitati vaše prijave",
+      "capped": "Prikazuju se vaše najnovije prijave."
+    },
     "changelog": "Novosti",
     "changelogVersionPending": "Novosti verzije {{version}} stižu s idućim ažuriranjem aplikacije.",
     "changelogGroupNew": "Novo",
@@ -4269,7 +4277,7 @@
     "personalDefaultDescription": "Automatski se učitava kada nijedno spremište nema zakačen profil.",
     "organizationDefaultDescription": "Automatski se učitava za članove koji nemaju osobne zadane postavke.",
     "setAsDefault": "Postavi kao zadano",
-    "saveFailed": "Nije moguće spremiti profil",
+    "saveFailed": "Nije moguće spremiti profil. Pokušajte ponovno.",
     "organizationRoleRequired": "Samo vlasnici organizacije i administratori mogu promijeniti profil organizacije.",
     "deleteTitle": "Izbriši profil",
     "deleteMessage": "Ovo trajno uklanja profil i njegove postavke. Ovo se ne može poništiti.",

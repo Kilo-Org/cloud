@@ -529,6 +529,14 @@
       "nextStepFinal": "Överklagandebeslutet är slutgiltigt. Det går inte att överklaga igen.",
       "viewReceipt": "Visa kvitto"
     },
+    "reportReceipts": {
+      "title": "Anmälningar",
+      "rowSubtitle": "Anmälningar du skickat in och deras utfall",
+      "emptyTitle": "Inga anmälningar än",
+      "emptyDescription": "Anmälningar du skickar in från en kommentar eller ett AI-svar visas här.",
+      "couldNotLoad": "Det gick inte att läsa in dina anmälningar",
+      "capped": "Visar dina senaste anmälningar."
+    },
     "changelog": "Nyheter",
     "changelogVersionPending": "Nyheter för version {{version}} kommer med nästa appuppdatering.",
     "changelogGroupNew": "Nytt",
@@ -4199,7 +4207,7 @@
     "personalDefaultDescription": "Laddas automatiskt när inget kodarkiv har en fäst profil.",
     "organizationDefaultDescription": "Laddas automatiskt för medlemmar som inte har någon personlig standard.",
     "setAsDefault": "Ställ in som standard",
-    "saveFailed": "Det gick inte att spara profilen",
+    "saveFailed": "Det gick inte att spara profilen. Försök igen.",
     "organizationRoleRequired": "Endast organisationsägare och administratörer kan ändra organisationsprofiler.",
     "deleteTitle": "Ta bort profil",
     "deleteMessage": "Detta tar bort profilen och dess inställningar permanent. Detta kan inte ångras.",

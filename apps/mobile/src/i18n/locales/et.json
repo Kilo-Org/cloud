@@ -529,6 +529,14 @@
       "nextStepFinal": "Vaidlustuse otsus on lõplik. Edasist vaidlustust esitada ei saa.",
       "viewReceipt": "Vaata kinnitust"
     },
+    "reportReceipts": {
+      "title": "Teated",
+      "rowSubtitle": "Sinu esitatud teated ja nende tulemused",
+      "emptyTitle": "Teateid veel pole",
+      "emptyDescription": "Siia ilmuvad teated, mille esitad kommentaari või AI vastuse kohta.",
+      "couldNotLoad": "Sinu teateid ei õnnestunud laadida",
+      "capped": "Kuvatakse sinu viimased teated."
+    },
     "changelog": "Mis on uut",
     "changelogVersionPending": "Versiooni {{version}} märkmed saabuvad rakenduse järgmise uuendusega.",
     "changelogGroupNew": "Uut",
@@ -4199,7 +4207,7 @@
     "personalDefaultDescription": "Laaditakse automaatselt, kui ühelgi hoidlal pole kinnitatud profiili.",
     "organizationDefaultDescription": "Laaditakse automaatselt liikmetele, kellel pole isiklikku vaikeprofiili.",
     "setAsDefault": "Määra vaikeväärtuseks",
-    "saveFailed": "Profiili ei saanud salvestada",
+    "saveFailed": "Profiili ei saanud salvestada. Proovi uuesti.",
     "organizationRoleRequired": "Organisatsiooni profiile saavad muuta ainult organisatsiooni omanikud ja administraatorid.",
     "deleteTitle": "Kustuta profiil",
     "deleteMessage": "See eemaldab jäädavalt profiili ja selle seaded. Seda ei saa tagasi võtta.",

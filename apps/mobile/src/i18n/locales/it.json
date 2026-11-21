@@ -530,6 +530,14 @@
       "nextStepFinal": "La decisione sul ricorso è definitiva. Non è possibile presentare altri ricorsi.",
       "viewReceipt": "Visualizza ricevuta"
     },
+    "reportReceipts": {
+      "title": "Segnalazioni",
+      "rowSubtitle": "Le segnalazioni che hai inviato e i loro esiti",
+      "emptyTitle": "Ancora nessuna segnalazione",
+      "emptyDescription": "Le segnalazioni che invii da un commento o da una risposta AI compaiono qui.",
+      "couldNotLoad": "Impossibile caricare le tue segnalazioni",
+      "capped": "Vengono mostrate le tue segnalazioni più recenti."
+    },
     "changelog": "Novità",
     "changelogVersionPending": "Le note della versione {{version}} arriveranno con il prossimo aggiornamento dell'app.",
     "changelogGroupNew": "Nuovo",
@@ -4269,7 +4277,7 @@
     "personalDefaultDescription": "Caricato automaticamente quando nessun repository ha un profilo bloccato.",
     "organizationDefaultDescription": "Caricamento automatico per i membri che non hanno impostazioni predefinite personali.",
     "setAsDefault": "Imposta come predefinito",
-    "saveFailed": "Impossibile salvare il profilo",
+    "saveFailed": "Impossibile salvare il profilo. Riprova.",
     "organizationRoleRequired": "Solo i proprietari dell'organizzazione e gli amministratori possono modificare il profilo dell'organizzazione.",
     "deleteTitle": "Elimina profilo",
     "deleteMessage": "Ciò rimuove permanentemente il profilo e le sue impostazioni. Questa operazione non può essere annullata.",

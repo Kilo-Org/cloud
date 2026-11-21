@@ -533,6 +533,14 @@
       "nextStepFinal": "Mae penderfyniad yr apêl yn derfynol. Ni ellir cyflwyno apêl bellach.",
       "viewReceipt": "Gweld y dderbynneb"
     },
+    "reportReceipts": {
+      "title": "Adroddiadau",
+      "rowSubtitle": "Yr adroddiadau rydych wedi'u cyflwyno a'u canlyniadau",
+      "emptyTitle": "Dim adroddiadau eto",
+      "emptyDescription": "Bydd adroddiadau rydych yn eu cyflwyno o sylw neu o ymateb AI yn ymddangos yma.",
+      "couldNotLoad": "Methu llwytho eich adroddiadau",
+      "capped": "Yn dangos eich adroddiadau diweddaraf."
+    },
     "changelog": "Beth sy'n newydd",
     "changelogVersionPending": "Daw nodiadau fersiwn {{version}} gyda'r diweddariad nesaf i'r ap.",
     "changelogGroupNew": "Newydd",
@@ -4479,7 +4487,7 @@
     "personalDefaultDescription": "Wedi'i lwytho'n awtomatig pan nad oes gan unrhyw ystorfa broffil wedi'i binio.",
     "organizationDefaultDescription": "Wedi'i lwytho'n awtomatig ar gyfer aelodau nad oes ganddynt unrhyw ragosodiad personol.",
     "setAsDefault": "Gosod fel rhagosodedig",
-    "saveFailed": "Ni fu modd cadw'r proffil",
+    "saveFailed": "Ni fu modd cadw'r proffil. Rhowch gynnig arall.",
     "organizationRoleRequired": "Dim ond perchnogion a gweinyddwyr y sefydliad sy'n gallu newid proffiliau'r sefydliad.",
     "deleteTitle": "Dileu proffil",
     "deleteMessage": "Mae hyn yn dileu'r proffil a'i osodiadau yn barhaol. Ni ellir dadwneud hyn.",

@@ -531,6 +531,14 @@
       "nextStepFinal": "Odločitev o pritožbi je dokončna. Pritožbe ni več mogoče oddati.",
       "viewReceipt": "Prikaži potrdilo"
     },
+    "reportReceipts": {
+      "title": "Prijave",
+      "rowSubtitle": "Prijave, ki si jih oddal, in njihovi izidi",
+      "emptyTitle": "Ni še nobene prijave",
+      "emptyDescription": "Prijave, ki jih oddaš iz komentarja ali odgovora AI, se prikažejo tukaj.",
+      "couldNotLoad": "Tvojih prijav ni bilo mogoče naložiti",
+      "capped": "Prikazane so tvoje najnovejše prijave."
+    },
     "changelog": "Kaj je novega",
     "changelogVersionPending": "Opombe za različico {{version}} prinese naslednja posodobitev aplikacije.",
     "changelogGroupNew": "Novosti",
@@ -4339,7 +4347,7 @@
     "personalDefaultDescription": "Samodejno naloženo, ko nobeno skladišče nima pripetega profila.",
     "organizationDefaultDescription": "Samodejno naloženo za člane, ki nimajo osebne privzete vrednosti.",
     "setAsDefault": "Nastavi kot privzeto",
-    "saveFailed": "Profila ni bilo mogoče shraniti",
+    "saveFailed": "Profila ni bilo mogoče shraniti. Poskusite znova.",
     "organizationRoleRequired": "Profile organizacije lahko spremenijo samo lastniki organizacije in skrbniki.",
     "deleteTitle": "Izbriši profil",
     "deleteMessage": "S tem trajno odstranite profil in njegove nastavitve. Tega ni mogoče razveljaviti.",

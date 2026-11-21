@@ -621,6 +621,14 @@
       "nextStepFinal": "The appeal decision is final. No further appeal can be filed.",
       "viewReceipt": "View receipt"
     },
+    "reportReceipts": {
+      "title": "Reports",
+      "rowSubtitle": "Reports you filed and their outcomes",
+      "emptyTitle": "No reports yet",
+      "emptyDescription": "Reports you file from a comment or an AI response appear here.",
+      "couldNotLoad": "Could not load your reports",
+      "capped": "Showing your most recent reports."
+    },
     "changelog": "What's New",
     "changelogGroupNew": "New",
     "changelogFixesIn": "Fixes and improvements in {{areas}}.",
@@ -4291,7 +4299,7 @@
     "personalDefaultDescription": "Auto-loaded when no repository has a pinned profile.",
     "organizationDefaultDescription": "Auto-loaded for members who have no personal default.",
     "setAsDefault": "Set as default",
-    "saveFailed": "Couldn't save profile",
+    "saveFailed": "Couldn't save the profile. Try again.",
     "organizationRoleRequired": "Only organization owners and admins can change organization profiles.",
     "deleteTitle": "Delete profile",
     "deleteMessage": "This permanently removes the profile and its settings. This cannot be undone.",

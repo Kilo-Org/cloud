@@ -529,6 +529,14 @@
       "nextStepFinal": "Isinqumo sesikhalo siyisinqumo sokugcina. Akukho esinye isikhalo esingafakwa.",
       "viewReceipt": "Buka irisidi"
     },
+    "reportReceipts": {
+      "title": "Imibiko",
+      "rowSubtitle": "Imibiko oyifakile kanye nemiphumela yayo",
+      "emptyTitle": "Ayikho imibiko okwamanje",
+      "emptyDescription": "Imibiko oyifaka kusukela kumazwana noma empendulweni ye-AI ivela lapha.",
+      "couldNotLoad": "Akukwazekanga ukulayisha imibiko yakho",
+      "capped": "Kuboniswa imibiko yakho yamuva kakhulu."
+    },
     "changelog": "Okusha",
     "changelogVersionPending": "Amanothi enguqulo {{version}} azofika nesibuyekezo esilandelayo sohlelo lokusebenza.",
     "changelogGroupNew": "Izinto ezintsha",
@@ -4199,7 +4207,7 @@
     "personalDefaultDescription": "Ilayisha ngokuzenzakalelayo lapho kungekho nqolobane enephrofayela ephiniwe.",
     "organizationDefaultDescription": "Kulayishwa ngokuzenzakalelayo kumalungu angenakho okumisiwe komuntu siqu.",
     "setAsDefault": "Setha njengokuzenzakalelayo",
-    "saveFailed": "Ayikwazanga ukulondoloza iphrofayela",
+    "saveFailed": "Ayikwazanga ukulondoloza iphrofayela. Zama futhi.",
     "organizationRoleRequired": "Abanikazi benhlangano nabalawuli kuphela abangashintsha iphrofayela yenhlangano.",
     "deleteTitle": "Susa iphrofayela",
     "deleteMessage": "Lokhu kususa iphrofayela nezilungiselelo zayo unomphela. Lokhu akukwazi ukuhlehliswa.",

@@ -531,6 +531,14 @@
       "nextStepFinal": "Sprendimas dėl apskundimo yra galutinis. Kito apskundimo pateikti negalima.",
       "viewReceipt": "Peržiūrėti patvirtinimą"
     },
+    "reportReceipts": {
+      "title": "Pranešimai",
+      "rowSubtitle": "Jūsų pateikti pranešimai ir jų rezultatai",
+      "emptyTitle": "Kol kas pranešimų nėra",
+      "emptyDescription": "Pranešimai, kuriuos pateikiate iš komentaro arba AI atsakymo, rodomi čia.",
+      "couldNotLoad": "Nepavyko įkelti jūsų pranešimų",
+      "capped": "Rodomi naujausi jūsų pranešimai."
+    },
     "changelog": "Kas naujo",
     "changelogVersionPending": "{{version}} versijos pastabos pasirodys su kitu programėlės atnaujinimu.",
     "changelogGroupNew": "Nauja",
@@ -4339,7 +4347,7 @@
     "personalDefaultDescription": "Automatiškai įkeliama, kai jokia saugykla neturi prisegto profilio.",
     "organizationDefaultDescription": "Automatiškai įkeliama nariams, kurie neturi asmeninio numatytojo profilio.",
     "setAsDefault": "Nustatyti kaip numatytąjį",
-    "saveFailed": "Nepavyko išsaugoti profilio",
+    "saveFailed": "Nepavyko išsaugoti profilio. Bandykite dar kartą.",
     "organizationRoleRequired": "Organizacijos profilį gali keisti tik organizacijos savininkai ir administratoriai.",
     "deleteTitle": "Ištrinti profilį",
     "deleteMessage": "Tai visam laikui pašalins profilį ir jo nustatymus. To negalima anuliuoti.",

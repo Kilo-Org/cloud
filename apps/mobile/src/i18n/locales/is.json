@@ -529,6 +529,14 @@
       "nextStepFinal": "Ákvörðun um áfrýjun er endanleg. Ekki er hægt að senda inn frekari áfrýjun.",
       "viewReceipt": "Skoða kvittun"
     },
+    "reportReceipts": {
+      "title": "Tilkynningar",
+      "rowSubtitle": "Tilkynningar sem þú sendir inn og niðurstöður þeirra",
+      "emptyTitle": "Engar tilkynningar ennþá",
+      "emptyDescription": "Tilkynningar sem þú sendir inn úr athugasemd eða svari frá gervigreind birtast hér.",
+      "couldNotLoad": "Ekki tókst að hlaða tilkynningunum þínum",
+      "capped": "Sýni nýjustu tilkynningarnar þínar."
+    },
     "changelog": "Nýjungar",
     "changelogVersionPending": "Upplýsingar um útgáfu {{version}} berast með næstu uppfærslu forritsins.",
     "changelogGroupNew": "Nýtt",
@@ -4199,7 +4207,7 @@
     "personalDefaultDescription": "Sjálfvirkt hlaðið þegar engin geymsla er með festan prófíl.",
     "organizationDefaultDescription": "Sjálfvirkt hlaðið fyrir meðlimi sem hafa engin persónuleg vanskil.",
     "setAsDefault": "Stillt sem sjálfgefið",
-    "saveFailed": "Ekki tókst að vista prófílinn",
+    "saveFailed": "Ekki tókst að vista prófílinn. Reyndu aftur.",
     "organizationRoleRequired": "Aðeins eigendur fyrirtækisins og stjórnendur geta breytt prófílum fyrirtækisins.",
     "deleteTitle": "Eyða prófíl",
     "deleteMessage": "Þetta fjarlægir prófílinn og stillingar hans varanlega. Þetta er ekki hægt að afturkalla.",

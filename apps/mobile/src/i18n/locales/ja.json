@@ -529,6 +529,14 @@
       "nextStepFinal": "異議申し立ての決定は確定しました。これ以上異議を申し立てることはできません。",
       "viewReceipt": "受付確認を表示"
     },
+    "reportReceipts": {
+      "title": "通報一覧",
+      "rowSubtitle": "通報した内容とその結果",
+      "emptyTitle": "通報はまだありません",
+      "emptyDescription": "コメントまたはAIの回答から通報した内容がここに表示されます。",
+      "couldNotLoad": "通報を読み込めませんでした",
+      "capped": "最新の通報を表示しています。"
+    },
     "changelog": "新着情報",
     "changelogVersionPending": "バージョン{{version}}のリリースノートは、次回のアプリアップデートで届きます。",
     "changelogGroupNew": "新機能",
@@ -4199,7 +4207,7 @@
     "personalDefaultDescription": "リポジトリに固定プロフィールがない場合に自動ロードされます。",
     "organizationDefaultDescription": "個人のデフォルトがないメンバーの場合は自動ロードされます。",
     "setAsDefault": "デフォルトとして設定",
-    "saveFailed": "プロフィールを保存できませんでした",
+    "saveFailed": "プロフィールを保存できませんでした。もう一度お試しください。",
     "organizationRoleRequired": "組織のプロフィールを変更できるのは組織のオーナーと管理者のみです。",
     "deleteTitle": "プロフィールの削除",
     "deleteMessage": "これにより、プロフィールとその設定が完全に削除されます。これを元に戻すことはできません。",

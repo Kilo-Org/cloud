@@ -531,6 +531,14 @@
       "nextStepFinal": "A decisão do recurso é final. Não é possível apresentar novo recurso.",
       "viewReceipt": "Ver comprovativo"
     },
+    "reportReceipts": {
+      "title": "Denúncias",
+      "rowSubtitle": "As denúncias que fizeste e os respetivos resultados",
+      "emptyTitle": "Ainda não há denúncias",
+      "emptyDescription": "As denúncias que fizeres a partir de um comentário ou de uma resposta de IA aparecem aqui.",
+      "couldNotLoad": "Não foi possível carregar as tuas denúncias",
+      "capped": "A mostrar as tuas denúncias mais recentes."
+    },
     "changelog": "Novidades",
     "changelogVersionPending": "As notas da versão {{version}} vêm na próxima atualização da app.",
     "changelogGroupNew": "Novo",
@@ -4339,7 +4347,7 @@
     "personalDefaultDescription": "Carregado automaticamente quando nenhum repositório tem um perfil fixado.",
     "organizationDefaultDescription": "Carregado automaticamente para membros que não têm predefinição pessoal.",
     "setAsDefault": "Definir como predefinido",
-    "saveFailed": "Não foi possível guardar o perfil",
+    "saveFailed": "Não foi possível guardar o perfil. Tenta novamente.",
     "organizationRoleRequired": "Apenas os proprietários da organização e os administradores podem alterar os perfis da organização.",
     "deleteTitle": "Eliminar perfil",
     "deleteMessage": "Elimina permanentemente o perfil e as respetivas definições. Esta ação não pode ser anulada.",

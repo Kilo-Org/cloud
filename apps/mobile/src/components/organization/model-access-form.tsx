@@ -42,6 +42,7 @@ type Tab = 'models' | 'providers' | 'gateways';
 
 /** The reason a save is refused, by the refusal `modelAccessSave` returned. */
 const BLOCKING_ISSUE_KEYS = {
+  'provider-catalog-unavailable': 'organizationModelAccess.providersNeedCatalog',
   'empty-provider-list': 'organizationModelAccess.emptyProviderList',
   'empty-model-list': 'organizationModelAccess.emptyModelList',
 } as const;
@@ -197,6 +198,7 @@ export function ModelAccessForm({
     draft,
     // A provider list the rows cannot stand for is not a policy of no providers.
     providerCatalogLoaded: !providerRowsIncomplete,
+    providerListEdited: form.providerListEdited,
     models: [...catalog, ...models],
   });
   const blockingIssue =
@@ -266,11 +268,7 @@ export function ModelAccessForm({
   // The organization's own catalog omits the models it denies, so the rows come
   // from the whole gateway catalog with its entries added: a denied model has
   // to stay on screen, or the admin can never allow it again.
-  const denyRows = denyListModels({
-    catalog,
-    available: models,
-    denyList: draft.modelDenyList,
-  });
+  const denyRows = denyListModels({ catalog, available: models, denyList: draft.modelDenyList });
 
   return (
     <View className="flex-1">

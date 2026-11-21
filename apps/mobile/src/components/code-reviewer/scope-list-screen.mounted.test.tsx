@@ -156,7 +156,9 @@ describe('ScopeListScreen organization rows', () => {
 
   it('paints the error banner alone, with no placeholder that could outlive it', async () => {
     // A served answer is the server's failure, so the banner keeps the system
-    // wording even when the device also reports itself offline.
+    // wording. A confirmed-offline device names the connection instead even for
+    // a coded error; that precedence is pinned in the classifier's own suite,
+    // and this case keeps connectivity online to isolate the served-answer rule.
     memberships.isError = true;
     // A tRPC envelope is what `readTrpcErrorField` reads as a server answer.
     memberships.error = Object.assign(new Error('boom'), {

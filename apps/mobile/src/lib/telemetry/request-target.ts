@@ -49,6 +49,9 @@ function isHostLike(text: string): boolean {
   );
 }
 
+/** A single label, the shape a host takes when it holds no dot and no colon. */
+const SINGLE_LABEL = /^[a-z\d](?:[a-z\d-]*[a-z\d])?$/iu;
+
 /** The index of the first `/`, `?` or `#` at or after `from`, else the length. */
 function nextDelimiter(text: string, from: number): number {
   for (let i = from; i < text.length; i += 1) {
@@ -111,15 +114,24 @@ export function stripQueryString(url: string): string {
     if (lastAt === -1) {
       return cutAtQueryOrFragment(url);
     }
-    // The text after the last `@` is the authority's host, port and path, so it
-    // must read as a host. A tail that does not is text this walk cannot place,
-    // and it may be a userinfo value itself: report no origin and path rather
-    // than emit it.
+    // The text after the last `@` stands for the authority's host, port and path,
+    // so it must read as a host. A single label with no colon qualifies, because
+    // nothing after the last `@` can be userinfo — unless the `@` sits after a
+    // query or fragment, where a single label is that text rather than a host.
     const tailStart = lastAt + 1;
-    if (!isHostLike(url.slice(tailStart, nextDelimiter(url, tailStart)))) {
+    const tail = url.slice(tailStart, nextDelimiter(url, tailStart));
+    const crossedQuery = url.search(/[?#]/u) !== -1 && url.search(/[?#]/u) < lastAt;
+    if (isHostLike(tail) || (!crossedQuery && SINGLE_LABEL.test(tail))) {
+      return url.slice(0, schemeEnd) + cutAtQueryOrFragment(url.slice(tailStart));
+    }
+    if (!crossedQuery) {
       return url.slice(0, schemeEnd);
     }
-    return url.slice(0, schemeEnd) + cutAtQueryOrFragment(url.slice(tailStart));
+    // The `@` belongs to the query or fragment. A path before it settles that the
+    // authority ended at the first delimiter, so the text before the query is
+    // kept only when it reads as a host: otherwise it may still be userinfo.
+    const run = url.slice(schemeEnd, nextDelimiter(url, schemeEnd));
+    return isHostLike(run) ? url.slice(0, schemeEnd) + run : url.slice(0, schemeEnd);
   } catch {
     return '';
   }

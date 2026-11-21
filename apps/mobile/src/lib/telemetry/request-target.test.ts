@@ -223,13 +223,60 @@ describe('stripQueryString', () => {
     expect(stripQueryString(`https://host:3000/a/b@${userinfo}`)).toBe('https://');
   });
 
-  it('reports no run when a single-label tail after an at-sign is not a host', () => {
+  it('keeps origin and path when a single-label tail after an at-sign reads as a host', () => {
     const singleLabel = ['host', 'x'].join('');
 
-    expect(stripQueryString(`https://api:3000/x@${singleLabel}/z`)).toBe('https://');
+    expect(stripQueryString(`https://api:3000/x@${singleLabel}/z`)).toBe(
+      `https://${singleLabel}/z`
+    );
   });
 
   it('keeps origin and path when a dotted-host tail after an at-sign reads as a host', () => {
     expect(stripQueryString(`https://api:3000/x@${HOST}/z`)).toBe(`https://${HOST}/z`);
+  });
+
+  it('keeps a single-label host with userinfo and a path', () => {
+    expect(stripQueryString(`https://${USERINFO}@host${TRPC_PATH_FIXTURE}`)).toBe(
+      `https://host${TRPC_PATH_FIXTURE}`
+    );
+  });
+
+  it('keeps the procedure of a single-label host with userinfo', () => {
+    const url = `https://${USERINFO}@host${TRPC_PATH_FIXTURE}`;
+
+    expect(trpcProcedureText(url)).toBe('a.b');
+  });
+
+  it('reports no run when an at-sign in a query follows no path', () => {
+    const value = ['x=a', 'path'].join('@');
+
+    expect(stripQueryString(`https://host:3000?${value}`)).toBe('https://');
+  });
+
+  it('reports no run when a ported single label precedes a query after a path', () => {
+    const procedure = ['x', 'y'].join('.');
+    const value = ['token=abc', 'secret=zzz'].join('@');
+    const url = `http://host:3000${TRPC_PATH}${procedure}?${value}`;
+
+    // `host:3000` before a path is the same text as a userinfo pair whose value
+    // carries a '/', so the run is not reported at all.
+    expect(stripQueryString(url)).toBe('http://');
+    expect(trpcProcedureText(url)).toBeUndefined();
+  });
+
+  it('keeps origin and path for a query separator inside the authority value', () => {
+    const value = ['ab', 'cd'].join('?');
+    const url = `https://user:${value}@${HOST}${TRPC_PATH_FIXTURE}`;
+
+    expect(stripQueryString(url)).toBe(`https://${HOST}${TRPC_PATH_FIXTURE}`);
+    expect(trpcProcedureText(url)).toBe('a.b');
+  });
+
+  it('keeps origin and path for a fragment separator inside the authority value', () => {
+    const value = ['ab', 'cd'].join('#');
+    const url = `https://user:${value}@${HOST}${TRPC_PATH_FIXTURE}`;
+
+    expect(stripQueryString(url)).toBe(`https://${HOST}${TRPC_PATH_FIXTURE}`);
+    expect(trpcProcedureText(url)).toBe('a.b');
   });
 });

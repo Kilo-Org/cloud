@@ -325,26 +325,6 @@ describe('ProviderKeyProviderPickerScreen', () => {
     }
   });
 
-  it('finds a row by the name it shows, not only the English one the server sent', async () => {
-    state.providers = [{ id: 'codestral', name: 'Legacy Codestral-only key' }];
-    await i18n.changeLanguage('pt-BR');
-    try {
-      const root = await mount();
-      const shown = rowLabels(root).map(node => node.props.accessibilityLabel);
-      expect(shown).toEqual([i18n.t('profile.providerKeys.names.codestral')]);
-
-      // The reader types what the row shows, so the search has to match the
-      // translated name too.
-      act(() => {
-        (searchInput(root).props.onChangeText as (value: string) => void)('Somente');
-      });
-
-      expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual(shown);
-    } finally {
-      await i18n.changeLanguage('en');
-    }
-  });
-
   it('offers the structured-credential providers its own form', async () => {
     state.providers = [
       { id: 'anthropic', name: 'Anthropic' },

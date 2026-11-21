@@ -37,6 +37,7 @@ import {
   providerKeyScopeInput,
   providerKeysHref,
 } from '@/lib/byok/provider-key-scope';
+import { providerKeyName } from '@/lib/byok/provider-key-name';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
@@ -280,7 +281,11 @@ export function ProviderKeyNewScreen() {
     <View className="flex-1 bg-background">
       {/* The provider is the scope of the key, so it is the header's subtitle,
           not a body line that read as a field label with no field. */}
-      <ScreenHeader title={title} subtitle={provider.name} backFallback={PROFILE_TAB_HREF} />
+      <ScreenHeader
+        title={title}
+        subtitle={providerKeyName(provider.id, provider.name)}
+        backFallback={PROFILE_TAB_HREF}
+      />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName={SCREEN_BODY_CLASS}

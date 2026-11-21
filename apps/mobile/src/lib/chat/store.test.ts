@@ -45,25 +45,15 @@ const chatDatabase = (database: DatabaseSync): ChatDatabase => ({
   runSync: (source: string, params: (string | number)[]) => {
     database.prepare(source).run(...params);
   },
-  withTransactionSync: (work: () => void) => {
-    database.exec('begin');
-    try {
-      work();
-      database.exec('commit');
-    } catch (error) {
-      database.exec('rollback');
-      throw error;
-    }
-  },
 });
 
 /**
  * The same database with a `runSync` a test can count, and refuse at a chosen
- * statement. A wipe goes through the transaction the app itself opens, so the
- * rollback it takes on a refusal is the app's own.
+ * statement. A wipe nests its deletes in a savepoint of its own, so the undo it
+ * takes on a refusal is the app's own.
  */
 const watchedDatabase = (database: DatabaseSync, refuseAt?: number) => {
-  const counts = { statements: [] as string[], transactions: 0 };
+  const counts = { statements: [] as string[] };
   const plain = chatDatabase(database);
   const db: ChatDatabase = {
     ...plain,
@@ -73,10 +63,6 @@ const watchedDatabase = (database: DatabaseSync, refuseAt?: number) => {
         throw new Error('the database refused the statement');
       }
       plain.runSync(source, params);
-    },
-    withTransactionSync: (work: () => void) => {
-      counts.transactions += 1;
-      plain.withTransactionSync(work);
     },
   };
   return { db, counts };
@@ -387,7 +373,6 @@ describe('wipeChats', () => {
 
     expect(wipeChats(watched.db, 'me')).toEqual(['one', 'two']);
 
-    expect(watched.counts.transactions).toBe(1);
     for (const table of ['parts', 'turns']) {
       const wiped = `select count(*) as n from ${table} where session_id in ('one', 'two')`;
       expect(tally(wiped)).toBe(0);
@@ -410,11 +395,37 @@ describe('wipeChats', () => {
       'the database refused the statement'
     );
 
-    // The refusal landed on the third statement, with the parts and turns of
-    // both chats already deleted, and the rollback put every row back.
+    // The refusal landed on the third statement, with the parts of both chats
+    // already deleted, and the savepoint put every row back.
     expect(rowCounts()).toEqual([4, 4, 2, 2]);
     expect(wipeChats(db, 'me')).toEqual(['one', 'two']);
     expect(rowCounts()).toEqual([0, 0, 0, 0]);
+  });
+
+  it('nests in a transaction the store left open, and leaves it open', async () => {
+    await write(conversation('one', 'kilo/one', 'first'));
+    await write(conversation('two', 'kilo/one', 'second'));
+    rememberChat(db, { sessionId: 'one', scope: 'me:personal', at: 100 });
+    rememberChat(db, { sessionId: 'two', scope: 'me:personal', at: 200 });
+    /* The store writes an exchange between a `BEGIN` and its `COMMIT`, and an
+       interrupted answer stops the fiber waiting on that write without stopping
+       the write. What is left is an open transaction holding a turn of the chat
+       being wiped, so the wipe has to work inside it without ending it. */
+    database.exec('begin');
+    database
+      .prepare('insert into turns (id, session_id, role) values (?, ?, ?)')
+      .run('trn_pending', 'one', 'user');
+
+    expect(wipeChats(db, 'me')).toEqual(['one', 'two']);
+
+    for (const table of ['chats', 'sessions', 'turns', 'parts']) {
+      expect(tally(`select count(*) as n from ${table}`)).toBe(0);
+    }
+    // The store's own unit is still the one in force, so its `COMMIT` has
+    // something to close and its unfinished write is not thrown away.
+    expect(database.isTransaction).toBe(true);
+    database.exec('commit');
+    expect(tally('select count(*) as n from sessions')).toBe(0);
   });
 
   it('runs one statement per table however many chats the account has', async () => {
@@ -429,8 +440,12 @@ describe('wipeChats', () => {
     // A statement per table, not per chat, is what keeps a sign-out from
     // blocking the thread in proportion to how much history the account has.
     expect(wipeChats(watched.db, 'me')).toEqual(['a', 'b', 'c']);
-    expect(watched.counts.statements.length).toBeLessThanOrEqual(4);
-    expect(watched.counts.transactions).toBe(1);
+    expect(watched.counts.statements).toHaveLength(6);
+    /* The connection is the one the SDK's store writes on, so the wipe must
+       never end a unit it did not open. */
+    expect(
+      watched.counts.statements.filter(statement => /^(begin|commit)/i.test(statement))
+    ).toEqual([]);
     for (const table of ['chats', 'sessions', 'turns', 'parts']) {
       expect(tally(`select count(*) as n from ${table}`)).toBe(0);
     }

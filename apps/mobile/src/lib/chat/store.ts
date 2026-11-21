@@ -29,14 +29,14 @@ type SqlValue = string | number;
  * The part of an Expo database this file uses, so a test can supply one.
  *
  * These are the members taken from the `SQLiteDatabase` that
- * `encryptedDatabase()` hands back. `withTransactionSync` runs the work inside
- * one transaction and undoes all of it when the work throws, which is what lets
- * a delete across the two owners be all or nothing.
+ * `encryptedDatabase()` hands back: a read, and a write. Nothing here opens a
+ * transaction, because this connection is the one the harness SDK's store keeps
+ * its conversations on and that store holds units of its own across awaits;
+ * the one delete that needs a unit nests a savepoint inside whatever it finds.
  */
 export type ChatDatabase = {
   readonly getAllSync: <T>(source: string, params: SqlValue[]) => T[];
   readonly runSync: (source: string, params: SqlValue[]) => void;
-  readonly withTransactionSync: (work: () => void) => void;
 };
 
 /** One row of the chat list. */
@@ -287,6 +287,14 @@ export function deleteChat(db: ChatDatabase, sessionId: string): void {
 }
 
 /**
+ * The savepoint the wipe's deletes run inside.
+ *
+ * A savepoint takes an identifier and SQLite binds no parameter there, so the
+ * name has to be a literal in the statement and a constant in the source.
+ */
+const WIPE = 'wipe_chats';
+
+/**
  * Forgets every chat of one account, which is what signing out does.
  *
  * A conversation is the most personal thing this app keeps on the device, so it
@@ -301,11 +309,19 @@ export function deleteChat(db: ChatDatabase, sessionId: string): void {
  * per-chat MCP preference — go with the rows rather than being left behind for
  * a session that no longer exists.
  *
- * One transaction, and one statement per table rather than one delete per chat:
+ * One unit, and one statement per table rather than one delete per chat:
  * signing out must not block the thread in proportion to how much history the
  * account has, and a refusal halfway through must not leave the list pointing
  * at conversations whose turns are already gone. Rolled back, the whole account
  * is still there and the next sign-out retries it.
+ *
+ * The unit is a savepoint, not a transaction, because the SDK's store keeps
+ * the conversations on this same connection and opens a transaction of its own
+ * for the exchange it is writing — across awaits, so an interrupted answer can
+ * leave that `BEGIN` standing when this runs. A `BEGIN` of ours inside it is
+ * refused, and a unit of our own would be undone by its `COMMIT` failing later.
+ * A savepoint is legal either way, undoes nothing but these deletes, and leaves
+ * the store's unit exactly as it found it.
  */
 export function wipeChats(db: ChatDatabase, userId: string | null): readonly string[] {
   const account =
@@ -319,12 +335,24 @@ export function wipeChats(db: ChatDatabase, userId: string | null): readonly str
   if (rows.length === 0) {
     return [];
   }
-  db.withTransactionSync(() => {
-    const owned = `(select session_id from chats ${account.where})`;
+  const owned = `(select session_id from chats ${account.where})`;
+  db.runSync(`savepoint ${WIPE}`, []);
+  try {
     db.runSync(`delete from parts where session_id in ${owned}`, account.args);
     db.runSync(`delete from turns where session_id in ${owned}`, account.args);
     db.runSync(`delete from sessions where id in ${owned}`, account.args);
     db.runSync(`delete from chats ${account.where}`, account.args);
-  });
+    db.runSync(`release ${WIPE}`, []);
+  } catch (error) {
+    /* The refusal is what the caller needs to see, so a savepoint that cannot
+       be undone is not allowed to replace it. */
+    try {
+      db.runSync(`rollback to ${WIPE}`, []);
+      db.runSync(`release ${WIPE}`, []);
+    } catch {
+      /* Nothing left to undo, and the error below says why the wipe stopped. */
+    }
+    throw error;
+  }
   return rows.map(row => row.session_id);
 }

@@ -4,15 +4,16 @@ import { searchSettings } from '@/lib/settings-search/match';
 
 import { CATALOG_LOADERS } from './catalogs';
 import { SUPPORTED_LANGUAGES, type SupportedLanguage } from './languages';
+import en from './locales/en.json';
 
 /**
  * The localized Settings search, read against every shipped catalog. The
- * matcher must find a setting by its own translated label and by the local
- * keywords that catalog ships, and it must treat a decomposed query
- * (`Cafe` + U+0301) as the precomposed label the screen renders. A locale
- * without an accent in any of these six labels gets the deliberate `Café`
- * entry, so canonical equivalence is exercised for every language rather than
- * skipped where the catalog happens to be unaccented.
+ * matcher must find a setting by its own translated label and by a keyword
+ * that appears nowhere in that label, and it must fold accents in both
+ * directions: a query without the accent still finds an accented label, and a
+ * query carrying an extra combining mark still finds the plain label. Locales
+ * whose six labels carry no foldable accent get the second direction against
+ * their real label, so no shipped language skips the check.
  */
 const KEYWORD_NAMES = [
   'signOut',
@@ -33,12 +34,11 @@ type SettingsSearchCopy = {
   keywords: Record<KeywordName, string>;
 };
 
-type SettingsCatalog = {
-  settingsSearch: SettingsSearchCopy;
-  common: { language: string; signOut: string; notifications: string };
-  preferences: { appearance: string; biometricUnlock: string };
-  profile: { privacyChoices: string };
-};
+/**
+ * Every shipped catalog is key-for-key identical to English, so en.json's
+ * type is the precise shape of the catalog each loader returns.
+ */
+type SettingsCatalog = typeof en;
 
 type SearchableEntry = {
   label: string;
@@ -47,13 +47,24 @@ type SearchableEntry = {
 
 type Highlight = { start: number; end: number };
 
+/**
+ * The combining diacritic block a search fold must drop: U+0300–U+036F. A
+ * label whose marks live here can be queried without them; a label whose
+ * script marks live elsewhere gets the added-mark direction instead, which a
+ * fold of this block alone still resolves.
+ */
+const FOLDABLE_DIACRITICS = /[\u0300-\u036f]/gu;
+const FOLDABLE_DIACRITIC = /[\u0300-\u036f]/u;
+
 type SettingsSearchResult = {
   entry: SearchableEntry;
   ranges: readonly Highlight[];
 };
 
 function settingsCatalog(tag: SupportedLanguage): SettingsCatalog {
-  return CATALOG_LOADERS[tag]() as unknown as SettingsCatalog;
+  // The loader is typed as i18next's loose ResourceKey; catalog parity makes
+  // en.json's type the exact shape of what it returns.
+  return CATALOG_LOADERS[tag]() as SettingsCatalog;
 }
 
 function alternatives(copy: SettingsSearchCopy, name: KeywordName): string[] {
@@ -80,9 +91,18 @@ function entriesOf(catalog: SettingsCatalog): SearchableEntry[] {
   }));
 }
 
-/** Folds case and marks the way the matcher compares a query with a label. */
+/** Folds case before marks, so Turkish İ becomes i instead of a bare I. */
 function foldForContainment(value: string): string {
-  return value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+  return value.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '');
+}
+
+/** Drops the foldable diacritics, lowering first so Turkish İ folds to i. */
+function withoutDiacritics(label: string): string {
+  return label
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(FOLDABLE_DIACRITICS, '')
+    .normalize('NFC');
 }
 
 /**
@@ -90,7 +110,9 @@ function foldForContainment(value: string): string {
  * appears in that label: the hit then proves the keyword is indexed rather
  * than the label happening to contain the query.
  */
-function independentKeyword(catalog: SettingsCatalog): { label: string; keyword: string } {
+function independentKeyword(
+  catalog: SettingsCatalog
+): { label: string; keyword: string } | undefined {
   for (const [name, label] of settingRows(catalog)) {
     const folded = foldForContainment(label);
     for (const keyword of alternatives(catalog.settingsSearch, name)) {
@@ -100,12 +122,7 @@ function independentKeyword(catalog: SettingsCatalog): { label: string; keyword:
       }
     }
   }
-  // Every shipped catalog carries one; the fallback keeps a regression a
-  // failed hit assertion rather than a missing keyword in the test itself.
-  return {
-    label: catalog.common.signOut,
-    keyword: alternatives(catalog.settingsSearch, 'signOut')[0] ?? '',
-  };
+  return undefined;
 }
 
 function hitFor(
@@ -153,35 +170,53 @@ describe('settings search copy', () => {
     expect(highlightedSpan(hit?.ranges ?? [])).toEqual({ start: 0, end: appearance.length });
   });
 
-  it.each(SUPPORTED_LANGUAGES)('%s finds a setting by a local keyword', tag => {
+  it.each(SUPPORTED_LANGUAGES)('%s finds a setting by a keyword absent from its label', tag => {
     const catalog = settingsCatalog(tag);
     const entries = entriesOf(catalog);
-    const { label, keyword } = independentKeyword(catalog);
+    const candidate = independentKeyword(catalog);
+    if (candidate === undefined) {
+      throw new Error(`${tag} has no keyword outside its label`);
+    }
+    const { label, keyword } = candidate;
 
     const hit = hitFor(searchSettings(entries, keyword, tag), label);
 
     expect(hit, `${tag} did not match keyword "${keyword}" for "${label}"`).toBeDefined();
+    // A keyword-only hit highlights nothing in the label.
+    expect(hit?.ranges ?? []).toHaveLength(0);
+    // Removing the keywords must remove the same hit: it came from a keyword,
+    // not from any part of the label.
+    const withoutKeywords = entries.map(entry =>
+      entry.label === label ? { ...entry, keywords: [] } : entry
+    );
+    const control = searchSettings(withoutKeywords, keyword, tag);
+    expect(
+      control.some(result => result.entry.label === label),
+      `${tag} still matched "${label}" without its keywords`
+    ).toBe(false);
   });
 
-  it.each(SUPPORTED_LANGUAGES)('%s matches a decomposed label as its precomposed form', tag => {
+  it.each(SUPPORTED_LANGUAGES)('%s folds accent differences against its label', tag => {
     const catalog = settingsCatalog(tag);
     const entries = entriesOf(catalog);
+    // A real label whose accent lives in the foldable diacritic block.
     const accented = entries
       .map(entry => entry.label)
-      .find(label => label !== label.normalize('NFD'));
-    const label = accented ?? 'Café';
-    const query = label.normalize('NFD');
+      .find(label => FOLDABLE_DIACRITIC.test(label.toLowerCase().normalize('NFD')));
+    const label = accented ?? catalog.preferences.appearance;
+    // With no such label, the query keeps the real text and adds one optional
+    // acute after its first character, which folding must drop. The first
+    // character is intentional: a trailing mark on a Turkish i is avoided.
+    const query =
+      accented === undefined
+        ? `${label.slice(0, 1)}\u0301${label.slice(1)}`
+        : withoutDiacritics(label);
 
-    expect(query, `${tag} produced no decomposed query for "${label}"`).not.toBe(label);
-    if (accented === undefined) {
-      // No shipped label carries a mark in this language, so the equivalence is
-      // pinned on a deliberate precomposed entry instead of being skipped.
-      entries.push({ label });
-    }
+    expect(query, `${tag} produced the label unchanged`).not.toBe(label);
 
     const hit = hitFor(searchSettings(entries, query, tag), label);
 
-    expect(hit, `${tag} did not match the decomposed form of "${label}"`).toBeDefined();
+    expect(hit, `${tag} did not match "${label}" from "${query}"`).toBeDefined();
     expect(highlightedSpan(hit?.ranges ?? [])).toEqual({ start: 0, end: label.length });
   });
 });

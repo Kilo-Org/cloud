@@ -264,7 +264,11 @@ describe('createTRPCContext revoked-account admission', () => {
     );
   });
 
-  test('refuses a batch that mixes a token cleanup with another call', async () => {
+  // The request must stay a mutation, or tRPC rejects a mixed-type batch before
+  // the context is created and this gate never runs. Pairing the cleanup with
+  // another MUTATION is what makes the per-call rule the thing under test: the
+  // request type alone would admit it.
+  test('refuses a batch that mixes a token cleanup with another mutation', async () => {
     mockedGetUserFromAuth.mockResolvedValue(
       failedAuthResponse({
         authorizationRefused: true,
@@ -274,9 +278,10 @@ describe('createTRPCContext revoked-account admission', () => {
 
     const error = await caught(
       createTRPCContext({
-        req: requestAt('/api/trpc/user.unregisterPushToken,user.getMe', 'mobile'),
+        req: requestAt('/api/trpc/user.unregisterPushToken,user.resetAPIKey', 'mobile'),
         info: {
-          calls: [{ path: 'user.unregisterPushToken' }, { path: 'user.getMe' }],
+          type: 'mutation',
+          calls: [{ path: 'user.unregisterPushToken' }, { path: 'user.resetAPIKey' }],
         } as never,
       })
     );

@@ -120,7 +120,7 @@ export function buildAndroidWidgetProps(
 // eslint-disable-next-line max-params -- preserve existing injected-format API and separate Home-only data
 export function buildCurrentWidgetProps(
   snapshot: GlanceableAgentsSnapshot,
-  translate: (key: string) => string,
+  translate: GlanceableTranslate,
   formatCount: GlanceableCountFormat,
   formatAgo: GlanceableAgoFormat,
   formatClock: GlanceableClockFormat,

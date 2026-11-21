@@ -40,6 +40,10 @@ import { ShareIntentProvider } from 'expo-share-intent';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
+import {
+  createLoginRedirectLatch,
+  loginRedirectDecision,
+} from '@/lib/navigation/login-redirect-latch';
 import { useRootNavigationReady } from '@/lib/navigation-ready';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewInstance } from 'react-native';
@@ -560,6 +564,15 @@ function RootLayoutNav({
     [shellGate, onLegalRoute, languageReloadFailed, restoreFailed]
   );
 
+  // The one-dispatch latch for the sign-out login redirect. The decision comes
+  // from `useSegments()`, which only updates after the router commits, so a
+  // sign-out re-emits `redirect-login` on every render while the segments still
+  // name the group being left. A second replace replaces the login route again
+  // — it unmounts and remounts, and the reader sees the destination arrive
+  // twice. The latch is released by the first decision that leaves
+  // `redirect-login`, so the next sign-out dispatches login afresh.
+  const [loginRedirectLatch] = useState(createLoginRedirectLatch);
+
   useEffect(() => {
     // Every settled tag ends startup the same way: record the outcome once and
     // hand the splash over to the reveal.
@@ -574,6 +587,13 @@ function RootLayoutNav({
       }
       router.replace(href);
     };
+    // Every decision passes through the latch: it admits one login dispatch, and
+    // the decision that leaves `redirect-login` releases it for the next
+    // sign-out. Waits hold it, because the tree has settled nowhere yet.
+    const dispatchLoginRedirect = loginRedirectLatch.shouldDispatch({
+      decision: loginRedirectDecision(decision.tag),
+      navigationReady,
+    });
 
     switch (decision.tag) {
       case 'settle-language-error': {
@@ -605,7 +625,9 @@ function RootLayoutNav({
         return;
       }
       case 'redirect-login': {
-        redirect('/(auth)/login');
+        if (dispatchLoginRedirect) {
+          redirect('/(auth)/login');
+        }
         return;
       }
       case 'settle-user-error': {
@@ -646,7 +668,14 @@ function RootLayoutNav({
         throw new Error(`Unhandled bootstrap decision: ${String(exhaustiveCheck)}`);
       }
     }
-  }, [decision, navigationReady, router, setStartupFinished, lastRouteHydratedVersion]);
+  }, [
+    decision,
+    navigationReady,
+    router,
+    setStartupFinished,
+    lastRouteHydratedVersion,
+    loginRedirectLatch,
+  ]);
 
   // Reactive snapshot of the pending deep-link slot so a destination stashed
   // after the gate effect last ran (e.g. a notification tap while signed out,

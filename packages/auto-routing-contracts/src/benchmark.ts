@@ -152,9 +152,10 @@ export const BenchmarkConfigSchema = z
     minAccuracy,
     accuracyNoiseBand: accuracyNoiseBand.default(POLICY_SETTING_VALUE_DEFAULTS.accuracyNoiseBand),
     // Optional override for the Kilo user whose identity/billing the decider
-    // CLI runs execute under. Null means the worker uses DEFAULT_BENCHMARK_USER_ID.
-    // The effective user must be an internal bot (`bot-internal-*`).
-    benchmarkUserId: z.string().trim().min(1).nullable(),
+    // CLI runs execute under. Absent or null means the worker uses
+    // DEFAULT_BENCHMARK_USER_ID. The effective user must be an internal bot
+    // (`bot-internal-*`).
+    benchmarkUserId: z.string().trim().min(1).nullable().default(null),
     // Optional override for the organization context. Null means the worker
     // uses DEFAULT_BENCHMARK_ORG_ID.
     benchmarkOrgId: z.string().trim().min(1).nullable().default(null),
@@ -635,6 +636,14 @@ export type ClassifierWinnerResponse = z.infer<typeof ClassifierWinnerResponseSc
 
 // Benchmark profile registry (global per exact measurement pair + engine).
 
+/**
+ * One row per requested profile. `failure` is the structured failure and wins when
+ * present; `failureReason` is the bounded flat text a failed row always carries, so a
+ * reader shows `failure.reason` first and falls back to `failureReason`. A pending or
+ * ready row carries neither. Both stay valid on the wire because the registry reports
+ * a profile that was never admitted (and a subscription resolution error) as `failed`
+ * with the flat text only.
+ */
 export const BenchmarkProfileEntryStatusSchema = z.object({
   entry: BenchmarkPairSchema,
   status: BenchmarkProfileStatusSchema,

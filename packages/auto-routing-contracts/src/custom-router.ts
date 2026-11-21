@@ -63,7 +63,7 @@ function addReservedSlugIssue(scope: OwnerType, slug: string, ctx: z.RefinementC
     ctx.addIssue({
       code: 'custom',
       path: ['slug'],
-      message: `Slug ${RESERVED_USER_CUSTOM_ROUTER_SLUG} is reserved for personal routers`,
+      message: `Slug ${RESERVED_USER_CUSTOM_ROUTER_SLUG} is reserved for organization routers and cannot be used by personal routers`,
     });
   }
 }

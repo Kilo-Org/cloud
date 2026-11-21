@@ -89,8 +89,9 @@ const STAMP_ROUNDS = 6;
 const STAMP_SETTLE_MS = 4_000;
 
 /**
- * Ordered newest first. Stamped only after every ingest write has landed,
- * because ingest overwrites this column with the time it processed the session.
+ * Ordered newest first. Stamped by the re-stamp loop below, which keeps writing
+ * these values until a read shows the order held, because any later ingest write
+ * rewrites the column to the current time.
  */
 const SESSION_UPDATED_AT = [
   '2099-01-01T00:00:07.000Z',

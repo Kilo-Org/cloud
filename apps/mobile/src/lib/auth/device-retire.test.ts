@@ -10,6 +10,7 @@ vi.mock('@/lib/trpc', () => ({
   trpcClient: { user: trpcMock },
 }));
 
+// eslint-disable-next-line import/first -- the mock above must be hoisted first
 import { retireDeviceRemoteState } from '@/lib/auth/device-retire';
 
 describe('retireDeviceRemoteState', () => {
@@ -25,13 +26,13 @@ describe('retireDeviceRemoteState', () => {
 
   it('unregisters the push token before it revokes the session', async () => {
     const calls: string[] = [];
-    trpcMock.unregisterPushToken.mutate.mockImplementation(async () => {
+    trpcMock.unregisterPushToken.mutate.mockImplementation(() => {
       calls.push('push');
-      return { success: true };
+      return Promise.resolve({ success: true });
     });
-    trpcMock.revokeCurrentDeviceSession.mutate.mockImplementation(async () => {
+    trpcMock.revokeCurrentDeviceSession.mutate.mockImplementation(() => {
       calls.push('revoke');
-      return { outcome: 'revoked' };
+      return Promise.resolve({ outcome: 'revoked' });
     });
 
     await expect(retireDeviceRemoteState('push-1')).resolves.toEqual({ status: 'fulfilled' });
@@ -46,10 +47,9 @@ describe('retireDeviceRemoteState', () => {
       { token: 'push-1' },
       { signal: expect.any(AbortSignal) }
     );
-    expect(trpcMock.revokeCurrentDeviceSession.mutate).toHaveBeenCalledWith(
-      undefined,
-      { signal: expect.any(AbortSignal) }
-    );
+    expect(trpcMock.revokeCurrentDeviceSession.mutate).toHaveBeenCalledWith(undefined, {
+      signal: expect.any(AbortSignal),
+    });
   });
 
   it('reports a rejected push unregister and still revokes the session', async () => {

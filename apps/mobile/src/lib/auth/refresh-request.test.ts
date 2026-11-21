@@ -312,9 +312,7 @@ describe('refresh request telemetry', () => {
 
     expect(answer.status).toBe(500);
     expect(reporter).toHaveBeenCalledTimes(1);
-    expect(reporter).toHaveBeenCalledWith(
-      expect.objectContaining({ status: 500, method: 'POST' })
-    );
+    expect(reporter).toHaveBeenCalledWith(expect.objectContaining({ status: 500, method: 'POST' }));
 
     reporter.mockClear();
     fetchMock.mockRejectedValueOnce(new Error('network down'));

@@ -14,7 +14,7 @@ import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-s
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { classifyListBody } from '@/lib/query/list-body-state';
-import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
+import { classifyReadFailureKind, readFailureKindVariant } from '@/lib/query/read-failure-variant';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 
 // Diverges from the Code Reviewer scope list: current server policy allows
@@ -46,13 +46,16 @@ export function ScopeListScreen() {
     connectivityKnown: connectivity !== 'unknown',
   });
   // The read settles instead of pausing, so `classifyListBody` can no longer
-  // reach its paused cause here: the failure's own cause decides the copy. A
-  // failure that never reached the server is the connection's.
-  const failureVariant = classifyReadFailureVariant({
-    errors: error ? [error] : [],
-    isPaused: false,
-    connectivity,
-  });
+  // reach its paused cause here: the failure's own cause decides the copy. The
+  // kind orders a control-plane deadline first, then the connection, so a
+  // slow-but-reachable server never reads as an unreachable one.
+  const failureVariant = readFailureKindVariant(
+    classifyReadFailureKind({
+      errors: error ? [error] : [],
+      isPaused: false,
+      connectivity,
+    })
+  );
 
   return (
     <View className="flex-1 bg-background">

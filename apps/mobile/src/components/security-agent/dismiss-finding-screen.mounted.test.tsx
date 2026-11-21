@@ -442,14 +442,14 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       expect(tree.root.findAllByType(ScrollView)).toHaveLength(0);
       expect(tree.root.findAllByType(SettingsRecoveryStatus)).toHaveLength(0);
       const error = renderFailure(tree);
+      // Both failures name a server answer in this setup: the sheet's own
+      // title differs, the classified cause does not.
+      expect(error.props.variant).toBe('server');
       if (source === 'finding') {
         // The sheet's own failure keeps its screen title, and the description
         // comes from the classified variant rather than a repeated message.
         expect(error.props.title).toBe(i18n.t('securityAgent.dismiss.couldNotLoad'));
         expect(error.props.message).toBeUndefined();
-        expect(error.props.variant).toBe('server');
-      } else {
-        expect(error.props.variant).toBeUndefined();
       }
       act(error.props.onRetry as () => void);
       expect(query.refetch).toHaveBeenCalledOnce();
@@ -494,7 +494,9 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     const tree = renderScreen();
 
     const error = renderFailure(tree);
-    expect(error.props.variant).toBeUndefined();
+    // Confirmed offline with no server answer: the failure names the
+    // connection rather than the default server wording.
+    expect(error.props.variant).toBe('offline');
     expect(error.props.message).toBe(i18n.t('securityAgent.dismiss.couldNotCheckPermissions'));
     act(error.props.onRetry as () => void);
     expect(capability.refetch).toHaveBeenCalledOnce();

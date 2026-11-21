@@ -43,8 +43,10 @@ import {
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import {
+  classifyReadFailureKind,
   classifyReadFailureVariant,
   isReadPausedBeforeData,
+  readFailureKindVariant,
 } from '@/lib/query/read-failure-variant';
 import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 import { cn } from '@/lib/utils';
@@ -199,9 +201,18 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
   }
 
   if (capability.status === 'error') {
+    // The capability read settles instead of pausing, so its own error names
+    // the cause: a failure that never reached the server is the connection's,
+    // and the deadline keeps its own wording.
+    const kind = classifyReadFailureKind({
+      errors: capability.error ? [capability.error] : [],
+      isPaused: false,
+      connectivity,
+    });
     return (
       <DismissSheetFrame>
         <QueryError
+          variant={readFailureKindVariant(kind)}
           message={t('securityAgent.dismiss.couldNotCheckPermissions')}
           onRetry={() => void capability.refetch()}
         />

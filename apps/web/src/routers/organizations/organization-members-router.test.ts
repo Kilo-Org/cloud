@@ -240,6 +240,49 @@ describe('organizations members trpc router', () => {
     });
   });
 
+  describe('search procedure', () => {
+    it('answers a member with names and avatars only', async () => {
+      const memberCaller = await createCallerForUser(memberUser.id);
+
+      const result = await memberCaller.organizations.members.search({
+        organizationId: testOrganization.id,
+        query: 'regular',
+      });
+
+      expect(result).toEqual({
+        members: [
+          {
+            id: regularUser.id,
+            name: 'Regular Members User',
+            image_url: regularUser.google_user_image_url,
+          },
+        ],
+      });
+    });
+
+    it('refuses a Kilo admin who holds no membership of their own', async () => {
+      const kiloAdminCaller = await createCallerForUser(adminUser.id);
+
+      await expect(
+        kiloAdminCaller.organizations.members.search({
+          organizationId: testOrganization.id,
+          query: 'regular',
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('refuses a query shorter than two characters', async () => {
+      const memberCaller = await createCallerForUser(memberUser.id);
+
+      await expect(
+        memberCaller.organizations.members.search({
+          organizationId: testOrganization.id,
+          query: ' r ',
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+  });
+
   describe('Kilo admin elevated writes', () => {
     async function elevatedAudits(actorId: string, organizationId: string) {
       return db

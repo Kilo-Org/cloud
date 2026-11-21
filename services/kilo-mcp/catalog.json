@@ -26710,6 +26710,39 @@
     ],
     "searchBlob": "organizations.members.resendInvite Resend a pending organization invitation email. Use when an invited person did not receive the original invite. organizations members resendinvite organizationid inviteid organizationId inviteId"
   },
+  "organizations.members.search": {
+    "path": "organizations.members.search",
+    "kind": "query",
+    "summary": "Search the people in an organization by name (case-insensitive word-prefix match) to find a member's user ID, display name, and avatar. Only direct members of the organization can search; results exclude bots, blocked accounts, and email addresses.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "query": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        }
+      },
+      "required": [
+        "organizationId",
+        "query"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "members",
+      "search",
+      "organizationid",
+      "query"
+    ],
+    "searchBlob": "organizations.members.search Search the people in an organization by name (case-insensitive word-prefix match) to find a member's user ID, display name, and avatar. Only direct members of the organization can search; results exclude bots, blocked accounts, and email addresses. organizations members search organizationid query organizationId query"
+  },
   "organizations.members.setChildMemberships": {
     "path": "organizations.members.setChildMemberships",
     "kind": "mutation",

@@ -38,6 +38,8 @@ const repositories = vi.hoisted(() => ({
   refetch: vi.fn(),
 }));
 const connectivity = vi.hoisted(() => ({ known: true }));
+const configRetry = vi.hoisted(() => ({ retry: vi.fn(), isRetrying: false }));
+const repositoriesRetry = vi.hoisted(() => ({ retry: vi.fn(), isRetrying: false }));
 const capability = vi.hoisted(() => ({ canManage: true }));
 const save = vi.hoisted(() => ({ mutateAsync: vi.fn(), isPending: false }));
 const saveButton = vi.hoisted(() => ({ onSave: null as (() => Promise<void>) | null }));
@@ -97,6 +99,8 @@ vi.mock('@shopify/flash-list', () => ({
   },
 }));
 vi.mock('@/lib/hooks/use-security-agent', () => ({
+  useRetrySecurityAgentConfig: () => configRetry,
+  useRetrySecurityAgentRepositories: () => repositoriesRetry,
   useSecurityAgentCapability: () => capability,
   useSecurityAgentConfig: () => config,
   useSecurityAgentRepositories: () => repositories,
@@ -254,6 +258,18 @@ async function pressEmptyStateAction(renderer: TestRenderer.ReactTestRenderer) {
   });
 }
 
+// The banner's Retry is the screen's own handler; reading it through a guard
+// makes a missing or non-callable handler fail loudly.
+function queryErrorRetry(renderer: TestRenderer.ReactTestRenderer): () => void {
+  const props: { onRetry?: unknown } = renderer.root.find(
+    node => String(node.type) === 'QueryError'
+  ).props;
+  if (typeof props.onRetry !== 'function') {
+    throw new TypeError('QueryError onRetry is not callable');
+  }
+  return props.onRetry as () => void;
+}
+
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   sideInsets.left = 0;
@@ -261,6 +277,8 @@ beforeEach(() => {
   config.data = configData('selected');
   config.isLoading = false;
   config.isError = false;
+  config.isPending = false;
+  config.fetchStatus = 'idle';
   config.error = null;
   platformError.props = null;
   repositories.data = THREE_REPOS;
@@ -270,6 +288,10 @@ beforeEach(() => {
   repositories.fetchStatus = 'idle';
   repositories.error = null;
   connectivity.known = true;
+  configRetry.retry.mockReset();
+  configRetry.retry.mockResolvedValue(undefined);
+  repositoriesRetry.retry.mockReset();
+  repositoriesRetry.retry.mockResolvedValue(undefined);
   capability.canManage = true;
   save.isPending = false;
   save.mutateAsync.mockReset();
@@ -531,6 +553,32 @@ describe('RepositorySettingsScreen repository picker', () => {
     expect(placeholderRows(renderer)).toHaveLength(0);
   });
 
+  it('retries a paused repository read through one deliberate attempt', async () => {
+    // A read with no data reuses its paused promise on `refetch()`, so the
+    // banner's Retry must run the deliberate attempt instead.
+    repositories.data = undefined;
+    repositories.isLoading = false;
+    repositories.isError = false;
+    repositories.fetchStatus = 'paused';
+    const { renderer } = await mount();
+
+    act(queryErrorRetry(renderer));
+
+    expect(repositoriesRetry.retry).toHaveBeenCalledTimes(1);
+    expect(repositories.refetch).not.toHaveBeenCalled();
+  });
+
+  it('retries a failed refetch over delivered rows through one deliberate attempt', async () => {
+    repositories.data = THREE_REPOS;
+    repositories.isError = true;
+    const { renderer } = await mount();
+
+    act(queryErrorRetry(renderer));
+
+    expect(repositoriesRetry.retry).toHaveBeenCalledTimes(1);
+    expect(repositories.refetch).not.toHaveBeenCalled();
+  });
+
   it('keeps the skeleton for a paused read whose connectivity is unsettled', async () => {
     connectivity.known = false;
     repositories.data = undefined;
@@ -581,6 +629,30 @@ describe('RepositorySettingsScreen repository picker', () => {
 });
 
 describe('config load failure', () => {
+  it('names the connection for a paused config read instead of holding the skeleton', async () => {
+    // A paused read is pending without loading and has no data, so the
+    // skeleton gate would hold it until connectivity returns.
+    config.data = null;
+    config.isLoading = false;
+    config.isPending = true;
+    config.fetchStatus = 'paused';
+
+    await mount();
+
+    const error = platformError.props;
+    if (!error) {
+      throw new Error('paused first read did not render the failure screen');
+    }
+    expect(error.variant).toBe('offline');
+    expect(error.errorTitle).toBe(i18n.t('securityAgent.repositories.couldNotLoad'));
+    const onRetry: unknown = error.onRetry;
+    if (typeof onRetry !== 'function') {
+      throw new TypeError('paused first read has no retry');
+    }
+    act(onRetry as () => void);
+    expect(configRetry.retry).toHaveBeenCalledTimes(1);
+  });
+
   it('titles the failure with the screen and leaves the description to the variant', async () => {
     config.data = null;
     config.isError = true;

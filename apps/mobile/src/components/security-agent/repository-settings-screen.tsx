@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the picker draws its rows, the mode choice, and every read state (loading, paused, failed, empty) from one screen; splitting would re-encode the same hooks */
 import {
   getSettingsDirtyState,
   isPersonalSecurityScope,
@@ -15,7 +16,10 @@ import { EmptyState, StateAction } from '@/components/empty-state';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { classifyListBody } from '@/lib/query/list-body-state';
-import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
+import {
+  classifyReadFailureVariant,
+  isReadPausedBeforeData,
+} from '@/lib/query/read-failure-variant';
 import { OrphanedFindingsCard } from '@/components/security-agent/orphaned-findings-card';
 import { RepoToggleRow } from '@/components/repo-toggle-row';
 import { ScreenHeader } from '@/components/screen-header';
@@ -34,6 +38,8 @@ import {
   useSettingsBackGuard,
 } from '@/lib/hooks/use-settings-back-guard';
 import {
+  useRetrySecurityAgentConfig,
+  useRetrySecurityAgentRepositories,
   useSaveSecurityAgentConfig,
   useSecurityAgentCapability,
   useSecurityAgentConfig,
@@ -76,6 +82,11 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
   const repositories = useSecurityAgentRepositories(scope);
+  // Both reads can be paused by the online manager, and a refetch on a read
+  // with no data reuses the paused promise. The deliberate attempts reach the
+  // server, so the paused branches below use them and not `refetch()`.
+  const configPausedRetry = useRetrySecurityAgentConfig(scope);
+  const repositoriesPausedRetry = useRetrySecurityAgentRepositories(scope);
   const save = useSaveSecurityAgentConfig(scope, { announceFailed: false });
   const feedback = useSettingsSaveFeedback();
   const connectivity = useCommittedConnectivityStatus();
@@ -197,6 +208,22 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
       />
     );
   }
+  // A first config read the online manager paused (connectivity known) can
+  // never finish: the skeleton gate would hold it until connectivity returns.
+  // Name the connection and offer the deliberate retry instead.
+  if (isReadPausedBeforeData({ ...config, connectivity })) {
+    return (
+      <PlatformErrorScreen
+        title={t('common.repositories')}
+        errorTitle={t('securityAgent.repositories.couldNotLoad')}
+        variant="offline"
+        onRetry={() => {
+          void configPausedRetry.retry();
+        }}
+        isRetrying={configPausedRetry.isRetrying}
+      />
+    );
+  }
   if (config.isLoading || !config.data) {
     return <RepositorySettingsSkeleton />;
   }
@@ -300,8 +327,12 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
               })}
               placement="top"
               title={t('common.couldNotLoadRepositories')}
-              onRetry={() => void repositories.refetch()}
-              isRetrying={repositories.isFetching}
+              // `refetch()` reuses a paused read's promise, so only the
+              // deliberate attempt reaches the server.
+              onRetry={() => {
+                void repositoriesPausedRetry.retry();
+              }}
+              isRetrying={repositoriesPausedRetry.isRetrying}
             />
           )}
           {repositoriesBody.status === 'empty' ? (

@@ -130,6 +130,7 @@ const { clearSettingsToolsEnabled, isSettingsToolsEnabled, setSettingsToolsEnabl
 const { ensureKiloMcp, forgetKiloMcp, kiloMcpState, kiloMcpTools, mcpEnabledFor, setMcpEnabled } =
   await import('./kilo-mcp');
 const { clearChatsForSignOut, releaseChatsForAccountSwitch } = await import('./sign-out');
+const { wipeChats } = await import('./store');
 const { askedIn, rememberAsked } = await import('./pending');
 const { setWebSearchEnabled, webSearchEnabledFor } = await import('./web-search-setting');
 
@@ -250,6 +251,41 @@ describe('remembered question targets', () => {
       images: [],
       failureKey: null,
     });
+  });
+
+  it('reports a refused wipe and still fails the boundary', async () => {
+    const question = {
+      text: 'unsent custom question',
+      model: 'backend:private:1:model',
+      effort: null,
+      images: [],
+    };
+    await rememberAsked('gone', question);
+    /* The store refuses when its own write never closes, and the wipe is one
+       transaction: nothing was deleted, so the boundary has to fail rather than
+       report a sign-out that left the account's chat rows on the device. */
+    const refusal = new Error('the store did not finish its write, so the chats were not wiped');
+    vi.mocked(wipeChats).mockRejectedValueOnce(refusal);
+    const warnings: string[] = [];
+    const warned = vi.spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
+      warnings.push(args.map(String).join(' '));
+    });
+
+    try {
+      await expect(clearChatsForSignOut('user-1')).rejects.toBe(refusal);
+    } finally {
+      warned.mockRestore();
+    }
+
+    // The only record that the departing account's rows are still there.
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('could not be wiped');
+    expect(warnings[0]).toContain(refusal.message);
+    // Neither the account nor a chat: the line is a log, not an identifier dump.
+    expect(warnings[0]).not.toContain('user-1');
+    expect(warnings[0]).not.toContain('gone');
+    // The questions go with the rows, so a refusal leaves both in place.
+    expect(await askedIn('gone')).toEqual({ ...question, failureKey: null });
   });
 });
 

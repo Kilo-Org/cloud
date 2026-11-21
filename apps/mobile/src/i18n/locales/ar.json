@@ -190,7 +190,30 @@
     "legalDocumentEnglishOnly": "هذا المستند متوفر باللغة الإنجليزية فقط.",
     "organizationTrialEndedBilling": "انتهت الفترة التجريبية للمؤسسة ولم تعد لديها خطة نشطة. يمكنك تحديث الفوترة، ثم المحاولة مرة أخرى.",
     "organizationTrialEndedBillingAtKiloAi": "انتهت الفترة التجريبية للمؤسسة ولم تعد لديها خطة نشطة. يمكنك تحديث الفوترة على kilo.ai، ثم المحاولة مرة أخرى.",
-    "viewOnGitHub": "عرض PR على GitHub"
+    "viewOnGitHub": "عرض PR على GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "نقطة تعداد",
+        "nestedBulletPoint": "نقطة تعداد متداخلة",
+        "orderedItem": "عنصر قائمة {n}",
+        "nestedOrderedItem": "عنصر قائمة متداخل {n}"
+      },
+      "blockquote": {
+        "quote": "اقتباس",
+        "nestedQuote": "اقتباس متداخل"
+      },
+      "table": {
+        "row": "صف {n}: {content}"
+      },
+      "math": {
+        "equation": "رياضيات: {latex}"
+      },
+      "rotor": {
+        "headings": "العناوين",
+        "links": "الروابط",
+        "images": "الصور"
+      }
+    }
   },
   "language": {
     "restarting": "جارٍ إعادة التشغيل لتطبيق اللغة",
@@ -431,6 +454,17 @@
       "location": "موقع Vertex",
       "clientEmail": "البريد الإلكتروني لحساب الخدمة",
       "privateKey": "المفتاح الخاص لحساب الخدمة",
+      "privateKeyBlockRequired": "الصق كتلة المفتاح بأكملها، من سطر BEGIN إلى سطر END.",
+      "privateKeyEncrypted": "كتلة المفتاح هذه محمية بعبارة مرور. الصق مفتاح حساب خدمة بدون عبارة مرور.",
+      "names": {
+        "codestral": "Codestral القديم فقط",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (تسجيل الدخول عبر ChatGPT)",
+        "xiaomi": "Xiaomi (الدفع حسب الاستخدام)",
+        "zai": "Z.ai (الدفع حسب الاستخدام)",
+        "bedrockByok": "Amazon Bedrock (مباشر)",
+        "vertexByok": "Google Vertex AI (مباشر)"
+      },
       "modelMappings": "تعيينات النماذج",
       "modelMappingsDescription": "وجّه نموذجًا من البوابة إلى اسم نشر مخصص.",
       "mappingTitle": "التعيين {{number}}",
@@ -509,6 +543,14 @@
       "nextStepAppeal": "ستظهر نتيجة الطعن على هذه الشاشة.",
       "nextStepFinal": "قرار الطعن نهائي. لا يمكن تقديم طعن آخر.",
       "viewReceipt": "عرض الإيصال"
+    },
+    "reportReceipts": {
+      "title": "البلاغات",
+      "rowSubtitle": "البلاغات التي قدّمتها ونتائجها",
+      "emptyTitle": "لا توجد بلاغات بعد",
+      "emptyDescription": "تظهر هنا البلاغات التي تقدّمها من تعليق أو من استجابة ذكاء اصطناعي.",
+      "couldNotLoad": "تعذّر تحميل بلاغاتك",
+      "capped": "يتم عرض أحدث بلاغاتك."
     },
     "changelog": "ما الجديد",
     "changelogVersionPending": "ستصل ملاحظات الإصدار {{version}} مع التحديث القادم للتطبيق.",
@@ -778,7 +820,7 @@
       "gateHidden": "مخفي",
       "gateNone": "لا شيء",
       "noFindings": "لا توجد نتائج.",
-      "findingsUnavailable": "النتائج غير متاحة لأن هذه المراجعة فشلت.",
+      "findingsUnavailable": "النتائج غير متاحة.",
       "findingsInProgress": "هذه المراجعة لا تزال قيد التنفيذ. ستظهر النتائج هنا عند اكتمالها.",
       "findingsEndedWithoutResults": "انتهت هذه المراجعة قبل أن تنتج أي نتائج.",
       "serviceUnavailable": "تعذّر الاتصال بخدمة مراجعة الكود. أعد المراجعة عندما تصبح الخدمة متاحة.",
@@ -3843,6 +3885,7 @@
       "identifierLabel": "المعرّف",
       "identifierRequired": "أدخل معرّفًا.",
       "identifierTaken": "يستخدم وضع آخر هذا المعرّف بالفعل.",
+      "identifierTooLong": "اجعل المعرّف في حدود {{max}} حرفًا أو أقل.",
       "nameLabel": "اسم الوضع",
       "nameRequired": "أدخل اسم وضع.",
       "notFound": "هذا الوضع لم يعد موجودًا.",
@@ -3937,7 +3980,7 @@
     "emailDeliveryFailed": "يتعذّر إرسال البريد الإلكتروني مؤقتًا. حاول مرة أخرى لاحقًا.",
     "admissionRequired": "لا يمكن التحقق من جهازك. استخدم \"$t(login.moreSignInOptions)\" لتسجيل الدخول على جهاز آخر أو عبر الويب.",
     "default": "حدث خطأ ما. حاول مرة أخرى.",
-    "retryableAdmission": "تعذّر التحقق من هذا الجهاز. تحقق من اتصالك وحاول مرة أخرى.",
+    "retryableAdmission": "تعذّر التحقق من هذا الجهاز. حاول مرة أخرى.",
     "startSignInFailed": "تعذّر بدء تسجيل الدخول. حاول مرة أخرى.",
     "couldNotOpenBrowser": "تعذّر فتح المتصفح. حاول مرة أخرى.",
     "signInTimedOut": "انتهت مهلة تسجيل الدخول. حاول مرة أخرى.",
@@ -4009,6 +4052,66 @@
     "nextScheduled": "المواعيد المجدولة القادمة",
     "answerNeeded": "بانتظار إجابتك",
     "waitingToRetry": "بانتظار إعادة المحاولة",
+    "countNoun": {
+      "needsInput_one": "بانتظار تدخلك",
+      "needsInput_other": "بانتظار تدخلك",
+      "needsInput_zero": "بانتظار تدخلك",
+      "needsInput_two": "بانتظار تدخلك",
+      "needsInput_few": "بانتظار تدخلك",
+      "needsInput_many": "بانتظار تدخلك",
+      "running_one": "جارٍ العمل",
+      "running_other": "جارٍ العمل",
+      "running_zero": "جارٍ العمل",
+      "running_two": "جارٍ العمل",
+      "running_few": "جارٍ العمل",
+      "running_many": "جارٍ العمل",
+      "scheduled_one": "مجدول",
+      "scheduled_other": "مجدول",
+      "scheduled_zero": "مجدولين",
+      "scheduled_two": "مجدولان",
+      "scheduled_few": "مجدولين",
+      "scheduled_many": "مجدول",
+      "idle_one": "خامل",
+      "idle_other": "خامل",
+      "idle_zero": "خاملين",
+      "idle_two": "خاملان",
+      "idle_few": "خاملين",
+      "idle_many": "خامل"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} بانتظار تدخلك",
+      "needsInput_other": "{{displayCount}} بانتظار تدخلك",
+      "needsInput_zero": "{{displayCount}} بانتظار تدخلك",
+      "needsInput_two": "{{displayCount}} بانتظار تدخلك",
+      "needsInput_few": "{{displayCount}} بانتظار تدخلك",
+      "needsInput_many": "{{displayCount}} بانتظار تدخلك",
+      "running_one": "{{displayCount}} جارٍ العمل",
+      "running_other": "{{displayCount}} جارٍ العمل",
+      "running_zero": "{{displayCount}} جارٍ العمل",
+      "running_two": "{{displayCount}} جارٍ العمل",
+      "running_few": "{{displayCount}} جارٍ العمل",
+      "running_many": "{{displayCount}} جارٍ العمل",
+      "scheduled_one": "{{displayCount}} مجدول",
+      "scheduled_other": "{{displayCount}} مجدول",
+      "scheduled_zero": "{{displayCount}} مجدولين",
+      "scheduled_two": "{{displayCount}} مجدولان",
+      "scheduled_few": "{{displayCount}} مجدولين",
+      "scheduled_many": "{{displayCount}} مجدول",
+      "idle_one": "{{displayCount}} خامل",
+      "idle_other": "{{displayCount}} خامل",
+      "idle_zero": "{{displayCount}} خاملين",
+      "idle_two": "{{displayCount}} خاملان",
+      "idle_few": "{{displayCount}} خاملين",
+      "idle_many": "{{displayCount}} خامل"
+    },
+    "footer": {
+      "checked": "آخر تحقق {{time}}",
+      "lastKnown": "آخر حالة معروفة · {{time}}"
+    },
+    "wake": {
+      "nextRun": "التشغيل التالي {{time}}",
+      "wasDue": "كان متوقعًا {{time}}"
+    },
     "step": {
       "editing": "التحرير",
       "reading": "القراءة",
@@ -4258,7 +4361,8 @@
         "space": "لا توجد مساحة تخزين كافية لهذا النموذج. حرّر مساحة وحاول مرة أخرى.",
         "network": "لم يكتمل التنزيل. تحقق من اتصالك وحاول مرة أخرى.",
         "invalidFile": "الملف الذي تم تنزيله ليس نموذجًا يمكن لهذا التطبيق تشغيله، لذا تمت إزالته.",
-        "checksum": "الملف الذي تم تنزيله لا يطابق المجموع الاختباري المنشور له، لذا تمت إزالته. حاول التنزيل مرة أخرى."
+        "checksum": "الملف الذي تم تنزيله لا يطابق المجموع الاختباري المنشور له، لذا تمت إزالته. حاول التنزيل مرة أخرى.",
+        "writeFailed": "تعذّر على هذا الجهاز حفظ النموذج. حاول التنزيل مرة أخرى."
       }
     },
     "catalog": {
@@ -4456,7 +4560,7 @@
     "personalDefaultDescription": "يتم تحميله تلقائيًا عندما لا يكون لدى أي مستودع ملف شخصي مثبت.",
     "organizationDefaultDescription": "يُحمَّل تلقائيًا للأعضاء الذين ليس لديهم ملف شخصي افتراضي.",
     "setAsDefault": "تعيين كافتراضي",
-    "saveFailed": "تعذر حفظ الملف الشخصي",
+    "saveFailed": "تعذّر حفظ الملف الشخصي. حاول مرة أخرى.",
     "organizationRoleRequired": "يمكن لمالكي المؤسسة والمشرفين فقط تغيير الملف الشخصي للمؤسسة.",
     "deleteTitle": "حذف الملف الشخصي",
     "deleteMessage": "يؤدي هذا إلى إزالة الملف الشخصي وإعداداته نهائيًا. لا يمكن التراجع عن هذا.",
@@ -4724,6 +4828,7 @@
         "balanceNeutral": "دون تأثير على الرصيد",
         "deduction": "خصم",
         "grant": "منحة رصيد",
+        "welcomeCredits": "رصيد الترحيب",
         "purchase": "شراء"
       },
       "purchaseFallback": "شراء رصيد",
@@ -5011,6 +5116,8 @@
     "connectedTo": "متصل بـ {{account}}",
     "disconnected": "تم قطع الاتصال بـ {{provider}}",
     "disconnectFailed": "تعذّر قطع الاتصال بـ {{provider}}",
+    "disconnectRetry": "تعذّر على Slack تأكيد قطع الاتصال. حاول مرة أخرى.",
+    "disconnectNeedsSupport": "تعذّر على Kilo قراءة الوصول إلى Slack المحفوظ لهذا الاتصال. تواصل مع الدعم لإكمال قطع الاتصال.",
     "couldNotLoad": "تعذّر تحميل التكاملات",
     "permissionDenied": "ليس لديك إذن لإدارة هذه التكاملات.",
     "managedByOwner": "اطلب من مالك المؤسسة تغيير اتصال لا يمكنك تغييره.",

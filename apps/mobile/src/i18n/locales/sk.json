@@ -188,7 +188,30 @@
     "privateRepositoryA11y": "{{name}}, súkromné úložisko",
     "legalDocumentEnglishOnly": "Tento dokument je dostupný len v angličtine.",
     "organizationTrialEndedBilling": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Môžete aktualizovať fakturáciu a potom to skúsiť znova.",
-    "organizationTrialEndedBillingAtKiloAi": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Môžete aktualizovať fakturáciu na kilo.ai a potom to skúsiť znova."
+    "organizationTrialEndedBillingAtKiloAi": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Môžete aktualizovať fakturáciu na kilo.ai a potom to skúsiť znova.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Odrážka",
+        "nestedBulletPoint": "Vnorená odrážka",
+        "orderedItem": "Položka zoznamu {n}",
+        "nestedOrderedItem": "Vnorená položka zoznamu {n}"
+      },
+      "blockquote": {
+        "quote": "Citácia",
+        "nestedQuote": "Vnorená citácia"
+      },
+      "table": {
+        "row": "Riadok {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Nadpisy",
+        "links": "Odkazy",
+        "images": "Obrázky"
+      }
+    }
   },
   "language": {
     "restarting": "Aplikácia sa reštartuje na zmenu jazyka",
@@ -429,6 +452,17 @@
       "location": "Umiestnenie Vertex",
       "clientEmail": "E-mail účtu služby",
       "privateKey": "Súkromný kľúč účtu služby",
+      "privateKeyBlockRequired": "Vlož celý blok kľúča, od riadku BEGIN po riadok END.",
+      "privateKeyEncrypted": "Tento blok kľúča je chránený prístupovou frázou. Vlož kľúč účtu služby, ktorý nemá prístupovú frázu.",
+      "names": {
+        "codestral": "Iba staršie Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Prihlásiť sa cez ChatGPT)",
+        "xiaomi": "Xiaomi (platba podľa spotreby)",
+        "zai": "Z.ai (platba podľa spotreby)",
+        "bedrockByok": "Amazon Bedrock (priame účtovanie)",
+        "vertexByok": "Google Vertex AI (priame účtovanie)"
+      },
       "modelMappings": "Mapovania modelov",
       "modelMappingsDescription": "Presmeruj model brány na vlastný názov nasadenia.",
       "mappingTitle": "Mapovanie {{number}}",
@@ -507,6 +541,14 @@
       "nextStepAppeal": "Výsledok odvolania sa zobrazí na tejto obrazovke.",
       "nextStepFinal": "Rozhodnutie o odvolaní je konečné. Ďalšie odvolanie už nie je možné podať.",
       "viewReceipt": "Zobraziť potvrdenie"
+    },
+    "reportReceipts": {
+      "title": "Nahlásenia",
+      "rowSubtitle": "Nahlásenia, ktoré si podal, a ich výsledky",
+      "emptyTitle": "Zatiaľ žiadne nahlásenia",
+      "emptyDescription": "Nahlásenia, ktoré podáš z komentára alebo z odpovede AI, sa zobrazia tu.",
+      "couldNotLoad": "Nepodarilo sa načítať tvoje nahlásenia",
+      "capped": "Zobrazujú sa tvoje najnovšie nahlásenia."
     },
     "changelog": "Čo je nové",
     "changelogVersionPending": "Poznámky k verzii {{version}} prídu s ďalšou aktualizáciou aplikácie.",
@@ -1331,7 +1373,7 @@
       "couldNotGetLatest": "Najnovšie údaje sa nepodarilo načítať.",
       "byline": "#{{number}} · autor: {{author}}",
       "noFindings": "Nenašli sa žiadne nálezy.",
-      "findingsUnavailable": "Výsledky nie sú k dispozícii, pretože táto kontrola zlyhala.",
+      "findingsUnavailable": "Výsledky nie sú k dispozícii.",
       "findingsInProgress": "Táto kontrola stále prebieha. Nálezy sa tu zobrazia po jej dokončení.",
       "findingsEndedWithoutResults": "Táto kontrola bola ukončená skôr, než vznikli nejaké nálezy.",
       "serviceUnavailable": "Nepodarilo sa pripojiť k službe kontroly kódu. Zopakujte kontrolu, keď bude služba dostupná.",
@@ -3715,6 +3757,7 @@
       "identifierLabel": "Identifikátor",
       "identifierRequired": "Zadajte identifikátor.",
       "identifierTaken": "Tento identifikátor už používa iný režim.",
+      "identifierTooLong": "Identifikátor môže mať najviac {{max}} znakov.",
       "nameLabel": "Názov režimu",
       "nameRequired": "Zadajte názov režimu.",
       "notFound": "Tento režim už neexistuje.",
@@ -3809,7 +3852,7 @@
     "emailDeliveryFailed": "Doručovanie e-mailov je dočasne nedostupné. Skús to neskôr.",
     "admissionRequired": "Tvoje zariadenie sa nedá overiť. Použi „$t(login.moreSignInOptions)“ a prihlás sa na inom zariadení alebo cez web.",
     "default": "Vyskytla sa chyba. Skús to znova.",
-    "retryableAdmission": "Toto zariadenie sa nepodarilo overiť. Skontroluj pripojenie a skús to znova.",
+    "retryableAdmission": "Toto zariadenie sa nepodarilo overiť. Skús to znova.",
     "startSignInFailed": "Prihlásenie sa nepodarilo spustiť. Skús to znova.",
     "couldNotOpenBrowser": "Prehliadač sa nepodarilo otvoriť. Skús to znova.",
     "signInTimedOut": "Čas na prihlásenie vypršal. Skús to znova.",
@@ -3881,6 +3924,50 @@
     "nextScheduled": "Ďalšie naplánované",
     "answerNeeded": "Čaká na odpoveď",
     "waitingToRetry": "Čaká na opakovanie",
+    "countNoun": {
+      "needsInput_one": "Čaká na odpoveď",
+      "needsInput_other": "Čaká na odpoveď",
+      "needsInput_few": "Čaká na odpoveď",
+      "needsInput_many": "Čaká na odpoveď",
+      "running_one": "Pracuje sa",
+      "running_other": "Pracuje sa",
+      "running_few": "Pracuje sa",
+      "running_many": "Pracuje sa",
+      "scheduled_one": "Naplánované",
+      "scheduled_other": "Naplánované",
+      "scheduled_few": "Naplánované",
+      "scheduled_many": "Naplánované",
+      "idle_one": "V nečinnosti",
+      "idle_other": "V nečinnosti",
+      "idle_few": "V nečinnosti",
+      "idle_many": "V nečinnosti"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Čaká na odpoveď",
+      "needsInput_other": "{{displayCount}} Čaká na odpoveď",
+      "needsInput_few": "{{displayCount}} Čaká na odpoveď",
+      "needsInput_many": "{{displayCount}} Čaká na odpoveď",
+      "running_one": "{{displayCount}} Pracuje sa",
+      "running_other": "{{displayCount}} Pracuje sa",
+      "running_few": "{{displayCount}} Pracuje sa",
+      "running_many": "{{displayCount}} Pracuje sa",
+      "scheduled_one": "{{displayCount}} Naplánované",
+      "scheduled_other": "{{displayCount}} Naplánované",
+      "scheduled_few": "{{displayCount}} Naplánované",
+      "scheduled_many": "{{displayCount}} Naplánované",
+      "idle_one": "{{displayCount}} V nečinnosti",
+      "idle_other": "{{displayCount}} V nečinnosti",
+      "idle_few": "{{displayCount}} V nečinnosti",
+      "idle_many": "{{displayCount}} V nečinnosti"
+    },
+    "footer": {
+      "checked": "Overené {{time}}",
+      "lastKnown": "Posledný známy stav · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Ďalšie spustenie {{time}}",
+      "wasDue": "Očakávalo sa {{time}}"
+    },
     "step": {
       "editing": "Úprava",
       "reading": "Čítanie",
@@ -4128,7 +4215,8 @@
         "space": "Na tento model nie je dostatok voľného úložiska. Uvoľnite miesto a skúste to znova.",
         "network": "Sťahovanie sa nedokončilo. Skontrolujte pripojenie a skúste to znova.",
         "invalidFile": "Stiahnutý súbor nie je model, ktorý by táto aplikácia mohla spustiť, preto bol odstránený.",
-        "checksum": "Stiahnutý súbor sa nezhoduje so zverejneným kontrolným súčtom, preto bol odstránený. Skúste ho stiahnuť znova."
+        "checksum": "Stiahnutý súbor sa nezhoduje so zverejneným kontrolným súčtom, preto bol odstránený. Skúste ho stiahnuť znova.",
+        "writeFailed": "Toto zariadenie nedokázalo uložiť model. Skúste ho stiahnuť znova."
       }
     },
     "catalog": {
@@ -4316,7 +4404,7 @@
     "personalDefaultDescription": "Automaticky načítané, keď žiadne úložisko nemá pripnutý profil.",
     "organizationDefaultDescription": "Automaticky načítané pre členov, ktorí nemajú žiadne osobné predvolené nastavenia.",
     "setAsDefault": "Nastaviť ako predvolené",
-    "saveFailed": "Profil sa nepodarilo uložiť",
+    "saveFailed": "Profil sa nepodarilo uložiť. Skúste to znova.",
     "organizationRoleRequired": "Profil organizácie môžu zmeniť iba vlastníci organizácie a správcovia.",
     "deleteTitle": "Odstrániť profil",
     "deleteMessage": "Tým sa natrvalo odstráni profil a jeho nastavenia. Toto sa nedá vrátiť späť.",
@@ -4582,6 +4670,7 @@
         "balanceNeutral": "Bez vplyvu na zostatok",
         "deduction": "Odpočet",
         "grant": "Pridelené kredity",
+        "welcomeCredits": "Uvítacie kredity",
         "purchase": "Nákup"
       },
       "purchaseFallback": "Nákup kreditov",
@@ -4853,6 +4942,8 @@
     "connectedTo": "Pripojené k účtu {{account}}",
     "disconnected": "Služba {{provider}} bola odpojená",
     "disconnectFailed": "Službu {{provider}} sa nepodarilo odpojiť",
+    "disconnectRetry": "Slack nevedel potvrdiť odpojenie. Skús to znova.",
+    "disconnectNeedsSupport": "Kilo nedokázalo prečítať uložený prístup k Slacku pre toto pripojenie. Kontaktuj podporu, aby sa odpojenie dokončilo.",
     "couldNotLoad": "Integrácie sa nepodarilo načítať",
     "permissionDenied": "Nemáte oprávnenie spravovať tieto integrácie.",
     "managedByOwner": "Požiadajte vlastníka organizácie, aby zmenil pripojenie, ktoré nemôžete zmeniť.",

@@ -18,13 +18,23 @@ import { useTRPC } from '@/lib/trpc';
  * `use-organization-queries` (`useOrganization`); keeping the hook here lets
  * the provider read the list without importing that module back, which would
  * be a module cycle.
+ *
+ * A consumer that must stay off for its own scope passes `enabled: false`. The
+ * token gate and the offline settle stay here, so every observer of the one
+ * cache entry uses the same options — the query's own options are
+ * last-writer-wins across observers.
+ *
+ * Every observer of this key must come through this hook. One built with
+ * defaulted options replaces the entry's options while it is mounted, which
+ * drops the offline settle for every other consumer and leaves their reads
+ * paused with no data.
  */
-export function useOrganizationsList() {
+export function useOrganizationsList(options: { enabled?: boolean } = {}) {
   const trpc = useTRPC();
   const { token } = useAuth();
   return useQuery({
     ...trpc.organizations.list.queryOptions(),
-    enabled: token != null,
+    enabled: token != null && (options.enabled ?? true),
     // The boundary waits on this first read; a paused one keeps it from
     // reaching its offline/error branch.
     ...SETTLE_WHILE_OFFLINE,

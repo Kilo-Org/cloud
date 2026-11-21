@@ -78,6 +78,7 @@ export type OrgModeFormErrorCode =
   | 'nameRequired'
   | 'identifierRequired'
   | 'identifierInvalid'
+  | 'identifierTooLong'
   | 'identifierTaken'
   | 'roleRequired'
   | 'restrictionInvalid';
@@ -112,7 +113,9 @@ function isValidRegExp(source: string): boolean {
 
 /**
  * What the form refuses before it reaches the server: the required strings, the
- * slug's shape, a slug another mode in this organization already holds, and a
+ * slug's shape, a slug longer than the server's bound (reported apart from the
+ * character set, so a long suggestion reads as too long rather than as invalid
+ * characters), a slug another mode in this organization already holds, and a
  * file pattern that is not a regular expression. The server repeats the bounds,
  * so this only makes the refusal local. The pattern belongs to the `edit` group,
  * so it is checked only while that group is on — the same rule
@@ -128,8 +131,10 @@ export function validateOrgModeForm(
   let slugError: OrgModeFormErrorCode | undefined = undefined;
   if (slug.length === 0) {
     slugError = 'identifierRequired';
-  } else if (!SLUG_PATTERN.test(slug) || slug.length > MODE_SLUG_MAX_LENGTH) {
+  } else if (!SLUG_PATTERN.test(slug)) {
     slugError = 'identifierInvalid';
+  } else if (slug.length > MODE_SLUG_MAX_LENGTH) {
+    slugError = 'identifierTooLong';
   } else if (existingModes.some(mode => mode.slug === slug && mode.id !== editingModeId)) {
     slugError = 'identifierTaken';
   }

@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}, kho lưu trữ riêng tư",
     "legalDocumentEnglishOnly": "Tài liệu này chỉ có sẵn bằng tiếng Anh.",
     "organizationTrialEndedBilling": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Bạn có thể cập nhật thanh toán, sau đó thử lại.",
-    "organizationTrialEndedBillingAtKiloAi": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Bạn có thể cập nhật thanh toán tại kilo.ai, sau đó thử lại."
+    "organizationTrialEndedBillingAtKiloAi": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Bạn có thể cập nhật thanh toán tại kilo.ai, sau đó thử lại.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Dấu đầu dòng",
+        "nestedBulletPoint": "Dấu đầu dòng lồng nhau",
+        "orderedItem": "Mục danh sách {n}",
+        "nestedOrderedItem": "Mục danh sách lồng nhau {n}"
+      },
+      "blockquote": {
+        "quote": "Trích dẫn",
+        "nestedQuote": "Trích dẫn lồng nhau"
+      },
+      "table": {
+        "row": "Dòng {n}: {content}"
+      },
+      "math": {
+        "equation": "Toán học: {latex}"
+      },
+      "rotor": {
+        "headings": "Tiêu đề",
+        "links": "Liên kết",
+        "images": "Hình ảnh"
+      }
+    }
   },
   "language": {
     "restarting": "Đang khởi động lại để áp dụng ngôn ngữ",
@@ -427,6 +450,17 @@
       "location": "Vị trí Vertex",
       "clientEmail": "Email tài khoản dịch vụ",
       "privateKey": "Khóa riêng tư của tài khoản dịch vụ",
+      "privateKeyBlockRequired": "Dán toàn bộ khối khóa, từ dòng BEGIN đến dòng END.",
+      "privateKeyEncrypted": "Khối khóa này được bảo vệ bằng cụm mật khẩu. Dán khóa tài khoản dịch vụ không có cụm mật khẩu.",
+      "names": {
+        "codestral": "Chỉ hỗ trợ Codestral cũ",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Đăng nhập bằng ChatGPT)",
+        "xiaomi": "Xiaomi (trả theo mức sử dụng)",
+        "zai": "Z.ai (trả theo mức sử dụng)",
+        "bedrockByok": "Amazon Bedrock (trực tiếp)",
+        "vertexByok": "Google Vertex AI (trực tiếp)"
+      },
       "modelMappings": "Ánh xạ mô hình",
       "modelMappingsDescription": "Chuyển một mô hình gateway tới tên deployment tùy chỉnh.",
       "mappingTitle": "Ánh xạ {{number}}",
@@ -505,6 +539,14 @@
       "nextStepAppeal": "Kết quả kháng nghị sẽ xuất hiện trên màn hình này.",
       "nextStepFinal": "Quyết định kháng nghị là cuối cùng. Bạn không thể gửi thêm kháng nghị nào nữa.",
       "viewReceipt": "Xem biên nhận"
+    },
+    "reportReceipts": {
+      "title": "Báo cáo",
+      "rowSubtitle": "Các báo cáo bạn đã gửi và kết quả của chúng",
+      "emptyTitle": "Chưa có báo cáo nào",
+      "emptyDescription": "Các báo cáo bạn gửi từ bình luận hoặc phản hồi của AI sẽ xuất hiện ở đây.",
+      "couldNotLoad": "Không thể tải báo cáo của bạn",
+      "capped": "Đang hiển thị các báo cáo gần đây nhất của bạn."
     },
     "changelog": "Có gì mới",
     "changelogVersionPending": "Ghi chú cho phiên bản {{version}} sẽ có trong bản cập nhật ứng dụng sau.",
@@ -774,7 +816,7 @@
       "gateHidden": "Ẩn",
       "gateNone": "Không có",
       "noFindings": "Không phát hiện vấn đề nào.",
-      "findingsUnavailable": "Không có kết quả vì phiên rà soát này đã thất bại.",
+      "findingsUnavailable": "Kết quả không khả dụng.",
       "findingsInProgress": "Phiên rà soát này vẫn đang được thực hiện. Kết quả sẽ xuất hiện ở đây khi phiên rà soát hoàn tất.",
       "findingsEndedWithoutResults": "Phiên rà soát này đã kết thúc trước khi phát hiện bất kỳ vấn đề nào.",
       "serviceUnavailable": "Không thể kết nối với dịch vụ rà soát mã. Hãy rà soát lại khi dịch vụ khả dụng.",
@@ -3595,6 +3637,7 @@
       "identifierLabel": "Mã định danh",
       "identifierRequired": "Nhập mã định danh.",
       "identifierTaken": "Một chế độ khác đã dùng mã định danh này.",
+      "identifierTooLong": "Giữ mã định danh từ {{max}} ký tự trở xuống.",
       "nameLabel": "Tên chế độ",
       "nameRequired": "Nhập tên chế độ.",
       "notFound": "Chế độ này không còn tồn tại.",
@@ -3681,7 +3724,7 @@
     "emailDeliveryFailed": "Hiện không thể gửi email. Vui lòng thử lại sau.",
     "admissionRequired": "Không thể xác minh thiết bị của bạn. Dùng '$t(login.moreSignInOptions)' để đăng nhập trên thiết bị khác hoặc qua web.",
     "default": "Đã xảy ra lỗi. Vui lòng thử lại.",
-    "retryableAdmission": "Chúng tôi không thể xác minh thiết bị này. Kiểm tra kết nối của bạn và thử lại.",
+    "retryableAdmission": "Không thể xác minh thiết bị này. Hãy thử lại.",
     "startSignInFailed": "Không thể bắt đầu đăng nhập. Vui lòng thử lại.",
     "couldNotOpenBrowser": "Không thể mở trình duyệt. Vui lòng thử lại.",
     "signInTimedOut": "Đã hết thời gian chờ đăng nhập. Vui lòng thử lại.",
@@ -3753,6 +3796,34 @@
     "nextScheduled": "Lịch tiếp theo",
     "answerNeeded": "Cần trả lời",
     "waitingToRetry": "Đang chờ thử lại",
+    "countNoun": {
+      "needsInput_one": "Cần phản hồi",
+      "needsInput_other": "Cần phản hồi",
+      "running_one": "Đang xử lý",
+      "running_other": "Đang xử lý",
+      "scheduled_one": "Đã lên lịch",
+      "scheduled_other": "Đã lên lịch",
+      "idle_one": "Đang rảnh",
+      "idle_other": "Đang rảnh"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Cần phản hồi",
+      "needsInput_other": "{{displayCount}} Cần phản hồi",
+      "running_one": "{{displayCount}} Đang xử lý",
+      "running_other": "{{displayCount}} Đang xử lý",
+      "scheduled_one": "{{displayCount}} Đã lên lịch",
+      "scheduled_other": "{{displayCount}} Đã lên lịch",
+      "idle_one": "{{displayCount}} Đang rảnh",
+      "idle_other": "{{displayCount}} Đang rảnh"
+    },
+    "footer": {
+      "checked": "Đã kiểm tra {{time}}",
+      "lastKnown": "Ghi nhận gần nhất · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Lần chạy tiếp theo {{time}}",
+      "wasDue": "Đã đến hạn {{time}}"
+    },
     "step": {
       "editing": "Đang chỉnh sửa",
       "reading": "Đang đọc",
@@ -3998,7 +4069,8 @@
         "space": "Không đủ dung lượng trống cho mô hình này. Hãy giải phóng dung lượng và thử lại.",
         "network": "Tải xuống chưa hoàn tất. Kiểm tra kết nối của bạn và thử lại.",
         "invalidFile": "Tệp đã tải xuống không phải là mô hình mà ứng dụng này có thể chạy, nên tệp đã bị xóa.",
-        "checksum": "Tệp đã tải xuống không khớp với mã kiểm tra đã công bố, nên tệp đã bị xóa. Hãy thử tải xuống lại."
+        "checksum": "Tệp đã tải xuống không khớp với mã kiểm tra đã công bố, nên tệp đã bị xóa. Hãy thử tải xuống lại.",
+        "writeFailed": "Thiết bị này không thể lưu mô hình. Hãy thử tải xuống lại."
       }
     },
     "catalog": {
@@ -4176,7 +4248,7 @@
     "personalDefaultDescription": "Tự động tải khi không có kho lưu trữ nào có hồ sơ được ghim.",
     "organizationDefaultDescription": "Tự động tải cho các thành viên không có mặc định cá nhân.",
     "setAsDefault": "Đặt làm mặc định",
-    "saveFailed": "Không thể lưu hồ sơ",
+    "saveFailed": "Không thể lưu hồ sơ. Thử lại.",
     "organizationRoleRequired": "Chỉ chủ sở hữu tổ chức và quản trị viên mới có thể thay đổi hồ sơ tổ chức.",
     "deleteTitle": "Xóa hồ sơ",
     "deleteMessage": "Thao tác này sẽ xóa vĩnh viễn hồ sơ và cài đặt của nó. Điều này không thể hoàn tác được.",
@@ -4440,6 +4512,7 @@
         "balanceNeutral": "Không ảnh hưởng số dư",
         "deduction": "Khấu trừ",
         "grant": "Tặng tín dụng",
+        "welcomeCredits": "Tín dụng chào mừng",
         "purchase": "Mua"
       },
       "purchaseFallback": "Mua tín dụng",
@@ -4695,6 +4768,8 @@
     "connectedTo": "Đã kết nối với {{account}}",
     "disconnected": "Đã ngắt kết nối {{provider}}",
     "disconnectFailed": "Không thể ngắt kết nối {{provider}}",
+    "disconnectRetry": "Slack không thể xác nhận việc ngắt kết nối. Hãy thử lại.",
+    "disconnectNeedsSupport": "Kilo không thể đọc quyền truy cập Slack đã lưu cho kết nối này. Hãy liên hệ hỗ trợ để hoàn tất việc ngắt kết nối.",
     "couldNotLoad": "Không thể tải các tích hợp",
     "permissionDenied": "Bạn không có quyền quản lý các tích hợp này.",
     "managedByOwner": "Hãy yêu cầu chủ sở hữu của tổ chức thay đổi kết nối mà bạn không thể thay đổi.",

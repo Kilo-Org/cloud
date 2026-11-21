@@ -1,9 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
-import { useAuth } from '@/lib/auth/auth-context';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useOrganization } from '@/lib/organization-context';
-import { useTRPC } from '@/lib/trpc';
 
 import {
   confirmGlanceableOrgMembership,
@@ -20,17 +18,8 @@ import { getGlanceableSnapshotForSignedInScope } from './persist';
  * stale.
  */
 export function useGlanceableOrgFence(): void {
-  const trpc = useTRPC();
-  const { token } = useAuth();
   const { organizationId } = useOrganization();
-  const {
-    data: orgs,
-    isLoading,
-    isError,
-  } = useQuery({
-    ...trpc.organizations.list.queryOptions(),
-    enabled: token != null,
-  });
+  const { data: orgs, isLoading, isError } = useOrganizationsList();
 
   useEffect(() => {
     const action = planOrgFenceAction({ organizationId, orgs, isLoading, isError });

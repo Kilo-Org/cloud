@@ -619,6 +619,22 @@ async function getGitHubBranchHead(
     return head === null ? { missing: true } : head;
   };
 
+  /**
+   * One installation with no alternative to walk to, so its answer is the
+   * connection's own: a refused credential takes the reconnect state and a
+   * rate limit stays retryable, the same classes the branch list answers for
+   * one connection.
+   */
+  const callOnly = async (integration: GitHubIntegrationRow): Promise<ProviderBranchHead> => {
+    try {
+      return await call(integration);
+    } catch (error) {
+      if (isGitHubRateLimitError(error)) throw githubRateLimitTrpcError(error);
+      if (refusalStatus(error) === 401) throw githubCredentialRefusedTrpcError(error);
+      throw error;
+    }
+  };
+
   if (input.githubIntegrationId) {
     const integration = await getGitHubIntegrationById(owner, input.githubIntegrationId);
     if (!integration || !isPlatformIntegrationHealthy(integration)) {
@@ -627,7 +643,7 @@ async function getGitHubBranchHead(
         message: inactiveConnectionMessage('GitHub'),
       });
     }
-    return call(integration);
+    return callOnly(integration);
   }
 
   if (owner.type === 'org') {
@@ -651,6 +667,7 @@ async function getGitHubBranchHead(
     ];
     let lastError: unknown;
     let rateLimitError: unknown;
+    let credentialError: unknown;
     for (const integration of candidates) {
       try {
         return await call(integration);
@@ -659,11 +676,21 @@ async function getGitHubBranchHead(
           rateLimitError ??= error;
           continue;
         }
+        // A refused credential belongs to one installation; another may still
+        // resolve the branch, so the reconnect state wins only if none does.
+        if (refusalStatus(error) === 401) {
+          credentialError ??= error;
+          continue;
+        }
+        // The list walk classifies a 5xx as SERVICE_UNAVAILABLE and a 451 as
+        // FORBIDDEN; this walk classifies only the refusals above and rethrows
+        // anything else unchanged.
         if (!isRepositoryUnreachable(error)) throw error;
         lastError = error;
       }
     }
     if (rateLimitError) throw githubRateLimitTrpcError(rateLimitError);
+    if (credentialError) throw githubCredentialRefusedTrpcError(credentialError);
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: githubRepositoryNotFoundMessage,
@@ -672,7 +699,7 @@ async function getGitHubBranchHead(
   }
 
   const integration = await requireActiveIntegration(owner, PLATFORM.GITHUB, 'GitHub');
-  return call(integration);
+  return callOnly(integration);
 }
 
 async function getGitLabBranchHead(

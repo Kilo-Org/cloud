@@ -8,6 +8,7 @@ import {
   agentConfigConflictTarget,
   agentConfigOwnerValues,
   assertAgentConfigCanBeEnabled,
+  configForAtomicMerge,
   getAgentConfigForOwner,
 } from '@/lib/agent-config/db/agent-configs';
 
@@ -29,20 +30,17 @@ export async function isReviewMemoryEnabled(input: {
   return getReviewMemoryEnabledFromConfig(row?.config);
 }
 
+/**
+ * Toggles the review-memory flag. The conflict branch merges only
+ * `review_memory_enabled` into the stored config, so a key another writer saved
+ * stays intact, and it never touches `is_enabled`.
+ */
 export async function setReviewMemoryEnabled(input: {
   owner: ReviewMemoryOwner;
   platform: ReviewMemoryPlatform;
   enabled: boolean;
   createdBy: string;
 }): Promise<boolean> {
-  const existing = await getAgentConfigForOwner(input.owner, 'code_review', input.platform);
-  const existingConfig = existing?.config;
-  const config = {
-    ...(existingConfig && typeof existingConfig === 'object' && !Array.isArray(existingConfig)
-      ? existingConfig
-      : {}),
-    review_memory_enabled: input.enabled,
-  };
   const now = new Date().toISOString();
 
   await db.transaction(async tx => {
@@ -60,13 +58,16 @@ export async function setReviewMemoryEnabled(input: {
         ...agentConfigOwnerValues(input.owner),
         agent_type: 'code_review',
         platform: input.platform,
-        config,
+        config: { review_memory_enabled: input.enabled },
         is_enabled: false,
         created_by: input.createdBy,
       })
       .onConflictDoUpdate({
         target: agentConfigConflictTarget(input.owner),
-        set: { config, updated_at: now },
+        set: {
+          config: configForAtomicMerge({ review_memory_enabled: input.enabled }),
+          updated_at: now,
+        },
       });
   });
 

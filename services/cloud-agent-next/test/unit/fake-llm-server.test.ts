@@ -1132,6 +1132,45 @@ describe('fake-llm-server HTTP', () => {
     ]);
   });
 
+  it('reads two distinct checkout paths in a single turn and returns only correlated file results', async () => {
+    const h = await start();
+    const prompt = '__fake__:file-read-pair:checkout:primary/marker.txt:extra/marker.txt';
+    const first = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    expect(first).toMatchObject({ name: 'read', arguments: { filePath: 'primary/marker.txt' } });
+    const history = [
+      { role: 'assistant', tool_calls: [{ id: first.id }] },
+      {
+        role: 'tool',
+        tool_call_id: first.id,
+        content:
+          '<path>/workspace/primary/marker.txt</path>\n<content>\n1: primary-marker\n</content>',
+      },
+    ];
+    const second = extractToolCall(await parseSse(await postToolChat(h.url, prompt, history)));
+    expect(second).toMatchObject({ name: 'read', arguments: { filePath: 'extra/marker.txt' } });
+    expect(second.id).not.toBe(first.id);
+    const withSecondResult = (content: string) =>
+      postToolChat(h.url, prompt, [
+        ...history,
+        { role: 'assistant', tool_calls: [{ id: second.id }] },
+        { role: 'tool', tool_call_id: second.id, content },
+      ]);
+    const wrongPath = await withSecondResult(
+      '<path>/workspace/primary/marker.txt</path>\n<content>\n1: extra-marker\n</content>'
+    );
+    expect(wrongPath.status).toBe(422);
+    const completed = await parseSse(
+      await withSecondResult(
+        '<path>/workspace/extra/marker.txt</path>\n<content>\n1: extra-marker\n</content>'
+      )
+    );
+    expect(completed[0]?.choices).toEqual([
+      expect.objectContaining({
+        delta: { role: 'assistant', content: 'file-read-pair:["primary-marker","extra-marker"]' },
+      }),
+    ]);
+  });
+
   it('keeps colons in the read-then-write prefix', async () => {
     const h = await start();
     const prompt = '__fake__:read-then-write:colon:plan.md:impl.ts:prefix:with:colons';

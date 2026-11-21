@@ -23,6 +23,7 @@ import {
   type EnkryptGuardrailRequest,
   type EnkryptVerdictCacheEntry,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/verdict-cache';
+import { countEnkryptCalls } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/call-counter';
 import { ENKRYPT_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
@@ -122,6 +123,7 @@ export function startEnkryptInputGuardrail(
 ): EnkryptInputGuardrail {
   const requestLogs: Promise<EnkryptRequestLog>[] = [];
   const captureResponse = Promise.withResolvers<boolean>();
+  const calls = countEnkryptCalls();
   const runScan = async (
     resolved: EnkryptGuardrailRequest | null,
     deadline: AbortSignal | null,
@@ -130,7 +132,7 @@ export function startEnkryptInputGuardrail(
     resolved && deadline
       ? scanRequestWithVerdictCache(resolved, {
           apiKey: ENKRYPT_API_KEY,
-          fetch,
+          fetch: calls.fetch,
           timeoutMs: ENKRYPT_GUARDRAIL_TIMEOUT_MS,
           deadline,
           signal,
@@ -222,7 +224,10 @@ export function startEnkryptInputGuardrail(
   };
   after(async () => {
     const results = (await Promise.all([blockingResults, logOnlyResults])).flat();
-    await recordEnkryptUsageRecords(results.flatMap(result => result.usageRecords));
+    await Promise.all([
+      recordEnkryptUsageRecords(results.flatMap(result => result.usageRecords)),
+      calls.flush(),
+    ]);
   });
   return {
     async requestLogs(shouldCaptureResponse = true) {

@@ -327,4 +327,249 @@ describe('moderation-router', () => {
       code: 'NOT_FOUND',
     });
   });
+
+  describe('moderation.listReportReceipts', () => {
+    const extraUserIds: string[] = [];
+
+    afterEach(async () => {
+      for (const userId of extraUserIds.splice(0)) {
+        await db
+          .delete(content_moderation_reports)
+          .where(eq(content_moderation_reports.kilo_user_id, userId));
+      }
+    });
+
+    /**
+     * Inserts a report row with a fixed `created_at`, so the ordering under test
+     * is decided by the given values rather than by insert time.
+     */
+    async function insertReport(input: {
+      userId: string;
+      createdAt: string;
+      targetId: string;
+      triageStatus?: string;
+      appealStatus?: string;
+    }): Promise<string> {
+      const [row] = await db
+        .insert(content_moderation_reports)
+        .values({
+          kilo_user_id: input.userId,
+          surface: 'ai_output',
+          target_kind: 'message',
+          target_id: input.targetId,
+          reason: 'other',
+          created_at: input.createdAt,
+          ...(input.triageStatus === undefined ? {} : { triage_status: input.triageStatus }),
+          ...(input.appealStatus === undefined ? {} : { appeal_status: input.appealStatus }),
+        })
+        .returning({ receiptId: content_moderation_reports.receipt_id });
+      return row.receiptId;
+    }
+
+    it('lists the caller own receipts newest first', async () => {
+      const caller = await createCallerForUser(user.id);
+      const oldest = await insertReport({
+        userId: user.id,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        targetId: 'msg-oldest',
+        triageStatus: 'actioned',
+        appealStatus: 'submitted',
+      });
+      const middle = await insertReport({
+        userId: user.id,
+        createdAt: '2026-02-01T00:00:00.000Z',
+        targetId: 'msg-middle',
+      });
+      const newest = await insertReport({
+        userId: user.id,
+        createdAt: '2026-03-01T00:00:00.000Z',
+        targetId: 'msg-newest',
+      });
+
+      const page = await caller.moderation.listReportReceipts({});
+
+      expect(
+        page.items.map(item => ({
+          receiptId: item.receiptId,
+          createdAt: new Date(item.createdAt).toISOString(),
+          triageStatus: item.triageStatus,
+          appealStatus: item.appealStatus,
+        }))
+      ).toEqual([
+        {
+          receiptId: newest,
+          createdAt: '2026-03-01T00:00:00.000Z',
+          triageStatus: 'received',
+          appealStatus: 'none',
+        },
+        {
+          receiptId: middle,
+          createdAt: '2026-02-01T00:00:00.000Z',
+          triageStatus: 'received',
+          appealStatus: 'none',
+        },
+        {
+          receiptId: oldest,
+          createdAt: '2026-01-01T00:00:00.000Z',
+          triageStatus: 'actioned',
+          appealStatus: 'submitted',
+        },
+      ]);
+      expect(page.nextCursor).toBeNull();
+    });
+
+    it('returns the older receipt from a cursor page without repeating the first page', async () => {
+      const caller = await createCallerForUser(user.id);
+      const oldest = await insertReport({
+        userId: user.id,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        targetId: 'msg-oldest',
+      });
+      const middle = await insertReport({
+        userId: user.id,
+        createdAt: '2026-02-01T00:00:00.000Z',
+        targetId: 'msg-middle',
+      });
+      const newest = await insertReport({
+        userId: user.id,
+        createdAt: '2026-03-01T00:00:00.000Z',
+        targetId: 'msg-newest',
+      });
+
+      const first = await caller.moderation.listReportReceipts({ limit: 2 });
+      expect(first.items.map(item => item.receiptId)).toEqual([newest, middle]);
+      if (!first.nextCursor) throw new Error('expected a next cursor for a partial page');
+
+      const second = await caller.moderation.listReportReceipts({
+        cursor: first.nextCursor,
+        limit: 2,
+      });
+      expect(second.items.map(item => item.receiptId)).toEqual([oldest]);
+      expect(second.nextCursor).toBeNull();
+
+      const firstPageIds = new Set(first.items.map(item => item.receiptId));
+      expect(second.items.filter(item => firstPageIds.has(item.receiptId))).toEqual([]);
+    });
+
+    it('pages receipts that share a timestamp without repeating or skipping one', async () => {
+      const caller = await createCallerForUser(user.id);
+      const sharedCreatedAt = '2026-03-01T00:00:00.000000Z';
+      const firstInserted = await insertReport({
+        userId: user.id,
+        createdAt: sharedCreatedAt,
+        targetId: 'msg-tie-a',
+      });
+      const secondInserted = await insertReport({
+        userId: user.id,
+        createdAt: sharedCreatedAt,
+        targetId: 'msg-tie-b',
+      });
+      const thirdInserted = await insertReport({
+        userId: user.id,
+        createdAt: sharedCreatedAt,
+        targetId: 'msg-tie-c',
+      });
+
+      // The keyset breaks ties on the row `id`, which is a random uuid unrelated
+      // to `receipt_id`, so read the row ids to derive the expected page order.
+      const rows = await db
+        .select({
+          id: content_moderation_reports.id,
+          receiptId: content_moderation_reports.receipt_id,
+        })
+        .from(content_moderation_reports)
+        .where(eq(content_moderation_reports.kilo_user_id, user.id));
+      const expectedOrder = rows
+        .slice()
+        .sort((a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0))
+        .map(row => row.receiptId);
+      expect(expectedOrder.slice().sort()).toEqual(
+        [firstInserted, secondInserted, thirdInserted].sort()
+      );
+
+      const firstPage = await caller.moderation.listReportReceipts({ limit: 2 });
+      expect(firstPage.items).toHaveLength(2);
+      if (!firstPage.nextCursor) throw new Error('expected a next cursor for a partial page');
+
+      const secondPage = await caller.moderation.listReportReceipts({
+        cursor: firstPage.nextCursor,
+        limit: 2,
+      });
+
+      const combinedIds = [...firstPage.items, ...secondPage.items].map(item => item.receiptId);
+      expect(combinedIds).toEqual(expectedOrder);
+      expect(new Set(combinedIds).size).toBe(combinedIds.length);
+      expect(secondPage.nextCursor).toBeNull();
+    });
+
+    it('never returns another user receipt', async () => {
+      const otherUser = await insertTestUser();
+      extraUserIds.push(otherUser.id);
+      const caller = await createCallerForUser(user.id);
+      const otherCaller = await createCallerForUser(otherUser.id);
+
+      const mine = await insertReport({
+        userId: user.id,
+        createdAt: '2026-01-02T00:00:00.000Z',
+        targetId: 'msg-mine',
+      });
+      const theirs = await insertReport({
+        userId: otherUser.id,
+        createdAt: '2026-01-03T00:00:00.000Z',
+        targetId: 'msg-theirs',
+      });
+
+      const myPage = await caller.moderation.listReportReceipts({});
+      expect(myPage.items.map(item => item.receiptId)).toEqual([mine]);
+      expect(myPage.nextCursor).toBeNull();
+
+      const theirPage = await otherCaller.moderation.listReportReceipts({});
+      expect(theirPage.items.map(item => item.receiptId)).toEqual([theirs]);
+      expect(theirPage.nextCursor).toBeNull();
+    });
+
+    it('rejects a malformed cursor', async () => {
+      const caller = await createCallerForUser(user.id);
+
+      await expect(
+        caller.moderation.listReportReceipts({ cursor: 'not-a-cursor' })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: 'Invalid report receipt cursor.',
+      });
+
+      await expect(
+        caller.moderation.listReportReceipts({ cursor: '2026-01-01 00:00:00+00|not-a-uuid' })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: 'Invalid report receipt cursor.',
+      });
+    });
+
+    it('rejects a cursor whose timestamp Postgres would refuse to parse', async () => {
+      const caller = await createCallerForUser(user.id);
+      const rowId = '8f14e45f-4a1a-4d3c-9b0e-2c6d5a7f1b93';
+      // JavaScript parses all three: `0` and `12` as years, and `2026-02-30` by
+      // rolling into March. Postgres rejects the impossible day.
+      const rejectedTimestamps = ['0', '12', '2026-02-30 00:00:00+00'];
+
+      for (const createdAt of rejectedTimestamps) {
+        await expect(
+          caller.moderation.listReportReceipts({ cursor: `${createdAt}|${rowId}` })
+        ).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+          message: 'Invalid report receipt cursor.',
+        });
+      }
+    });
+
+    it('returns an empty page when the caller has no reports', async () => {
+      const caller = await createCallerForUser(user.id);
+
+      await expect(caller.moderation.listReportReceipts({})).resolves.toEqual({
+        items: [],
+        nextCursor: null,
+      });
+    });
+  });
 });

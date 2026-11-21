@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "دا سند یوازې په انګلیسي ژبه کې د لاسرسي وړ دی.",
     "organizationTrialEndedBilling": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري. تاسو کولی شئ بیلنګ تازه کړئ، بیا یو ځل بیا هڅه وکړئ.",
     "organizationTrialEndedBillingAtKiloAi": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري. تاسو کولی شئ په kilo.ai کې بیلنګ تازه کړئ، بیا یو ځل بیا هڅه وکړئ.",
-    "viewOnGitHub": "PR په GitHub کې وګورئ"
+    "viewOnGitHub": "PR په GitHub کې وګورئ",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "د لېست ټکی",
+        "nestedBulletPoint": "دننه د لېست ټکی",
+        "orderedItem": "د لېست توکی {n}",
+        "nestedOrderedItem": "دننه د لېست توکی {n}"
+      },
+      "blockquote": {
+        "quote": "نقل",
+        "nestedQuote": "دننه نقل"
+      },
+      "table": {
+        "row": "قطار {n}: {content}"
+      },
+      "math": {
+        "equation": "ریاضی: {latex}"
+      },
+      "rotor": {
+        "headings": "سرلیکونه",
+        "links": "لینکونه",
+        "images": "انځورونه"
+      }
+    }
   },
   "language": {
     "restarting": "د ژبې د پلي کولو لپاره بیا پیلېږي",
@@ -427,6 +450,17 @@
       "location": "د Vertex ځای",
       "clientEmail": "د service account برېښنالیک",
       "privateKey": "د service account خصوصي کیلي",
+      "privateKeyBlockRequired": "د کیلي ټول بلاک پیسټ کړئ، له BEGIN کرښې څخه تر END کرښې پورې.",
+      "privateKeyEncrypted": "دا د کیلي بلاک په پاسفریز خوندي شوی دی. د service account هغه کیلي پیسټ کړئ چې پاسفریز نه لري.",
+      "names": {
+        "codestral": "پخوانی یوازې Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (د ChatGPT له لارې ننوځئ)",
+        "xiaomi": "Xiaomi (د کارونې پر بنسټ تادیه)",
+        "zai": "Z.ai (د کارونې پر بنسټ تادیه)",
+        "bedrockByok": "Amazon Bedrock (مستقیم)",
+        "vertexByok": "Google Vertex AI (مستقیم)"
+      },
       "modelMappings": "د ماډلونو نښلونې",
       "modelMappingsDescription": "د gateway یو ماډل یو دودیز deployment name ته واستوئ.",
       "mappingTitle": "نښلونه {{number}}",
@@ -505,6 +539,14 @@
       "nextStepAppeal": "د استیناف پایله به په دې پرده کې ښکاره شي.",
       "nextStepFinal": "د استیناف پرېکړه قطعي ده. نور استیناف نه شي سپارل کېدای.",
       "viewReceipt": "رسید وګورئ"
+    },
+    "reportReceipts": {
+      "title": "راپورونه",
+      "rowSubtitle": "هغه راپورونه چې تاسو سپارلي دي او پایلې یې",
+      "emptyTitle": "لا هېڅ راپور نشته",
+      "emptyDescription": "هغه راپورونه چې تاسو له یوې تبصرې یا د AI له ځواب څخه سپارئ، دلته ښکاري.",
+      "couldNotLoad": "ستاسو راپورونه ونه لوستل شول",
+      "capped": "ستاسو تر ټولو وروستي راپورونه ښودل کېږي."
     },
     "changelog": "نوي بدلونونه",
     "changelogVersionPending": "د {{version}} نسخې یادښتونه د اپ له راتلونکي تازه کېدو سره راځي.",
@@ -1277,7 +1319,7 @@
       "couldNotGetLatest": "وروستي معلومات ترلاسه نه شول.",
       "byline": "#{{number}} د {{author}} لخوا",
       "noFindings": "هېڅ موندنه نشته.",
-      "findingsUnavailable": "پایلې شتون نه لري ځکه چې دا بیاکتنه ناکامه شوه.",
+      "findingsUnavailable": "پایلې شتون نه لري.",
       "findingsInProgress": "دا بیاکتنه لاهم روانه ده. کله چې پای ته ورسېږي، موندنې به دلته ښکاره شي.",
       "findingsEndedWithoutResults": "دا بیاکتنه پرته له دې چې کومه موندنه رامنځته کړي، پای ته ورسېده.",
       "serviceUnavailable": "د کوډ د بیاکتنې له خدمت سره اړیکه ټینګه نه شوه. کله چې خدمت د لاسرسي وړ شي، د بیاکتنې بیا هڅه وکړئ.",
@@ -3591,6 +3633,7 @@
       "identifierLabel": "پېژندونکی",
       "identifierRequired": "پېژندونکی ولیکئ.",
       "identifierTaken": "بل حالت لا دمخه دا پېژندونکی کاروي.",
+      "identifierTooLong": "پېژندونکی {{max}} توري یا لږ وساتئ.",
       "nameLabel": "د حالت نوم",
       "nameRequired": "د حالت نوم ولیکئ.",
       "notFound": "دا حالت نور نشته.",
@@ -3681,7 +3724,7 @@
     "emailDeliveryFailed": "د لنډ وخت لپاره د برېښنالیک لېږل ممکن نه دي. مهرباني وکړئ وروسته بیا هڅه وکړئ.",
     "admissionRequired": "ستاسو وسیله نه شي تاییدېدای. په بله وسیله یا د وېب له لارې د ننوتلو لپاره '$t(login.moreSignInOptions)' وکاروئ.",
     "default": "تېروتنه وشوه. مهرباني وکړئ بیا هڅه وکړئ.",
-    "retryableAdmission": "موږ ونه شو کړای دا وسیله تایید کړو. خپله اړیکه وګورئ او بیا هڅه وکړئ.",
+    "retryableAdmission": "دا وسیله تایید نشوه. بیا هڅه وکړئ.",
     "startSignInFailed": "د ننوتلو پیل ناکام شو. مهرباني وکړئ بیا هڅه وکړئ.",
     "couldNotOpenBrowser": "براوزر پرانیستل نه شو. مهرباني وکړئ بیا هڅه وکړئ.",
     "signInTimedOut": "د ننوتلو مهلت پای ته ورسېد. مهرباني وکړئ بیا هڅه وکړئ.",
@@ -3753,6 +3796,34 @@
     "nextScheduled": "راتلونکی مهال ویش",
     "answerNeeded": "ځواب ته اړتیا لري",
     "waitingToRetry": "د بیا هڅې په تمه",
+    "countNoun": {
+      "needsInput_one": "ننوتنې ته اړتیا لري",
+      "needsInput_other": "ننوتنې ته اړتیا لري",
+      "running_one": "په کار بوخت",
+      "running_other": "په کار بوخت",
+      "scheduled_one": "مهال ویش شوی",
+      "scheduled_other": "مهال ویش شوی",
+      "idle_one": "وزګار",
+      "idle_other": "وزګار"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} ننوتنې ته اړتیا لري",
+      "needsInput_other": "{{displayCount}} ننوتنې ته اړتیا لري",
+      "running_one": "{{displayCount}} په کار بوخت",
+      "running_other": "{{displayCount}} په کار بوخت",
+      "scheduled_one": "{{displayCount}} مهال ویش شوی",
+      "scheduled_other": "{{displayCount}} مهال ویش شوی",
+      "idle_one": "{{displayCount}} وزګار",
+      "idle_other": "{{displayCount}} وزګار"
+    },
+    "footer": {
+      "checked": "کتل شوی {{time}}",
+      "lastKnown": "وروستی معلوم حالت · {{time}}"
+    },
+    "wake": {
+      "nextRun": "راتلونکی چلول {{time}}",
+      "wasDue": "تمه کېده {{time}}"
+    },
     "step": {
       "editing": "سمون",
       "reading": "لوستل",
@@ -3998,7 +4069,8 @@
         "space": "د دې ماډل لپاره کافي خالي ځای نشته. ځای خالي کړئ او بیا هڅه وکړئ.",
         "network": "ډاونلوډ بشپړ نشو. خپله اړیکه وګورئ او بیا هڅه وکړئ.",
         "invalidFile": "ډاونلوډ شوی فایل هغه ماډل نه دی چې دا اپلیکیشن یې چلولی شي، نو لرې کړل شو.",
-        "checksum": "ډاونلوډ شوی فایل د خپاره شوي چیکسم سره سمون نه لري، نو لرې کړل شو. بیا یې ډاونلوډ کړئ."
+        "checksum": "ډاونلوډ شوی فایل د خپاره شوي چیکسم سره سمون نه لري، نو لرې کړل شو. بیا یې ډاونلوډ کړئ.",
+        "writeFailed": "دا وسیله ماډل خوندي کولی نشوه. بیا یې ډاونلوډ کړئ."
       }
     },
     "catalog": {
@@ -4176,7 +4248,7 @@
     "personalDefaultDescription": "په اتوماتيک ډول بار شوی کله چې هیڅ زېرمتون پین شوی پروفایل نلري.",
     "organizationDefaultDescription": "د غړو لپاره په اتوماتيک ډول بار شوی څوک چې شخصي ډیفالټ نلري.",
     "setAsDefault": "د ډیفالټ په توګه تنظیم کړئ",
-    "saveFailed": "پروفایل خوندي نشو کړای",
+    "saveFailed": "پروفایل خوندي نه شو کړای. بیا هڅه وکړئ.",
     "organizationRoleRequired": "یوازې د سازمان مالکان او مدیران کولی شي د سازمان پروفایلونه بدله کړي.",
     "deleteTitle": "پروفایل ړنګ کړئ",
     "deleteMessage": "دا د تل لپاره پروفایل او د هغې تنظیمات لرې کوي. دا بېرته نه شي راګرځول کېدای.",
@@ -4440,6 +4512,7 @@
         "balanceNeutral": "په بیلانس بې اغېزې",
         "deduction": "کسر",
         "grant": "د کریډیټ ورکړه",
+        "welcomeCredits": "د ښه راغلاست کریډیټ",
         "purchase": "پېرود"
       },
       "purchaseFallback": "د کریډیټ پېرود",
@@ -4695,6 +4768,8 @@
     "connectedTo": "له {{account}} سره نښلول شوی",
     "disconnected": "له {{provider}} سره اړیکه پرې شوه",
     "disconnectFailed": "له {{provider}} سره اړیکه پرې نه شوه",
+    "disconnectRetry": "Slack نه شو کولی د اړیکې پرې کېدل تایید کړي. بیا هڅه وکړئ.",
+    "disconnectNeedsSupport": "Kilo د دې اړیکې لپاره خوندي شوې Slack لاسرسی لوستلی نشو. د اړیکې پرې کول بشپړولو لپاره له ملاتړ سره اړیکه ونیسئ.",
     "couldNotLoad": "ادغامونه راوړل نه شول",
     "permissionDenied": "تاسو د دې ادغامونو د مدیریت اجازه نه لرئ.",
     "managedByOwner": "د سازمان له مالک څخه وغواړئ چې هغه اړیکه بدله کړي چې تاسو یې نشئ کولی بدله کړئ.",

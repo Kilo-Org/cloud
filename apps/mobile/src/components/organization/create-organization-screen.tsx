@@ -9,6 +9,7 @@ import { z } from 'zod';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
@@ -24,13 +25,18 @@ import { CREATE_ORGANIZATION_FORM_DRAFT_KEY } from '@/lib/persist/drafts';
 import { type FormDraftState, useFormDraft } from '@/lib/persist/use-form-draft';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
-import { trpcClient, useTRPC } from '@/lib/trpc';
+import { useTRPC } from '@/lib/trpc';
 import { REWRITTEN_INPUT_AUTO_CORRECT } from '@/lib/input-suggestions';
 
 import { staleOrganizationScopeExit } from './organization-scope-model';
 
-/** One line under the field: a failure the person can act on, or a result. */
-type CreateMessage = { text: string; tone: 'error' | 'notice' };
+/**
+ * One line under the field: a failure the person can act on, or a result. The
+ * attempt counter keys the status line so a retry that fails with the same
+ * words as the failure before it still re-announces — a repeated message is
+ * a new event for a screen-reader user, not a re-render of the old one.
+ */
+type CreateMessage = { text: string; tone: 'error' | 'notice'; attempt: number };
 
 /** The navigation object a screen of a Stack sees. */
 type StackNavigation = {
@@ -212,6 +218,14 @@ function CreateOrganizationBody({
   // or the list refresh runs must not move the active organization. The
   // completion reads these live values, never the render that started it.
   const aliveRef = useRef(true);
+  // Counts the reported status lines this mount has shown, so the status line's
+  // announcement key (its `key` prop) changes with every report even when the
+  // words are identical.
+  const attemptRef = useRef(0);
+  const report = useCallback((line: string, tone: CreateMessage['tone']) => {
+    setMessage({ text: line, tone, attempt: attemptRef.current });
+    attemptRef.current += 1;
+  }, []);
   const focusedRef = useRef(routeFocused);
   const selectOrganizationRef = useRef(setOrganizationId);
   // A create that already succeeded must not repeat while the list refresh
@@ -254,7 +268,7 @@ function CreateOrganizationBody({
           trpc.organizations.list.queryKey()
         );
         if (memberships?.some(entry => entry.organizationId === organizationId) !== true) {
-          setMessage({ text: t('organization.create.createdNotListed'), tone: 'notice' });
+          report(t('organization.create.createdNotListed'), 'notice');
           return;
         }
         selectOrganizationRef.current(organizationId);
@@ -281,28 +295,35 @@ function CreateOrganizationBody({
         setSettling(false);
       }
     },
-    [navigation, onDraftClear, queryClient, router, stackSafeRouter, t, trpc]
+    [navigation, onDraftClear, queryClient, report, router, stackSafeRouter, t, trpc]
   );
 
-  const createOrganization = useMutation({
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    mutationFn: (input: { name: string }) =>
-      trpcClient.organizations.create.mutate({ name: input.name, autoAddCreator: true }),
-    // The refresh that has to land before the selection moves runs after this
-    // callback returns. Awaiting it here would keep the button busy, and the
-    // field disabled, for as long as that refresh takes.
-    onSuccess: ({ organization }) => {
-      void completeCreate(organization.id);
-    },
-    onError: (error: unknown) => {
-      submitLockedRef.current = false;
-      setSettling(false);
-      // A create runs outside any organization, so the reader holds no role in
-      // one: the copy names the owner who can change its plan, and the line
-      // offers no step of its own.
-      setMessage({ text: organizationErrorMessage(error), tone: 'error' });
-    },
-  });
+  const createOrganization = useMutation(
+    trpc.organizations.create.mutationOptions({
+      // Reachability is the create's outcome, not a precondition: the default
+      // `networkMode: 'online'` pauses the mutation while the connectivity
+      // manager reports the device offline, so the request is never sent and
+      // `isPending` never settles — the button keeps its spinner and the field
+      // stays disabled for as long as the outage lasts, with no failure
+      // surface. Attempting the request instead lets it fail through the normal
+      // path: `onError` releases the form and reports the failure.
+      networkMode: 'always',
+      // The refresh that has to land before the selection moves runs after this
+      // callback returns. Awaiting it here would keep the button busy, and the
+      // field disabled, for as long as that refresh takes.
+      onSuccess: ({ organization }) => {
+        void completeCreate(organization.id);
+      },
+      onError: (error: unknown) => {
+        submitLockedRef.current = false;
+        setSettling(false);
+        // A create runs outside any organization, so the reader holds no role
+        // in one: the copy names the owner who can change its plan, and the
+        // line offers no step of its own.
+        report(organizationErrorMessage(error), 'error');
+      },
+    })
+  );
 
   const submit = () => {
     if (createOrganization.isPending || submitLockedRef.current) {
@@ -310,13 +331,15 @@ function CreateOrganizationBody({
     }
     const name = nameRef.current.trim();
     if (!hasVisibleText(name)) {
-      setMessage({ text: t('organization.create.nameRequired'), tone: 'error' });
+      report(t('organization.create.nameRequired'), 'error');
       return;
     }
     setMessage(null);
     submitLockedRef.current = true;
     setSettling(true);
-    createOrganization.mutate({ name });
+    // The server's default for `autoAddCreator` is false, so the caller only
+    // becomes the new organization's owner when the request asks for it.
+    createOrganization.mutate({ name, autoAddCreator: true });
   };
 
   const pending = createOrganization.isPending;
@@ -356,12 +379,14 @@ function CreateOrganizationBody({
       </View>
       <Text variant="caption">{t('organization.create.trialNote')}</Text>
       {message == null ? null : (
-        <Text
-          className={message.tone === 'error' ? 'text-sm text-destructive' : undefined}
-          variant={message.tone === 'error' ? undefined : 'muted'}
-        >
-          {message.text}
-        </Text>
+        // Keyed on the attempt counter: TalkBack/VoiceOver announce a repeated
+        // identical failure as a new event.
+        <AccessibleStatus
+          key={message.attempt}
+          message={message.text}
+          tone={message.tone === 'error' ? 'error' : 'status'}
+          className="text-sm"
+        />
       )}
       <Button
         className={STATE_ACTION_CLASS}

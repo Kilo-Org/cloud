@@ -49,6 +49,7 @@ const ERROR_COPY_KEYS = {
   nameRequired: 'organization.modes.nameRequired',
   identifierRequired: 'organization.modes.identifierRequired',
   identifierInvalid: 'organization.modes.identifierInvalid',
+  identifierTooLong: 'organization.modes.identifierTooLong',
   identifierTaken: 'organization.modes.identifierTaken',
   roleRequired: 'organization.modes.roleRequired',
   restrictionInvalid: 'organization.modes.restrictionInvalid',
@@ -276,9 +277,11 @@ function ModeFormBody({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the restored value: `values` is one mutable ref object and the setters are stable
   }, [draft.value]);
 
+  // Every code reads its copy through the same call: only the too-long message
+  // carries `{{max}}`, and the others ignore the value.
   const errorFor = (field: keyof OrgModeFormErrors): string | undefined => {
     const code = errors[field];
-    return code === undefined ? undefined : t(ERROR_COPY_KEYS[code]);
+    return code === undefined ? undefined : t(ERROR_COPY_KEYS[code], { max: MODE_SLUG_MAX_LENGTH });
   };
 
   const leaveToList = () => {

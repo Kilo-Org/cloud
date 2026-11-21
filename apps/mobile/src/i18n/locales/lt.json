@@ -188,7 +188,30 @@
     "legalDocumentEnglishOnly": "Šis dokumentas prieinamas tik anglų kalba.",
     "organizationTrialEndedBilling": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Galite atnaujinti atsiskaitymo duomenis, tada bandykite dar kartą.",
     "organizationTrialEndedBillingAtKiloAi": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Galite atnaujinti atsiskaitymo duomenis adresu kilo.ai, tada bandykite dar kartą.",
-    "viewOnGitHub": "Peržiūrėti PR GitHub platformoje"
+    "viewOnGitHub": "Peržiūrėti PR GitHub platformoje",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Sąrašo punktas",
+        "nestedBulletPoint": "Įdėtasis sąrašo punktas",
+        "orderedItem": "Sąrašo elementas {n}",
+        "nestedOrderedItem": "Įdėtasis sąrašo elementas {n}"
+      },
+      "blockquote": {
+        "quote": "Citata",
+        "nestedQuote": "Įdėtoji citata"
+      },
+      "table": {
+        "row": "Eilutė {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Antraštės",
+        "links": "Nuorodos",
+        "images": "Paveikslėliai"
+      }
+    }
   },
   "language": {
     "restarting": "Paleidžiama iš naujo, kad būtų pakeista kalba",
@@ -429,6 +452,17 @@
       "location": "Vertex vieta",
       "clientEmail": "Paslaugos paskyros el. paštas",
       "privateKey": "Paslaugos paskyros privatusis raktas",
+      "privateKeyBlockRequired": "Įklijuokite visą rakto bloką nuo BEGIN eilutės iki END eilutės.",
+      "privateKeyEncrypted": "Šis rakto blokas apsaugotas slaptafraze. Įklijuokite paslaugos paskyros raktą be slaptafrazės.",
+      "names": {
+        "codestral": "Tik pasenęs Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Prisijungti per ChatGPT)",
+        "xiaomi": "Xiaomi (mokama pagal naudojimą)",
+        "zai": "Z.ai (mokama pagal naudojimą)",
+        "bedrockByok": "Amazon Bedrock (tiesiogiai)",
+        "vertexByok": "Google Vertex AI (tiesiogiai)"
+      },
       "modelMappings": "Modelių susiejimai",
       "modelMappingsDescription": "Nukreipkite šliuzo modelį į pasirinktinį diegimo pavadinimą.",
       "mappingTitle": "Susiejimas {{number}}",
@@ -507,6 +541,14 @@
       "nextStepAppeal": "Apskundimo rezultatas pasirodys šiame ekrane.",
       "nextStepFinal": "Sprendimas dėl apskundimo yra galutinis. Kito apskundimo pateikti negalima.",
       "viewReceipt": "Peržiūrėti patvirtinimą"
+    },
+    "reportReceipts": {
+      "title": "Pranešimai",
+      "rowSubtitle": "Jūsų pateikti pranešimai ir jų rezultatai",
+      "emptyTitle": "Kol kas pranešimų nėra",
+      "emptyDescription": "Pranešimai, kuriuos pateikiate iš komentaro arba AI atsakymo, rodomi čia.",
+      "couldNotLoad": "Nepavyko įkelti jūsų pranešimų",
+      "capped": "Rodomi naujausi jūsų pranešimai."
     },
     "changelog": "Kas naujo",
     "changelogVersionPending": "{{version}} versijos pastabos pasirodys su kitu programėlės atnaujinimu.",
@@ -1331,7 +1373,7 @@
       "couldNotGetLatest": "Nepavyko gauti naujausių duomenų.",
       "byline": "#{{number}} · Autorius: {{author}}",
       "noFindings": "Radinių nerasta",
-      "findingsUnavailable": "Rezultatai nepasiekiami, nes ši peržiūra nepavyko.",
+      "findingsUnavailable": "Rezultatai nepasiekiami.",
       "findingsInProgress": "Ši peržiūra vis dar vyksta. Radiniai čia atsiras jai pasibaigus.",
       "findingsEndedWithoutResults": "Ši peržiūra baigėsi, nespėjusi pateikti jokių radinių.",
       "serviceUnavailable": "Nepavyko prisijungti prie kodo peržiūros paslaugos. Pakartokite peržiūrą, kai paslauga bus pasiekiama.",
@@ -3715,6 +3757,7 @@
       "identifierLabel": "Identifikatorius",
       "identifierRequired": "Įveskite identifikatorių.",
       "identifierTaken": "Kitas režimas jau naudoja šį identifikatorių.",
+      "identifierTooLong": "Identifikatorius turi būti ne ilgesnis kaip {{max}} simboliai.",
       "nameLabel": "Režimo pavadinimas",
       "nameRequired": "Įveskite režimo pavadinimą.",
       "notFound": "Šio režimo nebėra.",
@@ -3809,7 +3852,7 @@
     "emailDeliveryFailed": "Šiuo metu el. laiškų pristatyti negalima. Bandyk dar kartą vėliau.",
     "admissionRequired": "Nepavyksta patikrinti tavo įrenginio. Pasirink „$t(login.moreSignInOptions)“, kad prisijungtum kitame įrenginyje arba svetainėje.",
     "default": "Įvyko klaida. Bandyk dar kartą.",
-    "retryableAdmission": "Nepavyko patikrinti šio įrenginio. Patikrink ryšį ir bandyk dar kartą.",
+    "retryableAdmission": "Nepavyko patikrinti šio įrenginio. Bandyk dar kartą.",
     "startSignInFailed": "Nepavyko pradėti prisijungimo. Bandyk dar kartą.",
     "couldNotOpenBrowser": "Nepavyko atidaryti naršyklės. Bandyk dar kartą.",
     "signInTimedOut": "Prisijungimui skirtas laikas baigėsi. Bandyk dar kartą.",
@@ -3881,6 +3924,50 @@
     "nextScheduled": "Artimiausi suplanuoti",
     "answerNeeded": "Laukia atsakymo",
     "waitingToRetry": "Laukiama pakartojimo",
+    "countNoun": {
+      "needsInput_one": "Laukia atsakymo",
+      "needsInput_other": "Laukia atsakymo",
+      "needsInput_few": "Laukia atsakymo",
+      "needsInput_many": "Laukia atsakymo",
+      "running_one": "Vykdoma",
+      "running_other": "Vykdomos",
+      "running_few": "Vykdomos",
+      "running_many": "Vykdomų",
+      "scheduled_one": "Suplanuota",
+      "scheduled_other": "Suplanuotos",
+      "scheduled_few": "Suplanuotos",
+      "scheduled_many": "Suplanuotų",
+      "idle_one": "Laukia",
+      "idle_other": "Laukia",
+      "idle_few": "Laukia",
+      "idle_many": "Laukia"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Laukia atsakymo",
+      "needsInput_other": "{{displayCount}} Laukia atsakymo",
+      "needsInput_few": "{{displayCount}} Laukia atsakymo",
+      "needsInput_many": "{{displayCount}} Laukia atsakymo",
+      "running_one": "{{displayCount}} Vykdoma",
+      "running_other": "{{displayCount}} Vykdomos",
+      "running_few": "{{displayCount}} Vykdomos",
+      "running_many": "{{displayCount}} Vykdomų",
+      "scheduled_one": "{{displayCount}} Suplanuota",
+      "scheduled_other": "{{displayCount}} Suplanuotos",
+      "scheduled_few": "{{displayCount}} Suplanuotos",
+      "scheduled_many": "{{displayCount}} Suplanuotų",
+      "idle_one": "{{displayCount}} Laukia",
+      "idle_other": "{{displayCount}} Laukia",
+      "idle_few": "{{displayCount}} Laukia",
+      "idle_many": "{{displayCount}} Laukia"
+    },
+    "footer": {
+      "checked": "Patikrinta {{time}}",
+      "lastKnown": "Paskutinė žinoma · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Kitas vykdymas {{time}}",
+      "wasDue": "Buvo numatyta {{time}}"
+    },
     "step": {
       "editing": "Redagavimas",
       "reading": "Skaitymas",
@@ -4128,7 +4215,8 @@
         "space": "Šiam modeliui nepakanka laisvos vietos. Atlaisvinkite vietos ir bandykite dar kartą.",
         "network": "Atsisiuntimas nebaigtas. Patikrinkite ryšį ir bandykite dar kartą.",
         "invalidFile": "Atsisiųstas failas nėra modelis, kurį ši programa gali paleisti, todėl jis buvo pašalintas.",
-        "checksum": "Atsisiųstas failas neatitinka paskelbtos kontrolinės sumos, todėl jis buvo pašalintas. Pabandykite atsisiųsti dar kartą."
+        "checksum": "Atsisiųstas failas neatitinka paskelbtos kontrolinės sumos, todėl jis buvo pašalintas. Pabandykite atsisiųsti dar kartą.",
+        "writeFailed": "Šis įrenginys negalėjo išsaugoti modelio. Pabandykite atsisiųsti dar kartą."
       }
     },
     "catalog": {
@@ -4316,7 +4404,7 @@
     "personalDefaultDescription": "Automatiškai įkeliama, kai jokia saugykla neturi prisegto profilio.",
     "organizationDefaultDescription": "Automatiškai įkeliama nariams, kurie neturi asmeninio numatytojo profilio.",
     "setAsDefault": "Nustatyti kaip numatytąjį",
-    "saveFailed": "Nepavyko išsaugoti profilio",
+    "saveFailed": "Nepavyko išsaugoti profilio. Bandykite dar kartą.",
     "organizationRoleRequired": "Organizacijos profilį gali keisti tik organizacijos savininkai ir administratoriai.",
     "deleteTitle": "Ištrinti profilį",
     "deleteMessage": "Tai visam laikui pašalins profilį ir jo nustatymus. To negalima anuliuoti.",
@@ -4582,6 +4670,7 @@
         "balanceNeutral": "Balanso nekeičia",
         "deduction": "Nurašymas",
         "grant": "Kreditų suteikimas",
+        "welcomeCredits": "Sveikinimo kreditai",
         "purchase": "Pirkimas"
       },
       "purchaseFallback": "Kreditų pirkimas",
@@ -4853,6 +4942,8 @@
     "connectedTo": "Prijungta: {{account}}",
     "disconnected": "Atjungta: {{provider}}",
     "disconnectFailed": "Nepavyko atjungti {{provider}}",
+    "disconnectRetry": "Slack nepavyko patvirtinti atjungimo. Bandykite dar kartą.",
+    "disconnectNeedsSupport": "Kilo nepavyko nuskaityti šiam ryšiui išsaugotos Slack prieigos. Norėdami užbaigti atjungimą, kreipkitės į pagalbos tarnybą.",
     "couldNotLoad": "Nepavyko įkelti integracijų",
     "permissionDenied": "Neturite teisių tvarkyti šių integracijų.",
     "managedByOwner": "Paprašykite organizacijos savininko pakeisti jungtį, kurios negalite pakeisti.",

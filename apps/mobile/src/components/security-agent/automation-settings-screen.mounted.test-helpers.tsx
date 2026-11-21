@@ -8,6 +8,16 @@
 // it and drives it through the exported mock state.
 
 import { vi } from 'vitest';
+import { type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
+
+type PreferenceRowProps = {
+  title: string;
+  accessibilityLabel?: string;
+  subtitle?: string;
+  value: boolean;
+  disabled: boolean;
+  onValueChange: (value: boolean) => void;
+};
 
 const config = vi.hoisted(() => ({
   data: null as unknown,
@@ -24,6 +34,13 @@ const retryConfig = vi.hoisted(() => ({
 }));
 const capability = vi.hoisted(() => ({
   canManage: true,
+  status: 'allowed' as 'loading' | 'error' | 'denied' | 'allowed',
+  isPending: false,
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
+}));
+const settingsRecovery = vi.hoisted(() => ({
+  retry: vi.fn(),
+  isRetrying: false,
 }));
 const save = vi.hoisted(() => ({
   mutateAsync: vi.fn(),
@@ -34,14 +51,7 @@ const trackInteraction = vi.hoisted(() => ({
   mutate: vi.fn(),
 }));
 const toggleRows = vi.hoisted(() => ({
-  rows: [] as {
-    title: string;
-    accessibilityLabel?: string;
-    subtitle?: string;
-    value: boolean;
-    disabled: boolean;
-    onValueChange: (value: boolean) => void;
-  }[],
+  rows: [] as PreferenceRowProps[],
 }));
 const pillGroups = vi.hoisted(() => ({
   groups: [] as { label: string; accessibilityLabel?: string }[],
@@ -87,6 +97,7 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentCapability: () => capability,
   useSecurityAgentConfig: () => config,
   useRetrySecurityAgentConfig: () => retryConfig,
+  useRetrySecurityAgentSettings: () => settingsRecovery,
   useSaveSecurityAgentConfig: (_scope: string, options?: { announceSaved?: boolean }) => {
     save.options = options;
     return save;
@@ -117,14 +128,7 @@ vi.mock('@/components/security-agent/settings-save-button', () => ({
   },
 }));
 vi.mock('@/components/ui/preference-row', () => ({
-  PreferenceRow: (props: {
-    title: string;
-    accessibilityLabel?: string;
-    subtitle?: string;
-    value: boolean;
-    disabled: boolean;
-    onValueChange: (value: boolean) => void;
-  }) => {
+  PreferenceRow: (props: PreferenceRowProps) => {
     toggleRows.rows.push(props);
     return null;
   },
@@ -144,21 +148,76 @@ vi.mock('@/components/platform-error-screen', () => ({
 vi.mock('@/components/screen-header', () => ({
   ScreenHeader: (props: { headerRight?: unknown }) => props.headerRight ?? null,
 }));
+vi.mock('@/components/security-agent/settings-recovery-status', () => ({
+  // A host string, so the suite can both count the status and read the props
+  // its Retry is wired through.
+  SettingsRecoveryStatus: 'SettingsRecoveryStatus',
+}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: (props: { children?: unknown }) => props.children,
 }));
 
+// The permission-recovery row the screen renders, found as the host element its
+// stub draws, so a case can tell one from none and read the message it carries.
+function recoveryStatuses(renderer: ReactTestRenderer): ReactTestInstance[] {
+  return renderer.root.findAll(node => String(node.type) === 'SettingsRecoveryStatus');
+}
+
+// The copy the screen drew, so a case can name the permission note it kept.
+function textContents(renderer: ReactTestRenderer): string[] {
+  return renderer.root
+    .findAll(node => String(node.type) === 'Text')
+    .map(node =>
+      node.children.filter((child): child is string => typeof child === 'string').join('')
+    );
+}
+
+const APPROVAL_ROW_TITLE = 'Require approval before auto-remediation';
+
+// The enabled draft the screen hydrates from, one object so a case names only
+// the fields its state is about.
+function enabledConfig(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    isEnabled: true,
+    autoAnalysisEnabled: false,
+    autoAnalysisMinSeverity: 'high',
+    autoAnalysisIncludeExisting: false,
+    autoRemediationEnabled: true,
+    autoRemediationMinSeverity: 'high',
+    autoRemediationIncludeExisting: false,
+    autoRemediationRequireApproval: true,
+    autoDismissEnabled: false,
+    autoDismissConfidenceThreshold: 'high',
+    ...overrides,
+  };
+}
+
+// The approval row the screen drew, read from the captured rows so a case
+// asserts on what rendered rather than on the fixture it set.
+function approvalRow(): PreferenceRowProps {
+  const row = toggleRows.rows.find(r => r.title === APPROVAL_ROW_TITLE);
+  if (!row) {
+    throw new Error('approval toggle row not found');
+  }
+  return row;
+}
+
 export {
+  approvalRow,
   capability,
   config,
   connectivity,
+  enabledConfig,
   pillGroups,
   platformError,
+  recoveryStatuses,
   retryConfig,
   save,
   saveButton,
+  settingsRecovery,
+  textContents,
   toastSuccess,
   toggleRows,
   trackInteraction,

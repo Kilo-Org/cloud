@@ -187,7 +187,30 @@
     "legalDocumentEnglishOnly": "Este documento solo está disponible en inglés.",
     "organizationTrialEndedBilling": "La prueba de la organización ha finalizado y no tiene ningún plan activo. Puedes actualizar la facturación y, después, volver a intentarlo.",
     "organizationTrialEndedBillingAtKiloAi": "La prueba de la organización ha finalizado y no tiene ningún plan activo. Puedes actualizar la facturación en kilo.ai y, después, volver a intentarlo.",
-    "viewOnGitHub": "Ver PR en GitHub"
+    "viewOnGitHub": "Ver PR en GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Viñeta",
+        "nestedBulletPoint": "Viñeta anidada",
+        "orderedItem": "Elemento de lista {n}",
+        "nestedOrderedItem": "Elemento de lista anidado {n}"
+      },
+      "blockquote": {
+        "quote": "Cita",
+        "nestedQuote": "Cita anidada"
+      },
+      "table": {
+        "row": "Fila {n}: {content}"
+      },
+      "math": {
+        "equation": "Matemáticas: {latex}"
+      },
+      "rotor": {
+        "headings": "Encabezados",
+        "links": "Enlaces",
+        "images": "Imágenes"
+      }
+    }
   },
   "language": {
     "restarting": "Reiniciando para aplicar el idioma",
@@ -428,6 +451,17 @@
       "location": "Ubicación de Vertex",
       "clientEmail": "Correo electrónico de la cuenta de servicio",
       "privateKey": "Clave privada de la cuenta de servicio",
+      "privateKeyBlockRequired": "Pega todo el bloque de clave, desde la línea BEGIN hasta la línea END.",
+      "privateKeyEncrypted": "Este bloque de clave está protegido por una frase de contraseña. Pega una clave de cuenta de servicio que no tenga frase de contraseña.",
+      "names": {
+        "codestral": "Solo Codestral heredado",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Iniciar sesión con ChatGPT)",
+        "xiaomi": "Xiaomi (pago por uso)",
+        "zai": "Z.ai (pago por uso)",
+        "bedrockByok": "Amazon Bedrock (directo)",
+        "vertexByok": "Google Vertex AI (directo)"
+      },
       "modelMappings": "Asignaciones de modelos",
       "modelMappingsDescription": "Dirige un modelo del gateway a un nombre de implementación personalizado.",
       "mappingTitle": "Asignación {{number}}",
@@ -506,6 +540,14 @@
       "nextStepAppeal": "El resultado de tu apelación aparecerá en esta pantalla.",
       "nextStepFinal": "La decisión de la apelación es definitiva. No se puede presentar otra apelación.",
       "viewReceipt": "Ver comprobante"
+    },
+    "reportReceipts": {
+      "title": "Denuncias",
+      "rowSubtitle": "Denuncias que has presentado y sus resultados",
+      "emptyTitle": "Aún no hay denuncias",
+      "emptyDescription": "Las denuncias que presentes desde un comentario o una respuesta de IA aparecerán aquí.",
+      "couldNotLoad": "No se pudieron cargar tus denuncias",
+      "capped": "Se muestran tus denuncias más recientes."
     },
     "changelog": "Novedades",
     "changelogVersionPending": "Las notas de la versión {{version}} llegan con la próxima actualización.",
@@ -775,7 +817,7 @@
       "gateHidden": "Oculto",
       "gateNone": "Ninguno",
       "noFindings": "No hay hallazgos.",
-      "findingsUnavailable": "Los resultados no están disponibles porque esta revisión falló.",
+      "findingsUnavailable": "Los resultados no están disponibles.",
       "findingsInProgress": "Esta revisión aún está en curso. Los hallazgos aparecerán aquí cuando termine.",
       "findingsEndedWithoutResults": "Esta revisión terminó antes de generar hallazgos.",
       "serviceUnavailable": "No se pudo conectar con el servicio de revisión de código. Vuelve a intentar la revisión cuando el servicio esté disponible.",
@@ -3657,6 +3699,7 @@
       "identifierLabel": "Identificador",
       "identifierRequired": "Introduce un identificador.",
       "identifierTaken": "Otro modo ya usa este identificador.",
+      "identifierTooLong": "Mantén el identificador en {{max}} caracteres o menos.",
       "nameLabel": "Nombre del modo",
       "nameRequired": "Introduce un nombre de modo.",
       "notFound": "Este modo ya no existe.",
@@ -3745,7 +3788,7 @@
     "emailDeliveryFailed": "El envío de correo no está disponible temporalmente. Inténtalo de nuevo más tarde.",
     "admissionRequired": "No se puede verificar tu dispositivo. Usa «$t(login.moreSignInOptions)» para iniciar sesión en otro dispositivo o desde la web.",
     "default": "Se ha producido un error. Inténtalo de nuevo.",
-    "retryableAdmission": "No pudimos verificar este dispositivo. Comprueba tu conexión e inténtalo de nuevo.",
+    "retryableAdmission": "No se pudo verificar este dispositivo. Inténtalo de nuevo.",
     "startSignInFailed": "No se pudo iniciar el proceso de acceso. Inténtalo de nuevo.",
     "couldNotOpenBrowser": "No se pudo abrir el navegador. Inténtalo de nuevo.",
     "signInTimedOut": "Se agotó el tiempo para iniciar sesión. Inténtalo de nuevo.",
@@ -3817,6 +3860,42 @@
     "nextScheduled": "Próximas programadas",
     "answerNeeded": "En espera de respuesta",
     "waitingToRetry": "En espera de reintento",
+    "countNoun": {
+      "needsInput_one": "En espera de respuesta",
+      "needsInput_many": "En espera de respuesta",
+      "needsInput_other": "En espera de respuesta",
+      "running_one": "Trabajando",
+      "running_many": "Trabajando",
+      "running_other": "Trabajando",
+      "scheduled_one": "Programada",
+      "scheduled_many": "Programadas",
+      "scheduled_other": "Programadas",
+      "idle_one": "En espera",
+      "idle_many": "En espera",
+      "idle_other": "En espera"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} En espera de respuesta",
+      "needsInput_many": "{{displayCount}} En espera de respuesta",
+      "needsInput_other": "{{displayCount}} En espera de respuesta",
+      "running_one": "{{displayCount}} Trabajando",
+      "running_many": "{{displayCount}} Trabajando",
+      "running_other": "{{displayCount}} Trabajando",
+      "scheduled_one": "{{displayCount}} Programada",
+      "scheduled_many": "{{displayCount}} Programadas",
+      "scheduled_other": "{{displayCount}} Programadas",
+      "idle_one": "{{displayCount}} En espera",
+      "idle_many": "{{displayCount}} En espera",
+      "idle_other": "{{displayCount}} En espera"
+    },
+    "footer": {
+      "checked": "Comprobado {{time}}",
+      "lastKnown": "Último estado conocido · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Próxima ejecución {{time}}",
+      "wasDue": "Estaba previsto {{time}}"
+    },
     "step": {
       "editing": "Editando",
       "reading": "Leyendo",
@@ -4063,7 +4142,8 @@
         "space": "No hay suficiente espacio libre para este modelo. Libera espacio e inténtalo de nuevo.",
         "network": "La descarga no se completó. Comprueba tu conexión e inténtalo de nuevo.",
         "invalidFile": "El archivo descargado no es un modelo que esta aplicación pueda ejecutar, así que se eliminó.",
-        "checksum": "El archivo descargado no coincide con su suma de verificación publicada, así que se eliminó. Intenta descargarlo de nuevo."
+        "checksum": "El archivo descargado no coincide con su suma de verificación publicada, así que se eliminó. Intenta descargarlo de nuevo.",
+        "writeFailed": "Este dispositivo no ha podido guardar el modelo. Intenta descargarlo de nuevo."
       }
     },
     "catalog": {
@@ -4246,7 +4326,7 @@
     "personalDefaultDescription": "Se carga automáticamente cuando ningún repositorio tiene un perfil fijado.",
     "organizationDefaultDescription": "Cargado automáticamente para miembros que no tienen valores predeterminados personales.",
     "setAsDefault": "Establecer como predeterminado",
-    "saveFailed": "No se pudo guardar el perfil",
+    "saveFailed": "No se pudo guardar el perfil. Inténtalo de nuevo.",
     "organizationRoleRequired": "Solo los propietarios de la organización y los administradores pueden cambiar los perfiles de la organización.",
     "deleteTitle": "Eliminar perfil",
     "deleteMessage": "Esto elimina permanentemente el perfil y su configuración. Esto no se puede deshacer.",
@@ -4511,6 +4591,7 @@
         "balanceNeutral": "Sin efecto en el saldo",
         "deduction": "Deducción",
         "grant": "Créditos otorgados",
+        "welcomeCredits": "Créditos de bienvenida",
         "purchase": "Compra"
       },
       "purchaseFallback": "Compra de créditos",
@@ -4774,6 +4855,8 @@
     "connectedTo": "Conectado a {{account}}",
     "disconnected": "{{provider}} desconectado",
     "disconnectFailed": "No se pudo desconectar {{provider}}",
+    "disconnectRetry": "Slack no pudo confirmar la desconexión. Inténtalo de nuevo.",
+    "disconnectNeedsSupport": "Kilo no pudo leer el acceso a Slack guardado para esta conexión. Contacta con soporte técnico para terminar de desconectarla.",
     "couldNotLoad": "No se pudieron cargar las integraciones",
     "permissionDenied": "No tienes permiso para gestionar estas integraciones.",
     "managedByOwner": "Pide a un propietario de la organización que cambie una conexión que no puedas cambiar.",

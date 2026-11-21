@@ -355,5 +355,19 @@ export function useAvailableModels(
   // least once, letting a caller keep the error state through a retry: v5
   // downgrades a no-data refetch back to pending and clears `error`, so
   // `isError` alone would drop the error block. See `use-current-user-id`.
-  return { models, isLoading, isError, isFetching, fetchStatus, isFetched, error, refetch };
+  //
+  // `hasDeliveredData` is the different question a body classifier asks: has
+  // the catalogue ever answered with a list? `isFetched` is true after a failed
+  // read too, so only `data !== undefined` may claim the list is empty.
+  return {
+    models,
+    isLoading,
+    isError,
+    isFetching,
+    fetchStatus,
+    isFetched,
+    hasDeliveredData: data !== undefined,
+    error,
+    refetch,
+  };
 }

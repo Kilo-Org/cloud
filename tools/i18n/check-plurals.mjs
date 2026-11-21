@@ -392,6 +392,36 @@ export const DYNAMIC_COUNTED_KEYS = new Map([
         'BUCKET_KEYS map in severity-count-phrase.ts; each bucket of a dashboard line agrees with its own count',
     },
   ],
+  [
+    'GLANCEABLE_COUNT_NOUN_KEY[kind]',
+    {
+      keys: [
+        'glanceable.countNoun.needsInput',
+        'glanceable.countNoun.running',
+        'glanceable.countNoun.scheduled',
+        'glanceable.countNoun.idle',
+      ],
+      source: 'apps/mobile/src/lib/glanceable/presentation.ts',
+      declaration: 'GLANCEABLE_COUNT_NOUN_KEY',
+      reason:
+        'GLANCEABLE_COUNT_NOUN_KEY map in presentation.ts; the count noun inflects with its own number on the split layouts',
+    },
+  ],
+  [
+    'GLANCEABLE_COUNT_MESSAGE_KEY[kind]',
+    {
+      keys: [
+        'glanceable.count.needsInput',
+        'glanceable.count.running',
+        'glanceable.count.scheduled',
+        'glanceable.count.idle',
+      ],
+      source: 'apps/mobile/src/lib/glanceable/presentation.ts',
+      declaration: 'GLANCEABLE_COUNT_MESSAGE_KEY',
+      reason:
+        'GLANCEABLE_COUNT_MESSAGE_KEY map in presentation.ts; each whole count line inflects with its own count',
+    },
+  ],
 ]);
 
 /**

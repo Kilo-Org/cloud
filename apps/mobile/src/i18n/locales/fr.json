@@ -187,7 +187,30 @@
     "legalDocumentEnglishOnly": "Ce document est disponible uniquement en anglais.",
     "organizationTrialEndedBilling": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Vous pouvez mettre à jour la facturation, puis réessayer.",
     "organizationTrialEndedBillingAtKiloAi": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Vous pouvez mettre à jour la facturation sur kilo.ai, puis réessayer.",
-    "viewOnGitHub": "Voir la PR sur GitHub"
+    "viewOnGitHub": "Voir la PR sur GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Puce",
+        "nestedBulletPoint": "Puce imbriquée",
+        "orderedItem": "Élément de liste {n}",
+        "nestedOrderedItem": "Élément de liste imbriqué {n}"
+      },
+      "blockquote": {
+        "quote": "Citation",
+        "nestedQuote": "Citation imbriquée"
+      },
+      "table": {
+        "row": "Ligne {n} : {content}"
+      },
+      "math": {
+        "equation": "Maths : {latex}"
+      },
+      "rotor": {
+        "headings": "Titres",
+        "links": "Liens",
+        "images": "Images"
+      }
+    }
   },
   "language": {
     "restarting": "Redémarrage pour changer de langue",
@@ -428,6 +451,17 @@
       "location": "Emplacement Vertex",
       "clientEmail": "E-mail du compte de service",
       "privateKey": "Clé privée du compte de service",
+      "privateKeyBlockRequired": "Collez le bloc de clé entier, de la ligne BEGIN à la ligne END.",
+      "privateKeyEncrypted": "Ce bloc de clé est protégé par une phrase secrète. Collez une clé de compte de service sans phrase secrète.",
+      "names": {
+        "codestral": "Codestral hérité uniquement",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Se connecter avec ChatGPT)",
+        "xiaomi": "Xiaomi (paiement à l’usage)",
+        "zai": "Z.ai (paiement à l’usage)",
+        "bedrockByok": "Amazon Bedrock (facturation directe)",
+        "vertexByok": "Google Vertex AI (facturation directe)"
+      },
       "modelMappings": "Correspondances de modèles",
       "modelMappingsDescription": "Associez un modèle de la passerelle à un nom de déploiement personnalisé.",
       "mappingTitle": "Correspondance {{number}}",
@@ -506,6 +540,14 @@
       "nextStepAppeal": "Le résultat du recours s'affichera sur cet écran.",
       "nextStepFinal": "La décision sur le recours est définitive. Aucun autre recours ne peut être déposé.",
       "viewReceipt": "Voir l'accusé de réception"
+    },
+    "reportReceipts": {
+      "title": "Signalements",
+      "rowSubtitle": "Signalements que vous avez déposés et leurs résultats",
+      "emptyTitle": "Aucun signalement pour l'instant",
+      "emptyDescription": "Les signalements que vous déposez à partir d'un commentaire ou d'une réponse de l'IA apparaissent ici.",
+      "couldNotLoad": "Impossible de charger vos signalements",
+      "capped": "Affichage de vos signalements les plus récents."
     },
     "changelog": "Nouveautés",
     "changelogVersionPending": "Les notes de la version {{version}} arriveront avec la prochaine mise à jour de l'application.",
@@ -742,7 +784,7 @@
       "gateHidden": "Masqué",
       "gateNone": "Aucun",
       "noFindings": "Aucun signalement",
-      "findingsUnavailable": "Les résultats ne sont pas disponibles, car cette revue a échoué.",
+      "findingsUnavailable": "Les résultats ne sont pas disponibles.",
       "findingsInProgress": "Cette revue est toujours en cours. Les signalements apparaîtront ici une fois qu'elle sera terminée.",
       "findingsEndedWithoutResults": "Cette revue s'est terminée avant de produire le moindre signalement.",
       "serviceUnavailable": "Impossible de joindre le service de revue de code. Relancez la revue lorsque le service sera disponible.",
@@ -3657,6 +3699,7 @@
       "identifierLabel": "Identifiant",
       "identifierRequired": "Saisissez un identifiant.",
       "identifierTaken": "Un autre mode utilise déjà cet identifiant.",
+      "identifierTooLong": "Limitez l'identifiant à {{max}} caractères ou moins.",
       "nameLabel": "Nom du mode",
       "nameRequired": "Saisissez un nom de mode.",
       "notFound": "Ce mode n'existe plus.",
@@ -3745,7 +3788,7 @@
     "emailDeliveryFailed": "L'envoi d'e-mails est temporairement indisponible. Réessayez plus tard.",
     "admissionRequired": "Impossible de vérifier votre appareil. Utilisez « $t(login.moreSignInOptions) » pour vous connecter sur un autre appareil ou depuis un navigateur.",
     "default": "Une erreur s'est produite. Réessayez.",
-    "retryableAdmission": "Nous n'avons pas pu vérifier cet appareil. Vérifiez votre connexion et réessayez.",
+    "retryableAdmission": "Impossible de vérifier cet appareil. Réessayez.",
     "startSignInFailed": "Impossible de lancer la connexion. Réessayez.",
     "couldNotOpenBrowser": "Impossible d'ouvrir le navigateur. Veuillez réessayer.",
     "signInTimedOut": "Le délai de connexion a expiré. Réessayez.",
@@ -3817,6 +3860,42 @@
     "nextScheduled": "Prochaines exécutions",
     "answerNeeded": "Réponse requise",
     "waitingToRetry": "Nouvelle tentative en attente",
+    "countNoun": {
+      "needsInput_one": "Intervention requise",
+      "needsInput_many": "Intervention requise",
+      "needsInput_other": "Intervention requise",
+      "running_one": "En cours",
+      "running_many": "En cours",
+      "running_other": "En cours",
+      "scheduled_one": "Planifiée",
+      "scheduled_many": "Planifiées",
+      "scheduled_other": "Planifiées",
+      "idle_one": "En veille",
+      "idle_many": "En veille",
+      "idle_other": "En veille"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Intervention requise",
+      "needsInput_many": "{{displayCount}} Intervention requise",
+      "needsInput_other": "{{displayCount}} Intervention requise",
+      "running_one": "{{displayCount}} En cours",
+      "running_many": "{{displayCount}} En cours",
+      "running_other": "{{displayCount}} En cours",
+      "scheduled_one": "{{displayCount}} Planifiée",
+      "scheduled_many": "{{displayCount}} Planifiées",
+      "scheduled_other": "{{displayCount}} Planifiées",
+      "idle_one": "{{displayCount}} En veille",
+      "idle_many": "{{displayCount}} En veille",
+      "idle_other": "{{displayCount}} En veille"
+    },
+    "footer": {
+      "checked": "Vérifié {{time}}",
+      "lastKnown": "Dernier état connu · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Prochaine exécution {{time}}",
+      "wasDue": "Était prévu {{time}}"
+    },
     "step": {
       "editing": "Modification",
       "reading": "Lecture",
@@ -4063,7 +4142,8 @@
         "space": "L'espace de stockage disponible est insuffisant pour ce modèle. Libérez de l'espace et réessayez.",
         "network": "Le téléchargement ne s'est pas terminé. Vérifiez votre connexion et réessayez.",
         "invalidFile": "Le fichier téléchargé n'est pas un modèle que cette application peut exécuter ; il a donc été supprimé.",
-        "checksum": "Le fichier téléchargé ne correspond pas à sa somme de contrôle publiée ; il a donc été supprimé. Réessayez le téléchargement."
+        "checksum": "Le fichier téléchargé ne correspond pas à sa somme de contrôle publiée ; il a donc été supprimé. Réessayez le téléchargement.",
+        "writeFailed": "Cet appareil n'a pas pu enregistrer le modèle. Réessayez le téléchargement."
       }
     },
     "catalog": {
@@ -4246,7 +4326,7 @@
     "personalDefaultDescription": "Chargé automatiquement lorsqu'aucun dépôt n'a de profil épinglé.",
     "organizationDefaultDescription": "Chargé automatiquement pour les membres qui n’ont aucun défaut personnel.",
     "setAsDefault": "Définir par défaut",
-    "saveFailed": "Impossible d'enregistrer le profil",
+    "saveFailed": "Impossible d'enregistrer le profil. Réessayez.",
     "organizationRoleRequired": "Seuls les propriétaires et les administrateurs de l'organisation peuvent modifier les profils de l'organisation.",
     "deleteTitle": "Supprimer le profil",
     "deleteMessage": "Cela supprime définitivement le profil et ses paramètres. Cela ne peut pas être annulé.",
@@ -4511,6 +4591,7 @@
         "balanceNeutral": "Sans effet sur le solde",
         "deduction": "Déduction",
         "grant": "Crédits offerts",
+        "welcomeCredits": "Crédits de bienvenue",
         "purchase": "Achat"
       },
       "purchaseFallback": "Achat de crédits",
@@ -4774,6 +4855,8 @@
     "connectedTo": "Connecté à {{account}}",
     "disconnected": "{{provider}} déconnecté",
     "disconnectFailed": "Impossible de déconnecter {{provider}}",
+    "disconnectRetry": "Slack n'a pas pu confirmer la déconnexion. Réessayez.",
+    "disconnectNeedsSupport": "Kilo n'a pas pu lire l'accès Slack enregistré pour cette connexion. Contactez l'assistance pour terminer la déconnexion.",
     "couldNotLoad": "Impossible de charger les intégrations",
     "permissionDenied": "Vous n'avez pas l'autorisation de gérer ces intégrations.",
     "managedByOwner": "Demandez à un propriétaire de l'organisation de modifier une connexion que vous ne pouvez pas modifier.",

@@ -99,6 +99,9 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'android' },
   useColorScheme: () => 'light',
 }));
+// The reviewer permission hook now observes the shared memberships read, whose
+// owner gates it on the auth token; this suite exercises the council screen.
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ isFocused: () => true }),
   useRouter: () => ({ push: state.routerPush, replace: state.routerReplace }),

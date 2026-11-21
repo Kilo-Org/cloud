@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Þetta skjal er aðeins tiltækt á ensku.",
     "organizationTrialEndedBilling": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Þú getur uppfært greiðsluupplýsingar og reynir síðan aftur.",
     "organizationTrialEndedBillingAtKiloAi": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Þú getur uppfært greiðsluupplýsingar á kilo.ai og reynir síðan aftur.",
-    "viewOnGitHub": "Skoða PR á GitHub"
+    "viewOnGitHub": "Skoða PR á GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Punktur",
+        "nestedBulletPoint": "Feltur punktur",
+        "orderedItem": "Listaatriði {n}",
+        "nestedOrderedItem": "Fellt listaatriði {n}"
+      },
+      "blockquote": {
+        "quote": "Tilvitnun",
+        "nestedQuote": "Feld tilvitnun"
+      },
+      "table": {
+        "row": "Röð {n}: {content}"
+      },
+      "math": {
+        "equation": "Stærðfræði: {latex}"
+      },
+      "rotor": {
+        "headings": "Fyrirsagnir",
+        "links": "Tenglar",
+        "images": "Myndir"
+      }
+    }
   },
   "language": {
     "restarting": "Endurræsi til að virkja valið tungumál",
@@ -427,6 +450,17 @@
       "location": "Vertex-staðsetning",
       "clientEmail": "Netfang þjónustureiknings",
       "privateKey": "Einkalykill þjónustureiknings",
+      "privateKeyBlockRequired": "Límdu alla lyklablokkina, frá BEGIN línunni til END línunnar.",
+      "privateKeyEncrypted": "Þessi lyklablokk er varin með lykilsetningu. Límdu lykil þjónustureiknings sem hefur enga lykilsetningu.",
+      "names": {
+        "codestral": "Eldri Codestral-eingöngu",
+        "openai": "OpenAI-API",
+        "openaiChatgpt": "OpenAI (Skrá sig inn með ChatGPT)",
+        "xiaomi": "Xiaomi (greiða eftir notkun)",
+        "zai": "Z.ai (greiða eftir notkun)",
+        "bedrockByok": "Amazon Bedrock (beint)",
+        "vertexByok": "Google Vertex AI (beint)"
+      },
       "modelMappings": "Líkanavarpanir",
       "modelMappingsDescription": "Beina gáttarlíkani á sérsniðið heiti uppsetningar.",
       "mappingTitle": "Vörpun {{number}}",
@@ -505,6 +539,14 @@
       "nextStepAppeal": "Niðurstaða áfrýjunarinnar birtist á þessum skjá.",
       "nextStepFinal": "Ákvörðun um áfrýjun er endanleg. Ekki er hægt að senda inn frekari áfrýjun.",
       "viewReceipt": "Skoða kvittun"
+    },
+    "reportReceipts": {
+      "title": "Tilkynningar",
+      "rowSubtitle": "Tilkynningar sem þú sendir inn og niðurstöður þeirra",
+      "emptyTitle": "Engar tilkynningar ennþá",
+      "emptyDescription": "Tilkynningar sem þú sendir inn úr athugasemd eða svari frá gervigreind birtast hér.",
+      "couldNotLoad": "Ekki tókst að hlaða tilkynningunum þínum",
+      "capped": "Sýni nýjustu tilkynningarnar þínar."
     },
     "changelog": "Nýjungar",
     "changelogVersionPending": "Upplýsingar um útgáfu {{version}} berast með næstu uppfærslu forritsins.",
@@ -1277,7 +1319,7 @@
       "couldNotGetLatest": "Ekki tókst að sækja nýjustu gögnin.",
       "byline": "#{{number}} eftir {{author}}",
       "noFindings": "Engin frávik fundust.",
-      "findingsUnavailable": "Niðurstöður eru ekki tiltækar þar sem þessi yfirferð mistókst.",
+      "findingsUnavailable": "Niðurstöður eru ekki tiltækar.",
       "findingsInProgress": "Þessi yfirferð er enn í gangi. Frávik birtast hér þegar henni er lokið.",
       "findingsEndedWithoutResults": "Þessari yfirferð lauk áður en nein frávik komu fram.",
       "serviceUnavailable": "Ekki náðist samband við kóðayfirferðarþjónustuna. Reyndu yfirferðina aftur þegar þjónustan er tiltæk.",
@@ -3591,6 +3633,7 @@
       "identifierLabel": "Auðkenni",
       "identifierRequired": "Sláðu inn auðkenni.",
       "identifierTaken": "Þetta auðkenni er þegar notað í öðrum ham.",
+      "identifierTooLong": "Haltu auðkenninu í {{max}} stöfum eða færri.",
       "nameLabel": "Heiti hams",
       "nameRequired": "Sláðu inn heiti hams.",
       "notFound": "Þessi hamur er ekki lengur til.",
@@ -3681,7 +3724,7 @@
     "emailDeliveryFailed": "Tímabundið er ekki hægt að senda tölvupóst. Reyndu aftur síðar.",
     "admissionRequired": "Ekki er hægt að staðfesta tækið þitt. Veldu „$t(login.moreSignInOptions)“ til að skrá þig inn á öðru tæki eða á vefnum.",
     "default": "Eitthvað fór úrskeiðis. Reyndu aftur.",
-    "retryableAdmission": "Ekki tókst að staðfesta þetta tæki. Athugaðu tenginguna og reyndu aftur.",
+    "retryableAdmission": "Tókst ekki að staðfesta þetta tæki. Reyndu aftur.",
     "startSignInFailed": "Ekki tókst að hefja innskráningu. Reyndu aftur.",
     "couldNotOpenBrowser": "Ekki tókst að opna vafrann. Reyndu aftur.",
     "signInTimedOut": "Innskráning tók of langan tíma. Reyndu aftur.",
@@ -3753,6 +3796,34 @@
     "nextScheduled": "Næst á dagskrá",
     "answerNeeded": "Bíður eftir svari",
     "waitingToRetry": "Bíður eftir endurtilraun",
+    "countNoun": {
+      "needsInput_one": "Bíður eftir svari",
+      "needsInput_other": "Bíður eftir svari",
+      "running_one": "Í vinnslu",
+      "running_other": "Í vinnslu",
+      "scheduled_one": "Áætlað",
+      "scheduled_other": "Áætlað",
+      "idle_one": "Í bið",
+      "idle_other": "Í bið"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Bíður eftir svari",
+      "needsInput_other": "{{displayCount}} Bíður eftir svari",
+      "running_one": "{{displayCount}} Í vinnslu",
+      "running_other": "{{displayCount}} Í vinnslu",
+      "scheduled_one": "{{displayCount}} Áætlað",
+      "scheduled_other": "{{displayCount}} Áætlað",
+      "idle_one": "{{displayCount}} Í bið",
+      "idle_other": "{{displayCount}} Í bið"
+    },
+    "footer": {
+      "checked": "Staðfest {{time}}",
+      "lastKnown": "Síðast þekkta staða · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Næsta keyrsla {{time}}",
+      "wasDue": "Átti að vera {{time}}"
+    },
     "step": {
       "editing": "Breyting",
       "reading": "Lestur",
@@ -3998,7 +4069,8 @@
         "space": "Það er ekki nóg laust geymslupláss fyrir þetta líkan. Losaðu pláss og reyndu aftur.",
         "network": "Niðurhalið kláraðist ekki. Athugaðu tenginguna þína og reyndu aftur.",
         "invalidFile": "Niðurhalaða skráin er ekki líkan sem þetta forrit getur keyrt, svo henni var eytt.",
-        "checksum": "Niðurhalaða skráin passar ekki við uppgefna gátsummu sína, svo henni var eytt. Reyndu að hlaða henni niður aftur."
+        "checksum": "Niðurhalaða skráin passar ekki við uppgefna gátsummu sína, svo henni var eytt. Reyndu að hlaða henni niður aftur.",
+        "writeFailed": "Þetta tæki gat ekki vistað líkanið. Reyndu að hlaða því niður aftur."
       }
     },
     "catalog": {
@@ -4176,7 +4248,7 @@
     "personalDefaultDescription": "Sjálfvirkt hlaðið þegar engin geymsla er með festan prófíl.",
     "organizationDefaultDescription": "Sjálfvirkt hlaðið fyrir meðlimi sem hafa engin persónuleg vanskil.",
     "setAsDefault": "Stillt sem sjálfgefið",
-    "saveFailed": "Ekki tókst að vista prófílinn",
+    "saveFailed": "Ekki tókst að vista prófílinn. Reyndu aftur.",
     "organizationRoleRequired": "Aðeins eigendur fyrirtækisins og stjórnendur geta breytt prófílum fyrirtækisins.",
     "deleteTitle": "Eyða prófíl",
     "deleteMessage": "Þetta fjarlægir prófílinn og stillingar hans varanlega. Þetta er ekki hægt að afturkalla.",
@@ -4440,6 +4512,7 @@
         "balanceNeutral": "Hefur ekki áhrif á stöðu",
         "deduction": "Frádráttur",
         "grant": "Úthlutuð inneign",
+        "welcomeCredits": "Velkomuinneign",
         "purchase": "Kaup"
       },
       "purchaseFallback": "Kaup á inneign",
@@ -4695,6 +4768,8 @@
     "connectedTo": "Tengt við {{account}}",
     "disconnected": "{{provider}} aftengt",
     "disconnectFailed": "Ekki tókst að aftengja {{provider}}",
+    "disconnectRetry": "Slack gat ekki staðfest aftenginguna. Reyndu aftur.",
+    "disconnectNeedsSupport": "Kilo gat ekki lesið vistaðan Slack-aðgang fyrir þessa tengingu. Hafðu samband við þjónustuver til að ljúka aftengingunni.",
     "couldNotLoad": "Ekki tókst að hlaða inn samþættingum",
     "permissionDenied": "Þú hefur ekki heimild til að stjórna þessum samþættingum.",
     "managedByOwner": "Biddu eiganda stofnunarinnar um að breyta tengingu sem þú getur ekki breytt.",

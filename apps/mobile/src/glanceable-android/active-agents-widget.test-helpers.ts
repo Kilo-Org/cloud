@@ -1,5 +1,7 @@
 import { buildHomeWidgetData, type HomeWidgetSessionRow } from '@kilocode/app-shared/home-widget';
 
+import { copyTranslate } from '@/lib/glanceable/copy.test-helpers';
+
 import { renderActiveAgentsWidget } from './active-agents-widget';
 import { type AndroidWidgetProps, buildAndroidWidgetProps } from './widget-props';
 
@@ -8,10 +10,22 @@ import { type AndroidWidgetProps, buildAndroidWidgetProps } from './widget-props
 export const NOW = 1_750_000_000_000;
 export const WAKE = new Date(NOW + 7_200_000).toISOString();
 const COPY: Record<string, string> = {
-  'glanceable.needsInput': 'Needs input',
-  'common.working': 'Working',
-  'common.scheduled': 'Scheduled',
-  'common.idle': 'Idle',
+  'glanceable.countNoun.needsInput_one': 'Needs input',
+  'glanceable.countNoun.needsInput_other': 'Needs input',
+  'glanceable.countNoun.running_one': 'Working',
+  'glanceable.countNoun.running_other': 'Working',
+  'glanceable.countNoun.scheduled_one': 'Scheduled',
+  'glanceable.countNoun.scheduled_other': 'Scheduled',
+  'glanceable.countNoun.idle_one': 'Idle',
+  'glanceable.countNoun.idle_other': 'Idle',
+  'glanceable.count.needsInput_one': '{{displayCount}} Needs input',
+  'glanceable.count.needsInput_other': '{{displayCount}} Needs input',
+  'glanceable.count.running_one': '{{displayCount}} Working',
+  'glanceable.count.running_other': '{{displayCount}} Working',
+  'glanceable.count.scheduled_one': '{{displayCount}} Scheduled',
+  'glanceable.count.scheduled_other': '{{displayCount}} Scheduled',
+  'glanceable.count.idle_one': '{{displayCount}} Idle',
+  'glanceable.count.idle_other': '{{displayCount}} Idle',
   'common.agent': 'Agent',
   'common.recent': 'Recent',
   'glanceable.empty': 'No work in progress',
@@ -19,11 +33,11 @@ const COPY: Record<string, string> = {
   'glanceable.waiting': 'Updating agents',
   'glanceable.signedOut': 'Sign in to see agents',
   'glanceable.privacy': 'Open Kilo to see agents',
-  'glanceable.checked': 'Checked',
-  'glanceable.lastKnown': 'Last known',
+  'glanceable.footer.checked': 'Checked {{time}}',
+  'glanceable.footer.lastKnown': 'Last known · {{time}}',
   'glanceable.awaitingUpdate': 'Awaiting update',
-  'glanceable.wasDue': 'Was due',
-  'glanceable.nextRun': 'Next run',
+  'glanceable.wake.wasDue': 'Was due {{time}}',
+  'glanceable.wake.nextRun': 'Next run {{time}}',
   'glanceable.newAgent': 'New agent',
   'glanceable.waitingForYou': 'Waiting for you',
   'glanceable.nextScheduled': 'Next scheduled',
@@ -35,8 +49,9 @@ const COPY: Record<string, string> = {
   'glanceable.answerNeeded': 'Answer needed',
   'glanceable.waitingToRetry': 'Waiting to retry',
   'glanceable.openAgents': 'Open agents',
+  'common.listJoiner': ', ',
 };
-export const translate = (key: string) => COPY[key] ?? key;
+export const translate = copyTranslate(COPY);
 
 /** The design frames, then launcher-reported dp cells including the landscape bands. */
 export const DESIGN = {

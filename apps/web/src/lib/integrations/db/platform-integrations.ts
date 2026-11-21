@@ -4,7 +4,7 @@ import {
   organizationWorkflowGitHubConnectionSql,
   organizationWorkflowGitHubPreferenceSql,
 } from '@kilocode/db';
-import { eq, and, or, isNull, asc, desc, sql, ne } from 'drizzle-orm';
+import { eq, and, or, isNull, inArray, asc, desc, sql, ne } from 'drizzle-orm';
 import type {
   GitHubRequester,
   IntegrationPermissions,
@@ -18,11 +18,18 @@ import { isPlatformIntegrationHealthy, platformIntegrationHealthSql } from '../c
 import { PendingInstallationMetadataWrapperSchema } from '../core/schemas';
 import type { GitHubAppType } from '../platforms/github/app-selector';
 import { canOrganizationUseMultipleGitHubInstallations } from '../github/multiple-installations';
+import { ownerFromIntegration } from '../core/owner';
 import {
   effectiveAppTypeCondition,
   occupiesAnotherGitHubInstallationSlot,
   ownerCondition,
 } from './predicates';
+import { lockGitHubInstallationIdentity } from './github-installations';
+import {
+  cancelActiveCodeReviewsForIntegration,
+  settleCancelledReviews,
+  type CancelledReviewRow,
+} from '@/lib/code-reviews/db/code-reviews';
 import { getPostgresErrorCode, RETRYABLE_TRANSACTION_SQLSTATES } from '@/lib/db-errors';
 
 /**
@@ -687,19 +694,61 @@ export async function deleteIntegration(
   );
 }
 
+/**
+ * Deletes every association of one GitHub installation and app type.
+ *
+ * The cancellation and the delete run in one transaction, under the
+ * installation advisory lock: the review foreign key is `ON DELETE SET NULL`,
+ * not cascade, so a queued or running review left behind would survive the
+ * delete with its dispatch reservation and never reach a terminal status. Every
+ * selected association is cancelled, including a disconnected one, where the
+ * cancellation matches nothing. The ledger settle waits for the commit — see
+ * the `settleCancelledReviews` doc comment for why.
+ */
 export async function deleteGitHubInstallationRecords(
   installationId: string,
   githubAppType: GitHubAppType
 ) {
-  await db
-    .delete(platform_integrations)
-    .where(
-      and(
-        eq(platform_integrations.platform, PLATFORM.GITHUB),
-        eq(platform_integrations.platform_installation_id, installationId),
-        effectiveAppTypeCondition(githubAppType)
-      )
-    );
+  const cancelledReviews = await db.transaction(async tx => {
+    await lockGitHubInstallationIdentity(tx, githubAppType, installationId);
+    const associations = await tx
+      .select({
+        id: platform_integrations.id,
+        owned_by_user_id: platform_integrations.owned_by_user_id,
+        owned_by_organization_id: platform_integrations.owned_by_organization_id,
+      })
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.platform, PLATFORM.GITHUB),
+          eq(platform_integrations.platform_installation_id, installationId),
+          effectiveAppTypeCondition(githubAppType)
+        )
+      );
+    const cancelled: CancelledReviewRow[] = [];
+    for (const association of associations) {
+      cancelled.push(
+        ...(await cancelActiveCodeReviewsForIntegration(
+          {
+            owner: ownerFromIntegration(association),
+            platform: PLATFORM.GITHUB,
+            integrationId: association.id,
+          },
+          tx
+        ))
+      );
+    }
+    if (associations.length > 0) {
+      await tx.delete(platform_integrations).where(
+        inArray(
+          platform_integrations.id,
+          associations.map(association => association.id)
+        )
+      );
+    }
+    return cancelled;
+  });
+  await settleCancelledReviews(cancelledReviews, 'user_cancelled');
 }
 
 /**

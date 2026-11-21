@@ -43,7 +43,9 @@ type ApplySharePrefillOptions = {
  * a file failure cannot cost the user their text. On `addCandidates` throw the
  * payload goes back to the store under the same id and the route params stay, so
  * the composer can offer a retry that delivers the same files instead of an
- * empty composer. Returns whether the payload was delivered.
+ * empty composer. A payload whose staging account is no longer signed in is not
+ * put back: it leaves with its account session. Returns whether the payload was
+ * delivered.
  */
 export async function applySharePrefill(options: ApplySharePrefillOptions): Promise<boolean> {
   const shareId = options.shareId;
@@ -53,18 +55,19 @@ export async function applySharePrefill(options: ApplySharePrefillOptions): Prom
 
   const isCurrent = (): boolean => options.isCurrent?.() !== false;
 
-  const payload = takeSharePayload(shareId);
-  if (payload === null) {
+  const taken = takeSharePayload(shareId);
+  if (taken === null) {
     if (isCurrent()) {
       options.clearShareIdParam();
     }
     return true;
   }
+  const payload = taken.payload;
 
   // A composer that already moved to a newer share delivers nothing for this
   // one; the payload goes back so it is not lost to the take.
   if (!isCurrent()) {
-    restoreSharePayload(shareId, payload);
+    restoreSharePayload(shareId, payload, taken.stagedUserId);
     return false;
   }
 
@@ -82,7 +85,7 @@ export async function applySharePrefill(options: ApplySharePrefillOptions): Prom
 
   if (payload.files.length > 0) {
     if (!isCurrent()) {
-      restoreSharePayload(shareId, payload);
+      restoreSharePayload(shareId, payload, taken.stagedUserId);
       return false;
     }
     try {
@@ -92,8 +95,9 @@ export async function applySharePrefill(options: ApplySharePrefillOptions): Prom
       // id and leave the param: the composer's own retry delivers this payload
       // again instead of leaving the person with an empty composer and no photo.
       // Neither the delivery signal nor the param clear runs, because nothing
-      // was delivered.
-      restoreSharePayload(shareId, payload);
+      // was delivered. The stamp travels with the restore, so the payload goes
+      // back only for the account that staged it.
+      restoreSharePayload(shareId, payload, taken.stagedUserId);
       return false;
     }
   }

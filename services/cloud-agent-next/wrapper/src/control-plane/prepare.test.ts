@@ -17,7 +17,11 @@ import type {
 } from '../../../src/shared/control-plane-protocol.js';
 import { controlPlaneWrapperFrameSchema } from '../../../src/shared/control-plane-protocol.js';
 import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
-import type { WrapperKiloClient } from '../kilo-api.js';
+import {
+  SessionRulesetNotAppliedError,
+  SessionRulesetUnverifiedError,
+  type WrapperKiloClient,
+} from '../kilo-api.js';
 import type { ExecResult, ProcessOptions, ProcessOutputStream, ProcessSpawn } from '../utils.js';
 import type { Harness as HarnessClient } from './harness.js';
 import { createKiloHarness } from './kilo-harness.js';
@@ -960,6 +964,7 @@ function createHarness(
           stopProcessCalls.push(opts.sessionId);
           if (cleanupFailure) throw new Error('stop failed');
         },
+        settleOutstandingRuleset: async () => undefined,
       } as unknown as WrapperKiloClient;
       currentClient = createKiloHarness({
         client,
@@ -2090,6 +2095,66 @@ describe('createPreparationManager', () => {
         subtype: 'kilo_import_timeout',
       },
     });
+  });
+
+  it('reports a permanent ruleset failure with the session-import subtype', async () => {
+    const harness = createHarness();
+    harness.setSessionExists(false);
+    const spec = routeSpec();
+    harness.setEnsureSessionError(
+      new SessionRulesetNotAppliedError(spec.kiloSessionId, new Error('ruleset was refused'))
+    );
+
+    await harness.manager.prepare(spec);
+
+    expect(lastFrame(harness.frames)).toMatchObject({
+      type: 'session.failed',
+      sessionId: spec.sessionId,
+      reason: 'workspace_setup_failed',
+      step: 'kilo_session',
+      subtype: 'kilo_import_failed',
+    });
+    expect(harness.frames.filter(frame => frame.type === 'session.failed')).toHaveLength(1);
+    // A permanent ruleset failure is not retried: the second attempt would find
+    // the committed record and return before applying the rules.
+    expect(harness.ensureSessionCalls()).toBe(1);
+  });
+
+  it('retries an unverified ruleset failure and reports the session-import subtype', async () => {
+    const harness = createHarness();
+    harness.setSessionExists(false);
+    const spec = routeSpec();
+    harness.setEnsureSessionError(
+      new SessionRulesetUnverifiedError(spec.kiloSessionId, new Error('marker read refused'))
+    );
+
+    await harness.manager.prepare(spec);
+
+    expect(lastFrame(harness.frames)).toMatchObject({
+      type: 'session.failed',
+      sessionId: spec.sessionId,
+      reason: 'workspace_setup_failed',
+      step: 'kilo_session',
+      subtype: 'kilo_import_failed',
+    });
+    expect(harness.frames.filter(frame => frame.type === 'session.failed')).toHaveLength(1);
+    // The wrapper wrote nothing, so a retried step re-reads the same durable
+    // state and can succeed. The step gets its one retry, so two attempts run.
+    expect(harness.ensureSessionCalls()).toBe(2);
+    expect(harness.frames.filter(frame => frame.type === 'session.restore_attempt')).toEqual([
+      expect.objectContaining({
+        outcome: 'fallback',
+        reason: 'not_found',
+        attempt: 1,
+        willRetry: true,
+      }),
+      expect.objectContaining({
+        outcome: 'fallback',
+        reason: 'not_found',
+        attempt: 2,
+        willRetry: false,
+      }),
+    ]);
   });
 
   it('projects one session_ready line per ready emit, with the session id and no directory', async () => {

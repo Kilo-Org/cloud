@@ -103,6 +103,8 @@ file	screen	source	platform	loading	empty	happy	retryable-error	non-retryable-er
 (app)/(tabs)/(3_profile)/provider-key-new.tsx	(app)/(tabs)/(3_profile)/provider-key-new	route	ios	none	n/a: form	T2-G04 kiloapp:///(app)/(tabs)/(3_profile)/provider-key-new?provider=anthropic	none	none	note: provider-key-new-screen.tsx:119	none	n/a
 (app)/(tabs)/(3_profile)/provider-keys.tsx	(app)/(tabs)/(3_profile)/provider-keys	route	android	T3-L02 force:loading kiloapp:///(app)/(tabs)/(3_profile)/provider-keys	none	T1-G04a kiloapp:///(app)/(tabs)/(3_profile)/provider-keys	none	none	n/a	none	none
 (app)/(tabs)/(3_profile)/provider-keys.tsx	(app)/(tabs)/(3_profile)/provider-keys	route	ios	T3-L02 force:loading kiloapp:///(app)/(tabs)/(3_profile)/provider-keys	none	T1-G04a kiloapp:///(app)/(tabs)/(3_profile)/provider-keys	none	none	n/a	none	none
+(app)/(tabs)/(3_profile)/report-receipts.tsx	(app)/(tabs)/(3_profile)/report-receipts	route	android	none	none	T2-G10c kiloapp:///(app)/(tabs)/(3_profile)/report-receipts ; S:app:mobile-report-receipts	none	none	none	none	none
+(app)/(tabs)/(3_profile)/report-receipts.tsx	(app)/(tabs)/(3_profile)/report-receipts	route	ios	none	none	T2-G10c kiloapp:///(app)/(tabs)/(3_profile)/report-receipts ; S:app:mobile-report-receipts	none	none	none	none	none
 (app)/(tabs)/(3_profile)/spend-alerts.tsx	(app)/(tabs)/(3_profile)/spend-alerts	route	android	none	n/a: form	T1-G06 kiloapp:///(app)/(tabs)/(3_profile)/spend-alerts	none	none	B:T1-G06 (member)	none	n/a
 (app)/(tabs)/(3_profile)/spend-alerts.tsx	(app)/(tabs)/(3_profile)/spend-alerts	route	ios	none	n/a: form	T1-G06 kiloapp:///(app)/(tabs)/(3_profile)/spend-alerts	none	none	B:T1-G06 (member)	none	n/a
 (app)/(tabs)/(3_profile)/tool-summary-translation.tsx	(app)/(tabs)/(3_profile)/tool-summary-translation	route	android	none	n/a: switches	T1-G03b kiloapp:///(app)/(tabs)/(3_profile)/tool-summary-translation	none	none	n/a	none	n/a
@@ -211,6 +213,8 @@ file	screen	source	platform	loading	empty	happy	retryable-error	non-retryable-er
 (app)/local-failure-copy-fixture.tsx	(app)/local-failure-copy-fixture	dev-fixture	ios	n/a	n/a	F:dev/local-failure-copy-fixture/all	n/a	n/a	n/a	n/a	none
 (app)/low-balance-alert-refusal-fixture.tsx	(app)/low-balance-alert-refusal-fixture	dev-fixture	android	n/a	n/a	F:dev/low-balance-alert-refusal-fixture	n/a	n/a	F:dev/low-balance-alert-refusal-fixture?billing=1	n/a	none
 (app)/low-balance-alert-refusal-fixture.tsx	(app)/low-balance-alert-refusal-fixture	dev-fixture	ios	n/a	n/a	F:dev/low-balance-alert-refusal-fixture	n/a	n/a	F:dev/low-balance-alert-refusal-fixture?billing=1	n/a	none
+(app)/mcp-form-sheet-fixture.tsx	(app)/mcp-form-sheet-fixture	dev-fixture	android	none	none	none	none	none	none	none	none
+(app)/mcp-form-sheet-fixture.tsx	(app)/mcp-form-sheet-fixture	dev-fixture	ios	none	none	none	none	none	none	none	none
 (app)/model-catalog/[owner]/[repo].tsx	(app)/model-catalog/[owner]/[repo]	route	android	none	none	none	none	none	none	none	none
 (app)/model-catalog/[owner]/[repo].tsx	(app)/model-catalog/[owner]/[repo]	route	ios	none	none	none	none	none	none	none	none
 (app)/model-catalog/index.tsx	(app)/model-catalog	route	android	none	none	T2-G04b kiloapp:///(app)/model-catalog	none	B:T2-G04b (not-found/permission variants)	B:T2-G04b	none	B:T2-G04b

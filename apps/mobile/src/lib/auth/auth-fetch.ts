@@ -15,6 +15,7 @@ import {
   type PendingLinkOffer,
 } from '@/lib/auth/native-auth-contract';
 import { buildClientMetadataHeaders } from '@/lib/client-metadata';
+import { reportAppAttestPostFailure } from '@/lib/telemetry/app-attest-events';
 
 const stringCodeErrorSchema = z.object({ code: z.string() });
 
@@ -24,6 +25,16 @@ const retryableAssertionBodySchema = z.looseObject({
     kind: z.literal('assertion'),
     keyId: z.string().min(1),
   }),
+});
+
+/**
+ * A token POST that carried Apple proof: the admission field's declared
+ * platform, which is what the server verifies. A plain `z.object` strips the
+ * payload during the check; an `undefined` admission (a device that cannot
+ * attest) and Android's payload both fail it.
+ */
+const appleProofBodySchema = z.object({
+  admission: z.object({ platform: z.literal('ios') }),
 });
 
 /**
@@ -54,6 +65,19 @@ type AuthAttempt =
   | { ok: true; data: unknown }
   | { ok: false; failure: PostAuthFailure; unknownKeyHint: AdmissionRecoveryHint | undefined };
 
+/**
+ * Report a token POST's transport failure, but only when that request carried
+ * Apple proof — a proof-less POST (Android, or a browser fallback) is not an
+ * App Attest attempt, and a server verdict is reported on the terminal path
+ * instead. Called from the transport catches alone, so the admission shape is
+ * parsed once and only when this request actually failed.
+ */
+function reportAppleProofTransportFailure(body: unknown, isTokenRoute: boolean, timedOut: boolean) {
+  if (isTokenRoute && appleProofBodySchema.safeParse(body).success) {
+    reportAppAttestPostFailure(timedOut ? 'timeout' : 'network');
+  }
+}
+
 async function sendAuthAttempt(
   path: AuthTerminalRoute,
   body: unknown,
@@ -64,15 +88,27 @@ async function sendAuthAttempt(
     controller.abort();
   }, AUTH_REQUEST_TIMEOUT_MS);
   try {
+    // Built outside the transport catch: a failure to build the headers or to
+    // serialize the body is not a transport failure and must not be reported
+    // as one.
+    const headers = {
+      'Content-Type': 'application/json',
+      ...buildClientMetadataHeaders(),
+      ...extraHeaders,
+    };
+    const payload = JSON.stringify(body);
+    const isTokenRoute = path === '/api/auth/native/token';
     const response = await fetch(`${API_BASE_URL}${path}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...buildClientMetadataHeaders(),
-        ...extraHeaders,
-      },
-      body: JSON.stringify(body),
+      headers,
+      body: payload,
       signal: controller.signal,
+    }).catch((error: unknown) => {
+      // The server never answered. Reported as the App Attest transport step
+      // only for a token POST that carried Apple proof; the app's own deadline
+      // is `timeout`, every other rejection `network`.
+      reportAppleProofTransportFailure(body, isTokenRoute, controller.signal.aborted);
+      throw error;
     });
 
     let json: unknown = undefined;
@@ -83,6 +119,7 @@ async function sendAuthAttempt(
       // body, so a failed parse must not swallow the timeout: rethrow so the
       // outer catch names it TIMEOUT instead of reporting an empty success.
       if (controller.signal.aborted) {
+        reportAppleProofTransportFailure(body, isTokenRoute, true);
         throw error;
       }
       json = undefined;

@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}, repozitor privat",
     "legalDocumentEnglishOnly": "Ky dokument është në dispozicion vetëm në anglisht.",
     "organizationTrialEndedBilling": "Periudha e provës e organizatës ka përfunduar dhe nuk ka asnjë plan aktiv. Ju mund të përditësoni faturimin dhe më pas të provoni përsëri.",
-    "organizationTrialEndedBillingAtKiloAi": "Periudha e provës e organizatës ka përfunduar dhe nuk ka asnjë plan aktiv. Ju mund të përditësoni faturimin në kilo.ai dhe më pas të provoni përsëri."
+    "organizationTrialEndedBillingAtKiloAi": "Periudha e provës e organizatës ka përfunduar dhe nuk ka asnjë plan aktiv. Ju mund të përditësoni faturimin në kilo.ai dhe më pas të provoni përsëri.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Pikë liste",
+        "nestedBulletPoint": "Pikë liste e mbivendosur",
+        "orderedItem": "Element liste {n}",
+        "nestedOrderedItem": "Element liste i mbivendosur {n}"
+      },
+      "blockquote": {
+        "quote": "Citat",
+        "nestedQuote": "Citat i mbivendosur"
+      },
+      "table": {
+        "row": "Rresht {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematikë: {latex}"
+      },
+      "rotor": {
+        "headings": "Titujt",
+        "links": "Lidhjet",
+        "images": "Imazhet"
+      }
+    }
   },
   "language": {
     "restarting": "Po riniset për të zbatuar ndryshimin e gjuhës",
@@ -427,6 +450,17 @@
       "location": "Vendndodhja Vertex",
       "clientEmail": "Email-i i llogarisë së shërbimit",
       "privateKey": "Çelësi privat i llogarisë së shërbimit",
+      "privateKeyBlockRequired": "Ngjit të gjithë bllokun e çelësit, nga rreshti BEGIN deri në rreshtin END.",
+      "privateKeyEncrypted": "Ky bllok i çelësit është i mbrojtur me frazëkalim. Ngjit një çelës të llogarisë së shërbimit që nuk ka frazëkalim.",
+      "names": {
+        "codestral": "Vetëm Codestral i vjetëruar",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Hyr me ChatGPT)",
+        "xiaomi": "Xiaomi (paguaj sipas përdorimit)",
+        "zai": "Z.ai (paguaj sipas përdorimit)",
+        "bedrockByok": "Amazon Bedrock (direkt)",
+        "vertexByok": "Google Vertex AI (direkt)"
+      },
       "modelMappings": "Hartëzimet e modeleve",
       "modelMappingsDescription": "Drejto një model të gateway-t te një emër i personalizuar deployment-i.",
       "mappingTitle": "Hartëzimi {{number}}",
@@ -505,6 +539,14 @@
       "nextStepAppeal": "Rezultati i apelimit do të shfaqet në këtë ekran.",
       "nextStepFinal": "Vendimi i apelimit është përfundimtar. Nuk mund të dërgohet asnjë apelim tjetër.",
       "viewReceipt": "Shiko dëftesën"
+    },
+    "reportReceipts": {
+      "title": "Raportet",
+      "rowSubtitle": "Raportet që ke paraqitur dhe rezultatet e tyre",
+      "emptyTitle": "Nuk ka raporte ende",
+      "emptyDescription": "Raportet që paraqit nga një koment ose një përgjigje AI shfaqen këtu.",
+      "couldNotLoad": "Raportet e tua nuk mund të ngarkoheshin",
+      "capped": "Po shfaqen raportet e tua më të fundit."
     },
     "changelog": "Çfarë ka të re",
     "changelogVersionPending": "Shënimet për versionin {{version}} vijnë me përditësimin e ardhshëm të aplikacionit.",
@@ -1277,7 +1319,7 @@
       "couldNotGetLatest": "Nuk u morën të dhënat më të fundit.",
       "byline": "#{{number}} nga {{author}}",
       "noFindings": "Nuk ka gjetje.",
-      "findingsUnavailable": "Rezultatet nuk janë të disponueshme sepse ky shqyrtim dështoi.",
+      "findingsUnavailable": "Rezultatet nuk janë të disponueshme.",
       "findingsInProgress": "Ky shqyrtim është ende në zhvillim. Gjetjet shfaqen këtu kur ai të përfundojë.",
       "findingsEndedWithoutResults": "Ky shqyrtim përfundoi përpara se të jepte ndonjë gjetje.",
       "serviceUnavailable": "Nuk u arrit lidhja me shërbimin e shqyrtimit të kodit. Riprovo shqyrtimin kur shërbimi të jetë i disponueshëm.",
@@ -3591,6 +3633,7 @@
       "identifierLabel": "Identifikuesi",
       "identifierRequired": "Vendos një identifikues.",
       "identifierTaken": "Një mënyrë tjetër e përdor tashmë këtë identifikues.",
+      "identifierTooLong": "Mbaje identifikuesin me {{max}} karaktere ose më pak.",
       "nameLabel": "Emri i mënyrës",
       "nameRequired": "Vendos një emër mënyre.",
       "notFound": "Kjo mënyrë nuk ekziston më.",
@@ -3681,7 +3724,7 @@
     "emailDeliveryFailed": "Dërgimi i emailit është përkohësisht i padisponueshëm. Provo përsëri më vonë.",
     "admissionRequired": "Pajisja jote nuk mund të verifikohet. Përdor '$t(login.moreSignInOptions)' për të hyrë në një pajisje tjetër ose përmes uebit.",
     "default": "Diçka shkoi keq. Provo përsëri.",
-    "retryableAdmission": "Nuk arritëm ta verifikonim këtë pajisje. Kontrollo lidhjen dhe provo përsëri.",
+    "retryableAdmission": "Nuk u arrit të verifikohej kjo pajisje. Provo përsëri.",
     "startSignInFailed": "Nuk u nis procesi i hyrjes. Provo përsëri.",
     "couldNotOpenBrowser": "Nuk u arrit të hapej shfletuesi. Provo përsëri.",
     "signInTimedOut": "Koha për të hyrë ka mbaruar. Provo përsëri.",
@@ -3753,6 +3796,34 @@
     "nextScheduled": "Të planifikuara në vijim",
     "answerNeeded": "Pret përgjigje",
     "waitingToRetry": "Në pritje për të riprovuar",
+    "countNoun": {
+      "needsInput_one": "Pret përgjigje",
+      "needsInput_other": "Pret përgjigje",
+      "running_one": "Duke punuar",
+      "running_other": "Duke punuar",
+      "scheduled_one": "E planifikuar",
+      "scheduled_other": "Të planifikuara",
+      "idle_one": "Në pritje",
+      "idle_other": "Në pritje"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Pret përgjigje",
+      "needsInput_other": "{{displayCount}} Pret përgjigje",
+      "running_one": "{{displayCount}} Duke punuar",
+      "running_other": "{{displayCount}} Duke punuar",
+      "scheduled_one": "{{displayCount}} E planifikuar",
+      "scheduled_other": "{{displayCount}} Të planifikuara",
+      "idle_one": "{{displayCount}} Në pritje",
+      "idle_other": "{{displayCount}} Në pritje"
+    },
+    "footer": {
+      "checked": "Kontrolluar {{time}}",
+      "lastKnown": "Gjendja e fundit e njohur · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Ekzekutimi i radhës {{time}}",
+      "wasDue": "Ishte planifikuar {{time}}"
+    },
     "step": {
       "editing": "Duke redaktuar",
       "reading": "Duke lexuar",
@@ -3998,7 +4069,8 @@
         "space": "Nuk ka hapësirë të lirë të mjaftueshme për këtë model. Liro hapësirë dhe provo përsëri.",
         "network": "Shkarkimi nuk përfundoi. Kontrollo lidhjen e internetit dhe provo përsëri.",
         "invalidFile": "Skedari i shkarkuar nuk është një model që ky aplikacion mund ta ekzekutojë, prandaj u hoq.",
-        "checksum": "Skedari i shkarkuar nuk përputhet me shumën e kontrollit të publikuar, prandaj u hoq. Provoni ta shkarkoni përsëri."
+        "checksum": "Skedari i shkarkuar nuk përputhet me shumën e kontrollit të publikuar, prandaj u hoq. Provoni ta shkarkoni përsëri.",
+        "writeFailed": "Kjo pajisje nuk mundi ta ruante modelin. Provoni ta shkarkoni përsëri."
       }
     },
     "catalog": {
@@ -4176,7 +4248,7 @@
     "personalDefaultDescription": "Ngarkohet automatikisht kur asnjë depo nuk ka një profil të gozhduar.",
     "organizationDefaultDescription": "Ngarkohet automatikisht për anëtarët që nuk kanë parazgjedhje personale.",
     "setAsDefault": "Cakto si parazgjedhje",
-    "saveFailed": "Profili nuk mund të ruhej",
+    "saveFailed": "Profili nuk mund të ruhej. Provo përsëri.",
     "organizationRoleRequired": "Vetëm pronarët e organizatës dhe administratorët mund të ndryshojnë profilet e organizatës.",
     "deleteTitle": "Fshi profilin",
     "deleteMessage": "Kjo heq përgjithmonë profilin dhe cilësimet e tij. Kjo nuk mund të zhbëhet.",
@@ -4440,6 +4512,7 @@
         "balanceNeutral": "Pa ndikim në bilanc",
         "deduction": "Zbritje",
         "grant": "Kredi të dhuruara",
+        "welcomeCredits": "Kredi mirëseardhjeje",
         "purchase": "Blerje"
       },
       "purchaseFallback": "Blerje kredish",
@@ -4695,6 +4768,8 @@
     "connectedTo": "I lidhur me {{account}}",
     "disconnected": "{{provider}} u shkëput",
     "disconnectFailed": "{{provider}} nuk mund të shkëputej",
+    "disconnectRetry": "Slack nuk mundi të konfirmojë shkëputjen. Provo përsëri.",
+    "disconnectNeedsSupport": "Kilo nuk mundi të lexojë aksesin në Slack të ruajtur për këtë lidhje. Kontakto mbështetjen për të përfunduar shkëputjen.",
     "couldNotLoad": "Integrimet nuk mund të ngarkoheshin",
     "permissionDenied": "Nuk ke leje për të menaxhuar këto integrime.",
     "managedByOwner": "Kërkoji një pronari të organizatës të ndryshojë një lidhje që nuk mund ta ndryshosh.",

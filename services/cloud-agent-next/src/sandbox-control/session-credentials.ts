@@ -1,4 +1,5 @@
 import { containedKiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
+import { withTimeout } from '@kilocode/worker-utils';
 import jwt from 'jsonwebtoken';
 import {
   networkSecretGrantsSchema,
@@ -13,6 +14,10 @@ import {
   requiresContainmentSandbox,
   type SessionMetadata,
 } from '../persistence/session-metadata.js';
+import {
+  hostedGitHubRepositoriesSchema,
+  type HostedGitHubRepositories,
+} from '../persistence/hosted-github-repositories.js';
 import {
   PROVIDER_DESCRIPTORS,
   providerUsesOutboundCredentialProxy,
@@ -35,9 +40,10 @@ import {
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../shared/runtime-environment.js';
 import { SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE } from '../shared/credential-upgrade.js';
 import type { GitHubReviewTarget } from '../shared/github-review-target.js';
-import type {
-  ControlPlaneCredentialRepository,
-  ControlPlaneCredentialSource,
+import {
+  hostedGitHubRepositoryIdentitySchema,
+  type ControlPlaneCredentialRepository,
+  type ControlPlaneCredentialSource,
 } from '../shared/control-plane-protocol.js';
 import type { SessionAttachPayload } from '../shared/sandbox-control-protocol.js';
 import { gitAuthorSchema } from '../shared/sandbox-control-protocol.js';
@@ -54,6 +60,7 @@ import {
   additionalCredentialReplacements,
   additionalEnvironmentMembers,
   additionalGitCredentials,
+  EnvironmentMemberCredentialError,
   memberCredentialRepository,
   resolveAdditionalMembers,
   selectScmEntry,
@@ -73,6 +80,10 @@ import {
 
 const WORKTREE_LEASE_MS = 4 * 60 * 60 * 1000;
 const CAPABILITY_CACHE_MS = 3 * 60 * 60 * 1000;
+const HOSTED_REPOSITORY_AUTHORIZATION_TTL_MS = 30_000;
+const HOSTED_REPOSITORY_AUTHORIZATION_FAST_FAILURE_MS = 2_000;
+// Leave room for up to five 4 s GitHub calls, including a possible login repair.
+const HOSTED_REPOSITORY_AUTHORIZATION_TIMEOUT_MS = { manifest: 23_000, repository: 15_000 };
 const timestampSchema = z.number().int().nonnegative();
 const tokenSchema = z
   .string()
@@ -136,6 +147,7 @@ const repositorySchema = z.discriminatedUnion('type', [
       repo: z.string().min(1),
       authentication: z.enum(['managed', 'explicit']),
       expectedIntegrationId: z.string().uuid().optional(),
+      hostedRepositoryId: hostedGitHubRepositoryIdentitySchema.shape.id.optional(),
       accessPurpose: z.enum(['workflow', 'agent']).optional(),
       allowUserAuthorization: z.boolean(),
     })
@@ -171,6 +183,7 @@ const scmSchema = z
     gitUrl: z.string().url(),
     author: gitAuthorSchema.optional(),
     githubAppType: z.enum(['standard', 'lite']).optional(),
+    hostedRepositoryVerifiedAt: timestampSchema.optional(),
     capability: capabilitySchema.optional(),
     nativeToken: realTokenSchema.optional(),
     gitlab: z
@@ -363,6 +376,11 @@ function refinePersistedSessionCredentialGrant(
     orgId: grant.orgId,
   };
   assertScmGrantValid(grant.scm, grant.repository, scmContext, reject, options);
+  const hostedPrimary =
+    grant.repository.type === 'github' && grant.repository.hostedRepositoryId !== undefined
+      ? grant.repository
+      : undefined;
+  if (hostedPrimary && !grant.additionalRepositories) reject();
   if (grant.additionalRepositories) {
     // Only a contained grant can hold several repositories: the proxy selects
     // each one's capability from the request URL.
@@ -370,6 +388,14 @@ function refinePersistedSessionCredentialGrant(
     const aliasByPurpose = new Map([[grant.scm.purpose, grant.scm.alias]]);
     for (const { repository, scm } of grant.additionalRepositories) {
       if (scm.purpose !== repository.type) reject();
+      if (
+        hostedPrimary
+          ? repository.type !== 'github' ||
+            repository.hostedRepositoryId === undefined ||
+            repository.expectedIntegrationId !== hostedPrimary.expectedIntegrationId
+          : repository.type === 'github' && repository.hostedRepositoryId !== undefined
+      )
+        reject();
       assertScmGrantValid(scm, repository, scmContext, reject, {
         allowStaleCapabilityBinding: true,
       });
@@ -402,6 +428,22 @@ function assertScmGrantValid(
   options?: { allowStaleCapabilityBinding?: boolean }
 ): void {
   if ((scm.author || scm.githubAppType) && scm.purpose !== 'github') reject();
+  if (
+    scm.hostedRepositoryVerifiedAt !== undefined &&
+    (repository.type !== 'github' || repository.hostedRepositoryId === undefined)
+  ) {
+    reject();
+  }
+  if (
+    repository.type === 'github' &&
+    repository.hostedRepositoryId !== undefined &&
+    (!context.contained ||
+      !context.orgId ||
+      !repository.expectedIntegrationId ||
+      repository.accessPurpose !== 'workflow' ||
+      repository.allowUserAuthorization)
+  )
+    reject();
   if (!context.contained) {
     if (
       scm.alias !== undefined ||
@@ -694,6 +736,9 @@ function repositoryFromSource(
       ...(repository.githubIntegrationId
         ? { expectedIntegrationId: repository.githubIntegrationId }
         : {}),
+      ...(repository.hostedRepositoryId === undefined
+        ? {}
+        : { hostedRepositoryId: repository.hostedRepositoryId }),
       ...(repository.githubAccessPurpose ? { accessPurpose: repository.githubAccessPurpose } : {}),
       allowUserAuthorization:
         repository.allowUserAuthorization ??
@@ -773,6 +818,63 @@ function isCapabilityCurrent(
   );
 }
 
+async function assertHostedGitHubRepositoryAccess(input: {
+  env: CredentialEnv;
+  userId: string;
+  organizationId: string;
+  repositories: HostedGitHubRepositories;
+  diagnostic?: GrantDiagnostic | undefined;
+}): Promise<void> {
+  const { env, userId, organizationId, repositories, diagnostic } = input;
+  const { integrationId, primary, additional } = repositories;
+  const binding = env.GIT_TOKEN_SERVICE;
+  const timeoutMs = additional.length
+    ? HOSTED_REPOSITORY_AUTHORIZATION_TIMEOUT_MS.manifest
+    : HOSTED_REPOSITORY_AUTHORIZATION_TIMEOUT_MS.repository;
+  const fail = (fullName: string, reason: string): never => {
+    diagnostic?.record(brokerGrantFailure('broker_authorization', reason));
+    throw new EnvironmentMemberCredentialError(fullName, { cause: new Error(reason) });
+  };
+  const resolve = async () => {
+    try {
+      const request = binding?.resolveHostedWorkspaceGitHubRepositories?.({
+        userId,
+        organizationId,
+        integrationId,
+        primaryRepo: primary.fullName,
+        additionalRepositoryIds: additional.map(repository => repository.id),
+      });
+      if (request === undefined) return undefined;
+      return await withTimeout(request, timeoutMs, 'Hosted repository authorization timed out');
+    } catch {
+      return undefined;
+    }
+  };
+  const startedAt = performance.now();
+  let result = await resolve();
+  if (
+    result?.success === false &&
+    result.reason === 'temporarily_unavailable' &&
+    performance.now() - startedAt < HOSTED_REPOSITORY_AUTHORIZATION_FAST_FAILURE_MS
+  ) {
+    result = await resolve();
+  }
+  if (!result?.success) return fail(primary.fullName, result?.reason ?? 'temporarily_unavailable');
+  if (primary.id !== result.primary?.id || primary.fullName !== result.primary.fullName) {
+    fail(primary.fullName, 'repository_unavailable');
+  }
+  const resolved = new Map(
+    result.additional.map(repository => [repository.id, repository.fullName])
+  );
+  for (const repository of additional) {
+    if (resolved.get(repository.id) !== repository.fullName) {
+      fail(repository.fullName, 'repository_unavailable');
+    }
+  }
+  if (result.additional.length !== additional.length)
+    fail(primary.fullName, 'repository_unavailable');
+}
+
 async function refreshScmCapability(
   env: CredentialEnv,
   grant: SessionCredentialGrant,
@@ -786,7 +888,12 @@ async function refreshScmCapability(
   if (repository.type === 'git') {
     throw new Error('A git repository carries no contained capability');
   }
-  if (repository.type === 'github' && repository.expectedIntegrationId) {
+  // Hosted credentials are checked by stable ID before grant preparation or redemption.
+  if (
+    repository.type === 'github' &&
+    repository.expectedIntegrationId &&
+    repository.hostedRepositoryId === undefined
+  ) {
     // Cached capabilities still require current association authorization; older brokers fail closed.
     const authorized = await authorizeCloudAgentGitHubRepo(env, {
       githubRepo: repository.repo,
@@ -824,7 +931,11 @@ async function refreshScmCapability(
         ? { expectedIntegrationId: repository.expectedIntegrationId }
         : {}),
     });
-    if (!issued.success || !('capability' in issued.value)) {
+    if (
+      !issued.success ||
+      !('capability' in issued.value) ||
+      (repository.hostedRepositoryId !== undefined && issued.value.source !== 'installation')
+    ) {
       diagnostic?.record(
         brokerGrantFailure(
           'broker_issuance',
@@ -1105,13 +1216,13 @@ export function kiloTokenHasRuntimeAuthorization(token: string): boolean {
  * credential of its platform.
  */
 function additionalRepositoryOf(
-  member: Parameters<typeof memberCredentialRepository>[0],
+  member: ControlPlaneCredentialRepository,
   existing: SessionCredentialGrant | undefined,
   source: ControlPlaneCredentialSource,
   diagnostic?: GrantDiagnostic
 ): AdditionalScmRepository['repository'] {
   const repository = repositoryFromSource(
-    memberCredentialRepository(member, source.repository),
+    member,
     existing,
     {
       ...(source.orgId === undefined ? {} : { orgId: source.orgId }),
@@ -1123,6 +1234,20 @@ function additionalRepositoryOf(
   );
   if (repository === undefined || repository.type === 'git') invalidCredentials();
   return repository;
+}
+
+function hostedCredentialRepository(
+  integrationId: string,
+  repository: HostedGitHubRepositories['primary']
+): Extract<ControlPlaneCredentialRepository, { type: 'github' }> {
+  return {
+    type: 'github',
+    repo: repository.fullName,
+    hostedRepositoryId: repository.id,
+    githubIntegrationId: integrationId,
+    githubAccessPurpose: 'workflow',
+    allowUserAuthorization: false,
+  };
 }
 
 /**
@@ -1227,13 +1352,44 @@ export async function prepareCredentialGrant(
     },
     diagnostic
   );
-  const additionalMembers = additionalEnvironmentMembers(input.environment, source.repository);
+  if (repository !== undefined) diagnostic?.fact({ repositoryKind: repository.type });
+  let hosted: HostedGitHubRepositories | undefined;
+  const hostedPrimaryId = repository?.type === 'github' ? repository.hostedRepositoryId : undefined;
+  if (source.additionalHostedGitHubRepositories !== undefined || hostedPrimaryId !== undefined) {
+    if (
+      !source.orgId ||
+      input.environment ||
+      source.repository?.type !== 'github' ||
+      source.repository.token !== undefined ||
+      repository?.type !== 'github' ||
+      !repository.expectedIntegrationId ||
+      repository.accessPurpose !== 'workflow' ||
+      repository.allowUserAuthorization
+    )
+      invalidCredentials();
+    const manifest = hostedGitHubRepositoriesSchema.safeParse({
+      integrationId: repository.expectedIntegrationId,
+      primary: { id: hostedPrimaryId, fullName: repository.repo },
+      additional: source.additionalHostedGitHubRepositories,
+    });
+    if (!manifest.success) invalidCredentials();
+    hosted = manifest.data;
+  }
+  const additionalMembers =
+    hosted === undefined
+      ? additionalEnvironmentMembers(input.environment, source.repository).map(member => ({
+          repoFullName: member.repoFullName,
+          source: memberCredentialRepository(member, source.repository),
+        }))
+      : hosted.additional.map(member => ({
+          repoFullName: member.fullName,
+          source: hostedCredentialRepository(hosted.integrationId, member),
+        }));
   const additionalEntries = additionalMembers.map(member => ({
     repoFullName: member.repoFullName,
-    repository: additionalRepositoryOf(member, existing, source, diagnostic),
+    repository: additionalRepositoryOf(member.source, existing, source, diagnostic),
   }));
   const additionalRepositories = additionalEntries.map(entry => entry.repository);
-  if (repository !== undefined) diagnostic?.fact({ repositoryKind: repository.type });
   if (
     existing &&
     (!isContainedSessionCredentialGrant(existing) ||
@@ -1321,17 +1477,33 @@ export async function prepareCredentialGrant(
       });
       invalidCredentials();
     }
-    if (repository !== undefined && repository.type !== 'git') {
-      const launchScm = await refreshScmCapability(
+    if (hosted !== undefined && source.orgId) {
+      await assertHostedGitHubRepositoryAccess({
         env,
-        grant,
-        repository,
-        outboundContainerId,
-        now,
-        input.refreshBacking,
-        existing?.scm,
-        diagnostic
-      );
+        userId: source.userId,
+        organizationId: source.orgId,
+        repositories: hosted,
+        diagnostic,
+      });
+    }
+    if (repository !== undefined && repository.type !== 'git') {
+      const prepareScm = async (
+        member: CredentialRepository,
+        existingScm: ScmGrant | undefined
+      ) => {
+        const scm = await refreshScmCapability(
+          env,
+          grant,
+          member,
+          outboundContainerId,
+          now,
+          input.refreshBacking,
+          existingScm,
+          diagnostic
+        );
+        return hosted === undefined ? scm : { ...scm, hostedRepositoryVerifiedAt: now };
+      };
+      const launchScm = await prepareScm(repository, existing?.scm);
       grant = { ...grant, scm: launchScm };
       if (additionalRepositories.length > 0) {
         // One failure fails the whole grant, and the error names that repository.
@@ -1339,17 +1511,7 @@ export async function prepareCredentialGrant(
           members: additionalEntries,
           launchScm,
           existing: existing?.additionalRepositories,
-          refresh: (member, existingScm) =>
-            refreshScmCapability(
-              env,
-              grant,
-              member,
-              outboundContainerId,
-              now,
-              input.refreshBacking,
-              existingScm,
-              diagnostic
-            ),
+          refresh: prepareScm,
         });
         grant = { ...grant, additionalRepositories: resolved };
       }
@@ -1449,7 +1611,11 @@ export function credentialSourceFromMetadata(
   ) {
     invalidCredentials();
   }
-  const repository = credentialRepositoryFromMetadata(metadata.repository);
+  const hosted = metadata.hostedGitHubRepositories;
+  const repository =
+    hosted === undefined
+      ? credentialRepositoryFromMetadata(metadata.repository)
+      : hostedCredentialRepository(hosted.integrationId, hosted.primary);
   return {
     userId,
     ...(metadata.workspace?.worktreeId === undefined
@@ -1465,6 +1631,7 @@ export function credentialSourceFromMetadata(
       ? {}
       : { billingOrigin: metadata.identity.billingOrigin }),
     ...(repository === undefined ? {} : { repository }),
+    ...(hosted === undefined ? {} : { additionalHostedGitHubRepositories: hosted.additional }),
   };
 }
 
@@ -1663,16 +1830,43 @@ export async function resolveSessionCredential(input: {
     if (!entry || entry.scm.purpose !== alias.purpose || entry.repository.type === 'git') {
       return null;
     }
+    const repository = entry.repository;
+    let hostedRepositoryVerifiedAt = entry.scm.hostedRepositoryVerifiedAt;
+    if (repository.type === 'github' && repository.hostedRepositoryId !== undefined) {
+      if (!grant.orgId || !repository.expectedIntegrationId) return null;
+      if (
+        !isCapabilityCurrent(entry.scm.capability, input.outboundContainerId, now) ||
+        hostedRepositoryVerifiedAt === undefined ||
+        hostedRepositoryVerifiedAt > now ||
+        now - hostedRepositoryVerifiedAt >= HOSTED_REPOSITORY_AUTHORIZATION_TTL_MS
+      ) {
+        await assertHostedGitHubRepositoryAccess({
+          env: input.env,
+          userId: grant.userId,
+          organizationId: grant.orgId,
+          repositories: {
+            integrationId: repository.expectedIntegrationId,
+            primary: { id: repository.hostedRepositoryId, fullName: repository.repo },
+            additional: [],
+          },
+        });
+        hostedRepositoryVerifiedAt = now;
+      }
+    }
     const scm = await refreshScmCapability(
       input.env,
       grant,
-      entry.repository,
+      repository,
       input.outboundContainerId,
       now,
       false,
       entry.scm
     );
-    grant = withEntryScm(grant, entry.additionalIndex, scm);
+    grant = withEntryScm(
+      grant,
+      entry.additionalIndex,
+      hostedRepositoryVerifiedAt === undefined ? scm : { ...scm, hostedRepositoryVerifiedAt }
+    );
     const refreshed = sessionCredentialGrantSchema.safeParse(grant);
     return refreshed.success && scm.capability
       ? { grant: refreshed.data, credential: scm.capability.credential }

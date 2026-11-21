@@ -680,8 +680,14 @@ export async function uninstallApp(owner: Owner, options: SlackUninstallOptions 
   if (shouldDeleteSlackInstallation) {
     const tokenRead = await readSlackBotToken(integration);
     if (tokenRead.status === 'unavailable') {
-      // A stored credential that cannot be read, or a row with no usable owner,
-      // cannot be fixed by retrying, so its copy must not offer a retry.
+      // Only a transient read failure can end differently on a retry, so only
+      // `read_failed` offers one. A credential the keyset cannot decrypt, and a
+      // row with no usable owner, stay the same on every attempt, so their copy
+      // names the support step instead.
+      //
+      // `read_failed` is the credential-store read throwing (a database or
+      // connection failure), not a decryption failure: the decrypt has its own
+      // outcome below, so the retry branch is not a bug.
       throw new TRPCError({
         code: 'SERVICE_UNAVAILABLE',
         message:

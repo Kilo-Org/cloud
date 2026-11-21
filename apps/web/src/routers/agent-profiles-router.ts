@@ -26,7 +26,12 @@ import { AgentConfigSchema } from '@kilocode/db/schema-types';
 import type { ProfileOwner } from '@kilocode/cloud-agent-profile';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { AGENT_ENV_VARS_PUBLIC_KEY } from '@kilocode/web-shared/lib/config.server';
-import { getPostgresErrorCode, isUniqueViolation } from '@/lib/db-errors';
+import {
+  getPostgresErrorCode,
+  getUniqueViolationConstraint,
+  isProfileNameUniqueConstraint,
+  isUniqueViolation,
+} from '@/lib/db-errors';
 
 /**
  * Mutating anything on an organization-owned profile — its content, its MCP
@@ -58,8 +63,23 @@ const VarSchema = z.object({
   networkSecret: networkSecretPolicySchema.optional(),
 });
 
+// The service drops whitespace-only rows before it writes and then applies the
+// cap to what is left, so a stored list can always be re-sent unchanged. The
+// schema counts that same list: the outer bound leaves room for the stored rows
+// an older write could leave behind (at most the cap) plus the one row an edit
+// appends, and the list cap is then checked on what would survive the drop.
 const CommandsSchema = z.object({
-  commands: z.array(z.string().max(500)).max(20),
+  commands: z
+    .array(z.string().max(profileCommandsService.MAX_PROFILE_COMMAND_LENGTH))
+    .max(profileCommandsService.MAX_PROFILE_COMMANDS + 1)
+    .refine(
+      commands =>
+        commands.filter(command => command.trim().length > 0).length <=
+        profileCommandsService.MAX_PROFILE_COMMANDS,
+      {
+        message: `Profiles are limited to ${profileCommandsService.MAX_PROFILE_COMMANDS} setup commands`,
+      }
+    ),
 });
 
 // Owner type schema
@@ -491,18 +511,59 @@ export const agentProfilesRouter = createTRPCRouter({
   /**
    * Create a new profile.
    *
+   * A caller may create the profile together with its content in one call: the
+   * variables, the setup commands, and the default flag are written in the same
+   * transaction as the profile row, so a rejected payload stores nothing.
+   *
    * The service refuses a create past `MAX_OWNER_PROFILES` with
    * `PRECONDITION_FAILED`, whose sentence the dialog shows as the reason.
    */
   create: baseProcedure
-    .input(ProfileNameSchema.extend({ organizationId: z.uuid().optional() }))
+    .input(
+      ProfileNameSchema.extend({
+        organizationId: z.uuid().optional(),
+        vars: z.array(VarSchema).max(profileVarsService.MAX_PROFILE_VARS).optional(),
+        commands: CommandsSchema.shape.commands.optional(),
+        setAsDefault: z.boolean().optional(),
+      })
+    )
     .output(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
         await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
-      return profileService.createProfile(db, owner, ctx.user.id, input.name, input.description);
+      try {
+        return await profileService.createProfileWithContent(
+          db,
+          publicKey,
+          owner,
+          ctx.user.id,
+          input
+        );
+      } catch (error) {
+        // Separates a per-owner profile name clash from every other constraint
+        // a create can trip. Only `UQ_agent_env_profiles_org_name` and
+        // `UQ_agent_env_profiles_user_name` earn the duplicate-name sentence the
+        // dialog shows as its inline error. Every other 23505 on this path keeps
+        // a CONFLICT code with a truthful sentence, so the client shows a
+        // readable answer instead of an internal error. A 23505 that carries no
+        // constraint name takes the same fallback, because the name is unknown.
+        const constraint = getUniqueViolationConstraint(error);
+        if (isProfileNameUniqueConstraint(constraint)) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'A profile with this name already exists',
+          });
+        }
+        if (isUniqueViolation(error)) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'A profile could not be created. Try again.',
+          });
+        }
+        throw error;
+      }
     }),
 
   /**

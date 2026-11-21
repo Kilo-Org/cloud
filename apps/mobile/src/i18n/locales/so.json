@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}, kaydka gaar ah",
     "legalDocumentEnglishOnly": "Dukumeentigan waxaa laga heli karaa af Ingiriisi oo keliya.",
     "organizationTrialEndedBilling": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Waxaad cusboonaysiin kartaa biilasha, ka dibna isku day mar kale.",
-    "organizationTrialEndedBillingAtKiloAi": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Waxaad cusboonaysiin kartaa biilasha kilo.ai, ka dibna isku day mar kale."
+    "organizationTrialEndedBillingAtKiloAi": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Waxaad cusboonaysiin kartaa biilasha kilo.ai, ka dibna isku day mar kale.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Dhibic liis",
+        "nestedBulletPoint": "Dhibic liis gudaha ah",
+        "orderedItem": "Shay liis {n}",
+        "nestedOrderedItem": "Shay liis gudaha ah {n}"
+      },
+      "blockquote": {
+        "quote": "Xigasho",
+        "nestedQuote": "Xigasho gudaha ah"
+      },
+      "table": {
+        "row": "Saf {n}: {content}"
+      },
+      "math": {
+        "equation": "Xisaab: {latex}"
+      },
+      "rotor": {
+        "headings": "Cinwaanno",
+        "links": "Xiriiriyeyaal",
+        "images": "Sawirro"
+      }
+    }
   },
   "language": {
     "restarting": "Dib ayaa loo bilaabayaa si luqadda loo adeegsado",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Natiijada rafcaankaaga waxay ka muuqan doontaa shaashaddan.",
       "nextStepFinal": "Go'aanka rafcaanku waa kama dambays. Rafcaan kale lama gudbin karo.",
       "viewReceipt": "Eeg rasiidka"
+    },
+    "reportReceipts": {
+      "title": "Warbixinno",
+      "rowSubtitle": "Warbixinno aad gudbisay iyo natiijooyinkooda",
+      "emptyTitle": "Weli warbixinno ma jiraan",
+      "emptyDescription": "Warbixinno aad ka gudbiso faallo ama jawaabta AI ayaa halkan ka muuqdaan.",
+      "couldNotLoad": "Warbixinnadaada lama soo kicin karin",
+      "capped": "Waxaa la muujinayaa warbixinnadaada ugu dambeeyay."
     },
     "changelog": "Waxyaabaha cusub",
     "changelogVersionPending": "Qoraallada nooca {{version}} waxay la yimaadaan cusboonaysiinta xigta.",
@@ -1277,7 +1308,7 @@
       "couldNotGetLatest": "Xogta ugu dambaysa lama heli karin.",
       "byline": "#{{number}} oo uu qoray {{author}}",
       "noFindings": "Ma jiraan natiijooyin.",
-      "findingsUnavailable": "Natiijooyinka lama heli karo sababtoo ah dib-u-eegistan way fashilantay.",
+      "findingsUnavailable": "Natiijooyinka lama heli karo.",
       "findingsInProgress": "Dib-u-eegistan wali way socotaa. Natiijooyinku halkan ayay ka soo baxaan markay dhammaato.",
       "findingsEndedWithoutResults": "Dib-u-eegistu way dhammaatay ka hor inta aanay wax natiijo ah soo saarin.",
       "serviceUnavailable": "Lama xiriiri karin adeegga dib-u-eegista koodhka. Mar kale isku day dib-u-eegista marka adeegga la heli karo.",
@@ -3591,6 +3622,7 @@
       "identifierLabel": "Aqoonsiga",
       "identifierRequired": "Geli aqoonsi.",
       "identifierTaken": "Qaab kale ayaa hore u isticmaalaya aqoonsigan.",
+      "identifierTooLong": "Aqoonsiga ku hay {{max}} xaraf ama ka yar.",
       "nameLabel": "Magaca qaabka",
       "nameRequired": "Geli magaca qaabka.",
       "notFound": "Qaabkani mar dambe ma jiro.",
@@ -3753,6 +3785,34 @@
     "nextScheduled": "Qorshaha xiga",
     "answerNeeded": "Jawaab loo baahan yahay",
     "waitingToRetry": "Dib-u-tijaabin sugaya",
+    "countNoun": {
+      "needsInput_one": "Jawaab sugaya",
+      "needsInput_other": "Jawaab sugaya",
+      "running_one": "Shaqaynaya",
+      "running_other": "Shaqaynaya",
+      "scheduled_one": "La qorsheeyay",
+      "scheduled_other": "La qorsheeyay",
+      "idle_one": "Hawl la'aan",
+      "idle_other": "Hawl la'aan"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Jawaab sugaya",
+      "needsInput_other": "{{displayCount}} Jawaab sugaya",
+      "running_one": "{{displayCount}} Shaqaynaya",
+      "running_other": "{{displayCount}} Shaqaynaya",
+      "scheduled_one": "{{displayCount}} La qorsheeyay",
+      "scheduled_other": "{{displayCount}} La qorsheeyay",
+      "idle_one": "{{displayCount}} Hawl la'aan",
+      "idle_other": "{{displayCount}} Hawl la'aan"
+    },
+    "footer": {
+      "checked": "La hubiyay {{time}}",
+      "lastKnown": "Ugu dambayn la ogaa · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Hawlgalka xiga {{time}}",
+      "wasDue": "La filayay {{time}}"
+    },
     "step": {
       "editing": "Tafatirid",
       "reading": "Akhris",
@@ -4176,7 +4236,7 @@
     "personalDefaultDescription": "Si otomaatig ah ayaa loo raray marka aysan jirin meel kayd ah oo leh astaan ku dheggan",
     "organizationDefaultDescription": "Si otomaatig ah ayaa loogu shubay xubnaha aan lahayn khaladka gaarka ah.",
     "setAsDefault": "U deji sidii hore",
-    "saveFailed": "Waa la kaydin kari waayay astaanta guud",
+    "saveFailed": "Ma kaydin kari waayay astaanta guud. Mar kale isku day.",
     "organizationRoleRequired": "Milkiilayaasha ururka iyo maamulayaasha oo keliya ayaa bedeli kara astaanta guud ee ururka.",
     "deleteTitle": "Tirtir astaanta guud",
     "deleteMessage": "Tani waxay si joogto ah meesha uga saaraysaa astaanta guud iyo dejinta Tan lama celin karo.",
@@ -4440,6 +4500,7 @@
         "balanceNeutral": "Aan saamaynin haraaga",
         "deduction": "Ka-goyn",
         "grant": "Deeq kiredit",
+        "welcomeCredits": "Kiredit soo dhawoow",
         "purchase": "Iibsasho"
       },
       "purchaseFallback": "Iibsashada kiredit",
@@ -4695,6 +4756,8 @@
     "connectedTo": "Ku xidhan {{account}}",
     "disconnected": "{{provider}} waa la gooyay",
     "disconnectFailed": "Lama goyn karo {{provider}}",
+    "disconnectRetry": "Slack ma xaqiijin karin goynta isku-xidhka. Mar kale isku day.",
+    "disconnectNeedsSupport": "Kilo ma akhrin karin gelitaanka Slack ee isku-xidhkan loo kaydiyay. La xiriir taageerada si aad u dhammaystirto goynta isku-xidhka.",
     "couldNotLoad": "Lama soo gelin karo isku-xidhka",
     "permissionDenied": "Ma haysatid ogolaansho aad ku maamusho isku-xidhkan.",
     "managedByOwner": "Weydii milkiilaha ururka si uu u beddelo isku-xidhka aadan beddeli karin.",

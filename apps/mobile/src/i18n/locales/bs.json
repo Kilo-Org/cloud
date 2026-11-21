@@ -187,7 +187,30 @@
     "legalDocumentEnglishOnly": "Ovaj dokument je dostupan samo na engleskom jeziku.",
     "organizationTrialEndedBilling": "Probni period organizacije je završen i ona nema aktivan plan. Možete ažurirati naplatu, a zatim pokušati ponovo.",
     "organizationTrialEndedBillingAtKiloAi": "Probni period organizacije je završen i ona nema aktivan plan. Možete ažurirati naplatu na kilo.ai, a zatim pokušati ponovo.",
-    "viewOnGitHub": "Pogledaj PR na GitHubu"
+    "viewOnGitHub": "Pogledaj PR na GitHubu",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Točka liste",
+        "nestedBulletPoint": "Ugniježđena točka liste",
+        "orderedItem": "Stavka liste {n}",
+        "nestedOrderedItem": "Ugniježđena stavka liste {n}"
+      },
+      "blockquote": {
+        "quote": "Citat",
+        "nestedQuote": "Ugniježđeni citat"
+      },
+      "table": {
+        "row": "Red {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Naslovi",
+        "links": "Poveznice",
+        "images": "Slike"
+      }
+    }
   },
   "language": {
     "restarting": "Ponovno pokretanje radi primjene jezika",
@@ -506,6 +529,14 @@
       "nextStepAppeal": "Ishod vaše žalbe pojavit će se na ovom ekranu.",
       "nextStepFinal": "Odluka o žalbi je konačna. Žalba se više ne može podnijeti.",
       "viewReceipt": "Prikaži potvrdu"
+    },
+    "reportReceipts": {
+      "title": "Prijave",
+      "rowSubtitle": "Prijave koje ste podnijeli i njihovi ishodi",
+      "emptyTitle": "Još nema prijava",
+      "emptyDescription": "Prijave koje podnesete iz komentara ili AI odgovora pojavit će se ovdje.",
+      "couldNotLoad": "Nije moguće učitati vaše prijave",
+      "capped": "Prikazane su vaše najnovije prijave."
     },
     "changelog": "Šta je novo",
     "changelogVersionPending": "Bilješke za verziju {{version}} stižu uz sljedeće ažuriranje aplikacije.",
@@ -1304,7 +1335,7 @@
       "couldNotGetLatest": "Nije moguće dohvatiti najnovije podatke.",
       "byline": "#{{number}} · Autor: {{author}}",
       "noFindings": "Nema nalaza.",
-      "findingsUnavailable": "Rezultati nisu dostupni jer ovaj pregled nije uspio.",
+      "findingsUnavailable": "Rezultati nisu dostupni.",
       "findingsInProgress": "Ovaj pregled je još u toku. Nalazi će se ovdje pojaviti kad završi.",
       "findingsEndedWithoutResults": "Ovaj pregled se završio prije nego što je dao bilo kakve nalaze.",
       "serviceUnavailable": "Nije moguće povezati se s uslugom za pregled koda. Ponovi pregled kada usluga bude dostupna.",
@@ -3653,6 +3684,7 @@
       "identifierLabel": "Identifikator",
       "identifierRequired": "Unesi identifikator.",
       "identifierTaken": "Drugi način rada već koristi ovaj identifikator.",
+      "identifierTooLong": "Zadrži identifikator na {{max}} znakova ili manje.",
       "nameLabel": "Naziv načina rada",
       "nameRequired": "Unesi naziv načina rada.",
       "notFound": "Ovaj način rada više ne postoji.",
@@ -3817,6 +3849,42 @@
     "nextScheduled": "Sljedeće zakazano",
     "answerNeeded": "Potreban odgovor",
     "waitingToRetry": "Čeka ponovni pokušaj",
+    "countNoun": {
+      "needsInput_one": "Čeka unos",
+      "needsInput_other": "Čeka unos",
+      "needsInput_few": "Čeka unos",
+      "running_one": "U toku",
+      "running_other": "U toku",
+      "running_few": "U toku",
+      "scheduled_one": "Zakazano",
+      "scheduled_other": "Zakazano",
+      "scheduled_few": "Zakazano",
+      "idle_one": "U mirovanju",
+      "idle_other": "U mirovanju",
+      "idle_few": "U mirovanju"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Čeka unos",
+      "needsInput_other": "{{displayCount}} Čeka unos",
+      "needsInput_few": "{{displayCount}} Čeka unos",
+      "running_one": "{{displayCount}} U toku",
+      "running_other": "{{displayCount}} U toku",
+      "running_few": "{{displayCount}} U toku",
+      "scheduled_one": "{{displayCount}} Zakazano",
+      "scheduled_other": "{{displayCount}} Zakazano",
+      "scheduled_few": "{{displayCount}} Zakazano",
+      "idle_one": "{{displayCount}} U mirovanju",
+      "idle_other": "{{displayCount}} U mirovanju",
+      "idle_few": "{{displayCount}} U mirovanju"
+    },
+    "footer": {
+      "checked": "Provjereno {{time}}",
+      "lastKnown": "Posljednje poznato · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Sljedeće pokretanje {{time}}",
+      "wasDue": "Očekivalo se {{time}}"
+    },
     "step": {
       "editing": "Uređivanje",
       "reading": "Čitanje",
@@ -4246,7 +4314,7 @@
     "personalDefaultDescription": "Automatski se učitava kada nijedno spremište nema zakačeni profil.",
     "organizationDefaultDescription": "Automatski se učitava za članove koji nemaju lične postavke.",
     "setAsDefault": "Postavi kao zadano",
-    "saveFailed": "Nije moguće sačuvati profil",
+    "saveFailed": "Nije moguće sačuvati profil. Pokušajte ponovo.",
     "organizationRoleRequired": "Samo vlasnici organizacije i administratori mogu promijeniti profile organizacije.",
     "deleteTitle": "Izbriši profil",
     "deleteMessage": "Ovo trajno uklanja profil i njegove postavke. Ovo se ne može poništiti.",
@@ -4511,6 +4579,7 @@
         "balanceNeutral": "Bez uticaja na stanje",
         "deduction": "Odbitak",
         "grant": "Dodjela kredita",
+        "welcomeCredits": "Krediti dobrodošlice",
         "purchase": "Kupovina"
       },
       "purchaseFallback": "Kupovina kredita",
@@ -4774,6 +4843,8 @@
     "connectedTo": "Povezano s {{account}}",
     "disconnected": "Veza s {{provider}} je prekinuta",
     "disconnectFailed": "Nije moguće prekinuti vezu s {{provider}}",
+    "disconnectRetry": "Slack nije mogao potvrditi prekid veze. Pokušaj ponovo.",
+    "disconnectNeedsSupport": "Kilo nije mogao pročitati sačuvani Slack pristup za ovu vezu. Obrati se podršci da dovršiš prekid veze.",
     "couldNotLoad": "Nije moguće učitati integracije",
     "permissionDenied": "Nemate dozvolu za upravljanje ovim integracijama.",
     "managedByOwner": "Zamolite vlasnika organizacije da promijeni vezu koju ne možete promijeniti.",

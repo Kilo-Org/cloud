@@ -5,13 +5,24 @@ import {
   cloudAgentWorktreeIdSchema,
   type CloudAgentWorktreeId,
 } from './cloud-agent-session-scope';
-import { storedSessionIdSchema } from './kilo-session-id';
+import {
+  KILO_SESSION_ID_LENGTH,
+  KILO_SESSION_ID_PREFIX,
+  storedSessionIdSchema,
+} from './kilo-session-id';
 import { needsPartTextRepair } from './part-text';
 import { sessionLiveSummarySchema } from './session-live-summary';
 
 export { cloudAgentSessionIdSchema, cloudAgentWorktreeIdSchema, type CloudAgentWorktreeId };
 
-export const sessionIdSchema = z.string().startsWith('ses_').length(30);
+/**
+ * A Kilo session id on the wire. Looser than `KILO_SESSION_ID_PATTERN` on the tail,
+ * so ids minted before the canonical shape stay readable.
+ */
+export const sessionIdSchema = z
+  .string()
+  .startsWith(KILO_SESSION_ID_PREFIX)
+  .length(KILO_SESSION_ID_LENGTH);
 
 export const sessionTitleSchema = z.string().trim().min(1).max(200);
 

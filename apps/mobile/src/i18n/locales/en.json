@@ -278,7 +278,30 @@
     "legalDocumentEnglishOnly": "This document is available in English only.",
     "organizationTrialEndedBilling": "The organization's trial has ended and it has no active plan. You can update billing, then try again.",
     "organizationTrialEndedBillingAtKiloAi": "The organization's trial has ended and it has no active plan. You can update billing at kilo.ai, then try again.",
-    "viewOnGitHub": "View PR on GitHub"
+    "viewOnGitHub": "View PR on GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Bullet point",
+        "nestedBulletPoint": "Nested bullet point",
+        "orderedItem": "List item {n}",
+        "nestedOrderedItem": "Nested list item {n}"
+      },
+      "blockquote": {
+        "quote": "Blockquote",
+        "nestedQuote": "Nested blockquote"
+      },
+      "table": {
+        "row": "Row {n}: {content}"
+      },
+      "math": {
+        "equation": "Math: {latex}"
+      },
+      "rotor": {
+        "headings": "Headings",
+        "links": "Links",
+        "images": "Images"
+      }
+    }
   },
   "language": {
     "restarting": "Restarting to apply language",
@@ -597,6 +620,14 @@
       "nextStepAppeal": "The appeal outcome will appear on this screen.",
       "nextStepFinal": "The appeal decision is final. No further appeal can be filed.",
       "viewReceipt": "View receipt"
+    },
+    "reportReceipts": {
+      "title": "Reports",
+      "rowSubtitle": "Reports you filed and their outcomes",
+      "emptyTitle": "No reports yet",
+      "emptyDescription": "Reports you file from a comment or an AI response appear here.",
+      "couldNotLoad": "Could not load your reports",
+      "capped": "Showing your most recent reports."
     },
     "changelog": "What's New",
     "changelogGroupNew": "New",
@@ -1369,7 +1400,7 @@
       "couldNotGetLatest": "Couldn't get the latest.",
       "byline": "#{{number}} by {{author}}",
       "noFindings": "No findings",
-      "findingsUnavailable": "Results are unavailable because this review failed.",
+      "findingsUnavailable": "Results are unavailable.",
       "findingsInProgress": "This review is still in progress. Findings appear here when it finishes.",
       "findingsEndedWithoutResults": "This review ended before it produced any findings.",
       "serviceUnavailable": "Could not reach the code review service. Retry the review when the service is available.",
@@ -3695,6 +3726,7 @@
       "identifierLabel": "Identifier",
       "identifierRequired": "Enter an identifier.",
       "identifierTaken": "Another mode already uses this identifier.",
+      "identifierTooLong": "Keep the identifier to {{max}} characters or fewer.",
       "nameLabel": "Mode name",
       "nameRequired": "Enter a mode name.",
       "notFound": "This mode no longer exists.",
@@ -3845,6 +3877,34 @@
     "nextScheduled": "Next scheduled",
     "answerNeeded": "Answer needed",
     "waitingToRetry": "Waiting to retry",
+    "countNoun": {
+      "needsInput_one": "Needs input",
+      "needsInput_other": "Needs input",
+      "running_one": "Working",
+      "running_other": "Working",
+      "scheduled_one": "Scheduled",
+      "scheduled_other": "Scheduled",
+      "idle_one": "Idle",
+      "idle_other": "Idle"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Needs input",
+      "needsInput_other": "{{displayCount}} Needs input",
+      "running_one": "{{displayCount}} Working",
+      "running_other": "{{displayCount}} Working",
+      "scheduled_one": "{{displayCount}} Scheduled",
+      "scheduled_other": "{{displayCount}} Scheduled",
+      "idle_one": "{{displayCount}} Idle",
+      "idle_other": "{{displayCount}} Idle"
+    },
+    "footer": {
+      "checked": "Checked {{time}}",
+      "lastKnown": "Last known · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Next run {{time}}",
+      "wasDue": "Was due {{time}}"
+    },
     "step": {
       "editing": "Editing",
       "reading": "Reading",
@@ -4268,7 +4328,7 @@
     "personalDefaultDescription": "Auto-loaded when no repository has a pinned profile.",
     "organizationDefaultDescription": "Auto-loaded for members who have no personal default.",
     "setAsDefault": "Set as default",
-    "saveFailed": "Couldn't save profile",
+    "saveFailed": "Couldn't save the profile. Try again.",
     "organizationRoleRequired": "Only organization owners and admins can change organization profiles.",
     "deleteTitle": "Delete profile",
     "deleteMessage": "This permanently removes the profile and its settings. This cannot be undone.",
@@ -4532,6 +4592,7 @@
         "balanceNeutral": "Balance neutral",
         "deduction": "Deduction",
         "grant": "Credit grant",
+        "welcomeCredits": "Welcome credits",
         "purchase": "Purchase"
       },
       "purchaseFallback": "Credit purchase",
@@ -4695,6 +4756,8 @@
     "connectedTo": "Connected to {{account}}",
     "disconnected": "{{provider}} disconnected",
     "disconnectFailed": "Could not disconnect {{provider}}",
+    "disconnectRetry": "Slack could not confirm the disconnect. Try again.",
+    "disconnectNeedsSupport": "Kilo could not read the Slack access saved for this connection. Contact support to finish disconnecting it.",
     "couldNotLoad": "Could not load integrations",
     "permissionDenied": "You do not have permission to manage these integrations.",
     "managedByOwner": "Ask an organization owner to change connections you can't edit.",

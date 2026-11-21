@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "E wātea ana tēnei tuhinga i te reo Ingarihi anake.",
     "organizationTrialEndedBilling": "Kua mutu te whakamātautau o te rōpū, ā, kāore ōna mahere kaha. Ka taea e koe te whakahou i te nama, kātahi ka whakamātau anō.",
     "organizationTrialEndedBillingAtKiloAi": "Kua mutu te whakamātautau o te rōpū, ā, kāore ōna mahere kaha. Ka taea e koe te whakahou i te nama i kilo.ai, kātahi ka whakamātau anō.",
-    "viewOnGitHub": "Tirohia te PR i GitHub"
+    "viewOnGitHub": "Tirohia te PR i GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Tohu rārangi",
+        "nestedBulletPoint": "Tohu rārangi whakauru",
+        "orderedItem": "Tūemi rārangi {n}",
+        "nestedOrderedItem": "Tūemi rārangi whakauru {n}"
+      },
+      "blockquote": {
+        "quote": "Whakahua",
+        "nestedQuote": "Whakahua whakauru"
+      },
+      "table": {
+        "row": "Rārangi {n}: {content}"
+      },
+      "math": {
+        "equation": "Pāngarau: {latex}"
+      },
+      "rotor": {
+        "headings": "Upoko",
+        "links": "Hono",
+        "images": "Whakaahua"
+      }
+    }
   },
   "language": {
     "restarting": "Kei te tīmata anō hei whakamahi i te reo",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Ka puta te otinga o te pīra ki tēnei mata.",
       "nextStepFinal": "Ko te whakatau mō te pīra he whakatau whakamutunga. Kāore e taea tētahi atu pīra te tuku.",
       "viewReceipt": "Tirohia te rīhīti"
+    },
+    "reportReceipts": {
+      "title": "Ngā pūrongo",
+      "rowSubtitle": "Ngā pūrongo i tukuna e koe me ō rātou otinga",
+      "emptyTitle": "Kāore anō he pūrongo",
+      "emptyDescription": "Ka puta ki konei ngā pūrongo ka tukuna e koe mai i tētahi kōrero, mai i tētahi whakautu AI rānei.",
+      "couldNotLoad": "Kāore i taea te uta i ō pūrongo",
+      "capped": "E whakaatu ana i ō pūrongo hou rawa."
     },
     "changelog": "Ngā mea hou",
     "changelogVersionPending": "Ka tae mai ngā tuhipoka o te putanga {{version}} me te whakahōu taupānga e whai ake.",
@@ -1277,7 +1308,7 @@
       "couldNotGetLatest": "Kāore i taea te tiki i ngā mōhiohio hou rawa.",
       "byline": "#{{number}} nā {{author}}",
       "noFindings": "Kāore he kitenga",
-      "findingsUnavailable": "Kāore ngā hua i te wātea nā te mea i rahua tēnei arotake.",
+      "findingsUnavailable": "Kāore ngā hua i te wātea.",
       "findingsInProgress": "Kei te haere tonu tēnei arotake. Ka puta ngā kitenga i konei ina oti.",
       "findingsEndedWithoutResults": "I mutu tēnei arotake i mua i te puta o tētahi kitenga.",
       "serviceUnavailable": "Kāore i taea te hono atu ki te ratonga arotake waehere. Whakamātau anō i te arotake ina wātea te ratonga.",
@@ -3591,6 +3622,7 @@
       "identifierLabel": "Tohu tautuhi",
       "identifierRequired": "Whakaurua he tohu tautuhi.",
       "identifierTaken": "Kua whakamahia kē tēnei tohu tautuhi e tētahi atu aratau.",
+      "identifierTooLong": "Kia {{max}} pūāhua iti iho rānei te tohu tautuhi.",
       "nameLabel": "Ingoa aratau",
       "nameRequired": "Whakaurua he ingoa aratau.",
       "notFound": "Kua kore tēnei aratau.",
@@ -3753,6 +3785,34 @@
     "nextScheduled": "Te whakaritenga e whai ake nei",
     "answerNeeded": "Me whai whakautu",
     "waitingToRetry": "E tatari ana ki te ngana anō",
+    "countNoun": {
+      "needsInput_one": "Me whai urupare",
+      "needsInput_other": "Me whai urupare",
+      "running_one": "Kei te mahi",
+      "running_other": "Kei te mahi",
+      "scheduled_one": "Kua whakaritea",
+      "scheduled_other": "Kua whakaritea",
+      "idle_one": "Kore mahi",
+      "idle_other": "Kore mahi"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Me whai urupare",
+      "needsInput_other": "{{displayCount}} Me whai urupare",
+      "running_one": "{{displayCount}} Kei te mahi",
+      "running_other": "{{displayCount}} Kei te mahi",
+      "scheduled_one": "{{displayCount}} Kua whakaritea",
+      "scheduled_other": "{{displayCount}} Kua whakaritea",
+      "idle_one": "{{displayCount}} Kore mahi",
+      "idle_other": "{{displayCount}} Kore mahi"
+    },
+    "footer": {
+      "checked": "Kua manatoko {{time}}",
+      "lastKnown": "Mōhiotanga whakamutunga · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Te whakahaerenga e whai ake nei {{time}}",
+      "wasDue": "I whakaritea {{time}}"
+    },
     "step": {
       "editing": "Whakatika",
       "reading": "Pānui",
@@ -4176,7 +4236,7 @@
     "personalDefaultDescription": "Ka utaina aunoa ina karekau he kōtaha kua titia ki tētahi putunga.",
     "organizationDefaultDescription": "Ka utaina aunoa mō ngā mema karekau he taunoa whaiaro.",
     "setAsDefault": "Tautuhi hei taunoa",
-    "saveFailed": "Kāore i taea te tiaki i te kōtaha",
+    "saveFailed": "Kāore i taea te tiaki i te kōtaha. Ngana anō.",
     "organizationRoleRequired": "Ko ngā rangatira o te rōpū me ngā kaiwhakahaere anake ka āhei ki te huri i ngā kōtaha rōpū.",
     "deleteTitle": "Mukua te kōtaha",
     "deleteMessage": "Ka tangohia tonutia te kōtaha me ona tautuhinga. Kāore e taea te whakakore i tēnei.",
@@ -4440,6 +4500,7 @@
         "balanceNeutral": "Kāore e pā ki te toenga",
         "deduction": "Tangohanga",
         "grant": "Koha whiwhinga",
+        "welcomeCredits": "Whiwhinga nau mai",
         "purchase": "Hoko"
       },
       "purchaseFallback": "Hoko whiwhinga",
@@ -4695,6 +4756,8 @@
     "connectedTo": "Kua hono ki {{account}}",
     "disconnected": "Kua wetekia a {{provider}}",
     "disconnectFailed": "Kāore i taea te wetewete i {{provider}}",
+    "disconnectRetry": "Kāore i taea e Slack te whakaū i te wetewete. Whakamātau anō.",
+    "disconnectNeedsSupport": "Kāore i taea e Kilo te pānui i te urunga Slack kua tiakina mō tēnei hononga. Whakapā atu ki te rōpū tautoko kia oti ai te wetewete.",
     "couldNotLoad": "Kāore i taea te uta i ngā tūhononga",
     "permissionDenied": "Kāore ōu whakaaetanga ki te whakahaere i ēnei tūhononga.",
     "managedByOwner": "Tonoa tētahi kaipupuri o te rōpū kia whakarerekē i tētahi hononga kāore e taea e koe te whakarerekē.",

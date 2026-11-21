@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "ເອກະສານນີ້ມີໃຫ້ໃນພາສາອັງກິດເທົ່ານັ້ນ.",
     "organizationTrialEndedBilling": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າສາມາດອັບເດດການຮຽກເກັບເງິນໄດ້, ແລ້ວລອງອີກຄັ້ງ.",
     "organizationTrialEndedBillingAtKiloAi": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າສາມາດອັບເດດການເກັບເງິນໄດ້ທີ່ kilo.ai, ແລ້ວລອງອີກຄັ້ງ.",
-    "viewOnGitHub": "ເບິ່ງ PR ໃນ GitHub"
+    "viewOnGitHub": "ເບິ່ງ PR ໃນ GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "ຈຸດລາຍການ",
+        "nestedBulletPoint": "ຈຸດລາຍການຊ້ອນ",
+        "orderedItem": "ຂໍ້ລາຍການ {n}",
+        "nestedOrderedItem": "ຂໍ້ລາຍການຊ້ອນ {n}"
+      },
+      "blockquote": {
+        "quote": "ຄຳອ້າງອີງ",
+        "nestedQuote": "ຄຳອ້າງອີງຊ້ອນ"
+      },
+      "table": {
+        "row": "ແຖວ {n}: {content}"
+      },
+      "math": {
+        "equation": "ຄະນິດສາດ: {latex}"
+      },
+      "rotor": {
+        "headings": "ຫົວຂໍ້",
+        "links": "ລິ້ງ",
+        "images": "ຮູບພາບ"
+      }
+    }
   },
   "language": {
     "restarting": "ກຳລັງເປີດແອັບໃໝ່ເພື່ອໃຊ້ພາສາທີ່ເລືອກ",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "ຜົນຂອງການອຸທອນຈະສະແດງຢູ່ໜ້າຈໍນີ້.",
       "nextStepFinal": "ຄຳຕັດສິນການອຸທອນເປັນຂັ້ນສຸດທ້າຍ. ບໍ່ສາມາດຍື່ນອຸທອນໄດ້ອີກ.",
       "viewReceipt": "ເບິ່ງໃບຮັບ"
+    },
+    "reportReceipts": {
+      "title": "ການລາຍງານ",
+      "rowSubtitle": "ການລາຍງານທີ່ທ່ານໄດ້ຍື່ນ ແລະ ຜົນຂອງມັນ",
+      "emptyTitle": "ຍັງບໍ່ມີການລາຍງານ",
+      "emptyDescription": "ການລາຍງານທີ່ທ່ານຍື່ນຈາກຄຳເຫັນ ຫຼື ຄຳຕອບຂອງ AI ຈະສະແດງຢູ່ນີ້.",
+      "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການລາຍງານຂອງທ່ານໄດ້",
+      "capped": "ກຳລັງສະແດງການລາຍງານລ່າສຸດຂອງທ່ານ."
     },
     "changelog": "ມີຫຍັງໃໝ່",
     "changelogVersionPending": "ບັນທຶກສຳລັບເວີຊັນ {{version}} ຈະມາພ້ອມກັບການອັບເດດແອັບຄັ້ງຕໍ່ໄປ",
@@ -1277,7 +1308,7 @@
       "couldNotGetLatest": "ບໍ່ສາມາດໂຫຼດຂໍ້ມູນລ່າສຸດໄດ້.",
       "byline": "#{{number}} ໂດຍ {{author}}",
       "noFindings": "ບໍ່ພົບບັນຫາ.",
-      "findingsUnavailable": "ບໍ່ມີຜົນລັບໃຫ້ເບິ່ງ ເພາະການກວດທານນີ້ລົ້ມເຫຼວ.",
+      "findingsUnavailable": "ບໍ່ສາມາດເຂົ້າເຖິງຜົນລັບໄດ້.",
       "findingsInProgress": "ການກວດທານນີ້ຍັງກຳລັງດຳເນີນການຢູ່. ຜົນລັບຈະປະກົດຂຶ້ນຢູ່ບ່ອນນີ້ເມື່ອມັນແລ້ວເສັດ.",
       "findingsEndedWithoutResults": "ການກວດທານນີ້ໄດ້ສິ້ນສຸດລົງກ່ອນທີ່ຈະມີຜົນລັບໃດໆ.",
       "serviceUnavailable": "ບໍ່ສາມາດເຊື່ອມຕໍ່ກັບບໍລິການກວດທານໂຄດໄດ້. ລອງກວດທານໃໝ່ເມື່ອບໍລິການພ້ອມໃຊ້ງານ.",
@@ -3591,6 +3622,7 @@
       "identifierLabel": "ຕົວລະບຸ",
       "identifierRequired": "ປ້ອນຕົວລະບຸ.",
       "identifierTaken": "ໂໝດອື່ນໃຊ້ຕົວລະບຸນີ້ແລ້ວ.",
+      "identifierTooLong": "ໃຫ້ຕົວລະບຸມີບໍ່ເກີນ {{max}} ຕົວອັກສອນ.",
       "nameLabel": "ຊື່ໂໝດ",
       "nameRequired": "ປ້ອນຊື່ໂໝດ.",
       "notFound": "ບໍ່ມີໂໝດນີ້ອີກແລ້ວ.",
@@ -3753,6 +3785,34 @@
     "nextScheduled": "ກຳນົດເວລາຖັດໄປ",
     "answerNeeded": "ລໍຄຳຕອບ",
     "waitingToRetry": "ລໍລອງໃໝ່",
+    "countNoun": {
+      "needsInput_one": "ລໍຂໍ້ມູນຈາກທ່ານ",
+      "needsInput_other": "ລໍຂໍ້ມູນຈາກທ່ານ",
+      "running_one": "ກຳລັງເຮັດວຽກ",
+      "running_other": "ກຳລັງເຮັດວຽກ",
+      "scheduled_one": "ກຳນົດເວລາ",
+      "scheduled_other": "ກຳນົດເວລາ",
+      "idle_one": "ວ່າງ",
+      "idle_other": "ວ່າງ"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} ລໍຂໍ້ມູນຈາກທ່ານ",
+      "needsInput_other": "{{displayCount}} ລໍຂໍ້ມູນຈາກທ່ານ",
+      "running_one": "{{displayCount}} ກຳລັງເຮັດວຽກ",
+      "running_other": "{{displayCount}} ກຳລັງເຮັດວຽກ",
+      "scheduled_one": "{{displayCount}} ກຳນົດເວລາ",
+      "scheduled_other": "{{displayCount}} ກຳນົດເວລາ",
+      "idle_one": "{{displayCount}} ວ່າງ",
+      "idle_other": "{{displayCount}} ວ່າງ"
+    },
+    "footer": {
+      "checked": "ກວດສອບແລ້ວ {{time}}",
+      "lastKnown": "ສະຖານະຫຼ້າສຸດທີ່ຮູ້ · {{time}}"
+    },
+    "wake": {
+      "nextRun": "ເຮັດວຽກຄັ້ງຕໍ່ໄປ {{time}}",
+      "wasDue": "ຄາດໄວ້ {{time}}"
+    },
     "step": {
       "editing": "ກຳລັງແກ້ໄຂ",
       "reading": "ກຳລັງອ່ານ",
@@ -4176,7 +4236,7 @@
     "personalDefaultDescription": "ໂຫຼດອັດຕະໂນມັດເມື່ອບໍ່ມີບ່ອນເກັບຂໍ້ມູນມີໂປຣໄຟລ໌ທີ່ປັກໝຸດໄວ້.",
     "organizationDefaultDescription": "ໂຫຼດອັດຕະໂນມັດສຳລັບສະມາຊິກທີ່ບໍ່ມີຄ່າເລີ່ມຕົ້ນສ່ວນຕົວ.",
     "setAsDefault": "ຕັ້ງເປັນຄ່າເລີ່ມຕົ້ນ",
-    "saveFailed": "ບໍ່ສາມາດບັນທຶກໂປຣໄຟລ໌ໄດ້",
+    "saveFailed": "ບໍ່ສາມາດບັນທຶກໂປຣໄຟລ໌ໄດ້. ລອງອີກຄັ້ງ.",
     "organizationRoleRequired": "ມີພຽງເຈົ້າຂອງອົງກອນ ແລະ ຜູ້ດູແລລະບົບທີ່ສາມາດປ່ຽນໂປຣໄຟລ໌ອົງກອນໄດ້.",
     "deleteTitle": "ລຶບໂປຣໄຟລ໌",
     "deleteMessage": "ນີ້ຈະເປັນການລຶບໂປຣໄຟລ໌ ແລະການຕັ້ງຄ່າຂອງມັນອອກຢ່າງຖາວອນ. ອັນນີ້ບໍ່ສາມາດຍົກເລີກໄດ້.",
@@ -4440,6 +4500,7 @@
         "balanceNeutral": "ບໍ່ກະທົບຍອດເງິນ",
         "deduction": "ການຫັກ",
         "grant": "ເຄຣດິດທີ່ໄດ້ຮັບ",
+        "welcomeCredits": "ເຄຣດິດຕ້ອນຮັບ",
         "purchase": "ການຊື້"
       },
       "purchaseFallback": "ການຊື້ເຄຣດິດ",
@@ -4695,6 +4756,8 @@
     "connectedTo": "ເຊື່ອມຕໍ່ກັບ {{account}} ແລ້ວ",
     "disconnected": "ຕັດການເຊື່ອມຕໍ່ {{provider}} ແລ້ວ",
     "disconnectFailed": "ບໍ່ສາມາດຕັດການເຊື່ອມຕໍ່ {{provider}} ໄດ້",
+    "disconnectRetry": "Slack ບໍ່ສາມາດຢືນຢັນການຕັດການເຊື່ອມຕໍ່ໄດ້. ລອງໃໝ່.",
+    "disconnectNeedsSupport": "Kilo ບໍ່ສາມາດອ່ານການເຂົ້າເຖິງ Slack ທີ່ບັນທຶກໄວ້ສຳລັບການເຊື່ອມຕໍ່ນີ້ໄດ້. ຕິດຕໍ່ຝ່າຍສະໜັບສະໜູນເພື່ອໃຫ້ການຕັດການເຊື່ອມຕໍ່ສຳເລັດ.",
     "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການເຊື່ອມໂຍງໄດ້",
     "permissionDenied": "ທ່ານບໍ່ມີສິດຈັດການການເຊື່ອມໂຍງເຫຼົ່ານີ້.",
     "managedByOwner": "ກະລຸນາຂໍໃຫ້ເຈົ້າຂອງອົງກອນປ່ຽນການເຊື່ອມຕໍ່ທີ່ທ່ານບໍ່ສາມາດປ່ຽນໄດ້.",

@@ -278,8 +278,8 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage', () => (
   recordEnkryptUsage: jest.fn(async () => undefined),
 }));
 const mockRedisValues = new Map<string, string>();
-jest.mock('@kilocode/web-shared/lib/redis', () => ({
-  redisClient: {
+jest.mock('@kilocode/web-shared/lib/redis', () => {
+  const client = {
     get: jest.fn(async () => null),
     mget: jest.fn(async (keys: string[]) => keys.map(key => mockRedisValues.get(key) ?? null)),
     set: jest.fn(async (key: string, value: unknown, options?: { nx?: true }) => {
@@ -287,8 +287,23 @@ jest.mock('@kilocode/web-shared/lib/redis', () => ({
       mockRedisValues.set(key, typeof value === 'string' ? value : JSON.stringify(value));
       return 'OK';
     }),
-  },
-}));
+    pipeline: jest.fn(() => {
+      const commands: Array<() => void> = [];
+      const pipeline = {
+        incrby: (key: string, increment: number) => {
+          commands.push(() =>
+            mockRedisValues.set(key, String(Number(mockRedisValues.get(key) ?? 0) + increment))
+          );
+          return pipeline;
+        },
+        expire: () => pipeline,
+        exec: async () => commands.forEach(command => command()),
+      };
+      return pipeline;
+    }),
+  };
+  return { redisClient: client, deferredRedisClient: client };
+});
 jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => {
   const actual = jest.requireActual('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers');
   return {
@@ -5859,6 +5874,11 @@ describe('Enkrypt output guardrail', () => {
     expect(
       mockedRecordEnkryptUsage.mock.calls.map(([record]) => record.guardrail ?? 'input')
     ).toEqual(expect.arrayContaining(['input', 'output']));
+    const callCounts = [...mockRedisValues]
+      .filter(([key]) => key.startsWith('enkrypt:calls:v1:'))
+      .reduce((sum, [, value]) => sum + Number(value), 0);
+    expect(callCounts).toBe(fetchSpy.mock.calls.length);
+    expect(callCounts).toBe(2);
   });
 
   it.each(cases)(

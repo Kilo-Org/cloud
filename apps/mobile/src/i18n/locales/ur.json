@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}، نجی ریپوزٹری",
     "legalDocumentEnglishOnly": "یہ دستاویز صرف انگریزی میں دستیاب ہے۔",
     "organizationTrialEndedBilling": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ آپ بلنگ اپ ڈیٹ کر سکتے ہیں، پھر دوبارہ کوشش کریں۔",
-    "organizationTrialEndedBillingAtKiloAi": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ آپ kilo.ai پر بلنگ اپ ڈیٹ کر سکتے ہیں، پھر دوبارہ کوشش کریں۔"
+    "organizationTrialEndedBillingAtKiloAi": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ آپ kilo.ai پر بلنگ اپ ڈیٹ کر سکتے ہیں، پھر دوبارہ کوشش کریں۔",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "فہرست نقطہ",
+        "nestedBulletPoint": "نیسٹڈ فہرست نقطہ",
+        "orderedItem": "فہرست آئٹم {n}",
+        "nestedOrderedItem": "نیسٹڈ فہرست آئٹم {n}"
+      },
+      "blockquote": {
+        "quote": "اقتباس",
+        "nestedQuote": "نیسٹڈ اقتباس"
+      },
+      "table": {
+        "row": "قطار {n}: {content}"
+      },
+      "math": {
+        "equation": "ریاضی: {latex}"
+      },
+      "rotor": {
+        "headings": "سرخیاں",
+        "links": "لنک",
+        "images": "تصاویر"
+      }
+    }
   },
   "language": {
     "restarting": "منتخب زبان لاگو کرنے کے لیے ایپ دوبارہ شروع ہو رہی ہے",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "اپیل کا نتیجہ اس اسکرین پر نظر آئے گا۔",
       "nextStepFinal": "اپیل کا فیصلہ حتمی ہے۔ مزید کوئی اپیل جمع نہیں کرائی جا سکتی۔",
       "viewReceipt": "رسید دیکھیں"
+    },
+    "reportReceipts": {
+      "title": "رپورٹس",
+      "rowSubtitle": "آپ کی جمع کرائی گئی رپورٹس اور ان کے نتائج",
+      "emptyTitle": "ابھی کوئی رپورٹ نہیں",
+      "emptyDescription": "تبصرے یا AI جواب سے آپ کی جمع کرائی گئی رپورٹس یہاں نظر آئیں گی۔",
+      "couldNotLoad": "آپ کی رپورٹس لوڈ نہیں ہو سکیں",
+      "capped": "آپ کی حالیہ ترین رپورٹس دکھائی جا رہی ہیں۔"
     },
     "changelog": "نیا کیا ہے",
     "changelogVersionPending": "ورژن {{version}} کے نوٹس ایپ کی اگلی اپ ڈیٹ کے ساتھ آئیں گے۔",
@@ -1277,7 +1308,7 @@
       "couldNotGetLatest": "تازہ ترین معلومات حاصل نہیں ہو سکیں۔",
       "byline": "#{{number}}، مصنف: {{author}}",
       "noFindings": "کوئی مسئلہ نہیں ملا۔",
-      "findingsUnavailable": "اس جائزے کی ناکامی کی وجہ سے نتائج دستیاب نہیں ہیں۔",
+      "findingsUnavailable": "نتائج دستیاب نہیں ہیں۔",
       "findingsInProgress": "یہ جائزہ ابھی جاری ہے۔ مکمل ہونے پر مسائل یہاں نظر آئیں گے۔",
       "findingsEndedWithoutResults": "یہ جائزہ کوئی مسئلہ سامنے لانے سے پہلے ہی ختم ہو گیا۔",
       "serviceUnavailable": "کوڈ کے جائزے کی سروس سے رابطہ نہیں ہو سکا۔ سروس دستیاب ہونے پر جائزے کی دوبارہ کوشش کریں۔",
@@ -3591,6 +3622,7 @@
       "identifierLabel": "شناخت کنندہ",
       "identifierRequired": "شناخت کنندہ درج کریں۔",
       "identifierTaken": "ایک اور موڈ پہلے ہی یہ شناخت کنندہ استعمال کرتا ہے۔",
+      "identifierTooLong": "شناخت کنندہ کو {{max}} حروف یا اس سے کم تک رکھیں۔",
       "nameLabel": "موڈ کا نام",
       "nameRequired": "موڈ کا نام درج کریں۔",
       "notFound": "یہ موڈ اب موجود نہیں ہے۔",
@@ -3753,6 +3785,34 @@
     "nextScheduled": "آئندہ شیڈول",
     "answerNeeded": "جواب درکار",
     "waitingToRetry": "دوبارہ کوشش کا انتظار",
+    "countNoun": {
+      "needsInput_one": "ان پٹ درکار",
+      "needsInput_other": "ان پٹ درکار",
+      "running_one": "کام جاری ہے",
+      "running_other": "کام جاری ہے",
+      "scheduled_one": "شیڈول شدہ",
+      "scheduled_other": "شیڈول شدہ",
+      "idle_one": "فارغ",
+      "idle_other": "فارغ"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} ان پٹ درکار",
+      "needsInput_other": "{{displayCount}} ان پٹ درکار",
+      "running_one": "{{displayCount}} کام جاری ہے",
+      "running_other": "{{displayCount}} کام جاری ہے",
+      "scheduled_one": "{{displayCount}} شیڈول شدہ",
+      "scheduled_other": "{{displayCount}} شیڈول شدہ",
+      "idle_one": "{{displayCount}} فارغ",
+      "idle_other": "{{displayCount}} فارغ"
+    },
+    "footer": {
+      "checked": "آخری تصدیق {{time}}",
+      "lastKnown": "آخری معلوم حالت · {{time}}"
+    },
+    "wake": {
+      "nextRun": "اگلا اجرا {{time}}",
+      "wasDue": "متوقع تھا {{time}}"
+    },
     "step": {
       "editing": "ترمیم",
       "reading": "پڑھ رہا ہے",
@@ -4176,7 +4236,7 @@
     "personalDefaultDescription": "جب کسی ریپوزٹری میں پن شدہ پروفائل نہ ہو تو خودکار طور پر لوڈ ہوتا ہے۔",
     "organizationDefaultDescription": "ان اراکین کے لیے خودکار طور پر لوڈ کیا گیا جن کا کوئی ذاتی ڈیفالٹ نہیں ہے۔",
     "setAsDefault": "بطور ڈیفالٹ سیٹ کریں۔",
-    "saveFailed": "پروفائل محفوظ نہیں ہو سکا",
+    "saveFailed": "پروفائل کو محفوظ نہیں کیا جا سکا۔ دوبارہ کوشش کریں۔",
     "organizationRoleRequired": "صرف تنظیم کے مالک اور منتظم تنظیم کی پروفائل بدل سکتے ہیں۔",
     "deleteTitle": "پروفائل حذف کریں۔",
     "deleteMessage": "یہ پروفائل اور اس کی ترتیبات کو مستقل طور پر ہٹا دیتا ہے۔ اسے کالعدم نہیں کیا جا سکتا۔",
@@ -4440,6 +4500,7 @@
         "balanceNeutral": "بیلنس پر اثر نہیں",
         "deduction": "کٹوتی",
         "grant": "مفت کریڈٹ",
+        "welcomeCredits": "خوش آمدید کریڈٹ",
         "purchase": "خریداری"
       },
       "purchaseFallback": "کریڈٹ کی خریداری",
@@ -4695,6 +4756,8 @@
     "connectedTo": "{{account}} سے منسلک",
     "disconnected": "{{provider}} منقطع ہو گیا",
     "disconnectFailed": "{{provider}} کو منقطع نہیں کیا جا سکا",
+    "disconnectRetry": "Slack منقطع ہونے کی تصدیق نہیں کر سکا۔ دوبارہ کوشش کریں۔",
+    "disconnectNeedsSupport": "Kilo اس کنکشن کے لیے محفوظ Slack رسائی نہیں پڑھ سکا۔ منقطع کرنے کا عمل مکمل کرنے کے لیے معاونت کی ٹیم سے رابطہ کریں۔",
     "couldNotLoad": "انٹیگریشنز لوڈ نہیں ہو سکیں",
     "permissionDenied": "آپ کو ان انٹیگریشنز کا انتظام کرنے کی اجازت نہیں ہے۔",
     "managedByOwner": "آپ جو کنکشن تبدیل نہیں کر سکتے، اسے تبدیل کرنے کے لیے تنظیم کے کسی مالک سے کہیں۔",

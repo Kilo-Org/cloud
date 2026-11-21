@@ -187,7 +187,30 @@
     "legalDocumentEnglishOnly": "Aquest document només està disponible en anglès.",
     "organizationTrialEndedBilling": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. Pots actualitzar la facturació i tornar-ho a provar.",
     "organizationTrialEndedBillingAtKiloAi": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. Pots actualitzar la facturació a kilo.ai i tornar-ho a provar.",
-    "viewOnGitHub": "Mostra la PR a GitHub"
+    "viewOnGitHub": "Mostra la PR a GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Punt de llista",
+        "nestedBulletPoint": "Punt de llista niuat",
+        "orderedItem": "Element de la llista {n}",
+        "nestedOrderedItem": "Element de la llista niuat {n}"
+      },
+      "blockquote": {
+        "quote": "Cita",
+        "nestedQuote": "Cita niuada"
+      },
+      "table": {
+        "row": "Fila {n}: {content}"
+      },
+      "math": {
+        "equation": "Matemàtiques: {latex}"
+      },
+      "rotor": {
+        "headings": "Encapçalaments",
+        "links": "Enllaços",
+        "images": "Imatges"
+      }
+    }
   },
   "language": {
     "restarting": "S'està reiniciant per aplicar l'idioma",
@@ -506,6 +529,14 @@
       "nextStepAppeal": "El resultat de la teva apel·lació apareixerà en aquesta pantalla.",
       "nextStepFinal": "La decisió de l'apel·lació és definitiva. No es pot presentar cap altra apel·lació.",
       "viewReceipt": "Mostra el comprovant"
+    },
+    "reportReceipts": {
+      "title": "Denúncies",
+      "rowSubtitle": "Les denúncies que has presentat i els seus resultats",
+      "emptyTitle": "Encara no hi ha denúncies",
+      "emptyDescription": "Les denúncies que presentis des d'un comentari o d'una resposta d'IA apareixeran aquí.",
+      "couldNotLoad": "No s'han pogut carregar les teves denúncies",
+      "capped": "Es mostren les teves denúncies més recents."
     },
     "changelog": "Novetats",
     "changelogVersionPending": "Les notes de la versió {{version}} arribaran amb la propera actualització de l'app.",
@@ -1304,7 +1335,7 @@
       "couldNotGetLatest": "No s'han pogut obtenir les dades més recents.",
       "byline": "#{{number}} · Autor: {{author}}",
       "noFindings": "No hi ha incidències.",
-      "findingsUnavailable": "Els resultats no estan disponibles perquè aquesta revisió ha fallat.",
+      "findingsUnavailable": "Els resultats no estan disponibles.",
       "findingsInProgress": "Aquesta revisió encara està en curs. Les incidències apareixeran aquí quan finalitzi.",
       "findingsEndedWithoutResults": "Aquesta revisió ha finalitzat abans de produir cap incidència.",
       "serviceUnavailable": "No s'ha pogut connectar amb el servei de revisió de codi. Torna a provar la revisió quan el servei estigui disponible.",
@@ -3653,6 +3684,7 @@
       "identifierLabel": "Identificador",
       "identifierRequired": "Introdueix un identificador.",
       "identifierTaken": "Un altre mode ja utilitza aquest identificador.",
+      "identifierTooLong": "Mantingues l'identificador en {{max}} caràcters o menys.",
       "nameLabel": "Nom del mode",
       "nameRequired": "Introdueix un nom de mode.",
       "notFound": "Aquest mode ja no existeix.",
@@ -3817,6 +3849,42 @@
     "nextScheduled": "Properes programades",
     "answerNeeded": "Pendent de resposta",
     "waitingToRetry": "Pendent de reintent",
+    "countNoun": {
+      "needsInput_one": "Pendent de resposta",
+      "needsInput_many": "Pendent de resposta",
+      "needsInput_other": "Pendent de resposta",
+      "running_one": "En curs",
+      "running_many": "En curs",
+      "running_other": "En curs",
+      "scheduled_one": "Programada",
+      "scheduled_many": "Programades",
+      "scheduled_other": "Programades",
+      "idle_one": "En espera",
+      "idle_many": "En espera",
+      "idle_other": "En espera"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Pendent de resposta",
+      "needsInput_many": "{{displayCount}} Pendent de resposta",
+      "needsInput_other": "{{displayCount}} Pendent de resposta",
+      "running_one": "{{displayCount}} En curs",
+      "running_many": "{{displayCount}} En curs",
+      "running_other": "{{displayCount}} En curs",
+      "scheduled_one": "{{displayCount}} Programada",
+      "scheduled_many": "{{displayCount}} Programades",
+      "scheduled_other": "{{displayCount}} Programades",
+      "idle_one": "{{displayCount}} En espera",
+      "idle_many": "{{displayCount}} En espera",
+      "idle_other": "{{displayCount}} En espera"
+    },
+    "footer": {
+      "checked": "Comprovat {{time}}",
+      "lastKnown": "Últim estat conegut · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Propera execució {{time}}",
+      "wasDue": "S’esperava {{time}}"
+    },
     "step": {
       "editing": "Edició",
       "reading": "Lectura",
@@ -4246,7 +4314,7 @@
     "personalDefaultDescription": "Es carrega automàticament quan cap dipòsit té un perfil fixat.",
     "organizationDefaultDescription": "Es carrega automàticament per als membres que no tenen cap predeterminat personal.",
     "setAsDefault": "Estableix com a predeterminat",
-    "saveFailed": "No s'ha pogut desar el perfil",
+    "saveFailed": "No s'ha pogut desar el perfil. Torna-ho a provar.",
     "organizationRoleRequired": "Només els propietaris i els administradors de l'organització poden canviar els perfils de l'organització.",
     "deleteTitle": "Suprimeix el perfil",
     "deleteMessage": "Això elimina permanentment el perfil i la seva configuració. Això no es pot desfer.",
@@ -4511,6 +4579,7 @@
         "balanceNeutral": "Sense efecte en el saldo",
         "deduction": "Deducció",
         "grant": "Concessió de crèdits",
+        "welcomeCredits": "Crèdits de benvinguda",
         "purchase": "Compra"
       },
       "purchaseFallback": "Compra de crèdits",
@@ -4774,6 +4843,8 @@
     "connectedTo": "Connectat a {{account}}",
     "disconnected": "S'ha desconnectat {{provider}}",
     "disconnectFailed": "No s'ha pogut desconnectar {{provider}}",
+    "disconnectRetry": "Slack no ha pogut confirmar la desconnexió. Torna-ho a provar.",
+    "disconnectNeedsSupport": "Kilo no ha pogut llegir l'accés de Slack desat per a aquesta connexió. Contacta amb l'equip de suport per acabar de desconnectar-la.",
     "couldNotLoad": "No s'han pogut carregar les integracions",
     "permissionDenied": "No tens permís per gestionar aquestes integracions.",
     "managedByOwner": "Demana a un propietari de l'organització que canviï una connexió que no pots canviar.",

@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Este documento só está dispoñible en inglés.",
     "organizationTrialEndedBilling": "O período de proba da organización rematou e non ten ningún plan activo. Podes actualizar a facturación e despois tentalo de novo.",
     "organizationTrialEndedBillingAtKiloAi": "O período de proba da organización rematou e non ten ningún plan activo. Podes actualizar a facturación en kilo.ai e despois tentalo de novo.",
-    "viewOnGitHub": "Ver a PR en GitHub"
+    "viewOnGitHub": "Ver a PR en GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Punto de lista",
+        "nestedBulletPoint": "Punto de lista aniñado",
+        "orderedItem": "Elemento da lista {n}",
+        "nestedOrderedItem": "Elemento da lista aniñado {n}"
+      },
+      "blockquote": {
+        "quote": "Cita",
+        "nestedQuote": "Cita aniñada"
+      },
+      "table": {
+        "row": "Fila {n}: {content}"
+      },
+      "math": {
+        "equation": "Matemáticas: {latex}"
+      },
+      "rotor": {
+        "headings": "Cabeceiras",
+        "links": "Ligazóns",
+        "images": "Imaxes"
+      }
+    }
   },
   "language": {
     "restarting": "Reiniciando para aplicar o idioma",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "O resultado do recurso aparecerá nesta pantalla.",
       "nextStepFinal": "A decisión do recurso é definitiva. Non se pode presentar ningún recurso máis.",
       "viewReceipt": "Ver xustificante"
+    },
+    "reportReceipts": {
+      "title": "Denuncias",
+      "rowSubtitle": "Denuncias que presentaches e os seus resultados",
+      "emptyTitle": "Aínda non hai denuncias",
+      "emptyDescription": "As denuncias que presentes desde un comentario ou unha resposta da IA aparecerán aquí.",
+      "couldNotLoad": "Non se puideron cargar as túas denuncias",
+      "capped": "Mostrando as túas denuncias máis recentes."
     },
     "changelog": "Novidades",
     "changelogVersionPending": "As notas da versión {{version}} chegarán coa próxima actualización da aplicación.",
@@ -1277,7 +1308,7 @@
       "couldNotGetLatest": "Non se puido obter a información máis recente.",
       "byline": "#{{number}} por {{author}}",
       "noFindings": "Non hai achados.",
-      "findingsUnavailable": "Os resultados non están dispoñibles porque esta revisión fallou.",
+      "findingsUnavailable": "Os resultados non están dispoñibles.",
       "findingsInProgress": "Esta revisión segue en curso. Os achados aparecerán aquí cando remate.",
       "findingsEndedWithoutResults": "Esta revisión rematou antes de producir ningún achado.",
       "serviceUnavailable": "Non se puido conectar co servizo de revisión de código. Tenta de novo a revisión cando o servizo estea dispoñible.",
@@ -3591,6 +3622,7 @@
       "identifierLabel": "Identificador",
       "identifierRequired": "Introduce un identificador.",
       "identifierTaken": "Outro modo xa usa este identificador.",
+      "identifierTooLong": "Mantén o identificador en {{max}} caracteres ou menos.",
       "nameLabel": "Nome do modo",
       "nameRequired": "Introduce un nome de modo.",
       "notFound": "Este modo xa non existe.",
@@ -3753,6 +3785,34 @@
     "nextScheduled": "Próximas tarefas programadas",
     "answerNeeded": "Agardando resposta",
     "waitingToRetry": "Agardando para reintentar",
+    "countNoun": {
+      "needsInput_one": "Agardando resposta",
+      "needsInput_other": "Agardando resposta",
+      "running_one": "Traballando",
+      "running_other": "Traballando",
+      "scheduled_one": "Programada",
+      "scheduled_other": "Programadas",
+      "idle_one": "En espera",
+      "idle_other": "En espera"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Agardando resposta",
+      "needsInput_other": "{{displayCount}} Agardando resposta",
+      "running_one": "{{displayCount}} Traballando",
+      "running_other": "{{displayCount}} Traballando",
+      "scheduled_one": "{{displayCount}} Programada",
+      "scheduled_other": "{{displayCount}} Programadas",
+      "idle_one": "{{displayCount}} En espera",
+      "idle_other": "{{displayCount}} En espera"
+    },
+    "footer": {
+      "checked": "Comprobado {{time}}",
+      "lastKnown": "Último estado coñecido · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Próxima execución {{time}}",
+      "wasDue": "Estaba previsto {{time}}"
+    },
     "step": {
       "editing": "Edición",
       "reading": "Lectura",
@@ -4176,7 +4236,7 @@
     "personalDefaultDescription": "Carga automaticamente cando ningún repositorio ten un perfil fixado.",
     "organizationDefaultDescription": "Cargado automático para membros que non teñen ningún valor predeterminado persoal.",
     "setAsDefault": "Establecer como predeterminado",
-    "saveFailed": "Non se puido gardar o perfil",
+    "saveFailed": "Non se puido gardar o perfil. Téntao de novo.",
     "organizationRoleRequired": "Só os propietarios da organización e os administradores poden cambiar os perfís da organización.",
     "deleteTitle": "Eliminar perfil",
     "deleteMessage": "Isto elimina permanentemente o perfil e a súa configuración. Isto non se pode desfacer.",
@@ -4440,6 +4500,7 @@
         "balanceNeutral": "Sen efecto no saldo",
         "deduction": "Dedución",
         "grant": "Concesión de créditos",
+        "welcomeCredits": "Créditos de benvida",
         "purchase": "Compra"
       },
       "purchaseFallback": "Compra de créditos",
@@ -4695,6 +4756,8 @@
     "connectedTo": "Conectado a {{account}}",
     "disconnected": "{{provider}} desconectado",
     "disconnectFailed": "Non se puido desconectar {{provider}}",
+    "disconnectRetry": "Slack non puido confirmar a desconexión. Téntao de novo.",
+    "disconnectNeedsSupport": "Kilo non puido ler o acceso a Slack gardado para esta conexión. Contacta coa asistencia para rematar a desconexión.",
     "couldNotLoad": "Non se puideron cargar as integracións",
     "permissionDenied": "Non tes permiso para xestionar estas integracións.",
     "managedByOwner": "Pídelle a unha persoa propietaria da organización que cambie unha conexión que non poidas cambiar.",

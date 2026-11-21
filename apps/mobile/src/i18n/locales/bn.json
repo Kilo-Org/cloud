@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "এই নথিটি কেবল ইংরেজিতে উপলব্ধ।",
     "organizationTrialEndedBilling": "সংস্থার ট্রায়াল শেষ হয়েছে এবং এর কোনো সক্রিয় প্ল্যান নেই। আপনি বিলিং আপডেট করতে পারেন, তারপর আবার চেষ্টা করুন।",
     "organizationTrialEndedBillingAtKiloAi": "সংস্থার ট্রায়াল শেষ হয়েছে এবং এর কোনো সক্রিয় প্ল্যান নেই। আপনি kilo.ai-এ বিলিং আপডেট করতে পারেন, তারপর আবার চেষ্টা করুন।",
-    "viewOnGitHub": "GitHub-এ PR দেখুন"
+    "viewOnGitHub": "GitHub-এ PR দেখুন",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "বুলেট পয়েন্ট",
+        "nestedBulletPoint": "নেস্টেড বুলেট পয়েন্ট",
+        "orderedItem": "তালিকার আইটেম {n}",
+        "nestedOrderedItem": "নেস্টেড তালিকার আইটেম {n}"
+      },
+      "blockquote": {
+        "quote": "উদ্ধৃতি",
+        "nestedQuote": "নেস্টেড উদ্ধৃতি"
+      },
+      "table": {
+        "row": "সারি {n}: {content}"
+      },
+      "math": {
+        "equation": "গণিত: {latex}"
+      },
+      "rotor": {
+        "headings": "শিরোনামসমূহ",
+        "links": "লিংকসমূহ",
+        "images": "ছবিসমূহ"
+      }
+    }
   },
   "language": {
     "restarting": "নির্বাচিত ভাষা চালু করতে অ্যাপ আবার চালু হচ্ছে",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "আপনার আপিলের ফলাফল এই স্ক্রিনে দেখা যাবে।",
       "nextStepFinal": "আপিলের সিদ্ধান্ত চূড়ান্ত। আর কোনো আপিল করা যাবে না।",
       "viewReceipt": "রসিদ দেখুন"
+    },
+    "reportReceipts": {
+      "title": "রিপোর্ট",
+      "rowSubtitle": "আপনার জমা দেওয়া রিপোর্ট এবং সেগুলোর ফলাফল",
+      "emptyTitle": "এখনো কোনো রিপোর্ট নেই",
+      "emptyDescription": "মন্তব্য বা AI প্রতিক্রিয়া থেকে আপনি যে রিপোর্ট জমা দেন, সেগুলো এখানে দেখা যাবে।",
+      "couldNotLoad": "আপনার রিপোর্ট লোড করা যায়নি",
+      "capped": "আপনার সাম্প্রতিকতম রিপোর্টগুলো দেখানো হচ্ছে।"
     },
     "changelog": "নতুন কী",
     "changelogVersionPending": "{{version}} সংস্করণের নোটগুলো অ্যাপের পরবর্তী আপডেটের সাথে আসবে।",
@@ -1277,7 +1308,7 @@
       "couldNotGetLatest": "সর্বশেষ তথ্য পাওয়া যায়নি।",
       "byline": "#{{number}} — {{author}}",
       "noFindings": "কোনো ত্রুটি পাওয়া যায়নি।",
-      "findingsUnavailable": "এই পর্যালোচনা ব্যর্থ হওয়ায় ফলাফল পাওয়া যাচ্ছে না।",
+      "findingsUnavailable": "ফলাফল পাওয়া যাচ্ছে না।",
       "findingsInProgress": "এই পর্যালোচনা এখনও চলছে। শেষ হলে ত্রুটিগুলি এখানে দেখা যাবে।",
       "findingsEndedWithoutResults": "এই পর্যালোচনাটি কোনো ত্রুটি তৈরি হওয়ার আগেই শেষ হয়ে গেছে।",
       "serviceUnavailable": "কোড পর্যালোচনা পরিষেবার সঙ্গে সংযোগ করা যায়নি। পরিষেবা উপলভ্য হলে আবার পর্যালোচনার চেষ্টা করুন।",
@@ -3591,6 +3622,7 @@
       "identifierLabel": "আইডেন্টিফায়ার",
       "identifierRequired": "একটি আইডেন্টিফায়ার লিখুন।",
       "identifierTaken": "অন্য একটি মোড ইতিমধ্যে এই আইডেন্টিফায়ার ব্যবহার করছে।",
+      "identifierTooLong": "আইডেন্টিফায়ারটি {{max}}টি অক্ষর বা তার কম রাখুন।",
       "nameLabel": "মোডের নাম",
       "nameRequired": "একটি মোডের নাম লিখুন।",
       "notFound": "এই মোডটি আর নেই।",
@@ -3753,6 +3785,34 @@
     "nextScheduled": "পরবর্তী নির্ধারিত",
     "answerNeeded": "উত্তর প্রয়োজন",
     "waitingToRetry": "আবার চেষ্টার অপেক্ষায়",
+    "countNoun": {
+      "needsInput_one": "ইনপুট প্রয়োজন",
+      "needsInput_other": "ইনপুট প্রয়োজন",
+      "running_one": "কাজ চলছে",
+      "running_other": "কাজ চলছে",
+      "scheduled_one": "নির্ধারিত",
+      "scheduled_other": "নির্ধারিত",
+      "idle_one": "নিষ্ক্রিয়",
+      "idle_other": "নিষ্ক্রিয়"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} ইনপুট প্রয়োজন",
+      "needsInput_other": "{{displayCount}} ইনপুট প্রয়োজন",
+      "running_one": "{{displayCount}} কাজ চলছে",
+      "running_other": "{{displayCount}} কাজ চলছে",
+      "scheduled_one": "{{displayCount}} নির্ধারিত",
+      "scheduled_other": "{{displayCount}} নির্ধারিত",
+      "idle_one": "{{displayCount}} নিষ্ক্রিয়",
+      "idle_other": "{{displayCount}} নিষ্ক্রিয়"
+    },
+    "footer": {
+      "checked": "যাচাই করা হয়েছে {{time}}",
+      "lastKnown": "সর্বশেষ জানা · {{time}}"
+    },
+    "wake": {
+      "nextRun": "পরবর্তী রান {{time}}",
+      "wasDue": "প্রত্যাশিত ছিল {{time}}"
+    },
     "step": {
       "editing": "সম্পাদনা",
       "reading": "পড়া",
@@ -4176,7 +4236,7 @@
     "personalDefaultDescription": "কোনো সংগ্রহস্থলে পিন করা প্রোফাইল না থাকলে স্বয়ংক্রিয়ভাবে লোড হয়।",
     "organizationDefaultDescription": "কোন ব্যক্তিগত ডিফল্ট নেই যারা সদস্যদের জন্য স্বয়ংক্রিয় লোড.",
     "setAsDefault": "ডিফল্ট হিসেবে সেট করুন",
-    "saveFailed": "প্রোফাইল সংরক্ষণ করা যায়নি",
+    "saveFailed": "প্রোফাইল সংরক্ষণ করা যায়নি। আবার চেষ্টা করুন।",
     "organizationRoleRequired": "শুধুমাত্র সংস্থার মালিক এবং অ্যাডমিনরা সংস্থার প্রোফাইল পরিবর্তন করতে পারেন।",
     "deleteTitle": "প্রোফাইল মুছুন",
     "deleteMessage": "এটি স্থায়ীভাবে প্রোফাইল এবং এর সেটিংস সরিয়ে দেয়। এটি পূর্বাবস্থায় ফেরানো যাবে না।",
@@ -4440,6 +4500,7 @@
         "balanceNeutral": "ব্যালেন্স অপরিবর্তিত",
         "deduction": "কর্তন",
         "grant": "ক্রেডিট অনুদান",
+        "welcomeCredits": "স্বাগত ক্রেডিট",
         "purchase": "কেনাকাটা"
       },
       "purchaseFallback": "ক্রেডিট কেনাকাটা",
@@ -4695,6 +4756,8 @@
     "connectedTo": "{{account}}-এর সাথে সংযুক্ত",
     "disconnected": "{{provider}}-এর সংযোগ বিচ্ছিন্ন হয়েছে",
     "disconnectFailed": "{{provider}}-এর সংযোগ বিচ্ছিন্ন করা যায়নি",
+    "disconnectRetry": "Slack সংযোগটি বিচ্ছিন্ন হওয়ার বিষয়টি নিশ্চিত করতে পারেনি। আবার চেষ্টা করুন।",
+    "disconnectNeedsSupport": "Kilo এই সংযোগের জন্য সংরক্ষিত Slack অ্যাক্সেস পড়তে পারেনি। সংযোগ বিচ্ছিন্ন করা সম্পূর্ণ করতে সহায়তা দলের সঙ্গে যোগাযোগ করুন।",
     "couldNotLoad": "ইন্টিগ্রেশন লোড করা যায়নি",
     "permissionDenied": "এই ইন্টিগ্রেশনগুলো পরিচালনা করার অনুমতি আপনার নেই।",
     "managedByOwner": "আপনি যে সংযোগটি পরিবর্তন করতে পারবেন না, সেটি পরিবর্তন করার জন্য আপনার প্রতিষ্ঠানের একজন মালিককে বলুন।",

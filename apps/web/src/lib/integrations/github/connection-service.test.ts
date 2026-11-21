@@ -16,10 +16,20 @@ import {
   fetchGitHubInstallationDetails,
   fetchGitHubRepositoriesForMaintenance,
 } from '@/lib/integrations/platforms/github/adapter';
-import { disconnectGitHubInstallation } from '@/lib/integrations/db/github-installations';
+import {
+  connectVerifiedGitHubInstallation,
+  disconnectGitHubInstallation,
+} from '@/lib/integrations/db/github-installations';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
+
+const mockLogExceptInTest = jest.fn();
+
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/utils.server'),
+  logExceptInTest: (...args: unknown[]) => mockLogExceptInTest(...args),
+}));
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   fetchGitHubInstallationDetails: jest.fn(),
@@ -40,6 +50,7 @@ const candidate = {
 
 describe('GitHub connection attempt persistence', () => {
   beforeEach(async () => {
+    mockLogExceptInTest.mockClear();
     await cleanupDbForTest();
     await db.insert(kilocode_users).values({
       id: userId,
@@ -396,6 +407,94 @@ describe('GitHub connection attempt persistence', () => {
       .from(platform_integrations)
       .where(eq(platform_integrations.id, firstCompleted.integrationId));
     expect(row).toMatchObject({ github_disconnected_at: null, integration_status: 'active' });
+  });
+
+  test('logs a committed workflow-role transfer itself and keeps its public result shape', async () => {
+    const holderId = 'oauth/github-picker-blocked-holder';
+    await db.insert(kilocode_users).values({
+      id: holderId,
+      google_user_email: 'holder@example.com',
+      google_user_name: 'Holder',
+      google_user_image_url: '',
+      stripe_customer_id: 'cus_holder',
+    });
+    const personalCandidate = {
+      ...candidate,
+      accountLogin: 'picker',
+      accountType: 'User' as const,
+    };
+    const holder = await connectVerifiedGitHubInstallation(
+      { type: 'user', id: holderId },
+      {
+        platformInstallationId: candidate.installationId,
+        platformAccountId: candidate.accountId,
+        platformAccountLogin: personalCandidate.accountLogin,
+        permissions: { contents: 'read' },
+        scopes: ['push'],
+        repositoryAccess: 'all',
+        repositories: null,
+        installedAt: '2026-09-07T00:00:00.000Z',
+        githubAppType: 'standard',
+        kiloUserId: holderId,
+        githubUserId: '456',
+        accountType: 'User',
+      }
+    );
+    if (!holder.ok) throw new Error('Expected the holder to connect');
+    // A blocked account no longer holds the installation, so completing for the
+    // other verified owner transfers the workflow role.
+    await db
+      .update(kilocode_users)
+      .set({ blocked_reason: 'test block' })
+      .where(eq(kilocode_users.id, holderId));
+
+    const attemptId = await createGitHubConnectionAttempt({
+      kiloUserId: userId,
+      owner: { type: 'user', id: userId },
+      githubAppType: 'standard',
+      returnTo: null,
+    });
+    await recordGitHubConnectionDiscovery({
+      attemptId,
+      userId,
+      githubUserId: '456',
+      candidates: [personalCandidate],
+    });
+    await selectGitHubConnectionInstallation({
+      attemptId,
+      userId,
+      installationId: candidate.installationId,
+    });
+
+    const completed = await completeGitHubConnectionAttempt({
+      attemptId,
+      userId,
+      githubUserId: '456',
+      candidate: personalCandidate,
+      authorizeOwner: async () => {},
+    });
+    if (!completed.ok) throw new Error('Expected completion');
+
+    // The public result stays the plain success shape, and this caller logged
+    // the transfer itself after its transaction committed.
+    expect(Object.keys(completed).sort()).toEqual(['integrationId', 'ok']);
+    expect(mockLogExceptInTest).toHaveBeenCalledWith(
+      '[connectVerifiedGitHubInstallation] Workflow role transferred',
+      expect.objectContaining({
+        installationId: candidate.installationId,
+        integrationId: holder.integrationId,
+        demotedTo: 'agent_only',
+        reason: 'blocked_personal_owner',
+        successorOwner: `user:${userId}`,
+      })
+    );
+    expect(mockLogExceptInTest).toHaveBeenCalledTimes(1);
+    await expect(
+      db
+        .select({ role: platform_integrations.github_connection_role })
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, holder.integrationId))
+    ).resolves.toEqual([{ role: 'agent_only' }]);
   });
 
   test('rejects completion when verified identity does not match the locked attempt', async () => {

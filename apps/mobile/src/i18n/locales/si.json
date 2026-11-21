@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}, පුද්ගලික කේත ගබඩාව",
     "legalDocumentEnglishOnly": "මෙම ලේඛනය ඉංග්‍රීසි භාෂාවෙන් පමණක් ලබා ගත හැක.",
     "organizationTrialEndedBilling": "සංවිධානයේ පරීක්ෂණ කාලය අවසන් වී ඇති අතර එයට සක්‍රීය සැලැස්මක් නොමැත. ඔබට බිල්පත් යාවත්කාලීන කර නැවත උත්සාහ කළ හැක.",
-    "organizationTrialEndedBillingAtKiloAi": "සංවිධානයේ පරීක්ෂණ කාලය අවසන් වී ඇති අතර එයට සක්‍රීය සැලැස්මක් නොමැත. ඔබට kilo.ai හි බිල්පත් යාවත්කාලීන කර නැවත උත්සාහ කළ හැක."
+    "organizationTrialEndedBillingAtKiloAi": "සංවිධානයේ පරීක්ෂණ කාලය අවසන් වී ඇති අතර එයට සක්‍රීය සැලැස්මක් නොමැත. ඔබට kilo.ai හි බිල්පත් යාවත්කාලීන කර නැවත උත්සාහ කළ හැක.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "බුලට් ලක්ෂ්‍යය",
+        "nestedBulletPoint": "කැදැලි බුලට් ලක්ෂ්‍යය",
+        "orderedItem": "ලැයිස්තු අයිතමය {n}",
+        "nestedOrderedItem": "කැදැලි ලැයිස්තු අයිතමය {n}"
+      },
+      "blockquote": {
+        "quote": "උද්ධෘතය",
+        "nestedQuote": "කැදැලි උද්ධෘතය"
+      },
+      "table": {
+        "row": "පේළිය {n}: {content}"
+      },
+      "math": {
+        "equation": "ගණිතය: {latex}"
+      },
+      "rotor": {
+        "headings": "ශීර්ෂ",
+        "links": "සබැඳි",
+        "images": "රූප"
+      }
+    }
   },
   "language": {
     "restarting": "භාෂාව යෙදීමට නැවත ආරම්භ කරමින්",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "අභියාචනයේ ප්‍රතිඵලය මෙම තිරයේ දිස්වනු ඇත.",
       "nextStepFinal": "අභියාචන තීරණය අවසාන ය. තවදුරටත් අභියාචනයක් ඉදිරිපත් කළ නොහැක.",
       "viewReceipt": "රිසිට්පත බලන්න"
+    },
+    "reportReceipts": {
+      "title": "වාර්තා",
+      "rowSubtitle": "ඔබ ඉදිරිපත් කළ වාර්තා සහ ඒවායේ ප්‍රතිඵල",
+      "emptyTitle": "තවම වාර්තා නැත",
+      "emptyDescription": "ඔබ අදහසකින් හෝ AI ප්‍රතිචාරයකින් ඉදිරිපත් කරන වාර්තා මෙහි දිස්වේ.",
+      "couldNotLoad": "ඔබේ වාර්තා පූරණය කළ නොහැකි විය",
+      "capped": "ඔබේ නවතම වාර්තා පෙන්වමින් පවතී."
     },
     "changelog": "අලුත් දේ",
     "changelogVersionPending": "{{version}} අනුවාදයේ සටහන් ඊළඟ යෙදුම් යාවත්කාලීනය සමඟ ලැබේ.",
@@ -1277,7 +1308,7 @@
       "couldNotGetLatest": "නවතම තොරතුරු ලබාගත නොහැකි විය.",
       "byline": "#{{number}} {{author}} විසින්",
       "noFindings": "සොයාගැනීම් නැත.",
-      "findingsUnavailable": "මෙම සමාලෝචනය අසාර්ථක වූ නිසා ප්‍රතිඵල ලබා ගත නොහැක.",
+      "findingsUnavailable": "ප්‍රතිඵල ලබා ගත නොහැක.",
       "findingsInProgress": "මෙම සමාලෝචනය තවමත් සිදු වෙමින් පවතී. එය අවසන් වන විට සොයාගැනීම් මෙහි දිස් වේ.",
       "findingsEndedWithoutResults": "මෙම සමාලෝචනය කිසිදු සොයාගැනීමක් නිපදවීමට පෙර අවසන් විය.",
       "serviceUnavailable": "කේත සමාලෝචන සේවාවට සම්බන්ධ විය නොහැකි විය. සේවාව ලබා ගත හැකි වූ විට සමාලෝචනය කිරීමට නැවත උත්සාහ කරන්න.",
@@ -3591,6 +3622,7 @@
       "identifierLabel": "හඳුන්වනය",
       "identifierRequired": "හඳුන්වනයක් ඇතුළත් කරන්න.",
       "identifierTaken": "තවත් ප්‍රකාරයක් දැනටමත් මෙම හඳුන්වනය භාවිතා කරයි.",
+      "identifierTooLong": "හඳුන්වනය {{max}} අකුරු හෝ ඊට අඩුවෙන් තබන්න.",
       "nameLabel": "ප්‍රකාරයේ නම",
       "nameRequired": "ප්‍රකාරයේ නමක් ඇතුළත් කරන්න.",
       "notFound": "මෙම ප්‍රකාරය තවදුරටත් නොපවතී.",
@@ -3753,6 +3785,34 @@
     "nextScheduled": "ඊළඟ නියමිත කාර්යයන්",
     "answerNeeded": "පිළිතුරක් අවශ්‍යයි",
     "waitingToRetry": "නැවත උත්සාහ කිරීමට රැඳී සිටී",
+    "countNoun": {
+      "needsInput_one": "ඔබේ ප්‍රතිචාරය අවශ්‍යයි",
+      "needsInput_other": "ඔබේ ප්‍රතිචාරය අවශ්‍යයි",
+      "running_one": "ක්‍රියාත්මකයි",
+      "running_other": "ක්‍රියාත්මකයි",
+      "scheduled_one": "නියමිතයි",
+      "scheduled_other": "නියමිතයි",
+      "idle_one": "නිෂ්ක්‍රීයයි",
+      "idle_other": "නිෂ්ක්‍රීයයි"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} ඔබේ ප්‍රතිචාරය අවශ්‍යයි",
+      "needsInput_other": "{{displayCount}} ඔබේ ප්‍රතිචාරය අවශ්‍යයි",
+      "running_one": "{{displayCount}} ක්‍රියාත්මකයි",
+      "running_other": "{{displayCount}} ක්‍රියාත්මකයි",
+      "scheduled_one": "{{displayCount}} නියමිතයි",
+      "scheduled_other": "{{displayCount}} නියමිතයි",
+      "idle_one": "{{displayCount}} නිෂ්ක්‍රීයයි",
+      "idle_other": "{{displayCount}} නිෂ්ක්‍රීයයි"
+    },
+    "footer": {
+      "checked": "තහවුරු කළේ {{time}}",
+      "lastKnown": "අවසන් වරට දන්නා තත්ත්වය · {{time}}"
+    },
+    "wake": {
+      "nextRun": "ඊළඟ ක්‍රියාත්මක වීම {{time}}",
+      "wasDue": "අපේක්ෂිත විය {{time}}"
+    },
     "step": {
       "editing": "සංස්කරණය",
       "reading": "කියවීම",
@@ -4176,7 +4236,7 @@
     "personalDefaultDescription": "කිසිදු ගබඩාවක පින් කළ පැතිකඩක් නොමැති විට ස්වයංක්‍රීයව පටවනු ලැබේ.",
     "organizationDefaultDescription": "පුද්ගලික පෙරනිමියක් නොමැති සාමාජිකයින් සඳහා ස්වයංක්‍රීයව පටවනු ලැබේ.",
     "setAsDefault": "පෙරනිමිය ලෙස සකසන්න",
-    "saveFailed": "පැතිකඩ සුරැකීමට නොහැකි විය",
+    "saveFailed": "පැතිකඩ සුරැකීමට නොහැකි විය. නැවත උත්සාහ කරන්න.",
     "organizationRoleRequired": "සංවිධාන පැතිකඩ වෙනස් කළ හැක්කේ සංවිධාන හිමිකරුවන්ට සහ පරිපාලකවරුන්ට පමණි.",
     "deleteTitle": "පැතිකඩ මකන්න",
     "deleteMessage": "මෙය පැතිකඩ සහ එහි සැකසුම් ස්ථිරවම ඉවත් කරයි. මෙය ආපසු හැරවිය නොහැක.",
@@ -4440,6 +4500,7 @@
         "balanceNeutral": "ශේෂයට බලපෑමක් නැත",
         "deduction": "අඩු කිරීම",
         "grant": "ක්‍රෙඩිට් ප්‍රදානය",
+        "welcomeCredits": "පිළිගැනීමේ ක්‍රෙඩිට්",
         "purchase": "මිලදී ගැනීම"
       },
       "purchaseFallback": "ක්‍රෙඩිට් මිලදී ගැනීම",
@@ -4695,6 +4756,8 @@
     "connectedTo": "{{account}} වෙත සම්බන්ධිතයි",
     "disconnected": "{{provider}} විසන්ධි කරන ලදී",
     "disconnectFailed": "{{provider}} විසන්ධි කළ නොහැකි විය",
+    "disconnectRetry": "Slack විසින් විසන්ධි කිරීම තහවුරු කළ නොහැකි විය. නැවත උත්සාහ කරන්න.",
+    "disconnectNeedsSupport": "මෙම සම්බන්ධතාව සඳහා සුරකින ලද Slack ප්‍රවේශය Kilo විසින් කියවීමට නොහැකි විය. විසන්ධි කිරීම සම්පූර්ණ කිරීමට සහාය කණ්ඩායම අමතන්න.",
     "couldNotLoad": "ඒකාබද්ධ කිරීම් පූරණය කළ නොහැකි විය",
     "permissionDenied": "මෙම ඒකාබද්ධ කිරීම් කළමනාකරණය කිරීමට ඔබට අවසර නැත.",
     "managedByOwner": "ඔබට වෙනස් කළ නොහැකි සම්බන්ධතාවක් වෙනස් කිරීමට සංවිධානයේ හිමිකරුවෙකුගෙන් ඉල්ලා සිටින්න.",

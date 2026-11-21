@@ -1,4 +1,5 @@
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import type {
   IntegrationPermissions,
@@ -8,9 +9,15 @@ import type {
 import {
   github_app_installations,
   github_installation_webhook_receipts,
+  kilocode_users,
+  organizations,
   platform_integrations,
 } from '@kilocode/db/schema';
 import { and, eq, isNull, lt, ne, or, sql } from 'drizzle-orm';
+import {
+  getGitHubInstallationHolderRejectionReason,
+  type GitHubInstallationHolderRejectionReason,
+} from '@/lib/integrations/github/runtime-authorization';
 import {
   canOrganizationCreateSharedGitHubConnection,
   canOrganizationUseMultipleGitHubInstallations,
@@ -60,6 +67,25 @@ export type VerifiedGitHubInstallationData = {
   pendingIntegrationId?: string;
 };
 
+/**
+ * Why a workflow-role holder was demoted, as logged. `integration_status` is
+ * logged as `inactive_status`, the long-standing value every other
+ * inactive-status transfer already carried.
+ */
+export type GitHubWorkflowRoleTransferReason =
+  | Exclude<GitHubInstallationHolderRejectionReason, 'integration_status'>
+  | 'inactive_status';
+
+/** One workflow-role demotion this connect performed, for logging after commit. */
+export type GitHubWorkflowRoleTransfer = {
+  installationId: string;
+  appType: 'standard' | 'lite';
+  integrationId: string;
+  demotedTo: 'agent_only' | 'none';
+  reason: GitHubWorkflowRoleTransferReason;
+  successorOwner: string;
+};
+
 export type ConnectVerifiedGitHubInstallationResult =
   | { ok: true; integrationId: string }
   | {
@@ -72,6 +98,27 @@ export type ConnectVerifiedGitHubInstallationResult =
         | 'multiple_installations_disabled'
         | 'installation_unavailable';
     };
+
+/**
+ * Result of a connect that ran in a caller-owned transaction. `roleTransfers`
+ * lists the workflow-role demotions the transaction performed.
+ *
+ * A caller that supplied the transaction (via `connectVerifiedGitHubInstallation`'s
+ * `transaction` parameter) MUST log them with `logGitHubWorkflowRoleTransfers`
+ * only after that transaction has committed, because a rollback would otherwise
+ * leave a logged transfer that never happened. Logging inside the transaction
+ * cannot know whether it commits.
+ */
+export type ConnectVerifiedGitHubInstallationInTransactionResult =
+  | { ok: true; integrationId: string; roleTransfers: GitHubWorkflowRoleTransfer[] }
+  | Extract<ConnectVerifiedGitHubInstallationResult, { ok: false }>;
+
+/** Logs committed workflow-role transfers. See the in-transaction result type. */
+export function logGitHubWorkflowRoleTransfers(transfers: GitHubWorkflowRoleTransfer[]): void {
+  for (const transfer of transfers) {
+    logExceptInTest('[connectVerifiedGitHubInstallation] Workflow role transferred', transfer);
+  }
+}
 
 function isCanonicalInstallationId(value: string): boolean {
   return /^[1-9][0-9]*$/.test(value);
@@ -93,12 +140,41 @@ function mergeRepositoryCache(
   ];
 }
 
+/**
+ * Connects inside a caller-owned transaction. Logging a transfer needs a
+ * commit, so this path only collects the transfers in `roleTransfers`; see
+ * `ConnectVerifiedGitHubInstallationInTransactionResult` and
+ * `logGitHubWorkflowRoleTransfers`.
+ *
+ * Declared before the owning overload so `ReturnType` and `jest.mocked` of this
+ * function resolve to the owning result, which callers without a transaction
+ * receive.
+ */
+export async function connectVerifiedGitHubInstallation(
+  owner: Owner,
+  data: VerifiedGitHubInstallationData,
+  transaction: DbTransaction
+): Promise<ConnectVerifiedGitHubInstallationInTransactionResult>;
+/**
+ * Connects a verified GitHub installation for `owner`, owning its transaction.
+ * The workflow-role transfers this call committed are logged before it
+ * resolves.
+ */
+export async function connectVerifiedGitHubInstallation(
+  owner: Owner,
+  data: VerifiedGitHubInstallationData
+): Promise<ConnectVerifiedGitHubInstallationResult>;
 export async function connectVerifiedGitHubInstallation(
   owner: Owner,
   data: VerifiedGitHubInstallationData,
   transaction?: DbTransaction
-): Promise<ConnectVerifiedGitHubInstallationResult> {
-  const execute = async (tx: DbTransaction): Promise<ConnectVerifiedGitHubInstallationResult> => {
+): Promise<
+  ConnectVerifiedGitHubInstallationInTransactionResult | ConnectVerifiedGitHubInstallationResult
+> {
+  const execute = async (
+    tx: DbTransaction
+  ): Promise<ConnectVerifiedGitHubInstallationInTransactionResult> => {
+    const roleTransfers: GitHubWorkflowRoleTransfer[] = [];
     await tx.execute(sql`SET LOCAL lock_timeout = '5s'`);
     await tx.execute(sql`SET LOCAL statement_timeout = '30s'`);
     await tx.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '60s'`);
@@ -143,7 +219,12 @@ export async function connectVerifiedGitHubInstallation(
     }
     if (requiresOwnerCardinalityLock) {
       // A locally disconnected connection has relinquished its slot; it must
-      // not block attaching a different installation.
+      // not block attaching a different installation. This is deliberately
+      // narrower than the holder rule the connection role uses
+      // (`getGitHubInstallationHolderRejectionReason`): this check decides how
+      // many installations the organization holds, and a suspended association
+      // is restored to active by `observeGitHubInstallationLifecycle`, so it
+      // must keep occupying the slot.
       const ownerIntegrations = await getOrganizationGitHubInstallationSlots(owner.id, tx);
       const hasAnotherInstallation = ownerIntegrations.some(integration =>
         occupiesAnotherGitHubInstallationSlot(integration, {
@@ -214,8 +295,16 @@ export async function connectVerifiedGitHubInstallation(
       .where(eq(github_app_installations.id, canonical.id));
 
     const existingMatches = await tx
-      .select()
+      .select({
+        integration: platform_integrations,
+        organizationDeletedAt: organizations.deleted_at,
+        userRecordId: kilocode_users.id,
+        userBlockedAt: kilocode_users.blocked_at,
+        userBlockedReason: kilocode_users.blocked_reason,
+      })
       .from(platform_integrations)
+      .leftJoin(organizations, eq(platform_integrations.owned_by_organization_id, organizations.id))
+      .leftJoin(kilocode_users, eq(platform_integrations.owned_by_user_id, kilocode_users.id))
       .where(
         and(
           eq(platform_integrations.platform, PLATFORM.GITHUB),
@@ -223,28 +312,40 @@ export async function connectVerifiedGitHubInstallation(
           effectiveAppTypeCondition(data.githubAppType)
         )
       )
-      .for('update');
+      // PostgreSQL rejects `FOR UPDATE` over a nullable outer join, so the lock
+      // covers the association rows only. The joined owner rows are read in the
+      // same statement.
+      .for('update', { of: platform_integrations });
 
     if (
       existingMatches.some(
         association =>
-          association.github_installation_id !== null &&
-          association.github_installation_id !== canonical.id
+          association.integration.github_installation_id !== null &&
+          association.integration.github_installation_id !== canonical.id
       )
     ) {
       return { ok: false, reason: 'installation_unavailable' };
     }
     const ownerMatches = existingMatches.filter(
       association =>
-        (owner.type === 'user' && association.owned_by_user_id === owner.id) ||
-        (owner.type === 'org' && association.owned_by_organization_id === owner.id)
+        (owner.type === 'user' && association.integration.owned_by_user_id === owner.id) ||
+        (owner.type === 'org' && association.integration.owned_by_organization_id === owner.id)
     );
     if (ownerMatches.length > 1) {
       return { ok: false, reason: 'installation_unavailable' };
     }
-    const existing = ownerMatches[0];
+    const existing = ownerMatches[0]?.integration;
     const otherOwnerAssociations = existingMatches.filter(
-      association => association.id !== existing?.id
+      association => association.integration.id !== existing?.id
+    );
+    // The role follows the associations that can act for the installation, which
+    // is the eligibility rule runtime authorization applies: the owner
+    // (personal record present and unblocked, organization not soft-deleted)
+    // and the association (active status, no suspension, valid authorization,
+    // no local disconnect). A row runtime authorization refuses must not hold
+    // the role.
+    const otherOwnerHolders = otherOwnerAssociations.filter(
+      association => getGitHubInstallationHolderRejectionReason(association) === null
     );
 
     if (
@@ -275,11 +376,93 @@ export async function connectVerifiedGitHubInstallation(
     if (existing && existing.github_connection_role === null && !canRecoverLegacyWorkflow) {
       return { ok: false, reason: 'installation_unavailable' };
     }
+    const roleFromOwnership: 'workflow' | 'agent_only' =
+      existing?.github_connection_role === 'workflow' || otherOwnerHolders.length === 0
+        ? 'workflow'
+        : 'agent_only';
+
+    // A personal owner does not take the workflow role from an organization.
+    // The organization workflow connection definition
+    // (`organizationWorkflowGitHubConnectionSql`) matches organization-owned
+    // rows only, so an organization demoted here would lose its workflow
+    // installation — Security Agent and review sync included — until its owner
+    // disconnects, and the healthy personal holder would then block it from
+    // recovering. An organization association relinquishes the installation
+    // only by a local disconnect, which is also the condition the
+    // single-installation slot check reads, so a suspended or auth-invalid
+    // organization association keeps the role until its owner restores it.
+    //
+    // A soft-deleted organization is the exception: it has no restore path, so
+    // it must not keep the installation from a personal claimant. The deletion
+    // is read from the joined owner record above.
+    //
+    // A new personal association is refused while an organization still holds
+    // the installation, and an existing personal association keeps the role it
+    // already stores — including `workflow` when it holds that role.
+    const organizationHoldsInstallation =
+      owner.type === 'user' &&
+      otherOwnerAssociations.some(
+        association =>
+          association.integration.owned_by_organization_id !== null &&
+          association.integration.github_disconnected_at === null &&
+          association.organizationDeletedAt === null
+      );
     const role: 'workflow' | 'agent_only' =
-      existing?.github_connection_role ??
-      (otherOwnerAssociations.length > 0 ? 'agent_only' : 'workflow');
+      roleFromOwnership === 'workflow' &&
+      organizationHoldsInstallation &&
+      existing?.github_connection_role !== 'workflow'
+        ? 'agent_only'
+        : roleFromOwnership;
     if (!existing && role === 'agent_only' && owner.type !== 'org') {
       return { ok: false, reason: 'claimed_by_other_owner' };
+    }
+
+    if (role === 'workflow') {
+      // The workflow role is single per installation identity
+      // (`UQ_platform_integrations_github_workflow_identity`, a unique index on
+      // `COALESCE(github_app_type, 'standard')` plus `platform_installation_id`
+      // restricted to `github_connection_role = 'workflow'`), so the loop below
+      // demotes only the peers that still store the role and fail the holder
+      // rule, which is the runtime eligibility rule (owner and association).
+      // A holding peer is never met: this association reached `workflow` either
+      // because it already stored that role, which the same unique index denies
+      // to every peer of the identity, or because no other association of the
+      // identity passes `getGitHubInstallationHolderRejectionReason`.
+      //
+      // The demotion is a transfer, not a suspension, and nothing reverses it
+      // on its own: `observeGitHubInstallationLifecycle` restores a suspended
+      // association to active without touching its role, and runtime
+      // authorization never promotes a holding secondary association. The
+      // demoted owner regains the role by connecting again once the current
+      // holder stops holding the installation, which is the same path a second
+      // owner already follows. The write below leaves `updated_at` alone,
+      // because that column is the tie-breaker of
+      // `personalGitHubIntegrationOrder()` and the connection state of this
+      // association did not change.
+      //
+      // The transfer is logged after commit, never here: a rollback of this
+      // transaction would otherwise report a transfer that never happened.
+      for (const association of otherOwnerAssociations) {
+        if (association.integration.github_connection_role !== 'workflow') continue;
+        const rejection = getGitHubInstallationHolderRejectionReason(association);
+        if (rejection === null) continue;
+        const demotedRole = association.integration.github_installation_id ? 'agent_only' : null;
+        await tx
+          .update(platform_integrations)
+          .set({
+            github_connection_role: demotedRole,
+            updated_at: association.integration.updated_at,
+          })
+          .where(eq(platform_integrations.id, association.integration.id));
+        roleTransfers.push({
+          installationId: data.platformInstallationId,
+          appType: data.githubAppType,
+          integrationId: association.integration.id,
+          demotedTo: demotedRole ?? 'none',
+          reason: rejection === 'integration_status' ? 'inactive_status' : rejection,
+          successorOwner: `${owner.type}:${owner.id}`,
+        });
+      }
     }
 
     const requiresSharingAdmission =
@@ -289,8 +472,10 @@ export async function connectVerifiedGitHubInstallation(
         return { ok: false, reason: 'shared_installation_disabled' };
       }
       if (
-        otherOwnerAssociations.some(
-          association => !association.github_installation_id || !association.github_connection_role
+        otherOwnerHolders.some(
+          association =>
+            !association.integration.github_installation_id ||
+            !association.integration.github_connection_role
         )
       ) {
         return { ok: false, reason: 'installation_unavailable' };
@@ -323,7 +508,7 @@ export async function connectVerifiedGitHubInstallation(
         .update(platform_integrations)
         .set({ ...values, github_disconnected_at: null })
         .where(eq(platform_integrations.id, existing.id));
-      return { ok: true, integrationId: existing.id };
+      return { ok: true, integrationId: existing.id, roleTransfers };
     }
 
     const pendingCandidates = await tx
@@ -371,11 +556,15 @@ export async function connectVerifiedGitHubInstallation(
           })
           .returning({ id: platform_integrations.id });
     if (!created) return { ok: false, reason: 'installation_unavailable' };
-    return { ok: true, integrationId: created.id };
+    return { ok: true, integrationId: created.id, roleTransfers };
   };
 
   try {
-    return await (transaction ? execute(transaction) : db.transaction(execute));
+    if (transaction) return await execute(transaction);
+    const committed = await db.transaction(execute);
+    if (!committed.ok) return committed;
+    logGitHubWorkflowRoleTransfers(committed.roleTransfers);
+    return { ok: true, integrationId: committed.integrationId };
   } catch (error) {
     const code = getPostgresErrorCode(error);
     if (code !== null && RETRYABLE_TRANSACTION_SQLSTATES.has(code)) {

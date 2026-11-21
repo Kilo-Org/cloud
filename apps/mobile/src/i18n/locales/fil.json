@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Ang dokumentong ito ay makukuha lamang sa Ingles.",
     "organizationTrialEndedBilling": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update mo ang billing, pagkatapos ay subukan muli.",
     "organizationTrialEndedBillingAtKiloAi": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update mo ang billing sa kilo.ai, pagkatapos ay subukan muli.",
-    "viewOnGitHub": "Tingnan ang PR sa GitHub"
+    "viewOnGitHub": "Tingnan ang PR sa GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Puntong listahan",
+        "nestedBulletPoint": "Nakapasok na puntong listahan",
+        "orderedItem": "Item sa listahan {n}",
+        "nestedOrderedItem": "Nakapasok na item sa listahan {n}"
+      },
+      "blockquote": {
+        "quote": "Sipi",
+        "nestedQuote": "Nakapasok na sipi"
+      },
+      "table": {
+        "row": "Hanay {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Mga pamagat",
+        "links": "Mga link",
+        "images": "Mga larawan"
+      }
+    }
   },
   "language": {
     "restarting": "Ini-restart para ilapat ang wika",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Lalabas ang resulta ng apela sa screen na ito.",
       "nextStepFinal": "Pinal na ang desisyon sa apela. Hindi na maaaring magsumite ng panibagong apela.",
       "viewReceipt": "Tingnan ang resibo"
+    },
+    "reportReceipts": {
+      "title": "Mga ulat",
+      "rowSubtitle": "Mga ulat na isinumite mo at ang mga resulta nito",
+      "emptyTitle": "Wala pang ulat",
+      "emptyDescription": "Lalabas dito ang mga ulat na isusumite mo mula sa isang komento o tugon ng AI.",
+      "couldNotLoad": "Hindi ma-load ang mga ulat mo",
+      "capped": "Ipinapakita ang mga pinakabago mong ulat."
     },
     "changelog": "Mga bago",
     "changelogVersionPending": "Nasa susunod na update ng app ang mga tala ng bersyong {{version}}.",
@@ -1277,7 +1308,7 @@
       "couldNotGetLatest": "Hindi makuha ang pinakabagong data.",
       "byline": "#{{number}} ni {{author}}",
       "noFindings": "Walang natukoy na isyu.",
-      "findingsUnavailable": "Hindi available ang mga resulta dahil nabigo ang pagsusuring ito.",
+      "findingsUnavailable": "Hindi available ang mga resulta.",
       "findingsInProgress": "Nagpapatuloy pa ang pagsusuri. Lalabas dito ang mga resulta kapag natapos na ito.",
       "findingsEndedWithoutResults": "Natapos ang pagsusuri nang hindi nakalikha ng anumang resulta.",
       "serviceUnavailable": "Hindi makakonekta sa serbisyo ng pagsusuri ng code. Subukang muli ang pagsusuri kapag available na ang serbisyo.",
@@ -3591,6 +3622,7 @@
       "identifierLabel": "Identifier",
       "identifierRequired": "Maglagay ng identifier.",
       "identifierTaken": "Ginagamit na ng ibang modo ang identifier na ito.",
+      "identifierTooLong": "Panatilihin ang identifier sa {{max}} character o mas kaunti.",
       "nameLabel": "Pangalan ng modo",
       "nameRequired": "Maglagay ng pangalan ng modo.",
       "notFound": "Wala na ang modong ito.",
@@ -3753,6 +3785,34 @@
     "nextScheduled": "Susunod na naka-iskedyul",
     "answerNeeded": "Kailangan ng sagot",
     "waitingToRetry": "Naghihintay ng muling pagsubok",
+    "countNoun": {
+      "needsInput_one": "Naghihintay ng sagot",
+      "needsInput_other": "Naghihintay ng sagot",
+      "running_one": "Nagtatrabaho",
+      "running_other": "Nagtatrabaho",
+      "scheduled_one": "Naka-iskedyul",
+      "scheduled_other": "Naka-iskedyul",
+      "idle_one": "Walang ginagawa",
+      "idle_other": "Walang ginagawa"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Naghihintay ng sagot",
+      "needsInput_other": "{{displayCount}} Naghihintay ng sagot",
+      "running_one": "{{displayCount}} Nagtatrabaho",
+      "running_other": "{{displayCount}} Nagtatrabaho",
+      "scheduled_one": "{{displayCount}} Naka-iskedyul",
+      "scheduled_other": "{{displayCount}} Naka-iskedyul",
+      "idle_one": "{{displayCount}} Walang ginagawa",
+      "idle_other": "{{displayCount}} Walang ginagawa"
+    },
+    "footer": {
+      "checked": "Nakumpirma {{time}}",
+      "lastKnown": "Huling nalaman · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Susunod na pagpapatakbo {{time}}",
+      "wasDue": "Inasahan {{time}}"
+    },
     "step": {
       "editing": "Nag-e-edit",
       "reading": "Nagbabasa",
@@ -4176,7 +4236,7 @@
     "personalDefaultDescription": "Awtomatikong na-load kapag walang repository na may naka-pin na profile.",
     "organizationDefaultDescription": "Awtomatikong na-load para sa mga miyembrong walang personal na default.",
     "setAsDefault": "Itakda bilang default",
-    "saveFailed": "Hindi ma-save ang profile",
+    "saveFailed": "Hindi ma-save ang profile. Subukang muli.",
     "organizationRoleRequired": "Mga may-ari ng organisasyon at admin lang ang maaaring baguhin ang profile ng organisasyon.",
     "deleteTitle": "Tanggalin ang profile",
     "deleteMessage": "Permanente nitong inaalis ang profile at mga setting nito. Hindi na ito maaaring bawiin.",
@@ -4440,6 +4500,7 @@
         "balanceNeutral": "Walang epekto sa balanse",
         "deduction": "Bawas",
         "grant": "Libreng credit",
+        "welcomeCredits": "Panimulang credit",
         "purchase": "Pagbili"
       },
       "purchaseFallback": "Pagbili ng credit",
@@ -4695,6 +4756,8 @@
     "connectedTo": "Nakakonekta sa {{account}}",
     "disconnected": "Nadiskonekta ang {{provider}}",
     "disconnectFailed": "Hindi ma-diskonekta ang {{provider}}",
+    "disconnectRetry": "Hindi makumpirma ng Slack ang pagdiskonekta. Subukan muli.",
+    "disconnectNeedsSupport": "Hindi mabasa ng Kilo ang naka-save na access sa Slack para sa koneksyong ito. Makipag-ugnayan sa suporta para tapusin ang pagdiskonekta.",
     "couldNotLoad": "Hindi ma-load ang mga integration",
     "permissionDenied": "Wala kang pahintulot na pamahalaan ang mga integration na ito.",
     "managedByOwner": "Hilingin sa isang may-ari ng organisasyon na baguhin ang isang koneksyong hindi mo mababago.",

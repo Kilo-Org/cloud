@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Dokiman sa a disponib nan lang angle sèlman.",
     "organizationTrialEndedBilling": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Ou ka mete ajou faktirasyon, epi eseye ankò.",
     "organizationTrialEndedBillingAtKiloAi": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Ou ka mete ajou faktirasyon sou kilo.ai, epi eseye ankò.",
-    "viewOnGitHub": "Gade PR a sou GitHub"
+    "viewOnGitHub": "Gade PR a sou GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Pwen lis",
+        "nestedBulletPoint": "Pwen lis anbo",
+        "orderedItem": "Eleman lis {n}",
+        "nestedOrderedItem": "Eleman lis anbo {n}"
+      },
+      "blockquote": {
+        "quote": "Sitasyon",
+        "nestedQuote": "Sitasyon anbo"
+      },
+      "table": {
+        "row": "Ranje {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematik: {latex}"
+      },
+      "rotor": {
+        "headings": "Tit",
+        "links": "Lyen",
+        "images": "Imaj"
+      }
+    }
   },
   "language": {
     "restarting": "Ap rekòmanse pou itilize lang ou chwazi a",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Rezilta apèl la ap parèt sou ekran sa a.",
       "nextStepFinal": "Desizyon apèl la final. Ou pa ka soumèt okenn lòt apèl.",
       "viewReceipt": "Wè resi a"
+    },
+    "reportReceipts": {
+      "title": "Rapò",
+      "rowSubtitle": "Rapò ou te soumèt ak rezilta yo",
+      "emptyTitle": "Poko gen rapò",
+      "emptyDescription": "Rapò ou soumèt soti nan yon kòmantè oswa nan yon repons AI ap parèt isit la.",
+      "couldNotLoad": "Nou pa t ka chaje rapò ou",
+      "capped": "Ap montre rapò ou ki pi resan yo."
     },
     "changelog": "Sa ki nouvo",
     "changelogVersionPending": "Nòt vèsyon {{version}} an ap vini ak pwochen mizajou aplikasyon an.",
@@ -1277,7 +1308,7 @@
       "couldNotGetLatest": "Nou pa t ka jwenn dènye done yo.",
       "byline": "#{{number}} pa {{author}}",
       "noFindings": "Pa gen okenn konsta.",
-      "findingsUnavailable": "Rezilta yo pa disponib paske revizyon sa a echwe.",
+      "findingsUnavailable": "Rezilta yo pa disponib.",
       "findingsInProgress": "Revizyon sa a poko fini. Konsta yo ap parèt la a lè l fini.",
       "findingsEndedWithoutResults": "Revizyon sa a fini anvan l fè nenpòt konsta.",
       "serviceUnavailable": "Nou pa t ka konekte ak sèvis revizyon kòd la. Eseye revizyon an ankò lè sèvis la disponib.",
@@ -3591,6 +3622,7 @@
       "identifierLabel": "Idantifyan",
       "identifierRequired": "Antre yon idantifyan.",
       "identifierTaken": "Yon lòt mòd deja itilize idantifyan sa a.",
+      "identifierTooLong": "Kenbe idantifyan an nan {{max}} karaktè oswa mwens.",
       "nameLabel": "Non mòd",
       "nameRequired": "Antre yon non mòd.",
       "notFound": "Mòd sa a pa egziste ankò.",
@@ -3753,6 +3785,34 @@
     "nextScheduled": "Pwochen ki pwograme",
     "answerNeeded": "Bezwen repons",
     "waitingToRetry": "Ap tann pou reeseye",
+    "countNoun": {
+      "needsInput_one": "Bezwen repons",
+      "needsInput_other": "Bezwen repons",
+      "running_one": "Ap travay",
+      "running_other": "Ap travay",
+      "scheduled_one": "Pwograme",
+      "scheduled_other": "Pwograme",
+      "idle_one": "San aktivite",
+      "idle_other": "San aktivite"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Bezwen repons",
+      "needsInput_other": "{{displayCount}} Bezwen repons",
+      "running_one": "{{displayCount}} Ap travay",
+      "running_other": "{{displayCount}} Ap travay",
+      "scheduled_one": "{{displayCount}} Pwograme",
+      "scheduled_other": "{{displayCount}} Pwograme",
+      "idle_one": "{{displayCount}} San aktivite",
+      "idle_other": "{{displayCount}} San aktivite"
+    },
+    "footer": {
+      "checked": "Verifye {{time}}",
+      "lastKnown": "Dènye eta koni · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Pwochen ekzekisyon {{time}}",
+      "wasDue": "Te dwe {{time}}"
+    },
     "step": {
       "editing": "Modifikasyon",
       "reading": "Lekti",
@@ -4176,7 +4236,7 @@
     "personalDefaultDescription": "Oto-chaje lè pa gen okenn depo ki gen yon pwofil kole.",
     "organizationDefaultDescription": "Oto-chaje pou manm ki pa gen okenn default pèsonèl.",
     "setAsDefault": "Mete kòm default",
-    "saveFailed": "Pa t 'kapab sove pwofil la",
+    "saveFailed": "Pa t 'kapab sove pwofil la. Eseye ankò.",
     "organizationRoleRequired": "Se sèlman pwopriyetè òganizasyon an ak administratè yo ki ka chanje pwofil òganizasyon an.",
     "deleteTitle": "Efase pwofil",
     "deleteMessage": "Sa a pou tout tan retire pwofil la ak paramèt li yo. Sa a pa ka defèt.",
@@ -4440,6 +4500,7 @@
         "balanceNeutral": "San efè sou balans",
         "deduction": "Dediksyon",
         "grant": "Kredi gratis",
+        "welcomeCredits": "Kredi byenvini",
         "purchase": "Acha"
       },
       "purchaseFallback": "Acha kredi",
@@ -4695,6 +4756,8 @@
     "connectedTo": "Konekte ak {{account}}",
     "disconnected": "{{provider}} dekonekte",
     "disconnectFailed": "Pa t ka dekonekte {{provider}}",
+    "disconnectRetry": "Slack pa t ka konfime dekoneksyon an. Eseye ankò.",
+    "disconnectNeedsSupport": "Kilo pa t ka li aksè Slack ki anrejistre pou koneksyon sa a. Kontakte ekip sipò a pou fini dekoneksyon an.",
     "couldNotLoad": "Pa t ka chaje entegrasyon yo",
     "permissionDenied": "Ou pa gen pèmisyon pou jere entegrasyon sa yo.",
     "managedByOwner": "Mande yon pwopriyetè òganizasyon pou chanje yon koneksyon ou pa ka chanje.",

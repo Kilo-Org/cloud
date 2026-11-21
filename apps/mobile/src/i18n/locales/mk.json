@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Овој документ е достапен само на англиски јазик.",
     "organizationTrialEndedBilling": "Пробниот период на организацијата заврши и таа нема активен план. Можеш да го ажурираш наплатувањето, а потоа да се обидеш повторно.",
     "organizationTrialEndedBillingAtKiloAi": "Пробниот период на организацијата заврши и таа нема активен план. Можеш да го ажурираш наплатувањето на kilo.ai, а потоа да се обидеш повторно.",
-    "viewOnGitHub": "Прикажи PR на GitHub"
+    "viewOnGitHub": "Прикажи PR на GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Точка на список",
+        "nestedBulletPoint": "Вгнездена точка на список",
+        "orderedItem": "Ставка на список {n}",
+        "nestedOrderedItem": "Вгнездена ставка на список {n}"
+      },
+      "blockquote": {
+        "quote": "Цитат",
+        "nestedQuote": "Вгнезден цитат"
+      },
+      "table": {
+        "row": "Ред {n}: {content}"
+      },
+      "math": {
+        "equation": "Математика: {latex}"
+      },
+      "rotor": {
+        "headings": "Наслови",
+        "links": "Линкови",
+        "images": "Слики"
+      }
+    }
   },
   "language": {
     "restarting": "Се рестартира за да се примени јазикот",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Исходот од жалбата ќе се прикаже на овој екран.",
       "nextStepFinal": "Одлуката по жалбата е конечна. Не може да се поднесе дополнителна жалба.",
       "viewReceipt": "Прикажи потврда"
+    },
+    "reportReceipts": {
+      "title": "Пријави",
+      "rowSubtitle": "Пријави што сте ги поднеле и нивните исходи",
+      "emptyTitle": "Сè уште нема пријави",
+      "emptyDescription": "Пријавите што ги поднесувате од коментар или од AI одговор се прикажуваат овде.",
+      "couldNotLoad": "Не можеа да се вчитаат вашите пријави",
+      "capped": "Се прикажуваат вашите најнови пријави."
     },
     "changelog": "Што има ново",
     "changelogVersionPending": "Белешките за верзијата {{version}} ќе стигнат со следното ажурирање.",
@@ -1277,7 +1308,7 @@
       "couldNotGetLatest": "Не можеа да се преземат најновите податоци.",
       "byline": "#{{number}} од {{author}}",
       "noFindings": "Нема наоди.",
-      "findingsUnavailable": "Резултатите не се достапни бидејќи овој преглед беше неуспешен.",
+      "findingsUnavailable": "Резултатите не се достапни.",
       "findingsInProgress": "Овој преглед сè уште е во тек. Наодите ќе се појават тука кога ќе заврши.",
       "findingsEndedWithoutResults": "Овој преглед заврши пред да даде некои наоди.",
       "serviceUnavailable": "Не успеа поврзувањето со услугата за преглед на код. Повтори го прегледот кога услугата ќе биде достапна.",
@@ -3591,6 +3622,7 @@
       "identifierLabel": "Идентификатор",
       "identifierRequired": "Внеси идентификатор.",
       "identifierTaken": "Друг режим веќе го користи овој идентификатор.",
+      "identifierTooLong": "Задржи го идентификаторот на {{max}} знаци или помалку.",
       "nameLabel": "Име на режимот",
       "nameRequired": "Внеси име на режимот.",
       "notFound": "Овој режим веќе не постои.",
@@ -3753,6 +3785,34 @@
     "nextScheduled": "Следни закажани",
     "answerNeeded": "Потребен е одговор",
     "waitingToRetry": "Чека повторен обид",
+    "countNoun": {
+      "needsInput_one": "Чека внес",
+      "needsInput_other": "Чека внес",
+      "running_one": "Во тек",
+      "running_other": "Во тек",
+      "scheduled_one": "Закажано",
+      "scheduled_other": "Закажано",
+      "idle_one": "Во мирување",
+      "idle_other": "Во мирување"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Чека внес",
+      "needsInput_other": "{{displayCount}} Чека внес",
+      "running_one": "{{displayCount}} Во тек",
+      "running_other": "{{displayCount}} Во тек",
+      "scheduled_one": "{{displayCount}} Закажано",
+      "scheduled_other": "{{displayCount}} Закажано",
+      "idle_one": "{{displayCount}} Во мирување",
+      "idle_other": "{{displayCount}} Во мирување"
+    },
+    "footer": {
+      "checked": "Проверено {{time}}",
+      "lastKnown": "Последно познато · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Следно извршување {{time}}",
+      "wasDue": "Се очекуваше {{time}}"
+    },
     "step": {
       "editing": "Уредување",
       "reading": "Читање",
@@ -4176,7 +4236,7 @@
     "personalDefaultDescription": "Автоматски се вчитува кога ниту едно складиште нема закачен профил.",
     "organizationDefaultDescription": "Автоматски се вчита за членови кои немаат личен стандард.",
     "setAsDefault": "Поставете како стандардно",
-    "saveFailed": "Не може да се зачува профилот",
+    "saveFailed": "Профилот не можеше да се зачува. Обидете се повторно.",
     "organizationRoleRequired": "Само сопствениците на организацијата и администраторите можат да го сменат профилот на организацијата.",
     "deleteTitle": "Избришете го профилот",
     "deleteMessage": "Ова трајно ги отстранува профилот и неговите поставки. Ова не може да се врати.",
@@ -4440,6 +4500,7 @@
         "balanceNeutral": "Без промена на салдото",
         "deduction": "Одбивање",
         "grant": "Доделени кредити",
+        "welcomeCredits": "Кредити за добредојде",
         "purchase": "Купување"
       },
       "purchaseFallback": "Купување кредити",
@@ -4695,6 +4756,8 @@
     "connectedTo": "Поврзано со {{account}}",
     "disconnected": "Врската со {{provider}} е прекината",
     "disconnectFailed": "Не може да се прекине врската со {{provider}}",
+    "disconnectRetry": "Slack не можеше да го потврди прекинот на врската. Обиди се повторно.",
+    "disconnectNeedsSupport": "Kilo не можеше да го прочита зачуваниот пристап до Slack за оваа врска. Контактирај ја поддршката за да го завршиш прекинот.",
     "couldNotLoad": "Не може да се вчитаат интеграциите",
     "permissionDenied": "Немате дозвола за управување со овие интеграции.",
     "managedByOwner": "Побарајте од сопственик на организацијата да ја промени врската што не можете да ја промените.",

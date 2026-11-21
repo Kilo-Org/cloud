@@ -125,6 +125,7 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
   useRetrySecurityAgentCapability: () => ({ retry: vi.fn(), isRetrying: false }),
   useSecurityAgentConfig: () => config,
   useRetrySecurityAgentConfig: () => ({ retry: vi.fn(), isRetrying: false }),
+  useRetrySecurityAgentSettings: () => ({ retry: vi.fn(), isRetrying: false }),
   useSaveSecurityAgentConfig: () => save,
   useTrackSecurityAgentInteraction: () => trackInteraction,
 }));

@@ -188,7 +188,30 @@
     "legalDocumentEnglishOnly": "Tento dokument je k dispozici pouze v angličtině.",
     "organizationTrialEndedBilling": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Fakturaci můžete aktualizovat a poté to zkuste znovu.",
     "organizationTrialEndedBillingAtKiloAi": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Fakturaci můžete aktualizovat na kilo.ai a poté to zkuste znovu.",
-    "viewOnGitHub": "Zobrazit PR na GitHubu"
+    "viewOnGitHub": "Zobrazit PR na GitHubu",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Odrážka",
+        "nestedBulletPoint": "Vnořená odrážka",
+        "orderedItem": "Položka seznamu {n}",
+        "nestedOrderedItem": "Vnořená položka seznamu {n}"
+      },
+      "blockquote": {
+        "quote": "Citace",
+        "nestedQuote": "Vnořená citace"
+      },
+      "table": {
+        "row": "Řádek {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Nadpisy",
+        "links": "Odkazy",
+        "images": "Obrázky"
+      }
+    }
   },
   "language": {
     "restarting": "Aplikace se restartuje kvůli změně jazyka",
@@ -507,6 +530,14 @@
       "nextStepAppeal": "Výsledek vašeho odvolání se zobrazí na této obrazovce.",
       "nextStepFinal": "Rozhodnutí o odvolání je konečné. Další odvolání již nelze podat.",
       "viewReceipt": "Zobrazit potvrzení"
+    },
+    "reportReceipts": {
+      "title": "Nahlášení",
+      "rowSubtitle": "Vámi podaná nahlášení a jejich výsledky",
+      "emptyTitle": "Zatím žádná nahlášení",
+      "emptyDescription": "Nahlášení, která podáte z komentáře nebo z odpovědi AI, se zobrazí zde.",
+      "couldNotLoad": "Nepodařilo se načíst vaše nahlášení",
+      "capped": "Zobrazují se vaše nejnovější nahlášení."
     },
     "changelog": "Co je nového",
     "changelogVersionPending": "Poznámky k verzi {{version}} přijdou s další aktualizací aplikace.",
@@ -1331,7 +1362,7 @@
       "couldNotGetLatest": "Aktuální stav se nepodařilo načíst.",
       "byline": "#{{number}} · autor: {{author}}",
       "noFindings": "Kontrola neodhalila žádné nálezy.",
-      "findingsUnavailable": "Výsledky nejsou k dispozici, protože tato kontrola selhala.",
+      "findingsUnavailable": "Výsledky nejsou k dispozici.",
       "findingsInProgress": "Tato kontrola stále probíhá. Nálezy se zde zobrazí po jejím dokončení.",
       "findingsEndedWithoutResults": "Tato kontrola skončila dříve, než mohla vyprodukovat jakékoli nálezy.",
       "serviceUnavailable": "Nepodařilo se připojit ke službě kontroly kódu. Zopakujte kontrolu, až bude služba dostupná.",
@@ -3715,6 +3746,7 @@
       "identifierLabel": "Identifikátor",
       "identifierRequired": "Zadejte identifikátor.",
       "identifierTaken": "Tento identifikátor už používá jiný režim.",
+      "identifierTooLong": "Ponechte identifikátor na {{max}} znacích nebo méně.",
       "nameLabel": "Název režimu",
       "nameRequired": "Zadejte název režimu.",
       "notFound": "Tento režim už neexistuje.",
@@ -3881,6 +3913,50 @@
     "nextScheduled": "Další naplánované",
     "answerNeeded": "Čeká na odpověď",
     "waitingToRetry": "Čeká na další pokus",
+    "countNoun": {
+      "needsInput_one": "Čeká na reakci",
+      "needsInput_other": "Čeká na reakci",
+      "needsInput_few": "Čeká na reakci",
+      "needsInput_many": "Čeká na reakci",
+      "running_one": "Pracuje",
+      "running_other": "Pracuje",
+      "running_few": "Pracuje",
+      "running_many": "Pracuje",
+      "scheduled_one": "Naplánováno",
+      "scheduled_other": "Naplánováno",
+      "scheduled_few": "Naplánováno",
+      "scheduled_many": "Naplánováno",
+      "idle_one": "Nečinný",
+      "idle_other": "Nečinného",
+      "idle_few": "Nečinní",
+      "idle_many": "Nečinných"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Čeká na reakci",
+      "needsInput_other": "{{displayCount}} Čeká na reakci",
+      "needsInput_few": "{{displayCount}} Čeká na reakci",
+      "needsInput_many": "{{displayCount}} Čeká na reakci",
+      "running_one": "{{displayCount}} Pracuje",
+      "running_other": "{{displayCount}} Pracuje",
+      "running_few": "{{displayCount}} Pracuje",
+      "running_many": "{{displayCount}} Pracuje",
+      "scheduled_one": "{{displayCount}} Naplánováno",
+      "scheduled_other": "{{displayCount}} Naplánováno",
+      "scheduled_few": "{{displayCount}} Naplánováno",
+      "scheduled_many": "{{displayCount}} Naplánováno",
+      "idle_one": "{{displayCount}} Nečinný",
+      "idle_other": "{{displayCount}} Nečinného",
+      "idle_few": "{{displayCount}} Nečinní",
+      "idle_many": "{{displayCount}} Nečinných"
+    },
+    "footer": {
+      "checked": "Ověřeno {{time}}",
+      "lastKnown": "Poslední známý stav · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Příští spuštění {{time}}",
+      "wasDue": "Očekáváno {{time}}"
+    },
     "step": {
       "editing": "Úpravy",
       "reading": "Čtení",
@@ -4316,7 +4392,7 @@
     "personalDefaultDescription": "Automaticky načteno, když žádné úložiště nemá připnutý profil.",
     "organizationDefaultDescription": "Automaticky načteno pro členy, kteří nemají žádné osobní výchozí nastavení.",
     "setAsDefault": "Nastavit jako výchozí",
-    "saveFailed": "Profil se nepodařilo uložit",
+    "saveFailed": "Profil se nepodařilo uložit. Zkuste to znovu.",
     "organizationRoleRequired": "Profily organizace mohou měnit pouze vlastníci organizace a správci.",
     "deleteTitle": "Smazat profil",
     "deleteMessage": "Tím se profil a jeho nastavení trvale odstraní. Toto nelze vrátit zpět.",
@@ -4582,6 +4658,7 @@
         "balanceNeutral": "Bez vlivu na zůstatek",
         "deduction": "Odečtení",
         "grant": "Přidělení kreditů",
+        "welcomeCredits": "Uvítací kredity",
         "purchase": "Nákup"
       },
       "purchaseFallback": "Nákup kreditů",
@@ -4853,6 +4930,8 @@
     "connectedTo": "Připojeno k účtu {{account}}",
     "disconnected": "{{provider}} byl odpojen",
     "disconnectFailed": "{{provider}} se nepodařilo odpojit",
+    "disconnectRetry": "Slack nemohl odpojení potvrdit. Zkuste to znovu.",
+    "disconnectNeedsSupport": "Kilo nemohl přečíst uložený přístup k Slacku pro toto připojení. Požádejte podporu o dokončení odpojení.",
     "couldNotLoad": "Integrace se nepodařilo načíst",
     "permissionDenied": "Nemáte oprávnění spravovat tyto integrace.",
     "managedByOwner": "Požádejte vlastníka organizace o změnu připojení, které nemůžete změnit.",

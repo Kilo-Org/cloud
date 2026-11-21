@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Ity antontan-taratasy ity dia tsy misy afa-tsy amin'ny teny anglisy.",
     "organizationTrialEndedBilling": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Afaka manavao ny faktiora ianao, ary hanandrana indray.",
     "organizationTrialEndedBillingAtKiloAi": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Afaka manavao ny faktiora ao amin'ny kilo.ai ianao, ary hanandrana indray.",
-    "viewOnGitHub": "Jereo ao amin'ny GitHub ny PR"
+    "viewOnGitHub": "Jereo ao amin'ny GitHub ny PR",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Teboka",
+        "nestedBulletPoint": "Teboka ao anaty",
+        "orderedItem": "Singa lisitra {n}",
+        "nestedOrderedItem": "Singa lisitra ao anaty {n}"
+      },
+      "blockquote": {
+        "quote": "Teny nalaina",
+        "nestedQuote": "Teny nalaina ao anaty"
+      },
+      "table": {
+        "row": "Andalana {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Lohateny",
+        "links": "Rohy",
+        "images": "Sary"
+      }
+    }
   },
   "language": {
     "restarting": "Manomboka indray mba hampiharana ny fiteny",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Hiseho eo amin'ity efijery ity ny vokatry ny fampakarana.",
       "nextStepFinal": "Farany ny fanapahan-kevitra momba ny fampakarana. Tsy misy fampakarana hafa azo alefa intsony.",
       "viewReceipt": "Jereo ny porofo"
+    },
+    "reportReceipts": {
+      "title": "Tatitra",
+      "rowSubtitle": "Ny tatitra nampidirinao sy ny vokany",
+      "emptyTitle": "Mbola tsy misy tatitra",
+      "emptyDescription": "Ny tatitra ampidirinao avy amin'ny fanehoan-kevitra na ny valin'ny AI dia miseho eto.",
+      "couldNotLoad": "Tsy afaka naka ny tatitrao",
+      "capped": "Mampiseho ny tatitrao farany indrindra."
     },
     "changelog": "Ny vaovao",
     "changelogVersionPending": "Ny naotin'ny kinova {{version}} dia ho avy amin'ny fanavaozana manaraka.",
@@ -1277,7 +1308,7 @@
       "couldNotGetLatest": "Tsy nety nalaina ny angona farany.",
       "byline": "#{{number}} nataon'i {{author}}",
       "noFindings": "Tsy misy olana hita.",
-      "findingsUnavailable": "Tsy misy valiny azo jerena satria tsy nahomby ity fanamarinana ity.",
+      "findingsUnavailable": "Tsy hita ny valiny.",
       "findingsInProgress": "Mbola mandeha ity fanamarinana ity. Hiseho eto ny olana hita rehefa vita izy.",
       "findingsEndedWithoutResults": "Nifarana ity fanamarinana ity nefa tsy nisy olana hita mihitsy.",
       "serviceUnavailable": "Tsy afaka nifandray tamin'ny tolotra fanamarinana kaody. Andramo indray ny fanamarinana rehefa azo ampiasaina ny tolotra.",
@@ -3591,6 +3622,7 @@
       "identifierLabel": "Famantarana",
       "identifierRequired": "Ampidiro ny famantarana.",
       "identifierTaken": "Efa mampiasa io famantarana io ny fomba fiasa hafa.",
+      "identifierTooLong": "Ataovy ao anatin'ny {{max}} tarehintsoratra ny famantarana.",
       "nameLabel": "Anaran'ny fomba fiasa",
       "nameRequired": "Ampidiro ny anaran'ny fomba fiasa.",
       "notFound": "Tsy misy intsony ity fomba fiasa ity.",
@@ -3753,6 +3785,34 @@
     "nextScheduled": "Voalahatra manaraka",
     "answerNeeded": "Mila valiny",
     "waitingToRetry": "Miandry hanandrana indray",
+    "countNoun": {
+      "needsInput_one": "Mila valiny",
+      "needsInput_other": "Mila valiny",
+      "running_one": "Miasa",
+      "running_other": "Miasa",
+      "scheduled_one": "Voalahatra",
+      "scheduled_other": "Voalahatra",
+      "idle_one": "Tsy miasa",
+      "idle_other": "Tsy miasa"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Mila valiny",
+      "needsInput_other": "{{displayCount}} Mila valiny",
+      "running_one": "{{displayCount}} Miasa",
+      "running_other": "{{displayCount}} Miasa",
+      "scheduled_one": "{{displayCount}} Voalahatra",
+      "scheduled_other": "{{displayCount}} Voalahatra",
+      "idle_one": "{{displayCount}} Tsy miasa",
+      "idle_other": "{{displayCount}} Tsy miasa"
+    },
+    "footer": {
+      "checked": "Voamarina {{time}}",
+      "lastKnown": "Fantatra farany · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Fampandehanana manaraka {{time}}",
+      "wasDue": "Nokasaina {{time}}"
+    },
     "step": {
       "editing": "Fanovana",
       "reading": "Famakiana",
@@ -4176,7 +4236,7 @@
     "personalDefaultDescription": "Ampidiro mandeha ho azy rehefa tsy misy tahiry misy piraofilina voafantina.",
     "organizationDefaultDescription": "Auto-loaded ho an'ny mpikambana tsy manana default manokana.",
     "setAsDefault": "Ataovy ho default",
-    "saveFailed": "Tsy afaka mitahiry piraofilina",
+    "saveFailed": "Tsy afaka nitahiry ny piraofilina. Andramo indray.",
     "organizationRoleRequired": "Ny tompon'ny fikambanana sy ny mpitantana ihany no afaka manova ny piraofilin'ny fikambanana.",
     "deleteTitle": "Fafao ny mombamomba",
     "deleteMessage": "Izany dia manala tanteraka ny mombamomba sy ny firafiny. Tsy azo averina izany.",
@@ -4440,6 +4500,7 @@
         "balanceNeutral": "Tsy manova ny sisa",
         "deduction": "Fanalana",
         "grant": "Kredita nomena",
+        "welcomeCredits": "Kredita tongasoa",
         "purchase": "Fividianana"
       },
       "purchaseFallback": "Fividianana kredita",
@@ -4695,6 +4756,8 @@
     "connectedTo": "Mifandray amin'i {{account}}",
     "disconnected": "Tapaka ny fifandraisana amin'i {{provider}}",
     "disconnectFailed": "Tsy afaka nanapaka ny fifandraisana amin'i {{provider}}",
+    "disconnectRetry": "Tsy afaka nanamarina ny fanapahana ny fifandraisana ny Slack. Andramo indray.",
+    "disconnectNeedsSupport": "Tsy afaka namaky ny fidirana Slack voatahiry ho an'ity fifandraisana ity ny Kilo. Mifandraisa amin'ny mpanohana hamita ny fanapahana ny fifandraisana.",
     "couldNotLoad": "Tsy afaka nampiditra ireo fampifandraisana",
     "permissionDenied": "Tsy manana alalana hitantana ireo fampifandraisana ireo ianao.",
     "managedByOwner": "Angataho amin'ny tompon'ny fikambanana hanova fifandraisana izay tsy azonao ovaina.",

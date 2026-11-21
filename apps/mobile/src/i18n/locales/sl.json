@@ -188,7 +188,30 @@
     "privateRepositoryA11y": "{{name}}, zasebno skladišče",
     "legalDocumentEnglishOnly": "Ta dokument je na voljo samo v angleščini.",
     "organizationTrialEndedBilling": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Obračun lahko posodobiš, nato poskusi znova.",
-    "organizationTrialEndedBillingAtKiloAi": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Obračun lahko posodobiš na kilo.ai, nato poskusi znova."
+    "organizationTrialEndedBillingAtKiloAi": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Obračun lahko posodobiš na kilo.ai, nato poskusi znova.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Alineja",
+        "nestedBulletPoint": "Gnezdena alineja",
+        "orderedItem": "Element seznama {n}",
+        "nestedOrderedItem": "Gnezdeni element seznama {n}"
+      },
+      "blockquote": {
+        "quote": "Citat",
+        "nestedQuote": "Gnezdeni citat"
+      },
+      "table": {
+        "row": "Vrstica {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Naslovi",
+        "links": "Povezave",
+        "images": "Slike"
+      }
+    }
   },
   "language": {
     "restarting": "Ponovni zagon za spremembo jezika",
@@ -507,6 +530,14 @@
       "nextStepAppeal": "Izid pritožbe bo prikazan na tem zaslonu.",
       "nextStepFinal": "Odločitev o pritožbi je dokončna. Pritožbe ni več mogoče oddati.",
       "viewReceipt": "Prikaži potrdilo"
+    },
+    "reportReceipts": {
+      "title": "Prijave",
+      "rowSubtitle": "Prijave, ki si jih oddal, in njihovi izidi",
+      "emptyTitle": "Ni še nobene prijave",
+      "emptyDescription": "Prijave, ki jih oddaš iz komentarja ali odgovora AI, se prikažejo tukaj.",
+      "couldNotLoad": "Tvojih prijav ni bilo mogoče naložiti",
+      "capped": "Prikazane so tvoje najnovejše prijave."
     },
     "changelog": "Kaj je novega",
     "changelogVersionPending": "Opombe za različico {{version}} prinese naslednja posodobitev aplikacije.",
@@ -1331,7 +1362,7 @@
       "couldNotGetLatest": "Najnovejših podatkov ni bilo mogoče pridobiti.",
       "byline": "#{{number}} · Avtor: {{author}}",
       "noFindings": "Ni ugotovitev.",
-      "findingsUnavailable": "Rezultati niso na voljo, ker ta pregled ni uspel.",
+      "findingsUnavailable": "Rezultati niso na voljo.",
       "findingsInProgress": "Ta pregled je še v teku. Ugotovitve se prikažejo tukaj, ko se zaključi.",
       "findingsEndedWithoutResults": "Ta pregled se je končal, preden je prinesel kakršne koli ugotovitve.",
       "serviceUnavailable": "Povezave s storitvijo za pregled kode ni bilo mogoče vzpostaviti. Znova zaženi pregled, ko bo storitev na voljo.",
@@ -3715,6 +3746,7 @@
       "identifierLabel": "Identifikator",
       "identifierRequired": "Vnesi identifikator.",
       "identifierTaken": "Drug način že uporablja ta identifikator.",
+      "identifierTooLong": "Identifikator naj ima {{max}} znakov ali manj.",
       "nameLabel": "Ime načina",
       "nameRequired": "Vnesi ime načina.",
       "notFound": "Ta način ne obstaja več.",
@@ -3881,6 +3913,50 @@
     "nextScheduled": "Naslednje načrtovano",
     "answerNeeded": "Potreben odgovor",
     "waitingToRetry": "Čaka na ponovni poskus",
+    "countNoun": {
+      "needsInput_one": "Čaka na vnos",
+      "needsInput_other": "Čaka na vnos",
+      "needsInput_two": "Čaka na vnos",
+      "needsInput_few": "Čaka na vnos",
+      "running_one": "V teku",
+      "running_other": "V teku",
+      "running_two": "V teku",
+      "running_few": "V teku",
+      "scheduled_one": "Načrtovano",
+      "scheduled_other": "Načrtovano",
+      "scheduled_two": "Načrtovano",
+      "scheduled_few": "Načrtovano",
+      "idle_one": "Nedejavno",
+      "idle_other": "Nedejavno",
+      "idle_two": "Nedejavno",
+      "idle_few": "Nedejavno"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Čaka na vnos",
+      "needsInput_other": "{{displayCount}} Čaka na vnos",
+      "needsInput_two": "{{displayCount}} Čaka na vnos",
+      "needsInput_few": "{{displayCount}} Čaka na vnos",
+      "running_one": "{{displayCount}} V teku",
+      "running_other": "{{displayCount}} V teku",
+      "running_two": "{{displayCount}} V teku",
+      "running_few": "{{displayCount}} V teku",
+      "scheduled_one": "{{displayCount}} Načrtovano",
+      "scheduled_other": "{{displayCount}} Načrtovano",
+      "scheduled_two": "{{displayCount}} Načrtovano",
+      "scheduled_few": "{{displayCount}} Načrtovano",
+      "idle_one": "{{displayCount}} Nedejavno",
+      "idle_other": "{{displayCount}} Nedejavno",
+      "idle_two": "{{displayCount}} Nedejavno",
+      "idle_few": "{{displayCount}} Nedejavno"
+    },
+    "footer": {
+      "checked": "Preverjeno {{time}}",
+      "lastKnown": "Nazadnje znano · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Naslednji zagon {{time}}",
+      "wasDue": "Pričakovano {{time}}"
+    },
     "step": {
       "editing": "Urejanje",
       "reading": "Branje",
@@ -4316,7 +4392,7 @@
     "personalDefaultDescription": "Samodejno naloženo, ko nobeno skladišče nima pripetega profila.",
     "organizationDefaultDescription": "Samodejno naloženo za člane, ki nimajo osebne privzete vrednosti.",
     "setAsDefault": "Nastavi kot privzeto",
-    "saveFailed": "Profila ni bilo mogoče shraniti",
+    "saveFailed": "Profila ni bilo mogoče shraniti. Poskusite znova.",
     "organizationRoleRequired": "Profile organizacije lahko spremenijo samo lastniki organizacije in skrbniki.",
     "deleteTitle": "Izbriši profil",
     "deleteMessage": "S tem trajno odstranite profil in njegove nastavitve. Tega ni mogoče razveljaviti.",
@@ -4582,6 +4658,7 @@
         "balanceNeutral": "Brez vpliva na stanje",
         "deduction": "Odbitek",
         "grant": "Dodelitev kreditov",
+        "welcomeCredits": "Krediti dobrodošlice",
         "purchase": "Nakup"
       },
       "purchaseFallback": "Nakup kreditov",
@@ -4853,6 +4930,8 @@
     "connectedTo": "Povezano z računom {{account}}",
     "disconnected": "Povezava s storitvijo {{provider}} je prekinjena",
     "disconnectFailed": "Povezave s storitvijo {{provider}} ni bilo mogoče prekiniti",
+    "disconnectRetry": "Slack ni mogel potrditi prekinitve povezave. Poskusi znova.",
+    "disconnectNeedsSupport": "Kilo ni mogel prebrati shranjene dostopa do Slacka za to povezavo. Za dokončanje prekinitve se obrni na podporo.",
     "couldNotLoad": "Integracij ni bilo mogoče naložiti",
     "permissionDenied": "Nimate dovoljenja za upravljanje teh integracij.",
     "managedByOwner": "Za spremembo povezave, ki je ne morete spremeniti, prosite lastnika organizacije.",

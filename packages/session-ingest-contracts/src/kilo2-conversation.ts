@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { KILO_SESSION_ID_PREFIX } from './kilo-session-id';
+
 const timestamp = z.number().finite();
 const model = z.object({ id: z.string(), providerID: z.string(), variant: z.string().optional() });
 const tokens = z.object({
@@ -84,8 +86,14 @@ export const kilo2MessageSchema = z
   })
   .passthrough();
 export type Kilo2Message = z.infer<typeof kilo2MessageSchema>;
+
+/**
+ * The sibling import resolves in both copies: `scripts/sync-kilo2-contracts.mjs`
+ * writes `kilo-session-id` and `base62` beside this file for the service whose
+ * Docker build context holds no workspace packages.
+ */
 export const kilo2SessionSchema = z.object({
-  id: z.string().startsWith('ses_'),
+  id: z.string().startsWith(KILO_SESSION_ID_PREFIX),
   parentID: z.string().optional(),
   location: z.object({ directory: z.string() }),
   title: z.string().optional(),

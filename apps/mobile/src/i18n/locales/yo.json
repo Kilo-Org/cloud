@@ -529,6 +529,14 @@
       "nextStepFinal": "Ìpinnu ẹ̀bẹ̀ yìí ti di ìparí. A kò lè fi ẹ̀bẹ̀ mìíràn ránṣẹ́ mọ́.",
       "viewReceipt": "Wo ìwé ẹ̀rí"
     },
+    "reportReceipts": {
+      "title": "Àwọn ìjábọ̀",
+      "rowSubtitle": "Àwọn ìjábọ̀ tí o fi ránṣẹ́ àti àbájáde wọn",
+      "emptyTitle": "Kò tíì sí ìjábọ̀ kankan",
+      "emptyDescription": "Àwọn ìjábọ̀ tí o bá fi ránṣẹ́ láti inú ọ̀rọ̀ kan tàbí ìdáhùn AI yóò hàn níbí.",
+      "couldNotLoad": "A kò lè gbé àwọn ìjábọ̀ rẹ wá",
+      "capped": "À ń fi àwọn ìjábọ̀ rẹ tó ṣẹ̀ṣẹ̀ wá hàn."
+    },
     "changelog": "Àwọn ohun tuntun",
     "changelogVersionPending": "Àkọsílẹ̀ ẹ̀yà {{version}} yóò dé pẹ̀lú ìmúdójúìwọ̀n áàpù tó kàn.",
     "changelogGroupNew": "Tuntun",
@@ -3614,6 +3622,7 @@
       "identifierLabel": "Ìdánimọ̀",
       "identifierRequired": "Tẹ ìdánimọ̀ kan.",
       "identifierTaken": "Ipò mìíràn ti ń lo ìdánimọ̀ yìí.",
+      "identifierTooLong": "Jẹ́ kí ìdánimọ̀ wà ní {{max}} lẹ́tà tàbí kéré sí i.",
       "nameLabel": "Orúkọ ipò",
       "nameRequired": "Tẹ orúkọ ipò kan.",
       "notFound": "Ipò yìí kò sí mọ́.",
@@ -4199,7 +4208,7 @@
     "personalDefaultDescription": "Ti kojọpọ laifọwọyi nigbati ko si ibi ipamọ ti o ni profaili pinni.",
     "organizationDefaultDescription": "Ti kojọpọ aifọwọyi fun awọn ọmọ ẹgbẹ ti ko ni aiyipada ti ara ẹni.",
     "setAsDefault": "Ṣeto bi aiyipada",
-    "saveFailed": "Ko le fi profaili pamọ",
+    "saveFailed": "Ko le fi profaili pamọ. Tún gbiyanjú.",
     "organizationRoleRequired": "Àwọn ẹni tó ni àjọ àti àwọn alákòóso nìkan ló lè yí àwọn profaili àjọ padà.",
     "deleteTitle": "Pa profaili rẹ",
     "deleteMessage": "Eyi yoo yọ profaili ati awọn eto rẹ kuro patapata. Eyi ko le ṣe atunṣe.",

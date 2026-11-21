@@ -533,6 +533,14 @@
       "nextStepFinal": "قرار الطعن نهائي. لا يمكن تقديم طعن آخر.",
       "viewReceipt": "عرض الإيصال"
     },
+    "reportReceipts": {
+      "title": "البلاغات",
+      "rowSubtitle": "البلاغات التي قدّمتها ونتائجها",
+      "emptyTitle": "لا توجد بلاغات بعد",
+      "emptyDescription": "تظهر هنا البلاغات التي تقدّمها من تعليق أو من استجابة ذكاء اصطناعي.",
+      "couldNotLoad": "تعذّر تحميل بلاغاتك",
+      "capped": "يتم عرض أحدث بلاغاتك."
+    },
     "changelog": "ما الجديد",
     "changelogVersionPending": "ستصل ملاحظات الإصدار {{version}} مع التحديث القادم للتطبيق.",
     "changelogGroupNew": "جديد",
@@ -3866,6 +3874,7 @@
       "identifierLabel": "المعرّف",
       "identifierRequired": "أدخل معرّفًا.",
       "identifierTaken": "يستخدم وضع آخر هذا المعرّف بالفعل.",
+      "identifierTooLong": "اجعل المعرّف في حدود {{max}} حرفًا أو أقل.",
       "nameLabel": "اسم الوضع",
       "nameRequired": "أدخل اسم وضع.",
       "notFound": "هذا الوضع لم يعد موجودًا.",
@@ -4479,7 +4488,7 @@
     "personalDefaultDescription": "يتم تحميله تلقائيًا عندما لا يكون لدى أي مستودع ملف شخصي مثبت.",
     "organizationDefaultDescription": "يُحمَّل تلقائيًا للأعضاء الذين ليس لديهم ملف شخصي افتراضي.",
     "setAsDefault": "تعيين كافتراضي",
-    "saveFailed": "تعذر حفظ الملف الشخصي",
+    "saveFailed": "تعذّر حفظ الملف الشخصي. حاول مرة أخرى.",
     "organizationRoleRequired": "يمكن لمالكي المؤسسة والمشرفين فقط تغيير الملف الشخصي للمؤسسة.",
     "deleteTitle": "حذف الملف الشخصي",
     "deleteMessage": "يؤدي هذا إلى إزالة الملف الشخصي وإعداداته نهائيًا. لا يمكن التراجع عن هذا.",

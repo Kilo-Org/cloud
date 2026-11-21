@@ -529,6 +529,14 @@
       "nextStepFinal": "Mkpebi mkpegharị a bụ nke ikpeazụ. Enweghị ike iziga mkpegharị ọzọ.",
       "viewReceipt": "Lee akwụkwọ nnata"
     },
+    "reportReceipts": {
+      "title": "Akụkọ",
+      "rowSubtitle": "Akụkọ ndị i debara na nsonaazụ ha",
+      "emptyTitle": "Enweghị akụkọ ruo ugbu a",
+      "emptyDescription": "Akụkọ ị na-edeba site na nkọwa ma ọ bụ nzaghachi AI na-apụta ebe a.",
+      "couldNotLoad": "Enweghị ike ibudata akụkọ gị",
+      "capped": "Na-egosi akụkọ gị ndị kacha ọhụrụ."
+    },
     "changelog": "Ihe ọhụrụ",
     "changelogVersionPending": "Ndetu maka ụdị {{version}} ga-abịa na mmelite ngwa na-esote.",
     "changelogGroupNew": "Ọhụrụ",
@@ -3614,6 +3622,7 @@
       "identifierLabel": "Njirimara",
       "identifierRequired": "Tinye njirimara.",
       "identifierTaken": "Ụdị ọrụ ọzọ ejirila njirimara a.",
+      "identifierTooLong": "Debe njirimara ahụ na {{max}} mkpụrụedemede ma ọ bụ obere.",
       "nameLabel": "Aha ụdị ọrụ",
       "nameRequired": "Tinye aha ụdị ọrụ.",
       "notFound": "Ụdị ọrụ a adịkwaghị.",
@@ -4199,7 +4208,7 @@
     "personalDefaultDescription": "A na-ebunye onwe ya mgbe enweghị ebe nchekwa nwere profaịlụ etinyere.",
     "organizationDefaultDescription": "A na-ebunye onwe ya maka ndị otu na-enweghị ndabara nkeonwe.",
     "setAsDefault": "Tọọ ka ndabara",
-    "saveFailed": "Enweghị ike ịchekwa profaịlụ",
+    "saveFailed": "Enweghị ike ịchekwa profaịlụ. Nwalee ọzọ.",
     "organizationRoleRequired": "Naanị ndị nwe nzukọ na ndị nchịkwa nwere ike ịgbanwe profaịlụ nzukọ.",
     "deleteTitle": "Hichapụ profaịlụ",
     "deleteMessage": "Nke a na-ewepụ profaịlụ na ntọala ya kpamkpam. Enweghị ike ịkagbu nke a.",

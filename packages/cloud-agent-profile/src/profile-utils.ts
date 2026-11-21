@@ -2,7 +2,7 @@ import { agent_environment_profiles } from '@kilocode/db/schema';
 import { count, eq, and, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { MAX_OWNER_PROFILES } from './contracts/profiles';
-import type { ProfileDatabase, ProfileOwner } from './types';
+import type { ProfileDatabase, ProfileOwner, ProfileTransaction } from './types';
 
 /**
  * Build ownership condition for profile queries.
@@ -46,8 +46,13 @@ export async function verifyProfileOwnership(
  * the owner instead of locking its row: profile creation is the only writer
  * that needs the whole owner serialized, and a row lock on the user or
  * organization row would queue behind unrelated credit and membership writes.
+ *
+ * Takes a transaction, so the lock and the write it guards are one unit.
  */
-export async function lockProfileCreation(db: ProfileDatabase, owner: ProfileOwner): Promise<void> {
+export async function lockProfileCreation(
+  db: ProfileTransaction,
+  owner: ProfileOwner
+): Promise<void> {
   const key = `agent-environment-profile-creation:${owner.type}:${owner.id}`;
   await db.execute(
     sql`SELECT pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(${key}, 0))`
@@ -56,11 +61,11 @@ export async function lockProfileCreation(db: ProfileDatabase, owner: ProfileOwn
 
 /**
  * Reject a create that would take an owner past {@link MAX_OWNER_PROFILES}.
- * Callers hold the owner's creation lock, so the count cannot move before the
- * insert it guards.
+ * Callers hold the owner's creation lock in the same transaction, so the count
+ * cannot move before the insert it guards and sees the insert's snapshot.
  */
 export async function assertOwnerProfileLimit(
-  db: ProfileDatabase,
+  db: ProfileTransaction,
   owner: ProfileOwner
 ): Promise<void> {
   const [row] = await db

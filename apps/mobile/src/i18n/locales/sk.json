@@ -531,6 +531,14 @@
       "nextStepFinal": "Rozhodnutie o odvolaní je konečné. Ďalšie odvolanie už nie je možné podať.",
       "viewReceipt": "Zobraziť potvrdenie"
     },
+    "reportReceipts": {
+      "title": "Nahlásenia",
+      "rowSubtitle": "Nahlásenia, ktoré si podal, a ich výsledky",
+      "emptyTitle": "Zatiaľ žiadne nahlásenia",
+      "emptyDescription": "Nahlásenia, ktoré podáš z komentára alebo z odpovede AI, sa zobrazia tu.",
+      "couldNotLoad": "Nepodarilo sa načítať tvoje nahlásenia",
+      "capped": "Zobrazujú sa tvoje najnovšie nahlásenia."
+    },
     "changelog": "Čo je nové",
     "changelogVersionPending": "Poznámky k verzii {{version}} prídu s ďalšou aktualizáciou aplikácie.",
     "changelogGroupNew": "Novinky",
@@ -3738,6 +3746,7 @@
       "identifierLabel": "Identifikátor",
       "identifierRequired": "Zadajte identifikátor.",
       "identifierTaken": "Tento identifikátor už používa iný režim.",
+      "identifierTooLong": "Identifikátor môže mať najviac {{max}} znakov.",
       "nameLabel": "Názov režimu",
       "nameRequired": "Zadajte názov režimu.",
       "notFound": "Tento režim už neexistuje.",
@@ -4339,7 +4348,7 @@
     "personalDefaultDescription": "Automaticky načítané, keď žiadne úložisko nemá pripnutý profil.",
     "organizationDefaultDescription": "Automaticky načítané pre členov, ktorí nemajú žiadne osobné predvolené nastavenia.",
     "setAsDefault": "Nastaviť ako predvolené",
-    "saveFailed": "Profil sa nepodarilo uložiť",
+    "saveFailed": "Profil sa nepodarilo uložiť. Skúste to znova.",
     "organizationRoleRequired": "Profil organizácie môžu zmeniť iba vlastníci organizácie a správcovia.",
     "deleteTitle": "Odstrániť profil",
     "deleteMessage": "Tým sa natrvalo odstráni profil a jeho nastavenia. Toto sa nedá vrátiť späť.",

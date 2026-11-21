@@ -529,6 +529,14 @@
       "nextStepFinal": "Desizyon apèl la final. Ou pa ka soumèt okenn lòt apèl.",
       "viewReceipt": "Wè resi a"
     },
+    "reportReceipts": {
+      "title": "Rapò",
+      "rowSubtitle": "Rapò ou te soumèt ak rezilta yo",
+      "emptyTitle": "Poko gen rapò",
+      "emptyDescription": "Rapò ou soumèt soti nan yon kòmantè oswa nan yon repons AI ap parèt isit la.",
+      "couldNotLoad": "Nou pa t ka chaje rapò ou",
+      "capped": "Ap montre rapò ou ki pi resan yo."
+    },
     "changelog": "Sa ki nouvo",
     "changelogVersionPending": "Nòt vèsyon {{version}} an ap vini ak pwochen mizajou aplikasyon an.",
     "changelogGroupNew": "Nouvo",
@@ -3614,6 +3622,7 @@
       "identifierLabel": "Idantifyan",
       "identifierRequired": "Antre yon idantifyan.",
       "identifierTaken": "Yon lòt mòd deja itilize idantifyan sa a.",
+      "identifierTooLong": "Kenbe idantifyan an nan {{max}} karaktè oswa mwens.",
       "nameLabel": "Non mòd",
       "nameRequired": "Antre yon non mòd.",
       "notFound": "Mòd sa a pa egziste ankò.",
@@ -4199,7 +4208,7 @@
     "personalDefaultDescription": "Oto-chaje lè pa gen okenn depo ki gen yon pwofil kole.",
     "organizationDefaultDescription": "Oto-chaje pou manm ki pa gen okenn default pèsonèl.",
     "setAsDefault": "Mete kòm default",
-    "saveFailed": "Pa t 'kapab sove pwofil la",
+    "saveFailed": "Pa t 'kapab sove pwofil la. Eseye ankò.",
     "organizationRoleRequired": "Se sèlman pwopriyetè òganizasyon an ak administratè yo ki ka chanje pwofil òganizasyon an.",
     "deleteTitle": "Efase pwofil",
     "deleteMessage": "Sa a pou tout tan retire pwofil la ak paramèt li yo. Sa a pa ka defèt.",

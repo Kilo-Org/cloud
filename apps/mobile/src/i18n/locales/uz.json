@@ -529,6 +529,14 @@
       "nextStepFinal": "Apellyatsiya bo'yicha qaror yakuniy. Boshqa apellyatsiya berish mumkin emas.",
       "viewReceipt": "Kvitansiyani ko'rish"
     },
+    "reportReceipts": {
+      "title": "Shikoyatlar",
+      "rowSubtitle": "Yuborgan shikoyatlaringiz va ularning natijalari",
+      "emptyTitle": "Hozircha shikoyatlar yo'q",
+      "emptyDescription": "Izoh yoki AI javobidan yuborgan shikoyatlaringiz shu yerda ko'rinadi.",
+      "couldNotLoad": "Shikoyatlaringizni yuklab bo'lmadi",
+      "capped": "Eng so'nggi shikoyatlaringiz ko'rsatilmoqda."
+    },
     "changelog": "Yangiliklar",
     "changelogVersionPending": "{{version}} versiyasi yangiliklari ilovaning keyingi yangilanishi bilan keladi.",
     "changelogGroupNew": "Yangi",
@@ -3614,6 +3622,7 @@
       "identifierLabel": "Identifikator",
       "identifierRequired": "Identifikator kiriting.",
       "identifierTaken": "Bu identifikatordan boshqa rejim allaqachon foydalanmoqda.",
+      "identifierTooLong": "Identifikatorni {{max}} ta belgi yoki undan kam qilib saqlang.",
       "nameLabel": "Rejim nomi",
       "nameRequired": "Rejim nomini kiriting.",
       "notFound": "Bu rejim endi mavjud emas.",
@@ -4199,7 +4208,7 @@
     "personalDefaultDescription": "Hech bir omborda mahkamlangan profil bo'lmasa, avtomatik yuklanadi.",
     "organizationDefaultDescription": "Shaxsiy standarti bo'lmagan a'zolar uchun avtomatik yuklanadi.",
     "setAsDefault": "Standart sifatida o'rnating",
-    "saveFailed": "Profilni saqlab bo‘lmadi",
+    "saveFailed": "Profilni saqlab bo‘lmadi. Qayta urinib ko‘ring.",
     "organizationRoleRequired": "Faqat tashkilot egalar va administratorlar tashkilot profilini o'zgartirishi mumkin.",
     "deleteTitle": "Profilni o'chirish",
     "deleteMessage": "Bu profil va uning sozlamalarini butunlay olib tashlaydi. Buni ortga qaytarib bo‘lmaydi.",

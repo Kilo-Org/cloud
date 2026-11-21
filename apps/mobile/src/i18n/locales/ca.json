@@ -530,6 +530,14 @@
       "nextStepFinal": "La decisió de l'apel·lació és definitiva. No es pot presentar cap altra apel·lació.",
       "viewReceipt": "Mostra el comprovant"
     },
+    "reportReceipts": {
+      "title": "Denúncies",
+      "rowSubtitle": "Les denúncies que has presentat i els seus resultats",
+      "emptyTitle": "Encara no hi ha denúncies",
+      "emptyDescription": "Les denúncies que presentis des d'un comentari o d'una resposta d'IA apareixeran aquí.",
+      "couldNotLoad": "No s'han pogut carregar les teves denúncies",
+      "capped": "Es mostren les teves denúncies més recents."
+    },
     "changelog": "Novetats",
     "changelogVersionPending": "Les notes de la versió {{version}} arribaran amb la propera actualització de l'app.",
     "changelogGroupNew": "Nou",
@@ -3676,6 +3684,7 @@
       "identifierLabel": "Identificador",
       "identifierRequired": "Introdueix un identificador.",
       "identifierTaken": "Un altre mode ja utilitza aquest identificador.",
+      "identifierTooLong": "Mantingues l'identificador en {{max}} caràcters o menys.",
       "nameLabel": "Nom del mode",
       "nameRequired": "Introdueix un nom de mode.",
       "notFound": "Aquest mode ja no existeix.",
@@ -4269,7 +4278,7 @@
     "personalDefaultDescription": "Es carrega automàticament quan cap dipòsit té un perfil fixat.",
     "organizationDefaultDescription": "Es carrega automàticament per als membres que no tenen cap predeterminat personal.",
     "setAsDefault": "Estableix com a predeterminat",
-    "saveFailed": "No s'ha pogut desar el perfil",
+    "saveFailed": "No s'ha pogut desar el perfil. Torna-ho a provar.",
     "organizationRoleRequired": "Només els propietaris i els administradors de l'organització poden canviar els perfils de l'organització.",
     "deleteTitle": "Suprimeix el perfil",
     "deleteMessage": "Això elimina permanentment el perfil i la seva configuració. Això no es pot desfer.",

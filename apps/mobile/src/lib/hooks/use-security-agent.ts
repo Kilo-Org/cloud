@@ -126,6 +126,16 @@ export function useRetrySecurityAgentConfig(scope: string) {
   return usePausedReadRetry(queryKey);
 }
 
+// Per-read retry for the one query the repository picker's banner waits on, vs
+// the settings-wide attempt above. It mirrors the query key that read uses.
+export function useRetrySecurityAgentRepositories(scope: string) {
+  const trpc = useTRPC();
+  const queryKey = isPersonalSecurityScope(scope)
+    ? trpc.securityAgent.getRepositories.queryKey()
+    : trpc.organizations.securityAgent.getRepositories.queryKey({ organizationId: scope });
+  return usePausedReadRetry(queryKey);
+}
+
 export function useSecurityAgentDashboardStats(scope: string, repoFullName?: string) {
   const trpc = useTRPC();
   const personal = useQuery({

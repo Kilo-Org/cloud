@@ -529,6 +529,14 @@
       "nextStepFinal": "A fellebbezési döntés végleges. További fellebbezés nem nyújtható be.",
       "viewReceipt": "Visszaigazolás megtekintése"
     },
+    "reportReceipts": {
+      "title": "Bejelentések",
+      "rowSubtitle": "A benyújtott bejelentéseid és eredményeik",
+      "emptyTitle": "Még nincsenek bejelentések",
+      "emptyDescription": "A hozzászólásból vagy AI-válaszból benyújtott bejelentések itt jelennek meg.",
+      "couldNotLoad": "Nem sikerült betölteni a bejelentéseidet",
+      "capped": "A legutóbbi bejelentéseid láthatók."
+    },
     "changelog": "Újdonságok",
     "changelogVersionPending": "A(z) {{version}} verzió újdonságai a következő frissítéssel érkeznek.",
     "changelogGroupNew": "Új",
@@ -3614,6 +3622,7 @@
       "identifierLabel": "Azonosító",
       "identifierRequired": "Adjon meg egy azonosítót.",
       "identifierTaken": "Egy másik mód már használja ezt az azonosítót.",
+      "identifierTooLong": "Legfeljebb {{max}} karakter hosszú legyen az azonosító.",
       "nameLabel": "Mód neve",
       "nameRequired": "Adjon meg egy módnevet.",
       "notFound": "Ez a mód már nem létezik.",
@@ -4199,7 +4208,7 @@
     "personalDefaultDescription": "Automatikusan betöltődik, ha egyetlen lerakat sem rendelkezik rögzített profillal.",
     "organizationDefaultDescription": "Automatikusan betöltve azon tagok számára, akiknek nincs személyes alapértelmezésük.",
     "setAsDefault": "Beállítás alapértelmezettként",
-    "saveFailed": "Nem sikerült menteni a profilt",
+    "saveFailed": "Nem sikerült menteni a profilt. Próbáld újra.",
     "organizationRoleRequired": "Csak a szervezet tulajdonosai és adminisztrátorai módosíthatják a szervezeti profilokat.",
     "deleteTitle": "Profil törlése",
     "deleteMessage": "Ezzel véglegesen eltávolítja a profilt és beállításait. Ezt nem lehet visszavonni.",

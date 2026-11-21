@@ -530,6 +530,14 @@
       "nextStepFinal": "Pārsūdzības lēmums ir galīgs. Papildu pārsūdzību iesniegt nevar.",
       "viewReceipt": "Skatīt apstiprinājumu"
     },
+    "reportReceipts": {
+      "title": "Ziņojumi",
+      "rowSubtitle": "Jūsu iesniegtie ziņojumi un to rezultāti",
+      "emptyTitle": "Vēl nav ziņojumu",
+      "emptyDescription": "Šeit parādīsies ziņojumi, kurus iesniedzat no komentāra vai AI atbildes.",
+      "couldNotLoad": "Neizdevās ielādēt jūsu ziņojumus",
+      "capped": "Tiek rādīti jūsu jaunākie ziņojumi."
+    },
     "changelog": "Kas jauns",
     "changelogVersionPending": "Versijas {{version}} piezīmes pienāks ar nākamo atjauninājumu.",
     "changelogGroupNew": "Jaunumi",
@@ -3676,6 +3684,7 @@
       "identifierLabel": "Identifikators",
       "identifierRequired": "Ievadiet identifikatoru.",
       "identifierTaken": "Cits režīms jau izmanto šo identifikatoru.",
+      "identifierTooLong": "Identifikators nedrīkst būt garāks par {{max}} rakstzīmēm.",
       "nameLabel": "Režīma nosaukums",
       "nameRequired": "Ievadiet režīma nosaukumu.",
       "notFound": "Šis režīms vairs neeksistē.",
@@ -4269,7 +4278,7 @@
     "personalDefaultDescription": "Automātiski ielādēts, ja nevienai krātuvei nav piesprausta profila.",
     "organizationDefaultDescription": "Automātiski ielādēts dalībniekiem, kuriem nav personisku noklusējuma.",
     "setAsDefault": "Iestatīt kā noklusējumu",
-    "saveFailed": "Nevarēja saglabāt profilu",
+    "saveFailed": "Nevarēja saglabāt profilu. Mēģiniet vēlreiz.",
     "organizationRoleRequired": "Organizācijas profilus var mainīt tikai organizācijas īpašnieki un administratori.",
     "deleteTitle": "Dzēst profilu",
     "deleteMessage": "Tādējādi profils un tā iestatījumi tiek neatgriezeniski noņemti. Šo darbību nevar atsaukt.",

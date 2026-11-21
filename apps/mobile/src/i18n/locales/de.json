@@ -529,6 +529,14 @@
       "nextStepFinal": "Die Entscheidung über den Einspruch ist endgültig. Ein weiterer Einspruch ist nicht möglich.",
       "viewReceipt": "Bestätigung anzeigen"
     },
+    "reportReceipts": {
+      "title": "Meldungen",
+      "rowSubtitle": "Eingereichte Meldungen und ihre Ergebnisse",
+      "emptyTitle": "Noch keine Meldungen",
+      "emptyDescription": "Meldungen, die du zu einem Kommentar oder einer KI-Antwort einreichst, erscheinen hier.",
+      "couldNotLoad": "Deine Meldungen konnten nicht geladen werden",
+      "capped": "Deine neuesten Meldungen werden angezeigt."
+    },
     "changelog": "Neuigkeiten",
     "changelogVersionPending": "Neuigkeiten zu Version {{version}} folgen im nächsten Update.",
     "changelogGroupNew": "Neu",
@@ -3618,6 +3626,7 @@
       "identifierLabel": "Bezeichner",
       "identifierRequired": "Bezeichner eingeben.",
       "identifierTaken": "Ein anderer Modus verwendet diesen Bezeichner bereits.",
+      "identifierTooLong": "Bezeichner auf {{max}} Zeichen oder weniger beschränken.",
       "nameLabel": "Modusname",
       "nameRequired": "Modusnamen eingeben.",
       "notFound": "Dieser Modus existiert nicht mehr.",
@@ -4199,7 +4208,7 @@
     "personalDefaultDescription": "Wird automatisch geladen, wenn kein Repository über ein angeheftetes Profil verfügt.",
     "organizationDefaultDescription": "Wird automatisch für Mitglieder geladen, die keinen persönlichen Standard haben.",
     "setAsDefault": "Als Standard festlegen",
-    "saveFailed": "Profil konnte nicht gespeichert werden",
+    "saveFailed": "Profil konnte nicht gespeichert werden. Versuche es erneut.",
     "organizationRoleRequired": "Nur Organisationsinhaber und Admins können Organisationsprofile ändern.",
     "deleteTitle": "Profil löschen",
     "deleteMessage": "Dadurch werden das Profil und seine Einstellungen dauerhaft entfernt. Dies kann nicht rückgängig gemacht werden.",

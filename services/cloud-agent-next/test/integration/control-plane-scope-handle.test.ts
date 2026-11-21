@@ -22,11 +22,13 @@ import { RUNTIME_AUTHORIZATION_KEY } from '../../src/session/runtime-authorizati
 import worker from '../../src/server.js';
 import { markHistoryHydrated } from '../../src/control-plane/session/history-hydration.js';
 import {
+  ACCEPTED_HANDLES_MAX,
   addAcceptedHandleSync,
   digestRuntimeProxyHandle,
   type AcceptedHandleFence,
   type ScopeHandleResolution,
 } from '../../src/control-plane/sandbox/accepted-handles.js';
+import { readScopeGrant, writeScopeGrant } from '../../src/control-plane/sandbox/scope-grants.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
 import { sessionDoName } from '../../src/session-identity.js';
 import type { AgentSandboxProvider, Env } from '../../src/types.js';
@@ -676,5 +678,415 @@ describe('SandboxControlV2 scope-handle resolution', () => {
     expect(outcome.token).toBe(sibling!.token);
     expect(outcome.runtimeAuthorization.resourceId).toBe(sibling!.sessionId);
     expect(outcome.organizationId).toBe(ORG_ID);
+  });
+});
+
+describe('adopted-handle claim and accepted-set consistency', () => {
+  it('records and serves the handle the member rows already hold', async () => {
+    const { sandbox, wrapper, scopeGrantId, members } = await createSharedScope(2);
+    const [creator, sibling] = members;
+    if (!creator || !sibling) throw new Error('Expected two scope members');
+    const fence = await currentFence(sandbox);
+
+    // A live accepted entry for a string no member row holds keeps the scope
+    // adopted under this fence while the rows' own string has no entry.
+    const other = createRuntimeProxyGrant({
+      plane: 'control',
+      authorizationId: crypto.randomUUID(),
+      sessionId: creator.sessionId,
+      kiloSessionId: creator.kiloId,
+      userId: USER_ID,
+      orgId: ORG_ID,
+      mode: 'direct',
+      allocationId: fence.allocationId,
+      providerInstanceId: fence.providerInstanceId,
+      connectionId: fence.connectionId,
+      wrapperInstanceId: fence.wrapperInstanceId,
+      leaseExpiresAt: Date.now() + 3_600_000,
+      state: 'active',
+    });
+    const markerHandle = await issueRuntimeCredentialProxyHandle(env, other);
+    await runInDurableObject(sandbox, instance => {
+      instance.ctx.storage.kv.delete('runtime_proxy_accepted_handles');
+    });
+    await seedAccepted(sandbox, scopeGrantId, markerHandle, creator, fence);
+
+    // A fresh attempt for the creator re-runs prepare on the same wrapper, so the
+    // mint returns the fence's persisted grant: the string its row already holds.
+    const input = await runInDurableObject(sandbox, async (_instance, state) => {
+      const db = drizzle(state.storage);
+      const route = await readRoute(db, creator.sessionId);
+      if (!route?.credentialSource) throw new Error('missing route');
+      db.update(routes)
+        .set({ state: 'failed' })
+        .where(eq(routes.session_id, creator.sessionId))
+        .run();
+      const { kilo: _kilo, ...spec } = route.spec;
+      const git = spec.git;
+      return {
+        spec: {
+          ...spec,
+          ...(git
+            ? { git: { url: git.url, ...(git.platform ? { platform: git.platform } : {}) } }
+            : {}),
+        },
+        credentials: route.credentialSource,
+      };
+    });
+    await sandbox.prepare(input);
+    const frame = await wrapper.nextSkipping(['worktree.snapshot', 'session.credentials']);
+    if (frame?.type !== 'session.prepare') throw new Error(`expected prepare, got ${frame?.type}`);
+    const served = frame.credentials?.proxy?.handle ?? '';
+    expect(served).toBe(creator.handle);
+    wrapper.send({ type: 'session.ready', sessionId: creator.sessionId });
+    await waitFor(async () =>
+      expect((await sandbox.status({ sessionId: creator.sessionId })).view.state).toBe('ready')
+    );
+
+    // The facade resolves the served string for this fence.
+    await expect(resolveHandle(sandbox, served)).resolves.toMatchObject({ type: 'served' });
+
+    // And the accepted set carries it, so a later resolution still works.
+    const servedDigest = await digestRuntimeProxyHandle(served);
+    const stored = await runInDurableObject(sandbox, instance => {
+      const store = instance.ctx.storage.kv.get<
+        Record<string, Array<{ handleDigest: string; exp: number }>>
+      >('runtime_proxy_accepted_handles');
+      return (store?.[scopeGrantId] ?? []).filter(
+        entry => entry.handleDigest === servedDigest && entry.exp > Date.now()
+      );
+    });
+    expect(stored).toHaveLength(1);
+  });
+
+  it('returns fail and serves nothing when the candidate handle does not verify for the owner', async () => {
+    const { sandbox, scopeGrantId, members } = await createSharedScope(2);
+    const [member] = members;
+    if (!member) throw new Error('Expected a scope member');
+    const fence = await currentFence(sandbox);
+
+    // A live accepted entry for a string no member row holds keeps the scope
+    // adoptable under this fence, so the claim below reaches its candidate branch.
+    const gate = createRuntimeProxyGrant({
+      plane: 'control',
+      authorizationId: crypto.randomUUID(),
+      sessionId: member.sessionId,
+      kiloSessionId: member.kiloId,
+      userId: USER_ID,
+      orgId: ORG_ID,
+      mode: 'direct',
+      allocationId: fence.allocationId,
+      providerInstanceId: fence.providerInstanceId,
+      connectionId: fence.connectionId,
+      wrapperInstanceId: fence.wrapperInstanceId,
+      leaseExpiresAt: Date.now() + 3_600_000,
+      state: 'active',
+    });
+    const gateHandle = await issueRuntimeCredentialProxyHandle(env, gate);
+    await runInDurableObject(sandbox, instance => {
+      instance.ctx.storage.kv.delete('runtime_proxy_accepted_handles');
+    });
+    await seedAccepted(sandbox, scopeGrantId, gateHandle, member, fence);
+
+    const foreign = await issueRuntimeCredentialProxyHandle(
+      env,
+      createRuntimeProxyGrant({
+        plane: 'control',
+        authorizationId: crypto.randomUUID(),
+        sessionId: member.sessionId,
+        kiloSessionId: member.kiloId,
+        userId: OTHER_USER_ID,
+        orgId: ORG_ID,
+        mode: 'direct',
+        allocationId: fence.allocationId,
+        providerInstanceId: fence.providerInstanceId,
+        connectionId: fence.connectionId,
+        wrapperInstanceId: fence.wrapperInstanceId,
+        leaseExpiresAt: Date.now() + 3_600_000,
+        state: 'active',
+      })
+    );
+    const exp = (jwt.decode(foreign) as { exp: number }).exp * 1000;
+    const outcome = await runInDurableObject(sandbox, async (instance, state) => {
+      const holder = instance as unknown as {
+        claimAdoptedScopeHandle(input: {
+          sessionId: string;
+          attemptId: string;
+          ownerId: string;
+          kiloSessionId: string;
+          candidate: { handle: string; exp: number; issuerSessionId: string } | null;
+          mintFence: AcceptedHandleFence;
+        }): Promise<{ kind: string; handle?: string }>;
+      };
+      const db = drizzle(state.storage);
+      const route = await readRoute(db, member.sessionId);
+      if (route === null) throw new Error('missing route');
+      db.update(routes)
+        .set({ state: 'preparing' })
+        .where(eq(routes.session_id, member.sessionId))
+        .run();
+      return holder.claimAdoptedScopeHandle({
+        sessionId: member.sessionId,
+        attemptId: route.attemptId,
+        ownerId: USER_ID,
+        kiloSessionId: member.kiloId,
+        candidate: { handle: foreign, exp, issuerSessionId: member.sessionId },
+        mintFence: fence,
+      });
+    });
+    expect(outcome.kind).toBe('fail');
+    expect(outcome.handle).toBeUndefined();
+
+    // Nothing was accepted for the rejected string.
+    const foreignDigest = await digestRuntimeProxyHandle(foreign);
+    const entries = await runInDurableObject(sandbox, instance => {
+      const store = instance.ctx.storage.kv.get<Record<string, Array<{ handleDigest: string }>>>(
+        'runtime_proxy_accepted_handles'
+      );
+      return Object.values(store ?? {}).flat();
+    });
+    expect(entries.some(entry => entry.handleDigest === foreignDigest)).toBe(false);
+  });
+
+  it('serves the canonical the row holds when a full accepted set rejects the candidate and the canonical issuer left', async () => {
+    const { sandbox, scopeGrantId, members } = await createSharedScope(2);
+    const [creator, sibling] = members;
+    if (!creator || !sibling) throw new Error('Expected two scope members');
+    // Both rows already serve the same canonical, minted by the creator.
+    expect(sibling.handle).toBe(creator.handle);
+    const fence = await currentFence(sandbox);
+
+    // The canonical's issuer stops being a scope member; the sibling's row keeps
+    // it. The issuer leaves both member projections together, as membership
+    // removal does, because the persisted grant requires a runtime-proxy member
+    // to also be a scope member.
+    await runInDurableObject(sandbox, (_instance, state) => {
+      const db = drizzle(state.storage);
+      const grant = readScopeGrant(db, scopeGrantId);
+      if (grant === null) throw new Error('missing scope grant');
+      const proxy = grant.kilo.runtimeProxy;
+      if (proxy === undefined) throw new Error('missing runtime proxy grant');
+      writeScopeGrant(db, {
+        ...grant,
+        members: grant.members.filter(member => member.sessionId !== creator.sessionId),
+        kilo: {
+          ...grant.kilo,
+          runtimeProxy: {
+            ...proxy,
+            members: proxy.members.filter(member => member.sessionId !== creator.sessionId),
+          },
+        },
+      });
+    });
+
+    // A full accepted set that carries the canonical, so the fallback below can
+    // keep serving it. The canonical's own entry sits a minute inside the reissue
+    // threshold, which makes the claim adopt the later candidate rather than keep
+    // the canonical, without relying on how long the fixture takes.
+    await seedAccepted(
+      sandbox,
+      scopeGrantId,
+      creator.handle,
+      creator,
+      fence,
+      Date.now() + 3_540_000
+    );
+    for (let index = 1; index < ACCEPTED_HANDLES_MAX; index += 1) {
+      const extra = await issueRuntimeCredentialProxyHandle(
+        env,
+        createRuntimeProxyGrant({
+          plane: 'control',
+          authorizationId: crypto.randomUUID(),
+          sessionId: creator.sessionId,
+          kiloSessionId: creator.kiloId,
+          userId: USER_ID,
+          orgId: ORG_ID,
+          mode: 'direct',
+          allocationId: fence.allocationId,
+          providerInstanceId: fence.providerInstanceId,
+          connectionId: fence.connectionId,
+          wrapperInstanceId: fence.wrapperInstanceId,
+          leaseExpiresAt: Date.now() + 3_600_000,
+          state: 'active',
+        })
+      );
+      await seedAccepted(sandbox, scopeGrantId, extra, creator, fence);
+    }
+    // The set is at the cap, so the candidate cannot be appended.
+    const acceptedCount = await runInDurableObject(sandbox, instance => {
+      const store = instance.ctx.storage.kv.get<Record<string, unknown[]>>(
+        'runtime_proxy_accepted_handles'
+      );
+      return (store?.[scopeGrantId] ?? []).length;
+    });
+    expect(acceptedCount).toBe(ACCEPTED_HANDLES_MAX);
+
+    // The canonical is near its reissue threshold and the candidate outlives it,
+    // so the claim adopts-candidate and the full set rejects the candidate.
+    const candidate = await issueRuntimeCredentialProxyHandle(
+      env,
+      createRuntimeProxyGrant({
+        plane: 'control',
+        authorizationId: crypto.randomUUID(),
+        sessionId: sibling.sessionId,
+        kiloSessionId: sibling.kiloId,
+        userId: USER_ID,
+        orgId: ORG_ID,
+        mode: 'direct',
+        allocationId: fence.allocationId,
+        providerInstanceId: fence.providerInstanceId,
+        connectionId: fence.connectionId,
+        wrapperInstanceId: fence.wrapperInstanceId,
+        leaseExpiresAt: Date.now() + 5 * 3_600_000,
+        state: 'active',
+      })
+    );
+    expect(candidate).not.toBe(sibling.handle);
+    // The fixture minted this handle, so its signed `exp` is the field the claim
+    // compares; `jwt.decode` types its result only as an object.
+    const candidateClaims = jwt.decode(candidate) as { exp: number };
+    const exp = candidateClaims.exp * 1000;
+
+    const outcome = await runInDurableObject(sandbox, async (instance, state) => {
+      const holder = instance as unknown as {
+        claimAdoptedScopeHandle(input: {
+          sessionId: string;
+          attemptId: string;
+          ownerId: string;
+          kiloSessionId: string;
+          candidate: { handle: string; exp: number; issuerSessionId: string } | null;
+          mintFence: AcceptedHandleFence;
+        }): Promise<{ kind: string; handle?: string }>;
+      };
+      const db = drizzle(state.storage);
+      const route = await readRoute(db, sibling.sessionId);
+      if (route === null) throw new Error('missing route');
+      db.update(routes)
+        .set({ state: 'preparing' })
+        .where(eq(routes.session_id, sibling.sessionId))
+        .run();
+      return holder.claimAdoptedScopeHandle({
+        sessionId: sibling.sessionId,
+        attemptId: route.attemptId,
+        ownerId: USER_ID,
+        kiloSessionId: sibling.kiloId,
+        candidate: { handle: candidate, exp, issuerSessionId: sibling.sessionId },
+        mintFence: fence,
+      });
+    });
+
+    // The row already serves the canonical, so the claim serves that string
+    // rather than the rejected candidate or a failure.
+    expect(outcome).toEqual({ kind: 'handle', handle: sibling.handle });
+  });
+
+  it('returns fail for a candidate the member row already holds when the accepted set does not carry it', async () => {
+    const { sandbox, scopeGrantId, members } = await createSharedScope(1);
+    const [member] = members;
+    if (!member) throw new Error('Expected a scope member');
+    const fence = await currentFence(sandbox);
+
+    await runInDurableObject(sandbox, instance => {
+      instance.ctx.storage.kv.delete('runtime_proxy_accepted_handles');
+    });
+    // A live accepted entry for a string no member row holds keeps the scope
+    // adoptable under this fence, so the claim below reaches its candidate branch.
+    const gate = createRuntimeProxyGrant({
+      plane: 'control',
+      authorizationId: crypto.randomUUID(),
+      sessionId: member.sessionId,
+      kiloSessionId: member.kiloId,
+      userId: USER_ID,
+      orgId: ORG_ID,
+      mode: 'direct',
+      allocationId: fence.allocationId,
+      providerInstanceId: fence.providerInstanceId,
+      connectionId: fence.connectionId,
+      wrapperInstanceId: fence.wrapperInstanceId,
+      leaseExpiresAt: Date.now() + 3_600_000,
+      state: 'active',
+    });
+    const markerHandle = await issueRuntimeCredentialProxyHandle(env, gate);
+    await seedAccepted(sandbox, scopeGrantId, markerHandle, member, fence);
+
+    const opaque = `opaque-unverifiable-handle-${crypto.randomUUID()}`;
+    await runInDurableObject(sandbox, (_instance, state) => {
+      const db = drizzle(state.storage);
+      const grant = readScopeGrant(db, scopeGrantId);
+      if (grant === null) throw new Error('missing scope grant');
+      const proxy = grant.kilo.runtimeProxy;
+      if (proxy === undefined) throw new Error('missing runtime proxy grant');
+      writeScopeGrant(db, {
+        ...grant,
+        kilo: {
+          ...grant.kilo,
+          runtimeProxy: {
+            ...proxy,
+            members: proxy.members.map(row =>
+              row.sessionId === member.sessionId ? { ...row, handle: opaque } : row
+            ),
+          },
+        },
+      });
+    });
+
+    const outcome = await runInDurableObject(sandbox, async (instance, state) => {
+      const holder = instance as unknown as {
+        claimAdoptedScopeHandle(input: {
+          sessionId: string;
+          attemptId: string;
+          ownerId: string;
+          kiloSessionId: string;
+          candidate: { handle: string; exp: number; issuerSessionId: string } | null;
+          mintFence: AcceptedHandleFence;
+        }): Promise<{ kind: string; handle?: string }>;
+      };
+      const db = drizzle(state.storage);
+      const route = await readRoute(db, member.sessionId);
+      if (route === null) throw new Error('missing route');
+      db.update(routes)
+        .set({ state: 'preparing' })
+        .where(eq(routes.session_id, member.sessionId))
+        .run();
+      // The member row already carries the candidate string, but that string is
+      // not registered for the current fence, so the claim must refuse rather
+      // than serve a value the facade would not resolve.
+      return holder.claimAdoptedScopeHandle({
+        sessionId: member.sessionId,
+        attemptId: route.attemptId,
+        ownerId: USER_ID,
+        kiloSessionId: member.kiloId,
+        candidate: {
+          handle: opaque,
+          exp: Date.now() + 3_600_000,
+          issuerSessionId: member.sessionId,
+        },
+        mintFence: fence,
+      });
+    });
+    expect(outcome.kind).toBe('fail');
+    expect(outcome.handle).toBeUndefined();
+
+    // The facade denies the refused string for this fence.
+    await expect(resolveHandle(sandbox, opaque)).resolves.toEqual({ type: 'denied' });
+
+    // Nothing was accepted for the refused string, anywhere.
+    const opaqueDigest = await digestRuntimeProxyHandle(opaque);
+    const entries = await runInDurableObject(sandbox, instance => {
+      const store = instance.ctx.storage.kv.get<Record<string, Array<{ handleDigest: string }>>>(
+        'runtime_proxy_accepted_handles'
+      );
+      return Object.values(store ?? {}).flat();
+    });
+    expect(entries.some(entry => entry.handleDigest === opaqueDigest)).toBe(false);
+
+    // And the claim changed no member row: the string is still there.
+    const stored = await runInDurableObject(sandbox, (_instance, state) => {
+      const grant = readScopeGrant(drizzle(state.storage), scopeGrantId);
+      if (grant === null) throw new Error('missing scope grant');
+      return grant.kilo.runtimeProxy?.members.find(row => row.sessionId === member.sessionId)
+        ?.handle;
+    });
+    expect(stored).toBe(opaque);
   });
 });

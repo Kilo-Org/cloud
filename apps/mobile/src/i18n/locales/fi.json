@@ -529,6 +529,14 @@
       "nextStepFinal": "Valituspäätös on lopullinen. Uutta valitusta ei voi tehdä.",
       "viewReceipt": "Näytä kuitti"
     },
+    "reportReceipts": {
+      "title": "Ilmoitukset",
+      "rowSubtitle": "Tekemäsi ilmoitukset ja niiden lopputulokset",
+      "emptyTitle": "Ei vielä ilmoituksia",
+      "emptyDescription": "Kommentista tai tekoälyvastauksesta tekemäsi ilmoitukset näkyvät tässä.",
+      "couldNotLoad": "Ilmoituksiasi ei voitu ladata",
+      "capped": "Näytetään uusimmat ilmoituksesi."
+    },
     "changelog": "Mitä uutta",
     "changelogVersionPending": "Version {{version}} julkaisutiedot tulevat sovelluksen seuraavan päivityksen mukana.",
     "changelogGroupNew": "Uutta",
@@ -3614,6 +3622,7 @@
       "identifierLabel": "Tunniste",
       "identifierRequired": "Anna tunniste.",
       "identifierTaken": "Toinen tila käyttää jo tätä tunnistetta.",
+      "identifierTooLong": "Pidä tunniste enintään {{max}} merkin mittaisena.",
       "nameLabel": "Tilan nimi",
       "nameRequired": "Anna tilalle nimi.",
       "notFound": "Tätä tilaa ei enää ole.",
@@ -4199,7 +4208,7 @@
     "personalDefaultDescription": "Ladataan automaattisesti, kun missään koodivarastossa ei ole kiinnitettyä profiilia.",
     "organizationDefaultDescription": "Ladataan automaattisesti jäsenille, joilla ei ole henkilökohtaista oletusprofiilia.",
     "setAsDefault": "Aseta oletusprofiiliksi",
-    "saveFailed": "Profiilia ei voitu tallentaa",
+    "saveFailed": "Profiilia ei voitu tallentaa. Yritä uudelleen.",
     "organizationRoleRequired": "Vain organisaation omistajat ja ylläpitäjät voivat muuttaa organisaation profiilia.",
     "deleteTitle": "Poista profiili",
     "deleteMessage": "Tämä poistaa profiilin ja sen asetukset pysyvästi. Tätä ei voi kumota.",

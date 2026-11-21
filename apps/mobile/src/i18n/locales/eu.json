@@ -529,6 +529,14 @@
       "nextStepFinal": "Helegitearen erabakia behin betikoa da. Ezin da helegite gehiago aurkeztu.",
       "viewReceipt": "Ikusi agiria"
     },
+    "reportReceipts": {
+      "title": "Salaketak",
+      "rowSubtitle": "Aurkeztu zenituen salaketak eta horien emaitzak",
+      "emptyTitle": "Oraindik ez dago salaketarik",
+      "emptyDescription": "Iruzkin batetik edo AI baten erantzun batetik aurkezten dituzun salaketak hemen agertzen dira.",
+      "couldNotLoad": "Ezin izan dira zure salaketak kargatu",
+      "capped": "Zure azken salaketak erakusten ari gara."
+    },
     "changelog": "Berritasunak",
     "changelogVersionPending": "{{version}} bertsioaren oharrak aplikazioaren hurrengo eguneratzearekin iritsiko dira.",
     "changelogGroupNew": "Berrikuntzak",
@@ -3614,6 +3622,7 @@
       "identifierLabel": "Identifikatzailea",
       "identifierRequired": "Sartu identifikatzaile bat.",
       "identifierTaken": "Beste modu batek dagoeneko identifikatzaile hau erabiltzen du.",
+      "identifierTooLong": "Eduki identifikatzailea {{max}} karaktere edo gutxiagotan.",
       "nameLabel": "Moduaren izena",
       "nameRequired": "Sartu moduaren izena.",
       "notFound": "Modu hau ez da jada existitzen.",
@@ -4199,7 +4208,7 @@
     "personalDefaultDescription": "Automatikoki kargatzen da biltegirik ez dagoenean ainguratuta dagoen profilik.",
     "organizationDefaultDescription": "Lehenetsi pertsonalik ez duten kideentzat automatikoki kargatu da.",
     "setAsDefault": "Ezarri lehenetsi gisa",
-    "saveFailed": "Ezin izan da profila gorde",
+    "saveFailed": "Ezin izan da profila gorde. Saiatu berriro.",
     "organizationRoleRequired": "Erakundeko jabeek eta administratzaileek soilik alda dezakete erakundearen profila.",
     "deleteTitle": "Ezabatu profila",
     "deleteMessage": "Honek profila eta bere ezarpenak betiko kentzen ditu. Hau ezin da desegin.",

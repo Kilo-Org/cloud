@@ -530,6 +530,14 @@
       "nextStepFinal": "La décision sur le recours est définitive. Aucun autre recours ne peut être déposé.",
       "viewReceipt": "Voir l'accusé de réception"
     },
+    "reportReceipts": {
+      "title": "Signalements",
+      "rowSubtitle": "Signalements que vous avez déposés et leurs résultats",
+      "emptyTitle": "Aucun signalement pour l'instant",
+      "emptyDescription": "Les signalements que vous déposez à partir d'un commentaire ou d'une réponse de l'IA apparaissent ici.",
+      "couldNotLoad": "Impossible de charger vos signalements",
+      "capped": "Affichage de vos signalements les plus récents."
+    },
     "changelog": "Nouveautés",
     "changelogVersionPending": "Les notes de la version {{version}} arriveront avec la prochaine mise à jour de l'application.",
     "changelogGroupNew": "Nouveau",
@@ -3680,6 +3688,7 @@
       "identifierLabel": "Identifiant",
       "identifierRequired": "Saisissez un identifiant.",
       "identifierTaken": "Un autre mode utilise déjà cet identifiant.",
+      "identifierTooLong": "Limitez l'identifiant à {{max}} caractères ou moins.",
       "nameLabel": "Nom du mode",
       "nameRequired": "Saisissez un nom de mode.",
       "notFound": "Ce mode n'existe plus.",
@@ -4269,7 +4278,7 @@
     "personalDefaultDescription": "Chargé automatiquement lorsqu'aucun dépôt n'a de profil épinglé.",
     "organizationDefaultDescription": "Chargé automatiquement pour les membres qui n’ont aucun défaut personnel.",
     "setAsDefault": "Définir par défaut",
-    "saveFailed": "Impossible d'enregistrer le profil",
+    "saveFailed": "Impossible d'enregistrer le profil. Réessayez.",
     "organizationRoleRequired": "Seuls les propriétaires et les administrateurs de l'organisation peuvent modifier les profils de l'organisation.",
     "deleteTitle": "Supprimer le profil",
     "deleteMessage": "Cela supprime définitivement le profil et ses paramètres. Cela ne peut pas être annulé.",

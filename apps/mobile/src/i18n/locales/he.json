@@ -530,6 +530,14 @@
       "nextStepFinal": "החלטת הערעור סופית. לא ניתן להגיש ערעור נוסף.",
       "viewReceipt": "הצגת האישור"
     },
+    "reportReceipts": {
+      "title": "דיווחים",
+      "rowSubtitle": "דיווחים שהגשת והתוצאות שלהם",
+      "emptyTitle": "אין עדיין דיווחים",
+      "emptyDescription": "דיווחים שתגיש מתגובה או מתשובת AI יופיעו כאן.",
+      "couldNotLoad": "לא ניתן לטעון את הדיווחים שלך",
+      "capped": "מוצגים הדיווחים האחרונים שלך."
+    },
     "changelog": "מה חדש",
     "changelogVersionPending": "ההערות לגרסה {{version}} יגיעו עם עדכון האפליקציה הבא.",
     "changelogGroupNew": "חדש",
@@ -3680,6 +3688,7 @@
       "identifierLabel": "מזהה",
       "identifierRequired": "הזינו מזהה.",
       "identifierTaken": "מצב אחר כבר משתמש במזהה הזה.",
+      "identifierTooLong": "הגבילו את המזהה ל-{{max}} תווים או פחות.",
       "nameLabel": "שם המצב",
       "nameRequired": "הזינו שם מצב.",
       "notFound": "המצב הזה כבר לא קיים.",
@@ -4269,7 +4278,7 @@
     "personalDefaultDescription": "נטען אוטומטית כאשר לאף מאגר אין פרופיל מוצמד.",
     "organizationDefaultDescription": "נטען אוטומטית עבור חברים שאין להם ברירת מחדל אישית.",
     "setAsDefault": "הגדר כברירת מחדל",
-    "saveFailed": "לא ניתן לשמור את הפרופיל",
+    "saveFailed": "לא ניתן היה לשמור את הפרופיל. נסה שוב.",
     "organizationRoleRequired": "רק בעלי הארגון ומנהלים יכולים לשנות פרופילי ארגון.",
     "deleteTitle": "מחק את הפרופיל",
     "deleteMessage": "פעולה זו מסירה לצמיתות את הפרופיל ואת ההגדרות שלו. לא ניתן לבטל זאת.",

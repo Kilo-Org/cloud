@@ -529,6 +529,14 @@
       "nextStepFinal": "Ko te whakatau mō te pīra he whakatau whakamutunga. Kāore e taea tētahi atu pīra te tuku.",
       "viewReceipt": "Tirohia te rīhīti"
     },
+    "reportReceipts": {
+      "title": "Ngā pūrongo",
+      "rowSubtitle": "Ngā pūrongo i tukuna e koe me ō rātou otinga",
+      "emptyTitle": "Kāore anō he pūrongo",
+      "emptyDescription": "Ka puta ki konei ngā pūrongo ka tukuna e koe mai i tētahi kōrero, mai i tētahi whakautu AI rānei.",
+      "couldNotLoad": "Kāore i taea te uta i ō pūrongo",
+      "capped": "E whakaatu ana i ō pūrongo hou rawa."
+    },
     "changelog": "Ngā mea hou",
     "changelogVersionPending": "Ka tae mai ngā tuhipoka o te putanga {{version}} me te whakahōu taupānga e whai ake.",
     "changelogGroupNew": "Hou",
@@ -3614,6 +3622,7 @@
       "identifierLabel": "Tohu tautuhi",
       "identifierRequired": "Whakaurua he tohu tautuhi.",
       "identifierTaken": "Kua whakamahia kē tēnei tohu tautuhi e tētahi atu aratau.",
+      "identifierTooLong": "Kia {{max}} pūāhua iti iho rānei te tohu tautuhi.",
       "nameLabel": "Ingoa aratau",
       "nameRequired": "Whakaurua he ingoa aratau.",
       "notFound": "Kua kore tēnei aratau.",
@@ -4199,7 +4208,7 @@
     "personalDefaultDescription": "Ka utaina aunoa ina karekau he kōtaha kua titia ki tētahi putunga.",
     "organizationDefaultDescription": "Ka utaina aunoa mō ngā mema karekau he taunoa whaiaro.",
     "setAsDefault": "Tautuhi hei taunoa",
-    "saveFailed": "Kāore i taea te tiaki i te kōtaha",
+    "saveFailed": "Kāore i taea te tiaki i te kōtaha. Ngana anō.",
     "organizationRoleRequired": "Ko ngā rangatira o te rōpū me ngā kaiwhakahaere anake ka āhei ki te huri i ngā kōtaha rōpū.",
     "deleteTitle": "Mukua te kōtaha",
     "deleteMessage": "Ka tangohia tonutia te kōtaha me ona tautuhinga. Kāore e taea te whakakore i tēnei.",

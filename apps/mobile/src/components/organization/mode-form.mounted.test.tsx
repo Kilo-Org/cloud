@@ -2,6 +2,7 @@
 import { createElement, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { MODE_SLUG_MAX_LENGTH, modeSlugFromName } from '@kilocode/app-shared/organizations';
 import { ModeForm } from '@/components/organization/mode-form';
 import { type OrgMode, type OrgModeFormDraft } from '@/components/organization/org-mode-form-model';
 import { FormField } from '@/components/ui/form-field';
@@ -120,6 +121,9 @@ const nameLabel = i18n.t('organization.modes.nameLabel');
 const identifierLabel = i18n.t('organization.modes.identifierLabel');
 const roleLabel = i18n.t('organization.modes.roleLabel');
 const identifierHint = i18n.t('organization.modes.identifierHint');
+
+/** 99 characters: 25 three-letter words joined by hyphens, twice the bound. */
+const LONG_MODE_NAME = Array.from({ length: 25 }, () => 'abc').join('-');
 
 function storedMode(id: string, name: string, slug: string): OrgMode {
   return {
@@ -419,6 +423,31 @@ describe('ModeForm refused save', () => {
 
     unmount();
   });
+
+  it('refuses a restored identifier past the bound, naming the bound', async () => {
+    // A draft written by a build whose suggestion was not clamped can hold an
+    // identifier the server refuses; Save reports the length, not the set.
+    draft.state = {
+      kind: 'ready',
+      value: restoredDraft({
+        name: 'Long',
+        slug: 'a'.repeat(MODE_SLUG_MAX_LENGTH + 1),
+        roleDefinition: 'Reviews every change.',
+      }),
+      save: draft.save,
+      clear: draft.clear,
+    };
+    const { renderer, unmount } = await mountCreateForm();
+
+    pressSave(renderer.root);
+
+    expect(fieldProps(renderer.root, identifierLabel).error).toBe(
+      i18n.t('organization.modes.identifierTooLong', { max: MODE_SLUG_MAX_LENGTH })
+    );
+    expect(mutations.create.mutate).not.toHaveBeenCalled();
+
+    unmount();
+  });
 });
 
 describe('ModeForm identifier hint', () => {
@@ -463,6 +492,42 @@ describe('ModeForm identifier hint', () => {
     expect(mutations.create.mutate).toHaveBeenCalledOnce();
     expect(mutations.create.mutate).toHaveBeenCalledWith(
       { name: 'Revisor de Código', slug: 'revisor-de-codigo', config: expect.anything() },
+      expect.anything()
+    );
+
+    unmount();
+  });
+
+  it('suggests an identifier inside the bound for a name far past it', async () => {
+    const { renderer, unmount } = await mountCreateForm();
+
+    changeField(renderer.root, nameLabel, LONG_MODE_NAME);
+
+    const suffix = ` · ${identifierHint}`;
+    const line = hintLines(renderer.root).find(text => text.endsWith(suffix));
+    expect(line).toBeDefined();
+    const suggested = (line ?? '').slice(0, -suffix.length);
+    expect(suggested).not.toBe('');
+    expect(suggested.length).toBeLessThanOrEqual(MODE_SLUG_MAX_LENGTH);
+
+    unmount();
+  });
+
+  it('saves a create with an identifier inside the bound for a name far past it', async () => {
+    const { renderer, unmount } = await mountCreateForm();
+
+    changeField(renderer.root, nameLabel, LONG_MODE_NAME);
+    changeField(renderer.root, roleLabel, 'Reviews every change.');
+
+    pressSave(renderer.root);
+
+    // The slugs `existingModes` holds, spelled out: the derived slug is far from
+    // either, so the count branch never runs and the fixture stays read-only here.
+    const expected = modeSlugFromName(LONG_MODE_NAME, ['architect', 'reviewer']);
+    expect(expected.length).toBeLessThanOrEqual(MODE_SLUG_MAX_LENGTH);
+    expect(mutations.create.mutate).toHaveBeenCalledOnce();
+    expect(mutations.create.mutate).toHaveBeenCalledWith(
+      { name: LONG_MODE_NAME, slug: expected, config: expect.anything() },
       expect.anything()
     );
 

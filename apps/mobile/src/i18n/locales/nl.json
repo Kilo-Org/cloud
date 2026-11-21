@@ -529,6 +529,14 @@
       "nextStepFinal": "Het besluit op je bezwaar is definitief. Er kan geen bezwaar meer worden ingediend.",
       "viewReceipt": "Ontvangstbewijs bekijken"
     },
+    "reportReceipts": {
+      "title": "Meldingen",
+      "rowSubtitle": "Meldingen die je hebt ingediend en hun uitkomsten",
+      "emptyTitle": "Nog geen meldingen",
+      "emptyDescription": "Meldingen die je vanuit een reactie of een AI-antwoord indient, verschijnen hier.",
+      "couldNotLoad": "Kon je meldingen niet laden",
+      "capped": "Je ziet je meest recente meldingen."
+    },
     "changelog": "Nieuw in deze versie",
     "changelogVersionPending": "De notities voor {{version}} komen met de volgende app-update.",
     "changelogGroupNew": "Nieuw",
@@ -3618,6 +3626,7 @@
       "identifierLabel": "Identificatie",
       "identifierRequired": "Voer een identificatie in.",
       "identifierTaken": "Een andere modus gebruikt deze identificatie al.",
+      "identifierTooLong": "Houd de identificatie op {{max}} tekens of minder.",
       "nameLabel": "Modusnaam",
       "nameRequired": "Voer een modusnaam in.",
       "notFound": "Deze modus bestaat niet meer.",
@@ -4199,7 +4208,7 @@
     "personalDefaultDescription": "Automatisch geladen wanneer geen enkele repository een vastgezet profiel heeft.",
     "organizationDefaultDescription": "Automatisch geladen voor leden die geen persoonlijke standaard hebben.",
     "setAsDefault": "Als standaard instellen",
-    "saveFailed": "Kan profiel niet opslaan",
+    "saveFailed": "Kan profiel niet opslaan. Probeer het opnieuw.",
     "organizationRoleRequired": "Alleen organisatie-eigenaren en beheerders kunnen organisatieprofielen wijzigen.",
     "deleteTitle": "Profiel verwijderen",
     "deleteMessage": "Hierdoor worden het profiel en de instellingen ervan permanent verwijderd. Dit kan niet ongedaan worden gemaakt.",

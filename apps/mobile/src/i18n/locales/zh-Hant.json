@@ -529,6 +529,14 @@
       "nextStepFinal": "申訴決定為最終決定，無法再次申訴。",
       "viewReceipt": "檢視回執"
     },
+    "reportReceipts": {
+      "title": "檢舉記錄",
+      "rowSubtitle": "你提交的檢舉及其結果",
+      "emptyTitle": "尚無檢舉記錄",
+      "emptyDescription": "你從留言或 AI 回應提交的檢舉會顯示在這裡。",
+      "couldNotLoad": "無法載入你的檢舉",
+      "capped": "僅顯示你最近的檢舉。"
+    },
     "changelog": "最新消息",
     "changelogVersionPending": "{{version}} 版的說明將隨下次應用程式更新提供。",
     "changelogGroupNew": "新功能",
@@ -3618,6 +3626,7 @@
       "identifierLabel": "識別碼",
       "identifierRequired": "請輸入識別碼。",
       "identifierTaken": "已有其他模式使用此識別碼。",
+      "identifierTooLong": "識別碼請保持在 {{max}} 個字元以內。",
       "nameLabel": "模式名稱",
       "nameRequired": "請輸入模式名稱。",
       "notFound": "此模式已不存在。",
@@ -4199,7 +4208,7 @@
     "personalDefaultDescription": "當沒有儲存庫具有固定設定檔時自動載入。",
     "organizationDefaultDescription": "為沒有個人預設值的會員自動載入。",
     "setAsDefault": "設為預設",
-    "saveFailed": "無法儲存設定檔",
+    "saveFailed": "無法儲存設定檔。請再試一次。",
     "organizationRoleRequired": "只有組織擁有者和管理員可以變更組織設定檔。",
     "deleteTitle": "刪除設定檔",
     "deleteMessage": "這將永久刪除設定檔及其設定。此操作無法撤銷。",

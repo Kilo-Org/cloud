@@ -529,6 +529,14 @@
       "nextStepFinal": "이의 제기 결정은 최종입니다. 더 이상 이의를 제기할 수 없습니다.",
       "viewReceipt": "접수증 보기"
     },
+    "reportReceipts": {
+      "title": "신고 내역",
+      "rowSubtitle": "접수한 신고와 그 결과",
+      "emptyTitle": "아직 신고 내역이 없습니다",
+      "emptyDescription": "댓글이나 AI 응답에서 접수한 신고가 여기에 표시됩니다.",
+      "couldNotLoad": "신고 내역을 불러올 수 없습니다",
+      "capped": "최근 신고 내역만 표시됩니다."
+    },
     "changelog": "새로운 기능",
     "changelogVersionPending": "{{version}} 버전의 릴리스 노트는 다음 앱 업데이트에 포함됩니다.",
     "changelogGroupNew": "새로 추가됨",
@@ -3618,6 +3626,7 @@
       "identifierLabel": "식별자",
       "identifierRequired": "식별자를 입력하세요.",
       "identifierTaken": "다른 모드에서 이미 이 식별자를 사용합니다.",
+      "identifierTooLong": "식별자를 {{max}}자 이하로 유지하세요.",
       "nameLabel": "모드 이름",
       "nameRequired": "모드 이름을 입력하세요.",
       "notFound": "이 모드는 더 이상 존재하지 않습니다.",
@@ -4199,7 +4208,7 @@
     "personalDefaultDescription": "고정된 프로필이 있는 저장소가 없으면 자동으로 로드됩니다.",
     "organizationDefaultDescription": "개인 불이행이 없는 회원을 위해 자동으로 로드됩니다.",
     "setAsDefault": "기본값으로 설정",
-    "saveFailed": "프로필을 저장할 수 없습니다.",
+    "saveFailed": "프로필을 저장할 수 없습니다. 다시 시도해 주세요.",
     "organizationRoleRequired": "조직 소유자와 관리자만 조직 프로필을 변경할 수 있습니다.",
     "deleteTitle": "프로필 삭제",
     "deleteMessage": "이렇게 하면 프로필과 해당 설정이 영구적으로 제거됩니다. 이 작업은 취소할 수 없습니다.",

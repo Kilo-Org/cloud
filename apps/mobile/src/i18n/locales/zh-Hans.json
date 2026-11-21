@@ -529,6 +529,14 @@
       "nextStepFinal": "申诉决定为最终结果，不可再次申诉。",
       "viewReceipt": "查看回执"
     },
+    "reportReceipts": {
+      "title": "举报记录",
+      "rowSubtitle": "你提交的举报及其处理结果",
+      "emptyTitle": "暂无举报",
+      "emptyDescription": "你从评论或 AI 回复中提交的举报将显示在这里。",
+      "couldNotLoad": "无法加载你的举报",
+      "capped": "仅显示你最近的举报。"
+    },
     "changelog": "更新内容",
     "changelogVersionPending": "{{version}} 版本的更新说明将随下次应用更新提供。",
     "changelogGroupNew": "新增",
@@ -3618,6 +3626,7 @@
       "identifierLabel": "标识符",
       "identifierRequired": "请输入标识符。",
       "identifierTaken": "另一个模式已使用此标识符。",
+      "identifierTooLong": "标识符请保持在 {{max}} 个字符以内。",
       "nameLabel": "模式名称",
       "nameRequired": "请输入模式名称。",
       "notFound": "此模式已不存在。",
@@ -4199,7 +4208,7 @@
     "personalDefaultDescription": "当没有存储库具有固定配置文件时自动加载。",
     "organizationDefaultDescription": "为没有个人默认值的会员自动加载。",
     "setAsDefault": "设为默认",
-    "saveFailed": "无法保存配置文件",
+    "saveFailed": "无法保存配置文件。请重试。",
     "organizationRoleRequired": "只有组织所有者和管理员可以更改组织配置文件。",
     "deleteTitle": "删除配置文件",
     "deleteMessage": "这将永久删除配置文件及其设置。此操作无法撤消。",

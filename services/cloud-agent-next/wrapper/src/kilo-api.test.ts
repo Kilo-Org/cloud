@@ -5,7 +5,6 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
-  readdirSync,
   readFileSync,
   rmSync,
   statSync,
@@ -1832,7 +1831,28 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
     it('fails retryably and removes nothing when HOME is unset', async () => {
       const sessionId = 'ses_record_permission_marker_without_home';
       const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      // The shared store is the one place a fallback path would have gone, so a
+      // marker already planted there is what a clear must not touch.
+      const control = join(tmpdir(), '.kilo-control');
+      const shared = join(control, 'rulesets');
+      const planted = join(shared, `${encodeURIComponent(sessionId)}.json`);
+      const plantedContents = JSON.stringify({ permission });
+      const preexisting = existsSync(control);
       const originalHome = process.env.HOME;
+      try {
+        // Planting is the test's own setup, not a step to skip: without the
+        // marker the assertions below would pass while proving nothing, so a
+        // store that cannot be created fails the test loudly instead.
+        mkdirSync(shared, { recursive: true, mode: 0o700 });
+        writeFileSync(planted, plantedContents, { mode: 0o600 });
+      } catch (error) {
+        if (!preexisting) rmSync(control, { recursive: true, force: true });
+        throw new Error(
+          `Could not plant the shared marker ${planted}, so the removal check cannot run: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+      }
       delete process.env.HOME;
       try {
         // A marker derived from a shared directory could be planted by another
@@ -1848,14 +1868,16 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
         expect(read).toBeInstanceOf(SessionRulesetUnverifiedError);
 
         // Nothing could have been written, so nothing is removed and no path is
-        // derived from a shared directory. The shared store is the one place a
-        // fallback would have gone.
-        const shared = join(tmpdir(), '.kilo-control', 'rulesets');
-        const before = existsSync(shared) ? readdirSync(shared).length : 0;
+        // derived from a shared directory: the planted marker is still there,
+        // byte for byte.
         await forgetSessionObligations(sessionId);
-        const after = existsSync(shared) ? readdirSync(shared).length : 0;
-        expect(after).toBe(before);
+        expect(existsSync(planted)).toBe(true);
+        expect(readFileSync(planted, 'utf8')).toBe(plantedContents);
       } finally {
+        // Only the planted marker is removed, and only a store this test
+        // created is taken with it: another run's files are left alone.
+        rmSync(planted, { force: true });
+        if (!preexisting) rmSync(control, { recursive: true, force: true });
         if (originalHome === undefined) delete process.env.HOME;
         else process.env.HOME = originalHome;
       }
@@ -1941,6 +1963,54 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
         expect(await readSessionObligations(sessionId)).toBeUndefined();
       } finally {
         await forgetSessionObligations(sessionId).catch(() => undefined);
+      }
+    });
+
+    it('keeps the metadata a re-pointed record carries instead of the stale marker copy', async () => {
+      const sessionId = 'ses_record_foreign_metadata';
+      const directory = temporaryDirectory('kilo-api-foreign-metadata-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-foreign-metadata-other-');
+      const home = temporaryDirectory('kilo-api-foreign-metadata-home-');
+      const older = { 'kilo.goal': { text: 'a goal the record already replaced', updatedAt: 1 } };
+      const newer = { 'kilo.goal': { text: 'the goal the record carries now', updatedAt: 2 } };
+      const originalHome = process.env.HOME;
+      process.env.HOME = home;
+      try {
+        await rememberSessionObligations(sessionId, { metadata: older });
+
+        // The record still names another directory, so this route has nothing to
+        // apply to, and the marker keeps every obligation. Its metadata must not
+        // stay the older copy: the import the restore runs clears the column, so
+        // this read is the last one that can see the newer goal.
+        const foreign = startEnsureSessionStub(sessionId, {
+          id: sessionId,
+          directory: otherDirectory,
+          metadata: newer,
+        });
+        await createClient(foreign.url).settleOutstandingRuleset(sessionId, directory);
+
+        expect(foreign.updates).toHaveLength(0);
+        expect(await readSessionObligations(sessionId)).toEqual({ metadata: newer });
+
+        // The import has now re-pointed the record here and dropped the column.
+        // The settle that follows restores what the record itself carried, not
+        // the stale goal the marker held before the re-point.
+        const repointed = startEnsureSessionStub(sessionId, { id: sessionId, directory });
+        await createClient(repointed.url).settleOutstandingRuleset(sessionId, directory);
+
+        expect(repointed.updates).toEqual([
+          { queryDirectory: directory, body: { metadata: newer } },
+        ]);
+        expect(
+          [...foreign.updates, ...repointed.updates].some(
+            update => JSON.stringify(update.body.metadata) === JSON.stringify(older)
+          )
+        ).toBe(false);
+        expect(await readSessionObligations(sessionId)).toBeUndefined();
+      } finally {
+        await forgetSessionObligations(sessionId).catch(() => undefined);
+        if (originalHome === undefined) delete process.env.HOME;
+        else process.env.HOME = originalHome;
       }
     });
 

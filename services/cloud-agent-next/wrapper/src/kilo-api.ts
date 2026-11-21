@@ -546,22 +546,28 @@ function rulesetCovers(
 type StoredRuleset = 'holds' | 'invalid' | 'missing';
 
 /**
- * What a session read says about this route's record. `foreign` is a record
- * that does not exist, answers 404, or names another directory: none of them is
- * this route's session, and the import re-points or creates it separately.
- * `invalid` is a record this route owns whose `permission` is present but is
- * not a ruleset. `permission` is the record's own ruleset, which is the
- * authoritative state of the session: this module is its only writer through
- * the native API.
+ * What a session read says about this route's record. A `foreign` record is one
+ * that answers 404, names another directory, or is not a session at all: it is
+ * not this route's session, and the import re-points or creates it separately.
+ * It still carries its own metadata when the read produced one, because the
+ * import that re-points it clears that column and this may be the last read
+ * that can see the value. `invalid` is a record this route owns whose
+ * `permission` is present but is not a ruleset. `permission` is the record's
+ * own ruleset, which is the authoritative state of the session: this module is
+ * its only writer through the native API.
  */
 type StoredRecord =
-  | 'foreign'
+  | { foreign: true; metadata: Record<string, unknown> | undefined }
   | 'invalid'
   | { permission: PermissionRuleset | undefined; metadata: Record<string, unknown> | undefined };
 
+function isForeignRecord(stored: StoredRecord): stored is Extract<StoredRecord, { foreign: true }> {
+  return typeof stored === 'object' && 'foreign' in stored;
+}
+
 /** What `stored` says about the ruleset `owed` the caller wants to apply. */
 function permissionState(stored: StoredRecord, owed: PermissionRuleset): StoredRuleset {
-  if (stored === 'foreign') return 'missing';
+  if (isForeignRecord(stored)) return 'missing';
   if (stored === 'invalid') return 'invalid';
   if (stored.permission === undefined) return 'missing';
   return rulesetCovers(stored.permission, owed) ? 'holds' : 'missing';
@@ -601,15 +607,24 @@ async function readStoredRecord(
 ): Promise<StoredRecord> {
   try {
     const current = await read();
-    if (current.response?.status === 404) return 'foreign';
+    if (current.response?.status === 404) return { foreign: true, metadata: undefined };
     // The read is unvalidated JSON, so the parts the decision uses are parsed.
     const record = storedSessionSchema.safeParse(
       requireSdkData(current, `Session get for ${sessionId}`)
     );
+    // Metadata of the wrong shape reads as absent, as the slug and share do: it
+    // carries no authorization decision, so a value the update endpoint cannot
+    // take must not fail a route, and the record's own copy is left alone.
+    const metadata = sessionMetadataSchema.safeParse(
+      record.success ? record.data.metadata : undefined
+    );
     // A record under another directory is not this route's session: its rules
-    // belong to that directory, and the import re-points it separately.
+    // belong to that directory, and the import re-points it separately. Its
+    // metadata is carried all the same, because the import that re-points it
+    // clears the column, so a value read here is the last copy of what the
+    // record held.
     if (!record.success || !(await sameDirectory(record.data.directory, directory))) {
-      return 'foreign';
+      return { foreign: true, metadata: metadata.success ? metadata.data : undefined };
     }
     const stored = record.data.permission;
     // The record names this directory, so a permission that is not a ruleset is
@@ -617,10 +632,6 @@ async function readStoredRecord(
     // reported, because both would let the route prepare without the rules.
     const permission = stored === undefined ? undefined : parseRuleset(stored);
     if (permission === undefined && stored !== undefined) return 'invalid';
-    // Metadata of the wrong shape reads as absent, as the slug and share do: it
-    // carries no authorization decision, so a value the update endpoint cannot
-    // take must not fail a route, and the record's own copy is left alone.
-    const metadata = sessionMetadataSchema.safeParse(record.data.metadata);
     return { permission, metadata: metadata.success ? metadata.data : undefined };
   } catch (error) {
     const aborted = abortedReason(signal, sessionId, 'Session ruleset read');
@@ -1453,7 +1464,24 @@ export function createWrapperKiloClient(
       // A record under another directory belongs to that directory until the
       // import re-points it, and an absent record has nothing to apply to, so
       // the marker keeps every obligation for the create path in both cases.
-      if (stored === 'foreign') return;
+      //
+      // The metadata such a record still carries is copied into the marker
+      // first, because the import the restore runs clears the column: this read
+      // is the last that can see the record's own goal, and the older copy the
+      // marker holds would otherwise be what the settle after the restore puts
+      // back. Only the metadata is rewritten: the permission obligation stays
+      // for the create path exactly as it is, and a marker write that fails is
+      // swallowed as everywhere else here, so it never fails the route.
+      if (isForeignRecord(stored)) {
+        if (
+          stored.metadata !== undefined &&
+          obligations.metadata !== undefined &&
+          stableJson(stored.metadata) !== stableJson(obligations.metadata)
+        ) {
+          await writeObligations(sessionId, { ...obligations, metadata: stored.metadata });
+        }
+        return;
+      }
       // A record that names this directory but carries a permission which is not
       // a ruleset cannot have the rules applied, so the route fails the way the
       // create path does. The record is left unchanged, so the marker stays and

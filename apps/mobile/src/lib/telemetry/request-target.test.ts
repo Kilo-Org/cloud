@@ -91,18 +91,19 @@ describe('stripQueryString', () => {
     );
   });
 
-  it('reads a single-label authority with a port as userinfo', () => {
-    // A single label with a numeric port is also the shape a numeric-leading
-    // userinfo pair takes, so it keeps the reading that removes userinfo.
+  it('reports the scheme alone for a ported single label before a query at-sign', () => {
+    // A single label with a numeric port is a host with a port and a userinfo
+    // pair whose value starts with digits, so neither reading is chosen.
     const url = `https://host:3000${TRPC_PATH}${['x', 'y'].join('.')}?email=${MEMBER}`;
 
-    expect(stripQueryString(url)).toBe(`https://${HOST}`);
+    expect(stripQueryString(url)).toBe('https://');
+    expect(trpcProcedureText(url)).toBeUndefined();
   });
 
-  it('reads a pathless single-label authority with a port as userinfo', () => {
+  it('reports the scheme alone for a pathless ported single label before a query at-sign', () => {
     const url = `https://host:3000?email=${MEMBER}`;
 
-    expect(stripQueryString(url)).toBe(`https://${HOST}`);
+    expect(stripQueryString(url)).toBe('https://');
   });
 
   it('reports no run when an at-sign in a query follows a ported single label', () => {

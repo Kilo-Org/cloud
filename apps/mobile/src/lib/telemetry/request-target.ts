@@ -62,6 +62,12 @@ function isHostLike(text: string): boolean {
 /** A single label, the shape a host takes when it holds no dot and no colon. */
 const SINGLE_LABEL = /^[a-z\d](?:[a-z\d-]*[a-z\d])?$/iu;
 
+/**
+ * A single label with a numeric port: a local backend's authority, and the same
+ * text as a userinfo pair whose value starts with digits.
+ */
+const PORTED_LABEL = /^[a-z\d](?:[a-z\d-]*[a-z\d])?:\d{1,5}$/iu;
+
 /** The index of the first `/`, `?` or `#` at or after `from`, else the length. */
 function nextDelimiter(text: string, from: number): number {
   for (let i = from; i < text.length; i += 1) {
@@ -82,11 +88,10 @@ function nextDelimiter(text: string, from: number): number {
  *
  * The text after that last `@` must read as a host, since it stands for the
  * authority's host, port and path; a single label with no colon qualifies,
- * because nothing after the last `@` can be userinfo. When it is neither, and
- * the `@` sits before any query or fragment, the result is the scheme alone. An
- * `@` after a query or fragment is that text or, when the marker sits inside a
- * value, still userinfo, so the text before the query is kept only when it
- * reads as a host.
+ * because nothing after the last `@` can be userinfo. When it is neither, the
+ * result is the scheme alone. A query or fragment before that `@` does not earn
+ * its own reading: a run that reads as a host keeps its origin, and any other
+ * run reports the scheme alone.
  *
  * A single label with a numeric port is not read as a host, though: `api:3000`
  * is the same text as a userinfo pair whose value starts with digits. Such a
@@ -150,6 +155,15 @@ export function stripQueryString(url: string): string {
     const tail = text.slice(tailStart, nextDelimiter(text, tailStart));
     const queryStart = text.search(/[?#]/u);
     const crossedQuery = queryStart !== -1 && queryStart < lastAt;
+    if (crossedQuery) {
+      const run = text.slice(schemeEnd, nextDelimiter(text, schemeEnd));
+      // A single label with a numeric port is a host with a port and a userinfo
+      // pair whose value starts with digits, so an `@` after the query may belong
+      // to either. Report the scheme alone rather than pick a reading.
+      if (PORTED_LABEL.test(run)) {
+        return prefix;
+      }
+    }
     if (isHostLike(tail) || (!crossedQuery && SINGLE_LABEL.test(tail))) {
       return prefix + cutAtQueryOrFragment(text.slice(tailStart));
     }

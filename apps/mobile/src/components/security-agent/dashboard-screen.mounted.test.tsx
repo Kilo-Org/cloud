@@ -184,7 +184,7 @@ const sectionsProps = vi.hoisted(() => ({
   props: [] as {
     data?: unknown;
     slaEnabled?: boolean;
-    neverSynced?: boolean;
+    nothingRecorded?: boolean;
     emptyGrant?: boolean;
     emptyGrantAction?: { label: string; pending: boolean; handlePress: () => void } | null;
   }[],
@@ -193,7 +193,7 @@ const sectionsProps = vi.hoisted(() => ({
 // Captures the sections placeholder's props, so a test can assert the loading
 // state stands in for the cards the same owner renders.
 const sectionsSkeletonProps = vi.hoisted(() => ({
-  props: [] as { slaEnabled?: boolean; neverSynced?: boolean }[],
+  props: [] as { slaEnabled?: boolean; nothingRecorded?: boolean }[],
 }));
 
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
@@ -356,14 +356,14 @@ vi.mock('@/components/security-agent/dashboard-sections', () => ({
   DashboardSections: (props: {
     data?: unknown;
     slaEnabled?: boolean;
-    neverSynced?: boolean;
+    nothingRecorded?: boolean;
     emptyGrant?: boolean;
     emptyGrantAction?: { label: string; pending: boolean; handlePress: () => void } | null;
   }) => {
     sectionsProps.props.push(props);
     return null;
   },
-  DashboardSectionsSkeleton: (props: { slaEnabled?: boolean; neverSynced?: boolean }) => {
+  DashboardSectionsSkeleton: (props: { slaEnabled?: boolean; nothingRecorded?: boolean }) => {
     sectionsSkeletonProps.props.push(props);
     return null;
   },
@@ -540,6 +540,45 @@ function dashboardMetric(id: string) {
   return { id, label: '', value: '', detail: '', tone: 'neutral' as const };
 }
 
+/**
+ * A `securityAgent.getDashboardStats` payload at the shape the server returns,
+ * so a case overrides only the part it reads. The finding counts start empty —
+ * a scope that has recorded nothing — and a case that records findings sets
+ * `status` (every finding in scope, whatever its status) with the `analysis`
+ * and `severity` counts its tiles read.
+ */
+function statsFixture(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    analysis: {
+      total: 0,
+      analyzed: 0,
+      exploitable: 0,
+      notExploitable: 0,
+      triageComplete: 0,
+      safeToDismiss: 0,
+      needsReview: 0,
+      analyzing: 0,
+      notAnalyzed: 0,
+      failed: 0,
+    },
+    severity: { critical: 0, high: 0, medium: 0, low: 0 },
+    status: { open: 0, fixed: 0, ignored: 0 },
+    sla: {
+      overall: { total: 0, withinSla: 0, overdue: 0 },
+      bySeverity: {
+        critical: { total: 0, withinSla: 0, overdue: 0 },
+        high: { total: 0, withinSla: 0, overdue: 0 },
+        medium: { total: 0, withinSla: 0, overdue: 0 },
+        low: { total: 0, withinSla: 0, overdue: 0 },
+      },
+      dueSoon: { total: 0, exploitable: 0 },
+      untrackedCount: 0,
+    },
+    repoHealth: [] as unknown[],
+    ...overrides,
+  };
+}
+
 describe('DashboardScreen names the scope it acts on', () => {
   // The dashboard is the enabled landing of one scope. An admin in several
   // organizations reads whose agent — and whose GitHub app — this one is.
@@ -576,25 +615,77 @@ describe('DashboardScreen before the first sync', () => {
     dashboardStats.isError = false;
     // The dashboard stats always carry repository health; the field decides
     // whether the repository card can show its own empty state.
-    dashboardStats.data = { sla: { overall: { total: 0 } }, repoHealth: [] };
+    dashboardStats.data = statsFixture();
+    lastSync.isPending = false;
+    sectionsProps.props = [];
     sharedMetrics.build.mockReturnValue([]);
   });
 
   // The stored absence of a sync is what paints "Not yet synced" under the
-  // filter. The sections must read that same fact, or an organization that has
-  // never run the agent reports an all-clear it never measured.
-  it('tells the sections nothing has been synced yet', () => {
-    sectionsProps.props = [];
+  // filter. The sections must read that same fact — together with the scope's
+  // own finding rows, because a partly failed or repo-scoped run records
+  // findings without ever advancing the sync time — or an organization that
+  // never measured anything reports an all-clear it never measured.
+  it('tells the sections nothing has been recorded yet', () => {
     lastSync.data = { lastSyncTime: null };
     renderScreen('org_123');
-    expect(sectionsProps.props.at(-1)?.neverSynced).toBe(true);
+    expect(sectionsProps.props.at(-1)?.nothingRecorded).toBe(true);
+  });
+
+  // A run that stopped part way wrote findings and never stamped the sync
+  // status, so the tiles carry their measured counts and their detail lines.
+  it('keeps a scope with recorded findings measured without a completed sync', () => {
+    const data = statsFixture({
+      analysis: {
+        total: 2,
+        analyzed: 0,
+        exploitable: 0,
+        notExploitable: 0,
+        triageComplete: 0,
+        safeToDismiss: 0,
+        needsReview: 0,
+        analyzing: 0,
+        notAnalyzed: 2,
+        failed: 0,
+      },
+      severity: { critical: 1, high: 1, medium: 0, low: 0 },
+      status: { open: 2, fixed: 0, ignored: 0 },
+    });
+    dashboardStats.data = data;
+    lastSync.data = { lastSyncTime: null };
+    sharedMetrics.build.mockReturnValue([dashboardMetric('openFindings')]);
+    const root = renderScreen('org_123');
+    // The tiles' own read of the same facts: the screen handed the helper
+    // `false`, so the counts and the detail line are the measured ones rather
+    // than the dash a `true` read paints over the same data. Each read is
+    // snapshotted to strings first, because the mocked builder hands back one
+    // shared metric object that every call would overwrite.
+    const measuredMetric = buildLocalizedMetrics(data, true, false)[0];
+    const measuredValue = measuredMetric?.value;
+    const measuredDetail = measuredMetric?.detail;
+    const unmeasuredDetail = buildLocalizedMetrics(data, true, true)[0]?.detail;
+
+    expect(sectionsProps.props.at(-1)?.nothingRecorded).toBe(false);
+    expect(measuredDetail).not.toBe('');
+    expect(measuredDetail).not.toBe(unmeasuredDetail);
+    expect(renderedTexts(root.root)).toContain(measuredValue);
+    expect(renderedTexts(root.root)).toContain(measuredDetail);
+  });
+
+  // The dismissed finding is still a recorded result: the scope ran and
+  // measured it, so its figures are numbers rather than dashes.
+  it('counts a dismissed finding as a recorded result', () => {
+    dashboardStats.data = statsFixture({ status: { open: 0, fixed: 0, ignored: 1 } });
+    lastSync.data = { lastSyncTime: null };
+    renderScreen('org_123');
+    expect(sectionsProps.props.at(-1)?.nothingRecorded).toBe(false);
   });
 
   it('leaves a synced scope measured', () => {
-    sectionsProps.props = [];
+    dashboardStats.data = statsFixture({ status: { open: 1, fixed: 0, ignored: 0 } });
     lastSync.data = { lastSyncTime: '2026-10-30T12:00:00.000Z' };
     renderScreen('org_123');
-    expect(sectionsProps.props.at(-1)?.neverSynced).toBe(false);
+    expect(sectionsProps.props.at(-1)?.nothingRecorded).toBe(false);
   });
 });
 
@@ -618,7 +709,7 @@ describe('DashboardScreen sync control terminal states', () => {
     dashboardStats.isLoading = false;
     dashboardStats.isPending = false;
     dashboardStats.isError = false;
-    dashboardStats.data = { sla: { overall: { total: 0 } } };
+    dashboardStats.data = statsFixture();
     lastSync.data = undefined;
     lastSync.isError = false;
     repositories.isLoading = false;
@@ -1165,7 +1256,8 @@ describe('DashboardScreen sync control terminal states', () => {
   });
 
   it('keeps the last risk breakdown on screen while a sync failure is shown', () => {
-    const stats = { sla: { overall: { total: 3, withinSla: 2, overdue: 1 } }, analysis: {} };
+    const stats = statsFixture();
+    stats.sla.overall = { total: 3, withinSla: 2, overdue: 1 };
     dashboardStats.data = stats;
     triggerSync.isError = true;
     triggerSync.error = mapSecuritySyncOperationError(
@@ -1204,7 +1296,7 @@ describe('DashboardScreen repository card with an empty grant', () => {
     dashboardStats.isPending = false;
     // The dashboard stats always carry repository health; the field decides
     // whether the repository card can show its own empty state.
-    dashboardStats.data = { sla: { overall: { total: 0 } }, repoHealth: [] };
+    dashboardStats.data = statsFixture();
     sharedMetrics.build.mockReturnValue([]);
     sectionsProps.props = [];
     router.push.mockClear();
@@ -1302,7 +1394,7 @@ describe('DashboardScreen repository card with an empty grant', () => {
     lastSync.isPending = true;
     lastSync.data = undefined;
     dashboardStats.isPending = false;
-    dashboardStats.data = { sla: { overall: { total: 0 } }, repoHealth: [] };
+    dashboardStats.data = statsFixture();
     const root = renderScreen('org_123');
 
     expect(renderedTexts(root.root)).toContain(
@@ -1313,10 +1405,7 @@ describe('DashboardScreen repository card with an empty grant', () => {
   // A grant narrowed after a sync leaves the card listing the findings already
   // stored, where it shows no step. The link is the shortcut a manager keeps.
   it('keeps the SLA card link when stored findings outlive the emptied grant', () => {
-    dashboardStats.data = {
-      sla: { overall: { total: 0 } },
-      repoHealth: [{ repoFullName: 'kilo/repo' }],
-    };
+    dashboardStats.data = statsFixture({ repoHealth: [{ repoFullName: 'kilo/repo' }] });
     const root = renderScreen('org_123');
 
     expect(renderedTexts(root.root)).toContain(
@@ -1601,7 +1690,7 @@ describe('buildLocalizedMetrics', () => {
     expect(compliance?.detail).toBe(i18n.t('securityAgent.dashboardMetrics.noDeadlineData'));
   });
 
-  it('reports no measurement instead of a clean result before the first sync', () => {
+  it('reports no measurement instead of a clean result while nothing is recorded', () => {
     const data: Parameters<typeof buildLocalizedMetrics>[0] = {
       analysis: {
         total: 0,
@@ -1632,8 +1721,8 @@ describe('buildLocalizedMetrics', () => {
     const metrics = buildLocalizedMetrics(data, true, true);
 
     // Zero counts and the line that read the zeros as a clean report both
-    // became a dash; the filter row above the tiles states the not-yet-synced
-    // status once, so a tile keeps no detail line to repeat it.
+    // became a dash; the filter row above the tiles names the absent sync once,
+    // so a tile keeps no detail line to repeat it.
     expect(metrics.map(metric => metric.value)).toEqual(['—', '—', '—']);
     expect(metrics.map(metric => metric.detail)).toEqual(['', '', '']);
     expect(metrics.every(metric => metric.tone === 'neutral')).toBe(true);
@@ -1933,29 +2022,27 @@ describe('DashboardScreen reconcile card states', () => {
 });
 
 describe('DashboardScreen pending stats', () => {
-  const resolvedData = {
+  // This scope has recorded findings, so its tiles carry their measured shape.
+  const resolvedData = statsFixture({
     analysis: {
       total: 3,
+      analyzed: 0,
       exploitable: 0,
-      needsReview: 1,
+      notExploitable: 0,
       triageComplete: 0,
+      safeToDismiss: 0,
+      needsReview: 1,
       analyzing: 0,
       notAnalyzed: 0,
       failed: 0,
     },
     severity: { critical: 1, high: 1, medium: 0, low: 0 },
-    sla: {
-      overall: { total: 0, withinSla: 0, overdue: 0 },
-      bySeverity: {
-        critical: { overdue: 0 },
-        high: { overdue: 0 },
-        medium: { overdue: 0 },
-        low: { overdue: 0 },
-      },
-      dueSoon: { total: 0, exploitable: 0 },
-      untrackedCount: 0,
-    },
-  };
+    status: { open: 3, fixed: 0, ignored: 0 },
+  });
+
+  // A scope that has measured nothing: no finding row at all, so its tiles
+  // carry the unmeasured shape even once the stats read has answered.
+  const unrecordedData = statsFixture();
 
   // Each case decides for itself whether the sync-status read has settled.
   beforeEach(() => {
@@ -2040,11 +2127,11 @@ describe('DashboardScreen pending stats', () => {
     );
   });
 
-  // `neverSynced` decides whether a tile carries a detail line, so a tile drawn
-  // before that read settles would shrink by a line the moment it resolves and
-  // move everything below it. The tiles wait for the read instead, and the
-  // section cards wait with them: they render below the tiles only once both
-  // reads settle, so their placeholders hold that space until then.
+  // `nothingRecorded` decides whether a tile carries a detail line, so a tile
+  // drawn before that read settles would shrink by a line the moment it
+  // resolves and move everything below it. The tiles wait for the read instead,
+  // and the section cards wait with them: they render below the tiles only once
+  // both reads settle, so their placeholders hold that space until then.
   it('keeps the tiles in the skeleton state while the sync-status read is pending', () => {
     dashboardStats.isPending = false;
     dashboardStats.data = resolvedData;
@@ -2058,13 +2145,13 @@ describe('DashboardScreen pending stats', () => {
     expect(renderedTexts(root.root)).not.toContain(
       i18n.t('securityAgent.dashboardMetrics.openFindings')
     );
-    expect(sectionsSkeletonProps.props).toEqual([{ slaEnabled: true, neverSynced: false }]);
+    expect(sectionsSkeletonProps.props).toEqual([{ slaEnabled: true, nothingRecorded: false }]);
     expect(sectionsProps.props).toHaveLength(0);
   });
 
-  it('paints the tiles and the link a never-synced scope loads once that read has answered', () => {
-    // The tiles wait for the sync-status read, and a scope that has never
-    // synced drops their detail line and shows the Manage repositories link
+  it('paints the tiles and the link an unrecorded scope loads once that read has answered', () => {
+    // The tiles wait for the sync-status read, and a scope with no recorded
+    // finding drops their detail line and shows the Manage repositories link
     // under them. When the stats read outlasts that read, the placeholder
     // already knows both shapes and must hold them: a three-line placeholder
     // and a missing link moved every card below when the reads resolved.
@@ -2081,7 +2168,7 @@ describe('DashboardScreen pending stats', () => {
     // Four two-line tiles, then the link's own box.
     expect(bars).toHaveLength(9);
     expect(bars.at(-1)?.props.className).toContain('min-h-[28px]');
-    expect(sectionsSkeletonProps.props).toEqual([{ slaEnabled: true, neverSynced: true }]);
+    expect(sectionsSkeletonProps.props).toEqual([{ slaEnabled: true, nothingRecorded: true }]);
     expect(sectionsProps.props).toHaveLength(0);
   });
 
@@ -2101,9 +2188,9 @@ describe('DashboardScreen pending stats', () => {
     expect(skeletonBars(root.root)).toHaveLength(8);
   });
 
-  it('loads a never-synced scope without the detail line the placeholder dropped', () => {
+  it('loads an unrecorded scope without the detail line the placeholder dropped', () => {
     dashboardStats.isPending = false;
-    dashboardStats.data = resolvedData;
+    dashboardStats.data = unrecordedData;
     lastSync.isPending = false;
     lastSync.data = { lastSyncTime: null };
     sharedMetrics.build.mockReturnValue(
@@ -2116,7 +2203,7 @@ describe('DashboardScreen pending stats', () => {
 
     expect(skeletonBars(root.root)).toHaveLength(0);
     expect(tileFrames(root.root)).toHaveLength(4);
-    expect(sectionsProps.props.at(-1)?.neverSynced).toBe(true);
+    expect(sectionsProps.props.at(-1)?.nothingRecorded).toBe(true);
   });
 
   it('renders the sections only after the sync-status read settles', () => {
@@ -2193,7 +2280,7 @@ describe('DashboardLoadingView frame', () => {
 
     renderElement(createElement(DashboardLoadingView, { scope: 'personal' }));
 
-    expect(sectionsSkeletonProps.props).toEqual([{ slaEnabled: true, neverSynced: false }]);
+    expect(sectionsSkeletonProps.props).toEqual([{ slaEnabled: true, nothingRecorded: false }]);
   });
 });
 
@@ -2214,7 +2301,7 @@ describe('DashboardScreen trial refusal (reader role)', () => {
     config.data = { slaEnabled: true };
     dashboardStats.isPending = false;
     dashboardStats.isError = false;
-    dashboardStats.data = { sla: { overall: { total: 0 } } };
+    dashboardStats.data = statsFixture();
     lastSync.data = undefined;
     lastSync.isError = false;
     repositories.isLoading = false;
@@ -2353,7 +2440,7 @@ describe('DashboardScreen pull-to-refresh failure retirement', () => {
     lastSync.isError = false;
     dashboardStats.isLoading = false;
     dashboardStats.isPending = false;
-    dashboardStats.data = { sla: { overall: { total: 0 } }, repoHealth: [] };
+    dashboardStats.data = statsFixture();
     sharedMetrics.build.mockReturnValue([]);
     lastSync.data = { lastSyncTime: '2026-10-30T12:00:00.000Z' };
     repositories.isLoading = false;

@@ -123,7 +123,7 @@ const STAT_DETAIL_LINE_CLASS = 'h-4 rounded';
 export function buildLocalizedMetrics(
   data: DashboardStats,
   slaEnabled: boolean,
-  neverSynced = false
+  nothingRecorded = false
 ) {
   const metrics = buildSecurityDashboardMetrics(data, slaEnabled);
   const number = (value: number) => formatNumber(value, i18n.language);
@@ -233,13 +233,13 @@ export function buildLocalizedMetrics(
     }
   });
 
-  // Before the first sync nothing has been measured, so every tile read a zero
-  // count and, under it, a line that described the zeros as a clean report
-  // ("All open findings tracked", "No findings have an SLA deadline yet").
-  // The filter row above already states that nothing has synced, so a dash in
-  // the numeric slot carries the measurement's absence and the tile keeps no
-  // detail line to repeat the status.
-  if (!neverSynced) {
+  // A scope that has recorded nothing measured no count, so every tile would
+  // read a zero and, under it, a line that described the zeros as a clean
+  // report ("All open findings tracked", "No findings have an SLA deadline
+  // yet"). The filter row above already states that nothing has synced, so a
+  // dash in the numeric slot carries the measurement's absence and the tile
+  // keeps no detail line to repeat the status.
+  if (!nothingRecorded) {
     return localized;
   }
   return localized.map(metric =>
@@ -309,10 +309,10 @@ function DashboardHeader({
 }
 // One placeholder tile per metric card the loaded grid shows, on the cards' own
 // class and line boxes, so the grid that replaces them keeps every frame it
-// painted. `neverSynced` decides whether a tile carries a detail line; a caller
-// that cannot read the sync status yet lays out the synced shape, which is the
-// one three of the four tiles carry in a scope that has synced.
-function DashboardMetricTiles({ neverSynced }: Readonly<{ neverSynced: boolean }>) {
+// painted. `nothingRecorded` decides whether a tile carries a detail line; a
+// caller that cannot read the sync status yet lays out the synced shape, which
+// is the one three of the four tiles carry in a scope that has synced.
+function DashboardMetricTiles({ nothingRecorded }: Readonly<{ nothingRecorded: boolean }>) {
   return (
     <View className="flex-row flex-wrap gap-3">
       {STAT_TILE_PLACEHOLDERS.map(placeholder => (
@@ -320,7 +320,7 @@ function DashboardMetricTiles({ neverSynced }: Readonly<{ neverSynced: boolean }
           {/* The loaded card's own line boxes: label, value, detail. */}
           <Skeleton className={cn('w-2/3', STAT_LABEL_LINE_CLASS)} />
           <Skeleton className={cn('w-1/2', STAT_VALUE_LINE_CLASS)} />
-          {neverSynced ? null : <Skeleton className={cn('w-full', STAT_DETAIL_LINE_CLASS)} />}
+          {nothingRecorded ? null : <Skeleton className={cn('w-full', STAT_DETAIL_LINE_CLASS)} />}
         </Card>
       ))}
     </View>
@@ -449,13 +449,17 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   );
 
   const slaEnabled = config.data?.slaEnabled ?? true;
-  // The stored absence of a sync, the same read that paints "Not yet synced"
-  // under the filter: nothing has been measured yet, so the tiles and the
-  // priority row must not read their empty result as a clean report. A read
-  // that is still loading or failed is not this state.
-  const neverSynced = lastSync.data?.lastSyncTime === null;
   const data = dashboardStats.data;
-  const metrics = data ? buildLocalizedMetrics(data, slaEnabled, neverSynced) : [];
+  // The sync status is stamped when a run completes, while findings land per
+  // chunk and a repo-scoped or partly failed run never advances it, so a
+  // missing time says nothing about whether this scope measured anything. Its
+  // own finding rows do: nothing measured is a scope that recorded none. A
+  // read that is still loading or failed is not this state either.
+  const hasRecordedFindings = data
+    ? data.status.open + data.status.fixed + data.status.ignored > 0
+    : false;
+  const nothingRecorded = lastSync.data?.lastSyncTime === null && !hasRecordedFindings;
+  const metrics = data ? buildLocalizedMetrics(data, slaEnabled, nothingRecorded) : [];
 
   const lastSyncTime = lastSync.data?.lastSyncTime;
   const now = useRelativeTimeNow();
@@ -947,7 +951,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
 
         {/* `isPending` rather than `isLoading`: a NetInfo-paused read is pending
             without fetching, and it must show this skeleton instead of an empty
-            metrics row. The sync-status read joins it because `neverSynced`
+            metrics row. The sync-status read joins it because `nothingRecorded`
             decides whether a tile carries a detail line: a tile that rendered
             the measured shape first would shrink by a line the moment the read
             resolved, which moves the whole dashboard. The section cards join it
@@ -955,7 +959,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             reads settle — so their placeholders keep the page's height until
             then instead of letting the cards push it down. The placeholder
             takes that shape as soon as the read has answered it: a scope that
-            has never synced replaces these tiles with two-line ones and its
+            has recorded nothing replaces these tiles with two-line ones and its
             Act-first card with a single line, so laying out the synced shape
             over it would move everything below by a line whenever the stats
             read outlasts the sync-status read. While the read is still pending
@@ -964,24 +968,24 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             first paint must not lose. */}
         {dashboardStats.isPending || lastSync.isPending ? (
           <View className="gap-4">
-            <DashboardMetricTiles neverSynced={neverSynced} />
-            {neverSynced && slaEnabled && !repositoryPolicyReadOnly && !repositoryScopeEmpty ? (
+            <DashboardMetricTiles nothingRecorded={nothingRecorded} />
+            {nothingRecorded && slaEnabled && !repositoryPolicyReadOnly && !repositoryScopeEmpty ? (
               // The Manage repositories link renders whenever SLA tracking is
               // on, nothing carries a deadline, and the reader may change the
-              // repository policy. Before the first sync that
-              // is certain, so the placeholder holds the link's own inline
-              // box and the sections below keep their place when the link
-              // arrives. Once the tiles are measured the link needs a
-              // measured total, which the placeholder cannot read, so a scope
-              // that has synced keeps it out of the loading state. A settled
-              // empty grant keeps it out too: the repository card below holds
-              // that state's step, and the placeholder already knows that
-              // shape.
+              // repository policy. A scope that has recorded nothing has no
+              // deadline at all, so that is certain, and the placeholder holds
+              // the link's own inline box so the sections below keep their
+              // place when the link arrives. Once the tiles are measured the
+              // link needs a measured total, which the placeholder cannot read,
+              // so a scope that has recorded a finding keeps it out of the
+              // loading state. A settled empty grant keeps it out too: the
+              // repository card below holds that state's step, and the
+              // placeholder already knows that shape.
               <View className="flex-row items-center gap-4">
                 <Skeleton className={cn('w-32', INLINE_LINK_BOX_CLASS)} />
               </View>
             ) : null}
-            <DashboardSectionsSkeleton slaEnabled={slaEnabled} neverSynced={neverSynced} />
+            <DashboardSectionsSkeleton slaEnabled={slaEnabled} nothingRecorded={nothingRecorded} />
           </View>
         ) : (
           <View className="flex-row flex-wrap gap-3">
@@ -1043,16 +1047,16 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           />
         ) : null}
 
-        {/* The Act first card's body depends on `neverSynced` too, so it waits
-            for the sync-status read rather than swapping one shape for the
-            other once the read resolves. */}
+        {/* The Act first card's body depends on `nothingRecorded` too, so it
+            waits for the sync-status read rather than swapping one shape for
+            the other once the read resolves. */}
         {data && !lastSync.isPending ? (
           <DashboardSections
             scope={scope}
             data={data}
             slaEnabled={slaEnabled}
             repoFullName={repoFullName}
-            neverSynced={neverSynced}
+            nothingRecorded={nothingRecorded}
             emptyGrant={repositoryScopeEmpty}
             emptyGrantAction={emptyGrantAction}
           />
@@ -1108,7 +1112,7 @@ export function DashboardLoadingView({ scope }: Readonly<{ scope: string }>) {
             />
           </IconButton>
         </View>
-        <DashboardMetricTiles neverSynced={false} />
+        <DashboardMetricTiles nothingRecorded={false} />
         {/* The tiles are only the top of the page: the loaded dashboard keeps
             reading below them, and the sections' cards land there. Without
             their placeholders this frame ended at the tiles and the empty
@@ -1116,7 +1120,7 @@ export function DashboardLoadingView({ scope }: Readonly<{ scope: string }>) {
             answered, so the shape is the one it defaults to (`slaEnabled` is
             read the same way on the loaded screen) in a scope that has synced,
             which is the shape most scopes give these cards. */}
-        <DashboardSectionsSkeleton slaEnabled neverSynced={false} />
+        <DashboardSectionsSkeleton slaEnabled nothingRecorded={false} />
       </TabScreenScrollView>
     </View>
   );

@@ -55,6 +55,9 @@ vi.mock('@/lib/trpc', async () => {
   };
 });
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://settings.test' }));
+// The scope title reads the shared memberships hook, which reads the auth
+// token; mock it so this suite does not load the real auth module.
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
 // The hand-off helper imports the browser launcher, which reaches a native
 // module no test project loads; this suite needs the mint, not the launch.
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));

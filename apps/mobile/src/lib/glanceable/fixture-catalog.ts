@@ -163,6 +163,7 @@ export const GLANCEABLE_FIXTURES = {
       ...many({ status: 'idle', count: 5, ago: 40 }),
     ],
   },
+  ...TITLE_FIXTURES,
   approving: {
     description: 'Needs approval while the in-place Approve runs: the Approving line.',
     rows: APPROVAL_ROWS,
@@ -296,7 +297,6 @@ export const GLANCEABLE_FIXTURES = {
     description: 'Working, scheduled, and idle.',
     rows: combinationRows(['running', 'scheduled', 'idle']),
   },
-  ...TITLE_FIXTURES,
   ...SESSION_CARD_FIXTURES,
 } satisfies Record<string, GlanceableFixture>;
 

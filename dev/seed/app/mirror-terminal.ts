@@ -82,14 +82,11 @@ const POLL_TIMEOUT_MS = 30_000;
 const POLL_INTERVAL_MS = 500;
 const BASE_TIME = Date.UTC(2026, 0, 2, 0, 0, 0);
 
-/**
- * The `updated_at` every fixture row starts at. Ingest replaces it with the time
- * it processed the session, so a row still carrying this value has not been
- * written yet.
- */
-const INGEST_PENDING_AT = '2000-01-01T00:00:00.000Z';
-/** How long to wait for every ingest write to land. */
-const INGEST_WRITE_TIMEOUT_MS = 60_000;
+const INSERTED_AT = '2000-01-01T00:00:00.000Z';
+/** Rounds of stamp-and-verify the order tolerates before failing. */
+const STAMP_ROUNDS = 6;
+/** Gap between a stamp and its verifying read, so a throttled ingest write can land. */
+const STAMP_SETTLE_MS = 4_000;
 
 /**
  * Ordered newest first. Stamped only after every ingest write has landed,
@@ -285,30 +282,6 @@ async function pollForHistory(baseUrl: string, sessionId: string, token: string)
   }
 }
 
-/**
- * Wait until a predicate holds, polling at {@link POLL_INTERVAL_MS}. Used for the
- * ingest writes, which the ingest API never reports: a row still carrying the
- * seed's sentinel `updated_at` has not been written yet.
- */
-async function waitFor(
-  isSettled: () => Promise<boolean>,
-  describePending: () => string
-): Promise<void> {
-  const deadline = Date.now() + INGEST_WRITE_TIMEOUT_MS;
-  for (;;) {
-    if (await isSettled()) {
-      return;
-    }
-    if (Date.now() >= deadline) {
-      throw new Error(
-        `Ingest did not write every session within the wait (${describePending()}); ` +
-          'the fixture order cannot be set reliably yet. Re-run the seed.'
-      );
-    }
-    await sleep(POLL_INTERVAL_MS);
-  }
-}
-
 export async function run(...args: string[]): Promise<SeedResult | void> {
   if (args.includes('--help') || args.includes('-h')) {
     printUsage();
@@ -387,7 +360,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       kilo_user_id: user.userId,
       title: fixtures.get(sessionId)?.title ?? sessionId,
       created_on_platform: 'cloud-agent-web',
-      updated_at: INGEST_PENDING_AT,
+      updated_at: INSERTED_AT,
     });
   }
 
@@ -401,62 +374,63 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   }
 
   // Ingest rewrites `updated_at` with the time it processed a session, and it
-  // does so asynchronously: a session it finishes last overwrites whatever the
-  // seed wrote, even a value far in the future. So the order cannot be set until
-  // every ingest write has provably landed. The rows start at a sentinel, and
-  // the seed waits until none carries it, which can only be true once ingest has
-  // written each one.
+  // does so asynchronously, so a late write can land after this function. Rather
+  // than wait for a signal ingest does not promise — its activity persist is
+  // throttled per session, and a fast rerun can leave it closed with no write
+  // pending at all — stamp the order and then keep re-stamping until a follow-up
+  // read shows it held. A late write is then absorbed by another round instead
+  // of failing the run or inverting the fixture.
   //
-  // Only then does it stamp `SESSION_UPDATED_AT`, newest first, which is the
-  // order the crawl's budget walks: the artifacts that can never be materialized
-  // must lead, or the fixture does not demonstrate the starvation. The stamped
-  // values are fixed, so a reseed is not a change the mirror would restart for.
+  // `SESSION_UPDATED_AT` is newest first, which is the order the crawl's budget
+  // walks: the artifacts that can never be materialized must lead, or the
+  // fixture does not demonstrate the starvation. The stamped values are fixed,
+  // so a reseed is not a change the mirror would restart for.
   const fixtureIdSet = new Set(sessionIds);
-  await waitFor(
-    async () => {
-      const rows = await db
-        .select({ sessionId: cli_sessions_v2.session_id, updatedAt: cli_sessions_v2.updated_at })
-        .from(cli_sessions_v2)
-        .where(eq(cli_sessions_v2.kilo_user_id, user.userId));
-      return rows
-        .filter(row => fixtureIdSet.has(row.sessionId))
-        .every(row => new Date(row.updatedAt).getTime() !== new Date(INGEST_PENDING_AT).getTime());
-    },
-    () => 'sentinel updated_at still present'
-  );
-  for (const [index, sessionId] of sessionIds.entries()) {
-    await db
-      .update(cli_sessions_v2)
-      .set({ updated_at: SESSION_UPDATED_AT[index] ?? SESSION_UPDATED_AT.at(-1) })
-      .where(
-        and(
-          eq(cli_sessions_v2.kilo_user_id, user.userId),
-          eq(cli_sessions_v2.session_id, sessionId)
-        )
-      );
+  for (let round = 0; round < STAMP_ROUNDS; round += 1) {
+    for (const [index, sessionId] of sessionIds.entries()) {
+      await db
+        .update(cli_sessions_v2)
+        .set({ updated_at: SESSION_UPDATED_AT[index] ?? SESSION_UPDATED_AT.at(-1) })
+        .where(
+          and(
+            eq(cli_sessions_v2.kilo_user_id, user.userId),
+            eq(cli_sessions_v2.session_id, sessionId)
+          )
+        );
+    }
+    // The gap lets a throttled ingest write land between the stamp and the read,
+    // so the read tests the order rather than the seed's own write.
+    await sleep(STAMP_SETTLE_MS);
+    const current = await db
+      .select({ sessionId: cli_sessions_v2.session_id, updatedAt: cli_sessions_v2.updated_at })
+      .from(cli_sessions_v2)
+      .where(eq(cli_sessions_v2.kilo_user_id, user.userId));
+    const leading = current
+      .filter(row => fixtureIdSet.has(row.sessionId))
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .map(row => row.sessionId)
+      .slice(0, TERMINAL_SESSION_IDS.length);
+    if (leading.join(',') === TERMINAL_SESSION_IDS.join(',')) {
+      break;
+    }
   }
-
-  const ordered = await db
+  // The loop above already broke on a verified order. Read once more so a write
+  // that landed after the last round cannot pass silently: the crawl orders by
+  // this column, and a stuck page behind the ordinary sessions would not
+  // demonstrate the starvation.
+  const finalRows = await db
     .select({ sessionId: cli_sessions_v2.session_id, updatedAt: cli_sessions_v2.updated_at })
     .from(cli_sessions_v2)
     .where(eq(cli_sessions_v2.kilo_user_id, user.userId));
-  // Scoped to this fixture's ids: the user may own other sessions. What the
-  // fixture depends on is that the three artifacts that can never be
-  // materialized lead the list, because the crawl orders by this same column and
-  // a stuck page at the back would not demonstrate the starvation. The four
-  // ordinary sessions may sit in any order behind them: their relative order
-  // decides nothing, because the budget picks by when each session last got a
-  // slot.
-  const fixtureIds = new Set(sessionIds);
-  const leading = ordered
-    .filter(row => fixtureIds.has(row.sessionId))
+  const finalLeading = finalRows
+    .filter(row => fixtureIdSet.has(row.sessionId))
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .map(row => row.sessionId)
     .slice(0, TERMINAL_SESSION_IDS.length);
-  if (leading.join(',') !== TERMINAL_SESSION_IDS.join(',')) {
+  if (finalLeading.join(',') !== TERMINAL_SESSION_IDS.join(',')) {
     throw new Error(
       'Fixture order is wrong; the crawl would not meet the stuck sessions first.\n' +
-        `expected leading: ${TERMINAL_SESSION_IDS.join(',')}\nactual leading:   ${leading.join(',')}`
+        `expected leading: ${TERMINAL_SESSION_IDS.join(',')}\nactual leading:   ${finalLeading.join(',')}`
     );
   }
 

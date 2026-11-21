@@ -725,7 +725,9 @@ describe('role read states', () => {
     // the screen.
     expect(typeof saveButton.onSave).toBe('function');
     expect(repoRows(renderer).map(row => (row.props as { disabled: boolean }).disabled)).toEqual([
-      false, false, false,
+      false,
+      false,
+      false,
     ]);
     const modeRows = renderer.root.findAll(node => String(node.type) === 'ChoiceRow');
     expect(modeRows.map(row => row.props.disabled)).toEqual([false, false]);
@@ -753,7 +755,9 @@ describe('role read states', () => {
     expect(textContents(renderer)).toContain(i18n.t('securityAgent.sla.permissionNote'));
     expect(saveButton.onSave).toBeNull();
     expect(repoRows(renderer).map(row => (row.props as { disabled: boolean }).disabled)).toEqual([
-      true, true, true,
+      true,
+      true,
+      true,
     ]);
   });
 });

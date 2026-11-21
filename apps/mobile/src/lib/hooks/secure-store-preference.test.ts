@@ -37,7 +37,7 @@ function flushMicrotasks(): Promise<void> {
   });
 }
 
-// eslint-disable-next-line no-empty-function -- listener body is irrelevant, only subscribe()'s side effect (starting the load) is under test
+// eslint-disable-next-line no-empty-function -- the listener body is irrelevant: cases read the store directly
 function noopListener(): void {}
 
 describe('createSecureStorePreference', () => {
@@ -54,19 +54,21 @@ describe('createSecureStorePreference', () => {
     // read path reports the failure once. The store must not add a record of
     // its own for the same rejection.
     getItemAsync.mockRejectedValue(new Error('disk error'));
-    const store = createSecureStorePreference<boolean>({
-      key: 'k',
-      defaultValue: false,
-      parse: raw => raw === 'true',
-      serialize: value => (value ? 'true' : 'false'),
-    });
     const events: TelemetryEvent[] = [];
     setTelemetrySink(event => {
       events.push(event);
     });
 
+    // Tracking the timers before construction: the store starts its read as it
+    // is built, so the retry backoff only exists once fake timers are on.
     vi.useFakeTimers();
     try {
+      const store = createSecureStorePreference<boolean>({
+        key: 'k',
+        defaultValue: false,
+        parse: raw => raw === 'true',
+        serialize: value => (value ? 'true' : 'false'),
+      });
       // Fake timers stay on, so the backoff must still fire. The wait is on the
       // store's own completion signal, not on a copied delay budget.
       const loading = store.whenLoaded();
@@ -88,12 +90,6 @@ describe('createSecureStorePreference', () => {
     // iOS rejects every read with this message until unlock; the store keeps
     // its default and the refusal leaves a breadcrumb instead of an event.
     getItemAsync.mockRejectedValue(new Error('User interaction is not allowed'));
-    const store = createSecureStorePreference<boolean>({
-      key: 'k',
-      defaultValue: false,
-      parse: raw => raw === 'true',
-      serialize: value => (value ? 'true' : 'false'),
-    });
     const events: TelemetryEvent[] = [];
     const breadcrumbs: TelemetryBreadcrumb[] = [];
     setTelemetrySink(event => {
@@ -103,8 +99,16 @@ describe('createSecureStorePreference', () => {
       breadcrumbs.push(breadcrumb);
     });
 
+    // Tracking the timers before construction: the store starts its read as it
+    // is built, so the retry backoff only exists once fake timers are on.
     vi.useFakeTimers();
     try {
+      const store = createSecureStorePreference<boolean>({
+        key: 'k',
+        defaultValue: false,
+        parse: raw => raw === 'true',
+        serialize: value => (value ? 'true' : 'false'),
+      });
       const loading = store.whenLoaded();
       await vi.runAllTimersAsync();
       await loading;
@@ -127,15 +131,17 @@ describe('createSecureStorePreference', () => {
     getItemAsync
       .mockRejectedValueOnce(new Error('keychain unavailable'))
       .mockResolvedValueOnce('true');
-    const store = createSecureStorePreference<boolean>({
-      key: 'k',
-      defaultValue: false,
-      parse: raw => raw === 'true',
-      serialize: value => (value ? 'true' : 'false'),
-    });
 
+    // Tracking the timers before construction: the store starts its read as it
+    // is built, so the retry backoff only exists once fake timers are on.
     vi.useFakeTimers();
     try {
+      const store = createSecureStorePreference<boolean>({
+        key: 'k',
+        defaultValue: false,
+        parse: raw => raw === 'true',
+        serialize: value => (value ? 'true' : 'false'),
+      });
       // The first read rejects; the retry timer must fire before the second
       // attempt can apply the stored value.
       const loading = store.whenLoaded();
@@ -480,10 +486,9 @@ describe('createSecureStorePreference', () => {
       mergeOnLoad: (disk, pending) => [...new Set([...disk, ...pending])],
     });
 
-    // The read starts, then the clear resets the store and a new choice
-    // follows it. The snapshot the read returns describes the state the clear
-    // removed, so it must not reach the value or the disk.
-    store.preload();
+    // The read starts at construction, then the clear resets the store and a
+    // new choice follows it. The snapshot the read returns describes the state
+    // the clear removed, so it must not reach the value or the disk.
     store.clear();
     store.set(['new']);
     pendingRead.resolve('["old"]');
@@ -507,10 +512,10 @@ describe('createSecureStorePreference', () => {
       serialize: value => (value ? 'true' : 'false'),
     });
 
-    /* The clear runs before any read starts and its delete spends the whole
-       retry budget without landing, so the disk still holds the snapshot the
-       clear removed. A read of that snapshot would bring the removed value
-       back, so the store must not start one. */
+    /* The read starts at construction, before the clear. Its result is the
+       snapshot the clear removed, so the clear fence must discard it: the
+       delete spends the whole retry budget without landing, and the store still
+       never reports the removed value. */
     vi.useFakeTimers();
     try {
       store.clear();
@@ -520,7 +525,7 @@ describe('createSecureStorePreference', () => {
       await loading;
 
       expect(deleteItemAsync).toHaveBeenCalledTimes(4);
-      expect(getItemAsync).not.toHaveBeenCalled();
+      expect(getItemAsync).toHaveBeenCalledTimes(1);
       expect(store.get()).toBe(false);
       expect(store.getRequested()).not.toBe(true);
       unsubscribe();
@@ -542,8 +547,8 @@ describe('createSecureStorePreference', () => {
     });
 
     /* One transient refusal must not pin the removed value: the retry lands
-       the delete, so the read that follows may start and the store reads the
-       default. */
+       the delete, so the clear's reset stands — the eager read's result is
+       fenced off and the store keeps the default. */
     vi.useFakeTimers();
     try {
       store.clear();
@@ -560,13 +565,8 @@ describe('createSecureStorePreference', () => {
     }
   });
 
-  it('preload() starts the disk read once and a following subscribe() does not start a second read', async () => {
-    const pendingReads: ((raw: string | null) => void)[] = [];
-    getItemAsync.mockReturnValue(
-      new Promise<string | null>(resolve => {
-        pendingReads.push(resolve);
-      })
-    );
+  it('reads the stored value for a getter with no subscriber', async () => {
+    getItemAsync.mockResolvedValue('true');
     const store = createSecureStorePreference<boolean>({
       key: 'k',
       defaultValue: false,
@@ -574,16 +574,36 @@ describe('createSecureStorePreference', () => {
       serialize: value => (value ? 'true' : 'false'),
     });
 
-    store.preload();
-    // preload() alone must start the read; otherwise this fails and the
-    // subscribe() below would be the only thing starting it.
+    // Construction starts the read: the settings registry's synchronous getter
+    // runs with no React tree, so no subscribe() and no preload may be needed
+    // for it to see the persisted value.
+    expect(getItemAsync).toHaveBeenCalledTimes(1);
+    expect(store.getRequested()).toBe(false);
+
+    await store.whenLoaded();
+
+    expect(store.getRequested()).toBe(true);
+    expect(store.get()).toBe(true);
+  });
+
+  it('construction starts the disk read once and a following subscribe() does not start a second read', async () => {
+    const read = Promise.withResolvers<string | null>();
+    getItemAsync.mockReturnValue(read.promise);
+    const store = createSecureStorePreference<boolean>({
+      key: 'k',
+      defaultValue: false,
+      parse: raw => raw === 'true',
+      serialize: value => (value ? 'true' : 'false'),
+    });
+
+    // Construction alone starts the read; nothing has subscribed yet.
     expect(getItemAsync).toHaveBeenCalledTimes(1);
 
     const unsubscribe = store.subscribe(noopListener);
-    // subscribe() must not start a second read.
+    // subscribe() only adds the listener, so it must not start a second read.
     expect(getItemAsync).toHaveBeenCalledTimes(1);
 
-    pendingReads[0]?.('true');
+    read.resolve('true');
     await flushMicrotasks();
 
     expect(store.get()).toBe(true);

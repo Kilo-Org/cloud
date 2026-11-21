@@ -16,6 +16,11 @@ function noop(): void {
  * instance (settings sheet, message list, new-session screen) shares one
  * value and one disk read. Consume via useSyncExternalStore.
  *
+ * The read starts at construction, so a synchronous reader of `getRequested()`
+ * with no React tree — the Android widget task, the settings registry — sees
+ * the persisted value once the read settles instead of the default until some
+ * subscriber mounts. A caller can await `whenLoaded()`.
+ *
  * The rendered value is the durable one: `set()` records a target, one write at
  * a time carries the latest target to disk, and the value the app shows moves
  * only when its write lands. A burst of choices therefore writes at most the
@@ -74,7 +79,6 @@ export function createSecureStorePreference<T>(options: {
    * cleared value back into memory and back onto disk.
    */
   let clearDeletion: Promise<boolean> | undefined = undefined;
-  let loadStarted = false;
   /**
    * Bumped by clear(), and by the `mergeOnLoad` reconcile that repaints the
    * value. A write that started under an earlier epoch still lands (the delete
@@ -238,8 +242,8 @@ export function createSecureStorePreference<T>(options: {
         void drainWrites();
       }
     } catch {
-      // Keep the default on read failure — this runs on mount, before the
-      // user has done anything, so there's nothing actionable to tell them.
+      // Keep the default on read failure — this runs at construction, before
+      // the user has done anything, so there's nothing actionable to tell them.
       // The SecureStore read path already reports the rejection once (a
       // warning event for a real failure, a breadcrumb for a locked device's
       // refusal), so a second record here would only duplicate it.
@@ -267,26 +271,18 @@ export function createSecureStorePreference<T>(options: {
     }
   };
 
-  const preload = () => {
-    if (!loadStarted) {
-      loadStarted = true;
-      void load();
-    }
-  };
+  // The read starts here, at construction, so a synchronous reader with no
+  // React tree (the Android widget task, the settings registry) sees the
+  // persisted value once the read settles instead of the default until some
+  // subscriber mounts.
+  void load();
 
   return {
-    /** Start the disk read without registering a listener (module-scope warm-up). */
-    preload,
-    /** Start the disk read and await it. For callers outside a React tree. */
+    /** Await the disk read the store started at construction. */
     whenLoaded: async () => {
-      preload();
       await loaded;
     },
     subscribe: (listener: () => void) => {
-      if (!loadStarted) {
-        loadStarted = true;
-        void load();
-      }
       listeners.add(listener);
       return () => {
         listeners.delete(listener);
@@ -399,10 +395,10 @@ export function createSecureStorePreference<T>(options: {
       // A clear before the initial load resolves must still win, even with
       // mergeOnLoad set.
       cleared = true;
-      // Recorded before emit() and before clear() returns: a listener that
-      // starts the read from the emit, or a caller that starts it right after
-      // the clear, must wait for the delete instead of reading the snapshot
-      // this clear removed. remove() never rejects, so holding it is safe.
+      // Recorded before emit() and before clear() returns, so any read that
+      // begins under it waits for the delete instead of reading the snapshot
+      // this clear removed: until the delete lands, the disk still holds it.
+      // remove() never rejects, so holding it is safe.
       clearDeletion = remove();
       emit();
       releaseDrainWaiters();

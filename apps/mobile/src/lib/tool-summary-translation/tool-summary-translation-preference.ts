@@ -96,10 +96,6 @@ function syncRuntime(): void {
   });
 }
 
-// Warm both disk reads at module scope so the runtime and the settings row see
-// the persisted value without waiting for a React mount, then keep them in sync.
-enabledStore.preload();
-modelStore.preload();
 enabledStore.subscribe(syncRuntime);
 modelStore.subscribe(syncRuntime);
 

@@ -64,11 +64,6 @@ export async function setLanguagePreferenceAsync(
   return result;
 }
 
-/** Start the disk read at module scope, before React mounts. */
-export function preloadLanguagePreference(): void {
-  store.preload();
-}
-
 /** Await the stored preference. For callers with no React tree. */
 export async function whenLanguagePreferenceLoaded(): Promise<void> {
   await store.whenLoaded();

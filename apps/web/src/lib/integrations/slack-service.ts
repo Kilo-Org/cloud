@@ -672,13 +672,9 @@ export async function uninstallApp(owner: Owner, options: SlackUninstallOptions 
   const shouldDeleteSlackInstallation =
     integration.integration_status === INTEGRATION_STATUS.ACTIVE;
 
-  // Revoke the stored credential if we have one. A Slack refusal that does not
-  // settle the token's state keeps the row, so a retry starts the revoke again.
-  const tokenRead = await readSlackBotToken(integration);
   if (shouldDeleteSlackInstallation) {
+    const tokenRead = await readSlackBotToken(integration);
     if (tokenRead.status === 'unavailable') {
-      // The grant may still be live in Slack and this row is the only pointer to it,
-      // so the row and its credential survive until the credential can be read.
       throw new TRPCError({
         code: 'SERVICE_UNAVAILABLE',
         message: SLACK_DISCONNECT_UNCONFIRMED_MESSAGE,

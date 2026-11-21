@@ -222,6 +222,9 @@ describe('slack-service uninstallApp', () => {
     expect(mockAuthRevoke).not.toHaveBeenCalled();
     expect(deleteChatSdkInstallation).not.toHaveBeenCalled();
     expect(deleteChatSdkIdentityCache).not.toHaveBeenCalled();
+    expect(mockGetSlackCredentialByIntegrationId).not.toHaveBeenCalled();
+    expect(mockDecryptSlackBotToken).not.toHaveBeenCalled();
+    expect(mockCaptureException).not.toHaveBeenCalled();
     expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
   });
 

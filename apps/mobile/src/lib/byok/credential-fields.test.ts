@@ -1,3 +1,6 @@
+import { createPrivateKey, generateKeyPairSync } from 'node:crypto';
+
+import { VertexCredentialsSchema } from '@kilocode/app-shared/byok-credentials';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -80,6 +83,47 @@ describe('firstMissingField', () => {
 });
 
 describe('credentialPayload', () => {
+  function vertexPrivateKey(privateKey: string) {
+    return VertexCredentialsSchema.parse(
+      credentialPayload({
+        providerId: 'vertex',
+        mode: 'apiKey',
+        values: {
+          project: 'p',
+          location: 'global',
+          clientEmail: 'service@example.test',
+          privateKey,
+        },
+        modelMappings: [],
+      })
+    ).googleCredentials.privateKey;
+  }
+
+  const { privateKey: signedKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const PEM = signedKey.export({ type: 'pkcs8', format: 'pem' });
+
+  it('stores a pasted key so the gateway can sign with it, whatever line breaks the paste kept', () => {
+    const folded = PEM.replace(/\n/g, '');
+    expect(() => createPrivateKey(folded)).toThrow();
+    for (const pasted of [
+      PEM,
+      folded,
+      PEM.replace(/\n/g, '\r\n'),
+      PEM.split('\n')
+        .map(line => `  ${line}`)
+        .join('\n'),
+      `  ${PEM}  `,
+    ]) {
+      const stored = vertexPrivateKey(pasted);
+      expect(() => createPrivateKey(stored)).not.toThrow();
+      expect(stored).toBe(PEM.trim());
+    }
+  });
+
+  it('leaves a value that is not a base64 PEM as typed', () => {
+    expect(vertexPrivateKey(' pem ')).toBe('pem');
+  });
+
   it('writes the Bedrock API-key method as the web form stores it', () => {
     expect(
       credentialPayload({

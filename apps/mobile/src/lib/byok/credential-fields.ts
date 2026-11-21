@@ -177,6 +177,36 @@ export function firstMissingField(
   return null;
 }
 
+/**
+ * A service-account private key in the shape the gateway signs with: the PEM
+ * header, its base64 body wrapped at 64 columns, and the footer.
+ *
+ * The key is pasted as a whole value into a single-line field, and a paste can
+ * arrive with its line breaks folded away; base64 does not need them, and the
+ * wrapping is then put back here. The result is the same value whether the
+ * reader pasted a file or a folded copy of it, so the gateway never receives a
+ * key it cannot parse. A value that is not a base64 PEM is returned as typed:
+ * this cannot repair a key that is not one, and the server's own check names
+ * the shape it refuses.
+ */
+function canonicalPrivateKey(value: string): string {
+  const typed = value.trim();
+  const match = /^-----BEGIN ([A-Z0-9 ]+)-----([\s\S]*)-----END ([A-Z0-9 ]+)-----$/.exec(typed);
+  if (!match) {
+    return typed;
+  }
+  const [, beginLabel, rawBody, endLabel] = match;
+  if (beginLabel !== endLabel) {
+    return typed;
+  }
+  const body = rawBody.replace(/\s+/g, '');
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(body) || body.length % 4 !== 0) {
+    return typed;
+  }
+  const lines = body.match(/.{1,64}/g) ?? [];
+  return [`-----BEGIN ${beginLabel}-----`, ...lines, `-----END ${beginLabel}-----`].join('\n');
+}
+
 /** The credential's own JSON object, without the empty mappings list. */
 export function credentialPayload(input: {
   providerId: string;
@@ -208,7 +238,7 @@ export function credentialPayload(input: {
         location: value('location'),
         googleCredentials: {
           clientEmail: value('clientEmail'),
-          privateKey: (input.values.privateKey ?? '').trim(),
+          privateKey: canonicalPrivateKey(input.values.privateKey ?? ''),
         },
       };
     }

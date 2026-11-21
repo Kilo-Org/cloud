@@ -1,8 +1,6 @@
-import { ai_gateway_config } from '@kilocode/db/schema';
 import { VercelModelIdOverridesConfigSchema } from '@kilocode/db/schema-types';
-import { eq } from 'drizzle-orm';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { readAiGatewayConfigRow } from '@kilocode/web-shared/lib/ai-gateway/providers/ai-gateway-config-row';
 import {
   AUTO_SMALL_FREE_MODEL_UPSTREAM_ID,
   isAutoSmallFreeModel,
@@ -27,13 +25,9 @@ const openRouterModelPrefixMapping: Record<string, string | undefined> = Object.
 
 /** Throws on an invalid stored config, so the cached getter keeps its last valid value. */
 export async function readVercelModelIdOverrides(): Promise<VercelModelIdOverrides> {
-  const [row] = await readDb
-    .select({ config: ai_gateway_config.vercel_model_id_overrides })
-    .from(ai_gateway_config)
-    .where(eq(ai_gateway_config.id, 1))
-    .limit(1);
-  if (!row?.config) return new Map();
-  const { overrides } = VercelModelIdOverridesConfigSchema.parse(row.config);
+  const row = await readAiGatewayConfigRow();
+  if (!row?.vercelModelIdOverrides) return new Map();
+  const { overrides } = VercelModelIdOverridesConfigSchema.parse(row.vercelModelIdOverrides);
   return new Map(overrides.map(o => [o.openrouter_model_id, o.vercel_model_id]));
 }
 
@@ -86,9 +80,19 @@ export function mapVercelModelIdToOpenRouter(
 }
 
 export async function mapModelIdToVercel(modelId: string): Promise<string> {
+  return (await resolveVercelModelId(modelId)).vercelModelId;
+}
+
+/**
+ * The Vercel model ID for a Kilo model ID, along with the admin overrides that produced it.
+ * Routing callers need both: the ID to name the model and the overrides to reverse it.
+ */
+export async function resolveVercelModelId(
+  modelId: string
+): Promise<{ vercelModelId: string; overrides: VercelModelIdOverrides }> {
   const [resolvedModelId, overrides] = await Promise.all([
     modelId.startsWith('~') ? resolveOpenRouterModelAlias(modelId) : modelId,
     getVercelModelIdOverrides(),
   ]);
-  return mapResolvedModelIdToVercel(resolvedModelId, overrides);
+  return { vercelModelId: mapResolvedModelIdToVercel(resolvedModelId, overrides), overrides };
 }

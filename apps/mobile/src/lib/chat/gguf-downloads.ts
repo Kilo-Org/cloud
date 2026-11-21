@@ -6,14 +6,13 @@ import {
   type GgufModelFile,
   type GgufModelRecord,
   type GgufStorage,
-  keepStoredModels,
   modelFileOf,
-  modelIndexFullyParsed,
   recordFileNames,
   removeQuietly,
   settled,
   STORAGE_HEADROOM_BYTES,
 } from './gguf-records';
+import { loadSavedModels, writeSavedModels } from './gguf-model-index';
 import {
   type GgufActiveDownload as Active,
   activeDownload,
@@ -60,20 +59,23 @@ export function ggufDownloads({
   const listeners = new Set<() => void>();
 
   const publish = () => {
-    snapshot = {
-      models,
-      download: active === undefined ? null : downloadProgress(active),
-      failure,
-      loadFailed,
-    };
+    const download = active === undefined ? null : downloadProgress(active);
+    snapshot = { models, download, failure, loadFailed };
     for (const listener of listeners) {
       listener();
     }
   };
 
-  const save = (next: readonly GgufModelRecord[]) => {
+  /**
+   * Writes the list the device keeps, and only then makes it the current one:
+   * a list the device could not take is not a list it holds.
+   */
+  const save = (next: readonly GgufModelRecord[]): boolean => {
+    if (!writeSavedModels(storage, next)) {
+      return false;
+    }
     models = next;
-    storage.writeIndex(JSON.stringify(next));
+    return true;
   };
 
   const discard = (download: Active) => {
@@ -96,8 +98,11 @@ export function ggufDownloads({
   /** Starts the transfer at the current step from zero. */
   const begin = (download: Active) => {
     const { url, part } = transferStart(download);
-    const progress = onProgress(() => download);
-    download.task = storage.createDownload(url, part, progress);
+    download.task = storage.createDownload(
+      url,
+      part,
+      onProgress(() => download)
+    );
     publish();
     void settle(download, download.task.downloadAsync());
   };
@@ -112,8 +117,13 @@ export function ggufDownloads({
       fail(download, read.problem);
       return;
     }
+    // The record goes in before the download ends. A device that could not take
+    // it holds no model the saved list names, so the files go with the failure.
+    if (!save([...models, read.model])) {
+      fail(download, 'space');
+      return;
+    }
     active = undefined;
-    save([...models, read.model]);
     publish();
   };
 
@@ -172,18 +182,30 @@ export function ggufDownloads({
     begin(download);
   };
 
+  /**
+   * Publishes what the task delivered. Never rejects: its callers start it and do
+   * not await it, and the row must reach a published end state either way.
+   */
   const settle = async (download: Active, operation: Promise<unknown>) => {
     const outcome = await settled(operation);
     if (active !== download) {
       return;
     }
+    // A stop that raced the pause wins: the task may report itself paused, but the
+    // download was already meant to end. A cancel leaves no row behind, and a
+    // low-space stop is the download's failure.
+    const ended = !outcome.ok || outcome.value === null;
+    if (ended && download.stop === 'cancel') {
+      discard(download);
+      publish();
+      return;
+    }
+    if (ended && download.stop === 'space') {
+      fail(download, 'space');
+      return;
+    }
     if (!outcome.ok) {
-      if (download.stop === 'cancel') {
-        discard(download);
-        publish();
-      } else if (download.stop === 'space') {
-        fail(download, 'space');
-      } else if (download.resuming && !download.restarted) {
+      if (download.resuming && !download.restarted) {
         restart(download);
       } else {
         fail(download, 'network');
@@ -191,51 +213,39 @@ export function ggufDownloads({
       return;
     }
     if (outcome.value === null) {
-      // A cancel or a low-space stop that raced the pause wins: the task reports
-      // itself paused, but the download was already meant to end, so it does.
-      if (download.stop === 'cancel') {
-        discard(download);
-        publish();
-        return;
-      }
-      if (download.stop === 'space') {
-        fail(download, 'space');
-        return;
-      }
       download.phase = 'paused';
       download.pausing = false;
       publish();
       return;
     }
-    await complete(download);
+    try {
+      await complete(download);
+    } catch {
+      // A storage call the OS refused at the last step is the download's failure,
+      // not a rejection nobody awaits and a row left asking to verify.
+      fail(download, 'space');
+    }
   };
-
   return {
     load: (): boolean => {
-      try {
-        const index = storage.readIndex();
-        models = keepStoredModels({
-          storage,
-          index,
-          partialNames: active?.transfers.map(transfer => transfer.part) ?? [],
-        });
-        if (modelIndexFullyParsed(index)) {
-          save(models);
-        }
-        if (loadFailed) {
-          loadFailed = false;
-        }
-        publish();
-        return true;
-      } catch {
-        // A storage the OS refused (permission, full disk, I/O) is a state the picker
-        // reports, not a crash: this store is read while rendering.
+      const saved = loadSavedModels({
+        storage,
+        partialNames: active?.transfers.map(transfer => transfer.part) ?? [],
+      });
+      // A storage the OS refused (permission, full disk, I/O) is a state the picker
+      // reports, not a crash: this store is read while rendering. The list the store
+      // already had stays, and a repeat of the same failure publishes nothing new.
+      if (saved.failed) {
         if (!loadFailed) {
           loadFailed = true;
           publish();
         }
         return false;
       }
+      models = saved.models;
+      loadFailed = false;
+      publish();
+      return true;
     },
     snapshot: () => snapshot,
     subscribe: (listener: () => void) => {
@@ -339,7 +349,12 @@ export function ggufDownloads({
       for (const name of recordFileNames(record)) {
         removeQuietly(storage, name);
       }
-      save(models.filter(model => model.fileId !== fileId));
+      const remaining = models.filter(model => model.fileId !== fileId);
+      if (!save(remaining)) {
+        // The files are gone, so the row goes with them. The saved list still
+        // names the entry, and the next load drops it and rewrites that list.
+        models = remaining;
+      }
       publish();
     },
   };

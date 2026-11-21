@@ -11,7 +11,8 @@ export type GgufVerification =
  * while the device is short of memory says nothing about the file, and hashing a
  * file again costs far less than downloading it again - so the read runs once
  * more. A checksum mismatch is the verdict itself and is never read again, and a
- * model whose projector does not read images is not the model the catalog promised.
+ * model whose projector does not read images is not the model the catalog
+ * promised: that verdict cannot change between reads, so it ends the check.
  */
 export async function verifyModel(
   storage: GgufStorage,
@@ -35,7 +36,13 @@ export async function verifyModel(
     if (read === 'checksum') {
       return { ok: false, problem: 'checksum' };
     }
-    if (read.ok && (projector === undefined || read.value.vision)) {
+    // A refused read is the one transient answer the second pass is for. A
+    // projector that reads no images cannot change between passes, so it ends
+    // verification here instead of hashing and loading the model again.
+    if (read.ok && projector !== undefined && !read.value.vision) {
+      return { ok: false, problem: 'invalidFile' };
+    }
+    if (read.ok) {
       if (!moveIntoPlace(storage, transfers)) {
         return { ok: false, problem: 'invalidFile' };
       }

@@ -73,24 +73,42 @@ export function ggufModelClient({
   let loaded: { readonly fileId: string; readonly context: Promise<GgufContext> } | undefined =
     undefined;
   let inflight: Promise<unknown> | undefined = undefined;
+  /**
+   * The teardown under way. Nothing opens a context until it settles, so two
+   * multi-gigabyte models are never resident at once: the entry leaves `loaded`
+   * first, and every caller that would open one waits here.
+   */
+  let freeing: Promise<void> = Promise.resolve();
   let busy = false;
   let sequence = 0;
 
-  const release = async (fileId?: string) => {
-    const current = loaded;
-    if (current === undefined || (fileId !== undefined && current.fileId !== fileId)) {
-      return;
-    }
-    loaded = undefined;
+  const free = async (
+    previous: Promise<void>,
+    current: { readonly context: Promise<GgufContext> }
+  ) => {
+    await settled(previous);
     const context = await settled(current.context);
     if (!context.ok) {
       return;
     }
-    if (inflight !== undefined) {
+    const running = inflight;
+    if (running !== undefined) {
       await settled(context.value.stopCompletion());
-      await settled(inflight);
+      await settled(running);
     }
     await settled(context.value.release());
+  };
+
+  const release = (fileId?: string): Promise<void> => {
+    const current = loaded;
+    if (current === undefined || (fileId !== undefined && current.fileId !== fileId)) {
+      // Nothing of this model is loaded, but a release the background listener
+      // started may still be freeing one, and the caller waits for it.
+      return freeing;
+    }
+    loaded = undefined;
+    freeing = free(freeing, current);
+    return freeing;
   };
 
   /** A vision model whose projector does not load is not the model that was verified. */

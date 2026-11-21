@@ -49,7 +49,8 @@ export function harness(
 ) {
   const freeBytes = options.freeBytes ?? 8_000_000_000;
   const files = new Map<string, number>();
-  const index: { text: string | null; fails?: boolean } = { text: null };
+  const index: { text: string | null; fails?: boolean; writeFails?: boolean } = { text: null };
+  const hashed: string[] = [];
   const tasks: Task[] = [];
   const inspected: string[] = [];
   const released: string[] = [];
@@ -61,6 +62,7 @@ export function harness(
     list: () => [...files.keys()],
     size: name => files.get(name) ?? 0,
     sha256: async name => {
+      hashed.push(name);
       if (name === options.unreadable) {
         throw new Error('read failed');
       }
@@ -89,6 +91,9 @@ export function harness(
       return index.text;
     },
     writeIndex: text => {
+      if (index.writeFails === true) {
+        throw new Error('storage unavailable');
+      }
       index.text = text;
     },
     createDownload: (url, name, report) => {
@@ -156,7 +161,7 @@ export function harness(
       released.push(fileId);
     },
   });
-  return { store, files, index, tasks, inspected, projectors, released };
+  return { store, files, index, tasks, inspected, projectors, released, hashed };
 }
 
 export const MODEL = {

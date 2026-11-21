@@ -15,6 +15,7 @@ import {
 } from '@kilocode/app-shared/home-widget';
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications/schemas';
 
+import { formatGlanceableCount } from '@/lib/glanceable/count-format';
 import {
   type GlanceableCountKind,
   glanceableCountLines,
@@ -204,10 +205,7 @@ export function buildGlanceableViewProps(
     primaryCount: primary === null ? 0 : primary.count,
     newestTitle,
     actionFeedback: home.status === 'content' ? extras.actionFeedback : null,
-    actions: {
-      approve: home.canApprove,
-      newAgent: home.canCreate,
-    },
+    actions: { approve: home.canApprove, newAgent: home.canCreate },
     needsInputSince: showCounts && snapshot.needsInput > 0 ? snapshot.needsInputSince : null,
     // The shared helper decides the wake, so a scheduled count with no usable
     // time is represented the same way on this surface as on every other.
@@ -215,7 +213,7 @@ export function buildGlanceableViewProps(
     newestResultKind,
     newestResultLabel,
     newestResultAt: newestResultKind === null ? null : snapshot.newestResultAt,
-    accessibilityLabel: glanceableSpokenLabel(snapshot, flags, copy),
+    accessibilityLabel: glanceableSpokenLabel(snapshot, flags, copy, formatGlanceableCount),
   };
 }
 

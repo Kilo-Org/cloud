@@ -1,22 +1,30 @@
 import { useTranslation } from 'react-i18next';
 
+import { type AccountBlockedRefusalReason } from '@kilocode/app-shared/auth';
+
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
 
 /**
- * The blocked-account explanation. Retry re-reads the account while the
- * session that was refused still exists, so a block lifted server-side
- * dismisses the surface without a sign-out. With no session left (the refresh
- * route's refusal) Contact support is the next step, and the exit only reveals
- * the screen the app has already settled on — the login screen — so it is
- * labelled for that reveal instead of for a sign-out that already happened.
+ * The blocked-account explanation, shaped by the refusal reason the server
+ * published.
+ *
+ * For an account block, Retry re-reads the account over the session that was
+ * refused (it does not sign in), so a block lifted server-side dismisses the
+ * surface without a sign-out. With no session left (the refresh route's
+ * refusal) Contact support is the next step, and the exit only reveals the
+ * screen the app has already settled on — the login screen — so it is labelled
+ * for that reveal instead of for a sign-out that already happened.
  */
 export function BlockedAccountSurface({
+  reason,
   canRetry,
   retrying,
   onRetry,
   onContactSupport,
   onSignOut,
 }: Readonly<{
+  /** Which refusal the server answered with; it picks the actions offered. */
+  reason: AccountBlockedRefusalReason;
   /** False once the refused session is gone: nothing is left to re-read. */
   canRetry: boolean;
   /** A retry read is in flight; the primary button shows its busy state. */
@@ -29,6 +37,23 @@ export function BlockedAccountSurface({
   // Without a session the exit cannot sign out: it clears the explanation and
   // reveals the login screen, so it says what it does.
   const exitLabel = canRetry ? t('common.signOut') : t('common.continue');
+  // A domain refusal is a property of the email domain, not of this account's
+  // state, so a re-read returns the same answer: no Retry in either state, and
+  // Contact support becomes the primary action.
+  if (reason === 'email_domain_blocked') {
+    return (
+      <BootstrapErrorScreen
+        title={t('accountBlocked.title')}
+        description={t('accountBlocked.domainDescription')}
+        primaryLabel={t('accountBlocked.contactSupport')}
+        primaryAccessibilityLabel={t('accountBlocked.contactSupport')}
+        onPrimaryPress={onContactSupport}
+        secondaryLabel={exitLabel}
+        secondaryAccessibilityLabel={exitLabel}
+        onSecondaryPress={onSignOut}
+      />
+    );
+  }
   const copy = {
     title: t('accountBlocked.title'),
     description: t('accountBlocked.description'),

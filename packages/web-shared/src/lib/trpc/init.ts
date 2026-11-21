@@ -1,6 +1,6 @@
 import 'server-only';
 import { headers } from 'next/headers';
-import { isSelfCleanupProcedureCall } from '@kilocode/app-shared/auth';
+import { accountBlockedRefusalReason, isSelfCleanupProcedureCall } from '@kilocode/app-shared/auth';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { initTRPC, TRPCError } from '@trpc/server';
 import type { ProcedureType } from '@trpc/server';
@@ -217,18 +217,23 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
   // and keep the user signed in, so this refuses with its own cause instead of
   // reaching the AuthContextError branch below.
   //
+  // Both refusals keep the same HTTP/tRPC shape (FORBIDDEN, `data.accountBlocked`)
+  // and differ only in the reason published beside it. The reason is what lets
+  // the app drop a retry: R1 (`account_blocked`) is one account's property,
+  // which support can lift, while R0 (`email_domain_blocked`) is the email
+  // domain's, so no retry, sign-out or sign-in can satisfy it.
+  //
   // Only the first-party mobile client gets that answer. The web app already
   // routes a blocked account to /account-blocked from its UNAUTHORIZED path
   // (sign-in -> after-sign-in -> /account-blocked), and no web consumer reads
   // `data.accountBlocked`, so every other client falls through to the
   // merge-base UNAUTHORIZED answer unchanged.
-  const blockedAccountAnswerable =
-    refusalReason === 'account_blocked' && isMobileClient(headersList?.get(APP_CLIENT_HEADER));
-  if (blockedAccountAnswerable) {
+  const accountBlockedReason = accountBlockedRefusalReason(refusalReason);
+  if (accountBlockedReason !== null && isMobileClient(headersList?.get(APP_CLIENT_HEADER))) {
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: 'Account access is blocked',
-      cause: new AccountBlockedError(),
+      cause: new AccountBlockedError(accountBlockedReason),
     });
   }
   if (!user) {

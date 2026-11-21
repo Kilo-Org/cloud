@@ -3064,6 +3064,7 @@
   "accountBlocked": {
     "title": "Kont bloke",
     "description": "Kilo bloke kont sa a, epi rekonekte p ap retire blokaj la. Ekip sipò a ka revize blokaj la sou demann.",
+    "domainDescription": "Kilo bloke kont ki sou domèn imèl sa a, epi rekonekte p ap chanje blokaj la. Ekip sipò a ka revize domèn nan sou demann.",
     "contactSupport": "Kontakte ekip sipò a"
   },
   "addCredits": {

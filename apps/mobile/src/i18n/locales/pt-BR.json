@@ -2571,6 +2571,7 @@
   "accountBlocked": {
     "title": "Conta bloqueada",
     "description": "O Kilo bloqueou esta conta e entrar de novo não vai desfazer o bloqueio. O suporte pode revisar o bloqueio a pedido.",
+    "domainDescription": "O Kilo bloqueou este domínio de e-mail e entrar de novo não vai desfazer o bloqueio. O suporte pode revisar o domínio a pedido.",
     "contactSupport": "Falar com o suporte"
   },
   "addCredits": {

@@ -3064,6 +3064,7 @@
   "accountBlocked": {
     "title": "I-akhawunti ivinjiwe",
     "description": "I-Kilo ivale le akhawunti, futhi ukungena kabusha ngeke kuyisule. Ithimba losizo lingabuyekeza ukuvalwa uma kuceliwe.",
+    "domainDescription": "I-Kilo ivale ama-akhawunti kulesi sizinda se-imeyili, futhi ukungena kabusha ngeke kuyishintshe. Ithimba losizo lingabuyekeza isizinda uma kuceliwe.",
     "contactSupport": "Xhumana nethimba losizo"
   },
   "addCredits": {

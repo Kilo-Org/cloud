@@ -3124,6 +3124,7 @@
   "accountBlocked": {
     "title": "Račun blokiran",
     "description": "Kilo je blokirao ovaj račun i ponovna prijava to neće ukloniti. Podrška može na zahtjev pregledati blokadu.",
+    "domainDescription": "Kilo blokira račune na ovoj email domeni i ponovna prijava to neće promijeniti. Podrška može na zahtjev pregledati domenu.",
     "contactSupport": "Obrati se podršci"
   },
   "addCredits": {

@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+import {
+  ACCOUNT_BLOCKED_REFUSAL_REASONS,
+  accountBlockedRefusalReason,
+  type AccountBlockedRefusalReason,
+} from '@kilocode/app-shared/auth';
 import { CONTROL_PLANE_TIMEOUT_MESSAGE } from '@kilocode/app-shared/control-plane';
 import { isUsageSourceNotConfigured } from '@kilocode/app-shared/usage-source';
 
@@ -254,12 +259,20 @@ type TrpcErrorData = {
   code?: string;
   authRequired?: boolean;
   accountBlocked?: boolean;
+  accountBlockedReason?: AccountBlockedRefusalReason;
 };
 
 const TrpcErrorDataSchema = z.looseObject({
   code: z.string().optional(),
   authRequired: z.boolean().optional(),
   accountBlocked: z.boolean().optional(),
+  // The shared reader drops a value this build does not know, so one unknown
+  // field cannot fail the whole parse and hide a refusal's other fields from
+  // `isAccountBlockedTrpcError` / `isPermissionDeniedError`.
+  accountBlockedReason: z.preprocess(
+    (value: unknown) => accountBlockedRefusalReason(value) ?? undefined,
+    z.enum(ACCOUNT_BLOCKED_REFUSAL_REASONS).optional()
+  ),
 });
 const TrpcErrorEnvelopeSchema = z.looseObject({
   data: z.unknown().optional(),
@@ -306,4 +319,25 @@ export function isPermissionDeniedError(error: unknown): boolean {
  */
 export function isAccountBlockedTrpcError(error: unknown): boolean {
   return readTrpcErrorData(error)?.accountBlocked === true;
+}
+
+/**
+ * Which of the two blocked-account refusals the server answered with, or null
+ * when this error is not one of them (or carries no recognisable reason).
+ *
+ * The two reasons need different actions, which is why presence alone
+ * (`isAccountBlockedTrpcError`) is not enough:
+ *
+ * - `'account_blocked'` is a property of one account, and support can lift it,
+ *   so re-reading the account over the refused session can succeed.
+ * - `'email_domain_blocked'` is a property of the account's email domain, so no
+ *   retry, sign-out or sign-in changes the answer.
+ *
+ * The value travels as `data.accountBlockedReason` (or
+ * `shape.data.accountBlockedReason`), and is validated through the shared
+ * reader so an unknown string reaching an older client reads as no reason at
+ * all rather than as a refused type.
+ */
+export function readAccountBlockedReason(error: unknown): AccountBlockedRefusalReason | null {
+  return accountBlockedRefusalReason(readTrpcErrorData(error)?.accountBlockedReason);
 }

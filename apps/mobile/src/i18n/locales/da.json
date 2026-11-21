@@ -3064,6 +3064,7 @@
   "accountBlocked": {
     "title": "Konto blokeret",
     "description": "Kilo har blokeret denne konto, og det hjælper ikke at logge ind igen. Support kan gennemgå blokeringen efter anmodning.",
+    "domainDescription": "Kilo blokerer konti på dette e-maildomæne, og det ændrer ikke noget at logge ind igen. Support kan gennemgå domænet efter anmodning.",
     "contactSupport": "Kontakt support"
   },
   "addCredits": {

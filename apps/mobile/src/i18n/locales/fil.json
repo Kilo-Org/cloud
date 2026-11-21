@@ -3064,6 +3064,7 @@
   "accountBlocked": {
     "title": "Na-block ang account",
     "description": "Na-block ng Kilo ang account na ito, at hindi ito maaalis kahit mag-sign in muli. Maaaring suriin ng suporta ang pag-block kapag hiniling.",
+    "domainDescription": "Hindi pinapayagan ng Kilo ang mga account sa email domain na ito, at hindi ito mababago kahit mag-sign in muli. Maaaring suriin ng suporta ang domain kapag hiniling.",
     "contactSupport": "Makipag-ugnayan sa suporta"
   },
   "addCredits": {

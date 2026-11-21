@@ -3064,6 +3064,7 @@
   "accountBlocked": {
     "title": "Llogaria e bllokuar",
     "description": "Kilo bllokoi këtë llogari dhe një hyrje e re nuk e heq bllokimin. Mbështetja mund ta shqyrtojë bllokimin me kërkesë.",
+    "domainDescription": "Kilo bllokon llogaritë në këtë domen emaili dhe një hyrje e re nuk do ta ndryshojë këtë. Mbështetja mund ta shqyrtojë domenin me kërkesë.",
     "contactSupport": "Kontakto mbështetjen"
   },
   "addCredits": {

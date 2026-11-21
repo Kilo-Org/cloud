@@ -82,7 +82,7 @@ import {
   setSignOutActive,
   subscribeSignOutActive,
 } from '@/lib/auth/sign-out-state';
-import { setBlockedAccountActive } from '@/lib/auth/blocked-account-state';
+import { setBlockedAccountExplanation } from '@/lib/auth/blocked-account-state';
 import { clearCacheScopeForSignOut, readCachedUserId } from '@/lib/persist/read-cache';
 import { clearToolSummaryTranslationsForSignOut } from '@/lib/persist/tool-summary-translation-cache';
 import { clearToolSummaryTranslationMemoryForSignOut } from '@/lib/tool-summary-translation/tool-summary-translation-runtime';
@@ -460,7 +460,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // A successful sign-in is the one event that proves the block no
         // longer applies, so it clears the blocked-account explanation the
         // signed-out surface would otherwise keep showing.
-        setBlockedAccountActive(false);
+        setBlockedAccountExplanation(null);
         // The sign-out fence opens so the read-cache mount can subscribe for
         // the new session, and the reactive `isSigningOut` follows the same
         // flag.
@@ -728,12 +728,14 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         !isSignedOutReference.current
       ) {
         if (outcome.userBlocked === true) {
-          // The refusal explains the session it ends, so the flag is raised
-          // before the teardown and deliberately outlives it: sign-out clears
-          // the credential, not the reason, and the signed-out surface must
-          // still say why once the token is gone. Only a successful sign-in
-          // clears it.
-          setBlockedAccountActive(true);
+          // The refusal explains the session it ends, so the explanation is
+          // raised before the teardown and deliberately outlives it: sign-out
+          // clears the credential, not the reason, and the signed-out surface
+          // must still say why once the token is gone. Only a successful
+          // sign-in clears it. The refresh route's frozen body names only a
+          // block, so the copy falls back to the account explanation (that path
+          // has no session left, so it already offers no retry).
+          setBlockedAccountExplanation('account_blocked');
         }
         await signOut(true, 'session_ended');
       }
@@ -794,10 +796,13 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             !isSignedOutReference.current
           ) {
             if (outcome.userBlocked === true) {
-              // Same refusal the unauthorized handler explains: the flag is
-              // raised before the teardown and outlives it, so the
-              // signed-out surface says why instead of a bare session end.
-              setBlockedAccountActive(true);
+              // Same refusal the unauthorized handler explains: the
+              // explanation is raised before the teardown and outlives it, so
+              // the signed-out surface says why instead of a bare session end.
+              // The frozen refresh body names only a block, so the copy falls
+              // back to the account explanation, and this path already has no
+              // session left to retry over.
+              setBlockedAccountExplanation('account_blocked');
             }
             await signOut(true, 'session_ended');
           }

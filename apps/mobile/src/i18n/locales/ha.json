@@ -3064,6 +3064,7 @@
   "accountBlocked": {
     "title": "An toshe asusu",
     "description": "Kilo ya toshe wannan asusu, kuma sake shiga ba zai buɗe shi ba. Masu tallafi na iya duba toshewar idan an buƙata.",
+    "domainDescription": "Kilo ya toshe asusu a wannan yankin imel, kuma sake shiga ba zai canza hakan ba. Masu tallafi na iya duba yankin idan an buƙata.",
     "contactSupport": "Tuntuɓi masu tallafi"
   },
   "addCredits": {

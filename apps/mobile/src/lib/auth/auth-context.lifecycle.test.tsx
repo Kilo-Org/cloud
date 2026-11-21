@@ -2290,7 +2290,7 @@ describe('bootstrap and foreground race fencing', () => {
     // get the one the provider writes, and start this case from the cleared
     // state so the assertions below describe this refusal alone.
     const blockedAccount = await import('@/lib/auth/blocked-account-state');
-    blockedAccount.setBlockedAccountActive(false);
+    blockedAccount.setBlockedAccountExplanation(null);
     expect(blockedAccount.isBlockedAccountActive()).toBe(false);
 
     // Prove the ordering the sign-out depends on, not only the final state:
@@ -2347,7 +2347,7 @@ describe('bootstrap and foreground race fencing', () => {
     expect(getCtx().token).toBe(storedToken);
 
     const blockedAccount = await import('@/lib/auth/blocked-account-state');
-    blockedAccount.setBlockedAccountActive(false);
+    blockedAccount.setBlockedAccountExplanation(null);
     expect(blockedAccount.isBlockedAccountActive()).toBe(false);
 
     // A 401 that names nothing but a rejected refresh token ends the session
@@ -2380,12 +2380,12 @@ describe('bootstrap and foreground race fencing', () => {
   it('a successful sign-in clears the explanation', async () => {
     const { getCtx, unmount } = await mountProvider();
     const blockedAccount = await import('@/lib/auth/blocked-account-state');
-    blockedAccount.setBlockedAccountActive(false);
+    blockedAccount.setBlockedAccountExplanation(null);
 
     // The explanation is showing from a blocked refusal the person has since
     // asked to sign in past: the published credentials prove it no longer
     // applies.
-    blockedAccount.setBlockedAccountActive(true);
+    blockedAccount.setBlockedAccountExplanation('account_blocked');
     expect(blockedAccount.isBlockedAccountActive()).toBe(true);
 
     await act(async () => {
@@ -2404,7 +2404,7 @@ describe('bootstrap and foreground race fencing', () => {
     const { isSignOutActive } = await import('@/lib/auth/sign-out-state');
     const { isSignOutTeardownActive } = await import('@/lib/auth/auth-transition-state');
     const { releaseChatsForAccountSwitch } = await import('@/lib/chat/sign-out');
-    blockedAccount.setBlockedAccountActive(false);
+    blockedAccount.setBlockedAccountExplanation(null);
     expect(blockedAccount.isBlockedAccountActive()).toBe(false);
 
     // Park the sign-in inside its transition: the release await is the gap

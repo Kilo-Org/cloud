@@ -2503,6 +2503,7 @@
   "accountBlocked": {
     "title": "帳號已封鎖",
     "description": "Kilo 已封鎖此帳號，重新登入也不會解除封鎖。如有請求，客服可以複核封鎖。",
+    "domainDescription": "Kilo 不允許使用此電子郵件網域的帳號，重新登入也不會改變。如有請求，客服可以複核該網域。",
     "contactSupport": "聯絡客服"
   },
   "addCredits": {

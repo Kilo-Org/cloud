@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { TRPCError } from '@trpc/server';
 import { NextResponse } from 'next/server';
+import type { AccountBlockedRefusalReason } from '@kilocode/app-shared/auth';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { AccountBlockedError, AuthContextError, trpcErrorFormatter } from './transport';
@@ -23,7 +24,7 @@ function requestAt(path: string, client?: string): Request {
 /** A failed auth read carries the response the caller would have returned. */
 function failedAuthResponse(extra: {
   authorizationRefused?: boolean;
-  refusalReason?: 'account_blocked';
+  refusalReason?: AccountBlockedRefusalReason;
 }) {
   return {
     user: null,
@@ -106,6 +107,38 @@ describe('createTRPCContext blocked-account refusal', () => {
     expect(trpcError.cause).toBeInstanceOf(AuthContextError);
   });
 
+  test.each(['account_blocked', 'email_domain_blocked'] as const)(
+    'raises %s with FORBIDDEN and that reason on the cause',
+    async reason => {
+      mockedGetUserFromAuth.mockResolvedValue(
+        failedAuthResponse({
+          authorizationRefused: true,
+          refusalReason: reason,
+        })
+      );
+
+      const error = await caught(createContext('mobile'));
+
+      expect(error).toBeInstanceOf(TRPCError);
+      const trpcError = error as TRPCError;
+      expect(trpcError.code).toBe('FORBIDDEN');
+      expect(trpcError.message).toBe('Account access is blocked');
+
+      const cause = trpcError.cause;
+      if (!(cause instanceof AccountBlockedError)) {
+        throw new Error('Expected the refusal cause to be an AccountBlockedError');
+      }
+      // The reason, not just "blocked": it is what tells the app whether a
+      // retry can ever succeed.
+      expect(cause.reason).toBe(reason);
+
+      const data = errorData(trpcError, 'user.getMe');
+      expect(data.accountBlocked).toBe(true);
+      expect(data.accountBlockedReason).toBe(reason);
+      expect(data.authRequired).toBeUndefined();
+    }
+  );
+
   test('answers a blocked account without the client header on UNAUTHORIZED', async () => {
     mockedGetUserFromAuth.mockResolvedValue(
       failedAuthResponse({
@@ -146,6 +179,28 @@ describe('createTRPCContext blocked-account refusal', () => {
     const data = errorData(trpcError, 'user.getMe');
     expect(data.authRequired).toBe(true);
     expect(data.accountBlocked).toBeUndefined();
+    expect(data.accountBlockedReason).toBeUndefined();
+  });
+
+  test('answers a domain-refused account that names another client on UNAUTHORIZED', async () => {
+    mockedGetUserFromAuth.mockResolvedValue(
+      failedAuthResponse({
+        authorizationRefused: true,
+        refusalReason: 'email_domain_blocked',
+      })
+    );
+
+    const error = await caught(createContext('web'));
+
+    expect(error).toBeInstanceOf(TRPCError);
+    const trpcError = error as TRPCError;
+    expect(trpcError.code).toBe('UNAUTHORIZED');
+    expect(trpcError.cause).toBeInstanceOf(AuthContextError);
+
+    const data = errorData(trpcError, 'user.getMe');
+    expect(data.authRequired).toBe(true);
+    expect(data.accountBlocked).toBeUndefined();
+    expect(data.accountBlockedReason).toBeUndefined();
   });
 });
 

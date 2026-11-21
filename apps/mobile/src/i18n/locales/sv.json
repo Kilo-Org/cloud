@@ -3064,6 +3064,7 @@
   "accountBlocked": {
     "title": "Kontot blockerat",
     "description": "Kilo har blockerat det här kontot och en ny inloggning häver inte blockeringen. Supporten kan granska blockeringen på begäran.",
+    "domainDescription": "Kilo tillåter inte konton på den här e-postdomänen och en ny inloggning ändrar inte det. Supporten kan granska domänen på begäran.",
     "contactSupport": "Kontakta supporten"
   },
   "addCredits": {

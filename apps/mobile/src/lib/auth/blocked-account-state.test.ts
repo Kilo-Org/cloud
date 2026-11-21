@@ -1,49 +1,83 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  getBlockedAccountExplanation,
   isBlockedAccountActive,
-  setBlockedAccountActive,
+  setBlockedAccountExplanation,
   subscribeBlockedAccount,
 } from '@/lib/auth/blocked-account-state';
 
 describe('blocked account state', () => {
   beforeEach(() => {
-    setBlockedAccountActive(false);
+    setBlockedAccountExplanation(null);
   });
 
   it('starts cleared', () => {
+    expect(getBlockedAccountExplanation()).toBeNull();
     expect(isBlockedAccountActive()).toBe(false);
   });
 
-  it('raises the flag and notifies subscribers', () => {
+  it('sets a reason and notifies subscribers', () => {
     const listener = vi.fn<() => void>();
     subscribeBlockedAccount(listener);
 
-    setBlockedAccountActive(true);
+    setBlockedAccountExplanation('account_blocked');
 
+    expect(getBlockedAccountExplanation()).toBe('account_blocked');
     expect(isBlockedAccountActive()).toBe(true);
     expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the domain refusal apart from the account block', () => {
+    setBlockedAccountExplanation('email_domain_blocked');
+
+    expect(getBlockedAccountExplanation()).toBe('email_domain_blocked');
+    expect(isBlockedAccountActive()).toBe(true);
   });
 
   it('notifies once per change, not on a repeated value', () => {
     const listener = vi.fn<() => void>();
     subscribeBlockedAccount(listener);
 
-    setBlockedAccountActive(true);
-    setBlockedAccountActive(true);
+    setBlockedAccountExplanation('account_blocked');
+    setBlockedAccountExplanation('account_blocked');
 
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
-  it('clears the flag and notifies subscribers', () => {
+  it('notifies on a change of reason', () => {
     const listener = vi.fn<() => void>();
-    setBlockedAccountActive(true);
+    setBlockedAccountExplanation('account_blocked');
     subscribeBlockedAccount(listener);
 
-    setBlockedAccountActive(false);
+    setBlockedAccountExplanation('email_domain_blocked');
 
+    expect(getBlockedAccountExplanation()).toBe('email_domain_blocked');
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears the reason and notifies subscribers', () => {
+    const listener = vi.fn<() => void>();
+    setBlockedAccountExplanation('account_blocked');
+    subscribeBlockedAccount(listener);
+
+    setBlockedAccountExplanation(null);
+
+    expect(getBlockedAccountExplanation()).toBeNull();
     expect(isBlockedAccountActive()).toBe(false);
     expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('notifies every subscriber', () => {
+    const first = vi.fn<() => void>();
+    const second = vi.fn<() => void>();
+    subscribeBlockedAccount(first);
+    subscribeBlockedAccount(second);
+
+    setBlockedAccountExplanation('account_blocked');
+
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(second).toHaveBeenCalledTimes(1);
   });
 
   it('stops notifying an unsubscribed listener', () => {
@@ -51,7 +85,7 @@ describe('blocked account state', () => {
     const unsubscribe = subscribeBlockedAccount(listener);
     unsubscribe();
 
-    setBlockedAccountActive(true);
+    setBlockedAccountExplanation('account_blocked');
 
     expect(listener).not.toHaveBeenCalled();
   });

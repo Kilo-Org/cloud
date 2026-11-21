@@ -701,6 +701,9 @@ describe('getUserFromAuth', () => {
         error: 'Access denied (R0)',
       });
       expect(result.authorizationRefused).toBe(true);
+      // R0 is the domain refusal: nothing the person does changes it, so the
+      // client must not offer a retry.
+      expect(result.refusalReason).toBe('email_domain_blocked');
     } finally {
       await db.delete(blacklisted_domains).where(eq(blacklisted_domains.domain, blockedDomain));
     }
@@ -720,7 +723,7 @@ describe('getUserFromAuth', () => {
     try {
       const refused = await getUserFromAuth({ adminOnly: false });
       expect(refused.user).toBeNull();
-      expect(refused.refusalReason).toBe('account_blocked');
+      expect(refused.refusalReason).toBe('email_domain_blocked');
 
       const admitted = await getUserFromAuth({
         adminOnly: false,

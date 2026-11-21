@@ -1,5 +1,6 @@
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import 'server-only';
+import type { AccountBlockedRefusalReason } from '@kilocode/app-shared/auth';
 import {
   validateAuthorizationHeader,
   isRejectedCredentialReason,
@@ -229,8 +230,15 @@ type GetAuthResponse =
        * tRPC context turns it into the blocked-account refusal so the client
        * explains the block instead of signing the user out; every other
        * refusal (nonadmin, org membership, 401/400) leaves it unset.
+       *
+       * The two branches set different values because they promise different
+       * things: R0 sets `email_domain_blocked`, which no client action can
+       * change (the domain is on an admin-managed blacklist), while R1 sets
+       * `account_blocked`, which support can lift, so only R1 may offer a
+       * retry. Both stay refused, and the admission below is keyed on its
+       * option, not this value.
        */
-      refusalReason?: 'account_blocked';
+      refusalReason?: AccountBlockedRefusalReason;
       rejectionReason?: 'empty_organization_context';
       isNewUser?: undefined;
       organizationId?: Organization['id'];
@@ -772,7 +780,7 @@ function authError(
   options?: {
     credentialsRejected?: boolean;
     authorizationRefused?: boolean;
-    refusalReason?: 'account_blocked';
+    refusalReason?: AccountBlockedRefusalReason;
     rejectionReason?: 'empty_organization_context';
     internalApiUse?: boolean;
     tokenSource?: string;
@@ -848,7 +856,7 @@ async function validateUserAuthorization({
     if (await isUserBlacklistedByDomain(user, readDb)) {
       return authError(403, 'Access denied (R0)', kiloUserId, {
         authorizationRefused: true,
-        refusalReason: 'account_blocked',
+        refusalReason: 'email_domain_blocked',
         internalApiUse,
         tokenSource,
         cloudAgentAuthority,

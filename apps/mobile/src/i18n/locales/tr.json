@@ -2503,6 +2503,7 @@
   "accountBlocked": {
     "title": "Hesap engellendi",
     "description": "Kilo bu hesabı engelledi ve yeniden giriş yapmak engeli kaldırmaz. Destek, talep üzerine engeli inceleyebilir.",
+    "domainDescription": "Kilo bu e-posta alan adındaki hesapları engelliyor ve yeniden giriş yapmak engeli kaldırmaz. Destek, talep üzerine alan adını inceleyebilir.",
     "contactSupport": "Destekle iletişime geç"
   },
   "addCredits": {

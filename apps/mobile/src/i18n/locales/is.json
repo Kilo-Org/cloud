@@ -3064,6 +3064,7 @@
   "accountBlocked": {
     "title": "Reikningur lokaður",
     "description": "Kilo hefur lokað þessum reikningi og ný innskráning opnar hann ekki. Þjónustuver getur farið yfir lokunina sé þess óskað.",
+    "domainDescription": "Kilo lokar fyrir reikninga á þessu tölvupóstsléni og ný innskráning breytir því ekki. Þjónustuver getur farið yfir lénið sé þess óskað.",
     "contactSupport": "Hafa samband við þjónustuver"
   },
   "addCredits": {

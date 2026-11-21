@@ -3184,6 +3184,7 @@
   "accountBlocked": {
     "title": "Účet zablokován",
     "description": "Kilo zablokovalo tento účet a nové přihlášení to nezruší. Podpora může blokaci na požádání přezkoumat.",
+    "domainDescription": "Kilo zablokovalo účty na této e-mailové doméně a nové přihlášení to nezruší. Podpora může doménu na požádání přezkoumat.",
     "contactSupport": "Kontaktovat podporu"
   },
   "addCredits": {

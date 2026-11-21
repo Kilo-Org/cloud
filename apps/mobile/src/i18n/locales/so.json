@@ -3064,6 +3064,7 @@
   "accountBlocked": {
     "title": "Akoonka waa xanniban yahay",
     "description": "Kilo waa xannibay akoonkan, oo mar kale soo galid ma tirtirto xannibaadda. Taageerada ayaa codsi ku eegi kartaa xannibaadda.",
+    "domainDescription": "Kilo ma ogola akoonno ku yaal domain-kan iimaylka, oo mar kale soo galid ma beddeli doonto. Taageerada ayaa codsi ku eegi kartaa domain-ka.",
     "contactSupport": "La xiriir taageerada"
   },
   "addCredits": {

@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  getBlockedAccountExplanation,
   isBlockedAccountActive,
-  setBlockedAccountActive,
+  setBlockedAccountExplanation,
   subscribeBlockedAccount,
 } from '@/lib/auth/blocked-account-state';
 import { setSignOutActive } from '@/lib/auth/sign-out-state';
@@ -16,7 +17,7 @@ const OTHER_FORBIDDEN = { data: { code: 'FORBIDDEN' } };
 
 describe('raiseBlockedAccountFromRefusal', () => {
   beforeEach(() => {
-    setBlockedAccountActive(false);
+    setBlockedAccountExplanation(null);
     setSignOutActive(false);
     setSignOutTeardownActive(false);
   });
@@ -27,7 +28,44 @@ describe('raiseBlockedAccountFromRefusal', () => {
     raiseBlockedAccountFromRefusal(BLOCKED_REFUSAL);
 
     expect(isBlockedAccountActive()).toBe(true);
-    setBlockedAccountActive(false);
+    setBlockedAccountExplanation(null);
+  });
+
+  it('publishes the reason the refusal carried', () => {
+    const domainRefusal = {
+      data: {
+        code: 'FORBIDDEN',
+        accountBlocked: true,
+        accountBlockedReason: 'email_domain_blocked',
+      },
+    };
+    tagDispatchSession(domainRefusal);
+
+    raiseBlockedAccountFromRefusal(domainRefusal);
+
+    expect(getBlockedAccountExplanation()).toBe('email_domain_blocked');
+    setBlockedAccountExplanation(null);
+  });
+
+  it('publishes the account refusal whose envelope names it', () => {
+    const accountRefusal = {
+      data: { code: 'FORBIDDEN', accountBlocked: true, accountBlockedReason: 'account_blocked' },
+    };
+    tagDispatchSession(accountRefusal);
+
+    raiseBlockedAccountFromRefusal(accountRefusal);
+
+    expect(getBlockedAccountExplanation()).toBe('account_blocked');
+    setBlockedAccountExplanation(null);
+  });
+
+  it('falls back to the account explanation for a refusal that names no reason', () => {
+    tagDispatchSession(BLOCKED_REFUSAL);
+
+    raiseBlockedAccountFromRefusal(BLOCKED_REFUSAL);
+
+    expect(getBlockedAccountExplanation()).toBe('account_blocked');
+    setBlockedAccountExplanation(null);
   });
 
   it('leaves other refusals alone', () => {
@@ -45,7 +83,7 @@ describe('raiseBlockedAccountFromRefusal', () => {
     const listener = (): void => {
       calls += 1;
     };
-    setBlockedAccountActive(true);
+    setBlockedAccountExplanation('account_blocked');
     tagDispatchSession(BLOCKED_REFUSAL);
     const unsubscribe = subscribeBlockedAccount(listener);
 
@@ -53,7 +91,7 @@ describe('raiseBlockedAccountFromRefusal', () => {
 
     expect(calls).toBe(0);
     unsubscribe();
-    setBlockedAccountActive(false);
+    setBlockedAccountExplanation(null);
   });
 
   it('does not raise while the sign-out fence is closed', () => {

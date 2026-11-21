@@ -33,6 +33,7 @@ const SIGN_OUT_LABEL = 'Sign out';
 const CONTINUE_LABEL = 'Continue';
 
 type SurfaceProps = {
+  reason: 'account_blocked' | 'email_domain_blocked';
   canRetry: boolean;
   retrying: boolean;
   onRetry: () => void;
@@ -93,6 +94,7 @@ describe('BlockedAccountSurface', () => {
     const onContactSupport = vi.fn<() => void>();
     const onSignOut = vi.fn<() => void>();
     const renderer = await mountSurface({
+      reason: 'account_blocked',
       canRetry: true,
       retrying: false,
       onRetry,
@@ -122,6 +124,7 @@ describe('BlockedAccountSurface', () => {
 
   it('shows Retry busy and disabled while a retry is in flight, keeping the other actions enabled', async () => {
     const renderer = await mountSurface({
+      reason: 'account_blocked',
       canRetry: true,
       retrying: true,
       onRetry: vi.fn<() => void>(),
@@ -151,6 +154,7 @@ describe('BlockedAccountSurface', () => {
     const onContactSupport = vi.fn<() => void>();
     const onSignOut = vi.fn<() => void>();
     const renderer = await mountSurface({
+      reason: 'account_blocked',
       canRetry: true,
       retrying: false,
       onRetry: vi.fn<() => void>(),
@@ -169,6 +173,7 @@ describe('BlockedAccountSurface', () => {
     const onContactSupport = vi.fn<() => void>();
     const onSignOut = vi.fn<() => void>();
     const renderer = await mountSurface({
+      reason: 'account_blocked',
       canRetry: true,
       retrying: false,
       onRetry: vi.fn<() => void>(),
@@ -187,6 +192,7 @@ describe('BlockedAccountSurface', () => {
     const onContactSupport = vi.fn<() => void>();
     const onSignOut = vi.fn<() => void>();
     const renderer = await mountSurface({
+      reason: 'account_blocked',
       canRetry: false,
       retrying: false,
       onRetry: vi.fn<() => void>(),
@@ -203,6 +209,77 @@ describe('BlockedAccountSurface', () => {
 
     press(renderer.root, CONTINUE_LABEL);
     expect(onSignOut).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('offers no Retry for a domain refusal while the session still exists', async () => {
+    const onRetry = vi.fn<() => void>();
+    const onContactSupport = vi.fn<() => void>();
+    const onSignOut = vi.fn<() => void>();
+    const renderer = await mountSurface({
+      reason: 'email_domain_blocked',
+      canRetry: true,
+      retrying: false,
+      onRetry,
+      onContactSupport,
+      onSignOut,
+    });
+
+    // A re-read of a domain refusal returns the same answer, so the surface
+    // must not offer one: Contact support leads, the exit follows.
+    expect(pressableLabels(renderer.root)).toEqual([CONTACT_SUPPORT_LABEL, SIGN_OUT_LABEL]);
+
+    press(renderer.root, CONTACT_SUPPORT_LABEL);
+    expect(onContactSupport).toHaveBeenCalledTimes(1);
+    expect(onRetry).not.toHaveBeenCalled();
+
+    press(renderer.root, SIGN_OUT_LABEL);
+    expect(onSignOut).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('offers no Retry for a domain refusal once the session is gone', async () => {
+    const onContactSupport = vi.fn<() => void>();
+    const onSignOut = vi.fn<() => void>();
+    const renderer = await mountSurface({
+      reason: 'email_domain_blocked',
+      canRetry: false,
+      retrying: false,
+      onRetry: vi.fn<() => void>(),
+      onContactSupport,
+      onSignOut,
+    });
+
+    // Without a session the exit cannot sign out, so it says what it does.
+    expect(pressableLabels(renderer.root)).toEqual([CONTACT_SUPPORT_LABEL, CONTINUE_LABEL]);
+
+    press(renderer.root, CONTINUE_LABEL);
+    expect(onSignOut).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('explains a domain refusal with the domain copy', async () => {
+    const renderer = await mountSurface({
+      reason: 'email_domain_blocked',
+      canRetry: true,
+      retrying: false,
+      onRetry: vi.fn<() => void>(),
+      onContactSupport: vi.fn<() => void>(),
+      onSignOut: vi.fn<() => void>(),
+    });
+
+    const copy = renderer.root
+      // The `Text` mock is the host string 'Text', which the host-component
+      // union does not name, so compare through `String`.
+      .findAll(node => String(node.type) === 'Text')
+      .flatMap(node => node.children)
+      .filter((child): child is string => typeof child === 'string');
+    expect(
+      copy.some(text => text.startsWith('Kilo does not allow accounts on this email domain'))
+    ).toBe(true);
 
     renderer.unmount();
   });

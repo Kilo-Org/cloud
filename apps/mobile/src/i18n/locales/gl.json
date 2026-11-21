@@ -3064,6 +3064,7 @@
   "accountBlocked": {
     "title": "Conta bloqueada",
     "description": "Kilo bloqueou esta conta e volver iniciar sesión non a desbloqueará. A asistencia pode revisar o bloqueo se o solicitas.",
+    "domainDescription": "Kilo bloquea as contas neste dominio de correo e volver iniciar sesión non o cambiará. A asistencia pode revisar o dominio se o solicitas.",
     "contactSupport": "Contactar coa asistencia"
   },
   "addCredits": {

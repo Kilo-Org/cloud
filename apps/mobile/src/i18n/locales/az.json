@@ -3064,6 +3064,7 @@
   "accountBlocked": {
     "title": "Hesab bloklanıb",
     "description": "Kilo bu hesabı bloklayıb və yenidən daxil olmaq bloku aradan qaldırmayacaq. Dəstək xidməti sorğu əsasında bloku nəzərdən keçirə bilər.",
+    "domainDescription": "Kilo bu e-poçt domenindəki hesabları bloklayır və yenidən daxil olmaq bunu dəyişməyəcək. Dəstək xidməti sorğu əsasında domeni nəzərdən keçirə bilər.",
     "contactSupport": "Dəstək xidməti ilə əlaqə saxla"
   },
   "addCredits": {

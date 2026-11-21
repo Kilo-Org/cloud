@@ -17,11 +17,14 @@
 // that issued the call, so a refusal from an earlier epoch never raises an
 // explanation over the account just signed in.
 
-import { isBlockedAccountActive, setBlockedAccountActive } from '@/lib/auth/blocked-account-state';
+import {
+  isBlockedAccountActive,
+  setBlockedAccountExplanation,
+} from '@/lib/auth/blocked-account-state';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import { isSignOutTeardownActive } from '@/lib/auth/auth-transition-state';
 import { isFromCurrentDispatchSession } from '@/lib/auth/dispatch-epoch';
-import { isAccountBlockedTrpcError } from '@/lib/trpc-error';
+import { isAccountBlockedTrpcError, readAccountBlockedReason } from '@/lib/trpc-error';
 
 /**
  * Raises the blocked-account explanation from any procedure's refusal. Total:
@@ -43,5 +46,5 @@ export function raiseBlockedAccountFromRefusal(error: unknown): void {
   if (!isFromCurrentDispatchSession(error)) {
     return;
   }
-  setBlockedAccountActive(true);
+  setBlockedAccountExplanation(readAccountBlockedReason(error) ?? 'account_blocked');
 }

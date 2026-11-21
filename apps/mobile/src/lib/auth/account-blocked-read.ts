@@ -1,8 +1,11 @@
 import { useEffect, useRef } from 'react';
 
-import { isBlockedAccountActive, setBlockedAccountActive } from '@/lib/auth/blocked-account-state';
+import {
+  isBlockedAccountActive,
+  setBlockedAccountExplanation,
+} from '@/lib/auth/blocked-account-state';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
-import { isAccountBlockedTrpcError } from '@/lib/trpc-error';
+import { isAccountBlockedTrpcError, readAccountBlockedReason } from '@/lib/trpc-error';
 
 /** What the latest current-user read attempt says about the account. */
 export type AccountReadVerdict = 'refused-blocked' | 'answered' | 'unsettled';
@@ -106,7 +109,7 @@ export function useBlockedAccountFromAccountRead(input: BlockedAccountFromAccoun
         return;
       }
       raisedFor.current = input.error;
-      setBlockedAccountActive(true);
+      setBlockedAccountExplanation(readAccountBlockedReason(input.error) ?? 'account_blocked');
       return;
     }
     // An answered read proves the block no longer applies, whoever raised the
@@ -116,7 +119,7 @@ export function useBlockedAccountFromAccountRead(input: BlockedAccountFromAccoun
     // (Sign out, sign-in) makes the condition false, so nothing runs.
     if (verdict === 'answered' && !input.fetching && isBlockedAccountActive()) {
       raisedFor.current = null;
-      setBlockedAccountActive(false);
+      setBlockedAccountExplanation(null);
       onAnswered.current?.();
     }
   }, [verdict, input.error, input.enabled, input.fetching]);

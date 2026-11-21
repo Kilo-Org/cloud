@@ -16,7 +16,10 @@ import {
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
-import { isBlockedAccountActive, setBlockedAccountActive } from '@/lib/auth/blocked-account-state';
+import {
+  isBlockedAccountActive,
+  setBlockedAccountExplanation,
+} from '@/lib/auth/blocked-account-state';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import { tagDispatchSession } from '@/lib/auth/dispatch-epoch';
 import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
@@ -88,12 +91,12 @@ describe('createKiloAppQueryClient', () => {
       },
     },
   ])('raises the blocked-account explanation from a failed $label refusal', async ({ fail }) => {
-    setBlockedAccountActive(false);
+    setBlockedAccountExplanation(null);
     const client = createKiloAppQueryClient();
     await fail(client);
 
     expect(isBlockedAccountActive()).toBe(true);
-    setBlockedAccountActive(false);
+    setBlockedAccountExplanation(null);
   });
 
   it.each([
@@ -134,7 +137,7 @@ describe('createKiloAppQueryClient', () => {
   ])(
     'does not raise the explanation from a $label refusal dispatched by a previous session',
     async ({ fail }) => {
-      setBlockedAccountActive(false);
+      setBlockedAccountExplanation(null);
       const client = createKiloAppQueryClient();
       const refusal = Object.assign(new Error('Access denied'), {
         data: { code: 'FORBIDDEN', accountBlocked: true },
@@ -147,12 +150,12 @@ describe('createKiloAppQueryClient', () => {
       await fail(client, refusal);
 
       expect(isBlockedAccountActive()).toBe(false);
-      setBlockedAccountActive(false);
+      setBlockedAccountExplanation(null);
     }
   );
 
   it('does not raise the explanation for an unrelated failure', async () => {
-    setBlockedAccountActive(false);
+    setBlockedAccountExplanation(null);
     const client = createKiloAppQueryClient();
     try {
       await client

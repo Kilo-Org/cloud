@@ -54,18 +54,22 @@ describe('trpcErrorFormatter support access reason', () => {
 });
 
 describe('trpcErrorFormatter accountBlocked data', () => {
-  test('surfaces a blocked-account refusal without asking the client to sign out', () => {
-    const error = new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Account access is blocked',
-      cause: new AccountBlockedError(),
-    });
+  test.each(['account_blocked', 'email_domain_blocked'] as const)(
+    'surfaces a %s refusal without asking the client to sign out',
+    reason => {
+      const error = new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Account access is blocked',
+        cause: new AccountBlockedError(reason),
+      });
 
-    const result = trpcErrorFormatter({ shape: shapeFor(error), error } as never);
+      const result = trpcErrorFormatter({ shape: shapeFor(error), error } as never);
 
-    expect(result.data.accountBlocked).toBe(true);
-    expect(result.data.authRequired).toBeUndefined();
-  });
+      expect(result.data.accountBlocked).toBe(true);
+      expect(result.data.accountBlockedReason).toBe(reason);
+      expect(result.data.authRequired).toBeUndefined();
+    }
+  );
 
   test('omits accountBlocked for an ordinary error', () => {
     const error = new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
@@ -73,6 +77,7 @@ describe('trpcErrorFormatter accountBlocked data', () => {
     const result = trpcErrorFormatter({ shape: shapeFor(error), error } as never);
 
     expect(result.data.accountBlocked).toBeUndefined();
+    expect(result.data.accountBlockedReason).toBeUndefined();
   });
 });
 

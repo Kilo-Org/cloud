@@ -7,6 +7,7 @@ import {
   isAccountBlockedTrpcError,
   isControlPlaneTimeout,
   isUsageSourceUnavailable,
+  readAccountBlockedReason,
   readTrpcServerMessage,
   trpcErrorVariant,
 } from '@/lib/trpc-error';
@@ -125,6 +126,70 @@ describe('isAccountBlockedTrpcError', () => {
     expect(isAccountBlockedTrpcError(undefined)).toBe(false);
     expect(isAccountBlockedTrpcError(null)).toBe(false);
     expect(isAccountBlockedTrpcError(new Error('network down'))).toBe(false);
+  });
+});
+
+describe('readAccountBlockedReason', () => {
+  it('reads the account refusal off a direct envelope', () => {
+    expect(
+      readAccountBlockedReason({
+        data: { code: 'FORBIDDEN', accountBlocked: true, accountBlockedReason: 'account_blocked' },
+      })
+    ).toBe('account_blocked');
+  });
+
+  it('reads the domain refusal off a shaped envelope', () => {
+    expect(
+      readAccountBlockedReason({
+        shape: {
+          data: {
+            code: 'FORBIDDEN',
+            accountBlocked: true,
+            accountBlockedReason: 'email_domain_blocked',
+          },
+        },
+      })
+    ).toBe('email_domain_blocked');
+  });
+
+  it('reads the reason off a real tRPC client error', () => {
+    const error = Object.assign(new Error('Access denied'), {
+      data: {
+        code: 'FORBIDDEN',
+        accountBlocked: true,
+        accountBlockedReason: 'email_domain_blocked',
+      },
+    });
+    expect(readAccountBlockedReason(error)).toBe('email_domain_blocked');
+  });
+
+  it('is null when the envelope carries no reason', () => {
+    expect(
+      readAccountBlockedReason({ data: { code: 'FORBIDDEN', accountBlocked: true } })
+    ).toBeNull();
+  });
+
+  it('is null for a reason this client does not know', () => {
+    expect(
+      readAccountBlockedReason({
+        data: { code: 'FORBIDDEN', accountBlocked: true, accountBlockedReason: 'rate_limited' },
+      })
+    ).toBeNull();
+  });
+
+  it('keeps the blocked flag when a future server names a reason this build does not know', () => {
+    // An older client must not read a newer refusal as an unexplained error.
+    const futureRefusal = {
+      data: { code: 'FORBIDDEN', accountBlocked: true, accountBlockedReason: 'rate_limited' },
+    };
+    expect(isAccountBlockedTrpcError(futureRefusal)).toBe(true);
+    expect(readAccountBlockedReason(futureRefusal)).toBeNull();
+  });
+
+  it('is null when there is no error at all', () => {
+    expect(readAccountBlockedReason(undefined)).toBeNull();
+    expect(readAccountBlockedReason(null)).toBeNull();
+    expect(readAccountBlockedReason(new Error('network down'))).toBeNull();
   });
 });
 

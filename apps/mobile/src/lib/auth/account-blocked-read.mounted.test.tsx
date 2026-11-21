@@ -6,7 +6,11 @@ import {
   accountReadVerdict,
   useBlockedAccountFromAccountRead,
 } from '@/lib/auth/account-blocked-read';
-import { isBlockedAccountActive, setBlockedAccountActive } from '@/lib/auth/blocked-account-state';
+import {
+  getBlockedAccountExplanation,
+  isBlockedAccountActive,
+  setBlockedAccountExplanation,
+} from '@/lib/auth/blocked-account-state';
 import { setSignOutActive } from '@/lib/auth/sign-out-state';
 
 // ── Fixtures ───────────────────────────────────────────────────────────────
@@ -74,7 +78,7 @@ describe('accountReadVerdict', () => {
 
 describe('useBlockedAccountFromAccountRead', () => {
   beforeEach(() => {
-    setBlockedAccountActive(false);
+    setBlockedAccountExplanation(null);
     // The fence is module-global: a case that closes it leaves it closed, so
     // every case starts with it reopened.
     setSignOutActive(false);
@@ -84,6 +88,26 @@ describe('useBlockedAccountFromAccountRead', () => {
     const renderer = mount({ error: BLOCKED_REFUSAL, userId: undefined, enabled: true });
 
     expect(isBlockedAccountActive()).toBe(true);
+    // A refusal that names no reason is treated as the account block.
+    expect(getBlockedAccountExplanation()).toBe('account_blocked');
+
+    renderer.unmount();
+  });
+
+  it('publishes the domain refusal the read carried', () => {
+    const renderer = mount({
+      error: {
+        data: {
+          code: 'FORBIDDEN',
+          accountBlocked: true,
+          accountBlockedReason: 'email_domain_blocked',
+        },
+      },
+      userId: undefined,
+      enabled: true,
+    });
+
+    expect(getBlockedAccountExplanation()).toBe('email_domain_blocked');
 
     renderer.unmount();
   });
@@ -133,7 +157,7 @@ describe('useBlockedAccountFromAccountRead', () => {
     // path), not from this hook: an answered identity read still proves the
     // block lifted, so it clears the explanation and refetches.
     const onAnswered = vi.fn<() => void>();
-    setBlockedAccountActive(true);
+    setBlockedAccountExplanation('account_blocked');
     const renderer = mount({ error: null, userId: 'user-1', enabled: true, onAnswered });
 
     expect(isBlockedAccountActive()).toBe(false);
@@ -248,7 +272,7 @@ describe('useBlockedAccountFromAccountRead', () => {
     // The overlay's Sign out clears the explanation; the session then ends and
     // the cached refusal is still the query's `error`.
     act(() => {
-      setBlockedAccountActive(false);
+      setBlockedAccountExplanation(null);
     });
     await update(renderer, { error: BLOCKED_REFUSAL, userId: undefined, enabled: false });
 
@@ -270,7 +294,7 @@ describe('useBlockedAccountFromAccountRead', () => {
     // A sign-in cleared the flag: the explanation is already gone, so the
     // answered read reveals nothing and must not refetch the tree.
     act(() => {
-      setBlockedAccountActive(false);
+      setBlockedAccountExplanation(null);
     });
     await update(renderer, { error: null, userId: 'user-1', enabled: true, onAnswered });
 
@@ -285,7 +309,7 @@ describe('useBlockedAccountFromAccountRead', () => {
     expect(isBlockedAccountActive()).toBe(true);
 
     act(() => {
-      setBlockedAccountActive(false);
+      setBlockedAccountExplanation(null);
     });
     // Same refusal, same session: the effect runs again because `fetching`
     // changed, and the attempt it names was already handled.
@@ -311,7 +335,7 @@ describe('useBlockedAccountFromAccountRead', () => {
       setSignOutActive(true);
     });
     act(() => {
-      setBlockedAccountActive(false);
+      setBlockedAccountExplanation(null);
     });
     await update(renderer, { error: BLOCKED_RETRY_REFUSAL, userId: undefined, enabled: true });
 
@@ -382,7 +406,7 @@ describe('useBlockedAccountFromAccountRead', () => {
     // explanation the previous session raised.
     act(() => {
       setSignOutActive(false);
-      setBlockedAccountActive(false);
+      setBlockedAccountExplanation(null);
     });
     await update(renderer, { error: null, userId: 'user-1', enabled: true, onAnswered });
 

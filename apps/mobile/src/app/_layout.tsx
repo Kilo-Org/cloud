@@ -62,8 +62,8 @@ import { MotionProvider } from '@/lib/a11y/motion';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useBlockedAccountFromAccountRead } from '@/lib/auth/account-blocked-read';
 import {
-  isBlockedAccountActive,
-  setBlockedAccountActive,
+  getBlockedAccountExplanation,
+  setBlockedAccountExplanation,
   subscribeBlockedAccount,
 } from '@/lib/auth/blocked-account-state';
 import { buildBlockedAccountSupportLink } from '@/lib/auth/blocked-account-support';
@@ -290,9 +290,9 @@ function RootLayoutNav({
   const accountUserId = userId ?? offlineUserId ?? undefined;
   const identityLoading = userIdLoading && offlineUserId === null;
   const identityError = userIdError && offlineUserId === null;
-  const blockedAccountActive = useSyncExternalStore(
+  const blockedAccountExplanation = useSyncExternalStore(
     subscribeBlockedAccount,
-    isBlockedAccountActive
+    getBlockedAccountExplanation
   );
   // The current-user read is the first authenticated call a restored account
   // makes, so a blocked account's context-level refusal lands on it: the
@@ -965,7 +965,16 @@ function RootLayoutNav({
   // beside it as the next step the copy names; it opens a mail to the support
   // address and leaves the explanation up. A new sign-in clears it too, since
   // that is the one event that proves the block no longer applies.
-  const showBlockedAccountError = blockedAccountActive && bootstrapErrorOwnsScreen;
+  //
+  // The raised value is the refusal reason, and it picks the actions: an
+  // account block offers Retry, while a domain refusal offers none (a re-read
+  // answers the same thing) and leads with Contact support. The overlay only
+  // renders with a non-null reason, so the surface always receives one.
+  const blockedAccountReason =
+    blockedAccountExplanation !== null && bootstrapErrorOwnsScreen
+      ? blockedAccountExplanation
+      : null;
+  const showBlockedAccountError = blockedAccountReason !== null;
 
   // The wait surface (or the held restore or blocked surface) covers the tree:
   // it leaves both accessibility trees, stops taking touches, and paints
@@ -1103,6 +1112,9 @@ function RootLayoutNav({
       {showBlockedAccountError ? (
         <View className="absolute inset-0">
           <BlockedAccountSurface
+            // `showBlockedAccountError` already required a non-null
+            // explanation, so the overlay never renders without a reason.
+            reason={blockedAccountReason}
             // A live token means the session that was refused is still there,
             // so the retry has an account to re-read. Without one the refresh
             // route's refusal already tore the session down.
@@ -1121,11 +1133,10 @@ function RootLayoutNav({
             }}
             onSignOut={() => {
               // The escape hatch must actually reach the login screen: the
-              // flag outlives a refresh-path teardown, so this explicit
-              // sign-out is what clears the explanation and reveals the
-              // route the bootstrap has already settled on (login once the
-              // token is gone).
-              setBlockedAccountActive(false);
+              // explanation outlives a refresh-path teardown, so this explicit
+              // sign-out is what clears it and reveals the route the bootstrap
+              // has already settled on (login once the token is gone).
+              setBlockedAccountExplanation(null);
               void signOut();
             }}
           />

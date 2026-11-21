@@ -3244,6 +3244,7 @@
   "accountBlocked": {
     "title": "Kont imblukkat",
     "description": "Kilo imblokka dan il-kont u d-dħul mill-ġdid ma jneħħix l-imblokk. L-appoġġ jista' jirrevedi l-imblokk fuq talba.",
+    "domainDescription": "Kilo ma jippermettix kontijiet fuq dan id-dominju tal-email u d-dħul mill-ġdid ma jbiddilx dan. L-appoġġ jista' jirrevedi d-dominju fuq talba.",
     "contactSupport": "Ikkuntattja l-appoġġ"
   },
   "addCredits": {

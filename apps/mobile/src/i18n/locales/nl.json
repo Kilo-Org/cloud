@@ -2503,6 +2503,7 @@
   "accountBlocked": {
     "title": "Account geblokkeerd",
     "description": "Kilo heeft dit account geblokkeerd en opnieuw inloggen heft de blokkade niet op. De helpdesk kan de blokkade op verzoek bekijken.",
+    "domainDescription": "Kilo staat geen accounts toe op dit e-maildomein en opnieuw inloggen verandert daar niets aan. De helpdesk kan het domein op verzoek bekijken.",
     "contactSupport": "Contact opnemen met de helpdesk"
   },
   "addCredits": {

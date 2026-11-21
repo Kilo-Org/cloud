@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "Dirista iimaylka si ku meel gaar ah looma heli karo. Fadlan mar kale isku day waqti dambe.",
     "admissionRequired": "Qalabkaaga lama xaqiijin karo. Isticmaal '$t(login.moreSignInOptions)' si aad uga soo gasho qalab kale ama bogga internetka.",
     "default": "Waxbaa khaldamay. Fadlan mar kale isku day.",
-    "retryableAdmission": "Qalabkan lama xaqiijin karin. Hubi xiriirkaaga oo mar kale isku day.",
+    "retryableAdmission": "Lama xaqiijin karin qalabkan. Isku day mar kale.",
     "startSignInFailed": "Soo gelitaanka lama bilaabi karin. Fadlan mar kale isku day.",
     "couldNotOpenBrowser": "Biraawsarka lama furi karin. Fadlan mar kale isku day.",
     "signInTimedOut": "Waqtigii loo qabtay soo gelitaanka wuu dhammaaday. Fadlan mar kale isku day.",

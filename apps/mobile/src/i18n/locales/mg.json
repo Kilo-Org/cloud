@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "Tsy azo atao vetivety ny fandefasana mailaka. Andramo indray rehefa afaka kelikely azafady.",
     "admissionRequired": "Tsy azo hamarinina ny fitaovanao. Ampiasao ny '$t(login.moreSignInOptions)' hidirana amin'ny fitaovana hafa na amin'ny tranonkala.",
     "default": "Nisy olana. Andramo indray azafady.",
-    "retryableAdmission": "Tsy afaka nanamarina ity fitaovana ity izahay. Jereo ny fifandraisanao ary andramo indray.",
+    "retryableAdmission": "Tsy afaka nanamarina ity fitaovana ity. Andramo indray.",
     "startSignInFailed": "Tsy afaka nanomboka ny fidirana. Andramo indray azafady.",
     "couldNotOpenBrowser": "Tsy voasokatra ny mpitety tranonkala. Andramo indray azafady.",
     "signInTimedOut": "Tapitra ny fotoana nomena hidirana. Andramo indray azafady.",

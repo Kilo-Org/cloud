@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "Dërgimi i emailit është përkohësisht i padisponueshëm. Provo përsëri më vonë.",
     "admissionRequired": "Pajisja jote nuk mund të verifikohet. Përdor '$t(login.moreSignInOptions)' për të hyrë në një pajisje tjetër ose përmes uebit.",
     "default": "Diçka shkoi keq. Provo përsëri.",
-    "retryableAdmission": "Nuk arritëm ta verifikonim këtë pajisje. Kontrollo lidhjen dhe provo përsëri.",
+    "retryableAdmission": "Nuk u arrit të verifikohej kjo pajisje. Provo përsëri.",
     "startSignInFailed": "Nuk u nis procesi i hyrjes. Provo përsëri.",
     "couldNotOpenBrowser": "Nuk u arrit të hapej shfletuesi. Provo përsëri.",
     "signInTimedOut": "Koha për të hyrë ka mbaruar. Provo përsëri.",

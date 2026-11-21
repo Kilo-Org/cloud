@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "We kunnen tijdelijk geen e-mails versturen. Probeer het later opnieuw.",
     "admissionRequired": "Je apparaat kan niet worden geverifieerd. Gebruik '$t(login.moreSignInOptions)' om je op een ander apparaat of via de website aan te melden.",
     "default": "Er is iets misgegaan. Probeer het opnieuw.",
-    "retryableAdmission": "We konden dit apparaat niet verifiëren. Controleer je verbinding en probeer het opnieuw.",
+    "retryableAdmission": "Dit apparaat kon niet worden geverifieerd. Probeer het opnieuw.",
     "startSignInFailed": "Het aanmelden kon niet worden gestart. Probeer het opnieuw.",
     "couldNotOpenBrowser": "De browser kon niet worden geopend. Probeer het opnieuw.",
     "signInTimedOut": "Het aanmelden duurde te lang. Probeer het opnieuw.",

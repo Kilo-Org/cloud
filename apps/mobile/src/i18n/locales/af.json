@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "E-pos kan tydelik nie afgelewer word nie. Probeer asseblief later weer.",
     "admissionRequired": "Jou toestel kan nie geverifieer word nie. Gebruik '$t(login.moreSignInOptions)' om op 'n ander toestel of via die web aan te meld.",
     "default": "Iets het verkeerd geloop. Probeer asseblief weer.",
-    "retryableAdmission": "Ons kon nie hierdie toestel verifieer nie. Kontroleer jou verbinding en probeer weer.",
+    "retryableAdmission": "Kon nie hierdie toestel verifieer nie. Probeer weer.",
     "startSignInFailed": "Kon nie aanmelding begin nie. Probeer asseblief weer.",
     "couldNotOpenBrowser": "Kon nie die blaaier oopmaak nie. Probeer asseblief weer.",
     "signInTimedOut": "Die tyd vir aanmelding het verstryk. Probeer asseblief weer.",

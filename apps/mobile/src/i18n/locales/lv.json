@@ -3777,7 +3777,7 @@
     "emailDeliveryFailed": "E-pasta nosūtīšana īslaicīgi nav pieejama. Mēģini vēlreiz vēlāk.",
     "admissionRequired": "Tavu ierīci nevar pārbaudīt. Izvēlies “$t(login.moreSignInOptions)”, lai pierakstītos citā ierīcē vai tīmeklī.",
     "default": "Radās kļūda. Lūdzu, mēģini vēlreiz.",
-    "retryableAdmission": "Neizdevās pārbaudīt šo ierīci. Pārbaudi savienojumu un mēģini vēlreiz.",
+    "retryableAdmission": "Neizdevās pārbaudīt šo ierīci. Mēģini vēlreiz.",
     "startSignInFailed": "Neizdevās sākt pierakstīšanos. Mēģini vēlreiz.",
     "couldNotOpenBrowser": "Neizdevās atvērt pārlūku. Mēģini vēlreiz.",
     "signInTimedOut": "Pierakstīšanās laiks ir beidzies. Mēģini vēlreiz.",

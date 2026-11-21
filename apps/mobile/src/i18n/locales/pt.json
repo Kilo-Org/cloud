@@ -3841,7 +3841,7 @@
     "emailDeliveryFailed": "O envio de emails está temporariamente indisponível. Tenta novamente mais tarde.",
     "admissionRequired": "Não é possível verificar o teu dispositivo. Usa '$t(login.moreSignInOptions)' para iniciar sessão noutro dispositivo ou no site.",
     "default": "Algo correu mal. Tenta novamente.",
-    "retryableAdmission": "Não foi possível verificar este dispositivo. Verifica a tua ligação e tenta novamente.",
+    "retryableAdmission": "Não foi possível verificar este dispositivo. Tenta novamente.",
     "startSignInFailed": "Não foi possível iniciar o processo de início de sessão. Tenta novamente.",
     "couldNotOpenBrowser": "Não foi possível abrir o navegador. Tenta novamente.",
     "signInTimedOut": "O tempo para iniciar sessão esgotou-se. Tenta novamente.",

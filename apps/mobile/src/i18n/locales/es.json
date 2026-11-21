@@ -3777,7 +3777,7 @@
     "emailDeliveryFailed": "El envío de correo no está disponible temporalmente. Inténtalo de nuevo más tarde.",
     "admissionRequired": "No se puede verificar tu dispositivo. Usa «$t(login.moreSignInOptions)» para iniciar sesión en otro dispositivo o desde la web.",
     "default": "Se ha producido un error. Inténtalo de nuevo.",
-    "retryableAdmission": "No pudimos verificar este dispositivo. Comprueba tu conexión e inténtalo de nuevo.",
+    "retryableAdmission": "No se pudo verificar este dispositivo. Inténtalo de nuevo.",
     "startSignInFailed": "No se pudo iniciar el proceso de acceso. Inténtalo de nuevo.",
     "couldNotOpenBrowser": "No se pudo abrir el navegador. Inténtalo de nuevo.",
     "signInTimedOut": "Se agotó el tiempo para iniciar sesión. Inténtalo de nuevo.",

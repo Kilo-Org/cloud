@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "Ba a iya aika imel a yanzu. Sake gwadawa daga baya.",
     "admissionRequired": "Ba a iya tabbatar da na'urarka ba. Yi amfani da '$t(login.moreSignInOptions)' don shiga a wata na'ura ko ta yanar gizo.",
     "default": "An samu matsala. Da fatan za ka sake gwadawa.",
-    "retryableAdmission": "Ba mu iya tabbatar da wannan na'urar ba. Duba haɗinka na intanet ka sake gwadawa.",
+    "retryableAdmission": "Ba a iya tabbatar da wannan na'urar ba. Sake gwadawa.",
     "startSignInFailed": "An kasa fara shiga. Sake gwadawa.",
     "couldNotOpenBrowser": "Ba a iya buɗe burauza ba. Sake gwadawa.",
     "signInTimedOut": "Wa'adin shiga ya ƙare. Sake gwadawa.",

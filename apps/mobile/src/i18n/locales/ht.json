@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "Sèvis pou voye imèl la pa disponib pou kounye a. Tanpri eseye ankò pita.",
     "admissionRequired": "Pa ka verifye aparèy ou a. Itilize '$t(login.moreSignInOptions)' pou konekte sou yon lòt aparèy oswa sou sit entènèt la.",
     "default": "Gen yon pwoblèm. Tanpri eseye ankò.",
-    "retryableAdmission": "Nou pa t kapab verifye aparèy sa a. Tcheke koneksyon ou epi eseye ankò.",
+    "retryableAdmission": "Pa t kapab verifye aparèy sa a. Eseye ankò.",
     "startSignInFailed": "Pa t ka kòmanse koneksyon an. Tanpri eseye ankò.",
     "couldNotOpenBrowser": "Pa t ka louvri navigatè a. Tanpri eseye ankò.",
     "signInTimedOut": "Tan pou konekte a fini. Tanpri eseye ankò.",

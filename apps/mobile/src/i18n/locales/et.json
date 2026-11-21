@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "E-kirju ei saa ajutiselt saata. Proovi hiljem uuesti.",
     "admissionRequired": "Sinu seadet ei saa kontrollida. Kasuta valikut „$t(login.moreSignInOptions)“, et logida sisse teises seadmes või veebis.",
     "default": "Midagi läks valesti. Proovi uuesti.",
-    "retryableAdmission": "Seda seadet ei õnnestunud kontrollida. Kontrolli ühendust ja proovi uuesti.",
+    "retryableAdmission": "Seda seadet ei õnnestunud kinnitada. Proovi uuesti.",
     "startSignInFailed": "Sisselogimise alustamine ebaõnnestus. Proovi uuesti.",
     "couldNotOpenBrowser": "Brauseri avamine ebaõnnestus. Proovi uuesti.",
     "signInTimedOut": "Sisselogimine aegus. Proovi uuesti.",

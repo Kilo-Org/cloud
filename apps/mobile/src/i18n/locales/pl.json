@@ -3841,7 +3841,7 @@
     "emailDeliveryFailed": "Wysyłanie wiadomości e-mail jest chwilowo niedostępne. Spróbuj ponownie później.",
     "admissionRequired": "Nie można zweryfikować twojego urządzenia. Użyj opcji „$t(login.moreSignInOptions)”, aby zalogować się na innym urządzeniu lub w przeglądarce.",
     "default": "Coś poszło nie tak. Spróbuj ponownie.",
-    "retryableAdmission": "Nie udało się zweryfikować tego urządzenia. Sprawdź połączenie i spróbuj ponownie.",
+    "retryableAdmission": "Nie udało się zweryfikować tego urządzenia. Spróbuj ponownie.",
     "startSignInFailed": "Nie udało się rozpocząć logowania. Spróbuj ponownie.",
     "couldNotOpenBrowser": "Nie udało się otworzyć przeglądarki. Spróbuj ponownie.",
     "signInTimedOut": "Upłynął limit czasu logowania. Spróbuj ponownie.",

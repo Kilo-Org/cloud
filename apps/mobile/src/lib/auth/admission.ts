@@ -11,6 +11,7 @@ import {
   PLAY_INTEGRITY_PROJECT_NUMBER,
 } from '@/lib/config';
 import { ATTEST_KEY_ID_KEY } from '@/lib/storage-keys';
+import { reportAppAttestFailure } from '@/lib/telemetry/app-attest-events';
 
 /** Must match `DEV_SENTINEL_PAYLOAD` in the web admission module. */
 export const DEV_SENTINEL_PAYLOAD = 'native-admission-dev-sentinel';
@@ -100,6 +101,22 @@ function isInvalidKeyError(error: unknown): boolean {
 }
 
 /**
+ * Run one native App Attest call, reporting a genuine rejection before it
+ * propagates. The rejection is unchanged for the caller.
+ */
+async function callNativeStep<T>(
+  step: 'generateKey' | 'attestKey',
+  run: () => Promise<T>
+): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    reportAppAttestFailure(step, error);
+    throw error;
+  }
+}
+
+/**
  * Produce an iOS App Attest payload for the challenge.
  *
  * The first call generates a Secure Enclave key and attests it; later calls
@@ -110,6 +127,11 @@ function isInvalidKeyError(error: unknown): boolean {
  * An `invalidKey` rejection means the stored key id no longer resolves — the
  * app was reinstalled, or restored onto another device. Clear it and re-attest
  * once, so the device is not stuck asserting against a key that is gone.
+ *
+ * Clearing that id is an expected, recovered step, so it files nothing; every
+ * other genuine native rejection is reported before it is normalized and still
+ * propagates exactly as before, so the caller's retryable message and the
+ * recovery above are unchanged.
  */
 async function getAppleAdmission(challenge: string): Promise<AdmissionPayload> {
   const storedKeyId = await SecureStore.getItemAsync(ATTEST_KEY_ID_KEY);
@@ -125,14 +147,23 @@ async function getAppleAdmission(challenge: string): Promise<AdmissionPayload> {
       };
     } catch (error) {
       if (!isInvalidKeyError(error)) {
+        reportAppAttestFailure('generateAssertion', error);
         throw error;
       }
       await SecureStore.deleteItemAsync(ATTEST_KEY_ID_KEY);
     }
   }
 
-  const keyId = await AppIntegrity.generateKeyAsync();
-  const payload = await AppIntegrity.attestKeyAsync(keyId, challenge);
+  return attestFreshAppleKey(challenge);
+}
+
+/** Generate and attest one new Secure Enclave key, reporting a genuine failure. */
+async function attestFreshAppleKey(challenge: string): Promise<AdmissionPayload> {
+  const keyId = await callNativeStep('generateKey', () => AppIntegrity.generateKeyAsync());
+  const payload = await callNativeStep('attestKey', () =>
+    AppIntegrity.attestKeyAsync(keyId, challenge)
+  );
+
   // Store only after a successful attestation. A stored id whose attestation
   // never reached the server would assert against a key the server does not know.
   await SecureStore.setItemAsync(ATTEST_KEY_ID_KEY, keyId);

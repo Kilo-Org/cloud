@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "現在、メールを送信できません。しばらくしてからもう一度お試しください。",
     "admissionRequired": "このデバイスを確認できません。「$t(login.moreSignInOptions)」を選択し、別のデバイスまたはウェブからサインインしてください。",
     "default": "問題が発生しました。もう一度お試しください。",
-    "retryableAdmission": "このデバイスを確認できませんでした。接続を確認して、もう一度お試しください。",
+    "retryableAdmission": "このデバイスを確認できませんでした。もう一度お試しください。",
     "startSignInFailed": "サインインを開始できませんでした。もう一度お試しください。",
     "couldNotOpenBrowser": "ブラウザーを開けませんでした。もう一度お試しください。",
     "signInTimedOut": "サインインがタイムアウトしました。もう一度お試しください。",

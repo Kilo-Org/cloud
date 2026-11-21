@@ -3777,7 +3777,7 @@
     "emailDeliveryFailed": "L'enviament de correus electrònics no està disponible temporalment. Torna-ho a provar més tard.",
     "admissionRequired": "No es pot verificar el teu dispositiu. Utilitza «$t(login.moreSignInOptions)» per iniciar la sessió en un altre dispositiu o des del web.",
     "default": "S'ha produït un error. Torna-ho a provar.",
-    "retryableAdmission": "No s'ha pogut verificar aquest dispositiu. Comprova la connexió i torna-ho a provar.",
+    "retryableAdmission": "No s'ha pogut verificar aquest dispositiu. Torna-ho a provar.",
     "startSignInFailed": "No s'ha pogut iniciar la sessió. Torna-ho a provar.",
     "couldNotOpenBrowser": "No s'ha pogut obrir el navegador. Torna-ho a provar.",
     "signInTimedOut": "S'ha esgotat el temps per iniciar la sessió. Torna-ho a provar.",

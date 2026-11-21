@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "Pansamantalang hindi makapagpadala ng email. Pakisubukan muli mamaya.",
     "admissionRequired": "Hindi ma-verify ang iyong device. Gamitin ang '$t(login.moreSignInOptions)' para mag-sign in sa ibang device o sa pamamagitan ng web.",
     "default": "Nagkaroon ng problema. Pakisubukan muli.",
-    "retryableAdmission": "Hindi namin ma-verify ang device na ito. Suriin ang iyong koneksyon at subukan muli.",
+    "retryableAdmission": "Hindi mapatunayan ang device na ito. Subukan muli.",
     "startSignInFailed": "Hindi masimulan ang pag-sign in. Pakisubukan muli.",
     "couldNotOpenBrowser": "Hindi mabuksan ang browser. Pakisubukan muli.",
     "signInTimedOut": "Naubos ang oras para sa pag-sign in. Pakisubukan muli.",

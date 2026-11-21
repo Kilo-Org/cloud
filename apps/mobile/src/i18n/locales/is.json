@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "Tímabundið er ekki hægt að senda tölvupóst. Reyndu aftur síðar.",
     "admissionRequired": "Ekki er hægt að staðfesta tækið þitt. Veldu „$t(login.moreSignInOptions)“ til að skrá þig inn á öðru tæki eða á vefnum.",
     "default": "Eitthvað fór úrskeiðis. Reyndu aftur.",
-    "retryableAdmission": "Ekki tókst að staðfesta þetta tæki. Athugaðu tenginguna og reyndu aftur.",
+    "retryableAdmission": "Tókst ekki að staðfesta þetta tæki. Reyndu aftur.",
     "startSignInFailed": "Ekki tókst að hefja innskráningu. Reyndu aftur.",
     "couldNotOpenBrowser": "Ekki tókst að opna vafrann. Reyndu aftur.",
     "signInTimedOut": "Innskráning tók of langan tíma. Reyndu aftur.",

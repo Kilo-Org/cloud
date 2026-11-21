@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "Vi kan ikke sende e-post akkurat nå. Prøv igjen senere.",
     "admissionRequired": "Enheten din kan ikke verifiseres. Bruk «$t(login.moreSignInOptions)» for å logge på en annen enhet eller via nettet.",
     "default": "Noe gikk galt. Prøv igjen.",
-    "retryableAdmission": "Vi kunne ikke verifisere denne enheten. Sjekk tilkoblingen og prøv igjen.",
+    "retryableAdmission": "Kunne ikke bekrefte denne enheten. Prøv igjen.",
     "startSignInFailed": "Kunne ikke starte påloggingen. Prøv igjen.",
     "couldNotOpenBrowser": "Kunne ikke åpne nettleseren. Prøv igjen.",
     "signInTimedOut": "Tiden for pålogging er utløpt. Prøv igjen.",

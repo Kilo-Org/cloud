@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "目前無法寄送電子郵件。請稍後再試。",
     "admissionRequired": "無法驗證你的裝置。請選擇「$t(login.moreSignInOptions)」，改用其他裝置或透過網頁登入。",
     "default": "發生錯誤。請再試一次。",
-    "retryableAdmission": "無法驗證此裝置。請檢查連線後再試一次。",
+    "retryableAdmission": "無法驗證此裝置。請重試。",
     "startSignInFailed": "無法開始登入。請再試一次。",
     "couldNotOpenBrowser": "無法開啟瀏覽器。請再試一次。",
     "signInTimedOut": "登入逾時。請再試一次。",

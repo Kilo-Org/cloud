@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "Xat yuborish xizmati vaqtincha ishlamayapti. Keyinroq qayta urinib ko'ring.",
     "admissionRequired": "Qurilmangizni tekshirib bo‘lmadi. Boshqa qurilmada yoki veb-sayt orqali kirish uchun '$t(login.moreSignInOptions)' dan foydalaning.",
     "default": "Xatolik yuz berdi. Qayta urinib ko‘ring.",
-    "retryableAdmission": "Bu qurilmani tekshirib bo'lmadi. Internetga ulanishni tekshiring va qayta urinib ko'ring.",
+    "retryableAdmission": "Bu qurilmani tekshirib boʻlmadi. Qayta urinib koʻring.",
     "startSignInFailed": "Kirishni boshlab bo'lmadi. Iltimos, qayta urinib ko'ring.",
     "couldNotOpenBrowser": "Brauzerni ochib bo'lmadi. Iltimos, qayta urinib ko'ring.",
     "signInTimedOut": "Kirish uchun ajratilgan vaqt tugadi. Qayta urinib ko'ring.",

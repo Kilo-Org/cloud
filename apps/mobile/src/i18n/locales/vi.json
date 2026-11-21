@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "Hiện không thể gửi email. Vui lòng thử lại sau.",
     "admissionRequired": "Không thể xác minh thiết bị của bạn. Dùng '$t(login.moreSignInOptions)' để đăng nhập trên thiết bị khác hoặc qua web.",
     "default": "Đã xảy ra lỗi. Vui lòng thử lại.",
-    "retryableAdmission": "Chúng tôi không thể xác minh thiết bị này. Kiểm tra kết nối của bạn và thử lại.",
+    "retryableAdmission": "Không thể xác minh thiết bị này. Hãy thử lại.",
     "startSignInFailed": "Không thể bắt đầu đăng nhập. Vui lòng thử lại.",
     "couldNotOpenBrowser": "Không thể mở trình duyệt. Vui lòng thử lại.",
     "signInTimedOut": "Đã hết thời gian chờ đăng nhập. Vui lòng thử lại.",

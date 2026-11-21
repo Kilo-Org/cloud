@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "O envío de correo non está dispoñible temporalmente. Téntao de novo máis tarde.",
     "admissionRequired": "Non se pode verificar o teu dispositivo. Usa \"$t(login.moreSignInOptions)\" para iniciar sesión noutro dispositivo ou a través da web.",
     "default": "Produciuse un erro. Téntao de novo.",
-    "retryableAdmission": "Non puidemos verificar este dispositivo. Comproba a conexión e téntao de novo.",
+    "retryableAdmission": "Non se puido verificar este dispositivo. Téntao de novo.",
     "startSignInFailed": "Non se puido comezar o proceso de inicio de sesión. Téntao de novo.",
     "couldNotOpenBrowser": "Non se puido abrir o navegador. Téntao de novo.",
     "signInTimedOut": "Esgotouse o tempo para iniciar sesión. Téntao de novo.",

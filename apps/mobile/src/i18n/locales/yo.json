@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "A kò lè fi iméèlì ránṣẹ́ fún ìgbà díẹ̀. Jọ̀wọ́ tún gbìyànjú nígbà mìíràn.",
     "admissionRequired": "A kò lè jẹ́rìí sí ẹ̀rọ rẹ. Lo '$t(login.moreSignInOptions)' láti wọlé lórí ẹ̀rọ mìíràn tàbí nípasẹ̀ wẹ́ẹ̀bù.",
     "default": "Àṣìṣe kan ṣẹlẹ̀. Jọ̀wọ́ tún gbìyànjú.",
-    "retryableAdmission": "A kò lè jẹ́rìí sí ẹ̀rọ yìí. Ṣàyẹ̀wò àsopọ̀ rẹ kí o tún gbìyànjú.",
+    "retryableAdmission": "A kò lè jẹ́rìí ẹ̀rọ yìí. Gbìyànjú lẹ́ẹ̀kan sí i.",
     "startSignInFailed": "A kò lè bẹ̀rẹ̀ ìwọlé. Jọ̀wọ́ tún gbìyànjú.",
     "couldNotOpenBrowser": "A kò lè ṣí aṣàwákiri. Jọ̀wọ́ tún gbìyànjú.",
     "signInTimedOut": "Àkókò ìwọlé ti parí. Jọ̀wọ́ tún gbìyànjú.",

@@ -3777,7 +3777,7 @@
     "emailDeliveryFailed": "L'invio delle email è temporaneamente non disponibile. Riprova più tardi.",
     "admissionRequired": "Impossibile verificare il tuo dispositivo. Usa \"$t(login.moreSignInOptions)\" per accedere da un altro dispositivo o tramite il web.",
     "default": "Si è verificato un errore. Riprova.",
-    "retryableAdmission": "Non siamo riusciti a verificare questo dispositivo. Controlla la connessione e riprova.",
+    "retryableAdmission": "Impossibile verificare questo dispositivo. Riprova.",
     "startSignInFailed": "Impossibile avviare l'accesso. Riprova.",
     "couldNotOpenBrowser": "Impossibile aprire il browser. Riprova.",
     "signInTimedOut": "Il tempo disponibile per accedere è scaduto. Riprova.",

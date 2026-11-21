@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "Ukulethwa kwe-imeyili akutholakali okwesikhashana. Sicela uzame futhi kamuva.",
     "admissionRequired": "Idivayisi yakho ayikwazi ukuqinisekiswa. Sebenzisa '$t(login.moreSignInOptions)' ukuze ungene kwenye idivayisi noma ngewebhu.",
     "default": "Kukhona okungahambanga kahle. Sicela uzame futhi.",
-    "retryableAdmission": "Asikwazanga ukuqinisekisa le divayisi. Hlola ukuxhumana kwakho bese uzama futhi.",
+    "retryableAdmission": "Le divayisi ayikwazanga ukuqinisekiswa. Zama futhi.",
     "startSignInFailed": "Asikwazanga ukuqala ukungena. Sicela uzame futhi.",
     "couldNotOpenBrowser": "Asikwazanga ukuvula isiphequluli. Sicela uzame futhi.",
     "signInTimedOut": "Ukungena kuphelelwe yisikhathi. Sicela uzame futhi.",

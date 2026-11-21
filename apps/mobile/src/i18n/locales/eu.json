@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "Une honetan ezin da mezu elektronikorik bidali. Saiatu berriro geroago.",
     "admissionRequired": "Zure gailua ezin da egiaztatu. Erabili '$t(login.moreSignInOptions)' beste gailu batean edo webgunearen bidez saioa hasteko.",
     "default": "Zerbait gaizki joan da. Saiatu berriro.",
-    "retryableAdmission": "Ezin izan dugu gailu hau egiaztatu. Egiaztatu zure konexioa eta saiatu berriro.",
+    "retryableAdmission": "Ezin izan da gailu hau egiaztatu. Saiatu berriro.",
     "startSignInFailed": "Ezin izan da saioa hasteko prozesua abiarazi. Saiatu berriro.",
     "couldNotOpenBrowser": "Ezin izan da nabigatzailea ireki. Saiatu berriro.",
     "signInTimedOut": "Saioa hasteko denbora agortu da. Saiatu berriro.",

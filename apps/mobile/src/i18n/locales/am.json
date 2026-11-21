@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "ለጊዜው ኢሜይል መላክ አይቻልም። በኋላ እንደገና ሞክር።",
     "admissionRequired": "መሣሪያህን ማረጋገጥ አይቻልም። በሌላ መሣሪያ ወይም በድረ ገጹ ለመግባት '$t(login.moreSignInOptions)'ን ተጠቀም።",
     "default": "ችግር ተከስቷል። እባክህ እንደገና ሞክር።",
-    "retryableAdmission": "ይህን መሣሪያ ማረጋገጥ አልቻልንም። ግንኙነትህን ፈትሽና እንደገና ሞክር።",
+    "retryableAdmission": "ይህን መሣሪያ ማረጋገጥ አልተቻለም። እንደገና ሞክር።",
     "startSignInFailed": "የመግቢያ ሂደቱን መጀመር አልተቻለም። እንደገና ሞክር።",
     "couldNotOpenBrowser": "አሳሹን መክፈት አልተቻለም። እንደገና ሞክር።",
     "signInTimedOut": "ለመግባት የተፈቀደው ጊዜ አልቋል። እንደገና ሞክር።",

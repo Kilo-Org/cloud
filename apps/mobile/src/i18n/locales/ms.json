@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "E-mel tidak dapat dihantar buat sementara waktu. Sila cuba lagi kemudian.",
     "admissionRequired": "Peranti anda tidak dapat disahkan. Gunakan '$t(login.moreSignInOptions)' untuk log masuk pada peranti lain atau melalui web.",
     "default": "Berlaku ralat. Sila cuba lagi.",
-    "retryableAdmission": "Kami tidak dapat mengesahkan peranti ini. Semak sambungan anda dan cuba lagi.",
+    "retryableAdmission": "Peranti ini tidak dapat disahkan. Cuba lagi.",
     "startSignInFailed": "Gagal memulakan log masuk. Sila cuba lagi.",
     "couldNotOpenBrowser": "Tidak dapat membuka penyemak imbas. Sila cuba lagi.",
     "signInTimedOut": "Masa untuk log masuk telah tamat. Sila cuba lagi.",

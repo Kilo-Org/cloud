@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "일시적으로 이메일을 보낼 수 없습니다. 잠시 후 다시 시도하세요.",
     "admissionRequired": "기기를 인증할 수 없습니다. '$t(login.moreSignInOptions)' 항목을 선택해 다른 기기나 웹에서 로그인하세요.",
     "default": "문제가 발생했습니다. 다시 시도하세요.",
-    "retryableAdmission": "이 기기를 인증하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
+    "retryableAdmission": "이 기기를 확인하지 못했습니다. 다시 시도하세요.",
     "startSignInFailed": "로그인을 시작하지 못했습니다. 다시 시도하세요.",
     "couldNotOpenBrowser": "브라우저를 열지 못했습니다. 다시 시도하세요.",
     "signInTimedOut": "로그인 제한 시간이 초과되었습니다. 다시 시도하세요.",

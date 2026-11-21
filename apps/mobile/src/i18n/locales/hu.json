@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "Az e-mailek kézbesítése átmenetileg nem érhető el. Próbáld újra később.",
     "admissionRequired": "Az eszközöd nem ellenőrizhető. Válaszd ezt a lehetőséget a másik eszközön vagy a weben való bejelentkezéshez: „$t(login.moreSignInOptions)”.",
     "default": "Hiba történt. Próbáld újra.",
-    "retryableAdmission": "Nem sikerült ellenőrizni ezt az eszközt. Ellenőrizd az internetkapcsolatot, és próbáld újra.",
+    "retryableAdmission": "Nem sikerült ellenőrizni ezt az eszközt. Próbáld újra.",
     "startSignInFailed": "Nem sikerült elindítani a bejelentkezést. Próbáld újra.",
     "couldNotOpenBrowser": "Nem sikerült megnyitni a böngészőt. Próbáld újra.",
     "signInTimedOut": "A bejelentkezés időtúllépés miatt megszakadt. Próbáld újra.",

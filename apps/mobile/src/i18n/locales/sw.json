@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "Huduma ya kutuma barua pepe haipatikani kwa muda. Tafadhali jaribu tena baadaye.",
     "admissionRequired": "Kifaa chako hakiwezi kuthibitishwa. Tumia '$t(login.moreSignInOptions)' ili uingie kwenye kifaa kingine au kupitia wavuti.",
     "default": "Hitilafu imetokea. Tafadhali jaribu tena.",
-    "retryableAdmission": "Hatukuweza kuthibitisha kifaa hiki. Angalia muunganisho wako kisha ujaribu tena.",
+    "retryableAdmission": "Imeshindikana kuthibitisha kifaa hiki. Jaribu tena.",
     "startSignInFailed": "Imeshindikana kuanzisha mchakato wa kuingia. Tafadhali jaribu tena.",
     "couldNotOpenBrowser": "Imeshindikana kufungua kivinjari. Tafadhali jaribu tena.",
     "signInTimedOut": "Muda wa kusubiri kuingia umeisha. Tafadhali jaribu tena.",

@@ -293,7 +293,7 @@ export type DirectByokCatalogServingCheck = (
 
 const allowEveryCatalogProvider: DirectByokCatalogServingCheck = async () => true;
 
-async function getCatalogModeModelIds(
+export async function getCatalogModeModelIds(
   keys: EnabledByokProvider[],
   isServingAllowed: DirectByokCatalogServingCheck
 ): Promise<ReadonlySet<string>> {

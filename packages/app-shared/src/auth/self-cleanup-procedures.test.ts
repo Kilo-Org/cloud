@@ -1,21 +1,44 @@
 import { describe, expect, it } from 'vitest';
 
-import { isSelfCleanupProcedure, SELF_CLEANUP_PROCEDURES } from './self-cleanup-procedures';
+import { isSelfCleanupProcedureCall, SELF_CLEANUP_PROCEDURES } from './self-cleanup-procedures';
 
-describe('isSelfCleanupProcedure', () => {
-  it('accepts every listed procedure', () => {
-    for (const path of SELF_CLEANUP_PROCEDURES) {
-      expect(isSelfCleanupProcedure(path)).toBe(true);
+describe('isSelfCleanupProcedureCall', () => {
+  it('accepts every listed procedure as the mutation it is declared as', () => {
+    for (const entry of SELF_CLEANUP_PROCEDURES) {
+      expect(entry.type).toBe('mutation');
+      expect(isSelfCleanupProcedureCall({ path: entry.path, type: entry.type })).toBe(true);
     }
   });
 
   it('accepts a listed procedure that carries the request query string', () => {
-    expect(isSelfCleanupProcedure('user.unregisterPushToken?batch=1&input=%7B%7D')).toBe(true);
+    expect(
+      isSelfCleanupProcedureCall({
+        path: 'user.unregisterPushToken?batch=1&input=%7B%7D',
+        type: 'mutation',
+      })
+    ).toBe(true);
+  });
+
+  // The exemption is for self-scoped writes: the same path as a read must not
+  // be admitted, or a query added to the shared list would reach a refused
+  // account.
+  it('rejects a listed path arriving as a query', () => {
+    for (const entry of SELF_CLEANUP_PROCEDURES) {
+      expect(isSelfCleanupProcedureCall({ path: entry.path, type: 'query' })).toBe(false);
+    }
+  });
+
+  it('rejects a listed path whose call kind is missing', () => {
+    for (const entry of SELF_CLEANUP_PROCEDURES) {
+      expect(isSelfCleanupProcedureCall({ path: entry.path })).toBe(false);
+    }
   });
 
   it('rejects a path that is not listed', () => {
-    expect(isSelfCleanupProcedure('user.getMe')).toBe(false);
-    expect(isSelfCleanupProcedure('user.unregisterPushTokenAll')).toBe(false);
-    expect(isSelfCleanupProcedure('')).toBe(false);
+    expect(isSelfCleanupProcedureCall({ path: 'user.getMe', type: 'mutation' })).toBe(false);
+    expect(
+      isSelfCleanupProcedureCall({ path: 'user.unregisterPushTokenAll', type: 'mutation' })
+    ).toBe(false);
+    expect(isSelfCleanupProcedureCall({ path: '', type: 'mutation' })).toBe(false);
   });
 });

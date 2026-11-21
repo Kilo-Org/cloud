@@ -1,6 +1,6 @@
 import 'server-only';
 import { headers } from 'next/headers';
-import { isSelfCleanupProcedure } from '@kilocode/app-shared/auth';
+import { isSelfCleanupProcedureCall } from '@kilocode/app-shared/auth';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { initTRPC, TRPCError } from '@trpc/server';
 import type { ProcedureType } from '@trpc/server';
@@ -73,10 +73,17 @@ export { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
 // count as a cleanup, and why, is the shared list the mobile client also reads
 // (`@kilocode/app-shared/auth`): it keeps those calls out of its batch, so the
 // two sides cannot drift.
+//
+// The exemption covers self-scoped writes only. The request must itself be a
+// mutation, and each call must be a listed cleanup declared as one, so a query
+// never enters the exemption even if its path were added to the shared list: a
+// refused account cannot gain a read this way.
 function admitsRefusedAccount(info: ControlPlaneRequestInfo | null | undefined): boolean {
+  const type = info?.type;
   const calls = info?.calls;
+  if (type !== 'mutation') return false;
   if (!calls || calls.length === 0) return false;
-  return calls.every(call => isSelfCleanupProcedure(call.path));
+  return calls.every(call => isSelfCleanupProcedureCall({ path: call.path, type }));
 }
 
 // Define the context type

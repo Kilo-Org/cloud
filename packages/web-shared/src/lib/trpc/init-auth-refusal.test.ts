@@ -160,7 +160,10 @@ describe('createTRPCContext revoked-account admission', () => {
     };
   }
 
-  const DEVICE = { calls: [{ path: 'user.revokeCurrentDeviceSession' }] } as const;
+  const DEVICE = {
+    type: 'mutation',
+    calls: [{ path: 'user.revokeCurrentDeviceSession' }],
+  } as const;
 
   test('admits the account for its own device-session revocation', async () => {
     mockedGetUserFromAuth.mockResolvedValue(blockedAccountAuthRead() as never);
@@ -188,7 +191,7 @@ describe('createTRPCContext revoked-account admission', () => {
 
       const context = (await createTRPCContext({
         req: requestAt(`/api/trpc/${path}`),
-        info: { calls: [{ path }] } as never,
+        info: { type: 'mutation', calls: [{ path }] } as never,
       })) as { user: { id: string } };
 
       expect(mockedGetUserFromAuth).toHaveBeenCalledWith(
@@ -205,7 +208,7 @@ describe('createTRPCContext revoked-account admission', () => {
 
     const context = (await createTRPCContext({
       req: requestAt('/api/trpc/user.unregisterPushToken?batch=1'),
-      info: { calls: [{ path: 'user.unregisterPushToken?batch=1' }] } as never,
+      info: { type: 'mutation', calls: [{ path: 'user.unregisterPushToken?batch=1' }] } as never,
     })) as { user: { id: string } };
 
     expect(mockedGetUserFromAuth).toHaveBeenCalledWith(
@@ -222,6 +225,7 @@ describe('createTRPCContext revoked-account admission', () => {
         '/api/trpc/user.revokeCurrentDeviceSession,user.unregisterPushToken,user.unregisterActivityToken'
       ),
       info: {
+        type: 'mutation',
         calls: [
           { path: 'user.unregisterPushToken' },
           { path: 'user.unregisterActivityToken' },
@@ -316,6 +320,58 @@ describe('createTRPCContext revoked-account admission', () => {
 
     const error = await caught(
       createTRPCContext({ req: requestAt('/api/trpc/user.getMe', 'mobile') })
+    );
+
+    expect(error).toBeInstanceOf(TRPCError);
+    expect((error as TRPCError).cause).toBeInstanceOf(AccountBlockedError);
+    expect(mockedGetUserFromAuth).toHaveBeenCalledWith(
+      expect.objectContaining({ allowRefusedAccountSelfCleanup: false })
+    );
+  });
+
+  // The exemption is for self-scoped writes. A cleanup path arriving as a read
+  // must not be admitted, otherwise a query added to the shared list would
+  // reach a refused account through the exemption.
+  test.each([['user.revokeCurrentDeviceSession'], ['user.unregisterPushToken']])(
+    'refuses the account when %s arrives as a query',
+    async path => {
+      mockedGetUserFromAuth.mockResolvedValue(
+        failedAuthResponse({
+          authorizationRefused: true,
+          refusalReason: 'account_blocked',
+        })
+      );
+
+      const error = await caught(
+        createTRPCContext({
+          req: requestAt(`/api/trpc/${path}`, 'mobile'),
+          info: { type: 'query', calls: [{ path }] } as never,
+        })
+      );
+
+      expect(error).toBeInstanceOf(TRPCError);
+      expect((error as TRPCError).cause).toBeInstanceOf(AccountBlockedError);
+      expect(mockedGetUserFromAuth).toHaveBeenCalledWith(
+        expect.objectContaining({ allowRefusedAccountSelfCleanup: false })
+      );
+    }
+  );
+
+  // tRPC always resolves a kind for a real request; without one the admission
+  // cannot tell a write from a read, so it must not admit.
+  test('refuses the account for a cleanup whose request kind is missing', async () => {
+    mockedGetUserFromAuth.mockResolvedValue(
+      failedAuthResponse({
+        authorizationRefused: true,
+        refusalReason: 'account_blocked',
+      })
+    );
+
+    const error = await caught(
+      createTRPCContext({
+        req: requestAt('/api/trpc/user.revokeCurrentDeviceSession', 'mobile'),
+        info: { calls: [{ path: 'user.revokeCurrentDeviceSession' }] } as never,
+      })
     );
 
     expect(error).toBeInstanceOf(TRPCError);

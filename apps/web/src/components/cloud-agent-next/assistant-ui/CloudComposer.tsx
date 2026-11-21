@@ -100,30 +100,19 @@ type CloudComposerProps = {
   /** Why sending waits while typing is open, such as a chat that still loads; shown on the send button. */
   sendUnavailableReason?: string;
   slashCommands?: SlashCommand[];
-  /** Options passed to the Cloud Agent attachment uploader. */
   attachmentUploadOptions: UseCloudAgentAttachmentUploadOptions;
-  /** Whether this composer can submit file attachments through its active transport. */
   attachmentsEnabled?: boolean;
-  /** Current mode for the toolbar */
   mode?: AgentMode;
-  /** Current model for the toolbar */
   model?: string;
-  /** Available model options for the toolbar */
   modelOptions?: ModelOption[];
   /** Optional model option pinned above regular gateway models. */
   pinnedModelOption?: ModelOption;
-  /** Whether models are loading */
   isLoadingModels?: boolean;
   onModelPickerIntent?: () => void;
-  /** Callback when mode changes */
   onModeChange?: (mode: AgentMode) => void;
-  /** Callback when model changes */
   onModelChange?: (model: string) => void;
-  /** Current variant for the toolbar */
   variant?: string;
-  /** Callback when variant changes */
   onVariantChange?: (variant: string) => void;
-  /** Available variant keys for the current model */
   availableVariants?: string[];
   /** Whether to show the toolbar (hide when no active session) */
   showToolbar?: boolean;
@@ -154,7 +143,6 @@ type CloudComposerProps = {
    * selected chat, so completion is scoped to this key.
    */
   conversationKey?: string;
-  /** Enables favorite stars in the model picker. */
   favorites?: boolean;
 };
 

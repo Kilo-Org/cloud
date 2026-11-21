@@ -51,9 +51,6 @@ type ApiSession = {
   associatedPr?: AssociatedPr | null;
 };
 
-/**
- * Database session type - with Date objects for convenient manipulation
- */
 export type DbSession = {
   latest_run_status?: ApiSession['latest_run_status'];
   latest_run_failure_kind?: ApiSession['latest_run_failure_kind'];
@@ -111,9 +108,6 @@ export type DbSessionV2 = {
   total_cost_microdollars?: number | null;
 };
 
-/**
- * Convert an API session (with string dates) to DbSession format (with Date objects)
- */
 export function apiSessionToDbSession(apiSession: ApiSession): DbSession | DbSessionV2 {
   return {
     ...apiSession,

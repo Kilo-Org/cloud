@@ -25,7 +25,11 @@ jest.mock('@octokit/auth-app', () => ({
 }));
 
 import { MAX_INLINE_COMMENT_BODY_CHARS } from '@/lib/code-reviews/core/constants';
-import { fetchPRInlineComments } from './adapter';
+import {
+  fetchPRInlineComments,
+  GITHUB_LISTING_TIMEOUT_MS,
+  GitHubListingBudgetExceededError,
+} from './adapter';
 
 const PER_PAGE = 100;
 const MAX_PAGES = 5;
@@ -222,5 +226,69 @@ describe('fetchPRInlineComments', () => {
     expect(mockListReviewComments.mock.calls.length).toBeLessThan(MAX_PAGES);
     const totalBytes = comments.reduce((sum, c) => sum + Buffer.byteLength(c.body), 0);
     expect(totalBytes).toBeGreaterThanOrEqual(512 * 1024);
+  });
+
+  it('covers every page of one listing with the same deadline', async () => {
+    jest.useFakeTimers();
+    try {
+      const signals: AbortSignal[] = [];
+      mockListReviewComments.mockImplementation(
+        (params: { page: number; request: { signal: AbortSignal } }) => {
+          const { signal } = params.request;
+          signals.push(signal);
+          if (signals.length === 1) return Promise.resolve(fullPage(1));
+          const { promise, reject } = Promise.withResolvers<never>();
+          const abort = () => reject(signal.reason);
+          if (signal.aborted) {
+            abort();
+            return promise;
+          }
+          signal.addEventListener('abort', abort, { once: true });
+          return promise;
+        }
+      );
+
+      const listing = fetchPRInlineComments('42', 'acme', 'widgets', 7);
+      const settled = listing.catch((error: unknown) => error);
+      await jest.advanceTimersByTimeAsync(GITHUB_LISTING_TIMEOUT_MS);
+      const thrown: unknown = await settled;
+
+      expect(thrown).toBeInstanceOf(GitHubListingBudgetExceededError);
+      expect((thrown as Error).message).toBe(
+        `GitHub pagination limit exceeded: PR inline comment listing did not finish within ${GITHUB_LISTING_TIMEOUT_MS / 1000} s`
+      );
+      expect(signals).toHaveLength(2);
+      expect(signals[0]).toBe(signals[1]);
+      expect(signals.every(signal => signal.aborted)).toBe(true);
+      const [{ reason }] = signals;
+      expect(reason.name).toBe('AbortError');
+      expect(reason.cause).toBeInstanceOf(GitHubListingBudgetExceededError);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('clears its deadline timer when the listing finishes', async () => {
+    jest.useFakeTimers();
+    try {
+      mockListReviewComments.mockResolvedValueOnce({
+        data: [
+          {
+            id: 1,
+            path: 'src/file.ts',
+            line: 1,
+            body: 'short comment',
+            position: 0,
+            user: { login: 'reviewer' },
+          },
+        ],
+      });
+
+      await expect(fetchPRInlineComments('42', 'acme', 'widgets', 7)).resolves.toHaveLength(1);
+
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

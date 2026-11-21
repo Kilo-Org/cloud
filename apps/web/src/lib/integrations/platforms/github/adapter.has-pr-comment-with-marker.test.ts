@@ -24,7 +24,11 @@ jest.mock('@octokit/auth-app', () => ({
   createAppAuth: jest.fn(() => async () => ({ token: 'mock-token', expiresAt: '2099-01-01' })),
 }));
 
-import { hasPRCommentWithMarker } from './adapter';
+import {
+  GITHUB_LISTING_TIMEOUT_MS,
+  GitHubListingBudgetExceededError,
+  hasPRCommentWithMarker,
+} from './adapter';
 
 const MARKER = '<!-- kilo-billing-notice -->';
 
@@ -130,5 +134,45 @@ describe('hasPRCommentWithMarker', () => {
 
     await expect(hasPRCommentWithMarker('42', 'acme', 'widgets', 7, MARKER)).resolves.toBe(true);
     expect(mockListComments).toHaveBeenCalledTimes(2);
+  });
+
+  it('covers every page of one scan with the same deadline', async () => {
+    jest.useFakeTimers();
+    try {
+      const signals: AbortSignal[] = [];
+      mockListComments.mockImplementation((params: { request: { signal: AbortSignal } }) => {
+        const { signal } = params.request;
+        signals.push(signal);
+        if (signals.length === 1) {
+          return Promise.resolve({ headers: lastPageHeader(12), data: fullPage() });
+        }
+        const { promise, reject } = Promise.withResolvers<never>();
+        const abort = () => reject(signal.reason);
+        if (signal.aborted) {
+          abort();
+          return promise;
+        }
+        signal.addEventListener('abort', abort, { once: true });
+        return promise;
+      });
+
+      const scan = hasPRCommentWithMarker('42', 'acme', 'widgets', 7, MARKER);
+      const settled = scan.catch((error: unknown) => error);
+      await jest.advanceTimersByTimeAsync(GITHUB_LISTING_TIMEOUT_MS);
+      const thrown: unknown = await settled;
+
+      expect(thrown).toBeInstanceOf(GitHubListingBudgetExceededError);
+      expect((thrown as Error).message).toBe(
+        `GitHub pagination limit exceeded: PR issue-comment scan did not finish within ${GITHUB_LISTING_TIMEOUT_MS / 1000} s`
+      );
+      expect(signals).toHaveLength(2);
+      expect(signals[0]).toBe(signals[1]);
+      expect(signals.every(signal => signal.aborted)).toBe(true);
+      const [{ reason }] = signals;
+      expect(reason.name).toBe('AbortError');
+      expect(reason.cause).toBeInstanceOf(GitHubListingBudgetExceededError);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

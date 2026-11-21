@@ -702,9 +702,12 @@ export async function listMySupportGrants(actorKiloUserId: string): Promise<Supp
  * requester still sees it, marked expired, in `listMySupportGrants`.
  *
  * A pending row always carries `request_expires_at`: `requestSupportGrant` is the
- * only writer that creates one, it stamps the deadline on every write request,
- * and an approved, denied or cancelled grant leaves `pending` rather than losing
- * the deadline. So this predicate cannot hide a request that is still open.
+ * only writer that creates one, and it stamps the deadline on every write request.
+ * A grant loses that deadline only in the same update that moves it off `pending`
+ * (approve, deny, cancel, revoke), so no row leaves `pending` and keeps a window
+ * this predicate would filter on. This is an application-level guarantee: the
+ * column is nullable and no check ties it to `status`, so a new writer that inserts
+ * a pending row without a deadline would drop out of this queue.
  */
 export async function listPendingSupportGrants(): Promise<SupportAccessGrant[]> {
   return db

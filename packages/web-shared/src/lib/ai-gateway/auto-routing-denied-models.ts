@@ -3,8 +3,14 @@ import {
   type AutoRouter,
   type AutoRoutingDeniedModelsRequest,
 } from '@kilocode/auto-routing-contracts';
+import { organizations } from '@kilocode/db/schema';
+import { and, eq, isNull } from 'drizzle-orm';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { byokOwner } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { inferenceRegionIneligibleCandidates } from '@kilocode/web-shared/lib/ai-gateway/inference-region-candidates';
+import { getRuntimeOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
+import { getOrganizationGatewaySettings } from '@kilocode/web-shared/lib/ai-gateway/providers/organization-gateway-settings';
 import { isDeniedByProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
@@ -164,13 +170,39 @@ export async function deniedAutoRoutingModelIdsForMember(
     fromDb: readDb,
   });
   const candidateIds = [...new Set(request.modelIds.filter(id => !isVirtualAutoModelId(id)))];
-  const [deniedByPolicy, deniedByPrivacy] = await Promise.all([
+  const [deniedByPolicy, deniedByPrivacy, deniedByRegion] = await Promise.all([
     deniedAutoRoutingCandidates(policy, candidateIds),
     isDataCollectionExplicitlyDisallowed(
       getEffectiveProviderPrivacy(undefined, policy.dataCollection)
     )
       ? dataCollectionRequiredAutoRoutingCandidates(candidateIds)
       : [],
+    inferenceRegionDeniedCandidatesForMember(request, policy, candidateIds),
   ]);
-  return [...new Set([...deniedByPolicy, ...deniedByPrivacy])];
+  return [...new Set([...deniedByPolicy, ...deniedByPrivacy, ...deniedByRegion])];
+}
+
+async function inferenceRegionDeniedCandidatesForMember(
+  request: AutoRoutingDeniedModelsRequest,
+  policy: EffectiveOrganizationModelPolicy,
+  candidateIds: ReadonlyArray<string>
+): Promise<string[]> {
+  const [organization] = await readDb
+    .select({ plan: organizations.plan, settings: organizations.settings })
+    .from(organizations)
+    .where(and(eq(organizations.id, request.organizationId), isNull(organizations.deleted_at)))
+    .limit(1);
+  if (!organization) return [];
+  const { dataRegion } = getOrganizationGatewaySettings(await getRuntimeOrganizationFeatures(), {
+    id: request.organizationId,
+    plan: organization.plan,
+    settings: organization.settings,
+  });
+  if (!dataRegion) return [];
+  return inferenceRegionIneligibleCandidates({
+    region: dataRegion,
+    candidateIds,
+    byokOwner: byokOwner(request.userId, request.organizationId),
+    policy,
+  });
 }

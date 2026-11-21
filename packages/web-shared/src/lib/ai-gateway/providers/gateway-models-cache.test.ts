@@ -25,7 +25,9 @@ import {
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   extractVercelInferenceProviderIdsFromModel,
+  extractVercelInferenceRegionsFromModel,
   getCachedVercelInferenceProviderIdsForModel,
+  getCachedVercelInferenceRegionsForModel,
   getOpenRouterChatModelIds,
   getOpenRouterModelsMetadataFromDatabase,
   getSystemOneModelIds,
@@ -229,6 +231,54 @@ describe('extractVercelInferenceProviderIdsFromModel', () => {
     };
 
     expect(extractVercelInferenceProviderIdsFromModel(model)).toEqual(['anthropic', 'bedrock']);
+  });
+});
+
+describe('extractVercelInferenceRegionsFromModel', () => {
+  it('unions the pinnable regions of every endpoint', () => {
+    const model = gatewayModel({
+      id: 'vendor/regional',
+      endpoints: [
+        {
+          provider_name: 'bedrock',
+          inference_regions: [{ geo_region: 'us' }, { geo_region: 'eu' }],
+        },
+        {
+          provider_name: 'vertex',
+          inference_regions: [{ geo_region: 'eu' }, { geo_region: 'jp' }],
+        },
+      ],
+    });
+
+    expect([...extractVercelInferenceRegionsFromModel(model)].sort()).toEqual(['eu', 'jp', 'us']);
+  });
+
+  it('ignores unknown and missing geo regions and endpoints without inference regions', () => {
+    const model = gatewayModel({
+      id: 'vendor/regional',
+      endpoints: [
+        {
+          provider_name: 'bedrock',
+          inference_regions: [
+            {},
+            { geo_region: 'mars' },
+            { geo_region: 'au' },
+            { geo_region: 'EU' },
+          ],
+        },
+        { provider_name: 'vertex', inference_regions: [] },
+        { provider_name: 'anthropic' },
+      ],
+    });
+
+    expect([...extractVercelInferenceRegionsFromModel(model)]).toEqual(['au']);
+  });
+
+  it('returns an empty set for a model without endpoints', () => {
+    expect(
+      extractVercelInferenceRegionsFromModel(gatewayModel({ id: 'vendor/none', endpoints: [] }))
+        .size
+    ).toBe(0);
   });
 });
 
@@ -639,6 +689,34 @@ describe('isValidOpenRouterModelId', () => {
     await expect(
       getCachedVercelInferenceProviderIdsForModel('anthropic/claude-sonnet-4.5')
     ).resolves.toEqual(['anthropic', 'bedrock']);
+  });
+
+  it('reads Vercel inference regions of language models from the database catalog', async () => {
+    await storeVercelModels([
+      gatewayModel({
+        id: 'anthropic/claude-sonnet-4.5',
+        type: 'language',
+        endpoints: [
+          { provider_name: 'anthropic', inference_regions: [{ geo_region: 'us' }] },
+          {
+            provider_name: 'bedrock',
+            inference_regions: [{ geo_region: 'eu' }, {}],
+          },
+        ],
+      }),
+      gatewayModel({
+        id: 'vendor/embedding',
+        type: 'embedding',
+        endpoints: [{ provider_name: 'test', inference_regions: [{ geo_region: 'us' }] }],
+      }),
+      gatewayModel({ id: 'vendor/unpinnable', type: 'language' }),
+    ]);
+
+    const regions = await getCachedVercelInferenceRegionsForModel('anthropic/claude-sonnet-4.5');
+    expect([...(regions ?? [])].sort()).toEqual(['eu', 'us']);
+    expect((await getCachedVercelInferenceRegionsForModel('vendor/unpinnable'))?.size).toBe(0);
+    await expect(getCachedVercelInferenceRegionsForModel('vendor/embedding')).resolves.toBeNull();
+    await expect(getCachedVercelInferenceRegionsForModel('vendor/unlisted')).resolves.toBeNull();
   });
 
   it('answers every queried id from one catalog snapshot per window', async () => {

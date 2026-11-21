@@ -92,6 +92,12 @@ Kilo-paid routes. A region pins Kilo's Vercel route, refuses other routes, and i
 OpenRouter off. BYOK, ChatGPT and Claude billing routes, FIM and edit are exempt.
 OpenRouter off also lifts the Vercel opt-out list.
 
+With a region, the classifier tiers and custom routers deny candidates no Kilo-paid route
+can serve in that region, unless a BYOK key routing would use serves them, and
+`kilo-auto/free` skips them (`inference-region-candidates.ts`). Fixed targets
+(`kilo-auto/small`, concrete Organization Auto routes, static fallbacks) are not filtered
+and get the region refusal.
+
 Deliberate limitations until users ask:
 
 - Model endpoint lists are not filtered by these policies.

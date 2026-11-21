@@ -1,3 +1,7 @@
+import {
+  OrganizationDataRegionSchema,
+  type OrganizationDataRegion,
+} from '@kilocode/db/schema-types';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -150,6 +154,44 @@ export async function getCachedVercelInferenceProviderIdsForModel(
   modelId: string
 ): Promise<string[] | null> {
   return (await getVercelInferenceProviderIdsByModel()).get(modelId) ?? null;
+}
+
+/** The inference regions Vercel can pin the model to at any of its endpoints. */
+export function extractVercelInferenceRegionsFromModel(
+  model: GatewayModelWithEndpoints
+): ReadonlySet<OrganizationDataRegion> {
+  const regions = new Set<OrganizationDataRegion>();
+  for (const endpoint of model.endpoints) {
+    for (const { geo_region } of endpoint.inference_regions ?? []) {
+      const region = OrganizationDataRegionSchema.safeParse(geo_region);
+      if (region.success) regions.add(region.data);
+    }
+  }
+  return regions;
+}
+
+/** Inference regions per Vercel language model id, projected from the cached Vercel metadata map. */
+const getVercelInferenceRegionsByModel = createCachedFetch<
+  ReadonlyMap<string, ReadonlySet<OrganizationDataRegion>>
+>(
+  async () => {
+    const models = await getVercelModelsMetadataFromDatabase();
+    return new Map(
+      Object.values(models)
+        .filter(model => model.type === 'language')
+        .map(model => [model.id, extractVercelInferenceRegionsFromModel(model)])
+    );
+  },
+  TTL_MS,
+  new Map(),
+  { name: 'vercelInferenceRegionsByModel' }
+);
+
+/** The regions Vercel can pin the language model to, or null when Vercel does not list it. */
+export async function getCachedVercelInferenceRegionsForModel(
+  vercelModelId: string
+): Promise<ReadonlySet<OrganizationDataRegion> | null> {
+  return (await getVercelInferenceRegionsByModel()).get(vercelModelId) ?? null;
 }
 
 function createModelIdsFetcher(

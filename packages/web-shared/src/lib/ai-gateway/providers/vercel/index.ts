@@ -26,6 +26,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import {
   getCachedVercelInferenceProviderIdsForModel,
+  getCachedVercelInferenceRegionsForModel,
   getOpenRouterModelsMetadataFromDatabase,
   getVercelLanguageModelIdsFromDatabase,
   isValidOpenRouterModelId,
@@ -231,6 +232,13 @@ export async function isVercelModel(requestedModel: string) {
     mapModelIdToVercel(requestedModel),
   ]);
   return vercelModels.has(vercelModelId);
+}
+
+/** The inference regions Vercel can pin the model to, or null when Vercel does not serve it. */
+export async function getVercelInferenceRegions(
+  requestedModel: string
+): Promise<ReadonlySet<OrganizationDataRegion> | null> {
+  return getCachedVercelInferenceRegionsForModel(await mapModelIdToVercel(requestedModel));
 }
 
 /**

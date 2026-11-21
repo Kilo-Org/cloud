@@ -3,6 +3,7 @@ import {
   AUTO_DECISION_HEADER,
   customRouterModelId,
   isCustomRouterModelId,
+  isVirtualAutoModelId,
   type AutoRouter,
   type CustomRouterErrorCode,
   type CustomRouterReference,
@@ -29,18 +30,22 @@ import {
   fetchEfficientAutoDecision,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
 import {
+  candidateModelIdsFromTable,
   collectDataCollectionRequiredAutoRoutingModelIds,
   collectDeniedAutoRoutingModelIds,
   dataCollectionRequiredAutoRoutingCandidates,
   deniedAutoRoutingCandidates,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models';
+import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
+import { inferenceRegionIneligibleCandidates } from '@kilocode/web-shared/lib/ai-gateway/inference-region-candidates';
+import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 import { AUTO_ROUTING_DECISION_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
   createDirectByokReferenceResolver,
   getDirectByokModel,
   supportsCatalogMode,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
-import { byokOwner } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { byokOwner, type ByokOwner } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { isDataCollectionExplicitlyDisallowed } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
@@ -55,9 +60,10 @@ import {
 import { logMicrodollarUsage } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
-import type {
-  GatewayCaller,
-  gatewayUsageContextBase,
+import {
+  resolveOrganizationGatewaySettings,
+  type GatewayCaller,
+  type gatewayUsageContextBase,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import type { BalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import {
@@ -141,19 +147,52 @@ async function authenticatedRoutingCaller(
   return { caller: { userId: caller.user.id, organizationId: caller.organizationId ?? null } };
 }
 
+type InferenceRegionScope = { region: OrganizationDataRegion; byokOwner: ByokOwner };
+
+/** The organization's inference region, when its gateway settings set one, and the BYOK owner. */
+async function resolveInferenceRegionScope(
+  ctx: ModelResolutionContext
+): Promise<InferenceRegionScope | null> {
+  const caller = await ctx.callerPromise;
+  if (caller.kind !== 'signed-in' || !caller.organizationId) return null;
+  const { plan, settings } = await ctx.balanceAndSettingsPromise;
+  const { dataRegion } = await resolveOrganizationGatewaySettings({
+    organizationId: caller.organizationId,
+    plan,
+    settings,
+  });
+  return dataRegion
+    ? { region: dataRegion, byokOwner: byokOwner(caller.user.id, caller.organizationId) }
+    : null;
+}
+
 async function autoRoutingDenials(
   ctx: ModelResolutionContext,
   fromPolicy: (policy: EffectiveOrganizationModelPolicy) => Promise<string[]>,
-  fromPrivacy: (options: { zdr: boolean }) => Promise<string[]>
+  fromPrivacy: (options: { zdr: boolean }) => Promise<string[]>,
+  fromRegion: {
+    scope: () => Promise<InferenceRegionScope | null>;
+    candidateIds: () => Promise<ReadonlyArray<string>>;
+  }
 ): Promise<string[]> {
   const groupPolicy = await ctx.organizationGroupPolicyPromise;
-  const [deniedFromPolicy, deniedFromPrivacy] = await Promise.all([
+  const regionDenials = async () => {
+    const scope = await fromRegion.scope();
+    if (!scope) return [];
+    return inferenceRegionIneligibleCandidates({
+      ...scope,
+      policy: groupPolicy,
+      candidateIds: await fromRegion.candidateIds(),
+    });
+  };
+  const [deniedFromPolicy, deniedFromPrivacy, deniedFromRegion] = await Promise.all([
     groupPolicy ? fromPolicy(groupPolicy) : [],
     isDataCollectionExplicitlyDisallowed(ctx.effectivePrivacy)
       ? fromPrivacy({ zdr: ctx.effectivePrivacy.zdr === true })
       : [],
+    regionDenials(),
   ]);
-  return [...new Set([...deniedFromPolicy, ...deniedFromPrivacy])];
+  return [...new Set([...deniedFromPolicy, ...deniedFromPrivacy, ...deniedFromRegion])];
 }
 
 function decisionRequest(ctx: ModelResolutionContext, caller: RoutingCaller) {
@@ -216,6 +255,8 @@ async function resolveAutoModelId(
     autoModel === KILO_AUTO_EFFICIENT_MODEL.id || autoModel === KILO_AUTO_BALANCED_MODEL.id;
   // Set by whichever decision runs; resolution only sees the decision itself.
   let classifierCostUsd = 0;
+  let inferenceRegionScope: Promise<InferenceRegionScope | null> | undefined;
+  const getInferenceRegionScope = () => (inferenceRegionScope ??= resolveInferenceRegionScope(ctx));
 
   const decisionForRouter = async (router: AutoRouter) => {
     const caller = await ctx.callerPromise;
@@ -226,7 +267,11 @@ async function resolveAutoModelId(
     const deniedModelIds = await autoRoutingDenials(
       ctx,
       policy => collectDeniedAutoRoutingModelIds(policy, router),
-      options => collectDataCollectionRequiredAutoRoutingModelIds(router, options)
+      options => collectDataCollectionRequiredAutoRoutingModelIds(router, options),
+      {
+        scope: getInferenceRegionScope,
+        candidateIds: async () => candidateModelIdsFromTable(await getCachedRoutingTable(router)),
+      }
     );
     const result = await fetchEfficientAutoDecision({
       ...decisionRequest(ctx, owner),
@@ -235,7 +280,24 @@ async function resolveAutoModelId(
       deniedModelIds,
     });
     classifierCostUsd = result?.costUsd ?? 0;
-    return result?.decision ?? null;
+    const decision = result?.decision ?? null;
+    if (!decision || isVirtualAutoModelId(decision.model)) return decision;
+    // The worker can pick from a newer routing table than the gateway's cached copy, or from
+    // any table when the gateway's is unavailable, so the denials above may not cover its pick.
+    const scope = await getInferenceRegionScope();
+    if (
+      scope &&
+      (
+        await inferenceRegionIneligibleCandidates({
+          ...scope,
+          policy: await ctx.organizationGroupPolicyPromise,
+          candidateIds: [decision.model],
+        })
+      ).length > 0
+    ) {
+      return null;
+    }
+    return decision;
   };
   const customRouterDecision = async (reference: CustomRouterReference) => {
     const auth = await authenticatedRoutingCaller(ctx.callerPromise);
@@ -254,7 +316,8 @@ async function resolveAutoModelId(
         autoRoutingDenials(
           ctx,
           policy => deniedAutoRoutingCandidates(policy, candidateIds),
-          options => dataCollectionRequiredAutoRoutingCandidates(candidateIds, options)
+          options => dataCollectionRequiredAutoRoutingCandidates(candidateIds, options),
+          { scope: getInferenceRegionScope, candidateIds: async () => candidateIds }
         ),
       decide: async (router, deniedModelIds) => {
         const outcome = await fetchCustomRouterDecision({
@@ -294,8 +357,23 @@ async function resolveAutoModelId(
         })
       ),
       isAutoFreeCandidateAllowed: async modelId => {
-        const policy = await ctx.organizationGroupPolicyPromise;
-        return policy ? (await getEffectiveModelDecision(policy, modelId)).allowed : true;
+        const [policy, regionScope] = await Promise.all([
+          ctx.organizationGroupPolicyPromise,
+          getInferenceRegionScope(),
+        ]);
+        if (policy && !(await getEffectiveModelDecision(policy, modelId)).allowed) return false;
+        // Free models are served on Kilo's own accounts, so BYOK keys are not considered.
+        return (
+          !regionScope ||
+          (
+            await inferenceRegionIneligibleCandidates({
+              region: regionScope.region,
+              candidateIds: [modelId],
+              byokOwner: null,
+              policy: null,
+            })
+          ).length === 0
+        );
       },
     },
     ctx.request,

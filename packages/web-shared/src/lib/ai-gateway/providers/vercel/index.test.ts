@@ -683,6 +683,63 @@ describe('canRouteToVercel', () => {
   });
 });
 
+describe('getVercelInferenceRegions', () => {
+  async function loadGetVercelInferenceRegions(
+    regionsByVercelModelId: Record<string, OrganizationDataRegion[]>
+  ) {
+    jest.resetModules();
+    const getCachedVercelInferenceRegionsForModel = jest.fn(async (vercelModelId: string) => {
+      const regions = regionsByVercelModelId[vercelModelId];
+      return regions ? new Set(regions) : null;
+    });
+    jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+      getVercelLanguageModelIdsFromDatabase: jest.fn(async () => new Set()),
+      getCachedVercelInferenceRegionsForModel,
+    }));
+    jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => {
+      const actual = jest.requireActual<typeof MapModelIdToVercelModule>(
+        '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel'
+      );
+      return {
+        ...actual,
+        mapModelIdToVercel: jest.fn(async (modelId: string) =>
+          actual.mapResolvedModelIdToVercel(modelId, new Map())
+        ),
+      };
+    });
+    return {
+      getCachedVercelInferenceRegionsForModel,
+      getVercelInferenceRegions: (
+        await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel')
+      ).getVercelInferenceRegions,
+    };
+  }
+
+  it('returns the regions Vercel can pin the model to', async () => {
+    const { getVercelInferenceRegions } = await loadGetVercelInferenceRegions({
+      'anthropic/claude-sonnet-4.5': ['eu', 'us'],
+    });
+
+    await expect(getVercelInferenceRegions('anthropic/claude-sonnet-4.5')).resolves.toEqual(
+      new Set(['eu', 'us'])
+    );
+  });
+
+  it('returns null for a model Vercel does not list', async () => {
+    const { getVercelInferenceRegions } = await loadGetVercelInferenceRegions({});
+
+    await expect(getVercelInferenceRegions('vendor/unknown')).resolves.toBeNull();
+  });
+
+  it('looks the model up under its Vercel id', async () => {
+    const { getVercelInferenceRegions, getCachedVercelInferenceRegionsForModel } =
+      await loadGetVercelInferenceRegions({ 'zai/glm-5.2': ['au'] });
+
+    await expect(getVercelInferenceRegions('z-ai/glm-5.2')).resolves.toEqual(new Set(['au']));
+    expect(getCachedVercelInferenceRegionsForModel).toHaveBeenCalledWith('zai/glm-5.2');
+  });
+});
+
 describe('isValidVercelModelId', () => {
   async function loadIsValidVercelModelId({
     vercelModelIds,

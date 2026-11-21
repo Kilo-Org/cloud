@@ -10,13 +10,11 @@ import {
   routerPush,
   signOutFn,
 } from '@/components/profile-screen.test-helpers';
+import { type SettingsSearchResult } from '@/components/settings-search/settings-search';
 import { SettingsTarget } from '@/components/settings-search/settings-target';
 import { i18n } from '@/i18n';
+import { type SettingDefinition } from '@/lib/settings-search/definitions';
 import { act, type ReactTestInstance } from '@/test/renderer';
-
-type SearchResult = {
-  entry: { id: string; label: string; path?: string; params?: Readonly<Record<string, string>> };
-};
 
 function byType(root: ReactTestInstance, type: string): ReactTestInstance[] {
   return root.findAll(node => node.type === type);
@@ -36,13 +34,21 @@ function query(root: ReactTestInstance, text: string) {
   });
 }
 
-function results(root: ReactTestInstance): readonly SearchResult[] {
+function results(root: ReactTestInstance): readonly SettingsSearchResult[] {
   const [node] = byType(root, 'SettingsSearchResults');
   if (!node) {
     return [];
   }
-  const value: readonly SearchResult[] = node.props.results;
+  const value: readonly SettingsSearchResult[] = node.props.results;
   return value;
+}
+
+function resultNode(root: ReactTestInstance): ReactTestInstance {
+  const [node] = byType(root, 'SettingsSearchResults');
+  if (!node) {
+    throw new Error('search results are not rendered');
+  }
+  return node;
 }
 
 /** The stationary highlight each active target paints over its row. */
@@ -90,7 +96,7 @@ describe('ProfileScreen settings search', () => {
     const targetItems = root
       .findAll(node => node.type === SettingsTarget)
       .map(node => {
-        const item: { id: string; label: string } = node.props.item;
+        const item: SettingDefinition = node.props.item;
         return item;
       });
     const indexedTitles = targetItems.map(item => i18n.t(item.label));
@@ -104,19 +110,22 @@ describe('ProfileScreen settings search', () => {
     }
   });
 
-  it('highlights the sign-out row without signing out', async () => {
+  it('highlights the sign-out row from its logout alias without signing out', async () => {
     const view = await mountProfile();
     const root = view.renderer.root;
     const signOutLabel = i18n.t('common.signOut');
     expect(findConfigureRows(root, signOutLabel)).toHaveLength(1);
     expect(targetHighlights(root)).toEqual([]);
 
-    query(root, signOutLabel);
+    // The field matches the localized keyword ("logout|log off"), not only the
+    // visible label.
+    query(root, 'logout');
     const entry = results(root).find(result => result.entry.id === 'profile.signOut');
-    expect(entry).toBeDefined();
-    const [resultNode] = byType(root, 'SettingsSearchResults');
+    if (!entry) {
+      throw new Error('the sign-out row is not found by its logout alias');
+    }
     act(() => {
-      resultNode!.props.onSelect(entry!.entry);
+      resultNode(root).props.onSelect(entry.entry);
     });
 
     expect(signOutFn).not.toHaveBeenCalled();
@@ -127,10 +136,12 @@ describe('ProfileScreen settings search', () => {
     // The highlight is painted over the control the row renders, not a copy of
     // the result: exactly the sign-out row's target is active.
     const [highlight] = targetHighlights(root);
-    expect(highlight).toBeDefined();
-    const highlightBox = highlight!.parent;
+    const highlightBox = highlight?.parent;
+    if (!highlightBox) {
+      throw new Error('the sign-out row is not highlighted');
+    }
     expect(
-      highlightBox!.findAll(
+      highlightBox.findAll(
         node => node.type === 'ConfigureRow' && node.props.title === signOutLabel
       )
     ).toHaveLength(1);
@@ -155,25 +166,25 @@ describe('ProfileScreen settings search', () => {
     ).toBe(true);
   });
 
-  it('opens a nested result on its screen with the row target and source params', async () => {
+  it('opens the privacy analytics setting on the consent review screen', async () => {
     const view = await mountProfile();
     const root = view.renderer.root;
-    const nested = {
-      id: 'preferences.language',
-      label: i18n.t('common.preferences'),
-      path: '/(app)/(tabs)/(3_profile)/preferences',
-      params: { mode: 'review' },
-    } as const;
 
-    query(root, nested.label);
-    const [resultNode] = byType(root, 'SettingsSearchResults');
+    // The privacy review's analytics control is reachable by its synonym, and
+    // its source carries the review-mode route parameter.
+    query(root, 'analytics');
+    const entry = results(root).find(result => result.entry.id === 'consent.helpImprove');
+    if (!entry) {
+      throw new Error('the privacy analytics setting is not indexed');
+    }
+    expect(entry.entry.path).toBe('/(app)/consent');
     act(() => {
-      resultNode!.props.onSelect(nested);
+      resultNode(root).props.onSelect(entry.entry);
     });
 
     expect(routerPush).toHaveBeenCalledWith({
-      pathname: nested.path,
-      params: { mode: 'review', settingsTarget: nested.id },
+      pathname: '/(app)/consent',
+      params: { mode: 'review', settingsTarget: 'consent.helpImprove' },
     });
     expect(keyboardDismissFn).toHaveBeenCalledTimes(1);
     expect(signOutFn).not.toHaveBeenCalled();

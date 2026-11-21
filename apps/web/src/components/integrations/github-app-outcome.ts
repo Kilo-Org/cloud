@@ -38,14 +38,15 @@ export const INSTALLATION_UNAVAILABLE_MESSAGE =
 /**
  * What a pending GitHub installation request still needs. The stored status
  * records why the request did not complete at the time; the resolved state
- * decides whether the reason still applies, so the copy describes the current
- * situation instead of ordering a removal that may have already happened.
+ * decides whether the reason still applies. `start_again` covers both a
+ * blocker that is gone and an organization approved for several installations,
+ * so its copy states only that the request is unfinished.
  */
 export const PENDING_REQUEST_EXPLANATION = {
   blocked_by_existing_installation:
     'This organization already has a GitHub installation. To use this installation instead, an owner or admin removes that one in Kilo (Disconnect, or Uninstall GitHub App); then cancel this request and start the connection again.',
   start_again:
-    'This request did not complete because another installation was connected at the time. That installation has since been removed, so cancel this request and start the connection again.',
+    'This request is still pending. Cancel it and start the connection again to complete it.',
 } as const;
 
 export type AppReturnOutcomeView = {
@@ -110,7 +111,9 @@ export function buildAppReturnOutcomeView(input: {
       ? 'Awaiting admin approval'
       : isNonRetryable
         ? 'Cannot complete installation'
-        : 'Installation failed';
+        : input.error === 'github_installation_restart'
+          ? 'Start the connection again'
+          : 'Installation failed';
   const description = isSuccess
     ? 'Your repositories are now connected.'
     : isPending
@@ -129,9 +132,11 @@ export function buildAppReturnOutcomeView(input: {
                   ? 'This installation could not be started from this account. An organization owner or admin can start it; if the organization already holds its installation, they must remove that installation in Kilo first.'
                   : input.error === 'installation_unavailable'
                     ? INSTALLATION_UNAVAILABLE_MESSAGE
-                    : input.error === 'install_state_user_mismatch'
-                      ? 'This connection was started from the Kilo App signed in as a different account. Sign in to the web with that account, or start again from the app.'
-                      : 'The installation did not complete. Try again or return to the Kilo App.';
+                    : input.error === 'github_installation_restart'
+                      ? 'This request is still pending. Start the connection again to complete it.'
+                      : input.error === 'install_state_user_mismatch'
+                        ? 'This connection was started from the Kilo App signed in as a different account. Sign in to the web with that account, or start again from the app.'
+                        : 'The installation did not complete. Try again or return to the Kilo App.';
   const cta = isSuccess ? 'Continue' : isPending ? 'Done' : isNonRetryable ? 'Back' : 'Try again';
 
   return {

@@ -919,6 +919,11 @@ export async function findPendingInstallations() {
  * installations change. A viewer must therefore resolve it against the
  * organization's current installation slots: the blocking installation may be
  * gone, which leaves nothing to remove and the request merely unfinished.
+ *
+ * An organization approved for multiple installations has no blocker at all:
+ * the completion path admits a further installation, so the request only has
+ * to be started again. The approval is irrelevant to a personal request,
+ * which is never subject to the organization rule.
  */
 export type PendingRequestState =
   | 'awaiting_approval'
@@ -927,10 +932,12 @@ export type PendingRequestState =
 
 export function resolvePendingRequestState(
   storedStatus: PendingApprovalStatus,
-  organizationSlots: readonly GitHubInstallationSlot[] | null
+  organizationSlots: readonly GitHubInstallationSlot[] | null,
+  organizationCanUseMultipleInstallations: boolean
 ): PendingRequestState {
   if (storedStatus === PENDING_APPROVAL_STATUS.AWAITING_INSTALLATION) return 'awaiting_approval';
   if (organizationSlots === null) return 'blocked_by_existing_installation';
+  if (organizationCanUseMultipleInstallations) return 'start_again';
   return organizationSlots.some(slot => slot.installationId !== null)
     ? 'blocked_by_existing_installation'
     : 'start_again';

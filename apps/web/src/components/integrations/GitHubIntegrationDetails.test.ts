@@ -325,11 +325,10 @@ describe('GitHubIntegrationDetails pending approval state', () => {
 
     const html = render();
 
-    expect(html).toContain(
-      'This request did not complete because another installation was connected at the time.'
-    );
-    expect(html).toContain('That installation has since been removed');
-    expect(html).toContain('cancel this request and start the connection again');
+    expect(html).toContain('This request is still pending.');
+    expect(html).toContain('Cancel it and start the connection again to complete it.');
+    expect(html).not.toContain('has since been removed');
+    expect(html).not.toContain('another installation was connected');
     expect(html).not.toContain('Disconnect');
     expect(html).not.toContain('Uninstall GitHub App');
     expect(html).not.toContain('already has a GitHub installation');
@@ -388,12 +387,45 @@ describe('GitHubIntegrationDetails pending approval state', () => {
     const html = render({ fromApp: true });
 
     expect(html).toContain('Start the connection again');
-    expect(html).toContain('That installation has since been removed');
+    expect(html).toContain('This request is still pending.');
+    expect(html).not.toContain('has since been removed');
+    expect(html).not.toContain('another installation was connected');
     expect(html).not.toContain('Existing installation blocks this request');
     expect(html).not.toContain('already has a GitHub installation');
     expect(html).not.toContain('Disconnect');
     expect(html).not.toContain('Uninstall GitHub App');
     expect(html).not.toContain('GitHub App installed');
+  });
+
+  it('links the start-again app return card to the retryable restart outcome, not an approval wait', () => {
+    mockInstallationData.value = {
+      installed: false,
+      installation: { id: 'pending-integration', status: null },
+    };
+    startAgainPendingCheck();
+
+    const html = render({ fromApp: true });
+
+    expect(html).toContain('error=github_installation_restart');
+    expect(html).not.toContain('github_pending_approval=true');
+  });
+
+  it('keeps the approval marker on the awaiting-approval app return card', () => {
+    mockInstallationData.value = {
+      installed: false,
+      installation: { id: 'pending-integration', status: 'awaiting_installation' },
+    };
+    mockPendingCheck.value = {
+      hasPending: true,
+      pendingOrganizationId: 'organization-1',
+      pendingIntegrationId: 'pending-integration',
+      pendingRequestState: 'awaiting_approval',
+    };
+
+    const html = render({ fromApp: true });
+
+    expect(html).toContain('github_pending_approval=true');
+    expect(html).not.toContain('github_installation_restart');
   });
 });
 
@@ -426,6 +458,28 @@ describe('GitHubIntegrationDetails fromApp outcome CTA behavior', () => {
       cta: 'Try again',
       href: '/cloud/sessions?error=installation_failed',
     });
+  });
+
+  it('retryable restart: Try again for a pending request that only has to be started again', () => {
+    expect(buildAppReturnOutcomeView({ error: 'github_installation_restart' })).toEqual({
+      kind: 'retryable',
+      title: 'Start the connection again',
+      description: 'This request is still pending. Start the connection again to complete it.',
+      cta: 'Try again',
+      href: '/cloud/sessions?error=github_installation_restart',
+    });
+  });
+
+  it('retryable restart copy claims no removal or blocking installation', () => {
+    const view = buildAppReturnOutcomeView({
+      error: 'github_installation_restart',
+      organizationId: 'org-123',
+    });
+    expect(view.description).not.toContain('has since been removed');
+    expect(view.description).not.toContain('another installation was connected');
+    expect(view.href).toBe(
+      '/cloud/sessions?error=github_installation_restart&organizationId=org-123'
+    );
   });
 
   it('retryable unknown error: keeps the raw code in the return href', () => {

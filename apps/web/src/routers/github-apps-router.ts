@@ -265,9 +265,11 @@ export const githubAppsRouter = createTRPCRouter({
       const canManageConnections =
         canManageOrganization(role) && isGitHubConnectionManagementEnabled();
       const sharingApproved = canOrganizationCreateSharedGitHubConnection(input.organizationId);
+      const organizationCanUseMultipleInstallations = canOrganizationUseMultipleGitHubInstallations(
+        input.organizationId
+      );
       const multipleInstallationsApproved =
-        activeIntegrationCount === 0 ||
-        canOrganizationUseMultipleGitHubInstallations(input.organizationId);
+        activeIntegrationCount === 0 || organizationCanUseMultipleInstallations;
       const existingConnectionAdmission = !canManageConnections
         ? { allowed: false as const, reason: 'not_authorized' as const }
         : !sharingApproved
@@ -330,14 +332,18 @@ export const githubAppsRouter = createTRPCRouter({
                 (await canUninstallGitHubInstallation(integration)),
               canCancel,
               // What the pending request means now, so the organization list
-              // can describe the actual remedy. Null for every other row and
-              // for a row whose metadata does not parse.
-              pendingRequestState: pendingMetadata.success
-                ? resolvePendingRequestState(
-                    pendingMetadata.data.pending_approval.status,
-                    organizationSlots
-                  )
-                : null,
+              // can describe the actual remedy. Only a row still awaiting
+              // completion reports a state: a completed row keeps its
+              // `pending_approval` metadata but is no longer a request. Null
+              // also for a row whose metadata does not parse.
+              pendingRequestState:
+                integration.integration_status === 'pending' && pendingMetadata.success
+                  ? resolvePendingRequestState(
+                      pendingMetadata.data.pending_approval.status,
+                      organizationSlots,
+                      organizationCanUseMultipleInstallations
+                    )
+                  : null,
               modelSlug: (metadata?.model_slug as string) || null,
               canManageModel,
             };
@@ -547,16 +553,23 @@ export const githubAppsRouter = createTRPCRouter({
       // What the request means now, so the requester's own view can name the
       // actual remedy: `getInstallation` returns the owner's live association,
       // so it never shows this row's state once another installation holds the
-      // slot. A personal request is not organization-scoped and carries its
-      // stored state; a row whose metadata does not parse reports no state.
+      // slot. Only a row still awaiting completion reports a state: a completed
+      // row keeps its `pending_approval` metadata but is no longer a request.
+      // A personal request is not organization-scoped and carries its stored
+      // state; a row whose metadata does not parse reports no state.
+      const isPendingRow = pendingInstallation.integration_status === 'pending';
       const pendingMetadata = PendingInstallationMetadataWrapperSchema.safeParse(
         pendingInstallation.metadata
       );
       const organizationId = pendingInstallation.owned_by_organization_id;
       const organizationSlots =
-        pendingMetadata.success && organizationId
+        isPendingRow && pendingMetadata.success && organizationId
           ? await getOrganizationGitHubInstallationSlots(organizationId)
           : null;
+      const organizationCanUseMultipleInstallations =
+        isPendingRow && pendingMetadata.success && organizationId
+          ? canOrganizationUseMultipleGitHubInstallations(organizationId)
+          : false;
 
       return {
         hasPending: true,
@@ -564,12 +577,14 @@ export const githubAppsRouter = createTRPCRouter({
         // Names the exact pending row this response describes, so a cancel is
         // pinned to it instead of to whichever pending row matches the owner.
         pendingIntegrationId: pendingInstallation.id,
-        pendingRequestState: pendingMetadata.success
-          ? resolvePendingRequestState(
-              pendingMetadata.data.pending_approval.status,
-              organizationSlots
-            )
-          : null,
+        pendingRequestState:
+          isPendingRow && pendingMetadata.success
+            ? resolvePendingRequestState(
+                pendingMetadata.data.pending_approval.status,
+                organizationSlots,
+                organizationCanUseMultipleInstallations
+              )
+            : null,
       };
     }),
 

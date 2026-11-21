@@ -152,7 +152,7 @@ test('a request blocked by the organization installation states the conditional 
   expect(html).not.toContain('That installation has since been removed');
 });
 
-test('a start-again request names no removal step', () => {
+test('a start-again request names no removal step and no cause', () => {
   mockRole = null;
   mockStatus = 'pending';
   mockPendingRequestState = 'start_again';
@@ -160,11 +160,10 @@ test('a start-again request names no removal step', () => {
     React.createElement(OrganizationGitHubInstallations, { organizationId: 'org-1' })
   );
   expect(html).toContain('Pending approval');
-  expect(html).toContain(
-    'This request did not complete because another installation was connected at the time.'
-  );
-  expect(html).toContain('That installation has since been removed');
-  expect(html).toContain('cancel this request and start the connection again');
+  expect(html).toContain('This request is still pending.');
+  expect(html).toContain('Cancel it and start the connection again to complete it.');
+  expect(html).not.toContain('has since been removed');
+  expect(html).not.toContain('another installation was connected');
   expect(html).not.toContain('Disconnect');
   expect(html).not.toContain('Uninstall GitHub App');
   expect(html).not.toContain('already has a GitHub installation');

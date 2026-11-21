@@ -1065,12 +1065,14 @@ function GitHubIntegrationDetailsContent({
                   <Button asChild variant="outline" className="mt-2">
                     <Link
                       href={buildAppReturnHref(
-                        'github_pending_approval=true',
+                        pendingRequestState === 'start_again'
+                          ? 'error=github_installation_restart'
+                          : 'github_pending_approval=true',
                         organizationId,
                         appBasePath
                       )}
                     >
-                      Done
+                      {pendingRequestState === 'start_again' ? 'Try again' : 'Done'}
                     </Link>
                   </Button>
                 </>

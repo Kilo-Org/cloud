@@ -1834,28 +1834,49 @@ describe('findGitLabIntegrationByWebhookToken', () => {
 
 describe('resolvePendingRequestState', () => {
   test.each([
-    ['awaiting_installation', null, 'awaiting_approval'],
-    ['awaiting_installation', [], 'awaiting_approval'],
+    ['awaiting_installation', null, false, 'awaiting_approval'],
+    ['awaiting_installation', [], false, 'awaiting_approval'],
     [
       'awaiting_installation',
       [{ installationId: 'inst-live', appType: 'standard' }],
+      false,
       'awaiting_approval',
     ],
-    ['blocked_by_existing_installation', null, 'blocked_by_existing_installation'],
+    ['blocked_by_existing_installation', null, false, 'blocked_by_existing_installation'],
     [
       'blocked_by_existing_installation',
       [{ installationId: 'inst-live', appType: 'standard' }],
+      false,
       'blocked_by_existing_installation',
     ],
     [
       'blocked_by_existing_installation',
       [{ installationId: null, appType: 'standard' }],
+      false,
       'start_again',
     ],
-    ['blocked_by_existing_installation', [], 'start_again'],
-  ] as const)('resolves stored %s with slots %j as %s', (storedStatus, slots, expected) => {
-    expect(resolvePendingRequestState(storedStatus, slots)).toBe(expected);
-  });
+    ['blocked_by_existing_installation', [], false, 'start_again'],
+    [
+      'blocked_by_existing_installation',
+      [{ installationId: 'inst-live', appType: 'standard' }],
+      true,
+      'start_again',
+    ],
+    ['blocked_by_existing_installation', null, true, 'blocked_by_existing_installation'],
+    [
+      'awaiting_installation',
+      [{ installationId: 'inst-live', appType: 'standard' }],
+      true,
+      'awaiting_approval',
+    ],
+  ] as const)(
+    'resolves stored %s with slots %j and multiple-installation approval %s as %s',
+    (storedStatus, slots, canUseMultipleInstallations, expected) => {
+      expect(resolvePendingRequestState(storedStatus, slots, canUseMultipleInstallations)).toBe(
+        expected
+      );
+    }
+  );
 });
 
 describe('autoCompleteInstallation organization installation policy', () => {

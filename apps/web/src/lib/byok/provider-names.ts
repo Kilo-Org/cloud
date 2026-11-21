@@ -110,12 +110,12 @@ export const ADD_BYOK_PROVIDERS: readonly ByokProviderOption[] = BYOK_PROVIDERS.
  * they never reach a picker, but a reader who is shown one must still get a
  * name instead of the row's raw id.
  */
-const STORED_ONLY_BYOK_PROVIDER_NAMES: Readonly<Record<string, string>> = {
-  [OPENAI_CHATGPT_PROVIDER_ID]: OPENAI_CHATGPT_PROVIDER_NAME,
-};
+const STORED_ONLY_BYOK_PROVIDER_NAMES = new Map<string, string>([
+  [OPENAI_CHATGPT_PROVIDER_ID, OPENAI_CHATGPT_PROVIDER_NAME],
+]);
 
 export function getByokProviderDisplayName(providerId: string): string {
-  const storedOnlyName = STORED_ONLY_BYOK_PROVIDER_NAMES[providerId];
+  const storedOnlyName = STORED_ONLY_BYOK_PROVIDER_NAMES.get(providerId);
   if (storedOnlyName !== undefined) {
     return storedOnlyName;
   }

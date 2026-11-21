@@ -52,4 +52,11 @@ describe('BYOK provider lists', () => {
       BYOK_PROVIDERS.filter(provider => provider.name === 'OpenAI (Sign in with ChatGPT)')
     ).toEqual([]);
   });
+
+  test('falls back to the id for a name inherited from the object prototype', () => {
+    // A stored provider id is an unconstrained string, so an id like
+    // "constructor" must reach the id itself and never an inherited member.
+    expect(getByokProviderDisplayName('constructor')).toBe('constructor');
+    expect(getByokProviderDisplayName('toString')).toBe('toString');
+  });
 });

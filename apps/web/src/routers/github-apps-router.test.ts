@@ -154,6 +154,8 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
     mockSyncIntegrationInstallationDetails(integrationId, details),
   getPrimaryGitHubIntegrationForOrganization: (organizationId: string) =>
     mockGetPrimaryGitHubIntegrationForOrganization(organizationId),
+}));
+jest.mock('@/lib/integrations/db/predicates', () => ({
   getOrganizationGitHubInstallationSlots: (organizationId: string) =>
     mockGetOrganizationGitHubInstallationSlots(organizationId),
 }));

@@ -26,10 +26,10 @@ import { lockProviderOAuthOwnerRow } from '@/lib/integrations/provider-oauth-att
 import { parsePlatformRepositoryCache } from '@/lib/integrations/core/schemas';
 import {
   effectiveAppTypeCondition,
+  getOrganizationGitHubInstallationSlots,
   occupiesAnotherGitHubInstallationSlot,
   ownerCondition,
 } from '@/lib/integrations/db/predicates';
-import { getOrganizationGitHubInstallationSlots } from '@/lib/integrations/db/platform-integrations';
 import { getPostgresErrorCode, RETRYABLE_TRANSACTION_SQLSTATES } from '@/lib/db-errors';
 import {
   cancelActiveCodeReviewsForIntegration,

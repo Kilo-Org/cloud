@@ -16,9 +16,9 @@ import {
   getGitHubConnectionStatusForOwner,
   getIntegrationsByOrganization,
   getIntegrationForOwner,
-  getOrganizationGitHubInstallationSlots,
   getPrimaryGitHubIntegrationForOrganization,
 } from './platform-integrations';
+import { getOrganizationGitHubInstallationSlots } from './predicates';
 
 const ownerId = 'oauth/organization-workflow-connection-owner';
 

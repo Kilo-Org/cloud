@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import type * as InstallStartModule from './install-start';
-import type * as PlatformIntegrationsModule from '../db/platform-integrations';
+import type * as PredicatesModule from '../db/predicates';
 import type * as ResolveOwnerModule from '../resolve-owner';
 import type * as MultipleInstallationsModule from './multiple-installations';
 import type * as InstallStateModule from './install-state';
@@ -17,7 +17,7 @@ jest.mock('./multiple-installations', () => ({
   canOrganizationUseMultipleGitHubInstallations: jest.fn(),
 }));
 
-jest.mock('../db/platform-integrations', () => ({
+jest.mock('../db/predicates', () => ({
   getOrganizationGitHubInstallationSlots: jest.fn(),
 }));
 
@@ -35,9 +35,8 @@ const { resolveAuthorizedOwner } = jest.requireMock<typeof ResolveOwnerModule>('
 const { canOrganizationUseMultipleGitHubInstallations } = jest.requireMock<
   typeof MultipleInstallationsModule
 >('./multiple-installations');
-const { getOrganizationGitHubInstallationSlots } = jest.requireMock<
-  typeof PlatformIntegrationsModule
->('../db/platform-integrations');
+const { getOrganizationGitHubInstallationSlots } =
+  jest.requireMock<typeof PredicatesModule>('../db/predicates');
 const { createInstallState } = jest.requireMock<typeof InstallStateModule>('./install-state');
 
 const ORGANIZATION_ID = '00000000-0000-4000-8000-000000000001';

@@ -9,7 +9,7 @@ import {
 } from '@/lib/integrations/platforms/github/app-selector';
 import { resolveAuthorizedOwner } from '@/lib/integrations/resolve-owner';
 import { canOrganizationUseMultipleGitHubInstallations } from '@/lib/integrations/github/multiple-installations';
-import { getOrganizationGitHubInstallationSlots } from '@/lib/integrations/db/platform-integrations';
+import { getOrganizationGitHubInstallationSlots } from '@/lib/integrations/db/predicates';
 import { createInstallState } from '@/lib/integrations/github/install-state';
 
 /**

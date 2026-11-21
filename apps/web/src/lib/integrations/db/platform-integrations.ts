@@ -21,9 +21,9 @@ import { canOrganizationUseMultipleGitHubInstallations } from '../github/multipl
 import { ownerFromIntegration } from '../core/owner';
 import {
   effectiveAppTypeCondition,
+  getOrganizationGitHubInstallationSlots,
   occupiesAnotherGitHubInstallationSlot,
   ownerCondition,
-  type GitHubInstallationSlot,
 } from './predicates';
 import { lockGitHubInstallationIdentity } from './github-installations';
 import {
@@ -283,34 +283,6 @@ export async function getPrimaryGitHubIntegrationForOrganization(organizationId:
     .limit(1);
 
   return integration ?? null;
-}
-
-/**
- * The installation slots an organization's live GitHub associations occupy, in
- * the shape the shared slot predicate reads. One definition serves the readers
- * that must agree with the writers applying the single-installation rule, so a
- * writer that already holds the organization lock reads the same rows through
- * its own transaction instead of a second copy of this query.
- */
-export async function getOrganizationGitHubInstallationSlots(
-  organizationId: string,
-  transaction?: DrizzleTransaction
-): Promise<GitHubInstallationSlot[]> {
-  const client = transaction ?? db;
-  return await client
-    .select({
-      installationId: platform_integrations.platform_installation_id,
-      appType: platform_integrations.github_app_type,
-    })
-    .from(platform_integrations)
-    .where(
-      and(
-        eq(platform_integrations.owned_by_organization_id, organizationId),
-        eq(platform_integrations.platform, PLATFORM.GITHUB),
-        // A locally disconnected connection has relinquished its slot.
-        isNull(platform_integrations.github_disconnected_at)
-      )
-    );
 }
 
 export async function getAllIntegationsForOrganization(organizationId: string) {

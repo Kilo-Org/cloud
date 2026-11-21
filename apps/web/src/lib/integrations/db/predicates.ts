@@ -1,5 +1,7 @@
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { platform_integrations } from '@kilocode/db/schema';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
+import { PLATFORM } from '../core/constants';
 import type { Owner } from '../core/types';
 import type { GitHubAppType } from '../platforms/github/app-selector';
 
@@ -57,4 +59,32 @@ export function occupiesAnotherGitHubInstallationSlot(
     existing.installationId !== candidate.installationId ||
     (existing.appType ?? 'standard') !== candidate.appType
   );
+}
+
+/**
+ * The installation slots an organization's live GitHub associations occupy, in
+ * the shape the shared slot predicate reads. This is the one read of that
+ * state: the install gate and every writer that applies the single-installation
+ * rule read it, so they cannot drift. A writer that already holds the
+ * organization lock passes its transaction instead of reading outside it.
+ */
+export async function getOrganizationGitHubInstallationSlots(
+  organizationId: string,
+  transaction?: DrizzleTransaction
+): Promise<GitHubInstallationSlot[]> {
+  const client = transaction ?? db;
+  return await client
+    .select({
+      installationId: platform_integrations.platform_installation_id,
+      appType: platform_integrations.github_app_type,
+    })
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.owned_by_organization_id, organizationId),
+        eq(platform_integrations.platform, PLATFORM.GITHUB),
+        // A locally disconnected connection has relinquished its slot.
+        isNull(platform_integrations.github_disconnected_at)
+      )
+    );
 }

@@ -30,7 +30,10 @@ import {
 } from '@/components/organization/spend-alert-validators';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { TabScreenScrollView } from '@/components/tab-screen';
+import {
+  SettingsSearchScrollView,
+  SettingsTarget,
+} from '@/components/settings-search/settings-target';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -55,6 +58,20 @@ import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { spendAlertsFormDraftKey } from '@/lib/persist/drafts';
 import { useFormDraft } from '@/lib/persist/use-form-draft';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
+import {
+  type SettingDefinition,
+  type SettingsTargetProps,
+} from '@/lib/settings-search/definitions';
+import {
+  SPEND_ALERT_ANOMALY_EMAIL_SETTING,
+  SPEND_ALERT_ANOMALY_PUSH_SETTING,
+  SPEND_ALERT_ANOMALY_SETTING,
+  SPEND_ALERT_MASTER_SETTING,
+  SPEND_ALERT_THRESHOLD_EMAIL_SETTING,
+  SPEND_ALERT_THRESHOLD_PUSH_SETTING,
+  SPEND_ALERT_THRESHOLD_SETTING,
+  SPEND_ALERT_WINDOW_SETTING,
+} from '@/lib/settings-search/notification-sources';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -165,10 +182,12 @@ type SpendAlertSpend = SpendAlertSettings['spend'];
 
 type PushOverride = Readonly<{ target: SpendAlertRuleKind; value: boolean }>;
 
-type SpendAlertsScreenProps = Readonly<{
-  /** Organization scope from the route; absent is the caller's personal scope. */
-  organizationId?: string;
-}>;
+type SpendAlertsScreenProps = Readonly<
+  SettingsTargetProps & {
+    /** Organization scope from the route; absent is the caller's personal scope. */
+    organizationId?: string;
+  }
+>;
 
 /**
  * The spend view the spend-alert push opens: the scope's rolling spend, the
@@ -176,7 +195,7 @@ type SpendAlertsScreenProps = Readonly<{
  * The same screen serves the personal scope and an organization scope — the
  * route decides, never the platform.
  */
-export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
+export function SpendAlertsScreen({ organizationId, settingsTarget }: SpendAlertsScreenProps) {
   const { t } = useTranslation();
   const isOrgScope = organizationId != null;
   const boundary = useOrgBoundary(organizationId);
@@ -253,7 +272,8 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('notifications.channel.spend')} backFallback={PROFILE_TAB_HREF} />
-      <TabScreenScrollView
+      <SettingsSearchScrollView
+        settingsTarget={settingsTarget}
         // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
         automaticallyAdjustKeyboardInsets
         className="flex-1"
@@ -274,7 +294,7 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
           onDraftChange={onDraftChange}
           onDraftClear={onDraftClear}
         />
-      </TabScreenScrollView>
+      </SettingsSearchScrollView>
     </View>
   );
 }
@@ -637,18 +657,20 @@ function SpendAlertsForm({
       {/* The master switch sits in its own group, in the shared switch-row
           anatomy: the row's own inset holds the switch level with its label. */}
       <RowGroup>
-        <PreferenceRow
-          title={t('spendAlerts.sendAlerts')}
-          value={enabled}
-          disabled={false}
-          onValueChange={value => {
-            setEnabled(value);
-            // Off hides the rule fields, so they stop gating Save; on restores
-            // their gate with whatever the fields currently hold.
-            setCanSave(value ? canSubmitWith(thresholdEnabled, anomalyEnabled) : true);
-            editDraft({ enabled: value });
-          }}
-        />
+        <SettingsTarget item={SPEND_ALERT_MASTER_SETTING}>
+          <PreferenceRow
+            title={t(SPEND_ALERT_MASTER_SETTING.label)}
+            value={enabled}
+            disabled={false}
+            onValueChange={value => {
+              setEnabled(value);
+              // Off hides the rule fields, so they stop gating Save; on restores
+              // their gate with whatever the fields currently hold.
+              setCanSave(value ? canSubmitWith(thresholdEnabled, anomalyEnabled) : true);
+              editDraft({ enabled: value });
+            }}
+          />
+        </SettingsTarget>
       </RowGroup>
 
       {enabled ? (
@@ -657,7 +679,9 @@ function SpendAlertsForm({
         // `defaultValue` (the comment at `formKey` above says why).
         <View key={formKey} className="gap-6">
           <RuleCard
-            title={t('spendAlerts.thresholdTitle')}
+            definition={SPEND_ALERT_THRESHOLD_SETTING}
+            emailSetting={SPEND_ALERT_THRESHOLD_EMAIL_SETTING}
+            pushSetting={SPEND_ALERT_THRESHOLD_PUSH_SETTING}
             subtitle={t('spendAlerts.thresholdSubtitle')}
             enabled={thresholdEnabled}
             onEnabledChange={value => {
@@ -701,24 +725,28 @@ function SpendAlertsForm({
                 revalidate();
               }}
             />
-            <View className="gap-1.5">
-              <Text className="text-sm font-medium text-foreground">
-                {t('spendAlerts.windowLabel')}
-              </Text>
-              <SegmentedControl<WindowOption>
-                accessibilityLabel={t('spendAlerts.windowLabel')}
-                options={windowOptions}
-                value={windowOption}
-                onChange={value => {
-                  setWindowOption(value);
-                  editDraft({ windowOption: value });
-                }}
-              />
-            </View>
+            <SettingsTarget item={SPEND_ALERT_WINDOW_SETTING}>
+              <View className="gap-1.5">
+                <Text className="text-sm font-medium text-foreground">
+                  {t(SPEND_ALERT_WINDOW_SETTING.label)}
+                </Text>
+                <SegmentedControl<WindowOption>
+                  accessibilityLabel={t(SPEND_ALERT_WINDOW_SETTING.label)}
+                  options={windowOptions}
+                  value={windowOption}
+                  onChange={value => {
+                    setWindowOption(value);
+                    editDraft({ windowOption: value });
+                  }}
+                />
+              </View>
+            </SettingsTarget>
           </RuleCard>
 
           <RuleCard
-            title={t('spendAlerts.anomalyTitle')}
+            definition={SPEND_ALERT_ANOMALY_SETTING}
+            emailSetting={SPEND_ALERT_ANOMALY_EMAIL_SETTING}
+            pushSetting={SPEND_ALERT_ANOMALY_PUSH_SETTING}
             subtitle={t('spendAlerts.anomalySubtitle')}
             enabled={anomalyEnabled}
             onEnabledChange={value => {
@@ -817,7 +845,12 @@ function CardSwitch({ accessibilityLabel, value, onValueChange }: CardSwitchProp
 }
 
 type RuleCardProps = Readonly<{
-  title: string;
+  /** The rule's own enable switch: its label is the card title. */
+  definition: SettingDefinition;
+  /** The rule's email channel row. */
+  emailSetting: SettingDefinition;
+  /** The rule's push channel row. */
+  pushSetting: SettingDefinition;
   subtitle: string;
   enabled: boolean;
   onEnabledChange: (value: boolean) => void;
@@ -832,7 +865,9 @@ type RuleCardProps = Readonly<{
 
 /** One alert kind: its enable switch, its kind-specific fields, its channels. */
 function RuleCard({
-  title,
+  definition,
+  emailSetting,
+  pushSetting,
   subtitle,
   enabled,
   onEnabledChange,
@@ -845,68 +880,75 @@ function RuleCard({
   children,
 }: RuleCardProps) {
   const { t } = useTranslation();
+  const title = t(definition.label);
 
   // The OS accessibility hierarchy does not group a switch with the card above
   // it, and both cards render an Email and a Push switch. Naming the kind
   // alongside the channel keeps each control addressable on its own, like the
   // Notifications screen's dedicated `spendAlertsToggle` label.
-  const emailLabel = formatList([title, t('common.email')], i18n.language);
-  const pushLabel = formatList([title, t('notifications.push')], i18n.language);
+  const emailLabel = formatList([title, t(emailSetting.label)], i18n.language);
+  const pushLabel = formatList([title, t(pushSetting.label)], i18n.language);
 
   return (
     <View className="gap-3">
-      <Card>
-        <View className="flex-row items-center justify-between gap-3">
-          <View className="min-w-0 flex-1">
-            <Text className="text-sm font-medium text-foreground">{title}</Text>
-            <Text variant="caption" className="mt-0.5">
-              {subtitle}
-            </Text>
+      <SettingsTarget item={definition}>
+        <Card>
+          <View className="flex-row items-center justify-between gap-3">
+            <View className="min-w-0 flex-1">
+              <Text className="text-sm font-medium text-foreground">{title}</Text>
+              <Text variant="caption" className="mt-0.5">
+                {subtitle}
+              </Text>
+            </View>
+            <CardSwitch accessibilityLabel={title} value={enabled} onValueChange={onEnabledChange} />
           </View>
-          <CardSwitch accessibilityLabel={title} value={enabled} onValueChange={onEnabledChange} />
-        </View>
 
-        {children}
-      </Card>
+          {children}
+        </Card>
+      </SettingsTarget>
 
       {/* The channel rows are their own grouped block beside the card, never a
           card inside a card: the row inset is the group's, so the switch ends
           level with the label without the card's pull. */}
       <RowGroup>
-        <PreferenceRow
-          title={t('common.email')}
-          value={emailEnabled}
-          disabled={false}
-          // The row's own label names the channel; the card's kind is composed
-          // into the switch label, so the two Email rows stay distinct.
-          accessibilityLabel={emailLabel}
-          onValueChange={onEmailChange}
-        />
-        {pushOffByCategory ? (
-          <RowFrame
-            title={t('notifications.push')}
-            onPress={onOpenNotifications}
-            trailing={{
-              kind: 'node',
-              node: (
-                <View className="min-w-0 shrink flex-row items-center gap-2">
-                  <Text variant="caption" className="shrink">
-                    {t('spendAlerts.pushOffByCategory')}
-                  </Text>
-                  <RowChevron />
-                </View>
-              ),
-            }}
-          />
-        ) : (
+        <SettingsTarget item={emailSetting}>
           <PreferenceRow
-            title={t('notifications.push')}
-            value={pushEnabled}
+            title={t(emailSetting.label)}
+            value={emailEnabled}
             disabled={false}
-            accessibilityLabel={pushLabel}
-            onValueChange={onPushChange}
+            // The row's own label names the channel; the card's kind is composed
+            // into the switch label, so the two Email rows stay distinct.
+            accessibilityLabel={emailLabel}
+            onValueChange={onEmailChange}
           />
-        )}
+        </SettingsTarget>
+        <SettingsTarget item={pushSetting}>
+          {pushOffByCategory ? (
+            <RowFrame
+              title={t(pushSetting.label)}
+              onPress={onOpenNotifications}
+              trailing={{
+                kind: 'node',
+                node: (
+                  <View className="min-w-0 shrink flex-row items-center gap-2">
+                    <Text variant="caption" className="shrink">
+                      {t('spendAlerts.pushOffByCategory')}
+                    </Text>
+                    <RowChevron />
+                  </View>
+                ),
+              }}
+            />
+          ) : (
+            <PreferenceRow
+              title={t(pushSetting.label)}
+              value={pushEnabled}
+              disabled={false}
+              accessibilityLabel={pushLabel}
+              onValueChange={onPushChange}
+            />
+          )}
+        </SettingsTarget>
       </RowGroup>
     </View>
   );

@@ -3,6 +3,7 @@ import {
   ORGANIZATION_MANAGE_ROLES,
   type OrganizationRole,
 } from '@kilocode/app-shared/organizations';
+import { type ParseKeys } from 'i18next';
 
 /**
  * The services the mobile hub shows, in the order `apps/web`'s integrations
@@ -210,14 +211,19 @@ export function blockedConnectionRoles(input: {
  * keys: the catalogs keep one key per copy, so the hub points at the key the
  * rest of the app already uses rather than adding a second spelling.
  */
-export function providerLabelKey(provider: IntegrationProvider): string {
-  const keys = {
-    github: 'common.github',
-    slack: 'agentChat.sessionFilter.platformSlack',
-    gitlab: 'common.gitlab',
-    discord: 'profile.providerDiscord',
-    linear: 'agentChat.sessionFilter.platformLinear',
-    bitbucket: 'agentChat.repoPicker.platformBitbucket',
-  } satisfies Record<IntegrationProvider, string>;
-  return keys[provider];
+const PROVIDER_LABEL_KEYS = {
+  github: 'common.github',
+  slack: 'agentChat.sessionFilter.platformSlack',
+  gitlab: 'common.gitlab',
+  discord: 'profile.providerDiscord',
+  linear: 'agentChat.sessionFilter.platformLinear',
+  bitbucket: 'agentChat.repoPicker.platformBitbucket',
+} as const satisfies Record<IntegrationProvider, ParseKeys<'translation'>>;
+
+/**
+ * The catalog key naming a provider, typed through the catalog so a search
+ * definition can hold it as a label without a cast.
+ */
+export function providerLabelKey(provider: IntegrationProvider): ParseKeys<'translation'> {
+  return PROVIDER_LABEL_KEYS[provider];
 }

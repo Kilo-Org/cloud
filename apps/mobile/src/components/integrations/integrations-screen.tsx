@@ -8,6 +8,10 @@ import { OrganizationBoundary } from '@/components/organization/organization-bou
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import {
+  SettingsSearchScrollView,
+  SettingsTarget,
+} from '@/components/settings-search/settings-target';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { RowGroup } from '@/components/ui/row-group';
@@ -37,6 +41,8 @@ import {
   providerLabelKey,
 } from '@/lib/integrations/provider-catalog';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
+import { type SettingsTargetProps } from '@/lib/settings-search/definitions';
+import { INTEGRATION_PROVIDER_SETTINGS } from '@/lib/settings-search/integration-source';
 import { isPermissionDeniedError, trpcErrorVariant } from '@/lib/trpc-error';
 
 /**
@@ -62,10 +68,12 @@ export function blockedNoteKey(roles: readonly OrganizationRole[]): string | nul
   return 'integrations.managedByOwner';
 }
 
-type IntegrationsScreenProps = Readonly<{
-  /** Organization scope from the route; absent is the caller's personal scope. */
-  organizationId?: string;
-}>;
+type IntegrationsScreenProps = Readonly<
+  SettingsTargetProps & {
+    /** Organization scope from the route; absent is the caller's personal scope. */
+    organizationId?: string;
+  }
+>;
 
 /**
  * The integrations hub: one row per service, the account it is connected to,
@@ -73,7 +81,7 @@ type IntegrationsScreenProps = Readonly<{
  * that owns the OAuth flow, because the provider callbacks land there; the
  * screen refreshes when the browser returns.
  */
-export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) {
+export function IntegrationsScreen({ organizationId, settingsTarget }: IntegrationsScreenProps) {
   const { t } = useTranslation();
   const pushOnce = useSinglePushRoute();
   const scope = integrationScope(organizationId);
@@ -230,7 +238,8 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
         subtitle={organizationName}
         backFallback={PROFILE_TAB_HREF}
       />
-      <TabScreenScrollView
+      <SettingsSearchScrollView
+        settingsTarget={settingsTarget}
         className="flex-1"
         contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
@@ -241,32 +250,36 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
           {rows.length > 0 ? (
             <RowGroup leadingTile>
               {rows.map(row => (
-                <IntegrationProviderRow
+                <SettingsTarget
                   key={row.provider}
-                  row={row}
-                  scope={scope}
-                  role={role}
-                  connecting={pendingProvider === row.provider}
-                  disconnecting={
-                    disconnect.isPending && disconnect.variables.provider === row.provider
-                  }
-                  onConnect={() => {
-                    connectProvider(row.provider);
-                  }}
-                  onDisconnect={() => {
-                    requestDisconnect(row);
-                  }}
-                  onOpenOnWeb={() => {
-                    manageRowOnWeb(row.provider);
-                  }}
-                  onRetryConnection={() => void bitbucket.refetch()}
-                  retryingConnection={bitbucket.isFetching}
-                />
+                  item={INTEGRATION_PROVIDER_SETTINGS[row.provider]}
+                >
+                  <IntegrationProviderRow
+                    row={row}
+                    scope={scope}
+                    role={role}
+                    connecting={pendingProvider === row.provider}
+                    disconnecting={
+                      disconnect.isPending && disconnect.variables.provider === row.provider
+                    }
+                    onConnect={() => {
+                      connectProvider(row.provider);
+                    }}
+                    onDisconnect={() => {
+                      requestDisconnect(row);
+                    }}
+                    onOpenOnWeb={() => {
+                      manageRowOnWeb(row.provider);
+                    }}
+                    onRetryConnection={() => void bitbucket.refetch()}
+                    retryingConnection={bitbucket.isFetching}
+                  />
+                </SettingsTarget>
               ))}
             </RowGroup>
           ) : null}
         </Section>
-      </TabScreenScrollView>
+      </SettingsSearchScrollView>
       {dialog}
     </View>
   );

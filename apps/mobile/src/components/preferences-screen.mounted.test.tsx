@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { PreferencesScreen } from '@/components/preferences-screen';
+import { PREFERENCE_SETTINGS_SOURCES } from '@/lib/settings-search/preference-sources';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 vi.hoisted(() => {
@@ -26,6 +27,10 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/components/settings-search/settings-target', () => ({
+  SettingsSearchScrollView: 'ScrollView',
+  SettingsTarget: 'SettingsTarget',
+}));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -131,5 +136,28 @@ describe('PreferencesScreen hub', () => {
       { value: 'dark', label: 'Dark' },
     ]);
     expect(control[0]?.props.value).toBe('system');
+  });
+
+  it('renders a search target for every indexed hub entry', async () => {
+    const renderer = await mountPreferences();
+    const source = PREFERENCE_SETTINGS_SOURCES.find(
+      candidate => candidate.path === '/(app)/(tabs)/(3_profile)/preferences'
+    );
+    if (!source) {
+      throw new Error('preferences hub source missing');
+    }
+
+    const renderedIds = renderer.root
+      .findAll(node => typeof node.type === 'string' && node.type === 'SettingsTarget')
+      .flatMap(node => {
+        const item = node.props.item;
+        const aliases = (node.props.targetIds ?? []) as readonly string[];
+        return [item.id, ...aliases];
+      });
+
+    // Set equality both ways: a row added without a definition, and a
+    // definition whose row is not rendered, both fail here instead of a
+    // tautological id list compared with itself.
+    expect(renderedIds).toEqual(source.settings.map(setting => setting.id));
   });
 });

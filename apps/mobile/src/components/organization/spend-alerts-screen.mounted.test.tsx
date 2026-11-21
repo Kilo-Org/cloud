@@ -5,7 +5,7 @@
 // save errors (retryable, draft kept), permission denial, the off state, and
 // the push channel's agreement with the Notifications screen.
 
-import { createElement, useState } from 'react';
+import { createElement, type ReactNode, useState } from 'react';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -16,6 +16,15 @@ import {
 } from '@/components/organization/spend-alerts-screen';
 import { thresholdError } from '@/components/organization/spend-alert-validators';
 import { formatList } from '@/lib/format';
+import {
+  NOTIFICATION_SETTINGS_SOURCES,
+  SPEND_ALERT_ANOMALY_EMAIL_SETTING,
+  SPEND_ALERT_ANOMALY_PUSH_SETTING,
+  SPEND_ALERT_THRESHOLD_EMAIL_SETTING,
+  SPEND_ALERT_THRESHOLD_SETTING,
+  SPEND_ALERT_THRESHOLD_PUSH_SETTING,
+  SPEND_ALERT_WINDOW_SETTING,
+} from '@/lib/settings-search/notification-sources';
 import { MIN_TAP_TARGET_DP, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import { compiledLengthDp } from '@/test/native-dimensions';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
@@ -106,7 +115,20 @@ vi.mock('@/components/organization/permission-denied', () => ({
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
-vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
+// The settings-search wrappers read the route's target from the scroll context.
+// The mock keeps each target addressable so the suite can assert which controls
+// the index can reach, and renders the rows exactly as the real one does.
+vi.mock('@/components/settings-search/settings-target', () => ({
+  SettingsSearchScrollView: ({
+    settingsTarget,
+    children,
+  }: {
+    settingsTarget?: string;
+    children?: ReactNode;
+  }) => createElement('SettingsSearchScrollView', { settingsTarget }, children),
+  SettingsTarget: ({ item, children }: { item: { id: string }; children?: ReactNode }) =>
+    createElement('SettingsTarget', { item }, children),
+}));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/directional-icons', () => ({
@@ -978,5 +1000,85 @@ describe('SpendAlertsScreen restored draft', () => {
     await waitFor(() => saveMutationFn.mock.calls.length === 1);
 
     expect(formDraft.clear).not.toHaveBeenCalled();
+  });
+});
+
+describe('SpendAlertsScreen settings search', () => {
+  const SPEND_SOURCES = NOTIFICATION_SETTINGS_SOURCES.filter(
+    source => source.path === '/(app)/(tabs)/(3_profile)/spend-alerts'
+  );
+
+  // The test renderer types host props as `unknown`; these name the props the
+  // mocked settings-search wrappers receive.
+  type MockSettingsTargetProps = { item: { id: string } };
+  type MockSettingsScrollProps = { settingsTarget?: string };
+
+  function targetIds(renderer: ReactTestRenderer): string[] {
+    return byType(renderer, 'SettingsTarget').map(target => {
+      const props = target.props as MockSettingsTargetProps;
+      return props.item.id;
+    });
+  }
+
+  it('indexes the personal spend screen and only it', () => {
+    expect(SPEND_SOURCES.length).toBeGreaterThan(0);
+    for (const source of SPEND_SOURCES) {
+      expect(source.path).toBe('/(app)/(tabs)/(3_profile)/spend-alerts');
+      expect(source.settings.length).toBeGreaterThan(0);
+    }
+    const ids = SPEND_SOURCES.flatMap(source => source.settings.map(item => item.id));
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('registers a target for every indexed spend setting', async () => {
+    const { renderer } = await mountLoaded();
+
+    const indexed = SPEND_SOURCES.flatMap(source => source.settings.map(item => item.id));
+    const rendered = new Set(targetIds(renderer));
+    expect(indexed.filter(id => !rendered.has(id))).toEqual([]);
+  });
+
+  it('targets the push row in both of its presentations', async () => {
+    // With push deliverable the row is a switch.
+    const { renderer } = await mountLoaded();
+    expect(targetIds(renderer)).toContain(SPEND_ALERT_THRESHOLD_PUSH_SETTING.id);
+    expect(targetIds(renderer)).toContain(SPEND_ALERT_ANOMALY_PUSH_SETTING.id);
+
+    // While the category or device cannot deliver, the row is the link to
+    // Notifications; the result must still land on it.
+    const off = await mountLoaded({ pushCategoryEnabled: false });
+    expect(pushOffRow(off.renderer)).toBeDefined();
+    expect(targetIds(off.renderer)).toContain(SPEND_ALERT_THRESHOLD_PUSH_SETTING.id);
+    expect(targetIds(off.renderer)).toContain(SPEND_ALERT_ANOMALY_PUSH_SETTING.id);
+  });
+
+  it('names the rule and channel rows with the index labels', async () => {
+    const { renderer } = await mountLoaded();
+    const rendered = texts(renderer);
+
+    // The card titles and the window choice list carry the definitions' labels.
+    expect(rendered).toContain(i18n.t(SPEND_ALERT_THRESHOLD_SETTING.label));
+    expect(rendered).toContain(i18n.t(SPEND_ALERT_WINDOW_SETTING.label));
+    // Both rules carry the channel definitions' label, so one definition per
+    // channel names every row and its search result.
+    expect(
+      rendered.filter(value => value === i18n.t(SPEND_ALERT_THRESHOLD_EMAIL_SETTING.label))
+    ).toHaveLength(2);
+    expect(
+      rendered.filter(value => value === i18n.t(SPEND_ALERT_ANOMALY_EMAIL_SETTING.label))
+    ).toHaveLength(2);
+  });
+
+  it('forwards the route target to the scroll surface', async () => {
+    getQueryFn.mockResolvedValue(settingsFixture());
+    const view = await renderWithProviders(
+      createElement(SpendAlertsScreen, { settingsTarget: SPEND_ALERT_WINDOW_SETTING.id })
+    );
+    await waitFor(() => texts(view.renderer).includes(i18n.t('spendAlerts.subtitle')));
+
+    const surface = byType(view.renderer, 'SettingsSearchScrollView')[0];
+    const props = surface?.props as MockSettingsScrollProps | undefined;
+    expect(props?.settingsTarget).toBe(SPEND_ALERT_WINDOW_SETTING.id);
+    expect(targetIds(view.renderer)).toContain(SPEND_ALERT_WINDOW_SETTING.id);
   });
 });

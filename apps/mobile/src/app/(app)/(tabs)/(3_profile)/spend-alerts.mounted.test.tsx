@@ -28,19 +28,16 @@ function mountRoute(): TestRenderer.ReactTestRenderer {
   return ref.current;
 }
 
-function findByType(
-  root: TestRenderer.ReactTestInstance,
-  type: string
-): TestRenderer.ReactTestInstance[] {
-  return root.findAll(node => typeof node.type === 'string' && (node.type as string) === type);
-}
+// The test renderer types host props as `unknown`; this names the props the
+// route forwards to the screen.
+type ScreenProps = { organizationId?: string; settingsTarget?: string };
 
-function screenScope(): unknown {
-  const screens = findByType(mountRoute().root, 'SpendAlertsScreen');
+function screenProps(): ScreenProps {
+  const screens = mountRoute().root.findAll(
+    node => typeof node.type === 'string' && (node.type as string) === 'SpendAlertsScreen'
+  );
   expect(screens).toHaveLength(1);
-  /* eslint-disable typescript-eslint/no-unsafe-member-access -- renderer props are an index signature */
-  return screens[0]?.props.organizationId;
-  /* eslint-enable typescript-eslint/no-unsafe-member-access */
+  return screens[0]?.props as ScreenProps;
 }
 
 beforeEach(() => {
@@ -64,13 +61,13 @@ describe('SpendAlertsRoute organization scope', () => {
   it('keeps the single organization id the link names', () => {
     useLocalSearchParamsMock.mockReturnValue({ org: 'org-b' });
 
-    expect(screenScope()).toBe('org-b');
+    expect(screenProps().organizationId).toBe('org-b');
   });
 
   it('takes the first id of a repeated org parameter', () => {
     useLocalSearchParamsMock.mockReturnValue({ org: ['org-b', 'org-c'] });
 
-    expect(screenScope()).toBe('org-b');
+    expect(screenProps().organizationId).toBe('org-b');
   });
 
   it.each<(string | string[] | undefined)[]>([[undefined], [''], [['', 'org-b']], [[]]])(
@@ -78,7 +75,30 @@ describe('SpendAlertsRoute organization scope', () => {
     org => {
       useLocalSearchParamsMock.mockReturnValue({ org });
 
-      expect(screenScope()).toBeUndefined();
+      expect(screenProps().organizationId).toBeUndefined();
     }
   );
+});
+
+describe('SpendAlertsRoute settings target', () => {
+  it('forwards the target a settings-search result names', () => {
+    useLocalSearchParamsMock.mockReturnValue({ settingsTarget: 'spendAlerts.threshold.window' });
+
+    expect(screenProps().settingsTarget).toBe('spendAlerts.threshold.window');
+  });
+
+  it('forwards the target beside an organization scope', () => {
+    useLocalSearchParamsMock.mockReturnValue({
+      org: 'org-b',
+      settingsTarget: 'spendAlerts.master',
+    });
+
+    expect(screenProps()).toEqual({ organizationId: 'org-b', settingsTarget: 'spendAlerts.master' });
+  });
+
+  it('opens with no target when the route has none', () => {
+    useLocalSearchParamsMock.mockReturnValue({});
+
+    expect(screenProps().settingsTarget).toBeUndefined();
+  });
 });

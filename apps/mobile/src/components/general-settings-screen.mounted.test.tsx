@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { GeneralSettingsScreen } from '@/components/general-settings-screen';
 import { AppUnlockProvider } from '@/lib/app-unlock-context';
+import { PREFERENCE_SETTINGS_SOURCES } from '@/lib/settings-search/preference-sources';
 
 vi.hoisted(() => {
   vi.stubGlobal('__DEV__', false);
@@ -93,6 +94,10 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/components/settings-search/settings-target', () => ({
+  SettingsSearchScrollView: 'ScrollView',
+  SettingsTarget: 'SettingsTarget',
+}));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 // Mutable because one row's state depends on the other: the auto-expand row
 // reads the hide-thinking value. Reset in beforeEach.
@@ -394,5 +399,21 @@ describe('GeneralSettingsScreen', () => {
 
     expect(texts(renderer)).not.toContain('Unavailable');
     expect(texts(renderer)).not.toContain('Check your device security settings and try again.');
+  });
+
+  it('renders a search target for every indexed General row', async () => {
+    const renderer = await mountGeneral();
+    const source = PREFERENCE_SETTINGS_SOURCES.find(
+      candidate => candidate.path === '/(app)/(tabs)/(3_profile)/general'
+    );
+    if (!source) {
+      throw new Error('general settings source missing');
+    }
+
+    const renderedIds = renderer.renderer.root
+      .findAll(node => typeof node.type === 'string' && node.type === 'SettingsTarget')
+      .map(node => node.props.item.id);
+
+    expect(renderedIds).toEqual(source.settings.map(setting => setting.id));
   });
 });

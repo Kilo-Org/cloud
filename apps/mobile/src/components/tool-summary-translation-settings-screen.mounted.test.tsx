@@ -10,6 +10,7 @@ import {
 } from '@/components/tool-summary-translation-settings-screen.mounted.test-helpers';
 import { ToolSummaryTranslationSettingsScreen } from '@/components/tool-summary-translation-settings-screen';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
+import { PREFERENCE_SETTINGS_SOURCES } from '@/lib/settings-search/preference-sources';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 type PickerParams = {
@@ -54,6 +55,10 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/components/settings-search/settings-target', () => ({
+  SettingsSearchScrollView: 'ScrollView',
+  SettingsTarget: 'SettingsTarget',
+}));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/preference-row', () => ({ PreferenceRow: 'PreferenceRow' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -347,5 +352,21 @@ describe('ToolSummaryTranslationSettingsScreen', () => {
     expect(findTexts(renderer)).not.toContain(
       'This model is no longer offered. Tap Model to choose another.'
     );
+  });
+
+  it('renders a search target for every indexed translation row', async () => {
+    const renderer = await mountScreen();
+    const source = PREFERENCE_SETTINGS_SOURCES.find(
+      candidate => candidate.path === '/(app)/(tabs)/(3_profile)/tool-summary-translation'
+    );
+    if (!source) {
+      throw new Error('tool summary translation source missing');
+    }
+
+    const renderedIds = renderer.root
+      .findAll(node => typeof node.type === 'string' && node.type === 'SettingsTarget')
+      .map(node => node.props.item.id);
+
+    expect(renderedIds).toEqual(source.settings.map(setting => setting.id));
   });
 });

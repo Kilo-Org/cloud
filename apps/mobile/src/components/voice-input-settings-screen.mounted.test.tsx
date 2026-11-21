@@ -10,6 +10,7 @@ import {
   mountVoiceInputSettingsScreen,
   unmountVoiceInputSettingsScreen,
 } from '@/components/voice-input-settings-screen.test-helpers';
+import { PREFERENCE_SETTINGS_SOURCES } from '@/lib/settings-search/preference-sources';
 
 type SelectionStatus = 'off' | 'loading' | 'error' | 'empty' | 'unavailable' | 'ready';
 type SelectionState = {
@@ -63,6 +64,10 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/components/settings-search/settings-target', () => ({
+  SettingsSearchScrollView: 'ScrollView',
+  SettingsTarget: 'SettingsTarget',
+}));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
@@ -363,5 +368,21 @@ describe('VoiceInputSettingsScreen', () => {
     // Clear control dismissing the keyboard, so the text survives the tap
     // (e3, 2026-09-12). 'handled' hands the tap to the control itself.
     expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
+  });
+
+  it('renders a search target for every indexed Voice input row', async () => {
+    const renderer = await mountVoiceInputSettingsScreen();
+    const source = PREFERENCE_SETTINGS_SOURCES.find(
+      candidate => candidate.path === '/(app)/(tabs)/(3_profile)/voice-input'
+    );
+    if (!source) {
+      throw new Error('voice input source missing');
+    }
+
+    const renderedIds = renderer.root
+      .findAll(node => typeof node.type === 'string' && node.type === 'SettingsTarget')
+      .map(node => node.props.item.id);
+
+    expect(renderedIds).toEqual(source.settings.map(setting => setting.id));
   });
 });

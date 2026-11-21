@@ -5,7 +5,10 @@ import { View } from 'react-native';
 import { openModelPicker } from '@/components/agents/model-selector';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { TabScreenScrollView } from '@/components/tab-screen';
+import {
+  SettingsSearchScrollView,
+  SettingsTarget,
+} from '@/components/settings-search/settings-target';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
@@ -17,6 +20,10 @@ import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useOrganization } from '@/lib/organization-context';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
+import {
+  TRANSLATE_SUMMARIES_SETTING,
+  TRANSLATION_MODEL_SETTING,
+} from '@/lib/settings-search/preference-sources';
 import { useToolSummaryTranslationPreference } from '@/lib/tool-summary-translation/tool-summary-translation-preference';
 
 /**
@@ -34,7 +41,9 @@ const NO_MODEL_VALUE = '—';
  * catalogue dropped: the row stays enabled for the picker and a notice below
  * names that fix.
  */
-export function ToolSummaryTranslationSettingsScreen() {
+export function ToolSummaryTranslationSettingsScreen({
+  settingsTarget,
+}: Readonly<{ settingsTarget?: string }>) {
   const { organizationId } = useOrganization();
   const { enabled, model, hasLoaded, setEnabled, setModel, getRequestedEnabled } =
     useToolSummaryTranslationPreference();
@@ -94,47 +103,52 @@ export function ToolSummaryTranslationSettingsScreen() {
         title={t('preferences.toolSummaryTranslation')}
         backFallback={PROFILE_TAB_HREF}
       />
-      <TabScreenScrollView
+      <SettingsSearchScrollView
+        settingsTarget={settingsTarget}
         className="flex-1"
         contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
         <Section>
           <RowGroup leadingTile>
-            <PreferenceRow
-              icon={WandSparkles}
-              title={t('preferences.translateSummaries')}
-              value={enabled}
-              disabled={!hasLoaded}
-              onValueChange={setEnabled}
-              resolveValue={getRequestedEnabled}
-            />
-            <ConfigureRow
-              icon={Cpu}
-              title={t('common.model')}
-              subtitle={modelSubtitle}
-              disabled={modelRowDisabled}
-              onPress={() => {
-                openModelPicker(pushOnce, {
-                  options: models,
-                  value: model.id,
-                  variant: '',
-                  // The translation model carries no reasoning effort: the chosen id
-                  // is the whole preference, so the picker offers no effort chips
-                  // and a model tap commits and closes in one press.
-                  acceptsVariant: false,
-                  onSelect: id => {
-                    setModel({
-                      id,
-                      // The stored name stays the catalogue's raw one: the row
-                      // localizes it at render, so a later language change is
-                      // reflected without rewriting the stored preference.
-                      name: models.find(candidate => candidate.id === id)?.name ?? id,
-                    });
-                  },
-                });
-              }}
-            />
+            <SettingsTarget item={TRANSLATE_SUMMARIES_SETTING}>
+              <PreferenceRow
+                icon={WandSparkles}
+                title={t(TRANSLATE_SUMMARIES_SETTING.label)}
+                value={enabled}
+                disabled={!hasLoaded}
+                onValueChange={setEnabled}
+                resolveValue={getRequestedEnabled}
+              />
+            </SettingsTarget>
+            <SettingsTarget item={TRANSLATION_MODEL_SETTING}>
+              <ConfigureRow
+                icon={Cpu}
+                title={t(TRANSLATION_MODEL_SETTING.label)}
+                subtitle={modelSubtitle}
+                disabled={modelRowDisabled}
+                onPress={() => {
+                  openModelPicker(pushOnce, {
+                    options: models,
+                    value: model.id,
+                    variant: '',
+                    // The translation model carries no reasoning effort: the chosen id
+                    // is the whole preference, so the picker offers no effort chips
+                    // and a model tap commits and closes in one press.
+                    acceptsVariant: false,
+                    onSelect: id => {
+                      setModel({
+                        id,
+                        // The stored name stays the catalogue's raw one: the row
+                        // localizes it at render, so a later language change is
+                        // reflected without rewriting the stored preference.
+                        name: models.find(candidate => candidate.id === id)?.name ?? id,
+                      });
+                    },
+                  });
+                }}
+              />
+            </SettingsTarget>
           </RowGroup>
           {/* The explanation is the caption the card answers to, so the switch
               row keeps its two-line budget whatever the language or width. */}
@@ -170,7 +184,7 @@ export function ToolSummaryTranslationSettingsScreen() {
             isRetrying={isFetching}
           />
         ) : null}
-      </TabScreenScrollView>
+      </SettingsSearchScrollView>
     </View>
   );
 }

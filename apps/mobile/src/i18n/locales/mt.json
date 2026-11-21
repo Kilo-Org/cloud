@@ -453,6 +453,17 @@
       "location": "Lokazzjoni ta' Vertex",
       "clientEmail": "Email tal-kont tas-servizz",
       "privateKey": "Ċavetta privata tal-kont tas-servizz",
+      "privateKeyBlockRequired": "Waħħal il-blokka kollha taċ-ċavetta, mil-linja BEGIN sal-linja END.",
+      "privateKeyEncrypted": "Dan il-blokk taċ-ċavetta huwa protett b'passphrase. Waħħal ċavetta tal-kont tas-servizz mingħajr passphrase.",
+      "names": {
+        "codestral": "Codestral antik biss",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Idħol b'ChatGPT)",
+        "xiaomi": "Xiaomi (ħlas skont l-użu)",
+        "zai": "Z.ai (ħlas skont l-użu)",
+        "bedrockByok": "Amazon Bedrock (dirett)",
+        "vertexByok": "Google Vertex AI (dirett)"
+      },
       "modelMappings": "Mappjar tal-mudelli",
       "modelMappingsDescription": "Ibgħat mudell tal-gateway lejn isem tad-deployment personalizzat.",
       "mappingTitle": "Mappjar {{number}}",

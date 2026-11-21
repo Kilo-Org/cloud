@@ -451,6 +451,17 @@
       "location": "Vertex atrašanās vieta",
       "clientEmail": "Pakalpojuma konta e-pasts",
       "privateKey": "Pakalpojuma konta privātā atslēga",
+      "privateKeyBlockRequired": "Ielīmē visu atslēgas bloku, no BEGIN rindas līdz END rindai.",
+      "privateKeyEncrypted": "Šis atslēgas bloks ir aizsargāts ar atslēgfrāzi. Ielīmē pakalpojuma konta atslēgu, kurai nav atslēgfrāzes.",
+      "names": {
+        "codestral": "Mantotais tikai Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Pierakstīties ar ChatGPT)",
+        "xiaomi": "Xiaomi (maksa pēc patēriņa)",
+        "zai": "Z.ai (maksa pēc patēriņa)",
+        "bedrockByok": "Amazon Bedrock (tieši)",
+        "vertexByok": "Google Vertex AI (tieši)"
+      },
       "modelMappings": "Modeļu kartējumi",
       "modelMappingsDescription": "Novirzi vārtejas modeli uz pielāgotu izvietojuma nosaukumu.",
       "mappingTitle": "Kartējums {{number}}",

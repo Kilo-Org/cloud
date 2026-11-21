@@ -34,9 +34,22 @@ export const containedKiloSessionIdSchema = z
 export const cloudAgentWorktreeIdSchema = z.templateLiteral(['worktree_', z.uuid()]);
 export type CloudAgentWorktreeId = z.infer<typeof cloudAgentWorktreeIdSchema>;
 
+/**
+ * The shape this system mints a Cloud Agent session id in. This is the issuing
+ * contract, not the rule a reader of a stored id may apply: a row keeps the id
+ * it was created with, including ids minted before this shape, so
+ * `cloudAgentSessionScopeAssertionSchema` reads one loosely on purpose.
+ */
 export const cloudAgentSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
 
 export const cloudAgentSessionScopeAssertionSchema = z.object({
+  /**
+   * The `cloud_agent_session_id` of the session row this assertion addresses,
+   * which is the id the row was created with. Rows keep that id, including ids
+   * minted before the `workspace_<uuid>` shape, so a v1 reader stays loose on
+   * purpose. `cloudAgentSessionIdSchema` governs the ids this system mints; it
+   * is not the rule an assertion about an existing row can be held to.
+   */
   cloudAgentSessionId: z.string().min(1).max(256),
   rootKiloSessionId: containedKiloSessionIdSchema,
   protocolVersion: z.literal(cloudAgentSessionScopeProtocolVersion),

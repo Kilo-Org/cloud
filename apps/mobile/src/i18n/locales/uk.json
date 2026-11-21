@@ -452,6 +452,17 @@
       "location": "Розташування Vertex",
       "clientEmail": "Електронна пошта сервісного облікового запису",
       "privateKey": "Закритий ключ сервісного облікового запису",
+      "privateKeyBlockRequired": "Вставте весь блок ключа, від рядка BEGIN до рядка END.",
+      "privateKeyEncrypted": "Цей блок ключа захищено парольною фразою. Вставте ключ сервісного облікового запису без парольної фрази.",
+      "names": {
+        "codestral": "Застарілий лише для Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Увійти через ChatGPT)",
+        "xiaomi": "Xiaomi (оплата за використання)",
+        "zai": "Z.ai (оплата за використання)",
+        "bedrockByok": "Amazon Bedrock (напряму)",
+        "vertexByok": "Google Vertex AI (напряму)"
+      },
       "modelMappings": "Зіставлення моделей",
       "modelMappingsDescription": "Спрямовуйте модель шлюзу на власну назву розгортання.",
       "mappingTitle": "Зіставлення {{number}}",

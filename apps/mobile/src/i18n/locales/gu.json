@@ -450,6 +450,17 @@
       "location": "Vertex સ્થાન",
       "clientEmail": "સર્વિસ એકાઉન્ટ ઇમેઇલ",
       "privateKey": "સર્વિસ એકાઉન્ટ પ્રાઇવેટ કી",
+      "privateKeyBlockRequired": "BEGIN લીટીથી END લીટી સુધીનો આખો કી બ્લોક પેસ્ટ કરો.",
+      "privateKeyEncrypted": "આ કી બ્લોક પાસફ્રેઝથી સુરક્ષિત છે. પાસફ્રેઝ વગરની સર્વિસ એકાઉન્ટ કી પેસ્ટ કરો.",
+      "names": {
+        "codestral": "ફક્ત જૂનું Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT વડે સાઇન ઇન કરો)",
+        "xiaomi": "Xiaomi (વપરાશ મુજબ ચુકવણી)",
+        "zai": "Z.ai (વપરાશ મુજબ ચુકવણી)",
+        "bedrockByok": "Amazon Bedrock (સીધું)",
+        "vertexByok": "Google Vertex AI (સીધું)"
+      },
       "modelMappings": "મોડેલ મેપિંગ",
       "modelMappingsDescription": "ગેટવે મોડેલને કસ્ટમ ડિપ્લોયમેન્ટ નામ પર મોકલો.",
       "mappingTitle": "મેપિંગ {{number}}",

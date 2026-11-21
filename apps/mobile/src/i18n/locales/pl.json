@@ -452,6 +452,17 @@
       "location": "Lokalizacja Vertex",
       "clientEmail": "Adres e-mail konta usługi",
       "privateKey": "Klucz prywatny konta usługi",
+      "privateKeyBlockRequired": "Wklej cały blok klucza, od wiersza BEGIN do wiersza END.",
+      "privateKeyEncrypted": "Ten blok klucza jest chroniony frazą hasłową. Wklej klucz konta usługi, który nie ma frazy hasłowej.",
+      "names": {
+        "codestral": "Starsza wersja tylko dla Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Zaloguj się przez ChatGPT)",
+        "xiaomi": "Xiaomi (płatność za użycie)",
+        "zai": "Z.ai (płatność za użycie)",
+        "bedrockByok": "Amazon Bedrock (bezpośrednio)",
+        "vertexByok": "Google Vertex AI (bezpośrednio)"
+      },
       "modelMappings": "Mapowania modeli",
       "modelMappingsDescription": "Kieruj model z bramy do niestandardowej nazwy wdrożenia.",
       "mappingTitle": "Mapowanie {{number}}",

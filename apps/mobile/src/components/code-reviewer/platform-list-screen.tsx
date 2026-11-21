@@ -1,4 +1,3 @@
-import { useQuery } from '@tanstack/react-query';
 import { type Href } from 'expo-router';
 import {
   CirclePlus,
@@ -26,6 +25,7 @@ import {
   classifyBitbucketConnection,
 } from '@/lib/code-reviewer-bitbucket';
 import { reviewerScopeTitle } from '@/lib/code-reviewer-scope-title';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useReviewerScopeName } from '@/lib/hooks/use-reviewer-scope-title';
 import {
   PERSONAL_SCOPE,
@@ -37,7 +37,6 @@ import {
 import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access';
 import { CODE_REVIEWER_HOME_PATH } from '@/lib/profile-agent-navigation';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
-import { useTRPC } from '@/lib/trpc';
 
 const PLATFORM_ICONS = {
   github: GitBranch,
@@ -70,17 +69,13 @@ function connectionSubtitle(status: {
 export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
-  const trpc = useTRPC();
   const isPersonal = scope === PERSONAL_SCOPE;
 
-  const organizations = useQuery({
-    ...trpc.organizations.list.queryOptions(),
-    enabled: !isPersonal,
-  });
-  // This screen fetches the memberships itself — its access classification and
-  // its Retry read that query — so it resolves the title from the same rule the
-  // screens without a list use, over the list it already has, and remembers the
-  // name that list delivers for a scope the reader may lose next.
+  const organizations = useOrganizationsList({ enabled: !isPersonal });
+  // This screen observes the memberships itself — its access classification and
+  // its Retry read the shared entry — so it resolves the title from the same
+  // rule the screens without a list use, over the list it already has, and
+  // remembers the name that list delivers for a scope the reader may lose next.
   const knownScopeName = useReviewerScopeName(scope, organizations.data);
   const scopeTitle = reviewerScopeTitle(
     scope,

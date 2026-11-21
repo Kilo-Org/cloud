@@ -450,6 +450,17 @@
       "location": "Goobta Vertex",
       "clientEmail": "Iimaylka service account",
       "privateKey": "Furaha gaarka ah ee service account",
+      "privateKeyBlockRequired": "Ku dheji block-ka furaha oo dhan, laga bilaabo safka BEGIN ilaa safka END.",
+      "privateKeyEncrypted": "Block-kan furaha ah waxaa lagu ilaaliyaa weedh sirta ah. Ku dheji furaha service account oo aan lahayn weedh sirta ah.",
+      "names": {
+        "codestral": "Codestral duugoobay kaliya",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Ku soo gal ChatGPT)",
+        "xiaomi": "Xiaomi (bixi inta aad isticmaalayso)",
+        "zai": "Z.ai (bixi inta aad isticmaalayso)",
+        "bedrockByok": "Amazon Bedrock (tooska ah)",
+        "vertexByok": "Google Vertex AI (tooska ah)"
+      },
       "modelMappings": "Isku-xidhka moodellada",
       "modelMappingsDescription": "U dir moodel gateway ah magac deployment oo gaar ah.",
       "mappingTitle": "Isku-xidhka {{number}}",

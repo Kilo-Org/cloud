@@ -450,6 +450,17 @@
       "location": "Vertex 位置",
       "clientEmail": "服務帳戶電子郵件",
       "privateKey": "服務帳戶私密金鑰",
+      "privateKeyBlockRequired": "貼上完整金鑰區塊，從 BEGIN 行到 END 行。",
+      "privateKeyEncrypted": "此金鑰區塊受密碼短語保護。請貼上沒有密碼短語的服務帳戶金鑰。",
+      "names": {
+        "codestral": "舊版僅限 Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI（使用 ChatGPT 登入）",
+        "xiaomi": "Xiaomi（按用量付費）",
+        "zai": "Z.ai（按用量付費）",
+        "bedrockByok": "Amazon Bedrock（直接計費）",
+        "vertexByok": "Google Vertex AI（直接計費）"
+      },
       "modelMappings": "模型對應",
       "modelMappingsDescription": "將閘道模型對應到自訂的部署名稱。",
       "mappingTitle": "對應 {{number}}",

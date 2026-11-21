@@ -450,6 +450,17 @@
       "location": "Lokasi Vertex",
       "clientEmail": "Email akun layanan",
       "privateKey": "Kunci pribadi akun layanan",
+      "privateKeyBlockRequired": "Tempel seluruh blok kunci, dari baris BEGIN sampai baris END.",
+      "privateKeyEncrypted": "Blok kunci ini dilindungi frasa sandi. Tempel kunci akun layanan yang tidak memiliki frasa sandi.",
+      "names": {
+        "codestral": "Hanya Codestral lama",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Masuk dengan ChatGPT)",
+        "xiaomi": "Xiaomi (bayar sesuai pemakaian)",
+        "zai": "Z.ai (bayar sesuai pemakaian)",
+        "bedrockByok": "Amazon Bedrock (langsung)",
+        "vertexByok": "Google Vertex AI (langsung)"
+      },
       "modelMappings": "Pemetaan model",
       "modelMappingsDescription": "Arahkan model gateway ke nama deployment kustom.",
       "mappingTitle": "Pemetaan {{number}}",

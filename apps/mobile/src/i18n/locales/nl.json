@@ -450,6 +450,17 @@
       "location": "Vertex-locatie",
       "clientEmail": "E-mailadres van serviceaccount",
       "privateKey": "Privésleutel van serviceaccount",
+      "privateKeyBlockRequired": "Plak het hele sleutelblok, van de BEGIN-regel tot de END-regel.",
+      "privateKeyEncrypted": "Dit sleutelblok is met een wachtwoordzin beveiligd. Plak een serviceaccountsleutel zonder wachtwoordzin.",
+      "names": {
+        "codestral": "Alleen verouderde Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Aanmelden met ChatGPT)",
+        "xiaomi": "Xiaomi (betalen naar gebruik)",
+        "zai": "Z.ai (betalen naar gebruik)",
+        "bedrockByok": "Amazon Bedrock (rechtstreeks)",
+        "vertexByok": "Google Vertex AI (rechtstreeks)"
+      },
       "modelMappings": "Modelkoppelingen",
       "modelMappingsDescription": "Stuur een gatewaymodel door naar een aangepaste deploymentnaam.",
       "mappingTitle": "Koppeling {{number}}",

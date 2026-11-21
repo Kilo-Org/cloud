@@ -96,6 +96,9 @@ const state = vi.hoisted(() => ({
   toggleRepo: vi.fn(),
 }));
 
+// The reviewer permission hook now observes the shared memberships read, whose
+// owner gates it on the auth token; this suite drives the surface states.
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: state.push }),

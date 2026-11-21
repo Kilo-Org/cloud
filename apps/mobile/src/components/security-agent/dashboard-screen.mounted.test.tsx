@@ -348,6 +348,9 @@ vi.mock('@/lib/trpc', () => ({
     },
   }),
 }));
+// The scope title reads the shared memberships hook, which reads the auth
+// token; mock it so this suite does not load the real auth module.
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
 vi.mock('@/components/query-error', () => ({ QueryError: () => null }));
 vi.mock('@/components/security-agent/audit-report-button', () => ({
   AuditReportButton: () => null,

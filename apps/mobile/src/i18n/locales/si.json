@@ -450,6 +450,17 @@
       "location": "Vertex ස්ථානය",
       "clientEmail": "සේවා ගිණුමේ ඊමේල් ලිපිනය",
       "privateKey": "සේවා ගිණුමේ පුද්ගලික යතුර",
+      "privateKeyBlockRequired": "BEGIN පේළියේ සිට END පේළිය දක්වා සම්පූර්ණ යතුරු කොටස අලවන්න.",
+      "privateKeyEncrypted": "මෙම යතුරු කොටස මුරපද වැකියකින් ආරක්ෂා කර ඇත. මුරපද වැකියක් නොමැති සේවා ගිණුමේ යතුරක් අලවන්න.",
+      "names": {
+        "codestral": "පැරණි Codestral පමණක්",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT හරහා පිවිසෙන්න)",
+        "xiaomi": "Xiaomi (භාවිතය අනුව ගෙවන්න)",
+        "zai": "Z.ai (භාවිතය අනුව ගෙවන්න)",
+        "bedrockByok": "Amazon Bedrock (සෘජු)",
+        "vertexByok": "Google Vertex AI (සෘජු)"
+      },
       "modelMappings": "මාදිලි සිතියම්ගත කිරීම්",
       "modelMappingsDescription": "Gateway මාදිලියක් අභිරුචි deployment නාමයකට යවන්න.",
       "mappingTitle": "සිතියම්ගත කිරීම {{number}}",

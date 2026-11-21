@@ -154,9 +154,9 @@ describe('resetCodeReviewConfigForOwner', () => {
     const blocker = new Client({ connectionString: computeDatabaseUrl() });
     const monitor = new Client({ connectionString: computeDatabaseUrl() });
     let pending: Promise<boolean> | undefined;
-    await blocker.connect();
-    await monitor.connect();
     try {
+      await blocker.connect();
+      await monitor.connect();
       await blocker.query('BEGIN');
       await blocker.query(
         `UPDATE agent_configs
@@ -174,8 +174,8 @@ describe('resetCodeReviewConfigForOwner', () => {
       await blocker.query('COMMIT');
       await expect(pending).resolves.toBe(true);
     } finally {
-      await blocker.end();
-      await monitor.end();
+      await blocker.end().catch(() => undefined);
+      await monitor.end().catch(() => undefined);
       if (pending) {
         await pending.catch(() => undefined);
       }

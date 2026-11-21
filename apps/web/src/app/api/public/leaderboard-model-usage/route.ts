@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
-import { LEADERBOARD_MODEL_SQL, resolveLeaderboardModel } from '@/lib/leaderboard-model';
+import {
+  LEADERBOARD_MODEL_SQL,
+  LEADERBOARD_SERVED_MODEL_SQL,
+  resolveLeaderboardModel,
+} from '@/lib/leaderboard-model';
 import {
   createPublicSnowflakeReport,
   publicSnowflakeReportOptions,
@@ -20,6 +24,7 @@ select
         else null
       end as mode
     , sum(coalesce(mu.total_input_tokens, 0)) + sum(coalesce(mu.total_output_tokens, 0)) as "tokens"
+    , ${LEADERBOARD_SERVED_MODEL_SQL} as "served_model"
 from microdollar_usage_daily as mu
 where
     mu.usage_date >= dateadd(week, -1, current_date())
@@ -30,7 +35,7 @@ where
         or coalesce(mu.requested_model, mu.model) = 'reflection/beam-free'
         or coalesce(mu.requested_model, mu.model) = 'stealth/glyph-cluster'
     )
-group by 1, 2, 3
+group by 1, 2, 3, 5
 order by 1 desc, 4 desc;
 `;
 
@@ -49,8 +54,8 @@ async function parseModelUsage(rows: string[][]): Promise<ModelUsage[]> {
   const usageByKey = new Map<string, ModelUsage>();
 
   for (const row of rows) {
-    const [usageDate, rawModel, modeValue, tokenValue] = row;
-    const model = await resolveLeaderboardModel(rawModel || '');
+    const [usageDate, rawModel, modeValue, tokenValue, servedModel] = row;
+    const model = await resolveLeaderboardModel(rawModel || '', servedModel);
     const tokens = Number(tokenValue);
     const mode = modeValue || null;
 

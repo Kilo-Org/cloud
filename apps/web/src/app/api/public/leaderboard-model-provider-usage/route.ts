@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
-import { LEADERBOARD_MODEL_SQL, resolveLeaderboardModel } from '@/lib/leaderboard-model';
+import {
+  LEADERBOARD_MODEL_SQL,
+  LEADERBOARD_SERVED_MODEL_SQL,
+  resolveLeaderboardModel,
+} from '@/lib/leaderboard-model';
 import { normalizePublicInferenceProvider } from '@/lib/public-inference-provider';
 import {
   createPublicSnowflakeReport,
@@ -21,6 +25,7 @@ select
     , sum(mu.total_cache_hit_tokens) as "sum_cache_hit_tokens"
     , sum(mu.request_count) as "sum_request_count"
     , sum(mu.error_count) as "sum_error_count"
+    , ${LEADERBOARD_SERVED_MODEL_SQL} as "served_model"
 from microdollar_usage_daily as mu
 where
     mu.usage_date >= dateadd(week, -1, current_date())
@@ -33,7 +38,7 @@ where
     and mu.total_output_tokens > 0
     and mu.is_user_byok = false
     and mu.requested_model not ilike '%mercury-edit%'
-group by 1, 2
+group by 1, 2, 9
 order by 4 desc;
 `;
 
@@ -73,8 +78,9 @@ async function parseAndAggregateUsage(rows: string[][]): Promise<ModelProviderUs
   for (const row of rows) {
     const [rawModel, rawProvider, ...rawAggregates] = row;
     const [sumCost, sumTokens, sumInputTokens, sumCacheHitTokens, sumRequestCount, sumErrorCount] =
-      rawAggregates.map(Number);
-    const model = await resolveLeaderboardModel(rawModel || '');
+      rawAggregates.slice(0, 6).map(Number);
+    const servedModel = rawAggregates[6];
+    const model = await resolveLeaderboardModel(rawModel || '', servedModel);
     const provider = normalizePublicInferenceProvider(rawProvider?.trim() || 'unknown');
 
     if (

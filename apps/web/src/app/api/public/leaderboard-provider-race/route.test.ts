@@ -313,18 +313,30 @@ describe('leaderboard model attribution', () => {
       rows: [
         ['2026-11-01', '~deepseek/deepseek-pro-latest', 'code', '6000000'],
         ['2026-11-01', 'deepseek/deepseek-v4-pro-0813', 'code', '6000000'],
-        ['2026-11-01', '~deepseek/unresolved-latest', 'code', '2000000'],
+        ['2026-11-01', '~deepseek/unresolved-latest', 'code', '2000000', 'vendor/served-model'],
+        ['2026-11-01', '~deepseek/unknown-latest', 'code', '1000000'],
       ],
       expected: [
         { usageDate: '2026-11-01', model: 'deepseek-v4-pro-0813', mode: 'code', tokens: 12_000_000 },
-        { usageDate: '2026-11-01', model: 'unresolved-latest', mode: 'code', tokens: 2_000_000 },
+        { usageDate: '2026-11-01', model: 'served-model', mode: 'code', tokens: 2_000_000 },
+        { usageDate: '2026-11-01', model: 'unknown-latest', mode: 'code', tokens: 1_000_000 },
       ],
     },
     {
       route: 'leaderboard-model-provider-usage',
       loadRoute: () => import('../leaderboard-model-provider-usage/route'),
       rows: [
-        ['~deepseek/deepseek-pro-latest', 'deepseek', '0', '6000000', '1', '0', '1', '0'],
+        [
+          '~deepseek/deepseek-pro-latest',
+          'deepseek',
+          '0',
+          '6000000',
+          '1',
+          '0',
+          '1',
+          '0',
+          'deepseek-v4-pro',
+        ],
         ['deepseek/deepseek-v4-pro-0813', 'deepseek', '0', '6000000', '1', '0', '1', '0'],
       ],
       expected: [
@@ -336,7 +348,7 @@ describe('leaderboard model attribution', () => {
       ],
     },
   ])(
-    '$route resolves latest aliases to their current gateway target',
+    '$route resolves latest aliases to their current gateway target, falling back to the served model',
     async ({ loadRoute, rows, expected }) => {
       await jest.isolateModulesAsync(async () => {
         const snowflake = await import('@/lib/snowflake');

@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "ເອກະສານນີ້ມີໃຫ້ໃນພາສາອັງກິດເທົ່ານັ້ນ.",
     "organizationTrialEndedBilling": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າສາມາດອັບເດດການຮຽກເກັບເງິນໄດ້, ແລ້ວລອງອີກຄັ້ງ.",
     "organizationTrialEndedBillingAtKiloAi": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າສາມາດອັບເດດການເກັບເງິນໄດ້ທີ່ kilo.ai, ແລ້ວລອງອີກຄັ້ງ.",
-    "viewOnGitHub": "ເບິ່ງ PR ໃນ GitHub"
+    "viewOnGitHub": "ເບິ່ງ PR ໃນ GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "ຈຸດລາຍການ",
+        "nestedBulletPoint": "ຈຸດລາຍການຊ້ອນ",
+        "orderedItem": "ຂໍ້ລາຍການ {n}",
+        "nestedOrderedItem": "ຂໍ້ລາຍການຊ້ອນ {n}"
+      },
+      "blockquote": {
+        "quote": "ຄຳອ້າງອີງ",
+        "nestedQuote": "ຄຳອ້າງອີງຊ້ອນ"
+      },
+      "table": {
+        "row": "ແຖວ {n}: {content}"
+      },
+      "math": {
+        "equation": "ຄະນິດສາດ: {latex}"
+      },
+      "rotor": {
+        "headings": "ຫົວຂໍ້",
+        "links": "ລິ້ງ",
+        "images": "ຮູບພາບ"
+      }
+    }
   },
   "language": {
     "restarting": "ກຳລັງເປີດແອັບໃໝ່ເພື່ອໃຊ້ພາສາທີ່ເລືອກ",

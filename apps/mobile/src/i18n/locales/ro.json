@@ -187,7 +187,30 @@
     "privateRepositoryA11y": "{{name}}, repository privat",
     "legalDocumentEnglishOnly": "Acest document este disponibil doar în engleză.",
     "organizationTrialEndedBilling": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Poți actualiza facturarea, apoi poți încerca din nou.",
-    "organizationTrialEndedBillingAtKiloAi": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Poți actualiza facturarea pe kilo.ai, apoi poți încerca din nou."
+    "organizationTrialEndedBillingAtKiloAi": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Poți actualiza facturarea pe kilo.ai, apoi poți încerca din nou.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Marcator",
+        "nestedBulletPoint": "Marcator imbricat",
+        "orderedItem": "Element de listă {n}",
+        "nestedOrderedItem": "Element de listă imbricat {n}"
+      },
+      "blockquote": {
+        "quote": "Citat",
+        "nestedQuote": "Citat imbricat"
+      },
+      "table": {
+        "row": "Rând {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematică: {latex}"
+      },
+      "rotor": {
+        "headings": "Titluri",
+        "links": "Legături",
+        "images": "Imagini"
+      }
+    }
   },
   "language": {
     "restarting": "Se repornește aplicația pentru a schimba limba",

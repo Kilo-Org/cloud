@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Dokumentu hau ingelesez bakarrik dago eskuragarri.",
     "organizationTrialEndedBilling": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Fakturazioa egunera dezakezu, eta gero berriro saiatu.",
     "organizationTrialEndedBillingAtKiloAi": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Fakturazioa kilo.ai-n egunera dezakezu, eta gero berriro saiatu.",
-    "viewOnGitHub": "Ikusi PR-a GitHub-en"
+    "viewOnGitHub": "Ikusi PR-a GitHub-en",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Buleta",
+        "nestedBulletPoint": "Buleta habiaratua",
+        "orderedItem": "Zerrendako elementua {n}",
+        "nestedOrderedItem": "Zerrendako elementu habiaratua {n}"
+      },
+      "blockquote": {
+        "quote": "Aipua",
+        "nestedQuote": "Aipu habiaratua"
+      },
+      "table": {
+        "row": "Lerroa {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Izenburuak",
+        "links": "Estekak",
+        "images": "Irudiak"
+      }
+    }
   },
   "language": {
     "restarting": "Hizkuntza aplikatzeko berrabiarazten",

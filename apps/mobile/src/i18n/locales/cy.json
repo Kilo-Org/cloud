@@ -190,7 +190,30 @@
     "legalDocumentEnglishOnly": "Dim ond yn Saesneg y mae'r ddogfen hon ar gael.",
     "organizationTrialEndedBilling": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol. Gallwch ddiweddaru bilio, ac yna rhoi cynnig arall arni.",
     "organizationTrialEndedBillingAtKiloAi": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol. Gallwch ddiweddaru bilio ar kilo.ai, ac yna rhoi cynnig arall arni.",
-    "viewOnGitHub": "Gweld y PR ar GitHub"
+    "viewOnGitHub": "Gweld y PR ar GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Bwled",
+        "nestedBulletPoint": "Bwled nyth",
+        "orderedItem": "Eitem rhestr {n}",
+        "nestedOrderedItem": "Eitem rhestr nyth {n}"
+      },
+      "blockquote": {
+        "quote": "Dyfyniad",
+        "nestedQuote": "Dyfyniad nyth"
+      },
+      "table": {
+        "row": "Rhes {n}: {content}"
+      },
+      "math": {
+        "equation": "Mathemateg: {latex}"
+      },
+      "rotor": {
+        "headings": "Penawdau",
+        "links": "Dolenni",
+        "images": "Delweddau"
+      }
+    }
   },
   "language": {
     "restarting": "Yn ailgychwyn i newid yr iaith",

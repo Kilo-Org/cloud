@@ -188,7 +188,30 @@
     "privateRepositoryA11y": "{{name}}, приватний репозиторій",
     "legalDocumentEnglishOnly": "Цей документ доступний лише англійською мовою.",
     "organizationTrialEndedBilling": "Пробний період організації завершився, і вона не має активного плану. Ви можете оновити оплату, а потім спробувати ще раз.",
-    "organizationTrialEndedBillingAtKiloAi": "Пробний період організації завершився, і вона не має активного плану. Ви можете оновити платіжні дані на kilo.ai, а потім спробувати ще раз."
+    "organizationTrialEndedBillingAtKiloAi": "Пробний період організації завершився, і вона не має активного плану. Ви можете оновити платіжні дані на kilo.ai, а потім спробувати ще раз.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Маркер списку",
+        "nestedBulletPoint": "Вкладений маркер списку",
+        "orderedItem": "Елемент списку {n}",
+        "nestedOrderedItem": "Вкладений елемент списку {n}"
+      },
+      "blockquote": {
+        "quote": "Цитата",
+        "nestedQuote": "Вкладена цитата"
+      },
+      "table": {
+        "row": "Рядок {n}: {content}"
+      },
+      "math": {
+        "equation": "Математика: {latex}"
+      },
+      "rotor": {
+        "headings": "Заголовки",
+        "links": "Посилання",
+        "images": "Зображення"
+      }
+    }
   },
   "language": {
     "restarting": "Перезапуск для зміни мови",

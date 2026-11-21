@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "この文書は英語でのみご利用いただけます。",
     "organizationTrialEndedBilling": "組織のトライアルは終了し、有効なプランがありません。請求情報を更新してから、もう一度お試しください。",
     "organizationTrialEndedBillingAtKiloAi": "組織のトライアルは終了し、有効なプランがありません。kilo.ai で請求情報を更新してから、もう一度お試しください。",
-    "viewOnGitHub": "GitHubでPRを表示"
+    "viewOnGitHub": "GitHubでPRを表示",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "箇条書きの項目",
+        "nestedBulletPoint": "ネストされた箇条書きの項目",
+        "orderedItem": "リスト項目 {n}",
+        "nestedOrderedItem": "ネストされたリスト項目 {n}"
+      },
+      "blockquote": {
+        "quote": "引用",
+        "nestedQuote": "ネストされた引用"
+      },
+      "table": {
+        "row": "行 {n}：{content}"
+      },
+      "math": {
+        "equation": "数式：{latex}"
+      },
+      "rotor": {
+        "headings": "見出し",
+        "links": "リンク",
+        "images": "画像"
+      }
+    }
   },
   "language": {
     "restarting": "言語設定を適用するために再起動中",

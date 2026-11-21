@@ -72,6 +72,23 @@ describe('retireDeviceRemoteState', () => {
     expect(trpcMock.revokeCurrentDeviceSession.mutate).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps a fulfilled unregister when the revoke is the step that stalls', async () => {
+    vi.useFakeTimers();
+    // The row is already gone: the unregister answered. The revoke then hangs,
+    // so the shared budget expires on the second call.
+    trpcMock.revokeCurrentDeviceSession.mutate.mockReturnValue(new Promise<never>(() => undefined));
+
+    const run = retireDeviceRemoteState('push-1');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(trpcMock.unregisterPushToken.mutate).toHaveBeenCalledTimes(1);
+    expect(trpcMock.revokeCurrentDeviceSession.mutate).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(CONTROL_PLANE_DEADLINE_MS);
+    // Reporting `rejected` here would record a deletion that already succeeded
+    // as still owed, and withhold the event that marks the token gone.
+    await expect(run).resolves.toEqual({ status: 'fulfilled' });
+  });
+
   it('spends one budget for the pair instead of one per call', async () => {
     vi.useFakeTimers();
     // A stalled first call: without the shared budget the revoke would get its

@@ -15,23 +15,32 @@ export type PushUnregisterOutcome = { status: 'fulfilled' | 'rejected' };
  * active", and an account that cannot sign back in never retries it.
  *
  * The two calls are serial under one shared budget, so a stalled first call can
- * hold local sign-out for at most that budget instead of twice it: the push
- * outcome becomes `rejected` (so the caller records the token for retry) and the
- * revoke is not attempted. An abandoned revoke is accepted, because the device
- * has already destroyed the refresh token and the orphaned session row dies
- * with the access token.
+ * hold local sign-out for at most that budget instead of twice it. An abandoned
+ * revoke is accepted, because the device has already destroyed the refresh
+ * token and the orphaned session row dies with the access token.
+ *
+ * A budget that expires reports the push outcome as of that moment: `fulfilled`
+ * only when the unregister had already answered, otherwise `rejected` so the
+ * caller records the token for retry. The deadline never invents a failure for
+ * work that completed.
  *
  * Never throws: every failure is reported through the returned outcome.
  */
 export async function retireDeviceRemoteState(
   pushToken: string | null
 ): Promise<PushUnregisterOutcome> {
+  // Declared beside the pair so a deadline that fires during the revoke still
+  // reports the unregister its real answer. Until the unregister settles the
+  // outcome is `rejected`: the row may remain, and the caller records the token
+  // for retry.
+  let push: PushUnregisterOutcome =
+    pushToken === null ? { status: 'fulfilled' } : { status: 'rejected' };
   const pair = withDeadline(CONTROL_PLANE_DEADLINE_MS, async signal => {
     const user = trpcClient.user;
-    let push: PushUnregisterOutcome = { status: 'fulfilled' };
     if (pushToken !== null) {
       try {
         await user.unregisterPushToken.mutate({ token: pushToken }, { signal });
+        push = { status: 'fulfilled' };
       } catch {
         push = { status: 'rejected' };
       }
@@ -47,8 +56,10 @@ export async function retireDeviceRemoteState(
   try {
     return await pair;
   } catch {
-    // The shared budget expired: the push row may remain, so the caller
-    // records the token for retry, and the revoke was not attempted.
-    return { status: 'rejected' };
+    // The shared budget expired. Report what the unregister actually answered:
+    // a row it already removed must not be recorded as still owed, or the
+    // caller retries a deletion that succeeded and withholds the notification
+    // event that marks the token gone.
+    return push;
   }
 }

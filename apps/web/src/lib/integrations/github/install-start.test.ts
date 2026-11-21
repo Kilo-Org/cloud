@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import type * as InstallStartModule from './install-start';
 import type * as PlatformIntegrationsModule from '../db/platform-integrations';
 import type * as ResolveOwnerModule from '../resolve-owner';
-import type * as MultipleInstallationsModule from '../multiple-installations';
+import type * as MultipleInstallationsModule from './multiple-installations';
 import type * as InstallStateModule from './install-state';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({

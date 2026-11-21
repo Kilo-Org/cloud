@@ -72,10 +72,13 @@ describe('migration journal', () => {
         missing.push(entry.idx);
         continue;
       }
-      snapshotByIdx.set(entry.idx, JSON.parse(fs.readFileSync(file, 'utf-8')) as {
-        id: string;
-        prevId: string;
-      });
+      snapshotByIdx.set(
+        entry.idx,
+        JSON.parse(fs.readFileSync(file, 'utf-8')) as {
+          id: string;
+          prevId: string;
+        }
+      );
     }
 
     const ids = new Set([...snapshotByIdx.values()].map(snapshot => snapshot.id));

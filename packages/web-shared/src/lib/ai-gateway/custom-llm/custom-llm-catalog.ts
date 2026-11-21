@@ -75,13 +75,14 @@ async function readAllCustomLlmRows(): Promise<CustomLlm[]> {
   return parseAllCustomLlmRows(await readDb.select().from(custom_llm2));
 }
 
-/** The custom LLMs that own their id, without partners. */
+/** The custom LLMs that own their id, without partners, parsed from raw rows. */
 export function parseCustomLlmRows(rows: readonly CustomLlm2[]): CustomLlm[] {
   return parseAllCustomLlmRows(rows).filter(customLlm => !isPartnerCustomLlm(customLlm));
 }
 
 export async function fetchCustomLlmsFromDatabase(): Promise<CustomLlm[]> {
-  return parseCustomLlmRows(await readAllCustomLlmRows());
+  const customLlms = await readAllCustomLlmRows();
+  return customLlms.filter(customLlm => !isPartnerCustomLlm(customLlm));
 }
 
 /** Admin edits take effect when this expires: every serverless instance keeps

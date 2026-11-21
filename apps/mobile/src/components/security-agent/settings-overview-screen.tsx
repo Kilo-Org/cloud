@@ -89,10 +89,11 @@ export function SettingsOverviewScreen({
     (recovery.isRetrying ||
       config.isError ||
       (config.fetchStatus === 'paused' && isConnectivityKnown));
+  // The capability read comes through the hook that owns the shared options,
+  // so it settles offline instead of pausing: a failure is the only unresolved
+  // state that names a connection.
   const capabilityUnavailable =
-    capability.status === 'error' ||
-    (capability.status === 'loading' &&
-      (recovery.isRetrying || (capability.fetchStatus === 'paused' && isConnectivityKnown)));
+    capability.status === 'error' || (capability.status === 'loading' && recovery.isRetrying);
   const repositoriesLoading = repositories.isLoading || recovery.isRetrying;
   const repositoriesError =
     repositories.isError ||
@@ -122,7 +123,7 @@ export function SettingsOverviewScreen({
   const settledVariantRef = useRef<'offline' | 'server' | null>(null);
   if (config.isError || (config.fetchStatus === 'paused' && isConnectivityKnown)) {
     settledVariantRef.current = settledFailure(config.error, config.fetchStatus);
-  } else if (capability.isError || (capability.fetchStatus === 'paused' && isConnectivityKnown)) {
+  } else if (capability.isError) {
     settledVariantRef.current = settledFailure(capability.error, capability.fetchStatus);
   }
   const variant = settledVariantRef.current ?? 'server';

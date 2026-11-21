@@ -14,9 +14,7 @@ import { CONTROL_PLANE_DEADLINE_MS, withDeadline } from '@kilocode/event-service
  * `ok: true` holds the parsed 2xx body; `ok: false` holds the parsed refusal
  * body, undefined when the refusal body could not be read.
  */
-type ExchangeOutcome =
-  | { ok: true; body: unknown }
-  | { ok: false; refusedBody: unknown };
+type ExchangeOutcome = { ok: true; body: unknown } | { ok: false; refusedBody: unknown };
 
 export async function exchangeLegacyToken(): Promise<{
   token: string;

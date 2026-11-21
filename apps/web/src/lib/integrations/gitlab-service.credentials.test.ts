@@ -77,6 +77,7 @@ let getValidGitLabToken: typeof GitLabService.getValidGitLabToken;
 let getValidGitLabProjectAccessToken: typeof GitLabService.getValidGitLabProjectAccessToken;
 let getOrCreateProjectAccessToken: typeof GitLabService.getOrCreateProjectAccessToken;
 let removeStoredProjectAccessToken: typeof GitLabProjectTokenHandles.removeStoredProjectAccessToken;
+let listProjectIdsWithStoredTokens: typeof GitLabProjectTokenHandles.listProjectIdsWithStoredTokens;
 let disconnectGitLabIntegration: typeof GitLabService.disconnectGitLabIntegration;
 let settleStoredProjectTokens: typeof GitLabService.settleStoredProjectTokens;
 
@@ -110,7 +111,8 @@ describe('GitLab encrypted credential persistence', () => {
       disconnectGitLabIntegration,
       settleStoredProjectTokens,
     } = await import('./gitlab-service'));
-    ({ removeStoredProjectAccessToken } = await import('./platforms/gitlab/project-token-handles'));
+    ({ removeStoredProjectAccessToken, listProjectIdsWithStoredTokens } =
+      await import('./platforms/gitlab/project-token-handles'));
   });
 
   beforeEach(() => {
@@ -1112,7 +1114,7 @@ describe('GitLab encrypted credential persistence', () => {
     expect(refusalMessage).toContain('projects: 99');
     expect(refusalMessage).toContain('stored GitLab instance address could not be used');
     expect(refusalMessage).toContain(
-      'The stored GitLab integration record must be repaired before this integration can be reconnected.'
+      'Ask Kilo support to repair the stored integration record, then reconnect.'
     );
     expect(refusalMessage).not.toContain('Reconnect the current instance');
     expect(mockRevokeProjectAccessToken).not.toHaveBeenCalled();
@@ -1182,7 +1184,7 @@ describe('GitLab encrypted credential persistence', () => {
     expect(refusalMessage).toContain('projects: 99');
     expect(refusalMessage).toContain('stored GitLab instance address could not be used');
     expect(refusalMessage).toContain(
-      'The stored GitLab integration record must be repaired before this integration can be reconnected.'
+      'Ask Kilo support to repair the stored integration record, then reconnect.'
     );
     expect(refusalMessage).not.toContain('Reconnect the current instance');
     expect(mockRevokeProjectAccessToken).not.toHaveBeenCalled();
@@ -1260,6 +1262,75 @@ describe('GitLab encrypted credential persistence', () => {
         )
       );
     expect(lateProjectCredential).toBeDefined();
+  });
+
+  it('lists only project ids that a stored credential row names', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    const [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await getOrCreateProjectAccessToken(integration, 42, { userId: user.id });
+    await db.insert(platform_access_token_credentials).values({
+      platform_integration_id: connected.integration.id,
+      token_encrypted: 'encrypted-malformed-token',
+      provider_credential_type: 'project_access_token',
+      provider_resource_id: 'not-a-project',
+      provider_base_url: 'https://gitlab.com',
+      provider_metadata: { providerCredentialId: '1234', expiresOn: '2027-07-13' },
+    });
+
+    await expect(
+      listProjectIdsWithStoredTokens({
+        id: connected.integration.id,
+        metadata: integration.metadata,
+      })
+    ).resolves.toEqual(['42']);
+  });
+
+  it('allows an instance change when only a malformed credential row is stored', async () => {
+    const user = await insertTestUser();
+    const initial = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-initial-token',
+      'https://gitlab.com',
+      user.id
+    );
+    await db.insert(platform_access_token_credentials).values({
+      platform_integration_id: initial.integration.id,
+      token_encrypted: 'encrypted-malformed-token',
+      provider_credential_type: 'project_access_token',
+      provider_resource_id: 'not-a-project',
+      provider_base_url: 'https://gitlab.com',
+      provider_metadata: { providerCredentialId: '1234', expiresOn: '2027-07-13' },
+    });
+
+    await expect(
+      connectWithPAT(
+        { type: 'user', id: user.id },
+        'glpat-other-instance-token',
+        'https://gitlab.example.com',
+        user.id
+      )
+    ).resolves.toMatchObject({ success: true });
+
+    const projectCredentials = await db
+      .select()
+      .from(platform_access_token_credentials)
+      .where(
+        and(
+          eq(platform_access_token_credentials.platform_integration_id, initial.integration.id),
+          eq(platform_access_token_credentials.provider_credential_type, 'project_access_token')
+        )
+      );
+    expect(projectCredentials).toHaveLength(0);
+    expect(mockRevokeProjectAccessToken).not.toHaveBeenCalled();
   });
 
   it('stores a newly created project token only in its exact encrypted row', async () => {
@@ -3206,6 +3277,142 @@ describe('GitLab encrypted credential persistence', () => {
       expect.objectContaining({ providerCredentialId: '777' })
     );
     expect(mockCreateProjectAccessToken).not.toHaveBeenCalled();
+  });
+
+  it('retries an unconfirmed revocation before refusing the replacement', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    let [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await getOrCreateProjectAccessToken(integration, 42, { userId: user.id });
+    [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    const nearExpiry = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    await db
+      .update(platform_access_token_credentials)
+      .set({
+        provider_metadata: {
+          providerCredentialId: '777',
+          expiresOn: nearExpiry,
+          authorizedAccountId: '123',
+        },
+      })
+      .where(
+        and(
+          eq(platform_access_token_credentials.platform_integration_id, connected.integration.id),
+          eq(platform_access_token_credentials.provider_resource_id, '42')
+        )
+      );
+    mockRotateProjectAccessToken.mockRejectedValueOnce(new Error('rotation failed'));
+    mockRevokeProjectAccessToken.mockRejectedValueOnce(
+      new GitLabProjectAccessTokenRevocationError(42, 503, 'GitLab responded with HTTP 503.')
+    );
+    mockRevokeProjectAccessToken.mockRejectedValueOnce(
+      new GitLabProjectAccessTokenRevocationError(42, 503, 'GitLab responded with HTTP 503.')
+    );
+    mockCreateProjectAccessToken.mockClear();
+
+    const refusal = await getOrCreateProjectAccessToken(integration, 42, {
+      userId: user.id,
+    }).catch((error: unknown) => error);
+
+    expect(refusal).toMatchObject({ code: 'PRECONDITION_FAILED' });
+    const refusalMessage = refusal instanceof Error ? refusal.message : '';
+    expect(refusalMessage).toContain('could not be confirmed as revoked');
+    expect(refusalMessage).toContain('Try again in a moment');
+    expect(mockRevokeProjectAccessToken).toHaveBeenCalledTimes(2);
+    expect(mockCreateProjectAccessToken).not.toHaveBeenCalled();
+    const [credential] = await db
+      .select()
+      .from(platform_access_token_credentials)
+      .where(
+        and(
+          eq(platform_access_token_credentials.platform_integration_id, connected.integration.id),
+          eq(platform_access_token_credentials.provider_resource_id, '42')
+        )
+      );
+    expect(credential.provider_metadata).toEqual(
+      expect.objectContaining({ providerCredentialId: '777' })
+    );
+  });
+
+  it('creates the replacement when the retried revocation succeeds', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    let [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await getOrCreateProjectAccessToken(integration, 42, { userId: user.id });
+    [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    const nearExpiry = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    await db
+      .update(platform_access_token_credentials)
+      .set({
+        provider_metadata: {
+          providerCredentialId: '777',
+          expiresOn: nearExpiry,
+          authorizedAccountId: '123',
+        },
+      })
+      .where(
+        and(
+          eq(platform_access_token_credentials.platform_integration_id, connected.integration.id),
+          eq(platform_access_token_credentials.provider_resource_id, '42')
+        )
+      );
+    mockRotateProjectAccessToken.mockRejectedValueOnce(new Error('rotation failed'));
+    mockRevokeProjectAccessToken.mockRejectedValueOnce(
+      new GitLabProjectAccessTokenRevocationError(42, 503, 'GitLab responded with HTTP 503.')
+    );
+    mockCreateProjectAccessToken.mockImplementationOnce(async () => ({
+      id: 888,
+      name: 'Kilo Code Review Bot',
+      token: '$$CREDENTIAL_QWERTYUIOPAS:L$$',
+      expires_at: '2027-07-13',
+      scopes: ['api', 'self_rotate'],
+      access_level: 30,
+      active: true,
+      revoked: false,
+      created_at: '2026-07-13T00:00:00.000Z',
+      last_used_at: null,
+      user_id: 123,
+    }));
+
+    await expect(getOrCreateProjectAccessToken(integration, 42, { userId: user.id })).resolves.toBe(
+      '$$CREDENTIAL_QWERTYUIOPAS:L$$'
+    );
+
+    expect(mockRevokeProjectAccessToken).toHaveBeenCalledTimes(2);
+    const [credential] = await db
+      .select()
+      .from(platform_access_token_credentials)
+      .where(
+        and(
+          eq(platform_access_token_credentials.platform_integration_id, connected.integration.id),
+          eq(platform_access_token_credentials.provider_resource_id, '42')
+        )
+      );
+    expect(credential.provider_metadata).toEqual(
+      expect.objectContaining({ providerCredentialId: '888' })
+    );
   });
 
   it('settles only the credential the failed rotation tried to replace', async () => {

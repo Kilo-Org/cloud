@@ -146,7 +146,8 @@ export async function getStoredProjectCredential(
 /**
  * Project ids whose access token belongs to the integration: the encrypted
  * rows it holds and any legacy metadata entry it still carries. Malformed
- * metadata keys are not GitLab project ids and cannot be revoked.
+ * metadata keys and stored rows whose resource id is not a project id name no
+ * GitLab project, so they name no revocable token and are left out of the list.
  */
 export async function listProjectIdsWithStoredTokens(
   integration: Pick<PlatformIntegration, 'id' | 'metadata'>
@@ -170,7 +171,15 @@ export async function listProjectIdsWithStoredTokens(
       )
     );
   for (const row of rows) {
-    if (row.projectId !== null) projectIds.add(row.projectId);
+    if (row.projectId === null) continue;
+    if (/^[1-9][0-9]*$/.test(row.projectId)) {
+      projectIds.add(row.projectId);
+      continue;
+    }
+    logExceptInTest(
+      '[listProjectIdsWithStoredTokens] Ignoring a credential row that names no project id',
+      { integrationId: integration.id }
+    );
   }
 
   return [...projectIds];
@@ -197,10 +206,11 @@ export async function dropUnrevokableProjectTokenEntry(
 
 /**
  * Why a stored project token stays stored after a removal attempt. It names the
- * remedy: an unusable stored integration record must be repaired before the
- * integration can be reconnected, a refused or unresolvable credential needs a
- * disconnect followed by a reconnect with a credential that can revoke, and an
- * unconfirmed answer or a changed handle can be retried in a moment.
+ * remedy: an unusable stored integration record is repaired by Kilo support
+ * before the integration can be reconnected, a refused or unresolvable
+ * credential needs a disconnect followed by a reconnect with a credential that
+ * can revoke, and an unconfirmed answer or a changed handle can be retried in a
+ * moment.
  */
 export type ProjectTokenRetentionReason =
   | 'provider_rejected'
@@ -237,8 +247,7 @@ export type ProjectTokenBlocker = {
 const BLOCKER_MESSAGES: Record<ProjectTokenBlocker['reason'], { cause: string; remedy: string }> = {
   stored_instance_unusable: {
     cause: 'the stored GitLab instance address could not be used',
-    remedy:
-      'The stored GitLab integration record must be repaired before this integration can be reconnected.',
+    remedy: 'Ask Kilo support to repair the stored integration record, then reconnect.',
   },
   provider_rejected: {
     cause: 'GitLab refused the connected credential while revoking them',
@@ -318,6 +327,10 @@ export function describeInstanceChangeBlockers(
 /** Refusal for a replacement while the replaced project token is not settled. */
 export const GITLAB_PROJECT_TOKEN_REPLACEMENT_UNSETTLED_MESSAGE =
   'The GitLab project token for this project must be revoked before a replacement is created. Reconnect the GitLab integration and retry.';
+
+/** Refusal for a replacement whose replaced token could not be confirmed revoked. */
+export const GITLAB_PROJECT_TOKEN_REPLACEMENT_UNCONFIRMED_MESSAGE =
+  'The GitLab project token for this project could not be confirmed as revoked, so no replacement was created. Try again in a moment.';
 
 /**
  * Removes the stored Project Access Token for a project

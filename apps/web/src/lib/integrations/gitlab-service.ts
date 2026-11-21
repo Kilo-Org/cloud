@@ -61,6 +61,7 @@ import {
   type StoredProjectCredential,
 } from '@/lib/integrations/platforms/gitlab/project-credential-lifecycle';
 import {
+  GITLAB_PROJECT_TOKEN_REPLACEMENT_UNCONFIRMED_MESSAGE,
   GITLAB_PROJECT_TOKEN_REPLACEMENT_UNSETTLED_MESSAGE,
   GITLAB_PROJECT_TOKENS_LIST_UNREADABLE_MESSAGE,
   describeInstanceChangeBlockers,
@@ -74,6 +75,7 @@ import {
   retireProjectCredentialsForReplacedAccount,
   storedInstanceUrlChanges,
   type ProjectTokenBlocker,
+  type StoredProjectTokenRemoval,
 } from '@/lib/integrations/platforms/gitlab/project-token-handles';
 import {
   GitLabPersonalAccessTokenMetadataSchema,
@@ -440,6 +442,35 @@ function waitForSettlementRetry(): Promise<void> {
   const { promise, resolve } = Promise.withResolvers<void>();
   setTimeout(resolve, PROJECT_TOKEN_SETTLEMENT_RETRY_DELAY_MS);
   return promise;
+}
+
+/**
+ * Settles the credential a failed rotation tried to replace. An outcome a
+ * repeat can change is attempted again, within the same bound the settlement
+ * uses, so a transient provider answer does not refuse a replacement the
+ * caller can still make.
+ */
+async function settleReplacedProjectCredential(
+  integration: Pick<PlatformIntegration, 'id' | 'metadata'>,
+  projectId: string,
+  options: { userToken: string; expectedCredential: StoredProjectCredential }
+): Promise<StoredProjectTokenRemoval> {
+  let removal = await removeStoredProjectAccessToken(integration, projectId, {
+    userToken: options.userToken,
+    expectedCredential: options.expectedCredential,
+  });
+  for (let attempt = 1; attempt < PROJECT_TOKEN_SETTLEMENT_ATTEMPTS; attempt++) {
+    if (removal.outcome !== 'retained' || !removal.retryable) return removal;
+    logExceptInTest('[settleReplacedProjectCredential] Retrying an unconfirmed revocation', {
+      projectId,
+    });
+    await waitForSettlementRetry();
+    removal = await removeStoredProjectAccessToken(integration, projectId, {
+      userToken: options.userToken,
+      expectedCredential: options.expectedCredential,
+    });
+  }
+  return removal;
 }
 
 type ProjectTokenSettlement = {
@@ -1046,7 +1077,7 @@ export async function getOrCreateProjectAccessToken(
       }
 
       if (replacedTokenUnsettled) {
-        const removal = await removeStoredProjectAccessToken(integration, projectIdStr, {
+        const removal = await settleReplacedProjectCredential(integration, projectIdStr, {
           userToken,
           expectedCredential: replacedTokenUnsettled,
         });
@@ -1056,11 +1087,15 @@ export async function getOrCreateProjectAccessToken(
             {
               projectId,
               expectedTokenId: replacedTokenUnsettled.tokenId,
+              retryable: removal.retryable,
+              reason: removal.reason,
             }
           );
           throw new TRPCError({
             code: 'PRECONDITION_FAILED',
-            message: GITLAB_PROJECT_TOKEN_REPLACEMENT_UNSETTLED_MESSAGE,
+            message: removal.retryable
+              ? GITLAB_PROJECT_TOKEN_REPLACEMENT_UNCONFIRMED_MESSAGE
+              : GITLAB_PROJECT_TOKEN_REPLACEMENT_UNSETTLED_MESSAGE,
           });
         }
       }

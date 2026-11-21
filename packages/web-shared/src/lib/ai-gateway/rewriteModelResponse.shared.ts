@@ -16,8 +16,7 @@ import type {
   VercelProviderMetaData,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { applyUsagePricing } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
-import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
-import { CLAUDE_BILLING_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/provider-id';
+import { isDelegatedBillingProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/provider-type-predicates';
 import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { withRequestId } from '@kilocode/web-shared/lib/ai-gateway/request-id';
 import type { createParser } from 'eventsource-parser';
@@ -451,10 +450,7 @@ function rewriteUsageCost(
   vercelCosts: ReturnType<typeof computeVercelCostFields> | undefined
 ) {
   usage.cost = costs.cost_mUsd / 1_000_000;
-  usage.is_byok =
-    context.user_byok ||
-    context.provider === OPENAI_CHATGPT_PROVIDER_ID ||
-    context.provider === CLAUDE_BILLING_PROVIDER_ID;
+  usage.is_byok = context.user_byok || isDelegatedBillingProvider(context.provider);
   if (
     usage.cost_details?.upstream_inference_cost == null &&
     gateway &&

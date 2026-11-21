@@ -1,5 +1,8 @@
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
-import { CLAUDE_BILLING_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/provider-id';
+import {
+  isDelegatedBillingProvider,
+  isPromotionalModelProvider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/provider-type-predicates';
 import { randomUUID } from 'crypto';
 import { db, isUSRegion } from '../drizzle';
 import { recordUsageInPrimaryRegion } from './usage-record-client';
@@ -191,10 +194,7 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     editor_name: usageContext.editor_name,
     api_kind: usageContext.api_kind,
     machine_id: usageContext.machine_id,
-    is_user_byok:
-      usageContext.user_byok ||
-      usageContext.provider === OPENAI_CHATGPT_PROVIDER_ID ||
-      usageContext.provider === CLAUDE_BILLING_PROVIDER_ID,
+    is_user_byok: usageContext.user_byok || isDelegatedBillingProvider(usageContext.provider),
     has_tools: usageContext.has_tools,
     feature: usageContext.feature,
     session_id: usageContext.session_id,
@@ -341,11 +341,7 @@ export async function toInsertableDbUsageRecord(
     moderation_latency: usageStats.moderation_latency,
     generation_time: usageStats.generation_time,
     // Custom LLM routes supply their own upstream credentials without using a user's BYOK key.
-    is_byok:
-      provider === 'custom' ||
-      provider === 'custom-public' ||
-      provider === 'partner' ||
-      usageStats.is_byok,
+    is_byok: isPromotionalModelProvider(provider) || provider === 'partner' || usageStats.is_byok,
     streamed: usageStats.streamed,
     cancelled: usageStats.cancelled,
     market_cost: usageStats.market_cost ?? null,
@@ -1299,9 +1295,7 @@ export function countAndStoreUsage(
   };
 
   const usesUserCredentials =
-    usageContext.user_byok ||
-    usageContext.provider === OPENAI_CHATGPT_PROVIDER_ID ||
-    usageContext.provider === CLAUDE_BILLING_PROVIDER_ID;
+    usageContext.user_byok || isDelegatedBillingProvider(usageContext.provider);
 
   if (clonedReponse.body) {
     if (usageContext.api_kind === 'responses') {
@@ -1776,11 +1770,8 @@ export async function processTokenData(
     );
   }
 
-  if (
-    !usageStats.model || // fallback for failure cases
-    usageContext.provider === 'custom' ||
-    usageContext.provider === 'custom-public' // custom LLMs do not reveal their upstream model
-  ) {
+  // Fall back to the requested model on failures and hide the upstream model on promotional routes.
+  if (!usageStats.model || isPromotionalModelProvider(usageContext.provider)) {
     usageStats.model = usageContext.requested_model;
   }
 

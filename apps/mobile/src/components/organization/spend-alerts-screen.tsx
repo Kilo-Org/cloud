@@ -6,7 +6,7 @@ import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
-import { type Href, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
@@ -60,23 +60,31 @@ import { useFormDraft } from '@/lib/persist/use-form-draft';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import {
   type SettingDefinition,
+  type SettingsPath,
   type SettingsTargetProps,
 } from '@/lib/settings-search/definitions';
 import {
-  SPEND_ALERT_ANOMALY_EMAIL_SETTING,
-  SPEND_ALERT_ANOMALY_PUSH_SETTING,
-  SPEND_ALERT_ANOMALY_SETTING,
+  SPEND_ALERT_ANOMALY_SETTINGS,
   SPEND_ALERT_MASTER_SETTING,
-  SPEND_ALERT_THRESHOLD_EMAIL_SETTING,
-  SPEND_ALERT_THRESHOLD_PUSH_SETTING,
-  SPEND_ALERT_THRESHOLD_SETTING,
-  SPEND_ALERT_WINDOW_SETTING,
+  SPEND_ALERT_THRESHOLD_SETTINGS,
 } from '@/lib/settings-search/notification-sources';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
 /** The Notifications screen owns the push gate the channel rows point at. */
-const NOTIFICATIONS_HREF = '/(app)/notifications' as Href;
+const NOTIFICATIONS_HREF = '/(app)/notifications' satisfies SettingsPath;
+
+/**
+ * The settings that exist only while the master switch is on: the two rule
+ * cards and everything inside them. A search result naming one of these cannot
+ * land while alerts are off, so the screen reveals the switch instead.
+ */
+const SPEND_ALERT_CARD_SETTING_IDS: ReadonlySet<string> = new Set(
+  [
+    ...Object.values(SPEND_ALERT_THRESHOLD_SETTINGS),
+    ...Object.values(SPEND_ALERT_ANOMALY_SETTINGS),
+  ].map(setting => setting.id)
+);
 
 const WINDOW_LABEL_KEYS = {
   '24': 'spendAlerts.window24h',
@@ -272,35 +280,31 @@ export function SpendAlertsScreen({ organizationId, settingsTarget }: SpendAlert
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('notifications.channel.spend')} backFallback={PROFILE_TAB_HREF} />
-      <SettingsSearchScrollView
+      {/* The form owns the scroll surface: it is also the only place the
+          rendered master switch (`enabled`) exists, and the reveal target
+          depends on that value (see `effectiveTarget`). */}
+      <SpendAlertsForm
+        organizationId={organizationId}
         settingsTarget={settingsTarget}
-        // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
-        automaticallyAdjustKeyboardInsets
-        className="flex-1"
-        contentContainerClassName={SCREEN_BODY_CLASS}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <SpendAlertsForm
-          organizationId={organizationId}
-          scope={query.data.scope}
-          scopeName={query.data.scopeName}
-          enabled={query.data.enabled ?? false}
-          rules={query.data.rules}
-          spend={query.data.spend}
-          pushCategoryEnabled={query.data.pushCategoryEnabled}
-          pushChannelBlocked={query.data.pushChannelBlocked}
-          restored={restored}
-          onDraftChange={onDraftChange}
-          onDraftClear={onDraftClear}
-        />
-      </SettingsSearchScrollView>
+        scope={query.data.scope}
+        scopeName={query.data.scopeName}
+        enabled={query.data.enabled ?? false}
+        rules={query.data.rules}
+        spend={query.data.spend}
+        pushCategoryEnabled={query.data.pushCategoryEnabled}
+        pushChannelBlocked={query.data.pushChannelBlocked}
+        restored={restored}
+        onDraftChange={onDraftChange}
+        onDraftClear={onDraftClear}
+      />
     </View>
   );
 }
 
 type SpendAlertsFormProps = Readonly<{
   organizationId?: string;
+  /** The route's search target, resolved against the live master switch. */
+  settingsTarget?: string;
   /** The scope the router read: the caller's own account or an organization. */
   scope: SpendAlertSettings['scope'];
   /** The owner's display name for that scope (the caller's name, or the org's). */
@@ -320,6 +324,7 @@ type SpendAlertsFormProps = Readonly<{
 
 function SpendAlertsForm({
   organizationId,
+  settingsTarget,
   scope,
   scopeName,
   enabled: storedEnabled,
@@ -625,8 +630,26 @@ function SpendAlertsForm({
     </>
   );
 
+  // A result naming a rule or one of its fields cannot land while the master
+  // switch is off: that branch does not render the cards at all. Revealing the
+  // switch is the prerequisite the person needs, and the one control that
+  // brings the cards back — never flipped on their behalf. While the cards are
+  // on screen the routed target stays exact.
+  const effectiveTarget =
+    !enabled && settingsTarget !== undefined && SPEND_ALERT_CARD_SETTING_IDS.has(settingsTarget)
+      ? SPEND_ALERT_MASTER_SETTING.id
+      : settingsTarget;
+
   return (
-    <>
+    <SettingsSearchScrollView
+      settingsTarget={effectiveTarget}
+      // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
+      automaticallyAdjustKeyboardInsets
+      className="flex-1"
+      contentContainerClassName={SCREEN_BODY_CLASS}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
       <Text variant="muted" className="text-sm">
         {t('spendAlerts.subtitle')}
       </Text>
@@ -679,9 +702,9 @@ function SpendAlertsForm({
         // `defaultValue` (the comment at `formKey` above says why).
         <View key={formKey} className="gap-6">
           <RuleCard
-            definition={SPEND_ALERT_THRESHOLD_SETTING}
-            emailSetting={SPEND_ALERT_THRESHOLD_EMAIL_SETTING}
-            pushSetting={SPEND_ALERT_THRESHOLD_PUSH_SETTING}
+            definition={SPEND_ALERT_THRESHOLD_SETTINGS.enabled}
+            emailSetting={SPEND_ALERT_THRESHOLD_SETTINGS.email}
+            pushSetting={SPEND_ALERT_THRESHOLD_SETTINGS.push}
             subtitle={t('spendAlerts.thresholdSubtitle')}
             enabled={thresholdEnabled}
             onEnabledChange={value => {
@@ -710,28 +733,30 @@ function SpendAlertsForm({
               router.push(NOTIFICATIONS_HREF);
             }}
           >
-            <FormField
-              label={t('spendAlerts.limitLabel')}
-              required={thresholdEnabled}
-              validateWhileTyping
-              placeholder={thresholdPlaceholder()}
-              keyboardType="decimal-pad"
-              defaultValue={thresholdRef.current || undefined}
-              validate={thresholdEnabled ? thresholdError : undefined}
-              reserveErrorMessages={thresholdEnabled ? thresholdErrorMessages() : undefined}
-              onChangeText={value => {
-                thresholdRef.current = value;
-                editDraft({});
-                revalidate();
-              }}
-            />
-            <SettingsTarget item={SPEND_ALERT_WINDOW_SETTING}>
+            <SettingsTarget item={SPEND_ALERT_THRESHOLD_SETTINGS.limit}>
+              <FormField
+                label={t(SPEND_ALERT_THRESHOLD_SETTINGS.limit.label)}
+                required={thresholdEnabled}
+                validateWhileTyping
+                placeholder={thresholdPlaceholder()}
+                keyboardType="decimal-pad"
+                defaultValue={thresholdRef.current || undefined}
+                validate={thresholdEnabled ? thresholdError : undefined}
+                reserveErrorMessages={thresholdEnabled ? thresholdErrorMessages() : undefined}
+                onChangeText={value => {
+                  thresholdRef.current = value;
+                  editDraft({});
+                  revalidate();
+                }}
+              />
+            </SettingsTarget>
+            <SettingsTarget item={SPEND_ALERT_THRESHOLD_SETTINGS.window}>
               <View className="gap-1.5">
                 <Text className="text-sm font-medium text-foreground">
-                  {t(SPEND_ALERT_WINDOW_SETTING.label)}
+                  {t(SPEND_ALERT_THRESHOLD_SETTINGS.window.label)}
                 </Text>
                 <SegmentedControl<WindowOption>
-                  accessibilityLabel={t(SPEND_ALERT_WINDOW_SETTING.label)}
+                  accessibilityLabel={t(SPEND_ALERT_THRESHOLD_SETTINGS.window.label)}
                   options={windowOptions}
                   value={windowOption}
                   onChange={value => {
@@ -744,9 +769,9 @@ function SpendAlertsForm({
           </RuleCard>
 
           <RuleCard
-            definition={SPEND_ALERT_ANOMALY_SETTING}
-            emailSetting={SPEND_ALERT_ANOMALY_EMAIL_SETTING}
-            pushSetting={SPEND_ALERT_ANOMALY_PUSH_SETTING}
+            definition={SPEND_ALERT_ANOMALY_SETTINGS.enabled}
+            emailSetting={SPEND_ALERT_ANOMALY_SETTINGS.email}
+            pushSetting={SPEND_ALERT_ANOMALY_SETTINGS.push}
             subtitle={t('spendAlerts.anomalySubtitle')}
             enabled={anomalyEnabled}
             onEnabledChange={value => {
@@ -775,21 +800,23 @@ function SpendAlertsForm({
               router.push(NOTIFICATIONS_HREF);
             }}
           >
-            <FormField
-              label={t('spendAlerts.multiplierLabel')}
-              required={anomalyEnabled}
-              validateWhileTyping
-              placeholder={String(DEFAULT_MULTIPLIER)}
-              keyboardType="decimal-pad"
-              defaultValue={multiplierRef.current || undefined}
-              validate={anomalyEnabled ? multiplierError : undefined}
-              reserveErrorMessages={anomalyEnabled ? multiplierErrorMessages() : undefined}
-              onChangeText={value => {
-                multiplierRef.current = value;
-                editDraft({});
-                revalidate();
-              }}
-            />
+            <SettingsTarget item={SPEND_ALERT_ANOMALY_SETTINGS.multiplier}>
+              <FormField
+                label={t(SPEND_ALERT_ANOMALY_SETTINGS.multiplier.label)}
+                required={anomalyEnabled}
+                validateWhileTyping
+                placeholder={String(DEFAULT_MULTIPLIER)}
+                keyboardType="decimal-pad"
+                defaultValue={multiplierRef.current || undefined}
+                validate={anomalyEnabled ? multiplierError : undefined}
+                reserveErrorMessages={anomalyEnabled ? multiplierErrorMessages() : undefined}
+                onChangeText={value => {
+                  multiplierRef.current = value;
+                  editDraft({});
+                  revalidate();
+                }}
+              />
+            </SettingsTarget>
           </RuleCard>
 
           {/* save has no mutation toast (inline error pattern P2), so
@@ -809,7 +836,7 @@ function SpendAlertsForm({
           {masterDirty || saved ? saveControls : null}
         </>
       )}
-    </>
+    </SettingsSearchScrollView>
   );
 }
 

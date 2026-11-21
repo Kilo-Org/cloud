@@ -577,10 +577,16 @@ export async function settleStoredProjectTokens(
           projectId,
           error: error instanceof Error ? error.message : String(error),
         });
+        // Only a stored row that cannot be read is permanent. Every other failure —
+        // a database error, a connection loss — can clear on a repeat, so it keeps
+        // the retryable answer instead of naming a repair.
+        const unreadable = error instanceof TRPCError && error.code === 'UNAUTHORIZED';
         return {
           outcome: 'retained' as const,
-          retryable: false,
-          reason: 'stored_credential_unreadable' as const,
+          retryable: !unreadable,
+          reason: unreadable
+            ? ('stored_credential_unreadable' as const)
+            : ('provider_unconfirmed' as const),
         };
       });
       if (outcome.outcome === 'removed') {

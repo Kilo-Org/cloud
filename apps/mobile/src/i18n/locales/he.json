@@ -2534,6 +2534,11 @@
     "retryLoadingAccount": "ניסיון נוסף לטעינת החשבון",
     "retryLoadingPrivacy": "ניסיון נוסף לטעינת העדפות הפרטיות"
   },
+  "accountBlocked": {
+    "title": "החשבון חסום",
+    "description": "Kilo חסמה את החשבון הזה, והתחברות מחדש לא תסיר את החסימה. התמיכה יכולה לבדוק את החסימה לפי בקשה.",
+    "contactSupport": "פנייה לתמיכה"
+  },
   "addCredits": {
     "cta": "הוספת קרדיטים",
     "billingPage": "דף החיוב"

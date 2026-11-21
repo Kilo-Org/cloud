@@ -3181,6 +3181,11 @@
     "retryLoadingAccount": "Bandyti įkelti paskyrą dar kartą",
     "retryLoadingPrivacy": "Bandyti įkelti privatumo parinktis dar kartą"
   },
+  "accountBlocked": {
+    "title": "Paskyra užblokuota",
+    "description": "Kilo užblokavo šią paskyrą, ir pakartotinis prisijungimas blokavimo nepanaikins. Pagalbos tarnyba gali patikrinti blokavimą gavusi prašymą.",
+    "contactSupport": "Kreiptis į pagalbos tarnybą"
+  },
   "addCredits": {
     "cta": "Papildyti kreditus",
     "billingPage": "atsiskaitymų puslapis"

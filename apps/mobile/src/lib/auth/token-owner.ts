@@ -2,6 +2,10 @@ import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
 import { isProtectedDataAvailable } from '@/lib/protected-data';
 import { AUTH_TOKEN_KEY } from '@/lib/storage-keys';
+import {
+  isSignOutTeardownActive,
+  setSignOutTeardownActive,
+} from '@/lib/auth/auth-transition-state';
 
 export type ActiveToken = {
   token: string;
@@ -12,22 +16,11 @@ export type ActiveTokenSnapshot = ActiveToken & { epoch: number };
 
 let activeToken: ActiveTokenSnapshot | null = null;
 
-// Sign-out teardown guard: set synchronously when sign-out starts and cleared
-// only when a sign-in publishes credentials. While it is set the stored
-// credentials are scheduled for deletion, so a refresh must not read or
-// publish them and a request-token cold read must not warm the owner from
-// them. The in-memory owner keeps serving while the guard is set: sign-out's
-// remote cleanup still needs its auth headers until the epoch bump.
-let signOutTeardownActive = false;
-
-/** Marks the sign-out teardown window (set at sign-out start, cleared at a sign-in's publish). */
-export function setSignOutTeardownActive(active: boolean): void {
-  signOutTeardownActive = active;
-}
-
-export function isSignOutTeardownActive(): boolean {
-  return signOutTeardownActive;
-}
+// The sign-out teardown guard lives in `auth-transition-state.ts` so
+// telemetry-adjacent consumers can read the window without this module's
+// SecureStore stack; re-exported here as the single source existing callers
+// already import.
+export { isSignOutTeardownActive, setSignOutTeardownActive };
 
 /** Holds the token in memory, tagged with the auth epoch that was current when it was stored. */
 export function setActiveToken(token: string, expiresAtMs: number | null): void {

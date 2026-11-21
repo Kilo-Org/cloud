@@ -2500,6 +2500,11 @@
     "retryLoadingAccount": "Coba muat akun lagi",
     "retryLoadingPrivacy": "Coba muat pilihan privasi lagi"
   },
+  "accountBlocked": {
+    "title": "Akun diblokir",
+    "description": "Kilo memblokir akun ini, dan masuk lagi tidak akan membuka blokirnya. Tim dukungan dapat meninjau pemblokiran jika diminta.",
+    "contactSupport": "Hubungi tim dukungan"
+  },
   "addCredits": {
     "cta": "Tambah kredit",
     "billingPage": "halaman penagihan"

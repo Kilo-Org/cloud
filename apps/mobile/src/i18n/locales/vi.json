@@ -2500,6 +2500,11 @@
     "retryLoadingAccount": "Thử tải lại thông tin tài khoản",
     "retryLoadingPrivacy": "Thử tải lại các tùy chọn quyền riêng tư"
   },
+  "accountBlocked": {
+    "title": "Tài khoản bị chặn",
+    "description": "Kilo đã chặn tài khoản này và đăng nhập lại sẽ không gỡ được lệnh chặn. Bộ phận hỗ trợ có thể xem xét lệnh chặn theo yêu cầu.",
+    "contactSupport": "Liên hệ hỗ trợ"
+  },
   "addCredits": {
     "cta": "Nạp tiền",
     "billingPage": "trang thanh toán"

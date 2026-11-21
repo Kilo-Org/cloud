@@ -39,7 +39,11 @@ import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
 import { isOperationStepUpClass } from '@kilocode/web-shared/lib/admin/step-up-policy';
 import { isAdminStepUpEnabled } from '@kilocode/web-shared/lib/config.server';
 import { captureMessage, setTag, trpcMiddleware } from '@sentry/nextjs';
-import { AuthContextError, trpcErrorFormatter } from '@kilocode/web-shared/lib/trpc/transport';
+import {
+  AccountBlockedError,
+  AuthContextError,
+  trpcErrorFormatter,
+} from '@kilocode/web-shared/lib/trpc/transport';
 import {
   appUpdateRequiredError,
   enforceMinimumVersion,
@@ -61,6 +65,37 @@ import {
 } from '@kilocode/web-shared/lib/trpc/control-plane-budget';
 
 export { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
+
+/**
+ * The only procedures a refused account may still call: the three cleanups its
+ * sign-out issues. A blocked account's sign-out must end the session
+ * server-side *and* delete the device's own push and activity token rows; a
+ * device that skips the latter keeps receiving notifications for an account it
+ * was just told it cannot use. The web logout route admits a blocked account
+ * for the same session cleanup
+ * (`apps/web/src/app/api/auth/revoke-web-session/route.ts`).
+ *
+ * Each of the three only deletes rows where `user_id` is the caller's own
+ * (`apps/web/src/routers/user-router.ts` `revokeCurrentDeviceSession` /
+ * `unregisterPushToken` / `unregisterActivityToken`), so the admission cannot
+ * carry a read or reach another account.
+ *
+ * The admission is keyed on the whole request, never on the first call: a
+ * batch that mixes a cleanup with any other call is refused as before, so the
+ * exemption cannot carry another procedure through the gate.
+ */
+const SELF_CLEANUP_PATHS: ReadonlySet<string> = new Set([
+  'user.revokeCurrentDeviceSession',
+  'user.unregisterPushToken',
+  'user.unregisterActivityToken',
+]);
+
+function admitsRefusedAccount(info: ControlPlaneRequestInfo | null | undefined): boolean {
+  const calls = info?.calls;
+  if (!calls || calls.length === 0) return false;
+  return calls.every(call => SELF_CLEANUP_PATHS.has(call.path.split('?')[0]));
+}
+
 // Define the context type
 export type TRPCContext = {
   user: User;
@@ -167,6 +202,7 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
     internalApiUse,
     webSessionId,
     webSessionPepper,
+    refusalReason,
   } = await withControlPlaneBudget({
     path: controlPlanePathFromInfo(opts?.info),
     type: controlPlaneTypeFromInfo(opts?.info),
@@ -176,10 +212,35 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
         adminOnly: false,
         requestHeaders: headersList,
         requestPathname: opts?.req ? new URL(opts.req.url).pathname : undefined,
+        // A refused account still owns the session it is signing out of. The
+        // admission covers only the cleanup procedures (see
+        // admitsRefusedAccount), so every other call keeps the block refusal
+        // below.
+        allowRefusedAccountSelfCleanup: admitsRefusedAccount(opts?.info),
       }),
     startedAt,
     surface: 'context',
   });
+  // Authorization refused the account itself (R0 domain blacklist / R1 blocked
+  // account) while the session is intact. That is a different answer from a
+  // missing session: the mobile app must show why the account cannot be used
+  // and keep the user signed in, so this refuses with its own cause instead of
+  // reaching the AuthContextError branch below.
+  //
+  // Only the first-party mobile client gets that answer. The web app already
+  // routes a blocked account to /account-blocked from its UNAUTHORIZED path
+  // (sign-in -> after-sign-in -> /account-blocked), and no web consumer reads
+  // `data.accountBlocked`, so every other client falls through to the
+  // merge-base UNAUTHORIZED answer unchanged.
+  const blockedAccountAnswerable =
+    refusalReason === 'account_blocked' && isMobileClient(headersList?.get(APP_CLIENT_HEADER));
+  if (blockedAccountAnswerable) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Account access is blocked',
+      cause: new AccountBlockedError(),
+    });
+  }
   if (!user) {
     throw new TRPCError({
       code: 'UNAUTHORIZED',

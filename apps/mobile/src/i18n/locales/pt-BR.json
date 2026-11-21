@@ -2568,6 +2568,11 @@
     "translateSummaries": "Traduzir resumos",
     "autoExpandThinkingInactiveSubtitle": "Não tem efeito enquanto os detalhes do raciocínio estiverem ocultos."
   },
+  "accountBlocked": {
+    "title": "Conta bloqueada",
+    "description": "O Kilo bloqueou esta conta e entrar de novo não vai desfazer o bloqueio. O suporte pode revisar o bloqueio a pedido.",
+    "contactSupport": "Falar com o suporte"
+  },
   "addCredits": {
     "cta": "Adicionar créditos",
     "billingPage": "página de cobrança"

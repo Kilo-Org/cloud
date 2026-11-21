@@ -3061,6 +3061,11 @@
     "retryLoadingAccount": "Sake gwada loda asusun",
     "retryLoadingPrivacy": "Sake gwada loda zaɓuɓɓukan sirri"
   },
+  "accountBlocked": {
+    "title": "An toshe asusu",
+    "description": "Kilo ya toshe wannan asusu, kuma sake shiga ba zai buɗe shi ba. Masu tallafi na iya duba toshewar idan an buƙata.",
+    "contactSupport": "Tuntuɓi masu tallafi"
+  },
   "addCredits": {
     "cta": "Ƙara kuɗin amfani",
     "billingPage": "shafin biyan kuɗi"

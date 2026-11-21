@@ -706,6 +706,119 @@ describe('getUserFromAuth', () => {
     }
   });
 
+  test('admits a refused email domain only for its own session cleanup', async () => {
+    const blockedDomain = `${crypto.randomUUID()}.blocked.example`;
+    const user = await insertTestUser({
+      google_user_email: `cleanup-domain@mail.${blockedDomain}`,
+      api_token_pepper: 'cleanup-domain-pepper',
+    });
+    await db.insert(blacklisted_domains).values({ domain: blockedDomain });
+    mockHeaders.mockResolvedValue(
+      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+    );
+
+    try {
+      const refused = await getUserFromAuth({ adminOnly: false });
+      expect(refused.user).toBeNull();
+      expect(refused.refusalReason).toBe('account_blocked');
+
+      const admitted = await getUserFromAuth({
+        adminOnly: false,
+        allowRefusedAccountSelfCleanup: true,
+      });
+
+      // The account is admitted so the revoke can end its own session; nothing
+      // about the refusal itself changes for any other call.
+      expect(admitted.authFailedResponse).toBeNull();
+      expect(admitted.user?.id).toBe(user.id);
+    } finally {
+      await db.delete(blacklisted_domains).where(eq(blacklisted_domains.domain, blockedDomain));
+    }
+  });
+
+  test('admits a blocked account only for its own session cleanup', async () => {
+    const user = await insertTestUser({
+      blocked_reason: 'blocked for test',
+      api_token_pepper: 'cleanup-blocked-pepper',
+    });
+    mockHeaders.mockResolvedValue(
+      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+    );
+
+    const refused = await getUserFromAuth({ adminOnly: false });
+    expect(refused.user).toBeNull();
+    expect(refused.authorizationRefused).toBe(true);
+    expect(refused.refusalReason).toBe('account_blocked');
+
+    // The same admission the domain refusal gets: sign-out has to end the
+    // session and delete the device's own token rows while the block stands.
+    const admitted = await getUserFromAuth({
+      adminOnly: false,
+      allowRefusedAccountSelfCleanup: true,
+    });
+
+    expect(admitted.authFailedResponse).toBeNull();
+    expect(admitted.refusalReason).toBeUndefined();
+    expect(admitted.user?.id).toBe(user.id);
+  });
+
+  test('still refuses a self-cleanup request that lands on an admin-only gate', async () => {
+    // The domain-blacklist branch, not the block branch: before the fix the
+    // admission left that branch without an answer and the else-if chain ended
+    // there, so `adminOnly` was never evaluated. Only this fixture fails on the
+    // previous shape; a blocked account already reached the admin check.
+    const blockedDomain = `${crypto.randomUUID()}.blocked.example`;
+    const user = await insertTestUser({
+      google_user_email: `cleanup-domain-nonadmin@mail.${blockedDomain}`,
+      is_admin: false,
+      api_token_pepper: 'cleanup-domain-nonadmin-pepper',
+    });
+    await db.insert(blacklisted_domains).values({ domain: blockedDomain });
+    mockHeaders.mockResolvedValue(
+      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+    );
+
+    try {
+      // The admission covers the account refusal only, so an admin-only surface
+      // still answers with the non-admin refusal instead of admitting the account.
+      const result = await getUserFromAuth({
+        adminOnly: true,
+        allowRefusedAccountSelfCleanup: true,
+      });
+
+      expect(result.authFailedResponse).not.toBeNull();
+      expect(result.authFailedResponse?.status).toBe(403);
+      await expect(result.authFailedResponse?.json()).resolves.toEqual({
+        success: false,
+        error: 'Access denied (nonadmin)',
+      });
+      expect(result.user).toBeNull();
+    } finally {
+      await db.delete(blacklisted_domains).where(eq(blacklisted_domains.domain, blockedDomain));
+    }
+  });
+
+  test('admits a blocked account whose block timestamp is set for its own session cleanup', async () => {
+    const user = await insertTestUser({
+      blocked_reason: null,
+      blocked_at: '2026-01-15T12:00:00.000Z',
+      api_token_pepper: 'cleanup-blocked-at-pepper',
+    });
+    mockHeaders.mockResolvedValue(
+      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+    );
+
+    const refused = await getUserFromAuth({ adminOnly: false });
+    expect(refused.refusalReason).toBe('account_blocked');
+
+    const admitted = await getUserFromAuth({
+      adminOnly: false,
+      allowRefusedAccountSelfCleanup: true,
+    });
+
+    expect(admitted.user?.id).toBe(user.id);
+  });
+
   test('authorizes a user whose email domain only shares a raw suffix with a refused domain', async () => {
     const blockedDomain = `${crypto.randomUUID()}.blocked.example`;
     const user = await insertTestUser({

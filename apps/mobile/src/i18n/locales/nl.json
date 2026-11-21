@@ -2500,6 +2500,11 @@
     "retryLoadingAccount": "Account opnieuw laden",
     "retryLoadingPrivacy": "Privacykeuzes opnieuw laden"
   },
+  "accountBlocked": {
+    "title": "Account geblokkeerd",
+    "description": "Kilo heeft dit account geblokkeerd en opnieuw inloggen heft de blokkade niet op. De helpdesk kan de blokkade op verzoek bekijken.",
+    "contactSupport": "Contact opnemen met de helpdesk"
+  },
   "addCredits": {
     "cta": "Tegoed aanvullen",
     "billingPage": "factureringspagina"

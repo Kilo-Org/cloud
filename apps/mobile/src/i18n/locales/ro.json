@@ -3121,6 +3121,11 @@
     "retryLoadingAccount": "Reîncearcă încărcarea contului",
     "retryLoadingPrivacy": "Reîncearcă încărcarea opțiunilor de confidențialitate"
   },
+  "accountBlocked": {
+    "title": "Cont blocat",
+    "description": "Kilo a blocat acest cont și o nouă autentificare nu va ridica blocarea. Asistența poate analiza blocarea la cerere.",
+    "contactSupport": "Contactează asistența"
+  },
   "addCredits": {
     "cta": "Adaugă credite",
     "billingPage": "pagina de facturare"

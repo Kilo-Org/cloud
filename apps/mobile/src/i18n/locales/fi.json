@@ -3061,6 +3061,11 @@
     "retryLoadingAccount": "Yritä ladata tili uudelleen",
     "retryLoadingPrivacy": "Yritä ladata yksityisyysasetukset uudelleen"
   },
+  "accountBlocked": {
+    "title": "Tili estetty",
+    "description": "Kilo esti tämän tilin, eikä uudelleenkirjautuminen poista estoa. Tuki voi tarkistaa eston pyynnöstä.",
+    "contactSupport": "Ota yhteyttä tukeen"
+  },
   "addCredits": {
     "cta": "Lisää krediittejä",
     "billingPage": "laskutussivu"

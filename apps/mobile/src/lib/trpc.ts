@@ -41,6 +41,15 @@ export const UNBATCHED_PROCEDURES = new Set([
   'user.getMe',
   'activeSessions.list',
   'cliSessionsV2.getSessionMessagesPage',
+  // Self-cleanup: the context admits a blocked account only for a request
+  // whose every call is one of these procedures. Sign-out and the logout
+  // reconciliation fire cleanups while other screens are still mounted, so a
+  // batched cleanup would share its request with whatever else is pending and
+  // the whole request — cleanup included — would be refused. Keeping each on
+  // its own request means the gate only ever sees cleanup calls there.
+  'user.revokeCurrentDeviceSession',
+  'user.unregisterPushToken',
+  'user.unregisterActivityToken',
 ]);
 
 /**

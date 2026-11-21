@@ -3121,6 +3121,11 @@
     "retryLoadingAccount": "Mēģināt ielādēt kontu vēlreiz",
     "retryLoadingPrivacy": "Mēģināt ielādēt privātuma iestatījumus vēlreiz"
   },
+  "accountBlocked": {
+    "title": "Konts bloķēts",
+    "description": "Kilo ir bloķējis šo kontu, un atkārtota pieteikšanās to neatbloķēs. Atbalsta dienests var pārskatīt bloķējumu pēc pieprasījuma.",
+    "contactSupport": "Sazināties ar atbalsta dienestu"
+  },
   "addCredits": {
     "cta": "Papildināt kredītus",
     "billingPage": "norēķinu lapa"

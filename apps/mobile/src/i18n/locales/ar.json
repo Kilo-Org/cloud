@@ -2636,6 +2636,11 @@
     "retryLoadingAccount": "إعادة محاولة تحميل الحساب",
     "retryLoadingPrivacy": "إعادة محاولة تحميل خيارات الخصوصية"
   },
+  "accountBlocked": {
+    "title": "الحساب محظور",
+    "description": "حظر Kilo هذا الحساب، وتسجيل الدخول مجددًا لن يرفع الحظر. يمكن للدعم مراجعة الحظر عند الطلب.",
+    "contactSupport": "التواصل مع الدعم"
+  },
   "addCredits": {
     "cta": "شحن الرصيد",
     "billingPage": "صفحة الفوترة"

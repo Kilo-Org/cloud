@@ -3121,6 +3121,11 @@
     "retryLoadingAccount": "Pokušaj ponovo učitati račun",
     "retryLoadingPrivacy": "Pokušaj ponovo učitati postavke privatnosti"
   },
+  "accountBlocked": {
+    "title": "Nalog blokiran",
+    "description": "Kilo je blokirao ovaj nalog i ponovna prijava to neće ukloniti. Podrška može na zahtjev pregledati blokadu.",
+    "contactSupport": "Kontaktiraj podršku"
+  },
   "addCredits": {
     "cta": "Dodaj kredite",
     "billingPage": "stranica za naplatu"

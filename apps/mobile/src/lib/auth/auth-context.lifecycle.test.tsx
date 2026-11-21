@@ -2273,6 +2273,188 @@ describe('bootstrap and foreground race fencing', () => {
 
     unmount();
   }, 30_000);
+
+  it('a USER_BLOCKED refresh refusal raises the explanation before the session ends and keeps it afterwards', async () => {
+    const storedToken = makeToken({ kiloUserId: 'user-1' });
+    hoisted.secureStore.getItemAsync
+      .mockResolvedValueOnce(storedToken)
+      .mockResolvedValueOnce('stored-refresh')
+      .mockResolvedValueOnce('9999999999999')
+      .mockResolvedValueOnce(storedToken);
+
+    const { getCtx, unmount } = await mountProvider();
+    expect(getCtx().token).toBe(storedToken);
+
+    // `mountProvider` resets the module registry, so a static import would
+    // read a different instance than the provider's: import after mount to
+    // get the one the provider writes, and start this case from the cleared
+    // state so the assertions below describe this refusal alone.
+    const blockedAccount = await import('@/lib/auth/blocked-account-state');
+    blockedAccount.setBlockedAccountActive(false);
+    expect(blockedAccount.isBlockedAccountActive()).toBe(false);
+
+    // Prove the ordering the sign-out depends on, not only the final state:
+    // the remote cleanup runs inside `signOut`, so reading the flag there
+    // catches a teardown that starts before the explanation is raised.
+    const blockedAtTeardown: boolean[] = [];
+    logoutCleanupMock.runLogoutCleanup.mockImplementationOnce(() => {
+      blockedAtTeardown.push(blockedAccount.isBlockedAccountActive());
+      return Promise.resolve();
+    });
+
+    // The refresh route names the blocked account in its 401 body.
+    hoisted.secureStore.getItemAsync.mockResolvedValue('stored-refresh');
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(Response.json({ error: 'USER_BLOCKED' }, { status: 401 }));
+    onTestFinished(() => {
+      fetchSpy.mockRestore();
+    });
+
+    const handler = unauthorizedMock.getHandler();
+    if (!handler) {
+      throw new Error('unauthorized handler was not registered');
+    }
+    await act(async () => {
+      await handler();
+    });
+
+    // The explanation was already raised when the teardown reached sign-out…
+    expect(blockedAtTeardown).toEqual([true]);
+    // …and it outlives the session it explains: the credential is gone, the
+    // session ended is recorded, and the reason stays on the signed-out surface.
+    expect(blockedAccount.isBlockedAccountActive()).toBe(true);
+    expect(getCtx().sessionEnded).toBe(true);
+    expect(getCtx().token).toBeUndefined();
+    expect(getCtx().restoreFailed).toBe(false);
+    expect(signOutTelemetryMock.reportAuthBranch).toHaveBeenCalledTimes(1);
+    expect(signOutTelemetryMock.reportAuthBranch).toHaveBeenCalledWith({
+      cause: 'session_ended',
+    });
+
+    unmount();
+  }, 30_000);
+
+  it('a plain refused refresh does not raise the explanation', async () => {
+    const storedToken = makeToken({ kiloUserId: 'user-1' });
+    hoisted.secureStore.getItemAsync
+      .mockResolvedValueOnce(storedToken)
+      .mockResolvedValueOnce('stored-refresh')
+      .mockResolvedValueOnce('9999999999999')
+      .mockResolvedValueOnce(storedToken);
+
+    const { getCtx, unmount } = await mountProvider();
+    expect(getCtx().token).toBe(storedToken);
+
+    const blockedAccount = await import('@/lib/auth/blocked-account-state');
+    blockedAccount.setBlockedAccountActive(false);
+    expect(blockedAccount.isBlockedAccountActive()).toBe(false);
+
+    // A 401 that names nothing but a rejected refresh token ends the session
+    // silently: there is no restriction to explain.
+    hoisted.secureStore.getItemAsync.mockResolvedValue('stored-refresh');
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(Response.json({ error: 'INVALID_REFRESH_TOKEN' }, { status: 401 }));
+    onTestFinished(() => {
+      fetchSpy.mockRestore();
+    });
+
+    const handler = unauthorizedMock.getHandler();
+    if (!handler) {
+      throw new Error('unauthorized handler was not registered');
+    }
+    await act(async () => {
+      await handler();
+    });
+
+    // The refusal really did sign out — the flag below is the only thing that
+    // stays unset.
+    expect(getCtx().sessionEnded).toBe(true);
+    expect(getCtx().token).toBeUndefined();
+    expect(blockedAccount.isBlockedAccountActive()).toBe(false);
+
+    unmount();
+  }, 30_000);
+
+  it('a successful sign-in clears the explanation', async () => {
+    const { getCtx, unmount } = await mountProvider();
+    const blockedAccount = await import('@/lib/auth/blocked-account-state');
+    blockedAccount.setBlockedAccountActive(false);
+
+    // The explanation is showing from a blocked refusal the person has since
+    // asked to sign in past: the published credentials prove it no longer
+    // applies.
+    blockedAccount.setBlockedAccountActive(true);
+    expect(blockedAccount.isBlockedAccountActive()).toBe(true);
+
+    await act(async () => {
+      await getCtx().signIn('active-token', 'active-refresh', 3600);
+    });
+
+    expect(getCtx().token).toBe('active-token');
+    expect(blockedAccount.isBlockedAccountActive()).toBe(false);
+
+    unmount();
+  }, 30_000);
+
+  it('a previous-session refusal cannot raise while a sign-in transition runs', async () => {
+    const { getCtx, unmount } = await mountProvider();
+    const blockedAccount = await import('@/lib/auth/blocked-account-state');
+    const { isSignOutActive } = await import('@/lib/auth/sign-out-state');
+    const { isSignOutTeardownActive } = await import('@/lib/auth/auth-transition-state');
+    const { releaseChatsForAccountSwitch } = await import('@/lib/chat/sign-out');
+    blockedAccount.setBlockedAccountActive(false);
+    expect(blockedAccount.isBlockedAccountActive()).toBe(false);
+
+    // Park the sign-in inside its transition: the release await is the gap
+    // where both fences were cleared before the token publishes, so a refusal
+    // from the previous session settling there would raise over the new
+    // account. The sample is taken only once the sign-in is parked there.
+    const releaseGate = Promise.withResolvers<undefined>();
+    const releasePark = Promise.withResolvers<undefined>();
+    vi.mocked(releaseChatsForAccountSwitch).mockImplementationOnce(async () => {
+      releaseGate.resolve(undefined);
+      await releasePark.promise;
+    });
+
+    let signInDone = false;
+    const trackSignIn = async (): Promise<void> => {
+      try {
+        await getCtx().signIn('active-token', 'active-refresh', 3600);
+      } finally {
+        signInDone = true;
+      }
+    };
+    const signInSettled = trackSignIn();
+    void signInSettled;
+    const signInPromise = signInSettled;
+
+    // Drive the sign-in to the parked release inside act, sample the fences
+    // there (the clears happen only at credential publication after this
+    // await), then let the release settle so the sign-in publishes.
+    await act(async () => {
+      await releaseGate.promise;
+    });
+    expect(signInDone).toBe(false);
+    expect([isSignOutActive(), isSignOutTeardownActive()]).toEqual([true, true]);
+
+    // The previous session's blocked refusal settles in this same gap; the
+    // fences keep it from raising (no direct raise call here: the assertion
+    // pins the fence state the raise reads, not a call made by hand).
+    expect(blockedAccount.isBlockedAccountActive()).toBe(false);
+
+    releasePark.resolve(undefined);
+    await act(async () => {
+      await signInPromise;
+    });
+
+    expect(signInDone).toBe(true);
+    expect(getCtx().token).toBe('active-token');
+    expect(blockedAccount.isBlockedAccountActive()).toBe(false);
+
+    unmount();
+  }, 30_000);
 });
 
 describe('reactive auth epoch', () => {

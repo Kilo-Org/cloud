@@ -2534,6 +2534,11 @@
     "retryLoadingAccount": "Volver a cargar la cuenta",
     "retryLoadingPrivacy": "Volver a cargar las opciones de privacidad"
   },
+  "accountBlocked": {
+    "title": "Cuenta bloqueada",
+    "description": "Kilo ha bloqueado esta cuenta y volver a iniciar sesión no lo desbloqueará. El soporte técnico puede revisar el bloqueo si lo solicitas.",
+    "contactSupport": "Contactar con soporte técnico"
+  },
   "addCredits": {
     "cta": "Añadir créditos",
     "billingPage": "página de facturación"

@@ -2500,6 +2500,11 @@
     "retryLoadingAccount": "重新載入帳戶",
     "retryLoadingPrivacy": "重新載入隱私權選項"
   },
+  "accountBlocked": {
+    "title": "帳號已封鎖",
+    "description": "Kilo 已封鎖此帳號，重新登入也不會解除封鎖。如有請求，客服可以複核封鎖。",
+    "contactSupport": "聯絡客服"
+  },
   "addCredits": {
     "cta": "加值點數",
     "billingPage": "帳單頁面"

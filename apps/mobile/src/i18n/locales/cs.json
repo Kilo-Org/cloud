@@ -3181,6 +3181,11 @@
     "retryLoadingAccount": "Znovu načíst účet",
     "retryLoadingPrivacy": "Znovu načíst nastavení soukromí"
   },
+  "accountBlocked": {
+    "title": "Účet zablokován",
+    "description": "Kilo zablokovalo tento účet a nové přihlášení to nezruší. Podpora může blokaci na požádání přezkoumat.",
+    "contactSupport": "Kontaktovat podporu"
+  },
   "addCredits": {
     "cta": "Dobít kredity",
     "billingPage": "stránka fakturace"

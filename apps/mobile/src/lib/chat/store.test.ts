@@ -453,8 +453,13 @@ describe('wipeChats', () => {
     expect(database.isTransaction).toBe(true);
     storeUnit.resolve(undefined);
     await closing;
+    /* A chat started in the window between the store closing its unit and the
+       wipe deleting is deleted by the same subquery as the rest, so it must be
+       in the answer too: the caller drops its pending question and its settings
+       from the ids, and one missing there outlives the account. */
+    rememberChat(db, { sessionId: 'late', scope: 'me:personal', at: 300 });
 
-    expect(await wiping).toEqual(['one', 'two']);
+    expect(await wiping).toEqual(['one', 'two', 'late']);
     for (const table of ['chats', 'sessions', 'turns', 'parts']) {
       expect(tally(`select count(*) as n from ${table}`)).toBe(0);
     }

@@ -67,6 +67,10 @@ function nextDelimiter(text: string, from: number): number {
  * message, the fingerprint path — carry origin and path. Returns empty string
  * on a non-string.
  *
+ * The value reported after that last `@` must read as a host, since it stands
+ * for the authority's host, port and path. When it does not, the result is the
+ * scheme alone.
+ *
  * A single label with a numeric port is not read as a host, though: `api:3000`
  * is the same text as a userinfo pair whose value starts with digits. Such a
  * run is read as userinfo, so a later `@` ends the value at the scheme alone
@@ -107,17 +111,15 @@ export function stripQueryString(url: string): string {
     if (lastAt === -1) {
       return cutAtQueryOrFragment(url);
     }
-    // An `@` inside a query or fragment belongs to that text, not to the
-    // authority. It terminates userinfo only when what follows it reads as a
-    // host, which is the shape an authority takes.
-    const queryStart = url.search(/[?#]/u);
-    const atInQuery = queryStart !== -1 && queryStart < lastAt;
-    if (atInQuery && !isHostLike(url.slice(lastAt + 1, nextDelimiter(url, lastAt + 1)))) {
-      // The run before the delimiter may be userinfo, and userinfo must not
-      // reach the value at all: report no origin and path rather than risk it.
+    // The text after the last `@` is the authority's host, port and path, so it
+    // must read as a host. A tail that does not is text this walk cannot place,
+    // and it may be a userinfo value itself: report no origin and path rather
+    // than emit it.
+    const tailStart = lastAt + 1;
+    if (!isHostLike(url.slice(tailStart, nextDelimiter(url, tailStart)))) {
       return url.slice(0, schemeEnd);
     }
-    return url.slice(0, schemeEnd) + cutAtQueryOrFragment(url.slice(lastAt + 1));
+    return url.slice(0, schemeEnd) + cutAtQueryOrFragment(url.slice(tailStart));
   } catch {
     return '';
   }

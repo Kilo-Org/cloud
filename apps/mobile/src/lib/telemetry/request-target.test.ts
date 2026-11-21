@@ -208,4 +208,28 @@ describe('stripQueryString', () => {
   it('leaves a scheme-less string unchanged except for its query and fragment', () => {
     expect(stripQueryString(`no-scheme/${MEMBER}/x?detail=1#top`)).toBe(`no-scheme/${MEMBER}/x`);
   });
+
+  it('reports no run when the text after an at-sign is not a host', () => {
+    const secret = ['abcdefghij', 'klmnopqrst'].join(':');
+    const userinfo = ['user', secret].join(':');
+
+    expect(stripQueryString(`https://api:3000/x@${userinfo}`)).toBe('https://');
+  });
+
+  it('reports no run when a pathless tail after an at-sign is not a host', () => {
+    const secret = ['abcdefghij', 'klmnopqrst'].join(':');
+    const userinfo = ['user', secret].join(':');
+
+    expect(stripQueryString(`https://host:3000/a/b@${userinfo}`)).toBe('https://');
+  });
+
+  it('reports no run when a single-label tail after an at-sign is not a host', () => {
+    const singleLabel = ['host', 'x'].join('');
+
+    expect(stripQueryString(`https://api:3000/x@${singleLabel}/z`)).toBe('https://');
+  });
+
+  it('keeps origin and path when a dotted-host tail after an at-sign reads as a host', () => {
+    expect(stripQueryString(`https://api:3000/x@${HOST}/z`)).toBe(`https://${HOST}/z`);
+  });
 });

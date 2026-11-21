@@ -12,32 +12,55 @@ import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PERSONAL_SCOPE } from '@/lib/hooks/use-code-reviewer';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { classifyListBody } from '@/lib/query/list-body-state';
 
 export function ScopeListScreen() {
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
-  const { data: orgs, isError, isFetching, refetch } = useOrganizationsList();
+  // The membership read comes through the hook that owns the shared entry's
+  // options. A second observer with defaulted options would replace those
+  // options while this screen is mounted and leave every other consumer's read
+  // paused with no data.
+  const { data: orgs, isError, isFetching, fetchStatus, refetch } = useOrganizationsList();
+  const connectivity = useCommittedConnectivityStatus();
 
   const openScope = (scope: string) => {
     pushOnce(`/(app)/code-reviewer/${scope}` as Href);
   };
 
+  // A delivered list stays on screen, so a background refetch that fails over
+  // cached rows must not push a banner above them. Only a read that failed with
+  // nothing delivered owns the banner, and a failed read names its cause with
+  // Retry instead of silently dropping the section.
+  const orgsBody = classifyListBody({
+    rowCount: orgs?.length ?? 0,
+    hasDeliveredData: orgs !== undefined,
+    isError,
+    isFetching,
+    fetchStatus,
+    connectivityKnown: connectivity !== 'unknown',
+  });
+
   return (
     <View className="flex-1 bg-background">
       <ReviewerHeader title={t('common.codeReviewer')} />
       <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
-        {isError && (
+        {orgsBody.status === 'error' ? (
           <QueryError
-            variant="server"
+            // Only a read that delivered nothing reaches here. Its cause picks
+            // the icon and wording: a read the connection stopped says so, a
+            // read that failed names the organizations it could not answer for.
+            variant={orgsBody.cause === 'offline' ? 'offline' : 'server'}
             title={t('common.couldNotLoadOrganizations')}
             message={t('codeReviewer.scopeList.personalStillAvailable')}
             placement="top"
             className="pb-6 pt-0"
             onRetry={() => void refetch()}
-            isRetrying={isFetching}
+            isRetrying={orgsBody.isRetrying}
           />
-        )}
+        ) : null}
         <RowGroup leadingTile>
           <ConfigureRow
             icon={User}
@@ -47,11 +70,11 @@ export function ScopeListScreen() {
               openScope(PERSONAL_SCOPE);
             }}
           />
-          {/* A token-gated read is not `isLoading` before the token resolves,
-              so the placeholder follows the payload's absence instead. A read
-              that failed with no rows is the error banner's surface, not a
-              placeholder that never resolves. */}
-          {orgs === undefined && !isError && <RowSkeleton tile subtitle />}
+          {/* The placeholder joins the group the organizations land in, so the
+              rows replace it in place. A read that never delivered is the
+              placeholder's surface; one that failed with nothing delivered is
+              the banner's, not a placeholder that never resolves. */}
+          {orgsBody.status === 'loading' ? <RowSkeleton tile subtitle /> : null}
           {orgs?.map(org => (
             <ConfigureRow
               key={org.organizationId}

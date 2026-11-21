@@ -1,9 +1,9 @@
 // The scope landing's organization rows follow the membership payload, not a
 // loading flag: the read is gated on the auth token, so before that token
-// resolves it is neither loading nor answered, and a read that failed with no
-// rows belongs to the error banner. The placeholder therefore follows
-// `data === undefined && !isError`, so it can never sit under the banner and
-// never outlive the rows it stands in for.
+// resolves it is neither loading nor answered. A delivered list therefore stays
+// on screen even when a background refetch fails over it, and only a read that
+// failed with nothing delivered owns the banner; the placeholder stands in for
+// a read that never delivered. The cases below pin all four states.
 
 import { createElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -19,6 +19,7 @@ type ListState = {
   data: Membership[] | undefined;
   isError: boolean;
   isFetching: boolean;
+  fetchStatus: 'fetching' | 'paused' | 'idle';
   refetch: () => void;
 };
 
@@ -27,7 +28,12 @@ const memberships = vi.hoisted(() => ({
   data: undefined as Membership[] | undefined,
   isError: false,
   isFetching: false,
+  fetchStatus: 'idle' as ListState['fetchStatus'],
   refetch: vi.fn<() => void>(),
+}));
+
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
 }));
 
 const MEMBERSHIPS: Membership[] = [
@@ -97,6 +103,7 @@ beforeEach(() => {
   memberships.data = undefined;
   memberships.isError = false;
   memberships.isFetching = false;
+  memberships.fetchStatus = 'idle';
   memberships.refetch.mockReset();
 });
 
@@ -151,6 +158,19 @@ describe('ScopeListScreen organization rows', () => {
     expect(findByType(root, 'RowSkeleton')).toHaveLength(0);
     // The banner promises Personal is still below, so the row stays.
     expect(rows(root).map(row => row.title)).toEqual(['Personal']);
+  });
+
+  it('keeps the delivered rows when a background refetch fails over them', async () => {
+    memberships.data = MEMBERSHIPS;
+    memberships.isError = true;
+    const root = await mountScreen();
+
+    // A delivered list is what the reader has; the failure of a later read
+    // must not paint a banner above it or take the rows away.
+    expect(findByType(root, 'QueryErrorMock')).toHaveLength(0);
+    expect(texts(root)).not.toContain('Could not load organizations');
+    expect(rows(root).map(row => row.title)).toEqual(['Personal', 'Drain Labs', 'Acme Support']);
+    expect(findByType(root, 'RowSkeleton')).toHaveLength(0);
   });
 
   it('replaces the placeholder with one row per membership', async () => {

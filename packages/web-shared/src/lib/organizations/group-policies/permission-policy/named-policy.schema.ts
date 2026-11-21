@@ -21,6 +21,7 @@ const agentPermissionSet = z.strictObject(AgentPermissionFields);
 const agentPermissionsDocument = agentPermissionSet.extend({
   by_os: z.partialRecord(z.enum(NAMED_POLICY_EXECUTION_OSES), agentPermissionSet).optional(),
 });
+// False and omission are neutral; neither overrides a restriction from another policy.
 const clientConfigurationDocument = z.strictObject({
   disable_auto_approve: z.boolean().optional(),
   disable_telemetry: z.boolean().optional(),

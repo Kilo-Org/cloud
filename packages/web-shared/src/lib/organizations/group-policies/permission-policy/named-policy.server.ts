@@ -352,7 +352,7 @@ async function mutateNamedPolicy<T>(
   access: AdminAccess,
   mutate: (tx: DrizzleTransaction) => Promise<{
     result: T;
-    change: string;
+    change: string | null;
   }>
 ) {
   const { organizationId, actor } = access;
@@ -360,8 +360,9 @@ async function mutateNamedPolicy<T>(
     await lockOrganizationGroupPolicy(tx, organizationId);
     await assertAdmin(tx, access, true);
     await assertOrganizationPermissionPolicyWriteEnabled(organizationId, tx);
-    const policyRevision = await bumpOrganizationGroupPolicyRevision(tx, organizationId, actor.id);
     const { result, change } = await mutate(tx);
+    if (change === null) return { result, policyRevision: await getRevision(tx, organizationId) };
+    const policyRevision = await bumpOrganizationGroupPolicyRevision(tx, organizationId, actor.id);
     await createAuditLog({
       action: 'organization.named_policy.change',
       actor_id: actor.id,
@@ -491,7 +492,8 @@ export async function setNamedOrganizationPolicyLink(
         message: 'The policy does not match this link kind.',
       });
     }
-    let previousId: string | undefined;
+    const nextId = policy?.id ?? null;
+    let previousId: string | null;
     let scopeLabel = 'organization default';
     if (scope.type === 'group') {
       const [group] = await tx
@@ -505,44 +507,48 @@ export async function setNamedOrganizationPolicyLink(
         );
       if (!group) throw new TRPCError({ code: 'NOT_FOUND', message: 'Group not found.' });
       scopeLabel = `group ${group.id}`;
-      const [previous] = await tx
-        .delete(organization_group_policy_links)
-        .where(
-          and(
-            eq(organization_group_policy_links.organization_id, organizationId),
-            eq(organization_group_policy_links.group_id, group.id),
-            eq(organization_group_policy_links.kind, kind)
-          )
-        )
-        .returning({ id: organization_group_policy_links.policy_id });
-      previousId = previous?.id;
-      if (policy)
-        await tx.insert(organization_group_policy_links).values({
-          organization_id: organizationId,
-          group_id: group.id,
-          kind,
-          policy_id: policy.id,
-        });
-    } else {
-      const [previous] = await tx
-        .delete(organization_default_policy_links)
-        .where(
-          and(
-            eq(organization_default_policy_links.organization_id, organizationId),
-            eq(organization_default_policy_links.kind, kind)
-          )
-        )
-        .returning({ id: organization_default_policy_links.policy_id });
-      previousId = previous?.id;
-      if (policy)
+      const link = organization_group_policy_links;
+      const scopeFilter = and(
+        eq(link.organization_id, organizationId),
+        eq(link.group_id, group.id),
+        eq(link.kind, kind)
+      );
+      const [previous] = await tx.select({ id: link.policy_id }).from(link).where(scopeFilter);
+      previousId = previous?.id ?? null;
+      if (previousId === nextId) return { result: nextId, change: null };
+      if (nextId === null) {
+        await tx.delete(link).where(scopeFilter);
+      } else {
         await tx
-          .insert(organization_default_policy_links)
-          .values({ organization_id: organizationId, kind, policy_id: policy.id });
+          .insert(link)
+          .values({ organization_id: organizationId, group_id: group.id, kind, policy_id: nextId })
+          .onConflictDoUpdate({
+            target: [link.organization_id, link.group_id, link.kind],
+            set: { policy_id: nextId },
+          });
+      }
+    } else {
+      const link = organization_default_policy_links;
+      const scopeFilter = and(eq(link.organization_id, organizationId), eq(link.kind, kind));
+      const [previous] = await tx.select({ id: link.policy_id }).from(link).where(scopeFilter);
+      previousId = previous?.id ?? null;
+      if (previousId === nextId) return { result: nextId, change: null };
+      if (nextId === null) {
+        await tx.delete(link).where(scopeFilter);
+      } else {
+        await tx
+          .insert(link)
+          .values({ organization_id: organizationId, kind, policy_id: nextId })
+          .onConflictDoUpdate({
+            target: [link.organization_id, link.kind],
+            set: { policy_id: nextId },
+          });
+      }
     }
-    if (policy) await assertAttachedPoliciesFit(tx, organizationId);
+    if (nextId !== null) await assertAttachedPoliciesFit(tx, organizationId);
     return {
-      result: policy?.id ?? null,
-      change: `Set ${kind} link for ${scopeLabel}: ${previousId ?? 'none'} to ${policy?.id ?? 'none'}`,
+      result: nextId,
+      change: `Set ${kind} link for ${scopeLabel}: ${previousId ?? 'none'} to ${nextId ?? 'none'}`,
     };
   });
 }

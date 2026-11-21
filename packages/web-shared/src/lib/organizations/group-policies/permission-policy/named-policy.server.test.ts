@@ -194,10 +194,8 @@ describe('named organization policy storage', () => {
       policyId: neutral.result.id,
     });
 
-    await expect(getNamedPolicyMemberSnapshot(input)).resolves.toMatchObject({
-      policy: {
-        agent_permissions: { layers: [{ schema_version: 1, tools: { websearch: 'deny' } }] },
-      },
+    expect((await getNamedPolicyMemberSnapshot(input)).policy).toEqual({
+      agent_permissions: { layers: [{ schema_version: 1, tools: { websearch: 'deny' } }] },
     });
     await db.insert(organization_group_memberships).values({
       organization_id: organizationId,
@@ -265,6 +263,52 @@ describe('named organization policy storage', () => {
       getNamedPolicyMemberSnapshot({ ...input, kiloUserId: 'outsider' })
     ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
   });
+
+  it.each(['default', 'group'] as const)(
+    'does not audit or bump the revision for an unchanged %s link',
+    async scopeType => {
+      const access = await createOrganization();
+      const { organizationId } = access;
+      const scope =
+        scopeType === 'default' ? defaultScope : await createGroup(organizationId, 'Group');
+      await enableFor(organizationId);
+      const link = { scope, kind: agentPermissions.kind };
+      await expect(
+        setNamedOrganizationPolicyLink(access, { ...link, policyId: null })
+      ).resolves.toEqual({
+        result: null,
+        policyRevision: 0,
+      });
+      expect(await namedAudit(organizationId)).toEqual([]);
+
+      const { result: policy } = await createNamedOrganizationPolicy(access, {
+        ...agentPermissions,
+        name: 'Policy',
+      });
+      const attached = await setNamedOrganizationPolicyLink(access, {
+        ...link,
+        policyId: policy.id,
+      });
+      const audit = await namedAudit(organizationId);
+      await expect(
+        setNamedOrganizationPolicyLink(access, { ...link, policyId: policy.id.toUpperCase() })
+      ).resolves.toEqual(attached);
+      expect(await namedAudit(organizationId)).toEqual(audit);
+
+      process.env.ORG_PERMISSION_POLICY_WRITES_ENABLED = 'false';
+      await expect(
+        setNamedOrganizationPolicyLink(access, { ...link, policyId: policy.id })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      process.env.ORG_PERMISSION_POLICY_WRITES_ENABLED = 'true';
+
+      const detached = await setNamedOrganizationPolicyLink(access, { ...link, policyId: null });
+      expect(detached).toEqual({ result: null, policyRevision: attached.policyRevision + 1 });
+      await expect(
+        setNamedOrganizationPolicyLink(access, { ...link, policyId: null })
+      ).resolves.toEqual(detached);
+      expect(await namedAudit(organizationId)).toHaveLength(audit.length + 1);
+    }
+  );
 
   it('rejects unauthorized, disabled, invalid and duplicate writes without revision or audit changes', async () => {
     const access = await createOrganization();
@@ -474,7 +518,7 @@ describe('named organization policy storage', () => {
     expect(await namedAudit(organizationId)).toEqual(audit);
   });
 
-  it('accepts exactly 101 layers but rolls back a link or edit that adds a 102nd OS layer', async () => {
+  it('accepts policy reuse at 101 layers but rolls back a link or edit that adds a 102nd OS layer', async () => {
     const access = await createOrganization();
     const { organizationId } = access;
     await enableFor(organizationId);
@@ -524,8 +568,14 @@ describe('named organization policy storage', () => {
       ...agentPermissions,
       name: 'Default policy',
     });
-    const { policyRevision } = await setNamedOrganizationPolicyLink(access, {
+    await setNamedOrganizationPolicyLink(access, {
       scope: defaultScope,
+      kind: agentPermissions.kind,
+      policyId: defaultPolicy.id,
+    });
+    const extraScope = { type: 'group', groupId: groups[50].id } as const;
+    const { policyRevision } = await setNamedOrganizationPolicyLink(access, {
+      scope: extraScope,
       kind: agentPermissions.kind,
       policyId: defaultPolicy.id,
     });
@@ -536,7 +586,7 @@ describe('named organization policy storage', () => {
     const audit = await namedAudit(organizationId);
     await expect(
       setNamedOrganizationPolicyLink(access, {
-        scope: { type: 'group', groupId: groups[50].id },
+        scope: extraScope,
         kind: agentPermissions.kind,
         policyId: policies[50].id,
       })

@@ -261,6 +261,28 @@ export function ggufModelClient({
         }
       };
       const run = async () => {
+        /**
+         * Gives up this answer's ownership of the client, once. A release that
+         * cannot stop the answer calls it while the answer is still pending, and
+         * the answer calls it again when it settles or fails: whichever happens
+         * first ends the turn, and the second call must not clear state a newer
+         * answer has taken over.
+         */
+        let released = false;
+        const giveUp = () => {
+          if (released) {
+            return;
+          }
+          released = true;
+          if (running()) {
+            stop('failed', streamed !== '');
+          }
+          if (abandon === giveUp) {
+            abandon = undefined;
+          }
+          busy = false;
+          inflight = undefined;
+        };
         try {
           const opened = await settled(load(request.model, file));
           if (!opened.ok) {
@@ -276,15 +298,7 @@ export function ggufModelClient({
           }
           const completion = opened.value.completion(paramsOf(request, file), onToken);
           inflight = completion;
-          // A release that could not stop this answer ends it here: the queue
-          // gets its failure, and the client is free for the next request.
-          abandon = () => {
-            if (running()) {
-              stop('failed', streamed !== '');
-            }
-            busy = false;
-            inflight = undefined;
-          };
+          abandon = giveUp;
           const finished = await settled(completion);
           if (!finished.ok) {
             stop('failed', streamed !== '');
@@ -304,9 +318,7 @@ export function ggufModelClient({
         } catch {
           stop('failed', streamed !== '');
         } finally {
-          busy = false;
-          inflight = undefined;
-          abandon = undefined;
+          giveUp();
         }
       };
       return Effect.andThen(

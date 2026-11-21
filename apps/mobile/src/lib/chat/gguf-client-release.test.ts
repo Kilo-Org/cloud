@@ -203,6 +203,53 @@ it('frees a context whose native stop throws as it is called, without wedging th
   expect(init).toHaveBeenCalledTimes(2);
 });
 
+it('does not let an abandoned answer clear the state a newer answer owns', async () => {
+  const timeline: Timeline = [];
+  const started = Promise.withResolvers<undefined>();
+  const settledLater = Promise.withResolvers<{ text: string }>();
+  const slow = Promise.withResolvers<{ text: string }>();
+  const stopping = {
+    model: { chatTemplates: { llamaChat: true, jinja: { default: false } } },
+    // The answer the failed stop could not interrupt: it settles only later.
+    completion: () => {
+      started.resolve(undefined);
+      return settledLater.promise;
+    },
+    stopCompletion: vi.fn(() => {
+      throw new Error('context already released');
+    }),
+    release: vi.fn(() => {
+      timeline.push('freed stopping');
+      return Promise.resolve();
+    }),
+  } as unknown as GgufContext;
+  // The next answer, still in flight when the abandoned one settles.
+  const second = {
+    model: { chatTemplates: { llamaChat: true, jinja: { default: false } } },
+    completion: () => slow.promise,
+    stopCompletion: vi.fn(() => Promise.resolve()),
+    release: vi.fn(() => Promise.resolve()),
+  } as unknown as GgufContext;
+  const { client, release } = clientWith([stopping, second], timeline);
+  const abandoned = settle(collect(client.stream(request)));
+  await started.promise;
+  await release();
+
+  // A newer answer takes the client and is still running.
+  const running = settle(collect(client.stream(request)));
+
+  // The abandoned answer settles now. Its exit must not free a client the newer
+  // answer owns: a third request must still be refused while that one runs.
+  settledLater.resolve({ text: 'late' });
+  await abandoned;
+  const third: unknown = await settle(collect(client.stream(request)));
+  expect(Array.isArray(third)).toBe(false);
+
+  slow.resolve({ text: 'ok' });
+  expect(Array.isArray(await running)).toBe(true);
+  await collect(client.stream(request));
+});
+
 it('keeps loading after a native release throws as it is called', async () => {
   const timeline: Timeline = [];
   const broken = throwingContext();

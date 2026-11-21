@@ -2,6 +2,13 @@ import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+const mockLogExceptInTest = jest.fn();
+
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/utils.server'),
+  logExceptInTest: (...args: unknown[]) => mockLogExceptInTest(...args),
+}));
+
 jest.mock(
   '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server',
   () => ({
@@ -126,6 +133,7 @@ describe('GitHub installation persistence', () => {
   beforeEach(async () => {
     process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = '';
     process.env.GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS = '';
+    mockLogExceptInTest.mockClear();
     await cleanupDbForTest();
     await db.insert(kilocode_users).values([
       {
@@ -2063,6 +2071,204 @@ describe('GitHub installation persistence', () => {
       github_connection_role: 'workflow',
       github_disconnected_at: null,
     });
+  });
+
+  test('does not let a blocked personal owner hold the installation', async () => {
+    const successor = await createTestOrganization('Blocked holder successor org', otherOwnerId, 0);
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'user', id: ownerId },
+      data('990115')
+    );
+    if (!first.ok) throw new Error('Expected the personal owner to connect');
+    await db
+      .update(kilocode_users)
+      .set({ blocked_reason: 'test block' })
+      .where(eq(kilocode_users.id, ownerId));
+
+    // A blocked account cannot act for the installation, so its association no
+    // longer holds the workflow role and the next verified organization owner
+    // takes it.
+    const second = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: successor.id },
+      { ...data('990115'), kiloUserId: otherOwnerId }
+    );
+    expect(second).toEqual({ ok: true, integrationId: expect.any(String) });
+    if (!second.ok) throw new Error('Expected the successor organization to connect');
+
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, '990115'));
+    expect(rows).toHaveLength(2);
+    expect(rows.find(row => row.id === first.integrationId)).toMatchObject({
+      github_connection_role: 'agent_only',
+      integration_status: 'active',
+      github_disconnected_at: null,
+    });
+    expect(rows.find(row => row.id === second.integrationId)).toMatchObject({
+      github_connection_role: 'workflow',
+    });
+    expect(rows.filter(row => row.github_connection_role === 'workflow')).toHaveLength(1);
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('990115', 'standard')
+    ).resolves.toBeUndefined();
+  });
+
+  test('does not let a soft-deleted organization hold the installation against an organization claimant', async () => {
+    const deleted = await createTestOrganization('Deleted holder predecessor', ownerId, 0);
+    const successor = await createTestOrganization('Deleted holder successor', otherOwnerId, 0);
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: deleted.id },
+      data('990116')
+    );
+    if (!first.ok) throw new Error('Expected the deleted organization to connect');
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, deleted.id));
+
+    // A soft-deleted organization has no restore path, so it stops holding the
+    // installation and the next organization takes the workflow role without
+    // sharing admission.
+    expect(process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS).toBeFalsy();
+    const second = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: successor.id },
+      { ...data('990116'), kiloUserId: otherOwnerId }
+    );
+    expect(second).toEqual({ ok: true, integrationId: expect.any(String) });
+    if (!second.ok) throw new Error('Expected the successor organization to connect');
+
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, '990116'));
+    expect(rows.find(row => row.id === first.integrationId)).toMatchObject({
+      github_connection_role: 'agent_only',
+    });
+    expect(rows.find(row => row.id === second.integrationId)).toMatchObject({
+      github_connection_role: 'workflow',
+    });
+    expect(rows.filter(row => row.github_connection_role === 'workflow')).toHaveLength(1);
+  });
+
+  test('admits a personal claimant over a soft-deleted organization', async () => {
+    const deleted = await createTestOrganization('Deleted holder personal org', ownerId, 0);
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: deleted.id },
+      data('990117')
+    );
+    if (!first.ok) throw new Error('Expected the deleted organization to connect');
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, deleted.id));
+
+    // The organization guard reads the deletion, so a personal claimant is not
+    // refused with the organization-holds-installation refusal.
+    const second = await connectVerifiedGitHubInstallation(
+      { type: 'user', id: otherOwnerId },
+      { ...data('990117'), kiloUserId: otherOwnerId }
+    );
+    expect(second).toEqual({ ok: true, integrationId: expect.any(String) });
+    if (!second.ok) throw new Error('Expected the personal claimant to connect');
+
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, '990117'));
+    expect(rows.find(row => row.id === first.integrationId)).toMatchObject({
+      github_connection_role: 'agent_only',
+    });
+    expect(rows.find(row => row.id === second.integrationId)).toMatchObject({
+      github_connection_role: 'workflow',
+      github_disconnected_at: null,
+    });
+    expect(rows.filter(row => row.github_connection_role === 'workflow')).toHaveLength(1);
+  });
+
+  test('logs the workflow role transfer once, only after the owning transaction commits', async () => {
+    const successor = await createTestOrganization('Transfer log successor org', otherOwnerId, 0);
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'user', id: ownerId },
+      data('990118')
+    );
+    if (!first.ok) throw new Error('Expected the personal owner to connect');
+    await db
+      .update(kilocode_users)
+      .set({ blocked_reason: 'test block' })
+      .where(eq(kilocode_users.id, ownerId));
+
+    const transferLogs = () =>
+      mockLogExceptInTest.mock.calls.filter(
+        ([message]) => message === '[connectVerifiedGitHubInstallation] Workflow role transferred'
+      );
+
+    // A caller-supplied transaction that rolls back must not log the transfer
+    // it performed.
+    await expect(
+      db.transaction(async tx => {
+        await connectVerifiedGitHubInstallation(
+          { type: 'org', id: successor.id },
+          { ...data('990118'), kiloUserId: otherOwnerId },
+          tx
+        );
+        throw new Error('rollback the transfer');
+      })
+    ).rejects.toThrow('rollback the transfer');
+    expect(transferLogs()).toHaveLength(0);
+
+    // The committed caller transaction returns the transfers and logs nothing
+    // itself, because only the caller knows when the transaction commits.
+    const transferred = await db.transaction(async tx =>
+      connectVerifiedGitHubInstallation(
+        { type: 'org', id: successor.id },
+        { ...data('990118'), kiloUserId: otherOwnerId },
+        tx
+      )
+    );
+    expect(transferred).toMatchObject({
+      ok: true,
+      roleTransfers: [
+        {
+          installationId: '990118',
+          appType: 'standard',
+          integrationId: first.integrationId,
+          demotedTo: 'agent_only',
+          reason: 'blocked_personal_owner',
+          successorOwner: `org:${successor.id}`,
+        },
+      ],
+    });
+    expect(transferLogs()).toHaveLength(0);
+
+    // The owning path logs each committed transfer exactly once.
+    const predecessor = await createTestOrganization('Transfer log predecessor org', ownerId, 0);
+    const third = await createTestOrganization('Transfer log third org', otherOwnerId, 0);
+    const predecessorConnect = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: predecessor.id },
+      data('990119')
+    );
+    if (!predecessorConnect.ok) throw new Error('Expected the predecessor to connect');
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, predecessor.id));
+    await expect(
+      connectVerifiedGitHubInstallation(
+        { type: 'org', id: third.id },
+        { ...data('990119'), kiloUserId: otherOwnerId }
+      )
+    ).resolves.toEqual({ ok: true, integrationId: expect.any(String) });
+    expect(transferLogs()).toEqual([
+      [
+        '[connectVerifiedGitHubInstallation] Workflow role transferred',
+        expect.objectContaining({
+          installationId: '990119',
+          integrationId: predecessorConnect.integrationId,
+          reason: 'deleted_organization',
+        }),
+      ],
+    ]);
   });
 
   test('gives the installation to a personal owner after the organization disconnects locally', async () => {

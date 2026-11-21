@@ -33,13 +33,14 @@ type SqlValue = string | number;
  * a `BEGIN` and a `COMMIT` of its own; `isInTransactionSync` says whether a unit
  * is already open, which is what this connection can be asked because the
  * harness SDK's store keeps the conversations here and holds units of its own
- * across awaits.
+ * across awaits. Both are required, so a handle that cannot answer the question
+ * fails to compile rather than turning the wait below into a no-op.
  */
 export type ChatDatabase = {
   readonly getAllSync: <T>(source: string, params: SqlValue[]) => T[];
   readonly runSync: (source: string, params: SqlValue[]) => void;
   readonly withTransactionSync: (work: () => void) => void;
-  readonly isInTransactionSync?: () => boolean;
+  readonly isInTransactionSync: () => boolean;
 };
 
 /** One row of the chat list. */
@@ -313,11 +314,11 @@ const turn = (): Promise<void> => {
  */
 async function ownUnit(db: ChatDatabase): Promise<void> {
   const until = Date.now() + STORE_UNIT_WAIT_MS;
-  while (db.isInTransactionSync?.() === true && Date.now() < until) {
+  while (db.isInTransactionSync() && Date.now() < until) {
     // eslint-disable-next-line no-await-in-loop -- each turn lets the write that holds the unit run on
     await turn();
   }
-  if (db.isInTransactionSync?.() === true) {
+  if (db.isInTransactionSync()) {
     throw new Error('the store did not finish its write, so the chats were not wiped');
   }
 }

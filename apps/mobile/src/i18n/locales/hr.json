@@ -187,7 +187,30 @@
     "legalDocumentEnglishOnly": "Ovaj je dokument dostupan samo na engleskom jeziku.",
     "organizationTrialEndedBilling": "Probno razdoblje organizacije je završilo i organizacija nema aktivan plan. Možete ažurirati naplatu i zatim pokušati ponovno.",
     "organizationTrialEndedBillingAtKiloAi": "Probno razdoblje organizacije je završilo i organizacija nema aktivan plan. Možete ažurirati naplatu na kilo.ai i zatim pokušati ponovno.",
-    "viewOnGitHub": "Pogledaj PR na GitHubu"
+    "viewOnGitHub": "Pogledaj PR na GitHubu",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Točka popisa",
+        "nestedBulletPoint": "Ugniježđena točka popisa",
+        "orderedItem": "Stavka popisa {n}",
+        "nestedOrderedItem": "Ugniježđena stavka popisa {n}"
+      },
+      "blockquote": {
+        "quote": "Citat",
+        "nestedQuote": "Ugniježđeni citat"
+      },
+      "table": {
+        "row": "Redak {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Naslovi",
+        "links": "Poveznice",
+        "images": "Slike"
+      }
+    }
   },
   "language": {
     "restarting": "Ponovno pokretanje radi promjene jezika",

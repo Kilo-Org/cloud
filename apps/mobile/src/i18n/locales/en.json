@@ -278,7 +278,30 @@
     "legalDocumentEnglishOnly": "This document is available in English only.",
     "organizationTrialEndedBilling": "The organization's trial has ended and it has no active plan. You can update billing, then try again.",
     "organizationTrialEndedBillingAtKiloAi": "The organization's trial has ended and it has no active plan. You can update billing at kilo.ai, then try again.",
-    "viewOnGitHub": "View PR on GitHub"
+    "viewOnGitHub": "View PR on GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Bullet point",
+        "nestedBulletPoint": "Nested bullet point",
+        "orderedItem": "List item {n}",
+        "nestedOrderedItem": "Nested list item {n}"
+      },
+      "blockquote": {
+        "quote": "Blockquote",
+        "nestedQuote": "Nested blockquote"
+      },
+      "table": {
+        "row": "Row {n}: {content}"
+      },
+      "math": {
+        "equation": "Math: {latex}"
+      },
+      "rotor": {
+        "headings": "Headings",
+        "links": "Links",
+        "images": "Images"
+      }
+    }
   },
   "language": {
     "restarting": "Restarting to apply language",

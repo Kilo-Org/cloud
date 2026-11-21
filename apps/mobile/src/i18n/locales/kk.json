@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Бұл құжат тек ағылшын тілінде қолжетімді.",
     "organizationTrialEndedBilling": "Ұйымның сынақ мерзімі аяқталды және оның белсенді жоспары жоқ. Төлем ақпаратын жаңартып, содан кейін қайталап көре аласыз.",
     "organizationTrialEndedBillingAtKiloAi": "Ұйымның сынақ мерзімі аяқталды және оның белсенді жоспары жоқ. kilo.ai сайтында төлем ақпаратын жаңартып, содан кейін қайталап көре аласыз.",
-    "viewOnGitHub": "PR-ді GitHub-та қарау"
+    "viewOnGitHub": "PR-ді GitHub-та қарау",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Тізім таңбасы",
+        "nestedBulletPoint": "Кірістірілген тізім таңбасы",
+        "orderedItem": "Тізім элементі {n}",
+        "nestedOrderedItem": "Кірістірілген тізім элементі {n}"
+      },
+      "blockquote": {
+        "quote": "Дәйексөз",
+        "nestedQuote": "Кірістірілген дәйексөз"
+      },
+      "table": {
+        "row": "Жол {n}: {content}"
+      },
+      "math": {
+        "equation": "Математика: {latex}"
+      },
+      "rotor": {
+        "headings": "Тақырыптар",
+        "links": "Сілтемелер",
+        "images": "Суреттер"
+      }
+    }
   },
   "language": {
     "restarting": "Тілді қолдану үшін қайта іске қосылуда",

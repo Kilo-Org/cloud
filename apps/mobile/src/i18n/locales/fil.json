@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Ang dokumentong ito ay makukuha lamang sa Ingles.",
     "organizationTrialEndedBilling": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update mo ang billing, pagkatapos ay subukan muli.",
     "organizationTrialEndedBillingAtKiloAi": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update mo ang billing sa kilo.ai, pagkatapos ay subukan muli.",
-    "viewOnGitHub": "Tingnan ang PR sa GitHub"
+    "viewOnGitHub": "Tingnan ang PR sa GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Puntong listahan",
+        "nestedBulletPoint": "Nakapasok na puntong listahan",
+        "orderedItem": "Item sa listahan {n}",
+        "nestedOrderedItem": "Nakapasok na item sa listahan {n}"
+      },
+      "blockquote": {
+        "quote": "Sipi",
+        "nestedQuote": "Nakapasok na sipi"
+      },
+      "table": {
+        "row": "Hanay {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Mga pamagat",
+        "links": "Mga link",
+        "images": "Mga larawan"
+      }
+    }
   },
   "language": {
     "restarting": "Ini-restart para ilapat ang wika",

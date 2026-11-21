@@ -188,7 +188,30 @@
     "legalDocumentEnglishOnly": "Ten dokument jest dostępny wyłącznie w języku angielskim.",
     "organizationTrialEndedBilling": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia, a następnie spróbować ponownie.",
     "organizationTrialEndedBillingAtKiloAi": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia na kilo.ai, a następnie spróbować ponownie.",
-    "viewOnGitHub": "Zobacz PR w serwisie GitHub"
+    "viewOnGitHub": "Zobacz PR w serwisie GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Punkt listy",
+        "nestedBulletPoint": "Zagnieżdżony punkt listy",
+        "orderedItem": "Element listy {n}",
+        "nestedOrderedItem": "Zagnieżdżony element listy {n}"
+      },
+      "blockquote": {
+        "quote": "Cytat",
+        "nestedQuote": "Zagnieżdżony cytat"
+      },
+      "table": {
+        "row": "Wiersz {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematyka: {latex}"
+      },
+      "rotor": {
+        "headings": "Nagłówki",
+        "links": "Odnośniki",
+        "images": "Obrazy"
+      }
+    }
   },
   "language": {
     "restarting": "Ponowne uruchamianie po zmianie języka",

@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Αυτό το έγγραφο είναι διαθέσιμο μόνο στα αγγλικά.",
     "organizationTrialEndedBilling": "Η δοκιμαστική περίοδος του οργανισμού έχει λήξει και δεν υπάρχει ενεργό πρόγραμμα. Μπορείτε να ενημερώσετε τη χρέωση και μετά να δοκιμάσετε ξανά.",
     "organizationTrialEndedBillingAtKiloAi": "Η δοκιμαστική περίοδος του οργανισμού έχει λήξει και δεν υπάρχει ενεργό πρόγραμμα. Μπορείτε να ενημερώσετε τη χρέωση στο kilo.ai και μετά να δοκιμάσετε ξανά.",
-    "viewOnGitHub": "Προβολή PR στο GitHub"
+    "viewOnGitHub": "Προβολή PR στο GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Κουκκίδα",
+        "nestedBulletPoint": "Ένθετη κουκκίδα",
+        "orderedItem": "Στοιχείο λίστας {n}",
+        "nestedOrderedItem": "Ένθετο στοιχείο λίστας {n}"
+      },
+      "blockquote": {
+        "quote": "Παράθεση",
+        "nestedQuote": "Ένθετη παράθεση"
+      },
+      "table": {
+        "row": "Γραμμή {n}: {content}"
+      },
+      "math": {
+        "equation": "Μαθηματικά: {latex}"
+      },
+      "rotor": {
+        "headings": "Επικεφαλίδες",
+        "links": "Σύνδεσμοι",
+        "images": "Εικόνες"
+      }
+    }
   },
   "language": {
     "restarting": "Επανεκκίνηση για εφαρμογή της νέας γλώσσας",

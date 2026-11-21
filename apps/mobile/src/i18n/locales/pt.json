@@ -188,7 +188,30 @@
     "privateRepositoryA11y": "{{name}}, repositório privado",
     "legalDocumentEnglishOnly": "Este documento está disponível apenas em inglês.",
     "organizationTrialEndedBilling": "O período de teste da organização terminou e esta não tem um plano ativo. Pode atualizar a faturação e, em seguida, tentar novamente.",
-    "organizationTrialEndedBillingAtKiloAi": "O período de teste da organização terminou e esta não tem um plano ativo. Pode atualizar a faturação em kilo.ai e, em seguida, tentar novamente."
+    "organizationTrialEndedBillingAtKiloAi": "O período de teste da organização terminou e esta não tem um plano ativo. Pode atualizar a faturação em kilo.ai e, em seguida, tentar novamente.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Marcador",
+        "nestedBulletPoint": "Marcador aninhado",
+        "orderedItem": "Item da lista {n}",
+        "nestedOrderedItem": "Item da lista aninhado {n}"
+      },
+      "blockquote": {
+        "quote": "Citação",
+        "nestedQuote": "Citação aninhada"
+      },
+      "table": {
+        "row": "Linha {n}: {content}"
+      },
+      "math": {
+        "equation": "Matemática: {latex}"
+      },
+      "rotor": {
+        "headings": "Títulos",
+        "links": "Ligações",
+        "images": "Imagens"
+      }
+    }
   },
   "language": {
     "restarting": "A reiniciar para aplicar o idioma",

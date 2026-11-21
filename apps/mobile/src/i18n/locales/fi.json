@@ -5100,5 +5100,19 @@
       "au": "Australia",
       "jp": "Japani"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "Hae asetuksia",
+    "noMatches": "Ei vastaavia asetuksia",
+    "emptyDescription": "Kokeile toista asetuksen nimeä tai hakusanaa.",
+    "resultsStatus": "Asetuksia löytyi: {{resultCount}}",
+    "keywords": {
+      "signOut": "kirjaudu ulos|uloskirjautuminen",
+      "appearance": "teema|värimaailma",
+      "appUnlock": "biometrinen tunnistus|kasvojentunnistus|sormenjälki",
+      "language": "kieli|käännös",
+      "notifications": "ilmoitukset|hälytykset|push-ilmoitukset",
+      "privacy": "analytiikka|seuranta"
+    }
   }
 }

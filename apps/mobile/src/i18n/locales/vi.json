@@ -5100,5 +5100,19 @@
       "au": "Úc",
       "jp": "Nhật Bản"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "Tìm tùy chọn",
+    "noMatches": "Không có tùy chọn phù hợp",
+    "emptyDescription": "Thử tên tùy chọn hoặc từ khóa khác.",
+    "resultsStatus": "Số tùy chọn tìm thấy: {{resultCount}}",
+    "keywords": {
+      "signOut": "đăng xuất|thoát tài khoản",
+      "appearance": "chủ đề|màu sắc|chế độ tối",
+      "appUnlock": "sinh trắc học|khuôn mặt|vân tay",
+      "language": "ngôn ngữ|bản dịch",
+      "notifications": "cảnh báo|thông báo đẩy",
+      "privacy": "phân tích|theo dõi"
+    }
   }
 }

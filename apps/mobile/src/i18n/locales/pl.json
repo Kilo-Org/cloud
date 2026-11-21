@@ -5274,5 +5274,19 @@
       "au": "Australia",
       "jp": "Japonia"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "Szukaj w preferencjach",
+    "noMatches": "Brak pasujących preferencji",
+    "emptyDescription": "Spróbuj innej nazwy preferencji lub słowa kluczowego.",
+    "resultsStatus": "Znalezione preferencje: {{resultCount}}",
+    "keywords": {
+      "signOut": "wyloguj|wylogowanie",
+      "appearance": "motyw|kolory|tryb ciemny",
+      "appUnlock": "biometria|twarz|odcisk palca",
+      "language": "język|tłumaczenie",
+      "notifications": "alerty|powiadomienia",
+      "privacy": "analityka|śledzenie|prywatność"
+    }
   }
 }

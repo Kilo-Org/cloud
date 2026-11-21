@@ -5100,5 +5100,19 @@
       "au": "Australiya",
       "jp": "Jabbaan"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "Raadinta dookhyada",
+    "noMatches": "Lama helin dookhyo u dhigma",
+    "emptyDescription": "Isku day magac dookh ama erey raadin oo kale.",
+    "resultsStatus": "Dookhyada la helay: {{resultCount}}",
+    "keywords": {
+      "signOut": "ka bax|ka bixid",
+      "appearance": "muuqaal|midab|naqshad",
+      "appUnlock": "aqoonsiga jirka|aqoonsiga wejiga|faraha",
+      "language": "luuqad|turjumaad",
+      "notifications": "digniino|ogeysiisyo",
+      "privacy": "asturnaan|falanqayn|dabagal"
+    }
   }
 }

@@ -5100,5 +5100,19 @@
       "au": "I-Australia",
       "jp": "I-Japani"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "Sesha okuncamelayo",
+    "noMatches": "Akukho okuncamelayo okuhambisana nosesho",
+    "emptyDescription": "Zama elinye igama lokuncamelayo noma igama elingukhiye.",
+    "resultsStatus": "Okuncamelayo okutholakele: {{resultCount}}",
+    "keywords": {
+      "signOut": "phuma|phuma ku-akhawunti",
+      "appearance": "indikimba|imibala",
+      "appUnlock": "ibhayomethrikhi|ubuso|isigxivizo somunwe",
+      "language": "ulimi|ukuhumusha",
+      "notifications": "izexwayiso|izaziso",
+      "privacy": "ukuhlaziya|ukulandelela"
+    }
   }
 }

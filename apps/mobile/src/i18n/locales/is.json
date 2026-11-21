@@ -5100,5 +5100,19 @@
       "au": "Ástralía",
       "jp": "Japan"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "Leita að kjörstillingum",
+    "noMatches": "Engar kjörstillingar fundust",
+    "emptyDescription": "Prófaðu annað heiti eða leitarorð.",
+    "resultsStatus": "Kjörstillingar sem fundust: {{resultCount}}",
+    "keywords": {
+      "signOut": "skrá út|útskráning",
+      "appearance": "þema|litasamsetning",
+      "appUnlock": "lífkenni|andlitsgreining|fingrafar",
+      "language": "tungumál|þýðing",
+      "notifications": "viðvaranir|tilkynningar|ýtitilkynningar",
+      "privacy": "notkunargreining|rakning"
+    }
   }
 }

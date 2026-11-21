@@ -5100,5 +5100,19 @@
       "au": "Ostralịa",
       "jp": "Japan"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "Chọọ Mmasị",
+    "noMatches": "Enweghị mmasị dabara na ọchụchọ a",
+    "emptyDescription": "Nwaa aha mmasị ma ọ bụ mkpụrụokwu ọzọ.",
+    "resultsStatus": "Mmasị achọtara: {{resultCount}}",
+    "keywords": {
+      "signOut": "pụọ|ọpụpụ",
+      "appearance": "ọdịdị|agba",
+      "appUnlock": "njirimara ahụ|ihu|akara mkpịsị aka",
+      "language": "asụsụ|ntụgharị asụsụ",
+      "notifications": "ọkwa|ịma ọkwa|ịdọ aka ná ntị",
+      "privacy": "nyocha|nsuso|nzuzo"
+    }
   }
 }

@@ -5187,5 +5187,19 @@
       "au": "Austràlia",
       "jp": "Japó"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "Cerca a les preferències",
+    "noMatches": "No s'ha trobat cap preferència",
+    "emptyDescription": "Prova amb un altre nom de preferència o una altra paraula clau.",
+    "resultsStatus": "Preferències trobades: {{resultCount}}",
+    "keywords": {
+      "signOut": "tancar sessió|sortir",
+      "appearance": "tema|colors",
+      "appUnlock": "biometria|reconeixement facial|empremta digital",
+      "language": "idioma|traducció",
+      "notifications": "avisos|alertes|notificacions",
+      "privacy": "analítica|seguiment"
+    }
   }
 }

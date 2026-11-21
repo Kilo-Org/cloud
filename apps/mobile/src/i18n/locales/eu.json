@@ -5100,5 +5100,19 @@
       "au": "Australia",
       "jp": "Japonia"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "Hobespenen bilaketa",
+    "noMatches": "Ez dago bat datorren hobespenik",
+    "emptyDescription": "Saiatu beste hobespen-izen edo gako-hitz batekin.",
+    "resultsStatus": "Aurkitutako hobespenak: {{resultCount}}",
+    "keywords": {
+      "signOut": "saioa amaitu|saioa itxi|irten",
+      "appearance": "gaia|koloreak|modu iluna",
+      "appUnlock": "biometria|aurpegia|hatz-marka",
+      "language": "hizkuntza|itzulpena",
+      "notifications": "alertak|jakinarazpenak|abisuak",
+      "privacy": "estatistikak|jarraipena|pribatutasuna"
+    }
   }
 }

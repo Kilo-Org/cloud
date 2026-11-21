@@ -178,33 +178,63 @@ export function firstMissingField(
 }
 
 /**
- * A service-account private key in the shape the gateway signs with: the PEM
- * header, its base64 body wrapped at 64 columns, and the footer.
+ * A service-account private key in the shape the gateway signs with, or null
+ * when the value is not one.
  *
  * The key is pasted as a whole value into a single-line field, and a paste can
- * arrive with its line breaks folded away; base64 does not need them, and the
- * wrapping is then put back here. The result is the same value whether the
- * reader pasted a file or a folded copy of it, so the gateway never receives a
- * key it cannot parse. A value that is not a base64 PEM is returned as typed:
- * this cannot repair a key that is not one, and the server's own check names
- * the shape it refuses.
+ * arrive with its line breaks folded away or escaped by the JSON file it came
+ * from: a downloaded key file stores the key as one JSON string, so copying the
+ * value out of it yields the two characters `\` and `n` where a line break was.
+ * Base64 does not need the breaks, so the wrapping is put back here. The result
+ * is the same value whether the reader pasted a file, a folded copy of it, or
+ * the escaped string from a downloaded key, so the gateway never receives a key
+ * it cannot parse.
+ *
+ * This checks the PEM's shape and not its contents: the DER inside is the
+ * gateway's to read, and the app has no parser for it. What it does catch is the
+ * value that is not a PEM at all, which the credential shape accepts (it only
+ * asks for a non-empty string) and which would otherwise be stored and fail at
+ * the first request that tries to sign.
  */
-function canonicalPrivateKey(value: string): string {
-  const typed = value.trim();
+function canonicalPrivateKey(value: string): string | null {
+  const typed = value
+    .replaceAll(String.raw`\r\n`, '\n')
+    .replaceAll(String.raw`\n`, '\n')
+    .trim();
   const match = /^-----BEGIN ([A-Z0-9 ]+)-----([\s\S]*)-----END ([A-Z0-9 ]+)-----$/.exec(typed);
   if (!match) {
-    return typed;
+    return null;
   }
   const [, beginLabel, rawBody, endLabel] = match;
-  if (beginLabel !== endLabel || rawBody === undefined) {
-    return typed;
+  if (
+    beginLabel === undefined ||
+    rawBody === undefined ||
+    beginLabel !== endLabel ||
+    !beginLabel.endsWith('PRIVATE KEY')
+  ) {
+    return null;
   }
   const body = rawBody.replaceAll(/\s+/g, '');
   if (!/^[A-Za-z0-9+/]+={0,2}$/.test(body) || body.length % 4 !== 0) {
-    return typed;
+    return null;
   }
-  const lines = body.match(/.{1,64}/g) ?? [];
+  const lines = body.match(/.{1,64}/g);
+  if (!lines) {
+    return null;
+  }
   return [`-----BEGIN ${beginLabel}-----`, ...lines, `-----END ${beginLabel}-----`].join('\n');
+}
+
+/** The Vertex credential one form's fields add up to, with its key in canonical form. */
+function vertexCredential(values: CredentialValues) {
+  return {
+    project: (values.project ?? '').trim(),
+    location: (values.location ?? '').trim(),
+    googleCredentials: {
+      clientEmail: (values.clientEmail ?? '').trim(),
+      privateKey: canonicalPrivateKey(values.privateKey ?? ''),
+    },
+  };
 }
 
 /** The credential's own JSON object, without the empty mappings list. */
@@ -233,12 +263,16 @@ export function credentialPayload(input: {
           };
     }
     case 'vertex': {
+      const { googleCredentials, ...rest } = vertexCredential(input.values);
+      const stored = googleCredentials.privateKey;
+      // `credentialProblem` refuses a key that is not a PEM, so a null here has
+      // already stopped the submit; the wire value stays a string so a JSON null
+      // can never reach the server.
       return {
-        project: value('project'),
-        location: value('location'),
+        ...rest,
         googleCredentials: {
-          clientEmail: value('clientEmail'),
-          privateKey: canonicalPrivateKey(input.values.privateKey ?? ''),
+          clientEmail: googleCredentials.clientEmail,
+          privateKey: stored ?? value('privateKey'),
         },
       };
     }
@@ -253,8 +287,9 @@ export function credentialPayload(input: {
 
 /**
  * Why this credential is refused, by the same check the web BYOK form runs on
- * the JSON it accepts. The form's own required-field check answers its fields;
- * this answers the shape they add up to.
+ * the JSON it accepts, plus the one rule that shape cannot express: the Vertex
+ * private key must be a PEM the gateway can sign with. The form's own
+ * required-field check answers its fields; this answers the value they add up to.
  */
 export function credentialProblem(input: {
   providerId: string;
@@ -262,6 +297,12 @@ export function credentialProblem(input: {
   values: CredentialValues;
   modelMappings: readonly ModelMapping[];
 }): StructuredCredentialProblem | null {
+  if (getStructuredCredentialKind(input.providerId) === 'vertex') {
+    const { privateKey } = vertexCredential(input.values).googleCredentials;
+    if (privateKey === null) {
+      return { code: 'invalid-credential' };
+    }
+  }
   return validateStructuredCredential(input.providerId, credentialPayload(input));
 }
 

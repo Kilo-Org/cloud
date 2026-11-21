@@ -14,6 +14,11 @@ import {
   readStructuredCredential,
 } from './credential-fields';
 
+/** A real key, because the Vertex form now refuses anything that is not a PEM. */
+const { privateKey: fixtureKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+const exportedKey = fixtureKey.export({ type: 'pkcs8', format: 'pem' });
+const PEM_KEY = typeof exportedKey === 'string' ? exportedKey : exportedKey.toString('utf8');
+
 describe('credentialForm', () => {
   it('offers one API key and its region for the API-key Bedrock method', () => {
     const form = credentialForm('bedrock', 'apiKey');
@@ -84,17 +89,22 @@ describe('firstMissingField', () => {
 });
 
 describe('credentialPayload', () => {
-  function vertexPrivateKey(privateKey: string) {
+  function vertexValues(privateKey: string) {
+    return {
+      project: 'p',
+      location: 'global',
+      clientEmail: 'service@example.test',
+      privateKey,
+    } satisfies CredentialValues;
+  }
+
+  /** The stored key, through the shape the create call sends. */
+  function storedVertexKey(privateKey: string) {
     return VertexCredentialsSchema.parse(
       credentialPayload({
         providerId: 'vertex',
         mode: 'apiKey',
-        values: {
-          project: 'p',
-          location: 'global',
-          clientEmail: 'service@example.test',
-          privateKey,
-        },
+        values: vertexValues(privateKey),
         modelMappings: [],
       })
     ).googleCredentials.privateKey;
@@ -115,15 +125,25 @@ describe('credentialPayload', () => {
         .map(line => `  ${line}`)
         .join('\n'),
       `  ${PEM}  `,
+      // The value copied out of a downloaded service-account file: the line
+      // breaks arrive as the two characters `\` and `n`.
+      PEM.trim().replaceAll('\n', String.raw`\n`),
     ]) {
-      const stored = vertexPrivateKey(pasted);
+      const stored = storedVertexKey(pasted);
       expect(() => createPrivateKey(stored)).not.toThrow();
       expect(stored).toBe(PEM.trim());
     }
   });
 
-  it('leaves a value that is not a base64 PEM as typed', () => {
-    expect(vertexPrivateKey(' pem ')).toBe('pem');
+  it('refuses a value that is not a private key instead of storing it', () => {
+    expect(
+      credentialProblem({
+        providerId: 'vertex',
+        mode: 'apiKey',
+        values: vertexValues('not a key'),
+        modelMappings: [],
+      })
+    ).toEqual({ code: 'invalid-credential' });
   });
 
   it('writes the Bedrock API-key method as the web form stores it', () => {
@@ -179,14 +199,14 @@ describe('credentialPayload', () => {
           project: 'project',
           location: 'global',
           clientEmail: 'service@example.test',
-          privateKey: 'pem',
+          privateKey: PEM_KEY,
         },
         modelMappings: [],
       })
     ).toEqual({
       project: 'project',
       location: 'global',
-      googleCredentials: { clientEmail: 'service@example.test', privateKey: 'pem' },
+      googleCredentials: { clientEmail: 'service@example.test', privateKey: PEM_KEY.trim() },
     });
   });
 });
@@ -264,7 +284,7 @@ describe('credentialProblem', () => {
           project: 'project',
           location: 'global',
           clientEmail: 'service@example.test',
-          privateKey: 'pem',
+          privateKey: PEM_KEY,
         },
         modelMappings: [],
       })

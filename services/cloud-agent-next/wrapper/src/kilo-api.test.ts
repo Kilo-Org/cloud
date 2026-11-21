@@ -1874,18 +1874,23 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       process.env.HOME = home;
       try {
         mkdirSync(join(home, '.kilo-control', 'rulesets'), { recursive: true });
+
+        // A bare array is not the obligation shape, so the parse rejects it as a
+        // whole and the message says so.
         writeFileSync(marker, '[{"permission":"edit"}]');
+        const shape = await readSessionObligations(sessionId).catch((error: unknown) => error);
+        expect(shape).toBeInstanceOf(SessionRulesetNotAppliedError);
+        expect((shape as Error).message).toContain(marker);
+        expect((shape as Error).message).toContain('is not a ruleset:');
+        expect((shape as Error).message).toContain('expected object, received array');
 
-        const error = await readSessionObligations(sessionId).catch((error: unknown) => error);
-
-        // A permanent failure is diagnosable: it names the file and what the
-        // parse rejected, and both values are wrapper-generated. The cause text
-        // is asserted rather than a bare field name, because the session id the
-        // message also carries already contains "permission".
-        expect(error).toBeInstanceOf(SessionRulesetNotAppliedError);
-        expect((error as Error).message).toContain(marker);
-        expect((error as Error).message).toContain('is not a ruleset:');
-        expect((error as Error).message).toContain('expected object, received array');
+        // The obligation shape with a permission that is not a ruleset takes the
+        // other branch, and its message names that cause.
+        writeFileSync(marker, '{"permission":[{"permission":"edit"}]}');
+        const permission = await readSessionObligations(sessionId).catch((error: unknown) => error);
+        expect(permission).toBeInstanceOf(SessionRulesetNotAppliedError);
+        expect((permission as Error).message).toContain(marker);
+        expect((permission as Error).message).toContain('its permission is not a ruleset');
       } finally {
         await forgetSessionObligations(sessionId).catch(() => undefined);
         if (originalHome === undefined) delete process.env.HOME;

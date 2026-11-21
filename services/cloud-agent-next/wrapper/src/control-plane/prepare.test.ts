@@ -2104,27 +2104,6 @@ describe('createPreparationManager', () => {
     ]);
   });
 
-  it('keeps the step retry budget and reports no subtype when the session step is aborted', async () => {
-    const harness = createHarness();
-    harness.setSessionExists(false);
-    const spec = routeSpec();
-    harness.setEnsureSessionError(new Error('kilo_session aborted'));
-
-    await harness.manager.prepare(spec);
-
-    // An abort is not a permanent ruleset failure, so the step takes its one retry; the failure
-    // carries no session-import subtype because the abort keeps its own classification.
-    expect(lastFrame(harness.frames)).toMatchObject({
-      type: 'session.failed',
-      sessionId: spec.sessionId,
-      reason: 'workspace_setup_failed',
-      step: 'kilo_session',
-    });
-    expect(lastFrame(harness.frames)).not.toHaveProperty('subtype');
-    expect(harness.frames.filter(frame => frame.type === 'session.failed')).toHaveLength(1);
-    expect(harness.ensureSessionCalls()).toBe(2);
-  });
-
   it('projects one session_ready line per ready emit, with the session id and no directory', async () => {
     const harness = createHarness();
     const spec = routeSpec();

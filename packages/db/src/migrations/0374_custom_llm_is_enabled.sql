@@ -1,0 +1,1 @@
+ALTER TABLE "custom_llm2" ADD COLUMN "is_enabled" boolean DEFAULT true NOT NULL;

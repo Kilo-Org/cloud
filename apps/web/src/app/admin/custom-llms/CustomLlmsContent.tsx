@@ -36,6 +36,7 @@ import {
   useCopyCustomLlm,
   useUpsertCustomLlm,
   useDeleteCustomLlm,
+  useSetCustomLlmEnabled,
 } from '@/app/admin/api/custom-llms/hooks';
 import {
   CustomLlmCredentialsSchema,
@@ -48,6 +49,7 @@ import { formatZodError } from '@/lib/zod/format-zod-error';
 import { toast } from 'sonner';
 import { ChevronRight, Copy as CopyIcon, Globe, Handshake, Lock, Plus, Pencil } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import Editor, { type EditorProps } from '@monaco-editor/react';
 
 const StrictCustomLlmDefinitionSchema = deepStrict(CustomLlmDefinitionSchema);
@@ -203,6 +205,7 @@ export function CustomLlmsContent() {
   const upsertMutation = useUpsertCustomLlm();
   const copyMutation = useCopyCustomLlm();
   const deleteMutation = useDeleteCustomLlm();
+  const setEnabledMutation = useSetCustomLlmEnabled();
   const [editor, setEditor] = useState<EditorState>(initialEditorState);
   const [copy, setCopy] = useState<CopyState | null>(null);
   const [pendingChange, setPendingChange] = useState<PendingChange | null>(null);
@@ -428,6 +431,18 @@ export function CustomLlmsContent() {
     if (change?.kind === 'copy') await submitCopy(change.input);
   }, [pendingChange, submitUpsert, submitCopy]);
 
+  const handleSetEnabled = useCallback(
+    async (publicId: string, isEnabled: boolean) => {
+      try {
+        await setEnabledMutation.mutateAsync({ public_id: publicId, is_enabled: isEnabled });
+        toast.success(isEnabled ? 'Custom LLM enabled' : 'Custom LLM disabled');
+      } catch (error) {
+        toast.error(formatZodError(error));
+      }
+    },
+    [setEnabledMutation]
+  );
+
   const handleDelete = useCallback(
     async (publicId: string) => {
       try {
@@ -458,6 +473,7 @@ export function CustomLlmsContent() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Enabled</TableHead>
               <TableHead>Public ID</TableHead>
               <TableHead>Display Name</TableHead>
               <TableHead>Access</TableHead>
@@ -468,13 +484,25 @@ export function CustomLlmsContent() {
           <TableBody>
             {data?.items.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="text-muted-foreground text-center">
+                <TableCell colSpan={6} className="text-muted-foreground text-center">
                   No custom LLMs defined yet.
                 </TableCell>
               </TableRow>
             )}
             {data?.items.map(item => (
               <TableRow key={item.public_id}>
+                <TableCell>
+                  <Switch
+                    checked={item.is_enabled}
+                    onCheckedChange={checked => handleSetEnabled(item.public_id, checked)}
+                    disabled={
+                      setEnabledMutation.isPending &&
+                      setEnabledMutation.variables?.public_id === item.public_id
+                    }
+                    aria-label={`${item.is_enabled ? 'Disable' : 'Enable'} ${item.public_id}`}
+                    title={item.is_enabled ? 'Disable custom LLM' : 'Enable custom LLM'}
+                  />
+                </TableCell>
                 <TableCell className="font-mono text-sm">{item.public_id}</TableCell>
                 <TableCell>{item.definition.display_name}</TableCell>
                 <TableCell>
@@ -703,6 +731,10 @@ export function CustomLlmsContent() {
                     </code>{' '}
                     to offer it to everyone, subject to organization provider allow lists. Without
                     any of these, nobody can use the model.
+                  </li>
+                  <li>
+                    A disabled custom LLM is treated as deleted until it is enabled again; a
+                    disabled partner falls back to the gateway.
                   </li>
                   <li>
                     Routing picks up changes within about a minute; public models and new providers

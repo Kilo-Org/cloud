@@ -53,8 +53,10 @@ function reportUnparseableCustomLlm(publicId: string, error: unknown): void {
   });
 }
 
+/** Disabled rows are skipped, so a disabled custom LLM behaves as if it were deleted. */
 function parseAllCustomLlmRows(rows: readonly CustomLlm2[]): CustomLlm[] {
   return rows.flatMap(row => {
+    if (!row.is_enabled) return [];
     const parsed = CustomLlmDefinitionSchema.safeParse(row.definition);
     if (!parsed.success) {
       reportUnparseableCustomLlm(row.public_id, parsed.error);

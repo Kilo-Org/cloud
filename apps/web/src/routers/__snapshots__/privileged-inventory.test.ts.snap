@@ -153,6 +153,7 @@ exports[`privileged inventory covers discovered tRPC procedures the guarded proc
   "admin.customLlm.copy mutation [admin] -> trpc.admin.customLlm",
   "admin.customLlm.delete mutation [admin] -> trpc.admin.customLlm",
   "admin.customLlm.list query [admin] -> trpc.admin.customLlm",
+  "admin.customLlm.setEnabled mutation [admin] -> trpc.admin.customLlm",
   "admin.customLlm.upsert mutation [admin] -> trpc.admin.customLlm",
   "admin.customPricing.get query [admin] -> trpc.admin.customPricing",
   "admin.customPricing.set mutation [admin] -> trpc.admin.customPricing",

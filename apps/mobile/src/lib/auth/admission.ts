@@ -100,6 +100,8 @@ function isInvalidKeyError(error: unknown): boolean {
   return invalidKeyErrorSchema.safeParse(error).success;
 }
 
+const invalidInputErrorSchema = z.object({ code: z.literal('ERR_APP_INTEGRITY_INVALID_INPUT') });
+
 /**
  * Run one native App Attest call, reporting a genuine rejection before it
  * propagates. The rejection is unchanged for the caller.
@@ -128,10 +130,9 @@ async function callNativeStep<T>(
  * app was reinstalled, or restored onto another device. Clear it and re-attest
  * once, so the device is not stuck asserting against a key that is gone.
  *
- * Clearing that id is an expected, recovered step, so it files nothing; every
- * other genuine native rejection is reported before it is normalized and still
- * propagates exactly as before, so the caller's retryable message and the
- * recovery above are unchanged.
+ * Treat `invalidInput` on a stored-key assertion the same way: the bridge
+ * hashes every challenge to 32 bytes, so retry with a fresh key once. Keep
+ * reporting `invalidInput` to distinguish it from expected `invalidKey`.
  */
 async function getAppleAdmission(challenge: string): Promise<AdmissionPayload> {
   const storedKeyId = await SecureStore.getItemAsync(ATTEST_KEY_ID_KEY);
@@ -148,7 +149,9 @@ async function getAppleAdmission(challenge: string): Promise<AdmissionPayload> {
     } catch (error) {
       if (!isInvalidKeyError(error)) {
         reportAppAttestFailure('generateAssertion', error);
-        throw error;
+        if (!invalidInputErrorSchema.safeParse(error).success) {
+          throw error;
+        }
       }
       await SecureStore.deleteItemAsync(ATTEST_KEY_ID_KEY);
     }

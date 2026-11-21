@@ -112,6 +112,12 @@ function invalidKeyError() {
   });
 }
 
+function invalidInputError() {
+  return Object.assign(new Error('Invalid input provided'), {
+    code: 'ERR_APP_INTEGRITY_INVALID_INPUT',
+  });
+}
+
 /** What the Expo module rejects with when Play Integrity invalidates its prepared provider. */
 function providerInvalidError() {
   return Object.assign(new Error('Integrity token provider invalid'), {
@@ -291,6 +297,64 @@ describe('getAdmission', () => {
     await expect(getAdmission()).rejects.toThrow('server down');
     expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
     expect(AppIntegrity.generateKeyAsync).not.toHaveBeenCalled();
+  });
+
+  it('files the invalid-input rejection, drops the stale id, and attests once', async () => {
+    const fetchSpy = setupChallengeFetch();
+    const { getAdmission, events } = await loadGetAdmissionWithEvents();
+    vi.mocked(SecureStore.getItemAsync).mockResolvedValue('key-stale');
+    vi.mocked(AppIntegrity.generateAssertionAsync).mockRejectedValue(invalidInputError());
+
+    await expect(getAdmission()).resolves.toEqual({
+      platform: 'ios',
+      kind: 'attestation',
+      challenge: 'server-challenge',
+      payload: 'attestation-b64',
+      keyId: 'key-1',
+    });
+
+    expect(events.map(event => event.tags)).toEqual([
+      {
+        'app_attest.step': 'generateAssertion',
+        'app_attest.error_domain': 'DCErrorDomain',
+        'app_attest.error_code': 2,
+      },
+    ]);
+    expect(AppIntegrity.generateAssertionAsync).toHaveBeenCalledTimes(1);
+    expect(SecureStore.deleteItemAsync).toHaveBeenCalledExactlyOnceWith(ATTEST_KEY_ID_KEY);
+    expect(AppIntegrity.generateKeyAsync).toHaveBeenCalledTimes(1);
+    expect(AppIntegrity.attestKeyAsync).toHaveBeenCalledExactlyOnceWith(
+      'key-1',
+      'server-challenge'
+    );
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a failed recovery attestation and leaves the attempt retryable', async () => {
+    setupChallengeFetch();
+    const { getAdmission, events } = await loadGetAdmissionWithEvents();
+    vi.mocked(SecureStore.getItemAsync).mockResolvedValue('key-stale');
+    vi.mocked(AppIntegrity.generateAssertionAsync).mockRejectedValue(invalidInputError());
+    const failure = Object.assign(new Error('[ExpoAppIntegrity]: Server unavailable'), {
+      code: 'ERR_APP_INTEGRITY_SERVER_UNAVAILABLE',
+    });
+    vi.mocked(AppIntegrity.attestKeyAsync).mockRejectedValue(failure);
+
+    await expect(getAdmission()).rejects.toBe(failure);
+
+    expect(events.map(event => event.tags)).toEqual([
+      {
+        'app_attest.step': 'generateAssertion',
+        'app_attest.error_domain': 'DCErrorDomain',
+        'app_attest.error_code': 2,
+      },
+      {
+        'app_attest.step': 'attestKey',
+        'app_attest.error_domain': 'DCErrorDomain',
+        'app_attest.error_code': 4,
+      },
+    ]);
+    expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
   });
 
   // ── App Attest step diagnostics ────────────────────────────────────────

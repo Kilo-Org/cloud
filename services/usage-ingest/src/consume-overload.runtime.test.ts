@@ -214,7 +214,7 @@ async function testQueueRetryDelay(randomValue: number) {
           msgId: 'queue-0',
           delaySeconds:
             status === 'admission'
-              ? 1 + Math.floor(randomValue * 4)
+              ? 1 + Math.floor(randomValue * 2)
               : 60 + Math.floor(randomValue * 61),
         },
       ]);

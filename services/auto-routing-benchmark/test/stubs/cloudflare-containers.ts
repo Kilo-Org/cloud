@@ -10,13 +10,23 @@ export class Container<Env = unknown> {
   defaultPort?: number;
   sleepAfter?: string;
   protected readonly env: Env;
+  // The class under test reads its durable cancellation tombstones from `this.ctx.storage`;
+  // the runtime base class keeps the Durable Object context, so the stub must too.
+  protected readonly ctx: unknown;
 
-  constructor(_ctx: unknown, env: Env) {
+  constructor(ctx: unknown, env: Env) {
+    this.ctx = ctx;
     this.env = env;
   }
 
   async fetch(_request: Request): Promise<Response> {
     return new Response(null, { status: 501 });
+  }
+
+  // The class under test reads the container state to keep a cancel from starting an
+  // instance that has no subprocess to stop; tests replace this to pick a state.
+  async getState(): Promise<{ status: 'stopped'; lastChange: number }> {
+    return { status: 'stopped', lastChange: Date.now() };
   }
 
   async destroy(): Promise<void> {}

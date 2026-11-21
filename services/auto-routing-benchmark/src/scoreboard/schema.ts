@@ -214,6 +214,12 @@ export const LiveScoreboardTableRowSchema = z.object({
     .pipe(EffortByComplexitySchema)
     .nullish()
     .transform(value => value ?? null),
+  // Exact desired platform membership recorded with this publication; null on rows written
+  // before the paid cutover. The scoreboard never reads it — it only has to round-trip.
+  desired_pairs: storedJsonSchema
+    .pipe(z.array(z.string()))
+    .nullish()
+    .transform(value => value ?? null),
   source: z.string(),
 });
 

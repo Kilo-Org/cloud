@@ -249,6 +249,26 @@ describe('mcp-catalog catalog', () => {
       }
     });
 
+    it('withholds paid benchmark confirmation while keeping reads and pause', () => {
+      const leaves = collectCatalogLeaves(rootRouter).filter(leaf =>
+        leaf.path.startsWith('customRouterBenchmarks.')
+      );
+      const { rows } = buildCatalogRows(
+        leaves,
+        new Map(leaves.map(leaf => [leaf.path, 'Benchmark procedure.']))
+      );
+      const paths = rows.map(row => row.path);
+      expect(leaves.some(leaf => leaf.path === 'customRouterBenchmarks.start')).toBe(true);
+      expect(paths).not.toContain('customRouterBenchmarks.start');
+      expect(paths).toEqual(
+        expect.arrayContaining([
+          'customRouterBenchmarks.quote',
+          'customRouterBenchmarks.progress',
+          'customRouterBenchmarks.pause',
+        ])
+      );
+    });
+
     it('fails on a zero-row catalog instead of emitting an empty one', () => {
       expect(() => buildCatalogRows([queryLeaf('admin.nothing')])).toThrow(/zero catalog rows/);
       expect(() => buildCatalogRows([])).toThrow(/zero catalog rows/);

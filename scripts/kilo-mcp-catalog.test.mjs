@@ -124,7 +124,7 @@ const catalogPathFragments = [
   // alters catalog.json (inputSchema, tags, searchBlob) without touching
   // apps/web. The derived test below keeps this list honest.
   /services\/cloud-agent-next\/src\/shared\//,
-  /packages\/\(app-shared\|cloud-agent-profile\|cloud-agent-sdk\|kiloclaw-instance-tiers\|kiloclaw-secret-catalog\|organization-entitlement\|session-ingest-contracts\)\/src\//,
+  /packages\/\(app-shared\|auto-routing-contracts\|cloud-agent-profile\|cloud-agent-sdk\|kiloclaw-instance-tiers\|kiloclaw-secret-catalog\|organization-entitlement\|session-ingest-contracts\)\/src\//,
 ];
 // A `git diff --exit-code` that covers both committed artifacts in the order
 // the workflow writes them (catalog first, then the generated skill), so

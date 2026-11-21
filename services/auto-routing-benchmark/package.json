@@ -19,7 +19,7 @@
     "smoke:scheduler": "tsx scripts/scheduler-smoke.ts",
     "test": "vitest run && pnpm run test:deploy && pnpm run test:python",
     "test:python": "tmp=$(mktemp -d) && python3 -m venv \"$tmp/venv\" && \"$tmp/venv/bin/pip\" install --quiet -r repo-study/requirements.txt && (cd scripts && \"$tmp/venv/bin/python\" -m unittest test_router_ledger test_router_study test_router_proof test_router_replay.ReplayInvariants) && (cd repo-study && \"$tmp/venv/bin/python\" -m unittest test_text_tariffs); status=$?; rm -rf \"$tmp\"; exit $status",
-    "test:deploy": "tsx --test scripts/deploy.test.mjs"
+    "test:deploy": "tsx --test scripts/deploy.test.mjs scripts/legacy-cancel.test.mjs"
   },
   "dependencies": {
     "@cloudflare/containers": "0.1.1",

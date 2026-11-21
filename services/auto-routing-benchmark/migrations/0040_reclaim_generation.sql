@@ -1,0 +1,1 @@
+ALTER TABLE `paid_benchmark_request_cases` ADD `generation` integer;

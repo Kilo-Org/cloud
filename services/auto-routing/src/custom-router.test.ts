@@ -5,7 +5,9 @@ import {
   CUSTOM_ROUTER_EVAL_CASE_PATH,
   CUSTOM_ROUTER_EVAL_PLAN_PATH,
   CUSTOM_ROUTER_EVAL_RESULT_PATH,
+  CUSTOM_ROUTER_EPOCH_PATH,
   CUSTOM_ROUTER_TABLE_PATH,
+  CUSTOM_ROUTER_TABLE_VERSION_PATH,
   CustomRouterDecideResponseSchema,
   verifyAutoDecision,
   type AutoRoutingMode,
@@ -32,6 +34,7 @@ import { clearOrganizationPolicyCache } from './organization-policy';
 import { app } from './index';
 
 const findCustomRouter = vi.hoisted(() => vi.fn());
+const findServingCustomRouter = vi.hoisted(() => vi.fn());
 const findCustomRouterById = vi.hoisted(() => vi.fn());
 const classifyNormalizedInput = vi.hoisted(() => vi.fn());
 const findEffectiveOrganizationMemberRole = vi.hoisted(() => vi.fn());
@@ -48,6 +51,7 @@ const dbRows = vi.hoisted(() => ({
 vi.mock('./custom-router-store', async importOriginal => ({
   ...(await importOriginal<typeof CustomRouterStoreModule>()),
   findCustomRouter,
+  findServingCustomRouter,
   findCustomRouterById,
 }));
 
@@ -420,6 +424,10 @@ beforeEach(() => {
   dbRows.blacklistLookupError = null;
   dbRows.blacklistLookups = [];
   findCustomRouter.mockReset().mockResolvedValue(customRouter());
+  findServingCustomRouter.mockReset().mockImplementation(async () => {
+    const router = await findCustomRouter();
+    return router ? { router, aliasTargets: new Map([[ALIAS, NEW_TARGET]]) } : null;
+  });
   findCustomRouterById.mockReset().mockResolvedValue(customRouter());
   findEffectiveOrganizationMemberRole.mockReset().mockResolvedValue('member');
   findOrganizationMemberBalanceRow.mockReset().mockResolvedValue(memberBalanceRow());
@@ -431,6 +439,12 @@ beforeEach(() => {
   recordUsage.mockClear();
   cacheIdFromName.mockClear();
   benchmarkFetch.mockReset().mockImplementation(async url => {
+    if (new URL(url).pathname === CUSTOM_ROUTER_EPOCH_PATH) {
+      return Response.json({ epoch: 1 });
+    }
+    if (new URL(url).pathname === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
+      return Response.json({ readinessVersion: 'readiness-1' });
+    }
     if (new URL(url).pathname === CUSTOM_ROUTER_TABLE_PATH) {
       return Response.json({ table: customTable });
     }
@@ -445,6 +459,64 @@ afterEach(async () => {
   clearEmailDomainBlacklistCache();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+});
+
+const ALIAS = '~anthropic/latest';
+const servingPin = {
+  model: SONNET,
+  pinnedAt: '2026-11-20T00:00:00.000Z',
+  requestId: '33333333-3333-4333-8333-333333333333',
+  confirmedAt: '2026-11-20T00:00:00.000Z',
+};
+const aliasEntry: CustomRouterEntry = { kind: 'gateway', model: ALIAS, servingPin };
+const aliasTable = table({
+  [ROUTE]: [{ model: ALIAS, accuracy: 0.9, avgCostUsd: 0.01, meetsThreshold: true, variant: null }],
+});
+const usablePin = () =>
+  benchmarkFetch.mockImplementation(async url => {
+    if (new URL(url).pathname === CUSTOM_ROUTER_EPOCH_PATH) {
+      return Response.json({ epoch: 2 });
+    }
+    if (new URL(url).pathname === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
+      return Response.json({ readinessVersion: 'readiness-pinned' });
+    }
+    if (new URL(url).pathname === CUSTOM_ROUTER_TABLE_PATH) {
+      return Response.json({
+        table: aliasTable,
+        servingPins: { [`gateway:${ALIAS}`]: SONNET },
+      });
+    }
+    return Response.json({ error: 'unexpected path' }, { status: 500 });
+  });
+
+// A pinned alias whose saved target the worker catalog no longer has: the pin is unusable, so
+// the pool serves the live alias and the worker says so on the entry key.
+const retiredPin = () =>
+  benchmarkFetch.mockImplementation(async url => {
+    const path = new URL(url).pathname;
+    if (path === CUSTOM_ROUTER_EPOCH_PATH) return Response.json({ epoch: 2 });
+    if (path === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
+      return Response.json({ readinessVersion: 'readiness-retired' });
+    }
+    if (path === CUSTOM_ROUTER_TABLE_PATH) {
+      return Response.json({
+        table: aliasTable,
+        servingFallback: [`gateway:${ALIAS}`],
+      });
+    }
+    return Response.json({ error: 'unexpected path' }, { status: 500 });
+  });
+
+const aliasOnlyPool = () =>
+  customRouter({ entries: [aliasEntry], defaultEntryKey: `gateway:${ALIAS}` });
+const NEW_TARGET = 'openai/gpt-5.2';
+
+// The snapshot the route reads: the pool with its observed pin for the target it measured, and the
+// target the alias moved to. A retirement serves the alias, so the stored target is what the
+// gateway substitutes for it.
+const servingSnapshot = (router = aliasOnlyPool()) => ({
+  router,
+  aliasTargets: new Map([[ALIAS, NEW_TARGET]]),
 });
 
 describe('public custom router decide', () => {
@@ -579,6 +651,451 @@ describe('public custom router decide', () => {
     });
   });
 
+  it('serves the live alias with the fallback marker when the pinned target retired', async () => {
+    findServingCustomRouter.mockResolvedValue(servingSnapshot());
+    retiredPin();
+    const { decision, decisionId } = await decisionOf(
+      await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody())
+    );
+    expect(decision).toMatchObject({
+      entry: { kind: 'gateway', model: ALIAS },
+      model: ALIAS,
+      servingFallback: true,
+      fallback: false,
+      stale: false,
+      tableVersion: 'custom-table-1',
+    });
+    expect(decision).not.toHaveProperty('servingPin');
+    // The verifier needs the entry, the exact saved pin the fallback was proven against, and the
+    // stored target it must substitute for the bare alias at redemption.
+    const verified = await verifyAutoDecision(decisionId, DECISION_SECRET, Date.now());
+    expect(verified).toEqual({
+      ok: true,
+      payload: expect.objectContaining({
+        model: ALIAS,
+        entryModel: ALIAS,
+        servingFallback: true,
+        servingPinModel: SONNET,
+        servingFallbackTarget: NEW_TARGET,
+      }),
+    });
+  });
+
+  it('serves the retired pin fallback without a routing table', async () => {
+    findServingCustomRouter.mockResolvedValue(servingSnapshot());
+    classifyNormalizedInput.mockRejectedValue(new Error('classifier down'));
+    benchmarkFetch.mockImplementation(async url => {
+      const path = new URL(url).pathname;
+      if (path === CUSTOM_ROUTER_EPOCH_PATH) return Response.json({ epoch: 2 });
+      if (path === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
+        return Response.json({ readinessVersion: 'readiness-empty' });
+      }
+      if (path === CUSTOM_ROUTER_TABLE_PATH) {
+        return Response.json({ table: null, servingFallback: [`gateway:${ALIAS}`] });
+      }
+      return Response.json({ error: 'unexpected path' }, { status: 500 });
+    });
+    const { decision } = await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    expect(decision).toMatchObject({
+      entry: { kind: 'gateway', model: ALIAS },
+      model: ALIAS,
+      servingFallback: true,
+      fallback: true,
+      tableVersion: null,
+    });
+  });
+
+  it('retries a retirement fallback the snapshot cannot name a target for', async () => {
+    findServingCustomRouter.mockResolvedValue({ router: aliasOnlyPool(), aliasTargets: new Map() });
+    retiredPin();
+    const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
+    expect(res.status).toBe(500);
+    expect(res.headers.get('retry-after')).toBe('5');
+    expect(await errorCode(res)).toBe('internal_error');
+  });
+
+  it('retries a retirement fallback whose stored target never moved off the pin', async () => {
+    findServingCustomRouter.mockResolvedValue({
+      router: aliasOnlyPool(),
+      aliasTargets: new Map([[ALIAS, SONNET]]),
+    });
+    retiredPin();
+    const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
+    expect(res.status).toBe(500);
+    expect(await errorCode(res)).toBe('internal_error');
+  });
+
+  it('signs the new stored target when an alias already moved again', async () => {
+    findServingCustomRouter.mockResolvedValue({
+      router: aliasOnlyPool(),
+      aliasTargets: new Map([[ALIAS, NEW_TARGET]]),
+    });
+    retiredPin();
+    const { decisionId } = await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    const verified = await verifyAutoDecision(decisionId, DECISION_SECRET, Date.now());
+    expect(verified).toEqual({
+      ok: true,
+      payload: expect.objectContaining({
+        servingFallback: true,
+        servingPinModel: SONNET,
+        servingFallbackTarget: NEW_TARGET,
+      }),
+    });
+  });
+
+  it('marks nothing when the pinned target is still usable', async () => {
+    findServingCustomRouter.mockResolvedValue(servingSnapshot());
+    usablePin();
+    const { decision } = await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    expect(decision).toMatchObject({ model: SONNET, servingPin });
+    expect(decision).not.toHaveProperty('servingFallback');
+  });
+
+  it('marks nothing when the worker reports no retirement for a saved pin', async () => {
+    findServingCustomRouter.mockResolvedValue(servingSnapshot());
+    benchmarkFetch.mockImplementation(async url => {
+      const path = new URL(url).pathname;
+      if (path === CUSTOM_ROUTER_EPOCH_PATH) return Response.json({ epoch: 2 });
+      if (path === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
+        return Response.json({ readinessVersion: 'readiness-alias' });
+      }
+      if (path === CUSTOM_ROUTER_TABLE_PATH) return Response.json({ table: aliasTable });
+      return Response.json({ error: 'unexpected path' }, { status: 500 });
+    });
+    const { decision } = await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    expect(decision).toMatchObject({ entry: { kind: 'gateway', model: ALIAS }, model: ALIAS });
+    expect(decision).not.toHaveProperty('servingFallback');
+  });
+
+  it('never dispatches a denied retired pin: the allowed live target is served and marked', async () => {
+    // The saved pin names a denied model, but the benchmark worker reported that exact target left
+    // its catalog (`servingFallback`), so the pin is not what would run. The live alias target is
+    // openai/gpt-5.2, which the policy cleared, so the pool serves that and says so on the wire.
+    findServingCustomRouter.mockResolvedValue(servingSnapshot());
+    gatewayDeniedModelIds = [SONNET];
+    retiredPin();
+    const { decision, decisionId } = await decisionOf(
+      await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody(), {
+        'X-KiloCode-OrganizationId': ORG_ID,
+      })
+    );
+    // Safe only because the retirement is marked and the denied model is never dispatched: the
+    // decision names the alias, not SONNET, and carries the retirement marker the gateway needs.
+    expect(decision).toMatchObject({
+      entry: { kind: 'gateway', model: ALIAS },
+      model: ALIAS,
+      servingFallback: true,
+      fallback: false,
+    });
+    expect(decision).not.toHaveProperty('servingPin');
+    expect(decision.model).not.toBe(SONNET);
+    // The signature binds the denied pin it retired and the concrete target it must substitute,
+    // so redemption cannot follow an alias move into a model the policy never checked.
+    const verified = await verifyAutoDecision(decisionId, DECISION_SECRET, Date.now());
+    expect(verified).toEqual({
+      ok: true,
+      payload: expect.objectContaining({
+        model: ALIAS,
+        entryModel: ALIAS,
+        servingFallback: true,
+        servingPinModel: SONNET,
+        servingFallbackTarget: NEW_TARGET,
+      }),
+    });
+  });
+
+  it('refuses a denied pin that still applies instead of unpinning it', async () => {
+    // The same pool and denial, but the worker still lists the pin: it is what would run, so the
+    // entry is unservable rather than silently swapped for its alias.
+    findServingCustomRouter.mockResolvedValue(servingSnapshot());
+    gatewayDeniedModelIds = [SONNET];
+    usablePin();
+    const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody(), {
+      'X-KiloCode-OrganizationId': ORG_ID,
+    });
+    expect(res.status).toBe(422);
+    expect(await errorCode(res)).toBe('custom_router_unavailable');
+  });
+
+  it('serves the pinned target the fresh definition carries on the first request after a move', async () => {
+    // The isolate's cached read still shows the pre-move pool; the authoritative read the route
+    // uses already carries the observed pin, so this request must dispatch the old target.
+    findCustomRouter.mockResolvedValue(
+      customRouter({
+        entries: [{ kind: 'gateway', model: ALIAS }],
+        defaultEntryKey: `gateway:${ALIAS}`,
+      })
+    );
+    findServingCustomRouter.mockResolvedValue(servingSnapshot());
+    usablePin();
+    const { decision } = await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    expect(decision).toMatchObject({
+      entry: { kind: 'gateway', model: ALIAS },
+      model: SONNET,
+      servingPin,
+    });
+    expect(findServingCustomRouter).toHaveBeenCalledWith(
+      env,
+      { type: 'user', id: USER_ID },
+      'mine'
+    );
+  });
+
+  it('refuses a pool the authoritative read no longer finds', async () => {
+    findCustomRouter.mockResolvedValue(aliasOnlyPool());
+    findServingCustomRouter.mockResolvedValue(null);
+    const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
+    expect(res.status).toBe(404);
+    expect(await errorCode(res)).toBe('router_not_found');
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
+  });
+
+  it('turns a failed authoritative read into a retryable error instead of the stale pool', async () => {
+    findCustomRouter.mockResolvedValue(aliasOnlyPool());
+    findServingCustomRouter.mockRejectedValue(new Error('connection terminated'));
+    const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
+    expect(res.status).toBe(500);
+    expect(res.headers.get('retry-after')).toBe('5');
+    expect(await errorCode(res)).toBe('internal_error');
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
+  });
+
+  it('ignores a caller-supplied definition on the public CLI path', async () => {
+    // The public request schema has no such field, so a forged pool is stripped before any policy
+    // or ranking runs, and the saved pool still decides.
+    findServingCustomRouter.mockResolvedValue(servingSnapshot(customRouter()));
+    const forged = customRouter({
+      ownerId: 'someone-else',
+      slug: 'other',
+      entries: [aliasEntry],
+      defaultEntryKey: `gateway:${ALIAS}`,
+    });
+    const { decision } = await decisionOf(
+      await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody({ customRouterDefinition: forged }))
+    );
+    expect(decision).toMatchObject({
+      entry: { kind: 'client', provider: 'ollama', model: 'qwen3:32b' },
+    });
+    expect(findServingCustomRouter).toHaveBeenCalledWith(
+      env,
+      { type: 'user', id: USER_ID },
+      'mine'
+    );
+  });
+
+  it('dispatches the pinned target of a ranked alias entry under its logical key', async () => {
+    findCustomRouter.mockResolvedValue(
+      customRouter({ entries: [aliasEntry], defaultEntryKey: `gateway:${ALIAS}` })
+    );
+    usablePin();
+    const { decision, decisionId } = await decisionOf(
+      await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody())
+    );
+    expect(decision).toMatchObject({
+      entry: { kind: 'gateway', model: ALIAS },
+      model: SONNET,
+      servingPin,
+      fallback: false,
+    });
+    const verified = await verifyAutoDecision(decisionId, DECISION_SECRET, Date.now());
+    expect(verified).toEqual({
+      ok: true,
+      payload: expect.objectContaining({ model: SONNET, routerModelId: 'kilo-auto/custom/mine' }),
+    });
+  });
+
+  it('dispatches the pinned target on the fallback path too', async () => {
+    findCustomRouter.mockResolvedValue(
+      customRouter({ entries: [aliasEntry], defaultEntryKey: `gateway:${ALIAS}` })
+    );
+    classifyNormalizedInput.mockRejectedValue(new Error('classifier down'));
+    usablePin();
+    const { decision } = await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    expect(decision).toMatchObject({
+      entry: { kind: 'gateway', model: ALIAS },
+      model: SONNET,
+      servingPin,
+      fallback: true,
+    });
+  });
+
+  it('does not serve a pinned entry whose target the organization policy denies', async () => {
+    findCustomRouter.mockResolvedValue(
+      customRouter({ entries: [aliasEntry], defaultEntryKey: `gateway:${ALIAS}` })
+    );
+    gatewayDeniedModelIds = [SONNET];
+    usablePin();
+    const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody(), {
+      'X-KiloCode-OrganizationId': ORG_ID,
+    });
+    expect(res.status).toBe(422);
+    expect(await errorCode(res)).toBe('custom_router_unavailable');
+    const [call] = gatewayCalls();
+    const { modelIds } = JSON.parse(call?.[1]?.body as string) as { modelIds: string[] };
+    // The policy is asked about every id the entry could dispatch: the pool model, the live alias
+    // target from the same snapshot, and the saved pin. All three are evaluated, so a denied pin is
+    // refused rather than silently unpinned to a target the policy never checked. The policy helper
+    // de-duplicates and sorts before it asks, so this is the exact order on the wire.
+    expect(modelIds).toEqual([SONNET, NEW_TARGET, ALIAS]);
+  });
+
+  it('serves the next request after a settlement because the router epoch moved', async () => {
+    await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    const paths = () => benchmarkFetch.mock.calls.map(([url]) => new URL(String(url)).pathname);
+    const tableFetches = () => paths().filter(path => path === CUSTOM_ROUTER_TABLE_PATH).length;
+    expect(tableFetches()).toBe(1);
+
+    // No clock movement and no polling interval: the very next request sees the new epoch, finds
+    // this pool's own ready set unchanged, and serves its cache without rebuilding.
+    benchmarkFetch.mockImplementation(async url => {
+      const path = new URL(String(url)).pathname;
+      if (path === CUSTOM_ROUTER_EPOCH_PATH) return Response.json({ epoch: 2 });
+      if (path === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
+        return Response.json({ readinessVersion: 'readiness-1' });
+      }
+      if (path === CUSTOM_ROUTER_TABLE_PATH) return Response.json({ table: rankedTable });
+      return Response.json({ error: 'unexpected path' }, { status: 500 });
+    });
+    await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    expect(tableFetches()).toBe(1);
+
+    // A pool whose own readiness fingerprint moved under the same new epoch rebuilds once, so a
+    // freshly ready measurement in another pool reaches this one on its next request.
+    benchmarkFetch.mockImplementation(async url => {
+      const path = new URL(String(url)).pathname;
+      if (path === CUSTOM_ROUTER_EPOCH_PATH) return Response.json({ epoch: 3 });
+      if (path === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
+        return Response.json({ readinessVersion: 'readiness-2' });
+      }
+      if (path === CUSTOM_ROUTER_TABLE_PATH) return Response.json({ table: rankedTable });
+      return Response.json({ error: 'unexpected path' }, { status: 500 });
+    });
+    await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    expect(tableFetches()).toBe(2);
+  });
+
+  it('never answers a post-settlement request from a build started before it', async () => {
+    // Epoch 1's table ranks only the stale client entry, so a leaked pre-settlement build is
+    // visible as a fallback/wrong pick rather than just a call count.
+    const oldTable = table({
+      [ROUTE]: [
+        {
+          model: 'client:ollama/qwen3:32b',
+          accuracy: 0.9,
+          avgCostUsd: 0,
+          meetsThreshold: true,
+          variant: null,
+        },
+      ],
+    });
+    const newTable = table({
+      [ROUTE]: [
+        { model: SONNET, accuracy: 0.95, avgCostUsd: 0.01, meetsThreshold: true, variant: null },
+      ],
+    });
+
+    let epoch = 1;
+    const oldBuildEntered = Promise.withResolvers<void>();
+    const oldBuildGate = Promise.withResolvers<void>();
+    benchmarkFetch.mockImplementation(async url => {
+      const path = new URL(String(url)).pathname;
+      if (path === CUSTOM_ROUTER_EPOCH_PATH) return Response.json({ epoch });
+      if (path === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
+        return Response.json({ readinessVersion: `readiness-${epoch}` });
+      }
+      if (path === CUSTOM_ROUTER_TABLE_PATH) {
+        if (epoch === 1) {
+          oldBuildEntered.resolve();
+          await oldBuildGate.promise;
+          return Response.json({ table: oldTable });
+        }
+        return Response.json({ table: newTable });
+      }
+      return Response.json({ error: 'unexpected path' }, { status: 500 });
+    });
+
+    const first = post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
+    await oldBuildEntered.promise;
+    epoch = 2;
+    const { decision: afterSettlement } = await decisionOf(
+      await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()).finally(() => oldBuildGate.resolve())
+    );
+    await decisionOf(await first);
+    const { decision: afterOldBuildLanded } = await decisionOf(
+      await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody())
+    );
+
+    expect(afterSettlement.model).toBe(SONNET);
+    expect(afterOldBuildLanded.model).toBe(SONNET);
+  });
+
+  it('re-reads the actual table once when the epoch endpoint is unavailable', async () => {
+    await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    const tableFetches = () =>
+      benchmarkFetch.mock.calls.filter(
+        ([url]) => new URL(String(url)).pathname === CUSTOM_ROUTER_TABLE_PATH
+      ).length;
+    expect(tableFetches()).toBe(1);
+
+    // A benchmark Worker that predates the epoch endpoint answers 404: the serving side can prove
+    // nothing about the cached table, so it fetches the real one instead of pretending the epoch
+    // is unchanged. The old worker still answers the fingerprint and table paths it always had.
+    benchmarkFetch.mockImplementation(async url => {
+      const path = new URL(String(url)).pathname;
+      if (path === CUSTOM_ROUTER_EPOCH_PATH) return new Response('not found', { status: 404 });
+      if (path === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
+        return Response.json({ readinessVersion: 'readiness-1' });
+      }
+      if (path === CUSTOM_ROUTER_TABLE_PATH) return Response.json({ table: rankedTable });
+      return Response.json({ error: 'unexpected path' }, { status: 500 });
+    });
+    const { decision } = await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    // The rebuilt table served normally; only the epoch proof was unavailable.
+    expect(decision.fallback).toBe(false);
+    expect(tableFetches()).toBe(2);
+
+    // The next unprovable request must re-read the actual table again, so a second 404 can observe
+    // a table that changed after the first, and an unknown epoch is never cached as proof.
+    benchmarkFetch.mockImplementation(async url => {
+      const path = new URL(String(url)).pathname;
+      if (path === CUSTOM_ROUTER_EPOCH_PATH) return new Response('not found', { status: 404 });
+      if (path === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
+        return Response.json({ readinessVersion: 'readiness-2' });
+      }
+      if (path === CUSTOM_ROUTER_TABLE_PATH) {
+        return Response.json({
+          table: table({
+            [ROUTE]: [
+              {
+                model: SONNET,
+                accuracy: 0.99,
+                avgCostUsd: 0.01,
+                meetsThreshold: true,
+                variant: null,
+              },
+            ],
+          }),
+        });
+      }
+      return Response.json({ error: 'unexpected path' }, { status: 500 });
+    });
+    const second = await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    expect(tableFetches()).toBe(3);
+    expect(second.decision.entry).toMatchObject({ kind: 'gateway', model: SONNET });
+  });
+
+  it('fails retryably when the epoch is unprovable and the table cannot be read', async () => {
+    await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    benchmarkFetch.mockImplementation(async url => {
+      const path = new URL(String(url)).pathname;
+      if (path === CUSTOM_ROUTER_EPOCH_PATH) return new Response('not found', { status: 404 });
+      return new Response('down', { status: 503 });
+    });
+    const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
+    expect(res.status).toBe(500);
+    expect(await errorCode(res)).toBe('internal_error');
+  });
+
   const imageMessages = [
     {
       role: 'user',
@@ -657,6 +1174,60 @@ describe('public custom router decide', () => {
       organizationId: ORG_ID,
       modelIds: [SONNET],
     });
+  });
+
+  it('asks the policy about the live alias target the entry would actually dispatch', async () => {
+    findServingCustomRouter.mockResolvedValue(
+      servingSnapshot(
+        customRouter({
+          entries: [{ kind: 'gateway', model: ALIAS }],
+          defaultEntryKey: `gateway:${ALIAS}`,
+        })
+      )
+    );
+    await decisionOf(
+      await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody(), { 'X-KiloCode-OrganizationId': ORG_ID })
+    );
+    const [call] = gatewayCalls();
+    // The alias and the concrete target it stores from this same snapshot, so the worker can route
+    // around a denied target instead of reaching the gateway and being refused there. A pin-less
+    // entry contributes exactly those two ids. `deniedOrganizationModelIds` de-duplicates and sorts
+    // before it asks, so compare sorted membership rather than request order.
+    expect(JSON.parse(call?.[1]?.body as string)).toEqual({
+      userId: USER_ID,
+      organizationId: ORG_ID,
+      // Sorted by the policy helper: `openai/gpt-5.2` then `~anthropic/latest`.
+      modelIds: [NEW_TARGET, ALIAS],
+    });
+  });
+
+  it('routes around an alias entry whose live target the organization policy denies', async () => {
+    findServingCustomRouter.mockResolvedValue(
+      servingSnapshot(
+        customRouter({
+          entries: [
+            { kind: 'gateway', model: ALIAS },
+            { kind: 'gateway', model: SONNET },
+          ],
+          defaultEntryKey: `gateway:${ALIAS}`,
+        })
+      )
+    );
+    customTable = table({
+      [ROUTE]: [
+        { model: ALIAS, accuracy: 0.95, avgCostUsd: 0.01, meetsThreshold: true, variant: null },
+        { model: SONNET, accuracy: 0.85, avgCostUsd: 0.01, meetsThreshold: true, variant: null },
+      ],
+    });
+    gatewayDeniedModelIds = [NEW_TARGET];
+    const { decision } = await decisionOf(
+      await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody({ clientEntries: [] }), {
+        'X-KiloCode-OrganizationId': ORG_ID,
+      })
+    );
+    // The alias entry is unservable because its stored target is denied, so the sibling serves.
+    expect(decision).toMatchObject({ model: SONNET, entry: { model: SONNET } });
+    expect(decision).not.toHaveProperty('servingFallback');
   });
 
   it('skips the organization policy for a personal context', async () => {
@@ -809,7 +1380,11 @@ describe('public custom router decide', () => {
 
   it('resolves a personal router for the authenticated user', async () => {
     await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
-    expect(findCustomRouter).toHaveBeenCalledWith(env, { type: 'user', id: USER_ID }, 'mine');
+    expect(findServingCustomRouter).toHaveBeenCalledWith(
+      env,
+      { type: 'user', id: USER_ID },
+      'mine'
+    );
   });
 
   it('resolves an organization router only in that organization context', async () => {
@@ -826,7 +1401,7 @@ describe('public custom router decide', () => {
         'X-KiloCode-OrganizationId': ORG_ID,
       })
     );
-    expect(findCustomRouter).toHaveBeenCalledWith(env, { type: 'org', id: ORG_ID }, 'team');
+    expect(findServingCustomRouter).toHaveBeenCalledWith(env, { type: 'org', id: ORG_ID }, 'team');
     expect(findEffectiveOrganizationMemberRole).toHaveBeenCalledWith(expect.anything(), {
       kiloUserId: USER_ID,
       organizationId: ORG_ID,
@@ -846,7 +1421,11 @@ describe('public custom router decide', () => {
       }
     );
     expect(res.status).toBe(200);
-    expect(findCustomRouter).toHaveBeenCalledWith(env, { type: 'org', id: otherOrg }, 'team');
+    expect(findServingCustomRouter).toHaveBeenCalledWith(
+      env,
+      { type: 'org', id: otherOrg },
+      'team'
+    );
   });
 
   it('denies an organization context the user is not a member of', async () => {
@@ -986,7 +1565,13 @@ describe('internal custom router decide', () => {
       'decision',
       expect.objectContaining({ model: SONNET })
     );
-    expect(benchmarkFetch).toHaveBeenCalledTimes(1);
+    // Exactly one table build; the readiness probe is a separate, cheap call by design.
+    const benchmarkPaths = () =>
+      benchmarkFetch.mock.calls.map(([url]) => new URL(String(url)).pathname);
+    expect(benchmarkPaths().filter(path => path === CUSTOM_ROUTER_TABLE_PATH)).toHaveLength(1);
+    expect(benchmarkPaths().filter(path => path === CUSTOM_ROUTER_TABLE_VERSION_PATH)).toHaveLength(
+      1
+    );
     expect(
       cacheIdFromName.mock.calls.every(([key]) => key.startsWith(`custom:${ROUTER_ID}:`))
     ).toBe(true);
@@ -1000,6 +1585,173 @@ describe('internal custom router decide', () => {
     const res = await internalDecide({ customRouter: { scope: 'org', slug: 'team' } });
     expect(res.status).toBe(404);
     expect(findCustomRouter).not.toHaveBeenCalled();
+  });
+
+  it('routes from the definition the authenticated caller supplied', async () => {
+    findCustomRouter.mockResolvedValue(null);
+    const res = await internalDecide({
+      customRouter: { scope: 'user', slug: 'mine' },
+      customRouterDefinition: customRouter({
+        entries: [sonnet],
+        defaultEntryKey: `gateway:${SONNET}`,
+      }),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toHaveProperty('decision', expect.objectContaining({ model: SONNET }));
+    expect(findCustomRouter).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['another owner', { ownerId: 'someone-else' }],
+    ['an organization owner', { ownerType: 'org' as const, ownerId: ORG_ID }],
+    ['another slug', { slug: 'other' }],
+    ['another base router', { baseRouter: 'frontier' as const }],
+  ])('refuses a supplied definition that names %s', async (_label, overrides) => {
+    findCustomRouter.mockResolvedValue(customRouter());
+    const res = await internalDecide({
+      router: 'efficient',
+      customRouter: { scope: 'user', slug: 'mine' },
+      customRouterDefinition: customRouter(overrides),
+    });
+    expect(res.status).toBe(404);
+    expect(await errorCode(res)).toBe('router_not_found');
+    expect(classifyNormalizedInput).not.toHaveBeenCalled();
+  });
+
+  it('accepts a supplied definition without a stated base router', async () => {
+    const res = await internalDecide({
+      customRouter: { scope: 'user', slug: 'mine' },
+      customRouterDefinition: customRouter({ baseRouter: 'frontier' }),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it('keeps the stored pool and its deny policy for callers without a definition', async () => {
+    findCustomRouter.mockResolvedValue(
+      customRouter({ entries: [aliasEntry, ollama], defaultEntryKey: `gateway:${ALIAS}` })
+    );
+    const res = await internalDecide({
+      router: 'efficient',
+      routingPolicy: { deniedModelIds: [SONNET] },
+      customRouter: { scope: 'user', slug: 'mine' },
+      clientEntries: [{ provider: 'ollama', model: 'qwen3:32b' }],
+    });
+    expect(res.status).toBe(200);
+    expect(findCustomRouter).toHaveBeenCalledWith(env, { type: 'user', id: USER_ID }, 'mine');
+    expect(await res.json()).toHaveProperty(
+      'decision',
+      expect.objectContaining({ model: 'client:ollama/qwen3:32b' })
+    );
+  });
+
+  it('carries the retired-pin marker on the private path', async () => {
+    findCustomRouter.mockResolvedValue(aliasOnlyPool());
+    benchmarkFetch.mockImplementation(async url => {
+      const path = new URL(url).pathname;
+      if (path === CUSTOM_ROUTER_EPOCH_PATH) return Response.json({ epoch: 2 });
+      if (path === CUSTOM_ROUTER_TABLE_VERSION_PATH) {
+        return Response.json({ readinessVersion: 'readiness-retired' });
+      }
+      if (path === CUSTOM_ROUTER_TABLE_PATH) {
+        return Response.json({ table: aliasTable, servingFallback: [`gateway:${ALIAS}`] });
+      }
+      return Response.json({ error: 'unexpected path' }, { status: 500 });
+    });
+    const res = await internalDecide({ customRouter: { scope: 'user', slug: 'mine' } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toHaveProperty(
+      'decision',
+      expect.objectContaining({ model: ALIAS, servingFallback: true })
+    );
+  });
+
+  it('does not let a denied retired pin block the pool it left', async () => {
+    // The saved pin names a model the policy denies, but the worker proved that target left the
+    // catalog: the live alias serves instead, so the entry is still servable and still ranked.
+    findCustomRouter.mockResolvedValue(aliasOnlyPool());
+    customTable = aliasTable;
+    retiredPin();
+    const res = await internalDecide({
+      customRouter: { scope: 'user', slug: 'mine' },
+      routingPolicy: { deniedModelIds: [SONNET] },
+      customRouterAliasTargets: { [ALIAS]: NEW_TARGET },
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toHaveProperty(
+      'decision',
+      expect.objectContaining({ model: ALIAS, servingFallback: true, fallback: false })
+    );
+  });
+
+  it('routes around an entry whose live alias target the policy denies', async () => {
+    // No saved pin: the entry would dispatch whatever the alias stores, and that target is denied.
+    // Its sibling stays servable, so the pool serves the sibling instead of failing.
+    findCustomRouter.mockResolvedValue(
+      customRouter({
+        entries: [{ kind: 'gateway', model: ALIAS }, sonnet],
+        defaultEntryKey: `gateway:${ALIAS}`,
+      })
+    );
+    customTable = table({
+      [ROUTE]: [
+        { model: ALIAS, accuracy: 0.95, avgCostUsd: 0.01, meetsThreshold: true, variant: null },
+        { model: SONNET, accuracy: 0.85, avgCostUsd: 0.01, meetsThreshold: true, variant: null },
+      ],
+    });
+    const res = await internalDecide({
+      customRouter: { scope: 'user', slug: 'mine' },
+      routingPolicy: { deniedModelIds: [NEW_TARGET] },
+      customRouterAliasTargets: { [ALIAS]: NEW_TARGET },
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toHaveProperty(
+      'decision',
+      expect.objectContaining({ model: SONNET, fallback: false })
+    );
+  });
+
+  it('refuses the alias entry when its only live target the policy denies has no sibling', async () => {
+    findCustomRouter.mockResolvedValue(aliasOnlyPool());
+    customTable = aliasTable;
+    const res = await internalDecide({
+      customRouter: { scope: 'user', slug: 'mine' },
+      routingPolicy: { deniedModelIds: [NEW_TARGET] },
+      customRouterAliasTargets: { [ALIAS]: NEW_TARGET },
+    });
+    expect(res.status).toBe(422);
+    expect(await errorCode(res)).toBe('custom_router_unavailable');
+  });
+
+  it('ignores alias targets the supplied definition does not own', async () => {
+    // A map naming a model outside the pool cannot make that model servable, and a target for an
+    // entry this definition lacks is dropped before it can steer the decision.
+    findCustomRouter.mockResolvedValue(null);
+    const res = await internalDecide({
+      customRouter: { scope: 'user', slug: 'mine' },
+      customRouterDefinition: customRouter({
+        entries: [sonnet],
+        defaultEntryKey: `gateway:${SONNET}`,
+      }),
+      customRouterAliasTargets: { [ALIAS]: NEW_TARGET },
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toHaveProperty('decision', expect.objectContaining({ model: SONNET }));
+  });
+
+  it('rejects an alias-target map with an alias or virtual target', async () => {
+    const res = await internalDecide({
+      customRouter: { scope: 'user', slug: 'mine' },
+      customRouterAliasTargets: { [ALIAS]: '~openai/latest' },
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('decides from the stored pool when the caller sends no alias targets', async () => {
+    // An older gateway sends no map: the pool still serves its measured entry, never a bare alias.
+    findCustomRouter.mockResolvedValue(customRouter({ entries: [sonnet] }));
+    const res = await internalDecide({ customRouter: { scope: 'user', slug: 'mine' } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toHaveProperty('decision', expect.objectContaining({ model: SONNET }));
   });
 
   it('still rejects callers without the internal secret', async () => {

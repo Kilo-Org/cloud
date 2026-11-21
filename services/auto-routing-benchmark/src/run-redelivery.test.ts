@@ -1,6 +1,8 @@
+import { BENCHMARK_CASE_INFERENCE_PATH } from '@kilocode/auto-routing-contracts';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
+import { BENCHMARK_CASE_HEADER, verifyCaseInferenceCapability } from './case-inference-capability';
 import { DECIDER_CASES } from './datasets/decider-cases';
 import { DeciderGraderRetryError } from './grading';
 import {
@@ -35,6 +37,7 @@ describe('a paid case whose queue invocation is canceled (production migrations 
   let claim: SchedulerClaim;
   let delivery: BenchmarkJobMessage;
   let answer: string;
+  let schedulerWaits: Array<{ reason: string; errorType: string }>;
 
   beforeEach(async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
@@ -44,6 +47,27 @@ describe('a paid case whose queue invocation is canceled (production migrations 
     );
     sqlite = new DatabaseSync(':memory:');
     applyBenchmarkMigrations(sqlite);
+    sqlite
+      .prepare('INSERT INTO benchmark_cutover (id, cutover_at) VALUES (1, ?)')
+      .run('1970-01-01T00:00:00.000Z');
+    schedulerWaits = [];
+    // The paid path reports a refused or failed start as a structured scheduler wait; keep
+    // the reason so a fixture break names the cause instead of a bare "never started".
+    vi.spyOn(console, 'warn').mockImplementation((line: unknown) => {
+      if (typeof line !== 'string') return;
+      try {
+        const parsed = JSON.parse(line) as {
+          event?: string;
+          reason?: string;
+          errorType?: string;
+        };
+        if (parsed.event === 'benchmark_scheduler_wait' && parsed.reason) {
+          schedulerWaits.push({ reason: parsed.reason, errorType: parsed.errorType ?? 'unknown' });
+        }
+      } catch {
+        // A non-JSON warn is unrelated to the paid start.
+      }
+    });
     sent = [];
     runRequests = [];
     runStarted = Promise.withResolvers<void>();
@@ -71,6 +95,9 @@ describe('a paid case whose queue invocation is canceled (production migrations 
       },
       BENCH_RUNNER: { idFromName: (name: string) => name, get: () => container },
       BENCHMARK_SCHEDULER_CONFIG: SLOTS,
+      // Every provider call goes through the case-scoped capability, so the worker needs its
+      // signing secret even in this harness.
+      INTERNAL_API_SECRET_PROD: { get: async () => 'case-inference-secret' },
       BOT_TOKEN_MINT_SECRET: { get: async () => 'mint-secret' },
       KILO_WEB_API_BASE_URL: 'https://app.test',
       KILO_CLI_API_URL: 'https://api.test',
@@ -81,10 +108,16 @@ describe('a paid case whose queue invocation is canceled (production migrations 
       .prepare(`
       INSERT INTO benchmark_runs (
         id, router, kind, purpose, status, started_at, min_accuracy, switch_cost_factor,
-        max_concurrency, repetitions, engine_identity, benchmark_user_id, benchmark_org_id
-      ) VALUES (?, 'efficient', 'decider', 'platform', 'running', ?, 0.7, 3, 0, 1, ?, 'bot-internal-benchmark', 'benchmark-org')
+        max_concurrency, repetitions, engine_identity, benchmark_user_id, benchmark_org_id,
+        admission_marker
+      ) VALUES (?, 'efficient', 'decider', 'platform', 'running', ?, 0.7, 3, 0, 1, ?, 'bot-internal-benchmark', 'benchmark-org', ?)
     `)
-      .run(RUN_ID, new Date(NOW).toISOString(), computeEngineIdentity('decider', 'efficient'));
+      .run(
+        RUN_ID,
+        new Date(NOW).toISOString(),
+        computeEngineIdentity('decider', 'efficient'),
+        crypto.randomUUID()
+      );
     const models = ['lane/model', 'other/model'];
     for (const model of models) {
       sqlite
@@ -186,9 +219,101 @@ describe('a paid case whose queue invocation is canceled (production migrations 
   }
 
   async function cancelDuringPaidCase() {
-    void processJob(env, delivery);
+    // A rejection here is the real answer: the paid path stopped before the container ever
+    // received the case, so surface the exact error instead of waiting out the suite timeout.
+    const job = processJob(env, delivery);
+    const outcome = await Promise.race([
+      job.then(
+        () => 'settled' as const,
+        (error: unknown) => ({ error }) as const
+      ),
+      runStarted.promise.then(() => 'started' as const),
+    ]);
+    if (outcome !== 'started') {
+      const reported = schedulerWaits.map(wait => `${wait.reason}/${wait.errorType}`).join(', ');
+      if (outcome === 'settled')
+        throw new Error(
+          `processJob settled without ever starting the paid case (scheduler wait: ${reported || 'none logged'})`
+        );
+      throw outcome.error as Error;
+    }
     await runStarted.promise;
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM scheduler_executions').get()?.n).toBe(1);
+    await expectCanonicalPaidStart();
+  }
+
+  /** The canonical case run this invocation opened, plus the guarded chunk it sits under. */
+  function canonicalCaseRun() {
+    return sqlite
+      .prepare(
+        `SELECT engine_identity, model, variant, rep, case_id, status, generation,
+          executor_run_id, executor_token, platform_covered, result_usable, started_at
+        FROM benchmark_case_runs`
+      )
+      .get();
+  }
+
+  /**
+   * The paid start owns one canonical generation: the case run row, the guarded chunk and
+   * the capability the CLI receives all name the same tuple. Anything else would let a
+   * redelivery infer a second time or bill a case nobody asked for.
+   */
+  async function expectCanonicalPaidStart() {
+    const caseId = JSON.parse(claim.case_ids)[0] as string;
+    expect(canonicalCaseRun()).toEqual({
+      engine_identity: computeEngineIdentity('decider', 'efficient'),
+      model: claim.model,
+      variant: claim.variant,
+      rep: claim.rep,
+      case_id: caseId,
+      status: 'running',
+      generation: 1,
+      executor_run_id: RUN_ID,
+      executor_token: claim.token,
+      platform_covered: 1,
+      result_usable: 0,
+      started_at: new Date(NOW).toISOString(),
+    });
+    expect(storedChunk(claim.id)).toEqual({
+      status: 'active',
+      token: claim.token,
+      slot: claim.slot,
+    });
+    // The capability must verify against the worker secret and name this exact generation,
+    // so the gateway can attribute the call and the case never spends under a general token.
+    const body = await runRequests[0].clone().json<{
+      inferenceProxy: {
+        url: string;
+        authorization: string;
+        invocation: string;
+        invocationHeader: string;
+        catalog: { url: string; authorization: string };
+      };
+    }>();
+    const { inferenceProxy } = body;
+    expect(inferenceProxy.url).toBe(
+      new URL(BENCHMARK_CASE_INFERENCE_PATH, env.BENCH_RESULT_URL).toString()
+    );
+    expect(inferenceProxy.authorization).toMatch(/^Bearer \S+$/);
+    const headers = new Headers({
+      authorization: inferenceProxy.authorization,
+      [inferenceProxy.invocationHeader]: inferenceProxy.invocation,
+    });
+    expect(inferenceProxy.invocationHeader).toBe(BENCHMARK_CASE_HEADER);
+    await expect(
+      verifyCaseInferenceCapability('case-inference-secret', headers, NOW)
+    ).resolves.toEqual({
+      engineIdentity: computeEngineIdentity('decider', 'efficient'),
+      runId: RUN_ID,
+      model: claim.model,
+      variant: claim.variant,
+      caseId,
+      repetition: claim.rep,
+      generation: 1,
+      startedAt: NOW,
+    });
+    // A case capability never carries the platform bot token for inference.
+    expect(inferenceProxy.catalog?.authorization).toBe('Bearer kilo-user-token');
   }
 
   async function redeliverAt(time: number) {

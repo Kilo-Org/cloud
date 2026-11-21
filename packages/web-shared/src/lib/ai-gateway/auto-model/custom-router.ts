@@ -4,12 +4,12 @@ import {
   type CustomRouterDefinition,
   type CustomRouterErrorCode,
   type CustomRouterReference,
+  type GatewayCustomRouterEntry,
 } from '@kilocode/auto-routing-contracts';
 import type { CustomRouterDecisionOutcome } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
-import {
-  findCustomRouter,
-  type CustomRouterOwner,
-} from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
+import { findDecisionPool } from '@kilocode/web-shared/lib/ai-gateway/auto-model/decision-pool';
+import type { CustomRouterOwner } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
+import { isLatestAliasId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export type CustomRouterResolution =
@@ -33,7 +33,9 @@ export async function decideCustomRouter(params: {
   deniedModelIds: (candidateModelIds: ReadonlyArray<string>) => Promise<string[]>;
   decide: (
     router: CustomRouterDefinition,
-    deniedModelIds: ReadonlyArray<string>
+    deniedModelIds: ReadonlyArray<string>,
+    /** Alias -> concrete target from the same snapshot, for the worker's own candidate set. */
+    aliasTargets: ReadonlyMap<string, string>
   ) => Promise<CustomRouterDecisionOutcome>;
 }): Promise<CustomRouterResolution> {
   const owner: CustomRouterOwner | null =
@@ -42,27 +44,95 @@ export async function decideCustomRouter(params: {
       : params.organizationId
         ? { type: 'org', id: params.organizationId }
         : null;
-  const router = owner ? await findCustomRouter(owner, params.reference.slug) : null;
-  if (!router) return CUSTOM_ROUTER_NOT_FOUND;
+  const pool = owner ? await findDecisionPool(owner, params.reference.slug) : null;
+  if (!pool) return CUSTOM_ROUTER_NOT_FOUND;
+  const { router, aliasTargets } = pool;
 
-  const gatewayModelIds = router.entries.flatMap(entry =>
-    entry.kind === 'gateway' ? [entry.model] : []
+  const gatewayEntries = router.entries.filter(
+    (entry): entry is GatewayCustomRouterEntry => entry.kind === 'gateway'
   );
-  const deniedModelIds = await params.deniedModelIds(gatewayModelIds);
-  const outcome = await params.decide(router, deniedModelIds);
+  const gatewayModelIds = gatewayEntries.map(entry => entry.model);
+  // The concrete model the stored config serves for an alias. Both dispatch paths use it, so the
+  // deny policy below names exactly the model that will run rather than the alias that could be
+  // remapped downstream.
+  const aliasConcreteTarget = (model: string): string | null =>
+    isLatestAliasId(model) ? (aliasTargets.get(model) ?? null) : model;
+  // A pinned entry dispatches its concrete target instead of its pool model, so the policy is
+  // evaluated for both, plus every alias's snapshot concrete target.
+  const dispatchableModelIds = [
+    ...new Set(
+      gatewayEntries.flatMap(entry => {
+        const target = aliasConcreteTarget(entry.model);
+        return [
+          entry.model,
+          ...(target ? [target] : []),
+          ...(entry.servingPin ? [entry.servingPin.model] : []),
+        ];
+      })
+    ),
+  ];
+  const deniedModelIds = await params.deniedModelIds(dispatchableModelIds);
+  // The worker gets the same targets this policy was derived from, so it can route around a
+  // denied live target instead of ranking an alias the gateway would refuse downstream.
+  const outcome = await params.decide(router, deniedModelIds, aliasTargets);
   if (outcome.kind !== 'ok') return outcome;
 
   const { decision } = outcome;
+  const entryModel = decision?.entry?.kind === 'gateway' ? decision.entry.model : null;
+  const pinned = entryModel
+    ? gatewayEntries.find(entry => entry.model === entryModel)?.servingPin
+    : undefined;
+  const dispatchesEntry = decision !== null && decision.model === entryModel;
+  const dispatchesPin =
+    pinned !== undefined && decision !== null && decision.model === pinned.model;
+  const markedFallback =
+    decision !== null && 'servingFallback' in decision && decision.servingFallback === true;
+  const stableModel = decision === null ? null : aliasConcreteTarget(decision.model);
+  // A saved pin is the concrete target this pool promised. Serving the entry's own id instead is
+  // the Worker's retirement answer, which it must mark and which must map to a different concrete
+  // target in this snapshot; an older Worker that never saw this definition, or a stored target
+  // that is the retired pin itself, would otherwise silently drop the target the gateway checked.
+  const servesEntryUnderPin =
+    pinned !== undefined &&
+    pinned.model !== entryModel &&
+    dispatchesEntry &&
+    !(markedFallback && stableModel !== null && stableModel !== pinned.model);
+  const pinMatchesDecision =
+    decision?.servingPin === undefined || decision.servingPin.model === decision.model;
   if (
-    decision?.entry?.kind !== 'gateway' ||
-    !gatewayModelIds.includes(decision.model) ||
-    deniedModelIds.includes(decision.model)
+    decision === null ||
+    !entryModel ||
+    !gatewayModelIds.includes(entryModel) ||
+    (!dispatchesEntry && !dispatchesPin) ||
+    servesEntryUnderPin ||
+    !pinMatchesDecision ||
+    // The dispatched model is what runs; the pool model is the identity the policy names. Both
+    // must be clear, so a denied alias cannot be reached through an allowed pin (or the reverse).
+    deniedModelIds.includes(decision.model) ||
+    deniedModelIds.includes(entryModel) ||
+    (stableModel !== null && deniedModelIds.includes(stableModel))
   ) {
     warnExceptInTest('Custom router decision is not a servable pool entry', {
       routerModelId: customRouterModelId(router.ownerType, router.slug),
       model: decision?.model ?? null,
+      entry: entryModel,
     });
     return { kind: 'unavailable' };
   }
-  return { kind: 'ok', decision };
+  // Dispatch the concrete model this snapshot proved, so a later alias move cannot remap the
+  // request after its policy was checked. An alias with no stored target keeps its own id: it is
+  // uninitialized rather than remapped, and refusing it would invent a policy the gateway lacks.
+  if (!isLatestAliasId(decision.model) || stableModel === null) {
+    return { kind: 'ok', decision };
+  }
+  // The dispatched model is no longer the pinned target, so the pin does not describe it.
+  const { servingPin: _pinnedTarget, ...dispatched } = decision;
+  return {
+    kind: 'ok',
+    decision: {
+      ...dispatched,
+      model: stableModel,
+      entry: { kind: 'gateway', model: stableModel },
+    },
+  };
 }

@@ -217,17 +217,16 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   // picker does. Only a failure with nothing delivered names its cause and Retry.
   //
   // v5 downgrades a no-data refetch back to `pending` and clears `error`, so the
-  // failure has to survive the Retry's own request: `isError || (isLoading &&
-  // isFetched)` is the idiom `tool-summary-translation-settings-screen.tsx` uses,
-  // and `hasDeliveredData` must be the delivered list, not `isFetched` (true
-  // after a failed read too).
+  // failure has to survive the Retry's own request, and `hasDeliveredData` must
+  // be the delivered list, not `isFetched` (true after a failed read too).
   const modelsBody = classifyListBody({
     rowCount: models.length,
     hasDeliveredData: modelsDelivered,
-    // A first load that already settled once is not a failure while the warm
-    // list still answers, so the retry-stable error needs the empty list too —
-    // the guard `tool-summary-translation-settings-screen.tsx` carries.
-    isError: (modelsUnavailableFlag || (modelsLoading && modelsFetched)) && models.length === 0,
+    // The classifier answers `rows` before it reads `isError` whenever the
+    // catalogue delivered any row, so a warm list already keeps the picker
+    // usable through a failure; only a read that delivered nothing reaches
+    // this branch.
+    isError: modelsUnavailableFlag || (modelsLoading && modelsFetched),
     isFetching: modelsFetching,
     fetchStatus: modelsFetchStatus,
     connectivityKnown: connectivity !== 'unknown',

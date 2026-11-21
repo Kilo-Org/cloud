@@ -1,23 +1,29 @@
 /* eslint-disable max-lines -- one mounted suite for the create contract: the name gate, the three exits,
-   the failure copy, and the durable draft share one mock harness. */
+   the failure announcement, the offline settle and the durable draft share one mock harness. */
 
 // Create-organization screen contract: an empty name is refused before any
 // request, a valid one creates with `autoAddCreator`, the new organization
 // becomes the selection and the stack lands on its hub — popped over the hub
 // the boundary entered with, pushed past itself from the Profile entry — a
 // create whose screen was left only refreshes the list, a failed refresh
-// reports the organization without moving the selection, a failure shows the
-// server's copy, the submit control stays disabled until a name is typed, and
-// the durable draft restores the name and is cleared once the create lands.
-// The tRPC client is mocked so no request leaves the test.
+// reports the organization without moving the selection, a failure is
+// announced through the status line and frees the form even while the
+// connectivity manager reports the device offline, the submit control stays
+// disabled until a name is typed, and the durable draft restores the name and
+// is cleared once the create lands. The tRPC client is mocked so no request
+// leaves the test.
 
 import { createElement } from 'react';
+import { onlineManager } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import '@/i18n';
+// Rendered for real: the announced-status contract — a polite live region on
+// Android, `announceForAccessibility` on iOS — is what the failure cases pin.
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { CreateOrganizationScreen } from './create-organization-screen';
 import { ORGANIZATION_HUB_PATH, ORGANIZATION_HUB_ROUTE_NAME } from '@/lib/organization-navigation';
 
@@ -25,6 +31,13 @@ import { ORGANIZATION_HUB_PATH, ORGANIZATION_HUB_ROUTE_NAME } from '@/lib/organi
 // shared doubles live in `vi.hoisted` and the factories only read them.
 const mocks = vi.hoisted(() => ({
   createMutate: vi.fn(),
+  // Stands in for tRPC's own `mutationOptions`, which emits the key and the
+  // function alongside the caller's options.
+  createOptions: vi.fn((options: Record<string, unknown>) => ({
+    ...options,
+    mutationKey: ['organizations.create'],
+    mutationFn: (input: { name: string; autoAddCreator?: boolean }) => mocks.createMutate(input),
+  })),
   replace: vi.fn(),
   setOrganizationId: vi.fn(),
   focused: { current: true },
@@ -87,8 +100,14 @@ vi.mock('expo-router', () => ({
 }));
 
 vi.mock('@/lib/trpc', () => ({
-  trpcClient: { organizations: { create: { mutate: mocks.createMutate } } },
-  useTRPC: () => ({ organizations: { list: { queryKey: () => ['organizations.list'] } } }),
+  useTRPC: () => ({
+    organizations: {
+      list: { queryKey: () => ['organizations.list'] },
+      // The screen builds its mutation from the typed options it ships with, so
+      // the mounted behavior covers the options tRPC would attach in the app.
+      create: { mutationOptions: mocks.createOptions },
+    },
+  }),
 }));
 
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
@@ -158,7 +177,15 @@ vi.mock('@/components/ui/text', async () => {
   };
 });
 
-vi.mock('react-native', () => ({ View: 'View', Platform: { OS: 'ios' } }));
+// `AccessibleStatus` renders live, so its iOS announcement channel is the
+// surface the failure cases assert.
+const announce = vi.hoisted(() => vi.fn());
+
+vi.mock('react-native', () => ({
+  View: 'View',
+  Platform: { OS: 'ios' },
+  AccessibilityInfo: { announceForAccessibility: announce },
+}));
 
 function mount() {
   return renderWithProviders(createElement(CreateOrganizationScreen));
@@ -170,7 +197,10 @@ type Handler = (value?: string) => void;
  * The element's prop callback, narrowed out of the renderer's untyped props so
  * the call is checked rather than an unsafe `any` invocation.
  */
-function handlerOf(node: ReactTestInstance, name: 'onPress' | 'onChangeText'): Handler | undefined {
+function handlerOf(
+  node: ReactTestInstance,
+  name: 'onPress' | 'onChangeText' | 'onSubmitEditing'
+): Handler | undefined {
   const handler: unknown = node.props[name];
   return typeof handler === 'function' ? (handler as Handler) : undefined;
 }
@@ -187,6 +217,11 @@ function texts(renderer: ReactTestRenderer): unknown[] {
   return renderer.root.findAllByType('Text').flatMap(node => node.props.children);
 }
 
+/** The status line's `AccessibleStatus`, matched only while it renders a line. */
+function statusOf(renderer: ReactTestRenderer): ReactTestInstance {
+  return renderer.root.find(node => node.type === AccessibleStatus && node.props.message != null);
+}
+
 async function type(renderer: ReactTestRenderer, value: string) {
   await act(() => {
     handlerOf(inputOf(renderer), 'onChangeText')?.(value);
@@ -201,6 +236,7 @@ function setStack(names: string[]) {
 
 beforeEach(() => {
   mocks.createMutate.mockReset();
+  mocks.createOptions.mockClear();
   mocks.replace.mockClear();
   mocks.setOrganizationId.mockClear();
   mocks.focused.current = true;
@@ -211,6 +247,10 @@ beforeEach(() => {
   errorCopy.lookup.mockClear();
   router.dismissTo.mockClear();
   router.push.mockClear();
+  announce.mockClear();
+  // A case that leaves the device offline must not park the next one with a
+  // paused scheduler.
+  onlineManager.setOnline(true);
   // The Profile entry pushes create: it is the only route of the organization
   // Stack when it mounts.
   setStack(['create']);
@@ -269,6 +309,8 @@ describe('CreateOrganizationScreen', () => {
       handlerOf(submitOf(renderer), 'onPress')?.();
     });
 
+    // `autoAddCreator` is the server's default-off flag the caller must send to
+    // become the new organization's owner.
     expect(mocks.createMutate).toHaveBeenCalledWith({ name: 'Acme', autoAddCreator: true });
     expect(mocks.setOrganizationId).toHaveBeenCalledWith('org-new');
     expect(mocks.replace).toHaveBeenCalledWith(ORGANIZATION_HUB_PATH);
@@ -422,6 +464,145 @@ describe('CreateOrganizationScreen', () => {
 
     expect(mocks.replace).not.toHaveBeenCalled();
     expect(texts(renderer)).toContain('You already own the maximum number of organizations.');
+    unmount();
+  });
+
+  it('reports a failure through the announced status line', async () => {
+    mocks.createMutate.mockRejectedValue(
+      new Error('You already own the maximum number of organizations.')
+    );
+    const { renderer, unmount } = await mount();
+
+    await type(renderer, 'Acme');
+    await act(() => {
+      handlerOf(submitOf(renderer), 'onPress')?.();
+    });
+
+    const status = statusOf(renderer);
+    expect(status.props.message).toBe('You already own the maximum number of organizations.');
+    expect(status.props.tone).toBe('error');
+    // The iOS announcement channel; Android reads the same status through the
+    // live region `AccessibleStatus` renders.
+    expect(announce).toHaveBeenCalledWith('You already own the maximum number of organizations.');
+    unmount();
+  });
+
+  it('announces a repeated identical refusal as a new event', async () => {
+    const { renderer, unmount } = await mount();
+
+    // The keyboard's Done action, not the submit button: with no name typed the
+    // button is disabled, so a person reaches a second identical refusal only
+    // from the field.
+    await act(() => {
+      handlerOf(inputOf(renderer), 'onSubmitEditing')?.();
+    });
+    expect(texts(renderer)).toContain('Enter an organization name.');
+    expect(mocks.createMutate).not.toHaveBeenCalled();
+    expect(announce).toHaveBeenCalledTimes(1);
+    expect(announce).toHaveBeenCalledWith('Enter an organization name.');
+    const first = statusOf(renderer);
+
+    // Nothing typed between the submits, so the line stays rendered with the
+    // same words. Only the keyed remount makes that a new announcement: the
+    // announcement hook's own dedupe would drop an unchanged message.
+    await act(() => {
+      handlerOf(inputOf(renderer), 'onSubmitEditing')?.();
+    });
+
+    expect(statusOf(renderer)).not.toBe(first);
+    expect(statusOf(renderer).props.message).toBe('Enter an organization name.');
+    expect(announce).toHaveBeenCalledTimes(2);
+    expect(announce).toHaveBeenLastCalledWith('Enter an organization name.');
+    // A fresh instance, not a second line: the screen still shows one.
+    expect(renderer.root.findAll(node => node.type === AccessibleStatus)).toHaveLength(1);
+    unmount();
+  });
+
+  it('settles the form when the request cannot reach the server and the retry then succeeds', async () => {
+    // The online manager reporting offline pauses a default `networkMode:
+    // 'online'` mutation forever: no request, `isPending` never settles, and
+    // the form stays locked. `networkMode: 'always'` sends it, so the
+    // unreachable request rejects and the form returns through `onError`.
+    onlineManager.setOnline(false);
+    mocks.createMutate.mockRejectedValueOnce(new Error('offline fixture'));
+    const { renderer, queryClient, unmount } = await mount();
+    queryClient.setQueryData(['organizations.list'], [{ organizationId: 'org-new' }]);
+
+    await type(renderer, 'Acme');
+    await act(() => {
+      handlerOf(submitOf(renderer), 'onPress')?.();
+    });
+
+    const status = statusOf(renderer);
+    expect(status.props.message).toBe('offline fixture');
+    expect(status.props.tone).toBe('error');
+    expect(announce).toHaveBeenLastCalledWith('offline fixture');
+    expect(mocks.createMutate).toHaveBeenCalledTimes(1);
+    // The failure released the form: the tap target and the field are back.
+    expect(submitOf(renderer).props.disabled).toBe(false);
+    expect(inputOf(renderer).props.editable).toBe(true);
+
+    // Back online, the same name creates for real.
+    onlineManager.setOnline(true);
+    mocks.createMutate.mockResolvedValueOnce({ organization: { id: 'org-new' } });
+    await act(() => {
+      handlerOf(submitOf(renderer), 'onPress')?.();
+    });
+
+    expect(mocks.setOrganizationId).toHaveBeenCalledWith('org-new');
+    expect(mocks.replace).toHaveBeenCalledWith(ORGANIZATION_HUB_PATH);
+    unmount();
+  });
+
+  it('settles the form while offline when the create itself succeeds', async () => {
+    // Radio off with the create still reaching the server (an edge server
+    // accepts it): the list refetch the completion awaits must not pause, or
+    // the submit stays busy over a created-but-unaddressable organization.
+    onlineManager.setOnline(false);
+    mocks.createMutate.mockResolvedValue({ organization: { id: 'org-new' } });
+    const { renderer, queryClient, unmount } = await mount();
+    // The refetch behind the invalidation could not be served; the list still
+    // says the membership is missing, so the screen reports it and moves on
+    // instead of holding the busy state.
+    queryClient.setQueryData(['organizations.list'], []);
+
+    await type(renderer, 'Acme');
+    await act(() => {
+      handlerOf(submitOf(renderer), 'onPress')?.();
+    });
+
+    expect(mocks.setOrganizationId).not.toHaveBeenCalled();
+    expect(mocks.replace).not.toHaveBeenCalled();
+    expect(submitOf(renderer).props.disabled).toBe(false);
+    expect(statusOf(renderer).props.message).toBe(
+      'Organization created. It will appear in the picker shortly.'
+    );
+    unmount();
+  });
+
+  it('drops a second tap while the create is in flight but not after the failure', async () => {
+    const pending = Promise.withResolvers<{ organization: { id: string } }>();
+    mocks.createMutate.mockReturnValue(pending.promise);
+    const { renderer, unmount } = await mount();
+
+    await type(renderer, 'Acme');
+    await act(() => {
+      handlerOf(submitOf(renderer), 'onPress')?.();
+    });
+    expect(mocks.createMutate).toHaveBeenCalledTimes(1);
+    expect(submitOf(renderer).props.disabled).toBe(true);
+
+    // The lock drops the tap before `isPending` alone would.
+    await act(() => {
+      handlerOf(submitOf(renderer), 'onPress')?.();
+    });
+    expect(mocks.createMutate).toHaveBeenCalledTimes(1);
+
+    await act(() => {
+      pending.reject(new Error('boom'));
+    });
+    expect(statusOf(renderer).props.message).toBe('boom');
+    expect(submitOf(renderer).props.disabled).toBe(false);
     unmount();
   });
 

@@ -1467,15 +1467,16 @@ export function createWrapperKiloClient(
       //
       // The metadata such a record still carries is copied into the marker
       // first, because the import the restore runs clears the column: this read
-      // is the last that can see the record's own goal, and the older copy the
-      // marker holds would otherwise be what the settle after the restore puts
-      // back. Only the metadata is rewritten: the permission obligation stays
-      // for the create path exactly as it is, and a marker write that fails is
-      // swallowed as everywhere else here, so it never fails the route.
+      // is the last that can see the record's own goal, and the settle after the
+      // restore has nothing else to put back. That holds whether or not the
+      // marker already owes a metadata value: a marker owing only a ruleset
+      // would otherwise lose the record's goal entirely once the import commits.
+      // Only the metadata is rewritten: the permission obligation stays for the
+      // create path exactly as it is, and a marker write that fails is swallowed
+      // as everywhere else here, so it never fails the route.
       if (isForeignRecord(stored)) {
         if (
           stored.metadata !== undefined &&
-          obligations.metadata !== undefined &&
           stableJson(stored.metadata) !== stableJson(obligations.metadata)
         ) {
           await writeObligations(sessionId, { ...obligations, metadata: stored.metadata });

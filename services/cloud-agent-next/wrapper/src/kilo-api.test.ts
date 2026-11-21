@@ -2014,6 +2014,47 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       }
     });
 
+    it('keeps a re-pointed record metadata even when the marker owes only a ruleset', async () => {
+      const sessionId = 'ses_record_foreign_metadata_rules_only';
+      const directory = temporaryDirectory('kilo-api-foreign-rules-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-foreign-rules-other-');
+      const home = temporaryDirectory('kilo-api-foreign-rules-home-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      const goal = { 'kilo.goal': { text: 'the goal the record carries now', updatedAt: 2 } };
+      const originalHome = process.env.HOME;
+      process.env.HOME = home;
+      try {
+        // The marker owes rules and no metadata, which is what an earlier failed
+        // apply leaves behind.
+        await rememberSessionObligations(sessionId, { permission });
+
+        const foreign = startEnsureSessionStub(sessionId, {
+          id: sessionId,
+          directory: otherDirectory,
+          metadata: goal,
+        });
+        await createClient(foreign.url).settleOutstandingRuleset(sessionId, directory);
+
+        // The goal is taken while the read can still see it; the rules stay owed.
+        expect(foreign.updates).toHaveLength(0);
+        expect(await readSessionObligations(sessionId)).toEqual({ permission, metadata: goal });
+
+        // The import re-points the record here and drops both columns.
+        const repointed = startEnsureSessionStub(sessionId, { id: sessionId, directory });
+        await createClient(repointed.url).settleOutstandingRuleset(sessionId, directory);
+
+        expect(repointed.updates).toEqual([
+          { queryDirectory: directory, body: { metadata: goal } },
+          { queryDirectory: directory, body: { permission } },
+        ]);
+        expect(await readSessionObligations(sessionId)).toBeUndefined();
+      } finally {
+        await forgetSessionObligations(sessionId).catch(() => undefined);
+        if (originalHome === undefined) delete process.env.HOME;
+        else process.env.HOME = originalHome;
+      }
+    });
+
     it('narrows a superseded marker before the import commits the row', async () => {
       const sessionId = 'ses_record_permission_supersede_before_import';
       const directory = temporaryDirectory('kilo-api-supersede-import-target-');

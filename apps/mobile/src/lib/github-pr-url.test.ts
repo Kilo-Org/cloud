@@ -176,4 +176,27 @@ describe('parseGitHubPrUrl', () => {
       parseGitHubPrUrl('[diff](https://github.com/octocat/hello-world/blob/main/a.md)')
     ).toBeNull();
   });
+
+  it('returns null for a paren nest deeper than the peel bound', () => {
+    const url = 'https://github.com/octocat/hello-world/pull/42';
+    expect(parseGitHubPrUrl('('.repeat(20_000) + url + ')'.repeat(20_000))).toBeNull();
+  });
+
+  it('returns null for an angle nest deeper than the peel bound', () => {
+    const url = 'https://github.com/octocat/hello-world/pull/42';
+    expect(parseGitHubPrUrl('<'.repeat(20_000) + url + '>'.repeat(20_000))).toBeNull();
+  });
+
+  it('returns null for a long run of opening brackets', () => {
+    expect(parseGitHubPrUrl('['.repeat(200_000))).toBeNull();
+  });
+
+  it('parses a paren nest that stays inside the peel bound', () => {
+    const url = 'https://github.com/octocat/hello-world/pull/42';
+    expect(parseGitHubPrUrl('('.repeat(6) + url + ')'.repeat(6))).toEqual({
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 42,
+    });
+  });
 });

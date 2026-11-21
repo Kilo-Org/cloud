@@ -48,28 +48,27 @@ export function ScopeListScreen() {
             }}
           />
           {/* A token-gated read is not `isLoading` before the token resolves,
-              so the placeholder follows the payload's absence instead. */}
-          {orgs === undefined ? (
-            <RowSkeleton tile subtitle />
-          ) : (
-            orgs.map(org => (
-              <ConfigureRow
-                key={org.organizationId}
-                icon={Building2}
-                title={org.organizationName}
-                // Every scope row says what it covers, as Personal does; a
-                // member's row says instead that the scope is read-only.
-                subtitle={
-                  org.role === 'member'
-                    ? t('codeReviewer.scopeList.viewOnly')
-                    : t('common.organizationRepositories')
-                }
-                onPress={() => {
-                  openScope(org.organizationId);
-                }}
-              />
-            ))
-          )}
+              so the placeholder follows the payload's absence instead. A read
+              that failed with no rows is the error banner's surface, not a
+              placeholder that never resolves. */}
+          {orgs === undefined && !isError && <RowSkeleton tile subtitle />}
+          {orgs?.map(org => (
+            <ConfigureRow
+              key={org.organizationId}
+              icon={Building2}
+              title={org.organizationName}
+              // Every scope row says what it covers, as Personal does; a
+              // member's row says instead that the scope is read-only.
+              subtitle={
+                org.role === 'member'
+                  ? t('codeReviewer.scopeList.viewOnly')
+                  : t('common.organizationRepositories')
+              }
+              onPress={() => {
+                openScope(org.organizationId);
+              }}
+            />
+          ))}
         </RowGroup>
       </TabScreenScrollView>
     </View>

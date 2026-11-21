@@ -58,6 +58,17 @@ describe('isMissingGrantHistoryProcedureError', () => {
     expect(isMissingGrantHistoryProcedureError(null)).toBe(false);
     expect(isMissingGrantHistoryProcedureError(undefined)).toBe(false);
   });
+
+  it('reads the signature off the plain-object shape the transport hands to a query', () => {
+    // The error a failing query observes is the decoded failure, not always an
+    // `Error` instance: the code sits under `data` and the message on the value.
+    expect(
+      isMissingGrantHistoryProcedureError({
+        message: MISSING_PROCEDURE_MESSAGE,
+        data: { code: 'NOT_FOUND' },
+      })
+    ).toBe(true);
+  });
 });
 
 describe('creditGrantHistoryQueryFn', () => {

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted suite pins the card's skeleton, both error classifications, rows, pin and unbind */
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -22,11 +23,16 @@ type TestBinding = {
 };
 type TestRepoOption = { platform: 'github' | 'gitlab'; fullName: string; private: boolean };
 
+/** The props the mocked `QueryError` host element carries; the renderer keeps them untyped. */
+type RenderedQueryError = { variant?: string; title?: string; onRetry?: () => void };
+
 const h = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
+  connectivity: 'online' as string,
   bindingsQuery: {
     bindings: [] as TestBinding[],
+    error: undefined as unknown,
     isLoading: true,
     isError: false,
     isRefetching: false,
@@ -51,6 +57,9 @@ vi.mock('@/lib/hooks/use-repo-bindings', () => ({
   useRepoOptions: () => h.repoOptions,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: h.success, error: h.error } }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => h.connectivity,
+}));
 vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(),
   impactAsync: vi.fn(),
@@ -129,8 +138,10 @@ function mountSection(organizationId?: string, canManage = true) {
 describe('ProfileRepoPinsSection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    h.connectivity = 'online';
     Object.assign(h.bindingsQuery, {
       bindings: [],
+      error: undefined,
       isLoading: true,
       isError: false,
       isRefetching: false,
@@ -155,14 +166,62 @@ describe('ProfileRepoPinsSection', () => {
   });
 
   it('retryable: a bindings failure shows QueryError and Retry refetches', async () => {
-    Object.assign(h.bindingsQuery, { isError: true, isLoading: false });
+    Object.assign(h.bindingsQuery, {
+      isError: true,
+      isLoading: false,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+    });
     const { renderer, unmount } = await mountSection();
-    const queryError = findAll(renderer.root, 'QueryError')[0];
+
+    // The renderer keeps host props untyped; the stub's props are the screen's own.
+    const queryError = findAll(renderer.root, 'QueryError')[0]?.props as
+      | RenderedQueryError
+      | undefined;
     if (!queryError) {
       throw new Error('QueryError was not rendered');
     }
+    expect(queryError.variant).toBe('server');
+    expect(queryError.title).toBe("Couldn't load profiles");
     act(() => {
-      (queryError.props as { onRetry: () => void }).onRetry();
+      queryError.onRetry?.();
+    });
+    expect(h.bindingsQuery.refetch).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('forbidden: names the permission state and offers no Retry', async () => {
+    Object.assign(h.bindingsQuery, {
+      isError: true,
+      isLoading: false,
+      error: { data: { code: 'FORBIDDEN' } },
+    });
+    const { renderer, unmount } = await mountSection();
+
+    const queryError = findAll(renderer.root, 'QueryError')[0]?.props as
+      | RenderedQueryError
+      | undefined;
+    expect(queryError?.variant).toBe('permission');
+    expect(queryError?.title).toBeUndefined();
+    expect(queryError?.onRetry).toBeUndefined();
+    unmount();
+  });
+
+  it('server: keeps the load-failure title and a Retry that refetches', async () => {
+    Object.assign(h.bindingsQuery, {
+      isError: true,
+      isLoading: false,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+    });
+    const { renderer, unmount } = await mountSection();
+
+    const queryError = findAll(renderer.root, 'QueryError')[0]?.props as
+      | RenderedQueryError
+      | undefined;
+    expect(queryError?.variant).toBe('server');
+    expect(queryError?.title).toBe("Couldn't load profiles");
+    expect(typeof queryError?.onRetry).toBe('function');
+    act(() => {
+      queryError?.onRetry?.();
     });
     expect(h.bindingsQuery.refetch).toHaveBeenCalledTimes(1);
     unmount();

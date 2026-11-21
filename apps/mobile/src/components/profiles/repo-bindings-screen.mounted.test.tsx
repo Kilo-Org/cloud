@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted suite pins loading, both error classifications, the add pickers, unbind and search */
 import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -20,6 +21,9 @@ import { waitFor } from '@/test/render-with-providers';
 type TestRepoOption = { platform: 'github' | 'gitlab'; fullName: string; private: boolean };
 type TestProfile = { id: string; name: string; isDefault: boolean };
 
+/** The props the mocked `QueryError` host element carries; the renderer keeps them untyped. */
+type RenderedQueryError = { variant?: string; title?: string; onRetry?: () => void };
+
 // The picker row for a private repository carries its privacy in the
 // accessible name, so it is matched by that name, never the bare full name.
 const PRIVATE_REPO_LABEL = 'acme/api, private repository';
@@ -27,8 +31,10 @@ const PRIVATE_REPO_LABEL = 'acme/api, private repository';
 const h = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
+  connectivity: 'online' as string,
   bindingsQuery: {
     bindings: [] as TestBinding[],
+    error: undefined as unknown,
     isLoading: true,
     isError: false,
     isRefetching: false,
@@ -69,6 +75,9 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileList: () => h.profileList,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: h.success, error: h.error } }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => h.connectivity,
+}));
 vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(),
   impactAsync: vi.fn(),
@@ -130,8 +139,10 @@ const PROFILE: TestProfile = { id: 'profile-1', name: 'Backend debugging', isDef
 describe('RepoBindingsScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    h.connectivity = 'online';
     Object.assign(h.bindingsQuery, {
       bindings: [],
+      error: undefined,
       isLoading: true,
       isError: false,
       isRefetching: false,
@@ -168,14 +179,58 @@ describe('RepoBindingsScreen', () => {
   });
 
   it('retryable: a bindings query failure shows QueryError and Retry refetches', async () => {
-    Object.assign(h.bindingsQuery, { isError: true, isLoading: false });
+    Object.assign(h.bindingsQuery, {
+      isError: true,
+      isLoading: false,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+    });
 
     const { renderer, unmount } = await mountScreen();
 
-    const queryError = findOne(renderer.root, 'QueryError');
-    expect(queryError.props.title).toBe("Couldn't load profiles");
+    // The renderer keeps host props untyped; the stub's props are the screen's own.
+    const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
+    expect(queryError.title).toBe("Couldn't load profiles");
+    expect(queryError.variant).toBe('server');
     act(() => {
-      (queryError.props as { onRetry: () => void }).onRetry();
+      queryError.onRetry?.();
+    });
+    expect(h.bindingsQuery.refetch).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('forbidden: names the permission state and offers no Retry', async () => {
+    Object.assign(h.bindingsQuery, {
+      isError: true,
+      isLoading: false,
+      error: { data: { code: 'FORBIDDEN' } },
+    });
+
+    const { renderer, unmount } = await mountScreen();
+
+    const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
+    expect(queryError.variant).toBe('permission');
+    expect(queryError.title).toBeUndefined();
+    expect(queryError.onRetry).toBeUndefined();
+
+    unmount();
+  });
+
+  it('server: keeps the load-failure title and a Retry that refetches', async () => {
+    Object.assign(h.bindingsQuery, {
+      isError: true,
+      isLoading: false,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+    });
+
+    const { renderer, unmount } = await mountScreen();
+
+    const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
+    expect(queryError.variant).toBe('server');
+    expect(queryError.title).toBe("Couldn't load profiles");
+    expect(typeof queryError.onRetry).toBe('function');
+    act(() => {
+      queryError.onRetry?.();
     });
     expect(h.bindingsQuery.refetch).toHaveBeenCalledTimes(1);
 

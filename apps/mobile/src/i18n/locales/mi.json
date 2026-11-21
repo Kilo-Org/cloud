@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "Kāore e wātea ana te tuku īmēra i tēnei wā. Whakamātau anō ā muri ake.",
     "admissionRequired": "Kāore e taea te manatoko i tō pūrere. Whakamahia '$t(login.moreSignInOptions)' hei takiuru mā tētahi atu pūrere, mā te tukutuku rānei.",
     "default": "Kua puta he hapa. Whakamātau anō.",
-    "retryableAdmission": "Kāore i taea e mātou te manatoko i tēnei pūrere. Tirohia tō hononga, ka whakamātau anō.",
+    "retryableAdmission": "Kāore i taea tēnei pūrere te manatoko. Whakamātau anō.",
     "startSignInFailed": "Kāore i taea te tīmata i te takiuru. Whakamātau anō.",
     "couldNotOpenBrowser": "Kāore i taea te whakatuwhera i te pūtirotiro. Whakamātau anō.",
     "signInTimedOut": "Kua pau te wā mō te takiuru. Whakamātau anō.",

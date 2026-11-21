@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "Email belum dapat dikirim untuk sementara waktu. Coba lagi nanti.",
     "admissionRequired": "Perangkatmu tidak dapat diverifikasi. Gunakan '$t(login.moreSignInOptions)' untuk masuk di perangkat lain atau melalui web.",
     "default": "Terjadi kesalahan. Coba lagi.",
-    "retryableAdmission": "Kami tidak dapat memverifikasi perangkat ini. Periksa koneksimu dan coba lagi.",
+    "retryableAdmission": "Tidak dapat memverifikasi perangkat ini. Coba lagi.",
     "startSignInFailed": "Gagal memulai proses masuk. Silakan coba lagi.",
     "couldNotOpenBrowser": "Tidak dapat membuka peramban. Coba lagi.",
     "signInTimedOut": "Waktu untuk masuk telah habis. Coba lagi.",

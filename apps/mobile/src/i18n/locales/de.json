@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "Die E-Mail-Zustellung ist vorübergehend nicht verfügbar. Bitte versuche es später erneut.",
     "admissionRequired": "Dein Gerät kann nicht verifiziert werden. Wähle „$t(login.moreSignInOptions)“, um dich auf einem anderen Gerät oder im Browser anzumelden.",
     "default": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
-    "retryableAdmission": "Wir konnten dieses Gerät nicht verifizieren. Prüfe deine Verbindung und versuche es erneut.",
+    "retryableAdmission": "Dieses Gerät konnte nicht bestätigt werden. Versuche es erneut.",
     "startSignInFailed": "Die Anmeldung konnte nicht gestartet werden. Bitte versuche es erneut.",
     "couldNotOpenBrowser": "Der Browser konnte nicht geöffnet werden. Bitte versuche es erneut.",
     "signInTimedOut": "Die Zeit für die Anmeldung ist abgelaufen. Bitte versuche es erneut.",

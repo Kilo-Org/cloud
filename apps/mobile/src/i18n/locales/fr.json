@@ -3777,7 +3777,7 @@
     "emailDeliveryFailed": "L'envoi d'e-mails est temporairement indisponible. Réessayez plus tard.",
     "admissionRequired": "Impossible de vérifier votre appareil. Utilisez « $t(login.moreSignInOptions) » pour vous connecter sur un autre appareil ou depuis un navigateur.",
     "default": "Une erreur s'est produite. Réessayez.",
-    "retryableAdmission": "Nous n'avons pas pu vérifier cet appareil. Vérifiez votre connexion et réessayez.",
+    "retryableAdmission": "Impossible de vérifier cet appareil. Réessayez.",
     "startSignInFailed": "Impossible de lancer la connexion. Réessayez.",
     "couldNotOpenBrowser": "Impossible d'ouvrir le navigateur. Veuillez réessayer.",
     "signInTimedOut": "Le délai de connexion a expiré. Réessayez.",

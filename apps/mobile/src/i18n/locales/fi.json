@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "Sähköpostin lähetys ei onnistu juuri nyt. Yritä myöhemmin uudelleen.",
     "admissionRequired": "Laitettasi ei voida todentaa. Valitse ”$t(login.moreSignInOptions)” ja kirjaudu toisella laitteella tai verkkosivustolla.",
     "default": "Jokin meni pieleen. Yritä uudelleen.",
-    "retryableAdmission": "Laitetta ei voitu todentaa. Tarkista yhteys ja yritä uudelleen.",
+    "retryableAdmission": "Laitetta ei voitu vahvistaa. Yritä uudelleen.",
     "startSignInFailed": "Kirjautumisen aloittaminen epäonnistui. Yritä uudelleen.",
     "couldNotOpenBrowser": "Selaimen avaaminen epäonnistui. Yritä uudelleen.",
     "signInTimedOut": "Kirjautuminen aikakatkaistiin. Yritä uudelleen.",

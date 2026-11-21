@@ -3905,7 +3905,7 @@
     "emailDeliveryFailed": "Bħalissa ma nistgħux nibagħtu emails. Erġa' pprova aktar tard.",
     "admissionRequired": "L-apparat tiegħek ma jistax jiġi vverifikat. Uża '$t(login.moreSignInOptions)' biex tidħol minn apparat ieħor jew mill-web.",
     "default": "Xi ħaġa marret ħażin. Erġa' pprova.",
-    "retryableAdmission": "Ma stajniex nivverifikaw dan l-apparat. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
+    "retryableAdmission": "Dan l-apparat ma setax jiġi vverifikat. Erġa' pprova.",
     "startSignInFailed": "Ma setax jibda d-dħul. Jekk jogħġbok erġa' pprova.",
     "couldNotOpenBrowser": "Ma setax jinfetaħ il-brawżer. Erġa' pprova.",
     "signInTimedOut": "Il-ħin biex tidħol skada. Erġa' pprova.",

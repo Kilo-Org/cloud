@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "暂时无法发送邮件。请稍后重试。",
     "admissionRequired": "无法验证你的设备。请选择“$t(login.moreSignInOptions)”，在其他设备或网页端登录。",
     "default": "出了点问题。请重试。",
-    "retryableAdmission": "无法验证此设备。请检查网络连接后重试。",
+    "retryableAdmission": "无法验证此设备。请重试。",
     "startSignInFailed": "无法发起登录。请重试。",
     "couldNotOpenBrowser": "无法打开浏览器。请重试。",
     "signInTimedOut": "登录超时。请重试。",

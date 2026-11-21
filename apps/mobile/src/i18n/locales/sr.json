@@ -3777,7 +3777,7 @@
     "emailDeliveryFailed": "Slanje e-pošte trenutno nije dostupno. Pokušaj ponovo kasnije.",
     "admissionRequired": "Nije moguće proveriti tvoj uređaj. Izaberi „$t(login.moreSignInOptions)“ da se prijaviš na drugom uređaju ili preko veba.",
     "default": "Došlo je do greške. Pokušaj ponovo.",
-    "retryableAdmission": "Nismo uspeli da proverimo ovaj uređaj. Proveri vezu i pokušaj ponovo.",
+    "retryableAdmission": "Ovaj uređaj nije mogao da se potvrdi. Pokušaj ponovo.",
     "startSignInFailed": "Nije moguće započeti prijavu. Pokušaj ponovo.",
     "couldNotOpenBrowser": "Nije moguće otvoriti pregledač. Pokušaj ponovo.",
     "signInTimedOut": "Vreme za prijavu je isteklo. Pokušaj ponovo.",

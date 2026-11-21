@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "Vi kan ikke sende e-mail i øjeblikket. Prøv igen senere.",
     "admissionRequired": "Din enhed kan ikke bekræftes. Brug '$t(login.moreSignInOptions)' til at logge ind på en anden enhed eller i browseren.",
     "default": "Noget gik galt. Prøv igen.",
-    "retryableAdmission": "Vi kunne ikke bekræfte denne enhed. Tjek din forbindelse, og prøv igen.",
+    "retryableAdmission": "Kunne ikke bekræfte denne enhed. Prøv igen.",
     "startSignInFailed": "Kunne ikke starte login. Prøv igen.",
     "couldNotOpenBrowser": "Kunne ikke åbne browseren. Prøv igen.",
     "signInTimedOut": "Tiden til at logge ind er udløbet. Prøv igen.",

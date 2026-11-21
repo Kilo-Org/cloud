@@ -3969,7 +3969,7 @@
     "emailDeliveryFailed": "Ni ellir anfon e-bost ar hyn o bryd. Rhowch gynnig eto yn nes ymlaen.",
     "admissionRequired": "Ni ellir gwirio'ch dyfais. Defnyddiwch '$t(login.moreSignInOptions)' i fewngofnodi ar ddyfais arall neu drwy'r we.",
     "default": "Aeth rhywbeth o'i le. Rho gynnig arall arni.",
-    "retryableAdmission": "Ni lwyddwyd i ddilysu'r ddyfais hon. Gwiriwch eich cysylltiad a rhowch gynnig eto.",
+    "retryableAdmission": "Methwyd gwirio'r ddyfais hon. Rhowch gynnig arall arni.",
     "startSignInFailed": "Ni lwyddwyd i ddechrau mewngofnodi. Rhowch gynnig eto.",
     "couldNotOpenBrowser": "Ni lwyddwyd i agor y porwr. Rhowch gynnig eto.",
     "signInTimedOut": "Daeth yr amser ar gyfer mewngofnodi i ben. Rhowch gynnig eto.",

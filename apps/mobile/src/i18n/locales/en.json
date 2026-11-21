@@ -3817,7 +3817,7 @@
     "emailDeliveryFailed": "Email delivery is temporarily unavailable. Please try again later.",
     "admissionRequired": "Your device can't be verified. Use '$t(login.moreSignInOptions)' to sign in on another device or through the web.",
     "default": "Something went wrong. Please try again.",
-    "retryableAdmission": "We could not verify this device. Check your connection and try again.",
+    "retryableAdmission": "We could not verify this device. Please try again.",
     "startSignInFailed": "Failed to start sign in. Please try again.",
     "couldNotOpenBrowser": "Could not open browser. Please try again.",
     "signInTimedOut": "Sign-in timed out. Please try again.",

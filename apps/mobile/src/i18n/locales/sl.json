@@ -3841,7 +3841,7 @@
     "emailDeliveryFailed": "Pošiljanje e-pošte trenutno ni na voljo. Poskusi znova pozneje.",
     "admissionRequired": "Tvoje naprave ni mogoče preveriti. Izberi »$t(login.moreSignInOptions)« za prijavo na drugi napravi ali prek spleta.",
     "default": "Nekaj je šlo narobe. Poskusi znova.",
-    "retryableAdmission": "Te naprave ni bilo mogoče preveriti. Preveri povezavo in poskusi znova.",
+    "retryableAdmission": "Te naprave ni bilo mogoče preveriti. Poskusi znova.",
     "startSignInFailed": "Prijave ni bilo mogoče začeti. Poskusi znova.",
     "couldNotOpenBrowser": "Brskalnika ni bilo mogoče odpreti. Poskusi znova.",
     "signInTimedOut": "Čas za prijavo je potekel. Poskusi znova.",

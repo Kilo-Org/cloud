@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "Det går inte att skicka e-post just nu. Försök igen senare.",
     "admissionRequired": "Din enhet kan inte verifieras. Välj ”$t(login.moreSignInOptions)” för att logga in på en annan enhet eller via webben.",
     "default": "Något gick fel. Försök igen.",
-    "retryableAdmission": "Vi kunde inte verifiera den här enheten. Kontrollera anslutningen och försök igen.",
+    "retryableAdmission": "Det gick inte att verifiera den här enheten. Försök igen.",
     "startSignInFailed": "Kunde inte starta inloggningen. Försök igen.",
     "couldNotOpenBrowser": "Kunde inte öppna webbläsaren. Försök igen.",
     "signInTimedOut": "Inloggningen tog för lång tid. Försök igen.",

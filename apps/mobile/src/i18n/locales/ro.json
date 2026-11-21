@@ -3777,7 +3777,7 @@
     "emailDeliveryFailed": "Trimiterea mesajelor prin e-mail este temporar indisponibilă. Încearcă din nou mai târziu.",
     "admissionRequired": "Dispozitivul tău nu poate fi verificat. Folosește „$t(login.moreSignInOptions)” pentru a te autentifica pe alt dispozitiv sau în browser.",
     "default": "A apărut o eroare. Încearcă din nou.",
-    "retryableAdmission": "Nu am putut verifica acest dispozitiv. Verifică conexiunea și încearcă din nou.",
+    "retryableAdmission": "Nu s-a putut verifica acest dispozitiv. Încearcă din nou.",
     "startSignInFailed": "Nu s-a putut începe autentificarea. Încearcă din nou.",
     "couldNotOpenBrowser": "Nu s-a putut deschide browserul. Încearcă din nou.",
     "signInTimedOut": "Timpul alocat autentificării a expirat. Încearcă din nou.",

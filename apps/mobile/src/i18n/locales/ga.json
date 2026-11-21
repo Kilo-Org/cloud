@@ -3905,7 +3905,7 @@
     "emailDeliveryFailed": "Níl seachadadh ríomhphoist ar fáil go sealadach. Bain triail as arís níos déanaí le do thoil.",
     "admissionRequired": "Ní féidir do ghléas a fhíorú. Úsáid '$t(login.moreSignInOptions)' chun síniú isteach ar ghléas eile nó ar an ngréasán.",
     "default": "Tharla earráid. Bain triail eile as.",
-    "retryableAdmission": "Níorbh fhéidir linn an gléas seo a fhíorú. Seiceáil do nasc agus bain triail as arís.",
+    "retryableAdmission": "Níorbh fhéidir an gléas seo a fhíorú. Bain triail eile as.",
     "startSignInFailed": "Theip ar an síniú isteach a thosú. Bain triail as arís le do thoil.",
     "couldNotOpenBrowser": "Níorbh fhéidir an brabhsálaí a oscailt. Bain triail as arís le do thoil.",
     "signInTimedOut": "Chuaigh an síniú isteach thar am. Bain triail as arís le do thoil.",

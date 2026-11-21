@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "Imeelii erguun yeroodhaaf hin danda'amu. Booda irra deebi'ii yaali.",
     "admissionRequired": "Meeshaan kee mirkanaa'uu hin danda'u. Meeshaa biraatiin ykn weebii irraa seenuuf '$t(login.moreSignInOptions)' fayyadami.",
     "default": "Dogoggorri uumame. Irra deebi'ii yaali.",
-    "retryableAdmission": "Meeshaa kana mirkaneessuu hin dandeenye. Walqunnamtii kee ilaaliitii irra deebi'ii yaali.",
+    "retryableAdmission": "Meeshaa kana mirkaneessuun hin danda'amne. Irra deebi'ii yaali.",
     "startSignInFailed": "Seensaa jalqabuun hin milkoofne. Irra deebi'ii yaali.",
     "couldNotOpenBrowser": "Biraawzarii banuun hin danda'amne. Irra deebi'ii yaali.",
     "signInTimedOut": "Yeroon seensaaf kenname darbeera. Irra deebi'ii yaali.",

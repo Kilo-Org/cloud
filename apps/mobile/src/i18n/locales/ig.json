@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "Enweghị ike iziga ozi-e ugbu a. Biko nwaa ọzọ ma emechaa.",
     "admissionRequired": "Enweghị ike inyocha njirimara ngwaọrụ gị. Jiri '$t(login.moreSignInOptions)' banye na ngwaọrụ ọzọ ma ọ bụ site na webụ.",
     "default": "Enwere njehie. Biko nwaa ọzọ.",
-    "retryableAdmission": "Anyị enweghị ike inyocha njirimara ngwaọrụ a. Lelee njikọ gị ma nwaa ọzọ.",
+    "retryableAdmission": "Enweghị ike ịnyochaa ngwaọrụ a. Nwaa ọzọ.",
     "startSignInFailed": "Enweghị ike ịmalite nbanye. Biko nwaa ọzọ.",
     "couldNotOpenBrowser": "Enweghị ike imepe ihe nchọgharị. Biko nwaa ọzọ.",
     "signInTimedOut": "Oge nbanye agwụla. Biko nwaa ọzọ.",

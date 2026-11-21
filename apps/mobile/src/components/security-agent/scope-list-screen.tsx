@@ -14,6 +14,7 @@ import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-s
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { classifyListBody } from '@/lib/query/list-body-state';
+import { classifyReadFailureVariant } from '@/lib/query/read-failure-variant';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 
 // Diverges from the Code Reviewer scope list: current server policy allows
@@ -25,8 +26,8 @@ export function ScopeListScreen() {
   // options. A second observer with defaulted options would replace those
   // options while this screen is mounted and leave every other consumer's read
   // paused with no data.
-  const { data: orgs, isError, isFetching, fetchStatus, refetch } = useOrganizationsList();
-  const connectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
+  const { data: orgs, error, isError, isFetching, fetchStatus, refetch } = useOrganizationsList();
+  const connectivity = useCommittedConnectivityStatus();
 
   const openScope = (scope: string) => {
     pushOnce(getSecurityAgentPath(scope));
@@ -34,16 +35,23 @@ export function ScopeListScreen() {
 
   // An org-list failure only degrades the organization section — the
   // Personal scope doesn't depend on it and must stay reachable. Only a
-  // delivered read may say which organizations exist: a failed read, or one
-  // paused by lost connectivity, delivered nothing and names its cause with
-  // Retry instead of silently dropping the section.
+  // delivered read may say which organizations exist, so a failed read names
+  // its cause with Retry instead of silently dropping the section.
   const orgsBody = classifyListBody({
     rowCount: orgs?.length ?? 0,
     hasDeliveredData: orgs !== undefined,
     isError: isError && orgs === undefined,
     isFetching,
     fetchStatus,
-    connectivityKnown,
+    connectivityKnown: connectivity !== 'unknown',
+  });
+  // The read settles instead of pausing, so `classifyListBody` can no longer
+  // reach its paused cause here: the failure's own cause decides the copy. A
+  // failure that never reached the server is the connection's.
+  const failureVariant = classifyReadFailureVariant({
+    errors: error ? [error] : [],
+    isPaused: false,
+    connectivity,
   });
 
   return (
@@ -84,7 +92,7 @@ export function ScopeListScreen() {
         {orgsBody.status === 'error' ? (
           <QueryError
             placement="top"
-            variant={orgsBody.cause === 'offline' ? 'offline' : 'server'}
+            variant={failureVariant}
             title={t('common.couldNotLoadOrganizations')}
             onRetry={() => void refetch()}
             isRetrying={orgsBody.isRetrying}

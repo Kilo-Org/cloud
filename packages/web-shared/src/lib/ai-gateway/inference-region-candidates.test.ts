@@ -122,7 +122,7 @@ beforeEach(() => {
 });
 
 describe('inferenceRegionIneligibleCandidates', () => {
-  it('keeps a model Vercel can pin to the region', async () => {
+  it('keeps a model servable in the region', async () => {
     await expect(
       ineligible({
         region: 'eu',
@@ -132,7 +132,7 @@ describe('inferenceRegionIneligibleCandidates', () => {
     ).resolves.toEqual([]);
   });
 
-  it('denies a model Vercel cannot pin to the region', async () => {
+  it('denies a model not servable in the region', async () => {
     await expect(
       ineligible({
         region: 'eu',
@@ -142,7 +142,7 @@ describe('inferenceRegionIneligibleCandidates', () => {
     ).resolves.toEqual([OUT_OF_REGION]);
   });
 
-  it('denies a model Vercel does not list', async () => {
+  it('denies a model no region-pinning route serves', async () => {
     await expect(
       ineligible({
         region: 'eu',
@@ -163,7 +163,7 @@ describe('inferenceRegionIneligibleCandidates', () => {
     expect(getCachedVercelInferenceRegionsForModel).toHaveBeenCalledWith('zai/glm-5.2');
   });
 
-  it('denies a custom LLM even when Vercel lists the same id in the region', async () => {
+  it('denies a custom LLM even when its id is otherwise servable in the region', async () => {
     jest.mocked(isCustomLlm).mockImplementation(async modelId => modelId === 'acme/custom');
 
     await expect(

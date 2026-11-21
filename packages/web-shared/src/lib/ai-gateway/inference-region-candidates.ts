@@ -13,12 +13,25 @@ import {
   getDirectByokModel,
   getDirectByokPolicyProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
-import { isVercelModelInInferenceRegion } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
+import { getVercelInferenceRegions } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
   getEffectiveModelDecision,
   isModelAllowedForProviderKey,
   type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
+
+/**
+ * Whether a Kilo-paid route can serve the model pinned to the inference region. Only routes that
+ * honor an inference region may serve such a request (see `getGatewaySettingsRefusal`); add any
+ * upstream that gains region pinning here.
+ */
+export async function isModelServableInInferenceRegion(
+  modelId: string,
+  region: OrganizationDataRegion
+): Promise<boolean> {
+  if (await isCustomLlm(modelId)) return false;
+  return (await getVercelInferenceRegions(modelId))?.has(region) ?? false;
+}
 
 /** The providers the policy lets serve the model, as `resolveAccessCheck` derives them. */
 async function allowedProvidersForModel(
@@ -70,10 +83,9 @@ async function candidatesServedByOwnerByok(
 }
 
 /**
- * The candidates an organization's inference region rules out: Kilo pays for them only through its
- * Vercel AI Gateway route pinned to the region, so a model Vercel cannot pin there, or a custom LLM,
- * fails unless the owner's own BYOK key serves it. Auto routing denies these so it never picks a
- * model the request then fails on. Without `byokOwner`, BYOK keys are not considered; `policy` is
+ * The candidates an organization's inference region rules out: a model no Kilo-paid route can serve
+ * pinned to the region (see `isModelServableInInferenceRegion`) fails unless the owner's own BYOK
+ * key serves it. Auto routing denies these so it never picks a model the request then fails on. Without `byokOwner`, BYOK keys are not considered; `policy` is
  * the member's organization model policy, which decides which keys routing may use.
  */
 export async function inferenceRegionIneligibleCandidates(params: {
@@ -85,10 +97,7 @@ export async function inferenceRegionIneligibleCandidates(params: {
   const { region, byokOwner, policy } = params;
   const candidateIds = [...new Set(params.candidateIds.filter(id => !isVirtualAutoModelId(id)))];
   const eligible = await Promise.all(
-    candidateIds.map(
-      async modelId =>
-        !(await isCustomLlm(modelId)) && (await isVercelModelInInferenceRegion(modelId, region))
-    )
+    candidateIds.map(modelId => isModelServableInInferenceRegion(modelId, region))
   );
   const outsideRegion = candidateIds.filter((_modelId, index) => !eligible[index]);
   if (outsideRegion.length === 0 || !byokOwner) return outsideRegion;

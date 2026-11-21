@@ -411,7 +411,7 @@ type ObserverOf = Partial<OperationResultObserver<MobileRouter, unknown>>;
  * `auth/dispatch-epoch.ts`). It is first in `trpcLinks` so every call is tagged,
  * including the ones the split sends to the single link.
  */
-export function createDispatchSessionLink(): TRPCLink<MobileRouter> {
+function createDispatchSessionLink(): TRPCLink<MobileRouter> {
   return () =>
     ({ op, next }) => {
       // Captured when the operation starts: the session that issued this call.

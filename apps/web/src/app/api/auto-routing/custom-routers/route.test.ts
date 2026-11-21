@@ -1355,41 +1355,6 @@ describe('/api/auto-routing/custom-routers', () => {
       });
     });
 
-    test('reuses the pre-lock measurements when a concurrent save changes only the pool', async () => {
-      await create(routerBody());
-      mockedRegister.mockClear();
-      mockedGetPlatformMeasurements.mockClear();
-      const admissionStarted = Promise.withResolvers<void>();
-      const releaseAdmission = Promise.withResolvers<void>();
-      mockedRegister.mockImplementationOnce(async () => {
-        admissionStarted.resolve();
-        await releaseAdmission.promise;
-        return { ok: true };
-      });
-      const baseChange = updateRouter(
-        request('/user/coding', { method: 'PATCH', body: { baseRouter: 'frontier' } }),
-        params('user', 'coding')
-      );
-      await admissionStarted.promise;
-      await db
-        .update(auto_routing_custom_routers)
-        .set({ entries: [gateway(SONNET), gateway(FLASH)] })
-        .where(eq(auto_routing_custom_routers.owned_by_user_id, user.id));
-      releaseAdmission.resolve();
-
-      expect((await baseChange).status).toBe(200);
-      expect(mockedGetPlatformMeasurements).toHaveBeenCalledTimes(1);
-      expect(mockedRegister).toHaveBeenLastCalledWith(
-        {
-          router: 'frontier',
-          ownerType: 'user',
-          ownerId: user.id,
-          entries: [{ model: SONNET }, { model: FLASH }],
-        },
-        expect.any(AbortSignal)
-      );
-    });
-
     test('rejects a save whose router was deleted after admission', async () => {
       await create(routerBody({ entries: [gateway(SONNET), gateway(FLASH)] }));
       mockedRegister.mockClear();

@@ -267,6 +267,7 @@ async function mountForm(overrides: Partial<FormProps> = {}) {
       catalogUnavailable: false,
       catalogIsFetching: false,
       onRetryCatalog: () => undefined,
+      providerNames: {},
       gateway: undefined,
       gatewayIsError: false,
       gatewayIsFetching: false,

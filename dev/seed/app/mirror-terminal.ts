@@ -63,6 +63,9 @@ export const TAIL_SESSION_IDS = [
   'ses_00000000016MirrorTailTerm4',
 ] as const;
 
+/** The three sessions whose artifact can never be materialized, in list order. */
+const TERMINAL_SESSION_IDS = [OVER_CAP_SESSION_ID, MISSING_SESSION_ID, FLAKY_SESSION_ID] as const;
+
 /** Non-fetchable fixtures picked for the crawl's download path. */
 export const OVER_CAP_PATH = '/mirror-fixture/over-cap.bin';
 export const MISSING_PATH = '/mirror-fixture/missing.bin';
@@ -390,17 +393,23 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     .select({ sessionId: cli_sessions_v2.session_id, updatedAt: cli_sessions_v2.updated_at })
     .from(cli_sessions_v2)
     .where(eq(cli_sessions_v2.kilo_user_id, user.userId));
-  // Scoped to this fixture's ids: the user may own other sessions, and only the
-  // relative order of the seven below decides what the crawl meets first.
+  // Scoped to this fixture's ids: the user may own other sessions. What the
+  // fixture depends on is that the three artifacts that can never be
+  // materialized lead the list, because the crawl orders by this same column and
+  // a stuck page at the back would not demonstrate the starvation. The four
+  // ordinary sessions may sit in any order behind them: their relative order
+  // decides nothing, because the budget picks by when each session last got a
+  // slot.
   const fixtureIds = new Set(sessionIds);
-  const actual = ordered
+  const leading = ordered
     .filter(row => fixtureIds.has(row.sessionId))
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-    .map(row => row.sessionId);
-  if (actual.join(',') !== sessionIds.join(',')) {
+    .map(row => row.sessionId)
+    .slice(0, TERMINAL_SESSION_IDS.length);
+  if (leading.join(',') !== TERMINAL_SESSION_IDS.join(',')) {
     throw new Error(
       'Fixture order is wrong; the crawl would not meet the stuck sessions first.\n' +
-        `expected: ${sessionIds.join(',')}\nactual:   ${actual.join(',')}`
+        `expected leading: ${TERMINAL_SESSION_IDS.join(',')}\nactual leading:   ${leading.join(',')}`
     );
   }
 

@@ -44,9 +44,7 @@ describe('getFraudDetectionHeaders', () => {
   });
 
   test('tolerates leading and trailing spaces around a coordinate', () => {
-    const headers = getFraudDetectionHeaders(
-      new Headers({ 'x-vercel-ip-latitude': ' 37.7749 ' })
-    );
+    const headers = getFraudDetectionHeaders(new Headers({ 'x-vercel-ip-latitude': ' 37.7749 ' }));
     expect(headers.http_x_vercel_ip_latitude).toBe(37.7749);
   });
 

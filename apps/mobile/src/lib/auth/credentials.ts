@@ -323,7 +323,9 @@ async function readRefusalText(response: Response): Promise<string | null> {
  */
 async function readAuthRefusalText(response: Response): Promise<string | null> {
   const expiry = Promise.withResolvers<null>();
-  const timer = setTimeout(() => expiry.resolve(null), REFUSAL_BODY_BUDGET_MS);
+  const timer = setTimeout(() => {
+    expiry.resolve(null);
+  }, REFUSAL_BODY_BUDGET_MS);
   try {
     return await Promise.race([readRefusalText(response), expiry.promise]);
   } finally {
@@ -416,16 +418,13 @@ async function doRefresh(): Promise<RefreshOutcome> {
         // stored pair. Every other failure status is classified on the status
         // alone, and a 2xx body must be read whole to parse.
         if (!res.ok) {
-          return {
-            response: res,
-            refusalText:
-              res.status === 401
-                ? await readAuthRefusalText(res)
-                : res.status === 403
-                  ? await readRefusalText(res)
-                  : null,
-            successBody: undefined,
-          };
+          let refusal: string | null = null;
+          if (res.status === 401) {
+            refusal = await readAuthRefusalText(res);
+          } else if (res.status === 403) {
+            refusal = await readRefusalText(res);
+          }
+          return { response: res, refusalText: refusal, successBody: undefined };
         }
         const body: unknown = await res.json();
         return { response: res, refusalText: null, successBody: body };

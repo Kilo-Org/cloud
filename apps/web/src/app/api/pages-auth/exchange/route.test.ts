@@ -6,6 +6,7 @@ import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/domain-gates';
 import { createDeviceAuthViewerToken } from '@/lib/device-auth/device-auth-viewer-token';
 import { createPagesAuthCode } from '@/lib/pages-auth/pages-auth-code';
+import { isPagesMemberSearchProofFor } from '@/lib/pages-auth/pages-member-search-proof';
 import { getUserAuthProviders } from '@/lib/user';
 import { POST } from './route';
 
@@ -128,12 +129,29 @@ describe('POST /api/pages-auth/exchange', () => {
     expect(await response.json()).toEqual({
       user: { id: 'user-1', name: 'Ada Lovelace', verified_email: 'ada@kilo.test' },
       organizations,
+      member_search_proof: expect.any(String),
     });
     expect(mockedFindUserById).toHaveBeenCalledWith('user-1');
     expect(mockedGetProfileOrganizations).toHaveBeenCalledWith('user-1', {
       excludeAccessBlocked: true,
     });
     expect(mockedGetUserAuthProviders).toHaveBeenCalledWith('user-1');
+  });
+
+  test('hands out a member search proof bound to the person and the deployment', async () => {
+    const response = await exchange(
+      { code: codeFor(PAGES_DEV), audience: PAGES_DEV, state: STATE },
+      DEV_SECRET
+    );
+    const { member_search_proof: proof } = await response.json();
+
+    expect(isPagesMemberSearchProofFor(proof, { userId: 'user-1', audience: PAGES_DEV })).toBe(
+      true
+    );
+    expect(isPagesMemberSearchProofFor(proof, { userId: 'user-1', audience: PAGES })).toBe(false);
+    expect(isPagesMemberSearchProofFor(proof, { userId: 'user-2', audience: PAGES_DEV })).toBe(
+      false
+    );
   });
 
   describe('verified_email', () => {
@@ -367,6 +385,7 @@ describe('POST /api/pages-auth/exchange', () => {
       expect(await response.json()).toEqual({
         user: { id: 'user-1', name: 'Ada Lovelace', verified_email: 'ada@kilo.test' },
         organizations,
+        member_search_proof: expect.any(String),
       });
       expect(mockedFindUserById).toHaveBeenCalledWith('user-1');
       expect(mockedGetProfileOrganizations).toHaveBeenCalledWith('user-1', {

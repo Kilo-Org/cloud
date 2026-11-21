@@ -290,8 +290,14 @@ function uniqueTokens(tokens: readonly string[]): string[] {
  * deletion). It NEVER throws: every step is internally caught, so a remote
  * or storage failure can never block local sign-out.
  *
- * - Revokes the current device session and unregisters the device push token
- *   concurrently, bounded at 15 s each by the tRPC client's `deadlineFetch`.
+ * - The device push token is unregistered FIRST, then the current device
+ *   session is revoked. The order is required, not cosmetic: the revoke ends
+ *   this credential's auth, so a deletion that lands after it is refused with
+ *   "Device session is no longer active", and an account that cannot sign back
+ *   in never retries it. Both calls are serial, each bounded at 15 s by the
+ *   tRPC client's `deadlineFetch`, so a stalled first call can hold local
+ *   sign-out for up to 30 s; the alternative — running them concurrently —
+ *   loses the deletion to the race.
  * - A failed revoke is not recorded: see the record type for why. A failed
  *   push or activity-token unregister is merged into this account's record; a
  *   fully successful one leaves this account's record only when no earlier

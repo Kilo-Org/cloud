@@ -28,18 +28,18 @@ function isWhitespaceChar(char: string): boolean {
     return false;
   }
   if (code <= 0x20) {
-    return code === 0x20 || (code >= 0x09 && code <= 0x0D);
+    return code === 0x20 || (code >= 0x09 && code <= 0x0d);
   }
   return (
-    code === 0xA0 ||
+    code === 0xa0 ||
     code === 0x1680 ||
-    (code >= 0x2000 && code <= 0x200A) ||
+    (code >= 0x2000 && code <= 0x200a) ||
     code === 0x2028 ||
     code === 0x2029 ||
-    code === 0x202F ||
-    code === 0x205F ||
+    code === 0x202f ||
+    code === 0x205f ||
     code === 0x3000 ||
-    code === 0xFEFF
+    code === 0xfeff
   );
 }
 

@@ -72,14 +72,20 @@ const AI_SDK_PROVIDER_FOR_CHAT_API = {
 } as const satisfies Record<GatewayChatApiKind, CustomLlmProvider | undefined>;
 
 /**
- * The chat API `provider` assigns `model` itself, or null when its chat APIs do not vary per
- * model.
+ * Where a provider states the chat APIs it serves a model over: one API it assigns to that model,
+ * or the fixed set it serves every model over.
  */
-function getAssignedModelChatApi(
+type DirectByokChatApiSource =
+  | { kind: 'per-model'; chatApi: GatewayChatApiKind }
+  | { kind: 'every-model'; chatApis: ReadonlyArray<GatewayChatApiKind> };
+
+function getDirectByokChatApiSource(
   provider: DirectByokProvider,
   model: DirectByokModel
-): GatewayChatApiKind | null {
-  return provider.getModelChatApi ? provider.getModelChatApi(model) : null;
+): DirectByokChatApiSource {
+  return provider.getModelChatApi
+    ? { kind: 'per-model', chatApi: provider.getModelChatApi(model) }
+    : { kind: 'every-model', chatApis: provider.supportedChatApis };
 }
 
 function getDirectByokAiSdkProvider(
@@ -87,8 +93,8 @@ function getDirectByokAiSdkProvider(
   model: DirectByokModel,
   id: string
 ): DirectByokAiSdkProvider | undefined {
-  const assignedChatApi = getAssignedModelChatApi(provider, model);
-  if (assignedChatApi !== null) return AI_SDK_PROVIDER_FOR_CHAT_API[assignedChatApi];
+  const source = getDirectByokChatApiSource(provider, model);
+  if (source.kind === 'per-model') return AI_SDK_PROVIDER_FOR_CHAT_API[source.chatApi];
   const choice = provider.getAiSdkProvider?.(id);
   return choice ? choice.aiSdkProvider : getAiSdkProvider(id);
 }
@@ -149,13 +155,8 @@ export function getDirectByokModelChatApis(
   provider: DirectByokProvider,
   model: DirectByokModel
 ): ReadonlyArray<GatewayChatApiKind> {
-  const assignedChatApi = getAssignedModelChatApi(provider, model);
-  if (assignedChatApi === null) {
-    // A null assignment means the provider states one chat API set for every model, which the
-    // provider type carries as an optional property.
-    return provider.supportedChatApis ?? [];
-  }
-  return [assignedChatApi];
+  const source = getDirectByokChatApiSource(provider, model);
+  return source.kind === 'per-model' ? [source.chatApi] : source.chatApis;
 }
 
 export function findDirectByokProvider(providerId: string): DirectByokProvider | undefined {

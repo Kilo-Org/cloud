@@ -63,6 +63,7 @@ const chromeWorkflowNames = [
   'model picker search filters and selects by model id',
   'workflow create, approve, and run returns result',
   'workflow auto-approve save stores approved hash',
+  'retry waits for the model catalog to offer the conversation model',
 ] as const;
 
 const PENDING_DRAFT_KEY = 'kiloPendingAgentMemoryDraft';
@@ -721,9 +722,17 @@ const readFirefoxStorage = async (
   return result;
 };
 
-const seedFirefoxConversation = async (driver: WebDriver, events: unknown[]): Promise<void> => {
+const seedFirefoxConversation = async (
+  driver: WebDriver,
+  events: unknown[],
+  model?: string
+): Promise<void> => {
   const result = await driver.executeAsyncScript(
-    (conversationEvents: unknown[], done: (value: unknown) => void) => {
+    (
+      conversationEvents: unknown[],
+      conversationModel: string | null,
+      done: (value: unknown) => void
+    ) => {
       const browserApi = (
         globalThis as typeof globalThis & {
           browser?: {
@@ -744,6 +753,7 @@ const seedFirefoxConversation = async (driver: WebDriver, events: unknown[]): Pr
               {
                 events: conversationEvents,
                 id: 'conversation-1',
+                ...(conversationModel === null ? {} : { model: conversationModel }),
                 title: 'Conversation 1',
               },
             ],
@@ -757,7 +767,8 @@ const seedFirefoxConversation = async (driver: WebDriver, events: unknown[]): Pr
           done(error instanceof Error ? error.message : String(error));
         });
     },
-    events
+    events,
+    model ?? null
   );
 
   assert.equal(result, 'ok');
@@ -3155,6 +3166,95 @@ const scenarios: FirefoxScenario[] = [
       } finally {
         await targetServer.close();
       }
+    },
+  },
+  {
+    name: 'retry waits for the model catalog to offer the conversation model',
+    run: context => {
+      const seenChatBodies: unknown[] = [];
+
+      /*
+       * The models route keeps failing, so no catalog loads and the conversation keeps the
+       * model id it was stored with.
+       */
+      return withSession(
+        context.api,
+        { modelFailuresBeforeSuccess: 1000, seenChatBodies },
+        async session => {
+          const targetPage = await session.openTargetPage();
+
+          await openAuthenticatedPanel(session);
+
+          /*
+           * The panel adopts the target tab and persists its own conversation as soon as the
+           * tab list loads. Seeding before that write lands lets it overwrite the seed, so the
+           * seed only goes in once the panel's own store shows the adopted target.
+           */
+          await waitUntil(
+            session.driver,
+            async () => {
+              const stored = await readFirefoxStorage(session.driver, ['kiloAgentConversations']);
+
+              return JSON.stringify(stored['kiloAgentConversations'] ?? null).includes(
+                '"selectedTabId"'
+              );
+            },
+            'Timed out waiting for the panel to persist its conversation target'
+          );
+
+          await seedFirefoxConversation(
+            session.driver,
+            [
+              {
+                id: 'retry-model-user',
+                role: 'user',
+                systemEnvironment: `<system_environment>\nSelected tab title: Kilo extension fixture\nSelected tab URL: ${targetPage.url}\nCurrent time: ${new Date().toISOString()}\nTimezone: UTC\n</system_environment>`,
+                text: 'Inspect this tab',
+                type: 'message',
+              },
+              {
+                id: 'retry-model-error',
+                retry: 'turn',
+                title: 'The server is busy. Try again in a moment.',
+                type: 'error',
+              },
+            ],
+            'retired/model-x'
+          );
+          await session.driver.navigate().refresh();
+
+          /*
+           * The alert is retryable and a target tab is selected, so the catalog is what
+           * decides whether this click starts a turn. The stored conversation carries its
+           * own system environment and model id.
+           */
+          await waitForText(session.driver, 'The server is busy. Try again in a moment.');
+          await waitForText(session.driver, 'Could not load models.');
+          await waitForTargetTab(session.driver, 'Kilo extension fixture');
+          const retryButton = await getButtonByText(session.driver, 'Retry');
+
+          await retryButton.click();
+
+          /*
+           * A retry starts only once the loaded catalog offers the conversation's model, so
+           * this click leaves the alert in place and sends nothing to the gateway.
+           */
+          const settleDeadline = Date.now() + 1750;
+
+          while (Date.now() < settleDeadline) {
+            const { promise, resolve } = Promise.withResolvers<void>();
+
+            setTimeout(resolve, 250);
+            await promise;
+          }
+
+          assert.equal(seenChatBodies.length, 0);
+          assert.match(
+            await getBodyText(session.driver),
+            /The server is busy\. Try again in a moment\./u
+          );
+        }
+      );
     },
   },
 ];

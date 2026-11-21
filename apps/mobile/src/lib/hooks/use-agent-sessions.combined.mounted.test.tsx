@@ -297,6 +297,66 @@ describe('combined and live refresh callers', () => {
     expect(finished).toBe(true);
   });
 
+  it('queues a departure reconcile behind an in-flight next page', async () => {
+    // A session leaving the active set reconciles page one. It shares the
+    // stored operation coordinator with the next-page fetch: a reconcile
+    // started over an in-flight next page joins that fetch instead of running
+    // its own, so the terminated session never reaches history.
+    client.setQueryData(STORED_KEY, {
+      pages: [{ ...history('Old history'), nextCursor: 'next' }],
+      pageParams: [null],
+    });
+    client.setQueryData(QUERY_KEY, {
+      sessions: [makeCached({ id: 'departing', organizationId: null })],
+    });
+    await render();
+    expect(combined().activeSessionIds.has('departing')).toBe(true);
+
+    const nextPage = deferred<ReturnType<typeof history>>();
+    const firstPage = deferred<ReturnType<typeof history>>();
+    state.stored.mockReturnValueOnce(nextPage.promise).mockReturnValueOnce(firstPage.promise);
+    let page: Promise<void> | undefined = undefined;
+    await act(async () => {
+      page = combined().fetchNextPage();
+      await flush();
+    });
+    expect(state.stored.mock.calls).toHaveLength(1);
+
+    // The CLI stops: the active poll drops the row and the departure effect
+    // schedules its reconcile.
+    await act(async () => {
+      client.setQueryData(QUERY_KEY, { sessions: [] });
+      await flush();
+    });
+    expect(combined().activeSessionIds.size).toBe(0);
+    expect(state.maintenance.length).toBeGreaterThan(0);
+    await act(async () => {
+      for (const run of state.maintenance.splice(0)) {
+        run();
+      }
+      await flush();
+    });
+    // Still one request: the departure reconcile did not start while the next
+    // page was in flight.
+    expect(state.stored.mock.calls).toHaveLength(1);
+
+    await act(async () => {
+      nextPage.resolve({ cliSessions: [stored('Next page', 'next')], nextCursor: null });
+      await page;
+      await flush();
+    });
+    expect(state.stored.mock.calls).toHaveLength(2);
+    // The queued departure reconcile now runs and refetches page one from the
+    // start cursor. Started without the coordinator it is swallowed by the
+    // in-flight fetch, so this second request never happens.
+    expect(state.stored.mock.calls[1]?.[0]).toMatchObject({ pageParam: null });
+    await act(async () => {
+      firstPage.resolve(history('Just terminated'));
+      await flush();
+    });
+    expect(combined().storedSessions.map(row => row.title)).toEqual(['Just terminated']);
+  });
+
   it.each(['context', 'account', 'sign-out', 'reattach'] as const)(
     'does not publish old refresh or departure work after %s changes',
     async change => {

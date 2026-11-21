@@ -197,7 +197,10 @@ type Handler = (value?: string) => void;
  * The element's prop callback, narrowed out of the renderer's untyped props so
  * the call is checked rather than an unsafe `any` invocation.
  */
-function handlerOf(node: ReactTestInstance, name: 'onPress' | 'onChangeText'): Handler | undefined {
+function handlerOf(
+  node: ReactTestInstance,
+  name: 'onPress' | 'onChangeText' | 'onSubmitEditing'
+): Handler | undefined {
   const handler: unknown = node.props[name];
   return typeof handler === 'function' ? (handler as Handler) : undefined;
 }
@@ -487,8 +490,11 @@ describe('CreateOrganizationScreen', () => {
   it('announces a repeated identical refusal as a new event', async () => {
     const { renderer, unmount } = await mount();
 
+    // The keyboard's Done action, not the submit button: with no name typed the
+    // button is disabled, so a person reaches a second identical refusal only
+    // from the field.
     await act(() => {
-      handlerOf(submitOf(renderer), 'onPress')?.();
+      handlerOf(inputOf(renderer), 'onSubmitEditing')?.();
     });
     expect(texts(renderer)).toContain('Enter an organization name.');
     expect(mocks.createMutate).not.toHaveBeenCalled();
@@ -496,11 +502,11 @@ describe('CreateOrganizationScreen', () => {
     expect(announce).toHaveBeenCalledWith('Enter an organization name.');
     const first = statusOf(renderer);
 
-    // Nothing typed between the submits, so the line stays rendered and the
-    // second refusal repeats the same words. Only the keyed remount makes that
-    // a new announcement: the announcement hook's own dedupe would drop it.
+    // Nothing typed between the submits, so the line stays rendered with the
+    // same words. Only the keyed remount makes that a new announcement: the
+    // announcement hook's own dedupe would drop an unchanged message.
     await act(() => {
-      handlerOf(submitOf(renderer), 'onPress')?.();
+      handlerOf(inputOf(renderer), 'onSubmitEditing')?.();
     });
 
     expect(statusOf(renderer)).not.toBe(first);

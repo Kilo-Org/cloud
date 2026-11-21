@@ -505,15 +505,13 @@ describe('named organization policy storage', () => {
         )
         .returning({ id: organization_named_policies.id }),
     ]);
-    await db
-      .insert(organization_group_memberships)
-      .values(
-        groups.map(group => ({
-          organization_id: organizationId,
-          group_id: group.id,
-          kilo_user_id: member,
-        }))
-      );
+    await db.insert(organization_group_memberships).values(
+      groups.map(group => ({
+        organization_id: organizationId,
+        group_id: group.id,
+        kilo_user_id: member,
+      }))
+    );
     await db.insert(organization_group_policy_links).values(
       groups.slice(0, 50).map((group, i) => ({
         organization_id: organizationId,

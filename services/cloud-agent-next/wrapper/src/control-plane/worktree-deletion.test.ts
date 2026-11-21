@@ -12,9 +12,9 @@ import {
   type WorktreeKiloCleanupClient,
 } from '../control/delete-worktree.js';
 import {
-  forgetOutstandingRuleset,
-  readOutstandingRuleset,
-  rememberOutstandingRuleset,
+  forgetSessionObligations,
+  readSessionObligations,
+  rememberSessionObligations,
 } from '../kilo-api.js';
 import { resetSessionDirectoryState } from '../control/session-directories.js';
 import { resetDirectoryOperationState } from '../control/worktree-operations.js';
@@ -558,8 +558,8 @@ describe('worktree deletion clears the session ruleset marker', () => {
     const stub = startCleanupStub();
     stub.sessions.set(id, directory);
     try {
-      await rememberOutstandingRuleset(id, permission);
-      expect(await readOutstandingRuleset(id)).toEqual(permission);
+      await rememberSessionObligations(id, { permission });
+      expect(await readSessionObligations(id)).toEqual({ permission });
 
       await deleteWorktree(
         { worktreeId, directory, sessionIds: [id] },
@@ -567,10 +567,10 @@ describe('worktree deletion clears the session ruleset marker', () => {
       );
 
       expect(stub.deleted.has(id)).toBe(true);
-      expect(await readOutstandingRuleset(id)).toBeUndefined();
+      expect(await readSessionObligations(id)).toBeUndefined();
     } finally {
       await stub.server.stop(true);
-      await forgetOutstandingRuleset(id).catch(() => undefined);
+      await forgetSessionObligations(id).catch(() => undefined);
       if (originalHome === undefined) delete process.env.HOME;
       else process.env.HOME = originalHome;
     }
@@ -590,7 +590,7 @@ describe('worktree deletion clears the session ruleset marker', () => {
       const stub = startCleanupStub();
       stub.sessions.set(id, directory);
       try {
-        await rememberOutstandingRuleset(id, permission);
+        await rememberSessionObligations(id, { permission });
         chmodSync(rulesets, 0o500);
         readOnly = true;
 
@@ -601,11 +601,11 @@ describe('worktree deletion clears the session ruleset marker', () => {
 
         expect(result).toEqual({ deleted: true, sessionIds: [id] });
         expect(stub.deleted.has(id)).toBe(true);
-        expect(await readOutstandingRuleset(id)).toEqual(permission);
+        expect(await readSessionObligations(id)).toEqual({ permission });
       } finally {
         if (readOnly) chmodSync(rulesets, 0o700);
         await stub.server.stop(true);
-        await forgetOutstandingRuleset(id).catch(() => undefined);
+        await forgetSessionObligations(id).catch(() => undefined);
         if (originalHome === undefined) delete process.env.HOME;
         else process.env.HOME = originalHome;
       }

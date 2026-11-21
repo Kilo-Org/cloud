@@ -798,23 +798,43 @@ keep environment snapshots and existing history/worktree recovery.
   `model`, `path`, `cost` or `tokens`: it accepts those keys and silently drops them. A re-point
   therefore clears the stored value of each. The record's own `slug` is carried: the import body has
   a `slug` field, so a re-point keeps the share URL naming the record's own slug.
-  The wrapper restores `metadata` with an update right after the import and before it applies the
-  ruleset, because it holds the session goal a user sees: a ruleset that cannot be applied throws,
-  and the next prepare settles that obligation without running the create path again, so a restore
-  placed after the apply would never reach the record. `agent` and `model` stay cleared on purpose:
-  every prompt sends its own agent and model from the route payload, so the stored pair is a mirror
-  that no turn reads. `path` is not restored either: no wrapper code reads it, and the import leaves
-  it empty. A restore that fails is logged and does not fail the route: the record is already
-  committed, and the metadata carries no authorization decision.
-  The native import also cannot carry a session permission ruleset, so the obligation is remembered
-  beside the wrapper's durable state before the import commits the row, and the ruleset is applied
-  right after the metadata restore. Writing the marker before the import is what makes the guarantee
-  hold: a marker written only after a failed apply would leave a window where the process dies
-  between the import and the write, and the committed record then owes rules that nothing remembers.
-  A create path that finds the obligation already remembered does not rewrite it. Every prepare
-  settles a remembered ruleset before the probe and again after a successful history restore; a
-  settle that finds no record leaves the remembered ruleset in place for the create path, which
-  applies it to the record it imports.
+  The native import also cannot carry a session permission ruleset or a session `metadata`, so both
+  obligations are remembered in one marker file per session beside the wrapper's durable state:
+  `$HOME/.kilo-control/rulesets/<encoded session id>.json` holds `{ permission?, metadata? }`,
+  either obligation may be present alone, and the file is deleted when neither remains. A marker
+  that holds a bare JSON array is read as `{ permission: array }`, which is the shape the earlier
+  code wrote. `agent` and `model` stay cleared on purpose: every prompt sends its own agent and
+  model from the route payload, so the stored pair is a mirror that no turn reads. `path` is not
+  restored either: no wrapper code reads it, and the import leaves it empty.
+  The marker goes down before the import commits the row, and the ruleset is applied right after the
+  metadata restore. Writing the marker before the import is what makes the guarantee hold: a marker
+  written only after a failed apply would leave a window where the process dies between the import
+  and the write, and the committed record then owes a ruleset and a metadata that nothing remembers.
+  The record's own `permission` is authoritative: when the marker and the record both hold a
+  ruleset, the record's set is the one applied, because the marker exists only because the native
+  import clears the row, and it is a durable copy of an obligation rather than a second source of
+  truth. The marker is rewritten to the record's set before the import and only when it does not
+  already cover it, so a directory that refuses the write cannot fail a route whose obligation is
+  already recorded. A rule that only the marker held is dropped rather than applied: the record's
+  authenticated permission is the state of the session, and this module is its only writer through
+  the native API. Once the record's set is applied, the marker is reduced to what is still owed and
+  removed when nothing remains, so a rule the record does not carry is not left behind as a standing
+  obligation.
+  The wrapper restores `metadata` right after the import and before it applies the ruleset, because
+  metadata holds the session goal a user sees: a ruleset that cannot be applied throws, and the
+  next prepare settles that obligation without running the create path again, so a restore placed
+  after the apply would never reach the record. A metadata restore that fails is logged and does
+  not fail the route: the record is already committed, the metadata carries no authorization
+  decision, and the obligation stays recorded so the next prepare retries it.
+  The record's own `metadata` is authoritative in the same way its `permission` is: the wrapper
+  supplies an owed value only where the import left the record empty. The update replaces the whole
+  value and the server normalizes what it stores, so a record that carries a value may hold a newer
+  goal than the copy the marker kept, and writing that copy back would revert the user's own goal.
+  A marker obligation the record already satisfies is dropped without a write.
+  Every prepare settles both obligations through `settleOutstandingRuleset`, before the probe and
+  again after a successful history restore; a settle that finds no record leaves the marker in place
+  for the create path, which applies what it owes to the record it imports. A create path whose
+  marker already covers what the record carries does not rewrite it.
   The ruleset is cleared only after the apply succeeds, and the apply is skipped when the record
   already holds every rule, because the native update appends rather than replaces; a marker that
   cannot be cleared is therefore not a failure, since the next prepare finds the stored rules and
@@ -828,6 +848,13 @@ keep environment snapshots and existing history/worktree recovery.
   because a ruleset widens what the agent may do. A marker that is present but not a ruleset fails the
   prepare with a permanent session-import reason instead of reading as nothing owed, since reading it
   as nothing owed would drop rules the record never received.
+  The marker directory is created `0700` and tightened to `0700` when it exists, and the file is
+  `0600`. There is no fallback to a shared temporary directory: a process without a home
+  directory cannot name the store, so recording or reading an obligation fails retryably instead of
+  reading as nothing owed, and forgetting one does nothing. The `0700` directory and the `0600` file
+  are defence in depth only while the wrapper and the agent share one uid inside the sandbox; a real
+  boundary needs wrapper-owned state outside any location the agent can write, which is a
+  sandbox-level change.
   A record whose own permission is present but not a ruleset fails the create path the same way,
   before the import, and the record is left unchanged: no rules are applied, so a later prepare in
   the same allocation reads that record again and fails the same way until the record is replaced.
@@ -840,11 +867,13 @@ keep environment snapshots and existing history/worktree recovery.
   update, because the retried step reads the same durable state and the native update appends. A
   marker that cannot be written before the import fails as retryable too, because no record is
   committed yet; a marker that reads but is not a ruleset, and a record whose permission is not a
-  ruleset, fail as the permanent session-import reason. A settle whose permission update fails
-  fails retryably and reports the same session-import reason, because the marker is intact and the
-  retried step reads it again. An apply interrupted by the step budget's abort reports the abort
-  rather than the permanent session-import reason, so the step keeps its own classification and
-  retry budget, and the marker stays for the next prepare.
+  ruleset, fail as the permanent session-import reason, whose message names the marker path and the
+  underlying cause in the wrapper log only, while the session frame still carries the session-import
+  reason with no detail. A settle whose permission update fails fails retryably and reports the same
+  session-import reason, because the marker is intact and the retried step reads it again. An apply
+  or a settle interrupted by the step budget's abort reports the abort rather than the permanent or
+  retryable ruleset classification, so the step keeps its own classification and retry budget, and
+  the marker stays for the next prepare.
   New chats and later siblings share that runtime and directory without resetting files.
 
   On a shared-workspace Kilo v2 runtime start without a workspace snapshot, the wrapper also preloads

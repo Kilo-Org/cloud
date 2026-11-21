@@ -1,4 +1,7 @@
 /* eslint-disable max-lines -- one suite covers the form's states, the organization boundary, both credential shapes and the save failures. */
+// eslint-disable-next-line import/no-nodejs-modules -- test-only fixture: a real key, because the form refuses anything else
+import { generateKeyPairSync } from 'node:crypto';
+
 import { createElement, type ElementType } from 'react';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
@@ -16,6 +19,14 @@ import { type ModelMapping } from '@/lib/byok/credential-fields';
 
 import { ProviderKeyNewScreen } from './provider-key-new-screen';
 import type * as ReactQuery from '@tanstack/react-query';
+
+/**
+ * A real key: the Vertex form refuses a private key that is not a PEM, so a
+ * placeholder value would never reach the create call this suite asserts.
+ */
+const { privateKey: fixtureKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+const exportedKey = fixtureKey.export({ type: 'pkcs8', format: 'pem' });
+const PEM_KEY = typeof exportedKey === 'string' ? exportedKey : exportedKey.toString('utf8');
 
 type MutationOptions = { kind?: 'create' | 'update' };
 
@@ -446,7 +457,7 @@ describe('ProviderKeyNewScreen', () => {
         project: 'project',
         location: 'global',
         clientEmail: 'service@example.test',
-        privateKey: 'pem',
+        privateKey: PEM_KEY,
       };
     });
     await act(() => {
@@ -458,7 +469,7 @@ describe('ProviderKeyNewScreen', () => {
       api_key: JSON.stringify({
         project: 'project',
         location: 'global',
-        googleCredentials: { clientEmail: 'service@example.test', privateKey: 'pem' },
+        googleCredentials: { clientEmail: 'service@example.test', privateKey: PEM_KEY.trim() },
       }),
     });
   });

@@ -818,7 +818,7 @@ describe('paid pool pins', () => {
     });
   });
 
-  it('stops waiting on a finalization that never resolves', async () => {
+  it('bounds consecutive finalization waits without counting delivery failures', async () => {
     const first = PLAN.pairs[0];
     if (!first) throw new Error('fixture plan lost its pair');
     const pinOnly: PaidBenchmarkPlan = {
@@ -842,9 +842,30 @@ describe('paid pool pins', () => {
     seedRun('run-live', 'running');
     seedRunningProfile('vendor/alpha', 'run-live');
     seedOutbox(`pins:${REQUEST_ID}`);
+    const intent = `pins:${REQUEST_ID}`;
     sqlite
-      .prepare('UPDATE paid_benchmark_billing_outbox SET attempts = 47 WHERE id = ?')
-      .run(`pins:${REQUEST_ID}`);
+      .prepare(
+        "UPDATE paid_benchmark_billing_outbox SET attempts = 55, last_error = 'controller down' WHERE id = ?"
+      )
+      .run(intent);
+    expect(await drainPaidBillingOutbox(env(), { limit: 5, now: 0 })).toEqual({
+      delivered: 0,
+      retried: 1,
+      abandoned: 0,
+      pinned: 0,
+    });
+    expect(
+      sqlite
+        .prepare(
+          'SELECT status, attempts, last_error FROM paid_benchmark_billing_outbox WHERE id = ?'
+        )
+        .get(intent)
+    ).toEqual({ status: 'pending', attempts: 1, last_error: 'serving_evidence_pending' });
+    sqlite
+      .prepare(
+        'UPDATE paid_benchmark_billing_outbox SET attempts = 47, available_at = 0 WHERE id = ?'
+      )
+      .run(intent);
 
     // One drain inside the bound keeps it pending.
     expect(await drainPaidBillingOutbox(env(), { limit: 5, now: 0 })).toEqual({

@@ -449,13 +449,12 @@ export async function drainPaidBillingOutbox(
         });
         summary.abandoned += 1;
         break;
-      case 'pending':
-        // A live finalization legitimately holds the intent, but not forever: after enough
-        // drains the run is not settling, so the move is reported as not applied instead of
-        // staying pending indefinitely. The counter is the outbox row's own durable attempt
-        // count, so a restart or a new isolate cannot reset the bound.
+      case 'pending': {
+        // Bound consecutive finalization waits, not time spent retrying a different failure.
+        const finalizing = publication.reason === PINS_EVIDENCE_PENDING;
         if (
-          publication.reason === PINS_EVIDENCE_PENDING &&
+          finalizing &&
+          row.last_error === PINS_EVIDENCE_PENDING &&
           row.attempts >= PAID_PINS_MAX_PENDING_ATTEMPTS
         ) {
           await closeAbandonedOutboxIntent(db, {
@@ -471,10 +470,12 @@ export async function drainPaidBillingOutbox(
         await failPaidBillingOutbox(db, {
           id: row.id,
           error: publication.reason,
+          resetOnReasonChange: finalizing,
           now: options.now,
         });
         summary.retried += 1;
         break;
+      }
     }
   }
   return summary;

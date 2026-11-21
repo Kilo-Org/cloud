@@ -2856,18 +2856,21 @@ export async function markPaidBillingOutboxDelivered(
 
 export async function failPaidBillingOutbox(
   db: D1Database,
-  input: { id: string; error: string; now?: number }
+  input: { id: string; error: string; resetOnReasonChange?: boolean; now?: number }
 ): Promise<void> {
   const nowMs = input.now ?? Date.now();
+  const error = input.error.slice(0, 500);
   await db
     .prepare(
       `UPDATE paid_benchmark_billing_outbox
-      SET attempts = attempts + 1,
-        available_at = ? + MIN(3600000, 60000 * (1 << MIN(attempts, 6))),
-        last_error = ?, updated_at = ?
-      WHERE id = ? AND status = 'pending'`
+      SET attempts = 1 + CASE WHEN ?1 AND last_error IS NOT ?2 THEN 0 ELSE attempts END,
+        available_at = ?3 + MIN(3600000, 60000 * (
+          1 << MIN(CASE WHEN ?1 AND last_error IS NOT ?2 THEN 0 ELSE attempts END, 6)
+        )),
+        last_error = ?2, updated_at = ?3
+      WHERE id = ?4 AND status = 'pending'`
     )
-    .bind(nowMs, input.error.slice(0, 500), nowMs, input.id)
+    .bind(input.resetOnReasonChange === true ? 1 : 0, error, nowMs, input.id)
     .run();
 }
 

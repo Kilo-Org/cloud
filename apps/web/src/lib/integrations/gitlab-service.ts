@@ -61,14 +61,19 @@ import {
   type StoredProjectCredential,
 } from '@/lib/integrations/platforms/gitlab/project-credential-lifecycle';
 import {
-  GITLAB_PROJECT_TOKENS_UNSETTLED_MESSAGE,
   GITLAB_PROJECT_TOKEN_REPLACEMENT_UNSETTLED_MESSAGE,
+  GITLAB_PROJECT_TOKENS_LIST_UNREADABLE_MESSAGE,
+  describeInstanceChangeBlockers,
   dropUnrevokableProjectTokenEntry,
   getStoredProjectCredential,
+  gitlabProjectTokensUnsettledMessage,
   listProjectIdsWithStoredTokens,
+  readStoredInstanceUrl,
   removeStoredProjectAccessToken,
   requireGitLabProjectId,
   retireProjectCredentialsForReplacedAccount,
+  storedInstanceUrlChanges,
+  type ProjectTokenBlocker,
 } from '@/lib/integrations/platforms/gitlab/project-token-handles';
 import {
   GitLabPersonalAccessTokenMetadataSchema,
@@ -446,6 +451,8 @@ type ProjectTokenSettlement = {
   retained: number;
   /** Handles that were listed but never attempted, for lack of credential or budget. */
   unattempted: number;
+  /** Every stored handle that remains, with the reason it was kept. */
+  blocking: ProjectTokenBlocker[];
 };
 
 /**
@@ -500,11 +507,16 @@ export async function settleStoredProjectTokens(
         noCredentialScrubbed += 1;
       }
     }
+    // No credential was resolved, so none of these could be attempted.
     return {
       revoked: 0,
       scrubbed: noCredentialScrubbed,
       retained: noCredentialOutstanding.size,
       unattempted: noCredentialOutstanding.size,
+      blocking: [...noCredentialOutstanding].map(projectId => ({
+        projectId,
+        reason: 'no_credential' as const,
+      })),
     };
   }
 
@@ -512,6 +524,7 @@ export async function settleStoredProjectTokens(
   const outstandingProjectIds = new Set(projectIds);
   const attemptedProjectIds = new Set<string>();
   const retryProjectIds = new Set<string>();
+  const retainedReasons = new Map<string, ProjectTokenBlocker['reason']>();
   let revoked = 0;
   let scrubbed = 0;
   for (let attempt = 0; attempt < PROJECT_TOKEN_SETTLEMENT_ATTEMPTS; attempt++) {
@@ -534,7 +547,11 @@ export async function settleStoredProjectTokens(
           projectId,
           error: error instanceof Error ? error.message : String(error),
         });
-        return { outcome: 'retained' as const, retryable: false };
+        return {
+          outcome: 'retained' as const,
+          retryable: false,
+          reason: 'provider_unconfirmed' as const,
+        };
       });
       if (outcome.outcome === 'removed') {
         outstandingProjectIds.delete(projectId);
@@ -542,8 +559,9 @@ export async function settleStoredProjectTokens(
       } else if (outcome.outcome === 'scrubbed') {
         outstandingProjectIds.delete(projectId);
         scrubbed += 1;
-      } else if (outcome.outcome === 'retained' && outcome.retryable) {
-        retryProjectIds.add(projectId);
+      } else if (outcome.outcome === 'retained') {
+        retainedReasons.set(projectId, outcome.reason);
+        if (outcome.retryable) retryProjectIds.add(projectId);
       }
     }
   }
@@ -551,7 +569,16 @@ export async function settleStoredProjectTokens(
   const unattempted = [...outstandingProjectIds].filter(
     projectId => !attemptedProjectIds.has(projectId)
   ).length;
-  return { revoked, scrubbed, retained: outstandingProjectIds.size, unattempted };
+  return {
+    revoked,
+    scrubbed,
+    retained: outstandingProjectIds.size,
+    unattempted,
+    blocking: [...outstandingProjectIds].map(projectId => ({
+      projectId,
+      reason: retainedReasons.get(projectId) ?? ('not_attempted' as const),
+    })),
+  };
 }
 
 /**
@@ -560,6 +587,11 @@ export async function settleStoredProjectTokens(
  * settlement revokes each handle against the instance it was minted on; a
  * handle the provider retains — or a stored project list that cannot be read —
  * refuses the change, so the handles are never dropped alone.
+ *
+ * The refusal names the blocking project ids and the kind of failure, because
+ * the remedy differs: an unusable stored instance address, a refused
+ * credential, an unresolvable credential, and an unconfirmed revocation each
+ * call for a different next step.
  */
 export async function ensureStoredProjectTokensSettledBeforeInstanceChange(
   integration: Pick<PlatformIntegration, 'id' | 'metadata'>,
@@ -579,11 +611,30 @@ export async function ensureStoredProjectTokensSettledBeforeInstanceChange(
   }
 
   const settlement = await settleStoredProjectTokens(integration, userToken);
-  if (settlement === null || settlement.retained > 0) {
+  if (settlement === null) {
     throw new TRPCError({
       code: 'PRECONDITION_FAILED',
-      message: GITLAB_PROJECT_TOKENS_UNSETTLED_MESSAGE,
+      message: GITLAB_PROJECT_TOKENS_LIST_UNREADABLE_MESSAGE,
     });
+  }
+  // A row whose instance value cannot be used explains a settlement that found
+  // no credential at all: nothing can be resolved against an instance the row
+  // does not name, so name that cause instead of the symptom.
+  const storedInstance = readStoredInstanceUrl(integration.metadata);
+  const blocking = storedInstance.ok
+    ? settlement.blocking
+    : settlement.blocking.map(blocker =>
+        blocker.reason === 'no_credential'
+          ? { projectId: blocker.projectId, reason: 'stored_instance_unusable' as const }
+          : blocker
+      );
+  const message = describeInstanceChangeBlockers(blocking);
+  if (message !== null) {
+    logExceptInTest(
+      '[ensureStoredProjectTokensSettledBeforeInstanceChange] Instance change refused',
+      { integrationId: integration.id, blocking }
+    );
+    throw new TRPCError({ code: 'PRECONDITION_FAILED', message });
   }
 }
 
@@ -1382,11 +1433,8 @@ export async function connectWithPAT(
     const connectedAccountId = String(validatedUser.id);
     if (
       existingIntegration.integration_status === INTEGRATION_STATUS.SUSPENDED &&
-      !instanceUrlChanged(
-        readOptionalMetadataString(
-          requireMetadataRecord(existingIntegration.metadata),
-          'gitlab_instance_url'
-        ),
+      !storedInstanceUrlChanges(
+        readStoredInstanceUrl(existingIntegration.metadata),
         normalizedInstanceUrl
       ) &&
       (existingAccountId === null || existingAccountId === connectedAccountId)
@@ -1398,11 +1446,8 @@ export async function connectWithPAT(
       });
     }
 
-    const instanceChangeRequested = instanceUrlChanged(
-      readOptionalMetadataString(
-        requireMetadataRecord(existingIntegration.metadata),
-        'gitlab_instance_url'
-      ),
+    const instanceChangeRequested = storedInstanceUrlChanges(
+      readStoredInstanceUrl(existingIntegration.metadata),
       normalizedInstanceUrl
     );
     if (instanceChangeRequested) {
@@ -1414,8 +1459,8 @@ export async function connectWithPAT(
 
     await db.transaction(async tx => {
       existingMetadata = await readGitLabMetadataInTransaction(tx, existingIntegration.id);
-      isInstanceChange = instanceUrlChanged(
-        readOptionalMetadataString(existingMetadata, 'gitlab_instance_url'),
+      isInstanceChange = storedInstanceUrlChanges(
+        readStoredInstanceUrl(existingMetadata),
         normalizedInstanceUrl
       );
       isAccountChange =
@@ -1435,7 +1480,7 @@ export async function connectWithPAT(
         if (remaining.length > 0) {
           throw new TRPCError({
             code: 'PRECONDITION_FAILED',
-            message: GITLAB_PROJECT_TOKENS_UNSETTLED_MESSAGE,
+            message: gitlabProjectTokensUnsettledMessage(remaining),
           });
         }
       }

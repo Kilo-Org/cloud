@@ -1,7 +1,6 @@
 import 'server-only';
 
 import { randomBytes, randomUUID } from 'node:crypto';
-import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
@@ -18,11 +17,13 @@ import {
   readGitLabMetadataInTransaction,
 } from './metadata-mutation';
 import {
-  GITLAB_PROJECT_TOKENS_UNSETTLED_MESSAGE,
+  gitlabProjectTokensUnsettledMessage,
   listProjectIdsWithStoredTokens,
+  readStoredInstanceUrl,
   retireProjectCredentialsForReplacedAccount,
+  storedInstanceUrlChanges,
 } from './project-token-handles';
-import { isDefaultGitLabInstanceUrl, normalizeGitLabInstanceUrl } from './instance-url';
+import { isDefaultGitLabInstanceUrl } from './instance-url';
 import {
   ensureStoredProjectTokensSettledBeforeInstanceChange,
   gitLabCredentialActor,
@@ -60,14 +61,6 @@ function generateWebhookSecret(): string {
   return randomBytes(32).toString('hex');
 }
 
-function instanceUrlChanged(existingUrl: string | undefined, newUrl: string): boolean {
-  try {
-    return normalizeGitLabInstanceUrl(existingUrl) !== newUrl;
-  } catch {
-    return true;
-  }
-}
-
 function readOptionalMetadataString(
   metadata: Readonly<Record<string, unknown>>,
   key: string
@@ -76,16 +69,6 @@ function readOptionalMetadataString(
   if (value === undefined) return undefined;
   if (typeof value !== 'string') throw new Error(`GitLab metadata ${key} must be a string`);
   return value;
-}
-
-const GitLabMetadataSnapshotSchema = z
-  .object({ gitlab_instance_url: z.string().optional() })
-  .passthrough();
-
-/** Instance URL a stored integration row names, read before its transaction. */
-function readStoredInstanceUrl(metadata: unknown): string | undefined {
-  const parsed = GitLabMetadataSnapshotSchema.safeParse(metadata);
-  return parsed.success ? parsed.data.gitlab_instance_url : undefined;
 }
 
 /**
@@ -141,7 +124,7 @@ export async function storeGitLabOAuthIntegration(
       existing.platform_account_id ?? existing.platform_installation_id ?? null;
     if (
       existing.integration_status === INTEGRATION_STATUS.SUSPENDED &&
-      !instanceUrlChanged(readStoredInstanceUrl(existing.metadata), input.providerBaseUrl) &&
+      !storedInstanceUrlChanges(readStoredInstanceUrl(existing.metadata), input.providerBaseUrl) &&
       (previousStoredAccountId === null || previousStoredAccountId === input.providerUser.id) &&
       input.scopes.includes('api')
     ) {
@@ -152,7 +135,7 @@ export async function storeGitLabOAuthIntegration(
       });
     }
 
-    const instanceChangeRequested = instanceUrlChanged(
+    const instanceChangeRequested = storedInstanceUrlChanges(
       readStoredInstanceUrl(existing.metadata),
       input.providerBaseUrl
     );
@@ -179,9 +162,11 @@ export async function storeGitLabOAuthIntegration(
         currentIntegration?.platform_account_id ??
         currentIntegration?.platform_installation_id ??
         null;
-      const currentInstanceUrl = readOptionalMetadataString(currentMetadata, 'gitlab_instance_url');
       const currentWebhookSecret = readOptionalMetadataString(currentMetadata, 'webhook_secret');
-      changedInstance = instanceUrlChanged(currentInstanceUrl, input.providerBaseUrl);
+      changedInstance = storedInstanceUrlChanges(
+        readStoredInstanceUrl(currentMetadata),
+        input.providerBaseUrl
+      );
       changedAccount =
         !changedInstance &&
         previousAccountId !== null &&
@@ -201,7 +186,7 @@ export async function storeGitLabOAuthIntegration(
         if (remaining.length > 0) {
           throw new TRPCError({
             code: 'PRECONDITION_FAILED',
-            message: GITLAB_PROJECT_TOKENS_UNSETTLED_MESSAGE,
+            message: gitlabProjectTokensUnsettledMessage(remaining),
           });
         }
       }

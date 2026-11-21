@@ -50,10 +50,46 @@ const GitLabInstanceUrlMetadataSchema = z
   .object({ gitlab_instance_url: z.string().optional() })
   .passthrough();
 
-/** Instance URL a stored integration row names, defaulting to gitlab.com. */
-function readStoredInstanceUrl(metadata: unknown): string {
+/**
+ * Outcome of reading the instance a stored integration row names. An unusable
+ * row is not defaulted: revoking against a host the row never named would drop
+ * a handle whose token stays live on the instance it was minted on.
+ */
+export type StoredInstanceUrl = { ok: true; url: string } | { ok: false };
+
+/**
+ * Instance URL a stored integration row names. An absent field is gitlab.com,
+ * because every writer stores the field for an instance that is not the
+ * default. A field the row carries but that cannot be read as an instance URL
+ * is unusable, and a caller that compares it to a requested instance treats it
+ * as a change, so the stored handles are settled before the row is rewritten.
+ */
+export function readStoredInstanceUrl(metadata: unknown): StoredInstanceUrl {
   const parsed = GitLabInstanceUrlMetadataSchema.safeParse(metadata);
-  return normalizeGitLabInstanceUrl(parsed.success ? parsed.data.gitlab_instance_url : undefined);
+  if (!parsed.success) return { ok: false };
+  if (parsed.data.gitlab_instance_url === undefined) {
+    return { ok: true, url: normalizeGitLabInstanceUrl(undefined) };
+  }
+  try {
+    return { ok: true, url: normalizeGitLabInstanceUrl(parsed.data.gitlab_instance_url) };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/**
+ * True when the requested instance differs from the one a stored row names. A
+ * row that carries an instance value which cannot be read counts as a change, so
+ * the stored project tokens are settled before the row is rewritten instead of
+ * being revoked against a defaulted host.
+ */
+export function storedInstanceUrlChanges(stored: StoredInstanceUrl, requestedUrl: string): boolean {
+  if (!stored.ok) return true;
+  try {
+    return normalizeGitLabInstanceUrl(stored.url) !== normalizeGitLabInstanceUrl(requestedUrl);
+  } catch {
+    return true;
+  }
 }
 
 /** Validates a caller-supplied project id before it reaches a provider URL. */
@@ -160,6 +196,18 @@ export async function dropUnrevokableProjectTokenEntry(
 }
 
 /**
+ * Why a stored project token stays stored after a removal attempt. It names the
+ * remedy: an unusable stored instance and a changed handle both need the stored
+ * rows repaired, a provider rejection needs a credential that may revoke, and an
+ * unconfirmed answer can be retried.
+ */
+export type ProjectTokenRetentionReason =
+  | 'provider_rejected'
+  | 'provider_unconfirmed'
+  | 'stored_instance_unusable'
+  | 'stored_handle_changed';
+
+/**
  * Outcome of removing one stored project token. A retained outcome says whether
  * a repeated attempt can settle it, so a caller that can try again does not
  * repeat a refusal the provider will keep answering. Only a missing answer, a
@@ -172,11 +220,96 @@ export type StoredProjectTokenRemoval =
   | { outcome: 'removed' }
   | { outcome: 'absent' }
   | { outcome: 'scrubbed' }
-  | { outcome: 'retained'; retryable: boolean };
+  | {
+      outcome: 'retained';
+      retryable: boolean;
+      reason: ProjectTokenRetentionReason;
+    };
 
-/** Refusal for an instance change while a stored project token is not settled. */
-export const GITLAB_PROJECT_TOKENS_UNSETTLED_MESSAGE =
-  'GitLab project tokens stored for the current instance must be revoked before the integration can connect to another instance. Reconnect the current instance with a token that can revoke them.';
+/** One stored project token that still blocks an instance change, and why. */
+export type ProjectTokenBlocker = {
+  projectId: string;
+  reason: ProjectTokenRetentionReason | 'no_credential' | 'not_attempted';
+};
+
+/** What to do about one refusal, and the kind it reports. */
+const BLOCKER_MESSAGES: Record<ProjectTokenBlocker['reason'], { cause: string; remedy: string }> = {
+  stored_instance_unusable: {
+    cause: 'the stored GitLab instance address could not be used',
+    remedy: 'Reconnect the current instance and try again.',
+  },
+  provider_rejected: {
+    cause: 'GitLab refused the connected credential while revoking them',
+    remedy: 'Reconnect the current instance with a token that can revoke them, then connect again.',
+  },
+  no_credential: {
+    cause: 'no stored credential can revoke them',
+    remedy: 'Reconnect the current instance with a token that can revoke them, then connect again.',
+  },
+  stored_handle_changed: {
+    cause: 'a stored handle changed while they were being revoked',
+    remedy: 'Try again in a moment.',
+  },
+  provider_unconfirmed: {
+    cause: 'a revocation could not be confirmed',
+    remedy: 'Try again in a moment.',
+  },
+  not_attempted: {
+    cause: 'a revocation could not be attempted',
+    remedy: 'Try again in a moment.',
+  },
+};
+
+/**
+ * The kinds a settlement reports in the order a refusal prefers: the kinds a
+ * request cannot retry away on its own come first, a bare retry last.
+ */
+const BLOCKER_PRECEDENCE: readonly ProjectTokenBlocker['reason'][] = [
+  'stored_instance_unusable',
+  'provider_rejected',
+  'no_credential',
+  'provider_unconfirmed',
+  'not_attempted',
+  'stored_handle_changed',
+];
+
+function instanceChangeBlockerMessage(
+  reason: ProjectTokenBlocker['reason'],
+  projectIds: readonly string[]
+): string {
+  const { cause, remedy } = BLOCKER_MESSAGES[reason];
+  return `GitLab project tokens stored for the current instance could not be revoked because ${cause} (projects: ${projectIds.join(', ')}). ${remedy}`;
+}
+
+/** Refusal for an in-transaction instance change that finds a stored handle. */
+export function gitlabProjectTokensUnsettledMessage(projectIds: readonly string[]): string {
+  return `GitLab project tokens stored for the current instance could not be revoked (projects: ${projectIds.join(', ')}). Reconnect the current instance with a token that can revoke them, then connect again.`;
+}
+
+/**
+ * Refusal for an instance change whose stored project token list could not be
+ * read, so no project id can be named.
+ */
+export const GITLAB_PROJECT_TOKENS_LIST_UNREADABLE_MESSAGE =
+  'The stored GitLab project tokens for the current instance could not be read, so the instance change was refused. Try again in a moment.';
+
+/**
+ * Refusal that names the stored handles blocking an instance change, with the
+ * remedy of the most actionable failure kind among them. Returns null when
+ * nothing blocks the change.
+ */
+export function describeInstanceChangeBlockers(
+  blocking: readonly ProjectTokenBlocker[]
+): string | null {
+  if (blocking.length === 0) return null;
+  const reason =
+    BLOCKER_PRECEDENCE.find(candidate => blocking.some(blocker => blocker.reason === candidate)) ??
+    'provider_unconfirmed';
+  return instanceChangeBlockerMessage(
+    reason,
+    blocking.map(blocker => blocker.projectId)
+  );
+}
 
 /** Refusal for a replacement while the replaced project token is not settled. */
 export const GITLAB_PROJECT_TOKEN_REPLACEMENT_UNSETTLED_MESSAGE =
@@ -194,6 +327,12 @@ export const GITLAB_PROJECT_TOKEN_REPLACEMENT_UNSETTLED_MESSAGE =
  * keeps the same contract: every stored id for the project is revoked before
  * either handle is dropped. An entry that names no revocable id is dropped
  * instead of kept, because no stored reader uses its plaintext token.
+ *
+ * A project that has a revocable id is settled only against the instance the
+ * integration row names. A row that carries an instance URL this module cannot
+ * use keeps its handles without a provider call: revoking against a defaulted
+ * host would drop a handle whose token stays live on the instance it was minted
+ * on.
  *
  * The caller passes the credential it already holds as `options.userToken`;
  * `options.signal` carries that caller's deadline into the provider request.
@@ -231,7 +370,7 @@ export async function removeStoredProjectAccessToken(
         currentTokenId: storedCredential?.tokenId ?? null,
       }
     );
-    return { outcome: 'retained', retryable: false };
+    return { outcome: 'retained', retryable: false, reason: 'stored_handle_changed' };
   }
   const tokenIds = [
     ...new Set(
@@ -249,7 +388,14 @@ export async function removeStoredProjectAccessToken(
     );
     return { outcome: dropped ? 'scrubbed' : 'absent' };
   }
-  const instanceUrl = readStoredInstanceUrl(integration.metadata);
+  const storedInstance = readStoredInstanceUrl(integration.metadata);
+  if (!storedInstance.ok) {
+    logExceptInTest(
+      '[removeStoredProjectAccessToken] Stored instance unusable; keeping stored project credential',
+      { projectId, tokenIds }
+    );
+    return { outcome: 'retained', retryable: false, reason: 'stored_instance_unusable' };
+  }
 
   try {
     for (const tokenId of tokenIds) {
@@ -257,7 +403,7 @@ export async function removeStoredProjectAccessToken(
         options.userToken,
         projectId,
         tokenId,
-        instanceUrl,
+        storedInstance.url,
         options.signal
       );
     }
@@ -275,6 +421,12 @@ export async function removeStoredProjectAccessToken(
     return {
       outcome: 'retained',
       retryable: status === undefined || status === 429 || status >= 500,
+      // A definitive provider answer (a 4xx other than the rate limit) repeats
+      // the same refusal, so only those name a rejected credential.
+      reason:
+        status !== undefined && status !== 404 && status !== 429 && status < 500
+          ? 'provider_rejected'
+          : 'provider_unconfirmed',
     };
   }
 
@@ -298,7 +450,7 @@ export async function removeStoredProjectAccessToken(
         '[removeStoredProjectAccessToken] Named credential replaced before its rows were dropped',
         { projectId, tokenId: expectedCredential.tokenId }
       );
-      return { outcome: 'retained', retryable: false };
+      return { outcome: 'retained', retryable: false, reason: 'stored_handle_changed' };
     }
   } else {
     await deleteStoredProjectTokenMetadataEntry({
@@ -363,7 +515,11 @@ export async function retireProjectCredentialsForReplacedAccount(input: {
           error: error instanceof Error ? error.message : String(error),
         }
       );
-      return { outcome: 'retained' as const, retryable: false };
+      return {
+        outcome: 'retained' as const,
+        retryable: false,
+        reason: 'stored_handle_changed' as const,
+      };
     });
     if (outcome.outcome !== 'retained') {
       retired += 1;

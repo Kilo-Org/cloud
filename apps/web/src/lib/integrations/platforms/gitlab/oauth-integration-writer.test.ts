@@ -1062,21 +1062,24 @@ describe('GitLab OAuth integration writer', () => {
       throw new Error('Insufficient permissions to revoke a project access token');
     };
 
-    await expect(
-      storeGitLabOAuthIntegration({
-        owner: { type: 'user', id: user.id },
-        authorizedByUserId: user.id,
-        providerBaseUrl: 'https://gitlab.example.com/other',
-        providerUser: { id: '101', login: 'old-login' },
-        accessToken: 'new-access-secret',
-        refreshToken: 'new-refresh-secret',
-        accessTokenExpiresAt: '2031-01-01T00:00:00.000Z',
-        oauthClientId: null,
-        oauthClientSecret: null,
-        scopes: ['api'],
-        repositories: null,
-      })
-    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+    const refusal = await storeGitLabOAuthIntegration({
+      owner: { type: 'user', id: user.id },
+      authorizedByUserId: user.id,
+      providerBaseUrl: 'https://gitlab.example.com/other',
+      providerUser: { id: '101', login: 'old-login' },
+      accessToken: 'new-access-secret',
+      refreshToken: 'new-refresh-secret',
+      accessTokenExpiresAt: '2031-01-01T00:00:00.000Z',
+      oauthClientId: null,
+      oauthClientSecret: null,
+      scopes: ['api'],
+      repositories: null,
+    }).catch((error: unknown) => error);
+
+    expect(refusal).toMatchObject({ code: 'PRECONDITION_FAILED' });
+    const refusalMessage = refusal instanceof Error ? refusal.message : '';
+    expect(refusalMessage).toContain('projects: 42');
+    expect(refusalMessage).toContain('a revocation could not be confirmed');
 
     const [unchanged] = await db
       .select()

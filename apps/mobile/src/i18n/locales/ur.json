@@ -3622,6 +3622,7 @@
       "identifierLabel": "شناخت کنندہ",
       "identifierRequired": "شناخت کنندہ درج کریں۔",
       "identifierTaken": "ایک اور موڈ پہلے ہی یہ شناخت کنندہ استعمال کرتا ہے۔",
+      "identifierTooLong": "شناخت کنندہ کو {{max}} حروف یا اس سے کم تک رکھیں۔",
       "nameLabel": "موڈ کا نام",
       "nameRequired": "موڈ کا نام درج کریں۔",
       "notFound": "یہ موڈ اب موجود نہیں ہے۔",

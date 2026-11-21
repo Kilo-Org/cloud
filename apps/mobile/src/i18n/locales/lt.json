@@ -3746,6 +3746,7 @@
       "identifierLabel": "Identifikatorius",
       "identifierRequired": "Įveskite identifikatorių.",
       "identifierTaken": "Kitas režimas jau naudoja šį identifikatorių.",
+      "identifierTooLong": "Identifikatorius turi būti ne ilgesnis kaip {{max}} simboliai.",
       "nameLabel": "Režimo pavadinimas",
       "nameRequired": "Įveskite režimo pavadinimą.",
       "notFound": "Šio režimo nebėra.",

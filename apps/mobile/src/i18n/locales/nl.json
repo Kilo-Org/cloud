@@ -3626,6 +3626,7 @@
       "identifierLabel": "Identificatie",
       "identifierRequired": "Voer een identificatie in.",
       "identifierTaken": "Een andere modus gebruikt deze identificatie al.",
+      "identifierTooLong": "Houd de identificatie op {{max}} tekens of minder.",
       "nameLabel": "Modusnaam",
       "nameRequired": "Voer een modusnaam in.",
       "notFound": "Deze modus bestaat niet meer.",

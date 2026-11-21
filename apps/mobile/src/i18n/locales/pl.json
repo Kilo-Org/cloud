@@ -3750,6 +3750,7 @@
       "identifierLabel": "Identyfikator",
       "identifierRequired": "Wprowadź identyfikator.",
       "identifierTaken": "Inny tryb już używa tego identyfikatora.",
+      "identifierTooLong": "Zachowaj identyfikator o długości {{max}} znaków lub mniej.",
       "nameLabel": "Nazwa trybu",
       "nameRequired": "Wprowadź nazwę trybu.",
       "notFound": "Ten tryb już nie istnieje.",

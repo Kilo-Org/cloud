@@ -3684,6 +3684,7 @@
       "identifierLabel": "Identifikators",
       "identifierRequired": "Ievadiet identifikatoru.",
       "identifierTaken": "Cits režīms jau izmanto šo identifikatoru.",
+      "identifierTooLong": "Identifikators nedrīkst būt garāks par {{max}} rakstzīmēm.",
       "nameLabel": "Režīma nosaukums",
       "nameRequired": "Ievadiet režīma nosaukumu.",
       "notFound": "Šis režīms vairs neeksistē.",

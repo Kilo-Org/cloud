@@ -3622,6 +3622,7 @@
       "identifierLabel": "Identifikator",
       "identifierRequired": "Angiv en identifikator.",
       "identifierTaken": "En anden tilstand bruger allerede denne identifikator.",
+      "identifierTooLong": "Hold identifikatoren på {{max}} tegn eller færre.",
       "nameLabel": "Tilstandens navn",
       "nameRequired": "Angiv et tilstandsnavn.",
       "notFound": "Denne tilstand findes ikke længere.",

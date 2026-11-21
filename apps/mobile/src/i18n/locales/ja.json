@@ -3626,6 +3626,7 @@
       "identifierLabel": "識別子",
       "identifierRequired": "識別子を入力してください。",
       "identifierTaken": "この識別子は別のモードで既に使用されています。",
+      "identifierTooLong": "識別子は{{max}}文字以内にしてください。",
       "nameLabel": "モード名",
       "nameRequired": "モード名を入力してください。",
       "notFound": "このモードは存在しません。",

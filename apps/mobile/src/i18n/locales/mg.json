@@ -3622,6 +3622,7 @@
       "identifierLabel": "Famantarana",
       "identifierRequired": "Ampidiro ny famantarana.",
       "identifierTaken": "Efa mampiasa io famantarana io ny fomba fiasa hafa.",
+      "identifierTooLong": "Ataovy ao anatin'ny {{max}} tarehintsoratra ny famantarana.",
       "nameLabel": "Anaran'ny fomba fiasa",
       "nameRequired": "Ampidiro ny anaran'ny fomba fiasa.",
       "notFound": "Tsy misy intsony ity fomba fiasa ity.",

@@ -3622,6 +3622,7 @@
       "identifierLabel": "İdentifikator",
       "identifierRequired": "İdentifikator daxil edin.",
       "identifierTaken": "Bu identifikator artıq başqa rejim tərəfindən istifadə olunur.",
+      "identifierTooLong": "İdentifikatoru {{max}} simvolla və ya daha az saxlayın.",
       "nameLabel": "Rejim adı",
       "nameRequired": "Rejim adı daxil edin.",
       "notFound": "Bu rejim artıq mövcud deyil.",

@@ -3808,6 +3808,7 @@
       "identifierLabel": "Aitheantóir",
       "identifierRequired": "Cuir isteach aitheantóir.",
       "identifierTaken": "Tá an t-aitheantóir seo in úsáid ag mód eile cheana féin.",
+      "identifierTooLong": "Coinnigh an t-aitheantóir ag {{max}} carachtar nó níos lú.",
       "nameLabel": "Ainm an mhóid",
       "nameRequired": "Cuir isteach ainm móid.",
       "notFound": "Níl an mód seo ann a thuilleadh.",

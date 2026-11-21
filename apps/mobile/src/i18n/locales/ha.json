@@ -3622,6 +3622,7 @@
       "identifierLabel": "Alamar ganowa",
       "identifierRequired": "Shigar da alamar ganowa.",
       "identifierTaken": "Wani yanayi ya riga ya yi amfani da wannan alamar ganowa.",
+      "identifierTooLong": "Ka riƙe alamar ganowa a cikin haruffa {{max}} ko ƙasa da haka.",
       "nameLabel": "Sunan yanayi",
       "nameRequired": "Shigar da sunan yanayi.",
       "notFound": "Wannan yanayin ba ya wanzu kuma.",

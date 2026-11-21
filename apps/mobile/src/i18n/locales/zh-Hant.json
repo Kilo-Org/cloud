@@ -3626,6 +3626,7 @@
       "identifierLabel": "識別碼",
       "identifierRequired": "請輸入識別碼。",
       "identifierTaken": "已有其他模式使用此識別碼。",
+      "identifierTooLong": "識別碼請保持在 {{max}} 個字元以內。",
       "nameLabel": "模式名稱",
       "nameRequired": "請輸入模式名稱。",
       "notFound": "此模式已不存在。",

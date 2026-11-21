@@ -3622,6 +3622,7 @@
       "identifierLabel": "Identifiseerder",
       "identifierRequired": "Voer 'n identifiseerder in.",
       "identifierTaken": "Hierdie identifiseerder word reeds deur 'n ander modus gebruik.",
+      "identifierTooLong": "Hou die identifiseerder op {{max}} karakters of minder.",
       "nameLabel": "Modusnaam",
       "nameRequired": "Voer 'n modusnaam in.",
       "notFound": "Hierdie modus bestaan nie meer nie.",

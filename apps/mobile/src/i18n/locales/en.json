@@ -3726,6 +3726,7 @@
       "identifierLabel": "Identifier",
       "identifierRequired": "Enter an identifier.",
       "identifierTaken": "Another mode already uses this identifier.",
+      "identifierTooLong": "Keep the identifier to {{max}} characters or fewer.",
       "nameLabel": "Mode name",
       "nameRequired": "Enter a mode name.",
       "notFound": "This mode no longer exists.",

@@ -3622,6 +3622,7 @@
       "identifierLabel": "Azonosító",
       "identifierRequired": "Adjon meg egy azonosítót.",
       "identifierTaken": "Egy másik mód már használja ezt az azonosítót.",
+      "identifierTooLong": "Legfeljebb {{max}} karakter hosszú legyen az azonosító.",
       "nameLabel": "Mód neve",
       "nameRequired": "Adjon meg egy módnevet.",
       "notFound": "Ez a mód már nem létezik.",

@@ -3622,6 +3622,7 @@
       "identifierLabel": "Identifikuesi",
       "identifierRequired": "Vendos një identifikues.",
       "identifierTaken": "Një mënyrë tjetër e përdor tashmë këtë identifikues.",
+      "identifierTooLong": "Mbaje identifikuesin me {{max}} karaktere ose më pak.",
       "nameLabel": "Emri i mënyrës",
       "nameRequired": "Vendos një emër mënyre.",
       "notFound": "Kjo mënyrë nuk ekziston më.",

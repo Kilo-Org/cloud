@@ -3622,6 +3622,7 @@
       "identifierLabel": "Ìdánimọ̀",
       "identifierRequired": "Tẹ ìdánimọ̀ kan.",
       "identifierTaken": "Ipò mìíràn ti ń lo ìdánimọ̀ yìí.",
+      "identifierTooLong": "Jẹ́ kí ìdánimọ̀ wà ní {{max}} lẹ́tà tàbí kéré sí i.",
       "nameLabel": "Orúkọ ipò",
       "nameRequired": "Tẹ orúkọ ipò kan.",
       "notFound": "Ipò yìí kò sí mọ́.",

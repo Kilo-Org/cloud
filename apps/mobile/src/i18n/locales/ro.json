@@ -3684,6 +3684,7 @@
       "identifierLabel": "Identificator",
       "identifierRequired": "Introdu un identificator.",
       "identifierTaken": "Un alt mod folosește deja acest identificator.",
+      "identifierTooLong": "Păstrează identificatorul la {{max}} caractere sau mai puțin.",
       "nameLabel": "Nume mod",
       "nameRequired": "Introdu un nume pentru mod.",
       "notFound": "Acest mod nu mai există.",

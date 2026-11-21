@@ -3622,6 +3622,7 @@
       "identifierLabel": "আইডেন্টিফায়ার",
       "identifierRequired": "একটি আইডেন্টিফায়ার লিখুন।",
       "identifierTaken": "অন্য একটি মোড ইতিমধ্যে এই আইডেন্টিফায়ার ব্যবহার করছে।",
+      "identifierTooLong": "আইডেন্টিফায়ারটি {{max}}টি অক্ষর বা তার কম রাখুন।",
       "nameLabel": "মোডের নাম",
       "nameRequired": "একটি মোডের নাম লিখুন।",
       "notFound": "এই মোডটি আর নেই।",

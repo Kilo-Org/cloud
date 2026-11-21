@@ -3688,6 +3688,7 @@
       "identifierLabel": "מזהה",
       "identifierRequired": "הזינו מזהה.",
       "identifierTaken": "מצב אחר כבר משתמש במזהה הזה.",
+      "identifierTooLong": "הגבילו את המזהה ל-{{max}} תווים או פחות.",
       "nameLabel": "שם המצב",
       "nameRequired": "הזינו שם מצב.",
       "notFound": "המצב הזה כבר לא קיים.",

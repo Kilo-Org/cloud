@@ -3622,6 +3622,7 @@
       "identifierLabel": "Identifierare",
       "identifierRequired": "Ange en identifierare.",
       "identifierTaken": "Ett annat läge använder redan den här identifieraren.",
+      "identifierTooLong": "Håll identifieraren till {{max}} tecken eller färre.",
       "nameLabel": "Lägesnamn",
       "nameRequired": "Ange ett lägesnamn.",
       "notFound": "Det här läget finns inte längre.",

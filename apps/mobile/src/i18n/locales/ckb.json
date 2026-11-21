@@ -3622,6 +3622,7 @@
       "identifierLabel": "ناسێنەر",
       "identifierRequired": "ناسێنەرێک بنووسە.",
       "identifierTaken": "مۆدێکی تر ئەم ناسێنەرە بەکاردەهێنێت.",
+      "identifierTooLong": "ناسێنەرەکە لە {{max}} پیت یان کەمتر ڕابگرە.",
       "nameLabel": "ناوی مۆد",
       "nameRequired": "ناوی مۆد بنووسە.",
       "notFound": "ئەم مۆدە چیتر بوونی نییە.",

@@ -3808,6 +3808,7 @@
       "identifierLabel": "Identifikatur",
       "identifierRequired": "Daħħal identifikatur.",
       "identifierTaken": "Mod ieħor diġà juża dan l-identifikatur.",
+      "identifierTooLong": "Żomm l-identifikatur fi {{max}} karattri jew inqas.",
       "nameLabel": "Isem il-mod",
       "nameRequired": "Daħħal isem il-mod.",
       "notFound": "Dan il-mod m'għadux jeżisti.",

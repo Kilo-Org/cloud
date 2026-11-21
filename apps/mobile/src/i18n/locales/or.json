@@ -3622,6 +3622,7 @@
       "identifierLabel": "ପରିଚାୟକ",
       "identifierRequired": "ଏକ ପରିଚାୟକ ଦିଅନ୍ତୁ।",
       "identifierTaken": "ଅନ୍ୟ ଏକ ମୋଡ୍ ଏହି ପରିଚାୟକକୁ ପୂର୍ବରୁ ବ୍ୟବହାର କରୁଛି।",
+      "identifierTooLong": "ପରିଚାୟକକୁ {{max}} ଅକ୍ଷର କିମ୍ବା ତାହାଠାରୁ କମ୍ ରଖନ୍ତୁ।",
       "nameLabel": "ମୋଡ୍ ନାମ",
       "nameRequired": "ମୋଡ୍ ନାମ ଦିଅନ୍ତୁ।",
       "notFound": "ଏହି ମୋଡ୍ ଆଉ ଅବସ୍ଥିତ ନାହିଁ।",

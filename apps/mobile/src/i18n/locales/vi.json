@@ -3626,6 +3626,7 @@
       "identifierLabel": "Mã định danh",
       "identifierRequired": "Nhập mã định danh.",
       "identifierTaken": "Một chế độ khác đã dùng mã định danh này.",
+      "identifierTooLong": "Giữ mã định danh từ {{max}} ký tự trở xuống.",
       "nameLabel": "Tên chế độ",
       "nameRequired": "Nhập tên chế độ.",
       "notFound": "Chế độ này không còn tồn tại.",

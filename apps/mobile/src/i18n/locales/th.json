@@ -3622,6 +3622,7 @@
       "identifierLabel": "ตัวระบุ",
       "identifierRequired": "กรอกตัวระบุ",
       "identifierTaken": "มีโหมดอื่นใช้ตัวระบุนี้อยู่แล้ว",
+      "identifierTooLong": "จำกัดตัวระบุให้ไม่เกิน {{max}} ตัวอักษร",
       "nameLabel": "ชื่อโหมด",
       "nameRequired": "กรอกชื่อโหมด",
       "notFound": "ไม่มีโหมดนี้แล้ว",

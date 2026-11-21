@@ -3684,6 +3684,7 @@
       "identifierLabel": "Identificador",
       "identifierRequired": "Introdueix un identificador.",
       "identifierTaken": "Un altre mode ja utilitza aquest identificador.",
+      "identifierTooLong": "Mantingues l'identificador en {{max}} caràcters o menys.",
       "nameLabel": "Nom del mode",
       "nameRequired": "Introdueix un nom de mode.",
       "notFound": "Aquest mode ja no existeix.",

@@ -3622,6 +3622,7 @@
       "identifierLabel": "Identifikator",
       "identifierRequired": "Identifikator kiriting.",
       "identifierTaken": "Bu identifikatordan boshqa rejim allaqachon foydalanmoqda.",
+      "identifierTooLong": "Identifikatorni {{max}} ta belgi yoki undan kam qilib saqlang.",
       "nameLabel": "Rejim nomi",
       "nameRequired": "Rejim nomini kiriting.",
       "notFound": "Bu rejim endi mavjud emas.",

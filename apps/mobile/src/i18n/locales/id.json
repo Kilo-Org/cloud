@@ -3626,6 +3626,7 @@
       "identifierLabel": "Pengenal",
       "identifierRequired": "Masukkan pengenal.",
       "identifierTaken": "Mode lain sudah menggunakan pengenal ini.",
+      "identifierTooLong": "Jaga pengenal tetap {{max}} karakter atau kurang.",
       "nameLabel": "Nama mode",
       "nameRequired": "Masukkan nama mode.",
       "notFound": "Mode ini sudah tidak ada.",

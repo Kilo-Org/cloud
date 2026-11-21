@@ -3622,6 +3622,7 @@
       "identifierLabel": "Isihlonzi",
       "identifierRequired": "Faka isihlonzi.",
       "identifierTaken": "Enye imodi isivele isebenzisa lesi sihlonzi.",
+      "identifierTooLong": "Gcina isihlonzi sibe yizinhlamvu ezingu-{{max}} noma ngaphansi.",
       "nameLabel": "Igama lemodi",
       "nameRequired": "Faka igama lemodi.",
       "notFound": "Le modi ayisekho.",

@@ -3622,6 +3622,7 @@
       "identifierLabel": "ઓળખક",
       "identifierRequired": "ઓળખક દાખલ કરો.",
       "identifierTaken": "બીજો મોડ પહેલેથી આ ઓળખકનો ઉપયોગ કરે છે.",
+      "identifierTooLong": "ઓળખકને {{max}} અક્ષરો કે તેથી ઓછા સુધી રાખો.",
       "nameLabel": "મોડ નામ",
       "nameRequired": "મોડ નામ દાખલ કરો.",
       "notFound": "આ મોડ હવે અસ્તિત્વમાં નથી.",

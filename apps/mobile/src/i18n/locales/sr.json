@@ -3684,6 +3684,7 @@
       "identifierLabel": "Identifikator",
       "identifierRequired": "Unesi identifikator.",
       "identifierTaken": "Drugi režim već koristi ovaj identifikator.",
+      "identifierTooLong": "Zadrži identifikator na {{max}} znakova ili manje.",
       "nameLabel": "Naziv režima",
       "nameRequired": "Unesi naziv režima.",
       "notFound": "Ovaj režim više ne postoji.",

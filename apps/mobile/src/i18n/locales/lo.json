@@ -3622,6 +3622,7 @@
       "identifierLabel": "ຕົວລະບຸ",
       "identifierRequired": "ປ້ອນຕົວລະບຸ.",
       "identifierTaken": "ໂໝດອື່ນໃຊ້ຕົວລະບຸນີ້ແລ້ວ.",
+      "identifierTooLong": "ໃຫ້ຕົວລະບຸມີບໍ່ເກີນ {{max}} ຕົວອັກສອນ.",
       "nameLabel": "ຊື່ໂໝດ",
       "nameRequired": "ປ້ອນຊື່ໂໝດ.",
       "notFound": "ບໍ່ມີໂໝດນີ້ອີກແລ້ວ.",

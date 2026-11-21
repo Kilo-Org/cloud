@@ -3622,6 +3622,7 @@
       "identifierLabel": "ಐಡೆಂಟಿಫೈಯರ್",
       "identifierRequired": "ಐಡೆಂಟಿಫೈಯರ್ ನಮೂದಿಸಿ.",
       "identifierTaken": "ಇನ್ನೊಂದು ಮೋಡ್ ಈಗಾಗಲೇ ಈ ಐಡೆಂಟಿಫೈಯರ್ ಬಳಸುತ್ತಿದೆ.",
+      "identifierTooLong": "ಐಡೆಂಟಿಫೈಯರ್ ಅನ್ನು {{max}} ಅಕ್ಷರಗಳು ಅಥವಾ ಕಡಿಮೆಗೆ ಇರಿಸಿ.",
       "nameLabel": "ಮೋಡ್ ಹೆಸರು",
       "nameRequired": "ಮೋಡ್ ಹೆಸರು ನಮೂದಿಸಿ.",
       "notFound": "ಈ ಮೋಡ್ ಇನ್ನಿಲ್ಲ.",

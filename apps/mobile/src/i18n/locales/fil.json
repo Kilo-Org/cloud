@@ -3622,6 +3622,7 @@
       "identifierLabel": "Identifier",
       "identifierRequired": "Maglagay ng identifier.",
       "identifierTaken": "Ginagamit na ng ibang modo ang identifier na ito.",
+      "identifierTooLong": "Panatilihin ang identifier sa {{max}} character o mas kaunti.",
       "nameLabel": "Pangalan ng modo",
       "nameRequired": "Maglagay ng pangalan ng modo.",
       "notFound": "Wala na ang modong ito.",

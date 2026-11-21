@@ -3622,6 +3622,7 @@
       "identifierLabel": "Identifikatzailea",
       "identifierRequired": "Sartu identifikatzaile bat.",
       "identifierTaken": "Beste modu batek dagoeneko identifikatzaile hau erabiltzen du.",
+      "identifierTooLong": "Eduki identifikatzailea {{max}} karaktere edo gutxiagotan.",
       "nameLabel": "Moduaren izena",
       "nameRequired": "Sartu moduaren izena.",
       "notFound": "Modu hau ez da jada existitzen.",

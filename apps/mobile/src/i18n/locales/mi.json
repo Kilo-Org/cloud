@@ -3622,6 +3622,7 @@
       "identifierLabel": "Tohu tautuhi",
       "identifierRequired": "Whakaurua he tohu tautuhi.",
       "identifierTaken": "Kua whakamahia kē tēnei tohu tautuhi e tētahi atu aratau.",
+      "identifierTooLong": "Kia {{max}} pūāhua iti iho rānei te tohu tautuhi.",
       "nameLabel": "Ingoa aratau",
       "nameRequired": "Whakaurua he ingoa aratau.",
       "notFound": "Kua kore tēnei aratau.",

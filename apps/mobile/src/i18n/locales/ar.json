@@ -3874,6 +3874,7 @@
       "identifierLabel": "المعرّف",
       "identifierRequired": "أدخل معرّفًا.",
       "identifierTaken": "يستخدم وضع آخر هذا المعرّف بالفعل.",
+      "identifierTooLong": "اجعل المعرّف في حدود {{max}} حرفًا أو أقل.",
       "nameLabel": "اسم الوضع",
       "nameRequired": "أدخل اسم وضع.",
       "notFound": "هذا الوضع لم يعد موجودًا.",

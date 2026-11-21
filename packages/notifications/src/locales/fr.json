@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Nouveau signalement de sécurité ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Critique",
+      "high": "Élevé",
+      "medium": "Moyen",
+      "low": "Faible"
+    },
     "securityFindingSlaWarning": {
       "title": "Avertissement SLA"
     },

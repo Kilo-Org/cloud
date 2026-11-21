@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "ಹೊಸ ಭದ್ರತಾ ಸಂಶೋಧನೆ ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "ಗಂಭೀರ",
+      "high": "ಹೆಚ್ಚು",
+      "medium": "ಮಧ್ಯಮ",
+      "low": "ಕಡಿಮೆ"
+    },
     "securityFindingSlaWarning": {
       "title": "SLA ಎಚ್ಚರಿಕೆ"
     },

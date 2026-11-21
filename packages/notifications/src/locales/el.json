@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Νέο εύρημα ασφαλείας ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Κρίσιμη",
+      "high": "Υψηλή",
+      "medium": "Μέτρια",
+      "low": "Χαμηλή"
+    },
     "securityFindingSlaWarning": {
       "title": "Προειδοποίηση SLA"
     },

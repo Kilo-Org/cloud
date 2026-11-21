@@ -397,10 +397,15 @@ describe('organization GitHub workflow connection lookups', () => {
       repository_access: 'all',
     });
 
-    await expect(getOrganizationGitHubInstallationSlots(organization.id)).resolves.toEqual([
-      { installationId: liveInstallationId, appType: 'standard' },
-      { installationId: null, appType: 'standard' },
-    ]);
+    // The query has no ORDER BY, so compare the set rather than row order.
+    const slots = await getOrganizationGitHubInstallationSlots(organization.id);
+    expect(slots).toHaveLength(2);
+    expect(slots).toEqual(
+      expect.arrayContaining([
+        { installationId: liveInstallationId, appType: 'standard' },
+        { installationId: null, appType: 'standard' },
+      ])
+    );
   });
 
   test('releases the organization slot when the association is disconnected locally', async () => {

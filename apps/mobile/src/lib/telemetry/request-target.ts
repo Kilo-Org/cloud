@@ -80,16 +80,19 @@ function nextDelimiter(text: string, from: number): number {
  * message, the fingerprint path — carry origin and path. Returns empty string
  * on a non-string.
  *
- * The value reported after that last `@` must read as a host, since it stands
- * for the authority's host, port and path. When it does not, the result is the
- * scheme alone.
+ * The text after that last `@` must read as a host, since it stands for the
+ * authority's host, port and path; a single label with no colon qualifies,
+ * because nothing after the last `@` can be userinfo. When it is neither, and
+ * the `@` sits before any query or fragment, the result is the scheme alone. An
+ * `@` after a query or fragment is that text or, when the marker sits inside a
+ * value, still userinfo, so the text before the query is kept only when it
+ * reads as a host.
  *
  * A single label with a numeric port is not read as a host, though: `api:3000`
  * is the same text as a userinfo pair whose value starts with digits. Such a
- * run is read as userinfo, so a later `@` ends the value at the scheme alone
- * when the text after it is not a host, and at that host when it is. A dotted
- * name, `localhost`, an IPv4 literal and a bracketed IPv6 authority never take
- * that reading and keep their own origin, port and path.
+ * run is read as userinfo, so the authority continues past a delimiter inside
+ * it. A dotted name, `localhost`, an IPv4 literal and a bracketed IPv6 authority
+ * never take that reading and keep their own origin, port and path.
  */
 export function stripQueryString(url: string): string {
   try {

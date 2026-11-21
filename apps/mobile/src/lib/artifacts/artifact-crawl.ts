@@ -34,6 +34,23 @@ export const MIRROR_SESSION_LIMIT = 50;
 export const MAX_ARTIFACT_BYTES = 25 * 1024 * 1024;
 
 /**
+ * How long the declared-length probe may take. The probe reads one response's
+ * headers, so it is a round trip, not a transfer: fifteen seconds covers a slow
+ * mobile handshake and still ends a dead request long before a foreground
+ * session would notice.
+ */
+export const ARTIFACT_PROBE_TIMEOUT_MS = 15_000;
+
+/**
+ * One total budget per artifact transfer, not a per-chunk idle timeout: the
+ * largest artifact the mirror keeps ({@link MAX_ARTIFACT_BYTES}, 25 MB) has to
+ * fit on a slow phone connection at roughly 700 kbps, and a transfer that
+ * stalls still ends the run well inside one foreground session instead of
+ * holding the cursor forever.
+ */
+export const ARTIFACT_DOWNLOAD_TIMEOUT_MS = 300_000;
+
+/**
  * The only network origin family a stored artifact URL may name: R2's S3 API
  * host, which is what every Kilo presign client mints
  * (`https://<account id>.r2.cloudflarestorage.com/<bucket>/<key>`). A stored URL
@@ -173,6 +190,64 @@ const DEFAULT_DEPS: ArtifactCrawlDeps = {
 /* eslint-enable @typescript-eslint/promise-function-async */
 
 /**
+ * Arm a deadline on `controller`: after `ms` the request it was given to is
+ * aborted. The returned function cancels the timer, so the caller clears it on
+ * every exit and no timer outlives the request it bounds.
+ */
+function abortAfter(controller: AbortController, ms: number): () => void {
+  const timer: ReturnType<typeof setTimeout> = setTimeout(() => {
+    controller.abort();
+  }, ms);
+  return () => {
+    clearTimeout(timer);
+  };
+}
+
+/**
+ * Settle with `work`, or reject as soon as `signal` aborts. `fetch` rejects a
+ * pending request on abort, but `pipeTo` takes no signal at all, and a request
+ * whose transport ignores the abort would otherwise hang the deadline. So the
+ * deadline is enforced here on the promise, not left to the transport. The side
+ * that loses the race is abandoned, so its rejection is kept handled, and the
+ * abort listener is removed once the race settles.
+ */
+async function raceAgainstAbort<T>(
+  work: Promise<T>,
+  signal: AbortSignal,
+  message: string
+): Promise<T> {
+  const settled = Promise.withResolvers<T>();
+  function settleWithError(error: unknown): void {
+    settled.reject(error instanceof Error ? error : new Error(message));
+  }
+  // The work's own outcome, whichever it is: this helper only adds the deadline,
+  // so a resolution and a rejection both pass through untouched. Awaiting here
+  // keeps both failures handled, including the transfer the deadline abandoned.
+  async function forwardWork(): Promise<void> {
+    try {
+      settled.resolve(await work);
+    } catch (error) {
+      settleWithError(error);
+    }
+  }
+  function onAbort(): void {
+    settleWithError(new Error(message));
+  }
+  // No await between the check and the listener, so an abort cannot be missed.
+  if (signal.aborted) {
+    onAbort();
+  } else {
+    signal.addEventListener('abort', onAbort, { once: true });
+  }
+  void forwardWork();
+  try {
+    return await settled.promise;
+  } finally {
+    signal.removeEventListener('abort', onAbort);
+  }
+}
+
+/**
  * The full byte length declared by a URL, or null when unknown.
  *
  * Attachment URLs are signed for GET, so HEAD would fail signature validation.
@@ -180,16 +255,23 @@ const DEFAULT_DEPS: ArtifactCrawlDeps = {
  * Content-Length. Expo's streaming fetch lets us abort at the headers even if a
  * server ignores Range and sends a full response. Unknown lengths still get the
  * post-download size check below. A probe whose redirect chain leaves the
- * allowed origins reports nothing.
+ * allowed origins reports nothing, and the probe itself is bounded by
+ * {@link ARTIFACT_PROBE_TIMEOUT_MS}: a server that never answers makes the probe
+ * report nothing rather than hold the artifact.
  */
 async function probeContentLength(url: string): Promise<number | null> {
   const controller = new AbortController();
+  const clearDeadline = abortAfter(controller, ARTIFACT_PROBE_TIMEOUT_MS);
   try {
-    const response = await fetchAllowedArtifact(url, {
-      method: 'GET',
-      headers: { Range: 'bytes=0-0' },
-      signal: controller.signal,
-    });
+    const response = await raceAgainstAbort(
+      fetchAllowedArtifact(url, {
+        method: 'GET',
+        headers: { Range: 'bytes=0-0' },
+        signal: controller.signal,
+      }),
+      controller.signal,
+      'Artifact length probe timed out'
+    );
     if (response === null || !response.ok) {
       return null;
     }
@@ -205,6 +287,11 @@ async function probeContentLength(url: string): Promise<number | null> {
   } catch {
     return null;
   } finally {
+    clearDeadline();
+    // The deadline is the timer now, not this call: aborting here can only end a
+    // probe that already has its headers. It is still needed, because a server
+    // that ignores Range may be sending a body the probe never reads, and the
+    // abort releases that stream.
     controller.abort();
   }
 }
@@ -344,34 +431,56 @@ async function fetchAllowedArtifact(
  * stay on the allowed origins; a refused hop leaves no bytes behind. The body is
  * piped through the file handle, so a download never sits in memory whole while
  * it is written, and every failure path releases the body.
+ *
+ * The whole transfer — headers and body — is bounded by
+ * {@link ARTIFACT_DOWNLOAD_TIMEOUT_MS} through one controller: the signal
+ * reaches every redirect hop and errors the response body, and because `pipeTo`
+ * takes no signal the pipe itself is raced against the abort. An aborted
+ * transfer becomes the retryable `download-failed` through
+ * {@link materializeArtifact}, so the cursor is held and the artifact is retried
+ * on the next run instead of stalling it forever.
  */
 async function downloadAllowedArtifact(url: string, target: File): Promise<File> {
-  const response = await fetchAllowedArtifact(url, { method: 'GET' });
-  if (response === null) {
-    throw new Error('Artifact download address is not an allowed origin');
-  }
-  if (!response.ok) {
-    // The caller keeps no bytes from a failed status, so release the body rather
-    // than leaving the connection's stream unread.
-    await response.body?.cancel();
-    throw new Error(`Artifact download failed with status ${response.status}`);
-  }
+  const controller = new AbortController();
+  const clearDeadline = abortAfter(controller, ARTIFACT_DOWNLOAD_TIMEOUT_MS);
+  let response: Response | null = null;
   try {
+    response = await raceAgainstAbort(
+      fetchAllowedArtifact(url, { method: 'GET', signal: controller.signal }),
+      controller.signal,
+      'Artifact download timed out'
+    );
+    if (response === null) {
+      throw new Error('Artifact download address is not an allowed origin');
+    }
+    if (!response.ok) {
+      // The caller keeps no bytes from a failed status, so release the body rather
+      // than leaving the connection's stream unread.
+      await response.body?.cancel();
+      throw new Error(`Artifact download failed with status ${response.status}`);
+    }
     // `writableStream()` opens a write-only handle: iOS throws when the file does
     // not exist, and neither platform truncates there. Creating it first makes
     // the staging path a fresh empty file, so a leftover of the same name cannot
     // leave a tail behind the new bytes.
     target.create({ intermediates: true, overwrite: true });
-    await (response.body ?? new Blob([]).stream()).pipeTo(target.writableStream());
+    // `pipeTo` accepts no signal, so the transfer is raced against the abort.
+    await raceAgainstAbort(
+      (response.body ?? new Blob([]).stream()).pipeTo(target.writableStream()),
+      controller.signal,
+      'Artifact download timed out'
+    );
     return target;
   } catch (error) {
     try {
-      await response.body?.cancel();
+      await response?.body?.cancel();
     } catch {
       // A failed pipe already released the stream, so nothing is left to cancel.
     }
     deleteQuietly(target);
     throw error;
+  } finally {
+    clearDeadline();
   }
 }
 

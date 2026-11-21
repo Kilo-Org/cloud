@@ -4,6 +4,8 @@ import { File } from 'expo-file-system';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  ARTIFACT_DOWNLOAD_TIMEOUT_MS,
+  ARTIFACT_PROBE_TIMEOUT_MS,
   type ArtifactCrawlDeps,
   buildSessionArtifacts,
   extractSessionArtifacts,
@@ -642,6 +644,72 @@ describe('materializeArtifact', () => {
     ).resolves.toEqual({ ok: false, reason: 'download-failed' });
     expect(probeFetch.mock.calls.length).toBeLessThanOrEqual(12);
     expect(tracked.created).toBe(false);
+  });
+
+  it('gives up on a body that never completes, and leaves no bytes behind', async () => {
+    vi.useFakeTimers();
+    try {
+      const downloadSignals: AbortSignal[] = [];
+      probeFetch.mockImplementation(async (_url, init) => {
+        if (init?.headers !== undefined) {
+          return new Response('x', {
+            status: 206,
+            headers: { 'content-length': '1', 'content-range': 'bytes 0-0/5' },
+          });
+        }
+        if (init?.signal) {
+          downloadSignals.push(init.signal);
+        }
+        return new Response(
+          new ReadableStream<Uint8Array>({
+            // The read a stalled transfer represents: the stream never delivers
+            // another chunk and never closes.
+            pull: () => Promise.withResolvers<undefined>().promise,
+          }),
+          { status: 200 }
+        );
+      });
+      const { file, tracked } = target();
+
+      const result = materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, file);
+      // The transfer is under way, and its signal is not aborted yet.
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(downloadSignals).toHaveLength(1);
+      expect(downloadSignals[0]?.aborted).toBe(false);
+
+      // The stalled body now reaches the deadline.
+      await vi.advanceTimersByTimeAsync(ARTIFACT_DOWNLOAD_TIMEOUT_MS);
+
+      await expect(result).resolves.toEqual({ ok: false, reason: 'download-failed' });
+      expect(downloadSignals[0]?.aborted).toBe(true);
+      expect(tracked.deleted).toBe(true);
+      expect(tracked.streamed).toBe(0);
+      expect(tracked.writes).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('downloads anyway when the probe never answers, and aborts the probe', async () => {
+    vi.useFakeTimers();
+    try {
+      // The probe's request never answers, so only the deadline can end it.
+      probeFetch.mockImplementation(() => Promise.withResolvers<Response>().promise);
+      const { file } = target();
+      const downloadFile = downloadResolving(7);
+
+      const result = materializeArtifact({ id: 'f1', mime: 'text/plain', url: ALLOWED_URL }, file, {
+        downloadFile,
+      });
+      await vi.advanceTimersByTimeAsync(ARTIFACT_PROBE_TIMEOUT_MS);
+
+      await expect(result).resolves.toEqual({ ok: true, size: 7 });
+      expect(downloadFile).toHaveBeenCalledOnce();
+      expect(probeFetch.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

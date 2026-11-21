@@ -3,6 +3,7 @@ import 'server-only';
 import {
   kilocode_users,
   organization_group_memberships,
+  organization_group_policy_links,
   organization_group_policy_settings,
   organization_groups,
   organization_memberships,
@@ -10,7 +11,11 @@ import {
   type Organization,
   type OrganizationGroup,
 } from '@kilocode/db/schema';
-import { MAX_ORGANIZATION_GROUPS, OrganizationSettingsSchema } from '@kilocode/db/schema-types';
+import {
+  MAX_ORGANIZATION_GROUPS,
+  OrganizationSettingsSchema,
+  type NamedOrganizationPolicyKind,
+} from '@kilocode/db/schema-types';
 import {
   describeModelAccessPolicyWriteRefusal,
   OrganizationGroupPoliciesSchema,
@@ -33,6 +38,10 @@ import {
   enkryptInputGuardrailGroupId,
   resolveEnkryptInputGuardrail,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
+import {
+  isOrganizationFeatureEnabled,
+  readOrganizationFeatures,
+} from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 import { normalizeRegisteredOrganizationGroupPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/registry.server';
 import {
   DEFAULT_ORGANIZATION_GROUP_POLICIES,
@@ -46,6 +55,11 @@ type OrganizationGroupActor = {
   id: string;
   email: string;
   name: string;
+};
+
+type NamedGroupPolicyLink = {
+  policyId: string;
+  kind: NamedOrganizationPolicyKind;
 };
 
 export type { CanonicalOrganizationGroupPolicySettings } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies.server';
@@ -107,7 +121,7 @@ async function assertEnterpriseOrganization(
 export async function lockOrganizationGroupPolicy(tx: DrizzleTransaction, organizationId: string) {
   await tx.execute(sql`
     SELECT pg_catalog.pg_advisory_xact_lock(
-      pg_catalog.hashtextextended(${`organization-group-policy:${organizationId}`}, 0)
+      pg_catalog.hashtextextended(${`organization-group-policy:${organizationId.toLowerCase()}`}, 0)
     )
   `);
 }
@@ -288,13 +302,46 @@ function groupPermissionPolicyTypes(
   );
 }
 
+async function getActiveNamedGroupPolicyLinks(
+  tx: DrizzleTransaction,
+  organizationId: string,
+  groupIds: string[]
+): Promise<NamedGroupPolicyLink[]> {
+  if (groupIds.length === 0) return [];
+  const links = await tx
+    .selectDistinct({
+      policyId: organization_group_policy_links.policy_id,
+      kind: organization_group_policy_links.kind,
+    })
+    .from(organization_group_policy_links)
+    .where(
+      and(
+        eq(organization_group_policy_links.organization_id, organizationId),
+        inArray(organization_group_policy_links.group_id, groupIds)
+      )
+    )
+    .orderBy(
+      asc(organization_group_policy_links.kind),
+      asc(organization_group_policy_links.policy_id)
+    );
+  if (links.length === 0) return [];
+  return isOrganizationFeatureEnabled(
+    await readOrganizationFeatures(tx),
+    'org_permission_policy',
+    organizationId
+  )
+    ? links
+    : [];
+}
+
 async function guardGroupPermissionPolicyChange(
   tx: DrizzleTransaction,
   organizationId: string,
   policyTypes: OrganizationGroupPolicyType[],
-  permissionPolicyAdmin: boolean | undefined
+  permissionPolicyAdmin: boolean | undefined,
+  namedPolicies: NamedGroupPolicyLink[] = []
 ) {
-  if (policyTypes.length === 0) return;
+  if (policyTypes.length === 0 && namedPolicies.length === 0) return;
   if (!permissionPolicyAdmin) {
     throw new TRPCError({
       code: 'FORBIDDEN',
@@ -311,7 +358,8 @@ async function guardGroupMembershipChange(
   permissionPolicyAdmin: boolean | undefined
 ) {
   const policyTypes = groupPermissionPolicyTypes(group);
-  if (policyTypes.length === 0) return [];
+  const namedPolicies = await getActiveNamedGroupPolicyLinks(tx, group.organization_id, [group.id]);
+  if (policyTypes.length === 0 && namedPolicies.length === 0) return { policyTypes, namedPolicies };
   const current = await tx
     .select({ userId: organization_group_memberships.kilo_user_id })
     .from(organization_group_memberships)
@@ -326,21 +374,32 @@ async function guardGroupMembershipChange(
     current.length === nextUserIds.size &&
     current.every(({ userId }) => nextUserIds.has(userId))
   ) {
-    return [];
+    return { policyTypes: [], namedPolicies: [] };
   }
   await guardGroupPermissionPolicyChange(
     tx,
     group.organization_id,
     policyTypes,
-    permissionPolicyAdmin
+    permissionPolicyAdmin,
+    namedPolicies
   );
-  return policyTypes;
+  return { policyTypes, namedPolicies };
 }
 
-function permissionPolicyAuditSuffix(policyTypes: OrganizationGroupPolicyType[], revision: number) {
-  return policyTypes.length > 0
-    ? `; permission policy: ${policyTypes.join(', ')} (revision ${revision})`
-    : '';
+function permissionPolicyAuditSuffix(
+  policyTypes: OrganizationGroupPolicyType[],
+  revision: number,
+  namedPolicies: NamedGroupPolicyLink[] = []
+) {
+  const embeddedSuffix =
+    policyTypes.length > 0
+      ? `; permission policy: ${policyTypes.join(', ')} (revision ${revision})`
+      : '';
+  const namedSuffix =
+    namedPolicies.length > 0
+      ? `; named policies: ${namedPolicies.map(({ kind, policyId }) => `${kind} ${policyId}`).join(', ')} (revision ${revision})`
+      : '';
+  return embeddedSuffix + namedSuffix;
 }
 
 function actorAudit(actor: OrganizationGroupActor) {
@@ -578,7 +637,7 @@ export async function updateOrganizationGroupDetails(params: {
       await assertGroupNameAvailable(tx, params.organizationId, params.name.trim(), params.groupId);
       const userIds = [...new Set(params.userIds)];
       await assertDirectMembers(tx, params.organizationId, userIds);
-      const policyTypes = await guardGroupMembershipChange(
+      const { policyTypes, namedPolicies } = await guardGroupMembershipChange(
         tx,
         existing,
         userIds,
@@ -608,7 +667,7 @@ export async function updateOrganizationGroupDetails(params: {
       await createAuditLog({
         action: 'organization.group.update',
         ...actorAudit(params.actor),
-        message: `Updated group "${existing.name}" (${existing.id}) with ${counted(userIds.length, 'member', 'members')}${permissionPolicyAuditSuffix(policyTypes, policyRevision)}`,
+        message: `Updated group "${existing.name}" (${existing.id}) with ${counted(userIds.length, 'member', 'members')}${permissionPolicyAuditSuffix(policyTypes, policyRevision, namedPolicies)}`,
         organization_id: params.organizationId,
         tx,
       });
@@ -717,7 +776,7 @@ export async function setOrganizationGroupMembers(params: {
       const group = await getGroupForUpdate(tx, params.organizationId, params.groupId);
       const userIds = [...new Set(params.userIds)];
       await assertDirectMembers(tx, params.organizationId, userIds);
-      const policyTypes = await guardGroupMembershipChange(
+      const { policyTypes, namedPolicies } = await guardGroupMembershipChange(
         tx,
         group,
         userIds,
@@ -733,7 +792,7 @@ export async function setOrganizationGroupMembers(params: {
       await createAuditLog({
         action: 'organization.group.members.set',
         ...actorAudit(params.actor),
-        message: `Set ${counted(userIds.length, 'member', 'members')} for group "${group.name}" (${group.id})${permissionPolicyAuditSuffix(policyTypes, policyRevision)}`,
+        message: `Set ${counted(userIds.length, 'member', 'members')} for group "${group.name}" (${group.id})${permissionPolicyAuditSuffix(policyTypes, policyRevision, namedPolicies)}`,
         organization_id: params.organizationId,
         tx,
       });
@@ -756,11 +815,6 @@ export async function setOrganizationMemberGroups(params: {
       const groupIds = [...new Set(params.groupIds.map(groupId => groupId.toLowerCase()))];
       const nextGroupIds = new Set(groupIds);
       await assertDirectMembers(tx, params.organizationId, [params.userId]);
-      const [member] = await tx
-        .select({ email: kilocode_users.google_user_email })
-        .from(kilocode_users)
-        .where(eq(kilocode_users.id, params.userId))
-        .limit(1);
       const groups = await tx
         .select({
           id: organization_groups.id,
@@ -789,19 +843,31 @@ export async function setOrganizationMemberGroups(params: {
       if (groups.filter(group => nextGroupIds.has(group.id)).length !== nextGroupIds.size) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'One or more groups are invalid.' });
       }
-      const policyTypes = [
-        ...new Set(
-          groups
-            .filter(group => nextGroupIds.has(group.id) !== (group.currentGroupId !== null))
-            .flatMap(groupPermissionPolicyTypes)
-        ),
-      ].sort();
+      const changedGroups = groups.filter(
+        group => nextGroupIds.has(group.id) !== (group.currentGroupId !== null)
+      );
+      const policyTypes = [...new Set(changedGroups.flatMap(groupPermissionPolicyTypes))].sort();
+      const namedPolicies = await getActiveNamedGroupPolicyLinks(
+        tx,
+        params.organizationId,
+        changedGroups.map(group => group.id)
+      );
       await guardGroupPermissionPolicyChange(
         tx,
         params.organizationId,
         policyTypes,
-        params.permissionPolicyAdmin
+        params.permissionPolicyAdmin,
+        namedPolicies
       );
+      let auditTarget = `organization member (${params.userId})`;
+      if (namedPolicies.length === 0) {
+        const [member] = await tx
+          .select({ email: kilocode_users.google_user_email })
+          .from(kilocode_users)
+          .where(eq(kilocode_users.id, params.userId))
+          .limit(1);
+        auditTarget = `organization member ${member?.email ?? params.userId} (${params.userId})`;
+      }
       await tx
         .delete(organization_group_memberships)
         .where(
@@ -823,7 +889,7 @@ export async function setOrganizationMemberGroups(params: {
       await createAuditLog({
         action: 'organization.group.member_groups.set',
         ...actorAudit(params.actor),
-        message: `Set ${counted(groupIds.length, 'group', 'groups')} for organization member ${member?.email ?? params.userId} (${params.userId})${permissionPolicyAuditSuffix(policyTypes, policyRevision)}`,
+        message: `Set ${counted(groupIds.length, 'group', 'groups')} for ${auditTarget}${permissionPolicyAuditSuffix(policyTypes, policyRevision, namedPolicies)}`,
         organization_id: params.organizationId,
         tx,
       });
@@ -888,11 +954,15 @@ export async function deleteOrganizationGroup(params: {
     async ({ tx, policyRevision }) => {
       const group = await getGroupForUpdate(tx, params.organizationId, params.groupId);
       const policyTypes = groupPermissionPolicyTypes(group);
+      const namedPolicies = await getActiveNamedGroupPolicyLinks(tx, params.organizationId, [
+        group.id,
+      ]);
       await guardGroupPermissionPolicyChange(
         tx,
         params.organizationId,
         policyTypes,
-        params.permissionPolicyAdmin
+        params.permissionPolicyAdmin,
+        namedPolicies
       );
       await releaseEnkryptInputGuardrailGroup(tx, params.organizationId, group, params.actor);
       await tx
@@ -906,7 +976,7 @@ export async function deleteOrganizationGroup(params: {
       await createAuditLog({
         action: 'organization.group.delete',
         ...actorAudit(params.actor),
-        message: `Deleted group "${group.name}" (${group.id})${permissionPolicyAuditSuffix(policyTypes, policyRevision)}`,
+        message: `Deleted group "${group.name}" (${group.id})${permissionPolicyAuditSuffix(policyTypes, policyRevision, namedPolicies)}`,
         organization_id: params.organizationId,
         tx,
       });

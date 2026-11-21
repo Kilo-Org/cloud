@@ -576,36 +576,39 @@ describe('worktree deletion clears the session ruleset marker', () => {
     }
   });
 
-  test('a marker that cannot be removed does not fail the deletion', async () => {
-    const id = sessionId(1);
-    const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
-    const home = mkdtempSync(join(tmpdir(), 'worktree-delete-home-'));
-    homes.push(home);
-    const rulesets = join(home, '.kilo-control', 'rulesets');
-    const originalHome = process.env.HOME;
-    process.env.HOME = home;
-    let readOnly = false;
-    const stub = startCleanupStub();
-    stub.sessions.set(id, directory);
-    try {
-      await rememberOutstandingRuleset(id, permission);
-      chmodSync(rulesets, 0o500);
-      readOnly = true;
+  test.skipIf(process.getuid?.() === 0)(
+    'a marker that cannot be removed does not fail the deletion',
+    async () => {
+      const id = sessionId(1);
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      const home = mkdtempSync(join(tmpdir(), 'worktree-delete-home-'));
+      homes.push(home);
+      const rulesets = join(home, '.kilo-control', 'rulesets');
+      const originalHome = process.env.HOME;
+      process.env.HOME = home;
+      let readOnly = false;
+      const stub = startCleanupStub();
+      stub.sessions.set(id, directory);
+      try {
+        await rememberOutstandingRuleset(id, permission);
+        chmodSync(rulesets, 0o500);
+        readOnly = true;
 
-      const result = await deleteWorktree(
-        { worktreeId, directory, sessionIds: [id] },
-        { clients: [stub.client], removeDirectory: async () => undefined }
-      );
+        const result = await deleteWorktree(
+          { worktreeId, directory, sessionIds: [id] },
+          { clients: [stub.client], removeDirectory: async () => undefined }
+        );
 
-      expect(result).toEqual({ deleted: true, sessionIds: [id] });
-      expect(stub.deleted.has(id)).toBe(true);
-      expect(await readOutstandingRuleset(id)).toEqual(permission);
-    } finally {
-      if (readOnly) chmodSync(rulesets, 0o700);
-      await stub.server.stop(true);
-      await forgetOutstandingRuleset(id).catch(() => undefined);
-      if (originalHome === undefined) delete process.env.HOME;
-      else process.env.HOME = originalHome;
+        expect(result).toEqual({ deleted: true, sessionIds: [id] });
+        expect(stub.deleted.has(id)).toBe(true);
+        expect(await readOutstandingRuleset(id)).toEqual(permission);
+      } finally {
+        if (readOnly) chmodSync(rulesets, 0o700);
+        await stub.server.stop(true);
+        await forgetOutstandingRuleset(id).catch(() => undefined);
+        if (originalHome === undefined) delete process.env.HOME;
+        else process.env.HOME = originalHome;
+      }
     }
-  });
+  );
 });

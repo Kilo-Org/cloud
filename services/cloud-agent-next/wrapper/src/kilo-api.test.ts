@@ -23,6 +23,7 @@ import {
   forgetOutstandingRuleset,
   readOutstandingRuleset,
   rememberOutstandingRuleset,
+  SessionRulesetError,
   SessionRulesetNotAppliedError,
   SessionRulesetUnverifiedError,
   type WrapperKiloClient,
@@ -950,6 +951,7 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
         metadataUpdateStatus?: number;
         getFailures?: number;
         onImport?: () => void;
+        onPermissionUpdate?: () => void;
       } = {}
     ): { url: string; imports: EnsureSessionImport[]; updates: EnsureSessionUpdate[] } {
       const imports: EnsureSessionImport[] = [];
@@ -993,6 +995,7 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
           if (request.method === 'PATCH' && url.pathname === `/session/${sessionId}`) {
             const body = (await request.json()) as EnsureSessionUpdate['body'];
             updates.push({ queryDirectory: url.searchParams.get('directory'), body });
+            if (body.permission !== undefined) options.onPermissionUpdate?.();
             if (body.metadata !== undefined && options.metadataUpdateStatus !== undefined) {
               return Response.json(
                 { error: { message: `update answered ${options.metadataUpdateStatus}` } },
@@ -1539,40 +1542,43 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       }
     });
 
-    it('keeps the route successful when the marker cannot be cleared', async () => {
-      const sessionId = 'ses_record_permission_marker_stuck';
-      const directory = temporaryDirectory('kilo-api-permission-stuck-target-');
-      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
-      const home = temporaryDirectory('kilo-api-permission-stuck-home-');
-      // Outstanding markers live under $HOME, so the test owns their directory.
-      const rulesets = join(home, '.kilo-control', 'rulesets');
-      const originalHome = process.env.HOME;
-      process.env.HOME = home;
-      let readOnly = false;
-      try {
-        await rememberOutstandingRuleset(sessionId, permission);
-        const stub = startEnsureSessionStub(sessionId, undefined, {
-          onImport: () => {
-            chmodSync(rulesets, 0o500);
-            readOnly = true;
-          },
-        });
+    it.skipIf(process.getuid?.() === 0)(
+      'keeps the route successful when the marker cannot be cleared',
+      async () => {
+        const sessionId = 'ses_record_permission_marker_stuck';
+        const directory = temporaryDirectory('kilo-api-permission-stuck-target-');
+        const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+        const home = temporaryDirectory('kilo-api-permission-stuck-home-');
+        // Outstanding markers live under $HOME, so the test owns their directory.
+        const rulesets = join(home, '.kilo-control', 'rulesets');
+        const originalHome = process.env.HOME;
+        process.env.HOME = home;
+        let readOnly = false;
+        try {
+          await rememberOutstandingRuleset(sessionId, permission);
+          const stub = startEnsureSessionStub(sessionId, undefined, {
+            onImport: () => {
+              chmodSync(rulesets, 0o500);
+              readOnly = true;
+            },
+          });
 
-        // The row is committed before the marker becomes undeletable; the apply
-        // itself succeeded, so the surviving marker is not a failure.
-        await createClient(stub.url).ensureSession(sessionId, directory);
+          // The row is committed before the marker becomes undeletable; the apply
+          // itself succeeded, so the surviving marker is not a failure.
+          await createClient(stub.url).ensureSession(sessionId, directory);
 
-        expect(stub.imports).toHaveLength(1);
-        expect(stub.updates).toHaveLength(1);
-        expect(stub.updates[0]).toEqual({ queryDirectory: directory, body: { permission } });
-        expect(await readOutstandingRuleset(sessionId)).toEqual(permission);
-      } finally {
-        if (readOnly) chmodSync(rulesets, 0o700);
-        await forgetOutstandingRuleset(sessionId).catch(() => undefined);
-        if (originalHome === undefined) delete process.env.HOME;
-        else process.env.HOME = originalHome;
+          expect(stub.imports).toHaveLength(1);
+          expect(stub.updates).toHaveLength(1);
+          expect(stub.updates[0]).toEqual({ queryDirectory: directory, body: { permission } });
+          expect(await readOutstandingRuleset(sessionId)).toEqual(permission);
+        } finally {
+          if (readOnly) chmodSync(rulesets, 0o700);
+          await forgetOutstandingRuleset(sessionId).catch(() => undefined);
+          if (originalHome === undefined) delete process.env.HOME;
+          else process.env.HOME = originalHome;
+        }
       }
-    });
+    );
 
     it('does not rewrite an existing marker before the import', async () => {
       const sessionId = 'ses_record_permission_marker_kept';
@@ -1655,6 +1661,38 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
         expect(await readOutstandingRuleset(sessionId)).toEqual(permission);
       } finally {
         await forgetOutstandingRuleset(sessionId);
+      }
+    });
+
+    it('reports the caller abort instead of a permanent ruleset failure', async () => {
+      const sessionId = 'ses_record_permission_apply_aborted';
+      const directory = temporaryDirectory('kilo-api-permission-abort-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-permission-abort-other-');
+      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+      const controller = new AbortController();
+      const stub = startEnsureSessionStub(
+        sessionId,
+        { id: sessionId, directory: otherDirectory, permission },
+        {
+          // The caller gives up while its permission update is in flight, which
+          // is what a step timeout or a release does.
+          onPermissionUpdate: () => controller.abort(new Error('kilo_session aborted')),
+        }
+      );
+      try {
+        const error = await createClient(stub.url)
+          .ensureSession(sessionId, directory, controller.signal)
+          .catch((error: unknown) => error);
+
+        // An interruption is not a ruleset failure: the step keeps its own
+        // classification and retry budget, so it must not carry the permanent one.
+        expect(error).not.toBeInstanceOf(SessionRulesetError);
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toBe('kilo_session aborted');
+        // The obligation is durable, so the next prepare applies it.
+        expect(await readOutstandingRuleset(sessionId)).toEqual(permission);
+      } finally {
+        await forgetOutstandingRuleset(sessionId).catch(() => undefined);
       }
     });
 
@@ -1749,34 +1787,37 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       }
     );
 
-    it('fails retryably when the marker cannot be written before the import', async () => {
-      const sessionId = 'ses_record_permission_marker_unwritable';
-      const home = temporaryDirectory('kilo-api-permission-unwritable-home-');
-      const control = join(home, '.kilo-control');
-      const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
-      const originalHome = process.env.HOME;
-      process.env.HOME = home;
-      let readOnly = false;
-      try {
-        mkdirSync(control, { recursive: true });
-        chmodSync(control, 0o500);
-        readOnly = true;
+    it.skipIf(process.getuid?.() === 0)(
+      'fails retryably when the marker cannot be written before the import',
+      async () => {
+        const sessionId = 'ses_record_permission_marker_unwritable';
+        const home = temporaryDirectory('kilo-api-permission-unwritable-home-');
+        const control = join(home, '.kilo-control');
+        const permission = [{ permission: 'edit', pattern: '*', action: 'deny' as const }];
+        const originalHome = process.env.HOME;
+        process.env.HOME = home;
+        let readOnly = false;
+        try {
+          mkdirSync(control, { recursive: true });
+          chmodSync(control, 0o500);
+          readOnly = true;
 
-        const error = await rememberOutstandingRuleset(sessionId, permission).catch(
-          (error: unknown) => error
-        );
+          const error = await rememberOutstandingRuleset(sessionId, permission).catch(
+            (error: unknown) => error
+          );
 
-        // The marker goes down before the import, so no record is committed and
-        // a retried step can store the marker and import.
-        expect(error).toBeInstanceOf(SessionRulesetUnverifiedError);
-        expect((error as SessionRulesetUnverifiedError).retryable).toBe(true);
-        expect((error as SessionRulesetUnverifiedError).sessionId).toBe(sessionId);
-      } finally {
-        if (readOnly) chmodSync(control, 0o700);
-        if (originalHome === undefined) delete process.env.HOME;
-        else process.env.HOME = originalHome;
+          // The marker goes down before the import, so no record is committed and
+          // a retried step can store the marker and import.
+          expect(error).toBeInstanceOf(SessionRulesetUnverifiedError);
+          expect((error as SessionRulesetUnverifiedError).retryable).toBe(true);
+          expect((error as SessionRulesetUnverifiedError).sessionId).toBe(sessionId);
+        } finally {
+          if (readOnly) chmodSync(control, 0o700);
+          if (originalHome === undefined) delete process.env.HOME;
+          else process.env.HOME = originalHome;
+        }
       }
-    });
+    );
 
     it('fails the settle retryably and sends no update when the session read cannot answer', async () => {
       const sessionId = 'ses_record_permission_get_unverified';

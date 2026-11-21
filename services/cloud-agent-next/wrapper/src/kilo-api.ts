@@ -962,6 +962,15 @@ export function createWrapperKiloClient(
         // The record is already in place, so a step retry would reuse it and
         // skip this call. The outstanding entry makes the next prepare apply
         // the ruleset instead of accepting the record as complete.
+        if (signal?.aborted) {
+          // The caller gave up (a step timeout or a release), so the route must
+          // keep that classification and its retry budget instead of reporting
+          // a permanent ruleset failure. The marker stays, so the next prepare
+          // applies it.
+          throw signal.reason instanceof Error
+            ? signal.reason
+            : new Error(`Session ruleset apply for ${sessionId} aborted`);
+        }
         throw new SessionRulesetNotAppliedError(sessionId, lastError);
       };
       const lookupTimeout = AbortSignal.timeout(5_000);
@@ -1086,8 +1095,13 @@ export function createWrapperKiloClient(
             { signal: signal ? AbortSignal.any([signal, restoreTimeout]) : restoreTimeout }
           );
           requireSdkData(restored, `Session metadata restore for ${sessionId}`);
-        } catch {
-          // The record is committed and this route may proceed without it.
+        } catch (error) {
+          // The record is committed and this route may proceed without it. The
+          // restored value is user-visible, so the loss is recorded for
+          // diagnosis; the detail is the SDK result message, which carries no
+          // token, header or record payload.
+          const detail = error instanceof Error ? error.message : String(error);
+          logToFile(`session metadata restore for ${sessionId} failed: ${detail}`);
         }
       }
       if (owed !== undefined) await applyRuleset(owed);

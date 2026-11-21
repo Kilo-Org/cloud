@@ -4664,14 +4664,27 @@
       "deductionFallback": "Odečtení kreditů",
       "emptyDescription": "Zde se zobrazí nákupy kreditů, účtenky a využití.",
       "emptyTitle": "Žádná historie kreditů",
+      "expiredGrant": "Platnost vypršela: {{description}}",
       "googlePlayReceipt": "Účtenka z Google Play",
       "kind": {
         "adjustment": "Úprava",
         "balanceNeutral": "Bez vlivu na zůstatek",
         "deduction": "Odečtení",
         "grant": "Přidělení kreditů",
+        "promotionalCredits": "Propagační kredity",
         "welcomeCredits": "Uvítací kredity",
         "purchase": "Nákup"
+      },
+      "program": {
+        "adminBulkGrant": "Přidělení kreditů správcem",
+        "contributorChampion": "Kredit pro šampiona přispěvatelů",
+        "feedback": "Kredit za zpětnou vazbu",
+        "influencer": "Kredit pro influencery",
+        "ossMonthlyReset": "Měsíční obnovení kreditů OSS",
+        "ossSponsorship": "Kredit za sponzorství OSS",
+        "pullRequest": "Kredit za PR",
+        "usageIssue": "Kredit za problém s využitím",
+        "vibeDay": "Kredit Vibe day"
       },
       "purchaseFallback": "Nákup kreditů",
       "receipt": "Účtenka",

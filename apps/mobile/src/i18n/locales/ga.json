@@ -4743,14 +4743,27 @@
       "deductionFallback": "Asbhaint chreidmheasa",
       "emptyDescription": "Taispeánfar ceannacháin chreidmheasa, admhálacha agus úsáid anseo.",
       "emptyTitle": "Gan stair chreidmheasa",
+      "expiredGrant": "Imithe in éag: {{description}}",
       "googlePlayReceipt": "Admháil ó Google Play",
       "kind": {
         "adjustment": "Coigeartú",
         "balanceNeutral": "Neodrach don iarmhéid",
         "deduction": "Asbhaint",
         "grant": "Deontas creidmheasa",
+        "promotionalCredits": "Creidmheasanna poiblíochta",
         "welcomeCredits": "Creidmheas fáilte",
         "purchase": "Ceannach"
+      },
+      "program": {
+        "adminBulkGrant": "Deontas creidmheasa ó riarthóir",
+        "contributorChampion": "Creidmheas curadh na rannpháirtithe",
+        "feedback": "Creidmheas aiseolais",
+        "influencer": "Creidmheas tionchaire",
+        "ossMonthlyReset": "Athshocrú míosúil OSS",
+        "ossSponsorship": "Creidmheas urraíochta OSS",
+        "pullRequest": "Creidmheas iarratais tarraingthe",
+        "usageIssue": "Creidmheas fadhb úsáide",
+        "vibeDay": "Creidmheas Vibe day"
       },
       "purchaseFallback": "Ceannach creidmheasa",
       "receipt": "Admháil",

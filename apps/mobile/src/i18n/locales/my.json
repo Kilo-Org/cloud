@@ -4506,14 +4506,27 @@
       "deductionFallback": "ခရက်ဒစ် နုတ်ယူမှု",
       "emptyDescription": "ခရက်ဒစ် ဝယ်ယူမှုများ၊ ပြေစာများနှင့် အသုံးပြုမှုများ ဤနေရာတွင် ပေါ်လာပါမည်။",
       "emptyTitle": "ခရက်ဒစ် မှတ်တမ်း မရှိပါ",
+      "expiredGrant": "သက်တမ်းကုန်ပြီ - {{description}}",
       "googlePlayReceipt": "Google Play မှ ပြေစာ",
       "kind": {
         "adjustment": "ချိန်ညှိမှု",
         "balanceNeutral": "လက်ကျန် မပြောင်းလဲ",
         "deduction": "နုတ်ယူမှု",
         "grant": "ခရက်ဒစ် ပေးအပ်မှု",
+        "promotionalCredits": "ပရိုမိုးရှင်း ခရက်ဒစ်များ",
         "welcomeCredits": "ကြိုဆိုရေး ခရက်ဒစ်",
         "purchase": "ဝယ်ယူမှု"
+      },
+      "program": {
+        "adminBulkGrant": "စီမံခန့်ခွဲသူ ခရက်ဒစ် ပေးအပ်မှု",
+        "contributorChampion": "ပံ့ပိုးသူ ချန်ပီယံ ခရက်ဒစ်",
+        "feedback": "တုံ့ပြန်ချက် ခရက်ဒစ်",
+        "influencer": "အင်ဖလူယင်ဆာ ခရက်ဒစ်",
+        "ossMonthlyReset": "အရင်းအမြစ်ဖွင့် ပံ့ပိုးငွေ လစဉ်ပြန်လည်သတ်မှတ်မှု",
+        "ossSponsorship": "အရင်းအမြစ်ဖွင့် ပံ့ပိုးငွေ ခရက်ဒစ်",
+        "pullRequest": "PR ခရက်ဒစ်",
+        "usageIssue": "အသုံးပြုမှု ပြဿနာ ခရက်ဒစ်",
+        "vibeDay": "Vibe day ခရက်ဒစ်"
       },
       "purchaseFallback": "ခရက်ဒစ် ဝယ်ယူမှု",
       "receipt": "ပြေစာ",

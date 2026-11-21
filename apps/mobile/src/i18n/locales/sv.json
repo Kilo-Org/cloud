@@ -4506,14 +4506,27 @@
       "deductionFallback": "Kreditavdrag",
       "emptyDescription": "Kreditköp, kvitton och användning visas här.",
       "emptyTitle": "Ingen kredithistorik",
+      "expiredGrant": "Utgånget: {{description}}",
       "googlePlayReceipt": "Kvitto från Google Play",
       "kind": {
         "adjustment": "Justering",
         "balanceNeutral": "Saldoneutral",
         "deduction": "Avdrag",
         "grant": "Kredittilldelning",
+        "promotionalCredits": "Kampanjkrediter",
         "welcomeCredits": "Välkomstkrediter",
         "purchase": "Köp"
+      },
+      "program": {
+        "adminBulkGrant": "Administratörskredittilldelning",
+        "contributorChampion": "Bidragsgivarmästarkredit",
+        "feedback": "Feedbackkredit",
+        "influencer": "Influencerkredit",
+        "ossMonthlyReset": "Återställning av sponsring av öppen källkod",
+        "ossSponsorship": "Kredit för sponsring av öppen källkod",
+        "pullRequest": "PR-kredit",
+        "usageIssue": "Kredit för användningsproblem",
+        "vibeDay": "Vibe day-kredit"
       },
       "purchaseFallback": "Kreditköp",
       "receipt": "Kvitto",

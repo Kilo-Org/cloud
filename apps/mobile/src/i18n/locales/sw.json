@@ -4506,14 +4506,27 @@
       "deductionFallback": "Makato ya salio",
       "emptyDescription": "Ununuzi wa salio, risiti na matumizi vitaonekana hapa.",
       "emptyTitle": "Hakuna historia ya salio",
+      "expiredGrant": "Muda wake umeisha: {{description}}",
       "googlePlayReceipt": "Risiti kutoka Google Play",
       "kind": {
         "adjustment": "Marekebisho",
         "balanceNeutral": "Haibadilishi salio",
         "deduction": "Makato",
         "grant": "Salio la bure",
+        "promotionalCredits": "Salio la promosheni",
         "welcomeCredits": "Salio la kukaribisha",
         "purchase": "Ununuzi"
+      },
+      "program": {
+        "adminBulkGrant": "Salio la bure kutoka kwa msimamizi",
+        "contributorChampion": "Salio la bingwa wa wachangiaji",
+        "feedback": "Salio la maoni",
+        "influencer": "Salio la mshawishi",
+        "ossMonthlyReset": "Uwekaji upya wa kila mwezi wa OSS",
+        "ossSponsorship": "Salio la udhamini wa OSS",
+        "pullRequest": "Salio la ombi la kuunganisha",
+        "usageIssue": "Salio la tatizo la matumizi",
+        "vibeDay": "Salio la Vibe Day"
       },
       "purchaseFallback": "Ununuzi wa salio",
       "receipt": "Risiti",

@@ -4506,14 +4506,27 @@
       "deductionFallback": "ການຫັກເຄຣດິດ",
       "emptyDescription": "ການຊື້ເຄຣດິດ, ໃບຮັບເງິນ ແລະ ການນຳໃຊ້ຈະສະແດງຢູ່ບ່ອນນີ້.",
       "emptyTitle": "ບໍ່ມີປະຫວັດເຄຣດິດ",
+      "expiredGrant": "ໝົດອາຍຸແລ້ວ: {{description}}",
       "googlePlayReceipt": "ໃບຮັບເງິນຈາກ Google Play",
       "kind": {
         "adjustment": "ການປັບປຸງ",
         "balanceNeutral": "ບໍ່ກະທົບຍອດເງິນ",
         "deduction": "ການຫັກ",
         "grant": "ເຄຣດິດທີ່ໄດ້ຮັບ",
+        "promotionalCredits": "ເຄຣດິດໂປຣໂມຊັນ",
         "welcomeCredits": "ເຄຣດິດຕ້ອນຮັບ",
         "purchase": "ການຊື້"
+      },
+      "program": {
+        "adminBulkGrant": "ການມອບເຄຣດິດໂດຍຜູ້ດູແລລະບົບ",
+        "contributorChampion": "ເຄຣດິດຜູ້ສະໜັບສະໜູນດີເດັ່ນ",
+        "feedback": "ເຄຣດິດຄຳຕິຊົມ",
+        "influencer": "ເຄຣດິດອິນຟລູເອນເຊີ",
+        "ossMonthlyReset": "ການຕັ້ງຍອດການສະໜັບສະໜູນ OSS ໃໝ່",
+        "ossSponsorship": "ເຄຣດິດການສະໜັບສະໜູນ OSS",
+        "pullRequest": "ເຄຣດິດຈາກຄຳຂໍລວມໂຄ້ດ",
+        "usageIssue": "ເຄຣດິດບັນຫາການນຳໃຊ້",
+        "vibeDay": "ເຄຣດິດວັນ Vibe"
       },
       "purchaseFallback": "ການຊື້ເຄຣດິດ",
       "receipt": "ໃບຮັບເງິນ",

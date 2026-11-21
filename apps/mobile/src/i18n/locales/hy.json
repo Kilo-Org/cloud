@@ -4506,6 +4506,7 @@
       "deductionFallback": "Կրեդիտների դուրսգրում",
       "emptyDescription": "Կրեդիտների գնումները, անդորրագրերը և օգտագործումը կհայտնվեն այստեղ։",
       "emptyTitle": "Կրեդիտների պատմություն չկա",
+      "expiredGrant": "Ժամկետանց՝ {{description}}",
       "googlePlayReceipt": "Անդորրագիր Google Play-ից",
       "purchaseFallback": "Կրեդիտների գնում",
       "receipt": "Անդորրագիր",
@@ -4517,8 +4518,20 @@
         "balanceNeutral": "Առանց հաշվեկշռի փոփոխության",
         "deduction": "Դուրսգրում",
         "grant": "Կրեդիտների տրամադրում",
+        "promotionalCredits": "Պրոմո կրեդիտներ",
         "welcomeCredits": "Ողջույնի կրեդիտներ",
         "purchase": "Գնում"
+      },
+      "program": {
+        "adminBulkGrant": "Ադմինիստրատորի կրեդիտների տրամադրում",
+        "contributorChampion": "Ներդրող-չեմպիոնի կրեդիտներ",
+        "feedback": "Հետադարձ կապի կրեդիտներ",
+        "influencer": "Ինֆլուենսերների կրեդիտներ",
+        "ossMonthlyReset": "Բաց կոդով նախագծերի կրեդիտների ամսական վերականգնում",
+        "ossSponsorship": "Բաց կոդով նախագծերի հովանավորության կրեդիտներ",
+        "pullRequest": "Ձգման հարցման կրեդիտներ",
+        "usageIssue": "Օգտագործման խնդրի կրեդիտներ",
+        "vibeDay": "Vibe Day-ի կրեդիտներ"
       }
     },
     "title": "Գնել կրեդիտներ",

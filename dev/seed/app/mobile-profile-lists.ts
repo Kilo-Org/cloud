@@ -92,6 +92,8 @@ const CREDIT_KEYS = [
   'welcome-grant',
   'referral-grant',
   'accounting-adjustment',
+  'program-grant',
+  'program-grant-expiry',
 ] as const;
 
 /** Stable UUID for one account's fixture key: a rerun replaces the same rows. */
@@ -398,6 +400,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       amount_microdollars: 5_000_000,
       is_free: true,
       description: 'Promotional credit',
+      credit_category: 'github-promo-2025-07-03',
       credit_source: 'promotion',
       expiry_date: iso(-10 * DAY_MS),
       created_at: iso(-90 * DAY_MS),
@@ -455,12 +458,34 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       credit_category: 'accounting_adjustment',
       created_at: iso(-150 * DAY_MS),
     },
+    {
+      id: creditIds[8],
+      kilo_user_id: userId,
+      amount_microdollars: 2_000_000,
+      is_free: true,
+      description: 'Promotional credit for influencer',
+      credit_category: 'influencer',
+      credit_source: 'promotion',
+      expiry_date: iso(-20 * DAY_MS),
+      created_at: iso(-100 * DAY_MS),
+    },
+    {
+      id: creditIds[9],
+      kilo_user_id: userId,
+      amount_microdollars: -2_000_000,
+      is_free: true,
+      description: 'Expired: Promotional credit for influencer',
+      credit_category: 'credits_expired',
+      original_transaction_id: creditIds[8],
+      credit_source: 'promotion',
+      created_at: iso(-20 * DAY_MS),
+    },
   ]);
 
   console.log('This fixture represents:');
   console.log('  Passkeys, blocked and muted people, recorded notifications, two provider keys');
-  console.log('  and a credit ledger with purchases, an expired grant, an unspent grant');
-  console.log('  that still expires, and a deduction.');
+  console.log('  and a credit ledger with purchases, an expired campaign grant, a program');
+  console.log('  grant with its own expiry, an unspent grant that still expires, and a deduction.');
   console.log('  The passkey rows list but cannot sign in: no device holds their private key.');
   console.log('The empty states of the blocked-people and passkey lists need no seed: a fresh');
   console.log('account already shows them. Data export needs the cloud-data-export-ui release');

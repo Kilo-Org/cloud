@@ -4664,14 +4664,27 @@
       "deductionFallback": "Списание кредитов",
       "emptyDescription": "Здесь появятся покупки кредитов, чеки и расход.",
       "emptyTitle": "Истории кредитов нет",
+      "expiredGrant": "Срок истёк: {{description}}",
       "googlePlayReceipt": "Чек в Google Play",
       "kind": {
         "adjustment": "Корректировка",
         "balanceNeutral": "Без изменения баланса",
         "deduction": "Списание",
         "grant": "Начисление кредитов",
+        "promotionalCredits": "Промо-кредиты",
         "welcomeCredits": "Приветственные кредиты",
         "purchase": "Покупка"
+      },
+      "program": {
+        "adminBulkGrant": "Кредиты от администратора",
+        "contributorChampion": "Кредит чемпиону контрибьюторов",
+        "feedback": "Кредит за обратную связь",
+        "influencer": "Кредит для инфлюенсеров",
+        "ossMonthlyReset": "Ежемесячное обновление спонсорских кредитов для открытого кода",
+        "ossSponsorship": "Кредит за спонсорство проектов с открытым кодом",
+        "pullRequest": "Кредит за пул-реквест",
+        "usageIssue": "Кредит за проблему с использованием",
+        "vibeDay": "Кредит за Vibe day"
       },
       "purchaseFallback": "Покупка кредитов",
       "receipt": "Чек",

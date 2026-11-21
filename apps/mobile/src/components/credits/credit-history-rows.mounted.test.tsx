@@ -1,12 +1,17 @@
+/* eslint-disable max-lines -- the three rows of one module keep their contract in one mounted suite: the shared fixtures, the renderer, and both catalog languages only read correctly together */
 import { createElement, type ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
 
 import { i18n } from '@/i18n';
-import { type CreditGrant, type CreditPurchaseEntry } from '@/lib/credits/credit-history';
+import {
+  type CreditDeduction,
+  type CreditGrant,
+  type CreditPurchaseEntry,
+} from '@/lib/credits/credit-history';
 
-import { GrantHistoryRow, PurchaseHistoryRow } from './credit-history-rows';
+import { GrantHistoryRow, LedgerHistoryRow, PurchaseHistoryRow } from './credit-history-rows';
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -65,6 +70,41 @@ function grant(overrides: Partial<CreditGrant> = {}): CreditGrant {
     expiryDate: null,
     ...overrides,
   };
+}
+
+function deduction(overrides: Partial<CreditDeduction> = {}): CreditDeduction {
+  return {
+    id: 'deduction-1',
+    date: '2026-11-12T10:00:00.000Z',
+    description: 'Credit expired',
+    amount_mUsd: -10_000_000,
+    kind: 'deduction',
+    expiry: null,
+    purchase: null,
+    ...overrides,
+  };
+}
+
+type DeductionGrant = NonNullable<CreditDeduction['purchase']>;
+
+/** The grant an expiry deduction closed, stored with the ledger's own wording. */
+function deductionGrant(overrides: Partial<DeductionGrant> = {}): DeductionGrant {
+  return {
+    id: 'grant-1',
+    date: '2026-08-01T10:00:00.000Z',
+    description: 'influencer-bonus',
+    amount_mUsd: 10_000_000,
+    is_free: true,
+    credit_source: null,
+    kind: 'influencer',
+    ...overrides,
+  };
+}
+
+function renderLedgerRow(deductionRow: CreditDeduction, grantListed = false) {
+  return render(
+    createElement(LedgerHistoryRow, { deduction: deductionRow, grantListed, last: false })
+  );
 }
 
 /** Every string the row paints, so a line the row drops is visible to a test. */
@@ -260,6 +300,121 @@ describe('PurchaseHistoryRow in the reader language', () => {
   });
 });
 
+describe('LedgerHistoryRow', () => {
+  it('titles a free grant from its reason and names the expiry that closed it', async () => {
+    const renderer = await renderLedgerRow(
+      deduction({ expiry: 'expired', purchase: deductionGrant() })
+    );
+
+    const painted = texts(renderer).map(text => readable(text));
+    // The ledger stores an English description; both lines read the catalog
+    // instead, so a grant the app knows never prints that stored sentence.
+    expect(painted).toContain('Influencer credit');
+    expect(painted).toContain('Expired: Influencer credit');
+    expect(painted).not.toContain('influencer-bonus');
+    expect(painted).not.toContain('Credit expired');
+    renderer.unmount();
+  });
+
+  it('reads the grant title and the expiry in Arabic', async () => {
+    try {
+      await act(async () => {
+        await i18n.changeLanguage('ar');
+      });
+      const renderer = await renderLedgerRow(
+        deduction({ expiry: 'expired', purchase: deductionGrant() })
+      );
+
+      const painted = texts(renderer).map(text => readable(text));
+      expect(painted).toContain('رصيد المؤثرين');
+      expect(painted).toContain('منتهي الصلاحية: رصيد المؤثرين');
+      renderer.unmount();
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
+    }
+  });
+
+  it('keeps the stored description of a paid grant and names its expiry', async () => {
+    const renderer = await renderLedgerRow(
+      deduction({
+        expiry: 'expired',
+        purchase: deductionGrant({
+          is_free: false,
+          credit_source: 'stripe',
+          description: 'Credit purchase',
+        }),
+      })
+    );
+
+    const painted = texts(renderer).map(text => readable(text));
+    // A paid grant's receipt records its own name, so the row keeps it rather
+    // than replacing it with a program title the reader never bought.
+    expect(painted).toContain('Credit purchase');
+    expect(painted).toContain('Expired: Credit purchase');
+    renderer.unmount();
+  });
+
+  it('keeps the ledger sentence on a row that is not an expiry', async () => {
+    const renderer = await renderLedgerRow(
+      deduction({
+        description: 'Usage charge against your grant',
+        expiry: null,
+        purchase: deductionGrant({
+          is_free: false,
+          credit_source: 'stripe',
+          description: 'Credit purchase',
+        }),
+      })
+    );
+
+    const painted = texts(renderer).map(text => readable(text));
+    // The row's own category is not an expiry, so its second line stays the
+    // ledger's sentence instead of claiming the grant ended.
+    expect(painted).toContain('Usage charge against your grant');
+    expect(painted.some(text => text.startsWith('Expired: '))).toBe(false);
+    renderer.unmount();
+  });
+
+  it('names the expiry once when the grant has its own purchase row above', async () => {
+    const renderer = await renderLedgerRow(
+      deduction({
+        description: 'Expired: Promotional credit',
+        expiry: 'expired',
+        purchase: deductionGrant({ description: 'promotional-bonus', kind: 'promotional' }),
+      }),
+      true
+    );
+
+    const painted = texts(renderer).map(text => readable(text));
+    // The purchase row above already carries the grant, so this row paints the
+    // expiry alone: the grant is titled from its reason, and the stored
+    // sentence must not gain a second prefix.
+    expect(painted).toContain('Expired: Promotional credits');
+    expect(painted).not.toContain('Expired: Expired: Promotional credits');
+    expect(painted).not.toContain('promotional-bonus');
+    renderer.unmount();
+  });
+
+  it('keeps the stored description of an expiry row whose grant is not loaded', async () => {
+    const renderer = await renderLedgerRow(
+      deduction({
+        description: 'Expired: Promotional credit',
+        expiry: 'expired',
+        purchase: null,
+      })
+    );
+
+    const painted = texts(renderer).map(text => readable(text));
+    // Nothing here names the grant, and the stored sentence already states the
+    // expiry, so the row may not wrap it again.
+    expect(painted).toContain('Expired: Promotional credit');
+    expect(painted).not.toContain('Expired: Expired: Promotional credit');
+    renderer.unmount();
+  });
+});
+
 describe('GrantHistoryRow', () => {
   it('titles each grant kind in English', async () => {
     const referral = await renderGrantRow(grant({ kind: 'referral' }));
@@ -270,9 +425,9 @@ describe('GrantHistoryRow', () => {
     expect(texts(pass)).toContain('Kilo Pass');
     pass.unmount();
 
-    const admin = await renderGrantRow(grant({ kind: 'grant' }));
-    expect(texts(admin)).toContain('Credit grant');
-    admin.unmount();
+    const promotional = await renderGrantRow(grant({ kind: 'promotional' }));
+    expect(texts(promotional)).toContain('Promotional credits');
+    promotional.unmount();
 
     const welcome = await renderGrantRow(grant({ kind: 'welcome' }));
     expect(texts(welcome)).toContain('Welcome credits');

@@ -4506,14 +4506,27 @@
       "deductionFallback": "კრედიტების ჩამოჭრა",
       "emptyDescription": "კრედიტების შენაძენები, ქვითრები და გამოყენება აქ გამოჩნდება.",
       "emptyTitle": "კრედიტების ისტორია ცარიელია",
+      "expiredGrant": "ვადაგასულია: {{description}}",
       "googlePlayReceipt": "ქვითარი Google Play-დან",
       "kind": {
         "adjustment": "კორექტირება",
         "balanceNeutral": "ბალანსზე გავლენის გარეშე",
         "deduction": "ჩამოჭრა",
         "grant": "კრედიტების მინიჭება",
+        "promotionalCredits": "სარეკლამო კრედიტები",
         "welcomeCredits": "მისალმების კრედიტები",
         "purchase": "შენაძენი"
+      },
+      "program": {
+        "adminBulkGrant": "ადმინისტრატორის კრედიტების მინიჭება",
+        "contributorChampion": "კონტრიბუტორ-ჩემპიონის კრედიტები",
+        "feedback": "გამოხმაურების კრედიტები",
+        "influencer": "ინფლუენსერის კრედიტები",
+        "ossMonthlyReset": "ღია კოდის პროგრამის ყოველთვიური განულება",
+        "ossSponsorship": "ღია კოდის პროექტების სპონსორობის კრედიტები",
+        "pullRequest": "PR კრედიტები",
+        "usageIssue": "გამოყენების პრობლემის კრედიტები",
+        "vibeDay": "Vibe Day კრედიტები"
       },
       "purchaseFallback": "კრედიტების შეძენა",
       "receipt": "ქვითარი",

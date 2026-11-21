@@ -4506,14 +4506,27 @@
       "deductionFallback": "點數扣除",
       "emptyDescription": "點數購買、收據與使用情況會顯示在這裡。",
       "emptyTitle": "尚無點數紀錄",
+      "expiredGrant": "已過期：{{description}}",
       "googlePlayReceipt": "Google Play 收據",
       "kind": {
         "adjustment": "調整",
         "balanceNeutral": "餘額不變",
         "deduction": "扣除",
         "grant": "贈送點數",
+        "promotionalCredits": "推廣點數",
         "welcomeCredits": "歡迎點數",
         "purchase": "購買"
+      },
+      "program": {
+        "adminBulkGrant": "管理員點數發放",
+        "contributorChampion": "貢獻者冠軍點數",
+        "feedback": "意見回饋點數",
+        "influencer": "網紅點數",
+        "ossMonthlyReset": "開源贊助重設",
+        "ossSponsorship": "開源贊助點數",
+        "pullRequest": "提取要求點數",
+        "usageIssue": "用量問題點數",
+        "vibeDay": "Vibe day 點數"
       },
       "purchaseFallback": "點數購買",
       "receipt": "收據",

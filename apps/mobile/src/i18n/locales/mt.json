@@ -4743,14 +4743,27 @@
       "deductionFallback": "Tnaqqis tal-krediti",
       "emptyDescription": "Ix-xiri, l-irċevuti u l-użu tal-krediti se jidhru hawn.",
       "emptyTitle": "L-ebda storja tal-krediti",
+      "expiredGrant": "Skada: {{description}}",
       "googlePlayReceipt": "Irċevuta minn Google Play",
       "kind": {
         "adjustment": "Aġġustament",
         "balanceNeutral": "Newtrali għall-bilanċ",
         "deduction": "Tnaqqis",
         "grant": "Għotja ta' krediti",
+        "promotionalCredits": "Krediti promozzjonali",
         "welcomeCredits": "Krediti tal-merħba",
         "purchase": "Xiri"
+      },
+      "program": {
+        "adminBulkGrant": "Għotja ta' krediti mill-amministratur",
+        "contributorChampion": "Kreditu taċ-champion tal-kontributuri",
+        "feedback": "Kreditu għall-kummenti",
+        "influencer": "Kreditu tal-influencer",
+        "ossMonthlyReset": "Tiġdid ta' kull xahar tal-OSS",
+        "ossSponsorship": "Kreditu ta' sponsorizzazzjoni OSS",
+        "pullRequest": "Kreditu tal-PR",
+        "usageIssue": "Kreditu għal problema fl-użu",
+        "vibeDay": "Kreditu Vibe day"
       },
       "purchaseFallback": "Xiri ta' krediti",
       "receipt": "Irċevuta",

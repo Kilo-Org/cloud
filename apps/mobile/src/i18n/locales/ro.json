@@ -4585,14 +4585,27 @@
       "deductionFallback": "Deducere de credite",
       "emptyDescription": "Achizițiile de credite, chitanțele și utilizarea vor apărea aici.",
       "emptyTitle": "Niciun istoric de credite",
+      "expiredGrant": "Expirat: {{description}}",
       "googlePlayReceipt": "Chitanță din Google Play",
       "kind": {
         "adjustment": "Ajustare",
         "balanceNeutral": "Fără impact asupra soldului",
         "deduction": "Deducere",
         "grant": "Credite acordate",
+        "promotionalCredits": "Credite promoționale",
         "welcomeCredits": "Credite de bun venit",
         "purchase": "Achiziție"
+      },
+      "program": {
+        "adminBulkGrant": "Credite acordate de administrator",
+        "contributorChampion": "Credit pentru campionul contribuitorilor",
+        "feedback": "Credit pentru păreri",
+        "influencer": "Credit pentru influenceri",
+        "ossMonthlyReset": "Resetare lunară OSS",
+        "ossSponsorship": "Credit de sponsorizare OSS",
+        "pullRequest": "Credit pentru PR",
+        "usageIssue": "Credit pentru problemă de utilizare",
+        "vibeDay": "Credit Vibe day"
       },
       "purchaseFallback": "Achiziție de credite",
       "receipt": "Chitanță",

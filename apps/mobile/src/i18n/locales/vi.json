@@ -4506,14 +4506,27 @@
       "deductionFallback": "Khấu trừ tín dụng",
       "emptyDescription": "Các giao dịch mua tín dụng, biên lai và mức sử dụng sẽ hiển thị tại đây.",
       "emptyTitle": "Chưa có lịch sử tín dụng",
+      "expiredGrant": "Đã hết hạn: {{description}}",
       "googlePlayReceipt": "Biên lai từ Google Play",
       "kind": {
         "adjustment": "Điều chỉnh",
         "balanceNeutral": "Không ảnh hưởng số dư",
         "deduction": "Khấu trừ",
         "grant": "Tặng tín dụng",
+        "promotionalCredits": "Tín dụng khuyến mãi",
         "welcomeCredits": "Tín dụng chào mừng",
         "purchase": "Mua"
+      },
+      "program": {
+        "adminBulkGrant": "Tín dụng do quản trị viên tặng",
+        "contributorChampion": "Tín dụng nhà vô địch đóng góp",
+        "feedback": "Tín dụng góp ý",
+        "influencer": "Tín dụng người có ảnh hưởng",
+        "ossMonthlyReset": "Gia hạn tài trợ mã nguồn mở",
+        "ossSponsorship": "Tín dụng tài trợ mã nguồn mở",
+        "pullRequest": "Tín dụng yêu cầu hợp nhất",
+        "usageIssue": "Tín dụng sự cố sử dụng",
+        "vibeDay": "Tín dụng Vibe Day"
       },
       "purchaseFallback": "Mua tín dụng",
       "receipt": "Biên lai",

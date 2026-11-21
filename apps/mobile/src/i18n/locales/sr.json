@@ -4585,6 +4585,7 @@
       "deductionFallback": "Odbitak kredita",
       "emptyDescription": "Kupovine kredita, računi i potrošnja prikazaće se ovde.",
       "emptyTitle": "Nema istorije kredita",
+      "expiredGrant": "Isteklo: {{description}}",
       "googlePlayReceipt": "Račun iz prodavnice Google Play",
       "purchaseFallback": "Kupovina kredita",
       "receipt": "Račun",
@@ -4596,8 +4597,20 @@
         "balanceNeutral": "Bez uticaja na stanje",
         "deduction": "Odbitak",
         "grant": "Dodela kredita",
+        "promotionalCredits": "Promotivni krediti",
         "welcomeCredits": "Krediti dobrodošlice",
         "purchase": "Kupovina"
+      },
+      "program": {
+        "adminBulkGrant": "Krediti od administratora",
+        "contributorChampion": "Kredit za šampiona saradnika",
+        "feedback": "Kredit za povratne informacije",
+        "influencer": "Kredit za influensere",
+        "ossMonthlyReset": "Mesečna obnova sponzorskih kredita za otvoreni kod",
+        "ossSponsorship": "Kredit za sponzorstvo otvorenog koda",
+        "pullRequest": "Kredit za zahtev za spajanje",
+        "usageIssue": "Kredit za problem sa korišćenjem",
+        "vibeDay": "Kredit za Vibe day"
       }
     },
     "title": "Kupi kredite",

@@ -4506,14 +4506,27 @@
       "deductionFallback": "Tegoedafschrijving",
       "emptyDescription": "Tegoedaankopen, bonnen en verbruik verschijnen hier.",
       "emptyTitle": "Geen tegoedgeschiedenis",
+      "expiredGrant": "Verlopen: {{description}}",
       "googlePlayReceipt": "Bon in Google Play",
       "kind": {
         "adjustment": "Correctie",
         "balanceNeutral": "Saldoneutraal",
         "deduction": "Afschrijving",
         "grant": "Tegoedtoekenning",
+        "promotionalCredits": "Promotietegoed",
         "welcomeCredits": "Welkomsttegoed",
         "purchase": "Aankoop"
+      },
+      "program": {
+        "adminBulkGrant": "Tegoedtoekenning door beheerder",
+        "contributorChampion": "Tegoed voor bijdragerskampioen",
+        "feedback": "Feedbacktegoed",
+        "influencer": "Influencertegoed",
+        "ossMonthlyReset": "Maandelijkse herinstelling van opensource-sponsoring",
+        "ossSponsorship": "Tegoed voor opensource-sponsoring",
+        "pullRequest": "PR-tegoed",
+        "usageIssue": "Tegoed voor gebruiksprobleem",
+        "vibeDay": "Vibe-dagtegoed"
       },
       "purchaseFallback": "Tegoedaankoop",
       "receipt": "Bon",

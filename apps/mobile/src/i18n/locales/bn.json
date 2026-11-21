@@ -4506,14 +4506,27 @@
       "deductionFallback": "ক্রেডিট কর্তন",
       "emptyDescription": "ক্রেডিট কেনাকাটা, রসিদ এবং ব্যবহার এখানে দেখা যাবে।",
       "emptyTitle": "কোনো ক্রেডিট ইতিহাস নেই",
+      "expiredGrant": "মেয়াদ শেষ: {{description}}",
       "googlePlayReceipt": "Google Play-এর রসিদ",
       "kind": {
         "adjustment": "সমন্বয়",
         "balanceNeutral": "ব্যালেন্স অপরিবর্তিত",
         "deduction": "কর্তন",
         "grant": "ক্রেডিট অনুদান",
+        "promotionalCredits": "প্রচারমূলক ক্রেডিট",
         "welcomeCredits": "স্বাগত ক্রেডিট",
         "purchase": "কেনাকাটা"
+      },
+      "program": {
+        "adminBulkGrant": "অ্যাডমিন ক্রেডিট অনুদান",
+        "contributorChampion": "অবদানকারী চ্যাম্পিয়ন ক্রেডিট",
+        "feedback": "মতামত ক্রেডিট",
+        "influencer": "ইনফ্লুয়েন্সার ক্রেডিট",
+        "ossMonthlyReset": "ওপেন সোর্স স্পনসরশিপ রিসেট",
+        "ossSponsorship": "ওপেন সোর্স স্পনসরশিপ ক্রেডিট",
+        "pullRequest": "পুল রিকোয়েস্ট ক্রেডিট",
+        "usageIssue": "ব্যবহারজনিত সমস্যার ক্রেডিট",
+        "vibeDay": "ভাইব ডে ক্রেডিট"
       },
       "purchaseFallback": "ক্রেডিট কেনাকাটা",
       "receipt": "রসিদ",

@@ -4506,14 +4506,27 @@
       "deductionFallback": "Αφαίρεση μονάδων",
       "emptyDescription": "Οι αγορές μονάδων, οι αποδείξεις και η χρήση θα εμφανίζονται εδώ.",
       "emptyTitle": "Δεν υπάρχει ιστορικό μονάδων",
+      "expiredGrant": "Έληξε: {{description}}",
       "googlePlayReceipt": "Απόδειξη από το Google Play",
       "kind": {
         "adjustment": "Προσαρμογή",
         "balanceNeutral": "Χωρίς επίδραση στο υπόλοιπο",
         "deduction": "Αφαίρεση",
         "grant": "Παροχή μονάδων",
+        "promotionalCredits": "Μονάδες προώθησης",
         "welcomeCredits": "Μονάδες καλωσορίσματος",
         "purchase": "Αγορά"
+      },
+      "program": {
+        "adminBulkGrant": "Παροχή μονάδων από διαχειριστή",
+        "contributorChampion": "Μονάδες κορυφαίου συνεισφέροντα",
+        "feedback": "Μονάδες για σχόλια",
+        "influencer": "Μονάδες από influencer",
+        "ossMonthlyReset": "Μηνιαία ανανέωση χορηγίας ανοικτού κώδικα",
+        "ossSponsorship": "Μονάδες χορηγίας ανοικτού κώδικα",
+        "pullRequest": "Μονάδες για αίτημα ενσωμάτωσης",
+        "usageIssue": "Μονάδες για ζήτημα χρήσης",
+        "vibeDay": "Μονάδες για την ημέρα Vibe"
       },
       "purchaseFallback": "Αγορά μονάδων",
       "receipt": "Απόδειξη",

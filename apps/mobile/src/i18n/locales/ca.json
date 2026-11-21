@@ -4585,14 +4585,27 @@
       "deductionFallback": "Deducció de crèdits",
       "emptyDescription": "Les compres de crèdits, els rebuts i l'ús apareixeran aquí.",
       "emptyTitle": "No hi ha historial de crèdits",
+      "expiredGrant": "Caducat: {{description}}",
       "googlePlayReceipt": "Rebut de Google Play",
       "kind": {
         "adjustment": "Ajust",
         "balanceNeutral": "Sense efecte en el saldo",
         "deduction": "Deducció",
         "grant": "Concessió de crèdits",
+        "promotionalCredits": "Crèdits promocionals",
         "welcomeCredits": "Crèdits de benvinguda",
         "purchase": "Compra"
+      },
+      "program": {
+        "adminBulkGrant": "Concessió de crèdits de l'administrador",
+        "contributorChampion": "Crèdit de campió dels col·laboradors",
+        "feedback": "Crèdit per comentaris",
+        "influencer": "Crèdit d'influencer",
+        "ossMonthlyReset": "Renovació mensual del patrocini de codi obert",
+        "ossSponsorship": "Crèdit de patrocini de codi obert",
+        "pullRequest": "Crèdit per PR",
+        "usageIssue": "Crèdit per problema d'ús",
+        "vibeDay": "Crèdit del dia Vibe"
       },
       "purchaseFallback": "Compra de crèdits",
       "receipt": "Rebut",

@@ -4506,14 +4506,27 @@
       "deductionFallback": "Kreditlevonás",
       "emptyDescription": "A kreditvásárlások, a nyugták és a felhasználás itt jelennek meg.",
       "emptyTitle": "Nincsenek kreditelőzmények",
+      "expiredGrant": "Lejárt: {{description}}",
       "googlePlayReceipt": "A nyugta a Google Playen érhető el",
       "kind": {
         "adjustment": "Korrekció",
         "balanceNeutral": "Egyenlegsemleges",
         "deduction": "Levonás",
         "grant": "Kreditjuttatás",
+        "promotionalCredits": "Promóciós kreditek",
         "welcomeCredits": "Üdvözlő kreditek",
         "purchase": "Vásárlás"
+      },
+      "program": {
+        "adminBulkGrant": "Adminisztrátori kreditjuttatás",
+        "contributorChampion": "Közreműködői bajnok kredit",
+        "feedback": "Visszajelzéskredit",
+        "influencer": "Influenszerkredit",
+        "ossMonthlyReset": "Nyílt forráskódú támogatás visszaállítása",
+        "ossSponsorship": "Nyílt forráskódú támogatási kredit",
+        "pullRequest": "PR-kredit",
+        "usageIssue": "Használati problémáért járó kredit",
+        "vibeDay": "Vibe day kredit"
       },
       "purchaseFallback": "Kreditvásárlás",
       "receipt": "Nyugta",

@@ -4664,14 +4664,27 @@
       "deductionFallback": "Pobranie kredytów",
       "emptyDescription": "Tutaj pojawią się zakupy kredytów, potwierdzenia i wykorzystanie.",
       "emptyTitle": "Brak historii kredytów",
+      "expiredGrant": "Wygasło: {{description}}",
       "googlePlayReceipt": "Potwierdzenie w Google Play",
       "kind": {
         "adjustment": "Korekta",
         "balanceNeutral": "Bez wpływu na saldo",
         "deduction": "Pobranie",
         "grant": "Przyznane kredyty",
+        "promotionalCredits": "Kredyty promocyjne",
         "welcomeCredits": "Kredyty powitalne",
         "purchase": "Zakup"
+      },
+      "program": {
+        "adminBulkGrant": "Kredyty przyznane przez administratora",
+        "contributorChampion": "Kredyty czempiona współtwórców",
+        "feedback": "Kredyty za opinię",
+        "influencer": "Kredyty dla influencerów",
+        "ossMonthlyReset": "Odnowienie sponsoringu OSS",
+        "ossSponsorship": "Kredyty sponsoringu OSS",
+        "pullRequest": "Kredyty za PR",
+        "usageIssue": "Kredyty za problem z użyciem",
+        "vibeDay": "Kredyty Vibe day"
       },
       "purchaseFallback": "Zakup kredytów",
       "receipt": "Potwierdzenie",

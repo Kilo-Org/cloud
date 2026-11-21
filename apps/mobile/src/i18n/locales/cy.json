@@ -4822,14 +4822,27 @@
       "deductionFallback": "Didyniad credyd",
       "emptyDescription": "Bydd pryniannau credyd, derbynebau a defnydd yn ymddangos yma.",
       "emptyTitle": "Dim hanes credydau",
+      "expiredGrant": "Wedi dod i ben: {{description}}",
       "googlePlayReceipt": "Derbynneb gan Google Play",
       "kind": {
         "adjustment": "Addasiad",
         "balanceNeutral": "Dim effaith ar y balans",
         "deduction": "Didyniad",
         "grant": "Credyd am ddim",
+        "promotionalCredits": "Credydau hyrwyddo",
         "welcomeCredits": "Credydau croeso",
         "purchase": "Pryniant"
+      },
+      "program": {
+        "adminBulkGrant": "Credydau gweinyddwr",
+        "contributorChampion": "Credyd pencampwr cyfrannwyr",
+        "feedback": "Credyd adborth",
+        "influencer": "Credyd dylanwadwr",
+        "ossMonthlyReset": "Ailosodiad misol nawdd OSS",
+        "ossSponsorship": "Credyd nawdd OSS",
+        "pullRequest": "Credyd cais tynnu",
+        "usageIssue": "Credyd problem defnydd",
+        "vibeDay": "Credyd Diwrnod Vibe"
       },
       "purchaseFallback": "Pryniant credyd",
       "receipt": "Derbynneb",

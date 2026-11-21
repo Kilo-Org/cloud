@@ -4506,14 +4506,27 @@
       "deductionFallback": "Tangohanga whiwhinga",
       "emptyDescription": "Ka puta mai ki konei ngā hoko whiwhinga, ngā rihīti, me te whakamahinga.",
       "emptyTitle": "Kāore he hītori whiwhinga",
+      "expiredGrant": "Kua pau te wā: {{description}}",
       "googlePlayReceipt": "Rihīti mai i Google Play",
       "kind": {
         "adjustment": "Whakatikatika",
         "balanceNeutral": "Kāore e pā ki te toenga",
         "deduction": "Tangohanga",
         "grant": "Koha whiwhinga",
+        "promotionalCredits": "Whiwhinga whakatairanga",
         "welcomeCredits": "Whiwhinga nau mai",
         "purchase": "Hoko"
+      },
+      "program": {
+        "adminBulkGrant": "Koha whiwhinga nā te kaiwhakahaere",
+        "contributorChampion": "Whiwhinga toa kaituku",
+        "feedback": "Whiwhinga urupare",
+        "influencer": "Whiwhinga kaiwhakaawe",
+        "ossMonthlyReset": "Tautuhi anō ā-marama OSS",
+        "ossSponsorship": "Whiwhinga tautoko pūtea OSS",
+        "pullRequest": "Whiwhinga tono kume",
+        "usageIssue": "Whiwhinga raru whakamahinga",
+        "vibeDay": "Whiwhinga Vibe day"
       },
       "purchaseFallback": "Hoko whiwhinga",
       "receipt": "Rihīti",

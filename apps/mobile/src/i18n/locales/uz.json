@@ -4506,14 +4506,27 @@
       "deductionFallback": "Kredit yechilishi",
       "emptyDescription": "Kredit xaridlari, cheklar va sarflar shu yerda ko‘rinadi.",
       "emptyTitle": "Kreditlar tarixi yo‘q",
+      "expiredGrant": "Muddati tugagan: {{description}}",
       "googlePlayReceipt": "Chek Google Play’da",
       "kind": {
         "adjustment": "Tuzatish",
         "balanceNeutral": "Balansga ta’sir qilmaydi",
         "deduction": "Yechib olish",
         "grant": "Bepul kredit",
+        "promotionalCredits": "Rag'bat kreditlari",
         "welcomeCredits": "Xush kelibsiz krediti",
         "purchase": "Xarid"
+      },
+      "program": {
+        "adminBulkGrant": "Administrator tomonidan berilgan kredit",
+        "contributorChampion": "Hissa qo'shuvchilar chempioni krediti",
+        "feedback": "Fikr-mulohaza uchun kredit",
+        "influencer": "Influencer krediti",
+        "ossMonthlyReset": "Ochiq kodli loyihalar homiyligining oylik yangilanishi",
+        "ossSponsorship": "Ochiq kodli loyihalarga homiylik krediti",
+        "pullRequest": "PR uchun kredit",
+        "usageIssue": "Foydalanish muammosi uchun kredit",
+        "vibeDay": "Vibe kuni krediti"
       },
       "purchaseFallback": "Kredit xaridi",
       "receipt": "Chek",

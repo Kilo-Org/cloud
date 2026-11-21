@@ -4506,14 +4506,27 @@
       "deductionFallback": "لێبڕینی کرێدیت",
       "emptyDescription": "کڕین، پسوولە و بەکارهێنانی کرێدیت لێرە دەردەکەون.",
       "emptyTitle": "هیچ مێژوویەکی کرێدیت نییە",
+      "expiredGrant": "بەسەرچوو: {{description}}",
       "googlePlayReceipt": "پسوولە لە Google Play",
       "kind": {
         "adjustment": "ڕێکخستنەوە",
         "balanceNeutral": "بێ کاریگەری لەسەر باڵانس",
         "deduction": "لێبڕین",
         "grant": "بەخشینی کرێدیت",
+        "promotionalCredits": "کرێدیتی پرۆمۆشناڵ",
         "welcomeCredits": "کرێدیتی بەخێربێیت",
         "purchase": "کڕین"
+      },
+      "program": {
+        "adminBulkGrant": "بەخشینی کرێدیت لەلایەن بەڕێوەبەر",
+        "contributorChampion": "کرێدیتی پاڵەوانی بەشداربوو",
+        "feedback": "کرێدیتی بۆچوون",
+        "influencer": "کرێدیتی ئینفلوانسەر",
+        "ossMonthlyReset": "نوێکردنەوەی پاڵپشتیی نەرمەکاڵای سەرچاوەکراوە",
+        "ossSponsorship": "کرێدیتی پاڵپشتیی نەرمەکاڵای سەرچاوەکراوە",
+        "pullRequest": "کرێدیتی داواکاری یەکخستن",
+        "usageIssue": "کرێدیتی کێشەی بەکارهێنان",
+        "vibeDay": "کرێدیتی ڕۆژی Vibe"
       },
       "purchaseFallback": "کڕینی کرێدیت",
       "receipt": "پسوولە",

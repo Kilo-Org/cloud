@@ -4506,14 +4506,27 @@
       "deductionFallback": "Одбивање кредити",
       "emptyDescription": "Купувањата на кредити, сметките и користењето ќе се појават тука.",
       "emptyTitle": "Нема историја на кредити",
+      "expiredGrant": "Истечен рок: {{description}}",
       "googlePlayReceipt": "Сметка од Google Play",
       "kind": {
         "adjustment": "Корекција",
         "balanceNeutral": "Без промена на салдото",
         "deduction": "Одбивање",
         "grant": "Доделени кредити",
+        "promotionalCredits": "Промоционални кредити",
         "welcomeCredits": "Кредити за добредојде",
         "purchase": "Купување"
+      },
+      "program": {
+        "adminBulkGrant": "Кредити од администратор",
+        "contributorChampion": "Кредит за шампион меѓу соработниците",
+        "feedback": "Кредит за повратни информации",
+        "influencer": "Кредит за инфлуенсери",
+        "ossMonthlyReset": "Месечно ресетирање на спонзорството за отворен код",
+        "ossSponsorship": "Кредит за спонзорство на отворен код",
+        "pullRequest": "Кредит за барање за спојување",
+        "usageIssue": "Кредит за проблем со користењето",
+        "vibeDay": "Кредит за Vibe day"
       },
       "purchaseFallback": "Купување кредити",
       "receipt": "Сметка",

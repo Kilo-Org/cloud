@@ -4506,14 +4506,27 @@
       "deductionFallback": "Кредитийн хасалт",
       "emptyDescription": "Кредитийн худалдан авалт, баримт, хэрэглээ энд харагдана.",
       "emptyTitle": "Кредитийн түүх алга",
+      "expiredGrant": "Хугацаа нь дууссан: {{description}}",
       "googlePlayReceipt": "Google Play-н баримт",
       "kind": {
         "adjustment": "Залруулга",
         "balanceNeutral": "Үлдэгдэлд нөлөөгүй",
         "deduction": "Хасалт",
         "grant": "Кредит олголт",
+        "promotionalCredits": "Урамшууллын кредит",
         "welcomeCredits": "Тавтай морилын кредит",
         "purchase": "Худалдан авалт"
+      },
+      "program": {
+        "adminBulkGrant": "Админы кредит олголт",
+        "contributorChampion": "Хувь нэмэр оруулагчийн аваргын кредит",
+        "feedback": "Санал хүсэлтийн кредит",
+        "influencer": "Инфлюенсер кредит",
+        "ossMonthlyReset": "Нээлттэй эхийн кредитийг сар бүр шинэчлэх",
+        "ossSponsorship": "Нээлттэй эхийн ивээн тэтгэлгийн кредит",
+        "pullRequest": "Нэгтгэх хүсэлтийн кредит",
+        "usageIssue": "Хэрэглээний асуудлын кредит",
+        "vibeDay": "Vibe Day кредит"
       },
       "purchaseFallback": "Кредит худалдан авалт",
       "receipt": "Баримт",

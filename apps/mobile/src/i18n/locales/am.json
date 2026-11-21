@@ -4506,14 +4506,27 @@
       "deductionFallback": "የክሬዲት ቅነሳ",
       "emptyDescription": "የክሬዲት ግዢዎች፣ ደረሰኞች እና አጠቃቀም እዚህ ይታያሉ።",
       "emptyTitle": "የክሬዲት ታሪክ የለም",
+      "expiredGrant": "ጊዜው አልፏል፦ {{description}}",
       "googlePlayReceipt": "ደረሰኝ ከGoogle Play",
       "kind": {
         "adjustment": "ማስተካከያ",
         "balanceNeutral": "ቀሪ ሂሳብን የማይቀይር",
         "deduction": "ቅነሳ",
         "grant": "የክሬዲት ስጦታ",
+        "promotionalCredits": "የማስተዋወቂያ ክሬዲት",
         "welcomeCredits": "የእንኳን ደህና መጡ ክሬዲት",
         "purchase": "ግዢ"
+      },
+      "program": {
+        "adminBulkGrant": "የአስተዳዳሪ ክሬዲት ስጦታ",
+        "contributorChampion": "የአስተዋጽኦ ሻምፒዮን ክሬዲት",
+        "feedback": "የግብረ-መልስ ክሬዲት",
+        "influencer": "የኢንፍሉዌንሰር ክሬዲት",
+        "ossMonthlyReset": "የክፍት ምንጭ ሶፍትዌር ክሬዲት ወርሃዊ እድሳት",
+        "ossSponsorship": "የክፍት ምንጭ ሶፍትዌር ድጋፍ ክሬዲት",
+        "pullRequest": "የማዋሃድ ጥያቄ ክሬዲት",
+        "usageIssue": "የአጠቃቀም ችግር ክሬዲት",
+        "vibeDay": "የVibe Day ክሬዲት"
       },
       "purchaseFallback": "የክሬዲት ግዢ",
       "receipt": "ደረሰኝ",

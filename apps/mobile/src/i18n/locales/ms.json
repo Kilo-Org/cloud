@@ -4506,14 +4506,27 @@
       "deductionFallback": "Potongan kredit",
       "emptyDescription": "Pembelian kredit, resit dan penggunaan akan dipaparkan di sini.",
       "emptyTitle": "Tiada sejarah kredit",
+      "expiredGrant": "Tamat tempoh: {{description}}",
       "googlePlayReceipt": "Resit daripada Google Play",
       "kind": {
         "adjustment": "Pelarasan",
         "balanceNeutral": "Neutral baki",
         "deduction": "Potongan",
         "grant": "Pemberian kredit",
+        "promotionalCredits": "Kredit promosi",
         "welcomeCredits": "Kredit selamat datang",
         "purchase": "Pembelian"
+      },
+      "program": {
+        "adminBulkGrant": "Pemberian kredit pentadbir",
+        "contributorChampion": "Kredit juara penyumbang",
+        "feedback": "Kredit maklum balas",
+        "influencer": "Kredit pempengaruh",
+        "ossMonthlyReset": "Pembaharuan penajaan OSS",
+        "ossSponsorship": "Kredit penajaan OSS",
+        "pullRequest": "Kredit PR",
+        "usageIssue": "Kredit isu penggunaan",
+        "vibeDay": "Kredit Vibe Day"
       },
       "purchaseFallback": "Pembelian kredit",
       "receipt": "Resit",

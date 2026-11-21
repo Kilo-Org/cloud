@@ -4506,14 +4506,27 @@
       "deductionFallback": "Cire kiredit",
       "emptyDescription": "Sayayyar kiredit, rasitai, da amfani za su bayyana a nan.",
       "emptyTitle": "Babu tarihin kiredit",
+      "expiredGrant": "Lokaci ya ƙare: {{description}}",
       "googlePlayReceipt": "Rasiti daga Google Play",
       "kind": {
         "adjustment": "Gyara",
         "balanceNeutral": "Ba ya canja ma'auni",
         "deduction": "Cirewa",
         "grant": "Kyautar kiredit",
+        "promotionalCredits": "Kiredit ɗin talla",
         "welcomeCredits": "Kiredit na maraba",
         "purchase": "Saye"
+      },
+      "program": {
+        "adminBulkGrant": "Kyautar kiredit daga mai gudanarwa",
+        "contributorChampion": "Kiredit na gwarzon mai ba da gudummawa",
+        "feedback": "Kiredit na ra'ayi",
+        "influencer": "Kiredit na mai tasiri",
+        "ossMonthlyReset": "Sake saitin OSS na wata-wata",
+        "ossSponsorship": "Kiredit na tallafin OSS",
+        "pullRequest": "Kiredit na buƙatar haɗa canje-canje",
+        "usageIssue": "Kiredit na matsalar amfani",
+        "vibeDay": "Kiredit na Vibe Day"
       },
       "purchaseFallback": "Sayen kiredit",
       "receipt": "Rasiti",

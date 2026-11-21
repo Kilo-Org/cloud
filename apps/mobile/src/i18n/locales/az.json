@@ -4506,14 +4506,27 @@
       "deductionFallback": "Kredit çıxılması",
       "emptyDescription": "Kredit alışları, qəbzlər və istifadə burada görünəcək.",
       "emptyTitle": "Kredit tarixçəsi yoxdur",
+      "expiredGrant": "Müddəti bitib: {{description}}",
       "googlePlayReceipt": "Google Play qəbzi",
       "kind": {
         "adjustment": "Düzəliş",
         "balanceNeutral": "Balansa təsirsiz",
         "deduction": "Çıxılma",
         "grant": "Kredit hədiyyəsi",
+        "promotionalCredits": "Promosyon kreditlər",
         "welcomeCredits": "Xoş gəlmə krediti",
         "purchase": "Alış"
+      },
+      "program": {
+        "adminBulkGrant": "İnzibatçı kredit hədiyyəsi",
+        "contributorChampion": "Töhfəçi çempion krediti",
+        "feedback": "Rəy krediti",
+        "influencer": "İnfluenser krediti",
+        "ossMonthlyReset": "OSS sponsorluğu yenilənməsi",
+        "ossSponsorship": "OSS sponsorluğu krediti",
+        "pullRequest": "Birləşdirmə sorğusu krediti",
+        "usageIssue": "İstifadə problemi krediti",
+        "vibeDay": "Vibe Day krediti"
       },
       "purchaseFallback": "Kredit alışı",
       "receipt": "Qəbz",

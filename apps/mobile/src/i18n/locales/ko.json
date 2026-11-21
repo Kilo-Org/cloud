@@ -4506,14 +4506,27 @@
       "deductionFallback": "크레딧 차감",
       "emptyDescription": "크레딧 구매, 영수증 및 사용 내역이 여기에 표시됩니다.",
       "emptyTitle": "크레딧 내역 없음",
+      "expiredGrant": "만료됨: {{description}}",
       "googlePlayReceipt": "Google Play 영수증",
       "kind": {
         "adjustment": "조정",
         "balanceNeutral": "잔액 변동 없음",
         "deduction": "차감",
         "grant": "크레딧 지급",
+        "promotionalCredits": "프로모션 크레딧",
         "welcomeCredits": "환영 크레딧",
         "purchase": "구매"
+      },
+      "program": {
+        "adminBulkGrant": "관리자 크레딧 지급",
+        "contributorChampion": "기여자 챔피언 크레딧",
+        "feedback": "피드백 크레딧",
+        "influencer": "인플루언서 크레딧",
+        "ossMonthlyReset": "OSS 후원 월간 초기화",
+        "ossSponsorship": "OSS 후원 크레딧",
+        "pullRequest": "PR 크레딧",
+        "usageIssue": "사용 문제 크레딧",
+        "vibeDay": "바이브 데이 크레딧"
       },
       "purchaseFallback": "크레딧 구매",
       "receipt": "영수증",

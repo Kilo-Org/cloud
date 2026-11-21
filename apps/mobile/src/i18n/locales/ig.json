@@ -4506,14 +4506,27 @@
       "deductionFallback": "Mwepụ kredit",
       "emptyDescription": "Ịzụ kredit, rịsịt, na ojiji ga-apụta ebe a.",
       "emptyTitle": "Enweghị akụkọ kredit",
+      "expiredGrant": "Oge agwụla: {{description}}",
       "googlePlayReceipt": "Rịsịt sitere na Google Play",
       "kind": {
         "adjustment": "Mmezi",
         "balanceNeutral": "Enweghị mmetụta n'ego fọdụrụ",
         "deduction": "Mwepụ",
         "grant": "Onyinye kredit",
+        "promotionalCredits": "Kredit nkwalite",
         "welcomeCredits": "Kredit nnabata",
         "purchase": "Ịzụ ahịa"
+      },
+      "program": {
+        "adminBulkGrant": "Onyinye kredit onye nchịkwa",
+        "contributorChampion": "Kredit onye mmeri ntinye aka",
+        "feedback": "Kredit nzaghachi",
+        "influencer": "Kredit influencer",
+        "ossMonthlyReset": "Mmeghari nkwado ngwanrọ mepere emepe",
+        "ossSponsorship": "Kredit nkwado ngwanrọ mepere emepe",
+        "pullRequest": "Kredit arịrịọ ijikọ koodu",
+        "usageIssue": "Kredit nsogbu ojiji",
+        "vibeDay": "Kredit Vibe Day"
       },
       "purchaseFallback": "Ịzụ kredit",
       "receipt": "Rịsịt",

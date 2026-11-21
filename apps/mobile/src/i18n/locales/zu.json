@@ -4506,14 +4506,27 @@
       "deductionFallback": "Ukudonswa kwamakhredithi",
       "emptyDescription": "Ukuthengwa kwamakhredithi, amarisidi, nokusetshenziswa kuzovela lapha.",
       "emptyTitle": "Awukho umlando wamakhredithi",
+      "expiredGrant": "Kuphelelwe yisikhathi: {{description}}",
       "googlePlayReceipt": "Irisidi evela ku-Google Play",
       "kind": {
         "adjustment": "Ulungiso",
         "balanceNeutral": "Akuthinti ibhalansi",
         "deduction": "Ukudonswa",
         "grant": "Isibonelelo samakhredithi",
+        "promotionalCredits": "Amakhredithi okukhangisa",
         "welcomeCredits": "Amakhredithi okwamukela",
         "purchase": "Ukuthenga"
+      },
+      "program": {
+        "adminBulkGrant": "Isibonelelo samakhredithi somlawuli",
+        "contributorChampion": "Amakhredithi omqhawe wabanikeli",
+        "feedback": "Amakhredithi empendulo",
+        "influencer": "Amakhredithi e-influencer",
+        "ossMonthlyReset": "Ukusetha kabusha kwanyanga zonke kwe-OSS",
+        "ossSponsorship": "Amakhredithi okuxhaswa kwe-OSS",
+        "pullRequest": "Amakhredithi e-PR",
+        "usageIssue": "Amakhredithi enkinga yokusetshenziswa",
+        "vibeDay": "Amakhredithi e-Vibe Day"
       },
       "purchaseFallback": "Ukuthengwa kwamakhredithi",
       "receipt": "Irisidi",

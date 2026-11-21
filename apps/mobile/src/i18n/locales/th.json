@@ -4506,14 +4506,27 @@
       "deductionFallback": "การหักเครดิต",
       "emptyDescription": "การซื้อเครดิต ใบเสร็จ และการใช้งานจะแสดงที่นี่",
       "emptyTitle": "ไม่มีประวัติเครดิต",
+      "expiredGrant": "หมดอายุแล้ว: {{description}}",
       "googlePlayReceipt": "ใบเสร็จจาก Google Play",
       "kind": {
         "adjustment": "การปรับปรุง",
         "balanceNeutral": "ไม่กระทบยอดคงเหลือ",
         "deduction": "การหักเครดิต",
         "grant": "เครดิตที่ได้รับ",
+        "promotionalCredits": "เครดิตโปรโมชัน",
         "welcomeCredits": "เครดิตต้อนรับ",
         "purchase": "การซื้อ"
+      },
+      "program": {
+        "adminBulkGrant": "เครดิตที่ผู้ดูแลระบบมอบให้",
+        "contributorChampion": "เครดิตแชมป์ผู้มีส่วนร่วม",
+        "feedback": "เครดิตข้อเสนอแนะ",
+        "influencer": "เครดิตอินฟลูเอนเซอร์",
+        "ossMonthlyReset": "การรีเซ็ตเครดิต OSS รายเดือน",
+        "ossSponsorship": "เครดิตสนับสนุน OSS",
+        "pullRequest": "เครดิต PR",
+        "usageIssue": "เครดิตปัญหาการใช้งาน",
+        "vibeDay": "เครดิต Vibe day"
       },
       "purchaseFallback": "การซื้อเครดิต",
       "receipt": "ใบเสร็จ",

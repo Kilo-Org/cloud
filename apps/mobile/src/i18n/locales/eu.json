@@ -4506,14 +4506,27 @@
       "deductionFallback": "Kreditu-kenketa",
       "emptyDescription": "Kreditu-erosketak, ordainagiriak eta erabilera hemen agertuko dira.",
       "emptyTitle": "Ez dago kredituen historiarik",
+      "expiredGrant": "Iraungita: {{description}}",
       "googlePlayReceipt": "Google Play-ko ordainagiria",
       "kind": {
         "adjustment": "Doikuntza",
         "balanceNeutral": "Saldoan eraginik gabe",
         "deduction": "Kenketa",
         "grant": "Kreditu-emakida",
+        "promotionalCredits": "Kreditu promozionalak",
         "welcomeCredits": "Ongietorri kredituak",
         "purchase": "Erosketa"
+      },
+      "program": {
+        "adminBulkGrant": "Administratzaileak emandako kreditua",
+        "contributorChampion": "Laguntzaile txapeldunaren kreditua",
+        "feedback": "Iritzi-kreditua",
+        "influencer": "Eragile-kreditua",
+        "ossMonthlyReset": "Kode irekiko babesaren hileko berrezarpena",
+        "ossSponsorship": "Kode irekiko babes-kreditua",
+        "pullRequest": "Bateratze-eskaeraren kreditua",
+        "usageIssue": "Erabilera-arazoko kreditua",
+        "vibeDay": "Vibe eguneko kreditua"
       },
       "purchaseFallback": "Kreditu-erosketa",
       "receipt": "Ordainagiria",

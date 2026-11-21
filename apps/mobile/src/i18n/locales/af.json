@@ -4506,14 +4506,27 @@
       "deductionFallback": "Kredietaftrekking",
       "emptyDescription": "Kredietaankope, kwitansies en gebruik sal hier verskyn.",
       "emptyTitle": "Geen kredietgeskiedenis nie",
+      "expiredGrant": "Verval: {{description}}",
       "googlePlayReceipt": "Kwitansie van Google Play",
       "kind": {
         "adjustment": "Aanpassing",
         "balanceNeutral": "Saldoneutraal",
         "deduction": "Aftrekking",
         "grant": "Kredniettoekenning",
+        "promotionalCredits": "Promosiekrediete",
         "welcomeCredits": "Welkomkrediete",
         "purchase": "Aankoop"
+      },
+      "program": {
+        "adminBulkGrant": "Administrateur-krediettoekenning",
+        "contributorChampion": "Bydraer-kampioenkrediet",
+        "feedback": "Terugvoerkrediet",
+        "influencer": "Influënserkrediet",
+        "ossMonthlyReset": "Herstel van oopbronborgskap",
+        "ossSponsorship": "Oopbronborgskapkrediet",
+        "pullRequest": "Trekversoekkrediet",
+        "usageIssue": "Gebruiksprobleemkrediet",
+        "vibeDay": "Vibe-dagkrediet"
       },
       "purchaseFallback": "Kredietaankoop",
       "receipt": "Kwitansie",

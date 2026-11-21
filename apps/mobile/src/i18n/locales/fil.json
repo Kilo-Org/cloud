@@ -4506,14 +4506,27 @@
       "deductionFallback": "Bawas sa credit",
       "emptyDescription": "Lalabas dito ang mga pagbili, resibo, at paggamit ng credit.",
       "emptyTitle": "Walang kasaysayan ng credit",
+      "expiredGrant": "Nag-expire: {{description}}",
       "googlePlayReceipt": "Resibo mula sa Google Play",
       "kind": {
         "adjustment": "Adjustment",
         "balanceNeutral": "Walang epekto sa balanse",
         "deduction": "Bawas",
         "grant": "Libreng credit",
+        "promotionalCredits": "Promosyonal na kredito",
         "welcomeCredits": "Panimulang credit",
         "purchase": "Pagbili"
+      },
+      "program": {
+        "adminBulkGrant": "Kredito mula sa admin",
+        "contributorChampion": "Kredito ng contributor champion",
+        "feedback": "Kredito para sa puna",
+        "influencer": "Kredito ng influencer",
+        "ossMonthlyReset": "Buwanang pag-reset ng pagtangkilik sa OSS",
+        "ossSponsorship": "Kredito sa pagtangkilik sa OSS",
+        "pullRequest": "Kredito para sa PR",
+        "usageIssue": "Kredito para sa isyu sa paggamit",
+        "vibeDay": "Kredito ng Vibe day"
       },
       "purchaseFallback": "Pagbili ng credit",
       "receipt": "Resibo",

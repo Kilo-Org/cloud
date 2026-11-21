@@ -4506,14 +4506,27 @@
       "deductionFallback": "积分扣除",
       "emptyDescription": "积分购买、收据和使用情况将显示在这里。",
       "emptyTitle": "暂无积分记录",
+      "expiredGrant": "已过期：{{description}}",
       "googlePlayReceipt": "收据位于 Google Play",
       "kind": {
         "adjustment": "调整",
         "balanceNeutral": "余额不变",
         "deduction": "扣除",
         "grant": "赠送积分",
+        "promotionalCredits": "促销积分",
         "welcomeCredits": "欢迎积分",
         "purchase": "购买"
+      },
+      "program": {
+        "adminBulkGrant": "管理员发放的积分",
+        "contributorChampion": "贡献者冠军积分",
+        "feedback": "反馈积分",
+        "influencer": "网红积分",
+        "ossMonthlyReset": "开源赞助重置",
+        "ossSponsorship": "开源赞助积分",
+        "pullRequest": "拉取请求积分",
+        "usageIssue": "用量问题积分",
+        "vibeDay": "Vibe Day 积分"
       },
       "purchaseFallback": "积分购买",
       "receipt": "收据",

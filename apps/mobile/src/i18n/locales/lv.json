@@ -4585,14 +4585,27 @@
       "deductionFallback": "Kredītu norakstīšana",
       "emptyDescription": "Šeit būs redzami kredītu pirkumi, kvītis un lietojums.",
       "emptyTitle": "Nav kredītu vēstures",
+      "expiredGrant": "Termiņš beidzies: {{description}}",
       "googlePlayReceipt": "Kvīts pakalpojumā Google Play",
       "kind": {
         "adjustment": "Korekcija",
         "balanceNeutral": "Neietekmē atlikumu",
         "deduction": "Norakstīšana",
         "grant": "Kredītu piešķīrums",
+        "promotionalCredits": "Promocijas kredīti",
         "welcomeCredits": "Sveiciena kredīti",
         "purchase": "Pirkums"
+      },
+      "program": {
+        "adminBulkGrant": "Administratora kredītu piešķīrums",
+        "contributorChampion": "Līdzstrādnieku čempiona kredīts",
+        "feedback": "Kredīts par atsauksmi",
+        "influencer": "Influenceru kredīts",
+        "ossMonthlyReset": "OSS sponsorēšanas ikmēneša atiestatīšana",
+        "ossSponsorship": "OSS sponsorēšanas kredīts",
+        "pullRequest": "Kredīts par izmaiņu pieprasījumu",
+        "usageIssue": "Kredīts par lietojuma problēmu",
+        "vibeDay": "Vibe dienas kredīts"
       },
       "purchaseFallback": "Kredītu pirkums",
       "receipt": "Kvīts",

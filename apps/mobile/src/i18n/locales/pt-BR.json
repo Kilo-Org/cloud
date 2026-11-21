@@ -4664,14 +4664,27 @@
       "deductionFallback": "Dedução de créditos",
       "emptyDescription": "Compras de créditos, recibos e uso aparecerão aqui.",
       "emptyTitle": "Nenhum histórico de créditos",
+      "expiredGrant": "Expirado: {{description}}",
       "googlePlayReceipt": "Recibo no Google Play",
       "kind": {
         "adjustment": "Ajuste",
         "balanceNeutral": "Sem efeito no saldo",
         "deduction": "Dedução",
         "grant": "Créditos concedidos",
+        "promotionalCredits": "Créditos promocionais",
         "welcomeCredits": "Créditos de boas-vindas",
         "purchase": "Compra"
+      },
+      "program": {
+        "adminBulkGrant": "Concessão de créditos do administrador",
+        "contributorChampion": "Crédito de campeão de colaboradores",
+        "feedback": "Crédito por feedback",
+        "influencer": "Crédito de influenciador",
+        "ossMonthlyReset": "Renovação mensal do patrocínio de código aberto",
+        "ossSponsorship": "Crédito de patrocínio de código aberto",
+        "pullRequest": "Crédito por PR",
+        "usageIssue": "Crédito por problema de uso",
+        "vibeDay": "Crédito do dia Vibe"
       },
       "purchaseFallback": "Compra de créditos",
       "receipt": "Recibo",

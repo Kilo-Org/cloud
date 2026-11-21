@@ -4506,14 +4506,27 @@
       "deductionFallback": "クレジットの差し引き",
       "emptyDescription": "クレジットの購入、領収書、使用状況がここに表示されます。",
       "emptyTitle": "クレジット履歴はありません",
+      "expiredGrant": "期限切れ: {{description}}",
       "googlePlayReceipt": "領収書は Google Play にあります",
       "kind": {
         "adjustment": "調整",
         "balanceNeutral": "残高変動なし",
         "deduction": "差し引き",
         "grant": "クレジット付与",
+        "promotionalCredits": "プロモーションクレジット",
         "welcomeCredits": "ウェルカムクレジット",
         "purchase": "購入"
+      },
+      "program": {
+        "adminBulkGrant": "管理者クレジット付与",
+        "contributorChampion": "コントリビューターチャンピオンクレジット",
+        "feedback": "フィードバッククレジット",
+        "influencer": "インフルエンサークレジット",
+        "ossMonthlyReset": "OSS支援のリセット",
+        "ossSponsorship": "OSS支援クレジット",
+        "pullRequest": "プルリクエストクレジット",
+        "usageIssue": "利用問題クレジット",
+        "vibeDay": "Vibe dayクレジット"
       },
       "purchaseFallback": "クレジットの購入",
       "receipt": "領収書",

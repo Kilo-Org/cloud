@@ -4598,14 +4598,27 @@
       "deductionFallback": "Credit deduction",
       "emptyDescription": "Credit purchases, receipts, and usage will appear here.",
       "emptyTitle": "No credit history",
+      "expiredGrant": "Expired: {{description}}",
       "googlePlayReceipt": "Receipt from Google Play",
       "kind": {
         "adjustment": "Adjustment",
         "balanceNeutral": "Balance neutral",
         "deduction": "Deduction",
         "grant": "Credit grant",
+        "promotionalCredits": "Promotional credits",
         "welcomeCredits": "Welcome credits",
         "purchase": "Purchase"
+      },
+      "program": {
+        "adminBulkGrant": "Admin credit grant",
+        "contributorChampion": "Contributor champion credit",
+        "feedback": "Feedback credit",
+        "influencer": "Influencer credit",
+        "ossMonthlyReset": "OSS sponsorship reset",
+        "ossSponsorship": "OSS sponsorship credit",
+        "pullRequest": "Pull request credit",
+        "usageIssue": "Usage issue credit",
+        "vibeDay": "Vibe day credit"
       },
       "purchaseFallback": "Credit purchase",
       "receipt": "Receipt",

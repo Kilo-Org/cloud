@@ -4506,14 +4506,27 @@
       "deductionFallback": "క్రెడిట్ తగ్గింపు",
       "emptyDescription": "క్రెడిట్ కొనుగోళ్లు, రసీదులు మరియు వినియోగం ఇక్కడ కనిపిస్తాయి.",
       "emptyTitle": "క్రెడిట్ చరిత్ర లేదు",
+      "expiredGrant": "గడువు ముగిసింది: {{description}}",
       "googlePlayReceipt": "Google Play నుండి రసీదు",
       "kind": {
         "adjustment": "సర్దుబాటు",
         "balanceNeutral": "బ్యాలెన్స్‌పై ప్రభావం లేదు",
         "deduction": "తగ్గింపు",
         "grant": "క్రెడిట్ మంజూరు",
+        "promotionalCredits": "ప్రమోషనల్ క్రెడిట్",
         "welcomeCredits": "స్వాగత క్రెడిట్",
         "purchase": "కొనుగోలు"
+      },
+      "program": {
+        "adminBulkGrant": "నిర్వాహకుడి క్రెడిట్ మంజూరు",
+        "contributorChampion": "కాంట్రిబ్యూటర్ ఛాంపియన్ క్రెడిట్",
+        "feedback": "అభిప్రాయ క్రెడిట్",
+        "influencer": "ఇన్‌ఫ్లుయెన్సర్ క్రెడిట్",
+        "ossMonthlyReset": "OSS ప్రాయోజకత్వ పునరుద్ధరణ",
+        "ossSponsorship": "OSS ప్రాయోజకత్వ క్రెడిట్",
+        "pullRequest": "పుల్ రిక్వెస్ట్ క్రెడిట్",
+        "usageIssue": "వినియోగ సమస్య క్రెడిట్",
+        "vibeDay": "Vibe Day క్రెడిట్"
       },
       "purchaseFallback": "క్రెడిట్ కొనుగోలు",
       "receipt": "రసీదు",

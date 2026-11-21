@@ -4506,14 +4506,27 @@
       "deductionFallback": "क्रेडिट कटौती",
       "emptyDescription": "क्रेडिट की खरीदारी, रसीदें और इस्तेमाल यहां दिखेंगे।",
       "emptyTitle": "कोई क्रेडिट इतिहास नहीं",
+      "expiredGrant": "समय समाप्त: {{description}}",
       "googlePlayReceipt": "Google Play की रसीद",
       "kind": {
         "adjustment": "समायोजन",
         "balanceNeutral": "बैलेंस पर असर नहीं",
         "deduction": "कटौती",
         "grant": "क्रेडिट अनुदान",
+        "promotionalCredits": "प्रमोशनल क्रेडिट",
         "welcomeCredits": "स्वागत क्रेडिट",
         "purchase": "खरीदारी"
+      },
+      "program": {
+        "adminBulkGrant": "एडमिन द्वारा क्रेडिट अनुदान",
+        "contributorChampion": "योगदानकर्ता चैंपियन क्रेडिट",
+        "feedback": "प्रतिक्रिया क्रेडिट",
+        "influencer": "इन्फ्लुएंसर क्रेडिट",
+        "ossMonthlyReset": "OSS प्रायोजन नवीनीकरण",
+        "ossSponsorship": "OSS प्रायोजन क्रेडिट",
+        "pullRequest": "पुल रिक्वेस्ट क्रेडिट",
+        "usageIssue": "उपयोग समस्या क्रेडिट",
+        "vibeDay": "Vibe Day क्रेडिट"
       },
       "purchaseFallback": "क्रेडिट खरीदारी",
       "receipt": "रसीद",

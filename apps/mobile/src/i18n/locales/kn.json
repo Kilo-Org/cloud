@@ -4506,14 +4506,27 @@
       "deductionFallback": "ಕ್ರೆಡಿಟ್ ಕಡಿತ",
       "emptyDescription": "ಕ್ರೆಡಿಟ್ ಖರೀದಿಗಳು, ರಸೀದಿಗಳು ಮತ್ತು ಬಳಕೆ ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತವೆ.",
       "emptyTitle": "ಕ್ರೆಡಿಟ್ ಇತಿಹಾಸವಿಲ್ಲ",
+      "expiredGrant": "ಅವಧಿ ಮುಗಿದಿದೆ: {{description}}",
       "googlePlayReceipt": "Google Play ನಿಂದ ರಸೀದಿ",
       "kind": {
         "adjustment": "ಹೊಂದಾಣಿಕೆ",
         "balanceNeutral": "ಬ್ಯಾಲೆನ್ಸ್ ಬದಲಾವಣೆ ಇಲ್ಲ",
         "deduction": "ಕಡಿತ",
         "grant": "ಕ್ರೆಡಿಟ್ ಅನುದಾನ",
+        "promotionalCredits": "ಪ್ರಚಾರ ಕ್ರೆಡಿಟ್‌ಗಳು",
         "welcomeCredits": "ಸ್ವಾಗತ ಕ್ರೆಡಿಟ್",
         "purchase": "ಖರೀದಿ"
+      },
+      "program": {
+        "adminBulkGrant": "ನಿರ್ವಾಹಕರ ಕ್ರೆಡಿಟ್ ಅನುದಾನ",
+        "contributorChampion": "ಕೊಡುಗೆದಾರ ಚಾಂಪಿಯನ್ ಕ್ರೆಡಿಟ್",
+        "feedback": "ಪ್ರತಿಕ್ರಿಯೆ ಕ್ರೆಡಿಟ್",
+        "influencer": "ಇನ್ಫ್ಲುಯೆನ್ಸರ್ ಕ್ರೆಡಿಟ್",
+        "ossMonthlyReset": "OSS ಮಾಸಿಕ ಮರುಹೊಂದಿಸುವಿಕೆ",
+        "ossSponsorship": "OSS ಪ್ರಾಯೋಜಕತ್ವ ಕ್ರೆಡಿಟ್",
+        "pullRequest": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಕ್ರೆಡಿಟ್",
+        "usageIssue": "ಬಳಕೆ ಸಮಸ್ಯೆಯ ಕ್ರೆಡಿಟ್",
+        "vibeDay": "Vibe day ಕ್ರೆಡಿಟ್"
       },
       "purchaseFallback": "ಕ್ರೆಡಿಟ್ ಖರೀದಿ",
       "receipt": "ರಸೀದಿ",

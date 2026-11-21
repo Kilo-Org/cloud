@@ -4506,14 +4506,27 @@
       "deductionFallback": "Dediksyon kredi",
       "emptyDescription": "Acha kredi, resi, ak itilizasyon ap parèt isit la.",
       "emptyTitle": "Pa gen istorik kredi",
+      "expiredGrant": "Ekspire: {{description}}",
       "googlePlayReceipt": "Resi ki nan Google Play",
       "kind": {
         "adjustment": "Ajisteman",
         "balanceNeutral": "San efè sou balans",
         "deduction": "Dediksyon",
         "grant": "Kredi gratis",
+        "promotionalCredits": "Kredi pwomosyonèl",
         "welcomeCredits": "Kredi byenvini",
         "purchase": "Acha"
+      },
+      "program": {
+        "adminBulkGrant": "Kredi administratè",
+        "contributorChampion": "Kredi chanpyon kontribitè",
+        "feedback": "Kredi kòmantè",
+        "influencer": "Kredi enfliyansè",
+        "ossMonthlyReset": "Reyinisyalizasyon chak mwa parennaj kòd ouvè",
+        "ossSponsorship": "Kredi parennaj kòd ouvè",
+        "pullRequest": "Kredi demann fizyon",
+        "usageIssue": "Kredi pou pwoblèm itilizasyon",
+        "vibeDay": "Kredi jou Vibe"
       },
       "purchaseFallback": "Acha kredi",
       "receipt": "Resi",

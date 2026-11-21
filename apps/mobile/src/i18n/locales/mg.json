@@ -4506,14 +4506,27 @@
       "deductionFallback": "Fanalana kredita",
       "emptyDescription": "Hiseho eto ny fividianana kredita, ny rosia ary ny fampiasana.",
       "emptyTitle": "Tsy misy tantaran'ny kredita",
+      "expiredGrant": "Lany fe-potoana: {{description}}",
       "googlePlayReceipt": "Rosia avy amin'ny Google Play",
       "kind": {
         "adjustment": "Fanitsiana",
         "balanceNeutral": "Tsy manova ny sisa",
         "deduction": "Fanalana",
         "grant": "Kredita nomena",
+        "promotionalCredits": "Kireditra fanentanana",
         "welcomeCredits": "Kredita tongasoa",
         "purchase": "Fividianana"
+      },
+      "program": {
+        "adminBulkGrant": "Kredita nomen’ny mpitantana",
+        "contributorChampion": "Kredita tompondakan’ny mpandray anjara",
+        "feedback": "Kredita fanehoan-kevitra",
+        "influencer": "Kredita influencer",
+        "ossMonthlyReset": "Fanavaozana fanohanana rindranasa misokatra loharano",
+        "ossSponsorship": "Kredita fanohanana rindranasa misokatra loharano",
+        "pullRequest": "Kredita PR",
+        "usageIssue": "Kredita olana fampiasana",
+        "vibeDay": "Kredita Vibe Day"
       },
       "purchaseFallback": "Fividianana kredita",
       "receipt": "Rosia",

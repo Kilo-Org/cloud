@@ -4506,14 +4506,27 @@
       "deductionFallback": "Ka-goynta kiredit-ka",
       "emptyDescription": "Iibsiyada kiredit-ka, rasiidhada, iyo isticmaalka halkan ayay ka muuqan doonaan.",
       "emptyTitle": "Ma jirto taariikh kiredit",
+      "expiredGrant": "Waqtigiisu dhacay: {{description}}",
       "googlePlayReceipt": "Rasiid ka yimid Google Play",
       "kind": {
         "adjustment": "Hagaajin",
         "balanceNeutral": "Aan saamaynin haraaga",
         "deduction": "Ka-goyn",
         "grant": "Deeq kiredit",
+        "promotionalCredits": "Kiredit xayeysiin",
         "welcomeCredits": "Kiredit soo dhawoow",
         "purchase": "Iibsasho"
+      },
+      "program": {
+        "adminBulkGrant": "Deeq kiredit maamule",
+        "contributorChampion": "Kiredit halyeeyga wax-ku-biirka",
+        "feedback": "Kiredit jawaab-celin",
+        "influencer": "Kiredit saameynle",
+        "ossMonthlyReset": "Cusboonaysiinta kafaalaqaadka OSS",
+        "ossSponsorship": "Kiredit kafaalaqaadka OSS",
+        "pullRequest": "Kiredit codsi isku-darid",
+        "usageIssue": "Kiredit dhibaatada isticmaalka",
+        "vibeDay": "Kiredit Vibe Day"
       },
       "purchaseFallback": "Iibsashada kiredit",
       "receipt": "Rasiid",

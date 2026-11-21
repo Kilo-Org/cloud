@@ -4585,14 +4585,27 @@
       "deductionFallback": "Detrazione crediti",
       "emptyDescription": "Qui appariranno acquisti, ricevute e utilizzo dei crediti.",
       "emptyTitle": "Nessuna cronologia crediti",
+      "expiredGrant": "Scaduto: {{description}}",
       "googlePlayReceipt": "Ricevuta da Google Play",
       "kind": {
         "adjustment": "Rettifica",
         "balanceNeutral": "Saldo invariato",
         "deduction": "Detrazione",
         "grant": "Crediti omaggio",
+        "promotionalCredits": "Crediti promozionali",
         "welcomeCredits": "Crediti di benvenuto",
         "purchase": "Acquisto"
+      },
+      "program": {
+        "adminBulkGrant": "Crediti dall'amministratore",
+        "contributorChampion": "Credito per il campione dei contributori",
+        "feedback": "Credito per feedback",
+        "influencer": "Crediti per influencer",
+        "ossMonthlyReset": "Ripristino mensile della sponsorizzazione open source",
+        "ossSponsorship": "Credito per sponsorizzazione open source",
+        "pullRequest": "Credito per pull request",
+        "usageIssue": "Credito per problema di utilizzo",
+        "vibeDay": "Credito Vibe day"
       },
       "purchaseFallback": "Acquisto crediti",
       "receipt": "Ricevuta",

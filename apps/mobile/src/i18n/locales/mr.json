@@ -4506,14 +4506,27 @@
       "deductionFallback": "क्रेडिट वजावट",
       "emptyDescription": "क्रेडिट खरेदी, पावत्या आणि वापर येथे दिसतील.",
       "emptyTitle": "क्रेडिट इतिहास नाही",
+      "expiredGrant": "कालबाह्य: {{description}}",
       "googlePlayReceipt": "Google Play कडून पावती",
       "kind": {
         "adjustment": "समायोजन",
         "balanceNeutral": "शिलकीवर परिणाम नाही",
         "deduction": "वजावट",
         "grant": "क्रेडिट अनुदान",
+        "promotionalCredits": "प्रोमोशनल क्रेडिट",
         "welcomeCredits": "स्वागत क्रेडिट",
         "purchase": "खरेदी"
+      },
+      "program": {
+        "adminBulkGrant": "प्रशासकाकडून क्रेडिट अनुदान",
+        "contributorChampion": "योगदानकर्ता चॅम्पियन क्रेडिट",
+        "feedback": "अभिप्रायासाठी क्रेडिट",
+        "influencer": "इन्फ्लुएन्सर क्रेडिट",
+        "ossMonthlyReset": "OSS प्रायोजकत्वाचा मासिक रीसेट",
+        "ossSponsorship": "OSS प्रायोजकत्व क्रेडिट",
+        "pullRequest": "पुल रिक्वेस्टसाठी क्रेडिट",
+        "usageIssue": "वापर समस्येसाठी क्रेडिट",
+        "vibeDay": "Vibe दिवस क्रेडिट"
       },
       "purchaseFallback": "क्रेडिट खरेदी",
       "receipt": "पावती",

@@ -4506,14 +4506,27 @@
       "deductionFallback": "Pengurangan kredit",
       "emptyDescription": "Pembelian kredit, tanda terima, dan penggunaan akan muncul di sini.",
       "emptyTitle": "Tidak ada riwayat kredit",
+      "expiredGrant": "Kedaluwarsa: {{description}}",
       "googlePlayReceipt": "Tanda terima dari Google Play",
       "kind": {
         "adjustment": "Penyesuaian",
         "balanceNeutral": "Saldo tetap",
         "deduction": "Pengurangan",
         "grant": "Kredit gratis",
+        "promotionalCredits": "Kredit promosi",
         "welcomeCredits": "Kredit selamat datang",
         "purchase": "Pembelian"
+      },
+      "program": {
+        "adminBulkGrant": "Pemberian kredit admin",
+        "contributorChampion": "Kredit juara kontributor",
+        "feedback": "Kredit masukan",
+        "influencer": "Kredit influencer",
+        "ossMonthlyReset": "Pengaturan ulang sponsor sumber terbuka bulanan",
+        "ossSponsorship": "Kredit sponsor sumber terbuka",
+        "pullRequest": "Kredit PR",
+        "usageIssue": "Kredit masalah penggunaan",
+        "vibeDay": "Kredit Vibe day"
       },
       "purchaseFallback": "Pembelian kredit",
       "receipt": "Tanda terima",

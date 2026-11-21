@@ -4664,14 +4664,27 @@
       "deductionFallback": "Kreditų nurašymas",
       "emptyDescription": "Čia bus rodomi kreditų pirkimai, kvitai ir naudojimas.",
       "emptyTitle": "Kreditų istorijos nėra",
+      "expiredGrant": "Galiojimas baigėsi: {{description}}",
       "googlePlayReceipt": "Kvitas iš Google Play",
       "kind": {
         "adjustment": "Koregavimas",
         "balanceNeutral": "Balanso nekeičia",
         "deduction": "Nurašymas",
         "grant": "Kreditų suteikimas",
+        "promotionalCredits": "Promociniai kreditai",
         "welcomeCredits": "Sveikinimo kreditai",
         "purchase": "Pirkimas"
+      },
+      "program": {
+        "adminBulkGrant": "Administratoriaus suteikti kreditai",
+        "contributorChampion": "Prisidėjusiųjų čempiono kreditai",
+        "feedback": "Atsiliepimų kreditai",
+        "influencer": "Nuomonės formuotojo kreditai",
+        "ossMonthlyReset": "Atvirojo kodo kreditų atkūrimas kas mėnesį",
+        "ossSponsorship": "Atvirojo kodo rėmimo kreditai",
+        "pullRequest": "Pakeitimų užklausos kreditai",
+        "usageIssue": "Naudojimo problemos kreditai",
+        "vibeDay": "Vibe Day kreditai"
       },
       "purchaseFallback": "Kreditų pirkimas",
       "receipt": "Kvitas",

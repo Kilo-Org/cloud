@@ -4506,14 +4506,27 @@
       "deductionFallback": "Credit-Abzug",
       "emptyDescription": "Credit-Käufe, Belege und Nutzung werden hier angezeigt.",
       "emptyTitle": "Kein Credit-Verlauf",
+      "expiredGrant": "Abgelaufen: {{description}}",
       "googlePlayReceipt": "Beleg bei Google Play",
       "kind": {
         "adjustment": "Anpassung",
         "balanceNeutral": "Saldoneutral",
         "deduction": "Abzug",
         "grant": "Credit-Gutschrift",
+        "promotionalCredits": "Aktions-Credits",
         "welcomeCredits": "Willkommens-Credits",
         "purchase": "Kauf"
+      },
+      "program": {
+        "adminBulkGrant": "Admin-Credit-Gutschrift",
+        "contributorChampion": "Credits für Beitrags-Champions",
+        "feedback": "Feedback-Credits",
+        "influencer": "Influencer-Credits",
+        "ossMonthlyReset": "Monatliches Zurücksetzen des Open-Source-Guthabens",
+        "ossSponsorship": "Credits für Open-Source-Förderung",
+        "pullRequest": "Pull-Request-Credits",
+        "usageIssue": "Credits für Nutzungsprobleme",
+        "vibeDay": "Vibe-Day-Credits"
       },
       "purchaseFallback": "Credit-Kauf",
       "receipt": "Beleg",

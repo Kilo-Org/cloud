@@ -4506,14 +4506,27 @@
       "deductionFallback": "Ìyọkúrò kírẹ́dítì",
       "emptyDescription": "Àwọn ìrajà kírẹ́dítì, ìwé ẹ̀rí ìsanwó, àti ìlò yóò hàn níbí.",
       "emptyTitle": "Kò sí ìtàn kírẹ́dítì",
+      "expiredGrant": "Àkókò ti kọjá: {{description}}",
       "googlePlayReceipt": "Ìwé ẹ̀rí ìsanwó láti Google Play",
       "kind": {
         "adjustment": "Àtúnṣe",
         "balanceNeutral": "Kò yí ìyókù padà",
         "deduction": "Ìyọkúrò",
         "grant": "Ẹ̀bùn kírẹ́dítì",
+        "promotionalCredits": "Kírẹ́dítì ìpolówó",
         "welcomeCredits": "Kírẹ́dítì ìkáàbọ̀",
         "purchase": "Ìrajà"
+      },
+      "program": {
+        "adminBulkGrant": "Ẹ̀bùn kírẹ́dítì alákòóso",
+        "contributorChampion": "Kírẹ́dítì akíkanjú olùkópa",
+        "feedback": "Kírẹ́dítì èsì",
+        "influencer": "Kírẹ́dítì onípa",
+        "ossMonthlyReset": "Àtúntò oṣooṣù OSS",
+        "ossSponsorship": "Kírẹ́dítì ìgbọ́wọ́ OSS",
+        "pullRequest": "Kírẹ́dítì ìbéèrè àkópọ̀",
+        "usageIssue": "Kírẹ́dítì ìṣòro lílò",
+        "vibeDay": "Kírẹ́dítì Vibe day"
       },
       "purchaseFallback": "Ìrajà kírẹ́dítì",
       "receipt": "Ìwé ẹ̀rí ìsanwó",

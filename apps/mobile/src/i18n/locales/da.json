@@ -4506,14 +4506,27 @@
       "deductionFallback": "Kreditfradrag",
       "emptyDescription": "Kreditkøb, kvitteringer og forbrug vises her.",
       "emptyTitle": "Ingen kredithistorik",
+      "expiredGrant": "Udløbet: {{description}}",
       "googlePlayReceipt": "Kvittering fra Google Play",
       "kind": {
         "adjustment": "Justering",
         "balanceNeutral": "Saldoneutral",
         "deduction": "Fradrag",
         "grant": "Tildelt kredit",
+        "promotionalCredits": "Kampagnekreditter",
         "welcomeCredits": "Velkomstkredit",
         "purchase": "Køb"
+      },
+      "program": {
+        "adminBulkGrant": "Administratorkredittildeling",
+        "contributorChampion": "Topbidragsyderkredit",
+        "feedback": "Feedbackkredit",
+        "influencer": "Influencerkredit",
+        "ossMonthlyReset": "Nulstilling af sponsorat af åben kildekode",
+        "ossSponsorship": "Kredit for sponsorat af åben kildekode",
+        "pullRequest": "PR-kredit",
+        "usageIssue": "Kredit for forbrugsproblem",
+        "vibeDay": "Vibe day-kredit"
       },
       "purchaseFallback": "Kreditkøb",
       "receipt": "Kvittering",

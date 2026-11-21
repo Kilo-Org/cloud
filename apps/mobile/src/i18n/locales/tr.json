@@ -4506,14 +4506,27 @@
       "deductionFallback": "Kredi düşümü",
       "emptyDescription": "Kredi satın alımları, makbuzlar ve kullanım burada görünecek.",
       "emptyTitle": "Kredi geçmişi yok",
+      "expiredGrant": "Süresi doldu: {{description}}",
       "googlePlayReceipt": "Makbuz Google Play'de",
       "kind": {
         "adjustment": "Düzeltme",
         "balanceNeutral": "Bakiyeyi etkilemez",
         "deduction": "Düşüm",
         "grant": "Kredi hediyesi",
+        "promotionalCredits": "Promosyon kredileri",
         "welcomeCredits": "Hoş geldin kredisi",
         "purchase": "Satın alım"
+      },
+      "program": {
+        "adminBulkGrant": "Yönetici tarafından verilen kredi",
+        "contributorChampion": "Katkı şampiyonu kredisi",
+        "feedback": "Geri bildirim kredisi",
+        "influencer": "Etkileyici kredisi",
+        "ossMonthlyReset": "Açık kaynak sponsorluğu aylık sıfırlaması",
+        "ossSponsorship": "Açık kaynak sponsorluk kredisi",
+        "pullRequest": "Çekme isteği kredisi",
+        "usageIssue": "Kullanım sorunu kredisi",
+        "vibeDay": "Vibe day kredisi"
       },
       "purchaseFallback": "Kredi satın alımı",
       "receipt": "Makbuz",

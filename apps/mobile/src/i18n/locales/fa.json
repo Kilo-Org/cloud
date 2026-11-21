@@ -4506,14 +4506,27 @@
       "deductionFallback": "کسر اعتبار",
       "emptyDescription": "خریدهای اعتبار، رسیدها و مصرف در اینجا نمایش داده می‌شوند.",
       "emptyTitle": "تاریخچهٔ اعتباری وجود ندارد",
+      "expiredGrant": "منقضی شد: {{description}}",
       "googlePlayReceipt": "رسید از Google Play",
       "kind": {
         "adjustment": "اصلاحیه",
         "balanceNeutral": "بدون تأثیر بر موجودی",
         "deduction": "کسر",
         "grant": "اعطای اعتبار",
+        "promotionalCredits": "اعتبار ترویجی",
         "welcomeCredits": "اعتبار خوش‌آمد",
         "purchase": "خرید"
+      },
+      "program": {
+        "adminBulkGrant": "اعطای اعتبار توسط مدیر",
+        "contributorChampion": "اعتبار قهرمان مشارکت‌کنندگان",
+        "feedback": "اعتبار بازخورد",
+        "influencer": "اعتبار اینفلوئنسر",
+        "ossMonthlyReset": "بازنشانی حمایت مالی متن‌باز",
+        "ossSponsorship": "اعتبار حمایت مالی متن‌باز",
+        "pullRequest": "اعتبار پول ریکوئست",
+        "usageIssue": "اعتبار مشکل مصرف",
+        "vibeDay": "اعتبار روز وایب"
       },
       "purchaseFallback": "خرید اعتبار",
       "receipt": "رسید",

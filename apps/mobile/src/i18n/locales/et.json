@@ -4506,14 +4506,27 @@
       "deductionFallback": "Krediidi mahaarvamine",
       "emptyDescription": "Krediidiostud, kviitungid ja kasutus kuvatakse siin.",
       "emptyTitle": "Krediitide ajalugu puudub",
+      "expiredGrant": "Aegunud: {{description}}",
       "googlePlayReceipt": "Kviitung Google Playst",
       "kind": {
         "adjustment": "Korrigeerimine",
         "balanceNeutral": "Saldot ei mõjuta",
         "deduction": "Mahaarvamine",
         "grant": "Tasuta krediit",
+        "promotionalCredits": "Kampaaniakrediit",
         "welcomeCredits": "Tervituskrediit",
         "purchase": "Ost"
+      },
+      "program": {
+        "adminBulkGrant": "Administraatori krediidieraldis",
+        "contributorChampion": "Panustajate šempionikrediit",
+        "feedback": "Tagasisidekrediit",
+        "influencer": "Influencer'i krediit",
+        "ossMonthlyReset": "OSS-i igakuine lähtestamine",
+        "ossSponsorship": "OSS-toetuskrediit",
+        "pullRequest": "Tõmbetaotluse krediit",
+        "usageIssue": "Kasutusprobleemi krediit",
+        "vibeDay": "Vibe day krediit"
       },
       "purchaseFallback": "Krediidiost",
       "receipt": "Kviitung",

@@ -188,7 +188,30 @@
     "privateRepositoryA11y": "{{name}}, zasebno skladišče",
     "legalDocumentEnglishOnly": "Ta dokument je na voljo samo v angleščini.",
     "organizationTrialEndedBilling": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Obračun lahko posodobiš, nato poskusi znova.",
-    "organizationTrialEndedBillingAtKiloAi": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Obračun lahko posodobiš na kilo.ai, nato poskusi znova."
+    "organizationTrialEndedBillingAtKiloAi": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Obračun lahko posodobiš na kilo.ai, nato poskusi znova.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Alineja",
+        "nestedBulletPoint": "Gnezdena alineja",
+        "orderedItem": "Element seznama {n}",
+        "nestedOrderedItem": "Gnezdeni element seznama {n}"
+      },
+      "blockquote": {
+        "quote": "Citat",
+        "nestedQuote": "Gnezdeni citat"
+      },
+      "table": {
+        "row": "Vrstica {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Naslovi",
+        "links": "Povezave",
+        "images": "Slike"
+      }
+    }
   },
   "language": {
     "restarting": "Ponovni zagon za spremembo jezika",
@@ -507,6 +530,14 @@
       "nextStepAppeal": "Izid pritožbe bo prikazan na tem zaslonu.",
       "nextStepFinal": "Odločitev o pritožbi je dokončna. Pritožbe ni več mogoče oddati.",
       "viewReceipt": "Prikaži potrdilo"
+    },
+    "reportReceipts": {
+      "title": "Prijave",
+      "rowSubtitle": "Prijave, ki si jih oddal, in njihovi izidi",
+      "emptyTitle": "Ni še nobene prijave",
+      "emptyDescription": "Prijave, ki jih oddaš iz komentarja ali odgovora AI, se prikažejo tukaj.",
+      "couldNotLoad": "Tvojih prijav ni bilo mogoče naložiti",
+      "capped": "Prikazane so tvoje najnovejše prijave."
     },
     "changelog": "Kaj je novega",
     "changelogVersionPending": "Opombe za različico {{version}} prinese naslednja posodobitev aplikacije.",
@@ -4316,7 +4347,7 @@
     "personalDefaultDescription": "Samodejno naloženo, ko nobeno skladišče nima pripetega profila.",
     "organizationDefaultDescription": "Samodejno naloženo za člane, ki nimajo osebne privzete vrednosti.",
     "setAsDefault": "Nastavi kot privzeto",
-    "saveFailed": "Profila ni bilo mogoče shraniti",
+    "saveFailed": "Profila ni bilo mogoče shraniti. Poskusite znova.",
     "organizationRoleRequired": "Profile organizacije lahko spremenijo samo lastniki organizacije in skrbniki.",
     "deleteTitle": "Izbriši profil",
     "deleteMessage": "S tem trajno odstranite profil in njegove nastavitve. Tega ni mogoče razveljaviti.",

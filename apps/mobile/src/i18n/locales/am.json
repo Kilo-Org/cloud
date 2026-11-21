@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "ይህ ሰነድ በእንግሊዝኛ ብቻ ይገኛል።",
     "organizationTrialEndedBilling": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም። የክፍያ መረጃን ማዘመን ይችላሉ፣ ከዚያ እንደገና ይሞክሩ።",
     "organizationTrialEndedBillingAtKiloAi": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም። በkilo.ai ላይ የክፍያ መረጃን ማዘመን ይችላሉ፣ ከዚያ እንደገና ይሞክሩ።",
-    "viewOnGitHub": "PRን በGitHub እይ"
+    "viewOnGitHub": "PRን በGitHub እይ",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "የዝርዝር ነጥብ",
+        "nestedBulletPoint": "የጎጆ ዝርዝር ነጥብ",
+        "orderedItem": "የዝርዝር ንጥል {n}",
+        "nestedOrderedItem": "የጎጆ ዝርዝር ንጥል {n}"
+      },
+      "blockquote": {
+        "quote": "ጥቅስ",
+        "nestedQuote": "የጎጆ ጥቅስ"
+      },
+      "table": {
+        "row": "ረድፍ {n}፦ {content}"
+      },
+      "math": {
+        "equation": "ሒሳብ፦ {latex}"
+      },
+      "rotor": {
+        "headings": "አርዕስቶች",
+        "links": "አገናኞች",
+        "images": "ምስሎች"
+      }
+    }
   },
   "language": {
     "restarting": "ቋንቋውን ለመቀየር እንደገና በመጀመር ላይ",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "የይግባኝዎ ውጤት በዚህ ማያ ላይ ይታያል።",
       "nextStepFinal": "የይግባኙ ውሳኔ የመጨረሻ ነው። ተጨማሪ ይግባኝ ማቅረብ አይቻልም።",
       "viewReceipt": "ደረሰኙን ይመልከቱ"
+    },
+    "reportReceipts": {
+      "title": "ሪፖርቶች",
+      "rowSubtitle": "ያቀረቧቸው ሪፖርቶች እና ውጤቶቻቸው",
+      "emptyTitle": "እስካሁን ምንም ሪፖርት የለም",
+      "emptyDescription": "ከአስተያየት ወይም ከ AI ምላሽ የሚያቀርቧቸው ሪፖርቶች እዚህ ይታያሉ።",
+      "couldNotLoad": "ሪፖርቶችዎን መጫን አልተቻለም",
+      "capped": "የቅርብ ጊዜ ሪፖርቶችዎን ያሳያል።"
     },
     "changelog": "አዲስ ነገር",
     "changelogVersionPending": "የስሪት {{version}} ማስታወሻዎች ከሚቀጥለው የመተግበሪያ ዝማኔ ጋር ይመጣሉ።",
@@ -4176,7 +4207,7 @@
     "personalDefaultDescription": "ምንም ማከማቻ የተሰካ መገለጫ ከሌለው በራስ-ሰር የሚጫን።",
     "organizationDefaultDescription": "ምንም የግል ነባሪ ለሌላቸው አባላት በራስ-የተጫነ።",
     "setAsDefault": "እንደ ነባሪ አዘጋጅ",
-    "saveFailed": "መገለጫ ማስቀመጥ አልተቻለም",
+    "saveFailed": "መገለጫ ማስቀመጥ አልተቻለም። እንደገና ሞክር።",
     "organizationRoleRequired": "የድርጅት መገለጫዎችን መቀየር የሚችሉት የድርጅት ባለቤቶች እና አስተዳዳሪዎች ብቻ ናቸው።",
     "deleteTitle": "መገለጫን ሰርዝ",
     "deleteMessage": "ይሄ መገለጫውን እና ቅንብሮቹን እስከመጨረሻው ያስወግዳል። ይህ ሊቀለበስ አይችልም።",

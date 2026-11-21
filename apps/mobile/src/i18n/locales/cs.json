@@ -188,7 +188,30 @@
     "legalDocumentEnglishOnly": "Tento dokument je k dispozici pouze v angličtině.",
     "organizationTrialEndedBilling": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Fakturaci můžete aktualizovat a poté to zkuste znovu.",
     "organizationTrialEndedBillingAtKiloAi": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Fakturaci můžete aktualizovat na kilo.ai a poté to zkuste znovu.",
-    "viewOnGitHub": "Zobrazit PR na GitHubu"
+    "viewOnGitHub": "Zobrazit PR na GitHubu",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Odrážka",
+        "nestedBulletPoint": "Vnořená odrážka",
+        "orderedItem": "Položka seznamu {n}",
+        "nestedOrderedItem": "Vnořená položka seznamu {n}"
+      },
+      "blockquote": {
+        "quote": "Citace",
+        "nestedQuote": "Vnořená citace"
+      },
+      "table": {
+        "row": "Řádek {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Nadpisy",
+        "links": "Odkazy",
+        "images": "Obrázky"
+      }
+    }
   },
   "language": {
     "restarting": "Aplikace se restartuje kvůli změně jazyka",
@@ -507,6 +530,14 @@
       "nextStepAppeal": "Výsledek vašeho odvolání se zobrazí na této obrazovce.",
       "nextStepFinal": "Rozhodnutí o odvolání je konečné. Další odvolání již nelze podat.",
       "viewReceipt": "Zobrazit potvrzení"
+    },
+    "reportReceipts": {
+      "title": "Nahlášení",
+      "rowSubtitle": "Vámi podaná nahlášení a jejich výsledky",
+      "emptyTitle": "Zatím žádná nahlášení",
+      "emptyDescription": "Nahlášení, která podáte z komentáře nebo z odpovědi AI, se zobrazí zde.",
+      "couldNotLoad": "Nepodařilo se načíst vaše nahlášení",
+      "capped": "Zobrazují se vaše nejnovější nahlášení."
     },
     "changelog": "Co je nového",
     "changelogVersionPending": "Poznámky k verzi {{version}} přijdou s další aktualizací aplikace.",
@@ -4316,7 +4347,7 @@
     "personalDefaultDescription": "Automaticky načteno, když žádné úložiště nemá připnutý profil.",
     "organizationDefaultDescription": "Automaticky načteno pro členy, kteří nemají žádné osobní výchozí nastavení.",
     "setAsDefault": "Nastavit jako výchozí",
-    "saveFailed": "Profil se nepodařilo uložit",
+    "saveFailed": "Profil se nepodařilo uložit. Zkuste to znovu.",
     "organizationRoleRequired": "Profily organizace mohou měnit pouze vlastníci organizace a správci.",
     "deleteTitle": "Smazat profil",
     "deleteMessage": "Tím se profil a jeho nastavení trvale odstraní. Toto nelze vrátit zpět.",

@@ -187,7 +187,30 @@
     "legalDocumentEnglishOnly": "Ovaj je dokument dostupan samo na engleskom jeziku.",
     "organizationTrialEndedBilling": "Probno razdoblje organizacije je završilo i organizacija nema aktivan plan. Možete ažurirati naplatu i zatim pokušati ponovno.",
     "organizationTrialEndedBillingAtKiloAi": "Probno razdoblje organizacije je završilo i organizacija nema aktivan plan. Možete ažurirati naplatu na kilo.ai i zatim pokušati ponovno.",
-    "viewOnGitHub": "Pogledaj PR na GitHubu"
+    "viewOnGitHub": "Pogledaj PR na GitHubu",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Točka popisa",
+        "nestedBulletPoint": "Ugniježđena točka popisa",
+        "orderedItem": "Stavka popisa {n}",
+        "nestedOrderedItem": "Ugniježđena stavka popisa {n}"
+      },
+      "blockquote": {
+        "quote": "Citat",
+        "nestedQuote": "Ugniježđeni citat"
+      },
+      "table": {
+        "row": "Redak {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Naslovi",
+        "links": "Poveznice",
+        "images": "Slike"
+      }
+    }
   },
   "language": {
     "restarting": "Ponovno pokretanje radi promjene jezika",
@@ -506,6 +529,14 @@
       "nextStepAppeal": "Ishod žalbe bit će prikazan na ovom zaslonu.",
       "nextStepFinal": "Odluka o žalbi je konačna. Žalba se više ne može podnijeti.",
       "viewReceipt": "Prikaži potvrdu"
+    },
+    "reportReceipts": {
+      "title": "Prijave",
+      "rowSubtitle": "Prijave koje ste podnijeli i njihovi ishodi",
+      "emptyTitle": "Još nema prijava",
+      "emptyDescription": "Prijave koje podnesete na komentar ili AI odgovor pojavljuju se ovdje.",
+      "couldNotLoad": "Nije moguće učitati vaše prijave",
+      "capped": "Prikazuju se vaše najnovije prijave."
     },
     "changelog": "Novosti",
     "changelogVersionPending": "Novosti verzije {{version}} stižu s idućim ažuriranjem aplikacije.",
@@ -4246,7 +4277,7 @@
     "personalDefaultDescription": "Automatski se učitava kada nijedno spremište nema zakačen profil.",
     "organizationDefaultDescription": "Automatski se učitava za članove koji nemaju osobne zadane postavke.",
     "setAsDefault": "Postavi kao zadano",
-    "saveFailed": "Nije moguće spremiti profil",
+    "saveFailed": "Nije moguće spremiti profil. Pokušajte ponovno.",
     "organizationRoleRequired": "Samo vlasnici organizacije i administratori mogu promijeniti profil organizacije.",
     "deleteTitle": "Izbriši profil",
     "deleteMessage": "Ovo trajno uklanja profil i njegove postavke. Ovo se ne može poništiti.",

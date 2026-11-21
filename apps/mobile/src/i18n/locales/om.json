@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Dokumentiin kun Afaan Ingiliffaan qofa argama.",
     "organizationTrialEndedBilling": "Yeroon yaalii dhaabbataa xumurameera, karoora socho'aa hin qabu. Kaffaltii haaromsuu danda'aa, sana booda irra deebi'ii yaali.",
     "organizationTrialEndedBillingAtKiloAi": "Yeroon yaalii dhaabbataa xumurameera, karoora socho'aa hin qabu. Kaffaltii kilo.ai irratti haaromsuu danda'aa, sana booda irra deebi'ii yaali.",
-    "viewOnGitHub": "PR GitHub irratti ilaali"
+    "viewOnGitHub": "PR GitHub irratti ilaali",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Tuqaa tarree",
+        "nestedBulletPoint": "Tuqaa tarree keessaa",
+        "orderedItem": "Qabiyyee tarree {n}",
+        "nestedOrderedItem": "Qabiyyee tarree keessaa {n}"
+      },
+      "blockquote": {
+        "quote": "Wabii",
+        "nestedQuote": "Wabii keessaa"
+      },
+      "table": {
+        "row": "Tarree {n}: {content}"
+      },
+      "math": {
+        "equation": "Herrega: {latex}"
+      },
+      "rotor": {
+        "headings": "Mata dureewwan",
+        "links": "Liinkiiwwan",
+        "images": "Suuraawwan"
+      }
+    }
   },
   "language": {
     "restarting": "Afaan filatame fayyadamuuf irra deebi'ee jalqabaa jira",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Bu'aan ol'iyyannoo kee fuula kana irratti mul'ata.",
       "nextStepFinal": "Murteen ol'iyyannoo kan dhumaa dha. Ol'iyyannoon biraa ergamuu hin danda'u.",
       "viewReceipt": "Ragaa ilaali"
+    },
+    "reportReceipts": {
+      "title": "Gabaasoota",
+      "rowSubtitle": "Gabaasoota ati galmeessite fi bu'aawwan isaanii",
+      "emptyTitle": "Gabaasni ammas hin jiru",
+      "emptyDescription": "Gabaasni yaada irraa yookaan deebii AI irraa ati galmeessitu asitti mul'ata.",
+      "couldNotLoad": "Gabaasoota kee fe'uu hin dandeenye",
+      "capped": "Gabaasoota kee haaraa agarsiisaa jira."
     },
     "changelog": "Waan haaraa",
     "changelogVersionPending": "Yaadannoon {{version}} haaromsa appii itti aanu waliin dhufa.",
@@ -4176,7 +4207,7 @@
     "personalDefaultDescription": "Yeroo kuusaan tokkollee piroofaayilii pinned hin qabne ofumaan fe'ama.",
     "organizationDefaultDescription": "Miseensoota durtii dhuunfaa hin qabneef ofumaan fe'ameera.",
     "setAsDefault": "Akka durtiitti saagi",
-    "saveFailed": "Profaayilii qusachuu hin dandeenye",
+    "saveFailed": "Profaayilii qusachuu hin dandeenye. Irra deebi'ii yaali.",
     "organizationRoleRequired": "Abbootiin dhaabbataa fi bulchitootaa qofa profaayilii dhaabbataa jiijjiiruu danda'u.",
     "deleteTitle": "Profaayilii haquu",
     "deleteMessage": "Kunis dhaabbataadhaan piroofaayilii fi qindaa'inoota isaa ni haqa. Kun duubatti deebi’uu hin danda’u.",

@@ -21,7 +21,7 @@ export function SaveProfileSheetFixture() {
       onClose={() => {
         router.back();
       }}
-      onSave={() => Promise.resolve(false)}
+      onSave={() => Promise.resolve({ saved: false, refusal: null })}
     />
   );
 }

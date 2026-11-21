@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}, özel depo",
     "legalDocumentEnglishOnly": "Bu belge yalnızca İngilizce olarak mevcuttur.",
     "organizationTrialEndedBilling": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. Faturalandırmayı güncelleyip ardından tekrar deneyebilirsin.",
-    "organizationTrialEndedBillingAtKiloAi": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. kilo.ai adresinden faturalandırmayı güncelleyip ardından tekrar deneyebilirsin."
+    "organizationTrialEndedBillingAtKiloAi": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. kilo.ai adresinden faturalandırmayı güncelleyip ardından tekrar deneyebilirsin.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Madde işareti",
+        "nestedBulletPoint": "İç içe madde işareti",
+        "orderedItem": "Liste öğesi {n}",
+        "nestedOrderedItem": "İç içe liste öğesi {n}"
+      },
+      "blockquote": {
+        "quote": "Alıntı",
+        "nestedQuote": "İç içe alıntı"
+      },
+      "table": {
+        "row": "Satır {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematik: {latex}"
+      },
+      "rotor": {
+        "headings": "Başlıklar",
+        "links": "Bağlantılar",
+        "images": "Görseller"
+      }
+    }
   },
   "language": {
     "restarting": "Dil değişikliğini uygulamak için yeniden başlatılıyor",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "İtiraz sonucu bu ekranda görünecek.",
       "nextStepFinal": "İtiraz kararı kesindir. Başka itiraz gönderilemez.",
       "viewReceipt": "Alındıyı görüntüle"
+    },
+    "reportReceipts": {
+      "title": "Raporlar",
+      "rowSubtitle": "Gönderdiğiniz raporlar ve sonuçları",
+      "emptyTitle": "Henüz rapor yok",
+      "emptyDescription": "Bir yorumdan veya bir yapay zeka yanıtından gönderdiğiniz raporlar burada görünür.",
+      "couldNotLoad": "Raporlarınız yüklenemedi",
+      "capped": "En son raporlarınız gösteriliyor."
     },
     "changelog": "Yenilikler",
     "changelogVersionPending": "{{version}} sürümünün notları sonraki uygulama güncellemesiyle gelir.",
@@ -4176,7 +4207,7 @@
     "personalDefaultDescription": "Hiçbir deponun sabitlenmiş profili olmadığında otomatik olarak yüklenir.",
     "organizationDefaultDescription": "Kişisel varsayılanı olmayan üyeler için otomatik olarak yüklenir.",
     "setAsDefault": "Varsayılan olarak ayarla",
-    "saveFailed": "Profil kaydedilemedi",
+    "saveFailed": "Profil kaydedilemedi. Tekrar deneyin.",
     "organizationRoleRequired": "Kuruluş profillerini yalnızca kuruluş sahipleri ve yöneticiler değiştirebilir.",
     "deleteTitle": "Profili sil",
     "deleteMessage": "Bu, profili ve ayarlarını kalıcı olarak kaldırır. Bu geri alınamaz.",

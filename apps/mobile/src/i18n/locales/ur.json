@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}، نجی ریپوزٹری",
     "legalDocumentEnglishOnly": "یہ دستاویز صرف انگریزی میں دستیاب ہے۔",
     "organizationTrialEndedBilling": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ آپ بلنگ اپ ڈیٹ کر سکتے ہیں، پھر دوبارہ کوشش کریں۔",
-    "organizationTrialEndedBillingAtKiloAi": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ آپ kilo.ai پر بلنگ اپ ڈیٹ کر سکتے ہیں، پھر دوبارہ کوشش کریں۔"
+    "organizationTrialEndedBillingAtKiloAi": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ آپ kilo.ai پر بلنگ اپ ڈیٹ کر سکتے ہیں، پھر دوبارہ کوشش کریں۔",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "فہرست نقطہ",
+        "nestedBulletPoint": "نیسٹڈ فہرست نقطہ",
+        "orderedItem": "فہرست آئٹم {n}",
+        "nestedOrderedItem": "نیسٹڈ فہرست آئٹم {n}"
+      },
+      "blockquote": {
+        "quote": "اقتباس",
+        "nestedQuote": "نیسٹڈ اقتباس"
+      },
+      "table": {
+        "row": "قطار {n}: {content}"
+      },
+      "math": {
+        "equation": "ریاضی: {latex}"
+      },
+      "rotor": {
+        "headings": "سرخیاں",
+        "links": "لنک",
+        "images": "تصاویر"
+      }
+    }
   },
   "language": {
     "restarting": "منتخب زبان لاگو کرنے کے لیے ایپ دوبارہ شروع ہو رہی ہے",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "اپیل کا نتیجہ اس اسکرین پر نظر آئے گا۔",
       "nextStepFinal": "اپیل کا فیصلہ حتمی ہے۔ مزید کوئی اپیل جمع نہیں کرائی جا سکتی۔",
       "viewReceipt": "رسید دیکھیں"
+    },
+    "reportReceipts": {
+      "title": "رپورٹس",
+      "rowSubtitle": "آپ کی جمع کرائی گئی رپورٹس اور ان کے نتائج",
+      "emptyTitle": "ابھی کوئی رپورٹ نہیں",
+      "emptyDescription": "تبصرے یا AI جواب سے آپ کی جمع کرائی گئی رپورٹس یہاں نظر آئیں گی۔",
+      "couldNotLoad": "آپ کی رپورٹس لوڈ نہیں ہو سکیں",
+      "capped": "آپ کی حالیہ ترین رپورٹس دکھائی جا رہی ہیں۔"
     },
     "changelog": "نیا کیا ہے",
     "changelogVersionPending": "ورژن {{version}} کے نوٹس ایپ کی اگلی اپ ڈیٹ کے ساتھ آئیں گے۔",
@@ -4176,7 +4207,7 @@
     "personalDefaultDescription": "جب کسی ریپوزٹری میں پن شدہ پروفائل نہ ہو تو خودکار طور پر لوڈ ہوتا ہے۔",
     "organizationDefaultDescription": "ان اراکین کے لیے خودکار طور پر لوڈ کیا گیا جن کا کوئی ذاتی ڈیفالٹ نہیں ہے۔",
     "setAsDefault": "بطور ڈیفالٹ سیٹ کریں۔",
-    "saveFailed": "پروفائل محفوظ نہیں ہو سکا",
+    "saveFailed": "پروفائل کو محفوظ نہیں کیا جا سکا۔ دوبارہ کوشش کریں۔",
     "organizationRoleRequired": "صرف تنظیم کے مالک اور منتظم تنظیم کی پروفائل بدل سکتے ہیں۔",
     "deleteTitle": "پروفائل حذف کریں۔",
     "deleteMessage": "یہ پروفائل اور اس کی ترتیبات کو مستقل طور پر ہٹا دیتا ہے۔ اسے کالعدم نہیں کیا جا سکتا۔",

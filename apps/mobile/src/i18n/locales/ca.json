@@ -187,7 +187,30 @@
     "legalDocumentEnglishOnly": "Aquest document només està disponible en anglès.",
     "organizationTrialEndedBilling": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. Pots actualitzar la facturació i tornar-ho a provar.",
     "organizationTrialEndedBillingAtKiloAi": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. Pots actualitzar la facturació a kilo.ai i tornar-ho a provar.",
-    "viewOnGitHub": "Mostra la PR a GitHub"
+    "viewOnGitHub": "Mostra la PR a GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Punt de llista",
+        "nestedBulletPoint": "Punt de llista niuat",
+        "orderedItem": "Element de la llista {n}",
+        "nestedOrderedItem": "Element de la llista niuat {n}"
+      },
+      "blockquote": {
+        "quote": "Cita",
+        "nestedQuote": "Cita niuada"
+      },
+      "table": {
+        "row": "Fila {n}: {content}"
+      },
+      "math": {
+        "equation": "Matemàtiques: {latex}"
+      },
+      "rotor": {
+        "headings": "Encapçalaments",
+        "links": "Enllaços",
+        "images": "Imatges"
+      }
+    }
   },
   "language": {
     "restarting": "S'està reiniciant per aplicar l'idioma",
@@ -506,6 +529,14 @@
       "nextStepAppeal": "El resultat de la teva apel·lació apareixerà en aquesta pantalla.",
       "nextStepFinal": "La decisió de l'apel·lació és definitiva. No es pot presentar cap altra apel·lació.",
       "viewReceipt": "Mostra el comprovant"
+    },
+    "reportReceipts": {
+      "title": "Denúncies",
+      "rowSubtitle": "Les denúncies que has presentat i els seus resultats",
+      "emptyTitle": "Encara no hi ha denúncies",
+      "emptyDescription": "Les denúncies que presentis des d'un comentari o d'una resposta d'IA apareixeran aquí.",
+      "couldNotLoad": "No s'han pogut carregar les teves denúncies",
+      "capped": "Es mostren les teves denúncies més recents."
     },
     "changelog": "Novetats",
     "changelogVersionPending": "Les notes de la versió {{version}} arribaran amb la propera actualització de l'app.",
@@ -4246,7 +4277,7 @@
     "personalDefaultDescription": "Es carrega automàticament quan cap dipòsit té un perfil fixat.",
     "organizationDefaultDescription": "Es carrega automàticament per als membres que no tenen cap predeterminat personal.",
     "setAsDefault": "Estableix com a predeterminat",
-    "saveFailed": "No s'ha pogut desar el perfil",
+    "saveFailed": "No s'ha pogut desar el perfil. Torna-ho a provar.",
     "organizationRoleRequired": "Només els propietaris i els administradors de l'organització poden canviar els perfils de l'organització.",
     "deleteTitle": "Suprimeix el perfil",
     "deleteMessage": "Això elimina permanentment el perfil i la seva configuració. Això no es pot desfer.",

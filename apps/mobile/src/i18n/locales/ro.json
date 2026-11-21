@@ -187,7 +187,30 @@
     "privateRepositoryA11y": "{{name}}, repository privat",
     "legalDocumentEnglishOnly": "Acest document este disponibil doar în engleză.",
     "organizationTrialEndedBilling": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Poți actualiza facturarea, apoi poți încerca din nou.",
-    "organizationTrialEndedBillingAtKiloAi": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Poți actualiza facturarea pe kilo.ai, apoi poți încerca din nou."
+    "organizationTrialEndedBillingAtKiloAi": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Poți actualiza facturarea pe kilo.ai, apoi poți încerca din nou.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Marcator",
+        "nestedBulletPoint": "Marcator imbricat",
+        "orderedItem": "Element de listă {n}",
+        "nestedOrderedItem": "Element de listă imbricat {n}"
+      },
+      "blockquote": {
+        "quote": "Citat",
+        "nestedQuote": "Citat imbricat"
+      },
+      "table": {
+        "row": "Rând {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematică: {latex}"
+      },
+      "rotor": {
+        "headings": "Titluri",
+        "links": "Legături",
+        "images": "Imagini"
+      }
+    }
   },
   "language": {
     "restarting": "Se repornește aplicația pentru a schimba limba",
@@ -506,6 +529,14 @@
       "nextStepAppeal": "Rezultatul contestației va apărea pe acest ecran.",
       "nextStepFinal": "Decizia privind contestația este definitivă. Nu se mai poate depune nicio contestație.",
       "viewReceipt": "Vezi confirmarea"
+    },
+    "reportReceipts": {
+      "title": "Raportări",
+      "rowSubtitle": "Raportările trimise de tine și rezultatele lor",
+      "emptyTitle": "Nicio raportare încă",
+      "emptyDescription": "Raportările pe care le trimiți dintr-un comentariu sau dintr-un răspuns AI apar aici.",
+      "couldNotLoad": "Nu am putut încărca raportările tale",
+      "capped": "Sunt afișate cele mai recente raportări ale tale."
     },
     "changelog": "Noutăți",
     "changelogVersionPending": "Notele versiunii {{version}} vin cu următoarea actualizare a aplicației.",
@@ -4246,7 +4277,7 @@
     "personalDefaultDescription": "Se încarcă automat când niciun depozit nu are un profil fixat.",
     "organizationDefaultDescription": "Încărcat automat pentru membrii care nu au o valoare implicită personală.",
     "setAsDefault": "Setați ca implicit",
-    "saveFailed": "Profilul nu a putut fi salvat",
+    "saveFailed": "Nu s-a putut salva profilul. Încearcă din nou.",
     "organizationRoleRequired": "Doar proprietarii și administratorii organizației pot modifica profilurile organizației.",
     "deleteTitle": "Ștergeți profilul",
     "deleteMessage": "Acest lucru elimină definitiv profilul și setările acestuia. Acest lucru nu poate fi anulat.",

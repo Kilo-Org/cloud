@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "دا سند یوازې په انګلیسي ژبه کې د لاسرسي وړ دی.",
     "organizationTrialEndedBilling": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري. تاسو کولی شئ بیلنګ تازه کړئ، بیا یو ځل بیا هڅه وکړئ.",
     "organizationTrialEndedBillingAtKiloAi": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري. تاسو کولی شئ په kilo.ai کې بیلنګ تازه کړئ، بیا یو ځل بیا هڅه وکړئ.",
-    "viewOnGitHub": "PR په GitHub کې وګورئ"
+    "viewOnGitHub": "PR په GitHub کې وګورئ",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "د لېست ټکی",
+        "nestedBulletPoint": "دننه د لېست ټکی",
+        "orderedItem": "د لېست توکی {n}",
+        "nestedOrderedItem": "دننه د لېست توکی {n}"
+      },
+      "blockquote": {
+        "quote": "نقل",
+        "nestedQuote": "دننه نقل"
+      },
+      "table": {
+        "row": "قطار {n}: {content}"
+      },
+      "math": {
+        "equation": "ریاضی: {latex}"
+      },
+      "rotor": {
+        "headings": "سرلیکونه",
+        "links": "لینکونه",
+        "images": "انځورونه"
+      }
+    }
   },
   "language": {
     "restarting": "د ژبې د پلي کولو لپاره بیا پیلېږي",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "د استیناف پایله به په دې پرده کې ښکاره شي.",
       "nextStepFinal": "د استیناف پرېکړه قطعي ده. نور استیناف نه شي سپارل کېدای.",
       "viewReceipt": "رسید وګورئ"
+    },
+    "reportReceipts": {
+      "title": "راپورونه",
+      "rowSubtitle": "هغه راپورونه چې تاسو سپارلي دي او پایلې یې",
+      "emptyTitle": "لا هېڅ راپور نشته",
+      "emptyDescription": "هغه راپورونه چې تاسو له یوې تبصرې یا د AI له ځواب څخه سپارئ، دلته ښکاري.",
+      "couldNotLoad": "ستاسو راپورونه ونه لوستل شول",
+      "capped": "ستاسو تر ټولو وروستي راپورونه ښودل کېږي."
     },
     "changelog": "نوي بدلونونه",
     "changelogVersionPending": "د {{version}} نسخې یادښتونه د اپ له راتلونکي تازه کېدو سره راځي.",
@@ -4176,7 +4207,7 @@
     "personalDefaultDescription": "په اتوماتيک ډول بار شوی کله چې هیڅ زېرمتون پین شوی پروفایل نلري.",
     "organizationDefaultDescription": "د غړو لپاره په اتوماتيک ډول بار شوی څوک چې شخصي ډیفالټ نلري.",
     "setAsDefault": "د ډیفالټ په توګه تنظیم کړئ",
-    "saveFailed": "پروفایل خوندي نشو کړای",
+    "saveFailed": "پروفایل خوندي نه شو کړای. بیا هڅه وکړئ.",
     "organizationRoleRequired": "یوازې د سازمان مالکان او مدیران کولی شي د سازمان پروفایلونه بدله کړي.",
     "deleteTitle": "پروفایل ړنګ کړئ",
     "deleteMessage": "دا د تل لپاره پروفایل او د هغې تنظیمات لرې کوي. دا بېرته نه شي راګرځول کېدای.",

@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}, repozitor privat",
     "legalDocumentEnglishOnly": "Ky dokument është në dispozicion vetëm në anglisht.",
     "organizationTrialEndedBilling": "Periudha e provës e organizatës ka përfunduar dhe nuk ka asnjë plan aktiv. Ju mund të përditësoni faturimin dhe më pas të provoni përsëri.",
-    "organizationTrialEndedBillingAtKiloAi": "Periudha e provës e organizatës ka përfunduar dhe nuk ka asnjë plan aktiv. Ju mund të përditësoni faturimin në kilo.ai dhe më pas të provoni përsëri."
+    "organizationTrialEndedBillingAtKiloAi": "Periudha e provës e organizatës ka përfunduar dhe nuk ka asnjë plan aktiv. Ju mund të përditësoni faturimin në kilo.ai dhe më pas të provoni përsëri.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Pikë liste",
+        "nestedBulletPoint": "Pikë liste e mbivendosur",
+        "orderedItem": "Element liste {n}",
+        "nestedOrderedItem": "Element liste i mbivendosur {n}"
+      },
+      "blockquote": {
+        "quote": "Citat",
+        "nestedQuote": "Citat i mbivendosur"
+      },
+      "table": {
+        "row": "Rresht {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematikë: {latex}"
+      },
+      "rotor": {
+        "headings": "Titujt",
+        "links": "Lidhjet",
+        "images": "Imazhet"
+      }
+    }
   },
   "language": {
     "restarting": "Po riniset për të zbatuar ndryshimin e gjuhës",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Rezultati i apelimit do të shfaqet në këtë ekran.",
       "nextStepFinal": "Vendimi i apelimit është përfundimtar. Nuk mund të dërgohet asnjë apelim tjetër.",
       "viewReceipt": "Shiko dëftesën"
+    },
+    "reportReceipts": {
+      "title": "Raportet",
+      "rowSubtitle": "Raportet që ke paraqitur dhe rezultatet e tyre",
+      "emptyTitle": "Nuk ka raporte ende",
+      "emptyDescription": "Raportet që paraqit nga një koment ose një përgjigje AI shfaqen këtu.",
+      "couldNotLoad": "Raportet e tua nuk mund të ngarkoheshin",
+      "capped": "Po shfaqen raportet e tua më të fundit."
     },
     "changelog": "Çfarë ka të re",
     "changelogVersionPending": "Shënimet për versionin {{version}} vijnë me përditësimin e ardhshëm të aplikacionit.",
@@ -4176,7 +4207,7 @@
     "personalDefaultDescription": "Ngarkohet automatikisht kur asnjë depo nuk ka një profil të gozhduar.",
     "organizationDefaultDescription": "Ngarkohet automatikisht për anëtarët që nuk kanë parazgjedhje personale.",
     "setAsDefault": "Cakto si parazgjedhje",
-    "saveFailed": "Profili nuk mund të ruhej",
+    "saveFailed": "Profili nuk mund të ruhej. Provo përsëri.",
     "organizationRoleRequired": "Vetëm pronarët e organizatës dhe administratorët mund të ndryshojnë profilet e organizatës.",
     "deleteTitle": "Fshi profilin",
     "deleteMessage": "Kjo heq përgjithmonë profilin dhe cilësimet e tij. Kjo nuk mund të zhbëhet.",

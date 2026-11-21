@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Tämä asiakirja on saatavilla vain englanniksi.",
     "organizationTrialEndedBilling": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Voit päivittää laskutuksen ja yrittää sitten uudelleen.",
     "organizationTrialEndedBillingAtKiloAi": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Voit päivittää laskutuksen osoitteessa kilo.ai ja yrittää sitten uudelleen.",
-    "viewOnGitHub": "Katso PR GitHubissa"
+    "viewOnGitHub": "Katso PR GitHubissa",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Luettelomerkki",
+        "nestedBulletPoint": "Sisennetty luettelomerkki",
+        "orderedItem": "Luettelon kohta {n}",
+        "nestedOrderedItem": "Sisennetty luettelon kohta {n}"
+      },
+      "blockquote": {
+        "quote": "Lainaus",
+        "nestedQuote": "Sisennetty lainaus"
+      },
+      "table": {
+        "row": "Rivi {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematiikka: {latex}"
+      },
+      "rotor": {
+        "headings": "Otsikot",
+        "links": "Linkit",
+        "images": "Kuvat"
+      }
+    }
   },
   "language": {
     "restarting": "Käynnistetään uudelleen kielen vaihtamiseksi",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Valituksen lopputulos näkyy tällä näytöllä.",
       "nextStepFinal": "Valituspäätös on lopullinen. Uutta valitusta ei voi tehdä.",
       "viewReceipt": "Näytä kuitti"
+    },
+    "reportReceipts": {
+      "title": "Ilmoitukset",
+      "rowSubtitle": "Tekemäsi ilmoitukset ja niiden lopputulokset",
+      "emptyTitle": "Ei vielä ilmoituksia",
+      "emptyDescription": "Kommentista tai tekoälyvastauksesta tekemäsi ilmoitukset näkyvät tässä.",
+      "couldNotLoad": "Ilmoituksiasi ei voitu ladata",
+      "capped": "Näytetään uusimmat ilmoituksesi."
     },
     "changelog": "Mitä uutta",
     "changelogVersionPending": "Version {{version}} julkaisutiedot tulevat sovelluksen seuraavan päivityksen mukana.",
@@ -4176,7 +4207,7 @@
     "personalDefaultDescription": "Ladataan automaattisesti, kun missään koodivarastossa ei ole kiinnitettyä profiilia.",
     "organizationDefaultDescription": "Ladataan automaattisesti jäsenille, joilla ei ole henkilökohtaista oletusprofiilia.",
     "setAsDefault": "Aseta oletusprofiiliksi",
-    "saveFailed": "Profiilia ei voitu tallentaa",
+    "saveFailed": "Profiilia ei voitu tallentaa. Yritä uudelleen.",
     "organizationRoleRequired": "Vain organisaation omistajat ja ylläpitäjät voivat muuttaa organisaation profiilia.",
     "deleteTitle": "Poista profiili",
     "deleteMessage": "Tämä poistaa profiilin ja sen asetukset pysyvästi. Tätä ei voi kumota.",

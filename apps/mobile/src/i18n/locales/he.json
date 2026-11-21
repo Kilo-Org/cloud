@@ -187,7 +187,30 @@
     "legalDocumentEnglishOnly": "מסמך זה זמין באנגלית בלבד.",
     "organizationTrialEndedBilling": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. תוכל לעדכן את החיוב, ואז לנסות שוב.",
     "organizationTrialEndedBillingAtKiloAi": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. תוכל לעדכן את החיוב ב-kilo.ai, ואז לנסות שוב.",
-    "viewOnGitHub": "הצגת ה-PR ב-GitHub"
+    "viewOnGitHub": "הצגת ה-PR ב-GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "נקודת תבליט",
+        "nestedBulletPoint": "נקודת תבליט מקוננת",
+        "orderedItem": "פריט ברשימה {n}",
+        "nestedOrderedItem": "פריט מקונן ברשימה {n}"
+      },
+      "blockquote": {
+        "quote": "ציטוט",
+        "nestedQuote": "ציטוט מקונן"
+      },
+      "table": {
+        "row": "שורה {n}: {content}"
+      },
+      "math": {
+        "equation": "מתמטיקה: {latex}"
+      },
+      "rotor": {
+        "headings": "כותרות",
+        "links": "קישורים",
+        "images": "תמונות"
+      }
+    }
   },
   "language": {
     "restarting": "האפליקציה מופעלת מחדש לשינוי השפה",
@@ -506,6 +529,14 @@
       "nextStepAppeal": "תוצאת הערעור תופיע במסך זה.",
       "nextStepFinal": "החלטת הערעור סופית. לא ניתן להגיש ערעור נוסף.",
       "viewReceipt": "הצגת האישור"
+    },
+    "reportReceipts": {
+      "title": "דיווחים",
+      "rowSubtitle": "דיווחים שהגשת והתוצאות שלהם",
+      "emptyTitle": "אין עדיין דיווחים",
+      "emptyDescription": "דיווחים שתגיש מתגובה או מתשובת AI יופיעו כאן.",
+      "couldNotLoad": "לא ניתן לטעון את הדיווחים שלך",
+      "capped": "מוצגים הדיווחים האחרונים שלך."
     },
     "changelog": "מה חדש",
     "changelogVersionPending": "ההערות לגרסה {{version}} יגיעו עם עדכון האפליקציה הבא.",
@@ -4246,7 +4277,7 @@
     "personalDefaultDescription": "נטען אוטומטית כאשר לאף מאגר אין פרופיל מוצמד.",
     "organizationDefaultDescription": "נטען אוטומטית עבור חברים שאין להם ברירת מחדל אישית.",
     "setAsDefault": "הגדר כברירת מחדל",
-    "saveFailed": "לא ניתן לשמור את הפרופיל",
+    "saveFailed": "לא ניתן היה לשמור את הפרופיל. נסה שוב.",
     "organizationRoleRequired": "רק בעלי הארגון ומנהלים יכולים לשנות פרופילי ארגון.",
     "deleteTitle": "מחק את הפרופיל",
     "deleteMessage": "פעולה זו מסירה לצמיתות את הפרופיל ואת ההגדרות שלו. לא ניתן לבטל זאת.",

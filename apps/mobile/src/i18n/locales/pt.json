@@ -188,7 +188,30 @@
     "privateRepositoryA11y": "{{name}}, repositório privado",
     "legalDocumentEnglishOnly": "Este documento está disponível apenas em inglês.",
     "organizationTrialEndedBilling": "O período de teste da organização terminou e esta não tem um plano ativo. Pode atualizar a faturação e, em seguida, tentar novamente.",
-    "organizationTrialEndedBillingAtKiloAi": "O período de teste da organização terminou e esta não tem um plano ativo. Pode atualizar a faturação em kilo.ai e, em seguida, tentar novamente."
+    "organizationTrialEndedBillingAtKiloAi": "O período de teste da organização terminou e esta não tem um plano ativo. Pode atualizar a faturação em kilo.ai e, em seguida, tentar novamente.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Marcador",
+        "nestedBulletPoint": "Marcador aninhado",
+        "orderedItem": "Item da lista {n}",
+        "nestedOrderedItem": "Item da lista aninhado {n}"
+      },
+      "blockquote": {
+        "quote": "Citação",
+        "nestedQuote": "Citação aninhada"
+      },
+      "table": {
+        "row": "Linha {n}: {content}"
+      },
+      "math": {
+        "equation": "Matemática: {latex}"
+      },
+      "rotor": {
+        "headings": "Títulos",
+        "links": "Ligações",
+        "images": "Imagens"
+      }
+    }
   },
   "language": {
     "restarting": "A reiniciar para aplicar o idioma",
@@ -507,6 +530,14 @@
       "nextStepAppeal": "O resultado do recurso aparecerá neste ecrã.",
       "nextStepFinal": "A decisão do recurso é final. Não é possível apresentar novo recurso.",
       "viewReceipt": "Ver comprovativo"
+    },
+    "reportReceipts": {
+      "title": "Denúncias",
+      "rowSubtitle": "As denúncias que fizeste e os respetivos resultados",
+      "emptyTitle": "Ainda não há denúncias",
+      "emptyDescription": "As denúncias que fizeres a partir de um comentário ou de uma resposta de IA aparecem aqui.",
+      "couldNotLoad": "Não foi possível carregar as tuas denúncias",
+      "capped": "A mostrar as tuas denúncias mais recentes."
     },
     "changelog": "Novidades",
     "changelogVersionPending": "As notas da versão {{version}} vêm na próxima atualização da app.",
@@ -4316,7 +4347,7 @@
     "personalDefaultDescription": "Carregado automaticamente quando nenhum repositório tem um perfil fixado.",
     "organizationDefaultDescription": "Carregado automaticamente para membros que não têm predefinição pessoal.",
     "setAsDefault": "Definir como predefinido",
-    "saveFailed": "Não foi possível guardar o perfil",
+    "saveFailed": "Não foi possível guardar o perfil. Tenta novamente.",
     "organizationRoleRequired": "Apenas os proprietários da organização e os administradores podem alterar os perfis da organização.",
     "deleteTitle": "Eliminar perfil",
     "deleteMessage": "Elimina permanentemente o perfil e as respetivas definições. Esta ação não pode ser anulada.",

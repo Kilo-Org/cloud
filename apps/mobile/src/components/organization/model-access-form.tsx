@@ -348,10 +348,11 @@ export function ModelAccessForm({
           whose only row would be a misleading empty-policy message. */}
       {tab === 'providers' && !providersEmpty ? (
         <View className="flex-1">
-          {/* The refusal below the tabs already carries this sentence when a
-              held provider edit cannot be saved, so the caption would repeat it
-              word for word. */}
-          {providerRowsIncomplete && savePayload.kind !== 'provider-catalog-unavailable' ? (
+          {/* The refusal under the tabs carries this sentence only while no
+              failure owns that line: a failed save shows its own message, so the
+              caption stays to keep the read-only explanation on screen. */}
+          {providerRowsIncomplete &&
+          !(savePayload.kind === 'provider-catalog-unavailable' && feedback.status !== 'failed') ? (
             <Text variant="caption" className="px-4 pb-2">
               {t('organizationModelAccess.providersNeedCatalog')}
             </Text>

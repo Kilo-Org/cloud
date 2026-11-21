@@ -751,6 +751,40 @@ describe('ModelAccessForm with a catalog that names no provider', () => {
       );
     expect(rendered).toHaveLength(0);
   });
+
+  it('keeps the read-only caption when a failed save owns the status line', async () => {
+    // A failure outranks the refusal in the status line, so the sentence that
+    // explains the disabled switches has no other home: the caption must stay.
+    // The order matters: an edit retires an earlier failure, so the failed save
+    // has to come after the provider toggle.
+    const root = render(['anthropic', 'openai']);
+    saved.mutateAsync.mockRejectedValueOnce(
+      Object.assign(new Error('Failed to update allow lists'), {
+        data: { code: 'INTERNAL_SERVER_ERROR', message: 'Failed to update allow lists' },
+      })
+    );
+
+    selectTab(root, 'providers');
+    changeProviders(
+      root,
+      toggleProvider(list(root, 'ProviderAllowList').props.draft as ModelAccessDraft, 'openai', false)
+    );
+    await pressSave(root);
+    expect(saved.mutateAsync).toHaveBeenCalledTimes(1);
+
+    renderWithCatalog(['anthropic', 'openai'], { catalog: UNNAMED });
+
+    expect(String(statusMessage(root))).not.toBe(
+      i18n.t('organizationModelAccess.providersNeedCatalog')
+    );
+    expect(statusMessage(root)).toBeDefined();
+    const rendered = root
+      .findAllByType('Text' as never)
+      .filter(
+        node => node.props.children === i18n.t('organizationModelAccess.providersNeedCatalog')
+      );
+    expect(rendered).toHaveLength(1);
+  });
 });
 
 describe('ModelAccessForm with a catalog that names every provider', () => {

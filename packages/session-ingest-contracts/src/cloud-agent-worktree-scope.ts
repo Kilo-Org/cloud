@@ -16,7 +16,15 @@ export const cloudAgentSessionScopeV2Headers = {
 export const CLOUD_AGENT_SESSION_SCOPE_PERSONAL_ORGANIZATION = 'personal' as const;
 
 export const MAX_CLOUD_AGENT_SESSION_SCOPE_MEMBER_ROOTS = 32;
-export const MAX_CLOUD_AGENT_SESSION_SCOPE_HEADER_BYTES = 4096;
+
+/**
+ * The budget for the sum of the encoded v2 header *values* only: the worktree
+ * id, the organization, and the comma-joined member roots. Header names, the
+ * `: ` separators, the line terminators, and the protocol header are left out,
+ * deliberately, because the parser compares exactly the value bytes the encoder
+ * writes. A caller that needs the true wire size adds that framing itself.
+ */
+export const MAX_CLOUD_AGENT_SESSION_SCOPE_HEADER_VALUE_BYTES = 4096;
 
 export const cloudAgentSessionScopeV2AssertionSchema = z.object({
   protocolVersion: z.literal(cloudAgentSessionScopeProtocolVersionV2),
@@ -55,7 +63,15 @@ function headerValue(value: string | undefined): string {
   return value ?? '';
 }
 
-export function measureCloudAgentSessionScopeV2HeaderBytes(
+/**
+ * The encoded size of the v2 header values alone, the number
+ * `MAX_CLOUD_AGENT_SESSION_SCOPE_HEADER_VALUE_BYTES` bounds. Header names, the
+ * `: ` separators, the line terminators, and the protocol header contribute
+ * nothing, because `parseCloudAgentSessionScopeV2Headers` compares exactly the
+ * value bytes `encodeCloudAgentSessionScopeV2Headers` writes. A caller that
+ * needs the size on the wire adds that framing itself.
+ */
+export function measureCloudAgentSessionScopeV2HeaderValueBytes(
   input: CloudAgentSessionScopeV2HeaderInput
 ): number {
   const encoder = new TextEncoder();
@@ -117,7 +133,8 @@ export function parseCloudAgentSessionScopeV2Headers(
     return { kind: 'invalid' };
   }
   if (
-    measureCloudAgentSessionScopeV2HeaderBytes(input) > MAX_CLOUD_AGENT_SESSION_SCOPE_HEADER_BYTES
+    measureCloudAgentSessionScopeV2HeaderValueBytes(input) >
+    MAX_CLOUD_AGENT_SESSION_SCOPE_HEADER_VALUE_BYTES
   ) {
     return { kind: 'invalid' };
   }

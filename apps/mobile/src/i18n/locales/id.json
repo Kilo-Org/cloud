@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Dokumen ini hanya tersedia dalam bahasa Inggris.",
     "organizationTrialEndedBilling": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Anda dapat memperbarui penagihan, lalu coba lagi.",
     "organizationTrialEndedBillingAtKiloAi": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Anda dapat memperbarui penagihan di kilo.ai, lalu coba lagi.",
-    "viewOnGitHub": "Lihat PR di GitHub"
+    "viewOnGitHub": "Lihat PR di GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Poin butir",
+        "nestedBulletPoint": "Poin butir bersarang",
+        "orderedItem": "Item daftar {n}",
+        "nestedOrderedItem": "Item daftar bersarang {n}"
+      },
+      "blockquote": {
+        "quote": "Kutipan",
+        "nestedQuote": "Kutipan bersarang"
+      },
+      "table": {
+        "row": "Baris {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Judul",
+        "links": "Tautan",
+        "images": "Gambar"
+      }
+    }
   },
   "language": {
     "restarting": "Memulai ulang untuk menerapkan bahasa",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Hasil banding akan muncul di layar ini.",
       "nextStepFinal": "Keputusan banding bersifat final. Banding lebih lanjut tidak dapat diajukan.",
       "viewReceipt": "Lihat tanda terima"
+    },
+    "reportReceipts": {
+      "title": "Laporan",
+      "rowSubtitle": "Laporan yang Anda ajukan dan hasilnya",
+      "emptyTitle": "Belum ada laporan",
+      "emptyDescription": "Laporan yang Anda ajukan dari komentar atau respons AI akan muncul di sini.",
+      "couldNotLoad": "Tidak dapat memuat laporan Anda",
+      "capped": "Menampilkan laporan terbaru Anda."
     },
     "changelog": "Yang baru",
     "changelogVersionPending": "Catatan versi {{version}} hadir di pembaruan aplikasi berikutnya.",
@@ -4176,7 +4207,7 @@
     "personalDefaultDescription": "Dimuat secara otomatis ketika tidak ada repositori yang memiliki profil yang disematkan.",
     "organizationDefaultDescription": "Dimuat otomatis untuk anggota yang tidak memiliki default pribadi.",
     "setAsDefault": "Tetapkan sebagai bawaan",
-    "saveFailed": "Tidak dapat menyimpan profil",
+    "saveFailed": "Tidak dapat menyimpan profil. Coba lagi.",
     "organizationRoleRequired": "Hanya pemilik organisasi dan admin yang dapat mengubah profil organisasi.",
     "deleteTitle": "Hapus profil",
     "deleteMessage": "Tindakan ini akan menghapus profil dan pengaturannya secara permanen. Hal ini tidak dapat dibatalkan.",

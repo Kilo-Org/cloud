@@ -188,7 +188,30 @@
     "legalDocumentEnglishOnly": "Ten dokument jest dostępny wyłącznie w języku angielskim.",
     "organizationTrialEndedBilling": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia, a następnie spróbować ponownie.",
     "organizationTrialEndedBillingAtKiloAi": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia na kilo.ai, a następnie spróbować ponownie.",
-    "viewOnGitHub": "Zobacz PR w serwisie GitHub"
+    "viewOnGitHub": "Zobacz PR w serwisie GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Punkt listy",
+        "nestedBulletPoint": "Zagnieżdżony punkt listy",
+        "orderedItem": "Element listy {n}",
+        "nestedOrderedItem": "Zagnieżdżony element listy {n}"
+      },
+      "blockquote": {
+        "quote": "Cytat",
+        "nestedQuote": "Zagnieżdżony cytat"
+      },
+      "table": {
+        "row": "Wiersz {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematyka: {latex}"
+      },
+      "rotor": {
+        "headings": "Nagłówki",
+        "links": "Odnośniki",
+        "images": "Obrazy"
+      }
+    }
   },
   "language": {
     "restarting": "Ponowne uruchamianie po zmianie języka",
@@ -507,6 +530,14 @@
       "nextStepAppeal": "Wynik odwołania pojawi się na tym ekranie.",
       "nextStepFinal": "Decyzja w sprawie odwołania jest ostateczna. Nie można złożyć kolejnego odwołania.",
       "viewReceipt": "Wyświetl potwierdzenie"
+    },
+    "reportReceipts": {
+      "title": "Zgłoszenia",
+      "rowSubtitle": "Zgłoszenia, które złożyłeś, i ich wyniki",
+      "emptyTitle": "Nie masz jeszcze zgłoszeń",
+      "emptyDescription": "Zgłoszenia złożone z komentarza lub odpowiedzi AI pojawiają się tutaj.",
+      "couldNotLoad": "Nie udało się wczytać twoich zgłoszeń",
+      "capped": "Wyświetlane są twoje najnowsze zgłoszenia."
     },
     "changelog": "Co nowego",
     "changelogVersionPending": "Opis wersji {{version}} dotrze z kolejną aktualizacją aplikacji.",
@@ -4316,7 +4347,7 @@
     "personalDefaultDescription": "Ładowane automatycznie, gdy żadne repozytorium nie ma przypiętego profilu.",
     "organizationDefaultDescription": "Ładowane automatycznie dla członków, którzy nie mają domyślnych ustawień osobistych.",
     "setAsDefault": "Ustaw jako domyślny",
-    "saveFailed": "Nie udało się zapisać profilu",
+    "saveFailed": "Nie udało się zapisać profilu. Spróbuj ponownie.",
     "organizationRoleRequired": "Tylko właściciele organizacji i administratorzy mogą zmieniać profile organizacji.",
     "deleteTitle": "Usuń profil",
     "deleteMessage": "Spowoduje to trwałe usunięcie profilu i jego ustawień. Tego nie można cofnąć.",

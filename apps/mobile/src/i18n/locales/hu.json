@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Ez a dokumentum csak angol nyelven érhető el.",
     "organizationTrialEndedBilling": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. Frissítheti a számlázást, majd próbálja újra.",
     "organizationTrialEndedBillingAtKiloAi": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. Frissítheti a számlázást a kilo.ai oldalon, majd próbálja újra.",
-    "viewOnGitHub": "PR megtekintése a GitHubon"
+    "viewOnGitHub": "PR megtekintése a GitHubon",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Felsorolásjel",
+        "nestedBulletPoint": "Beágyazott felsorolásjel",
+        "orderedItem": "Listaelem {n}",
+        "nestedOrderedItem": "Beágyazott listaelem {n}"
+      },
+      "blockquote": {
+        "quote": "Idézet",
+        "nestedQuote": "Beágyazott idézet"
+      },
+      "table": {
+        "row": "Sor {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Címsorok",
+        "links": "Hivatkozások",
+        "images": "Képek"
+      }
+    }
   },
   "language": {
     "restarting": "Újraindítás a nyelv beállításához",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "A fellebbezés eredménye ezen a képernyőn jelenik meg.",
       "nextStepFinal": "A fellebbezési döntés végleges. További fellebbezés nem nyújtható be.",
       "viewReceipt": "Visszaigazolás megtekintése"
+    },
+    "reportReceipts": {
+      "title": "Bejelentések",
+      "rowSubtitle": "A benyújtott bejelentéseid és eredményeik",
+      "emptyTitle": "Még nincsenek bejelentések",
+      "emptyDescription": "A hozzászólásból vagy AI-válaszból benyújtott bejelentések itt jelennek meg.",
+      "couldNotLoad": "Nem sikerült betölteni a bejelentéseidet",
+      "capped": "A legutóbbi bejelentéseid láthatók."
     },
     "changelog": "Újdonságok",
     "changelogVersionPending": "A(z) {{version}} verzió újdonságai a következő frissítéssel érkeznek.",
@@ -4176,7 +4207,7 @@
     "personalDefaultDescription": "Automatikusan betöltődik, ha egyetlen lerakat sem rendelkezik rögzített profillal.",
     "organizationDefaultDescription": "Automatikusan betöltve azon tagok számára, akiknek nincs személyes alapértelmezésük.",
     "setAsDefault": "Beállítás alapértelmezettként",
-    "saveFailed": "Nem sikerült menteni a profilt",
+    "saveFailed": "Nem sikerült menteni a profilt. Próbáld újra.",
     "organizationRoleRequired": "Csak a szervezet tulajdonosai és adminisztrátorai módosíthatják a szervezeti profilokat.",
     "deleteTitle": "Profil törlése",
     "deleteMessage": "Ezzel véglegesen eltávolítja a profilt és beállításait. Ezt nem lehet visszavonni.",

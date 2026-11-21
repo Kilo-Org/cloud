@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "この文書は英語でのみご利用いただけます。",
     "organizationTrialEndedBilling": "組織のトライアルは終了し、有効なプランがありません。請求情報を更新してから、もう一度お試しください。",
     "organizationTrialEndedBillingAtKiloAi": "組織のトライアルは終了し、有効なプランがありません。kilo.ai で請求情報を更新してから、もう一度お試しください。",
-    "viewOnGitHub": "GitHubでPRを表示"
+    "viewOnGitHub": "GitHubでPRを表示",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "箇条書きの項目",
+        "nestedBulletPoint": "ネストされた箇条書きの項目",
+        "orderedItem": "リスト項目 {n}",
+        "nestedOrderedItem": "ネストされたリスト項目 {n}"
+      },
+      "blockquote": {
+        "quote": "引用",
+        "nestedQuote": "ネストされた引用"
+      },
+      "table": {
+        "row": "行 {n}：{content}"
+      },
+      "math": {
+        "equation": "数式：{latex}"
+      },
+      "rotor": {
+        "headings": "見出し",
+        "links": "リンク",
+        "images": "画像"
+      }
+    }
   },
   "language": {
     "restarting": "言語設定を適用するために再起動中",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "異議申し立ての結果はこの画面に表示されます。",
       "nextStepFinal": "異議申し立ての決定は確定しました。これ以上異議を申し立てることはできません。",
       "viewReceipt": "受付確認を表示"
+    },
+    "reportReceipts": {
+      "title": "通報一覧",
+      "rowSubtitle": "通報した内容とその結果",
+      "emptyTitle": "通報はまだありません",
+      "emptyDescription": "コメントまたはAIの回答から通報した内容がここに表示されます。",
+      "couldNotLoad": "通報を読み込めませんでした",
+      "capped": "最新の通報を表示しています。"
     },
     "changelog": "新着情報",
     "changelogVersionPending": "バージョン{{version}}のリリースノートは、次回のアプリアップデートで届きます。",
@@ -4176,7 +4207,7 @@
     "personalDefaultDescription": "リポジトリに固定プロフィールがない場合に自動ロードされます。",
     "organizationDefaultDescription": "個人のデフォルトがないメンバーの場合は自動ロードされます。",
     "setAsDefault": "デフォルトとして設定",
-    "saveFailed": "プロフィールを保存できませんでした",
+    "saveFailed": "プロフィールを保存できませんでした。もう一度お試しください。",
     "organizationRoleRequired": "組織のプロフィールを変更できるのは組織のオーナーと管理者のみです。",
     "deleteTitle": "プロフィールの削除",
     "deleteMessage": "これにより、プロフィールとその設定が完全に削除されます。これを元に戻すことはできません。",

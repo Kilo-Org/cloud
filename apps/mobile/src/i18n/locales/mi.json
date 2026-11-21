@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "E wātea ana tēnei tuhinga i te reo Ingarihi anake.",
     "organizationTrialEndedBilling": "Kua mutu te whakamātautau o te rōpū, ā, kāore ōna mahere kaha. Ka taea e koe te whakahou i te nama, kātahi ka whakamātau anō.",
     "organizationTrialEndedBillingAtKiloAi": "Kua mutu te whakamātautau o te rōpū, ā, kāore ōna mahere kaha. Ka taea e koe te whakahou i te nama i kilo.ai, kātahi ka whakamātau anō.",
-    "viewOnGitHub": "Tirohia te PR i GitHub"
+    "viewOnGitHub": "Tirohia te PR i GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Tohu rārangi",
+        "nestedBulletPoint": "Tohu rārangi whakauru",
+        "orderedItem": "Tūemi rārangi {n}",
+        "nestedOrderedItem": "Tūemi rārangi whakauru {n}"
+      },
+      "blockquote": {
+        "quote": "Whakahua",
+        "nestedQuote": "Whakahua whakauru"
+      },
+      "table": {
+        "row": "Rārangi {n}: {content}"
+      },
+      "math": {
+        "equation": "Pāngarau: {latex}"
+      },
+      "rotor": {
+        "headings": "Upoko",
+        "links": "Hono",
+        "images": "Whakaahua"
+      }
+    }
   },
   "language": {
     "restarting": "Kei te tīmata anō hei whakamahi i te reo",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Ka puta te otinga o te pīra ki tēnei mata.",
       "nextStepFinal": "Ko te whakatau mō te pīra he whakatau whakamutunga. Kāore e taea tētahi atu pīra te tuku.",
       "viewReceipt": "Tirohia te rīhīti"
+    },
+    "reportReceipts": {
+      "title": "Ngā pūrongo",
+      "rowSubtitle": "Ngā pūrongo i tukuna e koe me ō rātou otinga",
+      "emptyTitle": "Kāore anō he pūrongo",
+      "emptyDescription": "Ka puta ki konei ngā pūrongo ka tukuna e koe mai i tētahi kōrero, mai i tētahi whakautu AI rānei.",
+      "couldNotLoad": "Kāore i taea te uta i ō pūrongo",
+      "capped": "E whakaatu ana i ō pūrongo hou rawa."
     },
     "changelog": "Ngā mea hou",
     "changelogVersionPending": "Ka tae mai ngā tuhipoka o te putanga {{version}} me te whakahōu taupānga e whai ake.",
@@ -4176,7 +4207,7 @@
     "personalDefaultDescription": "Ka utaina aunoa ina karekau he kōtaha kua titia ki tētahi putunga.",
     "organizationDefaultDescription": "Ka utaina aunoa mō ngā mema karekau he taunoa whaiaro.",
     "setAsDefault": "Tautuhi hei taunoa",
-    "saveFailed": "Kāore i taea te tiaki i te kōtaha",
+    "saveFailed": "Kāore i taea te tiaki i te kōtaha. Ngana anō.",
     "organizationRoleRequired": "Ko ngā rangatira o te rōpū me ngā kaiwhakahaere anake ka āhei ki te huri i ngā kōtaha rōpū.",
     "deleteTitle": "Mukua te kōtaha",
     "deleteMessage": "Ka tangohia tonutia te kōtaha me ona tautuhinga. Kāore e taea te whakakore i tēnei.",

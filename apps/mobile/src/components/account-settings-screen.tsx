@@ -4,6 +4,7 @@ import {
   Ban,
   Cpu,
   FileText,
+  Flag,
   Globe,
   KeyRound,
   Lock,
@@ -142,6 +143,14 @@ export function AccountSettingsScreen() {
             subtitle={t('profile.blockedPeople.rowSubtitle')}
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/blocked-people' as Href);
+            }}
+          />
+          <ConfigureRow
+            icon={Flag}
+            title={t('profile.reportReceipts.title')}
+            subtitle={t('profile.reportReceipts.rowSubtitle')}
+            onPress={() => {
+              router.push('/(app)/(tabs)/(3_profile)/report-receipts' as Href);
             }}
           />
           <ConfigureRow

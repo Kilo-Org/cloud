@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}, privat kodarkiv",
     "legalDocumentEnglishOnly": "Det här dokumentet finns endast på engelska.",
     "organizationTrialEndedBilling": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. Du kan uppdatera faktureringen och sedan försöka igen.",
-    "organizationTrialEndedBillingAtKiloAi": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. Du kan uppdatera faktureringen på kilo.ai och sedan försöka igen."
+    "organizationTrialEndedBillingAtKiloAi": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. Du kan uppdatera faktureringen på kilo.ai och sedan försöka igen.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Punkt",
+        "nestedBulletPoint": "Indragen punkt",
+        "orderedItem": "Listobjekt {n}",
+        "nestedOrderedItem": "Indraget listobjekt {n}"
+      },
+      "blockquote": {
+        "quote": "Citat",
+        "nestedQuote": "Indraget citat"
+      },
+      "table": {
+        "row": "Rad {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematik: {latex}"
+      },
+      "rotor": {
+        "headings": "Rubriker",
+        "links": "Länkar",
+        "images": "Bilder"
+      }
+    }
   },
   "language": {
     "restarting": "Startar om för att byta språk",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Utfallet av överklagandet visas på den här skärmen.",
       "nextStepFinal": "Överklagandebeslutet är slutgiltigt. Det går inte att överklaga igen.",
       "viewReceipt": "Visa kvitto"
+    },
+    "reportReceipts": {
+      "title": "Anmälningar",
+      "rowSubtitle": "Anmälningar du skickat in och deras utfall",
+      "emptyTitle": "Inga anmälningar än",
+      "emptyDescription": "Anmälningar du skickar in från en kommentar eller ett AI-svar visas här.",
+      "couldNotLoad": "Det gick inte att läsa in dina anmälningar",
+      "capped": "Visar dina senaste anmälningar."
     },
     "changelog": "Nyheter",
     "changelogVersionPending": "Nyheter för version {{version}} kommer med nästa appuppdatering.",
@@ -4176,7 +4207,7 @@
     "personalDefaultDescription": "Laddas automatiskt när inget kodarkiv har en fäst profil.",
     "organizationDefaultDescription": "Laddas automatiskt för medlemmar som inte har någon personlig standard.",
     "setAsDefault": "Ställ in som standard",
-    "saveFailed": "Det gick inte att spara profilen",
+    "saveFailed": "Det gick inte att spara profilen. Försök igen.",
     "organizationRoleRequired": "Endast organisationsägare och administratörer kan ändra organisationsprofiler.",
     "deleteTitle": "Ta bort profil",
     "deleteMessage": "Detta tar bort profilen och dess inställningar permanent. Detta kan inte ångras.",

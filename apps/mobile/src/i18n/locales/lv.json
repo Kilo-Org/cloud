@@ -187,7 +187,30 @@
     "legalDocumentEnglishOnly": "Šis dokuments ir pieejams tikai angļu valodā.",
     "organizationTrialEndedBilling": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Jūs varat atjaunināt norēķinu informāciju un pēc tam mēģināt vēlreiz.",
     "organizationTrialEndedBillingAtKiloAi": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Jūs varat atjaunināt norēķinu informāciju vietnē kilo.ai un pēc tam mēģināt vēlreiz.",
-    "viewOnGitHub": "Skatīt PR GitHub"
+    "viewOnGitHub": "Skatīt PR GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Saraksta punkts",
+        "nestedBulletPoint": "Iekļautais saraksta punkts",
+        "orderedItem": "Saraksta vienums {n}",
+        "nestedOrderedItem": "Iekļautais saraksta vienums {n}"
+      },
+      "blockquote": {
+        "quote": "Citāts",
+        "nestedQuote": "Iekļautais citāts"
+      },
+      "table": {
+        "row": "Rinda {n}: {content}"
+      },
+      "math": {
+        "equation": "Matemātika: {latex}"
+      },
+      "rotor": {
+        "headings": "Virsraksti",
+        "links": "Saites",
+        "images": "Attēli"
+      }
+    }
   },
   "language": {
     "restarting": "Notiek restartēšana, lai lietotu izvēlēto valodu",
@@ -506,6 +529,14 @@
       "nextStepAppeal": "Pārsūdzības rezultāts parādīsies šajā ekrānā.",
       "nextStepFinal": "Pārsūdzības lēmums ir galīgs. Papildu pārsūdzību iesniegt nevar.",
       "viewReceipt": "Skatīt apstiprinājumu"
+    },
+    "reportReceipts": {
+      "title": "Ziņojumi",
+      "rowSubtitle": "Jūsu iesniegtie ziņojumi un to rezultāti",
+      "emptyTitle": "Vēl nav ziņojumu",
+      "emptyDescription": "Šeit parādīsies ziņojumi, kurus iesniedzat no komentāra vai AI atbildes.",
+      "couldNotLoad": "Neizdevās ielādēt jūsu ziņojumus",
+      "capped": "Tiek rādīti jūsu jaunākie ziņojumi."
     },
     "changelog": "Kas jauns",
     "changelogVersionPending": "Versijas {{version}} piezīmes pienāks ar nākamo atjauninājumu.",
@@ -4246,7 +4277,7 @@
     "personalDefaultDescription": "Automātiski ielādēts, ja nevienai krātuvei nav piesprausta profila.",
     "organizationDefaultDescription": "Automātiski ielādēts dalībniekiem, kuriem nav personisku noklusējuma.",
     "setAsDefault": "Iestatīt kā noklusējumu",
-    "saveFailed": "Nevarēja saglabāt profilu",
+    "saveFailed": "Nevarēja saglabāt profilu. Mēģiniet vēlreiz.",
     "organizationRoleRequired": "Organizācijas profilus var mainīt tikai organizācijas īpašnieki un administratori.",
     "deleteTitle": "Dzēst profilu",
     "deleteMessage": "Tādējādi profils un tā iestatījumi tiek neatgriezeniski noņemti. Šo darbību nevar atsaukt.",

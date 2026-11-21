@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Ang dokumentong ito ay makukuha lamang sa Ingles.",
     "organizationTrialEndedBilling": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update mo ang billing, pagkatapos ay subukan muli.",
     "organizationTrialEndedBillingAtKiloAi": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update mo ang billing sa kilo.ai, pagkatapos ay subukan muli.",
-    "viewOnGitHub": "Tingnan ang PR sa GitHub"
+    "viewOnGitHub": "Tingnan ang PR sa GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Puntong listahan",
+        "nestedBulletPoint": "Nakapasok na puntong listahan",
+        "orderedItem": "Item sa listahan {n}",
+        "nestedOrderedItem": "Nakapasok na item sa listahan {n}"
+      },
+      "blockquote": {
+        "quote": "Sipi",
+        "nestedQuote": "Nakapasok na sipi"
+      },
+      "table": {
+        "row": "Hanay {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Mga pamagat",
+        "links": "Mga link",
+        "images": "Mga larawan"
+      }
+    }
   },
   "language": {
     "restarting": "Ini-restart para ilapat ang wika",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Lalabas ang resulta ng apela sa screen na ito.",
       "nextStepFinal": "Pinal na ang desisyon sa apela. Hindi na maaaring magsumite ng panibagong apela.",
       "viewReceipt": "Tingnan ang resibo"
+    },
+    "reportReceipts": {
+      "title": "Mga ulat",
+      "rowSubtitle": "Mga ulat na isinumite mo at ang mga resulta nito",
+      "emptyTitle": "Wala pang ulat",
+      "emptyDescription": "Lalabas dito ang mga ulat na isusumite mo mula sa isang komento o tugon ng AI.",
+      "couldNotLoad": "Hindi ma-load ang mga ulat mo",
+      "capped": "Ipinapakita ang mga pinakabago mong ulat."
     },
     "changelog": "Mga bago",
     "changelogVersionPending": "Nasa susunod na update ng app ang mga tala ng bersyong {{version}}.",
@@ -4176,7 +4207,7 @@
     "personalDefaultDescription": "Awtomatikong na-load kapag walang repository na may naka-pin na profile.",
     "organizationDefaultDescription": "Awtomatikong na-load para sa mga miyembrong walang personal na default.",
     "setAsDefault": "Itakda bilang default",
-    "saveFailed": "Hindi ma-save ang profile",
+    "saveFailed": "Hindi ma-save ang profile. Subukang muli.",
     "organizationRoleRequired": "Mga may-ari ng organisasyon at admin lang ang maaaring baguhin ang profile ng organisasyon.",
     "deleteTitle": "Tanggalin ang profile",
     "deleteMessage": "Permanente nitong inaalis ang profile at mga setting nito. Hindi na ito maaaring bawiin.",

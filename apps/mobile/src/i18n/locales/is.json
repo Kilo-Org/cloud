@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Þetta skjal er aðeins tiltækt á ensku.",
     "organizationTrialEndedBilling": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Þú getur uppfært greiðsluupplýsingar og reynir síðan aftur.",
     "organizationTrialEndedBillingAtKiloAi": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Þú getur uppfært greiðsluupplýsingar á kilo.ai og reynir síðan aftur.",
-    "viewOnGitHub": "Skoða PR á GitHub"
+    "viewOnGitHub": "Skoða PR á GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Punktur",
+        "nestedBulletPoint": "Feltur punktur",
+        "orderedItem": "Listaatriði {n}",
+        "nestedOrderedItem": "Fellt listaatriði {n}"
+      },
+      "blockquote": {
+        "quote": "Tilvitnun",
+        "nestedQuote": "Feld tilvitnun"
+      },
+      "table": {
+        "row": "Röð {n}: {content}"
+      },
+      "math": {
+        "equation": "Stærðfræði: {latex}"
+      },
+      "rotor": {
+        "headings": "Fyrirsagnir",
+        "links": "Tenglar",
+        "images": "Myndir"
+      }
+    }
   },
   "language": {
     "restarting": "Endurræsi til að virkja valið tungumál",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Niðurstaða áfrýjunarinnar birtist á þessum skjá.",
       "nextStepFinal": "Ákvörðun um áfrýjun er endanleg. Ekki er hægt að senda inn frekari áfrýjun.",
       "viewReceipt": "Skoða kvittun"
+    },
+    "reportReceipts": {
+      "title": "Tilkynningar",
+      "rowSubtitle": "Tilkynningar sem þú sendir inn og niðurstöður þeirra",
+      "emptyTitle": "Engar tilkynningar ennþá",
+      "emptyDescription": "Tilkynningar sem þú sendir inn úr athugasemd eða svari frá gervigreind birtast hér.",
+      "couldNotLoad": "Ekki tókst að hlaða tilkynningunum þínum",
+      "capped": "Sýni nýjustu tilkynningarnar þínar."
     },
     "changelog": "Nýjungar",
     "changelogVersionPending": "Upplýsingar um útgáfu {{version}} berast með næstu uppfærslu forritsins.",
@@ -4176,7 +4207,7 @@
     "personalDefaultDescription": "Sjálfvirkt hlaðið þegar engin geymsla er með festan prófíl.",
     "organizationDefaultDescription": "Sjálfvirkt hlaðið fyrir meðlimi sem hafa engin persónuleg vanskil.",
     "setAsDefault": "Stillt sem sjálfgefið",
-    "saveFailed": "Ekki tókst að vista prófílinn",
+    "saveFailed": "Ekki tókst að vista prófílinn. Reyndu aftur.",
     "organizationRoleRequired": "Aðeins eigendur fyrirtækisins og stjórnendur geta breytt prófílum fyrirtækisins.",
     "deleteTitle": "Eyða prófíl",
     "deleteMessage": "Þetta fjarlægir prófílinn og stillingar hans varanlega. Þetta er ekki hægt að afturkalla.",

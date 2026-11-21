@@ -188,7 +188,30 @@
     "legalDocumentEnglishOnly": "Šis dokumentas prieinamas tik anglų kalba.",
     "organizationTrialEndedBilling": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Galite atnaujinti atsiskaitymo duomenis, tada bandykite dar kartą.",
     "organizationTrialEndedBillingAtKiloAi": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Galite atnaujinti atsiskaitymo duomenis adresu kilo.ai, tada bandykite dar kartą.",
-    "viewOnGitHub": "Peržiūrėti PR GitHub platformoje"
+    "viewOnGitHub": "Peržiūrėti PR GitHub platformoje",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Sąrašo punktas",
+        "nestedBulletPoint": "Įdėtasis sąrašo punktas",
+        "orderedItem": "Sąrašo elementas {n}",
+        "nestedOrderedItem": "Įdėtasis sąrašo elementas {n}"
+      },
+      "blockquote": {
+        "quote": "Citata",
+        "nestedQuote": "Įdėtoji citata"
+      },
+      "table": {
+        "row": "Eilutė {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Antraštės",
+        "links": "Nuorodos",
+        "images": "Paveikslėliai"
+      }
+    }
   },
   "language": {
     "restarting": "Paleidžiama iš naujo, kad būtų pakeista kalba",
@@ -507,6 +530,14 @@
       "nextStepAppeal": "Apskundimo rezultatas pasirodys šiame ekrane.",
       "nextStepFinal": "Sprendimas dėl apskundimo yra galutinis. Kito apskundimo pateikti negalima.",
       "viewReceipt": "Peržiūrėti patvirtinimą"
+    },
+    "reportReceipts": {
+      "title": "Pranešimai",
+      "rowSubtitle": "Jūsų pateikti pranešimai ir jų rezultatai",
+      "emptyTitle": "Kol kas pranešimų nėra",
+      "emptyDescription": "Pranešimai, kuriuos pateikiate iš komentaro arba AI atsakymo, rodomi čia.",
+      "couldNotLoad": "Nepavyko įkelti jūsų pranešimų",
+      "capped": "Rodomi naujausi jūsų pranešimai."
     },
     "changelog": "Kas naujo",
     "changelogVersionPending": "{{version}} versijos pastabos pasirodys su kitu programėlės atnaujinimu.",
@@ -4316,7 +4347,7 @@
     "personalDefaultDescription": "Automatiškai įkeliama, kai jokia saugykla neturi prisegto profilio.",
     "organizationDefaultDescription": "Automatiškai įkeliama nariams, kurie neturi asmeninio numatytojo profilio.",
     "setAsDefault": "Nustatyti kaip numatytąjį",
-    "saveFailed": "Nepavyko išsaugoti profilio",
+    "saveFailed": "Nepavyko išsaugoti profilio. Bandykite dar kartą.",
     "organizationRoleRequired": "Organizacijos profilį gali keisti tik organizacijos savininkai ir administratoriai.",
     "deleteTitle": "Ištrinti profilį",
     "deleteMessage": "Tai visam laikui pašalins profilį ir jo nustatymus. To negalima anuliuoti.",

@@ -1824,6 +1824,20 @@ served it. A socket reconnect on the same wrapper keeps the handle valid; alloca
 replacement and authorization revocation invalidate it. Renewal checks current principal and
 organization membership bindings and never extends the delegation lifetime.
 
+A contained handle is also bound to the sandbox egress that sends it. The platform adds
+`x-kilo-runtime-proxy-origin`, an HMAC of the sandbox egress ID, outside the sandbox. The
+Containers outbound handler sets it on facade API requests and Session Sync `/v1/` requests,
+and replaces any value from the sandbox. On Vercel, each runtime-proxy injection rule injects
+it with the handle, including Session Sync. Session Sync forwards the proof through its
+authorization binding to the same Sandbox DO check. The Sandbox
+DO denies a handle without its own proof, so a copied handle fails from another host or through
+another sandbox. Allocations that started before this check are exempt until they stop. A local
+HTTP development facade (`http://host.docker.internal:<port>`) is also exempt: local workerd
+intercepts container egress only on ports 80 and 443, so local facade requests never get a proof.
+HTTPS local facades still require a proof. The facade removes the header before the upstream call.
+Deploy Session Sync proof forwarding before the Cloud Agent origin gate. Requests without a
+proof omit the new binding field, so older Cloud Agent bindings still accept their request shape.
+
 Because the handle is scope-wide, revoking one member's handle no longer stops another member's
 in-flight model calls while a surviving member can still serve; that member's **new** sends are still
 denied. The usage `session_id` attribute on a forwarded request is the wrapper's forwarded
@@ -2675,11 +2689,12 @@ before merging the enforcement release. A PR merge alone is not the deployment g
    Existing allocations remain exempt until they stop.
 
 Before the enforcement release, verify that every active Cloud Agent version has
-the compatibility readers and outbound proof injection. Search Worker logs for
-`runtime_proxy_origin_proof_unavailable`: each line is an egress that sent no proof.
-Also run one live Vercel sandbox request that sets its own
-`x-kilo-runtime-proxy-origin`. The facade must receive only the injected proof.
-Readers treat a value that is not exactly one proof, such as a joined duplicate,
-as absent. Keep the releases separate;
+the compatibility readers and outbound proof injection. Keep the releases separate;
 deploying both PRs together removes the compatibility boundary. For a rollback after
 enforcement, use the compatibility release as the Cloud Agent rollback target.
+
+Automatic deployments run Session Sync before Cloud Agent when both services change.
+Cloud Agent also waits for Session Ingest when that dependency is selected.
+A failed prerequisite blocks Cloud Agent. For single-Worker manual deployments,
+deploy Session Sync first.
+Keep Session Sync proof forwarding active until Cloud Agent has rolled back.

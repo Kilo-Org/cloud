@@ -79,6 +79,12 @@ describe('GitHub installation management input', () => {
 
 const mockMint = jest.fn();
 const mockButtons: Array<{ children?: React.ReactNode; onClick?: () => Promise<void> }> = [];
+// Installation row the component under test sees. Undefined means "no
+// installation" and keeps every existing test in this file on its current path.
+const mockInstallationData: { value: unknown } = { value: undefined };
+// The requester's own pending row, which is the only place a blocked request
+// is visible: the installation lookup returns the organization's live row.
+const mockPendingCheck: { value: unknown } = { value: undefined };
 
 jest.mock('@/lib/trpc/utils', () => ({
   useTRPC: () => ({
@@ -95,18 +101,30 @@ jest.mock('@/lib/trpc/utils', () => ({
         'refreshInstallation',
         'updateModel',
         'mintInstallState',
-      ].map(name => [name, { queryOptions: () => ({}), mutationOptions: () => ({}) }])
+      ].map(name => [name, { queryOptions: () => ({ name }), mutationOptions: () => ({}) }])
     ),
   }),
 }));
 jest.mock('@tanstack/react-query', () => ({
   ...jest.requireActual('@tanstack/react-query'),
-  useQuery: () => ({ data: undefined, isLoading: false, refetch: jest.fn() }),
+  useQuery: ({ name }: { name?: string } = {}) => ({
+    data:
+      name === 'getInstallation'
+        ? mockInstallationData.value
+        : name === 'checkUserPendingInstallation'
+          ? mockPendingCheck.value
+          : undefined,
+    isLoading: false,
+    refetch: jest.fn(),
+  }),
   useMutation: () => ({ mutateAsync: mockMint, isPending: false }),
   useQueryClient: () => ({ invalidateQueries: jest.fn() }),
 }));
 jest.mock('@/app/api/organizations/hooks', () => ({ useOrganizationWithMembers: () => ({}) }));
 jest.mock('@/lib/hooks/use-openrouter-models', () => ({ useModelSelectorList: () => ({}) }));
+jest.mock('@/components/shared/ModelCombobox', () => ({
+  ModelCombobox: () => null,
+}));
 jest.mock('@/components/ui/confirm', () => ({ useConfirm: () => jest.fn() }));
 jest.mock('./DevAddGitHubInstallationCard', () => ({ DevAddGitHubInstallationCard: () => null }));
 jest.mock('./OrganizationGitHubInstallations', () => ({
@@ -235,6 +253,96 @@ describe('GitHubIntegrationDetails installation setup recovery', () => {
     expect(html).toContain('/cloud/sessions?error=installation_unavailable');
     expect(html).not.toContain('another Kilo account');
     expect(html).not.toContain('Try again');
+  });
+});
+
+describe('GitHubIntegrationDetails pending approval state', () => {
+  // An app return path keeps this on the installation card rather than the
+  // identity card, whose client the other suites below already exercise.
+  function render(props: { fromApp?: boolean } = {}) {
+    return renderToStaticMarkup(
+      React.createElement(GitHubIntegrationDetails, {
+        organizationId: 'organization-1',
+        appReturnPath: '/cloud/sessions',
+        ...props,
+      })
+    );
+  }
+
+  function blockedPendingCheck() {
+    mockPendingCheck.value = {
+      hasPending: true,
+      pendingOrganizationId: 'organization-1',
+      pendingIntegrationId: 'pending-integration',
+      pendingApprovalStatus: 'blocked_by_existing_installation',
+    };
+  }
+
+  afterEach(() => {
+    mockInstallationData.value = undefined;
+    mockPendingCheck.value = undefined;
+  });
+
+  it('names the remedy from the requester pending row, not from the live installation row', () => {
+    // The organization holds its live installation, so the installation lookup
+    // reports that row; only the pending check carries the refusal.
+    mockInstallationData.value = {
+      installed: true,
+      installation: { id: 'live-integration', status: null },
+    };
+    blockedPendingCheck();
+
+    const html = render();
+
+    expect(html).toContain('This organization already has a GitHub installation.');
+    expect(html).toContain(
+      'An owner or admin must remove that installation in Kilo (Disconnect, or Uninstall GitHub App) before this request can complete.'
+    );
+    expect(html).toContain('cancel this request and start the connection again');
+    expect(html).toContain('Cancel Request');
+    expect(html).toContain('Installation Pending Admin Approval');
+    expect(html).not.toContain('Waiting for organization admin approval');
+    expect(html).not.toContain('Install Kilo GitHub App');
+  });
+
+  it('keeps the admin approval copy for a request still awaiting installation', () => {
+    mockInstallationData.value = {
+      installed: false,
+      installation: { id: 'pending-integration', status: 'awaiting_installation' },
+    };
+    mockPendingCheck.value = {
+      hasPending: true,
+      pendingOrganizationId: 'organization-1',
+      pendingIntegrationId: 'pending-integration',
+      pendingApprovalStatus: 'awaiting_installation',
+    };
+
+    const html = render();
+
+    expect(html).toContain(
+      'Your installation request has been submitted to the GitHub organization administrators.'
+    );
+    expect(html).toContain('Waiting for organization admin approval');
+    expect(html).not.toContain('already has a GitHub installation');
+    expect(html).not.toContain('Install Kilo GitHub App');
+  });
+
+  it('shows the blocked remedy in the app return card instead of the install card', () => {
+    // The organization's live installation is the row this lookup returns, so
+    // the outcome card must not report success for the blocked request.
+    mockInstallationData.value = {
+      installed: true,
+      installation: { id: 'live-integration', status: null },
+    };
+    blockedPendingCheck();
+
+    const html = render({ fromApp: true });
+
+    expect(html).toContain('Existing installation blocks this request');
+    expect(html).toContain('already has a GitHub installation');
+    expect(html).not.toContain('GitHub App installed');
+    expect(html).not.toContain('Awaiting admin approval');
+    expect(html).not.toContain('Open GitHub setup');
   });
 });
 

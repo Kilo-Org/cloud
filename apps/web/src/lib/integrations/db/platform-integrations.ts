@@ -875,13 +875,16 @@ export async function findPendingInstallations() {
       )
     );
 
-  // Filter to only return those with proper pending_approval metadata using Zod for safe parsing
-  // Only return 'awaiting_installation' status (simplified flow - no more ambiguous)
+  // Filter to only return those with proper pending_approval metadata using Zod for safe parsing.
+  // A request blocked by an existing installation is still awaiting completion, so both statuses
+  // match: the webhook may complete it once the organization's installation is removed.
   return results.filter(integration => {
     const parseResult = PendingInstallationMetadataWrapperSchema.safeParse(integration.metadata);
+    if (!parseResult.success) return false;
+    const { status } = parseResult.data.pending_approval;
     return (
-      parseResult.success &&
-      parseResult.data.pending_approval.status === PENDING_APPROVAL_STATUS.AWAITING_INSTALLATION
+      status === PENDING_APPROVAL_STATUS.AWAITING_INSTALLATION ||
+      status === PENDING_APPROVAL_STATUS.BLOCKED_BY_EXISTING_INSTALLATION
     );
   });
 }
@@ -1074,6 +1077,32 @@ export async function autoCompleteInstallation(
           })
         )
       ) {
+        // Record the refusal on the request so the requester and the
+        // organization's admins can see why it cannot complete. Only the
+        // pending_approval status changes: the requester fields and every
+        // other metadata key stay as written. A row whose metadata does not
+        // parse keeps its metadata rather than gaining a shape the schema
+        // cannot read. The outcome does not depend on this write, so a row
+        // removed before it still reports the refusal.
+        if (parseResult.success) {
+          await tx
+            .update(platform_integrations)
+            .set({
+              metadata: sql`jsonb_set(
+                coalesce(nullif(${platform_integrations.metadata}, 'null'::jsonb), '{}'::jsonb),
+                '{pending_approval,status}',
+                ${JSON.stringify(PENDING_APPROVAL_STATUS.BLOCKED_BY_EXISTING_INSTALLATION)}::jsonb,
+                true
+              )`,
+              updated_at: new Date().toISOString(),
+            })
+            .where(
+              and(
+                eq(platform_integrations.id, integrationId),
+                eq(platform_integrations.integration_status, INTEGRATION_STATUS.PENDING)
+              )
+            );
+        }
         return { ok: false, reason: 'multiple_installations_disabled' };
       }
     }

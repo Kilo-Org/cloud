@@ -61,7 +61,10 @@ export type KiloRequester = z.infer<typeof KiloRequesterSchema>;
  * Pending approval metadata schema
  */
 export const PendingApprovalMetadataSchema = z.object({
-  status: z.enum([PENDING_APPROVAL_STATUS.AWAITING_INSTALLATION]),
+  status: z.enum([
+    PENDING_APPROVAL_STATUS.AWAITING_INSTALLATION,
+    PENDING_APPROVAL_STATUS.BLOCKED_BY_EXISTING_INSTALLATION,
+  ]),
   requester: KiloRequesterSchema.optional(),
   github_requester: GitHubRequesterSchema.optional(),
   github_request_id: z.string().optional(),

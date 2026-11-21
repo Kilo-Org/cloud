@@ -421,4 +421,45 @@ describe('organization GitHub workflow connection lookups', () => {
 
     await expect(getOrganizationGitHubInstallationSlots(organization.id)).resolves.toEqual([]);
   });
+
+  test('keeps the organization slot while the association is suspended', async () => {
+    const organization = await createTestOrganization('Suspended slot', ownerId, 0);
+    const installationId = nextInstallationId();
+    const association = await insertAssociation(
+      organizationAssociation(organization.id, { installationId })
+    );
+    await db
+      .update(platform_integrations)
+      .set({ suspended_at: new Date().toISOString(), integration_status: 'suspended' })
+      .where(eq(platform_integrations.id, association.id));
+
+    // A suspended association keeps its slot until it is removed in Kilo, so
+    // the gate and the writers agree on what the organization still holds.
+    await expect(getOrganizationGitHubInstallationSlots(organization.id)).resolves.toEqual([
+      { installationId, appType: 'standard' },
+    ]);
+  });
+
+  test('keeps the organization slot while the association needs reauthorization', async () => {
+    const organization = await createTestOrganization('Reauthorization slot', ownerId, 0);
+    const installationId = nextInstallationId();
+    const association = await insertAssociation(
+      organizationAssociation(organization.id, { installationId })
+    );
+    await db
+      .update(platform_integrations)
+      .set({
+        auth_invalid_at: new Date().toISOString(),
+        auth_invalid_reason: 'token_revoked',
+        integration_status: 'active',
+      })
+      .where(eq(platform_integrations.id, association.id));
+
+    // An association that needs reauthorization keeps its slot until it is
+    // removed in Kilo, so the gate and the writers agree on what the
+    // organization still holds.
+    await expect(getOrganizationGitHubInstallationSlots(organization.id)).resolves.toEqual([
+      { installationId, appType: 'standard' },
+    ]);
+  });
 });

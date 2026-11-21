@@ -7,6 +7,7 @@ import { TRPCClientError } from '@trpc/client';
 import { ChevronDown, ExternalLink, Github, MoreHorizontal, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
+import { PENDING_APPROVAL_STATUS } from '@/lib/integrations/core/constants';
 import { buildGitHubInstallState } from './github-install-state';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -338,6 +339,16 @@ export function OrganizationGitHubInstallations({
                           )}
                         </div>
                         <p className="mt-1 text-sm text-muted-foreground">{repositoryScope}</p>
+                        {installation.status === 'pending' &&
+                          installation.pendingApprovalStatus ===
+                            PENDING_APPROVAL_STATUS.BLOCKED_BY_EXISTING_INSTALLATION && (
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              This organization already has a GitHub installation, so this request
+                              cannot complete. Remove that installation in Kilo (Disconnect, or
+                              Uninstall GitHub App), then cancel this request and start the
+                              connection again.
+                            </p>
+                          )}
                         {installation.connectionRole === 'agent_only' &&
                           (installation.status === 'connected' ? (
                             <p className="mt-1 text-sm text-muted-foreground">

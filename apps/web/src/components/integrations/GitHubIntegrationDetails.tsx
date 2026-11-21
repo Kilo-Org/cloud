@@ -24,6 +24,7 @@ import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { buildGitHubInstallState } from './github-install-state';
+import { PENDING_APPROVAL_STATUS } from '@/lib/integrations/core/constants';
 import { useConfirm } from '@/components/ui/confirm';
 import { OrganizationGitHubInstallations } from './OrganizationGitHubInstallations';
 import { GitHubIdentityCard } from './GitHubIdentityCard';
@@ -304,6 +305,20 @@ function GitHubIntegrationDetailsContent({
     trpc.githubApps.checkUserPendingInstallation.queryOptions(input)
   );
 
+  const status = installationData?.installation?.status;
+  const isPendingApproval = status === 'awaiting_installation';
+  // A blocked request never reaches `installation.status`: the organization
+  // holds its live installation, and the installation lookup returns that row.
+  // The requester's own pending row is the only place the refusal is visible,
+  // and that lookup is user-scoped, so it only applies to the owner this view
+  // shows.
+  const isBlockedPending =
+    pendingCheck?.pendingOrganizationId === (organizationId ?? null) &&
+    pendingCheck.pendingApprovalStatus === PENDING_APPROVAL_STATUS.BLOCKED_BY_EXISTING_INSTALLATION;
+  // A blocked request is still awaiting completion, so it keeps every waiting
+  // surface. The installation card below keeps describing the row it displays.
+  const isPendingRequest = isPendingApproval || isBlockedPending;
+
   const uninstallApp = useMutation(
     trpc.githubApps.uninstallApp.mutationOptions({
       onSuccess: () => {
@@ -508,8 +523,12 @@ function GitHubIntegrationDetailsContent({
 
   const handleCancelPending = async () => {
     // Cancel exactly the pending row this view rendered; the id is required so
-    // the request cannot fall back to another pending request.
-    const pendingIntegrationId = installationData?.installation?.id;
+    // the request cannot fall back to another pending request. A blocked
+    // request is not the row the installation lookup returns, so it names its
+    // own row from the pending check.
+    const pendingIntegrationId = isBlockedPending
+      ? pendingCheck?.pendingIntegrationId
+      : installationData?.installation?.id;
     if (!pendingIntegrationId) return;
     if (
       await confirm({
@@ -576,8 +595,6 @@ function GitHubIntegrationDetailsContent({
 
   const installation = installationData?.installation;
   const managementInput = buildGitHubManagementInput(organizationId, installation?.id);
-  const status = installation?.status;
-  const isPendingApproval = status === 'awaiting_installation';
 
   // Non-app mismatch landing: show corrective copy when the callback
   // detected a user mismatch and redirects without fromApp=1.  The
@@ -604,7 +621,7 @@ function GitHubIntegrationDetailsContent({
     );
   }
 
-  if (appReturnPath && !isInstalled && !isPendingApproval && !hasAppOutcome) {
+  if (appReturnPath && !isInstalled && !isPendingRequest && !hasAppOutcome) {
     return (
       <section
         className="flex min-h-64 flex-col justify-between rounded-xl border border-border bg-surface-background p-6"
@@ -738,21 +755,32 @@ function GitHubIntegrationDetailsContent({
   return (
     <div className="space-y-6">
       {/* Pending Approval Alert */}
-      {isPendingApproval && (
+      {isPendingRequest && (
         <Alert>
           <AlertDescription>
             <div className="flex items-end justify-between gap-4">
               <div className="flex-1 space-y-3">
                 <h4 className="font-medium">Installation Pending Admin Approval</h4>
-                <p className="text-muted-foreground text-sm">
-                  Your installation request has been submitted to the GitHub organization
-                  administrators. You will receive a notification once an admin approves the
-                  installation.
-                </p>
-                <ul className="text-muted-foreground mt-2 space-y-1 text-sm">
-                  <li>✓ Installation request submitted</li>
-                  <li>⏳ Waiting for organization admin approval</li>
-                </ul>
+                {isBlockedPending ? (
+                  <p className="text-muted-foreground text-sm">
+                    This organization already has a GitHub installation. An owner or admin must
+                    remove that installation in Kilo (Disconnect, or Uninstall GitHub App) before
+                    this request can complete. Then cancel this request and start the connection
+                    again.
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-muted-foreground text-sm">
+                      Your installation request has been submitted to the GitHub organization
+                      administrators. You will receive a notification once an admin approves the
+                      installation.
+                    </p>
+                    <ul className="text-muted-foreground mt-2 space-y-1 text-sm">
+                      <li>✓ Installation request submitted</li>
+                      <li>⏳ Waiting for organization admin approval</li>
+                    </ul>
+                  </>
+                )}
               </div>
               <Button
                 variant="outline"
@@ -913,7 +941,7 @@ function GitHubIntegrationDetailsContent({
                 </ul>
               </div>
 
-              {!isPendingApproval && (
+              {!isPendingRequest && (
                 <>
                   {pendingCheck?.hasPending &&
                   pendingCheck.pendingOrganizationId !== organizationId ? (
@@ -986,11 +1014,11 @@ function GitHubIntegrationDetailsContent({
           route) but a server redirect does not always open the app.  This fallback
           stays visible so the user can tap the button — a user-initiated navigation
           reliably triggers the universal link. */}
-      {fromApp && (isInstalled || isPendingApproval || hasAppOutcome) && (
+      {fromApp && (isInstalled || isPendingRequest || hasAppOutcome) && (
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="pt-6">
             <div className="flex flex-col items-center gap-4 text-center">
-              {success || isInstalled ? (
+              {success || (isInstalled && !isBlockedPending) ? (
                 <>
                   <CheckCircle2 className="h-8 w-8 text-green-500" />
                   <div className="space-y-1">
@@ -1011,14 +1039,19 @@ function GitHubIntegrationDetailsContent({
                     </Link>
                   </Button>
                 </>
-              ) : pendingApproval || isPendingApproval ? (
+              ) : pendingApproval || isPendingRequest ? (
                 <>
                   <RefreshCw className="h-8 w-8 text-amber-500" />
                   <div className="space-y-1">
-                    <h3 className="text-lg font-semibold">Awaiting admin approval</h3>
+                    <h3 className="text-lg font-semibold">
+                      {isBlockedPending
+                        ? 'Existing installation blocks this request'
+                        : 'Awaiting admin approval'}
+                    </h3>
                     <p className="text-muted-foreground text-sm">
-                      An organization admin must approve the installation request. Return to the
-                      Kilo App to check later.
+                      {isBlockedPending
+                        ? 'This organization already has a GitHub installation. An owner or admin must remove that installation in Kilo (Disconnect, or Uninstall GitHub App) before this request can complete. Then cancel this request and start the connection again.'
+                        : 'An organization admin must approve the installation request. Return to the Kilo App to check later.'}
                     </p>
                   </div>
                   <Button asChild variant="outline" className="mt-2">

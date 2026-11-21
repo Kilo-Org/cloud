@@ -44,16 +44,12 @@ describe('createBoundedStatusLog', () => {
 
   it('does not cut between the halves of a surrogate pair', () => {
     const log = createBoundedStatusLog();
-    // 'a' then emoji: the cap falls between the two halves of one pair.
-    const line = 'a' + '😀'.repeat(STATUS_LOG_MAX_LINE_LENGTH);
-
-    log.push(line);
+    // Emoji only, so the cap lands between the two halves of one pair: with a
+    // plain slice the kept text ends on a high surrogate and cannot render.
+    log.push('😀'.repeat(STATUS_LOG_MAX_LINE_LENGTH));
 
     const [stored] = log.entries();
-    expect(stored?.endsWith('…')).toBe(true);
-    const withoutMarker = stored?.slice(0, -1) ?? '';
-    // A lone surrogate half is not renderable; every pair must stay whole.
-    expect(withoutMarker).toBe(Array.from(withoutMarker).join(''));
+    expect(stored).toBe('😀'.repeat(149) + '…');
   });
 
   it('drops oldest entries first when the total-length ceiling is exceeded', () => {

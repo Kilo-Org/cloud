@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the submit-phase and suggestion-availability suites need the same mock harness, and splitting them would duplicate every module mock */
 // Mounted coverage for the create-mode comment composer's one submit phase:
 // the phase the surface published is the only admission and pending authority,
 // so a second tap during the Terms round-trip is dropped and a rejection
@@ -8,7 +9,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
-import { act } from '@/test/renderer';
+import { act, type ReactTestRenderer } from '@/test/renderer';
 
 import {
   hasCopy,
@@ -32,15 +33,19 @@ vi.hoisted(() => {
 type ConfirmRequest = { readonly confirmLabel: string; readonly onConfirm: () => void };
 
 const {
+  insets,
   announcement,
   confirmRequests,
   connectivity,
   createComment,
+  diffSelection,
   draftLoad,
   gate,
+  keyboard,
   pendingReview,
   termsStatus,
 } = vi.hoisted(() => ({
+  insets: { left: 0, right: 0 },
   announcement: { announce: vi.fn() },
   confirmRequests: [] as ConfirmRequest[],
   connectivity: { value: 'online' },
@@ -48,14 +53,20 @@ const {
     mutateAsync: vi.fn<() => Promise<unknown>>(),
     publish: { current: null as ((state: { error: Error | null }) => void) | null },
   },
+  diffSelection: { value: null as Record<string, unknown> | null },
   draftLoad: { value: { settled: true, value: null as string | null } },
   gate: { status: vi.fn<() => Promise<{ accepted: boolean; currentVersion: string }>>() },
+  keyboard: { visible: false },
   pendingReview: { addComment: vi.fn() },
   termsStatus: { accept: vi.fn<() => Promise<unknown>>() },
 }));
 
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: insets.left, right: insets.right }),
+}));
 vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
+  I18nManager: { isRTL: false, doLeftAndRightSwapInRTL: true },
   Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
   Platform: { OS: 'ios' },
   ScrollView: 'ScrollView',
@@ -71,7 +82,7 @@ vi.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 'Success' },
 }));
 vi.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
-vi.mock('expo-web-browser', () => ({ openBrowserAsync: vi.fn() }));
+vi.mock('expo-router', () => ({ router: { push: vi.fn() } }));
 
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -86,7 +97,7 @@ vi.mock('@/components/ui/dialog', () => ({
 vi.mock('@/components/pr-review/pr-form-sheet-chrome', () => ({
   PrFormSheetFooter: 'PrFormSheetFooter',
   PrFormSheetHeader: 'PrFormSheetHeader',
-  useFormSheetKeyboardVisible: () => false,
+  useFormSheetKeyboardVisible: () => keyboard.visible,
 }));
 vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
   PrReviewReconnectNotice: 'PrReviewReconnectNotice',
@@ -119,7 +130,9 @@ vi.mock('@/lib/persist/use-draft-load', () => ({
 vi.mock('@/lib/persist/use-draft-flush', () => ({ useDraftFlushOnBackground: vi.fn() }));
 
 vi.mock('@/lib/pr-review/build-suggestion-fence', () => ({ buildSuggestionFence: () => null }));
-vi.mock('@/lib/pr-review/diff-selection-bridge', () => ({ getDiffSelection: () => null }));
+vi.mock('@/lib/pr-review/diff-selection-bridge', () => ({
+  getDiffSelection: () => diffSelection.value,
+}));
 vi.mock('@/lib/pr-review/pending-review-provider', () => ({
   usePendingReview: () => ({
     addComment: pendingReview.addComment,
@@ -178,7 +191,9 @@ const NOT_RECORDED = 'We could not record this action. Please try again later.';
 beforeEach(() => {
   confirmRequests.length = 0;
   createComment.publish.current = null;
+  diffSelection.value = null;
   draftLoad.value = { settled: true, value: null };
+  keyboard.visible = false;
   connectivity.value = 'online';
   createComment.mutateAsync.mockReset();
   gate.status.mockReset();
@@ -294,7 +309,7 @@ describe('PrReviewCommentComposer submit phase', () => {
 
     act(() => {
       press(renderer, 'Comment now');
-      press(renderer, 'Cancel');
+      press(renderer, 'Discard');
     });
 
     await act(async () => {
@@ -317,19 +332,19 @@ describe('PrReviewCommentComposer submit phase', () => {
     act(() => {
       press(renderer, 'Comment now');
     });
-    press(renderer, 'Cancel');
+    press(renderer, 'Discard');
     act(() => {
       press(renderer, 'Comment now');
     });
 
     // The abandoned attempt's gate resolves: it writes nothing, and the
-    // successor's slot survives so Cancel still reaches the newer attempt.
+    // successor's slot survives so Discard still reaches the newer attempt.
     await act(async () => {
       abandoned.resolve({ accepted: true, currentVersion: 'v1' });
       await Promise.resolve();
     });
     expect(confirmRequests).toHaveLength(1);
-    press(renderer, 'Cancel');
+    press(renderer, 'Discard');
     expect(confirmRequests).toHaveLength(2);
 
     await act(async () => {
@@ -355,4 +370,90 @@ describe('PrReviewCommentComposer submit phase', () => {
       expect(isDisabled(renderer, 'Comment now')).toBe(false);
     }
   );
+});
+
+describe('PrReviewCommentComposer suggestion availability', () => {
+  const SUGGESTIONS_ADDED_LINES = 'Suggestions only apply to added lines.';
+  const TAP_DIFF_LINE = 'Tap a diff line to enable suggestions.';
+  const INSERT_A11Y = 'Insert a code suggestion';
+
+  function insertButton(renderer: ReactTestRenderer) {
+    return renderer.root
+      .findAllByType('Button')
+      .find(node => node.props.accessibilityLabel === INSERT_A11Y);
+  }
+
+  it('renders the added-lines-only reason on a deleted line', async () => {
+    const renderer = await mountComposer({ ...baseProps, side: 'LEFT' });
+    // The body field still works while the reason is on screen.
+    typeBody(renderer, 'hi');
+
+    expect(hasCopy(renderer, SUGGESTIONS_ADDED_LINES)).toBe(true);
+    expect(insertButton(renderer)).toBeUndefined();
+  });
+
+  it('renders the tap-a-line reason with no diff selection', async () => {
+    const renderer = await mountComposer(baseProps);
+
+    expect(hasCopy(renderer, TAP_DIFF_LINE)).toBe(true);
+    expect(insertButton(renderer)).toBeUndefined();
+  });
+
+  it('renders the Insert button once a line is selected', async () => {
+    diffSelection.value = {
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+      path: 'src/a.ts',
+      side: 'RIGHT',
+      line: 10,
+      selectedText: 'const a = 1;',
+    };
+    keyboard.visible = true;
+    const renderer = await mountComposer(baseProps);
+
+    const button = insertButton(renderer);
+    expect(button).toBeDefined();
+    expect(button?.props.accessibilityHint).toBeUndefined();
+    expect(hasCopy(renderer, SUGGESTIONS_ADDED_LINES)).toBe(false);
+    expect(hasCopy(renderer, TAP_DIFF_LINE)).toBe(false);
+  });
+});
+
+describe('PrReviewCommentComposer body side insets', () => {
+  const LANDSCAPE_LEFT = 51;
+
+  beforeEach(() => {
+    insets.left = 0;
+    insets.right = 0;
+  });
+
+  /** Every `View` that carries the shared helper's inline side padding. */
+  function paddedViews(renderer: ReactTestRenderer) {
+    return renderer.root.findAll(node => {
+      if (String(node.type) !== 'View') {
+        return false;
+      }
+      const style: unknown = node.props.style;
+      return typeof style === 'object' && style !== null && 'paddingLeft' in style;
+    });
+  }
+
+  it('clears the landscape cutout on the body and leaves the footer to its own bar', async () => {
+    insets.left = LANDSCAPE_LEFT;
+    const renderer = await mountComposer(baseProps);
+
+    // One wrapper, around the body only: the trailing footer clears the same
+    // insets on `ScreenFooter`'s own bar, and a second padding here would put
+    // the composer's two CTAs a cutout width inside the page column.
+    expect(paddedViews(renderer).map(node => node.props.style)).toEqual([
+      { paddingLeft: LANDSCAPE_LEFT, paddingRight: 8 },
+    ]);
+  });
+
+  it('leaves the portrait body without an inset style', async () => {
+    const renderer = await mountComposer(baseProps);
+
+    expect(paddedViews(renderer)).toHaveLength(0);
+  });
 });

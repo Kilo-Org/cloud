@@ -6,6 +6,7 @@ import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { INLINE_LINK_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import {
   type CreditDeduction,
@@ -17,7 +18,7 @@ import {
 import { keepZoneWithDate } from '@/lib/credits/expiry-zone';
 import { formatDate, formatPrefixedMoney } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { firstNonEmpty, parseTimestamp } from '@/lib/utils';
+import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
 const DEDUCTION_LABEL_KEYS = {
   deduction: 'credits.history.kind.deduction',
@@ -78,6 +79,8 @@ type PurchaseHistoryRowProps = Readonly<{
   entry: CreditPurchaseEntry;
   isOpeningReceipt: boolean;
   onOpenReceipt: (transactionId: string) => void;
+  /** The final row of the list draws no divider under it. */
+  last: boolean;
 }>;
 
 /**
@@ -99,6 +102,7 @@ export const PurchaseHistoryRow = memo(function PurchaseHistoryRow({
   entry,
   isOpeningReceipt,
   onOpenReceipt,
+  last,
 }: PurchaseHistoryRowProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -109,6 +113,7 @@ export const PurchaseHistoryRow = memo(function PurchaseHistoryRow({
 
   const storeReceiptKey = lookup(STORE_RECEIPT_KEYS, channel);
   const storeReceiptNote = storeReceiptKey ? t(storeReceiptKey) : null;
+  const dateLabel = formatDate(parseTimestamp(entry.date), i18n.language);
   const expiryLabel = entry.expiryDate
     ? keepZoneWithDate(
         t('organization.creditActivity.expiresUtc', {
@@ -118,28 +123,31 @@ export const PurchaseHistoryRow = memo(function PurchaseHistoryRow({
     : null;
 
   return (
-    <View className="gap-1 rounded-lg bg-secondary p-3">
+    <View className={cn('gap-1.5 px-4 py-3', !last && 'border-b-[0.5px] border-hair-soft')}>
       <View className="flex-row items-center justify-between gap-3">
-        <Text className="min-w-0 flex-1 text-sm font-medium text-foreground" numberOfLines={1}>
+        <Text variant="small" className="min-w-0 flex-1" numberOfLines={1}>
           {title}
         </Text>
-        <Text className="text-sm font-medium text-good">
+        <Text variant="small" className="text-good">
           {creditAmountLabel(entry.amount_mUsd)}
         </Text>
         {channel === 'card' && (
           <Pressable
             // The audit reads the pressable's own rect, and the glyph is 14 dp,
-            // so the box carries the floor itself: 28 dp, with the negative
-            // margin cancelling it back to one line so the row keeps its
-            // height (the same form as `INLINE_LINK_BOX_CLASS`). The slop then
-            // carries the reach to 44 dp without overlapping the amount beside
-            // it.
-            className="-my-[7px] min-h-[28px] min-w-[28px] items-center justify-center active:opacity-70"
+            // so the box carries the floor itself through the shared inline
+            // link box (28 dp, with the negative margin cancelling it back to
+            // one line so the row keeps its height). The slop then carries the
+            // reach to 44 dp without overlapping the amount beside it.
+            className={cn(INLINE_LINK_BOX_CLASS, 'active:opacity-70')}
             hitSlop={RECEIPT_HIT_SLOP}
             disabled={isOpeningReceipt}
             accessibilityRole="button"
             accessibilityState={{ busy: isOpeningReceipt }}
-            accessibilityLabel={t('credits.history.receiptA11y', { description: title })}
+            accessibilityLabel={t('credits.history.receiptA11y', {
+              description: title,
+              amount: creditAmountLabel(entry.amount_mUsd),
+              date: dateLabel,
+            })}
             onPress={() => {
               onOpenReceipt(entry.id);
             }}
@@ -153,18 +161,12 @@ export const PurchaseHistoryRow = memo(function PurchaseHistoryRow({
         )}
       </View>
       <View className="flex-row flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <Text className="text-xs text-muted-foreground">
-          {formatDate(parseTimestamp(entry.date), i18n.language)}
-        </Text>
+        <Text variant="caption">{dateLabel}</Text>
         {/* Both lines, not either: a pack Play sold still expires a year after
             purchase, so its row keeps the expiry beside the store that holds
             the receipt. */}
-        {expiryLabel != null && (
-          <Text className="text-xs text-muted-foreground">{expiryLabel}</Text>
-        )}
-        {storeReceiptNote != null && (
-          <Text className="text-xs text-muted-foreground">{storeReceiptNote}</Text>
-        )}
+        {expiryLabel != null && <Text variant="caption">{expiryLabel}</Text>}
+        {storeReceiptNote != null && <Text variant="caption">{storeReceiptNote}</Text>}
       </View>
     </View>
   );
@@ -186,27 +188,18 @@ function LedgerLine({
   return (
     <View className={muted ? 'gap-1 pl-4' : 'gap-1'}>
       <View className="flex-row items-center justify-between gap-3">
-        <Text
-          className={
-            muted
-              ? 'min-w-0 flex-1 text-sm text-muted-foreground'
-              : 'min-w-0 flex-1 text-sm font-medium text-foreground'
-          }
-          numberOfLines={1}
-        >
+        <Text variant={muted ? 'muted' : 'small'} className="min-w-0 flex-1" numberOfLines={1}>
           {title}
         </Text>
-        <Text className={amountMicrodollars >= 0 ? 'text-sm text-good' : 'text-sm text-foreground'}>
+        <Text variant="small" className={amountMicrodollars >= 0 ? 'text-good' : undefined}>
           {creditAmountLabel(amountMicrodollars)}
         </Text>
       </View>
       <View className="flex-row flex-wrap items-center justify-between gap-x-3 gap-y-1">
         {date != null && (
-          <Text className="text-xs text-muted-foreground">
-            {formatDate(parseTimestamp(date), i18n.language)}
-          </Text>
+          <Text variant="caption">{formatDate(parseTimestamp(date), i18n.language)}</Text>
         )}
-        <Text className="text-xs text-muted-foreground">{typeLabel}</Text>
+        <Text variant="caption">{typeLabel}</Text>
       </View>
     </View>
   );
@@ -222,14 +215,15 @@ function LedgerLine({
 export const LedgerHistoryRow = memo(function LedgerHistoryRow({
   deduction,
   grantListed,
-}: Readonly<{ deduction: CreditDeduction; grantListed: boolean }>) {
+  last,
+}: Readonly<{ deduction: CreditDeduction; grantListed: boolean; last: boolean }>) {
   const { t } = useTranslation();
   // The purchase row carries the grant, its receipt, and its expiry date, so a
   // grant printed again here would read as a second purchase.
   const purchase = grantListed ? null : deduction.purchase;
 
   return (
-    <View className="gap-2 rounded-lg bg-secondary p-3">
+    <View className={cn('gap-2 px-4 py-3', !last && 'border-b-[0.5px] border-hair-soft')}>
       <LedgerLine
         title={firstNonEmpty(
           purchase?.description,

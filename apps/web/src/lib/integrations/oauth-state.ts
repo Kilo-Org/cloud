@@ -61,6 +61,12 @@ export type VerifiedOAuthState = {
   /** Optional relative path to return to after the OAuth callback. */
   returnTo?: string;
   purpose?: 'provider_install';
+  /**
+   * Set when the app shell started the flow. The callback may then identify the
+   * user from this state (plus the shell's flow cookie) instead of a web
+   * session, and its redirects stay inside the shell.
+   */
+  appShell?: boolean;
   issuedAt: number;
 };
 
@@ -69,6 +75,8 @@ export type CreateOAuthStateOptions = {
   provider: OAuthStateProvider;
   /** Marks a provider-install state that a callback must consume exactly once. */
   purpose?: 'provider_install';
+  /** Marks a state the app shell minted; see `VerifiedOAuthState.appShell`. */
+  appShell?: boolean;
 };
 
 /**
@@ -91,6 +99,7 @@ export function createOAuthState(
     uid: userId,
     ...(safeReturnTo ? { returnTo: safeReturnTo } : {}),
     ...(options.purpose ? { purpose: options.purpose } : {}),
+    ...(options.appShell ? { appShell: true } : {}),
   });
 }
 
@@ -124,6 +133,7 @@ const OAuthStatePayloadSchema = z.object({
   nonce: z.string().min(1),
   returnTo: z.unknown().optional(),
   purpose: z.enum(['provider_install']).optional(),
+  appShell: z.literal(true).optional(),
 });
 
 export function verifyOAuthStateDetailed(state: string | null): OAuthStateVerificationResult {
@@ -141,6 +151,7 @@ export function verifyOAuthStateDetailed(state: string | null): OAuthStateVerifi
         owner: parsed.data.owner,
         userId: parsed.data.uid,
         issuedAt: parsed.data.iat,
+        ...(parsed.data.appShell === true ? { appShell: true } : {}),
         ...(returnTo ? { returnTo } : {}),
         ...(parsed.data.purpose ? { purpose: parsed.data.purpose } : {}),
       };

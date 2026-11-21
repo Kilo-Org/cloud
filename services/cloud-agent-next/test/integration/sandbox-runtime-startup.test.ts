@@ -39,7 +39,7 @@ const namespace = (env as unknown as { SANDBOX_CONTROL: DurableObjectNamespace<S
   .SANDBOX_CONTROL;
 const workerSecret = (env as unknown as { NEXTAUTH_SECRET: string }).NEXTAUTH_SECRET;
 const SESSION = 'workspace_11111111-1111-1111-1111-111111111111';
-const TARGET_ORG = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
+const TARGET_ORG = '22222222-2222-4222-8222-222222222222';
 const OTHER_ORG = '11111111-1111-4111-8111-111111111111';
 const scopedEnv = {
   NATIVE_RUNTIME_IMAGE: 'runtime-free',
@@ -222,7 +222,7 @@ async function requestPrepare(h: Harness, options: PrepareOptions = {}) {
       userId: 'user_123',
       kiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
       kiloToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
-      orgId: options.orgId ?? 'org_123',
+      orgId: options.orgId,
       ...(options.createdOnPlatform === undefined
         ? {}
         : { createdOnPlatform: options.createdOnPlatform }),
@@ -474,6 +474,20 @@ describe('downloaded startup in the allocation owner', () => {
       await recreate(h, { RUNTIME_KILO2_ORG_IDS: OTHER_ORG });
       expect(harnessOf(h, 1)).toBe('kilo2');
     });
+    it.each([undefined, OTHER_ORG])(
+      'starts v2 for a web account with organization %s when all accounts are enabled',
+      async orgId => {
+        const h = await setup(KILO2_SANDBOX, {}, { ...kilo2Env, RUNTIME_KILO2_ORG_IDS: '*' });
+        await prepare(h, { ...isolatedTarget, orgId });
+        expect(harnessOf(h, 0)).toBe('kilo2');
+        await runInDurableObject(h.stub, async (_instance, state) => {
+          const route = await readRoute(drizzle(state.storage), SESSION);
+          expect(route?.credentialSource).toMatchObject({ billingOrigin: 'cloud-agent-web' });
+          expect(route?.credentialSource?.orgId).toBe(orgId);
+          expect(await state.storage.get('runtime_harness')).toBe('kilo2');
+        });
+      }
+    );
     it('attributes a v2 run to kilo2 before its wrapper connects', async () => {
       const h = await setup(KILO2_SANDBOX, {}, kilo2Env);
       h.provider.adapter.describeRuntime = ref => ({
@@ -497,7 +511,7 @@ describe('downloaded startup in the allocation owner', () => {
     it.each(['cloud-agent', 'code-review', 'desktop', 'agent-manager', 'slack', undefined])(
       'starts v1 when a client claims web but the trusted origin is %s',
       async billingOrigin => {
-        const h = await setup(KILO2_SANDBOX, {}, kilo2Env);
+        const h = await setup(KILO2_SANDBOX, {}, { ...kilo2Env, RUNTIME_KILO2_ORG_IDS: '*' });
         await prepare(h, { ...isolatedTarget, billingOrigin });
         expect(harnessOf(h, 0)).toBe('kilo');
         await runInDurableObject(h.stub, async (_instance, state) => {
@@ -505,7 +519,56 @@ describe('downloaded startup in the allocation owner', () => {
         });
       }
     );
-    it('keeps an unlisted organization sandbox on v1 after the organization joins the list', async () => {
+    it.each(['cloud-agent', 'code-review', 'desktop', 'agent-manager', 'slack', undefined])(
+      'starts v2 from origin %s for an all-session organization',
+      async billingOrigin => {
+        const h = await setup(
+          KILO2_SANDBOX,
+          {},
+          {
+            ...kilo2Env,
+            RUNTIME_KILO2_ALL_SESSION_ORG_IDS: TARGET_ORG,
+          }
+        );
+        await prepare(h, { ...isolatedTarget, billingOrigin });
+        expect(harnessOf(h, 0)).toBe('kilo2');
+        await runInDurableObject(h.stub, async (_instance, state) => {
+          expect(await state.storage.get('runtime_harness')).toBe('kilo2');
+        });
+      }
+    );
+    it('starts v2 on the code-review native class for an all-session organization', async () => {
+      const h = await setup(
+        KILO2_SANDBOX,
+        {},
+        {
+          ...kilo2Env,
+          RUNTIME_KILO2_ALL_SESSION_ORG_IDS: TARGET_ORG,
+        }
+      );
+      await prepare(h, {
+        ...isolatedTarget,
+        sandboxKind: 'code-review',
+        billingOrigin: 'code-review',
+      });
+      expect(harnessOf(h, 0)).toBe('kilo2');
+    });
+    it('keeps a non-web origin on v1 outside the all-session scope', async () => {
+      const h = await setup(
+        KILO2_SANDBOX,
+        {},
+        {
+          ...kilo2Env,
+          RUNTIME_KILO2_ALL_SESSION_ORG_IDS: OTHER_ORG,
+        }
+      );
+      await prepare(h, { ...isolatedTarget, billingOrigin: 'code-review' });
+      expect(harnessOf(h, 0)).toBe('kilo');
+      await runInDurableObject(h.stub, async (_instance, state) => {
+        expect(await state.storage.get('runtime_harness')).toBe('kilo');
+      });
+    });
+    it('keeps an existing v1 sandbox on v1 after enabling all web accounts', async () => {
       const h = await setup(
         UNLISTED_KILO2_SANDBOX,
         {},
@@ -513,7 +576,7 @@ describe('downloaded startup in the allocation owner', () => {
       );
       await prepare(h, isolatedTarget);
       expect(harnessOf(h, 0)).toBe('kilo');
-      await recreate(h, { RUNTIME_KILO2_ORG_IDS: TARGET_ORG });
+      await recreate(h, { RUNTIME_KILO2_ORG_IDS: '*' });
       expect(harnessOf(h, 1)).toBe('kilo');
     });
     it('keeps a sandbox that allocated before the harness record on v1', async () => {

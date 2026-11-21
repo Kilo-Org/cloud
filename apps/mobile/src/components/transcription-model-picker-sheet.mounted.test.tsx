@@ -134,10 +134,24 @@ vi.mock('@/components/picker-sheet', () => ({
     createElement('PickerSheet', props, props.children),
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+// The row skeleton's text cell and the frame's lines render plain host nodes:
+// the real `Text` pulls the slot primitive and the RTL helpers, neither of
+// which this structural suite exercises.
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({ Mic: 'Mic' }));
+// The row primitives notify a selection through the haptic bridge, which loads
+// the expo runtime; the suite asserts structure, not feedback.
+vi.mock('@/lib/haptics', () => ({
+  impactHaptic: () => undefined,
+  notificationHaptic: () => undefined,
+  selectionHaptic: () => undefined,
+}));
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -229,7 +243,12 @@ describe('TranscriptionModelPickerSheet', () => {
         node.props.className.includes('py-3')
     );
     expect(skeletonRows).toHaveLength(6);
-    expect(skeletonRows[0]?.props.className).toContain('items-center justify-between');
+    // The shared skeleton row mirrors the row primitive it stands in for: the
+    // row floor, the gutter and one trailing-free line column.
+    expect(String(skeletonRows[0]?.props.className).split(' ')).toEqual(
+      expect.arrayContaining(['flex-row', 'items-center', 'px-4', 'py-3'])
+    );
+    expect(String(skeletonRows[0]?.props.className)).toContain(ROW_TARGET_CLASS);
     expect(findByType(renderer.root, 'ChoiceRow')).toHaveLength(0);
     expect(findByType(renderer.root, 'EmptyState')).toHaveLength(0);
 

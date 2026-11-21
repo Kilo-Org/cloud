@@ -1,0 +1,95 @@
+name: Cloud Agent E2E nightly
+
+on:
+  schedule:
+    # Deploys main HEAD to the e2e stack, then runs the full deployed suite.
+    # If HEAD's CI is red or still running, the deploy waits for the runtime
+    # publication (up to 45 minutes) and then fails.
+    - cron: '37 3 * * *'
+  workflow_dispatch:
+    inputs:
+      runtime_source_sha:
+        # Only main publishes a runtime. A dispatch from a branch must name a
+        # main SHA here, or the deploy waits up to 45 minutes and then fails.
+        description: 'Main SHA whose published runtime to use; empty uses the run SHA'
+        required: false
+        type: string
+        default: ''
+
+# The deploy job reads the runtime-publication workflow runs.
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: cloud-agent-e2e-nightly
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.repository == 'Kilo-Org/cloud'
+    uses: ./.github/workflows/cloud-agent-e2e-deploy.yml
+    with:
+      runtime_source_sha: ${{ inputs.runtime_source_sha || '' }}
+    secrets: inherit
+
+  tests:
+    needs: deploy
+    uses: ./.github/workflows/cloud-agent-e2e-tests.yml
+    secrets: inherit
+
+  notify-failure:
+    needs: [deploy, tests]
+    # Only main posts to Slack; a branch run never does.
+    if: always() && github.repository == 'Kilo-Org/cloud' && github.ref == 'refs/heads/main' && contains(join(needs.*.result, ','), 'failure')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Notify Slack
+        continue-on-error: true
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        with:
+          webhook: ${{ secrets.DEPLOY_NOTIFY_SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": ":red_circle: Cloud Agent nightly E2E failed"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Commit:*\n<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|`${{ github.sha }}`>"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Deploy:*\n${{ needs.deploy.result }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Failed tests:*\n${{ needs.tests.outputs.failed || 'n/a' }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Summary:*\n${{ needs.tests.outputs.summary || 'summary unavailable' }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>"
+                    }
+                  ]
+                }
+              ]
+            }

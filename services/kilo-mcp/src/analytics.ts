@@ -133,6 +133,17 @@ export type OAuthSignInInput = {
   reason?: string;
   /** Why the reason fired, as a member of the fixed vocabulary; never free text. */
   detail?: OAuthFailureDetail;
+  /**
+   * The account a stored hash of the presented refresh token belongs to. A hash
+   * match is the only proof of the account, so this binds no identity either:
+   * it rides as a property and the event stays anonymous.
+   */
+  tokenUserId?: string;
+  /**
+   * The account named in the presented token's prefix when no stored hash
+   * matched. Caller-controlled input, reported as unverified attribution.
+   */
+  unverifiedTokenUserId?: string;
 };
 
 /** `kilo_mcp_session_started`. */
@@ -189,6 +200,10 @@ export function oauthSignInEvent(input: OAuthSignInInput): McpAnalyticsEvent {
   if (input.clientId !== undefined) properties['clientId'] = input.clientId;
   if (input.reason !== undefined) properties['reason'] = input.reason;
   if (input.detail !== undefined) properties['detail'] = input.detail;
+  if (input.tokenUserId !== undefined) properties['tokenUserId'] = input.tokenUserId;
+  if (input.unverifiedTokenUserId !== undefined) {
+    properties['unverifiedTokenUserId'] = input.unverifiedTokenUserId;
+  }
   return { event: OAUTH_EVENT_BY_PHASE[input.phase], identity: input.identity, properties };
 }
 

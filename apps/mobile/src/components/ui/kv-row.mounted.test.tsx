@@ -10,6 +10,7 @@ import { KvRow } from './kv-row';
 // the RTL cases flip.
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('react-native', () => ({ I18nManager: i18nManager, Text: 'Text', View: 'View' }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 vi.mock('@/components/ui/icons', () => ({}));
@@ -82,6 +83,8 @@ function renderRow(
     | {
         value: string;
         selectable?: boolean;
+        testID?: string;
+        caption?: string;
         valueDirection?: 'ltr';
         valueFace?: 'mono' | 'text' | 'numeric';
         valueStatus?: { label: string; tone: 'good' | 'warn' | 'danger' | 'muted' };
@@ -129,6 +132,15 @@ afterEach(() => {
 });
 
 describe('KvRow mounted layout', () => {
+  it('takes the contract row anatomy without a divider of its own', () => {
+    const root = renderRow({ value: '1.2.3' });
+    const row = root.findAll(node => Object.is(node.type, 'View'))[0];
+    const classes = String(row?.props.className).split(' ');
+
+    expect(classes).toEqual(expect.arrayContaining(['min-h-[48px]', 'px-4', 'py-3']));
+    expect(classes.some(name => name.startsWith('border-'))).toBe(false);
+  });
+
   // Android's `selectable` routes the value through ReactTextView, which drops
   // the `maxLines` clamp on attach, so a clamped selectable value wrapped past
   // the one-line row height and painted a clipped second line (SPOT-DEFECT:
@@ -248,5 +260,50 @@ describe('KvRow value status', () => {
     // The label and the value paragraph, with no status node inside it.
     expect(nodes).toHaveLength(2);
     expect(nodes[1]?.props.children).toContain('Teams');
+  });
+});
+
+describe('KvRow caption', () => {
+  const captionText = 'Trial ends on Nov 24, 2026';
+
+  // The trial a plan is running cannot share the value's line: the tier keeps
+  // one line, and a right-to-left interface would otherwise order the tier
+  // after the date. So the caption is its own paragraph below both columns.
+  it('paints the caption as its own muted right-aligned line below the row', () => {
+    const root = renderRow({ value: 'Teams', valueFace: 'text', caption: captionText });
+    const caption = root.find(
+      node => Object.is(node.type, 'Text') && node.children.includes(captionText)
+    );
+
+    expect(String(caption.props.className)).toContain('pt-1');
+    expect(String(caption.props.className)).toContain('text-right');
+    expect(String(caption.props.className)).toContain('text-xs');
+    expect(String(caption.props.className)).toContain('text-muted-foreground');
+    expect(caption.props.numberOfLines).toBe(2);
+    expect(caption.props.ellipsizeMode).toBe('tail');
+
+    // Outside the value paragraph, so the two never share a bidi run …
+    const value = valueText(root, 'Teams');
+    expect(value.findAllByType('Text')).not.toContain(caption);
+    // … and below the row that holds both columns, not inside it.
+    expect(caption.parent).not.toBe(value.parent);
+    expect(String(caption.parent?.props.className)).not.toContain('flex-row');
+  });
+
+  it('paints no caption line on a row that carries none', () => {
+    const nodes = renderRow({ value: 'Teams' }).findAllByType('Text');
+
+    expect(nodes).toHaveLength(2);
+    expect(nodes.some(node => String(node.props.className).includes('text-xs'))).toBe(false);
+  });
+});
+
+describe('KvRow test handle', () => {
+  it("puts the caller's testID on the row container", () => {
+    const row = renderRow({ value: '1.2.3', testID: 'kv-1' }).find(
+      node => typeof node.type === 'string' && node.props.testID === 'kv-1'
+    );
+
+    expect(row.type).toBe('View');
   });
 });

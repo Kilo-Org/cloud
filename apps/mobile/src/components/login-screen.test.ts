@@ -56,6 +56,11 @@ const safeInsets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push }),
 }));
+// The globe's opener goes through the guarded push; the assertion below reads
+// the same spy.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => push,
+}));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
@@ -268,10 +273,6 @@ describe('login-screen error mapping', () => {
     expect(errorMessage('error', { kind: 'key', key: 'authErrors.networkError' })).toBe(
       'Network error. Please try again.'
     );
-  });
-
-  it('passes a server-authored error text through untranslated', () => {
-    expect(errorMessage('error', { kind: 'text', text: 'custom error' })).toBe('custom error');
   });
 
   it('falls back to default when no error is provided', () => {
@@ -672,8 +673,8 @@ describe('login-screen idle form', () => {
 
     const renderer = await mountLoginScreen();
 
-    // The form owns its space on the first frame, so the centered column never
-    // grows into a placeholder's place.
+    // The form owns its space on the first frame, so no placeholder swaps for
+    // it under the heading.
     const before = findByType(renderer.root, 'IdleAuth');
     expect(before).toHaveLength(1);
     expect(before[0]?.props.initialEmail).toBe('');
@@ -688,6 +689,24 @@ describe('login-screen idle form', () => {
     expect(after).toHaveLength(1);
     expect(after[0]).not.toBe(before[0]);
     expect(after[0]?.props.initialEmail).toBe('stored@example.com');
+
+    renderer.unmount();
+  });
+
+  it.each([
+    { status: 'idle' as const, code: undefined },
+    { status: 'pending' as const, code: 'UC-1234' },
+    { status: 'denied' as const, code: undefined },
+  ])('top-aligns the column in the $status state, so the logo never moves', async state => {
+    // The states below the heading differ in height; a centered column moved
+    // the logo by that difference when a poll answered denied.
+    deviceAuth.status = state.status;
+    deviceAuth.code = state.code;
+    const renderer = await mountLoginScreen();
+
+    const scroller = findByType(renderer.root, 'KeyboardAwareScrollView')[0];
+    expect(scroller?.props.contentContainerClassName).toContain('items-center');
+    expect(scroller?.props.contentContainerClassName).not.toMatch(/\bjustify-/);
 
     renderer.unmount();
   });

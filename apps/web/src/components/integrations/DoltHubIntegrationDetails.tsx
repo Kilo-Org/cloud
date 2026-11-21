@@ -75,7 +75,7 @@ export function DoltHubIntegrationDetails({
 
   const handleConnect = () => {
     setIsStartingConnection(true);
-    window.location.href = getPlatformOAuthConnectPath(PLATFORM.DOLTHUB, organizationId);
+    window.location.href = getPlatformOAuthConnectPath(PLATFORM.DOLTHUB, { organizationId });
   };
 
   const handleDisconnect = async () => {

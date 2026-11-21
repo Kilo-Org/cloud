@@ -4,10 +4,9 @@
 
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Skeleton } from '@/components/ui/skeleton';
-import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
+import { useDetailScreenBottomPadding, useStyleSideInsets } from '@/lib/screen-insets';
 
 const SKELETON_ROWS = [0, 1, 2, 3, 4, 5, 6, 7] as const;
 
@@ -18,7 +17,7 @@ export function PrDiffFileListLoading() {
   // skeleton rows off the sensor, matching the loaded FlashList whose content
   // container carries the same side insets. Zero insets collapse the style so
   // portrait geometry is byte-identical.
-  const insets = useSafeAreaInsets();
+  const insets = useStyleSideInsets();
   const sideInsetStyle =
     insets.left > 0 || insets.right > 0
       ? {
@@ -36,7 +35,7 @@ export function PrDiffFileListLoading() {
       {SKELETON_ROWS.map(index => (
         <View
           key={`file-list-skeleton-${index}`}
-          className="flex-row items-center gap-3 border-b border-hair-soft px-4 py-3"
+          className="flex-row items-center gap-3 border-b-[0.5px] border-hair-soft px-4 py-3"
         >
           <Skeleton className="h-5 w-5 rounded-md" />
           <View className="flex-1 gap-1.5">

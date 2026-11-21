@@ -1,6 +1,11 @@
 import { describe, expect, it } from '@jest/globals';
+import { EndpointPricingSchema } from '@kilocode/db/schema-types';
 import {
   getModelDisplayPricing,
+  getPeakPricing,
+  getWorstCaseModelPricing,
+  getWorstCasePeakPricing,
+  maxEndpointPricing,
   undoPricingDiscount,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
 
@@ -59,7 +64,360 @@ describe('getModelDisplayPricing', () => {
     });
   });
 
+  it('shows the undiscounted peak price', () => {
+    expect(
+      getModelDisplayPricing({
+        prompt: '0.00000005',
+        completion: '0.0000001',
+        discount: 0.5,
+        overrides: [{ prompt: '0.0000001', completion: '0.0000002' }],
+      })
+    ).toEqual({ prompt: '0.000000200000', completion: '0.000000400000' });
+  });
+
   it('returns undefined when there is no pricing', () => {
     expect(getModelDisplayPricing(undefined)).toBeUndefined();
+  });
+
+  it('ignores a long-context override', () => {
+    expect(
+      getModelDisplayPricing({
+        prompt: '0.000008',
+        completion: '0.00004',
+        overrides: [{ min_prompt_tokens: 272000, prompt: '0.000016', completion: '0.00006' }],
+      })
+    ).toEqual({ prompt: '0.000008', completion: '0.00004' });
+  });
+});
+
+describe('getWorstCaseModelPricing', () => {
+  const pricing = {
+    prompt: '0.000008',
+    completion: '0.00004',
+    discount: 0.5,
+    overrides: [{ min_prompt_tokens: 272000, prompt: '0.000016', completion: '0.00006' }],
+  };
+
+  it('includes the long-context override and undoes the discount', () => {
+    expect(getWorstCaseModelPricing(pricing)).toEqual({
+      prompt: '0.000032000000',
+      completion: '0.000120000000',
+    });
+  });
+
+  it('returns undefined when there is no pricing', () => {
+    expect(getWorstCaseModelPricing(undefined)).toBeUndefined();
+  });
+});
+
+describe('getPeakPricing', () => {
+  it('takes the highest OpenRouter time-of-day window and drops the windows', () => {
+    expect(
+      getPeakPricing({
+        prompt: '0.00000009',
+        completion: '0.00000036',
+        input_cache_read: '0.0000000018',
+        discount: 0,
+        overrides: [
+          {
+            utc_start: 0,
+            utc_end: 1400,
+            prompt: '0.00000018',
+            completion: '0.00000072',
+            input_cache_read: '0.0000000036',
+          },
+          { utc_start: 1400, utc_end: 0, prompt: '0.00000009', completion: '0.00000036' },
+        ],
+      })
+    ).toEqual({
+      prompt: '0.00000018',
+      completion: '0.00000072',
+      input_cache_read: '0.0000000036',
+      discount: 0,
+    });
+  });
+
+  it("multiplies Vercel's token prices by the peak multiplier and drops the multiplier", () => {
+    expect(
+      getPeakPricing({
+        prompt: '0.00000015',
+        completion: '0.0000006',
+        input_cache_read: '0.000000015',
+        image: '0.01',
+        web_search: '0.005',
+        peak_pricing: {
+          multiplier: 2,
+          windows: [{ start_minute_utc: 0, end_minute_utc: 840 }],
+        },
+      })
+    ).toEqual({
+      prompt: '0.000000300000',
+      completion: '0.000001200000',
+      input_cache_read: '0.000000030000',
+      image: '0.01',
+      web_search: '0.005',
+    });
+  });
+
+  it('leaves pricing without time-of-day prices untouched', () => {
+    const pricing = { prompt: '0.000001', completion: '0.000002' };
+    expect(getPeakPricing(pricing)).toBe(pricing);
+  });
+
+  it('ignores long-context overrides but keeps time-of-day windows', () => {
+    expect(
+      getPeakPricing({
+        prompt: '0.000008',
+        completion: '0.00004',
+        overrides: [
+          { utc_start: 0, utc_end: 1400, prompt: '0.00001', completion: '0.00005' },
+          { utc_start: 1400, utc_end: 0, prompt: '0.000008', completion: '0.00004' },
+          { min_prompt_tokens: 272000, prompt: '0.000016', completion: '0.00006' },
+          {
+            utc_start: 0,
+            utc_end: 1400,
+            min_prompt_tokens: 272000,
+            prompt: '0.00002',
+            completion: '0.00008',
+          },
+        ],
+      })
+    ).toEqual({ prompt: '0.00001', completion: '0.00005' });
+  });
+
+  it('treats a zero prompt-token threshold as a time-of-day window', () => {
+    expect(
+      getPeakPricing({
+        prompt: '0.000001',
+        completion: '0.000002',
+        overrides: [{ min_prompt_tokens: 0, prompt: '0.000002', completion: '0.000004' }],
+      })
+    ).toEqual({ prompt: '0.000002', completion: '0.000004' });
+  });
+
+  it('ignores Vercel price tiers beyond the first and drops them', () => {
+    const pricing = {
+      prompt: '0.000001',
+      completion: '0.000002',
+      prompt_tiers: [
+        { cost: '0.000001', min: 0, max: 200000 },
+        { cost: '0.000005', min: 200000 },
+      ],
+      completion_tiers: [
+        { cost: '0.000002', min: 0, max: 200000 },
+        { cost: '0.00001', min: 200000 },
+      ],
+    };
+    expect(getPeakPricing(pricing)).toEqual({ prompt: '0.000001', completion: '0.000002' });
+  });
+
+  it('applies the Vercel peak multiplier to the first-tier price only', () => {
+    expect(
+      getPeakPricing({
+        prompt: '0.000001',
+        completion: '0.000002',
+        prompt_tiers: [
+          { cost: '0.000001', min: 0, max: 200000 },
+          { cost: '0.000005', min: 200000 },
+        ],
+        peak_pricing: { multiplier: 2 },
+      })
+    ).toEqual({ prompt: '0.000002000000', completion: '0.000004000000' });
+  });
+
+  it('takes the highest Vercel price tier of each price in the worst case', () => {
+    expect(
+      getWorstCasePeakPricing({
+        prompt: '0.000001',
+        completion: '0.000002',
+        input_cache_read: '0.0000001',
+        input_cache_write: '0.00000125',
+        prompt_tiers: [
+          { cost: '0.000001', min: 0, max: 128000 },
+          { cost: '0.0000025', min: 128000, max: 256000 },
+          { cost: '0.000002', min: 256000 },
+        ],
+        completion_tiers: [
+          { cost: '0.000002', min: 0, max: 128000 },
+          { cost: '0.00001', min: 128000 },
+        ],
+        input_cache_read_tiers: [
+          { cost: '0.0000001', min: 0, max: 128000 },
+          { cost: '0.0000003', min: 128000 },
+        ],
+        input_cache_write_tiers: [
+          { cost: '0.00000125', min: 0, max: 128000 },
+          { cost: '0.0000025', min: 128000 },
+        ],
+      })
+    ).toEqual({
+      prompt: '0.0000025',
+      completion: '0.00001',
+      input_cache_read: '0.0000003',
+      input_cache_write: '0.0000025',
+    });
+  });
+
+  it('multiplies the highest Vercel price tier by the peak multiplier in the worst case', () => {
+    expect(
+      getWorstCasePeakPricing({
+        prompt: '0.000001',
+        completion: '0.000002',
+        prompt_tiers: [
+          { cost: '0.000001', min: 0, max: 200000 },
+          { cost: '0.000005', min: 200000 },
+        ],
+        peak_pricing: { multiplier: 2 },
+      })
+    ).toEqual({ prompt: '0.000010000000', completion: '0.000004000000' });
+  });
+
+  it('undoes a discount on the highest Vercel price tier in the worst case', () => {
+    expect(
+      getWorstCaseModelPricing({
+        prompt: '0.0000005',
+        completion: '0.000001',
+        discount: 0.5,
+        prompt_tiers: [
+          { cost: '0.0000005', min: 0, max: 200000 },
+          { cost: '0.000002', min: 200000 },
+        ],
+      })
+    ).toEqual({ prompt: '0.000004000000', completion: '0.000002000000' });
+  });
+
+  it('combines a long-context override with the Vercel multiplier only in the worst case', () => {
+    const pricing = {
+      prompt: '0.000001',
+      completion: '0.000002',
+      overrides: [{ min_prompt_tokens: 200000, prompt: '0.000003', completion: '0.000006' }],
+      peak_pricing: { multiplier: 2 },
+    };
+    expect(getPeakPricing(pricing)).toEqual({
+      prompt: '0.000002000000',
+      completion: '0.000004000000',
+    });
+    expect(getWorstCasePeakPricing(pricing)).toEqual({
+      prompt: '0.000006000000',
+      completion: '0.000012000000',
+    });
+  });
+});
+
+describe("Vercel's endpoints pricing payload", () => {
+  // The pricing of an endpoint in Vercel's `/v1/models/{id}/endpoints` response, unmodified.
+  const pricing = EndpointPricingSchema.parse({
+    prompt: '0.0000005',
+    prompt_tiers: [
+      { cost: '0.0000005', min: 0, max: 256000 },
+      { cost: '0.000002', min: 256000 },
+    ],
+    completion: '0.000003',
+    completion_tiers: [
+      { cost: '0.000003', min: 0, max: 256000 },
+      { cost: '0.000006', min: 256000 },
+    ],
+    image: '0',
+    image_output: '0',
+    web_search: '0',
+    internal_reasoning: '0',
+    input_cache_read: '0.00000005',
+    input_cache_read_tiers: [
+      { cost: '0.00000005', min: 0, max: 256000 },
+      { cost: '0.0000002', min: 256000 },
+    ],
+    input_cache_write: '0.000000625',
+    input_cache_write_tiers: [
+      { cost: '0.000000625', min: 0, max: 256000 },
+      { cost: '0.0000025', min: 256000 },
+    ],
+    discount: 0,
+  });
+  const basePrices = {
+    image: '0',
+    web_search: '0',
+    internal_reasoning: '0',
+  };
+
+  it('displays the first tier', () => {
+    expect(getModelDisplayPricing(pricing)).toEqual({
+      ...basePrices,
+      prompt: '0.0000005',
+      completion: '0.000003',
+      input_cache_read: '0.00000005',
+      input_cache_write: '0.000000625',
+      discount: 0,
+    });
+  });
+
+  it('bounds spending at the highest tier', () => {
+    expect(getWorstCaseModelPricing(pricing)).toEqual({
+      ...basePrices,
+      prompt: '0.000002',
+      completion: '0.000006',
+      input_cache_read: '0.0000002',
+      input_cache_write: '0.0000025',
+      discount: 0,
+    });
+  });
+});
+
+describe('maxEndpointPricing', () => {
+  it('takes the higher of each price', () => {
+    expect(
+      maxEndpointPricing(
+        { prompt: '0.000002', completion: '0.000003', input_cache_read: '0.0000002' },
+        { prompt: '0.000001', completion: '0.000005', input_cache_read: '0.0000001' }
+      )
+    ).toEqual({ prompt: '0.000002', completion: '0.000005', input_cache_read: '0.0000002' });
+  });
+
+  it('compares prices numerically rather than as strings', () => {
+    expect(
+      maxEndpointPricing(
+        { prompt: '0.0000009', completion: '0.00001' },
+        { prompt: '0.000001', completion: '0.000009' }
+      )
+    ).toEqual({ prompt: '0.000001', completion: '0.00001' });
+  });
+
+  it('keeps prices only one side has', () => {
+    expect(
+      maxEndpointPricing(
+        { prompt: '0.000001', completion: '0.000002', request: '0.01' },
+        { prompt: '0.000001', completion: '0.000002', input_cache_write: '0.000003' }
+      )
+    ).toEqual({
+      prompt: '0.000001',
+      completion: '0.000002',
+      request: '0.01',
+      input_cache_write: '0.000003',
+    });
+  });
+
+  it('ignores an unparsable price on the other side', () => {
+    expect(
+      maxEndpointPricing(
+        { prompt: '0.000001', completion: '0.000002' },
+        { prompt: 'n/a', completion: '0.000003', input_cache_read: 'n/a' }
+      )
+    ).toEqual({ prompt: '0.000001', completion: '0.000003' });
+  });
+
+  it('does not add zero prices the first side lacks', () => {
+    expect(
+      maxEndpointPricing(
+        { prompt: '0.000001', completion: '0.000002' },
+        { prompt: '0.000001', completion: '0.000002', image: '0', web_search: '0' }
+      )
+    ).toEqual({ prompt: '0.000001', completion: '0.000002' });
+  });
+
+  it('does not modify its arguments', () => {
+    const a = { prompt: '0.000001', completion: '0.000002' };
+    const b = { prompt: '0.000002', completion: '0.000001' };
+    maxEndpointPricing(a, b);
+    expect(a).toEqual({ prompt: '0.000001', completion: '0.000002' });
+    expect(b).toEqual({ prompt: '0.000002', completion: '0.000001' });
   });
 });

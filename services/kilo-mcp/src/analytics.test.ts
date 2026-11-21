@@ -161,6 +161,47 @@ describe('event builders: property allowlists', () => {
     );
     expect(withoutDetail.properties['detail']).toBeUndefined();
   });
+
+  it('oauthSignInEvent carries attribution as properties and stays anonymous', () => {
+    const verified = buildCapturePayload(
+      oauthSignInEvent({
+        identity: null,
+        phase: 'failed',
+        reason: 'invalid_grant',
+        detail: 'grant_not_found',
+        tokenUserId: 'user-7',
+      }),
+      API_KEY
+    );
+    expect(verified.distinct_id).toBe(ANONYMOUS_DISTINCT_ID);
+    expect(verified.properties['tokenUserId']).toBe('user-7');
+    expect(verified.properties['unverifiedTokenUserId']).toBeUndefined();
+    expect(verified.properties['userId']).toBeUndefined();
+    expect(verified.properties['$process_person_profile']).toBe(false);
+    expectExactKeys(verified, [...BASE_ANON, 'phase', 'reason', 'detail', 'tokenUserId']);
+
+    const unverified = buildCapturePayload(
+      oauthSignInEvent({
+        identity: null,
+        phase: 'failed',
+        reason: 'invalid_grant',
+        detail: 'grant_not_found',
+        unverifiedTokenUserId: 'user-9',
+      }),
+      API_KEY
+    );
+    expect(unverified.distinct_id).toBe(ANONYMOUS_DISTINCT_ID);
+    expect(unverified.properties['unverifiedTokenUserId']).toBe('user-9');
+    expect(unverified.properties['tokenUserId']).toBeUndefined();
+    expect(unverified.properties['$process_person_profile']).toBe(false);
+    expectExactKeys(unverified, [
+      ...BASE_ANON,
+      'phase',
+      'reason',
+      'detail',
+      'unverifiedTokenUserId',
+    ]);
+  });
 });
 
 describe('identity binding', () => {

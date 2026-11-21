@@ -24,7 +24,8 @@ describe('extractTermsMainHtml', () => {
 
     expect(result).toContain('Terms of Service');
     expect(result).toContain('Terms body');
-    expect(result).toContain('href="https://kilo.ai/support"');
+    expect(result).toMatch(/<span>Support<\/span>/);
+    expect(result).not.toContain('href="https://kilo.ai/support"');
     expect(result).not.toContain('Pricing');
     expect(result).not.toContain('Privacy');
   });

@@ -782,7 +782,7 @@ describe('organization admin router', () => {
 
     it('should store expiry_date on credit transaction', async () => {
       const caller = await createCallerForUser(adminUser.id);
-      const expiryDate = '2024-06-01T00:00:00.000Z';
+      const expiryDate = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
 
       await caller.organizations.admin.grantCredit({
         organizationId: testOrganization.id,
@@ -798,6 +798,55 @@ describe('organization admin router', () => {
       expect(txn).toBeDefined();
       expect(new Date(txn.expiry_date!).toISOString()).toBe(expiryDate);
       expect(txn.expiration_baseline_microdollars_used).toBe(0);
+    });
+
+    it('should refuse an expiry_date that is not in the future', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+
+      await expect(
+        caller.organizations.admin.grantCredit({
+          organizationId: testOrganization.id,
+          amount_usd: 10,
+          expiry_date: '2024-06-01T00:00:00.000Z',
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('Expiry date must be in the future'),
+      });
+
+      const txn = await db
+        .select()
+        .from(credit_transactions)
+        .where(eq(credit_transactions.organization_id, testOrganization.id));
+      expect(txn).toHaveLength(0);
+    });
+
+    it('should allow a past expiry_date on paid credits and negative grants', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      const pastDate = '2024-06-01T00:00:00.000Z';
+
+      // Paid credits store the purchase policy expiry, not the supplied one.
+      await caller.organizations.admin.grantCredit({
+        organizationId: testOrganization.id,
+        amount_usd: 10,
+        creditKind: 'paid',
+        expiry_date: pastDate,
+      });
+      // Negative grants store no expiry at all.
+      await caller.organizations.admin.grantCredit({
+        organizationId: testOrganization.id,
+        amount_usd: -5,
+        description: 'Debit with past expiry',
+        expiry_date: pastDate,
+      });
+
+      const txns = await db
+        .select()
+        .from(credit_transactions)
+        .where(eq(credit_transactions.organization_id, testOrganization.id));
+      expect(txns).toHaveLength(2);
+      const debit = txns.find(t => t.amount_microdollars < 0)!;
+      expect(debit.expiry_date).toBeNull();
     });
 
     it('should store expiry from expiry_hours', async () => {
@@ -848,7 +897,7 @@ describe('organization admin router', () => {
 
     it('should update next_credit_expiration_at on org', async () => {
       const caller = await createCallerForUser(adminUser.id);
-      const expiryDate = '2024-03-15T00:00:00.000Z';
+      const expiryDate = new Date(Date.now() + 45 * 24 * 3600 * 1000).toISOString();
 
       await caller.organizations.admin.grantCredit({
         organizationId: testOrganization.id,
@@ -923,7 +972,7 @@ describe('organization admin router', () => {
       await caller.organizations.admin.grantCredit({
         organizationId: testOrganization.id,
         amount_usd: 10,
-        expiry_date: '2024-06-01T00:00:00.000Z',
+        expiry_date: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
       });
 
       const [txn] = await db
@@ -1541,6 +1590,74 @@ describe('organization admin router', () => {
         expect(updatedChildOrganization.require_seats).toBe(false);
         expect(updatedChildOrganization.free_trial_end_at).toBeNull();
         expect(updatedChildOrganization.settings.suppress_trial_messaging).toBe(true);
+      } finally {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: null })
+          .where(eq(organizations.id, childOrganization.id));
+        await db
+          .delete(organizations)
+          .where(inArray(organizations.id, [childOrganization.id, parentOrganization.id]));
+      }
+    });
+
+    it('moves the Anthropic user profile id with the parent organization', async () => {
+      const searchPrefix = `Admin Profile Hierarchy ${crypto.randomUUID()}`;
+      const parentOrganization = await createTestOrganization(
+        `${searchPrefix} parent`,
+        adminUser.id,
+        0
+      );
+      const childOrganization = await createTestOrganization(
+        `${searchPrefix} child`,
+        adminUser.id,
+        0
+      );
+      const readProfileId = async (organizationId: string) => {
+        const [row] = await db
+          .select({ id: organizations.anthropic_user_profile_id })
+          .from(organizations)
+          .where(eq(organizations.id, organizationId));
+        return row.id;
+      };
+
+      try {
+        await db
+          .update(organizations)
+          .set({ anthropic_user_profile_id: 'uprof_parent' })
+          .where(eq(organizations.id, parentOrganization.id));
+        await db
+          .update(organizations)
+          .set({ anthropic_user_profile_id: 'uprof_child_own' })
+          .where(eq(organizations.id, childOrganization.id));
+        const caller = await createCallerForUser(adminUser.id);
+
+        await caller.organizations.admin.setParent({
+          organizationId: childOrganization.id,
+          parentOrganizationId: parentOrganization.id,
+        });
+        expect(await readProfileId(childOrganization.id)).toBe('uprof_parent');
+
+        await caller.organizations.admin.setParent({
+          organizationId: childOrganization.id,
+          parentOrganizationId: null,
+        });
+        expect(await readProfileId(childOrganization.id)).toBeNull();
+        expect(await readProfileId(parentOrganization.id)).toBe('uprof_parent');
+
+        await db
+          .update(organizations)
+          .set({ anthropic_user_profile_id: null })
+          .where(eq(organizations.id, parentOrganization.id));
+        await db
+          .update(organizations)
+          .set({ anthropic_user_profile_id: 'uprof_child_own' })
+          .where(eq(organizations.id, childOrganization.id));
+        await caller.organizations.admin.setParent({
+          organizationId: childOrganization.id,
+          parentOrganizationId: parentOrganization.id,
+        });
+        expect(await readProfileId(childOrganization.id)).toBeNull();
       } finally {
         await db
           .update(organizations)

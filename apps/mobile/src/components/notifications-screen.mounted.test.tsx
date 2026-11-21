@@ -6,7 +6,7 @@
 // with an inline retry, a UNAUTHORIZED failure disables the row with no retry,
 // and an unresolved preference query renders a skeleton with no control.
 
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -74,10 +74,14 @@ vi.mock('expo-notifications', () => ({
 }));
 vi.mock('expo-application', () => ({ nativeApplicationVersion: '1.0.4' }));
 vi.mock('sonner-native', () => ({ toast: { error: toastError, success: vi.fn() } }));
+// RowFrame's trailing renderer calls the selection haptic; the real module loads
+// expo-haptics' runtime, which reads `__DEV__`.
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('@/components/ui/icons', () => ({
   Bell: 'Bell',
   BellOff: 'BellOff',
   Bot: 'Bot',
+  Check: 'Check',
   CircleCheck: 'CircleCheck',
   KeyRound: 'KeyRound',
   ListTodo: 'ListTodo',
@@ -89,6 +93,66 @@ vi.mock('@/components/ui/icons', () => ({
   Wallet: 'Wallet',
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
+// The layout primitives the screen composes. Each mock renders the content the
+// assertions drive: the row text, the control a row carries in its trailing
+// slot, and a skeleton bar for the loading geometry.
+vi.mock('@/components/ui/section', () => ({
+  // The real `Section` draws its label through `SectionHeader`; the mock keeps
+  // the label in the tree so the assertions can read the section names.
+  Section: ({ label, children }: { label?: string; children?: ReactNode }): ReactNode =>
+    createElement(
+      'View',
+      null,
+      label === undefined ? null : createElement('Text', null, label),
+      children
+    ),
+}));
+vi.mock('@/components/ui/row-group', () => ({
+  RowGroup: ({ children }: { children?: ReactNode }): ReactNode => children,
+}));
+vi.mock('@/components/ui/card', () => ({ Card: 'View' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Pressable' }));
+vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: () => createElement('Skeleton') }));
+vi.mock('@/components/ui/configure-row', () => ({
+  ConfigureRow: (props: {
+    title: string;
+    subtitle?: string;
+    subtitlePlaceholder?: ReactNode;
+    trailing?: ReactNode;
+  }) =>
+    createElement(
+      'View',
+      null,
+      createElement('Text', null, props.title),
+      props.subtitle === undefined
+        ? (props.subtitlePlaceholder ?? null)
+        : createElement('Text', null, props.subtitle),
+      props.trailing ?? null
+    ),
+}));
+vi.mock('@/components/ui/preference-row', () => ({
+  PreferenceRow: (props: {
+    title: string;
+    subtitle: string;
+    value: boolean;
+    disabled: boolean;
+    accessibilityLabel?: string;
+    onValueChange: (value: boolean) => void;
+  }) =>
+    createElement(
+      'View',
+      null,
+      createElement('Text', null, props.title),
+      createElement('Text', null, props.subtitle),
+      createElement('Switch', {
+        value: props.value,
+        disabled: props.disabled,
+        accessibilityLabel: props.accessibilityLabel ?? props.title,
+        onValueChange: props.onValueChange,
+      })
+    ),
+}));
+
 // The briefing toggle reads the briefing preferences through the briefing API
 // and the native SQLCipher dismissal journal; the notification categories this
 // suite asserts are independent of it.
@@ -96,7 +160,7 @@ vi.mock('@/components/agent-briefing/briefing-notification-toggle', () => ({
   BriefingNotificationCategoryRow: () => null,
 }));
 vi.mock('@/components/tab-screen', () => ({
-  TabScreenScrollView: (props: { children?: unknown }) => props.children,
+  TabScreenScrollView: ({ children }: { children?: ReactNode }): ReactNode => children,
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -160,11 +224,9 @@ type I = ReactTestInstance;
 
 function fullCapabilities(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    chatMessages: { available: true, unavailableReasonCode: null },
     agentAttention: { available: true, unavailableReasonCode: null },
     agentUpdates: { available: true, unavailableReasonCode: null },
     sessionStatus: { available: true, unavailableReasonCode: null },
-    kiloclawActivity: { available: true, unavailableReasonCode: null },
     balanceAlerts: { available: true, unavailableReasonCode: null },
     spendAlerts: { available: true, unavailableReasonCode: null },
     securityFindings: { available: true, unavailableReasonCode: null },
@@ -174,11 +236,9 @@ function fullCapabilities(overrides: Record<string, unknown> = {}): Record<strin
 
 function fullPrefs(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    chatMessages: true,
     agentAttention: true,
     agentUpdates: true,
     sessionStatus: true,
-    kiloclawActivity: true,
     balanceAlerts: true,
     spendAlerts: true,
     securityFindings: true,
@@ -364,7 +424,6 @@ describe('NotificationsScreen category rows', () => {
     prefsQueryFn.mockResolvedValue(fullPrefs());
     const { renderer } = await renderScreen();
     await waitForEnabledSwitch(renderer, 'Agent updates');
-    expect(switchesByLabel(renderer.root, 'KiloClaw activity')).toHaveLength(0);
     expect(switchesByLabel(renderer.root, 'Chat messages')).toHaveLength(0);
     act(() => {
       switchOnValueChange(renderer.root, 'Agent updates')?.(false);
@@ -599,12 +658,9 @@ describe('NotificationsScreen category availability', () => {
     expect(textWithChildren(renderer.root, 'SERVER PROSE SENTINEL').length).toBe(0);
   });
 
-  it('paints the unavailable row with the muted switch pair, and keeps the accent beside it', async () => {
-    // A dimmed title beside a full-strength accent track reads as both
-    // unavailable and on: Android folds the colours into the switch drawables
-    // and draws no unavailable appearance of its own. The shared switch paints
-    // the palette's muted pair there, so the unavailable row loses the accent
-    // while an available row beside it keeps it.
+  it('disables the unavailable row and keeps its available sibling enabled', async () => {
+    // The switch's own paint is `PreferenceRow`'s (its suite asserts the muted
+    // pair); this screen owns which rows the capability disables.
     platform.os = 'android';
     prefsQueryFn.mockResolvedValue(
       fullPrefs({
@@ -619,13 +675,9 @@ describe('NotificationsScreen category availability', () => {
     const unavailable = switchPaint(renderer.root, 'Balance alerts');
     expect(unavailable?.disabled).toBe(true);
     expect(unavailable?.value).toBe(true);
-    expect(unavailable?.trackColor).toEqual({ false: '#A9A39A', true: '#6F6A61' });
-    expect(unavailable?.thumbColor).toBe('#fff');
 
     const available = switchPaint(renderer.root, 'Agent updates');
     expect(available?.disabled).toBe(false);
-    expect(available?.trackColor).toEqual({ false: '#A9A39A', true: '#4F5A10' });
-    expect(available?.thumbColor).toBe('#fff');
   });
 
   it('non-retryable unhappy: an unavailable category keeps its translated description, never the response sentence', async () => {
@@ -711,7 +763,9 @@ describe('NotificationsScreen category availability', () => {
     await waitForEnabledSwitch(renderer, 'Agent updates');
 
     expect(switchesByLabel(renderer.root, 'Security findings')[0]?.props.disabled).toBe(true);
-    expect(textWithChildren(renderer.root, 'new findings and SLA reminders').length).toBe(1);
+    expect(
+      textWithChildren(renderer.root, en.notifications.category.securityFindingsSubtitle).length
+    ).toBe(1);
     expect(textWithChildren(renderer.root, 'madeUpCode').length).toBe(0);
   });
 
@@ -732,7 +786,9 @@ describe('NotificationsScreen category availability', () => {
       await waitForEnabledSwitch(renderer, 'Agent updates');
 
       expect(switchesByLabel(renderer.root, 'Security findings')[0]?.props.disabled).toBe(true);
-      expect(textWithChildren(renderer.root, 'new findings and SLA reminders').length).toBe(1);
+      expect(
+        textWithChildren(renderer.root, en.notifications.category.securityFindingsSubtitle).length
+      ).toBe(1);
       expect(textWithChildren(renderer.root, code).length).toBe(0);
     }
   );
@@ -793,11 +849,9 @@ describe('NotificationsScreen category availability', () => {
 
   it('happy: a preferences response without capabilities renders every row as available', async () => {
     prefsQueryFn.mockResolvedValue({
-      chatMessages: true,
       agentAttention: true,
       agentUpdates: true,
       sessionStatus: true,
-      kiloclawActivity: true,
       balanceAlerts: true,
       spendAlerts: true,
       securityFindings: true,
@@ -810,7 +864,6 @@ describe('NotificationsScreen category availability', () => {
     expect(switchesByLabel(renderer.root, 'Agent updates')[0]?.props.disabled).toBe(false);
     expect(switchesByLabel(renderer.root, 'Balance alerts')[0]?.props.disabled).toBe(false);
     expect(switchesByLabel(renderer.root, 'Spend alerts category')[0]?.props.disabled).toBe(false);
-    expect(switchesByLabel(renderer.root, 'KiloClaw activity')).toHaveLength(0);
   });
 
   it('retryable unhappy: a capabilities query failure keeps last good availability and shows retry', async () => {

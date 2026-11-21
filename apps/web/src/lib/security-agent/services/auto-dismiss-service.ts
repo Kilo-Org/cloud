@@ -13,14 +13,18 @@ import 'server-only';
 import pLimit from 'p-limit';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { security_findings, type SecurityFinding } from '@kilocode/db/schema';
-import { and, count, eq, sql } from 'drizzle-orm';
+import { and, asc, count, eq, gt, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { trackSecurityAgentAutoDismiss } from '../posthog-tracking';
 import { getSecurityAgentConfig } from '../db/security-config';
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
 import { dismissDependabotAlert } from '../github/dependabot-api';
 import type { Owner } from '@/lib/code-reviews/core';
-import type { SecurityFindingAnalysis, SecurityReviewOwner } from '../core/types';
+import type {
+  SecurityAgentConfig,
+  SecurityFindingAnalysis,
+  SecurityReviewOwner,
+} from '../core/types';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
   SecurityAuditLogAction,
@@ -41,6 +45,7 @@ const logError = sentryLogger('security-agent:auto-dismiss', 'error');
 const TRIAGE_CONFIDENCES = ['high', 'medium', 'low'] as const;
 
 const AUTO_DISMISS_CONCURRENCY = 5;
+const AUTO_DISMISS_BATCH_SIZE = 100;
 
 type TriageConfidence = (typeof TRIAGE_CONFIDENCES)[number];
 
@@ -49,44 +54,76 @@ function isTriageConfidence(value: unknown): value is TriageConfidence {
 }
 
 /**
+ * Whether a triage confidence level meets the configured auto-dismiss threshold.
+ * 'low' accepts every confidence, 'medium' rejects 'low', 'high' accepts only 'high'.
+ * An unknown threshold never meets the threshold.
+ */
+function meetsAutoDismissConfidenceThreshold(
+  threshold: SecurityAgentConfig['auto_dismiss_confidence_threshold'],
+  confidence: TriageConfidence
+): boolean {
+  switch (threshold) {
+    case 'low':
+      return true;
+    case 'medium':
+      return confidence !== 'low';
+    case 'high':
+      return confidence === 'high';
+    default:
+      return false;
+  }
+}
+
+/**
+ * Narrow a SecurityReviewOwner into a discriminated owner identity.
+ * Every owner-shaped derivation (config owner, audit owner, audit event key,
+ * finding predicate, analytics organization id) derives from this result.
+ */
+function ownerIdentity(
+  owner: SecurityReviewOwner
+): { type: 'organization'; id: string } | { type: 'user'; id: string } {
+  if ('organizationId' in owner && owner.organizationId) {
+    return { type: 'organization', id: owner.organizationId };
+  }
+  if ('userId' in owner && owner.userId) {
+    return { type: 'user', id: owner.userId };
+  }
+  throw new Error('Invalid owner: must have either organizationId or userId');
+}
+
+/**
  * Convert SecurityReviewOwner + userId to Owner format for config lookups.
  * The userId represents the user performing the action (needed for audit/permissions).
  */
 function toOwner(securityOwner: SecurityReviewOwner, userId: string): Owner {
-  if ('organizationId' in securityOwner && securityOwner.organizationId) {
-    return { type: 'org', id: securityOwner.organizationId, userId };
-  }
-  if ('userId' in securityOwner && securityOwner.userId) {
-    return { type: 'user', id: securityOwner.userId, userId: securityOwner.userId };
-  }
-  throw new Error('Invalid owner: must have either organizationId or userId');
+  const identity = ownerIdentity(securityOwner);
+  return identity.type === 'organization'
+    ? { type: 'org', id: identity.id, userId }
+    : { type: 'user', id: identity.id, userId: identity.id };
 }
 
 function toAuditOwner(owner: SecurityReviewOwner): SecurityFindingAuditOwner {
-  if ('organizationId' in owner && owner.organizationId) {
-    return { type: 'organization', organizationId: owner.organizationId };
-  }
-  if ('userId' in owner && owner.userId) {
-    return { type: 'user', userId: owner.userId };
-  }
-  throw new Error('Invalid owner: must have either organizationId or userId');
+  const identity = ownerIdentity(owner);
+  return identity.type === 'organization'
+    ? { type: 'organization', organizationId: identity.id }
+    : { type: 'user', userId: identity.id };
 }
 
 function ownerAuditKeyPart(owner: SecurityReviewOwner): string {
-  if ('organizationId' in owner && owner.organizationId)
-    return `organization:${owner.organizationId}`;
-  if ('userId' in owner && owner.userId) return `user:${owner.userId}`;
-  throw new Error('Invalid owner: must have either organizationId or userId');
+  const identity = ownerIdentity(owner);
+  return `${identity.type}:${identity.id}`;
 }
 
 function ownerFindingCondition(owner: SecurityReviewOwner) {
-  if ('organizationId' in owner && owner.organizationId) {
-    return eq(security_findings.owned_by_organization_id, owner.organizationId);
-  }
-  if ('userId' in owner && owner.userId) {
-    return eq(security_findings.owned_by_user_id, owner.userId);
-  }
-  throw new Error('Invalid owner: must have either organizationId or userId');
+  const identity = ownerIdentity(owner);
+  return identity.type === 'organization'
+    ? eq(security_findings.owned_by_organization_id, identity.id)
+    : eq(security_findings.owned_by_user_id, identity.id);
+}
+
+/** Organization id for analytics events, or undefined for user-owned owners. */
+function ownerOrganizationId(owner: Owner): string | undefined {
+  return owner.type === 'org' ? owner.id : undefined;
 }
 
 function autoDismissCandidateCondition(owner: Owner) {
@@ -337,7 +374,7 @@ export async function maybeAutoDismissAnalysis(options: {
     trackSecurityAgentAutoDismiss({
       distinctId: userId,
       userId,
-      organizationId: 'organizationId' in owner ? owner.organizationId : undefined,
+      organizationId: ownerOrganizationId(ownerConverted),
       findingId,
       source: 'sandbox',
     });
@@ -349,12 +386,7 @@ export async function maybeAutoDismissAnalysis(options: {
   if (triage?.needsSandboxAnalysis === false && triage.suggestedAction === 'dismiss') {
     const threshold = config.auto_dismiss_confidence_threshold ?? 'high';
 
-    const meetsThreshold =
-      threshold === 'low' ||
-      (threshold === 'medium' && triage.confidence !== 'low') ||
-      (threshold === 'high' && triage.confidence === 'high');
-
-    if (meetsThreshold) {
+    if (meetsAutoDismissConfidenceThreshold(threshold, triage.confidence)) {
       const dismissedFinding = await dismissFindingWithAuditEvent(findingId, {
         owner,
         reason: 'not_used',
@@ -383,7 +415,7 @@ export async function maybeAutoDismissAnalysis(options: {
       trackSecurityAgentAutoDismiss({
         distinctId: userId,
         userId,
-        organizationId: 'organizationId' in owner ? owner.organizationId : undefined,
+        organizationId: ownerOrganizationId(ownerConverted),
         findingId,
         source: 'triage',
         confidence: triage.confidence,
@@ -430,84 +462,95 @@ export async function autoDismissEligibleFindings(
   const threshold = config.auto_dismiss_confidence_threshold ?? 'high';
   const installationId = await resolveGitHubInstallationId(ownerConverted);
 
-  const findings = await db
-    .select({
-      id: security_findings.id,
-      analysis: security_findings.analysis,
-    })
-    .from(security_findings)
-    .where(autoDismissCandidateCondition(ownerConverted));
+  const limit = pLimit(AUTO_DISMISS_CONCURRENCY);
 
   let dismissed = 0;
   let skipped = 0;
   let errors = 0;
+  let lastSeenId: string | undefined;
 
-  const limit = pLimit(AUTO_DISMISS_CONCURRENCY);
+  const processFinding = (finding: { id: string; analysis: SecurityFindingAnalysis | null }) =>
+    limit(async () => {
+      try {
+        const analysis = finding.analysis;
+        const triage = analysis?.triage;
 
-  await Promise.all(
-    findings.map(finding =>
-      limit(async () => {
-        try {
-          const analysis = finding.analysis;
-          const triage = analysis?.triage;
-
-          if (
-            !triage ||
-            analysis?.sandboxAnalysis !== undefined ||
-            triage.needsSandboxAnalysis !== false ||
-            triage.suggestedAction !== 'dismiss'
-          ) {
-            skipped++;
-            return;
-          }
-
-          if (threshold === 'high' && triage.confidence !== 'high') {
-            skipped++;
-            return;
-          }
-          if (threshold === 'medium' && triage.confidence === 'low') {
-            skipped++;
-            return;
-          }
-
-          const dismissedFinding = await dismissFindingWithAuditEvent(finding.id, {
-            owner,
-            reason: 'not_used',
-            comment: triage.needsSandboxReasoning,
-            dismissedBy: 'auto-triage-bulk',
-            dismissSource: 'bulk',
-            confidence: triage.confidence,
-            correlationId: operationId,
-            actor,
-          });
-          if (!dismissedFinding) {
-            skipped++;
-            return;
-          }
-          await safeWritebackDependabotDismissal(
-            dismissedFinding,
-            installationId,
-            triage.needsSandboxReasoning
-          );
-          dismissed++;
-        } catch (error) {
-          logError('Error dismissing finding', { findingId: finding.id, error });
-          captureException(error, {
-            tags: { operation: 'autoDismissEligibleFindings' },
-            extra: { findingId: finding.id },
-          });
-          errors++;
+        if (
+          !triage ||
+          analysis?.sandboxAnalysis !== undefined ||
+          triage.needsSandboxAnalysis !== false ||
+          triage.suggestedAction !== 'dismiss'
+        ) {
+          skipped++;
+          return;
         }
+
+        if (!meetsAutoDismissConfidenceThreshold(threshold, triage.confidence)) {
+          skipped++;
+          return;
+        }
+
+        const dismissedFinding = await dismissFindingWithAuditEvent(finding.id, {
+          owner,
+          reason: 'not_used',
+          comment: triage.needsSandboxReasoning,
+          dismissedBy: 'auto-triage-bulk',
+          dismissSource: 'bulk',
+          confidence: triage.confidence,
+          correlationId: operationId,
+          actor,
+        });
+        if (!dismissedFinding) {
+          skipped++;
+          return;
+        }
+        await safeWritebackDependabotDismissal(
+          dismissedFinding,
+          installationId,
+          triage.needsSandboxReasoning
+        );
+        dismissed++;
+      } catch (error) {
+        logError('Error dismissing finding', { findingId: finding.id, error });
+        captureException(error, {
+          tags: { operation: 'autoDismissEligibleFindings' },
+          extra: { findingId: finding.id },
+        });
+        errors++;
+      }
+    });
+
+  // Read one page at a time so only the current batch is in memory.
+  while (true) {
+    const pageCondition = lastSeenId
+      ? and(autoDismissCandidateCondition(ownerConverted), gt(security_findings.id, lastSeenId))
+      : autoDismissCandidateCondition(ownerConverted);
+
+    const findings = await db
+      .select({
+        id: security_findings.id,
+        analysis: security_findings.analysis,
       })
-    )
-  );
+      .from(security_findings)
+      .where(pageCondition)
+      .orderBy(asc(security_findings.id))
+      .limit(AUTO_DISMISS_BATCH_SIZE);
+
+    await Promise.all(findings.map(processFinding));
+
+    if (findings.length < AUTO_DISMISS_BATCH_SIZE) break;
+    const nextCursor = findings[findings.length - 1].id;
+    // A real ordered page advances the cursor past every id just read.
+    if (lastSeenId !== undefined && nextCursor <= lastSeenId) break;
+    lastSeenId = nextCursor;
+  }
 
   log('Bulk auto-dismiss complete', { dismissed, skipped, errors });
 
   trackSecurityAgentAutoDismiss({
     distinctId: userId,
     userId,
-    organizationId: 'organizationId' in owner ? owner.organizationId : undefined,
+    organizationId: ownerOrganizationId(ownerConverted),
     source: 'bulk',
     dismissed,
     skipped,

@@ -132,3 +132,24 @@ export function useSetBuiltinAgentsMutation(organizationId?: string) {
     })
   );
 }
+
+/**
+ * Model context limits are personal (user-scoped) even when the dialog shows
+ * organization settings, so this mutation records the user's settings and
+ * refreshes both the current context and the personal settings query.
+ */
+export function useSetModelContextLimitsMutation(organizationId?: string) {
+  const invalidateCurrent = useInvalidateCloudAgentSettings(organizationId);
+  const invalidatePersonal = useInvalidateCloudAgentSettings();
+  const queryClient = useQueryClient();
+  const trpc = useTRPC();
+
+  return useMutation(
+    trpc.cloudAgentSettings.setModelContextLimits.mutationOptions({
+      onSuccess: async ({ limits }) => {
+        queryClient.setQueryData(trpc.cloudAgentSettings.getModelContextLimits.queryKey(), limits);
+        await Promise.all([invalidateCurrent(), invalidatePersonal()]);
+      },
+    })
+  );
+}

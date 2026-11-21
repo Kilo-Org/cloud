@@ -77,7 +77,8 @@ export async function detectContextOverflow({
   response,
 }: {
   requestedModel: string;
-  request: GatewayRequest;
+  /** Null for a request that is not a chat request, which skips the estimate. */
+  request: GatewayRequest | null;
   response: Response;
 }): Promise<NextResponse | null> {
   const upstreamBody = await extractUpstreamContextOverflowBody(response);
@@ -89,7 +90,7 @@ export async function detectContextOverflow({
     );
   }
 
-  if (response.status !== 500) return null;
+  if (response.status !== 500 || !request) return null;
   if (!isAutoSmallFreeModel(requestedModel)) return null;
   const estimatedTokenCount = estimateTokenCount(request);
   if (estimatedTokenCount < AUTO_SMALL_FREE_MODEL_CONTEXT_LENGTH) return null;

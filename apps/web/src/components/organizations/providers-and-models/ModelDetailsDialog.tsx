@@ -20,13 +20,16 @@ import {
   ByokOnlyTag,
   PolicyPill,
 } from '@/components/organizations/providers-and-models/PolicyPills';
-import { DiscountedPrice } from '@/components/organizations/providers-and-models/DiscountedPrice';
+import { GatewayAvailabilityList } from '@/components/organizations/providers-and-models/GatewayAvailabilityList';
+import { InferenceRegionFlags } from '@/components/organizations/providers-and-models/InferenceRegionFlags';
 import type {
   ModelRow,
   ProviderOffering,
 } from '@/components/organizations/providers-and-models/providersAndModels.types';
 
 export function ModelDetailsDialog({
+  organizationId,
+  showGatewayAvailability,
   open,
   canEdit,
   infoModel,
@@ -39,6 +42,8 @@ export function ModelDetailsDialog({
   onToggleProviderEnabled,
   onClose,
 }: {
+  organizationId: string;
+  showGatewayAvailability: boolean;
   open: boolean;
   canEdit: boolean;
   infoModel: ModelRow | null;
@@ -122,7 +127,8 @@ export function ModelDetailsDialog({
                 <TableHead>In</TableHead>
                 <TableHead>Out</TableHead>
                 <TableHead>Trains</TableHead>
-                <TableHead>Retains prompts</TableHead>
+                <TableHead>Retains</TableHead>
+                {showGatewayAvailability ? <TableHead>Regions</TableHead> : null}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -161,20 +167,8 @@ export function ModelDetailsDialog({
                       </TableCell>
                     ) : (
                       <>
-                        <TableCell>
-                          <DiscountedPrice
-                            price={offering.promptPrice}
-                            originalPrice={offering.originalPromptPrice}
-                            formatPrice={formatPriceCompact}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <DiscountedPrice
-                            price={offering.completionPrice}
-                            originalPrice={offering.originalCompletionPrice}
-                            formatPrice={formatPriceCompact}
-                          />
-                        </TableCell>
+                        <TableCell>{formatPriceCompact(offering.promptPrice)}</TableCell>
+                        <TableCell>{formatPriceCompact(offering.completionPrice)}</TableCell>
                       </>
                     )}
                     <TableCell>
@@ -183,11 +177,20 @@ export function ModelDetailsDialog({
                     <TableCell>
                       <PolicyPill value={offering.retainsPrompts} variant="retainsPrompts" />
                     </TableCell>
+                    {showGatewayAvailability ? (
+                      <TableCell>
+                        <InferenceRegionFlags regions={offering.vercelInferenceRegions} />
+                      </TableCell>
+                    ) : null}
                   </TableRow>
                 );
               })}
             </TableBody>
           </Table>
+
+          {infoModel && showGatewayAvailability ? (
+            <GatewayAvailabilityList organizationId={organizationId} modelId={infoModel.modelId} />
+          ) : null}
         </div>
       </DialogContent>
     </Dialog>

@@ -24,3 +24,15 @@ export const GatewayApiKindSchema = z.enum([
 ]);
 
 export type GatewayApiKind = z.infer<typeof GatewayApiKindSchema>;
+
+// --- Organization ids ---
+
+/**
+ * The wire form of an `organizations.id` (packages/db, a Postgres `uuid` column). The check
+ * matches the column's shape — any 8-4-4-4-12 hex GUID — so every stored id passes and a stored
+ * organization keeps working across releases. Keep the check aligned with the column; a stricter
+ * form requires checking stored ids first.
+ */
+export const KiloOrganizationIdSchema = z.guid();
+
+export type KiloOrganizationId = z.infer<typeof KiloOrganizationIdSchema>;

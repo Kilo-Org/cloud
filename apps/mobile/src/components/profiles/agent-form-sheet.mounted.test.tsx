@@ -2,11 +2,12 @@
 import { createElement, type ReactNode, type Ref } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { AgentFormSheet } from '@/components/profiles/agent-form-sheet';
+import { AgentFormSheet, type AgentSaveFailure } from '@/components/profiles/agent-form-sheet';
 import { type AgentSource, PERMISSION_TOOLS } from '@/components/profiles/profile-agents-model';
 import { i18n } from '@/i18n';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
+import { MAX_PROFILE_AGENTS } from '@/lib/agent-profile-forms';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
 
 const h = vi.hoisted(() => ({
@@ -51,7 +52,22 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'SessionPageSheet' }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/text', async () => {
+  const React = await import('react');
+  return { Text: 'Text', TextClassContext: React.createContext<string | undefined>(undefined) };
+});
+// The choice row fires its own selection haptic; the wrapper's real module reaches
+// `expo-haptics` and then `expo`, whose async-require setup reads the app-only
+// `__DEV__` global. Mocking the wrapper keeps `expo` out of the suite.
+vi.mock('@/lib/haptics', () => ({
+  selectionHaptic: vi.fn(),
+  impactHaptic: vi.fn(),
+  notificationHaptic: vi.fn(),
+}));
+// The choice row's selection mark reaches the icon barrel, whose lucide modules
+// this project cannot parse in the mounted environment; every sibling form suite
+// mocks it the same way.
+vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({
     confirm: (request: unknown) => {
@@ -188,6 +204,19 @@ function mountSheet(
   existingSlugs: readonly string[] = [],
   draftScope?: string
 ) {
+  return mountSheetWith(agent, { existingSlugs, draftScope });
+}
+
+// eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
+function mountSheetWith(
+  agent: AgentSource | null,
+  options: {
+    existingSlugs?: readonly string[];
+    draftScope?: string;
+    saveFailure?: AgentSaveFailure | null;
+  } = {}
+) {
+  const { existingSlugs = [], draftScope, saveFailure = null } = options;
   return renderWithProviders(
     createElement(AgentFormSheet, {
       draftScope,
@@ -195,11 +224,13 @@ function mountSheet(
       existingSlugs,
       organizationId: undefined,
       isSaving: false,
+      saveFailure,
       onClose: () => {
         h.onClose();
       },
       onSave: payload => {
         h.onSave(payload);
+        return Promise.resolve();
       },
     })
   );
@@ -491,6 +522,37 @@ describe('AgentFormSheet refused save', () => {
 
     expect(h.scrollTo).toHaveBeenCalledWith({ y: 508, animated: true });
     expect(h.onSave).not.toHaveBeenCalled();
+
+    unmount();
+  });
+});
+
+describe('AgentFormSheet save refusal copy', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    h.useAvailableModels.mockReturnValue({ models: [] });
+  });
+
+  it('names the cap in the warn tone when a create is refused past it', async () => {
+    const { renderer, unmount } = await mountSheetWith(null, { saveFailure: { kind: 'limit' } });
+
+    const cap = i18n.t('profiles.agents.limitReached', { max: MAX_PROFILE_AGENTS });
+    const status = findAll(renderer.root, 'Text').find(node => node.props.children === cap);
+
+    expect(status?.props.className).toContain('text-warn');
+    expect(status?.props.className).not.toContain('text-destructive');
+
+    unmount();
+  });
+
+  it('shows any other refused create in the destructive tone', async () => {
+    const { renderer, unmount } = await mountSheetWith(null, { saveFailure: { kind: 'refused' } });
+
+    const failed = i18n.t('profiles.agents.saveFailed');
+    const status = findAll(renderer.root, 'Text').find(node => node.props.children === failed);
+
+    expect(status?.props.className).toContain('text-destructive');
 
     unmount();
   });

@@ -4,6 +4,7 @@ import * as SecureStore from '@/lib/auth/secure-store';
 import { Platform } from 'react-native';
 import * as z from 'zod';
 
+import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 import {
   API_BASE_URL,
   NATIVE_ADMISSION_DEV_SENTINEL,
@@ -23,8 +24,12 @@ export type AdmissionPayload = {
 };
 
 /**
- * Error thrown when the admission challenge endpoint is unreachable
- * (5xx or network error).  Callers map this to a retryable sign-in message.
+ * Error thrown when the admission challenge could not be obtained — the
+ * endpoint answers a non-ok response, the request fails (network error), the
+ * request or its body outlasts `ADMISSION_CHALLENGE_TIMEOUT_MS`, or the
+ * challenge body fails schema validation; `resolveAdmission` also rethrows
+ * this sentinel for every provider failure. Callers map this to a retryable
+ * sign-in message.
  */
 export const ADMISSION_CHALLENGE_FAILED = 'admission_challenge_failed';
 
@@ -45,18 +50,45 @@ export function hasAttestationCapability(): boolean {
   return false;
 }
 
+/**
+ * Upper bound on the challenge request, response body included.
+ *
+ * A challenge that never answers holds the caller's in-flight sign-in guard, so
+ * the control stays disabled with no message for the rest of the process. The
+ * timer aborts the request instead of racing a promise, which releases the
+ * connection and also ends a body read that stalls after the headers arrive.
+ */
+export const ADMISSION_CHALLENGE_TIMEOUT_MS = 15_000;
+
 async function requestChallenge(): Promise<{ challenge: string }> {
-  const response = await fetch(`${API_BASE_URL}/api/auth/native/admission-challenge`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ platform: Platform.OS === 'ios' ? 'ios' : 'android' }),
-  });
+  const controller = new AbortController();
+  const deadline = setTimeout(() => {
+    controller.abort();
+  }, ADMISSION_CHALLENGE_TIMEOUT_MS);
 
-  if (!response.ok) {
-    throw new Error(ADMISSION_CHALLENGE_FAILED);
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/native/admission-challenge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...buildClientMetadataHeaders() },
+      body: JSON.stringify({ platform: Platform.OS === 'ios' ? 'ios' : 'android' }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(ADMISSION_CHALLENGE_FAILED);
+    }
+
+    // The body read is inside this try so an abort that lands after the
+    // headers arrived still reads as the retryable sentinel below.
+    return AdmissionChallengeResponseSchema.parse(await response.json());
+  } catch (error) {
+    // Any transport failure, including the deadline above, is retryable: the
+    // caller must offer another attempt rather than submit a proof-less token
+    // request. A schema rejection keeps its own error; the caller normalizes it.
+    throw controller.signal.aborted ? new Error(ADMISSION_CHALLENGE_FAILED) : error;
+  } finally {
+    clearTimeout(deadline);
   }
-
-  return AdmissionChallengeResponseSchema.parse(await response.json());
 }
 
 export const AdmissionChallengeResponseSchema = z.object({ challenge: z.string().min(1) });
@@ -113,16 +145,60 @@ async function getAppleAdmission(challenge: string): Promise<AdmissionPayload> {
 // failure so the next attempt retries instead of awaiting a rejected promise.
 let integrityProvider: Promise<void> | undefined = undefined;
 
-async function prepareIntegrityProvider(projectNumber: string): Promise<void> {
+const PROVIDER_INVALID_CODE = 'ERR_APP_INTEGRITY_PROVIDER_INVALID';
+
+const providerInvalidErrorSchema = z.object({ code: z.literal(PROVIDER_INVALID_CODE) });
+
+/**
+ * One token request on the shared provider.
+ *
+ * The Expo module keeps whichever provider it prepared, so Play Integrity's
+ * `PROVIDER_INVALID` would fail every later request the same way. That exact
+ * promise is dropped before rethrowing, and only that one: a replacement
+ * another caller already started survives. Every other failure keeps the
+ * provider as it was.
+ */
+async function requestIntegrityToken(projectNumber: string, requestHash: string): Promise<string> {
   integrityProvider ??= AppIntegrity.prepareIntegrityTokenProviderAsync(projectNumber);
+  const provider = integrityProvider;
   try {
-    await integrityProvider;
+    await provider;
   } catch (error) {
-    // Drop the rejected promise so the next sign-in retries preparation
-    // instead of awaiting a promise that can only reject.
-    integrityProvider = undefined;
+    if (integrityProvider === provider) {
+      integrityProvider = undefined;
+    }
     throw error;
   }
+
+  try {
+    return await AppIntegrity.requestIntegrityCheckAsync(requestHash);
+  } catch (error) {
+    if (providerInvalidErrorSchema.safeParse(error).success && integrityProvider === provider) {
+      integrityProvider = undefined;
+    }
+    throw error;
+  }
+}
+
+/**
+ * One token request, plus at most one replacement for the invalid-provider code.
+ *
+ * The replacement is the only retry: the Expo module keeps the provider it
+ * prepared, so anything else means the device cannot attest right now and
+ * another prepare would not change that.
+ */
+async function requestIntegrityTokenWithReplacement(
+  projectNumber: string,
+  requestHash: string
+): Promise<string> {
+  try {
+    return await requestIntegrityToken(projectNumber, requestHash);
+  } catch (error) {
+    if (!providerInvalidErrorSchema.safeParse(error).success) {
+      throw error;
+    }
+  }
+  return requestIntegrityToken(projectNumber, requestHash);
 }
 
 /**
@@ -133,11 +209,10 @@ async function prepareIntegrityProvider(projectNumber: string): Promise<void> {
  * string, which is what the server recomputes.
  */
 async function getAndroidAdmission(challenge: string): Promise<AdmissionPayload> {
-  if (!PLAY_INTEGRITY_PROJECT_NUMBER) {
+  const projectNumber = PLAY_INTEGRITY_PROJECT_NUMBER;
+  if (!projectNumber) {
     throw new Error('Play Integrity project number is not configured');
   }
-
-  await prepareIntegrityProvider(PLAY_INTEGRITY_PROJECT_NUMBER);
 
   const requestHash = await digestStringAsync(CryptoDigestAlgorithm.SHA256, challenge, {
     encoding: CryptoEncoding.BASE64,
@@ -147,7 +222,7 @@ async function getAndroidAdmission(challenge: string): Promise<AdmissionPayload>
     platform: 'android',
     kind: 'assertion',
     challenge,
-    payload: await AppIntegrity.requestIntegrityCheckAsync(requestHash),
+    payload: await requestIntegrityTokenWithReplacement(projectNumber, requestHash),
   };
 }
 

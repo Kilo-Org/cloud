@@ -534,11 +534,8 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // Record the branch that fired immediately before the logout event,
         // so exactly one row lands per actual sign-out — a deduped sign-out
         // returned above and writes nothing — and it is attributed to the
-        // user. A server-refused refresh is the only ended-session path.
-        reportAuthBranch({
-          cause,
-          branch: cause === 'session_ended' ? 'refresh_401' : 'explicit',
-        });
+        // user.
+        reportAuthBranch({ cause });
         // Capture the logout event before any telemetry teardown step.
         captureEvent(LOGOUT_EVENT);
         // Remote cleanup (session revoke + push unregister + tombstone)
@@ -682,7 +679,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     const handler = async () => {
       const outcome = await performRefresh();
 
-      if (outcome.ok && isCurrentAuthEpoch(outcome.sessionVersion)) {
+      if (outcome.kind === 'ok' && isCurrentAuthEpoch(outcome.sessionVersion)) {
         setToken(outcome.token);
         // Invalidate all queries so failed authenticated work recovers
         // with the new token. UNAUTHORIZED errors have retry=0, so a
@@ -691,27 +688,23 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         return;
       }
 
-      // A refresh-token read that spent its budget on null while another
-      // member of the credential set is present is an unreadable credential
-      // read, not an absent session: never sign out, surface the existing
-      // retryable restore error, and record the branch. An EMPTY credential
-      // set is not an unreadable member — it is genuinely no session, and the
-      // bootstrap gate already routes to login — so it must never raise the
-      // restore error. A sign-out that owns the tree also owns this surface:
-      // its escape hatch already cleared the flag, and a deduped second
-      // sign-out (isSignedOutReference) would dead-end the overlay's Sign out.
+      // A reliable credential read found an access token and no refresh token:
+      // the set can never rotate, so the 401 ends the session for good, and
+      // ending it here once is what stops the retry loop. A 401 from a request
+      // that carried no bearer proves nothing about the stored token — the
+      // keychain could not supply one — so it leaves the session alone and the
+      // next authenticated request decides. An empty credential set is no
+      // session at all: the bootstrap gate already routes it to login, so it
+      // reaches neither branch here.
       if (
-        !outcome.ok &&
-        outcome.unreadable &&
-        outcome.presentKeys.length > 0 &&
+        outcome.kind === 'unrenewable' &&
+        isCurrentAuthEpoch(outcome.sessionVersion) &&
         !isSignedOutReference.current
       ) {
-        reportAuthBranch({
-          cause: 'credentials_unreadable',
-          branch: 'refresh_token_unreadable',
-          keyNames: outcome.presentKeys,
-        });
-        setRestoreFailed(true);
+        if (getActiveToken() === null) {
+          return;
+        }
+        await signOut(true, 'session_unrenewable');
         return;
       }
 
@@ -720,8 +713,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       // refresh from an older session — so re-check before tearing down: a
       // newer session must not be signed out by an older refusal.
       if (
-        !outcome.ok &&
-        outcome.refused &&
+        outcome.kind === 'refused' &&
         isCurrentAuthEpoch(outcome.sessionVersion) &&
         !isSignedOutReference.current
       ) {
@@ -766,7 +758,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
 
           const outcome = await performRefresh();
 
-          if (outcome.ok && isCurrentAuthEpoch(outcome.sessionVersion)) {
+          if (outcome.kind === 'ok' && isCurrentAuthEpoch(outcome.sessionVersion)) {
             setToken(outcome.token);
             return;
           }
@@ -779,12 +771,21 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // inside the refresh awaits, so a refusal from a superseded session
           // must not sign out the newer one.
           if (
-            !outcome.ok &&
-            outcome.refused &&
+            outcome.kind === 'refused' &&
             isCurrentAuthEpoch(outcome.sessionVersion) &&
             !isSignedOutReference.current
           ) {
             await signOut(true, 'session_ended');
+          }
+          // A set that cannot rotate is a session that cannot outlive this
+          // token. End it now, once, instead of letting every later request
+          // fail against a token nothing can renew.
+          if (
+            outcome.kind === 'unrenewable' &&
+            isCurrentAuthEpoch(outcome.sessionVersion) &&
+            !isSignedOutReference.current
+          ) {
+            await signOut(true, 'session_unrenewable');
           }
         } catch {
           // A rejected expiry read (or refresh) must not escape as an

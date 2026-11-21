@@ -6,7 +6,7 @@ import {
   buildOpaqueScopeKey,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { EMPTY_HOME_WIDGET_DETAILS } from '@kilocode/app-shared/home-widget';
+import { emptyHomeWidgetDetails } from '@kilocode/app-shared/home-widget';
 
 import { WIDGET_STORE_CLASS_MARKER } from '@/lib/auth/secure-store-gated';
 import { setProtectedDataAvailable } from '@/lib/protected-data';
@@ -41,7 +41,7 @@ const LOCKED_REFUSAL =
 const SNAPSHOT_KEY = 'glanceable-snapshot';
 const SCOPE_KEY = 'glanceable-scope-key';
 const HOME_WIDGET_DATA_KEY = 'home-widget-data';
-const details = EMPTY_HOME_WIDGET_DETAILS;
+const details = emptyHomeWidgetDetails();
 
 const store = new Map<string, string>();
 

@@ -22,6 +22,7 @@ const COPY: Record<string, string> = {
   'glanceable.checked': 'Checked',
   'glanceable.lastKnown': 'Last known',
   'glanceable.awaitingUpdate': 'Awaiting update',
+  'glanceable.wasDue': 'Was due',
   'glanceable.nextRun': 'Next run',
   'glanceable.newAgent': 'New agent',
   'glanceable.waitingForYou': 'Waiting for you',
@@ -159,7 +160,13 @@ export function render(props: AndroidWidgetProps, size: readonly [number, number
       widgetId: 1,
       width,
       height,
-      screenInfo: { screenWidthDp: 400, screenHeightDp: 800, density: 2, densityDpi: 320 },
+      screenInfo: {
+        screenWidthDp: 400,
+        screenHeightDp: 800,
+        density: 2,
+        densityDpi: 320,
+        fontScale: 1,
+      },
     },
     rtl
   ) as { light: Element; dark: Element };

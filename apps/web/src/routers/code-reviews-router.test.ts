@@ -97,6 +97,8 @@ import { generateBotUserId } from '@/lib/bot-users/types';
 import { BitbucketCodeReviewWebhookConfigurationError } from '@/lib/integrations/platforms/bitbucket/code-review-webhooks';
 import { updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
 import { createCallerForUser } from '@/routers/test-utils';
+import { createOrEnableAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
+import { createDefaultCodeReviewConfig } from '@/lib/code-reviews/core/default-config';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
@@ -522,6 +524,29 @@ describe('codeReviewRouter.listForOrganization role-gated ids', () => {
       expect(ownerReview?.total_cost_musd).toBe(500);
     } finally {
       await db.delete(cloud_agent_code_reviews).where(eq(cloud_agent_code_reviews.id, review.id));
+    }
+  });
+});
+
+describe('codeReviewRouter.listForUser budget', () => {
+  it('answers a spent mobile budget retryably instead of an empty list', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'list-for-user-budget@example.com',
+      google_user_name: 'List For User Budget',
+      is_admin: false,
+    });
+
+    try {
+      const caller = await createCallerForUser(user.id, {
+        controlPlaneStartedAt: performance.now() - 9_900,
+      });
+
+      await expect(caller.codeReviews.listForUser({})).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Your code reviews took too long to load. Try again.',
+      });
+    } finally {
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, user.id));
     }
   });
 });
@@ -1981,6 +2006,112 @@ describe('review agent config REVIEW.md setting', () => {
     expect(config?.is_enabled).toBe(false);
   });
 
+  it('creates an enabled personal config when enabling with no stored config', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    // No pre-existing agent_configs row: enabling must create one. The toggle
+    // used to update zero rows, report success, and leave the switch enabled
+    // locally, so the next save stored the row as disabled.
+    const result = await caller.personalReviewAgent.toggleReviewAgent({
+      platform: 'github',
+      isEnabled: true,
+    });
+
+    expect(result).toEqual({ success: true, isEnabled: true });
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'github'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+
+    expect(config?.is_enabled).toBe(true);
+    expect(config?.config).toEqual(
+      expect.objectContaining({
+        review_style: 'balanced',
+        repository_selection_mode: 'all',
+        disable_review_md: true,
+        review_guideline_source_repositories: [],
+      })
+    );
+  });
+
+  it('keeps a saved config when a first enable conflicts with an existing row', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: { review_style: 'strict', model_slug: 'saved-model' },
+      is_enabled: false,
+      created_by: testUser.id,
+    });
+
+    // Simulate the insert branch of a first enable whose earlier read saw no row.
+    await createOrEnableAgentConfigForOwner({
+      owner: { type: 'user', id: testUser.id },
+      agentType: 'code_review',
+      platform: 'github',
+      createdBy: testUser.id,
+      config: createDefaultCodeReviewConfig(),
+    });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'github'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+
+    expect(config?.is_enabled).toBe(true);
+    expect(config?.config).toEqual(
+      expect.objectContaining({ review_style: 'strict', model_slug: 'saved-model' })
+    );
+  });
+
+  it('stores the selected repository mode when a personal GitLab agent is enabled for the first time', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    await caller.personalReviewAgent.toggleReviewAgent({ platform: 'gitlab', isEnabled: true });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'gitlab'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+
+    expect(config?.is_enabled).toBe(true);
+    expect(config?.config).toEqual(
+      expect.objectContaining({
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [],
+      })
+    );
+  });
+
+  it('does not create a personal config when disabling with no stored config', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    const result = await caller.personalReviewAgent.toggleReviewAgent({
+      platform: 'github',
+      isEnabled: false,
+    });
+
+    expect(result).toEqual({ success: true, isEnabled: false });
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'github'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+
+    expect(config).toBeUndefined();
+  });
+
   it('preserves personal review feature settings during a full config save', async () => {
     const caller = await createCallerForUser(testUser.id);
     await db.insert(agent_configs).values({
@@ -2172,6 +2303,69 @@ describe('review agent config REVIEW.md setting', () => {
     expect(refetched.disableReviewMd).toBe(true);
     expect(refetched).not.toHaveProperty('maxReviewTimeMinutes');
   });
+
+  it.each(['personal', 'organization'] as const)(
+    'persists, patches, preserves, and clears the %s guideline allowlist',
+    async scope => {
+      const caller = await createCallerForUser(testUser.id);
+      const input = {
+        platform: 'github' as const,
+        reviewStyle: 'balanced' as const,
+        focusAreas: [],
+        modelSlug: 'test-model',
+        reviewGuidelineSourceRepositories: ['acme/guidelines'],
+      };
+      if (scope === 'personal') await caller.personalReviewAgent.saveReviewConfig(input);
+      else
+        await caller.organizations.reviewAgent.saveReviewConfig({
+          ...input,
+          organizationId: organization.id,
+        });
+      const get = () =>
+        scope === 'personal'
+          ? caller.personalReviewAgent.getReviewConfig({ platform: 'github' })
+          : caller.organizations.reviewAgent.getReviewConfig({
+              platform: 'github',
+              organizationId: organization.id,
+            });
+      const patch = (value: {
+        reviewStyle?: 'strict';
+        reviewGuidelineSourceRepositories?: string[];
+      }) =>
+        scope === 'personal'
+          ? caller.personalReviewAgent.patchReviewConfig({ platform: 'github', ...value })
+          : caller.organizations.reviewAgent.patchReviewConfig({
+              platform: 'github',
+              organizationId: organization.id,
+              ...value,
+            });
+      expect((await get()).reviewGuidelineSourceRepositories).toEqual(['acme/guidelines']);
+      await patch({ reviewStyle: 'strict' });
+      expect((await get()).reviewGuidelineSourceRepositories).toEqual(['acme/guidelines']);
+      await patch({ reviewGuidelineSourceRepositories: ['acme/other'] });
+      expect((await get()).reviewGuidelineSourceRepositories).toEqual(['acme/other']);
+      const saved = await db.query.agent_configs.findFirst({
+        where: and(
+          eq(agent_configs.agent_type, 'code_review'),
+          eq(agent_configs.platform, 'github'),
+          scope === 'personal'
+            ? eq(agent_configs.owned_by_user_id, testUser.id)
+            : eq(agent_configs.owned_by_organization_id, organization.id)
+        ),
+      });
+      expect(saved?.config).toEqual(
+        expect.objectContaining({ review_guideline_source_repositories: ['acme/other'] })
+      );
+      await patch({ reviewGuidelineSourceRepositories: [] });
+      expect((await get()).reviewGuidelineSourceRepositories).toEqual([]);
+      await expect(
+        patch({ reviewGuidelineSourceRepositories: ['https://example.com/policy'] })
+      ).rejects.toThrow();
+      await expect(
+        patch({ reviewGuidelineSourceRepositories: Array(101).fill('acme/guidelines') })
+      ).rejects.toThrow();
+    }
+  );
 
   it('persists organization disableReviewMd true as disable_review_md true', async () => {
     const caller = await createCallerForUser(testUser.id);

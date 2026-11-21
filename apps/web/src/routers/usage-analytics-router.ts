@@ -1,4 +1,5 @@
 import { TRPCError } from '@trpc/server';
+import { USAGE_SOURCE_NOT_CONFIGURED_MESSAGE } from '@kilocode/app-shared/usage-source';
 import * as z from 'zod';
 import { and, asc, eq, inArray, isNull, or } from 'drizzle-orm';
 import {
@@ -212,6 +213,14 @@ export class WhereBuilder {
     );
   }
 
+  addNotInOrNull(column: string, values: string[]): void {
+    const placeholders = values.map(() => '?').join(', ');
+    this.push(
+      `(${column} NOT IN (${placeholders}) OR ${column} IS NULL)`,
+      ...values.map(v => ({ type: 'TEXT' as const, value: v }))
+    );
+  }
+
   sql(): string {
     return this.clauses.length > 0 ? this.clauses.join('\n  AND ') : '1=1';
   }
@@ -343,13 +352,24 @@ function buildDimensionConditions(where: WhereBuilder, filters: UsageAnalyticsFi
 
   addInIfNonEmpty('feature', filters.features);
   addInIfNonEmpty('model', filters.models);
+  addInIfNonEmpty('auto_model', filters.autoModels);
   addInIfNonEmpty('mode', filters.modes);
   addInIfNonEmpty('provider', filters.providers);
+  addInIfNonEmpty('inference_provider', filters.inferenceProviders);
   addInIfNonEmpty('project_id', filters.projects);
   addNotInIfNonEmpty('feature', filters.excludedFeatures);
   addNotInIfNonEmpty('model', filters.excludedModels);
+  // Excluding named aliases must retain usage that has no router alias.
+  if (filters.excludedAutoModels && filters.excludedAutoModels.length > 0) {
+    where.addNotInOrNull('auto_model', filters.excludedAutoModels);
+  }
   addNotInIfNonEmpty('mode', filters.excludedModes);
   addNotInIfNonEmpty('provider', filters.excludedProviders);
+  // Excluding named serving providers must retain usage with no inference
+  // provider, mirroring the settled alias exclusion semantics above.
+  if (filters.excludedInferenceProviders && filters.excludedInferenceProviders.length > 0) {
+    where.addNotInOrNull('inference_provider', filters.excludedInferenceProviders);
+  }
   addNotInIfNonEmpty('project_id', filters.excludedProjects);
 }
 
@@ -467,12 +487,16 @@ export function dimensionColumn(dimension: BreakdownDimension): string {
       return 'feature';
     case 'model':
       return 'model';
+    case 'autoModel':
+      return 'auto_model';
     case 'mode':
       return 'mode';
     case 'user':
       return 'kilo_user_id';
     case 'provider':
       return 'provider';
+    case 'inferenceProvider':
+      return 'inference_provider';
     case 'project':
       return 'project_id';
     case 'organization':
@@ -657,9 +681,12 @@ function legacyOAuthProviderKey(provider: AuthProviderId, providerAccountId: str
 function requireSnowflakeConfig() {
   const config = resolveSnowflakeConfig();
   if (!config) {
+    // Not "the warehouse failed": no usage source is configured at all, so the
+    // message names the terminal condition (`USAGE_SOURCE_NOT_CONFIGURED_MESSAGE`)
+    // instead of the sanitized retryable one (`timedSnowflakeQuery`).
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
-      message: 'Usage data temporarily unavailable',
+      message: USAGE_SOURCE_NOT_CONFIGURED_MESSAGE,
     });
   }
   return config;
@@ -927,6 +954,21 @@ export const usageAnalyticsRouter = createTRPCRouter({
       const providerExpr = requestedDims.includes('provider') ? 'provider' : "''";
       const projectExpr = requestedDims.includes('project') ? 'project_id' : "''";
 
+      // `autoModel` and `inferenceProvider` are opt-in trailing dimensions.
+      // They are appended after the legacy metrics only when requested, so
+      // default queries keep the existing column positions (and metric offsets)
+      // byte-for-byte. Their 0-indexed positions depend on which opt-in dims
+      // are present: first trailing column = 14 (datetime + 6 dims + 7 metrics),
+      // each additional one increments. This ordered list is the source of both
+      // the SELECT suffix and the row offset map, so the two cannot drift.
+      const TRAILING_DIMS = [
+        { dim: 'autoModel', sql: 'auto_model', alias: 'dim_auto_model' },
+        { dim: 'inferenceProvider', sql: 'inference_provider', alias: 'dim_inference_provider' },
+      ] as const;
+
+      const presentTrailing = TRAILING_DIMS.filter(t => requestedDims.includes(t.dim));
+      const trailingSelect = presentTrailing.map(t => `, ${t.sql} AS ${t.alias}`).join('');
+
       // GROUP BY columns: bucket (pos 1) + each requested dimension column
       // SAFETY: dimensionColumn() returns only hardcoded string literals from
       // a typed enum chain — never user input.
@@ -948,7 +990,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
           COALESCE(SUM(total_output_tokens), 0),
           COALESCE(SUM(total_cache_write_tokens), 0),
           COALESCE(SUM(total_cache_hit_tokens), 0),
-          COALESCE(SUM(error_count), 0)
+          COALESCE(SUM(error_count), 0)${trailingSelect}
         FROM ${table}
         WHERE ${where.sql()}
         GROUP BY ${groupByClause}
@@ -975,6 +1017,11 @@ export const usageAnalyticsRouter = createTRPCRouter({
           })
       );
 
+      // Base dimensions keep fixed positions 1..6; opt-in trailing dimensions
+      // start at 14 and increment in the TRAILING_DIMS order above. A trailing
+      // dim is only read when requested, so its position is valid whenever used.
+      const trailingOffset = (dim: (typeof TRAILING_DIMS)[number]['dim']): number =>
+        14 + presentTrailing.findIndex(t => t.dim === dim);
       const dimIndexMap: Record<Dimension, number> = {
         feature: 1,
         model: 2,
@@ -982,6 +1029,8 @@ export const usageAnalyticsRouter = createTRPCRouter({
         user: 4,
         provider: 5,
         project: 6,
+        autoModel: trailingOffset('autoModel'),
+        inferenceProvider: trailingOffset('inferenceProvider'),
       };
 
       return {
@@ -1071,7 +1120,8 @@ export const usageAnalyticsRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       const accessByOrg = await getOrganizationsAccessRoles(ctx, input.organizationIds);
 
-      // Require access to every requested org (mirrors the single-org guard).
+      // Require access to every requested org. Roles come from memberships,
+      // plus the platform-admin elevation the helper documents.
       const hasAccessToAll = input.organizationIds.every(orgId => accessByOrg.has(orgId));
       if (!hasAccessToAll) {
         throw new TRPCError({

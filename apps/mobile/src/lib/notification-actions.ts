@@ -32,24 +32,20 @@ import {
 import * as Sentry from '@sentry/react-native';
 
 import { getLanguageSnapshot, i18n } from '@/i18n';
-import { WEB_BASE_URL } from '@/lib/config';
 
-import { openClawNotificationWebUrl } from './claw-notification';
 import { type PendingDeepLinkOptions, setPendingDeepLink } from './deep-link-launch';
 import {
   type NeedsInputAction,
   type NeedsInputActionOutcome,
 } from './notification-action-interaction';
-import {
-  notificationDestinationForData,
-  notificationPathForData,
-  prPathForData,
-} from './notification-path';
+import { notificationPathForData, prPathForData } from './notification-path';
 import {
   clearPostedNeedsInputNotification,
+  markNeedsInputReplyResult,
   notificationIdentifierForSession,
 } from './needs-input-presentation';
 import { type NotificationPreviews } from './needs-input-notification';
+import { finishHandlingNotificationResponse } from './notification-response-completion';
 
 /** Register one category per (raise kind × hasPr) descriptor. */
 export async function registerNeedsInputCategories(): Promise<void> {
@@ -139,6 +135,11 @@ export type NeedsInputActionDeps = {
    * which was produced under the choice at that moment.
    */
   readPreviews?: () => NotificationPreviews | undefined;
+  /**
+   * Defaults to the native report that ends the response on iOS (see
+   * `notification-response-completion.ts`); called once the dispatch settles.
+   */
+  finishHandlingResponse?: (key: string) => void;
 };
 
 /** The shape of the s4 entry point, kept as an annotation on the lazy load. */
@@ -194,10 +195,12 @@ const headlessStringDataSchema = z.string();
  * the JS response listener and the registered background task
  * (ExpoHandlingDelegate.handleNotificationResponse), so one tap can arrive
  * twice. Concurrent dispatches of one response share the first one — an action
- * answers once, and a body tap opens its destination once; once it settles, a
- * later tap — on the replaced result notification — is answered again, except
- * that a KiloClaw page already opened for that response identity is not opened
- * a second time by a late second delivery of the same tap.
+ * answers once, and a body tap stashes its destination once; once it settles, a
+ * later tap — on the replaced result notification — is answered again.
+ *
+ * When the shared dispatch settles, with a result or an error, the response is
+ * reported finished: iOS keeps the app running for a background action only
+ * until then.
  */
 // eslint-disable-next-line promise-function-async -- passthrough dispatch: one interaction per tap shares an in-flight promise
 export function handleNeedsInputNotificationResponse(
@@ -209,17 +212,17 @@ export function handleNeedsInputNotificationResponse(
   if (inFlight) {
     return inFlight;
   }
-  const dispatch = trackDispatch(key, dispatchNeedsInputResponse(response, deps));
+  const dispatch = trackDispatch(
+    key,
+    dispatchNeedsInputResponse(response, deps),
+    deps.finishHandlingResponse ?? finishHandlingNotificationResponse
+  );
   inFlightDispatches.set(key, dispatch);
   return dispatch;
 }
 
-// One dispatch per tap: the in-flight dispatch for each OS response, keyed by
-// its notification identifier and action. A body tap is deduped like an action
-// button, because Expo delivers a warm-background tap to both the JS listener
-// and the registered background task — and the tap's side effect is a browser
-// open, which must happen once. Entries are removed on settle so a retry tap on
-// the replaced notification runs again.
+// One in-flight dispatch per OS response, keyed by its notification identifier
+// and action; removed on settle so a retry tap runs again.
 const inFlightDispatches = new Map<string, Promise<boolean>>();
 
 /** The OS identity of a response: its notification identifier and action id. */
@@ -227,61 +230,21 @@ function responseDispatchKey(response: Notifications.NotificationResponse): stri
   return `${response.notification.request.identifier}:${response.actionIdentifier}`;
 }
 
-/** Forget the in-flight dispatch once it settles, without disturbing its result. */
-async function trackDispatch(key: string, dispatch: Promise<boolean>): Promise<boolean> {
-  try {
-    const result = await dispatch;
-    inFlightDispatches.delete(key);
-    return result;
-  } catch (error) {
-    inFlightDispatches.delete(key);
-    throw error;
-  }
-}
-
-// How long a response identity is remembered as having opened its page. Expo
-// can deliver one body tap as two responses that are not concurrent — the JS
-// listener first, then the registered background task once the first dispatch
-// settled — and both deliveries land within seconds of each other. The window
-// covers that race and nothing longer, so a person tapping the same,
-// still-present notification again a while later opens the page again.
-const OPENED_EXTERNAL_TTL_MS = 10 * 1000;
-
-// Oldest-first, so a full memory drops the least recently opened page.
-const OPENED_EXTERNAL_MEMORY_SIZE = 32;
-
-/** When each response identity last opened its external page. */
-const openedExternalPages = new Map<string, number>();
-
 /**
- * True when this dispatch is the first for the response's identity, false when
- * the same tap already opened its page. Expired entries are pruned on the way
- * in, and the memory stays bounded so a long session cannot grow it.
+ * Forget the in-flight dispatch once it settles, without disturbing its result,
+ * and report the response finished.
  */
-function claimExternalOpen(key: string, now: number): boolean {
-  for (const [seen, openedAt] of openedExternalPages) {
-    if (now - openedAt <= OPENED_EXTERNAL_TTL_MS) {
-      // Insertion order runs oldest first: every later entry is newer.
-      break;
-    }
-    openedExternalPages.delete(seen);
+async function trackDispatch(
+  key: string,
+  dispatch: Promise<boolean>,
+  finishHandlingResponse: (key: string) => void
+): Promise<boolean> {
+  try {
+    return await dispatch;
+  } finally {
+    inFlightDispatches.delete(key);
+    finishHandlingResponse(key);
   }
-  if (openedExternalPages.has(key)) {
-    return false;
-  }
-  openedExternalPages.set(key, now);
-  if (openedExternalPages.size > OPENED_EXTERNAL_MEMORY_SIZE) {
-    const oldest = openedExternalPages.keys().next().value;
-    if (oldest !== undefined) {
-      openedExternalPages.delete(oldest);
-    }
-  }
-  return true;
-}
-
-/** Clear the opened-page memory between tests; it is process-wide state. */
-export function _resetOpenedExternalPagesForTests(): void {
-  openedExternalPages.clear();
 }
 
 async function dispatchNeedsInputResponse(
@@ -347,26 +310,16 @@ async function dispatchNeedsInputResponse(
   if (data === null) {
     return false;
   }
-  const destination = notificationDestinationForData(data, WEB_BASE_URL);
-  if (destination === null) {
+  const href = notificationPathForData(data);
+  if (href === null) {
     return false;
   }
   Notifications.clearLastNotificationResponse();
-  if (destination.kind === 'external') {
-    // A KiloClaw push has no mobile screen: its tap opens the web page in the
-    // in-app browser, with the retry affordance a failed open offers. One tap
-    // can arrive twice, and a second delivery lands after the in-flight map
-    // has forgotten the first, so the page is claimed by response identity.
-    if (claimExternalOpen(responseDispatchKey(response), Date.now())) {
-      void openClawNotificationWebUrl(destination.url);
-    }
-    return false;
-  }
   // Always stash: the gated consumer in `_layout.tsx` owns every navigation.
   // `router.navigate` queues rather than throws when the router is unmounted,
   // so a tap while at the consent/force-update/login gate would navigate past
   // the gate and be dropped by the root redirect.
-  setPendingDeepLink(destination.href, 'notification', pendingDeepLinkOptionsForData(data));
+  setPendingDeepLink(href, 'notification', pendingDeepLinkOptionsForData(data));
   return false;
 }
 
@@ -557,9 +510,9 @@ async function runAnswerAction(args: {
     clearPostedNeedsInputNotification(data.cliSessionId);
   }
 
+  const identities = resultIdentities(response, data);
   await replaceNotification({
-    resultIdentifier: notificationIdentifierForSession(data.cliSessionId),
-    originalIdentifier: response.notification.request.identifier,
+    ...identities,
     title: resultTitleFor({
       previews: deps.readPreviews?.(),
       actedOnTitle: response.notification.request.content.title,
@@ -570,6 +523,11 @@ async function runAnswerAction(args: {
     categoryIdentifier: presentation.categoryIdentifier,
     interruptionLevel: presentation.interruptionLevel,
   });
+  if (identities.resultIdentifier !== notificationIdentifierForSession(data.cliSessionId)) {
+    // The result sits under a push's identifier, which the session's plan does
+    // not name: it is recorded so the plan retires it with the raise.
+    markNeedsInputReplyResult(data.cliSessionId, identities.resultIdentifier);
+  }
 
   if (presentation.raiseCleared) {
     // The raise is over for the user. The glanceable surfaces count the tray
@@ -590,11 +548,36 @@ async function refreshGlanceableAfterAnswer(deps: NeedsInputActionDeps): Promise
 }
 
 /**
- * Replace the acted-on notification with the action's result. The result is
- * posted under `notificationIdentifierForSession` — the identifier the next
- * sync's plan dismisses — and the notification the user actually acted on is
- * dismissed when it is a different one (a server push carries an OS-assigned
- * identifier), so one raise never ends with two notifications.
+ * Where the result goes, and which notification it replaces.
+ *
+ * The result is normally posted under `notificationIdentifierForSession` — the
+ * identifier the next sync's plan dismisses — and the notification the user
+ * acted on is dismissed when it is a different one (a server push carries an
+ * OS-assigned identifier).
+ *
+ * An inline Reply is the exception. Android keeps the replied notification on
+ * screen for the reply (`LIFETIME_EXTENDED_BY_DIRECT_REPLY`) and ignores a
+ * dismissal of it, so the raise would end with two notifications. Only a post
+ * under its own identifier ends that, so the result replaces it in place, and
+ * the session's identifier is the one dismissed. iOS removes a replied
+ * notification itself, and a post under its identifier is an ordinary post, so
+ * both platforms take the same path.
+ */
+function resultIdentities(
+  response: Notifications.NotificationResponse,
+  data: NeedsInputRaiseData
+): { resultIdentifier: string; replacedIdentifier: string } {
+  const actedOn = response.notification.request.identifier;
+  const session = notificationIdentifierForSession(data.cliSessionId);
+  return response.userText === undefined
+    ? { resultIdentifier: session, replacedIdentifier: actedOn }
+    : { resultIdentifier: actedOn, replacedIdentifier: session };
+}
+
+/**
+ * Replace a notification with the action's result: post the result under
+ * `resultIdentifier`, and dismiss `replacedIdentifier` when it is a different
+ * one, so one raise never ends with two notifications.
  *
  * `interruptionLevel` is outcome-derived: the retryable failure keeps the
  * raise's time-sensitive break-through because it still needs the user; the
@@ -602,7 +585,7 @@ async function refreshGlanceableAfterAnswer(deps: NeedsInputActionDeps): Promise
  */
 async function replaceNotification(args: {
   resultIdentifier: string;
-  originalIdentifier: string;
+  replacedIdentifier: string;
   title: string;
   body: string;
   data: NeedsInputRaiseData;
@@ -611,7 +594,7 @@ async function replaceNotification(args: {
 }): Promise<void> {
   const {
     resultIdentifier,
-    originalIdentifier,
+    replacedIdentifier,
     title,
     body,
     data,
@@ -635,9 +618,9 @@ async function replaceNotification(args: {
   } catch (error) {
     reportActionFailure('publish', error);
   }
-  if (originalIdentifier !== resultIdentifier) {
+  if (replacedIdentifier !== resultIdentifier) {
     try {
-      await Notifications.dismissNotificationAsync(originalIdentifier);
+      await Notifications.dismissNotificationAsync(replacedIdentifier);
     } catch (error) {
       reportActionFailure('dismiss', error);
     }

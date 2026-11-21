@@ -5,7 +5,7 @@ import { checkFirewallRateLimit } from '@/lib/auth/firewall-rate-limit';
 import { findUserByNormalizedEmail, getWorkOSOrganization } from '@/lib/user';
 import { validateMagicLinkSignupEmail } from '@/lib/schemas/email';
 import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
-import { isBlockedTLD } from '@kilocode/web-shared/lib/user/server';
+import { isBlockedTLD } from '@kilocode/web-shared/lib/user/domain-gates';
 import { isEmailBlacklisted } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';

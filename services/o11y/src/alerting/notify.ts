@@ -1,5 +1,5 @@
 /**
- * Slack notification delivery for SLO and container capacity alerts.
+ * Slack notification delivery for SLO, container capacity and queue alerts.
  */
 
 import type { AlertSeverity } from './slo-config';
@@ -57,6 +57,8 @@ export type ContainerAllocationAlertPayload = {
 
 export type QueueBacklogAlertPayload = {
   alertType: 'queue_backlog';
+  queueName?: string;
+  runbookUrl?: string;
   severity: AlertSeverity;
   provider: string;
   model: string;
@@ -67,11 +69,25 @@ export type QueueBacklogAlertPayload = {
   oldestMessageTimestamp?: Date;
 };
 
+export type DeadLetterQueueAlertPayload = {
+  alertType: 'dead_letter_queue';
+  severity: AlertSeverity;
+  provider: string;
+  model: string;
+  clientName: string;
+  queueId: string;
+  backlogCount: number;
+  newMessages: number;
+  backlogBytes: number;
+  oldestMessageTimestamp?: Date;
+};
+
 export type AlertPayload =
   | SloAlertPayload
   | ContainerCapacityAlertPayload
   | ContainerAllocationAlertPayload
-  | QueueBacklogAlertPayload;
+  | QueueBacklogAlertPayload
+  | DeadLetterQueueAlertPayload;
 
 // ── Formatting helpers ───────────────────────────────────────────────────────
 
@@ -109,6 +125,8 @@ function formatAlertTypeLabel(alertType: AlertPayload['alertType']): string {
       return 'Container Capacity';
     case 'queue_backlog':
       return 'Queue Backlog';
+    case 'dead_letter_queue':
+      return 'Dead-Letter Queue';
   }
 }
 
@@ -236,6 +254,7 @@ function buildQueueBacklogSlackBlocks(alert: QueueBacklogAlertPayload): object[]
     {
       type: 'section',
       fields: [
+        ...(alert.queueName ? [plainTextField('Queue', alert.queueName)] : []),
         plainTextField('Queue ID', alert.model),
         {
           type: 'mrkdwn',
@@ -252,7 +271,38 @@ function buildQueueBacklogSlackBlocks(alert: QueueBacklogAlertPayload): object[]
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `Oldest message: ${oldestMessageTimestamp}`,
+        text: `Oldest message: ${oldestMessageTimestamp}${alert.runbookUrl ? `\nRunbook: ${alert.runbookUrl}` : ''}`,
+      },
+    },
+  ];
+}
+
+function buildDeadLetterQueueSlackBlocks(alert: DeadLetterQueueAlertPayload): object[] {
+  const severityLabel = formatSeverityLabel(alert.severity);
+  const oldestMessageTimestamp = alert.oldestMessageTimestamp?.toISOString() ?? 'Unknown';
+
+  return [
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: `${severityLabel} — Dead-Letter Queue Alert` },
+    },
+    {
+      type: 'section',
+      fields: [
+        { type: 'mrkdwn', text: `*Queue:*\n${alert.model}` },
+        {
+          type: 'mrkdwn',
+          text: `*Backlog:*\n${alert.backlogCount.toLocaleString('en-US')} messages (${alert.newMessages.toLocaleString('en-US')} since last alert)`,
+        },
+        { type: 'mrkdwn', text: `*Queue ID:*\n${alert.queueId}` },
+        { type: 'mrkdwn', text: `*Backlog bytes:*\n${alert.backlogBytes.toLocaleString('en-US')}` },
+      ],
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `Each message is usage that was not recorded after every retry. Oldest message: ${oldestMessageTimestamp}\nRunbook: services/usage-ingest/README.md#dead-letter-alert`,
       },
     },
   ];
@@ -268,6 +318,8 @@ export function buildSlackMessage(alert: AlertPayload): object {
       return { blocks: buildCapacitySlackBlocks(alert) };
     case 'queue_backlog':
       return { blocks: buildQueueBacklogSlackBlocks(alert) };
+    case 'dead_letter_queue':
+      return { blocks: buildDeadLetterQueueSlackBlocks(alert) };
     default:
       return { blocks: buildSloSlackBlocks(alert) };
   }

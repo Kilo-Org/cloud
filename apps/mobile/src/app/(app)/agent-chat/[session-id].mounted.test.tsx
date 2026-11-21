@@ -48,7 +48,10 @@ const queryOptionsMock = vi.hoisted(() => vi.fn());
 // The route builds its narrowed foreground key from this session-scoped input.
 const cliSessionGetQueryKeyMock = vi.hoisted(() => vi.fn(() => [['cliSessionsV2', 'get']]));
 const organizations = vi.hoisted(() => [
-  { organizationId: 'org-a', organizationName: 'Session organization' },
+  {
+    organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
+    organizationName: 'Session organization',
+  },
 ]);
 const createMobileManagerMock = vi.hoisted(() => vi.fn());
 const authState = vi.hoisted(() => ({
@@ -103,6 +106,10 @@ const confirmationRequests = vi.hoisted(() => ({
 }));
 
 const navigationRoutes = ['session-detail'];
+// The header's back press with history: the route's own pop.
+const routerBack = vi.fn(() => {
+  navigationRoutes.pop();
+});
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 // The New-session composer mounts only from its own route; this suite asserts
 // the session route never puts it on screen for a `session-id` param. The
@@ -118,6 +125,8 @@ vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
   ActivityIndicator: 'ActivityIndicator',
+  // EmptyState reads the scheme for its dark disc and glyph ink.
+  useColorScheme: () => 'light',
   I18nManager: { isRTL: false },
   Platform: { OS: 'android' },
   // The session route's system Back listener registers on mount. These tests
@@ -133,6 +142,7 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
 }));
 vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalArrowLeft: 'DirectionalArrowLeft',
   DirectionalChevronLeft: 'ChevronLeft',
   DirectionalChevronRight: 'ChevronRight',
 }));
@@ -148,8 +158,12 @@ vi.mock('@/lib/user-web-connection-lifecycle', () => ({
   createNativeUserWebConnectionLifecycleHooks: () => ({}),
 }));
 vi.mock('@/lib/a11y/announce', () => ({ announceForA11y: vi.fn() }));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#999999',
+  useThemeColors: () => ({}),
+}));
 vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: 'RotateCcw',
   AlertCircle: 'AlertCircle',
   ChevronDown: 'ChevronDown',
   Clock: 'Clock',
@@ -183,6 +197,16 @@ vi.mock('@/components/agents/chat-markdown-text', () => ({
 vi.mock('expo-router', () => ({
   useLocalSearchParams: useLocalSearchParamsMock,
   useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
+  // The stack the route is rendered in: the exit rule reads its index to tell
+  // a dismissal from the only-route case.
+  useNavigation: () => ({
+    getState: () => ({
+      index: navigationRoutes.length - 1,
+      routes: navigationRoutes.map((name, index) => ({ name, key: `route-${index}` })),
+    }),
+    // The stack-safe replacement listens for its push's transition end.
+    addListener: () => () => undefined,
+  }),
   useRouter: useRouterMock,
   // The session route's Back listener runs while the route is focused, which
   // for these tests is its mount lifetime.
@@ -240,6 +264,12 @@ vi.mock('@/lib/trpc', () => ({
 
 vi.mock('@/components/invalid-route-state', () => ({
   InvalidRouteState: 'InvalidRouteState',
+}));
+
+// The real bubble draws a failed preparation group, whose output block pulls in
+// react-native-gesture-handler; the stored transcripts here carry no attempts.
+vi.mock('@/components/agents/preparation-group', () => ({
+  PreparationGroup: 'PreparationGroup',
 }));
 
 vi.mock('@/lib/hooks/use-session-mutations', () => ({
@@ -540,13 +570,23 @@ beforeEach(() => {
   useRouteForegroundRefreshMock.mockClear();
   cliSessionGetQueryKeyMock.mockClear();
   navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
+  routerBack.mockClear();
   useRouterMock.mockReturnValue({
     canGoBack: () => navigationRoutes.length > 1,
-    back: () => {
-      navigationRoutes.pop();
-    },
+    back: routerBack,
     replace: (href: string) => {
       navigationRoutes.splice(-1, 1, href);
+    },
+    // The stack-safe replacement pushes its destination, then retires the route
+    // it came from once that push settles: the end state is the one `replace`
+    // produces, so the source is gone from the modelled stack.
+    push: (href: string | { pathname: string }) => {
+      const path = typeof href === 'string' ? href : href.pathname;
+      const source = navigationRoutes.length - 1;
+      navigationRoutes.push(path);
+      if (source >= 0) {
+        navigationRoutes.splice(source, 1);
+      }
     },
     // The POP_TO end state the component relies on: find the destination at or
     // below the current index, truncate everything above it; with no match,
@@ -717,12 +757,17 @@ describe('SessionDetailScreen relaunch restore', () => {
 
 describe('SessionDetailScreen display scope', () => {
   it.each([
-    { label: 'route organization', route: 'org-a', data: null, expected: 'org-a' },
+    {
+      label: 'route organization',
+      route: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
+      data: null,
+      expected: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
+    },
     {
       label: 'fetched organization',
       route: undefined,
-      data: { organization_id: 'org-a' },
-      expected: 'org-a',
+      data: { organization_id: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10' },
+      expected: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
     },
     {
       label: 'explicit Personal',
@@ -731,6 +776,15 @@ describe('SessionDetailScreen display scope', () => {
       expected: null,
     },
     { label: 'legacy Personal', route: undefined, data: {}, expected: null },
+    {
+      // A hand-built link can carry a value the org procedures reject. It must
+      // not become the route scope: reading as absent lets the metadata read
+      // resolve the real organization instead of failing every request.
+      label: 'unusable route organization',
+      route: 'not-a-uuid',
+      data: { organization_id: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10' },
+      expected: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
+    },
   ])('passes resolved $label without changing global scope', async state => {
     useLocalSearchParamsMock.mockReturnValue({
       'session-id': 'ses_12345678901234567890123456',
@@ -776,11 +830,15 @@ describe('SessionDetailScreen display scope', () => {
         expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
         expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
       } else if (state !== 'pending') {
-        expect(Boolean(propOf(findByType(renderer.root, 'QueryError')[0], 'onRetry'))).toBe(false);
-        const buttonLabels = findByType(renderer.root, 'Button').flatMap(button =>
-          findByType(button, 'Text').flatMap(node => node.children)
+        // The terminal body repeats no exit: the header's back chevron is the
+        // only one, and a permanent denial draws no body action.
+        const error = findByType(renderer.root, 'QueryError')[0];
+        expect(Boolean(propOf(error, 'onRetry'))).toBe(false);
+        expect(propOf(error, 'action')).toBeUndefined();
+        expect(findByType(renderer.root, 'Button')).toHaveLength(0);
+        expect(propOf(renderer.root.findByType(ScreenHeader), 'onBack')).toEqual(
+          expect.any(Function)
         );
-        expect(buttonLabels).toEqual(['Copy', 'Back to sessions']);
       }
       expect(globalContext.organizationId).toBe('global-org');
       expect(globalContext.setOrganizationId).not.toHaveBeenCalled();
@@ -800,12 +858,12 @@ describe('SessionDetailScreen display scope', () => {
 
     queryState.isError = false;
     queryState.error = null;
-    queryState.data = { organization_id: 'org-a' };
+    queryState.data = { organization_id: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10' };
     await updateRoute(renderer);
 
     expect(queryState.refetch).not.toHaveBeenCalled();
     expect(propOf(findByType(renderer.root, 'SessionDetailContent')[0], 'displayScope')).toEqual({
-      organizationId: 'org-a',
+      organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
       isResolved: true,
     });
     expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
@@ -905,13 +963,15 @@ describe('SessionDetailScreen metadata read that cannot settle', () => {
     // transcript and drop the composer text under it.
     queryState.isPending = false;
     queryState.fetchStatus = 'idle';
-    queryState.data = { organization_id: 'org-a' };
+    queryState.data = { organization_id: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10' };
     await updateRoute(renderer);
 
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
     expect(managers).toHaveLength(1);
     expect(managers.at(-1)?.manager).toBe(mountedManager);
-    expect(propOf(renderer.root.findByType(AgentSessionProvider), 'organizationId')).toBe('org-a');
+    expect(propOf(renderer.root.findByType(AgentSessionProvider), 'organizationId')).toBe(
+      '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10'
+    );
   });
 });
 
@@ -1257,7 +1317,7 @@ function childIds({ store, manager }: ManagerProbe): string[] {
 async function startChildPage(pageKind: 'first' | 'older') {
   useLocalSearchParamsMock.mockReturnValue({
     'session-id': 'ses_12345678901234567890123456',
-    organizationId: 'org-a',
+    organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
   });
   const renderer = await mountRoute();
   const current = managers.at(-1);
@@ -1305,7 +1365,7 @@ describe.each(['first', 'older'] as const)('SessionDetailScreen %s child-page sc
       change: () => {
         useLocalSearchParamsMock.mockReturnValue({
           'session-id': 'ses_12345678901234567890123457',
-          organizationId: 'org-a',
+          organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
         });
       },
     },
@@ -1314,7 +1374,7 @@ describe.each(['first', 'older'] as const)('SessionDetailScreen %s child-page sc
       change: () => {
         useLocalSearchParamsMock.mockReturnValue({
           'session-id': 'ses_12345678901234567890123456',
-          organizationId: 'org-b',
+          organizationId: '7c1e4b2d-5a3f-4e8c-b9d6-1f2a3b4c5d6e',
         });
       },
     },
@@ -1443,7 +1503,9 @@ describe('SessionDetailScreen owner-scoped metadata and recovery', () => {
       queryFn: async () => {
         const account = requestAccount;
         await Promise.resolve();
-        return account === 'A' ? { organization_id: 'org-a' } : metadata.promise;
+        return account === 'A'
+          ? { organization_id: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10' }
+          : metadata.promise;
       },
     }));
     const client = new QueryClient({
@@ -1472,7 +1534,7 @@ describe('SessionDetailScreen owner-scoped metadata and recovery', () => {
     expect(rootRequests.slice(requestsBeforeReplacement)).toEqual([]);
 
     await act(async () => {
-      metadata.resolve({ organization_id: 'org-b' });
+      metadata.resolve({ organization_id: '7c1e4b2d-5a3f-4e8c-b9d6-1f2a3b4c5d6e' });
       await vi.advanceTimersByTimeAsync(0);
     });
     expect(transcriptText(renderer, 'RootText')).toBe('Account B root row');
@@ -1486,7 +1548,7 @@ describe('SessionDetailScreen owner-scoped metadata and recovery', () => {
     setSignOutActive(false);
     useLocalSearchParamsMock.mockReturnValue({
       'session-id': 'ses_12345678901234567890123456',
-      organizationId: 'org-a',
+      organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
     });
     const renderer = await mountRoute();
     expect(rootRequests).toEqual([]);
@@ -1530,7 +1592,10 @@ describe('SessionDetailScreen owner-scoped metadata and recovery', () => {
     expect(propOf(error, 'variant')).toBe(variant);
     expect(propOf(error, 'onRetry')).toBeUndefined();
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
-    expect(findByType(renderer.root, 'Button')).toHaveLength(2);
+    // The exit is the header's back chevron: the terminal body repeats no way
+    // out, and a permanent denial has no action to draw at all.
+    expect(findByType(renderer.root, 'Button')).toHaveLength(0);
+    expect(propOf(error, 'action')).toBeUndefined();
   });
 });
 
@@ -1540,7 +1605,7 @@ describe('SessionDetailScreen fresh authentication scope', () => {
     beginReplacement();
     useLocalSearchParamsMock.mockReturnValue({
       'session-id': 'ses_12345678901234567890123456',
-      organizationId: 'org-a',
+      organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
     });
     const renderer = await mountRoute();
 
@@ -1560,7 +1625,7 @@ describe('SessionDetailScreen fresh authentication scope', () => {
     commitAccount('A');
     useLocalSearchParamsMock.mockReturnValue({
       'session-id': 'ses_12345678901234567890123456',
-      organizationId: 'org-a',
+      organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
     });
     const renderer = await mountRoute();
     expect(transcriptText(renderer, 'RootText')).toBe('Account A root row');
@@ -1645,7 +1710,7 @@ describe.each([true, false])('SessionDetailScreen header return with history=%s'
     });
 
     expect(navigationRoutes).toEqual(
-      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)/']
+      hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)']
     );
     expect(rootRequests).toEqual([]);
   });
@@ -1662,7 +1727,7 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
     useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'ses_12345678901234567890123456' });
   });
 
-  it.each([undefined, 'org-a'])(
+  it.each([undefined, '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10'])(
     'shows the header and existing skeletons while identity is pending with organization %s',
     async organizationId => {
       useLocalSearchParamsMock.mockReturnValue({
@@ -1750,7 +1815,9 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
       await Promise.resolve();
     });
     expect(transcriptText(renderer)).toContain('Could not load your account');
-    expect(transcriptText(renderer)).toContain('Back to sessions');
+    // The header's back chevron is the only way out; the retryable card owns
+    // its Retry and repeats no exit of the screen's.
+    expect(transcriptText(renderer)).not.toContain('Back to sessions');
     expect(propOf(retryControl(renderer), 'accessibilityState')).toMatchObject({
       disabled: false,
       busy: false,
@@ -1782,22 +1849,43 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
     expect(transcriptText(renderer)).toBe('Account B child row');
   });
 
-  it('leaves failed confirmation through Back to sessions', async () => {
+  it('leaves a failed confirmation through the header back', async () => {
     confirmationRequests.getMe.mockRejectedValueOnce(new Error('offline'));
-    // The composer-under-session shape the fix exists for: the not-found
-    // screen sits above the New session composer, and "Back to sessions" must
-    // remove both rather than reveal what was below.
+    // The composer-under-session shape: the terminal body draws no exit of its
+    // own, so the header's back press is the route's own history and returns to
+    // the composer that opened the session.
     navigationRoutes.unshift('agent-chat/new');
     const renderer = await mountRoute();
-    const back = findByType(renderer.root, 'Button').find(button =>
-      findByType(button, 'Text').some(text => text.children.includes('Back to sessions'))
-    );
     act(() => {
-      pressControl(back);
+      pressControl(
+        findByType(renderer.root.findByType(ScreenHeader), 'Pressable').find(
+          node => propOf(node, 'accessibilityLabel') === 'Go back'
+        )
+      );
     });
 
-    // Truncated to the tabs entry: the composer is no longer on the stack.
-    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)/']);
+    expect(routerBack).toHaveBeenCalledTimes(1);
+    expect(navigationRoutes).toEqual(['agent-chat/new']);
+    expect(rootRequests).toEqual([]);
+  });
+
+  it('lands on the sessions list when the session route has nothing beneath it', async () => {
+    confirmationRequests.getMe.mockRejectedValueOnce(new Error('offline'));
+    // The only-route shape: a cold open leaves the session as the stack's only
+    // screen, so the header back has no history to pop. The press must still
+    // land on the sessions list, which the stack-safe replacement pushes over
+    // this route before retiring it.
+    const renderer = await mountRoute();
+    act(() => {
+      pressControl(
+        findByType(renderer.root.findByType(ScreenHeader), 'Pressable').find(
+          node => propOf(node, 'accessibilityLabel') === 'Go back'
+        )
+      );
+    });
+
+    expect(routerBack).not.toHaveBeenCalled();
+    expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)']);
     expect(rootRequests).toEqual([]);
   });
 
@@ -1844,7 +1932,7 @@ describe('SessionDetailScreen identity confirmation feedback', () => {
 
 describe.each([
   { route: 'personal', organizationId: undefined },
-  { route: 'explicit organization', organizationId: 'org-a' },
+  { route: 'explicit organization', organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10' },
 ])('SessionDetailScreen title isolation on $route routes', ({ organizationId }) => {
   it.each(['retained replacement', 'fresh pending mount'] as const)(
     'does not restore an inherited title after %s confirms with delayed metadata',
@@ -1860,7 +1948,9 @@ describe.each([
         queryFn: async () => {
           const account = requestAccount;
           await Promise.resolve();
-          return account === 'A' ? { organization_id: 'org-a' } : routeMetadata.promise;
+          return account === 'A'
+            ? { organization_id: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10' }
+            : routeMetadata.promise;
         },
       }));
       const client = new QueryClient({
@@ -1923,7 +2013,7 @@ describe.each([
         expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(1);
         expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
         await act(async () => {
-          routeMetadata.resolve({ organization_id: 'org-b' });
+          routeMetadata.resolve({ organization_id: '7c1e4b2d-5a3f-4e8c-b9d6-1f2a3b4c5d6e' });
           await vi.advanceTimersByTimeAsync(0);
         });
       }
@@ -2029,7 +2119,7 @@ describe('SessionDetailScreen malformed part transcript', () => {
 
     useLocalSearchParamsMock.mockReturnValue({
       'session-id': 'ses_12345678901234567890123456',
-      organizationId: 'org-a',
+      organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
     });
     const renderer = await mountRoute();
 
@@ -2116,7 +2206,7 @@ describe('SessionDetailScreen malformed patch part transcript', () => {
 
     useLocalSearchParamsMock.mockReturnValue({
       'session-id': 'ses_12345678901234567890123456',
-      organizationId: 'org-a',
+      organizationId: '3f6c1d9a-8b2e-4c7f-9a1d-5e8b2c4f6a10',
     });
     const renderer = await mountRoute();
 

@@ -2,12 +2,14 @@ import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { type TFunction } from 'i18next';
 
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { ChevronDown } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import {
+  FIELD_TRIGGER_BODY_CLASS,
+  FIELD_TRIGGER_FRAME_CLASS,
   LINE_ACTION_BOX_CLASS,
   LINE_ACTION_HIT_SLOP,
-  ROW_TARGET_CLASS,
 } from '@/lib/a11y/tap-target';
 import {
   buildSummaryLabel,
@@ -32,10 +34,7 @@ type NewSessionCloudEnvironmentRowProps = {
   onOpen: () => void;
 };
 
-const CARD_CLASS = cn(
-  ROW_TARGET_CLASS,
-  'flex-row items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5'
-);
+const CARD_CLASS = FIELD_TRIGGER_FRAME_CLASS;
 
 /**
  * The build line under the picked environment: a failed list, a failed build
@@ -63,9 +62,9 @@ function selectedBuildDetail({
 
 /**
  * The new-session Environment row: the cloud environment the session starts
- * with, and its snapshot build in one line. Every state renders the same card
- * and the same two reserved lines, so the form never changes height as the
- * list, the pick or the build settles.
+ * with, and its snapshot build in one line. Every state renders the same card,
+ * and the card is only as tall as what it shows: the title, then the detail
+ * line when the state has one, so the form never keeps a blank second line.
  *
  * The label is "Environment"; the row above it picked this form's earlier
  * naming and is the agent profile. Web's form keeps the profile under
@@ -103,26 +102,26 @@ export function NewSessionCloudEnvironmentRow({
   }
 
   const body = (
-    <>
+    <View className={cn(FIELD_TRIGGER_BODY_CLASS, 'justify-between')}>
       <View className="min-w-0 flex-1 gap-1">
         <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
           {label}
         </Text>
-        <Text className="min-h-10 text-sm text-muted-foreground" numberOfLines={2}>
-          {detail.length > 0 ? detail : '\u00A0\n\u00A0'}
-        </Text>
+        {detail.length === 0 ? null : (
+          <Text className="text-sm text-muted-foreground" numberOfLines={2}>
+            {detail}
+          </Text>
+        )}
       </View>
       {opensPicker ? <ChevronDown size={18} color={colors.mutedForeground} /> : null}
-    </>
+    </View>
   );
 
   const canOpen = opensPicker && !disabled;
 
   return (
-    <View className="mt-5">
-      <Text className="mb-2 text-sm font-medium text-muted-foreground">
-        {t('agentChat.newSession.cloudEnvironment')}
-      </Text>
+    <View className="gap-2">
+      <FormFieldLabel label={t('agentChat.newSession.cloudEnvironment')} />
       {/* The card's own chrome lives on the Pressable, exactly as the profile
           row below does, and the Pressable is never flattened: an unstyled
           Pressable around a styled card collapses into that card's native view

@@ -90,6 +90,13 @@ export async function buildControlPlaneMessagePayload(input: {
   if (mode === undefined || (input.turn.type === 'prompt' && model === undefined)) {
     throw new ControlPlaneMessageInputError('Session is missing a valid agent selection');
   }
+  // `custom` mode runs the session's own appended system prompt, so it is only
+  // valid on a session created in it: that create is what proved the prompt
+  // exists, and a message cannot add one. Repeating the stored mode is the
+  // normal case — a client that resumes the session sends the mode it stored.
+  if (mode === 'custom' && input.metadata.agent?.mode !== 'custom') {
+    throw new ControlPlaneMessageInputError('Custom mode requires a system prompt on the session');
+  }
   // Variants are model-specific. Only inherit the stored variant when the turn
   // keeps the stored model; an override that switches models must not pair the
   // new model with a variant meant for the old one.

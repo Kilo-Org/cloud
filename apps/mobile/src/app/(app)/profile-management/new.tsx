@@ -5,6 +5,7 @@ import { NewProfileScreen } from '@/components/profiles/new-profile-screen';
 import { useRepairProfileRouteStack } from '@/lib/hooks/use-repair-profile-route-stack';
 import {
   getNewProfilePath,
+  getProfilesPath,
   NEW_PROFILE_RETURNS,
   type ProfileManagementStack,
 } from '@/lib/profile-agent-navigation';
@@ -40,6 +41,7 @@ export default function AppStackNewProfileRoute() {
       stack={stack}
       initialOwner={owner}
       returnToCaller={returnTo !== undefined}
+      backFallback={getProfilesPath('app')}
       organizationId={organizationId}
     />
   );

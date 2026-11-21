@@ -3,19 +3,24 @@
 // button, and it presents a separate native window so it also stacks above a
 // formSheet route (a JS sheet or a portal overlay would render below it).
 //
-// Focus restore after the sheet closes belongs to the parent, which owns the
-// trigger. Every close path here routes through `onClose` or `onPick`.
+// The header is the shared sheet header, so the picker's title reads like every
+// other sheet's and Close is the way out. Opening the sheet moves assistive
+// focus to that title (Android's focus event): a separate native window has no
+// entry focus of its own, so a screen reader would otherwise stay on the list
+// behind it. Focus restore after the sheet closes belongs to the parent, which
+// owns the trigger. Every close path here routes through `onClose` or `onPick`.
 
-import { X } from '@/components/ui/icons';
 import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, type TextInstance, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { SheetHeader } from '@/components/sheet-header';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
 import { requestA11yFocus } from '@/lib/a11y/announce';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { REACTION_EMOJI, reactionLabel } from '@/lib/pr-review/discussion/reaction-pills';
 import {
   REVIEW_REACTION_CONTENTS,
@@ -40,14 +45,15 @@ export function ReactionPickerSheet({
   onClose,
   onPick,
 }: Readonly<ReactionPickerSheetProps>) {
-  const colors = useThemeColors();
-  const insets = useSafeAreaInsets();
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const titleRef = useRef<TextInstance | null>(null);
-  // Android can deliver layout before attaching the title ref. Retry from the
-  // ref callback when no request was dispatched; this latch is not focus proof.
+  // The latch records a dispatched request, not delivered focus: Android
+  // reports no outcome. Reaching the title is retried from the two real
+  // signals — the open render (a reopened sheet keeps its title mounted) and
+  // the body's layout, which arrives once the native window is presented and
+  // can accept focus.
   const titleFocusRequestedRef = useRef(false);
-  const titleLaidOutRef = useRef(false);
   const focusTitle = useCallback(() => {
     if (titleFocusRequestedRef.current) {
       return;
@@ -56,33 +62,14 @@ export function ReactionPickerSheet({
       titleFocusRequestedRef.current = true;
     }
   }, []);
-  const attachTitle = useCallback(
-    (node: TextInstance | null) => {
-      titleRef.current = node;
-      if (node !== null && titleLaidOutRef.current) {
-        focusTitle();
-      }
-    },
-    [focusTitle]
-  );
-  const handleTitleLayout = useCallback(() => {
-    titleLaidOutRef.current = true;
-    focusTitle();
-  }, [focusTitle]);
-
-  // Focus the picker's title once per presentation, when a request can actually
-  // reach it. `Sheet` returns null on the commit that flips `visible`, so the
-  // title mounts a render later; on Android its `onLayout` can even arrive
-  // before the ref is attached. Reaching the title is retried from each real
-  // signal — this effect for a reopen that never unmounted the title,
-  // `handleTitleLayout` and `attachTitle` otherwise — and the guard latches only
-  // on a dispatched request.
   useEffect(() => {
     if (!visible) {
       titleFocusRequestedRef.current = false;
-      titleLaidOutRef.current = false;
       return;
     }
+    // A first presentation mounts the title a render after `visible` flips, so
+    // there is nothing to focus yet; the body's layout below is that signal.
+    // A reopen keeps the title mounted, which is the earlier signal.
     if (titleRef.current !== null) {
       focusTitle();
     }
@@ -96,54 +83,53 @@ export function ReactionPickerSheet({
   }
 
   return (
-    // No snap points: the native sheet sizes to the emoji grid.
+    // No snap points: the native sheet sizes to the emoji grid. The modal
+    // wrapper covers the header too: a screen reader must not reach the
+    // comment list behind a separate native window. The bottom inset rides on
+    // that wrapper and the 24pt floor is the body's own scale class, so the
+    // sheet clears the home indicator without a literal in the style.
     <Sheet visible={visible} onClose={onClose}>
       <View
         accessibilityViewIsModal
-        className="gap-4 px-5 pt-4"
-        style={{ paddingBottom: insets.bottom + 24 }}
+        style={insets.bottom > 0 ? { paddingBottom: insets.bottom } : undefined}
       >
-        <View className="flex-row items-center">
-          <View className="size-[48px] shrink-0" />
-          <Text
-            ref={attachTitle}
-            onLayout={handleTitleLayout}
-            accessibilityRole="header"
-            className="min-w-0 flex-1 text-center text-base font-semibold text-foreground"
-          >
-            {/* i18n-dup-ok: prReview.discussion.reaction* is a numeral count label
-                ('3 reactions'); this key is the picker's title — cs/pl/uk differ. */}
-            {t('common.reactions')}
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('common.closeReactions')}
-            className="size-[48px] shrink-0 items-center justify-center rounded-full active:bg-muted"
-            onPress={onClose}
-          >
-            <X size={18} color={colors.foreground} />
-          </Pressable>
-        </View>
-        <View className="flex-row flex-wrap gap-2">
-          {REVIEW_REACTION_CONTENTS.map(content => {
-            const isReacted = reacted.has(content);
-            return (
-              <Pressable
-                key={content}
-                accessibilityRole="button"
-                accessibilityLabel={reactionLabel(content)}
-                className={cn(
-                  'h-[48px] w-[48px] items-center justify-center rounded-full active:opacity-75',
-                  isReacted ? 'bg-accent-soft' : 'bg-muted'
-                )}
-                onPress={() => {
-                  onPick(content);
-                }}
-              >
-                <Text className="text-xl">{REACTION_EMOJI[content]}</Text>
-              </Pressable>
-            );
-          })}
+        {/* i18n-dup-ok: prReview.discussion.reaction* is a numeral count label
+            ('3 reactions'); this key is the picker's title — cs/pl/uk differ. */}
+        {/* The native handle already leaves the room above the title, so the
+            header takes the shared under-handle pair instead of its own top
+            padding. */}
+        <SheetHeader
+          title={t('common.reactions')}
+          onDone={onClose}
+          // Same accessible name the picker's own header gave its close control.
+          doneLabel={t('common.closeReactions')}
+          topInset="never"
+          underHandle
+          titleRef={titleRef}
+        />
+        <View onLayout={focusTitle} className={cn(SCREEN_BODY_CLASS, 'pb-6')}>
+          <View className="flex-row flex-wrap gap-2">
+            {REVIEW_REACTION_CONTENTS.map(content => {
+              const isReacted = reacted.has(content);
+              return (
+                <Pressable
+                  key={content}
+                  accessibilityRole="button"
+                  accessibilityLabel={reactionLabel(content)}
+                  className={cn(
+                    ICON_TARGET_BOX_CLASS,
+                    'rounded-full active:opacity-75',
+                    isReacted ? 'bg-accent-soft' : 'bg-muted'
+                  )}
+                  onPress={() => {
+                    onPick(content);
+                  }}
+                >
+                  <Text className="text-lg">{REACTION_EMOJI[content]}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
       </View>
     </Sheet>

@@ -8,7 +8,6 @@ import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.util.Log
 import java.util.UUID
 
@@ -84,12 +83,7 @@ class ActiveAgentsDeadlineReceiver : BroadcastReceiver() {
         operation.cancel()
         return
       }
-      if (Build.VERSION.SDK_INT >= 31) {
-        // No exact-alarm permission: Android can defer delivery while idle.
-        alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, deadline, operation)
-      } else {
-        alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, deadline, operation)
-      }
+      alarmWhileIdle(alarms, deadline, operation)
     }
 
     @Synchronized

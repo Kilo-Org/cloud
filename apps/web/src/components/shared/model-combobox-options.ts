@@ -1,24 +1,7 @@
-export type ModelOption = {
-  id: string; // e.g., "anthropic/claude-sonnet-4.5"
-  name: string; // e.g., "Claude Sonnet 4.5"
-  /** Exact user-facing ID when `id` is an opaque selection value. */
-  displayId?: string;
-  /** Optional provider group for provider-aware catalogs. */
-  providerGroup?: { id: string; label: string };
-  /** Additional user-facing search terms. Opaque selection values stay excluded. */
-  searchTerms?: string[];
-  supportsVision?: boolean;
-  supportsReasoning?: boolean;
-  isFree?: boolean;
-  mayTrainOnYourPrompts?: boolean;
-  hasUserByokAvailable?: boolean;
-  showGatewayMetadata?: boolean;
-  unavailable?: boolean;
-  /** Ordered list of variant key names (e.g., ["none","low","medium","high","max"]) */
-  variants?: string[];
-  /** Reasoning-control variants only; [] is known default-only, absent is unknown. */
-  reasoningVariants?: string[];
-};
+import { isFavoriteOption } from './model-favorites';
+import type { ModelOption } from './model-option';
+
+export type { ModelOption };
 
 export type ModelOptionGroup = {
   id: string;
@@ -26,15 +9,28 @@ export type ModelOptionGroup = {
   models: ModelOption[];
 };
 
+export const NO_FAVORITES: ReadonlySet<string> = new Set();
+
 export function buildModelOptionGroups(
   models: ModelOption[],
-  preferredModels: ReadonlyArray<string>
+  preferredModels: ReadonlyArray<string>,
+  favoriteIds: ReadonlySet<string> = NO_FAVORITES
 ): ModelOptionGroup[] {
   const groups: ModelOptionGroup[] = [];
+  const favorites: ModelOption[] = [];
+  const rest: ModelOption[] = [];
+  for (const model of models) {
+    if (isFavoriteOption(model, favoriteIds)) favorites.push(model);
+    else rest.push(model);
+  }
+  if (favorites.length > 0) {
+    groups.push({ id: 'favorites', heading: 'Favorites', models: favorites });
+  }
+
   const groupIndexes = new Map<string, number>();
   const ungrouped: ModelOption[] = [];
 
-  for (const model of models) {
+  for (const model of rest) {
     if (!model.providerGroup) {
       ungrouped.push(model);
       continue;

@@ -77,6 +77,7 @@ const SubOrganizationPeopleOutputSchema = z.object({
       name: z.string(),
       memberCount: z.number().int().nonnegative(),
       pendingInvitationCount: z.number().int().nonnegative(),
+      requireSeats: z.boolean(),
       seatCount: SeatCountSchema,
       roleBreakdown: RoleBreakdownSchema,
       owners: z.array(PersonSchema),
@@ -743,6 +744,7 @@ export const organizationSubOrganizationsRouter = createTRPCRouter({
             name: child.name,
             memberCount,
             pendingInvitationCount: invitationCounts.pending.get(child.id) ?? 0,
+            requireSeats: child.requireSeats,
             seatCount: {
               used:
                 roleBreakdown.owner +

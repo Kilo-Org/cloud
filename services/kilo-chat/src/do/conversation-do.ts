@@ -38,27 +38,13 @@ function parseStoredContent(rawContent: string, messageId: string): ContentBlock
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { eq, lt, gte, desc, and, sql, inArray } from 'drizzle-orm';
-import {
-  attachments,
-  botMessageNotifications,
-  conversation,
-  members,
-  messages,
-  reactions,
-} from '../db/conversation-schema';
+import { attachments, conversation, members, messages, reactions } from '../db/conversation-schema';
 import { buildAttachmentR2Key } from '../util/attachment-key';
-import {
-  BOT_MESSAGE_NOTIFICATION_MIN_TEXT_CHARS,
-  BOT_MESSAGE_NOTIFICATION_TIMEOUT_MS,
-  botMessageNotificationTextLength,
-  sendConversationMessagePush,
-} from '../services/push-notifications';
 import { pushEventToHumanMembers } from '../services/event-push';
 import migrations from '../../drizzle/conversation/migrations';
 import { monotonicFactory } from 'ulid';
 
 type StoredMessageRow = typeof messages.$inferSelect;
-type BotMessageNotificationReason = 'length' | 'typing_stop' | 'timeout';
 type StoredAttachmentRow = typeof attachments.$inferSelect;
 
 const INIT_DEDUPE_WINDOW_MS = 30_000;
@@ -705,120 +691,6 @@ export class ConversationDO extends DurableObject<Env> {
     );
   }
 
-  private scheduleBotNotificationAlarm(notifyAfter: number): void {
-    this.ctx.waitUntil(
-      (async () => {
-        const currentAlarm = await this.ctx.storage.getAlarm();
-        if (currentAlarm === null || notifyAfter < currentAlarm) {
-          await this.ctx.storage.setAlarm(notifyAfter);
-        }
-      })()
-    );
-  }
-
-  private registerBotMessageNotification(
-    messageId: string,
-    botId: string,
-    content: ContentBlock[]
-  ): void {
-    const createdAt = Date.now();
-    const notifyAfter = createdAt + BOT_MESSAGE_NOTIFICATION_TIMEOUT_MS;
-
-    this.db
-      .insert(botMessageNotifications)
-      .values({
-        message_id: messageId,
-        bot_id: botId,
-        content: JSON.stringify(content),
-        created_at: createdAt,
-        notify_after: notifyAfter,
-      })
-      .run();
-
-    this.scheduleBotNotificationAlarm(notifyAfter);
-  }
-
-  private claimBotMessageNotification(
-    messageId: string,
-    reason: BotMessageNotificationReason
-  ): { messageId: string; botId: string; content: ContentBlock[] } | null {
-    const row = this.db
-      .select()
-      .from(botMessageNotifications)
-      .where(eq(botMessageNotifications.message_id, messageId))
-      .get();
-
-    if (!row || row.notified_at !== null) return null;
-
-    const notifiedAt = Date.now();
-    this.db
-      .update(botMessageNotifications)
-      .set({ notified_at: notifiedAt, notified_reason: reason })
-      .where(
-        and(
-          eq(botMessageNotifications.message_id, messageId),
-          sql`${botMessageNotifications.notified_at} IS NULL`
-        )
-      )
-      .run();
-
-    const claimed = this.db
-      .select()
-      .from(botMessageNotifications)
-      .where(eq(botMessageNotifications.message_id, messageId))
-      .get();
-
-    if (!claimed || claimed.notified_at !== notifiedAt) return null;
-
-    return {
-      messageId: claimed.message_id,
-      botId: claimed.bot_id,
-      content: parseStoredContent(claimed.content, claimed.message_id),
-    };
-  }
-
-  private dispatchClaimedBotMessageNotification(
-    claimed: { messageId: string; botId: string; content: ContentBlock[] },
-    reason: BotMessageNotificationReason
-  ): void {
-    const info = this.getInfo();
-    if (!info) return;
-    const memberContext = this.getMemberContext();
-    if (!memberContext.sandboxId) return;
-
-    const logContext =
-      reason === 'length'
-        ? 'bot.length'
-        : reason === 'typing_stop'
-          ? 'bot.typing_stop'
-          : 'bot.timeout';
-
-    this.ctx.waitUntil(
-      sendConversationMessagePush(this.env, {
-        conversationId: info.id,
-        sandboxId: memberContext.sandboxId,
-        title: info.title,
-        humanMemberIds: memberContext.humanMemberIds,
-        senderId: claimed.botId,
-        senderIsHuman: false,
-        messageId: claimed.messageId,
-        content: claimed.content,
-        recipientMode: 'all-human-members',
-        logContext,
-      })
-    );
-  }
-
-  private notifyBotMessageIfClaimable(
-    messageId: string,
-    reason: BotMessageNotificationReason
-  ): boolean {
-    const claimed = this.claimBotMessageNotification(messageId, reason);
-    if (!claimed) return false;
-    this.dispatchClaimedBotMessageNotification(claimed, reason);
-    return true;
-  }
-
   async createMessage(params: CreateMessageParams): Promise<CreateMessageResult> {
     const info = this.getInfo();
     if (!info) return { ok: false, code: 'internal', error: 'Conversation not initialized' };
@@ -921,13 +793,6 @@ export class ConversationDO extends DurableObject<Env> {
     const replyParentById = replyParentRow
       ? new Map([[replyParentRow.id, replyParentRow]])
       : new Map<string, StoredMessageRow>();
-
-    if (this.isBotMember(params.senderId)) {
-      this.registerBotMessageNotification(messageId, params.senderId, content);
-      if (botMessageNotificationTextLength(content) >= BOT_MESSAGE_NOTIFICATION_MIN_TEXT_CHARS) {
-        this.notifyBotMessageIfClaimable(messageId, 'length');
-      }
-    }
 
     return {
       ok: true,
@@ -1127,23 +992,6 @@ export class ConversationDO extends DurableObject<Env> {
       .where(eq(messages.id, params.messageId))
       .run();
 
-    if (this.isBotMember(params.senderId)) {
-      this.db
-        .update(botMessageNotifications)
-        .set({ content: JSON.stringify(content) })
-        .where(
-          and(
-            eq(botMessageNotifications.message_id, params.messageId),
-            sql`${botMessageNotifications.notified_at} IS NULL`
-          )
-        )
-        .run();
-
-      if (botMessageNotificationTextLength(content) >= BOT_MESSAGE_NOTIFICATION_MIN_TEXT_CHARS) {
-        this.notifyBotMessageIfClaimable(params.messageId, 'length');
-      }
-    }
-
     return {
       ok: true,
       stale: false,
@@ -1153,62 +1001,7 @@ export class ConversationDO extends DurableObject<Env> {
     };
   }
 
-  notifyLatestBotMessageOnTypingStop(
-    botId: string
-  ): { ok: true; notified: boolean } | { ok: false; error: string } {
-    if (!this.isBotMember(botId)) {
-      return { ok: false, error: 'Not a bot member' };
-    }
-
-    const row = this.db
-      .select({ messageId: botMessageNotifications.message_id })
-      .from(botMessageNotifications)
-      .where(
-        and(
-          eq(botMessageNotifications.bot_id, botId),
-          sql`${botMessageNotifications.notified_at} IS NULL`
-        )
-      )
-      .orderBy(desc(botMessageNotifications.created_at))
-      .limit(1)
-      .get();
-
-    if (!row) {
-      return { ok: true, notified: false };
-    }
-
-    return { ok: true, notified: this.notifyBotMessageIfClaimable(row.messageId, 'typing_stop') };
-  }
-
   override async alarm(): Promise<void> {
-    const now = Date.now();
-    const dueRows = this.db
-      .select()
-      .from(botMessageNotifications)
-      .where(
-        and(
-          sql`${botMessageNotifications.notified_at} IS NULL`,
-          sql`${botMessageNotifications.notify_after} <= ${now}`
-        )
-      )
-      .all();
-
-    for (const row of dueRows) {
-      this.notifyBotMessageIfClaimable(row.message_id, 'timeout');
-    }
-
-    const next = this.db
-      .select({ notifyAfter: botMessageNotifications.notify_after })
-      .from(botMessageNotifications)
-      .where(sql`${botMessageNotifications.notified_at} IS NULL`)
-      .orderBy(botMessageNotifications.notify_after)
-      .limit(1)
-      .get();
-
-    if (next) {
-      await this.ctx.storage.setAlarm(next.notifyAfter);
-    }
-
     await this.sweepOrphanAttachments();
   }
 
@@ -1260,7 +1053,6 @@ export class ConversationDO extends DurableObject<Env> {
       .where(eq(attachments.message_id, params.messageId))
       .all();
 
-    const clearPendingBotNotification = this.isBotMember(params.senderId);
     this.db.transaction(tx => {
       tx.update(messages)
         .set({ deleted: 1, updated_at: Date.now() })
@@ -1269,17 +1061,6 @@ export class ConversationDO extends DurableObject<Env> {
 
       if (attachmentRows.length > 0) {
         tx.delete(attachments).where(eq(attachments.message_id, params.messageId)).run();
-      }
-
-      if (clearPendingBotNotification) {
-        tx.delete(botMessageNotifications)
-          .where(
-            and(
-              eq(botMessageNotifications.message_id, params.messageId),
-              sql`${botMessageNotifications.notified_at} IS NULL`
-            )
-          )
-          .run();
       }
     });
 
@@ -1727,7 +1508,6 @@ export class ConversationDO extends DurableObject<Env> {
     this.db.transaction(tx => {
       tx.delete(attachments).run();
       tx.delete(reactions).run();
-      tx.delete(botMessageNotifications).run();
       tx.delete(messages).run();
       tx.delete(conversation).run();
       tx.delete(members).run();

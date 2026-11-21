@@ -1,11 +1,22 @@
 import type { User } from '@kilocode/db/schema';
+import React, { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+
+// The component's JSX compiles to `React.createElement`, and Next supplies the
+// binding its own build; here it comes from the test.
+Object.assign(globalThis, { React });
 
 const mockUseEffect = jest.fn((effect: () => void | (() => void), _deps?: unknown[]) => effect());
 const mockUseUser = jest.fn();
+const mockPathname = jest.fn(() => '/');
 
 jest.mock('react', () => ({
   ...jest.requireActual('react'),
   useEffect: (effect: () => void | (() => void), deps?: unknown[]) => mockUseEffect(effect, deps),
+}));
+
+jest.mock('next/navigation', () => ({
+  usePathname: () => mockPathname(),
 }));
 
 jest.mock('@/hooks/useUser', () => ({
@@ -43,9 +54,15 @@ async function waitForIreCalls(ire: jest.Mock, expectedCallCount: number) {
 describe('ImpactIdentify', () => {
   let originalWindow: typeof globalThis.window | undefined;
   let originalCrypto: Crypto;
+  let originalUttId: string | undefined;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // The component renders nothing without the Impact tag, so every render
+    // case below configures it; the shell case asserts the other skip.
+    originalUttId = process.env.NEXT_PUBLIC_IMPACT_UTT_ID;
+    process.env.NEXT_PUBLIC_IMPACT_UTT_ID = 'impact-utt-test-id';
+    mockPathname.mockReturnValue('/');
     originalWindow = globalThis.window;
     originalCrypto = globalThis.crypto;
     Object.defineProperty(globalThis, 'crypto', {
@@ -60,6 +77,11 @@ describe('ImpactIdentify', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+    if (originalUttId === undefined) {
+      delete process.env.NEXT_PUBLIC_IMPACT_UTT_ID;
+    } else {
+      process.env.NEXT_PUBLIC_IMPACT_UTT_ID = originalUttId;
+    }
     Object.defineProperty(globalThis, 'crypto', {
       configurable: true,
       value: originalCrypto,
@@ -79,9 +101,11 @@ describe('ImpactIdentify', () => {
     });
     mockUseUser.mockReturnValue({ data: null });
 
-    ImpactIdentify();
+    // The gate reads `usePathname`, so the component renders through the
+    // renderer instead of being called as a plain function.
+    renderToStaticMarkup(createElement(ImpactIdentify));
     await waitForIreCalls(ire, 1);
-    ImpactIdentify();
+    renderToStaticMarkup(createElement(ImpactIdentify));
     await waitForIreCalls(ire, 2);
 
     expect(ire).toHaveBeenNthCalledWith(1, 'identify', {
@@ -105,7 +129,7 @@ describe('ImpactIdentify', () => {
     });
     mockUseUser.mockReturnValue({ data: TEST_USER });
 
-    ImpactIdentify();
+    renderToStaticMarkup(createElement(ImpactIdentify));
     await waitForIreCalls(ire, 1);
 
     expect(ire).toHaveBeenCalledWith('identify', {
@@ -113,5 +137,20 @@ describe('ImpactIdentify', () => {
       customerEmail: '155b33cbec67ea77560d6ad79d7245d9b7c285e3',
       customProfileId: 'kilo-user:user_123',
     });
+  });
+
+  it('identifies nobody inside the app shell, where /api/user cannot see the shell session', async () => {
+    const ire = jest.fn();
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: { ire, localStorage: createLocalStorage() },
+    });
+    mockPathname.mockReturnValue('/app-shell/integrations/slack');
+
+    renderToStaticMarkup(createElement(ImpactIdentify));
+
+    expect(ire).not.toHaveBeenCalled();
+    // The shell page never issues the /api/user read the identify call needs.
+    expect(mockUseUser).not.toHaveBeenCalled();
   });
 });

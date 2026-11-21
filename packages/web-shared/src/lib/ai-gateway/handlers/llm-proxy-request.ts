@@ -15,6 +15,7 @@ import {
   invalidRequestResponse,
   malformedJsonResponse,
   modelDoesNotExistResponse,
+  providerOptionsNotSupportedResponse,
   storeAndPreviousResponseIdIsNotSupported,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
@@ -92,13 +93,7 @@ export function parseLlmProxyRequest(
   }
 
   if (request.body.providerOptions !== undefined) {
-    const error = 'The providerOptions field is not supported. Use provider instead.';
-    return reject(
-      NextResponse.json(
-        { error, error_type: ProxyErrorType.unsupported_field, message: error },
-        { status: 400 }
-      )
-    );
+    return reject(providerOptionsNotSupportedResponse());
   }
 
   if (!hasModelId(request)) return reject(modelDoesNotExistResponse());

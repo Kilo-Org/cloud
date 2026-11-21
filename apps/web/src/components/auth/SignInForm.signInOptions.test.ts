@@ -13,12 +13,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 let mockFlowEmail = '';
 let mockHintEmail = '';
-let mockClaudeEnabled = false;
+let mockClaudeConfigured = true;
 let mockReturning = false;
 let mockProviderSelect = false;
 
-jest.mock('@/lib/auth/claude/use-claude-sign-in-enabled', () => ({
-  useClaudeSignInEnabled: () => mockClaudeEnabled,
+jest.mock('@/lib/auth/claude/use-claude-sign-in-configured', () => ({
+  useClaudeSignInConfigured: () => mockClaudeConfigured,
 }));
 
 jest.mock('@/components/AnimatedLogoMark', () => ({
@@ -107,7 +107,7 @@ const { SignInForm } = require('./SignInForm') as {
 beforeEach(() => {
   mockFlowEmail = '';
   mockHintEmail = '';
-  mockClaudeEnabled = false;
+  mockClaudeConfigured = true;
   mockReturning = false;
   mockProviderSelect = false;
 });
@@ -144,23 +144,32 @@ describe('SignInForm sign-in options', () => {
     expect(html).toContain('Continue with Email');
   });
 
-  it('offers server-discovered Claude without an identified browser PostHog person', () => {
+  it('offers server-discovered Claude on the provider-select step', () => {
     mockProviderSelect = true;
     mockFlowEmail = 'employee@kilocode.ai';
-    mockClaudeEnabled = false;
     const html = renderToStaticMarkup(createElement(SignInForm, { searchParams: {} }));
     expect(html).toContain('claude');
     expect(html).toContain('google');
   });
 
-  it.each([false, true])(
-    'offers a remembered Claude method only when it is available (%s)',
-    enabled => {
-      mockClaudeEnabled = enabled;
+  it.each([true, false])(
+    'offers Claude on the landing view only when its provider is configured (%s)',
+    configured => {
+      mockClaudeConfigured = configured;
+      const html = renderToStaticMarkup(createElement(SignInForm, { searchParams: {} }));
+      expect(html.includes('Continue with Claude')).toBe(configured);
+      expect(html).toContain('Continue with Google');
+    }
+  );
+
+  it.each([true, false])(
+    'offers a remembered Claude method only when its provider is configured (%s)',
+    configured => {
+      mockClaudeConfigured = configured;
       mockReturning = true;
       mockHintEmail = 'remembered@example.com';
       const html = renderToStaticMarkup(createElement(SignInForm, { searchParams: {} }));
-      expect(html.includes('Continue with Claude')).toBe(enabled);
+      expect(html.includes('Continue with Claude')).toBe(configured);
       expect(html).toContain('or see other sign-in methods');
     }
   );

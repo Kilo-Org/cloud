@@ -29,6 +29,7 @@ import {
   baseCreatePreviewNextSchema,
   basePreviewOptionsNextSchema,
 } from './cloud-agent-next-schemas';
+import { MAX_MCP_PLAINTEXT_BYTES } from '@cloud-agent-shared/prepare-session-limits';
 
 const MESSAGE_UUID = '12345678-1234-4234-9234-123456789abc';
 const ATTACHMENT_ID = '87654321-4321-4321-8321-cba987654321';
@@ -297,6 +298,24 @@ describe('baseGetSessionNextOutputSchema', () => {
     expect(
       baseGetSessionNextOutputSchema.parse({ ...baseSession, runtimeAgents }).runtimeAgents
     ).toEqual(runtimeAgents);
+  });
+
+  it('preserves repository identity and the event-log watermark, and strips updateCursor', () => {
+    const identity = {
+      githubIntegrationId: 'integration_123',
+      bitbucketWorkspaceUuid: 'bb-workspace-uuid',
+      bitbucketRepositoryUuid: 'bb-repository-uuid',
+      latestEventId: 42,
+    };
+
+    expect(baseGetSessionNextOutputSchema.parse({ ...baseSession, ...identity })).toEqual({
+      ...baseSession,
+      ...identity,
+    });
+
+    expect(
+      baseGetSessionNextOutputSchema.parse({ ...baseSession, updateCursor: 7 })
+    ).not.toHaveProperty('updateCursor');
   });
 
   it('preserves safe DO-native metadata fields used by session detail UIs', () => {
@@ -686,6 +705,52 @@ describe('basePrepareSessionNextSchema cloneFromKiloSessionId union', () => {
       cloneFromKiloSessionId: undefined,
     });
     expect(result.success).toBe(true);
+  });
+
+  it.each(['   ', '\n'])('rejects a blank launch prompt %j as required', prompt => {
+    for (const schema of [
+      basePrepareSessionNextSchema,
+      personalPrepareSessionNextSchema,
+      organizationPrepareSessionNextSchema,
+    ]) {
+      const input = {
+        githubRepo: 'acme/repo',
+        prompt,
+        mode: 'code',
+        model: 'kilo/test-model',
+        organizationId: MESSAGE_UUID,
+      };
+      const result = schema.safeParse(input);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const issue = result.error.issues.find(entry => entry.message === 'Prompt is required');
+        expect(issue?.path).toEqual(['prompt']);
+      }
+    }
+  });
+
+  it('rejects a blank prompt-type initialPayload and accepts a real one', () => {
+    const baseInput = {
+      githubRepo: 'acme/repo',
+      prompt: 'Continue',
+      mode: 'code',
+      model: 'kilo/test-model',
+    };
+    const blank = basePrepareSessionNextSchema.safeParse({
+      ...baseInput,
+      initialPayload: { type: 'prompt', prompt: '  ', mode: 'code', model: 'm' },
+    });
+    expect(blank.success).toBe(false);
+    if (!blank.success) {
+      const issue = blank.error.issues.find(entry => entry.message === 'Prompt is required');
+      expect(issue?.path).toEqual(['initialPayload', 'prompt']);
+    }
+    expect(
+      basePrepareSessionNextSchema.safeParse({
+        ...baseInput,
+        initialPayload: { type: 'prompt', prompt: 'Do the work', mode: 'code', model: 'm' },
+      }).success
+    ).toBe(true);
   });
 
   it('drops a client environmentId: the server resolves the environment from the repository', () => {
@@ -1211,5 +1276,179 @@ describe('preview target schemas', () => {
         organizationId: '11111111-1111-4111-8111-111111111111',
       }).success
     ).toBe(true);
+  });
+});
+
+describe('basePrepareSessionNextSchema config caps', () => {
+  const prepareInput = {
+    githubRepo: 'acme/repo',
+    prompt: 'Prepare the session',
+    mode: 'code',
+    model: 'kilo/test-model',
+  };
+
+  const accepts = (overrides: Record<string, unknown>) =>
+    basePrepareSessionNextSchema.safeParse({ ...prepareInput, ...overrides }).success;
+
+  const filesOf = (count: number, content = 'x') =>
+    Object.fromEntries(Array.from({ length: count }, (_, index) => [`file-${index}.md`, content]));
+
+  const skillWithFiles = (files: Record<string, string>) => ({
+    name: 'skill',
+    rawMarkdown: 'body',
+    files,
+  });
+
+  const withLocalServer = (server: Record<string, unknown>) => ({
+    mcpServers: { local: { type: 'local', command: ['node'], ...server } },
+  });
+
+  const withRemoteServer = (server: Record<string, unknown>) => ({
+    mcpServers: { remote: { type: 'remote', url: 'https://example.com/mcp', ...server } },
+  });
+
+  const entries = (count: number, keyLength = 3, value = 'value') =>
+    Object.fromEntries(
+      Array.from({ length: count }, (_, index) => [`K${index}`.padEnd(keyLength, 'x'), value])
+    );
+
+  it('caps companion files at 40 per skill', () => {
+    expect(accepts({ runtimeSkills: [skillWithFiles(filesOf(40))] })).toBe(true);
+    expect(accepts({ runtimeSkills: [skillWithFiles(filesOf(41))] })).toBe(false);
+  });
+
+  it('caps companion file contents at 500,000 characters per skill', () => {
+    const atCap = filesOf(5, 'x'.repeat(100_000));
+    const overCap = { ...atCap, 'extra.md': 'x' };
+    expect(accepts({ runtimeSkills: [skillWithFiles(atCap)] })).toBe(true);
+    expect(accepts({ runtimeSkills: [skillWithFiles(overCap)] })).toBe(false);
+  });
+
+  it('caps environment variables at 50 entries', () => {
+    expect(accepts({ envVars: entries(50) })).toBe(true);
+    expect(accepts({ envVars: entries(51) })).toBe(false);
+  });
+
+  it('caps MCP servers at 20 entries and server names at 100 characters', () => {
+    const servers = (count: number) =>
+      Object.fromEntries(
+        Array.from({ length: count }, (_, index) => [
+          `server-${index}`,
+          { type: 'local', command: ['node'] },
+        ])
+      );
+    expect(accepts({ mcpServers: servers(20) })).toBe(true);
+    expect(accepts({ mcpServers: servers(21) })).toBe(false);
+
+    expect(
+      accepts({ mcpServers: { ['n'.repeat(100)]: { type: 'local', command: ['node'] } } })
+    ).toBe(true);
+    expect(
+      accepts({ mcpServers: { ['n'.repeat(101)]: { type: 'local', command: ['node'] } } })
+    ).toBe(false);
+  });
+
+  it('caps a local server environment at 50 entries and keys at 256 characters', () => {
+    expect(accepts(withLocalServer({ environment: entries(50) }))).toBe(true);
+    expect(accepts(withLocalServer({ environment: entries(51) }))).toBe(false);
+    expect(accepts(withLocalServer({ environment: entries(1, 256) }))).toBe(true);
+    expect(accepts(withLocalServer({ environment: entries(1, 257) }))).toBe(false);
+  });
+
+  it('caps remote server headers at 50 entries and keys at 256 characters', () => {
+    expect(accepts(withRemoteServer({ headers: entries(50) }))).toBe(true);
+    expect(accepts(withRemoteServer({ headers: entries(51) }))).toBe(false);
+    expect(accepts(withRemoteServer({ headers: entries(1, 256) }))).toBe(true);
+    expect(accepts(withRemoteServer({ headers: entries(1, 257) }))).toBe(false);
+  });
+
+  it('caps local server commands at 50 arguments of 8192 characters', () => {
+    expect(accepts(withLocalServer({ command: Array.from({ length: 50 }, () => 'arg') }))).toBe(
+      true
+    );
+    expect(accepts(withLocalServer({ command: Array.from({ length: 51 }, () => 'arg') }))).toBe(
+      false
+    );
+    expect(accepts(withLocalServer({ command: ['x'.repeat(8192)] }))).toBe(true);
+    expect(accepts(withLocalServer({ command: ['x'.repeat(8193)] }))).toBe(false);
+  });
+
+  it('caps a remote server URL at 4096 characters', () => {
+    const urlOf = (length: number) => `https://example.com/${'a'.repeat(length - 20)}`;
+    expect(urlOf(4096)).toHaveLength(4096);
+    expect(accepts(withRemoteServer({ url: urlOf(4096) }))).toBe(true);
+    expect(accepts(withRemoteServer({ url: urlOf(4097) }))).toBe(false);
+  });
+
+  it('rejects an empty server name and an empty environment or header key', () => {
+    expect(accepts({ mcpServers: { '': { type: 'local', command: ['node'] } } })).toBe(false);
+    expect(accepts(withLocalServer({ environment: { '': 'value' } }))).toBe(false);
+    expect(accepts(withRemoteServer({ headers: { '': 'value' } }))).toBe(false);
+  });
+
+  it('caps the MCP secret plaintext and the submitted size', () => {
+    const envWith = (count: number, value: string) =>
+      Object.fromEntries(Array.from({ length: count }, (_, index) => [`KEY_${index}`, value]));
+    // Values stay within their per-item cap, so only the materialized budget decides.
+    const perValue = 'x'.repeat(4096);
+    expect(perValue.length * 21).toBeGreaterThan(MAX_MCP_PLAINTEXT_BYTES);
+    expect(accepts(withLocalServer({ environment: envWith(19, perValue) }))).toBe(true);
+    expect(accepts(withLocalServer({ environment: envWith(21, perValue) }))).toBe(false);
+
+    // Escaped bytes count, because the attach schema measures the serialized JSON.
+    const control = String.fromCharCode(1).repeat(perValue.length);
+    expect(accepts(withLocalServer({ environment: envWith(19, control) }))).toBe(false);
+  });
+
+  it('caps encrypted envelope strings', () => {
+    const envelope = (dataLength: number, dekLength: number) => ({
+      encryptedData: 'x'.repeat(dataLength),
+      encryptedDEK: 'x'.repeat(dekLength),
+      algorithm: 'rsa-aes-256-gcm',
+      version: 1,
+    });
+    expect(accepts(withRemoteServer({ headers: { Authorization: envelope(32_816, 684) } }))).toBe(
+      true
+    );
+    expect(accepts(withRemoteServer({ headers: { Authorization: envelope(32_817, 684) } }))).toBe(
+      false
+    );
+    expect(accepts(withRemoteServer({ headers: { Authorization: envelope(32_816, 685) } }))).toBe(
+      false
+    );
+  });
+
+  it('accepts a realistic config that stays within every cap', () => {
+    const skill = (name: string) => ({
+      name,
+      rawMarkdown: `---\nname: ${name}\n---\nBody`,
+      files: filesOf(3, 'body'),
+    });
+    const input = {
+      ...prepareInput,
+      runtimeSkills: [skill('first-skill'), skill('second-skill')],
+      envVars: entries(10),
+      mcpServers: {
+        local: {
+          type: 'local',
+          command: ['node', 'server.js'],
+          environment: { LOCALE: 'en-US' },
+        },
+        remote: {
+          type: 'remote',
+          url: 'https://example.com/mcp',
+          headers: {
+            Authorization: {
+              encryptedData: 'x'.repeat(32_816),
+              encryptedDEK: 'x'.repeat(684),
+              algorithm: 'rsa-aes-256-gcm',
+              version: 1,
+            },
+            'X-Region': 'eu-west-1',
+          },
+        },
+      },
+    };
+    expect(basePrepareSessionNextSchema.safeParse(input).success).toBe(true);
   });
 });

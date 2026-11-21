@@ -15,6 +15,7 @@ import {
   MAX_SLOW_DELAY_MS,
   createFakeLlmState,
   extractPromptScope,
+  extractRequestPromptScope,
   handleFakeLlmRequest,
   hydrateFakeLlmState,
   serializeFakeLlmState,
@@ -358,6 +359,37 @@ describe('extractPromptScope', () => {
   it('does not absorb a following directive when the separator is missing', () => {
     const text = `${FAKE_SCOPE_MARKER_PREFIX}abc__fake__:echo:hi`;
     expect(extractPromptScope(text)).toEqual({ scope: undefined, text });
+  });
+});
+
+describe('extractRequestPromptScope', () => {
+  const marker = `${FAKE_SCOPE_MARKER_PREFIX}shardA\n`;
+  const userMessage = (content: unknown) => ({ messages: [{ role: 'user', content }] });
+
+  it('reads a scope that leads the whole text', () => {
+    expect(extractRequestPromptScope(userMessage(`${marker}__fake__:echo:hi`))).toEqual({
+      scope: 'shardA',
+      text: '__fake__:echo:hi',
+    });
+  });
+
+  it('reads a scope that leads the prompt part after a synthetic context part', () => {
+    const body = userMessage([
+      { type: 'text', text: 'Cloud Agent session context.' },
+      { type: 'text', text: `${marker}__fake__:slow:90:1000` },
+    ]);
+    expect(extractRequestPromptScope(body)).toEqual({
+      scope: 'shardA',
+      text: 'Cloud Agent session context.__fake__:slow:90:1000',
+    });
+  });
+
+  it('does not read a scope quoted inside a part, as in a title request', () => {
+    const text = `Generate a title for this conversation:\n1. ${marker}__fake__:echo:hi`;
+    expect(extractRequestPromptScope(userMessage([{ type: 'text', text }]))).toEqual({
+      scope: undefined,
+      text,
+    });
   });
 });
 

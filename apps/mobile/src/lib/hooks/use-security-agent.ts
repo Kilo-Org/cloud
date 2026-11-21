@@ -6,6 +6,7 @@ import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-q
 import { useCallback, useState } from 'react';
 
 import { type SecurityAgentConfig } from '@/lib/security-agent';
+import { retryPausedRead, usePausedReadRetry } from '@/lib/query/retry-paused-read';
 import {
   getSecurityAnalysisCapacityState,
   SECURITY_ANALYSIS_CAPACITY_POLL_MS,
@@ -100,25 +101,7 @@ export function useRetrySecurityAgentSettings(scope: string) {
         ];
     const attempts = await Promise.allSettled(
       keys.map(async queryKey => {
-        const query = queryClient.getQueryCache().find({ queryKey, exact: true });
-        if (!query) {
-          return;
-        }
-        const options = query.options;
-        // An uncached refetch reuses its paused promise, even with cancelRefetch.
-        // Cancel first, then bypass NetInfo for this deliberate attempt only.
-        await queryClient.cancelQueries({ queryKey, exact: true });
-        try {
-          await queryClient.query({
-            ...options,
-            queryKey,
-            networkMode: 'always',
-            retry: false,
-            staleTime: 0,
-          });
-        } finally {
-          query.setOptions(options);
-        }
+        await retryPausedRead(queryClient, queryKey);
       })
     );
     // Each query retains its own error; wait for every request to settle before
@@ -130,6 +113,28 @@ export function useRetrySecurityAgentSettings(scope: string) {
     setLastAttemptFailed(false);
   }, []);
   return { retry, isRetrying, lastAttemptFailed, clearLastAttemptFailed };
+}
+
+// Per-read retries for the one query a paused surface waits on, vs the
+// settings-wide attempt above. Each mirrors the query key its read uses.
+export function useRetrySecurityAgentConfig(scope: string) {
+  const trpc = useTRPC();
+  const queryKey = isPersonalSecurityScope(scope)
+    ? trpc.securityAgent.getConfig.queryKey()
+    : trpc.organizations.securityAgent.getConfig.queryKey({ organizationId: scope });
+  return usePausedReadRetry(queryKey);
+}
+
+export function useRetrySecurityAgentCapability(scope: string) {
+  const trpc = useTRPC();
+  const isPersonal = isPersonalSecurityScope(scope);
+  const retry = usePausedReadRetry(trpc.organizations.list.queryKey());
+  if (isPersonal) {
+    // The personal scope never reads the org list (see useSecurityAgentOrgRoleQuery's
+    // masking): a role query key would name a query this scope never fetches.
+    return { retry: () => undefined, isRetrying: false };
+  }
+  return retry;
 }
 
 export function useSecurityAgentDashboardStats(scope: string, repoFullName?: string) {
@@ -219,7 +224,6 @@ export function useSecurityAgentCapability(scope: string) {
   const { role, error, isLoading, isError, isFetching, refetch, hasData, isPending, fetchStatus } =
     useSecurityAgentOrgRoleQuery(scope);
   const canManage = canManageSecurityAgent(scope, role);
-
   let status: SecurityAgentCapabilityStatus = 'loading';
   if (isPersonalSecurityScope(scope)) {
     status = 'allowed';
@@ -243,6 +247,8 @@ export function useSecurityAgentCapability(scope: string) {
     isLoading,
     isError,
     isFetching,
+    /** A role read paused by the online manager: pending with no data yet. */
+    isPending,
     refetch,
     fetchStatus,
   };
@@ -253,7 +259,9 @@ export function useSecurityAgentCapability(scope: string) {
 // `state` is the derived, single-source answer every action surface reads
 // ("still loading" / "failed to load" / "full" / "available"); the raw counts
 // and flags stay for callers that need them.
-export function useSecurityAnalysisCapacity(scope: string) {
+// Pass `enabled: false` when the caller offers no start action: the read polls
+// while the owner is at the limit, which no other state needs.
+export function useSecurityAnalysisCapacity(scope: string, enabled = true) {
   const trpc = useTRPC();
   const capacityInput = { status: 'open' as const, limit: 1, offset: 0 };
   // While the owner is at the limit nothing on this screen changes when a
@@ -277,7 +285,7 @@ export function useSecurityAnalysisCapacity(scope: string) {
       : false;
   const personal = useQuery({
     ...trpc.securityAgent.listFindings.queryOptions(capacityInput),
-    enabled: isPersonalSecurityScope(scope),
+    enabled: enabled && isPersonalSecurityScope(scope),
     refetchInterval,
   });
   const organization = useQuery({
@@ -285,7 +293,7 @@ export function useSecurityAnalysisCapacity(scope: string) {
       organizationId: scope,
       ...capacityInput,
     }),
-    enabled: !isPersonalSecurityScope(scope),
+    enabled: enabled && !isPersonalSecurityScope(scope),
     refetchInterval,
   });
   const active = isPersonalSecurityScope(scope) ? personal : organization;

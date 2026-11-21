@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one suite covers every readout the billing model derives for the billing screen, the hub and the seats card, so the shared state transitions stay readable in one place. */
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -5,9 +6,14 @@ import {
   getAutoTopUpLinkLabel,
   getAutoTopUpReadout,
   getOrgSubscriptionState,
+  getOrgTrialHubCaption,
+  getOrgTrialStatusPill,
   getScheduledSeatChange,
   type OrgSeatSubscription,
+  seatCountReadout,
 } from '@/components/organization/billing-model';
+import { i18n } from '@/i18n';
+import { formatDate } from '@/lib/format';
 
 /** 2026-01-01T00:00:00Z, the paid period's end in these cases. */
 const PERIOD_END = 1_767_225_600;
@@ -37,6 +43,9 @@ function withStatus(status: string, cancelAtPeriodEnd = false): OrgSeatSubscript
     },
   });
 }
+
+/** A running trial the boundary row publishes beside a stopped-paying Stripe record. */
+const TRIAL = { trialStatus: 'trial_active', trialEndsAt: '2026-11-24T00:00:00.000Z' } as const;
 
 describe('getOrgSubscriptionState', () => {
   it('reports an active subscription renewing on the paid period end', () => {
@@ -119,7 +128,7 @@ describe('getOrgSubscriptionState', () => {
 
   it('reports a trial on its end date', () => {
     const state = getOrgSubscriptionState(withStatus('trialing'));
-    expect(state.tone).toBe('good');
+    expect(state.tone).toBe('default');
     expect(state.label.startsWith('Trial ends on ')).toBe(true);
   });
 
@@ -128,6 +137,103 @@ describe('getOrgSubscriptionState', () => {
       label: 'No subscription',
       tone: 'muted',
     });
+  });
+
+  it('states a running trial when there is no subscription', () => {
+    const state = getOrgSubscriptionState(subscription({ subscription: null }), {
+      trialStatus: 'trial_active',
+      trialEndsAt: '2026-11-24T00:00:00.000Z',
+    });
+    expect(state.tone).toBe('default');
+    expect(state.label.startsWith('Trial ends on ')).toBe(true);
+    expect(state.label).toContain('2026');
+  });
+
+  it('states the bare trial when the payload carries no end date', () => {
+    expect(
+      getOrgSubscriptionState(subscription({ subscription: null }), {
+        trialStatus: 'trial_ending_soon',
+        trialEndsAt: null,
+      })
+    ).toEqual({ label: 'Trial', tone: 'default' });
+  });
+
+  it('states the bare trial when the end date cannot be read', () => {
+    expect(
+      getOrgSubscriptionState(subscription({ subscription: null }), {
+        trialStatus: 'trial_expires_today',
+        trialEndsAt: 'not-a-timestamp',
+      })
+    ).toEqual({ label: 'Trial', tone: 'default' });
+  });
+
+  it('keeps "No subscription" for an expired trial with no subscription', () => {
+    // The expired stages are the trial's past, so the row falls back to the
+    // state it always painted.
+    expect(
+      getOrgSubscriptionState(subscription({ subscription: null }), {
+        trialStatus: 'trial_expired_soft',
+        trialEndsAt: '2026-11-01T00:00:00.000Z',
+      })
+    ).toEqual({ label: 'No subscription', tone: 'muted' });
+    expect(
+      getOrgSubscriptionState(subscription({ subscription: null }), {
+        trialStatus: 'trial_expired_hard',
+        trialEndsAt: '2026-10-01T00:00:00.000Z',
+      })
+    ).toEqual({ label: 'No subscription', tone: 'muted' });
+  });
+
+  it('keeps "No subscription" when the payload carries no trial at all', () => {
+    expect(
+      getOrgSubscriptionState(subscription({ subscription: null }), {
+        trialStatus: null,
+        trialEndsAt: null,
+      })
+    ).toEqual({ label: 'No subscription', tone: 'muted' });
+    expect(
+      getOrgSubscriptionState(subscription({ subscription: null }), {
+        trialStatus: undefined,
+        trialEndsAt: undefined,
+      })
+    ).toEqual({ label: 'No subscription', tone: 'muted' });
+  });
+
+  it('lets the server trial verdict own the row over a subscription that stopped paying', () => {
+    // The server publishes a running trial exactly when no paying seat
+    // subscription exists, so this combination is a `canceled` Stripe record
+    // beside a live trial: the record has stopped billing, and the trial is
+    // what governs the organization.
+    const state = getOrgSubscriptionState(withStatus('canceled'), TRIAL);
+    expect(state.tone).toBe('default');
+    expect(state.label.startsWith('Trial ends on ')).toBe(true);
+  });
+
+  it('keeps the payment failure visible while a trial is published', () => {
+    // None of these statuses pays for seats, so the server still publishes the
+    // trial beside them — but the failure is the one row on the screen that
+    // needs the billing manager's action, so it speaks over the trial's end
+    // date. `past_due` pays, so its trial would be suppressed server-side; the
+    // row is unchanged either way.
+    expect(getOrgSubscriptionState(withStatus('unpaid'), TRIAL)).toEqual({
+      label: 'Past due',
+      tone: 'danger',
+    });
+    expect(getOrgSubscriptionState(withStatus('past_due'), TRIAL)).toEqual({
+      label: 'Past due',
+      tone: 'danger',
+    });
+    expect(getOrgSubscriptionState(withStatus('incomplete'), TRIAL).tone).toBe('warn');
+    expect(getOrgSubscriptionState(withStatus('paused'), TRIAL).tone).toBe('warn');
+  });
+
+  it('lets a paying subscription own the row when the payload carries no trial', () => {
+    const state = getOrgSubscriptionState(subscription(), {
+      trialStatus: null,
+      trialEndsAt: null,
+    });
+    expect(state.tone).toBe('good');
+    expect(state.label.startsWith('Renews on ')).toBe(true);
   });
 
   it('does not print an unknown provider status verbatim', () => {
@@ -153,6 +259,71 @@ describe('getOrgSubscriptionState', () => {
       })
     );
     expect(state.label).toContain('2026');
+  });
+});
+
+describe('getOrgTrialStatusPill', () => {
+  it('states the end date of a running trial', () => {
+    const pill = getOrgTrialStatusPill({
+      trialStatus: 'trial_ending_very_soon',
+      trialEndsAt: '2026-11-19T00:00:00.000Z',
+    });
+    expect(pill?.tone).toBe('default');
+    expect(pill?.label.startsWith('Trial ends on ')).toBe(true);
+  });
+
+  it('has no pill when the trial is not what governs the organization', () => {
+    expect(getOrgTrialStatusPill({ trialStatus: 'subscribed', trialEndsAt: null })).toBeNull();
+    expect(
+      getOrgTrialStatusPill({ trialStatus: 'trial_expired_hard', trialEndsAt: null })
+    ).toBeNull();
+    expect(getOrgTrialStatusPill({ trialStatus: null, trialEndsAt: null })).toBeNull();
+  });
+});
+
+describe('getOrgTrialHubCaption', () => {
+  it('states the trial end as its own line, with no leading separator', () => {
+    const trial = {
+      trialStatus: 'trial_ending_very_soon',
+      trialEndsAt: '2026-11-19T00:00:00.000Z',
+    };
+    const caption = getOrgTrialHubCaption(trial);
+
+    // The same key the billing row reads: one piece of copy belongs to one key.
+    expect(caption).toBe(
+      i18n.t('organization.billing.stateTrialEndsOn', {
+        date: formatDate(new Date('2026-11-19T00:00:00.000Z'), i18n.language, {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        }),
+      })
+    );
+    expect(caption).toContain('Trial ends on ');
+
+    // The caption is its own line under the plan row, so it carries none of the
+    // separator the row used to concatenate the value and status with.
+    expect(caption?.startsWith(' ')).toBe(false);
+    expect(caption?.startsWith(' · ')).toBe(false);
+  });
+
+  it('falls back to the short status when the trial has no usable end', () => {
+    const caption = getOrgTrialHubCaption({
+      trialStatus: 'trial_ending_very_soon',
+      trialEndsAt: 'not-a-timestamp',
+    });
+
+    expect(caption).toBe(i18n.t('organization.billing.stateTrialing'));
+    expect(caption?.startsWith(' ')).toBe(false);
+    expect(caption?.startsWith(' · ')).toBe(false);
+  });
+
+  it('has no caption when the trial is not what governs the organization', () => {
+    expect(getOrgTrialHubCaption({ trialStatus: 'subscribed', trialEndsAt: null })).toBeNull();
+    expect(
+      getOrgTrialHubCaption({ trialStatus: 'trial_expired_hard', trialEndsAt: null })
+    ).toBeNull();
+    expect(getOrgTrialHubCaption({ trialStatus: null, trialEndsAt: null })).toBeNull();
   });
 });
 
@@ -185,6 +356,20 @@ describe('getScheduledSeatChange', () => {
 describe('formatSeatCount', () => {
   it('writes used against total', () => {
     expect(formatSeatCount(3, 5)).toBe('3 / 5');
+  });
+});
+
+describe('seatCountReadout', () => {
+  it('writes the isolated fraction for an enforced organization with bought seats', () => {
+    expect(seatCountReadout({ seatsEnforced: true, used: 3, total: 4 })).toBe('\u20663 / 4\u2069');
+  });
+
+  it('holds a seat-enforcing organization with none bought at the used count', () => {
+    expect(seatCountReadout({ seatsEnforced: true, used: 3, total: 0 })).toBe('3');
+  });
+
+  it('holds an unenforced organization at the used count with a positive total', () => {
+    expect(seatCountReadout({ seatsEnforced: false, used: 3, total: 5 })).toBe('3');
   });
 });
 

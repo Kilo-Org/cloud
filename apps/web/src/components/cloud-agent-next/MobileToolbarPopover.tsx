@@ -35,6 +35,8 @@ type MobileToolbarPopoverProps = {
   variantPickerTooltip?: string;
   className?: string;
   customModeOptions?: ModeOption[];
+  /** Enables favorite stars in the model picker. */
+  favorites?: boolean;
 };
 
 export function MobileToolbarPopover({
@@ -56,6 +58,7 @@ export function MobileToolbarPopover({
   variantPickerTooltip,
   className,
   customModeOptions,
+  favorites,
 }: MobileToolbarPopoverProps) {
   const [open, setOpen] = useState(false);
 
@@ -126,6 +129,7 @@ export function MobileToolbarPopover({
                 onValueChange={onModelChange}
                 isLoading={isLoadingModels}
                 label=""
+                favorites={favorites}
               />
             )}
           </div>

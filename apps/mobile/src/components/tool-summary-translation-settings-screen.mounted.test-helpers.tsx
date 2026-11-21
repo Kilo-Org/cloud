@@ -1,5 +1,4 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer the mounted tests inspect (same pattern as voice-input-settings-screen.mounted.test.tsx) */
-import { type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
+import { type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 
 /** The switch row on the subpage, found by its title. */
 export function findPreferenceRow(renderer: ReactTestRenderer): ReactTestInstance {

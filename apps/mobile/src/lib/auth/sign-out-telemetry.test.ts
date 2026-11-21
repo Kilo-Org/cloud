@@ -22,33 +22,28 @@ function installSinks() {
 }
 
 describe('reportAuthBranch', () => {
-  it('files an unreadable credential read under its cause and branch', () => {
+  it('files a session no credential can renew under its cause and branch', () => {
     const { events, breadcrumbs } = installSinks();
 
-    reportAuthBranch({
-      cause: 'credentials_unreadable',
-      branch: 'refresh_token_unreadable',
-      keyNames: ['auth-token', 'auth-token-expires-at'],
-    });
+    reportAuthBranch({ cause: 'session_unrenewable' });
 
     expect(events).toHaveBeenCalledTimes(1);
     expect(events).toHaveBeenCalledWith({
       level: 'warning',
-      error: new Error('Auth branch: credentials_unreadable (refresh_token_unreadable)'),
+      error: new Error('Auth branch: session_unrenewable (refresh_token_absent)'),
       tags: {
-        'auth.cause': 'credentials_unreadable',
-        'auth.branch': 'refresh_token_unreadable',
-        'auth.keys': 'auth-token,auth-token-expires-at',
+        'auth.cause': 'session_unrenewable',
+        'auth.branch': 'refresh_token_absent',
       },
-      fingerprint: ['auth-branch', 'credentials_unreadable', 'refresh_token_unreadable'],
+      fingerprint: ['auth-branch', 'session_unrenewable', 'refresh_token_absent'],
     });
     expect(breadcrumbs).not.toHaveBeenCalled();
   });
 
-  it('files an ended session under its own key and omits the key-names tag', () => {
+  it('files an ended session under its own key', () => {
     const { events } = installSinks();
 
-    reportAuthBranch({ cause: 'session_ended', branch: 'refresh_401' });
+    reportAuthBranch({ cause: 'session_ended' });
 
     expect(events).toHaveBeenCalledTimes(1);
     expect(events).toHaveBeenCalledWith({
@@ -62,7 +57,7 @@ describe('reportAuthBranch', () => {
   it('records an explicit sign-out as a breadcrumb and sends no event', () => {
     const { events, breadcrumbs } = installSinks();
 
-    reportAuthBranch({ cause: 'user', branch: 'explicit' });
+    reportAuthBranch({ cause: 'user' });
 
     expect(events).not.toHaveBeenCalled();
     expect(breadcrumbs).toHaveBeenCalledTimes(1);
@@ -76,8 +71,8 @@ describe('reportAuthBranch', () => {
 
   it('never throws into the caller when no sink is installed', () => {
     expect(() => {
-      reportAuthBranch({ cause: 'user', branch: 'explicit' });
-      reportAuthBranch({ cause: 'session_ended', branch: 'refresh_401' });
+      reportAuthBranch({ cause: 'user' });
+      reportAuthBranch({ cause: 'session_ended' });
     }).not.toThrow();
   });
 });

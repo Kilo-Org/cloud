@@ -3,12 +3,15 @@ import type { OpenRouterUsage } from '@kilocode/web-shared/lib/ai-gateway/proces
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   createStreamProgressLogger,
+  KEEP_ALIVE_COMMENT,
   logTerminalStreamEvent,
   partialCapturedBody,
-  readResponseText,
+  rewriteJsonResponse,
   rewriteSseStream,
   rewriteUsage,
   rewriteResponseMetadata,
+  startFirstByteKeepAlive,
+  type FirstByteKeepAlive,
   type ResponseMetadata,
   type RewriteResponseParams,
 } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse.shared';
@@ -38,49 +41,29 @@ export async function rewriteModelResponse_Responses({
   capture,
   reasoningEffort,
   vercelRequestId,
+  keepAliveUntilFirstByte,
 }: RewriteResponseParams) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
-    const textResult = await readResponseText(
+    return rewriteJsonResponse<
+      OpenAI.Responses.Response & ResponseMetadata & { usage?: OpenRouterUsage | null }
+    >({
       response,
       headers,
       vercelRequestId,
       capture,
-      reasoningEffort
-    );
-    if ('errorResponse' in textResult) {
-      capture?.setReadError(textResult.error);
-      return textResult.errorResponse;
-    }
-    capture?.setBody(textResult.text);
-    const { text } = textResult;
-    let json: OpenAI.Responses.Response & ResponseMetadata & { usage?: OpenRouterUsage | null };
-    try {
-      json = JSON.parse(text) as OpenAI.Responses.Response &
-        ResponseMetadata & {
-          usage?: OpenRouterUsage | null;
-        };
-    } catch {
-      // Upstream returned invalid/empty JSON body — pass through as-is
-      return new NextResponse(text, {
-        status: response.status,
-        statusText: response.statusText,
-        headers,
-      });
-    }
-    if (typeof json.id === 'string' && json.id) capture?.setGenerationId(json.id);
-    if (json.usage) {
-      rewriteUsage(json.usage, usageContext, json.provider_metadata ?? json.providerMetadata);
-    }
-    rewriteResponseMetadata(json, usageContext);
-    for (const item of Array.isArray(json.output) ? json.output : []) {
-      restoreResponsesOutputItemId(item);
-    }
-    return NextResponse.json(json, {
-      status: response.status,
-      statusText: response.statusText,
-      headers,
+      reasoningEffort,
+      mutate: json => {
+        if (typeof json.id === 'string' && json.id) capture?.setGenerationId(json.id);
+        if (json.usage) {
+          rewriteUsage(json.usage, usageContext, json.provider_metadata ?? json.providerMetadata);
+        }
+        rewriteResponseMetadata(json, usageContext);
+        for (const item of Array.isArray(json.output) ? json.output : []) {
+          restoreResponsesOutputItemId(item);
+        }
+      },
     });
   }
 
@@ -89,14 +72,20 @@ export async function rewriteModelResponse_Responses({
   // Shared with the stream's cancel() callback so a client disconnect still
   // logs the partially received response body.
   const capturedChunks: string[] | null = capture ? [] : null;
+  let keepAlive: FirstByteKeepAlive | null = null;
   const stream = new ReadableStream<string>({
-    async start(controller) {
+    async start(streamController) {
       const reader = response.body?.getReader();
       if (!reader) {
-        controller.close();
+        streamController.close();
         capture?.setBody('');
         return;
       }
+      keepAlive = startFirstByteKeepAlive(streamController, {
+        enabled: keepAliveUntilFirstByte,
+        response,
+      });
+      const controller = keepAlive?.output ?? streamController;
 
       let doneReceived = false;
       let terminalEventReceived = false;
@@ -155,7 +144,7 @@ export async function rewriteModelResponse_Responses({
           if (doneReceived || terminalEventReceived) {
             return;
           }
-          controller.enqueue(': KILO PROCESSING\n\n');
+          controller.enqueue(KEEP_ALIVE_COMMENT);
         },
       });
 
@@ -183,10 +172,12 @@ export async function rewriteModelResponse_Responses({
         vercelRequestId,
         capture,
         capturedChunks,
-        reasoningEffort
+        reasoningEffort,
+        keepAlive
       );
     },
     cancel() {
+      keepAlive?.stop();
       capture?.setReadError(
         new Error('response stream was cancelled'),
         partialCapturedBody(capturedChunks)

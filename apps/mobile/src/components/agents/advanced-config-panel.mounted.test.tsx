@@ -233,9 +233,9 @@ function layout(node: TestRenderer.ReactTestInstance, y: number) {
 }
 
 /**
- * The panel root, or the block it renders while expanded, found by the class
- * token that identifies it inside the panel. Both are the views whose layout
- * the reveal depends on. Matched by token, not by the whole class list, so a
+ * The panel root, or the block it renders while expanded, found by the handle
+ * that identifies it inside the panel. Both are the views whose layout the
+ * reveal depends on. Matched by token, not by the whole class list, so a
  * styling change to either view does not have to be mirrored here.
  */
 function layoutView(renderer: TestRenderer.ReactTestRenderer, token: string) {
@@ -250,6 +250,11 @@ function layoutView(renderer: TestRenderer.ReactTestRenderer, token: string) {
     throw new Error(`no view with layout class ${token}`);
   }
   return found;
+}
+
+/** The panel root: the view whose own offset the reveal reports. */
+function panelRoot(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.findByProps({ testID: 'advanced-config-panel' });
 }
 
 function byLabel(renderer: TestRenderer.ReactTestRenderer, label: string) {
@@ -276,14 +281,14 @@ function texts(renderer: TestRenderer.ReactTestRenderer): string[] {
     .filter((child): child is string => typeof child === 'string');
 }
 
-/** The remaining-characters counter nodes, which carry the counted label. */
+/** The remaining-characters rows, which show the counted phrase as their text. */
 function counterTexts(renderer: TestRenderer.ReactTestRenderer) {
   return renderer.root
     .findAllByType('Text' as never)
     .filter(
       node =>
-        typeof node.props.accessibilityLabel === 'string' &&
-        node.props.accessibilityLabel.includes('characters remaining')
+        typeof node.props.children === 'string' &&
+        node.props.children.endsWith('characters remaining')
     );
 }
 
@@ -347,7 +352,7 @@ describe('AdvancedConfigPanel', () => {
     expect(disclosure?.props.accessibilityState).toMatchObject({ expanded: false });
     expect(byLabel(renderer, 'Pick a profile')).toBeUndefined();
     expect(texts(renderer)).not.toContain('Environment variables');
-    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
+    expect(buttonByText(renderer, 'Save as profile')).toBeUndefined();
   });
 
   it('expands to both manual editors and the summary', () => {
@@ -356,8 +361,8 @@ describe('AdvancedConfigPanel', () => {
 
     expect(texts(renderer)).toContain('Environment variables');
     expect(texts(renderer)).toContain('Setup commands');
-    // No manual config yet, so no Save as Profile.
-    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
+    // No manual config yet, so no Save as profile.
+    expect(buttonByText(renderer, 'Save as profile')).toBeUndefined();
   });
 
   it('nests the revealed body under the disclosure row it belongs to', () => {
@@ -401,7 +406,7 @@ describe('AdvancedConfigPanel', () => {
     const renderer = mount({ onRequestReveal });
 
     // The collapsed panel already reports where it sits in the scroll content.
-    layout(layoutView(renderer, 'mt-5'), 812);
+    layout(panelRoot(renderer), 812);
     press(byLabel(renderer, 'Advanced Configuration'));
     // The reveal waits for the expanded block: a scroll issued at the tap would
     // clamp against the collapsed content height and move nothing.
@@ -422,23 +427,23 @@ describe('AdvancedConfigPanel', () => {
 
     // Re-expanding reveals against the offset the panel last reported.
     press(byLabel(renderer, 'Advanced Configuration'));
-    layout(layoutView(renderer, 'mt-5'), 640);
+    layout(panelRoot(renderer), 640);
     layout(layoutView(renderer, 'mt-3'), 690);
     expect(onRequestReveal).toHaveBeenCalledTimes(2);
     expect(onRequestReveal).toHaveBeenLastCalledWith(640);
   });
 
-  it('only offers Save as Profile for commands that will be persisted', () => {
+  it('only offers Save as profile for commands that will be persisted', () => {
     const renderer = mount();
     press(byLabel(renderer, 'Advanced Configuration'));
     press(buttonByText(renderer, 'Add command'));
-    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
+    expect(buttonByText(renderer, 'Save as profile')).toBeUndefined();
     typeInto(renderer, 'Command 1', '   ');
-    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
+    expect(buttonByText(renderer, 'Save as profile')).toBeUndefined();
     typeInto(renderer, 'Command 1', 'pnpm install');
-    expect(buttonByText(renderer, 'Save as Profile')).toBeDefined();
+    expect(buttonByText(renderer, 'Save as profile')).toBeDefined();
     typeInto(renderer, 'Command 1', '');
-    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
+    expect(buttonByText(renderer, 'Save as profile')).toBeUndefined();
   });
 
   it('names each setup-command control after the command position', () => {
@@ -467,12 +472,12 @@ describe('AdvancedConfigPanel', () => {
     );
   });
 
-  it('offers Save as Profile once a manual variable exists', () => {
+  it('offers Save as profile once a manual variable exists', () => {
     const renderer = mount();
     press(byLabel(renderer, 'Advanced Configuration'));
     addVariable(renderer, 'API_KEY', 'abc');
 
-    expect(buttonByText(renderer, 'Save as Profile')).toBeDefined();
+    expect(buttonByText(renderer, 'Save as profile')).toBeDefined();
     expect(texts(renderer)).toContain('1 var');
   });
 
@@ -574,7 +579,9 @@ describe('AdvancedConfigPanel', () => {
 
     press(buttonByText(renderer, 'Add command'));
     typeInto(renderer, 'Command 1', 'a'.repeat(470));
-    expect(counterTexts(renderer).map(node => node.props.children)).toEqual([30]);
+    expect(counterTexts(renderer).map(node => node.props.children)).toEqual([
+      '30 characters remaining',
+    ]);
     expect(texts(renderer)).not.toContain('The command is limited to 500 characters');
 
     // At the bound the sentence replaces the count, so only one line is present.
@@ -599,7 +606,7 @@ describe('AdvancedConfigPanel', () => {
     press(byLabel(renderer, 'Advanced Configuration'));
 
     addVariable(renderer, 'API_KEY', 'abc');
-    expect(buttonByText(renderer, 'Save as Profile')).toBeDefined();
+    expect(buttonByText(renderer, 'Save as profile')).toBeDefined();
   });
 
   it('includes the session-owned selected profile in resource counts', () => {
@@ -618,7 +625,7 @@ describe('AdvancedConfigPanel', () => {
     // A setup command.
     press(buttonByText(renderer, 'Add command'));
     typeInto(renderer, 'Command 1', 'pnpm install');
-    press(buttonByText(renderer, 'Save as Profile'));
+    press(buttonByText(renderer, 'Save as profile'));
 
     typeInto(renderer, 'Profile name', 'My Setup');
     act(() => {
@@ -658,7 +665,7 @@ describe('AdvancedConfigPanel', () => {
     // The profile carries the draft now, and the server appends a profile's
     // setup commands to the inline ones, so a kept draft would run them twice.
     expect(texts(renderer)).not.toContain('API_KEY');
-    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
+    expect(buttonByText(renderer, 'Save as profile')).toBeUndefined();
     expect(texts(renderer)).toContain('1 var · 1 setup cmd');
   });
 
@@ -669,7 +676,7 @@ describe('AdvancedConfigPanel', () => {
     const renderer = mount({ mocks });
     press(byLabel(renderer, 'Advanced Configuration'));
     addVariable(renderer, 'API_KEY', 'abc');
-    press(buttonByText(renderer, 'Save as Profile'));
+    press(buttonByText(renderer, 'Save as profile'));
     typeInto(renderer, 'Profile name', 'Broken');
 
     await act(async () => {
@@ -686,7 +693,7 @@ describe('AdvancedConfigPanel', () => {
     press(byLabel(renderer, 'Advanced Configuration'));
     addVariable(renderer, 'API_KEY', 'abc');
 
-    press(buttonByText(renderer, 'Save as Profile'));
+    press(buttonByText(renderer, 'Save as profile'));
     const firstSheet = renderer.root.findAll(node => node.type === SaveProfileSheet)[0];
     if (!firstSheet) {
       throw new TypeError('the first sheet was not mounted');
@@ -696,7 +703,7 @@ describe('AdvancedConfigPanel', () => {
     // The person dismisses it, then opens it again.
     invokeHandler(firstClose);
     expect(renderer.root.findAll(node => node.type === SaveProfileSheet)).toHaveLength(0);
-    press(buttonByText(renderer, 'Save as Profile'));
+    press(buttonByText(renderer, 'Save as profile'));
     expect(renderer.root.findAll(node => node.type === SaveProfileSheet)).toHaveLength(1);
 
     // A settlement from the closed sheet arrives late: it must not close the

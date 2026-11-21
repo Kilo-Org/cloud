@@ -20,10 +20,8 @@ import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { type ContainerUsageRpcMethods } from '@kilocode/container-usage';
-import type {
-  SandboxControlV2,
-  StoredProviderPin,
-} from '../../src/control-plane/sandbox/sandbox-do.js';
+import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
+import type { StoredProviderPin } from '../../src/control-plane/sandbox/provider-adapters.js';
 import {
   allocation as allocationTable,
   routes as routesTable,
@@ -193,6 +191,7 @@ type StartOptions = {
   meter?: ContainerUsageRpcMethods;
   preparingRoute?: string;
   preparingRouteDeadlineAt?: number;
+  environmentSnapshotId?: string;
   admissionError?: string;
   billingAdmissionMs?: number;
   egressMode?: EgressMode;
@@ -218,6 +217,14 @@ async function startAllocation(
     Object.assign(instance, {
       createProviderAdapter: () => provider.adapter,
       provider: provider.adapter,
+      ...(options.environmentSnapshotId === undefined
+        ? {}
+        : {
+            environmentSnapshotLaunch: async () => ({
+              options: { snapshot: { snapshotId: options.environmentSnapshotId } },
+              selection: { source: 'environment', capturedAt: 1 },
+            }),
+          }),
       ...(options.billingAdmissionMs === undefined
         ? {}
         : { sandboxTimers: () => ({ ...TIMERS, billingAdmissionMs: options.billingAdmissionMs }) }),
@@ -452,6 +459,57 @@ afterEach(async () => {
 });
 
 describe('SandboxControlV2 allocation lifecycle', () => {
+  it('logs the persisted attempt number and actual retry decision for snapshot creates', async () => {
+    const provider = createFakeProvider({ failFirstCreate: true });
+    const launch = provider.adapter.launch;
+    provider.adapter = {
+      ...provider.adapter,
+      environmentSnapshots: 'create',
+      async launch(ref, options) {
+        await launch(ref, options);
+        return { startSource: 'repository' };
+      },
+    };
+    const fields = vi.spyOn(logger, 'withFields');
+    try {
+      const stub = await startAllocation(provider, {
+        provider: 'vercel',
+        preparingRoute: 'workspace_vercel_snapshot_retry',
+        environmentSnapshotId: 'test-environment-snapshot',
+      });
+      const creates = () =>
+        fields.mock.calls
+          .map(([record]) => record)
+          .filter(record => record.diagnosticEvent === 'snapshot_restore_attempt_finished');
+      await waitFor(() => expect(creates()).toHaveLength(1));
+      await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+      await runAlarm(stub);
+      await awaitStarting(provider, stub);
+      expect(provider.createInputs.map(input => input.snapshot?.snapshotId)).toEqual([
+        'test-environment-snapshot',
+        'test-environment-snapshot',
+      ]);
+      expect(creates()).toEqual([
+        expect.objectContaining({
+          stage: 'provider_create',
+          allocationId: provider.createInputs[0]?.intentId,
+          attempt: 1,
+          outcome: 'failed',
+          willRetry: true,
+        }),
+        expect.objectContaining({
+          stage: 'provider_create',
+          allocationId: provider.createInputs[1]?.intentId,
+          attempt: 2,
+          outcome: 'restored',
+          willRetry: false,
+        }),
+      ]);
+    } finally {
+      fields.mockRestore();
+    }
+  });
+
   it.each([
     { stage: 'create', failure: { failFirstCreate: true } },
     { stage: 'launch', failure: { failFirstLaunch: 'transient launch failure' } },
@@ -3005,6 +3063,23 @@ describe('SandboxControlV2 allocation egress policy', () => {
     const pin = await readProviderPin(stub);
     await expect(
       startAllocation(provider, { sandboxId, provider: 'cloudflare-containers', ...policy })
+    ).rejects.toThrow('Sandbox configuration is invalid or unsupported');
+    expect(await readState(stub)).toEqual(before);
+    expect(await readProviderPin(stub)).toBe(pin);
+    expect(provider.createCalls).toBe(0);
+  });
+
+  it('rejects an unknown ensure provider as an invalid configuration without pinning it', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await configureEgressSandbox(provider);
+    const before = await readState(stub);
+    const pin = await readProviderPin(stub);
+    await expect(
+      startAllocation(provider, {
+        sandboxId,
+        // A provider id that a newer deployment knows.
+        provider: 'newer-provider' as StoredProviderPin['provider'],
+      })
     ).rejects.toThrow('Sandbox configuration is invalid or unsupported');
     expect(await readState(stub)).toEqual(before);
     expect(await readProviderPin(stub)).toBe(pin);

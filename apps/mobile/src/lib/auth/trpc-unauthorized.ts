@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { isProtectedDataAvailable } from '@/lib/protected-data';
+
 type TrpcUnauthorizedHandler = () => Promise<void> | void;
 
 // Sign out only on the server's context-level auth failure (invalid/missing
@@ -28,6 +30,18 @@ export function isUnauthorizedTrpcError(error: unknown): boolean {
   return ShapedUnauthorizedErrorSchema.safeParse(error).success;
 }
 
+/**
+ * True when a failed authenticated call is an expected state rather than a
+ * defect: the keychain refused the credential read because the device is locked
+ * (the documented locked state), or the server refused the request's session
+ * credential, which the auth layer refreshes or ends itself. Neither proves
+ * anything about a credential the caller owns, so a caller must not latch a
+ * refusal or file an event for it.
+ */
+export function isExpectedAuthFailure(error: unknown): boolean {
+  return !isProtectedDataAvailable() || isUnauthorizedTrpcError(error);
+}
+
 export function setTrpcUnauthorizedHandler(handler: TrpcUnauthorizedHandler): () => void {
   unauthorizedHandler = handler;
   return () => {
@@ -51,6 +65,16 @@ export async function handleTrpcQueryError(error: unknown): Promise<void> {
 
   const handler = unauthorizedHandler;
   unauthorizedPromise = runUnauthorizedHandler(handler);
+  await unauthorizedPromise;
+}
+
+/**
+ * Resolves once the auth handler run in flight has settled, or at once when
+ * none is running. It never starts a run: a caller that saw a refused
+ * credential through the query client waits here for the run the cache
+ * started, then reads the auth epoch to learn whether the session ended.
+ */
+export async function settledTrpcUnauthorizedHandling(): Promise<void> {
   await unauthorizedPromise;
 }
 

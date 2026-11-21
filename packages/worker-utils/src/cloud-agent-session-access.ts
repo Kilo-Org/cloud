@@ -1,5 +1,10 @@
 import type { WorkerDb } from '@kilocode/db/client';
-import { cli_sessions_v2, organization_memberships, organizations } from '@kilocode/db/schema';
+import {
+  cli_sessions_v2,
+  cloud_agent_worktrees,
+  organization_memberships,
+  organizations,
+} from '@kilocode/db/schema';
 import { and, eq, isNull } from 'drizzle-orm';
 import {
   activeOrganizationJoinCondition,
@@ -102,6 +107,56 @@ export async function queryAccessibleCloudAgentSession(
   return session
     ? { kiloSessionId: session.kiloSessionId, organizationId: session.organizationId }
     : null;
+}
+
+export const workspaceChatTargetErrors = {
+  not_found: 'The target Cloud Agent chat was not found. It may have been deleted.',
+  not_owner: 'The trigger must run as the owner of the target Cloud Agent chat.',
+  scope_mismatch:
+    'The target Cloud Agent chat must be in the same organization or personal scope as the trigger.',
+  no_workspace: 'The target Cloud Agent chat does not belong to a registered workspace.',
+} as const;
+
+export async function checkWorkspaceChatTarget(
+  db: SessionAccessDb,
+  {
+    cloudAgentSessionId,
+    userId,
+    organizationId,
+  }: {
+    cloudAgentSessionId: string;
+    userId: string;
+    organizationId: string | null;
+  }
+): Promise<keyof typeof workspaceChatTargetErrors | null> {
+  const [chat] = await db
+    .select({
+      userId: cli_sessions_v2.kilo_user_id,
+      organizationId: cli_sessions_v2.organization_id,
+      worktreeId: cloud_agent_worktrees.worktree_id,
+      workspaceOwner: cloud_agent_worktrees.kilo_user_id,
+      workspaceOrganization: cloud_agent_worktrees.organization_id,
+      deletionStartedAt: cloud_agent_worktrees.deletion_started_at,
+    })
+    .from(cli_sessions_v2)
+    .leftJoin(
+      cloud_agent_worktrees,
+      eq(cli_sessions_v2.cloud_agent_worktree_id, cloud_agent_worktrees.worktree_id)
+    )
+    .where(eq(cli_sessions_v2.cloud_agent_session_id, cloudAgentSessionId))
+    .limit(1);
+
+  if (!chat) return 'not_found';
+  if (chat.userId !== userId) return 'not_owner';
+  if (chat.organizationId !== organizationId) return 'scope_mismatch';
+  if (
+    !chat.worktreeId ||
+    chat.workspaceOwner !== userId ||
+    chat.workspaceOrganization !== organizationId
+  ) {
+    return 'no_workspace';
+  }
+  return chat.deletionStartedAt ? 'not_found' : null;
 }
 
 export async function queryAccessibleKiloSession(

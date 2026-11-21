@@ -64,7 +64,6 @@ export function sortActiveSessionsByCreatedAt(sessions: ActiveSession[]): Active
     if (bUnenriched) {
       return 1;
     }
-    // Both enriched: newest first.
     if (aMs !== bMs) {
       return bMs - aMs;
     }

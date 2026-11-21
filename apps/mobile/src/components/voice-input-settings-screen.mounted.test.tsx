@@ -45,6 +45,7 @@ const selectionArgs = vi.hoisted(() => ({ organizationId: undefined as string | 
 const organization = vi.hoisted(() => ({ organizationId: 'org-1' as string | null }));
 const voiceLanguage = vi.hoisted(() => ({ chosen: null as string | null, loaded: true }));
 
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   useColorScheme: () => 'light',
@@ -52,9 +53,9 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
 }));
-vi.mock('expo-router', () => ({
-  useRouter: () => ({ push }),
-}));
+vi.mock('expo-router', () => ({ useRouter: () => ({ push }) }));
+// `openModelPicker` takes the screen's guarded push (this file's spy).
+vi.mock('@/lib/hooks/use-single-push-route', () => ({ useSinglePushRoute: () => push }));
 vi.mock('@/components/ui/icons', () => ({
   Cpu: 'Cpu',
   Globe: 'Globe',
@@ -162,10 +163,6 @@ describe('VoiceInputSettingsScreen', () => {
       subtitle: 'None chosen',
       disabled: true,
     });
-    // The language row is now the group's final row, so the model row must not
-    // carry the divider-suppressing `last`.
-    expect(findConfigureRow(renderer, 'Transcription model').props.last).toBeUndefined();
-    expect(findConfigureRow(renderer, 'Language').props.last).toBe(true);
   });
 
   it('shows the loading caption disabled while the catalogue settles', async () => {

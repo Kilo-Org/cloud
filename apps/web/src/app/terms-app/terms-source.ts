@@ -1,4 +1,4 @@
-import { extractLegalMainHtml } from '@/app/legal-page-source';
+import { extractLegalMainHtml, loadLegalMainHtml } from '@/app/legal-page-source';
 
 export const TERMS_SOURCE_URL = 'https://kilo.ai/terms';
 
@@ -18,17 +18,14 @@ export function extractTermsMainHtml(html: string): string {
   });
 }
 
+/** The live terms, sanitized. Throws when the source cannot be read. */
+export async function loadTermsMainHtml(): Promise<string> {
+  return loadLegalMainHtml({ sourceUrl: TERMS_SOURCE_URL, extract: extractTermsMainHtml });
+}
+
 export async function fetchTermsMainHtml(): Promise<string> {
   try {
-    const response = await fetch(TERMS_SOURCE_URL, {
-      next: { revalidate: 3600 },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch terms: ${response.status}`);
-    }
-
-    return extractTermsMainHtml(await response.text());
+    return await loadTermsMainHtml();
   } catch {
     return TERMS_FALLBACK_HTML;
   }

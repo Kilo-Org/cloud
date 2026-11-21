@@ -5,6 +5,14 @@ import {
   type WebhookBodySchema,
   type WebhookBodyIssue,
 } from '@kilocode/worker-utils/webhook-body-validation';
+import {
+  existingChatWorkspaceSettingsError,
+  hasExistingChatWorkspaceSettings,
+  triggerChatIdSchema,
+  triggerChatRequiresCreator,
+  webhookTriggerTargetSchema,
+  type WebhookTriggerTarget,
+} from '@kilocode/worker-utils/webhook-trigger-target';
 import { DurableObject } from 'cloudflare:workers';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
@@ -50,7 +58,8 @@ export const TriggerConfig = z.object({
   executionUserId: z.string().min(1).nullable().optional(),
   createdAt: z.string(),
   isActive: z.boolean(),
-  targetType: z.enum(['cloud_agent', 'kiloclaw_chat']).default('cloud_agent'),
+  targetType: webhookTriggerTargetSchema.default('cloud_agent'),
+  cloudAgentSessionId: triggerChatIdSchema.nullish(),
   kiloclawInstanceId: z.string().nullable().optional(),
   githubRepo: z.string().nullable().optional(),
   mode: z.string().nullable().optional(),
@@ -105,7 +114,8 @@ export type ScheduledInvocationResult =
 
 type ConfigureInput = {
   executionUserId?: string;
-  targetType?: 'cloud_agent' | 'kiloclaw_chat';
+  targetType?: WebhookTriggerTarget;
+  cloudAgentSessionId?: string;
   kiloclawInstanceId?: string;
   githubRepo?: string;
   mode?: string;
@@ -169,6 +179,13 @@ export class TriggerDO extends DurableObject<Env> {
     }
 
     const targetType = configOverrides.targetType ?? 'cloud_agent';
+    const cloudAgentSessionId =
+      targetType === 'cloud_agent_chat'
+        ? triggerChatIdSchema.parse(configOverrides.cloudAgentSessionId)
+        : undefined;
+    if (targetType === 'cloud_agent_chat' && hasExistingChatWorkspaceSettings(configOverrides)) {
+      throw new Error(existingChatWorkspaceSettingsError);
+    }
     const sandboxAllocation = sandboxAllocationSchema
       .optional()
       .parse(configOverrides.sandboxAllocation);
@@ -189,7 +206,7 @@ export class TriggerDO extends DurableObject<Env> {
     const bodySchema = webhookBodySchema.nullish().parse(configOverrides.bodySchema);
     if (
       bodySchema != null &&
-      (targetType !== 'cloud_agent' || configOverrides.activationMode === 'scheduled')
+      (targetType === 'kiloclaw_chat' || configOverrides.activationMode === 'scheduled')
     ) {
       throw new Error('Body validation is only available for Cloud Agent webhooks');
     }
@@ -197,8 +214,11 @@ export class TriggerDO extends DurableObject<Env> {
     const webhookAuth = await this.resolveWebhookAuthOnCreate(configOverrides.webhookAuth);
     const executionUserId =
       z.string().min(1).optional().parse(configOverrides.executionUserId) ?? null;
-    if (executionUserId !== null && (!orgId || targetType !== 'cloud_agent')) {
+    if (executionUserId !== null && (!orgId || targetType === 'kiloclaw_chat')) {
       throw new Error('Execution user is only supported for organization Cloud Agent triggers');
+    }
+    if (targetType === 'cloud_agent_chat' && orgId && executionUserId === null) {
+      throw new Error(triggerChatRequiresCreator);
     }
     if (
       executionUserId !== null &&
@@ -214,6 +234,14 @@ export class TriggerDO extends DurableObject<Env> {
     if (existing && existing.execution_user_id !== executionUserId) {
       throw new Error('Execution user is immutable after creation');
     }
+    if (
+      existing &&
+      (existing.target_type === 'cloud_agent_chat' || targetType === 'cloud_agent_chat') &&
+      (existing.target_type !== targetType ||
+        existing.cloud_agent_session_id !== cloudAgentSessionId)
+    ) {
+      throw new Error('The target chat is immutable after creation');
+    }
 
     const config: TriggerConfig = {
       triggerId,
@@ -224,6 +252,7 @@ export class TriggerDO extends DurableObject<Env> {
       createdAt: new Date().toISOString(),
       isActive: true,
       targetType,
+      ...(cloudAgentSessionId ? { cloudAgentSessionId } : {}),
       kiloclawInstanceId: configOverrides.kiloclawInstanceId ?? null,
       githubRepo: configOverrides.githubRepo ?? null,
       mode: configOverrides.mode ?? null,
@@ -252,6 +281,7 @@ export class TriggerDO extends DurableObject<Env> {
       created_at: config.createdAt,
       is_active: config.isActive ? 1 : 0,
       target_type: config.targetType,
+      cloud_agent_session_id: cloudAgentSessionId ?? null,
       kiloclaw_instance_id: config.kiloclawInstanceId ?? null,
       github_repo: config.githubRepo ?? null,
       mode: config.mode ?? null,
@@ -327,7 +357,10 @@ export class TriggerDO extends DurableObject<Env> {
       executionUserId: record.execution_user_id,
       createdAt: record.created_at,
       isActive: record.is_active === 1,
-      targetType: record.target_type === 'kiloclaw_chat' ? 'kiloclaw_chat' : 'cloud_agent',
+      targetType: webhookTriggerTargetSchema.parse(record.target_type),
+      ...(record.cloud_agent_session_id
+        ? { cloudAgentSessionId: triggerChatIdSchema.parse(record.cloud_agent_session_id) }
+        : {}),
       kiloclawInstanceId: record.kiloclaw_instance_id ?? null,
       githubRepo: record.github_repo ?? null,
       mode: record.mode ?? null,
@@ -374,11 +407,17 @@ export class TriggerDO extends DurableObject<Env> {
     if (!existingConfig) {
       return { success: false };
     }
+    if (
+      existingConfig.targetType === 'cloud_agent_chat' &&
+      hasExistingChatWorkspaceSettings(updates)
+    ) {
+      throw new Error(existingChatWorkspaceSettingsError);
+    }
 
     const bodySchemaUpdate = webhookBodySchema.nullish().parse(updates.bodySchema);
     if (
       bodySchemaUpdate != null &&
-      (existingConfig.targetType !== 'cloud_agent' || existingConfig.activationMode !== 'webhook')
+      (existingConfig.targetType === 'kiloclaw_chat' || existingConfig.activationMode !== 'webhook')
     ) {
       throw new Error('Body validation is only available for Cloud Agent webhooks');
     }

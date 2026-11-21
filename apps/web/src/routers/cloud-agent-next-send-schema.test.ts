@@ -83,20 +83,32 @@ describe('baseSendMessageNextSchema', () => {
     expect(result.payload).toEqual(payload);
   });
 
-  it.each([
-    { mode: 'custom' },
-    { mode: 'not a slug' },
-    { model: '' },
-    { variant: 'high-123' },
-    { variant: 'x'.repeat(51) },
-  ])('rejects invalid command selection %p', selection => {
-    const result = baseSendMessageNextSchema.safeParse({
-      cloudAgentSessionId: 'cloud-session-1',
-      messageId: MESSAGE_ID,
-      payload: { ...commandPayload(), ...selection },
-    });
-    expect(result.success).toBe(false);
+  it('keeps the agent mode and variant the stored session can produce', () => {
+    // A session created in `custom` mode stores it, and a client resuming that
+    // session sends the mode back; a profile agent may pin a variant key the
+    // catalog defines with digits or separators. Both are storable, so neither
+    // may be refused here.
+    for (const selection of [{ mode: 'custom' }, { variant: 'high-2' }, { variant: 'xhigh_1' }]) {
+      const result = baseSendMessageNextSchema.safeParse({
+        cloudAgentSessionId: 'cloud-session-1',
+        messageId: MESSAGE_ID,
+        payload: { ...commandPayload(), ...selection },
+      });
+      expect(result.success).toBe(true);
+    }
   });
+
+  it.each([{ mode: 'not a slug' }, { model: '' }, { variant: 'x'.repeat(51) }])(
+    'rejects invalid command selection %p',
+    selection => {
+      const result = baseSendMessageNextSchema.safeParse({
+        cloudAgentSessionId: 'cloud-session-1',
+        messageId: MESSAGE_ID,
+        payload: { ...commandPayload(), ...selection },
+      });
+      expect(result.success).toBe(false);
+    }
+  );
 
   it('accepts a text-only prompt', () => {
     const result = baseSendMessageNextSchema.safeParse({

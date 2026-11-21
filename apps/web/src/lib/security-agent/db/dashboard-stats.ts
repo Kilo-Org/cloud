@@ -410,7 +410,7 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
             ${security_findings.analysis} AS analysis,
             ${security_findings.sla_due_at} AS sla_due_at
           FROM ${security_findings}
-          WHERE ${whereClause}
+          WHERE ${security_findings.status} = 'open' AND ${whereClause}
         ),
         repo_health AS (
           SELECT

@@ -32,6 +32,7 @@ const access: AccessibleCloudAgentSession = {
 const coordinates: PreviewTargetResult = {
   status: 'ok',
   coordinates: {
+    transport: 'durable-object',
     provider: 'cloudflare-containers',
     logicalSandboxId: sandboxId,
     allocationRef: 'allocation-ref',

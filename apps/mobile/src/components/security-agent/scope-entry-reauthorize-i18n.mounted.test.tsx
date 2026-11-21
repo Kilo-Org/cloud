@@ -32,6 +32,9 @@ vi.mock('@/lib/trpc', async () => {
   };
 });
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://settings.test' }));
+// The hand-off helper imports the browser launcher, which reaches a native
+// module this project cannot load; this suite renders the reauthorize copy.
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('react-native', () => ({ View: 'View', Switch: 'Switch' }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
@@ -129,7 +132,7 @@ beforeEach(() => {
       getConfig: structuredClone(securityConfigFixture),
       getRepositories: [],
       list: [],
-      mintInstallState: { token: 'install-state' },
+      mintHandoff: { path: '/app-shell/handoff?token=handoff-token' },
     };
     return Response.json({ result: { data: data[procedureFor(input)] } });
   });

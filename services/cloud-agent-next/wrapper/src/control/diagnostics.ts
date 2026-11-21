@@ -11,6 +11,11 @@ import {
   type ControlLogUploadResult,
   type ControlUploadFailureSample,
 } from '../../../src/shared/control-diagnostics.js';
+import {
+  createSandboxTransferClient,
+  sandboxTransferPath,
+  type SandboxTransferClient,
+} from './sandbox-transfer-client.js';
 
 export type ControlDiagnostics = {
   onDiagnostic: ControlDiagnosticReporter;
@@ -23,6 +28,8 @@ export type ControlDiagnostics = {
 type Options = {
   uploadUrl?: string;
   uploadGrant?: string;
+  client?: SandboxTransferClient;
+  logPathPrefix?: string;
   fetch?: (url: string, init: RequestInit) => Promise<Response>;
   now?: () => number;
   intervalMs?: number;
@@ -78,7 +85,18 @@ function retentionPriority(record: ControlDiagnosticRecord): number {
 export function createControlDiagnostics(options: Options): ControlDiagnostics {
   const records: ControlDiagnosticRecord[] = [];
   const now = options.now ?? Date.now;
-  const upload = options.fetch ?? fetch;
+  const client =
+    options.client ??
+    (options.uploadUrl && options.uploadGrant
+      ? createSandboxTransferClient({
+          baseUrl: options.uploadUrl,
+          grant: options.uploadGrant,
+          fetch: options.fetch,
+          attempts: 1,
+          timeoutMs: options.uploadTimeoutMs ?? 3000,
+        })
+      : undefined);
+  const logPathPrefix = options.logPathPrefix ?? (options.client ? 'logs' : '');
   let droppedRecords = 0;
   let droppedTerminalRecords = 0;
   let uploadFailures = 0;
@@ -239,45 +257,40 @@ export function createControlDiagnostics(options: Options): ControlDiagnostics {
 
   async function performFlush(): Promise<void> {
     const batch = nextBatch();
-    if (!batch || !options.uploadUrl || !options.uploadGrant || stopped) return;
+    if (!batch || !client || stopped) return;
     const timeout = new AbortController();
     const signal = AbortSignal.any([timeout.signal, stop.signal]);
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
-    let onAbort: (() => void) | undefined;
     let result: ControlLogUploadResult = 'network_failure';
     let statusCode: number | undefined;
     batch.attempts = Math.min(Number.MAX_SAFE_INTEGER, batch.attempts + 1);
     try {
-      const interrupted = new Promise<never>((_resolve, reject) => {
-        onAbort = () => reject(new Error('Diagnostic upload interrupted'));
-        signal.addEventListener('abort', onAbort, { once: true });
-        if (signal.aborted) onAbort();
-      });
       timeoutId = setTimeout(() => timeout.abort(), options.uploadTimeoutMs ?? 3000);
-      const response = await Promise.race([
-        upload(`${options.uploadUrl}/${batch.id}`, {
-          method: 'PUT',
-          headers: {
-            Authorization: `Bearer ${options.uploadGrant}`,
-            'Content-Type': 'application/json',
-          },
-          body: batch.body,
-          redirect: 'error',
-          signal,
-        }),
-        interrupted,
-      ]);
-      statusCode = response.status;
-      result = statusCode === 204 ? 'accepted' : 'http_rejection';
-      if (statusCode === 204 && pending === batch) pending = undefined;
-      if (statusCode === 401 || statusCode === 403) {
-        stopped = true;
-        accepting = false;
-        if (timer) clearInterval(timer);
-        pending = undefined;
-        records.length = 0;
+      const transfer = await client.put(sandboxTransferPath(logPathPrefix, batch.id), {
+        body: batch.body,
+        contentType: 'application/json',
+        signal,
+      });
+      statusCode = transfer.statusCode;
+      if (transfer.status === 'ok' && transfer.statusCode === 204) {
+        result = 'accepted';
+        if (pending === batch) pending = undefined;
+      } else if (transfer.status === 'ok' || transfer.status === 'rejected') {
+        result = 'http_rejection';
+        if (transfer.statusCode === 401 || transfer.statusCode === 403) {
+          stopped = true;
+          accepting = false;
+          if (timer) clearInterval(timer);
+          pending = undefined;
+          records.length = 0;
+        }
+      } else {
+        result = stop.signal.aborted
+          ? 'cancelled'
+          : timeout.signal.aborted
+            ? 'timeout'
+            : 'network_failure';
       }
-      void response.body?.cancel().catch(() => undefined);
     } catch {
       result = stop.signal.aborted
         ? 'cancelled'
@@ -286,7 +299,6 @@ export function createControlDiagnostics(options: Options): ControlDiagnostics {
           : 'network_failure';
     } finally {
       if (timeoutId !== undefined) clearTimeout(timeoutId);
-      if (onAbort) signal.removeEventListener('abort', onAbort);
       timeout.abort();
       reportUploadResult(batch, result, statusCode);
     }
@@ -302,7 +314,7 @@ export function createControlDiagnostics(options: Options): ControlDiagnostics {
 
   function flush(): Promise<void> {
     if (active) return active;
-    if (stopped || !options.uploadUrl || !options.uploadGrant) return Promise.resolve();
+    if (stopped || !client) return Promise.resolve();
     active = performFlush()
       .catch(() => undefined)
       .finally(() => {
@@ -312,7 +324,7 @@ export function createControlDiagnostics(options: Options): ControlDiagnostics {
   }
 
   function start(): void {
-    if (timer || stopped || !options.uploadUrl || !options.uploadGrant) return;
+    if (timer || stopped || !client) return;
     runSnapshot();
     void flush();
     timer = setInterval(() => {
@@ -334,12 +346,7 @@ export function createControlDiagnostics(options: Options): ControlDiagnostics {
       }, timeoutMs);
       try {
         await active;
-        while (
-          !stopped &&
-          options.uploadUrl &&
-          options.uploadGrant &&
-          (pending || records.length)
-        ) {
+        while (!stopped && client !== undefined && (pending || records.length)) {
           await flush();
           if (pending) break;
         }

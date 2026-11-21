@@ -52,7 +52,7 @@ describe('CodeReviewAgentConfigSchema repository_model_overrides', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects an invalid thinking_effort on an override', () => {
+  it.each(['', 'x'.repeat(51)])('rejects a thinking_effort outside 1-50 characters', effort => {
     const result = CodeReviewAgentConfigSchema.safeParse({
       ...base,
       repository_model_overrides: [
@@ -60,10 +60,25 @@ describe('CodeReviewAgentConfigSchema repository_model_overrides', () => {
           repository_id: 1,
           repo_full_name: 'acme/api',
           model_slug: 'openai/gpt-5',
-          thinking_effort: 'high-3', // digits/hyphen not allowed by the regex
+          thinking_effort: effort,
         },
       ],
     });
     expect(result.success).toBe(false);
+  });
+
+  it('accepts a model-specific thinking_effort key such as high-3', () => {
+    const result = CodeReviewAgentConfigSchema.safeParse({
+      ...base,
+      repository_model_overrides: [
+        {
+          repository_id: 1,
+          repo_full_name: 'acme/api',
+          model_slug: 'openai/gpt-5',
+          thinking_effort: 'high-3',
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
   });
 });

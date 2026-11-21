@@ -25,6 +25,7 @@ import {
 } from '@/components/agents/prepare-session-repository';
 import { i18n } from '@/i18n';
 import { type AgentAttachmentWire } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import { isTrialExpiredRefusal } from '@/lib/server-error-copy';
 import { trpcClient } from '@/lib/trpc';
 
 /**
@@ -111,6 +112,15 @@ export type PrepareAgentSessionDeps = {
    * change under the call and omit it.
    */
   shouldAbort?: () => boolean;
+  /**
+   * Whether this caller's reader may change the organization's plan. Prepare is
+   * headless and cannot read a role, and only the trial refusal's sentence
+   * depends on one (`cloudPrepareFailureMessage`), so a caller whose toast can
+   * offer the billing step passes the same read it offers the step from. Every
+   * other caller leaves the default: the copy then names the person who can
+   * change the plan, which is true for a reader the step would refuse.
+   */
+  canManageBilling?: boolean;
 };
 
 /**
@@ -122,6 +132,10 @@ export type PrepareAgentSessionDeps = {
  * cancelled the intent before any request was sent, so there is no rejection
  * to report and `message` is empty — the caller stays silent and keeps the
  * draft. Only a caller that supplied `shouldAbort` can receive it.
+ *
+ * `trialRefusal` says the organization subscription gate refused the create,
+ * so a caller whose toast can carry the plan step offers it to the role that
+ * can take it; every other reason is false.
  */
 export type PrepareAgentSessionOutcome =
   | { ok: true; sessionId: string }
@@ -130,6 +144,8 @@ export type PrepareAgentSessionOutcome =
       reason: 'outbox-unreadable' | 'prepare-failed' | 'aborted';
       retryable: boolean;
       message: string;
+      /** Whether this rejection is the organization trial refusal. */
+      trialRefusal: boolean;
       /**
        * The prepare rejection, when it was an `Error`. A caller that
        * classifies rejections itself (the Continue route) rethrows it, so its
@@ -160,6 +176,7 @@ export async function prepareAgentSession(
       reason: 'outbox-unreadable',
       retryable: false,
       message: i18n.t('agentChat.newSession.couldNotReadPendingSessions'),
+      trialRefusal: false,
     };
   }
   // Reuse a stored safe-retry key for this fingerprint on relaunch; mint a
@@ -205,7 +222,13 @@ export async function prepareAgentSession(
     // still holds a row from an earlier same-intent attempt must keep its
     // dedupe key.
     if (deps.shouldAbort?.() === true) {
-      return { ok: false, reason: 'aborted', retryable: false, message: '' };
+      return {
+        ok: false,
+        reason: 'aborted',
+        retryable: false,
+        message: '',
+        trialRefusal: false,
+      };
     }
 
     const result = input.organizationId
@@ -239,7 +262,10 @@ export async function prepareAgentSession(
     return { ok: true, sessionId: result.kiloSessionId };
   } catch (error) {
     const retryable = isCloudPrepareRetryableError(error);
-    const message = cloudPrepareFailureMessage(error);
+    // The refusal's sentence follows the reader the caller resolved; the flag
+    // travels with it so the caller's toast can add the plan step the copy
+    // promises.
+    const message = cloudPrepareFailureMessage(error, deps.canManageBilling ?? false);
     // A typed terminal rejection ends the intent; a retryable one keeps the key.
     if (!retryable) {
       // The handler must never reject: a cleanup failure here cannot change
@@ -256,6 +282,7 @@ export async function prepareAgentSession(
       reason: 'prepare-failed',
       retryable,
       message,
+      trialRefusal: isTrialExpiredRefusal(error),
       ...(error instanceof Error ? { error } : {}),
     };
   }

@@ -1,4 +1,4 @@
-import { extractLegalMainHtml } from '@/app/legal-page-source';
+import { extractLegalMainHtml, loadLegalMainHtml } from '@/app/legal-page-source';
 
 export const PRIVACY_POLICY_SOURCE_URL = 'https://kilo.ai/privacy';
 
@@ -18,17 +18,17 @@ export function extractPrivacyPolicyMainHtml(html: string): string {
   });
 }
 
+/** The live privacy policy, sanitized. Throws when the source cannot be read. */
+export async function loadPrivacyPolicyMainHtml(): Promise<string> {
+  return loadLegalMainHtml({
+    sourceUrl: PRIVACY_POLICY_SOURCE_URL,
+    extract: extractPrivacyPolicyMainHtml,
+  });
+}
+
 export async function fetchPrivacyPolicyMainHtml(): Promise<string> {
   try {
-    const response = await fetch(PRIVACY_POLICY_SOURCE_URL, {
-      next: { revalidate: 3600 },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch privacy policy: ${response.status}`);
-    }
-
-    return extractPrivacyPolicyMainHtml(await response.text());
+    return await loadPrivacyPolicyMainHtml();
   } catch {
     return PRIVACY_POLICY_FALLBACK_HTML;
   }

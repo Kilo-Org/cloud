@@ -25,6 +25,23 @@ const store = new Map<string, string>();
 const sqlLog: string[] = [];
 let randomCallCount = 0;
 let failNextProbe = false;
+// The message the probe seam throws. `database is locked` models a lock held
+// by another connection; the default models a wrong key or a corrupt file.
+let nextProbeMessage = 'file is not a database';
+// Fails the next schema migration the way a disk error does. `migrate` reads
+// the `__drizzle_migrations` ledger before it runs the schema. That read is the
+// one statement Drizzle does not wrap, so the fake rejects it once. The caller
+// then gets the original error, not a wrapper.
+let failNextMigration = false;
+// The message the migration seam throws. A corruption message routes the open
+// into the reset recovery; a lock or an engine limit keeps the file and never
+// counts; anything else counts toward the bounded reset.
+let nextMigrationMessage = 'migration failed: disk I/O error';
+// An optional `cause` for the migration seam's error, the way the driver
+// wraps a failed statement.
+let failNextMigrationCause: Error | undefined = undefined;
+// An optional non-Error throw from the migration seam.
+let failNextMigrationNonError: unknown = undefined;
 let failEveryProbe = false;
 let failNextPragma = false;
 let failEveryPragma = false;
@@ -45,6 +62,27 @@ let hasSQLCipher = true;
 // probed; -1 when it was never probed. Proves the probe precedes `PRAGMA key`.
 let cipherProbedAtSqlCount = -1;
 let closeCallCount = 0;
+
+// The busy cooldown is measured on `performance.now()`, a monotonic reading, so
+// the tests control that same clock. `performance` is in the list for that
+// reason; the wall-clock case below steps `Date` on its own to prove it cannot
+// stretch the window.
+function useMonotonicTestTimers(): void {
+  vi.useFakeTimers({
+    toFake: [
+      'setTimeout',
+      'clearTimeout',
+      'setInterval',
+      'clearInterval',
+      'Date',
+      'setImmediate',
+      'clearImmediate',
+      'hrtime',
+      'performance',
+      'Intl',
+    ],
+  });
+}
 
 type FakeExecuteResult = {
   changes: number | bigint;
@@ -109,13 +147,27 @@ function nativeStatement(source: string): FakeStatement {
         getFirstSync: () => rows[0] ?? null,
       };
     },
-    executeForRawResultSync: (params = []) => ({
-      getAllSync: () =>
-        currentHandle()
-          .prepare(source)
-          .all(...params)
-          .map(row => Object.values(row)),
-    }),
+    executeForRawResultSync: (params = []) => {
+      // Migration failure seam. Drizzle reads the ledger with `session.values`,
+      // which wraps nothing, so this throw is the error the open reports.
+      if (failNextMigration && source.includes('__drizzle_migrations')) {
+        failNextMigration = false;
+        if (failNextMigrationNonError !== undefined) {
+          // oxlint-disable-next-line no-throw-literal, typescript-eslint/only-throw-error -- the seam models a caller that throws a non-Error
+          throw failNextMigrationNonError;
+        }
+        throw failNextMigrationCause === undefined
+          ? new Error(nextMigrationMessage)
+          : new Error(nextMigrationMessage, { cause: failNextMigrationCause });
+      }
+      return {
+        getAllSync: () =>
+          currentHandle()
+            .prepare(source)
+            .all(...params)
+            .map(row => Object.values(row)),
+      };
+    },
   };
 }
 
@@ -125,10 +177,10 @@ function createFakeStatement(source: string): FakeStatement {
     return fakeRows(() => {
       if (failNextProbe) {
         failNextProbe = false;
-        throw new Error('file is not a database');
+        throw new Error(nextProbeMessage);
       }
       if (failEveryProbe) {
-        throw new Error('file is not a database');
+        throw new Error(nextProbeMessage);
       }
       return [{ 'count(*)': 0 }];
     });
@@ -209,6 +261,9 @@ vi.mock('expo-secure-store', () => ({
   setItemAsync: vi.fn(async (key: string, value: string) => {
     store.set(key, value);
   }),
+  deleteItemAsync: vi.fn(async (key: string) => {
+    store.delete(key);
+  }),
 }));
 
 vi.mock('expo-crypto', () => ({
@@ -242,7 +297,7 @@ vi.mock('@sentry/react-native', () => ({
 /* eslint-disable import/first */
 import * as SecureStore from 'expo-secure-store';
 import * as SQLite from 'expo-sqlite';
-import { PERSIST_DB_KEY } from '@/lib/storage-keys';
+import { PERSIST_DB_KEY, PERSIST_MIGRATION_FAILURES_KEY } from '@/lib/storage-keys';
 import { ProtectedDataUnavailableError, setProtectedDataAvailable } from '@/lib/protected-data';
 import {
   clearScope,
@@ -268,6 +323,11 @@ beforeEach(() => {
   sqlLog.length = 0;
   randomCallCount = 0;
   failNextProbe = false;
+  nextProbeMessage = 'file is not a database';
+  failNextMigration = false;
+  nextMigrationMessage = 'migration failed: disk I/O error';
+  failNextMigrationCause = undefined;
+  failNextMigrationNonError = undefined;
   failEveryProbe = false;
   failNextPragma = false;
   failEveryPragma = false;
@@ -696,6 +756,582 @@ describe('open failure recovery', () => {
       level: 'error',
       tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
     });
+  });
+});
+
+describe('migration failure keeps the database', () => {
+  it('a_migration_failure_does_not_delete_the_file_or_regenerate_the_key', async () => {
+    // A healthy open stores a value and the key it opened with.
+    await setItem('draft:u1', 'k', 'v');
+    const storedKey = store.get(PERSIST_DB_KEY);
+    expect(storedKey).toBeDefined();
+
+    // The next launch fails its migration.
+    failNextMigration = true;
+    resetEncryptedKvOpenForTests();
+
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('migration failed: disk I/O error');
+
+    // The second open ran and closed its handle.
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(2);
+    expect(closeCallCount).toBe(1);
+    // The file and the key stay: this branch never deletes or rekeys.
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(1);
+    expect(store.get(PERSIST_DB_KEY)).toBe(storedKey);
+    // The failure is reported once, under the migration operation tag.
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'error',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'migration' },
+    });
+  });
+
+  it('the_stored_value_survives_a_migration_failure_to_a_later_launch', async () => {
+    await setItem('draft:u1', 'k', 'v');
+    const storedKey = store.get(PERSIST_DB_KEY);
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(1);
+
+    // The next launch fails its migration and keeps the file and the key.
+    failNextMigration = true;
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('migration failed: disk I/O error');
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(2);
+    expect(store.get(PERSIST_DB_KEY)).toBe(storedKey);
+
+    // A launch after the failure reopens the same file and reads the value.
+    failNextMigration = false;
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).resolves.toBe('v');
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(3);
+  });
+
+  it('a_probe_failure_still_deletes_the_file_and_regenerates_the_key', async () => {
+    failNextProbe = true;
+    await setItem('s', 'a', 'x');
+
+    // A probe failure keeps the delete-and-recreate recovery, key included.
+    expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledWith('kilo-persist.db');
+    expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(2);
+    expect(store.get(PERSIST_DB_KEY)).toMatch(/^02[0-9a-f]{62}$/);
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'warning',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
+    });
+
+    await expect(getItem('s', 'a')).resolves.toBe('x');
+  });
+
+  it('a_corrupt_page_that_fails_inside_the_migration_resets_like_a_probe_failure', async () => {
+    // Damage past the first page passes the `sqlite_master` count and fails
+    // inside `migrate()` instead. The engine message routes it into the same
+    // recovery: an unrecoverable file must not leave the store broken for
+    // every later launch.
+    failNextMigration = true;
+    nextMigrationMessage = 'database disk image is malformed';
+    await setItem('s', 'a', 'x');
+
+    expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledWith('kilo-persist.db');
+    expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(2);
+    expect(store.get(PERSIST_DB_KEY)).toMatch(/^02[0-9a-f]{62}$/);
+    // One report: the reset, not a second migration capture for the same file.
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'warning',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
+    });
+
+    await expect(getItem('s', 'a')).resolves.toBe('x');
+  });
+
+  it('a_corruption_signal_wrapped_by_the_driver_resets_too', async () => {
+    // The driver wraps a failed statement and keeps the engine error in
+    // `cause`. The corruption check follows that chain.
+    failNextMigration = true;
+    nextMigrationMessage = "Failed to run the query 'CREATE TABLE ...'";
+    failNextMigrationCause = new Error('file is not a database');
+    await setItem('s', 'a', 'x');
+
+    expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledWith('kilo-persist.db');
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'warning',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
+    });
+    await expect(getItem('s', 'a')).resolves.toBe('x');
+  });
+
+  it('a_busy_signal_wrapped_by_the_driver_keeps_the_file', async () => {
+    // The driver wraps a failed statement and keeps the engine error in
+    // `cause`. A lock is no corruption signal, so the file stays.
+    await setItem('draft:u1', 'k', 'v');
+    const storedKey = store.get(PERSIST_DB_KEY);
+
+    failNextMigration = true;
+    nextMigrationMessage = "Failed to run the query 'CREATE TABLE ...'";
+    failNextMigrationCause = new Error('database is locked');
+    resetEncryptedKvOpenForTests();
+
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow(/Failed to run the query/);
+
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(1);
+    expect(store.get(PERSIST_DB_KEY)).toBe(storedKey);
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'warning',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'open' },
+    });
+  });
+
+  it('a_busy_message_inside_the_migration_keeps_the_file', async () => {
+    // A lock that surfaces inside `migrate()` is still a lock: the migration
+    // non-corruption branch routes it to the open report, and the file and
+    // the key stay.
+    await setItem('draft:u1', 'k', 'v');
+    const storedKey = store.get(PERSIST_DB_KEY);
+
+    failNextMigration = true;
+    nextMigrationMessage = 'database is locked';
+    resetEncryptedKvOpenForTests();
+
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database is locked');
+
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(1);
+    expect(store.get(PERSIST_DB_KEY)).toBe(storedKey);
+    // A lock is transient, so it never spends one of the bounded recovery
+    // attempts: the counter item is untouched.
+    expect(store.get(PERSIST_MIGRATION_FAILURES_KEY)).toBeUndefined();
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'warning',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'open' },
+    });
+  });
+
+  it('a_non_error_migration_rejection_keeps_the_file', async () => {
+    // A throw that is not an Error must never reach the destructive reset.
+    failNextMigration = true;
+    nextMigrationMessage = 'threw a string';
+    failNextMigrationNonError = 'migration exploded';
+    await expect(setItem('s', 'a', 'x')).rejects.toThrow('migration exploded');
+
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith('migration exploded', {
+      level: 'error',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'migration' },
+    });
+  });
+
+  it('consecutive_migration_failures_fall_back_to_the_reset_recovery', async () => {
+    // A healthy launch opens and writes.
+    await setItem('draft:u1', 'k', 'v');
+    const storedKey = store.get(PERSIST_DB_KEY);
+    expect(storedKey).toBeDefined();
+    const openCalls = vi.mocked(SQLite.openDatabaseSync).mock.calls.length;
+
+    // Three launches whose migration fails the same non-transient way. The
+    // file keeps until the threshold; each `resetEncryptedKvOpenForTests`
+    // models a relaunch, so every launch starts from the stored count.
+    failNextMigration = true;
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('migration failed: disk I/O error');
+    expect(vi.mocked(SQLite.openDatabaseSync).mock.calls.length).toBe(openCalls + 1);
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(store.get(PERSIST_MIGRATION_FAILURES_KEY)).toBe('1');
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'error',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'migration' },
+    });
+
+    failNextMigration = true;
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('migration failed: disk I/O error');
+    expect(vi.mocked(SQLite.openDatabaseSync).mock.calls.length).toBe(openCalls + 2);
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(store.get(PERSIST_MIGRATION_FAILURES_KEY)).toBe('2');
+    expect(store.get(PERSIST_DB_KEY)).toBe(storedKey);
+
+    // Each failed launch files its own migration report; drop those so the
+    // reset launch below is judged on its own captures.
+    vi.mocked(Sentry.captureException).mockClear();
+
+    // The third consecutive failure reaches the threshold: delete-and-recreate.
+    // The recovery opens a fresh empty file, so this call resolves — a null
+    // read from the recreated store — instead of rejecting.
+    failNextMigration = true;
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).resolves.toBeNull();
+    expect(vi.mocked(SQLite.openDatabaseSync).mock.calls.length).toBe(openCalls + 4);
+    expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledWith('kilo-persist.db');
+    expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(2);
+    expect(store.get(PERSIST_DB_KEY)).toMatch(/^02[0-9a-f]{62}$/);
+    expect(store.get(PERSIST_MIGRATION_FAILURES_KEY)).toBeUndefined();
+    // One report for the whole launch: the reset. No further migration
+    // capture for the same failure, and no capture for the clean reopen.
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'warning',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
+    });
+
+    // The reset wiped the recreated file, so this write lands on empty rows.
+    // It also proves the fresh file serves reads: the pre-failure value is
+    // gone with the file it lived in.
+    failNextMigration = false;
+    resetEncryptedKvOpenForTests();
+    await setItem('draft:u1', 'k', 'after');
+    await expect(getItem('draft:u1', 'k')).resolves.toBe('after');
+  });
+
+  it('a_successful_migration_clears_the_failure_count', async () => {
+    // Two failed launches keep the file and count up.
+    failNextMigration = true;
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('migration failed: disk I/O error');
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(store.get(PERSIST_MIGRATION_FAILURES_KEY)).toBe('1');
+
+    failNextMigration = true;
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('migration failed: disk I/O error');
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(store.get(PERSIST_MIGRATION_FAILURES_KEY)).toBe('2');
+    const storedKey = store.get(PERSIST_DB_KEY);
+
+    // A launch that migrates cleanly clears the count.
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).resolves.toBeNull();
+    expect(store.get(PERSIST_MIGRATION_FAILURES_KEY)).toBeUndefined();
+
+    // Counting starts over: one more failed launch keeps the file and the key.
+    failNextMigration = true;
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('migration failed: disk I/O error');
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(store.get(PERSIST_DB_KEY)).toBe(storedKey);
+    expect(store.get(PERSIST_MIGRATION_FAILURES_KEY)).toBe('1');
+  });
+
+  it('an_engine_limit_keeps_the_file_and_spends_no_recovery_attempt', async () => {
+    // A full disk, a read-only file, or a denied permission is not a verdict
+    // about the file: the recreated file meets the same limit, so the reset
+    // would drop the chats and conversation tables for nothing. More launches
+    // than the threshold prove the streak never counts these.
+    await setItem('draft:u1', 'k', 'v');
+    const storedKey = store.get(PERSIST_DB_KEY);
+
+    for (const message of [
+      'SQLITE_FULL: database or disk is full',
+      'attempt to write a readonly database',
+      'access permission denied',
+      'unable to open database file',
+    ]) {
+      failNextMigration = true;
+      nextMigrationMessage = message;
+      resetEncryptedKvOpenForTests();
+
+      // eslint-disable-next-line no-await-in-loop -- each message must fail its own launch before the next
+      await expect(getItem('draft:u1', 'k')).rejects.toThrow(message);
+
+      expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+      expect(store.get(PERSIST_DB_KEY)).toBe(storedKey);
+      expect(store.get(PERSIST_MIGRATION_FAILURES_KEY)).toBeUndefined();
+      // The failure is about the engine, like a lock that surfaces inside the
+      // migration, so it reports under the open operation rather than the
+      // migration one.
+      expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+        level: 'warning',
+        tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'open' },
+      });
+      vi.mocked(Sentry.captureException).mockClear();
+    }
+  });
+
+  it('a_probe_failure_that_reports_an_engine_limit_keeps_the_file', async () => {
+    // The probe can report the engine rather than the file. A full disk or a
+    // denied permission cannot be fixed by deleting the store, so the file and
+    // the key stay and the failure is reported under the open operation.
+    await setItem('draft:u1', 'k', 'v');
+    const storedKey = store.get(PERSIST_DB_KEY);
+
+    failNextProbe = true;
+    nextProbeMessage = 'unable to open database file';
+    resetEncryptedKvOpenForTests();
+
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('unable to open database file');
+
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(1);
+    expect(store.get(PERSIST_DB_KEY)).toBe(storedKey);
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'warning',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'open' },
+    });
+  });
+});
+
+describe('busy open failure keeps the database', () => {
+  it('a_locked_probe_does_not_delete_the_file_or_regenerate_the_key', async () => {
+    // A healthy open stores a value and the key it opened with.
+    await setItem('draft:u1', 'k', 'v');
+    const storedKey = store.get(PERSIST_DB_KEY);
+    expect(storedKey).toBeDefined();
+
+    // The next launch reaches the probe while another connection holds the
+    // file.
+    failNextProbe = true;
+    nextProbeMessage = 'database is locked';
+    resetEncryptedKvOpenForTests();
+
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database is locked');
+
+    // The failed open closed its handle: the native module keeps one
+    // connection per database name.
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(2);
+    expect(closeCallCount).toBe(1);
+    // The file and the key stay: a lock says nothing about either.
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(1);
+    expect(store.get(PERSIST_DB_KEY)).toBe(storedKey);
+    // The failure is reported once, as a warning under the open operation.
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'warning',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'open' },
+    });
+  });
+
+  it('a_busy_failure_drops_the_open_memo_so_the_next_caller_retries', async () => {
+    // A lock is transient: the memo must not keep rejecting every caller for
+    // the rest of the process. No test-only reset between the two calls.
+    await setItem('draft:u1', 'k', 'v');
+
+    failNextProbe = true;
+    nextProbeMessage = 'database is locked';
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database is locked');
+
+    // The very next caller retries the open and succeeds once the seam's
+    // one-shot probe failure is spent. The cooldown starts on the failure,
+    // so this first retry still runs.
+    await expect(getItem('draft:u1', 'k')).resolves.toBe('v');
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(3);
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+  });
+
+  it('a_second_busy_failure_inside_the_cooldown_fails_fast_and_reopens_after_the_window', async () => {
+    useMonotonicTestTimers();
+    await setItem('draft:u1', 'k', 'v');
+
+    // First busy failure: the memo drops, the cooldown window starts.
+    failEveryProbe = true;
+    nextProbeMessage = 'database is locked';
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database is locked');
+
+    // The owed retry runs and fails busy again: the memo now holds this
+    // rejection and the cooldown covers it.
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database is locked');
+    expect(Sentry.captureException).toHaveBeenCalledTimes(2);
+    const opensAfterSecondFailure = vi.mocked(SQLite.openDatabaseSync).mock.calls.length;
+
+    // A caller inside the window gets the memoized rejection: no further open
+    // attempt blocks the JS thread for the busy timeout, and no further event
+    // files.
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database is locked');
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(opensAfterSecondFailure);
+    expect(Sentry.captureException).toHaveBeenCalledTimes(2);
+
+    // The window passes with the lock held: one open per window. The attempt
+    // fails busy again and restarts the window.
+    vi.advanceTimersByTime(11_000);
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database is locked');
+    expect(vi.mocked(SQLite.openDatabaseSync).mock.calls.length).toBeGreaterThan(
+      opensAfterSecondFailure
+    );
+    expect(Sentry.captureException).toHaveBeenCalledTimes(3);
+
+    // The lock clears and a caller arrives after the new window: the store
+    // reopens the same file, and nothing was deleted or rekeyed.
+    failEveryProbe = false;
+    vi.advanceTimersByTime(11_000);
+    await expect(getItem('draft:u1', 'k')).resolves.toBe('v');
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it('concurrent_callers_share_one_reopen_after_the_cooldown_window', async () => {
+    // The window-expiry branch claims the retry: it clears `busyMemoRejected`
+    // before it drops the memo. Without the claim, a second caller that
+    // arrives while the reopen is still in flight passes the same guard and
+    // starts another open, whose rejection then memoizes.
+    useMonotonicTestTimers();
+    await setItem('draft:u1', 'k', 'v');
+
+    // First busy failure: the memo drops, the window starts.
+    failEveryProbe = true;
+    nextProbeMessage = 'database is locked';
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database is locked');
+
+    // The window passes, but the reopen stalls in the keychain read until the
+    // deferred resolver fires, so the two callers below overlap it.
+    failEveryProbe = false;
+    vi.advanceTimersByTime(11_000);
+    const { promise: keyReadStarted, resolve: markStarted } = Promise.withResolvers<undefined>();
+    const { promise: keyRead, resolve: releaseKeyRead } = Promise.withResolvers<string | null>();
+    vi.mocked(SecureStore.getItemAsync).mockImplementationOnce(() => {
+      markStarted(undefined);
+      return keyRead;
+    });
+
+    const first = getItem('draft:u1', 'k');
+    await keyReadStarted;
+    const second = getItem('draft:u1', 'k');
+    releaseKeyRead(store.get(PERSIST_DB_KEY) ?? null);
+
+    await expect(Promise.all([first, second])).resolves.toEqual(['v', 'v']);
+    expect(vi.mocked(SQLite.openDatabaseSync).mock.calls.length).toBe(3);
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it('the_stored_value_survives_a_locked_probe_to_a_later_launch', async () => {
+    await setItem('draft:u1', 'k', 'v');
+    const storedKey = store.get(PERSIST_DB_KEY);
+
+    failNextProbe = true;
+    nextProbeMessage = 'SQLITE_BUSY: database is locked';
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('SQLITE_BUSY');
+    expect(store.get(PERSIST_DB_KEY)).toBe(storedKey);
+
+    // A launch after the lock is gone reopens the same file and reads the
+    // value the failed open never touched.
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).resolves.toBe('v');
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+  });
+
+  it('a_busy_failure_after_a_dropped_memo_starts_a_new_cooldown', async () => {
+    // The cooldown belongs to the episode its memo recorded. Once the memo is
+    // dropped for another reason, the next busy failure is the first of a new
+    // episode: the caller after it retries at once instead of failing fast for
+    // what is left of the old window.
+    useMonotonicTestTimers();
+    await setItem('draft:u1', 'k', 'v');
+    const storedKey = store.get(PERSIST_DB_KEY) ?? null;
+
+    // A busy failure drops the memo and arms the cooldown.
+    failEveryProbe = true;
+    nextProbeMessage = 'database is locked';
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database is locked');
+
+    // The device locks during the open: the memo drops, the file is untouched.
+    failNextProbe = true;
+    vi.mocked(SecureStore.getItemAsync).mockImplementationOnce(async () => {
+      setProtectedDataAvailable(false);
+      return storedKey;
+    });
+    await expect(getItem('draft:u1', 'k')).rejects.toBeInstanceOf(ProtectedDataUnavailableError);
+    setProtectedDataAvailable(true);
+    vi.advanceTimersByTime(1000);
+
+    // The lock is still held. The first caller's failure is the first of the
+    // new episode, so the caller after it runs another open at once.
+    failEveryProbe = true;
+    nextProbeMessage = 'database is locked';
+    const opensBefore = vi.mocked(SQLite.openDatabaseSync).mock.calls.length;
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database is locked');
+    expect(vi.mocked(SQLite.openDatabaseSync).mock.calls.length).toBe(opensBefore + 1);
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database is locked');
+    expect(vi.mocked(SQLite.openDatabaseSync).mock.calls.length).toBe(opensBefore + 2);
+
+    vi.useRealTimers();
+  });
+
+  it('a_wall_clock_step_backwards_does_not_stretch_the_cooldown', async () => {
+    // A device clock correction steps `Date.now()` backwards. The cooldown runs
+    // on its own monotonic reading, so the memoized rejection still ends with
+    // the window instead of lasting until the clock catches up.
+    useMonotonicTestTimers();
+    await setItem('draft:u1', 'k', 'v');
+
+    failEveryProbe = true;
+    nextProbeMessage = 'database is locked';
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database is locked');
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database is locked');
+    const opensInsideWindow = vi.mocked(SQLite.openDatabaseSync).mock.calls.length;
+
+    // A clock correction an hour backwards, then a caller inside the window:
+    // the memoized rejection still fails fast with no further open.
+    vi.setSystemTime(Date.now() - 3_600_000);
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database is locked');
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(opensInsideWindow);
+
+    // The window ends on the monotonic reading: the next caller reopens the
+    // same file, and nothing was deleted.
+    vi.advanceTimersByTime(11_000);
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database is locked');
+    expect(vi.mocked(SQLite.openDatabaseSync).mock.calls.length).toBeGreaterThan(opensInsideWindow);
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+
+    vi.useRealTimers();
+  });
+
+  it('an_engine_limit_drops_the_open_memo_and_retries_like_a_lock', async () => {
+    // Unlike a lock, an engine limit can clear while the app keeps running:
+    // disk space is freed or a permission is restored. The memo must not hold
+    // the rejection until relaunch, so the limit reuses the busy retry and its
+    // cooldown instead of disabling the store for the rest of the process.
+    useMonotonicTestTimers();
+    await setItem('draft:u1', 'k', 'v');
+    const storedKey = store.get(PERSIST_DB_KEY);
+
+    // A full disk fails the probe: the memo drops and the cooldown starts.
+    failEveryProbe = true;
+    nextProbeMessage = 'SQLITE_FULL: database or disk is full';
+    resetEncryptedKvOpenForTests();
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database or disk is full');
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(store.get(PERSIST_DB_KEY)).toBe(storedKey);
+
+    // The second caller retries the open at once: the first failure dropped
+    // the memo instead of holding the rejection until relaunch.
+    const opensAfterFirstFailure = vi.mocked(SQLite.openDatabaseSync).mock.calls.length;
+    const reportsAfterFirstFailure = vi.mocked(Sentry.captureException).mock.calls.length;
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database or disk is full');
+    expect(vi.mocked(SQLite.openDatabaseSync).mock.calls.length).toBe(opensAfterFirstFailure + 1);
+    expect(vi.mocked(Sentry.captureException).mock.calls.length).toBe(reportsAfterFirstFailure + 1);
+
+    // A caller inside the window gets the memoized rejection: no second open
+    // attempt blocks the JS thread and no second event files.
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database or disk is full');
+    expect(vi.mocked(SQLite.openDatabaseSync).mock.calls.length).toBe(opensAfterFirstFailure + 1);
+    expect(vi.mocked(Sentry.captureException).mock.calls.length).toBe(reportsAfterFirstFailure + 1);
+
+    // The window passes: one open per window. The limit is still in force.
+    vi.advanceTimersByTime(11_000);
+    await expect(getItem('draft:u1', 'k')).rejects.toThrow('database or disk is full');
+    expect(vi.mocked(SQLite.openDatabaseSync).mock.calls.length).toBeGreaterThan(
+      opensAfterFirstFailure
+    );
+
+    // The limit lifts inside the new window: the next caller reopens the same
+    // file and reads the value the failed opens never touched.
+    failEveryProbe = false;
+    vi.advanceTimersByTime(11_000);
+    await expect(getItem('draft:u1', 'k')).resolves.toBe('v');
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(Crypto.getRandomBytesAsync).toHaveBeenCalledTimes(1);
+
+    vi.useRealTimers();
   });
 });
 

@@ -22,8 +22,13 @@ export const PROVIDER_COPY = {
   },
   bitbucket: {
     connectTitle: 'common.connectBitbucket',
-    connectDescription: 'agentChat.newSession.connectBitbucketDescription',
-    openLabel: 'agentChat.newSession.openBitbucket',
+    // Bitbucket's connect card explains itself through the restriction note
+    // below (`connectNoteKey`): a workspace access token is pasted in the
+    // app's own sheet, so there is no browser step left to announce.
+    connectDescription: null,
+    // The card's title already names Bitbucket, so the action repeats only
+    // the verb instead of the whole "Connect Bitbucket" phrase.
+    openLabel: 'common.connect',
     connectedTitle: 'common.bitbucketConnected',
     errorTitle: 'agentChat.newSession.couldNotLoadBitbucketRepositories',
     emptyDescription: 'agentChat.newSession.noRepositoriesVisibleBitbucket',
@@ -32,7 +37,8 @@ export const PROVIDER_COPY = {
   RepositoryPlatform,
   {
     connectTitle: string;
-    connectDescription: string;
+    /** Omitted when the card's own note says everything it needs to. */
+    connectDescription: string | null;
     openLabel: string;
     connectedTitle: string;
     errorTitle: string;

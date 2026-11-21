@@ -29,14 +29,16 @@ import {
   type CodeReviewAgentConfig,
   type RepositoryModelOverride,
 } from '@/lib/agent-config/core/types';
+import { agentVariantSchema } from '@/routers/cloud-agent-next-schemas';
 import { fetchAllGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
 import { fetchGitLabRepositoriesForOrganization } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
-import { createDefaultCodeReviewConfig } from '@/lib/code-reviews/core/default-config';
+import { setCodeReviewEnabled } from '@/lib/code-reviews/enable-code-review';
 import { repositoryModeForPlatform } from '@/lib/code-reviews/core/repository-mode';
 import { isCouncilEntitledForOrganization } from '@/lib/code-reviews/core/council-entitlement';
 import {
   CodeReviewCouncilConfigSchema,
+  ReviewGuidelineSourceRepositoriesSchema,
   type CodeReviewCouncilConfig,
 } from '@kilocode/db/schema-types';
 import { isCouncilActive } from '@kilocode/worker-utils/code-review-council';
@@ -99,12 +101,7 @@ const RepositoryModelOverrideInputSchema = z.object({
   // so an over-long slug is rejected at save time rather than failing the config's
   // canonical parse on read.
   modelSlug: z.string().max(512),
-  thinkingEffort: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .nullable()
-    .optional(),
+  thinkingEffort: agentVariantSchema.nullable().optional(),
 });
 
 // Bound the overrides array so a caller cannot grow the JSONB config unbounded, and
@@ -138,12 +135,7 @@ const SaveReviewConfigInputSchema = OrganizationIdInputSchema.extend({
   focusAreas: z.array(z.string()),
   customInstructions: z.string().optional(),
   modelSlug: z.string(),
-  thinkingEffort: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .nullable()
-    .optional(),
+  thinkingEffort: agentVariantSchema.nullable().optional(),
   repositorySelectionMode: z.enum(['all', 'selected']).optional(),
   selectedRepositoryIds: z.array(z.union([z.number(), z.string()])).optional(),
   manuallyAddedRepositories: z.array(ManuallyAddedRepositoryInputSchema).optional(),
@@ -153,6 +145,7 @@ const SaveReviewConfigInputSchema = OrganizationIdInputSchema.extend({
     .superRefine(rejectDuplicateRepositoryModelOverrides)
     .optional(),
   disableReviewMd: z.boolean().optional(),
+  reviewGuidelineSourceRepositories: ReviewGuidelineSourceRepositoriesSchema.optional(),
   // Feature-level guardrail: skip automated reviews of bot-authored PRs. Defaults to true.
   skipBotPullRequests: z.boolean().optional(),
   gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
@@ -176,12 +169,7 @@ const PatchReviewConfigInputSchema = OrganizationIdInputSchema.extend({
   focusAreas: z.array(z.string()).optional(),
   customInstructions: z.string().optional(),
   modelSlug: z.string().optional(),
-  thinkingEffort: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .nullable()
-    .optional(),
+  thinkingEffort: agentVariantSchema.nullable().optional(),
   repositorySelectionMode: z.enum(['all', 'selected']).optional(),
   selectedRepositoryIds: z.array(z.union([z.number(), z.string()])).optional(),
   // Compatibility: selectedRepositoryIds full-array input kept for web save and mobile clients before delta support; remove when web and all shipped mobile clients send deltas.
@@ -198,6 +186,7 @@ const PatchReviewConfigInputSchema = OrganizationIdInputSchema.extend({
     .superRefine(rejectDuplicateRepositoryModelOverrides)
     .optional(),
   disableReviewMd: z.boolean().optional(),
+  reviewGuidelineSourceRepositories: ReviewGuidelineSourceRepositoriesSchema.optional(),
   // GitHub only: skip automated reviews of bot-authored PRs. Omission preserves
   // the stored value (field-merge); mobile exposes this toggle.
   skipBotPullRequests: z.boolean().optional(),
@@ -612,6 +601,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           council: null,
           councilEnabledRepositoryIds: [],
           disableReviewMd: true,
+          reviewGuidelineSourceRepositories: [],
           skipBotPullRequests: true,
           reviewMemoryEnabled: false,
           actionRequired: null,
@@ -651,6 +641,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             thinkingEffort: override.thinking_effort ?? null,
           })),
         disableReviewMd: isBitbucket ? true : (cfg.disable_review_md ?? true),
+        reviewGuidelineSourceRepositories: cfg.review_guideline_source_repositories ?? [],
         skipBotPullRequests: cfg.skip_bot_pull_requests ?? true,
         council: cfg.council ?? null,
         councilEnabledRepositoryIds: cfg.council_enabled_repository_ids ?? [],
@@ -749,6 +740,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             council,
             council_enabled_repository_ids: input.councilEnabledRepositoryIds ?? [],
             disable_review_md: isBitbucket ? true : (input.disableReviewMd ?? true),
+            review_guideline_source_repositories: input.reviewGuidelineSourceRepositories ?? [],
             skip_bot_pull_requests: input.skipBotPullRequests ?? true,
             review_memory_enabled: false,
             review_analytics_enabled: false,
@@ -950,6 +942,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             thinkingEffort: o.thinking_effort ?? null,
           })),
           disableReviewMd: isBitbucket ? true : (prevCfg.disable_review_md ?? true),
+          reviewGuidelineSourceRepositories: prevCfg.review_guideline_source_repositories ?? [],
           skipBotPullRequests: prevCfg.skip_bot_pull_requests ?? true,
           manuallyAddedRepositories: isBitbucket ? [] : prevCfg.manually_added_repositories || [],
           // Council is org-only and Bitbucket never carries one; preserve as-is
@@ -1093,6 +1086,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             council,
             council_enabled_repository_ids: councilEnabledRepositoryIds,
             disable_review_md: disableReviewMd,
+            review_guideline_source_repositories: merged.reviewGuidelineSourceRepositories ?? [],
             // `skipBotPullRequests` is GitHub-only. Mobile exposes it, so the
             // patch schema now accepts it; a patch that omits it keeps the
             // stored value (field-merge), never the bare default.
@@ -1316,22 +1310,15 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           } else {
             didChange = false;
           }
-        } else if (existingConfig) {
-          await setAgentEnabled(input.organizationId, 'code_review', platform, input.isEnabled);
-          // Re-toggling to the same value is a no-op and must not be audited.
-          didChange = existingConfig.is_enabled !== input.isEnabled;
-        } else if (input.isEnabled) {
-          await upsertAgentConfig({
-            organizationId: input.organizationId,
-            agentType: 'code_review',
-            platform,
-            isEnabled: true,
-            createdBy: ctx.user.id,
-            config: createDefaultCodeReviewConfig(),
-          });
-          didChange = true;
         } else {
-          didChange = false;
+          const toggle = await setCodeReviewEnabled({
+            owner,
+            platform,
+            isEnabled: input.isEnabled,
+            createdBy: ctx.user.id,
+          });
+          // Re-toggling to the same value is a no-op and must not be audited.
+          didChange = toggle.changed;
         }
         await clearCodeReviewActionRequiredState({ owner, platform });
 

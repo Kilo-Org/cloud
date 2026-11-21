@@ -13,10 +13,14 @@ import { readTrpcErrorField } from '@/lib/trpc-error';
  */
 const EMAIL_SCHEMA = z.email().max(254);
 
+/** The reserve set for `FormField`'s `reserveErrorMessages`: every message the email rule can show. */
+export function inviteEmailErrorMessages(): readonly [invalid: string] {
+  return [i18n.t('organization.inviteMember.emailError')];
+}
+
 export function inviteEmailError(value: string): string | null {
-  return EMAIL_SCHEMA.safeParse(value.trim()).success
-    ? null
-    : i18n.t('organization.inviteMember.emailError');
+  const [invalid] = inviteEmailErrorMessages();
+  return EMAIL_SCHEMA.safeParse(value.trim()).success ? null : invalid;
 }
 
 /** Where a failed invite belongs and what it says, both localized. */
@@ -33,9 +37,13 @@ export type InviteErrorCopy = Readonly<{
  * can name — a taken address, an outstanding invitation, a lapsed plan — gets
  * its own line; every other failure — transport, permission, an SSO-only join
  * rule — gets the generic line.
+ *
+ * `canManageBilling` picks the reader's copy for the one sentence that depends
+ * on the role: the plan refusal offers the step to a reader who can take it and
+ * names the owner who can to everyone else.
  */
-export function inviteErrorCopy(error: unknown): InviteErrorCopy {
-  const known = knownServerErrorMessage(error);
+export function inviteErrorCopy(error: unknown, canManageBilling = false): InviteErrorCopy {
+  const known = knownServerErrorMessage(error, canManageBilling);
   if (known != null) {
     return { field: 'form', message: known };
   }

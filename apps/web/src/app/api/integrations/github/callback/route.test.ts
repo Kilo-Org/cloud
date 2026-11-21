@@ -8,7 +8,12 @@ import { exchangeGitHubOAuthCode } from '@/lib/integrations/platforms/github/ada
 import { linkKiloUser } from '@/lib/bot-identity';
 import { bot } from '@/lib/bot';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
-import { consumeInstallState } from '@/lib/integrations/github/install-state';
+import {
+  checkInstallState,
+  consumeInstallState,
+  consumeInstallStateWithoutSession,
+} from '@/lib/integrations/github/install-state';
+import { createAppShellFlowToken } from '@/lib/integrations/oauth/app-shell-flow';
 import {
   bindGitHubIntegrationToCanonicalInstallation,
   connectVerifiedGitHubInstallation,
@@ -43,6 +48,9 @@ import { assertUserAdministersInstallation } from '@/lib/integrations/platforms/
 const mockState = { kind: 'state' } as unknown as StateAdapter;
 
 jest.mock('@kilocode/web-shared/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/user/domain-gates', () => ({
+  isUserBlacklistedByDomain: jest.fn(async () => false),
+}));
 jest.mock('@/lib/bot/github-link-state');
 jest.mock('@/lib/bot-identity');
 jest.mock('@/lib/integrations/platforms/github/adapter');
@@ -114,7 +122,9 @@ jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
 jest.mock('@/lib/integrations/github/install-state', () => ({
+  checkInstallState: jest.fn(),
   consumeInstallState: jest.fn(),
+  consumeInstallStateWithoutSession: jest.fn(),
 }));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
@@ -132,6 +142,8 @@ const mockedOctokit = jest.mocked(Octokit);
 const mockedUpsertPlatformIntegrationForOwner = jest.mocked(upsertPlatformIntegrationForOwner);
 const mockedIsOrganizationMember = jest.mocked(isOrganizationMember);
 const mockedConsumeInstallState = jest.mocked(consumeInstallState);
+const mockedCheckInstallState = jest.mocked(checkInstallState);
+const mockedConsumeWithoutSession = jest.mocked(consumeInstallStateWithoutSession);
 const mockedVerifyGitHubInstallationAuthorization = jest.mocked(
   verifyGitHubInstallationAuthorization
 );
@@ -1857,5 +1869,173 @@ describe('GET /api/integrations/github/callback Sentry redaction', () => {
     expect(serializedMessage).toContain('install_token');
     expect(serializedMessage).toContain('missing_installation_id');
     expect(serializedMessage).toContain('setupAction');
+  });
+});
+
+describe('GET /api/integrations/github/callback app shell flow', () => {
+  const stateModule = jest.requireActual<typeof InstallStateModule>(
+    '@/lib/integrations/github/install-state'
+  );
+
+  async function createShellUser(): Promise<string> {
+    const id = `oauth/callback-shell-${randomUUID()}`;
+    await db.insert(kilocode_users).values({
+      id,
+      google_user_email: `callback-shell-${randomUUID()}@example.com`,
+      google_user_name: 'Test Shell User',
+      google_user_image_url: '',
+      stripe_customer_id: 'cus_test_callback_shell',
+    });
+    return id;
+  }
+
+  function shellRequest(pathWithQuery: string, cookie?: string) {
+    return new NextRequest(`http://localhost:3000${pathWithQuery}`, {
+      headers: cookie ? { cookie } : undefined,
+    });
+  }
+
+  function callbackPath(token: string, action: string) {
+    return `/api/integrations/github/callback?installation_id=${INSTALLATION_ID}&setup_action=${action}&state=${token}`;
+  }
+
+  async function deleteShellState(token: string) {
+    await db.delete(github_install_states).where(eq(github_install_states.token, token));
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // The in-app browser has no web session: identity can only come from the
+    // install state plus the shell's per-attempt binding cookie.
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: NextResponse.json(failureResult('unauthenticated'), { status: 401 }),
+    });
+    mockedCheckInstallState.mockImplementation(stateModule.checkInstallState);
+    mockedConsumeWithoutSession.mockImplementation(stateModule.consumeInstallStateWithoutSession);
+  });
+
+  test('a leaked install-state URL alone does not complete an install', async () => {
+    const userId = await createShellUser();
+    const token = await stateModule.createInstallState({
+      kiloUserId: userId,
+      ownerType: 'user',
+      ownerId: userId,
+      githubAppType: 'standard',
+      returnTo: '/app-shell/github-app',
+    });
+    try {
+      const { GET } = await import('./route');
+      const response = await GET(shellRequest(callbackPath(token, 'delete')));
+
+      expectRedirectLocation(response, '/');
+      expect(mockedConsumeWithoutSession).not.toHaveBeenCalled();
+      // The state survives, so the browser that started the flow can finish it.
+      await expect(stateModule.checkInstallState(token, userId)).resolves.toEqual({
+        status: 'valid',
+      });
+    } finally {
+      await deleteShellState(token);
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
+    }
+  });
+
+  test('a flow cookie minted for another state does not identify the caller', async () => {
+    const userId = await createShellUser();
+    const token = await stateModule.createInstallState({
+      kiloUserId: userId,
+      ownerType: 'user',
+      ownerId: userId,
+      githubAppType: 'standard',
+      returnTo: '/app-shell/github-app',
+    });
+    try {
+      const cookie = `kilo_app_shell_flow=${createAppShellFlowToken({
+        userId,
+        state: 'a-different-attempt-token',
+      })}`;
+      const { GET } = await import('./route');
+      const response = await GET(shellRequest(callbackPath(token, 'delete'), cookie));
+
+      // The cookie says this browser is in the app, so it stays there.
+      expectRedirectLocation(response, '/app-shell/expired');
+      expect(mockedConsumeWithoutSession).not.toHaveBeenCalled();
+    } finally {
+      await deleteShellState(token);
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
+    }
+  });
+
+  test('a matched flow cookie with an expired install state lands on the shell terminal page', async () => {
+    const userId = await createShellUser();
+    const token = await stateModule.createInstallState({
+      kiloUserId: userId,
+      ownerType: 'user',
+      ownerId: userId,
+      githubAppType: 'standard',
+      returnTo: '/app-shell/github-app',
+    });
+    const cookie = `kilo_app_shell_flow=${createAppShellFlowToken({ userId, state: token })}`;
+    await deleteShellState(token);
+    try {
+      const { GET } = await import('./route');
+      const response = await GET(shellRequest(callbackPath(token, 'delete'), cookie));
+
+      expectRedirectLocation(response, '/app-shell/expired');
+      expect(mockedConsumeWithoutSession).not.toHaveBeenCalled();
+    } finally {
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
+    }
+  });
+
+  test('a shell install state naming a blocked account ends in the shell', async () => {
+    const userId = await createShellUser();
+    const token = await stateModule.createInstallState({
+      kiloUserId: userId,
+      ownerType: 'user',
+      ownerId: userId,
+      githubAppType: 'standard',
+      returnTo: '/app-shell/github-app',
+    });
+    await db
+      .update(kilocode_users)
+      .set({ blocked_at: new Date().toISOString(), blocked_reason: 'abuse' })
+      .where(eq(kilocode_users.id, userId));
+    try {
+      const cookie = `kilo_app_shell_flow=${createAppShellFlowToken({ userId, state: token })}`;
+      const { GET } = await import('./route');
+      const response = await GET(shellRequest(callbackPath(token, 'delete'), cookie));
+
+      expectRedirectLocation(response, '/app-shell/account-unavailable');
+    } finally {
+      await deleteShellState(token);
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
+    }
+  });
+
+  test('the matching flow cookie completes the install and consumes the state', async () => {
+    const userId = await createShellUser();
+    const token = await stateModule.createInstallState({
+      kiloUserId: userId,
+      ownerType: 'user',
+      ownerId: userId,
+      githubAppType: 'standard',
+      returnTo: '/app-shell/github-app',
+    });
+    try {
+      const cookie = `kilo_app_shell_flow=${createAppShellFlowToken({ userId, state: token })}`;
+      const { GET } = await import('./route');
+      const response = await GET(shellRequest(callbackPath(token, 'delete'), cookie));
+
+      expectRedirectLocation(response, '/app-shell/github-app?github_action=delete');
+      const [state] = await db
+        .select({ consumedAt: github_install_states.consumed_at })
+        .from(github_install_states)
+        .where(eq(github_install_states.token, token));
+      expect(state.consumedAt).not.toBeNull();
+    } finally {
+      await deleteShellState(token);
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
+    }
   });
 });

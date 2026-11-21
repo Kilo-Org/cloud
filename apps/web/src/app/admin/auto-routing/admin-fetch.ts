@@ -1,19 +1,18 @@
 import * as z from 'zod';
 
-const AdminApiErrorSchema = z.object({ error: z.string().optional() });
+const AdminApiErrorSchema = z.object({ error: z.string().min(1), message: z.string().optional() });
+
+async function adminErrorMessage(response: Response): Promise<string> {
+  const parsed = AdminApiErrorSchema.safeParse(await response.json().catch(() => undefined));
+  if (!parsed.success) return `Request failed: ${response.status}`;
+  const { error, message } = parsed.data;
+  return message ? `${error}: ${message}` : error;
+}
 
 export async function parseAdminResponse<T extends object>(
   response: Response,
   schema: z.ZodType<T>
 ): Promise<T> {
-  const body: unknown = await response.json();
-  if (!response.ok) {
-    const parsedError = AdminApiErrorSchema.safeParse(body);
-    throw new Error(
-      parsedError.success && parsedError.data.error
-        ? parsedError.data.error
-        : `Request failed: ${response.status}`
-    );
-  }
-  return schema.parse(body);
+  if (!response.ok) throw new Error(await adminErrorMessage(response));
+  return schema.parse(await response.json());
 }

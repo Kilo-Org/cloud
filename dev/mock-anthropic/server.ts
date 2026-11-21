@@ -73,7 +73,13 @@ type IssuedCode = {
 
 const codes = new Map<string, IssuedCode>();
 const usedJtis = new Map<string, number>();
-const recordedRequests: Array<{ method: string; path: string; body: unknown; at: string }> = [];
+const recordedRequests: Array<{
+  method: string;
+  path: string;
+  body: unknown;
+  beta: string | null;
+  at: string;
+}> = [];
 
 function base64url(input: Buffer | string): string {
   return Buffer.from(input).toString('base64url');
@@ -284,6 +290,10 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse)
           ([key]) => !['client_assertion', 'assertion', 'code_verifier', 'code'].includes(key)
         )
       ),
+      beta:
+        typeof request.headers['anthropic-beta'] === 'string'
+          ? request.headers['anthropic-beta']
+          : null,
       at: new Date().toISOString(),
     });
   }

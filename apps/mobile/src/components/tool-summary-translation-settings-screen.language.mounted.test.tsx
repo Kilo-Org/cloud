@@ -28,6 +28,11 @@ vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
 }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+// The model row opens the picker through the guarded push; the picker is mocked
+// here, so the function only has to exist.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => vi.fn(),
+}));
 vi.mock('@/components/ui/icons', () => ({ Cpu: 'Cpu', WandSparkles: 'WandSparkles' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));

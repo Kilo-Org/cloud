@@ -22,6 +22,7 @@ import {
   SessionHistoryFailureError,
 } from '@/components/agents/session-history-failures';
 import { type AgentMode } from '@/components/agents/mode-normalize';
+import { parseCloudAgentSessionId, parseOrganizationScope } from '@/lib/cloud-agent-scope';
 import { CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
 import {
   fetchCloudAgentStreamTicket,
@@ -291,8 +292,11 @@ export function createMobileAgentSessionManager({
   // request closure below reads this binding at call time, so a scope resolved
   // after mount applies without recreating the manager — and without the route
   // re-keying the provider, which would remount the transcript and drop the
-  // composer draft under it.
-  let organizationId = initialOrganizationId;
+  // composer draft under it. The route hands in a param it does not own, so the
+  // scope is validated here too: every org-scoped request below validates it as
+  // a UUID, and an invalid value would fail them all with a permanent
+  // `BAD_REQUEST` that no retry can fix.
+  let organizationId = parseOrganizationScope(initialOrganizationId);
   // Last successful `fetchSession` metadata, memoized so `resolveSession` can
   // read `cloud_agent_session_id` without a duplicate serial
   // `cliSessionsV2.get`. It is only consulted when the id matches; any other
@@ -376,8 +380,8 @@ export function createMobileAgentSessionManager({
         cloudAgentSessionId = memo.cloudAgentSessionId;
       } else {
         const session = await trpcClient.cliSessionsV2.get.query({ session_id: kiloSessionId });
-        organizationId ??= session.organization_id ?? undefined;
-        cloudAgentSessionId = session.cloud_agent_session_id as CloudAgentSessionId | null;
+        organizationId ??= parseOrganizationScope(session.organization_id);
+        cloudAgentSessionId = parseCloudAgentSessionId(session.cloud_agent_session_id);
       }
       if (cloudAgentSessionId) {
         return {
@@ -461,12 +465,22 @@ export function createMobileAgentSessionManager({
       return page;
     },
     fetchCloudSession: async sessionId => {
+      // `resolveSession` reports `type: 'cloud-agent'` only for an id, so the
+      // SDK never asks for the metadata of a session that has none. A call
+      // without one is a contract violation, and sending it would be an input
+      // the procedure rejects as invalid (`cloudAgentSessionId` is required):
+      // the open would then spend its retries on a failure no retry can fix.
+      // Refusing it here keeps such a request off the network.
+      const cloudAgentSessionId = parseCloudAgentSessionId(sessionId);
+      if (cloudAgentSessionId === null) {
+        throw new Error('Cloud Agent session metadata requires a session id');
+      }
       const metadata = organizationId
         ? await trpcClient.organizations.cloudAgentNext.getSession.query({
-            cloudAgentSessionId: sessionId,
+            cloudAgentSessionId,
             organizationId,
           })
-        : await trpcClient.cloudAgentNext.getSession.query({ cloudAgentSessionId: sessionId });
+        : await trpcClient.cloudAgentNext.getSession.query({ cloudAgentSessionId });
       return metadata;
     },
     api: {
@@ -617,9 +631,8 @@ export function createMobileAgentSessionManager({
       // The route mounted before its metadata read could settle (offline or
       // stalled): adopt the organization this read resolves so org-scoped
       // requests carry it. An explicit route scope always wins.
-      organizationId ??= sessionResult.organization_id ?? undefined;
-      const cloudAgentSessionId =
-        sessionResult.cloud_agent_session_id as CloudAgentSessionId | null;
+      organizationId ??= parseOrganizationScope(sessionResult.organization_id);
+      const cloudAgentSessionId = parseCloudAgentSessionId(sessionResult.cloud_agent_session_id);
       // Memoize the metadata `resolveSession` needs so it never re-reads the row.
       fetchedMetadata = { sessionId: kiloSessionId, cloudAgentSessionId };
       const rs = sessionResult.runtimeState;
@@ -627,7 +640,7 @@ export function createMobileAgentSessionManager({
         kiloSessionId,
         cloudAgentSessionId,
         title: sessionResult.title,
-        organizationId: sessionResult.organization_id,
+        organizationId: parseOrganizationScope(sessionResult.organization_id) ?? null,
         profileId: sessionResult.profile_id,
         gitUrl: sessionResult.git_url,
         gitBranch: rs?.upstreamBranch ?? sessionResult.git_branch,

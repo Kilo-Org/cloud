@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- one file testing the whole ported security-agent
    presentation module (list/deadline + details/analysis/remediation); the
    coverage is the point, splitting by describe block would just scatter it. */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   formatRemediationOrigin,
@@ -17,9 +17,13 @@ import {
   getSecurityDeadlinePresentation,
   getSecurityFindingAnalysisState,
   getSupersedingFindingId,
+  hasRegisteredRemediationAttempt,
   isActiveRemediationStatus,
+  isSupersededFinding,
+  remediationNeedsAnalysisRefresh,
   type SecurityFinding,
   type SecurityFindingAnalysis,
+  type SecurityRemediationSignal,
 } from './presentation';
 
 type SandboxAnalysis = NonNullable<SecurityFindingAnalysis['sandboxAnalysis']>;
@@ -294,12 +298,92 @@ describe('getSecurityDeadlinePresentation', () => {
     expect(getSecurityDeadlinePresentation(dismissed, now)).toMatchObject({ label: 'Dismissed' });
   });
 
+  it('renders the dismissed detail with an Invalid Date label for an unparseable timestamp', () => {
+    const dismissed = makeFinding({ status: 'ignored', updated_at: '' });
+    expect(getSecurityDeadlinePresentation(dismissed, now)).toMatchObject({
+      label: 'Dismissed',
+      detail: 'Dismissed Invalid Date',
+    });
+  });
+
   it('reports no deadline set when sla_due_at is null', () => {
     const finding = makeFinding({ status: 'open', sla_due_at: null });
     expect(getSecurityDeadlinePresentation(finding, now)).toMatchObject({
       label: 'Deadline not set',
       tone: 'neutral',
     });
+  });
+
+  it('writes the deadline detail with the reused short-date formatter', () => {
+    // formatFindingDate is a memoized short-date formatter reused across rows.
+    // The reference string comes from the same zone and options, so this holds
+    // in every host timezone, like the local-component fixtures above.
+    const finding = makeFinding({ status: 'fixed', fixed_at: '2026-07-01 12:00:00+00' });
+    const expected = new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }).format(new Date('2026-07-01T12:00:00Z'));
+    expect(getSecurityDeadlinePresentation(finding, now).detail).toBe(`Fixed ${expected}`);
+  });
+
+  it('rebuilds the memoized date formatter after a device zone move', () => {
+    // The memoized formatter resolves its zone when built; a device that moves
+    // zones must rebuild it or keep writing the old wall clock (the same guard
+    // the mobile intl-cache describes). Drive the probe inputs the helper
+    // reads — the wall clock and the zone the no-argument probe resolves —
+    // then flip the zone between two renders of the same fixed date.
+    const finding = makeFinding({ status: 'fixed', fixed_at: '2026-07-01 12:00:00+00' });
+    const RealDateTimeFormat = Intl.DateTimeFormat;
+    // Zones whose wall clock puts the Jul 1 noon-UTC fixed date on a different
+    // calendar day: UTC-11 midday reads Jul 1, UTC+14 midnight reads Jul 2.
+    const zoneAt = { value: 'Pacific/Midway' };
+    const formatIn = (at: Date): string =>
+      `Fixed ${new RealDateTimeFormat('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        timeZone: zoneAt.value,
+      }).format(at)}`;
+    const mock = vi
+      .spyOn(Intl, 'DateTimeFormat')
+      // The zone probe constructs with an undefined locale; every other call
+      // keeps the real behavior so the memoized formatter renders real bits.
+      // Bound through Reflect.construct so the mock stays constructible.
+      .mockImplementation(function (...args: ConstructorParameters<typeof Intl.DateTimeFormat>) {
+        // A real device resolves its zone inside every unzoned construction:
+        // both the guard's probe `(undefined, {})` and the memoized rebuild
+        // `(en-US, FINDING_DATE_OPTIONS)` must read `zoneAt.value`, or the
+        // rebuilt formatter would render the host zone, not the moved zone.
+        return Reflect.construct(RealDateTimeFormat, [
+          args[0],
+          { ...(args[1] as Intl.DateTimeFormatOptions), timeZone: zoneAt.value },
+        ]);
+      } as unknown as typeof Intl.DateTimeFormat);
+    // Module state from the preceding tests is live: a formatter built in the
+    // host zone is cached and the probe clock is fresh. Own the wall clock for
+    // the whole test and stage it past the probe window between renders, so
+    // each render re-probes and the zone move is really observed.
+    const t0 = Date.now();
+    const advance = vi.spyOn(Date, 'now').mockReturnValue(t0 + 2000);
+    try {
+      // The fixed-at instant is noon UTC; Pacific/Midway (UTC-11) reads Jul 1.
+      expect(getSecurityDeadlinePresentation(finding, now).detail).toBe(
+        formatIn(new Date('2026-07-01T12:00:00Z'))
+      );
+
+      // Move the device zone to UTC+14, whose midnight already reads Jul 2,
+      // and step the clock past the one-second probe window again; the next
+      // call must rebuild and re-render the day boundary.
+      advance.mockReturnValue(t0 + 4000);
+      zoneAt.value = 'Pacific/Kiritimati';
+      expect(getSecurityDeadlinePresentation(finding, now).detail).toBe(
+        formatIn(new Date('2026-07-01T12:00:00Z'))
+      );
+    } finally {
+      advance.mockRestore();
+      mock.mockRestore();
+    }
   });
 
   it.each<[string, string, string, string, number?]>([
@@ -388,6 +472,16 @@ describe('getFindingLifecycleStatusPresentation', () => {
       )
     ).toMatchObject({ label: 'Superseded', tone: 'neutral' });
   });
+
+  it('does not call a non-ignored finding superseded', () => {
+    // A superseded reason only means superseded while the row is ignored; a
+    // fixed row that kept the reason shows its own status.
+    expect(
+      getFindingLifecycleStatusPresentation(
+        makeFinding({ status: 'fixed', ignored_reason: 'superseded:finding-2' })
+      )
+    ).toMatchObject({ label: 'Fixed', tone: 'success' });
+  });
 });
 
 describe('getSupersedingFindingId', () => {
@@ -404,6 +498,31 @@ describe('getSupersedingFindingId', () => {
       getSupersedingFindingId(makeFinding({ status: 'ignored', ignored_reason: 'not_exploitable' }))
     ).toBeNull();
     expect(getSupersedingFindingId(makeFinding({ status: 'open' }))).toBeNull();
+  });
+});
+
+describe('isSupersededFinding', () => {
+  it('is true only for an ignored finding that names its replacement', () => {
+    expect(
+      isSupersededFinding(
+        makeFinding({ status: 'ignored', ignored_reason: 'superseded:finding-2' })
+      )
+    ).toBe(true);
+  });
+
+  it('is false for a dismissed finding without a replacement', () => {
+    expect(
+      isSupersededFinding(makeFinding({ status: 'ignored', ignored_reason: 'not_used' }))
+    ).toBe(false);
+  });
+
+  it('is false when a row kept the replacement reference after leaving ignored', () => {
+    // Both surfaces derive their superseding id through this predicate, so a
+    // stale reference on a fixed row must not read as superseded.
+    expect(
+      isSupersededFinding(makeFinding({ status: 'fixed', ignored_reason: 'superseded:finding-2' }))
+    ).toBe(false);
+    expect(isSupersededFinding(makeFinding({ status: 'open' }))).toBe(false);
   });
 });
 
@@ -667,6 +786,119 @@ describe('getRemediationUnavailableCopy', () => {
     expect(getRemediationUnavailableCopy('toString')).toBe(
       'Remediation is unavailable for this finding.'
     );
+  });
+});
+
+// The rule shared with web's FindingDetailDialog and the mobile detail panels.
+function makeRemediationSignal(
+  overrides: Partial<SecurityRemediationSignal> = {}
+): SecurityRemediationSignal {
+  return { remediationAttempts: [], ...overrides };
+}
+
+function staleCapability(
+  reasons: { startReason?: string | null; retryReason?: string | null } = {
+    startReason: 'stale_analysis',
+  }
+) {
+  return {
+    startReason: reasons.startReason ?? null,
+    retryReason: reasons.retryReason ?? null,
+  };
+}
+
+describe('hasRegisteredRemediationAttempt', () => {
+  it('reports no attempt for the empty signal', () => {
+    expect(hasRegisteredRemediationAttempt(makeRemediationSignal())).toBe(false);
+  });
+
+  it('counts an attempt in the history list', () => {
+    expect(
+      hasRegisteredRemediationAttempt(makeRemediationSignal({ remediationAttempts: [{}] }))
+    ).toBe(true);
+  });
+
+  it('counts a summary latest attempt id', () => {
+    expect(
+      hasRegisteredRemediationAttempt(
+        makeRemediationSignal({ remediationSummary: { latestAttemptId: 'attempt-1' } })
+      )
+    ).toBe(true);
+  });
+
+  it('counts a nested latest attempt id', () => {
+    expect(
+      hasRegisteredRemediationAttempt(
+        makeRemediationSignal({ remediationSummary: { latestAttempt: { id: 'attempt-1' } } })
+      )
+    ).toBe(true);
+  });
+});
+
+describe('remediationNeedsAnalysisRefresh', () => {
+  it('refreshes when a stale start reason has no attempt', () => {
+    expect(
+      remediationNeedsAnalysisRefresh(
+        makeRemediationSignal({ remediationCapability: staleCapability() })
+      )
+    ).toBe(true);
+  });
+
+  it('refreshes on a stale retry reason', () => {
+    expect(
+      remediationNeedsAnalysisRefresh(
+        makeRemediationSignal({
+          remediationCapability: staleCapability({ retryReason: 'stale_analysis' }),
+        })
+      )
+    ).toBe(true);
+  });
+
+  it('stays quiet once an attempt exists in the history', () => {
+    expect(
+      remediationNeedsAnalysisRefresh(
+        makeRemediationSignal({
+          remediationAttempts: [{}],
+          remediationCapability: staleCapability(),
+        })
+      )
+    ).toBe(false);
+  });
+
+  it('stays quiet when the summary records a latest attempt id', () => {
+    expect(
+      remediationNeedsAnalysisRefresh(
+        makeRemediationSignal({
+          remediationCapability: staleCapability(),
+          remediationSummary: { latestAttemptId: 'attempt-1' },
+        })
+      )
+    ).toBe(false);
+  });
+
+  it('stays quiet when the summary records a nested attempt id', () => {
+    expect(
+      remediationNeedsAnalysisRefresh(
+        makeRemediationSignal({
+          remediationCapability: staleCapability(),
+          remediationSummary: { latestAttempt: { id: 'attempt-1' } },
+        })
+      )
+    ).toBe(false);
+  });
+
+  it('stays quiet for an unrelated rejection reason', () => {
+    expect(
+      remediationNeedsAnalysisRefresh(
+        makeRemediationSignal({
+          remediationCapability: staleCapability({ startReason: 'analysis_required' }),
+        })
+      )
+    ).toBe(false);
+  });
+
+  it('stays quiet when the capability is missing', () => {
+    expect(remediationNeedsAnalysisRefresh(makeRemediationSignal())).toBe(false);
   });
 });
 

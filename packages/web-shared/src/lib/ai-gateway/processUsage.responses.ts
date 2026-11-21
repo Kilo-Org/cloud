@@ -3,7 +3,6 @@ import type { EventSourceMessage } from 'eventsource-parser';
 import { captureMessage, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
 import { z } from 'zod';
-import { sentryRootSpan } from '../getRootSpan';
 import type { ProviderType } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type {
   JustTheCostsUsageStats,
@@ -17,6 +16,7 @@ import {
   contentPartSchema,
   drainSseStream,
   extractVercelUpstreamId,
+  nonEmptyStringSchema,
   reportUpstreamStreamError,
   selectUsageCostFields,
   upstreamStreamErrorSchema,
@@ -62,6 +62,16 @@ const responseEventSchema = z
         'response.queued',
       ].includes(event.type) || event.response != null
   );
+
+// Every `*.delta` event streams generated output: text, refusals, reasoning,
+// tool-call arguments, or audio. A tool call's name arrives with its item.
+const generatedOutputEventSchema = z.union([
+  z.looseObject({ type: z.string().endsWith('.delta'), delta: nonEmptyStringSchema }),
+  z.looseObject({
+    type: z.literal('response.output_item.added'),
+    item: z.looseObject({ name: nonEmptyStringSchema }),
+  }),
+]);
 
 const responseOutputItemSchema = z
   .object({
@@ -122,35 +132,19 @@ export async function parseResponsesMicrodollarUsageFromStream(
     name: 'responses-stream-processing',
     op: 'performance',
   });
-  const timeToFirstTokenSpan = startInactiveSpan({
-    name: 'time-to-first-token',
-    op: 'performance',
-  });
-
   let messageId: string | null = null;
   let model: string | null = null;
   let responseContent = '';
   let reportedError = statusCode >= 400;
-  const startedAt = performance.now();
-  let firstTokenReceived = false;
   let usage: ResponsesApiUsage | null = null;
   let providerMetadata: VercelProviderMetaData | null = null;
   let inference_provider: string | null = null;
   let finish_reason: unknown = null;
 
   const onEvent = (event: EventSourceMessage) => {
-    if (!firstTokenReceived) {
-      sentryRootSpan()?.setAttribute(
-        'responses.time_to_first_token_ms',
-        performance.now() - startedAt
-      );
-      firstTokenReceived = true;
-      timeToFirstTokenSpan.end();
-    }
-
     if (event.data === '[DONE]') {
       metadataCapture?.captureVercelMetadata('[DONE]');
-      return;
+      return false;
     }
 
     const payload: unknown = JSON.parse(event.data);
@@ -197,6 +191,8 @@ export async function parseResponsesMicrodollarUsageFromStream(
     if (json.type === 'response.failed' || json.type === 'response.incomplete') {
       reportedError = true;
     }
+
+    return generatedOutputEventSchema.safeParse(payload).success;
   };
 
   const { wasAborted, malformedEventCount, timing } = await drainSseStream(
@@ -204,6 +200,7 @@ export async function parseResponsesMicrodollarUsageFromStream(
     onEvent,
     streamProcessingSpan,
     requestStartedAt,
+    'responses.time_to_first_token_ms',
     () => ({ kiloUserId, provider, messageId, model })
   );
 

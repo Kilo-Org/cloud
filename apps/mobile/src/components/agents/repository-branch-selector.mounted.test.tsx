@@ -26,6 +26,11 @@ vi.mock('expo-router', () => ({
   useRouter: () => router,
   // The selector only builds an href literal; Href stays a type.
 }));
+// The picker opener goes through the guarded push, which forwards to the same
+// router spy asserted below.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => router.push,
+}));
 vi.mock('react-native', async () => {
   const React = await import('react');
   return {
@@ -419,6 +424,18 @@ describe('RepositoryBranchSelector', () => {
     );
 
     expect(texts(renderer)).toContain(i18n.t('agentChat.newSession.bitbucketOrganizationsOnly'));
+    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(0);
+  });
+
+  it('shows the quiet inactive note, not loading, for a disabled row', () => {
+    // en.json alone translates this key until the translation slice lands; the
+    // fallback then resolves the English copy in every catalog.
+    const note = i18n.t('agentChat.newSession.branchInactive');
+    const renderer = mountSelector(githubRow, branchesState({ isEnabled: false }));
+
+    expect(texts(renderer)).toContain(note);
+    expect(renderer.root.findAllByType('Skeleton' as never)).toHaveLength(0);
+    expect(texts(renderer)).not.toContain(i18n.t('agentChat.newSession.branchLoading'));
     expect(renderer.root.findAllByType('Button' as never)).toHaveLength(0);
   });
 

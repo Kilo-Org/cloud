@@ -1,18 +1,24 @@
 import type { Part } from '@kilocode/app-shared/opencode';
+import type { ReadonlyPart } from '../types';
 import type { MessageInfo } from '../types';
 import type { SessionStorage } from './types';
-import { forgetMessageVersions, forgetPartVersion, storageVersions } from './versions';
 import {
-  EMPTY_PARTS,
+  clearStorage,
+  deleteMessageFromStorage,
+  deletePartFromStorage,
+  type StorageContainers,
+} from './lifecycle';
+import type { PartsSnapshot } from './helpers';
+import {
   appendPartTextChunks,
-  clonePart,
+  createPartViewCache,
   createReadonlyPartView,
   createSubscriberRegistry,
-  forgetPartUpdateTime,
   insertSortedBy,
   isSupportedDeltaField,
   messageIdKey,
   publishPartsChanged,
+  readPartsSnapshot,
   upsertPartDroppingStaleSyntheticParts,
 } from './helpers';
 
@@ -21,12 +27,48 @@ function createMemoryStorage(): SessionStorage {
   let messageIds: string[] = [];
 
   const parts = new Map<string, Part[]>();
-  const partsSnapshot = new Map<string, Part[] | null>();
+  const partsSnapshot: PartsSnapshot = new Map<string, readonly ReadonlyPart[] | null>();
+  // Immutable views of the stored parts, per message and kept across snapshot
+  // rebuilds so a rebuild reuses the view of every part that did not change.
+  const partViews = createPartViewCache();
   // Ordering evidence of the last accepted update per part, owned next to the
   // parts it describes (see `upsertPartDroppingStaleSyntheticParts`).
   const partEvidence = new Map<string, number>();
 
   const subscribers = createSubscriberRegistry();
+
+  const containers: StorageContainers = {
+    messages: {
+      has: messageId => messages.has(messageId),
+      remove: messageId => {
+        messages.delete(messageId);
+      },
+      clear: () => messages.clear(),
+      ids: () => messageIds,
+      setIds: ids => {
+        messageIds = ids;
+      },
+    },
+    parts: {
+      get: messageId => parts.get(messageId),
+      set: (messageId, arr) => {
+        parts.set(messageId, arr);
+      },
+      has: messageId => parts.has(messageId),
+      remove: messageId => {
+        parts.delete(messageId);
+      },
+      messageIds: () => [...parts.keys()],
+      clear: () => parts.clear(),
+    },
+    snapshot: partsSnapshot,
+    views: partViews,
+    evidence: partEvidence,
+    subscribers,
+    beforeStructuralChange: () => {},
+    publishPartsRevision: () => {},
+    publishMessagesRevision: () => {},
+  };
 
   const storage: SessionStorage = {
     upsertMessage(info) {
@@ -52,7 +94,14 @@ function createMemoryStorage(): SessionStorage {
       const arr = parts.get(messageId) ?? [];
       parts.set(
         messageId,
-        upsertPartDroppingStaleSyntheticParts(arr, part, eventTime, partEvidence, authoritative)
+        upsertPartDroppingStaleSyntheticParts(
+          messageId,
+          arr,
+          part,
+          eventTime,
+          partEvidence,
+          authoritative
+        )
       );
       publishPartsChanged(partsSnapshot, subscribers, messageId);
     },
@@ -72,73 +121,30 @@ function createMemoryStorage(): SessionStorage {
     },
 
     deletePart(messageId, partId) {
-      forgetPartVersion(storage, messageId, partId);
-      const arr = parts.get(messageId);
-      if (!arr) return;
-      parts.set(
-        messageId,
-        arr.filter(p => p.id !== partId)
-      );
-      forgetPartUpdateTime(partEvidence, messageId, partId);
-      publishPartsChanged(partsSnapshot, subscribers, messageId);
+      deletePartFromStorage(storage, containers, messageId, partId);
     },
 
     getParts(messageId) {
-      const cached = partsSnapshot.get(messageId);
-      if (cached) return cached;
+      return readPartsSnapshot(messageId, parts.get(messageId), partsSnapshot, partViews);
+    },
 
-      const arr = parts.get(messageId);
-      if (!arr || arr.length === 0) return EMPTY_PARTS;
+    getPart(messageId, partId) {
+      const part = parts.get(messageId)?.find(item => item.id === partId);
+      return part ? createReadonlyPartView(part) : undefined;
+    },
 
-      const snapshot = arr.map(part => createReadonlyPartView(clonePart(part)));
-      partsSnapshot.set(messageId, snapshot);
-      return snapshot;
+    getPartIds(messageId) {
+      return (parts.get(messageId) ?? []).map(p => p.id);
     },
 
     subscribe: subscribers.subscribe,
 
     clear() {
-      storageVersions.delete(storage);
-      const existingMessageIds = [...messageIds];
-      const existingPartMessageIds = [...parts.keys()];
-
-      messages.clear();
-      messageIds = [];
-      parts.clear();
-      partsSnapshot.clear();
-      partEvidence.clear();
-
-      for (const messageId of existingMessageIds) {
-        subscribers.notifyMessage(messageId);
-      }
-      for (const messageId of existingPartMessageIds) {
-        subscribers.notifyParts(messageId);
-      }
-      subscribers.notifyMessageIds();
+      clearStorage(storage, containers);
     },
 
     deleteMessage(messageId) {
-      forgetMessageVersions(storage, messageId);
-      // A part delta can create parts before the message row (see
-      // `applyPartDelta`), so part state is dropped regardless of the row.
-      const hadMessage = messages.delete(messageId);
-      if (hadMessage) {
-        messageIds = messageIds.filter(id => id !== messageId);
-      }
-
-      const hadParts = parts.has(messageId);
-      for (const part of parts.get(messageId) ?? []) {
-        forgetPartUpdateTime(partEvidence, messageId, part.id);
-      }
-      parts.delete(messageId);
-      partsSnapshot.delete(messageId);
-      if (hadParts) {
-        subscribers.notifyParts(messageId);
-      }
-
-      if (!hadMessage) return;
-      subscribers.notifyMessage(messageId);
-      subscribers.notifyMessageIds();
+      deleteMessageFromStorage(storage, containers, messageId);
     },
   };
   return storage;

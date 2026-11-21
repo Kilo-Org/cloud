@@ -400,6 +400,7 @@ describe('prepareReviewPayload', () => {
       observed: true,
     });
     expect(mockUpdateRepositoryReviewInstructionsMetadata).toHaveBeenCalledWith(review.id, {
+      imports: [],
       used: true,
       ref: 'main',
       truncated: false,
@@ -721,6 +722,7 @@ describe('prepareReviewPayload', () => {
       })
     );
     expect(mockUpdateRepositoryReviewInstructionsMetadata).toHaveBeenCalledWith(review.id, {
+      imports: [],
       used: true,
       ref: 'main',
       truncated: false,
@@ -1039,6 +1041,7 @@ describe('prepareReviewPayload', () => {
       expect.objectContaining({ repositoryReviewInstructions: null })
     );
     expect(mockUpdateRepositoryReviewInstructionsMetadata).toHaveBeenCalledWith(review.id, {
+      imports: [],
       used: false,
       ref: null,
       truncated: false,
@@ -1089,6 +1092,7 @@ describe('prepareReviewPayload', () => {
       expect.objectContaining({ repositoryReviewInstructions: null })
     );
     expect(mockUpdateRepositoryReviewInstructionsMetadata).toHaveBeenCalledWith(review.id, {
+      imports: [],
       used: false,
       ref: null,
       truncated: false,
@@ -1116,6 +1120,7 @@ describe('prepareReviewPayload', () => {
       expect.objectContaining({ repositoryReviewInstructions: null })
     );
     expect(mockUpdateRepositoryReviewInstructionsMetadata).toHaveBeenCalledWith(review.id, {
+      imports: [],
       used: false,
       ref: null,
       truncated: false,
@@ -1148,6 +1153,7 @@ describe('prepareReviewPayload', () => {
       expect.objectContaining({ repositoryReviewInstructions: null })
     );
     expect(mockUpdateRepositoryReviewInstructionsMetadata).toHaveBeenCalledWith(review.id, {
+      imports: [],
       used: false,
       ref: null,
       truncated: false,
@@ -1186,6 +1192,7 @@ describe('prepareReviewPayload', () => {
       expect.objectContaining({ repositoryReviewInstructions: null })
     );
     expect(mockUpdateRepositoryReviewInstructionsMetadata).toHaveBeenCalledWith(review.id, {
+      imports: [],
       used: false,
       ref: null,
       truncated: false,
@@ -1197,7 +1204,7 @@ describe('prepareReviewPayload', () => {
       .insert(cloud_agent_code_reviews)
       .values(defineReview(testUser.id, integration.id))
       .returning();
-    mockFetchGitHubRootTextFileAtRef.mockResolvedValueOnce('a'.repeat(10_005));
+    mockFetchGitHubRootTextFileAtRef.mockResolvedValueOnce('a'.repeat(20_005));
 
     await prepareReviewPayload({
       reviewId: review.id,
@@ -1207,6 +1214,7 @@ describe('prepareReviewPayload', () => {
     });
 
     expect(mockUpdateRepositoryReviewInstructionsMetadata).toHaveBeenCalledWith(review.id, {
+      imports: [],
       used: true,
       ref: 'main',
       truncated: true,
@@ -1217,7 +1225,7 @@ describe('prepareReviewPayload', () => {
       123,
       expect.objectContaining({
         repositoryReviewInstructions: expect.stringContaining(
-          '[REVIEW.md truncated after 10000 characters.]'
+          '[REVIEW.md truncated after 20000 characters.]'
         ),
       })
     );

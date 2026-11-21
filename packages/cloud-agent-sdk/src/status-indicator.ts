@@ -50,13 +50,33 @@ export function indicatorForStatus(s: AgentStatus): SessionStatusIndicator | nul
       ...(s.code ? { code: s.code } : {}),
     } satisfies SessionStatusIndicator;
   }
-  if (s.type === 'disconnected')
+  if (s.type === 'disconnected') {
+    // A drop the transport recovers from on its own is a warning: the session
+    // is still alive and the socket is already reopening.
+    if (s.reconnecting === true)
+      return {
+        type: 'warning',
+        message: 'Reconnecting…',
+        timestamp: now,
+        code: 'agent-connection-reconnecting',
+      };
+    if (s.code === 'connection-lost') {
+      // The exhausted loss carries the classified connection copy, so the
+      // indicator and the error sink state the same message.
+      return {
+        type: 'error',
+        message: 'Connection lost. Please retry in a moment.',
+        timestamp: now,
+        code: s.code,
+      };
+    }
     return {
       type: 'error',
       message: 'Agent connection lost',
       timestamp: now,
       code: 'agent-connection-lost',
     };
+  }
   if (s.type === 'error')
     return {
       type: 'error',

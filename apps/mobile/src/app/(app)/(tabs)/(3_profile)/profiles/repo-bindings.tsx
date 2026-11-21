@@ -3,7 +3,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { RepoBindingsScreen } from '@/components/profiles/repo-bindings-screen';
 import { useLeaveStaleProfileScope } from '@/lib/hooks/use-leave-stale-profile-scope';
 import { useRepairProfileRouteStack } from '@/lib/hooks/use-repair-profile-route-stack';
-import { getRepoBindingsPath } from '@/lib/profile-agent-navigation';
+import { getProfilesPath, getRepoBindingsPath } from '@/lib/profile-agent-navigation';
 import {
   EXTERNAL_OPENERS,
   LIST_CHILD_PARENTS,
@@ -37,6 +37,7 @@ export default function RepoBindingsRoute() {
       organizationId={organizationId}
       stack="profileTab"
       openedFrom={openedFrom ?? undefined}
+      backFallback={getProfilesPath()}
     />
   );
 }

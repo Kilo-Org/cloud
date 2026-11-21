@@ -1,4 +1,4 @@
-import { type GlanceableAgentsSnapshotStatus } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { type GlanceableSnapshotStatusOverride } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { type SessionLiveOutcomeKind } from '@kilocode/notifications/schemas';
 
 import { APPROVAL_ROWS, combinationRows, many, mixedRows, roundWake } from './fixture-rows';
@@ -48,7 +48,7 @@ export type GlanceableFixtureRow = {
 export type GlanceableFixture = {
   description: string;
   /** Overrides the happy/empty derivation, exactly as the publisher does. */
-  status?: Exclude<GlanceableAgentsSnapshotStatus, 'happy' | 'empty'>;
+  status?: GlanceableSnapshotStatusOverride;
   /** Minutes since the last successful confirmation. */
   checkedAgo?: number;
   rows?: (now: number) => GlanceableFixtureRow[];
@@ -165,6 +165,26 @@ export const GLANCEABLE_FIXTURES = {
       },
       { status: 'busy', ago: 9, title: 'Write the release notes' },
       { status: 'idle', ago: 33, title: 'Triage new issues' },
+    ],
+  },
+  'thai-titles': {
+    description: 'Only running, with Thai session titles (tall fallback line box).',
+    rows: () => [
+      { status: 'busy', ago: 2, title: 'แก้ไขการทดสอบเข้าสู่ระบบที่ไม่เสถียร' },
+      { status: 'busy', ago: 11, title: 'เขียนบันทึกประจำรุ่น' },
+      { status: 'busy', ago: 19, title: 'ตรวจสอบรายการเซสชัน' },
+    ],
+  },
+  'myanmar-titles': {
+    description: 'Only running, with Myanmar session titles (tallest fallback line box).',
+    rows: () => [
+      {
+        status: 'busy',
+        ago: 2,
+        title: 'မတည်ငြိမ်သော လော့ဂ်အင် စမ်းသပ်မှုကို ပြင်ဆင်ခြင်း',
+      },
+      { status: 'busy', ago: 11, title: 'ထွက်ရှိမှု မှတ်စုများ ရေးသားခြင်း' },
+      { status: 'busy', ago: 19, title: 'ဆက်ရှင်စာရင်းကို စစ်ဆေးခြင်း' },
     ],
   },
   approving: {

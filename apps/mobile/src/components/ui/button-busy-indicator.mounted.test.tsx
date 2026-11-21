@@ -103,6 +103,7 @@ describe('Button busy mark', () => {
     );
     expect(track.props.style).toMatchObject({ borderColor: ink });
   });
+
   it.each(['default', 'icon'] as const)(
     'leaves the native iOS spinner unobstructed for size %s',
     size => {

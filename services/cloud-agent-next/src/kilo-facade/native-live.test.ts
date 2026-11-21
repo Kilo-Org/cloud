@@ -65,7 +65,7 @@ describe('readNativeLiveOperation', () => {
   it('reports a stopped runtime as not_ready instead of proxying anywhere', async () => {
     const read = vi.fn(async () => ({
       ok: false as const,
-      error: { code: 'not_ready', message: 'Live runtime is not ready', retryable: true },
+      error: { code: 'runtime_offline', message: 'Live runtime is not ready', retryable: true },
     }));
     const outcome = await readNativeLiveOperation(readParams({ name: 'session.status' }, read));
     expect(outcome).toEqual({ kind: 'not_ready', message: 'Live runtime is not ready' });
@@ -93,6 +93,23 @@ describe('readNativeLiveOperation', () => {
       }))
     );
     expect(outcome).toEqual({ kind: 'ok', body: {} });
+  });
+
+  it('returns only the board owned by the requested session', async () => {
+    const board = { ownerSessionID: kiloSessionId, revision: 0, messages: [], hasMore: false };
+    await expect(
+      readNativeLiveOperation(
+        readParams({ name: 'session.board' }, async () => ({ ok: true, result: board }))
+      )
+    ).resolves.toEqual({ kind: 'ok', body: board });
+    await expect(
+      readNativeLiveOperation(
+        readParams({ name: 'session.board' }, async () => ({
+          ok: true,
+          result: { ...board, ownerSessionID: 'ses_ffffffffffffffffffffffffff' },
+        }))
+      )
+    ).resolves.toMatchObject({ kind: 'failed', code: 'KILO_UPSTREAM_RESPONSE_INVALID' });
   });
 
   it('rejects a native session detail that names a different session', async () => {

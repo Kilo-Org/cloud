@@ -42,9 +42,11 @@ const DROPPED_MARKUP_CASES: Array<[label: string, markup: string, expected: stri
     '<a>click</a>',
   ],
   [
+    // The reference decodes only after the target resolves, so the link is now
+    // an absolute kilo.ai URL: a non-legal destination, keeping its words alone.
     'an entity-encoded javascript: link',
     `<a href="&#106;avascript:alert(1)">click</a>`,
-    '<a>click</a>',
+    '<span>click</span>',
   ],
   [
     'a data: link',
@@ -87,7 +89,7 @@ describe('extractLegalMainHtml', () => {
     const result = extractMain(`
       <div class="wrapper" style="color:red" data-sentry-component="Legal">
         <h1 id="terms">Terms of Service</h1>
-        <p>Read the <a href="/support" target="_blank" rel="noreferrer noopener">support policy</a>.</p>
+        <p>Read the <a href="https://support.example.com/support" target="_blank" rel="noreferrer noopener">support policy</a>.</p>
         <p>Text with <strong>bold</strong>, <em>emphasis</em>, <code>code</code> and <sup>1</sup>.</p>
         <ul><li>One</li><li>Two</li></ul>
         <ol start="3"><li>Three</li></ol>
@@ -98,7 +100,7 @@ describe('extractLegalMainHtml', () => {
     `);
 
     expect(result).toContain('<h1 id="terms">Terms of Service</h1>');
-    expect(result).toContain('href="https://kilo.ai/support"');
+    expect(result).toContain('href="https://support.example.com/support"');
     expect(result).toContain('target="_blank"');
     expect(result).toContain('rel="noreferrer noopener"');
     expect(result).toContain('<strong>bold</strong>');
@@ -116,20 +118,71 @@ describe('extractLegalMainHtml', () => {
     expect(result).not.toContain('data-sentry');
   });
 
+  test('absolutizes a relative target that carries a query string', () => {
+    expect(extractMain('<img src="/logo.png?w=800&amp;q=75" alt="Logo">')).toBe(
+      '<img src="https://kilo.ai/logo.png?w=800&amp;q=75" alt="Logo" />'
+    );
+  });
+
   test('keeps entity text readable', () => {
     expect(extractMain('<p>a &amp; b &lt;tag&gt;</p>')).toBe('<p>a &amp; b &lt;tag&gt;</p>');
   });
 
   test('pairs new-tab links with the site-wide rel convention', () => {
-    expect(extractMain('<a href="/x" target="_blank">one</a>')).toBe(
-      '<a href="https://kilo.ai/x" target="_blank" rel="noopener noreferrer">one</a>'
+    expect(extractMain('<a href="https://support.example.com/x" target="_blank">one</a>')).toBe(
+      '<a href="https://support.example.com/x" target="_blank" rel="noopener noreferrer">one</a>'
     );
-    expect(extractMain('<a href="/y" target="_blank" rel="nofollow">two</a>')).toBe(
-      '<a href="https://kilo.ai/y" target="_blank" rel="nofollow noopener noreferrer">two</a>'
+    expect(
+      extractMain('<a href="https://support.example.com/y" target="_blank" rel="nofollow">two</a>')
+    ).toBe(
+      '<a href="https://support.example.com/y" target="_blank" rel="nofollow noopener noreferrer">two</a>'
     );
-    expect(extractMain('<a href="/z">three</a>')).toBe('<a href="https://kilo.ai/z">three</a>');
-    expect(extractMain('<a href="/w" target="_BLANK">four</a>')).toBe(
-      '<a href="https://kilo.ai/w" target="_BLANK" rel="noopener noreferrer">four</a>'
+    expect(extractMain('<a href="mailto:hi@kilo.ai">three</a>')).toBe(
+      '<a href="mailto:hi@kilo.ai">three</a>'
     );
+    expect(extractMain('<a href="https://support.example.com/w" target="_BLANK">four</a>')).toBe(
+      '<a href="https://support.example.com/w" target="_BLANK" rel="noopener noreferrer">four</a>'
+    );
+  });
+
+  test('keeps only the legal kilo.ai destinations as links', () => {
+    expect(extractMain('<a href="/terms">terms</a>')).toBe(
+      '<a href="https://kilo.ai/terms">terms</a>'
+    );
+    expect(extractMain('<a href="/privacy/apps">apps</a>')).toBe(
+      '<a href="https://kilo.ai/privacy/apps">apps</a>'
+    );
+    expect(extractMain('<a href="mailto:hi@kilo.ai">email</a>')).toBe(
+      '<a href="mailto:hi@kilo.ai">email</a>'
+    );
+  });
+
+  test.each([
+    ['the pricing page', '<a href="/pricing">pricing</a>', '<span>pricing</span>'],
+    ['a plans page', '<a href="/plans">plans</a>', '<span>plans</span>'],
+    ['a marketing page', '<a href="/features">features</a>', '<span>features</span>'],
+    [
+      'an absolute marketing link',
+      '<a href="https://kilo.ai/pricing">pricing</a>',
+      '<span>pricing</span>',
+    ],
+    ['a relative marketing link', '<a href="pricing">pricing</a>', '<span>pricing</span>'],
+    [
+      'a relative marketing link with a query string',
+      '<a href="/pricing?plan=pro&amp;ref=app">pricing</a>',
+      '<span>pricing</span>',
+    ],
+    [
+      'a copied pricing URL',
+      '<a href="https://kilo.ai/pricing?plan=pro">pricing</a>',
+      '<span>pricing</span>',
+    ],
+    [
+      'a legal page from another host that is not kilo.ai',
+      '<a href="https://www.anaconda.com/legal/terms/terms-of-service">terms</a>',
+      '<a href="https://www.anaconda.com/legal/terms/terms-of-service">terms</a>',
+    ],
+  ])('strips the destination of %s but keeps its words', (_label, markup, expected) => {
+    expect(extractMain(markup)).toBe(expected);
   });
 });

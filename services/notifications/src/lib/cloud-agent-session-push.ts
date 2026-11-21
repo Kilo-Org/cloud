@@ -1,5 +1,6 @@
 import { presenceContextForCliSession, presenceContextForPlatform } from '@kilocode/event-service';
 import {
+  classifyCloudAgentSessionPush,
   cloudAgentSessionCategorySchema,
   sendCloudAgentSessionNotificationInputSchema,
   sendSessionReadyNotificationInputSchema,
@@ -62,10 +63,8 @@ export function raiseIdForWaitingRow(row: {
 /** Per-category preference columns, shared with the rest of the notification pipeline. */
 export type UserNotificationPreferences = {
   agentPushEnabled: boolean;
-  chatMessagesEnabled: boolean;
   agentAttentionEnabled: boolean;
   sessionStatusEnabled: boolean;
-  kiloclawActivityEnabled: boolean;
   balanceAlertsEnabled: boolean;
   spendAlertsEnabled: boolean;
   securityFindingsEnabled: boolean;
@@ -74,10 +73,8 @@ export type UserNotificationPreferences = {
 /** Default-on value used when a preference read returns no row. */
 export const DEFAULT_USER_NOTIFICATION_PREFERENCES: UserNotificationPreferences = {
   agentPushEnabled: true,
-  chatMessagesEnabled: true,
   agentAttentionEnabled: true,
   sessionStatusEnabled: true,
-  kiloclawActivityEnabled: true,
   balanceAlertsEnabled: true,
   spendAlertsEnabled: true,
   securityFindingsEnabled: true,
@@ -223,10 +220,10 @@ export async function dispatchCloudAgentSessionPush(
   deps: DispatchCloudAgentSessionPushDeps
 ): Promise<SendCloudAgentSessionNotificationResult> {
   const parsed = sendCloudAgentSessionNotificationInputSchema.parse(params);
-  // ponytail: Absent `category` is treated as 'status' at the read site
-  // (the existing rolling-deploy default). Producers that omit it keep
-  // being routed through `sessionStatusEnabled`.
-  const category: CloudAgentSessionCategory = parsed.category ?? 'status';
+  // Absent `category` is a status push: the shared classifier applies the
+  // schema default, so the preference gate below cannot disagree with the
+  // push kind and the history category.
+  const category: CloudAgentSessionCategory = classifyCloudAgentSessionPush(parsed);
   return dispatchSessionPush(
     parsed.userId,
     parsed.cliSessionId,

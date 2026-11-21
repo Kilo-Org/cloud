@@ -1,9 +1,20 @@
 /* eslint-disable max-lines -- One module owns the page and lifecycle browser tools; the shared CDP helpers keep their shapes consistent. */
 import { z } from 'zod';
 import { createWebMcpToolCall } from './agent-conversation';
+import {
+  AGENT_TAB_OUTSIDE_GROUP_ERROR,
+  RUN_CODE_UNSUPPORTED_ERROR,
+  ambiguousSelectorError,
+  originPatternMatches,
+  toBrowserOrigin,
+} from './browser-agent-checks';
 import { KILO_BROWSER_TOOL_PREFIX } from './browser-tool-contract';
-import { pressKeyChord } from './browser-tool-interact-actions';
-import type { BrowserToolDialog, BrowserToolResolvedTarget } from './browser-tool-session';
+import type {
+  BrowserToolDialog,
+  BrowserToolResolvedTarget,
+  BrowserToolUniqueTarget,
+  BrowserToolViewportState,
+} from './browser-tool-session';
 import { listInspectableTabsWithTabsApi } from './tab-debugger';
 import type {
   BrowserTabInfo,
@@ -67,21 +78,6 @@ export const MAX_BROWSER_EVALUATE_STRING_LENGTH = 8000;
 const DEFAULT_PAGE_LOAD_TIMEOUT_MS = 15_000;
 const PAGE_LOAD_POLL_INTERVAL_MS = 100;
 
-/** The page methods browser_run_code_unsafe backs; anything else is a named tool error. */
-export const RUN_CODE_SUPPORTED_METHODS = [
-  'click',
-  'content',
-  'evaluate',
-  'fill',
-  'goto',
-  'press',
-  'screenshot',
-  'selectOption',
-  'title',
-  'type',
-  'waitForSelector',
-] as const;
-
 export interface BrowserToolFileChooser {
   readonly backendNodeId?: number;
   readonly nodeId?: number;
@@ -102,17 +98,38 @@ export interface BrowserToolPageActionSession {
   ) => Promise<Record<string, unknown> | undefined>;
   readonly takeDialog: () => BrowserToolDialog | undefined;
   readonly takeFileChooser?: () => BrowserToolFileChooser | undefined;
+  /**
+   * The tab's viewport identity. Every caller view of a tab shares the tab
+   * session's object, so a resize override belongs to the tab. A session
+   * without it (a fake) is its own viewport.
+   */
+  readonly viewportState?: BrowserToolViewportState | undefined;
 }
 
 /** `chrome.tabs` plus the create/remove calls the browser_tabs actions need. */
 export interface BrowserToolPageTabsApi extends BrowserTabsApi {
-  readonly create?: (properties: {
-    readonly url?: string;
-  }) => Promise<BrowserTabInfo> | BrowserTabInfo;
-  readonly remove?: (tabId: number) => Promise<void> | void;
+  readonly create?:
+    | ((properties: {
+        readonly active?: boolean;
+        readonly url?: string;
+      }) => Promise<BrowserTabInfo> | BrowserTabInfo)
+    | undefined;
+  readonly remove?: ((tabId: number) => Promise<void> | void) | undefined;
+}
+
+/** What an agent caller may do with tabs: its grants and its session's group. */
+export interface BrowserAgentAccess {
+  readonly actOrigins: readonly string[];
+  readonly groupTabs?: readonly number[] | undefined;
+  readonly navigateOrigins: readonly string[];
+  readonly readableOrigins: readonly string[];
 }
 
 export interface BrowserToolPageActionOptions {
+  /** Present only for a CLI agent caller: the tab actions enforce the D9 boundary and per-origin grants. */
+  readonly agentAccess?: BrowserAgentAccess | undefined;
+  /** Records a tab the call opened, with the tab that opened it, so the session may use it later. */
+  readonly noteTabCreated?: ((tabId: number, openerTabId: number | undefined) => void) | undefined;
   /** WebMCP discovery across frames; wired to the existing WebMCP runtime. */
   readonly webMcpDiscover?: (tabId: number) => Promise<WebMcpDiscoveryResult | undefined>;
   /** WebMCP execution by tool name; wired to the existing WebMCP runtime. */
@@ -142,7 +159,6 @@ const cdpExceptionSchema = z.object({ text: z.string() });
 const cdpResolveNodeResponseSchema = z.object({
   object: z.object({ objectId: z.string().optional() }).optional(),
 });
-const cdpScreenshotResponseSchema = z.object({ data: z.string().optional() });
 /** `Page.navigate` sets `errorText` when the navigation could not start or resolve. */
 const cdpNavigateResponseSchema = z.object({ errorText: z.string().optional() });
 const navigationHistorySchema = z.object({
@@ -155,7 +171,6 @@ const pageIdentitySchema = z.object({
   title: z.string().optional(),
   url: z.string().optional(),
 });
-const pageScreenshotSchema = z.object({ base64: z.string(), mediaType: z.literal('image/png') });
 
 const fail = (error: string): EvalTabResult => ({ error, ok: false });
 const done = (value: unknown): EvalTabResult => ({ ok: true, value });
@@ -359,7 +374,7 @@ const navigateToUrl = async (
 
 const resolveElementObjectId = async (
   session: BrowserToolPageActionSession,
-  resolved: BrowserToolResolvedTarget
+  resolved: BrowserToolUniqueTarget
 ): Promise<string | undefined> => {
   const response = await session.send(
     'DOM.resolveNode',
@@ -389,6 +404,10 @@ const evaluateFunctionInPage = async (
 
   const resolved = await session.resolveTarget(target);
 
+  if (resolved?.kind === 'ambiguous') {
+    return fail(ambiguousSelectorError(resolved.matches));
+  }
+
   if (resolved === undefined) {
     return fail(`Element was not found for target: ${target}`);
   }
@@ -409,184 +428,15 @@ const evaluateFunctionInPage = async (
   );
 };
 
-const clickExpression = (selector: string): string =>
-  `(() => { const element = document.querySelector(${JSON.stringify(selector)}); if (element === null) { throw new Error('No element matches selector: ' + ${JSON.stringify(selector)}); } element.click(); return true; })()`;
-
-const fillExpression = (selector: string, value: string): string =>
-  `(() => { const element = document.querySelector(${JSON.stringify(selector)}); if (element === null) { throw new Error('No element matches selector: ' + ${JSON.stringify(selector)}); } const proto = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype; const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set; if (setter) { setter.call(element, ${JSON.stringify(value)}); } else { element.value = ${JSON.stringify(value)}; } element.dispatchEvent(new Event('input', { bubbles: true })); element.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`;
-
-const focusExpression = (selector: string): string =>
-  `(() => { const element = document.querySelector(${JSON.stringify(selector)}); if (element === null) { throw new Error('No element matches selector: ' + ${JSON.stringify(selector)}); } element.focus(); return true; })()`;
-
-const selectOptionExpression = (selector: string, values: readonly string[]): string =>
-  `(() => { const element = document.querySelector(${JSON.stringify(selector)}); if (!(element instanceof HTMLSelectElement)) { throw new Error('Element is not a select: ' + ${JSON.stringify(selector)}); } const wanted = ${JSON.stringify(values)}.map(String); for (const option of element.options) { option.selected = wanted.includes(option.value) || wanted.includes((option.textContent ?? '').trim()); } element.dispatchEvent(new Event('input', { bubbles: true })); element.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`;
-
-const waitForSelectorExpression = (selector: string): string =>
-  `document.querySelector(${JSON.stringify(selector)}) !== null`;
-
 /**
- * The `page` argument browser_run_code_unsafe hands the snippet, backed by the
- * session's CDP primitives. Every method the extension cannot back reports a
- * tool error naming the method instead of failing as an undefined call.
+ * Viewports a resize already overrode, so a later resize clears the old
+ * override first. The key is the tab's shared viewport identity, so a resize
+ * from one caller view and the tab's own session agree.
  */
-const createRunCodePage = (
-  session: BrowserToolPageActionSession,
-  now: () => number
-  // oxlint-disable-next-line anti-slop/no-unknown-returns -- the page facade surfaces the page's own untyped values to the snippet by contract.
-): Record<string, (...args: never[]) => Promise<unknown>> => {
-  const handlers = {
-    async click(selector: string): Promise<void> {
-      await runPageExpression(session, clickExpression(selector));
-    },
-    // oxlint-disable-next-line anti-slop/no-unknown-returns -- the page facade hands the snippet the page's own untyped value
-    content(): Promise<unknown> {
-      return runPageExpression(session, 'document.documentElement.outerHTML');
-    },
-    // oxlint-disable-next-line anti-slop/no-unknown-returns -- the page facade hands the snippet the page's own untyped value
-    evaluate(handler: unknown, argument?: unknown): Promise<unknown> {
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- the facade accepts a handler function or pre-stringified source; a function is serialized
-      const source = typeof handler === 'function' ? handler.toString() : String(handler);
+const resizedViewports = new WeakSet<object>();
 
-      return runPageExpression(
-        session,
-        `(${source})(${JSON.stringify(argument === undefined ? null : argument)})`
-      );
-    },
-    async fill(selector: string, value: string): Promise<void> {
-      await runPageExpression(session, fillExpression(selector, value));
-    },
-    async goto(url: string): Promise<{ readonly title: string; readonly url: string }> {
-      const navigationError = await navigateToUrl(session, url);
-
-      if (navigationError !== undefined) {
-        throw new Error(`page.goto could not load ${url}: ${navigationError}`);
-      }
-
-      await waitForPageLoad(session, now);
-
-      return readPageIdentity(session);
-    },
-    async press(key: string): Promise<void> {
-      const pressed = await pressKeyChord(session, key);
-
-      if (!pressed.ok) {
-        throw new Error(pressed.error);
-      }
-    },
-    async screenshot(): Promise<z.infer<typeof pageScreenshotSchema>> {
-      const response = await session.send('Page.captureScreenshot', { format: 'png' });
-      const parsed = cdpScreenshotResponseSchema.safeParse(response);
-
-      return { base64: parsed.success ? (parsed.data.data ?? '') : '', mediaType: 'image/png' };
-    },
-    async selectOption(selector: string, values: string | readonly string[]): Promise<void> {
-      await runPageExpression(
-        session,
-        selectOptionExpression(selector, Array.isArray(values) ? values : [values])
-      );
-    },
-    // oxlint-disable-next-line anti-slop/no-unknown-returns -- the page facade hands the snippet the page's own untyped value
-    title(): Promise<unknown> {
-      return runPageExpression(session, 'document.title');
-    },
-    async type(selector: string, text: string): Promise<void> {
-      await runPageExpression(session, focusExpression(selector));
-      await session.send('Input.insertText', { text });
-    },
-    async waitForSelector(
-      selector: string,
-      options?: { readonly timeout?: number }
-    ): Promise<void> {
-      const requested = options?.timeout;
-      const timeoutMs =
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- snippet-authored options are untyped; validate the timeout before clamping it
-        typeof requested === 'number' && Number.isFinite(requested) && requested > 0
-          ? Math.min(requested, DEFAULT_PAGE_LOAD_TIMEOUT_MS)
-          : DEFAULT_PAGE_LOAD_TIMEOUT_MS;
-      const start = now();
-
-      for (;;) {
-        // eslint-disable-next-line no-await-in-loop -- polling a page condition is inherently sequential
-        if ((await runPageExpression(session, waitForSelectorExpression(selector))) === true) {
-          return;
-        }
-
-        if (now() - start >= timeoutMs) {
-          throw new Error(`Timed out waiting for selector: ${selector}`);
-        }
-
-        // eslint-disable-next-line no-await-in-loop -- polling a page condition is inherently sequential
-        await sleep(PAGE_LOAD_POLL_INTERVAL_MS);
-      }
-    },
-  };
-
-  // oxlint-disable-next-line anti-slop/no-known-value-widening -- the run-code page is a deliberately open facade; unknown members throw at access time.
-  return new Proxy(handlers, {
-    get: (target, property, receiver) => {
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- a Proxy get trap receives arbitrary string or symbol keys; there is no schema to parse
-      if (typeof property === 'symbol' || property === 'then') {
-        return;
-      }
-
-      if (Object.hasOwn(target, property)) {
-        // oxlint-disable-next-line anti-slop/no-reflect-get, typescript-eslint/no-unsafe-return -- a Proxy get trap has no direct member access for a runtime key
-        return Reflect.get(target, property, receiver);
-      }
-
-      throw new Error(
-        `page.${property} is not supported by the Kilo extension. Supported methods: ${RUN_CODE_SUPPORTED_METHODS.join(', ')}.`
-      );
-    },
-  });
-};
-
-// oxlint-disable-next-line anti-slop/no-unknown-returns -- the snippet resolves to the page's own JSON value; the shared serializer guards the result
-type RunCodeSnippet = (page: unknown) => Promise<unknown>;
-
-const runCodeUnsafe = async (
-  session: BrowserToolPageActionSession,
-  args: Record<string, unknown>,
-  now: () => number
-): Promise<EvalTabResult> => {
-  const code = getStringArgument(args, 'code');
-  const filename = getStringArgument(args, 'filename');
-
-  if (code === undefined || code.trim() === '') {
-    return filename === undefined || filename === ''
-      ? fail('browser_run_code_unsafe requires a code argument.')
-      : fail(
-          'browser_run_code_unsafe cannot load code from a file: the Kilo extension has no workspace filesystem. Pass the code inline as a function of `page`.'
-        );
-  }
-
-  let compiled: RunCodeSnippet | undefined = undefined;
-
-  try {
-    // The snippet is model-authored and RCE-equivalent by contract; it runs in the extension runtime with a page object backed by the session primitives.
-    // eslint-disable-next-line eslint/no-new-func, typescript-eslint/no-implied-eval, typescript-eslint/no-unsafe-call, typescript-eslint/no-unsafe-member-access, typescript-eslint/no-unsafe-type-assertion
-    const AsyncFunctionConstructor = Object.getPrototypeOf(async () => {}).constructor as new (
-      ...parameters: string[]
-    ) => RunCodeSnippet;
-
-    compiled = new AsyncFunctionConstructor('page', `return await (${code})(page);`);
-  } catch (error) {
-    return fail(
-      `browser_run_code_unsafe could not compile the snippet: ${error instanceof Error ? error.message : 'unknown error'}`
-    );
-  }
-
-  try {
-    return serializeBrowserEvaluateResult(await compiled(createRunCodePage(session, now)));
-  } catch (error) {
-    return fail(
-      `browser_run_code_unsafe failed: ${error instanceof Error ? error.message : 'unknown error'}`
-    );
-  }
-};
-
-/** Sessions a resize already overrode, so a later resize clears the old override first. */
-const resizedSessions = new WeakSet<BrowserToolPageActionSession>();
+const viewportKeyOf = (session: BrowserToolPageActionSession): object =>
+  session.viewportState ?? session;
 
 const runNavigate = async (
   session: BrowserToolPageActionSession,
@@ -648,7 +498,9 @@ const runResize = async (
     return fail('browser_resize needs positive finite width and height.');
   }
 
-  if (resizedSessions.has(session)) {
+  const viewportKey = viewportKeyOf(session);
+
+  if (resizedViewports.has(viewportKey)) {
     await session.send('Emulation.clearDeviceMetricsOverride');
   }
 
@@ -658,7 +510,7 @@ const runResize = async (
     mobile: false,
     width,
   });
-  resizedSessions.add(session);
+  resizedViewports.add(viewportKey);
 
   return done({ height, width });
 };
@@ -681,7 +533,8 @@ const runHandleDialog = async (
     ...(promptText === undefined ? {} : { promptText }),
   });
 
-  return done({ accepted: accept, message: dialog.message, type: dialog.type });
+  // The message was shown with the modal state, to a caller allowed to read it; echoing it here would show it to all.
+  return done({ accepted: accept, type: dialog.type });
 };
 
 const runFileUpload = async (
@@ -766,6 +619,57 @@ const closeTab = async (
   return done('Closed the tab.');
 };
 
+const grantsOrigin = (origins: readonly string[], url: string | undefined): boolean => {
+  const origin = toBrowserOrigin(url);
+
+  return origin !== undefined && origins.some(pattern => originPatternMatches(pattern, origin));
+};
+
+/**
+ * The tabs an agent caller can reach, which is the D9 boundary: its session's
+ * group (the tabs the user dragged in or shared). Acting on any other tab is
+ * refused, and a grant for that origin is not an allowance, so listing one
+ * would only report the user's other tabs — with their count — and hand out an
+ * index that select and close must refuse. A panel caller reaches every tab.
+ */
+const reachableTabs = (
+  tabs: readonly InspectableTab[],
+  access: BrowserAgentAccess | undefined
+): readonly InspectableTab[] =>
+  access === undefined ? tabs : tabs.filter(tab => access.groupTabs?.includes(tab.id) === true);
+
+type ReachableTabResolution =
+  | { readonly ok: true; readonly tab: InspectableTab }
+  | { readonly error: string; readonly ok: false };
+
+/**
+ * The tab at a listed index. `list` numbers only the reachable tabs, so select
+ * and close resolve the same way. Every index past that list is one refusal
+ * when the caller is an agent: a different answer for a browser tab the list
+ * omits would report how many tabs the browser holds. Without agent access
+ * the list is the browser's, so a past index names nothing.
+ */
+const reachableTabAt = (
+  tabs: readonly InspectableTab[],
+  access: BrowserAgentAccess | undefined,
+  index: number
+): ReachableTabResolution => {
+  const tab = reachableTabs(tabs, access)[index];
+
+  if (tab !== undefined) {
+    return { ok: true, tab };
+  }
+
+  return access === undefined
+    ? { error: `No tab at index ${String(index)}.`, ok: false }
+    : { error: AGENT_TAB_OUTSIDE_GROUP_ERROR, ok: false };
+};
+
+/**
+ * The tab tools: `list` reports the tabs this caller may reach, `select` and
+ * `close` address that same list by index, and `new` opens a tab behind the
+ * user's.
+ */
 const runTabs = async (
   args: Record<string, unknown>,
   session: BrowserToolPageActionSession | undefined,
@@ -784,14 +688,27 @@ const runTabs = async (
       return fail('The browser tab API is unavailable.');
     }
 
-    return done({
-      tabs: tabs.map((tab, index) => ({
-        index,
-        selected: tab.id === options.tabId,
-        title: tab.title,
-        url: tab.url,
-      })),
-    });
+    // The index counts only the tabs this caller can reach, so a listed index is always one it may select or close.
+    const listed = reachableTabs(tabs, options.agentAccess).map((tab, index) => ({
+      index,
+      selected: tab.id === options.tabId,
+      title: tab.title,
+      url: tab.url,
+    }));
+
+    // An agent reads Playwright MCP's own list shape, `- 1: (current) [Title](url)`.
+    // One prompt then works on either backend, and the list costs lines instead of JSON per tab.
+    // The panel keeps the tab objects it renders from.
+    return done(
+      options.agentAccess === undefined
+        ? { tabs: listed }
+        : listed
+            .map(
+              tab =>
+                `- ${String(tab.index)}: ${tab.selected ? '(current) ' : ''}[${tab.title}](${tab.url})`
+            )
+            .join('\n')
+    );
   }
 
   if (action === 'new') {
@@ -802,7 +719,21 @@ const runTabs = async (
     }
 
     const url = getStringArgument(args, 'url');
-    const tab = await create(url === undefined ? {} : { url });
+
+    if (
+      options.agentAccess !== undefined &&
+      url !== undefined &&
+      !grantsOrigin(options.agentAccess.navigateOrigins, url)
+    ) {
+      return fail(`Opening a tab at ${url} needs a navigate grant for that origin (blocked).`);
+    }
+
+    // A tool call never takes the user's foreground: the tab opens behind the one they are looking at (D9).
+    const tab = await create(url === undefined ? { active: false } : { active: false, url });
+
+    if (tab?.id !== undefined) {
+      options.noteTabCreated?.(tab.id, options.tabId);
+    }
 
     return done({
       selected: true,
@@ -818,13 +749,14 @@ const runTabs = async (
 
     if (index !== undefined) {
       const tabs = await listInspectableTabs(options.tabsApi);
-      const tab = tabs?.[index];
+      const found =
+        tabs === undefined ? undefined : reachableTabAt(tabs, options.agentAccess, index);
 
-      if (tab === undefined) {
-        return fail(`No tab at index ${String(index)}.`);
+      if (found === undefined || !found.ok) {
+        return fail(found?.error ?? `No tab at index ${String(index)}.`);
       }
 
-      tabId = tab.id;
+      tabId = found.tab.id;
     }
 
     if (tabId === undefined) {
@@ -847,11 +779,13 @@ const runTabs = async (
     }
 
     const tabs = await listInspectableTabs(options.tabsApi);
-    const tab = tabs?.[index];
+    const found = tabs === undefined ? undefined : reachableTabAt(tabs, options.agentAccess, index);
 
-    if (tab === undefined) {
-      return fail(`No tab at index ${String(index)}.`);
+    if (found === undefined || !found.ok) {
+      return fail(found?.error ?? `No tab at index ${String(index)}.`);
     }
+
+    const { tab } = found;
 
     const update = options.tabsApi?.update?.bind(options.tabsApi);
 
@@ -930,7 +864,7 @@ const runWebMcpCall = async (
   const route = routes.get(name);
 
   if (route === undefined) {
-    return fail(`WebMCP tool "${name}" is not available. Call kilo_browser_webmcp_list first.`);
+    return fail(`WebMCP tool "${name}" is not available. List the page's WebMCP tools first.`);
   }
 
   const result = await options.webMcpExecute(
@@ -1021,7 +955,7 @@ export const runPageBrowserTool = async (
         return await runEvaluate(session, args);
       }
       case 'browser_run_code_unsafe': {
-        return await runCodeUnsafe(session, args, now);
+        return fail(RUN_CODE_UNSUPPORTED_ERROR);
       }
       default: {
         return fail(`${name} is not a page browser tool.`);
@@ -1035,18 +969,24 @@ export const runPageBrowserTool = async (
 };
 
 /**
- * Clears the device-metrics override a resize applied to this session. The
- * wiring calls it when it disposes a session so a resized tab returns to its
+ * Clears the device-metrics override a resize applied to this tab. The wiring
+ * calls it when it disposes a tab's session so a resized tab returns to its
  * natural viewport.
  */
 export const clearBrowserToolResize = async (
   session: BrowserToolPageActionSession | undefined
 ): Promise<void> => {
-  if (session === undefined || !resizedSessions.has(session)) {
+  if (session === undefined) {
     return;
   }
 
-  resizedSessions.delete(session);
+  const viewportKey = viewportKeyOf(session);
+
+  if (!resizedViewports.has(viewportKey)) {
+    return;
+  }
+
+  resizedViewports.delete(viewportKey);
 
   try {
     await session.send('Emulation.clearDeviceMetricsOverride');

@@ -5,7 +5,7 @@ import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-t
 import { getProfileOrganizations } from '@kilocode/web-shared/lib/organizations/organizations';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
-import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/server';
+import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/domain-gates';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import { verifyKiloTokenForPolicy } from '@kilocode/worker-utils/kilo-token-policy';
 import { isPagesAuthClient } from '@/lib/pages-auth/pages-auth-clients';

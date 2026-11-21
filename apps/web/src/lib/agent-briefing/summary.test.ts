@@ -2,7 +2,7 @@ import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gate
 import type {
   OpenRouterModel,
   OpenRouterModelsResponse,
-} from '@kilocode/web-shared/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { getRawOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
@@ -20,6 +20,7 @@ import type { BriefingReportRow } from './store';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
+  getVercelModelsMetadataFromDatabase: jest.fn(async () => ({})),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/providers/openrouter'),
@@ -348,12 +349,12 @@ describe('briefing model pricing', () => {
   });
 });
 
-function reportRow(excerpt: string, title = 'Captured session'): BriefingReportRow {
+function reportRow(excerpt: string, title?: string): BriefingReportRow {
   const source = {
     id: 'activity:ses_prompt',
     sessionId: 'ses_prompt',
     kind: 'activity' as const,
-    title,
+    ...(title !== undefined ? { title } : {}),
     url: '/cloud/sessions/ses_prompt',
     occurredAt: '2026-10-28T06:30:00.000Z',
     excerpt,
@@ -412,11 +413,12 @@ describe('briefing prompt evidence', () => {
     expect(prompt).toContain('[redacted credential]');
   });
 
-  it('sends only titles that screening clears', () => {
-    const prompt = promptFor(
-      reportRow('Nothing to report.', 'Plan for client_' + 'secret: "' + secretKey)
-    );
-    expect(prompt).not.toContain(secretKey);
-    expect(prompt).toContain('Agent session');
+  it('sends stored titles verbatim and invents no fallback label', () => {
+    const prompt = promptFor(reportRow('Nothing to report.', 'Deploy [redacted credential]'));
+    expect(prompt).toContain('Deploy [redacted credential]');
+    expect(prompt).not.toContain('Agent session');
+    // Capture withholds a title screening cannot clear, so the prompt carries none.
+    const withheld = promptFor(reportRow('Nothing to report.'));
+    expect(withheld).not.toContain('Agent session');
   });
 });

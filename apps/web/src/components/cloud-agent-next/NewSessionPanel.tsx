@@ -37,6 +37,7 @@ import { useRefreshRepositories } from '@/hooks/useRefreshRepositories';
 import { useSlashCommandAutocomplete } from '@/hooks/useSlashCommandAutocomplete';
 import { commandsOrDefault } from '@cloud-agent-shared';
 import { useOrganizationDefaults } from '@/app/api/organizations/hooks';
+import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import {
   selectedProfileIdAtom,
@@ -218,7 +219,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     () =>
       allModels.map(model => ({
         id: model.id,
-        name: model.name,
+        name: modelNameWithRetirement(model),
         isFree: model.isFree,
         mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
         hasUserByokAvailable: model.hasUserByokAvailable,
@@ -1594,6 +1595,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               }
               className="md:hidden"
               customModeOptions={customModeOptions}
+              favorites
             />
             {/* Desktop: individual pickers */}
             <div className="hidden md:contents">
@@ -1626,6 +1628,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                   isLoading={!modelsData}
                   variant="compact"
                   className="min-w-0"
+                  favorites
                 />
               )}
               {hasAgentModelOverride

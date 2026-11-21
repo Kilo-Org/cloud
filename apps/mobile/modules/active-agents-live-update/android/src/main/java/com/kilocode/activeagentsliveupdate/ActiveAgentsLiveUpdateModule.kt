@@ -214,6 +214,11 @@ class ActiveAgentsLiveUpdateModule : Module() {
    */
   private fun postedChannelId(): String? = notificationState.getString(POSTED_CHANNEL, null)
 
+  /** The view intent one deep-link record mints, so every copy matches on filterEquals. */
+  private fun viewIntent(url: String): Intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+    setPackage(context.packageName)
+  }
+
   /**
    * A PendingIntent that deep-links the app to the URL the JS side named: the
    * waiting session's route when one is recorded, the Agents tab otherwise.
@@ -226,17 +231,13 @@ class ActiveAgentsLiveUpdateModule : Module() {
    * holds one Open record at a time and a post that throws leaves the card still
    * in the shade with the record it already carries.
    */
-  private fun openPendingIntent(openUrl: String): PendingIntent {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(openUrl)).apply {
-      setPackage(context.packageName)
-    }
-    return PendingIntent.getActivity(
+  private fun openPendingIntent(openUrl: String): PendingIntent =
+    PendingIntent.getActivity(
       context,
       OPEN_REQUEST_CODE,
-      intent,
+      viewIntent(openUrl),
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
-  }
 
   /**
    * Drop the PendingIntent record a superseded Open URL created. `FLAG_NO_CREATE`
@@ -244,13 +245,10 @@ class ActiveAgentsLiveUpdateModule : Module() {
    * no-op rather than a new record.
    */
   private fun cancelOpenIntent(openUrl: String) {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(openUrl)).apply {
-      setPackage(context.packageName)
-    }
     PendingIntent.getActivity(
       context,
       OPEN_REQUEST_CODE,
-      intent,
+      viewIntent(openUrl),
       PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
     )?.cancel()
   }
@@ -289,17 +287,13 @@ class ActiveAgentsLiveUpdateModule : Module() {
    * The New agent action: the app's fixed new-agent deep link. One constant URL,
    * so the record under its request code never accumulates.
    */
-  private fun newAgentPendingIntent(url: String): PendingIntent {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-      setPackage(context.packageName)
-    }
-    return PendingIntent.getActivity(
+  private fun newAgentPendingIntent(url: String): PendingIntent =
+    PendingIntent.getActivity(
       context,
       NEW_AGENT_REQUEST_CODE,
-      intent,
+      viewIntent(url),
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
-  }
 
   /** The app is drawing in its dark theme: the card's accent and retry red follow it. */
   private fun isNight(): Boolean =

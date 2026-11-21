@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import {
   approveDeviceAuthRequest,
-  DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE,
-  DEVICE_AUTH_PENDING_LINK_CHOICE_MESSAGE,
+  DEVICE_AUTH_REFUSAL_CODES,
+  DeviceAuthRefusalError,
+  refusalCopyFor,
+  type DeviceAuthRefusalCode,
 } from '@/lib/device-auth/device-auth';
 import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
@@ -23,6 +25,15 @@ const TokensSchema = z.object({
    */
   add_pending_link: z.boolean().optional(),
 });
+
+/** The HTTP status each approval refusal answers with. A refusal missing here is a bug, not a 500. */
+const APPROVAL_REFUSAL_STATUS: Partial<Record<DeviceAuthRefusalCode, number>> = {
+  [DEVICE_AUTH_REFUSAL_CODES.requestNotFound]: 404,
+  [DEVICE_AUTH_REFUSAL_CODES.requestExpired]: 410,
+  [DEVICE_AUTH_REFUSAL_CODES.requestNotPending]: 409,
+  [DEVICE_AUTH_REFUSAL_CODES.clientConfirmationMismatch]: 409,
+  [DEVICE_AUTH_REFUSAL_CODES.pendingLinkChoiceRequired]: 409,
+};
 
 export const POST = withRestTiming('/api/device-auth/tokens', async (request: Request) => {
   const origin = request.headers.get('origin');
@@ -57,24 +68,13 @@ export const POST = withRestTiming('/api/device-auth/tokens', async (request: Re
       ...(addPendingLink !== undefined ? { addPendingLink } : {}),
     });
   } catch (error) {
-    if (error instanceof Error) {
-      if (error.message === DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE) {
-        return NextResponse.json({ error: error.message }, { status: 409 });
-      }
-      if (error.message === DEVICE_AUTH_PENDING_LINK_CHOICE_MESSAGE) {
-        return NextResponse.json({ error: error.message }, { status: 409 });
-      }
-      if (error.message === 'Device authorization request not found') {
-        return NextResponse.json({ error: 'Not found' }, { status: 404 });
-      }
-      if (error.message === 'Device authorization request is not pending') {
+    if (error instanceof DeviceAuthRefusalError) {
+      const status = APPROVAL_REFUSAL_STATUS[error.code];
+      if (status !== undefined) {
         return NextResponse.json(
-          { error: 'Device authorization request can no longer be approved' },
-          { status: 409 }
+          { error: error.code, message: refusalCopyFor(error.code) },
+          { status }
         );
-      }
-      if (error.message === 'Device authorization request has expired') {
-        return NextResponse.json({ error: error.message }, { status: 410 });
       }
     }
     throw error;

@@ -313,6 +313,10 @@ function GuardrailsForm({
       <Card>
         <CardHeader>
           <CardTitle>Enkrypt AI guardrails</CardTitle>
+          <CardDescription>
+            Guardrails apply to Chat Completions, Anthropic Messages and Responses API requests.
+            Autocomplete, embedding and transcription requests are not checked.
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-6">
           <InputGuardrailSection
@@ -421,7 +425,7 @@ function InputGuardrailSection({
   return (
     <GuardrailSection
       title="Input guardrails"
-      description="Check every input with Enkrypt AI, including tool results such as file reads and command output. Blocking detectors reject requests if Enkrypt is unavailable."
+      description="Check every input with Enkrypt AI, including tool results such as file reads and command output. If Enkrypt is unavailable, requests are sent unscanned rather than rejected."
       enabled={draft.enabled}
       onEnabledChange={enabled => onChange(current => ({ ...current, enabled }))}
     >
@@ -540,8 +544,8 @@ function OutputGuardrailSection({
           responses no longer stream.
         </li>
         <li>
-          Blocked responses are replaced with an error, and responses are withheld while Enkrypt is
-          unavailable. The model&apos;s usage is still charged.
+          Blocked responses are replaced with an error, and the model&apos;s usage is still charged.
+          If Enkrypt is unavailable, responses are released unscanned rather than withheld.
         </li>
         <li>
           Log only detectors check a copy of the response after it&apos;s sent and never delay it.

@@ -1,0 +1,86 @@
+/* eslint-disable typescript-eslint/consistent-type-definitions, vitest/no-conditional-expect, vitest/no-conditional-in-test -- AGENTS.md prefers type over interface, and the assertions walk each declared command */
+import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
+import extensionConfig from '../../../wxt.config';
+
+/*
+ * Chrome refuses to load an extension whose command has no `description`, and
+ * then no service worker ever starts: every E2E waits for a worker that never
+ * arrives. This guards the generated manifest against that regression.
+ */
+const commandSchema = z.object({
+  description: z.string().min(1),
+  suggested_key: z.object({ default: z.string() }).optional(),
+});
+
+const manifestSchema = z.object({
+  commands: z.record(z.string(), commandSchema).optional(),
+  content_security_policy: z.object({ extension_pages: z.string() }).optional(),
+  optional_permissions: z.array(z.string()).optional(),
+  permissions: z.array(z.string()).optional(),
+});
+
+const manifestFunctionSchema = z.custom<(...args: unknown[]) => unknown>(
+  value => typeof value === 'function'
+);
+
+const readManifest = (browser: 'chrome' | 'firefox') => {
+  const manifestFunction = manifestFunctionSchema.parse(extensionConfig.manifest);
+
+  return manifestSchema.parse(manifestFunction({ browser }));
+};
+
+const SHORTCUT_PATTERN =
+  /^(Ctrl|Alt|Command|MacCtrl)(\+(Shift|Alt|Ctrl|Command|MacCtrl))*\+[A-Z0-9]$/u;
+
+describe('extension manifest', () => {
+  it('gives every command a description and a valid shortcut', () => {
+    for (const browser of ['chrome', 'firefox'] as const) {
+      const manifest = readManifest(browser);
+      const commands = Object.values(manifest.commands ?? {});
+
+      expect(commands.length).toBeGreaterThan(0);
+      expect(commands.length).toBeLessThanOrEqual(4);
+
+      for (const command of commands) {
+        expect(command.description.length).toBeGreaterThan(0);
+
+        if (command.suggested_key !== undefined) {
+          expect(command.suggested_key.default).toMatch(SHORTCUT_PATTERN);
+        }
+      }
+    }
+  });
+
+  it('declares the permissions the local agent transport needs', () => {
+    for (const browser of ['chrome', 'firefox'] as const) {
+      const manifest = readManifest(browser);
+
+      expect(manifest.permissions).toContain('alarms');
+      expect(manifest.optional_permissions).toContain('nativeMessaging');
+    }
+  });
+
+  it('keeps downloads optional, so an update never disables the extension', () => {
+    for (const browser of ['chrome', 'firefox'] as const) {
+      const manifest = readManifest(browser);
+
+      // A required permission that adds a warning turns the extension off for every existing user until they accept it.
+      expect(manifest.permissions).not.toContain('downloads');
+      expect(manifest.optional_permissions).toContain('downloads');
+    }
+  });
+
+  it('lets every browser group a session’s tabs', () => {
+    for (const browser of ['chrome', 'firefox'] as const) {
+      expect(readManifest(browser).permissions).toContain('tabGroups');
+    }
+  });
+
+  it('keeps the loopback socket on ws:// in Firefox extension pages', () => {
+    const policy = readManifest('firefox').content_security_policy?.extension_pages;
+
+    expect(policy).toBe("script-src 'self';");
+    expect(policy).not.toContain('upgrade-insecure-requests');
+  });
+});

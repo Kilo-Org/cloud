@@ -6,16 +6,16 @@
     <title>Your weekly Kilo recommendations</title>
   </head>
   <body
+    class="kc-page kc-strong"
     style="
       margin: 0;
       padding: 0;
       font-family:
         -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      background-color: #ffffff;
       color: #1a1a1a;
     "
   >
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #ffffff">
+    <table width="100%" cellpadding="0" cellspacing="0" class="kc-page">
       <tr>
         <td align="center" style="padding: 40px 20px">
           <table width="520" cellpadding="0" cellspacing="0">
@@ -32,6 +32,7 @@
                       -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                       sans-serif;
                   "
+                  class="kc-strong"
                 >
                   Your weekly Kilo recommendations
                 </h1>
@@ -50,12 +51,15 @@
                       -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                       sans-serif;
                   "
+                  class="kc-text"
                 >
                   Here's how to get more from Kilo for
-                  <strong style="color: #1a1a1a">{{ organization_name }}</strong> this week. You
-                  have <strong style="color: #1a1a1a">{{ open_count }}</strong> open
+                  <strong class="kc-strong" style="color: #1a1a1a">{{ organization_name }}</strong>
+                  this week. You have
+                  <strong class="kc-strong" style="color: #1a1a1a">{{ open_count }}</strong> open
                   recommendations, and your organization has set up
-                  <strong style="color: #1a1a1a">{{ adopted_summary }}</strong> features.
+                  <strong class="kc-strong" style="color: #1a1a1a">{{ adopted_summary }}</strong>
+                  features.
                 </p>
 
                 <!-- Recommendations -->
@@ -80,6 +84,7 @@
                             -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                             sans-serif;
                         "
+                        class="kc-btn"
                       >
                         View recommendations
                       </a>
@@ -97,6 +102,7 @@
                       -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                       sans-serif;
                   "
+                  class="kc-text"
                 >
                   You're receiving this because you're an owner of this organization. You can turn
                   the weekly recommendations email off from the organization's Email preferences.
@@ -105,7 +111,7 @@
             </tr>
             <!-- Sign-off -->
             <tr>
-              <td style="padding: 0 40px 40px; border-top: 1px solid #ebebea">
+              <td class="kc-divider" style="padding: 0 40px 40px; border-top: 1px solid #ebebea">
                 <p
                   style="
                     margin: 20px 0 0;
@@ -116,6 +122,7 @@
                       -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                       sans-serif;
                   "
+                  class="kc-text"
                 >
                   — The Kilo Team
                 </p>
@@ -125,7 +132,11 @@
           <!-- Branding Footer -->
           <table width="520" cellpadding="0" cellspacing="0">
             <tr>
-              <td align="center" style="padding: 30px 20px; border-top: 1px solid #eee">
+              <td
+                align="center"
+                class="kc-divider"
+                style="padding: 30px 20px; border-top: 1px solid #eee"
+              >
                 <p
                   style="
                     margin: 0;
@@ -135,6 +146,7 @@
                       -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                       sans-serif;
                   "
+                  class="kc-faint"
                 >
                   © {{ year }} Kilo Code, Inc<br />455 Market St, Ste 1940 PMB 993504<br />San
                   Francisco, CA 94105, USA

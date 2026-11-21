@@ -2,12 +2,15 @@ import { getOutputHeaders } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   createStreamProgressLogger,
+  KEEP_ALIVE_COMMENT,
   logTerminalStreamEvent,
   partialCapturedBody,
-  readResponseText,
+  rewriteJsonResponse,
   rewriteSseStream,
   rewriteResponseMetadata,
   rewriteUsage,
+  startFirstByteKeepAlive,
+  type FirstByteKeepAlive,
   type ResponseMetadata,
   type ResponseUsage,
   type RewriteResponseParams,
@@ -41,46 +44,26 @@ export async function rewriteModelResponse_Messages({
   capture,
   reasoningEffort,
   vercelRequestId,
+  keepAliveUntilFirstByte,
 }: RewriteResponseParams) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
-    const textResult = await readResponseText(
+    return rewriteJsonResponse<
+      Anthropic.Messages.Message & ResponseMetadata & { usage?: MessagesApiUsage }
+    >({
       response,
       headers,
       vercelRequestId,
       capture,
-      reasoningEffort
-    );
-    if ('errorResponse' in textResult) {
-      capture?.setReadError(textResult.error);
-      return textResult.errorResponse;
-    }
-    capture?.setBody(textResult.text);
-    const { text } = textResult;
-    let json: Anthropic.Messages.Message & ResponseMetadata & { usage?: MessagesApiUsage };
-    try {
-      json = JSON.parse(text) as Anthropic.Messages.Message &
-        ResponseMetadata & {
-          usage?: MessagesApiUsage;
-        };
-    } catch {
-      // Upstream returned invalid/empty JSON body — pass through as-is
-      return new NextResponse(text, {
-        status: response.status,
-        statusText: response.statusText,
-        headers,
-      });
-    }
-    if (typeof json.id === 'string' && json.id) capture?.setGenerationId(json.id);
-    if (json.usage) {
-      rewriteUsage(json.usage, usageContext, json.provider_metadata ?? json.providerMetadata);
-    }
-    rewriteResponseMetadata(json, usageContext);
-    return NextResponse.json(json, {
-      status: response.status,
-      statusText: response.statusText,
-      headers,
+      reasoningEffort,
+      mutate: json => {
+        if (typeof json.id === 'string' && json.id) capture?.setGenerationId(json.id);
+        if (json.usage) {
+          rewriteUsage(json.usage, usageContext, json.provider_metadata ?? json.providerMetadata);
+        }
+        rewriteResponseMetadata(json, usageContext);
+      },
     });
   }
 
@@ -89,14 +72,20 @@ export async function rewriteModelResponse_Messages({
   // Shared with the stream's cancel() callback so a client disconnect still
   // logs the partially received response body.
   const capturedChunks: string[] | null = capture ? [] : null;
+  let keepAlive: FirstByteKeepAlive | null = null;
   const stream = new ReadableStream<string>({
-    async start(controller) {
+    async start(streamController) {
       const reader = response.body?.getReader();
       if (!reader) {
-        controller.close();
+        streamController.close();
         capture?.setBody('');
         return;
       }
+      keepAlive = startFirstByteKeepAlive(streamController, {
+        enabled: keepAliveUntilFirstByte,
+        response,
+      });
+      const controller = keepAlive?.output ?? streamController;
 
       let doneReceived = false;
       let terminalEventReceived = false;
@@ -162,7 +151,7 @@ export async function rewriteModelResponse_Messages({
           if (doneReceived || terminalEventReceived) {
             return;
           }
-          controller.enqueue(': KILO PROCESSING\n\n');
+          controller.enqueue(KEEP_ALIVE_COMMENT);
         },
       });
 
@@ -189,10 +178,12 @@ export async function rewriteModelResponse_Messages({
         vercelRequestId,
         capture,
         capturedChunks,
-        reasoningEffort
+        reasoningEffort,
+        keepAlive
       );
     },
     cancel() {
+      keepAlive?.stop();
       capture?.setReadError(
         new Error('response stream was cancelled'),
         partialCapturedBody(capturedChunks)

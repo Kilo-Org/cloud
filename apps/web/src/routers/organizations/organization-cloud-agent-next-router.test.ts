@@ -134,6 +134,7 @@ const mockGetWorktreeFile =
 const mockGetSandboxSelectionOptions =
   jest.fn<(input: GetSandboxSelectionOptionsInput) => Promise<SandboxSelectionCapabilities>>();
 const mockListPreviewServices = jest.fn<CloudAgentNextClient['listPreviewServices']>();
+const mockDeleteWorkspaceArtifact = jest.fn<CloudAgentNextClient['deleteWorkspaceArtifact']>();
 
 const mockCreateCloudAgentNextClient = jest.fn((_authToken: string) => ({
   getSandboxSelectionOptions: mockGetSandboxSelectionOptions,
@@ -151,6 +152,7 @@ const mockCreateCloudAgentNextClient = jest.fn((_authToken: string) => ({
   getWorktreeChanges: mockGetWorktreeChanges,
   refreshWorktreeChanges: mockRefreshWorktreeChanges,
   getWorktreeFile: mockGetWorktreeFile,
+  deleteWorkspaceArtifact: mockDeleteWorkspaceArtifact,
 }));
 
 const mockCreateCloudAgentNextClientForModel = jest.fn(
@@ -443,6 +445,12 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
   getWorktreeFile: (
     input: WorktreeFileQuery & { organizationId: string; cloudAgentSessionId: string }
   ) => Promise<GetWorktreeFileOutput>;
+  deleteWorkspaceArtifact: (input: {
+    organizationId: string;
+    cloudAgentSessionId: string;
+    relativePath: string;
+    expectedHash: string;
+  }) => ReturnType<CloudAgentNextClient['deleteWorkspaceArtifact']>;
   refreshWorktreeChanges: (input: {
     organizationId: string;
     cloudAgentSessionId: string;
@@ -3133,5 +3141,39 @@ describe('organizationCloudAgentNextRouter.listPreviewServices', () => {
       })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(mockVerifyOrgOwnsSessionV2ByCloudAgentId).not.toHaveBeenCalled();
+  });
+});
+
+describe('organizationCloudAgentNextRouter.deleteWorkspaceArtifact', () => {
+  const user = { id: 'oauth/org-artifact-owner', is_admin: false } as User;
+  const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
+  const relativePath = 'reports/summary.md';
+  const expectedHash = 'a'.repeat(64);
+  const input = {
+    organizationId: ORGANIZATION_ID,
+    cloudAgentSessionId,
+    relativePath,
+    expectedHash,
+  };
+
+  beforeEach(() => {
+    mockVerifyOrgOwnsSessionV2ByCloudAgentId
+      .mockReset()
+      .mockResolvedValue({ kiloSessionId: 'ses_12345678901234567890123456' });
+    mockDeleteWorkspaceArtifact.mockReset().mockResolvedValue({ status: 'deleted', revision: 7 });
+  });
+
+  it('forwards only the Worker artifact fields without requiring a subscription', async () => {
+    await expect(createCaller({ user }).deleteWorkspaceArtifact(input)).resolves.toEqual({
+      status: 'deleted',
+      revision: 7,
+    });
+
+    expect(mockDeleteWorkspaceArtifact).toHaveBeenCalledWith({
+      cloudAgentSessionId,
+      relativePath,
+      expectedHash,
+    });
+    expect(mockRequireActiveSubscription).not.toHaveBeenCalled();
   });
 });

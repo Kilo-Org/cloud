@@ -2,17 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
-import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
+import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
 import { type ReviewerPlatform } from '@/lib/code-reviewer-config';
-import { WEB_BASE_URL } from '@/lib/config';
-import { getGitLabIntegrationUrl } from '@/lib/integration-urls';
 import {
   type AuthorizationWait,
   openAuthorizationAndWaitForReturn,
   reportLateLaunchFailure,
 } from '@/lib/pr-review/connect-gate-platform';
-import { trpcClient } from '@/lib/trpc';
-import { readTrpcErrorField } from '@/lib/trpc-error';
 
 import { isPersonal } from './use-code-reviewer';
 
@@ -32,7 +28,7 @@ const HANDOFF_WATCHDOG_MS = 20_000;
  * tap itself owes.
  */
 export type ManageRepositoryAccess = {
-  /** Mints an install state and hands the user to the provider's settings page. */
+  /** Mints a hand-off token and hands the user to the provider's settings page. */
   handlePress: () => void;
   /**
    * True from the tap until the browser wait settles. The control draws its
@@ -138,33 +134,28 @@ export function useManageRepositoryAccess(
 
     if (platform === 'github') {
       try {
-        const { token } = await trpcClient.githubApps.mintInstallState.mutate({
-          organizationId: orgScope ?? undefined,
-          returnTo: '/cloud/sessions',
+        const url = await appShellHandoffUrl({
+          page: 'github-app',
+          ...(orgScope ? { organizationId: orgScope } : {}),
         });
-        const opened = await openSettings(getGitHubIntegrationUrl(WEB_BASE_URL, orgScope, token));
-        return opened;
-      } catch (error) {
-        // An organization's mint needs `OWNER`/`ADMIN` and refuses everyone else
-        // with `UNAUTHORIZED`; a non-multi-installation organization that
-        // already has an active GitHub App connection is refused with
-        // `FORBIDDEN`. Neither can mint a token, and the settings page still
-        // works without one: it mints its own state for the signed-in web user.
-        // Both therefore hand the reader to that page instead of an error
-        // toast, which would leave the control inert in exactly the state that
-        // needs a route to it.
-        const code = readTrpcErrorField(error, 'code');
-        if (orgScope && (code === 'FORBIDDEN' || code === 'UNAUTHORIZED')) {
-          const opened = await openSettings(getGitHubIntegrationUrl(WEB_BASE_URL, orgScope));
-          return opened;
-        }
+        return await openSettings(url);
+      } catch {
         toast.error(t('prReview.couldNotOpenGitHubAppSettings'));
+        return false;
       }
-      return false;
     }
     if (platform === 'gitlab') {
-      const opened = await openSettings(getGitLabIntegrationUrl(WEB_BASE_URL, orgScope));
-      return opened;
+      try {
+        const url = await appShellHandoffUrl({
+          page: 'integration',
+          platform: 'gitlab',
+          ...(orgScope ? { organizationId: orgScope } : {}),
+        });
+        return await openSettings(url);
+      } catch {
+        couldNotOpen();
+        return false;
+      }
     }
     return false;
   }, [orgScope, platform, t]);

@@ -1,0 +1,101 @@
+{
+  "ios": {
+    "bundleIdentifier": "com.kilocode.kiloapp",
+    "requireFullScreen": false,
+    "associatedDomains": ["applinks:app.kilo.ai", "webcredentials:app.kilo.ai"],
+    "entitlements": {
+      "com.apple.developer.usernotifications.time-sensitive": true
+    },
+    "infoPlist": {
+      "CFBundleLocalizations": ["en"]
+    }
+  },
+  "android": {
+    "package": "com.kilocode.kiloapp",
+    "blockedPermissions": [
+      "android.permission.READ_MEDIA_IMAGES",
+      "android.permission.READ_MEDIA_VIDEO",
+      "android.permission.READ_MEDIA_AUDIO"
+    ],
+    "permissions": ["android.permission.ACCESS_NOTIFICATION_POLICY"]
+  },
+  "scheme": "kiloapp",
+  "orientation": "default",
+  "platforms": ["ios", "android"],
+  "locales": {
+    "en": {
+      "ios": {
+        "NSCameraUsageDescription": "Fixture camera prompt.",
+        "NSPhotoLibraryUsageDescription": "Fixture photo library prompt.",
+        "NSLocalNetworkUsageDescription": "Fixture local network prompt.",
+        "NSMicrophoneUsageDescription": "Fixture microphone prompt.",
+        "NSSpeechRecognitionUsageDescription": "Fixture speech recognition prompt.",
+        "NSFaceIDUsageDescription": "Fixture Face ID prompt.",
+        "NSUserTrackingUsageDescription": "Fixture tracking prompt."
+      }
+    }
+  },
+  "plugins": [
+    [
+      "@sentry/react-native/expo",
+      { "experimental_android": { "enableAndroidGradlePlugin": true } }
+    ],
+    "./plugins/withAndroidRotationSurface",
+    "./plugins/withAndroidManifestFix",
+    "./plugins/withAndroidAlertDialogButtonCase",
+    "./plugins/withAndroidAlertDialogTheme",
+    "./plugins/withArtifactFileProvider",
+    "./plugins/withAppIntentLocalizations",
+    [
+      "./plugins/withBrandedSplash",
+      {
+        "image": "./assets/images/logo-mark.png",
+        "backgroundColor": "#FFDD00",
+        "imageWidth": 100
+      }
+    ],
+    [
+      "expo-dev-client",
+      { "toolsButton": false, "showMenuAtLaunch": false, "skipOnboarding": true }
+    ],
+    [
+      "expo-build-properties",
+      {
+        "android": {
+          "extraProguardRules": "-keep class expo.modules.adapters.react.apploader.RNHeadlessAppLoader { <init>(); }"
+        }
+      }
+    ],
+    ["expo-notifications", { "defaultChannel": "needs-input" }]
+  ],
+  "extra": {
+    "apiBaseUrl": "https://fixture.invalid/api",
+    "webBaseUrl": "https://fixture.invalid",
+    "cloudAgentWsUrl": "wss://fixture.invalid/cloud-agent",
+    "sessionIngestWsUrl": "wss://fixture.invalid/session-ingest",
+    "appsFlyerDevKey": "fixture-dev-key",
+    "appsFlyerAppId": "fixture-app-id",
+    "eventServiceUrl": "https://fixture.invalid/events",
+    "notificationsUrl": "https://fixture.invalid/notifications",
+    "posthogApiKey": "fixture-posthog-key",
+    "playIntegrityProjectNumber": "000000000000",
+    "router": {
+      "headOrigin": "https://app.kilo.ai"
+    },
+    "eas": {
+      "build": {
+        "experimental": {
+          "ios": {
+            "appExtensions": [
+              {
+                "targetName": "ArtifactsFileProvider",
+                "bundleIdentifier": "com.kilocode.kiloapp.artifactsfileprovider",
+                "entitlements": {}
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

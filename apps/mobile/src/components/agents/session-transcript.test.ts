@@ -388,13 +388,46 @@ describe('session transcript', () => {
     expect(keysOf(transcript)).toEqual(['msg_001', 'preparation:attempt_001', 'msg_002']);
   });
 
-  it('keeps orphaned preparation attempts visible after paginated prepends', () => {
+  it('drops a completed orphaned preparation attempt below the loaded turn', () => {
+    // The first page holds only the latest turn, but the server sends the newest
+    // attempts: a completed attempt from an older turn must not stack under it.
     const transcript = mergeSessionTranscript(
       [message('msg_011')],
       [attempt('attempt_older', 'msg_001')]
     );
 
-    expect(keysOf(transcript)).toEqual(['msg_011', 'preparation:attempt_older']);
+    expect(keysOf(transcript)).toEqual(['msg_011']);
+  });
+
+  it('keeps a running orphaned preparation attempt at the end', () => {
+    const running = {
+      ...attempt('attempt_running', 'msg_001'),
+      status: 'running' as const,
+      completedAt: undefined,
+    };
+    const transcript = mergeSessionTranscript([message('msg_011')], [running]);
+
+    expect(keysOf(transcript)).toEqual(['msg_011', 'preparation:attempt_running']);
+  });
+
+  it('keeps a failed orphaned preparation attempt at the end', () => {
+    const failed = {
+      ...attempt('attempt_failed', 'msg_001'),
+      status: 'failed' as const,
+      safeError: 'invalid_configuration',
+    };
+    const transcript = mergeSessionTranscript([message('msg_011')], [failed]);
+
+    expect(keysOf(transcript)).toEqual(['msg_011', 'preparation:attempt_failed']);
+  });
+
+  it('places a completed attempt after its trigger message once an older page loads it', () => {
+    const transcript = mergeSessionTranscript(
+      [message('msg_001'), message('msg_011')],
+      [attempt('attempt_older', 'msg_001')]
+    );
+
+    expect(keysOf(transcript)).toEqual(['msg_001', 'preparation:attempt_older', 'msg_011']);
   });
 
   it('hides warm-reuse completed attempts that only ran synthetic sandbox markers', () => {

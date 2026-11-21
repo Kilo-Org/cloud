@@ -18,4 +18,22 @@ describe('reviewerScopeTitle', () => {
     expect(reviewerScopeTitle('org-labs', undefined, labels)).toBe('Organization');
     expect(reviewerScopeTitle('org-gone', organizations, labels)).toBe('Organization');
   });
+
+  it('names a scope the membership list no longer carries from the remembered name', () => {
+    expect(reviewerScopeTitle('org-gone', organizations, labels, 'Drain Labs')).toBe('Drain Labs');
+  });
+
+  it('prefers the live membership name over the remembered one', () => {
+    expect(reviewerScopeTitle('org-labs', organizations, labels, 'Drain Labs Old Name')).toBe(
+      'Drain Labs'
+    );
+  });
+
+  it('keeps the generic label when nothing was remembered', () => {
+    expect(reviewerScopeTitle('org-gone', organizations, labels, undefined)).toBe('Organization');
+  });
+
+  it('never lets a remembered name title the personal scope', () => {
+    expect(reviewerScopeTitle('personal', organizations, labels, 'Drain Labs')).toBe('Personal');
+  });
 });

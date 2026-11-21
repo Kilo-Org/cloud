@@ -8,6 +8,7 @@ import { Trash2 } from '@/components/ui/icons';
 import { Pressable, TextInput, View } from 'react-native';
 
 import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
+import { COMPACT_CONTROL_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { useFormSheetKeyboardVisible } from '@/components/pr-review/pr-form-sheet-chrome';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -48,20 +49,20 @@ export function PrReviewPendingCommentRow({
         }
         className="min-h-9 flex-1 gap-0.5 active:opacity-70"
       >
-        <Text className="font-mono-medium text-[11px] text-muted-foreground" numberOfLines={1}>
+        <Text className="font-mono-medium text-xs text-muted-foreground" numberOfLines={1}>
           {location}
         </Text>
-        <Text className="text-xs leading-[1rem] text-foreground" numberOfLines={1}>
+        <Text className="text-xs text-foreground" numberOfLines={1}>
           {item.body.trim().length > 0 ? item.body : t('prReview.diff.emptyLine')}
         </Text>
         {stale ? (
           <View className="flex-row items-center gap-1.5">
             <View className="rounded-full border border-warn-tile-border bg-warn-tile-bg px-2 py-0.5">
-              <Text className="text-[10px] font-medium uppercase tracking-wide text-warn">
+              <Text className="text-xs font-medium text-warn">
                 {t('prReview.discussion.outdated')}
               </Text>
             </View>
-            <Text className="flex-1 text-[10px] text-muted-foreground">
+            <Text className="flex-1 text-xs text-muted-foreground">
               {t('prReview.pendingComment.staleHint')}
             </Text>
           </View>
@@ -73,7 +74,7 @@ export function PrReviewPendingCommentRow({
         hitSlop={8}
         accessibilityRole="button"
         accessibilityLabel={t('prReview.pendingComment.deleteA11y', { location })}
-        className="h-8 w-8 items-center justify-center rounded-md active:opacity-60"
+        className={cn(COMPACT_CONTROL_BOX_CLASS, 'rounded-md active:opacity-60')}
       >
         <Trash2 size={14} color={colors.mutedForeground} />
       </Pressable>

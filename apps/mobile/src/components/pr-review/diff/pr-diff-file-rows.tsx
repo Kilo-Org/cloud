@@ -1,34 +1,44 @@
 // File-level row components for the PR diff FlashList.
 
 import { selectionHaptic } from '@/lib/haptics';
-import { ChevronDown, Eye, EyeOff, File, Link2 } from '@/components/ui/icons';
+import { ChevronDown, ChevronUp, Eye, EyeOff, File, Link2 } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { fileStatusIcon, fileStatusLabel } from '@/components/pr-review/diff/pr-diff-file-status';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Text } from '@/components/ui/text';
 import { selectableRowA11y } from '@/lib/a11y/selectable-row';
+import {
+  COMPACT_CONTROL_BOX_CLASS,
+  COMPACT_CONTROL_HIT_SLOP,
+  ROW_FRAME_CONTENT_PRESS_CLASS,
+} from '@/lib/a11y/tap-target';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
-
-/** 36×36 visual box + 4pt hitSlop → ≥44×44 effective touch target (AC6). */
-const MARK_VIEWED_HIT_SLOP = 4;
+import { cn } from '@/lib/utils';
 
 function ExpandChevron({ hasDiff, expanded }: { hasDiff: boolean; expanded: boolean }) {
   const colors = useThemeColors();
   if (!hasDiff) {
     return <View className="h-3 w-3" />;
   }
-  if (expanded) {
-    return <ChevronDown size={18} color={colors.mutedForeground} />;
-  }
-  return <DirectionalChevronRight size={18} color={colors.mutedForeground} />;
+  // A disclosure caret, not a navigation chevron: it names the state of the
+  // patch under the row, so it stays on the vertical pair every other
+  // disclosure row uses instead of the row-trailing `RowChevron`.
+  return expanded ? (
+    <ChevronUp size={18} color={colors.mutedForeground} />
+  ) : (
+    <ChevronDown size={18} color={colors.mutedForeground} />
+  );
 }
 
-/** Fixed-size mark-viewed icon toggle — no path-text reflow on toggle (D9/AC6). */
+/**
+ * Fixed-size mark-viewed icon toggle — no path-text reflow on toggle (D9/AC6).
+ * The compact box plus its slop reach 48 dp: `h-9 w-9` measured 31.5 dp at
+ * NativeWind's 14pt rem, so a 4 dp slop stopped at 39.5 dp.
+ */
 export function MarkViewedToggle({
   path,
   viewed,
@@ -46,14 +56,14 @@ export function MarkViewedToggle({
         selectionHaptic();
         onToggle();
       }}
-      hitSlop={MARK_VIEWED_HIT_SLOP}
+      hitSlop={COMPACT_CONTROL_HIT_SLOP}
       {...selectableRowA11y({ multi: true, selected: viewed })}
       accessibilityLabel={
         viewed
           ? t('prReview.fileRows.unmarkViewed', { path })
           : t('prReview.fileRows.markViewed', { path })
       }
-      className="h-9 w-9 items-center justify-center active:opacity-70"
+      className={cn(COMPACT_CONTROL_BOX_CLASS, 'active:opacity-70')}
     >
       {viewed ? (
         <Eye size={18} color={colors.foreground} />
@@ -95,8 +105,11 @@ export function FileHeaderRow({
   const pathLine = isRename ? `${file.previousPath} → ${file.path}` : file.path;
 
   return (
-    <View className="border-b border-hair-soft bg-card px-4 py-3">
-      <View className="flex-row items-center gap-2">
+    // The row's padding sits on the inner row, the parent both controls touch
+    // in: Android delivers a touch only inside the parent view, so the expand
+    // control's cancelled padding and the toggle's slop stay reachable.
+    <View className="border-b-[0.5px] border-hair-soft bg-card">
+      <View className="flex-row items-center gap-2 px-4 py-3">
         <Pressable
           onPress={hasDiff ? onToggleExpand : undefined}
           disabled={!hasDiff}
@@ -105,7 +118,12 @@ export function FileHeaderRow({
             expanded ? t('prReview.fileRows.collapseFile') : t('prReview.fileRows.expandFile')
           }
           accessibilityState={{ expanded, disabled: !hasDiff }}
-          className="min-h-9 flex-1 flex-row items-center gap-2 active:opacity-70"
+          // The control spans the row's vertical padding, so its own node is
+          // the whole row height (the path lines alone measured 33.1 dp).
+          className={cn(
+            ROW_FRAME_CONTENT_PRESS_CLASS,
+            'min-h-9 flex-1 flex-row items-center gap-2 active:opacity-70'
+          )}
         >
           <View className="h-7 w-7 items-center justify-center">
             <ExpandChevron hasDiff={hasDiff} expanded={expanded} />
@@ -160,8 +178,11 @@ export function PatchMissingRow({
   const colors = useThemeColors();
   const { t } = useTranslation();
   return (
-    <View className="border-b border-hair-soft bg-secondary px-4 py-3">
-      <View className="flex-row items-center gap-2">
+    <View className="border-b-[0.5px] border-hair-soft bg-secondary px-4 py-3">
+      {/* The row spans 7 dp of the padding around it and cancels it again, so
+          the toggle's slop lands inside the row it touches in (46 dp) without
+          reaching the GitHub link's own `mt-2` gap below. */}
+      <View className="-my-2 flex-row items-center gap-2 py-2">
         <File size={14} color={colors.mutedForeground} />
         <View className="flex-1">
           <Text className="text-sm text-foreground">

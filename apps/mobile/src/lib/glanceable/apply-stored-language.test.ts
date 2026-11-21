@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { HOME_WIDGET_TITLE_LIMIT } from '@kilocode/app-shared/home-widget';
+import { GLANCEABLE_TITLE_LIMIT } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { sessionLiveActivityTitle } from '@kilocode/notifications/schemas';
 
 import { applyStoredLanguage } from './apply-stored-language';
@@ -14,7 +14,7 @@ vi.mock('@/lib/hooks/use-language-preference', () => ({
 }));
 
 const FAMILY = '\u{1F468}\u200D\u{1F469}\u200D\u{1F467}';
-const HEAD = 'x'.repeat(HOME_WIDGET_TITLE_LIMIT - 7);
+const HEAD = 'x'.repeat(GLANCEABLE_TITLE_LIMIT - 7);
 
 describe('applyStoredLanguage', () => {
   it('installs the segmenter a headless surface cuts its text with', async () => {

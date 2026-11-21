@@ -1,0 +1,2 @@
+ALTER TABLE "cloud_agent_user_settings" ADD COLUMN "web_search_enabled" boolean DEFAULT true NOT NULL;--> statement-breakpoint
+ALTER TABLE "cloud_agent_user_settings" ADD COLUMN "web_search_provider" text;

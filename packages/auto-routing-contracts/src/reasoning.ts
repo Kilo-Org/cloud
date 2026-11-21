@@ -3,6 +3,16 @@ import * as z from 'zod';
 export const ReasoningEffortSchema = z.enum(['minimal', 'low', 'medium', 'high']);
 export type ReasoningEffort = z.infer<typeof ReasoningEffortSchema>;
 
+// The canonical catalog variant key every reasoning-identity field shares: a trimmed,
+// non-empty string or null. Leaf-module rule so the field schemas that carry it (package root,
+// routing table, benchmark contracts and custom-router eval contracts) state the base rule once.
+export const VariantSchema = z.string().trim().min(1).nullable();
+
+// Reasoning-complexity bands the classifier emits and the routing table keys its effort map by.
+// One declaration: a band exists exactly once for both vocabularies.
+export const ReasoningComplexitySchema = z.enum(['low', 'medium', 'high']);
+export type ReasoningComplexity = z.infer<typeof ReasoningComplexitySchema>;
+
 // The two fields that carry a model's reasoning identity. Their schema types
 // differ (a canonical variant key is a string, the legacy effort is an enum
 // value), so this rule reads only whether each one is set.

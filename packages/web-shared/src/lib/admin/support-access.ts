@@ -221,6 +221,7 @@ const REST_READS: readonly ReadEntry[] = [
   ['/api/organizations/[id]/defaults'],
   ['/api/organizations/[id]/modes'],
   ['/api/organizations/[id]/guardrails'],
+  ['/api/organizations/[id]/browser-policy'],
 ];
 
 const SERVER_COMPONENT_READS: readonly ReadEntry[] = [['/organizations/[id]']];
@@ -228,6 +229,7 @@ const SERVER_COMPONENT_READS: readonly ReadEntry[] = [['/organizations/[id]']];
 const ORGANIZATION_WRITES: readonly WriteEntry[] = [
   ['organizations.settings.updateAllowLists', 'manage'],
   ['organizations.settings.updateDefaultModel', 'manage'],
+  ['organizations.settings.updateBrowserControl', 'manage'],
   ['organizations.settings.configureOrganizationDefaultBehavior', 'manage'],
   ['organizations.reviewAgent.patchReviewConfig', 'manage'],
   ['organizations.reviewAgent.toggleReviewAgent', 'manage'],
@@ -367,6 +369,10 @@ export type SupportStepUpPort = {
       | 'support_approval'
       | 'support_emergency_issue'
       | 'support_write_use';
+    /** The class the proof is minted for. A write is bound to one operation. */
+    actionClass: SupportActionClass;
+    /** The organization the action acts on. A write proof is bound to it. */
+    organizationId: string;
     credential?: SupportStepUpCredential;
     webSessionId?: string | null;
     route?: string | null;

@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
 import { getProfileOrganizations } from '@kilocode/web-shared/lib/organizations/organizations';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
-import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/server';
+import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/domain-gates';
 import { createDeviceAuthViewerToken } from '@/lib/device-auth/device-auth-viewer-token';
 import { createPagesAuthCode } from '@/lib/pages-auth/pages-auth-code';
 import { getUserAuthProviders } from '@/lib/user';
@@ -19,7 +19,8 @@ jest.mock('@kilocode/web-shared/lib/user/find-user-by-id', () => ({
   findUserById: jest.fn(),
 }));
 
-jest.mock('@kilocode/web-shared/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/domain-gates', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/user/domain-gates'),
   isUserBlacklistedByDomain: jest.fn(),
 }));
 

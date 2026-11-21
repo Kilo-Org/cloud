@@ -13,12 +13,9 @@ export type RedisKey = string & {
 
 const redisKey = <const Key extends string>(key: Key): Key & RedisKey => key as Key & RedisKey;
 
-/** Signup TLD blocklist and audit fields; the domains themselves live in Postgres. */
+/** Legacy signup settings key; persistent values are cleaned up best-effort after an admin save. */
 export const BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY = redisKey('admin:blacklisted-domains:settings');
-/**
- * The former combined settings and domain list. Read once to migrate its settings, and deleted
- * with its companion key by the next admin save.
- */
+/** Legacy combined settings and domain-list keys; current signup settings reads ignore them. */
 export const LEGACY_BLACKLIST_DOMAINS_REDIS_KEY = redisKey('admin:blacklisted-domains');
 export const LEGACY_BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY = redisKey(
   'admin:blacklisted-domains:updated-at'
@@ -40,14 +37,32 @@ export const codingPlanUsageRedisKey = (input: {
 /** `digest` is a hex SHA-256 over the envelope and its KMS context; see `data-key-cache.ts`. */
 export const byokDataKeyRedisKey = (digest: string) => redisKey(`byok-data-key:v1:${digest}`);
 
+/** `digest` is a hex SHA-256 over the caller, partner and prompt cache key; see `partner-upstream-error-cache.ts`. */
+export const partnerUpstreamErrorRedisKey = (digest: string) =>
+  redisKey(`partner-upstream-error:v1:${digest}`);
+
 export const LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY = redisKey(
   'public-api:leaderboard-model-provider-usage'
 );
 export const LEADERBOARD_MODEL_USAGE_REDIS_KEY = redisKey('public-api:leaderboard-model-usage');
 export const LEADERBOARD_PROVIDER_RACE_REDIS_KEY = redisKey('public-api:leaderboard-provider-race');
 
+/** Enkrypt guardrail calls started in one minute; `minute` counts minutes since the Unix epoch. */
+export const enkryptCallsMinuteRedisKey = (minute: number) =>
+  redisKey(`enkrypt:calls:v1:${minute}`);
+
 export const nonTrialEnterpriseRedisKey = (organizationId: string) =>
   redisKey(`organization:non-trial-enterprise:${organizationId}`);
+
+/** Anonymized AI-adoption aggregates for an organization over one rounded date range. */
+export const organizationAIAdoptionRedisKey = (input: {
+  organizationId: string;
+  startDate: string;
+  endDate: string;
+}) =>
+  redisKey(
+    `organization:ai-adoption:v1:${input.organizationId}:${input.startDate}:${input.endDate}`
+  );
 
 export const botIdentityRedisKey = (platform: string, teamId: string, userId: string) =>
   redisKey(`identity:${platform}:${teamId}:${userId}`);

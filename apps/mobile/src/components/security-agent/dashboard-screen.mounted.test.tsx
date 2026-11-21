@@ -14,8 +14,12 @@ import { createElement, type ReactElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as OrganizationsModule from '@kilocode/app-shared/organizations';
 import type * as SecurityAgentModule from '@kilocode/app-shared/security-agent';
 import { i18n } from '@/i18n';
+import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
+import { billingHrefFor } from '@/lib/trial-refusal';
+import { TRIAL_ENDED_BILLING_COPY_KEY, TRIAL_ENDED_COPY_KEY } from '@/lib/trial-refusal-copy';
 import {
   mapSecuritySyncOperationError,
   SECURITY_AMBIGUOUS_MESSAGE,
@@ -41,6 +45,12 @@ const CONFIGURATION_COPY = vi.hoisted(
 const RECONCILE_COPY = vi.hoisted(
   () => 'A sync may not have completed. Retry to reconcile it, or discard.'
 );
+
+// The two sentences the trial refusal has, one per reader, and the step the
+// billing one offers.
+const TRIAL_MEMBER_COPY = i18n.t(TRIAL_ENDED_COPY_KEY);
+const TRIAL_BILLING_COPY = i18n.t(TRIAL_ENDED_BILLING_COPY_KEY);
+const BILLING_ACTION_LABEL = i18n.t('organization.hub.manageBilling');
 
 const triggerSync = vi.hoisted(() => ({
   mutate: vi.fn(),
@@ -101,7 +111,12 @@ const recoveryStatus = vi.hoisted(() => ({
   renders: [] as { message?: string; isRetrying: boolean; onRetry: () => void }[],
 }));
 const dismissFailures = vi.hoisted(() => ({
-  failures: [] as { findingId: string; lastError: string; retryable: boolean | null }[],
+  failures: [] as {
+    findingId: string;
+    lastError: string;
+    lastErrorKey: string | null;
+    retryable: boolean | null;
+  }[],
   clear: vi.fn(),
   refresh: vi.fn(),
 }));
@@ -157,6 +172,7 @@ const retryCards = vi.hoisted(() => ({
   cards: [] as {
     lastError: string;
     retryable: boolean;
+    action?: { label: string; onPress: () => void };
     onRetry?: () => void;
     onDiscard?: () => void;
   }[],
@@ -185,8 +201,12 @@ vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
   RefreshControl: 'RefreshControl',
+  useWindowDimensions: () => ({ width: 390, height: 844 }),
+  Platform: { OS: 'android' },
 }));
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: () => undefined }));
 vi.mock('@/components/ui/icons', () => ({
+  FolderGit2: 'FolderGit2',
   RefreshCw: 'RefreshCw',
   Settings: 'Settings',
   ShieldAlert: 'ShieldAlert',
@@ -200,6 +220,20 @@ vi.mock('expo-router', () => ({
     focusEffect.effect = effect;
   },
 }));
+// The refusal hooks read the reader's role through the organization query
+// chain; this harness has no organization provider and the chain pulls the Expo
+// runtime it cannot load, so the boundary is stubbed and the real money-role
+// rule decides from the role a case sets.
+const trialRole = vi.hoisted(() => ({ role: undefined as string | undefined }));
+vi.mock('@/lib/hooks/use-organization-queries', async () => {
+  const { canManageOrganizationBilling } = await vi.importActual<typeof OrganizationsModule>(
+    '@kilocode/app-shared/organizations'
+  );
+  return {
+    isMoneyRole: canManageOrganizationBilling,
+    useOrgBoundary: () => ({ role: trialRole.role }),
+  };
+});
 vi.mock('@/lib/hooks/use-manage-repository-access', () => ({
   useManageRepositoryAccess: (
     _scope: string,
@@ -256,6 +290,7 @@ vi.mock('@/components/security-agent/security-command-retry-card', () => ({
   SecurityCommandRetryCard: (props: {
     lastError: string;
     retryable: boolean;
+    action?: { label: string; onPress: () => void };
     onRetry?: () => void;
     onDiscard?: () => void;
   }) => {
@@ -286,12 +321,12 @@ vi.mock('@/lib/utils', () => ({
   parseTimestamp: (value: string) => value,
   timeAgo: () => 'recently',
 }));
-// The header the dashboard paints: its title names the scope, the eyebrow the
-// product. Captured per render so a test can assert what a reader reads.
+// The header the dashboard paints: its title names the product, the subtitle
+// the scope. Captured per render so a test can assert what a reader reads.
 const headers = vi.hoisted(() => ({
   props: [] as {
     title?: string;
-    eyebrow?: string;
+    subtitle?: string;
     headerRight?: unknown;
     headerRightWidth?: number;
   }[],
@@ -299,7 +334,7 @@ const headers = vi.hoisted(() => ({
 // The shared membership list the scope title resolves from. The title never
 // fetches it, so the mock only needs the cache key it reads.
 vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: (props: { title?: string; eyebrow?: string }) => {
+  ScreenHeader: (props: { title?: string; subtitle?: string }) => {
     headers.props.push(props);
     return null;
   },
@@ -484,6 +519,23 @@ function preconditionError(upstreamCode: string): Error {
   );
 }
 
+/** The lapsed-trial refusal as the organization gate sends it. */
+function trialRefusalError(): Error {
+  return Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+    data: { code: 'FORBIDDEN' },
+  });
+}
+
+/** The billing step a refusal renders under the sentence that names it. */
+function billingSteps(root: I): I[] {
+  return root.findAll(
+    n =>
+      typeof n.type === 'string' &&
+      (n.type as string) === 'Pressable' &&
+      n.props.accessibilityLabel === BILLING_ACTION_LABEL
+  );
+}
+
 function dashboardMetric(id: string) {
   return { id, label: '', value: '', detail: '', tone: 'neutral' as const };
 }
@@ -497,24 +549,24 @@ describe('DashboardScreen names the scope it acts on', () => {
       { organizationId: 'org_123', organizationName: 'Drain Labs', role: 'owner' },
     ]);
     const header = headers.props.at(-1);
-    expect(header?.title).toBe('Drain Labs');
-    expect(header?.eyebrow).toBe('Security Agent');
+    expect(header?.title).toBe('Security Agent');
+    expect(header?.subtitle).toBe('Drain Labs');
   });
 
   it('names the personal scope', () => {
     headers.props = [];
     renderScreen('personal');
     const header = headers.props.at(-1);
-    expect(header?.title).toBe('Personal');
-    expect(header?.eyebrow).toBe('Security Agent');
+    expect(header?.title).toBe('Security Agent');
+    expect(header?.subtitle).toBe('Personal');
   });
 
   it('keeps the header line while the membership list loads', () => {
     headers.props = [];
     renderScreen('org_123');
     const header = headers.props.at(-1);
-    expect(header?.title).toBe('Organization');
-    expect(header?.eyebrow).toBe('Security Agent');
+    expect(header?.title).toBe('Security Agent');
+    expect(header?.subtitle).toBe('Organization');
   });
 });
 
@@ -1724,7 +1776,9 @@ describe('DashboardScreen dismiss failure card states', () => {
   });
 
   it('renders a retry card with the error and Retry for a retryable failure', () => {
-    dismissFailures.failures = [{ findingId: 'f1', lastError: 'Network error', retryable: true }];
+    dismissFailures.failures = [
+      { findingId: 'f1', lastError: 'Network error', lastErrorKey: null, retryable: true },
+    ];
     renderScreen();
 
     expect(retryCards.cards).toHaveLength(1);
@@ -1734,7 +1788,12 @@ describe('DashboardScreen dismiss failure card states', () => {
 
   it('renders a retry card with the error and no Retry for a non-retryable failure', () => {
     dismissFailures.failures = [
-      { findingId: 'f1', lastError: 'Security service is not configured', retryable: false },
+      {
+        findingId: 'f1',
+        lastError: 'Security service is not configured',
+        lastErrorKey: null,
+        retryable: false,
+      },
     ];
     renderScreen();
 
@@ -1744,7 +1803,9 @@ describe('DashboardScreen dismiss failure card states', () => {
   });
 
   it('drops the card after accept by clearing the failure', () => {
-    dismissFailures.failures = [{ findingId: 'f1', lastError: 'boom', retryable: true }];
+    dismissFailures.failures = [
+      { findingId: 'f1', lastError: 'boom', lastErrorKey: null, retryable: true },
+    ];
     renderScreen();
     expect(retryCards.cards).toHaveLength(1);
 
@@ -1920,7 +1981,7 @@ describe('DashboardScreen pending stats', () => {
         n =>
           typeof n.type === 'string' &&
           (n.type as string) === 'View' &&
-          String(n.props.className ?? '').includes('rounded-lg bg-secondary p-3')
+          String(n.props.className ?? '').includes('basis-2/5')
       )
       .map(n => String(n.props.className));
   }
@@ -2105,19 +2166,19 @@ describe('DashboardLoadingView frame', () => {
       .map(action => (action ? action.props.accessibilityLabel : undefined))
       .filter((label): label is string => label !== undefined);
 
-    expect(header.eyebrow).toBe(i18n.t('common.securityAgent'));
+    expect(header.title).toBe(i18n.t('common.securityAgent'));
     expect(labels).toEqual([i18n.t('common.findings'), i18n.t('securityAgent.dashboard.settings')]);
     expect(renderedTexts(root.root)).toContain(i18n.t('common.allRepositories'));
     expect(findSyncButton(root.root).props.disabled).toBe(true);
     const skeletons = root.root.findAll(
       n => typeof n.type === 'string' && (n.type as string) === 'Skeleton'
     );
-    // Four tile slots on the loaded card's own class, each with the card's three
+    // Four tile slots on the loaded card's own frame, each with the card's three
     // line boxes (label, value, detail), plus the status line's placeholder,
     // which keeps that line's height until the read lands.
     expect(
       root.root.findAll(
-        n => typeof n.type === 'string' && String(n.props.className).includes('w-[47%]')
+        n => typeof n.type === 'string' && String(n.props.className).includes('basis-2/5')
       )
     ).toHaveLength(4);
     expect(skeletons).toHaveLength(13);
@@ -2133,6 +2194,140 @@ describe('DashboardLoadingView frame', () => {
     renderElement(createElement(DashboardLoadingView, { scope: 'personal' }));
 
     expect(sectionsSkeletonProps.props).toEqual([{ slaEnabled: true, neverSynced: false }]);
+  });
+});
+
+describe('DashboardScreen trial refusal (reader role)', () => {
+  const ORG_SCOPE = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+  beforeEach(() => {
+    triggerSync.mutate.mockClear();
+    triggerSync.reset.mockClear();
+    triggerSync.isPending = false;
+    triggerSync.isError = false;
+    triggerSync.error = null;
+    syncActivity.syncRunning = false;
+    syncActivity.updatedAt = 0;
+    syncActivity.readFailedAt = 0;
+    router.push.mockClear();
+    manageAccess.onReturn = undefined;
+    config.data = { slaEnabled: true };
+    dashboardStats.isPending = false;
+    dashboardStats.isError = false;
+    dashboardStats.data = { sla: { overall: { total: 0 } } };
+    lastSync.data = undefined;
+    lastSync.isError = false;
+    repositories.isLoading = false;
+    repositories.isError = false;
+    repositories.data = [];
+    capability.canManage = false;
+    capability.status = 'allowed';
+    dismissFailures.failures = [];
+    dismissFailures.clear.mockClear();
+    dismissFailures.refresh.mockClear();
+    outbox.needsReconcile = [];
+    outbox.remove.mockClear();
+    outbox.refresh.mockClear();
+    retryCards.cards = [];
+    focusEffect.effect = undefined;
+    sharedMetrics.build.mockReturnValue([]);
+    trialRole.role = undefined;
+  });
+
+  it('gives a billing role the trial sentence and the step that opens billing', () => {
+    trialRole.role = 'owner';
+    triggerSync.isError = true;
+    triggerSync.error = mapSecuritySyncOperationError(trialRefusalError(), true);
+
+    const root = renderScreen(ORG_SCOPE);
+
+    expect(renderedTexts(root.root)).toContain(TRIAL_BILLING_COPY);
+    expect(renderedTexts(root.root)).not.toContain(TRIAL_MEMBER_COPY);
+    const [step] = billingSteps(root.root);
+    if (!step) {
+      throw new Error('the refusal rendered no billing step');
+    }
+    act(() => {
+      (step.props.onPress as () => void)();
+    });
+    expect(router.push).toHaveBeenCalledWith(billingHrefFor(ORG_SCOPE));
+  });
+
+  it('keeps every other role on the owner-naming sentence, with no step', () => {
+    trialRole.role = 'member';
+    triggerSync.isError = true;
+    triggerSync.error = mapSecuritySyncOperationError(trialRefusalError());
+
+    const root = renderScreen(ORG_SCOPE);
+
+    expect(renderedTexts(root.root)).toContain(TRIAL_MEMBER_COPY);
+    expect(renderedTexts(root.root)).not.toContain(TRIAL_BILLING_COPY);
+    expect(billingSteps(root.root)).toHaveLength(0);
+    // A trial refusal is still terminal: the fix is the plan, not a resubmit.
+    expect(syncDisabled(root.root)).toBe(true);
+  });
+
+  it('keeps a retryable failure on its ink, its retry and no billing step', () => {
+    trialRole.role = 'owner';
+    triggerSync.isError = true;
+    triggerSync.error = mapSecuritySyncOperationError(
+      new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE)
+    );
+
+    const root = renderScreen(ORG_SCOPE);
+
+    expect(billingSteps(root.root)).toHaveLength(0);
+    expect(syncFailureActions(root.root)).toHaveLength(1);
+    expect(syncDisabled(root.root)).toBe(false);
+  });
+
+  it('adds the billing step to a stored trial refusal, and only for a billing role', () => {
+    trialRole.role = 'owner';
+    dismissFailures.failures = [
+      {
+        findingId: 'f1',
+        lastError: TRIAL_BILLING_COPY,
+        lastErrorKey: TRIAL_ENDED_BILLING_COPY_KEY,
+        retryable: false,
+      },
+    ];
+
+    renderScreen(ORG_SCOPE);
+
+    expect(retryCards.cards[0]?.lastError).toBe(TRIAL_BILLING_COPY);
+    expect(retryCards.cards[0]?.action?.label).toBe(BILLING_ACTION_LABEL);
+  });
+
+  it('leaves a stored trial refusal without a step for a member', () => {
+    trialRole.role = 'member';
+    dismissFailures.failures = [
+      {
+        findingId: 'f1',
+        lastError: TRIAL_MEMBER_COPY,
+        lastErrorKey: TRIAL_ENDED_COPY_KEY,
+        retryable: false,
+      },
+    ];
+
+    renderScreen(ORG_SCOPE);
+
+    expect(retryCards.cards[0]?.action).toBeUndefined();
+  });
+
+  it('leaves a stored failure that is not the trial refusal without a step', () => {
+    trialRole.role = 'owner';
+    dismissFailures.failures = [
+      {
+        findingId: 'f1',
+        lastError: PERSISTENCE_FAILED_MESSAGE,
+        lastErrorKey: 'securityAgent.mutations.actionBlocked',
+        retryable: false,
+      },
+    ];
+
+    renderScreen(ORG_SCOPE);
+
+    expect(retryCards.cards[0]?.action).toBeUndefined();
   });
 });
 

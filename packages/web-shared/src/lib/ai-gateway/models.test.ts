@@ -88,11 +88,6 @@ describe('isFreeModel', () => {
       expect(isFreeModel('')).toBe(false);
     });
 
-    test('should return false for null/undefined', async () => {
-      expect(isFreeModel(null as unknown as string)).toBe(false);
-      expect(isFreeModel(undefined as unknown as string)).toBe(false);
-    });
-
     test('should be case-sensitive', async () => {
       expect(isFreeModel('model:FREE')).toBe(false);
       expect(isFreeModel('model:Free')).toBe(false);

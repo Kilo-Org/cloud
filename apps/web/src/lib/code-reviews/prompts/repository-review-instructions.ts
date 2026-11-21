@@ -1,6 +1,6 @@
 export const REVIEW_INSTRUCTIONS_FILE = 'REVIEW.md';
 
-const MAX_REVIEW_INSTRUCTIONS_CHARS = 10_000;
+export const MAX_REVIEW_INSTRUCTIONS_CHARS = 20_000;
 const TRUNCATION_NOTE = `\n\n[${REVIEW_INSTRUCTIONS_FILE} truncated after ${MAX_REVIEW_INSTRUCTIONS_CHARS} characters.]`;
 
 export type NormalizedRepositoryReviewInstructions = {
@@ -13,13 +13,7 @@ export function normalizeRepositoryReviewInstructions(
 ): NormalizedRepositoryReviewInstructions | null {
   if (rawContent == null) return null;
 
-  const content = rawContent
-    .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n')
-    .split('')
-    .filter(character => !isUnsafeControlCharacter(character))
-    .join('')
-    .trim();
+  const content = cleanReviewInstructions(rawContent);
 
   if (content.length === 0) return null;
 
@@ -28,9 +22,20 @@ export function normalizeRepositoryReviewInstructions(
   }
 
   return {
-    content: content.slice(0, MAX_REVIEW_INSTRUCTIONS_CHARS) + TRUNCATION_NOTE,
+    content:
+      content.slice(0, MAX_REVIEW_INSTRUCTIONS_CHARS - TRUNCATION_NOTE.length) + TRUNCATION_NOTE,
     truncated: true,
   };
+}
+
+export function cleanReviewInstructions(rawContent: string): string {
+  return rawContent
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split('')
+    .filter(character => !isUnsafeControlCharacter(character))
+    .join('')
+    .trim();
 }
 
 function isUnsafeControlCharacter(character: string): boolean {

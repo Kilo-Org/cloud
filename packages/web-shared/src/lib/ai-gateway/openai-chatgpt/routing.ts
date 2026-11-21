@@ -1,11 +1,18 @@
 import { z } from 'zod';
-import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
+import { ReasoningEffortSchema, type ReasoningEffort } from '@kilocode/db/schema-types';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { claimReportWindow } from '@kilocode/web-shared/lib/ai-gateway/report-window';
+import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import { isGptOssModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type {
+  GatewayRequest,
+  GatewayResponsesRequest,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { OPENAI_CHATGPT_RECONNECT_MESSAGE, resolveOpenAiChatGptAccessToken } from './refresh';
+import { openAiChatGptConnectorGone } from './connector';
 import {
   getOpenAiChatGptStoredConnection,
   openAiChatGptSharedServicesOwner,
@@ -13,6 +20,7 @@ import {
   type OpenAiChatGptStoredConnection,
 } from './store';
 import { isOpenAiModelServed } from './served-models';
+import { OPENAI_CHATGPT_PROVIDER_ID } from './provider-id';
 import { OPENAI_CHATGPT_API_KEY_ENV, OPENAI_CHATGPT_API_URL } from './upstream';
 
 /**
@@ -21,10 +29,16 @@ import { OPENAI_CHATGPT_API_KEY_ENV, OPENAI_CHATGPT_API_URL } from './upstream';
  * on the delegated token instead of a managed gateway.
  */
 
-/** The delegated upstream URL, shared with the served-model lookup. */
-export { OPENAI_CHATGPT_API_URL };
-
-export { OPENAI_CHATGPT_API_KEY_ENV };
+/**
+ * Shown on the organization's shared connection card when the person recorded
+ * as its connector is gone: the account row is missing, the account is
+ * soft-deleted or being deleted, or it holds no usable email. The row belongs
+ * to the organization, so an organization owner or admin reconnects it instead
+ * of losing it. Routing never refuses on this: it skips the shared row and
+ * falls back to the caller's own connection.
+ */
+export const OPENAI_CHATGPT_SHARED_RECONNECT_MESSAGE =
+  'The account that connected the shared-services ChatGPT connection for this organization is no longer available. An organization owner or admin can reconnect it.';
 
 /**
  * The delegated access token travels in its own upstream header. `extraHeaders`
@@ -61,7 +75,7 @@ const UNSUPPORTED_REASONING_FIELDS = ['enabled', 'exclude', 'max_tokens', 'gener
 const reasoningEffortUpdateSchema = z.strictObject({
   type: z.literal('configuration_update'),
   id: z.string().optional(),
-  reasoning: z.strictObject({ effort: ReasoningEffortSchema }),
+  reasoning: z.strictObject({ effort: ReasoningEffortSchema.or(z.literal('ultra')) }),
 });
 
 /**
@@ -86,8 +100,11 @@ export function withTraceabilityMetadata(
 
   const merged: Record<string, string> = { ...(metadata ?? {}), ...traceability };
   const removable = Object.keys(merged).filter(key => !(key in traceability));
-  while (Object.keys(merged).length > METADATA_ENTRY_LIMIT && removable.length > 0) {
-    delete merged[removable.shift() as string];
+  const excess = Object.keys(merged).length - METADATA_ENTRY_LIMIT;
+  if (excess > 0) {
+    for (const key of removable.slice(0, excess)) {
+      delete merged[key];
+    }
   }
   return merged;
 }
@@ -183,29 +200,34 @@ function openAiChatGptOwnerCandidates(input: OpenAiChatGptRoutingInput): OpenAiC
 }
 
 /**
- * An enabled, readable ChatGPT connection makes a delegated OpenAI model
- * eligible. The partner project key is deliberately not part of this check: a
- * missing deployment credential must not hide the person's connection state.
- * The delegated-token flow is accepted only by `POST /v1/responses`: a
- * `chat/completions` request for the same model keeps its current route, and
- * declaring `chat_completions` support here would make the gateway answer the
- * person with an api-kind error instead of their existing provider.
- */
-export async function isOpenAiChatGptEligible(input: OpenAiChatGptRoutingInput): Promise<boolean> {
-  const [owner] = openAiChatGptOwnerCandidates(input);
-  if (!owner) return false;
-  return (await eligibleUpstreamModelForOwner(input, owner)) !== null;
-}
-
-/**
  * Whether a stored row may serve traffic. The payload's `status` mirrors a save
  * or a terminal failure, but a person can also disable the row through the
  * ordinary BYOK toggle, which leaves the payload saying `connected`. Both the
  * enable flag and a connected status must hold for the route to be eligible and
  * for the models list to carry the BYOK tag.
  */
-function isUsableStoredConnection(stored: OpenAiChatGptStoredConnection | null): boolean {
+function isUsableStoredConnection(
+  stored: OpenAiChatGptStoredConnection | null
+): stored is OpenAiChatGptStoredConnection {
   return stored?.isEnabled === true && stored.connection.status === 'connected';
+}
+
+/**
+ * A shared connector that cannot serve stays in that state until an owner or
+ * admin reconnects it, so the report describes one standing fact rather than an
+ * event. The shared report window keeps that fact visible without repeating it
+ * on every request, and bounds the keys it remembers.
+ */
+function logSharedConnectorGone(organizationId: string, connectorId: string): void {
+  const key = `openai-chatgpt-shared-connector-gone:${organizationId}:${connectorId}`;
+  if (!claimReportWindow(key, Date.now())) return;
+  logExceptInTest(
+    JSON.stringify({
+      type: 'openai_chatgpt_shared_connector_gone',
+      organizationId,
+      connectorId,
+    })
+  );
 }
 
 /**
@@ -222,23 +244,28 @@ async function eligibleUpstreamModelForOwner(
   );
   if (!upstreamModel) return null;
 
-  // The catalog can list an OpenAI model the plain API does not serve. A
-  // `-pro` slug such as `openai/gpt-5.6-luna-pro` is a reasoning mode on the
-  // base model, not an API model id, so sending it upstream fails the request.
-  // Only a model this project actually serves may take the delegated route.
   if (!(await isOpenAiModelServed(getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV), upstreamModel))) {
     return null;
   }
 
   const stored = await getOpenAiChatGptStoredConnection(owner);
-  return isUsableStoredConnection(stored) ? upstreamModel : null;
+  if (!isUsableStoredConnection(stored)) return null;
+
+  if (owner.scope === 'shared_services' && (await openAiChatGptConnectorGone(stored))) {
+    logSharedConnectorGone(owner.organizationId, stored.createdBy);
+    return null;
+  }
+
+  return upstreamModel;
 }
 
 /**
  * The catalog model ids an enabled ChatGPT connection can serve, for the models
- * list's BYOK tag. Returns null when the person has no usable connection, so the
- * caller leaves the list untouched. The served-model gate is the same one
- * routing uses, so a model is tagged only when the delegated route can carry it.
+ * list's BYOK tag. Returns null when the usable connection is not there, so the
+ * caller leaves the list untouched: a person with no usable connection, or an
+ * organization's shared connection whose recorded connector is gone. The
+ * served-model gate is the same one routing uses, so a model is tagged only when
+ * the delegated route can carry it.
  */
 export async function getOpenAiChatGptByokModelIds(
   owner: OpenAiChatGptOwner,
@@ -246,6 +273,10 @@ export async function getOpenAiChatGptByokModelIds(
 ): Promise<Set<string> | null> {
   const stored = await getOpenAiChatGptStoredConnection(owner);
   if (!isUsableStoredConnection(stored)) return null;
+
+  if (owner.scope === 'shared_services' && (await openAiChatGptConnectorGone(stored))) {
+    return null;
+  }
 
   const apiKey = getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV);
   if (apiKey.trim().length === 0) return null;
@@ -280,6 +311,99 @@ export async function tagOpenAiChatGptByokModels<
   );
 }
 
+function normalizeReasoningEffort(
+  effort: unknown,
+  model: string,
+  normalizations: Set<string>
+): ReasoningEffort | undefined {
+  // https://developers.openai.com/api/docs/models/gpt-6.1-sol
+  if (effort === 'ultra' && model === 'gpt-6.1-sol') {
+    normalizations.add('reasoning_effort_ultra_to_max');
+    return 'max';
+  }
+  const parsed = ReasoningEffortSchema.safeParse(effort);
+  if (parsed.success) return parsed.data;
+  normalizations.add('reasoning_effort_removed');
+  return undefined;
+}
+
+function normalizeInputItems(
+  body: GatewayResponsesRequest,
+  upstreamModel: string,
+  normalizations: Set<string>
+): void {
+  const input: unknown = body.input;
+  if (!Array.isArray(input)) return;
+
+  // Subscription sharing rejects inline updates; promoting effort can break prompt-cache reuse.
+  const normalizedInput = input.filter(item => {
+    const update = reasoningEffortUpdateSchema.safeParse(item);
+    if (!update.success) return true;
+    body.reasoning = {
+      ...body.reasoning,
+      effort: normalizeReasoningEffort(update.data.reasoning.effort, upstreamModel, normalizations),
+    };
+    normalizations.add('reasoning_effort_update_promoted');
+    return false;
+  });
+  body.input = normalizedInput;
+
+  for (const item of normalizedInput) {
+    if (!isRecord(item)) continue;
+
+    if (item.type === 'reasoning' && 'encrypted_content' in item && !('summary' in item)) {
+      item.summary = [];
+      normalizations.add('reasoning_summary_added');
+    }
+
+    if (
+      (item.type === 'function_call' || item.type === 'custom_tool_call') &&
+      item.namespace == null &&
+      typeof item.name === 'string' &&
+      Array.isArray(body.tools)
+    ) {
+      const toolType = item.type === 'function_call' ? 'function' : 'custom';
+      if (
+        body.tools.some(
+          tool => isRecord(tool) && tool.type !== 'namespace' && tool.name === item.name
+        )
+      ) {
+        continue;
+      }
+      const namespaces = body.tools.flatMap(tool =>
+        isRecord(tool) &&
+        tool.type === 'namespace' &&
+        typeof tool.name === 'string' &&
+        Array.isArray(tool.tools) &&
+        tool.tools.some(
+          nestedTool =>
+            isRecord(nestedTool) && nestedTool.type === toolType && nestedTool.name === item.name
+        )
+          ? [tool.name]
+          : []
+      );
+      if (namespaces.length === 1) {
+        item.namespace = namespaces[0];
+        normalizations.add('tool_namespace_added');
+      }
+    }
+  }
+}
+
+function defaultFunctionToolStrict(tools: GatewayResponsesRequest['tools']): boolean {
+  if (!Array.isArray(tools)) return false;
+
+  // Avoid Responses auto-strict reinterpretation of caller-supplied function schemas.
+  let changed = false;
+  for (const tool of tools) {
+    if (tool?.type === 'function' && tool.strict === undefined) {
+      tool.strict = false;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 /**
  * Builds the provider that serves the delegated request. Returns null when the
  * partner key is missing: the deployment is misconfigured for token sharing, so
@@ -298,8 +422,8 @@ export function buildOpenAiChatGptProvider(
   if (apiKey.trim().length === 0) return null;
 
   return {
-    type: 'openai-chatgpt',
-    inferenceProviderId: 'openai-chatgpt',
+    type: OPENAI_CHATGPT_PROVIDER_ID,
+    inferenceProviderId: OPENAI_CHATGPT_PROVIDER_ID,
     ...(owner ? { chatGptOwner: owner } : {}),
     apiUrl: OPENAI_CHATGPT_API_URL,
     apiUrlOverrides: {},
@@ -319,47 +443,79 @@ export function buildOpenAiChatGptProvider(
       context.extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER] = accessToken;
 
       const body = context.request.body;
+      const normalizations = new Set<string>();
+      if (body.model !== upstreamModel) normalizations.add('model_prefix_removed');
       body.model = upstreamModel;
       // Stored conversations, background mode and hosted tools are not
       // supported by the delegated flow, so the request is forced stateless.
+      if (body.store !== false) normalizations.add('store_disabled');
       body.store = false;
-      delete body.conversation;
-      delete body.background;
-      // The gateway-only routing object is not part of the OpenAI API and
-      // api.openai.com rejects unknown request arguments, exactly like the
-      // other raw upstream providers strip it.
-      delete body.provider;
-      // Subscription sharing accepts only `auto` and `default`, which match the
-      // behavior without a tier, and rejects every other tier.
-      delete body.service_tier;
-      // The reasoning models served on this route reject sampling parameters
-      // with `unsupported_parameter`.
-      delete body.temperature;
-      delete body.top_p;
+      // Subscription sharing rejects gateway routing, non-default tiers, and sampling parameters.
+      for (const field of [
+        'conversation',
+        'background',
+        'provider',
+        'service_tier',
+        'temperature',
+        'top_p',
+      ]) {
+        if (Object.hasOwn(body, field)) {
+          Reflect.deleteProperty(body, field);
+          normalizations.add(`${field}_removed`);
+        }
+      }
+      if (defaultFunctionToolStrict(body.tools))
+        normalizations.add('function_tool_strict_defaulted');
       if (
         typeof body.max_output_tokens === 'number' &&
         body.max_output_tokens < MIN_MAX_OUTPUT_TOKENS
       ) {
         body.max_output_tokens = MIN_MAX_OUTPUT_TOKENS;
+        normalizations.add('max_output_tokens_clamped');
       }
-      // Subscription sharing rejects inline updates; changing request-level effort can break cache reuse.
-      if (Array.isArray(body.input)) {
-        body.input = body.input.filter(item => {
-          const update = reasoningEffortUpdateSchema.safeParse(item);
-          if (!update.success) return true;
-          body.reasoning = { ...body.reasoning, effort: update.data.reasoning.effort };
-          return false;
-        });
+
+      const streamOptions: unknown = body.stream_options;
+      if (isRecord(streamOptions) && 'include_usage' in streamOptions) {
+        delete streamOptions.include_usage;
+        normalizations.add('stream_options_include_usage_removed');
+        if (Object.keys(streamOptions).length === 0) delete body.stream_options;
       }
-      if (body.reasoning) {
+
+      normalizeInputItems(body, upstreamModel, normalizations);
+      const reasoning: unknown = body.reasoning;
+      if (isRecord(reasoning)) {
         for (const field of UNSUPPORTED_REASONING_FIELDS) {
-          Reflect.deleteProperty(body.reasoning, field);
+          if (Object.hasOwn(reasoning, field)) {
+            delete reasoning[field];
+            normalizations.add(`reasoning_${field}_removed`);
+          }
+        }
+        if ('effort' in reasoning) {
+          const effort = normalizeReasoningEffort(reasoning.effort, upstreamModel, normalizations);
+          if (effort === undefined) delete reasoning.effort;
+          else reasoning.effort = effort;
         }
       }
       // OpenAI requires this traceability metadata on every delegated Responses
       // request, including later turns. Without it the request is rejected once
       // the integration is enabled for it.
-      body.metadata = withTraceabilityMetadata(body.metadata, context.session_id);
+      const metadata = withTraceabilityMetadata(body.metadata, context.session_id);
+      if (
+        Object.keys(metadata).length !== Object.keys(body.metadata ?? {}).length ||
+        Object.entries(metadata).some(([key, value]) => body.metadata?.[key] !== value)
+      ) {
+        normalizations.add('traceability_metadata_added');
+      }
+      body.metadata = metadata;
+      if (normalizations.size > 0) {
+        logExceptInTest(
+          JSON.stringify({
+            type: 'openai_chatgpt_request_normalized',
+            model: upstreamModel,
+            normalizations: [...normalizations],
+          })
+        );
+      }
     },
   };
 }

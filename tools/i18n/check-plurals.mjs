@@ -43,7 +43,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { isTranslateCallee, propertyName, unwrap, walk } from '../lib/ast.mjs';
+import { isTranslateCallee, propertyName, stringLiteralValue, unwrap, walk } from '../lib/ast.mjs';
 import {
   catalogTags,
   declaresPluralFamily,
@@ -51,7 +51,7 @@ import {
   missingPluralCategories,
 } from '../lib/catalogs.mjs';
 import { runIfMain } from '../lib/entry-point.mjs';
-import { isTestArtifact, parseSourceTree } from '../lib/source-files.mjs';
+import { isTestArtifact, parseSourceTree, readSourceEntry } from '../lib/source-files.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const SOURCE_DIR = join(ROOT, 'apps/mobile/src');
@@ -145,6 +145,10 @@ export const NO_AGREEMENT = new Map([
   ],
   ['modelChat.mcp.connecting', 'carried count, no inflected word: "Connecting to Kilo tools…"'],
   ['modelChat.mcp.none', 'carried count, no inflected word: "No tools available"'],
+  [
+    'modelChat.mcp.notApplied',
+    'carried count, no inflected word: "Kilo tools were not added to this chat"',
+  ],
   ['modelChat.mcp.off', 'carried count, no inflected word: "Kilo tools are off"'],
   [
     'modelChat.mcp.unauthorized',
@@ -171,8 +175,9 @@ export const NO_AGREEMENT = new Map([
  * written the way the source writes it with its whitespace collapsed.
  */
 function countedKey(argument, text) {
-  if (argument.type === 'Literal' && typeof argument.value === 'string') {
-    return { key: argument.value };
+  const key = stringLiteralValue(argument);
+  if (key !== null) {
+    return { key };
   }
   if (argument.type === 'TemplateLiteral' && argument.expressions.length === 0) {
     const [chunk] = argument.quasis;
@@ -207,9 +212,10 @@ function countedCall(node, text) {
 }
 
 /**
- * One traversal of the source tree: every counted call, and every file the
- * parser refused. It is the one traversal the accessors below project from, so
- * an audit that asks several questions of the same tree scans it once.
+ * One traversal of the source tree: every counted call, and every file the walk
+ * could not read or the parser refused. It is the one traversal the accessors
+ * below project from, so an audit that asks several questions of the same tree
+ * scans it once.
  */
 export function auditCountedCalls(rootDir = SOURCE_DIR) {
   const calls = [];
@@ -237,7 +243,13 @@ export function auditCountedCalls(rootDir = SOURCE_DIR) {
  * It projects a scan the caller made once with `auditCountedCalls`.
  */
 export function collectCountedKeys(scan) {
-  return countedKeysFrom(scan.calls);
+  const keys = new Set();
+  for (const call of scan.calls) {
+    if (call.key !== undefined) {
+      keys.add(call.key);
+    }
+  }
+  return [...keys].sort();
 }
 
 /**
@@ -248,34 +260,8 @@ export function collectCountedKeys(scan) {
  * It projects a scan the caller made once with `auditCountedCalls`.
  */
 export function collectDynamicCountedCalls(scan) {
-  return dynamicCallsFrom(scan.calls);
-}
-
-/**
- * Every source file the parser refused, as one problem line per error. The
- * tree of such a file is empty, so its counted messages are invisible; saying
- * so keeps a syntax error from passing as a clean audit. It projects a scan the
- * caller made once with `auditCountedCalls`.
- */
-export function findUnparsedFiles(scan) {
-  return scan.problems;
-}
-
-/** The literal-key view of one collection of counted calls. */
-function countedKeysFrom(calls) {
-  const keys = new Set();
-  for (const call of calls) {
-    if (call.key !== undefined) {
-      keys.add(call.key);
-    }
-  }
-  return [...keys].sort();
-}
-
-/** The dynamic-expression view of one collection of counted calls. */
-function dynamicCallsFrom(calls) {
   const dynamic = new Set();
-  for (const call of calls) {
+  for (const call of scan.calls) {
     if (call.dynamic !== undefined) {
       dynamic.add(call.dynamic);
     }
@@ -284,17 +270,30 @@ function dynamicCallsFrom(calls) {
 }
 
 /**
+ * Every problem the tree scan made, as one line each: a file the parser refused
+ * or a file the walk could not read. A refused file's tree is empty, so its
+ * counted messages are invisible; an unreadable one was never read at all.
+ * Saying so keeps either failure from passing as a clean audit. It projects a
+ * scan the caller made once with `auditCountedCalls`.
+ */
+export function findUnparsedFiles(scan) {
+  return scan.problems;
+}
+
+/**
  * Every key the `McpStatusKey` union in `mcp-settings-state.ts` can name, in the
  * order the union lists them. Two call sites select from that union, so the
- * set is written once: a member added to the union is audited by adding it
- * here, and the audit then expects a plural family or its own `NO_AGREEMENT`
- * entry for it. The list decides which keys the audit looks at, never whether
- * their copy inflects.
+ * set is written once. The audit reads the union itself and names a member
+ * this list is missing, and a key this list carries that the union no longer
+ * names, so the two cannot drift apart. Each key still needs a plural family or
+ * its own `NO_AGREEMENT` entry: the list decides which keys the audit looks at,
+ * never whether their copy inflects.
  */
 const MCP_STATUS_KEYS = [
   'modelChat.mcp.available',
   'modelChat.mcp.connecting',
   'modelChat.mcp.none',
+  'modelChat.mcp.notApplied',
   'modelChat.mcp.off',
   'modelChat.mcp.unauthorized',
   'modelChat.mcp.unavailable',
@@ -303,22 +302,30 @@ const MCP_STATUS_KEYS = [
 
 /**
  * The variable-key counted calls the audit has reviewed, with the keys each
- * expression can produce and where that set is pinned. A key here is checked
- * exactly like a literal one: a plural family, or a `NO_AGREEMENT` entry.
+ * expression can produce, the app declaration it mirrors, and where that set is
+ * pinned: `source` is the module that owns the declaration, written relative to
+ * the repository root, and `declaration` is the type alias or const whose
+ * string keys are the set. A key here is checked exactly like a literal one — a
+ * plural family, or a `NO_AGREEMENT` entry — and the list itself is checked
+ * against its declaration by `checkDynamicCountedKeySources`.
  */
 export const DYNAMIC_COUNTED_KEYS = new Map([
   [
     'mcp.view.statusKey',
     {
       keys: MCP_STATUS_KEYS,
-      reason: 'McpStatusKey union in mcp-settings-state.ts; only the count-free statuses',
+      source: 'apps/mobile/src/components/chat/mcp-settings-state.ts',
+      declaration: 'McpStatusKey',
+      reason: 'every member of the McpStatusKey union',
     },
   ],
   [
     'kilo.statusKey',
     {
       keys: MCP_STATUS_KEYS,
-      reason: 'same McpStatusKey union through kiloServerRow in mcp-settings-state.ts',
+      source: 'apps/mobile/src/components/chat/mcp-settings-state.ts',
+      declaration: 'McpStatusKey',
+      reason: 'the same McpStatusKey union through kiloServerRow',
     },
   ],
   [
@@ -332,6 +339,8 @@ export const DYNAMIC_COUNTED_KEYS = new Map([
         'modelChat.mcp.serverUnreachable',
         'modelChat.mcpOAuth.serverNeedsSignIn',
       ],
+      source: 'apps/mobile/src/components/chat/mcp-settings-state.ts',
+      declaration: 'RemoteMcpStatusKey',
       reason: 'RemoteMcpStatusKey union in mcp-settings-state.ts; serverToolCount inflects',
     },
   ],
@@ -346,6 +355,8 @@ export const DYNAMIC_COUNTED_KEYS = new Map([
         'profiles.counts.setupCommands',
         'profiles.counts.agents',
       ],
+      source: 'apps/mobile/src/lib/profile-count-labels.ts',
+      declaration: 'COUNT_KEYS',
       reason: 'COUNT_KEYS map in profile-count-labels.ts; every unit word but MCP inflects',
     },
   ],
@@ -358,6 +369,8 @@ export const DYNAMIC_COUNTED_KEYS = new Map([
         'prReview.checks.pending',
         'prReview.checks.skipped',
       ],
+      source: 'apps/mobile/src/components/pr-review/pr-review-checks-status-row.tsx',
+      declaration: 'STATUS_LABEL_KEY',
       reason:
         'STATUS_LABEL_KEY map in pr-review-checks-status-row.tsx; passed, failed and skipped use plural families; pending remains invariant',
     },
@@ -373,24 +386,249 @@ export const DYNAMIC_COUNTED_KEYS = new Map([
         'securityAgent.dashboardMetrics.breakdownHigh',
         'securityAgent.dashboardMetrics.breakdownMediumLow',
       ],
+      source: 'apps/mobile/src/components/security-agent/severity-count-phrase.ts',
+      declaration: 'BUCKET_KEYS',
       reason:
         'BUCKET_KEYS map in severity-count-phrase.ts; each bucket of a dashboard line agrees with its own count',
     },
   ],
 ]);
 
-/** The English catalog, flattened. */
+/**
+ * The string keys one type node names, in the order it writes them. Each member
+ * of a union is a literal type holding the string, and the walk reads through
+ * any wrapper the parser keeps around a member, so a parenthesised member names
+ * its key like a bare one.
+ */
+function typeKeys(typeNode) {
+  const keys = [];
+  walk(typeNode, node => {
+    if (node.type !== 'TSLiteralType') {
+      return;
+    }
+    const key = stringLiteralValue(node.literal);
+    if (key !== null) {
+      keys.push(key);
+    }
+  });
+  return keys;
+}
+
+/**
+ * The string keys one const object declaration's initialiser names, in the
+ * order it writes them, or null when the initialiser is not an object. A
+ * property whose value is not a string literal names no key — a spread or a
+ * computed value, which these declarations do not use.
+ */
+function objectKeys(initializer) {
+  const object = unwrap(initializer);
+  if (object.type !== 'ObjectExpression') {
+    return null;
+  }
+  const keys = [];
+  for (const property of object.properties) {
+    if (property.type !== 'Property') {
+      continue;
+    }
+    const key = stringLiteralValue(property.value);
+    if (key !== null) {
+      keys.push(key);
+    }
+  }
+  return keys;
+}
+
+/**
+ * The noun phrase naming the initialiser shape `objectKeys` could not read.
+ * `unwrap` already reads through the TypeScript wrappers, so the shape is the
+ * node the check actually saw; spelling the node type as words keeps an
+ * unlisted expression readable in the diagnostic.
+ */
+function initializerShape(initializer) {
+  if (initializer === null) {
+    return 'no initializer';
+  }
+  const node = unwrap(initializer);
+  if (node.type === 'Identifier') {
+    return 'an identifier';
+  }
+  if (node.type === 'CallExpression') {
+    return 'a call expression';
+  }
+  if (node.type === 'TemplateLiteral') {
+    return 'a template literal';
+  }
+  if (node.type === 'MemberExpression') {
+    return 'a member expression';
+  }
+  if (node.type === 'ArrayExpression') {
+    return 'an array literal';
+  }
+  const words = node.type.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase();
+  return `${/^[aeiou]/.test(words) ? 'an' : 'a'} ${words}`;
+}
+
+/**
+ * The keys one declaration names, read from the syntax tree of the module that
+ * owns it: a union alias's members, or a const object's values, in the order
+ * the declaration writes them. `found` is false when the module declares no
+ * such alias or const, so a renamed declaration is reported instead of passing
+ * as an empty set; when it is declared but its initialiser is not a string-key
+ * object, `keys` is null and `shape` names what the check found instead.
+ */
+function declaredKeys(entry, declaration) {
+  let result = { found: false };
+  walk(entry.program, node => {
+    if (result.found) {
+      return;
+    }
+    if (node.type === 'TSTypeAliasDeclaration' && node.id.name === declaration) {
+      result = { found: true, keys: typeKeys(node.typeAnnotation), shape: null };
+      return;
+    }
+    if (
+      node.type !== 'VariableDeclarator' ||
+      node.id.type !== 'Identifier' ||
+      node.id.name !== declaration
+    ) {
+      return;
+    }
+    // objectKeys reads through an initialiser, so a declarator without one is
+    // named by the shape helper rather than handed to it.
+    const keys = node.init === null ? null : objectKeys(node.init);
+    result = { found: true, keys, shape: keys === null ? initializerShape(node.init) : null };
+  });
+  return result;
+}
+
+/**
+ * One declaration module, read and parsed once: the normalised path its
+ * diagnostics name it by, the syntax tree its declarations are read from, the
+ * lines that say the parser refused it, and the read of each declaration so
+ * far — whether it is declared, the keys it names, and the shape that stopped
+ * the read when it names none — the two `McpStatusKey` entries share one read.
+ *
+ * The read is the tree walk's own step, `readSourceEntry`, so a refused read
+ * yields that step's single line instead of a copy of its wording. The module
+ * sits below the source root, so both reads reach it; one wording means the
+ * caller's `reported` set drops the line the scan already owns instead of
+ * printing the same failure twice.
+ */
+function readDeclarationModule(rootDir, source) {
+  const entry = readSourceEntry(rootDir, rootDir, join(rootDir, source));
+  return { path: entry.path, entry, declarations: new Map(), problems: entry.problems };
+}
+
+/**
+ * Every mismatch between a reviewed `DYNAMIC_COUNTED_KEYS` entry and the app
+ * declaration it mirrors. A key the declaration names and the entry does not
+ * list is a message the audit never reads; a key the entry lists and the
+ * declaration dropped is a stale review. Each mismatch is one problem line
+ * naming the key, the expression, the declaration and the module that owns it.
+ * Empty on a healthy tree. It reads the declaration modules only, so an audit
+ * can check them without walking the source tree first. A caller that also
+ * scanned the tree passes the problems that scan already printed as `reported`:
+ * the declaration modules live below the source root, so the same `cannot read`
+ * or `cannot parse` line reaches both reads, and the tree's own scan owns it.
+ */
+export function checkDynamicCountedKeySources(rootDir = ROOT, reported = new Set()) {
+  const problems = [];
+  const modules = new Map();
+  for (const [expression, listed] of DYNAMIC_COUNTED_KEYS) {
+    let source = modules.get(listed.source);
+    if (source === undefined) {
+      source = readDeclarationModule(rootDir, listed.source);
+      modules.set(listed.source, source);
+      for (const problem of source.problems) {
+        if (!reported.has(problem)) {
+          problems.push(problem);
+        }
+      }
+    }
+    // A file the parser refused has no declaration to read, and its parse
+    // problems already say so; naming every listed key as undeclared would
+    // only bury that line.
+    if (source.entry === null || source.problems.length > 0) {
+      continue;
+    }
+    if (!source.declarations.has(listed.declaration)) {
+      source.declarations.set(listed.declaration, declaredKeys(source.entry, listed.declaration));
+    }
+    const read = source.declarations.get(listed.declaration);
+    if (!read.found) {
+      problems.push(
+        `${source.path}: ${listed.declaration} is not declared in this module, so ${expression} cannot be checked against it`
+      );
+      continue;
+    }
+    if (read.keys === null) {
+      problems.push(
+        `${source.path}: ${listed.declaration} is declared with ${read.shape}, so the string keys ${expression} relies on cannot be read; ${expression} is left unchecked`
+      );
+      continue;
+    }
+    const keys = read.keys;
+    const listedKeys = new Set(listed.keys);
+    for (const key of new Set(keys)) {
+      if (!listedKeys.has(key)) {
+        problems.push(
+          `${source.path}: ${listed.declaration} declares "${key}", which ${expression} does not list; the call at its site can produce an unaudited message`
+        );
+      }
+    }
+    const declared = new Set(keys);
+    for (const key of listed.keys) {
+      if (!declared.has(key)) {
+        problems.push(
+          `${source.path}: ${expression} lists "${key}", which ${listed.declaration} does not declare`
+        );
+      }
+    }
+  }
+  return problems;
+}
+
+/**
+ * One catalog, flattened by tag. The audited read and the per-locale loop both
+ * decode through here, so a change to how a catalog is read has one place to
+ * land. The read-and-report step is `readAuditedCatalog`; the plural-rule
+ * failure is reported by its caller with the same line.
+ */
+function readCatalog(tag, localesDir = LOCALES_DIR) {
+  return flattenCatalog(JSON.parse(readFileSync(join(localesDir, `${tag}.json`), 'utf8')));
+}
+
+/**
+ * One catalog read and reported: the flattened catalog and the problem lines a
+ * caller must print, or a `null` catalog and one line naming the cause when the
+ * filesystem refuses the file or `JSON.parse` rejects it.
+ */
+export function readAuditedCatalog(tag, localesDir = LOCALES_DIR) {
+  try {
+    return { catalog: readCatalog(tag, localesDir), problems: [] };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { catalog: null, problems: [`${tag}: cannot audit catalog: ${message}`] };
+  }
+}
+
+/**
+ * The English catalog, flattened. A caller that cannot read English gets one
+ * problem line and skips only the checks that need English: a read the
+ * filesystem refuses, or a file JSON.parse rejects, leaves the rest of the
+ * audit reporting instead of a stack trace.
+ */
 export function readEnglishCatalog(localesDir = LOCALES_DIR) {
-  return flattenCatalog(JSON.parse(readFileSync(join(localesDir, 'en.json'), 'utf8')));
+  return readAuditedCatalog('en', localesDir);
 }
 
 /**
  * Every counted key the audit is responsible for: the literal ones and every
  * key a reviewed dynamic call can produce.
  */
-function auditKeys(calls) {
-  const keys = new Set(countedKeysFrom(calls));
-  for (const expression of dynamicCallsFrom(calls)) {
+function auditKeys(scan) {
+  const keys = new Set(collectCountedKeys(scan));
+  for (const expression of collectDynamicCountedCalls(scan)) {
     const listed = DYNAMIC_COUNTED_KEYS.get(expression);
     if (listed !== undefined) {
       for (const key of listed.keys) {
@@ -401,74 +639,85 @@ function auditKeys(calls) {
   return [...keys].sort();
 }
 
-/** The unlisted dynamic calls among one collection of counted calls. */
-function unlistedDynamicCalls(calls) {
-  return dynamicCallsFrom(calls).filter(expression => !DYNAMIC_COUNTED_KEYS.has(expression));
-}
-
-/** The countless counted keys among one collection, checked against `english`. */
-function countlessFamilies(calls, english) {
-  return auditKeys(calls).filter(
-    key => !NO_AGREEMENT.has(key) && !declaresPluralFamily(english, key)
-  );
-}
-
 /**
  * The variable-key counted calls that are not in `DYNAMIC_COUNTED_KEYS`. Each
  * one is a call whose possible messages the audit cannot see. It projects a
  * scan the caller made once with `auditCountedCalls`.
  */
 export function findUnlistedDynamicCalls(scan) {
-  return unlistedDynamicCalls(scan.calls);
+  return collectDynamicCountedCalls(scan).filter(
+    expression => !DYNAMIC_COUNTED_KEYS.has(expression)
+  );
 }
 
 /**
  * The counted keys — literal, or produced by a reviewed dynamic call — that
  * are neither a plural family in English nor a reviewed `NO_AGREEMENT` entry.
  * Empty on a healthy tree; every entry is a message whose count cannot select
- * a form. It projects a scan the caller made once with `auditCountedCalls`,
- * and reads the English catalog per call.
+ * a form. It projects a scan the caller made once with `auditCountedCalls` and
+ * checks it against the `english` catalog the caller read once. Without an
+ * English catalog there is no family to judge against, so every key would look
+ * countless; the caller's one problem line already names the cause instead.
  */
-export function findCountlessFamilies(scan, localesDir = LOCALES_DIR) {
-  return countlessFamilies(scan.calls, readEnglishCatalog(localesDir));
+export function findCountlessFamilies(scan, english) {
+  if (english === null) {
+    return [];
+  }
+  return auditKeys(scan).filter(
+    key => !NO_AGREEMENT.has(key) && !declaresPluralFamily(english, key)
+  );
 }
 
 function run() {
   const sourceOnly = process.argv.includes('--source-only');
   const problems = [];
   const report = [];
-  const { calls, problems: unparsed } = auditCountedCalls(SOURCE_DIR);
-  const english = readEnglishCatalog();
+  const scan = auditCountedCalls(SOURCE_DIR);
+  const englishRead = readEnglishCatalog();
+  const english = englishRead.catalog;
+  problems.push(...englishRead.problems);
+  // The scan already read every file below the source root, the declaration
+  // modules included, so it owns their parse diagnostics; the declaration check
+  // skips the lines this scan already reported.
+  const unparsed = findUnparsedFiles(scan);
+  const reported = new Set(unparsed);
 
   for (const problem of unparsed) {
     problems.push(problem);
   }
 
-  for (const key of countlessFamilies(calls, english)) {
+  for (const problem of checkDynamicCountedKeySources(ROOT, reported)) {
+    problems.push(problem);
+  }
+
+  for (const key of findCountlessFamilies(scan, english)) {
     problems.push(
       `en: counted key "${key}" has no plural family; add _one/_other or list it in NO_AGREEMENT`
     );
   }
 
-  for (const expression of unlistedDynamicCalls(calls)) {
+  for (const expression of findUnlistedDynamicCalls(scan)) {
     problems.push(
       `en: counted call with variable key "${expression}" is not listed in DYNAMIC_COUNTED_KEYS; name its possible keys or add the call site's expression`
     );
   }
 
-  if (!sourceOnly) {
+  // A missing English catalog still lets the scan, declaration and
+  // variable-key problems print; only the locale comparison needs English.
+  if (!sourceOnly && english !== null) {
     let totalKeys = 0;
     for (const tag of catalogTags(LOCALES_DIR)) {
       if (tag === 'en') {
         continue;
       }
-      let catalog;
+      const read = readAuditedCatalog(tag);
+      problems.push(...read.problems);
+      if (read.catalog === null) {
+        continue;
+      }
       let missing;
       try {
-        catalog = flattenCatalog(
-          JSON.parse(readFileSync(join(LOCALES_DIR, `${tag}.json`), 'utf8'))
-        );
-        missing = missingPluralCategories(english, catalog, tag);
+        missing = missingPluralCategories(english, read.catalog, tag);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         problems.push(`${tag}: cannot audit catalog: ${message}`);
@@ -498,7 +747,10 @@ function run() {
       counts.push(`${report.length} language(s) with missing plural categories`);
     }
     console.error(`\ncheck-plurals: ${counts.join('; ')}`);
-    process.exit(1);
+    // The exit status is kept while Node drains the pending writes: a forced
+    // exit can lose the tail of a report piped to a slow reader.
+    process.exitCode = 1;
+    return;
   }
 
   console.log(

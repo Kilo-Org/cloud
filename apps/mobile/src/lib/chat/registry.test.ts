@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- the registry suite pins one question at a time, the moves onto another model or tool set, and the MCP discovery around an open on one fake SDK harness. */
 import { type ModelEvent, type ModelUsage, type PartDraft, type Turn } from '@kilocode/harness-sdk';
-import { Effect, Layer, Queue, Stream } from 'effect';
+import { Cause, Effect, Layer, Queue, Stream } from 'effect';
 import { type StoredChatBackend } from './backend-store';
 import { backendTargetId, CREDITS_FAILURE_KEY } from './backend-target';
 import { asMessages } from './turns';
@@ -47,6 +47,8 @@ let storedEffort: string | null = null;
 let storedTools: readonly string[] | null = null;
 /** Ends the answer that is arriving, so a test decides when a turn finishes. */
 let finish: (() => void) | undefined = undefined;
+/** Fails the answer that is arriving without a done event, so a test decides when a turn breaks. */
+let crash: (() => void) | undefined = undefined;
 let emitEvent: ((event: ModelEvent) => void) | undefined = undefined;
 let storedHistory: readonly Turn[] | undefined = undefined;
 /** A session id whose reopen fails, so the failed-open path can be exercised. */
@@ -197,7 +199,7 @@ const handleFor = (id: string) => {
           modelError.failed({ reason: 'status', status: 402, cause: PAYMENT_REQUIRED_BODY })
         );
       }
-      return Stream.callback<ModelEvent>(queue =>
+      return Stream.callback<ModelEvent, Error>(queue =>
         Effect.sync(() => {
           asked.push(said);
           emitEvent = event => {
@@ -215,6 +217,9 @@ const handleFor = (id: string) => {
             });
             Queue.offerUnsafe(queue, { kind: 'done', usage: CALL, stop: 'end' });
             Queue.endUnsafe(queue);
+          };
+          crash = () => {
+            Queue.failCauseUnsafe(queue, Cause.fail(new Error('the answer failed mid-stream')));
           };
           return Effect.void;
         })
@@ -603,6 +608,7 @@ beforeEach(async () => {
   questionRead.gate = undefined;
   questionRead.started = false;
   finish = undefined;
+  crash = undefined;
   emitEvent = undefined;
   storedHistory = undefined;
   failOpenFor = undefined;
@@ -1191,6 +1197,27 @@ describe('a second question while the first is being answered', () => {
     expect(asked.map(one => one.text)).toEqual(['first', 'second']);
   });
 
+  it('keeps the line ahead of what Stop lets through when two are waiting', async () => {
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    // Two questions typed while the first answer is still arriving.
+    await say(opened, { text: 'B', images: [] }, { model: 'kilo/one', effort: null });
+    await say(opened, { text: 'C', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    expect(waitingWords(opened)).toEqual(['B', 'C']);
+
+    // Stopping hands the line to ask in the order it was typed.
+    await stopChat(opened);
+    await settled();
+    expect(asked.map(one => one.text)).toEqual(['first', 'B']);
+
+    finish?.();
+    await settled();
+
+    expect(asked.map(one => one.text)).toEqual(['first', 'B', 'C']);
+    expect(snapshotOf(opened).waiting).toEqual([]);
+  });
+
   it('goes with the chat when the chat is closed', async () => {
     await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
     await settled();
@@ -1201,6 +1228,119 @@ describe('a second question while the first is being answered', () => {
     await settled();
 
     expect(asked.map(one => one.text)).toEqual(['first']);
+  });
+});
+
+describe('an answer the person stops', () => {
+  /** What each drawn bubble says, by who said it. */
+  const said = (sessionId: string) =>
+    asMessages(snapshotOf(sessionId)).map(message => [
+      message.info.role,
+      message.parts.flatMap(part => (part.type === 'text' ? [part.text] : [])).join(''),
+    ]);
+
+  it('keeps the words that had arrived under the question, and writes them down', async () => {
+    storedHistory = [];
+    await say(opened, { text: 'tell a story', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    emitEvent?.({ kind: 'delta', text: ' once upon a time' });
+    await settled();
+
+    await stopChat(opened);
+    await settled();
+
+    expect(said(opened)).toEqual([
+      ['user', 'tell a story'],
+      ['assistant', 'ok once upon a time'],
+    ]);
+    const written = await askedIn(opened);
+    expect(written?.answer).toBe('ok once upon a time');
+  });
+
+  it('keeps the words with the question when a later send takes its slot', async () => {
+    storedHistory = [];
+    await say(opened, { text: 'tell a story', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await stopChat(opened);
+    await settled();
+
+    await say(opened, { text: 'something else', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    expect(snapshotOf(opened).displaced.map(one => one.answer)).toEqual(['ok']);
+    const written = await keptIn(opened);
+    expect(written.map(one => one.answer)).toEqual(['ok']);
+    expect(said(opened).slice(0, 3)).toEqual([
+      ['user', 'tell a story'],
+      ['assistant', 'ok'],
+      ['user', 'something else'],
+    ]);
+  });
+
+  it('draws the written words again when the chat opens', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('stopped', place);
+    storedQuestions.set(
+      'chat-asked-target:stopped',
+      JSON.stringify({
+        text: 'tell a story',
+        model: 'kilo/one',
+        effort: null,
+        images: [],
+        answer: 'once upon a time',
+      })
+    );
+
+    await enterChat(place, 'stopped');
+    await settled();
+
+    expect(said('stopped')).toEqual([
+      ['user', 'tell a story'],
+      ['assistant', 'once upon a time'],
+    ]);
+  });
+
+  it('drops the words of an earlier attempt once the question is asked again', async () => {
+    storedHistory = [];
+    await say(opened, { text: 'tell a story', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    await stopChat(opened);
+    await settled();
+
+    await retryChat(opened);
+    await settled();
+
+    // The new attempt's words arrive in the answer, not under the question.
+    expect(snapshotOf(opened).askedAnswer).toBeNull();
+    expect(said(opened)).toEqual([
+      ['user', 'tell a story'],
+      ['assistant', 'ok'],
+    ]);
+    expect(asMessages(snapshotOf(opened)).at(-1)?.info.id).toBe(`${opened}:answering`);
+  });
+
+  it('keeps the words that had arrived when the stream fails, with the failure and a Retry', async () => {
+    storedHistory = [];
+    await say(opened, { text: 'tell a story', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    emitEvent?.({ kind: 'delta', text: ' once upon a time' });
+    await settled();
+
+    crash?.();
+    await settled();
+
+    const held = snapshotOf(opened);
+    expect(held.status).toBe('idle');
+    expect(held.failureKey).not.toBeNull();
+    expect(held.asked).toBe('tell a story');
+    expect(said(opened)).toEqual([
+      ['user', 'tell a story'],
+      ['assistant', 'ok once upon a time'],
+    ]);
+    const written = await askedIn(opened);
+    expect(written?.answer).toBe('ok once upon a time');
+    expect(written?.failureKey).toBe(held.failureKey);
   });
 });
 
@@ -1537,6 +1677,43 @@ describe('a question a later send took the slot from', () => {
     expect(asked.map(one => one.text)).toEqual(['first']);
   });
 
+  it('is asked before a question sent while the failure is on screen', async () => {
+    /* What the person sent while the first answer was arriving is already a
+       question they asked, and a failed answer holds it in the line. A new send
+       while that failure waits joins the line as well: the questions reach the
+       model in the order they were typed, not with the newest one first. */
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    // The second question is typed while the first answer is still arriving, so
+    // it is held; the first answer's own end is what fails the attempt.
+    const endFirst = crash;
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    expect(waitingWords(opened)).toEqual(['second']);
+
+    // The first answer fails and leaves its Retry; the held question stays.
+    endFirst?.();
+    await settled();
+    expect(snapshotOf(opened).displaced).toEqual([]);
+    expect(snapshotOf(opened).asked).toBe('first');
+
+    // A new send takes the slot from the failed question, and the held one is
+    // asked rather than answered behind the newcomer.
+    asked.length = 0;
+    await say(opened, { text: 'third', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    expect(asked.map(one => one.text)).toEqual(['second']);
+    expect(waitingWords(opened)).toEqual(['third']);
+    expect(snapshotOf(opened).displaced.map(one => one.text)).toEqual(['first']);
+
+    finish?.();
+    await settled();
+
+    expect(asked.map(one => one.text)).toEqual(['second', 'third']);
+    expect(snapshotOf(opened).waiting).toEqual([]);
+  });
+
   it('is queued once when its Retry is pressed twice while another answer arrives', async () => {
     creditsFailureFor = 's1';
     await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
@@ -1559,6 +1736,37 @@ describe('a question a later send took the slot from', () => {
     await settled();
 
     expect(waitingWords(opened)).toEqual(['first']);
+  });
+
+  it('asks its Retry ahead of the line when the failure already holds one', async () => {
+    /* The Retry names the attempt it asks again: it is that question, not a
+       newcomer, so it takes the slot back rather than waiting behind what the
+       failed answer is still holding. */
+    await say(opened, { text: 'kept', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    crash?.();
+    await settled();
+    expect(snapshotOf(opened).displaced).toEqual([]);
+
+    // A second exchange runs and fails while another question is held.
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    const endFirst = crash;
+    await say(opened, { text: 'second', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    endFirst?.();
+    await settled();
+
+    const displaced = snapshotOf(opened).displaced;
+    expect(displaced.map(one => one.text)).toEqual(['kept']);
+    expect(waitingWords(opened)).toEqual(['second']);
+
+    asked.length = 0;
+    await retryChat(opened, displaced[0]);
+    await settled();
+
+    expect(asked.map(one => one.text)).toEqual(['kept']);
+    expect(waitingWords(opened)).toEqual(['second']);
   });
 
   it('keeps a question said after it under its answer once it is asked again', async () => {
@@ -3000,12 +3208,12 @@ describe('custom backend question targets', () => {
       expect(asked.map(one => one.text)).toEqual([
         'first',
         'explicit Kilo recovery',
-        'explicit replacement question',
         'queued Kilo question',
+        'explicit replacement question',
       ]);
       expect(snapshotOf(opened)).toMatchObject({
         model: 'kilo/one',
-        asked: 'queued Kilo question',
+        asked: 'explicit replacement question',
         askedModel: 'kilo/one',
         waiting: [],
         failed: null,
@@ -3325,6 +3533,33 @@ describe('what a chat has used', () => {
     expect(snapshotOf(opened).failed).not.toBeNull();
     expect(snapshotOf(opened).record.usage).toEqual({ 'vendor/summary': CALL });
     expect(recorded.get(opened)).toEqual({ 'vendor/summary': CALL });
+  });
+
+  it('counts what the session reported before the person stopped the answer', async () => {
+    routedTotals.set(opened, new Map([['vendor/summary', CALL]]));
+    await say(
+      opened,
+      { text: 'after compaction', images: [] },
+      { model: 'kilo/one', effort: null }
+    );
+    await settled();
+
+    await stopChat(opened);
+    await settled();
+
+    expect(snapshotOf(opened).record.usage).toEqual({ 'vendor/summary': CALL });
+    expect(recorded.get(opened)).toEqual({ 'vendor/summary': CALL });
+  });
+
+  it('counts nothing for a stopped call the provider never reported', async () => {
+    await answer('one', 'kilo/one');
+    await say(opened, { text: 'two', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+
+    await stopChat(opened);
+    await settled();
+
+    expect(snapshotOf(opened).record.usage).toEqual({ 'kilo/one': CALL });
   });
 });
 

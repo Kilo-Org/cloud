@@ -35,6 +35,109 @@ describe('POST /api/device-auth/codes', () => {
     jest.clearAllMocks();
   });
 
+  test('refuses an unreadable body instead of opening the plain flow', async () => {
+    const req = new NextRequest('http://localhost:3000/api/device-auth/codes', {
+      method: 'POST',
+      body: '{',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await POST(req);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'INVALID_REQUEST_BODY',
+      message: 'This sign-in request could not be read. Start the sign-in again.',
+    });
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  test.each(['', '   '])('keeps the plain flow for a body of %j', async body => {
+    mockCreate.mockResolvedValue({
+      code: 'ABCD-EFGH',
+      userCode: 'ABCD-EFGH',
+      deviceCode: 'device-secret',
+      expiresAt: new Date(Date.now() + 600_000),
+      requestingClient: null,
+    });
+
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/device-auth/codes', {
+        method: 'POST',
+        body,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.not.objectContaining({ requestingClient: expect.anything() })
+    );
+  });
+
+  test('keeps the plain flow for a payload a client serializes as literal null', async () => {
+    mockCreate.mockResolvedValue({
+      code: 'ABCD-EFGH',
+      userCode: 'ABCD-EFGH',
+      deviceCode: 'device-secret',
+      expiresAt: new Date(Date.now() + 600_000),
+      requestingClient: null,
+    });
+
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/device-auth/codes', {
+        method: 'POST',
+        body: 'null',
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.not.objectContaining({ requestingClient: expect.anything() })
+    );
+  });
+
+  test.each([
+    ['a JSON string', '"ABCD-EFGH"'],
+    ['an array', '[]'],
+    ['a number', '42'],
+  ])('refuses a body that is %s, which is not a pairing request', async (_label, body) => {
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/device-auth/codes', {
+        method: 'POST',
+        body,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe('INVALID_REQUEST_BODY');
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['an empty token', ''],
+    ['an oversized token', 'a'.repeat(513)],
+  ])('names the sign-in link when the request carries %s', async (_label, pendingLinkToken) => {
+    const req = new NextRequest('http://localhost:3000/api/device-auth/codes', {
+      method: 'POST',
+      body: JSON.stringify({ pendingLinkToken }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await POST(req);
+
+    expect(response.status).toBe(400);
+    // The failing field is the pending-link token, so the refusal must not
+    // blame the requesting client the caller never sent.
+    expect(await response.json()).toEqual({
+      error: 'PENDING_LINK_INVALID',
+      message: 'This sign-in link could not be read. Start the sign-in again.',
+    });
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
   test('refuses a pending link token that names no live pending link', async () => {
     mockGetPendingLink.mockResolvedValue(null);
 
@@ -47,7 +150,10 @@ describe('POST /api/device-auth/codes', () => {
     const response = await POST(req);
 
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: 'PENDING_LINK_EXPIRED' });
+    expect(await response.json()).toEqual({
+      error: 'PENDING_LINK_EXPIRED',
+      message: 'This sign-in link has expired. Start the sign-in again.',
+    });
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
@@ -130,8 +236,8 @@ describe('POST /api/device-auth/codes', () => {
     );
   });
 
-  test('returns 429 with non-empty message when pending limit is hit', async () => {
-    mockCreate.mockRejectedValue(new DeviceAuthPendingLimitError());
+  test('returns 429 with the rate-limited code, the message, and the retry advisory', async () => {
+    mockCreate.mockRejectedValue(new DeviceAuthPendingLimitError(120));
 
     const req = new NextRequest('http://localhost:3000/api/device-auth/codes', {
       method: 'POST',
@@ -141,8 +247,10 @@ describe('POST /api/device-auth/codes', () => {
     const data = await response.json();
 
     expect(response.status).toBe(429);
-    expect(data.error).toBe(DEVICE_AUTH_PENDING_LIMIT_MESSAGE);
-    expect(data.error.length).toBeGreaterThan(0);
+    expect(data.error).toBe('RATE_LIMITED');
+    expect(data.message).toBe(DEVICE_AUTH_PENDING_LIMIT_MESSAGE);
+    expect(data.retryAfterSeconds).toBe(120);
+    expect(response.headers.get('Retry-After')).toBe('120');
   });
 
   test('keys the pending limit on the platform-observed caller address', async () => {
@@ -252,10 +360,12 @@ describe('POST /api/device-auth/codes', () => {
     [
       'an empty client id',
       { client_id: '', client_name: 'Acme', redirect_origin: 'https://a.test' },
+      'INVALID_REQUESTING_CLIENT',
     ],
     [
       'a control character in the name',
       { client_id: 'client-abc', client_name: 'Acme\u0007', redirect_origin: 'https://a.test' },
+      'INVALID_REQUESTING_CLIENT',
     ],
     [
       'an oversized redirect origin',
@@ -264,28 +374,73 @@ describe('POST /api/device-auth/codes', () => {
         client_name: 'Acme',
         redirect_origin: `https://${'a'.repeat(300)}`,
       },
+      'INVALID_REQUESTING_CLIENT',
     ],
     [
       'a redirect origin with a path',
       { client_id: 'client-abc', client_name: 'Acme', redirect_origin: 'https://a.test/cb' },
+      'INVALID_REQUESTING_CLIENT',
     ],
     [
       'a relative redirect origin',
       { client_id: 'client-abc', client_name: 'Acme', redirect_origin: '/cb' },
+      'INVALID_REQUESTING_CLIENT',
     ],
     [
       'a redirect origin that is prose',
       { client_id: 'client-abc', client_name: 'Acme', redirect_origin: 'the trusted app' },
+      'INVALID_REQUESTING_CLIENT',
     ],
     [
       'a bare web scheme',
       { client_id: 'client-abc', client_name: 'Acme', redirect_origin: 'https:' },
+      'INVALID_REQUESTING_CLIENT',
     ],
     [
       'a bare script scheme',
       { client_id: 'client-abc', client_name: 'Acme', redirect_origin: 'javascript:' },
+      'INVALID_REQUESTING_CLIENT',
     ],
-  ])('refuses a client description with %s', async (_label, requesting_client) => {
+    [
+      'a name of only invisible format controls',
+      { client_id: 'client-abc', client_name: '\u202e\u2066', redirect_origin: 'https://a.test' },
+      'INVALID_REQUESTING_CLIENT',
+    ],
+    [
+      'a name of only a soft hyphen',
+      { client_id: 'client-abc', client_name: '\u00ad', redirect_origin: 'https://a.test' },
+      'INVALID_REQUESTING_CLIENT',
+    ],
+    [
+      'a name of only a Hangul filler',
+      { client_id: 'client-abc', client_name: '\u3164', redirect_origin: 'https://a.test' },
+      'INVALID_REQUESTING_CLIENT',
+    ],
+    [
+      'a name of only variation selectors',
+      {
+        client_id: 'client-abc',
+        client_name: '\uFE00\uFE0F\u034F',
+        redirect_origin: 'https://a.test',
+      },
+      'INVALID_REQUESTING_CLIENT',
+    ],
+    [
+      'a client id with a layout format control',
+      { client_id: 'cl\u202eient-abc', client_name: 'Acme', redirect_origin: 'https://a.test' },
+      'INVALID_REQUESTING_CLIENT',
+    ],
+    [
+      'a client id with leading whitespace',
+      { client_id: ' client-abc', client_name: 'Acme', redirect_origin: 'https://a.test' },
+      'INVALID_REQUESTING_CLIENT',
+    ],
+    [
+      'a client id with trailing whitespace',
+      { client_id: 'client-abc ', client_name: 'Acme', redirect_origin: 'https://a.test' },
+      'INVALID_REQUESTING_CLIENT',
+    ],
+  ])('refuses a client description with %s', async (_label, requesting_client, code) => {
     const response = await POST(
       new NextRequest('http://localhost:3000/api/device-auth/codes', {
         method: 'POST',
@@ -295,6 +450,7 @@ describe('POST /api/device-auth/codes', () => {
     );
 
     expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe(code);
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
@@ -328,5 +484,45 @@ describe('POST /api/device-auth/codes', () => {
 
     expect(response.status).toBe(200);
     expect((await response.json()).requestingClient).toEqual(requestingClient);
+  });
+
+  test.each([
+    ['U+202E', '\u202e'],
+    ['U+2066', '\u2066'],
+  ])('accepts and strips %s from the displayed client fields', async (_label, bidi) => {
+    const strippedClient = {
+      clientName: 'Acme',
+      redirectOrigin: 'https://a.test',
+    };
+    mockCreate.mockResolvedValue({
+      code: 'ABCD-EFGH',
+      userCode: 'ABCD-EFGH',
+      deviceCode: 'device-secret',
+      expiresAt: new Date(Date.now() + 600_000),
+      requestingClient: { clientId: 'client-abc', ...strippedClient },
+    });
+
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/device-auth/codes', {
+        method: 'POST',
+        body: JSON.stringify({
+          requesting_client: {
+            client_id: 'client-abc',
+            client_name: `Ac${bidi}me`,
+            redirect_origin: `https://a${bidi}.test`,
+          },
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ requestingClient: { clientId: 'client-abc', ...strippedClient } })
+    );
+    expect((await response.json()).requestingClient).toEqual({
+      clientId: 'client-abc',
+      ...strippedClient,
+    });
   });
 });

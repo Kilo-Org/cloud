@@ -1,18 +1,17 @@
-import { SignJWT, jwtVerify } from 'jose';
+import { SignJWT } from 'jose';
 import { z } from 'zod';
-import {
-  CloudAgentAuthoritySchema,
-  validateCloudAgentAuthorityClaims,
-} from './cloud-agent-authority';
+import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
+import { CloudAgentAuthoritySchema } from './cloud-agent-authority';
 import { CloudAgentNextRuntimeAuthorizationClaimSchema } from './runtime-proxy-attestation';
+import { RuntimeAdmissionSchema } from './runtime-authorization-contract';
+import {
+  assertKiloTokenIssuedAt,
+  checkKiloTokenAuthorityClaims,
+  verifyKiloTokenSignature,
+} from './kilo-token-verification';
 
 export const KILO_TOKEN_VERSION = 3;
-const organizationRole = z.enum(['owner', 'admin', 'member', 'billing_manager']);
-const runtimeAdmission = z.object({
-  source: z.enum(['user', 'automation']),
-  authorizationUserId: z.string().min(1),
-  authorizationPepper: z.string().nullable(),
-});
+const organizationRole = z.enum(ORGANIZATION_ROLES);
 
 /**
  * All known fields that can appear in a Kilo user JWT, sourced from
@@ -38,7 +37,7 @@ export const kiloTokenPayload = z.object({
   deviceSessionId: z.string().optional(),
   // Org memberships (baked into tokens to avoid DB lookups)
   orgMemberships: z.array(z.object({ orgId: z.string(), role: organizationRole })).optional(),
-  runtimeAdmission: runtimeAdmission.optional(),
+  runtimeAdmission: RuntimeAdmissionSchema.optional(),
   runtimeAuthorization: CloudAgentNextRuntimeAuthorizationClaimSchema.optional(),
   cloudAgentAuthority: CloudAgentAuthoritySchema.optional(),
   // Standard JWT claims
@@ -47,11 +46,19 @@ export const kiloTokenPayload = z.object({
 });
 
 export type KiloTokenPayload = z.infer<typeof kiloTokenPayload>;
-const signKiloTokenPayload = kiloTokenPayload.omit({ iat: true, exp: true }).strict();
+// `cloudAgentAuthority` is intentionally excluded: authority tokens are minted only by
+// the policy path (signModernKiloToken / buildModernKiloTokenPayload in
+// kilo-token-policy.ts), which enforces the delegated-workload binding. The strict
+// parse makes that boundary a runtime refusal, not just a TypeScript one.
+const signKiloTokenPayload = kiloTokenPayload
+  .omit({ iat: true, exp: true, cloudAgentAuthority: true })
+  .strict();
 
 /**
  * Optional claims beyond the core fields (userId, pepper, version, env).
- * Derived from KiloTokenPayload so sign and verify stay in sync.
+ * Derived from KiloTokenPayload so sign and verify stay in sync, minus
+ * `cloudAgentAuthority`: that claim is minted only by the token policy path
+ * (`signModernKiloToken`), and the strict sign schema rejects it here.
  */
 export type SignKiloTokenExtra = Pick<
   KiloTokenPayload,
@@ -114,7 +121,9 @@ export async function signKiloToken(params: {
  * Verify a Kilo user JWT (HS256, version 3).
  *
  * Checks: signature, expiration (built into jose), version === 3, and that
- * kiloUserId is a non-empty string.
+ * kiloUserId is a non-empty string. When the token carries
+ * `cloudAgentAuthority`, it also checks that `iat` is present and not in the
+ * future.
  *
  * When `options.audience` is set, the token must have that exact audience.
  * When omitted, tokens that include an audience are rejected so a
@@ -127,19 +136,15 @@ export async function verifyKiloToken(
   secret: string,
   options?: { audience?: string }
 ): Promise<KiloTokenPayload> {
-  const { payload } = await jwtVerify(token, new TextEncoder().encode(secret), {
-    algorithms: ['HS256'],
+  const { payload } = await verifyKiloTokenSignature(token, secret, {
     audience: options?.audience,
   });
   if (options?.audience === undefined && payload.aud !== undefined) {
     throw new Error('Unexpected token audience');
   }
 
-  if (Object.hasOwn(payload, 'cloudAgentAuthority')) {
-    validateCloudAgentAuthorityClaims(payload);
-    if (typeof payload.iat !== 'number' || payload.iat > Math.floor(Date.now() / 1000)) {
-      throw new Error('Token issued in the future');
-    }
+  if (checkKiloTokenAuthorityClaims(payload)) {
+    assertKiloTokenIssuedAt(payload.iat, Math.floor(Date.now() / 1000));
   }
 
   return kiloTokenPayload.parse(payload);

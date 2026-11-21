@@ -1,7 +1,10 @@
 /**
  * In-app screen-state sampling for the design gate. The runner's inspector round trip can
  * take half a second through a tunnel, which hides a shift that happens soon after a
- * screen opens; sampling on the JS thread keeps a steady interval regardless.
+ * screen opens; sampling on the JS thread avoids that round trip.
+ * One tick walks and serializes the whole document on this thread, so ticks never
+ * overlap: the next one is scheduled only after the previous one returns, and the real
+ * spacing is the requested interval plus the tick's own cost.
  * Consecutive identical states collapse, retaining the latest dump. State is not proof of paint.
  */
 
@@ -20,6 +23,9 @@ export type Sample<T> = Readonly<{ t: number; repeat: number; dump: T }>;
  */
 const MAX_SAMPLES = 400;
 const MAX_RETAINED_CHARS = 4_000_000;
+
+/** The handle of a scheduled tick or deadline, in the runtime's own timer type. */
+type Timer = ReturnType<typeof setTimeout>;
 
 /**
  * The paint signature is the dump's own serialized text, so its length tracks what
@@ -78,13 +84,27 @@ export function createSampler<T extends PaintState>(snapshot: () => T) {
       }
     };
     tick();
-    const interval = setInterval(tick, intervalMs);
+    // One tick walks and serializes the whole document on this thread. A fixed
+    // period queues the next tick the moment the previous one starts, so a tick
+    // that costs more than the interval queues its successor behind it and the
+    // app never gets a slice to render the screen being measured. Each tick
+    // schedules the next one after it returns; the real spacing is therefore the
+    // interval plus this tick's cost, which the runner reads from the samples.
+    let pending: Timer | undefined = undefined;
+    const next = () => {
+      pending = undefined;
+      tick();
+      pending = setTimeout(next, intervalMs);
+    };
+    pending = setTimeout(next, intervalMs);
     // A runner that dies mid-run must not leave the app sampling forever.
     const deadline = setTimeout(() => {
-      clearInterval(interval);
+      clearTimeout(pending);
+      pending = undefined;
     }, maxMs);
     stopTimers = () => {
-      clearInterval(interval);
+      clearTimeout(pending);
+      pending = undefined;
       clearTimeout(deadline);
     };
   };

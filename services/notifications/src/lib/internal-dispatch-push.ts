@@ -1,6 +1,7 @@
 import {
   genericPushContentForPushData,
   SECURITY_FINDING_PUSH_TITLE_KEYS,
+  SECURITY_LIFECYCLE_I18N_KEY,
   type DispatchPushInput,
   type DispatchPushOutcome,
   type InternalDispatchRequest,
@@ -158,7 +159,9 @@ function buildDispatchInput(userId: string, input: InternalDispatchRequest): Dis
         push: {
           title: 'Kilo',
           body: 'A security check has an update',
-          i18nKey: 'internal.securityLifecycle',
+          // The catalog mapping reads this key, so the payload and the shared
+          // copy entries cannot drift apart.
+          i18nKey: SECURITY_LIFECYCLE_I18N_KEY,
           data: {
             type: 'security_lifecycle',
             event: input.event,

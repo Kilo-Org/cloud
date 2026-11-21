@@ -3,11 +3,14 @@
 import { useRef, useEffect, useCallback } from 'react';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 
-/**
- * localStorage key for sound notifications preference.
- * Exported so other components can read/write this preference.
- */
-export const SOUND_NOTIFICATIONS_KEY = 'kilo-sound-notifications-enabled';
+const SOUND_NOTIFICATIONS_KEY = 'kilo-sound-notifications-enabled';
+
+export function useSoundNotificationsPreference() {
+  return useLocalStorage(SOUND_NOTIFICATIONS_KEY, false, {
+    initializeWithValue: false,
+    deserializer: value => value === 'true',
+  });
+}
 
 /**
  * Hook for playing celebration sound when cloud agent streaming completes successfully.
@@ -15,9 +18,7 @@ export const SOUND_NOTIFICATIONS_KEY = 'kilo-sound-notifications-enabled';
  * Respects user preference stored in localStorage.
  */
 export function useCelebrationSound() {
-  const [soundEnabled, setSoundEnabled] = useLocalStorage(SOUND_NOTIFICATIONS_KEY, true, {
-    initializeWithValue: false,
-  });
+  const [soundEnabled] = useSoundNotificationsPreference();
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -47,5 +48,5 @@ export function useCelebrationSound() {
     }
   }, [soundEnabled]);
 
-  return { play, soundEnabled, setSoundEnabled };
+  return { play };
 }

@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
+import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -21,6 +22,8 @@ type LinearIntegrationDetailsProps = {
   organizationId?: string;
   success?: boolean;
   error?: string;
+  /** Overrides the OAuth start route, which the app shell serves itself. */
+  connectPath?: string;
 };
 
 const linearConnectionErrorMessages: Record<string, string> = {
@@ -44,6 +47,7 @@ export function LinearIntegrationDetails({
   organizationId,
   success,
   error,
+  connectPath,
 }: LinearIntegrationDetailsProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -63,7 +67,7 @@ export function LinearIntegrationDetails({
     return (
       openRouterModels?.data.map(model => ({
         id: model.id,
-        name: model.name,
+        name: modelNameWithRetirement(model),
         isFree: model.isFree,
         mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
         hasUserByokAvailable: model.hasUserByokAvailable,
@@ -121,7 +125,8 @@ export function LinearIntegrationDetails({
 
   const handleInstall = () => {
     setIsStartingLinearConnection(true);
-    window.location.href = getPlatformOAuthConnectPath(PLATFORM.LINEAR, organizationId);
+    window.location.href =
+      connectPath ?? getPlatformOAuthConnectPath(PLATFORM.LINEAR, { organizationId });
   };
 
   const handleUninstall = async () => {

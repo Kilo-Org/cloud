@@ -293,6 +293,29 @@ export const MAX_SETUP_COMMAND_LENGTH = 500;
 export const MAX_SETUP_COMMANDS = 20;
 
 /**
+ * Server cap: `contracts/agents.ts`'s `MAX_PROFILE_AGENTS`. The server counts
+ * every agent row of a profile, so the profile agents screen compares the
+ * loaded list's length against it before a create goes out, and names the cap
+ * in the reader's language.
+ */
+export const MAX_PROFILE_AGENTS = 20;
+
+/**
+ * Server cap: `profile-mcp-service.ts`'s `MAX_PROFILE_MCP_SERVERS`. The server
+ * counts every server row of a profile, enabled or not, so the MCP servers
+ * screen compares the loaded list's length against it before a create goes out.
+ */
+export const MAX_PROFILE_MCP_SERVERS = 20;
+
+/**
+ * Server cap: `contracts/kilo-commands.ts`'s `MAX_PROFILE_KILO_COMMANDS`. The
+ * server counts every slash command row of a profile, enabled or not, so the
+ * slash commands screen compares the loaded list's length against it before a
+ * create goes out.
+ */
+export const MAX_PROFILE_KILO_COMMANDS = 50;
+
+/**
  * Append a blank setup command for the user to type into. The server caps the
  * list at `MAX_SETUP_COMMANDS` (`CommandsSchema`'s
  * `z.array(z.string().max(500)).max(20)`), so at the cap the list is returned

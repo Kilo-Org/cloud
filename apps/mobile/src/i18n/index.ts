@@ -42,7 +42,6 @@ void i18n
     partialBundledLanguages: true,
     lng: 'en',
     fallbackLng: 'en',
-    compatibilityJSON: 'v4',
     interpolation: { escapeValue: false, defaultVariables: { supportEmail: SUPPORT_EMAIL } },
     initAsync: false,
     returnNull: false,

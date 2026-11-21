@@ -8,6 +8,7 @@ import {
   DirectionalChevronLeft,
   DirectionalChevronRight,
   DirectionalLogOut,
+  DirectionalLogs,
 } from './directional-icons';
 
 // Live, so a test can flip the interface direction before it renders: the
@@ -22,6 +23,7 @@ vi.mock('@/components/ui/icons', () => ({
   ChevronLeft: 'ChevronLeft',
   ChevronRight: 'ChevronRight',
   LogOut: 'LogOut',
+  Logs: 'Logs',
 }));
 
 type DirectionalWrapper = typeof DirectionalArrowLeft;
@@ -188,6 +190,44 @@ describe('DirectionalLogOut', () => {
     const icon = logOutIcon(renderer);
     expect(icon.props.style).toEqual(CALLER_STYLE);
     expect(mirrorStepCount(icon.props.style)).toBe(0);
+    expect(treeMirrorStepCount(renderer)).toBe(1);
+
+    renderer.unmount();
+  });
+});
+
+function renderLogs(): TestRenderer.ReactTestRenderer {
+  let renderer: TestRenderer.ReactTestRenderer | null = null;
+  act(() => {
+    renderer = TestRenderer.create(createElement(DirectionalLogs, { size: 24 }));
+  });
+  // eslint-disable-next-line typescript-eslint/no-unnecessary-condition
+  if (!renderer) {
+    throw new Error('Failed to create test renderer');
+  }
+  return renderer;
+}
+
+/**
+ * A bulleted list keeps its bullets on the reading-start side, so an RTL screen
+ * needs the glyph flipped: Lucide's `Logs` draws the ticks on the left in both
+ * directions.
+ */
+describe('DirectionalLogs', () => {
+  it('draws the list glyph unflipped in an LTR interface', () => {
+    const renderer = renderLogs();
+
+    expect(renderer.root.findAllByType('Logs')).toHaveLength(1);
+    expect(treeMirrorStepCount(renderer)).toBe(0);
+
+    renderer.unmount();
+  });
+
+  it('flips the glyph exactly once in an RTL interface, so the bullets sit at the reading start', () => {
+    i18nManager.isRTL = true;
+    const renderer = renderLogs();
+
+    expect(renderer.root.findAllByType('Logs')).toHaveLength(1);
     expect(treeMirrorStepCount(renderer)).toBe(1);
 
     renderer.unmount();

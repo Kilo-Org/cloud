@@ -24,7 +24,6 @@ import {
   pushInstanceEvent,
   pushInstanceEventToUser,
 } from './event-push';
-import { sendConversationMessagePush } from './push-notifications';
 import type { ConversationInfo, GetMessageResult } from '../do/conversation-do';
 
 export type DeferCtx = { waitUntil: (p: Promise<unknown>) => void };
@@ -320,25 +319,6 @@ export async function postCommitFanOut(
       );
     }
     await Promise.allSettled(instanceEvents);
-  }
-
-  // ── Block E: Push notification fanout ─────────────────────────────────
-  // User-authored messages notify other human members. Bot-authored message
-  // notifications are gated by ConversationDO state because bot messages
-  // stream through create + edit operations.
-  if (sandboxId !== null && isSenderHuman) {
-    await sendConversationMessagePush(env, {
-      conversationId,
-      sandboxId,
-      title: info.title ?? appliedAutoTitle,
-      humanMemberIds,
-      senderId: callerId,
-      senderIsHuman: true,
-      messageId,
-      content,
-      recipientMode: 'exclude-sender-human',
-      logContext: 'message.created',
-    });
   }
 }
 

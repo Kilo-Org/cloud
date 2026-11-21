@@ -286,7 +286,7 @@ jest.mock('@/lib/cloud-agent/stream-ticket', () => {
   return { ...actual, signPreviewTicket: mockSignPreviewTicket };
 });
 
-let createCaller: (ctx: { user: User; headersList?: Headers }) => {
+let createCaller: (ctx: { user: User; headersList?: Headers; controlPlaneStartedAt?: number }) => {
   getSession: (input: { cloudAgentSessionId: string }) => Promise<unknown>;
   getSessionMessagesPage: CloudAgentNextClient['getSessionMessagesPage'];
   getSandboxSelectionOptions: (input: {
@@ -460,6 +460,76 @@ describe('cloudAgentNextRouter.getSessionMessagesPage', () => {
     await expect(createCaller({ user }).getSessionMessagesPage(input)).rejects.toMatchObject({
       code: 'INTERNAL_SERVER_ERROR',
     });
+  });
+});
+
+describe('cloudAgentNextRouter session read failures', () => {
+  const user = { id: 'oauth/worker-outage', is_admin: false } as User;
+  const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
+
+  /** A cloud-agent Worker error envelope, as the tRPC client surfaces it. */
+  function workerTrpcError(code: string, httpStatus: number, retryable: boolean) {
+    return new TRPCClientError(`Worker ${code}`, {
+      result: {
+        error: {
+          code: -32603,
+          message: `Worker ${code}`,
+          data: { code, httpStatus, clientError: { code, message: code, retryable } },
+        },
+      },
+    });
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockVerifyUserOwnsSessionV2ByCloudAgentId
+      .mockReset()
+      .mockResolvedValue({ kiloSessionId: 'ses_12345678901234567890123456' });
+    mockGetSession.mockReset();
+    mockGetSessionMessagesPage.mockReset();
+  });
+
+  it.each([
+    ['a Worker outage', () => workerTrpcError('SERVICE_UNAVAILABLE', 503, true)],
+    ['a Worker timeout', () => workerTrpcError('TIMEOUT', 408, true)],
+    ['a network failure', () => TRPCClientError.from(new TypeError('fetch failed'))],
+  ])('answers %s on getSession as temporarily unavailable', async (_label, createError) => {
+    mockGetSession.mockRejectedValueOnce(createError());
+
+    await expect(createCaller({ user }).getSession({ cloudAgentSessionId })).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Session state is temporarily unavailable. Try again.',
+    });
+  });
+
+  it('answers a session the Worker no longer knows as not found', async () => {
+    mockGetSession.mockRejectedValueOnce(workerTrpcError('NOT_FOUND', 404, false));
+
+    await expect(createCaller({ user }).getSession({ cloudAgentSessionId })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+  });
+
+  it('keeps an unclassified Worker failure an internal error', async () => {
+    mockGetSession.mockRejectedValueOnce(workerTrpcError('INTERNAL_SERVER_ERROR', 500, true));
+
+    await expect(createCaller({ user }).getSession({ cloudAgentSessionId })).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+    });
+  });
+
+  it('answers a spent mobile budget on the messages page retryably without reading', async () => {
+    await expect(
+      createCaller({
+        user,
+        controlPlaneStartedAt: performance.now() - 9_900,
+      }).getSessionMessagesPage({ sessionId: cloudAgentSessionId, limit: 25 })
+    ).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Session messages are temporarily unavailable. Try again.',
+    });
+
+    expect(mockGetSessionMessagesPage).not.toHaveBeenCalled();
   });
 });
 

@@ -11,9 +11,10 @@ export const MAX_SCOPE_ORGANIZATION_IDS = 1_000;
 
 /**
  * Upper bound on the values accepted in one dimension filter list (`features`,
- * `models`, `modes`, `userIds`, `providers`, `projects`, and each `excluded*`
- * twin). The dashboard filter picker offers at most 100 suggestions per
- * dimension, so this leaves ample room for any real selection.
+ * `models`, `autoModels`, `modes`, `userIds`, `providers`,
+ * `inferenceProviders`, `projects`, and each `excluded*` twin). The dashboard
+ * filter picker offers at most 100 suggestions per dimension, so this leaves
+ * ample room for any real selection.
  */
 export const MAX_FILTER_VALUES = 500;
 
@@ -30,7 +31,16 @@ export type Granularity = z.infer<typeof GranularitySchema>;
 export const CostSourceSchema = z.enum(['cost', 'market']);
 export type CostSource = z.infer<typeof CostSourceSchema>;
 
-export const DimensionSchema = z.enum(['feature', 'model', 'mode', 'user', 'provider', 'project']);
+export const DimensionSchema = z.enum([
+  'feature',
+  'model',
+  'mode',
+  'user',
+  'provider',
+  'project',
+  'autoModel',
+  'inferenceProvider',
+]);
 export type Dimension = z.infer<typeof DimensionSchema>;
 
 export const BreakdownDimensionSchema = z.enum([...DimensionSchema.options, 'organization']);
@@ -75,15 +85,19 @@ const FiltersShape = {
   viewAs: z.enum(['self', 'org-wide']).default('self'),
   features: FilterValuesSchema,
   models: FilterValuesSchema,
+  autoModels: FilterValuesSchema,
   modes: FilterValuesSchema,
   userIds: FilterValuesSchema,
   providers: FilterValuesSchema,
+  inferenceProviders: FilterValuesSchema,
   projects: FilterValuesSchema,
   excludedFeatures: FilterValuesSchema,
   excludedModels: FilterValuesSchema,
+  excludedAutoModels: FilterValuesSchema,
   excludedModes: FilterValuesSchema,
   excludedUserIds: FilterValuesSchema,
   excludedProviders: FilterValuesSchema,
+  excludedInferenceProviders: FilterValuesSchema,
   excludedProjects: FilterValuesSchema,
 } as const;
 

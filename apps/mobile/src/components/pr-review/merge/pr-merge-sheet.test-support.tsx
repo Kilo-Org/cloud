@@ -129,6 +129,26 @@ export async function press(renderer: ReactTestRenderer, label: string) {
     (target.props.onPress as () => void)();
   });
 }
+// The method chips are Pressables, so `press` (built for Button) does not reach
+// them; these read and press the chip by its spoken method label.
+export function chipChecked(renderer: ReactTestRenderer, label: string): boolean {
+  const chip = findChip(renderer, label);
+  const props: { accessibilityState?: { checked?: boolean | 'mixed' } } = chip.props;
+  return props.accessibilityState?.checked === true;
+}
+function findChip(renderer: ReactTestRenderer, label: string) {
+  const chip = hosts(renderer, 'Pressable').find(node => node.props.accessibilityLabel === label);
+  if (!chip) {
+    throw new Error(`Method chip ${label} missing`);
+  }
+  return chip;
+}
+export async function chooseChip(renderer: ReactTestRenderer, label: string) {
+  const chip = findChip(renderer, label);
+  await act(() => {
+    (chip.props.onPress as () => void)();
+  });
+}
 export async function edit(renderer: ReactTestRenderer, label: string, text: string) {
   await act(() => {
     (input(renderer, label).props.onChangeText as (value: string) => void)(text);
@@ -138,16 +158,17 @@ export async function submit(renderer: ReactTestRenderer, label = 'Merge') {
   await press(renderer, label);
   await press(renderer, `Confirm ${label}`);
 }
-export function seedDraft(
-  userId: string,
-  entityKey: string,
-  value: { title: string; message: string }
-) {
+type StoredMergeDraft = {
+  title?: string;
+  message?: string;
+  method?: string;
+};
+export function seedDraft(userId: string, entityKey: string, value: StoredMergeDraft) {
   state.rows.set(`draft:${userId}\u0000${entityKey}`, JSON.stringify(value));
 }
 export function storedDraft(userId = 'u1', entityKey = draftKey) {
   const raw = state.rows.get(`draft:${userId}\u0000${entityKey}`);
-  return raw ? (JSON.parse(raw) as { title: string; message: string }) : null;
+  return raw ? (JSON.parse(raw) as StoredMergeDraft) : null;
 }
 export function visibleText(renderer: ReactTestRenderer): string {
   return (

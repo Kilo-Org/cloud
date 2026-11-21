@@ -66,7 +66,9 @@ work, work after the upstream request starts, and exceptional paths may use it.
 - Where correctness needs the primary on a rare path (read-after-write, a row
   lock, or an optimistic write such as lazy credit expiry), comment why.
 - `readDb` falls back to the primary when `POSTGRES_REPLICA_US_URL` is unset, so
-  that variable must stay set on the `kilocode-ai-gateway` Vercel project.
+  that variable must stay set on the `kilocode-ai-gateway` Vercel project. To take
+  a replica out of service, list its name in `POSTGRES_REPLICAS_DISABLED` rather
+  than deleting its URL; `lib/read-replicas.ts` owns the replica list.
 
 The queue transport and rollback are documented in
 [`ENVIRONMENT.md`](../../ENVIRONMENT.md), where stopping new production queue
@@ -81,6 +83,27 @@ gateway deployment, or adding another production caller of the usage-accounting
 path, enrols that traffic automatically, so such a change needs the same review
 as this contract. The [root `AGENTS.md`](../../AGENTS.md) remains the source of
 truth for which function regions actually run those deployments.
+
+## Advanced gateway policies
+
+`disable_openrouter` and `data_region` (`providers/organization-gateway-settings.ts`)
+apply only to enterprise organizations in the `gateway_settings` feature, and only to
+Kilo-paid routes. A region pins Kilo's Vercel route, refuses other routes, and implies
+OpenRouter off. BYOK, ChatGPT and Claude billing routes, FIM and edit are exempt.
+OpenRouter off also lifts the Vercel opt-out list.
+
+Deliberate limitations until users ask:
+
+- Model endpoint lists are not filtered by these policies.
+- Embeddings and System One use Vercel only when `mapModelIdToVercel` maps the id to a
+  Vercel model of that type; Vercel-only models are unsupported.
+- Transcriptions and image-only models are OpenRouter-only.
+
+## Autocomplete routes
+
+The edit and FIM (autocomplete) handlers intentionally skip the account rate
+limit and Enkrypt guardrails: their small models are not attack targets in
+practice, and the added latency makes no sense for autocomplete.
 
 ## Data collection versus ZDR
 

@@ -38,7 +38,7 @@ function SwipePanel({ action, align }: { action: TodoSwipeAction; align: 'start'
   return (
     <View
       className={cn(
-        'flex-1 flex-row items-center px-6',
+        'flex-1 flex-row items-center px-4',
         TONE_CLASS[action.tone].panel,
         align === 'start' ? 'justify-start' : 'justify-end'
       )}

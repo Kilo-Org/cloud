@@ -23,6 +23,7 @@ import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/or
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { OrganizationProvidersAndModelsConfigurationCard } from '@/components/organizations/OrganizationProvidersAndModelsConfigurationCard';
+import { OrganizationBrowserControlCard } from '@/components/organizations/OrganizationBrowserControlCard';
 import { OrganizationChildOrganizationsCard } from '@/components/organizations/OrganizationChildOrganizationsCard';
 import { OrganizationEmailPreferencesCard } from '@/components/organizations/OrganizationEmailPreferencesCard';
 import { OrgActiveKiloclawsCard } from '@/components/organizations/OrgActiveKiloclawsCard';
@@ -180,6 +181,12 @@ export function OrganizationDashboard({
             )}
             {isGuardrailsEnabled && (canManageOrganization(currentRole) || isKiloAdmin) && (
               <OrganizationGuardrailsCard organizationId={organizationId} />
+            )}
+            {organizationData && (
+              <OrganizationBrowserControlCard
+                organizationId={organizationId}
+                readonly={!(canManageOrganization(currentRole) || isKiloAdmin)}
+              />
             )}
           </div>
           <div className="space-y-8 lg:col-span-2">

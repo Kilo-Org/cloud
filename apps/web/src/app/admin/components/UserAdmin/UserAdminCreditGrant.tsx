@@ -63,6 +63,8 @@ export function UserAdminCreditGrant({
     selectedCreditCategory?.credit_expiry_date != null;
   const hasExpirationFromForm = expirationDate.trim() !== '' || Number(expiryHours) > 0;
   const hasExpiration = hasExpirationFromCategory || hasExpirationFromForm || neverExpire;
+  // A YYYY-MM-DD value is midnight UTC, so the earliest acceptable date is the next UTC day.
+  const minExpiryDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   const isExpirationValid = expectNegative || creditKind === 'paid' || hasExpiration;
   const isFormValid =
@@ -291,6 +293,7 @@ export function UserAdminCreditGrant({
                     expirationDate ?? selectedCreditCategory?.credit_expiry_date?.toISOString()
                   }
                   onChange={e => setExpirationDate(e.target.value)}
+                  min={minExpiryDate}
                   id="date"
                   disabled={!canManageCredits || !selectedCredit || neverExpire}
                 />

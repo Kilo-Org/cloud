@@ -28,6 +28,10 @@ vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: vi.fn() }),
 }));
+// The composer's pickers open through the guarded push; nothing here asserts it.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => vi.fn(),
+}));
 vi.mock('@/components/ui/icons', () => ({
   BookOpenCheck: 'BookOpenCheck',
   Bot: 'Bot',
@@ -93,15 +97,18 @@ const MODEL_OPTIONS: SessionModelOption[] = [
  * below.
  */
 function reportedModelOptions(): SessionModelOption[] {
-  const gatewayModels = toModelOptions({
-    data: [
-      {
-        id: 'deepseek/deepseek-v4.1-flash',
-        name: CATALOGUE_MODEL_NAME,
-        opencode: { variants: { low: {}, medium: {} } },
-      },
-    ],
-  });
+  const gatewayModels = toModelOptions(
+    {
+      data: [
+        {
+          id: 'deepseek/deepseek-v4.1-flash',
+          name: CATALOGUE_MODEL_NAME,
+          opencode: { variants: { low: {}, medium: {} } },
+        },
+      ],
+    },
+    'en'
+  );
   return buildSessionModelOptions({
     activeSessionType: null,
     remoteModelState: { ownerConnectionId: null, protocol: 'unknown', refresh: 'idle' },
@@ -159,9 +166,10 @@ function cliCatalogModelOptions(): SessionModelOption[] {
 const REPORTED_RAW_MODEL_ID = 'deepseek/deepseek-v4.1-flash-1017';
 
 function reportedRemoteOptions(): SessionModelOption[] {
-  const gatewayModels = toModelOptions({
-    data: [{ id: REPORTED_RAW_MODEL_ID, name: 'DeepSeek: DeepSeek V4.1 Flash 1017' }],
-  });
+  const gatewayModels = toModelOptions(
+    { data: [{ id: REPORTED_RAW_MODEL_ID, name: 'DeepSeek: DeepSeek V4.1 Flash 1017' }] },
+    'en'
+  );
   return buildSessionModelOptions({
     activeSessionType: 'remote',
     remoteModelState: { ownerConnectionId: 'cli-owner', protocol: 'unknown', refresh: 'idle' },
@@ -239,7 +247,11 @@ describe('ChatToolbar chip for a model the CLI catalogue cannot name', () => {
     const options = reportedRemoteOptions();
     const renderer = renderToolbar('remote-unavailable-model', options);
 
-    const modelChip = findPressable(renderer, label => label === 'DeepSeek V4.1 Flash 1017');
+    // The chip names the catalogue's model and states that it is unavailable;
+    // what matters here is that the raw reference never appears.
+    const modelChip = findPressable(renderer, label =>
+      label.startsWith('DeepSeek V4.1 Flash 1017')
+    );
     expect(modelChip).toBeDefined();
 
     const rawReference = renderer.root.findAll(
@@ -382,21 +394,30 @@ describe('ChatToolbar long model name', () => {
 });
 
 describe('ChatToolbar model chip while the model list loads', () => {
-  it('keeps the chip shell labelled while the model list loads instead of a blank pill', () => {
+  it('holds the name slot with a skeleton and a busy label while the model list loads', () => {
     const renderer = renderToolbar('deepseek/deepseek-v4.1-flash', MODEL_OPTIONS, {
       isLoadingModels: true,
     });
-    // The chip must read as the control it is: its own label, not an empty pill.
-    const loadingLabel = renderer.root.findAll(
+
+    // The chip must read as the control it is without printing a placeholder
+    // model name: a skeleton holds the name slot, and the wrapper's busy
+    // accessibility label is what assistive tech announces.
+    const chip = renderer.root.findAll(
       node =>
         typeof node.type === 'string' &&
-        (node.type as string) === 'Text' &&
-        node.props.children === i18n.t('common.model')
-    );
-    expect(loadingLabel).toHaveLength(1);
-    expect(loadingLabel[0]?.props.numberOfLines).toBe(1);
+        (node.type as string) === 'View' &&
+        (node.props.accessibilityState as { busy?: boolean } | undefined)?.busy === true
+    )[0];
+    expect(chip).toBeDefined();
+    expect(chip?.props.accessible).toBe(true);
+    expect(chip?.props.accessibilityRole).toBe('button');
+    expect(chip?.props.accessibilityState).toEqual({ busy: true, disabled: true });
+    expect(chip?.props.accessibilityLabel).toBe(i18n.t('common.model'));
 
-    // The loading chip is not the skeleton placeholder: it renders its own shell.
-    expect(renderer.root.findAllByType('Skeleton')).toHaveLength(0);
+    expect(renderer.root.findAllByType('Skeleton')).toHaveLength(1);
+    const labels = renderer.root
+      .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Text')
+      .map(node => node.props.children);
+    expect(labels).not.toContain(i18n.t('common.model'));
   });
 });

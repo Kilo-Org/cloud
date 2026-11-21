@@ -4,6 +4,10 @@ import {
   getDirectByokProviderListings,
   listDirectByokCatalogModels,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  getOpenRouterAliasTarget,
+  type GatewayModelMap,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import type {
   NormalizedProvider,
   OpenRouterModel,
@@ -25,13 +29,42 @@ function findSnapshotModel(
 }
 
 /**
+ * The snapshot's latest aliases (`~vendor/family-latest`) whose target is among `models`, listed
+ * like their target, as catalog-mode keys serve an alias by its target.
+ */
+function latestAliasModels(
+  providers: readonly NormalizedProvider[],
+  storedModels: GatewayModelMap,
+  models: readonly OpenRouterModel[]
+): OpenRouterModel[] {
+  const aliasModels: OpenRouterModel[] = [];
+  for (const aliasId of Object.keys(storedModels)) {
+    const targetId = getOpenRouterAliasTarget(storedModels, aliasId);
+    if (!targetId) continue;
+    const normalizedTargetId = normalizeModelId(targetId);
+    const target = models.find(model => normalizeModelId(model.slug) === normalizedTargetId);
+    const alias = target && findSnapshotModel(providers, aliasId);
+    if (!target || !alias || models.some(model => model.slug === alias.slug)) continue;
+    aliasModels.push({
+      ...target,
+      slug: alias.slug,
+      name: alias.name,
+      description: alias.description,
+    });
+  }
+  return aliasModels;
+}
+
+/**
  * Appends the direct BYOK providers with their own listing as BYOK-only providers, with the catalog
- * models their keys serve in catalog mode, so provider allow-lists can name them. Other direct BYOK
- * providers serve under a provider the snapshot already lists. A listing whose slug the snapshot
- * already has, or that serves no snapshot model, is left out.
+ * models their keys serve in catalog mode and the latest aliases of those models, so provider
+ * allow-lists can name them. Other direct BYOK providers serve under a provider the snapshot already
+ * lists. A listing whose slug the snapshot already has, or that serves no snapshot model, is left
+ * out.
  */
 export async function injectDirectByokProviders(
-  providers: readonly NormalizedProvider[]
+  providers: readonly NormalizedProvider[],
+  storedModels: GatewayModelMap
 ): Promise<NormalizedProvider[]> {
   const snapshotSlugs = new Set(providers.map(provider => provider.slug));
   const injected: NormalizedProvider[] = [];
@@ -65,6 +98,7 @@ export async function injectDirectByokProviders(
       });
     }
     if (models.length === 0) continue;
+    models.push(...latestAliasModels(providers, storedModels, models));
     models.sort((a, b) => a.name.localeCompare(b.name));
     injected.push({ ...listing, byokOnly: true, models });
   }

@@ -1,13 +1,10 @@
-import { Check } from '@/components/ui/icons';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, type ScrollViewInstance, View } from 'react-native';
+import { ScrollView, type ScrollViewInstance, View } from 'react-native';
 
 import { PickerSheet } from '@/components/picker-sheet';
+import { ChoiceRow } from '@/components/ui/choice-row';
 import { Text } from '@/components/ui/text';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { selectionCheckColor } from '@/lib/selection-check-color';
-import { cn } from '@/lib/utils';
+import { useSideInsetMarginStyle } from '@/lib/screen-insets';
 
 type ContextPickerSheetProps = {
   /** Sheet heading, shown in the standard picker header above the rows. */
@@ -18,6 +15,13 @@ type ContextPickerSheetProps = {
   currentIndex: number;
   onSelect: (index: number) => void;
   onDone: () => void;
+  /**
+   * Leaves without a pick. The sheet's header centers its title only between a
+   * leading Cancel and the trailing Done — that is the shape the Language and
+   * Run-on sheets carry — and a semisheet without a leading control read as a
+   * plain list.
+   */
+  onCancel: () => void;
   /** Set when the caller's bridge is gone — renders the "Options expired" shell. */
   expired?: boolean;
 };
@@ -39,10 +43,11 @@ export function ContextPickerSheet({
   currentIndex,
   onSelect,
   onDone,
+  onCancel,
   expired = false,
 }: Readonly<ContextPickerSheetProps>) {
-  const colors = useThemeColors();
   const listRef = useRef<ScrollViewInstance>(null);
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const [viewportHeight, setViewportHeight] = useState(0);
   const [checkedRow, setCheckedRow] = useState<{ y: number; height: number } | null>(null);
   const revealed = useRef(false);
@@ -70,19 +75,22 @@ export function ContextPickerSheet({
   }, [checkedRow, viewportHeight]);
 
   if (expired) {
-    return <PickerSheet title={title} onDone={onDone} scrollable={false} expired />;
+    return (
+      <PickerSheet title={title} onDone={onDone} onCancel={onCancel} scrollable={false} expired />
+    );
   }
 
   const lastRowIndex = options.length - 1;
 
   return (
-    <PickerSheet title={title} onDone={onDone} scrollable={false}>
+    <PickerSheet title={title} onDone={onDone} onCancel={onCancel} scrollable={false}>
       {/* The list is the sheet's own scroll view, so it measures its viewport
           itself: `flex-1` keeps it inside the presenter's height on both
           platforms, and the reveal above reads the height it reports. */}
       <ScrollView
         ref={listRef}
         className="flex-1"
+        style={sideInsetMarginStyle}
         nestedScrollEnabled
         showsVerticalScrollIndicator={false}
         onLayout={event => {
@@ -90,16 +98,9 @@ export function ContextPickerSheet({
         }}
       >
         {options.map((label, index) => (
-          <Pressable
+          <View
             key={index}
-            className={cn(
-              ROW_TARGET_CLASS,
-              'flex-row items-center gap-2 px-4 py-3 active:bg-secondary',
-              index !== lastRowIndex && 'border-b-[0.5px] border-hair-soft'
-            )}
-            onPress={() => {
-              onSelect(index);
-            }}
+            testID={`context-picker-account-${index}`}
             onLayout={
               index === currentIndex
                 ? event => {
@@ -108,24 +109,28 @@ export function ContextPickerSheet({
                   }
                 : undefined
             }
-            accessible
-            accessibilityRole="button"
-            accessibilityLabel={label}
-            accessibilityState={{ selected: index === currentIndex }}
           >
-            {/* Every account row holds the same blank gutter so the labels line
-                up; only the current account paints a check in it. The gutter is
-                the check's own 16 dp — the app's rem is 14, so `w-4` would clip
-                the icon. */}
-            <View className="w-[16px] items-center">
-              {index === currentIndex && <Check size={16} color={selectionCheckColor(colors)} />}
-            </View>
-            {/* The tail, not the leading words, tells sibling memberships
-              apart, so a label cut at the row's width keeps its own name. */}
-            <Text className="min-w-0 flex-1 text-sm" numberOfLines={1} ellipsizeMode="middle">
-              {label}
-            </Text>
-          </Pressable>
+            <ChoiceRow
+              accessibleName={label}
+              selected={index === currentIndex}
+              onPress={() => {
+                onSelect(index);
+              }}
+              className={index !== lastRowIndex ? 'border-b-[0.5px] border-hair-soft' : undefined}
+            >
+              <View className="min-w-0 flex-1 pe-3">
+                {/* The tail, not the leading words, tells sibling memberships
+                    apart, so a label cut at the row's width keeps its own
+                    name. The weight is the shared row title's, so an Arabic
+                    label in an RTL interface inks with the same stroke as the
+                    Latin org names it sits beside instead of reading as a
+                    muted line. */}
+                <Text className="text-sm font-medium" numberOfLines={1} ellipsizeMode="middle">
+                  {label}
+                </Text>
+              </View>
+            </ChoiceRow>
+          </View>
         ))}
       </ScrollView>
     </PickerSheet>

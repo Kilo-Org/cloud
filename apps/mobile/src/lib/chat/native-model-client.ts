@@ -305,6 +305,25 @@ function answer(
 }
 
 /**
+ * The reason a restricted availability answer reads as at send time, when the
+ * answer names none. Android's normal downloadable/downloading answer carries
+ * no reason, so the status picks the same class its own reason would name; an
+ * `unavailable` without a reason has nothing more specific to say.
+ */
+function reasonAtSendTime(availability: NativeAvailability): string {
+  if (availability.reason !== undefined) {
+    return availability.reason;
+  }
+  if (availability.status === 'downloadable') {
+    return 'model_download_required';
+  }
+  if (availability.status === 'downloading') {
+    return 'model_downloading';
+  }
+  return 'model_unavailable';
+}
+
+/**
  * Inference over a native on-device model. The harness still owns the
  * conversation: every request carries the full rendered history, and nothing
  * falls back to another model when this one is unavailable or busy.
@@ -323,11 +342,13 @@ export function nativeModelClient(bridge: NativeModelBridge): ModelClientService
             const availability = await bridge.availability();
             return availability;
           },
-          catch: () => nativeModelFailure('model_unavailable', false),
+          catch: () => nativeModelFailure('check_failed', false),
         }).pipe(
           Effect.filterOrFail(
             availability => availability.status === 'available',
-            () => nativeModelFailure('model_unavailable', false)
+            // The reason the model gave at send time carries its own next step; a
+            // restricted status without one falls back on the status itself.
+            availability => nativeModelFailure(reasonAtSendTime(availability), false)
           ),
           Effect.map(availability => answer(provider, availability, request))
         )

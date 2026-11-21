@@ -3,13 +3,11 @@ import { useMemo } from 'react';
 import type {
   OpenRouterModelsResponse,
   OpenRouterProvidersResponse,
-} from '@kilocode/web-shared/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import * as z from 'zod';
-import {
-  organizationModelsPath,
-  type OrganizationModelAudience,
-} from '@kilocode/app-shared/organizations';
+import { type OrganizationModelAudience } from '@kilocode/app-shared/organizations';
+import { useTRPC } from '@/lib/trpc/utils';
 
 interface OpenRouterProvider {
   name: string;
@@ -82,7 +80,7 @@ export function useOpenRouterModels() {
       }
       const body = await response.json();
       const { OpenRouterModelsResponseSchema } =
-        await import('@kilocode/web-shared/lib/organizations/organization-types');
+        await import('@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas');
       return OpenRouterModelsResponseSchema.parse(body);
     },
   });
@@ -98,38 +96,29 @@ export function useOpenRouterProviders() {
       }
       const data = await response.json();
       const { OpenRouterProvidersResponseSchema } =
-        await import('@kilocode/web-shared/lib/organizations/organization-types');
+        await import('@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas');
       return OpenRouterProvidersResponseSchema.parse(data);
     },
   });
 }
 
+/**
+ * The model list a picker offers, read over tRPC rather than the `/api` REST
+ * routes: those authenticate with the web session, and the app shell's session
+ * cookie only covers `/app-shell`, so its pages read the same list through
+ * `/app-shell/api/trpc`. The query carries an organization id or not, and the
+ * procedure answers with that organization's list or the caller's own.
+ */
 export function useModelSelectorList(
   organizationId: string | undefined,
   enabled = true,
   audience: OrganizationModelAudience = 'member',
   cacheOptions?: { staleTime: number; gcTime: number }
 ) {
+  const trpc = useTRPC();
   const query = useQuery({
     ...cacheOptions,
-    queryKey: ['openrouter-models', organizationId, audience],
-    enabled,
-    queryFn: async (): Promise<OpenRouterModelsResponse> => {
-      const response = await fetch(
-        organizationId ? organizationModelsPath(organizationId, audience) : '/api/openrouter/models'
-      );
-      if (!response.ok) {
-        throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
-      }
-      const body: unknown = await response.json();
-      const { OpenRouterModelsResponseSchema } =
-        await import('@kilocode/web-shared/lib/organizations/organization-types');
-      const parsedResponse = OpenRouterModelsResponseSchema.safeParse(body);
-      if (!parsedResponse.success) {
-        throw new Error('Failed to parse response: ' + z.prettifyError(parsedResponse.error));
-      }
-      return parsedResponse.data;
-    },
+    ...trpc.models.selectorList.queryOptions({ organizationId, audience }, { enabled }),
   });
 
   return {

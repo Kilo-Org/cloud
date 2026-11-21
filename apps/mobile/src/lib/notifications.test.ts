@@ -77,7 +77,6 @@ const mocks = vi.hoisted(() => ({
   requireOptionalNativeModule: vi.fn(),
   whenLanguagePreferenceLoaded: vi.fn(),
   languageResolved: 'en' as string,
-  openExternalUrl: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({
@@ -223,7 +222,6 @@ vi.mock('@kilocode/notifications/schemas', async importOriginal => ({
     { id: 'needs-input', name: 'Needs input', importance: 'high', bypassDnd: true },
     { id: 'agent-progress', name: 'Agent progress', importance: 'default', bypassDnd: false },
     { id: 'agent-briefing', name: 'Agent brief', importance: 'default', bypassDnd: false },
-    { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default', bypassDnd: false },
     { id: 'balance', name: 'Balance alerts', importance: 'default', bypassDnd: false },
     { id: 'security', name: 'Security findings', importance: 'high', bypassDnd: false },
     {
@@ -238,20 +236,6 @@ vi.mock('@kilocode/notifications/schemas', async importOriginal => ({
 vi.mock('@/lib/analytics/posthog', () => ({
   captureEvent: mocks.captureEvent,
 }));
-
-// This suite needs the web origin a KiloClaw tap opens on. The global setup
-// stubs `@/lib/config` with no values at all.
-vi.mock('@/lib/config', () => {
-  const values: Record<string, unknown> = { WEB_BASE_URL: 'https://app.example.com' };
-  return new Proxy(values, {
-    get: (target, key) => target[String(key)],
-    has: () => true,
-  });
-});
-
-// The in-app browser: a KiloClaw tap opens it, and the suite asserts the URL
-// instead of mounting a browser.
-vi.mock('./external-link', () => ({ openExternalUrl: mocks.openExternalUrl }));
 
 // The headless session push only: the follow store and the row delete are
 // observed here; every other export keeps its real implementation.
@@ -350,45 +334,11 @@ beforeEach(() => {
   _setScopeStoreForTests({ getItemAsync: mocks.getItemAsync });
 });
 
-describe('KiloClaw notification payloads', () => {
-  const clawPayloads = [
-    { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
-    { type: 'instance-lifecycle', event: 'ready', sandboxId: 's1' },
-    { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 's1' },
-  ] as const;
-
-  it.each(clawPayloads)('parses $type so a tap can open its web page', async data => {
+describe('a push kind this build does not declare', () => {
+  it('parses to null at the OS boundary, so its tap and banner stay untouched', async () => {
     const loaded = await loadNotifications();
 
-    expect(loaded.parseNotificationData(data)).toEqual(data);
-  });
-
-  it.each(clawPayloads)('keeps $type out of the foreground banner', async data => {
-    // The push was already delivered: a visible banner is the OS's job, and
-    // this handler only decides what a foregrounded app shows. KiloClaw has no
-    // in-app surface, and the push stays reachable from the history list.
-    const loaded = await loadNotifications();
-    loaded.setupNotificationHandler();
-    const handler = mocks.setNotificationHandler.mock.calls[0]?.[0] as {
-      handleNotification: (notification: {
-        request: { content: { data: unknown; title: string; body: string } };
-      }) => Promise<{
-        shouldShowBanner: boolean;
-        shouldShowList: boolean;
-        shouldSetBadge: boolean;
-        shouldPlaySound: boolean;
-      }>;
-    };
-    expect(
-      await handler.handleNotification({
-        request: { content: { data, title: 'Kilo', body: 'Activity update' } },
-      })
-    ).toMatchObject({
-      shouldShowBanner: false,
-      shouldShowList: false,
-      shouldSetBadge: false,
-      shouldPlaySound: false,
-    });
+    expect(loaded.parseNotificationData({ type: 'retired_kind', sandboxId: 's1' })).toBeNull();
   });
 });
 
@@ -836,6 +786,7 @@ describe.each(['cold', 'warm'])('%s notification responses', mode => {
 
   it.each([
     null,
+    { type: 'retired_kind', sandboxId: 's1' },
     { type: 'security_finding', scope: 'personal' },
     { type: 'security_finding', scope: [], findingId: 'finding-invalid' },
     {
@@ -861,42 +812,6 @@ describe.each(['cold', 'warm'])('%s notification responses', mode => {
 
     expect(pending.getPendingDeepLinkSnapshot()).toBe(existing);
     expect(mocks.lastResponse).toBe(mode === 'cold' ? null : response);
-    subscription.remove();
-  });
-});
-
-describe.each(['cold', 'warm'])('%s KiloClaw notification responses', mode => {
-  it.each([
-    [
-      { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
-      'https://app.example.com/claw/chat/c1',
-    ],
-    [
-      { type: 'instance-lifecycle', event: 'ready', sandboxId: 's1' },
-      'https://app.example.com/claw',
-    ],
-    [
-      { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 's1' },
-      'https://app.example.com/claw',
-    ],
-  ] as const)('opens $data.type on the web instead of stashing a route', async (data, url) => {
-    const { setupNotificationResponseHandler, checkInitialNotification, pending } =
-      await loadNotifications();
-    const response = { notification: { request: { content: { data } } } };
-    mocks.lastResponse = response;
-    const subscription = setupNotificationResponseHandler();
-
-    if (mode === 'cold') {
-      checkInitialNotification();
-    } else {
-      deliverWarmResponse(response);
-    }
-
-    await vi.waitFor(() => {
-      expect(mocks.openExternalUrl).toHaveBeenCalledWith(url, { retryOnError: true });
-    });
-    expect(pending.getPendingDeepLinkSnapshot()).toBeNull();
-    expect(mocks.clearLastNotificationResponse).toHaveBeenCalled();
     subscription.remove();
   });
 });
@@ -1398,6 +1313,33 @@ const needsInputPush = {
   cliSessionId: 'session-1',
   category: 'attention',
 };
+
+// Kinds this app retired. A server that has not stopped sending them still
+// delivers them, and their banner is drawn from the server-supplied title and
+// body, so a foreground delivery would draw one whose tap resolves no route.
+const RETIRED_PUSHES: [string, Record<string, unknown>][] = [
+  [
+    'chat.message',
+    { type: 'chat.message', sandboxId: 'sb1', conversationId: 'conv1', messageId: 'm1' },
+  ],
+  ['instance-lifecycle', { type: 'instance-lifecycle', event: 'ready', sandboxId: 'sb1' }],
+  [
+    'scheduled-action',
+    { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 'sb1' },
+  ],
+];
+
+describe('a push kind this app retired', () => {
+  it.each(RETIRED_PUSHES)('suppresses the %s banner', async (_kind, data) => {
+    const handleNotification = await loadForegroundHandler();
+
+    await expect(
+      handleNotification({
+        request: { content: { title: 'KiloClaw', body: 'Your instance is ready', data } },
+      })
+    ).resolves.toEqual(SUPPRESSED_BEHAVIOR);
+  });
+});
 
 describe('per-Focus agent-progress suppression', () => {
   it('suppresses an agent-progress push on iOS when the active Focus excludes it', async () => {
@@ -2223,7 +2165,9 @@ describe('setupNotificationBackgroundHandler', () => {
     await executor({
       data: {
         notification: null,
-        data: { dataString: JSON.stringify({ type: 'chat.message' }) },
+        data: {
+          dataString: JSON.stringify({ type: 'cloud_agent_session', cliSessionId: 'ses_1' }),
+        },
       },
       error: null,
       executionInfo: { eventId: 'e2', taskName: 'active-agents-glanceable-background-task' },
@@ -2316,7 +2260,9 @@ describe('runBackgroundNotificationTask', () => {
     const result = await loaded.runBackgroundNotificationTask({
       data: {
         notification: null,
-        data: { dataString: JSON.stringify({ type: 'chat.message' }) },
+        data: {
+          dataString: JSON.stringify({ type: 'cloud_agent_session', cliSessionId: 'ses_1' }),
+        },
       },
       error: null,
       executionInfo: {
@@ -2348,7 +2294,9 @@ describe('runBackgroundNotificationTask', () => {
     await loaded.runBackgroundNotificationTask({
       data: {
         notification: null,
-        data: { dataString: JSON.stringify({ type: 'chat.message' }) },
+        data: {
+          dataString: JSON.stringify({ type: 'cloud_agent_session', cliSessionId: 'ses_1' }),
+        },
       },
       error: null,
       executionInfo: {
@@ -2375,7 +2323,9 @@ describe('runBackgroundNotificationTask', () => {
     await loaded.runBackgroundNotificationTask({
       data: {
         notification: null,
-        data: { dataString: JSON.stringify({ type: 'chat.message' }) },
+        data: {
+          dataString: JSON.stringify({ type: 'cloud_agent_session', cliSessionId: 'ses_1' }),
+        },
       },
       error: null,
       executionInfo: {

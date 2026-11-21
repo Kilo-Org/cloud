@@ -3,35 +3,36 @@ import { selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
-import { ChevronDown, Eye, EyeOff } from '@/components/ui/icons';
+import { Eye, EyeOff } from '@/components/ui/icons';
 import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 
-import { AddCreditsButton, AddCreditsRow } from '@/components/add-credits-row';
 import { BalanceBlock, type BalanceBlockState } from '@/components/profile-balance-block';
-import { useContextPicker } from '@/components/context-control';
 import { CreditExpiryNote } from '@/components/credits/credit-expiry-note';
 import { PersonalCreditsLinks } from '@/components/credits/credits-links';
 import { KiloPassSubscriptionCard } from '@/components/kilo-pass/kilo-pass-subscription-card';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { useCanLinkExternalPurchase } from '@/lib/billing/external-purchase-link';
 import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
-import {
-  ICON_TARGET_BOX_CLASS,
-  LINE_ACTION_BOX_CLASS,
-  LINE_ACTION_HIT_SLOP,
-  STATE_ACTION_CLASS,
-} from '@/lib/a11y/tap-target';
+import { openExternalUrl } from '@/lib/external-link';
+import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatPrefixedMoney } from '@/lib/format';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_GUTTER_DP } from '@/lib/layout';
+import { useStyleSideInsets } from '@/lib/screen-insets';
 import { isMoneyRole, type OrgListEntry } from '@/lib/hooks/use-organization-queries';
-import { isNarrowLayout } from '@/lib/narrow-layout';
 import { useOrganization } from '@/lib/organization-context';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
+import {
+  classifyReadFailureKind,
+  readFailureKindIsRetryable,
+} from '@/lib/query/read-failure-variant';
 import { useTRPC } from '@/lib/trpc';
 import { HIDDEN_BALANCE } from '@/lib/storage-keys';
 import { cn } from '@/lib/utils';
@@ -48,11 +49,38 @@ type CreditsCardProps = {
  */
 const AMOUNT_DIRECTION = { direction: 'ltr', writingDirection: 'ltr' } as const;
 
+/**
+ * One `caption` line at font scale 1. `text-xs` lays out at 14.1 dp on the
+ * standard Android cell (measured on the Profile gate target), and the card's
+ * nearest spacing class is `h-4` (14 dp).
+ */
+const CAPTION_LINE_DP = 14.1;
+/**
+ * The funded note's line count at font scale 1: the sentence wraps to two
+ * `caption` lines in this card's column (gate-measured at 28.19 dp), one line
+ * for the empty message and one for the loading bar.
+ */
+const FUNDED_NOTE_LINES = 2;
+
+/**
+ * The sentence each failure kind paints: the connection's own wording, the
+ * retryable line a deadline shares (the card has no separate sentence for a
+ * wait that ended, and the server was reachable), the refusal, the terminal
+ * read, or the transient failure beside its Retry.
+ */
+const BALANCE_FAILURE_COPY = {
+  offline: 'profile.balanceUnreachable',
+  timeout: 'profile.balanceLoadFailed',
+  permission: 'profile.balanceAccessDenied',
+  'not-found': 'profile.balanceUnavailable',
+  terminal: 'profile.balanceUnavailable',
+  retryable: 'profile.balanceLoadFailed',
+} as const;
+
 export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
   const router = useRouter();
-  const { width } = useWindowDimensions();
   const fontScale = useLiveFontScale();
   const [availableWidth, setAvailableWidth] = useState<number | null>(null);
   // Stack the balance unless the expiry note keeps its two lines beside the
@@ -62,19 +90,39 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // 157 dp of the card, so the one-row layout holds from about 372 scaled card
   // dp. The threshold stacks below 370 of them and uses the card's width rather
   // than the display's; below it the note takes a row of its own at full width.
-  const stackBalance = availableWidth === null || availableWidth / fontScale < 370;
-  // Below NARROW_LAYOUT_WIDTH the account picker's 65% share leaves the
-  // "CREDITS" eyebrow too little room for one word and Android breaks it
-  // mid-word ("CREDIT S", 160 dp, e1, 2026-09-21). Stacking gives each line the
-  // row's full width.
-  const narrow = isNarrowLayout(width);
+  //
+  // The container reports that width one frame after it mounts, and the two
+  // arms are not the same height: stacked reserves a 48pt value column, the
+  // one-row arm takes the visibility control's own height. A first frame that
+  // guessed "stacked" therefore shrank by 5.7 dp when the width landed and
+  // moved every row below it (the held-loading gate run measured it on
+  // `(3_profile)`). The body's width is the card's width here, so the first
+  // frame reads it from the window and `onLayout` still owns the settled
+  // answer for any container narrower than the body.
+  //
+  // The window is not quite the body: the tab scroller puts the safe-area side
+  // margins on its own frame (`TabScreenScrollView`), so a landscape cutout
+  // narrows the settled card by its inset on each side. Subtracting only the
+  // gutter would guess a wider card than `onLayout` reports and could pick the
+  // one-row arm where the settled width stacks — the first-frame arm switch
+  // this line exists to prevent.
+  const window = useWindowDimensions();
+  const sideInsets = useStyleSideInsets();
+  const bodyWidth = window.width - SCREEN_GUTTER_DP * 2 - sideInsets.left - sideInsets.right;
+  const measuredWidth = availableWidth ?? bodyWidth;
+  const stackBalance = measuredWidth / fontScale < 370;
   const { t, i18n } = useTranslation();
-  const { openPicker } = useContextPicker(orgs);
   const { organizationId, error, isSaving, retry } = useOrganization();
   const selectedOrgId = organizationId ?? undefined;
 
   const { hideBalance, hasLoaded: hideBalanceLoaded, setHideBalance } = useHideBalancePreference();
-  const { userId, isError: userIdError, refetch: refetchUserId } = useCurrentUserId({ enabled });
+  const canLinkExternalPurchase = useCanLinkExternalPurchase();
+  const {
+    userId,
+    isError: userIdError,
+    error: userIdFailure,
+    refetch: refetchUserId,
+  } = useCurrentUserId({ enabled });
   const hasUserId = userId !== undefined;
 
   const balanceOptions = trpc.user.getContextBalance.queryOptions({
@@ -98,6 +146,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     isLoading: balanceLoading,
     isPlaceholderData: balancePlaceholder,
     isError: balanceQueryError,
+    error: balanceError,
     refetch: refetchBalance,
   } = useQuery({
     ...balanceOptions,
@@ -127,6 +176,26 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // A failed getMe (no userId) can never render a trusted balance, so it shares
   // the balance error surface. Retry re-resolves the owner and re-fetches.
   const balanceFailed = balanceQueryError || userIdError;
+
+  // The kind of the failure decides the copy and the action: a refusal is not a
+  // transient failure, and a terminal one is the answer. Only a retryable or
+  // offline failure offers Retry, because only those can succeed on a second
+  // attempt. The read itself settles regardless of the online manager
+  // (`SETTLE_WHILE_OFFLINE`), so an unreachable one names the connection by
+  // having no server answer at all — no separate probe is needed here.
+  const balanceFailureErrors: unknown[] = [];
+  if (balanceError) {
+    balanceFailureErrors.push(balanceError);
+  }
+  if (userIdFailure) {
+    balanceFailureErrors.push(userIdFailure);
+  }
+  const balanceFailureKind = classifyReadFailureKind({
+    errors: balanceFailureErrors,
+    isPaused: false,
+    connectivity: 'unknown',
+  });
+  const balanceRetryable = readFailureKindIsRetryable(balanceFailureKind);
 
   const creditData = selectedOrgId ? orgCreditData : personalCreditData;
   const creditsFailed = selectedOrgId ? orgCreditsError : personalCreditsError;
@@ -163,13 +232,6 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     (balanceLoading || balancePending || balancePlaceholder || !hideBalanceLoaded) &&
     !balanceFailed;
 
-  const selectedLabel = selectedOrgId
-    ? (orgs?.find(o => o.organizationId === selectedOrgId)?.organizationName ??
-      t('common.organization'))
-    : t('common.personal');
-
-  const canPickContext = orgs !== undefined;
-
   // Personal credits are a consumable bought in-app, so the personal row is
   // shown on every platform and at any balance — a funded user must still be
   // able to top up. Org billing stays a web flow and only members who can
@@ -180,13 +242,34 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
 
   // The expiry note's slot: under the amount. No entrance fade — the caption
   // holds a row of this block, so a fade that paints it late leaves it empty.
+  //
+  // The slot is a fixed box in every state: a funded account's sentence ("… in
+  // credits expires … Credits with the earliest expiry are used first.") wraps
+  // to two `caption` lines at this card's width and scale 1, the empty message
+  // is one line and the loading bar is one. A one-line slot grew the card by
+  // about 14 dp when funded credits landed and moved every row below it
+  // (Profile held-loading gate target, 2026-11-20).
+  //
+  // Both the line's height and the sentence's line count grow with the font
+  // scale, and the count grows faster than the scale: the column keeps its
+  // width in dp while every glyph widens, so a sentence that takes two lines at
+  // scale 1 takes about four at Android's largest scale. Reserving only
+  // `2 × scale` lines left the box one line short from about scale 1.5 and grew
+  // the card when a funded note landed — the shift this slot exists to prevent.
+  const noteLines = Math.ceil(FUNDED_NOTE_LINES * fontScale);
   const expirySlot = (
-    <>
+    <View
+      testID="credits-expiry-slot"
+      style={{ minHeight: CAPTION_LINE_DP * fontScale * noteLines }}
+    >
       {creditsFailed && (
         <Text className="text-xs text-muted-foreground">{t('credits.expiryUnavailable')}</Text>
       )}
       {!creditsFailed && creditsPending && (
-        <Skeleton className="h-3 w-40 max-w-full rounded bg-muted-soft" />
+        // The bar stands in for one `caption` line (14.1pt tall), so it takes
+        // that line's height: a shorter bar lifted the value column, and the
+        // row's centering moved the amount itself when the note landed.
+        <Skeleton className="h-4 w-40 max-w-full rounded bg-muted-soft" />
       )}
       {!creditsFailed && !creditsPending && (
         <CreditExpiryNote
@@ -195,7 +278,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           emptyMessage={t('credits.noExpiringCredits')}
         />
       )}
-    </>
+    </View>
   );
 
   // `shrink-0 grow-0` keeps the amount at its text height: a horizontal
@@ -204,7 +287,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const amountLine = (
     <ScrollView horizontal className="min-w-0 shrink-0 grow-0">
       <Text
-        className="text-2xl font-bold tabular-nums"
+        variant="figure"
         // A reader compares the amount digit by digit, and its symbol is
         // neutral to the line's direction, so the run keeps its own
         // left-to-right order whatever the interface language.
@@ -234,44 +317,47 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     </Pressable>
   );
 
-  // The purchase action: in the trailing control column with the visibility
-  // toggle. No in-progress indicator sits beside it, because this row paints a
-  // balance that belongs to the selected account and a background refresh may
-  // legitimately take a while or never finish. The first load and a context
-  // switch own the skeleton above; a refresh that fails owns the retry surface.
-  // An indicator tied to every in-flight refresh spun for as long as a stalled
-  // one lasted (and announced itself as "In progress").
-  //
-  // An organization's top-up is the external billing page, so it carries the
-  // row's App Store gate and opens for a member who can manage billing. It uses
-  // the same trailing slot as the personal purchase, and it is offered at any
-  // balance, exactly like the personal action beside it. The balance read no
-  // longer decides whether it exists: mounting the control once that read
-  // answered moved every section below the card with it (design gate, Profile,
-  // 2026-11-06), and the slot it takes is reserved in the card's other states.
-  //
-  // A stacked card holds the action on its own end-aligned row inside the
-  // balance block, so it takes the inline form: the button keeps its natural
-  // size there instead of the block width `AddCreditsRow` gives a window under
-  // the narrow threshold.
-  const orgAddCreditsAction =
-    selectedOrgId != null && canManageOrgBilling ? (
-      <AddCreditsRow url={organizationBillingUrl(selectedOrgId)} inline={stackBalance} />
-    ) : null;
+  // One purchase entry for the section, whichever scope is selected: the
+  // personal one is the in-app purchase, and an organization's is its billing
+  // page, which only a storefront that may link to it can offer. It lives in the
+  // Credits header, so it never wraps to a row of its own in a narrow card and
+  // never reads as a muted label with nothing to press.
+  const orgBillingUrl =
+    selectedOrgId != null && canManageOrgBilling ? organizationBillingUrl(selectedOrgId) : null;
+  let purchase: Readonly<{ label: string; onPress: () => void }> | null = null;
+  if (selectedOrgId == null) {
+    purchase = {
+      label: t('addCredits.cta'),
+      onPress: () => {
+        router.push('/(app)/credits' as Href);
+      },
+    };
+  } else if (orgBillingUrl !== null && canLinkExternalPurchase) {
+    purchase = {
+      label: t('addCredits.cta'),
+      onPress: () => {
+        void openExternalUrl(orgBillingUrl, { label: t('addCredits.billingPage') });
+      },
+    };
+  }
 
-  const addCreditsAction =
-    selectedOrgId == null ? (
-      <View className="max-w-full flex-row flex-wrap items-center justify-end gap-2">
-        <AddCreditsButton
-          className="h-auto max-w-full py-2"
-          onPress={() => {
-            router.push('/(app)/credits' as Href);
-          }}
-        />
-      </View>
-    ) : (
-      orgAddCreditsAction
-    );
+  const retryBalance = () => {
+    refetchUserId();
+    void refetchBalance();
+  };
+
+  // The failure's own sentence: the variant names the cause, so a refusal is
+  // not described as a transient failure and an unreachable read is not
+  // described as the server's. Only the retryable case keeps the short line
+  // beside a Retry.
+  const balanceFailureLabel = t(BALANCE_FAILURE_COPY[balanceFailureKind]);
+
+  // The retry line's spoken label names the action ("Tap to retry"), which the
+  // visible sentence cannot carry in one line; the other kinds are statements.
+  const balanceFailureAccessibilityLabel =
+    balanceFailureKind === 'retryable' || balanceFailureKind === 'timeout'
+      ? t('profile.failedToLoadBalance')
+      : balanceFailureLabel;
 
   // The balance slot's state: one shell paints all three, so the card never
   // moves as the read answers, fails or retries.
@@ -279,13 +365,17 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   if (showBalanceSkeleton) {
     balanceState = 'loading';
   } else if (balanceFailed) {
-    balanceState = 'failed';
+    balanceState = {
+      kind: 'failed',
+      failure: {
+        label: balanceFailureLabel,
+        accessibilityLabel: balanceFailureAccessibilityLabel,
+        retry: balanceRetryable
+          ? { handleRetry: retryBalance, actionLabel: t('common.retry') }
+          : undefined,
+      },
+    };
   }
-
-  const retryBalance = () => {
-    refetchUserId();
-    void refetchBalance();
-  };
 
   return (
     <View
@@ -294,45 +384,11 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         setAvailableWidth(event.nativeEvent.layout.width);
       }}
     >
-      {/* The header is one text line tall, like every other Profile section
-          heading, so "Credits" starts at the screen's top padding instead of
-          sitting at the bottom of a 44dp box. The picker keeps its touch target
-          on the shared line-action box: a 28dp frame that floats over the line
-          and reaches past 44dp with hitSlop, without growing the row. */}
-      <View
-        className={cn(
-          'gap-3',
-          narrow ? 'flex-col items-stretch' : 'flex-row items-center justify-between'
-        )}
-      >
-        <Text variant="small" className="shrink uppercase tracking-wide text-muted-foreground">
-          {t('profile.credits')}
-        </Text>
-        {canPickContext && (
-          <Pressable
-            className={cn(
-              LINE_ACTION_BOX_CLASS,
-              // A short account or org name must still carry the 44pt reach.
-              'min-w-[44px] flex-row items-center gap-1 active:opacity-70',
-              narrow ? 'max-w-full justify-start' : 'max-w-[65%] shrink justify-end'
-            )}
-            hitSlop={LINE_ACTION_HIT_SLOP}
-            onPress={openPicker}
-            accessibilityRole="button"
-            accessibilityLabel={selectedLabel}
-            accessibilityHint={t('profile.selectAccount')}
-          >
-            <Text
-              className="min-w-0 shrink text-xs font-medium text-muted-foreground"
-              numberOfLines={1}
-              ellipsizeMode="tail"
-            >
-              {selectedLabel}
-            </Text>
-            <ChevronDown size={14} color={colors.mutedForeground} />
-          </Pressable>
-        )}
-      </View>
+      <SectionHeader
+        label={t('profile.credits')}
+        actionLabel={purchase?.label}
+        onActionPress={purchase?.onPress}
+      />
       {error === 'save' && (
         <View>
           <AccessibleStatus message={t('common.couldNotSaveSetting')} className="text-sm" />
@@ -357,11 +413,6 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         amount={amountLine}
         toggle={visibilityToggle}
         note={expirySlot}
-        failureLabel={t('profile.balanceLoadFailed')}
-        action={addCreditsAction}
-        retryLabel={t('profile.failedToLoadBalance')}
-        retryActionLabel={t('common.retry')}
-        onRetry={retryBalance}
       />
       {/* The person's own history and invoices sit under their balance; an
           organization's balance has no personal rows, so only the personal

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
+import { renderRuntimeBootstrap } from './runtime-bootstrap.js';
 import {
   RUNTIME_DESCRIPTOR_MAX_BYTES,
   serializeRuntimeRelease,
@@ -95,6 +96,25 @@ function descriptor(): RuntimeReleaseDescriptor {
 }
 
 describe('runtime release descriptor', () => {
+  it('forwards trusted telemetry through the downloaded runtime environment allowlist', () => {
+    const command = renderRuntimeBootstrap({
+      descriptor: JSON.stringify(descriptor()),
+      artifactBaseUrl: 'https://runtime.example.com/artifacts',
+      reportUrl: 'https://runtime.example.com/startup',
+      allocationId: 'allocation_test',
+      grant: 'runtime-test-grant',
+      deadlineAt: Date.now() + 300_000,
+    });
+    const script = command.argv[2];
+    expect(script).toContain('/usr/bin/env -i');
+    for (const key of ['CLOUD_AGENT_SENTRY_DSN', 'CLOUD_AGENT_SENTRY_ENVIRONMENT']) {
+      expect(script).toContain(`${key}="\${${key}:-}"`);
+    }
+    for (const key of ['SENTRY_DSN', 'SENTRY_AUTH_TOKEN', 'SENTRY_ENVIRONMENT']) {
+      expect(script).not.toContain(`${key}="\${${key}:-}"`);
+    }
+  });
+
   it('serializes the compact descriptor within the 64 KiB launch cap', () => {
     const bytes = serializeRuntimeRelease(descriptor());
     expect(bytes.byteLength).toBeLessThanOrEqual(RUNTIME_DESCRIPTOR_MAX_BYTES);

@@ -102,7 +102,9 @@ export function CustomPricingContent() {
             is shown in the catalog. A <code>null</code> cache price bills cache tokens at the
             prompt price. <code>discountPercentage</code> only labels the model name.{' '}
             <code>fallbackOnly</code> prices apply only when the upstream reports no cost and are
-            not shown in the catalog. Changes apply within about a minute.
+            not shown in the catalog. Latest aliases (<code>~</code> model IDs) are billed at their
+            target model&apos;s custom pricing and cannot have entries of their own. Changes apply
+            within about a minute.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">

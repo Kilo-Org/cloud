@@ -1,20 +1,22 @@
-import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { Button } from '@/components/ui/button';
+import { ConfigureRow } from '@/components/ui/configure-row';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { Shield, X } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Globe, Shield, X } from '@/components/ui/icons';
+import { IconButton } from '@/components/ui/icon-button';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
-import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { revokeImageHost, useTrustedImageHosts } from '@/lib/hooks/use-trusted-image-hosts';
 import { revokeHost, useTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
-import { cn } from '@/lib/utils';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 
 function TrustedHostRow({
   host,
@@ -24,34 +26,31 @@ function TrustedHostRow({
   const colors = useThemeColors();
 
   return (
-    <View className="flex-row items-center justify-between gap-3 rounded-lg bg-secondary p-3">
-      <Text className="min-w-0 flex-1 text-sm font-medium" numberOfLines={1}>
-        {host}
-      </Text>
-      <Pressable
-        onPress={() => {
-          onRevoke(host);
-        }}
-        accessibilityRole="button"
-        accessibilityLabel={t('trustedHosts.revoke', { host })}
-        className={cn(ICON_TARGET_BOX_CLASS, 'shrink-0 active:opacity-70')}
-      >
-        <X size={16} color={colors.destructive} />
-      </Pressable>
-    </View>
+    <ConfigureRow
+      icon={Globe}
+      title={host}
+      variant="action"
+      trailing={
+        <IconButton
+          accessibilityLabel={t('trustedHosts.revoke', { host })}
+          onPress={() => {
+            onRevoke(host);
+          }}
+        >
+          <X size={16} color={colors.destructive} />
+        </IconButton>
+      }
+    />
   );
 }
 
 function HostListSkeleton() {
   return (
-    <View className="gap-3">
+    <RowGroup leadingTile>
       {[0, 1].map(index => (
-        <View key={index} className="flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-          <Skeleton className="h-5 w-40" />
-          <Skeleton className="ml-auto h-4 w-4 rounded" />
-        </View>
+        <RowSkeleton key={index} tile />
       ))}
-    </View>
+    </RowGroup>
   );
 }
 
@@ -71,22 +70,19 @@ function TrustedImageHostList({
   }
 
   if (hosts.length === 0) {
-    return (
-      <Text className="text-sm text-muted-foreground">{t('trustedHosts.imagesSectionEmpty')}</Text>
-    );
+    return <Text variant="caption">{t('trustedHosts.imagesSectionEmpty')}</Text>;
   }
 
   return (
-    <View className="gap-3">
+    <RowGroup leadingTile>
       {hosts.map(host => (
         <TrustedHostRow key={host} host={host} onRevoke={onRevoke} />
       ))}
-    </View>
+    </RowGroup>
   );
 }
 
 export function TrustedHostsScreen() {
-  const router = useRouter();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const { trustedHosts, hasLoaded } = useTrustedHosts();
@@ -110,32 +106,17 @@ export function TrustedHostsScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('trustedHosts.title')} />
+      <ScreenHeader title={t('trustedHosts.title')} backFallback={PROFILE_TAB_HREF} />
       {hasLoaded && imageHostsLoaded && hasNoTrustedHosts ? (
         <EmptyState
           icon={Shield}
           title={t('trustedHosts.emptyTitle')}
           description={t('trustedHosts.emptyDescription')}
-          action={
-            <Button
-              variant="outline"
-              className={STATE_ACTION_CLASS}
-              onPress={() => {
-                // The only caller pushes this screen from Account, so `back()`
-                // would land one row short of the Preferences hub the label
-                // names. POP_TO pops back to it, or replaces this screen with
-                // it when the stack was entered without it (deep link).
-                router.dismissTo('/(app)/(tabs)/(3_profile)/preferences' as Href);
-              }}
-            >
-              <Text>{t('trustedHosts.backToPreferences')}</Text>
-            </Button>
-          }
         />
       ) : (
         <TabScreenScrollView
           className="flex-1"
-          contentContainerClassName="gap-3 px-4 pt-4"
+          contentContainerClassName={SCREEN_BODY_CLASS}
           showsVerticalScrollIndicator={false}
         >
           {!hasLoaded ? (
@@ -143,7 +124,7 @@ export function TrustedHostsScreen() {
           ) : (
             <>
               {trustedHosts.length > 0 ? (
-                <View className="gap-3">
+                <RowGroup leadingTile>
                   {trustedHosts.map(host => (
                     <TrustedHostRow
                       key={host}
@@ -153,17 +134,10 @@ export function TrustedHostsScreen() {
                       }}
                     />
                   ))}
-                </View>
+                </RowGroup>
               ) : null}
-              <View className="gap-3">
-                <View className="gap-1">
-                  <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-                    {t('trustedHosts.imagesSectionTitle')}
-                  </Text>
-                  <Text className="text-xs text-muted-foreground">
-                    {t('trustedHosts.imagesSectionDescription')}
-                  </Text>
-                </View>
+              <Section label={t('trustedHosts.imagesSectionTitle')}>
+                <Text variant="caption">{t('trustedHosts.imagesSectionDescription')}</Text>
                 <TrustedImageHostList
                   hosts={trustedImageHosts}
                   hasLoaded={imageHostsLoaded}
@@ -171,7 +145,7 @@ export function TrustedHostsScreen() {
                     confirmRevoke(host, revokeImageHost, t('trustedHosts.revokeImageMessage'));
                   }}
                 />
-              </View>
+              </Section>
             </>
           )}
         </TabScreenScrollView>

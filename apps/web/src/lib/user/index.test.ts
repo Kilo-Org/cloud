@@ -65,6 +65,7 @@ import {
   bot_request_cloud_agent_sessions,
   kiloclaw_admin_audit_logs,
   admin_action_audit_logs,
+  blacklisted_domains_settings,
   kiloclaw_scheduled_actions,
   kiloclaw_scheduled_action_stages,
   kiloclaw_scheduled_action_targets,
@@ -131,6 +132,7 @@ import {
   operation_ledgers,
   analytics_event_outbox,
   bouncer_credit_event_outbox,
+  webhook_events_v2,
   bouncer_usage_event_outbox,
   external_side_effect_outbox,
   user_data_exports,
@@ -208,7 +210,6 @@ import {
 import type * as StripeClient from '@kilocode/web-shared/lib/stripe-client';
 import type * as PostHogModule from '@kilocode/web-shared/lib/posthog';
 import type * as BouncerClient from '@kilocode/web-shared/lib/bouncer/client';
-import type { WatchwoodSignupAssessment } from '@/lib/auth/watchwood';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/config.server'),
@@ -285,6 +286,7 @@ describe('User', () => {
   });
 
   afterEach(async () => {
+    await db.delete(blacklisted_domains_settings);
     await db.delete(cloud_agent_pr_watches);
     await db.delete(cloud_agent_worktrees);
     await db.delete(cloud_agent_workspace_folders);
@@ -910,43 +912,6 @@ describe('User', () => {
 
     afterEach(() => {
       jest.restoreAllMocks();
-    });
-
-    it.each<WatchwoodSignupAssessment>([
-      {
-        status: 'assessed',
-        riskScore: 1,
-        safetyIdentifier: '4829b420-d43c-4f31-893d-f5042cf274cf',
-        latencyMs: 10,
-        assessedAt: 1,
-      },
-      { status: 'unavailable', latencyMs: 1000, assessedAt: 1 },
-      { status: 'missing', latencyMs: 0, assessedAt: 1 },
-    ])('creates an account with a $status shadow assessment', async watchwood => {
-      const email = `watchwood-${watchwood.status}@example.com`;
-      const result = await createOrUpdateUser(
-        {
-          google_user_email: email,
-          google_user_name: 'Shadow Signup',
-          google_user_image_url: '',
-          hosted_domain: null,
-          provider: 'google',
-          provider_account_id: `watchwood-${watchwood.status}`,
-        },
-        undefined,
-        false,
-        new Headers({ 'x-forwarded-for': '203.0.113.70' }),
-        null,
-        { watchwood }
-      );
-
-      expect(result.success).toBe(true);
-      if (!result.success) return;
-      expect(result.isNew).toBe(true);
-      expect(await findUserById(result.user.id)).toMatchObject({ google_user_email: email });
-      expect(await getUserAuthProviders(result.user.id)).toMatchObject([
-        { provider: 'google', provider_account_id: `watchwood-${watchwood.status}` },
-      ]);
     });
 
     it('refuses a native signup without verified admission before creating a Stripe customer or user', async () => {
@@ -2538,6 +2503,14 @@ describe('User', () => {
       }
     });
 
+    it('clears the Anthropic user profile id', async () => {
+      const user = await insertTestUser({ anthropic_user_profile_id: 'uprof_test_soft_delete' });
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+
+      expect(await findUserById(user.id)).toMatchObject({ anthropic_user_profile_id: null });
+    });
+
     it.each([null, deletedEmail, 'deleted@deleted.invalid'])(
       'preserves deletion history and scrubs new PII on replay with normalized_email %p',
       async normalizedEmail => {
@@ -2734,7 +2707,7 @@ describe('User', () => {
       ).toHaveLength(0);
     });
 
-    it("removes the deleted user's own Claude billing connections and keeps the organization's shared one", async () => {
+    it("removes the deleted user's own Claude billing connections and keeps the organization's one", async () => {
       const user = await insertTestUser({
         google_user_email: `claude-billing-cleanup-${randomUUID()}@example.com`,
       });
@@ -2775,7 +2748,7 @@ describe('User', () => {
       expect(organizationRows[0]?.kilo_user_id).toBeNull();
     });
 
-    it("promotes a deleted user's personal payer when shared services still use it", async () => {
+    it("promotes a deleted user's personal payer when the organization still uses it", async () => {
       const user = await insertTestUser({
         google_user_email: `claude-billing-shared-cleanup-${randomUUID()}@example.com`,
       });
@@ -2798,7 +2771,7 @@ describe('User', () => {
       if (!payer) throw new Error('Missing payer fixture');
       await shareClaudeBillingConnection(
         { kind: 'personal', kiloUserId: user.id },
-        { kind: 'shared_services', organizationId: organization.id },
+        { kind: 'organization', organizationId: organization.id },
         user.id
       );
 
@@ -3090,6 +3063,29 @@ describe('User', () => {
   });
 
   describe('softDeleteUser', () => {
+    it('anonymizes the matching signup settings editor without changing the settings', async () => {
+      const editor = await insertTestUser({ id: `oauth/github:signup-settings-${randomUUID()}` });
+      const otherUser = await insertTestUser();
+      const [settings] = await db
+        .insert(blacklisted_domains_settings)
+        .values({
+          blocked_signup_tlds: ['example', 'test'],
+          updated_at: '2026-01-01T12:00:00.000Z',
+          updated_by: editor.id,
+          updated_by_email: editor.google_user_email,
+        })
+        .returning();
+      if (!settings) throw new Error('Missing signup settings fixture');
+
+      await softDeleteUser(otherUser.id);
+      expect(await db.select().from(blacklisted_domains_settings)).toEqual([settings]);
+
+      await softDeleteUser(editor.id);
+      expect(await db.select().from(blacklisted_domains_settings)).toEqual([
+        { ...settings, updated_by: null, updated_by_email: null },
+      ]);
+    });
+
     it('revokes the actor open support access grants and records events', async () => {
       const admin = await insertTestUser({
         is_admin: true,
@@ -5302,6 +5298,34 @@ describe('User', () => {
       const remainingOutbox = await db.select().from(external_side_effect_outbox);
       expect(remainingOutbox).toHaveLength(1);
       expect(remainingOutbox[0].invitation_id).toBe(forUser2.id);
+    });
+
+    it("deletes the user's partitioned webhook events, which no foreign key cascades into", async () => {
+      const user1 = await insertTestUser();
+      const user2 = await insertTestUser();
+      await db.insert(webhook_events_v2).values(
+        [user1.id, user2.id].map(userId => ({
+          owned_by_user_id: userId,
+          platform: 'github',
+          event_type: 'pull_request',
+          payload: { sender: { login: `login-${userId}` } },
+          headers: {},
+          event_signature: `delivery-${crypto.randomUUID()}`,
+        }))
+      );
+
+      await softDeleteUser(user1.id);
+
+      const remainingForDeletedUser = await db
+        .select({ id: webhook_events_v2.id })
+        .from(webhook_events_v2)
+        .where(eq(webhook_events_v2.owned_by_user_id, user1.id));
+      expect(remainingForDeletedUser).toHaveLength(0);
+      const remainingForOtherUser = await db
+        .select({ id: webhook_events_v2.id })
+        .from(webhook_events_v2)
+        .where(eq(webhook_events_v2.owned_by_user_id, user2.id));
+      expect(remainingForOtherUser).toHaveLength(1);
     });
 
     it('deletes the bouncer credit-event outbox rows for the deleted user', async () => {

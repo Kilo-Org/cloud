@@ -1,11 +1,13 @@
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown } from '@/components/ui/icons';
 
+import { FormFieldLabel } from '@/components/ui/form-field-label';
+import { InlineCodeText } from '@/components/ui/inline-code-text';
 import { Text } from '@/components/ui/text';
 import { FIELD_TRIGGER_BODY_CLASS, FIELD_TRIGGER_FRAME_CLASS } from '@/lib/a11y/tap-target';
-import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { folderPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
@@ -28,7 +30,7 @@ function FolderSelector({
   onChangeFolderPath,
   disabled = false,
 }: Readonly<FolderSelectorProps>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
 
@@ -44,7 +46,7 @@ function FolderSelector({
       currentPath: folderPath,
       onSelect: onChangeFolderPath,
     });
-    router.push('/(app)/agent-chat/folder-picker' as Href);
+    pushOnce('/(app)/agent-chat/folder-picker' as Href);
   }
 
   return (
@@ -91,21 +93,19 @@ export function LaunchFolderField({
     // remote surface's Folder row but inert, since there is no connection to
     // list folders on. The setup hint under Start names the recovery.
     return (
-      <View className="mt-5">
-        <Text className="mb-2 text-sm font-medium text-muted-foreground">
-          {t('agentChat.folderPicker.fieldLabel')}
-        </Text>
-        <Text className="text-sm text-muted-foreground">
-          {stripInlineCodeMarkers(t('agentChat.instancePicker.noCliInstancesDescription'))}
-        </Text>
+      <View className="gap-2">
+        <FormFieldLabel label={t('agentChat.folderPicker.fieldLabel')} />
+        <InlineCodeText
+          className="text-sm text-muted-foreground"
+          codeClassName="text-muted-foreground"
+          value={t('agentChat.instancePicker.noCliInstancesDescription')}
+        />
       </View>
     );
   }
   return (
-    <View className="mt-5">
-      <Text className="mb-2 text-sm font-medium text-muted-foreground">
-        {t('agentChat.folderPicker.fieldLabel')}
-      </Text>
+    <View className="gap-2">
+      <FormFieldLabel label={t('agentChat.folderPicker.fieldLabel')} />
       <FolderSelector
         folderPath={folderPath}
         projectName={runOnInstance.projectName}

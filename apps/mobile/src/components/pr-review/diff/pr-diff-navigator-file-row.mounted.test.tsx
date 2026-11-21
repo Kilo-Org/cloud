@@ -13,12 +13,20 @@ import { NavigatorFileRow } from './pr-diff-navigator-file-row';
 import { LTR_ISOLATE_CLOSE, LTR_ISOLATE_OPEN } from '@/lib/bidi';
 
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
-vi.mock('react-native', () => ({
-  I18nManager: i18nManager,
-  Pressable: 'Pressable',
-  Text: 'Text',
-  View: 'View',
-}));
+vi.mock('react-native', async () => {
+  // A `vi.mock` factory runs before this file's imports are initialised, so the
+  // shared flatten comes in dynamically; a static import would be unbound here.
+  // The shared `Text` reads a caller's own base direction through
+  // `StyleSheet.flatten` (`pinsTextDirection`), so this stub must flatten.
+  const { flattenStyle: flatten } = await import('@/test/style-sheet-mock');
+  return {
+    I18nManager: i18nManager,
+    Pressable: 'Pressable',
+    StyleSheet: { create: (styles: unknown) => styles, flatten },
+    Text: 'Text',
+    View: 'View',
+  };
+});
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 vi.mock('@/components/pr-review/diff/pr-diff-file-rows', () => ({
   MarkViewedToggle: 'MarkViewedToggle',
@@ -157,5 +165,16 @@ describe('NavigatorFileRow diff stats under an RTL interface', () => {
     expect(additions?.props.className).toContain('text-xs');
     expect(deletions?.props.className).toContain('text-muted-foreground');
     expect(deletions?.props.className).toContain('text-xs');
+  });
+});
+
+describe('NavigatorFileRow mark-viewed toggle', () => {
+  it('sits directly in the padded row, so its slop is inside the parent view', () => {
+    mountRow('src/greeting.ts');
+    const toggle = renderer?.root.find(node => Object.is(node.type, 'MarkViewedToggle'));
+    const parentClass = String(toggle?.parent?.props.className);
+
+    expect(parentClass).toContain('py-2.5');
+    expect(parentClass).toContain('flex-row');
   });
 });

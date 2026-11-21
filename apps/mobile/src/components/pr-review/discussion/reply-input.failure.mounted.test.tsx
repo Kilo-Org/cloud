@@ -41,7 +41,7 @@ vi.mock('react-native', () => ({
 }));
 
 vi.mock('expo-crypto', () => ({ randomUUID: () => 'not-used' }));
-vi.mock('expo-web-browser', () => ({ openBrowserAsync: vi.fn() }));
+vi.mock('expo-router', () => ({ router: { push: vi.fn() } }));
 vi.mock('expo-haptics', () => ({
   impactAsync: vi.fn(),
   notificationAsync: vi.fn(),

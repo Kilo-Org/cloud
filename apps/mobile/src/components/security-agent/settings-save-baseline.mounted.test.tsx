@@ -36,9 +36,21 @@ const saveButton = vi.hoisted(() => ({
   onSave: null as (() => Promise<void>) | null,
 }));
 
+vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
+vi.mock('@/components/ui/icons', () => ({
+  Check: 'Check',
+  CircleCheck: 'CircleCheck',
+  Clock: 'Clock',
+  GitPullRequest: 'GitPullRequest',
+  ScanSearch: 'ScanSearch',
+  Trash2: 'Trash2',
+}));
 vi.mock('react-native', () => ({
   View: 'View',
   Alert: { alert: vi.fn() },
+}));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
 }));
 vi.mock('sonner-native', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
@@ -46,6 +58,7 @@ vi.mock('sonner-native', () => ({
 vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentCapability: () => ({ canManage: true }),
   useSecurityAgentConfig: () => config,
+  useRetrySecurityAgentConfig: () => ({ retry: vi.fn(), isRetrying: false }),
   useSaveSecurityAgentConfig: () => save,
   useTrackSecurityAgentInteraction: () => ({ mutate: vi.fn() }),
 }));
@@ -67,8 +80,8 @@ vi.mock('@/components/security-agent/settings-save-button', () => ({
     return null;
   },
 }));
-vi.mock('@/components/security-agent/settings-toggle-row', () => ({
-  ToggleRow: (props: {
+vi.mock('@/components/ui/preference-row', () => ({
+  PreferenceRow: (props: {
     title: string;
     value: boolean;
     disabled: boolean;

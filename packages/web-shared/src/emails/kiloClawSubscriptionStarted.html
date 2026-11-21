@@ -6,16 +6,16 @@
     <title>Your KiloClaw subscription is active</title>
   </head>
   <body
+    class="kc-page kc-strong"
     style="
       margin: 0;
       padding: 0;
       font-family:
         -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      background-color: #ffffff;
       color: #1a1a1a;
     "
   >
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #ffffff">
+    <table width="100%" cellpadding="0" cellspacing="0" class="kc-page">
       <tr>
         <td align="center" style="padding: 40px 20px">
           <table width="520" cellpadding="0" cellspacing="0">
@@ -32,6 +32,7 @@
                       -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                       sans-serif;
                   "
+                  class="kc-strong"
                 >
                   Your KiloClaw subscription is active
                 </h1>
@@ -50,6 +51,7 @@
                       -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                       sans-serif;
                   "
+                  class="kc-text"
                 >
                   A KiloClaw hosting billing period has started. Here are the details:
                 </p>
@@ -63,6 +65,7 @@
                   cellpadding="0"
                   cellspacing="0"
                   style="background-color: #f6f6f4; border: 1px solid #ebebea; border-radius: 10px"
+                  class="kc-box"
                 >
                   <tr>
                     <td style="padding: 16px 20px">
@@ -76,8 +79,10 @@
                             -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                             sans-serif;
                         "
+                        class="kc-muted"
                       >
-                        <strong style="color: #1a1a1a">Plan:</strong> {{ plan_name }}
+                        <strong class="kc-strong" style="color: #1a1a1a">Plan:</strong> {{ plan_name
+                        }}
                       </p>
                       <p
                         style="
@@ -89,8 +94,10 @@
                             -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                             sans-serif;
                         "
+                        class="kc-muted"
                       >
-                        <strong style="color: #1a1a1a">Price:</strong> ${{ price_usd }} USD
+                        <strong class="kc-strong" style="color: #1a1a1a">Price:</strong> ${{
+                        price_usd }} USD
                       </p>
                       <p
                         style="
@@ -102,8 +109,10 @@
                             -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                             sans-serif;
                         "
+                        class="kc-muted"
                       >
-                        <strong style="color: #1a1a1a">Billing period:</strong> {{ billing_period }}
+                        <strong class="kc-strong" style="color: #1a1a1a">Billing period:</strong> {{
+                        billing_period }}
                       </p>
                       <p
                         style="
@@ -115,8 +124,9 @@
                             -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                             sans-serif;
                         "
+                        class="kc-muted"
                       >
-                        <strong style="color: #1a1a1a">Next billing date:</strong>
+                        <strong class="kc-strong" style="color: #1a1a1a">Next billing date:</strong>
                         {{ next_billing_date }}
                       </p>
                     </td>
@@ -145,6 +155,7 @@
                             -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                             sans-serif;
                         "
+                        class="kc-btn"
                       >
                         Manage subscription
                       </a>
@@ -155,7 +166,7 @@
             </tr>
             <!-- Sign-off -->
             <tr>
-              <td style="padding: 0 40px 40px; border-top: 1px solid #ebebea">
+              <td class="kc-divider" style="padding: 0 40px 40px; border-top: 1px solid #ebebea">
                 <p
                   style="
                     margin: 20px 0 0;
@@ -166,6 +177,7 @@
                       -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                       sans-serif;
                   "
+                  class="kc-text"
                 >
                   If you have any questions, reply to this email — we're here to help.
                 </p>
@@ -179,6 +191,7 @@
                       -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                       sans-serif;
                   "
+                  class="kc-text"
                 >
                   — The Kilo Team
                 </p>
@@ -188,7 +201,11 @@
           <!-- Branding Footer -->
           <table width="520" cellpadding="0" cellspacing="0">
             <tr>
-              <td align="center" style="padding: 30px 20px; border-top: 1px solid #eee">
+              <td
+                align="center"
+                class="kc-divider"
+                style="padding: 30px 20px; border-top: 1px solid #eee"
+              >
                 <p
                   style="
                     margin: 0;
@@ -198,6 +215,7 @@
                       -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                       sans-serif;
                   "
+                  class="kc-faint"
                 >
                   © {{ year }} Kilo Code, Inc<br />455 Market St, Ste 1940 PMB 993504<br />San
                   Francisco, CA 94105, USA

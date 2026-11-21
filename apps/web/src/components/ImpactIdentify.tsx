@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { useUser } from '@/hooks/useUser';
+import { isAppShellPath } from '@/lib/app-shell/shell-paths';
 import { logImpactReferralDebug } from '@/lib/impact/debug';
 import { IMPACT_CUSTOM_PROFILE_ID_STORAGE_KEY } from '@/lib/impact/referral-utils';
 
@@ -25,7 +27,21 @@ function getStableAnonymousProfileId(): string {
   return generated;
 }
 
+/**
+ * Identify the reader to Impact. The call reads `GET /api/user`, which
+ * authenticates with the web session, so it runs neither when the Impact tag is
+ * unconfigured nor inside the app shell: the shell's cookie `Path` keeps it away
+ * from `/api/user`, where the request could only answer 401.
+ */
 export function ImpactIdentify() {
+  const pathname = usePathname();
+  if (!process.env.NEXT_PUBLIC_IMPACT_UTT_ID || isAppShellPath(pathname)) {
+    return null;
+  }
+  return <ImpactIdentifyUser />;
+}
+
+function ImpactIdentifyUser() {
   const { data: user } = useUser();
 
   useEffect(() => {

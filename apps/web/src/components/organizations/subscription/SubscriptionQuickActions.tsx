@@ -15,6 +15,7 @@ import { BillingCycleChangeDialog } from './BillingCycleChangeDialog';
 import Link from 'next/link';
 import { seatPrice } from '@kilocode/web-shared/lib/organizations/constants';
 import { useOrganizationReadOnly } from '@/lib/organizations/use-organization-read-only';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { formatDate, canManageBilling, findPaidSeatItem } from './utils';
 import type { SubscriptionWithPeriod } from './types';
 
@@ -25,7 +26,7 @@ export function SubscriptionQuickActions({
 }: {
   subscription: SubscriptionWithPeriod;
   organizationId: string;
-  userRole: string;
+  userRole: OrganizationRole;
 }) {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showSeatChangeModal, setShowSeatChangeModal] = useState(false);

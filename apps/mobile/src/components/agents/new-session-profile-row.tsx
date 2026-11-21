@@ -4,7 +4,7 @@ import { type TFunction } from 'i18next';
 
 import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { Text } from '@/components/ui/text';
 import {
   formatProfileCountItems,
@@ -27,7 +27,8 @@ type ProfileRowProfile = Pick<EffectiveAgentProfile, 'name'> & ProfileCountCount
 
 /**
  * Keep the environment visible while it gates Start, without showing a default
- * before the query settles. Every state reserves the same two text lines.
+ * before the query settles. Every state renders the same card; a state with no
+ * counts is its one title line, and a summary adds its own line.
  *
  * This module stays free of the app's icon barrel: the mounted suite that
  * renders it cannot load `lucide-react-native`, so the tappable
@@ -41,10 +42,8 @@ export function renderProfileRow({
   onRetryProfile,
 }: Readonly<RenderProfileRowArgs>): ReactNode {
   return (
-    <View className="mt-5">
-      <Text className="mb-2 text-sm font-medium text-muted-foreground">
-        {t('agentChat.newSession.environment')}
-      </Text>
+    <View className="gap-2">
+      <FormFieldLabel label={t('agentChat.newSession.environment')} />
       {renderProfileRowBody({ t, profile, isProfileLoading, isProfileError, onRetryProfile })}
     </View>
   );
@@ -52,7 +51,8 @@ export function renderProfileRow({
 
 /**
  * The state body without the Environment label. `NewSessionProfileRow` reuses
- * it for its loading and failure states so both rows reserve the same lines.
+ * it for its loading and failure states so both rows share one card shape: a
+ * title line, plus the summary when the state has one.
  */
 export function renderProfileRowBody({
   t,
@@ -71,13 +71,13 @@ export function renderProfileRowBody({
   } else if (profile) {
     title = profile.name;
     // A profile with nothing configured resolves no counts. Treat that as no
-    // summary, so the slot keeps its placeholder instead of collapsing.
+    // summary, so the card keeps its title line alone.
     const counts = formatProfileCountItems(t, profileCountItems(profile)).join(' · ');
     summary = counts.length > 0 ? counts : undefined;
   }
 
   return (
-    <View className="min-h-[36px] flex-row items-center gap-2">
+    <View className="flex-row items-center gap-2">
       <View className="min-w-0 flex-1 gap-1">
         <Text
           className={cn(
@@ -92,23 +92,14 @@ export function renderProfileRowBody({
         >
           {title}
         </Text>
-        <View
-          accessibilityElementsHidden={!summary}
-          importantForAccessibility={summary ? 'auto' : 'no-hide-descendants'}
-        >
-          {/* The summary may wrap to a second line in long locales, so every
-              state holds both lines: `min-h-10` keeps a one-line summary at the
-              placeholder's height, and the placeholder itself spans two lines. */}
-          <Text
-            className="min-h-10 text-sm leading-[1.25rem] text-muted-foreground"
-            numberOfLines={2}
-          >
-            {summary ?? '\u00A0\n\u00A0'}
+        {/* The summary may wrap to a second line in long locales, and no state
+            reserves a blank one: the card is its title line until a summary
+            exists, then exactly as tall as that summary. */}
+        {summary === undefined ? null : (
+          <Text className="text-sm leading-[1.25rem] text-muted-foreground" numberOfLines={2}>
+            {summary}
           </Text>
-          {isProfileLoading ? (
-            <Skeleton className="absolute inset-y-0 left-0 w-2/3 rounded" />
-          ) : null}
-        </View>
+        )}
       </View>
       {showError ? (
         <Button

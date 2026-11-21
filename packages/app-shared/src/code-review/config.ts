@@ -72,6 +72,7 @@ export type CodeReviewConfigPatch = Partial<{
   selectedRepositoryIds: (number | string)[];
   repositoryModelOverrides: RepositoryModelOverrideInput[];
   disableReviewMd: boolean;
+  reviewGuidelineSourceRepositories: string[];
   /** GitHub only: skip automated reviews of PRs opened by bot accounts. */
   skipBotPullRequests: boolean;
 }>;

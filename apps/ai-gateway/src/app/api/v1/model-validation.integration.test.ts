@@ -51,6 +51,7 @@ import { NextRequest } from 'next/server';
 import { POST as personalValidator } from './models/validate/route';
 import { POST as organizationValidator } from './organizations/[id]/models/validate/route';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { KILO_TOKEN_VERSION } from '@kilocode/worker-utils/kilo-token';
 import { signModernKiloToken } from '@kilocode/worker-utils/kilo-token-policy';
 import { RUNTIME_PROXY_ATTESTATION_HEADER } from '@kilocode/worker-utils/runtime-proxy-attestation';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
@@ -60,7 +61,6 @@ jest.mock('../../../../../../services/cloud-agent-next/src/logger', () => ({
   logger: { withFields: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() }) },
 }));
 import jwt from 'jsonwebtoken';
-import { JWT_TOKEN_VERSION } from '@kilocode/web-shared/lib/tokens';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
@@ -249,7 +249,7 @@ describe('cloud-agent model validation through real web authentication', () => {
       if (scenario !== 'anonymous') {
         const token = jwt.sign(
           {
-            version: JWT_TOKEN_VERSION,
+            version: KILO_TOKEN_VERSION,
             kiloUserId: scenario === 'foreign' ? foreign.id : owner.id,
             apiTokenPepper:
               scenario === 'foreign' ? foreign.api_token_pepper : owner.api_token_pepper,
@@ -393,7 +393,7 @@ describe('cloud-agent model validation through real web authentication', () => {
     getAvailableModelsForOrganization.mockResolvedValue({ data: [{ id: privateModel }] });
     const bearer = jwt.sign(
       {
-        version: JWT_TOKEN_VERSION,
+        version: KILO_TOKEN_VERSION,
         kiloUserId: user.id,
         apiTokenPepper: user.api_token_pepper,
         env: process.env.NODE_ENV,

@@ -4,8 +4,8 @@ import { useAtom } from 'jotai';
 import { ChevronDown, ChevronRight, KeyRound, Plus, RefreshCw, Server, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { JSX } from 'react';
-import type { RemoteMcpServer } from '../../src/shared/remote-mcp';
-import { loadRemoteMcpStore, saveRemoteMcpStore } from '../../src/shared/remote-mcp-storage';
+import type { RemoteMcpServer, RemoteMcpStore } from '../../src/shared/remote-mcp';
+import { loadRemoteMcpStore, updateRemoteMcpStore } from '../../src/shared/remote-mcp-storage';
 import { remoteMcpStoreAtom } from './agent-chat-atoms';
 import { ErrorNotice } from './error-notice';
 import { connectAndPersistRemoteMcpServer } from './remote-mcp-client';
@@ -39,6 +39,15 @@ const authTypeValues: AuthType[] = ['none', 'bearer', 'header', 'oauth'];
 
 const isAuthType = (value: string): value is AuthType =>
   (authTypeValues as string[]).includes(value);
+
+/* A rejected save keeps the store untouched; an accepted one carries the saved store. */
+type SaveOutcome =
+  | { readonly error: string }
+  | {
+      readonly error: null;
+      readonly previousIds: ReadonlySet<string>;
+      readonly store: RemoteMcpStore;
+    };
 
 const defaultForm = (): FormState => ({
   allowInSafeMode: false,
@@ -479,12 +488,29 @@ export const RemoteMcpSettings = (): JSX.Element => {
 
   const handleSave = async (form: FormState): Promise<string | null> => {
     const existing = editingServer;
-    const draft = buildDraftFromForm(form, existing?.auth);
-    const { store: nextStore, error } = applyUpsert(store, draft);
-    if (error !== null) {
-      return error;
+    /* The atom can be stale (a connect or OAuth write may have landed since it
+       was set), so the upsert runs on the store the serialized update loads and
+       takes the saved auth from that store rather than from the atom. */
+    const saved = await updateRemoteMcpStore<SaveOutcome>(storage, freshStore => {
+      const existingServer = freshStore.servers.find(server => server.id === form.id);
+      const draft = buildDraftFromForm(form, existingServer?.auth, existingServer?.url);
+      const previousIds = new Set(freshStore.servers.map(server => server.id));
+      const upserted = applyUpsert(freshStore, draft);
+      if (upserted.error !== null) {
+        return { result: { error: upserted.error }, store: freshStore };
+      }
+
+      return {
+        result: { error: null, previousIds, store: upserted.store },
+        store: upserted.store,
+      };
+    });
+
+    if (saved.error !== null) {
+      return saved.error;
     }
-    await saveRemoteMcpStore(storage, nextStore);
+
+    const { previousIds, store: nextStore } = saved;
     setStore(nextStore);
     setShowAddForm(false);
     setEditingServer(null);
@@ -492,7 +518,7 @@ export const RemoteMcpSettings = (): JSX.Element => {
     // Connect (test) on save so tools are cached and usable immediately; the row surfaces any failure.
     const savedServer =
       existing === null
-        ? nextStore.servers.find(candidate => !store.servers.some(prev => prev.id === candidate.id))
+        ? nextStore.servers.find(candidate => !previousIds.has(candidate.id))
         : nextStore.servers.find(candidate => candidate.id === existing.id);
     if (savedServer !== undefined) {
       await connectServer(savedServer);
@@ -501,8 +527,11 @@ export const RemoteMcpSettings = (): JSX.Element => {
   };
 
   const handleRemove = async (serverId: string): Promise<void> => {
-    const nextStore = removeServer(store, serverId);
-    await saveRemoteMcpStore(storage, nextStore);
+    const nextStore = await updateRemoteMcpStore(storage, freshStore => {
+      const removedStore = removeServer(freshStore, serverId);
+      return { result: removedStore, store: removedStore };
+    });
+
     setStore(nextStore);
   };
 

@@ -16,6 +16,7 @@ import {
   AUTO_ROUTING_WORKER_URL,
   INTERNAL_API_SECRET,
 } from '@kilocode/web-shared/lib/config.server';
+import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export const EFFICIENT_DECISION_TIMEOUT_MS = 5_000;
@@ -94,7 +95,7 @@ type DecideOutcome =
 
 async function postDecision(
   payload: MirrorPayload,
-  workerUrl: string,
+  workerUrl: URL,
   authToken: string,
   options: FetchEfficientDecisionOptions
 ): Promise<DecideOutcome> {
@@ -105,7 +106,7 @@ async function postDecision(
   let signal: AbortSignal | undefined;
   try {
     signal = AbortSignal.timeout(options.timeoutMs ?? EFFICIENT_DECISION_TIMEOUT_MS);
-    const response = await fetch(`${workerUrl}/decide`, {
+    const response = await fetch(new URL('/decide', workerUrl).toString(), {
       method: 'POST',
       headers: new Headers({
         authorization: `Bearer ${authToken}`,
@@ -165,7 +166,7 @@ export async function fetchEfficientAutoDecision(
   params: EfficientDecisionParams,
   options: FetchEfficientDecisionOptions = {}
 ): Promise<{ decision: AutoRoutingDecision | null; costUsd: number } | null> {
-  const workerUrl = options.workerUrl ?? AUTO_ROUTING_WORKER_URL;
+  const workerUrl = parseInternalServiceUrl(options.workerUrl ?? AUTO_ROUTING_WORKER_URL);
   const authToken = options.authToken ?? INTERNAL_API_SECRET;
   if (!workerUrl || !authToken) return null;
 
@@ -197,9 +198,11 @@ export async function fetchCustomRouterDecision(
   params: EfficientDecisionParams & { customRouter: CustomRouterReference },
   options: FetchEfficientDecisionOptions = {}
 ): Promise<CustomRouterDecisionOutcome> {
-  const workerUrl = options.workerUrl ?? AUTO_ROUTING_WORKER_URL;
+  const workerUrl = parseInternalServiceUrl(options.workerUrl ?? AUTO_ROUTING_WORKER_URL);
   const authToken = options.authToken ?? INTERNAL_API_SECRET;
-  if (!workerUrl || !authToken) return { kind: 'unavailable' };
+  if (!workerUrl || !authToken) {
+    return { kind: 'unavailable' };
+  }
 
   const payload = buildDecidePayload(params);
   if (!payload) {

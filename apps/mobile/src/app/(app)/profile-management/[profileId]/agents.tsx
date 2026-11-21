@@ -35,5 +35,11 @@ export default function AppStackProfileAgentsRoute() {
   if (staleScope) {
     return null;
   }
-  return <ProfileAgentsScreen profileId={profileId} organizationId={organizationId} />;
+  return (
+    <ProfileAgentsScreen
+      profileId={profileId}
+      organizationId={organizationId}
+      backFallback={getProfilesPath('app')}
+    />
+  );
 }

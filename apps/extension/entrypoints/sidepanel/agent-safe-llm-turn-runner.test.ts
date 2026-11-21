@@ -69,6 +69,8 @@ const makeToolDef = (name: string): KiloGatewayToolDefinition =>
 
 const makeWorkflowCtx = () => ({
   allowWorkflowsInSafeMode: true,
+  claimTab: vi.fn().mockResolvedValue(true),
+  disposeBrowserCaller: vi.fn(),
   evalInTab: vi.fn(),
   getTabUrl: vi.fn(),
   mode: 'safe' as const,
@@ -86,6 +88,7 @@ describe('safe turn runner workflow wiring', () => {
     ({
       apiBaseUrl: 'https://api.example.com',
       appendEvents: vi.fn() as never,
+      browserCaller: { conversationId: 'conversation-1', kind: 'panel', panelId: 'panel-1' },
       conversationEvents: [],
       fetch: vi.fn() as never,
       model: 'test-model',
@@ -342,6 +345,10 @@ describe('safe turn runner workflow wiring', () => {
     expect(vi.mocked(executeKiloBrowserToolCall).mock.calls[0]![0].name).toBe(
       'kilo_browser_take_screenshot'
     );
+    // Safe mode's read-only set cannot answer a dialog, so the message says so.
+    expect(vi.mocked(executeKiloBrowserToolCall).mock.calls[0]![1]).toMatchObject({
+      safeMode: true,
+    });
   });
 
   it('converts a read-only kilo_browser_* gateway call to a browser tool-call event', async () => {

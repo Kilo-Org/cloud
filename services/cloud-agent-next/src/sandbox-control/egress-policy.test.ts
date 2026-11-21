@@ -75,6 +75,19 @@ describe('buildNativeEgressAllowlist', () => {
     expect(buildNativeEgressAllowlist({ allowlist, env })).toHaveLength(114);
   });
 
+  it('includes network-secret snapshot hosts without changing the user list', () => {
+    const allowlist = ['public.example.com'];
+    const policy = buildNativeEgressAllowlist({
+      allowlist,
+      env,
+      networkSecretHosts: ['api.axiom.co', 'sentry.io'],
+    });
+    expect(policy).toEqual(
+      expect.arrayContaining(['public.example.com', 'api.axiom.co', 'sentry.io'])
+    );
+    expect(allowlist).toEqual(['public.example.com']);
+  });
+
   it.each([
     { env: {} },
     { env: { WORKER_URL: 'http://agent.example.com' } },

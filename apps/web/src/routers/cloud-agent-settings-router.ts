@@ -15,14 +15,19 @@ import {
 } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   BuiltinAgentSettingsInputSchema,
+  ModelContextLimitsSchema,
   canonicalRepoFullName,
   clearContextSandboxAllocation,
   getBuiltinAgentSettings,
+  getModelContextLimits,
+  getWebSearchPreference,
   getSandboxAllocationSettings,
   listBindings,
   removeRepositorySettings,
   setBuiltinAgentSettings,
   setContextSandboxAllocation,
+  setModelContextLimits,
+  setWebSearchPreference,
   setRepositorySettings,
   type ProfileOwner,
   type RepositoryPlatform,
@@ -35,6 +40,7 @@ import {
 } from '@/lib/cloud-agent-next/sandbox-allocation-offers';
 import { DEFAULT_WORKSPACE_ORDER, workspaceOrderSchema } from '@/lib/cloud-agent/workspace-folders';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { webSearchPreferenceSchema } from '@cloud-agent-shared/web-search-provider';
 
 const RepositoryPlatformSchema = z.enum(['github', 'gitlab']);
 
@@ -53,6 +59,7 @@ const CloudAgentSettingsSchema = z.object({
   contextAllocation: z.string().nullable(),
   contextUnavailableReason: z.string().optional(),
   builtinAgents: BuiltinAgentSettingsInputSchema,
+  modelContextLimits: ModelContextLimitsSchema,
   repositories: z.array(RepositorySettingsRowSchema),
   capabilities: sandboxSelectionCapabilitiesSchema.nullable(),
   // Repository-scoped capability views so a GitLab row never offers a
@@ -64,6 +71,7 @@ const CloudAgentSettingsSchema = z.object({
 });
 
 const WorkspaceOrderSchema = z.object({ workspaceOrder: workspaceOrderSchema });
+const WebSearchSettingsSchema = z.object({ provider: webSearchPreferenceSchema });
 
 function ownerFromInput(organizationId: string | undefined, userId: string): ProfileOwner {
   return organizationId
@@ -115,13 +123,19 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
       const canManage = role ? canManageOrganization(role) : true;
       const owner = ownerFromInput(organizationId, ctx.user.id);
 
-      const [{ capabilities, capabilitiesByPlatform }, settings, bindings, builtinAgents] =
-        await Promise.all([
-          loadSettingsCapabilities(ctx.user, ctx.headersList, organizationId),
-          getSandboxAllocationSettings(db, owner),
-          listBindings(db, owner),
-          getBuiltinAgentSettings(db, ctx.user.id),
-        ]);
+      const [
+        { capabilities, capabilitiesByPlatform },
+        settings,
+        bindings,
+        builtinAgents,
+        modelContextLimits,
+      ] = await Promise.all([
+        loadSettingsCapabilities(ctx.user, ctx.headersList, organizationId),
+        getSandboxAllocationSettings(db, owner),
+        listBindings(db, owner),
+        getBuiltinAgentSettings(db, ctx.user.id),
+        getModelContextLimits(db, ctx.user.id),
+      ]);
 
       const rows = new Map<string, z.infer<typeof RepositorySettingsRowSchema>>();
       const rowKey = (fullName: string, platform: RepositoryPlatform) =>
@@ -184,6 +198,7 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
         contextAllocation: settings.contextAllocation,
         ...(contextReason ? { contextUnavailableReason: contextReason } : {}),
         builtinAgents,
+        modelContextLimits,
         repositories,
         capabilities,
         capabilitiesByPlatform,
@@ -275,6 +290,18 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
       return { success: true, agents };
     }),
 
+  getModelContextLimits: baseProcedure
+    .output(ModelContextLimitsSchema)
+    .query(({ ctx }) => getModelContextLimits(db, ctx.user.id)),
+
+  setModelContextLimits: baseProcedure
+    .input(z.object({ limits: ModelContextLimitsSchema }))
+    .output(z.object({ success: z.boolean(), limits: ModelContextLimitsSchema }))
+    .mutation(async ({ ctx, input }) => {
+      const limits = await setModelContextLimits(db, ctx.user.id, input.limits);
+      return { success: true, limits };
+    }),
+
   getWorkspaceOrder: baseProcedure.output(WorkspaceOrderSchema).query(async ({ ctx }) => {
     const [settings] = await db
       .select({ workspaceOrder: cloud_agent_user_settings.workspace_order })
@@ -283,6 +310,18 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
       .limit(1);
     return { workspaceOrder: settings?.workspaceOrder ?? DEFAULT_WORKSPACE_ORDER };
   }),
+
+  getWebSearch: baseProcedure.output(WebSearchSettingsSchema).query(async ({ ctx }) => ({
+    provider: await getWebSearchPreference(db, ctx.user.id),
+  })),
+
+  setWebSearch: baseProcedure
+    .input(WebSearchSettingsSchema)
+    .output(WebSearchSettingsSchema)
+    .mutation(async ({ ctx, input }) => {
+      await setWebSearchPreference(db, ctx.user.id, input.provider);
+      return input;
+    }),
 
   setWorkspaceOrder: baseProcedure
     .input(WorkspaceOrderSchema)

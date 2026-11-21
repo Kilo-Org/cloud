@@ -14,7 +14,7 @@ import {
   toWindowHours,
 } from '@/components/organization/spend-alert-validators';
 import { i18n } from '@/i18n';
-import { formatCurrency, formatNumber } from '@/lib/format';
+import { formatNumber, formatPrefixedUsd } from '@/lib/format';
 
 // `pnpm check:i18n` owns the copy; these assert the bounds, not the wording.
 const THRESHOLD_CASES: [string, number | null][] = [
@@ -63,7 +63,10 @@ describe('parseThreshold', () => {
 
   it('names the maximum for a value above the cap instead of calling it too small', () => {
     const maximum = i18n.t('spendAlerts.thresholdMaxError', {
-      max: formatCurrency(1_000_000, i18n.language, 0),
+      max: formatPrefixedUsd(1_000_000, i18n.language, {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }),
     });
     // A 950-digit paste overflows a JS number; it is a number, and it is too big.
     for (const value of ['1000000.01', '9'.repeat(950)]) {

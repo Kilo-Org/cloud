@@ -233,7 +233,9 @@ export const adminWebhookTriggersRouter = createTRPCRouter({
         .map(request => request.cloudAgentSessionId)
         .filter((sessionId): sessionId is string => sessionId !== null);
 
-      const sessionIdMap = await resolveCloudAgentSessionIds(cloudAgentSessionIds);
+      const sessionIdMap = await resolveCloudAgentSessionIds(cloudAgentSessionIds, {
+        includeLegacyV1: true,
+      });
 
       return result.requests.map(request =>
         summarizeRequestForAdmin({

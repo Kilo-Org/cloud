@@ -19,39 +19,10 @@ import {
 import type { HarnessActivity } from './harness-activity.js';
 import { kilo2MessageActivity, kilo2PartId } from './kilo2-message-activity.js';
 import type { Kilo2Message } from '../../../src/shared/kilo2-conversation.js';
+import { nativeErrorSchema, nativeTurnError } from './kilo2-native-error.js';
 import { logToFile } from '../utils.js';
 
-const nativeErrorSchema = z.object({
-  type: z.string(),
-  message: z.string(),
-  status: z.number().int().optional(),
-});
-
-/** Native error types that the failure classifier knows by an SDK error name. */
-const NATIVE_ERROR_NAMES = new Map([
-  ['provider.auth', 'ProviderAuthError'],
-  ['provider.content-filter', 'ContentFilterError'],
-]);
-
-/**
- * Kilo v2 classifies a rate limit from a provider code or text as well, so the
- * error can arrive without an HTTP status.
- */
-const NATIVE_ERROR_STATUSES = new Map([['provider.rate-limit', 429]]);
-
-/**
- * The native execution error in the shape `classifyAssistantFailure` reads.
- * An HTTP status is the most specific signal, so it becomes an `APIError`.
- */
-export function nativeTurnError(error: z.infer<typeof nativeErrorSchema>) {
-  const status = error.status ?? NATIVE_ERROR_STATUSES.get(error.type);
-  if (status !== undefined)
-    return { name: 'APIError', data: { message: error.message, statusCode: status } };
-  return {
-    name: NATIVE_ERROR_NAMES.get(error.type) ?? 'UnknownError',
-    data: { message: error.message },
-  };
-}
+export { nativeTurnError } from './kilo2-native-error.js';
 
 const MAX_FRAME_CHARS = 4 * 1024 * 1024;
 const MAX_TRACKED_MESSAGES = 1024;
@@ -90,23 +61,35 @@ export function createKilo2EventFeed(options: KiloEventFeedOptions): KiloEventFe
   const lifetime = new AbortController();
   const signal = AbortSignal.any([options.signal, lifetime.signal]);
   const api = createKilo2Api(options.source.server);
-  const { session, messages } = createKilo2Reads(api, options.source.directory);
+  const { session, messages, findEarlierParent } = createKilo2Reads(api, options.source.directory);
   const log = options.log ?? logToFile;
   // Each projection re-reads recent messages; forward only assistant messages that changed.
   // A digest keeps change detection from retaining every full native message.
-  const projected = new Map<string, string>();
+  // `parentUnresolved` records a lookup that history cannot satisfy, so later projections skip it.
+  type Projection = { digest?: string; parentID?: string; parentUnresolved?: boolean };
+  const projected = new Map<string, Projection>();
   const emittedPermissions = new Map<string, string>();
-  function changed(sessionId: string, message: Kilo2Message) {
+  function recordProjection(
+    sessionId: string,
+    message: Kilo2Message,
+    parentID?: string,
+    parentUnresolved = false
+  ) {
     const key = `${sessionId}/${message.id}`;
-    const value = createHash('sha256').update(JSON.stringify(message)).digest('hex');
-    if (projected.get(key) === value) return false;
+    const digest = createHash('sha256').update(JSON.stringify({ message, parentID })).digest('hex');
+    const previous = projected.get(key);
+    const changed = previous?.digest !== digest;
+    if (changed || (previous?.parentUnresolved ?? false) !== parentUnresolved)
+      trackProjection(key, { digest, parentID, parentUnresolved });
+    return changed;
+  }
+  function trackProjection(key: string, projection: Projection) {
     projected.delete(key);
-    projected.set(key, value);
+    projected.set(key, projection);
     if (projected.size > MAX_TRACKED_MESSAGES) {
       const oldest = projected.keys().next().value;
       if (oldest !== undefined) projected.delete(oldest);
     }
-    return true;
   }
   let opened = false;
   let frames: AsyncGenerator<string> | undefined;
@@ -274,7 +257,7 @@ export function createKilo2EventFeed(options: KiloEventFeedOptions): KiloEventFe
         );
         if (message.id !== messageID || message.type !== 'synthetic')
           throw new Error('Native notice identity mismatch');
-        if (changed(id, message))
+        if (recordProjection(id, message))
           emit(
             'conversation.message.updated',
             { sessionID: id, source: { version: 'v2', session: info }, message },
@@ -297,13 +280,24 @@ export function createKilo2EventFeed(options: KiloEventFeedOptions): KiloEventFe
         event.type.startsWith('session.execution.')
       ) {
         // The prompt an assistant message answers is the user message before it.
-        let parentID = '';
-        for (const message of (await messages(id, signal)).messages) {
+        const page = await messages(id, signal);
+        const stepStart = event.type === 'session.step.started';
+        let lookback = page.olderCursor;
+        let parentID: string | undefined;
+        let parentUnresolved = false;
+        for (const message of page.messages) {
           const activity = kilo2MessageActivity(id, message);
           if (!activity) continue;
           const { parts, ...summary } = activity;
-          const answers = parentID;
-          if (summary.role === 'user') parentID = message.id;
+          const key = `${id}/${message.id}`;
+          const cached = projected.get(key);
+          if (summary.role === 'user') {
+            parentID = message.id;
+            parentUnresolved = false;
+          } else {
+            parentID ??= cached?.parentID;
+            parentUnresolved ||= parentID === undefined && cached?.parentUnresolved === true;
+          }
           // A database read can overtake this event and include the next queued
           // prompt. Only its own delivery event may acknowledge a user message.
           if (
@@ -312,15 +306,45 @@ export function createKilo2EventFeed(options: KiloEventFeedOptions): KiloEventFe
           )
             continue;
           // A step start reports only its assistant message and omits parts.
-          // It neither records nor suppresses a later full read.
-          if (event.type === 'session.step.started' && message.id !== event.data.assistantMessageID)
-            continue;
+          // It must not suppress a later full projection.
+          if (stepStart && message.id !== event.data.assistantMessageID) continue;
           if (
             summary.role === 'assistant' &&
-            event.type !== 'session.step.started' &&
-            !changed(id, message)
-          )
-            continue;
+            parentID === undefined &&
+            !parentUnresolved &&
+            lookback
+          ) {
+            try {
+              const found = await findEarlierParent(
+                id,
+                lookback,
+                AbortSignal.any([signal, AbortSignal.timeout(2000)])
+              );
+              if ('parentID' in found) parentID = found.parentID;
+              else {
+                parentUnresolved = true;
+                log(
+                  `kilo2 feed phase=parent_lookup_unresolved sessionID=${id} messageID=${message.id} reason=${found.reason}`
+                );
+              }
+            } catch (error) {
+              if (signal.aborted) throw error;
+              log(
+                `kilo2 feed phase=parent_lookup_failed sessionID=${id} messageID=${message.id} error=${error instanceof Error ? error.message : String(error)}`
+              );
+            }
+            lookback = undefined;
+          }
+          if (summary.role === 'assistant') {
+            const unresolved = parentID === undefined && parentUnresolved;
+            if (stepStart) {
+              if (
+                (parentID !== undefined && cached?.parentID !== parentID) ||
+                (cached?.parentUnresolved ?? false) !== unresolved
+              )
+                trackProjection(key, { ...cached, parentID, parentUnresolved: unresolved });
+            } else if (!recordProjection(id, message, parentID, unresolved)) continue;
+          }
           report({ type: 'message', message: summary }, nativeDirectory);
           emit(
             'conversation.message.updated',
@@ -328,12 +352,11 @@ export function createKilo2EventFeed(options: KiloEventFeedOptions): KiloEventFe
               sessionID: id,
               source: { version: 'v2', session: info },
               message,
-              ...(summary.role === 'assistant' ? { parentID: answers } : {}),
+              ...(summary.role === 'assistant' && parentID !== undefined ? { parentID } : {}),
             },
             nativeDirectory
           );
-          if (event.type !== 'session.step.started')
-            for (const part of parts) report({ type: 'part', part }, nativeDirectory);
+          if (!stepStart) for (const part of parts) report({ type: 'part', part }, nativeDirectory);
         }
       }
     } finally {

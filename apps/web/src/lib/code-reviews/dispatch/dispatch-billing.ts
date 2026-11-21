@@ -49,9 +49,9 @@ export type CodeReviewDispatchBilling =
       reason: 'free_model' | 'byok' | 'sponsored_organization';
     }
   /**
-   * The organization's shared-services Claude connection must be reconnected by
-   * an owner. Routing refuses every request for the review model until it is,
-   * so no balance and no sponsorship runs the review.
+   * The organization's Claude connection must be reconnected by an owner.
+   * Routing refuses every request for the review model until it is, so no
+   * balance and no sponsorship runs the review.
    */
   | { skipBalanceCheck: false; reconnectRequired: true }
   | {

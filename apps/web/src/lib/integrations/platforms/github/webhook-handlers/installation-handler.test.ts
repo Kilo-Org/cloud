@@ -98,15 +98,26 @@ const mockFetchGitHubRepositories = jest.fn<() => Promise<PlatformRepository[]>>
 let connectionManagementEnabled = false;
 let selectResults: unknown[][] = [];
 
+// A select terminates either at `.where()` or at a following `.limit()`. The
+// returned value is thenable and also answers `.limit()`, so one fixture queue
+// serves both forms.
+const mockSelectQuery = () => {
+  const rows = selectResults.shift() ?? [];
+  return {
+    limit: async (_count: number) => rows,
+    then: (resolve: (value: unknown[]) => unknown) => Promise.resolve(rows).then(resolve),
+  };
+};
+
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: () => ({
-      from: () => ({ where: async () => selectResults.shift() ?? [] }),
+      from: () => ({ where: mockSelectQuery }),
     }),
     transaction: async (callback: (tx: unknown) => Promise<unknown>) =>
       callback({
         select: () => ({
-          from: () => ({ where: async () => selectResults.shift() ?? [] }),
+          from: () => ({ where: mockSelectQuery }),
         }),
         execute: async () => undefined,
       }),
@@ -302,7 +313,8 @@ describe('handleInstallationCreated', () => {
   );
 
   it('repairs an active unbound projection after a prior bind failure', async () => {
-    selectResults = [[{ ...orgIntegration, metadata: {} }], []];
+    // Select queue: ACTIVE candidates, repair admission check, pending target, legacy matches.
+    selectResults = [[{ ...orgIntegration, metadata: {} }], [], [], []];
     await handleInstallationCreated(
       {
         action: 'created',
@@ -319,12 +331,86 @@ describe('handleInstallationCreated', () => {
       },
       'standard'
     );
-    expect(mockBindCanonical).toHaveBeenCalledWith({
-      integrationId: 'pi_org',
-      installationId: '98765',
-      appType: 'standard',
-    });
+    expect(mockBindCanonical).toHaveBeenCalledWith(
+      {
+        integrationId: 'pi_org',
+        installationId: '98765',
+        appType: 'standard',
+      },
+      expect.anything()
+    );
     expect(mockAutoCompleteInstallation).not.toHaveBeenCalled();
+  });
+
+  it('binds a sole eligible active association when no other live association holds the installation', async () => {
+    // Select queue: ACTIVE candidates, repair admission check, pending target, legacy matches.
+    selectResults = [[{ ...orgIntegration, metadata: {} }], [], [], []];
+
+    const response = await handleInstallationCreated(
+      {
+        action: 'created',
+        installation: {
+          id: 98765,
+          account: { id: 11, login: 'acme' },
+          repository_selection: 'all',
+          events: [],
+          created_at: '2026-09-07T00:00:00Z',
+          permissions: {},
+        },
+        requester: { id: 22, login: 'owner' },
+        sender: { id: 22, login: 'owner' },
+      },
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ message: 'Installation recorded' });
+    expect(mockBindCanonical).toHaveBeenCalledTimes(1);
+    expect(mockBindCanonical).toHaveBeenCalledWith(
+      { integrationId: 'pi_org', installationId: '98765', appType: 'standard' },
+      expect.anything()
+    );
+    expect(mockAutoCompleteInstallation).not.toHaveBeenCalled();
+    expect(mockLogExceptInTest).not.toHaveBeenCalledWith(
+      'GitHub installation repair declined:',
+      expect.anything()
+    );
+  });
+
+  it('declines the repair and leaves the candidate unbound when another live association holds the installation', async () => {
+    // Select queue: ACTIVE candidates, repair admission check, pending target, legacy matches.
+    selectResults = [
+      [{ ...orgIntegration, metadata: {} }],
+      [{ id: 'existing-association' }],
+      [],
+      [],
+    ];
+
+    const response = await handleInstallationCreated(
+      {
+        action: 'created',
+        installation: {
+          id: 98765,
+          account: { id: 11, login: 'acme' },
+          repository_selection: 'all',
+          events: [],
+          created_at: '2026-09-07T00:00:00Z',
+          permissions: {},
+        },
+        requester: { id: 22, login: 'owner' },
+        sender: { id: 22, login: 'owner' },
+      },
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockBindCanonical).not.toHaveBeenCalled();
+    expect(mockAutoCompleteInstallation).not.toHaveBeenCalled();
+    expect(mockLogExceptInTest).toHaveBeenCalledWith('GitHub installation repair declined:', {
+      installation_id: '98765',
+      integration_id: 'pi_org',
+      reason: 'competing_association',
+    });
   });
 
   it('does not auto-attach a pending owner when the installation is already associated', async () => {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { buildAppReturnOutcomeView } from './github-app-outcome';
 import {
-  buildAppReturnOutcomeView,
   buildGitHubManagementInput,
   getGitHubUserConnectionErrorMessage,
   GitHubIntegrationDetails,
@@ -319,6 +319,18 @@ describe('GitHubIntegrationDetails fromApp outcome CTA behavior', () => {
     expect(view.kind).toBe('blocked');
     expect(view.cta).toBe('Back');
     expect(view.description).toContain('different account');
+  });
+
+  it('non-retryable start refusal: Back, no retry, names who can start the install', () => {
+    const view = buildAppReturnOutcomeView({ error: 'installation_start_refused' });
+    expect(view.kind).toBe('blocked');
+    expect(view.cta).toBe('Back');
+    expect(view.title).toBe('Cannot complete installation');
+    expect(view.description).toBe(
+      'This installation could not be started from this account. An organization owner or admin can start it; if the organization already holds its installation, they can manage it in GitHub.'
+    );
+    expect(view.description).not.toContain('Try again');
+    expect(view.href).toBe('/cloud/sessions?error=installation_start_refused');
   });
 
   it('success takes precedence over error, and pending over error (callback ordering)', () => {

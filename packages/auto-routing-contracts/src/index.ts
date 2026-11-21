@@ -1,12 +1,17 @@
 import * as z from 'zod';
 import { NormalizedClassifierInputSchema } from './input';
-import { OwnerTypeSchema } from './owner';
-import { ReasoningEffortSchema, refineVariantExclusivity } from './reasoning';
+import { OwnerIdentityShape } from './owner';
+import {
+  ReasoningEffortSchema,
+  refineVariantExclusivity,
+  ReasoningComplexitySchema,
+  VariantSchema,
+} from './reasoning';
 import {
   CustomRouterClientEntryIdSchema,
   CustomRouterEntryRefSchema,
   CustomRouterReferenceSchema,
-  customRouterCandidateModel,
+  refineEntryModelMatch,
 } from './custom-router';
 import { AutoRouterSchema, AutoRoutingModeSchema } from './router';
 import {
@@ -32,7 +37,7 @@ export {
   type AutoRoutingMode,
 } from './router';
 
-export { OwnerTypeSchema, type OwnerType } from './owner';
+export { OwnerIdSchema, OwnerIdentityShape, OwnerTypeSchema, type OwnerType } from './owner';
 
 // Capability-aware routing hints attached to the mirrored request payload.
 // Absent `constraints` (or absent fields within it) means "no extra
@@ -47,9 +52,7 @@ export const RoutingConstraintsSchema = z.object({
 });
 export type RoutingConstraints = z.infer<typeof RoutingConstraintsSchema>;
 
-export function isVirtualAutoModelId(model: string): boolean {
-  return model.trim().toLowerCase().startsWith('kilo-auto/');
-}
+export { isVirtualAutoModelId } from './virtual-auto-model';
 
 // What the gateway mirrors to the auto-routing worker per request: the
 // already-normalized classifier input plus caller identity. The gateway
@@ -95,7 +98,7 @@ export const ClassifierOutputSchema = z
     taskType: ClassifierTaskTypeSchema,
     subtaskType: ClassifierSubtaskTypeSchema,
     contextComplexity: z.enum(['small', 'medium', 'large']),
-    reasoningComplexity: z.enum(['low', 'medium', 'high']),
+    reasoningComplexity: ReasoningComplexitySchema,
     riskLevel: z.enum(['low', 'medium', 'high']),
     executionMode: z.enum([
       'answer_only',
@@ -130,7 +133,7 @@ export const AutoRoutingDecisionSchema = z
     source: z.literal('benchmark'),
     tableVersion: z.string().nullable(),
     // Canonical catalog variant key the chosen model was benchmarked with.
-    variant: z.string().trim().min(1).nullable().optional(),
+    variant: VariantSchema.optional(),
     // Legacy effort the chosen model was benchmarked with; retained for
     // rolling deploy reads. Prefer `variant` when present.
     reasoningEffort: ReasoningEffortSchema.nullable().optional(),
@@ -153,9 +156,7 @@ export const AutoRoutingDecisionSchema = z
   })
   .superRefine((decision, ctx) => {
     refineVariantExclusivity(decision, ctx, 'Decision');
-    if (decision.entry && decision.model !== customRouterCandidateModel(decision.entry)) {
-      ctx.addIssue({ code: 'custom', path: ['model'], message: 'model must match entry' });
-    }
+    refineEntryModelMatch(decision, ctx);
     if (
       decision.fallback !== true &&
       (decision.taskType === null ||
@@ -203,10 +204,7 @@ export type AutoRoutingClassifierModelResponse = z.infer<
   typeof AutoRoutingClassifierModelResponseSchema
 >;
 
-export const AutoRoutingModeOwnerQuerySchema = z.object({
-  ownerType: OwnerTypeSchema,
-  ownerId: z.string().trim().min(1),
-});
+export const AutoRoutingModeOwnerQuerySchema = z.object(OwnerIdentityShape);
 export type AutoRoutingModeOwnerQuery = z.infer<typeof AutoRoutingModeOwnerQuerySchema>;
 
 export const UpdateAutoRoutingModeRequestSchema = AutoRoutingModeOwnerQuerySchema.extend({
@@ -261,6 +259,7 @@ export {
   redactProviderHints,
   detectRequiredInputModalities,
   estimateRoutingTokens,
+  PROMPT_WALK_MAX_DEPTH,
   type ClassifierApiKind,
 } from './normalize';
 

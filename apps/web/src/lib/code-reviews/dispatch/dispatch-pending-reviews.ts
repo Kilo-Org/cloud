@@ -124,9 +124,9 @@ class CodeReviewInsufficientCreditsDispatchError extends Error {
 }
 
 /**
- * The organization's shared-services Claude billing link needs a reconnect, and
- * routing refuses every request for the review model until an owner performs
- * it. Thrown before the worker call so no session is prepared.
+ * The organization's Claude billing link needs a reconnect, and routing refuses
+ * every request for the review model until an owner performs it. Thrown before
+ * the worker call so no session is prepared.
  */
 class CodeReviewReconnectRequiredDispatchError extends Error {
   constructor() {

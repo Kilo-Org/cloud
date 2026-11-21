@@ -52,7 +52,7 @@ import {
   sendTurn,
   sessionSandboxObservation,
   trackCreations,
-  waitForBootTerminal,
+  waitForTerminalWithReplay,
   waitForPacedProgress,
   waitForPresentAllocation,
   type InFlightCreations,
@@ -469,7 +469,7 @@ async function runWorktreeChat(
     bootStream = await deadline.within('boot stream', signal =>
       openConnectedStream(scenarioConfig, cloudAgentSessionId, true, undefined, signal)
     );
-    const boot = await waitForBootTerminal({
+    const boot = await waitForTerminalWithReplay({
       deadline,
       config: scenarioConfig,
       sessionId: cloudAgentSessionId,
@@ -722,7 +722,7 @@ async function runWorktreeMultiChat(
     rootBootStream = await deadline.within('root boot stream', signal =>
       openConnectedStream(scenarioConfig, rootId, true, undefined, signal)
     );
-    const rootBoot = await waitForBootTerminal({
+    const rootBoot = await waitForTerminalWithReplay({
       deadline,
       config: scenarioConfig,
       sessionId: rootId,
@@ -936,13 +936,24 @@ async function runWorktreeMultiChat(
       );
     }
 
-    const pacedTerminal = await pacedStream.waitForTerminal(
-      Math.max(1, Math.min(TURN_BUDGET_MS, deadline.remaining('paced terminal'))),
-      paced.messageId
-    );
+    const {
+      terminal: pacedTerminal,
+      stream: recoveredPacedStream,
+      transport: pacedTransport,
+    } = await waitForTerminalWithReplay({
+      deadline,
+      config: scenarioConfig,
+      sessionId: rootId,
+      messageId: paced.messageId,
+      stream: pacedStream,
+      budgetMs: TURN_BUDGET_MS,
+      label: 'paced terminal',
+    });
+    pacedStream = recoveredPacedStream;
     if (!isMessageCompleted(pacedTerminal, paced.messageId)) {
       throw new Error(
-        `paced root turn ${paced.messageId} terminal=${terminalLabel(pacedTerminal)}`
+        `paced root turn ${paced.messageId} terminal=${terminalLabel(pacedTerminal)}` +
+          (pacedTransport === '' ? '' : `; ${pacedTransport}`)
       );
     }
     const pacedStatus = await deadline.within('paced durable', signal =>

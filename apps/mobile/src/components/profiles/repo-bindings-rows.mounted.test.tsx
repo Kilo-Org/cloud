@@ -7,6 +7,13 @@ import { describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { RepoBindingRow } from '@/components/profiles/repo-bindings-rows';
+import {
+  COMPACT_CONTROL_BOX_CLASS,
+  COMPACT_CONTROL_HIT_SLOP_DP,
+  COMPACT_CONTROL_ROW_END_CLASS,
+  ICON_TARGET_BOX_CLASS,
+  ROW_TARGET_CLASS,
+} from '@/lib/a11y/tap-target';
 import { type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -90,6 +97,39 @@ describe('RepoBindingRow', () => {
     }
     expect(badge.props.importantForAccessibility).toBe('no-hide-descendants');
     expect(badge.props.accessibilityElementsHidden).toBe(true);
+
+    unmount();
+  });
+
+  it('even the row insets with the compact remove box and its slop', async () => {
+    const { renderer, unmount } = await mountRows();
+
+    const row = renderer.root
+      .findAll(node => String(node.type) === 'View')
+      .find(node => String(node.props.className ?? '').includes(ROW_TARGET_CLASS));
+    if (!row) {
+      throw new Error('The binding row did not render');
+    }
+    // The row pads 16 dp on both sides — the gutter the leading icon and the
+    // trash glyph end at — and nothing narrower.
+    expect(String(row.props.className)).toContain('px-4');
+    expect(String(row.props.className)).not.toContain('px-3 ');
+
+    const remove = renderer.root
+      .findAll(node => String(node.type) === 'Pressable')
+      .find(node => node.props.accessibilityRole === 'button');
+    if (!remove) {
+      throw new Error('The remove control did not render');
+    }
+    // The row pads 16 dp on both sides and the glyph lands 16 dp from the end
+    // edge: the compact 32 dp box pulls 7 dp toward the edge
+    // (`COMPACT_CONTROL_ROW_END_CLASS`) and centres the glyph in the remaining
+    // space, while the 8 dp slop keeps the 48 dp touch reach inside the row
+    // Android clips touches to.
+    expect(String(remove.props.className)).toContain(COMPACT_CONTROL_BOX_CLASS);
+    expect(String(remove.props.className)).toContain(COMPACT_CONTROL_ROW_END_CLASS);
+    expect(String(remove.props.className)).not.toContain(ICON_TARGET_BOX_CLASS);
+    expect(remove.props.hitSlop).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
 
     unmount();
   });

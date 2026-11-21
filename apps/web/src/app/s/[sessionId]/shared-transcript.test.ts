@@ -1,4 +1,4 @@
-import type { AssistantMessage } from '@/types/opencode.gen';
+import type { AssistantMessage } from '@/types/opencode';
 import type { Part, StoredMessage, TextPart, ToolPart } from '@/components/cloud-agent-next/types';
 import {
   groupAssistantParts,
@@ -286,6 +286,33 @@ describe('summarizeAgentWork', () => {
         working
       )
     ).toContain('3 tool calls · 2 failed');
+  });
+
+  it('does not count passive notices as tool calls', () => {
+    const notice: ToolPart = {
+      ...makeToolPart('n1', 'agent_notice', 0),
+      state: {
+        status: 'completed',
+        input: {},
+        output: 'ok',
+        title: 'Agent notice',
+        metadata: {
+          backgroundResult: {
+            kind: 'notice',
+            state: 'completed',
+            outcome: 'unknown',
+            description: 'Loaded services/AGENTS.md',
+            output: 'ok',
+          },
+        },
+        time: { start: 10, end: 10 },
+      },
+    };
+
+    expect(summarizeAgentWork([notice])).toBe('Agent work');
+    expect(summarizeAgentWork([makeToolPart('t1', 'read', 1500), notice])).toBe(
+      'Worked for 2s · 1 tool call'
+    );
   });
 
   it('falls back to Agent work when there is nothing to summarize', () => {

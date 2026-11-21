@@ -9,6 +9,7 @@ import {
   KILO_GATEWAY_AUDIENCE,
   SESSION_INGEST_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { KILO_TOKEN_VERSION } from '@kilocode/worker-utils/kilo-token';
 import {
   isKiloCredentialExchangeEligible,
   verifyKiloTokenForPolicy,
@@ -21,7 +22,6 @@ import {
   generateInternalServiceToken,
   generateOrganizationApiToken,
   validateAuthorizationHeader,
-  JWT_TOKEN_VERSION,
   type BoundedInternalServiceAudience,
   type JWTTokenPayload,
 } from './tokens';
@@ -72,6 +72,7 @@ const mockUser: User = {
   email_domain: null,
   external_id: null,
   personal_account_disabled: false,
+  anthropic_user_profile_id: null,
 };
 
 describe('Token Functions', () => {
@@ -129,7 +130,7 @@ describe('Token Functions', () => {
 
       expect(claims).toMatchObject({
         kiloUserId: mockUser.id,
-        version: JWT_TOKEN_VERSION,
+        version: KILO_TOKEN_VERSION,
         aud: BITBUCKET_REPOSITORY_LIST_AUDIENCE,
         tokenPurpose: 'internal-service',
         credentialExchange: false,
@@ -248,7 +249,7 @@ describe('Token Functions', () => {
       expect(decoded).toBeTruthy();
       expect(decoded.kiloUserId).toBe(mockUser.id);
       expect(decoded.apiTokenPepper).toBe(mockUser.api_token_pepper);
-      expect(decoded.version).toBe(JWT_TOKEN_VERSION);
+      expect(decoded.version).toBe(KILO_TOKEN_VERSION);
       expect(decoded.env).toBe(process.env.NODE_ENV);
       // Organization ID should never be in the token
       expect(decoded.organizationId).toBeUndefined();
@@ -287,7 +288,7 @@ describe('Token Functions', () => {
           env: process.env.NODE_ENV,
           kiloUserId: mockUser.id,
           apiTokenPepper: mockUser.api_token_pepper,
-          version: JWT_TOKEN_VERSION,
+          version: KILO_TOKEN_VERSION,
           ...claims,
         },
         getEnvVariable('NEXTAUTH_SECRET'),
@@ -328,6 +329,30 @@ describe('Token Functions', () => {
       expect(
         validateAuthorizationHeader(new Headers({ authorization: `Bearer ${token}` })).error
       ).toMatch(/^Invalid token \([a-f0-9-]+\)$/);
+    });
+
+    it('marks only an attested cloud-agent-next runtime bearer as runtime-proxied', () => {
+      const runtimeToken = signedToken({
+        aud: KILO_API_AUDIENCE,
+        runtimeAuthorization: {
+          id: '11111111-1111-4111-8111-111111111111',
+          resourceKind: 'cloud-agent-next',
+          resourceId: 'agent_123',
+        },
+      });
+      const attested = validateAuthorizationHeader(
+        new Headers({ authorization: `Bearer ${runtimeToken}` }),
+        { runtimeProxyAttestationVerified: true }
+      );
+      const personal = validateAuthorizationHeader(
+        new Headers({ authorization: `Bearer ${generateApiToken(mockUser)}` }),
+        { runtimeProxyAttestationVerified: true }
+      );
+
+      expect(attested.error).toBeUndefined();
+      expect(attested.cloudAgentRuntimeProxied).toBe(true);
+      expect(personal.error).toBeUndefined();
+      expect(personal.cloudAgentRuntimeProxied).toBe(false);
     });
 
     it('should return error when authorization header is missing', () => {
@@ -386,7 +411,7 @@ describe('Token Functions', () => {
           env: process.env.NODE_ENV,
           kiloUserId: mockUser.id,
           apiTokenPepper: mockUser.api_token_pepper,
-          version: JWT_TOKEN_VERSION,
+          version: KILO_TOKEN_VERSION,
         },
         'wrong-secret',
         { algorithm: 'HS256', expiresIn: '5y' }
@@ -407,7 +432,7 @@ describe('Token Functions', () => {
           env: process.env.NODE_ENV,
           kiloUserId: mockUser.id,
           apiTokenPepper: mockUser.api_token_pepper,
-          version: JWT_TOKEN_VERSION - 1, // Outdated version
+          version: KILO_TOKEN_VERSION - 1, // Outdated version
         },
         getEnvVariable('NEXTAUTH_SECRET'),
         { algorithm: 'HS256', expiresIn: '5y' }
@@ -430,7 +455,7 @@ describe('Token Functions', () => {
           env: process.env.NODE_ENV,
           kiloUserId: mockUser.id,
           apiTokenPepper: mockUser.api_token_pepper,
-          version: JWT_TOKEN_VERSION,
+          version: KILO_TOKEN_VERSION,
         },
         getEnvVariable('NEXTAUTH_SECRET'),
         { algorithm: 'HS256', expiresIn: '-1h' } // Expired 1 hour ago
@@ -507,7 +532,7 @@ describe('Token Functions', () => {
           env: process.env.NODE_ENV,
           kiloUserId: mockUser.id,
           apiTokenPepper: mockUser.api_token_pepper,
-          version: JWT_TOKEN_VERSION,
+          version: KILO_TOKEN_VERSION,
           ...payloadClaims,
         },
         getEnvVariable('NEXTAUTH_SECRET'),
@@ -547,7 +572,7 @@ describe('Token Functions', () => {
         expect(decoded).toBeTruthy();
         expect(decoded.kiloUserId).toBe(mockUser.id);
         expect(decoded.apiTokenPepper).toBe(mockUser.api_token_pepper);
-        expect(decoded.version).toBe(JWT_TOKEN_VERSION);
+        expect(decoded.version).toBe(KILO_TOKEN_VERSION);
         expect(decoded.env).toBe(process.env.NODE_ENV);
         expect(decoded.organizationId).toBe(organizationId);
         expect(decoded.organizationRole).toBe(organizationRole);
@@ -601,7 +626,7 @@ describe('Token Functions', () => {
             env: process.env.NODE_ENV,
             kiloUserId: mockUser.id,
             apiTokenPepper: mockUser.api_token_pepper,
-            version: JWT_TOKEN_VERSION,
+            version: KILO_TOKEN_VERSION,
             organizationId,
           },
           getEnvVariable('NEXTAUTH_SECRET'),
@@ -634,7 +659,7 @@ describe('Token Functions', () => {
       expect(payload.env).toBe(process.env.NODE_ENV);
       expect(payload.kiloUserId).toBe(mockUser.id);
       expect(payload.apiTokenPepper).toBe(mockUser.api_token_pepper);
-      expect(payload.version).toBe(JWT_TOKEN_VERSION);
+      expect(payload.version).toBe(KILO_TOKEN_VERSION);
       expect(payload.iat).toBeTruthy();
       expect(payload.exp).toBeTruthy();
       // Organization ID should never be in token payload

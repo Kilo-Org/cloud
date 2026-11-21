@@ -4,7 +4,7 @@ import {
   isTerminalGlanceableStatus,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import {
-  EMPTY_HOME_WIDGET_DETAILS,
+  emptyHomeWidgetDetails,
   type HomeWidgetData,
   homeWidgetDataSchema,
   type HomeWidgetDetails,
@@ -21,7 +21,7 @@ import { HOME_WIDGET_DATA_KEY } from './widget-store';
 
 let storeForTests: GatedSecureStore | null = null;
 let lastData: HomeWidgetData | null = null;
-let details: HomeWidgetDetails = EMPTY_HOME_WIDGET_DETAILS;
+let details: HomeWidgetDetails = emptyHomeWidgetDetails();
 let confirmedAt: number | null = null;
 let epoch = 0;
 let writes: Promise<void> | null = null;
@@ -75,7 +75,7 @@ export function subscribeHomeWidgetData(listener: () => void): () => void {
 export function clearHomeWidgetData(): void {
   epoch += 1;
   lastData = null;
-  details = EMPTY_HOME_WIDGET_DETAILS;
+  details = emptyHomeWidgetDetails();
   confirmedAt = null;
   mirror(null);
   changed();
@@ -86,7 +86,7 @@ export function rememberHomeWidgetData(data: HomeWidgetData): boolean {
   const snapshot = data.snapshot;
   if (isTerminalGlanceableStatus(snapshot.status)) {
     epoch += 1;
-    details = EMPTY_HOME_WIDGET_DETAILS;
+    details = emptyHomeWidgetDetails();
     lastData = { snapshot, details };
     mirror(lastData);
     changed();
@@ -124,10 +124,10 @@ export function rememberHomeWidgetSnapshot(snapshot: GlanceableAgentsSnapshot): 
 
 export function getHomeWidgetDataForSnapshot(snapshot: GlanceableAgentsSnapshot): HomeWidgetData {
   if (isTerminalGlanceableStatus(snapshot.status)) {
-    return { snapshot, details: EMPTY_HOME_WIDGET_DETAILS };
+    return { snapshot, details: emptyHomeWidgetDetails() };
   }
   if (lastData !== null && isTerminalGlanceableStatus(lastData.snapshot.status)) {
-    return { snapshot: lastData.snapshot, details: EMPTY_HOME_WIDGET_DETAILS };
+    return { snapshot: lastData.snapshot, details: emptyHomeWidgetDetails() };
   }
   const retained = lastData?.snapshot.scopeKey === snapshot.scopeKey ? lastData : null;
   if (retained !== null) {
@@ -152,7 +152,7 @@ export function getHomeWidgetDataForSnapshot(snapshot: GlanceableAgentsSnapshot)
     details:
       snapshot.status === 'happy' || snapshot.status === 'empty'
         ? details
-        : EMPTY_HOME_WIDGET_DETAILS,
+        : emptyHomeWidgetDetails(),
   };
 }
 
@@ -222,7 +222,7 @@ export async function _flushHomeWidgetMirrorForTests(): Promise<void> {
 export function _resetHomeWidgetDataForTests(): void {
   epoch += 1;
   lastData = null;
-  details = EMPTY_HOME_WIDGET_DETAILS;
+  details = emptyHomeWidgetDetails();
   confirmedAt = null;
   storeForTests = null;
   listeners.clear();

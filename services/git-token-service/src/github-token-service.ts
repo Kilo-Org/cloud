@@ -171,6 +171,29 @@ export class GitHubTokenService {
     return token;
   }
 
+  async getTokenForRepositoryIds(
+    installationId: string,
+    repositoryIds: number[],
+    appType: GitHubAppType = 'standard'
+  ): Promise<string> {
+    const numericId = this.validateInstallationId(installationId);
+    const ids = [...new Set(repositoryIds)].sort((left, right) => left - right);
+    if (!ids.length || ids.some(id => !Number.isSafeInteger(id) || id <= 0))
+      throw new GitHubTokenGenerationError(undefined);
+    const cacheKey = `${installationId}:${appType}:repository-ids:${ids.join(',')}`;
+    const cached = await this.getCachedToken(cacheKey);
+    if (cached) return cached;
+    const { token, expiresAt } = await this.generateToken(
+      numericId,
+      this.getCredentials(appType),
+      undefined,
+      undefined,
+      ids
+    );
+    await this.cacheToken(cacheKey, token, expiresAt);
+    return token;
+  }
+
   async refreshInstallationAccountLoginIfDue(
     installationId: string,
     appType: GitHubAppType = 'standard'
@@ -299,7 +322,8 @@ export class GitHubTokenService {
     installationId: number,
     credentials: GitHubAppCredentials,
     repositoryNames?: string[],
-    permissions?: RepositoryPermissions
+    permissions?: RepositoryPermissions,
+    repositoryIds?: number[]
   ): Promise<Token> {
     try {
       const auth = createAppAuth({
@@ -312,6 +336,7 @@ export class GitHubTokenService {
         type: 'installation',
         repositoryNames,
         ...(permissions ? { permissions } : {}),
+        ...(repositoryIds ? { repositoryIds } : {}),
       });
       return {
         token: result.token,

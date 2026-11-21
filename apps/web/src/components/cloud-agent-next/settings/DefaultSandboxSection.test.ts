@@ -20,6 +20,7 @@ describe('DefaultSandboxSection eligibility failure', () => {
       canManage: true,
       contextAllocation: 'cloudflare-containers-standard-4',
       builtinAgents: {},
+      modelContextLimits: {},
       repositories: [],
       capabilities: null,
       capabilitiesByPlatform: { github: null, gitlab: null },

@@ -34,8 +34,17 @@ export type {
 } from '@kilocode/session-ingest-contracts';
 
 /**
- * Payload sent to a cloud agent session transport — either a chat prompt or a
- * slash command. Pairs with the SDK transport send types.
+ * A part as a storage reader sees it. `createReadonlyPartView` re-routes
+ * writes to nowhere at runtime, so the view's top-level fields are declared
+ * `readonly` — writing to a returned part is a compile error, passing one
+ * where `Part` is expected still typechecks.
+ */
+export type ReadonlyPart = Readonly<Part>;
+
+/**
+ * The single declaration of the payload sent to a cloud agent session
+ * transport — either a chat prompt or a slash command. Pairs with the SDK
+ * transport send types, which alias this declaration.
  */
 export type SendMessagePayload =
   | {
@@ -116,6 +125,7 @@ export type SessionActivity =
  */
 export type SdkStatusMessageCode =
   | 'agent-connection-lost'
+  | 'agent-connection-reconnecting'
   | 'session-stopped'
   | 'session-terminated'
   | 'setting-up-environment'
@@ -131,6 +141,7 @@ export type SdkStatusMessageCode =
   | 'not-authorized'
   | 'service-unavailable'
   | 'previous-task-in-progress'
+  | 'workspace-deleting'
   | 'service-temporarily-unavailable'
   | 'generic-error'
   | 'connection-lost'
@@ -147,7 +158,13 @@ export type AgentStatus =
       code?: SdkStatusMessageCode;
     }
   | { type: 'error'; message: string; code?: SdkStatusMessageCode }
-  | { type: 'disconnected' }
+  /** `reconnecting` marks a self-recovering transport drop, not a terminal loss. */
+  | {
+      type: 'disconnected';
+      reconnecting?: boolean | undefined;
+      /** Set on the exhausted loss, so surfaces render one canonical copy. */
+      code?: SdkStatusMessageCode | undefined;
+    }
   | { type: 'interrupted' }
   /** Scheduled to wake later; does nothing now. `scheduledAt` is the ISO-8601 wake time when the CLI reported one. */
   | { type: 'scheduled'; scheduledAt?: string };
@@ -348,10 +365,7 @@ export type ResolvedSession =
 
 export type SessionSnapshot = {
   info: SessionInfo;
-  messages: Array<{
-    info: MessageInfo;
-    parts: Part[];
-  }>;
+  messages: ProcessedMessage[];
 };
 
 /**
@@ -414,6 +428,57 @@ export type SessionConfig = {
     | undefined;
 };
 
+export type AssociatedPrData = {
+  url: string;
+  number: number;
+  state: string;
+  title: string | null;
+  headSha: string | null;
+  lastSyncedAt: string;
+  /** PR host (`github`, `gitlab`, …). Populated from `cli_sessions_v2.platform`. */
+  platform?: string | undefined;
+  reviewDecision: 'approved' | 'changes_requested' | 'review_required' | null;
+  reviewDecisionPending: boolean;
+};
+
+export type FetchedSessionData = {
+  kiloSessionId: KiloSessionId;
+  cloudAgentSessionId: CloudAgentSessionId | null;
+  title: string | null;
+  organizationId: string | null;
+  gitUrl: string | null;
+  gitBranch: string | null;
+  worktreeId?: string | null;
+  mode: string | null;
+  environmentId?: string | null;
+  model: string | null;
+  variant: string | null;
+  repository: string | null;
+  isInitiated: boolean;
+  isPreparingAsync: boolean;
+  /**
+   * Whether the session currently has a ready route that can own a terminal.
+   * Undefined when the adapter cannot resolve route state. Persisted
+   * `preparedAt`/`initiatedAt` are NOT readiness: a stopped sandbox clears the
+   * route while leaving both set.
+   */
+  routeReady?: boolean;
+  prompt: string | null;
+  initialMessageId: string | null;
+  /** Installed custom agents, including picker visibility and model overrides. */
+  runtimeAgents?: SessionConfig['runtimeAgents'];
+  associatedPr: AssociatedPrData | null;
+  totalCostMicrodollars?: number | null;
+  /** Origin platform (`created_on_platform`). Populated by the mobile adapter only. */
+  createdOnPlatform?: string | null;
+  /**
+   * The profile the session was prepared with, as recorded on the session row.
+   * Null for a session created before profile recording, or one whose create
+   * origin resolved no profile. Populated by the mobile and extension adapters.
+   */
+  profileId?: string | null;
+};
+
 /**
  * A caller-cached transcript page plus the rows the transcript draws from
  * service state, so a cached repaint matches the live transcript's layout.
@@ -430,7 +495,7 @@ export type CachedSessionSnapshotPage = SessionSnapshotPage & {
  * failures (`retryable_failure` for transient DO read issues,
  * `invalid_data` for shape mismatches, `too_large` for oversize pages) so
  * retry semantics can be surfaced without inferring them from the worker's
- * text. `null` represents an access-not-found outcome (worker returns 404).
+ * text.
  */
 export type SessionSnapshotPageOutcome =
   | (SessionSnapshotPage & { kind: 'success' })

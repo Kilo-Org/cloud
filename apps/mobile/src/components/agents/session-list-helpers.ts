@@ -1,7 +1,14 @@
+import { formatGitUrlProject } from '@kilocode/app-shared/git-url-project';
+
 import { i18n } from '@/i18n';
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
 import { isolateLtrBidiText } from '@/lib/bidi';
-import { CURRENCY_ZERO_THRESHOLD, formatClockTime, formatPrefixedUsd } from '@/lib/format';
+import {
+  CURRENCY_ZERO_THRESHOLD,
+  formatClockTime,
+  formatNumber,
+  formatPrefixedUsd,
+} from '@/lib/format';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { isUnknownOrigin, platformLabel, remoteAgentState } from '@/lib/platform-label';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
@@ -17,6 +24,20 @@ export type SessionSection = {
    * names the same day the heading does. */
   timeZone: string;
 };
+
+/**
+ * Spoken heading for one session-list section: the day label with the number of
+ * sessions under it, counted in the active language. The visible row keeps the
+ * label and a bare numeral apart, so this is the one string that ties the count
+ * to what it counts.
+ */
+export function sessionSectionAccessibilityLabel(title: string, count: number): string {
+  return i18n.t('agents.sessionList.sectionAccessibility', {
+    title,
+    count,
+    displayCount: formatNumber(count, i18n.language),
+  });
+}
 
 /** Platform buckets offered by the session filters, in display order. */
 export const PLATFORM_FILTERS = [
@@ -40,10 +61,6 @@ const platformExpansion: ReadonlyMap<string, string[]> = new Map([
   ['cloud-agent', ['cloud-agent', 'cloud-agent-web']],
   ['extension', ['vscode', 'agent-manager']],
 ]);
-
-function stripGitSuffix(value: string): string {
-  return value.endsWith('.git') ? value.slice(0, -4) : value;
-}
 
 export function expandPlatformFilter(filter: string[]): string[] {
   return filter.flatMap(p => platformExpansion.get(p) ?? [p]);
@@ -89,61 +106,6 @@ export function knownPlatformBucket(platform: string): string | null {
  */
 export function normalisePlatformSelection(filter: readonly string[]): string[] {
   return [...new Set(filter.map(platform => knownPlatformBucket(platform) ?? platform))];
-}
-
-/**
- * Decode every segment of a git URL path. Splitting before decoding keeps an
- * encoded slash inside its own segment, so the path keeps the boundaries the
- * raw URL had. A malformed escape (a lone `%` or a truncated sequence) cannot
- * be decoded, and its raw segment is kept instead of throwing: one bad segment
- * never blanks the label.
- */
-function decodePathSegments(path: string): string {
-  return path
-    .split('/')
-    .map(segment => {
-      try {
-        return decodeURIComponent(segment);
-      } catch {
-        return segment;
-      }
-    })
-    .join('/');
-}
-
-/**
- * Render a git URL as the `owner/repo` path its labels and filter keys show.
- * Segments are percent-decoded because a session stores the encoded URL while
- * the repository's own name is the decoded one, and each segment is decoded
- * once: a name holding a literal `%` stays intact.
- */
-export function formatGitUrlProject(gitUrl: string): string {
-  const sshMatch = /^git@[^:]+:(.+?)(?:\.git)?$/.exec(gitUrl);
-  const sshPath = sshMatch?.[1];
-  if (sshPath) {
-    return stripGitSuffix(decodePathSegments(sshPath));
-  }
-
-  const protocolIndex = gitUrl.indexOf('://');
-  if (protocolIndex === -1) {
-    return gitUrl;
-  }
-
-  const pathStart = gitUrl.indexOf('/', protocolIndex + 3);
-  if (pathStart === -1) {
-    return gitUrl;
-  }
-
-  const [rawPath = ''] = gitUrl.slice(pathStart + 1).split(/[?#]/);
-  const pathParts = rawPath.split('/').filter(Boolean);
-  const dashIndex = pathParts.indexOf('-');
-  const projectParts = dashIndex >= 2 ? pathParts.slice(0, dashIndex) : pathParts;
-
-  if (projectParts.length >= 2) {
-    return stripGitSuffix(decodePathSegments(projectParts.join('/')));
-  }
-
-  return gitUrl;
 }
 
 /**

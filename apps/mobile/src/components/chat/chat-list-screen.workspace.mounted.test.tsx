@@ -49,6 +49,7 @@ const NORDLICHT = {
   role: 'member',
 };
 
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }));
@@ -89,6 +90,7 @@ vi.mock('@/lib/chat/use-chat', async () => {
         chats: state.chats,
         isLoading: false,
         isError: false,
+        isSuccess: true,
         refetch: () => undefined,
         remove: async () => {
           await Promise.resolve();
@@ -106,8 +108,12 @@ vi.mock('@/lib/hooks/use-available-models', () => ({
     models: [{ id: 'm1', name: 'One', isPreferred: true }],
     isLoading: false,
     isError: false,
+    isFetched: true,
     refetch: () => undefined,
   }),
+}));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ primaryForeground: '#fff', mutedForeground: '#6F6A61' }),
@@ -118,6 +124,12 @@ vi.mock('sonner-native', () => ({
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: state.push, back: vi.fn() }),
+}));
+// The scope row opens the shared picker through the press-burst guard; this
+// suite asserts the press reached the route, so the guarded push is the router
+// mock it already checks.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => state.push,
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -135,19 +147,27 @@ vi.mock('react-native', () => ({
   useWindowDimensions: () => ({ fontScale: 1, width: 400, height: 800 }),
 }));
 vi.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
-vi.mock('@/components/agents/session-list-content', () => ({ FAB_MARGIN: 16, FAB_SIZE: 56 }));
 vi.mock('@/components/centered-state-surface', () => ({
   StateSurfaceInsets: 'StateSurfaceInsets',
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/screen-header', () => ({
+  // The account row is the screen's inline header action; render it so the
+  // tests can reach the control the tab actually shows.
+  ScreenHeader: (props: { inlineActions?: ReactNode }) =>
+    createElement('ScreenHeader', null, props.inlineActions),
+}));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/icons', () => ({
   Check: 'Check',
   ChevronDown: 'ChevronDown',
   MessageCircle: 'MessageCircle',
+  MessageCirclePlus: 'MessageCirclePlus',
   Plus: 'Plus',
   Server: 'Server',
 }));

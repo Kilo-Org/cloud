@@ -5,4 +5,4 @@
  * break above the first line (`apps/mobile/AGENTS.md`, leading-gap rule) and
  * the sheet's block pad below it.
  */
-export const TODO_SHEET_STATE_BODY_CLASS = 'px-5 pt-3 pb-8';
+export const TODO_SHEET_STATE_BODY_CLASS = 'px-4 pt-3 pb-8';

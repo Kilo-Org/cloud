@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one durable draft contract: the key helpers, the debounced store, and the pre-relaunch flush share one pending map */
 import * as Sentry from '@sentry/react-native';
 import * as z from 'zod';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
@@ -99,6 +100,9 @@ export const PENDING_SHARE_ID_DRAFT_KEY = 'pending-share-id';
 /** Agents session-list search query draft entity key. */
 export const SESSION_SEARCH_DRAFT_KEY = 'session-search-query';
 
+/** Create-organization form draft entity key. */
+export const CREATE_ORGANIZATION_FORM_DRAFT_KEY = 'organization-create-form';
+
 /** Pending-review draft entity key, unique per pull request. */
 export function prReviewDraftKey(owner: string, repo: string, number: number): string {
   return `pr-review:${owner}/${repo}#${number}`;
@@ -139,16 +143,6 @@ export function prCommentDraftKey(
   return `pr-comment:${owner}/${repo}#${number}:${path}:${side}:${startLine ?? line}-${line}`;
 }
 
-const mergeDraftSchema = z.object({
-  title: z.string(),
-  message: z.string(),
-});
-
-/** Runtime shape guard for a merge-sheet draft ({ title, message }). */
-export function isMergeDraft(value: unknown): value is { title: string; message: string } {
-  return mergeDraftSchema.safeParse(value).success;
-}
-
 const sharePayloadsDraftSchema = z.object({
   order: z.array(z.string()),
   entries: z.record(
@@ -184,6 +178,40 @@ export function isShareNavigationDraft(value: unknown): value is ShareNavigation
 /** Security dismiss draft entity key, unique per scope and finding. */
 export function securityDismissDraftKey(scope: string, findingId: string): string {
   return `security-dismiss:${scope}:${findingId}`;
+}
+
+/**
+ * Organization mode form draft entity key; `null` is the create form, so a
+ * new mode and an edited one never share typed text.
+ */
+export function orgModeFormDraftKey(organizationId: string, modeId: string | null): string {
+  return `org-mode-form:${organizationId}:${modeId ?? 'new'}`;
+}
+
+/**
+ * Organization group form draft entity key; `null` is the create form, so a
+ * new group and an edited one never share typed text.
+ */
+export function orgGroupFormDraftKey(organizationId: string, groupId: string | null): string {
+  return `org-group-form:${organizationId}:${groupId ?? 'new'}`;
+}
+
+/** Organization guardrails form draft entity key, unique per organization. */
+export function orgGuardrailsFormDraftKey(organizationId: string): string {
+  return `org-guardrails-form:${organizationId}`;
+}
+
+/** Organization model-access form draft entity key, unique per organization. */
+export function orgModelAccessFormDraftKey(organizationId: string): string {
+  return `org-model-access-form:${organizationId}`;
+}
+
+/**
+ * Spend-alerts form draft entity key; an undefined organization is the
+ * personal scope, which is also the key the personal alerts screen reads.
+ */
+export function spendAlertsFormDraftKey(organizationId: string | undefined): string {
+  return `spend-alerts-form:${organizationId ?? 'personal'}`;
 }
 
 /**
@@ -223,6 +251,8 @@ type DraftWritePayload = {
 type PendingSave = {
   timer: ReturnType<typeof setTimeout>;
   epoch: number;
+  userId: string;
+  entityKey: string;
   value: unknown;
 };
 
@@ -404,7 +434,7 @@ export function saveDraft(userId: string, entityKey: string, value: unknown): vo
     pendingSaves.delete(key);
     void writeDraftSafely({ epoch, userId, entityKey, value });
   }, DRAFT_DEBOUNCE_MS);
-  pendingSaves.set(key, { timer, epoch, value });
+  pendingSaves.set(key, { timer, epoch, userId, entityKey, value });
 }
 
 /**
@@ -424,7 +454,26 @@ export async function flushDraft(userId: string, entityKey: string): Promise<voi
   }
   clearTimeout(pending.timer);
   pendingSaves.delete(key);
-  await writeDraftSafely({ ...pending, userId, entityKey });
+  await writeDraftSafely(pending);
+}
+
+/**
+ * Forces every pending debounced write to run now. This is the save point
+ * before a relaunch that discards the JS context (`apply-language.ts`): that
+ * reload runs no React cleanup, so a draft still inside its 500 ms debounce
+ * window would be lost. The entries are drained first and their timers cleared,
+ * so no drained write also fires on its own; a key whose pending timer
+ * `clearDraft` already cancelled is not in the map, so a cleared draft is never
+ * resurrected. A no-op on an empty map; each write's failure is reported and
+ * swallowed at the `writeDraftSafely` boundary.
+ */
+export async function flushAllDrafts(): Promise<void> {
+  const pending = [...pendingSaves.values()];
+  pendingSaves.clear();
+  for (const entry of pending) {
+    clearTimeout(entry.timer);
+  }
+  await Promise.all(pending.map(entry => writeDraftSafely(entry)));
 }
 
 /**

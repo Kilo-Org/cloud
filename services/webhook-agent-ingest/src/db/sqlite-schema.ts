@@ -48,6 +48,7 @@ export const triggerConfig = sqliteTable('trigger_config', {
   created_at: text('created_at').notNull(),
   is_active: integer('is_active').notNull().default(1),
   target_type: text('target_type').notNull().default('cloud_agent'),
+  cloud_agent_session_id: text('cloud_agent_session_id'),
   kiloclaw_instance_id: text('kiloclaw_instance_id'),
   github_repo: text('github_repo'),
   mode: text('mode'),

@@ -1,11 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as OrganizationsModule from '@kilocode/app-shared/organizations';
+import type * as ReactI18nextModule from 'react-i18next';
 import type * as SecurityAgentModule from '@kilocode/app-shared/security-agent';
 
 import { useCancelSecurityRemediation } from './use-security-remediation';
 import { REMEDIATION_UNAVAILABLE_COPY } from '@kilocode/app-shared/security-agent';
 import { i18n } from '@/i18n';
 import { getRemediationUnavailableKey } from '@/lib/security-agent-copy';
+import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 
 type MutationOptions = {
   mutationFn?: (vars: unknown) => Promise<unknown>;
@@ -44,10 +47,45 @@ vi.mock('@tanstack/react-query', () => ({
 
 vi.mock('@/lib/query/schedule-cache-maintenance', () => ({ scheduleCacheMaintenance: vi.fn() }));
 
+// The remediation hooks read the reader's role and the step it offers through
+// the organization query chain and `expo-router`, and the label through
+// `useTranslation`; this pure project mounts no renderer and has no Expo
+// build, so those three boundaries are stubbed. The boundary double applies
+// the real `isMoneyRole` rule to whatever role a case sets.
+const trialRole = vi.hoisted(() => ({ role: undefined as string | undefined }));
+
+vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('@/lib/hooks/use-organization-queries', async () => {
+  const { canManageOrganizationBilling } = await vi.importActual<typeof OrganizationsModule>(
+    '@kilocode/app-shared/organizations'
+  );
+  return {
+    isMoneyRole: canManageOrganizationBilling,
+    useOrgBoundary: () => ({ role: trialRole.role }),
+  };
+});
+vi.mock('react-i18next', async importOriginal => ({
+  ...(await importOriginal<typeof ReactI18nextModule>()),
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
+
 vi.mock('sonner-native', () => ({
   toast: {
     error: (msg: string) => toastErrorMock(msg),
     success: (msg: string) => toastSuccessMock(msg),
+  },
+}));
+
+// The adapter's own module reaches `react-native` for its accessibility
+// announcement, which this pure project cannot parse; the double forwards the
+// options the way the real adapter does, so a bare copy and a toast carrying a
+// step stay distinguishable.
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: {
+    error: (msg: string, options?: unknown) =>
+      options === undefined ? toastErrorMock(msg) : toastErrorMock(msg, options),
+    success: (msg: string) => toastSuccessMock(msg),
+    warning: vi.fn(),
   },
 }));
 
@@ -106,6 +144,7 @@ const ORG_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 describe('useCancelSecurityRemediation (generation guard)', () => {
   beforeEach(() => {
     lastCapturedOptions = null;
+    trialRole.role = undefined;
     cancelMutateMock.mockReset();
     orgCancelMutateMock.mockReset();
     invalidateQueriesMock.mockReset();
@@ -188,6 +227,64 @@ describe('useCancelSecurityRemediation (generation guard)', () => {
       organizationId: ORG_ID,
       attemptId: 'a1',
     });
+  });
+});
+
+// The cancel hook reports through the same refusal toast as start/retry: the
+// sentence comes from the catalog for this reader's role, and only the trial
+// refusal for a billing role carries the step that ends it.
+describe('useCancelSecurityRemediation (refusal copy follows the reader)', () => {
+  const CANCEL_VARS = { attemptId: 'a1', findingId: 'f1' } as const;
+  const BILLING_ACTION_LABEL = 'organization.hub.manageBilling';
+
+  beforeEach(() => {
+    lastCapturedOptions = null;
+    trialRole.role = undefined;
+    toastErrorMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('offers the plan step with the billing copy to a role that can change the plan', () => {
+    trialRole.role = 'owner';
+    useCancelSecurityRemediation(ORG_ID);
+
+    lastCapturedOptions?.onError?.(
+      new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE),
+      CANCEL_VARS,
+      undefined
+    );
+
+    expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('common.organizationTrialEndedBilling'), {
+      action: { label: BILLING_ACTION_LABEL, onClick: expect.any(Function) },
+    });
+    // The step's label is real catalog copy, not just a key a screen would
+    // render raw.
+    expect(i18n.t(BILLING_ACTION_LABEL)).not.toBe(BILLING_ACTION_LABEL);
+  });
+
+  it('names the owner and offers no step to a reader who cannot change the plan', () => {
+    trialRole.role = 'member';
+    useCancelSecurityRemediation(ORG_ID);
+
+    lastCapturedOptions?.onError?.(
+      new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE),
+      CANCEL_VARS,
+      undefined
+    );
+
+    expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('common.organizationTrialEnded'));
+  });
+
+  it('keeps an unrelated failure its own copy and offers no step', () => {
+    trialRole.role = 'owner';
+    useCancelSecurityRemediation(ORG_ID);
+
+    lastCapturedOptions?.onError?.(new Error('Cancel failed'), CANCEL_VARS, undefined);
+
+    expect(toastErrorMock).toHaveBeenCalledWith('Cancel failed');
   });
 });
 

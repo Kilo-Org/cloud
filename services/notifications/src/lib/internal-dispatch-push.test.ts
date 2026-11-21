@@ -15,10 +15,8 @@ import { dispatchInternalPushCore, type InternalDispatchDeps } from './internal-
 
 const ALL_ON: UserNotificationPreferences = {
   agentPushEnabled: true,
-  chatMessagesEnabled: true,
   agentAttentionEnabled: true,
   sessionStatusEnabled: true,
-  kiloclawActivityEnabled: true,
   balanceAlertsEnabled: true,
   spendAlertsEnabled: true,
   securityFindingsEnabled: true,
@@ -260,10 +258,8 @@ describe('dispatchInternalPushCore', () => {
       preferences: {
         ...ALL_ON,
         agentPushEnabled: false,
-        chatMessagesEnabled: false,
         agentAttentionEnabled: false,
         sessionStatusEnabled: false,
-        kiloclawActivityEnabled: false,
         securityFindingsEnabled: false,
         balanceAlertsEnabled: true,
       },
@@ -282,10 +278,8 @@ describe('dispatchInternalPushCore', () => {
       preferences: {
         ...ALL_ON,
         agentPushEnabled: false,
-        chatMessagesEnabled: false,
         agentAttentionEnabled: false,
         sessionStatusEnabled: false,
-        kiloclawActivityEnabled: false,
         balanceAlertsEnabled: false,
         securityFindingsEnabled: true,
       },
@@ -608,10 +602,8 @@ describe('dispatchInternalPushCore', () => {
       preferences: {
         ...ALL_ON,
         agentPushEnabled: false,
-        chatMessagesEnabled: false,
         agentAttentionEnabled: false,
         sessionStatusEnabled: false,
-        kiloclawActivityEnabled: false,
         balanceAlertsEnabled: false,
         securityFindingsEnabled: true,
       },
@@ -756,10 +748,8 @@ describe('dispatchInternalPushCore', () => {
       preferences: {
         ...ALL_ON,
         agentPushEnabled: false,
-        chatMessagesEnabled: false,
         agentAttentionEnabled: false,
         sessionStatusEnabled: false,
-        kiloclawActivityEnabled: false,
         balanceAlertsEnabled: false,
         securityFindingsEnabled: false,
         spendAlertsEnabled: true,

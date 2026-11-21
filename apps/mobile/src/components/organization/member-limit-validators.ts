@@ -46,8 +46,12 @@ export type SaveErrorCopy = Readonly<{
  * line; everything else falls back to the settings line. The raw server message
  * never reaches the UI: a schema rejection carries a JSON array of zod issues,
  * not a sentence.
+ *
+ * `canManageBilling` picks the reader's copy for the one sentence that depends
+ * on the role: the plan refusal offers the step to a reader who can take it and
+ * names the owner who can to everyone else.
  */
-export function saveErrorCopy(error: unknown): SaveErrorCopy {
+export function saveErrorCopy(error: unknown, canManageBilling = false): SaveErrorCopy {
   if (readTrpcErrorField(error, 'code') === 'BAD_REQUEST') {
     return {
       field: 'limit',
@@ -58,6 +62,7 @@ export function saveErrorCopy(error: unknown): SaveErrorCopy {
   }
   return {
     field: 'form',
-    message: knownServerErrorMessage(error) ?? i18n.t('common.couldNotSaveSetting'),
+    message:
+      knownServerErrorMessage(error, canManageBilling) ?? i18n.t('common.couldNotSaveSetting'),
   };
 }

@@ -288,4 +288,79 @@ describe('Exa usage record across route, contract and writer', () => {
       .where(eq(kilocode_users.id, user.id));
     expect(uncharged.microdollars_used).toBe(0);
   });
+
+  it('records a charged personal record once when the client type carries U+0000', async () => {
+    const user = await insertTestUser({
+      microdollars_used: 0,
+      total_microdollars_acquired: 100_000_000,
+    });
+    await exhaustFreeAllowance(user.id);
+
+    const nulType = `deep\u0000tail`;
+    mockedGetUserFromAuth.mockResolvedValue({
+      user,
+      authFailedResponse: null,
+      organizationId: undefined,
+    });
+    mockedFetch.mockResolvedValue(
+      new Response(JSON.stringify({ results: [], costDollars: { total: 0.009 } }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      new Request('http://localhost:3000/api/exa/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-kilocode-feature': 'kiloclaw' },
+        body: JSON.stringify({ query: 'contract', type: nulType }),
+      }) as never
+    );
+    expect(response.status).toBe(200);
+    await flushAfterCallbacks();
+
+    expect(mockedCaptureException).not.toHaveBeenCalled();
+    expect(mockedRecordExaUsage).toHaveBeenCalledTimes(1);
+    const [[record]] = mockedRecordExaUsage.mock.calls;
+    await expect(mockedRecordExaUsage.mock.results[0].value).resolves.toBe('recorded');
+
+    expectRecordSurvivesTheWire(record);
+    expect(record).not.toHaveProperty('type');
+    expect(record.chargedToBalance).toBe(true);
+    expect(record.costMicrodollars).toBe(9000);
+
+    const rows = await db
+      .select()
+      .from(exa_usage_log)
+      .where(eq(exa_usage_log.kilo_user_id, user.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].type).toBeNull();
+
+    const [personalCounter] = await db
+      .select()
+      .from(exa_monthly_usage)
+      .where(
+        and(eq(exa_monthly_usage.kilo_user_id, user.id), isNull(exa_monthly_usage.organization_id))
+      );
+    expect(personalCounter).toMatchObject({
+      total_cost_microdollars: FREE_ALLOWANCE_MICRODOLLARS + record.costMicrodollars,
+      total_charged_microdollars: record.costMicrodollars,
+      request_count: 2,
+    });
+
+    const [charged] = await db
+      .select({ microdollars_used: kilocode_users.microdollars_used })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id));
+    expect(charged.microdollars_used).toBe(record.costMicrodollars);
+
+    const wireCopy = ExaUsageRecordSchema.parse(JSON.parse(JSON.stringify(record)));
+    await expect(recordExaUsage(wireCopy)).resolves.toBe('duplicate');
+    const [afterReplay] = await db
+      .select({ microdollars_used: kilocode_users.microdollars_used })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id));
+    expect(afterReplay.microdollars_used).toBe(record.costMicrodollars);
+  });
 });

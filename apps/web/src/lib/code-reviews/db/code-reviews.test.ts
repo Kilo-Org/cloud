@@ -2126,6 +2126,106 @@ describe('findPreviousCompletedReview', () => {
     expect(storedAttempt?.execution_id).toBeNull();
   });
 
+  it('keeps a cancelled attempt intact when a late completed callback names it explicitly', async () => {
+    const reviewId = await createReview('sha-late-callback-explicit');
+    const attempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'running',
+      sessionId: 'agent_cancelled_explicit',
+    });
+    await expect(cancelCodeReview(reviewId)).resolves.toBe(true);
+
+    const result = await updateCodeReviewAttemptForCallback({
+      codeReviewId: reviewId,
+      attemptId: attempt.id,
+      status: 'completed',
+      sessionId: 'agent_cancelled_explicit',
+      completedAt: new Date('2026-03-04T05:06:07.000Z'),
+    });
+
+    expect(result.id).toBe(attempt.id);
+    expect(result.status).toBe('cancelled');
+
+    const [storedAttempt] = await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.id, attempt.id))
+      .limit(1);
+
+    expect(storedAttempt?.status).toBe('cancelled');
+    expect(storedAttempt?.terminal_reason).toBe('user_cancelled');
+    expect(storedAttempt?.error_message).toBe('Cancelled by user');
+    expect(new Date(storedAttempt?.completed_at ?? '').getTime()).not.toBe(
+      new Date('2026-03-04T05:06:07.000Z').getTime()
+    );
+  });
+
+  it('keeps a cancelled attempt intact when a late completed callback matches its session', async () => {
+    const reviewId = await createReview('sha-late-callback-session');
+    const attempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'running',
+      sessionId: 'agent_cancelled_session',
+    });
+    await expect(cancelCodeReview(reviewId)).resolves.toBe(true);
+
+    const result = await updateCodeReviewAttemptForCallback({
+      codeReviewId: reviewId,
+      status: 'completed',
+      sessionId: 'agent_cancelled_session',
+      completedAt: new Date('2026-03-04T05:06:07.000Z'),
+    });
+
+    expect(result.id).toBe(attempt.id);
+    expect(result.status).toBe('cancelled');
+
+    const [storedAttempt] = await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.id, attempt.id))
+      .limit(1);
+
+    expect(storedAttempt?.status).toBe('cancelled');
+    expect(storedAttempt?.terminal_reason).toBe('user_cancelled');
+    expect(storedAttempt?.error_message).toBe('Cancelled by user');
+    expect(new Date(storedAttempt?.completed_at ?? '').getTime()).not.toBe(
+      new Date('2026-03-04T05:06:07.000Z').getTime()
+    );
+  });
+
+  it('does not reopen a cancelled attempt when a running callback matches its session', async () => {
+    const reviewId = await createReview('sha-running-callback-cancelled');
+    const attempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'running',
+      sessionId: 'agent_running_late',
+      cliSessionId: 'ses_running_late',
+    });
+    await expect(cancelCodeReview(reviewId)).resolves.toBe(true);
+
+    const result = await updateCodeReviewAttemptForCallback({
+      codeReviewId: reviewId,
+      status: 'running',
+      sessionId: 'agent_running_late',
+      cliSessionId: 'ses_running_late',
+      executionId: 'exec_running_late',
+    });
+
+    expect(result.id).toBe(attempt.id);
+    expect(result.status).toBe('cancelled');
+
+    const [storedAttempt] = await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.id, attempt.id))
+      .limit(1);
+
+    expect(storedAttempt?.status).toBe('cancelled');
+    expect(storedAttempt?.session_id).toBe('agent_running_late');
+    expect(storedAttempt?.cli_session_id).toBe('ses_running_late');
+    expect(storedAttempt?.execution_id).toBeNull();
+  });
+
   it('creates only one infra retry attempt for the same failed attempt', async () => {
     const reviewId = await createReview('sha-infra-retry');
     await updateCodeReviewStatus(reviewId, 'running', { sessionId: 'agent_failed' });
@@ -2187,7 +2287,7 @@ describe('findPreviousCompletedReview', () => {
     const reviewId = await createReview('sha-explicit-attempt');
     const firstAttempt = await createCodeReviewAttempt({
       codeReviewId: reviewId,
-      status: 'failed',
+      status: 'running',
       sessionId: 'agent-first',
     });
     const newerAttempt = await createCodeReviewAttempt({
@@ -2198,7 +2298,7 @@ describe('findPreviousCompletedReview', () => {
       sessionId: 'agent-second',
     });
 
-    await updateCodeReviewAttemptForCallback({
+    const updated = await updateCodeReviewAttemptForCallback({
       codeReviewId: reviewId,
       attemptId: firstAttempt.id,
       status: 'cancelled',
@@ -2208,9 +2308,40 @@ describe('findPreviousCompletedReview', () => {
     const updatedFirst = await getCodeReviewAttemptForReview(reviewId, firstAttempt.id);
     const unchangedLatest = await getCodeReviewAttemptForReview(reviewId, newerAttempt.id);
 
+    expect(updated.id).toBe(firstAttempt.id);
     expect(updatedFirst?.status).toBe('cancelled');
     expect(updatedFirst?.error_message).toBe('superseded callback');
     expect(unchangedLatest?.status).toBe('running');
+  });
+
+  it('leaves a terminal explicit attempt untouched and returns its stored row', async () => {
+    const reviewId = await createReview('sha-terminal-explicit-attempt');
+    const terminalAttempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'failed',
+      sessionId: 'agent-terminal',
+      errorMessage: 'startup failed',
+      terminalReason: 'sandbox_error',
+    });
+
+    const returned = await updateCodeReviewAttemptForCallback({
+      codeReviewId: reviewId,
+      attemptId: terminalAttempt.id,
+      status: 'cancelled',
+      errorMessage: 'late callback',
+      terminalReason: 'superseded',
+    });
+
+    expect(returned.id).toBe(terminalAttempt.id);
+    expect(returned.status).toBe('failed');
+    expect(returned.error_message).toBe('startup failed');
+    expect(returned.terminal_reason).toBe('sandbox_error');
+
+    const stored = await getCodeReviewAttemptForReview(reviewId, terminalAttempt.id);
+    expect(stored?.status).toBe('failed');
+    expect(stored?.error_message).toBe('startup failed');
+    expect(stored?.terminal_reason).toBe('sandbox_error');
+    expect(stored?.completed_at).toBe(terminalAttempt.completed_at);
   });
 
   it('throws for an explicit missing attempt id', async () => {
@@ -2524,6 +2655,39 @@ describe('resetCodeReviewForRetry', () => {
     expect(stored?.error_message).toBeNull();
   });
 
+  it('resets a plain cancelled review and a failed review and returns 1', async () => {
+    const cancelledReviewId = await insertReview('cancelled', {
+      terminal_reason: 'user_cancelled',
+      error_message: 'Cancelled by user',
+      session_id: 'agent-cancelled-reset',
+      completed_at: new Date('2026-02-01T02:00:00.000Z').toISOString(),
+    });
+
+    await expect(resetCodeReviewForRetry(cancelledReviewId)).resolves.toBe(1);
+
+    const resetCancelled = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, cancelledReviewId),
+    });
+    expect(resetCancelled?.status).toBe('pending');
+    expect(resetCancelled?.terminal_reason).toBeNull();
+    expect(resetCancelled?.error_message).toBeNull();
+    expect(resetCancelled?.session_id).toBeNull();
+    expect(resetCancelled?.completed_at).toBeNull();
+
+    const failedReviewId = await insertReview('failed', {
+      terminal_reason: 'sandbox_error',
+      error_message: 'Container shutdown: SIGTERM',
+    });
+
+    await expect(resetCodeReviewForRetry(failedReviewId)).resolves.toBe(1);
+
+    const resetFailed = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, failedReviewId),
+    });
+    expect(resetFailed?.status).toBe('pending');
+    expect(resetFailed?.terminal_reason).toBeNull();
+  });
+
   it('returns 0 for a review that is not in a retriggable terminal state', async () => {
     const reviewId = await insertReview('pending');
 
@@ -2535,6 +2699,27 @@ describe('resetCodeReviewForRetry', () => {
       where: eq(cloud_agent_code_reviews.id, reviewId),
     });
     expect(stored?.status).toBe('pending');
+  });
+
+  it('returns 0 for a superseded review even though it is cancelled and leaves the row unchanged', async () => {
+    const reviewId = await insertReview('cancelled', {
+      terminal_reason: 'superseded',
+      error_message: 'Superseded by new push',
+      session_id: 'agent-superseded',
+    });
+
+    const before = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+
+    const count = await resetCodeReviewForRetry(reviewId);
+
+    expect(count).toBe(0);
+
+    const stored = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+    expect(stored).toStrictEqual(before);
   });
 
   it('persists sanitized previous summaries while preserving null and valid markdown', async () => {
@@ -2721,7 +2906,7 @@ describe('listCodeReviews narrows the list DTO', () => {
     return reviewId;
   }
 
-  it('omits council_result, manual_config, and previous_summary_body from list rows', async () => {
+  it('omits heavy JSONB and text fields from list rows', async () => {
     const reviewId = await createReviewWithHeavyFields();
 
     const rows = await listCodeReviews({
@@ -2738,11 +2923,13 @@ describe('listCodeReviews narrows the list DTO', () => {
     expect(row).not.toHaveProperty('council_result');
     expect(row).not.toHaveProperty('manual_config');
     expect(row).not.toHaveProperty('previous_summary_body');
+    expect(row).not.toHaveProperty('repository_review_instructions_imports');
 
     const {
       council_result: _councilResult,
       manual_config: _manualConfig,
       previous_summary_body: _previousSummaryBody,
+      repository_review_instructions_imports: _repositoryReviewInstructionsImports,
       ...listColumns
     } = getTableColumns(cloud_agent_code_reviews);
     expect(Object.keys(row).sort()).toEqual(Object.keys(listColumns).sort());
@@ -3316,6 +3503,140 @@ describe('ensureCurrentCodeReviewAttemptFromReview', () => {
     await expect(ensureCurrentCodeReviewAttemptFromReview(review)).rejects.toThrow(
       `Code review ${review.id} has an unexpected persisted terminal reason 'not_a_reason'`
     );
+  });
+
+  it('reconciles a running attempt to the cancelled review state and leaves a terminal attempt alone', async () => {
+    const cancelledStartedAt = '2026-02-01T00:00:00.000Z';
+    const cancelledCompletedAt = '2026-02-01T01:00:00.000Z';
+    const review = await insertReview({
+      status: 'cancelled',
+      terminal_reason: 'user_cancelled',
+      error_message: 'Cancelled by user',
+      started_at: cancelledStartedAt,
+      completed_at: cancelledCompletedAt,
+    });
+
+    // The running attempt must be the latest row: reconciliation only ever repairs
+    // the latest attempt.
+    const terminalAttempt = await createCodeReviewAttempt({
+      codeReviewId: review.id,
+      status: 'failed',
+      errorMessage: 'startup failed',
+      terminalReason: 'sandbox_error',
+      completedAt: new Date('2026-01-30T00:00:00.000Z'),
+    });
+    const runningAttempt = await createCodeReviewAttempt({
+      codeReviewId: review.id,
+      status: 'running',
+      startedAt: new Date('2026-01-31T00:00:00.000Z'),
+    });
+
+    const reconciled = await ensureCurrentCodeReviewAttemptFromReview(review);
+
+    expect(reconciled.id).toBe(runningAttempt.id);
+    expect(reconciled.status).toBe('cancelled');
+
+    const [storedRunning] = await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.id, runningAttempt.id))
+      .limit(1);
+    expect(storedRunning?.status).toBe('cancelled');
+    expect(storedRunning?.terminal_reason).toBe('user_cancelled');
+    expect(storedRunning?.error_message).toBe('Cancelled by user');
+    expect(new Date(storedRunning?.completed_at ?? '').toISOString()).toBe(cancelledCompletedAt);
+
+    const [storedTerminal] = await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.id, terminalAttempt.id))
+      .limit(1);
+    expect(storedTerminal?.status).toBe('failed');
+    expect(storedTerminal?.terminal_reason).toBe('sandbox_error');
+    expect(storedTerminal?.error_message).toBe('startup failed');
+    expect(new Date(storedTerminal?.completed_at ?? '').toISOString()).toBe(
+      '2026-01-30T00:00:00.000Z'
+    );
+  });
+
+  it('leaves a running attempt untouched while its review is still running', async () => {
+    const attemptStartedAt = '2026-02-02T00:00:00.000Z';
+    const review = await insertReview({
+      status: 'running',
+      started_at: '2026-02-01T12:00:00.000Z',
+    });
+    const attempt = await createCodeReviewAttempt({
+      codeReviewId: review.id,
+      status: 'running',
+      startedAt: new Date(attemptStartedAt),
+    });
+
+    const untouched = await ensureCurrentCodeReviewAttemptFromReview(review);
+
+    expect(untouched.id).toBe(attempt.id);
+    expect(untouched.status).toBe('running');
+
+    const [storedAttempt] = await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.id, attempt.id))
+      .limit(1);
+    expect(storedAttempt?.status).toBe('running');
+    expect(new Date(storedAttempt?.started_at ?? '').toISOString()).toBe(attemptStartedAt);
+  });
+
+  it('does not terminalize a live attempt from a stale terminal review object', async () => {
+    // The interleaving `retryFailedCodeReview` can produce: retry A reads the
+    // failed review, retry B resets and dispatches a fresh attempt, then A
+    // calls this helper holding its stale `failed` row. The re-read inside the
+    // helper sees the live review, so A must not rewrite B's attempt.
+    const review = await insertReview({
+      status: 'failed',
+      terminal_reason: 'sandbox_error',
+      error_message: 'first run failed',
+      completed_at: '2026-02-01T00:00:00.000Z',
+    });
+
+    // The attempt A would have found: still in flight under the failed review.
+    const liveAttempt = await createCodeReviewAttempt({
+      codeReviewId: review.id,
+      status: 'running',
+      startedAt: new Date('2026-02-01T01:00:00.000Z'),
+    });
+
+    // Retry B reset the stored review back to a live state and its attempt
+    // carries the fresh session identity.
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({
+        status: 'running',
+        session_id: 'agent_retry_b',
+        cli_session_id: 'ses_retry_b',
+        terminal_reason: null,
+        updated_at: new Date().toISOString(),
+      })
+      .where(eq(cloud_agent_code_reviews.id, review.id));
+
+    // A's stale object still claims the review is terminal.
+    const staleReview: typeof review = {
+      ...review,
+      status: 'failed',
+      terminal_reason: 'sandbox_error',
+      error_message: 'first run failed',
+    };
+
+    const attempt = await ensureCurrentCodeReviewAttemptFromReview(staleReview);
+
+    expect(attempt.id).toBe(liveAttempt.id);
+    expect(attempt.status).toBe('running');
+
+    const [storedAttempt] = await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.id, liveAttempt.id))
+      .limit(1);
+    expect(storedAttempt?.status).toBe('running');
+    expect(storedAttempt?.terminal_reason).toBeNull();
   });
 });
 

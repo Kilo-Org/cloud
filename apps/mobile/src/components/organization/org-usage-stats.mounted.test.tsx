@@ -16,12 +16,17 @@ const query = vi.hoisted(() => ({
         totalOutputTokens: number;
       },
   isError: false,
-  isPaused: true,
   isFetching: false,
   refetch: vi.fn(),
 }));
+// The read no longer pauses (`SETTLE_WHILE_OFFLINE`); the offline wording keys
+// off the committed connectivity state, so the harness carries that instead.
+const connectivity = vi.hoisted(() => ({ value: 'offline' as 'online' | 'offline' | 'unknown' }));
 
 vi.mock('@/lib/hooks/use-organization-queries', () => ({ useOrgUsageStats: () => query }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => connectivity.value,
+}));
 vi.mock('@kilocode/app-shared/utils', () => ({ fromMicrodollars: (value: number) => value / 1e6 }));
 vi.mock('@/lib/format', () => ({
   formatPrefixedMoney: (value: number) => `$${value}`,
@@ -35,14 +40,12 @@ vi.mock('react-native', () => ({ View: 'View' }));
 beforeEach(() => {
   query.data = undefined;
   query.isError = false;
-  query.isPaused = true;
+  connectivity.value = 'online';
   query.refetch.mockClear();
 });
 
 describe('Organization usage availability', () => {
   it('fills every value slot with a loading block before the first totals arrive', async () => {
-    query.isPaused = false;
-
     const { renderer, unmount } = await renderWithProviders(
       createElement(OrgUsageStats, { organizationId: 'org-1' })
     );
@@ -59,11 +62,15 @@ describe('Organization usage availability', () => {
     expect(renderer.root.findAllByType('Skeleton')).toHaveLength(4);
     unmount();
   });
-  it.each(['paused', 'failed'] as const)(
-    'keeps labeled placeholders and recovery when %s',
-    async state => {
-      query.isPaused = state === 'paused';
-      query.isError = state === 'failed';
+  it.each([
+    { label: 'offline', connectivity: 'offline' as const, isError: false },
+    { label: 'failed', connectivity: 'online' as const, isError: true },
+    { label: 'failed offline', connectivity: 'offline' as const, isError: true },
+  ])(
+    'keeps labeled placeholders and recovery when the read $label',
+    async ({ connectivity: state, isError }) => {
+      connectivity.value = state;
+      query.isError = isError;
       const { renderer, unmount } = await renderWithProviders(
         createElement(OrgUsageStats, { organizationId: 'org-1' })
       );
@@ -77,6 +84,10 @@ describe('Organization usage availability', () => {
         expect(text).toContain(i18n.t(key));
       }
       expect(text.filter(value => value === '—')).toHaveLength(4);
+      // The offline wording only when the device is confirmed offline.
+      expect(text).toContain(
+        i18n.t(state === 'offline' ? 'queryError.offlineTitle' : 'common.somethingWentWrong')
+      );
       const retry = renderer.root.findByType('Button');
       act(() => {
         (retry.props.onPress as () => void)();
@@ -86,7 +97,7 @@ describe('Organization usage availability', () => {
     }
   );
 
-  it('retains cached totals through a paused refetch failure', async () => {
+  it('retains cached totals through a failed refetch', async () => {
     query.isError = true;
     query.data = {
       totalCost: 2_000_000,

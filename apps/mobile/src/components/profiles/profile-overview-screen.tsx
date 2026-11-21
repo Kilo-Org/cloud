@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one overview screen: identity, the usage counts and every configuration section share one data layer and one scroll body */
 import { useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import { lazy, Suspense, useEffect, useState } from 'react';
@@ -38,12 +39,17 @@ import {
   Trash2,
 } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowChevron } from '@/components/ui/row-chevron';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowValue } from '@/components/ui/row-value';
+import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileMutations, useAgentProfileOverview } from '@/lib/hooks/use-agent-profiles';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useLeaveMissingProfileRoute } from '@/lib/hooks/use-leave-missing-profile-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { usePopOnce } from '@/lib/navigation/pop-once';
 import { useTRPC } from '@/lib/trpc';
@@ -133,8 +139,12 @@ export function ProfileOverviewScreen({
   const canManage = permission === 'allowed';
   // Unsaved name or description edits ask before the route goes, the way the
   // profile form sheets do. A read-only viewer cannot edit the form, so the
-  // guard stays off for them.
-  const metadataGuard = useMetadataLeaveGuard({ enabled: canManage });
+  // guard stays off for them. A save or delete already in flight owns the
+  // route, so Back is dropped instead of offered a discard.
+  const metadataGuard = useMetadataLeaveGuard({
+    enabled: canManage,
+    saving: update.isPending || deleteProfile.isPending,
+  });
   // The config-import sheet is a modal over this screen, so it holds no route
   // and no draft of its own.
   const [importOpen, setImportOpen] = useState(false);
@@ -188,12 +198,11 @@ export function ProfileOverviewScreen({
       await deleteProfile.mutateAsync({ profileId });
       toast.success(t('profiles.deletedToast', { name: profileName }));
       // The profile is gone, so there is nothing left to keep: the pop must not
-      // ask about edits to it.
-      metadataGuard.markClean();
-      // Back during the delete already left this profile, and a Back handled
-      // while this dismissal runs is the same leave; a second pop would remove
-      // the profiles list beneath it.
-      popOnce();
+      // ask about edits to it. Back during the delete already left this profile,
+      // and a Back handled while this dismissal runs is the same leave; a second
+      // pop would remove the profiles list beneath it, so the leave goes through
+      // the guard's own once-only exit.
+      metadataGuard.leaveWithoutAsking(popOnce);
     } catch (error) {
       if (deleteErrorMessage(error) === 'blocked') {
         toast.error(t('profiles.deleteBlocked'));
@@ -220,9 +229,9 @@ export function ProfileOverviewScreen({
     <View className="flex-1 bg-background">
       {/* Back keeps the route it was opened from (the Profiles list, or the
           session whose profile chip opened it); `backFallback` still lands on
-          Profiles when the app has no history, as a cold deep link does. The
-          profile name is user prose, not a UI label, so it keeps a second line
-          for a natural break.
+          this stack's Profiles list when the app has no history, as a cold deep
+          link does. The profile name is user prose, not a UI label, so it keeps
+          a second line for a natural break.
 
           A read that has not answered yet shows a title-shaped bar in the
           title's own slot. The header used to read the generic Profiles title
@@ -238,11 +247,11 @@ export function ProfileOverviewScreen({
           ) : undefined
         }
         titleNumberOfLines={2}
-        backFallback={getProfilesPath()}
+        backFallback={getProfilesPath(stack)}
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-6 px-6 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
@@ -285,21 +294,23 @@ export function ProfileOverviewScreen({
               disabled={!canManage}
             />
 
-            <PreferenceRow
-              icon={Star}
-              title={t('profiles.defaultSectionTitle')}
-              subtitle={t(defaultDescriptionKey(isOrgOwned))}
-              value={profile.isDefault}
-              disabled={!canManage || defaultPending}
-              busy={defaultPending}
-              onValueChange={next => {
-                if (next) {
-                  setAsDefault.mutate({ profileId });
-                } else {
-                  clearDefault.mutate({ profileId });
-                }
-              }}
-            />
+            <RowGroup>
+              <PreferenceRow
+                icon={Star}
+                title={t('profiles.defaultSectionTitle')}
+                subtitle={t(defaultDescriptionKey(isOrgOwned))}
+                value={profile.isDefault}
+                disabled={!canManage || defaultPending}
+                busy={defaultPending}
+                onValueChange={next => {
+                  if (next) {
+                    setAsDefault.mutate({ profileId });
+                  } else {
+                    clearDefault.mutate({ profileId });
+                  }
+                }}
+              />
+            </RowGroup>
 
             <ProfileRepoPinsSection
               profileId={profileId}
@@ -307,18 +318,24 @@ export function ProfileOverviewScreen({
               canManage={canManage}
             />
 
-            <View className="gap-1">
-              <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-                {t('profiles.settingsSectionTitle')}
-              </Text>
-              <View>
-                {overviewSectionRows(profile).map((row, index, rows) => (
+            <Section label={t('profiles.settingsSectionTitle')}>
+              <RowGroup leadingTile>
+                {overviewSectionRows(profile).map(row => (
                   <ConfigureRow
                     key={row.key}
                     icon={SECTION_ICONS[row.key]}
                     title={t(row.titleKey)}
-                    subtitle={String(row.count)}
-                    last={index === rows.length - 1 && !canManage}
+                    // The count is a value, so it takes the trailing cell beside
+                    // the chevron; a section with nothing in it shows no number
+                    // rather than a bare zero under its name.
+                    trailing={
+                      <View className="flex-row items-center gap-2">
+                        {row.count > 0 ? (
+                          <RowValue text={String(row.count)} face="numeric" tone="muted" />
+                        ) : null}
+                        <RowChevron />
+                      </View>
+                    }
                     onPress={() => {
                       router.push(SECTION_PATHS[row.key](profileId, organizationId, stack));
                     }}
@@ -329,14 +346,13 @@ export function ProfileOverviewScreen({
                     icon={Download}
                     title={t('profiles.importConfigTitle')}
                     subtitle={t('profiles.importConfigRowSubtitle')}
-                    last
                     onPress={() => {
                       setImportOpen(true);
                     }}
                   />
                 ) : null}
-              </View>
-            </View>
+              </RowGroup>
+            </Section>
 
             {!canManage ? null : (
               <Button

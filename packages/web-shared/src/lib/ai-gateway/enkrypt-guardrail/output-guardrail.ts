@@ -16,10 +16,7 @@ import {
   guardrailSettings,
   type EnkryptOutputGuardrailReport,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
-import {
-  recordEnkryptUsageRecords,
-  usageRecordsWithAddedLatency,
-} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/input-guardrail';
+import { recordEnkryptUsageRecords } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/input-guardrail';
 import {
   extractResponseText,
   type ResponseBodyFormat,
@@ -35,6 +32,8 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/usage';
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { getOutputHeaders } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { KEEP_ALIVE_COMMENT } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse.shared';
+import { countEnkryptCalls } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/call-counter';
 import { ENKRYPT_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { EnkryptRequestLog } from '@kilocode/web-shared/lib/r2/api-request-log';
@@ -81,9 +80,6 @@ function isTooLargeToScan(text: string): boolean {
   return text.length > ENKRYPT_MAX_SCAN_CHARACTERS;
 }
 
-/** The comment the response rewrite already sends for upstream keep-alives. */
-const KEEP_ALIVE_COMMENT = ': KILO PROCESSING\n\n';
-
 /**
  * Clients and proxies time out a response that sends nothing for minutes, while generation alone
  * can take that long.
@@ -114,6 +110,8 @@ function wholeResponseCoverage(text: string): EnkryptScanCoverage {
     totalSegments: text.length > 0 ? 1 : 0,
     cachedCharacters: 0,
     cachedSegments: 0,
+    totalUnits: text.length > 0 ? 1 : 0,
+    cachedUnits: 0,
     omittedAttachments: 0,
   };
 }
@@ -174,14 +172,8 @@ function bodyFormat(response: Response): ResponseBodyFormat {
   return response.headers.get('content-type')?.includes('application/json') ? 'json' : 'sse';
 }
 
-function outputUsageRecords(
-  blockingCalls: EnkryptGuardrailCall[],
-  logOnlyCalls: EnkryptGuardrailCall[],
-  addedLatencyMs: number
-): EnkryptUsageRecord[] {
-  return usageRecordsWithAddedLatency(blockingCalls, logOnlyCalls, addedLatencyMs).map(
-    usageRecord => ({ ...usageRecord, guardrail: 'output' })
-  );
+function outputUsageRecords(calls: EnkryptGuardrailCall[]): EnkryptUsageRecord[] {
+  return calls.map(call => ({ ...call, guardrail: 'output' }));
 }
 
 function recordOutputUsageRecords(usageRecords: EnkryptUsageRecord[]): Promise<void> {
@@ -269,9 +261,9 @@ type GuardEnkryptOutputParams = {
  *
  * With a blocking detector, the whole upstream response is read before any of it reaches the
  * client, so a streamed response arrives at once after generation and the scan; the stream itself
- * starts at once with keep-alive comments. The response is released only when the blocking scan
- * allows it. A block, or any failure of the scan, replaces it with a rejection, so unscanned output
- * never reaches the client.
+ * starts at once with keep-alive comments. The response is released when the blocking scan allows
+ * it, or when Enkrypt fails and the scan fails open (see `failureVerdict` in `detect.ts`). A block,
+ * or a failure of Kilo's own, such as an invalid configuration, replaces it with a rejection.
  *
  * Log-only detectors never delay the response: they scan a copy of the body after it ends, and
  * only log. Usage records are written in `after()`.
@@ -297,9 +289,10 @@ export async function guardEnkryptOutput({
   const format = bodyFormat(response);
   const requestLogs: Promise<EnkryptRequestLog>[] = [];
   const captureResponse = Promise.withResolvers<boolean>();
+  const calls = countEnkryptCalls();
   const deps = {
     apiKey: ENKRYPT_API_KEY,
-    fetch,
+    fetch: calls.fetch,
     timeoutMs: ENKRYPT_GUARDRAIL_TIMEOUT_MS,
     signal,
     requestLog: captureRequestLogs && {
@@ -343,7 +336,7 @@ export async function guardEnkryptOutput({
   const decide = (verdict: EnkryptGuardrailVerdict, allowed: Response): OutputDecision => {
     report.verdict = verdict.action;
     report.unavailable_reason = verdict.action === 'unavailable' ? verdict.reason : null;
-    if (verdict.action === 'allow' || verdict.action === 'skip') {
+    if (verdict.action === 'allow' || verdict.action === 'skip' || verdict.action === 'fail_open') {
       return { action: 'release', response: allowed };
     }
     warnExceptInTest('[enkrypt-guardrail] output withheld', {
@@ -374,13 +367,17 @@ export async function guardEnkryptOutput({
       const scanned = (async () => {
         try {
           const copied = await readBody(copy);
+          // Where a blocking scan would start to hold the response back.
+          const waitStartedAt = performance.now();
           report.upstream_read_failed = copied.readError !== null;
           if (copied.overLimit) return notScannedBecause('held_output_too_large');
           const text = extractResponseText(kind, format, bodyText(copied));
           report.output_characters = text.length;
           if (isTooLargeToScan(text)) return notScannedBecause('output_too_large');
           const result = await scanOutput(logOnly, text);
-          return outputUsageRecords([], result.usageRecords, 0);
+          // A guardrail that only logs adds no latency, so it reports its log-only scan time.
+          report.added_latency_ms = Math.round(performance.now() - waitStartedAt);
+          return outputUsageRecords(result.usageRecords);
         } catch (error) {
           console.error('[enkrypt-guardrail] log-only output scan failed unexpectedly', {
             ...logFields,
@@ -389,7 +386,7 @@ export async function guardEnkryptOutput({
         }
       })();
       const logged = scanned.then(records => recordOutputUsageRecords(records ?? []));
-      after(logged);
+      after(logged.finally(calls.flush));
       captureRequestLogs?.(async (shouldCaptureResponse = true) => {
         captureResponse.resolve(shouldCaptureResponse);
         await scanned;
@@ -466,17 +463,16 @@ export async function guardEnkryptOutput({
 
     const waitStartedAt = performance.now();
     const { verdict, usageRecords } = await blockingResult;
-    const addedLatencyMs = Math.round(performance.now() - waitStartedAt);
-    report.added_latency_ms = addedLatencyMs;
+    report.added_latency_ms = Math.round(performance.now() - waitStartedAt);
     return {
       decision: decide(verdict, replayedResponse(response, buffered)),
       usageRecords: logOnlyResult.then(logOnlyScan =>
-        outputUsageRecords(usageRecords, logOnlyScan.usageRecords, addedLatencyMs)
+        outputUsageRecords([...usageRecords, ...logOnlyScan.usageRecords])
       ),
     };
   })();
   const recorded = scanned.then(({ usageRecords }) => usageRecords).then(recordOutputUsageRecords);
-  after(recorded);
+  after(recorded.finally(calls.flush));
   captureRequestLogs?.(async (shouldCaptureResponse = true) => {
     captureResponse.resolve(shouldCaptureResponse);
     const { usageRecords } = await scanned;

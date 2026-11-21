@@ -39,6 +39,16 @@ function secureStoreFailureFingerprint(operation: SecureStoreOperation): readonl
 const KEYCHAIN_INTERACTION_REFUSED_MESSAGE = 'User interaction is not allowed';
 
 /**
+ * True when iOS refused a keychain call because the device was locked (or had
+ * not been unlocked once since boot). The refusal is a device state, not a
+ * failure: callers that own their own reporting skip it instead of filing an
+ * event. Total: an unrecognized value yields `false` and never throws.
+ */
+export function isKeychainInteractionRefused(error: unknown): boolean {
+  return error instanceof Error && error.message.includes(KEYCHAIN_INTERACTION_REFUSED_MESSAGE);
+}
+
+/**
  * Report one failed SecureStore operation at warning level.
  *
  * The fingerprint and tags name the operation, never the raw native message.
@@ -64,7 +74,7 @@ export function reportSecureStoreFailure(operation: SecureStoreOperation, error:
   if (error instanceof ProtectedDataUnavailableError) {
     return;
   }
-  if (error instanceof Error && error.message.includes(KEYCHAIN_INTERACTION_REFUSED_MESSAGE)) {
+  if (isKeychainInteractionRefused(error)) {
     addTelemetryBreadcrumb({
       category: 'secure_store',
       level: 'warning',

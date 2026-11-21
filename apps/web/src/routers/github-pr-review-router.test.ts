@@ -991,6 +991,62 @@ describe('githubPrReviewRouter.listReviewThreads conversation comments', () => {
     expect(result.conversation.map((c: { commentId: number }) => c.commentId)).toEqual([
       1, 2, 3, 4, 5,
     ]);
+    expect(result.truncated).toBe(true);
+  });
+
+  it('marks the result truncated when the cap exhausted the conversation comments', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    let conversationCalls = 0;
+    mockGraphqlByOperation(buildOctokit('t1'), {
+      conversation: () => {
+        conversationCalls += 1;
+        // Always report another page so the loop hits the hard cap.
+        const pageIndex = conversationCalls;
+        return {
+          nodes: [
+            conversationNode({
+              databaseId: pageIndex,
+              id: `IC_${pageIndex}`,
+              body: `page-${pageIndex}`,
+            }),
+          ],
+          pageInfo: {
+            hasNextPage: true,
+            endCursor: `cursor-${pageIndex}`,
+          },
+        };
+      },
+    });
+
+    const result = await caller.listReviewThreads({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+    });
+
+    expect(conversationCalls).toBe(5);
+    expect(result.truncated).toBe(true);
+  });
+
+  it('keeps no truncated key when the conversation completes under the cap', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    mockGraphqlByOperation(buildOctokit('t1'), {
+      conversation: () => ({
+        nodes: [conversationNode({ databaseId: 1, id: 'IC_1', body: 'only' })],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      }),
+    });
+
+    const result = await caller.listReviewThreads({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+    });
+
+    expect(result.conversation).toHaveLength(1);
+    expect('truncated' in result).toBe(false);
   });
 
   it('returns conversation: [] on a cursored page and does not issue PrReviewConversationComments', async () => {
@@ -1083,6 +1139,22 @@ describe('githubPrReviewRouter.listInbox', () => {
       data: { data: { search } },
     });
   }
+
+  it('answers a spent mobile budget retryably before asking GitHub', async () => {
+    const caller = createCaller({
+      user: { id: 'user-1' } as User,
+      controlPlaneStartedAt: performance.now() - 9_900,
+    });
+    const octokit = buildOctokit('t1');
+
+    await expect(caller.listInbox({ direction: 'forward' })).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Your review inbox took too long to load. Try again.',
+    });
+
+    expect(octokit.request).not.toHaveBeenCalled();
+    expect(getGitHubUserAccessToken).not.toHaveBeenCalled();
+  });
 
   it('maps search nodes to inbox items and returns nextCursor from pageInfo', async () => {
     getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));

@@ -1017,7 +1017,8 @@ cache. Three places may set it, and the nearest one wins:
 1. The question: `session.ask(text, { maxTokens })`.
 2. The session: `openSession({ maxTokens })`.
 3. The `ModelCatalog` plugin's `maxOutputTokens`, when neither names one.
-4. `4096`, when the catalog names none either.
+
+When the catalog names none either, the package uses `4096`.
 
 One session does one thing at a time, because two answers built on one prefix
 means the second one misses the cache. A second question asked while the first
@@ -1371,8 +1372,10 @@ answered nothing at all — no tool call and no text — which is not a judgemen
 not something a description can fix, and it answered normally on every run
 since. `tried` now retries an empty answer on the other shape and keeps a second
 one, because twice is a finding. That is the second time this run measured the
-wrong thing, and both are recorded here so the third is caught in review. The subagent
-description was not, and what it cost is the point of keeping this run:
+wrong thing, and both are recorded here so the third is caught in review. The
+subagent description was not a wrong measurement of the model: it read as
+allowing two uses, and the table below is the delegation rate for each of the
+description's three versions:
 
 | Description | Delegated |
 |---|---:|
@@ -1636,21 +1639,18 @@ instead of the provider would be a change to what the provider sealed.
 .delta`, so both are read. Two providers relayed through the chat shape name it
 `reasoning` and `reasoning_content`, so both are read there.
 
-A turn holds as many reasoning parts as the model produced, and an encrypted
-block closes the one open at the time. What still merges is two signed blocks
-with nothing between them: a signature does not close a block here, so both
-land in one part with the second signature. A model produces those between tool
-calls, which this package does not have. Split on the signature when it does.
+A turn holds as many reasoning parts as the model produced. The words and the
+signature arrive on separate events, so both land on the block still open, and
+a signature closes it: the next thinking event opens a new part. An encrypted
+block closes the one open at the time. A model produces two signed blocks in a
+row between tool calls, and merging them would hand the provider one block
+under the other's seal.
 
 Measured with `pnpm test:e2e:probe responses anthropic/claude-sonnet-4.5` on
 2026-09-04: one reasoning item and one message in a turn, 43
 `response.reasoning.delta` frames and a single `response.output_item.done`
-carrying the reasoning. So the merge loses nothing today, and the probe is how
-to check that again.
-
-A thinking block is closed by its seal, not by the next event. A model produces
-two signed blocks in a row between tool calls, and merging them would hand the
-provider one block under the other's seal.
+carrying the reasoning. So a turn holds one sealed block today, and the probe
+is how to check that again.
 
 The gateway then ends a block with a reasoning event carrying no words and no
 signature, after the signature has already arrived. That event opens no block:
@@ -1820,9 +1820,8 @@ the entry even with the key.
 
 `openai` and `@anthropic-ai/sdk` are the contract the three wires are written
 against, and every import of either is a type. Nothing of either survives the
-build, so both are dev dependencies and a consumer installs neither: 21.5 MiB
-and 14.2 MiB unpacked at `openai` 7.36.0 and `@anthropic-ai/sdk` 0.137.0,
-against 4 runtime dependencies that are all used.
+build, so both are dev dependencies and a consumer installs neither: 22.9 MiB
+and 16.5 MiB unpacked at `openai` 7.55.0 and `@anthropic-ai/sdk` 1.8.0.
 
 That holds only while no published declaration names one. Exporting a type
 built out of one — `ContentBlock`, say, which two wires exported and neither
@@ -2036,8 +2035,8 @@ There are eleven entry points: `@kilocode/harness-sdk`, `/core`,
 `/plugins/remote-mcp`, `/plugins/tools`, `/plugins/store/node`, `/plugins/store/expo`
 and `/testing`.
 The two stores have
-subpaths of their own because each names a platform: exporting them from the
-root would pull `node:sqlite` or `expo-sqlite` into every bundle. `/plugins/fetch`
+subpaths of their own because each names a platform: exporting the Node store
+from the root would pull `node:sqlite` into every bundle. `/plugins/fetch`
 and `/testing` have theirs because an entry point is what a consumer bundles and
 neither runs in production — a caller with a `fetch` of their own should not
 carry this one, and the conformance checks belong to a plugin author's test
@@ -2090,6 +2089,8 @@ Add a row when you turn one off, and give the reason.
 | `import/max-dependencies` | Off for tests only. A test wires every plugin it exercises. |
 | `import/no-namespace` | Off for `src/index.test.ts` only. Asking what a barrel exports needs the namespace; there is no other way to read it. |
 | `typescript/no-unsafe-type-assertion` | Off for `src/plugins/remote-mcp/validator.ts` only. The permissive validator hands its `unknown` input back as the SDK's generic `T`, and an assertion is how it returns the value unchanged. |
+| `import/no-nodejs-modules` | Off for the eleven files that import a Node built-in: the Node store, its four tests, `expo-fixture.ts`, the two remote-mcp fixtures, `conformance.test.ts`, `resume-fixture.ts` and `image.test.ts`. The store opens `node:sqlite` and the remote-mcp fixtures serve over `node:http`. The store is the package's own `/plugins/store/node` entry point, which a caller chooses to run on Node; the others are tests and fixtures. The root barrel reaches none of them. |
+| `unicorn/no-null` | Off for `src/plugins/remote-mcp/app.ts` only. `AppBridge` names `null` as the value of its first argument when the caller registers the handlers by hand, and this file does exactly that, so the argument is the SDK's `null` and not one this package invents. |
 
 The block under `no-underscore-dangle` in `.oxlintrc.json` — `node/no-sync`,
 `one-var`, the `typescript/*`, `unicorn/*` and `vitest/*` rules that follow it —

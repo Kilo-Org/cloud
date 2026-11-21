@@ -1,84 +1,43 @@
-import { createElement } from 'react';
+import { describe, expect, test } from '@jest/globals';
+import React, { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AuthErrorNotification } from './AuthErrorNotification';
 
+// The component's JSX compiles to `React.createElement`, and Next supplies the
+// binding its own build; here it comes from the test.
+Object.assign(globalThis, { React });
+
 describe('AuthErrorNotification', () => {
-  it('announces global authentication errors atomically', () => {
+  test('links support from the full web app', () => {
     const html = renderToStaticMarkup(
-      createElement(AuthErrorNotification, { error: 'LINKING-FAILED' })
+      createElement(AuthErrorNotification, { error: 'SIGNUP-RATE-LIMITED' })
     );
 
-    expect(html).toContain('data-error-notification="true"');
-    expect(html).toContain('role="alert"');
-    expect(html).toContain('aria-live="assertive"');
-    expect(html).toContain('aria-atomic="true"');
-    expect(html).toContain('Account Linking Failed');
+    expect(html).toContain('href="https://kilo.ai/support"');
   });
 
-  it.each([
-    [
-      'DISCOVERY_RATE_LIMITED',
-      'Too Many Attempts',
-      'Too many sign-in attempts. Please try again later.',
-    ],
-    [
-      'DISCOVERY_FAILED',
-      'Sign-in Methods Unavailable',
-      'We could not find your sign-in methods. Please try again.',
-    ],
-    [
-      'NO_SUPPORTED_SIGN_IN_METHOD',
-      'No Supported Sign-in Method',
-      'No supported sign-in method is available for this account. Use a different email.',
-    ],
-    [
-      'MAGIC_LINK_DELIVERY_FAILED',
-      'Magic Link Not Sent',
-      'We could not send your magic link. Please try again.',
-    ],
-  ])('presents controlled operational error %s', (error, title, message) => {
-    const html = renderToStaticMarkup(createElement(AuthErrorNotification, { error }));
+  // The app shell renders no link out of itself, and the sign-in error text is
+  // the one place this component would otherwise send the user to marketing.
+  test.each(['SIGNUP-RATE-LIMITED', 'EMAIL-ALREADY-USED'])(
+    '%s mentions support without a link inside the app shell',
+    error => {
+      const html = renderToStaticMarkup(
+        createElement(AuthErrorNotification, { error, shell: true })
+      );
 
-    expect(html).toContain('role="alert"');
-    expect(html).toContain('aria-live="assertive"');
-    expect(html).toContain(title);
-    expect(html).toContain(message);
-  });
+      expect(html).toContain('contact support');
+      expect(html).not.toContain('<a');
+      expect(html).not.toContain('href=');
+    }
+  );
 
-  it('points new email signups at the other sign-in options', () => {
+  test('the blocked-account notice renders no link inside the app shell', () => {
     const html = renderToStaticMarkup(
-      createElement(AuthErrorNotification, { error: 'EMAIL-SIGNUP-DISABLED' })
+      createElement(AuthErrorNotification, { error: 'BLOCKED', shell: true })
     );
 
-    expect(html).toContain('role="alert"');
-    expect(html).toContain('Email Sign-up Is Paused');
-    expect(html).toContain('be created with email right now');
-    expect(html).toContain('choose one of the other');
-    expect(html).toContain('You can still sign in with email.');
-  });
-
-  it('uses the generic fallback for an unknown callback error', () => {
-    const html = renderToStaticMarkup(
-      createElement(AuthErrorNotification, { error: 'untrusted-query-error' })
-    );
-
-    expect(html).toContain('Oops! Something went wrong trying to log in.');
-    expect(html).not.toContain('untrusted-query-error');
-  });
-
-  it.each([
-    ['google,apple', ['Google', 'Apple'], []],
-    ['apple', ['Apple'], ['Google']],
-    ['apple,github,passkey,Apple,<b>x</b>', ['Apple'], ['Google', 'GitHub', 'Passkey', '<b>x</b>']],
-    [undefined, [], ['Google', 'Apple']],
-    ['github', [], ['Google', 'Apple', 'GitHub']],
-  ])('names only known step-up methods from the query %s', (methods, named, absent) => {
-    const html = renderToStaticMarkup(
-      createElement(AuthErrorNotification, { error: 'SIGNUP-STEP-UP', stepUpMethods: methods })
-    );
-
-    expect(html).toContain('role="alert"');
-    for (const name of named) expect(html).toContain(name);
-    for (const name of absent) expect(html).not.toContain(name);
+    expect(html).toContain('Account Blocked');
+    expect(html).not.toContain('<a');
+    expect(html).not.toContain('href=');
   });
 });

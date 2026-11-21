@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { getWebhookRoutes } from '@/lib/webhook-routes';
+import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 
 import { Button } from '@/components/ui/button';
 import { LinkButton } from '@/components/Button';
@@ -27,6 +28,7 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
   const router = useRouter();
   const queryClient = useQueryClient();
   const [githubRepo, setGithubRepo] = useState('');
+  const [isExistingChat, setIsExistingChat] = useState(false);
 
   // Build URLs based on context
   const routes = getWebhookRoutes(organizationId);
@@ -90,7 +92,7 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
     () =>
       (modelsData?.data || []).map(model => ({
         id: model.id,
-        name: model.name,
+        name: modelNameWithRetirement(model),
         isFree: model.isFree,
         mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
         hasUserByokAvailable: model.hasUserByokAvailable,
@@ -126,6 +128,12 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
     async (formData: TriggerFormData) => {
       await createTrigger({
         triggerId: formData.triggerId,
+        ...(formData.targetType === 'cloud_agent_chat'
+          ? {
+              targetType: formData.targetType,
+              cloudAgentSessionId: formData.cloudAgentSessionId,
+            }
+          : {}),
         runAsCreator: formData.runAsCreator,
         activationMode: formData.activationMode,
         cronExpression: formData.cronExpression,
@@ -184,7 +192,7 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
       {headerContent}
 
       {/* GitHub integration missing - non-blocking banner */}
-      {isGitHubIntegrationMissing && (
+      {isGitHubIntegrationMissing && !isExistingChat && (
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -225,6 +233,7 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
         canSetSandboxAllocation={capabilities?.canSetSandboxAllocation ?? false}
         sandboxSelection={capabilities?.sandboxSelection}
         onRepositoryChange={setGithubRepo}
+        onTargetTypeChange={target => setIsExistingChat(target === 'cloud_agent_chat')}
         isLoadingCapabilities={isLoadingCapabilities}
         hasCapabilitiesError={hasCapabilitiesError}
         onRetryCapabilities={() => void refetchCapabilities()}

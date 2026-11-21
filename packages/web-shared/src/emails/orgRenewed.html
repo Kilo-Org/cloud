@@ -6,16 +6,16 @@
     <title>Kilo for Teams Subscription Renewal</title>
   </head>
   <body
+    class="kc-page kc-strong"
     style="
       margin: 0;
       padding: 0;
       font-family:
         -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      background-color: #ffffff;
       color: #1a1a1a;
     "
   >
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #ffffff">
+    <table width="100%" cellpadding="0" cellspacing="0" class="kc-page">
       <tr>
         <td align="center" style="padding: 40px 20px">
           <table width="520" cellpadding="0" cellspacing="0">
@@ -32,6 +32,7 @@
                       -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                       sans-serif;
                   "
+                  class="kc-strong"
                 >
                   Kilo for Teams Subscription Renewal
                 </h1>
@@ -50,10 +51,11 @@
                       -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                       sans-serif;
                   "
+                  class="kc-text"
                 >
                   Your subscription for
-                  <strong style="color: #1a1a1a">{{ seats }}</strong> has been renewed for another
-                  month.
+                  <strong class="kc-strong" style="color: #1a1a1a">{{ seats }}</strong> has been
+                  renewed for another month.
                 </p>
                 <p
                   style="
@@ -65,9 +67,13 @@
                       -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                       sans-serif;
                   "
+                  class="kc-text"
                 >
                   You can view your organization's invoices
-                  <a href="{{ invoices_url }}" style="color: #1a1a1a; text-decoration: underline"
+                  <a
+                    href="{{ invoices_url }}"
+                    class="kc-strong"
+                    style="color: #1a1a1a; text-decoration: underline"
                     >here</a
                   >.
                 </p>
@@ -81,6 +87,7 @@
                       -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                       sans-serif;
                   "
+                  class="kc-text"
                 >
                   If you have any questions, please don't hesitate to reply to this email. We are
                   here to help!
@@ -89,7 +96,7 @@
             </tr>
             <!-- Sign-off -->
             <tr>
-              <td style="padding: 0 40px 40px; border-top: 1px solid #ebebea">
+              <td class="kc-divider" style="padding: 0 40px 40px; border-top: 1px solid #ebebea">
                 <p
                   style="
                     margin: 20px 0 0;
@@ -100,6 +107,7 @@
                       -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                       sans-serif;
                   "
+                  class="kc-text"
                 >
                   — The Kilo Team
                 </p>
@@ -109,7 +117,11 @@
           <!-- Branding Footer -->
           <table width="520" cellpadding="0" cellspacing="0">
             <tr>
-              <td align="center" style="padding: 30px 20px; border-top: 1px solid #eee">
+              <td
+                align="center"
+                class="kc-divider"
+                style="padding: 30px 20px; border-top: 1px solid #eee"
+              >
                 <p
                   style="
                     margin: 0;
@@ -119,6 +131,7 @@
                       -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
                       sans-serif;
                   "
+                  class="kc-faint"
                 >
                   © {{ year }} Kilo Code, Inc<br />455 Market St, Ste 1940 PMB 993504<br />San
                   Francisco, CA 94105, USA

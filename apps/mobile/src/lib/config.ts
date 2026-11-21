@@ -24,8 +24,6 @@ function optional(key: keyof typeof OPTIONAL_ENV_KEYS): string | undefined {
 
 export const API_BASE_URL: string = required('apiBaseUrl');
 export const WEB_BASE_URL: string = required('webBaseUrl');
-export const TERMS_URL = `${WEB_BASE_URL}/terms-app`;
-export const PRIVACY_URL = `${WEB_BASE_URL}/privacy-app`;
 export const APPSFLYER_DEV_KEY: string = required('appsFlyerDevKey');
 export const APPSFLYER_APP_ID: string = required('appsFlyerAppId');
 
@@ -91,6 +89,19 @@ for (const [key, schemes] of Object.entries(URL_SCHEMES)) {
     if (runProductionHostCheck) {
       assertProductionHost(key, value, PRODUCTION_HOSTS);
     }
+  }
+}
+// KILO_MCP_URL is resolved above (override or the committed production
+// default), so the loop over the raw extra values does not see the default.
+// Assert the resolved value here, the way SESSION_SYNC_URL is asserted; in a
+// production build with no override this is the committed https:// host, which
+// the allowlist accepts.
+if (KILO_MCP_URL) {
+  assertUrlScheme('kiloMcpUrl', KILO_MCP_URL, URL_SCHEMES.kiloMcpUrl, {
+    allowInsecure: __DEV__,
+  });
+  if (runProductionHostCheck) {
+    assertProductionHost('kiloMcpUrl', KILO_MCP_URL, PRODUCTION_HOSTS);
   }
 }
 

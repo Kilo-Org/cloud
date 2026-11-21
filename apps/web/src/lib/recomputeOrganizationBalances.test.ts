@@ -532,6 +532,18 @@ describe('recomputeOrganizationBalances after live usage writes', () => {
     return row;
   }
 
+  async function organizationLedger(organizationId: string) {
+    return db
+      .select({
+        id: creditTransactionsTable.id,
+        amount: creditTransactionsTable.amount_microdollars,
+        category: creditTransactionsTable.credit_category,
+      })
+      .from(creditTransactionsTable)
+      .where(eq(creditTransactionsTable.organization_id, organizationId))
+      .orderBy(creditTransactionsTable.id);
+  }
+
   it('keeps the balance the live writers produced for an ordinary organization', async () => {
     const { owner, organization } = await ordinaryOrganization();
     await writeLlmExaAndEnkryptUsage(organization.id, owner.id);
@@ -560,10 +572,52 @@ describe('recomputeOrganizationBalances after live usage writes', () => {
     const live = await balanceColumns(organization.id);
     expect(live.microdollars_used).toBe(llmCost + exaCost + enkryptCharge);
 
+    const ledgerBefore = await organizationLedger(organization.id);
+
+    for (let run = 0; run < 2; run++) {
+      const result = await recomputeOrganizationBalances({ organizationId: organization.id });
+
+      expect(result).toMatchObject({ success: true, accounting_error_mUsd: 0 });
+      expect(await balanceColumns(organization.id)).toEqual(live);
+      expect(await organizationLedger(organization.id)).toEqual(ledgerBefore);
+    }
+  });
+
+  it('still reconciles genuine credits alongside Kilo Pass consumption debits', async () => {
+    const { owner, organization } = await kiloPassOrganization();
+    await writeLlmExaAndEnkryptUsage(organization.id, owner.id);
+    const grant = 5_000_000;
+    await db.insert(creditTransactionsTable).values({
+      kilo_user_id: owner.id,
+      organization_id: organization.id,
+      amount_microdollars: grant,
+      is_free: true,
+      description: 'genuine grant missing from cached total',
+    });
+    const live = await balanceColumns(organization.id);
+
     const result = await recomputeOrganizationBalances({ organizationId: organization.id });
 
-    expect(result.success).toBe(true);
+    expect(result).toMatchObject({ success: true, accounting_error_mUsd: -grant });
     expect(await balanceColumns(organization.id)).toEqual(live);
+  });
+
+  it('still counts a positive credit that carries a consumption category', async () => {
+    const { owner, organization } = await kiloPassOrganization();
+    await writeLlmExaAndEnkryptUsage(organization.id, owner.id);
+    const credit = 1_000_000;
+    await db.insert(creditTransactionsTable).values({
+      kilo_user_id: owner.id,
+      organization_id: organization.id,
+      amount_microdollars: credit,
+      is_free: true,
+      description: 'positive row with a consumption prefix',
+      credit_category: `kpo:consumption:ai-gateway:${randomUUID()}`,
+    });
+
+    const result = await recomputeOrganizationBalances({ organizationId: organization.id });
+
+    expect(result).toMatchObject({ success: true, accounting_error_mUsd: -credit });
   });
 
   it('leaves an organization with only zero-charge Enkrypt usage unchanged', async () => {

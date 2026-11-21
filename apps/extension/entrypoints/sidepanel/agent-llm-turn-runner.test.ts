@@ -71,6 +71,8 @@ const makeToolDef = (name: string): KiloGatewayToolDefinition =>
 
 const makeWorkflowCtx = (mode: 'dangerous' | 'safe' = 'dangerous') => ({
   allowWorkflowsInSafeMode: false,
+  claimTab: vi.fn().mockResolvedValue(true),
+  disposeBrowserCaller: vi.fn(),
   evalInTab: vi.fn(),
   getTabUrl: vi.fn(),
   mode,
@@ -88,6 +90,7 @@ describe('dangerous turn runner workflow wiring', () => {
     ({
       apiBaseUrl: 'https://api.example.com',
       appendEvents: vi.fn() as never,
+      browserCaller: { conversationId: 'conversation-1', kind: 'panel', panelId: 'panel-1' },
       conversationEvents: [],
       fetch: vi.fn() as never,
       model: 'test-model',
@@ -299,6 +302,27 @@ describe('dangerous turn runner workflow wiring', () => {
       providerToolCallId: 'call-click',
       tabId: 7,
       type: 'tool-call',
+    });
+  });
+
+  it('does not mark a danger-mode browser call as safe mode', async () => {
+    vi.mocked(runLlmTurn).mockClear();
+    vi.mocked(executeKiloBrowserToolCall).mockClear();
+    vi.mocked(runLlmTurn).mockImplementation(async options => {
+      await options.executeToolCall({
+        arguments: {},
+        id: 'tc-snap',
+        name: 'kilo_browser_snapshot' as const,
+        tabId: 7,
+        type: 'tool-call' as const,
+      });
+    });
+
+    await runDangerousLlmTurn(buildOptions());
+
+    // Danger mode has the handler, so its modal state names it.
+    expect(vi.mocked(executeKiloBrowserToolCall).mock.calls[0]![1]).not.toMatchObject({
+      safeMode: true,
     });
   });
 

@@ -95,12 +95,51 @@ describe('forwardResolvedScmCapability', () => {
         provider === 'gitlab' ? 'synthetic-upstream-secret' : null
       );
       expect(request.headers.get('Authorization')).toBe(`Bearer ${alias}`);
-      const logs = JSON.stringify(logging.withFields.mock.calls);
-      for (const secret of [alias, capability, 'query-secret', 'synthetic-upstream-secret']) {
-        expect(logs).not.toContain(secret);
-      }
+      expect(logging.withFields).not.toHaveBeenCalled();
     }
   );
+
+  it.each(providers)('logs one bounded upstream failure for $provider', async fixture => {
+    const upstream = new Response('synthetic-body-secret', { status: 503 });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(upstream));
+    const response = await forwardResolvedScmCapability(
+      new Request(fixture.url),
+      { [fixture.method]: vi.fn().mockResolvedValue(fixture.result) },
+      fixture,
+      'trusted-container'
+    );
+    expect(response).toBe(upstream);
+    expect(logging.warn).toHaveBeenCalledExactlyOnceWith('Managed SCM upstream error response');
+    expect(logging.withFields).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ provider: fixture.provider, upstreamStatus: 503 })
+    );
+    const fields = JSON.stringify(logging.withFields.mock.calls);
+    for (const secret of [
+      fixture.capability,
+      'query-secret',
+      'synthetic-upstream-secret',
+      'synthetic-body-secret',
+    ]) {
+      expect(fields).not.toContain(secret);
+    }
+  });
+
+  it('keeps the GitHub quota diagnostic without logging the same response twice', async () => {
+    const fixture = providers[0];
+    const upstream = new Response(null, { status: 429 });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(upstream));
+    const response = await forwardResolvedScmCapability(
+      new Request(fixture.url),
+      { [fixture.method]: vi.fn().mockResolvedValue(fixture.result) },
+      fixture,
+      'trusted-container'
+    );
+    expect(response).toBe(upstream);
+    expect(logging.warn).toHaveBeenCalledExactlyOnceWith(
+      'Managed GitHub upstream rate-limit response'
+    );
+    expect(logging.withFields).toHaveBeenCalledOnce();
+  });
 
   it.each(providers)('fails closed for $provider without a redemption binding', async fixture => {
     const forward = vi.fn();

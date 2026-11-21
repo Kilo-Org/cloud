@@ -3,6 +3,7 @@ import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import {
+  cloudAgentPromptSchema,
   ParentCallbackTargetSchema,
   requestedEnvironmentSchema,
 } from '@kilocode/worker-utils/cloud-agent-authority';
@@ -18,6 +19,17 @@ import {
 } from '@kilocode/cloud-agent-sdk/tool-part-detail';
 import { SandboxStatusSessionIdSchema } from '@cloud-agent-shared/sandbox-status';
 import { SESSION_ID_RE } from '@cloud-agent-shared/protocol';
+import {
+  MAX_ENCRYPTED_DATA_LENGTH,
+  MAX_ENCRYPTED_DEK_LENGTH,
+  MAX_ENV_VARS,
+  MAX_RUNTIME_SKILL_COMPANION_FILES,
+  MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL,
+  mcpCommandSchema,
+  mcpEnvOrHeadersRecordSchema,
+  mcpRemoteUrlSchema,
+  mcpServersRecordSchema,
+} from '@cloud-agent-shared/prepare-session-limits';
 import { GetEgressAuditInputSchema } from '@kilocode/worker-utils/egress-audit';
 import { selectableSandboxAllocationInputSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import {
@@ -184,31 +196,14 @@ export const cloudAgentReleasePendingUploadsSchema = z.object({
   objectKeys: z.array(z.string().min(1).max(1024)).min(1).max(CLOUD_AGENT_ATTACHMENT_MAX_COUNT),
 });
 
-/**
- * Agent mode enum - all supported modes.
- * - code, plan, debug, orchestrator, ask: CLI agent modes
- * - build, architect: Backward-compatible aliases (build → code, architect → plan)
- * - custom: Custom mode (requires appendSystemPrompt)
- */
 export const messageIdNextSchema = z
   .string()
   .regex(MESSAGE_ID_PATTERN, 'Invalid message ID format');
 
-export const agentModeNextSchema = z.enum([
-  'code',
-  'plan',
-  'debug',
-  'orchestrator',
-  'ask',
-  'build',
-  'architect',
-  'custom',
-]);
-
-// Encrypted envelope shape (re-defined here to avoid importing server-only code).
+// Encrypted envelope shape (the shared limits module carries only the caps).
 const encryptedEnvelopeInputSchema = z.object({
-  encryptedData: z.string(),
-  encryptedDEK: z.string(),
+  encryptedData: z.string().max(MAX_ENCRYPTED_DATA_LENGTH),
+  encryptedDEK: z.string().max(MAX_ENCRYPTED_DEK_LENGTH),
   algorithm: z.literal('rsa-aes-256-gcm'),
   version: z.literal(1),
 });
@@ -222,8 +217,8 @@ const mcpSecretValueSchema = z.union([z.string().max(4096), encryptedEnvelopeInp
 const mcpLocalServerConfigSchema = z
   .object({
     type: z.literal('local'),
-    command: z.string().array().min(1, 'Command array must have at least one element'),
-    environment: z.record(z.string(), mcpSecretValueSchema).optional(),
+    command: mcpCommandSchema,
+    environment: mcpEnvOrHeadersRecordSchema(mcpSecretValueSchema).optional(),
     enabled: z.boolean().optional(),
     timeout: z.number().min(1).max(3_600_000).optional(),
   })
@@ -233,8 +228,8 @@ const mcpLocalServerConfigSchema = z
 const mcpRemoteServerConfigSchema = z
   .object({
     type: z.literal('remote'),
-    url: z.string().url('URL must be a valid URL format'),
-    headers: z.record(z.string(), mcpSecretValueSchema).optional(),
+    url: mcpRemoteUrlSchema,
+    headers: mcpEnvOrHeadersRecordSchema(mcpSecretValueSchema).optional(),
     enabled: z.boolean().optional(),
     timeout: z.number().min(1).max(3_600_000).optional(),
   })
@@ -250,7 +245,19 @@ export const runtimeSkillInputSchema = z.object({
     .regex(/^[a-z0-9][a-z0-9-]*$/, 'Skill name must be a slug'),
   rawMarkdown: z.string().min(1).max(runtimeSkillSchemaMax),
   /** Companion files keyed by relative path, excluding SKILL.md. */
-  files: z.record(z.string().max(200), z.string().max(runtimeSkillSchemaMax)).optional(),
+  files: z
+    .record(z.string().max(200), z.string().max(runtimeSkillSchemaMax))
+    .refine(
+      files => Object.keys(files).length <= MAX_RUNTIME_SKILL_COMPANION_FILES,
+      `A skill may have at most ${MAX_RUNTIME_SKILL_COMPANION_FILES} companion files`
+    )
+    .refine(
+      files =>
+        Object.values(files).reduce((total, content) => total + content.length, 0) <=
+        MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL,
+      `A skill's companion files may total at most ${MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL} characters`
+    )
+    .optional(),
 });
 
 /** Permission schema — mirrors the CLI's AgentConfig.permission shape. */
@@ -298,35 +305,31 @@ export const runtimeAgentInputSchema = z.object({
 });
 
 /**
- * Mode field accepted by prepare/update-session calls. Allows built-in
- * enum values plus any custom slug — cloud-agent-next cross-validates the
+ * Agent mode accepted by every cloud-agent-next call that names one: create,
+ * update, and a follow-up send. A mode is a slug, and `custom` is one of them —
+ * it selects the session's stored `appendSystemPrompt`, so a session created in
+ * it stays usable afterwards. cloud-agent-next cross-validates a non-built-in
  * slug against the session's `runtimeAgents` list.
  */
-export const preparedSessionModeSchema = z
+export const agentSessionModeSchema = z
   .string()
   .min(1)
   .max(50)
   .regex(/^[a-z][a-z0-9-]*$/, 'Mode must be a slug');
+
+/**
+ * Thinking-effort variant for a model. Variants are model- and agent-specific
+ * keys (the catalog's `opencode.variants`, or a stored profile agent's
+ * `config.variant`), so only the stored length bound applies — the catalog
+ * decides which keys exist, not this schema.
+ */
+export const agentVariantSchema = z.string().min(1).max(50);
 
 // Combined MCP server configuration schema — CLI-native local/remote format
 export const mcpServerConfigNextSchema = z.discriminatedUnion('type', [
   mcpLocalServerConfigSchema,
   mcpRemoteServerConfigSchema,
 ]);
-
-/**
- * Mode field for sendMessage. Built-in enum slugs plus any custom slug —
- * cloud-agent-next cross-validates against the session's stored runtimeAgents.
- * The reserved slug `custom` is still rejected here (requires prepare).
- */
-export const agentModeSendMessageSchema = z
-  .string()
-  .min(1)
-  .max(50)
-  .regex(/^[a-z][a-z0-9-]*$/, 'Mode must be a slug')
-  .refine(mode => mode !== 'custom', {
-    message: 'Custom mode requires prepareSession/updateSession, not sendMessage',
-  });
 
 /**
  * Discriminated execution payload for follow-up messages and prepared-session
@@ -340,25 +343,17 @@ export const sendMessageNextPayloadSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('prompt'),
     prompt: z.string().min(1).max(CLOUD_AGENT_PROMPT_MAX_LENGTH),
-    mode: agentModeSendMessageSchema,
+    mode: agentSessionModeSchema,
     model: z.string().min(1),
-    variant: z
-      .string()
-      .max(50)
-      .regex(/^[a-zA-Z]+$/)
-      .optional(),
+    variant: agentVariantSchema.optional(),
   }),
   z.object({
     type: z.literal('command'),
     command: z.string().min(1),
     arguments: z.string().max(CLOUD_AGENT_PROMPT_MAX_LENGTH).default(''),
-    mode: agentModeSendMessageSchema.optional(),
+    mode: agentSessionModeSchema.optional(),
     model: z.string().min(1).optional(),
-    variant: z
-      .string()
-      .max(50)
-      .regex(/^[a-zA-Z]+$/)
-      .optional(),
+    variant: agentVariantSchema.optional(),
   }),
 ]);
 
@@ -423,13 +418,9 @@ const PrepareSessionSharedFields = {
     .optional(),
 
   // Execution params (required)
-  mode: preparedSessionModeSchema,
+  mode: agentSessionModeSchema,
   model: z.string().min(1),
-  variant: z
-    .string()
-    .max(50)
-    .regex(/^[a-zA-Z]+$/)
-    .optional(),
+  variant: agentVariantSchema.optional(),
 
   /** The repository environment the user selected, with branches for its additional repositories. */
   requestedEnvironment: requestedEnvironmentSchema.optional(),
@@ -447,9 +438,14 @@ const PrepareSessionSharedFields = {
   profileId: z.uuid().optional(),
 
   // Optional configuration
-  envVars: z.record(z.string().max(256), z.string().max(256)).optional(),
+  envVars: z
+    .record(z.string().max(256), z.string().max(256))
+    .refine(envVars => Object.keys(envVars).length <= MAX_ENV_VARS, {
+      message: `Maximum ${MAX_ENV_VARS} environment variables allowed`,
+    })
+    .optional(),
   setupCommands: setupCommandsSchema.optional(),
-  mcpServers: z.record(z.string(), mcpServerConfigNextSchema).optional(),
+  mcpServers: mcpServersRecordSchema(mcpServerConfigNextSchema).optional(),
   runtimeSkills: z.array(runtimeSkillInputSchema).max(50).optional(),
   runtimeAgents: z.array(runtimeAgentInputSchema).max(20).optional(),
   upstreamBranch: z.string().optional(),
@@ -470,7 +466,7 @@ const PrepareSessionSharedFields = {
 };
 
 const PrepareSessionNonCloneVariant = z.object({
-  prompt: z.string().min(1).max(CLOUD_AGENT_PROMPT_MAX_LENGTH),
+  prompt: cloudAgentPromptSchema,
   initialMessageId: messageIdNextSchema.optional(),
   initialPayload: sendMessageNextPayloadSchema.optional(),
   autoInitiate: z.boolean().optional(),
@@ -540,7 +536,14 @@ export const basePrepareSessionNextSchema = z
   .refine(data => data.stackOnWorktreeId === undefined || data.upstreamBranch === undefined, {
     message: 'A stacked workspace cannot use an upstream branch',
     path: ['upstreamBranch'],
-  });
+  })
+  .refine(
+    data => data.initialPayload?.type !== 'prompt' || data.initialPayload.prompt.trim().length > 0,
+    {
+      message: 'Prompt is required',
+      path: ['initialPayload', 'prompt'],
+    }
+  );
 
 export const personalPrepareSessionNextSchema = basePrepareSessionNextSchema
   .and(
@@ -986,6 +989,12 @@ export const baseGetSessionNextOutputSchema = z.object({
   githubRepo: z.string().optional(),
   gitUrl: z.string().optional(),
   platform: z.enum(['github', 'gitlab', 'bitbucket']).optional(),
+  /** The GitHub connection this session's repository was prepared with. */
+  githubIntegrationId: z.string().optional(),
+  /** The Bitbucket workspace that owns this session's repository. */
+  bitbucketWorkspaceUuid: z.string().optional(),
+  /** The Bitbucket repository this session was prepared for. */
+  bitbucketRepositoryUuid: z.string().optional(),
 
   // Execution params
   prompt: z.string().optional(),
@@ -1034,6 +1043,12 @@ export const baseGetSessionNextOutputSchema = z.object({
   // Versioning
   timestamp: z.number(),
   version: z.number(),
+
+  /** Durability watermark: newest persisted event ID from the session event log. */
+  latestEventId: z.number().int().positive().nullable().optional(),
+
+  // `updateCursor` from the Worker's event log is deliberately NOT projected:
+  // no web consumer reads it, and it is an internal log offset.
 });
 
 // Schema for answering a question

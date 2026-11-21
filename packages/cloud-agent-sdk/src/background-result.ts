@@ -27,6 +27,16 @@ export const backgroundResultSchema = z.discriminatedUnion('kind', [
 ]);
 export type BackgroundResult = z.infer<typeof backgroundResultSchema>;
 
+// `satisfies Record<BackgroundResult['kind'], string>` turns a new union kind into a
+// compile error until it names its wire tool; these are the wire values the reader accepts.
+const BACKGROUND_RESULT_TOOL_NAMES = {
+  shell: 'background_shell_result',
+  subagent: 'background_subagent_result',
+  notice: 'agent_notice',
+} satisfies Record<BackgroundResult['kind'], string>;
+
+const BACKGROUND_RESULT_TOOLS = new Set<string>(Object.values(BACKGROUND_RESULT_TOOL_NAMES));
+
 export function backgroundOutcome(
   input:
     | { kind: 'shell'; state: string; exit?: number | undefined }
@@ -45,15 +55,12 @@ export function backgroundOutcome(
 
 export function backgroundResultLabel(result: BackgroundResult): string {
   if (result.kind === 'notice') return 'Agent notice';
-  const name = result.kind === 'shell' ? 'Shell' : result.agent || 'Agent';
+  const name = result.kind === 'shell' ? 'Shell' : result.agent || 'Subagent';
   return `${name.charAt(0).toUpperCase()}${name.slice(1)} ${result.outcome === 'unknown' ? 'ended' : result.outcome}`;
 }
 
 export function readBackgroundResult(part: ToolPart): BackgroundResult | undefined {
-  if (
-    !['background_shell_result', 'background_subagent_result', 'agent_notice'].includes(part.tool)
-  )
-    return;
+  if (!BACKGROUND_RESULT_TOOLS.has(part.tool)) return;
   if (part.state.status === 'pending') return;
   const parsed = backgroundResultSchema.safeParse(part.state.metadata?.['backgroundResult']);
   return parsed.success ? parsed.data : undefined;
@@ -63,6 +70,7 @@ export function projectBackgroundResult(
   message: Kilo2Message,
   result: BackgroundResult
 ): Kilo2Message {
+  const metadata = z.record(z.string(), z.unknown()).safeParse(message['metadata']);
   return {
     ...message,
     type: 'assistant',
@@ -71,12 +79,12 @@ export function projectBackgroundResult(
       {
         type: 'tool',
         id: message.id,
-        name: result.kind === 'notice' ? 'agent_notice' : `background_${result.kind}_result`,
+        name: BACKGROUND_RESULT_TOOL_NAMES[result.kind],
         time: { created: message.time.created, completed: message.time.created },
         state: {
           input: {},
           metadata: {
-            ...z.record(z.string(), z.unknown()).parse(message['metadata']),
+            ...(metadata.success ? metadata.data : {}),
             backgroundResult: result,
           },
           content: [{ type: 'text', text: result.output }],

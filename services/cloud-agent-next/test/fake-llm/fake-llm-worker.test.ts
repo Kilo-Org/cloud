@@ -390,9 +390,9 @@ describe('deployed fake llm worker', () => {
     expect(await drain(await chat('__fake__:echo:nope', ADMIN_TOKEN()))).toBe(401);
   });
 
-  it('rejects a policy-bearing model token', async () => {
-    const policyBearer = signToken({ tokenPurpose: 'human-api', credentialExchange: false });
-    expect(await drain(await chat('__fake__:echo:nope', policyBearer))).toBe(401);
+  it('rejects an organization-scoped model token', async () => {
+    const organizationBearer = signToken({ organizationId: 'org_e2e' });
+    expect(await drain(await chat('__fake__:echo:nope', organizationBearer))).toBe(401);
   });
 
   it('keeps the model credential out of /test/* and the admin token out of the model routes', async () => {

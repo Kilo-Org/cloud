@@ -6,7 +6,6 @@ import { FlashList } from '@shopify/flash-list';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   DiffFontMetricsContext,
@@ -17,7 +16,11 @@ import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { formatNumber } from '@/lib/format';
-import { useDetailScreenBottomPadding, useSideInsetStyle } from '@/lib/screen-insets';
+import {
+  useDetailScreenBottomPadding,
+  useSideInsetMarginStyle,
+  useSideInsetStyle,
+} from '@/lib/screen-insets';
 import { buildFileItems } from '@/lib/pr-review/diff/pr-diff-list-builder';
 import { itemTypeFor } from '@/lib/pr-review/diff/pr-diff-list-items';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
@@ -34,7 +37,7 @@ export function SessionDiffFileList({ files }: Readonly<{ files: PrReviewFile[] 
   const diffFontMetrics = useBoundedDiffFontMetrics();
   const bottomPadding = useDetailScreenBottomPadding();
   const sideInsetStyle = useSideInsetStyle();
-  const insets = useSafeAreaInsets();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
     files.length <= AUTO_EXPAND_MAX_FILES
       ? Object.fromEntries(files.map(file => [file.path, true]))
@@ -53,10 +56,12 @@ export function SessionDiffFileList({ files }: Readonly<{ files: PrReviewFile[] 
   );
   const stickyHeaderIndices = useMemo(() => stickyFileHeaderIndices(items), [items]);
   const renderItem = useDiffRenderItem({ source: 'session', setExpanded });
-  const contentContainerStyle = useMemo(
-    () => ({ paddingBottom: bottomPadding, paddingLeft: insets.left, paddingRight: insets.right }),
-    [bottomPadding, insets.left, insets.right]
-  );
+  // A file header row is a sticky header, and FlashList paints sticky headers in
+  // an overlay that is a sibling of the scroller, so the side insets cannot ride
+  // on `contentContainerStyle` — the padding narrows the scroller but not the
+  // overlay, and the header rows keep painting at the window edge. Margins on
+  // the list's own style narrow the box both of them sit in.
+  const contentContainerStyle = useMemo(() => ({ paddingBottom: bottomPadding }), [bottomPadding]);
 
   const totals = useMemo(() => {
     let additions = 0;
@@ -104,6 +109,7 @@ export function SessionDiffFileList({ files }: Readonly<{ files: PrReviewFile[] 
           maintainVisibleContentPosition={{ disabled: true }}
           // Re-measure rows when the bounded font scale changes.
           extraData={diffFontMetrics.scale}
+          style={sideInsetMarginStyle}
           contentContainerStyle={contentContainerStyle}
           ItemSeparatorComponent={null}
         />

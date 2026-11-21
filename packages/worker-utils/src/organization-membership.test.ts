@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { hasOrganizationAccess } from './organization-membership.js';
+import {
+  findEffectiveOrganizationMemberRole,
+  hasOrganizationAccess,
+} from './organization-membership.js';
 
 type MembershipFixture = { kind: 'member' } | { kind: 'non-member' } | { kind: 'soft-deleted' };
 
@@ -20,6 +23,28 @@ function createMembershipDb(fixture: MembershipFixture) {
 
   return { select, from, innerJoin, where, limit, rows };
 }
+
+describe('findEffectiveOrganizationMemberRole', () => {
+  it('reads both roles in one statement and applies the role priority', async () => {
+    const limit = vi.fn(async () => [{ directRole: 'member', inheritedRole: 'owner' }]);
+    const where = vi.fn(() => ({ limit }));
+    const leftJoin = vi.fn((): { leftJoin: unknown; where: unknown } => ({ leftJoin, where }));
+    const from = vi.fn(() => ({ leftJoin }));
+    const select = vi.fn(() => ({ from }));
+    const db = { select, from, leftJoin, where, limit };
+
+    await expect(
+      findEffectiveOrganizationMemberRole(db as never, {
+        kiloUserId: 'usr_1',
+        organizationId: 'org_1',
+      })
+    ).resolves.toBe('owner');
+
+    expect(db.select).toHaveBeenCalledOnce();
+    expect(db.leftJoin).toHaveBeenCalledTimes(3);
+    expect(db.limit).toHaveBeenCalledWith(1);
+  });
+});
 
 describe('hasOrganizationAccess', () => {
   it('returns true when the user has a direct membership in a live org', async () => {

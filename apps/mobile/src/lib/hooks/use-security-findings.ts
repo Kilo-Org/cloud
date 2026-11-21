@@ -4,9 +4,10 @@ import {
   isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner-native';
 
 import { trackSecurityAgentCommand } from '@/lib/hooks/use-security-agent-commands';
+import { announceTrialRefusal } from '@/lib/refusal-toast';
+import { isTrialExpiredRefusal } from '@/lib/server-error-copy';
 import {
   localizedSecurityMarkerMessage,
   mapSecurityDismissOperationError,
@@ -14,8 +15,10 @@ import {
 } from '@/lib/security-agent-ledger';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import { reconcileFirstPage, withInfiniteRetention } from '@/lib/query/infinite-retention';
+import { usePausedReadRetry } from '@/lib/query/retry-paused-read';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { type SecurityAnalysis } from '@/lib/security-agent';
+import { useBillingAction, useCanManageBilling } from '@/lib/trial-refusal';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 // Personal and org procedures resolve to nominally distinct tRPC option
@@ -84,6 +87,15 @@ export function useSecurityFinding(scope: string, id: string) {
   return isPersonalSecurityScope(scope) ? personal : organization;
 }
 
+/** Deliberate retry for the one paused finding read, keyed exactly as above. */
+export function useRetrySecurityFinding(scope: string, id: string) {
+  const trpc = useTRPC();
+  const queryKey = isPersonalSecurityScope(scope)
+    ? trpc.securityAgent.getFinding.queryKey({ id })
+    : trpc.organizations.securityAgent.getFinding.queryKey({ organizationId: scope, id });
+  return usePausedReadRetry(queryKey);
+}
+
 const ANALYSIS_POLL_INTERVAL_MS = 3000;
 
 // Poll only while there's something in flight: analysis still running, or a
@@ -99,11 +111,16 @@ function isSecurityAnalysisActive(data: SecurityAnalysis | undefined): boolean {
   return data.remediationAttempts.some(attempt => isActiveRemediationStatus(attempt.status));
 }
 
-export function useSecurityAnalysis(scope: string, findingId: string) {
+/**
+ * The finding's analysis. Pass `enabled: false` while no surface reads it: the
+ * query polls every `ANALYSIS_POLL_INTERVAL_MS` while a run is active, so an
+ * idle tab must not keep it awake.
+ */
+export function useSecurityAnalysis(scope: string, findingId: string, enabled = true) {
   const trpc = useTRPC();
   const personal = useQuery({
     ...trpc.securityAgent.getAnalysis.queryOptions({ findingId }),
-    enabled: isPersonalSecurityScope(scope),
+    enabled: enabled && isPersonalSecurityScope(scope),
     refetchInterval: query =>
       isSecurityAnalysisActive(query.state.data) ? ANALYSIS_POLL_INTERVAL_MS : false,
   });
@@ -112,7 +129,7 @@ export function useSecurityAnalysis(scope: string, findingId: string) {
       organizationId: scope,
       findingId,
     }),
-    enabled: !isPersonalSecurityScope(scope),
+    enabled: enabled && !isPersonalSecurityScope(scope),
     refetchInterval: query =>
       isSecurityAnalysisActive(query.state.data) ? ANALYSIS_POLL_INTERVAL_MS : false,
   });
@@ -142,6 +159,9 @@ export function dismissFindingIntentFingerprint(
 export function useDismissSecurityFinding(scope: string) {
   const queryClient = useQueryClient();
   const { getKey, rotateKey } = useHoistedOperationKey();
+  // The scope is the organization id for an organization scope, so the
+  // dismissal's copy follows this reader's role in the organization it acts on.
+  const canManageBilling = useCanManageBilling(scope);
   return useMutation({
     mutationFn: async (
       vars: Parameters<typeof trpcClient.securityAgent.dismissFinding.mutate>[0]
@@ -163,7 +183,7 @@ export function useDismissSecurityFinding(scope: string) {
         }
         // Map the raw `operation_in_progress` CONFLICT marker onto retryable
         // dismissal copy before the form renders it inline (P2).
-        throw mapSecurityDismissOperationError(error);
+        throw mapSecurityDismissOperationError(error, canManageBilling);
       }
     },
     onSuccess: result => {
@@ -177,6 +197,11 @@ export function useDismissSecurityFinding(scope: string) {
 export function useStartSecurityAnalysis(scope: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  // The scope is the organization id in an organization scope, so the
+  // rejection's copy and the step it offers follow this reader's role in the
+  // organization the analysis runs under.
+  const canManageBilling = useCanManageBilling(scope);
+  const billingAction = useBillingAction(scope);
   return useMutation({
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: Parameters<typeof trpcClient.securityAgent.startAnalysis.mutate>[0]) =>
@@ -188,7 +213,13 @@ export function useStartSecurityAnalysis(scope: string) {
             forceSandbox: true,
           }),
     onError: error => {
-      toast.error(localizedSecurityMarkerMessage(error) ?? error.message);
+      // The marker copy already follows this reader; only the trial refusal
+      // adds the plan step, and only for a role that can take it.
+      announceTrialRefusal(
+        localizedSecurityMarkerMessage(error, canManageBilling) ?? error.message,
+        billingAction,
+        isTrialExpiredRefusal(error)
+      );
     },
     onSuccess: async (result, vars) => {
       if (result.commandId) {

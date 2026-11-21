@@ -16,9 +16,9 @@ import {
   getCustomPricing,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
-  getModelDisplayPricing,
+  getWorstCaseModelPricing,
   type EndpointPricing,
 } from './providers/openrouter/display-pricing';
 import type { OpenRouterProviderConfig } from './providers/openrouter/types';
@@ -27,6 +27,10 @@ import {
   mapResolvedModelIdToVercel,
 } from './providers/vercel/mapModelIdToVercel';
 import { applyCustomPricingToPricing } from './custom-pricing';
+import {
+  getVercelPricingMetadata,
+  type VercelPricingMetadata,
+} from './providers/gateway-endpoint-pricing';
 
 type RateTier = {
   start_context_length: number;
@@ -82,6 +86,7 @@ function pickerRequestPrice(
   models: GatewayModelMap,
   catalog: OpenRouterModel[],
   preferredProviderOrderConfig: PreferredProviderOrderConfig,
+  vercelPricingMetadata: VercelPricingMetadata,
   customPricingConfig: CustomPricingConfig,
   inputTokenCeiling: number
 ): TextPricingRates {
@@ -91,7 +96,15 @@ function pickerRequestPrice(
   const pickerPricing = applyCustomPricingToPricing(
     customPricingConfig,
     model.id,
-    extra ? model.pricing : pickerModelPricing(model, models, preferredProviderOrderConfig)
+    extra
+      ? model.pricing
+      : pickerModelPricing(
+          model,
+          models,
+          preferredProviderOrderConfig,
+          vercelPricingMetadata,
+          'worstCase'
+        )
   );
   return applyTieredPricingRates(
     modelId,
@@ -317,13 +330,19 @@ export async function enforceRequestCostLimit(
   const parsed = boundedRequestSchema.safeParse(body);
   if (!parsed.success) return refused(boundedRefusal(parsed.error));
   try {
-    const [models, rawCatalog, preferredProviderOrderConfig, customPricingConfig] =
-      await Promise.all([
-        getOpenRouterModelsMetadataFromDatabase(),
-        getRawOpenRouterModels(),
-        getPreferredProviderOrderConfig(),
-        getCustomPricingConfig(),
-      ]);
+    const [
+      models,
+      rawCatalog,
+      preferredProviderOrderConfig,
+      customPricingConfig,
+      vercelPricingMetadata,
+    ] = await Promise.all([
+      getOpenRouterModelsMetadataFromDatabase(),
+      getRawOpenRouterModels(),
+      getPreferredProviderOrderConfig(),
+      getCustomPricingConfig(),
+      getVercelPricingMetadata(),
+    ]);
     const requestedMetadata = Object.hasOwn(models, model) ? models[model] : undefined;
     const aliasTarget = model.startsWith('~') ? requestedMetadata?.alias_target?.slug : undefined;
     const targetCatalogEntry = aliasTarget
@@ -341,6 +360,7 @@ export async function enforceRequestCostLimit(
     if (
       aliasTarget &&
       parsed.data.model !== model &&
+      parsed.data.model !== aliasTarget &&
       parsed.data.model !==
         mapResolvedModelIdToVercel(aliasTarget, await getVercelModelIdOverrides())
     )
@@ -352,6 +372,7 @@ export async function enforceRequestCostLimit(
       models,
       rawCatalog.data,
       preferredProviderOrderConfig,
+      vercelPricingMetadata,
       customPricingConfig,
       inputTokenCeiling
     );
@@ -361,6 +382,7 @@ export async function enforceRequestCostLimit(
           models,
           rawCatalog.data,
           preferredProviderOrderConfig,
+          vercelPricingMetadata,
           customPricingConfig,
           inputTokenCeiling
         )
@@ -439,7 +461,7 @@ function storedModelWorstRates(
   const routes = worstRates(
     metadata.endpoints.flatMap(endpoint => [
       pricedRates(endpoint.pricing),
-      pricedRates(getModelDisplayPricing(endpoint.pricing)),
+      pricedRates(getWorstCaseModelPricing(endpoint.pricing)),
     ])
   );
   const tiers = worstRates(

@@ -13,7 +13,7 @@ import { QueryError, type QueryErrorVariant } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { buildCreditHistoryItems, type CreditHistoryItem } from '@/lib/credits/credit-history';
@@ -22,30 +22,18 @@ import {
   useCreditPurchaseHistory,
   usePersonalCreditBlocks,
 } from '@/lib/hooks/use-personal-credits';
+import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { trpcErrorVariant } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
 
-// FlashList takes `contentContainerStyle` (no className), so the FlatList's
-// `grow gap-3 px-6 pt-4` content classes map to their pixel values. FlashList v2
-// positions every cell absolutely and has no `gap` handling (2.3.2 ships zero
-// `gap` references), so the 12px inter-row gap rides on the measured item
-// separator instead of `contentContainerStyle.gap`.
+// FlashList takes `contentContainerStyle` (no className), so the flat list's
+// rows draw their own 14pt gutter and 0.5pt hairline instead of the content
+// container carrying a page inset.
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = {
-  flexGrow: 1,
-  paddingHorizontal: 24,
-  paddingTop: 16,
-} satisfies ViewStyle;
+const listContentContainerStyle = { flexGrow: 1 } satisfies ViewStyle;
 
-const HistoryRowSeparator = () => <View className="h-3" />;
-
-function HistoryRowSkeleton() {
-  return (
-    <View className="gap-1.5 rounded-lg bg-secondary p-3">
-      <Skeleton className="h-4 w-40 rounded" />
-      <Skeleton className="h-3 w-24 rounded" />
-    </View>
-  );
+function HistoryRowSkeleton({ last }: Readonly<{ last: boolean }>) {
+  return <RowSkeleton subtitle last={last} />;
 }
 
 /**
@@ -95,17 +83,22 @@ export function PersonalCreditHistoryScreen() {
     : null;
 
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<CreditHistoryItem>) =>
+    ({ item, index }: ListRenderItemInfo<CreditHistoryItem>) =>
       item.kind === 'purchase' ? (
         <PurchaseHistoryRow
           entry={item.entry}
           isOpeningReceipt={openingReceiptId === item.entry.id}
           onOpenReceipt={openReceipt}
+          last={index === items.length - 1}
         />
       ) : (
-        <LedgerHistoryRow deduction={item.deduction} grantListed={item.grantListed} />
+        <LedgerHistoryRow
+          deduction={item.deduction}
+          grantListed={item.grantListed}
+          last={index === items.length - 1}
+        />
       ),
-    [openReceipt, openingReceiptId]
+    [openReceipt, openingReceiptId, items.length]
   );
 
   const purchasesFirstPageError = purchases.query.isError && purchases.entries.length === 0;
@@ -139,10 +132,10 @@ export function PersonalCreditHistoryScreen() {
   let body: ReactNode = null;
   if (isLoading) {
     body = (
-      <Animated.View exiting={FadeOut.duration(150)} className="gap-3 px-6 pt-4">
-        <HistoryRowSkeleton />
-        <HistoryRowSkeleton />
-        <HistoryRowSkeleton />
+      <Animated.View exiting={FadeOut.duration(150)}>
+        <HistoryRowSkeleton last={false} />
+        <HistoryRowSkeleton last={false} />
+        <HistoryRowSkeleton last />
       </Animated.View>
     );
   } else if (isFirstPageError) {
@@ -166,9 +159,16 @@ export function PersonalCreditHistoryScreen() {
   } else {
     const footer = (
       <View className="pt-3">
+        {purchases.isRetentionLimited && !isLaterPageError && !purchases.hasMore && (
+          <View className="items-center gap-3 px-4 py-4">
+            <Text variant="caption" className="text-center">
+              {t('credits.history.retentionLimit')}
+            </Text>
+          </View>
+        )}
         {purchases.hasMore && !isLaterPageError && (
-          <View className="items-center gap-3 px-6 py-4">
-            <Text variant="muted" className="text-center text-xs">
+          <View className="items-center gap-3 px-4 py-4">
+            <Text variant="caption" className="text-center">
               {t('organization.creditActivity.truncated')}
             </Text>
             <Button
@@ -183,8 +183,8 @@ export function PersonalCreditHistoryScreen() {
           </View>
         )}
         {isLaterPageError && (
-          <View className="items-center gap-3 px-6 py-4">
-            <Text variant="muted" className="text-center text-xs">
+          <View className="items-center gap-3 px-4 py-4">
+            <Text variant="caption" className="text-center">
               {t('common.couldnTLoadMore')}
             </Text>
             <Button
@@ -200,8 +200,8 @@ export function PersonalCreditHistoryScreen() {
           </View>
         )}
         {ledgerFailed && (
-          <View className="items-center gap-3 px-6 py-4">
-            <Text variant="muted" className="text-center text-xs">
+          <View className="items-center gap-3 px-4 py-4">
+            <Text variant="caption" className="text-center">
               {t('credits.history.activityUnavailable')}
             </Text>
             <Button
@@ -230,7 +230,6 @@ export function PersonalCreditHistoryScreen() {
           keyExtractor={item => item.key}
           renderItem={renderItem}
           getItemType={item => item.kind}
-          ItemSeparatorComponent={HistoryRowSeparator}
           contentContainerStyle={listContentContainerStyle}
           ListFooterComponent={footer}
         />
@@ -240,7 +239,7 @@ export function PersonalCreditHistoryScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('common.creditHistory')} />
+      <ScreenHeader title={t('common.creditHistory')} backFallback={PROFILE_TAB_HREF} />
       {body}
     </View>
   );

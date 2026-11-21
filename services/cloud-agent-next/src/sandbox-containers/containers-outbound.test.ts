@@ -13,17 +13,32 @@ vi.mock('../sandbox-outbound.js', () => ({
 }));
 
 import { handleManagedScmOutbound } from '../sandbox-outbound.js';
+import { createControlPlaneCredential } from '../sandbox-control/managed-credential.js';
 import { ContainersOutbound, type ContainersOutboundProps } from './containers-outbound.js';
+import type { getSentryConfig } from '../shared/sentry.js';
+import {
+  RUNTIME_PROXY_ORIGIN_HEADER,
+  runtimeProxyOriginProof,
+} from '../runtime-credential-proxy-origin.js';
 
-function outbound(props: ContainersOutboundProps, env: Partial<Cloudflare.Env> = {}) {
+function outbound(
+  props: ContainersOutboundProps,
+  env: Partial<Cloudflare.Env> & Parameters<typeof getSentryConfig>[0] = {}
+) {
   return new ContainersOutbound(
     { props } as ExecutionContext<ContainersOutboundProps>,
-    env as Cloudflare.Env
+    env as Cloudflare.Env & Parameters<typeof getSentryConfig>[0]
   );
 }
 
+const sentry = {
+  CLOUD_AGENT_SENTRY_DSN: 'https://0123456789abcdef@o123.ingest.sentry.io/456',
+  CLOUD_AGENT_SENTRY_ENVIRONMENT: 'production',
+};
+
 afterEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 
@@ -42,6 +57,70 @@ function auditFixture() {
 }
 
 describe('ContainersOutbound egress enforcement', () => {
+  it('denies a blocked destination before resolving a network secret', async () => {
+    const { props, env, recordEgressRequest } = auditFixture();
+    const resolveCredential = vi.fn();
+    const sandboxControl = {
+      getByName: () => ({ resolveCredential }),
+    } as unknown as Cloudflare.Env['SANDBOX_CONTROL'];
+    const alias = createControlPlaneCredential('ses-audit', 'secret');
+
+    const response = await outbound(props, { ...env, SANDBOX_CONTROL: sandboxControl }).fetch(
+      new Request('https://outside.test/', { headers: { authorization: `Bearer ${alias}` } })
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.text()).toBe('Egress destination disallowed');
+    expect(resolveCredential).not.toHaveBeenCalled();
+    expect(handleManagedScmOutbound).not.toHaveBeenCalled();
+    expect(recordEgressRequest).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ hostname: 'outside.test', decision: 'denied' })
+    );
+  });
+
+  it.each([true, false])(
+    'commits both credential decisions in one audit call (available: %s)',
+    async available => {
+      const { props, env, recordEgressRequest } = auditFixture();
+      const first = createControlPlaneCredential('ses-audit', 'secret');
+      const second = createControlPlaneCredential('ses-audit', 'secret');
+      const resolveCredential = async ({ credential }: { credential: string }) => ({
+        type: 'network',
+        key: credential === first ? 'FIRST' : 'SECOND',
+        value: 'synthetic-upstream-value',
+        allowedHosts: ['example.com'],
+        locations: ['header'],
+      });
+      const sandboxControl = {
+        getByName: () => ({ resolveCredential }),
+      } as unknown as Cloudflare.Env['SANDBOX_CONTROL'];
+      const upstream = vi.fn(async () => new Response('forwarded'));
+      vi.stubGlobal('fetch', upstream);
+      recordEgressRequest.mockImplementation(async () => {
+        expect(upstream).not.toHaveBeenCalled();
+        if (!available) throw new Error('Synthetic audit failure');
+      });
+
+      const response = await outbound(props, { ...env, SANDBOX_CONTROL: sandboxControl }).fetch(
+        new Request('https://example.com/', { headers: { 'x-first': first, 'x-second': second } })
+      );
+
+      expect(response.status).toBe(available ? 200 : 502);
+      expect(recordEgressRequest).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          decision: 'allowed',
+          credentialDecisions: [
+            { credentialKey: 'FIRST', credentialDecision: 'substituted' },
+            { credentialKey: 'SECOND', credentialDecision: 'substituted' },
+          ],
+        })
+      );
+      expect(JSON.stringify(recordEgressRequest.mock.calls)).not.toMatch(
+        /kcp1\.|synthetic-upstream-value/
+      );
+      expect(upstream).toHaveBeenCalledTimes(available ? 1 : 0);
+    }
+  );
   it.each([undefined, false])(
     'does not write audit records when opted out: %s',
     async egressAudit => {
@@ -347,6 +426,170 @@ describe('ContainersOutbound egress enforcement', () => {
     expect(handleManagedScmOutbound).not.toHaveBeenCalled();
   });
 
+  it('allows only the trusted Sentry envelope endpoint without extending the pinned allowlist', async () => {
+    const egressAllowlist: string[] = [];
+    const request = new Request(
+      'https://o123.ingest.sentry.io/api/456/envelope/?sentry_version=7&sentry_key=0123456789abcdef',
+      { method: 'POST', headers: { Host: 'evil.test' }, body: 'envelope' }
+    );
+
+    const response = await outbound({ containerId: 'container-1', egressAllowlist }, sentry).fetch(
+      request
+    );
+
+    expect(response.status).toBe(200);
+    expect(egressAllowlist).toEqual([]);
+    const forwarded = vi.mocked(handleManagedScmOutbound).mock.calls[0]?.[0];
+    expect(forwarded?.url).toBe(request.url);
+    expect(forwarded?.redirect).toBe('manual');
+    expect(forwarded?.headers.get('Host')).toBe('o123.ingest.sentry.io');
+    expect(await forwarded?.text()).toBe('envelope');
+  });
+
+  it.each([
+    ['POST', 'https://o123.ingest.sentry.io/api/456/envelope/?sentry_key=secret', 'allowed', 200],
+    ['GET', 'https://o123.ingest.sentry.io/api/456/envelope/?sentry_key=secret', 'denied', 403],
+    ['POST', 'https://o123.ingest.sentry.io/api/123/envelope/?sentry_key=secret', 'denied', 403],
+  ])('audits the final telemetry decision: %s %s', async (method, url, decision, status) => {
+    const { props, env, recordEgressRequest } = auditFixture();
+    recordEgressRequest.mockImplementationOnce(async () => {
+      expect(handleManagedScmOutbound).not.toHaveBeenCalled();
+    });
+
+    const response = await outbound({ ...props, egressAllowlist: [] }, { ...env, ...sentry }).fetch(
+      new Request(url, { method, headers: { Authorization: 'Bearer secret' } })
+    );
+
+    expect(response.status).toBe(status);
+    expect(recordEgressRequest).toHaveBeenCalledOnce();
+    expect(recordEgressRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ hostname: 'o123.ingest.sentry.io', method, decision })
+    );
+    expect(JSON.stringify(recordEgressRequest.mock.calls)).not.toMatch(
+      /secret|envelope|sentry_key/
+    );
+    expect(handleManagedScmOutbound).toHaveBeenCalledTimes(decision === 'allowed' ? 1 : 0);
+  });
+
+  it('does not let trusted telemetry bypass audit persistence failures', async () => {
+    const { props, env, recordEgressRequest } = auditFixture();
+    recordEgressRequest.mockRejectedValue(Object.assign(new Error('secret'), { retryable: true }));
+
+    const response = await outbound({ ...props, egressAllowlist: [] }, { ...env, ...sentry }).fetch(
+      new Request('https://o123.ingest.sentry.io/api/456/envelope/', { method: 'POST' })
+    );
+
+    expect(response.status).toBe(502);
+    expect(await response.text()).toBe('Egress audit unavailable');
+    expect(recordEgressRequest).toHaveBeenCalledTimes(3);
+    expect(handleManagedScmOutbound).not.toHaveBeenCalled();
+  });
+
+  it('derives the telemetry exception from the configured host and project', async () => {
+    const worker = outbound(
+      { containerId: 'container-1', egressAllowlist: [] },
+      { CLOUD_AGENT_SENTRY_DSN: 'https://anotherkey@telemetry.example.com/789' }
+    );
+    const response = await worker.fetch(
+      new Request('https://telemetry.example.com/api/789/envelope/', { method: 'POST' })
+    );
+    expect(response.status).toBe(200);
+    const originalDestination = await worker.fetch(
+      new Request('https://o123.ingest.sentry.io/api/456/envelope/', { method: 'POST' })
+    );
+    expect(originalDestination.status).toBe(403);
+    expect(handleManagedScmOutbound).toHaveBeenCalledOnce();
+  });
+
+  it('rejects URL credentials on the trusted telemetry endpoint', async () => {
+    const response = await outbound(
+      { containerId: 'container-1', egressAllowlist: [] },
+      sentry
+    ).fetch({
+      url: 'https://user:secret@o123.ingest.sentry.io/api/456/envelope/',
+      method: 'POST',
+    } as Request);
+
+    expect(response.status).toBe(403);
+    expect(handleManagedScmOutbound).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['GET', 'https://o123.ingest.sentry.io/api/456/envelope/'],
+    ['PUT', 'https://o123.ingest.sentry.io/api/456/envelope/'],
+    ['POST', 'http://o123.ingest.sentry.io/api/456/envelope/'],
+    ['POST', 'https://o123.ingest.sentry.io:8443/api/456/envelope/'],
+    ['POST', 'https://o124.ingest.sentry.io/api/456/envelope/'],
+    ['POST', 'https://sub.o123.ingest.sentry.io/api/456/envelope/'],
+    ['POST', 'https://evil.test/api/456/envelope/'],
+    ['POST', 'https://o123.ingest.sentry.io/api/123/envelope/'],
+    ['POST', 'https://o123.ingest.sentry.io/api/456/store/'],
+    ['POST', 'https://o123.ingest.sentry.io/api/456/envelope'],
+    ['POST', 'https://o123.ingest.sentry.io/api/456/envelope/extra'],
+    ['POST', 'https://o123.ingest.sentry.io/'],
+  ])('does not broaden egress with telemetry enabled: %s %s', async (method, url) => {
+    const response = await outbound(
+      { containerId: 'container-1', egressAllowlist: [] },
+      sentry
+    ).fetch(new Request(url, { method, headers: { Host: 'o123.ingest.sentry.io' } }));
+
+    expect(response.status).toBe(403);
+    expect(handleManagedScmOutbound).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {},
+    { CLOUD_AGENT_SENTRY_DSN: 'http://key@o123.ingest.sentry.io/456' },
+    { CLOUD_AGENT_SENTRY_DSN: 'invalid' },
+    { CLOUD_AGENT_SENTRY_DSN: 'https://key@o123.ingest.sentry.io/not-a-project' },
+  ])('fails closed without valid trusted telemetry configuration: %j', async configuration => {
+    const response = await outbound(
+      { containerId: 'container-1', egressAllowlist: [] },
+      configuration
+    ).fetch(
+      new Request('https://o123.ingest.sentry.io/api/456/envelope/', {
+        method: 'POST',
+        headers: { CLOUD_AGENT_SENTRY_DSN: sentry.CLOUD_AGENT_SENTRY_DSN },
+      })
+    );
+
+    expect(response.status).toBe(403);
+    expect(handleManagedScmOutbound).not.toHaveBeenCalled();
+  });
+
+  it('does not follow a redirect from the trusted telemetry endpoint', async () => {
+    vi.mocked(handleManagedScmOutbound).mockImplementationOnce(async request => {
+      expect(request.redirect).toBe('manual');
+      return new Response(null, { status: 302, headers: { Location: 'https://evil.test/' } });
+    });
+
+    const response = await outbound(
+      { containerId: 'container-1', egressAllowlist: [] },
+      sentry
+    ).fetch(new Request('https://o123.ingest.sentry.io/api/456/envelope/', { method: 'POST' }));
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get('Location')).toBe('https://evil.test/');
+    expect(handleManagedScmOutbound).toHaveBeenCalledOnce();
+
+    const redirected = await outbound(
+      { containerId: 'container-1', egressAllowlist: [] },
+      sentry
+    ).fetch(new Request('https://evil.test/', { method: 'POST' }));
+    expect(redirected.status).toBe(403);
+    expect(handleManagedScmOutbound).toHaveBeenCalledOnce();
+  });
+
+  it('does not let telemetry bypass invalid pinned policy props', async () => {
+    const response = await outbound(
+      { containerId: 'container-1', egressAllowlist: ['*'] },
+      sentry
+    ).fetch(new Request('https://o123.ingest.sentry.io/api/456/envelope/', { method: 'POST' }));
+
+    expect(response.status).toBe(502);
+    expect(handleManagedScmOutbound).not.toHaveBeenCalled();
+  });
+
   it.each(
     [null, ['*'], ['127.0.0.1'], 'example.com'].map(egressAllowlist => ({ egressAllowlist }))
   )('fails closed for invalid runtime props: %j', async ({ egressAllowlist }) => {
@@ -392,4 +635,52 @@ describe('ContainersOutbound egress enforcement', () => {
     expect(response.status).toBe(502);
     expect(handleManagedScmOutbound).not.toHaveBeenCalled();
   });
+});
+
+describe('ContainersOutbound runtime proxy origin', () => {
+  const env = {
+    NEXTAUTH_SECRET: 'origin-test-secret',
+    WORKER_URL: 'https://control.example.com',
+  } as unknown as Cloudflare.Env;
+
+  async function forwardedHeader(url: string): Promise<string | null | undefined> {
+    await outbound({ containerId: 'container-1' }, env).fetch(
+      new Request(url, { headers: { [RUNTIME_PROXY_ORIGIN_HEADER]: 'forged' } })
+    );
+    return vi
+      .mocked(handleManagedScmOutbound)
+      .mock.calls[0]?.[0].headers.get(RUNTIME_PROXY_ORIGIN_HEADER);
+  }
+
+  it('replaces a sandbox-supplied proof with this container proof for the facade', async () => {
+    const expected = await runtimeProxyOriginProof(env, 'container-1');
+    expect(expected).toEqual(expect.any(String));
+    expect(await forwardedHeader('https://control.example.com/api/profile')).toBe(expected);
+    expect(await runtimeProxyOriginProof(env, 'container-2')).not.toBe(expected);
+  });
+
+  it('replaces the proof before sending Session Sync uploads through the binding', async () => {
+    const sessionSync = vi.fn(async (_request: Request) => new Response('synced'));
+    const worker = outbound({ containerId: 'container-1' }, {
+      ...env,
+      SESSION_SYNC: { fetch: sessionSync },
+    } as unknown as Cloudflare.Env);
+    await worker.fetch(
+      new Request('https://session-sync.kiloapps.io/v1/sessions/ses_synthetic/batches', {
+        method: 'POST',
+        headers: { [RUNTIME_PROXY_ORIGIN_HEADER]: 'forged' },
+      })
+    );
+    expect(sessionSync).toHaveBeenCalledTimes(1);
+    expect(sessionSync.mock.calls[0]?.[0].headers.get(RUNTIME_PROXY_ORIGIN_HEADER)).toBe(
+      await runtimeProxyOriginProof(env, 'container-1')
+    );
+  });
+
+  it.each(['https://example.com/api/profile', 'https://control.example.com/kilo/session'])(
+    'strips the proof header from requests outside the facade: %s',
+    async url => {
+      expect(await forwardedHeader(url)).toBeNull();
+    }
+  );
 });

@@ -3,6 +3,7 @@ import {
   ProductionTokenProfileSchema,
   type ProductionTokenProfile,
 } from './production-token-profile';
+import type { AutoRouter } from './router';
 
 /**
  * Every policy setting an admin can see on the router Policy tab.
@@ -37,7 +38,13 @@ export type PolicySettingValue = number | ProductionTokenProfile | null;
 
 export type PolicySettingMeta =
   | { kind: 'auto'; label: string }
-  | { kind: 'fixed'; label: string; fixed: PolicySettingValue; reason: string };
+  | { kind: 'fixed'; label: string; fixed: PolicySettingValue; reason: string }
+  | {
+      kind: 'fixed';
+      label: string;
+      fixedByRouter: Readonly<Record<AutoRouter, PolicySettingValue>>;
+      reason: string;
+    };
 
 export const POLICY_SETTINGS = {
   minAccuracy: { kind: 'auto', label: 'Minimum accuracy' },
@@ -82,9 +89,9 @@ export const POLICY_SETTINGS = {
   deciderRepetitions: {
     kind: 'fixed',
     label: 'Decider repetitions',
-    fixed: 1,
+    fixedByRouter: { efficient: 3, frontier: 1 },
     reason:
-      'Repetitions change measurement noise, not the routing outcome the optimizer scores, so they stay at one.',
+      'With only a few dozen cases per route, one repetition lets measurement noise decide which candidates clear the accuracy floor, so the efficient router measures each case three times. The frontier router keeps one repetition, the count its current profiles were measured with.',
   },
   classifierMaxP95LatencyMs: {
     kind: 'fixed',
@@ -97,6 +104,9 @@ export const POLICY_SETTINGS = {
 
 export type PolicySettingKind = PolicySettingMeta['kind'];
 
+/** Smallest switch cost factor: below 1 a dearer fresh pick could win. */
+export const SWITCH_COST_FACTOR_MIN = 1;
+
 /**
  * The shape each setting's value must take. An override or computed value is
  * accepted only when it matches its own key's schema; it is never coerced.
@@ -107,7 +117,7 @@ export const POLICY_SETTING_VALUE_SCHEMAS = {
   frontierMinAccuracyDelta: z.number().min(0).max(1),
   productionTokenProfile: ProductionTokenProfileSchema,
   switchHorizonTurns: z.number().int().positive(),
-  switchCostFactor: z.number().min(1).max(100),
+  switchCostFactor: z.number().min(SWITCH_COST_FACTOR_MIN).max(100),
   bestAccuracySwitchThreshold: z.number().min(0).max(1),
   lowConfidenceThreshold: z.number().min(0).max(1),
   classifierRepetitions: z.number().int().min(1).max(5),
@@ -211,7 +221,8 @@ export type PolicySettingsState = Record<PolicySettingKey, PolicySettingState>;
 /**
  * The stored config values a policy setting falls back to when nothing is
  * computed. Only the auto settings are stored; a fixed setting has no stored
- * form, its served value is `POLICY_SETTINGS[key].fixed`.
+ * form, its served value is `POLICY_SETTINGS[key].fixed` (or its router's entry
+ * in `fixedByRouter`).
  */
 export type PolicySettingDefaults = {
   minAccuracy: number;
@@ -232,20 +243,22 @@ export type PolicySettingValues = PolicySettingDefaults & {
 };
 
 export type PolicySettingSource = PolicySettingDefaults & {
+  router: AutoRouter;
   policyOverrides?: PolicySettingOverrides | null;
   policyComputed?: PolicySettingComputedMap | null;
 };
 
 function resolveValue(
   key: PolicySettingKey,
-  defaults: PolicySettingDefaults,
+  config: PolicySettingSource,
   overrides: PolicySettingOverrides | null,
   computed: PolicySettingComputedMap | null
 ): PolicySettingValue {
   if (isAutoSetting(key)) {
-    return overrides?.[key] ?? computed?.[key]?.value ?? defaults[key];
+    return overrides?.[key] ?? computed?.[key]?.value ?? config[key];
   }
-  return POLICY_SETTINGS[key].fixed;
+  const meta = POLICY_SETTINGS[key];
+  return 'fixedByRouter' in meta ? meta.fixedByRouter[config.router] : meta.fixed;
 }
 
 export function resolvePolicySettings(config: PolicySettingSource): PolicySettingsState {

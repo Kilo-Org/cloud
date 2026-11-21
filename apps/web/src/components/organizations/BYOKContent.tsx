@@ -79,7 +79,12 @@ export function BYOKContent({
             ) : chatGptEnabled === undefined ? (
               <OpenAiChatGptCardView status={undefined} isOrganization />
             ) : null}
-            <ClaudeBillingCard organizationId={organizationId} />
+          </ConnectionSection>
+          <ConnectionSection
+            title="Claude billing"
+            description="Members’ requests and Kilo services such as code review bill through one Claude organization. Only owners and admins can link or remove it."
+          >
+            <ClaudeBillingCard organizationId={organizationId} scope="organization" />
           </ConnectionSection>
           {hasPermission ? (
             <>
@@ -92,7 +97,6 @@ export function BYOKContent({
                 ) : chatGptEnabled === undefined ? (
                   <ChatGptSharedServicesCardView status={undefined} />
                 ) : null}
-                <ClaudeBillingCard organizationId={organizationId} scope="shared_services" />
               </ConnectionSection>
               <BYOKKeysManager organizationId={organizationId} />
             </>

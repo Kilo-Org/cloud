@@ -961,7 +961,7 @@ describe('Cloud Agent MCP authority', () => {
   );
 
   it.each([null, organizationId])(
-    'binds scoped instructions to the canonical workspace parent, not the invoking sibling: %s',
+    'binds scoped instructions to the workspace, not the invoking chat: %s',
     async organizationIdValue => {
       const authority = organizationIdValue === null ? scope : organizationScope;
       const scopedAuth = forwardedAuthFromProps({
@@ -983,8 +983,12 @@ describe('Cloud Agent MCP authority', () => {
         scopedAuth
       );
       const body = (await response.json()) as { result: { instructions: string } };
-      expect(body.result.instructions).toContain('canonical parent session');
-      expect(body.result.instructions).toContain('not to the sibling chat that invoked this tool');
+      expect(body.result.instructions).toContain(
+        'It belongs to the workspace, not to the chat that invoked this tool'
+      );
+      expect(body.result.instructions).toContain(
+        "remains available after the workspace's first chat is deleted"
+      );
       expect(body.result.instructions).toContain('only when the user explicitly asks');
       expect(body.result.instructions).toContain('own sandbox and worktree');
       expect(body.result.instructions).toContain('fan out independent tasks');

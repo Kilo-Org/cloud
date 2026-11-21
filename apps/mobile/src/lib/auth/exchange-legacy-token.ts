@@ -82,7 +82,6 @@ export async function exchangeLegacyToken(): Promise<{
     const body: unknown = await response.json();
     const parsed = parseTokenPair(body);
 
-    // An exchange response must include a full token pair with expiry.
     if (!parsed?.refreshToken || !parsed.expiresIn) {
       return null;
     }

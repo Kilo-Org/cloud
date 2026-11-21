@@ -32,6 +32,7 @@ import type { Env } from '../../types.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { protectedProcedure } from '../auth.js';
 import {
+  AgentVariantSchema,
   AttachmentsSchema,
   Limits,
   MessageIdSchema,
@@ -75,11 +76,7 @@ export const CreateHostedWorkspaceInput = z
       .object({
         mode: ModeSlugSchema,
         model: modelIdSchema,
-        variant: z
-          .string()
-          .max(50)
-          .regex(/^[a-zA-Z]+$/)
-          .optional(),
+        variant: AgentVariantSchema.optional(),
       })
       .strict(),
     options: z

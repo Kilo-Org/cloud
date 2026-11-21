@@ -9,12 +9,15 @@ import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { applyReasoningDetailsResponseTransform } from '@kilocode/web-shared/lib/ai-gateway/reasoning-details-transform';
 import {
   createStreamProgressLogger,
+  KEEP_ALIVE_COMMENT,
   logTerminalStreamEvent,
   partialCapturedBody,
-  readResponseText,
+  rewriteJsonResponse,
   rewriteSseStream,
   rewriteUsage,
   rewriteResponseMetadata,
+  startFirstByteKeepAlive,
+  type FirstByteKeepAlive,
   type ResponseMetadata,
   type RewriteResponseParams,
 } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse.shared';
@@ -44,69 +47,47 @@ export async function rewriteModelResponse_ChatCompletions({
   reasoningEffort,
   vercelRequestId,
   responseTransforms,
+  keepAliveUntilFirstByte,
 }: RewriteChatCompletionsResponseParams) {
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
-    // Read the body text once to avoid "Response body object should not be
-    // disturbed or locked" errors that occur when `.clone().json()` fails.
-    const textResult = await readResponseText(
+    return rewriteJsonResponse<OpenAI.ChatCompletion & ResponseMetadata>({
       response,
       headers,
       vercelRequestId,
       capture,
-      reasoningEffort
-    );
-    if ('errorResponse' in textResult) {
-      capture?.setReadError(textResult.error);
-      return textResult.errorResponse;
-    }
-    capture?.setBody(textResult.text);
-    const { text } = textResult;
-    let json: OpenAI.ChatCompletion & ResponseMetadata;
-    try {
-      json = JSON.parse(text) as OpenAI.ChatCompletion & ResponseMetadata;
-    } catch {
-      // Upstream returned invalid/empty JSON body — pass through as-is
-      return new NextResponse(text, {
-        status: response.status,
-        statusText: response.statusText,
-        headers,
-      });
-    }
-    if (typeof json.id === 'string' && json.id) capture?.setGenerationId(json.id);
-    const usage = json.usage as OpenRouterUsage;
-    const firstMessage = json.choices?.[0]?.message as
-      | (OpenAI.ChatCompletionMessage & ResponseMetadata)
-      | undefined;
-    const providerMetadata =
-      json.provider_metadata ??
-      json.providerMetadata ??
-      firstMessage?.provider_metadata ??
-      firstMessage?.providerMetadata;
-    if (usage) {
-      rewriteUsage(usage, usageContext, providerMetadata);
-    }
-    rewriteResponseMetadata(json, usageContext);
-    for (const choice of json.choices ?? []) {
-      if (choice.message) {
-        const message = choice.message as OpenAI.ChatCompletionMessage & ResponseMetadata;
-        rewriteResponseMetadata(message, usageContext);
-      }
-      // Some APIs set null here, which @openrouter/ai-sdk-provider rejects in non-streaming responses
-      if (choice.message?.tool_calls === null) {
-        delete choice.message.tool_calls;
-      }
-      for (const toolCall of choice.message?.tool_calls ?? []) {
-        addMissingToolCallType(toolCall);
-      }
-      applyReasoningDetailsResponseTransform(responseTransforms, choice.message);
-    }
-
-    return NextResponse.json(json, {
-      status: response.status,
-      statusText: response.statusText,
-      headers,
+      reasoningEffort,
+      mutate: json => {
+        if (typeof json.id === 'string' && json.id) capture?.setGenerationId(json.id);
+        const usage = json.usage as OpenRouterUsage;
+        const firstMessage = json.choices?.[0]?.message as
+          | (OpenAI.ChatCompletionMessage & ResponseMetadata)
+          | undefined;
+        const providerMetadata =
+          json.provider_metadata ??
+          json.providerMetadata ??
+          firstMessage?.provider_metadata ??
+          firstMessage?.providerMetadata;
+        if (usage) {
+          rewriteUsage(usage, usageContext, providerMetadata);
+        }
+        rewriteResponseMetadata(json, usageContext);
+        for (const choice of json.choices ?? []) {
+          if (choice.message) {
+            const message = choice.message as OpenAI.ChatCompletionMessage & ResponseMetadata;
+            rewriteResponseMetadata(message, usageContext);
+          }
+          // Some APIs set null here, which @openrouter/ai-sdk-provider rejects in non-streaming responses
+          if (choice.message?.tool_calls === null) {
+            delete choice.message.tool_calls;
+          }
+          for (const toolCall of choice.message?.tool_calls ?? []) {
+            addMissingToolCallType(toolCall);
+          }
+          applyReasoningDetailsResponseTransform(responseTransforms, choice.message);
+        }
+      },
     });
   }
 
@@ -115,14 +96,20 @@ export async function rewriteModelResponse_ChatCompletions({
   // Shared with the stream's cancel() callback so a client disconnect still
   // logs the partially received response body.
   const capturedChunks: string[] | null = capture ? [] : null;
+  let keepAlive: FirstByteKeepAlive | null = null;
   const stream = new ReadableStream<string>({
-    async start(controller) {
+    async start(streamController) {
       const reader = response.body?.getReader();
       if (!reader) {
-        controller.close();
+        streamController.close();
         capture?.setBody('');
         return;
       }
+      keepAlive = startFirstByteKeepAlive(streamController, {
+        enabled: keepAliveUntilFirstByte,
+        response,
+      });
+      const controller = keepAlive?.output ?? streamController;
 
       let doneReceived = false;
       let terminalEventReceived = false;
@@ -202,7 +189,7 @@ export async function rewriteModelResponse_ChatCompletions({
           if (doneReceived || terminalEventReceived) {
             return;
           }
-          controller.enqueue(': KILO PROCESSING\n\n');
+          controller.enqueue(KEEP_ALIVE_COMMENT);
         },
       });
 
@@ -227,10 +214,12 @@ export async function rewriteModelResponse_ChatCompletions({
         vercelRequestId,
         capture,
         capturedChunks,
-        reasoningEffort
+        reasoningEffort,
+        keepAlive
       );
     },
     cancel() {
+      keepAlive?.stop();
       capture?.setReadError(
         new Error('response stream was cancelled'),
         partialCapturedBody(capturedChunks)

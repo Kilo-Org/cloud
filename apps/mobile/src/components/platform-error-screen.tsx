@@ -14,10 +14,11 @@ import { ScreenHeader } from '@/components/screen-header';
  */
 export function PlatformErrorScreen({
   title,
-  eyebrow,
+  subtitle,
   backFallback,
   errorTitle,
   message,
+  descriptionClassName,
   variant = 'server',
   onRetry,
   isRetrying = false,
@@ -25,7 +26,8 @@ export function PlatformErrorScreen({
 }: Readonly<{
   /** ScreenHeader's title, e.g. the screen/feature name. */
   title: string;
-  eyebrow?: string;
+  /** The header's line under the title: the scope the failed screen acts on. */
+  subtitle?: string;
   /**
    * Where the header's Back lands when the failed screen has no history to pop,
    * e.g. a deep link or a relaunch restore that opened it on its own. A caller
@@ -35,6 +37,12 @@ export function PlatformErrorScreen({
   /** QueryError's own title override — independent of the ScreenHeader title above. */
   errorTitle?: string;
   message?: string;
+  /**
+   * Constrains the description's own box. A caller whose copy is long enough to
+   * leave one word alone on its last line caps the measure here so the text
+   * breaks into balanced lines instead.
+   */
+  descriptionClassName?: string;
   variant?: QueryErrorVariant;
   /** Omit to render a non-retriable state (e.g. permission/not-found errors). */
   onRetry?: () => void;
@@ -44,11 +52,12 @@ export function PlatformErrorScreen({
 }>) {
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} eyebrow={eyebrow} backFallback={backFallback} />
+      <ScreenHeader title={title} subtitle={subtitle} backFallback={backFallback} />
       <QueryError
         variant={variant}
         title={errorTitle}
         message={message}
+        descriptionClassName={descriptionClassName}
         onRetry={onRetry}
         isRetrying={isRetrying}
         action={action}

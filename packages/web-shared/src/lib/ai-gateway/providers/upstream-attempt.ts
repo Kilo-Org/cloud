@@ -31,6 +31,11 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import { readChatGptUsageLimit } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/usage-limit';
 import { isAutoSmallFreeModel } from '@kilocode/web-shared/lib/ai-gateway/auto-small-free-model';
+import {
+  ANTHROPIC_USER_PROFILE_HEADER,
+  isAnthropicUserProfileRoute,
+} from '@kilocode/web-shared/lib/ai-gateway/anthropic-user-profiles/gateway';
+import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import { applyProviderSpecificLogic } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { ProviderRoute } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
@@ -61,6 +66,8 @@ export type SendUpstreamAttemptInput = {
   dataRegion: OrganizationDataRegion | null;
   /** What remains of `UPSTREAM_DURATION_BUDGET_MS` for this attempt. */
   upstreamDurationBudgetMs: number;
+  /** Sent on Kilo-paid Claude attempts; BYOK and subscription routes never carry it. */
+  anthropicUserProfileId?: string | null;
 };
 
 export type SendUpstreamAttemptResult =
@@ -103,7 +110,15 @@ export async function sendUpstreamAttempt({
   costLimit,
   dataRegion,
   upstreamDurationBudgetMs,
+  anthropicUserProfileId,
 }: SendUpstreamAttemptInput): Promise<SendUpstreamAttemptResult> {
+  if (
+    !isAutoSmallFreeModel(requestedModel) &&
+    !(await gatewayServesModel(providerContext.provider, requestedModel))
+  ) {
+    return { type: 'unknown-gateway-model' };
+  }
+
   const extraHeaders: Record<string, string> = {};
   await applyProviderSpecificLogic(
     providerContext.provider,
@@ -119,6 +134,13 @@ export async function sendUpstreamAttempt({
     isNonTrialEnterprise,
     dataRegion
   );
+  if (
+    anthropicUserProfileId &&
+    isAnthropicUserProfileRoute(providerContext) &&
+    isClaudeModel(requestedModel)
+  ) {
+    extraHeaders[ANTHROPIC_USER_PROFILE_HEADER] = anthropicUserProfileId;
+  }
   // This bound limits Kilo debits. The connected Claude organization pays its own bill.
   if (costLimit && providerContext.provider.type !== CLAUDE_BILLING_PROVIDER_ID) {
     const decision = await enforceRequestCostLimit(
@@ -137,13 +159,6 @@ export async function sendUpstreamAttempt({
         response: NextResponse.json({ error: decision.refusal }, { status: 402 }),
       };
     if (decision.providerConfig) request.body.provider = decision.providerConfig;
-  }
-
-  if (
-    !isAutoSmallFreeModel(requestedModel) &&
-    !(await gatewayServesModel(providerContext.provider, requestedModel))
-  ) {
-    return { type: 'unknown-gateway-model' };
   }
 
   const result = await upstreamRequest({
@@ -182,11 +197,12 @@ export async function sendUpstreamAttempt({
 
 /**
  * Keeps the stored Claude billing connection in step with Anthropic's answer.
- * A `user_profile_not_billable` response means the connection can no longer
- * bill, so later requests fail without an upstream call; the other refusals
- * leave it usable and are recorded for the owner to explain. A billed request
- * that succeeds clears the record. Best-effort: a database failure never
- * changes the upstream response the caller already has.
+ * A `user_profile_not_billable` or `user_profile_billing_not_authorized`
+ * response means the connection can no longer bill, so later requests fail
+ * without an upstream call; the other refusals leave it usable and are recorded
+ * for the owner to explain. A billed request that succeeds clears the record.
+ * Best-effort: a database failure never changes the upstream response the
+ * caller already has.
  */
 async function recordClaudeBillingRefusalResponse(
   response: Response,

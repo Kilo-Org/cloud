@@ -184,6 +184,7 @@ vi.mock('@/components/ui/text', async () => {
 });
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: 'RotateCcw',
   AlertCircle: 'AlertCircle',
   Lock: 'Lock',
   MessageCircle: 'MessageCircle',
@@ -193,6 +194,7 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#999999',
   useThemeColors: () => ({ foreground: '#000000', mutedForeground: '#666666' }),
 }));
 
@@ -245,6 +247,18 @@ vi.mock('@/components/agents/message-bubble', async () => {
   return {
     MessageBubble: (props: { message: TestMessage }) =>
       React.createElement('MessageBubble', { messageId: props.message.info.id }),
+  };
+});
+
+// The transcript mounts the part-detail host, and the host's sheet body reaches
+// expo-file-system and the tool-card barrel, which this suite's partial
+// `react-native` mock cannot load. The sheet's own behaviour is covered by its
+// suite; this one only needs the host to mount.
+vi.mock('@/components/agents/part-detail-sheet', async () => {
+  const React = await import('react');
+  return {
+    PartDetailSheet: (props: { visible: boolean }) =>
+      React.createElement('PartDetailSheet', { visible: props.visible }),
   };
 });
 

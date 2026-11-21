@@ -3,6 +3,7 @@ package com.kilocode.homewidgetrefresh
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
+import android.content.SharedPreferences
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
@@ -21,10 +22,15 @@ import javax.crypto.spec.GCMParameterSpec
 internal object HomeWidgetStore {
   private const val ALIAS = "kilo-home-widget-context"
   private const val WORK = "kilo-home-widget-refresh"
+  private const val DEFAULT_REFRESH_MS = 1_800_000L
+  private const val MIN_REFRESH_DELAY_MS = 900_000L
   private fun prefs(context: Context) = context.getSharedPreferences("home-widget-refresh", Context.MODE_PRIVATE)
+  /** The one cadence clamp: a refresh instant becomes a delay of at least the minimum. */
+  private fun delayFrom(refreshAt: Long, now: Long): Long = (refreshAt - now).coerceAtLeast(MIN_REFRESH_DELAY_MS)
+  /** Every write that supersedes the stored payload rotates the fence `current` checks. */
+  private fun SharedPreferences.Editor.rotateGeneration(): SharedPreferences.Editor = putString("generation", UUID.randomUUID().toString())
   /** A missing key and a JSON null are both "no value"; `optString` would return the literal "null". */
   private fun JSONObject.text(key: String): String? = if (isNull(key)) null else optString(key, null)
-  private fun JSONObject.integer(key: String): Int? = if (isNull(key)) null else getInt(key)
   private fun JSONObject.number(key: String): Long? = if (isNull(key)) null else getLong(key)
   private fun key(): SecretKey {
     val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
@@ -45,63 +51,79 @@ internal object HomeWidgetStore {
   }
   @Synchronized fun configure(context: Context, config: JSONObject) {
     val previous = HomeWidgetStore.config(context)
-    if (previous != null && (previous.text("scopeKey") != config.text("scopeKey") || previous.integer("accountEpoch") != config.integer("accountEpoch"))) clear(context)
-    val refreshAt = config.number("refreshAt") ?: (System.currentTimeMillis() + 1_800_000)
+    if (previous != null && (previous.text("scopeKey") != config.text("scopeKey") || previous.number("accountEpoch") != config.number("accountEpoch"))) clear(context)
+    val refreshAt = config.number("refreshAt") ?: (System.currentTimeMillis() + DEFAULT_REFRESH_MS)
     val cipher = Cipher.getInstance("AES/GCM/NoPadding")
     cipher.init(Cipher.ENCRYPT_MODE, key())
     val encrypted = cipher.iv + cipher.doFinal(config.toString().toByteArray(Charsets.UTF_8))
     check(prefs(context).edit().putString("protectedContext", Base64.encodeToString(encrypted, Base64.NO_WRAP))
-      .putString("generation", UUID.randomUUID().toString()).putString("data", config.getJSONObject("data").toString())
+      .rotateGeneration().putString("data", config.getJSONObject("data").toString())
       .remove("terminalFence").putLong("refreshAt", refreshAt)
-      .putLong("refreshDelay", (refreshAt - System.currentTimeMillis()).coerceAtLeast(900_000)).commit())
+      .putLong("refreshDelay", delayFrom(refreshAt, System.currentTimeMillis())).commit())
     schedule(context, replace = true)
   }
   @Synchronized fun clear(context: Context, cancel: Boolean = true) {
     prefs(context).edit().remove("protectedContext").remove("data").remove("terminalFence")
-      .remove("refreshAt").remove("refreshDelay").putString("generation", UUID.randomUUID().toString()).commit()
+      .remove("refreshAt").remove("refreshDelay").rotateGeneration().commit()
     if (cancel) WorkManager.getInstance(context).cancelUniqueWork(WORK)
   }
   @Synchronized fun fixture(context: Context, enabled: Boolean) {
-    prefs(context).edit().putBoolean("fixture", enabled).putString("generation", UUID.randomUUID().toString()).commit()
+    prefs(context).edit().putBoolean("fixture", enabled).rotateGeneration().commit()
     if (enabled) WorkManager.getInstance(context).cancelUniqueWork(WORK) else schedule(context, replace = true)
   }
   fun hasWidgets(context: Context): Boolean = AppWidgetManager.getInstance(context)
     .getAppWidgetIds(ComponentName(context.packageName, "${context.packageName}.widget.ActiveAgentsWidget")).isNotEmpty()
+  /** The two reasons a scheduled refresh stands down: no placed widget, or fixture mode holding it. */
+  private fun suspended(context: Context): Boolean =
+    !hasWidgets(context) || prefs(context).getBoolean("fixture", false)
   @Synchronized fun generation(context: Context) = prefs(context).getString("generation", "")!!
-  @Synchronized fun current(context: Context, scope: String, epoch: Int, generation: String): Boolean {
-    if (!hasWidgets(context) || prefs(context).getBoolean("fixture", false) || generation(context) != generation) return false
+  @Synchronized fun current(context: Context, scope: String, epoch: Long, generation: String): Boolean {
+    if (suspended(context) || generation(context) != generation) return false
     val config = config(context) ?: prefs(context).getString("terminalFence", null)?.let { JSONObject(it) } ?: return false
-    return config.text("scopeKey") == scope && config.integer("accountEpoch") == epoch
+    return config.text("scopeKey") == scope && config.number("accountEpoch") == epoch
   }
   @Synchronized fun data(context: Context): JSONObject? = prefs(context).getString("data", null)?.let { JSONObject(it) }
   @Synchronized fun schedule(context: Context, replace: Boolean = false) {
-    if (config(context) == null || !hasWidgets(context) || prefs(context).getBoolean("fixture", false)) {
+    if (config(context) == null || suspended(context)) {
       WorkManager.getInstance(context).cancelUniqueWork(WORK)
       return
     }
     val now = System.currentTimeMillis()
-    val wake = prefs(context).getLong("refreshAt", now + 1_800_000)
-    val requested = if (wake > now) wake - now else prefs(context).getLong("refreshDelay", 1_800_000)
-    val delay = requested.coerceAtLeast(900_000)
+    val wake = prefs(context).getLong("refreshAt", now + DEFAULT_REFRESH_MS)
+    val requestedAt = if (wake > now) wake else now + prefs(context).getLong("refreshDelay", DEFAULT_REFRESH_MS)
+    val delay = delayFrom(requestedAt, now)
     val request = OneTimeWorkRequest.Builder(HomeWidgetRefreshWorker::class.java)
       .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
       .setInitialDelay(delay, TimeUnit.MILLISECONDS).build()
     WorkManager.getInstance(context).enqueueUniqueWork(WORK,
       if (replace) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.APPEND_OR_REPLACE, request)
   }
+  /**
+   * Every refusal is a `null` return: no placed widget, fixture mode, a missing endpoint,
+   * token, scope or epoch, a disallowed endpoint host, a non-200 answer, a body over the
+   * cap, a response that names another scope, a response with no `home` object, a
+   * snapshot without `updatedAt` or older than the retained one, or a stored state that
+   * is no longer current when the request finishes. A current 401 is the exception: it
+   * clears the stored content and returns the terminal fence the widget draws instead.
+   * It still throws what the JDK throws on a malformed URL or transport failure, and
+   * `JSONException` when the body does not parse or lacks the `snapshot`, `details` or
+   * `refreshAt` member, when a retained payload is not the expected JSON type, or when
+   * `accountEpoch` is not a number. The caller (`HomeWidgetRefreshWorker.doWork`) catches
+   * every one of those.
+   */
   fun fetch(context: Context): JSONObject? {
     val config: JSONObject
     val generation: String
     synchronized(this) {
-      if (!hasWidgets(context) || prefs(context).getBoolean("fixture", false)) return null
+      if (suspended(context)) return null
       config = config(context) ?: return null
       generation = generation(context)
     }
     val endpoint = config.text("endpoint")?.let { URL(it) } ?: return null
-    require(endpoint.protocol == "https" || endpoint.host == "localhost" || endpoint.host == "127.0.0.1" || endpoint.host == "10.0.2.2")
+    if (endpoint.protocol != "https" && endpoint.host != "localhost" && endpoint.host != "127.0.0.1" && endpoint.host != "10.0.2.2") return null
     val token = config.text("token") ?: return null
     val scopeKey = config.text("scopeKey") ?: return null
-    val accountEpoch = config.integer("accountEpoch") ?: return null
+    val accountEpoch = config.number("accountEpoch") ?: return null
     val connection = endpoint.openConnection() as HttpURLConnection
     connection.connectTimeout = 15_000
     connection.readTimeout = 15_000
@@ -135,15 +157,17 @@ internal object HomeWidgetStore {
       if (bytes.size > 262_144) return null
       val response = JSONObject(String(bytes, Charsets.UTF_8))
       val snapshot = response.getJSONObject("snapshot")
-      if (snapshot.getString("scopeKey") != config.getString("scopeKey")) return null
-      response.getJSONObject("home")
+      if (snapshot.text("scopeKey") != scopeKey) return null
+      // The widget draws `home`; a response without its object is not a complete snapshot.
+      if (response.optJSONObject("home") == null) return null
       val data = JSONObject().put("snapshot", snapshot).put("details", response.getJSONObject("details"))
       synchronized(this) {
         if (!current(context, scopeKey, accountEpoch, generation)) return null
-        val oldAt = HomeWidgetStore.data(context)?.getJSONObject("snapshot")?.optString("updatedAt")
-        if (oldAt != null && snapshot.getString("updatedAt") < oldAt) return null
+        val previousAt = HomeWidgetStore.data(context)?.getJSONObject("snapshot")?.text("updatedAt")
+        val nextAt = snapshot.text("updatedAt") ?: return null
+        if (previousAt != null && nextAt < previousAt) return null
         prefs(context).edit().putString("data", data.toString()).putLong("refreshAt", response.getLong("refreshAt"))
-          .putLong("refreshDelay", (response.getLong("refreshAt") - System.currentTimeMillis()).coerceAtLeast(900_000)).commit()
+          .putLong("refreshDelay", delayFrom(response.getLong("refreshAt"), System.currentTimeMillis())).commit()
       }
       return JSONObject().put("response", response).put("scopeKey", scopeKey)
         .put("accountEpoch", accountEpoch).put("generation", generation)

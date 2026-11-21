@@ -1,8 +1,13 @@
-import { runtimeHarness, kilo2RuntimeEnvironment, probeKilo2Health } from './runtime-harness.js';
+import {
+  runtimeHarness,
+  prepareKilo2RuntimeEnvironment,
+  probeKilo2Health,
+} from './runtime-harness.js';
 import {
   GH_STACK_EXTENSION_NAME,
   GH_STACK_EXTENSIONS_ROOT,
 } from '../../../src/shared/runtime-distribution.js';
+import { GITHUB_REVIEW_TARGET_ENV } from '../../../src/shared/github-review-target.js';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import fsp from 'node:fs/promises';
@@ -219,6 +224,17 @@ export type KiloProcess = KiloServer & {
   stop(deadlineAt: number): Promise<boolean>;
 };
 
+/** The TCP port in a `kilo serve` URL, if it has one. */
+export function kiloServerPort(server: KiloServer | undefined): number | undefined {
+  if (server === undefined) return undefined;
+  try {
+    const port = Number(new URL(server.url).port);
+    return Number.isInteger(port) && port > 0 ? port : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export type KiloProcessSpawnInput = {
   directory: string;
   env: Record<string, string>;
@@ -231,16 +247,19 @@ export type KiloProcessSpawnInput = {
 export type KiloProcessSpawner = (input: KiloProcessSpawnInput) => Promise<KiloProcess>;
 
 async function defaultSpawnKiloProcess(input: KiloProcessSpawnInput): Promise<KiloProcess> {
+  const backend = runtimeHarness();
+  const env =
+    backend.kind === 'kilo2' ? await prepareKilo2RuntimeEnvironment(input.env) : input.env;
+  input.signal?.throwIfAborted();
   const placement = admitControlWorkload(input.workload);
   const processes = createOwnedProcessScope(placement);
   input.onProcessScope?.(processes);
-  const backend = runtimeHarness();
   const credential = createKiloServerCredential(backend.username);
   // Own process group via the owned-process scope's detached spawn.
   const proc = processes.spawn(backend.cli, ['serve', '--hostname=127.0.0.1', '--port=0'], {
     cwd: input.directory,
     env: {
-      ...(backend.kind === 'kilo2' ? kilo2RuntimeEnvironment(input.env) : input.env),
+      ...env,
       ...credential.env,
     },
   });
@@ -339,11 +358,14 @@ export type KiloRuntimeOptions = {
   isIdle?: (client: Harness, directory: string, signal: AbortSignal) => Promise<boolean>;
   /** Names the reserved port in the agent rules; unknown leaves that rule out. */
   sandboxProvider?: AgentSandboxProvider;
+  /** Adds the workspace Artifacts guidance to the agent rules when sync is running. */
+  artifacts?: boolean;
   /** Creates the Kilo home/auth/runtime directories before spawn (spec §7). */
   prepareFilesystem?: (
     env: Record<string, string>,
     directory: string,
-    sandboxProvider?: AgentSandboxProvider
+    sandboxProvider?: AgentSandboxProvider,
+    artifacts?: boolean
   ) => Promise<void>;
 };
 
@@ -376,6 +398,8 @@ export type KiloRuntime = {
   isSuspected(): boolean;
   isRestarting(): boolean;
   isUnavailable(): boolean;
+  /** The port of the live `kilo serve`; preview refuses it. */
+  serverPort(): number | undefined;
   needsCompute(): boolean;
   liveTreeExecutions(root: string): number[] | undefined;
   sessionState(id: string): ReturnType<RuntimeActivity['state']>;
@@ -533,13 +557,15 @@ async function defaultIsIdle(
 export async function prepareKiloFilesystem(
   env: Record<string, string>,
   directory: string,
-  sandboxProvider?: AgentSandboxProvider
+  sandboxProvider?: AgentSandboxProvider,
+  artifacts?: boolean
 ): Promise<void> {
   const home = env.HOME;
   if (home !== undefined && home.length > 0) {
     await writeCloudAgentRulesFile(home, {
       bashDefaultTimeoutMs: env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS,
       ...(sandboxProvider ? { sandboxProvider } : {}),
+      ...(artifacts ? { artifacts } : {}),
     });
   }
   const dataHome = env.XDG_DATA_HOME;
@@ -611,6 +637,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
   /** Spec §7: one health probe per silence episode, reset by any activity. */
   let probedThisEpisode = false;
   let pendingCredentials = false;
+  let mcpRefresh: Promise<void> | undefined;
   /** Single-flight owner for the health probe and the reconnect loop. */
   let recovery: Promise<void> | undefined;
   let lastActivityAt = scheduler.now();
@@ -965,7 +992,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     // Spec §7 pre-spawn filesystem: Kilo reads auth.json from disk, and a route
     // with no git and no setup commands never created the worktree directory.
     const env = options.env;
-    await prepareFilesystem(env, options.directory, options.sandboxProvider);
+    await prepareFilesystem(env, options.directory, options.sandboxProvider, options.artifacts);
     if (currentPhase() === 'stopped') throw new Error('Kilo runtime is shutting down');
     const controller = new AbortController();
     startAbort = controller;
@@ -1088,6 +1115,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
   }
 
   async function ensure(): Promise<Harness> {
+    while (mcpRefresh !== undefined) await mcpRefresh;
     if (phase === 'stopped') throw new Error('Kilo runtime is shutting down');
     if (phase === 'unavailable') throw new Error('Kilo runtime is unavailable');
     if (client) return client;
@@ -1290,6 +1318,15 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     ensure,
     isRetiredClient: candidate => retiredClients.has(candidate),
     async installCredentials(env, cloudAgentMcp): Promise<void> {
+      // The live environment is shared by every route on the key. Refuse a
+      // frame that would change the policy the siblings run under; credential
+      // rotation and the workspace MCP grant keep the policy and still apply.
+      if (
+        authorizationConfigurationSignature(options.env) !==
+        authorizationConfigurationSignature(env)
+      ) {
+        throw new KiloWorktreePolicyMismatchError();
+      }
       const installedHandle = options.env.KILOCODE_TOKEN;
       const incomingHandle = env.KILOCODE_TOKEN;
       const installedExp = proxyHandleExpiry(installedHandle);
@@ -1304,21 +1341,33 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       // Repeated proxy handles can still carry a renewed MCP credential.
       options.env = env;
       if (client && cloudAgentMcp) {
-        try {
-          await withTimeoutAndAbort(
-            client.updateCloudAgentMcp(
-              cloudAgentMcp,
-              AbortSignal.timeout(KILO_CONTROL_REQUEST_TIMEOUT_MS)
-            ),
-            {
-              timeoutMs: KILO_CONTROL_REQUEST_TIMEOUT_MS,
-              timeoutMessage: 'Cloud Agent MCP credential refresh timed out',
-              abortMessage: 'Cloud Agent MCP credential refresh aborted',
-            }
-          );
-        } catch {
-          log('control-plane MCP credential refresh failed; retaining pending credential restart');
-        }
+        const previous = mcpRefresh;
+        const refresh = (async () => {
+          await previous;
+          if (!client) return;
+          try {
+            await withTimeoutAndAbort(
+              client.updateCloudAgentMcp(
+                cloudAgentMcp,
+                AbortSignal.timeout(KILO_CONTROL_REQUEST_TIMEOUT_MS)
+              ),
+              {
+                timeoutMs: KILO_CONTROL_REQUEST_TIMEOUT_MS,
+                timeoutMessage: 'Cloud Agent MCP credential refresh timed out',
+                abortMessage: 'Cloud Agent MCP credential refresh aborted',
+              }
+            );
+          } catch {
+            pendingCredentials = true;
+            log(
+              'control-plane MCP credential refresh failed; retaining pending credential restart'
+            );
+          }
+        })().finally(() => {
+          if (mcpRefresh === refresh) mcpRefresh = undefined;
+        });
+        mcpRefresh = refresh;
+        await refresh;
       }
     },
     applyPendingCredentials,
@@ -1333,6 +1382,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     isSuspected: isSuspectedPhase,
     isRestarting: () => phase === 'restarting',
     isUnavailable: () => phase === 'unavailable',
+    serverPort: () => kiloServerPort(kiloProcess),
     async shutdown(): Promise<void> {
       if (phase === 'stopped') return;
       phase = 'stopped';
@@ -1395,6 +1445,8 @@ export type KiloRuntimes = {
   };
   /** Live runtimes serving one directory; worktree deletion retires them (R2). */
   runtimesForDirectory(directory: string): KiloRuntime[];
+  /** The ports of every live `kilo serve`; preview refuses them. */
+  serverPorts(): number[];
   /** Stops and removes every runtime serving one directory (worktree deletion). */
   retireDirectory(directory: string): Promise<void>;
   shutdown(): Promise<void>;
@@ -1495,6 +1547,68 @@ function mcpConfigurationSignature(env: Record<string, string>): string {
   }
 }
 
+/** Stable JSON with sorted object keys, so equal content compares equal. */
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (typeof value === 'object' && value !== null) {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record)
+      .sort()
+      .map(key => `${JSON.stringify(key)}:${canonicalJson(record[key])}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
+
+/**
+ * The authorization content of the generated runtime configuration: the
+ * composed permission map (the platform baseline with the session command
+ * policy and the review publisher refusals) and the trusted review target.
+ * Credentials, provider endpoints and the workspace MCP grant rotate between
+ * routes on one key, so they are deliberately absent.
+ */
+function authorizationConfigurationSignature(env: Record<string, string>): string {
+  const raw = env.KILO_CONFIG_CONTENT;
+  let permission: unknown;
+  if (raw === undefined) {
+    permission = null;
+  } else {
+    // A configuration that cannot be read has its own signature, which includes
+    // the raw text, so it matches only an identically written configuration.
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return canonicalJson({
+        unreadable: raw,
+        reviewTarget: env[GITHUB_REVIEW_TARGET_ENV] ?? null,
+      });
+    }
+    permission =
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      !Array.isArray(parsed) &&
+      'permission' in parsed
+        ? (parsed.permission ?? null)
+        : null;
+  }
+  return canonicalJson({ permission, reviewTarget: env[GITHUB_REVIEW_TARGET_ENV] ?? null });
+}
+
+/**
+ * A route asked to reuse a warm shared runtime whose generated authorization
+ * policy differs from its own prepared policy. One runtime serves every route
+ * on its key, so reusing it would run the joining route under another
+ * session's policy. Non-retryable: the caller must not drop and recreate the
+ * runtime to "fix" it.
+ */
+export class KiloWorktreePolicyMismatchError extends Error {
+  constructor() {
+    super('Kilo worktree authorization policy mismatch');
+    this.name = 'KiloWorktreePolicyMismatchError';
+  }
+}
+
 /**
  * One Kilo runtime per directory.
  * A fresh `ensure` after the restart budget is spent replaces the runtime,
@@ -1524,6 +1638,15 @@ export function createKiloRuntimes(options: KiloRuntimesOptions): KiloRuntimes {
         // materialized servers are unchanged.
         if (mcpConfigurationSignature(existing.env) !== mcpConfigurationSignature(input.env)) {
           throw new KiloWorktreeMcpMismatchError();
+        }
+        // The generated authorization policy travels with the runtime process.
+        // A route whose prepared policy differs must fail instead of running
+        // under the policy of the route that started the runtime.
+        if (
+          authorizationConfigurationSignature(existing.env) !==
+          authorizationConfigurationSignature(input.env)
+        ) {
+          throw new KiloWorktreePolicyMismatchError();
         }
         return existing.ensure();
       }
@@ -1584,6 +1707,11 @@ export function createKiloRuntimes(options: KiloRuntimesOptions): KiloRuntimes {
     },
     runtimesForDirectory: directory =>
       [...runtimes.values()].filter(runtime => runtime.directory === directory),
+    serverPorts: () =>
+      [...runtimes.values()].flatMap(runtime => {
+        const port = runtime.serverPort();
+        return port === undefined ? [] : [port];
+      }),
     async retireDirectory(directory) {
       const targets = [...runtimes.entries()].filter(
         ([, runtime]) => runtime.directory === directory

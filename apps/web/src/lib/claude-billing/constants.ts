@@ -4,10 +4,9 @@ import type { ClaudeBillingOwner } from '@kilocode/web-shared/lib/ai-gateway/cla
 export const CLAUDE_BILLING_CALLBACK_PATH = '/claude/billing/callback';
 
 /**
- * The page query that reports the outcome of a link attempt. A page can hold
- * both the person's own connection and the organization's shared-services one,
- * so each reports under its own query.
+ * The page query that reports the outcome of a link attempt. The personal page
+ * and the organization BYOK page each report under their own query.
  */
 export function claudeBillingOutcomeParam(owner: { kind: ClaudeBillingOwner['kind'] }): string {
-  return owner.kind === 'shared_services' ? 'claude_billing_shared' : 'claude_billing';
+  return owner.kind === 'organization' ? 'claude_billing_organization' : 'claude_billing';
 }

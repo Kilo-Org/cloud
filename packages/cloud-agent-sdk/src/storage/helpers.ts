@@ -1,8 +1,9 @@
 import type { Part, TextPart } from '@kilocode/app-shared/opencode';
+import type { ReadonlyPart } from '../types';
 import { partSettledAt } from '../part-utils';
 import { isPreviewOfStoredTool } from '../tool-detail-marker';
+import type { SessionSubscriptionKey } from './types';
 
-/** Sort key of a message id: the id is its own key. */
 function messageIdKey(value: string): string {
   return value;
 }
@@ -32,7 +33,7 @@ function insertSortedBy<T>(arr: readonly T[], item: T, key: (value: T) => string
 /**
  * Ordering evidence of the last accepted update for a stored part: the event
  * time it was accepted on (or the settle time that ordered it), keyed by the
- * part's message and id.
+ * message id the backend buckets the part under and the part id.
  *
  * The backend owns this store next to its parts. Keeping the evidence off the
  * part matters: a part is plain data the UI renders and `structuredClone`
@@ -43,30 +44,69 @@ function insertSortedBy<T>(arr: readonly T[], item: T, key: (value: T) => string
  */
 type PartOrderingEvidence = Map<string, number>;
 
-function partOrderingKey(messageID: string, partId: string): string {
-  return `${messageID}\u0000${partId}`;
+/** Per-message cached part views: the views, an invalidation marker, or nothing. */
+type PartsSnapshot = Map<string, readonly ReadonlyPart[] | null>;
+
+/**
+ * Immutable views of the stored parts of one backend, keyed by message and
+ * then by part id, so a rebuild only visits the parts of the message it is
+ * rebuilding.
+ *
+ * A view wraps a clone of the part it was built from, so it may be reused only
+ * while the part now stored is the very object the view was built from. Every
+ * storage path replaces a part object instead of mutating it (`applyTextDeltas`
+ * returns a new object and `upsertPart` stores a clone), so a replaced part
+ * always misses this cache and is rebuilt, and a reused view can never show
+ * content the store has already moved past.
+ */
+type PartViewCache = Map<string, Map<string, { source: Part; view: ReadonlyPart }>>;
+
+function createPartViewCache(): PartViewCache {
+  return new Map<string, Map<string, { source: Part; view: ReadonlyPart }>>();
 }
 
+/**
+ * Key of one part's ordering evidence. The message id is the one the storage
+ * keeps the parts under, not the label the part object carries, so the insert,
+ * the stale check and `forgetPartUpdateTime` all address the same entry.
+ */
+function partOrderingKey(messageId: string, partId: string): string {
+  return `${messageId}\u0000${partId}`;
+}
+
+/**
+ * Record the event time of an accepted update under the bucket the part is
+ * stored in.
+ */
 function rememberPartUpdateTime(
   evidence: PartOrderingEvidence,
-  part: Part,
+  messageId: string,
+  partId: string,
   eventTime: number | undefined
 ): void {
   if (eventTime === undefined) return;
-  evidence.set(partOrderingKey(part.messageID, part.id), eventTime);
+  evidence.set(partOrderingKey(messageId, partId), eventTime);
 }
 
-function storedPartUpdateTime(evidence: PartOrderingEvidence, part: Part): number | undefined {
-  return evidence.get(partOrderingKey(part.messageID, part.id));
+function storedPartUpdateTime(
+  evidence: PartOrderingEvidence,
+  messageId: string,
+  partId: string
+): number | undefined {
+  return evidence.get(partOrderingKey(messageId, partId));
 }
 
-/** Drop the ordering evidence of a part the backend no longer keeps. */
+/**
+ * Drop the ordering evidence of a part the backend no longer keeps. It takes
+ * the same message id the upsert keyed the evidence with, so the delete always
+ * finds the entry.
+ */
 function forgetPartUpdateTime(
   evidence: PartOrderingEvidence,
-  messageID: string,
+  messageId: string,
   partId: string
 ): void {
-  evidence.delete(partOrderingKey(messageID, partId));
+  evidence.delete(partOrderingKey(messageId, partId));
 }
 
 function toolLifecycleRank(part: Part): number | null {
@@ -105,23 +145,73 @@ function toolRunningStartedAt(part: Part): number | undefined {
 /**
  * A tool part advances pending → running → terminal and never moves backwards.
  * A snapshot, history or DO replay can re-deliver an older part version over
- * newer live state, so a lower-ranked update is dropped, and a terminal update
- * is applied only when it carries ordering evidence that it postdates the
- * stored update (the event's own time, or the tool state's `time.end` when a
- * replay carries no event time). Over a running part, that evidence must also
- * postdate the stored running update's ordering evidence — the later of its
- * recorded event time (when the update came from the wire) and the run's
- * `time.start` (the only evidence a replayed running part carries, and the bound
- * that keeps an inherited older event time from dropping the guard below the
- * live run): a terminal whose settle time predates the live run is an
- * out-of-order replay, not a completion. A terminal with no evidence at all
- * never replaces a live running task.
- *
- * The same ordering evidence settles the mirror case: a run whose `time.start`
- * postdates a stored terminal's settle time is a newer observation of that part
- * (a reopen replay of the live run over a stale cached terminal), so it
- * replaces it instead of being dropped as a backwards lifecycle step.
+ * newer live state, so a lower-ranked update is dropped (unless it reopens a
+ * settled run — see `runningReopensTerminal`), and a terminal update is applied
+ * only when it carries ordering evidence that it postdates the stored update
+ * (the event's own time, or the tool state's `time.end` when a replay carries
+ * no event time). A terminal with no evidence at all never replaces a live
+ * running task.
  */
+
+/** Ordering evidence of a terminal update: its event time, else its settle time. */
+function terminalOrder(part: Part, eventTime: number | undefined): number | undefined {
+  return eventTime ?? partSettledAt(part);
+}
+
+/**
+ * Ordering evidence of a stored running part: the later of the event time the
+ * update that applied it carried and the run's `time.start`.
+ */
+function runningOrder(stored: Part, storedEventTime: number | undefined): number | undefined {
+  const startedAt = toolRunningStartedAt(stored);
+  if (storedEventTime === undefined || startedAt === undefined) {
+    return storedEventTime ?? startedAt;
+  }
+  return Math.max(storedEventTime, startedAt);
+}
+
+/** A terminal update over a stored terminal applies only when it postdates it. */
+function terminalBeatsTerminal(
+  stored: Part,
+  incoming: Part,
+  storedEventTime: number | undefined,
+  eventTime: number | undefined
+): boolean {
+  const incomingOrder = terminalOrder(incoming, eventTime);
+  const storedOrder = terminalOrder(stored, storedEventTime);
+  if (incomingOrder === undefined || storedOrder === undefined) return false;
+  return incomingOrder > storedOrder;
+}
+
+/** A terminal update over a stored running part applies only when it postdates both evidence pieces. */
+function terminalBeatsRunning(
+  stored: Part,
+  incoming: Part,
+  storedEventTime: number | undefined,
+  eventTime: number | undefined
+): boolean {
+  const incomingOrder = terminalOrder(incoming, eventTime);
+  if (incomingOrder === undefined) return false;
+  // The stored running part carries two pieces of evidence: the event time of
+  // the update that last applied it (which can be inherited from an older part
+  // replaced on the same id) and the run's own `time.start`. A terminal must
+  // postdate both, so bound the guard by the later one — inherited older
+  // evidence must not drop it below the live run.
+  const storedOrder = runningOrder(stored, storedEventTime);
+  return storedOrder === undefined || incomingOrder > storedOrder;
+}
+
+/** A running update over a stored terminal applies only when the run started after its settle time. */
+function runningReopensTerminal(stored: Part, incoming: Part): boolean {
+  const runningStartedAt = toolRunningStartedAt(incoming);
+  const storedSettledAt = partSettledAt(stored);
+  return (
+    runningStartedAt !== undefined &&
+    storedSettledAt !== undefined &&
+    runningStartedAt > storedSettledAt
+  );
+}
+
 function isStaleToolLifecycleUpdate(
   stored: Part,
   incoming: Part,
@@ -137,54 +227,34 @@ function isStaleToolLifecycleUpdate(
   }
 
   if (incomingRank < storedRank) {
+    // Running (1) over terminal (2): the run reopens the settled run only when
+    // its start postdates the settle time. Every other lower-ranked update is
+    // stale.
     if (incomingRank === 1 && storedRank === 2) {
-      const runningStartedAt = toolRunningStartedAt(incoming);
-      const storedSettledAt = partSettledAt(stored);
-      if (
-        runningStartedAt !== undefined &&
-        storedSettledAt !== undefined &&
-        runningStartedAt > storedSettledAt
-      ) {
-        return false;
-      }
+      return !runningReopensTerminal(stored, incoming);
     }
     return true;
   }
 
   if (incomingRank === 2 && storedRank === 2) {
-    const incomingOrder = eventTime ?? partSettledAt(incoming);
-    const storedOrder = storedEventTime ?? partSettledAt(stored);
-    if (incomingOrder === undefined || storedOrder === undefined) return true;
-    return incomingOrder <= storedOrder;
+    return !terminalBeatsTerminal(stored, incoming, storedEventTime, eventTime);
   }
 
   if (incomingRank === 2 && storedRank === 1) {
-    const incomingOrder = eventTime ?? partSettledAt(incoming);
-    if (incomingOrder === undefined) return true;
-    // The stored running part carries two pieces of evidence: the event time of
-    // the update that last applied it (which can be inherited from an older part
-    // replaced on the same id) and the run's own `time.start`. A terminal must
-    // postdate both, so bound the guard by the later one — inherited older
-    // evidence must not drop it below the live run.
-    const runningStartedAt = toolRunningStartedAt(stored);
-    const storedOrder =
-      storedEventTime === undefined || runningStartedAt === undefined
-        ? (storedEventTime ?? runningStartedAt)
-        : Math.max(storedEventTime, runningStartedAt);
-    if (storedOrder !== undefined && incomingOrder <= storedOrder) return true;
+    return !terminalBeatsRunning(stored, incoming, storedEventTime, eventTime);
   }
 
   return false;
 }
 
 function upsertPartDroppingStaleSyntheticParts(
+  messageId: string,
   arr: Part[],
   part: Part,
   eventTime: number | undefined,
   evidence: PartOrderingEvidence,
   authoritative = false
 ): Part[] {
-  const nextPart = clonePart(part);
   const incomingIsSynthetic = Reflect.get(part, 'synthetic') === true;
   // A non-synthetic text or file part drops the synthetic placeholder parts of
   // the same type on its message: the optimistic text row and the optimistic
@@ -195,7 +265,7 @@ function upsertPartDroppingStaleSyntheticParts(
     ? arr.filter(
         existing =>
           existing.id === part.id ||
-          existing.messageID !== part.messageID ||
+          existing.messageID !== messageId ||
           existing.type !== part.type ||
           Reflect.get(existing, 'synthetic') !== true
       )
@@ -205,7 +275,7 @@ function upsertPartDroppingStaleSyntheticParts(
   if (idx >= 0) {
     const existing = filtered[idx];
     const storedEventTime =
-      existing === undefined ? undefined : storedPartUpdateTime(evidence, existing);
+      existing === undefined ? undefined : storedPartUpdateTime(evidence, messageId, existing.id);
     if (
       existing !== undefined &&
       !authoritative &&
@@ -216,6 +286,9 @@ function upsertPartDroppingStaleSyntheticParts(
     // A later history page or replay may carry a bounded preview of a tool call
     // this storage already holds in full; keep the complete copy.
     if (existing !== undefined && isPreviewOfStoredTool(existing, part)) return arr;
+    // The rejection paths above drop the incoming part, so they must not pay
+    // for a copy of it.
+    const nextPart = clonePart(part);
     const nextArr = [...filtered];
     nextArr[idx] = nextPart;
     // Remember the ordering evidence the accepted update actually won on: its
@@ -224,13 +297,15 @@ function upsertPartDroppingStaleSyntheticParts(
     // terminal whose event time falls between the two win.
     rememberPartUpdateTime(
       evidence,
-      nextPart,
+      messageId,
+      nextPart.id,
       eventTime ?? partSettledAt(nextPart) ?? storedEventTime
     );
     return nextArr;
   }
 
-  rememberPartUpdateTime(evidence, nextPart, eventTime);
+  const nextPart = clonePart(part);
+  rememberPartUpdateTime(evidence, messageId, nextPart.id, eventTime);
   return insertSortedBy(filtered, nextPart, partIdKey);
 }
 
@@ -244,7 +319,7 @@ function clonePart(part: Part): Part {
   return structuredClone(part);
 }
 
-function createReadonlyPartView(part: Part): Part {
+function createReadonlyPartView(part: Part): ReadonlyPart {
   return new Proxy(part, {
     set() {
       return true;
@@ -315,12 +390,65 @@ function appendPartTextChunks(
  * snapshot.
  */
 function publishPartsChanged(
-  snapshot: Map<string, Part[] | null>,
+  snapshot: PartsSnapshot,
   subscribers: SubscriberRegistry,
   messageId: string
 ): void {
   snapshot.set(messageId, null);
   subscribers.notifyParts(messageId);
+}
+
+/**
+ * One parts read for the whole message: the cached snapshot when this message
+ * already has one, `EMPTY_PARTS` when it stores nothing, else the snapshot
+ * recorded for later reads, assembled from the immutable views `views` already
+ * holds for the parts that did not change and fresh clone-plus-view builds for
+ * the ones that did. A `null` marker (a change that dropped the snapshot) is
+ * falsy, so it rebuilds.
+ *
+ * The cache is per message, so a rebuild costs one visit to this message's own
+ * parts: a part whose stored object is still the one its cached view came from
+ * is reused as is, and a streamed delta batch that replaced a single part
+ * clones only that part. Entries are swept after each build to the ids the
+ * message still stores, so a deleted part cannot leak its view.
+ */
+function readPartsSnapshot(
+  messageId: string,
+  arr: Part[] | undefined,
+  snapshot: PartsSnapshot,
+  views: PartViewCache
+): readonly ReadonlyPart[] {
+  const cached = snapshot.get(messageId);
+  if (cached) return cached;
+
+  if (!arr || arr.length === 0) {
+    views.delete(messageId);
+    return EMPTY_PARTS;
+  }
+
+  let byPart = views.get(messageId);
+  if (!byPart) {
+    byPart = new Map<string, { source: Part; view: ReadonlyPart }>();
+    views.set(messageId, byPart);
+  }
+
+  const built = arr.map(part => {
+    const entry = byPart.get(part.id);
+    if (entry && entry.source === part) return entry.view;
+    const view = createReadonlyPartView(clonePart(part));
+    byPart.set(part.id, { source: part, view });
+    return view;
+  });
+
+  if (byPart.size !== built.length) {
+    const stored = new Set(built.map(part => part.id));
+    for (const partId of [...byPart.keys()]) {
+      if (!stored.has(partId)) byPart.delete(partId);
+    }
+  }
+
+  snapshot.set(messageId, built);
+  return built;
 }
 
 function createSeedTextPart(messageId: string, partId: string, text: string): TextPart {
@@ -333,21 +461,21 @@ function createSeedTextPart(messageId: string, partId: string, text: string): Te
   };
 }
 
-const MESSAGE_IDS_KEY = 'messageIds';
+const messageIdsKey: SessionSubscriptionKey = 'messageIds';
 
 /** Subscription key of one message row's channel. */
-function messageKey(messageId: string): string {
+function messageKey(messageId: string): SessionSubscriptionKey {
   return `message:${messageId}`;
 }
 
 /** Subscription key of one message's parts channel. */
-function partsKey(messageId: string): string {
+function partsKey(messageId: string): SessionSubscriptionKey {
   return `parts:${messageId}`;
 }
 
 type SubscriberRegistry = {
-  subscribe(key: string, callback: () => void): () => void;
-  notify(key: string): void;
+  subscribe(key: SessionSubscriptionKey, callback: () => void): () => void;
+  notify(key: SessionSubscriptionKey): void;
   notifyMessageIds(): void;
   notifyMessage(messageId: string): void;
   notifyParts(messageId: string): void;
@@ -355,7 +483,7 @@ type SubscriberRegistry = {
 
 function createSubscriberRegistry(): SubscriberRegistry {
   const subscribers = new Map<string, Set<() => void>>();
-  const notify = (key: string): void => {
+  const notify = (key: SessionSubscriptionKey): void => {
     const subs = subscribers.get(key);
     if (subs) {
       for (const cb of subs) cb();
@@ -376,7 +504,7 @@ function createSubscriberRegistry(): SubscriberRegistry {
     },
     notify,
     notifyMessageIds() {
-      notify(MESSAGE_IDS_KEY);
+      notify(messageIdsKey);
     },
     notifyMessage(messageId) {
       notify(messageKey(messageId));
@@ -394,15 +522,26 @@ export {
   appendPartTextChunks,
   applyTextDeltas,
   clonePart,
+  createPartViewCache,
   createReadonlyPartView,
   createSeedTextPart,
   createSubscriberRegistry,
   forgetPartUpdateTime,
   insertSortedBy,
   isSupportedDeltaField,
+  messageIdsKey,
+  messageKey,
   messageIdKey,
+  partsKey,
   publishPartsChanged,
+  readPartsSnapshot,
   upsertPartDroppingStaleSyntheticParts,
 };
 export { orderMessageIds } from './message-order';
-export type { PartOrderingEvidence, SubscriberRegistry };
+export type {
+  PartOrderingEvidence,
+  PartViewCache,
+  PartsSnapshot,
+  SessionSubscriptionKey,
+  SubscriberRegistry,
+};

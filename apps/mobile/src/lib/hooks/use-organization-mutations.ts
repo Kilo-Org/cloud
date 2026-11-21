@@ -1,6 +1,5 @@
 import { hashKey, useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { announcingToast } from '@/lib/a11y/announcing-toast';
 import {
   isLatestMutationGeneration,
   nextMutationGeneration,
@@ -10,12 +9,31 @@ import {
   type OrgRole,
   type OrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
-import { organizationErrorMessage } from '@/lib/server-error-copy';
+import { announceTrialRefusal } from '@/lib/refusal-toast';
+import { isTrialExpiredRefusal, organizationErrorMessage } from '@/lib/server-error-copy';
+import {
+  type TrialRefusalAction,
+  useBillingAction,
+  useCanManageBilling,
+} from '@/lib/trial-refusal';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
-const onMutationError = (error: unknown) => {
-  announcingToast.error(organizationErrorMessage(error));
-};
+/**
+ * The toast a failed mutation paints: the reader's own copy for a rejection the
+ * app can explain, and the billing step when the refusal is the plan gate and
+ * this reader may change the plan.
+ */
+function onMutationError(
+  error: unknown,
+  canManageBilling: boolean,
+  billingAction: TrialRefusalAction | undefined
+) {
+  announceTrialRefusal(
+    organizationErrorMessage(error, canManageBilling),
+    billingAction,
+    isTrialExpiredRefusal(error)
+  );
+}
 
 // Distributive helpers: `OrgWithMembers` is a union of the admin and member
 // variants, so a plain `{ ...old, members: ... }` spread loses the variant
@@ -38,20 +56,25 @@ function filterMembers<T extends OrgWithMembers>(
 type UseOrganizationMutationsOptions = {
   /**
    * member-limit-sheet renders `updateMember` errors inline (Pattern P2) and
-   * owns that mutation's error feedback for its caller. member-row.tsx's
-   * action-sheet role change has no persistent surface to show an inline
-   * error in, so it keeps the default toast — hence this is per-hook-call
-   * rather than a blanket change to the mutation itself.
+   * owns that mutation's error feedback for its caller. member-row.tsx renders
+   * a refused role change on the row and owns a refused removal through the
+   * members screen's keyed store, so both member mutations stay silent for
+   * that caller — hence per-hook-call rather than a blanket change to the
+   * mutations themselves.
    */
-  silenceUpdateMemberToast?: boolean;
+  silenceMemberToast?: boolean;
 };
 
 export function useOrganizationMutations(
   organizationId: string,
-  { silenceUpdateMemberToast }: UseOrganizationMutationsOptions = {}
+  { silenceMemberToast }: UseOrganizationMutationsOptions = {}
 ) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  // The toast's copy and its optional step are the reader's: a role that can
+  // change the plan gets the copy that offers the step, and the step itself.
+  const canManageBilling = useCanManageBilling(organizationId);
+  const billingAction = useBillingAction(organizationId);
 
   const withMembersKey = trpc.organizations.withMembers.queryKey({ organizationId });
   const listKey = trpc.organizations.list.queryKey();
@@ -95,7 +118,7 @@ export function useOrganizationMutations(
           queryClient.setQueryData(withMembersKey, context.previous);
         }
         if (!silent) {
-          onMutationError(error);
+          onMutationError(error, canManageBilling, billingAction);
         }
       },
       onSettled: invalidateAll,
@@ -191,7 +214,7 @@ export function useOrganizationMutations(
                 }
               : member
           ),
-        { silent: silenceUpdateMemberToast }
+        { silent: silenceMemberToast }
       ),
       scope: { id: `organization:${organizationId}` },
     }),
@@ -200,8 +223,13 @@ export function useOrganizationMutations(
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       mutationFn: (input: { memberId: string }) =>
         trpcClient.organizations.members.remove.mutate({ organizationId, ...input }),
-      ...optimistic<{ memberId: string }>((old, input) =>
-        filterMembers(old, member => !(member.status === 'active' && member.id === input.memberId))
+      ...optimistic<{ memberId: string }>(
+        (old, input) =>
+          filterMembers(
+            old,
+            member => !(member.status === 'active' && member.id === input.memberId)
+          ),
+        { silent: silenceMemberToast }
       ),
       scope: { id: `organization:${organizationId}` },
     }),
@@ -219,7 +247,7 @@ export function useOrganizationMutations(
       scope: { id: `organization:${organizationId}` },
     }),
 
-    // No onMutationError toast here: low-balance-alert-sheet (the only
+    // No onMutationError toast here: low-balance-alert-screen (the only
     // caller) shows the error inline while it stays open (see Pattern P2).
     // onError policy: roll back the onMutate snapshot (latest generation only);
     // the caller renders the error inline (no toast).

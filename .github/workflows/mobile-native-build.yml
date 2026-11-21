@@ -27,7 +27,12 @@ on:
       - '.github/workflows/mobile-native-build.yml'
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # Only pull requests serialize and supersede on the ref. A push or
+  # workflow_dispatch run takes no shared slot: the platform jobs below
+  # already key their own never-cancelling slots on the nativeHash, and a
+  # shared whole-run slot made a second run wait out — or, while still
+  # pending, be cancelled by — an unrelated run of the same ref.
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   # Never cancel a push build: it is producing an artifact hosts will
   # install. A superseded pull_request build produces nothing anyone
   # keeps, so it must not hold a macOS runner for 90 minutes.
@@ -91,6 +96,38 @@ jobs:
           echo "ios_hash=$ios_hash" >> "$GITHUB_OUTPUT"
           echo "android_hash=$android_hash" >> "$GITHUB_OUTPUT"
           pnpm exec tsx dev/local/mobile-native-gate.ts "$ios_hash" "$android_hash"
+          printf '{"ios":"%s","android":"%s"}\n' "$ios_hash" "$android_hash" > native-build-claim.json
+
+      # A claim marks a hash this run decided to build, so a duplicate
+      # run's gate skips the same build instead of queueing behind it or
+      # building it a second time. The claim is inert once this run
+      # finishes: a success leaves the published artifact covering the
+      # hash, a failure or cancellation leaves the claim untrusted, and a
+      # hung run ages out after NATIVE_CLAIM_MAX_AGE_MS in
+      # dev/local/mobile-remote-native.ts.
+      # The claim is advisory: a failed upload must not fail the gate and
+      # skip the builds it exists to spare, so the run just loses the skip.
+      - name: Claim the iOS build
+        continue-on-error: true
+        if: steps.decide.outputs.need_ios == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.decide.outputs.prefix }}mobile-native-claim-ios-${{ steps.decide.outputs.ios_hash }}
+          path: native-build-claim.json
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Claim the Android build
+        continue-on-error: true
+        if: steps.decide.outputs.need_android == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.decide.outputs.prefix }}mobile-native-claim-android-${{ steps.decide.outputs.android_hash }}
+          path: native-build-claim.json
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
 
   # One harness SDK build per run. Both platform jobs need
   # packages/harness-sdk/dist and start together after the gate, so running the
@@ -100,12 +137,11 @@ jobs:
   # once and both builds download the tree it produced. The dist is a TypeScript
   # emit, so the Linux build serves the macOS job.
   #
-  # The job runs only when a platform job will. The gate already clears a
-  # platform whose artifact another run published, so a run with both cleared
-  # must not pay an install and a build for nobody.
+  # The job starts beside the gate, not behind it: it reads no gate output.
+  # When the gate clears both platforms, the platform jobs below skip and this
+  # job pays a small idle install on the shared store instead of saving it; the
+  # macOS builds every building run waits for start ~one gate job sooner.
   prepare-harness-sdk:
-    needs: gate
-    if: needs.gate.outputs.need_ios == 'true' || needs.gate.outputs.need_android == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
@@ -161,12 +197,11 @@ jobs:
   # `@kilocode/trpc` alone, but its declaration program also reads web-shared
   # and apps/web sources through their path aliases.
   #
-  # The job runs only when a platform job will: the gate clears a platform whose
-  # artifact another run already published, so a run with both cleared pays no
-  # install and no build for nobody.
+  # This job also starts beside the gate, for the same reason as the harness
+  # SDK producer above: it reads no gate output, and when the gate clears both
+  # platforms its install idles beside the skip instead of being saved by
+  # waiting behind the gate.
   prepare-trpc:
-    needs: gate
-    if: needs.gate.outputs.need_ios == 'true' || needs.gate.outputs.need_android == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:

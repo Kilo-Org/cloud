@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserAdminDashboard } from '@/app/admin/components/UserAdmin/UserAdminDashboard';
 import type { UserDetailProps } from '@/types/admin';
-import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/server';
+import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/domain-gates';
 import { requireAdminPage, AdminStepUpGate } from '@/lib/admin/require-admin-page';
 import {
   getPaymentStatusByUserIds,

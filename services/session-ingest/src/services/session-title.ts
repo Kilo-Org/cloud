@@ -3,13 +3,14 @@ import { z } from 'zod';
 
 import type { WorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
+import { sessionTitleSchema } from '@kilocode/session-ingest-contracts';
 
 import {
   DEFAULT_SESSION_TITLE_PATTERN,
   isDefaultSessionTitle,
 } from '../ingest/default-session-title';
 
-export const sessionTitleSchema = z.string().trim().min(1).max(200);
+export { sessionTitleSchema };
 
 export const reportSessionTitleSchema = z.object({
   title: sessionTitleSchema,

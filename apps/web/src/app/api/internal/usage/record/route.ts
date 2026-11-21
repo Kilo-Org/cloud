@@ -16,7 +16,7 @@ import {
  * Frankfurt-local sink for usage writes against the PostgreSQL primary.
  *
  * `writer_caller` comes from `x-usage-write-source`: `queue` (the usage-ingest
- * consumer), `queue_vercel` (the staging Vercel queue consumer),
+ * consumer), `queue_vercel` (the retired staging Vercel queue consumer in older deployments),
  * `region_handoff` (an SFO `kilocode-ai-gateway` handoff through
  * `recordUsageInPrimaryRegion`), or `unknown` when that header is missing or
  * any other value. Executing the write here collapses the row-lock hold on
@@ -76,7 +76,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
   };
 
-  const rawBody: unknown = await request.json().catch(() => null);
+  let rawBody: unknown;
+  try {
+    rawBody = await request.json();
+  } catch (error) {
+    // A body that cannot be read as JSON is a distinct failure from a valid-JSON
+    // payload that fails schema validation. A body-read error message can quote the
+    // request body or carry credentials, so only a bounded name/category is logged.
+    console.error('usage record request body could not be read as JSON', {
+      error_name: error instanceof Error ? error.name : typeof error,
+    });
+    return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
+  }
+
   const parsed = UsageRecordRequestSchema.safeParse(rawBody);
   timer.mark('validate');
   if (!parsed.success) {

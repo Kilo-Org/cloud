@@ -5,20 +5,28 @@ import path from 'node:path';
 import test from 'node:test';
 
 import {
+  IN_APP_SAMPLE_INTERVAL_MS,
   InfraError,
+  inAppSampleInterval,
+  joinPasses,
   linkPath,
   loadingPlaceholder,
+  openResetLink,
   runMatrix,
+  sampleInterval,
   sampleUntilSettled,
   screenFindings,
   screenIdentity,
+  waitForApp,
   waitForLoadingPlaceholder,
   waitForStableLayout,
   type CaptureContext,
   type Clock,
   type Device,
+  type HoldRelease,
+  type RunOutcome,
 } from './capture';
-import type { ProbeClient } from './cdp';
+import type { ProbeClient, ProbeSample } from './cdp';
 import { matrixCells } from './matrix';
 import { normalize, type ProbeDump } from './tree';
 
@@ -67,7 +75,7 @@ function dumpWith(
       {
         parent: 0,
         tag: 'Paragraph',
-        rect: [10, options.y ?? 50, 50, 20],
+        rect: [14, options.y ?? 50, 50, 20],
         text: options.text ?? 'Title',
         style: { opacity: options.opacity ?? 1, display: options.display ?? 'flex' },
       },
@@ -406,6 +414,25 @@ function fakeProbe(state: ProbeState): ProbeClient {
   };
 }
 
+test("waitForApp bounds the LogBox disable by the wait's remaining budget", async () => {
+  const clock = fakeClock();
+  const budgets: number[] = [];
+  const probe: ProbeClient = {
+    ...fakeProbe(probeState()),
+    ready: async () => {
+      await clock.sleep(40);
+      return true;
+    },
+    disableLogBox: async (budgetMs?: number) => {
+      budgets.push(budgetMs ?? -1);
+      return { exposing: 1, disabled: 1 };
+    },
+  };
+  const dump = await waitForApp(probe, clock, () => false, 100);
+  assert.equal(dump.env.route, '/');
+  assert.deepEqual(budgets, [60]);
+});
+
 function fakeDevice(
   calls: string[],
   state: ProbeState,
@@ -575,6 +602,19 @@ test('runMatrix retries a link that leaves the screen unchanged and reports last
       ],
     ]
   );
+});
+
+test('a link to the screen navigation resets to counts as opened when that screen settles', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  state.screen = '(app)/(tabs)/(0_home)';
+  const home = 'kiloapp:///(app)/(tabs)/(0_home)';
+  const ctx = context(fakeDevice(calls, state, { routes: { [home]: '/' } }), fakeProbe(state));
+  const outcome = await runMatrix(ctx, matrixCells('android', 'base'), [
+    { id: 'home', link: home },
+  ]);
+  assert.equal(calls.filter(call => call === `open:${home}`).length, 1);
+  assert.deepEqual(outcome.findings, []);
 });
 
 test('runMatrix re-sends a link the router routed without painting the screen', async () => {
@@ -932,7 +972,9 @@ test('capture brackets the screenshot with the latest tree and persists alignmen
   const dump: ProbeDump = JSON.parse(fs.readFileSync(path.join(ctx.out, screen.dump), 'utf8'));
   const alignment = JSON.parse(fs.readFileSync(path.join(ctx.out, screen.capture), 'utf8'));
   assert.equal(dump.nodes[1]?.text, 'Latest before capture');
-  assert.ok(outcome.findings.some(finding => finding.rule === 'unsettled'));
+  // The change landed after sampling stopped; the bracket's quiet wait absorbed it,
+  // so the capture is settled and the two bracket reads see the same screen.
+  assert.ok(!outcome.findings.some(finding => finding.rule === 'unsettled'));
   assert.equal(alignment.status, 'bracketed');
   assert.equal(alignment.before.dump.nodes[1].text, 'Latest before capture');
   assert.equal(alignment.after.dump.nodes[1].text, 'Latest before capture');
@@ -970,7 +1012,7 @@ test('capture retains a mismatched screenshot and reports inconclusive pixel ali
   assert.ok(fs.existsSync(path.join(ctx.out, screen.screenshot)));
 });
 
-test('capture marks slow bracketing reads inconclusive instead of certifying paint', async () => {
+test('capture keeps a bracket whose reads and screenshot are slow but adjacent', async () => {
   const calls: string[] = [];
   const state = probeState();
   const device = fakeDevice(calls, state);
@@ -980,6 +1022,8 @@ test('capture marks slow bracketing reads inconclusive instead of certifying pai
   let captured = false;
   device.screenshot = file => {
     screenshot(file);
+    // An iOS simulator screenshot under load: the fake clock advances at once.
+    void ctx.clock.sleep(9_000);
     captured = true;
   };
   const originalDump = probe.dump;
@@ -988,12 +1032,10 @@ test('capture marks slow bracketing reads inconclusive instead of certifying pai
     return originalDump();
   };
   const outcome = await runMatrix(ctx, matrixCells('android', 'base'), HOME);
-  const screen = outcome.cells[0]?.screens[0];
-  assert.ok(screen?.capture);
-  const alignment = JSON.parse(fs.readFileSync(path.join(ctx.out, screen.capture), 'utf8'));
-  assert.equal(alignment.status, 'inconclusive');
-  assert.match(alignment.reason, /bounded alignment window/);
-  assert.ok(outcome.findings.some(finding => finding.rule === 'capture-alignment'));
+  const alignment = captureEvidence(ctx, outcome);
+  assert.equal(alignment.status, 'bracketed');
+  assert.equal(alignment.gapMs, 0);
+  assert.ok(!outcome.findings.some(finding => finding.rule === 'capture-alignment'));
 });
 
 test('uniform captured content remains visible as possible blank-frame evidence without recapture', async () => {
@@ -1060,4 +1102,650 @@ test('a focused-screen transition is retained when route, text and geometry stay
   assert.ok(!outcome.findings.some(finding => finding.rule === 'env-mismatch'));
   const screen = outcome.cells[0]?.screens[0];
   assert.equal(screen?.env.screen, '(app)/(tabs)/settings');
+});
+
+test('the in-app sampling cadence follows the cost of one measured dump', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const probe = fakeProbe(state);
+  const ctx = context(fakeDevice(calls, state), probe);
+  // The in-app sampler walks and serializes the whole document on the app's own
+  // JS thread, so one dump is what a tick costs the screen it measures.
+  const dumpMs = 600;
+  const originalDump = probe.dump;
+  probe.dump = async () => {
+    await ctx.clock.sleep(dumpMs);
+    return originalDump();
+  };
+  const intervals: number[] = [];
+  probe.startSampling = async intervalMs => {
+    intervals.push(intervalMs);
+  };
+  const logs: string[] = [];
+  ctx.log = line => logs.push(line);
+  await runMatrix(ctx, matrixCells('android', 'base'), HOME);
+  assert.deepEqual(intervals, [inAppSampleInterval(dumpMs)]);
+  assert.ok((intervals[0] ?? 0) > IN_APP_SAMPLE_INTERVAL_MS);
+  assert.deepEqual(
+    logs.filter(line => line.includes('in-app dump')),
+    ['design-gate: home one in-app dump costs 600ms; sampling every 1200ms']
+  );
+});
+
+test('a dump that costs less than the floor keeps the default sampling cadence', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const probe = fakeProbe(state);
+  const ctx = context(fakeDevice(calls, state), probe);
+  const originalDump = probe.dump;
+  probe.dump = async () => {
+    await ctx.clock.sleep(40);
+    return originalDump();
+  };
+  const intervals: number[] = [];
+  probe.startSampling = async intervalMs => {
+    intervals.push(intervalMs);
+  };
+  const logs: string[] = [];
+  ctx.log = line => logs.push(line);
+  await runMatrix(ctx, matrixCells('android', 'base'), HOME);
+  assert.deepEqual(intervals, [IN_APP_SAMPLE_INTERVAL_MS]);
+  assert.deepEqual(
+    logs.filter(line => line.includes('in-app dump')),
+    []
+  );
+});
+
+function sampleAt(t: number, dump: ProbeDump = dumpWith()): ProbeSample {
+  return { t, repeat: 1, dump };
+}
+
+test('sampleInterval reads the spacing the retained samples carry', () => {
+  // Fewer than two samples carry no spacing of their own.
+  assert.equal(sampleInterval([]), IN_APP_SAMPLE_INTERVAL_MS);
+  assert.equal(sampleInterval([sampleAt(0)]), IN_APP_SAMPLE_INTERVAL_MS);
+  assert.equal(sampleInterval([sampleAt(0), sampleAt(850), sampleAt(1_700)]), 850);
+  // The span is divided by the ticks that span it, so an uneven capture is timed
+  // with the weighted average of its spacings rather than with its middle one.
+  assert.equal(sampleInterval([sampleAt(0), sampleAt(300), sampleAt(1_200), sampleAt(2_100)]), 700);
+});
+
+test('sampleInterval counts the repeats of a collapsed run as spacings', () => {
+  // A repeated state keeps the stamp of its first tick, so the second sample's
+  // repeats happen after its own stamp and only the first sample spans the gap.
+  assert.equal(
+    sampleInterval([
+      { t: 0, repeat: 1, dump: sampleAt(0).dump },
+      { t: 1_000, repeat: 5, dump: sampleAt(0).dump },
+    ]),
+    1_000
+  );
+  // Three ticks of one state and then three of the next: the span covers both
+  // runs of the first state at its own two spacings.
+  assert.equal(
+    sampleInterval([
+      { t: 0, repeat: 2, dump: sampleAt(0).dump },
+      { t: 750, repeat: 3, dump: sampleAt(0).dump },
+    ]),
+    375
+  );
+  // The timestamps are read in their own order, whatever order they arrive in.
+  assert.equal(sampleInterval([sampleAt(1_700), sampleAt(0), sampleAt(850)]), 850);
+});
+
+test('joinPasses counts the unsampled stretch as repeats of the first pass last state', () => {
+  const early = dumpWith({ y: 50 });
+  const late = dumpWith({ y: 80 });
+  const first = [
+    { t: 0, repeat: 1, dump: early },
+    { t: 250, repeat: 2, dump: early },
+  ];
+  const second = [{ t: 2_000, repeat: 1, dump: late }];
+  const joined = joinPasses(first, second, 250);
+  // The 1750 ms gap is seven spacings, and the tail's own two ticks already cover
+  // two of them, so five ticks are added and the tail spans seven.
+  assert.deepEqual(
+    joined.map(sample => [sample.t, sample.repeat]),
+    [
+      [0, 1],
+      [250, 7],
+      [2_000, 1],
+    ]
+  );
+  assert.equal(joined[1]?.dump, early);
+  // The capped stretch keeps a long quiet wait bounded.
+  const capped = joinPasses(first, [{ t: 250 + 250 * 500, repeat: 1, dump: late }], 250);
+  assert.equal(capped[1]?.repeat, 2 + 64);
+  // A pass that retained nothing falls back to the concatenation.
+  assert.deepEqual(joinPasses([], second, 250), second);
+  assert.deepEqual(joinPasses(first, [], 250), first);
+  // Without a spacing there is no tick to count.
+  assert.equal(joinPasses(first, second, 0)[1]?.repeat, 2);
+});
+
+test('a late arrival is timed with the spacing its samples report', () => {
+  const early = dumpWith({ y: 50 });
+  const late = dumpWith({ y: 80 });
+  const shifts = (intervalMs?: number) =>
+    screenFindings({
+      cell: 'base',
+      target: 'home',
+      dump: late,
+      tree: normalize(late),
+      sampled: {
+        dump: late,
+        timeline: [early, early, late, late],
+        settled: true,
+        elapsedMs: 2_000,
+        ...(intervalMs === undefined ? {} : { intervalMs }),
+      },
+    }).filter(finding => finding.rule === 'layout-shift');
+  // Two samples after the rest is two sample spacings, whatever they measured.
+  const measured = shifts(850)[0];
+  assert.equal(measured?.severity, 'error');
+  assert.match(measured?.message ?? '', /within 1700 ms after settling/u);
+  // Without a spacing of its own, the rule still falls back to the constant.
+  assert.match(shifts(undefined)[0]?.message ?? '', /within 500 ms after settling/u);
+});
+
+function captureEvidence(ctx: CaptureContext, outcome: { cells: RunOutcome['cells'] }) {
+  const capture = outcome.cells[0]?.screens[0]?.capture;
+  assert.ok(capture);
+  return JSON.parse(fs.readFileSync(path.join(ctx.out, capture), 'utf8'));
+}
+
+test('the bracket waits for a screen that changes once after sampling stops', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const probe = fakeProbe(state);
+  const ctx = context(fakeDevice(calls, state), probe);
+  const samplingPasses: number[] = [];
+  probe.startSampling = async intervalMs => {
+    samplingPasses.push(intervalMs);
+  };
+  const originalStop = probe.stopSampling;
+  let samplingStopped = false;
+  probe.stopSampling = async () => {
+    const sampled = await originalStop();
+    samplingStopped = true;
+    return sampled;
+  };
+  const originalDump = probe.dump;
+  let readsAfterStop = 0;
+  probe.dump = async () => {
+    if (samplingStopped) {
+      readsAfterStop += 1;
+      // The late navigation lands while the bracket waits for the screen to hold.
+      if (readsAfterStop === 2) {
+        state.route = '/late';
+        state.text = screenTextFor('/late');
+      }
+    }
+    return originalDump();
+  };
+  const logs: string[] = [];
+  ctx.log = line => logs.push(line);
+  const outcome = await runMatrix(ctx, matrixCells('android', 'base'), HOME);
+  // The bracket opens on the screen the late push produced, so both reads agree.
+  assert.equal(captureEvidence(ctx, outcome).status, 'bracketed');
+  const screen = outcome.cells[0]?.screens[0];
+  assert.ok(screen?.dump);
+  const captured = JSON.parse(fs.readFileSync(path.join(ctx.out, screen.dump), 'utf8'));
+  assert.equal(captured.env.route, '/late');
+  assert.ok(!outcome.findings.some(finding => finding.rule === 'unsettled'));
+  assert.ok(
+    logs.some(line => line.includes('late change after sampling stopped')),
+    `expected a late-change line, saw ${JSON.stringify(logs)}`
+  );
+  // The late change is real work, so the sampled window follows the screen: one
+  // more pass samples it and the timeline the shift rule reads ends on it.
+  assert.equal(samplingPasses.length, 2);
+  assert.equal(samplingPasses[1], samplingPasses[0]);
+  assert.ok(logs.some(line => line.includes('sampling once more')));
+  const timeline = JSON.parse(
+    fs.readFileSync(path.join(ctx.out, 'cells/base/home.timeline.json'), 'utf8')
+  ) as { samples: { dump: ProbeDump }[] };
+  assert.equal(timeline.samples.at(-1)?.dump.env.route, '/late');
+});
+
+test('a late layout change on the same route is reported as a shift, not absorbed', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const probe = fakeProbe(state);
+  const ctx = context(fakeDevice(calls, state), probe);
+  // The screen keeps its route and moves one node, so the shift rule reads one
+  // comparison context across both passes.
+  let moved = false;
+  const current = () =>
+    dumpWith({ y: moved ? 80 : 50, route: state.route, text: state.text, screen: state.screen });
+  let passes = 0;
+  probe.stopSampling = async () => {
+    passes += 1;
+    // Each pass stamps its own window, and the second pass samples the late layout.
+    return {
+      truncated: false,
+      samples: [{ t: passes === 1 ? 0 : 1_000, repeat: 3, dump: current() }],
+    };
+  };
+  let readsAfterStop = 0;
+  probe.dump = async () => {
+    if (passes > 0) {
+      readsAfterStop += 1;
+      // The late layout lands while the bracket waits for the screen to hold.
+      if (readsAfterStop === 2) moved = true;
+    }
+    return current();
+  };
+  const logs: string[] = [];
+  ctx.log = line => logs.push(line);
+  const outcome = await runMatrix(ctx, matrixCells('android', 'base'), HOME);
+  assert.equal(captureEvidence(ctx, outcome).status, 'bracketed');
+  // The two passes are one timeline: the late layout is the arrival the shift rule
+  // reads, not the rest state it starts from.
+  const shifts = outcome.findings.filter(finding => finding.rule === 'layout-shift');
+  assert.deepEqual(
+    shifts.map(finding => [finding.severity, finding.measured]),
+    [['error', 30]]
+  );
+  // The bridge adds only the ticks the tail does not cover, so the shift is timed
+  // at the four spacings it really spans, not at the two the tail double-counted.
+  assert.match(shifts[0]?.message ?? '', /within 1000 ms/u);
+  assert.ok(
+    logs.some(line => line.includes('sampling once more')),
+    `expected a retry line, saw ${JSON.stringify(logs)}`
+  );
+  // The screen held still and the bracket agrees, so the capture stays settled and
+  // the late change is reported instead of being hidden as an unsettled read.
+  assert.ok(!outcome.findings.some(finding => finding.rule === 'unsettled'));
+  const timeline = JSON.parse(
+    fs.readFileSync(path.join(ctx.out, 'cells/base/home.timeline.json'), 'utf8')
+  ) as { samples: { t: number; repeat: number; dump: ProbeDump }[] };
+  // The first pass keeps its state and gains the ticks of the unsampled stretch
+  // that its own three-tick tail does not already cover.
+  assert.deepEqual(
+    timeline.samples.map(sample => [sample.t, sample.repeat, sample.dump.nodes[1]?.rect[1]]),
+    [
+      [0, 4, 50],
+      [1_000, 3, 80],
+    ]
+  );
+  // The route is the one the link opened, and both passes share it.
+  assert.equal(timeline.samples.at(-1)?.dump.env.route, '/home');
+});
+
+test('a late change is sampled at most once more', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const probe = fakeProbe(state);
+  const ctx = context(fakeDevice(calls, state), probe);
+  const samplingPasses: number[] = [];
+  let readsThisPass = 0;
+  probe.startSampling = async intervalMs => {
+    samplingPasses.push(intervalMs);
+    readsThisPass = 0;
+  };
+  const originalStop = probe.stopSampling;
+  let passes = 0;
+  probe.stopSampling = async () => {
+    passes += 1;
+    readsThisPass = 0;
+    return originalStop();
+  };
+  const originalDump = probe.dump;
+  let changes = 0;
+  probe.dump = async () => {
+    readsThisPass += 1;
+    // The screen changes late in both passes; the second must not start a third.
+    if (passes >= 1 && readsThisPass === 2 && changes < 2) {
+      changes += 1;
+      state.route = `/late-${changes}`;
+      state.text = screenTextFor(state.route);
+    }
+    return originalDump();
+  };
+  const logs: string[] = [];
+  ctx.log = line => logs.push(line);
+  await runMatrix(ctx, matrixCells('android', 'base'), HOME);
+  assert.equal(changes, 2);
+  assert.equal(samplingPasses.length, 2);
+  assert.equal(logs.filter(line => line.includes('sampling once more')).length, 1);
+});
+
+test('a screen that keeps changing keeps the bracket a mismatch and says so', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const probe = fakeProbe(state);
+  const ctx = context(fakeDevice(calls, state), probe);
+  const originalStop = probe.stopSampling;
+  let samplingStopped = false;
+  probe.stopSampling = async () => {
+    const sampled = await originalStop();
+    samplingStopped = true;
+    return sampled;
+  };
+  const originalDump = probe.dump;
+  let readsAfterStop = 0;
+  probe.dump = async () => {
+    if (samplingStopped) {
+      readsAfterStop += 1;
+      state.text = readsAfterStop % 2 === 0 ? screenTextFor('/') : 'Still moving';
+    }
+    return originalDump();
+  };
+  const logs: string[] = [];
+  ctx.log = line => logs.push(line);
+  const outcome = await runMatrix(ctx, matrixCells('android', 'base'), HOME);
+  // A screen that never holds still is never certified: the two bracket reads
+  // differ, and the wait reports that it timed out rather than a settle.
+  assert.equal(captureEvidence(ctx, outcome).status, 'mismatch');
+  assert.ok(logs.some(line => line.includes('screen still changing before the screenshot')));
+  assert.ok(outcome.findings.some(finding => finding.rule === 'unsettled'));
+});
+
+const CLEAR = 'kiloapp:///dev/force-state/clear';
+
+test('openResetLink resends a reset whose send failed and confirms its delivery', async () => {
+  const sends: string[] = [];
+  let outcome = 'none';
+  const probe: ProbeClient = {
+    ...fakeProbe(probeState()),
+    openLink: async url => {
+      sends.push(url);
+      if (sends.length === 1) throw new InfraError('CDP Runtime.evaluate timed out');
+      outcome = `openLink ${url}: opened`;
+    },
+    lastOutcome: async () => outcome,
+  };
+  const ctx = context(fakeDevice([], probeState()), probe);
+  assert.equal(await openResetLink(ctx, CLEAR), undefined);
+  assert.deepEqual(sends, [CLEAR, CLEAR]);
+});
+
+test('openResetLink reports a reset the app never confirms instead of throwing', async () => {
+  const probe: ProbeClient = {
+    ...fakeProbe(probeState()),
+    openLink: async () => undefined,
+    lastOutcome: async () => `openLink ${CLEAR}: pending`,
+  };
+  const ctx = context(fakeDevice([], probeState()), probe);
+  assert.equal(await openResetLink(ctx, CLEAR), `openLink ${CLEAR}: pending`);
+});
+
+test('an unconfirmed reset on the last target skips the next cell and fails the restore', async () => {
+  const state = probeState();
+  const sends: string[] = [];
+  const probe: ProbeClient = {
+    ...fakeProbe(state),
+    openLink: async url => {
+      sends.push(url);
+      state.open?.(url);
+    },
+    lastOutcome: async () => `openLink ${CLEAR}: failed (no route)`,
+  };
+  const ctx = context(fakeDevice([], state), probe);
+  const result = await runMatrix(ctx, matrixCells('android', 'base', ['dark']), [
+    { id: 'forced', link: 'kiloapp://forced', after: CLEAR },
+  ]);
+  assert.deepEqual(
+    result.skipped.map(entry => `${entry.cell}/${entry.target}`),
+    ['dark/forced']
+  );
+  assert.match(result.restoreError ?? '', /forced left a forced state.*still unconfirmed/);
+  // Two sends after the capture, two at the next cell, two in the restore.
+  assert.equal(sends.filter(url => url === CLEAR).length, 6);
+});
+
+test('a held target is judged by the loading rules, an ordinary target is not', () => {
+  const blank: ProbeDump = {
+    version: 1,
+    env: {
+      platform: 'android',
+      osVersion: '15',
+      route: '/agents',
+      screen: '(app)/(tabs)/(2_agents)',
+      window: { width: 400, height: 800 },
+      pixelRatio: 2,
+      fontScale: 1,
+      colorScheme: 'light',
+      isRTL: false,
+      language: 'en',
+      languagePreference: 'system',
+      safeArea: { top: 0, right: 0, bottom: 0, left: 0 },
+      tapTarget: { min: 28, touch: 44 },
+    },
+    nodes: [{ parent: -1, tag: 'View', rect: [0, 0, 400, 800] }],
+  };
+  const args = { cell: 'base', target: 'held', dump: blank, tree: normalize(blank) };
+  assert.ok(
+    !screenFindings(args).some(finding => finding.rule === 'loading-placeholder'),
+    'the loading rules are opt-in: a capture of a loaded screen is not judged as a wait'
+  );
+  const findings = screenFindings({ ...args, held: true });
+  assert.ok(findings.some(finding => finding.rule === 'loading-placeholder'));
+  // A held capture is settled: the placeholder is the state the target names, so
+  // the unsettled warning that a placeholder normally raises must not fire.
+  const settled = screenFindings({
+    ...args,
+    held: true,
+    sampled: { dump: blank, timeline: [blank], settled: true, elapsedMs: 0 },
+  });
+  assert.ok(!settled.some(finding => finding.rule === 'unsettled'));
+});
+
+/** A held frame: a screen painting its own spinner while its data is pending. */
+function spinnerDump(options: { route?: string; label?: string } = {}): ProbeDump {
+  const base = dumpWith({ route: options.route ?? '/held', text: 'Loading' });
+  return {
+    ...base,
+    nodes: [
+      ...base.nodes,
+      {
+        parent: 0,
+        tag: 'ActivityIndicator',
+        rect: [40, 100, 20, 20],
+        ...(options.label === undefined ? {} : { label: options.label }),
+      },
+    ],
+  };
+}
+
+test('a held frame that is still moving is still judged by the loading rules', () => {
+  const frame = spinnerDump();
+  const moving = { dump: frame, timeline: [frame, frame], settled: false, elapsedMs: 10_800 };
+  const judged = screenFindings({
+    cell: 'base',
+    target: 'held',
+    dump: frame,
+    tree: normalize(frame),
+    sampled: moving,
+    held: true,
+  });
+  // The geometry rules still skip a frame whose rects describe more than one layout…
+  assert.ok(judged.some(finding => finding.rule === 'unsettled'));
+  // …and the loading rules judge it anyway: this is the frame the hold exists for,
+  // and they read one node's own name rather than comparing two rects.
+  assert.ok(
+    judged.some(finding => finding.rule === 'loading-unlabelled'),
+    'an unsettled held frame is still the frame the loading rules measure'
+  );
+  // The same frame without a hold is not judged as a wait.
+  const ordinary = screenFindings({
+    cell: 'base',
+    target: 'ordinary',
+    dump: frame,
+    tree: normalize(frame),
+    sampled: moving,
+  });
+  assert.ok(!ordinary.some(finding => finding.rule.startsWith('loading-')));
+});
+
+const LANDED: HoldRelease = {
+  confirmed: true,
+  cleared: true,
+  settled: true,
+  clearMs: 400,
+  landedMs: 900,
+};
+
+function releaseFindingsFor(release: HoldRelease, held = true) {
+  const frame = spinnerDump();
+  return screenFindings({
+    cell: 'base',
+    target: 'held',
+    dump: frame,
+    tree: normalize(frame),
+    held,
+    sampled: { dump: frame, timeline: [frame], settled: true, elapsedMs: 0, release },
+  }).filter(finding => finding.rule === 'loading-release');
+}
+
+test('a release the app never confirmed is reported, not passed', () => {
+  const findings = releaseFindingsFor({
+    ...LANDED,
+    confirmed: false,
+    failure: 'openLink kiloapp:///dev/force-state/clear: pending',
+    cleared: false,
+    settled: false,
+  });
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0]?.severity, 'warning');
+  assert.match(
+    findings[0]?.message ?? '',
+    /was not released \(openLink .* pending\).*loading frame only/u
+  );
+  // A capture that is not held has no landing to report on.
+  assert.deepEqual(releaseFindingsFor({ ...LANDED, confirmed: false }, false), []);
+});
+
+test('a placeholder that outlives the release is reported as an unmeasured landing', () => {
+  const findings = releaseFindingsFor({ ...LANDED, cleared: false, clearMs: 30_100 });
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0]?.measured, 30_100);
+  assert.match(findings[0]?.message ?? '', /still painted 30100 ms after the release/u);
+});
+
+test('a landing that never stops moving is reported as an unsettled landing', () => {
+  const findings = releaseFindingsFor({ ...LANDED, settled: false, landedMs: 8_240 });
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0]?.measured, 8_240);
+  assert.match(findings[0]?.message ?? '', /kept changing for 8240 ms/u);
+});
+
+test('a release that lands on content reports nothing', () => {
+  assert.deepEqual(releaseFindingsFor(LANDED), []);
+});
+
+const HELD_LINK = 'kiloapp://held';
+const RELEASE_LINK = 'kiloapp:///dev/force-state/clear?next=%2Fcontent';
+
+/** A held frame: the screen's own skeleton, painted while its data is pending. */
+function skeletonDump(route: string, text: string): ProbeDump {
+  const base = dumpWith({ route, text });
+  return {
+    ...base,
+    nodes: [
+      ...base.nodes,
+      { parent: 0, tag: 'View', rect: [0, 100, 100, 20], testID: 'screen-skeleton' },
+    ],
+  };
+}
+
+/** A probe whose held frame stays until the release link opens. */
+function heldProbe(state: ProbeState): ProbeClient {
+  const content = dumpWith({ route: '/content', text: screenTextFor('/content') });
+  const probe: ProbeClient & { released: boolean } = {
+    ...fakeProbe(state),
+    released: false,
+    dump: async () => (probe.released ? content : skeletonDump(state.route, state.text)),
+    openLink: async url => {
+      if (url === RELEASE_LINK) {
+        probe.released = true;
+        state.route = '/content';
+        state.text = screenTextFor('/content');
+        return;
+      }
+      state.open?.(url);
+    },
+    lastOutcome: async () => `openLink ${RELEASE_LINK}: opened`,
+  };
+  return probe;
+}
+
+const HELD_TARGET = { id: 'held', link: HELD_LINK, after: RELEASE_LINK, hold: true };
+
+test('a held capture releases onto its content and keeps the landed frame', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const ctx = context(
+    fakeDevice(calls, state, {
+      routes: { [HELD_LINK]: '/held' },
+      texts: { [HELD_LINK]: 'Loading' },
+    }),
+    heldProbe(state)
+  );
+  const logs: string[] = [];
+  ctx.log = line => logs.push(line);
+  const outcome = await runMatrix(ctx, matrixCells('android', 'base'), [HELD_TARGET]);
+  const screen = outcome.cells[0]?.screens[0];
+  assert.ok(screen?.landing, 'the landed frame is kept as evidence');
+  const landing = JSON.parse(fs.readFileSync(path.join(ctx.out, screen.landing), 'utf8'));
+  assert.equal(landing.env.route, '/content');
+  assert.ok(logs.some(line => line.includes('releasing the loading hold')));
+  assert.equal(
+    outcome.findings.filter(finding => finding.rule === 'loading-release').length,
+    0,
+    'a confirmed release onto content has nothing to report'
+  );
+  assert.equal(outcome.restoreError, undefined);
+});
+
+test('a held capture whose release never lands reports the unmeasured landing', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const probe: ProbeClient = {
+    ...heldProbe(state),
+    // The hold stays on: the app never reports the release it was sent.
+    lastOutcome: async () => `openLink ${RELEASE_LINK}: pending`,
+  };
+  const ctx = context(
+    fakeDevice(calls, state, {
+      routes: { [HELD_LINK]: '/held' },
+      texts: { [HELD_LINK]: 'Loading' },
+    }),
+    probe
+  );
+  const logs: string[] = [];
+  ctx.log = line => logs.push(line);
+  const outcome = await runMatrix(ctx, matrixCells('android', 'base'), [HELD_TARGET]);
+  const release = outcome.findings.filter(finding => finding.rule === 'loading-release');
+  assert.equal(release.length, 1);
+  assert.match(release[0]?.message ?? '', /was not released/u);
+  assert.ok(logs.some(line => line.includes('release link not confirmed')));
+  // A release that never landed cannot clear the placeholder the hold keeps
+  // painting, so the release path must not spend the wait's budget on it.
+  assert.ok(!logs.some(line => line.includes('still paints its placeholder')));
+});
+
+test('a held retry does not wait for a placeholder that cannot clear', async () => {
+  const calls: string[] = [];
+  const state = probeState();
+  const ctx = context(
+    fakeDevice(calls, state, {
+      routes: { [HELD_LINK]: '/held' },
+      // The first open reports the route without painting the screen; the retry
+      // paints it, and that paint is the held frame.
+      texts: { [HELD_LINK]: ['Screen /', 'Loading'] },
+    }),
+    heldProbe(state)
+  );
+  const logs: string[] = [];
+  ctx.log = line => logs.push(line);
+  const outcome = await runMatrix(ctx, matrixCells('android', 'base'), [HELD_TARGET]);
+  assert.equal(outcome.cells[0]?.screens.length, 1);
+  assert.ok(logs.some(line => line.includes('did not change the screen; opening the link again')));
+  assert.ok(
+    !logs.some(line => line.includes('still paints its loading placeholder')),
+    'the retry must not wait on the placeholder the hold keeps painting'
+  );
+  assert.ok(ctx.clock.now() < 30_000, 'the retry costs no placeholder wait');
 });

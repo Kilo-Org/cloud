@@ -65,6 +65,22 @@ corepack enable
 corepack install
 ```
 
+### Bun 1.4.4 (Cloud Agent development)
+
+Cloud Agent wrapper builds require exactly Bun 1.4.4, matching
+`RUNTIME_DISTRIBUTION.bun` in
+`services/cloud-agent-next/src/shared/runtime-distribution.ts`. The service's
+`dev` and `start` scripts and deployment CI build the wrapper automatically.
+
+Install or switch to this version using the
+[official installer](https://bun.com/docs/installation#installing-older-versions),
+then verify the version:
+
+```bash
+curl -fsSL https://bun.com/install | bash -s "bun-v1.4.4"
+bun --version
+```
+
 ### Docker
 
 Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) either from the website or via Homebrew:
@@ -245,52 +261,6 @@ pnpm test
 This runs the web, web environment, and local development-tool tests. They
 should pass against the local PostgreSQL database.
 
-### Watchwood signup shadow
-
-Watchwood collects browser evidence before authentication and records advisory assessments when the web app reaches new-account creation.
-Existing Turnstile and Bouncer decisions remain authoritative.
-Native account creation does not participate.
-
-Collection is disabled until all Watchwood variables in `ENVIRONMENT.md` are configured.
-There are no database migrations or required production changes for a disabled deployment.
-Before activation, confirm that the OpenAI organization and its dedicated key have access to Watchwood.
-The owner configures shared values with:
-
-```bash
-pnpm web:env set WATCHWOOD_ORG_ID
-pnpm web:env set WATCHWOOD_API_KEY
-pnpm web:env set WATCHWOOD_SHADOW_ENABLED
-```
-
-Set the enabled value to exact `true`, then redeploy.
-The browser receives only the organization and a server-generated signup identity.
-The server sends the token and trusted client IP to OpenAI, without email or phone signals.
-Production assessments require Vercel's trusted client-IP header.
-Production without Vercel skips assessment rather than trusting caller-supplied forwarding headers.
-Only local development and tests use the forwarded-header fallback.
-Turnstile verification signs a separate trusted-IP claim for Watchwood; existing authentication fields retain their behavior.
-Watchwood skips older proofs without that claim instead of changing authentication admission.
-Tokens remain transient; signed, HttpOnly cookies carry the signup identity and assessment through authentication redirects.
-The optional SDK device cookie stays disabled.
-
-The browser allows at most two seconds for shadow submission.
-After the mount request reports collection disabled, submission skips Watchwood without another request.
-An unresolved configuration request retains the bounded fail-open path.
-The server allows one second for body reads, Redis budgets, and the upstream check.
-It retries an upstream server error once and does not retry client errors.
-Upstream redirects count as errors and are never followed.
-Missing tokens, blocked scripts, invalid responses, unavailable services, and high risk scores do not refuse signup.
-Redis budgets limit assessments per verified Turnstile context and client IP; exhausted budgets reduce coverage, not signup admission.
-Each budget increment sets its expiry atomically.
-
-Logs named `[auth] Watchwood signup attempt` describe assessment coverage, failures, scores, and latency.
-Logs named `[auth] Watchwood signup shadow` correlate new-account attempts with existing signup outcomes through `operationId`.
-Both events carry `shadow: true` and `enforced: false`.
-The risk score ranges from zero to one; it is not a probability.
-Do not interpret a missing assessment as a low score.
-Observe coverage, conversion, latency, and confirmed abuse before proposing enforcement.
-To disable collection, set `WATCHWOOD_SHADOW_ENABLED` to `false` and redeploy.
-
 ### CLI session storage verification
 
 After migrating the local database, run the session-copy and account-cleanup
@@ -429,6 +399,51 @@ An empty credit block list shows no expiring credits, not an error.
 | `pnpm dev:db:reset` | Drop all app-owned schemas in the local dev database, recreate `public`, and leave the DB truly empty before re-migrating |
 | `pnpm --filter web stripe` | Start Stripe webhook forwarding to localhost |
 | `pnpm test:e2e` | Run Playwright end-to-end tests |
+| `pnpm dev:pixel-diff --before <png> --after <png> --out <new-dir>` | Compare existing proof screenshots without uploading them |
+
+## Browser pixel proof
+
+Use your existing web Playwright probe to reach the same settled state on base and head.
+The comparison command takes its PNG output. It does not start a browser or sign in.
+Keep the browser build, viewport, device scale, theme, fixture data, and screenshot coordinates fixed.
+Use the full viewport or the same fixed clip on both revisions, not independently sized element crops.
+Wait for the expected content and fonts before capture. Keep development overlays out of both frames.
+Capture one revision twice to check that the chosen state is stable.
+
+After the probe asserts that the expected state is visible, capture the viewport or a fixed clip:
+
+```ts
+await page.evaluate(() => document.fonts.ready);
+await page.screenshot({ path: outputPath, animations: 'disabled', caret: 'hide' });
+```
+
+Keep both PNGs outside the checkout. Use fixture data, not a real account.
+
+```sh
+pnpm dev:pixel-diff --before /tmp/proof/base.png --after /tmp/proof/head.png \
+  --out /tmp/proof/compare
+```
+
+Read `pixel-diff.json` for counts and boxes in physical pixels.
+The output keeps `comparison.png` and adds `focus.png` when a focus crop helps.
+An inconclusive result does not establish an unchanged screen.
+The comparison adds visual evidence; keep the Playwright assertions for behavior.
+
+For the extension, capture the signed-out side panel once per unpacked Chrome build:
+
+```sh
+pnpm --filter kilo-extension capture:sidepanel-proof \
+  --extension /tmp/proof/base-build --out /tmp/proof/base-panel.png
+pnpm --filter kilo-extension capture:sidepanel-proof \
+  --extension /tmp/proof/head-build --out /tmp/proof/head-panel.png
+pnpm dev:pixel-diff --before /tmp/proof/base-panel.png --after /tmp/proof/head-panel.png \
+  --out /tmp/proof/extension-compare --scale 2
+```
+
+Use fixture builds and the same Chromium executable for both captures.
+Give each capture a new `--out` path, including a repeat of the same build.
+Set `EXTENSION_E2E_EXECUTABLE_PATH` if you need to select that executable.
+This captures the extension document, not browser-owned dialogs or other browser controls.
 
 ## Git Workflow
 

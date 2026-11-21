@@ -186,12 +186,16 @@ const TriggerRow = memo(function TriggerRow({
         ) : (
           <div className="space-y-0.5">
             {trigger.githubRepo && <div className="font-mono">{trigger.githubRepo}</div>}
+            {trigger.targetType === 'cloud_agent_chat' && <div>Existing chat</div>}
             {trigger.activationMode === 'scheduled' && trigger.cronExpression && (
               <div className="text-muted-foreground/60 text-xs">
                 {describeCron(trigger.cronExpression)}
               </div>
             )}
-            {!trigger.githubRepo && !trigger.cronExpression && '—'}
+            {!trigger.githubRepo &&
+              !trigger.cronExpression &&
+              trigger.targetType !== 'cloud_agent_chat' &&
+              '—'}
           </div>
         )}
       </TableCell>

@@ -12,9 +12,8 @@ describe('consent mode', () => {
     });
   });
 
-  it('uses back and revoke actions when reviewing accepted consent', () => {
+  it('uses revoke alone when reviewing accepted consent', () => {
     expect(getConsentActions('review')).toEqual({
-      primaryLabel: 'Back',
       secondaryLabel: 'Revoke consent',
       destructiveLabel: 'Revoke consent',
       destructiveTitle: 'Revoke data sharing consent?',

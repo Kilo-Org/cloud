@@ -3,9 +3,6 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "Agentøkten din har en oppdatering",
-      "chatMessage": "Du har en ny melding",
-      "instanceLifecycle": "Forekomsten din har en oppdatering",
-      "scheduledAction": "En planlagt handling har en oppdatering",
       "lowBalance": "Saldoen din krever oppmerksomhet",
       "spendAlert": "Forbruket ditt krever oppmerksomhet",
       "securityFinding": "Et sikkerhetsfunn krever oppmerksomhet",
@@ -15,14 +12,7 @@
   },
   "agentSession": {
     "notification": {
-      "title": "{{sessionTitle}}",
       "body": "{{message}}"
-    }
-  },
-  "chat": {
-    "untitled": {
-      "title": "{{sandboxLabel}} · Uten tittel",
-      "body": "{{bodyPreview}}"
     }
   },
   "internal": {
@@ -45,43 +35,12 @@
     },
     "securityFindingSlaBreach": {
       "title": "SLA-brudd"
-    },
-    "securityLifecycle": {
-      "title": "Kilo",
-      "body": "En sikkerhetssjekk har en oppdatering"
-    }
-  },
-  "instanceLifecycle": {
-    "ready": {
-      "title": "{{instanceName}} er klar",
-      "body": "Trykk for å begynne å chatte."
-    },
-    "startFailed": {
-      "title": "{{instanceName}} kunne ikke startes",
-      "body": "Start mislyktes."
-    }
-  },
-  "scheduledAction": {
-    "restartNotice": {
-      "title": "{{instanceName}} vil startes på nytt snart",
-      "body": "Planlagt omstart kl. {{when}}."
-    },
-    "restartCancelled": {
-      "title": "{{instanceName}} omstart avbrutt",
-      "body": "Den tidligere planlagte omstarten er avbrutt."
-    },
-    "versionChangeNotice": {
-      "title": "{{instanceName}} vil oppgraderes snart",
-      "bodyWithTag": "Oppgrader til {{targetImageTag}} kl. {{when}}.",
-      "bodyWithoutTag": "Planlagt oppgradering kl. {{when}}."
-    },
-    "versionChangeCancelled": {
-      "title": "{{instanceName}} oppgradering avbrutt",
-      "body": "Den tidligere planlagte oppgraderingen er avbrutt."
     }
   },
   "sessionReady": {
-    "title": "{{sessionTitle}}",
     "body": "Kilo-økten din er klar til å styres fra telefonen"
+  },
+  "session": {
+    "title": "{{sessionTitle}}"
   }
 }

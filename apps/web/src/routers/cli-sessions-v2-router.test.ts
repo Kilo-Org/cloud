@@ -1852,6 +1852,38 @@ describe('cli-sessions-v2-router', () => {
       );
     });
 
+    it('forwards the worker workspace conflict so the client can cascade', async () => {
+      // The ingest client maps the worker's 409 to `CONFLICT` carrying the
+      // worker's error token. The app reads both to delete the workspace next,
+      // so this hop must not replace them with a generic failure.
+      fetchSpy.mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: 'workspace_requires_root_session' }), {
+          status: 409,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(caller.cliSessionsV2.delete({ session_id: sessionId })).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: 'workspace_requires_root_session',
+      });
+    });
+
+    it('maps an ingest delete budget expiry to the retryable answer', async () => {
+      // The ingest delete is the last hop of a mutation the caller already
+      // completed. A worker that never answers must read as retryable upstream,
+      // not as an internal defect. `fetchWithinBudget` rejects with this error
+      // when the hop outlives `CONTROL_PLANE_UPSTREAM_BUDGET_MS`.
+      fetchSpy.mockRejectedValueOnce(new ServiceFetchTimeoutError(8000));
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(caller.cliSessionsV2.delete({ session_id: sessionId })).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Failed to delete session',
+      });
+    });
+
     it('deletes a legacy agent session through ingest without a runtime call', async () => {
       await db
         .update(cli_sessions_v2)
@@ -2156,6 +2188,21 @@ describe('cli-sessions-v2-router', () => {
       await expect(
         caller.cliSessionsV2.get({ session_id: organizationSessionId })
       ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    });
+
+    it('get answers a spent mobile budget retryably instead of reading the session', async () => {
+      // The mobile procedure budget must not be consumed by this read: the
+      // caller sees a retryable answer instead of an opaque internal error.
+      const caller = await createCallerForUser(regularUser.id, {
+        controlPlaneStartedAt: performance.now() - 9_900,
+      });
+
+      await expect(
+        caller.cliSessionsV2.get({ session_id: organizationSessionId })
+      ).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Session details took too long to load. Try again.',
+      });
     });
 
     it('get distinguishes a session owned by another account from one that does not exist', async () => {

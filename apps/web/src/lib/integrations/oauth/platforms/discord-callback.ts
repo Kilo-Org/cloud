@@ -1,6 +1,5 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { captureException, captureMessage } from '@sentry/nextjs';
@@ -16,6 +15,10 @@ import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { withWorkspaceInstallationLock } from '@/lib/integrations/oauth/workspace-installation-lock';
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
+import {
+  oauthCallbackRedirectPath,
+  resolveOAuthCallbackActor,
+} from '@/lib/integrations/oauth/common';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
@@ -35,17 +38,22 @@ import { consumeProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-a
  */
 export async function handleDiscordOAuthCallback(request: NextRequest) {
   try {
-    // 1. Verify user authentication
-    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
-    if (authFailedResponse) {
-      return NextResponse.redirect(new URL('/users/sign_in', APP_URL));
-    }
-
-    // 2. Extract parameters
+    // 1. Extract parameters
     const searchParams = request.nextUrl.searchParams;
     const code = searchParams.get('code');
     const state = searchParams.get('state');
     const error = searchParams.get('error');
+
+    // 2. Identify the caller: a web session, or the app shell's signed state
+    // plus the flow cookie its connect route set for this exact attempt.
+    const verified = verifyOAuthState(state);
+    const actor = await resolveOAuthCallbackActor({ request, rawState: state, verified });
+    if (actor.status === 'unauthenticated') {
+      return NextResponse.redirect(
+        new URL(oauthCallbackRedirectPath(request, '/users/sign_in'), APP_URL)
+      );
+    }
+    const user = actor.user;
 
     // Handle OAuth errors from Discord
     if (error) {
@@ -86,14 +94,15 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
     }
 
     // 3. Verify signed state (CSRF protection)
-    const verified = verifyOAuthState(state);
     if (!state || !verified) {
       captureMessage('Discord callback invalid or tampered state signature', {
         level: 'warning',
         tags: { endpoint: 'discord/callback', source: 'discord_oauth' },
         extra: safeCallbackContext(searchParams),
       });
-      return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
+      return NextResponse.redirect(
+        new URL(oauthCallbackRedirectPath(request, '/integrations?error=invalid_state'), APP_URL)
+      );
     }
 
     // 4. Verify the user completing the flow is the same user who initiated it
@@ -103,7 +112,9 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
         tags: { endpoint: 'discord/callback', source: 'discord_oauth' },
         extra: { stateUserId: verified.userId, sessionUserId: user.id },
       });
-      return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
+      return NextResponse.redirect(
+        new URL(oauthCallbackRedirectPath(request, '/integrations?error=unauthorized'), APP_URL)
+      );
     }
 
     // 5. Parse owner from verified state payload
@@ -115,7 +126,9 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
         tags: { endpoint: 'discord/callback', source: 'discord_oauth' },
         extra: { code: '***', owner: ownerStr },
       });
-      return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
+      return NextResponse.redirect(
+        new URL(oauthCallbackRedirectPath(request, '/integrations?error=invalid_state'), APP_URL)
+      );
     }
 
     // 6. Verify the user may change the owner's Discord connection. An organization
@@ -126,12 +139,16 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
     } else {
       // For user-owned integrations, verify it's the same user
       if (user.id !== owner.id) {
-        return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
+        return NextResponse.redirect(
+          new URL(oauthCallbackRedirectPath(request, '/integrations?error=unauthorized'), APP_URL)
+        );
       }
     }
 
     if (verified.provider !== PLATFORM.DISCORD || verified.purpose !== 'provider_install') {
-      return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
+      return NextResponse.redirect(
+        new URL(oauthCallbackRedirectPath(request, '/integrations?error=invalid_state'), APP_URL)
+      );
     }
 
     if (

@@ -27,7 +27,7 @@ import {
   provider_oauth_attempts,
   external_side_effect_outbox,
 } from '@kilocode/db/schema';
-import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import type { DrizzleConnection, DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { auto_deleted_at, db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { and, asc, desc, eq, inArray, isNull, gt, or } from 'drizzle-orm';
 import { TRIAL_DURATION_DAYS } from '@kilocode/web-shared/lib/constants';
@@ -39,7 +39,11 @@ import {
 } from '@kilocode/web-shared/lib/email-address';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { resolveEffectiveOrganizationSsoPolicy } from './organization-sso-policy';
-import { classifyOrganizationEntitlement } from './trial-utils';
+import {
+  classifyOrganizationEntitlement,
+  getOrganizationTrialEndDate,
+  isRunningTrialStage,
+} from './trial-utils';
 import { logExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
@@ -50,6 +54,29 @@ import {
   lockOrganizationGroupPolicy,
 } from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { enforceOrganizationCreationLimit } from '@kilocode/web-shared/lib/organizations/organization-creation-limit';
+
+// `organization_seats_purchases` is append-only, so the most recently created
+// row is the organization's current subscription state — the same input the
+// subscription gate classifies with. Lazily built: suites that mock the
+// drizzle module must not see this evaluated at import time.
+function latestSeatPurchaseStatusSql() {
+  return sql<OrganizationSeatsPurchase['subscription_status'] | null>`(
+    SELECT ${organization_seats_purchases.subscription_status}
+    FROM ${organization_seats_purchases}
+    WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
+    ORDER BY ${organization_seats_purchases.created_at} DESC
+    LIMIT 1
+  )`;
+}
+
+/** An invitation is live while it is unaccepted and unexpired. */
+function liveInvitationCondition(organizationId: string) {
+  return and(
+    eq(organization_invitations.organization_id, organizationId),
+    isNull(organization_invitations.accepted_at),
+    gt(organization_invitations.expires_at, sql`NOW()`)
+  );
+}
 
 export async function getOrganizationById(
   id: Organization['id'],
@@ -79,16 +106,6 @@ export async function findOrganizationByStripeCustomerId(
 export async function getUserOrganizationsWithSeats(
   userId: User['id']
 ): Promise<UserOrganizationWithSeats[]> {
-  // `organization_seats_purchases` is append-only, so the most recently created
-  // row is the organization's current subscription state — the same input the
-  // subscription gate classifies with.
-  const latestSeatPurchaseStatus = sql<OrganizationSeatsPurchase['subscription_status'] | null>`(
-    SELECT ${organization_seats_purchases.subscription_status}
-    FROM ${organization_seats_purchases}
-    WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
-    ORDER BY ${organization_seats_purchases.created_at} DESC
-    LIMIT 1
-  )`;
   const results = await db
     .select({
       organizationId: organizations.id,
@@ -102,7 +119,7 @@ export async function getUserOrganizationsWithSeats(
       createdAt: organizations.created_at,
       freeTrialEndAt: organizations.free_trial_end_at,
       settings: organizations.settings,
-      latestSeatPurchaseStatus,
+      latestSeatPurchaseStatus: latestSeatPurchaseStatusSql(),
       seatCountTotal: organizations.seat_count,
       total_member_count: sql<number>`(
         SELECT COUNT(*)::int FROM (
@@ -131,18 +148,10 @@ export async function getUserOrganizationsWithSeats(
     );
 
   const now = new Date();
-  return results.map(result => ({
-    organizationName: result.organizationName,
-    organizationId: result.organizationId,
-    parentOrganizationId: result.parentOrganizationId,
-    role: result.role,
-    memberCount: result.total_member_count,
-    balance: result.totalMicrodollarsAcquired - result.microdollarsUsed,
-    requireSeats: result.requireSeats,
-    plan: result.plan,
-    created_at: result.createdAt,
-    isSalesDemo: result.isSalesDemo,
-    isTrialExpiredForEnforcement: classifyOrganizationEntitlement({
+  return results.map(result => {
+    // One classification feeds both the gate verdict and the trial readout, so
+    // the two can never disagree about which state the organization is in.
+    const entitlement = classifyOrganizationEntitlement({
       organization: {
         created_at: result.createdAt,
         free_trial_end_at: result.freeTrialEndAt,
@@ -151,12 +160,42 @@ export async function getUserOrganizationsWithSeats(
       },
       latestSeatPurchaseStatus: result.latestSeatPurchaseStatus,
       now,
-    }).isTrialExpiredForEnforcement,
-    seatCount: {
-      used: result.total_member_count,
-      total: result.seatCountTotal,
-    },
-  }));
+    });
+    // A bypass (`displayStatus === 'subscribed'`) means the trial is not what
+    // governs the organization, and the expired stages are the trial's past, so
+    // only the four running stages are published. The guard reads the published
+    // value itself — `trialStatus` stays a running stage through a bypass, so
+    // the bypass check names `bypassReason` alongside it, and the narrowed type
+    // is the set the wire actually carries. The date rides along with them: a
+    // client renders "trial ends on <date>" from the payload instead of
+    // re-deriving `free_trial_end_at ?? created_at + 14d` on the device.
+    const trialStatus =
+      entitlement.bypassReason == null && isRunningTrialStage(entitlement.trialStatus)
+        ? entitlement.trialStatus
+        : null;
+    return {
+      organizationName: result.organizationName,
+      organizationId: result.organizationId,
+      parentOrganizationId: result.parentOrganizationId,
+      role: result.role,
+      memberCount: result.total_member_count,
+      balance: result.totalMicrodollarsAcquired - result.microdollarsUsed,
+      requireSeats: result.requireSeats,
+      plan: result.plan,
+      created_at: result.createdAt,
+      isSalesDemo: result.isSalesDemo,
+      isTrialExpiredForEnforcement: entitlement.isTrialExpiredForEnforcement,
+      trialStatus,
+      trialEndsAt:
+        trialStatus == null
+          ? null
+          : getOrganizationTrialEndDate(result.freeTrialEndAt, result.createdAt).toISOString(),
+      seatCount: {
+        used: result.total_member_count,
+        total: result.seatCountTotal,
+      },
+    };
+  });
 }
 
 /**
@@ -233,13 +272,7 @@ export async function getProfileOrganizations(
   // getProfileOrganizations a single query and adds no seat-purchase lookup for
   // callers that don't opt in.
   const latestSeatPurchaseStatus = excludeAccessBlocked
-    ? sql<OrganizationSeatsPurchase['subscription_status'] | null>`(
-        SELECT ${organization_seats_purchases.subscription_status}
-        FROM ${organization_seats_purchases}
-        WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
-        ORDER BY ${organization_seats_purchases.created_at} DESC
-        LIMIT 1
-      )`
+    ? latestSeatPurchaseStatusSql()
     : sql<OrganizationSeatsPurchase['subscription_status'] | null>`NULL`;
 
   const results: ProfileOrganizationRow[] = await db
@@ -351,6 +384,43 @@ export async function skipCustomerSourceSurveyForOrgJoin(
     .where(and(eq(kilocode_users.id, userId), isNull(kilocode_users.customer_source)));
 }
 
+/**
+ * Insert an organization membership and, when the row is new, advance the
+ * organization's group-policy revision. The SSO/join path and the
+ * invitation-acceptance path both use this, so neither can commit the membership
+ * without the revision change. A caller that requires a new row reads the
+ * membership first and rejects the conflict.
+ */
+async function insertOrganizationMembership(
+  tx: DrizzleTransaction,
+  membership: {
+    organizationId: Organization['id'];
+    userId: User['id'];
+    role: OrganizationRole;
+    invitedBy?: string | null;
+  }
+): Promise<boolean> {
+  const result = await tx
+    .insert(organization_memberships)
+    .values({
+      organization_id: membership.organizationId,
+      kilo_user_id: membership.userId,
+      role: membership.role,
+      invited_by: membership.invitedBy ?? null,
+    })
+    .onConflictDoNothing();
+
+  const added = (result.rowCount ?? 0) > 0;
+  // Only a real membership change affects group-policy evaluation. Bumping the
+  // revision (and taking the org-wide policy advisory lock) on a no-op insert
+  // would serialize every SSO re-login on one row. Skip both when nothing was
+  // inserted.
+  if (added) {
+    await bumpOrganizationGroupPolicyRevision(tx, membership.organizationId, membership.userId);
+  }
+  return added;
+}
+
 export async function addUserToOrganization(
   organizationId: Organization['id'],
   userId: User['id'],
@@ -362,24 +432,11 @@ export async function addUserToOrganization(
       addUserToOrganization(organizationId, userId, role, tx)
     );
   }
-  const result = await txn
-    .insert(organization_memberships)
-    .values({
-      organization_id: organizationId,
-      kilo_user_id: userId,
-      role,
-    })
-    .onConflictDoNothing();
-
-  const added = (result.rowCount ?? 0) > 0;
-  // Only a real membership change affects group-policy evaluation. Bumping the
-  // revision (and taking the org-wide policy advisory lock) on a no-op insert
-  // would serialize every SSO re-login on one row. Skip both when nothing was
-  // inserted.
-  if (added) {
-    await bumpOrganizationGroupPolicyRevision(txn, organizationId, userId);
-  }
-  return added;
+  return await insertOrganizationMembership(txn, {
+    organizationId,
+    userId,
+    role,
+  });
 }
 
 export async function lockOrganizationMembershipMutation(
@@ -423,19 +480,19 @@ export async function addSsoUserToOrganization(
         .innerJoin(kilocode_users, eq(kilocode_users.id, userId))
         .where(
           and(
-            eq(organization_invitations.organization_id, organizationId),
+            liveInvitationCondition(organizationId),
             eq(organization_invitations.token, options.invitationToken),
             eq(organization_invitations.authentication_requirement, 'workos'),
-            eq(organization_invitations.sso_source_organization_id, organizationId),
-            isNull(organization_invitations.accepted_at),
-            gt(organization_invitations.expires_at, sql`NOW()`)
+            eq(organization_invitations.sso_source_organization_id, organizationId)
           )
         )
         .limit(1);
       if (
         invitation &&
-        normalizeEmail(invitation.email) ===
-          (invitation.normalizedUserEmail ?? normalizeEmail(invitation.userEmail))
+        invitationAddressesAccount(invitation.email, {
+          email: invitation.userEmail,
+          normalizedEmail: invitation.normalizedUserEmail,
+        })
       ) {
         return false;
       }
@@ -472,10 +529,16 @@ export async function updateUserRoleInOrganization(
   userId: User['id'],
   role: OrganizationRole,
   txn?: DrizzleTransaction
-): Promise<{ success: boolean; updated: 'membership' | 'invitation' | 'none' }> {
+): Promise<{
+  success: boolean;
+  updated: 'membership' | 'invitation' | 'none';
+}> {
   const run = async (
     tx: DrizzleTransaction
-  ): Promise<{ success: boolean; updated: 'membership' | 'invitation' | 'none' }> => {
+  ): Promise<{
+    success: boolean;
+    updated: 'membership' | 'invitation' | 'none';
+  }> => {
     const membershipUpdateResult = await tx
       .update(organization_memberships)
       .set({ role })
@@ -504,15 +567,12 @@ export async function updateUserRoleInOrganization(
     }
 
     const pendingInvitations = await tx
-      .select({ id: organization_invitations.id, email: organization_invitations.email })
+      .select({
+        id: organization_invitations.id,
+        email: organization_invitations.email,
+      })
       .from(organization_invitations)
-      .where(
-        and(
-          eq(organization_invitations.organization_id, organizationId),
-          isNull(organization_invitations.accepted_at),
-          gt(organization_invitations.expires_at, sql`NOW()`)
-        )
-      );
+      .where(liveInvitationCondition(organizationId));
 
     const invitationIds = pendingInvitations
       .filter(invitation => invitationAddressesAccount(invitation.email, user))
@@ -527,9 +587,8 @@ export async function updateUserRoleInOrganization(
       .set({ role })
       .where(
         and(
-          inArray(organization_invitations.id, invitationIds),
-          isNull(organization_invitations.accepted_at),
-          gt(organization_invitations.expires_at, sql`NOW()`)
+          liveInvitationCondition(organizationId),
+          inArray(organization_invitations.id, invitationIds)
         )
       );
 
@@ -542,6 +601,13 @@ export async function updateUserRoleInOrganization(
 
   return txn ? run(txn) : db.transaction(run);
 }
+
+/**
+ * Raised when the target organization row is deleted or never existed. Distinct
+ * from the SSO-misconfiguration sentence below, which applies only where the
+ * policy status is `misconfigured`.
+ */
+export const ORGANIZATION_MISSING_MESSAGE = 'This organization is no longer available';
 
 export const CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER =
   'Child organizations can only invite people who are already members of the parent organization.';
@@ -735,13 +801,7 @@ export async function assertInviteeAddressIsAvailable(
   const pendingInvitations = await tx
     .select({ email: organization_invitations.email })
     .from(organization_invitations)
-    .where(
-      and(
-        eq(organization_invitations.organization_id, organizationId),
-        isNull(organization_invitations.accepted_at),
-        gt(organization_invitations.expires_at, sql`NOW()`)
-      )
-    );
+    .where(liveInvitationCondition(organizationId));
 
   if (pendingInvitations.some(invitation => isSameInvitationAddress(invitation.email, email))) {
     throw new Error('User already has a pending invitation');
@@ -775,9 +835,8 @@ export async function inviteUserToOrganization(
   const run = async (tx: DrizzleTransaction): Promise<OrganizationInvitation> => {
     const membershipRule = await decideChildOrganizationMembership(tx, organizationId, { email });
     if (membershipRule === 'organization_missing') {
-      throw new Error('Organization SSO policy is misconfigured');
+      throw new Error(ORGANIZATION_MISSING_MESSAGE);
     }
-    // A child org can invite only people who already belong to its live parent.
     if (membershipRule === 'refused') {
       throw new Error(CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER);
     }
@@ -819,11 +878,15 @@ export async function inviteUserToOrganization(
   return txn ? run(txn) : db.transaction(run);
 }
 
+/**
+ * @param fromDb - Database instance to use (defaults to primary db, pass a replica connection for reads that tolerate lag)
+ */
 export async function getOrganizationMembers(
-  organizationId: Organization['id']
+  organizationId: Organization['id'],
+  fromDb: DrizzleConnection = db
 ): Promise<OrganizationMember[]> {
   const [activeMembers, pendingInvitations] = await Promise.all([
-    db
+    fromDb
       .select({
         id: organization_memberships.kilo_user_id,
         name: kilocode_users.google_user_name,
@@ -859,7 +922,7 @@ export async function getOrganizationMembers(
           eq(kilocode_users.is_bot, false)
         )
       ),
-    db
+    fromDb
       .select({
         id: organization_invitations.id,
         email: organization_invitations.email,
@@ -873,13 +936,7 @@ export async function getOrganizationMembers(
         external_side_effect_outbox,
         eq(external_side_effect_outbox.invitation_id, organization_invitations.id)
       )
-      .where(
-        and(
-          eq(organization_invitations.organization_id, organizationId),
-          isNull(organization_invitations.accepted_at),
-          gt(organization_invitations.expires_at, sql`NOW()`)
-        )
-      ),
+      .where(liveInvitationCondition(organizationId)),
   ]);
 
   const members: OrganizationMember[] = [
@@ -1128,16 +1185,19 @@ export async function acceptOrganizationInvite(
         return failureResult('Invitation is no longer valid');
       }
 
-      await tx.insert(organization_memberships).values({
-        organization_id: invitation.organization_id,
-        kilo_user_id: userId,
+      const inserted = await insertOrganizationMembership(tx, {
+        organizationId: invitation.organization_id,
+        userId,
         role: invitation.role,
-        invited_by: invitation.invited_by,
+        invitedBy: invitation.invited_by,
       });
-
-      // A real membership insert changes group-policy evaluation, so advance the
-      // same revision signal addUserToOrganization uses for the SSO path.
-      await bumpOrganizationGroupPolicyRevision(tx, invitation.organization_id, userId);
+      if (!inserted) {
+        // The read above runs under the membership-mutation advisory lock, but
+        // writers such as directory sync insert through addUserToOrganization
+        // without it. Keep that concurrent insert a failure: the invitation must
+        // not be accepted against a membership this path did not create.
+        throw new Error('Organization membership was created concurrently while accepting invite');
+      }
 
       await skipCustomerSourceSurveyForOrgJoin(userId, tx);
 
@@ -1235,22 +1295,6 @@ export async function mutateOrganizationSettings(
   return txn ? run(txn) : db.transaction(run);
 }
 
-export async function updateOrganizationSettings(
-  organizationId: Organization['id'],
-  settings: OrganizationSettings,
-  txn?: DrizzleTransaction
-): Promise<OrganizationSettings> {
-  const validated = OrganizationSettingsSchema.parse(settings);
-  await (txn || db)
-    .update(organizations)
-    .set({
-      settings: validated,
-    })
-    .where(eq(organizations.id, organizationId));
-
-  return validated;
-}
-
 // Atomically update the recommendations-digest flag inside the settings JSONB
 // without a read-modify-write of the whole object, so a concurrent settings
 // mutation can't clobber other fields. Persist false to distinguish an explicit
@@ -1311,7 +1355,7 @@ export async function markOrganizationAsDeleted(
       .where(eq(cloud_agent_environments.owned_by_organization_id, organizationId));
     await tx
       .update(organizations)
-      .set({ ...auto_deleted_at })
+      .set({ ...auto_deleted_at, anthropic_user_profile_id: null })
       .where(eq(organizations.id, organizationId));
 
     return members.map(member => member.id);

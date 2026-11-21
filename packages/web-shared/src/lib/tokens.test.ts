@@ -1,10 +1,7 @@
 import { describe, test, expect } from '@jest/globals';
 import jwt from 'jsonwebtoken';
-import {
-  validateAuthorizationHeader,
-  JWT_TOKEN_VERSION,
-  isRejectedCredentialReason,
-} from './tokens';
+import { KILO_TOKEN_VERSION } from '@kilocode/worker-utils/kilo-token';
+import { validateAuthorizationHeader, isRejectedCredentialReason } from './tokens';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
 describe('validateAuthorizationHeader (C15 device-session compatibility)', () => {
@@ -14,7 +11,7 @@ describe('validateAuthorizationHeader (C15 device-session compatibility)', () =>
         env: process.env.NODE_ENV,
         kiloUserId: 'test-user-c15',
         apiTokenPepper: 'test-pepper',
-        version: JWT_TOKEN_VERSION,
+        version: KILO_TOKEN_VERSION,
         deviceSessionId: 'device-session-c15-test',
       },
       getEnvVariable('NEXTAUTH_SECRET'),
@@ -39,7 +36,7 @@ describe('validateAuthorizationHeader (C15 device-session compatibility)', () =>
         env: process.env.NODE_ENV,
         kiloUserId: 'test-user-c15',
         apiTokenPepper: 'test-pepper',
-        version: JWT_TOKEN_VERSION,
+        version: KILO_TOKEN_VERSION,
         deviceSessionId,
       },
       getEnvVariable('NEXTAUTH_SECRET'),
@@ -61,7 +58,7 @@ describe('validateAuthorizationHeader (C15 device-session compatibility)', () =>
         env: process.env.NODE_ENV,
         kiloUserId: 'test-user-c15',
         apiTokenPepper: 'test-pepper',
-        version: JWT_TOKEN_VERSION,
+        version: KILO_TOKEN_VERSION,
       },
       getEnvVariable('NEXTAUTH_SECRET'),
       { algorithm: 'HS256', expiresIn: '5y' }
@@ -110,5 +107,66 @@ describe('isRejectedCredentialReason', () => {
     // Only the absence of a credential may continue anonymously. Every other
     // reason, including one this version does not know, fails the request.
     expect(isRejectedCredentialReason(reason)).toBe(expected);
+  });
+});
+
+describe('the verified payload schema', () => {
+  const validClaims = {
+    env: process.env.NODE_ENV,
+    kiloUserId: 'test-user-schema',
+    apiTokenPepper: 'test-pepper',
+    version: KILO_TOKEN_VERSION,
+  };
+
+  const validate = (claims: Record<string, unknown>) => {
+    const token = jwt.sign(claims, getEnvVariable('NEXTAUTH_SECRET'), {
+      algorithm: 'HS256',
+      expiresIn: '5y',
+    });
+    return validateAuthorizationHeader(new Headers({ authorization: `Bearer ${token}` }));
+  };
+
+  test('accepts a token whose claims match the schema', () => {
+    const result = validate(validClaims);
+
+    expect(result.error).toBeUndefined();
+    expect(result.kiloUserId).toBe('test-user-schema');
+  });
+
+  test('refuses a token whose kiloUserId is not a string', () => {
+    expect(validate({ ...validClaims, kiloUserId: 42 }).reason).toBe('invalid_token');
+  });
+
+  test('refuses a token with no version claim', () => {
+    expect(validate({ env: process.env.NODE_ENV, kiloUserId: 'test-user-schema' }).reason).toBe(
+      'invalid_token'
+    );
+  });
+
+  test('refuses a token whose organizationId is not a string', () => {
+    expect(validate({ ...validClaims, organizationId: 7 }).reason).toBe('invalid_token');
+  });
+
+  test('refuses a token whose internalApiUse is not a boolean', () => {
+    expect(validate({ ...validClaims, internalApiUse: 'true' }).reason).toBe('invalid_token');
+  });
+
+  test('leaves an outdated version to the version refusal', () => {
+    expect(validate({ ...validClaims, version: KILO_TOKEN_VERSION - 1 }).reason).toBe(
+      'token_version_outdated'
+    );
+  });
+
+  test('keeps an unknown claim and leaves the audience check to its own rules', () => {
+    const result = validate({ ...validClaims, someFutureClaim: 'x' });
+
+    expect(result.error).toBeUndefined();
+    expect(result.kiloUserId).toBe('test-user-schema');
+  });
+
+  test('does not decide a null audience in the schema', () => {
+    // The audience policy refuses a null audience on its own; the schema only
+    // has to let the claim through so that check stays reachable.
+    expect(validate({ ...validClaims, aud: null }).reason).toBe('audience_not_allowed');
   });
 });

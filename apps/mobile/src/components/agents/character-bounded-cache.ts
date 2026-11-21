@@ -70,6 +70,26 @@ export class CharacterBoundedCache<T> {
     return this.entries.get(key)?.value;
   }
 
+  /**
+   * Every entry's value in Map iteration order — the eviction order, oldest
+   * first — without refreshing any entry's recency.
+   *
+   * A caller that scans for a candidate (the fence walk prefix probe) must not
+   * move entries in the eviction order: a scan that made each visited walk the
+   * newest would pin the fences the user scrolled past ahead of the walks that
+   * are actually worth keeping, and the probe never writes, so it never has a
+   * reason to count as a use.
+   */
+  values(): IterableIterator<T> {
+    return this.wrappedValues();
+  }
+
+  private *wrappedValues(): Generator<T> {
+    for (const entry of this.entries.values()) {
+      yield entry.value;
+    }
+  }
+
   set(key: string, value: T, weight: number = key.length): void {
     this.remove(key);
     const pinned = this.pinned(value);

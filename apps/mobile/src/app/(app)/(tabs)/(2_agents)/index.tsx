@@ -1,22 +1,21 @@
 import { useCallback, useEffect, useState } from 'react';
 import * as WebBrowser from 'expo-web-browser';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert, AppState, Platform } from 'react-native';
 
 import { i18n } from '@/i18n';
 import { AgentSessionListScreen } from '@/components/agents/session-list-screen';
-import { type AgentsView, AgentsViewSegment } from '@/components/todos/agents-view-segment';
+import { AgentsViewSegment } from '@/components/todos/agents-view-segment';
 import { TodoListsScreen } from '@/components/todos/todo-lists-screen';
 import { runPendingWidgetActions } from '@/glanceable-ios/widget-actions';
-import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
-import { WEB_BASE_URL } from '@/lib/config';
+import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
+import { type AgentsView, parseAgentsViewParam } from '@/lib/agents-view';
 import {
   getGitHubInstallReturnOutcome,
   type GitHubInstallReturnOutcome,
   subscribeToGitHubInstallReturnOutcome,
 } from '@/lib/github-install-return';
 import { recoverGlanceableActivityKit } from '@/lib/glanceable/activity-kit-prompt';
-import { trpcClient } from '@/lib/trpc';
 
 export type GitHubInstallOutcomeAlertButton = {
   text: string;
@@ -109,23 +108,21 @@ export function buildGitHubInstallOutcomeAlert(
 }
 
 /**
- * Recovery for a retryable installation outcome: the consumed C1 install
- * state token is single-use, so mint a fresh one and reopen the web install
- * flow. The flow returns to /cloud/sessions so the outcome can reach this
- * tab again.
+ * Recovery for a retryable installation outcome: the consumed install state
+ * token is single-use, so mint a fresh shell hand-off and reopen the install
+ * flow. The flow returns to /cloud/sessions so the outcome can reach this tab
+ * again.
  *
- * When the original outcome was org-scoped, the retry mints and reopens the
- * web flow with the same organizationId so the GitHub install stays on the
- * original organization owner.
+ * When the original outcome was org-scoped, the retry hands off with the same
+ * organizationId so the GitHub install stays on the original organization
+ * owner.
  */
 async function retryGitHubInstall(organizationId?: string): Promise<void> {
   try {
-    const { token } = await trpcClient.githubApps.mintInstallState.mutate(
-      organizationId
-        ? { organizationId, returnTo: '/cloud/sessions' }
-        : { returnTo: '/cloud/sessions' }
-    );
-    const url = getGitHubIntegrationUrl(WEB_BASE_URL, organizationId, token);
+    const url = await appShellHandoffUrl({
+      page: 'github-app',
+      ...(organizationId ? { organizationId } : {}),
+    });
     await (Platform.OS === 'android'
       ? WebBrowser.openBrowserAsync(url)
       : WebBrowser.openAuthSessionAsync(url));
@@ -143,7 +140,30 @@ async function retryGitHubInstall(organizationId?: string): Promise<void> {
 }
 
 export default function AgentSessionList() {
-  const [view, setView] = useState<AgentsView>('sessions');
+  const router = useRouter();
+  // A link names the view it wants (`…/(2_agents)?view=todos`), and that name is
+  // a payload for one arrival, not tab state: the screen reads it into the view
+  // it shows and clears it, and the segment a person presses only changes that
+  // view. It must not stay on the route: Expo Router merges a bare string href
+  // into the target's existing params, so a `view` left behind would follow
+  // every later navigation to this tab and show To-dos to a destination that
+  // promised the sessions list — the reason `AGENTS_SESSIONS_INDEX_HREF` clears
+  // `status` on the way in.
+  const params = useLocalSearchParams<{ view?: string | string[] }>();
+  const [view, setView] = useState<AgentsView>(() => parseAgentsViewParam(params.view));
+  const linkedView = params.view === undefined ? null : parseAgentsViewParam(params.view);
+  useEffect(() => {
+    if (linkedView === null) {
+      return;
+    }
+    // A second link while the tab is mounted is a new answer rather than the
+    // one the first link gave.
+    setView(linkedView);
+    // `setParams` clears the marker through the navigation container, which is
+    // not guaranteed to reach this screen's params; the latch above keeps an
+    // uncleared marker from reading as a new arrival on every render.
+    router.setParams({ view: undefined });
+  }, [linkedView, router]);
   const consumeReturnOutcome = useCallback(() => {
     const result = getGitHubInstallReturnOutcome();
     const alert = buildGitHubInstallOutcomeAlert(result, () => {

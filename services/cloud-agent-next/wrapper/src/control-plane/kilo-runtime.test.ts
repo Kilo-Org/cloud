@@ -21,6 +21,8 @@ import {
   createKiloRuntimes,
   KiloWorktreeCredentialClassMismatchError,
   KiloWorktreeMcpMismatchError,
+  KiloWorktreePolicyMismatchError,
+  kiloServerPort,
   liveRuntimeClient,
   parseKiloPidfile,
   prepareKiloFilesystem,
@@ -205,6 +207,7 @@ function createRuntime(options: {
   isIdle?: () => boolean | Promise<boolean>;
   prepareFilesystem?: KiloRuntimeOptions['prepareFilesystem'];
   sandboxProvider?: KiloRuntimeOptions['sandboxProvider'];
+  artifacts?: KiloRuntimeOptions['artifacts'];
   spawnKilo?: KiloProcessSpawner;
   timers?: ControlPlaneTimers;
   onRestart?: KiloRuntimeOptions['onRestart'];
@@ -243,6 +246,7 @@ function createRuntime(options: {
     // The real preparation writes under HOME; `prepareKiloFilesystem` has its own tests.
     prepareFilesystem: options.prepareFilesystem ?? (async () => {}),
     ...(options.sandboxProvider ? { sandboxProvider: options.sandboxProvider } : {}),
+    ...(options.artifacts ? { artifacts: options.artifacts } : {}),
     ...(options.sampleMemory ? { sampleMemory: options.sampleMemory } : {}),
     onMemoryHold: info => options.memoryHolds?.push(info.held),
     onRestart: info => {
@@ -357,25 +361,127 @@ describe('prepareKiloFilesystem', () => {
     }
   });
 
-  it('receives the runtime provider before Kilo starts', async () => {
+  it('adds the Artifacts guidance only when the synchronizer is enabled', async () => {
+    const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'kilo-prepare-'));
+    try {
+      const withArtifactsHome = path.join(root, 'with-artifacts');
+      await prepareKiloFilesystem(
+        { HOME: withArtifactsHome },
+        path.join(root, 'worktree-a'),
+        'cloudflare',
+        true
+      );
+      const withArtifacts = await fsp.readFile(
+        path.join(withArtifactsHome, '.kilocode', 'rules', 'cloud-agent.md'),
+        'utf8'
+      );
+      expect(withArtifacts).toContain('## Artifacts');
+      expect(withArtifacts).toContain('except for files saved in `/artifacts`');
+
+      const withoutArtifactsHome = path.join(root, 'without-artifacts');
+      await prepareKiloFilesystem(
+        { HOME: withoutArtifactsHome },
+        path.join(root, 'worktree-b'),
+        'cloudflare',
+        false
+      );
+      const withoutArtifacts = await fsp.readFile(
+        path.join(withoutArtifactsHome, '.kilocode', 'rules', 'cloud-agent.md'),
+        'utf8'
+      );
+      expect(withoutArtifacts).not.toContain('## Artifacts');
+      expect(withoutArtifacts).toContain(
+        'The filesystem is ephemeral and will not persist after the session ends.'
+      );
+    } finally {
+      await fsp.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('receives the runtime provider and artifact flag before Kilo starts', async () => {
     const providers: Array<string | undefined> = [];
+    const artifacts: Array<boolean | undefined> = [];
     const { runtime } = createRuntime({
       spawner: createSpawner(),
       feed: createFeedFactory(),
       scheduler: createScheduler(),
       probe: createProbe(true),
       sandboxProvider: 'vercel',
-      prepareFilesystem: async (_env, _directory, sandboxProvider) => {
+      artifacts: true,
+      prepareFilesystem: async (_env, _directory, sandboxProvider, enabled) => {
         providers.push(sandboxProvider);
+        artifacts.push(enabled);
       },
     });
     await runtime.ensure();
     expect(providers).toEqual(['vercel']);
+    expect(artifacts).toEqual([true]);
     await runtime.shutdown();
   });
 });
 
 describe('Kilo startup lifecycle', () => {
+  it('holds sibling prompts until the running CLI applies the workspace MCP refresh', async () => {
+    const { runtime } = createRuntime({
+      spawner: createSpawner(),
+      feed: createFeedFactory(),
+      probe: createProbe(true),
+      scheduler: createScheduler(),
+      isIdle: () => false,
+    });
+    const client = await runtime.ensure();
+    const refresh = Promise.withResolvers<void>();
+    const materialized = Promise.withResolvers<void>();
+    const submitted = Promise.withResolvers<void>();
+    const events: string[] = [];
+    client.updateCloudAgentMcp = async () => {
+      await refresh.promise;
+      events.push('refreshed');
+    };
+    client.submit = async () => {
+      events.push('submitted');
+      submitted.resolve();
+    };
+    const turns = createTurnManager({
+      timers: TEST_TIMERS,
+      runtimes: { get: () => runtime },
+      emit: () => undefined,
+      materializeAttachments: async message => {
+        materialized.resolve();
+        return message;
+      },
+    });
+    turns.registerRoute({
+      sessionId: 'workspace_sibling',
+      kiloSessionId: 'ses_sibling',
+      directory: runtime.directory,
+      attemptId: 'sibling',
+    });
+    const installation = runtime.installCredentials(runtime.env, {
+      url: 'https://mcp.kiloapps.io/mcp',
+      token: 'renewed-mcp-grant',
+      expiresAt: 1_900_000_000,
+    });
+    try {
+      turns.submit('workspace_sibling', {
+        messageId: 'm1',
+        turn: { type: 'prompt', prompt: 'hello' },
+        agent: { mode: 'code', model: 'test/model' },
+      });
+      await materialized.promise;
+      await Bun.sleep(0);
+      expect(events).toEqual([]);
+      refresh.resolve();
+      await submitted.promise;
+      expect(events).toEqual(['refreshed', 'submitted']);
+    } finally {
+      refresh.resolve();
+      await installation;
+      turns.release('workspace_sibling');
+      await runtime.shutdown();
+    }
+  });
+
   it.each([0, 3600, -3600])('refreshes MCP with a proxy handle expiry delta of %s', async delta => {
     const exp = 1_800_000_000;
     const { runtime } = createRuntime({
@@ -443,7 +549,7 @@ describe('Kilo startup lifecycle', () => {
     await runtime.shutdown();
   });
   it.each(['rejection', 'timeout'])(
-    'does not reject general credential installation when MCP refresh fails by %s',
+    'recovers an MCP refresh %s when a sibling reuses the installed proxy handle',
     async failure => {
       const spawner = createSpawner();
       const { runtime, logs, restarts } = createRuntime({
@@ -452,6 +558,7 @@ describe('Kilo startup lifecycle', () => {
         probe: createProbe(true),
         scheduler: createScheduler(),
         isIdle: () => true,
+        env: { KILOCODE_TOKEN: proxyHandle(1_800_000_000) },
       });
       const client = await runtime.ensure();
       const grant = {
@@ -465,14 +572,21 @@ describe('Kilo startup lifecycle', () => {
           signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
         });
       };
-      await runtime.installCredentials({ HOME: '/new' }, grant);
+      await runtime.installCredentials(
+        { HOME: '/new', KILOCODE_TOKEN: proxyHandle(1_800_000_000) },
+        grant
+      );
       expect(runtime.env.HOME).toBe('/new');
       expect(logs).toContain(
         'control-plane MCP credential refresh failed; retaining pending credential restart'
       );
       expect(logs.join('\n')).not.toContain(grant.token);
+      expect(await runtime.applyPendingCredentials(() => false)).toBe(false);
+      expect(spawner.spawnCount()).toBe(1);
       expect(await runtime.applyPendingCredentials(() => true)).toBe(true);
       expect(restarts).toEqual([{ reason: 'credentials' }]);
+      expect(spawner.spawnCount()).toBe(2);
+      expect(await runtime.applyPendingCredentials(() => true)).toBe(false);
       await runtime.shutdown();
     },
     15_000
@@ -2647,6 +2761,38 @@ describe('createKiloRuntimes', () => {
     expect(runtimes.get('dir')).not.toBe(first);
   });
 
+  it('reports the port of each live Kilo server', async () => {
+    const spawner = createSpawner();
+    const runtimes = createKiloRuntimes({
+      readSnapshot: async () => [],
+      timers: TEST_TIMERS,
+      pidfileDirectory: '/tmp/kilo-runtimes-server-ports-pids',
+      scheduler: createScheduler().scheduler,
+      spawnKilo: spawner.spawn,
+      openFeed: createFeedFactory().openFeed,
+      probeHealth: createProbe(false).probe,
+      readProcessStartTime: () => undefined,
+      log: () => undefined,
+    });
+    expect(runtimes.serverPorts()).toEqual([]);
+    await runtimes.ensure({ key: 'a', directory: '/tmp/a', env: {} });
+    await runtimes.ensure({ key: 'b', directory: '/tmp/b', env: {} });
+    // The fake spawner serves each process on a port equal to its pid.
+    const ports = spawner.processes.map(record => record.pid);
+    expect(runtimes.serverPorts()).toEqual(ports);
+
+    await runtimes.get('a')?.shutdown();
+    expect(runtimes.serverPorts()).toEqual([ports[1]]);
+    await runtimes.shutdown();
+    expect(runtimes.serverPorts()).toEqual([]);
+  });
+
+  it('reads no port from a Kilo URL without one', () => {
+    expect(kiloServerPort({ url: 'http://127.0.0.1:4096', authorization: 'x' })).toBe(4096);
+    expect(kiloServerPort({ url: 'not a url', authorization: 'x' })).toBeUndefined();
+    expect(kiloServerPort(undefined)).toBeUndefined();
+  });
+
   it('summary counts a suspected runtime as suspected only', async () => {
     const spawner = createSpawner();
     const scheduler = createScheduler();
@@ -2783,6 +2929,136 @@ describe('createKiloRuntimes', () => {
     expect(drift).toBeInstanceOf(KiloWorktreeMcpMismatchError);
     // Drift must not silently recreate the runtime with the changed servers.
     expect(created).toBe(1);
+  });
+
+  it('reuses a warm runtime for the same authorization policy and rejects policy drift', async () => {
+    let created = 0;
+    const runtimes = createKiloRuntimes({
+      timers: TEST_TIMERS,
+      pidfileDirectory: '/tmp/kilo-runtimes-policy-test-pids',
+      createRuntime: options => {
+        created += 1;
+        return {
+          directory: options.directory,
+          env: options.env,
+          client: {},
+          ensure: async () => ({}),
+          installCredentials: async () => undefined,
+          applyPendingCredentials: async () => false,
+          isSuspected: () => false,
+          isRestarting: () => false,
+          isUnavailable: () => false,
+          shutdown: async () => undefined,
+        } as unknown as KiloRuntime;
+      },
+    });
+    const config = (permission: unknown, reviewTarget?: string) => ({
+      KILO_CONFIG_CONTENT: JSON.stringify({ permission }),
+      ...(reviewTarget ? { KILO_GITHUB_REVIEW_TARGET: reviewTarget } : {}),
+    });
+    const input = (env: Record<string, string>) => ({
+      key: '/tmp/policy-dir',
+      directory: '/tmp/policy-dir',
+      env,
+    });
+
+    await runtimes.ensure(input(config('allow')));
+    // A rotated Kilo credential and provider key keep the policy: reuse.
+    await runtimes.ensure(
+      input({
+        KILOCODE_TOKEN: 'kcp1.rotated',
+        KILO_CONFIG_CONTENT: JSON.stringify({
+          permission: 'allow',
+          provider: { apiKey: 'rotated' },
+        }),
+      })
+    );
+    expect(created).toBe(1);
+
+    // The workspace MCP grant rotates between routes on one key: reuse.
+    await runtimes.ensure(
+      input({
+        KILO_CONFIG_CONTENT: JSON.stringify({
+          permission: 'allow',
+          mcp: { 'kilo-cloud-agent': { headers: { Authorization: 'Bearer grant-b' } } },
+        }),
+      })
+    );
+    expect(created).toBe(1);
+
+    // A different command policy never shares the runtime's policy.
+    let permissionDrift: unknown;
+    try {
+      await runtimes.ensure(input(config({ bash: { '*': 'deny', 'git status': 'allow' } })));
+    } catch (error) {
+      permissionDrift = error;
+    }
+    expect(permissionDrift).toBeInstanceOf(KiloWorktreePolicyMismatchError);
+    expect(created).toBe(1);
+
+    // A different trusted review target is a policy drift too.
+    let targetDrift: unknown;
+    try {
+      await runtimes.ensure(input(config('allow', 'acme/widgets#42')));
+    } catch (error) {
+      targetDrift = error;
+    }
+    expect(targetDrift).toBeInstanceOf(KiloWorktreePolicyMismatchError);
+    expect(created).toBe(1);
+
+    // A live credential install cannot change the policy siblings run under,
+    // and the runtime keeps its own configuration.
+    const { runtime } = createRuntime({
+      spawner: createSpawner(),
+      feed: createFeedFactory(),
+      scheduler: createScheduler(),
+      probe: createProbe(true),
+      env: config({ edit: 'deny' }),
+    });
+    let installDrift: unknown;
+    try {
+      await runtime.installCredentials(config({ edit: 'allow' }));
+    } catch (error) {
+      installDrift = error;
+    }
+    expect(installDrift).toBeInstanceOf(KiloWorktreePolicyMismatchError);
+    expect(JSON.parse(runtime.env.KILO_CONFIG_CONTENT ?? '{}')).toEqual({
+      permission: { edit: 'deny' },
+    });
+    await runtime.shutdown();
+  });
+
+  it('signs an unreadable runtime configuration by its own text', async () => {
+    // A configuration that cannot be read compares by its own text, so a
+    // credential install admits it only when the text is identical.
+    const { runtime } = createRuntime({
+      spawner: createSpawner(),
+      feed: createFeedFactory(),
+      scheduler: createScheduler(),
+      probe: createProbe(true),
+      env: { KILO_CONFIG_CONTENT: 'not json' },
+    });
+    let drift: unknown;
+    try {
+      await runtime.installCredentials({ KILO_CONFIG_CONTENT: '{"permission":' });
+    } catch (error) {
+      drift = error;
+    }
+    expect(drift).toBeInstanceOf(KiloWorktreePolicyMismatchError);
+    expect(runtime.env.KILO_CONFIG_CONTENT).toBe('not json');
+    await runtime.shutdown();
+
+    // The identical configuration is accepted.
+    const { runtime: unreadable } = createRuntime({
+      spawner: createSpawner(),
+      feed: createFeedFactory(),
+      scheduler: createScheduler(),
+      probe: createProbe(true),
+      env: { KILO_CONFIG_CONTENT: '{"permission":' },
+    });
+    await unreadable.installCredentials({ KILO_CONFIG_CONTENT: '{"permission":' });
+    expect(unreadable.env.KILO_CONFIG_CONTENT).toBe('{"permission":');
+    await unreadable.shutdown();
   });
 
   it('rejects a proxy/non-proxy credential-class mismatch and never recreates the runtime', async () => {

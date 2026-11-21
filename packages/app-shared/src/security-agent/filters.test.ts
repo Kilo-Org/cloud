@@ -154,6 +154,17 @@ describe('getNextSecurityFindingsOffset', () => {
   it('stops after loading all findings remaining after a non-zero offset', () => {
     expect(getNextSecurityFindingsOffset(20, 80, 100)).toBeUndefined();
   });
+
+  it('stops on an empty page even when the backend count still reports rows', () => {
+    // A concurrent move between the count and the page read can empty a page;
+    // handing back the same offset would re-request it forever.
+    expect(getNextSecurityFindingsOffset(0, 0, 100)).toBeUndefined();
+    expect(getNextSecurityFindingsOffset(50, 0, 100)).toBeUndefined();
+  });
+
+  it('stops when the loaded count is negative', () => {
+    expect(getNextSecurityFindingsOffset(20, -1, 100)).toBeUndefined();
+  });
 });
 
 describe('hasActiveSecurityFindingFilters', () => {

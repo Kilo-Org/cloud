@@ -16,6 +16,7 @@ import {
   enkrypt_usage_guardrail,
   feature,
   finish_reason,
+  http_user_agent,
   microdollar_usage,
   microdollar_usage_metadata,
   organizations,
@@ -75,6 +76,18 @@ async function autoModelId(name: string): Promise<number> {
     .select({ id: auto_model.auto_model_id })
     .from(auto_model)
     .where(eq(auto_model.auto_model, name));
+  return row.id;
+}
+
+async function httpUserAgentId(userAgent: string): Promise<number> {
+  await db
+    .insert(http_user_agent)
+    .values({ http_user_agent: userAgent })
+    .onConflictDoNothing({ target: http_user_agent.http_user_agent });
+  const [row] = await db
+    .select({ id: http_user_agent.http_user_agent_id })
+    .from(http_user_agent)
+    .where(eq(http_user_agent.http_user_agent, userAgent));
   return row.id;
 }
 
@@ -446,6 +459,9 @@ describe('organizations.requestLogs trpc router', () => {
           feature_id: vscodeFeatureId,
           latency: 123.5,
           generation_time: 4567,
+          http_user_agent_id: await httpUserAgentId(
+            'Kilo-Code/1.2.3 ai-sdk/provider-utils/1.0.0 runtime/bun/1.0.0'
+          ),
         }),
         metadataRow(vercel.id, { is_user_byok: false, latency: 50, generation_time: 900 }),
         metadataRow(custom.id, { is_user_byok: false }),
@@ -466,6 +482,7 @@ describe('organizations.requestLogs trpc router', () => {
         user: { id: member.id, name: member.google_user_name, email: member.google_user_email },
         model: 'kilo-auto/balanced',
         provider: 'DeepInfra',
+        user_agent_name: 'Kilo Code',
         cost_microdollars: 1234,
         input_tokens: 1000,
         output_tokens: 200,
@@ -499,6 +516,24 @@ describe('organizations.requestLogs trpc router', () => {
         expect(row.created_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
       }
     });
+
+    it.each([false, true])(
+      'returns Unknown when user agent is absent with metadata present=%s',
+      async hasMetadata => {
+        const usage = usageRow({ organization_id: organization.id });
+        await db.insert(microdollar_usage).values(usage);
+        if (hasMetadata) {
+          await db.insert(microdollar_usage_metadata).values(metadataRow(usage.id));
+        }
+
+        const caller = await createCallerForUser(owner.id);
+        const result = await caller.organizations.requestLogs.list({
+          organizationId: organization.id,
+        });
+
+        expect(result).toMatchObject([{ id: usage.id, user_agent_name: 'Unknown' }]);
+      }
+    );
 
     describe.each(['openai-chatgpt', 'claude-billing'])('%s legacy requests', provider => {
       it.each([false, true])('returns BYOK when metadata exists=%s', async hasMetadata => {

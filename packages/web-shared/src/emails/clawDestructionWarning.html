@@ -6,16 +6,16 @@
     <title>Instance Deletion Warning</title>
   </head>
   <body
+    class="kc-page kc-strong"
     style="
       margin: 0;
       padding: 0;
       font-family:
         -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      background-color: #ffffff;
       color: #1a1a1a;
     "
   >
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #ffffff">
+    <table class="kc-page" width="100%" cellpadding="0" cellspacing="0">
       <tr>
         <td align="center" style="padding: 40px 20px">
           <table width="520" cellpadding="0" cellspacing="0">
@@ -23,6 +23,7 @@
             <tr>
               <td style="padding: 40px 40px 20px">
                 <h1
+                  class="kc-strong"
                   style="
                     margin: 0;
                     font-size: 24px;
@@ -41,6 +42,7 @@
             <tr>
               <td style="padding: 0 40px 30px">
                 <p
+                  class="kc-text"
                   style="
                     margin: 0 0 16px;
                     font-size: 14px;
@@ -52,10 +54,10 @@
                   "
                 >
                   Your KiloClaw instance
-                  <strong style="color: #1a1a1a">{{ instance_label }}</strong>
+                  <strong class="kc-strong" style="color: #1a1a1a">{{ instance_label }}</strong>
                   is scheduled for deletion on
-                  <strong style="color: #1a1a1a">{{ destruction_date }}</strong>. Take action now to
-                  prevent deletion.
+                  <strong class="kc-strong" style="color: #1a1a1a">{{ destruction_date }}</strong>.
+                  Take action now to prevent deletion.
                 </p>
                 <!-- CTA Button -->
                 <table width="100%" cellpadding="0" cellspacing="0">
@@ -63,6 +65,7 @@
                     <td align="center" style="padding: 10px 0 20px">
                       <a
                         href="{{ claw_url }}"
+                        class="kc-btn"
                         style="
                           display: inline-block;
                           padding: 10px 20px;
@@ -83,6 +86,7 @@
                   </tr>
                 </table>
                 <p
+                  class="kc-text"
                   style="
                     margin: 0 0 16px;
                     font-size: 14px;
@@ -97,6 +101,7 @@
                   lost.
                 </p>
                 <p
+                  class="kc-text"
                   style="
                     margin: 0;
                     font-size: 14px;
@@ -114,8 +119,9 @@
             </tr>
             <!-- Sign-off -->
             <tr>
-              <td style="padding: 0 40px 40px; border-top: 1px solid #ebebea">
+              <td class="kc-divider" style="padding: 0 40px 40px; border-top: 1px solid #ebebea">
                 <p
+                  class="kc-text"
                   style="
                     margin: 20px 0 0;
                     font-size: 14px;
@@ -134,8 +140,13 @@
           <!-- Branding Footer -->
           <table width="520" cellpadding="0" cellspacing="0">
             <tr>
-              <td align="center" style="padding: 30px 20px; border-top: 1px solid #eee">
+              <td
+                align="center"
+                class="kc-divider"
+                style="padding: 30px 20px; border-top: 1px solid #eee"
+              >
                 <p
+                  class="kc-faint"
                   style="
                     margin: 0;
                     font-size: 11px;

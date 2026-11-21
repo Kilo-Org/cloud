@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { index, sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 
 /**
  * The loop's state. Five tables, each answering one operator question: where
@@ -69,13 +69,23 @@ export const parkedActivations = sqliteTable('parked_activations', {
  * Events the loop gave up on and stepped over. Nothing reads these back: they
  * exist so that an event the directory can never satisfy is recoverable by an
  * operator rather than silently lost, and so `/status` can report a count.
+ *
+ * A row is kept for `PARKED_EVENT_RETENTION_MS` from its `parked_at`, so the
+ * table holds the skips of the last 30 days. The alarm deletes rows past that
+ * window, the index on `parked_at` makes the delete a range query, and
+ * `/status` counts retained rows only, which is the number an operator can
+ * still act on.
  */
-export const parkedEvents = sqliteTable('parked_events', {
-  event_id: text('event_id').primaryKey(),
-  event_type: text('event_type').notNull(),
-  class: text('class').notNull(),
-  status: integer('status'),
-  error: text('error').notNull(),
-  attempts: integer('attempts').notNull(),
-  parked_at: integer('parked_at').notNull(),
-});
+export const parkedEvents = sqliteTable(
+  'parked_events',
+  {
+    event_id: text('event_id').primaryKey(),
+    event_type: text('event_type').notNull(),
+    class: text('class').notNull(),
+    status: integer('status'),
+    error: text('error').notNull(),
+    attempts: integer('attempts').notNull(),
+    parked_at: integer('parked_at').notNull(),
+  },
+  table => [index('parked_events_parked_at_idx').on(table.parked_at)]
+);

@@ -46,9 +46,9 @@ describe('control-plane preparation attempt budget', () => {
       createMs +
       sandbox.providerCreateRetryMs +
       createMs +
-      // A failed snapshot launch stops the container and retries once with its
-      // own repository startup bound.
-      sandbox.providerStopAttemptMs +
+      // A failed snapshot launch stops the container within its own stop bound
+      // and retries once with its own repository startup bound.
+      sandbox.snapshotRetryStopMs +
       DEADLINE_MS.repositoryStartup +
       sandbox.wrapperFirstConnectMs +
       sandbox.wrapperHelloMs +

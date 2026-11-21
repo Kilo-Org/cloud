@@ -73,10 +73,14 @@ import {
   warnExceptInTest,
 } from '@kilocode/web-shared/lib/utils.server';
 import type { CodeReviewPlatform } from '../core/schemas';
+import { REVIEW_INSTRUCTIONS_FILE } from '../prompts/repository-review-instructions';
 import {
-  normalizeRepositoryReviewInstructions,
-  REVIEW_INSTRUCTIONS_FILE,
-} from '../prompts/repository-review-instructions';
+  MAX_REVIEW_GUIDELINE_IMPORTS,
+  resolveReviewGuidelines,
+  unusedRepositoryReviewInstructionsLookup,
+  type RepositoryReviewInstructionsLookup,
+} from '../resolve-review-guidelines';
+import { ReviewGuidelineSourceRepositoriesSchema } from '@kilocode/db/schema-types';
 import { getCurrentReviewSummaryForContext } from '../summary/history';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import {
@@ -86,6 +90,7 @@ import {
 import { getGitHubPullRequestCheckoutRef } from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-checkout-ref';
 import { getManualCodeReviewConfig } from '../manual-config';
 import { prepareCloudAgentWorkflowUser } from '@/lib/auth/cloud-agent-workflow-user';
+import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 
 const BitbucketWorkspaceSlugSchema = z.string().regex(/^[a-z0-9][a-z0-9_.-]*$/);
 const BitbucketRepositorySlugSchema = z.string().regex(/^[A-Za-z0-9_.-]+$/);
@@ -204,6 +209,24 @@ export async function prepareReviewPayload(
     const outputMode = manualConfig?.outputMode ?? 'provider';
     const config = manualConfig?.agentConfig ?? (agentConfig.config as CodeReviewAgentConfig);
     const shouldUseReviewMd = outputMode === 'provider' && config.disable_review_md === false;
+    const guidelineConfig =
+      manualConfig && shouldUseReviewMd && platform === 'github'
+        ? (
+            await getAgentConfigForOwner(owner, 'code_review', platform).catch(error => {
+              warnExceptInTest(
+                '[prepareReviewPayload] Guideline allowlist lookup failed; imports disabled',
+                {
+                  error: getReviewInstructionsFetchErrorMetadata(error),
+                }
+              );
+              return null;
+            })
+          )?.config
+        : agentConfig.config;
+    const allowedRepositories = ReviewGuidelineSourceRepositoriesSchema.safeParse(
+      guidelineConfig?.review_guideline_source_repositories ?? []
+    );
+    const guidelineSources = allowedRepositories.success ? allowedRepositories.data : [];
 
     logExceptInTest('[prepareReviewPayload] Found review in DB', {
       reviewId,
@@ -444,6 +467,8 @@ export async function prepareReviewPayload(
                 platform,
                 repoFullName: review.repo_full_name,
                 baseRef: review.base_ref,
+                allowedRepositories: guidelineSources,
+                githubToken: installationToken,
                 fetchInstructions: () =>
                   fetchGitHubRootTextFileAtRef({
                     token: installationToken,
@@ -767,6 +792,7 @@ export async function prepareReviewPayload(
         used: repositoryReviewInstructionsLookup.used,
         ref: repositoryReviewInstructionsLookup.ref,
         truncated: repositoryReviewInstructionsLookup.truncated,
+        imports: repositoryReviewInstructionsLookup.imports,
       }),
     ]);
 
@@ -952,7 +978,11 @@ export async function prepareReviewPayload(
       owner,
       repositorySize,
       sessionInput: {
-        ...sessionInput,
+        githubRepo: sessionInput.githubRepo,
+        gitUrl: sessionInput.gitUrl,
+        platform: sessionInput.platform,
+        model: sessionInput.model,
+        upstreamBranch: sessionInput.upstreamBranch,
         githubToken: sessionInput.githubToken ? '***' : undefined, // Redact token
         gitToken: sessionInput.gitToken ? '***' : undefined, // Redact token
         promptLength: sessionInput.prompt.length,
@@ -982,13 +1012,6 @@ export async function prepareReviewPayload(
   }
 }
 
-type RepositoryReviewInstructionsLookup = {
-  content: string | null;
-  used: boolean;
-  ref: string | null;
-  truncated: boolean;
-};
-
 /**
  * Every provider call for a review uses that review's platform integration, so
  * resolve it once and treat a missing value as a job error.
@@ -1000,38 +1023,50 @@ function requireProviderIntegrationId(integrationId: string | null, reviewId: st
   return integrationId;
 }
 
-function unusedRepositoryReviewInstructionsLookup(): RepositoryReviewInstructionsLookup {
-  return { content: null, used: false, ref: null, truncated: false };
-}
-
 async function fetchRepositoryReviewInstructions(params: {
   platform: CodeReviewPlatform;
   repoFullName: string;
   baseRef: string;
   fetchInstructions: () => Promise<string | null>;
+  allowedRepositories?: readonly string[];
+  githubToken?: string;
 }): Promise<RepositoryReviewInstructionsLookup> {
   try {
     const rawInstructions = await params.fetchInstructions();
-    const normalized = normalizeRepositoryReviewInstructions(rawInstructions);
+    const resolved = await resolveReviewGuidelines({
+      rawContent: rawInstructions,
+      platform: params.platform,
+      repository: params.repoFullName,
+      baseRef: params.baseRef,
+      allowedRepositories: params.allowedRepositories ?? [],
+      githubToken: params.githubToken,
+    });
 
     logExceptInTest('[prepareReviewPayload] REVIEW.md lookup complete', {
       platform: params.platform,
       repoFullName: params.repoFullName,
       baseRef: params.baseRef,
-      found: !!normalized,
-      truncated: normalized?.truncated ?? false,
+      found: resolved.used,
+      truncated: resolved.truncated,
+      importCount: resolved.imports.length,
     });
 
-    if (!normalized) {
-      return unusedRepositoryReviewInstructionsLookup();
+    const failedImports = resolved.imports.filter(
+      entry => entry.status !== 'imported' && entry.status !== 'dropped_budget'
+    );
+    if (failedImports.length > 0) {
+      warnExceptInTest('[prepareReviewPayload] Review guideline imports not applied', {
+        platform: params.platform,
+        repoFullName: params.repoFullName,
+        baseRef: params.baseRef,
+        failedImportCount: failedImports.length,
+        failedImports: failedImports
+          .slice(0, MAX_REVIEW_GUIDELINE_IMPORTS)
+          .map(({ source, sha, status }) => ({ source: source.slice(0, 200), sha, status })),
+      });
     }
 
-    return {
-      content: normalized.content,
-      used: true,
-      ref: params.baseRef,
-      truncated: normalized.truncated,
-    };
+    return resolved;
   } catch (error) {
     warnExceptInTest('[prepareReviewPayload] REVIEW.md lookup failed; using default guidance', {
       platform: params.platform,

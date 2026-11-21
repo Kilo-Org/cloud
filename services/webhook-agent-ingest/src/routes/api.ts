@@ -1,4 +1,12 @@
 import { webhookBodySchema } from '@kilocode/worker-utils/webhook-body-validation';
+import {
+  existingChatWorkspaceSettingsError,
+  hasExistingChatWorkspaceSettings,
+  triggerChatIdRequired,
+  triggerChatIdSchema,
+  triggerChatRequiresCreator,
+  webhookTriggerTargetSchema,
+} from '@kilocode/worker-utils/webhook-trigger-target';
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import type { HonoContext } from '../index';
@@ -127,17 +135,14 @@ type RouteContext = Context<HonoContext>;
 
 export const TriggerConfigInput = z
   .object({
-    targetType: z.enum(['cloud_agent', 'kiloclaw_chat']).default('cloud_agent'),
+    targetType: webhookTriggerTargetSchema.default('cloud_agent'),
+    cloudAgentSessionId: triggerChatIdSchema.optional(),
     executionUserId: z.string().min(1).optional(),
     kiloclawInstanceId: z.string().uuid().optional(),
     githubRepo: z.string().trim().min(1, 'githubRepo is required').optional(),
     mode: z.string().trim().min(1, 'mode is required').optional(),
     model: z.string().trim().min(1, 'model is required').optional(),
-    variant: z
-      .string()
-      .max(50)
-      .regex(/^[a-zA-Z]+$/)
-      .optional(),
+    variant: z.string().min(1).max(50).optional(),
     sandboxAllocation: sandboxAllocationSchema.optional(),
     environmentId: z.string().uuid().nullable().optional(),
     promptTemplate: z.string().trim().min(1, 'promptTemplate is required'),
@@ -158,7 +163,7 @@ export const TriggerConfigInput = z
   .superRefine((data, ctx) => {
     if (
       data.bodySchema != null &&
-      (data.targetType !== 'cloud_agent' || data.activationMode !== 'webhook')
+      (data.targetType === 'kiloclaw_chat' || data.activationMode !== 'webhook')
     ) {
       ctx.addIssue({
         code: 'custom',
@@ -167,7 +172,7 @@ export const TriggerConfigInput = z
       });
     }
     if (data.executionUserId !== undefined) {
-      if (data.targetType !== 'cloud_agent') {
+      if (data.targetType === 'kiloclaw_chat') {
         ctx.addIssue({
           code: 'custom',
           message: 'executionUserId is only supported for Cloud Agent triggers',
@@ -220,13 +225,14 @@ export const TriggerConfigInput = z
         });
       }
     }
-    if (data.targetType === 'cloud_agent') {
-      if (!data.githubRepo)
-        ctx.addIssue({
-          code: 'custom',
-          message: 'githubRepo is required for cloud_agent triggers',
-          path: ['githubRepo'],
-        });
+    if (data.targetType === 'cloud_agent' && !data.githubRepo) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'githubRepo is required for cloud_agent triggers',
+        path: ['githubRepo'],
+      });
+    }
+    if (data.targetType !== 'kiloclaw_chat') {
       if (!data.mode)
         ctx.addIssue({
           code: 'custom',
@@ -239,6 +245,24 @@ export const TriggerConfigInput = z
           message: 'model is required for cloud_agent triggers',
           path: ['model'],
         });
+    }
+    if (data.targetType === 'cloud_agent_chat') {
+      if (!data.cloudAgentSessionId) {
+        ctx.addIssue({
+          code: 'custom',
+          message: triggerChatIdRequired,
+          path: ['cloudAgentSessionId'],
+        });
+      }
+      if (hasExistingChatWorkspaceSettings(data)) {
+        ctx.addIssue({ code: 'custom', message: existingChatWorkspaceSettingsError });
+      }
+    } else if (data.cloudAgentSessionId !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'A chat ID is only used for an existing chat target.',
+        path: ['cloudAgentSessionId'],
+      });
     }
     if (data.targetType === 'kiloclaw_chat') {
       if (!data.kiloclawInstanceId)
@@ -266,19 +290,13 @@ export const TriggerConfigInput = z
 
 // Schema for partial updates (PUT endpoint)
 // null = explicitly clear the field, undefined = leave unchanged
-// Note: targetType and kiloclawInstanceId are intentionally excluded — they are
-// immutable after creation. To change target type or instance, delete and recreate.
 export const TriggerConfigUpdateInput = z
   .object({
     executionUserId: z.never().optional(),
+    cloudAgentSessionId: z.never().optional(),
     mode: z.string().trim().min(1).optional(),
     model: z.string().trim().min(1).optional(),
-    variant: z
-      .string()
-      .max(50)
-      .regex(/^[a-zA-Z]+$/)
-      .nullable()
-      .optional(),
+    variant: z.string().min(1).max(50).nullable().optional(),
     sandboxAllocation: sandboxAllocationSchema.nullable().optional(),
     environmentId: z.string().uuid().nullable().optional(),
     promptTemplate: z.string().trim().min(1).optional(),
@@ -345,6 +363,13 @@ async function handleCreateTrigger(
   const config = parsedConfig.data;
   if (config.executionUserId !== undefined && !namespace.startsWith('org/')) {
     return c.json(resError('executionUserId is only supported for organization triggers'), 400);
+  }
+  if (
+    config.targetType === 'cloud_agent_chat' &&
+    namespace.startsWith('org/') &&
+    !config.executionUserId
+  ) {
+    return c.json(resError(triggerChatRequiresCreator), 400);
   }
 
   try {
@@ -490,9 +515,15 @@ async function handleUpdateTrigger(c: RouteContext, namespace: string, triggerId
 
     if (
       updates.bodySchema != null &&
-      (existingConfig.targetType !== 'cloud_agent' || existingConfig.activationMode !== 'webhook')
+      (existingConfig.targetType === 'kiloclaw_chat' || existingConfig.activationMode !== 'webhook')
     ) {
       return c.json(resError('Body validation is only available for Cloud Agent webhooks'), 400);
+    }
+    if (
+      existingConfig.targetType === 'cloud_agent_chat' &&
+      hasExistingChatWorkspaceSettings(updates)
+    ) {
+      return c.json(resError(existingChatWorkspaceSettingsError), 400);
     }
 
     if (existingConfig.targetType === 'kiloclaw_chat' && updates.sandboxAllocation !== undefined) {

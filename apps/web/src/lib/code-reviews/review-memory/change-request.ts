@@ -13,6 +13,7 @@ import {
   createGitHubPullRequest,
   createOrUpdateGitHubRootTextFile,
   fetchGitHubRepositoryDefaultBranch,
+  fetchGitHubPullRequestForHeadBranch,
   fetchGitHubRootTextFileAtRef,
   generateGitHubInstallationToken,
 } from '@/lib/integrations/platforms/github/adapter';
@@ -31,6 +32,8 @@ const REVIEW_MEMORY_TARGET_FILE_PATH = 'REVIEW.md';
 const REVIEW_MEMORY_CHANGE_REQUEST_TITLE = 'docs(review): update REVIEW.md guidance';
 const REVIEW_MEMORY_CHANGE_REQUEST_MARKER = '<!-- kilo-review-memory-change-request -->';
 const OPENING_CHANGE_REQUEST_STALE_MS = 30 * 60 * 1000;
+const GITHUB_REQUEST_TIMEOUT_MS = 10_000;
+const REVIEW_MEMORY_GATEWAY_TIMEOUT_MS = 120_000;
 const APPROVABLE_STATUSES = new Set<ReviewMemoryProposalStatus>(EDITABLE_PROPOSAL_STATUSES);
 
 export class ReviewMemoryChangeRequestError extends Error {
@@ -99,12 +102,30 @@ export async function approveAndOpenReviewMemoryChangeRequest(input: {
       throw new Error('GitHub installation id is missing.');
     }
 
+    const branchName = `kilo/review-memory/${proposal.id.slice(0, 8)}`;
+
     const tokenData = await generateGitHubInstallationToken(
       integration.platform_installation_id,
       integration.github_app_type ?? 'standard',
-      integration.id
+      integration.id,
+      'workflow',
+      AbortSignal.timeout(GITHUB_REQUEST_TIMEOUT_MS)
     );
     const token = tokenData.token;
+    const existingPullRequest = await fetchGitHubPullRequestForHeadBranch({
+      token,
+      owner: repoOwner,
+      repo,
+      headBranch: branchName,
+    });
+    if (existingPullRequest) {
+      const resumed = await markProposalChangeRequestOpened({
+        proposalId: proposal.id,
+        changeRequestUrl: existingPullRequest.url,
+      });
+      if (!resumed) throw new Error('Failed to mark proposal change request opened.');
+      return resumed;
+    }
     const defaultBranch = await fetchGitHubRepositoryDefaultBranch({
       token,
       owner: repoOwner,
@@ -123,6 +144,7 @@ export async function approveAndOpenReviewMemoryChangeRequest(input: {
       repoFullName: proposal.repo_full_name,
       existingReviewMd,
       proposal,
+      signal: AbortSignal.timeout(REVIEW_MEMORY_GATEWAY_TIMEOUT_MS),
     });
 
     if (integrationResult.status === 'already_present') {
@@ -134,7 +156,6 @@ export async function approveAndOpenReviewMemoryChangeRequest(input: {
       throw new Error('Integration returned no REVIEW.md content.');
     }
 
-    const branchName = `kilo/review-memory/${proposal.id.slice(0, 8)}`;
     await createGitHubBranch({
       token,
       owner: repoOwner,

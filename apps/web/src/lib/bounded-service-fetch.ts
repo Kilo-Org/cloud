@@ -13,24 +13,39 @@ export const CONTROL_PLANE_UPSTREAM_BUDGET_MS = 8_000;
 /**
  * Raised when an internal-service fetch does not settle inside its budget.
  *
- * Carries only the budget: the request URL (and its query string), the
+ * Carries only budgets: the request URL (and its query string), the
  * `Authorization` header and the internal-service token are never attached to
  * this error or written to a log.
  */
 export class ServiceFetchTimeoutError extends Error {
+  /** Time the timed phase had left when it expired. */
   readonly budgetMs: number;
 
-  constructor(budgetMs: number) {
-    super(`Internal service did not respond within ${budgetMs}ms`);
+  /**
+   * Budget the phase was configured with. Equal to {@link budgetMs} unless the
+   * phase had already spent part of its budget before the timed operation
+   * started — a body read arms its timer with what the headers left, so
+   * reporting `budgetMs` alone would show a few milliseconds instead of the
+   * read's actual budget in logs and Sentry.
+   */
+  readonly totalBudgetMs: number;
+
+  constructor(budgetMs: number, totalBudgetMs: number = budgetMs) {
+    super(`Internal service did not respond within ${totalBudgetMs}ms`);
     this.name = 'ServiceFetchTimeoutError';
     this.budgetMs = budgetMs;
+    this.totalBudgetMs = totalBudgetMs;
   }
 }
 
 export type FetchWithinBudgetDeps = {
   /** Injectable for tests; defaults to the ambient `fetch`. */
   fetch?: typeof fetch;
-  /** Overrides {@link CONTROL_PLANE_UPSTREAM_BUDGET_MS} (tests only). */
+  /**
+   * Tightens {@link CONTROL_PLANE_UPSTREAM_BUDGET_MS} for a caller that shares
+   * one answer's budget between several phases, so this fetch cannot spend all
+   * of it. Tests also use it to shorten the budget.
+   */
   budgetMs?: number;
 };
 
@@ -112,4 +127,76 @@ export async function fetchWithinBudget(
       callerSignal.removeEventListener('abort', onCallerAbort);
     }
   });
+}
+
+/**
+ * Read a bounded fetch's JSON body inside the budget the fetch already spent
+ * part of.
+ *
+ * {@link fetchWithinBudget} settles as soon as the upstream answers with its
+ * headers and then disarms its timer, so an upstream that accepts the
+ * connection and stalls the body would hold the caller open with no bound at
+ * all. The body is therefore read under what is left of the budget and the read
+ * is abandoned when that runs out, rejecting with the same
+ * {@link ServiceFetchTimeoutError} the fetch raises so one caller handles both.
+ *
+ * The read goes through a reader this function owns rather than
+ * `response.json()`. `json()` locks the body stream for the whole read, and a
+ * locked stream cannot be cancelled, so an expired read of a real `Response`
+ * would leave the abandoned body being buffered for as long as the upstream
+ * kept trickling it. Cancelling a reader we hold tears the stream down and ends
+ * the transfer.
+ *
+ * `remainingBudgetMs` is what the headers left; `totalBudgetMs` is the budget
+ * this read was configured with, and it is the value the timeout error reports
+ * so logs and Sentry show the configured budget instead of the few milliseconds
+ * that were left when the body started.
+ */
+export async function readJsonWithinBudget<T = unknown>(
+  response: Response,
+  remainingBudgetMs: number,
+  totalBudgetMs: number = remainingBudgetMs
+): Promise<T> {
+  const budgetError = new ServiceFetchTimeoutError(remainingBudgetMs, totalBudgetMs);
+  const expired = Promise.withResolvers<never>();
+  // A body another reader already holds cannot be taken over; the wait is
+  // still bounded, only the cancellation is out of reach.
+  const body = response.body;
+  const reader = body && !body.locked && !response.bodyUsed ? body.getReader() : undefined;
+  const timer = setTimeout(
+    () => {
+      if (reader) {
+        void reader.cancel().catch(() => undefined);
+      }
+      expired.reject(budgetError);
+    },
+    Math.max(0, remainingBudgetMs)
+  );
+
+  try {
+    if (!reader) {
+      return await Promise.race([response.json() as Promise<T>, expired.promise]);
+    }
+    return JSON.parse(await Promise.race([readAllText(reader), expired.promise])) as T;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Read a streamed body to its end as text. Cancellation belongs to the caller:
+ * the reader it passed in is the only thing that can end a stalled transfer.
+ */
+async function readAllText(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<string> {
+  const decoder = new TextDecoder();
+  const chunks: string[] = [];
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    chunks.push(decoder.decode(value, { stream: true }));
+  }
+  chunks.push(decoder.decode());
+  return chunks.join('');
 }

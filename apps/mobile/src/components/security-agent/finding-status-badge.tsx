@@ -18,6 +18,13 @@ type FindingStatusBadgeProps = {
   size?: number;
   /** Set from the presentation's `spinning` field for in-progress states (e.g. queued/analyzing). */
   spinning?: boolean;
+  /**
+   * The label's own text class, for a line that already sets the size of every
+   * other item in it. The meta line under a finding's title paints the severity
+   * and the lifecycle status at the caption size, so the deadline this badge
+   * carries joins them instead of standing a step larger beside the same line.
+   */
+  textClassName?: string;
 };
 
 export function FindingStatusBadge({
@@ -26,6 +33,7 @@ export function FindingStatusBadge({
   tone,
   size = 14,
   spinning = false,
+  textClassName,
 }: Readonly<FindingStatusBadgeProps>) {
   const colors = useThemeColors();
   const Icon = FINDING_ICONS[icon];
@@ -38,7 +46,9 @@ export function FindingStatusBadge({
         color={findingToneColor(colors, tone)}
         spinning={spinning}
       />
-      <Text className={cn('text-sm font-medium', FINDING_TONE_TEXT_CLASS[tone])}>{label}</Text>
+      <Text className={cn('text-sm font-medium', FINDING_TONE_TEXT_CLASS[tone], textClassName)}>
+        {label}
+      </Text>
     </View>
   );
 }

@@ -50,9 +50,12 @@ async function runChunkedStreaming(
   const { config, conversation, timeoutMs = 60_000, api = 'unified' } = args;
   const directive = conversation && conversation !== '_' ? conversation : 'slow:5:50';
   let stream: StreamConnection | undefined;
+  let phase = 'start session';
   try {
     const session = await startSession(config, { prompt: fakeDirective(directive) }, api);
+    phase = 'open stream';
     stream = openStream(config, session.cloudAgentSessionId, { replay: false });
+    phase = 'inspect allocation';
     const container = await requireContainer(
       env.sessionSandbox,
       session,
@@ -70,6 +73,7 @@ async function runChunkedStreaming(
       };
     }
 
+    phase = 'wait for terminal';
     const terminal = await stream.waitForTerminal(timeoutMs, session.messageId);
     const events = [...stream.events];
     stream.close();
@@ -89,8 +93,8 @@ async function runChunkedStreaming(
       name: 'chunked-streaming',
       conversation,
       ok: false,
-      message: `threw: ${errorMessage(error)}`,
-      events: [],
+      message: `${phase}: ${errorMessage(error)}`,
+      events: stream?.events ?? [],
       durationMs: Date.now() - start,
     };
   } finally {

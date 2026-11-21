@@ -160,7 +160,7 @@ describe('expoPushExtrasForPushData', () => {
 
   it('returns no extras for a non-cloud-agent push', async () => {
     const extras = await expoPushExtrasForPushData(
-      { type: 'chat.message', sandboxId: 'sb_1', conversationId: 'conv_1', messageId: 'msg_1' },
+      { type: 'low_balance', organizationId: 'org_1' },
       ACCOUNT
     );
 

@@ -11,6 +11,8 @@
 
 import type { SessionConfig } from '@kilocode/cloud-agent-sdk';
 
+import { agentVariantSchema } from '@/routers/cloud-agent-next-schemas';
+
 /** The subset of a cloud session's runtime state this feature reads. */
 export type CloudRuntimeConfig = {
   platform?: 'github' | 'gitlab' | 'bitbucket' | (string & {});
@@ -66,7 +68,6 @@ export type DeriveCloudSessionForkResult =
 
 const MODE_SLUG_PATTERN = /^[a-z][a-z0-9-]*$/;
 const MAX_MODE_SLUG_LENGTH = 50;
-const VARIANT_PATTERN = /^[a-zA-Z]+$/;
 const GITHUB_REPO_PATTERN = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/;
 const GITLAB_PROJECT_PATTERN = /^[a-zA-Z0-9_.-]+(?:\/[a-zA-Z0-9_.-]+)+$/;
 
@@ -146,8 +147,9 @@ function toPrepareRuntimeAgents(
   return prepared;
 }
 
+/** Variants are model-specific keys, so the shared schema bounds only their length. */
 function isValidVariant(variant: string | undefined): variant is string {
-  return typeof variant === 'string' && variant.length <= 50 && VARIANT_PATTERN.test(variant);
+  return typeof variant === 'string' && agentVariantSchema.safeParse(variant).success;
 }
 
 function deriveRepository(

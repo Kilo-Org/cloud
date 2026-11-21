@@ -51,35 +51,22 @@ describe('findingDetailBackTarget', () => {
 describe('finding detail back control wiring', () => {
   // Source-read fallback: the pure project cannot mount the screen, so pin the
   // forced back control by reading the source. The loaded state renders its own
-  // `ScreenHeader`; the loading state renders the one that reserves the eyebrow
-  // line, and the failure and not-found states share the one that does not, so
-  // neither of those can gain a blank line above its title. This fails if a
-  // state stops rendering a header, or if its back control is removed.
+  // `ScreenHeader`; the loading, failure and not-found states share one, because
+  // neither a failure nor a not-found can be known before the first paint — that
+  // first frame is the loading one. The mounted finding-detail suite pins that
+  // this header keeps its subtitle line reserved. This fails if a state stops
+  // rendering a header, or if its back control is removed.
   const screenPath = fileURLToPath(
     new URL('../components/security-agent/finding-detail-screen.tsx', import.meta.url)
   );
   const source = readFileSync(screenPath, 'utf8');
   const screenHeaderCount = (source.match(/<ScreenHeader\b/g) ?? []).length;
   const showBackButtonCount = (source.match(/\bshowBackButton\b/g) ?? []).length;
-  const loadingHeaderCount = (source.match(/\{loadingHeader\}/g) ?? []).length;
   const pendingHeaderCount = (source.match(/\{pendingHeader\}/g) ?? []).length;
-  const loadingHeaderSource = /const loadingHeader = \(([\s\S]*?)\n {2}\);/.exec(source)?.[1] ?? '';
-  const pendingHeaderSource = /const pendingHeader = \(([\s\S]*?)\n {2}\);/.exec(source)?.[1] ?? '';
 
-  it('renders the loading, failure and not-found states through a header', () => {
-    expect(screenHeaderCount).toBe(3);
-    expect(loadingHeaderCount).toBe(1);
-    expect(pendingHeaderCount).toBe(2);
-  });
-
-  it('reserves the eyebrow line only while the load can still gain a repository', () => {
-    // The payload draws the finding's repository on the eyebrow line above the
-    // title, which pushes the title down half a line when it lands. Reserving
-    // the line while the load is pending keeps the title still. A finding that
-    // does not exist and a failed load never gain a repository, so a reserved
-    // line there would leave the title above a gap no label ever fills.
-    expect(loadingHeaderSource).toMatch(/\breserveEyebrow\b/);
-    expect(pendingHeaderSource).not.toMatch(/\breserveEyebrow\b/);
+  it('renders the loaded state and the single pending state through a header', () => {
+    expect(screenHeaderCount).toBe(2);
+    expect(pendingHeaderCount).toBe(3);
   });
 
   it('passes showBackButton on every ScreenHeader usage', () => {
@@ -88,16 +75,18 @@ describe('finding detail back control wiring', () => {
 });
 
 describe('profile tab anchor', () => {
-  // The profile tab stack anchors its initial route to `index` so a cold
-  // push-open builds the stack with the profile root underneath, and a tab
-  // re-press returns to the profile root. Pin the anchor by reading the layout
-  // source; this fails if `initialRouteName: 'index'` is removed.
+  // The profile tab stack anchors its root to `index` so a cold push-open
+  // builds the stack with the profile root underneath, and a tab re-press
+  // returns to the profile root. Pin the anchor by reading the layout source;
+  // this fails if `anchor: 'index'` is removed or replaced by the deprecated
+  // `initialRouteName` alias.
   const layoutPath = fileURLToPath(
     new URL('../app/(app)/(tabs)/(3_profile)/_layout.tsx', import.meta.url)
   );
   const layoutSource = readFileSync(layoutPath, 'utf8');
-  it("declares initialRouteName: 'index'", () => {
-    expect(layoutSource).toMatch(/initialRouteName:\s*'index'/);
+  it("declares anchor: 'index'", () => {
+    expect(layoutSource).toMatch(/anchor:\s*'index'/);
+    expect(layoutSource).not.toMatch(/initialRouteName/);
   });
 });
 

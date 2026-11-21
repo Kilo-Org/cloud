@@ -1,8 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic } from '@/lib/haptics';
-import { type Href } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
 import { appendNewSessionPrefill } from '@/components/agents/new-session-prefill';
@@ -11,10 +12,13 @@ import { useNewSessionNavigator } from '@/components/agents/use-new-session-navi
 import { i18n } from '@/i18n';
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { startAgent } from '@/lib/app-actions/start-agent';
+import { isMoneyRole, useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { linkStartedTodoSession } from '@/lib/hooks/todo-session-link';
 import { useKeyedSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
+import { announceTrialRefusal } from '@/lib/refusal-toast';
 import { todoSessionPrompt } from '@/lib/todos/todo-model';
 import { type TodoList } from '@/lib/todos/todo-types';
+import { billingActionFor, billingHrefFor } from '@/lib/trial-refusal';
 import { useTRPC } from '@/lib/trpc';
 
 type StartableTodo = { id: string; title: string; notes: string | null };
@@ -62,6 +66,11 @@ export function useStartTodo(): StartTodoControls {
   const trpc = useTRPC();
   const navigateToSession = useAgentSessionNavigator();
   const { openNewSessionHref } = useNewSessionNavigator();
+  // A to-do list names its own organization, so the role the refusal copy and
+  // its step follow is looked up per press from the shared membership list.
+  const { orgs } = useOrgBoundary();
+  const router = useRouter();
+  const { t } = useTranslation();
   // One admission per to-do: a to-do already starting refuses a second press,
   // and its row reads the pending entry for its spinner.
   const starts = useKeyedSurfaceFeedback<string, StartTodoFailure>();
@@ -83,6 +92,14 @@ export function useStartTodo(): StartTodoControls {
       if (attempt === null) {
         return;
       }
+      // The list carries its own organization, so the role is resolved for that
+      // membership rather than for whichever organization the device has
+      // selected: the refusal's copy and the step it offers must describe one
+      // reader. The lookup reads the same membership list `useCanManageBilling`
+      // reads, at the press, because the list is an argument here.
+      const canManageBilling = isMoneyRole(
+        orgs?.find(entry => entry.organizationId === list.organizationId)?.role
+      );
       try {
         const result = await startAgent({
           prompt: todoSessionPrompt(todo),
@@ -91,12 +108,24 @@ export function useStartTodo(): StartTodoControls {
           model: list.model ?? undefined,
           variant: list.variant ?? undefined,
           organizationId: list.organizationId ?? undefined,
+          canManageBilling,
         });
-        if (!result.ok || !result.sessionId) {
+        if (!result.ok) {
           // The toast owns the refusal copy and nothing renders a phase on the
           // row, so the admission is released below rather than settled as a
           // failure: a settled entry would stay in the store for the life of
-          // this surface.
+          // this surface. The plan refusal offers the step that ends it to the
+          // role that can take it; every other failure keeps its own copy.
+          announceTrialRefusal(
+            result.message,
+            billingActionFor(canManageBilling, t('organization.hub.manageBilling'), () => {
+              router.push(billingHrefFor(list.organizationId));
+            }),
+            result.trialRefusal === true
+          );
+          return;
+        }
+        if (!result.sessionId) {
           toast.error(result.message);
           return;
         }
@@ -131,7 +160,7 @@ export function useStartTodo(): StartTodoControls {
         attempt.abandon();
       }
     },
-    [navigateToSession, queryClient, review, starts, trpc]
+    [navigateToSession, orgs, queryClient, review, router, starts, t, trpc]
   );
 
   const isStarting = useCallback(

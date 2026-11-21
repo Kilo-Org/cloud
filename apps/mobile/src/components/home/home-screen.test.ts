@@ -62,7 +62,10 @@ vi.mock('@/components/todos/up-next-section', () => ({
 vi.mock('@/components/screen-header', () => ({
   ScreenHeader: () => null,
 }));
-vi.mock('@/components/context-control', () => ({ ContextControl: () => null }));
+vi.mock('@/components/context-control', () => ({
+  CONTEXT_CONTROL_INLINE_MIN_DP: 21,
+  ContextControl: () => null,
+}));
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: 'ScrollView',
   useTabBarBottomPadding: () => 0,
@@ -74,9 +77,5 @@ vi.mock('@/lib/hooks/use-agent-sessions', () => ({
 describe('HomeScreen copy', () => {
   it('does not show the first-time welcome headline on the main page', () => {
     expect(HomeScreen.toString()).not.toContain('Welcome to Kilo');
-  });
-
-  it('renders no KiloClaw surface', () => {
-    expect(HomeScreen.toString()).not.toContain('KiloClaw');
   });
 });

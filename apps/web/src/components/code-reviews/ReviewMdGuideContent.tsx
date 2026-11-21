@@ -28,12 +28,18 @@ const guidanceItems = [
 const limits = [
   'Hard safety, tooling, platform, and read-only constraints still apply.',
   'Custom instructions and focus areas are still applied around repository guidance.',
-  '@ imports are not expanded. Keep the guidance directly in REVIEW.md.',
-  'Content is truncated after 10,000 characters.',
+  '@ imports and URLs are not expanded. Shared guidelines use extends on GitHub only.',
+  'At most 10 imports are resolved. Self-imports and nested imports are not supported.',
+  'The total budget is 20,000 characters. Imports are dropped from the end first; repository text has priority.',
   'Do not include secrets, credentials, tokens, or private operational data.',
 ];
 
-const exampleReviewMd = `# REVIEW.md
+const exampleReviewMd = `---
+extends:
+  - acme/review-guidelines:frontend.md
+  - acme/review-guidelines:backend/api.md
+---
+# REVIEW.md
 
 ## What matters in this repository
 - Preserve tenant isolation for every database query.
@@ -141,6 +147,35 @@ export function ReviewMdGuideContent({
               <pre className="bg-muted/40 overflow-x-auto rounded-lg border p-4 text-sm">
                 <code>{exampleReviewMd}</code>
               </pre>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl">Shared guidelines on GitHub</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-muted-foreground text-sm">
+              <p>
+                An administrator must add source repositories to Allowed guideline source
+                repositories in Code Reviewer settings. Personal accounts have the same setting.
+                Each source must belong to the same GitHub account as the reviewed repository, and
+                the GitHub App installation must have access to it.
+              </p>
+              <p>
+                Add an extends list in YAML front matter, as shown above. Each entry uses
+                owner/repo:path without a host. Paths are relative, use / separators, end in .md,
+                and cannot contain .. segments or start with /. Paths are case-sensitive.
+              </p>
+              <p>
+                Kilo reads each source at its default branch head. All files from one source use the
+                same commit for that review. Imports appear in list order, then repository text.
+                Repository text wins on conflict. Front matter is removed from all files. Imported
+                extends lists are ignored.
+              </p>
+              <p>
+                Import failures do not stop reviews. Review metadata records each source, resolved
+                commit, and status. GitLab and Bitbucket imports are not supported.
+              </p>
             </CardContent>
           </Card>
         </div>

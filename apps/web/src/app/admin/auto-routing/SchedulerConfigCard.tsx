@@ -29,8 +29,6 @@ const SCHEDULER_CONFIG_QUERY_KEY = ['auto-routing', 'benchmark-scheduler-config'
 const SETTING_LABELS: Record<BenchmarkSchedulerSettingKey, string> = {
   slots: 'Container slots',
   modelConcurrency: 'Per-model concurrency',
-  providerConcurrency: 'Per-provider concurrency',
-  unknownProviderConcurrency: 'Unknown-provider concurrency',
 };
 
 type SchedulerOverrideForm = Record<BenchmarkSchedulerSettingKey, string>;
@@ -63,8 +61,6 @@ function SchedulerConfigEditor({ data }: { data: BenchmarkSchedulerConfigRespons
   const [form, setForm] = useState<SchedulerOverrideForm>(() => ({
     slots: String(data.settings.slots.override ?? ''),
     modelConcurrency: String(data.settings.modelConcurrency.override ?? ''),
-    providerConcurrency: String(data.settings.providerConcurrency.override ?? ''),
-    unknownProviderConcurrency: String(data.settings.unknownProviderConcurrency.override ?? ''),
   }));
   const parsed = BenchmarkSchedulerOverridesSchema.safeParse(
     Object.fromEntries(

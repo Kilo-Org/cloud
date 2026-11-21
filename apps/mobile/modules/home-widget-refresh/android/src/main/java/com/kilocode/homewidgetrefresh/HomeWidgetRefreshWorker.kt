@@ -17,7 +17,8 @@ import java.util.concurrent.TimeUnit
 
 /** WorkManager performs networking before booting JS; JS is only the widget renderer. */
 class HomeWidgetRefreshWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
-  @Volatile private var stopped = false
+  /** The worker has released its React registration. */
+  @Volatile private var released = false
   private val finished = CountDownLatch(1)
   private var listener: ReactInstanceEventListener? = null
   private var taskContext: HeadlessJsTaskContext? = null
@@ -38,7 +39,7 @@ class HomeWidgetRefreshWorker(context: Context, params: WorkerParameters) : Work
   private fun render(payload: JSONObject) {
     val host = (applicationContext as? ReactApplication)?.reactHost ?: return
     UiThreadUtil.runOnUiThread {
-      if (stopped) return@runOnUiThread
+      if (released) return@runOnUiThread
       val ready = host.currentReactContext
       if (ready != null) startTask(ready, payload) else {
         val pending = object : ReactInstanceEventListener {
@@ -62,7 +63,7 @@ class HomeWidgetRefreshWorker(context: Context, params: WorkerParameters) : Work
   }
 
   private fun startTask(context: ReactContext, payload: JSONObject) {
-    if (stopped || !HomeWidgetStore.current(applicationContext, payload.getString("scopeKey"), payload.getInt("accountEpoch"), payload.getString("generation"))) {
+    if (released || !HomeWidgetStore.current(applicationContext, payload.getString("scopeKey"), payload.getLong("accountEpoch"), payload.getString("generation"))) {
       finished.countDown()
       return
     }
@@ -78,13 +79,15 @@ class HomeWidgetRefreshWorker(context: Context, params: WorkerParameters) : Work
   }
 
   private fun cleanup() {
-    stopped = true
+    released = true
     UiThreadUtil.runOnUiThread {
       val host = (applicationContext as? ReactApplication)?.reactHost
       listener?.let { host?.removeReactInstanceEventListener(it) }
       listener = null
       taskListener?.let { taskContext?.removeTaskEventListener(it) }
       taskListener = null
+      taskContext = null
+      taskId = -1
     }
   }
   override fun onStopped() { super.onStopped(); cleanup(); finished.countDown() }

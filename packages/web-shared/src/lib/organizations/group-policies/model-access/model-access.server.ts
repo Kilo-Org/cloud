@@ -37,8 +37,8 @@ export type EffectiveOrganizationModelPolicy = {
     | {
         mode: 'selected';
         includeOrganizationBaseline: boolean;
-        modelAllowList: string[];
-        providerAllowList: string[];
+        modelAllowList: ReadonlySet<string>;
+        providerAllowList: ReadonlySet<string>;
       };
   dataCollection?: OrganizationSettings['data_collection'];
   policyRevision: number;
@@ -48,12 +48,7 @@ export type EffectiveOrganizationModelPolicy = {
 export type EffectiveModelDecision = {
   allowed: boolean;
   eligibleProviderRoutes?: ReadonlySet<string>;
-  denialSource?:
-    | 'organization_model'
-    | 'organization_provider'
-    | 'group_model'
-    | 'group_provider'
-    | 'no_grant';
+  denialSource?: 'organization_model' | 'organization_provider' | 'no_grant';
 };
 
 export function evaluateEffectiveModelAccessPolicy(
@@ -66,6 +61,9 @@ export function evaluateEffectiveModelAccessPolicy(
   const organizationProviderCeiling = organizationRestrictionsEnabled
     ? context.organization.settings.provider_allow_list
     : undefined;
+  // `organizationModelDenyList` and `organizationProviderCeiling` set the default
+  // model and provider access for organization members. Group policies set the
+  // access of their own members. Organization admins manage both.
   // The fields below do not vary by branch; each branch adds only the snapshot
   // requirement and the member grant that its policy mode implies.
   const organizationFields = {
@@ -111,22 +109,16 @@ export function evaluateEffectiveModelAccessPolicy(
     memberGrant: {
       mode: 'selected',
       includeOrganizationBaseline,
-      modelAllowList: [
-        ...new Set(
-          selectedPolicies.flatMap(policy =>
-            policy.data.mode === 'selected'
-              ? policy.data.model_allow_list.map(normalizeModelId)
-              : []
-          )
-        ),
-      ],
-      providerAllowList: [
-        ...new Set(
-          selectedPolicies.flatMap(policy =>
-            policy.data.mode === 'selected' ? policy.data.provider_allow_list : []
-          )
-        ),
-      ],
+      modelAllowList: new Set(
+        selectedPolicies.flatMap(policy =>
+          policy.data.mode === 'selected' ? policy.data.model_allow_list.map(normalizeModelId) : []
+        )
+      ),
+      providerAllowList: new Set(
+        selectedPolicies.flatMap(policy =>
+          policy.data.mode === 'selected' ? policy.data.provider_allow_list : []
+        )
+      ),
     },
   };
 }
@@ -181,12 +173,15 @@ export async function getEffectiveModelDecision(
     ? new Set(policy.organizationProviderCeiling)
     : undefined;
 
+  const resolveModelProviders = async () =>
+    currentModelProviders ?? (await providerLookup(modelId));
+
   async function decisionWithinOrganizationBaseline(): Promise<EffectiveModelDecision> {
     if (policy.organizationModelDenyList.includes(normalizedModelId)) {
       return { allowed: false, denialSource: 'organization_model' };
     }
     if (!organizationRoutes) return { allowed: true };
-    const modelProviders = currentModelProviders ?? (await providerLookup(modelId));
+    const modelProviders = await resolveModelProviders();
     if (modelProviders.size === 0) {
       return { allowed: false, denialSource: 'organization_model' };
     }
@@ -199,12 +194,14 @@ export async function getEffectiveModelDecision(
   if (policy.memberGrant.mode === 'organization_baseline') {
     return await decisionWithinOrganizationBaseline();
   }
-  if (policy.memberGrant.modelAllowList.includes(normalizedModelId)) {
+  if (policy.memberGrant.modelAllowList.has(normalizedModelId)) {
     return { allowed: true };
   }
-  if (policy.memberGrant.providerAllowList.length > 0) {
-    const modelProviders = currentModelProviders ?? (await providerLookup(modelId));
-    const memberProviders = new Set(policy.memberGrant.providerAllowList);
+  if (policy.memberGrant.providerAllowList.size > 0) {
+    // An empty provider set produces no eligible routes here, so the branch falls
+    // through to the organization-baseline check or `no_grant` on purpose.
+    const modelProviders = await resolveModelProviders();
+    const memberProviders = policy.memberGrant.providerAllowList;
     const eligibleProviderRoutes = getEligibleProviderRoutes(modelProviders, memberProviders);
     if (eligibleProviderRoutes.size > 0) {
       if (policy.memberGrant.includeOrganizationBaseline) {

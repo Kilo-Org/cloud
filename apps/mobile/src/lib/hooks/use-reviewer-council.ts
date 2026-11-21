@@ -49,6 +49,15 @@ function useCouncilEntitlement(scope: string, enabled: boolean) {
 }
 
 /**
+ * Why a settled organization refusal reads refused. A settled entitlement
+ * answer is the one state the reader can act on (the plan rule), so only it
+ * may name the plan; a rollout flag the build cannot apply and a failed
+ * entitlement read say nothing about the organization's plan and get the
+ * neutral sentence instead.
+ */
+export type CouncilRefusalReason = 'flagUnavailable' | 'entitlementErrored' | 'refused';
+
+/**
  * The council config gate, identical to the web page's: an entitled
  * organization behind the rollout flag. A personal scope can never show it, and
  * neither can a build that predates the flag (its registry minimum applies in
@@ -62,9 +71,18 @@ export function useCouncilGate(scope: string) {
   const flagEnabled = useFeatureFlag(CODE_REVIEW_COUNCIL_FLAG);
   const qualified = flagEnabled && !isPersonal(scope);
   const entitlement = useCouncilEntitlement(scope, flagEnabled);
+  let refusalReason: CouncilRefusalReason | null = null;
+  if (!qualified) {
+    refusalReason = 'flagUnavailable';
+  } else if (entitlement.isError) {
+    refusalReason = 'entitlementErrored';
+  } else if (entitlement.data?.entitled !== true) {
+    refusalReason = 'refused';
+  }
   return {
     allowed: qualified && (entitlement.data?.entitled ?? false),
     pending: qualified && entitlement.isPending,
+    refusalReason,
   };
 }
 

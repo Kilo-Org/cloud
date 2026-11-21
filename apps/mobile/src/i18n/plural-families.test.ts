@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   auditCountedCalls,
+  checkDynamicCountedKeySources,
   collectCountedKeys,
   collectDynamicCountedCalls,
   DYNAMIC_COUNTED_KEYS,
@@ -14,6 +15,7 @@ import {
   findUnlistedDynamicCalls,
   findUnparsedFiles,
   NO_AGREEMENT,
+  readEnglishCatalog,
 } from '../../../../tools/i18n/check-plurals.mjs';
 import { i18n } from '@/i18n';
 
@@ -46,7 +48,14 @@ describe('plural families', () => {
     const scan = auditCountedCalls();
     // A non-trivial scan, so the assertion below cannot pass by finding nothing.
     expect(collectCountedKeys(scan).length).toBeGreaterThan(10);
-    expect(findCountlessFamilies(scan)).toEqual([]);
+    const english = readEnglishCatalog();
+    // An unreadable English catalog makes the family check vacuous, so it must
+    // fail here rather than pass on an empty problem list.
+    expect(english.problems).toEqual([]);
+    expect(english.catalog).not.toBeNull();
+    if (english.catalog !== null) {
+      expect(findCountlessFamilies(scan, english.catalog)).toEqual([]);
+    }
   });
 
   it('keeps every NO_AGREEMENT entry documented with a reason', () => {
@@ -246,7 +255,16 @@ describe('plural families', () => {
     for (const [expression, listed] of DYNAMIC_COUNTED_KEYS) {
       expect(listed.keys.length, expression).toBeGreaterThan(0);
       expect(listed.reason.length, expression).toBeGreaterThan(0);
+      // The declaration each list mirrors is named so the audit can read it.
+      expect(listed.source.length, expression).toBeGreaterThan(0);
+      expect(listed.declaration.length, expression).toBeGreaterThan(0);
     }
+  });
+
+  it('checks every dynamic key list against its app declaration', () => {
+    // The lists are hand-written, so a member added to a union or a map, or a
+    // key a declaration dropped, drifts from the reviewed set silently.
+    expect(checkDynamicCountedKeySources()).toEqual([]);
   });
 
   it('selects the singular form of a dynamic family at count 1', () => {

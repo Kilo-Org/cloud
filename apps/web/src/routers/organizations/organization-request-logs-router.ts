@@ -8,6 +8,7 @@ import {
   enkrypt_usage_guardrail,
   feature,
   finish_reason,
+  http_user_agent,
   inference_region,
   kilocode_users,
   microdollar_usage,
@@ -48,6 +49,7 @@ import {
   type RequestLogRoutingDetails,
 } from '@/lib/request-logs/routing-details';
 import { timedUsageQuery } from '@/lib/usage-query';
+import { getUserAgentName } from '@/lib/user-agent';
 
 const LOG_SOURCE = 'request-logs';
 
@@ -233,6 +235,7 @@ export const organizationRequestLogsRouter = createTRPCRouter({
             requested_model: microdollar_usage.requested_model,
             provider: microdollar_usage.provider,
             inference_provider: microdollar_usage.inference_provider,
+            user_agent: http_user_agent.http_user_agent,
             cost: microdollar_usage.cost,
             input_tokens: microdollar_usage.input_tokens,
             output_tokens: microdollar_usage.output_tokens,
@@ -248,6 +251,10 @@ export const organizationRequestLogsRouter = createTRPCRouter({
           .leftJoin(
             microdollar_usage_metadata,
             eq(microdollar_usage_metadata.id, microdollar_usage.id)
+          )
+          .leftJoin(
+            http_user_agent,
+            eq(http_user_agent.http_user_agent_id, microdollar_usage_metadata.http_user_agent_id)
           )
           .leftJoin(feature, eq(feature.feature_id, microdollar_usage_metadata.feature_id))
           .leftJoin(kilocode_users, eq(kilocode_users.id, microdollar_usage.kilo_user_id))
@@ -271,6 +278,7 @@ export const organizationRequestLogsRouter = createTRPCRouter({
       user: { id: row.kilo_user_id, name: row.user_name, email: row.user_email },
       model: row.requested_model ?? row.model,
       provider: formatRequestLogProvider(row.inference_provider),
+      user_agent_name: getUserAgentName(row.user_agent),
       cost_microdollars: row.cost,
       input_tokens: row.input_tokens,
       output_tokens: row.output_tokens,

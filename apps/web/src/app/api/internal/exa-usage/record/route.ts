@@ -1,6 +1,8 @@
+import { taggedWriterDb } from '@kilocode/web-shared/lib/drizzle';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import {
+  USAGE_CLASS_LIMIT_HEADER,
   ExaUsageRecordSchema,
   ExaUsageWriteResponseSchema,
   type ExaUsageWriteResponse,
@@ -8,7 +10,7 @@ import {
 import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
 import { recordExaUsage } from '@/lib/exa-usage';
 import { describeDatabaseError } from '@kilocode/web-shared/lib/ai-gateway/usage-record-diagnostics';
-import { queueWriterAdmission } from '@kilocode/web-shared/lib/ai-gateway/usage-writer-admission';
+import { taggedWriterAdmission } from '@kilocode/web-shared/lib/ai-gateway/usage-writer-admission';
 
 /** Writes against the PostgreSQL primary, so it must run next to it. */
 export const preferredRegion = 'fra1';
@@ -51,7 +53,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const admission =
     request.headers.get('x-usage-write-source') === 'queue'
-      ? await queueWriterAdmission.acquire('queue', record.id, {
+      ? await taggedWriterAdmission.acquire('queue', record.id, {
           maxWaitMs: QUEUE_ADMISSION_MAX_WAIT_MS,
           signal: request.signal,
           writerClass: 'non_llm',
@@ -60,13 +62,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (admission && !admission.admitted) {
     return NextResponse.json(
       { error: 'Usage writer overloaded', reason: admission.reason },
-      { status: 429 }
+      {
+        status: 429,
+        headers: admission.classOnly ? { [USAGE_CLASS_LIMIT_HEADER]: 'non_llm' } : undefined,
+      }
     );
   }
 
   let status: ExaUsageWriteResponse['status'];
   try {
-    status = await recordExaUsage(record);
+    status = await recordExaUsage(record, admission ? { fromDb: taggedWriterDb } : undefined);
   } catch (error) {
     console.error('[exa-usage] failed to record usage in the primary region', {
       usage_id: record.id,

@@ -32,7 +32,9 @@ export const RELATIVE_TIME_LOCALE_LOADERS = {
   de: () => void require('@formatjs/intl-relativetimeformat/locale-data/de.js'),
   el: () => void require('@formatjs/intl-relativetimeformat/locale-data/el.js'),
   gu: () => void require('@formatjs/intl-relativetimeformat/locale-data/gu.js'),
-  ht: () => void require('@formatjs/intl-relativetimeformat/locale-data/ht.js'),
+  // The released packages carry no `ht` file, and everything they had for it
+  // is the French data.
+  ht: () => void require('@formatjs/intl-relativetimeformat/locale-data/fr.js'),
   ha: () => void require('@formatjs/intl-relativetimeformat/locale-data/ha.js'),
   he: () => void require('@formatjs/intl-relativetimeformat/locale-data/he.js'),
   hi: () => void require('@formatjs/intl-relativetimeformat/locale-data/hi.js'),

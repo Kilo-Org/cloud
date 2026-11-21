@@ -75,32 +75,3 @@ export function getFeatureFlagDefinition(key: string): FeatureFlagDefinition | u
 export function currentAppVersion(): string | null {
   return Application.nativeApplicationVersion ?? null;
 }
-
-/**
- * Compare dotted numeric version strings (`1.10.0` > `1.9.9`, missing
- * segments count as zero). Returns <0, 0, or >0 like `strcmp`.
- */
-export function compareAppVersions(a: string, b: string): number {
-  const left = a.split('.').map(segment => Number.parseInt(segment, 10) || 0);
-  const right = b.split('.').map(segment => Number.parseInt(segment, 10) || 0);
-  const length = Math.max(left.length, right.length);
-  for (let index = 0; index < length; index += 1) {
-    const delta = (left[index] ?? 0) - (right[index] ?? 0);
-    if (delta !== 0) {
-      return delta < 0 ? -1 : 1;
-    }
-  }
-  return 0;
-}
-
-/**
- * True when `current` is at or above `min`. An unknown build version never
- * clears the gate: a build that cannot prove its age does not get to apply a
- * flag it may not understand, so the flag's default holds.
- */
-export function isAppVersionAtLeast(current: string | null | undefined, min: string): boolean {
-  if (!current) {
-    return false;
-  }
-  return compareAppVersions(current, min) >= 0;
-}

@@ -121,12 +121,102 @@ describe('MarkdownMermaid source changes', () => {
     });
   });
 
+  // These cases import the module themselves: the prepared host and its failure
+  // record are module state, so a static import would carry them across cases.
   it('retries a failed host copy for the new source', async () => {
+    let clockNow = 0;
+    const { MERMAID_HOST_RETRY_MS, __setMermaidHostClockForTests } =
+      await import('./markdown-mermaid');
+    __setMermaidHostClockForTests(() => clockNow);
     hostMock.downloadAsync.mockRejectedValueOnce(new Error('copy failed'));
     const renderer = await mount('flowchart TD\n  a --> b');
     expect(countOf(renderer.root, FenceType)).toBe(1);
     expect(countOf(renderer.root, WebViewType)).toBe(0);
 
+    // A source after the cooldown starts the next attempt.
+    clockNow += MERMAID_HOST_RETRY_MS + 1;
+    await rerender(renderer, 'flowchart TD\n  c --> d');
+    expect(countOf(renderer.root, WebViewType)).toBe(1);
+    expect(countOf(renderer.root, FenceType)).toBe(0);
+    expect(hostMock.downloadAsync).toHaveBeenCalledTimes(2);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps the fence for a source inside the failure cooldown', async () => {
+    const { __setMermaidHostClockForTests } = await import('./markdown-mermaid');
+    __setMermaidHostClockForTests(() => 0);
+    hostMock.downloadAsync.mockRejectedValue(new Error('copy failed'));
+    const renderer = await mount('flowchart TD\n  a --> b');
+    expect(countOf(renderer.root, FenceType)).toBe(1);
+    expect(hostMock.downloadAsync).toHaveBeenCalledTimes(1);
+
+    // The clock does not move, so the second source draws its fence from the
+    // recorded failure instead of repeating the copy.
+    await rerender(renderer, 'flowchart TD\n  c --> d');
+    expect(countOf(renderer.root, FenceType)).toBe(1);
+    expect(countOf(renderer.root, WebViewType)).toBe(0);
+    expect(hostMock.downloadAsync).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('recovers the host in a later cooldown window', async () => {
+    let clockNow = 0;
+    const { MERMAID_HOST_RETRY_MS, __setMermaidHostClockForTests } =
+      await import('./markdown-mermaid');
+    __setMermaidHostClockForTests(() => clockNow);
+    hostMock.downloadAsync.mockRejectedValueOnce(new Error('copy failed'));
+    hostMock.downloadAsync.mockRejectedValueOnce(new Error('copy failed again'));
+    const renderer = await mount('flowchart TD\n  a --> b');
+    expect(countOf(renderer.root, FenceType)).toBe(1);
+    expect(hostMock.downloadAsync).toHaveBeenCalledTimes(1);
+
+    // A second failure re-arms the window, so the next source still fences.
+    clockNow += MERMAID_HOST_RETRY_MS + 1;
+    await rerender(renderer, 'flowchart TD\n  c --> d');
+    expect(countOf(renderer.root, FenceType)).toBe(1);
+    expect(hostMock.downloadAsync).toHaveBeenCalledTimes(2);
+
+    clockNow += MERMAID_HOST_RETRY_MS + 1;
+    await rerender(renderer, 'flowchart TD\n  e --> f');
+    expect(countOf(renderer.root, WebViewType)).toBe(1);
+    expect(countOf(renderer.root, FenceType)).toBe(0);
+    expect(hostMock.downloadAsync).toHaveBeenCalledTimes(3);
+    await loadPage(renderer);
+    expect(injected(webViewMock.injectJavaScript).at(-1)).toEqual({
+      source: 'flowchart TD\n  e --> f',
+      dark: false,
+      background: '#f4f4f4',
+    });
+
+    // The recovered host is process state: a later source reuses it.
+    await rerender(renderer, 'flowchart TD\n  g --> h');
+    expect(countOf(renderer.root, WebViewType)).toBe(1);
+    expect(hostMock.downloadAsync).toHaveBeenCalledTimes(3);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('retries immediately when the device clock moves backwards', async () => {
+    let clockNow = 0;
+    const { MERMAID_HOST_RETRY_MS, __setMermaidHostClockForTests } =
+      await import('./markdown-mermaid');
+    __setMermaidHostClockForTests(() => clockNow);
+    hostMock.downloadAsync.mockRejectedValueOnce(new Error('copy failed'));
+    const renderer = await mount('flowchart TD\n  a --> b');
+    expect(countOf(renderer.root, FenceType)).toBe(1);
+    expect(hostMock.downloadAsync).toHaveBeenCalledTimes(1);
+
+    // A backwards jump does not extend the failed window: the next source runs
+    // its attempt instead of holding the old failure forever.
+    clockNow = -MERMAID_HOST_RETRY_MS;
     await rerender(renderer, 'flowchart TD\n  c --> d');
     expect(countOf(renderer.root, WebViewType)).toBe(1);
     expect(countOf(renderer.root, FenceType)).toBe(0);

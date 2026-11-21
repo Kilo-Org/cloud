@@ -1,6 +1,7 @@
 import { sql, type SQL } from 'drizzle-orm';
 import * as z from 'zod';
 import {
+  EndpointInferenceRegionSchema,
   EndpointPricingSchema,
   EndpointSchema,
   EndpointsSchema,
@@ -23,6 +24,21 @@ import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/typ
 export type GatewayModelWithEndpoints = GatewayModel & { endpoints: Endpoint[] };
 
 export type GatewayModelMap = Record<string, GatewayModelWithEndpoints>;
+
+export const LATEST_ALIAS_PREFIX = '~';
+
+/** Whether a model id is a `~` latest alias rather than a concrete catalog id. */
+export function isLatestAliasId(modelId: string): boolean {
+  return modelId.startsWith(LATEST_ALIAS_PREFIX);
+}
+
+/** The model a `~` latest alias resolves to, or `undefined` for a non-alias or unresolvable id. */
+export function getOpenRouterAliasTarget(
+  models: GatewayModelMap,
+  modelId: string
+): string | undefined {
+  return isLatestAliasId(modelId) ? models[modelId]?.alias_target?.slug : undefined;
+}
 
 export const NO_ENDPOINTS_RESOURCE = 'no-endpoints-resource';
 const NoEndpointsResourceSchema = z.strictObject({ status: z.literal(404) });
@@ -82,8 +98,21 @@ function gatewayModelEndpointsUrlPrefix(gateway: Provider) {
 
 const GATEWAY_MODEL_ENDPOINTS_URL_SUFFIX = '/endpoints';
 
+/**
+ * The endpoints URL of one model. A string id returns the URL the live fetch reads; a SQL id
+ * expression returns the same URL as SQL, for the stored-row join.
+ */
+function gatewayModelEndpointsUrlFor(gateway: Provider, id: string): string;
+function gatewayModelEndpointsUrlFor(gateway: Provider, id: SQL): SQL;
+function gatewayModelEndpointsUrlFor(gateway: Provider, id: string | SQL): string | SQL {
+  const prefix = gatewayModelEndpointsUrlPrefix(gateway);
+  return typeof id === 'string'
+    ? `${prefix}${id}${GATEWAY_MODEL_ENDPOINTS_URL_SUFFIX}`
+    : sql`${prefix} || ${id} || ${GATEWAY_MODEL_ENDPOINTS_URL_SUFFIX}`;
+}
+
 export function gatewayModelEndpointsUrl(gateway: Provider, modelId: string) {
-  return `${gatewayModelEndpointsUrlPrefix(gateway)}${modelId}${GATEWAY_MODEL_ENDPOINTS_URL_SUFFIX}`;
+  return gatewayModelEndpointsUrlFor(gateway, modelId);
 }
 
 function parseGatewayModelEndpoints(raw: unknown): GatewayModelEndpoints {
@@ -110,11 +139,13 @@ export function gatewayModelEndpointsSource(
  * Keeps only `keys` of a jsonb object, so the query returns about as much data as the parsed models
  * hold rather than the raw upstream bodies. Absent keys stay absent, null values stay null, and
  * non-object values pass through unchanged, so the schemas see what they would in the raw body.
+ * `nested` picks keys of object members, and `nestedArrays` of each element of array members.
  */
 function pickJsonbKeys(
   value: SQL,
   keys: readonly string[],
-  nested: Partial<Record<string, readonly string[]>> = {}
+  nested: Partial<Record<string, readonly string[]>> = {},
+  nestedArrays: Partial<Record<string, readonly string[]>> = {}
 ): SQL {
   const object = sql`(${value})`;
   const otherKeys = sql`(
@@ -127,8 +158,19 @@ function pickJsonbKeys(
       THEN jsonb_build_object(${key}::text, ${pickJsonbKeys(member, nestedKeys)})
       ELSE '{}'::jsonb END`;
   });
+  const nestedArrayPicks = Object.entries(nestedArrays).map(([key, elementKeys = []]) => {
+    const member = sql`${object}->${key}::text`;
+    return sql` || CASE WHEN jsonb_typeof(${member}) = 'array'
+      THEN jsonb_build_object(${key}::text, (
+        SELECT coalesce(jsonb_agg(
+          ${pickJsonbKeys(sql`elements.element`, elementKeys)} ORDER BY elements.ordinality
+        ), '[]'::jsonb)
+        FROM jsonb_array_elements(${member}) WITH ORDINALITY AS elements(element, ordinality)
+      ))
+      ELSE '{}'::jsonb END`;
+  });
   return sql`CASE WHEN jsonb_typeof(${object}) = 'object'
-    THEN (${object} - ${otherKeys})${sql.join(nestedPicks, sql``)}
+    THEN (${object} - ${otherKeys})${sql.join([...nestedPicks, ...nestedArrayPicks], sql``)}
     ELSE ${object} END`;
 }
 
@@ -194,9 +236,12 @@ export async function readStoredGatewayModels(
           CASE WHEN jsonb_typeof(${endpointsList}) = 'array'
             THEN jsonb_build_object('data', jsonb_build_object('endpoints', (
               SELECT coalesce(jsonb_agg(
-                ${pickJsonbKeys(sql`endpoints.endpoint`, EndpointSchema.keyof().options, {
-                  pricing: EndpointPricingSchema.keyof().options,
-                })}
+                ${pickJsonbKeys(
+                  sql`endpoints.endpoint`,
+                  EndpointSchema.keyof().options,
+                  { pricing: EndpointPricingSchema.keyof().options },
+                  { inference_regions: EndpointInferenceRegionSchema.keyof().options }
+                )}
                 ORDER BY endpoints.ordinality
               ), '[]'::jsonb)
               FROM jsonb_array_elements(${endpointsList}) WITH ORDINALITY AS endpoints(endpoint, ordinality)
@@ -208,7 +253,7 @@ export async function readStoredGatewayModels(
       FROM jsonb_array_elements(${jsonbArrayOrEmpty(sql`list.data->'data'`)})
         WITH ORDINALITY AS items(item, ordinality)
       LEFT JOIN ai_gateway_metadata_cache AS endpoints_row
-        ON endpoints_row.url = ${gatewayModelEndpointsUrlPrefix(gateway)} || (${item}->>'id') || ${GATEWAY_MODEL_ENDPOINTS_URL_SUFFIX}
+        ON endpoints_row.url = ${gatewayModelEndpointsUrlFor(gateway, sql`(${item}->>'id')`)}
     ) AS projected
     WHERE list.url = ${source.url}
   `);

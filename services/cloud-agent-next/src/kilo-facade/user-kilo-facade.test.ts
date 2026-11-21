@@ -2953,7 +2953,7 @@ describe('hosted native routes', () => {
       deps: hostedDeps({
         nativeLiveRead: vi.fn(async () => ({
           ok: false as const,
-          error: { code: 'not_ready', message: 'Live runtime is not ready', retryable: true },
+          error: { code: 'runtime_offline', message: 'Live runtime is not ready', retryable: true },
         })),
       }),
     });

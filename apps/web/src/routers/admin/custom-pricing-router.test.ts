@@ -92,4 +92,18 @@ describe('adminCustomPricingRouter', () => {
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(await db.select().from(ai_gateway_config)).toEqual([]);
   });
+
+  it('rejects an entry for a latest alias without writing', async () => {
+    const caller = await createCallerForUser(admin.id);
+    const [entry] = config.models;
+    await expect(
+      caller.admin.customPricing.set({
+        config: { models: [entry, { ...entry, model: '~vendor/model-latest' }] },
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: expect.stringContaining('is a latest alias'),
+    });
+    expect(await db.select().from(ai_gateway_config)).toEqual([]);
+  });
 });

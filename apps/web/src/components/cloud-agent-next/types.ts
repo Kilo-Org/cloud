@@ -38,7 +38,7 @@ import type {
   EventSessionUpdated,
   Session,
   SessionStatus,
-} from '@/types/opencode.gen';
+} from '@/types/opencode';
 
 export type {
   Part,
@@ -93,60 +93,6 @@ export function isToolPart(part: Part): part is ToolPart {
 /** Check if a part is a FilePart */
 export function isFilePart(part: Part): part is FilePart {
   return part.type === 'file';
-}
-
-/**
- * Strip large content from a FilePart to reduce memory/storage usage.
- * Removes `url` and `source.text.value` while preserving metadata.
- * The stripped part can still be identified and displayed with a placeholder.
- */
-export function stripFilePartContent(part: FilePart): FilePart {
-  const stripped: FilePart = {
-    id: part.id,
-    sessionID: part.sessionID,
-    messageID: part.messageID,
-    type: 'file',
-    mime: part.mime,
-    filename: part.filename,
-    url: '', // Strip the potentially large data URL
-  };
-
-  if (part.source) {
-    stripped.source = {
-      ...part.source,
-      text: {
-        ...part.source.text,
-        value: '', // Strip the large file content
-      },
-    };
-  }
-
-  return stripped;
-}
-
-/**
- * Strip large content from a part.
- * - For FileParts: strips url and source.text.value
- * - For ToolParts with attachments: strips content from each attachment
- * Returns the original part unchanged for other part types.
- */
-export function stripPartContentIfFile(part: Part): Part {
-  if (isFilePart(part)) {
-    return stripFilePartContent(part);
-  }
-
-  if (isToolPart(part) && part.state.status === 'completed' && part.state.attachments) {
-    const strippedAttachments = part.state.attachments.map(stripFilePartContent);
-    return {
-      ...part,
-      state: {
-        ...part.state,
-        attachments: strippedAttachments,
-      },
-    };
-  }
-
-  return part;
 }
 
 /** Check if a part is a ReasoningPart */

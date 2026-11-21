@@ -1,10 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   handleTrpcQueryError,
+  isExpectedAuthFailure,
   isUnauthorizedTrpcError,
   setTrpcUnauthorizedHandler,
 } from '@/lib/auth/trpc-unauthorized';
+import { setProtectedDataAvailable } from '@/lib/protected-data';
 
 describe('trpc-unauthorized narrow check', () => {
   it('recognizes a context auth failure with data.authRequired (direct)', () => {
@@ -30,6 +32,30 @@ describe('trpc-unauthorized narrow check', () => {
 
   it('does NOT treat non-errors as session failures', () => {
     expect(isUnauthorizedTrpcError(null)).toBe(false);
+  });
+});
+
+describe('isExpectedAuthFailure', () => {
+  afterEach(() => {
+    setProtectedDataAvailable(true);
+  });
+
+  it('treats a context auth failure as the auth layer owning the answer', () => {
+    expect(isExpectedAuthFailure({ data: { authRequired: true, httpStatus: 401 } })).toBe(true);
+  });
+
+  it('leaves a procedure-level 401 to the caller', () => {
+    // An org-access denial is also a 401, but it is the caller’s to render.
+    expect(isExpectedAuthFailure({ data: { code: 'UNAUTHORIZED', httpStatus: 401 } })).toBe(false);
+  });
+
+  it('treats any failure while the keychain is locked as expected', () => {
+    // The credential could not be read at all, so no failure names a defect in
+    // whatever the caller owns.
+    setProtectedDataAvailable(false);
+    expect(isExpectedAuthFailure(new Error('transport refused'))).toBe(true);
+    expect(isExpectedAuthFailure({ data: { code: 'UNAUTHORIZED', httpStatus: 401 } })).toBe(true);
+    expect(isExpectedAuthFailure({ data: { authRequired: true } })).toBe(true);
   });
 });
 

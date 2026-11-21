@@ -20,6 +20,7 @@ type LinkedTodo = { id: string; title: string };
 const state = vi.hoisted(() => ({
   todo: null as LinkedTodo | null,
   sessionId: 'ses_todo_link_01',
+  candidatesError: false,
 }));
 const push = vi.hoisted(() => vi.fn());
 const refetch = vi.hoisted(() => vi.fn());
@@ -61,9 +62,6 @@ vi.mock('@/components/ui/text', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666', primaryForeground: '#000' }),
 }));
-vi.mock('@/lib/organization-context', () => ({
-  useOrganization: () => ({ organizationId: null }),
-}));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     todos: {
@@ -75,10 +73,10 @@ vi.mock('@/lib/trpc', () => ({
 }));
 vi.mock('@/lib/hooks/use-todos', () => ({
   useSessionTodo: () => ({ data: state.todo }),
-  useTodoCandidates: () => ({
+  useTodoCandidates: (_sessionId: string, _enabled: boolean) => ({
     data: [],
     isPending: false,
-    isError: false,
+    isError: state.candidatesError,
     isFetching: false,
     refetch,
   }),
@@ -129,6 +127,7 @@ async function mountRow(): Promise<Mounted> {
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   state.todo = null;
+  state.candidatesError = false;
   push.mockReset();
   refetch.mockReset();
 });
@@ -174,6 +173,17 @@ describe('SessionTodoLinkRow', () => {
       props.onPress?.();
     });
     expect(pickerVisible(mounted)).toBe(true);
+  });
+
+  it('insets the failure state in the unpadded sheet body', async () => {
+    state.candidatesError = true;
+    const mounted = await mountRow();
+    act(() => {
+      row(mounted).onPress?.();
+    });
+    const failure = mounted.renderer.root.find(node => (node.type as string) === 'QueryError');
+    expect(failure.props.placement).toBe('static');
+    expect(failure.props.inset).toBe('gutter');
   });
 
   it('renders its own pressable on the shared full target', async () => {

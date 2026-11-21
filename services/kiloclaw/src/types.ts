@@ -4,7 +4,6 @@ import type { KiloClawRegistry } from './durable-objects/kiloclaw-registry';
 import type { SnapshotRestoreMessage } from './schemas/snapshot-restore';
 import type { KiloClawBillingBinding } from './kiloclaw-billing-binding';
 import type { KiloChatBinding } from './kilo-chat-binding';
-import type { NotificationsBinding } from './notifications-binding';
 
 /**
  * Environment bindings for the KiloClaw Worker
@@ -14,7 +13,6 @@ export type KiloClawEnv = {
   KILOCLAW_APP: DurableObjectNamespace<KiloClawApp>;
   KILOCLAW_REGISTRY: DurableObjectNamespace<KiloClawRegistry>;
   KILOCLAW_BILLING?: KiloClawBillingBinding;
-  NOTIFICATIONS?: NotificationsBinding;
   KILOCLAW_AE?: AnalyticsEngineDataset;
   KILOCLAW_CONTROLLER_AE: AnalyticsEngineDataset;
   HYPERDRIVE?: Hyperdrive;

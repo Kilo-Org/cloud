@@ -20,7 +20,7 @@ import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timer
 import { slashCommandCatalogStatus } from '../../../src/shared/slash-commands.js';
 import { runAutoCommit } from '../auto-commit.js';
 import { autoCommitFailure, autoCommitRoots } from './auto-commit-roots.js';
-import { isEnvironmentRoot, routeRoots, type RouteRoot } from './workspace-roots.js';
+import { isEnvironmentRoot, routeRoots, sameRoots, type RouteRoot } from './workspace-roots.js';
 import { DEFAULT_CONDENSE_TIMEOUT_MS, type CondenseResult } from '../condense-on-complete.js';
 import { childFromSessionCreated, eventKiloSessionId } from '../control/feed.js';
 import { isDirectoryRewriteActive } from '../control/worktree-operations.js';
@@ -69,6 +69,21 @@ function hasNativeDrain(runtime: TurnKiloRuntime | undefined): boolean {
   }
 }
 
+/** The runtime's client, or the reason its getter gave (`kilo-runtime.ts`). */
+function runtimeClient(runtime: TurnKiloRuntime | undefined): {
+  client: Harness | undefined;
+  unavailable: string | undefined;
+} {
+  try {
+    return { client: runtime?.client, unavailable: undefined };
+  } catch (error) {
+    return {
+      client: undefined,
+      unavailable: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -108,6 +123,8 @@ export type TurnManagerDeps = {
   onDiagnostic?: ControlDiagnosticReporter;
   /** The one native projector, for the normal `session_outcome` transition. */
   onNativeDiagnostic?: ControlDiagnosticReporter;
+  /** Starts a bounded artifact flush when a turn reaches an outcome. */
+  flushArtifacts?: () => void;
   now?: () => number;
   scheduler?: TurnScheduler;
   materializeAttachments?: typeof materializeMessageAttachments;
@@ -179,10 +196,41 @@ type TurnRoute = {
   automaticPermissions: Set<string>;
   automaticQuestions: Set<string>;
   /** Suppresses cancellation aftershocks until this route starts another native execution. */
-  deadlineRuntimeId?: string;
+  interruptedRuntimeId?: string;
 };
 
 type QueueState = 'ready' | 'queue' | 'unavailable';
+
+/** Whether two review targets would publish to the same pull request. */
+function sameReviewTarget(
+  first: ControlPlaneRouteSpec['githubReviewTarget'],
+  second: ControlPlaneRouteSpec['githubReviewTarget']
+): boolean {
+  if (first === undefined || second === undefined) return first === second;
+  return (
+    first.repo === second.repo &&
+    first.pullRequestNumber === second.pullRequestNumber &&
+    first.appType === second.appType &&
+    first.botUserId === second.botUserId
+  );
+}
+
+/**
+ * Whether a re-registration still names the same workspace binding: the native
+ * session turns dispatch to, the checkout they run in, the roots they commit and
+ * the origin their review is published to. The runtime key is deliberately not
+ * part of it: a route that moves to another key is still the same workspace, and
+ * an execution that already started stays owned by the runtime that started it.
+ */
+function sameRegisteredBinding(previous: TurnRoute, next: TurnRoute): boolean {
+  return (
+    previous.kiloSessionId === next.kiloSessionId &&
+    previous.directory === next.directory &&
+    previous.createdOnPlatform === next.createdOnPlatform &&
+    sameReviewTarget(previous.githubReviewTarget, next.githubReviewTarget) &&
+    sameRoots(previous.roots, next.roots)
+  );
+}
 
 type AutomaticPermissionReply =
   | { response: 'always' }
@@ -429,6 +477,8 @@ export function createTurnManager(deps: TurnManagerDeps) {
       sessionId: turn.route.sessionId,
       ...(outcomeReason.success ? { outcomeReason: outcomeReason.data } : {}),
     });
+    // Do not delay the outcome: the flush bounds itself and runs off this path.
+    deps.flushArtifacts?.();
     resetTurn(turn.route.sessionId);
     maybeApplyPendingCredentials(turn.route.runtimeKey);
   }
@@ -529,6 +579,10 @@ export function createTurnManager(deps: TurnManagerDeps) {
           turn.submitting = turn.submitting.then(() => barrier);
         },
         submitPublication,
+        interruptAndFinalize: (client, nativeRuntimeId) => {
+          route.interruptedRuntimeId = nativeRuntimeId;
+          void finalizeInterruptedTurn(turn, abortKilo(route, client));
+        },
         autoCommit: (client, signal) => runAutoCommitStep(turn, client, signal),
         condense: (client, signal) => runCondenseStep(turn, client, signal),
         finalizing: () =>
@@ -820,17 +874,18 @@ export function createTurnManager(deps: TurnManagerDeps) {
     for (const pending of queued) chainSubmit(turn, pending);
   }
 
-  async function abortKilo(route: TurnRoute): Promise<void> {
-    const runtime = deps.runtimes.get(route.runtimeKey);
-    if (runtime === undefined) return;
+  async function abortKilo(route: TurnRoute, client?: Harness): Promise<boolean> {
     try {
-      await runtime.client.interrupt({
+      const target = client ?? deps.runtimes.get(route.runtimeKey)?.client;
+      if (!target) return false;
+      return await target.interrupt({
         sessionId: route.kiloSessionId,
         directory: route.directory,
         signal: AbortSignal.timeout(10_000),
       });
     } catch {
       log(`turn: Kilo abort failed session=${route.kiloSessionId}`);
+      return false;
     }
   }
 
@@ -895,17 +950,30 @@ export function createTurnManager(deps: TurnManagerDeps) {
         controller.abort(new Error('finalization timed out'));
       }, DEFAULT_CONDENSE_TIMEOUT_MS);
       emitEvents(sessionId, [{ type: CONTROL_PLANE_WRAPPER_FINALIZING_EVENT, properties: {} }]);
+      const runtime = deps.runtimes.get(turn.route.runtimeKey);
+      const { client, unavailable } = runtimeClient(runtime);
+      let skipped: string | undefined = runtime === undefined ? 'no runtime' : unavailable;
       try {
-        const client = deps.runtimes.get(turn.route.runtimeKey)?.client;
         if (client) {
           await runAutoCommitStep(turn, client, controller.signal);
           await runCondenseStep(turn, client, controller.signal);
         }
+      } catch (error) {
+        skipped = error instanceof Error ? error.message : String(error);
       } finally {
         scheduler.clearTimeout(timer);
         turn.stepAbort = undefined;
       }
       if (turns.get(sessionId) !== turn) return;
+      if (
+        skipped !== undefined &&
+        turn.prompts.some(
+          entry =>
+            entry.payload.finalization?.autoCommit === true ||
+            entry.payload.finalization?.condenseOnComplete === true
+        )
+      )
+        emitWarning(sessionId, `Finalization steps skipped: ${skipped}`);
       if (hasUndispatchedPrompt(turn)) {
         turn.phase = 'busy';
         return;
@@ -921,7 +989,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
   }
 
   async function finalizeInterruptedTurn(turn: Turn, stopped: Promise<boolean>): Promise<void> {
-    if (!turn.prompts.some(entry => entry.payload.finalization?.autoCommit)) return;
+    const autoCommit = turn.prompts.some(entry => entry.payload.finalization?.autoCommit);
     const { sessionId, runtimeKey: key, kiloSessionId } = turn.route;
     if (interruptedFinalizations.has(sessionId)) return;
     const abort = new AbortController();
@@ -931,14 +999,23 @@ export function createTurnManager(deps: TurnManagerDeps) {
     const onAbort = () => cancelled.reject(abort.signal.reason);
     abort.signal.addEventListener('abort', onAbort, { once: true });
     const timer = scheduler.setTimeout(
-      () => abort.abort(new Error('interruption auto-commit timed out')),
+      () => abort.abort(new Error('interrupted turn cleanup timed out')),
       DEFAULT_CONDENSE_TIMEOUT_MS
     );
     try {
-      if (!(await Promise.race([stopped, cancelled.promise]))) {
-        emitWarning(sessionId, 'Auto-commit skipped: agent cancellation was not confirmed');
+      const confirmed = await Promise.race([stopped, cancelled.promise]);
+      if (!confirmed) {
+        emitWarning(
+          sessionId,
+          autoCommit
+            ? 'Auto-commit skipped: agent cancellation was not confirmed'
+            : 'Agent cancellation was not confirmed'
+        );
+        const parked = turns.get(sessionId);
+        if (parked && parked !== turn) sendOutcome(parked, 'failed', 'prompt_failed');
         return;
       }
+      if (!autoCommit) return;
       abort.signal.throwIfAborted();
       const runtime = deps.runtimes.get(key);
       if (
@@ -951,7 +1028,8 @@ export function createTurnManager(deps: TurnManagerDeps) {
       }
       await runAutoCommitStep(turn, runtime.client, abort.signal);
     } catch {
-      emitWarning(sessionId, 'Auto-commit after interruption was cancelled or failed');
+      if (autoCommit)
+        emitWarning(sessionId, 'Auto-commit after interruption was cancelled or failed');
     } finally {
       scheduler.clearTimeout(timer);
       abort.signal.removeEventListener('abort', onAbort);
@@ -1051,20 +1129,51 @@ export function createTurnManager(deps: TurnManagerDeps) {
     return childRoots.get(kiloSessionId);
   }
 
-  /** `createdParentId` is the parent a `session.created` event reports. */
-  function emittingRoute(
-    key: string | undefined,
+  /** Whether a native session belongs to a route this wrapper serves. */
+  function isAttributedKiloSession(kiloSessionId: string | undefined): boolean {
+    return (
+      kiloSessionId !== undefined &&
+      (turnByKiloSession.has(kiloSessionId) || childRoots.has(kiloSessionId))
+    );
+  }
+
+  /**
+   * Event types whose loss an operator can see. Message and status events from a
+   * live foreign session would flood the log, and their absence is visible in the
+   * session that asked for them.
+   */
+  const UNATTRIBUTED_EVENT_TYPES: Record<string, true> = {
+    'permission.asked': true,
+    'permission.replied': true,
+    'question.asked': true,
+    'question.replied': true,
+    'question.rejected': true,
+    'session.created': true,
+    'session.error': true,
+    'session.turn.close': true,
+  };
+
+  /** A dropped event is a diagnosis, not a failure: name the ones that matter. */
+  function noteUnattributedEvent(
     eventSessionId: string | undefined,
-    createdParentId?: string
-  ): TurnRoute | undefined {
+    event: KiloFeedEvent | undefined,
+    runtimeKeyValue: string | undefined
+  ): void {
+    if (event === undefined || UNATTRIBUTED_EVENT_TYPES[event.type] !== true) return;
+    log(
+      `turn: dropped unattributed ${event.type} nativeSession=${
+        eventSessionId ?? 'unknown'
+      } runtimeKey=${runtimeKeyValue ?? 'unknown'}`
+    );
+  }
+
+  /**
+   * The route that owns an event which names no native session. Runtime-level
+   * events are like this, so the only live turn on that runtime owns the stream;
+   * when two turns share it the event has no single owner and is dropped.
+   */
+  function sessionlessOwner(key: string | undefined): TurnRoute | undefined {
     if (key === undefined) return undefined;
-    const direct = routes.get(key);
-    if (direct !== undefined) return direct;
-    const knownRoot =
-      resolveRootKiloSession(eventSessionId) ?? resolveRootKiloSession(createdParentId);
-    const knownSessionId = knownRoot === undefined ? undefined : turnByKiloSession.get(knownRoot);
-    const knownRoute = knownSessionId === undefined ? undefined : routes.get(knownSessionId);
-    if (knownRoute?.runtimeKey === key) return knownRoute;
     let matched: TurnRoute | undefined;
     for (const turn of turns.values()) {
       const route = routes.get(turn.route.sessionId);
@@ -1073,6 +1182,25 @@ export function createTurnManager(deps: TurnManagerDeps) {
       matched = route;
     }
     return matched;
+  }
+
+  /**
+   * The route that owns a newly announced child session. `session.created` is the
+   * one event a route may adopt: the child is not tracked yet, and the runtime
+   * that emitted it is authoritative, because its reported parent may name
+   * another route in the same worktree. Every other event is attributed only
+   * through a session that is already tracked. `createdParentId` is the parent
+   * the announcement reports; a child of an unknown parent is not adopted.
+   */
+  function emittingRoute(key: string | undefined, createdParentId: string): TurnRoute | undefined {
+    if (key === undefined) return undefined;
+    const direct = routes.get(key);
+    if (direct !== undefined) return direct;
+    const knownRoot = resolveRootKiloSession(createdParentId);
+    const knownSessionId = knownRoot === undefined ? undefined : turnByKiloSession.get(knownRoot);
+    const knownRoute = knownSessionId === undefined ? undefined : routes.get(knownSessionId);
+    if (knownRoute?.runtimeKey === key) return knownRoute;
+    return sessionlessOwner(key);
   }
 
   function onKiloError(turn: Turn, properties: Record<string, unknown>): void {
@@ -1130,21 +1258,18 @@ export function createTurnManager(deps: TurnManagerDeps) {
     }
     if (event && SYNTHETIC_KILO_EVENTS.has(event.type)) return;
     if (event?.type === 'session.created') registerChild(event);
-    let root = resolveRootKiloSession(eventSessionId);
-    // A descendant's reported parent may name another route in the same
-    // worktree; the runtime that emitted it is authoritative. Route roots keep
-    // their own identity so a runtime never captures another route's events.
-    const emitting = emittingRoute(
-      source.runtimeKey,
-      eventSessionId,
-      event?.type === 'session.created'
-        ? childFromSessionCreated(event.properties)?.parentId
-        : undefined
-    );
-    const isRouteRoot = eventSessionId !== undefined && turnByKiloSession.has(eventSessionId);
-    if (emitting !== undefined && !isRouteRoot && root !== emitting.kiloSessionId) {
-      root = emitting.kiloSessionId;
+    // A session-named control event is handled only for a native session this
+    // wrapper serves: a registered route root, or a child a `session.created`
+    // registered under one. Any other session has another owner, so its events are
+    // not handled here. An event that names no session is runtime-level and has no
+    // other owner to defer to.
+    const sessionOwner =
+      eventSessionId === undefined ? sessionlessOwner(source.runtimeKey) : undefined;
+    if (!isAttributedKiloSession(eventSessionId) && sessionOwner === undefined) {
+      noteUnattributedEvent(eventSessionId, event, source.runtimeKey);
+      return;
     }
+    const root = sessionOwner?.kiloSessionId ?? resolveRootKiloSession(eventSessionId);
     if (root === undefined) return;
     const sessionId = turnByKiloSession.get(root);
     if (sessionId === undefined) return;
@@ -1287,10 +1412,10 @@ export function createTurnManager(deps: TurnManagerDeps) {
       eventSessionId === root &&
       deps.runtimes.get(route.runtimeKey)?.sessionState(root)?.activity !== 'stopping'
     )
-      route.deadlineRuntimeId = undefined;
+      route.interruptedRuntimeId = undefined;
     if (
       event.type === 'session.error' &&
-      route.deadlineRuntimeId === event.nativeRuntimeId &&
+      route.interruptedRuntimeId === event.nativeRuntimeId &&
       isAssistantInterrupt(event.properties.error)
     )
       return false;
@@ -1336,11 +1461,44 @@ export function createTurnManager(deps: TurnManagerDeps) {
   function registerChild(event: KiloFeedEvent): void {
     const child = childFromSessionCreated(event.properties);
     if (child === undefined) return;
-    const parentRoot =
-      emittingRoute(event.runtimeKey, eventKiloSessionId(event.properties), child.parentId)
-        ?.kiloSessionId ?? resolveRootKiloSession(child.parentId);
-    if (parentRoot === undefined) return;
-    childRoots.set(child.childId, parentRoot);
+    // The created session names the session that spawned it. A child is tracked
+    // only under a parent this wrapper serves.
+    const parentRoot = resolveRootKiloSession(child.parentId);
+    if (parentRoot === undefined) {
+      log(
+        `turn: ignoring session.created for a child of an unknown parent child=${child.childId} parent=${child.parentId}`
+      );
+      return;
+    }
+    const owner = emittingRoute(event.runtimeKey, child.parentId);
+    childRoots.set(child.childId, owner?.kiloSessionId ?? parentRoot);
+  }
+
+  /**
+   * Settle the live turn of a route whose binding is being replaced, and stop any
+   * finalization it is running. The Cloud session receives one outcome for the
+   * prompt it accepted, and the next prompt builds its turn from the binding that
+   * is current. Called before the superseded runtime is released.
+   */
+  function settleSupersededRoute(sessionId: string): void {
+    interruptedFinalizations.get(sessionId)?.abort.abort(new Error('route binding changed'));
+    const turn = turns.get(sessionId);
+    if (turn === undefined) return;
+    // Finalization re-checks the live turn only after its steps return, so a
+    // running auto-commit or condense is stopped through the signal it takes.
+    turn.stepAbort?.abort(new Error('route binding changed'));
+    sendOutcome(turn, 'failed', 'agent_restarted');
+  }
+
+  /** A registration of the same binding leaves the live turn untouched. */
+  function adoptRegisteredRoute(previous: TurnRoute | undefined, route: TurnRoute): void {
+    if (previous === undefined || sameRegisteredBinding(previous, route)) return;
+    log(
+      `turn: route binding changed session=${route.sessionId} nativeSession=${
+        previous.kiloSessionId
+      }->${route.kiloSessionId}`
+    );
+    settleSupersededRoute(route.sessionId);
   }
 
   async function answerAutomaticPermission(
@@ -1375,7 +1533,15 @@ export function createTurnManager(deps: TurnManagerDeps) {
             ...(reply.response === 'reject' ? { message: reply.message } : {}),
           },
         });
-        if (!success) throw new Error('Permission reply was not accepted');
+        if (!success) {
+          if (reply.response === 'reject') {
+            log(
+              `turn: automatic permission already resolved origin=${route.createdOnPlatform} sessionId=${route.sessionId} permissionId=${permissionId}`
+            );
+            return;
+          }
+          throw new Error('Permission reply was not accepted');
+        }
         return;
       } catch (error) {
         log(
@@ -1546,10 +1712,23 @@ export function createTurnManager(deps: TurnManagerDeps) {
       maybeApplyPendingCredentials(runtimeKeyValue);
     },
 
+    /**
+     * Settle the work attached to a binding that a re-prepare is replacing. The
+     * prepare manager calls this only after it has established that the incoming
+     * spec names another binding, and before it releases the superseded runtime.
+     */
+    releaseSupersededRoute(spec: ControlPlaneRouteSpec): void {
+      log(`turn: route binding changed session=${spec.sessionId}`);
+      settleSupersededRoute(spec.sessionId);
+    },
+
     registerRoute(spec: ControlPlaneRouteSpec): void {
       const existing = routes.get(spec.sessionId);
       if (existing !== undefined && existing.kiloSessionId !== spec.kiloSessionId) {
         turnByKiloSession.delete(existing.kiloSessionId);
+        for (const [child, root] of childRoots) {
+          if (root === existing.kiloSessionId) childRoots.delete(child);
+        }
       }
       const route: TurnRoute = {
         sessionId: spec.sessionId,
@@ -1566,6 +1745,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
       routes.set(spec.sessionId, route);
       routeSpecs.set(spec.sessionId, spec);
       turnByKiloSession.set(spec.kiloSessionId, spec.sessionId);
+      adoptRegisteredRoute(existing, route);
     },
 
     release(sessionId: string): void {
@@ -1749,7 +1929,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
         ...(route ? { sessionId: route.sessionId, rootKiloSessionId: route.kiloSessionId } : {}),
       });
       if (!route || route.runtimeKey !== key) return;
-      route.deadlineRuntimeId = identity.nativeRuntimeId;
+      route.interruptedRuntimeId = identity.nativeRuntimeId;
       const turn = turns.get(route.sessionId);
       // A stall in Kilo's model retry loop fails as the assistant failure Kilo was
       // retrying (for example a rate limit), not as a platform no-progress failure.

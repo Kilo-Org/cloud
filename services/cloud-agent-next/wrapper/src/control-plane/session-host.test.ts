@@ -13,6 +13,9 @@ import { createControlPlaneTerminals } from './terminals.js';
 import { git } from '../utils.js';
 import { createKilo2Harness } from './kilo2-harness.js';
 import { createKilo2Lifecycle } from './kilo2-lifecycle.js';
+import { createPreviewForwarder } from './preview-forwarder.js';
+import { createPreviewTunnelClient } from './preview-tunnel.js';
+import { startFakeTunnelWorker } from './preview-tunnel-fixture.js';
 
 async function settle() {
   for (let index = 0; index < 40; index++) await Promise.resolve();
@@ -371,6 +374,65 @@ describe('production session host composition', () => {
       expect(f.host.getHeartbeat().active).toBe(false);
     } finally {
       await f.terminals.forgetSession(session.sessionId);
+      await f.dispose();
+    }
+  });
+
+  it('keeps an open preview tunnel and its open streams out of the heartbeat', async () => {
+    const f = await hostFixture();
+    const worker = startFakeTunnelWorker();
+    const release = Promise.withResolvers<void>();
+    const dev = Bun.serve({
+      port: 0,
+      hostname: '127.0.0.1',
+      async fetch() {
+        await release.promise;
+        return new Response('late');
+      },
+    });
+    const tunnel = createPreviewTunnelClient({
+      url: worker.url,
+      credential: 'launch-jwt',
+      forwarder: createPreviewForwarder({
+        refusedPorts: () => [],
+        headTimeoutMs: 5_000,
+        socketTimeoutMs: 2_000,
+      }),
+      log: () => undefined,
+    });
+    const dispatch = createControlPlaneFrameDispatcher({
+      preparation: {},
+      turns: { current: f.host.turns },
+      terminals: {},
+      worktreeChanges: {},
+      worktreeDeletion: {},
+      kiloRequests: {},
+      previewTunnel: { current: tunnel },
+      send: () => undefined,
+      log: () => undefined,
+    });
+    try {
+      const before = f.host.getHeartbeat();
+      expect(before.active).toBe(false);
+      dispatch({ type: 'preview.tunnel' });
+      await worker.waitForConnection();
+      worker.send({
+        type: 'open',
+        stream: 1,
+        open: { port: dev.port ?? 0, method: 'GET', path: '/hold', headers: [] },
+      });
+      await worker.take('credit', 1);
+      expect(tunnel.openStreams()).toBe(1);
+      expect(f.host.getHeartbeat()).toEqual(before);
+      release.resolve();
+      await worker.take('end', 1);
+      expect(tunnel.openStreams()).toBe(0);
+      expect(f.host.getHeartbeat()).toEqual(before);
+    } finally {
+      release.resolve();
+      tunnel.stop();
+      await worker.stop();
+      await dev.stop(true);
       await f.dispose();
     }
   });
@@ -1000,6 +1062,7 @@ describe('production session host composition', () => {
       expect(f.host.getHeartbeat().active).toBe(true);
       f.event(feed, 'session.status', { sessionID: 'ses_other', status: { type: 'idle' } });
       f.event(feed, 'session.turn.close', { sessionID: 'ses_other', reason: 'completed' });
+      await settle();
       expect(f.host.getHeartbeat().active).toBe(false);
     } finally {
       stop.resolve(true);

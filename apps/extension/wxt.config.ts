@@ -1,6 +1,8 @@
 import { defineConfig } from 'wxt';
 import tailwindcss from '@tailwindcss/vite';
 
+import { sbomModulesPlugin } from './scripts/sbom-modules-plugin';
+
 const posthogApiKey = process.env['VITE_POSTHOG_API_KEY'];
 if (posthogApiKey === undefined || posthogApiKey.trim().length === 0) {
   console.warn(
@@ -23,6 +25,18 @@ export default defineConfig({
         id: 'browser-agent@kilo.ai',
       },
     },
+    commands: {
+      'stop-all-local-agents': {
+        // Chrome refuses to start the background worker when a command has no description.
+        description: 'Stop all local agents',
+        suggested_key: { default: 'Alt+Shift+K' },
+      },
+    },
+    // Firefox's MV3 default also carries `upgrade-insecure-requests`, which turns the local agent hub's
+    // ws://127.0.0.1 socket into wss:// and the handshake never starts; Chrome's default has no such directive.
+    ...(browser === 'firefox'
+      ? { content_security_policy: { extension_pages: "script-src 'self';" } }
+      : {}),
     description: 'Side-panel AI chat agent. Use open-weight or frontier models.',
     host_permissions: [
       '<all_urls>',
@@ -32,14 +46,17 @@ export default defineConfig({
       'http://localhost/*',
     ],
     name: 'Kilo Code',
+    // Optional permissions never disable installs; Chrome prompts when the switch turns on.
+    // `downloads` is optional on purpose: a required permission that adds a warning disables the extension for every existing user until they accept it.
+    optional_permissions: ['downloads', 'nativeMessaging'],
     permissions:
       browser === 'firefox'
-        ? ['contextMenus', 'identity', 'scripting', 'storage', 'tabs']
-        : ['contextMenus', 'debugger', 'identity', 'scripting', 'storage'],
+        ? ['alarms', 'contextMenus', 'identity', 'scripting', 'storage', 'tabGroups', 'tabs']
+        : ['alarms', 'contextMenus', 'debugger', 'identity', 'scripting', 'storage', 'tabGroups'],
   }),
   modules: ['@wxt-dev/module-react'],
   vite: () => ({
-    plugins: [tailwindcss()],
+    plugins: [tailwindcss(), sbomModulesPlugin()],
   }),
   zip: {
     excludeSources: ['*', '**/*'],

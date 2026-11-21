@@ -51,7 +51,8 @@ type PrMergeSheetProps = Readonly<{
   initialMethod: PrMergeMethod;
   mode: 'merge' | 'enable-auto-merge';
   sheetTitle: string;
-  eyebrow: string;
+  /** The reference under the title; absent when the route names no request. */
+  eyebrow?: string;
   prRef?: ProviderPrRef;
   mergeState?: ProviderPrMergeState | null;
   autoMergeCapability?: ProviderReviewCapability;
@@ -92,21 +93,36 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
       })
     : null;
   const methodOptions = providerMethodOptions ?? mergeMethodOptionsFor(repoSettings);
-  const [method, setMethod] = useState<AllowedMergeMethod>(
-    () =>
-      methodOptions.find(o => o.value === initialMethod)?.value ??
-      (providerMethodOptions
-        ? (providerMethodOptions[0]?.value ?? defaultMergeMethodOptionFor(repoSettings))
-        : defaultMergeMethodOptionFor(repoSettings))
-  );
+  const fallbackMethod: AllowedMergeMethod =
+    methodOptions.find(o => o.value === initialMethod)?.value ??
+    (providerMethodOptions
+      ? (providerMethodOptions[0]?.value ?? defaultMergeMethodOptionFor(repoSettings))
+      : defaultMergeMethodOptionFor(repoSettings));
   const showDeleteBranchToggle = prRef ? true : !isCrossRepo;
   const [deleteBranch, setDeleteBranch] = useState<boolean>(repoSettings.deleteBranchOnMerge);
   const titleInputRef = useRef<TextInput>(null);
   const messageInputRef = useRef<TextInput>(null);
   const scrollRef = useRef<ScrollViewInstance | null>(null);
   const { height: windowHeight } = useWindowDimensions();
-  const { settled, titleRef, messageRef, titleSaveRef, messageSaveRef, clearMergeDraft } =
-    usePrMergeDraft({ owner, repoName, number, title, bodyMarkdown, prRef });
+  const {
+    settled,
+    titleRef,
+    messageRef,
+    titleSaveRef,
+    messageSaveRef,
+    method,
+    selectMethod,
+    clearMergeDraft,
+  } = usePrMergeDraft({
+    owner,
+    repoName,
+    number,
+    title,
+    bodyMarkdown,
+    prRef,
+    allowedMethods: methodOptions.map(o => o.value),
+    fallbackMethod,
+  });
 
   // Half detent (~0.5) vs full: hide delete-branch + tighten message so
   // Merge/Cancel stay above the closed-sheet limit without scrolling.
@@ -145,7 +161,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
     };
   }, []);
 
-  // Footer Cancel discards; header back passively dismisses and retains the draft.
+  // Footer Discard clears the draft; header back passively dismisses and retains it.
   function handleCancel() {
     clearMergeDraft();
     onDismiss();
@@ -180,7 +196,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
               methodOptions={methodOptions}
               method={method}
               isMutating={isMutating}
-              onMethodChange={setMethod}
+              onMethodChange={selectMethod}
               titleRef={titleSaveRef}
               titleInputRef={titleInputRef}
               titlePlaceholder={defaultCommitTitle(title, number)}

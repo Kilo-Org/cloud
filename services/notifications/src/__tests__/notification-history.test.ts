@@ -167,7 +167,15 @@ describe('recordNotificationHistory', () => {
         push: {
           title: 'T',
           body: 'B',
-          data: { type: 'instance-lifecycle', event: 'ready', sandboxId: 'sb' },
+          data: {
+            type: 'active_agents_glanceable',
+            status: 'running',
+            running: 1,
+            needsInput: 0,
+            needsApproval: 0,
+            idle: 0,
+            updatedAt: '2026-11-16T00:00:00.000Z',
+          },
         },
       })
     );

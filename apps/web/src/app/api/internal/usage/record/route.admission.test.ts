@@ -115,6 +115,7 @@ it.each(['queue', 'queue_vercel'])(
     try {
       const ninth = await POST(request(source));
       expect(ninth.status).toBe(429);
+      expect(ninth.headers.get('x-usage-class-limit')).toBeNull();
       await expect(ninth.json()).resolves.toEqual({
         error: 'Usage writer overloaded',
         reason: 'queue_limit',
@@ -184,6 +185,58 @@ it('returns the unchanged 429 body when no slot frees within the wait', async ()
     await held.drain();
   }
   expect((await POST(request('queue'))).status).toBe(200);
+});
+
+it('classifies a rejected body read as a bounded read failure, not a schema failure', async () => {
+  const acquire = jest.spyOn(queueWriterAdmission, 'acquire');
+  const secretive = request('queue');
+  jest
+    .spyOn(secretive, 'json')
+    .mockRejectedValue(new SyntaxError('sensitive body text must not leak into logs'));
+  const response = await POST(secretive);
+  expect(response.status).toBe(400);
+  await expect(response.json()).resolves.toEqual({ error: 'Invalid body' });
+  expect(acquire).not.toHaveBeenCalled();
+  expect(persist).not.toHaveBeenCalled();
+
+  const logs = [console.log, console.info, console.warn, console.error].flatMap(
+    log => jest.mocked(log).mock.calls
+  );
+  const reads = logs.filter(
+    ([line]) => line === 'usage record request body could not be read as JSON'
+  );
+  expect(reads).toHaveLength(1);
+  expect(reads[0][1]).toEqual({ error_name: 'SyntaxError' });
+  const schemaFailures = logs.filter(([line]) => line === 'usage record request failed validation');
+  expect(schemaFailures).toHaveLength(0);
+  expect(JSON.stringify(logs)).not.toContain('sensitive');
+});
+
+it.each([
+  new Error('sensitive non-SyntaxError message must not leak into logs'),
+  new TypeError('sensitive type error body must not leak'),
+])('never logs a raw message for a non-SyntaxError body-read rejection (%s)', async error => {
+  const acquire = jest.spyOn(queueWriterAdmission, 'acquire');
+  const secretive = request('queue');
+  jest.spyOn(secretive, 'json').mockRejectedValue(error);
+  const response = await POST(secretive);
+  expect(response.status).toBe(400);
+  await expect(response.json()).resolves.toEqual({ error: 'Invalid body' });
+  expect(acquire).not.toHaveBeenCalled();
+  expect(persist).not.toHaveBeenCalled();
+
+  const logs = [console.log, console.info, console.warn, console.error].flatMap(
+    log => jest.mocked(log).mock.calls
+  );
+  const reads = logs.filter(
+    ([line]) => line === 'usage record request body could not be read as JSON'
+  );
+  expect(reads).toHaveLength(1);
+  expect(reads[0][1]).toEqual({ error_name: error.name });
+  expect(JSON.stringify(logs)).not.toContain(error.message);
+  expect(JSON.stringify(logs)).not.toContain('sensitive');
+  const schemaFailures = logs.filter(([line]) => line === 'usage record request failed validation');
+  expect(schemaFailures).toHaveLength(0);
 });
 
 it('keeps auth and validation ahead of admission even when the pool is overloaded', async () => {

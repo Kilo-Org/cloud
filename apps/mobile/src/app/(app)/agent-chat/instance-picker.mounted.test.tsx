@@ -78,10 +78,14 @@ vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insets,
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/icons', () => ({
+  RefreshCw: 'RefreshCw',
   Check: 'Check',
   Cloud: 'Cloud',
   Info: 'Info',
@@ -358,6 +362,28 @@ describe('InstancePickerScreen list', () => {
     for (const radio of radios(renderer.root)) {
       expect(radio.props.accessibilityState).toMatchObject({ checked: false });
     }
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('dismisses from the header Cancel without reporting a pick', async () => {
+    const renderer = await mount();
+    const [sheet] = findByType(renderer.root, 'SheetHeader');
+    if (!sheet) {
+      throw new Error('The picker sheet did not mount');
+    }
+    const props = sheet.props as { onCancel?: () => void };
+    const cancel = props.onCancel;
+    expect(typeof cancel).toBe('function');
+
+    act(() => {
+      cancel?.();
+    });
+
+    expect(router.back).toHaveBeenCalledTimes(1);
+    expect(bridge.onSelect).not.toHaveBeenCalled();
 
     act(() => {
       renderer.unmount();

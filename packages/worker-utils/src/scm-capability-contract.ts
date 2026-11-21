@@ -6,6 +6,9 @@ export const CURRENT_CAPABILITY_PREFIX = {
   bitbucket: 'kbb1.',
 } as const satisfies Record<CapabilityPurpose, string>;
 
+/** Issued only when the caller supplies a GitHub task policy. */
+export const GITHUB_TASK_CAPABILITY_PREFIX = 'kgh3.';
+
 export const LEGACY_CAPABILITY_PREFIX = {
   github: 'kgh1.',
   gitlab: 'kgl1.',

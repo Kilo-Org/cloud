@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
 
 import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, inArray, ne } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
+import { findSeedUserId } from '../lib/users';
 
 export const usage = '<fake-email>';
 
@@ -15,9 +16,10 @@ export const usage = '<fake-email>';
  * - `refusedOrganizationId` never got a seat subscription and its trial ended
  *   more than three days ago, so `classifyOrganizationEntitlement` reports
  *   `trial_expired_hard` with no bypass and every organization mutation is
- *   refused with `FORBIDDEN` / `Organization trial has expired.` The owner
- *   still sees the rename control, so a rename typed here is rejected by the
- *   server while the dialog stays open.
+ *   refused with `FORBIDDEN` / `Organization trial has expired.` The hub reads
+ *   that same verdict, so its rename control states the ended plan instead of
+ *   opening the dialog, and a rename sent from anywhere else is still rejected
+ *   by the server.
  * - `acceptedOrganizationId` is a fresh organization inside its trial, so the
  *   same rename succeeds and the dialog closes.
  */
@@ -48,14 +50,9 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error('This fixture requires a local development database and SKIP_STRIPE_API=true.');
   }
   const db = getSeedDb();
-  const userId = `dev-seed:mobile-org-rename:${email}`;
-  const [existing] = await db
-    .select({ id: kilocode_users.id })
-    .from(kilocode_users)
-    .where(eq(kilocode_users.normalized_email, email));
-  if (existing && existing.id !== userId) {
-    throw new Error('The requested email belongs to a different account; choose a new fake email.');
-  }
+  // A fake account that already signed in keeps its own row: the fixture joins
+  // it, so the seed runs before or after the device-code sign-in.
+  const userId = (await findSeedUserId(email)) ?? `dev-seed:mobile-org-rename:${email}`;
   await db
     .insert(kilocode_users)
     .values({
@@ -82,7 +79,10 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       plan: 'teams',
       settings: {},
     })
-    .onConflictDoNothing();
+    .onConflictDoUpdate({
+      target: organizations.id,
+      set: { created_by_kilo_user_id: userId },
+    });
   await db
     .insert(organizations)
     .values({
@@ -93,7 +93,24 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       plan: 'teams',
       settings: {},
     })
-    .onConflictDoNothing();
+    .onConflictDoUpdate({
+      target: organizations.id,
+      set: { created_by_kilo_user_id: userId },
+    });
+  // The ids stay fixed so deep links stay stable, and each organization belongs
+  // to one account at a time: a run for another email takes it over instead of
+  // adding that email beside the previous owner.
+  await db
+    .delete(organization_memberships)
+    .where(
+      and(
+        inArray(organization_memberships.organization_id, [
+          REFUSED_ORGANIZATION_ID,
+          ACCEPTED_ORGANIZATION_ID,
+        ]),
+        ne(organization_memberships.kilo_user_id, userId)
+      )
+    );
   for (const organizationId of [REFUSED_ORGANIZATION_ID, ACCEPTED_ORGANIZATION_ID]) {
     await db
       .insert(organization_memberships)
@@ -102,7 +119,9 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   }
 
   console.log('This fixture represents: an organization owner renaming their organization.');
-  console.log('The refused organization answers every rename with the trial sentence.');
+  console.log(
+    'The refused organization states the ended plan on its rename control; a rename sent another way is refused.'
+  );
   console.log('Suggested next step: open a returned deep link on the signed-in mobile app.');
   return {
     userId,

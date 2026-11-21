@@ -1,3 +1,5 @@
+import { type Href } from 'expo-router';
+
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAgentProfileOverview } from '@/lib/hooks/use-agent-profiles';
@@ -17,17 +19,27 @@ import { useAgentProfileOverview } from '@/lib/hooks/use-agent-profiles';
  * whether or not the name is known yet, so the arrival of a long name cannot
  * move the body, and while that read is in flight the line holds a placeholder
  * bar instead of reading as an empty slot.
+ *
+ * Every section route passes the Profiles list of its own stack: a section
+ * screen exists in two stacks (the Profile tab's and the app-level Manage
+ * Profiles one), and a default shared here could only ever name one of them.
  */
 export function ProfileSectionHeader({
   profileId,
   organizationId,
   title,
+  backFallback,
   onBack,
 }: Readonly<{
   profileId: string;
   organizationId?: string;
   /** The section's own label: the screen's title and its accessible header name. */
   title: string;
+  /**
+   * Where the header's Back lands when the screen opens with no history to pop.
+   * The section screen's stack passes its own Profiles list.
+   */
+  backFallback: Href;
   onBack?: () => void;
 }>) {
   const overview = useAgentProfileOverview(profileId, organizationId);
@@ -39,6 +51,7 @@ export function ProfileSectionHeader({
         overview.isPending ? <Skeleton className="h-3.5 w-24 rounded-full" /> : undefined
       }
       reserveSubtitle
+      backFallback={backFallback}
       onBack={onBack}
     />
   );

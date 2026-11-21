@@ -329,4 +329,42 @@ describe('control-plane wrapper process', () => {
       await handle.child.exited;
     }
   }, 90_000);
+
+  it('generates a new wrapper identity for each process with the same launch environment', async () => {
+    const server = startControlServer('accept');
+    const launchId = '5d8a9f1e-3f4b-4c2d-8e7a-1b2c3d4e5f60';
+    const env = childEnv(`ws://127.0.0.1:${server.port}/sandbox-control-v2/fake`, {
+      CONTROL_WRAPPER_INSTANCE_ID: launchId,
+      CONTROL_PLANE_TIMER_DIVISOR: '50',
+    });
+    const children: Bun.Subprocess[] = [];
+    const identities: string[] = [];
+    try {
+      for (let index = 0; index < 2; index += 1) {
+        const before = server.state.hellos.length;
+        const child = Bun.spawn([process.execPath, 'run', MAIN_PATH], {
+          env,
+          stdout: 'ignore',
+          stderr: 'ignore',
+        });
+        children.push(child);
+        await waitFor(() => server.state.hellos.length > before);
+        const identity = server.state.hellos[before]?.wrapperId;
+        expect(identity).toBeTypeOf('string');
+        identities.push(String(identity));
+        server.send({ type: 'shutdown', reason: 'test shutdown' });
+        expect(await waitForExit(child, 6_000)).toBe(0);
+        await child.exited;
+      }
+      expect(identities[0]).not.toBe(launchId);
+      expect(identities[1]).not.toBe(launchId);
+      expect(identities[0]).not.toBe(identities[1]);
+    } finally {
+      for (const child of children) {
+        if (child.exitCode === null) child.kill();
+        await child.exited;
+      }
+      server.stop();
+    }
+  }, 20_000);
 });

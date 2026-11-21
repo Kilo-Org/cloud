@@ -14,17 +14,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { CreditsCard } from './profile-credits-card';
-import {
-  ICON_TARGET_BOX_CLASS,
-  LINE_ACTION_BOX_CLASS,
-  LINE_ACTION_HIT_SLOP,
-  MIN_TAP_TARGET_DP,
-  tapTargetReachDp,
-  TOUCH_TARGET_DP,
-} from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
-import { contextPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
-import { OrganizationProvider } from '@/lib/organization-context';
+import { OrganizationProvider, useOrganization } from '@/lib/organization-context';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
 
@@ -33,6 +25,9 @@ import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/rend
 // the marker itself is asserted only where the wrapping behavior is under test.
 const readable = (text: string) =>
   text.replaceAll(/[\u2066\u2068\u2069]/g, '').replaceAll('\u00A0', ' ');
+
+/** One `caption` line at font scale 1, as the card reserves it (gate-measured). */
+const CAPTION_LINE_DP = 14.1;
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
@@ -46,6 +41,8 @@ const currentUser = vi.hoisted(() => ({
 }));
 /** Window the card lays out in; a narrow one must stack the credits header. */
 const windowDims = vi.hoisted(() => ({ width: 390, height: 844, fontScale: 1, scale: 2 }));
+/** The safe-area side insets the scroller takes off the card's settled width. */
+const insets = vi.hoisted(() => ({ left: 0, right: 0 }));
 
 // The provider now announces the lost-membership recovery through the
 // toast adapter, whose module graph reaches react-native's Flow source
@@ -115,6 +112,11 @@ const routerPush = vi.hoisted(() => vi.fn());
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: routerPush, back: vi.fn() }),
 }));
+// The credits row opens its route through the press-burst guard; the assertions
+// below read the router mock, so the guarded push is that same function.
+vi.mock('@/lib/hooks/use-single-push-route', () => ({
+  useSinglePushRoute: () => routerPush,
+}));
 
 // The mounted OrganizationProvider reads the shared memberships from this
 // list. The payload is driveable per test: a stored selection missing from
@@ -137,7 +139,7 @@ vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) 
 vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
 
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0 }),
+  useSafeAreaInsets: () => ({ bottom: 0, left: insets.left, right: insets.right, top: 0 }),
 }));
 
 vi.mock('react-native-reanimated', () => ({
@@ -152,6 +154,7 @@ vi.mock('react-native', () => ({
   // Sheet registers the app-level Android Back listener while it is visible.
   BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   ActivityIndicator: 'ActivityIndicator',
+  I18nManager: { isRTL: false },
   // The account picker's sheet is a native modal; honored like the real one so
   // the closed sheet renders nothing.
   Modal: (props: { visible?: boolean; children?: ReactNode }) =>
@@ -188,21 +191,17 @@ vi.mock('@/components/ui/skeleton', () => ({
   Skeleton: () => 'SKELETON',
 }));
 
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/text', () => ({
+  Text: 'Text',
+  EYEBROW_LATIN_DISPLAY: 'font-mono-medium text-[11px]',
+}));
 
-const addCreditsRowProps = vi.hoisted(() => ({
-  latest: undefined as { url?: string; onPress?: () => void } | undefined,
+const externalPurchase = vi.hoisted(() => ({ canLink: true }));
+vi.mock('@/lib/billing/external-purchase-link', () => ({
+  useCanLinkExternalPurchase: () => externalPurchase.canLink,
 }));
-vi.mock('@/components/add-credits-row', () => ({
-  AddCreditsButton: (props: { url?: string; onPress?: () => void }) => {
-    addCreditsRowProps.latest = props;
-    return 'ADD_CREDITS_BUTTON';
-  },
-  AddCreditsRow: (props: { url?: string; onPress?: () => void }) => {
-    addCreditsRowProps.latest = props;
-    return 'ADD_CREDITS_ROW';
-  },
-}));
+const openExternalUrl = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/external-link', () => ({ openExternalUrl }));
 
 const kiloPassCardProps = vi.hoisted(() => ({
   latest: undefined as { hideLoadingSkeleton?: boolean } | undefined,
@@ -236,15 +235,41 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const BALANCE_KEY = [['user', 'getContextBalance'], { input: {}, type: 'query' }] as const;
-const organizationName = 'A very long organization name that must leave the credits label visible';
+
+/** A tRPC client rejection, as `readTrpcErrorField` reads it. */
+function trpcError(code: string): Error {
+  return Object.assign(new Error(code), { data: { code, message: code } });
+}
+
+/**
+ * A read that never reached the server: a fetch rejection carries no tRPC code
+ * and no HTTP status, which is what names the connection rather than the
+ * server.
+ */
+function getConnectionBalanceFailure(): void {
+  getContextBalanceQueryFn.mockRejectedValue(new TypeError('Network request failed'));
+}
 const savedMetadata = new Map<string, string>();
 let saveCompletion: Promise<undefined> | undefined = undefined;
+
+const organizationSwitch: { set: (id: string | null) => void } = { set: () => undefined };
+
+/**
+ * The card plus the provider's own switch, which the header's account control
+ * drives on screen. A test that switches accounts calls it directly, so the
+ * card's balance behavior is observed without the picker owning the card.
+ */
+function CardHarness({ orgs }: Readonly<{ orgs?: OrgListEntry[] }>) {
+  const organization = useOrganization();
+  organizationSwitch.set = organization.setOrganizationId;
+  return createElement(CreditsCard, { enabled: true, orgs });
+}
 
 async function mountCard(
   queryClient: QueryClient = createTestQueryClient(),
   orgs?: OrgListEntry[]
 ) {
-  const ui = await renderWithProviders(createElement(CreditsCard, { enabled: true, orgs }), {
+  const ui = await renderWithProviders(createElement(CardHarness, { orgs }), {
     queryClient,
     wrapper: OrganizationProvider,
   });
@@ -262,27 +287,25 @@ async function mountCard(
   };
 }
 
-async function openSheet(renderer: ReactTestRenderer) {
-  const control = renderer.root.find(
-    node => node.type === Pressable && node.props.accessibilityHint === 'Select account'
+/** The credits section's purchase action: the header control the card renders. */
+function addCreditsAction(renderer: ReactTestRenderer): ReactTestInstance {
+  return renderer.root.find(
+    node => node.type === Pressable && node.props.accessibilityLabel === i18n.t('addCredits.cta')
   );
+}
+
+/** The purchase action when the scope offers one, without throwing when it does not. */
+function findPurchase(renderer: ReactTestRenderer): ReactTestInstance | undefined {
+  return renderer.root.findAll(
+    node => node.type === Pressable && node.props.accessibilityLabel === i18n.t('addCredits.cta')
+  )[0];
+}
+
+/** Switches the active account through the provider, as the header control does. */
+async function switchAccountTo(organizationId: string | null) {
   await act(() => {
-    (control.props.onPress as () => void)();
+    organizationSwitch.set(organizationId);
   });
-}
-
-/** The bridge the card handed the shared account picker route. */
-function pickerBridge() {
-  const bridge = contextPickerSlot.get(UNFENCED_ROUTE_KEY);
-  if (bridge === undefined) {
-    throw new Error('the account picker route was not handed a bridge');
-  }
-  return bridge;
-}
-
-/** The account labels the picker route would render, in option order. */
-function accountLabels() {
-  return pickerBridge().options;
 }
 
 /** Presses a plain control of the card by its visible label. */
@@ -293,41 +316,6 @@ async function pressLabel(renderer: ReactTestRenderer, label: string) {
   await act(() => {
     (target.props.onPress as () => void)();
   });
-}
-
-/**
- * Applies one account choice, or dismisses without one for `Cancel`: the card
- * presses the choice the route reports, exactly as a row press would.
- */
-async function choose(label: string) {
-  if (label === 'Cancel') {
-    contextPickerSlot.clear(UNFENCED_ROUTE_KEY);
-    return;
-  }
-  const bridge = pickerBridge();
-  const index = bridge.options.indexOf(label);
-  if (index === -1) {
-    throw new Error(`${label} is not one of the picker's rows`);
-  }
-  await act(() => {
-    bridge.onSelect(index);
-  });
-}
-
-/**
- * The header container's classes: the row that lays out the credits eyebrow
- * beside the account picker. The card's outer box is the only View whose whole
- * class list is `gap-3`, so the header is the one that adds to it.
- */
-function headerClasses(renderer: ReactTestRenderer): string[] {
-  const header = renderer.root.find(node => {
-    if (!Object.is(node.type, 'View')) {
-      return false;
-    }
-    const className = String(node.props.className);
-    return className.includes('gap-3') && className !== 'gap-3';
-  });
-  return String(header.props.className).split(' ');
 }
 
 /** A node's class tokens, so a class assertion never depends on their order. */
@@ -355,11 +343,11 @@ function renders(node: ReactTestInstance, text: string): boolean {
   );
 }
 
-/** The card's balance shell: its only `min-h-16 rounded-lg bg-secondary` box. */
+/** The card's balance shell: its only `min-h-16 rounded-xl bg-secondary` box. */
 function balanceBlock(renderer: ReactTestRenderer): ReactTestInstance {
   return renderer.root.find(
     node =>
-      Object.is(node.type, 'View') && hasClasses(node, ['min-h-16', 'rounded-lg', 'bg-secondary'])
+      Object.is(node.type, 'View') && hasClasses(node, ['min-h-16', 'rounded-xl', 'bg-secondary'])
   );
 }
 
@@ -383,16 +371,19 @@ beforeEach(() => {
   Platform.OS = 'ios';
   balancePreference.loaded = true;
   windowDims.width = 390;
+  windowDims.fontScale = 1;
+  insets.left = 0;
+  insets.right = 0;
   // A test that simulates the app reporting offline must not leak that state.
   onlineManager.setOnline(true);
   savedMetadata.clear();
   saveCompletion = undefined;
-  addCreditsRowProps.latest = undefined;
+  externalPurchase.canLink = true;
+  openExternalUrl.mockReset();
   // The shared memberships the provider reads default to none; tests that
   // stage a stored selection set their own payload.
   listState.payload = [];
   routerPush.mockReset();
-  contextPickerSlot.clearAll();
   storage.read.mockReset().mockImplementation(async (key: string) => {
     await Promise.resolve();
     return savedMetadata.get(key) ?? null;
@@ -424,11 +415,11 @@ describe('CreditsCard balance state', () => {
     personalCreditBlocksQueryFn.mockResolvedValue({
       creditBlocks: [{ balance_mUsd: 2_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
     });
-    const { texts, unmount } = await mountCard();
+    const { renderer, texts, unmount } = await mountCard();
     try {
       await waitFor(() => texts().some(text => text.includes('$2.00')));
       expect(texts()).toContain('SKELETON');
-      expect(texts()).toContain('ADD_CREDITS_BUTTON');
+      expect(addCreditsAction(renderer).props.accessibilityRole).toBe('button');
       expect(texts()).not.toContain('$0.00');
       await act(async () => {
         pendingBalance.resolve({ balance: 7 });
@@ -506,15 +497,14 @@ describe('CreditsCard balance state', () => {
     listState.payload = orgs;
     savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
 
-    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+    const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
     await waitFor(() => texts().includes('$10.00'));
 
     // The newly selected account's read never answers: the previous account's
     // amount must not stay on the row under the new account's name.
     const stalled = Promise.withResolvers<undefined>();
     getContextBalanceQueryFn.mockReturnValue(stalled.promise);
-    await openSheet(renderer);
-    await choose('Beta');
+    await switchAccountTo('org-b');
 
     await waitFor(() => texts().includes('SKELETON'));
     expect(texts()).not.toContain('$10.00');
@@ -627,7 +617,7 @@ describe('CreditsCard balance state', () => {
     orgCreditBlocksQueryFn.mockResolvedValue({
       creditBlocks: [{ balance_mUsd: 2_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
     });
-    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+    const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
     const previousNote =
       '$2.00 in credits expires 12/17/2099 (UTC). Credits with the earliest expiry are used first.';
     await waitFor(() =>
@@ -637,8 +627,7 @@ describe('CreditsCard balance state', () => {
     );
     const pending = Promise.withResolvers<{ creditBlocks: [] }>();
     orgCreditBlocksQueryFn.mockReturnValue(pending.promise);
-    await openSheet(renderer);
-    await choose('Beta');
+    await switchAccountTo('org-b');
     await waitFor(() => texts().includes('$10.00') && texts().includes('SKELETON'));
 
     expect(texts()).not.toContain(previousNote);
@@ -747,112 +736,14 @@ describe('CreditsCard balance state', () => {
     }
   });
 
-  it.each([
-    { orgs: [], options: ['Personal', 'Cancel'], choice: 0, expected: null, label: 'Personal' },
-    {
-      orgs: [{ organizationId: 'org-a', organizationName, role: 'owner' }],
-      options: ['Personal', organizationName, 'Cancel'],
-      choice: 1,
-      expected: 'org-a',
-      label: organizationName,
-    },
-  ])('uses supplied memberships for the picker: $expected', async state => {
-    // The staged stored selection is missing from the supplied list, so the
-    // provider recovers before the card renders: give the shared list the
-    // same payload the card receives, so the recovery lands on the selection
-    // the assertions then drive.
-    listState.payload = state.orgs as OrgListEntry[];
-    const seededSelection = (state.orgs as OrgListEntry[])[0]?.organizationId;
-    savedMetadata.set(ORGANIZATION_STORAGE_KEY, seededSelection ?? 'missing-org');
-    const { renderer, unmount } = await mountCard(
-      createTestQueryClient(),
-      state.orgs as OrgListEntry[]
-    );
-    await openSheet(renderer);
-    expect(accountLabels()).toEqual(state.options.filter(label => label !== 'Cancel'));
-    await choose('Cancel');
-    expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe(
-      (state.orgs as OrgListEntry[])[0]?.organizationId ?? undefined
-    );
-    await openSheet(renderer);
-    await choose(state.label);
-    expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe(state.expected ?? undefined);
-    const label = renderer.root.findByProps({ children: state.label });
-    expect(label.props).toMatchObject({ numberOfLines: 1, ellipsizeMode: 'tail' });
-    unmount();
-  });
-
-  it.each(['org-b', null])(
-    'retries the latest Profile selection %s after save failures',
-    async id => {
-      Platform.OS = 'android';
-      savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'previous-org');
-      const orgs = [
-        { organizationId: 'org-a', organizationName: 'Supplied organization', role: 'owner' },
-        { organizationId: 'org-b', organizationName: 'Latest organization', role: 'owner' },
-      ] as OrgListEntry[];
-      // The staged 'previous-org' selection must stay in the fetched list, or
-      // the provider's lost-membership recovery switches it away before the
-      // save-failure flow under test runs.
-      listState.payload = orgs;
-      storage.write.mockRejectedValueOnce(new Error('write failed'));
-      const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
-      await openSheet(renderer);
-      await choose('Supplied organization');
-      expect(texts()).toContain('Could not save setting');
-      expect(texts()).toContain('Supplied organization');
-      expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe('previous-org');
-      const retryButton = renderer.root.findByProps({ accessibilityLabel: 'Retry' });
-      expect(retryButton.props.accessibilityRole).toBe('button');
-      expect(retryButton.props.accessibilityHint).toBe('Could not save setting');
-      // Keep the rendered handler to catch a retry that captures the earlier failed choice.
-      const retry = retryButton.props.onPress as () => void;
-      (id === null ? storage.remove : storage.write).mockRejectedValueOnce(
-        new Error('latest save failed')
-      );
-      await openSheet(renderer);
-      await choose(id === null ? 'Personal' : 'Latest organization');
-      const label = id === null ? 'Personal' : 'Latest organization';
-      expect(texts()).toContain(label);
-      expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe('previous-org');
-      const status = renderer.root.find(
-        node => (node.type as string) === 'Text' && node.props.accessibilityLiveRegion === 'polite'
-      );
-      expect(status.children).toContain('Could not save setting');
-      const save = Promise.withResolvers<undefined>();
-      saveCompletion = save.promise;
-      await act(() => {
-        retry();
-      });
-      expect(texts()).toContain(label);
-      expect(texts()).toContain('Could not save setting');
-      const busyRetry = renderer.root.findByProps({ accessibilityLabel: 'Retry' });
-      expect(busyRetry.props.accessibilityState).toEqual({ busy: true, disabled: true });
-      expect(busyRetry.props.disabled).toBe(true);
-      expect(busyRetry.findAllByType('ActivityIndicator' as ElementType)).toHaveLength(1);
-      expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe('previous-org');
-      await act(() => {
-        save.resolve(undefined);
-      });
-      expect(savedMetadata.get(ORGANIZATION_STORAGE_KEY)).toBe(id ?? undefined);
-      expect(texts()).toContain(label);
-      expect(texts()).not.toContain('Could not save setting');
-      expect(texts()).not.toContain('Retry');
-      unmount();
-      const reopened = await mountCard(createTestQueryClient(), orgs);
-      expect(reopened.texts()).toContain(label);
-      reopened.unmount();
-    }
-  );
-
   it('shows a skeleton (not $0) when no signed-in user is resolved yet', async () => {
-    const { texts, unmount } = await mountCard();
+    const { renderer, texts, unmount } = await mountCard();
 
     expect(texts()).toContain('SKELETON');
     expect(texts()).not.toContain('$0.00');
-    // The personal purchase holds its slot while the balance loads, so it never
-    // pops in when the read answers.
-    expect(texts()).toContain('ADD_CREDITS_BUTTON');
+    // The personal purchase is the section action, so it never pops in when
+    // the balance read answers.
+    expect(addCreditsAction(renderer).props.accessibilityRole).toBe('button');
 
     unmount();
   });
@@ -924,7 +815,7 @@ describe('CreditsCard balance state', () => {
 
     const { renderer, texts, unmount } = await mountCard();
 
-    expect(texts()).toContain('ADD_CREDITS_BUTTON');
+    expect(addCreditsAction(renderer).props.accessibilityRole).toBe('button');
     expect(texts()).not.toContain('$0.00');
 
     const errorPressable = renderer.root.find(
@@ -1101,22 +992,20 @@ describe('CreditsCard add-credits entry point', () => {
     ['android', 0],
     ['android', 10],
   ] as const)(
-    'renders the personal in-app CTA in the balance card on %s at a %i balance',
+    'renders the personal in-app CTA as the credits section action on %s at a %i balance',
     async (os, balance) => {
       Platform.OS = os;
       currentUser.userId = 'user-1';
       const queryClient = createTestQueryClient();
       queryClient.setQueryData([...BALANCE_KEY], { balance });
 
-      const { texts, unmount } = await mountCard(queryClient);
+      const { renderer, texts, unmount } = await mountCard(queryClient);
       await waitFor(() => texts().includes(`$${balance.toFixed(2)}`));
 
-      expect(texts()).toContain('ADD_CREDITS_BUTTON');
-      expect(addCreditsRowProps.latest?.url).toBeUndefined();
-      expect(addCreditsRowProps.latest?.onPress).toBeTypeOf('function');
-
+      const action = addCreditsAction(renderer);
+      expect(action.props.accessibilityRole).toBe('button');
       act(() => {
-        addCreditsRowProps.latest?.onPress?.();
+        (action.props.onPress as () => void)();
       });
       expect(routerPush).toHaveBeenCalledWith('/(app)/credits');
 
@@ -1140,15 +1029,18 @@ describe('CreditsCard add-credits entry point', () => {
     onlineManager.setOnline(true);
   });
 
-  it('settles an unreachable balance read to the retry surface while offline', async () => {
+  it('settles an unreachable balance read to the connection state while offline', async () => {
     currentUser.userId = 'user-1';
-    getContextBalanceQueryFn.mockRejectedValue(new Error('Network request failed'));
+    getConnectionBalanceFailure();
     onlineManager.setOnline(false);
 
     const { labels, texts, unmount } = await mountCard();
-    await waitFor(() => labels().includes('Failed to load balance. Tap to retry.'));
+    // A read that never reached the server names the connection, not a
+    // server-side failure, and keeps the Retry that a restored network makes
+    // useful.
+    await waitFor(() => labels().includes('Could not reach the server. Try again.'));
 
-    expect(texts()).toContain("Couldn't load balance");
+    expect(texts()).toContain('Could not reach the server. Try again.');
     expect(texts()).toContain('Retry');
     expect(texts()).not.toContain('SKELETON');
     expect(texts()).not.toContain('$0.00');
@@ -1158,19 +1050,64 @@ describe('CreditsCard add-credits entry point', () => {
 
   it('keeps personal Buy credits actionable when the balance request fails', async () => {
     currentUser.userId = 'user-1';
-    getContextBalanceQueryFn.mockRejectedValue(new Error('Balance unavailable'));
+    getConnectionBalanceFailure();
+
+    const { renderer, labels, texts, unmount } = await mountCard();
+    await waitFor(() => labels().includes('Could not reach the server. Try again.'));
+
+    expect(addCreditsAction(renderer).props.accessibilityRole).toBe('button');
+    expect(texts()).not.toContain('$0.00');
+    act(() => {
+      (addCreditsAction(renderer).props.onPress as () => void)();
+    });
+    expect(routerPush).toHaveBeenCalledWith('/(app)/credits');
+
+    unmount();
+  });
+
+  it('names a permission refusal without offering Retry', async () => {
+    currentUser.userId = 'user-1';
+    getContextBalanceQueryFn.mockRejectedValue(trpcError('FORBIDDEN'));
+
+    const { renderer, labels, texts, unmount } = await mountCard();
+    const PERMISSION_COPY = "You don't have permission to view this balance.";
+    await waitFor(() => labels().includes(PERMISSION_COPY));
+
+    expect(texts()).toContain(PERMISSION_COPY);
+    // A refusal cannot be fixed by asking again, so the card offers no action.
+    expect(texts()).not.toContain('Retry');
+    const retrySurface = renderer.root.findAll(
+      node => node.type === Pressable && node.props.accessibilityRole === 'button'
+    );
+    expect(
+      retrySurface.some(node =>
+        String(node.props.accessibilityLabel ?? '').includes('Tap to retry')
+      )
+    ).toBe(false);
+    unmount();
+  });
+
+  it('describes a terminal balance failure as an explanation with no Retry', async () => {
+    currentUser.userId = 'user-1';
+    getContextBalanceQueryFn.mockRejectedValue(trpcError('NOT_FOUND'));
+
+    const { labels, texts, unmount } = await mountCard();
+    await waitFor(() => labels().includes("Balance couldn't be loaded."));
+
+    expect(texts()).toContain("Balance couldn't be loaded.");
+    expect(texts()).not.toContain('Retry');
+    unmount();
+  });
+
+  it('keeps the retry line for a transient balance failure', async () => {
+    currentUser.userId = 'user-1';
+    getContextBalanceQueryFn.mockRejectedValue(trpcError('INTERNAL_SERVER_ERROR'));
 
     const { labels, texts, unmount } = await mountCard();
     await waitFor(() => labels().includes('Failed to load balance. Tap to retry.'));
 
-    expect(texts()).toContain('ADD_CREDITS_BUTTON');
-    expect(texts()).not.toContain('$0.00');
-    expect(addCreditsRowProps.latest?.onPress).toBeTypeOf('function');
-    act(() => {
-      addCreditsRowProps.latest?.onPress?.();
-    });
-    expect(routerPush).toHaveBeenCalledWith('/(app)/credits');
-
+    expect(texts()).toContain("Couldn't load balance");
+    expect(texts()).toContain('Retry');
     unmount();
   });
 
@@ -1180,18 +1117,18 @@ describe('CreditsCard add-credits entry point', () => {
     const queryClient = createTestQueryClient();
     queryClient.setQueryData([...BALANCE_KEY], { balance: 0 });
 
-    const { texts, unmount } = await mountCard(queryClient);
+    const { renderer, texts, unmount } = await mountCard(queryClient);
     await waitFor(() => texts().includes('$0.00'));
 
     expect(texts()).not.toContain(
       'Your credit balance is empty. Credits are managed outside the iOS app for this account.'
     );
-    expect(texts()).toContain('ADD_CREDITS_BUTTON');
+    expect(addCreditsAction(renderer).props.accessibilityRole).toBe('button');
 
     unmount();
   });
 
-  it('keeps the org payment-details URL for a money-role member', async () => {
+  it('puts an organization purchase in the credits header and opens its billing page', async () => {
     currentUser.userId = 'user-1';
     savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
     const queryClient = createTestQueryClient();
@@ -1203,25 +1140,31 @@ describe('CreditsCard add-credits entry point', () => {
     // lost-membership recovery switches it to Personal before the card reads it.
     listState.payload = orgs;
 
-    const { texts, unmount } = await mountCard(queryClient, orgs);
-    await waitFor(() => addCreditsRowProps.latest?.url !== undefined);
+    const { renderer, unmount } = await mountCard(queryClient, orgs);
+    await switchAccountTo('org-a');
+    await waitFor(() => findPurchase(renderer) !== undefined);
 
-    expect(texts()).toContain('ADD_CREDITS_ROW');
-    expect(addCreditsRowProps.latest?.url).toBe(
-      'https://example.com/organizations/org-a/payment-details'
+    const action = addCreditsAction(renderer);
+    expect(action.props.accessibilityRole).toBe('button');
+    await act(() => {
+      (action.props.onPress as () => void)();
+    });
+    expect(openExternalUrl).toHaveBeenCalledWith(
+      'https://example.com/organizations/org-a/payment-details',
+      { label: i18n.t('addCredits.billingPage') }
     );
-    expect(addCreditsRowProps.latest?.onPress).toBeUndefined();
+    expect(routerPush).not.toHaveBeenCalled();
 
     unmount();
   });
 
-  it('paints the org purchase row before the balance read answers', async () => {
+  it('paints the organization purchase before the balance read answers', async () => {
     currentUser.userId = 'user-1';
     savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
     // The balance read decides nothing about whether the organization has a
-    // purchase entry point, so the row must be part of the card's first paint:
-    // mounting it when the read lands moved every section below it (design
-    // gate, Profile, 2026-11-06).
+    // purchase entry point, so the action must be part of the card's first
+    // paint: mounting it when the read lands moved every section below it
+    // (design gate, Profile, 2026-11-06).
     const balance = Promise.withResolvers<{ balance: number }>();
     getContextBalanceQueryFn.mockReturnValue(balance.promise);
     const orgs = [
@@ -1229,18 +1172,16 @@ describe('CreditsCard add-credits entry point', () => {
     ] as OrgListEntry[];
     listState.payload = orgs;
 
-    const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
-    await waitFor(() => texts().includes('Acme'));
+    const { renderer, unmount } = await mountCard(createTestQueryClient(), orgs);
+    await switchAccountTo('org-a');
+    await waitFor(() => findPurchase(renderer) !== undefined);
 
-    expect(texts()).toContain('ADD_CREDITS_ROW');
-    expect(addCreditsRowProps.latest?.url).toBe(
-      'https://example.com/organizations/org-a/payment-details'
-    );
+    expect(addCreditsAction(renderer).props.accessibilityRole).toBe('button');
 
     unmount();
   });
 
-  it('renders no row for a non-money-role org member', async () => {
+  it('offers no purchase to a non-money-role org member', async () => {
     currentUser.userId = 'user-1';
     savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
     const queryClient = createTestQueryClient();
@@ -1251,17 +1192,20 @@ describe('CreditsCard add-credits entry point', () => {
     // Same seeding as the money-role case: keep the selection recoverable.
     listState.payload = orgs;
 
-    const { texts, unmount } = await mountCard(queryClient, orgs);
-    await waitFor(() => texts().includes('Acme'));
+    const { renderer, texts, unmount } = await mountCard(queryClient, orgs);
+    await switchAccountTo('org-a');
+    await waitFor(() => texts().includes('$0.00'));
 
-    // The personal row may render before the stored org resolves; the settled
-    // tree must hold no row at all for a member who cannot manage billing.
-    expect(texts()).not.toContain('ADD_CREDITS_ROW');
+    // The personal action may render before the stored org resolves; the
+    // settled tree must hold no purchase control for a member who cannot
+    // manage billing.
+    expect(findPurchase(renderer)).toBeUndefined();
 
     unmount();
   });
 
-  it('keeps the org action on the balance card instead of a block below it', async () => {
+  it('shows no dead purchase label where the storefront may not link out', async () => {
+    externalPurchase.canLink = false;
     currentUser.userId = 'user-1';
     savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
     const queryClient = createTestQueryClient();
@@ -1271,77 +1215,15 @@ describe('CreditsCard add-credits entry point', () => {
     ] as OrgListEntry[];
     listState.payload = orgs;
 
-    const { renderer, unmount } = await mountCard(queryClient, orgs);
-    await waitFor(
-      () => renderer.root.findAll(node => node.children.includes('ADD_CREDITS_ROW')).length > 0
-    );
+    const { renderer, texts, unmount } = await mountCard(queryClient, orgs);
+    await switchAccountTo('org-a');
+    await waitFor(() => texts().includes('$0.00'));
 
-    // The action shares the balance card, which is the row it tops up: a block
-    // of its own held nothing but the button once the copy beside it left.
-    const action = renderer.root.find(node => node.children.includes('ADD_CREDITS_ROW'));
-    let ancestor = action.parent;
-    let insideBalanceCard = false;
-    while (ancestor !== null) {
-      if (hasClasses(ancestor, ['min-h-16', 'rounded-lg', 'bg-secondary'])) {
-        insideBalanceCard = true;
-        break;
-      }
-      ancestor = ancestor.parent;
-    }
-    expect(insideBalanceCard).toBe(true);
+    // A plain muted label would read as a disabled action with nothing behind
+    // it; the organization's own screens carry the top-up on this storefront.
+    expect(findPurchase(renderer)).toBeUndefined();
+    expect(texts()).not.toContain(i18n.t('addCredits.cta'));
 
-    unmount();
-  });
-});
-
-describe('CreditsCard credits header', () => {
-  const headerOrgs = [
-    { organizationId: 'org-a', organizationName, role: 'owner' },
-  ] as OrgListEntry[];
-
-  it('keeps the credits eyebrow and the account picker on one row at phone widths', async () => {
-    const { renderer, unmount } = await mountCard(createTestQueryClient(), headerOrgs);
-
-    // The 160 dp window of the e1 round squeezed the eyebrow until Android
-    // broke it mid-word ("CREDIT S"); a phone-width window must not.
-    expect(headerClasses(renderer)).toContain('flex-row');
-    unmount();
-  });
-
-  it('stacks the credits eyebrow above the account picker in a narrow window', async () => {
-    windowDims.width = 160;
-    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), headerOrgs);
-
-    const classes = headerClasses(renderer);
-    expect(classes).toContain('flex-col');
-    expect(classes).not.toContain('flex-row');
-    // The eyebrow keeps its full copy instead of breaking mid-word.
-    expect(texts()).toContain('Credits');
-    unmount();
-  });
-
-  it('keeps the header one text line tall and reaches the picker target with hitSlop', async () => {
-    const { renderer, unmount } = await mountCard(createTestQueryClient(), headerOrgs);
-
-    // The header is the eyebrow's line, so "Credits" starts at the screen's top
-    // padding like the other Profile section headings; a taller row pushes it
-    // down and opens a hole under the screen title.
-    expect(headerClasses(renderer)).not.toContain('min-h-[44px]');
-    expect(headerClasses(renderer)).toContain('items-center');
-    const picker = renderer.root.find(
-      node => Object.is(node.type, Pressable) && node.props.accessibilityHint === 'Select account'
-    );
-    // The picker floats the shared 28dp line-action box over the line and
-    // reaches the 44pt target with its slop instead of growing the row.
-    for (const token of LINE_ACTION_BOX_CLASS.split(' ')) {
-      expect(String(picker.props.className)).toContain(token);
-    }
-    expect(picker.props.hitSlop).toBe(LINE_ACTION_HIT_SLOP);
-    expect(tapTargetReachDp(MIN_TAP_TARGET_DP, LINE_ACTION_HIT_SLOP.top)).toBeGreaterThanOrEqual(
-      TOUCH_TARGET_DP
-    );
-    // A short account or org name must not shrink the target below 44pt.
-    expect(String(picker.props.className)).toContain('min-w-[44px]');
     unmount();
   });
 });
@@ -1368,13 +1250,38 @@ describe('CreditsCard balance row', () => {
     return mounted;
   }
 
+  /**
+   * The one-row arm's control slot: the row's last child, beside the value column.
+   * The row is reanimated's `Animated.View` (it animates its own layout), which is
+   * not a host `View` in the rendered tree, so it is matched by its classes alone.
+   */
+  function controlSlot(renderer: ReactTestRenderer): ReactTestInstance {
+    const rows = renderer.root.findAll(node =>
+      hasClasses(node, ['min-w-0', 'flex-1', 'flex-row', 'items-center', 'gap-1'])
+    );
+    const row = rows[0];
+    if (rows.length !== 1 || row === undefined) {
+      throw new Error(`Expected one one-row arm, received ${rows.length}`);
+    }
+    const slot = row.children.at(-1);
+    if (slot === undefined || typeof slot === 'string') {
+      throw new Error('The one-row arm has no control slot');
+    }
+    return slot;
+  }
+
   /** The nearest host View above the note: the column the note shares with the amount. */
   function noteColumn(renderer: ReactTestRenderer): ReactTestInstance {
     const [note] = renderer.root.findAll(
       node => typeof node.type === 'string' && node.props.children === 'No expiring credits.'
     );
     let current = note?.parent ?? null;
-    while (current !== null && !Object.is(current.type, 'View')) {
+    // The note sits in its own fixed two-line slot; the column it shares with
+    // the amount is the first `View` above that slot.
+    while (
+      current !== null &&
+      (!Object.is(current.type, 'View') || current.props.testID === 'credits-expiry-slot')
+    ) {
       current = current.parent;
     }
     if (current === null) {
@@ -1383,14 +1290,158 @@ describe('CreditsCard balance row', () => {
     return current;
   }
 
-  it('keeps the note in the amount column on a wide card, with the purchase action in its own column', async () => {
+  it('keeps the note in the amount column on a wide card', async () => {
     const { renderer, unmount } = await mountAtCardWidth(383);
 
     const column = noteColumn(renderer);
     expect(renders(column, '$12.34')).toBe(true);
     expect(renders(column, 'ADD_CREDITS_BUTTON')).toBe(false);
-    expect(renders(balanceBlock(renderer), 'ADD_CREDITS_BUTTON')).toBe(true);
+    expect(renders(balanceBlock(renderer), 'ADD_CREDITS_BUTTON')).toBe(false);
     unmount();
+  });
+
+  it('holds the toggle box while the balance loads, so the wide card is the same height after', async () => {
+    currentUser.userId = 'user-a';
+    const pending = Promise.withResolvers<{ balance: number }>();
+    getContextBalanceQueryFn.mockReturnValue(pending.promise);
+    personalCreditBlocksQueryFn.mockResolvedValue({ creditBlocks: [] });
+    const { renderer, texts, unmount } = await mountCard();
+    try {
+      const box = cardBox(renderer);
+      await act(() => {
+        (box.props.onLayout as (event: { nativeEvent: { layout: { width: number } } }) => void)({
+          nativeEvent: { layout: { width: 383 } },
+        });
+      });
+      // The one-row arm gives the control the row's height: a placeholder that
+      // is not the control's own 48pt box shrinks the card while the read runs
+      // and grows it when the amount lands, moving every row below the card.
+      const loadingControl = controlSlot(renderer);
+      expect(classesOf(loadingControl)).toEqual(
+        expect.arrayContaining(ICON_TARGET_BOX_CLASS.split(' '))
+      );
+
+      await act(async () => {
+        pending.resolve({ balance: 1 });
+        await pending.promise;
+      });
+      await waitFor(() => texts().includes('$1.00'));
+      expect(String(controlSlot(renderer).props.className)).toContain(ICON_TARGET_BOX_CLASS);
+    } finally {
+      unmount();
+      pending.resolve({ balance: 1 });
+    }
+  });
+
+  /** The note's fixed box: the one View the card tags as the expiry slot. */
+  function noteSlot(renderer: ReactTestRenderer): ReactTestInstance {
+    const [slot] = renderer.root.findAll(node => node.props.testID === 'credits-expiry-slot');
+    if (slot === undefined) {
+      throw new Error('The card painted no expiry slot');
+    }
+    return slot;
+  }
+
+  /** The height the slot reserves, in dp, at the test's font scale of 1. */
+  function slotHeight(slot: ReactTestInstance): number {
+    const style: unknown = slot.props.style;
+    if (style === null || typeof style !== 'object' || !('minHeight' in style)) {
+      return 0;
+    }
+    const { minHeight } = style;
+    return typeof minHeight === 'number' ? minHeight : 0;
+  }
+
+  it('reserves the funded note’s two lines while the credits load', async () => {
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 12.34 });
+    const pending = Promise.withResolvers<{
+      creditBlocks: { balance_mUsd: number; expiry_date: string | null }[];
+    }>();
+    personalCreditBlocksQueryFn.mockReturnValue(pending.promise);
+    const { renderer, texts, unmount } = await mountCard();
+    try {
+      // A funded note is a sentence that wraps to two `caption` lines at this
+      // card's width (14.1 dp each: the gate device measured the funded
+      // sentence at 28.19 dp), while the bar stands in for one. A slot that only
+      // held the bar grew the card by a line when funded credits landed and
+      // moved every row below it.
+      expect(slotHeight(noteSlot(renderer))).toBeCloseTo(28.2, 5);
+
+      await act(async () => {
+        pending.resolve({
+          creditBlocks: [{ balance_mUsd: 2_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
+        });
+        await pending.promise;
+      });
+      await waitFor(() => texts().some(text => text.includes('in credits expires')));
+      expect(renders(noteSlot(renderer), 'in credits expires')).toBe(true);
+      expect(slotHeight(noteSlot(renderer))).toBeCloseTo(28.2, 5);
+    } finally {
+      unmount();
+      pending.resolve({ creditBlocks: [] });
+    }
+  });
+
+  it('reserves the wrapped note at a large font scale, not just a scaled two-line box', async () => {
+    // Android's largest scale (2.0) is the gate's `font-max` cell: the column
+    // keeps its dp width while every glyph widens, so the funded sentence takes
+    // about twice as many lines as at scale 1 and the box has to reserve them.
+    windowDims.fontScale = 2;
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 12.34 });
+    personalCreditBlocksQueryFn.mockResolvedValue({
+      creditBlocks: [{ balance_mUsd: 2_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
+    });
+    const { texts, renderer, unmount } = await mountCard();
+    try {
+      await waitFor(() => texts().some(text => text.includes('in credits expires')));
+      // Four lines at 28.2 dp each, not the two a scale-multiplied box holds.
+      expect(slotHeight(noteSlot(renderer))).toBeCloseTo(CAPTION_LINE_DP * 2 * 4, 5);
+      expect(slotHeight(noteSlot(renderer))).toBeGreaterThan(CAPTION_LINE_DP * 2 * 2);
+    } finally {
+      unmount();
+    }
+  });
+
+  it('keeps the stacked arm on the first frame where the scroller takes landscape insets', async () => {
+    // The review's own case: the landscape insets (47/59) at font scale 2. The
+    // settled width is 800 - 28 - 47 - 59 = 666 card dp, and 666 / 2 = 333
+    // stacks; the window alone (800 - 28 = 772, 386 scaled) would pick the
+    // one-row arm and `onLayout` would flip it.
+    windowDims.width = 800;
+    windowDims.fontScale = 2;
+    insets.left = 47;
+    insets.right = 59;
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockReturnValue(Promise.withResolvers<{ balance: number }>().promise);
+    personalCreditBlocksQueryFn.mockResolvedValue({ creditBlocks: [] });
+    const { renderer, unmount } = await mountCard();
+    try {
+      // No layout event: this is the arm the first frame paints.
+      const shell = balanceBlock(renderer);
+      expect(classesOf(shell)).not.toContain('flex-row');
+    } finally {
+      unmount();
+    }
+  });
+
+  it('keeps the one-row arm on the first frame where the insets leave room for it', async () => {
+    // The same window and scale without the cutout: 772 / 2 = 386 scaled dp
+    // keeps the note beside the amount, so the first frame must agree.
+    windowDims.width = 800;
+    windowDims.fontScale = 2;
+    insets.left = 0;
+    insets.right = 0;
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockReturnValue(Promise.withResolvers<{ balance: number }>().promise);
+    personalCreditBlocksQueryFn.mockResolvedValue({ creditBlocks: [] });
+    const { renderer, unmount } = await mountCard();
+    try {
+      expect(classesOf(balanceBlock(renderer))).toContain('flex-row');
+    } finally {
+      unmount();
+    }
   });
 
   it.each<[string, number]>([
@@ -1399,48 +1450,40 @@ describe('CreditsCard balance row', () => {
     // three lines, so both stack instead.
     ['the compact cell', 332],
     ['a 390 dp screen', 362],
-  ])(
-    'gives the note its own line under the amount and the purchase action its own row on %s',
-    async (_name, width) => {
-      const { renderer, unmount } = await mountAtCardWidth(width);
+  ])('gives the note its own line under the amount on %s', async (_name, width) => {
+    const { renderer, unmount } = await mountAtCardWidth(width);
 
-      // A stacked card keeps the value and its caption together: the amount and
-      // its visibility toggle share the value line, the note takes the column's
-      // next line at the column's own gap, and the purchase action takes its
-      // own row under the pair, so no control sits beside the toggle at another
-      // height and the note keeps the card's full width.
-      const shell = balanceBlock(renderer);
-      expect(classesOf(shell)).not.toContain('flex-row');
-      const column = valueColumn(renderer);
-      const wrapper = column.parent;
-      expect(wrapper?.parent).toBe(shell);
-      // The column's wrapper is a row, so its child's `flex-1` is a width
-      // share. In a column wrapper it would be a 0 vertical basis, and the
-      // 48 dp floor would pin the column: a longer note would paint outside
-      // the card instead of growing it.
-      if (wrapper === null) {
-        throw new Error('The stacked value column has no wrapper');
-      }
-      expect(classesOf(wrapper)).toContain('flex-row');
-
-      const row = amountRow(renderer);
-      expect(row.parent).toBe(column);
-      expect(renders(row, 'No expiring credits.')).toBe(false);
-      expect(renders(row, 'ADD_CREDITS_BUTTON')).toBe(false);
-      // The toggle shares the amount's line, so the note under it keeps the
-      // column's full width instead of the width left beside a toggle column.
-      const toggle = renderer.root.findByProps({ accessibilityLabel: 'Hide balance' });
-      expect(row.findAll(node => node === toggle)).toHaveLength(1);
-      expect(wrapper.children.at(-1)).toBe(column);
-      expect(renders(column, 'No expiring credits.')).toBe(true);
-      expect(renders(column, 'ADD_CREDITS_BUTTON')).toBe(false);
-      const actionRow = shell.children.at(-1);
-      if (actionRow === undefined || typeof actionRow === 'string') {
-        throw new Error('The stacked card has no purchase row');
-      }
-      expect(actionRow).not.toBe(wrapper);
-      expect(renders(actionRow, 'ADD_CREDITS_BUTTON')).toBe(true);
-      unmount();
+    // A stacked card keeps the value and its caption together: the amount and
+    // its visibility toggle share the value line, and the note takes the
+    // column's next line, so the note keeps the card's full width.
+    const shell = balanceBlock(renderer);
+    expect(classesOf(shell)).not.toContain('flex-row');
+    const column = valueColumn(renderer);
+    const wrapper = column.parent;
+    expect(wrapper?.parent).toBe(shell);
+    // The column's wrapper is a row, so its child's `flex-1` is a width
+    // share. In a column wrapper it would be a 0 vertical basis, and the
+    // 48 dp floor would pin the column: a longer note would paint outside
+    // the card instead of growing it.
+    if (wrapper === null) {
+      throw new Error('The stacked value column has no wrapper');
     }
-  );
+    expect(classesOf(wrapper)).toContain('flex-row');
+
+    const row = amountRow(renderer);
+    expect(row.parent).toBe(column);
+    expect(renders(row, 'No expiring credits.')).toBe(false);
+    expect(renders(row, 'ADD_CREDITS_BUTTON')).toBe(false);
+    // The toggle shares the amount's line, so the note under it keeps the
+    // column's full width instead of the width left beside a toggle column.
+    const toggle = renderer.root.findByProps({ accessibilityLabel: 'Hide balance' });
+    expect(row.findAll(node => node === toggle)).toHaveLength(1);
+    expect(wrapper.children.at(-1)).toBe(column);
+    expect(renders(column, 'No expiring credits.')).toBe(true);
+    expect(renders(column, 'ADD_CREDITS_BUTTON')).toBe(false);
+    // The purchase action is the section header's, so the card ends at its
+    // value column and paints no empty action row.
+    expect(shell.children.at(-1)).toBe(wrapper);
+    unmount();
+  });
 });

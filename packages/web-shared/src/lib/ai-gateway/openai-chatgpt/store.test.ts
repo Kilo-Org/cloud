@@ -183,6 +183,7 @@ describe('openai-chatgpt connection store', () => {
     await expect(getOpenAiChatGptStoredConnection(USER_OWNER)).resolves.toEqual({
       connection: buildConnection(),
       isEnabled: true,
+      createdBy: TEST_USER_ID,
     });
   });
 

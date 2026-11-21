@@ -8,11 +8,11 @@ import {
   benchmarkPairKey,
   RoutingTableSchema,
 } from './routing-table';
-import { ReasoningEffortSchema, refineVariantExclusivity } from './reasoning';
+import { ReasoningEffortSchema, refineVariantExclusivity, VariantSchema } from './reasoning';
 import { addDuplicateKeyIssues } from './duplicate-keys';
 import { TaxonomyRouteKeySchema } from './taxonomy';
 import { AutoRouterSchema, DEFAULT_AUTO_ROUTER, type AutoRouter } from './router';
-import { OwnerTypeSchema } from './owner';
+import { OwnerIdentityShape } from './owner';
 import {
   POLICY_SETTING_VALUE_DEFAULTS,
   POLICY_SETTING_VALUE_SCHEMAS,
@@ -20,9 +20,6 @@ import {
   PolicySettingOverridesSchema,
   PolicySettingsStateSchema,
 } from './policy-settings';
-
-export { ReasoningEffortSchema } from './reasoning';
-export type { ReasoningEffort } from './reasoning';
 
 export const BenchmarkKindSchema = z.enum(['classifier', 'decider']);
 export type BenchmarkKind = z.infer<typeof BenchmarkKindSchema>;
@@ -52,14 +49,8 @@ export type BenchmarkQueueSelector = z.infer<typeof BenchmarkQueueSelectorSchema
 export const BENCHMARK_CONTAINER_BUDGET = 250;
 
 /** Scheduler limits an admin can override at runtime, without a deploy. */
-export const BENCHMARK_SCHEDULER_SETTING_KEYS = [
-  'slots',
-  'modelConcurrency',
-  'providerConcurrency',
-  'unknownProviderConcurrency',
-] as const;
-export const BenchmarkSchedulerSettingKeySchema = z.enum(BENCHMARK_SCHEDULER_SETTING_KEYS);
-export type BenchmarkSchedulerSettingKey = z.infer<typeof BenchmarkSchedulerSettingKeySchema>;
+export const BENCHMARK_SCHEDULER_SETTING_KEYS = ['slots', 'modelConcurrency'] as const;
+export type BenchmarkSchedulerSettingKey = (typeof BENCHMARK_SCHEDULER_SETTING_KEYS)[number];
 
 export const BenchmarkSchedulerLimitSchema = z
   .number()
@@ -96,8 +87,15 @@ export const BenchmarkSchedulerSettingSchema = z.object({
 });
 export type BenchmarkSchedulerSetting = z.infer<typeof BenchmarkSchedulerSettingSchema>;
 
+/**
+ * Unknown setting keys are stripped, so a client parses a worker that still serves
+ * a retired setting.
+ */
 export const BenchmarkSchedulerConfigResponseSchema = z.object({
-  settings: z.record(BenchmarkSchedulerSettingKeySchema, BenchmarkSchedulerSettingSchema),
+  settings: z.object({
+    slots: BenchmarkSchedulerSettingSchema,
+    modelConcurrency: BenchmarkSchedulerSettingSchema,
+  } satisfies Record<BenchmarkSchedulerSettingKey, typeof BenchmarkSchedulerSettingSchema>),
   updatedAt: z.string().nullable(),
   updatedBy: z.string().nullable(),
 });
@@ -110,7 +108,7 @@ export const BenchmarkDeciderModelSchema = z
   .object({
     id: z.string().trim().min(1),
     // Canonical catalog variant key. Legacy run snapshots may omit it.
-    variant: z.string().trim().min(1).nullable().optional(),
+    variant: VariantSchema.optional(),
     // Legacy snapshot identity; new benchmark writers emit variant only.
     reasoningEffort: ReasoningEffortSchema.nullable().default(null),
   })
@@ -254,7 +252,7 @@ export const BenchmarkModelSummarySchema = z.object({
   model: z.string(),
   // Exact-pair identity for summary rows. Optional so already-persisted run
   // payloads and old admin-UI responses still parse. Null = default/no variant.
-  variant: z.string().trim().min(1).nullable().optional(),
+  variant: VariantSchema.optional(),
   // '*' for classifier runs, otherwise "<taskType>/<subtaskType>".
   routeKey: z.union([TaxonomyRouteKeySchema, z.literal('*')]),
   accuracy: z.number(),
@@ -264,6 +262,11 @@ export const BenchmarkModelSummarySchema = z.object({
   p50TtftMs: z.number().nonnegative().nullable().optional(),
   p95LatencyMs: z.number().nullable(),
   cases: z.number().int(),
+  // Cases that reported a cost: the denominator of `avgCostUsd` for the route.
+  // Absent or null on a summary from a worker that predates it and on rows
+  // written before it was stored, so a reader must treat it as unknown rather
+  // than assume every case was priced.
+  costedCases: z.number().int().nonnegative().nullable().optional(),
   errors: z.number().int(),
   timeouts: z.number().int().default(0),
   // Classifier runs only: share of cases whose predicted taskType/subtaskType
@@ -272,10 +275,10 @@ export const BenchmarkModelSummarySchema = z.object({
   routeAccuracy: z.number().min(0).max(1).nullable().default(null),
   // Mean tokens per graded case, as the CLI reports them on `step_finish`: input excludes cache
   // reads, output excludes reasoning. Null for summaries recorded before token capture.
-  avgInputTokens: z.number().nonnegative().nullable().optional(),
-  avgCachedInputTokens: z.number().nonnegative().nullable().optional(),
-  avgOutputTokens: z.number().nonnegative().nullable().optional(),
-  avgReasoningTokens: z.number().nonnegative().nullable().optional(),
+  avgInputTokens: z.number().nonnegative().nullable().default(null),
+  avgCachedInputTokens: z.number().nonnegative().nullable().default(null),
+  avgOutputTokens: z.number().nonnegative().nullable().default(null),
+  avgReasoningTokens: z.number().nonnegative().nullable().default(null),
 });
 export type BenchmarkModelSummary = z.infer<typeof BenchmarkModelSummarySchema>;
 
@@ -289,6 +292,18 @@ export const BenchmarkRunProgressSchema = z.object({
 });
 export type BenchmarkRunProgress = z.infer<typeof BenchmarkRunProgressSchema>;
 
+/**
+ * Cost and case tallies over one run's graded cases. `totalCostUsd` is the sum of
+ * the cases whose provider reported a cost, and null when none did — a run can
+ * measure cases without anyone knowing what they cost.
+ */
+export const BenchmarkRunTotalsSchema = z.object({
+  totalCostUsd: z.number().nullable(),
+  measuredCases: z.number().int().nonnegative(),
+  erroredCases: z.number().int().nonnegative(),
+});
+export type BenchmarkRunTotals = z.infer<typeof BenchmarkRunTotalsSchema>;
+
 export const BenchmarkRunSchema = z.object({
   id: z.string(),
   router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
@@ -300,13 +315,101 @@ export const BenchmarkRunSchema = z.object({
   completedAt: z.string().nullable(),
   error: z.string().nullable(),
   // Optional so run payloads persisted before the field existed still parse.
-  // Omitted for terminal runs, whose counts are already final in `summaries`.
+  // Omitted for terminal runs, whose counts are already final in their summaries.
   progress: BenchmarkRunProgressSchema.optional(),
-  summaries: z.array(BenchmarkModelSummarySchema),
+  // Admin run list only, and optional for the same reason: the list computes
+  // them from case_results, a stored run row has none.
+  totals: BenchmarkRunTotalsSchema.optional(),
+  // Model ids the run enqueued, so the admin can find a model's run by name
+  // without loading any run's summaries. Optional: only the list serves it.
+  models: z.array(z.string()).optional(),
 });
 export type BenchmarkRun = z.infer<typeof BenchmarkRunSchema>;
 
-export const BenchmarkRunsResponseSchema = z.object({ runs: z.array(BenchmarkRunSchema) });
+/**
+ * Field the previous web release still requires on each run of the admin run
+ * list. Production deploys this worker before the web promotion (ADR 0003
+ * invariant 7), so the list keeps an empty `summaries` array per run until that
+ * release is promoted; the per-run summaries route serves the rows. Remove this
+ * schema with the projection in the worker's admin routes.
+ */
+export const BenchmarkRunAdminLegacyFieldsSchema = z.object({ summaries: z.tuple([]) });
+export type BenchmarkRunAdminLegacyFields = z.infer<typeof BenchmarkRunAdminLegacyFieldsSchema>;
+
+/** Admin run list entry: the run plus the transitional fields. */
+export type BenchmarkRunAdminResponseRun = BenchmarkRun & BenchmarkRunAdminLegacyFields;
+
+export const BenchmarkRunsResponseSchema = z.object({
+  runs: z.array(BenchmarkRunSchema),
+  // Ids of every running run of the requested router, whatever the list filter,
+  // so one request per poll both lists runs and tells which runs are still
+  // going. Absent from workers that predate it; readers then fall back to the
+  // listed runs.
+  runningRunIds: z.array(z.string()).optional(),
+});
+export type BenchmarkRunsResponse = z.infer<typeof BenchmarkRunsResponseSchema>;
+/**
+ * One measured (model, variant) pair summed over every route of a run: the
+ * answer to "what did this model score and cost" without reading the routes.
+ * `accuracy` is the mean case score; `costPerCaseUsd` is the mean over the cases
+ * that reported a cost, so both cost fields are null when none did.
+ */
+export const BenchmarkModelTotalsSchema = z.object({
+  model: z.string(),
+  variant: VariantSchema.optional(),
+  accuracy: z.number(),
+  // Classifier runs only, as on BenchmarkModelSummarySchema.
+  routeAccuracy: z.number().min(0).max(1).nullable(),
+  costPerCaseUsd: z.number().nullable(),
+  totalCostUsd: z.number().nullable(),
+  cases: z.number().int().nonnegative(),
+  // Cases that reported no cost. They are outside the mean and the total, which
+  // only cover the cases that did, and the console states them apart.
+  uncostedCases: z.number().int().nonnegative().default(0),
+  errors: z.number().int().nonnegative(),
+  timeouts: z.number().int().nonnegative(),
+});
+export type BenchmarkModelTotals = z.infer<typeof BenchmarkModelTotalsSchema>;
+
+export const BenchmarkRunSummariesResponseSchema = z.object({
+  summaries: z.array(BenchmarkModelSummarySchema),
+  // Optional: absent from workers that predate it, and the route rows still
+  // serve the run's detail.
+  modelTotals: z.array(BenchmarkModelTotalsSchema).optional(),
+});
+export type BenchmarkRunSummariesResponse = z.infer<typeof BenchmarkRunSummariesResponseSchema>;
+// A config save persists the config first, then syncs the platform registry and
+// republishes the routing table. Either step can fail after the save; the save
+// still succeeds and reports what did not happen.
+export const BenchmarkConfigSaveWarningSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('registry_sync_failed'), message: z.string() }),
+  z.object({ kind: z.literal('routing_table_publish_failed'), message: z.string() }),
+]);
+export type BenchmarkConfigSaveWarning = z.infer<typeof BenchmarkConfigSaveWarningSchema>;
+// Outcome of the platform-queue drain a save runs after its registry sync and
+// publish. A separate field rather than a `warnings` kind: `warnings` is a
+// discriminated union, so an older web release would reject a kind it does not
+// know and show the whole save as failed. An unknown top-level key is stripped
+// by that release instead, so this only ever adds information.
+export const BenchmarkConfigSaveDrainSchema = z.object({
+  // The run the save started, or null when nothing was pending (every pair
+  // already measured or in flight) or the queue's run slot was occupied.
+  runId: z.string().nullable(),
+  entryCount: z.number().int(),
+  // Set when the drain did not start a run in this request: `active_run` when
+  // the queue already had one, `nothing_pending` when the queue had nothing to
+  // claim (an owner run in flight, or every pair already measured), `timeout`
+  // when the bounded drain exceeded its deadline, `failed` when it threw. The
+  // per-minute scheduler picks the work up either way.
+  //
+  // This field is new in the release that added drain-on-save, so no released
+  // web parses it. When adding a member, remember a released web parses this
+  // object with its own enum: an unknown value fails its whole save, so a new
+  // member has to reach the web before the worker emits it.
+  skipped: z.enum(['active_run', 'nothing_pending', 'timeout', 'failed']).nullable(),
+});
+export type BenchmarkConfigSaveDrain = z.infer<typeof BenchmarkConfigSaveDrainSchema>;
+
 // config is null until an admin saves one — the worker never fabricates a
 // default config, and runs cannot start without a saved one.
 export const BenchmarkConfigResponseSchema = z.object({
@@ -314,6 +417,11 @@ export const BenchmarkConfigResponseSchema = z.object({
   // Per-setting effective/computed/override resolution. Null when no config is
   // saved; optional so PUT responses from an older worker still parse.
   policySettings: PolicySettingsStateSchema.nullable().optional(),
+  // PUT only. Optional so GET responses and older workers still parse.
+  warnings: z.array(BenchmarkConfigSaveWarningSchema).optional(),
+  // PUT only. Optional so a GET, or a response from a worker that predates the
+  // drain-on-save, still parses.
+  drain: BenchmarkConfigSaveDrainSchema.optional(),
 });
 export const StartBenchmarkRunRequestSchema = z.object({
   router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
@@ -346,9 +454,65 @@ export const StartBenchmarkRunResponseSchema = z.object({
 /**
  * Wire status for a Benchmark profile. Presentation maps pending/running to
  * "Benchmarking"; "Unavailable" is a web-derived state and never a wire status.
+ * A permanently failed profile is reported as `failed` with a `permanent` failure.
  */
 export const BenchmarkProfileStatusSchema = z.enum(['pending', 'running', 'ready', 'failed']);
 export type BenchmarkProfileStatus = z.infer<typeof BenchmarkProfileStatusSchema>;
+
+/** Bounded failure text stored on failed profile rows. */
+export const BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH = 500;
+
+export const BenchmarkProfileFailureClassSchema = z.enum([
+  'catalog_absent',
+  'context_too_small',
+  'model_not_found',
+  'unsupported',
+  'provider_unavailable',
+  'model_resolution',
+  'ambiguous_execution',
+  'container_capacity',
+  'catalog_load',
+  'grader',
+  'run_timed_out',
+  'orphaned_claim',
+  'run_init_failed',
+  'unknown',
+]);
+export type BenchmarkProfileFailureClass = z.infer<typeof BenchmarkProfileFailureClassSchema>;
+
+const BenchmarkProfileFailureShape = {
+  failureClass: BenchmarkProfileFailureClassSchema,
+  reason: z.string().max(BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH).nullable(),
+  /** Consecutive failed runs since the last ready measurement. */
+  attempts: z.number().int().nonnegative(),
+  firstFailedAt: z.string(),
+  lastFailedAt: z.string(),
+};
+
+export const BenchmarkProfileFailureSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('retryable'),
+    ...BenchmarkProfileFailureShape,
+    /** Earliest time a bulk requeue re-admits this profile. */
+    retryAfter: z.string(),
+  }),
+  z.object({
+    kind: z.literal('permanent'),
+    ...BenchmarkProfileFailureShape,
+    cause: z.enum(['terminal_class', 'model_budget_exhausted', 'infrastructure_budget_exhausted']),
+  }),
+]);
+export type BenchmarkProfileFailure = z.infer<typeof BenchmarkProfileFailureSchema>;
+
+export const BenchmarkRegistryFailedEntrySchema = z.object({
+  model: z.string().trim().min(1),
+  variant: VariantSchema,
+  queues: z.array(BenchmarkRunPurposeSchema).min(1),
+  runId: z.string().nullable(),
+  failure: BenchmarkProfileFailureSchema,
+});
+export type BenchmarkRegistryFailedEntry = z.infer<typeof BenchmarkRegistryFailedEntrySchema>;
+
 /** Registry row counts for one queue, under the live engine identity. */
 export const BenchmarkRegistryQueueSchema = z.object({
   pending: z.number().int(),
@@ -373,11 +537,13 @@ export const BenchmarkRegistryResponseSchema = z.object({
     .array(
       z.object({
         model: z.string().trim().min(1),
-        variant: z.string().trim().min(1).nullable(),
+        variant: VariantSchema,
         status: BenchmarkProfileStatusSchema,
       })
     )
     .optional(),
+  /** Failed rows of the live identity that a queue still wants, retryable and permanent. */
+  failedEntries: z.array(BenchmarkRegistryFailedEntrySchema).optional(),
 });
 export type BenchmarkRegistryResponse = z.infer<typeof BenchmarkRegistryResponseSchema>;
 
@@ -387,6 +553,12 @@ export const RequeueBenchmarkRegistryRequestSchema = z.object({
 });
 export const RequeueBenchmarkRegistryResponseSchema = z.object({
   requeued: z.number().int(),
+});
+
+/** Admin re-admit of one failed registry pair; clears its failure history. */
+export const ReadmitBenchmarkProfileRequestSchema = z.object({
+  router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
+  entry: BenchmarkPairSchema,
 });
 
 export const RefreshBenchmarkProfilesRequestSchema = z.object({
@@ -412,7 +584,23 @@ export const RefreshBenchmarkProfilesResponseSchema = z.object({
   refreshed: z.array(BenchmarkPairSchema),
   unavailable: z.array(BenchmarkPairSchema),
   skipped: z.array(BenchmarkPairSchema),
+  /**
+   * Why each `unavailable` pair was refused, by the same rule the drain applies. Optional
+   * so a response from a worker that predates it still parses.
+   */
+  refusals: z
+    .array(
+      z.object({
+        entry: BenchmarkPairSchema,
+        failureClass: BenchmarkProfileFailureClassSchema,
+        reason: z.string(),
+      })
+    )
+    .optional(),
 });
+export type RefreshBenchmarkProfilesResponse = z.infer<
+  typeof RefreshBenchmarkProfilesResponseSchema
+>;
 
 export const BenchmarkRoutingTableResponseSchema = z.object({
   table: RoutingTableSchema.nullable(),
@@ -447,21 +635,18 @@ export type ClassifierWinnerResponse = z.infer<typeof ClassifierWinnerResponseSc
 
 // Benchmark profile registry (global per exact measurement pair + engine).
 
-/** Bounded failure text stored on failed profile rows. */
-export const BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH = 500;
-
 export const BenchmarkProfileEntryStatusSchema = z.object({
   entry: BenchmarkPairSchema,
   status: BenchmarkProfileStatusSchema,
   failureReason: z.string().max(BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH).nullable().optional(),
+  failure: BenchmarkProfileFailureSchema.nullable().optional(),
 });
 export type BenchmarkProfileEntryStatus = z.infer<typeof BenchmarkProfileEntryStatusSchema>;
 
 export const RegisterBenchmarkProfilesRequestSchema = z
   .object({
     router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
-    ownerType: OwnerTypeSchema,
-    ownerId: z.string().trim().min(1),
+    ...OwnerIdentityShape,
     entries: EfficientModelPoolSchema,
     // Subset of `entries` the owner explicitly retries after a terminal failure.
     // Absent/empty means no explicit retries (failed current profiles are reported
@@ -487,8 +672,7 @@ export type RegisterBenchmarkProfilesRequest = z.input<
 >;
 
 export const SyncBenchmarkSubscriptionsRequestSchema = z.object({
-  ownerType: OwnerTypeSchema,
-  ownerId: z.string().trim().min(1),
+  ...OwnerIdentityShape,
   entries: EfficientModelPoolSchema.nullable(),
   restorePrevious: z.boolean().optional(),
 });
@@ -504,8 +688,7 @@ export type SyncBenchmarkSubscriptionsRequest = z.infer<
 const OwnerScopedPoolRequestSchema = z
   .object({
     router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
-    ownerType: OwnerTypeSchema.optional(),
-    ownerId: z.string().trim().min(1).optional(),
+    ...z.object(OwnerIdentityShape).partial().shape,
     entries: EfficientModelPoolSchema,
   })
   .superRefine((request, ctx) => {

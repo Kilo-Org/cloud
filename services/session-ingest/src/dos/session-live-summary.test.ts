@@ -94,6 +94,16 @@ describe('foldSessionLiveSummary', () => {
     ).toEqual({ verb: 'searching', target: 'docs.example.com' });
   });
 
+  it('maps a web fetch to its host, keeping a port and falling back to the text', () => {
+    expect(
+      run([part('webfetch', 'running', { url: ' https://localhost:8080/a/b?q=1#top ' })]).step
+    ).toEqual({ verb: 'searching', target: 'localhost:8080' });
+    expect(run([part('web_fetch', 'running', { url: 'docs.example.com/a' })]).step).toEqual({
+      verb: 'searching',
+      target: 'docs.example.com/a',
+    });
+  });
+
   it('maps unknown tools to other with no target', () => {
     expect(run([part('task', 'running', { description: 'do it' })]).step).toEqual({
       verb: 'other',

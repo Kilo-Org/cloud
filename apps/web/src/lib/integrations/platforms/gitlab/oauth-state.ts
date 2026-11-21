@@ -34,12 +34,19 @@ export type GitLabOAuthStatePayload = z.infer<typeof GitLabOAuthStatePayloadSche
 export type VerifiedGitLabOAuthState = Omit<GitLabOAuthStatePayload, 'instanceUrl'> & {
   instanceUrl: string;
   userId: string;
+  /** See `VerifiedOAuthState.appShell`. */
+  appShell?: boolean;
 };
 
-export function createGitLabOAuthState(payload: GitLabOAuthStatePayload, userId: string): string {
+export function createGitLabOAuthState(
+  payload: GitLabOAuthStatePayload,
+  userId: string,
+  options: { appShell?: boolean } = {}
+): string {
   const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
   return createOAuthState(`${GITLAB_OAUTH_STATE_PREFIX}${encodedPayload}`, userId, undefined, {
     provider: 'gitlab',
+    appShell: options.appShell,
   });
 }
 
@@ -60,6 +67,7 @@ export function verifyGitLabOAuthState(state: string | null): VerifiedGitLabOAut
       ...parsed.data,
       instanceUrl: parsed.data.instanceUrl ?? DEFAULT_GITLAB_OAUTH_INSTANCE_URL,
       userId: verified.userId,
+      ...(verified.appShell ? { appShell: true } : {}),
     };
   } catch {
     return null;

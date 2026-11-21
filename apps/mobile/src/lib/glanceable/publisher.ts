@@ -12,7 +12,7 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import {
   buildHomeWidgetDetails,
-  EMPTY_HOME_WIDGET_DETAILS,
+  emptyHomeWidgetDetails,
   type HomeWidgetDetails,
 } from '@kilocode/app-shared/home-widget';
 
@@ -441,7 +441,7 @@ export class GlanceablePublisher {
     if (incoming.status !== 'signed_out' && incoming.status !== 'privacy') {
       getGlanceableDelivery().registerScopeTokens(ctx.organizationId, ctx.userId);
     }
-    setHomeWidgetDetails(EMPTY_HOME_WIDGET_DETAILS);
+    setHomeWidgetDetails(emptyHomeWidgetDetails());
     // A late background delivery supersedes a pending coalesced emit and any
     // pending 8 s terminal, so neither can fire after the newer snapshot.
     this.cancelCoalesce();

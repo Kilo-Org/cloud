@@ -19,6 +19,7 @@ import type { SQL } from 'drizzle-orm';
 import { signKiloToken, clearSecretCacheForTest } from '@kilocode/worker-utils';
 import type * as AccountAccessModule from '@kilocode/worker-utils/account-access';
 import type { OrganizationMemberBalanceRow } from '@kilocode/worker-utils/account-access';
+import type * as OrganizationMembershipModule from '@kilocode/worker-utils/organization-membership';
 import type { UsageRecordRequest } from '@kilocode/usage-contracts';
 import type * as ClassifierConfigModule from './classifier-config';
 import type * as CustomRouterStoreModule from './custom-router-store';
@@ -33,7 +34,7 @@ import { app } from './index';
 const findCustomRouter = vi.hoisted(() => vi.fn());
 const findCustomRouterById = vi.hoisted(() => vi.fn());
 const classifyNormalizedInput = vi.hoisted(() => vi.fn());
-const findOrganizationMemberRole = vi.hoisted(() => vi.fn());
+const findEffectiveOrganizationMemberRole = vi.hoisted(() => vi.fn());
 const findOrganizationMemberBalanceRow = vi.hoisted(() => vi.fn());
 const dbRows = vi.hoisted(() => ({
   user: [] as unknown[],
@@ -75,8 +76,12 @@ vi.mock('./classifier-config', async importOriginal => ({
 
 vi.mock('@kilocode/worker-utils/account-access', async importOriginal => ({
   ...(await importOriginal<typeof AccountAccessModule>()),
-  findOrganizationMemberRole,
   findOrganizationMemberBalanceRow,
+}));
+
+vi.mock('@kilocode/worker-utils/organization-membership', async importOriginal => ({
+  ...(await importOriginal<typeof OrganizationMembershipModule>()),
+  findEffectiveOrganizationMemberRole,
 }));
 
 vi.mock('@kilocode/db', async importOriginal => {
@@ -357,6 +362,10 @@ async function errorCode(res: Response) {
   return body.error.code;
 }
 
+async function errorResponse(res: Response) {
+  return (await res.json()) as { error: { code: string; message: string } };
+}
+
 const fetchMock = vi.fn<typeof fetch>();
 let gatewayDeniedModelIds: string[] = [];
 let gatewayFailuresLeft = 0;
@@ -412,7 +421,7 @@ beforeEach(() => {
   dbRows.blacklistLookups = [];
   findCustomRouter.mockReset().mockResolvedValue(customRouter());
   findCustomRouterById.mockReset().mockResolvedValue(customRouter());
-  findOrganizationMemberRole.mockReset().mockResolvedValue('member');
+  findEffectiveOrganizationMemberRole.mockReset().mockResolvedValue('member');
   findOrganizationMemberBalanceRow.mockReset().mockResolvedValue(memberBalanceRow());
   classifyNormalizedInput.mockReset().mockResolvedValue({
     cost: 0.000002,
@@ -818,7 +827,10 @@ describe('public custom router decide', () => {
       })
     );
     expect(findCustomRouter).toHaveBeenCalledWith(env, { type: 'org', id: ORG_ID }, 'team');
-    expect(findOrganizationMemberRole).toHaveBeenCalledWith(expect.anything(), ORG_ID, USER_ID);
+    expect(findEffectiveOrganizationMemberRole).toHaveBeenCalledWith(expect.anything(), {
+      kiloUserId: USER_ID,
+      organizationId: ORG_ID,
+    });
     const verified = await verifyAutoDecision(decisionId, DECISION_SECRET, Date.now());
     expect(verified.ok && verified.payload.organizationId).toBe(ORG_ID);
   });
@@ -838,12 +850,14 @@ describe('public custom router decide', () => {
   });
 
   it('denies an organization context the user is not a member of', async () => {
-    findOrganizationMemberRole.mockResolvedValue(null);
+    findEffectiveOrganizationMemberRole.mockResolvedValue(null);
     const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody(), {
       'X-KiloCode-OrganizationId': ORG_ID,
     });
     expect(res.status).toBe(403);
-    expect(await errorCode(res)).toBe('forbidden');
+    expect(await errorResponse(res)).toEqual({
+      error: { code: 'forbidden', message: 'Not a member of the organization' },
+    });
     expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
 
@@ -1046,7 +1060,7 @@ describe('client eval proxy', () => {
     findCustomRouterById.mockResolvedValue(
       customRouter({ ownerType: 'org', ownerId: ORG_ID, slug: 'team' })
     );
-    findOrganizationMemberRole.mockResolvedValue('billing_manager');
+    findEffectiveOrganizationMemberRole.mockResolvedValue('billing_manager');
     findOrganizationMemberBalanceRow.mockResolvedValue(null);
     benchmarkFetch.mockResolvedValueOnce(Response.json({ score: 1 }));
     const upload = {
@@ -1095,7 +1109,7 @@ describe('client eval proxy', () => {
 
   it('rejects an upload when the owning organization has no balance', async () => {
     findCustomRouterById.mockResolvedValue(customRouter({ ownerType: 'org', ownerId: ORG_ID }));
-    findOrganizationMemberRole.mockResolvedValue('admin');
+    findEffectiveOrganizationMemberRole.mockResolvedValue('admin');
     dbRows.organization = [{ total_microdollars_acquired: 1_000, microdollars_used: 1_000 }];
     const res = await post(
       CUSTOM_ROUTER_EVAL_PLAN_PATH,
@@ -1119,11 +1133,35 @@ describe('client eval proxy', () => {
     expect(benchmarkFetch).not.toHaveBeenCalled();
   });
 
+  it('runs an eval plan for an owner inherited from the live parent organization', async () => {
+    findCustomRouterById.mockResolvedValue(
+      customRouter({ ownerType: 'org', ownerId: ORG_ID, slug: 'team' })
+    );
+    findEffectiveOrganizationMemberRole.mockResolvedValue('owner');
+    dbRows.user = [spentBalanceUser()];
+    benchmarkFetch.mockResolvedValueOnce(Response.json({}));
+    const res = await post(
+      CUSTOM_ROUTER_EVAL_PLAN_PATH,
+      { routerId: ROUTER_ID },
+      { 'X-KiloCode-OrganizationId': ORG_ID }
+    );
+    expect(res.status).toBe(200);
+    expect(findEffectiveOrganizationMemberRole).toHaveBeenCalledWith(expect.anything(), {
+      kiloUserId: USER_ID,
+      organizationId: ORG_ID,
+    });
+    expect(forwarded(CUSTOM_ROUTER_EVAL_PLAN_PATH)).toMatchObject({
+      routerId: ROUTER_ID,
+      ownerType: 'org',
+      ownerId: ORG_ID,
+    });
+  });
+
   it('runs an eval plan for an organization billing manager funded by the organization', async () => {
     findCustomRouterById.mockResolvedValue(
       customRouter({ ownerType: 'org', ownerId: ORG_ID, slug: 'team' })
     );
-    findOrganizationMemberRole.mockResolvedValue('billing_manager');
+    findEffectiveOrganizationMemberRole.mockResolvedValue('billing_manager');
     findOrganizationMemberBalanceRow.mockResolvedValue(null);
     dbRows.user = [spentBalanceUser()];
     benchmarkFetch.mockResolvedValueOnce(Response.json({}));

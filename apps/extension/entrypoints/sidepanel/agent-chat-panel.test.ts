@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { TARGET_TAB_UNAVAILABLE_ABORT_REASON } from '@/src/shared/agent-llm-turn-runner-core';
 
 // Agent-chat-panel transitively imports the WXT '#imports' virtual module; stub it so the graph loads under vitest.
 // eslint-disable-next-line vitest/prefer-import-in-mock, jest/no-untyped-mock-factory
@@ -15,11 +16,46 @@ vi.mock('#imports', () => ({
 
 // eslint-disable-next-line import/first
 import {
+  abortRunsWithoutInspectableTab,
   formatSelectedTabSystemEnvironment,
   formatSystemEnvironment,
   getInitialInspectableTabId,
   getSelectedInspectableTabId,
+  runOwesTabLease,
 } from './agent-chat-panel';
+
+describe('aborting runs whose target tab went away', () => {
+  it('aborts with the tab-close reason so the turn does not report a Stop', () => {
+    const gone = new AbortController();
+    const kept = new AbortController();
+    const runs = [
+      { abort: gone, selectedTabId: 7 },
+      { abort: kept, selectedTabId: 8 },
+    ];
+
+    abortRunsWithoutInspectableTab({ inspectableTabIds: new Set([8]), runs });
+
+    expect(gone.signal.reason).toBe(TARGET_TAB_UNAVAILABLE_ABORT_REASON);
+    expect(kept.signal.aborted).toBe(false);
+  });
+});
+
+describe('turn-end tab lease release', () => {
+  it('releases the lease for the current run', () => {
+    expect(runOwesTabLease({ currentRunToken: 4, runToken: 4 })).toBe(true);
+  });
+
+  it('releases the lease for a run whose conversation was closed, deleted or stopped', () => {
+    // A closed turn has no run state left (abortConversationRun deleted it).
+    // It must still free the tab.
+    expect(runOwesTabLease({ currentRunToken: undefined, runToken: 4 })).toBe(true);
+  });
+
+  it('keeps the lease for a run a newer turn of the same conversation replaced', () => {
+    // Same caller key: the newer run releases it at its own turn end.
+    expect(runOwesTabLease({ currentRunToken: 5, runToken: 4 })).toBe(false);
+  });
+});
 
 describe('selected tab context formatting', () => {
   it('redacts URL query and hash data and escapes page-controlled title text', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { hasInviteSeatCapacity, inviteConsumesSeat } from './seat-capacity';
+import { hasInviteSeatCapacity, inviteConsumesSeat, seatCountReadout } from './seat-capacity';
 
 describe('inviteConsumesSeat', () => {
   it('counts every role but billing_manager', () => {
@@ -51,5 +51,23 @@ describe('hasInviteSeatCapacity', () => {
         totalSeats: 5,
       })
     ).toBe(false);
+  });
+});
+
+describe('seatCountReadout', () => {
+  const formatNumber = (value: number) => value.toLocaleString('en-US');
+
+  it('writes the fraction for an enforced organization with bought seats', () => {
+    expect(seatCountReadout({ seatsEnforced: true, used: 4, total: 10, formatNumber })).toBe(
+      '4 / 10'
+    );
+  });
+
+  it('holds a seat-enforcing organization with none bought at the used count', () => {
+    expect(seatCountReadout({ seatsEnforced: true, used: 1, total: 0, formatNumber })).toBe('1');
+  });
+
+  it('holds an unenforced organization at the used count with a positive total', () => {
+    expect(seatCountReadout({ seatsEnforced: false, used: 2, total: 5, formatNumber })).toBe('2');
   });
 });

@@ -7,6 +7,8 @@ export type EmbeddingProxyRequest = {
   dimensions?: number;
   safety_identifier?: string;
   provider?: Record<string, unknown>;
+  /** Vercel routing options; the gateway sets them itself and rejects a client value. */
+  providerOptions?: unknown;
   input_type?: string;
   // Mistral-specific
   output_dtype?: string;
@@ -25,15 +27,22 @@ export function validateEmbeddingDimensions(
 
 /**
  * Build the upstream request body for the target provider.
- * Strips the deprecated `user` field (replaced by `safety_identifier`) and
- * native Mistral fields that upstream providers (OpenRouter, Vercel) don't understand.
+ * Strips the deprecated `user` field (replaced by `safety_identifier`),
+ * native Mistral fields that upstream providers (OpenRouter, Vercel) don't understand,
+ * and any client `providerOptions`, which only the gateway may set.
  * Catalog dimensions for fixed-width models describe local storage shape only.
  */
 export function buildUpstreamBody(
   body: EmbeddingProxyRequest & { user?: string },
   requestedModel = body.model
 ): Record<string, unknown> {
-  const { output_dtype: _, output_dimension: __, user: ___, ...upstreamBody } = body;
+  const {
+    output_dtype: _,
+    output_dimension: __,
+    user: ___,
+    providerOptions: _____,
+    ...upstreamBody
+  } = body;
   if (getKiloEmbeddingModel(requestedModel)?.dimensionMode !== 'fixed') return upstreamBody;
   const { dimensions: ____, ...fixedBody } = upstreamBody;
   return fixedBody;

@@ -87,6 +87,36 @@ function makeAssistantMessage(): StoredMessage {
   };
 }
 
+function makeBackgroundTaskMessage(
+  state: 'completed' | 'error',
+  synthetic = true,
+  background = true
+): StoredMessage {
+  const action = state === 'completed' ? 'completed' : 'failed';
+  const tag = state === 'completed' ? 'task_result' : 'task_error';
+  return {
+    info: { ...makeUserMessage().info, id: 'user_task_result' },
+    parts: [
+      {
+        id: 'task_result',
+        sessionID: 'ses_1',
+        messageID: 'user_task_result',
+        type: 'text',
+        synthetic,
+        metadata: { background },
+        text: [
+          `<task id="ses_child" state="${state}">`,
+          `<summary>Background task ${action}: Inspect the file</summary>`,
+          `<${tag}>`,
+          'Detail from the subagent.',
+          `</${tag}>`,
+          '</task>',
+        ].join('\n'),
+      },
+    ],
+  };
+}
+
 describe('SharedSessionTranscript', () => {
   it('shows chat and keeps agent work collapsed by default', () => {
     const html = renderToStaticMarkup(
@@ -101,6 +131,38 @@ describe('SharedSessionTranscript', () => {
     expect(html).toContain('1 tool call');
     expect(html).not.toContain('data-part="reason_1"');
     expect(html).not.toContain('data-part="tool_1"');
+  });
+
+  it.each([
+    ['completed', 'Subagent finished'],
+    ['error', 'Subagent failed'],
+  ] as const)('shows a Kilo v1 %s background task as a collapsed result', (state, title) => {
+    const html = renderToStaticMarkup(
+      React.createElement(SharedSessionTranscript, {
+        messages: [makeUserMessage(), makeBackgroundTaskMessage(state), makeAssistantMessage()],
+      })
+    );
+
+    expect(html).toContain('Please inspect this.');
+    expect(html).toContain('The file looks fine.');
+    expect(html).toContain('data-message-id="user_task_result"');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain(title);
+    expect(html).toContain('Inspect the file');
+    expect(html).not.toContain('&lt;task');
+    expect(html).not.toContain('Detail from the subagent.');
+  });
+
+  it.each([
+    makeBackgroundTaskMessage('completed', false),
+    makeBackgroundTaskMessage('completed', true, false),
+  ])('keeps task-like text without both background markers as chat', message => {
+    const html = renderToStaticMarkup(
+      React.createElement(SharedSessionTranscript, { messages: [message] })
+    );
+
+    expect(html).not.toContain('Subagent finished');
+    expect(html).toContain('Detail from the subagent.');
   });
 
   it('renders an empty-state when there are no messages', () => {

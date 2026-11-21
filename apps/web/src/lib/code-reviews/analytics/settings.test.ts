@@ -92,6 +92,7 @@ describe('Code Reviewer analytics settings', () => {
         selected_repository_ids: [],
         manually_added_repositories: [],
         disable_review_md: true,
+        review_guideline_source_repositories: [],
         review_memory_enabled: false,
         review_analytics_enabled: true,
       });

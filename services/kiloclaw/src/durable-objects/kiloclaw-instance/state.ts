@@ -6,8 +6,16 @@ import {
   type DockerLocalProviderState,
   type NorthflankProviderState,
 } from '../../schemas/instance-config';
-import { LIFECYCLE_NOTIFICATION_RESET } from './lifecycle-push';
 import type { InstanceMutableState } from './types';
+
+/**
+ * Reset shape for the "instance ready" notification flag. Spread this into
+ * storage updates / mutable-state factories so the flag never drifts apart
+ * across the provision, wipe, and create-from-scratch code paths.
+ */
+export const INSTANCE_READY_EMAIL_RESET = {
+  instanceReadyEmailSent: false,
+} as const;
 
 /**
  * Derived from PersistedStateSchema — single source of truth for DO KV keys.
@@ -339,13 +347,8 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.preRestoreStatus = d.preRestoreStatus;
     s.pendingRestoreVolumeId = d.pendingRestoreVolumeId;
     // Legacy instances pre-dating this field treat absence as already-sent
-    // to avoid spurious emails/pushes after deploy.
+    // to avoid spurious emails after deploy.
     s.instanceReadyEmailSent = 'instanceReadyEmailSent' in raw ? d.instanceReadyEmailSent : true;
-    // Legacy instances with an in-flight `starting` attempt at deploy time
-    // should not emit a retroactive `start_failed` push for that attempt.
-    // startAsync() re-arms this flag for every subsequent attempt.
-    s.startFailurePushSentForAttempt =
-      'startFailurePushSentForAttempt' in raw ? d.startFailurePushSentForAttempt : true;
     s.customSecretMeta = d.customSecretMeta;
     s.vectorMemoryEnabled = d.vectorMemoryEnabled;
     s.vectorMemoryModel = d.vectorMemoryModel;
@@ -449,7 +452,7 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.restoreStartedAt = null;
   s.preRestoreStatus = null;
   s.pendingRestoreVolumeId = null;
-  Object.assign(s, LIFECYCLE_NOTIFICATION_RESET);
+  Object.assign(s, INSTANCE_READY_EMAIL_RESET);
   s.vectorMemoryEnabled = false;
   s.vectorMemoryModel = null;
   s.dreamingEnabled = false;
@@ -546,7 +549,7 @@ export function createMutableState(): InstanceMutableState {
     restoreStartedAt: null,
     preRestoreStatus: null,
     pendingRestoreVolumeId: null,
-    ...LIFECYCLE_NOTIFICATION_RESET,
+    ...INSTANCE_READY_EMAIL_RESET,
     customSecretMeta: null,
     vectorMemoryEnabled: false,
     vectorMemoryModel: null,

@@ -45,12 +45,15 @@ data-contract caveats, even when changed code is outside `packages/db`.
 | `pnpm format` | Format supported files |
 | `pnpm typecheck` | Run repository TypeScript checks |
 | `pnpm lint` | Run repository lint checks |
-| `pnpm test` | Run web, web-env, and local development-tool tests; not every package suite |
-| `pnpm validate` | Run root typecheck, lint, and test scripts |
+| `pnpm test` | Run the web suite and the repository script suites; not every package suite |
+| `pnpm validate` | Run typecheck, lint, test, and the dependency-cycle check |
 
-Package-level scripts are in the relevant `package.json`. Read root and relevant
-package manifests before running repository JavaScript or package scripts. Load
-`repository-verification` to select narrow checks and prepare test dependencies.
+The root `package.json` `scripts` block lists what each aggregate command runs;
+`typecheck` and `lint` hand off to `scripts/typecheck-all.sh` and
+`scripts/lint-all.sh`. Package-level scripts are in the relevant `package.json`.
+Read root and relevant package manifests before running repository JavaScript or
+package scripts. Load `repository-verification` to select narrow checks and
+prepare test dependencies.
 
 ## Guidance Map
 

@@ -1,13 +1,18 @@
 /* eslint-disable id-length, jest/no-conditional-in-test, jest/max-expects, max-lines, require-await, sort-keys, typescript-eslint/no-base-to-string, typescript-eslint/no-unsafe-assignment, typescript-eslint/no-unsafe-type-assertion, typescript-eslint/require-await, unicorn/no-useless-undefined -- Fake CDP session returns verbatim responses for assertions; masked-output tests assert many unrelated fields at once. */
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { TAB_NOT_INSPECTABLE_ERROR } from './tab-debugger';
+import { pngScanlinesOf, writeRgbPng } from './browser-png-test-images';
 import {
   READ_BROWSER_TOOL_NAMES,
   isReadBrowserToolName,
   runReadBrowserTool,
 } from './browser-tool-read-actions';
+import { captureBrowserAriaSnapshot } from './browser-tool-snapshot';
 import type { BrowserAriaNode, BrowserToolPageSession } from './browser-tool-snapshot';
+import { captureAgentSnapshotView } from './browser-agent-frames';
 import type { BrowserConsoleMessage, BrowserNetworkRequest } from './browser-tool-session';
+import type { ScreenshotMaskInput, ScreenshotMaskResult } from './browser-screenshot-masking';
 
 interface RecordedCommand {
   readonly method: string;
@@ -37,8 +42,14 @@ const SAMPLE_TREE: BrowserAriaNode[] = [
 const createSession = ({
   attachError,
   axNodes = SAMPLE_TREE,
+  axNodesByFrame,
   boxes = {},
   consoleMessages = [],
+  frameOwnerBackendNodeId = 99,
+  frameTree,
+  freshFrame,
+  layoutMetrics,
+  layoutMetricsError = false,
   requestsSinceLoad = [],
   pageText = () => '',
   responseBody,
@@ -48,22 +59,43 @@ const createSession = ({
 }: {
   attachError?: Error;
   axNodes?: BrowserAriaNode[];
+  axNodesByFrame?: Record<string, BrowserAriaNode[]>;
   boxes?: Record<number, { content: number[]; height: number; width: number }>;
   consoleMessages?: BrowserConsoleMessage[];
+  frameOwnerBackendNodeId?: number;
+  frameTree?: Record<string, unknown>;
+  /** The frame the tab's screencast would hand back; absent means the session could not force one. */
+  freshFrame?: string;
+  layoutMetrics?: Record<string, unknown>;
+  layoutMetricsError?: boolean;
   requestsSinceLoad?: BrowserNetworkRequest[];
   pageText?: () => string;
   responseBody?: { base64Encoded?: boolean; body?: string };
   screenshot?: string;
   timeOrigin?: number;
   webMcpTools?: { description?: string; name?: string; title?: string }[];
-} = {}): { commands: RecordedCommand[]; session: BrowserToolPageSession } => {
+} = {}): {
+  commands: RecordedCommand[];
+  freshRequests: string[];
+  /** The pixel size each forced frame asked the screencast for: undefined means the tab's own device pixels. */
+  freshSizes: ({ readonly height: number; readonly width: number } | undefined)[];
+  session: BrowserToolPageSession;
+} => {
   const commands: RecordedCommand[] = [];
+  const freshRequests: string[] = [];
+  const freshSizes: ({ readonly height: number; readonly width: number } | undefined)[] = [];
 
   const session: BrowserToolPageSession = {
     attach: async () => {
       if (attachError !== undefined) {
         throw attachError;
       }
+    },
+    captureViewportImage: async (format, options) => {
+      freshRequests.push(format);
+      freshSizes.push(options?.size);
+
+      return freshFrame;
     },
     consoleMessages: () => consoleMessages,
     networkRequestsSinceLoad: () => requestsSinceLoad,
@@ -79,7 +111,11 @@ const createSession = ({
       commands.push({ method, params });
 
       if (method === 'Accessibility.getFullAXTree') {
-        return { nodes: axNodes };
+        const frameId = params?.['frameId'];
+
+        return {
+          nodes: (typeof frameId === 'string' ? axNodesByFrame?.[frameId] : undefined) ?? axNodes,
+        };
       }
 
       if (method === 'DOM.getBoxModel') {
@@ -92,6 +128,22 @@ const createSession = ({
 
       if (method === 'Page.captureScreenshot') {
         return { data: screenshot };
+      }
+
+      if (method === 'Page.getFrameTree') {
+        return frameTree ?? {};
+      }
+
+      if (method === 'Page.getLayoutMetrics') {
+        if (layoutMetricsError) {
+          throw new Error('layout metrics unavailable');
+        }
+
+        return layoutMetrics ?? {};
+      }
+
+      if (method === 'DOM.getFrameOwner') {
+        return { backendNodeId: frameOwnerBackendNodeId };
       }
 
       if (method === 'Network.getResponseBody') {
@@ -116,7 +168,7 @@ const createSession = ({
     },
   };
 
-  return { commands, session };
+  return { commands, freshRequests, freshSizes, session };
 };
 
 const consoleMessage = (
@@ -188,6 +240,52 @@ describe('browser_snapshot', () => {
     expect(result.ok).toBe(false);
     expect(result).toMatchObject({ error: expect.stringContaining('cannot be inspected') });
   });
+
+  it('reads a granted iframe through its own document when the call targets its ref', async () => {
+    const { session } = createSession({
+      axNodesByFrame: {
+        child: [
+          axNode({ childIds: ['2'], nodeId: '1', role: 'RootWebArea' }),
+          axNode({
+            backendDOMNodeId: 21,
+            name: 'card marker-42',
+            nodeId: '2',
+            role: 'StaticText',
+          }),
+        ],
+      },
+      frameOwnerBackendNodeId: 12,
+      frameTree: {
+        frameTree: {
+          childFrames: [
+            {
+              frame: {
+                id: 'child',
+                parentId: 'main',
+                securityOrigin: 'https://pay.example.com',
+                url: 'https://pay.example.com/widget',
+              },
+            },
+          ],
+          frame: {
+            id: 'main',
+            securityOrigin: 'https://app.example.com',
+            url: 'https://app.example.com/dashboard',
+          },
+        },
+      },
+    });
+
+    const result = await runReadBrowserTool('browser_snapshot', { target: 'e12' }, session, {
+      agentScope: { readableOrigins: ['https://app.example.com', 'https://pay.example.com'] },
+    });
+
+    expect(result.ok).toBe(true);
+    const text = result.ok ? String(result.value) : '';
+
+    expect(text).toContain('card marker-42');
+    expect(text).not.toContain('Submit');
+  });
 });
 
 describe('browser_find', () => {
@@ -200,6 +298,25 @@ describe('browser_find', () => {
     expect(text).toContain('Found 1 match(es) for "submit"');
     expect(text).toContain("Path: button 'Submit'");
     expect(text).toContain('- button "Submit" [ref=e12]');
+  });
+
+  it('keeps the refs of the last snapshot: a find only adds to the registry', async () => {
+    const { session } = createSession();
+    const registrations: unknown[] = [];
+    const recording: BrowserToolPageSession = {
+      ...session,
+      registerRefs: (_refs, options) => {
+        registrations.push(options);
+      },
+    };
+
+    await runReadBrowserTool('browser_find', { text: 'submit' }, recording);
+    await runReadBrowserTool('browser_find', { text: 'submit' }, recording, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+    });
+    await runReadBrowserTool('browser_snapshot', {}, recording);
+
+    expect(registrations).toStrictEqual([{ merge: true }, { merge: true }, { merge: false }]);
   });
 
   it('finds by regex', async () => {
@@ -242,9 +359,593 @@ describe('browser_find', () => {
       runReadBrowserTool('browser_find', { regex: 'a', text: 'a' }, session)
     ).resolves.toMatchObject({ ok: false });
   });
+
+  // More printed lines than one snapshot shows, short enough that all of them fit one result: the needle is the 2,102nd line.
+  const LONG_TREE: BrowserAriaNode[] = [
+    axNode({
+      childIds: [
+        ...[...Array.from({ length: 2100 }).keys()].map(index => `i${String(index)}`),
+        'n',
+      ],
+      nodeId: 'root',
+      role: 'generic',
+    }),
+    ...[...Array.from({ length: 2100 }).keys()].map(index =>
+      axNode({
+        backendDOMNodeId: 1000 + index,
+        name: String(index),
+        nodeId: `i${String(index)}`,
+        role: 'button',
+      })
+    ),
+    axNode({ backendDOMNodeId: 99_999, name: 'Needle 777', nodeId: 'n', role: 'button' }),
+  ];
+  const MAIN_ONLY_FRAME_TREE = {
+    frameTree: {
+      frame: {
+        id: 'main',
+        securityOrigin: 'https://app.example.com',
+        url: 'https://app.example.com/dashboard',
+      },
+    },
+  };
+
+  it('finds a match past the lines one snapshot prints, with its ref', async () => {
+    const { session } = createSession({ axNodes: LONG_TREE });
+    const result = await runReadBrowserTool('browser_find', { text: 'Needle 777' }, session);
+
+    expect(String(result.ok ? result.value : '')).toContain('Found 1 match(es) for "Needle 777"');
+    expect(String(result.ok ? result.value : '')).toContain('- button "Needle 777" [ref=e99999]');
+  });
+
+  it('finds a match past the printed lines for an agent caller and registers its ref', async () => {
+    const registered: string[][] = [];
+    const { session } = createSession({ axNodes: LONG_TREE, frameTree: MAIN_ONLY_FRAME_TREE });
+    const result = await runReadBrowserTool(
+      'browser_find',
+      { text: 'Needle 777' },
+      {
+        ...session,
+        registerRefs: entries => {
+          registered.push(entries.map(entry => entry.ref));
+        },
+      },
+      { agentScope: { readableOrigins: ['https://app.example.com'] } }
+    );
+
+    expect(String(result.ok ? result.value : '')).toContain('- button "Needle 777" [ref=e99999]');
+    expect(registered.at(-1)).toContain('e99999');
+  });
+
+  it('leaves browser_snapshot capped at the printed-line limit', async () => {
+    const { session } = createSession({ axNodes: LONG_TREE, frameTree: MAIN_ONLY_FRAME_TREE });
+    const panel = await runReadBrowserTool('browser_snapshot', {}, session);
+    const agent = await runReadBrowserTool('browser_snapshot', {}, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+    });
+
+    for (const result of [panel, agent]) {
+      expect(String(result.ok ? result.value : '')).toContain('(snapshot truncated at 2000 lines)');
+      expect(String(result.ok ? result.value : '')).not.toContain('Needle 777');
+    }
+  });
+
+  it('walks the same number of lines on the DOM-walker fallback as on the accessibility tree', async () => {
+    // An empty accessibility tree sends the capture to the injected DOM walker.
+    const { commands, session } = createSession({ axNodes: [] });
+    await runReadBrowserTool('browser_find', { text: 'Needle' }, session);
+    const walker = commands.find(
+      command =>
+        command.method === 'Runtime.evaluate' &&
+        String(command.params?.['expression']).includes('"maxNameLength"')
+    );
+
+    expect(String(walker?.params?.['expression'])).toContain('"maxLines":50000');
+  });
+
+  it('names the line bound a capture actually stopped at', async () => {
+    const { session } = createSession({ axNodes: LONG_TREE, frameTree: MAIN_ONLY_FRAME_TREE });
+    const panel = await captureBrowserAriaSnapshot(session, { maxLines: 5 });
+    const agent = await captureAgentSnapshotView(
+      session,
+      { readableOrigins: ['https://app.example.com'] },
+      { maxLines: 5 }
+    );
+
+    for (const text of [panel.text, agent.text]) {
+      expect(text).toContain('(snapshot truncated at 5 lines)');
+    }
+  });
+
+  // More lines than a search reads: the needle sits past the search's line bound.
+  const PAST_FIND_BOUND_TREE: BrowserAriaNode[] = [
+    axNode({
+      childIds: [
+        ...[...Array.from({ length: 50_005 }).keys()].map(index => `b${String(index)}`),
+        'n',
+      ],
+      nodeId: 'root',
+      role: 'generic',
+    }),
+    ...[...Array.from({ length: 50_005 }).keys()].map(index =>
+      axNode({
+        backendDOMNodeId: 1000 + index,
+        name: `Item ${String(index)}`,
+        nodeId: `b${String(index)}`,
+        role: 'button',
+      })
+    ),
+    axNode({ backendDOMNodeId: 999_999, name: 'Needle 9', nodeId: 'n', role: 'button' }),
+  ];
+
+  it('says a search that hit its line bound stopped there, and where, instead of "No matches"', async () => {
+    const { session } = createSession({
+      axNodes: PAST_FIND_BOUND_TREE,
+      frameTree: MAIN_ONLY_FRAME_TREE,
+    });
+    const panel = await runReadBrowserTool('browser_find', { text: 'Needle 9' }, session);
+    const agent = await runReadBrowserTool('browser_find', { text: 'Needle 9' }, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+    });
+
+    for (const result of [panel, agent]) {
+      const text = String(result.ok ? result.value : '');
+
+      expect(text).not.toContain('No matches');
+      expect(text).toContain(
+        'No match for "Needle 9" in the first 50000 lines of the page snapshot. The search stopped there, after button \'Item 49999\'; the rest of the page was not searched.'
+      );
+    }
+  });
+
+  it('notes where a search that hit its line bound stopped when it still found matches', async () => {
+    const { session } = createSession({ axNodes: PAST_FIND_BOUND_TREE });
+    const result = await runReadBrowserTool('browser_find', { text: 'Item 4999' }, session);
+    const text = String(result.ok ? result.value : '');
+
+    expect(text).toContain('Found 11 match(es) for "Item 4999"');
+    expect(text).toContain(
+      "The search stopped after 50000 lines, at button 'Item 49999'; the rest of the page was not searched."
+    );
+  });
 });
 
 describe('browser_take_screenshot', () => {
+  const FRAME_TREE_WITH_PAY = {
+    frameTree: {
+      childFrames: [
+        {
+          frame: {
+            id: 'f1',
+            parentId: 'main',
+            securityOrigin: 'https://pay.example.com',
+            url: 'https://pay.example.com/widget',
+          },
+        },
+      ],
+      frame: {
+        id: 'main',
+        securityOrigin: 'https://app.example.com',
+        url: 'https://app.example.com/dashboard',
+      },
+    },
+  };
+
+  const recordMask = (): {
+    readonly inputs: ScreenshotMaskInput[];
+    readonly mask: (input: ScreenshotMaskInput) => Promise<ScreenshotMaskResult>;
+  } => {
+    const inputs: ScreenshotMaskInput[] = [];
+
+    return {
+      inputs,
+      mask: input => {
+        inputs.push(input);
+
+        return Promise.resolve({ dataUrl: 'data:image/png;base64,TUFTS0VE', ok: true });
+      },
+    };
+  };
+
+  it('takes the frame the tab can force instead of waiting for the next presented one', async () => {
+    const { commands, freshRequests, session } = createSession({ freshFrame: 'RlJFU0g=' });
+
+    const result = await runReadBrowserTool('browser_take_screenshot', { type: 'png' }, session);
+
+    expect(result.ok).toBe(true);
+    expect(freshRequests).toStrictEqual(['png']);
+    // The forced frame is the image: no plain capture went out.
+    expect(commands.some(command => command.method === 'Page.captureScreenshot')).toBe(false);
+    expect(result.ok ? result.value : undefined).toMatchObject({
+      dataUrl: 'data:image/png;base64,RlJFU0g=',
+      mediaType: 'image/png',
+    });
+  });
+
+  it('re-deflates the forced frame for size without changing its scanlines', async () => {
+    const png = writeRgbPng({ level: 0, size: { height: 120, width: 200 } });
+    const frame = Buffer.from(png).toString('base64');
+    const { session } = createSession({ freshFrame: frame });
+
+    const result = await runReadBrowserTool('browser_take_screenshot', { type: 'png' }, session);
+    const { dataUrl } = z
+      .object({ dataUrl: z.string() })
+      .parse(result.ok ? result.value : undefined);
+    const base64 = dataUrl.replace('data:image/png;base64,', '');
+
+    expect(base64.length).toBeGreaterThan(0);
+    expect(base64.length).toBeLessThan(frame.length);
+    expect(pngScanlinesOf(Buffer.from(base64, 'base64')).equals(pngScanlinesOf(png))).toBe(true);
+  });
+
+  it('re-deflates a masked image the masker encoded for speed', async () => {
+    const png = writeRgbPng({ level: 0, size: { height: 120, width: 200 } });
+    const masked = Buffer.from(png).toString('base64');
+    const { session } = createSession({
+      frameTree: FRAME_TREE_WITH_PAY,
+      freshFrame: 'RlJFU0g=',
+      layoutMetrics: {
+        cssLayoutViewport: { clientHeight: 120, clientWidth: 200 },
+        cssVisualViewport: { pageX: 0, pageY: 0 },
+        layoutViewport: { clientHeight: 120, clientWidth: 200 },
+      },
+    });
+
+    const result = await runReadBrowserTool('browser_take_screenshot', { type: 'png' }, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+      maskScreenshot: async () => ({ dataUrl: `data:image/png;base64,${masked}`, ok: true }),
+    });
+    const { dataUrl } = z
+      .object({ dataUrl: z.string() })
+      .parse(result.ok ? result.value : undefined);
+    const base64 = dataUrl.replace('data:image/png;base64,', '');
+
+    expect(base64.length).toBeLessThan(masked.length);
+    expect(pngScanlinesOf(Buffer.from(base64, 'base64')).equals(pngScanlinesOf(png))).toBe(true);
+  });
+
+  it('falls back to a plain capture when the tab cannot force a frame', async () => {
+    const { commands, session } = createSession({ screenshot: 'UExBSU4=' });
+
+    const result = await runReadBrowserTool('browser_take_screenshot', { type: 'png' }, session);
+
+    expect(result.ok ? result.value : undefined).toMatchObject({
+      dataUrl: 'data:image/png;base64,UExBSU4=',
+    });
+    expect(commands).toContainEqual({
+      method: 'Page.captureScreenshot',
+      params: { format: 'png', fromSurface: true },
+    });
+  });
+
+  it('never takes a forced frame for a full-page or an element capture', async () => {
+    const { freshRequests, session } = createSession({ freshFrame: 'RlJFU0g=' });
+
+    await runReadBrowserTool('browser_take_screenshot', { fullPage: true, type: 'png' }, session);
+    await runReadBrowserTool('browser_take_screenshot', { target: 'e12' }, session);
+
+    expect(freshRequests).toStrictEqual([]);
+  });
+
+  it('keeps a webp request off the forced frame, which has no webp format', async () => {
+    const { commands, freshRequests, session } = createSession({
+      freshFrame: 'RlJFU0g=',
+      screenshot: 'V0VCUA==',
+    });
+
+    const result = await runReadBrowserTool('browser_take_screenshot', { type: 'webp' }, session);
+
+    // `Page.startScreencast` would answer with png or jpeg bytes; the plain capture is the one that honours webp.
+    expect(freshRequests).toStrictEqual([]);
+    expect(commands).toContainEqual({
+      method: 'Page.captureScreenshot',
+      params: { format: 'webp', fromSurface: true },
+    });
+    expect(result.ok ? result.value : undefined).toMatchObject({
+      dataUrl: 'data:image/webp;base64,V0VCUA==',
+      mediaType: 'image/webp',
+    });
+  });
+
+  it('masks the forced frame with the viewport geometry, in the image the mask is applied to', async () => {
+    const { session } = createSession({
+      frameTree: FRAME_TREE_WITH_PAY,
+      freshFrame: 'RlJFU0g=',
+      // A masked css capture needs a proven scale: the CSS viewport is what makes the image CSS-sized.
+      layoutMetrics: {
+        cssLayoutViewport: { clientHeight: 400, clientWidth: 800 },
+        cssVisualViewport: { pageX: 0, pageY: 0 },
+        layoutViewport: { clientHeight: 400, clientWidth: 800 },
+      },
+    });
+    const { inputs, mask } = recordMask();
+
+    const result = await runReadBrowserTool('browser_take_screenshot', { type: 'png' }, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+      maskScreenshot: mask,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]?.dataUrl).toBe('data:image/png;base64,RlJFU0g=');
+  });
+
+  it('masks a withheld frame inside an element capture in the clip coordinate space', async () => {
+    // The clip is the iframe's own rect, so its page-space box lands at the image origin.
+    const iframeRect = { content: [40, 120, 440, 120, 440, 320, 40, 320], height: 200, width: 400 };
+    const { session } = createSession({
+      boxes: { 12: iframeRect, 99: iframeRect },
+      frameTree: FRAME_TREE_WITH_PAY,
+    });
+    const { inputs, mask } = recordMask();
+
+    const result = await runReadBrowserTool('browser_take_screenshot', { target: 'e12' }, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+      maskScreenshot: mask,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]?.boxes).toStrictEqual([{ height: 200, left: 0, top: 0, width: 400 }]);
+    expect(inputs[0]?.scale).toBe(1);
+  });
+
+  it('renders a device-scale element capture at the device pixel ratio', async () => {
+    const iframeRect = { content: [40, 120, 440, 120, 440, 320, 40, 320], height: 200, width: 400 };
+    const { commands, session } = createSession({
+      boxes: { 12: iframeRect, 99: iframeRect },
+      frameTree: FRAME_TREE_WITH_PAY,
+      layoutMetrics: {
+        cssLayoutViewport: { clientWidth: 400 },
+        layoutViewport: { clientWidth: 800 },
+      },
+    });
+    const { inputs, mask } = recordMask();
+
+    await runReadBrowserTool(
+      'browser_take_screenshot',
+      { scale: 'device', target: 'e12' },
+      session,
+      {
+        agentScope: { readableOrigins: ['https://app.example.com'] },
+        maskScreenshot: mask,
+      }
+    );
+
+    expect(commands).toContainEqual({
+      method: 'Page.captureScreenshot',
+      params: {
+        clip: { height: 200, scale: 2, width: 400, x: 40, y: 120 },
+        format: 'png',
+        fromSurface: true,
+      },
+    });
+    expect(inputs[0]?.scale).toBe(2);
+  });
+
+  it('renders a device-scale element capture for a panel caller too', async () => {
+    const { commands, session } = createSession({
+      boxes: { 12: { content: [10, 20, 110, 20, 110, 70, 10, 70], height: 50, width: 100 } },
+      layoutMetrics: {
+        cssLayoutViewport: { clientWidth: 400 },
+        layoutViewport: { clientWidth: 800 },
+      },
+    });
+
+    // The side panel and a workflow run have no agent scope, and still asked for device pixels.
+    await runReadBrowserTool(
+      'browser_take_screenshot',
+      { scale: 'device', target: 'e12' },
+      session
+    );
+
+    expect(commands).toContainEqual({
+      method: 'Page.captureScreenshot',
+      params: {
+        clip: { height: 50, scale: 2, width: 100, x: 10, y: 20 },
+        format: 'png',
+        fromSurface: true,
+      },
+    });
+  });
+
+  it('reports the masked image as PNG whatever the capture type was', async () => {
+    const iframeRect = { content: [40, 120, 440, 120, 440, 320, 40, 320], height: 200, width: 400 };
+    const { session } = createSession({
+      boxes: { 12: iframeRect, 99: iframeRect },
+      frameTree: FRAME_TREE_WITH_PAY,
+    });
+    const { mask } = recordMask();
+
+    const result = await runReadBrowserTool(
+      'browser_take_screenshot',
+      { scale: 'css', target: 'e12', type: 'jpeg' },
+      session,
+      { agentScope: { readableOrigins: ['https://app.example.com'] }, maskScreenshot: mask }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { dataUrl: 'data:image/png;base64,TUFTS0VE', mediaType: 'image/png' },
+    });
+  });
+
+  it('keeps the capture media type when nothing is masked', async () => {
+    const { session } = createSession({ frameTree: FRAME_TREE_WITH_PAY });
+
+    const result = await runReadBrowserTool(
+      'browser_take_screenshot',
+      { scale: 'css', type: 'jpeg' },
+      session,
+      {
+        agentScope: { readableOrigins: ['https://app.example.com', 'https://pay.example.com'] },
+        maskScreenshot: () =>
+          Promise.resolve({ dataUrl: 'data:image/png;base64,TUFTS0VE', ok: true }),
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { dataUrl: 'data:image/jpeg;base64,QUJD', mediaType: 'image/jpeg' },
+    });
+  });
+
+  it('captures and masks a scrolled element in document space', async () => {
+    // The box model reports viewport coordinates; the clip the capture takes is document-space.
+    const viewportRect = {
+      content: [40, 120, 440, 120, 440, 320, 40, 320],
+      height: 200,
+      width: 400,
+    };
+    const { commands, session } = createSession({
+      boxes: { 12: viewportRect, 99: viewportRect },
+      frameTree: FRAME_TREE_WITH_PAY,
+      layoutMetrics: {
+        cssLayoutViewport: { clientWidth: 400 },
+        cssVisualViewport: { pageX: 100, pageY: 50 },
+        layoutViewport: { clientWidth: 400 },
+      },
+    });
+    const { inputs, mask } = recordMask();
+
+    await runReadBrowserTool('browser_take_screenshot', { scale: 'css', target: 'e12' }, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+      maskScreenshot: mask,
+    });
+
+    expect(commands).toContainEqual({
+      method: 'Page.captureScreenshot',
+      params: {
+        clip: { height: 200, scale: 1, width: 400, x: 140, y: 170 },
+        format: 'png',
+        fromSurface: true,
+      },
+    });
+    expect(inputs[0]?.boxes).toStrictEqual([{ height: 200, left: 0, top: 0, width: 400 }]);
+  });
+
+  it('masks a scrolled viewport capture where the frame paints in the image', async () => {
+    const viewportRect = {
+      content: [40, 120, 440, 120, 440, 320, 40, 320],
+      height: 200,
+      width: 400,
+    };
+    const { session } = createSession({
+      boxes: { 99: viewportRect },
+      frameTree: FRAME_TREE_WITH_PAY,
+      layoutMetrics: {
+        cssLayoutViewport: { clientHeight: 200, clientWidth: 400 },
+        cssVisualViewport: { pageX: 100, pageY: 50 },
+        layoutViewport: { clientHeight: 200, clientWidth: 400 },
+      },
+    });
+    const { inputs, mask } = recordMask();
+
+    await runReadBrowserTool('browser_take_screenshot', { scale: 'css' }, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+      maskScreenshot: mask,
+    });
+
+    // The withheld frame sits at viewport (40,120); the viewport image starts at the scroll position.
+    expect(inputs[0]?.boxes).toStrictEqual([{ height: 200, left: 40, top: 120, width: 400 }]);
+  });
+
+  it('takes a css-scale viewport capture at the CSS size on a 2x tab, and masks at that scale', async () => {
+    const { freshSizes, session } = createSession({
+      frameTree: FRAME_TREE_WITH_PAY,
+      freshFrame: 'RlJFU0g=',
+      layoutMetrics: {
+        cssLayoutViewport: { clientHeight: 400, clientWidth: 800 },
+        cssVisualViewport: { pageX: 0, pageY: 0 },
+        layoutViewport: { clientHeight: 800, clientWidth: 1600 },
+      },
+    });
+    const { inputs, mask } = recordMask();
+
+    await runReadBrowserTool('browser_take_screenshot', { scale: 'css', type: 'png' }, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+      maskScreenshot: mask,
+    });
+
+    // The image is the viewport in CSS pixels: the screencast is asked for that size, not the tab's 2x pixels.
+    expect(freshSizes).toStrictEqual([{ height: 400, width: 800 }]);
+    // The mask boxes are CSS pixels, so they map onto that image one for one.
+    expect(inputs[0]?.scale).toBe(1);
+  });
+
+  it('refuses a masked css capture when the CSS viewport is unknown, instead of masking at a guess', async () => {
+    const { session } = createSession({
+      frameTree: FRAME_TREE_WITH_PAY,
+      layoutMetrics: {
+        // The layout viewport is in device pixels; without a CSS width there is neither a viewport nor a ratio.
+        layoutViewport: { clientHeight: 800, clientWidth: 1600 },
+      },
+    });
+    const { inputs, mask } = recordMask();
+
+    const result = await runReadBrowserTool(
+      'browser_take_screenshot',
+      { scale: 'css', type: 'png' },
+      session,
+      { agentScope: { readableOrigins: ['https://app.example.com'] }, maskScreenshot: mask }
+    );
+
+    // A 1x mask over a device-pixel image would leave a withheld frame's pixels visible: fail closed instead.
+    expect(result.ok).toBe(false);
+    expect(inputs).toStrictEqual([]);
+    expect(result.ok ? '' : result.error).toContain('viewport could not be measured');
+  });
+
+  it('clips a device-scale viewport capture at the tab\u2019s ratio and masks at the same scale', async () => {
+    const { commands, freshSizes, session } = createSession({
+      frameTree: FRAME_TREE_WITH_PAY,
+      layoutMetrics: {
+        cssLayoutViewport: { clientHeight: 400, clientWidth: 800 },
+        cssVisualViewport: { pageX: 0, pageY: 0 },
+        layoutViewport: { clientHeight: 800, clientWidth: 1600 },
+      },
+    });
+    const { inputs, mask } = recordMask();
+
+    await runReadBrowserTool('browser_take_screenshot', { scale: 'device', type: 'png' }, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+      maskScreenshot: mask,
+    });
+
+    // A device-pixel capture is the viewport rendered at the tab's own ratio: no css size is asked for, and the
+    // Plain capture cuts exactly that region.
+    expect(freshSizes).toStrictEqual([undefined]);
+    expect(commands).toContainEqual({
+      method: 'Page.captureScreenshot',
+      params: {
+        clip: { height: 400, scale: 2, width: 800, x: 0, y: 0 },
+        format: 'png',
+        fromSurface: true,
+      },
+    });
+    expect(inputs[0]?.scale).toBe(2);
+  });
+
+  it('drops a withheld frame that the element clip does not overlap', async () => {
+    const { session } = createSession({
+      boxes: {
+        12: { content: [0, 0, 200, 0, 200, 100, 0, 100], height: 100, width: 200 },
+        99: { content: [300, 400, 500, 400, 500, 500, 300, 500], height: 100, width: 200 },
+      },
+      frameTree: FRAME_TREE_WITH_PAY,
+    });
+    const { inputs, mask } = recordMask();
+
+    const result = await runReadBrowserTool('browser_take_screenshot', { target: 'e12' }, session, {
+      agentScope: { readableOrigins: ['https://app.example.com'] },
+      maskScreenshot: mask,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(inputs).toHaveLength(0);
+    expect(result).toMatchObject({ value: { dataUrl: 'data:image/png;base64,QUJD' } });
+  });
+
   it('returns the image and a text line', async () => {
     const { commands, session } = createSession();
     const result = await runReadBrowserTool('browser_take_screenshot', { type: 'png' }, session);
@@ -255,7 +956,7 @@ describe('browser_take_screenshot', () => {
     });
     expect(commands).toContainEqual({
       method: 'Page.captureScreenshot',
-      params: { format: 'png' },
+      params: { format: 'png', fromSurface: true },
     });
   });
 
@@ -265,7 +966,7 @@ describe('browser_take_screenshot', () => {
 
     expect(commands).toContainEqual({
       method: 'Page.captureScreenshot',
-      params: { captureBeyondViewport: true, format: 'png' },
+      params: { captureBeyondViewport: true, format: 'png', fromSurface: true },
     });
   });
 
@@ -278,8 +979,37 @@ describe('browser_take_screenshot', () => {
     expect(result.ok).toBe(true);
     expect(commands).toContainEqual({
       method: 'Page.captureScreenshot',
-      params: { clip: { height: 10, scale: 1, width: 10, x: 3, y: 4 }, format: 'png' },
+      params: {
+        clip: { height: 10, scale: 1, width: 10, x: 3, y: 4 },
+        format: 'png',
+        fromSurface: true,
+      },
     });
+  });
+
+  it('keeps a panel element capture working when layout metrics fail', async () => {
+    const { session } = createSession({ layoutMetricsError: true });
+
+    const result = await runReadBrowserTool(
+      'browser_take_screenshot',
+      { scale: 'css', target: 'e12', type: 'png' },
+      session
+    );
+
+    expect(result.ok).toBe(true);
+  });
+
+  it('fails an agent element capture closed when layout metrics fail', async () => {
+    const { session } = createSession({ layoutMetricsError: true });
+
+    const result = await runReadBrowserTool(
+      'browser_take_screenshot',
+      { scale: 'css', target: 'e12', type: 'png' },
+      session,
+      { agentScope: { readableOrigins: ['https://app.example.com'] } }
+    );
+
+    expect(result.ok).toBe(false);
   });
 
   it('rejects fullPage combined with a target', async () => {

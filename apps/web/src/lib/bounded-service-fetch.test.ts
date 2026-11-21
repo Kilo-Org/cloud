@@ -6,6 +6,7 @@ import {
   CONTROL_PLANE_UPSTREAM_BUDGET_MS,
   ServiceFetchTimeoutError,
   fetchWithinBudget,
+  readJsonWithinBudget,
 } from './bounded-service-fetch';
 import { CONTROL_PLANE_PROCEDURE_BUDGET_MS } from '@kilocode/web-shared/lib/trpc/control-plane-budget';
 
@@ -151,5 +152,99 @@ describe('fetchWithinBudget', () => {
     expect(rendered).not.toContain('?session=');
     expect(rendered).not.toContain(INTERNAL_SERVICE_TOKEN);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('readJsonWithinBudget', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.useRealTimers();
+  });
+
+  test('reads a body the upstream delivers inside the remaining budget', async () => {
+    const response = new Response(JSON.stringify({ sessions: [] }), { status: 200 });
+
+    await expect(readJsonWithinBudget(response, 1_000)).resolves.toEqual({ sessions: [] });
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('cancels a real response body that never finishes', async () => {
+    // A real `Response`, because the interesting state only a real body
+    // produces is the one `response.json()` leaves behind: it locks the stream,
+    // and a locked stream cannot be cancelled. The upstream here sends a
+    // partial body and then stalls, so an expiry that did not cancel its own
+    // reader would keep the transfer alive after the caller gave up.
+    const cancel = jest.fn(async () => undefined);
+    let bursts = 0;
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        bursts += 1;
+        if (bursts === 1) {
+          controller.enqueue(encoder.encode('{"sessions":'));
+        }
+      },
+      cancel,
+    });
+    const response = new Response(stream, { status: 200 });
+
+    const outcome = readJsonWithinBudget(response, 500).catch((error: unknown) => error);
+
+    let settledEarly = false;
+    void outcome.then(() => {
+      settledEarly = true;
+    });
+
+    await jest.advanceTimersByTimeAsync(499);
+    expect(settledEarly).toBe(false);
+    expect(cancel).not.toHaveBeenCalled();
+
+    await jest.advanceTimersByTimeAsync(1);
+
+    const error = await outcome;
+    expect(error).toBeInstanceOf(ServiceFetchTimeoutError);
+    expect((error as ServiceFetchTimeoutError).budgetMs).toBe(500);
+    // No separate total was given, so the error reports the same value twice.
+    expect((error as ServiceFetchTimeoutError).totalBudgetMs).toBe(500);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('reports the read budget it was configured with, not only what the headers left', async () => {
+    // A body read arms its timer with the remainder, which is often a few
+    // hundred milliseconds. Logs and Sentry must still show the budget the read
+    // was configured with, or a 4,500 ms read looks like a 120 ms one.
+    const response = {
+      json: () => new Promise<never>(() => {}),
+      body: null,
+    } as unknown as Response;
+
+    const outcome = readJsonWithinBudget(response, 120, 4_500).catch((error: unknown) => error);
+    await jest.advanceTimersByTimeAsync(120);
+
+    const error = await outcome;
+    expect(error).toBeInstanceOf(ServiceFetchTimeoutError);
+    expect((error as ServiceFetchTimeoutError).budgetMs).toBe(120);
+    expect((error as ServiceFetchTimeoutError).totalBudgetMs).toBe(4_500);
+    expect((error as ServiceFetchTimeoutError).message).toContain('4500ms');
+  });
+
+  test('leaves a body a reader already holds alone', async () => {
+    // Cancelling a locked stream throws, so a mid-read body is abandoned.
+    const cancel = jest.fn(async () => undefined);
+    const response = {
+      json: () => new Promise<never>(() => {}),
+      body: { locked: true, cancel },
+    } as unknown as Response;
+
+    const outcome = readJsonWithinBudget(response, 100).catch((error: unknown) => error);
+    await jest.advanceTimersByTimeAsync(100);
+
+    expect(await outcome).toBeInstanceOf(ServiceFetchTimeoutError);
+    expect(cancel).not.toHaveBeenCalled();
   });
 });

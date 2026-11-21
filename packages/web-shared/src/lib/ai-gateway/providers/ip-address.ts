@@ -87,10 +87,13 @@ export function isPublicIp(address: string): boolean {
       inIpv4Cidr(address, '172.16.0.0', 12) ||
       inIpv4Cidr(address, '192.0.0.0', 24) ||
       inIpv4Cidr(address, '192.0.2.0', 24) ||
+      inIpv4Cidr(address, '192.31.196.0', 24) ||
+      inIpv4Cidr(address, '192.52.193.0', 24) ||
       inIpv4Cidr(address, '192.88.99.0', 24) ||
       inIpv4Cidr(address, '192.168.0.0', 16) ||
       inIpv4Cidr(address, '198.18.0.0', 15) ||
       inIpv4Cidr(address, '198.51.100.0', 24) ||
+      inIpv4Cidr(address, '192.175.48.0', 24) ||
       inIpv4Cidr(address, '203.0.113.0', 24) ||
       inIpv4Cidr(address, '224.0.0.0', 4) ||
       inIpv4Cidr(address, '240.0.0.0', 4)
@@ -144,6 +147,9 @@ export function isPublicIp(address: string): boolean {
       28
     )
   )
+    return false;
+  // 6to4 embeds an IPv4 address, such as 2002:7f00:1:: for 127.0.0.1.
+  if (inIpv6Prefix(normalized, [toBigInt('0x2002'), zero, zero, zero, zero, zero, zero, zero], 16))
     return false;
   if (inIpv6Prefix(normalized, [toBigInt('0x3fff'), zero, zero, zero, zero, zero, zero, zero], 20))
     return false;

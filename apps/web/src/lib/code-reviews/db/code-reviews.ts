@@ -23,6 +23,7 @@ import {
   count,
   ne,
   inArray,
+  notInArray,
   or,
   sql,
   gte,
@@ -32,6 +33,7 @@ import {
   type SQL,
 } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
+import type { ReviewGuidelineImport } from '@kilocode/db/schema-types';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { sanitizePostgresString } from '@kilocode/web-shared/lib/sanitize-jsonb';
 import {
@@ -58,6 +60,7 @@ import {
   FUNDED_CODE_REVIEW_BALANCE_THRESHOLD_MICRODOLLARS,
   isTerminalCodeReviewStatus,
   NON_TERMINAL_CODE_REVIEW_STATUSES,
+  TERMINAL_CODE_REVIEW_STATUSES,
   MAX_CONCURRENT_CODE_REVIEWS_PER_DEFAULT_USER,
   MAX_CONCURRENT_CODE_REVIEWS_PER_FUNDED_USER,
   MAX_CONCURRENT_CODE_REVIEWS_PER_ORG,
@@ -172,6 +175,42 @@ function buildAttemptUpdateData(
 
   return updateData;
 }
+
+/**
+ * Writes attempt-status fields only while the row is still in flight. Cancellation
+ * (cancelCodeReviewsWithDatabase) terminalizes non-terminal attempts of the review in
+ * one statement, so a late or redelivered status callback must never overwrite those
+ * rows: when the conditional update matches nothing, the stored row is returned as-is.
+ */
+async function updateAttemptUnlessTerminal(
+  attemptId: string,
+  fields: Omit<AttemptCallbackFields, 'codeReviewId' | 'attemptId'>
+): Promise<CloudAgentCodeReviewAttempt> {
+  const [updated] = await db
+    .update(cloud_agent_code_review_attempts)
+    .set(buildAttemptUpdateData(fields))
+    .where(
+      and(
+        eq(cloud_agent_code_review_attempts.id, attemptId),
+        notInArray(cloud_agent_code_review_attempts.status, [...TERMINAL_CODE_REVIEW_STATUSES])
+      )
+    )
+    .returning();
+
+  if (updated) return updated;
+
+  const [stored] = await db
+    .select()
+    .from(cloud_agent_code_review_attempts)
+    .where(eq(cloud_agent_code_review_attempts.id, attemptId))
+    .limit(1);
+  if (!stored) {
+    throw new Error('Failed to update code review attempt');
+  }
+
+  return stored;
+}
+
 export type CancelledReviewRow = {
   id: string;
   prevStatus: 'pending' | 'queued' | 'running';
@@ -335,20 +374,25 @@ export async function createCodeReview(params: CreateReviewParams): Promise<stri
  */
 export async function getCodeReviewById(reviewId: string): Promise<CloudAgentCodeReview | null> {
   try {
-    // Do NOT select the heavy `council_result` JSONB: this getter feeds many hot, non-detail
-    // callers (status/usage callbacks, CLI, dispatch, cancel/retrigger) that never read it.
-    // The column is kept off the wire and returned as null; the one consumer that needs it —
-    // the review-detail `get` procedure — loads it explicitly via `getCodeReviewCouncilResult`.
-    // Returning the full row type (with council_result: null) avoids churning every caller.
-    const { council_result: _councilResult, ...columns } =
-      getTableColumns(cloud_agent_code_reviews);
+    // Do NOT select the heavy `council_result` or `repository_review_instructions_imports`
+    // JSONB: this getter feeds many hot, non-detail callers (status/usage callbacks, CLI,
+    // dispatch, cancel/retrigger) that never read them. The columns are kept off the wire and
+    // returned as null; the review-detail `get` procedure loads `council_result` explicitly
+    // via `getCodeReviewCouncilResult`. Returning the full row type avoids churning every caller.
+    const {
+      council_result: _councilResult,
+      repository_review_instructions_imports: _repositoryReviewInstructionsImports,
+      ...columns
+    } = getTableColumns(cloud_agent_code_reviews);
     const [review] = await db
       .select(columns)
       .from(cloud_agent_code_reviews)
       .where(eq(cloud_agent_code_reviews.id, reviewId))
       .limit(1);
 
-    return review ? { ...review, council_result: null } : null;
+    return review
+      ? { ...review, council_result: null, repository_review_instructions_imports: null }
+      : null;
   } catch (error) {
     captureException(error, {
       tags: { operation: 'getCodeReviewById' },
@@ -623,7 +667,10 @@ export async function createCodeReviewAttempt(params: {
 export async function createInfraRetryAttemptIfMissing(params: {
   codeReviewId: string;
   retryOfAttemptId: string;
+  /** Defaults to 'infra_failure'. A caller with its own bound may pass a distinct reason. */
+  retryReason?: string;
 }): Promise<InfraRetryAttemptResult> {
+  const retryReason = params.retryReason ?? 'infra_failure';
   try {
     return await db.transaction(async tx => {
       const [review] = await tx
@@ -677,7 +724,7 @@ export async function createInfraRetryAttemptIfMissing(params: {
         .where(
           and(
             eq(cloud_agent_code_review_attempts.code_review_id, params.codeReviewId),
-            eq(cloud_agent_code_review_attempts.retry_reason, 'infra_failure'),
+            eq(cloud_agent_code_review_attempts.retry_reason, retryReason),
             eq(cloud_agent_code_review_attempts.retry_of_attempt_id, params.retryOfAttemptId)
           )
         )
@@ -693,7 +740,7 @@ export async function createInfraRetryAttemptIfMissing(params: {
         .where(
           and(
             eq(cloud_agent_code_review_attempts.code_review_id, params.codeReviewId),
-            eq(cloud_agent_code_review_attempts.retry_reason, 'infra_failure')
+            eq(cloud_agent_code_review_attempts.retry_reason, retryReason)
           )
         )
         .limit(1);
@@ -717,7 +764,7 @@ export async function createInfraRetryAttemptIfMissing(params: {
           code_review_id: params.codeReviewId,
           attempt_number: (latest?.attempt_number ?? 0) + 1,
           retry_of_attempt_id: params.retryOfAttemptId,
-          retry_reason: 'infra_failure',
+          retry_reason: retryReason,
           analytics_enabled_at_dispatch: sourceAttempt.analytics_enabled_at_dispatch,
           status: 'pending',
         })
@@ -762,7 +809,9 @@ export async function ensureCodeReviewAttemptForRunningCallback(params: {
       (params.cliSessionId !== undefined && latestAttempt.cli_session_id === params.cliSessionId);
     const latestAttemptIsRetry = latestAttempt.retry_of_attempt_id !== null;
     const shouldUpdateLatestPending =
-      sessionMatches ||
+      // Cancellation terminalizes the review's non-terminal attempts, so a session match
+      // from a redelivered callback must not reopen one of those rows either.
+      (!isTerminalCodeReviewStatus(latestAttempt.status) && sessionMatches) ||
       (!latestAttemptIsRetry &&
         (latestAttempt.status === 'pending' ||
           (!latestAttempt.session_id &&
@@ -770,20 +819,12 @@ export async function ensureCodeReviewAttemptForRunningCallback(params: {
             !isTerminalCodeReviewStatus(latestAttempt.status))));
 
     if (shouldUpdateLatestPending) {
-      const [updated] = await db
-        .update(cloud_agent_code_review_attempts)
-        .set(
-          buildAttemptUpdateData({
-            status: 'running',
-            sessionId: params.sessionId,
-            cliSessionId: params.cliSessionId,
-            executionId: params.executionId,
-          })
-        )
-        .where(eq(cloud_agent_code_review_attempts.id, latestAttempt.id))
-        .returning();
-
-      if (updated) return updated;
+      return await updateAttemptUnlessTerminal(latestAttempt.id, {
+        status: 'running',
+        sessionId: params.sessionId,
+        cliSessionId: params.cliSessionId,
+        executionId: params.executionId,
+      });
     }
 
     return latestAttempt;
@@ -810,29 +851,16 @@ export async function updateCodeReviewAttemptForCallback(
           `Code review attempt ${params.attemptId} not found for review ${params.codeReviewId}`
         );
       }
-
-      const [updated] = await db
-        .update(cloud_agent_code_review_attempts)
-        .set(
-          buildAttemptUpdateData({
-            status: params.status,
-            sessionId: params.sessionId,
-            cliSessionId: params.cliSessionId,
-            executionId: params.executionId,
-            errorMessage: params.errorMessage,
-            terminalReason: params.terminalReason,
-            startedAt: params.startedAt,
-            completedAt: params.completedAt,
-          })
-        )
-        .where(eq(cloud_agent_code_review_attempts.id, explicitAttempt.id))
-        .returning();
-
-      if (!updated) {
-        throw new Error('Failed to update code review attempt');
-      }
-
-      return updated;
+      return await updateAttemptUnlessTerminal(explicitAttempt.id, {
+        status: params.status,
+        sessionId: params.sessionId,
+        cliSessionId: params.cliSessionId,
+        executionId: params.executionId,
+        errorMessage: params.errorMessage,
+        terminalReason: params.terminalReason,
+        startedAt: params.startedAt,
+        completedAt: params.completedAt,
+      });
     }
 
     if (params.status === 'running') {
@@ -896,28 +924,16 @@ export async function updateCodeReviewAttemptForCallback(
       });
     }
 
-    const [updated] = await db
-      .update(cloud_agent_code_review_attempts)
-      .set(
-        buildAttemptUpdateData({
-          status: params.status,
-          sessionId: params.sessionId,
-          cliSessionId: params.cliSessionId,
-          executionId: params.executionId,
-          errorMessage: params.errorMessage,
-          terminalReason: params.terminalReason,
-          startedAt: params.startedAt,
-          completedAt: params.completedAt,
-        })
-      )
-      .where(eq(cloud_agent_code_review_attempts.id, targetAttempt.id))
-      .returning();
-
-    if (!updated) {
-      throw new Error('Failed to update code review attempt');
-    }
-
-    return updated;
+    return await updateAttemptUnlessTerminal(targetAttempt.id, {
+      status: params.status,
+      sessionId: params.sessionId,
+      cliSessionId: params.cliSessionId,
+      executionId: params.executionId,
+      errorMessage: params.errorMessage,
+      terminalReason: params.terminalReason,
+      startedAt: params.startedAt,
+      completedAt: params.completedAt,
+    });
   } catch (error) {
     captureException(error, {
       tags: { operation: 'updateCodeReviewAttemptForCallback' },
@@ -986,16 +1002,44 @@ export async function ensureCurrentCodeReviewAttemptFromReview(
   review: CloudAgentCodeReview,
   analyticsEnabledAtDispatch?: boolean
 ): Promise<CloudAgentCodeReviewAttempt> {
+  // The caller's `review` argument may be stale: `retryFailedCodeReview` passes a
+  // row it read earlier, so two concurrent retries can interleave and the stale
+  // one would rewrite the other's live attempt to terminal. Re-read the review
+  // row and decide the repair on that fresh state instead, falling back to the
+  // argument only when the row is gone (deleted mid-flight).
+  const freshReview = (await getCodeReviewById(review.id)) ?? review;
   let attempt = await getLatestCodeReviewAttempt(review.id);
   if (attempt) {
     if (
-      attempt.status === 'pending' &&
-      (review.session_id || review.cli_session_id || review.status !== 'pending')
+      // Two repairs only. (1) Today's: a pending attempt mirrors the review once the
+      // review carries session identity or has moved off pending. (2) New: an attempt
+      // still in flight must not outlive its review, so when the review row reached a
+      // terminal state (cancellation terminalizes attempts, but a review can flip on
+      // its own) a non-terminal attempt is reconciled to it. A terminal attempt is
+      // history and never rewritten; a running attempt under a running review is not
+      // touched.
+      !isTerminalCodeReviewStatus(attempt.status) &&
+      (attempt.status === 'pending'
+        ? freshReview.session_id || freshReview.cli_session_id || freshReview.status !== 'pending'
+        : isTerminalCodeReviewStatus(freshReview.status))
     ) {
       const [updated] = await db
         .update(cloud_agent_code_review_attempts)
-        .set(buildAttemptUpdateData(persistedCodeReviewAttemptFields(review)))
-        .where(eq(cloud_agent_code_review_attempts.id, attempt.id))
+        .set(buildAttemptUpdateData(persistedCodeReviewAttemptFields(freshReview)))
+        .where(
+          and(
+            eq(cloud_agent_code_review_attempts.id, attempt.id),
+            // Compare-and-set on the review state the repair decided from: the
+            // stored review row must still be in that state, so a review a
+            // concurrent retry reset back to a live state never has its
+            // in-flight attempt rewritten under it.
+            sql`exists (
+              select 1 from ${cloud_agent_code_reviews}
+              where ${cloud_agent_code_reviews.id} = ${review.id}
+                and ${cloud_agent_code_reviews.status} = ${freshReview.status}
+            )`
+          )
+        )
         .returning();
 
       attempt = updated ?? attempt;
@@ -1578,6 +1622,7 @@ export async function updateRepositoryReviewInstructionsMetadata(
     used: boolean;
     ref: string | null;
     truncated: boolean;
+    imports?: ReviewGuidelineImport[];
   }
 ): Promise<void> {
   try {
@@ -1587,13 +1632,23 @@ export async function updateRepositoryReviewInstructionsMetadata(
         repository_review_instructions_used: metadata.used,
         repository_review_instructions_ref: metadata.ref,
         repository_review_instructions_truncated: metadata.truncated,
+        repository_review_instructions_imports:
+          metadata.imports?.map(entry => ({
+            ...entry,
+            source: sanitizePostgresString(entry.source),
+          })) ?? [],
         updated_at: new Date().toISOString(),
       })
       .where(eq(cloud_agent_code_reviews.id, reviewId));
   } catch (error) {
     captureException(error, {
       tags: { operation: 'updateRepositoryReviewInstructionsMetadata' },
-      extra: { reviewId, metadata },
+      extra: {
+        reviewId,
+        used: metadata.used,
+        truncated: metadata.truncated,
+        importCount: metadata.imports?.length ?? 0,
+      },
     });
     throw error;
   }
@@ -1608,7 +1663,10 @@ export async function updateRepositoryReviewInstructionsMetadata(
  */
 export type CodeReviewListRow = Omit<
   CloudAgentCodeReview,
-  'council_result' | 'manual_config' | 'previous_summary_body'
+  | 'council_result'
+  | 'manual_config'
+  | 'previous_summary_body'
+  | 'repository_review_instructions_imports'
 >;
 
 export async function listCodeReviews(params: ListReviewsParams): Promise<CodeReviewListRow[]> {
@@ -1637,12 +1695,14 @@ export async function listCodeReviews(params: ListReviewsParams): Promise<CodeRe
     }
 
     // Select every column except the heavy JSONB/text fields no list UI reads
-    // (council_result, manual_config, previous_summary_body). The review-detail
-    // path still returns them. total_cost_musd stays: the mobile detail renders it.
+    // (council_result, manual_config, previous_summary_body,
+    // repository_review_instructions_imports). The review-detail path still returns
+    // the first three. total_cost_musd stays: the mobile detail renders it.
     const {
       council_result: _councilResult,
       manual_config: _manualConfig,
       previous_summary_body: _previousSummaryBody,
+      repository_review_instructions_imports: _repositoryReviewInstructionsImports,
       ...listColumns
     } = getTableColumns(cloud_agent_code_reviews);
     const reviews = await db
@@ -1916,7 +1976,9 @@ export async function cancelCodeReview(reviewId: string): Promise<boolean> {
 
 /**
  * Resets a failed code review for retry
- * Clears status back to 'pending' and removes error/session data
+ * Clears status back to 'pending' and removes error/session data.
+ * Refuses reviews whose terminal reason is 'superseded': a superseded review was
+ * replaced by a newer push, so re-running it would resurrect stale work.
  */
 export async function resetCodeReviewForRetry(reviewId: string): Promise<number> {
   try {
@@ -1947,7 +2009,10 @@ export async function resetCodeReviewForRetry(reviewId: string): Promise<number>
       .where(
         and(
           eq(cloud_agent_code_reviews.id, reviewId),
-          inArray(cloud_agent_code_reviews.status, ['failed', 'cancelled', 'interrupted'])
+          inArray(cloud_agent_code_reviews.status, ['failed', 'cancelled', 'interrupted']),
+          // Null-safe: 'superseded' reviews stay retired even though 'cancelled' is in
+          // the retriggable status list.
+          sql`${cloud_agent_code_reviews.terminal_reason} IS DISTINCT FROM 'superseded'`
         )
       )
       .returning({ id: cloud_agent_code_reviews.id });

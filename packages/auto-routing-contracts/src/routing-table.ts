@@ -1,9 +1,19 @@
 import * as z from 'zod';
-import { ReasoningEffortSchema, refineVariantExclusivity } from './reasoning';
+import {
+  ReasoningComplexitySchema,
+  ReasoningEffortSchema,
+  VariantSchema,
+  refineVariantExclusivity,
+} from './reasoning';
 import { TaxonomyRouteKeySchema } from './taxonomy';
 import { DEFAULT_AUTO_ROUTER, type AutoRouter } from './router';
 import { addDuplicateKeyIssues } from './duplicate-keys';
-import { POLICY_SETTING_VALUE_DEFAULTS } from './policy-settings';
+import {
+  POLICY_SETTINGS,
+  POLICY_SETTING_VALUE_DEFAULTS,
+  POLICY_SETTING_VALUE_SCHEMAS,
+  SWITCH_COST_FACTOR_MIN,
+} from './policy-settings';
 import {
   ProductionTokenProfileSchema,
   type ProductionTokenProfile,
@@ -23,7 +33,8 @@ export const PoolEntrySchema = z.object({
 export type PoolEntry = z.infer<typeof PoolEntrySchema>;
 
 export const BenchmarkPairSchema = PoolEntrySchema.extend({
-  variant: z.string().trim().min(1).nullable(),
+  // Canonical catalog variant key, shared with every other variant field in the package.
+  variant: VariantSchema,
 });
 export type BenchmarkPair = z.infer<typeof BenchmarkPairSchema>;
 
@@ -135,7 +146,7 @@ export const RankedCandidateSchema = z
     p50LatencyMs: z.number().nonnegative().nullable().optional(),
     // Canonical catalog variant key the model was benchmarked with.
     // Optional so tables published before this field existed stay valid.
-    variant: z.string().trim().min(1).nullable().optional(),
+    variant: VariantSchema.optional(),
     // Legacy effort the model was benchmarked with; retained for rolling
     // deploy reads of old published tables. Prefer `variant` when present.
     reasoningEffort: ReasoningEffortSchema.nullable().optional(),
@@ -146,8 +157,7 @@ export const RankedCandidateSchema = z
   .superRefine((candidate, ctx) => refineVariantExclusivity(candidate, ctx, 'Candidate'));
 export type RankedCandidate = z.infer<typeof RankedCandidateSchema>;
 
-export const ReasoningComplexitySchema = z.enum(['low', 'medium', 'high']);
-export type ReasoningComplexity = z.infer<typeof ReasoningComplexitySchema>;
+export { ReasoningComplexitySchema, type ReasoningComplexity } from './reasoning';
 export const ComplexityLabelsSchema = z.record(z.string().min(1), ReasoningComplexitySchema);
 export type ComplexityLabels = z.infer<typeof ComplexityLabelsSchema>;
 
@@ -168,14 +178,18 @@ const routingTableFields = {
   // Benchmark run id.
   version: z.string().min(1),
   generatedAt: z.string().min(1),
-  minAccuracy: z.number().min(0).max(1),
-  accuracyNoiseBand: z.number().min(0).max(1).optional(),
+  minAccuracy: POLICY_SETTING_VALUE_SCHEMAS.minAccuracy,
+  accuracyNoiseBand: POLICY_SETTING_VALUE_SCHEMAS.accuracyNoiseBand.optional(),
   // Keep a session's incumbent model unless the fresh pick is cheaper by
   // more than this factor.
-  switchCostFactor: z.number().min(1),
+  // A published table accepts any factor at or above the policy minimum: the
+  // upper bound is an input limit, and a stored table must keep parsing.
+  switchCostFactor: z.number().min(SWITCH_COST_FACTOR_MIN),
   // In best-accuracy mode, keep a threshold-meeting incumbent unless the
   // fresh pick improves accuracy by more than this absolute delta.
-  bestAccuracySwitchThreshold: z.number().min(0).max(1).default(0.05),
+  bestAccuracySwitchThreshold: POLICY_SETTING_VALUE_SCHEMAS.bestAccuracySwitchThreshold.default(
+    POLICY_SETTINGS.bestAccuracySwitchThreshold.fixed
+  ),
   productionTokenProfile: ProductionTokenProfileSchema.nullable().optional(),
   effortByComplexity: EffortByComplexitySchema.optional(),
   switchHorizonTurns: z.number().int().positive().nullable().optional(),
@@ -233,8 +247,14 @@ export type CustomRoutingTable = z.infer<typeof CustomRoutingTableSchema>;
 export const ROUTING_TABLE_KV_KEY = 'routing_table_v1';
 export const FRONTIER_ROUTING_TABLE_KV_KEY = 'routing_table_frontier_v1';
 
+// Exhaustive map: a new AutoRouter without a key here is a type error.
+const ROUTING_TABLE_KV_KEY_BY_ROUTER = {
+  efficient: ROUTING_TABLE_KV_KEY,
+  frontier: FRONTIER_ROUTING_TABLE_KV_KEY,
+} as const satisfies Record<AutoRouter, string>;
+
 export function routingTableKvKey(router: AutoRouter = DEFAULT_AUTO_ROUTER): string {
-  return router === 'frontier' ? FRONTIER_ROUTING_TABLE_KV_KEY : ROUTING_TABLE_KV_KEY;
+  return ROUTING_TABLE_KV_KEY_BY_ROUTER[router];
 }
 
 const LATENCY_WEIGHT = 1.5;
@@ -245,17 +265,16 @@ const ACCURACY_WEIGHT = 15;
 export const RANKING_POLICY_VERSION = 'value-ttft-prodcost-request-pairs-v6';
 
 type RankInput = Omit<RankedCandidate, 'meetsThreshold'> & {
-  meetsThreshold?: boolean;
   // Benchmark p50 latency for this route. Null ranks last among competitors.
   p50LatencyMs: number | null;
 };
 
-export function wilsonLowerBound(accuracy: number, n: number, z = 1.0): number {
+export function wilsonLowerBound(accuracy: number, n: number, zScore = 1.0): number {
   if (n <= 0) return 0;
-  const zSquared = z * z;
+  const zSquared = zScore * zScore;
   const denominator = 1 + zSquared / n;
   const center = accuracy + zSquared / (2 * n);
-  const margin = z * Math.sqrt((accuracy * (1 - accuracy) + zSquared / (4 * n)) / n);
+  const margin = zScore * Math.sqrt((accuracy * (1 - accuracy) + zSquared / (4 * n)) / n);
   return Math.max(0, (center - margin) / denominator);
 }
 
@@ -307,11 +326,15 @@ export function rankCandidates(
   const floor =
     minAccuracy - (options?.accuracyNoiseBand ?? POLICY_SETTING_VALUE_DEFAULTS.accuracyNoiseBand);
   const requestTokens = options?.requestTokens ?? null;
+  const byAccuracyThenCost = (
+    x: { accuracy: number; avgCostUsd: number },
+    y: { accuracy: number; avgCostUsd: number }
+  ) => y.accuracy - x.accuracy || x.avgCostUsd - y.avgCostUsd;
   return candidates
     .map(({ p50LatencyMs, ...c }) => {
       const estimatedRequestCostUsd =
         requestTokens !== null && c.pricing != null
-          ? c.avgCostUsd + requestTokens * c.pricing.promptUsdPerToken
+          ? estimateRequestCostUsd(c, { uncachedInputTokens: requestTokens, cachedInputTokens: 0 })
           : requestTokens !== null && c.estimatedRequestCostUsd != null
             ? c.estimatedRequestCostUsd
             : estimateRequestCostUsd(c, options?.profile ?? null);
@@ -339,16 +362,10 @@ export function rankCandidates(
     })
     .toSorted((a, b) => {
       if (a.competes !== b.competes) return a.competes ? -1 : 1;
-      if (!a.competes) {
-        const x = a.candidate;
-        const y = b.candidate;
-        return y.accuracy - x.accuracy || x.avgCostUsd - y.avgCostUsd;
-      }
+      if (!a.competes) return byAccuracyThenCost(a.candidate, b.candidate);
       if (a.free !== b.free) return a.free ? -1 : 1;
       if (a.value !== b.value) return a.value < b.value ? -1 : 1;
-      const x = a.candidate;
-      const y = b.candidate;
-      return y.accuracy - x.accuracy || x.avgCostUsd - y.avgCostUsd;
+      return byAccuracyThenCost(a.candidate, b.candidate);
     })
     .map(s => s.candidate);
 }

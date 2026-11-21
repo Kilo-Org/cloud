@@ -1,7 +1,7 @@
 import { InfraError } from './capture';
 import { TAP_TARGET } from './matrix';
 import { APP_ID } from './report';
-import type { ProbeDump, ProbeNode } from './tree';
+import { IOS_SWITCH_TRACK_TAG, type Insets, type ProbeDump, type ProbeNode } from './tree';
 import { snapshotScrollAxes, uiautomatorTag } from './uiautomator';
 
 type Writable<T> = { -readonly [K in keyof T]: T[K] };
@@ -12,6 +12,7 @@ type AgentNode = {
   index: number;
   parentIndex?: number | null;
   type?: string;
+  role?: string | null;
   kind?: string;
   label?: string | null;
   contentDescription?: string | null;
@@ -51,12 +52,14 @@ function isAgentNode(value: unknown): value is AgentNode {
   );
 }
 
+type SnapshotInsets = { insets: Insets; known: boolean };
+
 export function snapshotInsets(
   nodes: readonly AgentNode[],
   width: number,
   height: number,
   density: number
-) {
+): SnapshotInsets {
   const insets = { top: 0, right: 0, bottom: 0, left: 0 };
   let known = false;
   for (const node of nodes) {
@@ -142,26 +145,66 @@ function markScrolledBoxes(
   return inside;
 }
 
-export function agentDeviceToProbeDump(json: string): ProbeDump {
-  const data = (JSON.parse(json) as { data?: AgentSnapshot } | null)?.data;
-  const density = data?.androidSnapshot?.pixelDensity;
-  const width = data?.viewport?.width;
-  const height = data?.viewport?.height;
-  if (
-    typeof density !== 'number' ||
-    density <= 0 ||
-    typeof width !== 'number' ||
-    typeof height !== 'number' ||
-    !Array.isArray(data?.nodes)
-  ) {
-    throw new InfraError('agent-device snapshot has no Android pixelDensity, viewport, or nodes');
+/**
+ * The app's own views in an iOS snapshot. The snapshot holds the whole UIKit
+ * hierarchy: the keyboard's window, a sheet's dimming view (three windows wide)
+ * and its grabber, which are the system's, so only React Native's host views and
+ * the native views they hold are kept. Inside them, UIKit's private views (a
+ * scroll indicator) are dropped too, and a text's accessibility element repeats
+ * the text it belongs to and is not a view.
+ */
+function iosAppNodes(nodes: readonly AgentNode[]): AgentNode[] {
+  const hosted = new Set<number>();
+  const dropped = new Set<number>();
+  const kept: AgentNode[] = [];
+  for (const node of nodes) {
+    const role = node.role ?? '';
+    const parent = node.parentIndex ?? undefined;
+    if (role.startsWith('_UI') || (parent !== undefined && dropped.has(parent))) {
+      dropped.add(node.index);
+      continue;
+    }
+    if (!/^(RCT|RNS|RNC)/.test(role) && (parent === undefined || !hosted.has(parent))) continue;
+    hosted.add(node.index);
+    if (role !== 'RCTAccessibilityElement') kept.push(node);
   }
-  const all = data.nodes.filter(isAgentNode);
-  const safeArea = snapshotInsets(all, width, height, density);
+  return kept;
+}
+
+const IOS_TAGS: Record<string, string> = {
+  StaticText: 'Paragraph',
+  TextField: 'TextInput',
+  TextView: 'TextInput',
+  Other: 'View',
+};
+const IOS_PRESSABLE_KINDS = new Set(['button', 'link', 'text-field', 'text-view']);
+/**
+ * A React Native `Switch` is two views on iOS: the host, whose frame is the touch
+ * area React Native lays out, and the `UISwitch` inside it, whose frame is the
+ * track UIKit draws from the host's top. The host is the control; the track keeps
+ * its own tag so the row rule measures what is painted.
+ */
+const IOS_SWITCH_HOST = 'RCTSwitchComponentView';
+
+/** Where one snapshot's frames live, and how its nodes read. */
+type Conversion = {
+  platform: 'android' | 'ios';
+  window: { width: number; height: number };
+  density: number;
+  safeArea: SnapshotInsets;
+  tag: (node: AgentNode) => string;
+  pressable: (node: AgentNode) => boolean;
+  testID: (identifier: string) => boolean;
+};
+
+function convert(
+  all: readonly AgentNode[],
+  kept: readonly AgentNode[],
+  how: Conversion
+): ProbeDump {
+  const { density, window } = how;
   const byIndex = new Map(all.map(node => [node.index, node]));
-  const kept = all.filter(node => node.bundleId === APP_ID && !node.systemBar);
   const newIndex = new Map(kept.map((node, position) => [node.index, position + 1]));
-  const window = { width: round(width / density), height: round(height / density) };
   const nodes: Writable<ProbeNode>[] = [
     { parent: -1, tag: 'View', rect: [0, 0, window.width, window.height] },
   ];
@@ -174,7 +217,7 @@ export function agentDeviceToProbeDump(json: string): ProbeDump {
     const { x, y, width: w, height: h } = node.rect;
     const converted: Writable<ProbeNode> = {
       parent: parent === undefined ? 0 : (newIndex.get(parent) ?? 0),
-      tag: uiautomatorTag(node.type ?? ''),
+      tag: how.tag(node),
       rect: [round(x / density), round(y / density), round(w / density), round(h / density)],
     };
     scrolled.set(
@@ -188,10 +231,8 @@ export function agentDeviceToProbeDump(json: string): ProbeDump {
       const accessibilityLabel = label ?? node.contentDescription ?? undefined;
       if (accessibilityLabel) converted.label = accessibilityLabel;
     }
-    if (node.identifier && !node.identifier.startsWith('com.android.')) {
-      converted.testID = node.identifier;
-    }
-    if (node.hittable === true && node.kind !== 'scroll-area') converted.pressable = true;
+    if (node.identifier && how.testID(node.identifier)) converted.testID = node.identifier;
+    if (how.pressable(node)) converted.pressable = true;
     if (node.kind === 'scroll-area') converted.scrollAxes = snapshotScrollAxes(converted.tag);
     nodes.push(converted);
   }
@@ -199,7 +240,7 @@ export function agentDeviceToProbeDump(json: string): ProbeDump {
     version: 1,
     env: {
       source: 'agent-device',
-      platform: 'android',
+      platform: how.platform,
       osVersion: '',
       route: '',
       window,
@@ -209,10 +250,77 @@ export function agentDeviceToProbeDump(json: string): ProbeDump {
       isRTL: false,
       language: 'unknown',
       languagePreference: 'unknown',
-      safeArea: safeArea.insets,
-      safeAreaKnown: safeArea.known,
+      safeArea: how.safeArea.insets,
+      safeAreaKnown: how.safeArea.known,
       tapTarget: TAP_TARGET,
     },
     nodes,
   };
+}
+
+/**
+ * An Android snapshot reports pixels and the density that turns them into dp.
+ * An iOS snapshot reports points and no screen scale, so its dump says 1 until
+ * the screenshot of the same screen supplies the scale (`withScreenshotScale`).
+ */
+export function agentDeviceToProbeDump(json: string): ProbeDump {
+  const data = (JSON.parse(json) as { data?: AgentSnapshot } | null)?.data;
+  const all = Array.isArray(data?.nodes) ? data.nodes.filter(isAgentNode) : [];
+  const application = all.find(node => node.role === 'UIApplication');
+  if (data?.androidSnapshot === undefined && application !== undefined) {
+    const { width, height } = application.rect;
+    return convert(all, iosAppNodes(all), {
+      platform: 'ios',
+      window: { width: round(width), height: round(height) },
+      density: 1,
+      // The snapshot names no system bars on iOS, so the insets are unknown.
+      safeArea: { insets: { top: 0, right: 0, bottom: 0, left: 0 }, known: false },
+      tag: node =>
+        node.role === IOS_SWITCH_HOST
+          ? 'Switch'
+          : node.role === IOS_SWITCH_TRACK_TAG
+            ? IOS_SWITCH_TRACK_TAG
+            : (IOS_TAGS[node.type ?? 'Other'] ?? node.type ?? 'View'),
+      pressable: node =>
+        node.hittable === true &&
+        (node.role === IOS_SWITCH_HOST || IOS_PRESSABLE_KINDS.has(node.kind ?? '')),
+      testID: () => true,
+    });
+  }
+  const density = data?.androidSnapshot?.pixelDensity;
+  const width = data?.viewport?.width;
+  const height = data?.viewport?.height;
+  if (
+    typeof density !== 'number' ||
+    density <= 0 ||
+    typeof width !== 'number' ||
+    typeof height !== 'number' ||
+    !Array.isArray(data?.nodes)
+  ) {
+    throw new InfraError(
+      'agent-device snapshot is neither an iOS tree nor an Android one with pixelDensity, viewport, and nodes'
+    );
+  }
+  return convert(
+    all,
+    all.filter(node => node.bundleId === APP_ID && !node.systemBar),
+    {
+      platform: 'android',
+      window: { width: round(width / density), height: round(height / density) },
+      density,
+      safeArea: snapshotInsets(all, width, height, density),
+      tag: node => uiautomatorTag(node.type ?? ''),
+      pressable: node => node.hittable === true && node.kind !== 'scroll-area',
+      testID: identifier => !identifier.startsWith('com.android.'),
+    }
+  );
+}
+
+/**
+ * An iOS snapshot's dump with the screen scale its screenshot shows: the
+ * screenshot is the window's points times that scale.
+ */
+export function withScreenshotScale(dump: ProbeDump, imageWidth: number): ProbeDump {
+  if (dump.env.source !== 'agent-device' || dump.env.platform !== 'ios') return dump;
+  return { ...dump, env: { ...dump.env, pixelRatio: imageWidth / dump.env.window.width } };
 }

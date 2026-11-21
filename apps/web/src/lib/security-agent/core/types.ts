@@ -1,5 +1,9 @@
 import * as z from 'zod';
-import { DEFAULT_SECURITY_NOTIFICATION_POLICY } from '@kilocode/worker-utils/security-notification-policy';
+import {
+  DEFAULT_SECURITY_NOTIFICATION_POLICY,
+  SecurityNotificationSeveritySchema,
+  SecurityNotificationWarningDaysSchema,
+} from '@kilocode/worker-utils/security-notification-policy';
 export {
   DependabotAlertState,
   SecuritySeverity,
@@ -79,21 +83,18 @@ export const SecurityAgentConfigSchema = z
     sla_notifications_enabled: z
       .boolean()
       .catch(DEFAULT_SECURITY_NOTIFICATION_POLICY.sla_notifications_enabled),
-    sla_notification_min_severity: z
-      .enum(['critical', 'high', 'medium', 'low'])
-      .catch(DEFAULT_SECURITY_NOTIFICATION_POLICY.sla_notification_min_severity),
-    sla_notification_warning_days: z
-      .number()
-      .int()
-      .min(1)
-      .max(365)
-      .catch(DEFAULT_SECURITY_NOTIFICATION_POLICY.sla_notification_warning_days),
+    sla_notification_min_severity: SecurityNotificationSeveritySchema.catch(
+      DEFAULT_SECURITY_NOTIFICATION_POLICY.sla_notification_min_severity
+    ),
+    sla_notification_warning_days: SecurityNotificationWarningDaysSchema.catch(
+      DEFAULT_SECURITY_NOTIFICATION_POLICY.sla_notification_warning_days
+    ),
     new_finding_notifications_enabled: z
       .boolean()
       .catch(DEFAULT_SECURITY_NOTIFICATION_POLICY.new_finding_notifications_enabled),
-    new_finding_notification_min_severity: z
-      .enum(['critical', 'high', 'medium', 'low'])
-      .catch(DEFAULT_SECURITY_NOTIFICATION_POLICY.new_finding_notification_min_severity),
+    new_finding_notification_min_severity: SecurityNotificationSeveritySchema.catch(
+      DEFAULT_SECURITY_NOTIFICATION_POLICY.new_finding_notification_min_severity
+    ),
   })
   .passthrough();
 

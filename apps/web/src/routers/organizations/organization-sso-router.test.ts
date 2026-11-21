@@ -2,6 +2,7 @@ jest.mock('@workos-inc/node', () => {
   const mockWorkOSInstance = {
     organizations: {
       getOrganizationByExternalId: jest.fn(),
+      createOrganization: jest.fn(),
       deleteOrganization: jest.fn(),
     },
     sso: {
@@ -40,6 +41,7 @@ const { mockWorkOSInstance } = jest.requireMock('@workos-inc/node') as {
   mockWorkOSInstance: {
     organizations: {
       getOrganizationByExternalId: jest.Mock;
+      createOrganization: jest.Mock;
       deleteOrganization: jest.Mock;
     };
     sso: {
@@ -49,6 +51,7 @@ const { mockWorkOSInstance } = jest.requireMock('@workos-inc/node') as {
 };
 
 const getOrganizationByExternalId = mockWorkOSInstance.organizations.getOrganizationByExternalId;
+const createWorkOSOrganization = mockWorkOSInstance.organizations.createOrganization;
 const deleteOrganization = mockWorkOSInstance.organizations.deleteOrganization;
 const listConnections = mockWorkOSInstance.sso.listConnections;
 
@@ -383,6 +386,37 @@ describe('organization SSO router', () => {
         hasConnection: true,
         domain: 'read-sso.test',
       });
+    });
+  });
+
+  describe('createConfig', () => {
+    beforeEach(() => {
+      getOrganizationByExternalId.mockReset();
+      createWorkOSOrganization.mockReset();
+      getOrganizationByExternalId.mockResolvedValue(null);
+    });
+
+    test('returns only the identifier of the created WorkOS organization', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const target = await createSsoOrganization('Created SSO Organization', null);
+      // The provider object carries `Date` timestamps, which plain tRPC JSON
+      // cannot carry as `Date`. Returning the object would hand the client a
+      // type the wire does not match, so the procedure returns the id alone.
+      createWorkOSOrganization.mockResolvedValue({
+        object: 'organization',
+        id: 'workos-created-organization',
+        name: 'Created SSO Organization',
+        allowProfilesOutsideOrganization: false,
+        domains: [],
+        externalId: target.id,
+        metadata: {},
+        createdAt: new Date('2026-11-05T17:34:30.901Z'),
+        updatedAt: new Date('2026-11-05T17:34:30.901Z'),
+      });
+
+      await expect(
+        caller.organizations.sso.createConfig({ organizationId: target.id })
+      ).resolves.toEqual({ id: 'workos-created-organization' });
     });
   });
 

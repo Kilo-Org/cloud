@@ -42,7 +42,7 @@ test('watches completed main workflows without checking out code or granting per
   assert.ok(job.steps.every(step => step.uses && !step.uses.includes('checkout')));
 });
 
-test('covers every push workflow, except E2E which already sends its own notification', () => {
+test('covers every push workflow, except E2E whose nightly sends its own notification', () => {
   const directory = new URL('../.github/workflows/', import.meta.url);
   const pushWorkflows = readdirSync(directory)
     .filter(name => /\.ya?ml$/.test(name))
@@ -80,7 +80,9 @@ test('preserves the richer E2E notification without sending a duplicate', () => 
   assert.equal(shouldNotify({ ...failedRun, name: 'Cloud Agent E2E tests' }), false);
   const e2e = readWorkflow('cloud-agent-e2e-tests');
   assert.equal(e2e.name, 'Cloud Agent E2E tests');
-  assert.ok(e2e.jobs['notify-failure']);
+  // The nightly owns the notification, so a manual tests run does not post.
+  assert.equal(e2e.jobs['notify-failure'], undefined);
+  assert.ok(readWorkflow('cloud-agent-e2e-nightly').jobs['notify-failure']);
 });
 
 test('Slack payload uses the failed run metadata and safely serializes special characters', async () => {

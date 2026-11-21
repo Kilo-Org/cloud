@@ -81,6 +81,7 @@ jest.mock('@kilocode/web-shared/lib/tokens', () => ({
 }));
 
 jest.mock('@/lib/bounded-service-fetch', () => ({
+  ...jest.requireActual('@/lib/bounded-service-fetch'),
   fetchWithinBudget: jest.fn(async () => ({
     ok: true,
     json: async () => ({

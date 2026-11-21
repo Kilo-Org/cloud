@@ -16,19 +16,19 @@ import {
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { RuntimeAuthorizationSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
 import {
-  authorizeCloudAgentChild,
-  authorizeCloudAgentWorkspaceSibling,
-  issueCloudAgentMcpGrant,
-  assertCloudAgentParentAuthority,
-  CLOUD_AGENT_PARENT_AUTHORITY_DENIED,
-  type WorkspaceMcpBinding,
+  isWorkspaceAnchorMetadata,
+  workspaceSessionIdForMetadata,
+  type WorkspaceAuthoritySeed,
 } from '../../cloud-agent-authority.js';
-import {
-  CloudAgentAuthoritySchema,
-  type CloudAgentAuthority,
-} from '@kilocode/worker-utils/cloud-agent-authority';
+import { getWorkspaceStub } from '../workspace/workspace-stub.js';
 import { sessionCallbackContext } from './callback-context.js';
-import { createSessionListStatusOutbox, deriveSessionListStatus } from './list-status.js';
+import {
+  createSessionListStatusOutbox,
+  deriveSessionListStatus,
+  nativeSessionTitle,
+  TRANSCRIPT_EVENT_TYPES,
+} from './list-status.js';
+import { createNativeLiveSummary, type NativeLiveSummary } from './native-live-summary.js';
 import { createRuntimeHarnessRecorder } from './runtime-harness-record.js';
 import {
   cloudAgentWorktreeIdSchema,
@@ -36,7 +36,7 @@ import {
   type CloudAgentChildSessionLineage,
   type CloudAgentWorktreeLocation,
 } from '@kilocode/session-ingest-contracts';
-import { asc, eq, gt } from 'drizzle-orm';
+import { asc } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { z } from 'zod';
@@ -60,6 +60,7 @@ import {
   issuePersistedRuntimeProxyGrant,
   resolvePersistedRuntimeProxyCredential,
 } from '../../runtime-credential-proxy-rpc.js';
+import { classifyRuntimeProxyFenceError, readRuntimeProxyFence } from './runtime-proxy-fence.js';
 import type { ScopeHandleResolution } from '../sandbox/accepted-handles.js';
 import {
   getRuntimeAuthorizationRecoveryState as readRuntimeAuthorizationRecoveryState,
@@ -69,7 +70,6 @@ import {
 import { sessionRuntimeLocator } from '../../sandbox-control/worktree-ownership.js';
 import { logRuntimeAuthorizationDiagnostic } from '../../session/runtime-authorization-diagnostics.js';
 import { applyControlPlanePreparingEvent } from '../../sandbox-session/control-plane-preparing.js';
-import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import {
   applyPendingInteractionEvent,
   pendingInteractionsSchema,
@@ -130,6 +130,7 @@ import {
   type ControlPlaneRouteUpdate,
   type ControlPlaneRouteView,
   type ControlPlaneSessionRefPayload,
+  type ControlPlaneReleasePayload,
   type ControlPlaneSetupCommandKind,
   type ControlPlaneSetupEvent,
   type ControlPlaneStatusResult,
@@ -137,6 +138,7 @@ import {
   type ControlPlaneWorktreeCaptureInput,
   type ControlPlaneWorkspaceStoppedPayload,
 } from '../../shared/control-plane-protocol.js';
+import { projectStoredRouteSpecSkills } from '../../shared/runtime-profile.js';
 import {
   worktreeBranchOperationResultSchema,
   type ControlPlaneWorktreeGitInput,
@@ -203,6 +205,10 @@ import {
   worktreeChangesReadySchema,
   type WorktreeChangesReady,
 } from '../worktree-changes-ready.js';
+import {
+  WORKSPACE_ARTIFACTS_CHANGED_EVENT,
+  type WorkspaceArtifactsChanged,
+} from '../sandbox/notifications.js';
 import { createControlPlaneTerminals, type ControlPlaneTerminals } from './terminals.js';
 import { createControlPlanePreview, type ControlPlanePreview } from './preview.js';
 import type {
@@ -237,8 +243,10 @@ import type {
 import {
   cloudAgentChildSessions,
   controlPlaneMessages,
+  costBackfillState,
   events,
   historyImport,
+  sessionCostTotals,
 } from './sqlite-schema.js';
 import {
   decodeSessionHistoryCursor,
@@ -281,6 +289,7 @@ import type {
 } from '../sandbox/sandbox-do.js';
 import type { ScopeGrantView } from '../sandbox/scope-view.js';
 import { diagnosticCause, logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
+import { readSentryIdentity } from '../../sentry-identity.js';
 
 /** Where a committed message transition came from (legacy diagnostic field). */
 type ControlPlaneMessageSource = 'coordinator' | 'wrapper_outcome' | 'operation_result';
@@ -318,6 +327,11 @@ const EVENT_RECEIPT_RETENTION_MS = 5 * 60_000;
  */
 const rootStatusSchema = z.object({ type: z.string(), settled: z.boolean() });
 type RootStatus = z.infer<typeof rootStatusSchema>;
+
+const workspaceArtifactsChangedSchema = z
+  .object({ revision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER) })
+  .strict();
+
 const rootStatusEventSchema = z.object({
   sessionID: z.string(),
   status: z.object({ type: z.string() }),
@@ -452,6 +466,17 @@ export const controlPlaneSessionRegistrationSchema = z
   .strict();
 export type ControlPlaneSessionRegistration = z.infer<typeof controlPlaneSessionRegistrationSchema>;
 
+/**
+ * A registration read back from storage carries the runtime skills written
+ * under an earlier path rule; it keeps the entries the current rule accepts so
+ * the session still loads its identity and spec. The registration that arrives
+ * from the Worker is parsed with the strict schema above.
+ */
+const storedControlPlaneSessionRegistrationSchema = z.preprocess(raw => {
+  if (typeof raw !== 'object' || raw === null || !('spec' in raw)) return raw;
+  return { ...raw, spec: projectStoredRouteSpecSkills(raw.spec) };
+}, controlPlaneSessionRegistrationSchema);
+
 function statusWorkspaceIdentity(registration: ControlPlaneSessionRegistration | null) {
   return registration === null
     ? null
@@ -462,31 +487,7 @@ function statusWorkspaceIdentity(registration: ControlPlaneSessionRegistration |
       );
 }
 
-const cloudAgentChildSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
-
-const cloudAgentChildSessionRegistrationSchema = z
-  .object({
-    cloudAgentSessionId: cloudAgentChildSessionIdSchema,
-    initialMessageId: z.string().min(1).max(200).optional(),
-    worktreeId: cloudAgentWorktreeIdSchema.optional(),
-  })
-  .strict();
-
-const cloudAgentChildSessionListSchema = z
-  .object({
-    limit: z.number().int().min(1).max(50),
-    cursor: z.uuid().optional(),
-  })
-  .strict();
-
-export type CloudAgentChildSessionPage = {
-  sessions: Array<{
-    cloudAgentSessionId: string;
-    initialMessageId?: string;
-    worktreeId?: string;
-  }>;
-  nextCursor?: string;
-};
+const LEGACY_CHILD_REGISTRY_EXPORT_LIMIT = 1_000;
 
 export type ControlPlaneSendResult =
   | { type: 'ok' }
@@ -561,7 +562,7 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
     payload: ControlPlaneCancelWorkspacePayload
   ): Promise<ControlPlaneCancelWorkspaceResult>;
   answer(payload: ControlPlaneAnswerPayload): Promise<ControlPlaneDispatchResult>;
-  release(payload: ControlPlaneSessionRefPayload): Promise<void>;
+  release(payload: ControlPlaneReleasePayload): Promise<void>;
   /** H4: the Sandbox DO returns the connected allocation fence for a bound handle. */
   getRuntimeCredentialProxyFence(input: {
     ownerId: string;
@@ -569,12 +570,17 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
     kiloSessionId: string;
     directory: string;
     handle: string;
+    /** The platform-added sandbox egress proof, when the request carried one. */
+    originProof?: string;
   }): Promise<ControlRuntimeCredentialProxyFenceScope | null>;
   /**
    * Asks the Sandbox DO to serve the handle on behalf of a surviving member of
    * the scope when this Session DO cannot resolve it locally.
    */
-  resolveScopeHandle(input: { handle: string }): Promise<ScopeHandleResolution>;
+  resolveScopeHandle(input: {
+    handle: string;
+    originProof?: string;
+  }): Promise<ScopeHandleResolution>;
   /** The locator a wiped issuer uses to keep resolving through a survivor. */
   getAcceptedHandleIssuerLocator(issuerSessionId: string): Promise<{
     scopeId: string;
@@ -794,10 +800,19 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private pendingInteractions: PendingInteractions | undefined;
   private availableCommands: CommandsAvailableData = { commands: [] };
   private rootStatus: RootStatus | undefined;
+  /**
+   * Latest transcript write, for the list row's activity time. Memory only:
+   * the list status snapshot keeps the last published value across eviction.
+   */
+  private transcriptActivityAt: number | undefined;
+  /** A Kilo v2 rename of the root not yet handed to the list status outbox. */
+  private pendingRootRename: string | undefined;
   private readonly historyHydrations = new Map<string, Promise<void>>();
   /** Report obligations for terminal messages (plan B5); repair is best effort. */
   private readonly reportOutbox: ReportOutbox;
   private readonly listStatusOutbox: ReturnType<typeof createSessionListStatusOutbox>;
+  /** The Kilo v2 root's session card summary, published with the list status. */
+  private readonly nativeLiveSummary: NativeLiveSummary;
   private readonly runtimeHarnessRecorder: ReturnType<typeof createRuntimeHarnessRecorder>;
   /** Terminal callback outbox (plan B5); one job per drained batch. */
   private readonly messageCallbacks: MessageCallbacks;
@@ -848,6 +863,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       storage: ctx.storage,
       publish: update => this.env.SESSION_INGEST.publishCloudAgentSessionStatus(update),
     });
+    this.nativeLiveSummary = createNativeLiveSummary(ctx.storage);
     this.runtimeHarnessRecorder = createRuntimeHarnessRecorder({
       storage: ctx.storage,
       record: params => this.env.SESSION_INGEST.recordCloudAgentSessionHarness(params),
@@ -899,6 +915,17 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       resolveTarget: (sandboxId, scope) => this.previewTargetFor(sandboxId, scope),
     });
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
+  }
+
+  [readSentryIdentity]() {
+    if (!this.metadata) return undefined;
+    const { userId, orgId, sessionId } = this.metadata.identity;
+    return {
+      userId,
+      orgId: orgId ?? '(personal)',
+      sessionId,
+      sandboxId: this.metadata.workspace?.sandboxId,
+    };
   }
 
   private async terminalRequest(
@@ -1232,7 +1259,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     await migrate(this.db, migrations);
     const raw = await this.ctx.storage.get<unknown>(REGISTRATION_KEY);
-    const parsed = controlPlaneSessionRegistrationSchema.safeParse(raw);
+    const parsed = storedControlPlaneSessionRegistrationSchema.safeParse(raw);
     this.registration = parsed.success ? parsed.data : null;
     const rawMetadata = await this.ctx.storage.get<unknown>(SESSION_METADATA_KEY);
     if (rawMetadata === undefined) {
@@ -1440,174 +1467,39 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
   }
 
-  async assertCloudAgentManagementAuthority(authority: unknown): Promise<void> {
+  /**
+   * The one-time adoption source for this chat's workspace authority: the
+   * stored runtime authorization and the legacy child registry, only when this
+   * chat created its workspace and may launch children. The workspace Durable
+   * Object owns both after adoption.
+   */
+  async exportWorkspaceAuthoritySeed(): Promise<WorkspaceAuthoritySeed | null> {
     await this.initialized;
-    const scope = CloudAgentAuthoritySchema.safeParse(authority);
-    const authorization = RuntimeAuthorizationSchema.safeParse(
-      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
-    );
-    if (!scope.success || !authorization.success) {
-      throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
+    const metadata = this.metadata;
+    if (metadata?.allowSubagentSessions !== true || !isWorkspaceAnchorMetadata(metadata)) {
+      return null;
     }
-    assertCloudAgentParentAuthority(this.metadata, authorization.data, scope.data);
-  }
-
-  async recordCloudAgentChildSession(input: unknown): Promise<{ success: true }> {
-    await this.initialized;
-    const child = cloudAgentChildSessionRegistrationSchema.parse(input);
-    if (this.metadata?.allowSubagentSessions !== true) {
-      throw new Error('Cloud Agent child registry denied');
-    }
-    if (child.cloudAgentSessionId === this.sessionId) {
-      throw new Error('Cloud Agent child registry requires another session');
-    }
-    this.db
-      .insert(cloudAgentChildSessions)
-      .values({
-        child_session_id: child.cloudAgentSessionId,
-        initial_message_id: child.initialMessageId ?? null,
-        worktree_id: child.worktreeId ?? null,
-        created_at: Date.now(),
-      })
-      .onConflictDoNothing()
-      .run();
-    return { success: true };
-  }
-
-  async forgetCloudAgentChildSession(input: unknown): Promise<{ success: true }> {
-    await this.initialized;
-    const childSessionId = cloudAgentChildSessionIdSchema.parse(input);
-    this.db
-      .delete(cloudAgentChildSessions)
-      .where(eq(cloudAgentChildSessions.child_session_id, childSessionId))
-      .run();
-    return { success: true };
-  }
-
-  async listCloudAgentChildSessions(input: unknown): Promise<CloudAgentChildSessionPage> {
-    await this.initialized;
-    const page = cloudAgentChildSessionListSchema.parse(input);
-    const cursorSessionId = page.cursor === undefined ? undefined : `workspace_${page.cursor}`;
-    const rows = this.db
+    const authorization = await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY);
+    if (authorization === undefined) return null;
+    const children = this.db
       .select({
         cloudAgentSessionId: cloudAgentChildSessions.child_session_id,
         initialMessageId: cloudAgentChildSessions.initial_message_id,
         worktreeId: cloudAgentChildSessions.worktree_id,
       })
       .from(cloudAgentChildSessions)
-      .where(
-        cursorSessionId === undefined
-          ? undefined
-          : gt(cloudAgentChildSessions.child_session_id, cursorSessionId)
-      )
       .orderBy(asc(cloudAgentChildSessions.child_session_id))
-      .limit(page.limit + 1)
+      .limit(LEGACY_CHILD_REGISTRY_EXPORT_LIMIT)
       .all();
-    const visible = rows.slice(0, page.limit);
-    const last = visible.at(-1);
-    const nextCursor =
-      rows.length > page.limit && last !== undefined
-        ? last.cloudAgentSessionId.slice('workspace_'.length)
-        : undefined;
     return {
-      sessions: visible.map(row => ({
+      metadata,
+      authorization,
+      children: children.map(row => ({
         cloudAgentSessionId: row.cloudAgentSessionId,
         ...(row.initialMessageId === null ? {} : { initialMessageId: row.initialMessageId }),
         ...(row.worktreeId === null ? {} : { worktreeId: row.worktreeId }),
       })),
-      ...(nextCursor === undefined ? {} : { nextCursor }),
     };
-  }
-
-  async getCloudAgentSpawnRuntimeToken(authority: CloudAgentAuthority): Promise<string> {
-    return (await this.getCloudAgentSpawnContext(authority)).token;
-  }
-
-  async getCloudAgentSpawnContext(
-    authority: CloudAgentAuthority
-  ): Promise<{ token: string; createdOnPlatform: string | undefined }> {
-    await this.initialized;
-    const scope = CloudAgentAuthoritySchema.safeParse(authority);
-    const authorization = RuntimeAuthorizationSchema.safeParse(
-      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
-    );
-    if (!scope.success || !authorization.success) {
-      throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
-    }
-    assertCloudAgentParentAuthority(this.metadata, authorization.data, scope.data);
-    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-    if (!secret) throw new Error('Authentication unavailable');
-    const issued = await renewRuntimeAuthorization({
-      authorization: authorization.data,
-      secret,
-      connectionString: this.env.HYPERDRIVE.connectionString,
-    }).catch(error => {
-      if (
-        error instanceof RuntimeAuthorizationRevokedError ||
-        error instanceof RuntimeAuthorizationExpiredError
-      ) {
-        throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
-      }
-      throw error;
-    });
-    const current = RuntimeAuthorizationSchema.safeParse(
-      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
-    );
-    if (!current.success) throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
-    assertCloudAgentParentAuthority(this.metadata, current.data, scope.data);
-    return {
-      token: issued.token,
-      createdOnPlatform: this.metadata?.identity.createdOnPlatform,
-    };
-  }
-
-  async authorizeCloudAgentChild(input: {
-    authority: CloudAgentAuthority;
-    childSessionId: string;
-  }): Promise<{ token: string; seal: string }> {
-    await this.initialized;
-    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-    if (!secret) throw new Error('Authentication unavailable');
-    return authorizeCloudAgentChild({
-      ...input,
-      secret,
-      connectionString: this.env.HYPERDRIVE.connectionString,
-      metadata: () => this.getMetadata(),
-      authorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
-    });
-  }
-
-  async authorizeCloudAgentWorkspaceSibling(input: {
-    siblingSessionId: string;
-  }): Promise<{ token: string; seal: string }> {
-    await this.initialized;
-    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-    if (!secret) throw new Error('Authentication unavailable');
-    return authorizeCloudAgentWorkspaceSibling({
-      parentSessionId: this.metadata?.identity.sessionId ?? '',
-      siblingSessionId: input.siblingSessionId,
-      secret,
-      connectionString: this.env.HYPERDRIVE.connectionString,
-      metadata: () => this.getMetadata(),
-      authorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
-    });
-  }
-
-  async issueCloudAgentMcpGrant(
-    workspace?: WorkspaceMcpBinding
-  ): Promise<{ url: string; token: string; expiresAt: number } | undefined> {
-    await this.initialized;
-    if (this.metadata?.allowSubagentSessions !== true) return undefined;
-    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-    if (!secret) throw new Error('Authentication unavailable');
-    return issueCloudAgentMcpGrant({
-      workspace,
-      secret,
-      connectionString: this.env.HYPERDRIVE.connectionString,
-      metadata: () => this.getMetadata(),
-      authorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
-      mcpUrl: this.env.CLOUD_AGENT_MCP_URL_OVERRIDE,
-    });
   }
 
   /**
@@ -1644,7 +1536,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * proxy endpoint. The handle is minted and bound by the Sandbox DO when it
    * sends `session.prepare` on a connected socket (R1).
    */
-  async resolveRuntimeCredentialProxyGrant(handle: string): Promise<{
+  async resolveRuntimeCredentialProxyGrant(
+    handle: string,
+    originProof?: string
+  ): Promise<{
     token: string;
     organizationId?: string;
     runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
@@ -1676,31 +1571,31 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           const sandboxId = metadata?.workspace?.sandboxId;
           const directory = this.registration?.spec.directory ?? metadata?.workspace?.workspacePath;
           if (!metadata || !kiloSessionId || !sandboxId || !directory) return null;
-          const peer = this.sandboxPeerFor(sandboxId);
-          if (peer === null) {
-            localScopeView = undefined;
-            return null;
-          }
-          const resolution = await peer.getRuntimeCredentialProxyFence({
-            ownerId: metadata.identity.userId,
-            sessionId: metadata.identity.sessionId,
-            kiloSessionId,
-            directory,
-            handle,
+          const result = await readRuntimeProxyFence({
+            getPeer: () => this.sandboxPeerFor(sandboxId),
+            request: {
+              ownerId: metadata.identity.userId,
+              sessionId: metadata.identity.sessionId,
+              kiloSessionId,
+              directory,
+              handle,
+              originProof,
+            },
+            correlation: { sessionId: metadata.identity.sessionId, kiloSessionId, sandboxId },
           });
-          if (resolution?.scopeViewUnavailable !== undefined) {
-            localScopeView = undefined;
-            throw new Error(resolution.scopeViewUnavailable);
-          }
-          localScopeView = resolution?.scopeView;
-          return resolution;
+          localScopeView = result?.scopeView;
+          return result?.fence ?? null;
         },
-        token: () => this.getRuntimeToken(),
+        token: (secret, beforeRenew) => this.getStoredRuntimeToken(secret, beforeRenew),
       });
     } catch (error) {
-      // A revoked/expired authorization threw. Fall through to scope resolution
-      // so a surviving member can still serve; if none can, the original outcome
-      // (a 503) is preserved below.
+      const fenceOutcome = classifyRuntimeProxyFenceError(error);
+      // A stale accepted handle denies. A fence transport failure, and every
+      // other outcome, rethrows so the facade answers its retryable 503.
+      if (fenceOutcome === 'deny') return null;
+      if (fenceOutcome === 'retry') throw error;
+      // A revoked or expired local runtime authorization is the one outcome
+      // that scope resolution serves, through a surviving member.
       localError = error;
     }
     if (local)
@@ -1711,7 +1606,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       if (localError !== null) throw localError;
       return null;
     }
-    const fromScope = await this.resolveRuntimeCredentialProxyGrantFromScope(handle);
+    const fromScope = await this.resolveRuntimeCredentialProxyGrantFromScope(handle, originProof);
     if (fromScope) return fromScope;
     if (localError !== null) throw localError;
     return null;
@@ -1731,7 +1626,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * any failure to reach a decision within the total bound throws so the facade
    * returns its existing retryable 503 `Credential unavailable`.
    */
-  private async resolveRuntimeCredentialProxyGrantFromScope(handle: string): Promise<{
+  private async resolveRuntimeCredentialProxyGrantFromScope(
+    handle: string,
+    originProof: string | undefined
+  ): Promise<{
     token: string;
     organizationId?: string;
     runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
@@ -1744,7 +1642,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       outcome = await withTimeout(
         withDORetry(
           () => this.scopeResolutionPeer() ?? peer,
-          current => current.resolveScopeHandle({ handle }),
+          current => current.resolveScopeHandle({ handle, originProof }),
           'resolveScopeHandle'
         ),
         this.sessionTimers().scopeResolutionMs,
@@ -1776,11 +1674,16 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   /** C1c model preflight: renew and return the backing runtime token. */
   async getRuntimeToken(): Promise<string | null> {
-    const metadata = await this.getMetadata();
     const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
     if (!secret) throw new Error('NEXTAUTH_SECRET is not configured on the worker');
+    return this.getStoredRuntimeToken(secret);
+  }
+
+  private async getStoredRuntimeToken(secret: string, beforeRenew?: () => Promise<boolean>) {
+    const metadata = await this.getMetadata();
     return renewStoredRuntimeAuthorization({
       metadata,
+      beforeRenew,
       getAuthorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
       putAuthorization: authorization =>
         this.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, authorization),
@@ -2270,8 +2173,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * Worker-facing live native read (spec §10). The route identity comes from
    * this DO's own registration, never from the caller, so a request cannot name
    * a sibling session or a stale runtime. A route that is not ready returns
-   * `not_ready` without preparing or waking the sandbox, and the Sandbox DO
-   * binds the request to the current wrapper socket as the generation fence.
+   * `runtime_offline`, which callers can tell apart from the Sandbox DO's
+   * transient `not_ready` wrapper failures, without preparing or waking the
+   * sandbox. The Sandbox DO binds the request to the current wrapper socket as
+   * the generation fence.
    */
   async kiloRequest(operation: ControlPlaneNativeOperation): Promise<ControlPlaneControlResult> {
     await this.initialized;
@@ -2285,14 +2190,14 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (this.route.state !== 'ready') {
       return {
         ok: false,
-        error: { code: 'not_ready', message: 'Live runtime is not ready', retryable: true },
+        error: { code: 'runtime_offline', message: 'Live runtime is not ready', retryable: true },
       };
     }
     const peer = this.sandboxPeer();
     if (peer === null) {
       return {
         ok: false,
-        error: { code: 'not_ready', message: 'Sandbox is not available', retryable: true },
+        error: { code: 'runtime_offline', message: 'Sandbox is not available', retryable: true },
       };
     }
     const upstreamBranch = this.metadata?.repository?.upstreamBranch;
@@ -2569,6 +2474,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           await this.ctx.storage.put(PENDING_INTERACTIONS_KEY, next);
         }
         await this.recordRootStatus(event);
+        const rootRename = this.nativeRootRename(event);
         // A retried batch can be partially applied; commit its receipt with the row mutation.
         const stored = this.partText.transaction(() =>
           this.ctx.storage.transactionSync(() => {
@@ -2578,10 +2484,15 @@ export class SandboxSessionV2 extends DurableObject<Env> {
               queries: this.eventQueries,
               partText: this.partText,
             });
+            if (persisted !== null && persisted.id !== 0 && this.registration !== null)
+              this.nativeLiveSummary.observe(event, this.registration.spec.kiloSessionId);
             if (receiptKey !== undefined) this.ctx.storage.kv.put(receiptKey, index + 1);
             return persisted;
           })
         );
+        if (stored !== null && stored.id !== 0 && TRANSCRIPT_EVENT_TYPES.has(event.type))
+          this.transcriptActivityAt = Date.now();
+        if (rootRename !== undefined) this.pendingRootRename = rootRename;
         if (stored !== null) this.broadcast(stored);
         if (event.type === 'session.created' && this.registration !== null) {
           const info = z
@@ -2640,6 +2551,32 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       if (this.metadata?.workspace?.worktreeId !== parsed.worktreeId) return false;
       this.worktreeChanges.ready(parsed.revision);
       return true;
+    });
+  }
+
+  async onWorkspaceArtifactsChanged(notification: WorkspaceArtifactsChanged): Promise<void> {
+    await this.initialized;
+    const parsed = workspaceArtifactsChangedSchema.parse(notification);
+    return this.enqueue(async () => {
+      const payload = JSON.stringify({ revision: parsed.revision });
+      const timestamp = Date.now();
+      const id = this.eventQueries.insertUnique({
+        executionId: '',
+        sessionId: this.sessionId,
+        streamEventType: WORKSPACE_ARTIFACTS_CHANGED_EVENT,
+        payload,
+        timestamp,
+        entityId: `workspace-artifacts/${parsed.revision}`,
+      });
+      if (id === null) return;
+      this.broadcast({
+        id,
+        execution_id: '',
+        session_id: this.sessionId,
+        stream_event_type: WORKSPACE_ARTIFACTS_CHANGED_EVENT,
+        payload,
+        timestamp,
+      });
     });
   }
 
@@ -2728,14 +2665,32 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         // Registration alone is not a transition. Native work may start without
         // a Cloud message, so do not gate those updates on message admission.
         if (this.messages.length > 0 || nativeStatus !== undefined || status !== 'idle') {
+          const liveSummary = this.nativeLiveSummary.settled(status);
           this.listStatusOutbox.record(
             {
               sessionId: this.registration.spec.kiloSessionId,
               kiloUserId: this.metadata.identity.userId,
               cloudAgentSessionId: this.sessionId,
             },
-            status
+            status,
+            Date.now(),
+            {
+              activityAt: this.transcriptActivityAt,
+              title: this.pendingRootRename,
+              // Kilo v1 reports its summary and cost through its own ingest client.
+              transcript:
+                liveSummary === undefined
+                  ? undefined
+                  : {
+                      liveSummary,
+                      totalCostMicrodollars: this.eventQueries.getTotalCostMicrodollars(
+                        this.sessionId,
+                        this.registration.spec.kiloSessionId
+                      ),
+                    },
+            }
           );
+          this.pendingRootRename = undefined;
         }
         statusDueAt = this.listStatusOutbox.nextDueAt();
       }
@@ -3124,12 +3079,19 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   async getRuntimeAuthorizationStatus(): Promise<{
     state: 'legacy' | 'active' | 'expired' | 'revoked';
     id?: string;
+    /** The workspace whose Cloud Agent authority a user send in this chat may renew. */
+    workspaceSessionId?: string;
   }> {
     await this.initialized;
-    return readRuntimeAuthorizationRecoveryState({
+    const status = await readRuntimeAuthorizationRecoveryState({
       metadata: this.metadata,
       getAuthorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
     });
+    const workspaceSessionId =
+      this.metadata?.allowSubagentSessions === true
+        ? workspaceSessionIdForMetadata(this.metadata)
+        : undefined;
+    return workspaceSessionId === undefined ? status : { ...status, workspaceSessionId };
   }
 
   /**
@@ -3288,14 +3250,23 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.initialized;
     if (this.registration === null) return;
     await this.enqueue(async () => {
+      if (this.registration === null) return;
       const peer = this.sandboxPeer();
       if (peer !== null) {
+        const standalone =
+          this.metadata !== null && this.metadata.workspace?.worktreeId === undefined;
         await withDORetry(
           () => peer,
-          current => current.release({ sessionId: this.sessionId }),
+          current =>
+            current.release(
+              standalone
+                ? { sessionId: this.sessionId, reason: 'standalone_session_deleted' }
+                : { sessionId: this.sessionId }
+            ),
           'release'
         );
       }
+      await this.settleWorkspaceAuthorityBeforeDelete();
       await this.tearDownSession();
     });
   }
@@ -3351,13 +3322,17 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   /**
    * Worktree deletion, phase 2 (legacy `finishWorktreeDeletion`): purge this
-   * session's data once the Sandbox DO confirmed the worktree cleanup. Idempotent
-   * and holds no per-worktree state: the Sandbox DO already removed the routes.
+   * session's data once the Sandbox DO confirmed the worktree cleanup, for the
+   * stored worktree binding. Idempotent and holds no per-worktree state: the
+   * Sandbox DO already removed the routes.
    */
   async finishWorktreeDeletion(worktreeId: string): Promise<void> {
     await this.initialized;
-    cloudAgentWorktreeIdSchema.parse(worktreeId);
+    const requested = cloudAgentWorktreeIdSchema.parse(worktreeId);
     if (this.registration === null) return;
+    if (this.metadata !== null && this.metadata.workspace?.worktreeId !== requested) {
+      throw new Error('Worktree identity conflict');
+    }
     await this.enqueue(async () => {
       await this.tearDownSession();
     });
@@ -3393,12 +3368,38 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
   }
 
+  /**
+   * A chat that created its workspace hands the workspace authority over
+   * before its own storage is wiped. A workspace chat leaves it to the
+   * workspace, which outlives this chat; a chat without a worktree is the whole
+   * workspace, so deleting it ends that authority.
+   */
+  private async settleWorkspaceAuthorityBeforeDelete(): Promise<void> {
+    const metadata = this.metadata;
+    if (metadata?.allowSubagentSessions !== true || !isWorkspaceAnchorMetadata(metadata)) return;
+    const ownerId = metadata.identity.userId;
+    const workspaceSessionId = metadata.identity.sessionId;
+    if (metadata.workspace?.worktreeId === undefined) {
+      await withDORetry(
+        () => getWorkspaceStub(this.env, ownerId, workspaceSessionId),
+        stub => stub.markDeleted(),
+        'markDeleted'
+      );
+      return;
+    }
+    await withDORetry(
+      () => getWorkspaceStub(this.env, ownerId, workspaceSessionId),
+      stub => stub.describe(),
+      'describe'
+    );
+  }
+
   private async pruneChildRegistryEntry(ownerId: string, parentSessionId: string): Promise<void> {
     try {
       await withDORetry(
-        () => getSandboxSessionStub(this.env, ownerId, parentSessionId),
-        stub => stub.forgetCloudAgentChildSession(this.sessionId),
-        'forgetCloudAgentChildSession'
+        () => getWorkspaceStub(this.env, ownerId, parentSessionId),
+        stub => stub.forgetChild(this.sessionId),
+        'forgetChild'
       );
     } catch (error) {
       logger
@@ -3407,7 +3408,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           parentSessionId,
           error: error instanceof Error ? error.message : String(error),
         })
-        .warn('Failed to prune deleted child from parent session registry');
+        .warn('Failed to prune deleted child from parent workspace registry');
     }
   }
 
@@ -3475,6 +3476,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         this.db.delete(events).run();
         this.db.delete(cloudAgentChildSessions).run();
         this.db.delete(historyImport).run();
+        this.db.delete(sessionCostTotals).run();
+        this.db.delete(costBackfillState).run();
       },
     });
     this.clearSessionInMemoryState();
@@ -3728,6 +3731,23 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     const route = persistedRouteView(view, previous);
     await this.persistRoute(route);
+    if (
+      (route.state === 'ready' || route.state === 'failed') &&
+      previousAttemptId !== route.attemptId &&
+      readPreparationAttempt(this.eventQueries, route.attemptId) === null
+    ) {
+      const trigger = oldestOpenMessage(this.messages, 'queued');
+      if (trigger !== undefined) {
+        this.logStartupFinished(
+          route.attemptId,
+          route.state === 'ready'
+            ? { status: 'completed' }
+            : { status: 'failed', safeError: route.reason },
+          Date.now(),
+          trigger.createdAt
+        );
+      }
+    }
     if (route.state === 'preparing' || route.state === 'reconnecting') {
       await this.clearTransportRecovery();
     }
@@ -4266,12 +4286,53 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   /** Close one route attempt's open row by persisted identity, never by a scan. */
   private finalizeAttempt(attemptId: string, outcome: PreparationOutcome): void {
     this.preparationRecorders.delete(attemptId);
-    for (const event of finalizePreparationAttempt(this.eventQueries, attemptId, {
+    const attempt = readPreparationAttempt(this.eventQueries, attemptId);
+    const timestamp = Date.now();
+    const events = finalizePreparationAttempt(this.eventQueries, attemptId, {
       ...outcome,
-      timestamp: Date.now(),
-    })) {
-      this.broadcast(event);
+      timestamp,
+    });
+    if (events.length > 0 && attempt !== null) {
+      const trigger = this.messages.find(message => message.messageId === attempt.triggerMessageId);
+      this.logStartupFinished(attemptId, outcome, timestamp, trigger?.createdAt, attempt.startedAt);
     }
+    for (const event of events) this.broadcast(event);
+  }
+
+  private logStartupFinished(
+    attemptId: string,
+    outcome: PreparationOutcome,
+    timestamp: number,
+    admittedAt: number | undefined,
+    preparationStartedAt?: number
+  ): void {
+    const container =
+      this.route.state !== 'unknown' && this.route.attemptId === attemptId
+        ? this.route.container
+        : undefined;
+    const reason = outcome.status === 'failed' ? outcome.safeError : undefined;
+    logControlDiagnostic('session_startup_finished', {
+      sessionId: this.sessionId,
+      sandboxId: this.registration?.sandboxId,
+      allocationId: container?.allocationId,
+      attemptId,
+      provider: container?.provider ?? this.registration?.sandboxSelection?.provider,
+      startSource: container?.startSource,
+      outcome:
+        outcome.status === 'completed'
+          ? 'ready'
+          : reason === 'preparation_cancelled'
+            ? 'cancelled'
+            : reason === 'preparation_timeout'
+              ? 'timeout'
+              : 'failed',
+      reason: reason === 'Preparation did not complete' ? 'preparation_incomplete' : reason,
+      durationMs: admittedAt === undefined ? undefined : Math.max(0, timestamp - admittedAt),
+      preparationMs:
+        preparationStartedAt === undefined
+          ? undefined
+          : Math.max(0, timestamp - preparationStartedAt),
+    });
   }
 
   /** The route attempt a notification must name (the route-view fence). */
@@ -4552,6 +4613,32 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (!parsed.success || parsed.data.sessionID !== this.registration?.spec.kiloSessionId) return;
     this.rootStatus = { type: parsed.data.status.type, settled: false };
     await this.ctx.storage.put(ROOT_STATUS_KEY, this.rootStatus);
+  }
+
+  /** A Kilo v2 rename of the root: its title against the source stored before this event. */
+  private nativeRootRename(event: {
+    type: string;
+    properties: Record<string, unknown>;
+  }): string | undefined {
+    const rootKiloSessionId = this.registration?.spec.kiloSessionId;
+    if (
+      rootKiloSessionId === undefined ||
+      event.type !== 'conversation.source' ||
+      event.properties.sessionID !== rootKiloSessionId
+    )
+      return undefined;
+    // persistConversationEvent drops a source that names another session, so it is no rename.
+    const title = nativeSessionTitle(event.properties.source, rootKiloSessionId);
+    if (title === undefined) return undefined;
+    const stored = this.eventQueries.findByEntityId(`conversation-source/${rootKiloSessionId}`);
+    const previous =
+      stored === null
+        ? undefined
+        : nativeSessionTitle(
+            readNativeEventPayload(stored.payload)?.properties.source,
+            rootKiloSessionId
+          );
+    return title === previous ? undefined : title;
   }
 
   private async settleRootStatus(): Promise<void> {

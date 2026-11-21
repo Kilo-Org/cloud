@@ -245,6 +245,25 @@ export {
 } from './builtin-agents';
 export { getBuiltinAgentSettings, setBuiltinAgentSettings } from './builtin-agent-settings-service';
 
+// User-scoped per-model context-window caps
+export {
+  ModelContextLimitsSchema,
+  normalizeModelContextLimits,
+  hasModelContextLimits,
+  MAX_MODEL_CONTEXT_LIMITS,
+  MAX_MODEL_CONTEXT_LIMIT_MODEL_LENGTH,
+  MIN_MODEL_CONTEXT_TOKENS,
+  MAX_MODEL_CONTEXT_TOKENS,
+  type ModelContextLimits,
+} from './model-context-limits';
+export { getModelContextLimits, setModelContextLimits } from './model-context-limits-service';
+export {
+  getWebSearchPreference,
+  setWebSearchPreference,
+  webSearchPreferenceSchema,
+  type WebSearchPreference,
+} from './web-search-settings-service';
+
 // Local config import (preview diff + selective upsert)
 export {
   buildImportPreview,

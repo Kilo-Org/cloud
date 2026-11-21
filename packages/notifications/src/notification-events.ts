@@ -2,17 +2,6 @@ import { z } from 'zod';
 
 import { nonEmptyStringSchema } from './non-empty-string';
 
-export const instanceLifecycleEventSchema = z.enum(['ready', 'start_failed']);
-export type InstanceLifecycleEvent = z.infer<typeof instanceLifecycleEventSchema>;
-
-export const scheduledActionEventSchema = z.enum([
-  'scheduled_restart_notice',
-  'scheduled_restart_cancelled',
-  'scheduled_version_change_notice',
-  'scheduled_version_change_cancelled',
-]);
-export type ScheduledActionEvent = z.infer<typeof scheduledActionEventSchema>;
-
 // 1:1 map to SecurityAuditLogAction (packages/db/src/schema-types.ts):
 // analysis_completed -> FindingAnalysisCompleted,
 // analysis_failed -> FindingAnalysisFailed,
@@ -50,4 +39,15 @@ export const securityLifecyclePayloadShape = {
   scope: nonEmptyStringSchema,
   remediationId: nonEmptyStringSchema.optional(),
   prUrl: nonEmptyStringSchema.optional(),
+};
+
+// The fields a security-finding event carries on every path: the visible push in
+// `push-data.ts` and the internal dispatch request in `rpc-schemas.ts` both carry
+// them. The dispatch request deliberately adds finding content the push must not
+// carry (`notificationKind`, `severity`, `repoFullName`, `title`, `ghsaId`), so
+// only this identity pair belongs here. Declared once so a rename or a changed
+// bound cannot reach one path and miss the other.
+export const securityFindingPayloadShape = {
+  findingId: nonEmptyStringSchema,
+  scope: nonEmptyStringSchema,
 };

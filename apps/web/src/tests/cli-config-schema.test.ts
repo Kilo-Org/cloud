@@ -94,6 +94,37 @@ describe('kilo config.json schema merge', () => {
     expect(props.privacy_mode).toBeDefined();
     expect(props.retention).toBeDefined();
     expect(props.memory_model).toBeDefined();
+    expect(props.browser).toBeDefined();
+  });
+
+  test('browser exposes backend, observation, allowSensitive and target', () => {
+    const browser = props.browser as {
+      type: string;
+      additionalProperties: boolean;
+      properties: {
+        backend: { type: string; enum: string[]; default: string };
+        observation: { type: string; enum: string[]; default: string };
+        allowSensitive: { type: string; default: boolean };
+        target: { anyOf: Array<{ type?: string }> };
+      };
+    };
+    expect(browser.type).toBe('object');
+    expect(browser.additionalProperties).toBe(false);
+    expect(browser.properties.backend).toEqual(
+      expect.objectContaining({
+        type: 'string',
+        enum: ['playwright', 'extension', 'off'],
+        default: 'playwright',
+      })
+    );
+    expect(browser.properties.observation).toEqual(
+      expect.objectContaining({ type: 'string', enum: ['full', 'diff', 'none'], default: 'full' })
+    );
+    expect(browser.properties.allowSensitive).toEqual(
+      expect.objectContaining({ type: 'boolean', default: false })
+    );
+    expect(browser.properties.target.anyOf.some(variant => variant.type === 'string')).toBe(true);
+    expect(browser.properties.target.anyOf.some(variant => variant.type === 'null')).toBe(true);
   });
 
   test('retention exposes enabled boolean and maxAgeDays number', () => {
@@ -185,6 +216,7 @@ describe('kilo config.json schema merge', () => {
   test('merges kilo experimental keys without restoring retired keys', () => {
     const exp = props.experimental as { properties: Record<string, unknown> };
     expect(exp.properties.codebase_search).toBeUndefined();
+    expect(exp.properties.browser_extension).toBeUndefined();
     expect(exp.properties.agent_requirements).toEqual(expect.objectContaining({ type: 'boolean' }));
     expect(exp.properties.native_notebook_tools).toEqual(
       expect.objectContaining({ type: 'boolean' })

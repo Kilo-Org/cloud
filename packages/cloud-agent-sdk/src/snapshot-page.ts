@@ -37,9 +37,15 @@ export function replayStoredMessages(
   messages: SessionSnapshot['messages'],
   emit: (event: ChatEvent) => void,
   version?: ChatEventVersion
-): void {
+): string[] {
+  // The ids of the rows this replay actually emitted, so a caller that has to
+  // name the page's rows later — retained-history bookkeeping, for one — reads
+  // the same rows the replay accepted. Re-deriving them with a second
+  // predicate would read the rows the check above skips.
+  const emittedMessageIds: string[] = [];
   for (const msg of messages) {
     if (!messageUpdatedDataSchema.safeParse({ info: msg.info }).success) continue;
+    emittedMessageIds.push(msg.info.id);
     emit({ type: 'message.updated', info: msg.info, ...(version ? { version } : {}) });
 
     for (const part of msg.parts) {
@@ -52,6 +58,7 @@ export function replayStoredMessages(
       });
     }
   }
+  return emittedMessageIds;
 }
 
 export function replaySnapshotPage(
@@ -68,13 +75,31 @@ export function replaySnapshot(sink: TransportSink, snapshot: SessionSnapshot): 
   replaySnapshotPage(sink, snapshotPageFromSnapshot(snapshot));
 }
 
-export function sessionSnapshotFailureMessage(kind: SessionSnapshotFailureKind): string {
+/**
+ * The one message for a session-history read that can be retried. Both the
+ * `retryable_failure` outcome and a rejected read that carries no message of
+ * its own report it.
+ */
+export const SESSION_HISTORY_UNAVAILABLE_MESSAGE = 'Session history temporarily unavailable';
+
+/**
+ * One session-history read failure: the machine kind decides retry versus
+ * terminal, and `message` is the human-readable identity of the failure.
+ */
+export type SessionSnapshotFailure = {
+  kind: SessionSnapshotFailureKind;
+  message: string;
+};
+
+export function sessionSnapshotFailureMessage(
+  kind: SessionSnapshotFailureKind
+): SessionSnapshotFailure {
   switch (kind) {
     case 'retryable_failure':
-      return 'Session history temporarily unavailable';
+      return { kind, message: SESSION_HISTORY_UNAVAILABLE_MESSAGE };
     case 'too_large':
-      return 'Session history too large to load';
+      return { kind, message: 'Session history too large to load' };
     case 'invalid_data':
-      return 'Session history is unavailable';
+      return { kind, message: 'Session history is unavailable' };
   }
 }

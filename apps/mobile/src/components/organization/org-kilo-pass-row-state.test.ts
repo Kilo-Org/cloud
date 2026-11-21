@@ -34,9 +34,10 @@ describe('getOrgKiloPassRowState', () => {
     expect(row).toEqual({
       subtitle: '$49 · 8 paid seats',
       attention: false,
-      action: 'manage',
+      tone: 'default',
+      action: 'none',
       actionLabel: null,
-      accessibilityHint: 'Opens Kilo Pass management on web.',
+      accessibilityHint: null,
       loading: false,
     });
   });
@@ -56,7 +57,7 @@ describe('getOrgKiloPassRowState', () => {
     ).toBe('$199 · 2 paid seats');
   });
 
-  it('routes no agreement / unavailable to setup, not the detail page that throws', () => {
+  it('states that no pass exists without offering a setup page', () => {
     const row = getOrgKiloPassRowState({
       data: summary({
         state: 'unavailable',
@@ -67,13 +68,16 @@ describe('getOrgKiloPassRowState', () => {
       isError: false,
     });
     expect(row.subtitle).toBe('Not subscribed');
-    expect(row.action).toBe('setup');
-    expect(row.accessibilityHint).toBe('Opens Kilo Pass setup on web.');
+    expect(row.action).toBe('none');
+    expect(row.accessibilityHint).toBeNull();
     expect(row.attention).toBe(false);
+    // The billing row paints an absent pass in the same muted ink as the
+    // screen's other inert values ("No subscription", "Disabled").
+    expect(row.tone).toBe('muted');
     expect(row.loading).toBe(false);
   });
 
-  it('routes every state backed by an agreement to the detail management page', () => {
+  it('keeps every state backed by an agreement inert, with no web destination', () => {
     const destinations = [
       summary({ state: 'active', commercialState: 'active' }),
       summary({ state: 'cancel_at_period_end', commercialState: 'cancel_at_period_end' }),
@@ -84,8 +88,8 @@ describe('getOrgKiloPassRowState', () => {
     ];
     for (const data of destinations) {
       const row = getOrgKiloPassRowState({ data, isError: false });
-      expect(row.action).toBe('manage');
-      expect(row.accessibilityHint).toBe('Opens Kilo Pass management on web.');
+      expect(row.action).toBe('none');
+      expect(row.accessibilityHint).toBeNull();
     }
   });
 
@@ -147,11 +151,12 @@ describe('getOrgKiloPassRowState', () => {
       });
       expect(row.subtitle).toBe(subtitle);
       expect(row.attention).toBe(true);
-      expect(row.action).toBe('manage');
+      expect(row.tone).toBe('warn');
+      expect(row.action).toBe('none');
     }
   });
 
-  it('treats an ended agreement as ended and keeps it on the detail page', () => {
+  it('treats an ended agreement as ended and inert', () => {
     const row = getOrgKiloPassRowState({
       data: summary({
         state: 'ended',
@@ -161,7 +166,7 @@ describe('getOrgKiloPassRowState', () => {
       isError: false,
     });
     expect(row.subtitle).toBe('Ended');
-    expect(row.action).toBe('manage');
+    expect(row.action).toBe('none');
   });
 
   it('renders an inert busy row without a web action while the query is pending', () => {
@@ -177,6 +182,7 @@ describe('getOrgKiloPassRowState', () => {
     expect(row).toEqual({
       subtitle: 'Could not load status',
       attention: true,
+      tone: 'warn',
       action: 'retry',
       actionLabel: 'Retry',
       accessibilityHint: 'Retries loading Kilo Pass status.',
@@ -186,7 +192,7 @@ describe('getOrgKiloPassRowState', () => {
 
   it('keeps showing stale summary data when a background refetch fails', () => {
     const row = getOrgKiloPassRowState({ data: summary(), isError: true });
-    expect(row.action).toBe('manage');
+    expect(row.action).toBe('none');
     expect(row.subtitle).toBe('$49 · 8 paid seats');
   });
 });

@@ -10,8 +10,7 @@ import type {
   ExaUsageRecord,
   LlmUsageQueueMessage,
 } from '@kilocode/usage-contracts';
-import { enqueueVercelUsage } from '@kilocode/usage-queue/vercel/publisher';
-import { USAGE_VERCEL_QUEUE_ENABLED } from '@kilocode/usage-queue/vercel/config';
+import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
 import { getVercelExecutionRegion } from '@kilocode/worker-utils/vercel-execution-region';
 
 export const USAGE_ENQUEUE_TIMEOUT_MS = 2_000;
@@ -136,33 +135,11 @@ function reportAttempt(diagnostic: AttemptDiagnostic): void {
   }
 }
 
-const LOOPBACK_HOSTNAMES: ReadonlySet<string> = new Set(['localhost', '127.0.0.1', '[::1]']);
-
-/**
- * `fetch` only speaks http(s). `new URL` accepts any `scheme:`, so a value like
- * `localhost:3000/usage` parses as a `localhost:` URL with no host and would fail every
- * attempt. The Bearer secret must never cross the network in clear text, so plain HTTP is
- * accepted only for a loopback host, as in local fixtures. Every Cloudflare HTTP publication
- * path goes through this check.
- */
-function parsePublisherUrl(value: string): URL | null {
-  try {
-    const url = new URL(value);
-    if (url.protocol === 'https:') return url;
-    return url.protocol === 'http:' && LOOPBACK_HOSTNAMES.has(url.hostname) ? url : null;
-  } catch {
-    return null;
-  }
-}
-
 /** HTTP 202 confirms enqueueing, not a committed usage row. */
 export async function enqueueUsage(
   payload: LlmUsageQueueMessage,
   { retryTransientFailures = false }: { retryTransientFailures?: boolean } = {}
 ): Promise<UsageEnqueueOutcome> {
-  if (USAGE_VERCEL_QUEUE_ENABLED) {
-    return enqueueVercelUsage(payload);
-  }
   return publishToUsageIngest({ usageId: payload.core.id }, USAGE_INGEST_URL, payload, {
     retryTransientFailures,
   });
@@ -181,7 +158,7 @@ function usageIngestSiblingUrl(
   usageIngestUrl: string | undefined,
   siblingPath: string
 ): string | undefined {
-  const url = usageIngestUrl ? parsePublisherUrl(usageIngestUrl) : null;
+  const url = usageIngestUrl ? parseInternalServiceUrl(usageIngestUrl) : null;
   if (!url || url.pathname !== USAGE_INGEST_PATH || url.search || url.hash) return undefined;
   url.pathname = siblingPath;
   return url.toString();
@@ -189,8 +166,7 @@ function usageIngestSiblingUrl(
 
 /**
  * Publishes the bare Enkrypt usage write to the usage-ingest `/enkrypt-usage` path, which wraps it
- * in the tagged queue envelope. Always Cloudflare HTTP with transient retries: the staging Vercel
- * queue carries LLM usage only.
+ * in the tagged queue envelope. Always Cloudflare HTTP with transient retries.
  */
 export async function enqueueEnkryptUsage(
   usageWrite: EnkryptUsageWriteInput
@@ -241,7 +217,7 @@ async function publishToUsageIngest(
 
   // A URL that is not an absolute http(s) endpoint is configuration, not transport: no
   // request is attempted, so the caller must fall back exactly like a missing publisher.
-  const parsedUrl = parsePublisherUrl(ingestUrl);
+  const parsedUrl = parseInternalServiceUrl(ingestUrl);
   if (!parsedUrl) return reportUnavailable(identity, 'publisher_not_configured');
   const url = parsedUrl.toString();
 

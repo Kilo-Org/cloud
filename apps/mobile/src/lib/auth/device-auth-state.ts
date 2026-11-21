@@ -4,21 +4,14 @@ import { type PendingLinkResult } from '@/lib/auth/native-auth-contract';
 type DeviceAuthStatus = 'idle' | 'pending' | 'approved' | 'denied' | 'expired' | 'error';
 
 /**
- * A device-auth error stored untranslated. Almost every site owns a catalog
+ * A device-auth error stored untranslated. Every device-auth error is a catalog
  * key, so the screen translates it at render and a language switch re-renders
- * the banner in the new language; the one server-authored case (the 429 start
- * refusal's own body text) has no key and flows through as text.
+ * the banner in the new language.
  */
-export type DeviceAuthError =
-  | { kind: 'key'; key: AuthErrorMessageKey }
-  | { kind: 'text'; text: string };
+export type DeviceAuthError = { kind: 'key'; key: AuthErrorMessageKey };
 
 export function deviceAuthErrorKey(key: AuthErrorMessageKey): DeviceAuthError {
   return { kind: 'key', key };
-}
-
-export function deviceAuthErrorText(text: string): DeviceAuthError {
-  return { kind: 'text', text };
 }
 
 export type DeviceAuthState = {

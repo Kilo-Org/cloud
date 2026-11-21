@@ -6,16 +6,16 @@
     <title>{{ heading }}</title>
   </head>
   <body
+    class="kc-page kc-strong"
     style="
       margin: 0;
       padding: 0;
       font-family:
         -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      background-color: #ffffff;
       color: #1a1a1a;
     "
   >
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #ffffff">
+    <table class="kc-page" width="100%" cellpadding="0" cellspacing="0">
       <tr>
         <td align="center" style="padding: 40px 20px">
           <table width="520" cellpadding="0" cellspacing="0">
@@ -23,6 +23,7 @@
             <tr>
               <td style="padding: 40px 40px 20px">
                 <h1
+                  class="kc-strong"
                   style="
                     margin: 0;
                     font-size: 24px;
@@ -41,6 +42,7 @@
             <tr>
               <td style="padding: 0 40px 20px">
                 <p
+                  class="kc-text"
                   style="
                     margin: 0 0 16px;
                     font-size: 14px;
@@ -62,11 +64,13 @@
                   width="100%"
                   cellpadding="0"
                   cellspacing="0"
+                  class="kc-box"
                   style="background-color: #f6f6f4; border: 1px solid #ebebea; border-radius: 10px"
                 >
                   <tr>
                     <td style="padding: 16px 20px">
                       <p
+                        class="kc-muted"
                         style="
                           margin: 0 0 8px;
                           font-size: 13px;
@@ -77,12 +81,15 @@
                             sans-serif;
                         "
                       >
-                        <strong style="color: #1a1a1a">{{ amount_label }}:</strong>
+                        <strong class="kc-strong" style="color: #1a1a1a"
+                          >{{ amount_label }}:</strong
+                        >
                         ${{ amount_usd }} USD
                       </p>
                       {{ service_fee_section }} {{ credits_row_section }} {{ credit_expiry_section
                       }}
                       <p
+                        class="kc-muted"
                         style="
                           margin: 0;
                           font-size: 13px;
@@ -93,7 +100,8 @@
                             sans-serif;
                         "
                       >
-                        <strong style="color: #1a1a1a">Date:</strong> {{ purchase_date }}
+                        <strong class="kc-strong" style="color: #1a1a1a">Date:</strong> {{
+                        purchase_date }}
                       </p>
                     </td>
                   </tr>
@@ -108,6 +116,7 @@
                     <td align="center" style="padding: 10px 0 20px">
                       <a
                         href="{{ credits_url }}"
+                        class="kc-btn"
                         style="
                           display: inline-block;
                           padding: 10px 20px;
@@ -128,6 +137,7 @@
                   </tr>
                 </table>
                 <p
+                  class="kc-muted"
                   style="
                     margin: 0;
                     font-size: 13px;
@@ -144,8 +154,9 @@
             </tr>
             <!-- Sign-off -->
             <tr>
-              <td style="padding: 0 40px 40px; border-top: 1px solid #ebebea">
+              <td class="kc-divider" style="padding: 0 40px 40px; border-top: 1px solid #ebebea">
                 <p
+                  class="kc-text"
                   style="
                     margin: 20px 0 0;
                     font-size: 14px;
@@ -159,6 +170,7 @@
                   If you have any questions, reply to this email — we're here to help.
                 </p>
                 <p
+                  class="kc-text"
                   style="
                     margin: 16px 0 0;
                     font-size: 14px;
@@ -177,8 +189,13 @@
           <!-- Branding Footer -->
           <table width="520" cellpadding="0" cellspacing="0">
             <tr>
-              <td align="center" style="padding: 30px 20px; border-top: 1px solid #eee">
+              <td
+                align="center"
+                class="kc-divider"
+                style="padding: 30px 20px; border-top: 1px solid #eee"
+              >
                 <p
+                  class="kc-faint"
                   style="
                     margin: 0;
                     font-size: 11px;

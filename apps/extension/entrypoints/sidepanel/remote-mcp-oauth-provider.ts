@@ -9,7 +9,7 @@ import type { RemoteMcpOAuthState, RemoteMcpServer } from '../../src/shared/remo
 import type { RemoteMcpStorageArea } from '../../src/shared/remote-mcp-storage';
 import {
   loadRemoteMcpStore,
-  saveRemoteMcpStore,
+  updateRemoteMcpStore,
   upsertRemoteMcpServer,
 } from '../../src/shared/remote-mcp-storage';
 import {
@@ -55,20 +55,23 @@ export const createRemoteMcpOAuthProvider = ({
   // Merge a partial OAuth state into this server's persisted oauth blob.
   // Passing no patch clears the server's oauth state entirely.
   const updateOAuthState = async (patch?: Partial<RemoteMcpOAuthState>): Promise<void> => {
-    const store = await loadRemoteMcpStore(storageArea);
-    const current = store.servers.find(candidate => candidate.id === server.id);
-    if (current === undefined) {
-      return;
-    }
+    await updateRemoteMcpStore(storageArea, store => {
+      const current = store.servers.find(candidate => candidate.id === server.id);
+      if (current === undefined) {
+        return { result: undefined, store };
+      }
 
-    const existing = current.auth.type === 'oauth' ? current.auth.oauth : undefined;
-    const oauth = patch === undefined ? undefined : { ...existing, ...patch };
+      const existing = current.auth.type === 'oauth' ? current.auth.oauth : undefined;
+      const oauth = patch === undefined ? undefined : { ...existing, ...patch };
 
-    const next = upsertRemoteMcpServer(store, {
-      ...current,
-      auth: { oauth, type: 'oauth' },
+      return {
+        result: undefined,
+        store: upsertRemoteMcpServer(store, {
+          ...current,
+          auth: { oauth, type: 'oauth' },
+        }),
+      };
     });
-    await saveRemoteMcpStore(storageArea, next);
   };
 
   return {

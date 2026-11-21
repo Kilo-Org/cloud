@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Part } from './types';
+import { toolStateOf } from './part-utils';
 
 /**
  * Client side of the Cloud Agent tool display projection
@@ -31,8 +32,10 @@ export function readToolDetailMarker(part: unknown): ToolDetailMarker | undefine
 }
 
 function settledToolIdentity(part: Part): string | undefined {
-  if (part.type !== 'tool' || part.state.status !== 'completed') return undefined;
-  return JSON.stringify([part.callID, part.state.time.start, part.state.time.end]);
+  if (part.type !== 'tool') return undefined;
+  const state = toolStateOf(part);
+  if (state === null || state.status !== 'completed') return undefined;
+  return JSON.stringify([part.callID, state.time?.start, state.time?.end]);
 }
 
 /**

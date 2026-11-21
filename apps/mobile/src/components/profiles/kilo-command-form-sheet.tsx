@@ -21,12 +21,13 @@ import {
 import { SheetHeader } from '@/components/sheet-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
-import { Switch } from '@/components/ui/switch';
-import { Text } from '@/components/ui/text';
+import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroup } from '@/components/ui/row-group';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
-import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
+import { MAX_PROFILE_KILO_COMMANDS } from '@/lib/agent-profile-forms';
 import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 
 /** Catalog key for each refused field, so the message lands under the input at fault. */
 const ERROR_KEYS = {
@@ -66,8 +67,12 @@ function nameErrorMessage(
   return undefined;
 }
 
-/** The save's refusal: a name the server already has, or any other refusal. */
+/**
+ * The save's refusal: the per-profile command cap, a name the server already
+ * has, or any other refusal.
+ */
 export type KiloCommandSaveFailure =
+  | { readonly kind: 'limit' }
   | { readonly kind: 'name-conflict' }
   | { readonly kind: 'refused' };
 
@@ -106,10 +111,11 @@ type KiloCommandFormSheetProps = Readonly<{
  * the reader never chose. A name the profile already uses is refused here from
  * `existingNames`, and one only the server can detect (a stale list) arrives in
  * `saveFailure` as `name-conflict` and shows the same message under the field.
- * Any other refused save arrives as `refused` and renders one line inside the
- * sheet, because a toast behind the open sheet is invisible. Create omits empty
- * optional fields so the DB default applies; update sends `null` so an emptied
- * field clears.
+ * A create the profile's cap refuses arrives as `limit` and renders the cap
+ * copy as a warning; any other refused save arrives as `refused` and renders
+ * one line inside the sheet, because a toast behind the open sheet is
+ * invisible. Create omits empty optional fields so the DB default applies;
+ * update sends `null` so an emptied field clears.
  */
 export function KiloCommandFormSheet({
   draftScope,
@@ -176,6 +182,16 @@ export function KiloCommandFormSheet({
   };
 
   const nameError = nameErrorMessage(t, error, saveFailure?.kind === 'name-conflict');
+  // The one refusal line: a create past the cap names the cap as a warning, and
+  // any other refusal keeps the error tone.
+  let refusalMessage: string | null = null;
+  let refusalTone: 'warn' | 'error' = 'error';
+  if (saveFailure?.kind === 'limit') {
+    refusalMessage = t('profiles.slashCommands.limitReached', { max: MAX_PROFILE_KILO_COMMANDS });
+    refusalTone = 'warn';
+  } else if (saveFailure?.kind === 'refused') {
+    refusalMessage = t('profiles.slashCommands.saveFailed');
+  }
 
   return (
     <SessionPageSheet visible onClose={onClose} onRequestDismiss={requestDismiss}>
@@ -190,15 +206,12 @@ export function KiloCommandFormSheet({
       <ScrollView
         ref={scrollRef}
         className="flex-1"
-        contentContainerClassName="gap-4 px-6 pt-4 pb-8"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
-        <AccessibleStatus
-          message={saveFailure?.kind === 'refused' ? t('profiles.slashCommands.saveFailed') : null}
-          className="text-sm"
-        />
+        <AccessibleStatus message={refusalMessage} tone={refusalTone} className="text-sm" />
         <FormField
           label={t('profiles.slashCommands.name')}
           defaultValue={nameRef.current}
@@ -267,17 +280,15 @@ export function KiloCommandFormSheet({
             modelRef.current = value;
           }}
         />
-        <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-          <Text {...HIDDEN_LABEL_PROPS} className="flex-1 text-sm font-medium text-foreground">
-            {t('profiles.slashCommands.subtask')}
-          </Text>
-          <Switch
+        <RowGroup>
+          <PreferenceRow
+            title={t('profiles.slashCommands.subtask')}
             value={subtask}
             disabled={isSaving}
-            accessibilityLabel={t('profiles.slashCommands.subtask')}
             onValueChange={setSubtask}
           />
-        </View>
+        </RowGroup>
+        <View className="h-3" />
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
       {dialog}

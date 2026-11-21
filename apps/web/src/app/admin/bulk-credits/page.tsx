@@ -125,6 +125,9 @@ function BulkCreditsTab() {
   const [expirationDate, setExpirationDate] = useState<string>('');
   const [description, setDescription] = useState<string>('');
 
+  // A YYYY-MM-DD value is midnight UTC, so the earliest acceptable date is the next UTC day.
+  const minExpiryDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
   const [creditResults, setCreditResults] = useState<CreditResult[] | null>(null);
 
   const matchUsersMutation = useMutation(
@@ -483,6 +486,7 @@ function BulkCreditsTab() {
                         type="date"
                         value={expirationDate}
                         onChange={e => setExpirationDate(e.target.value)}
+                        min={minExpiryDate}
                         disabled={!canManageCredits}
                       />
                     </div>

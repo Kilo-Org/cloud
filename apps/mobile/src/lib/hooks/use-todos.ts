@@ -214,14 +214,10 @@ export function useSessionTodo(sessionId: string) {
   return useQuery(trpc.todos.items.forSession.queryOptions({ sessionId }));
 }
 
-export function useTodoCandidates(
-  sessionId: string,
-  organizationId: string | null,
-  enabled: boolean
-) {
+export function useTodoCandidates(sessionId: string, enabled: boolean) {
   const trpc = useTRPC();
   return useQuery({
-    ...trpc.todos.items.candidatesForSession.queryOptions({ sessionId, organizationId }),
+    ...trpc.todos.items.candidatesForSession.queryOptions({ sessionId }),
     enabled,
   });
 }

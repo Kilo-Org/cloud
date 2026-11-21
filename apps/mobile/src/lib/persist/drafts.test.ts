@@ -30,8 +30,8 @@ import {
   DRAFT_MAX_BYTES,
   DRAFT_MAX_ENTRIES,
   draftScope,
+  flushAllDrafts,
   flushDraft,
-  isMergeDraft,
   isStringDraft,
   loadDraft,
   NEW_SESSION_DRAFT_KEY,
@@ -47,6 +47,7 @@ import {
   securityDismissDraftKey,
 } from './drafts';
 import { forgetShapeMismatchesForTests } from './draft-read-report';
+import { isMergeDraft } from './merge-draft';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import { inFlightSaveCount } from '@/lib/hooks/save-chain';
 /* eslint-enable import/first */
@@ -152,11 +153,19 @@ describe('draft scope and entity keys', () => {
     );
   });
 
-  it('isMergeDraft accepts a title+message object and rejects other shapes', () => {
+  it('isMergeDraft accepts any subset of the authored fields and rejects other shapes', () => {
     expect(isMergeDraft({ title: 'T', message: 'M' })).toBe(true);
     expect(isMergeDraft({ title: '', message: '' })).toBe(true);
-    expect(isMergeDraft({ title: 'T' })).toBe(false);
-    expect(isMergeDraft({ message: 'M' })).toBe(false);
+    // Every field is optional: the sheet persists only what the person authored,
+    // so a method-only tap stores `{ method }` and a text-only edit stores none.
+    expect(isMergeDraft({})).toBe(true);
+    expect(isMergeDraft({ title: 'T' })).toBe(true);
+    expect(isMergeDraft({ message: 'M' })).toBe(true);
+    expect(isMergeDraft({ method: 'squash' })).toBe(true);
+    // The method is an open string, narrowed against the pull request's allowed
+    // methods at restore, so another build's record still loads its text.
+    expect(isMergeDraft({ title: 'T', message: 'M', method: 'octopus' })).toBe(true);
+    expect(isMergeDraft({ title: 'T', message: 'M', method: 1 })).toBe(false);
     expect(isMergeDraft({ title: 1, message: 'M' })).toBe(false);
     expect(isMergeDraft({ title: 'T', message: 2 })).toBe(false);
     expect(isMergeDraft('not an object')).toBe(false);
@@ -236,6 +245,34 @@ describe('merge, reply, and comment keys restore per account and destination', (
     saveDraft('u1', key, { title: 'T', message: 'M' });
     await flushDraft('u1', key);
     await expect(loadDraft('u1', key, isMergeDraft)).resolves.toEqual({ title: 'T', message: 'M' });
+  });
+
+  it('round-trips the chosen merge method with the draft', async () => {
+    const key = prMergeDraftKey('acme', 'kilo', 42);
+    saveDraft('u1', key, { title: 'T', message: 'M', method: 'squash' });
+    await flushDraft('u1', key);
+    await expect(loadDraft('u1', key, isMergeDraft)).resolves.toEqual({
+      title: 'T',
+      message: 'M',
+      method: 'squash',
+    });
+  });
+
+  it('keeps the user text of a record whose method this build cannot restore', async () => {
+    const key = prMergeDraftKey('acme', 'kilo', 42);
+    // Another build persisted a method this one does not know. The text is
+    // still the person's, so the record must load rather than be classified as
+    // a shape mismatch (which `drafts.ts` leaves stored for the other build).
+    seedStoredValue(
+      draftScope('u1'),
+      key,
+      JSON.stringify({ title: 'T', message: 'M', method: 'octopus' })
+    );
+    await expect(loadDraft('u1', key, isMergeDraft)).resolves.toEqual({
+      title: 'T',
+      message: 'M',
+      method: 'octopus',
+    });
   });
 
   it('does not restore a merge draft under a different account or PR', async () => {
@@ -364,6 +401,46 @@ describe('debounce', () => {
     expect(kvMock.setItem).toHaveBeenCalledWith('draft:u1', 'k', '"forced"');
     vi.advanceTimersByTime(DRAFT_DEBOUNCE_MS * 2);
     expect(kvMock.setItem).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('flushAllDrafts', () => {
+  it('writes every pending draft once and leaves no timer behind', async () => {
+    vi.useFakeTimers();
+    saveDraft('u1', 'A', 'va');
+    saveDraft('u1', 'B', { nested: true });
+
+    await expect(flushAllDrafts()).resolves.toBeUndefined();
+
+    expect(kvMock.setItem).toHaveBeenCalledTimes(2);
+    expect(kvMock.setItem).toHaveBeenCalledWith('draft:u1', 'A', '"va"');
+    expect(kvMock.setItem).toHaveBeenCalledWith('draft:u1', 'B', '{"nested":true}');
+
+    // The map was drained, so no debounced timer fires the same write again and
+    // a second flush has nothing left to force.
+    await vi.advanceTimersByTimeAsync(DRAFT_DEBOUNCE_MS * 2);
+    expect(kvMock.setItem).toHaveBeenCalledTimes(2);
+    await expect(flushAllDrafts()).resolves.toBeUndefined();
+    expect(kvMock.setItem).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not write back a key cleared before the flush', async () => {
+    vi.useFakeTimers();
+    saveDraft('u1', 'A', 'va');
+    saveDraft('u1', 'B', 'vb');
+
+    // Discard robs the pending entry of its timer, so the flush must not find
+    // it and resurrect the text the person dropped.
+    await clearDraft('u1', 'A');
+    await flushAllDrafts();
+
+    expect(kvMock.setItem).toHaveBeenCalledTimes(1);
+    expect(kvMock.setItem).toHaveBeenCalledWith('draft:u1', 'B', '"vb"');
+    expect(kvMock.setItem).not.toHaveBeenCalledWith('draft:u1', 'A', expect.anything());
+
+    await vi.advanceTimersByTimeAsync(DRAFT_DEBOUNCE_MS * 2);
+    await expect(loadDraft('u1', 'A', isStringDraft)).resolves.toBeNull();
+    await expect(loadDraft('u1', 'B', isStringDraft)).resolves.toBe('vb');
   });
 });
 

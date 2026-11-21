@@ -114,6 +114,7 @@ import {
   EnkryptBenchmarkSchema,
 } from './schema-types';
 import type {
+  AnthropicUserProfileDeletionReason,
   EnkryptDetectorId,
   EnkryptGuardrailDecision,
   EnkryptGuardrailDirection,
@@ -130,6 +131,7 @@ import type {
   AutoFreeConfig,
   GatewayModelListConfig,
   VercelModelIdOverridesConfig,
+  LatestAliasTargetsConfig,
   PreferredProviderOrderConfig,
   CustomPricingConfig,
   KiloClawAdminAuditAction,
@@ -171,6 +173,7 @@ import type {
   CodeReviewType,
   CodeReviewTriggerSource,
   CodeReviewCouncilResult,
+  ReviewGuidelineImport,
   CodeReviewPlatform,
   ReviewMemoryEvidenceItem,
   ReviewMemoryPlatform,
@@ -552,9 +555,16 @@ export const kilocode_users = pgTable(
     external_id: text().default(sql`null`),
 
     personal_account_disabled: boolean().default(false).notNull(),
+
+    /** Anthropic `uprof_…` user profile that attributes this user's personal Claude traffic. */
+    anthropic_user_profile_id: text(),
   },
   table => [
     unique('UQ_b1afacbcf43f2c7c4cb9f7e7faa').on(table.google_user_email),
+    index('IDX_kilocode_users_anthropic_user_profile_id')
+      .on(table.anthropic_user_profile_id)
+      .where(sql`${table.anthropic_user_profile_id} IS NOT NULL`)
+      .concurrently(),
     index('IDX_kilocode_users_signup_ip_created_at').on(table.signup_ip, table.created_at),
     index('IDX_kilocode_users_next_credit_expiration_at')
       .on(table.next_credit_expiration_at)
@@ -3422,8 +3432,17 @@ export const organizations = pgTable(
     directory_idp_id: text(),
     // Identifier for this organization in the customer's own system.
     external_org_id: text(),
+    /**
+     * Anthropic `uprof_…` user profile that attributes this organization's Claude
+     * traffic. A sub-organization shares its parent's profile.
+     */
+    anthropic_user_profile_id: text(),
   },
   table => [
+    index('IDX_organizations_anthropic_user_profile_id')
+      .on(table.anthropic_user_profile_id)
+      .where(sql`${table.anthropic_user_profile_id} IS NOT NULL`)
+      .concurrently(),
     check('organizations_name_not_empty_check', sql`length(trim(${table.name})) > 0`),
     check(
       'organizations_not_parented_by_self_check',
@@ -5335,6 +5354,72 @@ export const webhook_events = pgTable(
   ]
 );
 
+// Replaces `webhook_events`, which keeps serving reads until its rows age out.
+// Partitioned daily on created_at in the migration; Drizzle cannot express it.
+// `apps/web/src/lib/integrations/db/webhook-event-partitions.ts` creates future
+// partitions and drops ones past retention.
+//
+// No foreign keys to kilocode_users or organizations: creating, detaching or
+// dropping a partition of a table with those keys locks both referenced tables,
+// and the drop takes ACCESS EXCLUSIVE on them. User deletion removes these rows
+// explicitly, and retention bounds anything else.
+//
+// Deduplication lives in `webhook_event_signatures`: a unique key on a
+// partitioned table must include created_at, which a redelivery does not share.
+export const webhook_events_v2 = pgTable(
+  'webhook_events_v2',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`),
+    owned_by_organization_id: uuid(),
+    owned_by_user_id: text(),
+    platform: text().notNull(),
+    event_type: text().notNull(),
+    event_action: text(),
+    payload: jsonb().notNull(),
+    headers: jsonb().notNull(),
+    processed: boolean().notNull().default(false),
+    processed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    handlers_triggered: text().array().default([]).notNull(),
+    errors: jsonb(),
+    event_signature: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.id, table.created_at] }),
+    index('IDX_webhook_events_v2_owned_by_org_id_created_at').on(
+      table.owned_by_organization_id,
+      table.created_at
+    ),
+    index('IDX_webhook_events_v2_owned_by_user_id_created_at').on(
+      table.owned_by_user_id,
+      table.created_at
+    ),
+    check(
+      'webhook_events_v2_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+  ]
+);
+
+// One row per accepted webhook delivery. Claiming the signature in the same
+// transaction as the event insert is how redeliveries are rejected. No foreign
+// key to webhook_events_v2, so its partitions can be dropped freely.
+export const webhook_event_signatures = pgTable(
+  'webhook_event_signatures',
+  {
+    event_signature: text().notNull().primaryKey(),
+    webhook_event_id: uuid().notNull(),
+    webhook_event_created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [index('IDX_webhook_event_signatures_created_at').on(table.created_at)]
+);
+
 // ============ WEBHOOK TRIGGERS ============
 // Registry for webhook triggers - PostgreSQL is listing/ownership index only
 // Authoritative config data lives in the worker's TriggerDO
@@ -5350,8 +5435,8 @@ export const cloud_agent_webhook_triggers = pgTable(
     organization_id: uuid('organization_id').references(() => organizations.id, {
       onDelete: 'cascade',
     }),
-    // Target type: 'cloud_agent' (default) or 'kiloclaw_chat'
     target_type: text('target_type').notNull().default('cloud_agent'),
+    cloud_agent_session_id: text('cloud_agent_session_id'),
     // KiloClaw Chat target: which instance to send messages to
     kiloclaw_instance_id: uuid('kiloclaw_instance_id').references(() => kiloclaw_instances.id),
     // Activation mode: 'webhook' (default) or 'scheduled' (cron-based)
@@ -5411,6 +5496,15 @@ export const cloud_agent_webhook_triggers = pgTable(
       sql`(
         ${table.target_type} != 'kiloclaw_chat' OR
         ${table.kiloclaw_instance_id} IS NOT NULL
+      )`
+    ),
+    check(
+      'CHK_cloud_agent_webhook_triggers_existing_chat_fields',
+      sql`(
+        (${table.target_type} = 'cloud_agent_chat' AND ${table.cloud_agent_session_id} IS NOT NULL
+          AND ${table.github_repo} IS NULL AND ${table.profile_id} IS NULL
+          AND ${table.kiloclaw_instance_id} IS NULL) OR
+        (${table.target_type} != 'cloud_agent_chat' AND ${table.cloud_agent_session_id} IS NULL)
       )`
     ),
     // Scheduled triggers require cron_expression
@@ -5632,6 +5726,11 @@ export const session_step_up_proofs = pgTable(
       table.session_id_hash,
       table.expires_at
     ),
+    // The operation lookup matches user + session + binding hash; without this
+    // index the claim scans every proof of the session.
+    index('idx_session_step_up_proofs_user_session_binding')
+      .on(table.kilo_user_id, table.session_id_hash, table.action_binding_hash)
+      .concurrently(),
     index('idx_session_step_up_proofs_expires_at').on(table.expires_at),
     index('idx_session_step_up_proofs_passkey_credential_id').on(table.passkey_credential_id),
     check('check_session_step_up_proofs_method', sql`${table.method} IN ('webauthn_uv')`),
@@ -5650,6 +5749,7 @@ export type SessionStepUpProof = typeof session_step_up_proofs.$inferSelect;
 export type NewSessionStepUpProof = typeof session_step_up_proofs.$inferInsert;
 
 export type WebhookEvent = typeof webhook_events.$inferSelect;
+export type WebhookEventV2 = typeof webhook_events_v2.$inferSelect;
 
 // ============ MODEL STATS ============
 // Cached model data from OpenRouter and external benchmarks
@@ -6020,15 +6120,73 @@ export const ai_gateway_config = pgTable(
     preferred_models: jsonb().$type<GatewayModelListConfig>(),
     unavailable_models: jsonb().$type<GatewayModelListConfig>(),
     vercel_model_id_overrides: jsonb().$type<VercelModelIdOverridesConfig>(),
+    latest_alias_targets: jsonb().$type<LatestAliasTargetsConfig>(),
     preferred_provider_order: jsonb().$type<PreferredProviderOrderConfig>(),
     custom_pricing: jsonb().$type<CustomPricingConfig>(),
   },
   table => [check('ai_gateway_config_singleton', sql`${table.id} = 1`)]
 );
 
+/**
+ * Anthropic user profiles the daily cleanup deletes. A row is queued when the
+ * profile is detached, before the remote delete, and `deleted_at` is set once
+ * Anthropic confirms it, so a failed delete is retried without relisting the
+ * profile. Deleted rows older than 30 days are pruned.
+ */
+export const anthropic_user_profile_deletions = pgTable(
+  'anthropic_user_profile_deletions',
+  {
+    id: idPrimaryKeyColumn,
+    user_profile_id: text().notNull(),
+    reason: text().$type<AnthropicUserProfileDeletionReason>().notNull(),
+    /** The blocked user the profile was linked to, for `user_blocked` deletions. */
+    kilo_user_id: text(),
+    profile_created_at: timestamp({ withTimezone: true, mode: 'string' }),
+    profile_updated_at: timestamp({ withTimezone: true, mode: 'string' }),
+    queued_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    attempt_count: integer().default(0).notNull(),
+    last_attempt_at: timestamp({ withTimezone: true, mode: 'string' }),
+    /** When Anthropic confirmed the delete; null while it is still pending. */
+    deleted_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    unique('UQ_anthropic_user_profile_deletions_user_profile_id').on(table.user_profile_id),
+    index('IDX_anthropic_user_profile_deletions_deleted_at').on(table.deleted_at),
+  ]
+);
+
+export type AnthropicUserProfileDeletion = typeof anthropic_user_profile_deletions.$inferSelect;
+
+/** Where the daily Anthropic user profile cleanup continues its scan of the profile list. */
+export const anthropic_user_profile_cleanup_state = pgTable(
+  'anthropic_user_profile_cleanup_state',
+  {
+    id: integer().primaryKey().default(1),
+    /** The `next_page` token of the oldest-first profile list; null starts from the beginning. */
+    next_page: text(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [check('anthropic_user_profile_cleanup_state_singleton', sql`${table.id} = 1`)]
+);
+
 export const blacklisted_domains = pgTable('blacklisted_domains', {
   domain: text().primaryKey(),
 });
+
+export const blacklisted_domains_settings = pgTable(
+  'blacklisted_domains_settings',
+  {
+    id: integer().primaryKey().default(1),
+    blocked_signup_tlds: text().array().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    updated_by: text(),
+    updated_by_email: text(),
+  },
+  table => [check('blacklisted_domains_settings_singleton', sql`${table.id} = 1`)]
+);
 
 export const ai_gateway_sync_providers_state = pgTable(
   'ai_gateway_sync_providers_state',
@@ -6138,6 +6296,7 @@ export const cloud_agent_code_reviews = pgTable(
     repository_review_instructions_used: boolean().notNull().default(false),
     repository_review_instructions_ref: text(),
     repository_review_instructions_truncated: boolean().notNull().default(false),
+    repository_review_instructions_imports: jsonb().$type<ReviewGuidelineImport[]>(),
 
     // Previous summary captured before the agent updates the platform comment
     previous_summary_body: text(),
@@ -7169,10 +7328,13 @@ export type NewCloudAgentSession = typeof cloud_agent_sessions.$inferInsert;
  * Pending-upload ledger for cloud agent attachments. An uploader admits a row
  * in status 'pending' before its R2 write (the presigned composer path and the
  * Kilo Bot upload path); send-time finalization flips the matching rows to
- * 'linked' in one transaction; a cron reaper deletes the R2 objects behind
- * abandoned 'pending' rows whose lease has expired and records them as
- * 'reaped'. kilo_user_id is text() because user IDs are not always UUIDs
- * (OAuth users).
+ * 'linked' in one transaction. A client release claims its own 'pending' rows
+ * as 'released', which keeps the object key until the presigned-URL TTL passes
+ * so a late PUT is still attributable; a released row counts against neither
+ * the per-message nor the per-account ceiling. A cron reaper deletes the R2
+ * objects behind every non-linked state, 'pending' and 'released', whose lease
+ * has expired, recording each claimed row as 'reaped'. kilo_user_id is text()
+ * because user IDs are not always UUIDs (OAuth users).
  */
 export const cloud_agent_pending_uploads = pgTable(
   'cloud_agent_pending_uploads',
@@ -7193,14 +7355,16 @@ export const cloud_agent_pending_uploads = pgTable(
       table.message_uuid,
       table.status
     ),
-    // The hourly reaper scans `status = 'pending' AND expires_at < now()`,
-    // which the composite index above cannot serve.
+    // The hourly reaper scans
+    // `status IN ('pending', 'released') AND expires_at < now()`, which the
+    // composite index above cannot serve.
     index('IDX_cloud_agent_pending_uploads_expired')
       .on(table.expires_at)
-      .where(sql`${table.status} = 'pending'`),
+      .concurrently()
+      .where(sql`${table.status} IN ('pending', 'released')`),
     check(
       'cloud_agent_pending_uploads_status_check',
-      sql`${table.status} IN ('pending', 'linked', 'reaped')`
+      sql`${table.status} IN ('pending', 'linked', 'released', 'reaped')`
     ),
   ]
 );
@@ -7512,6 +7676,42 @@ export const device_refresh_tokens = pgTable(
 export type DeviceRefreshToken = typeof device_refresh_tokens.$inferSelect;
 
 /**
+ * A one-time, short-lived grant that opens one app-shell page for one user.
+ *
+ * The native app mints it through an authenticated mutation immediately before
+ * it opens the in-app browser, and the web consumes it once at
+ * `/app-shell/handoff`. The row carries the target the token opens, so the
+ * consuming request cannot redirect anywhere else, and only the SHA-256 digest
+ * of the issued token is stored: a leaked row authorizes nothing.
+ */
+export const app_shell_handoff_tokens = pgTable(
+  'app_shell_handoff_tokens',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    token_hash: text().notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    /** The allow-listed shell path this token opens, including its query. */
+    target_path: text().notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_app_shell_handoff_tokens_token_hash').on(table.token_hash),
+    index('IDX_app_shell_handoff_tokens_expires_at').on(table.expires_at),
+    index('IDX_app_shell_handoff_tokens_kilo_user_id').on(table.kilo_user_id),
+  ]
+);
+
+export type AppShellHandoffToken = typeof app_shell_handoff_tokens.$inferSelect;
+export type NewAppShellHandoffToken = typeof app_shell_handoff_tokens.$inferInsert;
+
+/**
  * A one-time, short-lived grant that lets a native app session add, rename, or
  * remove a passkey.
  *
@@ -7700,8 +7900,9 @@ export const openai_chatgpt_connections = pgTable(
     /**
      * True for the organization's shared-services connection: one row per
      * organization, used by the platform's own callers (code reviewer, Slack
-     * bot) instead of any member's personal connection. The
-     * connecting person is recorded in `kilo_user_id` and `created_by`.
+     * bot) instead of any member's personal connection. The connecting person
+     * is recorded in `created_by`, and the organization's shared connection is
+     * revalidated against that person before it serves a request.
      */
     is_shared_services: boolean().default(false).notNull(),
     /**
@@ -8804,6 +9005,11 @@ export const agent_environment_profile_vars = pgTable(
     key: text().notNull(),
     value: text().notNull(), // Plaintext if is_secret=false, encrypted if is_secret=true
     is_secret: boolean().notNull().default(false),
+    delivery: text({ enum: ['env', 'network'] })
+      .notNull()
+      .default('env'),
+    allowed_hosts: text().array(),
+    injection_locations: text().array(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -9007,6 +9213,11 @@ export const cloud_agent_environment_vars = pgTable(
     key: text().notNull(),
     value: text().notNull(), // Plaintext if is_secret=false, RSA+AES envelope JSON if is_secret=true
     is_secret: boolean().notNull().default(false),
+    delivery: text({ enum: ['env', 'network'] })
+      .notNull()
+      .default('env'),
+    allowed_hosts: text().array(),
+    injection_locations: text().array(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -9144,6 +9355,10 @@ export type CloudAgentBuiltinAgentOverrides = Record<
   { model?: string | null; variant?: string; disable?: boolean }
 >;
 
+// Map of gateway model id (for example `openai/gpt-6.1-sol`) to a context-window
+// token cap. See ModelContextLimitsSchema in `@kilocode/cloud-agent-profile`.
+export type CloudAgentModelContextLimits = Record<string, number>;
+
 export const cloud_agent_user_settings = pgTable(
   'cloud_agent_user_settings',
   {
@@ -9152,6 +9367,9 @@ export const cloud_agent_user_settings = pgTable(
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     workspace_order: text().$type<'manual' | 'created' | 'activity'>().notNull().default('manual'),
     builtin_agents: jsonb().$type<CloudAgentBuiltinAgentOverrides>().notNull().default({}),
+    model_context_limits: jsonb().$type<CloudAgentModelContextLimits>().notNull().default({}),
+    web_search_enabled: boolean().notNull().default(true),
+    web_search_provider: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -11209,11 +11427,8 @@ export const enkrypt_usage = pgTable(
       .references(() => enkrypt_usage_decision.decision_id),
     enkrypt_credits_cost: real(),
     charged_microdollars: bigint({ mode: 'number' }).notNull(),
-    // How long the request waited for the guardrail verdict: before its upstream call for the input
-    // guardrail, and between the end of the upstream response and its release for the output
-    // guardrail. Set only on the final call of the guardrail's blocking scan, or of its log-only
-    // scan when no blocking call was recorded, so it is counted once per guardrail and request; null
-    // on other calls or when the request returned before awaiting the verdict.
+    // How long this Enkrypt call took, from sending the request until the response was read or the
+    // call failed.
     added_latency_ms: integer(),
     // Null on rows recorded before the output guardrail existed, which are all input guardrail calls.
     guardrail_id: integer().references(() => enkrypt_usage_guardrail.guardrail_id),

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 
-import { API_BASE_URL, WEB_BASE_URL } from '@/lib/config';
+import { appShellSignInUrl } from '@/lib/app-shell-handoff';
+import { API_BASE_URL } from '@/lib/config';
 import { openAuthBrowser, resolveAuthBrowserKind } from '@/lib/auth/auth-browser';
-import { getDeviceAuth429Error } from '@/lib/auth/poll-response';
+import { getDeviceAuthStartRefusalError } from '@/lib/auth/poll-response';
 import { parseAuthError, parseDeviceAuthCodeResponse } from '@/lib/auth/native-auth-contract';
 import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 import {
@@ -13,7 +14,7 @@ import {
   idleDeviceAuthState,
   pendingDeviceAuthState,
 } from '@/lib/auth/device-auth-state';
-import { startDeviceAuthPoll } from '@/lib/auth/device-auth-poll';
+import { deviceAuthExpiresAt, startDeviceAuthPoll } from '@/lib/auth/device-auth-poll';
 import {
   clearPendingExternalAuth,
   readPendingExternalAuth,
@@ -116,7 +117,7 @@ export function useDeviceAuth(): DeviceAuthResult {
         setState,
         cleanup,
         browserKind: resolveAuthBrowserKind(record.verificationUrl),
-        startedAt: record.startedAt,
+        expiresAt: record.expiresAt,
       });
     }
 
@@ -168,26 +169,23 @@ export function useDeviceAuth(): DeviceAuthResult {
         }
 
         if (!response.ok) {
-          if (response.status === 429) {
-            const body = (await response.json().catch(() => undefined)) as
-              | { error?: string }
-              | undefined;
-            setState(errorDeviceAuthState(undefined, getDeviceAuth429Error(body), undefined));
-            return;
-          }
+          // One body read serves both refusals below: the pending-link match and
+          // the stable code that picks the banner copy.
+          const body = await response.json().catch(() => undefined);
           // A link that lapsed or was used elsewhere cannot start a browser sign-in. The
           // pending-link screen shows its own expired state, so this is no error banner.
-          if (response.status === 400 && pendingLinkToken) {
-            const refusal = parseAuthError(await response.json().catch(() => undefined));
-            if (refusal?.code === 'PENDING_LINK_EXPIRED') {
-              setState({ ...idleDeviceAuthState(), expiredPendingLinkToken: pendingLinkToken });
-              return;
-            }
+          if (
+            response.status === 400 &&
+            pendingLinkToken &&
+            parseAuthError(body)?.code === 'PENDING_LINK_EXPIRED'
+          ) {
+            setState({ ...idleDeviceAuthState(), expiredPendingLinkToken: pendingLinkToken });
+            return;
           }
           setState(
             errorDeviceAuthState(
               undefined,
-              deviceAuthErrorKey('authErrors.startSignInFailed'),
+              getDeviceAuthStartRefusalError(body, response.status),
               undefined
             )
           );
@@ -207,8 +205,23 @@ export function useDeviceAuth(): DeviceAuthResult {
         }
 
         const { userCode, deviceCode } = data;
+        const expiresAt = deviceAuthExpiresAt(Date.now(), data.expiresIn);
 
         deviceCodeReference.current = deviceCode;
+
+        // Sign-in uses the server-provided verificationUrl, which points at the
+        // chrome-free `/device-auth` approval page (outside the full web's
+        // navigation, and it closes itself). SSO recovery routes through the app
+        // shell's sign-in page — the marketing sign-in page links to the pricing
+        // site — and hands it the approval page as its callback; the
+        // organization id is NOT put in the URL, it stays in client state and as
+        // a Sentry tag.
+        const verificationUrl = new URL(data.verificationUrl);
+        const callbackPath = `${verificationUrl.pathname}${verificationUrl.search}`;
+        let browserUrl = data.verificationUrl;
+        if (mode === 'sso') {
+          browserUrl = appShellSignInUrl({ email: ssoEmail, callbackPath });
+        }
 
         // Persist the pending transaction so a process death mid-sign-in can
         // resume it. The device code is a secret, so it lives in SecureStore
@@ -216,23 +229,9 @@ export function useDeviceAuth(): DeviceAuthResult {
         void writePendingExternalAuth({
           deviceCode,
           userCode,
-          verificationUrl: data.verificationUrl,
-          startedAt: Date.now(),
+          verificationUrl: browserUrl,
+          expiresAt,
         });
-
-        // Sign-in uses the server-provided verificationUrl which points directly
-        // at /device-auth?code=... SSO recovery routes through the sign-in page
-        // with sso=true and the email so the web SSO page resolves the
-        // organization; the organization id is NOT put in the URL — it stays in
-        // client state and as a Sentry tag.
-        let browserUrl = data.verificationUrl;
-        if (mode === 'sso') {
-          browserUrl = `${WEB_BASE_URL}/users/sign_in?${new URLSearchParams({
-            sso: 'true',
-            email: ssoEmail ?? '',
-            callbackPath: `/device-auth?code=${userCode}&app=1`,
-          }).toString()}`;
-        }
 
         setState(pendingDeviceAuthState(userCode, browserUrl));
 
@@ -248,6 +247,7 @@ export function useDeviceAuth(): DeviceAuthResult {
           // which API opened it: the plain browser on a non-product host (or on
           // Android) needs its own dismissal.
           browserKind: resolveAuthBrowserKind(browserUrl),
+          expiresAt,
         });
 
         await openAuthBrowser(browserUrl);

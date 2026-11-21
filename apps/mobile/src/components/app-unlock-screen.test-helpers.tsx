@@ -123,6 +123,7 @@ const keyboard = vi.hoisted(() => {
 export { announcements, catalogs, lifecycle, native, platform, route, storage };
 vi.mock('@/i18n/catalogs', () => ({ CATALOG_LOADERS: catalogs }));
 vi.mock('expo-local-authentication', () => native);
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('expo-secure-store', () => storage);
 // The E2E fault hook stays closed: rejected reads come from the SecureStore
 // mock, not the bundle-time fault window.
@@ -296,6 +297,7 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({ useCurrentUserId: () => ({ u
 vi.mock('@/lib/form-sheet', () => ({
   useFormSheetDetents: () => ({ fullSheetDetent: 1 }),
   useSheetHeaderTopClearance: () => 0,
+  useSettledSheetHeaderTopClearance: () => ({ clearance: 0, onLayout: vi.fn() }),
   useFormSheetScreenOptions: () => ({
     presentation: 'formSheet',
     sheetAllowedDetents: [0.5, 1],
@@ -366,6 +368,8 @@ vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' })
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
 vi.mock('@/lib/hooks/use-language-preference', () => ({
+  getLanguagePreference: () => 'device',
+  hasLanguagePreferenceWriteInFlight: () => false,
   getResolvedLanguage: () => 'en',
   useLanguagePreference: () => ({ preference: 'device', hasLoaded: true }),
 }));

@@ -54,6 +54,12 @@ vi.mock('expo-router', () => ({
 }));
 // The sheet reaches `voiceInputLanguageDisplayName`, which imports both native
 // modules; mock them so the node environment never loads the native packages.
+// The sheet reads the resolved UI language so its search terms carry that
+// language's generated names; the store behind it reaches expo-secure-store,
+// which the node environment cannot load.
+vi.mock('@/lib/hooks/use-language-preference', () => ({
+  getResolvedLanguage: () => 'de',
+}));
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US' }],
 }));
@@ -91,6 +97,8 @@ const flashListMock = vi.hoisted(
 vi.mock('@shopify/flash-list', () => ({ FlashList: flashListMock }));
 vi.mock('react-native', () => ({
   Keyboard: { dismiss: () => undefined },
+  Pressable: 'Pressable',
+  Text: 'Text',
   View: 'View',
   TextInput: 'TextInput',
   I18nManager: { isRTL: false },
@@ -101,10 +109,18 @@ vi.mock('@/components/picker-sheet', () => ({
     createElement('PickerSheet', props, props.headerContent, props.children),
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/icons', () => ({ Mic: 'Mic', Search: 'Search', SearchX: 'SearchX' }));
+vi.mock('@/components/ui/icons', () => ({
+  Mic: 'Mic',
+  Search: 'Search',
+  SearchX: 'SearchX',
+  X: 'X',
+}));
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 

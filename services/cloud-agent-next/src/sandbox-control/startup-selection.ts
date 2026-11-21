@@ -7,6 +7,7 @@ import {
   type SandboxKind,
 } from '../sandbox-placement.js';
 import type { RuntimeHarness } from '../shared/control-plane-runtime-contract.js';
+import { PROVIDER_DESCRIPTORS } from '../shared/sandbox-provider.js';
 import type { AgentSandboxProvider, Env } from '../types.js';
 import { ProviderCreationError } from './provider.js';
 import { RetiredSandboxProviderError } from './retired-cloudflare-provider.js';
@@ -29,8 +30,9 @@ export type StartupCohortContext = {
 
 const orgIdsSchema = z.array(z.uuid()).min(1);
 
-function configuredOrgIds(raw: string | undefined): string[] | undefined {
+function configuredOrgIds(raw: string | undefined): '*' | string[] | undefined {
   if (raw === undefined) return undefined;
+  if (raw.trim() === '*') return '*';
   const values = raw
     .split(',')
     .map(value => value.trim())
@@ -51,25 +53,37 @@ function isIsolatedNativeSandbox(cohort: StartupCohortContext | undefined): bool
   return sandboxClass === 'isolated-small' || sandboxClass === 'isolated-standard';
 }
 
-function inOrgScope(
-  provider: AgentSandboxProvider,
-  cohort: StartupCohortContext | undefined,
-  orgIds: readonly string[]
-): boolean {
-  if (orgIds.length === 0) return false;
+function cohortOrgId(cohort: StartupCohortContext | undefined): string | undefined {
   const routes = cohort?.preparingRoutes ?? [];
-  if (routes.length === 0) return false;
+  if (routes.length === 0) return undefined;
   let orgId: string | undefined;
   for (const route of routes) {
-    if (route.orgId === undefined || route.orgId === '') return false;
-    if (orgId !== undefined && route.orgId !== orgId) return false;
+    if (route.orgId === undefined || route.orgId === '') return undefined;
+    if (orgId !== undefined && route.orgId !== orgId) return undefined;
     orgId = route.orgId;
   }
-  return (
-    orgId !== undefined &&
-    orgIds.includes(orgId) &&
-    (provider !== 'cloudflare-containers' || isIsolatedNativeSandbox(cohort))
-  );
+  return orgId;
+}
+
+function inOrgScope(
+  cohort: StartupCohortContext | undefined,
+  orgIds: '*' | readonly string[]
+): boolean {
+  if (orgIds === '*') return true;
+  if (orgIds.length === 0) return false;
+  const orgId = cohortOrgId(cohort);
+  return orgId !== undefined && orgIds.includes(orgId);
+}
+
+function allSessionScope(
+  cohort: StartupCohortContext | undefined,
+  allSessionOrgIds: '*' | readonly string[] | undefined
+): boolean {
+  if (allSessionOrgIds === undefined) return false;
+  if (allSessionOrgIds === '*') return true;
+  if (allSessionOrgIds.length === 0) return false;
+  const orgId = cohortOrgId(cohort);
+  return orgId !== undefined && allSessionOrgIds.includes(orgId);
 }
 
 type StartupEnv = Pick<
@@ -80,13 +94,14 @@ type StartupEnv = Pick<
   | 'RUNTIME_INTERACTIVE_ORG_IDS'
   | 'RUNTIME_RELEASE_DESCRIPTOR_KILO2'
   | 'RUNTIME_KILO2_ORG_IDS'
+  | 'RUNTIME_KILO2_ALL_SESSION_ORG_IDS'
 >;
 
 function startupTarget(
   env: StartupEnv,
   provider: AgentSandboxProvider
 ): { mode: 'downloaded'; image: 'runtime-free' } {
-  if (provider === 'cloudflare') throw new RetiredSandboxProviderError('create');
+  if (PROVIDER_DESCRIPTORS[provider].retired) throw new RetiredSandboxProviderError('create');
   if (provider === 'vercel') return { mode: 'downloaded', image: 'runtime-free' };
   if (env.RUNTIME_INTERACTIVE_ORG_IDS !== undefined)
     throw new ProviderCreationError('invalid_configuration');
@@ -102,8 +117,9 @@ function startupTarget(
 /**
  * The harness a sandbox's first allocation selects. Only a downloaded start in
  * the `RUNTIME_KILO2_ORG_IDS` scope runs v2 when every route has the trusted
- * cloud-agent-web origin.
- * An unset list keeps v1 everywhere.
+ * cloud-agent-web origin. `RUNTIME_KILO2_ALL_SESSION_ORG_IDS` admits every
+ * origin and native sandbox class for its own accounts. `*` includes all
+ * organizations and personal accounts. An unset list keeps v1 everywhere.
  */
 export function newSandboxHarness(
   env: StartupEnv,
@@ -112,11 +128,16 @@ export function newSandboxHarness(
 ): RuntimeHarness {
   startupTarget(env, provider);
   const orgIds = configuredOrgIds(env.RUNTIME_KILO2_ORG_IDS);
-  return orgIds !== undefined &&
-    inOrgScope(provider, cohort, orgIds) &&
-    cohort?.preparingRoutes?.every(route => route.billingOrigin === 'cloud-agent-web')
-    ? 'kilo2'
-    : 'kilo';
+  if (orgIds === undefined) return 'kilo';
+  const allSessionOrgIds = configuredOrgIds(env.RUNTIME_KILO2_ALL_SESSION_ORG_IDS);
+  const allSessions = allSessionScope(cohort, allSessionOrgIds);
+  if (!inOrgScope(cohort, orgIds)) return 'kilo';
+  if (provider === 'cloudflare-containers' && !allSessions && !isIsolatedNativeSandbox(cohort))
+    return 'kilo';
+  const routes = cohort?.preparingRoutes ?? [];
+  const webOnly =
+    routes.length > 0 && routes.every(route => route.billingOrigin === 'cloud-agent-web');
+  return routes.length > 0 && (webOnly || allSessions) ? 'kilo2' : 'kilo';
 }
 
 /** Resolve trusted deployment configuration once per create attempt. */

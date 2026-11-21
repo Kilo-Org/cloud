@@ -1,6 +1,11 @@
 /* eslint-disable max-lines, require-await, typescript-eslint/require-await, unicorn/no-useless-undefined -- Fake extension runtime returns verbatim responses for assertions. */
 import { describe, expect, it, vi } from 'vitest';
-import { BROWSER_TOOL_MESSAGE, TAB_NOT_INSPECTABLE_ERROR } from '@/src/shared/tab-debugger';
+import { z } from 'zod';
+import {
+  BROWSER_TOOL_MESSAGE,
+  DISPOSE_BROWSER_CALLER_MESSAGE,
+  TAB_NOT_INSPECTABLE_ERROR,
+} from '@/src/shared/tab-debugger';
 import type {
   BrowserTabInfo,
   BrowserTabsApi,
@@ -9,6 +14,7 @@ import type {
   ChromeDebuggerEventListener,
   TabDebuggerRequest,
 } from '@/src/shared/tab-debugger';
+import { startDownloadHold } from '@/src/shared/browser-download-hold-host';
 
 /*
  * The WXT `defineBackground` global only exists inside the bundler. Stubbing
@@ -50,10 +56,13 @@ interface FakeDebuggerState {
   detachCalls: number;
 }
 
-const createFakeDebuggerApi = (): { api: ChromeDebuggerApi; state: FakeDebuggerState } => {
+const createFakeDebuggerApi = (
+  options: { readonly opensDialogOn?: string | undefined } = {}
+): { api: ChromeDebuggerApi; state: FakeDebuggerState } => {
   const state: FakeDebuggerState = { attachCalls: 0, commands: [], detachCalls: 0 };
   const detachListeners: ChromeDebuggerDetachListener[] = [];
   const eventListeners: ChromeDebuggerEventListener[] = [];
+  let dialogEmitted = false;
   const api: ChromeDebuggerApi = {
     attach: async () => {
       state.attachCalls += 1;
@@ -91,6 +100,20 @@ const createFakeDebuggerApi = (): { api: ChromeDebuggerApi; state: FakeDebuggerS
         method,
         ...(commandParams === undefined ? {} : { params: commandParams }),
       });
+
+      // A page's own script opens the dialog while the call runs, as a click's handler would.
+      if (options.opensDialogOn === method && !dialogEmitted) {
+        dialogEmitted = true;
+
+        for (const listener of eventListeners) {
+          listener({}, 'Page.javascriptDialogOpening', {
+            frameId: 'main',
+            message: 'Saved',
+            type: 'alert',
+            url: 'https://example.com/',
+          });
+        }
+      }
 
       if (method === 'Runtime.evaluate') {
         const expression = commandParams?.['expression'];
@@ -143,18 +166,70 @@ const createFakeTabsApi = (
   return { api, state: { removedListeners } };
 };
 
-const browserToolRequest = (
-  tabId: number,
-  tool: string,
-  args: Record<string, unknown>
-): TabDebuggerRequest => ({
-  arguments: args,
-  tabId,
-  tool,
+/** One browser tool message: the call the model made, and the panel's mode when it has one. */
+const toolRequest = (call: {
+  readonly args?: Record<string, unknown>;
+  readonly safeMode?: boolean;
+  readonly tabId: number;
+  readonly tool: string;
+}): TabDebuggerRequest => ({
+  ...(call.safeMode === undefined ? {} : { safeMode: call.safeMode }),
+  arguments: call.args ?? {},
+  caller: { conversationId: 'conversation-1', kind: 'panel', panelId: 'panel-1' },
+  tabId: call.tabId,
+  tool: call.tool,
   type: BROWSER_TOOL_MESSAGE,
 });
 
+/** The text a browser tool answer carries, for the branches that answer with a result. */
+const modalTextOf = (response: unknown): string => {
+  const parsed = z
+    .object({
+      ok: z.literal(true),
+      result: z.object({ ok: z.boolean(), value: z.unknown().optional() }),
+      type: z.literal(BROWSER_TOOL_MESSAGE),
+    })
+    .safeParse(response);
+  const value = parsed.success ? parsed.data.result.value : undefined;
+
+  return typeof value === 'string' ? value : '';
+};
+
 describe('background browser tool branch', () => {
+  it('tells a safe-mode message the dialog is the user’s to answer, naming no tool it cannot call', async () => {
+    // The page opens a dialog while the tool runs; its frame carries the origin the answer is judged by.
+    const { api: debuggerApi } = createFakeDebuggerApi({ opensDialogOn: 'Runtime.evaluate' });
+    const tabs = new Map([[41, { id: 41, title: 'Example', url: 'https://example.com/' }]]);
+    const { api: tabsApi } = createFakeTabsApi(tabs);
+
+    const response = await handleTabDebuggerRequest({
+      debuggerApi,
+      request: toolRequest({ safeMode: true, tabId: 41, tool: 'kilo_browser_snapshot' }),
+      scriptingApi: undefined,
+      tabsApi,
+    });
+
+    // Through the whole message path: the background passes the mode to the runtime, which answers the modal state.
+    expect(modalTextOf(response)).toContain(
+      'answer it on the page; this mode cannot answer dialogs'
+    );
+  });
+
+  it('names the handler to a danger-mode message, which can answer the same dialog', async () => {
+    const { api: debuggerApi } = createFakeDebuggerApi({ opensDialogOn: 'Runtime.evaluate' });
+    const tabs = new Map([[41, { id: 41, title: 'Example', url: 'https://example.com/' }]]);
+    const { api: tabsApi } = createFakeTabsApi(tabs);
+
+    const response = await handleTabDebuggerRequest({
+      debuggerApi,
+      request: toolRequest({ tabId: 41, tool: 'kilo_browser_snapshot' }),
+      scriptingApi: undefined,
+      tabsApi,
+    });
+
+    expect(modalTextOf(response)).toContain('can be handled by kilo_browser_handle_dialog');
+  });
+
   it('answers a browser tool message with the dispatch result', async () => {
     const { api: debuggerApi, state } = createFakeDebuggerApi();
     const tabs = new Map([[41, { id: 41, title: 'Example', url: 'https://example.com/' }]]);
@@ -162,8 +237,12 @@ describe('background browser tool branch', () => {
 
     const response = await handleTabDebuggerRequest({
       debuggerApi,
-      request: browserToolRequest(41, 'kilo_browser_navigate', {
-        url: 'https://example.com/other',
+      request: toolRequest({
+        args: {
+          url: 'https://example.com/other',
+        },
+        tabId: 41,
+        tool: 'kilo_browser_navigate',
       }),
       scriptingApi: undefined,
       tabsApi,
@@ -181,8 +260,12 @@ describe('background browser tool branch', () => {
     const { api: debuggerApi, state } = createFakeDebuggerApi();
     const tabs = new Map([[42, { id: 42, title: 'Example', url: 'https://example.com/' }]]);
     const { api: tabsApi, state: tabsState } = createFakeTabsApi(tabs);
-    const request = browserToolRequest(42, 'kilo_browser_navigate', {
-      url: 'https://example.com/',
+    const request = toolRequest({
+      args: {
+        url: 'https://example.com/',
+      },
+      tabId: 42,
+      tool: 'kilo_browser_navigate',
     });
 
     await handleTabDebuggerRequest({ debuggerApi, request, scriptingApi: undefined, tabsApi });
@@ -211,7 +294,11 @@ describe('background browser tool branch', () => {
 
     const first = await handleTabDebuggerRequest({
       debuggerApi,
-      request: browserToolRequest(43, 'kilo_browser_navigate', { url: 'https://example.com/' }),
+      request: toolRequest({
+        args: { url: 'https://example.com/' },
+        tabId: 43,
+        tool: 'kilo_browser_navigate',
+      }),
       scriptingApi: undefined,
       tabsApi,
     });
@@ -222,7 +309,11 @@ describe('background browser tool branch', () => {
 
     const second = await handleTabDebuggerRequest({
       debuggerApi,
-      request: browserToolRequest(43, 'kilo_browser_navigate', { url: 'https://example.com/' }),
+      request: toolRequest({
+        args: { url: 'https://example.com/' },
+        tabId: 43,
+        tool: 'kilo_browser_navigate',
+      }),
       scriptingApi: undefined,
       tabsApi,
     });
@@ -241,7 +332,11 @@ describe('background browser tool branch', () => {
 
     await handleTabDebuggerRequest({
       debuggerApi,
-      request: browserToolRequest(46, 'kilo_browser_resize', { height: 600, width: 800 }),
+      request: toolRequest({
+        args: { height: 600, width: 800 },
+        tabId: 46,
+        tool: 'kilo_browser_resize',
+      }),
       scriptingApi: undefined,
       tabsApi,
     });
@@ -250,7 +345,11 @@ describe('background browser tool branch', () => {
 
     await handleTabDebuggerRequest({
       debuggerApi,
-      request: browserToolRequest(46, 'kilo_browser_navigate', { url: 'https://example.com/' }),
+      request: toolRequest({
+        args: { url: 'https://example.com/' },
+        tabId: 46,
+        tool: 'kilo_browser_navigate',
+      }),
       scriptingApi: undefined,
       tabsApi,
     });
@@ -266,7 +365,7 @@ describe('background browser tool branch', () => {
 
     const response = await handleTabDebuggerRequest({
       debuggerApi,
-      request: browserToolRequest(44, 'kilo_browser_snapshot', {}),
+      request: toolRequest({ tabId: 44, tool: 'kilo_browser_snapshot' }),
       scriptingApi: undefined,
       tabsApi: undefined,
     });
@@ -281,7 +380,11 @@ describe('background browser tool branch', () => {
 
     const response = await handleTabDebuggerRequest({
       debuggerApi,
-      request: browserToolRequest(45, 'kilo_browser_click', { bogus: true, target: 'e1' }),
+      request: toolRequest({
+        args: { bogus: true, target: 'e1' },
+        tabId: 45,
+        tool: 'kilo_browser_click',
+      }),
       scriptingApi: undefined,
       tabsApi,
     });
@@ -299,6 +402,98 @@ describe('background browser tool branch', () => {
   });
 });
 
+describe('the cached browser runtime', () => {
+  /**
+   * The defect this covers: the panel path built the runtime without the hold, and the runtime cache is keyed by the
+   * tabs API alone. The agent bridge then reused that runtime for the rest of the worker's life, with no hold: every
+   * agent download fell back to the cancel-after-start guard.
+   */
+  it('keeps the hold when a panel message created the runtime first', async () => {
+    const { api: debuggerApi } = createFakeDebuggerApi();
+    const tabs = new Map([[60, { id: 60, title: 'Example', url: 'https://example.com/' }]]);
+    const { api: tabsApi } = createFakeTabsApi(tabs);
+    const closed: string[] = [];
+    const hold = {
+      announce: () => undefined,
+      arm: () => undefined,
+      closeSession: (session: string) => {
+        closed.push(session);
+      },
+      drain: () => [],
+      handle: () => false,
+      navigate: () => undefined,
+      needOf: () => undefined,
+      settle: async () => 'no_sign' as const,
+      tab: () => undefined,
+      tracked: () => undefined,
+    };
+    const agentCaller = {
+      controllerId: 'controller-1',
+      kind: 'agent',
+      sessionHandle: 'session-1',
+    } as const;
+
+    // The panel's message is the first one this worker sees: it creates the one runtime for this tabs API.
+    await handleTabDebuggerRequest({
+      debuggerApi,
+      downloadHold: hold,
+      request: toolRequest({
+        args: { url: 'https://example.com/' },
+        tabId: 60,
+        tool: 'kilo_browser_navigate',
+      }),
+      scriptingApi: undefined,
+      tabsApi,
+    });
+
+    // The agent's session ends through the same cached runtime: the hold is part of it, so the session closes there.
+    const response = await handleTabDebuggerRequest({
+      debuggerApi,
+      downloadHold: hold,
+      request: { caller: agentCaller, type: DISPOSE_BROWSER_CALLER_MESSAGE },
+      scriptingApi: undefined,
+      tabsApi,
+    });
+
+    expect(response).toMatchObject({ ok: true, type: DISPOSE_BROWSER_CALLER_MESSAGE });
+    expect(closed).toStrictEqual(['session-1']);
+  });
+});
+
+describe('the hold a browser is given', () => {
+  /**
+   * The defect this covers: the request handler was handed a hold unconditionally, and `downloadTierOf` reads
+   * `hasHold: downloadHold !== undefined`. A browser whose `chrome.downloads` has no `onDeterminingFilename` — Firefox —
+   * was therefore given the hold tier, where nothing was ever registered, and `legacy` — the cancel-after-start guard
+   * the extension keeps there — was unreachable from the agent bridge.
+   */
+  it('gives a browser without the event no hold, so the legacy guard is the one that arms', () => {
+    const downloads = { cancel: async () => undefined };
+
+    // A Firefox extension: its own origin is `moz-extension://`, and its downloads API has no hold event at all.
+    expect(
+      startDownloadHold({
+        downloads: () => downloads,
+        extensionOrigin: () => 'moz-extension://kilo-test-extension-id/',
+        sessionStorage: () => undefined,
+      })
+    ).toBeUndefined();
+
+    // Chrome keeps the hold, whether or not the optional permission has been granted yet: the grant is what makes the
+    // Event exist there, and the listener is installed again from `permissions.onAdded` when it arrives.
+    expect(
+      startDownloadHold({
+        downloads: () => ({
+          cancel: async () => undefined,
+          onDeterminingFilename: { addListener: () => undefined },
+        }),
+        extensionOrigin: () => 'chrome-extension://kilo-test-extension-id/',
+        sessionStorage: () => undefined,
+      })
+    ).toBeDefined();
+  });
+});
+
 describe('background trusted-sender gate over the browser tool message', () => {
   it('ignores the browser tool message from a content-script sender', () => {
     const listener = harness.onMessageListeners.at(-1);
@@ -307,7 +502,11 @@ describe('background trusted-sender gate over the browser tool message', () => {
 
     const sendResponse = vi.fn();
     const result = listener?.(
-      browserToolRequest(50, 'kilo_browser_navigate', { url: 'https://example.com/' }),
+      toolRequest({
+        args: { url: 'https://example.com/' },
+        tabId: 50,
+        tool: 'kilo_browser_navigate',
+      }),
       // A content script shares the extension id but reports the host page's web origin.
       { id: 'kilo-test-extension-id', origin: 'https://evil.example' },
       sendResponse
@@ -324,7 +523,11 @@ describe('background trusted-sender gate over the browser tool message', () => {
 
     const sendResponse = vi.fn();
     const returned = listener?.(
-      browserToolRequest(52, 'kilo_browser_navigate', { url: 'https://example.com/' }),
+      toolRequest({
+        args: { url: 'https://example.com/' },
+        tabId: 52,
+        tool: 'kilo_browser_navigate',
+      }),
       {
         id: 'kilo-test-extension-id',
         origin: 'chrome-extension://kilo-test-extension-id/entrypoints/sidepanel.html',

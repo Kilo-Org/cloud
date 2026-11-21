@@ -143,21 +143,75 @@ describe('background activity authorization', () => {
       } as never)
     ).rejects.toThrow();
   });
-  it('does not present an unavailable runtime as an empty inventory', async () => {
+  it('does not present an offline sandbox as an empty inventory', async () => {
     const harness = setup();
     harness.stub.kiloRequest.mockResolvedValueOnce({
       ok: false,
-      error: { code: 'not_ready', message: 'No runtime', retryable: true },
+      error: { code: 'runtime_offline', message: 'Live runtime is not ready', retryable: true },
     });
     await expect(
       harness.caller.getBackgroundActivity({ cloudAgentSessionId: sessionId })
-    ).rejects.toThrow('unavailable');
+    ).resolves.toBeNull();
+  });
+  it('still reports a live sandbox whose wrapper read failed as unavailable', async () => {
+    const harness = setup();
+    harness.stub.kiloRequest.mockResolvedValueOnce({
+      ok: false,
+      error: { code: 'not_ready', message: 'Wrapper request timed out', retryable: true },
+    });
+    await expect(
+      harness.caller.getBackgroundActivity({ cloudAgentSessionId: sessionId })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
   });
   it('reports an invalid native inventory as unavailable rather than an internal error', async () => {
     const harness = setup();
     harness.stub.kiloRequest.mockResolvedValueOnce({ ok: true, result: { jobs: 'invalid' } });
     await expect(
       harness.caller.getBackgroundActivity({ cloudAgentSessionId: sessionId })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+  });
+});
+
+describe('agent board reads', () => {
+  const board = { ownerSessionID: kiloSessionId, revision: 1, messages: [], hasMore: false };
+  it('reads only the registered session through the named operation', async () => {
+    const harness = setup();
+    harness.stub.kiloRequest.mockResolvedValueOnce({ ok: true, result: board });
+    await expect(harness.caller.getAgentBoard({ cloudAgentSessionId: sessionId })).resolves.toEqual(
+      board
+    );
+    expect(access).toHaveBeenCalledWith(
+      expect.objectContaining({ kiloUserId: userId, cloudAgentSessionId: sessionId })
+    );
+    expect(harness.stub.kiloRequest).toHaveBeenCalledWith({ name: 'session.board' });
+  });
+  it('does not read a foreign chat', async () => {
+    const harness = setup();
+    access.mockRejectedValueOnce(new Error('denied'));
+    await expect(harness.caller.getAgentBoard({ cloudAgentSessionId: sessionId })).rejects.toThrow(
+      'denied'
+    );
+    expect(harness.stub.kiloRequest).not.toHaveBeenCalled();
+  });
+  it('answers null for an offline sandbox or a runtime without a board, and unavailable for an invalid board', async () => {
+    const harness = setup();
+    harness.stub.kiloRequest.mockResolvedValueOnce({
+      ok: false,
+      error: { code: 'runtime_offline', message: 'Live runtime is not ready', retryable: true },
+    });
+    await expect(
+      harness.caller.getAgentBoard({ cloudAgentSessionId: sessionId })
+    ).resolves.toBeNull();
+    harness.stub.kiloRequest.mockResolvedValueOnce({
+      ok: false,
+      error: { code: 'unsupported', message: 'session.board is not supported', retryable: false },
+    });
+    await expect(
+      harness.caller.getAgentBoard({ cloudAgentSessionId: sessionId })
+    ).resolves.toBeNull();
+    harness.stub.kiloRequest.mockResolvedValueOnce({ ok: true, result: { messages: 'invalid' } });
+    await expect(
+      harness.caller.getAgentBoard({ cloudAgentSessionId: sessionId })
     ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
   });
 });

@@ -92,7 +92,6 @@ vi.mock('@/lib/trpc', () => {
 
 type ProbeState = {
   summary: unknown;
-  isLoading: boolean;
   isFetching: boolean;
 };
 
@@ -100,7 +99,6 @@ function Probe({ holder }: { holder: { current: ProbeState | undefined } }) {
   const usage = useUsageAnalytics({ kind: 'personal' }, '7d', 'cost');
   holder.current = {
     summary: usage.summary,
-    isLoading: usage.isLoading,
     isFetching: usage.isFetching,
   };
   return null;
@@ -195,7 +193,7 @@ describe('useUsageAnalytics window across a foreground resume', () => {
       '2026-11-12T15:30:00.000Z',
     ]);
     expect(holder.current?.summary).toBeDefined();
-    expect(holder.current?.isLoading).toBe(false);
+    expect(holder.current?.isFetching).toBe(false);
   });
 
   it('moves the window to the new UTC day when the resume crosses midnight', async () => {

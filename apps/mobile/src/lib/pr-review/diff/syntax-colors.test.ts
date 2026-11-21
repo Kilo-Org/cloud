@@ -25,6 +25,14 @@ const MIN_TEXT_RATIO = 4.5;
 const YELLOW_CODE_TINT = 'rgba(26, 26, 16, 0.1)';
 const YELLOW_CARD = compositeOver(YELLOW_CODE_TINT, '#FFDD00');
 
+// The diff renderer paints the dark token rows on the dark good/danger tiles,
+// not only on a code card: `global.css` builds each tile as the dark status hue
+// at 10% alpha over the dark page. They are part of the surface the dark half
+// must clear.
+const DARK_PAGE = '#0E0E10';
+const DARK_GOOD_TILE = compositeOver('#5FCB8E1A', DARK_PAGE);
+const DARK_DANGER_TILE = compositeOver('#F28B7A1A', DARK_PAGE);
+
 function contrastRatio(foreground: string, background: string): number {
   const foregroundLuminance = relativeLuminance(foreground);
   const backgroundLuminance = relativeLuminance(background);
@@ -38,11 +46,11 @@ function contrastRatio(foreground: string, background: string): number {
 
 describe('tokenColorFor', () => {
   it('returns the light color for a known class in light mode', () => {
-    expect(tokenColorFor('keyword', false)).toBe('#772BB9');
+    expect(tokenColorFor('keyword', false)).toBe(TOKEN_DARK_LIGHT.keyword.light);
   });
 
   it('returns the dark color for a known class in dark mode', () => {
-    expect(tokenColorFor('keyword', true)).toBe('#EFE0FF');
+    expect(tokenColorFor('keyword', true)).toBe(TOKEN_DARK_LIGHT.keyword.dark);
   });
 
   it('falls back to the default color for an unknown class', () => {
@@ -146,9 +154,13 @@ describe('syntax tokens on their code-card surfaces (WCAG AA text)', () => {
     yellowTint: YELLOW_CARD,
   } as const;
 
+  // Dim code cards: the assistant `muted` card and the app card — plus the
+  // 10%-status tinted diff tiles the dark token rows are painted on.
   const dimCards = {
     assistant: '#1F1F24',
     card: '#17171A',
+    goodTile: DARK_GOOD_TILE,
+    dangerTile: DARK_DANGER_TILE,
   } as const;
 
   it('every onLight token clears 4.5:1 on each bright card', () => {

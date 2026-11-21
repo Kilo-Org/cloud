@@ -17,8 +17,8 @@ import * as z from 'zod';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { organizations } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
+import { OrganizationSSODomainSchema } from '@kilocode/web-shared/lib/organizations/company-domain';
 import {
-  OrganizationSSODomainSchema,
   type OrganizationSsoConfigView,
   type OrganizationSsoStatusView,
 } from '@kilocode/web-shared/lib/organizations/organization-types';
@@ -136,7 +136,11 @@ export const organizationSsoRouter = createTRPCRouter({
       message: 'Created WorkOS SSO organization',
       metadata: { workosOrganizationId: createdOrg.id },
     });
-    return createdOrg;
+    // Only the identifier, never the WorkOS object. Its timestamps are `Date`
+    // instances, which plain tRPC JSON carries as ISO strings, so returning it
+    // would hand the client a type the wire does not match. The caller
+    // invalidates its config query and reads nothing else.
+    return { id: createdOrg.id };
   }),
   getConfig: organizationMemberProcedure.input(OrgIdSchema).query(async opts => {
     const { organizationId } = opts.input;

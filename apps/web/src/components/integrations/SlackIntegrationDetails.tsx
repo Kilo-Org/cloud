@@ -17,6 +17,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
+import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -30,6 +31,8 @@ type SlackIntegrationDetailsProps = {
   error?: string;
   /** Organization members without management authority get a read-only view. */
   canManage?: boolean;
+  /** Overrides the OAuth start route, which the app shell serves itself. */
+  connectPath?: string;
 };
 
 const slackConnectionErrorMessages: Record<string, string> = {
@@ -64,6 +67,7 @@ export function SlackIntegrationDetails({
   success,
   error,
   canManage = true,
+  connectPath,
 }: SlackIntegrationDetailsProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -85,7 +89,7 @@ export function SlackIntegrationDetails({
     return (
       openRouterModels?.data.map(model => ({
         id: model.id,
-        name: model.name,
+        name: modelNameWithRetirement(model),
         isFree: model.isFree,
         mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
         hasUserByokAvailable: model.hasUserByokAvailable,
@@ -171,7 +175,8 @@ export function SlackIntegrationDetails({
 
   const handleInstall = () => {
     setIsStartingSlackConnection(true);
-    window.location.href = getPlatformOAuthConnectPath(PLATFORM.SLACK, organizationId);
+    window.location.href =
+      connectPath ?? getPlatformOAuthConnectPath(PLATFORM.SLACK, { organizationId });
   };
 
   const handleUninstall = async () => {

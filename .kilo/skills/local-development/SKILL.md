@@ -51,6 +51,16 @@ http://localhost:<reported-port>/users/sign_in?fakeUser=<fake-email>&callbackPat
 
 Always set `callbackPath` to destination page. Build `<fake-email>` as `kilo-<username>-<time including seconds>@example.com`, where username comes from home directory. For admin access, email must end in `@admin.example.com`. Wait for account-creation spinner to finish. Open admin panel from top-right account menu.
 
+A fake-login URL keeps an existing session. To switch users, sign out at `http://localhost:<reported-port>/api/auth/signout` first.
+
+Admin pages ask for a passkey when `ADMIN_STEP_UP_ENABLED=true`. Exporting the variable in the shell does not reach running services. To browse admin pages locally, add `ADMIN_STEP_UP_ENABLED=false` to `apps/web/.env.development.local`, run `pnpm dev:restart nextjs`, and remove the line when done.
+
+## Browser testing
+
+Run Playwright headless. Open a visible browser window only when the user asks for one.
+
+Organization request log details show provider routing only when `R2_ACCOUNT_ID` and the `R2_AI_PROVIDER_METADATA_*` variables in `.env.local` are set; there is no local emulator.
+
 ## Service management
 
 | Command or path | Use |

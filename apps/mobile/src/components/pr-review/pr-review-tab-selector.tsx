@@ -1,13 +1,10 @@
-import { selectionHaptic } from '@/lib/haptics';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { tabEntryA11y } from '@/lib/a11y/tab-entry';
 import { formatNumber } from '@/lib/format';
-import { PR_REVIEW_TAB_HIT_SLOP } from '@/lib/pr-review/pr-review-tab-target';
-import { cn } from '@/lib/utils';
 
 export type PrReviewTabId = 'overview' | 'files' | 'discussion';
 
@@ -38,10 +35,10 @@ type PrReviewTabSelectorProps = {
 const NO_DISABLED_TABS: readonly PrReviewTabId[] = [];
 
 /**
- * Horizontal pill row at the top of the PR review surface that picks
- * between the Overview, Files, and Discussion tabs. S5 owns the API;
- * S6b (Files body) and S7b (Discussion body) only ever render their
- * respective tab bodies — the parent screen owns the tab state.
+ * The shared segmented control at the top of the PR review surface that picks
+ * between the Overview, Files, and Discussion tabs. It keeps tab semantics
+ * (a `tablist` of tabs), because each option switches the body below it. The
+ * parent screen owns the tab state; each tab body only renders itself.
  */
 export function PrReviewTabSelector({
   activeTab,
@@ -50,61 +47,47 @@ export function PrReviewTabSelector({
   disabledTabs = NO_DISABLED_TABS,
 }: PrReviewTabSelectorProps) {
   const { t } = useTranslation();
+  const options = TABS.map(tab => {
+    const label = t(tab.labelKey);
+    const count =
+      tab.id === 'discussion' && discussionCount && discussionCount > 0 ? discussionCount : null;
+    return {
+      value: tab.id,
+      label,
+      disabled: disabledTabs.includes(tab.id),
+      badge: count === null ? undefined : <DiscussionCountBadge count={count} />,
+      // The badge is drawn beside the label, so the spoken name carries the
+      // count too: a reader hears that the discussion has comments without
+      // opening the tab, as a sighted reader sees.
+      accessibilityLabel:
+        count === null
+          ? undefined
+          : t('prReview.tabs.discussionAccessibility', {
+              title: label,
+              count,
+              displayCount: formatNumber(count, i18n.language),
+            }),
+    };
+  });
   return (
-    <View accessibilityRole="tablist" className="flex-row gap-1 rounded-lg bg-secondary p-1">
-      {TABS.map(tab => {
-        const active = tab.id === activeTab;
-        const disabled = disabledTabs.includes(tab.id);
-        const badge =
-          tab.id === 'discussion' && discussionCount && discussionCount > 0
-            ? formatNumber(discussionCount, i18n.language)
-            : null;
-        return (
-          <Pressable
-            key={tab.id}
-            {...tabEntryA11y({ selected: active, disabled })}
-            hitSlop={PR_REVIEW_TAB_HIT_SLOP}
-            disabled={disabled}
-            onPress={() => {
-              if (active) {
-                return;
-              }
-              selectionHaptic();
-              onChange(tab.id);
-            }}
-            className={cn(
-              'flex-1 items-center justify-center rounded-md py-2 active:opacity-70',
-              // Dark paints `bg-card` below the row's `bg-secondary`, so the
-              // selected pill takes the palette's elevated neutral fill
-              // instead: the same raised-surface step a filled neutral control
-              // uses, so the pill stays the neutral raised surface light mode
-              // shows rather than a tinted accent that pulls the eye.
-              active && 'bg-card shadow-sm shadow-[#0000000D] dark:bg-secondary-fill',
-              disabled && 'opacity-60'
-            )}
-          >
-            <View className="flex-row items-center gap-1">
-              <Text
-                className={cn(
-                  'text-sm',
-                  active ? 'font-semibold text-foreground' : 'text-muted-foreground dark:text-ink2'
-                )}
-              >
-                {t(tab.labelKey)}
-              </Text>
-              {badge ? (
-                // `muted` equals the row's `secondary` in both palettes, so the
-                // badge fills with `muted-soft` to read as a pill at all.
-                <View className="min-w-5 items-center justify-center rounded-full bg-muted-soft px-1.5 py-0.5">
-                  <Text className="text-center text-[11px] font-medium text-foreground">
-                    {badge}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-          </Pressable>
-        );
-      })}
+    <SegmentedControl
+      accessibilityLabel={t('common.prReview')}
+      semantics="tabs"
+      options={options}
+      value={activeTab}
+      onChange={onChange}
+    />
+  );
+}
+
+function DiscussionCountBadge({ count }: Readonly<{ count: number }>) {
+  // `muted` equals the track's `secondary` in both palettes, so the badge
+  // fills with `muted-soft` to read as a pill at all.
+  return (
+    <View className="min-w-5 items-center justify-center rounded-full bg-muted-soft px-1.5 py-0.5">
+      <Text className="text-center text-xs font-medium text-foreground">
+        {formatNumber(count, i18n.language)}
+      </Text>
     </View>
   );
 }

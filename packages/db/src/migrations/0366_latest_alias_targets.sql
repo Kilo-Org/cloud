@@ -1,0 +1,1 @@
+ALTER TABLE "ai_gateway_config" ADD COLUMN "latest_alias_targets" jsonb;

@@ -4,34 +4,43 @@ import { resolvePushLocale, translatePush } from './i18n';
 
 describe('translatePush', () => {
   it('translates a key into Spanish for the es locale', () => {
-    expect(translatePush('es', 'generic.body.chatMessage')).toBe('Tienes un mensaje nuevo');
+    expect(
+      translatePush('es', 'generic.body.lowBalance', undefined, 'Your balance needs attention')
+    ).toBe('Tu saldo necesita atención');
   });
 
   it('returns English for the en locale', () => {
-    expect(translatePush('en', 'generic.body.chatMessage')).toBe('You have a new message');
+    expect(
+      translatePush('en', 'generic.body.lowBalance', undefined, 'Your balance needs attention')
+    ).toBe('Your balance needs attention');
   });
 
   it('interpolates params into the translated string', () => {
-    expect(translatePush('es', 'instanceLifecycle.ready.title', { instanceName: 'Mi Bot' })).toBe(
-      'Mi Bot está listo'
-    );
+    expect(
+      translatePush(
+        'en',
+        'internal.securityFindingNew.title',
+        { severity: 'high' },
+        'New security finding ({{severity}})'
+      )
+    ).toBe('New security finding (high)');
   });
 
   it('falls back to English for an unknown locale', () => {
-    expect(translatePush('xx', 'generic.body.chatMessage')).toBe('You have a new message');
+    expect(
+      translatePush('xx', 'generic.body.lowBalance', undefined, 'Your balance needs attention')
+    ).toBe('Your balance needs attention');
   });
 
   it('falls back to English for a null locale', () => {
-    expect(translatePush(null, 'generic.body.chatMessage')).toBe('You have a new message');
+    expect(
+      translatePush(null, 'generic.body.lowBalance', undefined, 'Your balance needs attention')
+    ).toBe('Your balance needs attention');
   });
 
-  it('returns the key itself when the key is unknown and no fallback is given', () => {
-    expect(translatePush('es', 'missing.key')).toBe('missing.key');
-  });
-
-  it('returns the fallback string when the key is unknown and a fallback is given', () => {
-    expect(translatePush('es', 'missing.key', undefined, 'Fallback English')).toBe(
-      'Fallback English'
+  it('returns the given fallback when the key is unknown', () => {
+    expect(translatePush('de', 'not.a.catalog.key', undefined, 'Something went wrong')).toBe(
+      'Something went wrong'
     );
   });
 });

@@ -10,6 +10,7 @@ import {
 import {
   createNetworkErrorFetch,
   isAbortError,
+  isTransportFailure,
   type NetworkErrorContext,
   normalizeUrlPath,
   readTrpcErrorContext,
@@ -182,6 +183,82 @@ describe('readTrpcErrorContext', () => {
       path: undefined,
     });
   });
+
+  it('reads the failing field paths of a validation failure and not its messages', () => {
+    // The server's formatter sends `z.flattenError` under `data.zodError`. The
+    // messages beside each path are dropped: a Zod message can quote the input.
+    const error = {
+      data: {
+        code: 'BAD_REQUEST',
+        httpStatus: 400,
+        path: 'organizations.cloudAgentNext.getSession',
+        zodError: {
+          formErrors: ['Unrecognized key: "extra"'],
+          fieldErrors: {
+            organizationId: ['Invalid UUID at "alice@example.com"'],
+            cloudAgentSessionId: ['Invalid input: expected string, received undefined'],
+          },
+        },
+      },
+    };
+
+    expect(readTrpcErrorContext(error)).toEqual({
+      code: 'BAD_REQUEST',
+      httpStatus: 400,
+      path: 'organizations.cloudAgentNext.getSession',
+      invalidFields: 'organizationId,cloudAgentSessionId',
+      formErrorCount: 1,
+    });
+  });
+
+  it('reads a whole-input failure with no field paths', () => {
+    const error = {
+      shape: {
+        data: {
+          code: 'BAD_REQUEST',
+          httpStatus: 400,
+          zodError: { formErrors: ['Prompt cannot be blank'], fieldErrors: {} },
+        },
+      },
+    };
+
+    expect(readTrpcErrorContext(error)).toEqual({
+      code: 'BAD_REQUEST',
+      httpStatus: 400,
+      path: undefined,
+      formErrorCount: 1,
+    });
+  });
+
+  it('caps the field paths and the length of each one', () => {
+    const longPath = `payload.${'a'.repeat(200)}`;
+    const fieldErrors: Record<string, string[]> = {};
+    for (let index = 0; index < 20; index += 1) {
+      fieldErrors[index === 5 ? longPath : `payload.parts.${index}`] = ['invalid'];
+    }
+
+    const context = readTrpcErrorContext({
+      data: { code: 'BAD_REQUEST', zodError: { fieldErrors } },
+    });
+    const fields = context.invalidFields?.split(',') ?? [];
+
+    expect(fields).toHaveLength(12);
+    expect(fields).toContain(`payload.${'a'.repeat(56)}`);
+    expect(fields.every(field => field.length <= 64)).toBe(true);
+  });
+
+  it('ignores a zodError that is not the flattened form', () => {
+    expect(
+      readTrpcErrorContext({
+        data: { code: 'BAD_REQUEST', httpStatus: 400, zodError: null },
+      })
+    ).toEqual({ code: 'BAD_REQUEST', httpStatus: 400, path: undefined });
+    expect(
+      readTrpcErrorContext({
+        data: { code: 'BAD_REQUEST', zodError: 'issues' },
+      })
+    ).toEqual({ code: 'BAD_REQUEST', httpStatus: undefined, path: undefined });
+  });
 });
 
 describe('readTrpcResponseError', () => {
@@ -312,6 +389,10 @@ describe('createNetworkErrorFetch', () => {
         original
       );
 
+      // The rejection carries the marker a query catch-all reads, so the same
+      // failure is not filed a second time as an app error.
+      expect(isTransportFailure(original)).toBe(true);
+      expect(isTransportFailure({ message: message })).toBe(false);
       expect(events).toHaveLength(0);
       expect(breadcrumbs).toEqual([
         {
@@ -336,6 +417,9 @@ describe('createNetworkErrorFetch', () => {
 
     await expect(wrapped('https://example.com/api/trpc/session.list')).rejects.toBe(abort);
 
+    // An abort is the caller cancelling, not a transport failure: nothing was
+    // recorded for it, so it carries no marker.
+    expect(isTransportFailure(abort)).toBe(false);
     expect(events).toHaveLength(0);
     expect(breadcrumbs).toHaveLength(0);
   });
@@ -575,6 +659,56 @@ describe('createNetworkErrorFetch', () => {
     // The inner status names the defect; the 207 envelope only says the body
     // is a batch, so keying on it would merge a 400 and a 500 of one procedure.
     expect(event?.fingerprint).toEqual(['network-error', 'trpc', 'session.list', 'http.400']);
+  });
+
+  it('(j) reports the failing field paths of a validation failure and no message', async () => {
+    const value = 'alice@example.com';
+    const batchError = {
+      message: 'bad request',
+      code: -32_600,
+      data: {
+        code: 'BAD_REQUEST',
+        httpStatus: 400,
+        path: 'organizations.cloudAgentNext.getSession',
+        zodError: {
+          formErrors: [],
+          fieldErrors: {
+            organizationId: [`Invalid UUID at "${value}"`],
+            cloudAgentSessionId: ['Invalid input: expected string, received undefined'],
+          },
+        },
+      },
+    };
+    const response = Response.json([{ error: batchError }], {
+      status: 207,
+      statusText: 'Multi-Status',
+    });
+    const wrapped = createNetworkErrorFetch(resolvingFetch(response), {
+      source: 'trpc',
+      isResponseError: status => status >= 400 || status === 207,
+      readResponseError: readTrpcResponseError,
+    });
+
+    await wrapped('https://example.com/api/trpc/organizations.cloudAgentNext.getSession?batch=1');
+
+    const event = reportedEvent();
+    expect(event?.contexts?.[NETWORK_BODY_CONTEXT]).toEqual({
+      code: 'BAD_REQUEST',
+      httpStatus: 400,
+      path: 'organizations.cloudAgentNext.getSession',
+      invalidFields: 'organizationId,cloudAgentSessionId',
+    });
+    // The path names the defect; the Zod message beside it can quote the input.
+    const serialized = JSON.stringify(event);
+    expect(serialized).not.toContain(value);
+    expect(serialized).not.toContain('Invalid UUID');
+    // The scrubbed event the transport sends keeps the paths.
+    expect(scrubEvent(event)?.contexts?.[NETWORK_BODY_CONTEXT]).toEqual({
+      code: 'BAD_REQUEST',
+      httpStatus: 400,
+      path: 'organizations.cloudAgentNext.getSession',
+      invalidFields: 'organizationId,cloudAgentSessionId',
+    });
   });
 
   it('(i2) keys a 207 batch on the parsed inner status, not the envelope', async () => {
@@ -917,6 +1051,58 @@ describe('createNetworkErrorFetch status policy', () => {
     expect(breadcrumbs).toHaveLength(0);
   });
 
+  it('records the repository-refused FORBIDDEN on the personal branch listing as a breadcrumb', async () => {
+    // The provider installation no longer grants the repository. The screen
+    // names that answer and offers no retry, so it is the app's expected
+    // outcome, not a defect to file.
+    const procedure = 'cloudAgentNext.listRepositoryBranches';
+    await respond(
+      `https://example.com/api/trpc/${procedure}`,
+      Response.json(
+        {
+          error: {
+            message: 'denied',
+            code: -32_003,
+            data: { code: 'FORBIDDEN', httpStatus: 403, path: procedure },
+          },
+        },
+        { status: 403 }
+      )
+    );
+
+    expect(events).toHaveLength(0);
+    expect(breadcrumbs.map(breadcrumb => breadcrumb.message)).toEqual([
+      `POST /api/trpc/${procedure} -> 403`,
+    ]);
+  });
+
+  it.each([
+    'organizations.cloudAgentNext.getAttachmentUploadUrl',
+    'organizations.cloudAgentNext.listRepositoryBranches',
+  ])('still reports an organization FORBIDDEN on %s in a batch', async procedure => {
+    // Organization access middleware also answers FORBIDDEN for a transient
+    // support-access lookup failure, so these refusals stay reportable.
+    await respond(
+      `https://example.com/api/trpc/${procedure},user.getMe?batch=1`,
+      Response.json(
+        [
+          {
+            error: {
+              message: 'denied',
+              code: -32_003,
+              data: { code: 'FORBIDDEN', httpStatus: 403, path: procedure },
+            },
+          },
+        ],
+        { status: 207 }
+      )
+    );
+
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['network-error', 'trpc', procedure, 'http.403'],
+    ]);
+  });
+
   it.each([400, 500])('still reports a %i exactly once', async status => {
     await respond('https://example.com/api/trpc/user.getMe', new Response('', { status }));
     // The direct body and the batch item are two processes' first report of
@@ -985,6 +1171,138 @@ describe('createNetworkErrorFetch status policy', () => {
       ['network-error', 'fetch', '/api/auth/native/exchange', 'http.400'],
     ]);
     expect(breadcrumbs).toHaveLength(0);
+  });
+
+  it('records one breadcrumb for repeated expected answers of one endpoint', async () => {
+    // A screen polling a refused endpoint gets the same answer on every
+    // request; only the first one leaves a breadcrumb. The wrapper is built
+    // once and called repeatedly, as a polling screen does.
+    const wrapped = createNetworkErrorFetch(resolvingFetch(new Response('', { status: 404 })));
+    await Promise.all(
+      Array.from({ length: 4 }, () =>
+        wrapped('https://example.com/api/trpc/user.getMe?batch=1', { method: 'POST' })
+      )
+    );
+
+    expect(events).toHaveLength(0);
+    expect(breadcrumbs).toHaveLength(1);
+    expect(breadcrumbs[0]?.message).toBe('POST /api/trpc/user.getMe -> 404');
+  });
+
+  it('records a breadcrumb for each expected status of one endpoint', async () => {
+    // The status is part of the fingerprint, so a 429 and a 404 are two
+    // answers, not a repeat.
+    await respond(
+      'https://example.com/api/trpc/user.getMe?batch=1',
+      new Response('', { status: 429 })
+    );
+    await respond(
+      'https://example.com/api/trpc/user.getMe?batch=1',
+      new Response('', { status: 404 })
+    );
+
+    expect(events).toHaveLength(0);
+    expect(breadcrumbs.map(breadcrumb => breadcrumb.message)).toEqual([
+      'POST /api/trpc/user.getMe -> 429',
+      'POST /api/trpc/user.getMe -> 404',
+    ]);
+  });
+
+  it('leaves the event claim unspent for an expected answer', async () => {
+    // The screen saw the 404 first; the later real failure for the same
+    // endpoint still files its event.
+    await respond('https://example.com/api/trpc/user.getMe', new Response('', { status: 404 }));
+    await respond('https://example.com/api/trpc/user.getMe', new Response('', { status: 500 }));
+
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['network-error', 'trpc', 'user.getMe', 'http.500'],
+    ]);
+    expect(breadcrumbs).toHaveLength(1);
+  });
+
+  it('leaves the claim unspent when the expected answer shares its fingerprint with a later report', async () => {
+    // The 404 and the 500 above are different fingerprints, so they cannot show
+    // that the expected answer left the claim alone. Here both answers are one
+    // fingerprint: the same URL, source, status and outcome. A caller's own
+    // expected-answer rule marks the first; the same answer without that rule
+    // must still file the single event.
+    const url = 'https://example.com/mcp';
+    const wrappedExpected = createNetworkErrorFetch(
+      resolvingFetch(new Response('', { status: 405 })),
+      {
+        isExpectedAnswer: () => true,
+      }
+    );
+    await wrappedExpected(url, { method: 'GET' });
+
+    expect(events).toHaveLength(0);
+    expect(breadcrumbs).toHaveLength(1);
+
+    // The same fingerprint, this time a real answer: the event must still file.
+    // This is the decisive step — a latch that spent the claim would record
+    // nothing here.
+    const wrappedReal = createNetworkErrorFetch(resolvingFetch(new Response('', { status: 405 })));
+    await wrappedReal(url, { method: 'GET' });
+
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['network-error', 'fetch', '/mcp', 'http.405'],
+    ]);
+    // The first report leaves no breadcrumb; the trail already holds the
+    // expected answer's one.
+    expect(breadcrumbs).toHaveLength(1);
+
+    // The next repeat leaves the single breadcrumb the report claim allows, and
+    // the one after that records nothing.
+    await wrappedReal(url, { method: 'GET' });
+    expect(breadcrumbs).toHaveLength(2);
+    await wrappedReal(url, { method: 'GET' });
+    expect(breadcrumbs).toHaveLength(2);
+  });
+
+  it('bounds the expected-answer latch and refreshes a fingerprint that keeps answering', async () => {
+    const answer = (index: number) =>
+      respond(`https://example.com/v1/files/${String(index)}`, new Response('', { status: 404 }));
+    const breadcrumbsFor = (index: number) =>
+      breadcrumbs.filter(
+        breadcrumb => breadcrumb.message === `POST /v1/files/${String(index)} -> 404`
+      ).length;
+
+    // A dynamic path segment forces one fingerprint per object id, as in the
+    // report claim; the latch remembers the 200 most recently answered ones.
+    // The calls must run in order because the order is what the cap evicts by,
+    // so they cannot be parallelised.
+    for (let index = 0; index < 200; index += 1) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- the eviction order under test is the call order
+      await answer(index);
+    }
+    expect(breadcrumbs).toHaveLength(200);
+
+    // The still-answering fingerprint is refreshed, so the next new path
+    // releases another one instead of it.
+    await answer(0);
+    await answer(200);
+    await answer(0);
+
+    expect(breadcrumbs).toHaveLength(201);
+    expect(breadcrumbsFor(0)).toBe(1);
+    expect(breadcrumbs.at(-1)?.message).toBe('POST /v1/files/200 -> 404');
+
+    // A released fingerprint records once more instead of the map growing.
+    await answer(1);
+    expect(breadcrumbs).toHaveLength(202);
+    expect(breadcrumbs.at(-1)?.message).toBe('POST /v1/files/1 -> 404');
+  });
+
+  it('clears the expected-answer latch in `resetNetworkErrorReports`', async () => {
+    await respond('https://example.com/api/trpc/user.getMe', new Response('', { status: 404 }));
+    resetNetworkErrorReports();
+    await respond('https://example.com/api/trpc/user.getMe', new Response('', { status: 404 }));
+
+    expect(breadcrumbs).toHaveLength(2);
+    expect(breadcrumbs.map(breadcrumb => breadcrumb.message)).toEqual([
+      'POST /api/trpc/user.getMe -> 404',
+      'POST /api/trpc/user.getMe -> 404',
+    ]);
   });
 });
 

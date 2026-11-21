@@ -2,7 +2,6 @@ import type { EventSourceMessage } from 'eventsource-parser';
 import { captureMessage, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
 import { z } from 'zod';
-import { sentryRootSpan } from '../getRootSpan';
 import type { ProviderType } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type {
   JustTheCostsUsageStats,
@@ -16,6 +15,7 @@ import {
   contentPartSchema,
   drainSseStream,
   extractVercelUpstreamId,
+  nonEmptyStringSchema,
   reportUpstreamStreamError,
   selectUsageCostFields,
   upstreamStreamErrorSchema,
@@ -48,6 +48,27 @@ const messageEventSchema = z.looseObject({
 });
 
 const contentDeltaSchema = contentPartSchema('text_delta');
+
+// Signature and citation deltas carry no generated tokens. A tool call's name
+// arrives with its content block.
+const generatedOutputEventSchema = z.union([
+  z.looseObject({
+    type: z.literal('content_block_delta'),
+    delta: z.union([
+      z.looseObject({ type: z.literal('text_delta'), text: nonEmptyStringSchema }),
+      z.looseObject({ type: z.literal('thinking_delta'), thinking: nonEmptyStringSchema }),
+      z.looseObject({ type: z.literal('input_json_delta'), partial_json: nonEmptyStringSchema }),
+    ]),
+  }),
+  z.looseObject({
+    type: z.literal('content_block_start'),
+    content_block: z.union([
+      z.looseObject({ type: z.literal('text'), text: nonEmptyStringSchema }),
+      z.looseObject({ type: z.literal('thinking'), thinking: nonEmptyStringSchema }),
+      z.looseObject({ name: nonEmptyStringSchema }),
+    ]),
+  }),
+]);
 
 const messageDeltaSchema = z.object({
   delta: z.object({ stop_reason: z.unknown().optional() }).nullish(),
@@ -127,17 +148,10 @@ export async function parseMessagesMicrodollarUsageFromStream(
     name: 'messages-stream-processing',
     op: 'performance',
   });
-  const timeToFirstTokenSpan = startInactiveSpan({
-    name: 'time-to-first-token',
-    op: 'performance',
-  });
-
   let messageId: string | null = null;
   let model: string | null = null;
   let responseContent = '';
   let reportedError = statusCode >= 400;
-  const startedAt = performance.now();
-  let firstTokenReceived = false;
   let startUsage: MessagesApiUsage | null = null;
   let deltaUsage: MessagesApiUsage | null = null;
   let finish_reason: unknown = null;
@@ -145,18 +159,9 @@ export async function parseMessagesMicrodollarUsageFromStream(
   let inference_provider: string | null = null;
 
   const onEvent = (event: EventSourceMessage) => {
-    if (!firstTokenReceived) {
-      sentryRootSpan()?.setAttribute(
-        'messages.time_to_first_token_ms',
-        performance.now() - startedAt
-      );
-      firstTokenReceived = true;
-      timeToFirstTokenSpan.end();
-    }
-
     if (event.data === '[DONE]') {
       metadataCapture?.captureVercelMetadata('[DONE]');
-      return;
+      return false;
     }
 
     const payload: unknown = JSON.parse(event.data);
@@ -174,7 +179,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
         logContext: { provider, inference_provider, messageId, model },
         sentryExtra: { kiloUserId, provider, messageId, model },
       });
-      return;
+      return false;
     }
 
     let eventProviderMetadata: VercelProviderMetaData | null | undefined;
@@ -209,6 +214,8 @@ export async function parseMessagesMicrodollarUsageFromStream(
       inference_provider =
         eventProviderMetadata.gateway?.routing?.finalProvider ?? inference_provider;
     }
+
+    return generatedOutputEventSchema.safeParse(payload).success;
   };
 
   const { wasAborted, malformedEventCount, timing } = await drainSseStream(
@@ -216,6 +223,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
     onEvent,
     streamProcessingSpan,
     requestStartedAt,
+    'messages.time_to_first_token_ms',
     () => ({ kiloUserId, provider, messageId, model })
   );
 

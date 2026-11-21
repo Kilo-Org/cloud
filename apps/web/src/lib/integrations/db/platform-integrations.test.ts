@@ -696,6 +696,76 @@ describe('upsertPlatformIntegrationForOwner', () => {
     });
   });
 
+  test('autoCompleteInstallation reports not_pending when the row leaves pending before the update', async () => {
+    const accountId = `autocomplete-race-${Date.now()}`;
+    const pending = await createPendingIntegration({
+      userId,
+      requester: {
+        kilo_user_id: userId,
+        kilo_user_email: 'requester@example.com',
+        kilo_user_name: 'Requester',
+        requested_at: new Date().toISOString(),
+      },
+      githubRequester: { id: 'github-requester-race', login: 'requester' },
+      githubRequest: {
+        id: 'github-request-race',
+        accountId,
+        accountLogin: 'target-org',
+      },
+      githubAppType: 'standard',
+    });
+    if (!pending) throw new Error('Expected a pending row to be created');
+
+    // A writer that does not hold the installation advisory lock — an
+    // owner-scoped delete — removes the pending row after autoComplete reads
+    // it and takes the lock, but before it runs its pending-conditional
+    // update. The first statement after the pending read is the advisory-lock
+    // execute call, so the delete runs there, on its own connection. The
+    // completion transaction waits until that delete commits. No sleep and no
+    // polling are needed: the transaction is parked inside the hook.
+    let deleteRan = false;
+
+    const outcome = await db.transaction(async tx => {
+      // Replace only the `execute` method on this transaction. Every other
+      // property stays on the real drizzle transaction object.
+      const runExecute = tx.execute;
+      tx.execute = (async (...args: unknown[]) => {
+        const result = await Reflect.apply(runExecute, tx, args);
+        if (!deleteRan) {
+          deleteRan = true;
+          await deleteIntegrationForOwner({ type: 'user', id: userId }, 'github', 'standard');
+        }
+        return result;
+      }) as unknown as typeof tx.execute;
+
+      return autoCompleteInstallation(
+        {
+          integrationId: pending.id,
+          installationData: {
+            installation_id: INSTALLATION_ID,
+            account_id: accountId,
+            account_login: 'target-org',
+            repository_selection: 'all',
+            permissions: {},
+            events: [],
+            created_at: new Date().toISOString(),
+          },
+          existingMetadata: pending.metadata as Record<string, unknown>,
+          authorizedRequesterAccountIds: ['github-requester-race'],
+        },
+        tx
+      );
+    });
+
+    expect(outcome).toEqual({ ok: false, reason: 'not_pending' });
+
+    const [row] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, pending.id));
+    expect(row).toBeUndefined();
+  });
+
   test('same-owner refresh with app type is not confused by another owner other-app-type row', async () => {
     const ownerA: Owner = { type: 'user', id: userId };
     const ownerB: Owner = { type: 'user', id: otherUserId };

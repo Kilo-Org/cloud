@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { BUILTIN_AGENT_MODES } from './agent-modes.js';
+import { BUILTIN_AGENT_MODES } from './agent-modes';
 
 export const RuntimeProfileLimits = {
   MAX_RUNTIME_INSTRUCTIONS: 50,
@@ -22,6 +22,10 @@ export const RuntimeProfileLimits = {
   MAX_RUNTIME_KILO_COMMAND_NAME_LENGTH: 100,
   MAX_RUNTIME_KILO_COMMAND_TEMPLATE: 100_000,
   MAX_RUNTIME_KILO_COMMAND_DESCRIPTION: 2000,
+  MAX_MODEL_CONTEXT_LIMITS: 50,
+  MAX_MODEL_CONTEXT_LIMIT_MODEL_LENGTH: 200,
+  MIN_MODEL_CONTEXT_TOKENS: 1_000,
+  MAX_MODEL_CONTEXT_TOKENS: 10_000_000,
 } as const;
 
 /** Profile rules share the legacy rules directory with the reserved built-in file. */
@@ -49,17 +53,44 @@ export type RuntimeInstructionInput = z.infer<typeof RuntimeInstructionSchema>;
 
 const SKILL_FILE_PATH_PATTERN = /^[a-zA-Z0-9._\-/]+$/;
 
-/** Shared by schema validation and the legacy writer that skips unsafe files. */
+/** Shared by schema validation and the writer that keeps only accepted paths. */
 export function isSafeSkillFilePath(path: string): boolean {
   return (
     path.length > 0 &&
     path.length <= RuntimeProfileLimits.MAX_RUNTIME_SKILL_COMPANION_PATH_LENGTH &&
     SKILL_FILE_PATH_PATTERN.test(path) &&
-    !path.startsWith('/') &&
+    path.split('/').every(segment => segment !== '' && segment !== '.' && segment !== '..') &&
     !path.includes('..') &&
-    !path.includes('//') &&
     path.toLowerCase() !== 'skill.md'
   );
+}
+
+export type AcceptedRuntimeSkillFiles = {
+  accepted: Record<string, string>;
+  rejected: Array<{ path: string; reason: 'path' | 'duplicate' }>;
+};
+
+/** Split a companion-file map into the entries the writer keeps and why the rest are dropped. */
+export function acceptedRuntimeSkillFiles(
+  files: Record<string, string>
+): AcceptedRuntimeSkillFiles {
+  const accepted: Array<[string, string]> = [];
+  const rejected: AcceptedRuntimeSkillFiles['rejected'] = [];
+  const seen = new Set<string>();
+  for (const [path, content] of Object.entries(files)) {
+    if (!isSafeSkillFilePath(path)) {
+      rejected.push({ path, reason: 'path' });
+      continue;
+    }
+    const folded = path.toLowerCase();
+    if (seen.has(folded)) {
+      rejected.push({ path, reason: 'duplicate' });
+      continue;
+    }
+    seen.add(folded);
+    accepted.push([path, content]);
+  }
+  return { accepted: Object.fromEntries(accepted), rejected };
 }
 
 /** Validate a map of companion files bundled with a skill. */
@@ -73,12 +104,20 @@ const RuntimeSkillFilesSchema = z
     `A skill may have at most ${RuntimeProfileLimits.MAX_RUNTIME_SKILL_COMPANION_FILES} companion files`
   )
   .superRefine((files, ctx) => {
+    const { accepted, rejected } = acceptedRuntimeSkillFiles(files);
+    const first = rejected[0];
+    if (first) {
+      ctx.addIssue({
+        code: 'custom',
+        message:
+          first.reason === 'path'
+            ? `Skill file path rejected: ${first.path}`
+            : `Skill file path duplicates another companion file: ${first.path}`,
+      });
+      return;
+    }
     let total = 0;
-    for (const [path, content] of Object.entries(files)) {
-      if (!isSafeSkillFilePath(path)) {
-        ctx.addIssue({ code: 'custom', message: `Skill file path rejected: ${path}` });
-        return;
-      }
+    for (const content of Object.values(accepted)) {
       total += content.length;
     }
     if (total > RuntimeProfileLimits.MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL) {
@@ -121,6 +160,45 @@ export const RuntimeSkillsSchema = z
     RuntimeProfileLimits.MAX_RUNTIME_SKILLS,
     `Maximum ${RuntimeProfileLimits.MAX_RUNTIME_SKILLS} runtime skills allowed`
   );
+
+/** Keep only the companion files the current path rule accepts, whatever the stored shape. */
+export function projectStoredRuntimeSkills(value: unknown): unknown {
+  if (!Array.isArray(value)) return value;
+  const skills: unknown[] = value;
+  return skills.map(skill => {
+    if (typeof skill !== 'object' || skill === null || !('files' in skill)) return skill;
+    const files = skill.files;
+    if (typeof files !== 'object' || files === null || Array.isArray(files)) return skill;
+    const companions = Object.fromEntries(
+      Object.entries(files as Record<string, unknown>).filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string'
+      )
+    );
+    return { ...skill, files: acceptedRuntimeSkillFiles(companions).accepted };
+  });
+}
+
+/**
+ * Route spec read back from storage: its runtime skills keep the entries the
+ * current path rule accepts, so a spec written under an earlier rule still
+ * loads. A spec that arrives on the wire is parsed with
+ * `controlPlaneRouteSpecSchema` and stays strict.
+ */
+export function projectStoredRouteSpecSkills(spec: unknown): unknown {
+  if (typeof spec !== 'object' || spec === null || !('runtimeSkills' in spec)) return spec;
+  return { ...spec, runtimeSkills: projectStoredRuntimeSkills(spec.runtimeSkills) };
+}
+
+/**
+ * Runtime skills read back from storage. A bundle written under an earlier path
+ * rule keeps the companion files the current rule accepts, so a stored session
+ * or registration parses with the rest of its configuration. Anything a caller
+ * supplies is validated with `RuntimeSkillsSchema` instead.
+ */
+export const PersistedRuntimeSkillsSchema = z.preprocess(
+  projectStoredRuntimeSkills,
+  RuntimeSkillsSchema.optional()
+);
 
 export type RuntimeSkillInput = z.infer<typeof RuntimeSkillSchema>;
 
@@ -253,6 +331,28 @@ export const RuntimeBuiltinAgentsSchema = z
     }
   });
 export type RuntimeBuiltinAgents = z.infer<typeof RuntimeBuiltinAgentsSchema>;
+
+/**
+ * User-scoped per-model context-window caps, keyed by gateway model id without
+ * the `kilo/` prefix. Materialized into `KILO_CONFIG_CONTENT.provider.kilo.models`
+ * at session preparation time. Keep the bounds in sync with
+ * `ModelContextLimitsSchema` in `@kilocode/cloud-agent-profile`; a parity test
+ * asserts they match.
+ */
+export const RuntimeModelContextLimitsSchema = z
+  .record(
+    z.string().min(1).max(RuntimeProfileLimits.MAX_MODEL_CONTEXT_LIMIT_MODEL_LENGTH),
+    z
+      .number()
+      .int()
+      .min(RuntimeProfileLimits.MIN_MODEL_CONTEXT_TOKENS)
+      .max(RuntimeProfileLimits.MAX_MODEL_CONTEXT_TOKENS)
+  )
+  .refine(
+    limits => Object.keys(limits).length <= RuntimeProfileLimits.MAX_MODEL_CONTEXT_LIMITS,
+    `Maximum ${RuntimeProfileLimits.MAX_MODEL_CONTEXT_LIMITS} model context limits allowed`
+  );
+export type RuntimeModelContextLimits = z.infer<typeof RuntimeModelContextLimitsSchema>;
 
 export const RuntimeKiloCommandSchema = z.object({
   name: z

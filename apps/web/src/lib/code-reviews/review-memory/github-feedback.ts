@@ -7,7 +7,7 @@ import {
   type GitHubAppType,
 } from '@/lib/integrations/platforms/github/adapter';
 import type { PullRequestReviewCommentPayload } from '@/lib/integrations/platforms/github/webhook-schemas';
-import { isKiloGitHubBotLogin } from '@/lib/code-reviews/kilo-bot-logins';
+import { isKiloGitHubBotLogin, isKiloReviewBotAuthor } from '@/lib/code-reviews/kilo-bot-logins';
 import { recordReplyFeedbackEvent, type ReviewMemoryOwner } from './db';
 import { isReviewMemoryEnabled } from './settings';
 
@@ -28,7 +28,13 @@ export type FetchParentReviewComment = (input: {
   owner: string;
   repo: string;
   commentId: number;
-}) => Promise<{ id: number; body: string; userLogin: string | null } | null>;
+}) => Promise<{
+  id: number;
+  body: string;
+  userLogin: string | null;
+  userType: string | null;
+  userId: number | null;
+} | null>;
 
 export type FetchRepositoryPermission = (input: {
   installationId: string;
@@ -78,7 +84,13 @@ export async function handleGitHubReviewCommentReply(input: {
   });
 
   if (!parent) return { recorded: false, reason: 'parent-comment-not-found' };
-  if (!isKiloGitHubBotLogin(parent.userLogin ?? undefined)) {
+  if (
+    !isKiloReviewBotAuthor({
+      login: parent.userLogin ?? '',
+      type: parent.userType ?? '',
+      id: parent.userId,
+    })
+  ) {
     return { recorded: false, reason: 'not-kilo-comment' };
   }
 
@@ -192,7 +204,13 @@ const defaultFetchParentComment: FetchParentReviewComment = async input => {
     input.appType
   );
   if (!comment) return null;
-  return { id: comment.id, body: comment.body, userLogin: comment.userLogin };
+  return {
+    id: comment.id,
+    body: comment.body,
+    userLogin: comment.userLogin,
+    userType: comment.userType,
+    userId: comment.userId,
+  };
 };
 
 const defaultFetchRepositoryPermission: FetchRepositoryPermission = async input => {

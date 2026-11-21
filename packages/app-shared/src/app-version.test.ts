@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isVersionBelow } from './app-version';
+import { compareAppVersions, isAppVersionAtLeast, isVersionBelow } from './app-version';
 
 describe('isVersionBelow', () => {
   it('returns true when current is below minimum', () => {
@@ -27,5 +27,40 @@ describe('isVersionBelow', () => {
     expect(isVersionBelow('1.x', '1.0.0')).toBe(false);
     expect(isVersionBelow('1.x', '1.1.0')).toBe(true);
     expect(isVersionBelow('1.x', '2.0.0')).toBe(true);
+  });
+});
+
+describe('compareAppVersions', () => {
+  it.each([
+    ['1.0.8', '1.0.8', 0],
+    ['1.0.8', '1.0.4', 1],
+    ['1.0.4', '1.0.8', -1],
+    ['1.10.0', '1.9.9', 1],
+    ['2.0.0', '1.99.99', 1],
+    ['1.0', '1.0.0', 0],
+    ['1', '1.0.1', -1],
+    ['0.9', '1.0.0', -1],
+  ] as const)('compares %s vs %s', (a, b, expected) => {
+    expect(compareAppVersions(a, b)).toBe(expected);
+  });
+
+  it('treats non-numeric segments as zero instead of throwing', () => {
+    expect(compareAppVersions('1.0.x', '1.0.0')).toBe(0);
+  });
+});
+
+describe('isAppVersionAtLeast', () => {
+  it('clears the gate at and above the minimum', () => {
+    expect(isAppVersionAtLeast('1.0.6', '1.0.6')).toBe(true);
+    expect(isAppVersionAtLeast('1.0.8', '1.0.6')).toBe(true);
+    expect(isAppVersionAtLeast('2.0.0', '1.0.6')).toBe(true);
+  });
+
+  it('holds the gate below the minimum and for an unknown version', () => {
+    expect(isAppVersionAtLeast('1.0.5', '1.0.6')).toBe(false);
+    expect(isAppVersionAtLeast('0.9.9', '1.0.6')).toBe(false);
+    expect(isAppVersionAtLeast(null, '1.0.6')).toBe(false);
+    expect(isAppVersionAtLeast(undefined, '1.0.6')).toBe(false);
+    expect(isAppVersionAtLeast('', '1.0.6')).toBe(false);
   });
 });

@@ -38,7 +38,6 @@ import { AccountLinkingProviders } from '@/lib/auth/provider-metadata';
 import { assertUserCanBeSoftDeleted, SoftDeletePreconditionError } from '@/lib/user';
 import { mintPasskeyManagementAuthorization } from '@/lib/auth/passkey-management';
 import { refreshGlanceableScope } from '@kilocode/web-shared/lib/notifications-worker-client';
-import { isClaudePlatformOAuthEnabled } from '@kilocode/web-shared/lib/auth/claude/feature-flag.server';
 
 jest.mock('@kilocode/web-shared/lib/email', () => {
   const actual = jest.requireActual('@kilocode/web-shared/lib/email');
@@ -59,10 +58,6 @@ jest.mock('@/lib/user/gdpr-removal', () => ({
 jest.mock('@/lib/account-linking-session', () => ({
   ...jest.requireActual('@/lib/account-linking-session'),
   createAccountLinkingSession: jest.fn(),
-}));
-
-jest.mock('@kilocode/web-shared/lib/auth/claude/feature-flag.server', () => ({
-  isClaudePlatformOAuthEnabled: jest.fn(async () => true),
 }));
 
 jest.mock('@/lib/user', () => {
@@ -164,20 +159,6 @@ describe('user router - linkAuthProvider', () => {
       code: 'BAD_REQUEST',
     });
     expect(mockCreateLinkingSession).not.toHaveBeenCalled();
-  });
-
-  it('refuses a Claude link while Sign in with Claude is not launched', async () => {
-    const user = await insertTestUser();
-    const caller = await createCallerForUser(user.id);
-    const mockCreateLinkingSession = jest.mocked(createAccountLinkingSession);
-    jest.mocked(isClaudePlatformOAuthEnabled).mockResolvedValueOnce(false);
-    mockCreateLinkingSession.mockClear();
-
-    await expect(caller.user.linkAuthProvider({ provider: 'claude' })).rejects.toMatchObject({
-      code: 'BAD_REQUEST',
-    });
-    expect(mockCreateLinkingSession).not.toHaveBeenCalled();
-    expect(isClaudePlatformOAuthEnabled).toHaveBeenCalledWith(user.google_user_email);
   });
 });
 
@@ -2282,6 +2263,34 @@ describe('user router - device sessions', () => {
     await expect(
       caller.user.revokeDeviceSessionById({ sessionId: 'not-a-uuid' })
     ).rejects.toThrow();
+  });
+
+  it('lists and revokes a session whose id is not a versioned UUID', async () => {
+    // A `uuid` column accepts any 8-4-4-4-12 hex value; this one carries a
+    // version-0 nibble, so the version-strict RFC validator would refuse it.
+    const versionlessSessionId = '1f0d3a52-6a0b-0c4e-0a51-0d1e2b3c4a05';
+    await db.insert(device_sessions).values({
+      id: versionlessSessionId,
+      kilo_user_id: owner.id,
+      user_agent: 'Kilo-Code/1.2.3 (ios)',
+      last_seen_at: '2026-04-25 10:00:00+00',
+    });
+
+    const caller = await createCallerForUser(owner.id);
+
+    const listed = await caller.user.listDeviceSessions();
+    expect(listed.some(row => row.id === versionlessSessionId)).toBe(true);
+
+    await expect(
+      caller.user.revokeDeviceSessionById({ sessionId: versionlessSessionId })
+    ).resolves.toBeDefined();
+
+    const [row] = await db
+      .select()
+      .from(device_sessions)
+      .where(eq(device_sessions.id, versionlessSessionId));
+    expect(row?.revoked_at).not.toBeNull();
+    expect(row?.revoked_reason).toBe('user_revoked');
   });
 
   it('revokes the current device session with the logout reason', async () => {

@@ -1,0 +1,16 @@
+{
+  "name": "pages-output",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "predeploy": "pnpm run build",
+    "deploy": "wrangler deploy",
+    "test": "node --test scripts/*.test.mjs",
+    "typecheck": "node --check scripts/build.mjs && node --check scripts/shell.mjs"
+  },
+  "devDependencies": {
+    "jsonc-parser": "3.3.1",
+    "wrangler": "catalog:"
+  }
+}

@@ -26,6 +26,8 @@ const mocks = vi.hoisted(() => ({
   mergeProfileConfiguration: vi.fn(),
   loadEnvironmentForSession: vi.fn(),
   getBuiltinAgentSettings: vi.fn(),
+  getModelContextLimits: vi.fn(),
+  getWebSearchPreference: vi.fn(),
   assertRepositoryAccessBeforeSessionCreation: vi.fn(),
   assertEnvironmentRepositoriesAccess: vi.fn(),
   assertKiloModelAvailable: vi.fn(),
@@ -52,6 +54,8 @@ vi.mock('@kilocode/cloud-agent-profile', async importActual => ({
   mergeProfileConfiguration: mocks.mergeProfileConfiguration,
   loadEnvironmentForSession: mocks.loadEnvironmentForSession,
   getBuiltinAgentSettings: mocks.getBuiltinAgentSettings,
+  getModelContextLimits: mocks.getModelContextLimits,
+  getWebSearchPreference: mocks.getWebSearchPreference,
 }));
 
 vi.mock('../../session/validate-repository-access.js', () => ({
@@ -149,6 +153,26 @@ describe('hosted workspace mutation inputs', () => {
     expect(hostedWorkspaceCreateRequest(input).options?.kiloSessionId).toBe(kiloSessionId);
   });
 
+  it('accepts a model-specific variant key on both create mutations', () => {
+    for (const variant of ['high-2', 'thinking-v2', 'xhigh_1']) {
+      const workspace = CreateHostedWorkspaceInput.parse({
+        ...validCreate,
+        agent: { ...validCreate.agent, variant },
+      });
+      expect(hostedWorkspaceCreateRequest(workspace).agent.variant).toBe(variant);
+
+      expect(
+        CreateHostedWorkspaceSessionInput.parse({
+          workspaceId,
+          operationKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          clientProvenance: 'agent-manager',
+          message: { prompt: 'Second chat' },
+          agent: { mode: 'code', model: 'anthropic/claude-sonnet-4', variant },
+        }).agent.variant
+      ).toBe(variant);
+    }
+  });
+
   it('does not accept workspace-wide overrides when adding a sibling', () => {
     const valid = {
       workspaceId,
@@ -223,6 +247,8 @@ describe('createHostedWorkspace profile preflight', () => {
     });
     mocks.loadEnvironmentForSession.mockResolvedValue({ status: 'none' });
     mocks.getBuiltinAgentSettings.mockResolvedValue({});
+    mocks.getModelContextLimits.mockResolvedValue({});
+    mocks.getWebSearchPreference.mockResolvedValue('default');
     mocks.createSessionWithLedger.mockResolvedValue({
       cloudAgentSessionId,
       kiloSessionId,

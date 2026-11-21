@@ -14,6 +14,8 @@ function setup() {
     USAGE_INGEST_PUBLISH_SECRET: 'synthetic-local-secret',
     USAGE_INGEST_QUEUE: { send, sendBatch: vi.fn(), metrics: vi.fn() },
     USAGE_INGEST_DLQ: { send: vi.fn(), sendBatch: vi.fn(), metrics: vi.fn() },
+    USAGE_INGEST_ENKRYPT_QUEUE: { send: vi.fn(), sendBatch: vi.fn(), metrics: vi.fn() },
+    USAGE_INGEST_ENKRYPT_DLQ: { send: vi.fn(), sendBatch: vi.fn(), metrics: vi.fn() },
   };
   return { send, env };
 }
@@ -122,6 +124,31 @@ describe('usage publisher', () => {
       expect(send).not.toHaveBeenCalled();
     }
   );
+
+  it('returns 413 before oversized-body cancellation cleanup finishes', async () => {
+    const { send, env } = setup();
+    const cleanup = Promise.withResolvers<void>();
+    const cancel = vi.fn(() => cleanup.promise);
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(MAX_USAGE_BYTES + 1));
+      },
+      cancel,
+    });
+    let status: number | undefined;
+    const response = worker.fetch(request(stream), env).then(value => {
+      status = value.status;
+    });
+    try {
+      await vi.waitFor(() => expect(status).toBe(413));
+      expect(cancel).toHaveBeenCalledOnce();
+      expect(stream.locked).toBe(false);
+      expect(send).not.toHaveBeenCalled();
+    } finally {
+      cleanup.resolve();
+      await response;
+    }
+  });
 
   it('accepts the serialized boundary but rejects JSON expansion beyond it', async () => {
     const { send, env } = setup();

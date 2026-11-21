@@ -41,7 +41,7 @@ export async function sendAutoRoutingPoolNoticeEmail(params: {
     const settingsUrl = router.organization
       ? `${NEXTAUTH_URL}/organizations/${encodeURIComponent(router.organization.id)}/providers-and-models`
       : `${NEXTAUTH_URL}/profile`;
-    return `<li style="margin: 0 0 12px"><strong>${escapeHtml(label)}:</strong> <code>${escapeHtml(router.modelId)}</code> · <a href="${escapeHtml(settingsUrl)}" style="color: #1a1a1a; text-decoration: underline">Manage</a></li>`;
+    return `<li style="margin: 0 0 12px"><strong>${escapeHtml(label)}:</strong> <code>${escapeHtml(router.modelId)}</code> · <a class="kc-strong" href="${escapeHtml(settingsUrl)}" style="color: #1a1a1a; text-decoration: underline">Manage</a></li>`;
   });
   const cutoverAt = `${new Intl.DateTimeFormat('en-US', {
     dateStyle: 'full',

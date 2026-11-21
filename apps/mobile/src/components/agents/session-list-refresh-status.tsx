@@ -92,7 +92,7 @@ export function SessionListRefreshStatus({
         hitSlop={12}
         className="justify-center active:opacity-70"
       >
-        <Text className="font-mono-medium text-[11px] uppercase tracking-[1.5px] text-primary">
+        <Text variant="eyebrow" className="text-primary">
           {t('common.retry')}
         </Text>
       </Pressable>

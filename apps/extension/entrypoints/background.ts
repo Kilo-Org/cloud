@@ -1,14 +1,26 @@
-/* eslint-disable max-lines */
+/* eslint-disable import/max-dependencies, max-lines */
 import { storage } from '#imports';
 import { z } from 'zod';
 import { buildPendingMemoryDraft } from '@/src/shared/agent-memories';
 import { savePendingAgentMemoryDraft } from '@/src/shared/agent-memories-storage';
 import type { WebMcpToolCallEvent } from '@/src/shared/agent-conversation';
-import { runKiloBrowserTool } from '@/src/shared/browser-tool-dispatch';
 import type { BrowserToolDispatchOptions } from '@/src/shared/browser-tool-dispatch';
-import { createBrowserToolSession } from '@/src/shared/browser-tool-session';
-import type { BrowserToolSession } from '@/src/shared/browser-tool-session';
-import { clearBrowserToolResize } from '@/src/shared/browser-tool-page-actions';
+import { startDownloadHold } from '@/src/shared/browser-download-hold-host';
+import type { DownloadHold } from '@/src/shared/browser-download-hold';
+import type { DownloadHoldPermissionsApi } from '@/src/shared/browser-download-hold-listener';
+import { createBrowserRuntime } from '@/src/shared/browser-runtime';
+import type { BrowserDownloadsApi, BrowserRuntime } from '@/src/shared/browser-runtime';
+import {
+  createBrowserTabGroupController,
+  createStorageSessionTabGroupPersistence,
+} from '@/src/shared/browser-tab-groups';
+import type { BrowserTabGroupsApi } from '@/src/shared/browser-tab-groups';
+import {
+  createStorageSessionLeasePersistence,
+  createTabLeaseRegistry,
+} from '@/src/shared/browser-tab-leases';
+import { createRuntimeBrowserBridge } from '@/src/shared/local-agents/browser-bridge';
+import { readLocalAgentsHostApis, startLocalAgentsHost } from '@/src/shared/local-agents/host';
 import {
   ADD_TO_MEMORY_MENU_ID,
   enableActionClickSidePanel,
@@ -24,17 +36,17 @@ import type {
 } from '@/src/shared/side-panel';
 import {
   BROWSER_TOOL_MESSAGE,
+  CLAIM_TAB_MESSAGE,
+  DISPOSE_BROWSER_CALLER_MESSAGE,
   EVAL_TAB_MESSAGE,
   LIST_INSPECTABLE_TABS_MESSAGE,
   PAGE_SNAPSHOT_MESSAGE,
+  RELEASE_BROWSER_CALLER_MESSAGE,
   VIEWPORT_SCREENSHOT_MESSAGE,
   WEB_MCP_DISCOVER_MESSAGE,
   WEB_MCP_EXECUTE_MESSAGE,
   discoverWebMcpToolsInTab,
-  evalInTab,
-  evalInTabWithScripting,
   executeWebMcpToolInTab,
-  getInspectableTab,
   getPageSnapshotInTabWithScripting,
   getViewportScreenshotWithTabsApi,
   isTabDebuggerRequest,
@@ -66,6 +78,31 @@ interface ChromeRuntimeApi {
     ) => void;
   };
 }
+
+/*
+ * The download hold, built while this worker's module is evaluated: `onDeterminingFilename`
+ * only reaches an extension that was listening when the browser created the download, so the
+ * listener cannot wait for `defineBackground` to run or for the first message.
+ */
+const readChrome = (
+  globalThis as typeof globalThis & {
+    chrome?: {
+      downloads?: BrowserDownloadsApi;
+      permissions?: DownloadHoldPermissionsApi;
+      runtime?: { getURL?: (path: string) => string };
+    };
+  }
+).chrome;
+
+const profileDownloadHold = startDownloadHold({
+  downloads: () => readChrome?.downloads,
+  // `chrome-extension://` on Chrome, `moz-extension://` on Firefox: the one signal that separates a browser that
+  // Raises `onDeterminingFilename` from one that never can, before the optional permission decides anything.
+  extensionOrigin: () => readChrome?.runtime?.getURL?.(''),
+  permissions: () => readChrome?.permissions,
+  // `storage` is the whole area multiplexer; the record's key selects `session:`.
+  sessionStorage: () => storage,
+});
 
 /*
  * Trust boundary for the eval/debugger message path. Today only the extension's own pages (the
@@ -106,65 +143,96 @@ const isTrustedExtensionSender = (sender: unknown, runtimeId: string | undefined
 };
 
 /*
- * One browser-tool session per tab, created through the session module
- * factory on the first `kilo.tabs.browserTool` message and reused for the
- * tab's lifetime (so console, network and ref state accumulate between tool
- * calls). Where `debuggerApi` is absent (Firefox) the factory builds the
- * scripting backend. A session is disposed and evicted when its tab closes or
- * leaves the extension's reach, so the next call starts fresh instead of
- * reusing a dead session.
+ * One browser runtime per tabs API — in the browser, the one `chrome.tabs`
+ * object. Every browser-tool and eval message goes through it: it owns the
+ * per-tab lease, the single debugger attachment per tab, one ref registry per
+ * caller, and the serial call chain. Where `debuggerApi` is absent (Firefox)
+ * the tab session builds the scripting backend.
  */
-const browserToolSessions = new Map<number, BrowserToolSession>();
+const browserRuntimes = new WeakMap<BrowserTabsApi, BrowserRuntime>();
 
-const disposeBrowserToolSession = async (tabId: number): Promise<void> => {
-  const session = browserToolSessions.get(tabId);
+// One onRemoved listener per tabs API, wired lazily on the first message; the WeakSet keeps a second registration a no-op.
+const runtimeCleanupWiredTabsApis = new WeakSet<BrowserTabsApi>();
 
-  if (session === undefined) {
-    return;
-  }
+/** `chrome.tabs.group` is the one tab-group call that lives on the tabs API; the rest are `chrome.tabGroups`. */
+type NativeTabsApi = BrowserTabsApi & Pick<BrowserTabGroupsApi, 'group'>;
 
-  browserToolSessions.delete(tabId);
-  // Clear a browser_resize override before the debugger detaches, so a tab that stays open but leaves the extension's reach does not keep the resized viewport.
-  await clearBrowserToolResize(session);
-  await session.dispose();
-};
-
-// One onRemoved listener per tabs API, wired lazily on the first tool message; the WeakSet keeps a second registration a no-op.
-const sessionCleanupWiredTabsApis = new WeakSet<BrowserTabsApi>();
-
-const wireBrowserToolSessionCleanup = (tabsApi: BrowserTabsApi): void => {
-  if (sessionCleanupWiredTabsApis.has(tabsApi) || tabsApi.onRemoved === undefined) {
-    return;
-  }
-
-  sessionCleanupWiredTabsApis.add(tabsApi);
-  tabsApi.onRemoved.addListener(tabId => {
-    void disposeBrowserToolSession(tabId);
-  });
-};
-
-const getOrCreateBrowserToolSession = ({
+export const getBrowserRuntime = ({
   debuggerApi,
+  downloadHold: hold,
+  downloadsApi,
   scriptingApi,
-  tabId,
+  tabGroupsApi,
   tabsApi,
 }: {
   readonly debuggerApi: ChromeDebuggerApi | undefined;
+  /** The hold that decides a download before its file exists; absent on Firefox, which has no such event. */
+  readonly downloadHold?: DownloadHold | undefined;
+  /** `chrome.downloads`, resolved per call: the optional permission can change while the worker lives. */
+  readonly downloadsApi?: (() => BrowserDownloadsApi | undefined) | undefined;
   readonly scriptingApi: BrowserScriptingApi | undefined;
-  readonly tabId: number;
-  readonly tabsApi: BrowserTabsApi;
-}): BrowserToolSession => {
-  const existing = browserToolSessions.get(tabId);
+  /** Absent on Firefox or without the `tabGroups` permission: sessions track their tabs by id. */
+  readonly tabGroupsApi?: BrowserTabGroupsApi | undefined;
+  readonly tabsApi: NativeTabsApi;
+}): BrowserRuntime => {
+  const existing = browserRuntimes.get(tabsApi);
 
   if (existing !== undefined) {
     return existing;
   }
 
-  const session = createBrowserToolSession({ debuggerApi, scriptingApi, tabId, tabsApi });
+  const runtime = createBrowserRuntime({
+    debuggerApi,
+    ...(hold === undefined ? {} : { downloadHold: hold }),
+    ...(downloadsApi === undefined ? {} : { downloadsApi }),
+    leases: createTabLeaseRegistry({
+      persistence: createStorageSessionLeasePersistence(storage),
+    }),
+    scriptingApi,
+    // Every session gets its group `Kilo · <title>`; an ended one collapses, greys and stays adoptable (D12).
+    // `tabs.group` lives on the tabs API and the rest of the group surface on `chrome.tabGroups`.
+    // Without the group API sessions track their tabs by id. Either way they outlive a worker restart in `storage.session`.
+    tabGroups: createBrowserTabGroupController({
+      api:
+        tabGroupsApi === undefined
+          ? { tabQuery: query => tabsApi.query(query) }
+          : {
+              ...(tabsApi.group === undefined ? {} : { group: tabsApi.group.bind(tabsApi) }),
+              tabGroupOf: async tabId => {
+                const tab = await tabsApi.get?.(tabId);
 
-  browserToolSessions.set(tabId, session);
+                return tab?.groupId;
+              },
+              tabQuery: query => tabsApi.query(query),
+              ...(tabGroupsApi.update === undefined
+                ? {}
+                : {
+                    update: async (groupId, props) => {
+                      await tabGroupsApi.update?.(groupId, props);
+                    },
+                  }),
+            },
+      persistence: createStorageSessionTabGroupPersistence(storage),
+    }),
+    tabsApi,
+  });
 
-  return session;
+  browserRuntimes.set(tabsApi, runtime);
+
+  if (!runtimeCleanupWiredTabsApis.has(tabsApi)) {
+    runtimeCleanupWiredTabsApis.add(tabsApi);
+    tabsApi.onRemoved?.addListener(tabId => {
+      void runtime.disposeTab(tabId);
+    });
+    // A tab opened from a tab in a session's group joins that session (D9).
+    tabsApi.onCreated?.addListener(tab => {
+      if (tab.id !== undefined) {
+        void runtime.noteTabCreated(tab.id, tab.openerTabId);
+      }
+    });
+  }
+
+  return runtime;
 };
 
 const webMcpDiscoveryValueSchema = z.object({
@@ -220,15 +288,35 @@ const webMcpDispatchOptions = (
 
 export const handleTabDebuggerRequest = async ({
   debuggerApi,
+  downloadHold,
+  downloadsApi,
   request,
   scriptingApi,
+  tabGroupsApi,
   tabsApi,
 }: {
   debuggerApi: ChromeDebuggerApi | undefined;
+  /** The one hold of the profile: passed here so the panel's first message cannot cache a runtime without it. */
+  downloadHold?: DownloadHold | undefined;
+  downloadsApi?: (() => BrowserDownloadsApi | undefined) | undefined;
   request: TabDebuggerRequest;
   scriptingApi: BrowserScriptingApi | undefined;
-  tabsApi: BrowserTabsApi | undefined;
+  tabGroupsApi?: BrowserTabGroupsApi | undefined;
+  tabsApi: NativeTabsApi | undefined;
 }): Promise<TabDebuggerResponse> => {
+  // One runtime per tabs API, and the same tab-group surface for the panel and the agent bridge. The hold goes in
+  // On both paths: the cache is keyed by the tabs API alone, so a panel message that created the runtime without it
+  // Would leave the agent bridge reusing a runtime whose guard can only cancel a file after it starts.
+  const runtimeFor = (tabs: NativeTabsApi): BrowserRuntime =>
+    getBrowserRuntime({
+      debuggerApi,
+      ...(downloadHold === undefined ? {} : { downloadHold }),
+      downloadsApi,
+      scriptingApi,
+      tabGroupsApi,
+      tabsApi: tabs,
+    });
+
   try {
     if (request.type === LIST_INSPECTABLE_TABS_MESSAGE) {
       if (debuggerApi) {
@@ -318,33 +406,60 @@ export const handleTabDebuggerRequest = async ({
     }
 
     if (request.type === EVAL_TAB_MESSAGE) {
-      if (debuggerApi) {
-        return {
-          ok: true,
-          result: await evalInTab({
-            code: request.code,
-            debuggerApi,
-            tabId: request.tabId,
-            ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
-          }),
-          type: EVAL_TAB_MESSAGE,
-        };
+      if (tabsApi === undefined) {
+        return { error: 'Tab evaluation API is unavailable.', ok: false };
       }
 
-      if (scriptingApi) {
-        return {
-          ok: true,
-          result: await evalInTabWithScripting({
-            code: request.code,
-            scriptingApi,
-            tabId: request.tabId,
-            ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
-          }),
-          type: EVAL_TAB_MESSAGE,
-        };
+      const runtime = runtimeFor(tabsApi);
+
+      return {
+        ok: true,
+        result: await runtime.evalInTab({
+          caller: request.caller,
+          code: request.code,
+          tabId: request.tabId,
+          ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
+        }),
+        type: EVAL_TAB_MESSAGE,
+      };
+    }
+
+    if (request.type === CLAIM_TAB_MESSAGE) {
+      if (tabsApi === undefined) {
+        return { error: 'Tab lease API is unavailable.', ok: false };
       }
 
-      return { error: 'Tab evaluation API is unavailable.', ok: false };
+      const runtime = runtimeFor(tabsApi);
+
+      return {
+        granted: await runtime.claimTab({
+          caller: request.caller,
+          ...(request.from === undefined ? {} : { from: request.from }),
+          tabId: request.tabId,
+        }),
+        ok: true,
+        type: CLAIM_TAB_MESSAGE,
+      };
+    }
+
+    if (request.type === RELEASE_BROWSER_CALLER_MESSAGE) {
+      const runtime = tabsApi === undefined ? undefined : runtimeFor(tabsApi);
+
+      return {
+        ok: true,
+        released: runtime?.releaseCaller(request.caller) ?? 0,
+        type: RELEASE_BROWSER_CALLER_MESSAGE,
+      };
+    }
+
+    if (request.type === DISPOSE_BROWSER_CALLER_MESSAGE) {
+      const runtime = tabsApi === undefined ? undefined : runtimeFor(tabsApi);
+
+      return {
+        ok: true,
+        released: runtime?.disposeCaller(request.caller) ?? 0,
+        type: DISPOSE_BROWSER_CALLER_MESSAGE,
+      };
     }
 
     if (request.type === BROWSER_TOOL_MESSAGE) {
@@ -352,39 +467,61 @@ export const handleTabDebuggerRequest = async ({
         return { error: 'Browser tool API is unavailable.', ok: false };
       }
 
-      wireBrowserToolSessionCleanup(tabsApi);
+      const runtime = runtimeFor(tabsApi);
+      const outcome = await runtime.runTool({
+        ...(request.agent === undefined ? {} : { agent: request.agent }),
+        arguments: request.arguments,
+        caller: request.caller,
+        options: webMcpDispatchOptions(scriptingApi),
+        ...(request.safeMode === undefined ? {} : { safeMode: request.safeMode }),
+        tabId: request.tabId,
+        ...(request.takeOver === undefined ? {} : { takeOver: request.takeOver }),
+        toolName: request.tool,
+      });
 
-      // The tab left the extension's reach (closed, or a browser-internal page): dispose its session and report it.
-      const reach = await getInspectableTab({ tabId: request.tabId, tabsApi });
-
-      if (!reach.ok) {
-        await disposeBrowserToolSession(request.tabId);
-
+      if (outcome.kind === 'needs_permission') {
         return {
           ok: true,
-          result: { error: reach.error, ok: false },
+          permission: {
+            items: outcome.items.map(item => ({ ...item })),
+            ...(outcome.stepToken === undefined ? {} : { stepToken: outcome.stepToken }),
+          },
+          result: outcome.result,
           type: BROWSER_TOOL_MESSAGE,
         };
       }
 
-      const session = getOrCreateBrowserToolSession({
-        debuggerApi,
-        scriptingApi,
-        tabId: request.tabId,
-        tabsApi,
-      });
-      const result = await runKiloBrowserTool({
-        arguments: request.arguments,
-        options: {
-          tabId: request.tabId,
-          tabsApi,
-          ...webMcpDispatchOptions(scriptingApi),
-        },
-        session,
-        toolName: request.tool,
-      });
+      if (outcome.kind === 'origin_changed') {
+        return {
+          ok: true,
+          originChanged: { from: outcome.from, to: outcome.to },
+          result: outcome.result,
+          type: BROWSER_TOOL_MESSAGE,
+        };
+      }
 
-      return { ok: true, result, type: BROWSER_TOOL_MESSAGE };
+      if (outcome.kind === 'needs_take_over') {
+        return {
+          ok: true,
+          takeOver: {
+            holderKind: 'agent',
+            sessionTitle: outcome.owner.title ?? 'Kilo CLI session',
+            tabId: request.tabId,
+          },
+          type: BROWSER_TOOL_MESSAGE,
+        };
+      }
+
+      if (outcome.kind === 'unsupported') {
+        return { ok: true, result: outcome.result, type: BROWSER_TOOL_MESSAGE };
+      }
+
+      return {
+        ok: true,
+        result: outcome.result,
+        type: BROWSER_TOOL_MESSAGE,
+        ...(outcome.withheldFrames === undefined ? {} : { withheldFrames: outcome.withheldFrames }),
+      };
     }
 
     // Every schema-valid request type is handled above; this keeps the chain total for future message types.
@@ -454,11 +591,13 @@ export default defineBackground(() => {
       chrome?: {
         contextMenus?: NativeContextMenusApi;
         debugger?: ChromeDebuggerApi;
+        downloads?: BrowserDownloadsApi;
         runtime?: ChromeRuntimeApi;
         scripting?: BrowserScriptingApi;
         sidePanel?: Parameters<typeof enableActionClickSidePanel>[0] & NativeSidePanelOpenApi;
         sidebarAction?: NativeSidebarActionApi;
-        tabs?: BrowserTabsApi;
+        tabGroups?: BrowserTabGroupsApi;
+        tabs?: NativeTabsApi;
       };
     }
   ).chrome;
@@ -473,6 +612,40 @@ export default defineBackground(() => {
       };
     }
   ).browser;
+
+  // Local agents register every listener here so one service-worker wake serves either feature.
+  // The bridge resolves the runtime lazily: a CLI session opens it, not every worker boot.
+  const tabsApi = chromeApi?.tabs;
+  const debuggerApi = chromeApi?.debugger;
+  const scriptingApi = chromeApi?.scripting;
+  const tabGroupsApi = chromeApi?.tabGroups;
+
+  // The hold decides every download of the profile; its listener was installed when this module was
+  // Evaluated, so the first download of this worker already has an answer. Firefox has none: its guard
+  // Cancels a file after it starts, and the runtime arms that tier when it is given no hold.
+  startLocalAgentsHost({
+    ...readLocalAgentsHostApis(),
+    ...(tabsApi === undefined
+      ? {}
+      : {
+          bridge: createRuntimeBrowserBridge({
+            activeTabId: async () => {
+              const tabs = await tabsApi.query({ active: true, lastFocusedWindow: true });
+
+              return tabs[0]?.id;
+            },
+            runtime: () =>
+              getBrowserRuntime({
+                debuggerApi,
+                ...(profileDownloadHold === undefined ? {} : { downloadHold: profileDownloadHold }),
+                downloadsApi: () => chromeApi?.downloads,
+                scriptingApi,
+                tabGroupsApi,
+                tabsApi,
+              }),
+          }),
+        }),
+  });
 
   const menusApi: NativeContextMenusApi | undefined =
     browserGlobal?.contextMenus ?? chromeApi?.contextMenus;
@@ -505,8 +678,11 @@ export default defineBackground(() => {
     void (async (): Promise<void> => {
       const response = await handleTabDebuggerRequest({
         debuggerApi: chromeApi.debugger,
+        ...(profileDownloadHold === undefined ? {} : { downloadHold: profileDownloadHold }),
+        downloadsApi: () => chromeApi.downloads,
         request: message,
         scriptingApi: chromeApi.scripting,
+        tabGroupsApi: chromeApi.tabGroups,
         tabsApi: chromeApi.tabs,
       });
       sendResponse(response);

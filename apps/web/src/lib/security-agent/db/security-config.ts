@@ -1,4 +1,5 @@
 import {
+  agentConfigOwnerValues,
   getAgentConfigForOwner,
   setAgentEnabledForOwner,
 } from '@/lib/agent-config/db/agent-configs';
@@ -142,10 +143,7 @@ async function writeSecurityAgentConfigWithRevision(
   if (params.platform === 'github') {
     await assertGitHubAutomationCanBeEnabled(params.owner, tx);
   }
-  const ownerValues =
-    params.owner.type === 'org'
-      ? { owned_by_organization_id: params.owner.id, owned_by_user_id: null }
-      : { owned_by_organization_id: null, owned_by_user_id: params.owner.id };
+  const ownerValues = agentConfigOwnerValues(params.owner);
 
   if (params.expectedRevision === null) {
     const inserted = await tx

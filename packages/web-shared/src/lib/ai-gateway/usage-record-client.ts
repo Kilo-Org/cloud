@@ -3,6 +3,7 @@ import 'server-only';
 import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { parseInternalServiceUrl } from '@kilocode/web-shared/lib/internal-service-url';
 import type { UsageRecordInsertResult } from './processUsage.types';
 import { UsageRecordResponseSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
 
@@ -77,6 +78,9 @@ export async function recordUsageInPrimaryRegion(
   }
   if (!APP_URL) {
     return { kind: 'unavailable', reason: 'missing_app_url' };
+  }
+  if (!parseInternalServiceUrl(APP_URL)) {
+    return { kind: 'unavailable', reason: 'unsupported_app_url' };
   }
 
   const url = new URL(USAGE_RECORD_PATH, APP_URL).toString();

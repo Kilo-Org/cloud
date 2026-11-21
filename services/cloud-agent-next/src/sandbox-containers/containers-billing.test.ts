@@ -15,15 +15,18 @@ const { DurableObjectMock } = vi.hoisted(() => ({
 
 vi.mock('cloudflare:workers', () => ({ DurableObject: DurableObjectMock }));
 
-import type {
-  BudgetVerdict,
-  ContainerUsageRpcMethods,
-  HeartbeatAck,
-  RecordAck,
-  RecordStartResult,
+import {
+  createContainerUsageClient,
+  type BudgetVerdict,
+  type ContainerUsageRpcMethods,
+  type HeartbeatAck,
+  type RecordAck,
+  type RecordStartResult,
 } from '@kilocode/container-usage';
 import type { Env } from '../types.js';
 import { containerLimitError } from '../container-limit-test-helpers.js';
+import { containersBillingIdentity } from '../container-usage-context.js';
+import { MeteredBillingLifecycle } from '../metered-billing-lifecycle.js';
 import { ContainersBillingScheduler } from './containers-billing.js';
 import { CONTROL_SUPERVISOR_PATH } from '../sandbox-control/container-paths.js';
 import { SandboxContainers, type ContainerInstanceSize } from './SandboxContainers.js';
@@ -464,7 +467,7 @@ describe('ContainersBilling identity and admission', () => {
     expect(storage.map.get(START_ACK_KEY)).toBeUndefined();
   });
 
-  it('sends the capacity marker and drops the generation at the container limit', async () => {
+  it('returns a capacity rejection without retrying or leaving a generation', async () => {
     const admitted = setup();
     await expect(admit(admitted.instance, 'standard-4')).resolves.toEqual({ success: true });
     expect(admitted.meter.recordStartInputs).toEqual([
@@ -478,11 +481,54 @@ describe('ContainersBilling identity and admission', () => {
       error: { code: 'container_limit_reached', message: limit.message },
     };
 
-    await expect(admit(limited.instance, 'standard-4')).rejects.toMatchObject({
+    await expect(admit(limited.instance, 'standard-4')).resolves.toEqual({
+      success: false,
       code: 'container_limit_reached',
       message: limit.message,
     });
+    expect(limited.meter.recordStartInputs).toEqual([
+      expect.objectContaining({ enforceCapacity: true }),
+    ]);
     expect(limited.storage.map.get(BILLING_CONTEXT_KEY)).toBeUndefined();
+    expect(limited.storage.map.get(START_ACK_KEY)).toBeUndefined();
+    expect(limited.storage.alarm).toBeUndefined();
+    expect(limited.container.startCalls).toHaveLength(0);
+  });
+
+  it('returns the same capacity rejection when admitting directly before a start', async () => {
+    const storage = new FakeStorage();
+    const meter = new FakeMeter();
+    const limit = containerLimitError('user', 3);
+    meter.startResult = {
+      success: false,
+      error: { code: 'container_limit_reached', message: limit.message },
+    };
+    const { className: sandboxClassName, service } = containersBillingIdentity('standard-4');
+    const identity = { sandboxClassName };
+    const schedule = vi.fn();
+    const lifecycle = new MeteredBillingLifecycle({
+      storage,
+      usageClient: createContainerUsageClient(meter, { service }),
+      enforceContainerCapacity: true,
+      schedule,
+      deleteSchedules: vi.fn(),
+      getState: async () => ({ status: 'stopped' }),
+      isContainerRunning: () => false,
+      stopContainer: vi.fn(),
+      destroyContainer: vi.fn(),
+      waitUntil: vi.fn(),
+      durableObjectId: 'do-id',
+    });
+    await lifecycle.configureBilling(identity, BILLING_INPUT);
+
+    await expect(lifecycle.admitBeforeStart(identity)).resolves.toEqual({
+      success: false,
+      code: 'container_limit_reached',
+      message: limit.message,
+    });
+    expect(meter.recordStartInputs).toHaveLength(1);
+    expect(schedule).not.toHaveBeenCalled();
+    expect(storage.map.get(BILLING_CONTEXT_KEY)).toBeUndefined();
   });
 
   it('does not skip an unmeasured context that carries a pending stop', async () => {
@@ -1761,6 +1807,117 @@ describe('ContainersBilling durable alarm dispatch', () => {
       payload: readGeneration(storage),
       dueAtMs: (heartbeatDue as number) + 300_000,
     });
+  });
+});
+
+describe('ContainersBilling heartbeat timeout resilience', () => {
+  it('keeps a transient heartbeat timeout off the alarm and redelivers the same segment on recovery', async () => {
+    const { instance, storage, meter, pendingTasks } = setup();
+    await admit(instance, 'standard-4');
+    await launch(instance, REF_A, 'standard-4');
+    await flushPending(pendingTasks);
+    const heartbeatDue = readSchedules(storage)?.billingHeartbeatTick?.dueAtMs as number;
+
+    let heartbeatHangs = true;
+    vi.spyOn(meter, 'recordHeartbeat').mockImplementation(async input => {
+      meter.recordHeartbeatInputs.push(input);
+      if (heartbeatHangs) return new Promise<HeartbeatAck>(() => {});
+      return { ...recordAck(), budget: { verdict: 'continue' } };
+    });
+
+    vi.setSystemTime(heartbeatDue);
+    const alarmRun = instance.alarm();
+    await vi.advanceTimersByTimeAsync(31_000);
+    await expect(alarmRun).resolves.toBeUndefined();
+    await flushPending(pendingTasks);
+
+    const pending = storage.map.get(BILLING_CONTEXT_KEY) as {
+      pendingHeartbeat?: { seq: number; usageSinceLast: number };
+    };
+    expect(pending.pendingHeartbeat).toMatchObject({ seq: 1, usageSinceLast: 300 });
+    expect(meter.recordHeartbeatInputs).toHaveLength(3);
+    const nextDue = readSchedules(storage)?.billingHeartbeatTick?.dueAtMs as number;
+    expect(readSchedules(storage)?.billingHeartbeatTick).toMatchObject({
+      payload: readGeneration(storage),
+    });
+    expect(nextDue).toBeGreaterThan(heartbeatDue);
+
+    heartbeatHangs = false;
+    vi.setSystemTime(nextDue);
+    await instance.alarm();
+    await flushPending(pendingTasks);
+
+    expect(meter.recordHeartbeatInputs).toHaveLength(4);
+    const first = meter.recordHeartbeatInputs[0];
+    const redelivery = meter.recordHeartbeatInputs[3];
+    expect(redelivery.seq).toBe(first.seq);
+    expect(redelivery.usageSinceLast).toBe(first.usageSinceLast);
+    expect(redelivery.idempotencyKey).toBe(first.idempotencyKey);
+    const advanced = storage.map.get(BILLING_CONTEXT_KEY) as {
+      pendingHeartbeat?: unknown;
+      nextSeq: number;
+    };
+    expect(advanced.pendingHeartbeat).toBeUndefined();
+    expect(advanced.nextSeq).toBe(2);
+  });
+
+  it('bounds a persistent heartbeat timeout across ticks without abandoning the running generation', async () => {
+    const { instance, storage, meter, pendingTasks } = setup();
+    await admit(instance, 'standard-4');
+    await launch(instance, REF_A, 'standard-4');
+    await flushPending(pendingTasks);
+    vi.spyOn(meter, 'recordHeartbeat').mockImplementation(async input => {
+      meter.recordHeartbeatInputs.push(input);
+      return new Promise<HeartbeatAck>(() => {});
+    });
+
+    for (let tick = 0; tick < 3; tick += 1) {
+      const due = readSchedules(storage)?.billingHeartbeatTick?.dueAtMs as number;
+      vi.setSystemTime(due);
+      const alarmRun = instance.alarm();
+      await vi.advanceTimersByTimeAsync(31_000);
+      await expect(alarmRun).resolves.toBeUndefined();
+      await flushPending(pendingTasks);
+    }
+
+    expect(meter.recordHeartbeatInputs).toHaveLength(9);
+    expect(meter.recordHeartbeatInputs.every(input => input.seq === 1)).toBe(true);
+    expect(meter.recordHeartbeatInputs.every(input => input.usageSinceLast === 300)).toBe(true);
+    const context = storage.map.get(BILLING_CONTEXT_KEY) as {
+      pendingHeartbeat?: { seq: number };
+      nextSeq: number;
+    };
+    expect(context.pendingHeartbeat).toMatchObject({ seq: 1 });
+    expect(context.nextSeq).toBe(1);
+    expect(readGeneration(storage)).toBeDefined();
+    expect(readSchedules(storage)?.billingHeartbeatTick).toBeDefined();
+  });
+
+  it('abandons a stopped generation through the alarm after persistent stop timeouts', async () => {
+    const { instance, container, storage, meter, pendingTasks } = setup();
+    await admit(instance, 'standard-4');
+    await launch(instance, REF_A, 'standard-4');
+    await flushPending(pendingTasks);
+    vi.spyOn(meter, 'recordStop').mockImplementation(async input => {
+      meter.recordStopInputs.push(input);
+      return new Promise<RecordAck>(() => {});
+    });
+
+    container.running = false;
+    for (let tick = 0; tick < 20 && readGeneration(storage) !== undefined; tick += 1) {
+      const due = readSchedules(storage)?.billingHeartbeatTick?.dueAtMs;
+      if (due === undefined) break;
+      vi.setSystemTime(due);
+      const alarmRun = instance.alarm();
+      await vi.advanceTimersByTimeAsync(31_000);
+      await expect(alarmRun).resolves.toBeUndefined();
+      await flushPending(pendingTasks);
+    }
+
+    expect(storage.map.has(BILLING_CONTEXT_KEY)).toBe(false);
+    expect(readSchedules(storage)?.billingHeartbeatTick).toBeUndefined();
+    expect(meter.recordStopInputs.length).toBeGreaterThan(0);
+    expect(meter.recordStopInputs.every(input => input.seq === 1)).toBe(true);
   });
 });
 

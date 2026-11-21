@@ -7,6 +7,7 @@ import {
   foldPendingGlanceableRefreshDeadline,
   flushDueGlanceableRefreshes,
   flushDueGlanceableRefreshesSafely,
+  GLANCEABLE_APPROVAL_MIN_INTERVAL_MS,
   GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
   GLANCEABLE_REFRESH_RETRY_MAX_MS,
   refreshGlanceableSnapshot,
@@ -231,7 +232,7 @@ describe('refreshGlanceableSnapshot delivery window', () => {
     expect(await h.storage.get(pendingKey('user-1', null))).toBeUndefined();
   });
 
-  it('delivers an approval change inside the window instead of deferring it', async () => {
+  it('delivers an approval change past the short floor instead of deferring it', async () => {
     const h = makeHarness();
     const base = Date.parse('2026-09-18T01:00:00.000Z');
     let now = base;
@@ -242,7 +243,8 @@ describe('refreshGlanceableSnapshot delivery window', () => {
     expect(h.expoSends).toHaveLength(1);
 
     // A question -> permission move keeps needsInput constant but gates the
-    // Approve control, which must not wait out the shared window.
+    // Approve control, which must not wait out the shared window. It does wait
+    // out the short approval floor, and 2s is past it.
     now = base + 2_000;
     h.setNext(snapshot({ running: 1, needsInput: 1, needsApproval: 1 }));
     await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now, {
@@ -265,9 +267,106 @@ describe('refreshGlanceableSnapshot delivery window', () => {
     await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now);
     expect(h.builds).toBe(2);
     expect(h.expoSends).toHaveLength(2);
-    expect(await h.storage.get(pendingKey('user-approval', null))).toMatchObject({
+    // A counts-only deferral is never marked as an approval move, so it lands
+    // on the full window it was deferred to and not on the short floor.
+    expect(await h.storage.get(pendingKey('user-approval', null))).toEqual({
+      userId: 'user-approval',
+      organizationId: null,
       dueAt: base + 2_000 + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+      deferredAt: now,
     });
+  });
+
+  it('defers an approval change inside the floor and lands it from that deadline', async () => {
+    const h = makeHarness();
+    const base = Date.parse('2026-09-18T02:00:00.000Z');
+    let now = base;
+    const scope = { userId: 'user-approval-floor', organizationId: null };
+    const key = pendingKey('user-approval-floor', null);
+
+    h.setNext(snapshot({ running: 1, needsInput: 0, needsApproval: 0 }));
+    await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now);
+    expect(h.expoSends).toHaveLength(1);
+
+    // A move into permission 500ms after a delivery is inside the short floor
+    // too: the control may not run one build and device wake per caller frame.
+    now = base + 500;
+    h.setNext(snapshot({ running: 1, needsInput: 1, needsApproval: 1 }));
+    await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now, {
+      approvalChanged: true,
+    });
+
+    const dueAt = base + GLANCEABLE_APPROVAL_MIN_INTERVAL_MS;
+    expect(h.builds).toBe(1);
+    expect(h.expoSends).toHaveLength(1);
+    expect(await h.storage.get(key)).toEqual({
+      userId: 'user-approval-floor',
+      organizationId: null,
+      dueAt,
+      deferredAt: base + 500,
+      approvalChanged: true,
+    });
+    expect(await h.storage.getAlarm()).toBe(dueAt);
+
+    // The flush at the floor deadline lands the control. The trailing refresh
+    // carries the exemption, so the window this change was deferred out of does
+    // not bounce it into a second pending record.
+    now = dueAt;
+    await expect(
+      flushDueGlanceableRefreshes(asStorage(h.storage), h.deps, () => now)
+    ).resolves.toBeNull();
+    expect(h.builds).toBe(2);
+    expect(h.expoSends).toHaveLength(2);
+    expect(h.expoSends[1][0].data).toMatchObject({
+      running: 1,
+      needsInput: 1,
+      needsApproval: 1,
+    });
+    expect(await h.storage.get(key)).toBeUndefined();
+  });
+
+  it("keeps an approval deferral's floor deadline when a counts-only change defers later", async () => {
+    const h = makeHarness();
+    const base = Date.parse('2026-09-18T02:30:00.000Z');
+    let now = base;
+    const scope = { userId: 'user-approval-merge', organizationId: null };
+    const key = pendingKey('user-approval-merge', null);
+
+    h.setNext(snapshot({ running: 1, needsInput: 0 }));
+    await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now);
+
+    // The move into permission defers to the short floor.
+    now = base + 500;
+    h.setNext(snapshot({ running: 1, needsInput: 1, needsApproval: 1 }));
+    await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now, {
+      approvalChanged: true,
+    });
+
+    // A counts-only change defers later in the same window. Its window-end
+    // deadline must not push the Approve control out with it: the earliest
+    // deadline wins and the exemption travels with it.
+    now = base + 800;
+    h.setNext(snapshot({ running: 3, needsInput: 1, needsApproval: 1 }));
+    await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now);
+
+    const dueAt = base + GLANCEABLE_APPROVAL_MIN_INTERVAL_MS;
+    expect(h.builds).toBe(1);
+    expect(await h.storage.get(key)).toEqual({
+      userId: 'user-approval-merge',
+      organizationId: null,
+      dueAt,
+      deferredAt: base + 800,
+      approvalChanged: true,
+    });
+    expect(await h.storage.getAlarm()).toBe(dueAt);
+
+    // The floor deadline still delivers both changes.
+    now = dueAt;
+    await flushDueGlanceableRefreshes(asStorage(h.storage), h.deps, () => now);
+    expect(h.builds).toBe(2);
+    expect(h.expoSends).toHaveLength(2);
+    expect(h.expoSends[1][0].data).toMatchObject({ running: 3, needsApproval: 1 });
+    expect(await h.storage.get(key)).toBeUndefined();
   });
 
   it('re-arms a trailing refresh whose build returns no snapshot', async () => {
@@ -1153,20 +1252,23 @@ describe('refreshGlanceableSnapshot delivery window', () => {
     const key = pendingKey('user-backoff-reset', null);
 
     // A delivery opens the window and a later heartbeat re-arms a retried
-    // record, so the slot carries a backed-off count.
+    // record, so the slot carries a backed-off count. The seventh attempt is
+    // spaced sixty-four windows out, so its deadline sits past this window's
+    // end: a fresh change's own deadline is the earlier one.
     h.setNext(snapshot({ running: 1 }));
     await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now);
     await h.storage.put(key, {
       userId: 'user-backoff-reset',
       organizationId: null,
-      dueAt: now,
+      dueAt: now + 640_000,
       deferredAt: now - 400_000,
       attempts: 7,
     });
 
-    // A fresh change inside the window is a new deferral, not a retry: it gets
-    // the window's normal deadline and drops the failed-attempt count so the
-    // next failure backs off from one window again.
+    // A fresh change inside the window is a new deferral, not a retry: its own
+    // deadline is earlier, so it wins the slot, takes the window's normal
+    // deadline and drops the failed-attempt count so the next failure backs off
+    // from one window again.
     now = base + 2_000;
     h.setNext(snapshot({ running: 2 }));
     await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now);

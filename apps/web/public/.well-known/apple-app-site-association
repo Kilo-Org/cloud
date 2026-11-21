@@ -31,6 +31,8 @@
           { "/": "/organizations/*/overview" },
           { "/": "/organizations/*/integrations" },
           { "/": "/organizations/*/usage-details" },
+          { "/": "/organizations/new" },
+          { "/": "/organizations/create" },
           { "/": "/organizations/new", "exclude": true },
           { "/": "/organizations/create", "exclude": true },
           { "/": "/organizations/*/*", "exclude": true },

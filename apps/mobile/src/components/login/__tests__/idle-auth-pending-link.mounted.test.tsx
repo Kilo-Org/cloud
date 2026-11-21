@@ -66,11 +66,7 @@ vi.mock('@/components/login/email-otp-form', () => ({ EmailOtpForm: 'EmailOtpFor
 vi.mock('@/components/login/apple-logo', () => ({ AppleLogo: 'AppleLogo' }));
 vi.mock('@/components/login/google-logo', () => ({ GoogleLogo: 'GoogleLogo' }));
 vi.mock('@/components/ui/icons', () => ({ KeyRound: 'KeyRound', Mail: 'Mail' }));
-vi.mock('expo-web-browser', () => ({ openBrowserAsync: vi.fn() }));
-vi.mock('@/lib/config', () => ({
-  TERMS_URL: 'https://app.kilo.ai/terms-app',
-  PRIVACY_URL: 'https://app.kilo.ai/privacy-app',
-}));
+vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#14130f', mutedForeground: '#6f6a61' }),
 }));

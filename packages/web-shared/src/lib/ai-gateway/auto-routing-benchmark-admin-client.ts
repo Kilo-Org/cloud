@@ -8,13 +8,16 @@ import {
   BenchmarkConfigResponseSchema,
   BenchmarkSchedulerConfigResponseSchema,
   BenchmarkRunsResponseSchema,
+  BenchmarkRunSummariesResponseSchema,
   CUSTOM_ROUTER_STATUS_PATH,
   CustomRouterStatusResponseSchema,
   PLATFORM_MEASUREMENTS_PATH,
   PlatformMeasurementsResponseSchema,
+  RefreshBenchmarkProfilesResponseSchema,
   RequeueBenchmarkRegistryResponseSchema,
   StartBenchmarkRunResponseSchema,
   type BenchmarkConfig,
+  type BenchmarkPair,
   type BenchmarkProfileQuotaError,
   type BenchmarkSchedulerOverrides,
   type BenchmarkKind,
@@ -28,6 +31,7 @@ import {
   AUTO_ROUTING_BENCHMARK_WORKER_URL,
   INTERNAL_API_SECRET,
 } from '@kilocode/web-shared/lib/config.server';
+import { parseInternalServiceEndpoint } from '@kilocode/web-shared/lib/internal-service-url';
 import { createWorkerAdminFetch, ErrorBodySchema, type ErrorBody } from './worker-admin-fetch';
 
 const fetchBenchmarkAdmin = createWorkerAdminFetch({
@@ -98,6 +102,14 @@ export function listBenchmarkRuns(
   );
 }
 
+export function getBenchmarkRunSummaries(runId: string, router: AutoRouter = DEFAULT_AUTO_ROUTER) {
+  return fetchBenchmarkAdmin(
+    `/admin/runs/${encodeURIComponent(runId)}/summaries?router=${router}`,
+    { method: 'GET' },
+    BenchmarkRunSummariesResponseSchema
+  );
+}
+
 export function startBenchmarkRun(
   kind: BenchmarkKind,
   force: boolean,
@@ -138,10 +150,32 @@ export function requeueBenchmarkRegistry(
   );
 }
 
-export function getBenchmarkRoutingTable(router: AutoRouter = DEFAULT_AUTO_ROUTER) {
+/**
+ * Re-admit one failed registry pair, retryable or permanent: its failure history is
+ * cleared and it measures again on the next drain, unless the catalog cannot run it.
+ */
+export function readmitBenchmarkProfile(
+  entry: BenchmarkPair,
+  router: AutoRouter = DEFAULT_AUTO_ROUTER
+) {
+  return fetchBenchmarkAdmin(
+    `/admin/registry/refresh?router=${router}`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ router, mode: 'refresh', entries: [entry] }),
+    },
+    RefreshBenchmarkProfilesResponseSchema
+  );
+}
+
+export function getBenchmarkRoutingTable(
+  router: AutoRouter = DEFAULT_AUTO_ROUTER,
+  signal?: AbortSignal
+) {
   return fetchBenchmarkAdmin(
     `/admin/routing-table?router=${router}`,
-    { method: 'GET' },
+    { method: 'GET', signal },
     BenchmarkRoutingTableResponseSchema
   );
 }
@@ -160,25 +194,26 @@ export async function registerOwnerBenchmarkProfiles(
   },
   signal: AbortSignal = AbortSignal.timeout(5_000)
 ): Promise<RegisterOwnerBenchmarkProfilesResult> {
-  if (!AUTO_ROUTING_BENCHMARK_WORKER_URL || !INTERNAL_API_SECRET) {
+  const endpoint = parseInternalServiceEndpoint(
+    AUTO_ROUTING_BENCHMARK_WORKER_URL,
+    `/admin/profiles/register?router=${request.router}`
+  );
+  if (!endpoint || !INTERNAL_API_SECRET) {
     return {
       ok: false,
       status: 500,
       error: { error: 'Auto routing benchmark worker is not configured' },
     };
   }
-  const response = await fetch(
-    `${AUTO_ROUTING_BENCHMARK_WORKER_URL}/admin/profiles/register?router=${request.router}`,
-    {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${INTERNAL_API_SECRET}`,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify(request),
-      signal,
-    }
-  );
+  const response = await fetch(endpoint.toString(), {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${INTERNAL_API_SECRET}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(request),
+    signal,
+  });
   const body: unknown = await response.json().catch(() => null);
   if (response.ok && BenchmarkProfileStatusesResponseSchema.safeParse(body).success) {
     return { ok: true };

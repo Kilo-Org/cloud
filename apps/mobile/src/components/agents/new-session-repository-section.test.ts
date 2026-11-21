@@ -5,6 +5,7 @@ import { act, type TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
 import {
   branchSelectorProps,
   githubRow,
@@ -72,9 +73,17 @@ vi.mock('@/lib/hooks/use-collapsed-connect-ctas-preference', () => ({
 
 /** The rendered Text node holding exactly `copy`, if it is mounted. */
 function textNode(renderer: TestRenderer.ReactTestRenderer, copy: string) {
+  // The action label is the row's centre-aligned Text; the card headers carry
+  // their own title copy, so the centre alignment keeps this lookup on the
+  // action regardless of its position in the tree.
   return renderer.root
     .findAllByType('Text' as never)
-    .find(node => node.children.length === 1 && node.children[0] === copy);
+    .find(
+      node =>
+        node.children.length === 1 &&
+        node.children[0] === copy &&
+        String(node.props.className).includes('text-center')
+    );
 }
 
 /** The headers of the connect cards; the section renders no other pressable. */
@@ -225,16 +234,20 @@ describe('NewSessionRepositorySection connect card open action', () => {
       ],
     });
 
-    // A label box sized to the label's own measured width is a fraction
-    // narrower than the glyphs Android lays out, so "Open GitLab" wrapped onto
-    // two lines. The label takes the row's remaining width instead, and
-    // `numberOfLines` pins the single line.
-    for (const key of ['openGithub', 'openGitlab', 'openBitbucket'] as const) {
-      const label = textNode(renderer, i18n.t(`agentChat.newSession.${key}`));
-      expect(label, key).toBeDefined();
-      expect(label?.props.className, key).toContain('flex-1');
-      expect(label?.props.className, key).toContain('text-center');
-      expect(label?.props.numberOfLines, key).toBe(1);
+    // The icon and the label sit on the row's centre as one group, so the
+    // label only shrinks: the button owns the remaining width. `numberOfLines`
+    // pins the single line. Bitbucket's action reads the bare "Connect" verb
+    // while its card header keeps the "Connect Bitbucket" title.
+    for (const copy of [
+      i18n.t('agentChat.newSession.openGithub'),
+      i18n.t('agentChat.newSession.openGitlab'),
+      i18n.t('common.connect'),
+    ]) {
+      const label = textNode(renderer, copy);
+      expect(label, copy).toBeDefined();
+      expect(label?.props.className, copy).toContain('shrink');
+      expect(label?.props.className, copy).toContain('text-center');
+      expect(label?.props.numberOfLines, copy).toBe(1);
     }
   });
 
@@ -369,11 +382,18 @@ describe('NewSessionRepositorySection connect card layout stability', () => {
       groups: [group('github', 'repos'), group('gitlab', 'connect')],
     });
 
-    const card = renderer.root.find(
-      node =>
-        node.type === ('Animated.View' as never) && String(node.props.className).includes('bg-card')
+    // The section opts out of the layout transition at its own disclosure; the
+    // shared section owns the surface, so the caller only passes the flag.
+    const sections = renderer.root.findAll(
+      node => node.type === CollapsibleSection && node.props.animateLayout === false
     );
-    expect(card.props.layout).toBeUndefined();
+    expect(sections).toHaveLength(1);
+
+    const transitionViews = renderer.root.findAll(node => node.type === ('Animated.View' as never));
+    expect(transitionViews.length).toBeGreaterThan(0);
+    for (const view of transitionViews) {
+      expect(view.props.layout).toBeUndefined();
+    }
 
     const content = renderer.root.find(
       node => node.type === ('Animated.View' as never) && node.props.entering !== undefined
@@ -383,33 +403,17 @@ describe('NewSessionRepositorySection connect card layout stability', () => {
 });
 
 describe('NewSessionRepositorySection connect button label', () => {
-  it('keeps the connect action label on a single line with the row remaining width', () => {
-    // A label sized to its own content is measured at its longest word's width
-    // and wraps onto a second line. Taking the row's remaining width gives the
-    // one line room, and the pin keeps it single-line on a narrow button.
+  it('keeps the connect action label on a single line inside the full-width button', () => {
+    // The button owns the row's remaining width and centres the glyph and the
+    // label as one group, so the label only shrinks; the pin keeps it
+    // single-line on a narrow button.
     const renderer = mountSection({ groups: [group('gitlab', 'connect')] });
 
     const label = labelNode(renderer, i18n.t('agentChat.newSession.openGitlab'));
 
     expect(label?.props.numberOfLines).toBe(1);
-    expect(String(label?.props.className)).toContain('flex-1');
+    expect(String(label?.props.className)).toContain('shrink');
     expect(String(label?.props.className)).toContain('text-center');
-  });
-
-  it('offsets the label with a logical inline-end margin so RTL stays centred', () => {
-    // The trailing offset mirrors the leading glyph plus the row gap. It must be
-    // the logical `me-*` (React Native resolves `marginInlineEnd` to
-    // `marginLeft` under RTL), not the physical `mr-*`: in RTL the row mirrors
-    // the glyph to the right, so a physical right margin would offset the label
-    // on the same side as the glyph and land it 24px off the button's centre.
-    const renderer = mountSection({ groups: [group('gitlab', 'connect')] });
-
-    const className = String(
-      labelNode(renderer, i18n.t('agentChat.newSession.openGitlab'))?.props.className
-    );
-
-    expect(className).toContain('me-[24px]');
-    expect(className).not.toMatch(/\bmr-|margin-?[rR]ight/);
   });
 });
 

@@ -2,7 +2,11 @@ import { inArray, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDrizzleClient, type DrizzleClient } from '@kilocode/db/client';
 import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
-import { hasInheritedOrganizationAccess } from '../../src/organization-membership';
+import type { OrganizationRole } from '@kilocode/db/schema-types';
+import {
+  findEffectiveOrganizationMemberRole,
+  hasEffectiveOrganizationAccess,
+} from '../../src/organization-membership';
 
 let client: DrizzleClient;
 
@@ -82,77 +86,91 @@ async function softDeleteOrganization(organizationId: string): Promise<void> {
   `);
 }
 
-describe('hasInheritedOrganizationAccess', () => {
-  it('accepts a direct member', async () => {
+/**
+ * Reads the role and checks that the boolean helper reports the same answer, so
+ * both entry points apply one rule.
+ */
+async function expectEffectiveRole(
+  params: { kiloUserId: string; organizationId: string },
+  role: OrganizationRole | null
+): Promise<void> {
+  await expect(findEffectiveOrganizationMemberRole(client.db, params)).resolves.toBe(role);
+  await expect(hasEffectiveOrganizationAccess(client.db, params)).resolves.toBe(role !== null);
+}
+
+describe('findEffectiveOrganizationMemberRole', () => {
+  it('returns the direct role for a direct member', async () => {
     const kiloUserId = await insertUser();
     const organizationId = await insertOrganization();
     await insertMembership(organizationId, kiloUserId, 'member');
 
-    await expect(
-      hasInheritedOrganizationAccess(client.db, { kiloUserId, organizationId })
-    ).resolves.toBe(true);
+    await expectEffectiveRole({ kiloUserId, organizationId }, 'member');
   });
 
-  it('accepts a child organization reached through a parent role', async () => {
+  it.each(['owner', 'admin'] as const)(
+    'returns the parent role %s for a child organization',
+    async role => {
+      const kiloUserId = await insertUser();
+      const parentOrganizationId = await insertOrganization();
+      const childOrganizationId = await insertOrganization(parentOrganizationId);
+      await insertMembership(parentOrganizationId, kiloUserId, role);
+
+      await expectEffectiveRole({ kiloUserId, organizationId: childOrganizationId }, role);
+    }
+  );
+
+  it('returns the inherited owner role over a direct member role', async () => {
     const kiloUserId = await insertUser();
     const parentOrganizationId = await insertOrganization();
     const childOrganizationId = await insertOrganization(parentOrganizationId);
+    await insertMembership(childOrganizationId, kiloUserId, 'member');
     await insertMembership(parentOrganizationId, kiloUserId, 'owner');
 
-    await expect(
-      hasInheritedOrganizationAccess(client.db, {
-        kiloUserId,
-        organizationId: childOrganizationId,
-      })
-    ).resolves.toBe(true);
+    await expectEffectiveRole({ kiloUserId, organizationId: childOrganizationId }, 'owner');
   });
 
-  it('refuses an organization with no membership and no parent role', async () => {
+  it('returns the inherited admin role over a direct billing manager role', async () => {
     const kiloUserId = await insertUser();
-    const organizationId = await insertOrganization();
+    const parentOrganizationId = await insertOrganization();
+    const childOrganizationId = await insertOrganization(parentOrganizationId);
+    await insertMembership(childOrganizationId, kiloUserId, 'billing_manager');
+    await insertMembership(parentOrganizationId, kiloUserId, 'admin');
 
-    await expect(
-      hasInheritedOrganizationAccess(client.db, { kiloUserId, organizationId })
-    ).resolves.toBe(false);
+    await expectEffectiveRole({ kiloUserId, organizationId: childOrganizationId }, 'admin');
   });
 
-  it('refuses a child organization for a plain member of the parent', async () => {
+  it('returns null for a parent role that cannot inherit', async () => {
     const kiloUserId = await insertUser();
     const parentOrganizationId = await insertOrganization();
     const childOrganizationId = await insertOrganization(parentOrganizationId);
     await insertMembership(parentOrganizationId, kiloUserId, 'member');
 
-    await expect(
-      hasInheritedOrganizationAccess(client.db, {
-        kiloUserId,
-        organizationId: childOrganizationId,
-      })
-    ).resolves.toBe(false);
+    await expectEffectiveRole({ kiloUserId, organizationId: childOrganizationId }, null);
   });
 
-  it('refuses a child organization whose parent is soft-deleted', async () => {
+  it('returns null when the parent organization is soft-deleted', async () => {
     const kiloUserId = await insertUser();
     const parentOrganizationId = await insertOrganization();
     const childOrganizationId = await insertOrganization(parentOrganizationId);
     await insertMembership(parentOrganizationId, kiloUserId, 'owner');
     await softDeleteOrganization(parentOrganizationId);
 
-    await expect(
-      hasInheritedOrganizationAccess(client.db, {
-        kiloUserId,
-        organizationId: childOrganizationId,
-      })
-    ).resolves.toBe(false);
+    await expectEffectiveRole({ kiloUserId, organizationId: childOrganizationId }, null);
   });
 
-  it('refuses a soft-deleted organization the user is a direct member of', async () => {
+  it('returns null when the target organization is soft-deleted', async () => {
     const kiloUserId = await insertUser();
     const organizationId = await insertOrganization();
     await insertMembership(organizationId, kiloUserId, 'owner');
     await softDeleteOrganization(organizationId);
 
-    await expect(
-      hasInheritedOrganizationAccess(client.db, { kiloUserId, organizationId })
-    ).resolves.toBe(false);
+    await expectEffectiveRole({ kiloUserId, organizationId }, null);
+  });
+
+  it('returns null for a user who has no membership', async () => {
+    const kiloUserId = await insertUser();
+    const organizationId = await insertOrganization();
+
+    await expectEffectiveRole({ kiloUserId, organizationId }, null);
   });
 });

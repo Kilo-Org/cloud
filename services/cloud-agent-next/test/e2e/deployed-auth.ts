@@ -1,15 +1,16 @@
 /**
  * Deployed-profile auth contract for the E2E driver.
  *
- * The deployed driver does not mint JWTs: it presents a real ordinary personal
- * Kilo API token (the `generateApiToken` family) as a bearer and fetches stream
- * tickets from the live backend. This module owns that decision and fails closed
- * before any request when the supplied token is not an ordinary personal token.
+ * The deployed driver presents a real ordinary personal Kilo API token (the
+ * `generateApiToken` family) as the source credential. It exchanges that token
+ * for a short-lived Cloud Agent control token and presents the control token to
+ * the Worker; stream tickets still use the source token. This module owns that
+ * decision and fails closed before any request when the supplied token is not an
+ * ordinary personal token.
  *
  * The token pre-check decodes the JWT payload WITHOUT verifying the signature.
  * The Worker remains the signature-verification authority; this only rejects
- * policy-bearing/runtime tokens early with a diagnostic, because those take the
- * runtime-authorization path and fail admission against the fake catalog URL.
+ * policy-bearing/runtime source tokens early with a diagnostic.
  */
 
 import { readFileSync, statSync } from 'node:fs';
@@ -450,4 +451,115 @@ export async function fetchStreamTicket(input: {
     throw new Error('Stream ticket response did not contain a non-empty string "ticket"');
   }
   return ticket;
+}
+
+/**
+ * Bound the control-token exchange like the ticket request, so a stalled
+ * backend cannot hang session admission.
+ */
+const CONTROL_TOKEN_TIMEOUT_MS = 10_000;
+
+/** Exchange a little early so a token cannot expire mid-request. */
+const CONTROL_TOKEN_REFRESH_MARGIN_MS = 60_000;
+
+export type ControlTokenProvider = { getToken: () => Promise<string> };
+
+/**
+ * Exchange the ordinary personal token for a short-lived Cloud Agent control
+ * token. Never prints or returns the source token in an error.
+ */
+export async function exchangeControlToken(input: {
+  backendUrl: string;
+  sourceToken: string;
+  timeoutMs?: number;
+  fetchImpl?: typeof fetch;
+}): Promise<{ token: string; expiresAtMs: number }> {
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const timeoutMs = input.timeoutMs ?? CONTROL_TOKEN_TIMEOUT_MS;
+  const url = `${input.backendUrl.replace(/\/$/, '')}/api/cloud-agent-next/token`;
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  const response = await fetchImpl(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${input.sourceToken}`,
+    },
+    body: JSON.stringify({}),
+    signal: timeoutSignal,
+  });
+  if (!response.ok) {
+    throw new Error(`Control token exchange failed: ${response.status} ${response.statusText}`);
+  }
+
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    if (timeoutSignal.aborted) {
+      throw new Error(`Control token exchange timed out after ${timeoutMs}ms`);
+    }
+    throw new Error('Control token exchange response was not valid JSON');
+  }
+  if (typeof body !== 'object' || body === null) {
+    throw new Error('Control token exchange response was not a JSON object');
+  }
+  const record = body as Record<string, unknown>;
+  const token = record.token;
+  if (typeof token !== 'string' || token.length === 0) {
+    throw new Error('Control token exchange response did not contain a non-empty string "token"');
+  }
+  const expiresAt = record.expiresAt;
+  if (typeof expiresAt !== 'string' || expiresAt.length === 0) {
+    throw new Error('Control token exchange response did not contain a string "expiresAt"');
+  }
+  const expiresAtMs = Date.parse(expiresAt);
+  if (!Number.isFinite(expiresAtMs)) {
+    throw new Error('Control token exchange response "expiresAt" was not a valid date');
+  }
+  if (expiresAtMs <= Date.now()) {
+    throw new Error('Control token exchange returned an already-expired token');
+  }
+  return { token, expiresAtMs };
+}
+
+/**
+ * Cache exchanged control tokens and refresh them shortly before expiry. The
+ * in-flight promise is shared so concurrent scenario calls perform one exchange.
+ */
+export function createControlTokenProvider(input: {
+  backendUrl: string;
+  sourceToken: string;
+  fetchImpl?: typeof fetch;
+  nowMs?: () => number;
+  refreshMarginMs?: number;
+  timeoutMs?: number;
+}): ControlTokenProvider {
+  const nowMs = input.nowMs ?? Date.now;
+  const refreshMarginMs = input.refreshMarginMs ?? CONTROL_TOKEN_REFRESH_MARGIN_MS;
+  let cached: { token: string; expiresAtMs: number } | undefined;
+  let inFlight: Promise<string> | undefined;
+
+  const exchange = async (): Promise<string> => {
+    const exchanged = await exchangeControlToken({
+      backendUrl: input.backendUrl,
+      sourceToken: input.sourceToken,
+      ...(input.fetchImpl === undefined ? {} : { fetchImpl: input.fetchImpl }),
+      ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
+    });
+    cached = exchanged;
+    return exchanged.token;
+  };
+
+  return {
+    getToken: async () => {
+      const current = cached;
+      if (current !== undefined && current.expiresAtMs - nowMs() > refreshMarginMs) {
+        return current.token;
+      }
+      inFlight ??= exchange().finally(() => {
+        inFlight = undefined;
+      });
+      return inFlight;
+    },
+  };
 }

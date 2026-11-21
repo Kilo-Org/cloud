@@ -3,10 +3,7 @@ import {
   postSecurityWorkerCommand,
   type AcceptedSecurityWorkerCommand,
 } from './security-sync-worker-client';
-
-type ManualSecuritySyncOwner =
-  | { organizationId: string; userId?: never }
-  | { userId: string; organizationId?: never };
+import type { SecurityReviewOwner } from '../core/types';
 
 type ManualSecuritySyncActor = {
   id: string;
@@ -15,7 +12,7 @@ type ManualSecuritySyncActor = {
 };
 
 type SubmitManualSecuritySyncParams = {
-  owner: ManualSecuritySyncOwner;
+  owner: SecurityReviewOwner;
   actor: ManualSecuritySyncActor;
   repoFullName?: string;
   origin?: 'manual' | 'dashboard_refresh' | 'enable_initial_sync';

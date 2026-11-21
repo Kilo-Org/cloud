@@ -1,5 +1,6 @@
 import 'server-only';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { isClaudeFederationConfigured } from './federation-jwt';
 
 /**
  * Claude Platform OAuth configuration shared by "Sign in with Claude" and
@@ -66,6 +67,16 @@ export const CLAUDE_BILLING_ASSERTION_AUDIENCE = getEnvVariable(
 );
 
 export const CLAUDE_BILLING_SCOPE = 'org:billing_attribution';
+
+/**
+ * Whether a Linked billing link attempt can complete: the billing OAuth app's
+ * client ID and assertion audience, plus the federation signer that asserts it.
+ */
+export function isClaudeBillingLinkingConfigured(): boolean {
+  return Boolean(
+    CLAUDE_BILLING_CLIENT_ID && CLAUDE_BILLING_ASSERTION_AUDIENCE && isClaudeFederationConfigured()
+  );
+}
 
 /** Requests an organization connection, which only a billing connection uses. */
 export const CLAUDE_BILLING_CONNECTION_TYPE = 'organization_shared';

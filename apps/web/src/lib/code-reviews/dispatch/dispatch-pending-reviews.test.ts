@@ -2202,7 +2202,7 @@ describe('tryDispatchPendingReviews', () => {
       43,
       expect.objectContaining({
         conclusion: 'action_required',
-        output: expect.objectContaining({ title: 'Reconnect Claude billing to run this review' }),
+        output: expect.objectContaining({ title: 'Link Claude billing again to run this review' }),
       }),
       'standard'
     );

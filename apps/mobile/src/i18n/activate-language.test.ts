@@ -90,7 +90,6 @@ function createHarness({
     partialBundledLanguages: true,
     lng: 'en',
     fallbackLng: 'en',
-    compatibilityJSON: 'v4',
     interpolation: { escapeValue: false },
     initAsync: false,
     returnNull: false,

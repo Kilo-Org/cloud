@@ -35,6 +35,10 @@ export type BootstrapDecisionInput = {
   needsConsent: boolean;
   onConsentRoute: boolean;
   onConsentReviewRoute: boolean;
+  /** A legal document screen. The consent surfaces open it, so while consent is
+   *  still needed it counts as a consent route: the reader has to be able to
+   *  read the policy before deciding. */
+  onLegalRoute: boolean;
   languageReloadFailed: boolean;
   /** Every retried startup credential read failed: the stored session could
    *  not be read, so it is not known to be gone. */
@@ -84,7 +88,10 @@ function resolveBootstrapTag(input: BootstrapDecisionInput): BootstrapDecisionTa
     return 'wait-user-consent';
   }
   if (input.needsConsent) {
-    return input.onConsentRoute ? 'settle-consent' : 'redirect-consent';
+    // A legal document opened from the consent card must survive the gate: the
+    // card reads the policy before the decision, and redirecting it back to the
+    // card made the link look dead.
+    return input.onConsentRoute || input.onLegalRoute ? 'settle-consent' : 'redirect-consent';
   }
   if ((input.onConsentRoute && !input.onConsentReviewRoute) || input.inAuthGroup) {
     return 'redirect-app';
@@ -129,12 +136,14 @@ export function resolveBootstrapDecision(input: BootstrapDecisionInput): Bootstr
     !input.consentChecked &&
     !input.inAuthGroup &&
     !input.inForceUpdate &&
-    !input.onConsentRoute;
+    !input.onConsentRoute &&
+    !input.onLegalRoute;
   const needsForceUpdate = input.updateRequired && !input.inForceUpdate;
   const showingForceUpdate = input.updateRequired && input.inForceUpdate;
   const needsAuth = !input.hasToken && !input.inAuthGroup;
   const needsAppRedirect = input.hasToken && input.inAuthGroup;
-  const needsConsentRedirect = input.consentChecked && input.needsConsent && !input.onConsentRoute;
+  const needsConsentRedirect =
+    input.consentChecked && input.needsConsent && !input.onConsentRoute && !input.onLegalRoute;
   const needsRedirect =
     !input.isLoading &&
     (needsForceUpdate ||

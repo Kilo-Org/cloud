@@ -6,7 +6,10 @@ import {
 import { getWorkerDb } from '@kilocode/db/client';
 import { drizzle } from 'drizzle-orm/pg-proxy';
 import { NotificationChannelDO, NotificationsService } from '../../../notifications/src/index';
-import { GLANCEABLE_DELIVERY_MIN_INTERVAL_MS } from '../../../notifications/src/lib/glanceable-refresh';
+import {
+  GLANCEABLE_APPROVAL_MIN_INTERVAL_MS,
+  GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+} from '../../../notifications/src/lib/glanceable-refresh';
 import {
   sendPushNotifications,
   type ExpoPushMessage,
@@ -186,15 +189,23 @@ async function flushAsync(): Promise<void> {
  * scope per `GLANCEABLE_DELIVERY_MIN_INTERVAL_MS`, deferring a change inside the
  * window to the Durable Object alarm. The glanceable cases below assert the
  * connection DO's own per-status-change trigger, so step the wall clock past
- * the window between heartbeats. The window itself is covered by
+ * the window between heartbeats. An approval-carrying refresh uses the shorter
+ * `GLANCEABLE_APPROVAL_MIN_INTERVAL_MS` floor instead, so `advance` steps the
+ * clock by an exact amount. The windows themselves are covered by
  * `services/notifications/src/lib/glanceable-refresh.test.ts`.
  */
-function useDeliveryWindowClock(): { tick: () => void } {
+function useDeliveryWindowClock(): {
+  tick: () => void;
+  advance: (ms: number) => void;
+} {
   let now = Date.now();
   vi.spyOn(Date, 'now').mockImplementation(() => now);
   return {
     tick: () => {
       now += GLANCEABLE_DELIVERY_MIN_INTERVAL_MS + 1_000;
+    },
+    advance: (ms: number) => {
+      now += ms;
     },
   };
 }
@@ -252,7 +263,9 @@ function setupOrganizationMembership(isMember: boolean) {
   vi.mocked(getWorkerDb).mockReturnValue(
     drizzle(async (sql: string) => {
       if (sql.includes('organization_memberships')) {
-        return { rows: isMember ? [['membership-1']] : [] };
+        // The lookup selects the direct role and the inherited role from one row over
+        // the live organization; a non-member gets a row with no role.
+        return { rows: [[isMember ? 'owner' : null, null]] };
       }
       throw new Error(`Unexpected query: ${sql}`);
     }) as never
@@ -321,7 +334,7 @@ function setupGlanceableDelivery(foreignSessionIds: string[] = []) {
       })
     );
   });
-  return { ...result, env, messages, channelStorage: storage };
+  return { ...result, env, messages, channel, channelStorage: storage };
 }
 
 function connectWebSocket(doInstance: UserConnectionDO, connectionId: string): MockWS {
@@ -1020,17 +1033,42 @@ describe('UserConnectionDO', () => {
       expect(messages.every(message => message.data?.organizationBound === false)).toBe(true);
     });
 
-    it('delivers a question -> permission move inside the delivery window', async () => {
-      const { doInstance, mockCtx, messages } = setupGlanceableDelivery();
+    it('coalesces a permission move inside the short approval floor and delivers it past it', async () => {
+      const { doInstance, mockCtx, messages, channel, channelStorage } = setupGlanceableDelivery();
       const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
       const clock = useDeliveryWindowClock();
       clock.tick();
       sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'question')]);
       await flushAsync();
       expect(messages).toHaveLength(1);
-      // No clock tick: still inside the delivery window. The Approve control
-      // gates nothing here except this window, so the move must not wait it out.
+
+      // No clock advance: inside the short approval floor. The move is
+      // coalesced into a pending record that keeps the approval flag, so its
+      // trailing delivery cannot be bounced by the floor it was deferred out of.
       sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'permission')]);
+      await flushAsync();
+      expect(messages).toHaveLength(1);
+      const pending = (await channelStorage.get(pendingGlanceableKey('usr_1', null))) as
+        | { dueAt: number; approvalChanged?: boolean }
+        | undefined;
+      expect(pending).toMatchObject({
+        userId: 'usr_1',
+        organizationId: null,
+        approvalChanged: true,
+      });
+      const delivery = (await channelStorage.get(
+        `glanceable:${JSON.stringify(['usr_1', null])}:delivery`
+      )) as { deliveredAt: number } | undefined;
+      if (!delivery) throw new Error('Expected a shipped delivery record');
+      // The floor is measured from the last delivery, so the Approve control
+      // can never lag the full 10 s window.
+      expect(pending?.dueAt).toBe(delivery.deliveredAt + GLANCEABLE_APPROVAL_MIN_INTERVAL_MS);
+      expect(channelStorage.setAlarm).toHaveBeenCalledWith(pending?.dueAt);
+
+      // Past the floor the pending record delivers on the alarm that was armed
+      // for it: both counts land without the full window elapsing.
+      clock.advance(GLANCEABLE_APPROVAL_MIN_INTERVAL_MS + 1);
+      await channel.alarm();
       await flushAsync();
       expect(messages.map(message => message.data)).toMatchObject([
         { needsInput: 1, needsApproval: 0 },

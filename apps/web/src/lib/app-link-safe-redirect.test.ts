@@ -21,7 +21,6 @@ describe('browserLandingPath', () => {
   it('passes unclaimed paths through unchanged', () => {
     const unclaimed = [
       '/organizations/abc123/guardrails',
-      '/organizations/new',
       '/account-verification',
       '/sign-in-to-editor',
       '/users/accept-invite/x',
@@ -109,13 +108,17 @@ describe('isAppLinkClaimed', () => {
     // below it is a web-only page.
     expect(isAppLinkClaimed('/organizations/abc123')).toBe(true);
     expect(isAppLinkClaimed('/organizations/abc123/guardrails')).toBe(false);
+    // Both create-form pages open the app's own form.
+    expect(isAppLinkClaimed('/organizations/new')).toBe(true);
+    expect(isAppLinkClaimed('/organizations/create')).toBe(true);
   });
 
   it('rejects unclaimed paths', () => {
-    expect(isAppLinkClaimed('/organizations/new')).toBe(false);
     expect(isAppLinkClaimed('/organizations/abc123/request-logs')).toBe(false);
     expect(isAppLinkClaimed('/claw')).toBe(false);
     expect(isAppLinkClaimed('/account-verification')).toBe(false);
+    // A depth below the create form is a web page again.
+    expect(isAppLinkClaimed('/organizations/new/plan')).toBe(false);
     // A sub-path of a claimed page with no screen of its own stays in the
     // browser, so the web keeps serving it (a sign-in redirect to it must not
     // hop through the interstitial).

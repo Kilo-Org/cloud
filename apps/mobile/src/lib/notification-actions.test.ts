@@ -17,12 +17,14 @@ import {
   setPendingDeepLink,
 } from './deep-link-launch';
 import {
-  _resetOpenedExternalPagesForTests,
   handleNeedsInputNotificationResponse,
   isNeedsInputActionIdentifier,
   registerNeedsInputCategories,
 } from './notification-actions';
-import { notificationIdentifierForSession } from './needs-input-presentation';
+import {
+  notificationIdentifierForSession,
+  retireNeedsInputReplyResult,
+} from './needs-input-presentation';
 import { PENDING_DEEP_LINK_KEY } from './storage-keys';
 
 const mocks = vi.hoisted(() => ({
@@ -33,7 +35,6 @@ const mocks = vi.hoisted(() => ({
   runNeedsInputInteraction: vi.fn(),
   refreshGlanceableSurfacesFromTray: vi.fn(),
   captureException: vi.fn(),
-  openExternalUrl: vi.fn(),
 }));
 
 vi.mock('expo-notifications', () => ({
@@ -58,18 +59,6 @@ vi.mock('./glanceable/approve-front-agent', () => ({
 vi.mock('@sentry/react-native', () => ({
   captureException: mocks.captureException,
 }));
-
-// A KiloClaw tap opens the in-app browser; the suite asserts the URL instead of
-// mounting one. The web origin it opens on comes from the app build's config,
-// which the global setup stubs with no values.
-vi.mock('./external-link', () => ({ openExternalUrl: mocks.openExternalUrl }));
-vi.mock('@/lib/config', () => {
-  const values: Record<string, unknown> = { WEB_BASE_URL: 'https://app.example.com' };
-  return new Proxy(values, {
-    get: (target, key) => target[String(key)],
-    has: () => true,
-  });
-});
 
 type RaiseData = {
   type: 'cloud_agent_session';
@@ -127,7 +116,6 @@ function raiseResponse(input: ResponseInput = {}): Notifications.NotificationRes
 
 beforeEach(() => {
   _resetDeepLinkLaunchForTests();
-  _resetOpenedExternalPagesForTests();
   _setSecureStoreForTests({
     setItemAsync: vi.fn().mockResolvedValue(undefined),
     deleteItemAsync: vi.fn().mockResolvedValue(undefined),
@@ -140,7 +128,6 @@ beforeEach(() => {
   mocks.runNeedsInputInteraction.mockReset();
   mocks.refreshGlanceableSurfacesFromTray.mockReset().mockResolvedValue(undefined);
   mocks.captureException.mockReset();
-  mocks.openExternalUrl.mockReset();
 });
 
 describe('registerNeedsInputCategories', () => {
@@ -458,6 +445,45 @@ describe('handleNeedsInputNotificationResponse — approve and reply', () => {
     expect(mocks.dismissNotificationAsync).toHaveBeenCalledWith('fcm-remote-1');
   });
 
+  it('replaces an inline reply in place, because Android keeps it for the reply', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        identifier: 'fcm-remote-1',
+        actionIdentifier: NEEDS_INPUT_ACTION_IDS.reply,
+        userText: 'ship it',
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identifier: 'fcm-remote-1',
+        content: expect.objectContaining({ body: 'Reply sent' }),
+      })
+    );
+    expect(mocks.dismissNotificationAsync.mock.calls).toEqual([['needs-input:ses_1']]);
+    // The result is outside the session's identifier, so the plan's retirement reaches it.
+    await retireNeedsInputReplyResult('ses_1', vi.fn<(error: unknown) => void>());
+    expect(mocks.dismissNotificationAsync).toHaveBeenLastCalledWith('fcm-remote-1');
+  });
+
+  it('keeps the session identifier for an Approve, and records no reply result', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+
+    await handleNeedsInputNotificationResponse(raiseResponse({ identifier: 'fcm-remote-2' }), {
+      runInteraction: mocks.runNeedsInputInteraction,
+    });
+
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ identifier: 'needs-input:ses_1' })
+    );
+    expect(mocks.dismissNotificationAsync.mock.calls).toEqual([['fcm-remote-2']]);
+    await retireNeedsInputReplyResult('ses_1', vi.fn<(error: unknown) => void>());
+    expect(mocks.dismissNotificationAsync.mock.calls).toEqual([['fcm-remote-2']]);
+  });
+
   it('uses the attention title when the response notification has no title', async () => {
     mocks.runNeedsInputInteraction.mockResolvedValue('ok');
 
@@ -520,7 +546,7 @@ describe('handleNeedsInputNotificationResponse — approve and reply', () => {
   it('dismisses an answer action whose notification carries no session', async () => {
     const handled = await handleNeedsInputNotificationResponse(
       raiseResponse({
-        data: { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
+        data: { type: 'agent_briefing', url: '/agent-briefing' },
       }),
       { runInteraction: mocks.runNeedsInputInteraction }
     );
@@ -545,7 +571,7 @@ describe('handleNeedsInputNotificationResponse — approve and reply', () => {
     });
   });
 
-  it('falls back to retryable when the headless envelope is unparseable JSON', async () => {
+  it('dismisses an answer action whose headless envelope is unparseable JSON', async () => {
     await handleNeedsInputNotificationResponse(raiseResponse({ data: '{not json' }), {
       runInteraction: mocks.runNeedsInputInteraction,
     });
@@ -867,6 +893,25 @@ describe('handleNeedsInputNotificationResponse — default action', () => {
     expect(mocks.runNeedsInputInteraction).not.toHaveBeenCalled();
   });
 
+  it('leaves the pending destination alone for a push kind this build does not route', async () => {
+    setPendingDeepLink('/(app)/(tabs)/(3_profile)', 'notification');
+
+    // A kind the shared schema does not declare — a retired push, or one a
+    // newer server sends: the tap resolves no destination, so nothing opens and
+    // no route is stashed.
+    const handled = await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
+        data: { type: 'retired_kind' },
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    expect(handled).toBe(false);
+    expect(getPendingDeepLinkSnapshot()).toBe('/(app)/(tabs)/(3_profile)');
+    expect(mocks.clearLastNotificationResponse).not.toHaveBeenCalled();
+  });
+
   it('leaves the pending destination alone for payload data with no destination', async () => {
     setPendingDeepLink('/(app)/(tabs)/(3_profile)', 'notification');
 
@@ -883,154 +928,6 @@ describe('handleNeedsInputNotificationResponse — default action', () => {
     expect(handled).toBe(false);
     expect(getPendingDeepLinkSnapshot()).toBe('/(app)/(tabs)/(3_profile)');
     expect(mocks.clearLastNotificationResponse).not.toHaveBeenCalled();
-    expect(mocks.openExternalUrl).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    [
-      { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
-      'https://app.example.com/claw/chat/c1',
-    ],
-    [
-      { type: 'instance-lifecycle', event: 'ready', sandboxId: 's1' },
-      'https://app.example.com/claw',
-    ],
-    [
-      { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 's1' },
-      'https://app.example.com/claw',
-    ],
-  ] as const)('opens a KiloClaw $data.type tap on the web', async (data, url) => {
-    setPendingDeepLink('/(app)/(tabs)/(3_profile)', 'notification');
-
-    const handled = await handleNeedsInputNotificationResponse(
-      raiseResponse({
-        actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
-        data,
-      }),
-      { runInteraction: mocks.runNeedsInputInteraction }
-    );
-
-    await vi.waitFor(() => {
-      expect(mocks.openExternalUrl).toHaveBeenCalledWith(url, { retryOnError: true });
-    });
-    expect(handled).toBe(false);
-    // The browser opens directly; no app route is stashed or consumed.
-    expect(getPendingDeepLinkSnapshot()).toBe('/(app)/(tabs)/(3_profile)');
-    expect(mocks.clearLastNotificationResponse).toHaveBeenCalled();
-  });
-
-  it('opens one KiloClaw page when a warm tap reaches both dispatchers', async () => {
-    // Two separately deserialized responses carrying one OS identity, which is
-    // what the JS listener and the registered background task each receive:
-    // distinct objects, same notification identifier and action.
-    const response = {
-      identifier: 'e2e-warm-double',
-      actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
-      data: { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
-    } as const;
-    const fromListener = raiseResponse(response);
-    const fromBackgroundTask = raiseResponse(response);
-
-    const [first, second] = await Promise.all([
-      handleNeedsInputNotificationResponse(fromListener, {
-        runInteraction: mocks.runNeedsInputInteraction,
-      }),
-      handleNeedsInputNotificationResponse(fromBackgroundTask, {
-        runInteraction: mocks.runNeedsInputInteraction,
-      }),
-    ]);
-
-    expect(fromListener).not.toBe(fromBackgroundTask);
-    expect(first).toBe(false);
-    expect(second).toBe(false);
-    await vi.waitFor(() => {
-      expect(mocks.openExternalUrl).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  it('opens one KiloClaw page when the second delivery arrives after the first settled', async () => {
-    // The background task can deliver the same tap after the listener's
-    // dispatch resolved, when the in-flight map no longer holds the identity.
-    const sameTap = {
-      identifier: 'e2e-warm-sequential',
-      actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
-      data: { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
-    } as const;
-
-    await handleNeedsInputNotificationResponse(raiseResponse(sameTap), {
-      runInteraction: mocks.runNeedsInputInteraction,
-    });
-    await vi.waitFor(() => {
-      expect(mocks.openExternalUrl).toHaveBeenCalledTimes(1);
-    });
-
-    await handleNeedsInputNotificationResponse(raiseResponse(sameTap), {
-      runInteraction: mocks.runNeedsInputInteraction,
-    });
-
-    // The settled identity is remembered, so the second delivery opens nothing.
-    expect(mocks.openExternalUrl).toHaveBeenCalledTimes(1);
-  });
-
-  it('opens again when the same notification is tapped after the delivery window', async () => {
-    // The memory covers the delivery race only, so a genuine second tap on the
-    // same notification — the page was closed, the row is still in the tray —
-    // opens it again once the window has passed.
-    const sameTap = {
-      identifier: 'e2e-warm-later',
-      actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
-      data: { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
-    } as const;
-
-    await handleNeedsInputNotificationResponse(raiseResponse(sameTap), {
-      runInteraction: mocks.runNeedsInputInteraction,
-    });
-    await vi.waitFor(() => {
-      expect(mocks.openExternalUrl).toHaveBeenCalledTimes(1);
-    });
-
-    // Fake the clock only: the open resolves through a dynamic import, so the
-    // assertion below still needs real microtasks (and `vi.waitFor` real timers).
-    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() + 11_000 });
-    try {
-      await handleNeedsInputNotificationResponse(raiseResponse(sameTap), {
-        runInteraction: mocks.runNeedsInputInteraction,
-      });
-    } finally {
-      vi.useRealTimers();
-    }
-
-    await vi.waitFor(() => {
-      expect(mocks.openExternalUrl).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  it('opens again for a tap on a different notification', async () => {
-    await handleNeedsInputNotificationResponse(
-      raiseResponse({
-        identifier: 'e2e-warm-first',
-        actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
-        data: { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
-      }),
-      { runInteraction: mocks.runNeedsInputInteraction }
-    );
-    await vi.waitFor(() => {
-      expect(mocks.openExternalUrl).toHaveBeenCalledTimes(1);
-    });
-
-    // The dedupe is keyed by the OS identity, so another notification's tap is
-    // a new dispatch rather than a replay of the settled one.
-    await handleNeedsInputNotificationResponse(
-      raiseResponse({
-        identifier: 'e2e-warm-second',
-        actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
-        data: { type: 'chat.message', sandboxId: 's1', conversationId: 'c1', messageId: 'm1' },
-      }),
-      { runInteraction: mocks.runNeedsInputInteraction }
-    );
-    await vi.waitFor(() => {
-      expect(mocks.openExternalUrl).toHaveBeenCalledTimes(2);
-    });
   });
 });
 
@@ -1097,5 +994,86 @@ describe('handleNeedsInputNotificationResponse — one interaction per tap', () 
     // One interaction per action id: approve once, reply once; the two opens
     // never reach the runner.
     expect(mocks.runNeedsInputInteraction).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('handleNeedsInputNotificationResponse — finished report', () => {
+  const approveKey = `needs-input:ses_1:${NEEDS_INPUT_ACTION_IDS.approve}`;
+
+  it('reports the response finished once the answer and its result notification are done', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+    const finishHandlingResponse = vi.fn<(key: string) => void>();
+
+    await handleNeedsInputNotificationResponse(raiseResponse(), {
+      runInteraction: mocks.runNeedsInputInteraction,
+      finishHandlingResponse,
+    });
+
+    expect(finishHandlingResponse).toHaveBeenCalledExactlyOnceWith(approveKey);
+    // iOS may suspend the app as soon as the report arrives, so the result
+    // notification must already be posted.
+    expect(mocks.scheduleNotificationAsync.mock.invocationCallOrder[0]).toBeLessThan(
+      finishHandlingResponse.mock.invocationCallOrder[0] ?? 0
+    );
+  });
+
+  it('reports the response finished after a failed interaction', async () => {
+    mocks.runNeedsInputInteraction.mockRejectedValue(new Error('network down'));
+    const finishHandlingResponse = vi.fn<(key: string) => void>();
+
+    await handleNeedsInputNotificationResponse(raiseResponse(), {
+      runInteraction: mocks.runNeedsInputInteraction,
+      finishHandlingResponse,
+    });
+
+    expect(finishHandlingResponse).toHaveBeenCalledExactlyOnceWith(approveKey);
+  });
+
+  it('reports the response finished when the dispatch itself throws', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+    const finishHandlingResponse = vi.fn<(key: string) => void>();
+
+    await expect(
+      handleNeedsInputNotificationResponse(raiseResponse(), {
+        runInteraction: mocks.runNeedsInputInteraction,
+        readPreviews: () => {
+          throw new Error('preferences unreadable');
+        },
+        finishHandlingResponse,
+      })
+    ).rejects.toThrow('preferences unreadable');
+
+    expect(finishHandlingResponse).toHaveBeenCalledExactlyOnceWith(approveKey);
+  });
+
+  it('reports a response delivered twice once', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+    const finishHandlingResponse = vi.fn<(key: string) => void>();
+
+    await Promise.all([
+      handleNeedsInputNotificationResponse(raiseResponse(), {
+        runInteraction: mocks.runNeedsInputInteraction,
+        finishHandlingResponse,
+      }),
+      handleNeedsInputNotificationResponse(raiseResponse(), {
+        runInteraction: mocks.runNeedsInputInteraction,
+        finishHandlingResponse,
+      }),
+    ]);
+
+    expect(finishHandlingResponse).toHaveBeenCalledExactlyOnceWith(approveKey);
+  });
+
+  it('reports a body tap finished under the mapped default action id', async () => {
+    const finishHandlingResponse = vi.fn<(key: string) => void>();
+
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({ actionIdentifier: 'expo.modules.notifications.actions.DEFAULT' }),
+      { finishHandlingResponse }
+    );
+
+    expect(finishHandlingResponse).toHaveBeenCalledExactlyOnceWith(
+      'needs-input:ses_1:expo.modules.notifications.actions.DEFAULT'
+    );
   });
 });

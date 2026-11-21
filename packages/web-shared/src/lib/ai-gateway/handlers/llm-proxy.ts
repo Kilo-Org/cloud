@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
-import { type NextRequest } from 'next/server';
+import { type NextResponse as NextResponseType } from 'next/server';
+import { after, type NextRequest } from 'next/server';
+import { ensureAnthropicUserProfile } from '@kilocode/web-shared/lib/ai-gateway/anthropic-user-profiles/ensure';
+import {
+  isAnthropicUserProfileRoute,
+  resolveGatewayAnthropicUserProfile,
+} from '@kilocode/web-shared/lib/ai-gateway/anthropic-user-profiles/gateway';
 import { extractPromptInfo } from '@kilocode/web-shared/lib/ai-gateway/extractPromptInfo';
 import { determineFallbackFeature } from '@kilocode/web-shared/lib/ai-gateway/determineFallbackFeature';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
@@ -22,33 +27,21 @@ import {
   invalidPathResponse,
   extractReasoningSetting,
   paidModelAuthRequiredResponse,
-  anonymousFreeModelLimitResponse,
-  accountFreeModelLimitResponse,
   unknownModelResponse,
   lastUserPromptText,
   requestedLogprobs,
   requestedSamples,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
-import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { type BalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { logUnrewrittenResponse } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
-import {
-  freeModelRateLimitKey,
-  isFreeModelRateLimited,
-  type FreeModelRateLimitSubject,
-} from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
-import {
-  gatewayRateLimitKey,
-  isGatewayAccountRateLimited,
-} from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
 import { AUTO_DECISION_HEADER } from '@kilocode/auto-routing-contracts';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import {
   getMaxTokens,
   hasMiddleOutTransform,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
-import { DEFAULT_BENCHMARK_USER_ID, redactProviderHints } from '@kilocode/auto-routing-contracts';
+import { redactProviderHints } from '@kilocode/auto-routing-contracts';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
 import { evaluateEffectiveModelAccessPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
@@ -82,8 +75,9 @@ import { resolveEnkryptOutputScan } from '@kilocode/web-shared/lib/ai-gateway/en
 import {
   gatewayUsageContextBase,
   readGatewayBalance,
+  freeModelRateLimitRejection,
+  gatewayAccountRateLimitRejection,
   resolveGatewayCaller,
-  type GatewayCaller,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
 import { createAiProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/kilo-routing-decision';
 
@@ -98,39 +92,6 @@ function llmProxyPath(url: URL): LlmProxyPath | null {
     default:
       return null;
   }
-}
-
-/**
- * Signed-in callers count per account, anonymous callers per IP. Uses the
- * resolved caller rather than the token's claims, so a revoked token cannot spend
- * its account's allowance: a rejected credential gets the invalid-token
- * response instead.
- */
-async function freeModelRateLimitResponse(params: {
-  request: NextRequest;
-  ipAddress: string;
-  callerPromise: Promise<GatewayCaller>;
-  model: string;
-  feature: string | null;
-}): Promise<NextResponseType<unknown> | null> {
-  const caller = await params.callerPromise;
-  if (caller.kind === 'rejected') return caller.response;
-  const subject: FreeModelRateLimitSubject =
-    caller.kind === 'signed-in'
-      ? { kind: 'account', kiloUserId: caller.user.id }
-      : { kind: 'ip', ipAddress: params.ipAddress };
-
-  // The default internal benchmark user is exempt: a run sends every case of
-  // every free model it measures, and the anti-abuse limit would otherwise
-  // throttle the measurement itself. A benchmark user override is not exempt.
-  const isExempt = subject.kind === 'account' && subject.kiloUserId === DEFAULT_BENCHMARK_USER_ID;
-  if (isExempt || !(await isFreeModelRateLimited(params.request, subject))) return null;
-  console.warn(
-    `Model rate limit exceeded, ${freeModelRateLimitKey(subject)}, model: ${params.model}, feature: ${params.feature ?? 'none'}`
-  );
-  return subject.kind === 'account'
-    ? accountFreeModelLimitResponse()
-    : anonymousFreeModelLimitResponse();
 }
 
 export async function handleLlmProxyRequest(
@@ -156,18 +117,8 @@ export async function handleLlmProxyRequest(
   // account with a read-replica query, so a cap placed after auth still spends a
   // connection on every flooded request. The key comes from the signed token
   // instead, which costs no query.
-  const accountKey = gatewayRateLimitKey(request.headers, rawIpAddress);
-  if (await isGatewayAccountRateLimited(request, accountKey)) {
-    console.warn(`Gateway account rate limit exceeded, user: ${accountKey}`);
-    return NextResponse.json(
-      {
-        error: 'Rate limit exceeded',
-        error_type: ProxyErrorType.rate_limit_exceeded,
-        message: 'Too many requests. Please try again later.',
-      },
-      { status: 429 }
-    );
-  }
+  const accountRateLimited = await gatewayAccountRateLimitRejection(request, rawIpAddress);
+  if (accountRateLimited) return accountRateLimited;
 
   const requestBodyText = await request.text();
   // Free models also serve anonymous callers, so a missing credential resolves to
@@ -302,6 +253,21 @@ export async function handleLlmProxyRequest(
   }
 
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
+  // Overlaps routing work; a failed lookup only drops the profile header.
+  const anthropicUserProfilePromise = callerPromise
+    .then(caller =>
+      caller.kind === 'signed-in'
+        ? resolveGatewayAnthropicUserProfile({
+            model: effectiveModelIdLowerCased,
+            user: caller.user,
+            organizationId: caller.organizationId,
+          })
+        : null
+    )
+    .catch((error: unknown) => {
+      console.error('Failed to resolve the Anthropic user profile', error);
+      return null;
+    });
   const customLlm = await findCustomLlm(effectiveModelIdLowerCased);
   const isPrivateCustomLlm = customLlm !== null && !isPublicCustomLlm(customLlm.definition);
   // Anonymous callers cannot use private custom LLMs, so those are never publicly free.
@@ -312,10 +278,11 @@ export async function handleLlmProxyRequest(
   const clientIp = bareIpLiteral(ipAddress);
 
   if (isPubliclyFreeModel) {
-    const rateLimited = await freeModelRateLimitResponse({
+    const freeModelCaller = await callerPromise;
+    if (freeModelCaller.kind === 'rejected') return freeModelCaller.response;
+    const rateLimited = await freeModelRateLimitRejection({
       request,
-      ipAddress,
-      callerPromise,
+      caller: freeModelCaller,
       model: effectiveModelIdLowerCased,
       feature,
     });
@@ -386,6 +353,7 @@ export async function handleLlmProxyRequest(
     organizationId,
     botId,
     countryCode,
+    taskId: headers.taskId,
     boundedSpending: requestCostLimit !== null,
     providerMetadataCapture,
     effectivePrivacy,
@@ -415,7 +383,7 @@ export async function handleLlmProxyRequest(
     provider: route.provider.type,
     requested_model: effectiveModelIdLowerCased,
     is_free: route.isFree,
-    custom_llm_pricing: customLlm?.definition.pricing ?? null,
+    custom_llm_pricing: route.customLlmPricing ?? customLlm?.definition.pricing ?? null,
     promptInfo,
     max_tokens: getMaxTokens(requestBodyParsed),
     has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),
@@ -479,6 +447,21 @@ export async function handleLlmProxyRequest(
     return guardrailRejection;
   }
   const requestCostBalance = requestCostLimit !== null ? await balanceAndSettingsPromise : null;
+  const anthropicUserProfile = await anthropicUserProfilePromise;
+  if (
+    anthropicUserProfile?.create &&
+    !anthropicUserProfile.userProfileId &&
+    isAnthropicUserProfileRoute(route)
+  ) {
+    // This request goes out unattributed; later ones carry the stored profile.
+    const { subject } = anthropicUserProfile;
+    after(() =>
+      ensureAnthropicUserProfile(subject, countryCode).then(
+        () => undefined,
+        (error: unknown) => console.error('Failed to create an Anthropic user profile', error)
+      )
+    );
+  }
 
   const {
     attempt,
@@ -501,6 +484,7 @@ export async function handleLlmProxyRequest(
       signal: request.signal,
       vercelRequestId: headers.vercelRequestId,
       dataRegion,
+      anthropicUserProfileId: anthropicUserProfile?.userProfileId ?? null,
       costLimit:
         requestCostLimit !== null && requestCostBalance
           ? {
@@ -517,6 +501,9 @@ export async function handleLlmProxyRequest(
   }
   if (attempt.type === 'error') return attempt.response;
   usageContext.provider = providerContext.provider.type;
+  // A partner route bills its own pricing; the gateway route it fails over to bills the model's.
+  usageContext.custom_llm_pricing =
+    providerContext.customLlmPricing ?? customLlm?.definition.pricing ?? null;
 
   const { settings: organizationSettings } = await balanceAndSettingsPromise;
   return await respondToUpstream({
@@ -547,6 +534,7 @@ export async function handleLlmProxyRequest(
           )
         : null,
     signal: request.signal,
+    keepAliveUntilFirstByte: caller.kind === 'signed-in' && caller.cloudAgentRuntimeProxied,
     captureEnkryptOutputReport: report =>
       providerMetadataCapture?.captureEnkryptOutputReport(report),
   });

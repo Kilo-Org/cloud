@@ -11,28 +11,30 @@ import {
 // The row table carries icon components; the pure node project cannot load the
 // native icon package, and the icons are not what this suite asserts.
 vi.mock('@/components/ui/icons', () => ({
-  Building2: 'Building2',
   Cpu: 'Cpu',
-  FileText: 'FileText',
   KeyRound: 'KeyRound',
   LineChart: 'LineChart',
   Lock: 'Lock',
-  Mail: 'Mail',
-  Plug: 'Plug',
   ScrollText: 'ScrollText',
   Server: 'Server',
   Shield: 'Shield',
   SlidersHorizontal: 'SlidersHorizontal',
-  Users: 'Users',
-  Wallet: 'Wallet',
+  UsersRound: 'UsersRound',
 }));
+
+// The request-logs row mirrors its glyph with the screen that owns it, so the
+// row table reads the direction-aware wrapper rather than the raw icon.
+vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalLogs: 'DirectionalLogs',
+}));
+
+// Every row is an absolute web URL, so the suite needs the base the app bakes
+// in. The shared setup mocks this module with no value at all.
+vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.kilo.ai' }));
 
 function gate(overrides: Partial<OrgSettingsGate> = {}): OrgSettingsGate {
   return {
-    role: 'owner',
     plan: 'enterprise',
-    isTopLevel: true,
-    guardrailsEnabled: true,
     ...overrides,
   };
 }
@@ -42,125 +44,126 @@ function areas(overrides: Partial<OrgSettingsGate> = {}) {
 }
 
 function inAppAreas(overrides: Partial<OrgInAppSettingsGate> = {}) {
-  return visibleInAppSettingsRows({ role: 'owner', plan: 'enterprise', ...overrides }).map(
-    row => row.area
-  );
+  return visibleInAppSettingsRows(
+    {
+      role: 'owner',
+      plan: 'enterprise',
+      guardrailsEnabled: true,
+      ...overrides,
+    },
+    'org_1'
+  ).map(row => row.area);
 }
 
 describe('visibleOrgSettingsRows', () => {
-  it('lists every area for an owner of an enterprise organization', () => {
-    expect(areas()).toEqual([
-      'usageDetails',
-      'providersAndModels',
-      'customModes',
-      'groups',
-      'guardrails',
-      'byok',
-      'ssoAndDomain',
-      'emailPreferences',
-      'requestLogs',
-      'integrations',
-      'subOrganizations',
-      'distributeFunds',
-    ]);
+  it('lists the shell card an enterprise organization shows', () => {
+    expect(areas()).toEqual(['ssoAndDomain']);
   });
 
-  it('keeps only the member-readable rows for a member on enterprise', () => {
-    expect(areas({ role: 'member' })).toEqual([
-      'usageDetails',
-      'customModes',
-      'groups',
-      'ssoAndDomain',
-      'integrations',
-    ]);
+  it('shows the teams data collection card where enterprise shows providers and models', () => {
+    // Data collection is the teams dashboard card the shell hosts, so it
+    // replaces the enterprise card rather than joining it.
+    expect(areas({ plan: 'teams' })).toEqual(['dataCollection']);
   });
 
-  it('drops the enterprise-only rows for a member on teams', () => {
-    expect(areas({ role: 'member', plan: 'teams' })).toEqual([
-      'usageDetails',
-      'customModes',
-      'dataCollection',
-      'integrations',
-    ]);
-  });
-
-  it('keeps billing, management and admin rows for an admin on teams', () => {
-    expect(areas({ role: 'admin', plan: 'teams' })).toEqual([
-      'usageDetails',
-      'customModes',
-      'guardrails',
-      'byok',
-      'emailPreferences',
-      'dataCollection',
-      'requestLogs',
-      'integrations',
-      'subOrganizations',
-      'distributeFunds',
-    ]);
-  });
-
-  it('hides the sub-organization rows for a child organization', () => {
-    const rows = areas({ role: 'billing_manager', isTopLevel: false });
-    expect(rows).not.toContain('subOrganizations');
-    expect(rows).not.toContain('distributeFunds');
-    expect(rows).toContain('providersAndModels');
-  });
-
-  it('hides guardrails when the organization has not enabled Kilo Encrypt', () => {
-    expect(areas({ guardrailsEnabled: false })).not.toContain('guardrails');
-  });
-
-  it('drops the owner-only rows for a billing manager', () => {
-    const rows = areas({ role: 'billing_manager' });
-    expect(rows).not.toContain('guardrails');
-    expect(rows).not.toContain('emailPreferences');
-    expect(rows).toContain('providersAndModels');
-  });
-
-  it('opens the web page that owns each setting', () => {
-    const rows = visibleOrgSettingsRows(gate(), 'org_1');
-    const byArea = new Map(rows.map(row => [row.area, row]));
-    expect(
-      byArea.get('usageDetails')?.url.endsWith('/organizations/org_1/usage-details?view=ai-usage')
-    ).toBe(true);
-    expect(
-      byArea.get('subOrganizations')?.url.endsWith('/organizations/org_1/sub-organizations')
-    ).toBe(true);
-    expect(
-      byArea
-        .get('distributeFunds')
-        ?.url.endsWith('/organizations/org_1/sub-organizations/distribute-funds')
-    ).toBe(true);
-    // A dashboard card rather than a page of its own.
-    expect(byArea.get('ssoAndDomain')?.url.endsWith('/organizations/org_1')).toBe(true);
-    // Data collection is the teams dashboard's card, in place of providers and
-    // models, so it appears on that plan only.
-    const teams = visibleOrgSettingsRows(gate({ plan: 'teams' }), 'org_1');
-    expect(
-      teams.find(row => row.area === 'dataCollection')?.url.endsWith('/organizations/org_1')
-    ).toBe(true);
-  });
-
-  it('keeps every in-app area out of the web group', () => {
-    for (const role of ['owner', 'admin', 'billing_manager', 'member', undefined] as const) {
-      for (const plan of ['enterprise', 'teams'] as const) {
-        expect(areas({ role, plan })).not.toContain('auditLogs');
+  it('hands every remaining row off to the shell page that owns it', () => {
+    // Providers and models, guardrails, request logs and the sub-organization
+    // areas are in-app destinations or absent, so no web page row is left: the
+    // two dashboard cards the app shell owns are the whole group.
+    for (const plan of ['enterprise', 'teams'] as const) {
+      for (const row of visibleOrgSettingsRows(gate({ plan }), 'org_1')) {
+        expect(row.target.kind).toBe('app-shell');
       }
     }
+    expect(visibleOrgSettingsRows(gate(), 'org_1')[0]?.target).toEqual({
+      kind: 'app-shell',
+      target: { page: 'organization-sso', organizationId: 'org_1' },
+    });
+    expect(visibleOrgSettingsRows(gate({ plan: 'teams' }), 'org_1')[0]?.target).toEqual({
+      kind: 'app-shell',
+      target: { page: 'organization-data-collection', organizationId: 'org_1' },
+    });
   });
 });
 
 describe('visibleInAppSettingsRows', () => {
-  it('returns the audit log to every billing role on the enterprise plan', () => {
-    for (const role of ['owner', 'admin', 'billing_manager'] as const) {
-      expect(inAppAreas({ role })).toEqual(['auditLogs']);
+  it('returns every in-app area to a billing role on enterprise', () => {
+    for (const role of ['owner', 'admin'] as const) {
+      expect(inAppAreas({ role })).toEqual([
+        'customModes',
+        'groups',
+        'usageDetails',
+        'auditLogs',
+        'requestLogs',
+        'providersAndModels',
+        'guardrails',
+        'byok',
+      ]);
     }
+    // A billing manager reaches Model Access, but guardrails stays with the
+    // roles that manage the organization.
+    expect(inAppAreas({ role: 'billing_manager' })).toEqual([
+      'customModes',
+      'groups',
+      'usageDetails',
+      'auditLogs',
+      'requestLogs',
+      'providersAndModels',
+      'byok',
+    ]);
   });
 
-  it('returns nothing to a member, an unknown role or a teams plan', () => {
-    expect(inAppAreas({ role: 'member' })).toEqual([]);
-    expect(inAppAreas({ role: undefined })).toEqual([]);
-    expect(inAppAreas({ plan: 'teams' })).toEqual([]);
+  it('hides guardrails until the organization enables Kilo Encrypt', () => {
+    expect(inAppAreas({ guardrailsEnabled: false })).not.toContain('guardrails');
+    expect(inAppAreas({ guardrailsEnabled: undefined })).not.toContain('guardrails');
+  });
+
+  it('keeps custom modes, groups and usage for a member of an enterprise organization', () => {
+    expect(inAppAreas({ role: 'member' })).toEqual(['customModes', 'groups', 'usageDetails']);
+    expect(inAppAreas({ role: undefined })).toEqual(['customModes', 'groups', 'usageDetails']);
+    expect(inAppAreas({ plan: 'teams', role: 'member' })).toEqual(['customModes', 'usageDetails']);
+  });
+
+  it('keeps the keys for a billing role on the teams plan, where the audit log is refused', () => {
+    expect(inAppAreas({ plan: 'teams', guardrailsEnabled: false })).toEqual([
+      'customModes',
+      'usageDetails',
+      'requestLogs',
+      'byok',
+    ]);
+  });
+
+  it('opens the native screen that owns each setting', () => {
+    const rows = visibleInAppSettingsRows(
+      {
+        role: 'owner',
+        plan: 'enterprise',
+        guardrailsEnabled: true,
+      },
+      'org_1'
+    );
+    const byArea = new Map(rows.map(row => [row.area, row]));
+    expect(byArea.get('customModes')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/modes');
+    expect(byArea.get('groups')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/groups');
+    expect(byArea.get('usageDetails')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/usage');
+    expect(byArea.get('auditLogs')?.href).toBe('/(app)/(tabs)/(3_profile)/organization/audit-log');
+    expect(byArea.get('requestLogs')?.href).toBe(
+      '/(app)/(tabs)/(3_profile)/organization/request-logs'
+    );
+    // The row and the screen's empty state draw one glyph, and it mirrors in
+    // right-to-left, so neither reads as a different list from the other.
+    expect(byArea.get('requestLogs')?.icon).toBe('DirectionalLogs');
+    expect(byArea.get('auditLogs')?.icon).toBe('ScrollText');
+    expect(byArea.get('providersAndModels')?.href).toBe(
+      '/(app)/(tabs)/(3_profile)/organization/providers-and-models'
+    );
+    expect(byArea.get('guardrails')?.href).toBe(
+      '/(app)/(tabs)/(3_profile)/organization/guardrails'
+    );
+    expect(byArea.get('byok')?.href).toEqual({
+      pathname: '/(app)/(tabs)/(3_profile)/provider-keys',
+      params: { org: 'org_1' },
+    });
   });
 });
 

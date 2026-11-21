@@ -52,7 +52,7 @@ export function WorkspaceSnapshotRecovery({
       }}
     >
       <AlertDialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm" className="bg-background">
+        <Button type="button" variant="ghost" size="sm">
           <RotateCcw className="size-4" />
           Start fresh
         </Button>

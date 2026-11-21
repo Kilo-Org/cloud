@@ -12,12 +12,17 @@ export const SANDBOX_NOTIFICATION_LIMITS = {
   activeLanes: 4,
 } as const;
 
+export const WORKSPACE_ARTIFACTS_CHANGED_EVENT = 'cloud.workspace.artifacts.changed';
+
+export type WorkspaceArtifactsChanged = { revision: number };
+
 export type SandboxNotification =
   | { kind: 'events'; payload: ControlPlaneEventsNotification }
   | { kind: 'route'; payload: ControlPlaneRouteUpdate }
   | { kind: 'outcome'; payload: ControlPlaneOutcome }
   | { kind: 'workspace_stopped'; payload: ControlPlaneWorkspaceStoppedPayload }
-  | { kind: 'worktree_changes'; payload: WorktreeChangesReady };
+  | { kind: 'worktree_changes'; payload: WorktreeChangesReady }
+  | { kind: 'workspace_artifacts'; payload: WorkspaceArtifactsChanged };
 
 type DropCause = 'capacity' | 'expired' | 'failed' | 'retired' | 'wrapper';
 export type NotificationLoss = {

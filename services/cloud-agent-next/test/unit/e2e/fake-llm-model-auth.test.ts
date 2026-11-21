@@ -26,15 +26,7 @@ const NOW_SECONDS = Math.floor(Date.now() / 1000);
  * Declared locally so deleting a claim from the implementation cannot silently
  * delete its test case; the test asserts this list equals the imported one.
  */
-const EXPECTED_FORBIDDEN_CLAIMS = [
-  'aud',
-  'tokenPurpose',
-  'credentialExchange',
-  'runtimeAdmission',
-  'runtimeAuthorization',
-  'organizationId',
-  'organizationRole',
-] as const;
+const EXPECTED_FORBIDDEN_CLAIMS = ['organizationId', 'organizationRole'] as const;
 
 function base64url(value: string): string {
   return Buffer.from(value, 'utf8').toString('base64url');
@@ -60,20 +52,6 @@ function ordinaryPayload(overrides: Record<string, unknown> = {}): Record<string
 
 function forbiddenClaimValue(claim: string): unknown {
   switch (claim) {
-    case 'aud':
-      return 'kilo-api';
-    case 'tokenPurpose':
-      return 'human-api';
-    case 'credentialExchange':
-      return true;
-    case 'runtimeAdmission':
-      return { source: 'user', authorizationUserId: 'user_1', authorizationPepper: null };
-    case 'runtimeAuthorization':
-      return {
-        id: '11111111-1111-4111-8111-111111111111',
-        resourceKind: 'cloud-agent-next',
-        resourceId: 'resource_1',
-      };
     case 'organizationId':
       return 'org_1';
     case 'organizationRole':
@@ -214,6 +192,50 @@ describe('verifyModelRouteBearer', () => {
         }
       }
     }
+  });
+
+  it('accepts a modern control token with a runtime admission', async () => {
+    const token = signRaw(
+      ordinaryPayload({
+        aud: 'cloud-agent-next',
+        tokenPurpose: 'human-api',
+        credentialExchange: false,
+        runtimeAdmission: {
+          source: 'user',
+          authorizationUserId: 'user_1',
+          authorizationPepper: 'pepper',
+        },
+      })
+    );
+    await expect(verifyModelRouteBearer(`Bearer ${token}`, SECRET)).resolves.toMatchObject({
+      ok: true,
+    });
+  });
+
+  it('accepts a runtime token with the delegated-workload audience array', async () => {
+    const token = signRaw(
+      ordinaryPayload({
+        aud: ['kilo-api', 'kilo-gateway', 'session-ingest'],
+        tokenPurpose: 'delegated-workload',
+        credentialExchange: false,
+        runtimeAuthorization: {
+          id: '11111111-1111-4111-8111-111111111111',
+          resourceKind: 'cloud-agent-next',
+          resourceId: 'resource_1',
+        },
+      })
+    );
+    await expect(verifyModelRouteBearer(`Bearer ${token}`, SECRET)).resolves.toMatchObject({
+      ok: true,
+    });
+  });
+
+  it('rejects a token with an audience this stack does not issue', async () => {
+    const token = signRaw(ordinaryPayload({ aud: 'some-other-service' }));
+    await expect(verifyModelRouteBearer(`Bearer ${token}`, SECRET)).resolves.toMatchObject({
+      ok: false,
+      status: 401,
+    });
   });
 
   it('accepts a correctly signed token whose pepper claim is explicitly null', async () => {

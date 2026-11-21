@@ -30,6 +30,7 @@ export default function AuthLayout() {
   return (
     <Stack screenLayout={appSurfaceSceneLayout} screenOptions={{ headerShown: false }}>
       <Stack.Screen name="login" />
+      <Stack.Screen name="legal/[document]" />
       <Stack.Screen name="language-picker" options={themedSheetOptions} />
     </Stack>
   );

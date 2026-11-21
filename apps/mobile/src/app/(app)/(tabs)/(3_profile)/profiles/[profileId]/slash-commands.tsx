@@ -35,5 +35,11 @@ export default function ProfileSlashCommandsRoute() {
   if (staleScope) {
     return null;
   }
-  return <ProfileKiloCommandsScreen profileId={profileId} organizationId={organizationId} />;
+  return (
+    <ProfileKiloCommandsScreen
+      profileId={profileId}
+      organizationId={organizationId}
+      backFallback={getProfilesPath()}
+    />
+  );
 }

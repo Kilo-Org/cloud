@@ -1,5 +1,8 @@
 import { z } from 'zod';
-import { backgroundActivityInventorySchema } from '@kilocode/session-ingest-contracts';
+import {
+  agentBoardSchema,
+  backgroundActivityInventorySchema,
+} from '@kilocode/session-ingest-contracts';
 import type {
   ControlPlaneControlResult,
   ControlPlaneNativeOperation,
@@ -160,6 +163,12 @@ function parseNativeResult(
         ? bounded(parsed.data)
         : invalidNativeResult();
     }
+    case 'session.board': {
+      const parsed = agentBoardSchema.safeParse(value);
+      return parsed.success && parsed.data.ownerSessionID === kiloSessionId
+        ? bounded(parsed.data)
+        : invalidNativeResult();
+    }
     case 'session.get':
       return sessionPublicShape(value, kiloSessionId);
     case 'session.messages':
@@ -242,7 +251,11 @@ export async function readNativeLiveOperation(
     };
   }
   if (!result.ok) {
-    if (result.error.code === 'not_ready' || result.error.code === 'not_found') {
+    if (
+      result.error.code === 'not_ready' ||
+      result.error.code === 'not_found' ||
+      result.error.code === 'runtime_offline'
+    ) {
       return { kind: 'not_ready', message: result.error.message };
     }
     if (result.error.code === 'too_large') return { kind: 'too_large' };

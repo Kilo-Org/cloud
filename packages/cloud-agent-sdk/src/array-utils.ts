@@ -8,15 +8,8 @@ export function splitByContiguousPrefix<T>(
   let lastCompleteIndex = -1;
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
-    if (item !== undefined && isComplete(item)) {
-      if (i === 0 || i === lastCompleteIndex + 1) {
-        lastCompleteIndex = i;
-      } else {
-        break;
-      }
-    } else {
-      break;
-    }
+    if (item === undefined || !isComplete(item)) break;
+    lastCompleteIndex = i;
   }
   return {
     staticItems: items.slice(0, lastCompleteIndex + 1),

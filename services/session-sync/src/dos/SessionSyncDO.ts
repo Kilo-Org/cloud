@@ -369,7 +369,7 @@ export class SessionSyncDO extends DurableObject<Env> {
         this.pendingRegistration = undefined;
       }
       if (!meta) return ok(null);
-      const tenant = { type: meta.tenant_type, id: meta.tenant_id } as Tenant;
+      const tenant = { type: meta.tenant_type, id: meta.tenant_id };
       const input = { tenant, sessionID: meta.session_id, bytes: 0 };
       if (meta.deleted_at !== null && (meta.tenant_lease >= 0 || this.leaseReconcilePending)) {
         const released = await this.tenantCall(() =>

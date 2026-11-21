@@ -99,6 +99,29 @@ describe('manualReviewStartFailure recognized server sentences', () => {
     );
     expect(failure.retryable).toBe(false);
   });
+
+  it('offers a billing role the copy that offers the plan step', () => {
+    const failure = manualReviewStartFailure(
+      trpcError('FORBIDDEN', ORGANIZATION_TRIAL_EXPIRED_MESSAGE),
+      'github',
+      true
+    );
+
+    expect(failure.message).toBe(i18n.t('common.organizationTrialEndedBilling'));
+    expect(failure.retryable).toBe(false);
+  });
+
+  it('keeps the owner-naming copy for a reader who cannot change the plan', () => {
+    const refusal = trpcError('FORBIDDEN', ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
+
+    expect(manualReviewStartFailure(refusal, 'github', false).message).toBe(
+      i18n.t('common.organizationTrialEnded')
+    );
+    // An unresolved role keeps today's copy.
+    expect(manualReviewStartFailure(refusal, 'github').message).toBe(
+      i18n.t('common.organizationTrialEnded')
+    );
+  });
 });
 
 describe('manualReviewStartFailure retryability', () => {

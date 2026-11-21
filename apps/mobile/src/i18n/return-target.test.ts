@@ -43,7 +43,8 @@ vi.mock('@/lib/auth/secure-store', () => ({
 }));
 
 // The total helpers this module disarms through. They are the wrapper's own
-// `*Safe` pair, so the fake keeps their policy: report nothing, return false.
+// `*Safe` pair, so the fake keeps their total contract: never throw, return
+// false. The real helpers also report the refusal; this fake has no sink.
 vi.mock('@/lib/auth/secure-store-value', () => ({
   deleteStoredValueSafe: async (key: string) => {
     await Promise.resolve();

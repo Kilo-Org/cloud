@@ -295,17 +295,11 @@ describe('OfflineBanner mounted with confirmed connectivity', () => {
       const banner = await mountTree();
       const screen = await mountTree(<SettingsOverviewScreen scope={scope} />);
       const activeQueries = harness.queryClient.getQueryCache().findAll({ type: 'active' });
-      expect(activeQueries).toHaveLength(scope === 'personal' ? 2 : 3);
-      // On an organization scope the capability read comes through the hook
-      // that owns the shared memberships options, which settle instead of
-      // pausing: it runs, while the other reads stay paused.
-      const settled = activeQueries.filter(query => query.state.fetchStatus === 'fetching');
+      // The capability read settles instead of pausing, so it runs here.
+      const settled = activeQueries.filter(query => query.state.fetchStatus !== 'paused');
       expect(settled).toHaveLength(scope === 'personal' ? 0 : 1);
-      expect(
-        activeQueries
-          .filter(query => !settled.includes(query))
-          .every(query => query.state.fetchStatus === 'paused')
-      ).toBe(true);
+      expect(settled.every(query => query.state.fetchStatus === 'fetching')).toBe(true);
+      expect(activeQueries).toHaveLength(scope === 'personal' ? 2 : 3);
       expect(activeQueries.every(query => query.state.data === undefined)).toBe(true);
       // The loading body is the skeleton, not the controls: how many blocks it
       // draws is its own shape, so only their presence matters here.

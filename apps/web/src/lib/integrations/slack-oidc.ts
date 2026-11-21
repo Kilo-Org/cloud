@@ -56,6 +56,11 @@ const userInfoResponseSchema = z.object({
   [USER_ID_CLAIM]: z.string().min(1).optional(),
 });
 
+const revokeResponseSchema = z.object({
+  ok: z.boolean(),
+  error: z.string().optional(),
+});
+
 /**
  * The Sign in with Slack client credential. Both halves are required: a token
  * request needs both, so the link page answers with its own error instead of
@@ -145,6 +150,7 @@ export async function exchangeSlackOidcCode(code: string): Promise<string> {
       body: new URLSearchParams({
         client_id: clientId,
         client_secret: clientSecret,
+        grant_type: 'authorization_code',
         code,
         redirect_uri: getSlackOidcRedirectUri(),
       }).toString(),
@@ -192,7 +198,7 @@ export async function fetchSlackIdentity(accessToken: string): Promise<SlackIden
 /** Best-effort token revocation; the token is single-use proof and short-lived. */
 export async function revokeSlackOidcToken(accessToken: string): Promise<void> {
   try {
-    await slackRequest(
+    const body = await slackRequest(
       SLACK_OIDC_REVOKE_URL,
       {
         method: 'POST',
@@ -203,6 +209,16 @@ export async function revokeSlackOidcToken(accessToken: string): Promise<void> {
       },
       'revoke'
     );
+
+    // Record Slack's answer when it is not an acceptance, so the revocation's
+    // own outcome is observable. The token is short-lived either way.
+    const parsed = revokeResponseSchema.safeParse(body);
+    if (!parsed.success || !parsed.data.ok) {
+      captureException(new SlackOidcError('Slack declined the sign-in token revocation'), {
+        tags: { component: 'kilo-bot', op: 'slack-oidc-revoke' },
+        extra: { error: parsed.success ? parsed.data.error : 'unrecognised response' },
+      });
+    }
   } catch (error) {
     captureException(error, { tags: { component: 'kilo-bot', op: 'slack-oidc-revoke' } });
   }

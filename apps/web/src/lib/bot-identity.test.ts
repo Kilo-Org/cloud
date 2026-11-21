@@ -155,4 +155,28 @@ describe('linkKiloUser', () => {
     await expect(linkKiloUser(state as never, slackIdentity, 'kilo-1')).resolves.toBe('conflict');
     await expect(resolveKiloUserId(state as never, slackIdentity)).resolves.toBe('kilo-2');
   });
+
+  test('an identity with no stored holder links on the retried compare-and-set', async () => {
+    const base = createState();
+    // The first compare-and-set is refused, then the re-read finds nothing
+    // stored for the identity, which is the state this test covers.
+    let setAttempts = 0;
+    let reads = 0;
+    const state = {
+      ...base,
+      setIfNotExists: async (key: string, value: unknown) => {
+        setAttempts += 1;
+        if (setAttempts === 1) return false;
+        return await base.setIfNotExists(key, value);
+      },
+      get: async (key: string) => {
+        reads += 1;
+        return reads === 1 ? null : await base.get(key);
+      },
+    };
+
+    await expect(linkKiloUser(state as never, slackIdentity, 'kilo-1')).resolves.toBe('linked');
+    expect(setAttempts).toBe(2);
+    await expect(resolveKiloUserId(state as never, slackIdentity)).resolves.toBe('kilo-1');
+  });
 });

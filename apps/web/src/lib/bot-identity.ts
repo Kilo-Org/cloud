@@ -86,7 +86,18 @@ export async function linkKiloUser(
     return 'linked';
   }
 
-  return (await state.get<string>(key)) === kiloUserId ? 'linked' : 'conflict';
+  const holder = await state.get<string>(key);
+  if (holder === kiloUserId) {
+    return 'linked';
+  }
+
+  // The identity is free again when nothing is stored for it, so the claim is
+  // retried once. A value in the re-read belongs to another Kilo account.
+  if (holder === null) {
+    return (await state.setIfNotExists(key, kiloUserId)) ? 'linked' : 'conflict';
+  }
+
+  return 'conflict';
 }
 
 /**

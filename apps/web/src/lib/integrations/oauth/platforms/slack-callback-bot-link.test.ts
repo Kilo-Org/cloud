@@ -68,6 +68,7 @@ jest.mock(
 );
 
 import { NextRequest } from 'next/server';
+import { captureException } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { bot } from '@/lib/bot';
 import { resolveKiloUserId } from '@/lib/bot-identity';
@@ -365,5 +366,42 @@ describe('handleSlackOAuthCallback Slack bot-link', () => {
     expect(response.status).toBe(400);
     await expect(response.text()).resolves.toContain('was not completed');
     expect(mockExchangeSlackOidcCode).not.toHaveBeenCalled();
+  });
+
+  it('renders the link failure page when the state store rejects the completion', async () => {
+    const contextKey = await seedPendingLink();
+    state.setIfNotExists = async () => {
+      throw new Error('redis unavailable');
+    };
+
+    const response = await callCallback({ state: botLinkState(contextKey) });
+    const body = await response.text();
+
+    expect(response.status).toBe(400);
+    expect(response.headers.get('location')).toBeNull();
+    expect(body).toContain('Link Failed');
+    expect(body).toContain('could not finish linking');
+    expect(body).not.toContain('error=installation');
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({ op: 'slack-bot-link-completion' }),
+      })
+    );
+    expect(mockAfter).not.toHaveBeenCalled();
+  });
+
+  it('renders the link failure page when bot initialization fails', async () => {
+    const contextKey = await seedPendingLink();
+    mockedBot.initialize.mockRejectedValueOnce(new Error('database unavailable'));
+
+    const response = await callCallback({ state: botLinkState(contextKey) });
+    const body = await response.text();
+
+    expect(response.status).toBe(400);
+    expect(response.headers.get('location')).toBeNull();
+    expect(body).toContain('could not finish linking');
+    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(state.values.has(`${contextKey}:consumed`)).toBe(false);
   });
 });

@@ -11,6 +11,7 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 }));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
+import { captureException } from '@sentry/nextjs';
 import {
   exchangeSlackOidcCode,
   fetchSlackIdentity,
@@ -30,6 +31,7 @@ function jsonResponse(body: unknown, status = 200) {
 
 beforeEach(() => {
   mockFetch.mockReset();
+  jest.mocked(captureException).mockClear();
   global.fetch = mockFetch as never;
 });
 
@@ -73,6 +75,7 @@ describe('exchangeSlackOidcCode', () => {
     expect(requestUrl).toBe('https://slack.com/api/openid.connect.token');
     expect(init.method).toBe('POST');
     const body = new URLSearchParams(init.body as string);
+    expect(body.get('grant_type')).toBe('authorization_code');
     expect(body.get('code')).toBe('the-code');
     expect(body.get('client_id')).toBe('client-id');
     expect(body.get('redirect_uri')).toBe(getSlackOidcRedirectUri());
@@ -125,5 +128,27 @@ describe('revokeSlackOidcToken', () => {
     mockFetch.mockRejectedValue(new Error('network down'));
 
     await expect(revokeSlackOidcToken('xoxp-oidc')).resolves.toBeUndefined();
+  });
+
+  test('records a revocation answer that is not an acceptance without throwing', async () => {
+    const capture = jest.mocked(captureException);
+    mockFetch.mockResolvedValue(jsonResponse({ ok: false, error: 'invalid_token' }));
+
+    await expect(revokeSlackOidcToken('xoxp-oidc')).resolves.toBeUndefined();
+
+    expect(capture).toHaveBeenCalledTimes(1);
+    expect(capture.mock.calls[0]?.[1]).toMatchObject({
+      tags: { component: 'kilo-bot', op: 'slack-oidc-revoke' },
+      extra: { error: 'invalid_token' },
+    });
+  });
+
+  test('records nothing for an accepted revocation', async () => {
+    const capture = jest.mocked(captureException);
+    mockFetch.mockResolvedValue(jsonResponse({ ok: true }));
+
+    await expect(revokeSlackOidcToken('xoxp-oidc')).resolves.toBeUndefined();
+
+    expect(capture).not.toHaveBeenCalled();
   });
 });

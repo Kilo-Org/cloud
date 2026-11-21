@@ -17,7 +17,11 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { User } from '@kilocode/db';
 import { after } from 'next/server';
 import type { PlatformIdentity } from '@/lib/bot-identity';
-import { completeLinkAccount, reprocessLinkedContext } from '@/lib/bot/link-account-completion';
+import {
+  completeLinkAccount,
+  reprocessLinkedContext,
+  type CompleteLinkAccountOutcome,
+} from '@/lib/bot/link-account-completion';
 import { errorPage, linkConflictPage, linkUsedPage, page } from '@/lib/bot/link-account-page';
 import {
   isSlackBotLinkState,
@@ -150,12 +154,26 @@ async function handleSlackBotLinkCallback({
     );
   }
 
-  await bot.initialize();
-  const outcome = await completeLinkAccount({
-    identity: provenIdentity,
-    contextKey: state.contextKey,
-    user,
-  });
+  let outcome: CompleteLinkAccountOutcome;
+  try {
+    await bot.initialize();
+    outcome = await completeLinkAccount({
+      identity: provenIdentity,
+      contextKey: state.contextKey,
+      user,
+    });
+  } catch (error) {
+    // Finishing a link reports its outcome on the link flow's own pages.
+    captureException(error, {
+      tags: { component: 'kilo-bot', op: 'slack-bot-link-completion' },
+      extra: { stateUserId: state.userId },
+    });
+    return errorPage(
+      'Link Failed',
+      'We could not finish linking your Slack account. Please go back to your chat and try again.',
+      400
+    );
+  }
 
   if (outcome.status === 'used') {
     return linkUsedPage();

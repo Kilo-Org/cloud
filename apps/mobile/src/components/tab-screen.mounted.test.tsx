@@ -406,11 +406,12 @@ describe('SheetScrollView', () => {
     unmount();
   });
 
-  it('floors the sheet viewport under a keyboard taller than the sheet frame', async () => {
-    // A half-detent sheet with the keyboard up: the sheet frame is only 88pt
-    // tall, so a band that kept its raw 300 would leave a negative viewport
-    // with nothing to scroll. The margin drops to 300 - MIN_BODY_VIEWPORT, so
-    // the 88pt floor stays on screen and the rest rides under the keyboard.
+  it('floors the sheet viewport when the keyboard takes the whole room', async () => {
+    // A half-detent sheet with the keyboard up: the room is 300pt (a 300pt
+    // keyboard over a 300pt frame), so the first pass reports a collapsed body
+    // and the raw band would leave no viewport at all. The margin settles at
+    // 300 - MIN_BODY_VIEWPORT, and the next layout reports the 88pt body that
+    // margin leaves, so the floor is what stays on screen.
     layout.platform = 'android';
     layout.fontScale = 1;
     layout.bottom = 0;

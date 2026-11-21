@@ -79,20 +79,16 @@ is rejected, not a path back to preinstalled startup. The renderer emits only th
 
 ### Kilo v2 harness
 
-A downloaded target can also name `kilo2: { orgIds, allSessionOrgIds? }`. Without it, new sandboxes
-select v1. The checked-in default uses `kilo2: { orgIds: "*" }` for all organizations and personal
-accounts, plus `allSessionOrgIds: ["9d278969-5453-4ae3-a51f-a8d2274a7b56"]` for the Kilo
-organization.
-A sandbox's first allocation selects v2 only when every preparing route has the
-worker-owned `billingOrigin: cloud-agent-web`. Its downloaded start must also pass the organization
-rule for `kilo2.orgIds`: `"*"` admits every account; a UUID list requires one listed organization
-across all preparing routes. Native allocations must be isolated. Code reviews, desktop, Agent
-Manager and other origins stay on v1, including routes with a missing origin and sandboxes with mixed
-origins. `kilo2.allSessionOrgIds` admits every origin and native sandbox class for its own accounts,
-and each listed organization must also be inside `kilo2.orgIds` (`"*"` requires `orgIds: "*"`). This
-origin restriction applies only to v2 selection; downloaded v1 startup is available to every account.
-A client-supplied `createdOnPlatform` cannot select v2. Existing routes without a stored
-`billingOrigin` select v1.
+A downloaded target can name `kilo2: { orgIds, allSessionOrgIds? }`. Without it, new sandboxes
+select v1. The checked-in default sets both scopes to `"*"`, so first allocations with preparing
+routes select v2 for every organization, personal account, session origin and native sandbox class.
+
+For narrower rollouts, `kilo2.orgIds` can list UUIDs. All preparing routes must then belong to the
+same listed organization. Outside `kilo2.allSessionOrgIds`, v2 requires every preparing route to
+have the Worker-owned `billingOrigin: cloud-agent-web`, and native sandboxes must be isolated.
+A client-supplied `createdOnPlatform` cannot satisfy the origin check. The all-session scope must
+be within `kilo2.orgIds` (`"*"` requires `orgIds: "*"`).
+
 The Sandbox DO stores that harness, and every later allocation of the
 sandbox uses it, because native history does not move between v1 and v2. A sandbox that allocated
 before this record existed stays on v1. The harness is stored after startup preflight and capacity

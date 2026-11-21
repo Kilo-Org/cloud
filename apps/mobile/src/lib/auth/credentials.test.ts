@@ -126,6 +126,7 @@ vi.mock('@/lib/telemetry/posthog-storage', () => ({
 }));
 vi.mock('react-native', () => ({
   AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+  Platform: { OS: 'ios' },
 }));
 // sonner-native is imported by secure-store-preference, which the remote MCP
 // store and the settings-tools switch warm at module scope. It resolves

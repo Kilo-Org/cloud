@@ -8,7 +8,7 @@ import { useRawTRPCClient } from '@/lib/trpc/utils';
 import { useQuestionContext } from './QuestionContext';
 import { ToolCardShell } from './ToolCardShell';
 import type { ToolPart } from './types';
-import type { QuestionInfo } from '@/types/opencode.gen';
+import type { QuestionInfo } from '@/types/opencode';
 
 type QuestionToolCardProps =
   | {

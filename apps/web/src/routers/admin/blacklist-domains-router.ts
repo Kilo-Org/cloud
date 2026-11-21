@@ -88,8 +88,11 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
         domains,
         version,
         // The editor always shows an editable list: the stored one, or the effective fallback
-        // (env or built-in) before an admin first saves one.
-        blocked_signup_tlds: settings.blocked_signup_tlds ?? envFallbackSignupTlds,
+        // (env or built-in) before an admin first saves one. Normalizing it here keeps a legacy
+        // entry such as `asia.` showing the bare label that enforcement already compares.
+        blocked_signup_tlds: normalizeSignupTlds(
+          settings.blocked_signup_tlds ?? envFallbackSignupTlds
+        ),
       };
     })
   ),

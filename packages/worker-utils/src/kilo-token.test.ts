@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { SignJWT, decodeProtectedHeader } from 'jose';
+import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
 import {
   kiloTokenPayload,
   KILO_TOKEN_VERSION,
@@ -60,6 +61,27 @@ describe('signKiloToken', () => {
         secret: SECRET,
         expiresInSeconds: 60,
         extra: { unknownClaim: true } as unknown as SignKiloTokenExtra,
+      })
+    ).rejects.toThrow();
+  });
+
+  it('refuses a cloudAgentAuthority claim through the shared signer', async () => {
+    const authority = {
+      version: 1 as const,
+      ownerId: 'user-123',
+      parentSessionId: 'workspace_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      organizationId: null,
+      authorizationId: '11111111-1111-4111-8111-111111111111',
+      expiresAt: Math.floor(Date.now() / 1000) + 600,
+    };
+
+    await expect(
+      signKiloToken({
+        userId: 'user-123',
+        pepper: 'pepper-123',
+        secret: SECRET,
+        expiresInSeconds: 60,
+        extra: { cloudAgentAuthority: authority } as unknown as SignKiloTokenExtra,
       })
     ).rejects.toThrow();
   });
@@ -201,6 +223,25 @@ describe('signKiloToken', () => {
       runtimeAuthorization: { ...claim, extraKey: true },
     });
     await expect(verifyKiloToken(widened, SECRET)).rejects.toThrow();
+  });
+
+  it.each(ORGANIZATION_ROLES)('round-trips the %s organization role', async role => {
+    const { token } = await signKiloToken({
+      userId: 'user-roles',
+      pepper: 'pepper-roles',
+      secret: SECRET,
+      expiresInSeconds: 60,
+      extra: {
+        organizationId: 'org-roles',
+        organizationRole: role,
+        orgMemberships: [{ orgId: 'org-roles', role }],
+      },
+    });
+
+    const payload = await verifyKiloToken(token, SECRET);
+
+    expect(payload.organizationRole).toBe(role);
+    expect(payload.orgMemberships?.[0]?.role).toBe(role);
   });
 });
 

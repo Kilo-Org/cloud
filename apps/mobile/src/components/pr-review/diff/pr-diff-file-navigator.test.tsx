@@ -53,7 +53,10 @@ vi.mock('@shopify/flash-list', () => ({
       index: number;
     }) => ReactElement;
     return createElement(
-      Fragment,
+      // A host node, not a Fragment: the navigator's sheet contract is about
+      // where the scroller sits among the sheet's direct children, and a
+      // Fragment disappears from the tree before that can be asserted.
+      'FlashList',
       null,
       data.map((item, index) =>
         createElement(Fragment, { key: index }, renderItem({ item, index }))
@@ -70,6 +73,7 @@ vi.mock('@/components/ui/icons', () => ({
   ChevronLeft: 'ChevronLeft',
   ChevronRight: 'ChevronRight',
   Search: 'Search',
+  X: 'X',
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/empty-state', () => ({
@@ -928,5 +932,110 @@ describe('PrDiffFileNavigator listed-file progress', () => {
 
     // Truncated: the copy names the listed files instead of the whole set.
     expect(renderedText(renderer)).toContain('1 sur 1 consulté parmi les fichiers affichés');
+  });
+});
+
+describe('PrDiffFileNavigator body side insets', () => {
+  const LANDSCAPE_LEFT = 51;
+
+  beforeEach(() => {
+    rowRenders.length = 0;
+    listQueryResult = {
+      query: {
+        isLoading: false,
+        isFetching: false,
+        isFetchingNextPage: false,
+        hasNextPage: false,
+        fetchNextPage: fetchNextPageMock,
+        refetch: vi.fn(),
+      },
+      files: [makeFile('src/a.ts')],
+      firstPageErrorState: null,
+      laterPageError: false,
+    };
+    viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
+    fetchAllResult = {
+      run: fetchAllRunMock,
+      feedback: { status: 'idle' },
+      loadedFiles: 0,
+      totalFiles: null,
+      failure: null,
+    };
+    insetsState.left = 0;
+    insetsState.right = 0;
+  });
+
+  /** Every `View` that carries the helper's inline side padding. */
+  function paddedViews(renderer: Awaited<ReturnType<typeof mountNavigator>>['renderer']) {
+    return renderer.root.findAll(node => {
+      if (String(node.type) !== 'View') {
+        return false;
+      }
+      const style: unknown = node.props.style;
+      return typeof style === 'object' && style !== null && 'paddingLeft' in style;
+    });
+  }
+
+  it('clears the landscape cutout on the search block', async () => {
+    insetsState.left = LANDSCAPE_LEFT;
+    const { renderer } = await mountNavigator();
+
+    // The fixed block above the list takes the padding: the search row, the
+    // viewed count and the retry card are one column inside it. The 8 dp on
+    // the other side is the shared helper's clearance for a side status area
+    // that leaves the top inset at zero.
+    expect(paddedViews(renderer).map(node => node.props.style)).toEqual([
+      { paddingLeft: LANDSCAPE_LEFT, paddingRight: 8 },
+    ]);
+  });
+
+  it('keeps the list a direct child of the sheet and insets it by margin', async () => {
+    insetsState.left = LANDSCAPE_LEFT;
+    await mountNavigator();
+
+    // react-native-screens sizes a formSheet by finding the scroller among the
+    // sheet's direct children, so the list cannot sit inside a padded wrapper:
+    // it takes the same insets as a margin on its own frame.
+    expect(flashListProps.current?.style).toEqual({
+      marginLeft: LANDSCAPE_LEFT,
+      marginRight: 8,
+    });
+  });
+
+  it("keeps the header and the list as the sheet content's two children", async () => {
+    const { renderer } = await renderWithProviders(
+      createElement(PrDiffFileNavigator, {
+        ...BASE_PROPS,
+        header: createElement('NavigatorHeader'),
+      })
+    );
+
+    // react-native-screens honors a formSheet's pinned header only when the
+    // content's direct children are [header, scroll view]: the header and the
+    // fixed search column share the first child, and the scroller is the
+    // second. Keep them apart and a third sibling pins the list full-bleed over
+    // the header.
+    const blocks = renderer.root.findAll(
+      node => String(node.type) === 'View' && node.props.collapsable === false
+    );
+    expect(blocks).toHaveLength(1);
+    const block = blocks[0];
+    if (block === undefined) {
+      throw new Error('the navigator renders no header block');
+    }
+    const blockChildren = block.children.filter(child => typeof child !== 'string');
+    // The header, then the search column: what the header child owns.
+    expect(blockChildren).toHaveLength(2);
+    expect(block.findAll(node => String(node.type) === 'NavigatorHeader')).toHaveLength(1);
+    // The scroller is a sibling of that block, never inside it.
+    expect(block.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(1);
+  });
+
+  it('leaves the portrait body without an inset style', async () => {
+    const { renderer } = await mountNavigator();
+
+    expect(paddedViews(renderer)).toHaveLength(0);
+    expect(flashListProps.current?.style).toBeUndefined();
   });
 });

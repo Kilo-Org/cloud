@@ -43,6 +43,12 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect', () => 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ENKRYPT_API_KEY: 'test-enkrypt-key',
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/call-counter', () => ({
+  countEnkryptCalls: () => ({
+    fetch: (...args: Parameters<typeof fetch>) => fetch(...args),
+    flush: async () => {},
+  }),
+}));
 
 const mockedAfter = jest.mocked(after);
 const mockedRecordUsage = jest.mocked(recordEnkryptUsage);
@@ -494,8 +500,8 @@ describe('guardEnkryptOutput', () => {
         { text: MODEL_OUTPUT, detectors: { pii }, user_metadata: { organization_id: 'org-1' } },
       ]);
       expect(mockedRecordUsage.mock.calls).toEqual([
-        // The latency a blocking scan would have added, from the end of the body to the verdict.
-        [usageRecord({ decision: 'allowed', creditsCost: 2, addedLatencyMs: 180 })],
+        // The call's own latency, not the 180 ms from the end of the body to the verdict.
+        [usageRecord({ decision: 'allowed', creditsCost: 2, addedLatencyMs: 120 })],
       ]);
     });
 
@@ -1040,7 +1046,7 @@ describe('guardEnkryptOutput', () => {
   });
 
   describe('usage', () => {
-    it('preserves the inference association on a failed blocking call and log-only usage, with latency only on the blocking call', async () => {
+    it('preserves the inference association on a failed blocking call and log-only usage, each with its own latency', async () => {
       const microdollarUsageId = '00000000-0000-4000-8000-000000000003';
       let blockingCalls = 0;
       const fetchSpy = mockEnkrypt(request => {
@@ -1073,7 +1079,7 @@ describe('guardEnkryptOutput', () => {
             microdollarUsageId,
             decision: 'allowed',
             creditsCost: 2,
-            addedLatencyMs: null,
+            addedLatencyMs: expect.any(Number),
           }),
         ],
       ]);

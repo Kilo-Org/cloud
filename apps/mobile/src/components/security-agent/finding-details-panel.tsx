@@ -4,6 +4,7 @@ import {
   getFindingSeverityPresentation,
   getSecurityDeadlinePresentation,
   getSupersedingFindingId,
+  isSupersededFinding,
 } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
 import { ExternalLink, GitMerge } from '@/components/ui/icons';
@@ -134,7 +135,7 @@ function DismissalOrSupersessionNote({
 // Ported from FindingDetailDialog.tsx:552 (getFindingDetailsPresentation) —
 // source, package, severity/status, timestamps, and dismissal/supersession
 // context as plain facts rather than the web's hero + next-step action card
-// (Task 7 owns actions). The repository is the screen header's eyebrow, so this
+// (Task 7 owns actions). The repository is the screen header's subtitle, so this
 // card does not repeat it.
 export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsPanelProps>) {
   const router = useRouter();
@@ -153,7 +154,12 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
     (deadline.state.kind === 'fixed' && !deadline.state.beforeDeadline)
       ? null
       : deadlineCopy;
-  const supersedingFindingId = getSupersedingFindingId(finding);
+  // A superseding reference only counts while the row is still ignored, so the
+  // badge, the date row and the note below cannot disagree with the rest of the
+  // panel about the same finding.
+  const supersedingFindingId = isSupersededFinding(finding)
+    ? getSupersedingFindingId(finding)
+    : null;
   // A code the app does not know yet reads as the raw code, the same way
   // packages/app-shared renders it for web. A word like "Unknown" would hide
   // which value the backend actually sent.
@@ -220,7 +226,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
       : []),
   ];
 
-  // The repository is the header's eyebrow, which sits directly above this
+  // The repository is the header's subtitle, which sits directly above this
   // card, so the details list does not repeat it. What the source reported of
   // the advisory identifiers is optional; the group's divider hangs under
   // whichever row ends it.
@@ -236,7 +242,11 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
   return (
     <View className="gap-4">
       <Card>
-        <Text className="text-base font-medium" selectable>
+        {/* The title and the description are the advisory's own words, not app
+            copy, so each lays itself out from its first strong character: an
+            English finding keeps its left edge and the punctuation that ends it
+            inside a right-to-left interface. */}
+        <Text className="text-base font-medium" selectable direction="auto">
           {finding.title}
         </Text>
         <View className="flex-row flex-wrap items-center gap-3">
@@ -251,11 +261,14 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
               icon={deadline.icon}
               label={deadlineBadgeCopy.label}
               tone={deadline.tone}
+              // The severity and the lifecycle status beside it are captions;
+              // the badge joins that one size instead of standing a step larger.
+              textClassName="text-xs"
             />
           ) : null}
         </View>
         {description ? (
-          <Text variant="muted" className="text-sm" selectable>
+          <Text variant="muted" className="text-sm" selectable direction="auto">
             {description}
           </Text>
         ) : null}

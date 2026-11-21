@@ -1,7 +1,7 @@
 import { setupCommandsSchema } from '@kilocode/cloud-agent-profile/setup-script';
 import { environmentSetupCommandCountSchema } from '../shared/setup-script.js';
 import {
-  RuntimeSkillsSchema,
+  PersistedRuntimeSkillsSchema,
   RuntimeAgentsSchema,
   RuntimeBuiltinAgentsSchema,
   RuntimeModelContextLimitsSchema,
@@ -11,9 +11,18 @@ import {
 export * from '../shared/runtime-profile.js';
 import * as z from 'zod';
 import { webSearchProviderSchema } from '../shared/web-search-provider.js';
+import { networkSecretsSchema } from '@kilocode/worker-utils/network-secrets';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 import { AgentVariantSchema, Limits } from '../schema.js';
 import { isValidSandboxId } from '../sandbox-id.js';
+import {
+  MAX_ENCRYPTED_DATA_LENGTH,
+  MAX_ENCRYPTED_DEK_LENGTH,
+  mcpCommandSchema,
+  mcpEnvOrHeadersRecordSchema,
+  mcpRemoteUrlSchema,
+  mcpServersRecordSchema,
+} from '../shared/prepare-session-limits.js';
 
 /**
  * Attachment filename extension deny-list shared by every worker-layer
@@ -95,8 +104,8 @@ export type Attachments = z.infer<typeof AttachmentsSchema>;
  * Defined here to avoid circular dependency with router/schemas.ts.
  */
 export const EncryptedSecretEnvelopeSchema = z.object({
-  encryptedData: z.string().describe('AES-encrypted value (base64)'),
-  encryptedDEK: z.string().describe('RSA-encrypted DEK (base64)'),
+  encryptedData: z.string().max(MAX_ENCRYPTED_DATA_LENGTH).describe('AES-encrypted value (base64)'),
+  encryptedDEK: z.string().max(MAX_ENCRYPTED_DEK_LENGTH).describe('RSA-encrypted DEK (base64)'),
   algorithm: z.literal('rsa-aes-256-gcm'),
   version: z.literal(1),
 });
@@ -180,8 +189,8 @@ export const modelIdSchema = z
 const MCPLocalServerConfigSchema = z
   .object({
     type: z.literal('local'),
-    command: z.string().array().min(1, 'Command array must have at least one element'),
-    environment: z.record(z.string(), MCPSecretValueSchema).optional(),
+    command: mcpCommandSchema,
+    environment: mcpEnvOrHeadersRecordSchema(MCPSecretValueSchema).optional(),
     enabled: z.boolean().optional(),
     timeout: z.number().min(1).max(3_600_000).optional(),
   })
@@ -196,8 +205,8 @@ const MCPLocalServerConfigSchema = z
 const MCPRemoteServerConfigSchema = z
   .object({
     type: z.literal('remote'),
-    url: z.string().url('URL must be a valid URL format'),
-    headers: z.record(z.string(), MCPSecretValueSchema).optional(),
+    url: mcpRemoteUrlSchema,
+    headers: mcpEnvOrHeadersRecordSchema(MCPSecretValueSchema).optional(),
     enabled: z.boolean().optional(),
     timeout: z.number().min(1).max(3_600_000).optional(),
   })
@@ -243,13 +252,13 @@ const SharedSessionProfileFields = {
     .optional(),
   encryptedSecrets: EncryptedSecretsSchema.optional(),
   setupCommands: setupCommandsSchema.optional(),
-  mcpServers: z
-    .record(z.string().max(100), MCPServerConfigSchema)
-    .refine(obj => Object.keys(obj).length <= Limits.MAX_MCP_SERVERS, {
-      message: `Maximum ${Limits.MAX_MCP_SERVERS} MCP servers allowed`,
-    })
-    .optional(),
-  runtimeSkills: RuntimeSkillsSchema.optional(),
+  mcpServers: mcpServersRecordSchema(MCPServerConfigSchema).optional(),
+  /**
+   * Stored bundles are read with the path rule's tolerance: a companion file
+   * written under an earlier rule is dropped instead of failing the whole
+   * payload. A caller's own skills are validated with `RuntimeSkillsSchema`.
+   */
+  runtimeSkills: PersistedRuntimeSkillsSchema,
   runtimeAgents: RuntimeAgentsSchema.optional(),
   builtinAgents: RuntimeBuiltinAgentsSchema.optional(),
   modelContextLimits: RuntimeModelContextLimitsSchema.optional(),
@@ -259,6 +268,7 @@ const SharedSessionProfileFields = {
 
 export const SessionProfileBundleSchema = z.object({
   ...SharedSessionProfileFields,
+  networkSecrets: networkSecretsSchema.optional(),
   /**
    * The environment's start commands. They run after setup in every prepared
    * workspace, including one whose environment snapshot already ran setup.

@@ -51,6 +51,7 @@ export const builds = sqliteTable(
     input: text('input').notNull(),
     /** JSON envelopes; null once the builder allocation ended. */
     encrypted_secrets: text('encrypted_secrets'),
+    network_secret_grants: text('network_secret_grants'),
     instance: text('instance').notNull(),
     /** SHA-256 of the selected runtime release descriptor; null for the baked image. */
     runtime_release: text('runtime_release'),

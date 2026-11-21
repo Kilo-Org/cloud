@@ -78,6 +78,8 @@ type ProviderPolicyInput = {
   organizationId: string | undefined;
   botId: string | undefined;
   countryCode: string | null;
+  /** The `x-kilocode-taskid` header. */
+  taskId: string | null;
   boundedSpending: boolean;
   providerMetadataCapture: AiProviderMetadataCapture | undefined;
   effectivePrivacy: ReturnType<typeof getEffectiveProviderPrivacy>;
@@ -197,6 +199,7 @@ export async function resolveProviderAndPolicy(
     botId: input.botId,
     boundedSpending: input.boundedSpending,
     countryCode: input.countryCode,
+    taskId: input.taskId,
     getRoutingProviderConfig: async () =>
       (isAnonymous ? undefined : (await getAccessCheck()).effectiveProviderConfig) ??
       request.body.provider,
@@ -266,7 +269,7 @@ export async function resolveProviderAndPolicy(
     if (orgAutoRouteTarget) {
       try {
         const directByokTarget = await getDirectByokModel(orgAutoRouteTarget);
-        if (directByokTarget.provider && route.provider.type !== 'direct-byok') {
+        if (directByokTarget && route.provider.type !== 'direct-byok') {
           return organizationAutoConfigurationResponse(
             `Organization Auto route target '${orgAutoRouteTarget}' is unavailable because this organization does not have an enabled BYOK credential for ${directByokTarget.provider.id}.`
           );

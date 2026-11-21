@@ -204,6 +204,20 @@ export function useSheetHeaderTopClearance(topInset: SheetHeaderTopInset | undef
 }
 
 /**
+ * The surface a `presentation: 'modal'` route paints behind its header, body
+ * and footer. iOS presents the route as a page sheet over a dimmed, near-black
+ * backdrop: in dark the canvas colour is that backdrop's colour, so the sheet
+ * edge disappears and the band above the title reads as empty page. The raised
+ * card surface separates the sheet from the backdrop. Android presents the
+ * route full-window, where the canvas stays.
+ *
+ * Resolved at render, so the class follows the platform the screen paints on.
+ */
+export function modalSheetSurfaceClass(): string {
+  return Platform.OS === 'ios' ? 'bg-background dark:bg-card' : 'bg-background';
+}
+
+/**
  * When the header samples where its surface sits, in ms after a movement.
  *
  * The platform moves a presented sheet without a React layout pass: it slides
@@ -305,7 +319,14 @@ export function useSettledSheetHeaderTopClearance(input: {
   // The burst in flight: a newer one retires every sample of the older ones, so
   // a moving sheet is only ever measured by the burst that followed its move.
   const burstRef = useRef(0);
-  const readable = topInset !== undefined && Platform.OS === 'android' && insetTop > 0;
+  // 'never' is the caller's promise that the surface can never reach the window
+  // top, and the header reserves no inset for it (`sheetHeaderTopClearance`).
+  // The settled read must not top one up: it measures where the header landed
+  // inside its own surface, so a surface that places its content at its own
+  // origin reads as the window top and would push a floating card's title down
+  // by the whole inset.
+  const readable =
+    topInset !== undefined && topInset !== 'never' && Platform.OS === 'android' && insetTop > 0;
 
   const sample = useCallback(() => {
     // `getBoundingClientRect` is the transform-aware read: React Native's

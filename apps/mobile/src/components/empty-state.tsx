@@ -1,6 +1,6 @@
 import { type LucideIcon } from '@/components/ui/icons';
 import { type ComponentType, type ReactNode } from 'react';
-import { type ScrollViewProps, View } from 'react-native';
+import { type ScrollViewProps, useColorScheme, View } from 'react-native';
 
 import { CenteredState } from '@/components/centered-state';
 import { useShortCenteredBand } from '@/components/centered-state-band';
@@ -12,7 +12,14 @@ import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-color
 import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { cn } from '@/lib/utils';
 
-const DEFAULT_ICON_CONTAINER_CLASS = 'h-14 w-14 rounded-full border border-border bg-card';
+/* Light draws the disc as the card surface it sits on top of in a card-styled
+ * block. Dark cannot: `--card` is 1.09:1 off the `--secondary` surface a `Card`
+ * paints and off the page, so the disc disappears and only its border shows.
+ * The filled neutral is 1.70:1 off that card surface and 1.99:1 off the page,
+ * so the disc reads as a disc again while the glyph keeps 5.4:1 on it, the same
+ * ratio the light cell's muted glyph has on white. */
+const DEFAULT_ICON_CONTAINER_CLASS =
+  'h-14 w-14 rounded-full border border-border bg-card dark:bg-secondary-fill';
 
 /** The page gutter a state draws for itself; see `inset`. */
 const STATE_GUTTER_CLASS = SCREEN_GUTTER_CLASS;
@@ -46,11 +53,15 @@ type EmptyStateProps = {
    */
   inset?: 'gutter' | 'none';
   refreshControl?: ScrollViewProps['refreshControl'];
-  /** Overrides the icon bubble's container classes (size/shape/background). Defaults to the card-style bubble. */
+  /** Overrides the icon bubble's container classes (size/shape/background).
+   *  Defaults to the card-style bubble: the card surface in light, and the
+   *  filled neutral in dark, where `--card` sits 1.09:1 on the `Card` surface
+   *  and the disc would otherwise disappear. */
   iconContainerClassName?: string;
-  /** Overrides the glyph color. Defaults to the muted token, which reads a step
-   *  dimmer on a near-black dark tile than on the light one; a caller that keeps
-   *  the illustration as visible as its light cell passes its own token. */
+  /** Overrides the glyph color. Defaults to the muted token in light and the
+   *  secondary-ink token in dark, which keeps the mark as visible on the dark
+   *  disc as the muted token is on the light one; a caller that keeps the
+   *  illustration as visible as its light cell passes its own token. */
   iconColor?: string;
   iconSize?: number;
   iconStrokeWidth?: number;
@@ -101,6 +112,11 @@ function EmptyStateBody({
   compactTitleClassName,
 }: Readonly<EmptyStateProps>) {
   const colors = useThemeColors();
+  // The light disc is the card surface and the muted glyph reads on it. The
+  // dark disc is the filled neutral instead, where the muted glyph sits dimmer
+  // than its light counterpart, so dark takes the secondary ink and the mark
+  // stays as visible as it is in light. An explicit `iconColor` still wins.
+  const stateIconInk = useColorScheme() === 'dark' ? colors.ink2 : colors.mutedForeground;
   // A centered state is handed the band between the page header and the fixed
   // bottom tab bar, and in a short landscape window that band is shorter than
   // the full stack: on a 411dp-tall window the band is ~120dp — ~49dp once the
@@ -133,11 +149,7 @@ function EmptyStateBody({
       <View className={cn('items-center', compact ? 'gap-2' : 'gap-4')}>
         {compact ? null : (
           <View className={cn('items-center justify-center', iconContainerClassName)}>
-            <Icon
-              size={iconSize}
-              color={iconColor ?? colors.mutedForeground}
-              strokeWidth={iconStrokeWidth}
-            />
+            <Icon size={iconSize} color={iconColor ?? stateIconInk} strokeWidth={iconStrokeWidth} />
           </View>
         )}
         <View className="items-center gap-1">
@@ -183,7 +195,7 @@ type StateActionIcon = ComponentType<{ size?: number; color?: string }>;
 
 type StateActionProps = {
   label: string;
-  /** The action's cue: `Plus` creates, `RotateCcw` retries, `ArrowLeft` goes back. */
+  /** The action's cue: `Plus` creates, `RotateCcw` retries, `DirectionalArrowLeft` goes back. */
   icon: StateActionIcon;
   onPress: () => void;
   /** The action is running: only the leading icon becomes a spinner and presses are ignored. */

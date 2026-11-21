@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { kilo2EventSchema, kilo2MessageSchema } from '@kilocode/session-ingest-contracts';
 import type { NativeEvent } from './native-sync';
+import { messageIDFromEventID } from './message-id';
 import {
   nativeSnapshotSessionSchema,
   type NativeSnapshotMessage,
@@ -270,7 +271,7 @@ export function applyNativeEvent(
   if (frame.type === 'session.agent.selected' || frame.type === 'session.model.selected') {
     const agent = frame.type === 'session.agent.selected';
     return append({
-      id: messageIDFromEvent(event),
+      id: messageIDFromEventID(event['id']),
       type: agent ? 'agent-switched' : 'model-switched',
       metadata: event['metadata'],
       time: { created },
@@ -281,7 +282,7 @@ export function applyNativeEvent(
   }
   if (frame.type === 'session.instructions.updated' && data['text'] !== undefined)
     return append({
-      id: messageIDFromEvent(event),
+      id: messageIDFromEventID(event['id']),
       type: 'system',
       text: data['text'],
       description: `Instructions updated: ${Object.keys(recordSchema.parse(data['delta'])).join(', ')}`,
@@ -294,7 +295,7 @@ export function applyNativeEvent(
     });
   if (frame.type === 'session.skill.activated')
     return append({
-      id: messageIDFromEvent(event),
+      id: messageIDFromEventID(event['id']),
       type: 'skill',
       skill: data['id'],
       name: data['name'],
@@ -305,7 +306,7 @@ export function applyNativeEvent(
   if (frame.type === 'session.shell.started') {
     const shell = recordSchema.parse(data['shell']);
     return append({
-      id: messageIDFromEvent(event),
+      id: messageIDFromEventID(event['id']),
       type: 'shell',
       shellID: shell['id'],
       command: shell['command'],
@@ -350,7 +351,7 @@ export function applyNativeEvent(
     if (frame.type === 'session.execution.interrupted' && data['reason'] === 'shutdown')
       return settled;
     const message = messageSchema.parse({
-      id: messageIDFromEvent(event),
+      id: messageIDFromEventID(event['id']),
       type: 'idle',
       outcome:
         frame.type === 'session.execution.succeeded'
@@ -369,13 +370,13 @@ export function applyNativeEvent(
       text: data['text'],
       description: data['description'],
       metadata: data['metadata'],
-      id: messageIDFromEvent(event),
+      id: messageIDFromEventID(event['id']),
       type: 'synthetic',
       time: { created },
     });
   if (frame.type === 'session.compaction.started')
     return append({
-      id: data['inputID'] ?? messageIDFromEvent(event),
+      id: data['inputID'] ?? messageIDFromEventID(event['id']),
       type: 'compaction',
       status: 'running',
       reason: data['reason'],
@@ -397,7 +398,7 @@ export function applyNativeEvent(
       id:
         current?.message.status === 'running'
           ? current.message.id
-          : (data['inputID'] ?? messageIDFromEvent(event)),
+          : (data['inputID'] ?? messageIDFromEventID(event['id'])),
       type: 'compaction',
       status: failed ? 'failed' : 'completed',
       reason: data['reason'],
@@ -661,43 +662,42 @@ export function applyNativeEvent(
   });
 }
 
-function messageIDFromEvent(event: Record<string, unknown>): string {
-  return z.string().startsWith('evt_').parse(event['id']).replace(/^evt_/, 'msg_');
-}
-
 /** Session identity remains the portable snapshot identity, never a runtime root grant. */
 export function applyNativeSessionEvent(
   session: NativeSnapshotSession | undefined,
   frame: NativeEvent
 ): NativeSnapshotSession | undefined {
-  if (
-    ![
-      'session.agent.selected',
-      'session.model.selected',
-      'session.renamed',
-      'session.metadata.updated',
-    ].includes(frame.type)
-  )
-    return session;
-  const event = readNativeEvent(frame);
-  const data = event.data;
-  if (!session) return session;
-  if (frame.type === 'session.agent.selected')
-    return nativeSnapshotSessionSchema.parse({
-      ...session,
-      agent: z.string().parse(data['agent']),
-    });
-  if (frame.type === 'session.model.selected')
-    return nativeSnapshotSessionSchema.parse({ ...session, model: data['model'] });
-  if (frame.type === 'session.renamed')
-    return nativeSnapshotSessionSchema.parse({
-      ...session,
-      title: z.string().parse(data['title']),
-    });
-  if (frame.type === 'session.metadata.updated')
-    return nativeSnapshotSessionSchema.parse({
-      ...session,
-      metadata: z.record(z.string(), z.json()).parse(data['metadata']),
-    });
-  return session;
+  switch (frame.type) {
+    case 'session.agent.selected': {
+      const { data } = readNativeEvent(frame);
+      if (!session) return session;
+      return nativeSnapshotSessionSchema.parse({
+        ...session,
+        agent: z.string().parse(data['agent']),
+      });
+    }
+    case 'session.model.selected': {
+      const { data } = readNativeEvent(frame);
+      if (!session) return session;
+      return nativeSnapshotSessionSchema.parse({ ...session, model: data['model'] });
+    }
+    case 'session.renamed': {
+      const { data } = readNativeEvent(frame);
+      if (!session) return session;
+      return nativeSnapshotSessionSchema.parse({
+        ...session,
+        title: z.string().parse(data['title']),
+      });
+    }
+    case 'session.metadata.updated': {
+      const { data } = readNativeEvent(frame);
+      if (!session) return session;
+      return nativeSnapshotSessionSchema.parse({
+        ...session,
+        metadata: z.record(z.string(), z.json()).parse(data['metadata']),
+      });
+    }
+    default:
+      return session;
+  }
 }

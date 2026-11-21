@@ -16,11 +16,20 @@ export const LOCAL_AGENT_ERROR_CODES = {
   needsPermission: -32_010,
   originChanged: -32_012,
   protocolMismatch: -32_020,
+  /**
+   * No live session holds this handle, and the user did not end it: the
+   * extension lost it (a dropped connection, a restart without its state).
+   * The call did not run, so the CLI may open a new session and send it again.
+   */
+  sessionLost: -32_006,
   tabBusy: -32_002,
   tabTaken: -32_003,
   unsupportedInBrowser: -32_005,
   userStopped: -32_004,
 } as const;
+
+/** What `session_lost` says, wherever the extension finds the handle gone. */
+export const SESSION_LOST_MESSAGE = 'This agent session is no longer open in the browser.';
 
 export type LocalAgentErrorCode =
   (typeof LOCAL_AGENT_ERROR_CODES)[keyof typeof LOCAL_AGENT_ERROR_CODES];

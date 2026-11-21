@@ -8,9 +8,11 @@ import { Input } from '@/components/ui/input';
 import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import { Skeleton } from '@/components/ui/skeleton';
+import { formatNumber } from '@/lib/format';
 import { isolateBidiText, isolateLtrBidiText } from '@/lib/bidi';
 import { transcriptText } from '@/lib/native-remote/projections';
 import { type NativeRemoteSession } from '@/lib/native-remote/use-native-session';
+import { REWRITTEN_INPUT_AUTO_CORRECT } from '@/lib/input-suggestions';
 import { NativeRemoteQuestion } from './native-remote-question';
 import { NativeRemoteMessages } from './native-remote-lists';
 
@@ -32,7 +34,7 @@ export function NativeRemoteTranscript({
   sessionID: string;
   remote: NativeRemoteSession;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { state, conversation, pending, canControl } = remote;
   const commandStatus = state?.commands[remote.commandID];
   const loading = !state || conversation?.loading;
@@ -48,6 +50,25 @@ export function NativeRemoteTranscript({
         })}
       </Text>
       {loading && <Skeleton className="h-80 rounded-md" />}
+      {!loading && conversation && conversation.recoveryGaps > 0 ? (
+        <View className="gap-2 rounded-lg border border-border p-3">
+          <Text accessibilityRole="alert">
+            {t('nativeRemote.recoveryGaps', {
+              count: conversation.recoveryGaps,
+              displayCount: formatNumber(conversation.recoveryGaps, i18n.language),
+            })}
+          </Text>
+          {/* Recovery reads the snapshot over the live socket; the runner's
+              restart does not take it down, so this is a connection guard. */}
+          <Button
+            variant="outline"
+            disabled={state.connection !== 'connected'}
+            onPress={() => void remote.recover()}
+          >
+            <Text>{t('common.retry')}</Text>
+          </Button>
+        </View>
+      ) : null}
       {!loading &&
         conversation?.session &&
         (conversation.messages.length > 0 || conversation.incompleteMessageIDs.length === 0) && (
@@ -167,7 +188,11 @@ function NativeRemoteComposer({ remote }: { remote: NativeRemoteSession }) {
         placeholder={t('nativeRemote.prompt')}
         defaultValue=""
         multiline
-        className="min-h-24 leading-tight"
+        // Submit clears this field once the send confirms, so Android keeps
+        // the framework suggestion popup off — it crashes against rewritten
+        // text (see REWRITTEN_INPUT_AUTO_CORRECT).
+        autoCorrect={REWRITTEN_INPUT_AUTO_CORRECT}
+        className="min-h-24 rounded-md border border-input bg-background leading-tight"
         autoCapitalize="sentences"
         onChangeText={text => {
           prompt.current = text;

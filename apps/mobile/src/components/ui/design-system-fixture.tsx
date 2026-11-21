@@ -21,11 +21,13 @@ import { RowFrame } from '@/components/ui/row-frame';
 import { RowGroup, RowGroupItem } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { ScreenFooter } from '@/components/ui/screen-footer';
+import { SearchField } from '@/components/ui/search-field';
 import { Section } from '@/components/ui/section';
 import { SectionHeaderSkeleton } from '@/components/ui/section-header-skeleton';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { SessionRow } from '@/components/ui/session-row';
 import { Text } from '@/components/ui/text';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { cn } from '@/lib/utils';
 
@@ -46,6 +48,7 @@ const LONG_VALUE =
  */
 export function DesignSystemFixture() {
   const router = useRouter();
+  const colors = useThemeColors();
   const [switchOn, setSwitchOn] = useState(true);
   const [choice, setChoice] = useState<'balanced' | 'lenient'>('balanced');
   const [scope, setScope] = useState<'personal' | 'organization' | 'plan'>('personal');
@@ -59,7 +62,7 @@ export function DesignSystemFixture() {
       >
         <Section
           label="Section header"
-          icon={<Inbox size={14} className="text-muted-foreground" />}
+          icon={<Inbox size={14} color={colors.mutedForeground} />}
           actionLabel="Action"
           actionTestID="fixture-section-action"
           onActionPress={() => undefined}
@@ -130,6 +133,9 @@ export function DesignSystemFixture() {
                 value: switchOn,
                 onValueChange: setSwitchOn,
                 testID: 'fixture-row-switch',
+                // A label-only content press is hidden from assistive
+                // technology, so the switch carries the row's name.
+                accessibilityLabel: 'Switch with its own handle',
               }}
               pressTarget="content"
             />
@@ -421,6 +427,19 @@ export function DesignSystemFixture() {
               A read-only box that swaps with the field above
             </Text>
           </View>
+          <SearchField placeholder={LONG_TITLE} hasText={false} onChangeText={() => undefined} />
+          <SearchField
+            placeholder="Search"
+            defaultValue="A typed query"
+            hasText
+            onChangeText={() => undefined}
+          />
+          <SearchField
+            placeholder="Search"
+            hasText={false}
+            busy="Searching"
+            onChangeText={() => undefined}
+          />
         </Section>
 
         <Section label="Segmented control">

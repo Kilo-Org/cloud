@@ -18,6 +18,7 @@ import { renderWithProviders } from '@/test/render-with-providers';
 import { compiledDimensions, compiledLengthDp } from '@/test/native-dimensions';
 
 import { i18n } from '@/i18n';
+import { formatDate } from '@/lib/format';
 import { AddCreditsRow } from '@/components/add-credits-row';
 import { type OrgKiloPassRowState, type OrgKiloPassSummary } from './org-kilo-pass-row-state';
 import { OrganizationHubScreen } from './hub-screen';
@@ -38,6 +39,9 @@ const boundary = vi.hoisted(() => ({
   balance: 5_000_000,
   plan: 'teams' as 'teams' | 'enterprise',
   isTrialExpiredForEnforcement: false,
+  /** The trial readout `organizations.list` carries; null for a subscribed org. */
+  trialStatus: null as string | null,
+  trialEndsAt: null as string | null,
 }));
 const routerPush = vi.hoisted(() => vi.fn());
 const openExternalUrlMock = vi.hoisted(() => vi.fn());
@@ -77,6 +81,8 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
       seatCount: boundary.seatCount,
       plan: boundary.plan,
       isTrialExpiredForEnforcement: boundary.isTrialExpiredForEnforcement,
+      trialStatus: boundary.trialStatus,
+      trialEndsAt: boundary.trialEndsAt,
     },
     isResolving: false,
   }),
@@ -140,10 +146,16 @@ vi.mock('@/lib/app-shell-handoff', () => ({ openAppShellHandoff: openAppShellHan
 vi.mock('@/lib/format', () => ({
   formatPrefixedMoney: (amount: number) => `$${amount}`,
   formatNumber: String,
+  // The billing model's trial pill states the trial end; the date's own
+  // formatting is the real module's job and is pinned in its unit test.
+  formatDate: (date: Date) => date.toISOString().slice(0, 10),
 }));
 
 vi.mock('@/lib/utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
+  // The billing model parses the trial end with the shared helper, which exists
+  // to read timestamps Hermes' own `new Date` cannot.
+  parseTimestamp: (value: string) => new Date(value),
 }));
 
 // A suite that sets `current` pins the row state it needs; every other suite
@@ -154,6 +166,7 @@ const kiloPassRowState = vi.hoisted(() => ({
   current: null as null | {
     subtitle: string;
     attention: boolean;
+    tone: 'default' | 'muted' | 'warn';
     action: 'retry' | 'none';
     actionLabel: string | null;
     accessibilityHint: string | null;
@@ -294,16 +307,18 @@ function hitSlopPerSide(hitSlop: unknown): number {
   return 0;
 }
 
+/** The plan refusal block the header's siblings render, wherever it appears. */
+function refusals(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.findAllByType('OrganizationPlanRefusal');
+}
+
 function findRenameControl(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
-  // A lapsed plan appends its reason to the control's name, so the search takes
-  // the name the control always starts with rather than the whole string.
   const title = i18n.t('organization.hub.renameTitle');
   return root.findAll(node => {
     if (typeof node.type !== 'string') {
       return false;
     }
-    const label: unknown = node.props.accessibilityLabel;
-    return typeof label === 'string' && (label === title || label.startsWith(`${title}. `));
+    return node.props.accessibilityLabel === title;
   });
 }
 
@@ -321,6 +336,8 @@ beforeEach(() => {
   boundary.balance = 5_000_000;
   boundary.plan = 'teams';
   boundary.isTrialExpiredForEnforcement = false;
+  boundary.trialStatus = null;
+  boundary.trialEndsAt = null;
   storefrontRule.linkAllowed = true;
   hideBalancePref.hideBalance = false;
   hideBalancePref.hasLoaded = true;
@@ -355,7 +372,7 @@ describe('Organization hub card', () => {
 
     const seats = renderer.root
       .findAllByType('KvRow')
-      .find(node => node.props.label === i18n.t('organization.hub.organizationSeats'));
+      .find(node => node.props.label === i18n.t('organization.billing.seats'));
     // Left-to-right isolate (U+2066) and pop-directional-isolate (U+2069): the
     // pair reads 1 of 5 in either interface direction.
     expect(seats?.props.value).toBe('\u20661 / 5\u2069');
@@ -373,13 +390,14 @@ describe('Organization hub card', () => {
 
     const seats = renderer.root
       .findAllByType('KvRow')
-      .find(node => node.props.label === i18n.t('organization.hub.organizationSeats'));
+      .find(node => node.props.label === i18n.t('organization.billing.seats'));
     expect(seats?.props.value).toBe('1');
     unmount();
   });
 
   it('offers the top-up on the balance line of an empty balance', async () => {
     boundary.balance = 0;
+    storefrontRule.linkAllowed = true;
 
     const { renderer, unmount } = await renderHub();
 
@@ -409,6 +427,23 @@ describe('Organization hub card', () => {
     expect(balance?.props.trailing).toBeUndefined();
     unmount();
   });
+
+  it('leaves an empty balance alone where the platform may not open the top-up', async () => {
+    // The storefront rule refuses the link on every Android build, where the
+    // shared row paints its label as plain text: a bare caption pinned to the
+    // amount would read as a unit of it. The Billing row carries the
+    // destination instead.
+    boundary.balance = 0;
+    storefrontRule.linkAllowed = false;
+
+    const { renderer, unmount } = await renderHub();
+
+    const balance = renderer.root
+      .findAllByType('KvRow')
+      .find(node => node.props.label === i18n.t('organization.hub.balance'));
+    expect(balance?.props.trailing).toBeUndefined();
+    unmount();
+  });
 });
 
 describe('Organization hub plan', () => {
@@ -416,8 +451,6 @@ describe('Organization hub plan', () => {
     renderer.root
       .findAllByType('KvRow')
       .find(node => node.props.label === i18n.t('organization.hub.plan'));
-  const refusals = (renderer: TestRenderer.ReactTestRenderer) =>
-    renderer.root.findAllByType('OrganizationPlanRefusal');
 
   it('names the plan in every state, in the card the seats belong to', async () => {
     const entitled = await renderHub();
@@ -428,8 +461,9 @@ describe('Organization hub plan', () => {
     // value in the card.
     expect(entitledRow?.props.valueTone).toBeUndefined();
     // An entitled organization is not warned about a state it is not in, and it
-    // carries no status segment.
+    // carries no status segment and no trial caption.
     expect(entitledRow?.props.valueStatus).toBeUndefined();
+    expect(entitledRow?.props.caption).toBeUndefined();
     expect(refusals(entitled.renderer)).toHaveLength(0);
     entitled.unmount();
 
@@ -448,7 +482,44 @@ describe('Organization hub plan', () => {
       label: i18n.t('organization.hub.planStatusLapsed'),
       tone: 'danger',
     });
+    // No trial runs beside the lapse, so there is nothing for the caption line.
+    expect(lapsedRow?.props.caption).toBeUndefined();
     lapsed.unmount();
+  });
+
+  it('states the running trial under the plan row, never inside its value', async () => {
+    boundary.trialStatus = 'trial_active';
+    boundary.trialEndsAt = '2026-11-24T00:00:00.000Z';
+
+    const { renderer, unmount } = await renderHub();
+
+    const expectedDate = formatDate(new Date('2026-11-24T00:00:00.000Z'), i18n.language, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+    const row = planRow(renderer);
+    // The tier alone on the value line, in the row's ordinary ink: the trial is
+    // a caption line of its own below the row, so a compact window keeps the
+    // value one line tall and a right-to-left interface cannot order the tier
+    // after the date.
+    expect(row?.props.value).toBe(i18n.t('organization.hub.planTeams'));
+    expect(String(row?.props.value)).not.toContain(expectedDate);
+    expect(row?.props.valueTone).toBeUndefined();
+    // The caption replaces the old wrapped value: no line count is raised on
+    // the value, and nothing states the trial as a value status.
+    expect(row?.props.valueLines).toBeUndefined();
+    expect(row?.props.valueStatus).toBeUndefined();
+    expect(row?.props.caption).toBe(
+      i18n.t('organization.billing.stateTrialEndsOn', { date: expectedDate })
+    );
+    // Its own line needs no leading separator, and it states the trial end
+    // rather than losing it to the value's ellipsis.
+    expect(String(row?.props.caption)).not.toMatch(/^ · /);
+    // A running trial is not the lapsed state, so nothing above the card
+    // explains an ending that has not happened.
+    expect(refusals(renderer)).toHaveLength(0);
+    unmount();
   });
 
   it('explains a lapsed plan with the state alone, leaving the step to the action', async () => {
@@ -492,6 +563,11 @@ describe('Organization hub plan', () => {
 
     const [refusal] = refusals(renderer);
     expect(refusal?.props.action).toBeUndefined();
+    // With no action, the sentence has to carry the step and the destination
+    // the reader can act on instead of naming someone else.
+    expect(refusal?.props.message).toBe(i18n.t('common.organizationTrialEndedBillingAtKiloAi'));
+    expect(refusal?.props.message).not.toBe(i18n.t('common.organizationTrialEnded'));
+    expect(refusal?.props.message).not.toBe(i18n.t('organization.hub.planEnded'));
     expect(openExternalUrlMock).not.toHaveBeenCalled();
     unmount();
   });
@@ -585,6 +661,15 @@ describe('OrganizationHubScreen rename control', () => {
     unmount();
   });
 
+  it('keeps the rename glyph on the header ink', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    // `colors.foreground` is the token the shared ScreenHeader paints its own
+    // chevron with, so the control beside the title carries the same ink.
+    expect(renderer.root.findAllByType('Pencil')[0]?.props.color).toBe('black');
+    unmount();
+  });
+
   it('compiles the rename control box to at least 28dp with a 44pt reach', async () => {
     const { renderer, unmount } = await renderHub();
 
@@ -627,7 +712,7 @@ describe('OrganizationHubScreen rename control', () => {
     unmount();
   });
 
-  it('states why a lapsed plan cannot rename, keeping the box and the control disabled', async () => {
+  it('keeps a lapsed plan off the rename control and lets the refusal block speak it once', async () => {
     boundary.isTrialExpiredForEnforcement = true;
 
     const { renderer, unmount } = await renderHub();
@@ -640,14 +725,16 @@ describe('OrganizationHubScreen rename control', () => {
     }
 
     // The server refuses every rename while the trial is expired, so the control
-    // says why instead of opening a field whose save cannot succeed. The reason
-    // joins the control's name: React Native maps a hint to Android's tooltip
-    // text, which a screen reader does not announce with the node.
+    // stays disabled instead of opening a field whose save cannot succeed.
     expect(control.props.disabled).toBe(true);
     expect(control.props.accessibilityState).toEqual({ disabled: true });
-    expect(control.props.accessibilityLabel).toBe(
-      `${i18n.t('organization.hub.renameTitle')}. ${i18n.t('organization.hub.planEnded')}`
-    );
+
+    // It keeps its own name and says nothing about the plan: the refusal block
+    // below the header states the reason once, so a label that carried it as
+    // well would have the screen reader speak the same sentence twice.
+    const label = control.props.accessibilityLabel as string;
+    expect(label).toBe(i18n.t('organization.hub.renameTitle'));
+    expect(label).not.toContain(i18n.t('organization.hub.planEnded'));
     expect(control.props.accessibilityHint).toBeUndefined();
     expect(control.props.onPress).toBeUndefined();
 
@@ -655,6 +742,11 @@ describe('OrganizationHubScreen rename control', () => {
     expect(sideFromClass(control.props.className, 'h')).toBeGreaterThanOrEqual(MIN_BOX_DP);
     expect(sideFromClass(control.props.className, 'w')).toBeGreaterThanOrEqual(MIN_BOX_DP);
     expect(String(control.props.className)).toContain('opacity-50');
+
+    // Once on the screen, in the block that owns the sentence.
+    const blocks = refusals(renderer);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]?.props.message).toBe(i18n.t('organization.hub.planEnded'));
 
     expect(renderer.root.findAll(node => String(node.type) === 'RenameModal')).toHaveLength(0);
     unmount();
@@ -724,6 +816,7 @@ describe('Organization hub Kilo Pass placeholder', () => {
   const loadingState = {
     subtitle: 'Loading…',
     attention: false,
+    tone: 'default',
     action: 'none',
     actionLabel: null,
     accessibilityHint: null,
@@ -741,6 +834,39 @@ describe('Organization hub Kilo Pass placeholder', () => {
       node => String(node.type) === 'Text' && node.props.children === subtitle
     )[0];
   }
+
+  it('tells assistive tech the row is busy and holds its press while the summary loads', async () => {
+    function kiloPassRow(root: TestRenderer.ReactTestInstance) {
+      const row = root
+        .findAll(node => String(node.type) === 'Pressable')
+        .find(node => String(node.props.accessibilityLabel).startsWith(i18n.t('kiloPass.title')));
+      if (!row) {
+        throw new Error('Kilo Pass row missing');
+      }
+      return row;
+    }
+
+    kiloPassRowState.current = { ...loadingState };
+    const loading = await renderHub();
+    // A settled row announces itself idle; while the summary loads the same
+    // control is busy and refuses the press, because the page behind it has no
+    // read to show yet.
+    expect(kiloPassRow(loading.renderer.root).props.accessibilityState).toEqual({
+      busy: true,
+      disabled: true,
+    });
+    expect(kiloPassRow(loading.renderer.root).props.disabled).toBe(true);
+    loading.unmount();
+
+    kiloPassRowState.current = { ...loadingState, loading: false, subtitle: 'Not subscribed' };
+    const settled = await renderHub();
+    expect(kiloPassRow(settled.renderer.root).props.accessibilityState).toEqual({
+      busy: false,
+      disabled: false,
+    });
+    expect(kiloPassRow(settled.renderer.root).props.disabled).toBe(false);
+    settled.unmount();
+  });
 
   it('renders the loading bar on the subtitle line box, not above it', async () => {
     // Compile the box the subtitle actually lays out, from the class the screen
@@ -794,6 +920,7 @@ describe('Organization hub Kilo Pass placeholder', () => {
     kiloPassRowState.current = {
       subtitle: 'Not subscribed',
       attention: false,
+      tone: 'muted',
       action: 'none',
       actionLabel: null,
       accessibilityHint: null,
@@ -1224,6 +1351,7 @@ describe('Organization hub Kilo Pass icon tile', () => {
     kiloPassRowState.current = {
       subtitle: 'Not subscribed',
       attention: false,
+      tone: 'muted',
       action: 'none',
       actionLabel: 'Set up',
       accessibilityHint: 'Opens Kilo Pass setup on web.',
@@ -1242,6 +1370,7 @@ describe('Organization hub Kilo Pass icon tile', () => {
     kiloPassRowState.current = {
       subtitle: 'Could not load status',
       attention: true,
+      tone: 'warn',
       action: 'retry',
       actionLabel: 'Retry',
       accessibilityHint: 'Retries loading Kilo Pass status.',

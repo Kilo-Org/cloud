@@ -10,6 +10,7 @@ import { type ShareDestinationRow } from './share-destinations';
 import { type ShareGateState } from './share-gate-state';
 
 vi.mock('react-native', () => ({
+  Pressable: 'Pressable',
   View: 'View',
   TextInput: 'TextInput',
   // `@/components/ui/input` reads `I18nManager.isRTL` through
@@ -242,6 +243,25 @@ describe('ShareDestinationList surface states', () => {
     expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'ConfigureRow')).toHaveLength(1);
     expect(renderer.root.findAll(node => String(node.type) === 'StoredSessionRow')).toHaveLength(0);
+    unmount();
+  });
+
+  it('matches an accented destination title from an unaccented query', async () => {
+    const accented = Array.from({ length: 9 }, (_, index) => ({
+      session_id: `accented-${index}`,
+      title: index === 0 ? 'Revisão do fluxo' : `Task ${index}`,
+      git_branch: 'main',
+      live: false,
+    })) as ShareDestinationRow[];
+    const { renderer, unmount } = await mount(happy, [], accented);
+    // The mock renders `SearchField` as a bare TextInput; this is its only prop
+    // surface, so naming the probe shape here is the whole contract.
+    const input = renderer.root.find(node => String(node.type) === 'TextInput');
+    const searchField = input.props as { onChangeText: (text: string) => void };
+    act(() => {
+      searchField.onChangeText('revisao');
+    });
+    expect(renderer.root.findAll(node => String(node.type) === 'StoredSessionRow')).toHaveLength(1);
     unmount();
   });
 

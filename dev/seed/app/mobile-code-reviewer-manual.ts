@@ -1,10 +1,16 @@
 import { randomUUID } from 'node:crypto';
 
-import { kilocode_users, platform_integrations } from '@kilocode/db/schema';
+import {
+  kilocode_users,
+  platform_integrations,
+  platform_oauth_credentials,
+} from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 
 import type { SeedResult } from '../index';
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
+import { fakeGitLabOAuthCredential } from '../lib/gitlab-credential';
+import { findSeedUserId } from '../lib/users';
 
 export const usage = '<fake-email>';
 
@@ -37,16 +43,9 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   }
 
   const db = getSeedDb();
-  const userId = `dev-seed:mobile-code-reviewer-manual:${email}`;
-
-  const [existing] = await db
-    .select({ id: kilocode_users.id })
-    .from(kilocode_users)
-    .where(eq(kilocode_users.normalized_email, email));
-  if (existing && existing.id !== userId) {
-    throw new Error('The requested email belongs to a different account; choose a new fake email.');
-  }
-
+  // A fake account that already signed in keeps its own row: the fixture joins
+  // it, so the seed runs before or after the device-code sign-in.
+  const userId = (await findSeedUserId(email)) ?? `dev-seed:mobile-code-reviewer-manual:${email}`;
   await db
     .insert(kilocode_users)
     .values({
@@ -86,34 +85,48 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       )
     );
 
-  const [integration] = await db
-    .insert(platform_integrations)
-    .values({
+  // The status read asks git-token-service for the stored credential (#8044),
+  // so an active row alone reads as "reconnect required" and the form never
+  // opens. The fixture stores a placeholder credential the local worker
+  // decrypts.
+  const integrationId = randomUUID();
+  const account = { id: 'dev-seed-gitlab-account', login: 'manual-review-lab' };
+  const providerBaseUrl = 'https://gitlab.com';
+  const credential = fakeGitLabOAuthCredential({
+    integrationId,
+    userId,
+    providerBaseUrl,
+    providerSubjectId: account.id,
+    providerSubjectLogin: account.login,
+  });
+  await db.transaction(async tx => {
+    await tx.insert(platform_integrations).values({
+      id: integrationId,
       owned_by_user_id: userId,
       created_by_user_id: userId,
       platform: 'gitlab',
       integration_type: 'oauth',
-      platform_account_id: 'dev-seed-gitlab-account',
-      platform_account_login: 'manual-review-lab',
+      platform_account_id: account.id,
+      platform_account_login: account.login,
       repository_access: 'all',
       repositories: [],
       integration_status: 'active',
-      metadata: { gitlab_instance_url: 'https://gitlab.com' },
-    })
-    .returning({ id: platform_integrations.id });
-  if (!integration) throw new Error('The fixture GitLab integration was not inserted.');
+      metadata: { gitlab_instance_url: providerBaseUrl },
+    });
+    await tx.insert(platform_oauth_credentials).values(credential);
+  });
 
   console.log(
     'This fixture represents: a personal Code Reviewer scope with GitLab connected and GitHub absent.'
   );
   console.log(
-    'No provider credential is stored, so the form is reachable while a real review start would not be.'
+    'Note: the stored GitLab credential is a placeholder, so the form opens while a real review start fails at GitLab.'
   );
 
   return {
     email,
     userId,
-    gitlabIntegrationId: integration.id,
+    gitlabIntegrationId: integrationId,
     manualReviewDeepLink: 'kiloapp:///(app)/code-reviewer/personal/manual-review',
   };
 }

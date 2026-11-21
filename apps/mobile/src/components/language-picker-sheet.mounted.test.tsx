@@ -74,6 +74,7 @@ vi.mock('react-native', async () => {
     ActivityIndicator: 'ActivityIndicator',
     I18nManager: i18nManager,
     Keyboard: { dismiss: () => undefined },
+    Pressable: 'Pressable',
     TextInput: MockTextInput,
     View: 'View',
     useWindowDimensions: () => windowSize,
@@ -98,6 +99,12 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('expo', () => ({ reloadAppAsync }));
+// `apply-language` flushes pending durable drafts before a direction reload.
+// The real module opens the encrypted store, so the flush is a stub here: this
+// suite is about the sheet's own apply states, not the store.
+vi.mock('@/lib/persist/drafts', () => ({
+  flushAllDrafts: vi.fn(() => Promise.resolve(undefined)),
+}));
 
 vi.mock('@/i18n/apply-language', async importOriginal => {
   const actual = await importOriginal<typeof ApplyLanguageModule>();
@@ -137,7 +144,7 @@ vi.mock('@/components/picker-sheet', () => ({
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
-vi.mock('@/components/ui/icons', () => ({ Search: 'Search', SearchX: 'SearchX' }));
+vi.mock('@/components/ui/icons', () => ({ Search: 'Search', SearchX: 'SearchX', X: 'X' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ background: '#ffffff', mutedForeground: '#6b7280' }),
@@ -327,14 +334,14 @@ describe('LanguagePickerSheet apply', () => {
 
     const sheet = findByType(renderer.root, 'PickerSheet')[0];
     expect(sheet?.props.headerInBody).toBe(true);
-    // The extracted `LanguageSearchField` owns the pill chrome: its own
-    // instance carries no className, so step into its rendered `View`.
+    // The extracted `LanguageSearchField` renders the shared `SearchField`: its
+    // own instance carries no className, so step into its outer `View`.
     const field = renderer.root.findByType(LanguageSearchField);
-    const pill = field.findByType('View');
-    expect(String(pill.props.className)).toContain('rounded-full');
+    const frame = field.findAllByType('View')[0];
+    expect(String(frame?.props.className)).toContain('rounded-md');
     // The field keeps the page gutter as the list header too, so the rows it
     // scrolls with and the field itself share one inset.
-    expect(String(pill.props.className)).toContain('mx-4');
+    expect(String(frame?.props.className)).toContain('mx-4');
     // One field on screen: the list header, not a second copy in the chrome.
     expect(findByType(renderer.root, 'TextInput')).toHaveLength(1);
 

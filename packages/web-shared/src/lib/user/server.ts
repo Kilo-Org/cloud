@@ -57,6 +57,7 @@ import {
 } from '@kilocode/web-shared/lib/admin/privileged-access';
 import { actionClassForRoute } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import { runStepUpGuard, stepUpRefusalPayload } from '@kilocode/web-shared/lib/admin/step-up-guard';
+import { isCredentialExemptibleClass } from '@kilocode/web-shared/lib/admin/step-up-policy';
 import { reportStepUpFailure } from '@kilocode/web-shared/lib/admin/step-up-observation';
 import { z } from 'zod';
 import { v5 as uuidv5 } from 'uuid';
@@ -71,6 +72,7 @@ import {
   isKiloCredentialExchangeEligible,
   verifyKiloTokenForPolicy,
   type KiloCredentialExchangeEligibilityPolicy,
+  type KiloTokenPolicyClaims,
 } from '@kilocode/worker-utils/kilo-token-policy';
 
 // NextAuth calls a user-provided `debug` logger regardless of the `debug` option,
@@ -171,7 +173,28 @@ export type RequiredPermissions = {
    * data route.
    */
   skipStepUpGuard?: boolean;
+  /**
+   * Non-session credential kinds that skip the passkey step-up guard for this
+   * call, for a read-only, low-risk data route that has been explicitly
+   * approved to accept them (`GET /api/private/users`, for Pylon webhooks).
+   *
+   * Three limits hold regardless of what a caller passes:
+   * - Matched against the kind `getUserFromAuth` derives for the request, not
+   *   against headers.
+   * - `'session'` is not accepted: the type excludes it and the runtime check
+   *   ignores it, so a browser session always faces step-up.
+   * - The exemption applies only when the request's action class is
+   *   `credentialExemptible` in `step-up-policy.ts` (read-grade classes).
+   *   Writes and operation-bound classes keep the guard.
+   *
+   * Admin authentication still applies in full. Do not add routes without a
+   * security review. Pass `requestMethod` so the action class is not inferred
+   * from a missing header.
+   */
+  stepUpExemptCredentials?: readonly StepUpExemptibleCredential[];
 };
+
+export type StepUpExemptibleCredential = Exclude<PrivilegedCredentialKind, 'session'>;
 
 type GetAuthResponse =
   | {
@@ -200,6 +223,7 @@ type GetAuthResponse =
       tokenSource?: string;
       deviceSessionId?: string;
       cloudAgentAuthority?: CloudAgentAuthority;
+      cloudAgentRuntimeProxied?: undefined;
       credential?: undefined;
       webSessionId?: undefined;
       webSessionPepper?: undefined;
@@ -219,6 +243,8 @@ type GetAuthResponse =
       tokenSource?: string;
       deviceSessionId?: string;
       cloudAgentAuthority?: CloudAgentAuthority;
+      /** True only for a token whose runtime claim the Cloud Agent runtime proxy attested. */
+      cloudAgentRuntimeProxied?: boolean;
       credential?: PrivilegedCredentialKind;
       /** Server-only per-session id for MFA step-up; never sent to the browser. */
       webSessionId?: string;
@@ -269,6 +295,19 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
     const routeAttribution = () =>
       (attribution ??= actionClassForRoute({ surface, route: route ?? '', method }));
 
+    // `wouldBlock` sizes bearer traffic that step-up enforcement would refuse. A
+    // request the caller exempted is never refused, so it must not count as one.
+    // Server-component layouts skip the guard but still refuse bearer
+    // credentials themselves, so they keep reporting `wouldBlock` for
+    // non-session traffic. The exemption needs both a listed credential kind and
+    // an exemptible action class; the class is only resolved when the kind is
+    // listed.
+    const stepUpExempt =
+      credential !== 'session' &&
+      (opts.stepUpExemptCredentials?.some(kind => kind === credential) ?? false) &&
+      isCredentialExemptibleClass(routeAttribution().actionClass);
+    const wouldBlockUnderStepUp = credential !== 'session' && !stepUpExempt;
+
     if (result.user) {
       emitAdminAccessEvent({
         surface,
@@ -277,13 +316,14 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
         authViaToken,
         tokenSource: result.tokenSource ?? null,
         credential,
+        wouldBlock: wouldBlockUnderStepUp,
         route,
         method,
         userAgentProduct: userAgentProductFromHeaders(headersList),
         ip: clientIpFromHeaders(headersList),
       });
 
-      if (isAdminStepUpEnabled() && !opts.skipStepUpGuard) {
+      if (isAdminStepUpEnabled() && !opts.skipStepUpGuard && !stepUpExempt) {
         const { actionClass, inventoryId, targetKind } = routeAttribution();
         try {
           await runStepUpGuard({
@@ -344,7 +384,7 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
         actionClass,
         actionId: inventoryId,
         target: null,
-        wouldBlock: credential !== 'session',
+        wouldBlock: wouldBlockUnderStepUp,
         userAgentProduct: userAgentProductFromHeaders(headersList),
         tokenSource: result.tokenSource ?? null,
         route,
@@ -364,9 +404,14 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
  * Reads the browser session only. A request that presents a credential is
  * refused, never downgraded to its session, because these callers mint or
  * exchange credentials and must not do so for a bearer caller.
+ *
+ * Both session-only entry points (`resolveSessionOnly` and
+ * `getUserFromSessionForCredentialIssuanceOrRedirect`) take the
+ * credential-presence answer from `authViaTokenFromHeaders` and differ only in
+ * their outcome, a 401 versus a redirect, so the presence rule has one home.
  */
 async function resolveSessionOnly(opts: RequiredPermissions): Promise<GetAuthResponse> {
-  if ((await headers()).has('authorization')) {
+  if (authViaTokenFromHeaders(await headers())) {
     return authError(401, 'Unauthorized', '?');
   }
 
@@ -389,7 +434,7 @@ export async function getUserFromSessionForStepUp(): Promise<GetAuthResponse> {
 export async function getUserFromSessionForCredentialIssuanceOrRedirect(
   loggedOutRedirectUrl = '/users/sign_in'
 ): Promise<User> {
-  if ((await headers()).has('authorization')) {
+  if (authViaTokenFromHeaders(await headers())) {
     redirect(await appendCallbackPath(loggedOutRedirectUrl));
   }
 
@@ -399,22 +444,26 @@ export async function getUserFromSessionForCredentialIssuanceOrRedirect(
   );
 }
 
-export async function getUserFromBearerForCredentialExchange(
-  requestHeaders: Headers,
-  policy: KiloCredentialExchangeEligibilityPolicy
-): Promise<GetAuthResponse> {
+async function verifyKiloApiBearer(requestHeaders: Headers) {
   const token = extractBearerToken(requestHeaders.get('authorization'));
-  if (!token) return authError(401, 'Unauthorized', '?');
+  if (!token) return null;
 
-  let auth: Awaited<ReturnType<typeof verifyKiloTokenForPolicy>>;
   try {
-    auth = await verifyKiloTokenForPolicy(token, NEXTAUTH_SECRET, {
+    return await verifyKiloTokenForPolicy(token, NEXTAUTH_SECRET, {
       audience: KILO_API_AUDIENCE,
       mode: 'allow-legacy',
     });
   } catch {
-    return authError(401, 'Unauthorized', '?');
+    return null;
   }
+}
+
+export async function getUserFromBearerForCredentialExchange(
+  requestHeaders: Headers,
+  policy: KiloCredentialExchangeEligibilityPolicy
+): Promise<GetAuthResponse> {
+  const auth = await verifyKiloApiBearer(requestHeaders);
+  if (!auth) return authError(401, 'Unauthorized', '?');
 
   if (auth.claims.env !== process.env.NODE_ENV) {
     return authError(401, 'Unauthorized', auth.userId);
@@ -440,6 +489,64 @@ export async function getUserFromBearerForCredentialExchange(
     return authError(401, 'Unauthorized', auth.userId);
   }
   return result;
+}
+
+const accountBearerClaimNames: ReadonlySet<string> = new Set([
+  'version',
+  'kiloUserId',
+  'apiTokenPepper',
+  'env',
+  'iat',
+  'exp',
+  'aud',
+  'tokenPurpose',
+  'credentialExchange',
+  'deviceAuthRequestCode',
+  'deviceSessionId',
+  'organizationId',
+  'organizationRole',
+] satisfies (keyof KiloTokenPolicyClaims)[]);
+
+export async function getUserFromAccountBearer(requestHeaders: Headers): Promise<GetAuthResponse> {
+  const auth = await verifyKiloApiBearer(requestHeaders);
+  if (!auth) return authError(401, 'Unauthorized', '?');
+
+  const { userId, claims, claimNames } = auth;
+  const { tokenPurpose, deviceSessionId, organizationId, credentialExchange } = claims;
+  if (
+    claims.env !== process.env.NODE_ENV ||
+    claims.apiTokenPepper === undefined ||
+    credentialExchange === true ||
+    !claimNames.every(name => accountBearerClaimNames.has(name)) ||
+    (tokenPurpose !== undefined &&
+      tokenPurpose !== 'human-api' &&
+      tokenPurpose !== 'device-access') ||
+    (tokenPurpose === 'device-access' && deviceSessionId === undefined)
+  ) {
+    return authError(401, 'Unauthorized', userId);
+  }
+
+  const user = await findUserById(userId, db);
+  if (!user || user.is_bot || claims.apiTokenPepper !== user.api_token_pepper) {
+    return authError(401, 'Unauthorized', userId);
+  }
+  const result = await validateUserAuthorization({
+    kiloUserId: userId,
+    user,
+    opts: { adminOnly: false },
+  });
+  if (!result.user) return result;
+
+  if (
+    deviceSessionId !== undefined &&
+    (!uuid.safeParse(deviceSessionId).success ||
+      !(await readActiveDeviceSession(deviceSessionId, userId)))
+  ) {
+    return authError(401, 'Device session is no longer active', userId);
+  }
+
+  // The caller authorizes the requested organization against this signed binding, not a header.
+  return { ...result, organizationId };
 }
 
 async function resolveUserFromAuth(
@@ -551,6 +658,7 @@ async function resolveUserFromAuth(
       tokenSource,
       deviceSessionId,
       cloudAgentAuthority: scope,
+      cloudAgentRuntimeProxied: authorizationValidationResult.cloudAgentRuntimeProxied,
     });
     if (scope && !isCloudAgentAuthorityHttpPathAllowed(scope, opts.requestPathname)) {
       return authError(401, 'Cloud Agent authority has expired', scope.ownerId, {
@@ -560,7 +668,7 @@ async function resolveUserFromAuth(
         cloudAgentAuthority: scope,
       });
     }
-    return result.user ? { ...result, cloudAgentAuthority: scope } : result;
+    return result;
   }
 
   return resolveUserFromSession(opts, readDb);
@@ -682,6 +790,8 @@ type UserAuthorizationRequest = {
   tokenSource?: string;
   deviceSessionId?: string;
   cloudAgentAuthority?: CloudAgentAuthority;
+  /** True only for a token whose runtime claim the Cloud Agent runtime proxy attested. */
+  cloudAgentRuntimeProxied?: boolean;
   webSession?: {
     id?: string;
     pepper?: string | null;
@@ -702,6 +812,7 @@ async function validateUserAuthorization({
   tokenSource,
   deviceSessionId,
   cloudAgentAuthority,
+  cloudAgentRuntimeProxied,
   webSession,
 }: UserAuthorizationRequest): Promise<GetAuthResponse> {
   if (!user) {
@@ -794,6 +905,8 @@ async function validateUserAuthorization({
     botId,
     tokenSource,
     deviceSessionId,
+    cloudAgentAuthority,
+    cloudAgentRuntimeProxied,
     webSessionId: webSession?.id,
     webSessionPepper: webSession?.pepper,
     authenticatedAt: webSession?.authenticatedAt,

@@ -183,10 +183,11 @@ Usage-accounting transport is selected from deployment labels alone: staging wit
 - `CHAT_RESOURCE_TOKENS_ENABLED` - Default-off family gate for fresh chat resource issuance; requires the master and exact `true`. Validated modern devices retain chat/event-service/notifications issuance after rollback, capped by one hour and parent expiry. [SERVER]
 - `DELEGATED_RESOURCE_TOKENS_ENABLED` - Default-off family gate for explicit API, gateway, and attribution delegation, including the organization user-token resource route, and for the five-minute Pages-audience (`pages`, `pages-dev`) tokens from `POST /api/auth/resource-token`, which organization credentials cannot mint; requires the master and exact `true`. Disabled explicit delegation remains unavailable. [SERVER]
 - `WORKFLOW_GATEWAY_RESOURCE_TOKENS_ENABLED` - Default-off family gate for server workflow gateway tokens; requires the master and exact `true`. [SERVER]
+- `ORG_PERMISSION_POLICY_WRITES_ENABLED` - Default-off web deployment gate for Enterprise organization permission policy writes. Set to exact `true` only after the web app and both Gateway regions have compatible group-policy readers, older operator-config writers are no longer serving, and web deployments that can write the retired client policy have been drained. Drain older web deployments that can return the retired policy before serving consumers that require the agent-permissions-only response. The organization must also be enabled for `org_permission_policy`. After enabling writes, retain compatible readers even if either gate is disabled. [SERVER]
 - `INTERNAL_BOT_RESOURCE_TOKENS_ENABLED` - Default-off family gate for internal bot tokens from `POST /api/internal/bot-token`; requires the master and exact `true`. [SERVER]
 - `CALLBACK_TOKEN_SECRET` - Secret for signing callback tokens. Required for local development. `[SECRET]`
 - `INTERNAL_SECRET` - Alias/fallback for `INTERNAL_API_SECRET`; used in KiloClaw E2E scripts (`services/kiloclaw/e2e/`). `[SECRET]`
-- Native (mobile) sign-in rate limits are Vercel Firewall rules configured in the project's firewall configuration, not environment variables. `native-token-address` counts token exchanges per caller address before the admission gate; `native-token-user` counts them per account after it. Both belong in that configuration, and `apps/web/src/lib/auth/native-token-rate-limit.ts` reports a rule that is not configured at most once a minute. The address rule must answer: when it is absent, the exchange is refused before any provider call.
+- Native (mobile) sign-in rate limits are Vercel Firewall rules configured in the project's firewall configuration, not environment variables. `native-token-address` counts token exchanges per caller address before the admission gate; `native-token-user` counts them per account after it. Both belong in that configuration, and `apps/web/src/lib/auth/native-token-rate-limit.ts` checks them through the shared firewall helper, which reports a rule that is not configured or an answer the firewall blocked at most once a minute. The address rule must answer: when it is absent, the exchange is refused before any provider call.
 - Sign-in code email rate limits are Vercel Firewall rules configured in the project's firewall configuration, not environment variables. `magic-link-email` counts sends per normalized address; `sign-in-code-email-ip` counts sends per caller address. `apps/web/src/lib/auth/email-signin-eligibility.ts` sends a magic link or sign-in code only when both rules answer that the caller may proceed; an unconfigured or unevaluable rule refuses the send and is reported to Sentry at most once a minute, so both rules are required configuration.
 - Native admission rate limiting is a Vercel Firewall rule configured in the project's firewall configuration, not an environment variable. `native-admission-challenge` counts challenge issuance per caller address at `POST /api/auth/native/admission-challenge`; it belongs in that configuration, because `apps/web/src/lib/auth/native-admission.ts` checks it through the shared helper and refuses the request when the rule is unconfigured or cannot be evaluated, reporting that answer to Sentry at most once a minute.
 
@@ -330,8 +331,8 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `NATIVE_ADMISSION_DEV_SENTINEL` - When `true`, non-production accepts the fixed device-attestation sentinel from devices that cannot attest (simulator, emulator without Play Services). Ignored when `NODE_ENV=production`. The mobile build reads the same name. [SERVER]
 - `GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER` - Google Cloud project number for Play Integrity API. Also read by the mobile build, where it ships in the bundle; it is an identifier, not a secret. [SERVER]
 - `GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY` - Service account JSON key for Play Integrity API. `[SECRET]`
-- `GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME` - Expected Android package name (e.g., `com.kilocode.app`), verified against the Play Integrity verdict. [SERVER]
-- `GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS` - Comma-separated SHA-256 signing certificate digests (hex) accepted for the Android app. [SERVER]
+- `GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME` - Android package name (`com.kilocode.kiloapp`), verified against the Play Integrity verdict. [SERVER]
+- `GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS` - Comma-separated SHA-256 digests of accepted Play signing certificates. Use the base64url encoding from `certificateSha256Digest`, not the hex fingerprint. [SERVER]
 
 ### Ablation / Experimentation
 
@@ -341,11 +342,11 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 
 - `POSTGRES_URL` - Primary Postgres connection string. `[SECRET]`
 - `POSTGRES_REPLICA_US_URL` - US read replica used by `readDb` in US Vercel regions (`sfo1`); see `packages/web-shared/src/lib/drizzle.ts`. When unset, `readDb` falls back to the primary, so it must be set on every project that runs in `sfo1`, including `kilocode-ai-gateway`. `[SECRET]`
-- `POSTGRES_REPLICA_EU_URL`, `POSTGRES_REPLICA_EU_URL_2` - EU read replicas; `readDb` picks one at random in EU regions and falls back to the primary when neither is set. `[SECRET]`
+- `POSTGRES_REPLICA_EU_URL`, `POSTGRES_REPLICA_EU_URL_2` - EU read replicas; in EU regions `readDb` picks one per request by hashing the client IP (per instance at random when there is no IP) and falls back to the primary when neither is set. `[SECRET]`
+- `POSTGRES_REPLICAS_DISABLED` - Comma-separated read replica names to switch off without deleting their URLs: `us-west`, `eu-central-1`, `eu-central-2` (the names in replication health alerts). `readDb` skips them and falls back as if their URL were unset. The replication health check logs the disabled names and skips their probes. Disabling every replica is a health check error in production. An unknown name triggers a startup warning and a health check error. Set it on every project that reads replicas (`kilocode-app` and `kilocode-ai-gateway`) and redeploy; see `packages/web-shared/src/lib/read-replicas.ts`. [SERVER]
 - `POSTGRES_SCRIPT_URL` - Alternate Postgres URL used by one-off scripts/backfills in `src/scripts/` and tests. `[SECRET]`
 - `POSTGRES_URL_PRODUCTION` - Production Postgres connection string override; used by `packages/db/src/database-url.ts`. `[SECRET]`
 - `POSTGRES_CONNECT_TIMEOUT` - Postgres connect timeout in ms (required; typical: 10000). [SERVER]
-- `POSTGRES_MAX_QUERY_TIME` - Max allowed query time in ms. [SERVER]
 - `USE_PRODUCTION_DB` - Forces use of the production DB URL in non-production contexts; used by `packages/db/src/database-url.ts`. [SERVER]
 - `DATABASE_CA` - CA certificate content (PEM) for TLS connections to Postgres; used by `packages/db/src/database-url.ts` in tests and scripts. When unset, the connection string's `sslmode` parameter decides: `require`/`prefer`/`no-verify` encrypt, `verify-ca`/`verify-full` also verify the server certificate against the system trust store, `disable` or no `sslmode` keeps TLS off for local development. [SERVER]
 - `DATABASE_URL` - Generic/alternate Postgres URL used by E2E tests and some services (`cloud-agent-next`, `kiloclaw`). `[SECRET]`
@@ -447,7 +448,7 @@ admission responses within the same slot and deadline.
   - After a declined charge commits to `bouncer_credit_event_outbox`, the webhook delivers that row immediately, then calls `charge-decide` with `stage: "failure"` and the charge id as `requestId`. An enforced verdict expires every open Checkout session of the declined charge's Stripe customer, in payment or subscription mode; a charge without a customer falls back to the open session behind its payment intent. A failed immediate delivery leaves the sessions alone and the cron drainer retries it. These steps are bounded and never fail the webhook; a redelivered second Stripe event for the same charge finds the row already delivered and changes nothing.
   - Bouncer enforces no charge block until `enforcement.enabled` is on and a reason is listed in `enforcement.chargeBlockReasons`, which ships empty; user and IP exemptions still apply.
   - Deploy Bouncer v2 before this cloud change. Bouncer retains v1 for the current cloud deployment; the new outbox sends only v2.
-- `CRON_SECRET` - Shared secret for authenticated cron endpoints; used in `dev/discord-gateway-cron.ts` and `.env.test`. `[SECRET]`
+- `CRON_SECRET` - Shared secret for authenticated cron endpoints; used in `dev/discord-gateway-cron.ts` and `.env.test`. If the root `.env.local` value is blank, `pnpm dev:env` fills it with a generated value and copies it to `apps/web/.env.development.local`. `[SECRET]`
 - `dispatch-invite-email-outbox` - Vercel cron path (`/api/cron/dispatch-invite-email-outbox`) that drains the organization invite-email outbox; reuses `CRON_SECRET` for auth. [SERVER]
 - `dispatch-bouncer-credit-event-outbox` - Vercel cron path (`/api/cron/dispatch-bouncer-credit-event-outbox`) that drains the Bouncer credit-event outbox every minute; reuses `CRON_SECRET` for auth. [SERVER]
 - `dispatch-bouncer-usage-event-outbox` - Vercel cron path (`/api/cron/dispatch-bouncer-usage-event-outbox`) that retries the Bouncer usage-event outbox every minute; reuses `CRON_SECRET` for auth. [SERVER]
@@ -633,6 +634,7 @@ Abrupt OOM/SIGKILL failures and synthetic session failure events are not capture
 
 - `DOCKER_SOCKET` - Path or URL for the Docker daemon socket; `services/cloud-agent-next/scripts/dev.sh` maps it to `DOCKER_HOST` for local Wrangler. [SERVER]
 - `SECRET` - Generic secret env var used in `services/kiloclaw/src/auth/sandbox-id-adversarial.test.ts` for sandbox auth tests. `[SECRET]`
+- `SESSION_SHARE_JWT_SECRET_PROD` - Secrets Store binding of `services/session-ingest` that signs and verifies public session share tokens. Only that Worker reads it, so `pnpm dev:env` generates a random local value (`@dev-generate base64 32`) and no `.env.local` key is needed. `[SECRET]`
 
 ## Browser Extension (apps/extension)
 
@@ -647,7 +649,7 @@ Abrupt OOM/SIGKILL failures and synthetic session failure events are not capture
 - `WEB_BASE_URL` - Base HTTPS URL for the mobile in-app web views (e.g. `https://app.kilo.ai`). Bundled into the binary. [PUBLIC]
 - `CLOUD_AGENT_WS_URL` - WebSocket URL for Cloud Agent Next streaming in the mobile app. Bundled into the binary. [PUBLIC]
 - `SESSION_INGEST_WS_URL` - WebSocket URL for session ingest from the mobile app. Bundled into the binary. [PUBLIC]
-- `EXPO_PUBLIC_SESSION_SYNC_URL` - Native remote preview relay URL for development bundles, inlined into the JS bundle. The preview requires `__DEV__` and an explicit isolated Worker URL, such as `http://localhost:8817`. Release bundles ignore this setting and expose neither the Profile entry nor the `/native-remote` screen. [PUBLIC]
+- `EXPO_PUBLIC_SESSION_SYNC_URL` - Native remote preview relay URL for development bundles, inlined into the JS bundle. The preview requires `__DEV__` and an explicit isolated Worker URL; `pnpm dev:env:mobile` writes the local session-sync Worker URL (`http://<host>:8817`), and `pnpm dev:start session-sync` starts that Worker. Release bundles ignore this setting and expose neither the Profile entry nor the `/native-remote` screen. [PUBLIC]
 - `APPSFLYER_DEV_KEY` - AppsFlyer development key for mobile attribution. Bundled into the binary (not secret — it's a device-level SDK key). [PUBLIC]
 - `APPSFLYER_APP_ID` - AppsFlyer app ID for mobile attribution tracking. [PUBLIC]
 - `EVENT_SERVICE_URL` - WebSocket URL for the event service from mobile. Bundled into the binary. [PUBLIC]

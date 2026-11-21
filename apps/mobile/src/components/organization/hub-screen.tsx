@@ -22,6 +22,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { AddCreditsRow } from '@/components/add-credits-row';
 import { KiloPassIcon } from '@/components/kilo-pass/kilo-pass-icon';
+import { getOrgTrialHubCaption, seatCountReadout } from '@/components/organization/billing-model';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import {
   getOrgKiloPassRowState,
@@ -40,6 +41,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { IconTile } from '@/components/ui/icon-tile';
 import { KvRow } from '@/components/ui/kv-row';
 import { RowGroup } from '@/components/ui/row-group';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -52,7 +54,6 @@ import { NEUTRAL_TINT, type Tint, toneColor } from '@/lib/agent-color';
 import { openAppShellHandoff } from '@/lib/app-shell-handoff';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { useCanLinkExternalPurchase } from '@/lib/billing/external-purchase-link';
-import { seatCountReadout } from '@/components/organization/billing-model';
 import { WEB_BASE_URL } from '@/lib/config';
 import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
 import { openExternalUrl } from '@/lib/external-link';
@@ -78,31 +79,27 @@ type OrganizationHubScreenProps = Readonly<{
   organizationIdOverride?: string;
 }>;
 
-/** Whether the rename control offers the dialog, or states why it cannot. */
-type RenameControl = { kind: 'ready'; onPress: () => void } | { kind: 'blocked'; reason: string };
+/** Whether the rename control offers the dialog, or only says it cannot. */
+type RenameControl = { kind: 'ready'; onPress: () => void } | { kind: 'blocked' };
 
 /**
  * The rename control's props for its state. A blocked control keeps the same
  * box and therefore the same header width: the title beside it cannot reflow to
- * another line. It is dimmed the way the shared Button dims a disabled
- * non-primary control, and the reason joins the control's own name, in the
- * shape this screen's other composed labels use. A hint would not reach Android:
- * React Native maps `accessibilityHint` to the platform's tooltip text, which
- * TalkBack does not announce with the node, so the reason would be spoken on one
- * platform only.
+ * another line. It is dimmed and disabled the way the shared Button dims a
+ * disabled non-primary control, and it states nothing beyond its own name: the
+ * plan refusal block below the header states the reason once, so a label that
+ * repeated it would have the screen reader speak the sentence twice in a row.
+ * A hint is no place for it either: React Native maps `accessibilityHint` to the
+ * platform's tooltip text, which TalkBack does not announce with the node.
  */
 function renameControlProps(control: RenameControl, label: string) {
   if (control.kind === 'ready') {
     return { accessibilityLabel: label, onPress: control.onPress };
   }
-  // Built outside the props object: the shared screen-reader name is the
-  // control's title followed by the reason, the shape the rest of this screen
-  // composes its labels with.
-  const blockedLabel = `${label}. ${control.reason}`;
   return {
     disabled: true,
     className: 'opacity-50',
-    accessibilityLabel: blockedLabel,
+    accessibilityLabel: label,
     accessibilityState: { disabled: true },
   };
 }
@@ -232,26 +229,35 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   // exactly as it does for the new-session composer. Only the server's boolean
   // is read; nothing re-derives the plan state from seats or balance.
   const planEnded = org.isTrialExpiredForEnforcement;
+  // The caption speaks the trial's own words on its own line below the plan
+  // row — the hub readout, from the boundary row the server already classified
+  // — and is absent whenever the trial is not what governs the organization.
+  const trialCaption = getOrgTrialHubCaption(org);
   const planName =
     org.plan === 'enterprise'
       ? t('organization.hub.planEnterprise')
       : t('organization.hub.planTeams');
   const planBillingUrl = `${WEB_BASE_URL}/organizations/${organizationId}/subscriptions`;
-  // A role that gets the billing action below the block needs only the state,
-  // because the action is the next step. A role that cannot change the plan
-  // gets the sentence the rest of the app shows with the same explanation, so
-  // the member still learns who can end the state.
-  const planMessage = showMoney
-    ? t('organization.hub.planEnded')
-    : t('common.organizationTrialEnded');
+  // A money role whose platform may open the billing page gets the state
+  // alone, because the banner's action is the next step. A money role the
+  // storefront rule keeps from linking has no action under the sentence, so the
+  // sentence carries the step and names where billing is changed. A role that
+  // cannot change the plan is told who can.
+  let planMessage = t('common.organizationTrialEnded');
+  if (showMoney) {
+    planMessage = canLinkBilling
+      ? t('organization.hub.planEnded')
+      : t('common.organizationTrialEndedBillingAtKiloAi');
+  }
 
   // The rename control's two states. `organizations.update` runs on the
   // organization billing mutation procedure, which refuses every mutation once
   // `classifyOrganizationEntitlement` reports the hard-expired trial, and that is
-  // the same server verdict `planEnded` reads. A lapsed plan therefore states the
-  // blocker on the control instead of opening a field whose save cannot succeed.
+  // the same server verdict `planEnded` reads. A lapsed plan therefore disables
+  // the control instead of opening a field whose save cannot succeed, and the
+  // refusal block below the header states why.
   const renameControl: RenameControl = planEnded
-    ? { kind: 'blocked', reason: t('organization.hub.planEnded') }
+    ? { kind: 'blocked' }
     : {
         kind: 'ready',
         onPress: () => {
@@ -296,7 +302,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
         headerRight={
           showMoney ? (
             <IconButton {...renameControlProps(renameControl, t('organization.hub.renameTitle'))}>
-              <Pencil size={16} color={colors.mutedForeground} />
+              <Pencil size={16} color={colors.foreground} />
             </IconButton>
           ) : undefined
         }
@@ -343,9 +349,13 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                 valueDirection="ltr"
                 // An empty balance offers the top-up on the amount's own line: a
                 // row of its own would hold nothing but this control, and
-                // `lineAction` keeps that line one text line tall.
+                // `lineAction` keeps that line one text line tall. Only painted
+                // where the platform may open the page (`canLinkBilling`),
+                // because the control's label alone beside the amount reads as
+                // part of it, and the Billing row below carries the destination
+                // on a platform that cannot link.
                 trailing={
-                  org.balance === 0 ? (
+                  org.balance === 0 && canLinkBilling ? (
                     <AddCreditsRow inline lineAction url={organizationBillingUrl(organizationId)} />
                   ) : undefined
                 }
@@ -359,7 +369,9 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               />
             )}
             <KvRow
-              label={t('organization.hub.organizationSeats')}
+              // The hub is the organization's own screen, so the label does not
+              // repeat "Organization"; it is the Seats label Billing uses.
+              label={t('organization.billing.seats')}
               // `requireSeats` is the enforcement switch; total is the raw
               // purchased capacity and can legitimately be zero, so the shared
               // readout prints the used count alone until seats were bought.
@@ -378,6 +390,11 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
             <KvRow
               label={t('organization.hub.plan')}
               value={planName}
+              // The trial sentence is a caption line of its own rather than a
+              // second value segment: the tier keeps one line, and a
+              // right-to-left interface cannot order the tier after the date.
+              // Nothing is ellipsized away.
+              caption={trialCaption ?? undefined}
               valueStatus={
                 planEnded
                   ? { label: t('organization.hub.planStatusLapsed'), tone: 'danger' }
@@ -448,6 +465,9 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                       return;
                     }
                     void kiloPassSummary.refetch();
+                  }}
+                  onOpen={() => {
+                    router.push(billingHrefFor(organizationId));
                   }}
                 />
               )}
@@ -556,27 +576,31 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
 type OrgKiloPassRowProps = Readonly<{
   state: OrgKiloPassRowState;
   onRetry: () => void;
+  /** The organization's billing page, which carries the pass's own readout. */
+  onOpen: () => void;
 }>;
 
 /**
  * Compact Kilo Pass for Orgs row in the billing configuration group. Mirrors
  * ConfigureRow's layout and divider, but renders KiloPassIcon directly (it is
- * a plain function component, not a LucideIcon) and sets an explicit
- * accessibility role and label for the one action it can offer, the retry.
- * Never the last row — "Low balance alert" always follows it — so the divider
- * is permanent. Its icon tile follows ConfigureRow's rule too: the shared
- * neutral tile unless the state needs attention (warn), never a hue hashed from
- * the title.
+ * a plain function component, not a LucideIcon). Never the last row — "Low
+ * balance alert" always follows it — so the divider is permanent. Its icon tile
+ * follows ConfigureRow's rule too: the shared neutral tile unless the state
+ * needs attention (warn), never a hue hashed from the title.
  *
- * The row opens nothing else: Kilo Pass is no longer sold in either store, so
- * it has no setup or management page to send the reader to and carries no
- * chevron.
+ * The row opens the organization's billing page, the surface that reads the
+ * pass's plan, seats and scheduled change, so it ends in the chevron every
+ * destination row in this card carries; without one it read as loose text in a
+ * card of navigation rows. A state that can only be retried keeps the retry as
+ * its press and shows the retry label in place of the chevron, since that press
+ * does not leave the card.
  */
-function OrgKiloPassRow({ state, onRetry }: OrgKiloPassRowProps) {
+function OrgKiloPassRow({ state, onRetry, onOpen }: OrgKiloPassRowProps) {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const tint: Tint = state.attention ? toneColor('warn') : NEUTRAL_TINT;
-  const onPress = state.action === 'retry' ? onRetry : null;
+  const retries = state.action === 'retry';
+  const onPress = retries ? onRetry : onOpen;
   const accessibilityLabel = state.actionLabel
     ? `${t('kiloPass.title')}. ${state.subtitle}. ${state.actionLabel}`
     : `${t('kiloPass.title')}. ${state.subtitle}`;
@@ -599,26 +623,25 @@ function OrgKiloPassRow({ state, onRetry }: OrgKiloPassRowProps) {
           <Text className="mt-0.5 text-xs text-muted-foreground">{state.subtitle}</Text>
         )}
       </View>
-      {state.action === 'retry' ? (
+      {retries ? (
         <Text className="shrink-0 text-xs font-medium text-primary">{state.actionLabel}</Text>
-      ) : null}
+      ) : (
+        <View className="shrink-0">{renderRowTrailing({ kind: 'chevron' })}</View>
+      )}
     </View>
   );
-
-  if (onPress == null) {
-    return (
-      <View accessibilityLabel={accessibilityLabel} accessibilityState={{ busy: state.loading }}>
-        {inner}
-      </View>
-    );
-  }
 
   return (
     <Pressable
       onPress={onPress}
+      // A row whose summary is still loading has no read to open, so the press
+      // waits; the state below is what tells assistive tech the row is working
+      // rather than idle.
+      disabled={state.loading}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      accessibilityHint={state.accessibilityHint ?? undefined}
+      accessibilityHint={retries ? (state.accessibilityHint ?? undefined) : undefined}
+      accessibilityState={{ busy: state.loading, disabled: state.loading }}
       className="active:opacity-70"
     >
       {inner}

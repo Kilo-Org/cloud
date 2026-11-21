@@ -94,6 +94,7 @@ const adminAreaPolicies: Record<string, AdminAreaPolicy> = {
   disputes: sensitiveWrite,
   earlyFraudWarnings: sensitiveWrite,
   emailTesting: platform,
+  enkryptCalls: platform,
   enrichmentData: { read: 'platform_read', write: 'platform_write', target: 'none' },
   extendClawTrial: platform,
   featureInterest: platform,

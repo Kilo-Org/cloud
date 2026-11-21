@@ -55,7 +55,7 @@ export async function isModelRestrictionExempt(
     );
   }
   const directByokModel = await getDirectByokModel(requestedModelId);
-  return directByokModel.provider !== null && directByokModel.model !== null;
+  return directByokModel !== null;
 }
 
 /**

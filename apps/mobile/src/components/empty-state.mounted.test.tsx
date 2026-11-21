@@ -27,6 +27,9 @@ const band = vi.hoisted(() => ({ short: false }));
 
 vi.mock('react-native', () => ({
   View: 'View',
+  // EmptyState reads the scheme for its dark disc and glyph ink. These cases
+  // pin the light presentation; the dark disc is measured in the design gate.
+  useColorScheme: () => 'light',
 }));
 vi.mock('@/lib/utils', () => ({ cn: (...values: unknown[]) => values.filter(Boolean).join(' ') }));
 vi.mock('@/components/centered-state', () => ({

@@ -1,11 +1,12 @@
 import { type Href, useRouter } from 'expo-router';
-import { ArrowLeft, ArrowRight, Building2, type LucideIcon, Plus } from '@/components/ui/icons';
+import { Building2, type LucideIcon, Plus } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { EmptyState, StateAction } from '@/components/empty-state';
+import { DirectionalArrowLeft, DirectionalArrowRight } from '@/components/ui/directional-icons';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useContextPicker } from '@/components/context-control';
@@ -18,12 +19,12 @@ type OrganizationBoundaryProps = Readonly<{
   /** Full-screen callers pass a title for the `ScreenHeader`; sheets omit it and own no chrome. */
   title?: string;
   /**
-   * Hold the header's eyebrow line while the caller's real content has one to
-   * fill. The boundary paints no eyebrow itself, so this only reserves the
-   * band: the title keeps its height and the content below it does not move
-   * when the resolved screen swaps the label in.
+   * Hold the header's subtitle line while the caller's real content has one to
+   * fill. The boundary paints no subtitle itself, so this only reserves the
+   * band: the title keeps its place and the content below it does not move
+   * when the resolved screen swaps the organization's name in.
    */
-  reserveEyebrow?: boolean;
+  reserveSubtitle?: boolean;
   /**
    * Where the header's Back lands when the screen opens with no history to pop.
    * Every caller that passes a `title` names its own area's parent: the Profile
@@ -63,7 +64,7 @@ type OrganizationBoundaryProps = Readonly<{
  */
 export function OrganizationBoundary({
   title,
-  reserveEyebrow,
+  reserveSubtitle,
   backFallback,
   organizationIdOverride,
   icon = Building2,
@@ -108,7 +109,7 @@ export function OrganizationBoundary({
     const backToProfileAction = (
       <StateAction
         label={t('organization.boundary.backToProfile')}
-        icon={ArrowLeft}
+        icon={DirectionalArrowLeft}
         onPress={() => {
           router.replace(PROFILE_TAB_HREF);
         }}
@@ -164,7 +165,7 @@ export function OrganizationBoundary({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={title} reserveEyebrow={reserveEyebrow} backFallback={backFallback} />
+      <ScreenHeader title={title} reserveSubtitle={reserveSubtitle} backFallback={backFallback} />
       {content}
     </View>
   );
@@ -195,7 +196,7 @@ function OrganizationPickerBoundaryState({
           <View className="gap-3">
             <StateAction
               label={t('organization.boundary.chooseAccount')}
-              icon={ArrowRight}
+              icon={DirectionalArrowRight}
               onPress={() => {
                 openPicker();
               }}

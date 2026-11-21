@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { paintSignature } from '../../../apps/mobile/src/lib/design-gate/paint-state';
 import {
-  CAPTURE_ALIGNMENT_BUDGET_MS,
+  CAPTURE_GAP_BUDGET_MS,
   captureAlignment,
   screenshotObservation,
   type CaptureAlignment,
@@ -15,7 +15,14 @@ import { enterTouchMode } from './input-mode';
 import { checkDevLogOverlay } from './logbox';
 import { envMismatches, isRtlLanguage, mirrorReference, type CellConfig } from './matrix';
 import type { Rgba } from './pixels';
-import { checkMirror, checkScreen, checkShift, normalize } from './rules';
+import {
+  checkLoadingAffordance,
+  checkLoadingLabels,
+  checkMirror,
+  checkScreen,
+  checkShift,
+  normalize,
+} from './rules';
 import type { LayoutTree, ProbeDump, ProbeEnv } from './tree';
 
 export type Exec = (command: string, args: readonly string[]) => Buffer;
@@ -55,7 +62,17 @@ export class InfraError extends Error {
   override name = 'InfraError';
 }
 
-export type Target = Readonly<{ id: string; link: string }>;
+/**
+ * `after` is a link opened once the target is captured: the reset of a state
+ * the target link forced (`kiloapp:///dev/force-state/clear`), so the next
+ * target does not inherit it.
+ *
+ * `hold` marks a target whose link holds the screen's data pending (the dev
+ * `loading` force mode). Such a target is measured in its loading state, then
+ * released through `after` while the same sampler runs, so the jump to the
+ * landed content is one timeline the shift rule reads.
+ */
+export type Target = Readonly<{ id: string; link: string; after?: string; hold?: boolean }>;
 
 export type Screen = {
   target: string;
@@ -64,6 +81,8 @@ export type Screen = {
   annotated: string;
   dump: string;
   capture?: string;
+  /** The frame a held target's content landed on, when its hold was released. */
+  landing?: string;
   env: ProbeEnv;
 };
 
@@ -128,6 +147,31 @@ const SCREEN_QUIET_TIMEOUT_MS = 15_000;
 const RTL_LANGUAGE = 'ar';
 const LTR_FALLBACK_LANGUAGE = 'en';
 
+/**
+ * What releasing a held target established.
+ *
+ * A held target is measured twice: the loading frame the target names, then the
+ * screen its content lands on once the hold is released. `settled` above speaks
+ * for the loading frame only, so the landing needs its own evidence: a release
+ * the app never confirmed, or a placeholder that outlives the hold, leaves the
+ * second half of the capture unmeasured, and a row that reported neither would
+ * pass with no landing evidence at all.
+ */
+export type HoldRelease = {
+  /** The app reported delivering the release link it was sent. */
+  confirmed: boolean;
+  /** Why the app never confirmed the release link. */
+  failure?: string;
+  /** The placeholder the hold painted cleared once the release landed. */
+  cleared: boolean;
+  /** Milliseconds the placeholder took to clear, or its whole budget when it did not. */
+  clearMs: number;
+  /** The landed screen stopped changing within the settle budget. */
+  settled: boolean;
+  /** Milliseconds the landing took to stop changing, or how long it was still moving. */
+  landedMs: number;
+};
+
 export type Sampled = {
   dump: ProbeDump;
   timeline: ProbeDump[];
@@ -136,6 +180,8 @@ export type Sampled = {
   elapsedMs: number;
   /** Set when the measured screen still paints a loading placeholder. */
   blockedBy?: 'loading-placeholder';
+  /** Present on a held target that was released: what the landing established. */
+  release?: HoldRelease;
   /** Milliseconds this capture spent waiting for the placeholder to clear. */
   loadingWaitMs?: number;
   /**
@@ -186,18 +232,6 @@ export function loadingPlaceholder(tree: LayoutTree): boolean {
  */
 export function inAppSampleInterval(dumpMs: number): number {
   return Math.max(IN_APP_SAMPLE_INTERVAL_MS, Math.ceil(dumpMs * 2));
-}
-
-/**
- * The window one capture may span, given what one of its dumps costs.
- *
- * The bracket reads two full trees around the screenshot, so on a screen whose
- * dump costs half a second the reads alone exceed the default window and a
- * perfectly aligned capture is reported inconclusive. The window grows with the
- * measurement and never shrinks below the constant: a cheap screen keeps it.
- */
-export function captureBudgetMs(dumpMs: number): number {
-  return Math.max(CAPTURE_ALIGNMENT_BUDGET_MS, Math.ceil(dumpMs * 2) + 1_000);
 }
 
 /** One sampling window, sized for the settle it spans. */
@@ -344,12 +378,18 @@ async function reportLogBox(probe: ProbeClient, log: (line: string) => void): Pr
     }
     if (result.exposing === 0) {
       log(
-        'design-gate: no module of the app runtime exposed LogBox setDisabled; a dev toast still painting is reported as a dev-overlay warning'
+        'design-gate: no module of the app runtime exposed LogBox setDisabled; a dev toast' +
+          ' still painting is reported as a dev-overlay finding at the level LogBox' +
+          ' painted, or by its message text when the dump carries no level chrome (an' +
+          ' error fails the run)'
       );
       return;
     }
     log(
-      `design-gate: ${result.exposing} module(s) exposed LogBox setDisabled but none accepted the switch; a dev toast still painting is reported as a dev-overlay warning`
+      `design-gate: ${result.exposing} module(s) exposed LogBox setDisabled but none accepted` +
+        ' the switch; a dev toast still painting is reported as a dev-overlay finding at' +
+        ' the level LogBox painted, or by its message text when the dump carries no level' +
+        ' chrome (an error fails the run)'
     );
   } catch (error) {
     log(`design-gate: LogBox disable unavailable: ${String(error)}`);
@@ -373,12 +413,24 @@ export function screenFindings(args: {
   tree: LayoutTree;
   image?: Rgba;
   sampled?: Sampled;
+  /** The target names its own loading state, so the placeholder is the screen. */
+  held?: boolean;
 }): Finding[] {
   const alignment = args.sampled?.alignment;
   const image =
     alignment === undefined || alignment.status === 'bracketed' ? args.image : undefined;
   const findings: Finding[] = [];
   if (args.sampled?.settled !== false) findings.push(...checkScreen(args.tree, image));
+  // A held target measures the loading frame, so the loading rules judge it: a
+  // screen that says nothing while it waits, and a wait a reader cannot name.
+  // They run outside the settled gate: the frame a held target names is often
+  // still animating when it is read (a spinner, a repainting skeleton), and these
+  // rules read one node's own role and name without comparing two rects, so an
+  // unsettled loading frame is exactly the tree they can still measure. Gating
+  // them on `settled` would exempt the frames the hold exists to judge.
+  if (args.held === true) {
+    findings.push(...checkLoadingAffordance(args.tree), ...checkLoadingLabels(args.tree));
+  }
   findings.push(...checkDevLogOverlay(args.dump));
   if (alignment !== undefined && alignment.status !== 'bracketed') {
     findings.push({
@@ -387,8 +439,8 @@ export function screenFindings(args: {
       cell: args.cell,
       target: args.target,
       element: rootRef(args.dump),
-      measured: alignment.after.completedMs - alignment.before.startedMs,
-      expected: `matching probe states bracketing a screenshot within ${alignment.budgetMs} ms`,
+      measured: alignment.gapMs,
+      expected: `matching probe states read within ${CAPTURE_GAP_BUDGET_MS} ms of each side of the screenshot`,
       unit: 'ms',
       message: `${alignment.reason} The screenshot is preserved; pixel-to-tree rules were skipped.`,
     });
@@ -432,6 +484,16 @@ export function screenFindings(args: {
         })
       );
     }
+    if (args.held === true && args.sampled.release !== undefined) {
+      findings.push(
+        ...releaseFindings({
+          cell: args.cell,
+          target: args.target,
+          dump: args.dump,
+          release: args.sampled.release,
+        })
+      );
+    }
   }
   return findings.map(finding => ({ ...finding, cell: args.cell, target: args.target }));
 }
@@ -466,6 +528,7 @@ export function captureFiles(out: string, cell: string, target: string) {
     screenshot: `${base}.png`,
     annotated: `${base}.annotated.png`,
     dump: `${base}.json`,
+    landing: `${base}.landing.json`,
     timeline: `${base}.timeline.json`,
     capture: `${base}.capture.json`,
     absolute: (relative: string) => path.join(out, relative),
@@ -553,10 +616,15 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
   // Route and probe text can reveal stale navigation, but neither proves native paint.
   // Keep this bounded navigation retry separate from screenshot capture: a genuine
   // blank screenshot must survive as evidence rather than be retried until it disappears.
+  // A link to the screen navigation resets to (Home) changes nothing on glass;
+  // it opened when the settled screen is the one the link names. A URL drops
+  // groups, so the route alone cannot tell, but the probe's screen keeps them.
+  const linkScreen = linkRoute?.slice(1);
   const opened = (dump: ProbeDump) =>
     screenTexts(dump) !== beforeTexts ||
     (dump.env.screen !== undefined && dump.env.screen !== beforeScreen) ||
-    (beforeRoute === linkRoute && dump.env.route.split('?')[0] === linkRoute);
+    (beforeRoute === linkRoute && dump.env.route.split('?')[0] === linkRoute) ||
+    (linkScreen !== undefined && linkScreen !== '' && dump.env.screen === linkScreen);
   await ctx.probe.openLink(target.link);
   // A cold screen paints its own loading placeholder and holds it still, so a
   // settle loop would measure the placeholder. Wait for it to clear first, and
@@ -571,7 +639,15 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
       );
     }
   };
-  await waitForPlaceholder();
+  // A held target's link keeps its data pending: the placeholder is the state
+  // being measured, so waiting for it to clear would spend the whole bound on the
+  // screen the target asked for. Its wait runs after the hold is released, in the
+  // release pass below.
+  if (target.hold === true) {
+    ctx.log(`design-gate: ${target.id} opens held in its loading state`);
+  } else {
+    await waitForPlaceholder();
+  }
   // Sampling starts only once the placeholder is gone. The in-app sampler
   // traverses and serializes the whole tree on the app's own JS thread every
   // interval, so a sampler ticking through a cold open competes with the very
@@ -591,26 +667,19 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
       `design-gate: ${target.id} one in-app dump costs ${dumpMs}ms; sampling every ${samplingMs}ms`
     );
   }
-  // The bracket reads two full trees around the screenshot, so on a screen whose
-  // dump is expensive those reads alone outlast the default window and a correct
-  // bracket is reported inconclusive. The window follows the same measurement; a
-  // cheap screen keeps the constant.
-  const alignmentBudgetMs = captureBudgetMs(dumpMs);
-  if (alignmentBudgetMs > CAPTURE_ALIGNMENT_BUDGET_MS) {
-    ctx.log(
-      `design-gate: ${target.id} one dump costs ${dumpMs}ms; alignment window ${alignmentBudgetMs}ms`
-    );
-  }
   await startSampling(ctx, samplingMs);
   let settled = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
   let unopened: string | undefined;
   if (!opened(settled.dump)) {
     ctx.log(`design-gate: ${target.id} did not change the screen; opening the link again`);
     // The retry opens the same cold screen, so it gets the same wait, and the
-    // timeline is restarted after it for the same reason as above.
+    // timeline is restarted after it for the same reason as above. A held target
+    // is the exception for the same reason as the first open: its placeholder
+    // cannot clear while the data is held, so waiting on it would spend the whole
+    // bound and log a placeholder the target asked for.
     await ctx.probe.stopSampling();
     await ctx.probe.openLink(target.link);
-    await waitForPlaceholder();
+    if (target.hold !== true) await waitForPlaceholder();
     await startSampling(ctx, samplingMs);
     settled = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
     if (!opened(settled.dump)) unopened = await ctx.probe.lastOutcome();
@@ -709,9 +778,59 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     screenshot,
     after,
     layoutSignature,
-    screenshotObservation(dump, image),
-    alignmentBudgetMs
+    screenshotObservation(dump, image)
   );
+  // A held target is measured twice in one timeline: the loading frame above,
+  // then the screen the content lands on once the hold is released. One timeline
+  // is what lets the shift rule report the jump a person sees between the two,
+  // instead of comparing two captures and guessing which rect answers for which.
+  let release: HoldRelease | undefined;
+  let landing: string | undefined;
+  if (target.hold === true && target.after !== undefined) {
+    ctx.log(`design-gate: ${target.id} releasing the loading hold`);
+    await startSampling(ctx, samplingMs);
+    const releaseFailure = await openResetLink(ctx, target.after);
+    if (releaseFailure !== undefined) {
+      ctx.log(`design-gate: ${target.id} release link not confirmed: ${releaseFailure}`);
+    }
+    // A release that never reaches the app leaves the hold on, so the placeholder
+    // it kept painting is not the placeholder this wait is about: the release's
+    // own confirmation is the finding, and waiting here would spend the bound on
+    // the state the target asked for.
+    const wait =
+      releaseFailure === undefined
+        ? await waitForLoadingPlaceholder(ctx.probe, ctx.clock)
+        : { cleared: false, observed: false, elapsedMs: 0 };
+    if (releaseFailure === undefined && !wait.cleared && wait.observed) {
+      ctx.log(
+        `design-gate: ${target.id} still paints its placeholder ${wait.elapsedMs}ms after release`
+      );
+    }
+    const landed = await sampleUntilSettled(ctx.probe, ctx.clock, ctx.observeMs);
+    const released = await ctx.probe.stopSampling();
+    samples = joinPasses(samples, released.samples, spacingMs);
+    truncated = truncated || released.truncated;
+    reportTruncation();
+    // The landing is evidence in its own right: the loading frame is what the row
+    // names, and this is the screen it gave way to. Keep the frame, so a landing
+    // the rules never grade is still on disk to read.
+    landing = files.landing;
+    writeJson(files.absolute(landing), landed.dump);
+    release = {
+      confirmed: releaseFailure === undefined,
+      ...(releaseFailure === undefined ? {} : { failure: releaseFailure }),
+      // A wait that never saw a placeholder has nothing left to clear: the release
+      // landed on content directly.
+      cleared: wait.cleared || !wait.observed,
+      clearMs: wait.elapsedMs,
+      settled: landed.settled,
+      landedMs: landed.elapsedMs,
+    };
+    ctx.log(
+      `design-gate: ${target.id} released onto ${landed.dump.env.screen ?? landed.dump.env.route}` +
+        `${landed.settled ? '' : ' (still moving)'}`
+    );
+  }
   const stillLoading = loadingPlaceholder(normalize(dump));
   const sampled: Sampled = {
     ...settled,
@@ -722,10 +841,12 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     // A screen that still paints its loading placeholder is never the settled
     // screen the target describes. The settle loop only saw the sampled window, so
     // work that landed after it counts as settled only when the quiet wait above
-    // proved the layout held still before the bracket opened.
-    settled: settled.settled && !stillLoading && quiet,
-    ...(stillLoading ? { blockedBy: 'loading-placeholder' as const } : {}),
+    // proved the layout held still before the bracket opened. A held target is the
+    // exception: its placeholder is the state the target names.
+    settled: settled.settled && (!stillLoading || target.hold === true) && quiet,
+    ...(stillLoading && target.hold !== true ? { blockedBy: 'loading-placeholder' as const } : {}),
     ...(placeholderWaitedMs > 0 ? { loadingWaitMs: placeholderWaitedMs } : {}),
+    ...(release === undefined ? {} : { release }),
   };
   writeJson(files.absolute(files.capture), alignment);
   const screen: Screen = {
@@ -735,6 +856,7 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
     annotated: files.annotated,
     dump: files.dump,
     capture: files.capture,
+    ...(landing === undefined ? {} : { landing }),
     env: sampled.dump.env,
   };
   return { sampled, screen, unopened, image };
@@ -926,6 +1048,77 @@ export function unsettledFinding(args: {
   };
 }
 
+/**
+ * A held target whose landing was never measured.
+ *
+ * The release is the second half of a held capture: the screen the loading frame
+ * gives way to. An unconfirmed release, a placeholder that outlives the hold, or
+ * a landing that never stops moving leaves that half unmeasured, and the row says
+ * so instead of reporting the loading frame as the whole capture. Every arm is a
+ * warning: the loading frame itself was still measured, and what is missing is
+ * the evidence for the frame after it.
+ */
+export function releaseFindings(args: {
+  cell: string;
+  target: string;
+  dump: ProbeDump;
+  release: HoldRelease;
+}): Finding[] {
+  const { release } = args;
+  if (!release.confirmed) {
+    return [
+      {
+        rule: 'loading-release',
+        severity: 'warning',
+        cell: args.cell,
+        target: args.target,
+        element: rootRef(args.dump),
+        measured: 1,
+        expected: 'a release the app reports delivering',
+        unit: 'ratio',
+        message:
+          `The hold was not released (${release.failure ?? 'not confirmed'}), so the screen the ` +
+          'content lands on was never measured: this row judges the loading frame only.',
+      },
+    ];
+  }
+  if (!release.cleared) {
+    return [
+      {
+        rule: 'loading-release',
+        severity: 'warning',
+        cell: args.cell,
+        target: args.target,
+        element: rootRef(args.dump),
+        measured: release.clearMs,
+        expected: 'the content that replaces the loading placeholder',
+        unit: 'ms',
+        message:
+          `The loading placeholder was still painted ${release.clearMs} ms after the release, so ` +
+          'the frame the target lands on was never measured.',
+      },
+    ];
+  }
+  if (!release.settled) {
+    return [
+      {
+        rule: 'loading-release',
+        severity: 'warning',
+        cell: args.cell,
+        target: args.target,
+        element: rootRef(args.dump),
+        measured: release.landedMs,
+        expected: 'the released screen at rest',
+        unit: 'ms',
+        message:
+          `The released screen kept changing for ${release.landedMs} ms, so its landed frame ` +
+          'describes more than one layout.',
+      },
+    ];
+  }
+  return [];
+}
+
 function warningFinding(
   cell: string,
   target: string,
@@ -947,6 +1140,40 @@ function warningFinding(
   };
 }
 
+const RESET_ATTEMPTS = 2;
+const RESET_CONFIRM_MS = 5_000;
+const RESET_POLL_MS = 250;
+
+/**
+ * Opens a target's reset link (`kiloapp:///dev/force-state/clear`) and waits for
+ * the app to report that its own `Linking.openURL` delivered it; a send that
+ * fails or is never confirmed is sent once more. Returns why the reset was not
+ * confirmed, or undefined. Never throws: cleanup must not fail the capture.
+ */
+export async function openResetLink(
+  ctx: CaptureContext,
+  link: string
+): Promise<string | undefined> {
+  const delivered = `openLink ${link}: opened`;
+  let last = 'not sent';
+  for (let attempt = 1; attempt <= RESET_ATTEMPTS; attempt += 1) {
+    try {
+      await ctx.probe.openLink(link);
+      const deadline = ctx.clock.now() + RESET_CONFIRM_MS;
+      for (;;) {
+        last = await ctx.probe.lastOutcome();
+        if (last === delivered) return undefined;
+        if (!last.endsWith(': pending') || ctx.clock.now() >= deadline) break;
+        await ctx.clock.sleep(RESET_POLL_MS);
+      }
+    } catch (error) {
+      last = String(error);
+    }
+    ctx.log(`design-gate: reset ${link} not confirmed (attempt ${attempt}): ${last}`);
+  }
+  return last;
+}
+
 export async function runMatrix(
   ctx: CaptureContext,
   cells: readonly CellConfig[],
@@ -964,6 +1191,20 @@ export async function runMatrix(
   const outcome: RunOutcome = { cells: [], findings: [], skipped: [] };
   const trees = new Map<string, LayoutTree>();
   let baseWindow: ProbeEnv['window'] | undefined;
+  // A forced state whose reset was not confirmed. It outlives the cell: every
+  // later target, in this cell or the next, would be measured in that state,
+  // so each cell first sends the reset again, and the run's restore does too.
+  let leaked: { link: string; reason: string } | undefined;
+  const retryLeakedReset = async (): Promise<string | undefined> => {
+    if (leaked === undefined) return undefined;
+    const failure = await openResetLink(ctx, leaked.link);
+    if (failure === undefined) {
+      ctx.log(`design-gate: the forced state is cleared now (${leaked.reason})`);
+      leaked = undefined;
+      return undefined;
+    }
+    return `${leaked.reason}; the reset is still unconfirmed: ${failure}`;
+  };
   let restored: Promise<unknown[]> | undefined;
   const restoreState = (): Promise<unknown[]> => {
     restored ??= (async () => {
@@ -973,6 +1214,8 @@ export async function runMatrix(
       } catch (error) {
         errors.push(error);
       }
+      const leftState = await retryLeakedReset();
+      if (leftState !== undefined) errors.push(new Error(leftState));
       try {
         await ensureLanguage(ctx, baseline);
       } catch (error) {
@@ -1035,7 +1278,16 @@ export async function runMatrix(
       if (cellLanguage === undefined) continue;
       await ctx.clock.sleep(CONFIG_SETTLE_MS);
       const seen = new Map<string, string>();
+      const leftState = await retryLeakedReset();
       for (const [index, target] of targets.entries()) {
+        if (leaked !== undefined) {
+          outcome.skipped.push({
+            cell: config.id,
+            target: target.id,
+            reason: leftState ?? leaked.reason,
+          });
+          continue;
+        }
         try {
           const targetLanguage = await ensureLanguage(ctx, language);
           const languageReady = targetLanguage.matched;
@@ -1043,12 +1295,20 @@ export async function runMatrix(
           // target itself caused (the previous target switched the app language)
           // leaves this target cold whatever its index.
           const warm = targetLanguage.reloaded || (cellLanguage.reloaded && index === 0);
+          // The reset runs whether the capture succeeds or fails, and it never
+          // throws, so neither outcome is replaced by a reset failure.
           const { sampled, screen, unopened, image } = await captureScreen(
             ctx,
             config.id,
             target,
             warm
-          );
+          ).finally(async () => {
+            if (target.after === undefined) return;
+            const failure = await openResetLink(ctx, target.after);
+            if (failure === undefined) return;
+            leaked = { link: target.after, reason: `${target.id} left a forced state: ${failure}` };
+            ctx.log(`design-gate: ${leaked.reason}; later targets are skipped until a reset lands`);
+          });
           const { dump } = sampled;
           run.env ??= dump.env;
           run.screens.push(screen);
@@ -1093,7 +1353,13 @@ export async function runMatrix(
             );
             continue;
           }
-          const mismatches = envMismatches(config, dump.env, baseWindow, language.resolved);
+          const mismatches = envMismatches(
+            config,
+            dump.env,
+            baseWindow,
+            language.resolved,
+            ctx.device.platform
+          );
           if (mismatches.length > 0) {
             outcome.findings.push(envMismatchFinding(config.id, target.id, dump, mismatches));
             continue;
@@ -1107,6 +1373,7 @@ export async function runMatrix(
               tree,
               image,
               sampled,
+              held: target.hold === true,
             })
           );
           if (!sampled.settled) continue;

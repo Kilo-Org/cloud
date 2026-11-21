@@ -46,6 +46,7 @@ const REGION_CHOICES = [
  */
 export function GatewaySettingsSection({
   organizationId,
+  canManageBilling = false,
   settings,
   isError,
   isFetching,
@@ -53,6 +54,8 @@ export function GatewaySettingsSection({
   onRetry,
 }: Readonly<{
   organizationId: string;
+  /** Whether the reader may change the plan; it picks the refusal's sentence. */
+  canManageBilling?: boolean;
   settings: OrgGatewaySettings | undefined;
   isError: boolean;
   isFetching: boolean;
@@ -60,7 +63,7 @@ export function GatewaySettingsSection({
   onRetry: () => void;
 }>) {
   const { t } = useTranslation();
-  const save = useSaveOrgGatewaySettings(organizationId);
+  const save = useSaveOrgGatewaySettings(organizationId, canManageBilling);
   const [regionPickerOpen, setRegionPickerOpen] = useState(false);
   const region: RegionChoice = settings?.data_region ?? 'global';
 
@@ -126,8 +129,10 @@ export function GatewaySettingsSection({
             }}
           />
         </RowGroup>
-        <Text variant="caption">{t('organizationModelAccess.inferenceRegionDescription')}</Text>
-        <Text variant="caption">{t('organizationModelAccess.disableOpenrouterNote')}</Text>
+        <View className="gap-3">
+          <Text variant="caption">{t('organizationModelAccess.inferenceRegionDescription')}</Text>
+          <Text variant="caption">{t('organizationModelAccess.disableOpenrouterNote')}</Text>
+        </View>
       </SettingsSection>
       <MenuSheet
         visible={regionPickerOpen}

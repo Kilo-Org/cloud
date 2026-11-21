@@ -15,6 +15,11 @@ import {
 export const offlineState: ConnectivityState = { isConnected: true, isInternetReachable: false };
 export const onlineState: ConnectivityState = { isConnected: true, isInternetReachable: true };
 export const unknownState: ConnectivityState = { isConnected: null, isInternetReachable: null };
+// A definite NetInfo disconnect: the radio reports no connection at all.
+export const disconnectedState: ConnectivityState = {
+  isConnected: false,
+  isInternetReachable: null,
+};
 // The radio-back-without-reachability case (uxs3 spot check, e6-after-net:
 // airplane mode → 3G while NetInfo's external probe never answers).
 export const radioUpUnknownState: ConnectivityState = {

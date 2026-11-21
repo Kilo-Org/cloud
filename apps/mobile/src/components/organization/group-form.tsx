@@ -1,14 +1,17 @@
+/* eslint-disable max-lines -- one form: the wrapper that owns the durable draft, the loading shape it gates a create on, and the body that seeds from it */
 import { type Href, useNavigation, useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
-import { Search } from '@/components/ui/icons';
 
 import { GroupMemberPicker } from '@/components/organization/group-member-picker';
 import {
+  filterOrgGroupMembers,
   isOrgGroupFormDirty,
+  isOrgGroupFormDraft,
   ORG_GROUP_DESCRIPTION_MAX_LENGTH,
   ORG_GROUP_NAME_MAX_LENGTH,
+  type OrgGroupFormDraft,
   orgGroupFormExit,
   orgGroupNameError,
   selectOrgGroupMemberPickerState,
@@ -23,10 +26,11 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldLabel } from '@/components/ui/form-field-label';
-import { Input } from '@/components/ui/input';
+import { SearchField } from '@/components/ui/search-field';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 import { type OrgGroup, useOrgGroupMutations } from '@/lib/hooks/use-org-groups-queries';
-import { FIELD_TRIGGER_FRAME_CLASS } from '@/lib/a11y/tap-target';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import {
   type ActiveOrgMember,
@@ -36,8 +40,8 @@ import {
 import { usePopOnce } from '@/lib/navigation/pop-once';
 import { armLeaveSettle } from '@/lib/navigation/leave-settle';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
-import { cn } from '@/lib/utils';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { orgGroupFormDraftKey } from '@/lib/persist/drafts';
+import { type FormDraftState, useFormDraft } from '@/lib/persist/use-form-draft';
 
 const GROUPS_LIST_PATH = '/(app)/(tabs)/(3_profile)/organization/groups' as const;
 const GROUP_FORM_PATH = '/(app)/(tabs)/(3_profile)/organization/group-form' as const;
@@ -55,10 +59,83 @@ type StackNavigation = {
   isFocused: () => boolean;
 };
 
+/** The branch of `useFormDraft` a mounted body reads. */
+type FormDraft<T> = Extract<FormDraftState<T>, { kind: 'ready' }>;
+
 type GroupFormProps = Readonly<{
   organizationId: string;
+  /** Whether the reader may change the plan; it picks the refusal's sentence. */
+  canManageBilling?: boolean;
   /** The group being edited, or undefined to create one. */
   group: OrgGroup | undefined;
+}>;
+
+/**
+ * One organization group, created or edited, on top of the form's durable draft.
+ *
+ * A device language change that flips the text direction reloads the JS bundle
+ * (`apply-language.ts`), which kills the React tree without running its cleanup,
+ * so the fields' text and the member selection live in the encrypted draft store
+ * as well as in their refs. This wrapper owns that store: it loads the draft
+ * under the current account and the group's own key, and hands the body the
+ * loaded value.
+ */
+export function GroupForm({ organizationId, canManageBilling = false, group }: GroupFormProps) {
+  const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
+  const draft = useFormDraft<OrgGroupFormDraft>({
+    userId,
+    isIdentityLoading,
+    entityKey: orgGroupFormDraftKey(organizationId, group?.id ?? null),
+    validate: isOrgGroupFormDraft,
+  });
+  // A create gated on the draft and an edit does not: a create has nothing to
+  // show without it — there is no server record — so it holds its loading state
+  // until the store answers and its uncontrolled fields seed once, never
+  // twice; an edit already has the server row, so it shows that at once and the
+  // body applies a restored draft only while the person has not typed.
+  if (group === undefined && draft.kind === 'loading') {
+    return <GroupFormSkeleton />;
+  }
+
+  return (
+    <GroupFormBody
+      organizationId={organizationId}
+      canManageBilling={canManageBilling}
+      group={group}
+      draft={{
+        kind: 'ready',
+        value: draft.kind === 'ready' ? draft.value : null,
+        save: draft.save,
+        clear: draft.clear,
+      }}
+    />
+  );
+}
+
+/**
+ * The create form's shape while its stored draft loads: the name row, the
+ * description block, then the action bar.
+ */
+function GroupFormSkeleton() {
+  const { t } = useTranslation();
+  return (
+    <View className="flex-1 bg-background">
+      <ScreenHeader title={t('organization.groups.create')} />
+      <View className={SCREEN_BODY_CLASS}>
+        <Skeleton className="h-11 rounded-lg" />
+        <Skeleton className="h-20 rounded-lg" />
+        <Skeleton className="h-11 rounded-lg" />
+      </View>
+    </View>
+  );
+}
+
+type GroupFormBodyProps = Readonly<{
+  organizationId: string;
+  /** Whether the reader may change the plan; it picks the refusal's sentence. */
+  canManageBilling: boolean;
+  group: OrgGroup | undefined;
+  draft: FormDraft<OrgGroupFormDraft>;
 }>;
 
 /**
@@ -73,27 +150,14 @@ type GroupFormProps = Readonly<{
  * The route admits an owner or admin only — the mutations are
  * `organizationAdminMutationProcedure` — and hands this form the group it resolves.
  */
-export function GroupForm({ organizationId, group }: GroupFormProps) {
+function GroupFormBody({ organizationId, canManageBilling, group, draft }: GroupFormBodyProps) {
   const router = useRouter();
   const navigation = useNavigation<StackNavigation>();
   const popOnce = usePopOnce();
   const stackSafeReplace = useStackSafeReplace();
   const { t } = useTranslation();
-  const colors = useThemeColors();
-  const mutations = useOrgGroupMutations(organizationId);
+  const mutations = useOrgGroupMutations(organizationId, canManageBilling);
   const orgWithMembers = useOrgWithMembers(organizationId);
-  const nameRef = useRef(group?.name ?? '');
-  const descriptionRef = useRef(group?.description ?? '');
-  const memberSearchRef = useRef('');
-  const [memberIds, setMemberIds] = useState<readonly string[]>(
-    sortOrgGroupMemberIds(group?.memberIds ?? [])
-  );
-  const [memberQuery, setMemberQuery] = useState('');
-  const [nameError, setNameError] = useState<'required' | 'tooLong' | null>(null);
-  const [dirty, setDirty] = useState(false);
-  const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<'name'>();
-  const guard = useMetadataLeaveGuard({ enabled: true });
-  const { confirm, dialog } = useConfirmDialog();
   const initial =
     group === undefined
       ? null
@@ -102,6 +166,36 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
           description: group.description ?? '',
           memberIds: sortOrgGroupMemberIds(group.memberIds),
         };
+  // The best content this body already has: the restored draft, else the group
+  // it edits, else an empty create form.
+  const restored = draft.value;
+  const seed: OrgGroupFormDraft = {
+    name: restored?.name ?? initial?.name ?? '',
+    description: restored?.description ?? initial?.description ?? '',
+    memberIds: sortOrgGroupMemberIds(restored?.memberIds ?? initial?.memberIds ?? []),
+    memberQuery: restored?.memberQuery ?? '',
+  };
+  const nameRef = useRef(seed.name);
+  const descriptionRef = useRef(seed.description);
+  const memberSearchRef = useRef(seed.memberQuery);
+  const [memberIds, setMemberIds] = useState<readonly string[]>(seed.memberIds);
+  const [memberQuery, setMemberQuery] = useState(seed.memberQuery);
+  const [nameError, setNameError] = useState<'required' | 'tooLong' | null>(null);
+  const [dirty, setDirty] = useState(false);
+  // A restored draft that arrived after this body mounted re-seeds the
+  // uncontrolled fields and the search by remounting them under this key.
+  const [applyGeneration, setApplyGeneration] = useState(0);
+  // Set by the first edit of any field: a restored draft never overwrites text
+  // the person typed.
+  const touchedRef = useRef(false);
+  // A draft that already seeded the mount (or the create's gate) is applied.
+  const appliedRef = useRef(draft.value !== null);
+  const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<'name'>();
+  const saving = mutations.create.isPending || mutations.updateDetails.isPending;
+  const removing = mutations.remove.isPending;
+  const busy = saving || removing;
+  const guard = useMetadataLeaveGuard({ enabled: true, saving: busy, onDiscard: draft.clear });
+  const { confirm, dialog } = useConfirmDialog();
 
   const syncDirty = (nextMemberIds: readonly string[] = memberIds) => {
     const next = isOrgGroupFormDirty(
@@ -112,11 +206,62 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
       },
       initial
     );
-    if (next !== dirty) {
-      setDirty(next);
-      guard.handleDirtyChange(next);
-    }
+    setDirty(next);
+    // Reported on every edit, not only on a change of this form's own verdict: a
+    // caller-driven leave whose pop the navigator dropped leaves the form mounted
+    // with `dirty` still true while the guard stands down, so a gated report would
+    // never re-arm it and a later Back would leave silently with the draft. The
+    // hook's `setState` bails out on an unchanged value, so repeating the verdict
+    // costs nothing.
+    guard.handleDirtyChange(next);
   };
+
+  /** The whole form into the durable draft, since a reload runs no cleanup. */
+  const saveDraftValues = (
+    nextMemberIds: readonly string[] = memberIds,
+    nextMemberQuery: string = memberQuery
+  ) => {
+    touchedRef.current = true;
+    draft.save({
+      name: nameRef.current,
+      description: descriptionRef.current,
+      memberIds: nextMemberIds,
+      memberQuery: nextMemberQuery,
+    });
+  };
+
+  /** One edit of the saved fields: the guard's verdict, then the draft. */
+  const editValues = (nextMemberIds: readonly string[] = memberIds) => {
+    syncDirty(nextMemberIds);
+    saveDraftValues(nextMemberIds);
+  };
+
+  // The guard arms from the mount, not from the first keystroke: a body that
+  // opened on a restored draft (the reload this draft exists for) would
+  // otherwise let a Back leave without asking.
+  useEffect(() => {
+    syncDirty();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one mount verdict over the content the body opened with
+  }, []);
+
+  // The restored draft that arrived after an edit body mounted: applied once,
+  // and only while the person has not typed into any field.
+  useEffect(() => {
+    const arrived = draft.value;
+    if (arrived === null || touchedRef.current || appliedRef.current) {
+      return;
+    }
+    appliedRef.current = true;
+    const arrivedMemberIds = sortOrgGroupMemberIds(arrived.memberIds);
+    nameRef.current = arrived.name;
+    descriptionRef.current = arrived.description;
+    memberSearchRef.current = arrived.memberQuery;
+    setMemberIds(arrivedMemberIds);
+    setMemberQuery(arrived.memberQuery);
+    setApplyGeneration(generation => generation + 1);
+    syncDirty(arrivedMemberIds);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the restored value: the refs are one mutable object and the setters are stable
+  }, [draft.value]);
 
   const leaveToList = () => {
     guard.leaveWithoutAsking(() => {
@@ -155,16 +300,17 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
     });
   };
 
+  // The draft became the saved record (or the record is gone), so its stored
+  // copy goes before the screen leaves.
+  const leaveAfterSave = () => {
+    draft.clear();
+    leaveToList();
+  };
+
   const activeMembers: readonly ActiveOrgMember[] = (orgWithMembers.data?.members ?? []).filter(
     member => isActiveOrgMember(member)
   );
-  const query = memberQuery.trim().toLowerCase();
-  const visibleMembers =
-    query.length === 0
-      ? activeMembers
-      : activeMembers.filter(member =>
-          `${member.name} ${member.email}`.toLowerCase().includes(query)
-        );
+  const visibleMembers = filterOrgGroupMembers(activeMembers, memberQuery);
   const visibleMemberIds = visibleMembers.map(member => member.id);
   const selectedVisibleCount = visibleMemberIds.filter(id => memberIds.includes(id)).length;
   const allVisibleSelected =
@@ -190,6 +336,7 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
     if (group === undefined) {
       mutations.create.mutate(payload, {
         onSuccess: created => {
+          draft.clear();
           // Members belong to a group that exists, so the created group opens
           // its own form for that step instead of dropping the selection. The
           // form it replaces is retired once that push has landed: swapping two
@@ -207,7 +354,7 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
     }
     mutations.updateDetails.mutate(
       { groupId: group.id, ...payload, userIds: memberIds },
-      { onSuccess: leaveToList }
+      { onSuccess: leaveAfterSave }
     );
   };
 
@@ -220,14 +367,10 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
       message: t('organization.groups.deleteMessage'),
       confirmLabel: t('organization.groups.deleteAction'),
       onConfirm: () => {
-        mutations.remove.mutate({ groupId: group.id }, { onSuccess: leaveToList });
+        mutations.remove.mutate({ groupId: group.id }, { onSuccess: leaveAfterSave });
       },
     });
   };
-
-  const saving = mutations.create.isPending || mutations.updateDetails.isPending;
-  const removing = mutations.remove.isPending;
-  const busy = saving || removing;
 
   return (
     <View className="flex-1 bg-background">
@@ -240,83 +383,88 @@ export function GroupForm({ organizationId, group }: GroupFormProps) {
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
-        <FormField
-          label={t('organization.groups.nameLabel')}
-          required
-          containerOnLayout={fieldLayout('name')}
-          defaultValue={nameRef.current}
-          maxLength={ORG_GROUP_NAME_MAX_LENGTH}
-          disabled={busy}
-          error={
-            nameError === null
-              ? undefined
-              : t(
-                  nameError === 'required'
-                    ? 'organization.groups.nameRequired'
-                    : 'organization.groups.nameTooLong'
-                )
-          }
-          onChangeText={value => {
-            nameRef.current = value;
-            syncDirty();
-            if (nameError !== null && orgGroupNameError(value) === null) {
-              setNameError(null);
+        {/* Keyed by the applied draft: a remount re-reads every `defaultValue`
+            from the refs and re-arms the search, which a live uncontrolled
+            input would ignore. */}
+        <Fragment key={applyGeneration}>
+          <FormField
+            label={t('organization.groups.nameLabel')}
+            required
+            containerOnLayout={fieldLayout('name')}
+            defaultValue={nameRef.current}
+            maxLength={ORG_GROUP_NAME_MAX_LENGTH}
+            disabled={busy}
+            error={
+              nameError === null
+                ? undefined
+                : t(
+                    nameError === 'required'
+                      ? 'organization.groups.nameRequired'
+                      : 'organization.groups.nameTooLong'
+                  )
             }
-          }}
-        />
-        <FormField
-          label={t('organization.groups.descriptionLabel')}
-          defaultValue={descriptionRef.current}
-          multiline
-          textAlignVertical="top"
-          maxLength={ORG_GROUP_DESCRIPTION_MAX_LENGTH}
-          className="min-h-20 leading-[1.25rem]"
-          disabled={busy}
-          onChangeText={value => {
-            descriptionRef.current = value;
-            syncDirty();
-          }}
-        />
+            onChangeText={value => {
+              nameRef.current = value;
+              editValues();
+              if (nameError !== null && orgGroupNameError(value) === null) {
+                setNameError(null);
+              }
+            }}
+          />
+          <FormField
+            label={t('organization.groups.descriptionLabel')}
+            defaultValue={descriptionRef.current}
+            multiline
+            textAlignVertical="top"
+            maxLength={ORG_GROUP_DESCRIPTION_MAX_LENGTH}
+            className="min-h-20 leading-[1.25rem]"
+            disabled={busy}
+            onChangeText={value => {
+              descriptionRef.current = value;
+              editValues();
+            }}
+          />
 
-        {group === undefined ? null : (
-          <View className="gap-2">
-            <FormFieldLabel label={t('organization.groups.membersLabel')} />
-            <View className={cn(FIELD_TRIGGER_FRAME_CLASS, 'flex-row items-center gap-2')}>
-              <Search size={16} color={colors.mutedForeground} />
-              <Input
-                className="min-h-10 flex-1 border-0 bg-transparent pl-0"
-                placeholder={t('organization.groups.searchMembers')}
+          {group === undefined ? null : (
+            <View className="gap-2">
+              <FormFieldLabel label={t('organization.groups.membersLabel')} />
+              <SearchField
                 accessibilityLabel={t('organization.groups.membersLabel')}
-                autoCapitalize="none"
-                autoCorrect={false}
+                placeholder={t('organization.groups.searchMembers')}
+                defaultValue={memberSearchRef.current}
+                hasText={memberQuery !== ''}
                 onChangeText={value => {
                   memberSearchRef.current = value;
                   setMemberQuery(value);
+                  // The search is not a saved field, so the guard's verdict stays
+                  // the metadata's; the draft still records it, because a reload
+                  // that lost the filter would look like a different list.
+                  saveDraftValues(memberIds, value);
+                }}
+              />
+              <GroupMemberPicker
+                picker={memberPicker}
+                error={orgWithMembers.error}
+                isRetrying={orgWithMembers.isFetching}
+                onRetry={() => void orgWithMembers.refetch()}
+                visibleMembers={visibleMembers}
+                memberIds={memberIds}
+                allVisibleSelected={allVisibleSelected}
+                busy={busy}
+                onToggleAll={selected => {
+                  const toggled = toggleOrgGroupMembers(memberIds, visibleMemberIds, selected);
+                  setMemberIds(toggled);
+                  editValues(toggled);
+                }}
+                onToggleMember={(memberId, selected) => {
+                  const toggled = toggleOrgGroupMember(memberIds, memberId, selected);
+                  setMemberIds(toggled);
+                  editValues(toggled);
                 }}
               />
             </View>
-            <GroupMemberPicker
-              picker={memberPicker}
-              error={orgWithMembers.error}
-              isRetrying={orgWithMembers.isFetching}
-              onRetry={() => void orgWithMembers.refetch()}
-              visibleMembers={visibleMembers}
-              memberIds={memberIds}
-              allVisibleSelected={allVisibleSelected}
-              busy={busy}
-              onToggleAll={selected => {
-                const toggled = toggleOrgGroupMembers(memberIds, visibleMemberIds, selected);
-                setMemberIds(toggled);
-                syncDirty(toggled);
-              }}
-              onToggleMember={(memberId, selected) => {
-                const toggled = toggleOrgGroupMember(memberIds, memberId, selected);
-                setMemberIds(toggled);
-                syncDirty(toggled);
-              }}
-            />
-          </View>
-        )}
+          )}
+        </Fragment>
 
         <OrgFormActions
           saving={saving}

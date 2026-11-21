@@ -19,7 +19,8 @@ import { EmptyState, StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { type PrInboxView } from '@/components/pr-review/pr-review-inbox-view';
-import { ArrowRight, GitPullRequest } from '@/components/ui/icons';
+import { DirectionalArrowRight } from '@/components/ui/directional-icons';
+import { GitPullRequest } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { type ProviderPrPlatform } from '@/lib/pr-review/provider-pr-ref';
 
@@ -126,7 +127,7 @@ function InboxBody({
           // personal scope, which needs no organization membership.
           <StateAction
             label={t('prReview.inbox.continueInPersonal')}
-            icon={ArrowRight}
+            icon={DirectionalArrowRight}
             onPress={onContinueInPersonal}
           />
         }
@@ -142,6 +143,21 @@ function InboxBody({
           organizationId={organizationId}
         />
       </View>
+    );
+  }
+
+  if (view.kind === 'offline') {
+    // The device has no network, so the copy names the connection and never
+    // the backend. Retry stays: a restored connection makes it useful.
+    return (
+      <QueryError
+        variant="offline"
+        title={t('queryError.offlineTitle')}
+        placement="top"
+        inset="gutter"
+        onRetry={onRetry}
+        isRetrying={isRetrying}
+      />
     );
   }
 

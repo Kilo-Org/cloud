@@ -59,11 +59,11 @@ export type EnkryptGuardrailCall = {
   scannedCharacters: number;
   /** The text the scan covers, including what the verdict cache covered; see the ledger column. */
   totalCharacters: number;
+  /** How long this Enkrypt call took, in milliseconds; see the ledger column. */
+  addedLatencyMs: number;
 };
 
 export type EnkryptUsageRecord = EnkryptGuardrailCall & {
-  /** The request's wait for the verdict, on one call per request only; see the ledger column. */
-  addedLatencyMs: number | null;
   /** Defaults to the input guardrail. */
   guardrail?: EnkryptGuardrailDirection;
 };
@@ -192,12 +192,13 @@ async function detectorIds(
  * Runs on the primary; gateway code calls `recordEnkryptUsage` instead.
  */
 export async function recordEnkryptUsageLocally(
-  usageWrite: EnkryptUsageWrite
+  usageWrite: EnkryptUsageWrite,
+  fromDb: typeof db = db
 ): Promise<EnkryptUsageWriteResponse['status']> {
   const { id, occurredAt } = usageWrite;
   const chargedMicrodollars = enkryptCreditsToMicrodollars(usageWrite.creditsCost);
 
-  const outcome = await db.transaction(async tx => {
+  const outcome = await fromDb.transaction(async tx => {
     const apiKindId = await lookupId(
       () =>
         tx

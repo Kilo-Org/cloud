@@ -219,6 +219,8 @@ describe('safe tool runtime browser dispatch', () => {
     expect(mocks.sendMessage).toHaveBeenCalledWith({
       arguments: { target: 'e5' },
       caller: browserCaller,
+      // Safe mode's read-only set cannot answer a dialog, so the message says so.
+      safeMode: true,
       tabId: 7,
       takeOver: false,
       tool: 'kilo_browser_click',

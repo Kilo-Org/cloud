@@ -9,12 +9,13 @@ import {
   native_attested_keys,
 } from '@kilocode/db/schema';
 import type { Organization } from '@workos-inc/node';
-import { and, eq, getTableName, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, eq, getTableName, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
 import {
   cleanupExpiredDeviceRefreshTokens,
   createDeviceSession,
   createDeviceSessionWithAttestedKey,
+  createDeviceSessionWithCredentials,
   issueSessionCredentials,
   rotateRefreshToken,
   revokeDeviceSession,
@@ -28,6 +29,8 @@ import {
 } from '@kilocode/web-shared/lib/auth/device-session-cache';
 import { isBlockedTLD } from '@kilocode/web-shared/lib/user/domain-gates';
 import { isEmailBlacklisted } from '@kilocode/web-shared/lib/blacklist-domains-config';
+import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import type * as TokensModule from '@kilocode/web-shared/lib/tokens';
 import { getWorkOSOrganization } from '@/lib/user';
 
 jest.mock('@kilocode/web-shared/lib/user/domain-gates', () => ({
@@ -45,9 +48,19 @@ jest.mock('@/lib/user', () => ({
   getWorkOSOrganization: jest.fn(),
 }));
 
+// Token generation is the first step of minting a pair, so failing it proves a
+// mint failure rolls back the rows the transaction wrote before it.
+jest.mock('@kilocode/web-shared/lib/tokens', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/tokens') as object),
+  generateApiToken: jest.fn(),
+}));
+
+const actualTokens = jest.requireActual<typeof TokensModule>('@kilocode/web-shared/lib/tokens');
+
 const mockIsEmailBlacklisted = jest.mocked(isEmailBlacklisted);
 const mockIsBlockedTLD = jest.mocked(isBlockedTLD);
 const mockGetWorkOSOrganization = jest.mocked(getWorkOSOrganization);
+const mockGenerateApiToken = jest.mocked(generateApiToken);
 
 describe('device-sessions', () => {
   const testUserId = 'test-user-ds-' + Date.now();
@@ -59,6 +72,7 @@ describe('device-sessions', () => {
     mockIsEmailBlacklisted.mockResolvedValue(false);
     mockIsBlockedTLD.mockResolvedValue(false);
     mockGetWorkOSOrganization.mockResolvedValue(null);
+    mockGenerateApiToken.mockImplementation(actualTokens.generateApiToken);
 
     await db.insert(kilocode_users).values({
       id: testUserId,
@@ -200,6 +214,144 @@ describe('device-sessions', () => {
       expect(live.map(row => row.id)).toEqual(
         expect.arrayContaining([...seeded.map(row => row.id), deviceAuthSessionId])
       );
+    });
+
+    test('a lost claim rolls back the session and the cap eviction it caused', async () => {
+      // Fill the account to the cap so the next insert displaces the oldest
+      // session. A claim that loses must undo both writes, or a duplicate
+      // sign-in at the cap signs another device out for nothing.
+      const seeded: string[] = [];
+      for (let index = 0; index < MAX_LIVE_APP_SESSIONS; index += 1) {
+        seeded.push(await createDeviceSession({ userId: testUserId }));
+      }
+      const oldestSessionId = seeded[0]!;
+
+      const lost = await createDeviceSession({
+        userId: testUserId,
+        claim: async () => false,
+      });
+
+      expect(lost).toBeNull();
+
+      const rows = await db
+        .select({
+          id: device_sessions.id,
+          revoked_at: device_sessions.revoked_at,
+          revoked_reason: device_sessions.revoked_reason,
+        })
+        .from(device_sessions)
+        .where(eq(device_sessions.kilo_user_id, testUserId));
+
+      // No surplus row survived the rollback.
+      expect(rows).toHaveLength(MAX_LIVE_APP_SESSIONS);
+      // The session the insert had displaced is still live.
+      const oldest = rows.find(row => row.id === oldestSessionId);
+      expect(oldest?.revoked_at).toBeNull();
+      expect(oldest?.revoked_reason).toBeNull();
+      expect(rows.filter(row => row.revoked_at === null)).toHaveLength(MAX_LIVE_APP_SESSIONS);
+    });
+
+    test('a lost claim on the credential path rolls back the session and its tokens', async () => {
+      const seeded: string[] = [];
+      for (let index = 0; index < MAX_LIVE_APP_SESSIONS; index += 1) {
+        seeded.push(await createDeviceSession({ userId: testUserId }));
+      }
+      const oldestSessionId = seeded[0]!;
+
+      const lost = await createDeviceSessionWithCredentials({
+        userId: testUserId,
+        user: fakeUser,
+        claim: async () => false,
+      });
+
+      expect(lost).toBeNull();
+
+      const rows = await db
+        .select({ id: device_sessions.id, revoked_at: device_sessions.revoked_at })
+        .from(device_sessions)
+        .where(eq(device_sessions.kilo_user_id, testUserId));
+
+      expect(rows).toHaveLength(MAX_LIVE_APP_SESSIONS);
+      expect(rows.find(row => row.id === oldestSessionId)?.revoked_at).toBeNull();
+
+      // The attempt minted no refresh token for any session of this account.
+      const tokens = await db
+        .select({ token_hash: device_refresh_tokens.token_hash })
+        .from(device_refresh_tokens)
+        .where(
+          inArray(
+            device_refresh_tokens.device_session_id,
+            rows.map(row => row.id)
+          )
+        );
+      expect(tokens).toHaveLength(0);
+    });
+
+    test('a claim that settles runs inside the transaction and the session commits', async () => {
+      // The claim must receive the session's transaction: if it were handed the
+      // pool, its write would commit even when the session rolled back. Prove it
+      // by reading the just-inserted session through the executor the claim got.
+      let sawOwnRow = false;
+      const sessionId = await createDeviceSession({
+        userId: testUserId,
+        claim: async (tx: DrizzleTransaction) => {
+          const [row] = await tx
+            .select({ id: device_sessions.id })
+            .from(device_sessions)
+            .where(eq(device_sessions.kilo_user_id, testUserId));
+          sawOwnRow = row !== undefined;
+          return true;
+        },
+      });
+
+      expect(sawOwnRow).toBe(true);
+      expect(sessionId).not.toBeNull();
+      const [row] = await db
+        .select({ revoked_at: device_sessions.revoked_at })
+        .from(device_sessions)
+        .where(eq(device_sessions.id, sessionId!));
+      expect(row?.revoked_at).toBeNull();
+    });
+
+    test('a claim write through the transaction is rolled back with a lost claim', async () => {
+      // A claim that writes through its executor must leave nothing behind when
+      // it loses. The write must be an INSERT: an update matches no row through
+      // the pool either, because the session this transaction inserted is not
+      // committed yet, so an update could not tell the two executors apart. An
+      // insert through the pool commits and survives the rollback; an insert
+      // through the transaction rolls back with the session.
+      const marker = `claim-marker-${Date.now()}`;
+      const lost = await createDeviceSession({
+        userId: testUserId,
+        claim: async (tx: DrizzleTransaction) => {
+          await tx.insert(device_sessions).values({ kilo_user_id: testUserId, user_agent: marker });
+          return false;
+        },
+      });
+
+      expect(lost).toBeNull();
+      const rows = await db
+        .select({ user_agent: device_sessions.user_agent })
+        .from(device_sessions)
+        .where(eq(device_sessions.user_agent, marker));
+      expect(rows).toHaveLength(0);
+    });
+
+    test('a claim that throws rejects instead of reporting a lost claim', async () => {
+      await expect(
+        createDeviceSession({
+          userId: testUserId,
+          claim: async () => {
+            throw new Error('claim store down');
+          },
+        })
+      ).rejects.toThrow('claim store down');
+
+      const rows = await db
+        .select({ id: device_sessions.id })
+        .from(device_sessions)
+        .where(eq(device_sessions.kilo_user_id, testUserId));
+      expect(rows).toHaveLength(0);
     });
   });
 
@@ -1067,7 +1219,6 @@ describe('device-sessions', () => {
 
     test('persists the key, the session, and the refresh token together', async () => {
       const result = await createDeviceSessionWithAttestedKey({
-        userId: testUserId,
         userAgent: 'attested-agent',
         user: fakeUser,
         verification: {
@@ -1126,7 +1277,6 @@ describe('device-sessions', () => {
       );
 
       await createDeviceSessionWithAttestedKey({
-        userId: testUserId,
         user: fakeUser,
         verification: {
           ok: true,
@@ -1154,14 +1304,12 @@ describe('device-sessions', () => {
 
       try {
         await createDeviceSessionWithAttestedKey({
-          userId: otherUserId,
-          user: fakeUser,
+          user: { ...fakeUser, id: otherUserId },
           verification: { ok: true, platform: 'ios', keyId, publicKey: 'Zmlyc3Q=' },
         });
 
         await expect(
           createDeviceSessionWithAttestedKey({
-            userId: testUserId,
             user: fakeUser,
             verification: { ok: true, platform: 'ios', keyId, publicKey: 'c2Vjb25k' },
           })
@@ -1183,6 +1331,69 @@ describe('device-sessions', () => {
       } finally {
         await db.delete(kilocode_users).where(eq(kilocode_users.id, otherUserId));
       }
+    });
+  });
+
+  describe('createDeviceSessionWithCredentials', () => {
+    test('creates the session and its credential pair together', async () => {
+      const result = await createDeviceSessionWithCredentials({
+        userId: testUserId,
+        userAgent: 'plain-agent',
+        user: fakeUser,
+      });
+
+      const sessions = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.id, result.sessionId));
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0]!.kilo_user_id).toBe(testUserId);
+      expect(sessions[0]!.user_agent).toBe('plain-agent');
+      expect(sessions[0]!.revoked_at).toBeNull();
+
+      const refreshRows = await db
+        .select()
+        .from(device_refresh_tokens)
+        .where(eq(device_refresh_tokens.device_session_id, result.sessionId));
+      expect(refreshRows).toHaveLength(1);
+      expect(refreshRows[0]!.token_hash).toBe(
+        createHash('sha256').update(result.refreshToken).digest('hex')
+      );
+
+      expect(result.token.length).toBeGreaterThan(0);
+      expect(result.expiresIn).toBe(3600);
+    });
+
+    test('rolls back the session insert when minting the pair fails', async () => {
+      // The mint generates the access token before it writes the refresh token,
+      // so a failure here happens inside the transaction, after the session
+      // insert.
+      mockGenerateApiToken.mockImplementationOnce(() => {
+        throw new Error('synthetic mint failure');
+      });
+
+      await expect(
+        createDeviceSessionWithCredentials({
+          userId: testUserId,
+          userAgent: 'plain-agent',
+          user: fakeUser,
+        })
+      ).rejects.toThrow('synthetic mint failure');
+
+      const sessions = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.kilo_user_id, testUserId));
+      expect(sessions).toHaveLength(0);
+
+      const refreshRows = await db
+        .select()
+        .from(device_refresh_tokens)
+        .innerJoin(device_sessions, eq(device_refresh_tokens.device_session_id, device_sessions.id))
+        .where(eq(device_sessions.kilo_user_id, testUserId));
+      expect(refreshRows).toHaveLength(0);
+
+      mockGenerateApiToken.mockImplementation(actualTokens.generateApiToken);
     });
   });
 });

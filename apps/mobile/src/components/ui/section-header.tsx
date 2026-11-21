@@ -1,9 +1,10 @@
 import { type ReactNode } from 'react';
-import { I18nManager, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
 import { SECTION_ACTION_BOX_CLASS, SECTION_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
+import { hasRtlScript, keepsLatinDisplay } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
 type SectionHeaderProps = {
@@ -68,6 +69,13 @@ export function SectionHeader({
   inset = false,
 }: Readonly<SectionHeaderProps>) {
   const hasAction = Boolean(actionLabel && onActionPress) && !(actionHidden && notice);
+  // The action's display treatment follows the copy's script, not the interface
+  // direction: only right-to-left script copy drops the capitals and tracking
+  // (`keepsLatinDisplay`, shared with the eyebrow variant in `text.tsx`), so a
+  // Latin "SEE ALL" keeps the look of the eyebrow beside it in an RTL screen.
+  // Only an action resolves it: a header without one never reads the interface
+  // direction, which is what a mounted suite stubbing `react-native` relies on.
+  const actionKeepsLatinDisplay = hasAction && keepsLatinDisplay(hasRtlScript(actionLabel));
   // A section label is a heading: a reader navigates a long settings screen by
   // jumping between them, and the role is what makes them jump targets.
   const labelText = (
@@ -106,7 +114,11 @@ export function SectionHeader({
     <View className={cn('flex-row flex-wrap items-end gap-2 py-2', inset && SCREEN_GUTTER_CLASS)}>
       {labelNode}
       {notice ? (
-        <View className="min-w-0 shrink grow basis-0 flex-row items-center justify-end gap-2">
+        // The slot spans the row's `py-2` and cancels it again (`-my-2 py-2`),
+        // so it keeps the one-line height while a line-sized action inside it
+        // (Home's `Retry`, a 28 dp box over a 14 dp line) lies wholly inside the
+        // slot: Android delivers a touch only inside the parent view.
+        <View className="-my-2 min-w-0 shrink grow basis-0 flex-row items-center justify-end gap-2 py-2">
           {notice}
         </View>
       ) : null}
@@ -159,11 +171,12 @@ export function SectionHeader({
               // The muted ink is the disabled read; the enabled action keeps the
               // accent at full strength, so only it reads ready.
               actionDisabled ? 'text-muted-foreground' : 'text-primary',
-              // LTR-only: the letterspaced capitals break a cursive script's
-              // joins, so an RTL action label drops them (home-ar-loading).
-              // The class string is the eyebrow variant's, so the two labels
-              // cannot drift apart.
-              !I18nManager.isRTL && EYEBROW_LATIN_DISPLAY
+              // The letterspaced capitals break a cursive script's joins, so
+              // right-to-left script copy drops them (home-ar-loading) while
+              // Latin copy keeps them in either direction. The class string and
+              // the script rule are the eyebrow variant's, so the two labels of
+              // one row cannot drift apart.
+              actionKeepsLatinDisplay && EYEBROW_LATIN_DISPLAY
             )}
           >
             {actionLabel}

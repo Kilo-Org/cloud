@@ -14,8 +14,11 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { db } from '@kilocode/web-shared/lib/drizzle';
-import { queueWriterAdmission } from '@kilocode/web-shared/lib/ai-gateway/usage-writer-admission';
+import { db, taggedWriterDb } from '@kilocode/web-shared/lib/drizzle';
+import {
+  queueWriterAdmission,
+  taggedWriterAdmission,
+} from '@kilocode/web-shared/lib/ai-gateway/usage-writer-admission';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { POST } from './route';
@@ -36,7 +39,7 @@ afterEach(() => {
 async function holdNonLlmSlots(): Promise<HeldSlot[]> {
   const held: HeldSlot[] = [];
   for (let attempt = 0; attempt <= SHARED_LIMIT; attempt++) {
-    const slot = await queueWriterAdmission.acquire('queue', randomUUID(), {
+    const slot = await taggedWriterAdmission.acquire('queue', randomUUID(), {
       maxWaitMs: 0,
       writerClass: 'non_llm',
     });
@@ -130,8 +133,8 @@ async function debitedMicrodollars(record: ExaUsageRecord) {
 function heldWrite() {
   const settle = Promise.withResolvers<void>();
   const started = Promise.withResolvers<void>();
-  const transaction = db.transaction.bind(db);
-  jest.spyOn(db, 'transaction').mockImplementationOnce(async (...args) => {
+  const transaction = taggedWriterDb.transaction.bind(taggedWriterDb);
+  jest.spyOn(taggedWriterDb, 'transaction').mockImplementationOnce(async (...args) => {
     started.resolve();
     await settle.promise;
     return transaction(...args);
@@ -277,13 +280,14 @@ describe(`POST ${EXA_USAGE_WRITE_PATH}`, () => {
   test('returns the overload body for a queue write when admission is full, without writing', async () => {
     const record = await personalRecord();
     const acquire = jest
-      .spyOn(queueWriterAdmission, 'acquire')
+      .spyOn(taggedWriterAdmission, 'acquire')
       .mockResolvedValueOnce({ admitted: false, reason: 'queue_limit' });
-    const transaction = jest.spyOn(db, 'transaction');
+    const transaction = jest.spyOn(taggedWriterDb, 'transaction');
 
     const response = await post(record, fromQueue);
 
     expect(response.status).toBe(429);
+    expect(response.headers.get('x-usage-class-limit')).toBeNull();
     await expect(response.json()).resolves.toEqual({
       error: 'Usage writer overloaded',
       reason: 'queue_limit',
@@ -300,13 +304,14 @@ describe(`POST ${EXA_USAGE_WRITE_PATH}`, () => {
   test('rejects a queue write over the non-LLM ceiling with 429 and no write, leaving LLM slots free', async () => {
     const record = await personalRecord();
     jest.spyOn(console, 'warn').mockImplementation(() => {});
-    const transaction = jest.spyOn(db, 'transaction');
+    const transaction = jest.spyOn(taggedWriterDb, 'transaction');
     const nonLlm = await holdNonLlmSlots();
 
     const response = await post(record, fromQueue);
 
     expect(nonLlm).toHaveLength(NON_LLM_CEILING);
     expect(response.status).toBe(429);
+    expect(response.headers.get('x-usage-class-limit')).toBe('non_llm');
     await expect(response.json()).resolves.toEqual({
       error: 'Usage writer overloaded',
       reason: 'queue_limit',
@@ -314,14 +319,16 @@ describe(`POST ${EXA_USAGE_WRITE_PATH}`, () => {
     expect(transaction).not.toHaveBeenCalled();
     expect(await logRows(record.userId)).toEqual([]);
     expect(await debitedMicrodollars(record)).toBe(0);
-    expect(holdLlmSlots()).toHaveLength(SHARED_LIMIT - NON_LLM_CEILING);
+    expect(holdLlmSlots()).toHaveLength(SHARED_LIMIT);
   });
 
   test('returns the non-LLM slot after a queue write succeeds and after it throws', async () => {
     const recorded = await personalRecord();
     const failed = await personalRecord();
     jest.spyOn(console, 'error').mockImplementation(() => {});
-    jest.spyOn(db, 'transaction').mockRejectedValueOnce(new Error('synthetic write failure'));
+    jest
+      .spyOn(taggedWriterDb, 'transaction')
+      .mockRejectedValueOnce(new Error('synthetic write failure'));
 
     expect((await post(failed, fromQueue)).status).toBe(500);
     expect((await post(recorded, fromQueue)).status).toBe(200);
@@ -357,7 +364,7 @@ describe(`POST ${EXA_USAGE_WRITE_PATH}`, () => {
   test('keeps the admission slot until a queue write commits', async () => {
     const record = await personalRecord();
     const release = jest.fn();
-    jest.spyOn(queueWriterAdmission, 'acquire').mockResolvedValueOnce({ admitted: true, release });
+    jest.spyOn(taggedWriterAdmission, 'acquire').mockResolvedValueOnce({ admitted: true, release });
     const write = heldWrite();
 
     const pending = post(record, fromQueue);
@@ -375,9 +382,9 @@ describe(`POST ${EXA_USAGE_WRITE_PATH}`, () => {
   test('releases the admission slot after a failed queue write and logs only the usage id', async () => {
     const record = await personalRecord();
     const release = jest.fn();
-    jest.spyOn(queueWriterAdmission, 'acquire').mockResolvedValueOnce({ admitted: true, release });
+    jest.spyOn(taggedWriterAdmission, 'acquire').mockResolvedValueOnce({ admitted: true, release });
     const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
-    jest.spyOn(db, 'transaction').mockRejectedValueOnce(
+    jest.spyOn(taggedWriterDb, 'transaction').mockRejectedValueOnce(
       Object.assign(new Error(`Failed query: insert ... params: ${record.userId}`), {
         cause: Object.assign(new Error('violates foreign key'), {
           code: '23503',
@@ -407,7 +414,7 @@ describe(`POST ${EXA_USAGE_WRITE_PATH}`, () => {
     'writes source %s without taking queue admission',
     async source => {
       const record = await personalRecord();
-      const acquire = jest.spyOn(queueWriterAdmission, 'acquire');
+      const acquire = jest.spyOn(taggedWriterAdmission, 'acquire');
 
       const response = await post(
         record,

@@ -16,8 +16,7 @@ import {
   sessionStatusUpdatedPayloadSchema,
 } from './schemas';
 import { stubUserMessage } from './test-helpers';
-import type { AssociatedPrData, FetchedSessionData } from './session-manager';
-import type { CloudSessionSnapshotPage } from './types';
+import type { AssociatedPrData, CloudSessionSnapshotPage, FetchedSessionData } from './types';
 
 describe('cloudSessionMetadataSchema', () => {
   it('preserves safe environment, PR, spend, and origin metadata without exposing unprojected fields', () => {
@@ -251,6 +250,18 @@ describe('cloudSessionMessagesPageSchema', () => {
 
     expect(parsed?.preparationAttempts).toEqual([attempt]);
     expect(parsed?.queuedMessages).toEqual([queued]);
+  });
+
+  it('states the v1 page version explicitly instead of keeping the wire source', () => {
+    const parsed = cloudSessionMessagesPageSchema.parse({
+      ...page,
+      source: { version: 'v1' },
+    });
+
+    // Both arms of the transform hand consumers one shape: the version is a
+    // field, and the wire `source` object does not survive the projection.
+    expect(parsed?.sourceVersion).toBe('v1');
+    expect(parsed && 'source' in parsed).toBe(false);
   });
 
   it('keeps both row sets on a v2 conversation page', () => {

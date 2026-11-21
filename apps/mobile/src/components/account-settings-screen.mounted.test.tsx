@@ -33,6 +33,7 @@ vi.mock('@/components/ui/icons', () => ({
   Ban: 'Ban',
   Cpu: 'Cpu',
   FileText: 'FileText',
+  Flag: 'Flag',
   Globe: 'Globe',
   KeyRound: 'KeyRound',
   Lock: 'Lock',
@@ -182,6 +183,18 @@ describe('AccountSettingsScreen', () => {
     }
   });
 
+  it('opens the reports this reader filed from the Reports row', async () => {
+    const renderer = await mountAccount();
+
+    const reports = findConfigureRow(renderer, 'Reports');
+    expect(reports.props).toMatchObject({ icon: 'Flag' });
+
+    act(() => {
+      (reports.props.onPress as () => void)();
+    });
+    expect(push).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/report-receipts');
+  });
+
   it('asks before revoking every web session', async () => {
     const renderer = await mountAccount();
 
@@ -244,6 +257,7 @@ describe('AccountSettingsScreen', () => {
       'Provider keys',
       'Your data',
       'Blocked and muted people',
+      'Reports',
       'Device sessions',
       'Sign out of all web sessions',
     ]);

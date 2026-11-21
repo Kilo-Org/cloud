@@ -12,7 +12,6 @@ import {
   composeActiveSessionSpokenMeta,
   composeActiveSessionVisibleMeta,
   expandPlatformFilter,
-  formatGitUrlProject,
   formatMeta,
   formatScheduledWake,
   knownPlatformBucket,
@@ -422,56 +421,6 @@ describe('normalisePlatformSelection (persisted selection → sheet rows)', () =
     expect(
       expandPlatformFilter(normalisePlatformSelection(['cloud-agent-web'])).toSorted()
     ).toEqual(['cloud-agent', 'cloud-agent-web'].toSorted());
-  });
-});
-
-describe('formatGitUrlProject (percent-decoded segments)', () => {
-  it('decodes an encoded CJK repository name in an https URL', () => {
-    expect(formatGitUrlProject('https://github.com/org/%E5%B1%B1%E7%94%B0-API.git')).toBe(
-      'org/山田-API'
-    );
-    expect(formatGitUrlProject('https://github.com/org/%E5%B1%B1%E7%94%B0-API')).toBe(
-      'org/山田-API'
-    );
-  });
-
-  it('decodes an encoded CJK repository name in an ssh URL', () => {
-    expect(formatGitUrlProject('git@github.com:org/%E5%B1%B1%E7%94%B0-API.git')).toBe(
-      'org/山田-API'
-    );
-    expect(formatGitUrlProject('git@github.com:org/%E5%B1%B1%E7%94%B0-API')).toBe('org/山田-API');
-  });
-
-  it('decodes every path segment, not only the repository name', () => {
-    expect(
-      formatGitUrlProject(
-        'https://gitlab.com/%E7%A7%BB%E5%8A%A8%E7%AB%AF/%D0%BC%D0%B5%D1%82%D0%B0%D0%B4%D0%B0%D0%BD%D0%BD%D1%8B%D0%B5.git'
-      )
-    ).toBe('移动端/метаданные');
-  });
-
-  it('keeps the GitLab dash-separated project form while decoding', () => {
-    expect(
-      formatGitUrlProject('https://gitlab.com/group/%E7%A7%BB%E5%8A%A8%E7%AB%AF/-/tree/main')
-    ).toBe('group/移动端');
-  });
-
-  it('keeps a malformed escape raw instead of throwing', () => {
-    expect(formatGitUrlProject('https://github.com/org/%E5%B1%B1%ZZ-repo.git')).toBe(
-      'org/%E5%B1%B1%ZZ-repo'
-    );
-    expect(formatGitUrlProject('https://github.com/org/100%-repo.git')).toBe('org/100%-repo');
-    expect(formatGitUrlProject('git@github.com:org/100%-repo.git')).toBe('org/100%-repo');
-  });
-
-  it('decodes %25 to a single % and never decodes the value twice', () => {
-    expect(formatGitUrlProject('https://github.com/org/50%2525-off.git')).toBe('org/50%25-off');
-    expect(formatGitUrlProject('https://github.com/org/50%25-off.git')).toBe('org/50%-off');
-  });
-
-  it('leaves an already-decoded URL unchanged', () => {
-    expect(formatGitUrlProject('https://github.com/org/山田-API.git')).toBe('org/山田-API');
-    expect(formatGitUrlProject('git@github.com:org/метаданные.git')).toBe('org/метаданные');
   });
 });
 

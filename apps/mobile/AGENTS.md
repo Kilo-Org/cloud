@@ -16,15 +16,16 @@ Expo Router app for iOS and Android only. Use dev builds, never Expo Go. No web-
 
 ## Commands
 
-Run from `apps/mobile/`: `pnpm typecheck`, `pnpm lint`, `pnpm format` (or `format:check`), `pnpm check:unused`, `pnpm test`.
+Run from `apps/mobile/`: `pnpm typecheck`, `pnpm lint`, `pnpm format` (or `format:check`), `pnpm check:unused`, `pnpm assert:config`, `pnpm test`.
 
 Before pushing:
 
 ```bash
-pnpm format && pnpm typecheck && pnpm lint && pnpm check:unused
+pnpm format && pnpm typecheck && pnpm lint && pnpm check:unused && pnpm assert:config
 git diff --check
 ```
 
+- `pnpm assert:config` reads the evaluated Expo config and fails when a value the bundle or the store depends on drifts (bundle id, scheme, orientations, associated domains, plugins and their options, localized permission prompts). `--config <path>` reads an already-evaluated config instead, resolved from `apps/mobile`. `--profile <name>` selects the contract set, and falls back to `EAS_BUILD_PROFILE`, which the release supplies as `production`. The success line names the resolved profile. Exit 1 is contract drift. Exit 2 is a config it could not evaluate or read. `--profile` selects the contract set only, so a local release-set run needs the production environment. `pnpm test` runs the live guard and the fixture cases for both profiles.
 - Fix lint rules in spirit: autofix first, then extract code. Never compress code to dodge line limits.
 - Do not commit plans, specs, or other non-code Markdown files.
 - The repository dev runner owns Metro. Never run `pnpm start`.
@@ -98,6 +99,15 @@ above another native sheet, and a dialog rendered through `@rn-primitives/portal
 tree, so it cannot: `useConfirmDialog` therefore presents a native sheet, not a portal card. A `DialogCard`
 is a portal card and stays behind a presented sheet — never open one from sheet content. When a surface
 needs to stack and a form must host it, make it a `formSheet` route or a `Sheet`.
+
+A toast raised while a native sheet is open must be visible over it, and must not cover the sheet's actions.
+On iOS the root Toaster's `FullWindowOverlay` already draws above every presented sheet. On Android the
+app's one Toaster (`AppToaster`) renders into the top open sheet's toast host instead of the main tree the
+sheet covers: `Sheet` and every focused presented route (a `formSheet` or `modal` scene, through the shared
+scene layout) wrap their content in `SheetToastScope` (`@/components/sheet-toast-host`). Inside a sheet the
+toast is compact (its text capped at 1.4x the font scale) and starts below the sheet's `SheetHeader` and the
+status bar, read from both views' window rects, so the header's actions stay above it and the bottom actions
+of a short sheet stay clear below it; call sites keep calling `toast.error`.
 
 Markdown images reach `react-native-enriched-markdown` only from HTTPS hosts the reader trusted or confirmed;
 `markdown-image-gate` rewrites every other image into a "Load" link before the native view can fetch it.
@@ -239,6 +249,7 @@ A phase that several flags, refs, nullable fields, or timers encode together is 
 - Center single-line content on both axes in its row or control: icons beside text, carets, button labels, badges, and the text and placeholder of single-line inputs.
 - Keep related items closer together than unrelated groups, and use the same gap for the same relation everywhere.
 - Plan long text: a label that can grow truncates with an ellipsis or wraps by design. When secondary text cannot fit, drop it before you squeeze the primary text.
+- At a large font scale (`LARGE_FONT_SCALE` from `@/lib/font-scale/system-font-scale-context`), primary text wraps instead of truncating: a row title, a header title and a header subtitle take up to two lines, a `KvRow` value moves under its label, and a header's `inlineActions` cluster (the account picker) takes its own row under the title. Read the threshold through that constant or `useIsLargeFontScale()`; never add a second one. At any scale, a header title that its `inlineActions` cluster would cut (a long translated tab title) moves the cluster under the title; the header decides it by comparing the title's box with the width a hidden copy of the title takes outside the row. Never decide a cut from a copy laid out inside the title's box: Android lays an uncapped line out up to a pixel wider than its box without breaking it, while the capped title beside it ends in an ellipsis.
 - Never shift layout when state changes. Reserve the space for spinners, status lines, errors, and copy that comes and goes, or replace content in place.
 - Never grow a row or a section header to a control's touch size. Keep the row one line tall and reach 44pt with `hitSlop` on a shared compact box from `@/lib/a11y/tap-target` (`LINE_ACTION_BOX_CLASS`, `SECTION_ACTION_BOX_CLASS`). A taller box leaves empty space above its text, and at the top of a screen that space reads as a hole under the title.
 - Do not repeat what the screen already shows: no "Enabled" beside a switch, no product name beside its logo, no description that restates the title.
@@ -246,7 +257,7 @@ A phase that several flags, refs, nullable fields, or timers encode together is 
 
 ### Layout contract
 
-One contract, enforced by `pnpm check:classes` (baseline in `tools/nativewind/layout-baseline.json`).
+One contract, enforced by `pnpm --filter kilo-app run check:classes` (baseline in `tools/nativewind/layout-baseline.json`).
 
 | Concern | Contract | Use |
 |---|---|---|
@@ -256,11 +267,13 @@ One contract, enforced by `pnpm check:classes` (baseline in `tools/nativewind/la
 | Section header | A heading (the label carries the header role): 10pt mono uppercase eyebrow, muted; optional icon, 11pt mono primary action in a compact box that never changes the header's height, and notice. No hand-made labels. Gutter-free inside a padded body; `inset` for a full-bleed list; `actionTestID` for a native test handle. | `SectionHeader` from `@/components/ui/section-header`, or `Section` when it has content |
 | Settings and navigation rows | One grouped card per section; hairline between rows inset to the row text; none after the last. | `RowGroup` from `@/components/ui/row-group`; pass `leadingTile` for icon rows |
 | Grouped rows in a virtualized list | A list cannot pass its rows as one child array, so each cell draws its own rounded end, surface and trailing hairline. | `RowGroupItem` with `position` `first`/`middle`/`last` (`only` for a one-row section) |
-| Row anatomy | The one row geometry: `ROW_FRAME_CLASS` (`min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3`); 30pt `IconTile`; title `text-sm font-medium` on one line; up to two subtitle lines (`face: 'mono'` for an identifier, `ellipsizeMode: 'middle'` for a value); a typed trailing cell (chevron, check, switch, value, badge, action, node). Never re-spell it. | `RowFrame` from `@/components/ui/row-frame`; `ConfigureRow`, `PreferenceRow`, `KvRow` and `ChoiceRow` are thin wrappers over it (use them when their fixed anatomy fits, `RowFrame` directly for a link row, two subtitle lines or a mixed trailing cell) |
+| Row anatomy | The one row geometry: `ROW_FRAME_CLASS` (`min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3`); 30pt `IconTile`; title `text-sm font-medium` on one line (two at a large font scale); up to two subtitle lines (`face: 'mono'` for an identifier, `ellipsizeMode: 'middle'` for a value); a typed trailing cell (chevron, check, switch, value, badge, action, node). Never re-spell it. | `RowFrame` from `@/components/ui/row-frame`; `ConfigureRow`, `PreferenceRow`, `KvRow` and `ChoiceRow` are thin wrappers over it (use them when their fixed anatomy fits, `RowFrame` directly for a link row, two subtitle lines or a mixed trailing cell) |
 | Flat list rows | Full-bleed, no card, content from the 14pt gutter, `border-b-[0.5px] border-hair-soft` hairline, `RowChevron`. A hue strip sits at the gutter. | `SessionRow`, which owns that geometry; callers add no padding of their own. Rows own no card and no grouped divider |
-| Card | Non-row block (balance, metric, form, info): `rounded-xl bg-secondary p-4`, inner `gap-3`, never nested. For full-bleed layered content the surface alone, with each layer owning its inset. | `Card` from `@/components/ui/card`; `padding="none"` for the bare surface |
-| Fields | A single-line `Input` owns its 44pt box and inset. A multiline field or a composer keeps its own text metrics inside the shared bordered surface; a read-only or preview box that swaps with a single-line field reuses its exported box. | `Input` from `@/components/ui/input`; `InputFrame` for a multiline/composer surface; `INPUT_BOX_SHAPE_CLASS` for the preview box |
-| Segmented control | The track and its loaded height are the control's own; a skeleton reserves that frame instead of a hand-sized box. Options may carry a badge, a disabled state and their own test handle. | `SegmentedControl` from `@/components/ui/segmented-control`; `SEGMENTED_FRAME_CLASS` / `SEGMENTED_FRAME_HEIGHT_CLASS` for a skeleton |
+| Card | Non-row block (balance, metric, info, a field block on a non-form screen): `rounded-xl bg-secondary p-4`, inner `gap-3`, never nested. For full-bleed layered content the surface alone, with each layer owning its inset. | `Card` from `@/components/ui/card`; `padding="none"` for the bare surface |
+| Fields | A single-line `Input` owns its 44pt box and inset. A multiline field or a composer keeps its own text metrics inside the shared bordered surface; a read-only or preview box that swaps with a single-line field reuses its exported box. A form field's visible label renders through FormFieldLabel, and the field block owns the gap between that label and its control. | `Input` from `@/components/ui/input`; `InputFrame` for a multiline/composer surface; `INPUT_BOX_SHAPE_CLASS` for the preview box; FormFieldLabel for the label |
+| Forms | A form — a screen or sheet whose job is to fill in and submit fields (New profile, Edit profile, Profile detail's name and description, New mode, Create organization) — lays its fields flat in the body at the section gap, never in a `Card`. A `Card` holds fields only as one block among other content: an item the person adds or removes (a model mapping, a variable), a one-time entry under the status that asked for it (a confirmation code), or a settings group whose fields belong to the control beside them. | `FormField` directly in the `SCREEN_BODY_CLASS` body |
+| Search field | One shape for every search: the bordered field surface (`rounded-md`, the input border and fill), an 18pt leading magnifier, the single-line `Input`'s 44pt box with the frame's 10.5pt inset, `text-sm` for the query and the one-line hint (the `FormField` size, so a search inside a form matches the fields beside it), and an in-field clear on both platforms. A running search names its spinner. The caller sets only its placement (gutter and vertical margin). | `SearchField` from `@/components/ui/search-field` |
+| Segmented control | The track and its loaded height are the control's own; a skeleton reserves that frame instead of a hand-sized box. Options may carry a badge, a disabled state, their own test handle, and a spoken name and hint when the visible label is a short form; a badge that carries information (a count) goes into the spoken name too. A strip whose options switch the body below it passes `semantics="tabs"` (a `tablist` of tabs); a value choice keeps the default radio group. | `SegmentedControl` from `@/components/ui/segmented-control`; `SEGMENTED_FRAME_CLASS` / `SEGMENTED_FRAME_HEIGHT_CLASS` for a skeleton |
 | Radii | Controls `rounded-md`; tiles and thumbnails `rounded-lg`; cards, row groups and dialogs `rounded-xl`; pills, avatars and the FAB `rounded-full`. Nothing else. | the primitives above |
 | Dividers | 0.5pt `border-hair-soft`. Never `border-border` for a row divider. | `RowGroup`, `RowGroupItem`, flat list rows |
 | Typography roles | Large title 30pt/700 on tab roots; title 15.75pt/600; heading `text-base font-semibold`; body the `Text` default; secondary `variant="muted"`; caption `variant="caption"`; a metric figure `variant="figure"`, a half-width stat tile `variant="stat"`; eyebrow the 10pt mono one. No `text-[Npx]`, no `text-xl` or larger, no `uppercase` or `tracking-*` outside `components/ui`. | `Text` variants, `ScreenHeader`, `SectionHeader`, `Eyebrow` |
@@ -271,22 +284,14 @@ One contract, enforced by `pnpm check:classes` (baseline in `tools/nativewind/la
 | Primary action | One per screen. A pinned footer is the shared bar, outside the scroll body; an inline action ends its section. | `ScreenFooter` from `@/components/ui/screen-footer` (`clearance` for the bottom band, `keyboard` for who lifts it) |
 | Create control | One per list screen: the header `+` creates, and the empty state carries the title and description only. | `ScreenHeader` `headerRight` with `IconButton` |
 | FAB | One 56pt round primary button, gutter-aligned above the tab bar. | `Fab` from `@/components/ui/fab` |
-| Arbitrary values | No spacing, font-size, line-height, tracking or radius in `[..]`, and none of the bans L1–L13 below the table, outside `components/ui`, the two header components, `@/lib/layout` and `@/lib/a11y/tap-target`. | `pnpm check:classes` enforces it |
+| Arbitrary values | No spacing, font-size, line-height, tracking or radius in `[..]`, and none of the bans `LAYOUT_RULES` names, outside `components/ui`, the two header components, `@/lib/layout` and `@/lib/a11y/tap-target`. | `pnpm --filter kilo-app run check:classes` enforces it |
 
-`pnpm check:classes` reads every class string (and every `style`/`*Style` object) against `LAYOUT_RULES` in
-`tools/nativewind/check-classes.mjs`, which is the only description of the rules: **L1** an arbitrary spacing,
-type-size, line-height, tracking or radius value; **L2** a page inset written on a scroll body or a `CenteredState`
-content container, or any padding on a `ScreenHeader`/`SheetHeader`; **L3** `uppercase` or `tracking-*` outside a
-section label; **L4** a card surface built by hand (a card fill plus a card radius, even when the two sit in
-different branches of one className); **L5** `text-xl` or larger; **L6** a layout number in a `style` or `*Style`
-object (an inset or a measurement passes); **L7** a chevron imported straight from the icon modules instead of
-`RowChevron`; **L8** an arbitrary height, width or size that pins one box; **L9** a row divider drawn as
-`border-b`/`border-t` in `border-border` instead of `border-hair-soft`; **L10** `ScreenHeader` `titleContent`
-outside the three screens that own a title line; **L11** a `Sheet` without a `SheetHeader`; **L12** a horizontal
-padding or margin wider than the 14pt gutter (`px-`/`ps-`/`pe-`/`pl-`/`pr-`/`mx-`/`ms-`/`me-` at 5 and up); **L13** a
-`Button` inside an `EmptyState`/`QueryError` `action` slot instead of `StateAction`. A
-violation the migration has not reached is admitted by `tools/nativewind/layout-baseline.json`, which only shrinks: fix the call
-site and lower its line, never regenerate the baseline over a new violation.
+`pnpm --filter kilo-app run check:classes` reads every class string (and every `style`/`*Style` object)
+against `LAYOUT_RULES` in `tools/nativewind/check-classes.mjs`, which is the only description of the rules:
+read the L1–L13 ids and their bans there instead of restating them here. A violation the migration has not
+reached is admitted by `tools/nativewind/layout-baseline.json`, which only shrinks: fix the call site and
+lower its line, never regenerate the baseline over a new violation, and the rewrite refuses while the theme
+or any walked file could not be read or parsed.
 
 After you change anything in `components/ui`, run the design gate on
 `kiloapp:///(auth)/design-system-fixture` and on one migrated screen per changed primitive.
@@ -353,16 +358,19 @@ pnpm dev:mobile:design-gate run --link <deep link> [--link ...] --matrix standar
 - The sampler retains the newest layouts that fit its weight budget, up to a maximum count. A truncation flag in the timeline and motion artifacts marks incomplete capture.
 - Fix every `error` finding, then run the gate again until it exits 0. Fix each `warning`, or give a one-line reason in the pull request.
 - Exit code 2 is an environment failure (no device, no Metro page, no probe), not a pass.
-- The gate disables LogBox's UI in the app runtime at every readiness wait, through each module that exposes `setDisabled`, so a warning toast does not paint over a capture. It never wraps `console.*`: the app already has wrappers there, and a replacement breaks them. A React "state update on a component that hasn't mounted yet" toast painted over a screen anyway is a `dev-overlay` warning, not a screen defect: it means disabling failed in that runtime, an environment problem the run log names. Dev warnings are not graded by the gate — developers see them in Metro and LogBox in normal use.
+- The gate disables LogBox's UI in the app runtime at every readiness wait, through each module that exposes `setDisabled`, so a toast does not paint over a capture. It never wraps `console.*`: the app already has wrappers there, and a replacement breaks them. A toast painted over a screen anyway is a `dev-overlay` finding at the level LogBox painted: an error-level one fails the run and has to be cleared before the screen is judged, a warning-level one is reported without failing the run, and when the dump carries no level chrome the toast's message text classifies it. React logs "state update on a component that hasn't mounted yet" through `console.error`, so LogBox paints that toast at error level and the run fails until the toast is cleared; the run log names the runtime whose disable pass failed.
 - Attach `contact-sheet.png` from the output directory to the pull request with `gh pr comment --attach`. Never commit it.
 - A separate reviewer judges the per-screen sheets in `sheets/` for what numbers cannot measure. Never grade your own screenshots.
 - For an Android release build, `pnpm dev:mobile:design-gate scan --source agent-device` checks the current screen from the accessibility tree of an open `agent-device` session, and `--source uiautomator` does the same without one. Both read the tree until its layout repeats and measure that read; a screen that never settles is not measured and the command exits 2.
 - For an interaction, `pnpm dev:mobile:design-gate motion --link <deep link> --tap <label>` presses the control, reports any layout shift it causes, and records the motion. The press runs the real handler: tap only an action with no effect outside the app, never one that opens a browser, pays, or sends data. The Android emulator renders in software, so judge animation feel on the iOS simulator or a device.
+- The whole-app pass lives in `dev/local/design-gate/batches/`: `manifest.tsv` holds one row per deep link (batch, tier, phase, matrix, platforms, state, forced state, link, expected kind and screen), and `coverage.tsv` maps every route file to the links, fixtures and seeds that reach each state on each platform. A new screen needs a coverage row: `pnpm dev:mobile:design-gate batches coverage` fails without one, and `batches coverage --write` adds it.
+- `batches seed --email <fake@example.com> --out <map.json>` runs the seeds the manifest needs and writes that account's id map; links name seeded ids as `{{seed:<step>.<key>}}`. `batches run --device <serial>@<metro-url>@<map.json> [--device ...] --out <dir>` runs the batches in parallel across devices, each with its own Metro and the map of the account it is signed in as (`--seeds <map.json>` covers devices that name none), and writes a merged `summary.tsv`. A seeded batch runs only on a device whose map resolves it. `batches help` lists every flag.
+- `--cell font-max` adds the largest text size (Android font scale 2.0, iOS `accessibility-extra-extra-extra-large`) as an opt-in cell; the gate restores the device setting after the run. No preset includes it.
 
 ## Debugging
 
 - Keep the simulator font size and font scaling at their defaults.
-- Never change simulator Dynamic Type, accessibility text size, or font scaling for testing or debugging.
+- Never change simulator Dynamic Type, accessibility text size, or font scaling for testing or debugging. The design gate's opt-in `font-max` cell is the only exception, and it restores the setting itself.
 
 Add narrow temporary logs at the real boundaries. Reproduce. Read the tmux service logs. Fix the demonstrated cause. Remove the logs. Do not guess, and do not commit debug logging.
 
@@ -403,3 +411,4 @@ Make a fixture when you test your work end to end (E2E) and the state you need i
 - Put backend fixtures in `dev/seed/<scope>/<topic>.ts`, and follow the contract in `dev/seed/AGENTS.md`.
 - Commit every fixture you make, so that the next agent can use it again. Do not keep a fixture only in a scratch directory.
 - Write in the fixture what it represents and how to open it, for example the deep link that the seed topic returns.
+- For a data screen's loading, retryable error, terminal error, permission or offline state, use the forced data state instead of a new fixture: `kiloapp:///dev/force-state/<loading|retryable|non-retryable|permission|offline>?next=<url-encoded app link>`, then `kiloapp:///dev/force-state/clear`. `src/lib/force-state-fixture.ts` says what each mode answers and what it leaves live.

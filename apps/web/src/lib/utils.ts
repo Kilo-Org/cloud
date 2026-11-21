@@ -1,4 +1,3 @@
-import type { User } from '@kilocode/db/schema';
 import type { PaymentMethodInfo } from './stripePaymentMethodInfo';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -8,14 +7,6 @@ export { formatCents, formatDollars } from '@kilocode/app-shared/utils';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
-}
-
-export function getInitials(user: User) {
-  if (!user) {
-    return '';
-  }
-
-  return getInitialsFromName(user.google_user_name || user.google_user_email || '');
 }
 
 export function getInitialsFromName(name: string): string {
@@ -28,8 +19,18 @@ export function getInitialsFromName(name: string): string {
     .slice(0, 2);
 }
 
+/**
+ * Formats a Unix timestamp in seconds as a US date, so the server render and the
+ * browser render the same digits whatever locale each runtime carries.
+ *
+ * The calendar day is the viewer's local one, like the other timestamp
+ * formatters in this module (only date-only strings are pinned to UTC): a
+ * timestamp near local midnight can therefore name a different day on a server
+ * whose time zone differs from the viewer's. That is intentional — a purchase
+ * belongs on the day the buyer made it — so this helper does not pin a zone.
+ */
 export function formatDate(timestamp: number) {
-  return new Date(timestamp * 1000).toLocaleDateString();
+  return new Date(timestamp * 1000).toLocaleDateString('en-US');
 }
 
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -47,8 +48,20 @@ export function isDateOnlyString(value: unknown): value is string {
   return typeof value === 'string' && DATE_ONLY_RE.test(value);
 }
 
+/**
+ * Parses `value` and rejects both null input and an Invalid Date. This is the
+ * shared parse-and-validate step for the nullable date formatters, so a missing
+ * or malformed value renders the em-dash instead of "Invalid Date".
+ */
+function toValidDate(value: string | Date | null): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 export function formatIsoDateString_UsaDateOnlyFormat(dateString: string | Date | null): string {
-  if (!dateString) return '—';
+  const date = toValidDate(dateString);
+  if (!date) return '—';
   const formatOptions: Intl.DateTimeFormatOptions = {
     year: 'numeric',
     month: 'short',
@@ -57,10 +70,6 @@ export function formatIsoDateString_UsaDateOnlyFormat(dateString: string | Date 
   if (isDateOnlyString(dateString)) {
     formatOptions.timeZone = 'UTC';
   }
-  const date = new Date(dateString);
-  // Malformed strings (e.g. "not-a-date") produce an Invalid Date; fall back
-  // to the em-dash so the UI never renders a literal "Invalid Date".
-  if (Number.isNaN(date.getTime())) return '—';
   return date.toLocaleDateString('en-US', formatOptions);
 }
 
@@ -71,9 +80,8 @@ export function formatIsoDateString_UsaDateOnlyFormat(dateString: string | Date 
  * not pass date-only strings.
  */
 export function formatIsoHourString_UsaHourFormat(dateString: string | Date | null): string {
-  if (!dateString) return '—';
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return '—';
+  const date = toValidDate(dateString);
+  if (!date) return '—';
   return date.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
 }
 
@@ -83,17 +91,16 @@ export function formatIsoHourString_UsaHourFormat(dateString: string | Date | nu
  * granularity).
  */
 export function formatIsoDateTime_UsaDateHourFormat(dateString: string | Date | null): string {
-  if (!dateString) return '—';
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return '—';
+  const date = toValidDate(dateString);
+  if (!date) return '—';
   const datePart = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const hourPart = date.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
   return `${datePart}, ${hourPart}`;
 }
 
 export function formatIsoDateTime_IsoOrderNoSeconds(dateString: string | Date | null): string {
-  if (!dateString) return '—';
-  const date = new Date(dateString);
+  const date = toValidDate(dateString);
+  if (!date) return '—';
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
@@ -103,26 +110,35 @@ export function formatIsoDateTime_IsoOrderNoSeconds(dateString: string | Date | 
   return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
 
+const US_GROUPED_NUMBER = new Intl.NumberFormat('en-US');
+
+// Long and short compact displays of one locale, so the digits and the
+// magnitude word ("million", "M") always come from the same locale data.
+const US_COMPACT_NUMBER = {
+  long: new Intl.NumberFormat('en-US', {
+    notation: 'compact',
+    compactDisplay: 'long',
+    maximumFractionDigits: 1,
+  }),
+  short: new Intl.NumberFormat('en-US', {
+    notation: 'compact',
+    compactDisplay: 'short',
+    maximumFractionDigits: 1,
+  }),
+} as const;
+
+/**
+ * Formats a count for a stat tile: grouped below one million ("742,318") and
+ * compact at or above it ("1.8 million", or "1.8M" when shortened). The locale
+ * is pinned, so the digits and the magnitude word agree and the server render
+ * matches the browser render.
+ */
 export function formatLargeNumber(num: number, shorten: boolean = false): string {
   if (num < 1000000) {
-    return num.toLocaleString();
+    return US_GROUPED_NUMBER.format(num);
   }
 
-  const units = [
-    { value: 1e15, label: 'quadrillion', short: 'quadrillion' },
-    { value: 1e12, label: 'trillion', short: 'T' },
-    { value: 1e9, label: 'billion', short: 'B' },
-    { value: 1e6, label: 'million', short: 'M' },
-  ];
-
-  for (const unit of units) {
-    if (num >= unit.value) {
-      const formatted = (num / unit.value).toFixed(1);
-      return `${formatted} ${shorten ? unit.short : unit.label}`;
-    }
-  }
-
-  return num.toLocaleString();
+  return US_COMPACT_NUMBER[shorten ? 'short' : 'long'].format(num);
 }
 
 export function formatBytes(value: number | null): string {
@@ -208,6 +224,10 @@ export function toNonNullish<T>(value: T, message?: string): NonNullable<T> {
   return value;
 }
 
+/**
+ * Describes the payment method types the settings UI presents: "Stripe Link"
+ * and card endings. Returns `''` for any other Stripe method type.
+ */
 export function formatPaymentMethodDescription(info: PaymentMethodInfo): string {
   if (info.type === 'link') {
     return 'Stripe Link';

@@ -45,7 +45,7 @@ const createRuntime = () => {
       readonly args: string[];
       readonly func: (...args: string[]) => InjectionResult;
       readonly target: { readonly tabId: number; readonly documentIds?: string[] };
-      readonly world: 'MAIN';
+      readonly world: 'ISOLATED' | 'MAIN';
     }): Promise<BrowserScriptingInjectionResult[]> =>
       Promise.resolve([{ documentId: 'doc-1', result: 'ok' }]),
   };

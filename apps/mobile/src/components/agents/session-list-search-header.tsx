@@ -1,15 +1,11 @@
-import { Search, X } from '@/components/ui/icons';
 import { type RefObject } from 'react';
-import { Pressable, type TextInput, View } from 'react-native';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { type TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { Input } from '@/components/ui/input';
-import { FIELD_CLEAR_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { SearchField } from '@/components/ui/search-field';
 import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { useSideInsetStyle } from '@/lib/screen-insets';
 import { cn } from '@/lib/utils';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type SessionListSearchHeaderProps = {
   inputRef: RefObject<TextInput | null>;
@@ -41,71 +37,36 @@ export function SessionListSearchHeader({
   defaultValue,
   inputKey,
 }: Readonly<SessionListSearchHeaderProps>) {
-  const colors = useThemeColors();
   const { t } = useTranslation();
   // The landscape side insets keep the field's rounded border and left tap
   // area clear of the sensor housing; portrait insets are 0, leaving only the
   // page gutter.
   const sideInsetStyle = useSideInsetStyle();
+  const field = (
+    <SearchField
+      key={inputKey}
+      inputRef={inputRef}
+      accessibilityLabel={t('agents.search.searchSessions')}
+      placeholder={t('agents.search.searchSessionsPlaceholder')}
+      hasText={hasText}
+      busy={showSearchBusy ? t('agents.search.searching') : undefined}
+      onChangeText={onChangeText}
+      onClear={onClearSearch}
+      onFocus={onFocus}
+      onBlur={onBlur}
+      defaultValue={defaultValue}
+    />
+  );
   // The gutter and the landscape sensor insets sit outside the bordered field,
-  // so the field's border box keeps only its own inset (`px-2`) and the page
-  // inset never becomes padding inside it.
+  // so the field keeps only its own inset and the page inset never becomes
+  // padding inside it. The insets go on a wrapper outside the gutter: inline
+  // padding on the gutter View would replace its `px-4` instead of adding to it.
   return (
     <View
       style={inline ? undefined : sideInsetStyle}
-      className={cn(inline ? 'min-w-0 flex-1' : cn('my-2', SCREEN_GUTTER_CLASS))}
+      className={inline ? 'min-w-0 flex-1' : undefined}
     >
-      <View className="flex-row items-center gap-2 rounded-md border border-input bg-background px-2">
-        {/* Fixed-size slot: the spinner swaps in for the icon, so the row never reflows. */}
-        <View className="size-5 items-center justify-center">
-          {showSearchBusy ? (
-            <ActivityIndicator
-              size="small"
-              color={colors.mutedForeground}
-              accessibilityLabel={t('agents.search.searching')}
-            />
-          ) : (
-            <Search size={18} color={colors.mutedForeground} />
-          )}
-        </View>
-        <Input
-          key={inputKey}
-          ref={inputRef}
-          accessibilityLabel={t('agents.search.searchSessions')}
-          // The shared box supplies the height (`min-h-[44px]`, never `py`: iOS
-          // insets the already-centered text rect by padding and draws the
-          // placeholder low) and the RTL content alignment, so this field keeps
-          // only its own size and text size.
-          className="flex-1 text-sm text-foreground"
-          // One line, always: at a narrow width with a large font scale the
-          // placeholder wrapped inside the field and the field grew with it.
-          numberOfLines={1}
-          placeholder={t('agents.search.searchSessionsPlaceholder')}
-          placeholderTextColor={colors.mutedForeground}
-          onChangeText={onChangeText}
-          onFocus={onFocus}
-          onBlur={onBlur}
-          defaultValue={defaultValue}
-          returnKeyType="search"
-          // Keep Android landscape searches in the app instead of the IME's fullscreen editor.
-          disableFullscreenUI
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        {hasText ? (
-          <Pressable
-            onPress={onClearSearch}
-            accessibilityLabel={t('common.clearSearch')}
-            accessibilityRole="button"
-            // The shared in-field clear box carries the whole 48pt target on its
-            // own node, so the 16pt glyph is never what the size audit measures
-            // and the frame needs no `hitSlop` toward the input beside it.
-            className={cn(FIELD_CLEAR_BOX_CLASS, 'active:opacity-70')}
-          >
-            <X size={16} color={colors.mutedForeground} />
-          </Pressable>
-        ) : null}
-      </View>
+      {inline ? field : <View className={cn('my-2', SCREEN_GUTTER_CLASS)}>{field}</View>}
     </View>
   );
 }

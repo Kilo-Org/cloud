@@ -24,6 +24,7 @@ import {
   type SessionStatusIndicator,
   type SlashCommandCatalogStatus,
   type SlashCommandInfo,
+  type SnapshotHistoryFailure,
   type StandalonePermission,
   type StandaloneQuestion,
   type StandaloneSuggestion,
@@ -35,6 +36,7 @@ import {
 } from '@kilocode/cloud-agent-sdk';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
 import { type BackgroundActivityState } from '@kilocode/cloud-agent-sdk/background-activity';
+import { type AgentBoardState } from '@kilocode/cloud-agent-sdk/agent-board';
 import { type SessionStatus } from '@kilocode/cloud-agent-sdk/schemas';
 import { cloudAgentId } from '@kilocode/cloud-agent-sdk/test-helpers';
 
@@ -288,6 +290,7 @@ export function createAgentChatFixtureManager(
       canInterrupt: fixed(false),
       statusIndicator: fixed<SessionStatusIndicator | null>(null),
       error: fixed<string | null>(null),
+      failedHistoryKind: fixed<SnapshotHistoryFailure | null>(null),
       question: fixed<QuestionState | null>(null),
       sessionInfo: fixed<SessionInfo | null>({ id: AGENT_CHAT_FIXTURE_SESSION_ID }),
       sessionId: fixed<CloudAgentSessionId | null>(cloudAgentId('cag_designGateAgentChat')),
@@ -307,6 +310,7 @@ export function createAgentChatFixtureManager(
       ),
       pendingQuestions: fixed<readonly StandaloneQuestion[]>([]),
       backgroundActivity: fixed<BackgroundActivityState>({ status: 'inactive' }),
+      agentBoard: fixed<AgentBoardState>({ status: 'inactive' }),
       pendingPermissions: fixed<readonly StandalonePermission[]>(
         waitingForPermission ? [PENDING_BASH_ASK] : []
       ),

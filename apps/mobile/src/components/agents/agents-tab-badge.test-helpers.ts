@@ -71,9 +71,10 @@ vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshCont
 // the minimal `react-native` mock below.
 vi.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
 vi.mock('react-native', () => ({
-  // The live Agents header reads the interface direction for its action
-  // label's LTR-only letterspacing (session-list-screen.tsx), so the mock
-  // needs the export to exist.
+  // The live Agents header follows the copy's script for its action label's
+  // capitals and tracking — right-to-left script copy drops them inside an RTL
+  // interface (`keepsLatinDisplay`, session-list-screen.tsx) — so the mock needs
+  // the export to exist.
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   AppState: { addEventListener: () => ({ remove: () => undefined }) },
@@ -116,7 +117,10 @@ vi.mock('@/components/empty-state', () => ({
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
-vi.mock('@/components/context-control', () => ({ ContextControl: 'ContextControl' }));
+vi.mock('@/components/context-control', () => ({
+  CONTEXT_CONTROL_INLINE_MIN_DP: 21,
+  ContextControl: 'ContextControl',
+}));
 vi.mock('@/components/ui/section-header', () => ({ SectionHeader: 'SectionHeader' }));
 vi.mock('@/components/agents/session-preview-overlay', () => ({
   SessionPreviewOverlay: () => null,

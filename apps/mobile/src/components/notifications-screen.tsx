@@ -75,6 +75,29 @@ import { cn } from '@/lib/utils';
 const permissionQueryKey = ['notificationPermission'] as const;
 
 /**
+ * Opens the page where this app's notifications are turned on and off.
+ *
+ * Android has a page for exactly that, and `openSettings` lands on App info, a
+ * tap away from it. iOS lets an app open only its own settings page, which
+ * holds the notification switch. A device that refuses the intent falls back to
+ * App info, which still leads there.
+ */
+async function openNotificationSettings(): Promise<void> {
+  const packageName = Application.applicationId;
+  if (Platform.OS === 'android' && packageName !== null) {
+    try {
+      await Linking.sendIntent('android.settings.APP_NOTIFICATION_SETTINGS', [
+        { key: 'android.provider.extra.APP_PACKAGE', value: packageName },
+      ]);
+      return;
+    } catch {
+      // Fall back to App info below.
+    }
+  }
+  await Linking.openSettings();
+}
+
+/**
  * The master gate's bell, by its settled presentation. The neutral state reads
  * nothing yet, so it keeps the tile's frame with a loading mark instead of one
  * of these.
@@ -577,7 +600,7 @@ export function NotificationsScreen() {
           t('notifications.disabledMessage'),
           [
             { text: t('common.cancel'), style: 'cancel' },
-            { text: t('common.openSettings'), onPress: () => void Linking.openSettings() },
+            { text: t('common.openSettings'), onPress: () => void openNotificationSettings() },
           ],
           // Android back dismisses, which equals the no-op Cancel.
           { cancelable: true }
@@ -636,7 +659,7 @@ export function NotificationsScreen() {
       t('notifications.disableMessage'),
       [
         { text: t('common.cancel'), style: 'cancel' },
-        { text: t('common.openSettings'), onPress: () => void Linking.openSettings() },
+        { text: t('common.openSettings'), onPress: () => void openNotificationSettings() },
       ],
       // Android back dismisses, which equals the no-op Cancel.
       { cancelable: true }

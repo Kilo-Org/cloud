@@ -1,6 +1,7 @@
 import { type ReactElement, useEffect, useState } from 'react';
 import { View } from 'react-native';
 
+import { SheetToastScope } from '@/components/sheet-toast-host';
 import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
 import { NativeStateSurface, type ScreenLayoutProps } from '@/components/centered-state-surface';
 import { sceneAt, settleLeaveWindow } from '@/lib/navigation/leave-settle';
@@ -26,12 +27,22 @@ import { sceneAt, settleLeaveWindow } from '@/lib/navigation/leave-settle';
  * per-route navigation object reports the scene's real position in the stack;
  * its focus/blur events fire on push, pop, and sheet dismissal. Exactly one
  * scene — the one a sighted user sees — stays exposed.
+ *
+ * A focused presented scene — a formSheet or a modal route — also hosts the
+ * app's toasts on Android (`SheetToastScope`), the same in-sheet placement the
+ * imperative `Sheet` uses there; iOS keeps the root Toaster, whose overlay
+ * already draws above the presentation. A covered or dismissing scene hands
+ * the toasts back with its focus. The host is the scene's last child, so the
+ * scroll view react-native-screens finds through the first descendants stays
+ * the same.
  */
 function CoveredScreenA11yGate({
   navigation,
+  options,
   children,
 }: {
   navigation: ScreenLayoutProps['navigation'];
+  options: ScreenLayoutProps['options'];
   children: ReactElement;
 }) {
   const [focused, setFocused] = useState(() => navigation.isFocused());
@@ -57,7 +68,11 @@ function CoveredScreenA11yGate({
       accessibilityElementsHidden={!focused}
       importantForAccessibility={focused ? 'auto' : 'no-hide-descendants'}
     >
-      {children}
+      {options.presentation === undefined || options.presentation === 'card' ? (
+        children
+      ) : (
+        <SheetToastScope hosting={focused}>{children}</SheetToastScope>
+      )}
     </View>
   );
 }
@@ -102,9 +117,9 @@ function SettledLeaveEndsWithThisScene({
  * tree when covered. The unlock surface belongs to the root scene only, so
  * these stacks must not wrap a second `NativeStateSurface` around theirs.
  */
-export function appSceneLayout({ navigation, children }: ScreenLayoutProps): ReactElement {
+export function appSceneLayout({ navigation, options, children }: ScreenLayoutProps): ReactElement {
   return (
-    <CoveredScreenA11yGate navigation={navigation}>
+    <CoveredScreenA11yGate navigation={navigation} options={options}>
       <>
         <SettledLeaveEndsWithThisScene navigation={navigation} />
         {children}
@@ -120,7 +135,7 @@ export function appSceneLayout({ navigation, children }: ScreenLayoutProps): Rea
  */
 export function appSurfaceSceneLayout(props: ScreenLayoutProps): ReactElement {
   return (
-    <CoveredScreenA11yGate navigation={props.navigation}>
+    <CoveredScreenA11yGate navigation={props.navigation} options={props.options}>
       <>
         <SettledLeaveEndsWithThisScene navigation={props.navigation} />
         <NativeStateSurface {...props} />
@@ -133,7 +148,7 @@ export function appSurfaceSceneLayout(props: ScreenLayoutProps): ReactElement {
 // the unlock overlay above the scene content); the a11y gate wraps both.
 export function appScreenLayout({ navigation, ...props }: ScreenLayoutProps): ReactElement {
   return (
-    <CoveredScreenA11yGate navigation={navigation}>
+    <CoveredScreenA11yGate navigation={navigation} options={props.options}>
       <>
         <SettledLeaveEndsWithThisScene navigation={navigation} />
         {appUnlockScreenLayout({ navigation, ...props })}

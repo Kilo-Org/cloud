@@ -6,14 +6,15 @@ import { View, type ViewStyle } from 'react-native';
 import { EmptyState } from '@/components/empty-state';
 import { Button } from '@/components/ui/button';
 import { FilterChip } from '@/components/ui/filter-chip';
-import { Input } from '@/components/ui/input';
 import { SearchX } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroupItem, rowGroupPosition } from '@/components/ui/row-group';
+import { SearchField } from '@/components/ui/search-field';
 import { Text } from '@/components/ui/text';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import {
   type DenyListModel,
+  denyListRowNote,
   matchesSearch,
   type ModelAccessDraft,
   setModelsAllowed,
@@ -42,13 +43,11 @@ function ListHeader({
 }>) {
   return (
     <View className="gap-3 pt-3 pb-3">
-      <Text variant="caption">{description}</Text>
-      <Input
+      <Text variant="muted">{description}</Text>
+      <SearchField
         defaultValue={search}
         placeholder={searchPlaceholder}
-        accessibilityLabel={searchPlaceholder}
-        autoCapitalize="none"
-        autoCorrect={false}
+        hasText={search !== ''}
         onChangeText={onSearchChange}
       />
       <View className="flex-row flex-wrap items-center gap-2">
@@ -104,6 +103,12 @@ export function ProviderAllowList({
     [draft, disabled, onChange, shown.length]
   );
 
+  // Two causes leave the list empty: a query filtered every provider out, or
+  // the catalog names no provider at all.
+  const emptyLabel = search.trim()
+    ? t('organizationModelAccess.providersEmpty')
+    : t('organizationModelAccess.providersNone');
+
   return (
     <FlashList
       data={shown}
@@ -145,7 +150,7 @@ export function ProviderAllowList({
           }
         />
       }
-      ListEmptyComponent={<NoMatch label={t('organizationModelAccess.providersEmpty')} />}
+      ListEmptyComponent={<NoMatch label={emptyLabel} />}
     />
   );
 }
@@ -188,6 +193,7 @@ export function ModelDenyList({
         <PreferenceRow
           title={item.name}
           subtitle={item.id}
+          note={denyListRowNote(item, t)}
           value={!draft.modelDenyList.includes(item.id)}
           disabled={disabled}
           onValueChange={next => {
@@ -196,7 +202,7 @@ export function ModelDenyList({
         />
       </RowGroupItem>
     ),
-    [draft, disabled, onChange, shown.length]
+    [draft, disabled, onChange, shown.length, t]
   );
 
   const emptyLabel = (() => {

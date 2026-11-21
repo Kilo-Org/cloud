@@ -41,6 +41,7 @@ import {
 import { assertChargeAllowed } from '@kilocode/web-shared/lib/bouncer/charge-gate';
 import { KILO_PASS_REFERRER_REWARD_CAP } from '@/lib/impact/kilo-pass-referrals';
 import { TRPCError } from '@trpc/server';
+import { isKiloClawPaidHostingAvailable } from '@kilocode/db/kiloclaw-paid-hosting';
 import {
   credit_transactions,
   impact_referral_reward_decisions,
@@ -96,6 +97,7 @@ import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { timedUsageQuery } from '@/lib/usage-query';
 import {
   billingHistoryResponseSchema,
+  mapKiloPassInvoiceLine,
   mapStripeInvoiceToBillingHistoryEntry,
 } from '@/lib/subscriptions/subscription-center';
 import type Stripe from 'stripe';
@@ -892,6 +894,7 @@ const ActivateCheckoutHostingOutputSchema = z.discriminatedUnion('outcome', [
       'destroyed_instance',
       'requires_reprovision',
       'signup_unavailable',
+      'hosting_ended',
       'insufficient_credits',
       'expired_commit',
       'unexpected_error',
@@ -974,7 +977,7 @@ const GetPurchasePresentationInputSchema = z.object({
 
 const PurchasePresentationCtaOutputSchema = z.object({
   label: z.string().nullable(),
-  action: z.enum(['none', 'open_web', 'open_native']),
+  action: z.enum(['none', 'open_web']),
 });
 
 const GetPurchasePresentationOutputSchema = z.object({
@@ -1776,6 +1779,17 @@ export const kiloPassRouter = createTRPCRouter({
         return { outcome: 'activated', hostingIntent: hostingPlan };
       }
 
+      if (!isKiloClawPaidHostingAvailable()) {
+        logHostingActivationWarning('Kilo Pass hosting activation blocked at end of life', {
+          user_id: ctx.user.id,
+          checkout_session_id: input.sessionId,
+          instance_id: instance.id,
+          reason: 'hosting_ended',
+          duration_ms: Date.now() - startedAt,
+        });
+        return { outcome: 'action_required', hostingIntent: hostingPlan, reason: 'hosting_ended' };
+      }
+
       const expectedPriceVersion = resolveKiloClawEnrollmentPriceVersion(
         existingSubscription
           ? {
@@ -2504,7 +2518,10 @@ export const kiloPassRouter = createTRPCRouter({
 
       const hasMore = invoices.data.length > limit;
       const page = hasMore ? invoices.data.slice(0, limit) : invoices.data;
-      const entries = page.map(mapStripeInvoiceToBillingHistoryEntry);
+      const entries = page.map(invoice => ({
+        ...mapStripeInvoiceToBillingHistoryEntry(invoice),
+        line: mapKiloPassInvoiceLine(invoice),
+      }));
       const lastInvoice = page[page.length - 1];
       const cursor = hasMore && lastInvoice ? lastInvoice.id : null;
 

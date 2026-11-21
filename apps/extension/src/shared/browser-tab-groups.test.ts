@@ -1,13 +1,20 @@
+/* eslint-disable vitest/no-conditional-in-test -- a fake group/update store branches on the id it is given */
 /* eslint-disable max-lines -- One suite walks the session/group state machine end to end; splitting it would scatter the transitions. */
 /* eslint-disable require-await, unicorn/no-useless-undefined, vitest/max-expects, vitest/prefer-mock-return-shorthand -- fakes must return promises like the browser API, and one test body checks one state-machine transition end to end */
 import { describe, expect, it, vi } from 'vitest';
 import {
   BROWSER_TAB_GROUP_COLOR,
+  TAB_GROUP_SESSIONS_STORAGE_KEY,
   browserTabGroupEndedTitle,
   browserTabGroupTitle,
   createBrowserTabGroupController,
+  createStorageSessionTabGroupPersistence,
 } from './browser-tab-groups';
-import type { BrowserTabGroupUpdate } from './browser-tab-groups';
+import type {
+  BrowserTabGroupPersistence,
+  BrowserTabGroupUpdate,
+  PersistedTabGroupSession,
+} from './browser-tab-groups';
 
 const createGroupMock = (id: number) =>
   vi.fn(async (_options: { readonly tabIds: number[] }) => id);
@@ -49,7 +56,7 @@ describe('browser tab groups', () => {
 
     await expect(
       controller.shareActiveTab({ sessionHandle: 's1', tabId: 7 })
-    ).resolves.toStrictEqual({ groupId: 9, tabId: 7 });
+    ).resolves.toStrictEqual({ groupId: 9, kind: 'shared', tabId: 7 });
 
     expect(group).toHaveBeenCalledExactlyOnceWith({ tabIds: [7] });
     expect(update).toHaveBeenCalledExactlyOnceWith(9, {
@@ -73,7 +80,7 @@ describe('browser tab groups', () => {
 
     await expect(
       controller.shareActiveTab({ sessionHandle: 's1', tabId: 8 })
-    ).resolves.toStrictEqual({ groupId: 12, tabId: 8 });
+    ).resolves.toStrictEqual({ groupId: 12, kind: 'shared', tabId: 8 });
     expect(update).toHaveBeenCalledWith(12, { color: 'grey', title: 'Kilo · Report' });
     // Nothing ever groups zero tabs: an empty call would make this reject.
     const groupedTabCounts = group.mock.calls.map(([options]) => options.tabIds.length);
@@ -120,7 +127,7 @@ describe('browser tab groups', () => {
 
     await expect(
       controller.shareActiveTab({ sessionHandle: 's1', tabId: 15 })
-    ).resolves.toStrictEqual({ tabId: 15 });
+    ).resolves.toStrictEqual({ kind: 'shared', tabId: 15 });
   });
 
   it('records the group id even when tabGroups.update is missing', async () => {
@@ -130,7 +137,7 @@ describe('browser tab groups', () => {
 
     await expect(
       controller.shareActiveTab({ sessionHandle: 's1', tabId: 16 })
-    ).resolves.toStrictEqual({ groupId: 4, tabId: 16 });
+    ).resolves.toStrictEqual({ groupId: 4, kind: 'shared', tabId: 16 });
   });
 
   it('groups and records an explicitly shared tab', async () => {
@@ -140,7 +147,7 @@ describe('browser tab groups', () => {
 
     await expect(
       controller.shareActiveTab({ sessionHandle: 's1', tabId: 11 })
-    ).resolves.toStrictEqual({ groupId: 6, tabId: 11 });
+    ).resolves.toStrictEqual({ groupId: 6, kind: 'shared', tabId: 11 });
 
     expect(group).toHaveBeenLastCalledWith({ tabIds: [11] });
     expect(controller.tabsForSession('s1')).toStrictEqual([11]);
@@ -154,8 +161,20 @@ describe('browser tab groups', () => {
 
     await expect(
       controller.shareActiveTab({ sessionHandle: 's1', tabId: 12 })
-    ).resolves.toStrictEqual({ tabId: 12 });
+    ).resolves.toStrictEqual({ kind: 'shared', tabId: 12 });
     expect(controller.tabsForSession('s1')).toStrictEqual([12]);
+  });
+
+  it('moves a tab another session shares out of the first session, as Chrome moves it between groups', async () => {
+    const controller = createBrowserTabGroupController({ api: {} });
+    await controller.openSession({ controllerId: 'c1', sessionHandle: 's1', title: 'First' });
+    await controller.openSession({ controllerId: 'c1', sessionHandle: 's2', title: 'Second' });
+
+    await controller.shareActiveTab({ sessionHandle: 's1', tabId: 13 });
+    await controller.shareActiveTab({ sessionHandle: 's2', tabId: 13 });
+
+    expect(controller.sessionForTab(13)).toBe('s2');
+    expect(controller.isTabAllowed('s1', 13)).toBe(false);
   });
 
   it('resolves the active tab in the last focused window when no tab is named', async () => {
@@ -169,6 +188,7 @@ describe('browser tab groups', () => {
     await controller.openSession({ controllerId: 'c1', sessionHandle: 's1', title: 'Report' });
 
     await expect(controller.shareActiveTab({ sessionHandle: 's1' })).resolves.toStrictEqual({
+      kind: 'shared',
       tabId: 21,
     });
     expect(tabQuery).toHaveBeenCalledWith({ active: true, lastFocusedWindow: true });
@@ -185,7 +205,7 @@ describe('browser tab groups', () => {
 
     await expect(
       controller.shareActiveTab({ sessionHandle: 's1', tabId: 13 })
-    ).resolves.toStrictEqual({ tabId: 13 });
+    ).resolves.toStrictEqual({ kind: 'shared', tabId: 13 });
     expect(controller.tabsForSession('s1')).toStrictEqual([13]);
     warn.mockRestore();
   });
@@ -249,21 +269,96 @@ describe('browser tab groups', () => {
 
     await expect(controller.adoptEnded({ sessionHandle: 'c' })).resolves.toStrictEqual({
       groupId: 2,
+      kind: 'adopted',
     });
 
     expect(update).toHaveBeenCalledWith(2, { collapsed: false, title: 'Kilo · Beta' });
-    expect(controller.tabsForSession('b')).toStrictEqual([32]);
-    expect(controller.isTabAllowed('b', 32)).toBe(true);
-    expect(controller.sessionForTab(32)).toBe('b');
+    // The adopted group is the caller's now: `c` reaches its tabs and the ended handle is retired.
+    expect(controller.tabsForSession('c')).toStrictEqual([32]);
+    expect(controller.isTabAllowed('c', 32)).toBe(true);
+    expect(controller.sessionForTab(32)).toBe('c');
+    expect(controller.tabsForSession('b')).toStrictEqual([]);
     // Alpha stays ended and untargetable.
     expect(controller.tabsForSession('a')).toStrictEqual([]);
     expect(controller.listSessions().map(session => session.ended)).toStrictEqual([true, false]);
   });
 
+  it('keeps a session that already owns tabs instead of adopting an ended group', async () => {
+    let nextGroupId = 1;
+    const group = vi.fn(async (_options: { readonly tabIds: number[] }) => nextGroupId++);
+    const controller = createBrowserTabGroupController({ api: { group } });
+    await controller.openSession({ controllerId: 'c1', sessionHandle: 'a', title: 'Alpha' });
+    await controller.openSession({ controllerId: 'c1', sessionHandle: 'b', title: 'Beta' });
+    await controller.shareActiveTab({ sessionHandle: 'a', tabId: 31 });
+    await controller.shareActiveTab({ sessionHandle: 'b', tabId: 32 });
+    await controller.closeSession({ sessionHandle: 'a' });
+
+    await expect(controller.adoptEnded({ sessionHandle: 'b' })).resolves.toStrictEqual({
+      kind: 'kept',
+    });
+
+    // Its own group is its reach; the ended one is left for a session that has none.
+    expect(controller.tabsForSession('b')).toStrictEqual([32]);
+    expect(controller.tabsForSession('a')).toStrictEqual([]);
+  });
+
+  it('ends the group a tab is actually in when no group id was recorded', async () => {
+    const update = createUpdateMock();
+    const tabGroupOf = vi.fn(async () => 77);
+    const controller = createBrowserTabGroupController({ api: { tabGroupOf, update } });
+
+    await controller.openSession({ controllerId: 'c1', sessionHandle: 'a', title: 'Alpha' });
+    await controller.shareActiveTab({ sessionHandle: 'a', tabId: 31 });
+
+    // No group: the tab id is recorded, the group id is not.
+    expect(controller.listSessions()[0]?.groupId).toBeUndefined();
+
+    await controller.closeSession({ sessionHandle: 'a' });
+
+    // The tab knows its group, so the ended state still lands.
+    expect(tabGroupOf).toHaveBeenCalledWith(31);
+    expect(update).toHaveBeenCalledWith(77, {
+      collapsed: true,
+      color: 'grey',
+      title: 'Kilo · ended',
+    });
+  });
+
+  it('retries with the live group when the recorded id is stale', async () => {
+    const update = createUpdateMock();
+    let failRecordedId = false;
+
+    update.mockImplementation(async (groupId: number) => {
+      if (failRecordedId && groupId === 1) {
+        throw new Error('No group with id: 1');
+      }
+    });
+    const controller = createBrowserTabGroupController({
+      api: { group: async () => 1, tabGroupOf: async () => 9, update },
+    });
+
+    await controller.openSession({ controllerId: 'c1', sessionHandle: 'a', title: 'Alpha' });
+    await controller.shareActiveTab({ sessionHandle: 'a', tabId: 31 });
+    expect(controller.listSessions()[0]?.groupId).toBe(1);
+
+    // Chrome recreated the group: the recorded id no longer updates, the tab's live one does.
+    failRecordedId = true;
+    await controller.closeSession({ sessionHandle: 'a' });
+
+    expect(update).toHaveBeenCalledWith(9, {
+      collapsed: true,
+      color: 'grey',
+      title: 'Kilo · ended',
+    });
+    expect(controller.listSessions()[0]?.groupId).toBe(9);
+  });
+
   it('creates an empty active session when nothing has ended', async () => {
     const controller = createBrowserTabGroupController({ api: {} });
 
-    await expect(controller.adoptEnded({ sessionHandle: 'fresh' })).resolves.toStrictEqual({});
+    await expect(controller.adoptEnded({ sessionHandle: 'fresh' })).resolves.toStrictEqual({
+      kind: 'none',
+    });
     expect(controller.listSessions()).toStrictEqual([
       { ended: false, sessionHandle: 'fresh', tabs: [], title: 'fresh' },
     ]);
@@ -276,11 +371,55 @@ describe('browser tab groups', () => {
     expect(controller.tabsForSession('ghost')).toStrictEqual([]);
     expect(controller.sessionForTab(44)).toBeUndefined();
     expect(controller.isTabAllowed('ghost', 44)).toBe(false);
-    await expect(controller.adoptEnded({ sessionHandle: 'ghost' })).resolves.toStrictEqual({});
+    await expect(controller.adoptEnded({ sessionHandle: 'ghost' })).resolves.toStrictEqual({
+      kind: 'none',
+    });
     await expect(
       controller.shareActiveTab({ sessionHandle: 'nobody', tabId: 44 })
-    ).resolves.toStrictEqual({ tabId: 44 });
+    ).resolves.toStrictEqual({ kind: 'no_session' });
     expect(controller.tabsForSession('nobody')).toStrictEqual([]);
+  });
+
+  it('reports an adopted group the browser never grouped', async () => {
+    const controller = createBrowserTabGroupController({ api: {} });
+    await controller.openSession({ controllerId: 'c1', sessionHandle: 'a', title: 'Alpha' });
+    await controller.shareActiveTab({ sessionHandle: 'a', tabId: 31 });
+    await controller.closeSession({ sessionHandle: 'a' });
+
+    await expect(controller.adoptEnded({ sessionHandle: 'b' })).resolves.toStrictEqual({
+      kind: 'adopted',
+    });
+    expect(controller.tabsForSession('b')).toStrictEqual([31]);
+  });
+
+  it('reports no tab when the browser has no active tab', async () => {
+    const controller = createBrowserTabGroupController({ api: { tabQuery: async () => [] } });
+    await controller.openSession({ controllerId: 'c1', sessionHandle: 's1', title: 'Report' });
+
+    await expect(controller.shareActiveTab({ sessionHandle: 's1' })).resolves.toStrictEqual({
+      kind: 'no_tab',
+    });
+    expect(controller.tabsForSession('s1')).toStrictEqual([]);
+  });
+
+  it('refuses to share a tab another live session holds', async () => {
+    const tabQuery = vi.fn(async () => [{ active: true, id: 61 }]);
+    const controller = createBrowserTabGroupController({ api: { tabQuery } });
+    await controller.openSession({ controllerId: 'c1', sessionHandle: 'a', title: 'Alpha' });
+    await controller.openSession({ controllerId: 'c1', sessionHandle: 'b', title: 'Beta' });
+    await controller.shareActiveTab({ sessionHandle: 'a', tabId: 61 });
+
+    await expect(controller.shareActiveTab({ sessionHandle: 'b' })).resolves.toStrictEqual({
+      kind: 'held',
+      tabId: 61,
+    });
+    expect(controller.tabsForSession('b')).toStrictEqual([]);
+    expect(controller.sessionForTab(61)).toBe('a');
+    // Sharing the tab again into the session that holds it is a no-op success.
+    await expect(controller.shareActiveTab({ sessionHandle: 'a' })).resolves.toStrictEqual({
+      kind: 'shared',
+      tabId: 61,
+    });
   });
 
   it('adds a reported tab to the session that owns its group', async () => {
@@ -333,5 +472,196 @@ describe('browser tab groups', () => {
 
     expect(controller.tabsForSession('s1')).toStrictEqual([81]);
     expect(controller.isTabAllowed('s1', 82)).toBe(false);
+  });
+});
+
+/** `storage.session` as two service workers share it: the second one starts with nothing in memory. */
+const createSessionStore = () => {
+  let stored: PersistedTabGroupSession[] | undefined = undefined;
+  const persistence: BrowserTabGroupPersistence = {
+    read: async () => stored,
+    write: async sessions => {
+      stored = [...sessions];
+    },
+  };
+
+  return { persistence, stored: () => stored };
+};
+
+describe('browser tab groups across a service-worker restart', () => {
+  it('gives a new worker the sessions, groups and tabs the old one stored', async () => {
+    const store = createSessionStore();
+    const before = createBrowserTabGroupController({
+      api: { group: createGroupMock(9), update: createUpdateMock() },
+      persistence: store.persistence,
+    });
+    await before.openSession({ controllerId: 'c1', sessionHandle: 's1', title: 'Report' });
+    await before.shareActiveTab({ sessionHandle: 's1', tabId: 7 });
+
+    await vi.waitFor(() => {
+      expect(store.stored()).toStrictEqual([
+        { ended: false, groupId: 9, sessionHandle: 's1', tabs: [7], title: 'Report' },
+      ]);
+    });
+
+    const after = createBrowserTabGroupController({ api: {}, persistence: store.persistence });
+    await after.restore();
+
+    expect(after.listSessions()).toStrictEqual([
+      { ended: false, groupId: 9, sessionHandle: 's1', tabs: [7], title: 'Report' },
+    ]);
+    expect(after.isTabAllowed('s1', 7)).toBe(true);
+  });
+
+  it('keeps an ended group adoptable after the restart', async () => {
+    const store = createSessionStore();
+    const before = createBrowserTabGroupController({
+      api: { group: createGroupMock(9), update: createUpdateMock() },
+      persistence: store.persistence,
+    });
+    await before.openSession({ controllerId: 'c1', sessionHandle: 's1', title: 'Report' });
+    await before.shareActiveTab({ sessionHandle: 's1', tabId: 7 });
+    await before.closeSession({ sessionHandle: 's1' });
+
+    await vi.waitFor(() => {
+      expect(store.stored()?.[0]?.ended).toBe(true);
+    });
+
+    const after = createBrowserTabGroupController({
+      api: { update: createUpdateMock() },
+      persistence: store.persistence,
+    });
+    await after.restore();
+
+    await expect(after.adoptEnded({ sessionHandle: 's2' })).resolves.toStrictEqual({
+      groupId: 9,
+      kind: 'adopted',
+    });
+    expect(after.tabsForSession('s2')).toStrictEqual([7]);
+  });
+
+  it('writes nothing before the stored sessions are read, and keeps a tab closed meanwhile closed', async () => {
+    const read = Promise.withResolvers<PersistedTabGroupSession[] | undefined>();
+    const writes: PersistedTabGroupSession[][] = [];
+    const after = createBrowserTabGroupController({
+      api: {},
+      persistence: {
+        read: () => read.promise,
+        write: async sessions => {
+          writes.push([...sessions]);
+        },
+      },
+    });
+
+    after.noteTabRemoved(7);
+    await after.openSession({ controllerId: 'c2', sessionHandle: 's2', title: 'New' });
+    await Promise.resolve();
+
+    // Writing now would replace the stored session with this worker's empty view.
+    expect(writes).toStrictEqual([]);
+
+    read.resolve([
+      { ended: false, groupId: 9, sessionHandle: 's1', tabs: [7, 8], title: 'Report' },
+    ]);
+    await after.restore();
+
+    const expected = [
+      { ended: false, sessionHandle: 's2', tabs: [], title: 'New' },
+      { ended: false, groupId: 9, sessionHandle: 's1', tabs: [8], title: 'Report' },
+    ];
+
+    expect(after.listSessions()).toStrictEqual(expected);
+    await vi.waitFor(() => {
+      expect(writes.at(-1)).toStrictEqual(expected);
+    });
+  });
+
+  it('restores nothing from unreadable storage, and still answers', async () => {
+    const items = new Map<string, unknown>([[TAB_GROUP_SESSIONS_STORAGE_KEY, [{ tabs: 'x' }]]]);
+    const persistence = createStorageSessionTabGroupPersistence({
+      getItem: key => items.get(key),
+      setItem: (key, value) => {
+        items.set(key, value);
+      },
+    });
+    const failing = createBrowserTabGroupController({
+      api: {},
+      persistence: { read: () => Promise.reject(new Error('storage gone')), write: async () => {} },
+    });
+    const garbled = createBrowserTabGroupController({ api: {}, persistence });
+
+    await expect(failing.restore()).resolves.toBe(false);
+    await expect(garbled.restore()).resolves.toBe(true);
+    expect(failing.listSessions()).toStrictEqual([]);
+    expect(garbled.listSessions()).toStrictEqual([]);
+  });
+
+  it('keeps the stored sessions through a failed read: writes wait, and the next call reads again', async () => {
+    let reads = 0;
+    const later = Promise.withResolvers<PersistedTabGroupSession[] | undefined>();
+    const writes: PersistedTabGroupSession[][] = [];
+    const after = createBrowserTabGroupController({
+      api: {},
+      persistence: {
+        read: () => {
+          reads += 1;
+
+          return reads === 1 ? Promise.reject(new Error('storage busy')) : later.promise;
+        },
+        write: async sessions => {
+          writes.push([...sessions]);
+        },
+      },
+    });
+
+    await expect(after.restore()).resolves.toBe(false);
+    // The change asks for a write, and the write asks for the read again.
+    await after.openSession({ controllerId: 'c2', sessionHandle: 's2', title: 'New' });
+    await Promise.resolve();
+
+    // This worker's view alone would erase s1.
+    expect(reads).toBe(2);
+    expect(writes).toStrictEqual([]);
+
+    later.resolve([{ ended: false, groupId: 9, sessionHandle: 's1', tabs: [7], title: 'Report' }]);
+    await expect(after.restore()).resolves.toBe(true);
+
+    const expected = [
+      { ended: false, sessionHandle: 's2', tabs: [], title: 'New' },
+      { ended: false, groupId: 9, sessionHandle: 's1', tabs: [7], title: 'Report' },
+    ];
+
+    expect(after.listSessions()).toStrictEqual(expected);
+    await vi.waitFor(() => {
+      expect(writes.at(-1)).toStrictEqual(expected);
+    });
+  });
+
+  it('keeps only the newest 64 ended sessions', async () => {
+    const store = createSessionStore();
+    const controller = createBrowserTabGroupController({
+      api: {},
+      persistence: store.persistence,
+    });
+
+    for (let index = 0; index < 70; index += 1) {
+      const sessionHandle = `s${index}`;
+
+      // eslint-disable-next-line no-await-in-loop -- sessions end in order
+      await controller.openSession({ controllerId: 'c1', sessionHandle, title: sessionHandle });
+      // eslint-disable-next-line no-await-in-loop -- see above
+      await controller.closeSession({ sessionHandle });
+    }
+    await controller.openSession({ controllerId: 'c1', sessionHandle: 'live', title: 'Live' });
+
+    const handles = controller.listSessions().map(session => session.sessionHandle);
+
+    expect(handles).toHaveLength(65);
+    expect(handles).not.toContain('s5');
+    expect(handles).toContain('s6');
+    expect(handles).toContain('live');
+    await vi.waitFor(() => {
+      expect(store.stored()).toHaveLength(65);
+    });
   });
 });

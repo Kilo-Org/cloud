@@ -6,12 +6,14 @@ import { View } from 'react-native';
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 
 import { BitbucketConnectForm } from '@/components/code-reviewer/bitbucket-connect-form';
+import { StateAction } from '@/components/empty-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { useMetadataLeaveGuard } from '@/components/profiles/use-metadata-leave-guard';
 import { QueryError } from '@/components/query-error';
 import { SheetHeader } from '@/components/sheet-header';
 import { SheetScrollView } from '@/components/tab-screen';
+import { RotateCcw } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
@@ -65,8 +67,19 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
   const { t } = useTranslation();
   // The token field is the sheet's only draft, and the header close control,
   // the Android Back and the back gesture would drop whatever is typed in it.
-  const guard = useMetadataLeaveGuard({ enabled: true });
-  const { role, org, isResolving, isError } = useOrgBoundary(scope);
+  // No second in-flight source exists: the form reports `dirty: false` while a
+  // connect is pending (`onDirtyChange?.(holdsDraft && !submitting &&
+  // !connectLanded)`), so a running connect has already disarmed the guard, and
+  // a landed one closes the sheet through `leaveWithoutAsking`.
+  const guard = useMetadataLeaveGuard({ enabled: true, saving: false });
+  const {
+    role,
+    org,
+    isResolving,
+    isError,
+    isFetching: isOrgFetching,
+    refetch,
+  } = useOrgBoundary(scope);
   const readiness = useBitbucketReadiness(scope);
   // The readiness read describes workspace access tokens only, so this is what
   // tells a Bitbucket OAuth connection apart from a workspace with none.
@@ -92,12 +105,43 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     !(status.isError && status.data == null);
   let title = t('agentChat.repoPicker.platformBitbucket');
   let deniedDescription = t('prReview.connect.gitlabReconnectAdminOnlyDescription');
+  // The lapsed plan's second paragraph under the role sentence, and `undefined`
+  // in every denial that has one reason only. The two reasons are unrelated
+  // blockers, so they stay apart instead of forming one dense paragraph the
+  // reader takes as a single claim.
+  let deniedPlanLine: string | undefined = undefined;
+  // The denial's way out, offered only where the sheet joins the two refusals
+  // below: a retry here re-reads the three answers the page was decided from.
+  let deniedAction: ReactNode = undefined;
   if (readsSettled) {
     if (managesExisting) {
       deniedDescription = t('integrations.managedByOwner');
     } else if (integrationId === null) {
       title = t('common.connectBitbucket');
-      deniedDescription = t('codeReviewer.bitbucket.notConnectedReadOnly');
+      const roleDenial = t('prReview.connect.adminOnlyConnectDescription');
+      // The same organization's lapsed plan refuses every organization change,
+      // so a member must not read the role as the only blocker: the plan line
+      // under the role names the owner and the billing step that unblocks it.
+      // It is this sheet's own key because the retry below carries the step the
+      // shared ended-plan sentence keeps for the surfaces that have no control.
+      if (org?.isTrialExpiredForEnforcement === true) {
+        deniedDescription = roleDenial;
+        deniedPlanLine = t('codeReviewer.bitbucket.notConnectedReadOnlyPlan');
+        deniedAction = (
+          <StateAction
+            label={t('common.retry')}
+            icon={RotateCcw}
+            loading={readiness.isFetching || status.isFetching || isOrgFetching}
+            onPress={() => {
+              void refetch();
+              void readiness.refetch();
+              void status.refetch();
+            }}
+          />
+        );
+      } else {
+        deniedDescription = roleDenial;
+      }
     } else {
       title = t('prReview.connect.reconnectTitleBitbucket');
     }
@@ -168,7 +212,30 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     }
 
     if (!canManage) {
-      return <PermissionDenied description={deniedDescription} showBack={false} />;
+      // The role sentence stays the state's description. The plan line is a
+      // second paragraph in the same muted body token, one paragraph gap under
+      // it, so the reader sees two reasons rather than one cramped paragraph at
+      // a different size.
+      return (
+        <PermissionDenied
+          description={
+            deniedPlanLine === undefined ? (
+              deniedDescription
+            ) : (
+              <View className="items-center gap-2">
+                <Text variant="muted" className="text-center">
+                  {deniedDescription}
+                </Text>
+                <Text variant="muted" className="text-center">
+                  {deniedPlanLine}
+                </Text>
+              </View>
+            )
+          }
+          showBack={false}
+          action={deniedAction}
+        />
+      );
     }
 
     // The connect mutation refuses a second Bitbucket integration for the same
@@ -179,7 +246,9 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
       return (
         <View className="px-4 pt-3">
           <Text variant="muted" className="text-sm">
-            {t('codeReviewer.bitbucketConnect.managedOnWeb')}
+            {t('codeReviewer.bitbucketConnect.managedOnWeb', {
+              organization: org.organizationName,
+            })}
           </Text>
         </View>
       );
@@ -195,6 +264,7 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
         <BitbucketConnectForm
           scope={scope}
           integrationId={integrationId}
+          organizationName={org.organizationName}
           onDirtyChange={guard.handleDirtyChange}
           onConnected={() => {
             notificationHaptic(Haptics.NotificationFeedbackType.Success);

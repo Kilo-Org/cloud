@@ -45,6 +45,7 @@ import { timingSafeEqual } from '@kilocode/encryption';
 import { isRepositoryAgentOrigin } from '../../shared/agent-modes.js';
 import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
 import { logger } from '../../logger.js';
+import { NETWORK_SECRET_LIMITS } from '@kilocode/worker-utils/network-secrets';
 
 const WEB_ORIGIN = 'cloud-agent-web';
 
@@ -246,6 +247,7 @@ function applyProfileResolution(
           ? {}
           : { environmentSetupCommandCount: resolved.environmentSetupCommandCount }),
         encryptedSecrets: resolved.encryptedSecrets,
+        ...(resolved.networkSecrets ? { networkSecrets: resolved.networkSecrets } : {}),
         mcpServers: profileMcpServersToClientRecord(resolved.mcpServers),
         runtimeSkills: resolved.skills,
         runtimeAgents: resolved.agents,
@@ -262,12 +264,19 @@ function applyProfileResolution(
 function assertResolvedConfigurationWithinSessionLimits(
   resolved: SessionProfileBundle | undefined
 ): void {
+  if (Object.keys(resolved?.networkSecrets ?? {}).length > NETWORK_SECRET_LIMITS.MAX_SECRETS) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `Maximum ${NETWORK_SECRET_LIMITS.MAX_SECRETS} network secrets per workspace after merging environments and profiles`,
+    });
+  }
   // An older wrapper receives the start commands appended to setup, so the
   // combined list must fit one setup list.
   const setupAndStart = [...(resolved?.setupCommands ?? []), ...(resolved?.startCommands ?? [])];
   const parsed = SessionProfileBundleSchema.safeParse({
     envVars: resolved?.envVars,
     encryptedSecrets: resolved?.encryptedSecrets,
+    networkSecrets: resolved?.networkSecrets,
     setupCommands: setupAndStart,
   });
   if (!parsed.success) {
@@ -589,6 +598,12 @@ export async function preflightSessionCreation(
   );
   await validateEndpoint?.(resolvedRequest);
 
+  // Only a model the caller's organization catalogue makes available may serve a
+  // session. This create-time check answers that for a prompt turn. A policy-bearing
+  // bearer is checked in `issueSessionRuntimeAuthorization`, once the runtime
+  // authorization exists. The AI gateway enforces the same requirement for the
+  // session at inference time (`resolveProviderAndPolicy` ->
+  // `getEffectiveModelDecision`).
   if (resolvedRequest.initialTurn?.type === 'prompt' && !isPolicyBearingAuthToken(ctx.authToken)) {
     await assertKiloModelAvailable({
       env: ctx.env,

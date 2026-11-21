@@ -68,7 +68,7 @@ export function hashStepUpBinding(
   return createHash('sha256').update(stepUpBindingValue(actionClass, operation)).digest('hex');
 }
 
-async function countPasskeys(userId: string, fromDb: typeof db): Promise<number> {
+async function countPasskeys(userId: string, fromDb: DrizzleConnection): Promise<number> {
   const [row] = await fromDb
     .select({ count: sql<number>`count(*)::int` })
     .from(passkey_credentials)
@@ -88,7 +88,7 @@ async function countPasskeys(userId: string, fromDb: typeof db): Promise<number>
  */
 export async function evaluateStepUp(
   params: StepUpEvaluationParams,
-  fromDb: typeof db = db
+  fromDb: DrizzleConnection = db
 ): Promise<StepUpEvaluation> {
   if (!params.webSessionId) {
     return { state: { status: 'session_unbound' }, proof: null, passkeyCount: 0 };
@@ -101,10 +101,17 @@ export async function evaluateStepUp(
   const operationClass = isOperationStepUpClass(params.actionClass);
   const passkeyCount = await countPasskeys(params.userId, fromDb);
 
-  const proofFilters = [
+  // The three session-binding predicates every proof read shares. The
+  // latestProof fallback below reuses them on purpose: it must see proofs in
+  // any state (revoked, consumed, expired) to explain a refusal, so it omits
+  // the freshness filters of proofFilters.
+  const proofIdentity = [
     eq(session_step_up_proofs.kilo_user_id, params.userId),
     eq(session_step_up_proofs.session_id_hash, sessionIdHash),
     eq(session_step_up_proofs.purpose, policy.purpose),
+  ];
+  const proofFilters = [
+    ...proofIdentity,
     isNull(session_step_up_proofs.revoked_at),
     isNull(session_step_up_proofs.consumed_at),
     gt(session_step_up_proofs.expires_at, nowIso),
@@ -179,13 +186,7 @@ export async function evaluateStepUp(
       revoked_at: session_step_up_proofs.revoked_at,
     })
     .from(session_step_up_proofs)
-    .where(
-      and(
-        eq(session_step_up_proofs.kilo_user_id, params.userId),
-        eq(session_step_up_proofs.session_id_hash, sessionIdHash),
-        eq(session_step_up_proofs.purpose, policy.purpose)
-      )
-    )
+    .where(and(...proofIdentity))
     .orderBy(desc(session_step_up_proofs.verified_at))
     .limit(1);
 

@@ -109,6 +109,18 @@ async function restartForDirection(
   if (!(await writeDirectionAttemptAsync(language))) {
     return { kind: 'restart-skipped' };
   }
+  try {
+    // A form's typed text lives in the durable draft store behind a 500 ms
+    // debounce. The reload below discards the JS context without running React
+    // cleanup, so a draft still inside that window would be lost; forcing every
+    // pending write here is its save point. Loaded here, not at module scope: a
+    // static import would pull the native SQLCipher store into the language
+    // picker's suites.
+    const { flushAllDrafts } = await import('@/lib/persist/drafts');
+    await flushAllDrafts();
+  } catch {
+    // A failed convenience flush must not block the relaunch.
+  }
   syncRtl(language);
   try {
     await reloadAppAsync();

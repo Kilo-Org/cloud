@@ -155,15 +155,17 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
   }));
 
   if (config.isError && !config.data) {
+    // The error title names what failed and the classified variant supplies the
+    // cause and next step; naming the failed action in both said neither.
     return (
       <PlatformErrorScreen
         title={t('common.notifications')}
+        errorTitle={t('securityAgent.notifications.couldNotLoad')}
         variant={classifyReadFailureVariant({
           errors: [config.error],
           isPaused: config.fetchStatus === 'paused',
           connectivity,
         })}
-        message={t('securityAgent.notifications.couldNotLoad')}
         onRetry={() => void config.refetch()}
       />
     );
@@ -285,6 +287,9 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
               />
               <FormField
                 label={t('securityAgent.notifications.slaLeadTimeLabel')}
+                // The severity picker above labels itself with the section
+                // eyebrow, so this field's label takes the same style.
+                labelRole="section"
                 error={
                   isValidDayCount(slaNotificationWarningDays)
                     ? undefined

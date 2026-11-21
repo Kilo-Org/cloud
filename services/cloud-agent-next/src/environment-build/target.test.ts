@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkerDb } from '@kilocode/db/client';
 import type { EnvironmentReference } from '@kilocode/cloud-agent-profile';
+import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import type * as vercelCredentialResolver from '../byoc/vercel-credential-resolver.js';
 import type * as vercelOwner from '../byoc/vercel-owner.js';
 import type { Env } from '../types.js';
@@ -48,7 +49,7 @@ const ENV = {
   RUNTIME_RELEASE_BUCKET: {},
 } as unknown as Env;
 
-function target(commands: string[] = []) {
+function target(commands: string[] = [], egressMode: EgressMode | null = null) {
   return resolveEnvironmentBuildTarget({
     env: ENV,
     db: {} as WorkerDb,
@@ -56,6 +57,7 @@ function target(commands: string[] = []) {
     repoFullName: 'acme/widgets',
     commands,
     sandboxAllocation: null,
+    egressMode,
   });
 }
 
@@ -105,6 +107,23 @@ describe('resolveEnvironmentBuildTarget', () => {
     });
   });
 
+  it('resolves saved defaults with the environment allowlist, the same way a session does', async () => {
+    resolveSaved.mockResolvedValue(undefined);
+    await expect(target(['pnpm install'], 'allowlist')).resolves.toMatchObject({
+      ok: true,
+      target: { provider: 'cloudflare-containers' },
+    });
+    expect(resolveSaved).toHaveBeenCalledWith(
+      expect.objectContaining({ runtime: { egressMode: 'allowlist' } })
+    );
+  });
+
+  it('resolves saved defaults without an egress need for an unrestricted environment', async () => {
+    resolveSaved.mockResolvedValue(undefined);
+    await target(['pnpm install'], 'unrestricted');
+    expect(resolveSaved.mock.calls[0]?.[0]).not.toHaveProperty('runtime');
+  });
+
   it('refuses the native builder when the runtime image is not downloaded/runtime-free', async () => {
     resolveSaved.mockResolvedValue(undefined);
     await expect(
@@ -115,6 +134,7 @@ describe('resolveEnvironmentBuildTarget', () => {
         repoFullName: 'acme/widgets',
         commands: ['pnpm install'],
         sandboxAllocation: null,
+        egressMode: null,
       })
     ).resolves.toEqual({
       ok: false,

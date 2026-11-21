@@ -269,6 +269,19 @@ function findElementByComponent(node: Node, component: unknown): Record<string, 
   return null;
 }
 
+/** Every element of this component type (by reference) in the tree, in render order. */
+function collectElementsByComponent(node: Node, component: unknown): Record<string, unknown>[] {
+  if (node === null || typeof node !== 'object') {
+    return [];
+  }
+  const found = 'type' in node && node.type === component ? [node.props ?? {}] : [];
+  const children = node.props?.children;
+  for (const child of Array.isArray(children) ? children : [children]) {
+    found.push(...collectElementsByComponent(child as Node, component));
+  }
+  return found;
+}
+
 type ElementNode = { type?: unknown; props?: Record<string, unknown> } | null;
 
 /** The first node of `typeName`, so a test can inspect its position in the tree. */
@@ -506,7 +519,7 @@ describe('NewSessionConfigureForm', () => {
         isRemoteTargetSelected: false,
         isSubmitting: false,
         model: 'claude-opus-4-7',
-        isProfileLoading: false,
+        profileGate: { kind: 'ready' },
       },
     });
     expect(reason).toBe('attachment-uploading');
@@ -1178,7 +1191,9 @@ describe('NewSessionConfigureForm', () => {
     expect(control).not.toBeNull();
     // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
     expect(control!.value).toBe('leave');
-    expect(findTextContent(element, t => t === 'Changes')).toBe(true);
+    expect(collectElementsByComponent(element, FormFieldLabel).map(({ label }) => label)).toContain(
+      'Changes'
+    );
   });
 
   it('renders the commit control as Commit and push when autoCommit is true', async () => {
@@ -1207,7 +1222,9 @@ describe('NewSessionConfigureForm', () => {
     }) as Node;
 
     expect(findElementByType(element, 'SegmentedControl')).toBeNull();
-    expect(findTextContent(element, t => t === 'Changes')).toBe(false);
+    expect(
+      collectElementsByComponent(element, FormFieldLabel).map(({ label }) => label)
+    ).not.toContain('Changes');
   });
 
   it('holds the rows below the repository section until its final height is known', async () => {
@@ -1220,7 +1237,9 @@ describe('NewSessionConfigureForm', () => {
       repositoryRegionSettled: false,
     }) as Node;
 
-    expect(findTextContent(unsettled, t => t === 'Changes')).toBe(false);
+    expect(
+      collectElementsByComponent(unsettled, FormFieldLabel).map(({ label }) => label)
+    ).not.toContain('Changes');
     expect(containsComponent(unsettled, NewSessionProfileRow)).toBe(false);
     expect(findElementByType(unsettled, 'AdvancedConfigPanel')).toBeNull();
 
@@ -1231,7 +1250,9 @@ describe('NewSessionConfigureForm', () => {
       repositoryRegionSettled: true,
     }) as Node;
 
-    expect(findTextContent(settled, t => t === 'Changes')).toBe(true);
+    expect(collectElementsByComponent(settled, FormFieldLabel).map(({ label }) => label)).toContain(
+      'Changes'
+    );
     expect(containsComponent(settled, NewSessionProfileRow)).toBe(true);
     expect(findElementByType(settled, 'AdvancedConfigPanel')).not.toBeNull();
   });

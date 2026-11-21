@@ -9,8 +9,10 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { type BriefingPreferences } from '@/lib/agent-briefing';
 import {
   briefingPickerDate,
@@ -21,6 +23,7 @@ import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { formatClockTime } from '@/lib/format';
 import { dateTimeFormat } from '@/lib/intl-cache';
 import { useTRPC } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
 
 export function ScheduleSettings({
   preferences,
@@ -108,7 +111,9 @@ export function ScheduleSettings({
         />
         <Text variant="caption">{t('agentBriefing.timezoneHint')}</Text>
         <Button
-          variant="ghost"
+          variant="link"
+          size="sm"
+          className={cn(STATE_ACTION_CLASS, 'self-start')}
           disabled={offline || update.isPending}
           onPress={() => {
             draft.current.timezone = dateTimeFormat(undefined, {}).resolvedOptions().timeZone;
@@ -127,7 +132,9 @@ export function ScheduleSettings({
         const clock = formatClockTime(pickerValue, i18n.resolvedLanguage ?? i18n.language);
         return (
           <View key={field.key} className="gap-2">
-            <Text>{field.label}</Text>
+            {/* The same label the text fields above wear: one relation, one
+                size, whether its value is typed or picked. */}
+            <FormFieldLabel label={field.label} />
             <Button
               variant="outline"
               disabled={offline || update.isPending}

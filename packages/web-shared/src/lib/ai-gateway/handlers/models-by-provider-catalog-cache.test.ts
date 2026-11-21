@@ -33,8 +33,8 @@ jest.mock(
         memberGrant: {
           mode: 'selected',
           includeOrganizationBaseline: false,
-          modelAllowList: [],
-          providerAllowList: ['alpha'],
+          modelAllowList: new Set<string>(),
+          providerAllowList: new Set(['alpha']),
         },
         policyRevision: 1,
         customLlmGrantee: { organizationId: 'org-1', groupIds: [] },

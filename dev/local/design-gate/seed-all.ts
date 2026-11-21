@@ -1,0 +1,268 @@
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+
+import {
+  templateReferences,
+  type ManifestRow,
+  type SeedMap,
+  type SeedValue,
+} from './batch-manifest';
+
+/** `mobile-profile-caps` prints `<stem>AtCapProfileId` and `<stem>BelowCapProfileId` per list. */
+const PROFILE_CAP_STEMS = [
+  'instructions',
+  'skills',
+  'variables',
+  'commands',
+  'agents',
+  'mcpServers',
+  'slashCommands',
+];
+
+/**
+ * Every seed topic the batch manifest needs, in the order they must run, keyed
+ * by the step name a `{{seed:<step>.<key>}}` link template names. Each topic
+ * prints its ids with `--json`, so the map never reads the database itself.
+ * `screens` names the screens whose content a step provides even where no link
+ * templates its ids (a row whose expected screen is one of them, or below one,
+ * selects the step), and `needs` the steps it builds on.
+ * Order matters: the reviewer analytics topic seeds the organizations the
+ * account-pair topic created, and every topic needs the signed-in account.
+ * `sessions` gives an account with no GitHub integration a fake one that lists
+ * its root session's repository, so a fresh fake account needs no GitHub App.
+ */
+export const SEED_STEPS: readonly Readonly<{
+  step: string;
+  topic: string;
+  args: (email: string) => string[];
+  /** The keys a link may template; `batches seed` fails the step when one is missing. */
+  outputs: readonly string[];
+  screens?: readonly string[];
+  needs?: readonly string[];
+}>[] = [
+  {
+    step: 'org-pair',
+    topic: 'app:mobile-org-account-pair',
+    args: email => [email],
+    outputs: ['ownerOrganizationId', 'memberOrganizationId'],
+    screens: ['(app)/(tabs)/(3_profile)/organization'],
+  },
+  {
+    step: 'reviewer-analytics',
+    topic: 'app:mobile-reviewer-analytics',
+    args: email => [email],
+    outputs: [],
+    screens: ['(app)/code-reviewer/[scope]/analytics'],
+    needs: ['org-pair'],
+  },
+  {
+    step: 'profile-caps',
+    topic: 'app:mobile-profile-caps',
+    args: email => ['--email', email],
+    outputs: PROFILE_CAP_STEMS.flatMap(stem => [
+      `${stem}AtCapProfileId`,
+      `${stem}BelowCapProfileId`,
+    ]),
+    screens: ['(app)/profile-management', '(app)/(tabs)/(3_profile)/profiles'],
+  },
+  {
+    step: 'security-findings',
+    topic: 'app:security-agent-findings',
+    args: email => [email],
+    outputs: ['openFindingId', 'dismissedFindingId'],
+    screens: ['(app)/security-agent/[scope]/findings'],
+  },
+  {
+    step: 'security-org-scopes',
+    topic: 'app:mobile-security-agent-notification-scopes',
+    args: email => [email],
+    outputs: ['organizationId'],
+  },
+  {
+    step: 'review-list',
+    topic: 'code-reviews:review-list',
+    args: email => ['--email', email, '--count', '60'],
+    outputs: ['newestReviewId'],
+    screens: ['(app)/code-reviewer/[scope]/reviews'],
+  },
+  {
+    step: 'sessions',
+    topic: 'app:mobile-sheet-fixtures',
+    args: email => [email, '--child-performance'],
+    outputs: [
+      'rootSessionId',
+      'childSessionId',
+      'unsupportedSessionId',
+      'emptySessionId',
+      'performanceRootSessionId',
+    ],
+  },
+  {
+    step: 'paged-history',
+    topic: 'app:paged-history',
+    args: email => [email],
+    outputs: ['sessionId'],
+  },
+  {
+    step: 'session-diff',
+    topic: 'app:mobile-session-diff-fixture',
+    args: email => [email],
+    outputs: ['sessionId'],
+  },
+  {
+    step: 'report-receipts',
+    topic: 'app:mobile-report-receipts',
+    args: email => [email],
+    outputs: ['receivedReceiptId', 'actionedReceiptId', 'rejectedReceiptId'],
+    screens: ['(app)/(tabs)/(3_profile)/report-receipts'],
+  },
+];
+
+/**
+ * Every `{{seed:<step>.<key>}}` in the rows whose step or key is not declared
+ * above: a misspelled key fails here, statically, instead of as an unresolved
+ * link on every device.
+ */
+export function templateProblems(rows: readonly ManifestRow[]): string[] {
+  return rows.flatMap(row =>
+    templateReferences(row.link).flatMap(reference => {
+      const [, step = '', key = ''] = /^seed:([a-z0-9-]+)\.([A-Za-z0-9]+)$/.exec(reference) ?? [];
+      const entry = SEED_STEPS.find(candidate => candidate.step === step);
+      if (entry === undefined) return [`line ${row.line}: {{${reference}}} names no seed step`];
+      return entry.outputs.includes(key)
+        ? []
+        : [`line ${row.line}: {{${reference}}}: ${step} declares no ${key}`];
+    })
+  );
+}
+
+export type SeedRunner = (
+  topic: string,
+  args: readonly string[]
+) => {
+  status: number | null;
+  stdout: string;
+  stderr: string;
+};
+
+export function pnpmSeedRunner(repo: string): SeedRunner {
+  return (topic, args) => {
+    const result = spawnSync('pnpm', ['-s', 'dev:seed', topic, ...args, '--json'], {
+      cwd: repo,
+      encoding: 'utf8',
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    return { status: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
+  };
+}
+
+function parseSeedJson(stdout: string): Record<string, SeedValue> {
+  const line = stdout
+    .split('\n')
+    .map(entry => entry.trim())
+    .filter(entry => entry.startsWith('{'))
+    .at(-1);
+  if (line === undefined) throw new Error('the topic printed no JSON line');
+  const parsed: unknown = JSON.parse(line);
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error('the topic printed JSON that is not an object');
+  }
+  const values: Record<string, SeedValue> = {};
+  for (const [key, value] of Object.entries(parsed)) {
+    if (value === null || ['string', 'number', 'boolean'].includes(typeof value)) {
+      values[key] = value as SeedValue;
+    }
+  }
+  return values;
+}
+
+/**
+ * The steps the given rows need, in `SEED_STEPS` order: every step a link
+ * template names, every step that provides a row's expected screen, and the
+ * steps those build on.
+ */
+export function stepsFor(rows: readonly ManifestRow[]): string[] {
+  const named = new Set(
+    rows.flatMap(row =>
+      templateReferences(row.link).map(reference => /^seed:([a-z0-9-]+)\./.exec(reference)?.[1])
+    )
+  );
+  for (const entry of SEED_STEPS) {
+    const provides = (entry.screens ?? []).some(screen =>
+      rows.some(row => row.screen === screen || row.screen.startsWith(`${screen}/`))
+    );
+    if (provides) named.add(entry.step);
+  }
+  // `needs` only points at earlier steps, so one pass in reverse order closes it.
+  for (const entry of [...SEED_STEPS].reverse()) {
+    if (named.has(entry.step)) for (const need of entry.needs ?? []) named.add(need);
+  }
+  return SEED_STEPS.map(entry => entry.step).filter(step => named.has(step));
+}
+
+/**
+ * Runs every seed step for one fake account and returns the id map. A failed
+ * step is recorded with its error and the next steps still run, so one missing
+ * service costs only the links that reference that step.
+ */
+export function seedAll(options: {
+  email: string;
+  steps?: readonly string[];
+  run: SeedRunner;
+  log: (line: string) => void;
+}): SeedMap {
+  if (!/@example\.com$/i.test(options.email)) {
+    throw new Error(`seed-all seeds fake accounts only (@example.com), got ${options.email}`);
+  }
+  const wanted = options.steps ?? SEED_STEPS.map(entry => entry.step);
+  const unknown = wanted.filter(step => !SEED_STEPS.some(entry => entry.step === step));
+  if (unknown.length > 0) throw new Error(`unknown seed step(s): ${unknown.join(', ')}`);
+  const steps: Record<string, SeedMap['steps'][string]> = {};
+  for (const entry of SEED_STEPS.filter(candidate => wanted.includes(candidate.step))) {
+    const result = options.run(entry.topic, entry.args(options.email));
+    try {
+      if (result.status !== 0) {
+        // The runner prints `Seed runner failed: <Error>: <message>` first; a
+        // Drizzle error then dumps an object whose last lines are braces.
+        const lines = result.stderr
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => line !== '' && !line.startsWith('at '));
+        const reason = lines.find(line => /error/i.test(line)) ?? lines[0] ?? 'no stderr';
+        throw new Error(`exit ${result.status}: ${reason}`);
+      }
+      const values = parseSeedJson(result.stdout);
+      const missing = entry.outputs.filter(key => values[key] === undefined);
+      if (missing.length > 0) throw new Error(`printed no ${missing.join(', ')}`);
+      steps[entry.step] = { topic: entry.topic, ok: true, values };
+      options.log(
+        `seed-all: ${entry.step} (${entry.topic}) ok: ${Object.keys(values).length} values`
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      steps[entry.step] = { topic: entry.topic, ok: false, values: {}, error: message };
+      options.log(`seed-all: ${entry.step} (${entry.topic}) FAILED: ${message}`);
+    }
+  }
+  return { email: options.email, createdAt: new Date().toISOString(), steps };
+}
+
+export function readSeedMap(file: string): SeedMap {
+  const parsed: unknown = JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (
+    typeof parsed !== 'object' ||
+    parsed === null ||
+    !('steps' in parsed) ||
+    typeof parsed.steps !== 'object' ||
+    parsed.steps === null
+  ) {
+    throw new Error(`${file} is not a seed-all map`);
+  }
+  return parsed as SeedMap;
+}
+
+export function writeSeedMap(file: string, map: SeedMap): void {
+  fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
+  fs.writeFileSync(file, `${JSON.stringify(map, null, 2)}\n`);
+}

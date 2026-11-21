@@ -4,6 +4,7 @@ import {
   classifyOrganizationEntitlement,
   getOrgTrialStatusFromDays,
   getDaysRemainingInTrial,
+  isRunningTrialStage,
   PAID_ORGANIZATION_SEAT_SUBSCRIPTION_STATUSES,
 } from './trial-utils';
 
@@ -39,6 +40,25 @@ describe('getOrgTrialStatusFromDays', () => {
     expect(getOrgTrialStatusFromDays(-4)).toBe('trial_expired_hard');
     expect(getOrgTrialStatusFromDays(-5)).toBe('trial_expired_hard');
     expect(getOrgTrialStatusFromDays(-10)).toBe('trial_expired_hard');
+  });
+});
+
+describe('isRunningTrialStage', () => {
+  it('accepts the four stages a trial is still running in', () => {
+    for (const stage of [
+      'trial_active',
+      'trial_ending_soon',
+      'trial_ending_very_soon',
+      'trial_expires_today',
+    ] as const) {
+      expect(isRunningTrialStage(stage)).toBe(true);
+    }
+  });
+
+  it('rejects the expired stages and a bypassed trial', () => {
+    expect(isRunningTrialStage('trial_expired_soft')).toBe(false);
+    expect(isRunningTrialStage('trial_expired_hard')).toBe(false);
+    expect(isRunningTrialStage('subscribed')).toBe(false);
   });
 });
 

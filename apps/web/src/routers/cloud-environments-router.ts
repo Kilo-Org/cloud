@@ -6,6 +6,12 @@ import { AGENT_ENV_VARS_PUBLIC_KEY } from '@kilocode/web-shared/lib/config.serve
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { SELECTABLE_SANDBOX_ALLOCATIONS } from '@kilocode/worker-utils/sandbox-allocation';
 import { egressModeSchema, egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
+import {
+  NETWORK_SECRET_LIMITS,
+  networkSecretInputSchema,
+  networkSecretChangeSchema,
+  networkSecretStoredPolicySchema,
+} from '@kilocode/worker-utils/network-secrets';
 import { isUniqueViolation } from '@/lib/db-errors';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
@@ -147,6 +153,7 @@ const environmentResponseBaseSchema = {
   commands: z.array(z.string()),
   startCommands: z.array(z.string()),
   secretKeys: z.array(z.string()),
+  networkSecrets: z.array(networkSecretStoredPolicySchema.extend({ key: z.string() })).optional(),
   configurationRevision: z.number(),
   sandboxAllocation: z.string().nullable(),
   egressMode: egressModeSchema.nullable(),
@@ -294,6 +301,10 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
           repositories: environmentRepositoryListSchema.optional(),
           plainVars: environmentPlainVarsSchema.optional(),
           secrets: environmentSecretsSchema.optional(),
+          networkSecrets: z
+            .array(networkSecretInputSchema)
+            .max(NETWORK_SECRET_LIMITS.MAX_SECRETS)
+            .optional(),
           commands: environmentCommandsSchema.optional(),
           startCommands: environmentCommandsSchema.optional(),
           sandboxAllocation: environmentSandboxAllocationSchema.optional(),
@@ -336,6 +347,7 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
         name: input.name,
         plainVars: input.plainVars,
         secrets: input.secrets,
+        networkSecrets: input.networkSecrets,
         commands: input.commands,
         startCommands: input.startCommands,
         sandboxAllocation: input.sandboxAllocation,
@@ -366,6 +378,10 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
           repositories: environmentRepositoryListSchema.optional(),
           plainVars: environmentPlainVarsSchema.optional(),
           secrets: environmentSecretChangesSchema.optional(),
+          networkSecrets: z
+            .array(networkSecretChangeSchema)
+            .max(2 * NETWORK_SECRET_LIMITS.MAX_SECRETS)
+            .optional(),
           commands: environmentCommandsSchema.optional(),
           startCommands: environmentCommandsSchema.optional(),
           sandboxAllocation: environmentSandboxAllocationSchema.optional(),
@@ -415,6 +431,7 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
           repositories,
           plainVars: input.plainVars,
           secrets: input.secrets,
+          networkSecrets: input.networkSecrets,
           commands: input.commands,
           startCommands: input.startCommands,
           sandboxAllocation: input.sandboxAllocation,

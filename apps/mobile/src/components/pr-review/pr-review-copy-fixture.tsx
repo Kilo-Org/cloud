@@ -11,6 +11,7 @@ import { PrMergeSheet } from '@/components/pr-review/merge/pr-merge-sheet';
 import { providerPrMergeTitles } from '@/components/pr-review/merge/pr-merge-titles';
 import { PrReviewChecksSection } from '@/components/pr-review/pr-review-checks-section';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useSideInsetMarginStyle, useSideInsetStyle } from '@/lib/screen-insets';
 import { PrReviewCommentComposer } from '@/components/pr-review/pr-review-comment-composer';
 import {
   createFixtureClient,
@@ -28,6 +29,7 @@ import {
   type PrReviewOverviewFixtureSurface,
 } from '@/components/pr-review/pr-review-overview-copy-fixture';
 import { PrReviewReviewSubmitScreen } from '@/components/pr-review/pr-review-review-submit-screen';
+import { PrReviewRouteFixture } from '@/components/pr-review/pr-review-route-fixture';
 import {
   type PrReviewTabId,
   PrReviewTabSelector,
@@ -35,6 +37,10 @@ import {
 import { ScreenHeader } from '@/components/screen-header';
 import { FeedbackPromptProvider } from '@/components/use-feedback-prompt';
 import { clearDiffSelection, setDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
+import {
+  FIXTURE_WRITE_REFUSED,
+  isRouteSurface,
+} from '@/lib/pr-review/pr-review-copy-fixture-route';
 import {
   pendingReviewDraftKey,
   PendingReviewProvider,
@@ -53,6 +59,10 @@ import { TRPCProvider } from '@/lib/trpc';
 // dev/pr-review-copy-fixture/composer?side=LEFT reaching the deleted-line
 // (suggestions unavailable) state and composer?selected=1 the added line with a
 // seeded selection; the gate surfaces are dev/pr-review-copy-fixture/gate-*.
+// The screen surfaces open the REAL nested routes instead of re-created bodies:
+// dev/pr-review-copy-fixture/screen-{file-navigator,merge,review-submit,
+// comment-composer,conversation-comment,comment-edit}, with `?shape=gitlab`
+// reaching the provider route shape and `?state=long` the long body.
 // Uses the app's selected language without changing its preference.
 // Real review consumers read owned fake DTOs across an asynchronous tRPC boundary.
 // Reads never invoke global fetch. The mutation cache rejects before any mutation
@@ -88,11 +98,12 @@ const scope: ProviderPrScope = {
 function ChecksSectionSurface() {
   const queries = useProviderPrQueries(triple);
   const read = useQuery(queries.checksOptions(headSha, true));
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   if (read.isLoading) {
     return null;
   }
   return (
-    <ScrollView contentContainerClassName={SCREEN_BODY_CLASS}>
+    <ScrollView contentContainerClassName={SCREEN_BODY_CLASS} style={sideInsetMarginStyle}>
       <PrReviewChecksSection {...triple} checks={read} />
     </ScrollView>
   );
@@ -108,6 +119,7 @@ export function PrReviewCopyFixture() {
   // the deleted-line state and `selected=1` seeds an added-line selection.
   const fixtureSide = side === 'LEFT' ? 'LEFT' : 'RIGHT';
   const router = useRouter();
+  const sideInsetStyle = useSideInsetStyle();
   const { t } = useTranslation();
   const [queryClient] = useState(
     () =>
@@ -115,7 +127,7 @@ export function PrReviewCopyFixture() {
         defaultOptions: { queries: { retry: false, staleTime: Infinity } },
         mutationCache: new MutationCache({
           onMutate: () => {
-            throw new Error('Review copy fixture does not allow writes');
+            throw new Error(FIXTURE_WRITE_REFUSED);
           },
         }),
       })
@@ -148,10 +160,16 @@ export function PrReviewCopyFixture() {
     <ScreenHeader title={t('prReview.fileNavigator.title')} eyebrow="sample/review-copy#1" />
   );
   let content: ReactNode = null;
-  if (surface === 'tabs') {
+  if (isRouteSurface(surface)) {
+    // The real route screens (both route shapes), with the params and
+    // providers their layouts publish.
+    content = <PrReviewRouteFixture surface={surface} />;
+  } else if (surface === 'tabs') {
     content = (
-      <View className="px-4 pb-2 pt-3">
-        <PrReviewTabSelector activeTab={tab} onChange={setTab} discussionCount={3} />
+      <View style={sideInsetStyle}>
+        <View className="px-4 pb-2 pt-3">
+          <PrReviewTabSelector activeTab={tab} onChange={setTab} discussionCount={3} />
+        </View>
       </View>
     );
   } else if (surface === 'merge') {

@@ -30,16 +30,10 @@ const RELATIVE_TIME_UNITS: readonly { unit: Intl.RelativeTimeFormatUnit; seconds
  *
  * The sign decides the direction: an instant ahead of the clock is a wait the
  * user is looking forward to (a scheduled wake reads "in 2 hours"), so the
- * magnitude picks the unit and a future value is formatted positive.
- *
- * `nowMs` is the caller's clock. A relative label must be derived from a value
- * the render traces (the ticker's `now`), never from a live `Date.now()` read:
- * React Compiler is enabled for this app and memoizes render expressions
- * against their traced inputs, so a label computed from an untracked clock is
- * cached with the row's unchanged props and the on-screen text freezes
- * (conversation list, 2026-09-16). Callers that pass `nowMs` own the tick.
+ * magnitude picks the unit and a future value is formatted positive. An event
+ * that already happened goes through `timeAgo`, which never reads forward.
  */
-function timeAgo(date: Date, locale?: string, nowMs: number = Date.now()): string {
+function relativeTime(date: Date, locale?: string, nowMs: number = Date.now()): string {
   if (Number.isNaN(date.getTime())) {
     return '';
   }
@@ -57,6 +51,25 @@ function timeAgo(date: Date, locale?: string, nowMs: number = Date.now()): strin
     }
   }
   return i18n.t('common.justNow');
+}
+
+/**
+ * The relative time of an event that already happened, like "3 days ago".
+ *
+ * `nowMs` is the caller's clock. A relative label must be derived from a value
+ * the render traces (the ticker's `now`), never from a live `Date.now()` read:
+ * React Compiler is enabled for this app and memoizes render expressions
+ * against their traced inputs, so a label computed from an untracked clock is
+ * cached with the row's unchanged props and the on-screen text freezes
+ * (conversation list, 2026-09-16). Callers that pass `nowMs` own the tick.
+ *
+ * That clock is sampled once a tick, so it trails the wall clock by up to a
+ * tick, and by more when the OS holds the timer back. An event stamped after
+ * the sample — a chat that answered a moment ago — is therefore read as now,
+ * never as "in 1 minute".
+ */
+function timeAgo(date: Date, locale?: string, nowMs: number = Date.now()): string {
+  return relativeTime(date, locale, Math.max(nowMs, date.getTime()));
 }
 
 // eslint-disable-next-line no-empty-function -- intentional no-op
@@ -77,4 +90,4 @@ function capitalize(value: string): string {
   return first.toLocaleUpperCase(i18n.language) + value.slice(first.length);
 }
 
-export { asyncNoop, capitalize, cn, firstNonEmpty, parseTimestamp, pick, timeAgo };
+export { asyncNoop, capitalize, cn, firstNonEmpty, parseTimestamp, pick, relativeTime, timeAgo };

@@ -94,6 +94,50 @@ function generateRefreshToken(): string {
 }
 
 /**
+ * A guard the caller runs inside the transaction that creates a device
+ * session, after the insert and the session-limit enforcement. Returning a
+ * falsy value throws {@link DeviceSessionClaimLostError}, so the claim the
+ * guard settles — a single-use ticket, a slot, a token — is issued only when
+ * the session it authorizes commits.
+ */
+export type DeviceSessionClaim = (tx: DrizzleTransaction) => Promise<unknown>;
+
+/**
+ * The claim a session's guard settled was lost to a competing request, so the
+ * session (and every write the same transaction made, such as a session-limit
+ * eviction) rolled back with it. Helpers translate this to `null` instead of
+ * throwing, so callers answer a refusal, not a fault.
+ */
+export class DeviceSessionClaimLostError extends Error {
+  constructor() {
+    super('Device session claim was lost to a concurrent request');
+    this.name = 'DeviceSessionClaimLostError';
+  }
+}
+
+/**
+ * Run one claim guard inside the transaction. A falsy result is a lost claim.
+ */
+async function runSessionClaim(
+  tx: DrizzleTransaction,
+  claim: DeviceSessionClaim | undefined
+): Promise<void> {
+  if (claim && !(await claim(tx))) {
+    throw new DeviceSessionClaimLostError();
+  }
+}
+
+/**
+ * Map a caught transaction error to its outcome: a lost claim is a null
+ * result, everything else keeps throwing.
+ */
+function rethrowUnlessClaimLost(error: unknown): void {
+  if (!(error instanceof DeviceSessionClaimLostError)) {
+    throw error;
+  }
+}
+
+/**
  * Live app sessions one account may keep. A sign-in beyond the cap signs out
  * the least recently used session instead of being refused: an uninstalled
  * app leaves its rows behind for the refresh-token lifetime, so refusing at
@@ -186,10 +230,42 @@ export async function createDeviceSession(params: {
   userId: string;
   userAgent?: string;
   deviceAuthRequestId?: string;
-}): Promise<string> {
-  const { sessionId, evictedSessionIds } = await db.transaction(tx =>
-    insertDeviceSession(tx, params)
-  );
+}): Promise<string>;
+export async function createDeviceSession(params: {
+  userId: string;
+  userAgent?: string;
+  deviceAuthRequestId?: string;
+  claim: DeviceSessionClaim;
+}): Promise<string | null>;
+/**
+ * Create a device session in its own transaction and enforce the app-session
+ * cap.
+ *
+ * With `claim`, the guard runs inside that transaction after the insert and
+ * the cap enforcement: a guard that reports a lost claim rolls the session
+ * and its eviction back and the helper resolves `null` instead of returning a
+ * session id, so a caller without its proof neither mints a session nor
+ * displaces one.
+ */
+export async function createDeviceSession(
+  params: { userId: string; userAgent?: string; deviceAuthRequestId?: string } & {
+    claim?: DeviceSessionClaim;
+  }
+): Promise<string | null> {
+  // Both locals are assigned by the transaction, whose only early exit is a
+  // throw; the catch returns before the locals are read.
+  let sessionId!: string;
+  let evictedSessionIds!: string[];
+  try {
+    ({ sessionId, evictedSessionIds } = await db.transaction(async tx => {
+      const inserted = await insertDeviceSession(tx, params);
+      await runSessionClaim(tx, params.claim);
+      return inserted;
+    }));
+  } catch (error) {
+    rethrowUnlessClaimLost(error);
+    return null;
+  }
 
   invalidateEvictedSessions(evictedSessionIds);
 
@@ -485,20 +561,22 @@ export async function rotateRefreshToken(
  * Bind key persistence and session creation atomically so that a partial failure
  * never leaves one committed without the other when supportsRefresh is true.
  *
+ * The session, the attested key and the minted credentials all name the account
+ * of `params.user`, so they cannot disagree.
+ *
  * Returns the session ID and credential pair on success.
  * Throws KeyCollisionError if the key already belongs to a different user.
  */
 export async function createDeviceSessionWithAttestedKey(params: {
-  userId: string;
   userAgent?: string;
   user: User;
   verification: VerifyAdmissionOk;
 }): Promise<{ token: string; refreshToken: string; expiresIn: number; sessionId: string }> {
   const { credentials, evictedSessionIds } = await db.transaction(async tx => {
-    await persistAttestedKey(params.userId, params.verification, tx);
+    await persistAttestedKey(params.user.id, params.verification, tx);
 
     const { sessionId, evictedSessionIds } = await insertDeviceSession(tx, {
-      userId: params.userId,
+      userId: params.user.id,
       userAgent: params.userAgent,
     });
 
@@ -509,6 +587,79 @@ export async function createDeviceSessionWithAttestedKey(params: {
 
     return { credentials, evictedSessionIds };
   });
+
+  invalidateEvictedSessions(evictedSessionIds);
+
+  return credentials;
+}
+
+/**
+ * Create a device session and mint its credential pair in a single transaction.
+ *
+ * Minting the refresh token in the session's transaction means a mint failure
+ * cannot leave a committed session row without its refresh token. The cache of
+ * evicted sessions is invalidated only after the transaction commits.
+ *
+ * With `claim`, the guard runs inside the transaction after the insert and the
+ * cap enforcement, before the credentials are minted: a guard that reports a
+ * lost claim rolls the session and its eviction back and the helper resolves
+ * `null` instead of delivering credentials, so a caller without its proof
+ * neither mints a session nor displaces one.
+ *
+ * Returns the session ID and credential pair, or `null` for a lost claim.
+ */
+export async function createDeviceSessionWithCredentials(params: {
+  userId: string;
+  userAgent?: string;
+  user: User;
+  deviceAuthRequestId?: string;
+}): Promise<{ token: string; refreshToken: string; expiresIn: number; sessionId: string }>;
+export async function createDeviceSessionWithCredentials(params: {
+  userId: string;
+  userAgent?: string;
+  user: User;
+  deviceAuthRequestId?: string;
+  claim: DeviceSessionClaim;
+}): Promise<{ token: string; refreshToken: string; expiresIn: number; sessionId: string } | null>;
+export async function createDeviceSessionWithCredentials(
+  params: {
+    userId: string;
+    userAgent?: string;
+    user: User;
+    deviceAuthRequestId?: string;
+  } & { claim?: DeviceSessionClaim }
+): Promise<{
+  token: string;
+  refreshToken: string;
+  expiresIn: number;
+  sessionId: string;
+} | null> {
+  // Both locals are assigned by the transaction, whose only early exit is a
+  // throw; the catch returns before the locals are read.
+  let credentials!: { token: string; refreshToken: string; expiresIn: number; sessionId: string };
+  let evictedSessionIds!: string[];
+  try {
+    ({ credentials, evictedSessionIds } = await db.transaction(async tx => {
+      const { sessionId, evictedSessionIds } = await insertDeviceSession(tx, {
+        userId: params.userId,
+        userAgent: params.userAgent,
+        deviceAuthRequestId: params.deviceAuthRequestId,
+      });
+
+      await runSessionClaim(tx, params.claim);
+
+      return {
+        credentials: {
+          ...(await mintSessionCredentials(tx, params.user, sessionId)),
+          sessionId,
+        },
+        evictedSessionIds,
+      };
+    }));
+  } catch (error) {
+    rethrowUnlessClaimLost(error);
+    return null;
+  }
 
   invalidateEvictedSessions(evictedSessionIds);
 

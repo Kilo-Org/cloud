@@ -39,8 +39,10 @@ export async function beginGitHubAppInstall(
     // relinquished its slot, so neither blocks the page; a suspended or
     // auth-invalid association still holds its slot until it is disconnected. A
     // suspended, auth-invalid or GitHub-deleted association keeps the slot until
-    // a local disconnect in Kilo releases it, which is why the refusal names that
-    // action.
+    // an admin removes it in Kilo, which is why the refusal names that action.
+    // The list offers a local disconnect when connection management is enabled,
+    // and an uninstall of this app's own installation otherwise; both release
+    // the slot, so the refusal names the removal rather than one control.
     //
     // This read answers the common case before the install page opens. It is
     // not the admission check for the rule: each writer applies the rule
@@ -51,7 +53,7 @@ export async function beginGitHubAppInstall(
       throw new TRPCError({
         code: 'FORBIDDEN',
         message:
-          'This organization already has a GitHub installation. An owner or admin must disconnect it in Kilo before starting another.',
+          'This organization already has a GitHub installation. An owner or admin must remove that installation in Kilo (Disconnect, or Uninstall GitHub App) before starting another.',
       });
     }
   }

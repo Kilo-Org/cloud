@@ -76,7 +76,7 @@ describe('beginGitHubAppInstall organization installation slot rule', () => {
     ).rejects.toMatchObject({
       code: 'FORBIDDEN',
       message:
-        'This organization already has a GitHub installation. An owner or admin must disconnect it in Kilo before starting another.',
+        'This organization already has a GitHub installation. An owner or admin must remove that installation in Kilo (Disconnect, or Uninstall GitHub App) before starting another.',
     });
     expect(mockCreateInstallState).not.toHaveBeenCalled();
   });

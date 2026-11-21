@@ -53,8 +53,7 @@ export async function retireDeviceRemoteState(
         // into this controller, so the pair keeps one total bound.
         await withDeadline(
           PUSH_UNREGISTER_DEADLINE_MS,
-          async pushSignal =>
-            user.unregisterPushToken.mutate({ token: pushToken }, { signal: pushSignal }),
+          pushSignal => user.unregisterPushToken.mutate({ token: pushToken }, { signal: pushSignal }),
           signal
         );
         push = { status: 'fulfilled' };

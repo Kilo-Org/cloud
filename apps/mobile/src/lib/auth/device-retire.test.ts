@@ -100,10 +100,11 @@ describe('retireDeviceRemoteState', () => {
     trpcMock.unregisterPushToken.mutate.mockReturnValue(new Promise<never>(() => undefined));
 
     let settled = false;
-    const run = retireDeviceRemoteState('push-1').then(value => {
+    const run = (async () => {
+      const value = await retireDeviceRemoteState('push-1');
       settled = true;
       return value;
-    });
+    })();
 
     await vi.advanceTimersByTimeAsync(0);
     expect(trpcMock.unregisterPushToken.mutate).toHaveBeenCalledTimes(1);
@@ -130,10 +131,11 @@ describe('retireDeviceRemoteState', () => {
     trpcMock.revokeCurrentDeviceSession.mutate.mockReturnValue(new Promise<never>(() => undefined));
 
     let settled = false;
-    const run = retireDeviceRemoteState('push-1').then(value => {
+    const run = (async () => {
+      const value = await retireDeviceRemoteState('push-1');
       settled = true;
       return value;
-    });
+    })();
 
     await vi.advanceTimersByTimeAsync(PUSH_UNREGISTER_DEADLINE_MS);
     expect(trpcMock.revokeCurrentDeviceSession.mutate).toHaveBeenCalledTimes(1);

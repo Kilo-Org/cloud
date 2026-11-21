@@ -524,6 +524,8 @@ describe('deniedAutoRoutingModelIdsForMember with an inference region', () => {
 
   it('denies candidates outside the region of an enterprise organization with the feature', async () => {
     const member = await setUp({ settings: { data_region: 'eu' } });
+    const memberPolicy = policy({ policyRevision: 7 });
+    jest.mocked(resolveOrganizationMemberModelPolicy).mockResolvedValue(memberPolicy);
 
     await expect(deniedAutoRoutingModelIdsForMember({ ...member, modelIds })).resolves.toEqual(
       regionDenied
@@ -532,7 +534,11 @@ describe('deniedAutoRoutingModelIdsForMember with an inference region', () => {
       region: 'eu',
       candidateIds: ['anthropic/claude', 'openai/gpt-5'],
       byokOwner: { type: 'organization', id: member.organizationId },
+      policy: memberPolicy,
     });
+    expect(jest.mocked(inferenceRegionIneligibleCandidates).mock.lastCall?.[0].policy).toBe(
+      memberPolicy
+    );
   });
 
   it('merges region denials with the group policy denials without duplicates', async () => {

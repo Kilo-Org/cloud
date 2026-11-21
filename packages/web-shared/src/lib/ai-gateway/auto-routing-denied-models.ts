@@ -177,13 +177,14 @@ export async function deniedAutoRoutingModelIdsForMember(
     )
       ? dataCollectionRequiredAutoRoutingCandidates(candidateIds)
       : [],
-    inferenceRegionDeniedCandidatesForMember(request, candidateIds),
+    inferenceRegionDeniedCandidatesForMember(request, policy, candidateIds),
   ]);
   return [...new Set([...deniedByPolicy, ...deniedByPrivacy, ...deniedByRegion])];
 }
 
 async function inferenceRegionDeniedCandidatesForMember(
   request: AutoRoutingDeniedModelsRequest,
+  policy: EffectiveOrganizationModelPolicy,
   candidateIds: ReadonlyArray<string>
 ): Promise<string[]> {
   const [organization] = await readDb
@@ -202,5 +203,6 @@ async function inferenceRegionDeniedCandidatesForMember(
     region: dataRegion,
     candidateIds,
     byokOwner: byokOwner(request.userId, request.organizationId),
+    policy,
   });
 }

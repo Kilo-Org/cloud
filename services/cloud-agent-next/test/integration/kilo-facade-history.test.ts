@@ -22,15 +22,21 @@ const userId = 'oauth/history-owner';
 const responseSchema = z.array(kiloSdkStoredMessageSchema);
 const sessions = env.SANDBOX_SESSION as DurableObjectNamespace<SandboxSessionV2>;
 
-async function fixture(version: 'v1' | 'v2' = 'v2') {
+async function fixture(version: 'v1' | 'v2' = 'v2', registered = true) {
   const sessionId = `workspace_${crypto.randomUUID()}`;
   const kiloSessionId = `ses_${crypto.randomUUID().replaceAll('-', '').slice(0, 26)}`;
   const stub = sessions.getByName(sessionDoName(userId, sessionId));
-  await seedRegistration(stub, {
-    sandboxId: `ses-${crypto.randomUUID().replaceAll('-', '')}`,
-    spec: { sessionId, kiloSessionId, directory: '/workspace/private', attemptId: 'history-only' },
-    credentials: { userId, kiloSessionId, kiloToken: 'synthetic-token', scopeId: sessionId },
-  });
+  if (registered)
+    await seedRegistration(stub, {
+      sandboxId: `ses-${crypto.randomUUID().replaceAll('-', '')}`,
+      spec: {
+        sessionId,
+        kiloSessionId,
+        directory: '/workspace/private',
+        attemptId: 'history-only',
+      },
+      credentials: { userId, kiloSessionId, kiloToken: 'synthetic-token', scopeId: sessionId },
+    });
   await runInDurableObject(stub, instance => {
     instance.sandboxPeerFor = () => {
       throw new Error('History must not contact the sandbox');
@@ -226,6 +232,54 @@ describe('public persisted Cloud history', () => {
     const second = await f.request(`?limit=1&before=${cursor}`);
     expect(second.status).toBe(200);
     expect(responseSchema.parse(await second.json())).toEqual([messages[1]]);
+  });
+
+  it('preserves authorized legacy v1 ingest history without a DO registration', async () => {
+    const f = await fixture('v1', false);
+    await runInDurableObject(f.facade, async (_instance, state) => {
+      await writeTestSessionIngestState(state.storage, {
+        messages: {
+          [f.kiloSessionId]: [
+            {
+              info: {
+                id: 'msg_legacy',
+                sessionID: f.kiloSessionId,
+                role: 'user',
+                time: { created: 1 },
+                agent: 'code',
+                model: { providerID: 'kilo', modelID: 'legacy' },
+              },
+              parts: [
+                {
+                  id: 'prt_legacy',
+                  sessionID: f.kiloSessionId,
+                  messageID: 'msg_legacy',
+                  type: 'text',
+                  text: 'persisted v1',
+                },
+              ],
+            },
+          ],
+        },
+      });
+    });
+    const response = await f.request();
+    expect(response.status).toBe(200);
+    expect(responseSchema.parse(await response.json())).toMatchObject([
+      { info: { id: 'msg_legacy' }, parts: [{ text: 'persisted v1' }] },
+    ]);
+    expect((await f.request('', 'foreign-owner')).status).toBe(404);
+  });
+
+  it('keeps displayable history readable when a native shell record is present', async () => {
+    const f = await fixture();
+    await f.publish({ id: 'msg_visible', type: 'user', time: { created: 1 }, text: 'visible' });
+    await f.publish({ id: 'msg_shell', type: 'shell', time: { created: 2 } });
+    const response = await f.request('?limit=2');
+    expect(response.status).toBe(200);
+    expect(responseSchema.parse(await response.json()).map(item => item.info.id)).toEqual([
+      'msg_visible',
+    ]);
   });
 
   it('returns empty only for a confirmed empty v2 source and keeps missing v1 history pending', async () => {

@@ -57,6 +57,7 @@ export async function readPublicV2History(input: HistoryRequest): Promise<Histor
   const bounded = input.query.limit !== undefined && input.query.limit > 0;
   let cursor = input.query.before;
   let omittedItemCount = 0;
+  let displayOmissionCount = 0;
   let bytes = 2;
   const messages: KiloSdkStoredMessage[] = [];
   for (let pageIndex = 0; pageIndex < MAX_PUBLIC_HISTORY_PAGES; pageIndex++) {
@@ -86,7 +87,11 @@ export async function readPublicV2History(input: HistoryRequest): Promise<Histor
     try {
       for (const item of page.messages) {
         const display = readKilo2Messages(page.source.session, [item.message])[0];
-        if (display === undefined) return { kind: 'invalid_data' };
+        if (display === undefined) {
+          if (item.message.type !== 'compaction' && item.message.type !== 'shell')
+            displayOmissionCount++;
+          continue;
+        }
         if (display.info.role === 'assistant' && item.parentID !== undefined)
           display.info.parentID = item.parentID;
         projected.push(kiloSdkStoredMessageSchema.parse(display));
@@ -101,7 +106,12 @@ export async function readPublicV2History(input: HistoryRequest): Promise<Histor
     omittedItemCount += page.omittedItemCount;
     if (bounded || page.nextCursor === null) {
       if (messages.length === 0 && omittedItemCount > 0) return { kind: 'too_large' };
-      return { kind: 'success', messages, nextCursor: page.nextCursor, omittedItemCount };
+      return {
+        kind: 'success',
+        messages,
+        nextCursor: page.nextCursor,
+        omittedItemCount: omittedItemCount + displayOmissionCount,
+      };
     }
     if (page.nextCursor === cursor) return { kind: 'invalid_data' };
     cursor = page.nextCursor;

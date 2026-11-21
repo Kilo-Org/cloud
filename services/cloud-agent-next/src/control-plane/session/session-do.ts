@@ -2800,6 +2800,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const rootKiloSessionId = this.registration?.spec.kiloSessionId;
     if (rootKiloSessionId !== undefined && rootKiloSessionId !== expectedRootKiloSessionId)
       return null;
+    // Legacy ingest history remains readable without a DO registration; the facade resolves ownership first.
     return (
       readConversationSource({
         queries: this.eventQueries,

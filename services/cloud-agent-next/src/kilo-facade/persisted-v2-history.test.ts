@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   kiloSdkPartSchema,
+  sdkFilePartSchema,
   partIdSchema,
   type Kilo2Message,
 } from '@kilocode/session-ingest-contracts';
@@ -111,6 +112,38 @@ describe('public v2 history compatibility and failures', () => {
     expect(await readPublicV2History(f.input)).toEqual({ kind: 'too_large' });
   });
 
+  it.each([undefined, 3])(
+    'skips non-display native records without failing a page with limit %s',
+    async limit => {
+      const f = fixture();
+      f.getSessionMessagesPage.mockResolvedValue(
+        page([
+          { id: 'msg_user', type: 'user', time: { created: 1 }, text: 'visible' },
+          { id: 'msg_shell', type: 'shell', time: { created: 2 } },
+          { id: 'msg_internal', type: 'internal', time: { created: 3 } },
+        ])
+      );
+      expect(await readPublicV2History({ ...f.input, query: { limit } })).toMatchObject({
+        kind: 'success',
+        messages: [{ info: { id: 'msg_user' } }],
+        omittedItemCount: 1,
+      });
+    }
+  );
+
+  it('confirms an empty display transcript when the source contains only non-display records', async () => {
+    const f = fixture();
+    f.getSessionMessagesPage.mockResolvedValue(
+      page([{ id: 'msg_shell', type: 'shell', time: { created: 1 } }])
+    );
+    expect(await readPublicV2History(f.input)).toEqual({
+      kind: 'success',
+      messages: [],
+      nextCursor: null,
+      omittedItemCount: 0,
+    });
+  });
+
   it('preserves compaction marker, summary and native content identities', async () => {
     const f = fixture();
     f.getSessionMessagesPage.mockResolvedValue(
@@ -159,7 +192,7 @@ describe('public v2 history compatibility and failures', () => {
   });
 
   it.each(['msg_answer_000000', 'msg_answer_000000_summary', 'msg_answer_000001_file_0'])(
-    'validates derived display IDs without allowing them as ingest write IDs: %s',
+    'validates derived display IDs without allowing them as strict stored part IDs: %s',
     id => {
       expect(
         kiloSdkPartSchema.safeParse({
@@ -174,18 +207,40 @@ describe('public v2 history compatibility and failures', () => {
     }
   );
 
-  it.each(['msg_answer', 'msg_answer_00000', 'msg_answer/other_000000', 'msg_answer\u0000_000000'])(
-    'rejects non-derived or unsafe display IDs: %s',
-    id => {
-      expect(
-        kiloSdkPartSchema.safeParse({
-          id,
-          sessionID: kiloSessionId,
-          messageID: 'msg_answer',
-          type: 'text',
-          text: 'display',
-        }).success
-      ).toBe(false);
-    }
-  );
+  it.each([
+    ['msg_answer_000001_file_0', true],
+    ['msg_other_000001_file_0', false],
+  ])('binds file attachment %s to its message', (id, valid) => {
+    expect(
+      sdkFilePartSchema.safeParse({
+        id,
+        sessionID: kiloSessionId,
+        messageID: 'msg_answer',
+        type: 'file',
+        mime: 'text/plain',
+        url: 'data:text/plain,display',
+      }).success
+    ).toBe(valid);
+  });
+
+  it.each([
+    'msg_answer',
+    'msg_123456',
+    'msg_other_000001',
+    'msg_other_000001_summary',
+    'msg_other_000001_file_0',
+    'msg_answer_00000',
+    'msg_answer/other_000000',
+    'msg_answer\u0000_000000',
+  ])('rejects non-derived or unsafe display IDs: %s', id => {
+    expect(
+      kiloSdkPartSchema.safeParse({
+        id,
+        sessionID: kiloSessionId,
+        messageID: 'msg_answer',
+        type: 'text',
+        text: 'display',
+      }).success
+    ).toBe(false);
+  });
 });

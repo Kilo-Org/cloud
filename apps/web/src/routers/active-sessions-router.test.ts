@@ -316,6 +316,27 @@ describe('active-sessions-router', () => {
         'Invalid ticket response from session ingest'
       );
     });
+
+    it('reports a 200 body that never completes as SERVICE_UNAVAILABLE', async () => {
+      jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValue(new Response(new ReadableStream({ start() {} }), { status: 200 }));
+      const caller = await createCallerForUser(regularUser.id);
+
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+      try {
+        const rejection = caller.activeSessions.createWebTicket();
+        const failure = expectMintFailure(
+          rejection,
+          'SERVICE_UNAVAILABLE',
+          'Session ingest is unavailable'
+        );
+        await jest.advanceTimersByTimeAsync(CONTROL_PLANE_UPSTREAM_BUDGET_MS);
+        await failure;
+      } finally {
+        jest.useRealTimers();
+      }
+    });
   });
 
   describe('listInstances', () => {
@@ -492,12 +513,12 @@ describe('active-sessions-router', () => {
 
       const caller = await createCallerForUser(regularUser.id);
       await expect(caller.activeSessions.listInstances()).rejects.toMatchObject({
-        code: 'INTERNAL_SERVER_ERROR',
+        code: 'BAD_GATEWAY',
         cause: expect.objectContaining({ name: 'ZodError' }),
       });
     });
 
-    it('throws a TRPCError when the upstream worker returns a non-2xx response', async () => {
+    it('throws BAD_GATEWAY when the upstream worker returns a non-2xx response', async () => {
       jest
         .spyOn(global, 'fetch')
         .mockResolvedValue(new Response('upstream failed', { status: 502 }));
@@ -509,22 +530,25 @@ describe('active-sessions-router', () => {
         await rejection;
       } catch (err) {
         if (!(err instanceof TRPCError)) throw err;
-        expect(err.code).toBe('INTERNAL_SERVER_ERROR');
-        // Mobile (later slice) uses the thrown status to render a retryable
-        // error state; verify the contract is "throws, never returns empty".
+        expect(err.code).toBe('BAD_GATEWAY');
+        // Mobile uses the thrown status to render a retryable error state;
+        // verify the contract is "throws, never returns empty".
         expect(err.message).toContain('502');
       }
     });
 
-    it('throws a TRPCError when fetch itself fails (network error)', async () => {
+    it('throws SERVICE_UNAVAILABLE when fetch itself fails (network error)', async () => {
       jest.spyOn(global, 'fetch').mockRejectedValue(new Error('socket hang up'));
 
       const caller = await createCallerForUser(regularUser.id);
-      const rejection = caller.activeSessions.listInstances();
-      await expect(rejection).rejects.toBeInstanceOf(TRPCError);
+
+      await expect(caller.activeSessions.listInstances()).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Session ingest is unavailable',
+      });
     });
 
-    it('throws a TRPCError when the worker returns an unexpected payload shape', async () => {
+    it('throws BAD_GATEWAY when the worker returns an unexpected payload shape', async () => {
       jest.spyOn(global, 'fetch').mockResolvedValue(
         new Response(JSON.stringify({ wrong: 'shape' }), {
           status: 200,
@@ -533,18 +557,87 @@ describe('active-sessions-router', () => {
       );
 
       const caller = await createCallerForUser(regularUser.id);
-      await expect(caller.activeSessions.listInstances()).rejects.toBeInstanceOf(TRPCError);
+
+      await expect(caller.activeSessions.listInstances()).rejects.toMatchObject({
+        code: 'BAD_GATEWAY',
+        message: 'Invalid instance response from session ingest',
+      });
     });
 
-    it('does NOT swallow upstream failures into {instances: []} (unlike `list`)', async () => {
-      // Sanity: `list` returns {sessions: []} on a 502; `listInstances` must not.
-      jest
-        .spyOn(global, 'fetch')
-        .mockResolvedValueOnce(new Response('bad gateway', { status: 502 }));
+    it.each([503, 504])('keeps the worker %i retryable as SERVICE_UNAVAILABLE', async status => {
+      jest.spyOn(global, 'fetch').mockResolvedValue(new Response('upstream failed', { status }));
 
       const caller = await createCallerForUser(regularUser.id);
-      const result = await caller.activeSessions.list();
-      expect(result).toEqual({ sessions: [] });
+
+      await expect(caller.activeSessions.listInstances()).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Session ingest is unavailable',
+      });
+    });
+
+    it('reports a body that never completes as SERVICE_UNAVAILABLE instead of hanging', async () => {
+      jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValue(new Response(new ReadableStream({ start() {} }), { status: 200 }));
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const caller = await createCallerForUser(regularUser.id);
+
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+      try {
+        const rejection = caller.activeSessions.listInstances();
+        const assertion = expect(rejection).rejects.toMatchObject({
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Session ingest is unavailable',
+        });
+        await jest.advanceTimersByTimeAsync(CONTROL_PLANE_UPSTREAM_BUDGET_MS);
+        await assertion;
+      } finally {
+        jest.useRealTimers();
+        warn.mockRestore();
+      }
+    });
+
+    it('logs a bounded excerpt of a non-2xx body instead of the whole payload', async () => {
+      const longRun = 'x'.repeat(500);
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ error: longRun }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(caller.activeSessions.listInstances()).rejects.toMatchObject({
+        code: 'BAD_GATEWAY',
+      });
+
+      const logged = warn.mock.calls[0];
+      // `Response` constructed in-process carries no status text; the status
+      // alone is the report.
+      expect(logged[0]).toMatch(/^\[active-sessions\.instances\] non-2xx: 500/);
+      const excerpt = logged[1];
+      expect(typeof excerpt).toBe('string');
+      expect((excerpt as string).length).toBeLessThanOrEqual(200);
+      for (const argument of logged) {
+        expect(String(argument)).not.toContain(longRun);
+      }
+    });
+
+    it('reports both list and listInstances failures as SERVICE_UNAVAILABLE', async () => {
+      jest
+        .spyOn(global, 'fetch')
+        .mockImplementation(() => Promise.resolve(new Response('bad gateway', { status: 502 })));
+
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(caller.activeSessions.list()).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Session ingest is unavailable',
+      });
+      await expect(caller.activeSessions.listInstances()).rejects.toMatchObject({
+        code: 'BAD_GATEWAY',
+      });
     });
   });
 

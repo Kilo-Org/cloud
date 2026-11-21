@@ -138,6 +138,24 @@ describe('sendRefreshRequest over XMLHttpRequest', () => {
     );
   });
 
+  it('reads a body that arrives after the caller has already asked for it', async () => {
+    vi.stubGlobal('XMLHttpRequest', FakeXhr);
+
+    const answerPromise = sendRefreshRequest(request());
+    const xhr = FakeXhr.instances[0];
+    xhr?.receiveHead(200);
+    const answer = await answerPromise;
+
+    // The read is outstanding while the body is still on the wire, which is the
+    // only path a real answer takes; the completion handler has to settle it.
+    const pending = answer.text(1_000);
+    await Promise.resolve();
+    xhr?.receiveBody('{"token":"late"}');
+
+    await expect(pending).resolves.toBe('{"token":"late"}');
+    expect(xhr?.aborted).toBe(false);
+  });
+
   it('rejects when the request fails before its head', async () => {
     vi.stubGlobal('XMLHttpRequest', FakeXhr);
 

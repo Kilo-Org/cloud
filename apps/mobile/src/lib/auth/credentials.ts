@@ -346,30 +346,35 @@ async function doRefresh(): Promise<RefreshOutcome> {
       return { kind: 'unreadable' };
     }
 
-    // Bound the refresh network I/O at the control-plane deadline so a hung
-    // backend can never leave the refresh (or a sign-out queueing behind its
-    // credential write) waiting forever. The deadline reaches the request
-    // through its signal, so an abandoned call is aborted, not merely ignored.
-    const answer = await withDeadline(CONTROL_PLANE_DEADLINE_MS, signal =>
-      sendRefreshRequest({
+    // Bound the whole exchange — the request and its body — at the control-plane
+    // deadline, so a hung backend can never leave the refresh (or a sign-out
+    // queueing behind its credential write) waiting forever, and an abandoned
+    // exchange is aborted rather than merely ignored.
+    const exchange = await withDeadline(CONTROL_PLANE_DEADLINE_MS, async signal => {
+      const answer = await sendRefreshRequest({
         url: `${API_BASE_URL}${REFRESH_PATH}`,
         body: JSON.stringify({ refreshToken: storedRefreshToken }),
         signal,
-      })
-    );
-    // The status is already known here, before any body is read: that is the
-    // whole point of the transport. A 401 is terminal on the status alone, so
-    // its body gets a short budget and a body that stalls only costs the
-    // blocked-account copy. A 403 needs its body under the call's deadline
-    // because the route has no 403 branch: the body is what tells its own
-    // refusal apart from an intermediary's (an edge firewall, a WAF, a proxy)
-    // refusal, which proves nothing about the stored pair. Every other failure
-    // status is classified on the status alone, and a 2xx body must be read
-    // whole to parse.
-    const refusalText = !answer.ok ? await answer.text(REFUSAL_BODY_BUDGET_MS) : null;
-    const successBody: unknown = answer.ok
-      ? JSON.parse((await answer.text(CONTROL_PLANE_DEADLINE_MS)) ?? '')
-      : undefined;
+      });
+      // The status is already known here, before any body is read: that is the
+      // whole point of the transport. A 401 is terminal on the status alone, so
+      // its body gets a short budget and a body that stalls only costs the
+      // blocked-account copy. A 403 needs its whole body, because the route has
+      // no 403 branch: the body is what tells its own refusal apart from an
+      // intermediary's (an edge firewall, a WAF, a proxy) refusal, which proves
+      // nothing about the stored pair — so it is read for as long as the one
+      // deadline allows and classified on the status alone if it never comes.
+      const refusalText = answer.ok
+        ? null
+        : await answer.text(
+            answer.status === 401 ? REFUSAL_BODY_BUDGET_MS : CONTROL_PLANE_DEADLINE_MS
+          );
+      const successText = answer.ok ? await answer.text(CONTROL_PLANE_DEADLINE_MS) : null;
+      return { answer, refusalText, successText };
+    });
+    const { answer, refusalText, successText } = exchange;
+    const successBody: unknown =
+      successText === null ? undefined : (JSON.parse(successText) as unknown);
     const { status, ok, retryAfter } = answer;
 
     if (superseded()) {

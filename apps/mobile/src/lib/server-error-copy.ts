@@ -7,6 +7,10 @@
 // generic line, and a raw server sentence never reaches a screen.
 
 import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-review';
+import {
+  SLACK_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
+  SLACK_DISCONNECT_UNCONFIRMED_MESSAGE,
+} from '@kilocode/app-shared/integrations-errors';
 import { ORGANIZATION_INVITE_SEAT_LIMIT_REACHED } from '@kilocode/app-shared/organizations';
 
 import { i18n } from '@/i18n';
@@ -125,6 +129,16 @@ function copyKeyFor(
       // The source session is still being written to, or the copy's staging
       // failed: the same clone can be started again once it settles.
       return 'agentChat.session.cloneFailedRetry';
+    }
+    case SLACK_DISCONNECT_UNCONFIRMED_MESSAGE: {
+      // Slack did not answer, so the row and its credential are kept: the same
+      // Disconnect action can be retried once Slack responds.
+      return 'integrations.disconnectRetry';
+    }
+    case SLACK_DISCONNECT_NEEDS_SUPPORT_MESSAGE: {
+      // The connection cannot be read, so the screen names the support step
+      // instead of a retry.
+      return 'integrations.disconnectNeedsSupport';
     }
     case REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.proposal_not_found: {
       return 'queryError.notFoundDescription';

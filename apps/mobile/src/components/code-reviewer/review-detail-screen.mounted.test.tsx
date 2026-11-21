@@ -709,6 +709,10 @@ describe('ReviewDetailScreen empty council', () => {
     const texts = renderScreen();
     expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.findingsUnavailable'));
     expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.noFindings'));
+    // The suite renders English (vitest.setup stubs an en-US device and the i18n
+    // instance starts in `en`), so the copy is pinned literally as well: the
+    // section reports unavailable results rather than a clean run.
+    expect(texts).toContain('Results are unavailable.');
   });
 
   it.each(['failed', 'completed'])('preserves findings from a %s review', status => {

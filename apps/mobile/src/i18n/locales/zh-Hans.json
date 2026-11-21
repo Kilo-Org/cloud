@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}，私有仓库",
     "legalDocumentEnglishOnly": "本文件仅提供英文版本。",
     "organizationTrialEndedBilling": "组织的试用期已结束，且没有生效的套餐。您可以更新账单信息，然后重试。",
-    "organizationTrialEndedBillingAtKiloAi": "组织的试用期已结束，且没有生效的套餐。您可以在 kilo.ai 更新账单信息，然后重试。"
+    "organizationTrialEndedBillingAtKiloAi": "组织的试用期已结束，且没有生效的套餐。您可以在 kilo.ai 更新账单信息，然后重试。",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "项目符号",
+        "nestedBulletPoint": "嵌套项目符号",
+        "orderedItem": "列表项 {n}",
+        "nestedOrderedItem": "嵌套列表项 {n}"
+      },
+      "blockquote": {
+        "quote": "引用",
+        "nestedQuote": "嵌套引用"
+      },
+      "table": {
+        "row": "行 {n}：{content}"
+      },
+      "math": {
+        "equation": "数学：{latex}"
+      },
+      "rotor": {
+        "headings": "标题",
+        "links": "链接",
+        "images": "图片"
+      }
+    }
   },
   "language": {
     "restarting": "正在重启以应用语言设置",
@@ -506,6 +529,14 @@
       "nextStepFinal": "申诉决定为最终结果，不可再次申诉。",
       "viewReceipt": "查看回执"
     },
+    "reportReceipts": {
+      "title": "举报记录",
+      "rowSubtitle": "你提交的举报及其处理结果",
+      "emptyTitle": "暂无举报",
+      "emptyDescription": "你从评论或 AI 回复中提交的举报将显示在这里。",
+      "couldNotLoad": "无法加载你的举报",
+      "capped": "仅显示你最近的举报。"
+    },
     "changelog": "更新内容",
     "changelogVersionPending": "{{version}} 版本的更新说明将随下次应用更新提供。",
     "changelogGroupNew": "新增",
@@ -774,7 +805,7 @@
       "gateHidden": "已隐藏",
       "gateNone": "无",
       "noFindings": "未发现问题",
-      "findingsUnavailable": "由于本次审查失败，结果不可用。",
+      "findingsUnavailable": "结果不可用。",
       "findingsInProgress": "本次审查仍在进行中，完成后问题将显示在这里。",
       "findingsEndedWithoutResults": "本次审查提前结束，未产生任何问题。",
       "serviceUnavailable": "无法连接到代码审查服务。请在服务可用时重试审查。",
@@ -3595,6 +3626,7 @@
       "identifierLabel": "标识符",
       "identifierRequired": "请输入标识符。",
       "identifierTaken": "另一个模式已使用此标识符。",
+      "identifierTooLong": "标识符请保持在 {{max}} 个字符以内。",
       "nameLabel": "模式名称",
       "nameRequired": "请输入模式名称。",
       "notFound": "此模式已不存在。",
@@ -3681,7 +3713,7 @@
     "emailDeliveryFailed": "暂时无法发送邮件。请稍后重试。",
     "admissionRequired": "无法验证你的设备。请选择“$t(login.moreSignInOptions)”，在其他设备或网页端登录。",
     "default": "出了点问题。请重试。",
-    "retryableAdmission": "无法验证此设备。请检查网络连接后重试。",
+    "retryableAdmission": "无法验证此设备。请重试。",
     "startSignInFailed": "无法发起登录。请重试。",
     "couldNotOpenBrowser": "无法打开浏览器。请重试。",
     "signInTimedOut": "登录超时。请重试。",
@@ -3753,6 +3785,34 @@
     "nextScheduled": "下次计划",
     "answerNeeded": "等待回答",
     "waitingToRetry": "等待重试",
+    "countNoun": {
+      "needsInput_one": "等待输入",
+      "needsInput_other": "等待输入",
+      "running_one": "处理中",
+      "running_other": "处理中",
+      "scheduled_one": "已计划",
+      "scheduled_other": "已计划",
+      "idle_one": "空闲",
+      "idle_other": "空闲"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} 等待输入",
+      "needsInput_other": "{{displayCount}} 等待输入",
+      "running_one": "{{displayCount}} 处理中",
+      "running_other": "{{displayCount}} 处理中",
+      "scheduled_one": "{{displayCount}} 已计划",
+      "scheduled_other": "{{displayCount}} 已计划",
+      "idle_one": "{{displayCount}} 空闲",
+      "idle_other": "{{displayCount}} 空闲"
+    },
+    "footer": {
+      "checked": "上次确认 {{time}}",
+      "lastKnown": "上次已知状态 · {{time}}"
+    },
+    "wake": {
+      "nextRun": "下次运行 {{time}}",
+      "wasDue": "原定 {{time}}"
+    },
     "step": {
       "editing": "编辑中",
       "reading": "读取中",
@@ -3998,7 +4058,8 @@
         "space": "没有足够的可用存储空间来存放此模型。请释放空间后重试。",
         "network": "下载未完成。请检查你的网络连接后重试。",
         "invalidFile": "下载的文件不是此应用可以运行的模型，因此已被移除。",
-        "checksum": "下载的文件与其公布的校验和不匹配，因此已被移除。请重新下载。"
+        "checksum": "下载的文件与其公布的校验和不匹配，因此已被移除。请重新下载。",
+        "writeFailed": "此设备无法保存该模型。请重试下载。"
       }
     },
     "catalog": {
@@ -4176,7 +4237,7 @@
     "personalDefaultDescription": "当没有存储库具有固定配置文件时自动加载。",
     "organizationDefaultDescription": "为没有个人默认值的会员自动加载。",
     "setAsDefault": "设为默认",
-    "saveFailed": "无法保存配置文件",
+    "saveFailed": "无法保存配置文件。请重试。",
     "organizationRoleRequired": "只有组织所有者和管理员可以更改组织配置文件。",
     "deleteTitle": "删除配置文件",
     "deleteMessage": "这将永久删除配置文件及其设置。此操作无法撤消。",
@@ -4440,6 +4501,7 @@
         "balanceNeutral": "余额不变",
         "deduction": "扣除",
         "grant": "赠送积分",
+        "welcomeCredits": "欢迎积分",
         "purchase": "购买"
       },
       "purchaseFallback": "积分购买",
@@ -4695,6 +4757,8 @@
     "connectedTo": "已连接到 {{account}}",
     "disconnected": "已断开 {{provider}} 的连接",
     "disconnectFailed": "无法断开 {{provider}} 的连接",
+    "disconnectRetry": "Slack 无法确认已断开连接。请重试。",
+    "disconnectNeedsSupport": "Kilo 无法读取为此连接保存的 Slack 访问权限。请联系技术支持以完成断开连接。",
     "couldNotLoad": "无法加载集成",
     "permissionDenied": "你没有管理这些集成的权限。",
     "managedByOwner": "请联系组织所有者更改你无法更改的连接。",

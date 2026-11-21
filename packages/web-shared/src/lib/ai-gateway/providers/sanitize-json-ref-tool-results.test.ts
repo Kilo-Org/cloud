@@ -1,12 +1,12 @@
 import { describe, expect, jest, test } from '@jest/globals';
 import type OpenAI from 'openai';
 import { PROMPT_WALK_MAX_DEPTH } from '@kilocode/auto-routing-contracts';
-import { CACHE_CONTROL_NODE_BUDGET } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import {
-  JSON_REF_MAX_DEPTH,
-  JSON_REF_NODE_BUDGET,
-  sanitizeJsonRefToolResults,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
+  CLIENT_SCHEMA_MAX_DEPTH,
+  CLIENT_SCHEMA_NODE_BUDGET,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/client-schema-budget';
+import { CACHE_CONTROL_NODE_BUDGET } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import { sanitizeJsonRefToolResults } from '@kilocode/web-shared/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
 function makeChatRequest(messages: OpenAI.Chat.ChatCompletionMessageParam[]): GatewayRequest {
@@ -143,7 +143,7 @@ describe('sanitizeJsonRefToolResults', () => {
   });
 
   test('keeps the traversal budgets equal to the modules that own them', () => {
-    expect(JSON_REF_MAX_DEPTH).toBe(PROMPT_WALK_MAX_DEPTH);
-    expect(JSON_REF_NODE_BUDGET).toBe(CACHE_CONTROL_NODE_BUDGET);
+    expect(CLIENT_SCHEMA_MAX_DEPTH).toBe(PROMPT_WALK_MAX_DEPTH);
+    expect(CLIENT_SCHEMA_NODE_BUDGET).toBe(CACHE_CONTROL_NODE_BUDGET);
   });
 });

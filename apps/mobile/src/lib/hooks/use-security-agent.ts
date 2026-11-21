@@ -125,6 +125,15 @@ export function useRetrySecurityAgentConfig(scope: string) {
   return usePausedReadRetry(queryKey);
 }
 
+// Per-read retry for the one query the repository picker's banner waits on.
+export function useRetrySecurityAgentRepositories(scope: string) {
+  const trpc = useTRPC();
+  const queryKey = isPersonalSecurityScope(scope)
+    ? trpc.securityAgent.getRepositories.queryKey()
+    : trpc.organizations.securityAgent.getRepositories.queryKey({ organizationId: scope });
+  return usePausedReadRetry(queryKey);
+}
+
 export function useRetrySecurityAgentCapability(scope: string) {
   const trpc = useTRPC();
   const isPersonal = isPersonalSecurityScope(scope);

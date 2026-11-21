@@ -42,6 +42,8 @@ export default defineProject({
     execArgv: ['--disable-warning=ExperimentalWarning'],
     include: [
       'plugins/**/*.test.ts',
+      // Node-environment contract tests for the app scripts.
+      'scripts/**/*.test.ts',
       'src/i18n/**/*.test.ts',
       'src/lib/*.test.ts',
       'src/lib/i18n/**/*.test.ts',

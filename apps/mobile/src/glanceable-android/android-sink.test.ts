@@ -1223,7 +1223,13 @@ describe('androidSink widget publish and end', () => {
 
     const notification = mocks.getNotification();
     expect(notification).toMatchObject({ title: '2 Needs input', text: '4 Working · 3 Idle' });
-    expect(notification?.subText).toMatch(new RegExp(`^${i18n.t('glanceable.lastKnown')} · `, 'u'));
+    // The template comes from the whole footer message, so the bare prefix key
+    // the Live Activity still uses cannot satisfy this line.
+    const template = i18n.t('glanceable.footer.lastKnown', { time: '\u0000' });
+    const [head = '', tail = ''] = template.split('\u0000');
+    expect(head).not.toBe('');
+    expect(notification?.subText?.startsWith(head)).toBe(true);
+    expect(notification?.subText?.endsWith(tail)).toBe(true);
     expect(notification?.compactText).toBe('2');
     expect(getCurrentWidgetProps()?.accessibilityLabel).toContain(
       '2 Needs input, 4 Working, 3 Idle, Open agents'

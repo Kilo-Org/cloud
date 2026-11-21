@@ -32,6 +32,17 @@ export const ROW_FRAME_CLASS = 'min-h-[48px] flex-row items-center justify-betwe
  */
 export const ROW_FRAME_STACK_CLASS = 'min-h-[48px] gap-2 px-4 py-3';
 
+/**
+ * The frame as a column: the row's own line, then a caption line under both
+ * columns. The inset and the minimum height stay the frame's, so a row with a
+ * caption starts its text at the same x and keeps the same rhythm as its
+ * siblings.
+ */
+const ROW_FRAME_COLUMN_CLASS = 'min-h-[48px] px-4 py-3';
+
+/** The row's own line inside the column frame. */
+const ROW_FRAME_LINE_CLASS = 'flex-row items-center justify-between gap-3';
+
 /** The row's leading tile frame, at the 30pt `IconTile` size. */
 export const ROW_TILE_CLASS = 'h-[30px] w-[30px] shrink-0 rounded-lg';
 
@@ -68,6 +79,15 @@ type RowFrameProps = Readonly<{
   subtitlePlaceholder?: ReactNode;
   /** The text column's content, instead of `title`/`subtitle`. The caller owns its own type and cue. */
   children?: ReactNode;
+  /**
+   * A line under the whole row, below both columns — a caption that belongs to
+   * the row's value but cannot share its line. It spans the row's width, so a
+   * wrapped sentence is never clamped to the value's column. A footer takes the
+   * column frame, so it paints under the row's own line on every press path;
+   * `stack` is not combined with it, because stacking puts the leading cell
+   * above the text column and a footer belongs under both.
+   */
+  footer?: ReactNode;
   /** The trailing slot: one of the typed marks, or a node a wrapper built. */
   trailing?: RowTrailingSpec;
   /** Makes the frame a pressable row. Omit it and the row is static. */
@@ -143,6 +163,7 @@ export function RowFrame({
   secondSubtitle,
   subtitlePlaceholder,
   children,
+  footer,
   trailing,
   onPress,
   pressTarget = 'row',
@@ -226,7 +247,51 @@ export function RowFrame({
   ) : null;
 
   const trailingNode = renderRowTrailing(trailing);
-  const frameClass = cn(stack ? ROW_FRAME_STACK_CLASS : ROW_FRAME_CLASS, className);
+  // A caller that hands a footer gets the column frame: the row's own line
+  // first, then that line under both columns at the row's full width.
+  const frameClass =
+    footer === undefined
+      ? cn(stack ? ROW_FRAME_STACK_CLASS : ROW_FRAME_CLASS, className)
+      : cn(ROW_FRAME_COLUMN_CLASS, className);
+
+  /**
+   * The row's own line, in the order the caller's shape asks for. A footer
+   * closes the column below it, so the line keeps the leading cell, the text
+   * column and the trailing cell side by side. A stack puts the leading cell and
+   * the trailing cell on a line above the text column.
+   */
+  const renderBody = (): ReactNode => {
+    if (footer !== undefined) {
+      return (
+        <>
+          <View className={ROW_FRAME_LINE_CLASS}>
+            {leadingNode}
+            {textBlock}
+            {trailingNode}
+          </View>
+          {footer}
+        </>
+      );
+    }
+    if (stack) {
+      return (
+        <>
+          <View className={cn('w-full', ROW_FRAME_LINE_CLASS)}>
+            {leadingNode}
+            {trailingNode ? <View className="shrink-0">{trailingNode}</View> : null}
+          </View>
+          {textBlock}
+        </>
+      );
+    }
+    return (
+      <>
+        {leadingNode}
+        {textBlock}
+        {trailingNode}
+      </>
+    );
+  };
 
   if (pressTarget === 'content') {
     // The trailing control owns the row's name when the content is only its
@@ -252,20 +317,34 @@ export function RowFrame({
       accessibilityHint: contentAccessibilityHint,
       accessibilityState: contentOwnsName ? { disabled } : undefined,
     };
+    const contentPress = (
+      <Pressable
+        {...contentProps}
+        className={cn(
+          'min-w-0 flex-1 flex-row items-center gap-3 self-stretch',
+          ROW_FRAME_CONTENT_PRESS_CLASS,
+          !disabled && 'active:opacity-70'
+        )}
+      >
+        {leadingNode}
+        {textBlock}
+      </Pressable>
+    );
+    if (footer === undefined) {
+      return (
+        <View testID={testID} className={frameClass} onLayout={onLayout}>
+          {contentPress}
+          {trailingNode}
+        </View>
+      );
+    }
     return (
       <View testID={testID} className={frameClass} onLayout={onLayout}>
-        <Pressable
-          {...contentProps}
-          className={cn(
-            'min-w-0 flex-1 flex-row items-center gap-3 self-stretch',
-            ROW_FRAME_CONTENT_PRESS_CLASS,
-            !disabled && 'active:opacity-70'
-          )}
-        >
-          {leadingNode}
-          {textBlock}
-        </Pressable>
-        {trailingNode}
+        <View className={ROW_FRAME_LINE_CLASS}>
+          {contentPress}
+          {trailingNode}
+        </View>
+        {footer}
       </View>
     );
   }
@@ -273,21 +352,7 @@ export function RowFrame({
   if (onPress === undefined) {
     return (
       <View testID={testID} className={frameClass} onLayout={onLayout}>
-        {stack ? (
-          <>
-            <View className="w-full flex-row items-center justify-between gap-3">
-              {leadingNode}
-              {trailingNode ? <View className="shrink-0">{trailingNode}</View> : null}
-            </View>
-            {textBlock}
-          </>
-        ) : (
-          <>
-            {leadingNode}
-            {textBlock}
-            {trailingNode}
-          </>
-        )}
+        {renderBody()}
       </View>
     );
   }
@@ -312,21 +377,7 @@ export function RowFrame({
       hitSlop={hitSlop}
       onLayout={onLayout}
     >
-      {stack ? (
-        <>
-          <View className="w-full flex-row items-center justify-between gap-3">
-            {leadingNode}
-            {trailingNode ? <View className="shrink-0">{trailingNode}</View> : null}
-          </View>
-          {textBlock}
-        </>
-      ) : (
-        <>
-          {leadingNode}
-          {textBlock}
-          {trailingNode}
-        </>
-      )}
+      {renderBody()}
     </Pressable>
   );
 }

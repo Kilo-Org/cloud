@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "આ દસ્તાવેજ ફક્ત અંગ્રેજીમાં ઉપલબ્ધ છે.",
     "organizationTrialEndedBilling": "સંસ્થાનો ટ્રાયલ સમાપ્ત થઈ ગયો છે અને તેની પાસે કોઈ સક્રિય પ્લાન નથી. તમે બિલિંગ અપડેટ કરી શકો છો, પછી ફરીથી પ્રયાસ કરો.",
     "organizationTrialEndedBillingAtKiloAi": "સંસ્થાનો ટ્રાયલ સમાપ્ત થઈ ગયો છે અને તેની પાસે કોઈ સક્રિય પ્લાન નથી. તમે બિલિંગ kilo.ai પર અપડેટ કરી શકો છો, પછી ફરીથી પ્રયાસ કરો.",
-    "viewOnGitHub": "GitHub પર PR જુઓ"
+    "viewOnGitHub": "GitHub પર PR જુઓ",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "બુલેટ પોઇન્ટ",
+        "nestedBulletPoint": "નેસ્ટેડ બુલેટ પોઇન્ટ",
+        "orderedItem": "યાદીની આઇટમ {n}",
+        "nestedOrderedItem": "નેસ્ટેડ યાદીની આઇટમ {n}"
+      },
+      "blockquote": {
+        "quote": "અવતરણ",
+        "nestedQuote": "નેસ્ટેડ અવતરણ"
+      },
+      "table": {
+        "row": "પંક્તિ {n}: {content}"
+      },
+      "math": {
+        "equation": "ગણિત: {latex}"
+      },
+      "rotor": {
+        "headings": "શીર્ષકો",
+        "links": "લિંક્સ",
+        "images": "છબીઓ"
+      }
+    }
   },
   "language": {
     "restarting": "ભાષા લાગુ કરવા ઍપ ફરી શરૂ થઈ રહી છે",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "અપીલનું પરિણામ આ સ્ક્રીન પર દેખાશે.",
       "nextStepFinal": "અપીલનો નિર્ણય અંતિમ છે. હવે વધુ અપીલ કરી શકાતી નથી.",
       "viewReceipt": "રસીદ જુઓ"
+    },
+    "reportReceipts": {
+      "title": "રિપોર્ટ્સ",
+      "rowSubtitle": "તમે ફાઇલ કરેલા રિપોર્ટ્સ અને તેમના પરિણામો",
+      "emptyTitle": "હજી સુધી કોઈ રિપોર્ટ નથી",
+      "emptyDescription": "તમે કોમેન્ટ અથવા AI પ્રતિસાદ પરથી ફાઇલ કરેલા રિપોર્ટ્સ અહીં દેખાશે.",
+      "couldNotLoad": "તમારા રિપોર્ટ્સ લોડ કરી શકાયા નથી",
+      "capped": "તમારા સૌથી તાજેતરના રિપોર્ટ્સ બતાવી રહ્યા છીએ."
     },
     "changelog": "નવું શું છે",
     "changelogVersionPending": "{{version}} સંસ્કરણની નોંધો આગામી ઍપ અપડેટ સાથે આવશે.",
@@ -1277,7 +1308,7 @@
       "couldNotGetLatest": "નવીનતમ માહિતી મેળવી શકાઈ નહીં.",
       "byline": "{{author}} દ્વારા #{{number}}",
       "noFindings": "કોઈ તારણ મળ્યું નથી.",
-      "findingsUnavailable": "આ સમીક્ષા નિષ્ફળ ગઈ હોવાથી પરિણામો ઉપલબ્ધ નથી.",
+      "findingsUnavailable": "પરિણામો ઉપલબ્ધ નથી.",
       "findingsInProgress": "આ સમીક્ષા હજુ પ્રગતિમાં છે. તે પૂર્ણ થતાં તારણ અહીં દેખાશે.",
       "findingsEndedWithoutResults": "આ સમીક્ષા કોઈ તારણ આપી શકે તે પહેલાં જ સમાપ્ત થઈ ગઈ.",
       "serviceUnavailable": "કોડ સમીક્ષા સેવા સાથે જોડાઈ શકાયું નહીં. સેવા ઉપલબ્ધ થાય ત્યારે સમીક્ષાનો ફરી પ્રયાસ કરો.",
@@ -3591,6 +3622,7 @@
       "identifierLabel": "ઓળખક",
       "identifierRequired": "ઓળખક દાખલ કરો.",
       "identifierTaken": "બીજો મોડ પહેલેથી આ ઓળખકનો ઉપયોગ કરે છે.",
+      "identifierTooLong": "ઓળખકને {{max}} અક્ષરો કે તેથી ઓછા સુધી રાખો.",
       "nameLabel": "મોડ નામ",
       "nameRequired": "મોડ નામ દાખલ કરો.",
       "notFound": "આ મોડ હવે અસ્તિત્વમાં નથી.",
@@ -3681,7 +3713,7 @@
     "emailDeliveryFailed": "હમણાં ઇમેઇલ મોકલી શકાતો નથી. કૃપા કરીને પછીથી ફરી પ્રયત્ન કરો.",
     "admissionRequired": "તમારા ઉપકરણની ચકાસણી થઈ શકતી નથી. બીજા ઉપકરણ પર અથવા વેબ દ્વારા સાઇન ઇન કરવા માટે '$t(login.moreSignInOptions)' વાપરો.",
     "default": "કંઈક ભૂલ થઈ છે. કૃપા કરીને ફરી પ્રયત્ન કરો.",
-    "retryableAdmission": "આ ઉપકરણની ચકાસણી કરી શકાઈ નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો.",
+    "retryableAdmission": "આ ઉપકરણ ચકાસી શકાયું નથી. ફરી પ્રયાસ કરો.",
     "startSignInFailed": "સાઇન ઇનની પ્રક્રિયા શરૂ કરી શકાઈ નહીં. કૃપા કરીને ફરી પ્રયત્ન કરો.",
     "couldNotOpenBrowser": "બ્રાઉઝર ખોલી શકાયું નહીં. કૃપા કરીને ફરી પ્રયત્ન કરો.",
     "signInTimedOut": "સાઇન ઇન કરવાની સમયમર્યાદા પૂરી થઈ ગઈ છે. કૃપા કરીને ફરી પ્રયત્ન કરો.",
@@ -3753,6 +3785,34 @@
     "nextScheduled": "આગામી નિર્ધારિત",
     "answerNeeded": "જવાબ જરૂરી",
     "waitingToRetry": "ફરી પ્રયાસની રાહમાં",
+    "countNoun": {
+      "needsInput_one": "જવાબ જરૂરી",
+      "needsInput_other": "જવાબ જરૂરી",
+      "running_one": "કામ ચાલુ છે",
+      "running_other": "કામ ચાલુ છે",
+      "scheduled_one": "નિર્ધારિત",
+      "scheduled_other": "નિર્ધારિત",
+      "idle_one": "નિષ્ક્રિય",
+      "idle_other": "નિષ્ક્રિય"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} જવાબ જરૂરી",
+      "needsInput_other": "{{displayCount}} જવાબ જરૂરી",
+      "running_one": "{{displayCount}} કામ ચાલુ છે",
+      "running_other": "{{displayCount}} કામ ચાલુ છે",
+      "scheduled_one": "{{displayCount}} નિર્ધારિત",
+      "scheduled_other": "{{displayCount}} નિર્ધારિત",
+      "idle_one": "{{displayCount}} નિષ્ક્રિય",
+      "idle_other": "{{displayCount}} નિષ્ક્રિય"
+    },
+    "footer": {
+      "checked": "ચકાસ્યું {{time}}",
+      "lastKnown": "છેલ્લે જાણીતું · {{time}}"
+    },
+    "wake": {
+      "nextRun": "આગામી રન {{time}}",
+      "wasDue": "અપેક્ષિત હતું {{time}}"
+    },
     "step": {
       "editing": "સંપાદન",
       "reading": "વાંચન",
@@ -3998,7 +4058,8 @@
         "space": "આ મોડેલ માટે પૂરતી ખાલી સ્ટોરેજ નથી. જગ્યા ખાલી કરો અને ફરી પ્રયાસ કરો.",
         "network": "ડાઉનલોડ પૂર્ણ થયું નથી. તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો.",
         "invalidFile": "ડાઉનલોડ કરેલ ફાઇલ એ મોડેલ નથી જે આ એપ ચલાવી શકે, તેથી તેને દૂર કરવામાં આવી છે.",
-        "checksum": "ડાઉનલોડ કરેલ ફાઇલ તેના પ્રકાશિત ચેકસમ સાથે મેળ ખાતી નથી, તેથી તેને દૂર કરવામાં આવી છે. ફરીથી ડાઉનલોડ કરવાનો પ્રયાસ કરો."
+        "checksum": "ડાઉનલોડ કરેલ ફાઇલ તેના પ્રકાશિત ચેકસમ સાથે મેળ ખાતી નથી, તેથી તેને દૂર કરવામાં આવી છે. ફરીથી ડાઉનલોડ કરવાનો પ્રયાસ કરો.",
+        "writeFailed": "આ ઉપકરણ આ મોડેલને સાચવી શક્યું નથી. ડાઉનલોડ ફરીથી કરવાનો પ્રયાસ કરો."
       }
     },
     "catalog": {
@@ -4176,7 +4237,7 @@
     "personalDefaultDescription": "જ્યારે કોઈ રિપોઝિટરીમાં પિન કરેલ પ્રોફાઇલ ન હોય ત્યારે સ્વતઃ લોડ થાય છે.",
     "organizationDefaultDescription": "કોઈ વ્યક્તિગત ડિફૉલ્ટ ન હોય તેવા સભ્યો માટે સ્વતઃ લોડ થાય છે.",
     "setAsDefault": "ડિફૉલ્ટ તરીકે સેટ કરો",
-    "saveFailed": "પ્રોફાઇલ સાચવી શકાઈ નથી",
+    "saveFailed": "પ્રોફાઇલ સાચવી શકાઈ નથી. ફરી પ્રયાસ કરો.",
     "organizationRoleRequired": "માત્ર સંસ્થાના માલિકો અને એડમિનો જ સંસ્થા પ્રોફાઇલ બદલી શકે છે.",
     "deleteTitle": "પ્રોફાઇલ કાઢી નાખો",
     "deleteMessage": "આ પ્રોફાઇલ અને તેની સેટિંગ્સને કાયમ માટે દૂર કરે છે. આ પૂર્વવત્ કરી શકાતું નથી.",
@@ -4440,6 +4501,7 @@
         "balanceNeutral": "બેલેન્સ પર અસર નહીં",
         "deduction": "કપાત",
         "grant": "ક્રેડિટ અનુદાન",
+        "welcomeCredits": "સ્વાગત ક્રેડિટ",
         "purchase": "ખરીદી"
       },
       "purchaseFallback": "ક્રેડિટ ખરીદી",
@@ -4695,6 +4757,8 @@
     "connectedTo": "{{account}} સાથે કનેક્ટ થયેલ",
     "disconnected": "{{provider}} ડિસ્કનેક્ટ થયું",
     "disconnectFailed": "{{provider}} ડિસ્કનેક્ટ કરી શકાયું નહીં",
+    "disconnectRetry": "Slack ડિસ્કનેક્શનની પુષ્ટિ કરી શક્યું નહીં. ફરી પ્રયાસ કરો.",
+    "disconnectNeedsSupport": "Kilo આ કનેક્શન માટે સાચવેલ Slack ઍક્સેસ વાંચી શક્યું નહીં. ડિસ્કનેક્ટ પૂર્ણ કરવા સહાય ટીમનો સંપર્ક કરો.",
     "couldNotLoad": "ઇન્ટિગ્રેશન્સ લોડ કરી શકાયા નહીં",
     "permissionDenied": "તમને આ ઇન્ટિગ્રેશન્સ મેનેજ કરવાની પરવાનગી નથી.",
     "managedByOwner": "તમે ન બદલી શકો એવું કનેક્શન બદલવા માટે સંસ્થાના માલિકને કહો.",

@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "See dokument on saadaval ainult inglise keeles.",
     "organizationTrialEndedBilling": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Saad arveldust uuendada ja seejärel uuesti proovida.",
     "organizationTrialEndedBillingAtKiloAi": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Saad arveldust kilo.ai keskkonnas uuendada ja seejärel uuesti proovida.",
-    "viewOnGitHub": "Vaata PR-i GitHubis"
+    "viewOnGitHub": "Vaata PR-i GitHubis",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Punkt",
+        "nestedBulletPoint": "Pesastatud punkt",
+        "orderedItem": "Loendi üksus {n}",
+        "nestedOrderedItem": "Pesastatud loendi üksus {n}"
+      },
+      "blockquote": {
+        "quote": "Tsitaat",
+        "nestedQuote": "Pesastatud tsitaat"
+      },
+      "table": {
+        "row": "Rida {n}: {content}"
+      },
+      "math": {
+        "equation": "Matemaatika: {latex}"
+      },
+      "rotor": {
+        "headings": "Pealkirjad",
+        "links": "Veebilingid",
+        "images": "Pildid"
+      }
+    }
   },
   "language": {
     "restarting": "Keele vahetamiseks taaskäivitatakse rakendus",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Vaidlustuse tulemus kuvatakse sellel ekraanil.",
       "nextStepFinal": "Vaidlustuse otsus on lõplik. Edasist vaidlustust esitada ei saa.",
       "viewReceipt": "Vaata kinnitust"
+    },
+    "reportReceipts": {
+      "title": "Teated",
+      "rowSubtitle": "Sinu esitatud teated ja nende tulemused",
+      "emptyTitle": "Teateid veel pole",
+      "emptyDescription": "Siia ilmuvad teated, mille esitad kommentaari või AI vastuse kohta.",
+      "couldNotLoad": "Sinu teateid ei õnnestunud laadida",
+      "capped": "Kuvatakse sinu viimased teated."
     },
     "changelog": "Mis on uut",
     "changelogVersionPending": "Versiooni {{version}} märkmed saabuvad rakenduse järgmise uuendusega.",
@@ -1277,7 +1308,7 @@
       "couldNotGetLatest": "Uusimaid andmeid ei õnnestunud laadida.",
       "byline": "#{{number}}, autor {{author}}",
       "noFindings": "Leide ei leitud.",
-      "findingsUnavailable": "Tulemused pole saadaval, sest see ülevaatus ebaõnnestus.",
+      "findingsUnavailable": "Tulemused pole saadaval.",
       "findingsInProgress": "See ülevaatus on veel käimas. Leiud ilmuvad siia, kui see lõpeb.",
       "findingsEndedWithoutResults": "See ülevaatus lõppes, ilma et ühtegi leidu oleks ilmnenud.",
       "serviceUnavailable": "Koodi ülevaatuse teenusega ei õnnestunud ühendust luua. Proovi ülevaatust uuesti, kui teenus on saadaval.",
@@ -3591,6 +3622,7 @@
       "identifierLabel": "Identifikaator",
       "identifierRequired": "Sisesta identifikaator.",
       "identifierTaken": "Seda identifikaatorit kasutab juba teine režiim.",
+      "identifierTooLong": "Hoia identifikaator {{max}} tähemärgi piires või lühem.",
       "nameLabel": "Režiimi nimi",
       "nameRequired": "Sisesta režiimi nimi.",
       "notFound": "Seda režiimi enam ei ole.",
@@ -3681,7 +3713,7 @@
     "emailDeliveryFailed": "E-kirju ei saa ajutiselt saata. Proovi hiljem uuesti.",
     "admissionRequired": "Sinu seadet ei saa kontrollida. Kasuta valikut „$t(login.moreSignInOptions)“, et logida sisse teises seadmes või veebis.",
     "default": "Midagi läks valesti. Proovi uuesti.",
-    "retryableAdmission": "Seda seadet ei õnnestunud kontrollida. Kontrolli ühendust ja proovi uuesti.",
+    "retryableAdmission": "Seda seadet ei õnnestunud kinnitada. Proovi uuesti.",
     "startSignInFailed": "Sisselogimise alustamine ebaõnnestus. Proovi uuesti.",
     "couldNotOpenBrowser": "Brauseri avamine ebaõnnestus. Proovi uuesti.",
     "signInTimedOut": "Sisselogimine aegus. Proovi uuesti.",
@@ -3753,6 +3785,34 @@
     "nextScheduled": "Järgmisena ajastatud",
     "answerNeeded": "Vajab vastust",
     "waitingToRetry": "Ootab uut katset",
+    "countNoun": {
+      "needsInput_one": "Vajab sisendit",
+      "needsInput_other": "Vajab sisendit",
+      "running_one": "Töös",
+      "running_other": "Töös",
+      "scheduled_one": "Ajastatud",
+      "scheduled_other": "Ajastatud",
+      "idle_one": "Ooterežiimis",
+      "idle_other": "Ooterežiimis"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Vajab sisendit",
+      "needsInput_other": "{{displayCount}} Vajab sisendit",
+      "running_one": "{{displayCount}} Töös",
+      "running_other": "{{displayCount}} Töös",
+      "scheduled_one": "{{displayCount}} Ajastatud",
+      "scheduled_other": "{{displayCount}} Ajastatud",
+      "idle_one": "{{displayCount}} Ooterežiimis",
+      "idle_other": "{{displayCount}} Ooterežiimis"
+    },
+    "footer": {
+      "checked": "Kontrollitud {{time}}",
+      "lastKnown": "Viimane teadaolev · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Järgmine käivitus {{time}}",
+      "wasDue": "Pidi toimuma {{time}}"
+    },
     "step": {
       "editing": "Redigeerimine",
       "reading": "Lugemine",
@@ -3998,7 +4058,8 @@
         "space": "Selle mudeli jaoks pole piisavalt vaba salvestusruumi. Vabasta ruumi ja proovi uuesti.",
         "network": "Allalaadimine ei lõppenud. Kontrolli ühendust ja proovi uuesti.",
         "invalidFile": "Allalaaditud fail ei ole mudel, mida see rakendus saab käivitada, seega see eemaldati.",
-        "checksum": "Allalaaditud fail ei vasta avaldatud kontrollsummale, seega see eemaldati. Proovi uuesti alla laadida."
+        "checksum": "Allalaaditud fail ei vasta avaldatud kontrollsummale, seega see eemaldati. Proovi uuesti alla laadida.",
+        "writeFailed": "See seade ei suutnud mudelit salvestada. Proovi uuesti alla laadida."
       }
     },
     "catalog": {
@@ -4176,7 +4237,7 @@
     "personalDefaultDescription": "Laaditakse automaatselt, kui ühelgi hoidlal pole kinnitatud profiili.",
     "organizationDefaultDescription": "Laaditakse automaatselt liikmetele, kellel pole isiklikku vaikeprofiili.",
     "setAsDefault": "Määra vaikeväärtuseks",
-    "saveFailed": "Profiili ei saanud salvestada",
+    "saveFailed": "Profiili ei saanud salvestada. Proovi uuesti.",
     "organizationRoleRequired": "Organisatsiooni profiile saavad muuta ainult organisatsiooni omanikud ja administraatorid.",
     "deleteTitle": "Kustuta profiil",
     "deleteMessage": "See eemaldab jäädavalt profiili ja selle seaded. Seda ei saa tagasi võtta.",
@@ -4440,6 +4501,7 @@
         "balanceNeutral": "Saldot ei mõjuta",
         "deduction": "Mahaarvamine",
         "grant": "Tasuta krediit",
+        "welcomeCredits": "Tervituskrediit",
         "purchase": "Ost"
       },
       "purchaseFallback": "Krediidiost",
@@ -4695,6 +4757,8 @@
     "connectedTo": "Ühendatud kontoga {{account}}",
     "disconnected": "Ühendus teenusega {{provider}} katkestati",
     "disconnectFailed": "Ühendust teenusega {{provider}} ei õnnestunud katkestada",
+    "disconnectRetry": "Slack ei õnnestunud ühenduse katkestamist kinnitada. Proovi uuesti.",
+    "disconnectNeedsSupport": "Kilo ei saanud selle ühenduse jaoks salvestatud Slacki juurdepääsu lugeda. Ühenduse katkestamise lõpuleviimiseks võta ühendust toega.",
     "couldNotLoad": "Integratsioone ei õnnestunud laadida",
     "permissionDenied": "Sul pole õigust neid integratsioone hallata.",
     "managedByOwner": "Kui sa ei saa ühendust muuta, pöördu selle muutmiseks organisatsiooni omaniku poole.",

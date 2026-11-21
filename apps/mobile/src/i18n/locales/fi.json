@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Tämä asiakirja on saatavilla vain englanniksi.",
     "organizationTrialEndedBilling": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Voit päivittää laskutuksen ja yrittää sitten uudelleen.",
     "organizationTrialEndedBillingAtKiloAi": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Voit päivittää laskutuksen osoitteessa kilo.ai ja yrittää sitten uudelleen.",
-    "viewOnGitHub": "Katso PR GitHubissa"
+    "viewOnGitHub": "Katso PR GitHubissa",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Luettelomerkki",
+        "nestedBulletPoint": "Sisennetty luettelomerkki",
+        "orderedItem": "Luettelon kohta {n}",
+        "nestedOrderedItem": "Sisennetty luettelon kohta {n}"
+      },
+      "blockquote": {
+        "quote": "Lainaus",
+        "nestedQuote": "Sisennetty lainaus"
+      },
+      "table": {
+        "row": "Rivi {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematiikka: {latex}"
+      },
+      "rotor": {
+        "headings": "Otsikot",
+        "links": "Linkit",
+        "images": "Kuvat"
+      }
+    }
   },
   "language": {
     "restarting": "Käynnistetään uudelleen kielen vaihtamiseksi",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Valituksen lopputulos näkyy tällä näytöllä.",
       "nextStepFinal": "Valituspäätös on lopullinen. Uutta valitusta ei voi tehdä.",
       "viewReceipt": "Näytä kuitti"
+    },
+    "reportReceipts": {
+      "title": "Ilmoitukset",
+      "rowSubtitle": "Tekemäsi ilmoitukset ja niiden lopputulokset",
+      "emptyTitle": "Ei vielä ilmoituksia",
+      "emptyDescription": "Kommentista tai tekoälyvastauksesta tekemäsi ilmoitukset näkyvät tässä.",
+      "couldNotLoad": "Ilmoituksiasi ei voitu ladata",
+      "capped": "Näytetään uusimmat ilmoituksesi."
     },
     "changelog": "Mitä uutta",
     "changelogVersionPending": "Version {{version}} julkaisutiedot tulevat sovelluksen seuraavan päivityksen mukana.",
@@ -1277,7 +1308,7 @@
       "couldNotGetLatest": "Uusimpia tietoja ei voitu hakea.",
       "byline": "#{{number}}, tekijä {{author}}",
       "noFindings": "Havaintoja ei ole.",
-      "findingsUnavailable": "Tulokset eivät ole saatavilla, koska tämä katselmointi epäonnistui.",
+      "findingsUnavailable": "Tulokset eivät ole saatavilla.",
       "findingsInProgress": "Tämä katselmointi on vielä kesken. Havainnot näkyvät tässä, kun se valmistuu.",
       "findingsEndedWithoutResults": "Tämä katselmointi päättyi ennen kuin se tuotti havaintoja.",
       "serviceUnavailable": "Koodin katselmointipalveluun ei saatu yhteyttä. Yritä katselmointia uudelleen, kun palvelu on käytettävissä.",
@@ -3591,6 +3622,7 @@
       "identifierLabel": "Tunniste",
       "identifierRequired": "Anna tunniste.",
       "identifierTaken": "Toinen tila käyttää jo tätä tunnistetta.",
+      "identifierTooLong": "Pidä tunniste enintään {{max}} merkin mittaisena.",
       "nameLabel": "Tilan nimi",
       "nameRequired": "Anna tilalle nimi.",
       "notFound": "Tätä tilaa ei enää ole.",
@@ -3681,7 +3713,7 @@
     "emailDeliveryFailed": "Sähköpostin lähetys ei onnistu juuri nyt. Yritä myöhemmin uudelleen.",
     "admissionRequired": "Laitettasi ei voida todentaa. Valitse ”$t(login.moreSignInOptions)” ja kirjaudu toisella laitteella tai verkkosivustolla.",
     "default": "Jokin meni pieleen. Yritä uudelleen.",
-    "retryableAdmission": "Laitetta ei voitu todentaa. Tarkista yhteys ja yritä uudelleen.",
+    "retryableAdmission": "Laitetta ei voitu vahvistaa. Yritä uudelleen.",
     "startSignInFailed": "Kirjautumisen aloittaminen epäonnistui. Yritä uudelleen.",
     "couldNotOpenBrowser": "Selaimen avaaminen epäonnistui. Yritä uudelleen.",
     "signInTimedOut": "Kirjautuminen aikakatkaistiin. Yritä uudelleen.",
@@ -3753,6 +3785,34 @@
     "nextScheduled": "Seuraavaksi ajastetut",
     "answerNeeded": "Odottaa vastausta",
     "waitingToRetry": "Odottaa uutta yritystä",
+    "countNoun": {
+      "needsInput_one": "Odottaa vastausta",
+      "needsInput_other": "Odottaa vastausta",
+      "running_one": "Työn alla",
+      "running_other": "Työn alla",
+      "scheduled_one": "Ajastettu",
+      "scheduled_other": "Ajastettu",
+      "idle_one": "Valmiina",
+      "idle_other": "Valmiina"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Odottaa vastausta",
+      "needsInput_other": "{{displayCount}} Odottaa vastausta",
+      "running_one": "{{displayCount}} Työn alla",
+      "running_other": "{{displayCount}} Työn alla",
+      "scheduled_one": "{{displayCount}} Ajastettu",
+      "scheduled_other": "{{displayCount}} Ajastettu",
+      "idle_one": "{{displayCount}} Valmiina",
+      "idle_other": "{{displayCount}} Valmiina"
+    },
+    "footer": {
+      "checked": "Tarkistettu {{time}}",
+      "lastKnown": "Viimeisin tiedossa oleva · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Seuraava ajo {{time}}",
+      "wasDue": "Odotettiin {{time}}"
+    },
     "step": {
       "editing": "Muokkaus",
       "reading": "Lukeminen",
@@ -3998,7 +4058,8 @@
         "space": "Laitteessa ei ole tarpeeksi vapaata tallennustilaa tälle mallille. Vapauta tilaa ja yritä uudelleen.",
         "network": "Lataus ei valmistunut. Tarkista yhteytesi ja yritä uudelleen.",
         "invalidFile": "Ladattu tiedosto ei ole malli, jota tämä sovellus voi ajaa, joten se poistettiin.",
-        "checksum": "Ladattu tiedosto ei vastaa julkaistua tarkistussummaansa, joten se poistettiin. Yritä latausta uudelleen."
+        "checksum": "Ladattu tiedosto ei vastaa julkaistua tarkistussummaansa, joten se poistettiin. Yritä latausta uudelleen.",
+        "writeFailed": "Tämä laite ei voinut tallentaa mallia. Yritä latausta uudelleen."
       }
     },
     "catalog": {
@@ -4176,7 +4237,7 @@
     "personalDefaultDescription": "Ladataan automaattisesti, kun missään koodivarastossa ei ole kiinnitettyä profiilia.",
     "organizationDefaultDescription": "Ladataan automaattisesti jäsenille, joilla ei ole henkilökohtaista oletusprofiilia.",
     "setAsDefault": "Aseta oletusprofiiliksi",
-    "saveFailed": "Profiilia ei voitu tallentaa",
+    "saveFailed": "Profiilia ei voitu tallentaa. Yritä uudelleen.",
     "organizationRoleRequired": "Vain organisaation omistajat ja ylläpitäjät voivat muuttaa organisaation profiilia.",
     "deleteTitle": "Poista profiili",
     "deleteMessage": "Tämä poistaa profiilin ja sen asetukset pysyvästi. Tätä ei voi kumota.",
@@ -4440,6 +4501,7 @@
         "balanceNeutral": "Ei vaikuta saldoon",
         "deduction": "Veloitus",
         "grant": "Myönnetyt krediitit",
+        "welcomeCredits": "Tervetulokrediitit",
         "purchase": "Osto"
       },
       "purchaseFallback": "Krediittiosto",
@@ -4695,6 +4757,8 @@
     "connectedTo": "Yhdistetty: {{account}}",
     "disconnected": "Yhteys palveluun {{provider}} katkaistu",
     "disconnectFailed": "Yhteyttä palveluun {{provider}} ei voitu katkaista",
+    "disconnectRetry": "Slack ei voinut vahvistaa yhteyden katkaisua. Yritä uudelleen.",
+    "disconnectNeedsSupport": "Kilo ei voinut lukea tälle yhteydelle tallennettua Slack-käyttöoikeutta. Ota yhteyttä tukeen, jotta yhteyden katkaisu saadaan päätökseen.",
     "couldNotLoad": "Integraatioita ei voitu ladata",
     "permissionDenied": "Sinulla ei ole oikeutta hallita näitä integraatioita.",
     "managedByOwner": "Pyydä organisaation omistajaa muuttamaan yhteyttä, jota et voi muuttaa.",

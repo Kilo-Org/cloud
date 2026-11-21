@@ -18,6 +18,16 @@ const expectedFiles = new Map(
   })
 );
 
+// The loops below are the assertion set. A generator that read no language tags
+// would compare nothing and still print the success line, so the table has to
+// stand on its own before the loops start.
+if (expectedFiles.size === 0) {
+  console.error(
+    'Check SUPPORTED_LANGUAGES: the generator produced no language tables, so nothing was compared.'
+  );
+  process.exit(1);
+}
+
 // Any file under the directory that the generator no longer produces is drift
 // too: the loader map keys every generated module, so a stale file is dead.
 const onDisk = readdirSync(OUTPUT_DIR).filter(name => name.endsWith('.ts'));
@@ -31,6 +41,7 @@ for (const file of onDisk) {
     continue;
   }
   if (readFileSync(join(OUTPUT_DIR, file), 'utf8') !== expected) {
+    console.error(`${file}: generated content is stale`);
     drifted = true;
   }
 }

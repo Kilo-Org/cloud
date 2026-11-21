@@ -6,7 +6,10 @@ import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { github_connection_attempts } from '@kilocode/db/schema';
 import type { Owner } from '@/lib/integrations/core/types';
-import { connectVerifiedGitHubInstallation } from '@/lib/integrations/db/github-installations';
+import {
+  connectVerifiedGitHubInstallation,
+  logGitHubWorkflowRoleTransfers,
+} from '@/lib/integrations/db/github-installations';
 import {
   fetchGitHubInstallationDetails,
   fetchGitHubRepositoriesForMaintenance,
@@ -183,7 +186,7 @@ export async function completeGitHubConnectionAttempt(input: {
           });
           return null;
         });
-  return db.transaction(async tx => {
+  const completed = await db.transaction(async tx => {
     const [attempt] = await tx
       .select()
       .from(github_connection_attempts)
@@ -201,7 +204,11 @@ export async function completeGitHubConnectionAttempt(input: {
     )
       return { ok: false as const, reason: 'installation_unavailable' as const };
     if (attempt.completed_integration_id)
-      return { ok: true as const, integrationId: attempt.completed_integration_id };
+      return {
+        ok: true as const,
+        integrationId: attempt.completed_integration_id,
+        roleTransfers: [],
+      };
     if (attempt.consumed_at || new Date(attempt.expires_at) <= new Date())
       return { ok: false as const, reason: 'installation_unavailable' as const };
     const storedCandidates = candidatesSchema.safeParse(attempt.eligible_installations);
@@ -247,4 +254,10 @@ export async function completeGitHubConnectionAttempt(input: {
       .where(eq(github_connection_attempts.id, attempt.id));
     return result;
   });
+  // Log the workflow-role transfers only after this transaction has committed —
+  // see the ConnectVerifiedGitHubInstallationInTransactionResult doc comment.
+  if (completed.ok) logGitHubWorkflowRoleTransfers(completed.roleTransfers);
+  return completed.ok
+    ? { ok: true as const, integrationId: completed.integrationId }
+    : { ok: false as const, reason: completed.reason };
 }

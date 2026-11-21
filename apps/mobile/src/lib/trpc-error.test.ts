@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isControlPlaneTimeout,
   isUsageSourceUnavailable,
+  readTrpcServerMessage,
   trpcErrorVariant,
 } from '@/lib/trpc-error';
 
@@ -92,6 +93,189 @@ describe('trpcErrorVariant', () => {
     expect(trpcErrorVariant(new Error('network down'))).toBe('server');
     expect(trpcErrorVariant(undefined)).toBe('server');
     expect(trpcErrorVariant(null)).toBe('server');
+  });
+});
+
+describe('readTrpcServerMessage', () => {
+  it('returns the sentence of a real server answer, whose data carries the code only', () => {
+    // The production shape, measured against the local server: the formatted
+    // data carries code, httpStatus, stack and path, never a message; the
+    // server's sentence is the error's own message.
+    const answered = Object.assign(new Error('A profile with this name already exists'), {
+      name: 'TRPCClientError',
+      data: { code: 'CONFLICT', httpStatus: 409, path: 'agentProfiles.create', zodError: null },
+    });
+    expect(readTrpcServerMessage(answered)).toBe('A profile with this name already exists');
+  });
+
+  it('yields no sentence for an internal server error', () => {
+    // An unexpected failure carries diagnostic text. Only a sentence the
+    // application wrote for a person reaches the sheet.
+    const failed = Object.assign(new Error('probe diagnostic text'), {
+      name: 'TRPCClientError',
+      data: {
+        code: 'INTERNAL_SERVER_ERROR',
+        httpStatus: 500,
+        path: 'agentProfiles.create',
+        stack: 'probe stack',
+      },
+    });
+    expect(readTrpcServerMessage(failed)).toBeUndefined();
+  });
+
+  it('yields no sentence for the internal server error of an unset key', () => {
+    const unconfigured = Object.assign(
+      new Error('Agent environment encryption key not configured'),
+      {
+        name: 'TRPCClientError',
+        data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500, path: 'agentProfiles.create' },
+      }
+    );
+    expect(readTrpcServerMessage(unconfigured)).toBeUndefined();
+  });
+
+  it('yields no sentence for a context auth failure, whatever the envelope carries', () => {
+    // The session failure carries the server's diagnostic text and is handled
+    // by the sign-out path, so it is not a sentence for this sheet.
+    const signedOut = Object.assign(
+      new Error('User not authenticated - no user to set on context'),
+      {
+        name: 'TRPCClientError',
+        data: {
+          code: 'UNAUTHORIZED',
+          httpStatus: 401,
+          path: 'agentProfiles.create',
+          authRequired: true,
+        },
+      }
+    );
+    expect(readTrpcServerMessage(signedOut)).toBeUndefined();
+    expect(
+      readTrpcServerMessage({
+        shape: {
+          data: {
+            code: 'UNAUTHORIZED',
+            message: 'User not authenticated - no user to set on context',
+            authRequired: true,
+          },
+        },
+      })
+    ).toBeUndefined();
+  });
+
+  it('yields no sentence for a procedure-level auth denial', () => {
+    // Every procedure-level denial carries an org-access diagnostic, so the
+    // caller states its own line instead of showing that text.
+    const denied = Object.assign(
+      new Error('You do not have the required organizational role to access this feature'),
+      {
+        name: 'TRPCClientError',
+        data: {
+          code: 'UNAUTHORIZED',
+          httpStatus: 401,
+          path: 'agentProfiles.create',
+        },
+      }
+    );
+    expect(readTrpcServerMessage(denied)).toBeUndefined();
+    expect(
+      readTrpcServerMessage({
+        shape: {
+          data: {
+            code: 'UNAUTHORIZED',
+            message: 'You do not have the required organizational role to access this feature',
+          },
+        },
+      })
+    ).toBeUndefined();
+  });
+
+  it('yields no sentence for a validation payload', () => {
+    const invalid = Object.assign(new Error('Input validation failed'), {
+      name: 'TRPCClientError',
+      data: {
+        code: 'BAD_REQUEST',
+        httpStatus: 400,
+        path: 'agentProfiles.create',
+        zodError: { formErrors: [['Too small']], fieldErrors: { name: ['Required'] } },
+      },
+    });
+    expect(readTrpcServerMessage(invalid)).toBeUndefined();
+  });
+
+  it('yields no sentence for a framework code, whatever human-looking text it carries', () => {
+    // The allowlist decides, not the presence of text: a framework code is not
+    // a refusal the application wrote for a person.
+    for (const code of [
+      'PARSE_ERROR',
+      'METHOD_NOT_SUPPORTED',
+      'NOT_IMPLEMENTED',
+      'CLIENT_CLOSED_REQUEST',
+      'PAYLOAD_TOO_LARGE',
+      'TIMEOUT',
+      'UNPROCESSABLE_CONTENT',
+    ]) {
+      const framework = Object.assign(new Error('Something went wrong. Please try again.'), {
+        name: 'TRPCClientError',
+        data: { code, httpStatus: 400, path: 'agentProfiles.create' },
+      });
+      expect(readTrpcServerMessage(framework), code).toBeUndefined();
+      expect(readTrpcServerMessage({ data: { code } }), code).toBeUndefined();
+      expect(
+        readTrpcServerMessage({ shape: { data: { code, message: 'Please try again.' } } }),
+        code
+      ).toBeUndefined();
+    }
+  });
+
+  it('returns the sentence of an allowlisted application refusal', () => {
+    const cases: [string, string][] = [
+      ['BAD_REQUEST', 'The name is too long.'],
+      ['PRECONDITION_FAILED', 'Add a variable before saving.'],
+      ['NOT_FOUND', 'That profile no longer exists.'],
+      ['TOO_MANY_REQUESTS', 'Too many attempts. Wait a moment.'],
+      ['FORBIDDEN', 'You cannot change this profile.'],
+      ['CONFLICT', 'A profile with this name already exists'],
+    ];
+    for (const [code, sentence] of cases) {
+      const answered = Object.assign(new Error(sentence), {
+        name: 'TRPCClientError',
+        data: { code, httpStatus: 400, path: 'agentProfiles.create', zodError: null },
+      });
+      expect(readTrpcServerMessage(answered), code).toBe(sentence);
+      expect(readTrpcServerMessage({ shape: { data: { code, message: sentence } } }), code).toBe(
+        sentence
+      );
+    }
+  });
+
+  it('returns a message carried under a shaped answer', () => {
+    expect(
+      readTrpcServerMessage({
+        shape: { data: { code: 'CONFLICT', message: 'Name already taken' } },
+      })
+    ).toBe('Name already taken');
+  });
+
+  it('refuses the payload-less transport error named like a tRPC client error', () => {
+    expect(
+      readTrpcServerMessage(
+        Object.assign(new Error('Request timed out after 15000ms'), { name: 'TRPCClientError' })
+      )
+    ).toBeUndefined();
+    expect(
+      readTrpcServerMessage(
+        Object.assign(new Error('fetch failed: Unable to resolve host'), {
+          name: 'TRPCClientError',
+        })
+      )
+    ).toBeUndefined();
+  });
+
+  it('refuses a bare Error and a value that is no error at all', () => {
+    expect(readTrpcServerMessage(new Error('network down'))).toBeUndefined();
+    expect(readTrpcServerMessage(undefined)).toBeUndefined();
+    expect(readTrpcServerMessage(null)).toBeUndefined();
   });
 });
 

@@ -255,10 +255,12 @@ describe('use-native-auth error mapping', () => {
   });
 
   it('has a retryable admission error constant', () => {
-    expect(retryableAdmissionError()).toBe(
-      'We could not verify this device. Check your connection and try again.'
-    );
-    expect(retryableAdmissionError()).toMatch(/try again/i);
+    const message = retryableAdmissionError();
+    // A retryable admission refusal says what failed and offers the retry, and
+    // it must not diagnose a network cause the client has not proven.
+    expect(message).toMatch(/verify this device/i);
+    expect(message).toMatch(/try again/i);
+    expect(message).not.toMatch(/connection|network/i);
   });
 
   it('ADMISSION_REQUIRED message includes the More sign-in options CTA', () => {

@@ -1741,6 +1741,8 @@ export type OrganizationGroupPolicy =
 export type OrganizationGroupPolicyType = OrganizationGroupPolicy['type'];
 export type OrganizationGroupPolicies = OrganizationGroupPolicy[];
 
+export type NamedOrganizationPolicyKind = 'agent_permissions' | 'client_configuration';
+
 const GroupNameSchema = z.enum(['read', 'edit', 'browser', 'command', 'mcp']);
 
 const EditGroupConfigSchema = z.object({
@@ -1912,6 +1914,7 @@ export const AuditLogAction = z.enum([
   'organization.group.default_policy.remove',
   'organization.group.policy_type.enable', // Legacy action retained for existing audit rows.
   'organization.group.policy_type.disable', // Legacy action retained for existing audit rows.
+  'organization.named_policy.change',
   'organization.created', // ✅
   'organization.token.generate', // ✅
   'organization.funds.distribute_to_children', // ✅

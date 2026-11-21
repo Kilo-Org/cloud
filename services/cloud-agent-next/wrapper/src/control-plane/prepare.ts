@@ -25,6 +25,7 @@ import {
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 import type { ControlDiagnosticReporter } from '../../../src/shared/control-diagnostics.js';
 import type { Harness } from './harness.js';
+import { isPermanentRulesetFailure, SessionRulesetError } from '../kilo-api.js';
 import {
   git,
   runProcess,
@@ -399,7 +400,15 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   }
 
   function emitFailure(sessionId: string, step: ControlPlanePreparationStep, error: unknown): void {
-    const subtype = error instanceof WrapperBootstrapError ? error.subtype : undefined;
+    // The ruleset apply runs inside the same session step that commits the
+    // import, so both ruleset failures report the session-import reason instead
+    // of the generic workspace one.
+    const subtype =
+      error instanceof SessionRulesetError
+        ? 'kilo_import_failed'
+        : error instanceof WrapperBootstrapError
+          ? error.subtype
+          : undefined;
     deps.emit({
       type: 'session.failed',
       sessionId,
@@ -477,7 +486,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       try {
         return await operation(attempt);
       } catch (error) {
-        if (!isCurrent()) throw error;
+        // A permanent ruleset failure cannot gain its ruleset from a second
+        // attempt, because a retry re-reads the same durable state. A retryable
+        // one reads state that can answer on the next attempt.
+        if (!isCurrent() || isPermanentRulesetFailure(error)) throw error;
         lastError = error;
       }
     }
@@ -1435,6 +1447,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
             const snapshotRestore: NonNullable<Parameters<Harness['open']>[0]['snapshotRestore']> =
               { timings: {} };
             let failed = false;
+            let final = false;
             try {
               await withinStep('kilo_session', timers.kiloSessionMs, async signal => {
                 await Promise.all([
@@ -1459,6 +1472,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
               });
             } catch (error) {
               failed = true;
+              final = isPermanentRulesetFailure(error);
               throw error;
             } finally {
               if (snapshotRestore.startedAt !== undefined) {
@@ -1478,7 +1492,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
                       snapshotRestore.durationMs ??
                       Math.round(performance.now() - snapshotRestore.startedAt),
                     ...result,
-                    willRetry: failed && !owner.released && attempt < STEP_RETRY_ATTEMPTS,
+                    willRetry: failed && !final && !owner.released && attempt < STEP_RETRY_ATTEMPTS,
                   });
                 } catch {
                   // Diagnostic delivery must not change preparation's result.

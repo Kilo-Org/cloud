@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}，私有儲存庫",
     "legalDocumentEnglishOnly": "本文件僅提供英文版本。",
     "organizationTrialEndedBilling": "組織的試用期已結束，且沒有使用中的方案。您可以更新帳單資訊，然後再試一次。",
-    "organizationTrialEndedBillingAtKiloAi": "組織的試用期已結束，且沒有使用中的方案。您可以在 kilo.ai 更新帳單資訊，然後再試一次。"
+    "organizationTrialEndedBillingAtKiloAi": "組織的試用期已結束，且沒有使用中的方案。您可以在 kilo.ai 更新帳單資訊，然後再試一次。",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "項目符號",
+        "nestedBulletPoint": "巢狀項目符號",
+        "orderedItem": "清單項目 {n}",
+        "nestedOrderedItem": "巢狀清單項目 {n}"
+      },
+      "blockquote": {
+        "quote": "引用",
+        "nestedQuote": "巢狀引用"
+      },
+      "table": {
+        "row": "列 {n}：{content}"
+      },
+      "math": {
+        "equation": "數學：{latex}"
+      },
+      "rotor": {
+        "headings": "標題",
+        "links": "連結",
+        "images": "圖片"
+      }
+    }
   },
   "language": {
     "restarting": "正在重新啟動以套用語言",
@@ -506,6 +529,14 @@
       "nextStepFinal": "申訴決定為最終決定，無法再次申訴。",
       "viewReceipt": "檢視回執"
     },
+    "reportReceipts": {
+      "title": "檢舉記錄",
+      "rowSubtitle": "你提交的檢舉及其結果",
+      "emptyTitle": "尚無檢舉記錄",
+      "emptyDescription": "你從留言或 AI 回應提交的檢舉會顯示在這裡。",
+      "couldNotLoad": "無法載入你的檢舉",
+      "capped": "僅顯示你最近的檢舉。"
+    },
     "changelog": "最新消息",
     "changelogVersionPending": "{{version}} 版的說明將隨下次應用程式更新提供。",
     "changelogGroupNew": "新功能",
@@ -774,7 +805,7 @@
       "gateHidden": "隱藏",
       "gateNone": "無",
       "noFindings": "未發現問題。",
-      "findingsUnavailable": "由於此次審查失敗，無法取得結果。",
+      "findingsUnavailable": "無法取得結果。",
       "findingsInProgress": "此審查仍在進行中。完成後，發現的問題會顯示在這裡。",
       "findingsEndedWithoutResults": "此審查在發現任何問題前即已結束。",
       "serviceUnavailable": "無法連線至程式碼審查服務。請在服務可用時重新嘗試審查。",
@@ -3595,6 +3626,7 @@
       "identifierLabel": "識別碼",
       "identifierRequired": "請輸入識別碼。",
       "identifierTaken": "已有其他模式使用此識別碼。",
+      "identifierTooLong": "識別碼請保持在 {{max}} 個字元以內。",
       "nameLabel": "模式名稱",
       "nameRequired": "請輸入模式名稱。",
       "notFound": "此模式已不存在。",
@@ -3681,7 +3713,7 @@
     "emailDeliveryFailed": "目前無法寄送電子郵件。請稍後再試。",
     "admissionRequired": "無法驗證你的裝置。請選擇「$t(login.moreSignInOptions)」，改用其他裝置或透過網頁登入。",
     "default": "發生錯誤。請再試一次。",
-    "retryableAdmission": "無法驗證此裝置。請檢查連線後再試一次。",
+    "retryableAdmission": "無法驗證此裝置。請重試。",
     "startSignInFailed": "無法開始登入。請再試一次。",
     "couldNotOpenBrowser": "無法開啟瀏覽器。請再試一次。",
     "signInTimedOut": "登入逾時。請再試一次。",
@@ -3753,6 +3785,34 @@
     "nextScheduled": "下次排程",
     "answerNeeded": "等待回答",
     "waitingToRetry": "等待重試",
+    "countNoun": {
+      "needsInput_one": "等待輸入",
+      "needsInput_other": "等待輸入",
+      "running_one": "處理中",
+      "running_other": "處理中",
+      "scheduled_one": "已排程",
+      "scheduled_other": "已排程",
+      "idle_one": "閒置",
+      "idle_other": "閒置"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} 等待輸入",
+      "needsInput_other": "{{displayCount}} 等待輸入",
+      "running_one": "{{displayCount}} 處理中",
+      "running_other": "{{displayCount}} 處理中",
+      "scheduled_one": "{{displayCount}} 已排程",
+      "scheduled_other": "{{displayCount}} 已排程",
+      "idle_one": "{{displayCount}} 閒置",
+      "idle_other": "{{displayCount}} 閒置"
+    },
+    "footer": {
+      "checked": "上次確認 {{time}}",
+      "lastKnown": "最後已知 · {{time}}"
+    },
+    "wake": {
+      "nextRun": "下次執行 {{time}}",
+      "wasDue": "原定 {{time}}"
+    },
     "step": {
       "editing": "編輯中",
       "reading": "讀取中",
@@ -3998,7 +4058,8 @@
         "space": "沒有足夠的可用儲存空間容納這個模型。請清出空間後再試一次。",
         "network": "下載未完成。請檢查網路連線後再試一次。",
         "invalidFile": "下載的檔案不是這個應用程式可執行的模型，因此已將其移除。",
-        "checksum": "下載的檔案與公布的校驗碼不符，因此已將其移除。請重新下載。"
+        "checksum": "下載的檔案與公布的校驗碼不符，因此已將其移除。請重新下載。",
+        "writeFailed": "此裝置無法儲存這個模型。請重試下載。"
       }
     },
     "catalog": {
@@ -4176,7 +4237,7 @@
     "personalDefaultDescription": "當沒有儲存庫具有固定設定檔時自動載入。",
     "organizationDefaultDescription": "為沒有個人預設值的會員自動載入。",
     "setAsDefault": "設為預設",
-    "saveFailed": "無法儲存設定檔",
+    "saveFailed": "無法儲存設定檔。請再試一次。",
     "organizationRoleRequired": "只有組織擁有者和管理員可以變更組織設定檔。",
     "deleteTitle": "刪除設定檔",
     "deleteMessage": "這將永久刪除設定檔及其設定。此操作無法撤銷。",
@@ -4440,6 +4501,7 @@
         "balanceNeutral": "餘額不變",
         "deduction": "扣除",
         "grant": "贈送點數",
+        "welcomeCredits": "歡迎點數",
         "purchase": "購買"
       },
       "purchaseFallback": "點數購買",
@@ -4695,6 +4757,8 @@
     "connectedTo": "已連結至 {{account}}",
     "disconnected": "已中斷與 {{provider}} 的連結",
     "disconnectFailed": "無法中斷與 {{provider}} 的連結",
+    "disconnectRetry": "Slack 無法確認已中斷連結。請再試一次。",
+    "disconnectNeedsSupport": "Kilo 無法讀取為此連結儲存的 Slack 存取權。請聯絡客服以完成中斷連結。",
     "couldNotLoad": "無法載入整合",
     "permissionDenied": "您沒有管理這些整合的權限。",
     "managedByOwner": "請洽詢組織擁有者來變更您無法變更的連結。",

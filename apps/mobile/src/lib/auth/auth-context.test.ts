@@ -127,6 +127,7 @@ import {
 import { clearActiveToken, getActiveToken, setSignOutTeardownActive } from '@/lib/auth/token-owner';
 import { clearAttestKeyOnRefusal } from '@/lib/auth/admission';
 import * as SecureStore from 'expo-secure-store';
+import { CONTROL_PLANE_DEADLINE_MS } from '@kilocode/event-service';
 /* eslint-enable import/first */
 
 async function flushMicrotasks(): Promise<void> {
@@ -758,5 +759,101 @@ describe('exchangeLegacyToken', () => {
     expect(result).toBeNull();
     expect(store.get(LEGACY_EXCHANGE_DONE_KEY)).toBeUndefined();
     expect(store.get(AUTH_TOKEN_KEY)).toBe('old-token');
+  });
+
+  it('settles as retry-next-launch when the exchange request never settles', async () => {
+    store.set(AUTH_TOKEN_KEY, 'old-token');
+    // Never settles: only the deadline can end this request.
+    const neverSettles = Promise.withResolvers<Response>();
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(() => neverSettles.promise);
+    // Suppress Node.js 24 unhandledRejection from AbortController.abort()
+    // with a non-DOMException reason during fake-timer tests.
+    process.on('unhandledRejection', swallowUnhandledRejection);
+    vi.useFakeTimers();
+    try {
+      const exchange = exchangeLegacyToken();
+      // Let the SecureStore and admission reads resolve so the deadline timer
+      // registers, then cross it.
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(CONTROL_PLANE_DEADLINE_MS + 1);
+
+      await expect(exchange).resolves.toBeNull();
+      // The call is bounded: the deadline signal reached the request.
+      expect(fetchSpy.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
+      // Retry next launch: the old token stays and no done marker is set.
+      expect(store.get(AUTH_TOKEN_KEY)).toBe('old-token');
+      expect(store.get(LEGACY_EXCHANGE_DONE_KEY)).toBeUndefined();
+    } finally {
+      process.off('unhandledRejection', swallowUnhandledRejection);
+      vi.useRealTimers();
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it('settles when a success body stalls after its headers', async () => {
+    store.set(AUTH_TOKEN_KEY, 'old-token');
+    // Headers arrive, the body never ends: the token pair can never be parsed
+    // from it, and waiting on it used to keep this promise pending for good.
+    const stalled = new Response(
+      new ReadableStream({
+        start() {
+          // Never enqueues and never closes.
+        },
+      }),
+      { status: 200 }
+    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(stalled);
+    process.on('unhandledRejection', swallowUnhandledRejection);
+    vi.useFakeTimers();
+    try {
+      const exchange = exchangeLegacyToken();
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(CONTROL_PLANE_DEADLINE_MS + 1);
+
+      await expect(exchange).resolves.toBeNull();
+      // No partial pair was written and no completion marker was set.
+      expect(store.get(AUTH_TOKEN_KEY)).toBe('old-token');
+      expect(store.get(LEGACY_EXCHANGE_DONE_KEY)).toBeUndefined();
+      expect(vi.mocked(SecureStore.setItemAsync)).not.toHaveBeenCalledWith(
+        AUTH_TOKEN_KEY,
+        expect.anything(),
+        expect.anything()
+      );
+    } finally {
+      process.off('unhandledRejection', swallowUnhandledRejection);
+      vi.useRealTimers();
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it('settles when a refusal body stalls after its headers', async () => {
+    store.set(AUTH_TOKEN_KEY, 'old-token');
+    const stalled = new Response(
+      new ReadableStream({
+        start() {
+          // Never enqueues and never closes.
+        },
+      }),
+      { status: 403 }
+    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(stalled);
+    process.on('unhandledRejection', swallowUnhandledRejection);
+    vi.useFakeTimers();
+    try {
+      const exchange = exchangeLegacyToken();
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(CONTROL_PLANE_DEADLINE_MS + 1);
+
+      await expect(exchange).resolves.toBeNull();
+      // Retry next launch: the old token stays and no done marker is set.
+      expect(store.get(AUTH_TOKEN_KEY)).toBe('old-token');
+      expect(store.get(LEGACY_EXCHANGE_DONE_KEY)).toBeUndefined();
+    } finally {
+      process.off('unhandledRejection', swallowUnhandledRejection);
+      vi.useRealTimers();
+      fetchSpy.mockRestore();
+    }
   });
 });

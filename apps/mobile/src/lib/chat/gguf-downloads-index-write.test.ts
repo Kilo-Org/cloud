@@ -5,7 +5,7 @@ import { CATALOG, finish, harness, taskAt } from './gguf-downloads.test-helpers'
 import { ggufModelName } from './gguf-records';
 
 describe('a saved list the device will not take', () => {
-  it('reports the finished download as failed instead of leaving it at verifying', async () => {
+  it('reports the finished download as a write failure instead of leaving it at verifying', async () => {
     const h = harness();
     h.store.start(CATALOG);
     h.index.writeFails = true;
@@ -17,7 +17,7 @@ describe('a saved list the device will not take', () => {
     expect(h.store.snapshot()).toMatchObject({
       models: [],
       download: null,
-      failure: { fileId: 'small', problem: 'space' },
+      failure: { fileId: 'small', problem: 'writeFailed' },
     });
     expect(h.files.size).toBe(0);
     expect(h.index.text).toBeNull();

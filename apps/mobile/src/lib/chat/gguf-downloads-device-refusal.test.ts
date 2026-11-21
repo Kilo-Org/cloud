@@ -38,6 +38,21 @@ describe('a device that refuses a storage call at the last step', () => {
     expect(h.tasks).toHaveLength(0);
     expect(h.files.size).toBe(0);
   });
+
+  it('reports the write failure when the finished list cannot be saved', async () => {
+    const h = harness();
+    h.store.start(CATALOG);
+    h.index.writeFails = true;
+
+    await finish(taskAt(h.tasks, 0), 1000);
+
+    expect(h.store.snapshot()).toMatchObject({
+      models: [],
+      download: null,
+      failure: { fileId: 'small', problem: 'writeFailed' },
+    });
+    expect(h.files.size).toBe(0);
+  });
 });
 
 describe('the space problem stays for an actual storage-space stop', () => {
@@ -48,21 +63,6 @@ describe('the space problem stays for an actual storage-space stop', () => {
 
     expect(h.store.snapshot().failure).toEqual({ fileId: 'small', problem: 'space' });
     expect(h.tasks).toHaveLength(0);
-  });
-
-  it('reports space, not a write failure, when the finished list cannot be saved', async () => {
-    const h = harness();
-    h.store.start(CATALOG);
-    h.index.writeFails = true;
-
-    await finish(taskAt(h.tasks, 0), 1000);
-
-    expect(h.store.snapshot()).toMatchObject({
-      models: [],
-      download: null,
-      failure: { fileId: 'small', problem: 'space' },
-    });
-    expect(h.files.size).toBe(0);
   });
 });
 

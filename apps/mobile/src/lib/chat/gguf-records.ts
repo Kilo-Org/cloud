@@ -52,7 +52,8 @@ export type GgufDownload = {
 /**
  * `space` is the device running out of room. `writeFailed` is the device
  * refusing a storage call at the end of a download - a permission or I/O
- * refusal, which says nothing about free space.
+ * refusal writing the saved list, moving a file, or reading its size - which
+ * says nothing about free space.
  */
 export type GgufDownloadProblem = 'space' | 'network' | 'invalidFile' | 'checksum' | 'writeFailed';
 

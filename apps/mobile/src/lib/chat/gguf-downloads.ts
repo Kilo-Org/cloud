@@ -65,8 +65,14 @@ export function ggufDownloads({
   const publish = () => {
     const download = active === undefined ? null : downloadProgress(active);
     snapshot = { models, download, failure, loadFailed };
+    // Isolate subscribers: a view that throws while rendering the finished state
+    // must not fail a download the saved list already names, nor block other views.
     for (const listener of listeners) {
-      listener();
+      try {
+        listener();
+      } catch {
+        // A subscriber's own error must not break the download's notification.
+      }
     }
   };
 
@@ -136,8 +142,10 @@ export function ggufDownloads({
     }
     // The record goes in before the download ends. A device that could not take
     // it holds no model the saved list names, so the files go with the failure.
+    // A refused write is the same refusal the other steps report, so one refusal
+    // reads as one problem rather than as a verdict about free space.
     if (!save([...models, read.model])) {
-      fail(download, 'space');
+      fail(download, 'writeFailed');
       return;
     }
     active = undefined;
@@ -183,11 +191,7 @@ export function ggufDownloads({
     await verify(download, download.done + size);
   };
 
-  const onProgress = createProgressReporter({
-    storage,
-    activeDownload: () => active,
-    publish,
-  });
+  const onProgress = createProgressReporter({ storage, activeDownload: () => active, publish });
 
   /** A resume the server refused: drop the partial file and download it again from zero. */
   const restart = (download: Active) => {
@@ -234,10 +238,11 @@ export function ggufDownloads({
     try {
       await complete(download);
     } catch {
-      // A storage call the OS refused at the last step (a size read, or a
+      // A storage call the OS refused at the last step (a size read, a move, a
       // transfer it would not open) is the download's failure, not a rejection
-      // nobody awaits and a row left asking to verify. It is a refusal, not a
-      // verdict about free space, so it reads as its own problem.
+      // nobody awaits and a row left asking to verify, and not a verdict about
+      // free space: it reads as its own problem. `publish()` contains its
+      // listeners, so a finished download is never failed here.
       fail(download, 'writeFailed');
     }
   };

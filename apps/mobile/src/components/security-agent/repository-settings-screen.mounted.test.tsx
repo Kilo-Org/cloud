@@ -40,7 +40,13 @@ const repositories = vi.hoisted(() => ({
 const connectivity = vi.hoisted(() => ({ known: true }));
 const configRetry = vi.hoisted(() => ({ retry: vi.fn(), isRetrying: false }));
 const repositoriesRetry = vi.hoisted(() => ({ retry: vi.fn(), isRetrying: false }));
-const capability = vi.hoisted(() => ({ canManage: true }));
+const capability = vi.hoisted(() => ({
+  canManage: true,
+  status: 'allowed' as 'loading' | 'error' | 'denied' | 'allowed',
+  isPending: false,
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
+}));
+const settingsRecovery = vi.hoisted(() => ({ retry: vi.fn(), isRetrying: false }));
 const save = vi.hoisted(() => ({ mutateAsync: vi.fn(), isPending: false }));
 const saveButton = vi.hoisted(() => ({ onSave: null as (() => Promise<void>) | null }));
 const sideInsets = vi.hoisted(() => ({ left: 0, right: 0 }));
@@ -101,6 +107,7 @@ vi.mock('@shopify/flash-list', () => ({
 vi.mock('@/lib/hooks/use-security-agent', () => ({
   useRetrySecurityAgentConfig: () => configRetry,
   useRetrySecurityAgentRepositories: () => repositoriesRetry,
+  useRetrySecurityAgentSettings: () => settingsRecovery,
   useSecurityAgentCapability: () => capability,
   useSecurityAgentConfig: () => config,
   useSecurityAgentRepositories: () => repositories,
@@ -143,6 +150,11 @@ vi.mock('@/components/empty-state', () => ({
   StateAction: 'StateAction',
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+vi.mock('@/components/security-agent/settings-recovery-status', () => ({
+  // A host string, so the suite can both count the status and read the props
+  // its Retry is wired through.
+  SettingsRecoveryStatus: 'SettingsRecoveryStatus',
+}));
 // `headerRight` is a prop, not a child: the stub renders it so the Save button
 // (the screen's only save path) actually mounts.
 vi.mock('@/components/screen-header', () => ({
@@ -258,6 +270,13 @@ async function pressEmptyStateAction(renderer: TestRenderer.ReactTestRenderer) {
   });
 }
 
+// The permission-recovery row the screen renders, found as the host element its
+// stub draws, so a case can tell one from none and read the props its Retry is
+// wired through.
+function recoveryStatuses(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.findAll(node => String(node.type) === 'SettingsRecoveryStatus');
+}
+
 // The banner's Retry is the screen's own handler; reading it through a guard
 // makes a missing or non-callable handler fail loudly.
 function queryErrorRetry(renderer: TestRenderer.ReactTestRenderer): () => void {
@@ -293,6 +312,12 @@ beforeEach(() => {
   repositoriesRetry.retry.mockReset();
   repositoriesRetry.retry.mockResolvedValue(undefined);
   capability.canManage = true;
+  capability.status = 'allowed';
+  capability.isPending = false;
+  capability.fetchStatus = 'idle';
+  settingsRecovery.retry.mockReset();
+  settingsRecovery.retry.mockResolvedValue(undefined);
+  settingsRecovery.isRetrying = false;
   save.isPending = false;
   save.mutateAsync.mockReset();
   save.mutateAsync.mockResolvedValue({});
@@ -669,5 +694,66 @@ describe('config load failure', () => {
     expect(error.errorTitle).toBe(i18n.t('securityAgent.repositories.couldNotLoad'));
     expect(error.message).toBeUndefined();
     expect(error.variant).toBe('server');
+  });
+});
+
+describe('role read states', () => {
+  // A non-personal scope is the only one whose capability comes from the role
+  // read: the personal scope short-circuits to `allowed`, so these states do
+  // not exist there.
+  const ORG_SCOPE = 'org_role_fixture';
+
+  it('offers Retry and keeps the controls usable when the role read fails', async () => {
+    // A failed role read is not a refusal: it must name its cause with a Retry
+    // instead of claiming the viewer may not change these settings.
+    capability.canManage = false;
+    capability.status = 'error';
+    const { renderer } = await mount(ORG_SCOPE);
+
+    const statuses = recoveryStatuses(renderer);
+    expect(statuses).toHaveLength(1);
+    const onRetry: unknown = statuses[0]?.props.onRetry;
+    if (typeof onRetry !== 'function') {
+      throw new TypeError('recovery status onRetry is not callable');
+    }
+    act(onRetry as () => void);
+    expect(settingsRecovery.retry).toHaveBeenCalledTimes(1);
+
+    expect(textContents(renderer)).not.toContain(i18n.t('securityAgent.sla.permissionNote'));
+    // The header keeps its save path and the rows keep their controls: the
+    // server enforces the permission, so an unanswered question must not lock
+    // the screen.
+    expect(typeof saveButton.onSave).toBe('function');
+    expect(repoRows(renderer).map(row => (row.props as { disabled: boolean }).disabled)).toEqual([
+      false, false, false,
+    ]);
+    const modeRows = renderer.root.findAll(node => String(node.type) === 'ChoiceRow');
+    expect(modeRows.map(row => row.props.disabled)).toEqual([false, false]);
+  });
+
+  it('keeps the controls usable while a paused first role read names the connection', async () => {
+    // A first role read the online manager paused can never finish: it names the
+    // connection with Retry rather than reading as a refusal.
+    capability.status = 'loading';
+    capability.isPending = true;
+    capability.fetchStatus = 'paused';
+    connectivity.known = true;
+    const { renderer } = await mount(ORG_SCOPE);
+
+    expect(recoveryStatuses(renderer)).toHaveLength(1);
+    expect(textContents(renderer)).not.toContain(i18n.t('securityAgent.sla.permissionNote'));
+  });
+
+  it('locks the controls and names the rule only on a settled denial', async () => {
+    capability.canManage = false;
+    capability.status = 'denied';
+    const { renderer } = await mount(ORG_SCOPE);
+
+    expect(recoveryStatuses(renderer)).toHaveLength(0);
+    expect(textContents(renderer)).toContain(i18n.t('securityAgent.sla.permissionNote'));
+    expect(saveButton.onSave).toBeNull();
+    expect(repoRows(renderer).map(row => (row.props as { disabled: boolean }).disabled)).toEqual([
+      true, true, true,
+    ]);
   });
 });

@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 import { useStyleSideInsets } from '@/lib/screen-insets';
 
+import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { useSettingsSaveFeedback } from '@/components/security-agent/settings-save-feedback';
 import { EmptyState, StateAction } from '@/components/empty-state';
@@ -40,6 +41,7 @@ import {
 import {
   useRetrySecurityAgentConfig,
   useRetrySecurityAgentRepositories,
+  useRetrySecurityAgentSettings,
   useSaveSecurityAgentConfig,
   useSecurityAgentCapability,
   useSecurityAgentConfig,
@@ -79,7 +81,11 @@ function RepositorySettingsSkeleton() {
 
 export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const { t } = useTranslation();
-  const canManage = useSecurityAgentCapability(scope).canManage;
+  const capability = useSecurityAgentCapability(scope);
+  // Only a settled denial disables the controls: a failed or still-unanswered role
+  // read is not evidence that the viewer cannot manage the settings.
+  const readOnly = capability.status === 'denied';
+  const settingsRecovery = useRetrySecurityAgentSettings(scope);
   const config = useSecurityAgentConfig(scope);
   const repositories = useSecurityAgentRepositories(scope);
   // Both reads can be paused by the online manager, and a refetch on a read
@@ -90,6 +96,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   const save = useSaveSecurityAgentConfig(scope, { announceFailed: false });
   const feedback = useSettingsSaveFeedback();
   const connectivity = useCommittedConnectivityStatus();
+  const capabilityPaused = isReadPausedBeforeData({ ...capability, connectivity });
 
   const [mode, setMode] = useState<RepositorySelectionMode>('all');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -182,14 +189,14 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
         <RepoToggleRow
           repo={item}
           selected={selectedIdSet.has(item.id)}
-          disabled={!canManage}
+          disabled={readOnly}
           onPress={() => {
             toggleRepo(item.id);
           }}
         />
       </RowGroupItem>
     ),
-    [selectedIdSet, canManage, repositoryCount, toggleRepo]
+    [selectedIdSet, readOnly, repositoryCount, toggleRepo]
   );
 
   if (config.isError && !config.data) {
@@ -284,12 +291,21 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   // the rendered order and paddings are unchanged from the ScrollView version.
   const listHeader: ReactNode = (
     <View className="gap-6 px-4 pt-3">
-      {!canManage && (
+      {capability.status === 'error' || capabilityPaused ? (
+        <SettingsRecoveryStatus
+          message={t('securityAgent.settingsOverview.couldNotLoadPermissions')}
+          isRetrying={settingsRecovery.isRetrying}
+          onRetry={() => {
+            void settingsRecovery.retry();
+          }}
+        />
+      ) : null}
+      {readOnly && (
         <Text className="text-center text-xs text-muted-foreground">
           {t('securityAgent.sla.permissionNote')}
         </Text>
       )}
-      <OrphanedFindingsCard scope={scope} canManage={canManage} />
+      <OrphanedFindingsCard scope={scope} canManage={!readOnly} />
       <RadioGroup label={t('common.repositories')}>
         <RowGroup>
           {(['all', 'selected'] as const).map(option => (
@@ -299,7 +315,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
                 option === 'all' ? t('common.allRepositories') : t('common.selectedRepositories')
               }
               selected={mode === option}
-              disabled={!canManage || noRepositoriesAvailable}
+              disabled={readOnly || noRepositoriesAvailable}
               onPress={() => {
                 setMode(option);
               }}
@@ -386,7 +402,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
         title={t('common.repositories')}
         onBack={onBack}
         headerRight={
-          canManage ? (
+          readOnly ? undefined : (
             <SettingsSaveButton
               dirty={dirty}
               valid={valid}
@@ -394,7 +410,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
               onSave={handleSave}
               skipNextGuardRef={skipNextGuardRef}
             />
-          ) : undefined
+          )
         }
       />
       {feedback.node}

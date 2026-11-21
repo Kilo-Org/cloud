@@ -6,6 +6,13 @@ import { trpcClient } from '@/lib/trpc';
 export type PushUnregisterOutcome = { status: 'fulfilled' | 'rejected' };
 
 /**
+ * Share of `CONTROL_PLANE_DEADLINE_MS` the push-token unregister may spend on
+ * its own. A stalled unregister is abandoned here, so the revoke that follows
+ * always starts with at least the other half of the budget.
+ */
+const PUSH_UNREGISTER_DEADLINE_MS = Math.floor(CONTROL_PLANE_DEADLINE_MS / 2);
+
+/**
  * Retire this device's remote rows while the session still authenticates the
  * calls, holding the whole pair to ONE `CONTROL_PLANE_DEADLINE_MS` budget.
  *
@@ -14,10 +21,12 @@ export type PushUnregisterOutcome = { status: 'fulfilled' | 'rejected' };
  * a deletion that lands after it is refused with "Device session is no longer
  * active", and an account that cannot sign back in never retries it.
  *
- * The two calls are serial under one shared budget, so a stalled first call can
- * hold local sign-out for at most that budget instead of twice it. An abandoned
- * revoke is accepted, because the device has already destroyed the refresh
- * token and the orphaned session row dies with the access token.
+ * The unregister is capped at `PUSH_UNREGISTER_DEADLINE_MS`, half of the
+ * budget. A stalled unregister is therefore abandoned in time for the revoke to
+ * run on the remaining budget: it can neither delay the revoke nor extend local
+ * sign-out past one `CONTROL_PLANE_DEADLINE_MS`. An abandoned revoke is
+ * accepted, because the device has already destroyed the refresh token and the
+ * orphaned session row dies with the access token.
  *
  * A budget that expires reports the push outcome as of that moment: `fulfilled`
  * only when the unregister had already answered, otherwise `rejected` so the
@@ -39,7 +48,15 @@ export async function retireDeviceRemoteState(
     const user = trpcClient.user;
     if (pushToken !== null) {
       try {
-        await user.unregisterPushToken.mutate({ token: pushToken }, { signal });
+        // The nested deadline abandons a stalled unregister at half the budget,
+        // so the revoke below still gets its attempt. An outer abort forwards
+        // into this controller, so the pair keeps one total bound.
+        await withDeadline(
+          PUSH_UNREGISTER_DEADLINE_MS,
+          async pushSignal =>
+            user.unregisterPushToken.mutate({ token: pushToken }, { signal: pushSignal }),
+          signal
+        );
         push = { status: 'fulfilled' };
       } catch {
         push = { status: 'rejected' };

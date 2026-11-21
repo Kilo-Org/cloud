@@ -297,9 +297,9 @@ function uniqueTokens(tokens: readonly string[]): string[] {
  *   in never retries it. Both calls are serial but share ONE
  *   `CONTROL_PLANE_DEADLINE_MS` budget, so local sign-out waits at most 15 s
  *   for the pair; the alternative — running them concurrently — loses the
- *   deletion to the race. A stalled push step therefore spends the same budget
- *   the revoke would have used: the push is retried from its record and the
- *   revoke is skipped.
+ *   deletion to the race. The push step is capped at half that budget, so a
+ *   stalled unregister is retried from its record while the revoke still gets
+ *   its own attempt on the budget that is left.
  * - A failed revoke is not recorded: see the record type for why. A failed
  *   push or activity-token unregister is merged into this account's record; a
  *   fully successful one leaves this account's record only when no earlier

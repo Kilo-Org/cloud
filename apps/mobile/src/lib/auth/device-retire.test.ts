@@ -13,6 +13,10 @@ vi.mock('@/lib/trpc', () => ({
 // eslint-disable-next-line import/first -- the mock above must be hoisted first
 import { retireDeviceRemoteState } from '@/lib/auth/device-retire';
 
+// Mirrors the module's cap on the push unregister: half of the one control-plane
+// budget the pair may spend in total.
+const PUSH_UNREGISTER_DEADLINE_MS = Math.floor(CONTROL_PLANE_DEADLINE_MS / 2);
+
 describe('retireDeviceRemoteState', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -89,21 +93,53 @@ describe('retireDeviceRemoteState', () => {
     await expect(run).resolves.toEqual({ status: 'fulfilled' });
   });
 
-  it('spends one budget for the pair instead of one per call', async () => {
+  it('abandons a stalled unregister at the push budget and still revokes once', async () => {
     vi.useFakeTimers();
-    // A stalled first call: without the shared budget the revoke would get its
-    // own full window afterwards, and sign-out would wait twice as long.
+    // A stalled unregister must not consume the whole budget: the device
+    // session row would stay live server-side after sign-out.
     trpcMock.unregisterPushToken.mutate.mockReturnValue(new Promise<never>(() => undefined));
 
-    const run = retireDeviceRemoteState('push-1');
+    let settled = false;
+    const run = retireDeviceRemoteState('push-1').then(value => {
+      settled = true;
+      return value;
+    });
+
     await vi.advanceTimersByTimeAsync(0);
     expect(trpcMock.unregisterPushToken.mutate).toHaveBeenCalledTimes(1);
-
-    await vi.advanceTimersByTimeAsync(CONTROL_PLANE_DEADLINE_MS);
-    await expect(run).resolves.toEqual({ status: 'rejected' });
-
-    // The single budget was spent by the stalled push step, so the revoke never
-    // started and could not receive a second window.
     expect(trpcMock.revokeCurrentDeviceSession.mutate).not.toHaveBeenCalled();
+
+    // Half the budget only: the nested deadline gives up on the unregister and
+    // the revoke starts on the budget that is left.
+    await vi.advanceTimersByTimeAsync(PUSH_UNREGISTER_DEADLINE_MS);
+    expect(trpcMock.revokeCurrentDeviceSession.mutate).toHaveBeenCalledTimes(1);
+    expect(settled).toBe(true);
+
+    // The remaining budget is never needed, so sign-out waited one half window
+    // rather than a full one.
+    await vi.advanceTimersByTimeAsync(CONTROL_PLANE_DEADLINE_MS - PUSH_UNREGISTER_DEADLINE_MS);
+    await expect(run).resolves.toEqual({ status: 'rejected' });
+  });
+
+  it('settles within one budget when both the unregister and the revoke stall', async () => {
+    vi.useFakeTimers();
+    // Neither call answers. Sign-out must never wait two windows: the push step
+    // is abandoned at half the budget and the revoke at the end of the one
+    // shared budget.
+    trpcMock.unregisterPushToken.mutate.mockReturnValue(new Promise<never>(() => undefined));
+    trpcMock.revokeCurrentDeviceSession.mutate.mockReturnValue(new Promise<never>(() => undefined));
+
+    let settled = false;
+    const run = retireDeviceRemoteState('push-1').then(value => {
+      settled = true;
+      return value;
+    });
+
+    await vi.advanceTimersByTimeAsync(PUSH_UNREGISTER_DEADLINE_MS);
+    expect(trpcMock.revokeCurrentDeviceSession.mutate).toHaveBeenCalledTimes(1);
+    expect(settled).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(CONTROL_PLANE_DEADLINE_MS - PUSH_UNREGISTER_DEADLINE_MS);
+    await expect(run).resolves.toEqual({ status: 'rejected' });
   });
 });

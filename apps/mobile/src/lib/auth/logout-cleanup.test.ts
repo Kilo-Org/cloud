@@ -390,7 +390,7 @@ describe('runLogoutCleanup', () => {
     });
   });
 
-  it('keeps the push token for retry when the shared pair deadline stalls the unregister', async () => {
+  it('keeps the push token for retry when the push half-budget stalls the unregister', async () => {
     seedRecords([]);
     pushOutcome('token');
     trpcMock.unregisterPushToken.mutate.mockReturnValue(new Promise<never>(() => undefined));
@@ -401,13 +401,16 @@ describe('runLogoutCleanup', () => {
       // Let the chain reach the stalled unregister before spending the budget.
       await vi.advanceTimersByTimeAsync(0);
       expect(trpcMock.unregisterPushToken.mutate).toHaveBeenCalledTimes(1);
+      expect(trpcMock.revokeCurrentDeviceSession.mutate).not.toHaveBeenCalled();
 
-      // The one budget the pair shares expires: the push step spent it, so the
-      // revoke is never sent and its own budget is not granted.
+      // The push step is abandoned at half the pair's budget, so the revoke
+      // still gets its own attempt on the budget that is left.
+      await vi.advanceTimersByTimeAsync(Math.floor(CONTROL_PLANE_DEADLINE_MS / 2));
+      expect(trpcMock.revokeCurrentDeviceSession.mutate).toHaveBeenCalledTimes(1);
+
       await vi.advanceTimersByTimeAsync(CONTROL_PLANE_DEADLINE_MS);
       await expect(run).resolves.toBeUndefined();
 
-      expect(trpcMock.revokeCurrentDeviceSession.mutate).not.toHaveBeenCalled();
       expect(await storedRecordFor('u1')).toMatchObject({
         userId: 'u1',
         pushTokens: ['push-1'],

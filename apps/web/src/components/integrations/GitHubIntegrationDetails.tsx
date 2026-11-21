@@ -765,7 +765,13 @@ function GitHubIntegrationDetailsContent({
           <AlertDescription>
             <div className="flex items-end justify-between gap-4">
               <div className="flex-1 space-y-3">
-                <h4 className="font-medium">Installation Pending Admin Approval</h4>
+                <h4 className="font-medium">
+                  {pendingRequestState === 'start_again'
+                    ? 'Start the connection again'
+                    : pendingRequestState === 'blocked_by_existing_installation'
+                      ? 'Existing installation blocks this request'
+                      : 'Installation Pending Admin Approval'}
+                </h4>
                 {isBlockedPending ? (
                   <p className="text-muted-foreground text-sm">
                     {pendingRequestState === 'start_again'

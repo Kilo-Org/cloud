@@ -311,7 +311,8 @@ describe('GitHubIntegrationDetails pending approval state', () => {
     expect(html).toContain('cancel this request and start the connection again');
     expect(html).not.toContain('must remove that installation');
     expect(html).toContain('Cancel Request');
-    expect(html).toContain('Installation Pending Admin Approval');
+    expect(html).toContain('Existing installation blocks this request');
+    expect(html).not.toContain('Installation Pending Admin Approval');
     expect(html).not.toContain('Waiting for organization admin approval');
     expect(html).not.toContain('Install Kilo GitHub App');
   });
@@ -333,7 +334,8 @@ describe('GitHubIntegrationDetails pending approval state', () => {
     expect(html).not.toContain('Uninstall GitHub App');
     expect(html).not.toContain('already has a GitHub installation');
     expect(html).toContain('Cancel Request');
-    expect(html).toContain('Installation Pending Admin Approval');
+    expect(html).toContain('Start the connection again');
+    expect(html).not.toContain('Installation Pending Admin Approval');
   });
 
   it('keeps the admin approval copy for a request still awaiting approval', () => {
@@ -353,6 +355,7 @@ describe('GitHubIntegrationDetails pending approval state', () => {
     expect(html).toContain(
       'Your installation request has been submitted to the GitHub organization administrators.'
     );
+    expect(html).toContain('Installation Pending Admin Approval');
     expect(html).toContain('Waiting for organization admin approval');
     expect(html).not.toContain('already has a GitHub installation');
     expect(html).not.toContain('That installation has since been removed');

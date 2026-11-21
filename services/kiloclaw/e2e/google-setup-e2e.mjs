@@ -27,10 +27,6 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// ---------------------------------------------------------------------------
-// Load secrets from .dev.vars (same file wrangler uses)
-// ---------------------------------------------------------------------------
-
 function loadDevVars() {
   const devVarsPath = path.resolve(__dirname, '../.dev.vars');
   const vars = {};
@@ -65,10 +61,6 @@ const DOCKER_CONTEXT = path.resolve(__dirname, '../google-setup');
 const DOCKER_WORKER_URL = WORKER_URL;
 
 const cleanupFns = [];
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function green(msg) {
   console.log(`\x1b[32m  ✓ ${msg}\x1b[0m`);
@@ -123,10 +115,6 @@ function cleanup() {
   green('Done');
 }
 
-// ---------------------------------------------------------------------------
-// Preflight
-// ---------------------------------------------------------------------------
-
 bold('Preflight');
 
 try {
@@ -155,10 +143,6 @@ try {
   process.exit(1);
 }
 
-// ---------------------------------------------------------------------------
-// Setup: create user, provision instance, generate JWT
-// ---------------------------------------------------------------------------
-
 bold('Setup');
 
 sql(
@@ -186,7 +170,6 @@ const provisionPromise = fetch(`${WORKER_URL}/api/platform/provision`, {
 }).catch(() => {});
 green('Provision request fired');
 
-// Poll until DO is reachable (enough for credential tests)
 let doReachable = false;
 for (let i = 0; i < 60; i++) {
   const { status } = await internalGet(`/api/platform/status?userId=${USER_ID}`);
@@ -204,7 +187,6 @@ if (!doReachable) {
 }
 green('Instance DO reachable');
 
-// Verify googleConnected is false before we start
 const { json: statusBefore } = await internalGet(`/api/platform/status?userId=${USER_ID}`);
 if (statusBefore?.googleConnected !== false) {
   red('Expected googleConnected=false before test, got: ' + statusBefore?.googleConnected);
@@ -225,10 +207,6 @@ const jwt = await new SignJWT({
   .sign(new TextEncoder().encode(NEXTAUTH_SECRET));
 green('JWT generated');
 
-// ---------------------------------------------------------------------------
-// Build Docker image
-// ---------------------------------------------------------------------------
-
 bold('Building Docker image');
 
 try {
@@ -239,10 +217,6 @@ try {
   cleanup();
   process.exit(1);
 }
-
-// ---------------------------------------------------------------------------
-// Run Docker container (interactive — user completes OAuth flow)
-// ---------------------------------------------------------------------------
 
 bold('Running Google Setup');
 console.log('  Complete the OAuth flow in your browser.');
@@ -276,10 +250,6 @@ if (exitCode !== 0) {
 
 green('Container exited successfully');
 
-// ---------------------------------------------------------------------------
-// Verify: googleConnected should now be true
-// ---------------------------------------------------------------------------
-
 bold('Verification');
 
 const { json: statusAfter } = await internalGet(`/api/platform/status?userId=${USER_ID}`);
@@ -292,7 +262,6 @@ if (statusAfter?.googleConnected === true) {
   process.exit(1);
 }
 
-// Also verify via debug-status
 const { json: debugAfter } = await internalGet(`/api/platform/debug-status?userId=${USER_ID}`);
 if (debugAfter?.googleConnected === true) {
   green('debug-status confirms googleConnected=true');
@@ -300,16 +269,8 @@ if (debugAfter?.googleConnected === true) {
   red('debug-status shows googleConnected=' + debugAfter?.googleConnected);
 }
 
-// ---------------------------------------------------------------------------
-// Optional: clear credentials to leave clean state
-// ---------------------------------------------------------------------------
-
 await internalDelete(`/api/platform/google-credentials?userId=${USER_ID}`);
 green('Credentials cleared (clean state)');
-
-// ---------------------------------------------------------------------------
-// Cleanup
-// ---------------------------------------------------------------------------
 
 cleanup();
 

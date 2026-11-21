@@ -17,10 +17,6 @@ import { execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import { ask, runCommand, runCommandOutput, GCP_APIS } from './shared.mjs';
 
-// ---------------------------------------------------------------------------
-// CLI args
-// ---------------------------------------------------------------------------
-
 const args = process.argv.slice(2);
 const tokenArg = args.find(a => a.startsWith('--token='));
 const token = tokenArg?.substring(tokenArg.indexOf('=') + 1);
@@ -96,10 +92,6 @@ function workerApiUrl(path) {
   return instanceId ? `${base}?instanceId=${encodeURIComponent(instanceId)}` : base;
 }
 
-// ---------------------------------------------------------------------------
-// Step 1: Validate session token
-// ---------------------------------------------------------------------------
-
 if (instanceId) {
   console.log(`Targeting instance: ${instanceId}`);
 }
@@ -126,10 +118,6 @@ if (!authCheckRes.ok) {
 
 console.log('Session token verified.\n');
 
-// ---------------------------------------------------------------------------
-// Step 2: Fetch public key for encryption
-// ---------------------------------------------------------------------------
-
 console.log('Fetching encryption public key...');
 
 const pubKeyRes = await fetch(workerApiUrl('/api/admin/public-key'), { headers: authHeaders });
@@ -144,10 +132,6 @@ if (!publicKeyPem || !publicKeyPem.includes('BEGIN PUBLIC KEY')) {
   console.error('Invalid public key received from worker.');
   process.exit(1);
 }
-
-// ---------------------------------------------------------------------------
-// Step 3: Sign into gcloud and set up GCP project + APIs
-// ---------------------------------------------------------------------------
 
 if (!process.stdin.isTTY) {
   console.error('Error: stdin is not a TTY. This script requires an interactive terminal.');
@@ -169,7 +153,6 @@ let clientId;
 let clientSecret;
 
 if (isMemberMode) {
-  // Member mode: skip project/OAuth setup, use provided credentials
   projectId = projectIdFlag;
   clientId = clientIdFlag;
   clientSecret = clientSecretFlag;
@@ -178,9 +161,6 @@ if (isMemberMode) {
   await runCommand('gcloud', ['config', 'set', 'project', projectId]);
   console.log(`Using project: ${projectId}\n`);
 } else {
-  // Solo mode: full project + OAuth setup
-
-  // Project selection: create new or use existing
   console.log('Google Cloud project setup:');
   console.log('  1. Create a new project (recommended)');
   console.log('  2. Use an existing project\n');
@@ -188,7 +168,6 @@ if (isMemberMode) {
   const projectChoice = await ask('Choose (1 or 2): ');
 
   if (projectChoice === '2') {
-    // List existing projects as a numbered menu
     console.log('\nFetching your projects...');
     let projects = [];
     try {
@@ -265,18 +244,12 @@ if (isMemberMode) {
     }
   }
 
-  // Set as active project
   await runCommand('gcloud', ['config', 'set', 'project', projectId]);
   console.log(`\nUsing project: ${projectId}`);
 
-  // Enable APIs
   console.log('\nEnabling Google APIs (this may take a minute)...');
   await runCommand('gcloud', ['services', 'enable', ...GCP_APIS, `--project=${projectId}`]);
   console.log('APIs enabled.\n');
-
-  // ---------------------------------------------------------------------------
-  // Step 4: Configure OAuth consent screen + create OAuth client
-  // ---------------------------------------------------------------------------
 
   const consentUrl = `https://console.cloud.google.com/auth/overview?project=${projectId}`;
   const credentialsUrl = `https://console.cloud.google.com/apis/credentials?project=${projectId}`;
@@ -324,11 +297,7 @@ if (isMemberMode) {
     console.error('Client ID and Client Secret are required.');
     process.exit(1);
   }
-} // end solo/member mode branch
-
-// ---------------------------------------------------------------------------
-// Step 5: Run gog auth to set credentials and authorize account
-// ---------------------------------------------------------------------------
+}
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 
@@ -367,7 +336,6 @@ const gogEnv = {
   GOG_KEYRING_PASSWORD: 'kiloclaw',
 };
 
-// Build client_secret.json in Google's standard format and feed it to gog
 const clientSecretJson = JSON.stringify({
   installed: {
     client_id: clientId,
@@ -380,7 +348,6 @@ const clientSecretJson = JSON.stringify({
   },
 });
 
-// Write to temp file so gog can read it
 const clientSecretPath = '/tmp/client_secret.json';
 writeFileSync(clientSecretPath, clientSecretJson);
 
@@ -395,7 +362,6 @@ try {
   process.exit(1);
 }
 
-// Use the gcloud account email for gog auth add
 const userEmail = gcloudAccount;
 console.log(`\nAuthorizing ${userEmail} with gog...`);
 console.log('You will need to open a URL in your browser to authorize Google Workspace access.\n');
@@ -431,7 +397,6 @@ try {
 
 console.log(`\nAuthenticated as: ${userEmail}`);
 
-// Verify the account was actually stored before tarballing
 console.log('Verifying credentials...');
 try {
   const authList = execFileSync('gog', ['auth', 'list', '--json'], {
@@ -455,19 +420,12 @@ try {
   process.exit(1);
 }
 
-// ---------------------------------------------------------------------------
-// Gmail Pub/Sub setup (for push notifications)
-// ---------------------------------------------------------------------------
-
 console.log('\nSetting up Gmail push notifications...');
 
-// Track whether push setup succeeded — used in the final summary message.
 let pushSetupOk = true;
 
 if (!isMemberMode) {
   // Project-level push infra — only in solo mode (admin already set this up for members)
-
-  // Step 1: Create Pub/Sub topic (idempotent)
   console.log('Creating Pub/Sub topic gog-gmail-watch...');
   try {
     execFileSync('gcloud', ['pubsub', 'topics', 'create', 'gog-gmail-watch', '--quiet'], {
@@ -487,7 +445,6 @@ if (!isMemberMode) {
     }
   }
 
-  // Step 2: Grant Gmail API push publisher role
   if (pushSetupOk) {
     console.log('Granting Gmail push publisher role...');
     try {
@@ -554,17 +511,14 @@ if (!isMemberMode) {
       }
     }
   }
-} // end solo-only push infra
+}
 
-// Step 3: Extract userId from JWT for the push subscription URL
 let pushUserId;
 try {
   const [, jwtPayload] = token.split('.');
   const claims = JSON.parse(Buffer.from(jwtPayload, 'base64url').toString());
   pushUserId = claims.kiloUserId ?? claims.sub;
-} catch {
-  // fall through
-}
+} catch {}
 
 if (!pushUserId) {
   console.warn('Warning: Could not extract userId from token. Skipping Pub/Sub setup.');
@@ -580,7 +534,6 @@ if (isMemberMode) {
 }
 
 if (pushUserId && pushSetupOk) {
-  // Get GCP project ID for topic path and SA email
   const gcpProject = execFileSync('gcloud', ['config', 'get-value', 'project'], {
     encoding: 'utf8',
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -658,7 +611,6 @@ if (pushUserId && pushSetupOk) {
     }
   }
 
-  // Create or update push subscription (both modes)
   if (pushSetupOk) {
     const safeId = pushUserId.replaceAll(/[^a-zA-Z0-9_-]/g, '-');
     const subscriptionName = `gog-gmail-push-${safeId.slice(0, 8)}`;
@@ -689,7 +641,6 @@ if (pushUserId && pushSetupOk) {
     } catch (createErr) {
       const createOutput = createErr.stderr?.toString() ?? createErr.message;
       if (createOutput.includes('ALREADY_EXISTS') || createOutput.includes('already exists')) {
-        // Subscription exists — update it
         try {
           execFileSync(
             'gcloud',
@@ -731,7 +682,6 @@ if (pushUserId && pushSetupOk) {
     }
   }
 
-  // Register Gmail watch (both modes)
   if (pushSetupOk) {
     console.log('Registering Gmail watch...');
     try {
@@ -761,11 +711,7 @@ if (pushUserId && pushSetupOk) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Step 6: Create config tarball, encrypt, and POST
-// (After gmail watch start so watch state is included in the tarball)
-// ---------------------------------------------------------------------------
-
+// After gmail watch start so watch state is included in the tarball
 console.log('\nCreating config tarball...');
 const tarballBuffer = execFileSync('tar', ['czf', '-', '-C', `${gogHome}/.config`, 'gogcli'], {
   maxBuffer: 1024 * 1024,
@@ -781,10 +727,6 @@ const encryptedBundle = {
   email: userEmail,
   ...(pushSaEmail ? { gmailPushOidcEmail: pushSaEmail } : {}),
 };
-
-// ---------------------------------------------------------------------------
-// POST encrypted credentials to worker
-// ---------------------------------------------------------------------------
 
 console.log('Sending credentials to your kiloclaw instance...');
 

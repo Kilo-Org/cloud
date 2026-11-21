@@ -427,6 +427,7 @@
       "location": "Vertex konumu",
       "clientEmail": "Hizmet hesabı e-postası",
       "privateKey": "Hizmet hesabı özel anahtarı",
+      "privateKeyBlockRequired": "Anahtar bloğunun tamamını BEGIN satırından END satırına kadar yapıştır.",
       "names": {
         "codestral": "Yalnızca eski Codestral",
         "openai": "OpenAI API",

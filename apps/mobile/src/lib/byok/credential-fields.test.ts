@@ -212,20 +212,55 @@ describe('credentialPayload', () => {
 });
 
 describe('readStructuredCredential', () => {
-  const form = credentialForm('azure', 'apiKey');
-
-  function readAzure(rows: readonly Partial<ModelMapping>[]) {
+  /** One form's fields read as the credential its provider takes. */
+  function read(
+    providerId: string,
+    values: CredentialValues,
+    rows: readonly Partial<ModelMapping>[] = []
+  ) {
+    const form = credentialForm(providerId, 'apiKey');
     if (!form) {
-      throw new Error('missing the Azure form');
+      throw new Error(`missing the ${providerId} form`);
     }
-    return readStructuredCredential({
-      providerId: 'azure',
-      mode: 'apiKey',
-      form,
-      values: { apiKey: 'k', resourceName: 'r' },
-      rows,
-    });
+    return readStructuredCredential({ providerId, mode: 'apiKey', form, values, rows });
   }
+  const readAzure = (rows: readonly Partial<ModelMapping>[]) =>
+    read('azure', { apiKey: 'k', resourceName: 'r' }, rows);
+  const readVertex = (privateKey: string) =>
+    read('vertex', { project: 'p', location: 'global', clientEmail: 'a@b.test', privateKey });
+
+  /** A key file in one of the three labels a signing key carries. */
+  function signingKey(type: 'pkcs8' | 'pkcs1' | 'sec1'): string {
+    const pair =
+      type === 'sec1'
+        ? generateKeyPairSync('ec', { namedCurve: 'P-256' })
+        : generateKeyPairSync('rsa', { modulusLength: 2048 });
+    const pem = pair.privateKey.export({ type, format: 'pem' });
+    return typeof pem === 'string' ? pem : pem.toString('utf8');
+  }
+
+  // These three formats are the labels a signing key carries: PKCS#8 is
+  // `PRIVATE KEY`, PKCS#1 is `RSA PRIVATE KEY` and SEC1 is `EC PRIVATE KEY`,
+  // and each has to stay accepted.
+  it.each(['pkcs8', 'pkcs1', 'sec1'] as const)('takes a %s key file', type => {
+    expect(readVertex(signingKey(type)).tag).toBe('ready');
+  });
+
+  it('refuses an encrypted key on the private-key field', () => {
+    const encrypted = fixtureKey.export({
+      type: 'pkcs8',
+      format: 'pem',
+      cipher: 'aes-256-cbc',
+      passphrase: 'x',
+    });
+    const pem = typeof encrypted === 'string' ? encrypted : encrypted.toString('utf8');
+    expect(pem.startsWith('-----BEGIN ENCRYPTED PRIVATE KEY-----')).toBe(true);
+    expect(readVertex(pem)).toEqual({ tag: 'refused', field: 'privateKey' });
+  });
+
+  it('refuses a value that is not a key on the private-key field', () => {
+    expect(readVertex('not a key')).toEqual({ tag: 'refused', field: 'privateKey' });
+  });
 
   it('names the row a half-filled mapping sits in', () => {
     expect(readAzure([{ gatewayModelSlug: 'gpt-4' }])).toEqual({

@@ -427,6 +427,7 @@
       "location": "Goobta Vertex",
       "clientEmail": "Iimaylka service account",
       "privateKey": "Furaha gaarka ah ee service account",
+      "privateKeyBlockRequired": "Ku dheji block-ka furaha oo dhan, laga bilaabo safka BEGIN ilaa safka END.",
       "names": {
         "codestral": "Codestral duugoobay kaliya",
         "openai": "OpenAI API",

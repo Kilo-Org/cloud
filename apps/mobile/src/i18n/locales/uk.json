@@ -429,6 +429,7 @@
       "location": "Розташування Vertex",
       "clientEmail": "Електронна пошта сервісного облікового запису",
       "privateKey": "Закритий ключ сервісного облікового запису",
+      "privateKeyBlockRequired": "Вставте весь блок ключа, від рядка BEGIN до рядка END.",
       "names": {
         "codestral": "Застарілий лише для Codestral",
         "openai": "OpenAI API",

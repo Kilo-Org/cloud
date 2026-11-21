@@ -427,6 +427,7 @@
       "location": "Ibi Vertex",
       "clientEmail": "Ímeèlì service account",
       "privateKey": "Kọ́kọ́rọ́ àdáni service account",
+      "privateKeyBlockRequired": "Lẹ gbogbo àkójọ kọ́kọ́rọ́ náà síbí, láti ìlà BEGIN sí ìlà END.",
       "names": {
         "codestral": "Àtijọ́ Codestral nìkan",
         "openai": "OpenAI API",

@@ -427,6 +427,7 @@
       "location": "Vertex இருப்பிடம்",
       "clientEmail": "சேவைக் கணக்கு மின்னஞ்சல்",
       "privateKey": "சேவைக் கணக்கின் தனிப்பட்ட விசை",
+      "privateKeyBlockRequired": "முழு விசைத் தொகுதியையும் BEGIN வரியிலிருந்து END வரி வரை ஒட்டவும்.",
       "names": {
         "codestral": "பழைய Codestral-மட்டும்",
         "openai": "OpenAI API",

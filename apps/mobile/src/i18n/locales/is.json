@@ -427,6 +427,7 @@
       "location": "Vertex-staðsetning",
       "clientEmail": "Netfang þjónustureiknings",
       "privateKey": "Einkalykill þjónustureiknings",
+      "privateKeyBlockRequired": "Límdu alla lyklablokkina, frá BEGIN línunni til END línunnar.",
       "names": {
         "codestral": "Eldri Codestral-eingöngu",
         "openai": "OpenAI-API",

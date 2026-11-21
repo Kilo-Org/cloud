@@ -427,6 +427,7 @@
       "location": "Vertex-locatie",
       "clientEmail": "E-mailadres van serviceaccount",
       "privateKey": "Privésleutel van serviceaccount",
+      "privateKeyBlockRequired": "Plak het hele sleutelblok, van de BEGIN-regel tot de END-regel.",
       "names": {
         "codestral": "Alleen verouderde Codestral",
         "openai": "OpenAI API",

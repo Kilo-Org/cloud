@@ -427,6 +427,7 @@
       "location": "Τοποθεσία Vertex",
       "clientEmail": "Email λογαριασμού υπηρεσίας",
       "privateKey": "Ιδιωτικό κλειδί λογαριασμού υπηρεσίας",
+      "privateKeyBlockRequired": "Επικόλλησε ολόκληρο το μπλοκ του κλειδιού, από τη γραμμή BEGIN έως τη γραμμή END.",
       "names": {
         "codestral": "Παλαιό Codestral μόνο",
         "openai": "OpenAI API",

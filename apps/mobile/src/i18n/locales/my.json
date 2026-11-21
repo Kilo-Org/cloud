@@ -427,6 +427,7 @@
       "location": "Vertex တည်နေရာ",
       "clientEmail": "Service account အီးမေးလ်",
       "privateKey": "Service account သီးသန့် ကီး",
+      "privateKeyBlockRequired": "BEGIN လိုင်းမှ END လိုင်းအထိ ကီးဘလောက်တစ်ခုလုံးကို ကူးထည့်ပါ။",
       "names": {
         "codestral": "အဟောင်း Codestral သီးသန့်",
         "openai": "OpenAI API",

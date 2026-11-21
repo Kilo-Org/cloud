@@ -474,6 +474,28 @@ describe('ProviderKeyNewScreen', () => {
     });
   });
 
+  it('puts a refused Vertex key under its own field and sends nothing', async () => {
+    state.params = { provider: 'vertex' };
+    state.providers = [{ id: 'vertex', name: 'Google Vertex AI' }];
+    const root = await mount();
+
+    act(() => {
+      credentialForm(root).values.current = {
+        project: 'project',
+        location: 'global',
+        clientEmail: 'service@example.test',
+        privateKey: 'not a key',
+      };
+    });
+    await act(() => {
+      (addButton(root).props.onPress as () => void)();
+    });
+
+    expect(state.mutateAsync).not.toHaveBeenCalled();
+    expect(Object.keys(credentialForm(root).errors)).toEqual(['privateKey']);
+    expect(statusMessages(root)).toHaveLength(1);
+  });
+
   it('names the field a structured credential still needs', async () => {
     state.params = { provider: 'azure' };
     state.providers = [{ id: 'azure', name: 'Azure Foundry' }];

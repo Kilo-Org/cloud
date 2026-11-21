@@ -427,6 +427,7 @@
       "location": "Vertex ස්ථානය",
       "clientEmail": "සේවා ගිණුමේ ඊමේල් ලිපිනය",
       "privateKey": "සේවා ගිණුමේ පුද්ගලික යතුර",
+      "privateKeyBlockRequired": "BEGIN පේළියේ සිට END පේළිය දක්වා සම්පූර්ණ යතුරු කොටස අලවන්න.",
       "names": {
         "codestral": "පැරණි Codestral පමණක්",
         "openai": "OpenAI API",

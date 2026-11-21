@@ -427,6 +427,7 @@
       "location": "ตำแหน่ง Vertex",
       "clientEmail": "อีเมลบัญชีบริการ",
       "privateKey": "คีย์ส่วนตัวของบัญชีบริการ",
+      "privateKeyBlockRequired": "วางบล็อกคีย์ทั้งหมด ตั้งแต่บรรทัด BEGIN ถึงบรรทัด END",
       "names": {
         "codestral": "แบบเดิมสำหรับ Codestral เท่านั้น",
         "openai": "OpenAI API",

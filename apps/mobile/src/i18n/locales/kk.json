@@ -427,6 +427,7 @@
       "location": "Vertex орналасуы",
       "clientEmail": "Service account электрондық поштасы",
       "privateKey": "Service account жеке кілті",
+      "privateKeyBlockRequired": "Бүкіл кілт блогын BEGIN жолынан END жолына дейін қойыңыз.",
       "names": {
         "codestral": "Ескірген тек Codestral",
         "openai": "OpenAI API",

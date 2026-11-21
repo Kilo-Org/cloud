@@ -429,6 +429,7 @@
       "location": "Lokacija Vertex",
       "clientEmail": "E-poštni naslov računa storitve",
       "privateKey": "Zasebni ključ računa storitve",
+      "privateKeyBlockRequired": "Prilepi celoten blok ključa, od vrstice BEGIN do vrstice END.",
       "names": {
         "codestral": "Samo za starejši Codestral",
         "openai": "OpenAI API",

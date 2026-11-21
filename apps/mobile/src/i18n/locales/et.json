@@ -427,6 +427,7 @@
       "location": "Vertexi asukoht",
       "clientEmail": "Teenusekonto e-posti aadress",
       "privateKey": "Teenusekonto privaatvõti",
+      "privateKeyBlockRequired": "Kleebi terve võtmeplokk, alates BEGIN-reast kuni END-reani.",
       "names": {
         "codestral": "Ainult vana Codestral",
         "openai": "OpenAI API",

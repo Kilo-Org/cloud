@@ -427,6 +427,7 @@
       "location": "Vertex-plassering",
       "clientEmail": "E-postadresse for tjenestekonto",
       "privateKey": "Privat nøkkel for tjenestekonto",
+      "privateKeyBlockRequired": "Lim inn hele nøkkelblokken, fra BEGIN-linjen til END-linjen.",
       "names": {
         "codestral": "Kun eldre Codestral",
         "openai": "OpenAI-API",

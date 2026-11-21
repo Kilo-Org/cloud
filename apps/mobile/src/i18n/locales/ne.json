@@ -427,6 +427,7 @@
       "location": "Vertex स्थान",
       "clientEmail": "सेवा खाता इमेल",
       "privateKey": "सेवा खाताको निजी कुञ्जी",
+      "privateKeyBlockRequired": "BEGIN लाइनदेखि END लाइनसम्मको सम्पूर्ण कुञ्जी ब्लक टाँस्नुहोस्।",
       "names": {
         "codestral": "पुरानो Codestral मात्र",
         "openai": "OpenAI API",

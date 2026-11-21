@@ -428,6 +428,7 @@
       "location": "Vertex atrašanās vieta",
       "clientEmail": "Pakalpojuma konta e-pasts",
       "privateKey": "Pakalpojuma konta privātā atslēga",
+      "privateKeyBlockRequired": "Ielīmē visu atslēgas bloku, no BEGIN rindas līdz END rindai.",
       "names": {
         "codestral": "Mantotais tikai Codestral",
         "openai": "OpenAI API",

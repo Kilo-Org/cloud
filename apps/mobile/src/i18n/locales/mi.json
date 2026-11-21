@@ -427,6 +427,7 @@
       "location": "Tauwāhi Vertex",
       "clientEmail": "Īmēra o te pūkete ratonga",
       "privateKey": "Kī tūmataiti o te pūkete ratonga",
+      "privateKeyBlockRequired": "Whakapiria te paraka kī katoa, mai i te rārangi BEGIN ki te rārangi END.",
       "names": {
         "codestral": "Codestral tuku iho anake",
         "openai": "OpenAI API",

@@ -429,6 +429,7 @@
       "location": "Vertex vieta",
       "clientEmail": "Paslaugos paskyros el. paštas",
       "privateKey": "Paslaugos paskyros privatusis raktas",
+      "privateKeyBlockRequired": "Įklijuokite visą rakto bloką nuo BEGIN eilutės iki END eilutės.",
       "names": {
         "codestral": "Tik pasenęs Codestral",
         "openai": "OpenAI API",

@@ -429,6 +429,7 @@
       "location": "Umístění Vertex",
       "clientEmail": "E-mail účtu služby",
       "privateKey": "Soukromý klíč účtu služby",
+      "privateKeyBlockRequired": "Vložte celý blok klíče, od řádku BEGIN po řádek END.",
       "names": {
         "codestral": "Pouze starší Codestral",
         "openai": "OpenAI API",

@@ -431,6 +431,7 @@
       "location": "Lleoliad Vertex",
       "clientEmail": "E-bost cyfrif gwasanaeth",
       "privateKey": "Allwedd breifat cyfrif gwasanaeth",
+      "privateKeyBlockRequired": "Gludwch y bloc allwedd cyfan, o'r llinell BEGIN i'r llinell END.",
       "names": {
         "codestral": "Hen Codestral yn unig",
         "openai": "OpenAI API",

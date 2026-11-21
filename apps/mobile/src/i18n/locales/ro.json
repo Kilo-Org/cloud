@@ -428,6 +428,7 @@
       "location": "Locație Vertex",
       "clientEmail": "E-mailul contului de serviciu",
       "privateKey": "Cheia privată a contului de serviciu",
+      "privateKeyBlockRequired": "Lipește întregul bloc de cheie, de la linia BEGIN până la linia END.",
       "names": {
         "codestral": "Doar Codestral vechi",
         "openai": "API OpenAI",

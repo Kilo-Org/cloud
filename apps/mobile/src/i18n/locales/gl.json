@@ -427,6 +427,7 @@
       "location": "Localización de Vertex",
       "clientEmail": "Correo electrónico da conta de servizo",
       "privateKey": "Clave privada da conta de servizo",
+      "privateKeyBlockRequired": "Pega o bloque de clave completo, desde a liña BEGIN ata a liña END.",
       "names": {
         "codestral": "Só Codestral antigo",
         "openai": "OpenAI API",

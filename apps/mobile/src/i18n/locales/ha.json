@@ -427,6 +427,7 @@
       "location": "Wurin Vertex",
       "clientEmail": "Imel na asusun sabis",
       "privateKey": "Maɓallin sirri na asusun sabis",
+      "privateKeyBlockRequired": "Liƙa dukan shingen maɓallin, daga layin BEGIN zuwa layin END.",
       "names": {
         "codestral": "Tsohon Codestral kawai",
         "openai": "OpenAI API",

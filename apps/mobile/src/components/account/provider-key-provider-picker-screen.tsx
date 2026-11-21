@@ -105,14 +105,17 @@ export function ProviderKeyProviderPickerScreen({
     // comparison alone, rather than matching every name.
     const foldedNeedle = foldForSearch(trimmed);
     return rows.filter(provider => {
-      // The row shows the resolved name, so the search has to match what the
-      // reader sees, not only the English name the server sent.
-      const name = providerKeyName(provider.id, provider.name);
-      return (
-        name.toLocaleLowerCase(i18n.language).includes(nameNeedle) ||
-        (foldedNeedle !== '' && foldForSearch(name).includes(foldedNeedle)) ||
-        provider.id.toLocaleLowerCase(ID_FOLD_LOCALE).includes(idNeedle)
+      // The row shows the resolved name, so the search matches what the reader
+      // sees; the server's English name keeps answering a query typed from it,
+      // so switching the row to the catalog name does not break that habit.
+      // Both names fold the same way, accents included.
+      const names = [providerKeyName(provider.id, provider.name), provider.name];
+      const matchesName = names.some(
+        name =>
+          name.toLocaleLowerCase(i18n.language).includes(nameNeedle) ||
+          (foldedNeedle !== '' && foldForSearch(name).includes(foldedNeedle))
       );
+      return matchesName || provider.id.toLocaleLowerCase(ID_FOLD_LOCALE).includes(idNeedle);
     });
   }, [providers.data, query, i18n.language]);
 

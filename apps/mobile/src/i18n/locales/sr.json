@@ -428,6 +428,7 @@
       "location": "Vertex lokacija",
       "clientEmail": "Imejl servisnog naloga",
       "privateKey": "Privatni ključ servisnog naloga",
+      "privateKeyBlockRequired": "Nalepi ceo blok ključa, od linije BEGIN do linije END.",
       "names": {
         "codestral": "Samo zastareli Codestral",
         "openai": "OpenAI API",

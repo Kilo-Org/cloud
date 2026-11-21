@@ -427,6 +427,7 @@
       "location": "የVertex አካባቢ",
       "clientEmail": "የአገልግሎት መለያ ኢሜይል",
       "privateKey": "የአገልግሎት መለያ የግል ቁልፍ",
+      "privateKeyBlockRequired": "ሙሉውን የቁልፍ ብሎክ ከBEGIN መስመር እስከ END መስመር ይለጥፉ።",
       "names": {
         "codestral": "የቆየ Codestral-ብቻ",
         "openai": "OpenAI API",

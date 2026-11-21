@@ -428,6 +428,7 @@
       "location": "מיקום Vertex",
       "clientEmail": "כתובת האימייל של חשבון השירות",
       "privateKey": "המפתח הפרטי של חשבון השירות",
+      "privateKeyBlockRequired": "הדבק את כל בלוק המפתח, מהשורה של BEGIN ועד לשורה של END.",
       "names": {
         "codestral": "Codestral מדור קודם בלבד",
         "openai": "OpenAI API",

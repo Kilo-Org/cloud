@@ -427,6 +427,7 @@
       "location": "Vertex байршил",
       "clientEmail": "Service account-ийн имэйл",
       "privateKey": "Service account-ийн хувийн түлхүүр",
+      "privateKeyBlockRequired": "Түлхүүрийн блокийг бүхэлд нь, BEGIN мөрөөс END мөр хүртэл буулгана уу.",
       "names": {
         "codestral": "Зөвхөн хуучин Codestral",
         "openai": "OpenAI API",

@@ -427,6 +427,7 @@
       "location": "Indawo ye-Vertex",
       "clientEmail": "I-imeyili ye-service account",
       "privateKey": "Ukhiye oyimfihlo we-service account",
+      "privateKeyBlockRequired": "Namathisela ukhiye wonke, kusukela emugqeni othi BEGIN kuya emugqeni othi END.",
       "names": {
         "codestral": "Codestral yakudala kuphela",
         "openai": "OpenAI API",

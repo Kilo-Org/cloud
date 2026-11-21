@@ -427,6 +427,7 @@
       "location": "Vertex-helyszín",
       "clientEmail": "Szolgáltatásfiók e-mail-címe",
       "privateKey": "Szolgáltatásfiók privát kulcsa",
+      "privateKeyBlockRequired": "Illeszd be a teljes kulcsblokkot, a BEGIN sortól az END sorig.",
       "names": {
         "codestral": "Csak a régi Codestral",
         "openai": "OpenAI API",

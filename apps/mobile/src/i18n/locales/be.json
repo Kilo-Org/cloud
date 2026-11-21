@@ -429,6 +429,7 @@
       "location": "Размяшчэнне Vertex",
       "clientEmail": "Электронная пошта сэрвіснага ўліковага запісу",
       "privateKey": "Закрыты ключ сэрвіснага ўліковага запісу",
+      "privateKeyBlockRequired": "Устаўце ўвесь блок ключа, ад радка BEGIN да радка END.",
       "names": {
         "codestral": "Толькі састарэлы Codestral",
         "openai": "OpenAI API",

@@ -427,6 +427,7 @@
       "location": "Vertex లొకేషన్",
       "clientEmail": "సర్వీస్ ఖాతా ఇమెయిల్",
       "privateKey": "సర్వీస్ ఖాతా ప్రైవేట్ కీ",
+      "privateKeyBlockRequired": "BEGIN లైన్ నుండి END లైన్ వరకు మొత్తం కీ బ్లాక్‌ను అతికించండి.",
       "names": {
         "codestral": "పాత Codestral మాత్రమే",
         "openai": "OpenAI API",

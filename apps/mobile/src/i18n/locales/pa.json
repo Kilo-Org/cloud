@@ -427,6 +427,7 @@
       "location": "Vertex ਟਿਕਾਣਾ",
       "clientEmail": "ਸੇਵਾ ਖਾਤਾ ਈਮੇਲ",
       "privateKey": "ਸੇਵਾ ਖਾਤੇ ਦੀ ਨਿੱਜੀ ਕੁੰਜੀ",
+      "privateKeyBlockRequired": "ਪੂਰਾ ਕੁੰਜੀ ਬਲਾਕ ਪੇਸਟ ਕਰੋ, BEGIN ਲਾਈਨ ਤੋਂ END ਲਾਈਨ ਤੱਕ।",
       "names": {
         "codestral": "ਸਿਰਫ਼ ਪੁਰਾਣਾ Codestral",
         "openai": "OpenAI API",

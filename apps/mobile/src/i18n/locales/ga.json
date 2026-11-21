@@ -430,6 +430,7 @@
       "location": "Suíomh Vertex",
       "clientEmail": "Ríomhphost an chuntais seirbhíse",
       "privateKey": "Eochair phríobháideach an chuntais seirbhíse",
+      "privateKeyBlockRequired": "Greamaigh an bloc eochrach iomlán, ón líne BEGIN go dtí an líne END.",
       "names": {
         "codestral": "Codestral oidhreachta amháin",
         "openai": "OpenAI API",

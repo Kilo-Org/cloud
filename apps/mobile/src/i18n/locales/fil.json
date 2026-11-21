@@ -427,6 +427,7 @@
       "location": "Lokasyon ng Vertex",
       "clientEmail": "Email ng service account",
       "privateKey": "Private key ng service account",
+      "privateKeyBlockRequired": "I-paste ang buong key block, mula sa linyang BEGIN hanggang sa linyang END.",
       "names": {
         "codestral": "Codestral na luma lamang",
         "openai": "OpenAI API",

@@ -431,6 +431,7 @@
       "location": "موقع Vertex",
       "clientEmail": "البريد الإلكتروني لحساب الخدمة",
       "privateKey": "المفتاح الخاص لحساب الخدمة",
+      "privateKeyBlockRequired": "الصق كتلة المفتاح بأكملها، من سطر BEGIN إلى سطر END.",
       "names": {
         "codestral": "Codestral القديم فقط",
         "openai": "OpenAI API",

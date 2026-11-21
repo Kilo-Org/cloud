@@ -429,6 +429,7 @@
       "location": "Расположение Vertex",
       "clientEmail": "Email сервисного аккаунта",
       "privateKey": "Закрытый ключ сервисного аккаунта",
+      "privateKeyBlockRequired": "Вставьте весь блок ключа, от строки BEGIN до строки END.",
       "names": {
         "codestral": "Устаревший только для Codestral",
         "openai": "OpenAI API",

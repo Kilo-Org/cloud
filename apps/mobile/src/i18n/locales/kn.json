@@ -427,6 +427,7 @@
       "location": "Vertex ಸ್ಥಳ",
       "clientEmail": "ಸೇವಾ ಖಾತೆಯ ಇಮೇಲ್",
       "privateKey": "ಸೇವಾ ಖಾತೆಯ ಖಾಸಗಿ ಕೀ",
+      "privateKeyBlockRequired": "BEGIN ಸಾಲಿನಿಂದ END ಸಾಲಿನವರೆಗಿನ ಸಂಪೂರ್ಣ ಕೀ ಬ್ಲಾಕ್ ಅನ್ನು ಪೇಸ್ಟ್ ಮಾಡಿ.",
       "names": {
         "codestral": "ಹಳೆಯ Codestral ಮಾತ್ರ",
         "openai": "OpenAI API",

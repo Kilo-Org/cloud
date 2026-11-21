@@ -427,6 +427,7 @@
       "location": "Vertex joylashuvi",
       "clientEmail": "Xizmat hisobi e-pochtasi",
       "privateKey": "Xizmat hisobi shaxsiy kaliti",
+      "privateKeyBlockRequired": "Butun kalit blokini BEGIN qatoridan END qatorigacha joylang.",
       "names": {
         "codestral": "Faqat eski Codestral",
         "openai": "OpenAI API",

@@ -427,6 +427,7 @@
       "location": "Vertex-ის მდებარეობა",
       "clientEmail": "სერვისული ანგარიშის ელფოსტა",
       "privateKey": "სერვისული ანგარიშის პირადი გასაღები",
+      "privateKeyBlockRequired": "ჩასვით გასაღების მთელი ბლოკი, BEGIN სტრიქონიდან END სტრიქონამდე.",
       "names": {
         "codestral": "მხოლოდ მოძველებული Codestral",
         "openai": "OpenAI API",

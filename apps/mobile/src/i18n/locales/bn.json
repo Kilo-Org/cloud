@@ -427,6 +427,7 @@
       "location": "Vertex লোকেশন",
       "clientEmail": "সার্ভিস অ্যাকাউন্টের ইমেল",
       "privateKey": "সার্ভিস অ্যাকাউন্টের প্রাইভেট কী",
+      "privateKeyBlockRequired": "BEGIN লাইন থেকে END লাইন পর্যন্ত সম্পূর্ণ কী ব্লকটি পেস্ট করুন।",
       "names": {
         "codestral": "শুধু পুরোনো Codestral",
         "openai": "OpenAI API",

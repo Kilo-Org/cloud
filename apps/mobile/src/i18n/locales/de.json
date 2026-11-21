@@ -427,6 +427,7 @@
       "location": "Vertex-Standort",
       "clientEmail": "E-Mail-Adresse des Dienstkontos",
       "privateKey": "Privater Schlüssel des Dienstkontos",
+      "privateKeyBlockRequired": "Füge den gesamten Schlüsselblock ein, von der BEGIN-Zeile bis zur END-Zeile.",
       "names": {
         "codestral": "Nur veraltetes Codestral",
         "openai": "OpenAI-API",

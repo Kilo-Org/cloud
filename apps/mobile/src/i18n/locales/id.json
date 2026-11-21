@@ -427,6 +427,7 @@
       "location": "Lokasi Vertex",
       "clientEmail": "Email akun layanan",
       "privateKey": "Kunci pribadi akun layanan",
+      "privateKeyBlockRequired": "Tempel seluruh blok kunci, dari baris BEGIN sampai baris END.",
       "names": {
         "codestral": "Hanya Codestral lama",
         "openai": "OpenAI API",

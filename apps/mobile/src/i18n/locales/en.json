@@ -519,6 +519,7 @@
       "location": "Vertex location",
       "clientEmail": "Service account email",
       "privateKey": "Service account private key",
+      "privateKeyBlockRequired": "Paste the whole key block, from the BEGIN line to the END line.",
       "names": {
         "codestral": "Legacy Codestral-only",
         "openai": "OpenAI API",

@@ -427,6 +427,7 @@
       "location": "Vertex məkanı",
       "clientEmail": "Xidmət hesabının e-poçtu",
       "privateKey": "Xidmət hesabının şəxsi açarı",
+      "privateKeyBlockRequired": "Bütün açar blokunu BEGIN sətrindən END sətrinə qədər yapışdır.",
       "names": {
         "codestral": "Yalnız köhnə Codestral",
         "openai": "OpenAI API",

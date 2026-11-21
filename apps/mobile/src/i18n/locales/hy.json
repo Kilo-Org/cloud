@@ -427,6 +427,7 @@
       "location": "Vertex-ի գտնվելու վայր",
       "clientEmail": "Ծառայողական հաշվի էլ. փոստ",
       "privateKey": "Ծառայողական հաշվի մասնավոր բանալի",
+      "privateKeyBlockRequired": "Տեղադրեք բանալու ամբողջ բլոկը՝ BEGIN տողից մինչև END տողը։",
       "names": {
         "codestral": "Հնացած Codestral-միայն",
         "openai": "OpenAI API",

@@ -427,6 +427,7 @@
       "location": "Vertexロケーション",
       "clientEmail": "サービスアカウントのメールアドレス",
       "privateKey": "サービスアカウントの秘密鍵",
+      "privateKeyBlockRequired": "BEGINの行からENDの行まで、キーブロック全体を貼り付けてください。",
       "names": {
         "codestral": "レガシーCodestral専用",
         "openai": "OpenAI API",

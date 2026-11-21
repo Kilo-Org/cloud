@@ -427,6 +427,7 @@
       "location": "Eneo la Vertex",
       "clientEmail": "Barua pepe ya akaunti ya huduma",
       "privateKey": "Ufunguo binafsi wa akaunti ya huduma",
+      "privateKeyBlockRequired": "Bandika kizuizi kizima cha ufunguo, kutoka mstari wa BEGIN hadi mstari wa END.",
       "names": {
         "codestral": "Codestral ya zamani pekee",
         "openai": "OpenAI API",

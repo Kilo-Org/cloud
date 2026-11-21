@@ -427,6 +427,7 @@
       "location": "Vertex مقام",
       "clientEmail": "سروس اکاؤنٹ ای میل",
       "privateKey": "سروس اکاؤنٹ کی نجی کلید",
+      "privateKeyBlockRequired": "پورا کلید بلاک پیسٹ کریں، BEGIN لائن سے END لائن تک۔",
       "names": {
         "codestral": "صرف پرانا Codestral",
         "openai": "OpenAI API",

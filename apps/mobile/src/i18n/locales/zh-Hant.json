@@ -427,6 +427,7 @@
       "location": "Vertex 位置",
       "clientEmail": "服務帳戶電子郵件",
       "privateKey": "服務帳戶私密金鑰",
+      "privateKeyBlockRequired": "貼上完整金鑰區塊，從 BEGIN 行到 END 行。",
       "names": {
         "codestral": "舊版僅限 Codestral",
         "openai": "OpenAI API",

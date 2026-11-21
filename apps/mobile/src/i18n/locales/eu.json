@@ -427,6 +427,7 @@
       "location": "Vertex kokapena",
       "clientEmail": "Zerbitzu-kontuaren helbide elektronikoa",
       "privateKey": "Zerbitzu-kontuaren gako pribatua",
+      "privateKeyBlockRequired": "Itsatsi gako-bloke osoa, BEGIN lerrotik END lerroa arte.",
       "names": {
         "codestral": "Codestral zaharra soilik",
         "openai": "OpenAI API",

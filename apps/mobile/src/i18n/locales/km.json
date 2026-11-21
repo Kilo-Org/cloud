@@ -427,6 +427,7 @@
       "location": "ទីតាំង Vertex",
       "clientEmail": "អ៊ីមែល service account",
       "privateKey": "សោឯកជនរបស់ service account",
+      "privateKeyBlockRequired": "បិទភ្ជាប់ប្លុកសោទាំងមូល ពីបន្ទាត់ BEGIN ដល់បន្ទាត់ END",
       "names": {
         "codestral": "មានតែ Codestral ចាស់ប៉ុណ្ណោះ",
         "openai": "OpenAI API",

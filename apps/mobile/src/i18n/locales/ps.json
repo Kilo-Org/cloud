@@ -427,6 +427,7 @@
       "location": "د Vertex ځای",
       "clientEmail": "د service account برېښنالیک",
       "privateKey": "د service account خصوصي کیلي",
+      "privateKeyBlockRequired": "د کیلي ټول بلاک پیسټ کړئ، له BEGIN کرښې څخه تر END کرښې پورې.",
       "names": {
         "codestral": "پخوانی یوازې Codestral",
         "openai": "OpenAI API",

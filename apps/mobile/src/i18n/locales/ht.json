@@ -427,6 +427,7 @@
       "location": "Lokasyon Vertex",
       "clientEmail": "Imèl kont sèvis",
       "privateKey": "Kle prive kont sèvis",
+      "privateKeyBlockRequired": "Kole tout blòk kle a, soti nan liy BEGIN rive nan liy END.",
       "names": {
         "codestral": "Ansyen Codestral sèlman",
         "openai": "OpenAI API",

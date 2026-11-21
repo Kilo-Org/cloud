@@ -427,6 +427,7 @@
       "location": "Lokasi Vertex",
       "clientEmail": "E-mel akaun perkhidmatan",
       "privateKey": "Kunci peribadi akaun perkhidmatan",
+      "privateKeyBlockRequired": "Tampal seluruh blok kunci, dari baris BEGIN hingga baris END.",
       "names": {
         "codestral": "Codestral legasi sahaja",
         "openai": "OpenAI API",

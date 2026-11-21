@@ -125,4 +125,24 @@ describe('ProviderKeyProviderPickerScreen translated names', () => {
 
     expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual(shown);
   });
+
+  it('still finds a row by the English name the server sends', async () => {
+    state.providers = [{ id: 'codestral', name: 'Legacy Codestral-only key' }];
+    await i18n.changeLanguage('pt-BR');
+    const view = await renderWithProviders(createElement(ProviderKeyProviderPickerScreen, {}));
+    renderer = view.renderer;
+    const root = view.renderer.root;
+    const shown = rowLabels(root).map(node => node.props.accessibilityLabel);
+    expect(shown).toEqual([i18n.t('profile.providerKeys.names.codestral')]);
+
+    act(() => {
+      // The row reads the catalog name, which has no `key` noun; only the
+      // server's own string still carries this query whole.
+      (searchInput(root).props.onChangeText as (value: string) => void)(
+        'Legacy Codestral-only key'
+      );
+    });
+
+    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual(shown);
+  });
 });

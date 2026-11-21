@@ -430,6 +430,7 @@
       "location": "Lokazzjoni ta' Vertex",
       "clientEmail": "Email tal-kont tas-servizz",
       "privateKey": "Ċavetta privata tal-kont tas-servizz",
+      "privateKeyBlockRequired": "Waħħal il-blokka kollha taċ-ċavetta, mil-linja BEGIN sal-linja END.",
       "names": {
         "codestral": "Codestral antik biss",
         "openai": "OpenAI API",

@@ -427,6 +427,7 @@
       "location": "Bakka Vertex",
       "clientEmail": "Imeelii herrega tajaajilaa",
       "privateKey": "Furtuu dhuunfaa herrega tajaajilaa",
+      "privateKeyBlockRequired": "Boolloo furtuu guutuu, sarara BEGIN irraa hanga sarara END tti maxxansi.",
       "names": {
         "codestral": "Codestral qofa kan duraa",
         "openai": "OpenAI API",

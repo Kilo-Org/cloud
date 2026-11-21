@@ -178,6 +178,19 @@ export function firstMissingField(
 }
 
 /**
+ * The PEM labels a key the gateway can sign with carries, spelled exactly.
+ *
+ * The label is matched against these rather than by its last words: an encrypted
+ * PKCS#8 key is labelled `ENCRYPTED PRIVATE KEY`, so a suffix check would take
+ * it, and the gateway holds no passphrase to open it.
+ */
+const SIGNING_KEY_LABELS: ReadonlySet<string> = new Set([
+  'PRIVATE KEY',
+  'RSA PRIVATE KEY',
+  'EC PRIVATE KEY',
+]);
+
+/**
  * A service-account private key in the shape the gateway signs with, or null
  * when the value is not one.
  *
@@ -194,7 +207,9 @@ export function firstMissingField(
  * gateway's to read, and the app has no parser for it. What it does catch is the
  * value that is not a PEM at all, which the credential shape accepts (it only
  * asks for a non-empty string) and which would otherwise be stored and fail at
- * the first request that tries to sign.
+ * the first request that tries to sign. The label has to be one of the three a
+ * signing key carries, so an encrypted key — which needs a passphrase the
+ * gateway does not have — is refused here as well.
  */
 function canonicalPrivateKey(value: string): string | null {
   const typed = value
@@ -210,7 +225,7 @@ function canonicalPrivateKey(value: string): string | null {
     beginLabel === undefined ||
     rawBody === undefined ||
     beginLabel !== endLabel ||
-    !beginLabel.endsWith('PRIVATE KEY')
+    !SIGNING_KEY_LABELS.has(beginLabel)
   ) {
     return null;
   }
@@ -286,6 +301,19 @@ export function credentialPayload(input: {
 }
 
 /**
+ * Whether the Vertex private key the fields hold is not a PEM the gateway can
+ * sign with. It is the one refusal here about a single field's value rather
+ * than about the credential the fields add up to, so the form points at the
+ * field instead of at the whole form.
+ */
+function refusesPrivateKey(providerId: string, values: CredentialValues): boolean {
+  return (
+    getStructuredCredentialKind(providerId) === 'vertex' &&
+    vertexCredential(values).googleCredentials.privateKey === null
+  );
+}
+
+/**
  * Why this credential is refused, by the same check the web BYOK form runs on
  * the JSON it accepts, plus the one rule that shape cannot express: the Vertex
  * private key must be a PEM the gateway can sign with. The form's own
@@ -297,11 +325,8 @@ export function credentialProblem(input: {
   values: CredentialValues;
   modelMappings: readonly ModelMapping[];
 }): StructuredCredentialProblem | null {
-  if (getStructuredCredentialKind(input.providerId) === 'vertex') {
-    const { privateKey } = vertexCredential(input.values).googleCredentials;
-    if (privateKey === null) {
-      return { code: 'invalid-credential' };
-    }
+  if (refusesPrivateKey(input.providerId, input.values)) {
+    return { code: 'invalid-credential' };
   }
   return validateStructuredCredential(input.providerId, credentialPayload(input));
 }
@@ -319,7 +344,13 @@ export type CredentialRead =
    * among the rows the form shows, so the refusal can name the row.
    */
   | { readonly tag: 'incomplete-mapping'; readonly mapping: number }
-  | { readonly tag: 'refused' };
+  /**
+   * The credential's shape is refused. `field` names the one field whose own
+   * value the check refuses, when the refusal is about that value rather than
+   * about the fields together: the field is masked, so a form-wide sentence
+   * would leave the reader with no value to look at and fix.
+   */
+  | { readonly tag: 'refused'; readonly field?: CredentialFieldId };
 
 /**
  * The credential a structured form holds. `rows` are Azure's mapping rows as
@@ -354,8 +385,12 @@ export function readStructuredCredential(input: {
     values: input.values,
     modelMappings,
   };
+  // The private-key refusal names its field, because the field is masked: a
+  // form-wide sentence would leave the reader nothing to look at.
   if (credentialProblem(credential)) {
-    return { tag: 'refused' };
+    return refusesPrivateKey(input.providerId, input.values)
+      ? { tag: 'refused', field: 'privateKey' }
+      : { tag: 'refused' };
   }
   return { tag: 'ready', credential: JSON.stringify(credentialPayload(credential)) };
 }

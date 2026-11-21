@@ -429,6 +429,7 @@
       "location": "Localização Vertex",
       "clientEmail": "Email da conta de serviço",
       "privateKey": "Chave privada da conta de serviço",
+      "privateKeyBlockRequired": "Cola o bloco completo da chave, desde a linha BEGIN até à linha END.",
       "names": {
         "codestral": "Apenas Codestral antigo",
         "openai": "OpenAI API",

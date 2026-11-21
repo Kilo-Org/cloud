@@ -427,6 +427,7 @@
       "location": "Vertex ଅବସ୍ଥାନ",
       "clientEmail": "ସର୍ଭିସ୍ ଆକାଉଣ୍ଟ ଇମେଲ୍",
       "privateKey": "ସର୍ଭିସ୍ ଆକାଉଣ୍ଟ ପ୍ରାଇଭେଟ୍ କୀ",
+      "privateKeyBlockRequired": "BEGIN ଧାଡ଼ିରୁ END ଧାଡ଼ି ପର୍ଯ୍ୟନ୍ତ ସମ୍ପୂର୍ଣ୍ଣ କୀ ବ୍ଲକ୍ ପେଷ୍ଟ କରନ୍ତୁ।",
       "names": {
         "codestral": "କେବଳ ପୁରୁଣା Codestral",
         "openai": "OpenAI API",

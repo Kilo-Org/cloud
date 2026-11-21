@@ -427,6 +427,7 @@
       "location": "Vertex लोकेशन",
       "clientEmail": "सर्विस अकाउंट ईमेल",
       "privateKey": "सर्विस अकाउंट प्राइवेट कुंजी",
+      "privateKeyBlockRequired": "BEGIN पंक्ति से END पंक्ति तक पूरा कुंजी ब्लॉक पेस्ट करें।",
       "names": {
         "codestral": "केवल पुराना Codestral",
         "openai": "OpenAI API",

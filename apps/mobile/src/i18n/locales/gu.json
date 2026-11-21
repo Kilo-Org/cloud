@@ -427,6 +427,7 @@
       "location": "Vertex સ્થાન",
       "clientEmail": "સર્વિસ એકાઉન્ટ ઇમેઇલ",
       "privateKey": "સર્વિસ એકાઉન્ટ પ્રાઇવેટ કી",
+      "privateKeyBlockRequired": "BEGIN લીટીથી END લીટી સુધીનો આખો કી બ્લોક પેસ્ટ કરો.",
       "names": {
         "codestral": "ફક્ત જૂનું Codestral",
         "openai": "OpenAI API",

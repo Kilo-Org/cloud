@@ -427,6 +427,7 @@
       "location": "Vertex-ligging",
       "clientEmail": "Diensrekening-e-posadres",
       "privateKey": "Privaat sleutel van diensrekening",
+      "privateKeyBlockRequired": "Plak die hele sleutelblok, vanaf die BEGIN-lyn tot die END-lyn.",
       "names": {
         "codestral": "Slegs verouderde Codestral",
         "openai": "OpenAI API",

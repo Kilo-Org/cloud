@@ -427,6 +427,7 @@
       "location": "Vertex-sijainti",
       "clientEmail": "Palvelutilin sähköpostiosoite",
       "privateKey": "Palvelutilin yksityinen avain",
+      "privateKeyBlockRequired": "Liitä koko avainlohko BEGIN-riviltä END-riville.",
       "names": {
         "codestral": "Vain vanha Codestral",
         "openai": "OpenAI-API",

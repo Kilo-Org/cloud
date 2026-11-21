@@ -427,6 +427,7 @@
       "location": "Vertex ലൊക്കേഷൻ",
       "clientEmail": "സർവീസ് അക്കൗണ്ട് ഇമെയിൽ",
       "privateKey": "സർവീസ് അക്കൗണ്ട് പ്രൈവറ്റ് കീ",
+      "privateKeyBlockRequired": "മുഴുവൻ കീ ബ്ലോക്കും BEGIN ലൈൻ മുതൽ END ലൈൻ വരെ പേസ്റ്റ് ചെയ്യുക.",
       "names": {
         "codestral": "പഴയ Codestral മാത്രം",
         "openai": "OpenAI API",

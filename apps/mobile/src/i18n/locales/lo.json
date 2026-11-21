@@ -427,6 +427,7 @@
       "location": "ສະຖານທີ່ Vertex",
       "clientEmail": "ອີເມວບັນຊີບໍລິການ",
       "privateKey": "ຄີສ່ວນຕົວຂອງບັນຊີບໍລິການ",
+      "privateKeyBlockRequired": "ວາງບລັອກຄີທັງໝົດ, ຕັ້ງແຕ່ແຖວ BEGIN ຈົນເຖິງແຖວ END.",
       "names": {
         "codestral": "ສະເພາະ Codestral ສະບັບເກົ່າ",
         "openai": "OpenAI API",

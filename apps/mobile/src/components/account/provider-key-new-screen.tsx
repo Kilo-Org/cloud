@@ -223,12 +223,19 @@ export function ProviderKeyNewScreen() {
     }
     if (credential.tag === 'incomplete-mapping' || credential.tag === 'refused') {
       // A half-filled mapping is on screen, so its number points at the row to
-      // fix; every other shape refusal names no value the reader can see.
-      const message =
-        credential.tag === 'incomplete-mapping'
-          ? t('profile.providerKeys.incompleteMapping', { number: credential.mapping })
-          : t('profile.providerKeys.invalidCredentials');
-      attempt.fail({ kind: 'refused', message });
+      // fix. A refused private key is masked, so the sentence naming the shape
+      // it wants sits under that field; every other refusal names no value the
+      // reader can see.
+      if (credential.tag === 'refused' && credential.field === 'privateKey') {
+        setFieldErrors({ privateKey: t('profile.providerKeys.privateKeyBlockRequired') });
+      }
+      attempt.fail({
+        kind: 'refused',
+        message:
+          credential.tag === 'incomplete-mapping'
+            ? t('profile.providerKeys.incompleteMapping', { number: credential.mapping })
+            : t('profile.providerKeys.invalidCredentials'),
+      });
       return;
     }
     try {

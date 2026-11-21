@@ -428,6 +428,7 @@
       "location": "Ubicació de Vertex",
       "clientEmail": "Correu electrònic del compte de servei",
       "privateKey": "Clau privada del compte de servei",
+      "privateKeyBlockRequired": "Enganxa tot el bloc de clau, des de la línia BEGIN fins a la línia END.",
       "names": {
         "codestral": "Només Codestral antic",
         "openai": "OpenAI API",

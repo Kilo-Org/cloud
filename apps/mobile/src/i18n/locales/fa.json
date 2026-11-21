@@ -427,6 +427,7 @@
       "location": "موقعیت Vertex",
       "clientEmail": "ایمیل حساب سرویس",
       "privateKey": "کلید خصوصی حساب سرویس",
+      "privateKeyBlockRequired": "بلوک کلید خصوصی را بهطور کامل، از خط BEGIN تا خط END جای‌گذاری کنید.",
       "names": {
         "codestral": "فقط Codestral قدیمی",
         "openai": "OpenAI API",

@@ -90,6 +90,8 @@ const mockRecordOperationAcceptance = jest.fn<(...args: unknown[]) => Promise<un
 const mockSettleOperation = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockGetSecurityAgentCommandStatus = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockGetSecurityAgentCommandStatuses = jest.fn<(...args: unknown[]) => Promise<unknown>>();
+const mockMarkApplyAutoRemediationCommandAdmissionFailed =
+  jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockGetReauthorizeUrl = jest.fn<(installationId: string) => string>();
 const mockHasSecurityReviewPermissions = jest.fn<(...args: unknown[]) => boolean>(() => true);
 const mockFetchGitHubRepositories =
@@ -168,7 +170,10 @@ jest.mock('../db/security-commands', () => ({
   getSecurityAgentCommandStatus: mockGetSecurityAgentCommandStatus,
   getSecurityAgentCommandStatuses: mockGetSecurityAgentCommandStatuses,
   listActiveSecurityAgentCommands: jest.fn(),
+  markApplyAutoRemediationCommandAdmissionFailed:
+    mockMarkApplyAutoRemediationCommandAdmissionFailed,
 }));
+jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 jest.mock('../db/dashboard-stats', () => ({ getDashboardStats: jest.fn() }));
 jest.mock('../db/security-analysis', () => ({
   canStartAnalysis: mockCanStartAnalysis,
@@ -996,6 +1001,59 @@ describe('saveConfig', () => {
         },
       })
     );
+  });
+
+  it('marks the failed admission when the existing-findings submission fails', async () => {
+    mockSaveSecurityAgentConfigWithRevision.mockResolvedValue({
+      newRevision: 2,
+      existingRemediationCommandId: commandId,
+    });
+    mockSubmitApplyAutoRemediation.mockRejectedValueOnce(new Error('worker unreachable'));
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await expect(
+        createHandlers().saveConfig.handler({
+          ctx: context,
+          input: { expectedRevision: 1 },
+        })
+      ).resolves.toEqual({ success: true, existingRemediationCommandId: commandId });
+
+      expect(mockMarkApplyAutoRemediationCommandAdmissionFailed).toHaveBeenCalledWith(
+        commandId,
+        'Settings saved, but existing exploitable findings could not be queued.'
+      );
+      expect(mockLogSecurityAudit).toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it('keeps the save success when the admission-failure marking write throws', async () => {
+    mockSaveSecurityAgentConfigWithRevision.mockResolvedValue({
+      newRevision: 2,
+      existingRemediationCommandId: commandId,
+    });
+    mockSubmitApplyAutoRemediation.mockRejectedValueOnce(new Error('worker unreachable'));
+    mockMarkApplyAutoRemediationCommandAdmissionFailed.mockRejectedValueOnce(
+      new Error('marking write failed')
+    );
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await expect(
+        createHandlers().saveConfig.handler({
+          ctx: context,
+          input: { expectedRevision: 1 },
+        })
+      ).resolves.toEqual({ success: true, existingRemediationCommandId: commandId });
+
+      expect(mockMarkApplyAutoRemediationCommandAdmissionFailed).toHaveBeenCalledWith(
+        commandId,
+        'Settings saved, but existing exploitable findings could not be queued.'
+      );
+      expect(mockLogSecurityAudit).toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 });
 

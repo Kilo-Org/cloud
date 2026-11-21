@@ -55,11 +55,16 @@ const CONTEXT = {
 
 type Recorded = { url: string; body: unknown };
 
+/** A deterministic `pinnedAt` the pins stub reports; the contract only requires an ISO instant. */
+const PINNED_AT = '2026-01-01T00:00:00.000Z';
+
 let app: Hono<HonoEnv>;
 let db: D1Database;
 let sqlite: ReturnType<typeof openPaidDatabase>['sqlite'];
 let billing: Recorded[];
 let pins: Recorded[];
+/** `${model}\u001f${target}` keys the stub has already pinned, so a replay answers `unchanged`. */
+let pinned: Set<string>;
 
 async function parseBody<T>(response: Response, schema: z.ZodType<T>): Promise<T> {
   const body: unknown = await response.json();
@@ -93,11 +98,24 @@ function installFetch(): void {
       const parsed = CustomRouterPoolPinsRequestSchema.safeParse(body);
       if (!parsed.success) return json({ error: 'invalid pins body' }, 400);
       pins.push({ url, body: parsed.data });
+      // `decideServingPins` answers for exactly the aliases it was sent: each is applied on the
+      // first delivery and reported `unchanged` on a replay. An empty answer is a contract
+      // violation, not adoption, so the stub must not answer one.
+      const applied: { model: string; target: string; pinnedAt: string }[] = [];
+      const skipped: { model: string; reason: 'unchanged' }[] = [];
+      for (const alias of parsed.data.aliases) {
+        const key = `${alias.model}\u001f${alias.target}`;
+        if (pinned.has(key)) skipped.push({ model: alias.model, reason: 'unchanged' });
+        else {
+          pinned.add(key);
+          applied.push({ model: alias.model, target: alias.target, pinnedAt: PINNED_AT });
+        }
+      }
       return json({
         routerId: parsed.data.routerId,
         poolUnchanged: true,
-        applied: [],
-        skipped: [],
+        applied,
+        skipped,
       });
     }
     return json({ error: 'unexpected url' }, 404);
@@ -202,6 +220,7 @@ beforeEach(() => {
   seedBenchmarkConfig(sqlite);
   billing = [];
   pins = [];
+  pinned = new Set();
   catalog = CATALOG;
   app = new Hono<HonoEnv>();
   registerPaidBenchmarkRoutes(app);

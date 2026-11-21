@@ -1,6 +1,5 @@
 import {
   customRouterModelId,
-  isVirtualAutoModelId,
   type AutoRoutingDecision,
   type CustomRouterDefinition,
   type CustomRouterErrorCode,
@@ -8,13 +7,9 @@ import {
   type GatewayCustomRouterEntry,
 } from '@kilocode/auto-routing-contracts';
 import type { CustomRouterDecisionOutcome } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
-import {
-  findCustomRouter,
-  type CustomRouterOwner,
-} from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
-import { readLatestAliasTargets } from '@kilocode/web-shared/lib/ai-gateway/providers/latest-alias-targets';
+import { findDecisionPool } from '@kilocode/web-shared/lib/ai-gateway/auto-model/decision-pool';
+import type { CustomRouterOwner } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { isLatestAliasId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
-import { db } from '@kilocode/web-shared/lib/drizzle';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export type CustomRouterResolution =
@@ -38,7 +33,9 @@ export async function decideCustomRouter(params: {
   deniedModelIds: (candidateModelIds: ReadonlyArray<string>) => Promise<string[]>;
   decide: (
     router: CustomRouterDefinition,
-    deniedModelIds: ReadonlyArray<string>
+    deniedModelIds: ReadonlyArray<string>,
+    /** Alias -> concrete target from the same snapshot, for the worker's own candidate set. */
+    aliasTargets: ReadonlyMap<string, string>
   ) => Promise<CustomRouterDecisionOutcome>;
 }): Promise<CustomRouterResolution> {
   const owner: CustomRouterOwner | null =
@@ -47,28 +44,9 @@ export async function decideCustomRouter(params: {
       : params.organizationId
         ? { type: 'org', id: params.organizationId }
         : null;
-  // A pool's pins and an alias's stored target are routing state written in the same PostgreSQL
-  // transaction, so a replica read, or two primary reads split by a promotion, can serve a pool
-  // whose definition no longer matches the target the provider would resolve later. A pool
-  // without a gateway alias keeps its previous single primary read; an alias-bearing pool takes
-  // one read-only repeatable-read snapshot and serves the definition and targets from it.
-  const firstRead = owner ? await findCustomRouter(owner, params.reference.slug, db) : null;
-  if (!owner || !firstRead) return CUSTOM_ROUTER_NOT_FOUND;
-  const hasAliasEntry = firstRead.entries.some(
-    entry => entry.kind === 'gateway' && isLatestAliasId(entry.model)
-  );
-  const snapshot = hasAliasEntry
-    ? await db.transaction(
-        async tx => ({
-          router: await findCustomRouter(owner, params.reference.slug, tx),
-          aliasTargets: await readLatestAliasTargets(tx),
-        }),
-        { isolationLevel: 'repeatable read', accessMode: 'read only' }
-      )
-    : null;
-  const router = snapshot ? snapshot.router : firstRead;
-  if (!router) return CUSTOM_ROUTER_NOT_FOUND;
-  const aliasTargets = snapshot?.aliasTargets;
+  const pool = owner ? await findDecisionPool(owner, params.reference.slug) : null;
+  if (!pool) return CUSTOM_ROUTER_NOT_FOUND;
+  const { router, aliasTargets } = pool;
 
   const gatewayEntries = router.entries.filter(
     (entry): entry is GatewayCustomRouterEntry => entry.kind === 'gateway'
@@ -77,13 +55,8 @@ export async function decideCustomRouter(params: {
   // The concrete model the stored config serves for an alias. Both dispatch paths use it, so the
   // deny policy below names exactly the model that will run rather than the alias that could be
   // remapped downstream.
-  const aliasConcreteTarget = (model: string): string | null => {
-    if (!isLatestAliasId(model)) return model;
-    const stored = aliasTargets?.get(model);
-    return stored && !isLatestAliasId(stored.target) && !isVirtualAutoModelId(stored.target)
-      ? stored.target
-      : null;
-  };
+  const aliasConcreteTarget = (model: string): string | null =>
+    isLatestAliasId(model) ? (aliasTargets.get(model) ?? null) : model;
   // A pinned entry dispatches its concrete target instead of its pool model, so the policy is
   // evaluated for both, plus every alias's snapshot concrete target.
   const dispatchableModelIds = [
@@ -99,7 +72,9 @@ export async function decideCustomRouter(params: {
     ),
   ];
   const deniedModelIds = await params.deniedModelIds(dispatchableModelIds);
-  const outcome = await params.decide(router, deniedModelIds);
+  // The worker gets the same targets this policy was derived from, so it can route around a
+  // denied live target instead of ranking an alias the gateway would refuse downstream.
+  const outcome = await params.decide(router, deniedModelIds, aliasTargets);
   if (outcome.kind !== 'ok') return outcome;
 
   const { decision } = outcome;

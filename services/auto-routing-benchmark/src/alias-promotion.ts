@@ -55,12 +55,17 @@ export const RELEASE_ALIAS_PROMOTION_LEASE_SQL = `
  * those ids and `?2` a JSON array of each base router's live engine identity and repetition count.
  * Readiness comes from the registry alone: no catalog and no network, so a target the catalog has
  * since retired still reports the measurement that exists for it.
+ *
+ * The provenance test is the same one every other readiness reader applies: a `ready` row whose
+ * `run_id` is missing *or empty* names no measuring run, so it ranks nothing and backs no pin.
+ * Reporting it here would let an observed pin freeze a target the routing table treats as
+ * unmeasured.
  */
 export const ALIAS_PROMOTION_READY_PAIRS_SQL = `
   SELECT DISTINCT profile.router, profile.model
   FROM benchmark_profiles AS profile
   WHERE profile.status = 'ready'
-    AND profile.run_id IS NOT NULL
+    AND profile.run_id IS NOT NULL AND profile.run_id <> ''
     AND profile.model IN (SELECT wanted.value FROM json_each(?1) AS wanted)
     AND EXISTS (
       SELECT 1 FROM json_each(?2) AS current

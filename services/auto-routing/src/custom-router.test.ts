@@ -767,10 +767,49 @@ describe('public custom router decide', () => {
     expect(decision).not.toHaveProperty('servingFallback');
   });
 
-  it('never turns a denied pinned target into an unmarked alias dispatch', async () => {
+  it('never dispatches a denied retired pin: the allowed live target is served and marked', async () => {
+    // The saved pin names a denied model, but the benchmark worker reported that exact target left
+    // its catalog (`servingFallback`), so the pin is not what would run. The live alias target is
+    // openai/gpt-5.2, which the policy cleared, so the pool serves that and says so on the wire.
     findServingCustomRouter.mockResolvedValue(servingSnapshot());
     gatewayDeniedModelIds = [SONNET];
     retiredPin();
+    const { decision, decisionId } = await decisionOf(
+      await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody(), {
+        'X-KiloCode-OrganizationId': ORG_ID,
+      })
+    );
+    // Safe only because the retirement is marked and the denied model is never dispatched: the
+    // decision names the alias, not SONNET, and carries the retirement marker the gateway needs.
+    expect(decision).toMatchObject({
+      entry: { kind: 'gateway', model: ALIAS },
+      model: ALIAS,
+      servingFallback: true,
+      fallback: false,
+    });
+    expect(decision).not.toHaveProperty('servingPin');
+    expect(decision.model).not.toBe(SONNET);
+    // The signature binds the denied pin it retired and the concrete target it must substitute,
+    // so redemption cannot follow an alias move into a model the policy never checked.
+    const verified = await verifyAutoDecision(decisionId, DECISION_SECRET, Date.now());
+    expect(verified).toEqual({
+      ok: true,
+      payload: expect.objectContaining({
+        model: ALIAS,
+        entryModel: ALIAS,
+        servingFallback: true,
+        servingPinModel: SONNET,
+        servingFallbackTarget: NEW_TARGET,
+      }),
+    });
+  });
+
+  it('refuses a denied pin that still applies instead of unpinning it', async () => {
+    // The same pool and denial, but the worker still lists the pin: it is what would run, so the
+    // entry is unservable rather than silently swapped for its alias.
+    findServingCustomRouter.mockResolvedValue(servingSnapshot());
+    gatewayDeniedModelIds = [SONNET];
+    usablePin();
     const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody(), {
       'X-KiloCode-OrganizationId': ORG_ID,
     });
@@ -893,7 +932,11 @@ describe('public custom router decide', () => {
     expect(await errorCode(res)).toBe('custom_router_unavailable');
     const [call] = gatewayCalls();
     const { modelIds } = JSON.parse(call?.[1]?.body as string) as { modelIds: string[] };
-    expect([...modelIds].sort()).toEqual([ALIAS, SONNET].sort());
+    // The policy is asked about every id the entry could dispatch: the pool model, the live alias
+    // target from the same snapshot, and the saved pin. All three are evaluated, so a denied pin is
+    // refused rather than silently unpinned to a target the policy never checked. The policy helper
+    // de-duplicates and sorts before it asks, so this is the exact order on the wire.
+    expect(modelIds).toEqual([SONNET, NEW_TARGET, ALIAS]);
   });
 
   it('serves the next request after a settlement because the router epoch moved', async () => {
@@ -1131,6 +1174,60 @@ describe('public custom router decide', () => {
       organizationId: ORG_ID,
       modelIds: [SONNET],
     });
+  });
+
+  it('asks the policy about the live alias target the entry would actually dispatch', async () => {
+    findServingCustomRouter.mockResolvedValue(
+      servingSnapshot(
+        customRouter({
+          entries: [{ kind: 'gateway', model: ALIAS }],
+          defaultEntryKey: `gateway:${ALIAS}`,
+        })
+      )
+    );
+    await decisionOf(
+      await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody(), { 'X-KiloCode-OrganizationId': ORG_ID })
+    );
+    const [call] = gatewayCalls();
+    // The alias and the concrete target it stores from this same snapshot, so the worker can route
+    // around a denied target instead of reaching the gateway and being refused there. A pin-less
+    // entry contributes exactly those two ids. `deniedOrganizationModelIds` de-duplicates and sorts
+    // before it asks, so compare sorted membership rather than request order.
+    expect(JSON.parse(call?.[1]?.body as string)).toEqual({
+      userId: USER_ID,
+      organizationId: ORG_ID,
+      // Sorted by the policy helper: `openai/gpt-5.2` then `~anthropic/latest`.
+      modelIds: [NEW_TARGET, ALIAS],
+    });
+  });
+
+  it('routes around an alias entry whose live target the organization policy denies', async () => {
+    findServingCustomRouter.mockResolvedValue(
+      servingSnapshot(
+        customRouter({
+          entries: [
+            { kind: 'gateway', model: ALIAS },
+            { kind: 'gateway', model: SONNET },
+          ],
+          defaultEntryKey: `gateway:${ALIAS}`,
+        })
+      )
+    );
+    customTable = table({
+      [ROUTE]: [
+        { model: ALIAS, accuracy: 0.95, avgCostUsd: 0.01, meetsThreshold: true, variant: null },
+        { model: SONNET, accuracy: 0.85, avgCostUsd: 0.01, meetsThreshold: true, variant: null },
+      ],
+    });
+    gatewayDeniedModelIds = [NEW_TARGET];
+    const { decision } = await decisionOf(
+      await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody({ clientEntries: [] }), {
+        'X-KiloCode-OrganizationId': ORG_ID,
+      })
+    );
+    // The alias entry is unservable because its stored target is denied, so the sibling serves.
+    expect(decision).toMatchObject({ model: SONNET, entry: { model: SONNET } });
+    expect(decision).not.toHaveProperty('servingFallback');
   });
 
   it('skips the organization policy for a personal context', async () => {
@@ -1566,6 +1663,95 @@ describe('internal custom router decide', () => {
       'decision',
       expect.objectContaining({ model: ALIAS, servingFallback: true })
     );
+  });
+
+  it('does not let a denied retired pin block the pool it left', async () => {
+    // The saved pin names a model the policy denies, but the worker proved that target left the
+    // catalog: the live alias serves instead, so the entry is still servable and still ranked.
+    findCustomRouter.mockResolvedValue(aliasOnlyPool());
+    customTable = aliasTable;
+    retiredPin();
+    const res = await internalDecide({
+      customRouter: { scope: 'user', slug: 'mine' },
+      routingPolicy: { deniedModelIds: [SONNET] },
+      customRouterAliasTargets: { [ALIAS]: NEW_TARGET },
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toHaveProperty(
+      'decision',
+      expect.objectContaining({ model: ALIAS, servingFallback: true, fallback: false })
+    );
+  });
+
+  it('routes around an entry whose live alias target the policy denies', async () => {
+    // No saved pin: the entry would dispatch whatever the alias stores, and that target is denied.
+    // Its sibling stays servable, so the pool serves the sibling instead of failing.
+    findCustomRouter.mockResolvedValue(
+      customRouter({
+        entries: [{ kind: 'gateway', model: ALIAS }, sonnet],
+        defaultEntryKey: `gateway:${ALIAS}`,
+      })
+    );
+    customTable = table({
+      [ROUTE]: [
+        { model: ALIAS, accuracy: 0.95, avgCostUsd: 0.01, meetsThreshold: true, variant: null },
+        { model: SONNET, accuracy: 0.85, avgCostUsd: 0.01, meetsThreshold: true, variant: null },
+      ],
+    });
+    const res = await internalDecide({
+      customRouter: { scope: 'user', slug: 'mine' },
+      routingPolicy: { deniedModelIds: [NEW_TARGET] },
+      customRouterAliasTargets: { [ALIAS]: NEW_TARGET },
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toHaveProperty(
+      'decision',
+      expect.objectContaining({ model: SONNET, fallback: false })
+    );
+  });
+
+  it('refuses the alias entry when its only live target the policy denies has no sibling', async () => {
+    findCustomRouter.mockResolvedValue(aliasOnlyPool());
+    customTable = aliasTable;
+    const res = await internalDecide({
+      customRouter: { scope: 'user', slug: 'mine' },
+      routingPolicy: { deniedModelIds: [NEW_TARGET] },
+      customRouterAliasTargets: { [ALIAS]: NEW_TARGET },
+    });
+    expect(res.status).toBe(422);
+    expect(await errorCode(res)).toBe('custom_router_unavailable');
+  });
+
+  it('ignores alias targets the supplied definition does not own', async () => {
+    // A map naming a model outside the pool cannot make that model servable, and a target for an
+    // entry this definition lacks is dropped before it can steer the decision.
+    findCustomRouter.mockResolvedValue(null);
+    const res = await internalDecide({
+      customRouter: { scope: 'user', slug: 'mine' },
+      customRouterDefinition: customRouter({
+        entries: [sonnet],
+        defaultEntryKey: `gateway:${SONNET}`,
+      }),
+      customRouterAliasTargets: { [ALIAS]: NEW_TARGET },
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toHaveProperty('decision', expect.objectContaining({ model: SONNET }));
+  });
+
+  it('rejects an alias-target map with an alias or virtual target', async () => {
+    const res = await internalDecide({
+      customRouter: { scope: 'user', slug: 'mine' },
+      customRouterAliasTargets: { [ALIAS]: '~openai/latest' },
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('decides from the stored pool when the caller sends no alias targets', async () => {
+    // An older gateway sends no map: the pool still serves its measured entry, never a bare alias.
+    findCustomRouter.mockResolvedValue(customRouter({ entries: [sonnet] }));
+    const res = await internalDecide({ customRouter: { scope: 'user', slug: 'mine' } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toHaveProperty('decision', expect.objectContaining({ model: SONNET }));
   });
 
   it('still rejects callers without the internal secret', async () => {

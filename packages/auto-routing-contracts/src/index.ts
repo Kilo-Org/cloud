@@ -8,6 +8,7 @@ import {
   VariantSchema,
 } from './reasoning';
 import {
+  CustomRouterAliasTargetsSchema,
   CustomRouterClientEntryIdSchema,
   CustomRouterDefinitionSchema,
   CustomRouterEntryRefSchema,
@@ -95,6 +96,12 @@ export const MirrorPayloadSchema = z.object({
   // worker accepts it only after it re-checks owner, slug, and base router, and the public CLI
   // route never reads it.
   customRouterDefinition: CustomRouterDefinitionSchema.optional(),
+  // Alias id -> the concrete target the gateway's own primary snapshot stored for it, so the
+  // worker can rank and exclude the model that would actually run instead of the alias that could
+  // move. Server-to-server only, like `customRouterDefinition`; the worker narrows it to that
+  // definition's alias entries, so it can never name a model outside the pool. Optional so an
+  // older gateway still decides.
+  customRouterAliasTargets: CustomRouterAliasTargetsSchema.optional(),
   // Client entries the caller can serve; present only on the public CLI decide path.
   clientEntries: z.array(CustomRouterClientEntryIdSchema).optional(),
 });

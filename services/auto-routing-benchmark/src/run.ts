@@ -4570,6 +4570,11 @@ async function finalizeRunIfComplete(
     // completing first would expose a run older than the stale age — its rows
     // carry claim-time `updated_at`, so the age guard does not cover them — and
     // a sweep landing in between would fail entries that are fully measured.
+    //
+    // A deferred publication (`deferred` below) is an *outcome*, not a thrown error, so it is
+    // handled after the catch: completing the run here would settle it over a measurement that
+    // never became ready, and the settled-run sweep only looks at running runs.
+    let publicationDeferred = false;
     try {
       await settleProfileRunAttempts(env.BENCH_DB, {
         runId,
@@ -4590,18 +4595,11 @@ async function finalizeRunIfComplete(
         runId,
         entryFailures.map(({ entry }) => entry)
       );
+      // Recorded before the next transition: if the ready publication then throws, the run must
+      // still stay open for this deferral rather than complete over it in the catch below.
+      publicationDeferred = remeasured === 'deferred';
       const published = await markProfilesReadyForRun(env.BENCH_DB, runId);
-      if (remeasured === 'deferred' || published === 'deferred') {
-        await markSettledRunInitialized(env.BENCH_DB, runId);
-        console.log(
-          JSON.stringify({
-            event: 'benchmark_decider_run_deferred',
-            runId,
-            purpose: state.purpose,
-          })
-        );
-        return;
-      }
+      publicationDeferred = publicationDeferred || published === 'deferred';
     } catch (error) {
       console.warn(
         JSON.stringify({
@@ -4610,6 +4608,31 @@ async function finalizeRunIfComplete(
           ...formatError(error),
         })
       );
+    }
+    if (publicationDeferred) {
+      // The run must stay open for the settled-run sweep to retry the whole finalization. The
+      // marker is what makes the sweep see a settled run, so a failed marker write is *not* a
+      // reason to complete: the initialization pass re-materializes a running run without one
+      // and the next dispatch retries the same publication. Completing instead would settle the
+      // run over an unpublished measurement and strand its claims under a terminal run.
+      await markSettledRunInitialized(env.BENCH_DB, runId).catch(error => {
+        console.warn(
+          JSON.stringify({
+            event: 'benchmark_deferred_marker_write_failed',
+            runId,
+            purpose: state.purpose,
+            ...formatError(error),
+          })
+        );
+      });
+      console.log(
+        JSON.stringify({
+          event: 'benchmark_decider_run_deferred',
+          runId,
+          purpose: state.purpose,
+        })
+      );
+      return;
     }
     await markRunCompleted(env.BENCH_DB, runId);
     console.log(
@@ -4768,6 +4791,67 @@ export function summarize(rows: CaseResultRow[], kind: BenchmarkKind): Benchmark
 /** The deterministic run id a paid request owns, so activation is idempotent. */
 export function paidRunIdForRequest(router: AutoRouter, requestId: string): string {
   return `${router === 'frontier' ? 'frontier-' : ''}user-paid-${requestId}`;
+}
+
+/**
+ * Hand a `ready` registry row with no measuring run (`run_id` missing or empty) back to the
+ * queue for one exact pair.
+ *
+ * Such a row ranks nothing: the quote, the custom table, alias promotion and this launch all
+ * refuse it as serving evidence, so a request quoted against it was priced as missing work. The
+ * claim could never start that work — `markProfilesRunningForRun` only takes `pending` rows (or
+ * `running` under this run), and the re-measure queue refuses a row without provenance — so the
+ * request would attach to an owner that never finishes and wait forever. Reopening the row is
+ * the paid measurement the owner confirmed.
+ *
+ * The row's demand flags are left exactly as they were: this repairs provenance, it does not
+ * enrol or cancel demand. The confirmed request's claim follows in the same launch, so a pair
+ * the platform also wants is measured once — if the platform queue wins that race the request
+ * attaches to it and reuses the result, which is the designed behavior for a shared pair.
+ *
+ * The predicate is the unusable provenance itself, so a row that gained a real measuring run in
+ * the window is left alone.
+ *
+ * Cost: one statement per asked model, each admitted by the registry's full leading primary-key
+ * prefix (`router`, `model`), so a large pool costs one bounded seek per model rather than a scan
+ * of every profile under the router.
+ */
+function reopenUnrankedReadyPairStatements(
+  db: D1Database,
+  current: { router: string; engineIdentity: string; repetitions: number },
+  entries: readonly { model: string; variant: string | null }[],
+  nowIso: string
+): D1PreparedStatement[] {
+  if (entries.length === 0) return [];
+  // One statement per asked model, not per entry, and never per row of the registry: admission is
+  // the full leading primary-key prefix — `router` and `model` bound as equality — so the plan is
+  // a bounded seek that also narrows the index to exactly that model's rows. The exact effort is
+  // then a membership test against the model's own asked variants, in storage form (the column's
+  // key), so a sibling effort of the same model is never reopened.
+  const variantsByModel = new Map<string, Set<string>>();
+  for (const entry of entries) {
+    const model = variantsByModel.get(entry.model) ?? new Set<string>();
+    model.add(variantToStorage(entry.variant));
+    variantsByModel.set(entry.model, model);
+  }
+  return [...variantsByModel].map(([model, variants]) =>
+    db
+      .prepare(
+        `UPDATE benchmark_profiles
+        SET status = 'pending', run_id = NULL, completed_at = NULL, updated_at = ?1
+        WHERE router = ?2 AND model = ?3 AND engine_identity = ?4 AND repetitions = ?5
+          AND status = 'ready' AND (run_id IS NULL OR run_id = '')
+          AND variant IN (SELECT value FROM json_each(?6))`
+      )
+      .bind(
+        nowIso,
+        current.router,
+        model,
+        current.engineIdentity,
+        current.repetitions,
+        JSON.stringify([...variants])
+      )
+  );
 }
 
 /** The request id a paid run id names, or null when the id is not a paid run. */
@@ -4942,11 +5026,13 @@ export async function startPaidRequestRun(
     }
   }
   // The crash-after-success fence. A previous activation may have committed a pair's
-  // serving-reuse decision (its display rows are all `reused`) and died before claiming the
-  // siblings. That decision is durable, but the registry evidence behind it need not be: the
-  // profile can be withdrawn before this retry. Re-deriving readiness now would put the pair
-  // back into `measured` and launch a measurement the request already decided to reuse, so
-  // the committed rows are the authority — never the current registry read.
+  // serving-reuse decision and died before claiming the siblings. That decision is durable, but
+  // the registry evidence behind it need not be: the profile can be withdrawn before this retry.
+  // Re-deriving readiness now would put the pair back into `measured` and launch a measurement
+  // the request already decided to reuse, so the committed rows are the authority — never the
+  // current registry read. The pair's other rows may already be terminal under the shared
+  // generation (`done`) or a pause; the store's predicate proves the decision by its marker and
+  // holds only a live `queued`/`running` row against it.
   const allPairs = entries.map(entry => ({
     model: entry.model,
     variant: variantToStorage(entry.variant),
@@ -4973,15 +5059,28 @@ export async function startPaidRequestRun(
   // row at all, and the plan cannot stage it: the explicit confirmation is the authorization,
   // so create exactly those rows here — non-platform demand only, `pending`, requested now —
   // and never for a pair that is already present.
-  await env.BENCH_DB.batch(
-    enrollPaidPairStatements(env.BENCH_DB, {
+  //
+  // The same batch reopens a `ready` row whose `run_id` is missing or empty. Those rows are not
+  // serving evidence anywhere (see `readyKeys` above), so this request was quoted as having to
+  // measure them, but the claim below can only take a `pending` row or one already claimed by
+  // this run: without the reopen the launch would report `pairs_claimed` forever and the request
+  // would attach to an owner that never finishes. It is conditioned on the unusable provenance,
+  // so a row that gained a real measuring run in the window is untouched.
+  await env.BENCH_DB.batch([
+    ...enrollPaidPairStatements(env.BENCH_DB, {
       router,
       engineIdentity,
       repetitions: policy.deciderRepetitions,
       entries: measured,
       requestedAt: request.activated_at ?? request.created_at,
-    })
-  );
+    }),
+    ...reopenUnrankedReadyPairStatements(
+      env.BENCH_DB,
+      { router, engineIdentity, repetitions: policy.deciderRepetitions },
+      measured,
+      request.activated_at ?? request.created_at
+    ),
+  ]);
   // R33 crash recovery needs no separate clear: the claim predicate accepts
   // `status = 'running' AND run_id = <this deterministic id>`, so a row a crashed activation
   // left claimed under this id is reclaimed by the same call that claims a fresh slot. The

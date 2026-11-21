@@ -988,24 +988,29 @@ export const SERVING_EVIDENCE_GONE_REASON =
   'The benchmark result this estimate relies on is gone; request a new estimate.';
 
 /**
- * Whether every pair this plan treats as serving still has a ready profile with usable
- * provenance at the quoted engine and repetition count. Reads only the plan's own pairs, so a
- * caller can refuse a pin move whose ready evidence disappeared before anything is staged or
- * pinned.
+ * Whether the evidence a pin move depends on still exists: every alias this plan would publish
+ * needs a confirmed target with a ready profile that names its measuring run, at the quoted
+ * engine and repetition count.
+ *
+ * Only published targets are read, and a target counts once — any of its effort variants being
+ * ready is enough, which is exactly the rule the settlement callback applies per alias. Two
+ * narrower readings both broke real pools: requiring every plan pair let one withdrawn sibling
+ * refuse a free move, and requiring every variant of the pinned target would refuse an alias the
+ * callback publishes from its ready variant while a sibling variant is merely requeued. Either
+ * way the owner was left with "request a new estimate", and that fresh estimate prices work the
+ * click never authorized.
  */
 export async function readServingPairsStillReady(
   db: D1Database,
-  plan: Pick<PaidBenchmarkPlan, 'pairs' | 'engineIdentity' | 'repetitions' | 'router'>
+  plan: Pick<PaidBenchmarkPlan, 'pairs' | 'aliases' | 'engineIdentity' | 'repetitions' | 'router'>
 ): Promise<boolean> {
-  const entries = plan.pairs.map(pair => ({
-    model: pair.model,
-    variant: variantFromStorage(pair.variant),
-  }));
-  if (entries.length === 0) return false;
+  const pinned = new Set(plan.aliases.map(alias => alias.target));
+  const targets = plan.pairs.filter(pair => pinned.has(pair.model));
+  if (targets.length === 0) return false;
   const ready = await listReadyCurrentProfilesForEntries(
     db,
     { router: plan.router, engineIdentity: plan.engineIdentity, repetitions: plan.repetitions },
-    entries
+    targets.map(pair => ({ model: pair.model, variant: variantFromStorage(pair.variant) }))
   );
   const proven = new Set(
     ready
@@ -1013,9 +1018,9 @@ export async function readServingPairsStillReady(
       // ranked or bound to a summary — the same readiness table assembly and alias promotion
       // require, and the reason it is not serving evidence here.
       .filter(row => row.run_id != null && row.run_id !== '')
-      .map(row => exactPairKey(row.model, variantFromStorage(row.variant)))
+      .map(row => row.model)
   );
-  return entries.every(entry => proven.has(exactPairKey(entry.model, entry.variant)));
+  return [...pinned].every(model => proven.has(model));
 }
 
 /** Canonical JSON so two equal contexts compare equal whatever their key order. */

@@ -2,6 +2,7 @@ import {
   ClassifierOutputSchema,
   MirrorPayloadSchema,
   DEFAULT_AUTO_ROUTER,
+  poolAliasTargets,
   taxonomyRouteKey,
   type AutoRoutingDecision,
   type AutoRoutingDecisionResponse,
@@ -875,7 +876,10 @@ async function decideCustomRouter(
     const routing = customRouting(
       router,
       payload.clientEntries ?? [],
-      new Set(payload.routingPolicy?.deniedModelIds ?? [])
+      new Set(payload.routingPolicy?.deniedModelIds ?? []),
+      // Narrowed to this definition's own alias entries, so the caller's map can never name a
+      // model the pool would not dispatch. A gateway that sends nothing keeps today's decision.
+      poolAliasTargets(router, new Map(Object.entries(payload.customRouterAliasTargets ?? {})))
     );
     const run = await runDecision(
       c,

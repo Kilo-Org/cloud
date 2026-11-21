@@ -65,41 +65,81 @@ export type CustomRouting = {
    * target, and only a decision that actually serves that alias is marked as the fallback.
    */
   servingFallback: Set<string>;
+  /**
+   * Alias id -> the concrete target the caller's snapshot stores for it. A gateway entry with no
+   * usable pin dispatches whatever its alias resolves to, so that target is part of what this
+   * request would run and part of what the policy must allow. Empty when the caller has no
+   * snapshot (the gateway path keeps failing closed at redemption instead).
+   */
+  aliasTargets: ReadonlyMap<string, string>;
 };
+
+/**
+ * Whether one pool entry can serve this request. Servability follows the target the entry would
+ * actually dispatch, not the saved pin, because a pin is only dispatched while the benchmark worker
+ * reports it usable:
+ * - a client entry needs its client listed;
+ * - a gateway entry whose pool model is denied or virtual never serves;
+ * - a usable pin whose target is denied makes the entry unservable rather than silently unpinning
+ *   it to an alias;
+ * - a pin the worker reported retired is not what would run, so a denied retired pin cannot block
+ *   the live alias that replaced it;
+ * - every remaining case dispatches the live alias, so a denied stored target for it routes around
+ *   here instead of reaching the gateway and being refused there.
+ */
+function entryServesRequest(
+  routing: CustomRouting,
+  savedEntries: ReadonlyMap<string, CustomRouterEntry>,
+  clientKeys: ReadonlySet<string>,
+  ref: CustomRouterEntryRef
+): boolean {
+  const key = customRouterEntryKey(ref);
+  const saved = savedEntries.get(key);
+  if (!saved) return false;
+  if (saved.kind === 'client') return clientKeys.has(key);
+  if (routing.deniedModelIds.has(saved.model) || isVirtualAutoModelId(saved.model)) return false;
+  // A saved pin that still applies is what the entry promises, so a denied pin keeps the entry
+  // out rather than silently unpinning it to an alias. Once the benchmark worker reports that
+  // target left the catalog the pin is not what runs, so its denial cannot block the live alias.
+  if (
+    saved.servingPin !== undefined &&
+    routing.deniedModelIds.has(saved.servingPin.model) &&
+    !routing.servingFallback.has(key)
+  ) {
+    return false;
+  }
+  // Null only when the usable pin's own target is denied, which is a denial of what would run.
+  const dispatch = customRouterEntryDispatch(saved, {
+    deniedModelIds: routing.deniedModelIds,
+    usablePins: routing.usablePins,
+  });
+  if (!dispatch) return false;
+  if (dispatch.pinned) return true;
+  const liveTarget = routing.aliasTargets.get(saved.model);
+  return liveTarget === undefined || !routing.deniedModelIds.has(liveTarget);
+}
 
 export function customRouting(
   router: CustomRouterDefinition,
   clientEntries: ReadonlyArray<CustomRouterClientEntryId>,
-  deniedModelIds: ReadonlySet<string>
+  deniedModelIds: ReadonlySet<string>,
+  aliasTargets: ReadonlyMap<string, string> = new Map()
 ): CustomRouting {
-  const poolKeys = new Set(router.entries.map(customRouterEntryKey));
   const clientKeys = new Set(
     clientEntries.map(entry => customRouterEntryKey({ kind: 'client', ...entry }))
   );
-  const usablePins = new Map<string, string>();
-  // A saved pin names the concrete target this entry may dispatch once the benchmark worker
-  // reports it usable. A denied target makes the entry unservable even when the pin is not yet
-  // usable, so a policy never silently unpins to an alias that may resolve to the denied model.
-  const deniedPinKeys = new Set(
-    router.entries.flatMap(entry =>
-      entry.kind === 'gateway' && entry.servingPin && deniedModelIds.has(entry.servingPin.model)
-        ? [customRouterEntryKey(entry)]
-        : []
-    )
+  const savedEntries = new Map(
+    router.entries.map(entry => [customRouterEntryKey(entry), entry] as const)
   );
-  return {
+  const routing: CustomRouting = {
     router,
     deniedModelIds,
-    usablePins,
+    usablePins: new Map(),
     servingFallback: new Set<string>(),
-    isServable: entry => {
-      const key = customRouterEntryKey(entry);
-      if (!poolKeys.has(key)) return false;
-      if (entry.kind === 'client') return clientKeys.has(key);
-      if (deniedPinKeys.has(key)) return false;
-      return !deniedModelIds.has(entry.model) && !isVirtualAutoModelId(entry.model);
-    },
+    aliasTargets,
+    isServable: ref => entryServesRequest(routing, savedEntries, clientKeys, ref),
   };
+  return routing;
 }
 
 /**

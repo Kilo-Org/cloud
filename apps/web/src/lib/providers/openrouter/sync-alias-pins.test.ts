@@ -5,7 +5,7 @@
  * Worker reply, and keep another transaction open to prove the lock ordering.
  */
 import { afterAll, beforeEach, describe, expect, it } from '@jest/globals';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import {
   ai_gateway_config,
   auto_routing_custom_routers,
@@ -23,8 +23,11 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-clie
   releaseAliasPromotion: (request: unknown) => mockRelease(request),
 }));
 
-import { lockAliasPromotionWrite } from '@/lib/auto-routing-custom-routers';
-import { promoteAliasTargets } from '@/lib/providers/openrouter/sync-alias-pins';
+import { lockAliasPromotionWrite, lockOwner } from '@/lib/auto-routing-custom-routers';
+import {
+  candidatePoolCondition,
+  promoteAliasTargets,
+} from '@/lib/providers/openrouter/sync-alias-pins';
 
 const ALIAS = '~vendor/latest';
 const OTHER_ALIAS = '~vendor/other-latest';
@@ -159,7 +162,11 @@ describe('promoteAliasTargets', () => {
       previous: previousFrom([{ alias: ALIAS, target: OLD }]),
     });
 
-    expect(result).toEqual({ written: true, observed: 1 });
+    expect(result).toEqual({
+      written: true,
+      observed: 1,
+      targets: [{ alias: ALIAS, target: NEW }],
+    });
     expect(await entriesOf(pool)).toMatchObject([
       { kind: 'gateway', model: ALIAS, servingPin: { model: OLD, source: 'observed' } },
     ]);
@@ -227,7 +234,7 @@ describe('promoteAliasTargets', () => {
       previous: previousFrom([{ alias: ALIAS, target: OLD }]),
     });
 
-    expect(result).toEqual({ written: true, observed: 1 });
+    expect(result).toMatchObject({ written: true, observed: 1 });
     expect(await entriesOf(pool)).toMatchObject([
       { kind: 'gateway', model: ALIAS, servingPin: { model: OLD, source: 'observed' } },
     ]);
@@ -244,7 +251,11 @@ describe('promoteAliasTargets', () => {
       previous: previousFrom([]),
     });
 
-    expect(result).toEqual({ written: true, observed: 0 });
+    expect(result).toEqual({
+      written: true,
+      observed: 0,
+      targets: [{ alias: ALIAS, target: NEW }],
+    });
     expect(await entriesOf(pool)).toEqual([gateway(ALIAS)]);
     expect(mockAcquire).not.toHaveBeenCalled();
     expect(await readTargets()).toEqual([{ alias: ALIAS, target: NEW }]);
@@ -270,7 +281,11 @@ describe('promoteAliasTargets', () => {
       previous: previousFrom([{ alias: ALIAS, target: OLD }]),
     });
 
-    expect(result).toEqual({ written: true, observed: 0 });
+    expect(result).toEqual({
+      written: true,
+      observed: 0,
+      targets: [{ alias: ALIAS, target: NEW }],
+    });
     expect(await entriesOf(confirmedPool)).toEqual([
       { kind: 'gateway', model: ALIAS, servingPin: confirmed(OLD) },
     ]);
@@ -291,7 +306,11 @@ describe('promoteAliasTargets', () => {
       previous: previousFrom([{ alias: ALIAS, target: NEW }]),
     });
 
-    expect(result).toEqual({ written: true, observed: 0 });
+    expect(result).toEqual({
+      written: true,
+      observed: 0,
+      targets: [{ alias: ALIAS, target: NEW }],
+    });
     expect(await entriesOf(late)).toEqual([gateway(ALIAS)]);
     expect(mockAcquire).not.toHaveBeenCalled();
   });
@@ -307,7 +326,8 @@ describe('promoteAliasTargets', () => {
       previous: previousFrom([{ alias: ALIAS, target: OLD }]),
     });
 
-    expect(result).toEqual({ written: false, observed: 0 });
+    // The fence was refused before the lock, so nothing was read: the caller reads the primary.
+    expect(result).toEqual({ written: false, observed: 0, targets: null });
     expect(await entriesOf(pool)).toEqual([gateway(ALIAS)]);
     expect(await readTargets()).toEqual([{ alias: ALIAS, target: OLD }]);
     expect(mockRelease).not.toHaveBeenCalled();
@@ -324,7 +344,9 @@ describe('promoteAliasTargets', () => {
       previous: previousFrom([{ alias: ALIAS, target: OLD }]),
     });
 
-    expect(result).toEqual({ written: false, observed: 0 });
+    // The fence refuses inside `readReadyPairs`, before the promotion takes any lock, so nothing
+    // was read and the caller reads the stored targets itself.
+    expect(result).toEqual({ written: false, observed: 0, targets: null });
     expect(await entriesOf(pool)).toEqual([gateway(ALIAS)]);
     expect(await readTargets()).toEqual([{ alias: ALIAS, target: OLD }]);
     expect(mockRelease).toHaveBeenCalledTimes(1);
@@ -341,7 +363,12 @@ describe('promoteAliasTargets', () => {
       previous: previousFrom([{ alias: ALIAS, target: OLD }]),
     });
 
-    expect(result).toEqual({ written: false, observed: 0 });
+    // Another run moved the targets first; the caller must render the ones that won.
+    expect(result).toEqual({
+      written: false,
+      observed: 0,
+      targets: [{ alias: ALIAS, target: NEW }],
+    });
     expect(await entriesOf(pool)).toEqual([gateway(ALIAS)]);
     expect(await readTargets()).toEqual([{ alias: ALIAS, target: NEW }]);
   });
@@ -356,7 +383,8 @@ describe('promoteAliasTargets', () => {
       previous: previousFrom([{ alias: ALIAS, target: OLD }]),
     });
 
-    expect(result).toEqual({ written: false, observed: 0 });
+    // A reset stored nothing; the caller must render an empty target set, not the previous one.
+    expect(result).toEqual({ written: false, observed: 0, targets: [] });
     expect(await entriesOf(pool)).toEqual([gateway(ALIAS)]);
     expect(await readTargets()).toEqual([]);
   });
@@ -398,7 +426,11 @@ describe('promoteAliasTargets', () => {
       previous: previousFrom([{ alias: ALIAS, target: OLD }]),
     });
 
-    expect(result).toEqual({ written: true, observed: 1 });
+    expect(result).toEqual({
+      written: true,
+      observed: 1,
+      targets: [{ alias: ALIAS, target: NEW }],
+    });
     expect(await entriesOf(efficientPool)).toMatchObject([
       { kind: 'gateway', model: ALIAS, servingPin: { model: OLD, source: 'observed' } },
     ]);
@@ -439,7 +471,7 @@ describe('promoteAliasTargets', () => {
 
       writeMayCommit.resolve();
       await write;
-      expect(await promotion).toEqual({ written: true, observed: 1 });
+      expect(await promotion).toMatchObject({ written: true, observed: 1 });
       expect(await entriesOf(pool)).toMatchObject([
         { kind: 'gateway', model: ALIAS, servingPin: { model: OLD, source: 'observed' } },
       ]);
@@ -447,5 +479,200 @@ describe('promoteAliasTargets', () => {
       writeMayCommit.resolve();
       await write;
     }
+  });
+
+  it('keeps an edit from a writer that holds none of the promotion locks', async () => {
+    const owner = await newUser();
+    const pool = await seedPool({
+      userId: owner,
+      slug: 'rolling-deploy',
+      entries: [gateway(ALIAS)],
+    });
+    await storeTargets([{ alias: ALIAS, target: OLD }]);
+    mockAcquire.mockResolvedValue(held([{ router: 'efficient', model: OLD }]));
+
+    // An instance of the previous deploy rewrites the whole entries document, takes no alias
+    // promotion lock, and is still serving while this one promotes.
+    const editApplied = Promise.withResolvers<number>();
+    const editMayCommit = Promise.withResolvers<void>();
+    const legacyEdit = db.transaction(async tx => {
+      const edited: CustomRouterEntry[] = [gateway(ALIAS), gateway('vendor/added-during-rollout')];
+      await tx
+        .update(auto_routing_custom_routers)
+        .set({ entries: edited })
+        .where(eq(auto_routing_custom_routers.id, pool));
+      const backend = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid()::int AS pid`);
+      const pid = backend.rows[0]?.pid;
+      if (pid === undefined) throw new Error('PostgreSQL backend pid unavailable');
+      editApplied.resolve(pid);
+      await editMayCommit.promise;
+    });
+
+    try {
+      const legacyPid = await editApplied.promise;
+      const promotion = promoteAliasTargets({
+        next: [{ alias: ALIAS, target: NEW }],
+        previous: previousFrom([{ alias: ALIAS, target: OLD }]),
+      });
+
+      // The promotion cannot rewrite a row the old writer holds, so it queues on that row.
+      let blocked = false;
+      for (let attempt = 0; attempt < 2000 && !blocked; attempt += 1) {
+        const waiting = await db.execute(sql`
+          SELECT 1 FROM pg_stat_activity
+          WHERE datname = current_database()
+            AND wait_event_type = 'Lock'
+            AND ${legacyPid} = ANY(pg_blocking_pids(pid))
+            AND query LIKE '%auto_routing_custom_routers%'`);
+        blocked = waiting.rows.length > 0;
+      }
+      expect(blocked).toBe(true);
+
+      editMayCommit.resolve();
+      await legacyEdit;
+      expect(await promotion).toMatchObject({ written: true, observed: 1 });
+
+      // The pin is added to the edited document instead of replacing it with the pre-edit one.
+      expect(await entriesOf(pool)).toMatchObject([
+        { kind: 'gateway', model: ALIAS, servingPin: { model: OLD, source: 'observed' } },
+        { kind: 'gateway', model: 'vendor/added-during-rollout' },
+      ]);
+      expect(await readTargets()).toEqual([{ alias: ALIAS, target: NEW }]);
+    } finally {
+      editMayCommit.resolve();
+      await legacyEdit;
+    }
+  });
+
+  it('pins a save from a deployed writer that serializes the row without a pin', async () => {
+    const owner = await newUser();
+    const pool = await seedPool({
+      userId: owner,
+      slug: 'reverse-rollout',
+      entries: [gateway(ALIAS)],
+    });
+    await storeTargets([{ alias: ALIAS, target: OLD }]);
+    mockAcquire.mockResolvedValue(held([{ router: 'efficient', model: OLD }]));
+
+    // The deployed writer: take the owner lock, re-read the pool, then save the edited document.
+    // Paused between the read and the save, it holds an `entries` value with no pin, which is what
+    // would erase a pin written in between.
+    const saveAllowed = Promise.withResolvers<void>();
+    const legacyRead = Promise.withResolvers<number>();
+    const legacySave = db.transaction(async tx => {
+      await lockOwner(tx, { type: 'user', id: owner });
+      const [row] = await tx
+        .select({ entries: auto_routing_custom_routers.entries })
+        .from(auto_routing_custom_routers)
+        .where(eq(auto_routing_custom_routers.id, pool));
+      if (!row) throw new Error('Pool disappeared');
+      const backend = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid()::int AS pid`);
+      const pid = backend.rows[0]?.pid;
+      if (pid === undefined) throw new Error('PostgreSQL backend pid unavailable');
+      legacyRead.resolve(pid);
+      await saveAllowed.promise;
+      await tx
+        .update(auto_routing_custom_routers)
+        .set({ entries: [...row.entries, gateway('vendor/added-during-rollout')] })
+        .where(eq(auto_routing_custom_routers.id, pool));
+    });
+
+    try {
+      const legacyPid = await legacyRead.promise;
+      const promotion = promoteAliasTargets({
+        next: [{ alias: ALIAS, target: NEW }],
+        previous: previousFrom([{ alias: ALIAS, target: OLD }]),
+      });
+
+      // The promotion takes the same owner lock the deployed writer holds, so it cannot slip a pin
+      // between that writer's read and its save.
+      let blocked = false;
+      for (let attempt = 0; attempt < 2000 && !blocked; attempt += 1) {
+        const waiting = await db.execute(sql`
+          SELECT 1 FROM pg_stat_activity
+          WHERE datname = current_database()
+            AND wait_event_type = 'Lock'
+            AND ${legacyPid} = ANY(pg_blocking_pids(pid))
+            AND query LIKE '%pg_advisory_xact_lock%'`);
+        blocked = waiting.rows.length > 0;
+      }
+      expect(blocked).toBe(true);
+
+      saveAllowed.resolve();
+      await legacySave;
+      expect(await promotion).toMatchObject({ written: true, observed: 1 });
+
+      // The deployed writer's document landed first; the pin was then applied to it, so neither
+      // side lost a write.
+      expect(await entriesOf(pool)).toMatchObject([
+        { kind: 'gateway', model: ALIAS, servingPin: { model: OLD, source: 'observed' } },
+        { kind: 'gateway', model: 'vendor/added-during-rollout' },
+      ]);
+    } finally {
+      saveAllowed.resolve();
+      await legacySave;
+    }
+  });
+});
+
+describe('candidate pool plan', () => {
+  afterAll(async () => {
+    await db.delete(ai_gateway_config).where(eq(ai_gateway_config.id, 1));
+    if (userIds.length > 0) {
+      await db
+        .delete(auto_routing_custom_routers)
+        .where(inArray(auto_routing_custom_routers.owned_by_user_id, userIds));
+      await db.delete(kilocode_users).where(inArray(kilocode_users.id, userIds));
+    }
+  });
+
+  it('finds a multi-alias promotion through the GIN index, not a scan', async () => {
+    const owner = await newUser();
+    const rollback = new Error('rollback the planner population');
+
+    // 20,000 analyzed pools with one concrete entry each, then two that hold the aliases a move
+    // rewrites. The stats are gathered inside the transaction that rolls back, so no other suite
+    // sees the population and the planner sees a real table rather than an empty one.
+    await expect(
+      db.transaction(async tx => {
+        await tx.execute(sql`
+          INSERT INTO auto_routing_custom_routers
+            (owned_by_user_id, slug, name, base_router, mode, entries, default_entry_key)
+          SELECT ${owner},
+                 'plan-' || n,
+                 'plan-' || n,
+                 'efficient',
+                 'cost_per_accuracy',
+                 jsonb_build_array(jsonb_build_object('kind', 'gateway', 'model', 'vendor/plan-' || n)),
+                 'gateway:vendor/plan-' || n
+          FROM generate_series(1, 20000) AS n
+        `);
+        for (const [index, model] of [ALIAS, OTHER_ALIAS].entries()) {
+          await tx.execute(sql`
+            INSERT INTO auto_routing_custom_routers
+              (owned_by_user_id, slug, name, base_router, mode, entries, default_entry_key)
+            VALUES (${owner}, ${`plan-alias-${index}`}, ${`plan-alias-${index}`}, 'efficient',
+                    'cost_per_accuracy',
+                    jsonb_build_array(jsonb_build_object('kind', 'gateway', 'model', ${model}::text)),
+                    ${`gateway:${model}`})
+          `);
+        }
+        await tx.execute(sql.raw('ANALYZE auto_routing_custom_routers'));
+
+        const plan = await tx.execute(sql`
+          EXPLAIN SELECT id, base_router, entries
+          FROM auto_routing_custom_routers
+          WHERE ${candidatePoolCondition([ALIAS, OTHER_ALIAS])}
+          FOR UPDATE
+        `);
+        const lines = plan.rows.map(row => Object.values(row).join(' ')).join('\n');
+
+        expect(lines).toContain('IDX_auto_routing_custom_routers_entries');
+        expect(lines).toContain('@> ANY');
+        expect(lines).not.toContain('Seq Scan on auto_routing_custom_routers');
+
+        throw rollback;
+      })
+    ).rejects.toBe(rollback);
   });
 });

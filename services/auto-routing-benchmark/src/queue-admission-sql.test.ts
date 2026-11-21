@@ -7,9 +7,11 @@ import { DECIDER_CASES } from './datasets/decider-cases';
 import { insertRun as insertRunRow, MAX_RUNNING_RUNS_PER_QUEUE } from './db';
 import { ACTIVE_MEASUREMENT_REVISION, MEASUREMENT_REVISION } from './measurement-revision';
 import {
+  QueueRunNotAdmittedError,
   computeEngineIdentity,
   dispatchScheduler,
   drainQueue,
+  startRun,
   type BenchmarkJobMessage,
 } from './run';
 import {
@@ -235,6 +237,14 @@ describe('decider queue admission (production migrations and real SQLite)', () =
       .get(model);
   }
 
+  /** Every run row, whatever its purpose or status: a refused admission must leave none. */
+  function runRows(): number {
+    const row = sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_runs').get() as
+      | { n: number }
+      | undefined;
+    return Number(row?.n ?? 0);
+  }
+
   function initialized(runId: string): boolean {
     return sqlite.prepare('SELECT 1 FROM scheduler_runs WHERE run_id = ?').get(runId) !== undefined;
   }
@@ -441,5 +451,112 @@ describe('decider queue admission (production migrations and real SQLite)', () =
         startingRunId: secondResult.runId,
       })
     );
+  });
+
+  /**
+   * The operator hold is a live `operator-pause-*` lease on dispatch-lock row 1. The lease stops
+   * chunk claims, but a drain under it used to still write a `running` run and claim registry
+   * profiles, consuming an admission slot and queuing chunks for work the hold forbids. Admission
+   * itself now refuses, in the same statement as the insert, so nothing is half-created.
+   */
+  describe('operator pause on the dispatch lock', () => {
+    const HOLD_SQL = 'UPDATE scheduler_dispatch_lock SET token = ?, lease_until = ? WHERE id = 1';
+
+    it.each(['efficient', 'frontier'] as const)(
+      'refuses a %s platform run while the operator hold is live, then admits it after release',
+      async router => {
+        const model = router === 'frontier' ? 'vendor/frontier-hold' : NEW_MODEL;
+        insertProfile(model, 'pending', null, router, 'platform');
+        sqlite.prepare(HOLD_SQL).run('operator-pause-userpay', NOW + 3600_000);
+
+        // The real start path, not the SQL in isolation: a held drain must start nothing.
+        expect(await drainQueue(env, 'platform', router, { skipPlatformSync: true })).toBeNull();
+        expect(runRows()).toBe(0);
+        // No admission slot consumed and no claim taken: both would outlive the hold.
+        expect(profile(model)).toEqual({ status: 'pending', run_id: null });
+        expect(sent).toEqual([]);
+
+        // A direct start must be refused too — a second entry point cannot bypass the hold.
+        await expect(
+          startRun(env, 'decider', {
+            router,
+            purpose: 'platform',
+            entries: [{ model, variant: null }],
+          })
+        ).rejects.toThrow(QueueRunNotAdmittedError);
+        expect(runRows()).toBe(0);
+        expect(profile(model)).toEqual({ status: 'pending', run_id: null });
+        expect(sent).toEqual([]);
+
+        sqlite.prepare(HOLD_SQL).run(null, 0);
+        const started = await drainQueue(env, 'platform', router, { skipPlatformSync: true });
+
+        if (!started) throw new Error(`Expected the ${router} drain to start after release`);
+        expect(started.entryCount).toBe(1);
+        expect(profile(model)).toEqual({ status: 'running', run_id: started.runId });
+        expect(sent).toContainEqual(
+          expect.objectContaining({ runId: started.runId, kind: 'decider', schedulerWake: true })
+        );
+      }
+    );
+
+    it('refuses the user purpose under the hold, then admits it after release', async () => {
+      // Both queue purposes funnel through this one admission statement, so the guard must cover
+      // the user purpose too. This fixture seeds no other run and no starting run, so the *only*
+      // predicate that can refuse is the hold — the assertion discriminates the new guard instead
+      // of passing on occupancy. It asserts admission only: a user run is dispatchable solely
+      // through its own paid launch, which `startPaidRequestRun` owns.
+      const model = 'vendor/user-hold';
+      insertProfile(model, 'pending', null, 'efficient', 'user');
+      sqlite.prepare(HOLD_SQL).run('operator-pause-userpay', NOW + 3600_000);
+
+      await expect(
+        startRun(env, 'decider', {
+          router: 'efficient',
+          purpose: 'user',
+          paidRequestId: 'request-under-hold',
+          entries: [{ model, variant: null }],
+        })
+      ).rejects.toThrow(QueueRunNotAdmittedError);
+      expect(runRows()).toBe(0);
+      expect(profile(model)).toEqual({ status: 'pending', run_id: null });
+      expect(sent).toEqual([]);
+
+      sqlite.prepare(HOLD_SQL).run(null, 0);
+      const started = await startRun(env, 'decider', {
+        router: 'efficient',
+        purpose: 'user',
+        paidRequestId: 'request-under-hold',
+        entries: [{ model, variant: null }],
+      });
+
+      expect(
+        sqlite.prepare('SELECT purpose FROM benchmark_runs WHERE id = ?').get(started.runId)
+      ).toEqual({ purpose: 'user' });
+      expect(profile(model)).toEqual({ status: 'running', run_id: started.runId });
+    });
+
+    it('does not treat an ordinary dispatch-pass lease as an operator hold', async () => {
+      insertProfile(NEW_MODEL, 'pending', null, 'efficient', 'platform');
+      // A dispatch pass or a deploy intent holds a *lease*, not a pause: it must never stop a
+      // drain from admitting, or normal platform work would stall behind every concurrent pass.
+      sqlite.prepare(HOLD_SQL).run('dispatch-pass-0123456789', NOW + 60_000);
+
+      const started = await drainQueue(env, 'platform', 'efficient', { skipPlatformSync: true });
+
+      if (!started) throw new Error('Expected the drain to admit beside a normal lease');
+      expect(profile(NEW_MODEL)).toEqual({ status: 'running', run_id: started.runId });
+    });
+
+    it('does not block on an expired operator token', async () => {
+      insertProfile(NEW_MODEL, 'pending', null, 'efficient', 'platform');
+      // The operator token is still written, but its lease lapsed: the release is authoritative.
+      sqlite.prepare(HOLD_SQL).run('operator-pause-userpay', NOW - 1);
+
+      const started = await drainQueue(env, 'platform', 'efficient', { skipPlatformSync: true });
+
+      if (!started) throw new Error('Expected an expired hold to admit');
+      expect(profile(NEW_MODEL)).toEqual({ status: 'running', run_id: started.runId });
+    });
   });
 });

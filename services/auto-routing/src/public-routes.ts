@@ -16,6 +16,7 @@ import {
   isVirtualAutoModelId,
   normalizeClassifierInput,
   parseCustomRouterModelId,
+  poolAliasTargets,
   signAutoDecision,
   type CustomRouterDecideResponse,
   type CustomRouterDefinition,
@@ -181,16 +182,23 @@ export const publicDecideHandler = publicHandler(async c => {
   if (!serving) throw new CustomRouterError('router_not_found', 'Custom router not found');
   const router = serving.router;
   // The organization model policy filters gateway entries for any router used in that
-  // organization's context, including a member's personal router. A pinned entry can dispatch its
-  // concrete target instead of the pool model, so both are evaluated; the target is what actually
-  // runs, and a denied target makes the entry unservable rather than silently unpinning it.
+  // organization's context, including a member's personal router. A gateway entry dispatches the
+  // target the entry would actually run, so the policy names every candidate that can run: the
+  // pool model, the saved pin, and the alias's stored target from this same snapshot. Those three
+  // are the only ids a pool entry can dispatch, and `poolAliasTargets` keeps the map to this
+  // router's own alias entries with concrete targets, so it can never widen the pool.
+  const aliasTargets = poolAliasTargets(router, serving.aliasTargets);
   const gatewayModelIds = [
     ...new Set(
-      router.entries.flatMap(entry =>
-        entry.kind === 'gateway'
-          ? [entry.model, ...(entry.servingPin ? [entry.servingPin.model] : [])]
-          : []
-      )
+      router.entries.flatMap(entry => {
+        if (entry.kind !== 'gateway') return [];
+        const target = aliasTargets.get(entry.model);
+        return [
+          entry.model,
+          ...(target === undefined ? [] : [target]),
+          ...(entry.servingPin ? [entry.servingPin.model] : []),
+        ];
+      })
     ),
   ];
   const policyDeniedModelIds =
@@ -249,7 +257,12 @@ export const publicDecideHandler = publicHandler(async c => {
     customRouter: reference,
     clientEntries: request.clientEntries,
   };
-  const routing = customRouting(router, request.clientEntries, new Set(deniedModelIds));
+  const routing = customRouting(
+    router,
+    request.clientEntries,
+    new Set(deniedModelIds),
+    aliasTargets
+  );
   const run = await runDecision(
     c,
     payload,

@@ -256,7 +256,7 @@ async function resolveAutoModelId(
           policy => deniedAutoRoutingCandidates(policy, candidateIds),
           options => dataCollectionRequiredAutoRoutingCandidates(candidateIds, options)
         ),
-      decide: async (router, deniedModelIds) => {
+      decide: async (router, deniedModelIds, aliasTargets) => {
         const outcome = await fetchCustomRouterDecision({
           ...decisionRequest(ctx, caller),
           router: router.baseRouter,
@@ -264,6 +264,9 @@ async function resolveAutoModelId(
           // The same definition the deny policy above was derived from, so the worker cannot
           // dispatch a target this gateway did not check (and vice versa).
           customRouterDefinition: router,
+          // The alias targets from that same snapshot, so a denied live target routes around in
+          // the worker instead of being ranked here and refused after it is picked.
+          customRouterAliasTargets: aliasTargets,
           requestedModel: customRouterModelId(router.ownerType, router.slug),
           deniedModelIds,
         });

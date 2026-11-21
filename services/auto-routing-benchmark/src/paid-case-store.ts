@@ -868,18 +868,26 @@ function wireCaseReason(reason: string | null): string | null {
 }
 
 /**
- * The pairs of one request whose serving-reuse decision already committed: every one of the
- * pair's display rows is `reused` and carries the serving marker. This is the
- * crash-after-success fence:
+ * The pairs of one request whose serving-reuse decision already committed: at least one of the
+ * pair's display rows carries the serving marker, and no row of the pair is still live. This is
+ * the crash-after-success fence:
  *
  * A launch that reconciled an observed-ready pair to `reused` and then died before claiming
  * its siblings leaves exactly this state. A retry must not re-decide that pair from the
  * registry (the profile may have been withdrawn since) and must never measure it, so it
  * consults this instead of re-deriving readiness.
  *
- * Plain prior-case reuse is deliberately not this signal: a never-measured pair with copied
- * draws still has to materialize its profile with zero provider calls, so its rows are staged
- * `queued` until a launch claims it. Only the reconcile writes this state.
+ * The pair's rows need not all be `reused`: a case shared with another payer's generation can
+ * already be `done`, and a slot stopped by a pause stays `paused`. Those rows are terminal —
+ * nothing can measure them again — so requiring every row to be `reused` would let a retry
+ * re-measure a pair whose reuse decision this request already made. The marker row is the proof
+ * of that decision, and a live row still holds the pair open; only a `queued`/`running` row can
+ * carry the pair into the launch.
+ *
+ * Plain prior-case reuse is deliberately not this signal: its rows are `reused` with a null
+ * reason, so a never-measured pair with copied draws still has to materialize its profile with
+ * zero provider calls, and stays `queued` until a launch claims it. Only the reconcile writes the
+ * marker.
  */
 export function readReusedRequestPairStatement(
   db: D1Database,
@@ -892,20 +900,15 @@ export function readReusedRequestPairStatement(
     .prepare(
       `SELECT rc.model AS model, rc.variant AS variant
       FROM paid_benchmark_request_cases AS rc
-      WHERE rc.request_id = ? AND rc.status = 'reused' AND rc.reason = ?
+      WHERE rc.request_id = ?
         AND (rc.model || char(31) || rc.variant) IN (SELECT value FROM json_each(?))
       GROUP BY rc.model, rc.variant
-      HAVING NOT EXISTS (
-        SELECT 1 FROM paid_benchmark_request_cases AS other
-        WHERE other.request_id = ? AND other.model = rc.model AND other.variant = rc.variant
-          AND (other.status <> 'reused' OR other.reason IS NOT ?)
-      )`
+      HAVING SUM(CASE WHEN rc.status = 'reused' AND rc.reason = ? THEN 1 ELSE 0 END) > 0
+        AND SUM(CASE WHEN rc.status IN ('queued', 'running') THEN 1 ELSE 0 END) = 0`
     )
     .bind(
       input.requestId,
-      SERVING_REUSE_CASE_MARKER,
       JSON.stringify(input.pairs.map(pair => `${pair.model}\u001f${pair.variant}`)),
-      input.requestId,
       SERVING_REUSE_CASE_MARKER
     );
 }

@@ -214,6 +214,9 @@ describe('alias promotion readiness lease (real migrations)', () => {
     insertProfile({ model: 'vendor/wrong-reps', repetitions: 1 });
     insertProfile({ model: 'vendor/failed', status: 'failed', runId: 'run-failed' });
     insertProfile({ model: 'vendor/no-run', status: 'ready', runId: null });
+    // An empty `run_id` names no measuring run either: the quote, table assembly and paid
+    // launch all refuse it, so a pin must not be observed from it.
+    insertProfile({ model: 'vendor/empty-run', status: 'ready', runId: '' });
     insertProfile({ model: 'vendor/unasked' });
     insertProfile({
       model: 'vendor/frontier-only',
@@ -240,6 +243,7 @@ describe('alias promotion readiness lease (real migrations)', () => {
       'vendor/wrong-reps',
       'vendor/failed',
       'vendor/no-run',
+      'vendor/empty-run',
       'vendor/frontier-only',
       'vendor/frontier-wrong-reps',
       'vendor/not-asked-elsewhere',

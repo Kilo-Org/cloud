@@ -238,6 +238,10 @@ graded cases; the Wilson lower bound penalizes thin coverage.
   When the stable catalog alias moves, save its previous concrete target on existing pools
   that have a ready shared measurement but no pin. Save the observations and the alias move
   in one transaction under the benchmark readiness lease. This does not start any measurement.
+  The promotion takes the alias-promotion key exclusively, then every affected owner's advisory
+  lock, then reads those pools `FOR UPDATE`, so it is ordered in both directions against both a
+  pool save from this release and a save from a deployed instance that knows only the owner lock.
+  A pool created while the promotion runs is discovered again and locked before it is pinned.
   Unmeasured entries follow the new target. Do not infer targets from before deployment.
   Both serving paths rank and dispatch the pinned target while it remains usable.
   If the catalog no longer serves it, dispatch the live target and show a warning.
@@ -468,7 +472,9 @@ pass/fail, never customer data, model output, credentials, or tenant identifiers
    `started_at`, so a post-cutover timestamp cannot make legacy work claimable. Migration
    `0038` adds that column with no backfill: existing rows stay `NULL` and are treated as legacy.
 4. **Apply and deploy.** Apply the additive D1 migrations and the PostgreSQL pool-entry index.
-   The index limits alias promotion to pools that contain an affected alias.
+   The index serves the alias promotion's `entries @> ANY($1)` candidate read: on PostgreSQL 16.16
+   over 20,000 analyzed pools, a two-alias promotion with no planner overrides planned a Bitmap
+   Index Scan on it, so a promotion does not scan pools while it holds the exclusive lock.
    PostgreSQL keeps the existing native usage schema. D1 migration `0038` creates the case
    fence, request tables, receipts, and attempt history, and adds `benchmark_runs.admission_marker`.
    The readiness migration adds one epoch row per base router. It does not invalidate results or

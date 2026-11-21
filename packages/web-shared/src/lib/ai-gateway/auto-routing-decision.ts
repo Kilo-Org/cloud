@@ -31,6 +31,11 @@ export type EfficientDecisionParams = {
    * gateway enforces instead of its own cached or replicated copy.
    */
   customRouterDefinition?: CustomRouterDefinition;
+  /**
+   * Alias id -> the concrete target that same primary snapshot stored, so the worker ranks the
+   * model that would actually run. Only the private authenticated custom-router path sets it.
+   */
+  customRouterAliasTargets?: ReadonlyMap<string, string>;
   apiKind: ClassifierApiKind;
   body: unknown;
   requestedModel: string;
@@ -86,6 +91,9 @@ function buildDecidePayload(params: EfficientDecisionParams): DecidePayload | nu
     ...(params.customRouter ? { customRouter: params.customRouter } : {}),
     ...(params.customRouter && params.customRouterDefinition
       ? { customRouterDefinition: params.customRouterDefinition }
+      : {}),
+    ...(params.customRouter && params.customRouterAliasTargets?.size
+      ? { customRouterAliasTargets: Object.fromEntries(params.customRouterAliasTargets) }
       : {}),
     ...(params.deniedModelIds?.length
       ? { routingPolicy: { deniedModelIds: [...params.deniedModelIds] } }

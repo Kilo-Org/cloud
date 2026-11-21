@@ -373,4 +373,77 @@ describe('alias readiness lease fence (production migrations)', () => {
 
     expect(runStatus()).toBe('completed');
   });
+
+  it('keeps a deferred run open when the deferral marker write fails', async () => {
+    // A deferred publication writes nothing, so the run must stay open for the settled-run sweep
+    // to retry the whole finalization. Recording that state is one more write, and a D1 statement
+    // can fail even when it would have changed no row (the marker insert is idempotent). Falling
+    // through to completion there would settle the run over a measurement that never became
+    // ready — while the sweep only looks at *running* runs, so nothing would ever retry it. This
+    // is the platform finalization path, where that marker write has no surrounding catch.
+    seedSettledRun({ purpose: 'platform' });
+    await acquireAliasPromotionLease(env.BENCH_DB, 'promotion-6', [], []);
+
+    const baseDb = sqliteD1(sqlite);
+    let markerWrites = 0;
+    let faulted = false;
+    const db = {
+      prepare(sqlText: string) {
+        const statement = baseDb.prepare(sqlText);
+        // Fault exactly the first marker write; every later write and every other statement
+        // reaches the real adapter unchanged — it only recognizes the statements it made itself.
+        if (!sqlText.includes('INSERT INTO scheduler_runs')) return statement;
+        return {
+          ...statement,
+          bind(...values: unknown[]) {
+            const bound = statement.bind(...(values as never[]));
+            if (faulted) return bound;
+            faulted = true;
+            return {
+              ...bound,
+              run: async () => {
+                markerWrites += 1;
+                throw new Error('D1_ERROR: scheduler marker write failed');
+              },
+            } as unknown as D1PreparedStatement;
+          },
+        } as unknown as D1PreparedStatement;
+      },
+      batch(statements: D1PreparedStatement[]) {
+        return baseDb.batch(statements);
+      },
+      exec(sqlText: string) {
+        return baseDb.exec(sqlText);
+      },
+    } as unknown as D1Database;
+
+    await dispatchScheduler({ ...env, BENCH_DB: db } as unknown as Env);
+
+    // The attempt records prove finalization really reached its publication step, so this is the
+    // deferral's marker write failing — not a pass that returned before settling anything.
+    expect(attempts()).toEqual([
+      { model: 'vendor/x', outcome: 'progress' },
+      { model: 'vendor/y', outcome: 'progress' },
+    ]);
+    expect(markerWrites).toBe(1);
+    expect(runStatus()).toBe('running');
+    expect(
+      sqlite
+        .prepare(
+          'SELECT COUNT(*) AS n FROM benchmark_runs WHERE id = ? AND completed_at IS NOT NULL'
+        )
+        .get(runId)
+    ).toEqual({ n: 0 });
+    expect(profiles().map(row => row.status)).toEqual(['running', 'running']);
+
+    // The run's scheduler marker is still there and the next pass retries the same publication.
+    await releaseAliasPromotionLease(env.BENCH_DB, 'promotion-6');
+    await dispatchScheduler(env);
+
+    expect(runStatus()).toBe('completed');
+    expect(profiles()).toEqual([
+      { model: 'vendor/x', status: 'ready', run_id: runId },
+      { model: 'vendor/y', status: 'ready', run_id: runId },
+    ]);
+  });
 });

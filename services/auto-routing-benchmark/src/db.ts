@@ -318,6 +318,14 @@ const QUEUE_RUN_OCCUPANCY_SQL = `
  * Inserts a decider run only while its (router ?2, queue ?15) has no starting run
  * and fewer than ?17 active runs, so the check and the insert are one statement.
  * The run records the measurement revision it was started under (?16).
+ *
+ * ?19 is the admission instant, compared against a *live operator pause* on the dispatch lock
+ * row (id 1, `operator-pause-*`, `lease_until` in the future). The hold exists to freeze the
+ * queues: the lease stops chunk claims, but nothing before the claim, so without this predicate
+ * a drain under the hold still writes a `running` run, consumes one of ?17 admission slots and
+ * claims registry profiles that no dispatch can start. Only that token prefix is a hold — an
+ * ordinary dispatch pass or the deploy intent on another row keeps admitting platform work,
+ * and an expired operator token blocks nothing.
  */
 const ADMIT_DECIDER_RUN_SQL = `
   INSERT INTO benchmark_runs (id, router, accuracy_noise_band, frontier_min_accuracy_delta,
@@ -337,6 +345,12 @@ const ADMIT_DECIDER_RUN_SQL = `
     WHERE active.router = ?2 AND active.kind = 'decider' AND active.purpose = ?15
       AND active.status = 'running'
   ) < ?17
+  AND NOT EXISTS (
+    SELECT 1 FROM scheduler_dispatch_lock AS held
+    WHERE held.id = 1
+      AND held.token LIKE 'operator-pause-%'
+      AND held.lease_until > ?19
+  )
 `;
 
 export async function getQueueRunOccupancy(
@@ -435,6 +449,12 @@ export async function insertRun(
     );
   }
 
+  // CLASSIFIER IS NOT COVERED BY THE OPERATOR-HOLD ADMISSION GUARD. This branch is a plain
+  // insert with no occupancy and no hold predicate, and it is reached only by the explicit admin
+  // start (`admin.ts`), never by the cron drain. Until a classifier hold is designed and tested,
+  // it must not be run while the `operator-pause-*` lease is live; that is a rollout prohibition,
+  // not a verified property. Do not widen this branch by hand: a half-applied guard here would
+  // admit a classifier run under a hold that everyone reads as a freeze.
   if (row.kind === 'classifier') {
     await orm.batch([orm.insert(benchmarkRuns).values(row), ...dependents]);
     return { admitted: true };
@@ -464,7 +484,9 @@ export async function insertRun(
       // Post-cutover admission provenance: only a Worker that owns the paid flow writes
       // it, so a run admitted by an older image during the deploy overlap stays NULL and
       // is never claimable, initializable or dispatchable.
-      crypto.randomUUID()
+      crypto.randomUUID(),
+      // The admission instant the operator-hold predicate compares the lease against.
+      Date.now()
     ),
     db.prepare(QUEUE_RUN_OCCUPANCY_SQL).bind(row.router, row.purpose),
     ...dependents.map(query => {

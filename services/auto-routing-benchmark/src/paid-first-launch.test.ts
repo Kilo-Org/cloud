@@ -723,6 +723,93 @@ describe('first paid request for an unmeasured pair (production migrations)', ()
     expect(providerCalls).toBe(0);
   });
 
+  it('treats a serving decision as committed when its other rows settled elsewhere', async () => {
+    // The same crash window, but the pair shared its cases with another payer: those rows are
+    // already `done` (the shared generation settled), so only part of the pair carries the
+    // marker. Requiring every row to be `reused` would miss the committed decision, re-derive a
+    // withdrawn readiness, and pay to measure a pair this request already decided to reuse.
+    const requestId = seedActiveRequest([
+      { model: 'vendor/x', variant: '' },
+      { model: 'vendor/alpha', variant: '' },
+    ]);
+    sqlite
+      .prepare(
+        `UPDATE paid_benchmark_request_cases SET status = 'reused', reason = ?
+        WHERE request_id = ? AND model = 'vendor/x'`
+      )
+      .run(SERVING_REUSE_CASE_MARKER, requestId);
+    // One slot of the pair settled as `done` under the shared generation (no marker on it).
+    sqlite
+      .prepare(
+        `UPDATE paid_benchmark_request_cases SET status = 'done', reason = NULL
+        WHERE request_id = ? AND model = 'vendor/x'
+          AND case_id = (SELECT MIN(case_id) FROM paid_benchmark_request_cases
+            WHERE request_id = ? AND model = 'vendor/x')`
+      )
+      .run(requestId, requestId);
+    // ...and the serving evidence behind the decision is gone.
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles
+          (router, model, variant, engine_identity, repetitions, status, run_id,
+            requested_at, updated_at, platform_requested, user_requested)
+        VALUES ('efficient', 'vendor/x', '', ?, 3, 'pending', NULL, ?, ?, 0, 0)`
+      )
+      .run(engineIdentity, '2026-10-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z');
+
+    const result = await startPaidRequestRun(env, requestId);
+
+    // X is not claimed, enrolled or re-measured; only the sibling is measured.
+    expect(result).toEqual({ runId: `user-paid-${requestId}`, claimed: 1, skipped: [] });
+    expect(
+      sqlite
+        .prepare('SELECT model FROM run_models WHERE run_id = ? ORDER BY model')
+        .all(result.runId!)
+    ).toEqual([{ model: 'vendor/alpha' }]);
+    expect(
+      sqlite
+        .prepare(
+          `SELECT status, run_id FROM benchmark_profiles
+          WHERE model = 'vendor/x' AND variant = '' AND engine_identity = ? AND repetitions = 3`
+        )
+        .get(engineIdentity)
+    ).toEqual({ status: 'pending', run_id: null });
+    expect(sent).toEqual([
+      { runId: result.runId, kind: 'decider', model: 'vendor/alpha', schedulerWake: true },
+    ]);
+    expect(providerCalls).toBe(0);
+  });
+
+  it('still measures a marked pair whose case rows are live', async () => {
+    // The other half of the fence: the marker is only proof of a *committed* decision while no
+    // row of the pair is live. A `queued` row means work this request still owns, so the pair
+    // must be claimed and measured rather than reported as reused.
+    const requestId = seedActiveRequest([{ model: 'vendor/x', variant: '' }]);
+    sqlite
+      .prepare(
+        `UPDATE paid_benchmark_request_cases SET status = 'reused', reason = ?
+        WHERE request_id = ? AND model = 'vendor/x'
+          AND case_id <> (SELECT MIN(case_id) FROM paid_benchmark_request_cases
+            WHERE request_id = ? AND model = 'vendor/x')`
+      )
+      .run(SERVING_REUSE_CASE_MARKER, requestId, requestId);
+
+    const result = await startPaidRequestRun(env, requestId);
+
+    expect(result).toEqual({ runId: `user-paid-${requestId}`, claimed: 1, skipped: [] });
+    expect(
+      sqlite.prepare('SELECT model FROM run_models WHERE run_id = ?').all(result.runId!)
+    ).toEqual([{ model: 'vendor/x' }]);
+    expect(
+      countRows(
+        `SELECT COUNT(*) AS n FROM paid_benchmark_request_cases
+        WHERE request_id = ? AND model = 'vendor/x' AND status IN ('queued', 'running')`,
+        requestId
+      )
+    ).toBeGreaterThan(0);
+    expect(providerCalls).toBe(0);
+  });
+
   it('still launches zero-provider materialization for an all-historically-reused pair', async () => {
     // Ordinary historical reuse (paid-benchmark.ts stages every draw `reused` with no marker)
     // is NOT a serving decision: the pair has no ready profile yet, so the launch must claim
@@ -846,5 +933,84 @@ describe('first paid request for an unmeasured pair (production migrations)', ()
     expect(profileRow('vendor/alpha')).toBeUndefined();
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_runs').get()).toEqual({ n: 0 });
     expect(sent).toEqual([]);
+  });
+
+  /** Seed one `ready` row for the request's pair with the given measuring-run provenance. */
+  function seedReadyProfile(runId: string | null) {
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles
+          (router, model, variant, engine_identity, repetitions, status, run_id,
+            requested_at, updated_at, completed_at, platform_requested, user_requested)
+        VALUES ('efficient', 'vendor/alpha', '', ?, 3, 'ready', ?, ?, ?, ?, 0, 0)`
+      )
+      .run(
+        engineIdentity,
+        runId,
+        '2026-10-01T00:00:00.000Z',
+        '2026-10-01T00:00:00.000Z',
+        '2026-10-01T00:00:00.000Z'
+      );
+  }
+
+  it.each<[string, string | null]>([
+    ['null', null],
+    ['empty', ''],
+  ])('reopens a ready row with a %s measuring run so the pair can be claimed', async (_, runId) => {
+    // A `ready` row whose `run_id` is missing or empty ranks nothing anywhere: the quote, the
+    // custom table, alias promotion and this launch all treat it as unmeasured, so the request
+    // was priced for measuring it. The claim only takes a `pending` row (or one already ours),
+    // and the re-measure queue refuses a row without provenance, so without the reopen the
+    // launch reports `pairs_claimed` and the request attaches to an owner that never finishes.
+    const requestId = seedActiveRequest([{ model: 'vendor/alpha', variant: '' }]);
+    seedReadyProfile(runId);
+    expect(profileRow('vendor/alpha')).toEqual({
+      status: 'ready',
+      run_id: runId,
+      platform_requested: 0,
+      user_requested: 0,
+    });
+
+    const result = await startPaidRequestRun(env, requestId);
+
+    // The confirmed work actually starts: the unusable row is back in the queue and this run
+    // owns it, so the scheduler will measure it instead of the launch attaching forever.
+    expect(result).toEqual({ runId: `user-paid-${requestId}`, claimed: 1, skipped: [] });
+    expect(profileRow('vendor/alpha')).toEqual({
+      status: 'running',
+      run_id: `user-paid-${requestId}`,
+      platform_requested: 0,
+      user_requested: 0,
+    });
+    expect(sent).toEqual([
+      {
+        runId: `user-paid-${requestId}`,
+        kind: 'decider',
+        model: 'vendor/alpha',
+        schedulerWake: true,
+      },
+    ]);
+    expect(providerCalls).toBe(0);
+  });
+
+  it('leaves a ready row with real provenance to the serving evidence', async () => {
+    // The reopen is conditioned on the unusable provenance. A ready row that names its
+    // measuring run is serving evidence, so the pair is reconciled to `reused` and completed
+    // with its pin — never reopened, claimed or measured.
+    const requestId = seedActiveRequest([{ model: 'vendor/alpha', variant: '' }]);
+    seedReadyProfile('mature-alpha');
+
+    const result = await startPaidRequestRun(env, requestId);
+
+    expect(result).toEqual({ runId: null, claimed: 0, skipped: ['already_ready'] });
+    expect(profileRow('vendor/alpha')).toEqual({
+      status: 'ready',
+      run_id: 'mature-alpha',
+      platform_requested: 0,
+      user_requested: 0,
+    });
+    expect(runCount()).toBe(0);
+    expect(sent).toEqual([]);
+    expect(providerCalls).toBe(0);
   });
 });

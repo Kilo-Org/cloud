@@ -69,6 +69,7 @@ import {
   fetchEfficientAutoDecision,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
 import { findCustomRouter } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
+import { findDecisionPool } from '@kilocode/web-shared/lib/ai-gateway/auto-model/decision-pool';
 import {
   signAutoDecision,
   type AutoDecisionPayload,
@@ -317,6 +318,11 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models', () =
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
   findCustomRouter: jest.fn(),
 }));
+// The gateway decision path reads the pool and its alias targets in one primary statement through
+// this module; the redemption path below still reads through `findCustomRouter`.
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/decision-pool', () => ({
+  findDecisionPool: jest.fn(),
+}));
 let mockDecisionSecret = 'test-decision-secret';
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ...jest.requireActual<Record<string, unknown>>('@kilocode/web-shared/lib/config.server'),
@@ -375,6 +381,7 @@ function usageAccountingResult(
 const mockedFetchEfficientAutoDecision = jest.mocked(fetchEfficientAutoDecision);
 const mockedFetchCustomRouterDecision = jest.mocked(fetchCustomRouterDecision);
 const mockedFindCustomRouter = jest.mocked(findCustomRouter);
+const mockedFindDecisionPool = jest.mocked(findDecisionPool);
 const mockedReadLatestAliasTargets = jest.mocked(readLatestAliasTargets);
 const mockedDeniedAutoRoutingCandidates = jest.mocked(deniedAutoRoutingCandidates);
 const mockedIsReleaseToggleEnabled = jest.mocked(isReleaseToggleEnabled);
@@ -4517,6 +4524,10 @@ describe('custom routers and signed auto decisions', () => {
     mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
     mockedDeniedAutoRoutingCandidates.mockResolvedValue([]);
     mockedFindCustomRouter.mockResolvedValue(personalRouter);
+    mockedFindDecisionPool.mockResolvedValue({
+      router: personalRouter,
+      aliasTargets: new Map(),
+    });
     mockedFetchCustomRouterDecision.mockResolvedValue({
       kind: 'ok',
       decision: haikuDecision,
@@ -4548,14 +4559,15 @@ describe('custom routers and signed auto decisions', () => {
       const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/custom/mine')));
 
       expect(response.status).toBe(200);
-      const [routerLookup] = mockedFindCustomRouter.mock.calls;
-      expect(routerLookup?.[0]).toEqual({ type: 'user', id: 'user-123' });
-      expect(routerLookup?.[1]).toBe('mine');
-      expect(routerLookup?.[2] === db).toBe(true);
+      // The decision reads the owner's own pool in one primary statement, and the signer's
+      // redemption read is a separate path.
+      const [poolLookup] = mockedFindDecisionPool.mock.calls;
+      expect(poolLookup).toEqual([{ type: 'user', id: 'user-123' }, 'mine']);
       const decideParams = mockedFetchCustomRouterDecision.mock.calls[0]?.[0];
       expect(decideParams).toMatchObject({
         customRouter: { scope: 'user', slug: 'mine' },
         customRouterDefinition: personalRouter,
+        customRouterAliasTargets: new Map(),
         router: 'frontier',
         requestedModel: 'kilo-auto/custom/mine',
         userId: 'user-123',
@@ -4585,11 +4597,14 @@ describe('custom routers and signed auto decisions', () => {
 
     it('resolves an organization router in the active organization and applies its policy', async () => {
       setOrganizationAuth('org-1');
-      mockedFindCustomRouter.mockResolvedValue({
-        ...personalRouter,
-        ownerType: 'org',
-        ownerId: 'org-1',
-        slug: 'team',
+      mockedFindDecisionPool.mockResolvedValue({
+        router: {
+          ...personalRouter,
+          ownerType: 'org',
+          ownerId: 'org-1',
+          slug: 'team',
+        },
+        aliasTargets: new Map(),
       });
       mockedDeniedAutoRoutingCandidates.mockResolvedValue(['openai/gpt-5-mini']);
 
@@ -4598,10 +4613,9 @@ describe('custom routers and signed auto decisions', () => {
       );
 
       expect(response.status).toBe(200);
-      const [routerLookup] = mockedFindCustomRouter.mock.calls;
-      expect(routerLookup?.[0]).toEqual({ type: 'org', id: 'org-1' });
-      expect(routerLookup?.[1]).toBe('team');
-      expect(routerLookup?.[2] === db).toBe(true);
+      // An organization context scopes the one pool read to that organization, never the member.
+      const [poolLookup] = mockedFindDecisionPool.mock.calls;
+      expect(poolLookup).toEqual([{ type: 'org', id: 'org-1' }, 'team']);
       expect(mockedDeniedAutoRoutingCandidates).toHaveBeenCalledWith(expect.anything(), [
         haiku,
         'openai/gpt-5-mini',
@@ -4624,7 +4638,7 @@ describe('custom routers and signed auto decisions', () => {
       ['an organization router without an organization context', 'kilo-auto/custom/org/team'],
       ['a missing router', 'kilo-auto/custom/missing'],
     ])('answers router_not_found for %s', async (_name, model) => {
-      if (model.endsWith('missing')) mockedFindCustomRouter.mockResolvedValue(null);
+      if (model.endsWith('missing')) mockedFindDecisionPool.mockResolvedValue(null);
 
       const response = await handleLlmProxyRequest(makeRequest(makeBody(model)));
 

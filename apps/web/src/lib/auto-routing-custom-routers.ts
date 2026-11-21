@@ -480,8 +480,11 @@ async function validateLinkedEntries(
 }
 
 export async function lockOwner(tx: DrizzleTransaction, owner: CustomRouterOwner): Promise<void> {
-  const key = `auto-routing-custom-routers:${owner.type}:${owner.id}`;
-  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`);
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${ownerLockKey(owner)}, 0))`);
+}
+
+function ownerLockKey(owner: CustomRouterOwner): string {
+  return `auto-routing-custom-routers:${owner.type}:${owner.id}`;
 }
 
 /**
@@ -502,6 +505,26 @@ export async function lockAliasPromotionExclusive(tx: DrizzleTransaction): Promi
   await tx.execute(
     sql`SELECT pg_advisory_xact_lock(hashtextextended(${ALIAS_PROMOTION_LOCK_KEY}, 0))`
   );
+}
+
+/**
+ * Takes every pool owner's lock, in the order every writer takes them, so an ordinary pool save
+ * cannot interleave a read of the row with the promotion's rewrite of it.
+ *
+ * A deployed instance of the previous release takes only `lockOwner`, then re-reads the pool inside
+ * its transaction and saves that read. If a promotion rewrote `entries` between that read and the
+ * save, the save would erase the new pin. Taking the same keys keeps the promotion ordered against
+ * it in both directions without any new protocol on the writer's side, and a writer that lands
+ * first still gets pinned, because the promotion re-reads the row under the lock it just took.
+ */
+export async function lockPoolOwners(
+  tx: DrizzleTransaction,
+  owners: readonly CustomRouterOwner[]
+): Promise<void> {
+  const keys = [...new Set(owners.map(ownerLockKey))].sort();
+  for (const key of keys) {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`);
+  }
 }
 
 /**

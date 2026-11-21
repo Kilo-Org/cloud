@@ -13,6 +13,7 @@ import {
   planSlotCount,
   planSlotIsCovered,
   planSlotIsMissing,
+  readServingPairsStillReady,
   stableStringify,
 } from './paid-benchmark-plan';
 
@@ -560,6 +561,143 @@ describe('paid benchmark plan', () => {
     expect(outcome.plan.maximumMicrodollars).toBe(0);
     // Only the stale pin is republished; the already-correct pin is neither moved nor churned.
     expect(outcome.plan.aliases).toEqual([{ model: '~vendor/latest', target: 'vendor/alpha' }]);
+  });
+
+  it('keeps a free pin move confirmable when an unrelated ready sibling is withdrawn', async () => {
+    const { db, sqlite } = openPaidDatabase();
+    // Two aliases resolve to ready targets; only `~vendor/latest` still pins a stale one.
+    const insertProfile = sqlite.prepare(
+      `INSERT INTO benchmark_profiles
+        (router, model, variant, engine_identity, repetitions, status, run_id, requested_at,
+          updated_at)
+      VALUES ('efficient', ?, ?, ?, 3, 'ready', 'run-ready',
+        '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`
+    );
+    insertProfile.run('vendor/alpha', 'high', ENGINE);
+    insertProfile.run('vendor/cheap', '', ENGINE);
+    const twoAliasCatalog = {
+      data: [
+        ...CATALOG.data,
+        { id: '~vendor/settled', alias_target: 'vendor/cheap', pricing: null },
+      ],
+    };
+    const quoted = await buildPaidBenchmarkPlan(
+      {
+        db,
+        env: { KILO_WEB_API_BASE_URL: 'https://web.test' },
+        fetchImpl: (async () =>
+          new Response(JSON.stringify(twoAliasCatalog), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          })) as unknown as typeof fetch,
+      },
+      {
+        context: context([
+          {
+            kind: 'gateway',
+            model: '~vendor/latest',
+            servingPin: { model: 'vendor/old-target', pinnedAt: '2026-01-01T00:00:00.000Z' },
+          },
+          {
+            kind: 'gateway',
+            model: '~vendor/settled',
+            servingPin: { model: 'vendor/cheap', pinnedAt: '2026-01-01T00:00:00.000Z' },
+          },
+        ]),
+        engineIdentity: ENGINE,
+        projectId: PROJECT_ID,
+        config: CONFIG,
+        cases: CASES,
+      }
+    );
+    expect(quoted.status).toBe('ready');
+    if (quoted.status !== 'ready') return;
+    expect(quoted.plan.aliases).toEqual([{ model: '~vendor/latest', target: 'vendor/alpha' }]);
+    expect(await readServingPairsStillReady(db, quoted.plan)).toBe(true);
+
+    // The sibling pair this plan does not publish loses its ready row before the click. The
+    // free move still depends only on its own target, so it stays confirmable; requiring the
+    // whole plan would refuse it and turn the withdrawn sibling into a paid re-estimate.
+    sqlite.prepare("DELETE FROM benchmark_profiles WHERE model = 'vendor/cheap'").run();
+    expect(await readServingPairsStillReady(db, quoted.plan)).toBe(true);
+
+    // The published target itself losing readiness is still a refusal.
+    sqlite.prepare("DELETE FROM benchmark_profiles WHERE model = 'vendor/alpha'").run();
+    expect(await readServingPairsStillReady(db, quoted.plan)).toBe(false);
+  });
+
+  it('accepts a pin target ready at one effort variant while another is requeued', async () => {
+    const { db, sqlite } = openPaidDatabase();
+    // A real two-variant model: the alias resolves to both pairs, so the gate reads both rows.
+    const duoCatalog = {
+      data: [
+        ...CATALOG.data,
+        {
+          id: 'vendor/duo',
+          pricing: { prompt: 1e-6, completion: 2e-6 },
+          opencode: {
+            variants: {
+              high: { reasoning: { effort: 'high' } },
+              low: { reasoning: { effort: 'low' } },
+            },
+          },
+        },
+        { id: '~vendor/duo-latest', alias_target: 'vendor/duo', pricing: null },
+      ],
+    };
+    const insertProfile = sqlite.prepare(
+      `INSERT INTO benchmark_profiles
+        (router, model, variant, engine_identity, repetitions, status, run_id, requested_at,
+          updated_at)
+      VALUES ('efficient', 'vendor/duo', ?, ?, 3, ?, ?, '2026-01-01T00:00:00.000Z',
+        '2026-01-01T00:00:00.000Z')`
+    );
+    insertProfile.run('high', ENGINE, 'ready', 'run-high');
+    insertProfile.run('low', ENGINE, 'ready', 'run-low');
+    const quoted = await buildPaidBenchmarkPlan(
+      {
+        db,
+        env: { KILO_WEB_API_BASE_URL: 'https://web.test' },
+        fetchImpl: (async () =>
+          new Response(JSON.stringify(duoCatalog), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          })) as unknown as typeof fetch,
+      },
+      {
+        context: context([
+          {
+            kind: 'gateway',
+            model: '~vendor/duo-latest',
+            servingPin: { model: 'vendor/old-target', pinnedAt: '2026-01-01T00:00:00.000Z' },
+          },
+        ]),
+        engineIdentity: ENGINE,
+        projectId: PROJECT_ID,
+        config: CONFIG,
+        cases: CASES,
+      }
+    );
+    expect(quoted.status).toBe('ready');
+    if (quoted.status !== 'ready') return;
+    expect(quoted.plan.pairs.map(pair => pair.variant).sort()).toEqual(['high', 'low']);
+    expect(quoted.plan.pairs.every(pair => pair.serving)).toBe(true);
+    expect(quoted.plan.aliases).toEqual([{ model: '~vendor/duo-latest', target: 'vendor/duo' }]);
+    expect(await readServingPairsStillReady(db, quoted.plan)).toBe(true);
+    // The low variant is requeued before the click: no run is finishing it, but the ready high
+    // row still pins the alias, which is exactly what the settlement callback would write.
+    // Requiring every variant would refuse a pin that would have succeeded.
+    sqlite
+      .prepare(
+        "UPDATE benchmark_profiles SET status = 'pending', run_id = NULL WHERE variant = 'low'"
+      )
+      .run();
+    expect(await readServingPairsStillReady(db, quoted.plan)).toBe(true);
+    // Take away the only ready row: the requeued variant cannot pin the alias on its own.
+    sqlite
+      .prepare("DELETE FROM benchmark_profiles WHERE model = 'vendor/duo' AND variant = 'high'")
+      .run();
+    expect(await readServingPairsStillReady(db, quoted.plan)).toBe(false);
   });
 
   it('quotes nothing when the saved pin already names the alias current target', async () => {

@@ -348,6 +348,65 @@ function stripServingPin(entry: CustomRouterEntry): CustomRouterEntry {
   return rest;
 }
 
+/**
+ * An alias is a `~` model id whose target moves. A stored target is concrete: it is neither
+ * another alias nor a reserved `kilo-auto/` model. `storedAliasTarget` in the gateway and the
+ * benchmark's catalog resolution apply the same rule, so both sides of a dispatch agree on when a
+ * target is unproven.
+ */
+export const ALIAS_MODEL_PREFIX = '~';
+
+export function isConcreteAliasTarget(target: string): boolean {
+  return (
+    !target.startsWith(ALIAS_MODEL_PREFIX) &&
+    !target.startsWith(CLIENT_CANDIDATE_PREFIX) &&
+    !isVirtualAutoModelId(target)
+  );
+}
+
+/**
+ * The alias-to-concrete-target map a pool needs to rank the target it would actually dispatch.
+ * Server-to-server only, and it can never widen a pool: `poolAliasTargets` keeps only keys that
+ * are gateway alias entries of the definition it is given, and every target must be a concrete id.
+ */
+export const CustomRouterAliasTargetsSchema = z
+  .record(GatewayModelIdSchema, GatewayModelIdSchema)
+  .superRefine((targets, ctx) => {
+    if (Object.keys(targets).length > MAX_CUSTOM_ROUTER_ENTRIES) {
+      addIssue(ctx, [], `Too big: expected at most ${MAX_CUSTOM_ROUTER_ENTRIES} alias targets`);
+    }
+    for (const [alias, target] of Object.entries(targets)) {
+      if (!alias.startsWith(ALIAS_MODEL_PREFIX)) {
+        addIssue(ctx, [alias], 'Alias targets are keyed by a ~ alias');
+      }
+      if (!isConcreteAliasTarget(target)) {
+        addIssue(ctx, [alias], `Alias ${alias} target must name a concrete model`);
+      }
+    }
+  });
+export type CustomRouterAliasTargets = z.infer<typeof CustomRouterAliasTargetsSchema>;
+
+/**
+ * The alias targets of one saved pool that a caller may rely on, restricted to that pool's own
+ * gateway alias entries. A definition is required: without it an unrestrained map could name a
+ * target no entry of this request can dispatch.
+ */
+export function poolAliasTargets(
+  router: Pick<CustomRouterDefinition, 'entries'>,
+  aliasTargets: ReadonlyMap<string, string>
+): Map<string, string> {
+  const aliases = new Set(
+    router.entries.flatMap(entry =>
+      entry.kind === 'gateway' && entry.model.startsWith(ALIAS_MODEL_PREFIX) ? [entry.model] : []
+    )
+  );
+  return new Map(
+    [...aliasTargets].filter(
+      ([alias, target]) => aliases.has(alias) && isConcreteAliasTarget(target)
+    )
+  );
+}
+
 export const CustomRouterWriteEntriesSchema = CustomRouterEntriesSchema.transform(entries =>
   entries.map(stripServingPin)
 ).superRefine((entries, ctx) => {

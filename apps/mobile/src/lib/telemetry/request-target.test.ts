@@ -303,4 +303,15 @@ describe('stripQueryString', () => {
       expect(stripQueryString(url)).toBe(`https://${HOST}${TRPC_PATH_FIXTURE}`);
     }
   });
+
+  it('reads a non-special scheme as an authority only after two separators', () => {
+    const scheme = ['custom', ''].join(':');
+
+    expect(stripQueryString(`${scheme}${TRPC_PATH_FIXTURE}`)).toBe(`${scheme}${TRPC_PATH_FIXTURE}`);
+    expect(stripQueryString(`${scheme}/${USERINFO}@${HOST}/x`)).toBe(
+      `${scheme}/${USERINFO}@${HOST}/x`
+    );
+    expect(stripQueryString(`${scheme}///a@b/c`)).toBe(`${scheme}///a@b/c`);
+    expect(stripQueryString(`${scheme}//${USERINFO}@${HOST}/x`)).toBe(`${scheme}//${HOST}/x`);
+  });
 });

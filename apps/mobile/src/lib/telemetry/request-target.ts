@@ -109,7 +109,8 @@ export function stripQueryString(url: string): string {
     // `https:///` all reach the same authority. Any other scheme reads its
     // authority only after `//`, as the format requires.
     const isSpecial = SPECIAL_SCHEME.test(scheme[1] ?? '');
-    if (!isSpecial && (scheme[2] ?? '') === '') {
+    const separator = scheme[2] ?? '';
+    if (!isSpecial && separator !== '//') {
       return cutAtQueryOrFragment(text);
     }
     const schemeEnd = scheme[0].length;
@@ -152,14 +153,8 @@ export function stripQueryString(url: string): string {
     if (isHostLike(tail) || (!crossedQuery && SINGLE_LABEL.test(tail))) {
       return prefix + cutAtQueryOrFragment(text.slice(tailStart));
     }
-    if (!crossedQuery) {
-      return prefix;
-    }
-    // The `@` belongs to the query or fragment. A path before it settles that the
-    // authority ended at the first delimiter, so the text before the query is
-    // kept only when it reads as a host: otherwise it may still be userinfo.
-    const run = text.slice(schemeEnd, nextDelimiter(text, schemeEnd));
-    return isHostLike(run) ? prefix + run : prefix;
+    // The reported value keeps its scheme and no authority here.
+    return prefix;
   } catch {
     return '';
   }

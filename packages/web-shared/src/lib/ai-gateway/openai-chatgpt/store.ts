@@ -71,7 +71,7 @@ export function openAiChatGptOwnerKey(owner: OpenAiChatGptOwner): string {
  * here. Asserting it once keeps an absent predicate, which would make a
  * `delete(...).where(...)` unfiltered, out of every caller's reach.
  */
-function ownerRowWhere(...conditions: SQL[]): SQL {
+function ownerRowWhere(...conditions: [SQL, SQL, ...SQL[]]): SQL {
   return and(...conditions) as SQL;
 }
 

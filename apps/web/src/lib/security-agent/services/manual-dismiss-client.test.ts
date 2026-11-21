@@ -15,18 +15,18 @@ describe('submitManualFindingDismissal', () => {
   });
 
   it('submits the dismissal analytics identity and returns accepted correlation ids', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 202,
-      json: () =>
-        Promise.resolve({
+    mockFetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({
           success: true,
           accepted: true,
           commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
           runId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
           messageId: 'dismiss-message-123',
         }),
-    });
+        { status: 202 }
+      )
+    );
 
     await expect(
       submitManualFindingDismissal({
@@ -62,18 +62,18 @@ describe('submitManualFindingDismissal', () => {
   });
 
   it('passes the stable operation key to the Worker when present', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 202,
-      json: () =>
-        Promise.resolve({
+    mockFetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({
           success: true,
           accepted: true,
           commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
           runId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
           messageId: 'dismiss-message-123',
         }),
-    });
+        { status: 202 }
+      )
+    );
 
     await submitManualFindingDismissal({
       owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
@@ -130,11 +130,7 @@ describe('submitManualFindingDismissal', () => {
   });
 
   it('classifies a 5xx status as ambiguous transport (BAD_GATEWAY)', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 502,
-      json: () => Promise.resolve({ error: 'boom' }),
-    });
+    mockFetch.mockResolvedValue(new Response(JSON.stringify({ error: 'boom' }), { status: 502 }));
 
     let captured: unknown;
     try {
@@ -158,12 +154,15 @@ describe('submitManualFindingDismissal', () => {
   });
 
   it('classifies the known disabled-routing 503 as a definitive pre-acceptance rejection (PRECONDITION_FAILED)', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 503,
-      json: () =>
-        Promise.resolve({ success: false, error: 'Finding dismissal Worker routing is disabled' }),
-    });
+    mockFetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Finding dismissal Worker routing is disabled',
+        }),
+        { status: 503 }
+      )
+    );
 
     let captured: unknown;
     try {
@@ -188,11 +187,11 @@ describe('submitManualFindingDismissal', () => {
   });
 
   it('keeps a 503 with a non-matching body ambiguous transport (BAD_GATEWAY)', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 503,
-      json: () => Promise.resolve({ success: false, error: 'gateway upstream unavailable' }),
-    });
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ success: false, error: 'gateway upstream unavailable' }), {
+        status: 503,
+      })
+    );
 
     let captured: unknown;
     try {
@@ -213,11 +212,9 @@ describe('submitManualFindingDismissal', () => {
   });
 
   it('classifies a 4xx status as a definitive pre-acceptance rejection (PRECONDITION_FAILED)', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 400,
-      json: () => Promise.resolve({ error: 'invalid' }),
-    });
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ error: 'invalid' }), { status: 400 })
+    );
 
     let captured: unknown;
     try {
@@ -240,11 +237,7 @@ describe('submitManualFindingDismissal', () => {
   });
 
   it('classifies a non-JSON body as ambiguous transport (BAD_GATEWAY)', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 202,
-      json: () => Promise.reject(new SyntaxError('Unexpected token < in JSON')),
-    });
+    mockFetch.mockResolvedValue(new Response('<html>gateway</html>', { status: 202 }));
 
     let captured: unknown;
     try {
@@ -264,11 +257,9 @@ describe('submitManualFindingDismissal', () => {
   });
 
   it('classifies a 2xx with lost correlation ids as ambiguous transport (BAD_GATEWAY)', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 202,
-      json: () => Promise.resolve({ success: true, accepted: true }),
-    });
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ success: true, accepted: true }), { status: 202 })
+    );
 
     let captured: unknown;
     try {

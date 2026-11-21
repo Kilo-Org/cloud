@@ -337,6 +337,30 @@ describe('active-sessions-router', () => {
         jest.useRealTimers();
       }
     });
+
+    it('reports a 200 body that fails mid-transfer as SERVICE_UNAVAILABLE', async () => {
+      // The transfer is torn down after the headers (a reset connection or a
+      // premature close), so the read rejects with a stream error rather than a
+      // timeout. That is the same transport failure the fetch stage maps to
+      // SERVICE_UNAVAILABLE, not a malformed body.
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(
+          new ReadableStream({
+            pull() {
+              throw new Error('network error');
+            },
+          }),
+          { status: 200 }
+        )
+      );
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expectMintFailure(
+        caller.activeSessions.createWebTicket(),
+        'SERVICE_UNAVAILABLE',
+        'Session ingest is unavailable'
+      );
+    });
   });
 
   describe('listInstances', () => {
@@ -597,6 +621,35 @@ describe('active-sessions-router', () => {
       }
     });
 
+    it('reports a body that fails mid-transfer as SERVICE_UNAVAILABLE', async () => {
+      // The upstream sends headers and then the transfer breaks (a reset
+      // connection or a premature close). `reader.read()` rejects with a
+      // TypeError, which is the same transport failure the fetch stage maps to
+      // SERVICE_UNAVAILABLE — not a malformed body, so not BAD_GATEWAY.
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(
+          new ReadableStream({
+            pull() {
+              throw new Error('network error');
+            },
+          }),
+          { status: 200 }
+        )
+      );
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      const caller = await createCallerForUser(regularUser.id);
+
+      try {
+        await expect(caller.activeSessions.listInstances()).rejects.toMatchObject({
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Session ingest is unavailable',
+        });
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
     it('logs a bounded excerpt of a non-2xx body instead of the whole payload', async () => {
       const longRun = 'x'.repeat(500);
       jest.spyOn(global, 'fetch').mockResolvedValue(
@@ -624,7 +677,36 @@ describe('active-sessions-router', () => {
       }
     });
 
-    it('reports both list and listInstances failures as SERVICE_UNAVAILABLE', async () => {
+    it('logs a capped excerpt of a non-2xx non-JSON body', async () => {
+      // The upstream error body is unclassified text, so a JSON-only read would
+      // add no note at all for an HTML error page. The excerpt is the first 200
+      // characters of whatever the body is.
+      const longRun = 'y'.repeat(500);
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(`<html>${longRun}</html>`, {
+          status: 502,
+          headers: { 'Content-Type': 'text/html' },
+        })
+      );
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(caller.activeSessions.listInstances()).rejects.toMatchObject({
+        code: 'BAD_GATEWAY',
+      });
+
+      const logged = warn.mock.calls[0];
+      expect(logged[0]).toMatch(/^\[active-sessions\.instances\] non-2xx: 502/);
+      const excerpt = logged[1];
+      expect(typeof excerpt).toBe('string');
+      expect((excerpt as string).length).toBeLessThanOrEqual(200);
+      expect(excerpt as string).toContain('<html>');
+      for (const argument of logged) {
+        expect(String(argument)).not.toContain(longRun);
+      }
+    });
+
+    it('reports a 502 as SERVICE_UNAVAILABLE for list and BAD_GATEWAY for listInstances', async () => {
       jest
         .spyOn(global, 'fetch')
         .mockImplementation(() => Promise.resolve(new Response('bad gateway', { status: 502 })));

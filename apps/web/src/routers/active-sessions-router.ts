@@ -5,9 +5,9 @@ import { z } from 'zod';
 import { SESSION_INGEST_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
 import {
   CONTROL_PLANE_UPSTREAM_BUDGET_MS,
-  ServiceFetchTimeoutError,
   fetchWithinBudget,
   readJsonWithinBudget,
+  readTextWithinBudget,
 } from '@/lib/bounded-service-fetch';
 import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
 import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
@@ -71,19 +71,24 @@ export type ConnectedInstance = z.infer<typeof connectedInstanceSchema>;
 const INSTANCE_ERROR_LOG_EXCERPT_CHARS = 200;
 
 /**
- * Classifies a failed session-ingest body read. A read that outlived the budget
- * is the same transport failure the fetch itself raises, so it stays retryable;
- * a body that arrived but is not JSON is a bad gateway answer.
+ * Classifies a failed session-ingest body read.
+ *
+ * Only a body that arrived in full and is not JSON is a bad gateway answer
+ * (`SyntaxError` from `JSON.parse`). Every other failure is a transport
+ * failure — the read outlived its budget (`ServiceFetchTimeoutError`) or the
+ * transfer broke mid-body (`TypeError` from a reset connection or a premature
+ * close) — which is the same failure the fetch stage maps to
+ * `SERVICE_UNAVAILABLE`, so it stays retryable here too.
  */
 function bodyReadFailureError(error: unknown, malformedMessage: string): TRPCError {
-  if (error instanceof ServiceFetchTimeoutError) {
-    return new TRPCError({
-      code: 'SERVICE_UNAVAILABLE',
-      message: 'Session ingest is unavailable',
-      cause: error,
-    });
+  if (error instanceof SyntaxError) {
+    return new TRPCError({ code: 'BAD_GATEWAY', message: malformedMessage, cause: error });
   }
-  return new TRPCError({ code: 'BAD_GATEWAY', message: malformedMessage, cause: error });
+  return new TRPCError({
+    code: 'SERVICE_UNAVAILABLE',
+    message: 'Session ingest is unavailable',
+    cause: error,
+  });
 }
 
 /**
@@ -298,18 +303,20 @@ export const activeSessionsRouter = createTRPCRouter({
       // The upstream error body is unclassified text. Read it inside what the
       // headers left of the budget and log a bounded excerpt, never the whole
       // payload on a polled procedure.
+      const remaining = remainingBudgetMs();
       let excerpt: string | null = null;
       try {
-        const body: unknown = await readJsonWithinBudget(
+        const text = await readTextWithinBudget(
           response,
-          remainingBudgetMs(),
+          remaining,
           CONTROL_PLANE_UPSTREAM_BUDGET_MS
         );
-        const serialized = JSON.stringify(body);
-        excerpt = serialized.slice(0, INSTANCE_ERROR_LOG_EXCERPT_CHARS);
+        // The first 200 characters of the upstream error body, whatever its
+        // content type.
+        excerpt = text.slice(0, INSTANCE_ERROR_LOG_EXCERPT_CHARS);
       } catch {
-        // A body that does not parse or outlives the budget adds no note; the
-        // status below is the whole report.
+        // A body that outlives the budget adds no note; the status below is the
+        // whole report.
       }
       console.warn(
         `[active-sessions.instances] non-2xx: ${response.status} ${response.statusText}`,

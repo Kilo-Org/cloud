@@ -118,7 +118,10 @@ jest.mock('@kilocode/web-shared/lib/tokens', () => ({
   generateBoundedInternalServiceToken: () => 'test-token',
 }));
 
-const workerAnswer = () => ({ ok: true, json: async () => ({ sessions: liveSessions }) });
+const workerAnswer = () => ({
+  ok: true,
+  text: async () => JSON.stringify({ sessions: liveSessions }),
+});
 const mockFetchWithinBudget = jest.fn(async (_url: string, _init?: RequestInit, _deps?: object) =>
   workerAnswer()
 );
@@ -271,7 +274,7 @@ describe('listActiveSessions budgets', () => {
       // the wait, or this answer hangs past the point the caller can use it.
       mockFetchWithinBudget.mockResolvedValueOnce({
         ok: true,
-        json: () => new Promise<never>(() => {}),
+        text: () => new Promise<never>(() => {}),
       });
       selectMock.mockImplementation(() => fakeQuery([]));
 
@@ -308,7 +311,7 @@ describe('listActiveSessions budgets', () => {
       const HEADER_DELAY_MS = 3_000;
       mockFetchWithinBudget.mockImplementationOnce(async () => {
         await new Promise(resolve => setTimeout(resolve, HEADER_DELAY_MS));
-        return { ok: true, json: () => new Promise<never>(() => {}) };
+        return { ok: true, text: () => new Promise<never>(() => {}) };
       });
       selectMock.mockImplementation(() => fakeQuery([]));
 

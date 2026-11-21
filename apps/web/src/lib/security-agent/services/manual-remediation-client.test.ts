@@ -20,11 +20,9 @@ describe('submitManualRemediationStart', () => {
   });
 
   it('returns queued attempt correlation for accepted admission', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 202,
-      json: () =>
-        Promise.resolve({
+    mockFetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({
           success: true,
           accepted: true,
           admitted: true,
@@ -32,7 +30,9 @@ describe('submitManualRemediationStart', () => {
           attemptId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
           attemptNumber: 1,
         }),
-    });
+        { status: 202 }
+      )
+    );
 
     await expect(
       submitManualRemediationStart({
@@ -49,17 +49,17 @@ describe('submitManualRemediationStart', () => {
   });
 
   it('returns a typed policy rejection for analysis_required', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 409,
-      json: () =>
-        Promise.resolve({
+    mockFetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({
           success: false,
           accepted: false,
           admitted: false,
           reason: 'analysis_required',
         }),
-    });
+        { status: 409 }
+      )
+    );
 
     await expect(
       submitManualRemediationStart({
@@ -71,17 +71,17 @@ describe('submitManualRemediationStart', () => {
   });
 
   it('returns a typed not-found rejection when the finding disappears', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 404,
-      json: () =>
-        Promise.resolve({
+    mockFetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({
           success: false,
           accepted: false,
           admitted: false,
           reason: 'finding_not_found',
         }),
-    });
+        { status: 404 }
+      )
+    );
 
     await expect(
       submitManualRemediationStart({
@@ -93,11 +93,7 @@ describe('submitManualRemediationStart', () => {
   });
 
   it('classifies a non-JSON gateway response as ambiguous transport, not a SyntaxError', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 502,
-      json: () => Promise.reject(new SyntaxError('Unexpected token < in JSON at position 0')),
-    });
+    mockFetch.mockResolvedValue(new Response('<html>gateway</html>', { status: 502 }));
 
     let captured: unknown;
     try {
@@ -187,22 +183,18 @@ describe('remediation Worker call sites', () => {
   it.each(callSites)(
     'classifies a Worker 5xx on $name as ambiguous transport',
     async ({ submit }) => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 500,
-        json: () => Promise.resolve({ error: 'internal error' }),
-      });
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ error: 'internal error' }), { status: 500 })
+      );
 
       await expect(submit()).rejects.toMatchObject({ name: 'TRPCError', code: 'BAD_GATEWAY' });
     }
   );
 
   it.each(callSites)('keeps a 4xx on $name definitive', async ({ submit }) => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 400,
-      json: () => Promise.resolve({ error: 'Invalid request' }),
-    });
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ error: 'Invalid request' }), { status: 400 })
+    );
     const logged = jest.spyOn(console, 'error').mockImplementation(() => {});
 
     const error: TRPCError = await submit().then(
@@ -232,11 +224,9 @@ describe('remediation Worker call sites', () => {
       // A 401/403 is the Worker rejecting the server's own credentials: the
       // same deployment misconfiguration as an unset URL or secret, so the
       // device gets the service-not-configured copy, not the rejection line.
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 401,
-        json: () => Promise.resolve({ error: 'Unauthorized' }),
-      });
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+      );
       const logged = jest.spyOn(console, 'error').mockImplementation(() => {});
 
       const error: TRPCError = await submit().then(

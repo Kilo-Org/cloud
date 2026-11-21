@@ -151,12 +151,52 @@ export async function fetchWithinBudget(
  * this read was configured with, and it is the value the timeout error reports
  * so logs and Sentry show the configured budget instead of the few milliseconds
  * that were left when the body started.
+ *
+ * The read itself is {@link readTextWithinBudget}, which owns the reader, the
+ * timer and the cancellation; this function only parses what it returns, so a
+ * body that arrived but is not JSON rejects with `SyntaxError` while every
+ * transport failure keeps rejecting with {@link ServiceFetchTimeoutError} or
+ * the underlying stream error.
  */
 export async function readJsonWithinBudget<T = unknown>(
   response: Response,
   remainingBudgetMs: number,
   totalBudgetMs: number = remainingBudgetMs
 ): Promise<T> {
+  // The bounded text reader below owns the whole timeout/cancel contract; the
+  // only addition here is the parse, so a body that arrived but is not JSON
+  // rejects with `SyntaxError` rather than `ServiceFetchTimeoutError`.
+  return JSON.parse(await readTextWithinBudget(response, remainingBudgetMs, totalBudgetMs)) as T;
+}
+
+/**
+ * Read a bounded fetch's body to its end as text, under the same budget rule as
+ * {@link readJsonWithinBudget}.
+ *
+ * {@link fetchWithinBudget} settles as soon as the upstream answers with its
+ * headers and then disarms its timer, so an upstream that accepts the
+ * connection and stalls the body would hold the caller open with no bound at
+ * all. The body is therefore read under what is left of the budget and the read
+ * is abandoned when that runs out, rejecting with the same
+ * {@link ServiceFetchTimeoutError} the fetch raises so one caller handles both.
+ *
+ * The read goes through a reader this function owns rather than
+ * `response.text()`. `text()` locks the body stream for the whole read, and a
+ * locked stream cannot be cancelled, so an expired read of a real `Response`
+ * would leave the abandoned body being buffered for as long as the upstream
+ * kept trickling it. Cancelling a reader we hold tears the stream down and ends
+ * the transfer.
+ *
+ * `remainingBudgetMs` is what the headers left; `totalBudgetMs` is the budget
+ * this read was configured with, and it is the value the timeout error reports
+ * so logs and Sentry show the configured budget instead of the few milliseconds
+ * that were left when the body started.
+ */
+export async function readTextWithinBudget(
+  response: Response,
+  remainingBudgetMs: number,
+  totalBudgetMs: number = remainingBudgetMs
+): Promise<string> {
   const budgetError = new ServiceFetchTimeoutError(remainingBudgetMs, totalBudgetMs);
   const expired = Promise.withResolvers<never>();
   // A body another reader already holds cannot be taken over; the wait is
@@ -175,9 +215,9 @@ export async function readJsonWithinBudget<T = unknown>(
 
   try {
     if (!reader) {
-      return await Promise.race([response.json() as Promise<T>, expired.promise]);
+      return await Promise.race([response.text(), expired.promise]);
     }
-    return JSON.parse(await Promise.race([readAllText(reader), expired.promise])) as T;
+    return await Promise.race([readAllText(reader), expired.promise]);
   } finally {
     clearTimeout(timer);
   }

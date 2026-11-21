@@ -84,9 +84,7 @@ jest.mock('@/lib/bounded-service-fetch', () => ({
   ...jest.requireActual('@/lib/bounded-service-fetch'),
   fetchWithinBudget: jest.fn(async () => ({
     ok: true,
-    json: async () => ({
-      sessions: liveSessions,
-    }),
+    text: async () => JSON.stringify({ sessions: liveSessions }),
   })),
 }));
 

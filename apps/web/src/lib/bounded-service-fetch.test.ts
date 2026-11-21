@@ -7,6 +7,7 @@ import {
   ServiceFetchTimeoutError,
   fetchWithinBudget,
   readJsonWithinBudget,
+  readTextWithinBudget,
 } from './bounded-service-fetch';
 import { CONTROL_PLANE_PROCEDURE_BUDGET_MS } from '@kilocode/web-shared/lib/trpc/control-plane-budget';
 
@@ -174,7 +175,7 @@ describe('readJsonWithinBudget', () => {
 
   test('cancels a real response body that never finishes', async () => {
     // A real `Response`, because the interesting state only a real body
-    // produces is the one `response.json()` leaves behind: it locks the stream,
+    // produces is a locked stream: `text()` would lock it for the whole read,
     // and a locked stream cannot be cancelled. The upstream here sends a
     // partial body and then stalls, so an expiry that did not cancel its own
     // reader would keep the transfer alive after the caller gave up.
@@ -219,7 +220,7 @@ describe('readJsonWithinBudget', () => {
     // hundred milliseconds. Logs and Sentry must still show the budget the read
     // was configured with, or a 4,500 ms read looks like a 120 ms one.
     const response = {
-      json: () => new Promise<never>(() => {}),
+      text: () => new Promise<never>(() => {}),
       body: null,
     } as unknown as Response;
 
@@ -237,7 +238,7 @@ describe('readJsonWithinBudget', () => {
     // Cancelling a locked stream throws, so a mid-read body is abandoned.
     const cancel = jest.fn(async () => undefined);
     const response = {
-      json: () => new Promise<never>(() => {}),
+      text: () => new Promise<never>(() => {}),
       body: { locked: true, cancel },
     } as unknown as Response;
 
@@ -246,5 +247,51 @@ describe('readJsonWithinBudget', () => {
 
     expect(await outcome).toBeInstanceOf(ServiceFetchTimeoutError);
     expect(cancel).not.toHaveBeenCalled();
+  });
+});
+
+describe('readTextWithinBudget', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.useRealTimers();
+  });
+
+  test('reads a text body to its end inside the remaining budget', async () => {
+    const response = new Response('<html>upstream failed</html>', {
+      status: 502,
+      headers: { 'Content-Type': 'text/html' },
+    });
+
+    await expect(readTextWithinBudget(response, 1_000)).resolves.toBe(
+      '<html>upstream failed</html>'
+    );
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('rejects with ServiceFetchTimeoutError when the budget is already spent', async () => {
+    // A spent budget arms the timer with zero, so the expiry fires before any
+    // body can arrive and the reader's cancel tears the stream down.
+    const cancel = jest.fn(async () => undefined);
+    const stream = new ReadableStream<Uint8Array>({
+      pull() {
+        // Never enqueues: the transfer stays open like a stalled upstream.
+      },
+      cancel,
+    });
+    const response = new Response(stream, { status: 200 });
+
+    const outcome = readTextWithinBudget(response, 0).catch((error: unknown) => error);
+    await jest.advanceTimersByTimeAsync(0);
+
+    const error = await outcome;
+    expect(error).toBeInstanceOf(ServiceFetchTimeoutError);
+    expect((error as ServiceFetchTimeoutError).budgetMs).toBe(0);
+    expect((error as ServiceFetchTimeoutError).totalBudgetMs).toBe(0);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
   });
 });

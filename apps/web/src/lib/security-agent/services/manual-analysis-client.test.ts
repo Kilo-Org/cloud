@@ -16,16 +16,16 @@ describe('submitManualAnalysisStart', () => {
   });
 
   it('submits a durable manual analysis command and returns queued state', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 202,
-      json: () =>
-        Promise.resolve({
+    mockFetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({
           success: true,
           accepted: true,
           commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
         }),
-    });
+        { status: 202 }
+      )
+    );
 
     await expect(
       submitManualAnalysisStart({
@@ -97,11 +97,12 @@ describe('submitManualAnalysisStart', () => {
   });
 
   it('classifies a non-JSON gateway response as ambiguous transport, not a SyntaxError', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 502,
-      json: () => Promise.reject(new SyntaxError('Unexpected token < in JSON at position 0')),
-    });
+    mockFetch.mockResolvedValue(
+      new Response('<html>gateway</html>', {
+        status: 502,
+        headers: { 'Content-Type': 'text/html' },
+      })
+    );
 
     let captured: unknown;
     try {
@@ -118,11 +119,9 @@ describe('submitManualAnalysisStart', () => {
   });
 
   it('classifies a Worker 5xx as ambiguous transport', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 503,
-      json: () => Promise.resolve({ error: 'gateway upstream unavailable' }),
-    });
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ error: 'gateway upstream unavailable' }), { status: 503 })
+    );
 
     await expect(submitManualAnalysisStart(startParams())).rejects.toMatchObject({
       name: 'TRPCError',
@@ -131,11 +130,9 @@ describe('submitManualAnalysisStart', () => {
   });
 
   it('keeps a 4xx Worker rejection definitive', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 400,
-      json: () => Promise.resolve({ error: 'Invalid manual analysis command' }),
-    });
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ error: 'Invalid manual analysis command' }), { status: 400 })
+    );
 
     await expect(submitManualAnalysisStart(startParams())).rejects.toThrow(
       'Invalid manual analysis command'
@@ -143,11 +140,11 @@ describe('submitManualAnalysisStart', () => {
   });
 
   it('keeps the known disabled-routing 503 definitive', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 503,
-      json: () => Promise.resolve({ error: 'Manual analysis Worker routing is disabled' }),
-    });
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ error: 'Manual analysis Worker routing is disabled' }), {
+        status: 503,
+      })
+    );
 
     await expect(submitManualAnalysisStart(startParams())).rejects.toThrow(
       'Manual analysis Worker routing is disabled'
@@ -155,15 +152,15 @@ describe('submitManualAnalysisStart', () => {
   });
 
   it('keeps the known disabled-routing 503 definitive even with success true (no success requirement)', async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 503,
-      json: () =>
-        Promise.resolve({
+    mockFetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({
           error: 'Manual analysis Worker routing is disabled',
           success: true,
         }),
-    });
+        { status: 503 }
+      )
+    );
 
     await expect(submitManualAnalysisStart(startParams())).rejects.toThrow(
       'Manual analysis Worker routing is disabled'

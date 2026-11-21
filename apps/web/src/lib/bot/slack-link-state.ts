@@ -52,6 +52,31 @@ export function createSlackBotLinkState(params: {
   });
 }
 
+const slackBotLinkStateKindSchema = z.object({ kind: z.literal(KIND) });
+
+/**
+ * Classify a state as a Slack bot-link state by decoding only its payload half.
+ *
+ * This exists to pick an error page for a state that failed verification — a
+ * paused sign-in outlives the 10-minute TTL — so it checks neither the
+ * signature nor the age and must never authorize anything.
+ */
+export function isSlackBotLinkState(state: string | null): boolean {
+  if (!state) return false;
+
+  const dotIndex = state.indexOf('.');
+  if (dotIndex === -1) return false;
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(Buffer.from(state.slice(0, dotIndex), 'base64url').toString('utf8'));
+  } catch {
+    return false;
+  }
+
+  return slackBotLinkStateKindSchema.safeParse(payload).success;
+}
+
 export function verifySlackBotLinkState(state: string | null): VerifiedSlackBotLinkState | null {
   return verifySignedToken(state, {
     ttlSeconds: STATE_TTL_SECONDS,

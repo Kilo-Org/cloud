@@ -20,6 +20,7 @@ import type { PlatformIdentity } from '@/lib/bot-identity';
 import { completeLinkAccount, reprocessLinkedContext } from '@/lib/bot/link-account-completion';
 import { errorPage, linkConflictPage, linkUsedPage, page } from '@/lib/bot/link-account-page';
 import {
+  isSlackBotLinkState,
   verifySlackBotLinkState,
   type VerifiedSlackBotLinkState,
 } from '@/lib/bot/slack-link-state';
@@ -212,6 +213,19 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
     const botLinkState = verifySlackBotLinkState(state);
     if (botLinkState) {
       return await handleSlackBotLinkCallback({ user, state: botLinkState, code, error });
+    }
+
+    // A bot-link state that failed verification is expired or tampered with;
+    // the link flow's own expired page says so, while the install-flow error
+    // below would send the user to an unrelated integrations page. The
+    // response must not distinguish expired from tampered, so this branch
+    // answers both the same way.
+    if (isSlackBotLinkState(state)) {
+      return errorPage(
+        'Link Expired',
+        'Invalid or expired link. Please go back to your chat and try again.',
+        400
+      );
     }
 
     // Handle OAuth errors from Slack

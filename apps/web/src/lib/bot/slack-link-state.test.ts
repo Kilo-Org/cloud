@@ -1,6 +1,10 @@
 import { describe, expect, test } from '@jest/globals';
 import { createSignedToken } from '@/lib/signed-token';
-import { createSlackBotLinkState, verifySlackBotLinkState } from './slack-link-state';
+import {
+  createSlackBotLinkState,
+  isSlackBotLinkState,
+  verifySlackBotLinkState,
+} from './slack-link-state';
 
 const params = {
   userId: 'kilo-user-1',
@@ -67,5 +71,50 @@ describe('slack bot-link state', () => {
     });
 
     expect(verifySlackBotLinkState(state)).toBeNull();
+  });
+});
+
+describe('isSlackBotLinkState', () => {
+  test('classifies an expired state that verification rejects', () => {
+    const realNow = Date.now;
+    let state: string;
+    try {
+      Date.now = () => 1_000_000_000_000;
+      state = createSlackBotLinkState(params);
+      Date.now = () => 1_000_000_000_000 + 11 * 60 * 1000;
+
+      expect(verifySlackBotLinkState(state)).toBeNull();
+      expect(isSlackBotLinkState(state)).toBe(true);
+    } finally {
+      Date.now = realNow;
+    }
+  });
+
+  test('classifies a correctly signed bot-link state', () => {
+    expect(isSlackBotLinkState(createSlackBotLinkState(params))).toBe(true);
+  });
+
+  test('classifies a tampered-signature state', () => {
+    const [payload, signature] = createSlackBotLinkState(params).split('.');
+
+    expect(isSlackBotLinkState(`${payload}.${signature}x`)).toBe(true);
+  });
+
+  test('does not classify an install-flow state', () => {
+    const installState = createSignedToken({
+      provider: 'slack',
+      purpose: 'provider_install',
+      owner: 'user:x',
+      userId: 'y',
+    });
+
+    expect(isSlackBotLinkState(installState)).toBe(false);
+  });
+
+  test('does not classify missing or undecodable input', () => {
+    expect(isSlackBotLinkState(null)).toBe(false);
+    expect(isSlackBotLinkState('')).toBe(false);
+    expect(isSlackBotLinkState('garbage')).toBe(false);
+    expect(isSlackBotLinkState('bm90anNvbg.')).toBe(false);
   });
 });

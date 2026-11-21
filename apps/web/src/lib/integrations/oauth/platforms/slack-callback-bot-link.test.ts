@@ -261,9 +261,11 @@ describe('handleSlackOAuthCallback Slack bot-link', () => {
     const contextKey = await seedPendingLink();
 
     const response = await callCallback({ state: botLinkState(contextKey) });
+    const body = await response.text();
 
     expect(response.status).toBe(409);
-    await expect(response.text()).resolves.toContain('already linked to a different Kilo account');
+    expect(body).toContain('already linked to a different Kilo account');
+    expect(body).toContain('disconnect the slack integration');
     await expect(mappedKiloUser()).resolves.toBe(OTHER_KILO_USER_ID);
     expect(mockAfter).not.toHaveBeenCalled();
   });
@@ -307,6 +309,38 @@ describe('handleSlackOAuthCallback Slack bot-link', () => {
     await callCallback({ state: botLinkState(contextKey) });
 
     expect(mockedBot.getAdapter).not.toHaveBeenCalled();
+  });
+
+  it('reports the link-flow expired page for an expired bot-link state', async () => {
+    const contextKey = await seedPendingLink();
+    const now = jest.spyOn(Date, 'now');
+    let expiredState: string;
+    try {
+      now.mockReturnValue(1_000_000_000_000);
+      expiredState = botLinkState(contextKey);
+      now.mockReturnValue(1_000_000_000_000 + 11 * 60 * 1000);
+
+      const response = await callCallback({ state: expiredState });
+
+      expect(response.status).toBe(400);
+      await expect(response.text()).resolves.toContain('Link Expired');
+      expect(mockExchangeSlackOidcCode).not.toHaveBeenCalled();
+      await expect(mappedKiloUser()).resolves.toBeNull();
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it('reports the same expired page for a tampered bot-link signature', async () => {
+    const contextKey = await seedPendingLink();
+    const [payload, signature] = botLinkState(contextKey).split('.');
+
+    const response = await callCallback({ state: `${payload}.${signature}x` });
+
+    expect(response.status).toBe(400);
+    await expect(response.text()).resolves.toContain('Link Expired');
+    expect(mockExchangeSlackOidcCode).not.toHaveBeenCalled();
+    await expect(mappedKiloUser()).resolves.toBeNull();
   });
 
   it('reports a failed identity proof without writing a mapping', async () => {

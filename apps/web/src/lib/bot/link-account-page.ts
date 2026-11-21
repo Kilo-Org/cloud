@@ -15,8 +15,14 @@ const PAGE_HEADERS = {
   // or forward it. `form-action` also governs the redirects of a form
   // submission, and the identity proof continues to Slack from that POST, so
   // Slack is the one additional origin the submission may reach.
+  //
+  // The apex and the wildcard are both required: a host source without a
+  // wildcard does not match subdomains, and `*.slack.com` does not match
+  // `slack.com` itself. The sign-in endpoint is on the apex today, but Slack
+  // routes some sign-in hops through a workspace or `app.` subdomain, and a
+  // blocked hop shows the user a CSP error instead of the sign-in page.
   'content-security-policy':
-    "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://slack.com; frame-ancestors 'none'; base-uri 'none'",
+    "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://slack.com https://*.slack.com; frame-ancestors 'none'; base-uri 'none'",
   'x-frame-options': 'DENY',
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'no-referrer',
@@ -53,7 +59,9 @@ export function linkConflictPage(platform: string): Response {
   return errorPage(
     'Already linked',
     `This ${platform} account is already linked to a different Kilo account. No changes were made. ` +
-      `Sign in to the Kilo account that already holds it, then request a new link from your chat.`,
+      `Sign in to the Kilo account that already holds it, then request a new link from your chat. ` +
+      `If you cannot sign in to that account, a workspace owner or admin can disconnect the ` +
+      `${platform} integration and connect it again, which clears the links held for that workspace.`,
     409
   );
 }

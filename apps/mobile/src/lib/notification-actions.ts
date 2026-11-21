@@ -579,6 +579,12 @@ function resultIdentities(
  * `resultIdentifier`, and dismiss `replacedIdentifier` when it is a different
  * one, so one raise never ends with two notifications.
  *
+ * The dismissal follows a post that landed. A rejected post is reported and
+ * returns before it: the result never exists in that case, so the acted-on
+ * notification is the only carrier left of the outcome — and, for a retryable
+ * result, of the Approve/Reply actions the user retries with. Dismissing it
+ * there would end the tap with nothing on screen.
+ *
  * `interruptionLevel` is outcome-derived: the retryable failure keeps the
  * raise's time-sensitive break-through because it still needs the user; the
  * `ok` / `unavailable` confirmations are quiet.
@@ -617,6 +623,7 @@ async function replaceNotification(args: {
     });
   } catch (error) {
     reportActionFailure('publish', error);
+    return;
   }
   if (replacedIdentifier !== resultIdentifier) {
     try {

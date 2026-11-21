@@ -445,6 +445,40 @@ describe('handleNeedsInputNotificationResponse — approve and reply', () => {
     expect(mocks.dismissNotificationAsync).toHaveBeenCalledWith('fcm-remote-1');
   });
 
+  const publishFailureCases: { shape: string; input: ResponseInput }[] = [
+    { shape: 'Approve', input: { identifier: 'fcm-remote-1' } },
+    {
+      shape: 'inline reply',
+      input: {
+        identifier: 'fcm-remote-1',
+        actionIdentifier: NEEDS_INPUT_ACTION_IDS.reply,
+        userText: 'ship it',
+      },
+    },
+  ];
+
+  it.each(publishFailureCases)(
+    'keeps the acted-on raise when the $shape result cannot be published',
+    async ({ input }) => {
+      mocks.runNeedsInputInteraction.mockResolvedValue('retryable');
+      mocks.scheduleNotificationAsync.mockRejectedValue(new Error('native scheduler unavailable'));
+
+      const handled = await handleNeedsInputNotificationResponse(raiseResponse(input), {
+        runInteraction: mocks.runNeedsInputInteraction,
+      });
+
+      expect(handled).toBe(true);
+      // The raise is the only carrier of the outcome and its retry actions.
+      expect(mocks.dismissNotificationAsync).not.toHaveBeenCalled();
+      expect(mocks.captureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          tags: expect.objectContaining({ 'error.operation': 'needs_input_action_publish' }),
+        })
+      );
+    }
+  );
+
   it('replaces an inline reply in place, because Android keeps it for the reply', async () => {
     mocks.runNeedsInputInteraction.mockResolvedValue('ok');
 

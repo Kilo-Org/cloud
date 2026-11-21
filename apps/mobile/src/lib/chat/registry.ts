@@ -59,6 +59,7 @@ import { questionSearches } from './web-search-budget';
 import {
   type Asked,
   askedIn,
+  firstQuestionIn,
   forgetAsked,
   forgetQuestions,
   keptIn,
@@ -1576,29 +1577,72 @@ async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<st
      moved halfway onto the chat. */
   const turns = await runtime.runPromise(handle.history).catch(async (error: unknown) => {
     await bestEffort(() => runtime.runPromise(Scope.close(scope, Exit.void)));
+    /* The copy wrote its rows as the clone was made, and no row of the list
+       names it, so nothing else ever reaches them: a sign-out that wipes the
+       chats list would leave a copy of the conversation behind. */
+    await bestEffort(() => {
+      deleteChat(database, handle.id);
+    });
     throw error;
   });
-  /* Each durable step that carried a record, with how to carry it back. Only
-     the ones that completed are undone, because carrying a record back forgets
-     the session it is carried from: an undo for a step that never ran would
-     delete the record it was meant to keep. */
-  const carried: (() => Promise<void>)[] = [];
-  const carry = async (on: () => Promise<void>, back: () => Promise<void>) => {
+  /* Each restore that puts the session the chat stays on back as it was,
+     registered before its forward step runs, so a step refused halfway is
+     repaired too. */
+  const restores: (() => Promise<void>)[] = [];
+  const carry = async (restore: () => Promise<void>, on: () => Promise<void>) => {
+    restores.push(restore);
     await on();
-    carried.push(back);
   };
   try {
+    /* What the session the chat stays on held before the first record moved.
+       The moves are not atomic — each removes from the source and then writes
+       the destination — so a half-applied step is undone by putting this back
+       rather than by moving the copy's records in reverse. That reverse is what
+       the moves do without it: the source's value is gone by the time the undo
+       runs, so the move back carries the copy's and the person's explicit
+       choice is lost. Read inside the guard because it can fail, and a copy
+       left running with nothing reaching it is a session nobody can end. */
+    const [askedBefore, keptBefore, nameBefore, mcpBefore, webSearchBefore] = await Promise.all([
+      askedIn(sessionId),
+      keptIn(sessionId),
+      firstQuestionIn(sessionId),
+      mcpChoiceFor(sessionId),
+      webSearchChoiceFor(sessionId),
+    ]);
     await carry(
-      () => moveQuestions(sessionId, handle.id),
-      () => moveQuestions(handle.id, sessionId)
+      async () => {
+        await forgetQuestions(sessionId);
+        if (askedBefore !== null) {
+          await rememberAsked(sessionId, askedBefore);
+        }
+        if (keptBefore.length > 0) {
+          await replaceKept(sessionId, keptBefore);
+        }
+        if (nameBefore !== null) {
+          await rememberFirstQuestion(sessionId, nameBefore);
+        }
+      },
+      () => moveQuestions(sessionId, handle.id)
     );
     await carry(
-      () => moveMcpEnabled(sessionId, handle.id),
-      () => moveMcpEnabled(handle.id, sessionId)
+      async () => {
+        if (mcpBefore === null) {
+          await forgetMcpEnabled([sessionId]);
+          return;
+        }
+        await persistMcpEnabled(sessionId, mcpBefore);
+      },
+      () => moveMcpEnabled(sessionId, handle.id)
     );
     await carry(
-      () => moveWebSearchEnabled(sessionId, handle.id),
-      () => moveWebSearchEnabled(handle.id, sessionId)
+      async () => {
+        if (webSearchBefore === null) {
+          await forgetWebSearchEnabled([sessionId]);
+          return;
+        }
+        await persistWebSearchEnabled(sessionId, webSearchBefore);
+      },
+      () => moveWebSearchEnabled(sessionId, handle.id)
     );
     /* The row is the last durable write, and nothing between it and the map can
        throw, so a failure elsewhere never leaves the row naming a session the
@@ -1623,11 +1667,12 @@ async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<st
   } catch (error) {
     /* The copy is live and nothing reaches it: its scope closes first, so the
        store writes down what it still holds, and only then is the row under it
-       deleted. */
+       deleted. What moved off the source goes back before the copy is cleaned
+       up, because the copy may hold records the source no longer does. */
     await bestEffort(() => runtime.runPromise(Scope.close(scope, Exit.void)));
-    for (const back of carried) {
+    for (const restore of restores) {
       // eslint-disable-next-line no-await-in-loop -- the records go back one at a time: they share one database and no lock
-      await bestEffort(back);
+      await bestEffort(restore);
     }
     await bestEffort(() => forgetQuestions(handle.id));
     await bestEffort(() => forgetMcpEnabled([handle.id]));

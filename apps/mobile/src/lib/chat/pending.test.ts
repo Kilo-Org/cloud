@@ -16,10 +16,7 @@ import { DERIVED_CHAT_TEXT_MAX_LENGTH } from './title';
 
 const stored = vi.hoisted(() => new Map<string, string>());
 vi.mock('@/lib/persist/encrypted-kv', () => ({
-  getItem: async (scope: string, key: string) => {
-    await Promise.resolve();
-    return stored.get(`${scope}:${key}`) ?? null;
-  },
+  getItem: (scope: string, key: string) => Promise.resolve(stored.get(`${scope}:${key}`) ?? null),
   setItem: async (scope: string, key: string, value: string) => {
     await Promise.resolve();
     stored.set(`${scope}:${key}`, value);
@@ -28,6 +25,9 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
     await Promise.resolve();
     stored.delete(`${scope}:${key}`);
   },
+  // Only the record this reader saw: a newer question in the gap survives.
+  removeItemIfValue: (scope: string, key: string, value: string) =>
+    Promise.resolve(stored.get(`${scope}:${key}`) === value && stored.delete(`${scope}:${key}`)),
 }));
 
 const row = (sessionId: string, title: string) => ({

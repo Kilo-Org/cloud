@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { getItem, removeItem, setItem } from '@/lib/persist/encrypted-kv';
+import { getItem, removeItem, removeItemIfValue, setItem } from '@/lib/persist/encrypted-kv';
 
 import { EFFORTS } from './effort';
 import { type ChatTarget, type Displaced, type Question } from './state';
@@ -190,7 +190,9 @@ export async function askedIn(sessionId: string): Promise<Asked | null> {
   // eslint-disable-next-line no-console -- the record is gone by the time a screen could mention it
   console.warn(`[chat] a stored question could not be read: ${reason}`);
   try {
-    await removeItem(SCOPE, sessionId);
+    /* Compared and deleted in one statement: a read followed by a delete is two
+       store calls, and a question written in the gap would be deleted here. */
+    await removeItemIfValue(SCOPE, sessionId, stored);
   } catch {
     // A store that refuses the delete is still read as absent.
   }

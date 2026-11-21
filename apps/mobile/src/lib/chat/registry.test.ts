@@ -423,6 +423,13 @@ const choiceWrites = vi.hoisted(() => ({
   gate: undefined as Promise<void> | undefined,
   refuse: 0,
 }));
+/**
+ * Refuses the next web-search choice write once the source key is already gone,
+ * which is a move refused halfway rather than a write refused outright.
+ */
+const moveChoiceFailure = vi.hoisted(() => ({ next: false }));
+/** Every session whose rows were deleted, so a copy left under no row is told. */
+const deletedSessions = vi.hoisted(() => [] as string[]);
 vi.mock('@/lib/persist/encrypted-kv', () => {
   const setItem = async (
     scope: string,
@@ -437,6 +444,10 @@ vi.mock('@/lib/persist/encrypted-kv', () => {
       if (choiceWrites.refuse > 0) {
         choiceWrites.refuse -= 1;
         throw new Error('the choice could not be written');
+      }
+      if (moveChoiceFailure.next) {
+        moveChoiceFailure.next = false;
+        throw new Error('the choice could not be moved');
       }
     }
     if (signal?.aborted) {
@@ -466,6 +477,14 @@ vi.mock('@/lib/persist/encrypted-kv', () => {
         throw new Error('cancelled');
       }
       storedQuestions.delete(`${scope}:${key}`);
+    },
+    removeItemIfValue: async (scope: string, key: string, value: string) => {
+      await Promise.resolve();
+      if (storedQuestions.get(`${scope}:${key}`) !== value) {
+        return false;
+      }
+      storedQuestions.delete(`${scope}:${key}`);
+      return true;
     },
   };
 });
@@ -536,6 +555,7 @@ vi.mock('./store', () => ({
   },
   scopeOfChat: (_database: unknown, sessionId: string) => scopes.of(sessionId),
   deleteChat: (_database: unknown, sessionId: string) => {
+    deletedSessions.push(sessionId);
     scopes.forget(sessionId);
     recorded.delete(sessionId);
   },
@@ -653,6 +673,8 @@ beforeEach(async () => {
   storedQuestions.clear();
   choiceWrites.gate = undefined;
   choiceWrites.refuse = 0;
+  moveChoiceFailure.next = false;
+  deletedSessions.length = 0;
   clonedWith = undefined;
   clonesMade = 0;
   releasedRounds.owners.length = 0;
@@ -2399,7 +2421,6 @@ describe('a chat that could not be started', () => {
     /* Opened in a scope of its own, and closing that scope is the only thing
        that releases the handle. */
     expect(released).toEqual(['s1']);
-    expect(scopes.of('s1')).toBeNull();
     /* Nothing was installed either: releasing the id finds no live chat to
        close, so the session was given back rather than kept. */
     await releaseChat('s1');
@@ -2423,6 +2444,9 @@ describe('a chat that could not be started', () => {
     await settled();
 
     expect(released).toEqual(['s1']);
+    /* The row was written before the record read, so this is the rollback
+       deleting it: a row with no live chat is a list entry nothing can open. */
+    expect(scopes.of('s1')).toBeNull();
     /* Releasing it finds no live chat, so the session was given back once. */
     await releaseChat('s1');
     expect(released).toEqual(['s1']);
@@ -3450,6 +3474,46 @@ describe('custom backend question targets', () => {
     expect(mcp.enabled.get('s1')).toBe(false);
     expect(mcp.enabled.has('s2')).toBe(false);
     expect(snapshotOf('s1').failed).toContain('history unreadable');
+  });
+
+  it('removes the copy the store wrote when the history cannot be read', async () => {
+    backendState.profiles = [backend];
+    const target = backendTargetId(backend, 'same-model');
+    /* The person's own choices on the session the chat is on, so a cleanup that
+       took them would be told from one that left them alone. */
+    storedQuestions.set('chat-web-search:s1', 'off');
+    mcp.enabled.set('s1', false);
+    failHistoryFor = 's2';
+
+    await say(opened, { text: 'custom question', images: [] }, { model: target, effort: null });
+    await settled();
+
+    /* The clone writes the copy's `sessions`, `turns` and `parts` rows eagerly,
+       and no `chats` row names the copy, so nothing else ever reaches them: a
+       sign-out wiping the list would leave a copy of the conversation behind. */
+    expect(deletedSessions).toContain('s2');
+    expect(storedQuestions.get('chat-web-search:s1')).toBe('off');
+    expect(mcp.enabled.get('s1')).toBe(false);
+    expect(snapshotOf('s1').failed).toContain('history unreadable');
+  });
+
+  it('restores the source choice when the preference move fails halfway', async () => {
+    backendState.profiles = [backend];
+    const target = backendTargetId(backend, 'same-model');
+    storedQuestions.set('chat-web-search:s1', 'off');
+    /* Refused once the source key is already gone, which is the half-applied
+       step the reverse move could not repair. */
+    moveChoiceFailure.next = true;
+
+    await say(opened, { text: 'custom question', images: [] }, { model: target, effort: null });
+    await settled();
+
+    /* The chat stays on the session it moved off, and its explicit choice is
+       still there for the next tap and the next open to read. */
+    expect(snapshotOf('s1').sessionId).toBe('s1');
+    expect(snapshotOf('s1').failed).toBe('the choice could not be moved');
+    expect(storedQuestions.get('chat-web-search:s1')).toBe('off');
+    expect(storedQuestions.get('chat-web-search:s2')).toBeUndefined();
   });
 
   it('retains the target when the custom request fails after a successful move', async () => {

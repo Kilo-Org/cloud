@@ -279,13 +279,26 @@ class GatewayBlockerError extends BatchBlockerError {
   }
 }
 
+/**
+ * Which half of cleanup failed. `profile-unverified` means removal itself was
+ * not verified, so the directory may still exist. `browser-unsettled` means the
+ * directory was verified absent, but the browser never settled, so the session
+ * it held may still be live and can write the directory again.
+ */
+export type CleanupOutcome = 'browser-unsettled' | 'profile-unverified';
+
 export class CleanupBlockerError extends BatchBlockerError {
+  readonly outcome: CleanupOutcome;
   readonly survivingProfilePath: string | null;
 
-  constructor(reason: string, options: { survivingProfilePath?: string | null } = {}) {
+  constructor(
+    reason: string,
+    input: { outcome: CleanupOutcome; survivingProfilePath: string | null }
+  ) {
     super('cleanup', reason);
     this.name = 'CleanupBlockerError';
-    this.survivingProfilePath = options.survivingProfilePath ?? null;
+    this.outcome = input.outcome;
+    this.survivingProfilePath = input.survivingProfilePath;
   }
 }
 
@@ -1995,6 +2008,7 @@ export const cleanupAttempt = async (
   // can never truncate it.
   if (removalFailure !== null) {
     throw new CleanupBlockerError(`${cleanupOperatorAction}: ${removalFailure}`, {
+      outcome: 'profile-unverified',
       survivingProfilePath: userDataDir,
     });
   }
@@ -2002,6 +2016,7 @@ export const cleanupAttempt = async (
     // The profile is verifiably gone, but the browser never settled (or the
     // close failed during setup), so the token session it held is still live.
     throw new CleanupBlockerError(`${cleanupOperatorAction}: ${settlementFailure}`, {
+      outcome: 'browser-unsettled',
       survivingProfilePath: userDataDir,
     });
   }
@@ -2434,7 +2449,11 @@ const runAttempt = async (input: {
       if (error instanceof CleanupBlockerError) {
         throw error;
       }
-      throw new CleanupBlockerError(errorToReason(error));
+      // An unexpected cleanup failure proves nothing about the directory.
+      throw new CleanupBlockerError(errorToReason(error), {
+        outcome: 'profile-unverified',
+        survivingProfilePath: userDataDir,
+      });
     }
   }
 };
@@ -2715,11 +2734,20 @@ const main = async (): Promise<number> => {
         ...(survivingProfilePath === null ? {} : { survivingProfilePath }),
       });
       await writeBlockerArtifact(outDir, blocker);
-      // blocker.json caps the reason; stderr keeps the full path actionable.
-      if (survivingProfilePath !== null) {
-        console.error(
-          `cleanup could not verify the throwaway profile is gone: ${survivingProfilePath}; ${cleanupOperatorAction}`
-        );
+      // blocker.json caps the reason; stderr keeps the full path actionable and
+      // names which half of cleanup failed, so the operator never chases a
+      // directory that was already verified absent.
+      if (error instanceof CleanupBlockerError && error.survivingProfilePath !== null) {
+        const profilePath = error.survivingProfilePath;
+        if (error.outcome === 'profile-unverified') {
+          console.error(
+            `cleanup could not verify the throwaway profile was removed: ${profilePath}; ${cleanupOperatorAction}`
+          );
+        } else {
+          console.error(
+            `cleanup did not confirm the browser stopped: ${profilePath} was verified absent, but the run's session may still be live; ${cleanupOperatorAction}`
+          );
+        }
       }
       return 2;
     }

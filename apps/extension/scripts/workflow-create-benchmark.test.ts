@@ -71,7 +71,10 @@ describe('benchmark cleanup', () => {
       const blocker = failure as CleanupBlockerError;
       expect(blocker.message.startsWith(operatorAction)).toBe(true);
       expect(blocker.message).toContain('context close exceeded the 30ms cleanup cap');
-      expect(blocker.survivingProfilePath).toBe(dir);
+      expect({
+        outcome: blocker.outcome,
+        survivingProfilePath: blocker.survivingProfilePath,
+      }).toStrictEqual({ outcome: 'browser-unsettled', survivingProfilePath: dir });
       const afterCleanup = await probe(dir);
       expect({ after: afterCleanup, before: beforeCleanup }).toStrictEqual({
         after: 'ENOENT',
@@ -110,6 +113,7 @@ describe('benchmark cleanup', () => {
       expect(failure).toBeInstanceOf(CleanupBlockerError);
       const blocker = failure as CleanupBlockerError;
       expect(blocker.message.startsWith(operatorAction)).toBe(true);
+      expect(blocker.outcome).toBe('profile-unverified');
       expect(blocker.survivingProfilePath).toBe(dir);
       const survivingProfile = await probe(dir);
       expect({ survivingProfile }).toStrictEqual({ survivingProfile: 'present' });

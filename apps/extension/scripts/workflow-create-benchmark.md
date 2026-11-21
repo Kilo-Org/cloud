@@ -196,7 +196,8 @@ The driver writes into `--out`:
   directory is gone for good: either removal was not verified, or the browser
   never settled and can write the directory again after the absence check.
   The reason is capped at 120 characters; the same command prints the full
-  path and the action to stderr.
+  path and the action to stderr, and that line distinguishes an unverified
+  removal from a browser that did not stop.
 
 Exit codes: `0` every attempt passed the correctness check; `1` at least one
 attempt failed; `2` usage error or blocker.

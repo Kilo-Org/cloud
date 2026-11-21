@@ -580,7 +580,7 @@ export async function settleStoredProjectTokens(
         return {
           outcome: 'retained' as const,
           retryable: false,
-          reason: 'provider_unconfirmed' as const,
+          reason: 'stored_credential_unreadable' as const,
         };
       });
       if (outcome.outcome === 'removed') {

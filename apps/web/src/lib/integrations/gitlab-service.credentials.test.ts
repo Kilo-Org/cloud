@@ -2537,6 +2537,55 @@ describe('GitLab encrypted credential persistence', () => {
     expect(credentials).toHaveLength(1);
   });
 
+  it('keeps a project token whose stored credential cannot be parsed and names the permanent cause', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    const [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await getOrCreateProjectAccessToken(integration, 42, { userId: user.id });
+    await db
+      .update(platform_access_token_credentials)
+      .set({ provider_metadata: { expiresOn: '2027-07-13' } })
+      .where(
+        and(
+          eq(platform_access_token_credentials.platform_integration_id, connected.integration.id),
+          eq(platform_access_token_credentials.provider_resource_id, '42')
+        )
+      );
+
+    await expect(settleStoredProjectTokens(integration, 'glpat-primary-token')).resolves.toEqual({
+      revoked: 0,
+      scrubbed: 0,
+      retained: 1,
+      unattempted: 0,
+      blocking: [{ projectId: '42', reason: 'stored_credential_unreadable' }],
+    });
+
+    expect(mockRevokeProjectAccessToken).not.toHaveBeenCalled();
+
+    const refusal = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.example.com',
+      user.id
+    ).catch((error: unknown) => error);
+
+    expect(refusal).toMatchObject({ code: 'PRECONDITION_FAILED' });
+    const refusalMessage = refusal instanceof Error ? refusal.message : '';
+    expect(refusalMessage).toContain('a stored project credential could not be read');
+    expect(refusalMessage).toContain(
+      'Ask Kilo support to repair the stored integration record, then reconnect.'
+    );
+    expect(refusalMessage).not.toContain('Try again in a moment');
+  });
+
   it('drops a legacy entry that names no revocable id on disconnect', async () => {
     const user = await insertTestUser();
     const connected = await connectWithPAT(

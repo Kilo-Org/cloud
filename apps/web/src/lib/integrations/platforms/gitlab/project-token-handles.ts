@@ -206,16 +206,17 @@ export async function dropUnrevokableProjectTokenEntry(
 
 /**
  * Why a stored project token stays stored after a removal attempt. It names the
- * remedy: an unusable stored integration record is repaired by Kilo support
- * before the integration can be reconnected, a refused or unresolvable
- * credential needs a disconnect followed by a reconnect with a credential that
- * can revoke, and an unconfirmed answer or a changed handle can be retried in a
- * moment.
+ * remedy: an unusable stored integration record, or a stored credential that
+ * cannot be read, is repaired by Kilo support before the integration can be
+ * reconnected, a refused or unresolvable credential needs a disconnect followed
+ * by a reconnect with a credential that can revoke, and an unconfirmed answer or
+ * a changed handle can be retried in a moment.
  */
 export type ProjectTokenRetentionReason =
   | 'provider_rejected'
   | 'provider_unconfirmed'
   | 'stored_instance_unusable'
+  | 'stored_credential_unreadable'
   | 'stored_handle_changed';
 
 /**
@@ -249,6 +250,10 @@ const BLOCKER_MESSAGES: Record<ProjectTokenBlocker['reason'], { cause: string; r
     cause: 'the stored GitLab instance address could not be used',
     remedy: 'Ask Kilo support to repair the stored integration record, then reconnect.',
   },
+  stored_credential_unreadable: {
+    cause: 'a stored project credential could not be read',
+    remedy: 'Ask Kilo support to repair the stored integration record, then reconnect.',
+  },
   provider_rejected: {
     cause: 'GitLab refused the connected credential while revoking them',
     remedy:
@@ -279,6 +284,7 @@ const BLOCKER_MESSAGES: Record<ProjectTokenBlocker['reason'], { cause: string; r
  */
 const BLOCKER_PRECEDENCE: readonly ProjectTokenBlocker['reason'][] = [
   'stored_instance_unusable',
+  'stored_credential_unreadable',
   'provider_rejected',
   'no_credential',
   'provider_unconfirmed',

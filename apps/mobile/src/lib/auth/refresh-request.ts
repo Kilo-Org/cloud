@@ -63,7 +63,11 @@ export type RefreshRequest = {
 const XHR_HEADERS_RECEIVED = 2;
 const XHR_DONE = 4;
 
-/** The body read for one answered request, settled once. */
+/**
+ * The body read for one answered request, settled once. The JS timer is the only
+ * stalled-body bound: a zero `xhr.timeout` means the native timeout event never
+ * fires, so the transport registers no handler for it.
+ */
 function readBody(xhr: XMLHttpRequest, budgetMs: number): Promise<string | null> {
   const settled = Promise.withResolvers<string | null>();
   let done = false;
@@ -95,10 +99,6 @@ function readBody(xhr: XMLHttpRequest, budgetMs: number): Promise<string | null>
   };
   // oxlint-disable-next-line unicorn/prefer-add-event-listener -- a failure has one owner, like the completion handler above
   xhr.onerror = () => {
-    finish(null);
-  };
-  // oxlint-disable-next-line unicorn/prefer-add-event-listener -- a timeout has one owner, like the completion handler above
-  xhr.ontimeout = () => {
     finish(null);
   };
   return settled.promise;

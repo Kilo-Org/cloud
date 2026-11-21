@@ -25,7 +25,6 @@ class FakeXhr {
   responseText = '';
   onreadystatechange: (() => void) | null = null;
   onerror: (() => void) | null = null;
-  ontimeout: (() => void) | null = null;
   aborted = false;
   sent: { url: string; body: string } | undefined;
   private readonly headers = new Map<string, string>();

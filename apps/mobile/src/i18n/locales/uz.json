@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}, shaxsiy repozitoriya",
     "legalDocumentEnglishOnly": "Ushbu hujjat faqat ingliz tilida mavjud.",
     "organizationTrialEndedBilling": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Siz hisob-kitobni yangilab, so'ng qayta urinib ko'rishingiz mumkin.",
-    "organizationTrialEndedBillingAtKiloAi": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Siz kilo.ai saytida hisob-kitobni yangilab, so'ng qayta urinib ko'rishingiz mumkin."
+    "organizationTrialEndedBillingAtKiloAi": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Siz kilo.ai saytida hisob-kitobni yangilab, so'ng qayta urinib ko'rishingiz mumkin.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Ro‘yxat belgisi",
+        "nestedBulletPoint": "Ichma-ich ro‘yxat belgisi",
+        "orderedItem": "Ro‘yxat elementi {n}",
+        "nestedOrderedItem": "Ichma-ich ro‘yxat elementi {n}"
+      },
+      "blockquote": {
+        "quote": "Iqtibos",
+        "nestedQuote": "Ichma-ich iqtibos"
+      },
+      "table": {
+        "row": "Qator {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Sarlavhalar",
+        "links": "Havolalar",
+        "images": "Rasmlar"
+      }
+    }
   },
   "language": {
     "restarting": "Tilni qo'llash uchun qayta ishga tushirilmoqda",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Apellyatsiya natijasi shu ekranda ko'rinadi.",
       "nextStepFinal": "Apellyatsiya bo'yicha qaror yakuniy. Boshqa apellyatsiya berish mumkin emas.",
       "viewReceipt": "Kvitansiyani ko'rish"
+    },
+    "reportReceipts": {
+      "title": "Shikoyatlar",
+      "rowSubtitle": "Yuborgan shikoyatlaringiz va ularning natijalari",
+      "emptyTitle": "Hozircha shikoyatlar yo'q",
+      "emptyDescription": "Izoh yoki AI javobidan yuborgan shikoyatlaringiz shu yerda ko'rinadi.",
+      "couldNotLoad": "Shikoyatlaringizni yuklab bo'lmadi",
+      "capped": "Eng so'nggi shikoyatlaringiz ko'rsatilmoqda."
     },
     "changelog": "Yangiliklar",
     "changelogVersionPending": "{{version}} versiyasi yangiliklari ilovaning keyingi yangilanishi bilan keladi.",
@@ -4181,7 +4212,7 @@
     "personalDefaultDescription": "Hech bir omborda mahkamlangan profil bo'lmasa, avtomatik yuklanadi.",
     "organizationDefaultDescription": "Shaxsiy standarti bo'lmagan a'zolar uchun avtomatik yuklanadi.",
     "setAsDefault": "Standart sifatida o'rnating",
-    "saveFailed": "Profilni saqlab bo‘lmadi",
+    "saveFailed": "Profilni saqlab bo‘lmadi. Qayta urinib ko‘ring.",
     "organizationRoleRequired": "Faqat tashkilot egalar va administratorlar tashkilot profilini o'zgartirishi mumkin.",
     "deleteTitle": "Profilni o'chirish",
     "deleteMessage": "Bu profil va uning sozlamalarini butunlay olib tashlaydi. Buni ortga qaytarib bo‘lmaydi.",

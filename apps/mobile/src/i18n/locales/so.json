@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}, kaydka gaar ah",
     "legalDocumentEnglishOnly": "Dukumeentigan waxaa laga heli karaa af Ingiriisi oo keliya.",
     "organizationTrialEndedBilling": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Waxaad cusboonaysiin kartaa biilasha, ka dibna isku day mar kale.",
-    "organizationTrialEndedBillingAtKiloAi": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Waxaad cusboonaysiin kartaa biilasha kilo.ai, ka dibna isku day mar kale."
+    "organizationTrialEndedBillingAtKiloAi": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Waxaad cusboonaysiin kartaa biilasha kilo.ai, ka dibna isku day mar kale.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Dhibic liis",
+        "nestedBulletPoint": "Dhibic liis gudaha ah",
+        "orderedItem": "Shay liis {n}",
+        "nestedOrderedItem": "Shay liis gudaha ah {n}"
+      },
+      "blockquote": {
+        "quote": "Xigasho",
+        "nestedQuote": "Xigasho gudaha ah"
+      },
+      "table": {
+        "row": "Saf {n}: {content}"
+      },
+      "math": {
+        "equation": "Xisaab: {latex}"
+      },
+      "rotor": {
+        "headings": "Cinwaanno",
+        "links": "Xiriiriyeyaal",
+        "images": "Sawirro"
+      }
+    }
   },
   "language": {
     "restarting": "Dib ayaa loo bilaabayaa si luqadda loo adeegsado",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Natiijada rafcaankaaga waxay ka muuqan doontaa shaashaddan.",
       "nextStepFinal": "Go'aanka rafcaanku waa kama dambays. Rafcaan kale lama gudbin karo.",
       "viewReceipt": "Eeg rasiidka"
+    },
+    "reportReceipts": {
+      "title": "Warbixinno",
+      "rowSubtitle": "Warbixinno aad gudbisay iyo natiijooyinkooda",
+      "emptyTitle": "Weli warbixinno ma jiraan",
+      "emptyDescription": "Warbixinno aad ka gudbiso faallo ama jawaabta AI ayaa halkan ka muuqdaan.",
+      "couldNotLoad": "Warbixinnadaada lama soo kicin karin",
+      "capped": "Waxaa la muujinayaa warbixinnadaada ugu dambeeyay."
     },
     "changelog": "Waxyaabaha cusub",
     "changelogVersionPending": "Qoraallada nooca {{version}} waxay la yimaadaan cusboonaysiinta xigta.",
@@ -4181,7 +4212,7 @@
     "personalDefaultDescription": "Si otomaatig ah ayaa loo raray marka aysan jirin meel kayd ah oo leh astaan ku dheggan",
     "organizationDefaultDescription": "Si otomaatig ah ayaa loogu shubay xubnaha aan lahayn khaladka gaarka ah.",
     "setAsDefault": "U deji sidii hore",
-    "saveFailed": "Waa la kaydin kari waayay astaanta guud",
+    "saveFailed": "Ma kaydin kari waayay astaanta guud. Mar kale isku day.",
     "organizationRoleRequired": "Milkiilayaasha ururka iyo maamulayaasha oo keliya ayaa bedeli kara astaanta guud ee ururka.",
     "deleteTitle": "Tirtir astaanta guud",
     "deleteMessage": "Tani waxay si joogto ah meesha uga saaraysaa astaanta guud iyo dejinta Tan lama celin karo.",

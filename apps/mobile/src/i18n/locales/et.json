@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "See dokument on saadaval ainult inglise keeles.",
     "organizationTrialEndedBilling": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Saad arveldust uuendada ja seejärel uuesti proovida.",
     "organizationTrialEndedBillingAtKiloAi": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Saad arveldust kilo.ai keskkonnas uuendada ja seejärel uuesti proovida.",
-    "viewOnGitHub": "Vaata PR-i GitHubis"
+    "viewOnGitHub": "Vaata PR-i GitHubis",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Punkt",
+        "nestedBulletPoint": "Pesastatud punkt",
+        "orderedItem": "Loendi üksus {n}",
+        "nestedOrderedItem": "Pesastatud loendi üksus {n}"
+      },
+      "blockquote": {
+        "quote": "Tsitaat",
+        "nestedQuote": "Pesastatud tsitaat"
+      },
+      "table": {
+        "row": "Rida {n}: {content}"
+      },
+      "math": {
+        "equation": "Matemaatika: {latex}"
+      },
+      "rotor": {
+        "headings": "Pealkirjad",
+        "links": "Veebilingid",
+        "images": "Pildid"
+      }
+    }
   },
   "language": {
     "restarting": "Keele vahetamiseks taaskäivitatakse rakendus",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Vaidlustuse tulemus kuvatakse sellel ekraanil.",
       "nextStepFinal": "Vaidlustuse otsus on lõplik. Edasist vaidlustust esitada ei saa.",
       "viewReceipt": "Vaata kinnitust"
+    },
+    "reportReceipts": {
+      "title": "Teated",
+      "rowSubtitle": "Sinu esitatud teated ja nende tulemused",
+      "emptyTitle": "Teateid veel pole",
+      "emptyDescription": "Siia ilmuvad teated, mille esitad kommentaari või AI vastuse kohta.",
+      "couldNotLoad": "Sinu teateid ei õnnestunud laadida",
+      "capped": "Kuvatakse sinu viimased teated."
     },
     "changelog": "Mis on uut",
     "changelogVersionPending": "Versiooni {{version}} märkmed saabuvad rakenduse järgmise uuendusega.",
@@ -4181,7 +4212,7 @@
     "personalDefaultDescription": "Laaditakse automaatselt, kui ühelgi hoidlal pole kinnitatud profiili.",
     "organizationDefaultDescription": "Laaditakse automaatselt liikmetele, kellel pole isiklikku vaikeprofiili.",
     "setAsDefault": "Määra vaikeväärtuseks",
-    "saveFailed": "Profiili ei saanud salvestada",
+    "saveFailed": "Profiili ei saanud salvestada. Proovi uuesti.",
     "organizationRoleRequired": "Organisatsiooni profiile saavad muuta ainult organisatsiooni omanikud ja administraatorid.",
     "deleteTitle": "Kustuta profiil",
     "deleteMessage": "See eemaldab jäädavalt profiili ja selle seaded. Seda ei saa tagasi võtta.",

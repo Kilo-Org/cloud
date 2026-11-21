@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Dette dokumentet er kun tilgjengelig på engelsk.",
     "organizationTrialEndedBilling": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. Du kan oppdatere faktureringen og deretter prøve igjen.",
     "organizationTrialEndedBillingAtKiloAi": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. Du kan oppdatere faktureringen på kilo.ai og deretter prøve igjen.",
-    "viewOnGitHub": "Vis PR på GitHub"
+    "viewOnGitHub": "Vis PR på GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Punktmerke",
+        "nestedBulletPoint": "Nestet punktmerke",
+        "orderedItem": "Listeelement {n}",
+        "nestedOrderedItem": "Nestet listeelement {n}"
+      },
+      "blockquote": {
+        "quote": "Sitat",
+        "nestedQuote": "Nestet sitat"
+      },
+      "table": {
+        "row": "Rad {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematikk: {latex}"
+      },
+      "rotor": {
+        "headings": "Overskrifter",
+        "links": "Lenker",
+        "images": "Bilder"
+      }
+    }
   },
   "language": {
     "restarting": "Starter på nytt for å bruke språket",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Resultatet av klagen vises på denne skjermen.",
       "nextStepFinal": "Klageavgjørelsen er endelig. Du kan ikke klage på nytt.",
       "viewReceipt": "Vis kvittering"
+    },
+    "reportReceipts": {
+      "title": "Rapporter",
+      "rowSubtitle": "Rapporter du har sendt inn, og resultatene deres",
+      "emptyTitle": "Ingen rapporter ennå",
+      "emptyDescription": "Rapporter du sender inn fra en kommentar eller en AI-respons, vises her.",
+      "couldNotLoad": "Kunne ikke laste inn rapportene dine",
+      "capped": "Viser de nyeste rapportene dine."
     },
     "changelog": "Nyheter",
     "changelogVersionPending": "Merknadene for versjon {{version}} kommer med neste appoppdatering.",
@@ -4181,7 +4212,7 @@
     "personalDefaultDescription": "Lastes automatisk når ingen repository har en festet profil.",
     "organizationDefaultDescription": "Lastes automatisk for medlemmer som ikke har noen personlig standard.",
     "setAsDefault": "Sett som standard",
-    "saveFailed": "Kunne ikke lagre profilen",
+    "saveFailed": "Kunne ikke lagre profilen. Prøv igjen.",
     "organizationRoleRequired": "Bare organisasjonseiere og administratorer kan endre organisasjonsprofiler.",
     "deleteTitle": "Slett profil",
     "deleteMessage": "Dette fjerner profilen og dens innstillinger permanent. Dette kan ikke angres.",

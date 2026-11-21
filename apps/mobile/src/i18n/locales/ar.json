@@ -190,7 +190,30 @@
     "legalDocumentEnglishOnly": "هذا المستند متوفر باللغة الإنجليزية فقط.",
     "organizationTrialEndedBilling": "انتهت الفترة التجريبية للمؤسسة ولم تعد لديها خطة نشطة. يمكنك تحديث الفوترة، ثم المحاولة مرة أخرى.",
     "organizationTrialEndedBillingAtKiloAi": "انتهت الفترة التجريبية للمؤسسة ولم تعد لديها خطة نشطة. يمكنك تحديث الفوترة على kilo.ai، ثم المحاولة مرة أخرى.",
-    "viewOnGitHub": "عرض PR على GitHub"
+    "viewOnGitHub": "عرض PR على GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "نقطة تعداد",
+        "nestedBulletPoint": "نقطة تعداد متداخلة",
+        "orderedItem": "عنصر قائمة {n}",
+        "nestedOrderedItem": "عنصر قائمة متداخل {n}"
+      },
+      "blockquote": {
+        "quote": "اقتباس",
+        "nestedQuote": "اقتباس متداخل"
+      },
+      "table": {
+        "row": "صف {n}: {content}"
+      },
+      "math": {
+        "equation": "رياضيات: {latex}"
+      },
+      "rotor": {
+        "headings": "العناوين",
+        "links": "الروابط",
+        "images": "الصور"
+      }
+    }
   },
   "language": {
     "restarting": "جارٍ إعادة التشغيل لتطبيق اللغة",
@@ -509,6 +532,14 @@
       "nextStepAppeal": "ستظهر نتيجة الطعن على هذه الشاشة.",
       "nextStepFinal": "قرار الطعن نهائي. لا يمكن تقديم طعن آخر.",
       "viewReceipt": "عرض الإيصال"
+    },
+    "reportReceipts": {
+      "title": "البلاغات",
+      "rowSubtitle": "البلاغات التي قدّمتها ونتائجها",
+      "emptyTitle": "لا توجد بلاغات بعد",
+      "emptyDescription": "تظهر هنا البلاغات التي تقدّمها من تعليق أو من استجابة ذكاء اصطناعي.",
+      "couldNotLoad": "تعذّر تحميل بلاغاتك",
+      "capped": "يتم عرض أحدث بلاغاتك."
     },
     "changelog": "ما الجديد",
     "changelogVersionPending": "ستصل ملاحظات الإصدار {{version}} مع التحديث القادم للتطبيق.",
@@ -4461,7 +4492,7 @@
     "personalDefaultDescription": "يتم تحميله تلقائيًا عندما لا يكون لدى أي مستودع ملف شخصي مثبت.",
     "organizationDefaultDescription": "يُحمَّل تلقائيًا للأعضاء الذين ليس لديهم ملف شخصي افتراضي.",
     "setAsDefault": "تعيين كافتراضي",
-    "saveFailed": "تعذر حفظ الملف الشخصي",
+    "saveFailed": "تعذّر حفظ الملف الشخصي. حاول مرة أخرى.",
     "organizationRoleRequired": "يمكن لمالكي المؤسسة والمشرفين فقط تغيير الملف الشخصي للمؤسسة.",
     "deleteTitle": "حذف الملف الشخصي",
     "deleteMessage": "يؤدي هذا إلى إزالة الملف الشخصي وإعداداته نهائيًا. لا يمكن التراجع عن هذا.",

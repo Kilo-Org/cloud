@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}, hazina ya kibinafsi",
     "legalDocumentEnglishOnly": "Nyaraka hii inapatikana kwa Kiingereza pekee.",
     "organizationTrialEndedBilling": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Unaweza kusasisha malipo, kisha ujaribu tena.",
-    "organizationTrialEndedBillingAtKiloAi": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Unaweza kusasisha malipo kwenye kilo.ai, kisha ujaribu tena."
+    "organizationTrialEndedBillingAtKiloAi": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Unaweza kusasisha malipo kwenye kilo.ai, kisha ujaribu tena.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Nukta ya orodha",
+        "nestedBulletPoint": "Nukta ya orodha ya ndani",
+        "orderedItem": "Kipengee cha orodha {n}",
+        "nestedOrderedItem": "Kipengee cha orodha ya ndani {n}"
+      },
+      "blockquote": {
+        "quote": "Nukuu",
+        "nestedQuote": "Nukuu ya ndani"
+      },
+      "table": {
+        "row": "Safu {n}: {content}"
+      },
+      "math": {
+        "equation": "Hesabu: {latex}"
+      },
+      "rotor": {
+        "headings": "Vichwa",
+        "links": "Viungo",
+        "images": "Picha"
+      }
+    }
   },
   "language": {
     "restarting": "Programu inaanza upya ili kutumia lugha",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Matokeo ya rufaa yataonekana kwenye skrini hii.",
       "nextStepFinal": "Uamuzi wa rufaa ni wa mwisho. Hakuna rufaa nyingine inayoweza kuwasilishwa.",
       "viewReceipt": "Angalia risiti"
+    },
+    "reportReceipts": {
+      "title": "Ripoti",
+      "rowSubtitle": "Ripoti ulizowasilisha na matokeo yake",
+      "emptyTitle": "Hakuna ripoti bado",
+      "emptyDescription": "Ripoti unazowasilisha kutoka kwa maoni au jibu la AI zinaonekana hapa.",
+      "couldNotLoad": "Imeshindwa kupakia ripoti zako",
+      "capped": "Inaonyesha ripoti zako za hivi karibuni."
     },
     "changelog": "Mapya",
     "changelogVersionPending": "Maelezo ya toleo {{version}} yatakuja na sasisho lijalo la programu.",
@@ -4181,7 +4212,7 @@
     "personalDefaultDescription": "Imepakia kiotomatiki wakati hakuna hazina iliyo na wasifu uliobandikwa.",
     "organizationDefaultDescription": "Imepakiwa kiotomatiki kwa wanachama ambao hawana chaguo-msingi la kibinafsi.",
     "setAsDefault": "Weka kama chaguomsingi",
-    "saveFailed": "Haikuweza kuhifadhi wasifu",
+    "saveFailed": "Haikuweza kuhifadhi wasifu. Jaribu tena.",
     "organizationRoleRequired": "Wamiliki na wasimamizi wa shirika pekee wanaweza kubadilisha wasifu wa shirika.",
     "deleteTitle": "Futa wasifu",
     "deleteMessage": "Hii huondoa kabisa wasifu na mipangilio yake. Hili haliwezi kutenduliwa.",

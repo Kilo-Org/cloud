@@ -31,6 +31,12 @@ export type RefreshAnswer = {
    * arrive within that budget; the request is abandoned at that point.
    */
   text(budgetMs: number): Promise<string | null>;
+  /**
+   * Ends the exchange when its caller is done with it. A request whose status
+   * the caller already used is released here rather than left holding the
+   * connection and a socket for the life of the app.
+   */
+  release(): void;
 };
 
 export type RefreshRequest = {
@@ -114,6 +120,9 @@ function viaXhr(
       ok: xhr.status >= 200 && xhr.status < 300,
       retryAfter: xhr.getResponseHeader('retry-after'),
       text: budgetMs => readBody(xhr, budgetMs),
+      release: () => {
+        xhr.abort();
+      },
     });
   };
   // oxlint-disable-next-line unicorn/prefer-add-event-listener -- one owner for the pre-head failure
@@ -150,6 +159,13 @@ async function viaFetch({ url, body, signal }: RefreshRequest): Promise<RefreshA
         return null;
       } finally {
         clearTimeout(timer);
+      }
+    },
+    release: () => {
+      // A resolved fetch body still holds the connection until it is read or
+      // the response is discarded; the caller owns that decision.
+      if (response.body !== null && !response.bodyUsed) {
+        void response.body.cancel();
       }
     },
   };

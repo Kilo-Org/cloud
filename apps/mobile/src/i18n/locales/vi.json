@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}, kho lưu trữ riêng tư",
     "legalDocumentEnglishOnly": "Tài liệu này chỉ có sẵn bằng tiếng Anh.",
     "organizationTrialEndedBilling": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Bạn có thể cập nhật thanh toán, sau đó thử lại.",
-    "organizationTrialEndedBillingAtKiloAi": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Bạn có thể cập nhật thanh toán tại kilo.ai, sau đó thử lại."
+    "organizationTrialEndedBillingAtKiloAi": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Bạn có thể cập nhật thanh toán tại kilo.ai, sau đó thử lại.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Dấu đầu dòng",
+        "nestedBulletPoint": "Dấu đầu dòng lồng nhau",
+        "orderedItem": "Mục danh sách {n}",
+        "nestedOrderedItem": "Mục danh sách lồng nhau {n}"
+      },
+      "blockquote": {
+        "quote": "Trích dẫn",
+        "nestedQuote": "Trích dẫn lồng nhau"
+      },
+      "table": {
+        "row": "Dòng {n}: {content}"
+      },
+      "math": {
+        "equation": "Toán học: {latex}"
+      },
+      "rotor": {
+        "headings": "Tiêu đề",
+        "links": "Liên kết",
+        "images": "Hình ảnh"
+      }
+    }
   },
   "language": {
     "restarting": "Đang khởi động lại để áp dụng ngôn ngữ",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Kết quả kháng nghị sẽ xuất hiện trên màn hình này.",
       "nextStepFinal": "Quyết định kháng nghị là cuối cùng. Bạn không thể gửi thêm kháng nghị nào nữa.",
       "viewReceipt": "Xem biên nhận"
+    },
+    "reportReceipts": {
+      "title": "Báo cáo",
+      "rowSubtitle": "Các báo cáo bạn đã gửi và kết quả của chúng",
+      "emptyTitle": "Chưa có báo cáo nào",
+      "emptyDescription": "Các báo cáo bạn gửi từ bình luận hoặc phản hồi của AI sẽ xuất hiện ở đây.",
+      "couldNotLoad": "Không thể tải báo cáo của bạn",
+      "capped": "Đang hiển thị các báo cáo gần đây nhất của bạn."
     },
     "changelog": "Có gì mới",
     "changelogVersionPending": "Ghi chú cho phiên bản {{version}} sẽ có trong bản cập nhật ứng dụng sau.",
@@ -4181,7 +4212,7 @@
     "personalDefaultDescription": "Tự động tải khi không có kho lưu trữ nào có hồ sơ được ghim.",
     "organizationDefaultDescription": "Tự động tải cho các thành viên không có mặc định cá nhân.",
     "setAsDefault": "Đặt làm mặc định",
-    "saveFailed": "Không thể lưu hồ sơ",
+    "saveFailed": "Không thể lưu hồ sơ. Thử lại.",
     "organizationRoleRequired": "Chỉ chủ sở hữu tổ chức và quản trị viên mới có thể thay đổi hồ sơ tổ chức.",
     "deleteTitle": "Xóa hồ sơ",
     "deleteMessage": "Thao tác này sẽ xóa vĩnh viễn hồ sơ và cài đặt của nó. Điều này không thể hoàn tác được.",

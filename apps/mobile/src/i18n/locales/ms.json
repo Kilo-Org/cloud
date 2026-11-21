@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Dokumen ini hanya tersedia dalam bahasa Inggeris.",
     "organizationTrialEndedBilling": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Anda boleh mengemas kini bil, kemudian cuba lagi.",
     "organizationTrialEndedBillingAtKiloAi": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Anda boleh mengemas kini bil di kilo.ai, kemudian cuba lagi.",
-    "viewOnGitHub": "Lihat PR di GitHub"
+    "viewOnGitHub": "Lihat PR di GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Poin bulet",
+        "nestedBulletPoint": "Poin bulet bersarang",
+        "orderedItem": "Item senarai {n}",
+        "nestedOrderedItem": "Item senarai bersarang {n}"
+      },
+      "blockquote": {
+        "quote": "Petikan",
+        "nestedQuote": "Petikan bersarang"
+      },
+      "table": {
+        "row": "Baris {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematik: {latex}"
+      },
+      "rotor": {
+        "headings": "Tajuk",
+        "links": "Pautan",
+        "images": "Imej"
+      }
+    }
   },
   "language": {
     "restarting": "Memulakan semula apl untuk menukar bahasa",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Hasil rayuan akan dipaparkan pada skrin ini.",
       "nextStepFinal": "Keputusan rayuan adalah muktamad. Tiada rayuan selanjutnya boleh diserahkan.",
       "viewReceipt": "Lihat resit"
+    },
+    "reportReceipts": {
+      "title": "Laporan",
+      "rowSubtitle": "Laporan yang anda failkan dan hasilnya",
+      "emptyTitle": "Belum ada laporan",
+      "emptyDescription": "Laporan yang anda failkan daripada ulasan atau respons AI akan dipaparkan di sini.",
+      "couldNotLoad": "Tidak dapat memuatkan laporan anda",
+      "capped": "Memaparkan laporan terkini anda."
     },
     "changelog": "Yang baharu",
     "changelogVersionPending": "Nota untuk versi {{version}} akan tiba bersama kemas kini apl seterusnya.",
@@ -4181,7 +4212,7 @@
     "personalDefaultDescription": "Auto-muat apabila tiada repositori mempunyai profil yang disematkan.",
     "organizationDefaultDescription": "Dimuat secara automatik untuk ahli yang tidak mempunyai lalai peribadi.",
     "setAsDefault": "Tetapkan sebagai lalai",
-    "saveFailed": "Tidak dapat menyimpan profil",
+    "saveFailed": "Tidak dapat menyimpan profil. Cuba lagi.",
     "organizationRoleRequired": "Hanya pemilik organisasi dan pentadbir boleh mengubah profil organisasi.",
     "deleteTitle": "Padam profil",
     "deleteMessage": "Ini mengalih keluar profil dan tetapannya secara kekal. Ini tidak boleh dibuat asal.",

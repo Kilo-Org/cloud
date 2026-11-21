@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}, inqolobane yekhodi eyimfihlo",
     "legalDocumentEnglishOnly": "Leli dokhumenti litholakala ngesiNgisi kuphela.",
     "organizationTrialEndedBilling": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Ungabuyekeza ukukhokhela, bese uzama futhi.",
-    "organizationTrialEndedBillingAtKiloAi": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Ungabuyekeza ukukhokhela ku-kilo.ai, bese uzama futhi."
+    "organizationTrialEndedBillingAtKiloAi": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Ungabuyekeza ukukhokhela ku-kilo.ai, bese uzama futhi.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Iphuzu lohlu",
+        "nestedBulletPoint": "Iphuzu lohlu olungaphakathi",
+        "orderedItem": "Into yohlu {n}",
+        "nestedOrderedItem": "Into yohlu engaphakathi {n}"
+      },
+      "blockquote": {
+        "quote": "Isicaphucaphu",
+        "nestedQuote": "Isicaphucaphu esingaphakathi"
+      },
+      "table": {
+        "row": "Umugqa {n}: {content}"
+      },
+      "math": {
+        "equation": "Izibalo: {latex}"
+      },
+      "rotor": {
+        "headings": "Izihloko",
+        "links": "Izixhumanisi",
+        "images": "Izithombe"
+      }
+    }
   },
   "language": {
     "restarting": "Kuqaliswa kabusha ukuze kusetshenziswe ulimi olukhethiwe",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Umphumela wesikhalo uzovela kulesi sikrini.",
       "nextStepFinal": "Isinqumo sesikhalo siyisinqumo sokugcina. Akukho esinye isikhalo esingafakwa.",
       "viewReceipt": "Buka irisidi"
+    },
+    "reportReceipts": {
+      "title": "Imibiko",
+      "rowSubtitle": "Imibiko oyifakile kanye nemiphumela yayo",
+      "emptyTitle": "Ayikho imibiko okwamanje",
+      "emptyDescription": "Imibiko oyifaka kusukela kumazwana noma empendulweni ye-AI ivela lapha.",
+      "couldNotLoad": "Akukwazekanga ukulayisha imibiko yakho",
+      "capped": "Kuboniswa imibiko yakho yamuva kakhulu."
     },
     "changelog": "Okusha",
     "changelogVersionPending": "Amanothi enguqulo {{version}} azofika nesibuyekezo esilandelayo sohlelo lokusebenza.",
@@ -4181,7 +4212,7 @@
     "personalDefaultDescription": "Ilayisha ngokuzenzakalelayo lapho kungekho nqolobane enephrofayela ephiniwe.",
     "organizationDefaultDescription": "Kulayishwa ngokuzenzakalelayo kumalungu angenakho okumisiwe komuntu siqu.",
     "setAsDefault": "Setha njengokuzenzakalelayo",
-    "saveFailed": "Ayikwazanga ukulondoloza iphrofayela",
+    "saveFailed": "Ayikwazanga ukulondoloza iphrofayela. Zama futhi.",
     "organizationRoleRequired": "Abanikazi benhlangano nabalawuli kuphela abangashintsha iphrofayela yenhlangano.",
     "deleteTitle": "Susa iphrofayela",
     "deleteMessage": "Lokhu kususa iphrofayela nezilungiselelo zayo unomphela. Lokhu akukwazi ukuhlehliswa.",

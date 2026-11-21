@@ -14,6 +14,7 @@ const DirectErrorSchema = z.looseObject({
     code: z.string().optional(),
     message: z.string().optional(),
     upstreamCode: z.string().optional(),
+    zodError: z.unknown().optional(),
   }),
 });
 const ShapedErrorSchema = z.looseObject({
@@ -22,6 +23,7 @@ const ShapedErrorSchema = z.looseObject({
       code: z.string().optional(),
       message: z.string().optional(),
       upstreamCode: z.string().optional(),
+      zodError: z.unknown().optional(),
     }),
   }),
 });
@@ -69,6 +71,89 @@ export function readTrpcErrorField(
   }
   if (field === 'message' && error instanceof Error) {
     return error.message;
+  }
+  return undefined;
+}
+
+/**
+ * The tRPC codes whose envelope carries a sentence the application wrote for a
+ * person. Everything else the wire can name is a framework or transport code —
+ * `PARSE_ERROR`, `METHOD_NOT_SUPPORTED`, `NOT_IMPLEMENTED`,
+ * `CLIENT_CLOSED_REQUEST`, `PAYLOAD_TOO_LARGE`, `TIMEOUT`,
+ * `UNPROCESSABLE_CONTENT`, `INTERNAL_SERVER_ERROR`, and any code added upstream
+ * — whose text nobody authored for a person. The check is an allowlist so a new
+ * framework code reaches the screen as the caller's neutral line, not as
+ * engineering text.
+ */
+const AUTHORED_REFUSAL_CODES = [
+  'BAD_REQUEST',
+  'CONFLICT',
+  'PRECONDITION_FAILED',
+  'FORBIDDEN',
+  'NOT_FOUND',
+  'TOO_MANY_REQUESTS',
+] as const;
+
+type AuthoredRefusalCode = (typeof AUTHORED_REFUSAL_CODES)[number];
+
+/**
+ * Whether this envelope carries a refusal the application wrote, so its
+ * sentence may be shown to a person.
+ *
+ * Wire shape of a mobile call: the client rejects with a `TRPCClientError`
+ * whose `message` is the server's message, and whose `data` holds the code,
+ * status, path and stack. Only an allowlisted application code speaks for the
+ * person, and only when the envelope is not one of the two shapes that carry
+ * no authored sentence:
+ *
+ * - An authored refusal, such as a duplicate name (`CONFLICT`), carries a
+ *   sentence written for the person, so the caller shows it.
+ * - `INTERNAL_SERVER_ERROR`, and every other code outside the allowlist,
+ *   carries diagnostic text, so the caller states its own neutral line.
+ * - `UNAUTHORIZED` is outside the allowlist. The one context-level auth
+ *   failure is already handled by the sign-out path, and every
+ *   procedure-level one carries an org-access diagnostic, so the caller
+ *   states its own line for both.
+ * - A non-null `zodError` names an input contract failure, which has no
+ *   reading for the person, so the caller states the neutral line too.
+ *
+ * An envelope without a code is not a server answer, so it yields no sentence.
+ */
+function isAuthoredRefusal(code: string | undefined, zodError: unknown): boolean {
+  if (code === undefined || !AUTHORED_REFUSAL_CODES.includes(code as AuthoredRefusalCode)) {
+    return false;
+  }
+  if (zodError !== undefined && zodError !== null) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * The sentence a tRPC SERVER answered with, or undefined when this error is not
+ * a refusal the application wrote for a person.
+ *
+ * The envelope's code decides, not the presence of text: the server's formatted
+ * `data` carries the code, status, path and zod error, so the sentence lives on
+ * `Error.message` (`shape.data.message` when shaped). A 5xx or a validation
+ * payload yields no sentence, and the caller states its neutral line.
+ *
+ * A transport wrapper is named `TRPCClientError` too and carries no `data`, so
+ * it yields no sentence either.
+ */
+export function readTrpcServerMessage(error: unknown): string | undefined {
+  const direct = DirectErrorSchema.safeParse(error);
+  if (direct.success) {
+    const { code, zodError } = direct.data.data;
+    if (!isAuthoredRefusal(code, zodError)) {
+      return undefined;
+    }
+    return error instanceof Error ? error.message : undefined;
+  }
+  const shaped = ShapedErrorSchema.safeParse(error);
+  if (shaped.success) {
+    const { code, message, zodError } = shaped.data.shape.data;
+    return isAuthoredRefusal(code, zodError) ? message : undefined;
   }
   return undefined;
 }

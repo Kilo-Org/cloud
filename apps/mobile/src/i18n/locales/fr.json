@@ -187,7 +187,30 @@
     "legalDocumentEnglishOnly": "Ce document est disponible uniquement en anglais.",
     "organizationTrialEndedBilling": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Vous pouvez mettre à jour la facturation, puis réessayer.",
     "organizationTrialEndedBillingAtKiloAi": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Vous pouvez mettre à jour la facturation sur kilo.ai, puis réessayer.",
-    "viewOnGitHub": "Voir la PR sur GitHub"
+    "viewOnGitHub": "Voir la PR sur GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Puce",
+        "nestedBulletPoint": "Puce imbriquée",
+        "orderedItem": "Élément de liste {n}",
+        "nestedOrderedItem": "Élément de liste imbriqué {n}"
+      },
+      "blockquote": {
+        "quote": "Citation",
+        "nestedQuote": "Citation imbriquée"
+      },
+      "table": {
+        "row": "Ligne {n} : {content}"
+      },
+      "math": {
+        "equation": "Maths : {latex}"
+      },
+      "rotor": {
+        "headings": "Titres",
+        "links": "Liens",
+        "images": "Images"
+      }
+    }
   },
   "language": {
     "restarting": "Redémarrage pour changer de langue",
@@ -506,6 +529,14 @@
       "nextStepAppeal": "Le résultat du recours s'affichera sur cet écran.",
       "nextStepFinal": "La décision sur le recours est définitive. Aucun autre recours ne peut être déposé.",
       "viewReceipt": "Voir l'accusé de réception"
+    },
+    "reportReceipts": {
+      "title": "Signalements",
+      "rowSubtitle": "Signalements que vous avez déposés et leurs résultats",
+      "emptyTitle": "Aucun signalement pour l'instant",
+      "emptyDescription": "Les signalements que vous déposez à partir d'un commentaire ou d'une réponse de l'IA apparaissent ici.",
+      "couldNotLoad": "Impossible de charger vos signalements",
+      "capped": "Affichage de vos signalements les plus récents."
     },
     "changelog": "Nouveautés",
     "changelogVersionPending": "Les notes de la version {{version}} arriveront avec la prochaine mise à jour de l'application.",
@@ -4251,7 +4282,7 @@
     "personalDefaultDescription": "Chargé automatiquement lorsqu'aucun dépôt n'a de profil épinglé.",
     "organizationDefaultDescription": "Chargé automatiquement pour les membres qui n’ont aucun défaut personnel.",
     "setAsDefault": "Définir par défaut",
-    "saveFailed": "Impossible d'enregistrer le profil",
+    "saveFailed": "Impossible d'enregistrer le profil. Réessayez.",
     "organizationRoleRequired": "Seuls les propriétaires et les administrateurs de l'organisation peuvent modifier les profils de l'organisation.",
     "deleteTitle": "Supprimer le profil",
     "deleteMessage": "Cela supprime définitivement le profil et ses paramètres. Cela ne peut pas être annulé.",

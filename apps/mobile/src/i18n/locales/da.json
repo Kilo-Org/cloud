@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Dette dokument er kun tilgængeligt på engelsk.",
     "organizationTrialEndedBilling": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. Du kan opdatere betalingen og derefter prøve igen.",
     "organizationTrialEndedBillingAtKiloAi": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. Du kan opdatere betalingen på kilo.ai og derefter prøve igen.",
-    "viewOnGitHub": "Vis PR på GitHub"
+    "viewOnGitHub": "Vis PR på GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Punkttegn",
+        "nestedBulletPoint": "Indlejret punkttegn",
+        "orderedItem": "Listeelement {n}",
+        "nestedOrderedItem": "Indlejret listeelement {n}"
+      },
+      "blockquote": {
+        "quote": "Citat",
+        "nestedQuote": "Indlejret citat"
+      },
+      "table": {
+        "row": "Række {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematik: {latex}"
+      },
+      "rotor": {
+        "headings": "Overskrifter",
+        "links": "Weblinks",
+        "images": "Billeder"
+      }
+    }
   },
   "language": {
     "restarting": "Genstarter for at skifte sprog",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Resultatet af din klage vises på denne skærm.",
       "nextStepFinal": "Afgørelsen om klagen er endelig. Der kan ikke indsendes flere klager.",
       "viewReceipt": "Se kvittering"
+    },
+    "reportReceipts": {
+      "title": "Anmeldelser",
+      "rowSubtitle": "Dine indsendte anmeldelser og deres resultater",
+      "emptyTitle": "Ingen anmeldelser endnu",
+      "emptyDescription": "Anmeldelser, du indsender fra en kommentar eller et AI-svar, vises her.",
+      "couldNotLoad": "Kunne ikke indlæse dine anmeldelser",
+      "capped": "Viser dine seneste anmeldelser."
     },
     "changelog": "Nyheder",
     "changelogVersionPending": "Noterne til version {{version}} kommer med næste appopdatering.",
@@ -4181,7 +4212,7 @@
     "personalDefaultDescription": "Automatisk indlæst, når intet lager har en fastgjort profil.",
     "organizationDefaultDescription": "Automatisk indlæst for medlemmer, der ikke har nogen personlig standard.",
     "setAsDefault": "Indstil som standard",
-    "saveFailed": "Profilen kunne ikke gemmes",
+    "saveFailed": "Profilen kunne ikke gemmes. Prøv igen.",
     "organizationRoleRequired": "Kun organisationsejere og administratorer kan ændre organisationens profiler.",
     "deleteTitle": "Slet profil",
     "deleteMessage": "Dette fjerner permanent profilen og dens indstillinger. Dette kan ikke fortrydes.",

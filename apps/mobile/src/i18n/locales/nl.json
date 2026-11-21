@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Dit document is alleen beschikbaar in het Engels.",
     "organizationTrialEndedBilling": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Je kunt de facturering bijwerken en het daarna opnieuw proberen.",
     "organizationTrialEndedBillingAtKiloAi": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Je kunt de facturering bijwerken op kilo.ai en het daarna opnieuw proberen.",
-    "viewOnGitHub": "PR op GitHub bekijken"
+    "viewOnGitHub": "PR op GitHub bekijken",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Opsommingsteken",
+        "nestedBulletPoint": "Genest opsommingsteken",
+        "orderedItem": "Lijstitem {n}",
+        "nestedOrderedItem": "Genest lijstitem {n}"
+      },
+      "blockquote": {
+        "quote": "Citaat",
+        "nestedQuote": "Genest citaat"
+      },
+      "table": {
+        "row": "Rij {n}: {content}"
+      },
+      "math": {
+        "equation": "Wiskunde: {latex}"
+      },
+      "rotor": {
+        "headings": "Koppen",
+        "links": "Koppelingen",
+        "images": "Afbeeldingen"
+      }
+    }
   },
   "language": {
     "restarting": "Opnieuw starten om de taal in te stellen",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "De uitkomst van je bezwaar verschijnt op dit scherm.",
       "nextStepFinal": "Het besluit op je bezwaar is definitief. Er kan geen bezwaar meer worden ingediend.",
       "viewReceipt": "Ontvangstbewijs bekijken"
+    },
+    "reportReceipts": {
+      "title": "Meldingen",
+      "rowSubtitle": "Meldingen die je hebt ingediend en hun uitkomsten",
+      "emptyTitle": "Nog geen meldingen",
+      "emptyDescription": "Meldingen die je vanuit een reactie of een AI-antwoord indient, verschijnen hier.",
+      "couldNotLoad": "Kon je meldingen niet laden",
+      "capped": "Je ziet je meest recente meldingen."
     },
     "changelog": "Nieuw in deze versie",
     "changelogVersionPending": "De notities voor {{version}} komen met de volgende app-update.",
@@ -4181,7 +4212,7 @@
     "personalDefaultDescription": "Automatisch geladen wanneer geen enkele repository een vastgezet profiel heeft.",
     "organizationDefaultDescription": "Automatisch geladen voor leden die geen persoonlijke standaard hebben.",
     "setAsDefault": "Als standaard instellen",
-    "saveFailed": "Kan profiel niet opslaan",
+    "saveFailed": "Kan profiel niet opslaan. Probeer het opnieuw.",
     "organizationRoleRequired": "Alleen organisatie-eigenaren en beheerders kunnen organisatieprofielen wijzigen.",
     "deleteTitle": "Profiel verwijderen",
     "deleteMessage": "Hierdoor worden het profiel en de instellingen ervan permanent verwijderd. Dit kan niet ongedaan worden gemaakt.",

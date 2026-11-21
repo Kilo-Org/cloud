@@ -187,7 +187,30 @@
     "legalDocumentEnglishOnly": "Este documento solo está disponible en inglés.",
     "organizationTrialEndedBilling": "La prueba de la organización ha finalizado y no tiene ningún plan activo. Puedes actualizar la facturación y, después, volver a intentarlo.",
     "organizationTrialEndedBillingAtKiloAi": "La prueba de la organización ha finalizado y no tiene ningún plan activo. Puedes actualizar la facturación en kilo.ai y, después, volver a intentarlo.",
-    "viewOnGitHub": "Ver PR en GitHub"
+    "viewOnGitHub": "Ver PR en GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Viñeta",
+        "nestedBulletPoint": "Viñeta anidada",
+        "orderedItem": "Elemento de lista {n}",
+        "nestedOrderedItem": "Elemento de lista anidado {n}"
+      },
+      "blockquote": {
+        "quote": "Cita",
+        "nestedQuote": "Cita anidada"
+      },
+      "table": {
+        "row": "Fila {n}: {content}"
+      },
+      "math": {
+        "equation": "Matemáticas: {latex}"
+      },
+      "rotor": {
+        "headings": "Encabezados",
+        "links": "Enlaces",
+        "images": "Imágenes"
+      }
+    }
   },
   "language": {
     "restarting": "Reiniciando para aplicar el idioma",
@@ -506,6 +529,14 @@
       "nextStepAppeal": "El resultado de tu apelación aparecerá en esta pantalla.",
       "nextStepFinal": "La decisión de la apelación es definitiva. No se puede presentar otra apelación.",
       "viewReceipt": "Ver comprobante"
+    },
+    "reportReceipts": {
+      "title": "Denuncias",
+      "rowSubtitle": "Denuncias que has presentado y sus resultados",
+      "emptyTitle": "Aún no hay denuncias",
+      "emptyDescription": "Las denuncias que presentes desde un comentario o una respuesta de IA aparecerán aquí.",
+      "couldNotLoad": "No se pudieron cargar tus denuncias",
+      "capped": "Se muestran tus denuncias más recientes."
     },
     "changelog": "Novedades",
     "changelogVersionPending": "Las notas de la versión {{version}} llegan con la próxima actualización.",
@@ -4251,7 +4282,7 @@
     "personalDefaultDescription": "Se carga automáticamente cuando ningún repositorio tiene un perfil fijado.",
     "organizationDefaultDescription": "Cargado automáticamente para miembros que no tienen valores predeterminados personales.",
     "setAsDefault": "Establecer como predeterminado",
-    "saveFailed": "No se pudo guardar el perfil",
+    "saveFailed": "No se pudo guardar el perfil. Inténtalo de nuevo.",
     "organizationRoleRequired": "Solo los propietarios de la organización y los administradores pueden cambiar los perfiles de la organización.",
     "deleteTitle": "Eliminar perfil",
     "deleteMessage": "Esto elimina permanentemente el perfil y su configuración. Esto no se puede deshacer.",

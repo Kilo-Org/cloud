@@ -188,7 +188,30 @@
     "privateRepositoryA11y": "{{name}}, súkromné úložisko",
     "legalDocumentEnglishOnly": "Tento dokument je dostupný len v angličtine.",
     "organizationTrialEndedBilling": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Môžete aktualizovať fakturáciu a potom to skúsiť znova.",
-    "organizationTrialEndedBillingAtKiloAi": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Môžete aktualizovať fakturáciu na kilo.ai a potom to skúsiť znova."
+    "organizationTrialEndedBillingAtKiloAi": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Môžete aktualizovať fakturáciu na kilo.ai a potom to skúsiť znova.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Odrážka",
+        "nestedBulletPoint": "Vnorená odrážka",
+        "orderedItem": "Položka zoznamu {n}",
+        "nestedOrderedItem": "Vnorená položka zoznamu {n}"
+      },
+      "blockquote": {
+        "quote": "Citácia",
+        "nestedQuote": "Vnorená citácia"
+      },
+      "table": {
+        "row": "Riadok {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Nadpisy",
+        "links": "Odkazy",
+        "images": "Obrázky"
+      }
+    }
   },
   "language": {
     "restarting": "Aplikácia sa reštartuje na zmenu jazyka",
@@ -507,6 +530,14 @@
       "nextStepAppeal": "Výsledok odvolania sa zobrazí na tejto obrazovke.",
       "nextStepFinal": "Rozhodnutie o odvolaní je konečné. Ďalšie odvolanie už nie je možné podať.",
       "viewReceipt": "Zobraziť potvrdenie"
+    },
+    "reportReceipts": {
+      "title": "Nahlásenia",
+      "rowSubtitle": "Nahlásenia, ktoré si podal, a ich výsledky",
+      "emptyTitle": "Zatiaľ žiadne nahlásenia",
+      "emptyDescription": "Nahlásenia, ktoré podáš z komentára alebo z odpovede AI, sa zobrazia tu.",
+      "couldNotLoad": "Nepodarilo sa načítať tvoje nahlásenia",
+      "capped": "Zobrazujú sa tvoje najnovšie nahlásenia."
     },
     "changelog": "Čo je nové",
     "changelogVersionPending": "Poznámky k verzii {{version}} prídu s ďalšou aktualizáciou aplikácie.",
@@ -4321,7 +4352,7 @@
     "personalDefaultDescription": "Automaticky načítané, keď žiadne úložisko nemá pripnutý profil.",
     "organizationDefaultDescription": "Automaticky načítané pre členov, ktorí nemajú žiadne osobné predvolené nastavenia.",
     "setAsDefault": "Nastaviť ako predvolené",
-    "saveFailed": "Profil sa nepodarilo uložiť",
+    "saveFailed": "Profil sa nepodarilo uložiť. Skúste to znova.",
     "organizationRoleRequired": "Profil organizácie môžu zmeniť iba vlastníci organizácie a správcovia.",
     "deleteTitle": "Odstrániť profil",
     "deleteMessage": "Tým sa natrvalo odstráni profil a jeho nastavenia. Toto sa nedá vrátiť späť.",

@@ -143,7 +143,7 @@
     "jotai": "2.18.1",
     "jose": "catalog:",
     "jotai-minidb": "0.0.8",
-    "js-yaml": "4.3.2",
+    "js-yaml": "catalog:",
     "jsonwebtoken": "catalog:",
     "linkify-it": "5.0.2",
     "lucide-react": "0.552.0",

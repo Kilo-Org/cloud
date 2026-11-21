@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Dokumentu hau ingelesez bakarrik dago eskuragarri.",
     "organizationTrialEndedBilling": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Fakturazioa egunera dezakezu, eta gero berriro saiatu.",
     "organizationTrialEndedBillingAtKiloAi": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Fakturazioa kilo.ai-n egunera dezakezu, eta gero berriro saiatu.",
-    "viewOnGitHub": "Ikusi PR-a GitHub-en"
+    "viewOnGitHub": "Ikusi PR-a GitHub-en",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Buleta",
+        "nestedBulletPoint": "Buleta habiaratua",
+        "orderedItem": "Zerrendako elementua {n}",
+        "nestedOrderedItem": "Zerrendako elementu habiaratua {n}"
+      },
+      "blockquote": {
+        "quote": "Aipua",
+        "nestedQuote": "Aipu habiaratua"
+      },
+      "table": {
+        "row": "Lerroa {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Izenburuak",
+        "links": "Estekak",
+        "images": "Irudiak"
+      }
+    }
   },
   "language": {
     "restarting": "Hizkuntza aplikatzeko berrabiarazten",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Helegitearen emaitza pantaila honetan agertuko da.",
       "nextStepFinal": "Helegitearen erabakia behin betikoa da. Ezin da helegite gehiago aurkeztu.",
       "viewReceipt": "Ikusi agiria"
+    },
+    "reportReceipts": {
+      "title": "Salaketak",
+      "rowSubtitle": "Aurkeztu zenituen salaketak eta horien emaitzak",
+      "emptyTitle": "Oraindik ez dago salaketarik",
+      "emptyDescription": "Iruzkin batetik edo AI baten erantzun batetik aurkezten dituzun salaketak hemen agertzen dira.",
+      "couldNotLoad": "Ezin izan dira zure salaketak kargatu",
+      "capped": "Zure azken salaketak erakusten ari gara."
     },
     "changelog": "Berritasunak",
     "changelogVersionPending": "{{version}} bertsioaren oharrak aplikazioaren hurrengo eguneratzearekin iritsiko dira.",
@@ -4181,7 +4212,7 @@
     "personalDefaultDescription": "Automatikoki kargatzen da biltegirik ez dagoenean ainguratuta dagoen profilik.",
     "organizationDefaultDescription": "Lehenetsi pertsonalik ez duten kideentzat automatikoki kargatu da.",
     "setAsDefault": "Ezarri lehenetsi gisa",
-    "saveFailed": "Ezin izan da profila gorde",
+    "saveFailed": "Ezin izan da profila gorde. Saiatu berriro.",
     "organizationRoleRequired": "Erakundeko jabeek eta administratzaileek soilik alda dezakete erakundearen profila.",
     "deleteTitle": "Ezabatu profila",
     "deleteMessage": "Honek profila eta bere ezarpenak betiko kentzen ditu. Hau ezin da desegin.",

@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Bu sənəd yalnız ingilis dilində mövcuddur.",
     "organizationTrialEndedBilling": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Billinqi yeniləyə və sonra yenidən cəhd edə bilərsiniz.",
     "organizationTrialEndedBillingAtKiloAi": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Billinqi kilo.ai ünvanında yeniləyə və sonra yenidən cəhd edə bilərsiniz.",
-    "viewOnGitHub": "GitHub-da PR-ə bax"
+    "viewOnGitHub": "GitHub-da PR-ə bax",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Büllet işarəsi",
+        "nestedBulletPoint": "İç-içə büllet işarəsi",
+        "orderedItem": "Siyahı elementi {n}",
+        "nestedOrderedItem": "İç-içə siyahı elementi {n}"
+      },
+      "blockquote": {
+        "quote": "Sitat",
+        "nestedQuote": "İç-içə sitat"
+      },
+      "table": {
+        "row": "Sətir {n}: {content}"
+      },
+      "math": {
+        "equation": "Riyaziyyat: {latex}"
+      },
+      "rotor": {
+        "headings": "Başlıqlar",
+        "links": "Keçidlər",
+        "images": "Şəkillər"
+      }
+    }
   },
   "language": {
     "restarting": "Dil dəyişikliyini tətbiq etmək üçün yenidən başladılır",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Apellyasiyanın nəticəsi bu ekranda görünəcək.",
       "nextStepFinal": "Apellyasiya qərarı qətidir. Artıq apellyasiya vermək mümkün deyil.",
       "viewReceipt": "Qəbzə bax"
+    },
+    "reportReceipts": {
+      "title": "Şikayətlər",
+      "rowSubtitle": "Göndərdiyiniz şikayətlər və onların nəticələri",
+      "emptyTitle": "Hələ şikayət yoxdur",
+      "emptyDescription": "Şərhdən və ya AI cavabından göndərdiyiniz şikayətlər burada görünəcək.",
+      "couldNotLoad": "Şikayətləriniz yüklənə bilmədi",
+      "capped": "Ən son şikayətləriniz göstərilir."
     },
     "changelog": "Yeniliklər",
     "changelogVersionPending": "{{version}} versiyasının qeydləri tətbiqin növbəti yeniləməsi ilə gələcək.",
@@ -4181,7 +4212,7 @@
     "personalDefaultDescription": "Heç bir repozitorda bərkidilmiş profil olmadıqda avtomatik yüklənir.",
     "organizationDefaultDescription": "Şəxsi defoltu olmayan üzvlər üçün avtomatik yüklənir.",
     "setAsDefault": "Defolt olaraq təyin edin",
-    "saveFailed": "Profili saxlamaq mümkün olmadı",
+    "saveFailed": "Profili yadda saxlamaq mümkün olmadı. Yenidən cəhd edin.",
     "organizationRoleRequired": "Təşkilat profillərini yalnız təşkilat sahibləri və inzibatçılar dəyişə bilər.",
     "deleteTitle": "Profili silin",
     "deleteMessage": "Bu, profili və onun parametrlərini həmişəlik silir. Bu geri qaytarıla bilməz.",

@@ -638,6 +638,45 @@ describe('deep-link-launch', () => {
       });
     });
 
+    it('keeps the capture time across a restart so the bound counts from capture', async () => {
+      const capturedAt = Date.now() - 23 * 60 * 60 * 1000;
+      store.set(
+        PENDING_DEEP_LINK_KEY,
+        JSON.stringify({
+          href: '/(app)/(tabs)/(3_profile)',
+          source: 'notification',
+          storedAt: capturedAt,
+          userId: null,
+        })
+      );
+
+      // The first start restores the destination, and nothing consumes it.
+      await restorePersistedPendingDeepLink();
+      await vi.waitFor(() => {
+        expect(secureStoreMock.setItemAsync).toHaveBeenCalledWith(
+          PENDING_DEEP_LINK_KEY,
+          expect.any(String)
+        );
+      });
+      const restored = JSON.parse(store.get(PENDING_DEEP_LINK_KEY) ?? '') as { storedAt: number };
+      expect(restored.storedAt).toBe(capturedAt);
+
+      // A restart two hours later still finds the destination unconsumed.
+      _resetDeepLinkLaunchForTests();
+      vi.useFakeTimers({ now: Date.now() + 2 * 60 * 60 * 1000 });
+      try {
+        await restorePersistedPendingDeepLink();
+
+        // 25 h have passed since capture, so the record expires.
+        expect(getPendingDeepLinkSnapshot()).toBeNull();
+        await vi.waitFor(() => {
+          expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('discards a corrupt record with no navigation', async () => {
       store.set(PENDING_DEEP_LINK_KEY, 'not json');
       _resetDeepLinkLaunchForTests();

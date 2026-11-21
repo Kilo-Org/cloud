@@ -156,6 +156,23 @@ describe('sendRefreshRequest over XMLHttpRequest', () => {
     expect(xhr?.aborted).toBe(false);
   });
 
+  it('releases a request whose answer the caller does not need to read', async () => {
+    vi.stubGlobal('XMLHttpRequest', FakeXhr);
+
+    const answerPromise = sendRefreshRequest(request());
+    const xhr = FakeXhr.instances[0];
+    xhr?.receiveHead(429);
+    const answer = await answerPromise;
+    expect(answer.status).toBe(429);
+    expect(xhr?.aborted).toBe(false);
+
+    answer.release();
+
+    // The unread response must not hold the connection after its status was
+    // used for the answer.
+    expect(xhr?.aborted).toBe(true);
+  });
+
   it('rejects when the request fails before its head', async () => {
     vi.stubGlobal('XMLHttpRequest', FakeXhr);
 

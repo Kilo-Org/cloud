@@ -278,7 +278,30 @@
     "legalDocumentEnglishOnly": "This document is available in English only.",
     "organizationTrialEndedBilling": "The organization's trial has ended and it has no active plan. You can update billing, then try again.",
     "organizationTrialEndedBillingAtKiloAi": "The organization's trial has ended and it has no active plan. You can update billing at kilo.ai, then try again.",
-    "viewOnGitHub": "View PR on GitHub"
+    "viewOnGitHub": "View PR on GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Bullet point",
+        "nestedBulletPoint": "Nested bullet point",
+        "orderedItem": "List item {n}",
+        "nestedOrderedItem": "Nested list item {n}"
+      },
+      "blockquote": {
+        "quote": "Blockquote",
+        "nestedQuote": "Nested blockquote"
+      },
+      "table": {
+        "row": "Row {n}: {content}"
+      },
+      "math": {
+        "equation": "Math: {latex}"
+      },
+      "rotor": {
+        "headings": "Headings",
+        "links": "Links",
+        "images": "Images"
+      }
+    }
   },
   "language": {
     "restarting": "Restarting to apply language",
@@ -597,6 +620,14 @@
       "nextStepAppeal": "The appeal outcome will appear on this screen.",
       "nextStepFinal": "The appeal decision is final. No further appeal can be filed.",
       "viewReceipt": "View receipt"
+    },
+    "reportReceipts": {
+      "title": "Reports",
+      "rowSubtitle": "Reports you filed and their outcomes",
+      "emptyTitle": "No reports yet",
+      "emptyDescription": "Reports you file from a comment or an AI response appear here.",
+      "couldNotLoad": "Could not load your reports",
+      "capped": "Showing your most recent reports."
     },
     "changelog": "What's New",
     "changelogGroupNew": "New",
@@ -4273,7 +4304,7 @@
     "personalDefaultDescription": "Auto-loaded when no repository has a pinned profile.",
     "organizationDefaultDescription": "Auto-loaded for members who have no personal default.",
     "setAsDefault": "Set as default",
-    "saveFailed": "Couldn't save profile",
+    "saveFailed": "Couldn't save the profile. Try again.",
     "organizationRoleRequired": "Only organization owners and admins can change organization profiles.",
     "deleteTitle": "Delete profile",
     "deleteMessage": "This permanently removes the profile and its settings. This cannot be undone.",

@@ -375,6 +375,12 @@ async function doRefresh(): Promise<RefreshOutcome> {
             answer.status === 401 ? REFUSAL_BODY_BUDGET_MS : CONTROL_PLANE_DEADLINE_MS
           )
         : null;
+      // A status that needs no body leaves the response unread: the exchange is
+      // released here so it cannot hold the connection after its answer was
+      // used.
+      if (!readsRefusalBody && !answer.ok) {
+        answer.release();
+      }
       const successText = answer.ok ? await answer.text(CONTROL_PLANE_DEADLINE_MS) : null;
       return { answer, refusalText, successText };
     });

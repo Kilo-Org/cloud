@@ -42,6 +42,13 @@ type KvRowProps = {
   testID?: string;
   /** Allow the value text to be selected/copied (e.g. identifiers, versions, paths). */
   selectable?: boolean;
+  /**
+   * A second line under the row for the state the value cannot hold on one
+   * line — the trial a plan is running. It spans the whole row below both
+   * columns, so the value above stays a single line and the two never share a
+   * paragraph direction.
+   */
+  caption?: string;
   /** Extra classes for the value text only (e.g. `uppercase` for a status readout). */
   valueClassName?: string;
   /**
@@ -104,7 +111,7 @@ const DOT_TONE = {
  * catalog, so each language keeps its own spacing and the value keeps the row's
  * ordinary colour.
  */
-type KvStatus = Readonly<{ label: string; tone: KvTone }>;
+type KvStatus = Readonly<{ label: string; tone: RowValueTone }>;
 
 /** Label-left / value-right row; at a large font scale the value sits under the label. */
 export function KvRow({
@@ -118,6 +125,7 @@ export function KvRow({
   className,
   testID,
   selectable,
+  caption,
   valueClassName,
   valueAccessibilityLabel,
   valueDirection,
@@ -208,6 +216,20 @@ export function KvRow({
                 </View>
               ),
             }
+      }
+      footer={
+        caption === undefined ? undefined : (
+          // Its own paragraph below both columns: the value above stays one
+          // line, and a right-to-left interface cannot reorder the caption
+          // against it.
+          <Text
+            className="pt-1 text-right text-xs text-muted-foreground"
+            numberOfLines={2}
+            ellipsizeMode="tail"
+          >
+            {caption}
+          </Text>
+        )
       }
       testID={testID}
       className={className}

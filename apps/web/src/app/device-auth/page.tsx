@@ -9,6 +9,7 @@ import {
   getDeviceAuthRequest,
   isDeviceAuthRequestExpired,
 } from '@/lib/device-auth/device-auth';
+import { normalizeDeviceAuthUserCode } from '@/lib/device-auth/user-code';
 import { requestingClientOfRow, type RequestingClient } from '@/lib/device-auth/requesting-client';
 
 type PageProps = {
@@ -18,7 +19,10 @@ type PageProps = {
 const deviceAuthSearchParamsSchema = z.object({
   code: z.preprocess(value => {
     const code = Array.isArray(value) ? value[0] : value;
-    return typeof code === 'string' ? code.trim() || undefined : code;
+    // A person reads the code off one device and types it into another, so the
+    // dash, stray whitespace and lower case all reach here. Normalize once, so
+    // the page, the stored lookup and every redirect use one canonical code.
+    return typeof code === 'string' ? normalizeDeviceAuthUserCode(code) || undefined : code;
   }, z.string().min(1).optional()),
   app: z.union([z.string(), z.array(z.string())]).optional(),
 });

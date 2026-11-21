@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Akwụkwọ a dị naanị n'asụsụ Bekee.",
     "organizationTrialEndedBilling": "Oge nnwale nke òtù ahụ agwụla na o nweghị atụmatụ na-arụ ọrụ. Ị nwere ike imelite nhazi ụgwọ, wee nwaa ọzọ.",
     "organizationTrialEndedBillingAtKiloAi": "Oge nnwale nke òtù ahụ agwụla na o nweghị atụmatụ na-arụ ọrụ. Ị nwere ike imelite nhazi ụgwọ na kilo.ai, wee nwaa ọzọ.",
-    "viewOnGitHub": "Lelee PR na GitHub"
+    "viewOnGitHub": "Lelee PR na GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Bọlite",
+        "nestedBulletPoint": "Bọlite dị n’ime",
+        "orderedItem": "Ihe ndepụta {n}",
+        "nestedOrderedItem": "Ihe ndepụta dị n’ime {n}"
+      },
+      "blockquote": {
+        "quote": "Nhọta",
+        "nestedQuote": "Nhọta dị n’ime"
+      },
+      "table": {
+        "row": "Ahịrị {n}: {content}"
+      },
+      "math": {
+        "equation": "Mgbakọ: {latex}"
+      },
+      "rotor": {
+        "headings": "Isiokwu",
+        "links": "Njikọ",
+        "images": "Onyonyo"
+      }
+    }
   },
   "language": {
     "restarting": "Na-amalitegharị iji asụsụ ahọpụtara",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Nsonaazụ mkpegharị ga-apụta na ihuenyo a.",
       "nextStepFinal": "Mkpebi mkpegharị a bụ nke ikpeazụ. Enweghị ike iziga mkpegharị ọzọ.",
       "viewReceipt": "Lee akwụkwọ nnata"
+    },
+    "reportReceipts": {
+      "title": "Akụkọ",
+      "rowSubtitle": "Akụkọ ndị i debara na nsonaazụ ha",
+      "emptyTitle": "Enweghị akụkọ ruo ugbu a",
+      "emptyDescription": "Akụkọ ị na-edeba site na nkọwa ma ọ bụ nzaghachi AI na-apụta ebe a.",
+      "couldNotLoad": "Enweghị ike ibudata akụkọ gị",
+      "capped": "Na-egosi akụkọ gị ndị kacha ọhụrụ."
     },
     "changelog": "Ihe ọhụrụ",
     "changelogVersionPending": "Ndetu maka ụdị {{version}} ga-abịa na mmelite ngwa na-esote.",
@@ -4181,7 +4212,7 @@
     "personalDefaultDescription": "A na-ebunye onwe ya mgbe enweghị ebe nchekwa nwere profaịlụ etinyere.",
     "organizationDefaultDescription": "A na-ebunye onwe ya maka ndị otu na-enweghị ndabara nkeonwe.",
     "setAsDefault": "Tọọ ka ndabara",
-    "saveFailed": "Enweghị ike ịchekwa profaịlụ",
+    "saveFailed": "Enweghị ike ịchekwa profaịlụ. Nwalee ọzọ.",
     "organizationRoleRequired": "Naanị ndị nwe nzukọ na ndị nchịkwa nwere ike ịgbanwe profaịlụ nzukọ.",
     "deleteTitle": "Hichapụ profaịlụ",
     "deleteMessage": "Nke a na-ewepụ profaịlụ na ntọala ya kpamkpam. Enweghị ike ịkagbu nke a.",

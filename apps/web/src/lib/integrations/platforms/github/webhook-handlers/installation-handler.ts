@@ -76,11 +76,11 @@ async function hasOtherLiveAssociation(
 }
 
 /**
- * Bounds every lock-taking transaction of this handler: the installation
- * repair and the pending completion both serialize on the installation
- * identity lock and, for an organization, on the owner slot lock. A delivery
- * that cannot take a contended lock fails fast and GitHub redelivers it.
- * Matches the bounds of connectVerifiedGitHubInstallation.
+ * Bounds every lock-taking transaction of this handler. The installation
+ * repair serializes on the installation identity lock; the pending completion
+ * serializes on that lock and then on the owner slot lock. A delivery that
+ * cannot take a contended lock fails fast and GitHub redelivers it. Matches
+ * the bounds of connectVerifiedGitHubInstallation.
  */
 async function boundRepairTransaction(tx: DbTransaction): Promise<void> {
   await tx.execute(sql`SET LOCAL lock_timeout = '5s'`);

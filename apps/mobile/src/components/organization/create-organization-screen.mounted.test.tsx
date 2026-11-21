@@ -484,25 +484,30 @@ describe('CreateOrganizationScreen', () => {
     unmount();
   });
 
-  it('announces a repeated identical failure as a new event', async () => {
-    mocks.createMutate.mockRejectedValue(
-      new Error('You already own the maximum number of organizations.')
-    );
+  it('announces a repeated identical refusal as a new event', async () => {
     const { renderer, unmount } = await mount();
 
-    await type(renderer, 'Acme');
     await act(() => {
       handlerOf(submitOf(renderer), 'onPress')?.();
     });
-    // A retry clears the line and then fails with the same words. The line's
-    // key follows the attempt counter, so the second failure is a new
-    // announcement rather than a silent re-render of the first.
-    await type(renderer, ' Acme ');
+    expect(texts(renderer)).toContain('Enter an organization name.');
+    expect(mocks.createMutate).not.toHaveBeenCalled();
+    expect(announce).toHaveBeenCalledTimes(1);
+    expect(announce).toHaveBeenCalledWith('Enter an organization name.');
+    const first = statusOf(renderer);
+
+    // Nothing typed between the submits, so the line stays rendered and the
+    // second refusal repeats the same words. Only the keyed remount makes that
+    // a new announcement: the announcement hook's own dedupe would drop it.
     await act(() => {
       handlerOf(submitOf(renderer), 'onPress')?.();
     });
 
+    expect(statusOf(renderer)).not.toBe(first);
+    expect(statusOf(renderer).props.message).toBe('Enter an organization name.');
     expect(announce).toHaveBeenCalledTimes(2);
+    expect(announce).toHaveBeenLastCalledWith('Enter an organization name.');
+    // A fresh instance, not a second line: the screen still shows one.
     expect(renderer.root.findAll(node => node.type === AccessibleStatus)).toHaveLength(1);
     unmount();
   });

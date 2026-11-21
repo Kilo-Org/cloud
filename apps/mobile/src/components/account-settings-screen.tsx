@@ -12,16 +12,19 @@ import {
   Smartphone,
   UserRound,
 } from '@/components/ui/icons';
+import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { DirectionalLogOut } from '@/components/ui/directional-icons';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { attemptPushRegistrationReconciliation } from '@/lib/auth/push-registration-reconciliation';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { getResolvedLanguage, useLanguagePreference } from '@/lib/hooks/use-language-preference';
@@ -33,6 +36,12 @@ import { useTRPC } from '@/lib/trpc';
 import { LANGUAGE_ENDONYMS } from '@/i18n/languages';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { setLanguagePickerBridge } from '@/lib/picker-bridge';
+
+/**
+ * Rows the skeleton reserves while the account read is pending: enough to fill
+ * the first screen of the list, so the swap to real rows does not scroll.
+ */
+const SKELETON_ROWS = [0, 1, 2, 3, 4, 5, 6, 7];
 
 /**
  * Account settings subpage. The first three rows are unchanged from the former
@@ -48,7 +57,7 @@ export function AccountSettingsScreen() {
   const { t } = useTranslation();
   const trpc = useTRPC();
   const { confirm, dialog } = useConfirmDialog();
-  const { userId } = useCurrentUserId();
+  const { userId, isLoading, isFetchError, refetch } = useCurrentUserId();
   const { preference: languagePreference } = useLanguagePreference();
   const { hasLoaded: trustedHostsLoaded } = useTrustedHosts();
   const languageEndonym = LANGUAGE_ENDONYMS[getResolvedLanguage()];
@@ -64,6 +73,131 @@ export function AccountSettingsScreen() {
     })
   );
 
+  let body: ReactNode = null;
+  if (isLoading) {
+    body = (
+      <RowGroup leadingTile>
+        {SKELETON_ROWS.map(row => (
+          <RowSkeleton key={row} tile subtitle />
+        ))}
+      </RowGroup>
+    );
+  } else if (isFetchError) {
+    // A failed attempt keeps a cached identity, which must not be presented as
+    // the current account's settings, so the retry stands in place of the rows.
+    body = <QueryError onRetry={refetch} />;
+  } else {
+    body = (
+      <RowGroup leadingTile>
+        <ConfigureRow
+          icon={UserRound}
+          title={t('profile.editProfile.title')}
+          subtitle={t('profile.editProfile.rowSubtitle')}
+          onPress={() => {
+            router.push('/(app)/(tabs)/(3_profile)/profile-edit' as Href);
+          }}
+        />
+        <ConfigureRow
+          icon={Lock}
+          title={t('profile.signInMethods.title')}
+          subtitle={t('profile.linkedAccounts')}
+          onPress={() => {
+            router.push('/(app)/(tabs)/(3_profile)/login-methods' as Href);
+          }}
+        />
+        <ConfigureRow
+          icon={Globe}
+          title={t('common.language')}
+          subtitle={languageSubtitle}
+          onPress={() => {
+            setLanguagePickerBridge({
+              onApplied: () => {
+                if (userId) {
+                  void attemptPushRegistrationReconciliation(userId);
+                }
+              },
+            });
+            pushOnce('/(app)/language-picker' as Href);
+          }}
+        />
+        <ConfigureRow
+          icon={Shield}
+          title={t('trustedHosts.title')}
+          subtitle={t('trustedHosts.subtitle')}
+          disabled={!trustedHostsLoaded}
+          onPress={() => {
+            router.push('/(app)/(tabs)/(3_profile)/trusted-hosts' as Href);
+          }}
+        />
+        <ConfigureRow
+          icon={KeyRound}
+          title={t('profile.passkeysTitle')}
+          subtitle={t('profile.passkeysSubtitle')}
+          onPress={() => {
+            router.push('/(app)/(tabs)/(3_profile)/passkeys' as Href);
+          }}
+        />
+        <ConfigureRow
+          icon={Cpu}
+          title={t('profile.providerKeys.title')}
+          subtitle={t('profile.providerKeys.rowSubtitle')}
+          onPress={() => {
+            router.push('/(app)/(tabs)/(3_profile)/provider-keys' as Href);
+          }}
+        />
+        <ConfigureRow
+          icon={FileText}
+          title={t('profile.dataExport.title')}
+          subtitle={t('profile.dataExport.rowSubtitle')}
+          onPress={() => {
+            router.push('/(app)/(tabs)/(3_profile)/data-export' as Href);
+          }}
+        />
+        <ConfigureRow
+          icon={Ban}
+          title={t('profile.blockedPeople.title')}
+          subtitle={t('profile.blockedPeople.rowSubtitle')}
+          onPress={() => {
+            router.push('/(app)/(tabs)/(3_profile)/blocked-people' as Href);
+          }}
+        />
+        <ConfigureRow
+          icon={Flag}
+          title={t('profile.reportReceipts.title')}
+          subtitle={t('profile.reportReceipts.rowSubtitle')}
+          onPress={() => {
+            router.push('/(app)/(tabs)/(3_profile)/report-receipts' as Href);
+          }}
+        />
+        <ConfigureRow
+          icon={Smartphone}
+          title={t('common.deviceSessions')}
+          subtitle={t('profile.deviceSessionsSubtitle')}
+          onPress={() => {
+            router.push('/(app)/(tabs)/(3_profile)/device-sessions' as Href);
+          }}
+        />
+        <ConfigureRow
+          icon={DirectionalLogOut}
+          title={t('profile.signOutWeb.title')}
+          subtitle={t('profile.signOutWeb.rowSubtitle')}
+          tone="danger"
+          accessibilityLabel={t('profile.signOutWeb.title')}
+          onPress={() => {
+            confirm({
+              title: t('profile.signOutWeb.confirmTitle'),
+              message: t('profile.signOutWeb.confirmMessage'),
+              confirmLabel: t('common.signOut'),
+              onConfirm: () => {
+                signOutWeb.mutate(undefined);
+              },
+            });
+          }}
+        />
+      </RowGroup>
+    );
+  }
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('preferences.account')} backFallback={PROFILE_TAB_HREF} />
@@ -72,113 +206,7 @@ export function AccountSettingsScreen() {
         contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
-        <RowGroup leadingTile>
-          <ConfigureRow
-            icon={UserRound}
-            title={t('profile.editProfile.title')}
-            subtitle={t('profile.editProfile.rowSubtitle')}
-            onPress={() => {
-              router.push('/(app)/(tabs)/(3_profile)/profile-edit' as Href);
-            }}
-          />
-          <ConfigureRow
-            icon={Lock}
-            title={t('profile.signInMethods.title')}
-            subtitle={t('profile.linkedAccounts')}
-            onPress={() => {
-              router.push('/(app)/(tabs)/(3_profile)/login-methods' as Href);
-            }}
-          />
-          <ConfigureRow
-            icon={Globe}
-            title={t('common.language')}
-            subtitle={languageSubtitle}
-            onPress={() => {
-              setLanguagePickerBridge({
-                onApplied: () => {
-                  if (userId) {
-                    void attemptPushRegistrationReconciliation(userId);
-                  }
-                },
-              });
-              pushOnce('/(app)/language-picker' as Href);
-            }}
-          />
-          <ConfigureRow
-            icon={Shield}
-            title={t('trustedHosts.title')}
-            subtitle={t('trustedHosts.subtitle')}
-            disabled={!trustedHostsLoaded}
-            onPress={() => {
-              router.push('/(app)/(tabs)/(3_profile)/trusted-hosts' as Href);
-            }}
-          />
-          <ConfigureRow
-            icon={KeyRound}
-            title={t('profile.passkeysTitle')}
-            subtitle={t('profile.passkeysSubtitle')}
-            onPress={() => {
-              router.push('/(app)/(tabs)/(3_profile)/passkeys' as Href);
-            }}
-          />
-          <ConfigureRow
-            icon={Cpu}
-            title={t('profile.providerKeys.title')}
-            subtitle={t('profile.providerKeys.rowSubtitle')}
-            onPress={() => {
-              router.push('/(app)/(tabs)/(3_profile)/provider-keys' as Href);
-            }}
-          />
-          <ConfigureRow
-            icon={FileText}
-            title={t('profile.dataExport.title')}
-            subtitle={t('profile.dataExport.rowSubtitle')}
-            onPress={() => {
-              router.push('/(app)/(tabs)/(3_profile)/data-export' as Href);
-            }}
-          />
-          <ConfigureRow
-            icon={Ban}
-            title={t('profile.blockedPeople.title')}
-            subtitle={t('profile.blockedPeople.rowSubtitle')}
-            onPress={() => {
-              router.push('/(app)/(tabs)/(3_profile)/blocked-people' as Href);
-            }}
-          />
-          <ConfigureRow
-            icon={Flag}
-            title={t('profile.reportReceipts.title')}
-            subtitle={t('profile.reportReceipts.rowSubtitle')}
-            onPress={() => {
-              router.push('/(app)/(tabs)/(3_profile)/report-receipts' as Href);
-            }}
-          />
-          <ConfigureRow
-            icon={Smartphone}
-            title={t('common.deviceSessions')}
-            subtitle={t('profile.deviceSessionsSubtitle')}
-            onPress={() => {
-              router.push('/(app)/(tabs)/(3_profile)/device-sessions' as Href);
-            }}
-          />
-          <ConfigureRow
-            icon={DirectionalLogOut}
-            title={t('profile.signOutWeb.title')}
-            subtitle={t('profile.signOutWeb.rowSubtitle')}
-            tone="danger"
-            accessibilityLabel={t('profile.signOutWeb.title')}
-            onPress={() => {
-              confirm({
-                title: t('profile.signOutWeb.confirmTitle'),
-                message: t('profile.signOutWeb.confirmMessage'),
-                confirmLabel: t('common.signOut'),
-                onConfirm: () => {
-                  signOutWeb.mutate(undefined);
-                },
-              });
-            }}
-          />
-        </RowGroup>
+        {body}
       </TabScreenScrollView>
       {dialog}
     </View>

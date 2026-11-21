@@ -43,12 +43,16 @@ export function providerListEditedBy(state: FormState, next: ModelAccessDraft): 
  */
 export function providerDataNotice(params: {
   catalogUnavailable: boolean;
+  /** Whether the gateway catalog named no provider, so the rows hold only saved slugs. */
+  catalogProvidersEmpty: boolean;
   providersEmpty: boolean;
 }): string | null {
   if (params.catalogUnavailable) {
     return 'organizationModelAccess.catalogUnavailable';
   }
-  return params.providersEmpty ? 'organizationModelAccess.providersUnavailable' : null;
+  return params.providersEmpty || params.catalogProvidersEmpty
+    ? 'organizationModelAccess.providersUnavailable'
+    : null;
 }
 
 /**

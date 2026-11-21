@@ -29,6 +29,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { i18n } from '@/i18n';
 import { AnalysisSettingsScreen } from './analysis-settings-screen';
 
+const WARM_MODEL = { id: 'vendor/triage', name: 'Vendor Triage', variants: [], isPreferred: false };
+
 // The helper owns the mount itself, so the suite never re-registers mocks; it
 // binds the one screen element every case mounts.
 const mount = mountFor(createElement(AnalysisSettingsScreen, { scope: 'personal' }));
@@ -142,6 +144,21 @@ describe('AnalysisSettingsScreen model catalogue states', () => {
     expect(failureScreens.props[0]?.title).toBe(i18n.t('common.couldNotLoadModels'));
     expect(paints(renderer, i18n.t('common.noModelsAvailable'))).toBe(false);
     expect(hostElements(renderer, 'ConfigureRow')).toHaveLength(0);
+  });
+
+  it('keeps a warm catalogue usable while a settled first load refetches', async () => {
+    // The retry-stable error must not fire over a list that answers: a refetch
+    // after a settle is a load, not a failure, while the rows still render.
+    config.data = enabledConfig();
+    catalog.models = [WARM_MODEL];
+    catalog.hasDeliveredData = true;
+    catalog.isLoading = true;
+    catalog.isFetched = true;
+
+    const { renderer } = await mount();
+
+    expect(failureScreens.props).toHaveLength(0);
+    expect(hostElements(renderer, 'ConfigureRow')).toHaveLength(3);
   });
 
   it('keeps the rows but disables them under one notice for a delivered empty catalogue', async () => {

@@ -224,7 +224,10 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const modelsBody = classifyListBody({
     rowCount: models.length,
     hasDeliveredData: modelsDelivered,
-    isError: modelsUnavailableFlag || (modelsLoading && modelsFetched),
+    // A first load that already settled once is not a failure while the warm
+    // list still answers, so the retry-stable error needs the empty list too —
+    // the guard `tool-summary-translation-settings-screen.tsx` carries.
+    isError: (modelsUnavailableFlag || (modelsLoading && modelsFetched)) && models.length === 0,
     isFetching: modelsFetching,
     fetchStatus: modelsFetchStatus,
     connectivityKnown: connectivity !== 'unknown',

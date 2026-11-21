@@ -59,8 +59,6 @@ const UNBATCHED_PROCEDURE_PATHS = [
 
 type UnbatchedProcedure = (typeof UNBATCHED_PROCEDURE_PATHS)[number];
 
-export const UNBATCHED_PROCEDURES: ReadonlySet<string> = new Set(UNBATCHED_PROCEDURE_PATHS);
-
 /** Fails to compile with the offending name when `T` is not `never`. */
 type AssertNever<T extends never> = T;
 
@@ -68,8 +66,12 @@ type AssertNever<T extends never> = T;
 // refuses every call in a mixed request, so the cleanup itself would fail.
 type UnlistedSelfCleanup = Exclude<SelfCleanupProcedure, UnbatchedProcedure>;
 
-/** Typecheck-only: every shared self-cleanup must be unbatched. */
-export type AssertEverySelfCleanupIsUnbatched = AssertNever<UnlistedSelfCleanup>;
+// The set is typed with the assertion so the guard is consumed rather than an
+// exported alias no one imports: a shared cleanup missing above makes
+// `AssertNever` reject its own argument and the typecheck names it.
+export const UNBATCHED_PROCEDURES: ReadonlySet<string> = new Set<
+  UnbatchedProcedure | AssertNever<UnlistedSelfCleanup>
+>(UNBATCHED_PROCEDURE_PATHS);
 
 /**
  * E2E-only artificial backend latency (repro for latency-dependent UI states,

@@ -21,9 +21,13 @@ export const LATEST_ALIAS_TARGET_MIN_AGE_MS = 24 * 60 * 60 * 1000;
 
 export type LatestAliasTargets = ReadonlyMap<string, LatestAliasTarget>;
 
-/** Throws on an invalid stored config, so the cached getter keeps its last valid value. */
+/**
+ * Throws on an invalid stored config, so the cached getter keeps its last valid value. Accepts a
+ * transaction client so a caller can read the alias targets in the same snapshot as the pool
+ * definition it serves from, instead of a target the next promotion has already replaced.
+ */
 export async function readLatestAliasTargets(
-  fromDb: MetadataDb = readDb
+  fromDb: Pick<MetadataDb, 'select'> = readDb
 ): Promise<LatestAliasTargets> {
   const [row] = await fromDb
     .select({ config: ai_gateway_config.latest_alias_targets })

@@ -233,13 +233,16 @@ graded cases; the Wilson lower bound penalizes thin coverage.
 - Thresholds, noise band, token profile, and switch settings come from the base router.
 - Ranking: within the accuracy band, $0 candidates rank before paid candidates. $0 candidates are
   ordered by `effectiveLatency^1.5 / wilson^15`. Paid candidates keep the existing value formula.
-- **Serving pins.** A completed confirmed request pins each alias whose target produced a usable
-  result: the pin stores the concrete target on the saved pool entry, ordered by the request's
-  confirmation time, and only while the pool is still the version that request confirmed. While
-  the pin is usable, both serving paths rank and dispatch that concrete target (including the
-  default fallback); the logical entry stays the ranking and policy identity. When the pinned
-  target is no longer in the catalog, the live alias target serves again with a warning and no
-  new paid work. Clients never send a pin, and a pool edit preserves it by entry key.
+- **Serving pins.** A completed request pins the usable concrete target its owner confirmed.
+  Confirmation time orders callbacks; the pool must still match the confirmed version.
+  When the stable catalog alias moves, save its previous concrete target on existing pools
+  that have a ready shared measurement but no pin. Save the observations and the alias move
+  in one transaction under the benchmark readiness lease. This does not start any measurement.
+  Unmeasured entries follow the new target. Do not infer targets from before deployment.
+  Both serving paths rank and dispatch the pinned target while it remains usable.
+  If the catalog no longer serves it, dispatch the live target and show a warning.
+  A ready replacement can be confirmed at no cost. Clients cannot write pins.
+  A pool edit preserves the stored pin by entry key.
 - **Benchmark output is shared, not per pool.** A ready measurement is global for its concrete
   target, base router, variant, engine identity, and repetitions. Every pool that uses that target
   (directly, through a `measuredAs` link, or through a saved serving pin) reads the same rows, so a
@@ -464,9 +467,10 @@ pass/fail, never customer data, model output, credentials, or tenant identifiers
    `admission_marker` is `NULL` is never initialized, measured or published, whatever its
    `started_at`, so a post-cutover timestamp cannot make legacy work claimable. Migration
    `0038` adds that column with no backfill: existing rows stay `NULL` and are treated as legacy.
-4. **Apply and deploy.** Apply the additive D1 migrations. PostgreSQL uses the existing native
-   usage schema. Migration `0038` creates the case fence, request tables, receipts, and attempt
-   history. It also adds `benchmark_runs.admission_marker` without backfill.
+4. **Apply and deploy.** Apply the additive D1 migrations and the PostgreSQL pool-entry index.
+   The index limits alias promotion to pools that contain an affected alias.
+   PostgreSQL keeps the existing native usage schema. D1 migration `0038` creates the case
+   fence, request tables, receipts, and attempt history, and adds `benchmark_runs.admission_marker`.
    The readiness migration adds one epoch row per base router. It does not invalidate results or
    rebuild a table. Each custom routing request reads that epoch by key before reusing cached
    rankings. A shared gateway benchmark changes the epoch with its ready profile, so the next
@@ -477,7 +481,8 @@ pass/fail, never customer data, model output, credentials, or tenant identifiers
    The wrapper holds dispatch while it drains active work, applies migrations, deploys the
    benchmark Worker, and waits for a changed container image. Verify the platform funding
    organization and its executor membership before dispatch resumes. The Worker, web, and
-   gateway deploy jobs can complete in different orders. The operator hold fences spend.
+   gateway deploy jobs can complete in different orders. The operator hold fences benchmark
+   dispatch, not ordinary routing.
 5. **Prove legacy work is fenced and existing pools are unchanged.** With the worker live and the
    hold still held, read (do not write) the request, registry, and run tables: every legacy run is
    terminally cancelled (none queued, paused, or resumable), no pre-cutover user run resumes, no
@@ -498,6 +503,9 @@ pass/fail, never customer data, model output, credentials, or tenant identifiers
 6. **Release and verify.** Before release, confirm the benchmark Worker, serving Worker, web, and
    gateway each contain the merged head. Confirm the benchmark Worker answers the serving
    Worker's readiness check. One successful deployment proves nothing about the others.
+   Until the serving Worker and gateway deploys are both verified, an older gateway verifies
+   the unchanged `v1` token and ignores the optional alias proof fields because its parser
+   strips them, so strict signed alias-retirement verification must not be claimed.
    Then release only the exact pause token passed to `--expect-token`, never a broad `LIKE` match.
    Verify read-only:
    platform dispatch resumes, a pool quote is `empty` or `ready` without starting work, a fresh

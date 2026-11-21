@@ -16,6 +16,7 @@ import {
   CustomRouterErrorCodeSchema,
   CustomRouterErrorResponseSchema,
   CustomRouterPoolPinsRequestSchema,
+  CustomRouterServingPinSchema,
   CustomRouterSummarySchema,
   GatewayCustomRouterEntrySchema,
   MAX_CLIENT_CONTEXT_LENGTH,
@@ -531,6 +532,51 @@ describe('auto decision tokens', () => {
     ).resolves.toEqual({ ok: false, reason: 'malformed' });
   });
 
+  it('round trips the signed pool identity a retirement fallback needs', async () => {
+    const pinned = {
+      ...decisionPayload,
+      entryModel: 'anthropic/claude-sonnet-4',
+      servingFallback: true as const,
+      servingPinModel: 'anthropic/claude-sonnet-4.5',
+      servingFallbackTarget: 'anthropic/claude-sonnet-4.6',
+    };
+    await expect(
+      verifyAutoDecision(await signAutoDecision(pinned, DECISION_SECRET), DECISION_SECRET, 1_000)
+    ).resolves.toEqual({ ok: true, payload: pinned });
+  });
+
+  it('refuses a fallback marker without the entry, pin and target it retires', async () => {
+    const signed = (overrides: Record<string, unknown>) =>
+      signAutoDecision({ ...decisionPayload, ...overrides }, DECISION_SECRET);
+
+    await expect(signed({ servingFallback: true })).rejects.toThrow(/entryModel/);
+    await expect(
+      signed({
+        entryModel: 'anthropic/claude-sonnet-4',
+        servingFallback: true,
+      })
+    ).rejects.toThrow(/servingPinModel/);
+    await expect(
+      signed({
+        entryModel: 'anthropic/claude-sonnet-4',
+        servingFallback: true,
+        servingPinModel: 'anthropic/claude-sonnet-4.5',
+      })
+    ).rejects.toThrow(/servingFallbackTarget/);
+  });
+
+  it('refuses a fallback proof without the marker that scopes it', async () => {
+    const signed = (overrides: Record<string, unknown>) =>
+      signAutoDecision({ ...decisionPayload, ...overrides }, DECISION_SECRET);
+
+    await expect(signed({ servingPinModel: 'anthropic/claude-sonnet-4.5' })).rejects.toThrow(
+      /servingPinModel/
+    );
+    await expect(signed({ servingFallbackTarget: 'anthropic/claude-sonnet-4.6' })).rejects.toThrow(
+      /servingFallbackTarget/
+    );
+  });
+
   it('rejects a signature from another secret', async () => {
     const token = await signAutoDecision(decisionPayload, 'other-secret');
     await expect(verifyAutoDecision(token, DECISION_SECRET, 1_000)).resolves.toEqual({
@@ -703,6 +749,25 @@ describe('custom router serving pins', () => {
       defaultEntryKey: `gateway:${ALIAS}`,
     });
     expect(written.entries[0]).toEqual({ kind: 'gateway', model: ALIAS });
+  });
+
+  it('parses an observed pin and still refuses a virtual target', () => {
+    const observed = {
+      model: PINNED,
+      pinnedAt: '2026-11-20T00:00:00.000Z',
+      source: 'observed' as const,
+    };
+    const aliasWithObserved = { kind: 'gateway' as const, model: ALIAS, servingPin: observed };
+    expect(GatewayCustomRouterEntrySchema.safeParse(aliasWithObserved).success).toBe(true);
+    expect(
+      GatewayCustomRouterEntrySchema.safeParse({
+        ...aliasWithObserved,
+        servingPin: { ...observed, model: 'kilo-auto/efficient' },
+      }).success
+    ).toBe(false);
+    expect(
+      CustomRouterServingPinSchema.safeParse({ ...observed, source: 'confirmed' }).success
+    ).toBe(false);
   });
 
   it('accepts a decision that dispatches the pin and refuses one that does not', () => {

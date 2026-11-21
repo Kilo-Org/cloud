@@ -325,7 +325,7 @@ has the full choreography (`docs/adr/0005-custom-auto-routers.md`, "Paid benchma
 Run these checks on the release being deployed; treat an unrun check as unproved. Steps 1, 3 and 4
 are read-only; step 2 cancels legacy work under the hold before the deploy, as described there.
 
-1. Before the hold: record the deployed engine identity and measurement revision, the count of
+1. Before cancellation: record the deployed engine identity and measurement revision, the count of
    ready pairs per router, and the published routing-table versions.
 2. Under the hold: run `scripts/legacy-cancel.mjs` in the mandatory order — `--dry-run --remote`,
    then `--apply --remote --baseline-out <path>`, then `--verify --remote --baseline <path>` as the
@@ -339,9 +339,8 @@ are read-only; step 2 cancels legacy work under the hold before the deploy, as d
    summaries, lane records, routing artifacts and finished profile rows; a cancelled run is
    `failed` with an operator-cancel marker, not a model failure. It cannot stop admission: only the
    dispatch lease gates claims, so `--verify` re-reads live state rather than trusting `--apply`.
-   Then confirm no run is `running`, no chunk is `pending`, `queued` or `active`, and no paid
-   request is `active` with unsettled cases. This is a required verification before merge and
-   deploy.
+   Verify no run is `running` and no chunk is `pending`, `queued` or `active` before enqueueing.
+   Migration 0038 creates the paid request table. Check paid requests after the deploy.
 3. After the deploy and before release: run the late read-only checks with
    `scripts/legacy-cancel.mjs --legacy-residue --remote` — the only mode defined for the
    post-cutover schema. It reports legacy work (a run with `benchmark_runs.admission_marker IS

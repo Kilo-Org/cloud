@@ -607,6 +607,310 @@ export function markPaidCaseReusedStatements(
 }
 
 /**
+ * Reconcile one request's own display rows to `reused` for an exact pair that has become
+ * serving since the quote. The pair's ready profile (`status = 'ready'`, a real measuring
+ * `run_id`) is the evidence; a request quoted as non-serving can therefore stop waiting on
+ * display rows nobody will measure without ever being claimed, remeasured or charged.
+ *
+ * Only this request's rows move, and only from `queued`/`running`; `benchmark_case_runs`,
+ * payer rows and usage are untouched, so a pair shared with another payer keeps its live
+ * generation. `charged_microdollars` is preserved. Returns the reused-slot count so the
+ * caller can decide whether the pair is fully satisfied; the recount statement runs in the
+ * same batch.
+ */
+export function markServingPairReusedStatements(
+  db: D1Database,
+  input: {
+    requestId: string;
+    router: string;
+    engineIdentity: string;
+    repetitions: number;
+    model: string;
+    /** Storage variant key; '' means the default variant. */
+    variant: string;
+    now?: number;
+  }
+): D1PreparedStatement[] {
+  const at = iso(input.now ?? Date.now());
+  // Under serving evidence, every one of this request's rows for the exact pair is a serving
+  // reuse: a still-live row becomes `reused`, and a row the staging pass already marked
+  // `reused` (an ordinary historical draw with a null reason) gains the serving marker. Both
+  // are needed for the durable read's "every row carries the marker" test to hold.
+  const servingEvidence = `EXISTS (
+    SELECT 1 FROM benchmark_profiles AS serving
+    WHERE serving.router = ? AND serving.engine_identity = ? AND serving.repetitions = ?
+      AND serving.model = rc.model AND serving.variant = rc.variant
+      AND serving.status = 'ready'
+      AND serving.run_id IS NOT NULL AND serving.run_id <> ''
+  )`;
+  return [
+    db
+      .prepare(
+        `UPDATE paid_benchmark_request_cases AS rc
+        SET status = 'reused', reason = ?, updated_at = ?
+        WHERE rc.request_id = ? AND rc.engine_identity = ? AND rc.model = ? AND rc.variant = ?
+          AND (rc.status IN ('queued', 'running')
+            OR (rc.status = 'reused' AND (rc.reason IS NULL OR rc.reason = ?)))
+          AND ${servingEvidence}`
+      )
+      .bind(
+        SERVING_REUSE_CASE_MARKER,
+        at,
+        input.requestId,
+        input.engineIdentity,
+        input.model,
+        input.variant,
+        SERVING_REUSE_CASE_MARKER,
+        input.router,
+        input.engineIdentity,
+        input.repetitions
+      ),
+    db
+      .prepare(
+        `UPDATE paid_benchmark_requests
+        SET staged_cases = (
+            SELECT COUNT(*) FROM paid_benchmark_request_cases WHERE request_id = ?
+          ), updated_at = ?
+        WHERE id = ? AND status = 'preparing'`
+      )
+      .bind(input.requestId, at, input.requestId),
+  ];
+}
+
+/**
+ * The pairs of one request that still have live (`queued`/`running`) display rows among
+ * `pairs`, keyed `model`/storage `variant`. Run in the same batch as
+ * {@link markServingPairReusedStatements}: a pair the reconcile could not move still needs a
+ * measurement, so the caller fails closed by claiming it instead of treating it as reused.
+ */
+export function readLiveRequestPairStatement(
+  db: D1Database,
+  input: {
+    requestId: string;
+    pairs: readonly { model: string; variant: string }[];
+  }
+): D1PreparedStatement {
+  return db
+    .prepare(
+      `SELECT DISTINCT model, variant FROM paid_benchmark_request_cases
+      WHERE request_id = ? AND status IN ('queued', 'running')
+        AND (model || char(31) || variant) IN (SELECT value FROM json_each(?))`
+    )
+    .bind(
+      input.requestId,
+      JSON.stringify(input.pairs.map(pair => `${pair.model}\u001f${pair.variant}`))
+    );
+}
+
+/** Reason recorded when a serving pair's own display rows could not be reconciled. */
+export const SERVING_RECONCILE_INCOMPLETE_REASON =
+  'A model that became measured while this request was confirmed could not be reconciled. Start a fresh estimate.';
+
+/**
+ * Durably refuse an activation whose reconcile could not prove an observed-ready pair's
+ * display rows were all handled. It is one guarded close inside the reconcile's own batch:
+ *
+ * - the request fails only while at least one of the attempted pairs still has a live
+ *   (`queued`/`running`) display row **and** no serving profile for that exact row, which is
+ *   precisely the state a withdrawal leaves behind;
+ * - every other statement of the close is conditioned on the request having been failed with
+ *   this exact reason, so it can never fire for a reconcile that actually succeeded.
+ *
+ * Because the decision and the state commit together, a crash before the next activation
+ * cannot re-enter: the request is terminal, so the next launch returns `request_not_active`.
+ * Only this request's rows move — another payer's `benchmark_case_runs`, receipts and usage
+ * are untouched — and its already-charged amount is preserved.
+ */
+export function failUnreconciledServingPairStatements(
+  db: D1Database,
+  input: {
+    requestId: string;
+    /** Attempted serving pairs, storage variant keys ('' = default). */
+    pairs: readonly { model: string; variant: string }[];
+    router: string;
+    engineIdentity: string;
+    repetitions: number;
+    now?: number;
+  }
+): D1PreparedStatement[] {
+  const nowMs = input.now ?? Date.now();
+  const at = iso(nowMs);
+  const closeId = `close:${input.requestId}`;
+  const reason = SERVING_RECONCILE_INCOMPLETE_REASON;
+  const pairPlan = JSON.stringify(input.pairs.map(pair => `${pair.model}\u001f${pair.variant}`));
+  // Still unproven: an attempted pair still has a live display row and no serving profile.
+  const unproven = `EXISTS (
+    SELECT 1 FROM paid_benchmark_request_cases AS rc
+    WHERE rc.request_id = ? AND rc.status IN ('queued', 'running')
+      AND (rc.model || char(31) || rc.variant) IN (SELECT value FROM json_each(?))
+      AND NOT EXISTS (
+        SELECT 1 FROM benchmark_profiles AS serving
+        WHERE serving.router = ? AND serving.engine_identity = ?
+          AND serving.repetitions = ?
+          AND serving.model = rc.model AND serving.variant = rc.variant
+          AND serving.status = 'ready' AND serving.run_id IS NOT NULL AND serving.run_id <> ''
+      )
+  )`;
+  // Every other statement only fires for the close this function wrote.
+  const closedHere = `EXISTS (
+    SELECT 1 FROM paid_benchmark_requests AS closed
+    WHERE closed.id = ? AND closed.status = 'failed' AND closed.failure_reason = ?
+  )`;
+  return [
+    db
+      .prepare(
+        `UPDATE paid_benchmark_requests
+        SET status = 'failed', failure_reason = ?, failure_retryable = 1, updated_at = ?
+        WHERE id = ? AND status IN ('preparing', 'active') AND ${unproven}`
+      )
+      .bind(
+        reason,
+        at,
+        input.requestId,
+        input.requestId,
+        pairPlan,
+        input.router,
+        input.engineIdentity,
+        input.repetitions
+      ),
+    db
+      .prepare(
+        `UPDATE benchmark_case_payers SET status = 'detached', reason = ?, updated_at = ?
+        WHERE request_id = ? AND status = 'eligible' AND ${closedHere}`
+      )
+      .bind(reason, at, input.requestId, input.requestId, reason),
+    db
+      .prepare(
+        `UPDATE benchmark_case_runs
+        SET status = 'cancelled', failure_reason = ?, settled_at = ?, settlement_id = ?,
+          updated_at = ?
+        WHERE status IN ('queued', 'running') AND platform_covered = 0
+          AND EXISTS (
+            SELECT 1 FROM paid_benchmark_request_cases AS mine
+            WHERE mine.engine_identity = benchmark_case_runs.engine_identity
+              AND mine.model = benchmark_case_runs.model
+              AND mine.variant = benchmark_case_runs.variant
+              AND mine.rep = benchmark_case_runs.rep
+              AND mine.case_id = benchmark_case_runs.case_id
+              AND mine.request_id = ?
+          )
+          -- Another live payer or an eligible other payer keeps the generation.
+          AND NOT EXISTS (
+            SELECT 1 FROM paid_benchmark_request_cases AS other
+            JOIN paid_benchmark_requests AS other_request ON other_request.id = other.request_id
+            WHERE other.engine_identity = benchmark_case_runs.engine_identity
+              AND other.model = benchmark_case_runs.model
+              AND other.variant = benchmark_case_runs.variant
+              AND other.rep = benchmark_case_runs.rep
+              AND other.case_id = benchmark_case_runs.case_id
+              AND other.status IN ('queued', 'running')
+              AND other_request.status = 'active' AND other.request_id <> ?
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM benchmark_case_payers AS payer
+            WHERE payer.engine_identity = benchmark_case_runs.engine_identity
+              AND payer.model = benchmark_case_runs.model
+              AND payer.variant = benchmark_case_runs.variant
+              AND payer.rep = benchmark_case_runs.rep
+              AND payer.case_id = benchmark_case_runs.case_id
+              AND payer.generation = benchmark_case_runs.generation
+              AND payer.status = 'eligible' AND payer.request_id <> ?
+          )
+          AND ${closedHere}`
+      )
+      .bind(
+        reason,
+        at,
+        closeId,
+        at,
+        input.requestId,
+        input.requestId,
+        input.requestId,
+        input.requestId,
+        reason
+      ),
+    db
+      .prepare(
+        `INSERT INTO paid_benchmark_cancellations (
+          engine_identity, model, variant, rep, case_id, generation, executor_run_id,
+          executor_token, status, attempts, available_at, created_at, updated_at
+        )
+        SELECT engine_identity, model, variant, rep, case_id, generation, executor_run_id,
+          executor_token, 'pending', 0, ?, ?, ?
+        FROM benchmark_case_runs
+        WHERE status = 'cancelled' AND settlement_id = ?
+          AND executor_run_id IS NOT NULL AND executor_token IS NOT NULL
+          AND ${closedHere}
+        ON CONFLICT DO NOTHING`
+      )
+      .bind(nowMs, nowMs, nowMs, closeId, input.requestId, reason),
+    db
+      .prepare(
+        `UPDATE paid_benchmark_request_cases SET status = 'failed', reason = ?, updated_at = ?
+        WHERE request_id = ? AND status IN ('queued', 'running') AND ${closedHere}`
+      )
+      .bind(reason, at, input.requestId, input.requestId, reason),
+  ];
+}
+
+/**
+ * Internal marker written to `paid_benchmark_request_cases.reason` when a pair's display rows
+ * are converted by the serving reconcile (a pair that became measured after the quote). It is
+ * the durable proof of that decision, distinct from an ordinary historical reuse: those rows
+ * stay `reused` with a null reason and still require the zero-provider profile
+ * materialization. Never user-visible — the progress reader maps it back to null.
+ */
+export const SERVING_REUSE_CASE_MARKER = 'serving_reuse';
+
+/** Map a stored case reason to the wire form: the internal serving marker is never exposed. */
+function wireCaseReason(reason: string | null): string | null {
+  return reason === SERVING_REUSE_CASE_MARKER ? null : reason;
+}
+
+/**
+ * The pairs of one request whose serving-reuse decision already committed: every one of the
+ * pair's display rows is `reused` and carries the serving marker. This is the
+ * crash-after-success fence:
+ *
+ * A launch that reconciled an observed-ready pair to `reused` and then died before claiming
+ * its siblings leaves exactly this state. A retry must not re-decide that pair from the
+ * registry (the profile may have been withdrawn since) and must never measure it, so it
+ * consults this instead of re-deriving readiness.
+ *
+ * Plain prior-case reuse is deliberately not this signal: a never-measured pair with copied
+ * draws still has to materialize its profile with zero provider calls, so its rows are staged
+ * `queued` until a launch claims it. Only the reconcile writes this state.
+ */
+export function readReusedRequestPairStatement(
+  db: D1Database,
+  input: {
+    requestId: string;
+    pairs: readonly { model: string; variant: string }[];
+  }
+): D1PreparedStatement {
+  return db
+    .prepare(
+      `SELECT rc.model AS model, rc.variant AS variant
+      FROM paid_benchmark_request_cases AS rc
+      WHERE rc.request_id = ? AND rc.status = 'reused' AND rc.reason = ?
+        AND (rc.model || char(31) || rc.variant) IN (SELECT value FROM json_each(?))
+      GROUP BY rc.model, rc.variant
+      HAVING NOT EXISTS (
+        SELECT 1 FROM paid_benchmark_request_cases AS other
+        WHERE other.request_id = ? AND other.model = rc.model AND other.variant = rc.variant
+          AND (other.status <> 'reused' OR other.reason IS NOT ?)
+      )`
+    )
+    .bind(
+      input.requestId,
+      SERVING_REUSE_CASE_MARKER,
+      JSON.stringify(input.pairs.map(pair => `${pair.model}\u001f${pair.variant}`)),
+      input.requestId,
+      SERVING_REUSE_CASE_MARKER
+    );
+}
+
+/**
  * Post-completion bookkeeping: pin the request's confirmed alias targets for the pool
  * controller. Amount 0 and no case work, so it can never start inference or spend. The
  * deterministic id makes a replay a no-op. This is the only billing outbox kind left.
@@ -2464,7 +2768,7 @@ export async function readPaidBenchmarkProgress(
         // This owner's own receipts for this case, never the Kilo amount: `charged` and
         // `covered` are disjoint branches, so nothing is counted twice.
         chargedMicrodollars: Number(caseUsage?.billed_microdollars ?? 0),
-        reason: row.reason,
+        reason: wireCaseReason(row.reason),
       };
     }),
     nextCursor:

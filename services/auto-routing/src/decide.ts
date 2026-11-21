@@ -6,6 +6,7 @@ import {
   type AutoRoutingDecision,
   type AutoRoutingDecisionResponse,
   type AutoRoutingMode,
+  type CustomRouterDefinition,
   type CustomRouterReference,
   type MirrorPayload,
   type NormalizedClassifierInput,
@@ -21,7 +22,7 @@ import {
   customRouterTarget,
   customRouting,
 } from './custom-router-decision';
-import { findCustomRouter } from './custom-router-store';
+import { findCustomRouter, type CustomRouterOwner } from './custom-router-store';
 import { writeClassifierMetricsDataPoint } from './classifier-analytics';
 import type { ClassifierAnalyticsStatus } from './classifier-analytics';
 import {
@@ -835,6 +836,30 @@ export async function runDecision(
   }
 }
 
+/**
+ * A pool definition an authenticated caller supplied is usable only when it is the exact saved
+ * pool this request names: same owner, same slug, and the same base router when the caller states
+ * one. Anything else is refused as `router_not_found`, so a forged or stale definition can never
+ * choose what the request routes to.
+ */
+function providedCustomRouterDefinition(
+  payload: MirrorPayload,
+  owner: CustomRouterOwner,
+  reference: CustomRouterReference
+): CustomRouterDefinition {
+  const router = payload.customRouterDefinition;
+  if (
+    !router ||
+    router.ownerType !== owner.type ||
+    router.ownerId !== owner.id ||
+    router.slug !== reference.slug ||
+    (payload.router !== undefined && router.baseRouter !== payload.router)
+  ) {
+    throw new CustomRouterError('router_not_found', 'Custom router not found');
+  }
+  return router;
+}
+
 async function decideCustomRouter(
   c: Context<HonoEnv>,
   payload: MirrorPayload,
@@ -842,10 +867,13 @@ async function decideCustomRouter(
 ): Promise<Response> {
   try {
     const owner = customRouterOwner(reference, payload);
-    const stored = owner ? await findCustomRouter(c.env, owner, reference.slug) : null;
-    if (!stored) throw new CustomRouterError('router_not_found', 'Custom router not found');
+    if (!owner) throw new CustomRouterError('router_not_found', 'Custom router not found');
+    const router = payload.customRouterDefinition
+      ? providedCustomRouterDefinition(payload, owner, reference)
+      : await findCustomRouter(c.env, owner, reference.slug);
+    if (!router) throw new CustomRouterError('router_not_found', 'Custom router not found');
     const routing = customRouting(
-      stored,
+      router,
       payload.clientEntries ?? [],
       new Set(payload.routingPolicy?.deniedModelIds ?? [])
     );

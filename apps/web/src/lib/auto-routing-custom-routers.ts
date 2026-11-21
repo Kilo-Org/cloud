@@ -485,6 +485,26 @@ export async function lockOwner(tx: DrizzleTransaction, owner: CustomRouterOwner
 }
 
 /**
+ * Serializes an alias promotion against every pool entry writer. A promotion takes this key
+ * exclusively while it snapshots the affected pools and commits their observed pins; create,
+ * update, delete and pin publication take it shared first, so their committed rows either precede
+ * the snapshot or land after the alias config already moved. Always before `lockOwner`.
+ */
+const ALIAS_PROMOTION_LOCK_KEY = 'auto-routing-custom-routers:alias-promotion';
+
+export async function lockAliasPromotionWrite(tx: DrizzleTransaction): Promise<void> {
+  await tx.execute(
+    sql`SELECT pg_advisory_xact_lock_shared(hashtextextended(${ALIAS_PROMOTION_LOCK_KEY}, 0))`
+  );
+}
+
+export async function lockAliasPromotionExclusive(tx: DrizzleTransaction): Promise<void> {
+  await tx.execute(
+    sql`SELECT pg_advisory_xact_lock(hashtextextended(${ALIAS_PROMOTION_LOCK_KEY}, 0))`
+  );
+}
+
+/**
  * The immutable pool a benchmark request measures. Paid benchmarks derive it from the saved row,
  * so a request can never benchmark a pool an editor has not persisted, and the Worker needs no
  * PostgreSQL access of its own.
@@ -735,6 +755,7 @@ export async function createCustomRouterResponse(
   await validateLinkedEntries(input.entries, input.baseRouter);
 
   const router = await db.transaction(async tx => {
+    await lockAliasPromotionWrite(tx);
     await lockOwner(tx, owner);
     assertCanCreate(await ownerRouterSlugs(tx, owner), input.slug);
     validateNewGatewayEntries({ entries: input.entries, existingKeys: new Set(), rejections });
@@ -836,6 +857,7 @@ export async function updateCustomRouterResponse(
   }
 
   const router = await db.transaction(async tx => {
+    await lockAliasPromotionWrite(tx);
     await lockOwner(tx, owner);
     const current = await findRouter(tx, owner, slug);
     const next = applyUpdate(current, input);
@@ -930,6 +952,7 @@ export async function deleteCustomRouterResponse(
   const { scope, slug } = parseRouterParams(params);
   const owner = await resolveEditableOwner(context, scope);
   await db.transaction(async tx => {
+    await lockAliasPromotionWrite(tx);
     await lockOwner(tx, owner);
     const current = await findRouter(tx, owner, slug);
     await pausePoolBeforeMutation(owner, current.id);
@@ -959,6 +982,7 @@ export async function registerClientEntryResponse(
   await validateLinkedEntries([incoming], planned.baseRouter, planned.entries);
 
   const router = await db.transaction(async tx => {
+    await lockAliasPromotionWrite(tx);
     await lockOwner(tx, owner);
     const current = await findRouter(tx, owner, slug);
     if (incoming.measuredAs !== undefined && current.baseRouter !== planned.baseRouter) {
@@ -1009,6 +1033,7 @@ export async function removeClientEntryResponse(
   const owner = await resolveEditableOwner(context, scope);
 
   const router = await db.transaction(async tx => {
+    await lockAliasPromotionWrite(tx);
     await lockOwner(tx, owner);
     const current = await findRouter(tx, owner, slug);
     if (!current.entries.some(entry => customRouterEntryKey(entry) === key)) return current;

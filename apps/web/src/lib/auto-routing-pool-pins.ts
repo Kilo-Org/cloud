@@ -14,7 +14,11 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq } from 'drizzle-orm';
-import { customRouterPoolVersion, lockOwner } from '@/lib/auto-routing-custom-routers';
+import {
+  customRouterPoolVersion,
+  lockAliasPromotionWrite,
+  lockOwner,
+} from '@/lib/auto-routing-custom-routers';
 import { decideServingPins } from '@/lib/auto-routing-pool-pin-decision';
 
 export class PoolPinsRouterNotFoundError extends Error {
@@ -40,6 +44,7 @@ export async function applyServingPins(
   const now = new Date().toISOString();
 
   return db.transaction(async tx => {
+    await lockAliasPromotionWrite(tx);
     await lockOwner(tx, owner);
     const [row] = await tx
       .select()

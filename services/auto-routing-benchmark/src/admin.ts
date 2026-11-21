@@ -1,6 +1,10 @@
 import * as z from 'zod';
 import {
   AUTO_ROUTERS,
+  BENCHMARK_ALIAS_PROMOTION_PATH,
+  AliasPromotionRequestSchema,
+  AliasPromotionAcquireResponseSchema,
+  AliasPromotionReleaseResponseSchema,
   AutoRouterSchema,
   CUSTOM_ROUTER_BLOCKED_MODELS_PATH,
   CUSTOM_ROUTER_EPOCH_PATH,
@@ -44,6 +48,7 @@ import {
   type BenchmarkConfigSaveWarning,
   type BenchmarkRegistryQueue,
   type BenchmarkIdentity,
+  POLICY_SETTINGS,
   resolveBenchmarkIdentity,
   resolvePolicySettings,
   resolveEffectivePolicy,
@@ -67,6 +72,11 @@ import {
   readPaidBenchmarkAdminContext,
   readPaidBenchmarkAdminProgress,
 } from './paid-benchmark-admin';
+import {
+  acquireAliasPromotionLease,
+  releaseAliasPromotionLease,
+  type AliasPromotionProfileIdentity,
+} from './alias-promotion';
 import { registerProfileRefreshRoute } from './admin-profile-refresh';
 import { debugRunCli } from './cli-runner';
 import { assembleCustomRoutingTable } from './custom-routing-table';
@@ -1098,6 +1108,35 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
         // Unprovable state is never "unchanged": the caller must re-read the actual table.
         return c.json({ error: 'Readiness epoch is unavailable' }, 503);
       }
+    }
+  );
+
+  // Short global readiness fence for an alias move. The catalog writer holds it while it saves the
+  // observed concrete targets it read here, so no ready publication can land between that read and
+  // the save. It reads the registry alone and never starts, dispatches or grades a benchmark.
+  app.post(
+    BENCHMARK_ALIAS_PROMOTION_PATH,
+    zodJsonValidator(AliasPromotionRequestSchema, {
+      errorMessage: 'Invalid alias promotion request',
+    }),
+    async c => {
+      const request = c.req.valid('json');
+      if (request.action === 'release') {
+        await releaseAliasPromotionLease(c.env.BENCH_DB, request.token);
+        return c.json(AliasPromotionReleaseResponseSchema.parse({ status: 'released' }));
+      }
+      const currentIdentities: AliasPromotionProfileIdentity[] = AUTO_ROUTERS.map(router => ({
+        router,
+        engine_identity: computeEngineIdentity('decider', router),
+        repetitions: POLICY_SETTINGS.deciderRepetitions.fixedByRouter[router],
+      }));
+      const acquired = await acquireAliasPromotionLease(
+        c.env.BENCH_DB,
+        request.token,
+        request.models,
+        currentIdentities
+      );
+      return c.json(AliasPromotionAcquireResponseSchema.parse(acquired));
     }
   );
 

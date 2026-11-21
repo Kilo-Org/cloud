@@ -9,6 +9,7 @@ import {
 } from './reasoning';
 import {
   CustomRouterClientEntryIdSchema,
+  CustomRouterDefinitionSchema,
   CustomRouterEntryRefSchema,
   CustomRouterReferenceSchema,
   CustomRouterServingPinSchema,
@@ -89,6 +90,11 @@ export const MirrorPayloadSchema = z.object({
   constraints: RoutingConstraintsSchema.optional(),
   // Custom router reference (ADR 0005). Optional so an old worker or gateway still parses.
   customRouter: CustomRouterReferenceSchema.optional(),
+  // The exact saved pool the authenticated gateway resolved for this request, so the private
+  // decide path and the gateway route from one definition generation. Server-to-server only: the
+  // worker accepts it only after it re-checks owner, slug, and base router, and the public CLI
+  // route never reads it.
+  customRouterDefinition: CustomRouterDefinitionSchema.optional(),
   // Client entries the caller can serve; present only on the public CLI decide path.
   clientEntries: z.array(CustomRouterClientEntryIdSchema).optional(),
 });
@@ -156,6 +162,9 @@ export const AutoRoutingDecisionSchema = z
     servingPin: CustomRouterServingPinSchema.optional(),
     stale: z.boolean().optional(),
     fallback: z.boolean().optional(),
+    // True only when a pinned alias entry served its live alias target because the pinned concrete
+    // target left the catalog. The gateway refuses a bare alias for a pinned entry without it.
+    servingFallback: z.literal(true).optional(),
   })
   .superRefine((decision, ctx) => {
     refineVariantExclusivity(decision, ctx, 'Decision');
@@ -277,3 +286,4 @@ export * from './paid-benchmark';
 export * from './benchmark-inference';
 export * from './benchmark-project';
 export * from './paid-benchmark-admin';
+export * from './alias-promotion';

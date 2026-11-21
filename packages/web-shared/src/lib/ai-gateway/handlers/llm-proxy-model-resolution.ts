@@ -261,6 +261,9 @@ async function resolveAutoModelId(
           ...decisionRequest(ctx, caller),
           router: router.baseRouter,
           customRouter: reference,
+          // The same definition the deny policy above was derived from, so the worker cannot
+          // dispatch a target this gateway did not check (and vice versa).
+          customRouterDefinition: router,
           requestedModel: customRouterModelId(router.ownerType, router.slug),
           deniedModelIds,
         });

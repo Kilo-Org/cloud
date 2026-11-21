@@ -23,6 +23,7 @@ import {
   fetchCustomRouterEpoch,
   fetchCustomRouterTable,
   fetchCustomRouterTableVersion,
+  type CustomRouterTableLoad,
 } from './benchmark-origin';
 import { CustomRouterError, DEPENDENCY_RETRY_AFTER_SECONDS } from './caller-auth';
 import type { CustomRouterOwner } from './custom-router-store';
@@ -32,6 +33,13 @@ import { contextProvablyTooSmall, satisfiesRequiredModalities } from './decision
 import { getModelCapabilities, type ModelCapabilities } from './model-capabilities';
 
 const CUSTOM_ROUTER_TABLE_CACHE_TTL_MS = 60_000;
+/**
+ * A catalog retirement is not a pool write: it changes neither the saved definition nor the
+ * benchmark readiness epoch, so only the table's own read can retire a saved pin. A pool that is
+ * serving a pin therefore re-reads sooner than one with no pin to retire, which bounds how long a
+ * retired target is still dispatched. A pool with no pin keeps the longer TTL.
+ */
+const CUSTOM_ROUTER_PINNED_TABLE_CACHE_TTL_MS = 15_000;
 const CUSTOM_ROUTER_TABLE_CACHE_LIMIT = 1_000;
 
 // A router owned by an organization resolves only in that organization's context.
@@ -52,6 +60,11 @@ export type CustomRouting = {
   deniedModelIds: ReadonlySet<string>;
   /** Entry key -> concrete target this request may dispatch for that pinned entry. */
   usablePins: Map<string, string>;
+  /**
+   * Entry keys whose saved pin target left the catalog. Such an entry dispatches its live alias
+   * target, and only a decision that actually serves that alias is marked as the fallback.
+   */
+  servingFallback: Set<string>;
 };
 
 export function customRouting(
@@ -64,14 +77,26 @@ export function customRouting(
     clientEntries.map(entry => customRouterEntryKey({ kind: 'client', ...entry }))
   );
   const usablePins = new Map<string, string>();
+  // A saved pin names the concrete target this entry may dispatch once the benchmark worker
+  // reports it usable. A denied target makes the entry unservable even when the pin is not yet
+  // usable, so a policy never silently unpins to an alias that may resolve to the denied model.
+  const deniedPinKeys = new Set(
+    router.entries.flatMap(entry =>
+      entry.kind === 'gateway' && entry.servingPin && deniedModelIds.has(entry.servingPin.model)
+        ? [customRouterEntryKey(entry)]
+        : []
+    )
+  );
   return {
     router,
     deniedModelIds,
     usablePins,
+    servingFallback: new Set<string>(),
     isServable: entry => {
       const key = customRouterEntryKey(entry);
       if (!poolKeys.has(key)) return false;
       if (entry.kind === 'client') return clientKeys.has(key);
+      if (deniedPinKeys.has(key)) return false;
       return !deniedModelIds.has(entry.model) && !isVirtualAutoModelId(entry.model);
     },
   };
@@ -95,11 +120,6 @@ export function customRouterEntryTarget(
   const pin = entry.kind === 'gateway' ? entry.servingPin : undefined;
   return pin ? { model: dispatch.model, servingPin: pin } : { model: dispatch.model };
 }
-
-type CustomRouterTableLoad = {
-  table: RoutingTable | null;
-  servingPins: ReadonlyMap<string, string>;
-};
 
 type CachedTableEntry = {
   load: CustomRouterTableLoad;
@@ -154,7 +174,8 @@ function cacheEntry(key: string, entry: CachedTableEntry): void {
  * - one exact-key epoch read per route through the existing benchmark service binding;
  * - a mismatch falls back to the existing per-pool fingerprint, so only the pools whose ready set
  *   actually changed rebuild (an alias, catalog, or client-only change keeps its cached table);
- * - the 60 s TTL still bounds what the epoch and fingerprint do not cover (catalog prices);
+ * - the 60 s TTL still bounds what the epoch and fingerprint do not cover (catalog prices); a pool
+ *   serving a pin re-reads at 15 s, because a catalog retirement writes no epoch and no pool row;
  * - an unprovable epoch (older benchmark Worker answering 404 during a staggered deploy, a 5xx, an
  *   unreadable body) never reads as "unchanged": the actual table is fetched on that request,
  *   single-flighted so a burst shares one fetch, and it is never cached as proof, so a later 503
@@ -168,7 +189,11 @@ async function loadCustomRouterTable(
   const key = JSON.stringify(context);
   const epoch = await fetchCustomRouterEpoch(env, router.baseRouter);
   const cached = tableCache.get(key);
-  if (cached && epoch !== null && Date.now() - cached.builtAt < CUSTOM_ROUTER_TABLE_CACHE_TTL_MS) {
+  const cacheTtl =
+    cached && (cached.load.servingPins.size > 0 || cached.load.servingFallback.size > 0)
+      ? CUSTOM_ROUTER_PINNED_TABLE_CACHE_TTL_MS
+      : CUSTOM_ROUTER_TABLE_CACHE_TTL_MS;
+  if (cached && epoch !== null && Date.now() - cached.builtAt < cacheTtl) {
     if (cached.epoch === epoch) return cached.load;
     // The router's registry moved. Only this pool's own ready set decides whether it rebuilds, and
     // the record of that check must not extend `builtAt`: the hard TTL still has to expire so
@@ -270,6 +295,7 @@ export function customRouterTarget(
       const loaded = await loadCustomRouterTable(env, router);
       // The benchmark worker is the authority on which pins still have a usable measurement.
       routing.usablePins = new Map(loaded.servingPins);
+      routing.servingFallback = new Set(loaded.servingFallback);
       const routingTable = servableRoutingTable(loaded.table, routing);
       timings.tableMs = performance.now() - tableStartedAt;
       const capabilitiesStartedAt = performance.now();
@@ -322,6 +348,25 @@ function findPoolEntry(
   return routing.router.entries.find(entry => customRouterEntryKey(entry) === key);
 }
 
+/**
+ * True when this target is the live alias of a pinned entry whose saved concrete target left the
+ * catalog. Only then may a decision name the bare alias for a pinned entry, and only then does the
+ * wire marker appear; a pin the worker still serves and a denied target both stay unmarked.
+ */
+function servesRetiredPinFallback(
+  routing: CustomRouting,
+  entry: CustomRouterEntry,
+  target: { model: string; servingPin?: CustomRouterServingPin }
+): { servingFallback?: true } {
+  return entry.kind === 'gateway' &&
+    entry.servingPin !== undefined &&
+    target.servingPin === undefined &&
+    target.model === entry.model &&
+    routing.servingFallback.has(customRouterEntryKey(entry))
+    ? { servingFallback: true }
+    : {};
+}
+
 // A custom router never routes outside its pool: a null decision takes the default entry, then
 // the first entry this client can serve that fits the request (ADR 0005). A pinned entry
 // dispatches its benchmarked concrete target, including on the fallback path.
@@ -343,6 +388,7 @@ export function customRouterDecision(
           entry: ref,
           stale: decision.stale ?? false,
           fallback: false,
+          ...servesRetiredPinFallback(routing, poolEntry, target),
         };
       }
     }
@@ -375,6 +421,7 @@ export function customRouterDecision(
     switchReason: null,
     stale: false,
     fallback: true,
+    ...servesRetiredPinFallback(routing, fallback.entry, fallback.target),
   };
 }
 
@@ -397,6 +444,7 @@ export function publicCustomRouterDecision(decision: AutoRoutingDecision): Custo
     entry,
     model: decision.model,
     ...(decision.servingPin ? { servingPin: decision.servingPin } : {}),
+    ...(decision.servingFallback ? { servingFallback: true } : {}),
     variant: decision.variant ?? decision.reasoningEffort ?? null,
     stale: decision.stale ?? false,
     fallback: decision.fallback ?? false,

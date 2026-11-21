@@ -110,6 +110,11 @@ import {
   platformCoverageStatements,
   pausePaidUnfundedCaseStatements,
   completePaidBenchmarkRequestStatements,
+  enqueuePaidPoolPinsStatement,
+  markServingPairReusedStatements,
+  readLiveRequestPairStatement,
+  readReusedRequestPairStatement,
+  failUnreconciledServingPairStatements,
   readPaidBenchmarkRequest,
   readPaidCaseRun,
   releasePaidCaseGenerationStatements,
@@ -198,6 +203,7 @@ import {
   hasScheduledChunks,
   hasUnsettledChunks,
   listSettledSchedulerRuns,
+  markSettledRunInitialized,
   recoverChunks,
   releaseInitializationLease,
   resolveSchedulerConfig,
@@ -4505,7 +4511,22 @@ async function finalizeRunIfComplete(
           })
         );
       });
-      await markProfilesReadyForEntries(env.BENCH_DB, runId, completePairs);
+      // The readiness fence: while an alias promotion holds the readiness lease, a ready
+      // publication must not land. `markProfilesReadyForEntries` writes nothing then, so the
+      // run stays open (claimed) for the settled-run sweep to retry the whole finalization.
+      // Completing it here would settle the run over a publication that never happened.
+      const publication = await markProfilesReadyForEntries(env.BENCH_DB, runId, completePairs);
+      if (publication === 'deferred') {
+        await markSettledRunInitialized(env.BENCH_DB, runId);
+        console.log(
+          JSON.stringify({
+            event: 'benchmark_paid_run_deferred',
+            runId,
+            readyEntries: completePairs.length,
+          })
+        );
+        return;
+      }
       await releaseProfileClaimsForEntries(env.BENCH_DB, runId, releasedPairs);
       await markRunCompleted(env.BENCH_DB, runId);
       console.log(
@@ -4564,12 +4585,23 @@ async function finalizeRunIfComplete(
           fenced: false,
         })),
       });
-      await settleRemeasuresForRun(
+      const remeasured = await settleRemeasuresForRun(
         env.BENCH_DB,
         runId,
         entryFailures.map(({ entry }) => entry)
       );
-      await markProfilesReadyForRun(env.BENCH_DB, runId);
+      const published = await markProfilesReadyForRun(env.BENCH_DB, runId);
+      if (remeasured === 'deferred' || published === 'deferred') {
+        await markSettledRunInitialized(env.BENCH_DB, runId);
+        console.log(
+          JSON.stringify({
+            event: 'benchmark_decider_run_deferred',
+            runId,
+            purpose: state.purpose,
+          })
+        );
+        return;
+      }
     } catch (error) {
       console.warn(
         JSON.stringify({
@@ -4822,81 +4854,139 @@ export async function startPaidRequestRun(
   const seenPairs = new Set<string>();
   for (const pair of frozenPairs) {
     if (pair.serving) continue;
-    const key = exactPairKey(pair.model, pair.variant ?? null);
+    // The frozen plan carries the storage variant key ('' = default). Normalize once here so
+    // every consumer — registry key, claim, enrollment, display reconcile — compares the same
+    // application form; SQL storage keys are re-derived at the boundary.
+    const variant = variantFromStorage(pair.variant);
+    const key = exactPairKey(pair.model, variant);
     if (seenPairs.has(key)) continue;
     seenPairs.add(key);
-    entries.push({ model: pair.model, variant: pair.variant ?? null });
+    entries.push({ model: pair.model, variant });
   }
   if (entries.length === 0) {
-    await env.BENCH_DB.batch(
-      completePaidBenchmarkRequestStatements(env.BENCH_DB, { requestId: request.id })
-    );
+    // Nothing to measure, so the request is complete here. Its pin intent joins the same
+    // batch: an all-`serving` quote is exactly the zero-cost alias move whose pin has no
+    // other completion path. The outbox row is idempotent (`pins:<requestId>`).
+    await env.BENCH_DB.batch([
+      ...completePaidBenchmarkRequestStatements(env.BENCH_DB, { requestId: request.id }),
+      enqueuePaidPoolPinsStatement(env.BENCH_DB, { requestId: request.id }),
+    ]);
     return { runId: null, claimed: 0, skipped: ['nothing_left'] };
   }
   const current = { router, engineIdentity, repetitions: policy.deciderRepetitions };
-  // A ready pair is re-measured through the remeasure queue; a pending one is claimed
-  // directly. Both paths keep the platform's own claim semantics.
   const readyRows = await listReadyCurrentProfilesForEntries(env.BENCH_DB, current, entries);
+  // Serving evidence is a ready row that names a real measuring run, the same rule the quote
+  // and the alias promotion use: a `ready` row with no (or empty) `run_id` ranks nothing and
+  // cannot back a pin, so it is not reused here either. Registry variants are stored form, so
+  // they normalize to the application form; plan entries carry the storage key and normalize
+  // through the same helper, or a default-variant pair never matches its own registry row.
   const readyKeys = new Set(
-    readyRows.map(row => exactPairKey(row.model, variantFromStorage(row.variant)))
+    readyRows
+      .filter(row => row.run_id != null && row.run_id !== '')
+      .map(row => exactPairKey(row.model, variantFromStorage(row.variant)))
   );
-  if (readyKeys.size === entries.length) {
-    // Every pair already has a ready measurement at this engine and repetition count: the
-    // pool's table can be assembled from it, so there is nothing left to do or charge.
-    await env.BENCH_DB.batch(
-      completePaidBenchmarkRequestStatements(env.BENCH_DB, { requestId: request.id })
-    );
-    return { runId: null, claimed: 0, skipped: ['already_ready'] };
-  }
-  if (readyKeys.size > 0) {
-    const statements = entries
-      .filter(entry => readyKeys.has(exactPairKey(entry.model, entry.variant)))
-      .map(entry =>
-        env.BENCH_DB.prepare(
-          `INSERT INTO profile_remeasures (router, model, variant, engine_identity,
-            repetitions, run_id, requested_at, claimed_at)
-          SELECT ?, ?, ?, ?, ?, NULL, ?, NULL
-          WHERE NOT EXISTS (
-            SELECT 1 FROM profile_remeasures WHERE router = ? AND model = ? AND variant = ?
-              AND engine_identity = ? AND repetitions = ? AND run_id IS NULL
-          )`
-        ).bind(
+  const entryKey = (entry: { model: string; variant: string | null }) =>
+    exactPairKey(entry.model, variantFromStorage(entry.variant));
+  // A pair that became serving after the quote is reused, never remeasured: its ready profile
+  // already ranks it, so paying to re-measure it (a probe-case revision promotion included)
+  // would bill work the owner never needed. Its display rows move to `reused` from that
+  // evidence in the same batch as the read below; if readiness withdrew so a row cannot move,
+  // the same batch fails the request durably rather than measuring an unproven pair.
+  const quotedReady = entries.filter(entry => readyKeys.has(entryKey(entry)));
+  const reusedPairKeys = new Set<string>();
+  if (quotedReady.length > 0) {
+    const readyPairs = quotedReady.map(entry => ({
+      model: entry.model,
+      variant: variantToStorage(entry.variant),
+    }));
+    const results = await env.BENCH_DB.batch([
+      ...readyPairs.flatMap(pair =>
+        markServingPairReusedStatements(env.BENCH_DB, {
+          requestId: request.id,
           router,
-          entry.model,
-          variantToStorage(entry.variant),
           engineIdentity,
-          policy.deciderRepetitions,
-          request.activated_at ?? request.created_at,
-          router,
-          entry.model,
-          variantToStorage(entry.variant),
-          engineIdentity,
-          policy.deciderRepetitions
-        )
-      );
-    await env.BENCH_DB.batch(statements);
-  }
-  // A pair the platform has never seen has no registry row at all, and the plan cannot stage
-  // it. The explicit confirmation is the authorization, so create exactly those rows here —
-  // non-platform demand only, `pending`, requested now — and never for a pair that is already
-  // present (a legacy-ready pair is reused, never re-queued).
-  const missing = entries.filter(entry => !readyKeys.has(exactPairKey(entry.model, entry.variant)));
-  if (missing.length > 0) {
-    await env.BENCH_DB.batch(
-      enrollPaidPairStatements(env.BENCH_DB, {
+          repetitions: policy.deciderRepetitions,
+          model: pair.model,
+          variant: pair.variant,
+        })
+      ),
+      readLiveRequestPairStatement(env.BENCH_DB, { requestId: request.id, pairs: readyPairs }),
+      // Durable guard, same batch: if readiness withdrew in the window, the request fails
+      // terminally (retryable, fresh estimate) instead of leaving JS state that a later
+      // activation would re-enter and measure. Conditioned on an unproven live row, so a
+      // successful reconcile closes nothing.
+      ...failUnreconciledServingPairStatements(env.BENCH_DB, {
+        requestId: request.id,
+        pairs: readyPairs,
         router,
         engineIdentity,
         repetitions: policy.deciderRepetitions,
-        entries: missing,
-        requestedAt: request.activated_at ?? request.created_at,
-      })
+      }),
+    ]);
+    const liveRows = (results[readyPairs.length * 2]?.results ?? []) as Array<{
+      model: string;
+      variant: string;
+    }>;
+    const liveKeys = new Set(
+      liveRows.map(row => exactPairKey(row.model, variantFromStorage(row.variant)))
     );
+    for (const entry of quotedReady) {
+      const key = entryKey(entry);
+      if (!liveKeys.has(key)) reusedPairKeys.add(key);
+    }
+    // The guard's close is durable: re-read it rather than trusting the batch result, so a
+    // failed request can never fall through to a launch.
+    const afterReconcile = await readPaidBenchmarkRequest(env.BENCH_DB, request.id);
+    if (afterReconcile?.status !== 'active') {
+      return { runId: null, claimed: 0, skipped: ['request_not_active'] };
+    }
   }
+  // The crash-after-success fence. A previous activation may have committed a pair's
+  // serving-reuse decision (its display rows are all `reused`) and died before claiming the
+  // siblings. That decision is durable, but the registry evidence behind it need not be: the
+  // profile can be withdrawn before this retry. Re-deriving readiness now would put the pair
+  // back into `measured` and launch a measurement the request already decided to reuse, so
+  // the committed rows are the authority — never the current registry read.
+  const allPairs = entries.map(entry => ({
+    model: entry.model,
+    variant: variantToStorage(entry.variant),
+  }));
+  const durableReuse = await readReusedRequestPairStatement(env.BENCH_DB, {
+    requestId: request.id,
+    pairs: allPairs,
+  }).all<{ model: string; variant: string }>();
+  for (const row of durableReuse.results) {
+    reusedPairKeys.add(exactPairKey(row.model, variantFromStorage(row.variant)));
+  }
+  const measured = entries.filter(entry => !reusedPairKeys.has(entryKey(entry)));
+  if (measured.length === 0) {
+    // Every quoted pair is serving now: the request is fully reused, so it completes with its
+    // pin intent instead of starting a run nobody needs.
+    await env.BENCH_DB.batch([
+      ...completePaidBenchmarkRequestStatements(env.BENCH_DB, { requestId: request.id }),
+      enqueuePaidPoolPinsStatement(env.BENCH_DB, { requestId: request.id }),
+    ]);
+    return { runId: null, claimed: 0, skipped: ['already_ready'] };
+  }
+  // Every remaining entry was proven never-ready for this request, so measuring it cannot
+  // duplicate a pair that already serves. A pair the platform has never seen has no registry
+  // row at all, and the plan cannot stage it: the explicit confirmation is the authorization,
+  // so create exactly those rows here — non-platform demand only, `pending`, requested now —
+  // and never for a pair that is already present.
+  await env.BENCH_DB.batch(
+    enrollPaidPairStatements(env.BENCH_DB, {
+      router,
+      engineIdentity,
+      repetitions: policy.deciderRepetitions,
+      entries: measured,
+      requestedAt: request.activated_at ?? request.created_at,
+    })
+  );
   // R33 crash recovery needs no separate clear: the claim predicate accepts
   // `status = 'running' AND run_id = <this deterministic id>`, so a row a crashed activation
   // left claimed under this id is reclaimed by the same call that claims a fresh slot. The
   // id is only ever ours, so nothing else's claims can be touched.
-  const claimed = await markProfilesRunningForRun(env.BENCH_DB, runId, entries, current);
+  const claimed = await markProfilesRunningForRun(env.BENCH_DB, runId, measured, current);
   if (claimed.length === 0) {
     // Every pair is claimed by a live run right now. That is attachment, not failure: the
     // cases are being measured, the request keeps its place, and a later activation pass

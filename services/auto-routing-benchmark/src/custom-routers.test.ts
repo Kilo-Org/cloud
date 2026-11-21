@@ -9,6 +9,7 @@ import type {
   ClientCustomRouterEntry,
   CustomRouterBenchmarkContext,
   CustomRoutingTable,
+  GatewayCustomRouterEntry,
 } from '@kilocode/auto-routing-contracts';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import {
@@ -1210,5 +1211,278 @@ describe('custom router tables and statuses (real SQLite)', () => {
       baseRouter: 'efficient',
       models: [{ model: 'vendor/gw', variants: [null] }],
     });
+  });
+});
+
+describe('observed serving pin (real SQLite)', () => {
+  const ALIAS = '~vendor/latest';
+  const OLD_TARGET = 'vendor/old';
+  const NEW_TARGET = 'vendor/new';
+  const OBSERVED_AT = '2026-11-20T09:00:00.000Z';
+  const CONFIRMED_AT = '2026-11-20T10:00:00.000Z';
+
+  let sqlite: DatabaseSync;
+  let db: D1Database;
+
+  beforeEach(() => {
+    sqlite = new DatabaseSync(':memory:');
+    applyBenchmarkMigrations(sqlite);
+    db = sqliteD1(sqlite);
+  });
+
+  function catalog(liveTarget: string, extra: string[] = []): typeof source {
+    return {
+      ...source,
+      fetchImpl: async () =>
+        Response.json({
+          data: [
+            { id: ALIAS, alias_target: liveTarget },
+            ...[liveTarget, ...extra].map(id => ({
+              id,
+              pricing: { prompt: '0.000001', completion: '0.000002' },
+            })),
+          ],
+        }),
+    };
+  }
+
+  function readyProfile(model: string, runId: string, admitted: boolean, accuracy = 0.95) {
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles (router, model, variant, engine_identity, repetitions, status,
+          run_id, requested_at, updated_at, completed_at, platform_requested, user_requested)
+         VALUES ('efficient', ?, '', ?, 3, 'ready', ?, '2026-10-01', '2026-10-01', '2026-10-01', 0, 1)`
+      )
+      .run(model, ENGINE, runId);
+    sqlite
+      .prepare(
+        `INSERT INTO model_summaries (run_id, model, variant, route_key, accuracy, avg_cost_usd,
+          avg_latency_ms, p50_latency_ms, cases, errors, p95_latency_ms, timeouts)
+         VALUES (?, ?, '', ?, ?, 0.001, 800, 800, 20, 0, 900, 0)`
+      )
+      .run(runId, model, ROUTE, accuracy);
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_runs (id, router, kind, purpose, status, started_at, completed_at,
+          min_accuracy, switch_cost_factor, max_concurrency, repetitions, engine_identity,
+          admission_marker)
+         VALUES (?, 'efficient', 'decider', 'platform', 'completed', '2026-10-01', '2026-10-01',
+           0.7, 3, 0, 3, ?, ?)`
+      )
+      .run(runId, ENGINE, admitted ? `marker-${runId}` : null);
+    sqlite
+      .prepare(`INSERT INTO run_models (run_id, model, variant, enqueued) VALUES (?, ?, '', 1)`)
+      .run(runId, model);
+  }
+
+  function context(pin?: { model: string; source?: 'observed' }): CustomRouterBenchmarkContext {
+    const entry: GatewayCustomRouterEntry = { kind: 'gateway', model: ALIAS };
+    if (pin) {
+      entry.servingPin = pin.source
+        ? { model: pin.model, pinnedAt: OBSERVED_AT, source: 'observed' }
+        : { model: pin.model, pinnedAt: OBSERVED_AT, confirmedAt: CONFIRMED_AT };
+    }
+    return {
+      ownerType: 'user',
+      ownerId: 'user-b',
+      baseRouter: 'efficient',
+      entries: [entry],
+      clientEvalEntryKeys: [],
+    };
+  }
+
+  const rankedModels = (table: CustomRoutingTable | null) =>
+    Object.values(table?.routes ?? {})
+      .flat()
+      .map(candidate => candidate.model);
+
+  it('serves a promoted observation with a stale catalog that still reports its old target', async () => {
+    readyProfile(OLD_TARGET, 'run-old', true);
+    const result = await assembleCustomRouterTable(
+      db,
+      CONFIG,
+      context({ model: OLD_TARGET, source: 'observed' }),
+      catalog(OLD_TARGET)
+    );
+    expect(rankedModels(result.table)).toEqual([ALIAS]);
+    expect(result.servingPins).toEqual({ [`gateway:${ALIAS}`]: OLD_TARGET });
+    expect(result.table?.routes[ROUTE]).toHaveLength(1);
+
+    const statuses = await lookupCustomRouterStatuses(
+      db,
+      CONFIG,
+      context({ model: OLD_TARGET, source: 'observed' }),
+      catalog(OLD_TARGET)
+    );
+    expect(statuses.entries[0]?.variants[0]).toMatchObject({
+      status: 'ready',
+      servingModel: OLD_TARGET,
+      availability: 'ready',
+    });
+    expect(statuses.entries[0]?.variants[0]).not.toHaveProperty('servingFallback');
+  });
+
+  it('reads identically to a confirmed pin of the same target, so promotion has no dispatch gap', async () => {
+    readyProfile(OLD_TARGET, 'run-old', true);
+    const observed = await assembleCustomRouterTable(
+      db,
+      CONFIG,
+      context({ model: OLD_TARGET, source: 'observed' }),
+      catalog(OLD_TARGET)
+    );
+    const confirmed = await assembleCustomRouterTable(
+      db,
+      CONFIG,
+      context({ model: OLD_TARGET }),
+      catalog(OLD_TARGET)
+    );
+    expect(observed.table?.routes).toEqual(confirmed.table?.routes);
+    expect(observed.table?.version).toBe(confirmed.table?.version);
+    expect(observed.servingPins).toEqual(confirmed.servingPins);
+    expect(
+      await computeCustomRouterReadinessVersion(
+        db,
+        CONFIG,
+        context({ model: OLD_TARGET, source: 'observed' }),
+        catalog(OLD_TARGET)
+      )
+    ).toBe(await computeCustomRouterReadinessVersion(db, CONFIG, context(), catalog(OLD_TARGET)));
+  });
+
+  it('keeps the observed target ranked and warns once the catalog reports the move', async () => {
+    readyProfile(OLD_TARGET, 'run-old', true, 0.95);
+    readyProfile(NEW_TARGET, 'run-new', true, 0.9);
+    const moved = catalog(NEW_TARGET, [OLD_TARGET]);
+    const result = await assembleCustomRouterTable(
+      db,
+      CONFIG,
+      context({ model: OLD_TARGET, source: 'observed' }),
+      moved
+    );
+    expect(
+      Object.values(result.table?.routes ?? {}).map(route =>
+        route.map(candidate => ({ model: candidate.model, accuracy: candidate.accuracy }))
+      )
+    ).toEqual([[{ model: ALIAS, accuracy: 0.95 }]]);
+    expect(result.servingPins).toEqual({ [`gateway:${ALIAS}`]: OLD_TARGET });
+    expect(rankedModels(result.table)).not.toContain(NEW_TARGET);
+
+    const statuses = await lookupCustomRouterStatuses(
+      db,
+      CONFIG,
+      context({ model: OLD_TARGET, source: 'observed' }),
+      moved
+    );
+    expect(statuses.entries[0]?.variants[0]).toMatchObject({
+      status: 'ready',
+      servingModel: OLD_TARGET,
+      availability: 'alias_rebenchmark_needed',
+    });
+    expect(statuses.entries[0]?.variants[0]).not.toHaveProperty('servingFallback');
+  });
+
+  it('keeps a listed but unmeasured saved pin as the dispatch target', async () => {
+    const moved = catalog(NEW_TARGET, [OLD_TARGET]);
+    const pinnedContext = context({ model: OLD_TARGET });
+
+    const result = await assembleCustomRouterTable(db, CONFIG, pinnedContext, moved);
+    expect(result.table).toBeNull();
+    expect(result.servingPins).toEqual({ [`gateway:${ALIAS}`]: OLD_TARGET });
+    expect(result.servingFallback).toBeUndefined();
+    const statuses = await lookupCustomRouterStatuses(db, CONFIG, pinnedContext, moved);
+    const variant = statuses.entries[0]?.variants[0];
+    expect(variant).toMatchObject({ status: 'missing', availability: 'unbenchmarked' });
+    expect(variant).not.toHaveProperty('servingFallback');
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_profiles').get()).toEqual({ n: 0 });
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_runs').get()).toEqual({ n: 0 });
+  });
+
+  it('falls back to the live target with a warning when the observed target is gone', async () => {
+    readyProfile(OLD_TARGET, 'run-old', true, 0.95);
+    const gone = catalog(NEW_TARGET);
+    const result = await assembleCustomRouterTable(
+      db,
+      CONFIG,
+      context({ model: OLD_TARGET, source: 'observed' }),
+      gone
+    );
+    expect(result.table).toBeNull();
+    expect(result.servingPins).toBeUndefined();
+    expect(result.servingFallback).toEqual([`gateway:${ALIAS}`]);
+
+    const statuses = await lookupCustomRouterStatuses(
+      db,
+      CONFIG,
+      context({ model: OLD_TARGET, source: 'observed' }),
+      gone
+    );
+    expect(statuses.entries[0]?.variants[0]).toMatchObject({
+      servingFallback: true,
+      status: 'missing',
+      availability: 'alias_rebenchmark_needed',
+    });
+
+    readyProfile(NEW_TARGET, 'run-new', true, 0.9);
+    const recovered = await assembleCustomRouterTable(
+      db,
+      CONFIG,
+      context({ model: OLD_TARGET, source: 'observed' }),
+      gone
+    );
+    expect(
+      Object.values(recovered.table?.routes ?? {})
+        .flat()
+        .map(candidate => candidate.model)
+    ).toEqual([ALIAS]);
+    expect(recovered.servingPins).toBeUndefined();
+    expect(recovered.servingFallback).toEqual([`gateway:${ALIAS}`]);
+    const recoveredStatuses = await lookupCustomRouterStatuses(
+      db,
+      CONFIG,
+      context({ model: OLD_TARGET, source: 'observed' }),
+      gone
+    );
+    expect(recoveredStatuses.entries[0]?.variants[0]).toMatchObject({
+      servingFallback: true,
+      status: 'ready',
+      availability: 'ready',
+    });
+  });
+
+  it('preserves the legacy concrete candidate and duplicate dedupe for un-pinned rows', async () => {
+    readyProfile(OLD_TARGET, 'run-legacy', false, 0.95);
+    const aliasOnly = await assembleCustomRouterTable(db, CONFIG, context(), catalog(OLD_TARGET));
+    expect(rankedModels(aliasOnly.table)).toEqual([OLD_TARGET]);
+    expect(aliasOnly.servingPins).toBeUndefined();
+
+    const duplicate = await assembleCustomRouterTable(
+      db,
+      CONFIG,
+      {
+        ...context(),
+        entries: [
+          { kind: 'gateway', model: ALIAS },
+          { kind: 'gateway', model: OLD_TARGET },
+        ],
+      },
+      catalog(OLD_TARGET)
+    );
+    expect(rankedModels(duplicate.table)).toEqual([OLD_TARGET]);
+    expect(duplicate.servingPins).toBeUndefined();
+    expect(duplicate.table?.version).not.toBe(aliasOnly.table?.version);
+  });
+
+  it('ranks a paid observation of the same live target with the un-pinned alias version', async () => {
+    readyProfile(OLD_TARGET, 'run-paid', true, 0.95);
+    const unpinned = await assembleCustomRouterTable(db, CONFIG, context(), catalog(OLD_TARGET));
+    expect(rankedModels(unpinned.table)).toEqual([ALIAS]);
+    const promoted = await assembleCustomRouterTable(
+      db,
+      CONFIG,
+      context({ model: OLD_TARGET, source: 'observed' }),
+      catalog(OLD_TARGET)
+    );
+    expect(rankedModels(promoted.table)).toEqual([ALIAS]);
+    expect(promoted.table?.version).toBe(unpinned.table?.version);
   });
 });

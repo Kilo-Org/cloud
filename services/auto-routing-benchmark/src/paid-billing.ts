@@ -22,6 +22,9 @@ import {
   type PaidBenchmarkQuoteRow,
   type PaidBenchmarkRequestRow,
 } from './paid-case-store';
+import { exactPairKey } from './db';
+import type { BenchmarkProfileRowStatus } from './db-schema';
+import { variantFromStorage } from './reasoning-effort';
 import { PaidBenchmarkPlanSchema } from './paid-benchmark-plan';
 
 const DELIVERY_TIMEOUT_MS = 10_000;
@@ -104,6 +107,78 @@ export async function publishPaidPoolPins(
   const aliases = plan.data.aliases.filter(alias => usableModels.has(alias.target));
   if (aliases.length === 0)
     return { published: false, reason: 'no_usable_targets', retryable: false };
+  // A `reused` progress row is not by itself proof that its target still serves: a plan-time
+  // `serving` pair stages its rows from the quote's claim, and the launch reconcile converts a
+  // queued row the same way, while the registry evidence behind either can be withdrawn before
+  // this callback. So each alias is decided from its target's own current registry rows.
+  //
+  // A target may name several effort variants, and each is a separate registry row, so they
+  // are grouped by model and never collapsed to one variant. The alias publishes while any of
+  // its variants is ready with a measuring run — the same model-level rule the usable-target
+  // filter above already uses — and only waits when none is ready but one is still finalizing.
+  const targets = aliases.map(alias => ({
+    alias,
+    variants: plan.data.pairs
+      .filter(pair => pair.model === alias.target)
+      .map(pair => ({ model: pair.model, variant: variantFromStorage(pair.variant) })),
+  }));
+  const models = [...new Set(targets.flatMap(target => target.variants.map(pair => pair.model)))];
+  // One bounded read. `model IN (...)` seeks the registry PK prefix (router, model, …); the
+  // exact (model, variant) pairing is then applied in JS, so this stays one indexed query
+  // instead of a full-table expression scan.
+  const statusByKey = new Map<
+    string,
+    { status: BenchmarkProfileRowStatus; runId: string | null }
+  >();
+  if (models.length > 0) {
+    const rows = await env.BENCH_DB.prepare(
+      `SELECT model, variant, status, run_id FROM benchmark_profiles
+      WHERE router = ? AND engine_identity = ? AND repetitions = ?
+        AND model IN (SELECT value FROM json_each(?))`
+    )
+      .bind(
+        plan.data.router,
+        plan.data.engineIdentity,
+        plan.data.repetitions,
+        JSON.stringify(models)
+      )
+      .all<{
+        model: string;
+        variant: string;
+        status: BenchmarkProfileRowStatus;
+        run_id: string | null;
+      }>();
+    for (const row of rows.results)
+      statusByKey.set(exactPairKey(row.model, variantFromStorage(row.variant)), {
+        status: row.status,
+        runId: row.run_id,
+      });
+  }
+  const statusOf = (pair: { model: string; variant: string | null }) =>
+    statusByKey.get(exactPairKey(pair.model, pair.variant));
+  const isReady = (pair: { model: string; variant: string | null }) => {
+    const row = statusOf(pair);
+    return row?.status === 'ready' && row.runId != null && row.runId !== '';
+  };
+  const isSetting = (pair: { model: string; variant: string | null }) => {
+    const status = statusOf(pair)?.status;
+    return status === 'pending' || status === 'running';
+  };
+  const published = targets
+    .filter(target => target.variants.some(isReady))
+    .map(target => target.alias);
+  // Any target still finalizing must not be delivered yet, even when a sibling is ready: one
+  // outbox intent delivers once, so delivering now would mark it done with that alias dropped.
+  // Wait for terminal readiness; the intent stays pending and the next drain publishes both.
+  const anySetting = targets.some(
+    target =>
+      target.variants.length > 0 &&
+      !target.variants.some(isReady) &&
+      target.variants.some(isSetting)
+  );
+  if (anySetting) return { published: false, reason: 'serving_evidence_pending', retryable: true };
+  if (published.length === 0)
+    return { published: false, reason: 'serving_evidence_gone', retryable: false };
 
   const body = CustomRouterPoolPinsRequestSchema.safeParse({
     routerId: request.router_id,
@@ -113,7 +188,7 @@ export async function publishPaidPoolPins(
     requestId: request.id,
     // The explicit click that confirmed the target; a pin never moves on completion time.
     confirmedAt: request.activated_at ?? request.created_at,
-    aliases,
+    aliases: published,
   });
   if (!body.success) return { published: false, reason: 'pins_payload_invalid', retryable: false };
   const delivery = await deliverPaidPoolPins(env, body.data, fetchImpl);

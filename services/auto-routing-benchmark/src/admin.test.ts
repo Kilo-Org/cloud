@@ -130,7 +130,7 @@ vi.mock('./db', async importOriginal => {
     reuseDeciderCaseResults: vi.fn().mockResolvedValue(0),
     listQueuedRemeasures: vi.fn().mockResolvedValue([]),
     copyRemeasureBaselines: vi.fn().mockResolvedValue(0),
-    settleRemeasuresForRun: vi.fn().mockResolvedValue(undefined),
+    settleRemeasuresForRun: vi.fn().mockResolvedValue('published'),
     markStaleRunsFailed: vi.fn(),
     listStaleRunningDeciderRuns: vi.fn(),
     listPendingCurrentProfiles: vi.fn(),

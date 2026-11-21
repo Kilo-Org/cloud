@@ -43,11 +43,11 @@ import {
 import {
   applyLatestAliasTargets,
   getLatestAliasTargets,
-  latestAliasTargetsConfig,
   readLatestAliasTargets,
   updateLatestAliasTargets,
   type LatestAliasTargets,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/latest-alias-targets';
+import { promoteAliasTargets } from '@/lib/providers/openrouter/sync-alias-pins';
 import { recordSyncCompleted } from '@/lib/providers/openrouter/sync-providers-stale-alert';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import {
@@ -371,10 +371,11 @@ async function storeVercelModelIdOverrides(overrides: VercelModelIdOverride[]) {
 async function generateLatestAliasTargets(
   openRouterModels: GatewayModelMap,
   openRouterCatalogModels: readonly CatalogModel[]
-): Promise<LatestAliasTarget[] | null> {
+): Promise<{ previous: LatestAliasTargets; next: LatestAliasTarget[] } | null> {
   try {
-    return updateLatestAliasTargets({
-      previous: await readLatestAliasTargets(db),
+    const previous = await readLatestAliasTargets(db);
+    const next = updateLatestAliasTargets({
+      previous,
       models: openRouterModels,
       createdAtMs: new Map(
         openRouterCatalogModels
@@ -383,22 +384,12 @@ async function generateLatestAliasTargets(
       ),
       nowMs: Date.now(),
     });
+    return { previous, next };
   } catch (err) {
     console.error('[sync-providers] generating latest alias targets failed', err);
     captureException(err, { tags: { component: 'sync-providers-latest-alias-targets' } });
     return null;
   }
-}
-
-async function storeLatestAliasTargets(entries: LatestAliasTarget[]) {
-  const value = latestAliasTargetsConfig(entries);
-  await db
-    .insert(ai_gateway_config)
-    .values({ id: 1, latest_alias_targets: value })
-    .onConflictDoUpdate({
-      target: ai_gateway_config.id,
-      set: { latest_alias_targets: value },
-    });
 }
 
 /**
@@ -483,34 +474,47 @@ export async function syncAndStoreProviders() {
     openRouterModels,
     openRouterCatalog.data
   );
-  const latestAliasTargets: LatestAliasTargets = generatedLatestAliasTargets
-    ? new Map(generatedLatestAliasTargets.map(entry => [entry.alias, entry]))
+
+  const customLlms = await fetchCustomLlmsFromDatabase();
+  const buildProviders = (targets: LatestAliasTargets) =>
+    syncProviders({
+      providers: openrouterProviders,
+      openRouterModels: applyLatestAliasTargets(openRouterModels, targets),
+      openRouterCatalogModels: openRouterCatalog.data,
+      vercelModels,
+      vercelModelIdOverrides,
+      customLlms,
+    });
+
+  // The prospective snapshot, validated before anything is written, so a suspicious sync leaves the
+  // stored alias targets and pins untouched.
+  const prospectiveTargets: LatestAliasTargets = generatedLatestAliasTargets
+    ? new Map(generatedLatestAliasTargets.next.map(entry => [entry.alias, entry]))
     : await getLatestAliasTargets();
-
-  const providers = await syncProviders({
-    providers: openrouterProviders,
-    openRouterModels: applyLatestAliasTargets(openRouterModels, latestAliasTargets),
-    openRouterCatalogModels: openRouterCatalog.data,
-    vercelModels,
-    vercelModelIdOverrides,
-    customLlms: await fetchCustomLlmsFromDatabase(),
-  });
-
-  if (providers.total_providers < 10) {
-    throw new Error(`Suspicious: total number of providers is ${providers.total_providers} < 10`);
+  const prospective = await buildProviders(prospectiveTargets);
+  if (prospective.total_providers < 10) {
+    throw new Error(`Suspicious: total number of providers is ${prospective.total_providers} < 10`);
+  }
+  if (prospective.total_models < 100) {
+    throw new Error(`Suspicious: total number of models is ${prospective.total_models} < 100`);
   }
 
-  if (providers.total_models < 100) {
-    throw new Error(`Suspicious: total number of models is ${providers.total_models} < 100`);
+  let providers = prospective;
+  if (generatedLatestAliasTargets) {
+    const promotion = await promoteAliasTargets(generatedLatestAliasTargets);
+    if (!promotion.written) {
+      // Another readiness holder or a stale lease owns the move. This snapshot renders the targets
+      // actually stored in the primary, so it never publishes a move no pool witnessed.
+      console.warn(
+        '[sync-providers] alias targets were not promoted; this cycle keeps the stored targets'
+      );
+      providers = await buildProviders(await readLatestAliasTargets(db));
+    }
   }
 
   if (generatedVercelModelIdOverrides) {
     await storeVercelModelIdOverrides(generatedVercelModelIdOverrides);
   }
-  if (generatedLatestAliasTargets) {
-    await storeLatestAliasTargets(generatedLatestAliasTargets);
-  }
-
   const result = await applySnapshotChangesAndAudit({ providers });
 
   const completed_at = await recordSyncCompleted('providers');

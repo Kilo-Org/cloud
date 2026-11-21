@@ -64,6 +64,11 @@ import { noLiveBenchmarkChunks } from './profile-entry-claims';
 import { platformCoverageStatements } from './paid-case-store';
 import { ACTIVE_MEASUREMENT_REVISION } from './measurement-revision';
 import {
+  aliasReadinessClearSql,
+  aliasReadinessFenceReadStatement,
+  aliasReadinessSampleClockStatement,
+} from './alias-readiness-lease';
+import {
   parseProfileState,
   profileFailureAssignments,
   profileFailureResetAssignments,
@@ -2586,10 +2591,45 @@ export async function copyRemeasureBaselines(
   return result.meta.changes ?? 0;
 }
 
+/** Outcome of a ready publication: `deferred` wrote nothing, so the run stays open. */
+export type ReadyPublication = 'published' | 'deferred';
+
+/** The fence read every guarded publication batches first: `free` is 1 while it may publish. */
+export function aliasReadinessAllows(fence: unknown): boolean {
+  const row = fence as { free?: unknown } | null | undefined;
+  return Number(row?.free) === 1;
+}
+
+/**
+ * One database-clock sample per publication. The same cutoff guards every statement in the
+ * batch, so a lease that expires mid-batch cannot let one statement skip and a later one
+ * write — the publication is all-or-none.
+ */
+async function sampleAliasReadinessCutoff(db: D1Database): Promise<number> {
+  const row = await aliasReadinessSampleClockStatement(db).first<{ now_ms: number }>();
+  const nowMs = Number(row?.now_ms);
+  if (!Number.isFinite(nowMs)) throw new Error('readiness clock read failed');
+  return nowMs;
+}
+
+/** Whether an unexpired readiness lease currently blocks a ready publication. */
+export async function aliasReadinessLeaseHeld(db: D1Database): Promise<boolean> {
+  return !aliasReadinessAllows(
+    await aliasReadinessFenceReadStatement(db, await sampleAliasReadinessCutoff(db)).first<{
+      free: number;
+    }>()
+  );
+}
+
 /**
  * Settle this run's re-measures: an entry with a dead lane is dropped and keeps its
  * previous measurement; every other claimed profile moves its provenance to this run,
  * which now holds its full result set. Status stays `ready` throughout.
+ *
+ * Every statement carries {@link aliasReadinessClearSql} against one sampled cutoff, and the
+ * batch opens with the same read, so a held lease makes the whole publication a no-op and the
+ * caller keeps the run open for the settled-run sweep. Partial publication is impossible: the
+ * failed-entry deletes and the provenance update share the cutoff.
  */
 export async function settleRemeasuresForRun(
   db: D1Database,
@@ -2597,18 +2637,22 @@ export async function settleRemeasuresForRun(
   /** Storage-form variant keys ('' = default variant). */
   failedEntries: readonly { model: string; variant: string }[],
   nowIso: string = new Date().toISOString()
-): Promise<void> {
+): Promise<ReadyPublication> {
+  const cutoff = await sampleAliasReadinessCutoff(db);
   const orm = drizzle(db);
-  const statements: BatchItem<'sqlite'>[] = failedEntries.map(entry =>
-    orm
-      .delete(profileRemeasures)
-      .where(
-        and(
-          eq(profileRemeasures.run_id, runId),
-          eq(profileRemeasures.model, entry.model),
-          eq(profileRemeasures.variant, entry.variant)
+  const clear = aliasReadinessClearSql(cutoff);
+  const statements: { toSQL: () => { sql: string; params: unknown[] } }[] = failedEntries.map(
+    entry =>
+      orm
+        .delete(profileRemeasures)
+        .where(
+          and(
+            eq(profileRemeasures.run_id, runId),
+            eq(profileRemeasures.model, entry.model),
+            eq(profileRemeasures.variant, entry.variant),
+            clear
+          )
         )
-      )
   );
   statements.push(
     orm
@@ -2617,6 +2661,7 @@ export async function settleRemeasuresForRun(
       .where(
         and(
           eq(benchmarkProfiles.status, 'ready'),
+          clear,
           sql`EXISTS (
             SELECT 1 FROM ${profileRemeasures}
             WHERE ${profileRemeasures.run_id} = ${runId}
@@ -2628,9 +2673,16 @@ export async function settleRemeasuresForRun(
           )`
         )
       ),
-    orm.delete(profileRemeasures).where(eq(profileRemeasures.run_id, runId))
+    orm.delete(profileRemeasures).where(and(eq(profileRemeasures.run_id, runId), clear))
   );
-  await orm.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
+  const [fence] = await db.batch([
+    aliasReadinessFenceReadStatement(db, cutoff),
+    ...statements.map(statement => {
+      const built = statement.toSQL();
+      return db.prepare(built.sql).bind(...built.params);
+    }),
+  ]);
+  return aliasReadinessAllows(fence?.results[0]) ? 'published' : 'deferred';
 }
 
 /**
@@ -2640,7 +2692,8 @@ export async function settleRemeasuresForRun(
 export function markProfilesReadyForRunStatement(
   orm: ReturnType<typeof drizzle>,
   runId: string,
-  nowIso: string
+  nowIso: string,
+  readinessCutoffMs: number
 ) {
   return orm
     .update(benchmarkProfiles)
@@ -2650,7 +2703,13 @@ export function markProfilesReadyForRunStatement(
       updated_at: nowIso,
       completed_at: nowIso,
     })
-    .where(and(eq(benchmarkProfiles.run_id, runId), eq(benchmarkProfiles.status, 'running')));
+    .where(
+      and(
+        eq(benchmarkProfiles.run_id, runId),
+        eq(benchmarkProfiles.status, 'running'),
+        aliasReadinessClearSql(readinessCutoffMs)
+      )
+    );
 }
 
 /**
@@ -2663,10 +2722,12 @@ export async function markProfilesReadyForEntries(
   runId: string,
   entries: readonly BenchmarkPair[],
   nowIso: string = new Date().toISOString()
-): Promise<void> {
-  if (entries.length === 0) return;
+): Promise<ReadyPublication> {
+  if (entries.length === 0) return 'published';
+  const cutoff = await sampleAliasReadinessCutoff(db);
   const orm = drizzle(db);
-  await orm.batch([
+  const clear = aliasReadinessClearSql(cutoff);
+  const statements = [
     orm
       .update(benchmarkProfiles)
       .set({
@@ -2679,6 +2740,7 @@ export async function markProfilesReadyForEntries(
         and(
           eq(benchmarkProfiles.run_id, runId),
           eq(benchmarkProfiles.status, 'running'),
+          clear,
           or(
             ...entries.map(entry =>
               and(
@@ -2694,6 +2756,7 @@ export async function markProfilesReadyForEntries(
       .where(
         and(
           eq(profileRemeasures.run_id, runId),
+          clear,
           or(
             ...entries.map(entry =>
               and(
@@ -2704,7 +2767,15 @@ export async function markProfilesReadyForEntries(
           )
         )
       ),
+  ];
+  const [fence] = await db.batch([
+    aliasReadinessFenceReadStatement(db, cutoff),
+    ...statements.map(statement => {
+      const built = statement.toSQL();
+      return db.prepare(built.sql).bind(...built.params);
+    }),
   ]);
+  return aliasReadinessAllows(fence?.results[0]) ? 'published' : 'deferred';
 }
 
 /**
@@ -2763,8 +2834,15 @@ export async function markProfilesReadyForRun(
   db: D1Database,
   runId: string,
   nowIso: string = new Date().toISOString()
-): Promise<void> {
-  await markProfilesReadyForRunStatement(drizzle(db), runId, nowIso);
+): Promise<ReadyPublication> {
+  const cutoff = await sampleAliasReadinessCutoff(db);
+  const orm = drizzle(db);
+  const statement = markProfilesReadyForRunStatement(orm, runId, nowIso, cutoff).toSQL();
+  const [fence] = await db.batch([
+    aliasReadinessFenceReadStatement(db, cutoff),
+    db.prepare(statement.sql).bind(...statement.params),
+  ]);
+  return aliasReadinessAllows(fence?.results[0]) ? 'published' : 'deferred';
 }
 
 /**

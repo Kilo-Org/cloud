@@ -101,6 +101,7 @@ import {
 import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
 import { readJsonBody } from '@kilocode/web-shared/tests/helpers/request-body.helper';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
+import { readLatestAliasTargets } from '@kilocode/web-shared/lib/ai-gateway/providers/latest-alias-targets';
 import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
 import { GEMMA_4_26B_A4B_IT_FREE_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import {
@@ -172,6 +173,12 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   ...jest.requireActual<Record<string, unknown>>('@kilocode/web-shared/lib/drizzle'),
   readDb: {},
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/latest-alias-targets', () => {
+  const actual = jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/latest-alias-targets'
+  );
+  return { ...actual, readLatestAliasTargets: jest.fn(async () => new Map()) };
+});
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
   ...(jest.requireActual(
     '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog'
@@ -368,6 +375,7 @@ function usageAccountingResult(
 const mockedFetchEfficientAutoDecision = jest.mocked(fetchEfficientAutoDecision);
 const mockedFetchCustomRouterDecision = jest.mocked(fetchCustomRouterDecision);
 const mockedFindCustomRouter = jest.mocked(findCustomRouter);
+const mockedReadLatestAliasTargets = jest.mocked(readLatestAliasTargets);
 const mockedDeniedAutoRoutingCandidates = jest.mocked(deniedAutoRoutingCandidates);
 const mockedIsReleaseToggleEnabled = jest.mocked(isReleaseToggleEnabled);
 const mockedCollectDeniedAutoRoutingModelIds = jest.mocked(collectDeniedAutoRoutingModelIds);
@@ -4540,10 +4548,14 @@ describe('custom routers and signed auto decisions', () => {
       const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/custom/mine')));
 
       expect(response.status).toBe(200);
-      expect(mockedFindCustomRouter).toHaveBeenCalledWith({ type: 'user', id: 'user-123' }, 'mine');
+      const [routerLookup] = mockedFindCustomRouter.mock.calls;
+      expect(routerLookup?.[0]).toEqual({ type: 'user', id: 'user-123' });
+      expect(routerLookup?.[1]).toBe('mine');
+      expect(routerLookup?.[2] === db).toBe(true);
       const decideParams = mockedFetchCustomRouterDecision.mock.calls[0]?.[0];
       expect(decideParams).toMatchObject({
         customRouter: { scope: 'user', slug: 'mine' },
+        customRouterDefinition: personalRouter,
         router: 'frontier',
         requestedModel: 'kilo-auto/custom/mine',
         userId: 'user-123',
@@ -4556,6 +4568,19 @@ describe('custom routers and signed auto decisions', () => {
         auto_model: 'kilo-auto/custom/mine',
         requested_model: haiku,
       });
+    });
+
+    it('forwards the stored pool, not a definition supplied in the request body', async () => {
+      const body = {
+        ...makeBody('kilo-auto/custom/mine'),
+        customRouterDefinition: { ...personalRouter, entries: [{ kind: 'gateway', model: haiku }] },
+      };
+
+      const response = await handleLlmProxyRequest(makeRequest(body));
+
+      expect(response.status).toBe(200);
+      const decideParams = mockedFetchCustomRouterDecision.mock.calls[0]?.[0];
+      expect(decideParams?.customRouterDefinition).toBe(personalRouter);
     });
 
     it('resolves an organization router in the active organization and applies its policy', async () => {
@@ -4573,7 +4598,10 @@ describe('custom routers and signed auto decisions', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockedFindCustomRouter).toHaveBeenCalledWith({ type: 'org', id: 'org-1' }, 'team');
+      const [routerLookup] = mockedFindCustomRouter.mock.calls;
+      expect(routerLookup?.[0]).toEqual({ type: 'org', id: 'org-1' });
+      expect(routerLookup?.[1]).toBe('team');
+      expect(routerLookup?.[2] === db).toBe(true);
       expect(mockedDeniedAutoRoutingCandidates).toHaveBeenCalledWith(expect.anything(), [
         haiku,
         'openai/gpt-5-mini',
@@ -4671,18 +4699,54 @@ describe('custom routers and signed auto decisions', () => {
   });
 
   describe('x-kilo-auto-decision header', () => {
+    const DECISION_MODEL = 'openai/gpt-4o';
+    const PINNED_MODEL = 'openai/gpt-4o-2024-11-20';
+    const ALIAS_MODEL = '~openai/gpt-4o-latest';
+    const FALLBACK_MODEL = 'openai/gpt-4o-2024-08-06';
+    const retiredEntry = {
+      kind: 'gateway' as const,
+      model: ALIAS_MODEL,
+      servingPin: { model: PINNED_MODEL, pinnedAt: '2026-11-20T00:00:00.000Z' },
+    };
+    const signedPool: CustomRouterDefinition = {
+      ...personalRouter,
+      entries: [
+        ...personalRouter.entries,
+        { kind: 'gateway', model: DECISION_MODEL },
+        retiredEntry,
+      ],
+    };
+
     const signedPayload: AutoDecisionPayload = {
       userId: 'user-123',
       organizationId: null,
       routerModelId: 'kilo-auto/custom/mine',
-      model: 'openai/gpt-4o',
+      model: DECISION_MODEL,
       variant: null,
+      entryModel: DECISION_MODEL,
       expiresAt: Date.now() + 60_000,
     };
 
+    let transactionSpy: jest.SpiedFunction<typeof db.transaction>;
+
+    beforeEach(() => {
+      mockedFindCustomRouter.mockResolvedValue(signedPool);
+      mockedReadLatestAliasTargets.mockResolvedValue(new Map());
+      transactionSpy = jest
+        .spyOn(db, 'transaction')
+        .mockImplementation(
+          (async (callback: (tx: unknown) => Promise<unknown>) =>
+            await callback({ name: 'tx' })) as typeof db.transaction
+        );
+    });
+
+    afterEach(() => {
+      transactionSpy.mockRestore();
+    });
+
     async function requestWithDecision(
       overrides: Partial<AutoDecisionPayload> = {},
-      model = 'openai/gpt-4o'
+      model = DECISION_MODEL
     ) {
       const token = await signAutoDecision(
         { ...signedPayload, ...overrides },
@@ -4695,10 +4759,14 @@ describe('custom routers and signed auto decisions', () => {
       const response = await requestWithDecision();
 
       expect(response.status).toBe(200);
-      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe('openai/gpt-4o');
+      const [call] = mockedFindCustomRouter.mock.calls;
+      expect(call?.[0]).toEqual({ type: 'user', id: 'user-123' });
+      expect(call?.[1]).toBe('mine');
+      expect(call?.[2] === db).toBe(true);
+      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe(DECISION_MODEL);
       expect(usageContext()).toMatchObject({
         auto_model: 'kilo-auto/custom/mine',
-        requested_model: 'openai/gpt-4o',
+        requested_model: DECISION_MODEL,
       });
       expect(mockedFetchCustomRouterDecision).not.toHaveBeenCalled();
       expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
@@ -4711,6 +4779,73 @@ describe('custom routers and signed auto decisions', () => {
 
       expect(response.status).toBe(200);
       expect(usageContext()).toMatchObject({ auto_model: 'kilo-auto/custom/mine' });
+    });
+
+    it('refuses a token whose entry is no longer the target its saved pin serves', async () => {
+      const response = await requestWithDecision(
+        { entryModel: ALIAS_MODEL, model: ALIAS_MODEL },
+        ALIAS_MODEL
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({
+        error: { code: 'invalid_auto_decision', reason: 'pool_stale_alias' },
+        error_type: 'invalid_auto_decision',
+      });
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    });
+
+    it('refuses a token whose entry is not in the saved pool', async () => {
+      const response = await requestWithDecision(
+        { entryModel: 'meta/llama-4', model: 'meta/llama-4' },
+        'meta/llama-4'
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({
+        error: { code: 'invalid_auto_decision', reason: 'pool_mismatch' },
+        error_type: 'invalid_auto_decision',
+      });
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    });
+
+    it('serves the retirement fallback the token proves against the snapshot target', async () => {
+      mockedReadLatestAliasTargets.mockResolvedValue(
+        new Map([[ALIAS_MODEL, { alias: ALIAS_MODEL, target: FALLBACK_MODEL }]])
+      );
+
+      const response = await requestWithDecision(
+        {
+          entryModel: ALIAS_MODEL,
+          model: ALIAS_MODEL,
+          servingFallback: true,
+          servingPinModel: PINNED_MODEL,
+          servingFallbackTarget: FALLBACK_MODEL,
+        },
+        ALIAS_MODEL
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockedReadLatestAliasTargets).toHaveBeenCalled();
+      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe(FALLBACK_MODEL);
+      expect(usageContext()).toMatchObject({
+        auto_model: 'kilo-auto/custom/mine',
+        requested_model: FALLBACK_MODEL,
+      });
+    });
+
+    it('serves the saved pin a timely token names instead of the moved alias', async () => {
+      const response = await requestWithDecision(
+        { entryModel: ALIAS_MODEL, model: PINNED_MODEL },
+        PINNED_MODEL
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe(PINNED_MODEL);
+      expect(usageContext()).toMatchObject({
+        auto_model: 'kilo-auto/custom/mine',
+        requested_model: PINNED_MODEL,
+      });
     });
 
     it.each([

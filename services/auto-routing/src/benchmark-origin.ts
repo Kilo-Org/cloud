@@ -136,10 +136,17 @@ export async function fetchCustomRouterTableVersion(
   }
 }
 
+export type CustomRouterTableLoad = {
+  table: CustomRoutingTable | null;
+  servingPins: ReadonlyMap<string, string>;
+  /** Entry keys whose saved pin target left the catalog; the live alias serves instead. */
+  servingFallback: ReadonlySet<string>;
+};
+
 export async function fetchCustomRouterTable(
   env: BenchmarkEnv,
   context: CustomRouterBenchmarkContext
-): Promise<{ table: CustomRoutingTable | null; servingPins: ReadonlyMap<string, string> }> {
+): Promise<CustomRouterTableLoad> {
   const res = await fetchBenchmark(env, CUSTOM_ROUTER_TABLE_PATH, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -160,6 +167,7 @@ export async function fetchCustomRouterTable(
   return {
     table: parsed.data.table,
     servingPins: new Map(Object.entries(parsed.data.servingPins ?? {})),
+    servingFallback: new Set(parsed.data.servingFallback ?? []),
   };
 }
 

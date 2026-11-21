@@ -133,6 +133,22 @@ function seedRequest(
 }
 
 /**
+ * A current ready registry row for one target. Publication pins a target only while its row
+ * still exists at this engine and repetition count and names its measuring run, so a test that
+ * expects a pin must seed this. `runId` null models a withdrawn/incomplete row on purpose.
+ */
+function seedReadyProfile(model: string, runId: string | null, variant = ''): void {
+  sqlite
+    .prepare(
+      `INSERT OR REPLACE INTO benchmark_profiles
+        (router, model, variant, engine_identity, repetitions, status, run_id, requested_at,
+          updated_at)
+      VALUES ('efficient', ?, ?, 'engine-test', 3, 'ready', ?, ?, ?)`
+    )
+    .run(model, variant, runId, AT, AT);
+}
+
+/**
  * Seed an outbox row. `kind` is the schema's closed union (`'pins'`), so a retired monetary
  * kind has to be written as raw text by the migration-rehearsal fixture, not here.
  */
@@ -178,6 +194,8 @@ describe('paid billing outbox', () => {
         VALUES (?, 'engine-test', 'vendor/alpha', '', 0, 'case-a', 'done', 0, 20000, NULL, ?)`
       )
       .run(REQUEST_ID, AT);
+    // The target must still serve for the callback to pin it; this test is about delivery.
+    seedReadyProfile('vendor/alpha', 'run-ready');
     seedOutbox(`pins:${REQUEST_ID}`);
     const summary = await drainPaidBillingOutbox(env(), { limit: 5 });
     expect(summary.pinned).toBe(1);
@@ -208,6 +226,7 @@ describe('paid billing outbox', () => {
         VALUES (?, 'engine-test', 'vendor/alpha', '', 0, 'case-a', 'reused', 0, 0, NULL, ?)`
       )
       .run(REQUEST_ID, AT);
+    seedReadyProfile('vendor/alpha', 'run-ready');
     // The store writes the deterministic id; a second enqueue for the same request is a no-op.
     await db.batch([
       enqueuePaidPoolPinsStatement(db, { requestId: REQUEST_ID, now: 0 }),
@@ -234,6 +253,7 @@ describe('paid billing outbox', () => {
         VALUES (?, 'engine-test', 'vendor/alpha', '', 0, 'case-a', 'done', 0, 0, NULL, ?)`
       )
       .run(REQUEST_ID, AT);
+    seedReadyProfile('vendor/alpha', 'run-ready');
     seedOutbox(`pins:${REQUEST_ID}`);
     const failing = async () => {
       throw new Error('network down');
@@ -264,6 +284,10 @@ describe('paid pool pins', () => {
         VALUES (?, 'engine-test', 'vendor/alpha', '', 0, 'case-a', 'done', 0, 20000, NULL, ?)`
       )
       .run(REQUEST_ID, AT);
+    // The confirmed target must still be a ready row that names its measuring run, or the
+    // callback withholds the pin; this test is about which alias is published, not about a
+    // withdrawn target (covered separately).
+    seedReadyProfile('vendor/alpha', 'run-ready');
     const request = await readPaidBenchmarkRequest(db, REQUEST_ID);
     if (!request) throw new Error('request missing');
     const published = await publishPaidPoolPins(env(), request);
@@ -337,5 +361,273 @@ describe('paid pool pins', () => {
     // A second close is a no-op: the store only closes preparing/active requests.
     await db.batch(completePaidBenchmarkRequestStatements(db, { requestId: REQUEST_ID }));
     expect((await readPaidBenchmarkRequest(db, REQUEST_ID))?.status).toBe('completed');
+  });
+
+  it('publishes a pin-only move only while its serving evidence is still ready', async () => {
+    const first = PLAN.pairs[0];
+    if (!first) throw new Error('fixture plan lost its pair');
+    const pinOnly: PaidBenchmarkPlan = {
+      ...PLAN,
+      pairs: [{ ...first, serving: true, missing: btoa('\0'), cost: [0] }],
+      counts: { reused: 3, covered: 0, shared: 0, exclusive: 0 },
+      estimateMicrodollars: 0,
+      maximumMicrodollars: 0,
+    };
+    seedRequest('completed');
+    sqlite.prepare('UPDATE paid_benchmark_quotes SET plan = ?').run(JSON.stringify(pinOnly));
+    sqlite
+      .prepare(
+        `INSERT INTO paid_benchmark_request_cases
+          (request_id, engine_identity, model, variant, rep, case_id, status, covered_by_kilo,
+            charged_microdollars, reason, updated_at)
+        VALUES (?, 'engine-test', 'vendor/alpha', '', 0, 'case-a', 'reused', 0, 0, NULL, ?)`
+      )
+      .run(REQUEST_ID, AT);
+    const completed = await readPaidBenchmarkRequest(db, REQUEST_ID);
+    if (!completed) throw new Error('request missing');
+    // The target has no ready profile: the reused row alone must not move the pin.
+    expect(await publishPaidPoolPins(env(), completed)).toEqual({
+      published: false,
+      reason: 'serving_evidence_gone',
+      retryable: false,
+    });
+    expect(pins).toHaveLength(0);
+
+    // A `ready` row with no `run_id` names no measuring run, so it is not serving evidence.
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles
+          (router, model, variant, engine_identity, repetitions, status, run_id, requested_at,
+            updated_at)
+        VALUES ('efficient', 'vendor/alpha', '', 'engine-test', 3, 'ready', NULL, ?, ?)`
+      )
+      .run(AT, AT);
+    expect(await publishPaidPoolPins(env(), completed)).toEqual({
+      published: false,
+      reason: 'serving_evidence_gone',
+      retryable: false,
+    });
+    expect(pins).toHaveLength(0);
+
+    // With the ready profile present, the same reused row publishes the exact target.
+    sqlite
+      .prepare(
+        `UPDATE benchmark_profiles SET run_id = 'run-ready'
+        WHERE model = 'vendor/alpha' AND engine_identity = 'engine-test'`
+      )
+      .run();
+    expect((await publishPaidPoolPins(env(), completed)).published).toBe(true);
+    expect(pins).toHaveLength(1);
+    expect(CustomRouterPoolPinsRequestSchema.parse(pins[0]).aliases).toEqual([
+      { model: '~vendor/latest', target: 'vendor/alpha' },
+    ]);
+  });
+
+  it('waits for a still-finalizing target, then pins it once it is ready', async () => {
+    seedRequest('completed');
+    sqlite
+      .prepare(
+        `INSERT INTO paid_benchmark_request_cases
+          (request_id, engine_identity, model, variant, rep, case_id, status, covered_by_kilo,
+            charged_microdollars, reason, updated_at)
+        VALUES (?, 'engine-test', 'vendor/alpha', '', 0, 'case-a', 'done', 0, 20000, NULL, ?)`
+      )
+      .run(REQUEST_ID, AT);
+    // The case rows settled but the registry finalization is still running (this is also what
+    // an alias-lease deferral looks like). The pin must not be dropped: it waits.
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles
+          (router, model, variant, engine_identity, repetitions, status, run_id, requested_at,
+            updated_at)
+        VALUES ('efficient', 'vendor/alpha', '', 'engine-test', 3, 'running', 'run-live', ?, ?)`
+      )
+      .run(AT, AT);
+    seedOutbox(`pins:${REQUEST_ID}`);
+    const pending = await drainPaidBillingOutbox(env(), { limit: 5, now: 0 });
+    expect(pending).toEqual({ delivered: 0, retried: 1, pinned: 0 });
+    expect(pins).toHaveLength(0);
+    // Still pending, so the intent survives for the next drain instead of being dropped.
+    expect(outboxStatus(`pins:${REQUEST_ID}`)).toBe('pending');
+
+    // Finalization completes: the same intent now delivers exactly once, at no extra cost.
+    sqlite
+      .prepare("UPDATE benchmark_profiles SET status = 'ready' WHERE model = 'vendor/alpha'")
+      .run();
+    const ready = await drainPaidBillingOutbox(env(), { limit: 5, now: 10 * 60 * 1000 });
+    expect(ready.pinned).toBe(1);
+    expect(pins).toHaveLength(1);
+    expect(outboxStatus(`pins:${REQUEST_ID}`)).toBe('delivered');
+    expect(CustomRouterPoolPinsRequestSchema.parse(pins[0]).aliases).toEqual([
+      { model: '~vendor/latest', target: 'vendor/alpha' },
+    ]);
+    expect(billing).toHaveLength(0);
+  });
+
+  it('withholds a withdrawn mixed target without blocking a ready sibling alias', async () => {
+    const first = PLAN.pairs[0];
+    if (!first) throw new Error('fixture plan lost its pair');
+    // A mixed plan: the alias target became serving after the quote (so its display row is a
+    // launch-time serving reuse) while a second pair is measured by this request.
+    const mixed: PaidBenchmarkPlan = {
+      ...PLAN,
+      pairs: [
+        { ...first, serving: true, missing: btoa('\0'), cost: [0] },
+        {
+          model: 'vendor/beta',
+          variant: '',
+          serving: false,
+          missing: btoa('\u0001'),
+          covered: btoa('\0'),
+          cost: [20_000],
+        },
+      ],
+      aliases: [
+        { model: '~vendor/latest', target: 'vendor/alpha' },
+        { model: '~vendor/other', target: 'vendor/beta' },
+      ],
+    };
+    seedRequest('completed');
+    sqlite.prepare('UPDATE paid_benchmark_quotes SET plan = ?').run(JSON.stringify(mixed));
+    // The serving row carries the marker the launch reconcile writes; the sibling is `done`.
+    const insertCase = sqlite.prepare(
+      `INSERT INTO paid_benchmark_request_cases
+        (request_id, engine_identity, model, variant, rep, case_id, status, covered_by_kilo,
+          charged_microdollars, reason, updated_at)
+      VALUES (?, 'engine-test', ?, '', 0, 'case-a', ?, 0, 0, ?, ?)`
+    );
+    insertCase.run(REQUEST_ID, 'vendor/alpha', 'reused', 'serving_reuse', AT);
+    insertCase.run(REQUEST_ID, 'vendor/beta', 'done', null, AT);
+    // Only the sibling's target still has ready provenance; the serving target was withdrawn.
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles
+          (router, model, variant, engine_identity, repetitions, status, run_id, requested_at,
+            updated_at)
+        VALUES ('efficient', 'vendor/beta', '', 'engine-test', 3, 'ready', 'run-ready', ?, ?)`
+      )
+      .run(AT, AT);
+    const completed = await readPaidBenchmarkRequest(db, REQUEST_ID);
+    if (!completed) throw new Error('request missing');
+
+    // The marker row alone must not pin the withdrawn target, and the ready sibling still pins.
+    expect(await publishPaidPoolPins(env(), completed)).toMatchObject({ published: true });
+    expect(pins).toHaveLength(1);
+    expect(CustomRouterPoolPinsRequestSchema.parse(pins[0]).aliases).toEqual([
+      { model: '~vendor/other', target: 'vendor/beta' },
+    ]);
+
+    // With no ready target left the callback withholds entirely, so nothing is invented.
+    sqlite.prepare("DELETE FROM benchmark_profiles WHERE model = 'vendor/beta'").run();
+    pins.length = 0;
+    expect(await publishPaidPoolPins(env(), completed)).toEqual({
+      published: false,
+      reason: 'serving_evidence_gone',
+      retryable: false,
+    });
+    expect(pins).toHaveLength(0);
+  });
+
+  it('waits while a sibling target is finalizing, then publishes both once', async () => {
+    const first = PLAN.pairs[0];
+    if (!first) throw new Error('fixture plan lost its pair');
+    const mixed: PaidBenchmarkPlan = {
+      ...PLAN,
+      pairs: [
+        { ...first, serving: true, missing: btoa('\0'), cost: [0] },
+        {
+          model: 'vendor/beta',
+          variant: '',
+          serving: true,
+          missing: btoa('\0'),
+          covered: btoa('\0'),
+          cost: [0],
+        },
+      ],
+      aliases: [
+        { model: '~vendor/latest', target: 'vendor/alpha' },
+        { model: '~vendor/other', target: 'vendor/beta' },
+      ],
+    };
+    seedRequest('completed');
+    sqlite.prepare('UPDATE paid_benchmark_quotes SET plan = ?').run(JSON.stringify(mixed));
+    sqlite
+      .prepare(
+        `INSERT INTO paid_benchmark_request_cases
+          (request_id, engine_identity, model, variant, rep, case_id, status, covered_by_kilo,
+            charged_microdollars, updated_at)
+        VALUES (?, 'engine-test', 'vendor/alpha', '', 0, 'case-a', 'reused', 0, 0, ?),
+               (?, 'engine-test', 'vendor/beta', '', 0, 'case-a', 'done', 0, 20000, ?)`
+      )
+      .run(REQUEST_ID, AT, REQUEST_ID, AT);
+    seedReadyProfile('vendor/alpha', 'run-alpha');
+    // beta's registry row exists but is still finalizing.
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles
+          (router, model, variant, engine_identity, repetitions, status, run_id, requested_at,
+            updated_at)
+        VALUES ('efficient', 'vendor/beta', '', 'engine-test', 3, 'running', 'run-beta', ?, ?)`
+      )
+      .run(AT, AT);
+    seedOutbox(`pins:${REQUEST_ID}`);
+
+    // A ready sibling must NOT be delivered alone: one intent delivers once, so delivering now
+    // would permanently drop the sibling still finalizing.
+    const waiting = await drainPaidBillingOutbox(env(), { limit: 5, now: 0 });
+    expect(waiting).toEqual({ delivered: 0, retried: 1, pinned: 0 });
+    expect(pins).toHaveLength(0);
+    expect(outboxStatus(`pins:${REQUEST_ID}`)).toBe('pending');
+
+    // Terminal readiness publishes both aliases in the one intent.
+    sqlite
+      .prepare("UPDATE benchmark_profiles SET status = 'ready' WHERE model = 'vendor/beta'")
+      .run();
+    const delivered = await drainPaidBillingOutbox(env(), { limit: 5, now: 10 * 60 * 1000 });
+    expect(delivered.pinned).toBe(1);
+    expect(pins).toHaveLength(1);
+    expect(outboxStatus(`pins:${REQUEST_ID}`)).toBe('delivered');
+    expect(CustomRouterPoolPinsRequestSchema.parse(pins[0]).aliases).toEqual([
+      { model: '~vendor/latest', target: 'vendor/alpha' },
+      { model: '~vendor/other', target: 'vendor/beta' },
+    ]);
+    expect(billing).toHaveLength(0);
+  });
+
+  it('keeps both effort variants of one target, publishing while either is ready', async () => {
+    const first = PLAN.pairs[0];
+    if (!first) throw new Error('fixture plan lost its pair');
+    // Two effort variants of the same model: a map keyed by model would keep only one, so a
+    // ready high variant could be lost behind a still-finalizing low one (or the reverse).
+    const twoVariants: PaidBenchmarkPlan = {
+      ...PLAN,
+      pairs: [
+        { ...first, serving: true, missing: btoa('\0'), cost: [0] },
+        { ...first, variant: 'high', serving: true, missing: btoa('\0'), cost: [0] },
+      ],
+    };
+    seedRequest('completed');
+    sqlite.prepare('UPDATE paid_benchmark_quotes SET plan = ?').run(JSON.stringify(twoVariants));
+    sqlite
+      .prepare(
+        `INSERT INTO paid_benchmark_request_cases
+          (request_id, engine_identity, model, variant, rep, case_id, status, covered_by_kilo,
+            charged_microdollars, updated_at)
+        VALUES (?, 'engine-test', 'vendor/alpha', '', 0, 'case-a', 'reused', 0, 0, ?)`
+      )
+      .run(REQUEST_ID, AT);
+    // The default variant is ready; the high variant is still finalizing.
+    seedReadyProfile('vendor/alpha', 'run-default', '');
+    seedReadyProfile('vendor/alpha', 'run-high', 'high');
+    sqlite.prepare("UPDATE benchmark_profiles SET status = 'running' WHERE variant = 'high'").run();
+    const request = await readPaidBenchmarkRequest(db, REQUEST_ID);
+    if (!request) throw new Error('request missing');
+
+    // The ready variant publishes the alias; the pending variant must not clobber it.
+    expect((await publishPaidPoolPins(env(), request)).published).toBe(true);
+    expect(pins).toHaveLength(1);
+    expect(CustomRouterPoolPinsRequestSchema.parse(pins[0]).aliases).toEqual([
+      { model: '~vendor/latest', target: 'vendor/alpha' },
+    ]);
   });
 });

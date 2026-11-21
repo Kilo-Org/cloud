@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { ACTIVE_MEASUREMENT_REVISION, deciderCasesForRouter } from './measurement-revision';
 import { BenchmarkPaidPlanError, computeEngineIdentity, startPaidRequestRun } from './run';
+import { SERVING_RECONCILE_INCOMPLETE_REASON, SERVING_REUSE_CASE_MARKER } from './paid-case-store';
 
 /**
  * A first paid request for a pool the platform has never measured — the R09 case. On real
@@ -547,6 +548,290 @@ describe('first paid request for an unmeasured pair (production migrations)', ()
       .prepare('SELECT model FROM run_models WHERE run_id = ? ORDER BY model')
       .all(result.runId!) as { model: string }[];
     expect(models).toEqual([{ model: 'vendor/alpha' }]);
+    expect(providerCalls).toBe(0);
+  });
+
+  it('reuses a pair that became ready after the quote instead of remeasuring it', async () => {
+    // The freeze happens at quote time. Here the quote priced BOTH pairs as unmeasured, then
+    // `vendor/x` became ready (revision 2) before the click. A stale ready profile already
+    // ranks X, so remeasuring it — including the revision-3 probe cases — would bill the owner
+    // for a pair that serves. X must be reused from that evidence; only Y is measured.
+    const requestId = seedActiveRequest([
+      { model: 'vendor/x', variant: '' },
+      { model: 'vendor/alpha', variant: '' },
+    ]);
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles
+          (router, model, variant, engine_identity, repetitions, status, run_id,
+            requested_at, updated_at, completed_at, platform_requested, user_requested)
+        VALUES ('efficient', 'vendor/x', '', ?, 3, 'ready', 'mature-x-run', ?, ?, ?, 0, 0)`
+      )
+      .run(
+        engineIdentity,
+        '2026-10-01T00:00:00.000Z',
+        '2026-10-01T00:00:00.000Z',
+        '2026-10-01T00:00:00.000Z'
+      );
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_runs
+          (id, router, kind, purpose, status, started_at, completed_at, min_accuracy,
+            switch_cost_factor, max_concurrency, repetitions, engine_identity,
+            benchmark_user_id, benchmark_org_id, measurement_revision, admission_marker)
+        VALUES ('mature-x-run', 'efficient', 'decider', 'user', 'completed',
+          '2026-10-01T00:00:00.000Z', '2026-10-01T01:00:00.000Z', 0.7, 3, 0, 3, ?,
+          'bot-internal-1', 'bench-org', 2, 'admitted:seed')`
+      )
+      .run(engineIdentity);
+
+    const before = profileRow('vendor/x');
+    const result = await startPaidRequestRun(env, requestId);
+
+    // Only Y is claimed; X contributes no claim and no re-measure, and its profile stands.
+    expect(result).toEqual({ runId: `user-paid-${requestId}`, claimed: 1, skipped: [] });
+    expect(profileRow('vendor/x')).toEqual(before!);
+    expect(
+      countRows('SELECT COUNT(*) AS n FROM profile_remeasures WHERE run_id = ?', result.runId)
+    ).toBe(0);
+    expect(
+      countRows('SELECT COUNT(*) AS n FROM profile_remeasures WHERE model = ?', 'vendor/x')
+    ).toBe(0);
+    expect(
+      sqlite
+        .prepare('SELECT model FROM run_models WHERE run_id = ? ORDER BY model')
+        .all(result.runId!)
+    ).toEqual([{ model: 'vendor/alpha' }]);
+    // X's own staged rows are now reuse evidence, not live work: nothing waits on them.
+    expect(
+      countRows(
+        `SELECT COUNT(*) AS n FROM paid_benchmark_request_cases
+        WHERE request_id = ? AND model = 'vendor/x' AND status IN ('queued', 'running')`,
+        requestId
+      )
+    ).toBe(0);
+    expect(
+      countRows(
+        `SELECT COUNT(*) AS n FROM paid_benchmark_request_cases
+        WHERE request_id = ? AND model = 'vendor/x' AND status = 'reused'`,
+        requestId
+      )
+    ).toBe(cases.length * REPETITIONS);
+    // Y still launches independently, and nothing reaches a provider from a launch.
+    expect(sent).toEqual([
+      { runId: result.runId, kind: 'decider', model: 'vendor/alpha', schedulerWake: true },
+    ]);
+    expect(providerCalls).toBe(0);
+  });
+
+  it('completes a fully now-ready request with its pin intent and starts no run', async () => {
+    // Both pairs were quoted unmeasured and both became ready before the click. There is no
+    // work left, so the request completes in the launch batch together with the durable pin
+    // intent the outbox drain delivers — never a run, a claim or a provider call.
+    const requestId = seedActiveRequest([
+      { model: 'vendor/x', variant: '' },
+      { model: 'vendor/alpha', variant: '' },
+    ]);
+    for (const model of ['vendor/x', 'vendor/alpha'])
+      sqlite
+        .prepare(
+          `INSERT INTO benchmark_profiles
+            (router, model, variant, engine_identity, repetitions, status, run_id,
+              requested_at, updated_at, completed_at, platform_requested, user_requested)
+          VALUES ('efficient', ?, '', ?, 3, 'ready', ?, ?, ?, ?, 0, 0)`
+        )
+        .run(
+          model,
+          engineIdentity,
+          `mature-${model}`,
+          '2026-10-01T00:00:00.000Z',
+          '2026-10-01T00:00:00.000Z',
+          '2026-10-01T00:00:00.000Z'
+        );
+
+    const result = await startPaidRequestRun(env, requestId);
+
+    expect(result).toEqual({ runId: null, claimed: 0, skipped: ['already_ready'] });
+    expect(runCount()).toBe(0);
+    expect(sent).toEqual([]);
+    expect(providerCalls).toBe(0);
+    expect(
+      sqlite.prepare('SELECT status FROM paid_benchmark_requests WHERE id = ?').get(requestId)
+    ).toEqual({ status: 'completed' });
+    expect(
+      sqlite.prepare('SELECT id, kind, status FROM paid_benchmark_billing_outbox').all()
+    ).toEqual([{ id: `pins:${requestId}`, kind: 'pins', status: 'pending' }]);
+    // No display row is left live.
+    expect(
+      countRows(
+        `SELECT COUNT(*) AS n FROM paid_benchmark_request_cases
+        WHERE request_id = ? AND status IN ('queued', 'running')`,
+        requestId
+      )
+    ).toBe(0);
+  });
+
+  it('does not measure a pair whose serving reuse already committed, after it stops being ready', async () => {
+    // The crash-after-success window: a prior activation reconciled X to `reused` and died
+    // before claiming Y. X's profile is withdrawn before the retry, so a registry re-read
+    // would call X never-ready and measure it — spend the request already decided against.
+    // The committed display rows are the durable authority.
+    const requestId = seedActiveRequest([
+      { model: 'vendor/x', variant: '' },
+      { model: 'vendor/alpha', variant: '' },
+    ]);
+    // X's every row was converted by an earlier serving reconcile: `reused` plus the marker.
+    sqlite
+      .prepare(
+        `UPDATE paid_benchmark_request_cases SET status = 'reused', reason = ?
+        WHERE request_id = ? AND model = 'vendor/x'`
+      )
+      .run(SERVING_REUSE_CASE_MARKER, requestId);
+    // ...and its serving evidence is gone.
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles
+          (router, model, variant, engine_identity, repetitions, status, run_id,
+            requested_at, updated_at, platform_requested, user_requested)
+        VALUES ('efficient', 'vendor/x', '', ?, 3, 'pending', NULL, ?, ?, 0, 0)`
+      )
+      .run(engineIdentity, '2026-10-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z');
+
+    const result = await startPaidRequestRun(env, requestId);
+
+    // Only the sibling is measured; X is neither claimed nor remeasured.
+    expect(result).toEqual({ runId: `user-paid-${requestId}`, claimed: 1, skipped: [] });
+    expect(
+      countRows('SELECT COUNT(*) AS n FROM profile_remeasures WHERE model = ?', 'vendor/x')
+    ).toBe(0);
+    expect(
+      sqlite
+        .prepare('SELECT model FROM run_models WHERE run_id = ? ORDER BY model')
+        .all(result.runId!)
+    ).toEqual([{ model: 'vendor/alpha' }]);
+    expect(
+      sqlite
+        .prepare(
+          `SELECT status, run_id FROM benchmark_profiles
+          WHERE model = 'vendor/x' AND variant = '' AND engine_identity = ? AND repetitions = 3`
+        )
+        .get(engineIdentity)
+    ).toEqual({ status: 'pending', run_id: null });
+    expect(sent).toEqual([
+      { runId: result.runId, kind: 'decider', model: 'vendor/alpha', schedulerWake: true },
+    ]);
+    expect(providerCalls).toBe(0);
+  });
+
+  it('still launches zero-provider materialization for an all-historically-reused pair', async () => {
+    // Ordinary historical reuse (paid-benchmark.ts stages every draw `reused` with no marker)
+    // is NOT a serving decision: the pair has no ready profile yet, so the launch must claim
+    // it and let the reuse copier ready it with zero provider calls. Only the serving marker
+    // may suppress that, or shared activation would silently stop working.
+    const requestId = seedActiveRequest([{ model: 'vendor/alpha', variant: '' }]);
+    sqlite
+      .prepare(
+        `UPDATE paid_benchmark_request_cases SET status = 'reused', reason = NULL
+        WHERE request_id = ?`
+      )
+      .run(requestId);
+
+    const result = await startPaidRequestRun(env, requestId);
+
+    expect(result).toEqual({ runId: `user-paid-${requestId}`, claimed: 1, skipped: [] });
+    expect(
+      sqlite.prepare('SELECT model FROM run_models WHERE run_id = ?').all(result.runId!)
+    ).toEqual([{ model: 'vendor/alpha' }]);
+    expect(sent).toEqual([
+      { runId: result.runId, kind: 'decider', model: 'vendor/alpha', schedulerWake: true },
+    ]);
+    expect(providerCalls).toBe(0);
+  });
+
+  it('durably fails when readiness withdrew, and a second activation cannot launch', async () => {
+    // The launch reads readiness, then reconciles. If the serving profile is withdrawn in
+    // that window, the reconcile cannot move this request's rows. The pair's lifecycle is
+    // therefore unproven, and inserting a remeasure would be fail-open spend — worse, a JS-only
+    // deferral would let the NEXT activation see the pair as never-ready and measure it. The
+    // guard closes the request in the reconcile batch itself, so nothing can re-enter.
+    const requestId = seedActiveRequest([
+      { model: 'vendor/x', variant: '' },
+      { model: 'vendor/alpha', variant: '' },
+    ]);
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles
+          (router, model, variant, engine_identity, repetitions, status, run_id,
+            requested_at, updated_at, completed_at, platform_requested, user_requested)
+        VALUES ('efficient', 'vendor/x', '', ?, 3, 'ready', 'mature-x-run', ?, ?, ?, 0, 0)`
+      )
+      .run(
+        engineIdentity,
+        '2026-10-01T00:00:00.000Z',
+        '2026-10-01T00:00:00.000Z',
+        '2026-10-01T00:00:00.000Z'
+      );
+
+    // Withdraw the serving evidence exactly between the launch's readiness read and its
+    // reconcile: the wrapper runs the withdrawal the first time the reconcile SQL is prepared.
+    const reconcileSql = `SET status = 'reused', reason = ?`;
+    const baseDb = sqliteD1(sqlite);
+    let withdrew = false;
+    const db = {
+      prepare(sqlText: string) {
+        if (sqlText.includes(reconcileSql) && !withdrew) {
+          withdrew = true;
+          sqlite
+            .prepare(
+              "UPDATE benchmark_profiles SET status = 'pending', run_id = NULL WHERE model = 'vendor/x'"
+            )
+            .run();
+        }
+        return baseDb.prepare(sqlText);
+      },
+      batch(statements: D1PreparedStatement[]) {
+        return baseDb.batch(statements);
+      },
+      exec(sqlText: string) {
+        return baseDb.exec(sqlText);
+      },
+    } as unknown as D1Database;
+    const envWithHook = { ...env, BENCH_DB: db } as unknown as Env;
+
+    const result = await startPaidRequestRun(envWithHook, requestId);
+
+    // The request is terminally failed with a retryable, fresh-estimate reason.
+    expect(result).toEqual({ runId: null, claimed: 0, skipped: ['request_not_active'] });
+    const requestRow = sqlite
+      .prepare(
+        'SELECT status, failure_reason, failure_retryable FROM paid_benchmark_requests WHERE id = ?'
+      )
+      .get(requestId);
+    expect(requestRow).toEqual({
+      status: 'failed',
+      failure_reason: SERVING_RECONCILE_INCOMPLETE_REASON,
+      failure_retryable: 1,
+    });
+    // No remeasure, no enrollment, no run, no provider, and no live display row left.
+    expect(
+      countRows('SELECT COUNT(*) AS n FROM profile_remeasures WHERE model = ?', 'vendor/x')
+    ).toBe(0);
+    expect(runCount()).toBe(0);
+    expect(sent).toEqual([]);
+    expect(providerCalls).toBe(0);
+    expect(
+      countRows(
+        `SELECT COUNT(*) AS n FROM paid_benchmark_request_cases
+        WHERE request_id = ? AND status IN ('queued', 'running')`,
+        requestId
+      )
+    ).toBe(0);
+
+    // The durable state is the fence: a second activation cannot launch the pair either.
+    const second = await startPaidRequestRun(env, requestId);
+    expect(second).toEqual({ runId: null, claimed: 0, skipped: ['request_not_active'] });
+    expect(runCount()).toBe(0);
+    expect(sent).toEqual([]);
     expect(providerCalls).toBe(0);
   });
 

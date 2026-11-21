@@ -200,6 +200,28 @@ export async function hasScheduledChunks(db: D1Database, runId: string): Promise
   return row !== null;
 }
 
+/**
+ * Records an already-settled run as scheduler-initialized, so the settled-run sweep keeps
+ * retrying its finalization. Used when a ready publication was deferred and the run has no
+ * marker yet: without it, dispatch would have to materialize the run (writing the marker)
+ * before the sweep could see it. The insert refuses while any chunk is unsettled, so it only
+ * marks a run whose scheduled work is already accounted for.
+ */
+export async function markSettledRunInitialized(db: D1Database, runId: string): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO scheduler_runs (run_id)
+      SELECT ?1
+      WHERE NOT EXISTS (
+        SELECT 1 FROM scheduler_chunks
+        WHERE run_id = ?1 AND status IN ('pending', 'queued', 'active')
+      )
+      ON CONFLICT DO NOTHING`
+    )
+    .bind(runId)
+    .run();
+}
+
 /** Rows each lane of a run already holds; exported for the query-plan regression test. */
 export const SCHEDULER_MATERIALIZED_LANES_SQL = `
   SELECT model, variant, rep, COUNT(*) AS written, MAX(chunk) AS last

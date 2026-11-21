@@ -96,12 +96,10 @@ const GatewayCustomRouterEntryRefSchema = z.object({
 });
 
 /**
- * The concrete gateway model a saved pool entry keeps serving after its `*-latest` alias moves
- * (ADR 0005). Only the benchmark worker's settlement callback writes it, through the web's
- * internal pool-pins endpoint; clients never send it. `confirmedAt` is the quote's confirmation
- * time and orders pins, so a slow older request can never overwrite a newer quote's pin;
- * `pinnedAt` is when this row was written. Both order fields stay optional so a pin written by an
- * older build still parses, and such a pin counts as the oldest.
+ * A concrete target kept by a pool after an alias moves (ADR 0005). The server records an
+ * observed target at promotion or a confirmed target after the owner clicks. Clients cannot
+ * write either. A confirmation takes precedence over an observation and orders later callbacks.
+ * Pins without a confirmation time are older than every confirmation.
  */
 export const CustomRouterServingPinSchema = z.object({
   model: z
@@ -112,6 +110,7 @@ export const CustomRouterServingPinSchema = z.object({
   pinnedAt: z.iso.datetime(),
   requestId: z.uuid().optional(),
   confirmedAt: z.iso.datetime().optional(),
+  source: z.literal('observed').optional(),
 });
 export type CustomRouterServingPin = z.infer<typeof CustomRouterServingPinSchema>;
 
@@ -467,6 +466,9 @@ export const CustomRouterDecisionSchema = z
     // True when no routing decision named a servable entry, so the default or first servable
     // entry was used. taskType and subtaskType still report the classification, if any.
     fallback: z.boolean(),
+    // True only when a pinned alias entry had to serve its live alias target because the pinned
+    // concrete target left the catalog. Optional so a not-yet-redeployed worker still parses.
+    servingFallback: z.literal(true).optional(),
     sticky: z.boolean(),
     taskType: ClassifierTaskTypeSchema.nullable(),
     subtaskType: ClassifierSubtaskTypeSchema.nullable(),
@@ -491,15 +493,50 @@ export const AUTO_DECISION_TTL_MS = 5 * 60 * 1000;
 const AUTO_DECISION_CLOCK_SKEW_MS = 30 * 1000;
 const AUTO_DECISION_TOKEN_VERSION = 'v1';
 
-export const AutoDecisionPayloadSchema = z.object({
-  userId: z.string().min(1),
-  organizationId: z.string().min(1).nullable(),
-  routerModelId: z.string().min(1),
-  model: z.string().min(1),
-  variant: z.string().min(1).nullable(),
-  // Epoch milliseconds.
-  expiresAt: z.number().int().nonnegative(),
-});
+export const AutoDecisionPayloadSchema = z
+  .object({
+    userId: z.string().min(1),
+    organizationId: z.string().min(1).nullable(),
+    routerModelId: z.string().min(1),
+    model: z.string().min(1),
+    variant: z.string().min(1).nullable(),
+    // The saved gateway entry this decision's pool picked, so the gateway re-checks that pool
+    // instead of trusting the token's model alone.
+    entryModel: z.string().min(1).optional(),
+    // Signed only when the entry's pinned target left the catalog and its live alias target
+    // served instead; without it a bare alias under a saved pin is stale, not a fallback.
+    servingFallback: z.literal(true).optional(),
+    // The saved pin the fallback was proven against, so it cannot authorize another entry.
+    servingPinModel: z.string().min(1).optional(),
+    // The concrete target the alias's stored target proved at signing. A move after signing would
+    // serve a different model than the worker ranked, so the target is signed and re-checked.
+    servingFallbackTarget: z.string().min(1).optional(),
+    // Epoch milliseconds.
+    expiresAt: z.number().int().nonnegative(),
+  })
+  .superRefine((payload, ctx) => {
+    if (payload.servingFallback === undefined) {
+      for (const field of ['servingPinModel', 'servingFallbackTarget'] as const) {
+        if (payload[field] !== undefined) {
+          ctx.addIssue({
+            code: 'custom',
+            path: [field],
+            message: `${field} needs servingFallback`,
+          });
+        }
+      }
+      return;
+    }
+    for (const field of ['entryModel', 'servingPinModel', 'servingFallbackTarget'] as const) {
+      if (payload[field] === undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [field],
+          message: `servingFallback needs ${field}`,
+        });
+      }
+    }
+  });
 export type AutoDecisionPayload = z.infer<typeof AutoDecisionPayloadSchema>;
 
 export type AutoDecisionVerification =

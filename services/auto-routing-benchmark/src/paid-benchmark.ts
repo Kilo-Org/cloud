@@ -63,7 +63,9 @@ import {
 } from './paid-case-store';
 import {
   PaidBenchmarkPlanSchema,
+  SERVING_EVIDENCE_GONE_REASON,
   buildPaidBenchmarkPlan,
+  isPinOnlyPlan,
   ownerOf,
   planSlotAt,
   planSlotCount,
@@ -74,6 +76,7 @@ import {
   readPairPendingOutputs,
   readPairStoredDraws,
   readPlatformRequestedPairs,
+  readServingPairsStillReady,
   stableStringify,
   type PaidBenchmarkPlan,
 } from './paid-benchmark-plan';
@@ -190,9 +193,17 @@ export async function stagePaidBenchmarkRequest(
       status: 'aborted',
       reason: 'The quoted case set does not match this pool; request a new estimate.',
     };
+  // A pin-move quote promises every slot as an already-served reuse: the pin may only move onto
+  // a target whose ready profile still exists. Re-read exactly those pairs before the first
+  // write, so a measurement that disappeared between quote and click refuses instead of
+  // enqueuing a pin onto evidence that is gone. A request that already staged a slot is past
+  // that decision, so the check is skipped on a resumed or replayed staging pass. It reads the
+  // plan's own pairs only and creates no measurement.
   const minimums = minimumCaseRevisions(plan.router, plan.revision);
   let budget = options.budgetSlots ?? STAGE_BUDGET_SLOTS;
   let counts = await readRequestCounts(db, request.id);
+  if (counts.total === 0 && isPinOnlyPlan(plan) && !(await readServingPairsStillReady(db, plan)))
+    return { status: 'aborted', reason: SERVING_EVIDENCE_GONE_REASON };
   while (counts.total < total && budget > 0) {
     const start = counts.total;
     const slice: { pairIndex: number; caseIndex: number; rep: number }[] = [];
@@ -473,9 +484,10 @@ async function launchPaidRun(
   if (outcome.runId !== null) return 'started';
   if (outcome.skipped.includes('pairs_claimed')) return 'attached';
   // Every other skip is benign for this request: it is already settled (`nothing_left`,
-  // `already_ready`), not live (`request_not_active`), already launched (`run_exists`), or
-  // waiting on capacity (`queue_full`). None of them strand the request, so none of them is
-  // a failure — a later reconcile resumes or the request settles on its own.
+  // `already_ready`), not live (`request_not_active` — including a request a reconcile guard
+  // just failed, which is durable and terminal), already launched (`run_exists`), or waiting on
+  // capacity (`queue_full`). None of them strand the request, so none of them is a failure — a
+  // later reconcile resumes or the request settles on its own.
   return 'attached';
 }
 
@@ -654,6 +666,12 @@ async function startPaidBenchmark(
       retryable: true,
     };
   if (!aliases) return { status: 'quote_mismatch', reason: 'alias_moved' };
+  // A pin-move quote's whole promise is that every pair is already served. If that ready
+  // evidence disappeared after the quote, refuse before consuming the quote so the owner
+  // neither spends nor pins onto a target with no usable measurement; a fresh estimate is the
+  // only way forward. This reads the plan's own pairs and creates no measurement.
+  if (isPinOnlyPlan(plan) && !(await readServingPairsStillReady(db, plan)))
+    return { status: 'blocked', reason: SERVING_EVIDENCE_GONE_REASON, retryable: true };
 
   const requestId = crypto.randomUUID();
   const created = await db.batch(

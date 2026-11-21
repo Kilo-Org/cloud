@@ -25,6 +25,7 @@ import {
   registerPaidBenchmarkRoutes,
 } from './paid-benchmark';
 import { selectPaidModelRequestPayerStatements } from './paid-case-store';
+import { SERVING_EVIDENCE_GONE_REASON } from './paid-benchmark-plan';
 import { computeEngineIdentity } from './run';
 
 const CATALOG = {
@@ -379,6 +380,317 @@ describe('paid benchmark reuse', () => {
     expect(progress.counts.reused).toBe(SLOTS);
     expect(billing).toHaveLength(0);
   });
+
+  it('quotes zero to move a saved pin onto a ready shared target', async () => {
+    const ALIAS = '~vendor/latest';
+    const OLD_TARGET = 'vendor/old-target';
+    const NEW_TARGET = 'vendor/alpha';
+    // The alias moved to vendor/alpha and another pool's shared result already readied it;
+    // this pool still pins the old target, so its only remaining decision is that move.
+    catalog = {
+      data: [...CATALOG.data, { id: ALIAS, alias_target: NEW_TARGET, pricing: null }],
+    };
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles
+          (router, model, variant, engine_identity, repetitions, status, run_id, requested_at,
+            updated_at)
+        VALUES ('efficient', 'vendor/alpha', 'high', ?, 3, 'ready', 'run-ready',
+          '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`
+      )
+      .run(ENGINE);
+    const context = {
+      ...CONTEXT,
+      entries: [
+        {
+          kind: 'gateway' as const,
+          model: ALIAS,
+          servingPin: { model: OLD_TARGET, pinnedAt: '2026-01-01T00:00:00.000Z' },
+        },
+      ],
+    };
+    const quoteResponse = await post({
+      action: 'quote',
+      ownerType: 'user',
+      ownerId: 'user-1',
+      routerId: ROUTER_ID,
+      poolVersion: 'pool-v1',
+      poolSlug: 'pool-one',
+      context,
+    });
+    expect(quoteResponse.status).toBe(200);
+    const quoted = await parseBody(quoteResponse, PaidBenchmarkQuoteSchema);
+    expect(quoted.status).toBe('ready');
+    if (quoted.status !== 'ready') return;
+    // A zero-dollar ready quote: every slot is a free reuse of the already measured target.
+    expect(quoted.estimateMicrodollars).toBe(0);
+    expect(quoted.maximumMicrodollars).toBe(0);
+    expect(quoted.cases).toEqual({ reused: SLOTS, covered: 0, shared: 0, exclusive: 0 });
+    expect(quoted.aliases).toEqual([{ model: ALIAS, target: NEW_TARGET }]);
+
+    // Nothing runs or is queued before the owner explicitly clicks.
+    expect(countRows('SELECT COUNT(*) AS count FROM paid_benchmark_requests')).toBe(0);
+    expect(countRows('SELECT COUNT(*) AS count FROM paid_benchmark_request_cases')).toBe(0);
+    expect(countRows('SELECT COUNT(*) AS count FROM benchmark_case_runs')).toBe(0);
+    expect(countRows('SELECT COUNT(*) AS count FROM paid_model_requests')).toBe(0);
+    expect(billing).toHaveLength(0);
+    expect(pins).toHaveLength(0);
+
+    const started = await startResult(await post(startRequest(quoted.id, { context })));
+    if (started.status !== 'started') throw new Error('start refused');
+    let progress = started.request;
+    for (let attempt = 0; attempt < 20 && progress.status === 'preparing'; attempt += 1)
+      progress = await progressBody(await post(progressRequest()));
+    expect(progress.status).toBe('completed');
+    if (progress.status !== 'completed') return;
+    expect(progress.chargedMicrodollars).toBe(0);
+    expect(progress.counts.reused).toBe(SLOTS);
+    // Reuse only: no benchmark case run, permit or usage exists for the move.
+    expect(countRows('SELECT COUNT(*) AS count FROM benchmark_case_runs')).toBe(0);
+    expect(countRows('SELECT COUNT(*) AS count FROM paid_model_requests')).toBe(0);
+    expect(billing).toHaveLength(0);
+
+    // The real drain publishes the exact alias and target the owner confirmed.
+    await reconcilePaidBenchmarkRequests(paidBindings(db));
+    expect(pins).toHaveLength(1);
+    const pinsBody = CustomRouterPoolPinsRequestSchema.parse(pins[0]?.body);
+    expect(pinsBody).toMatchObject({
+      routerId: ROUTER_ID,
+      ownerType: 'user',
+      ownerId: 'user-1',
+      poolVersion: 'pool-v1',
+      aliases: [{ model: ALIAS, target: NEW_TARGET }],
+    });
+    expect(pinsBody.requestId).toBe(startedRequestId(progress));
+    expect(
+      countRows(
+        "SELECT COUNT(*) AS count FROM paid_benchmark_billing_outbox WHERE status = 'delivered'"
+      )
+    ).toBe(1);
+
+    // Replaying the same confirmation delivers nothing again and spends nothing.
+    const replay = await startResult(await post(startRequest(quoted.id, { context })));
+    expect(replay.status).toBe('started');
+    await reconcilePaidBenchmarkRequests(paidBindings(db));
+    expect(pins).toHaveLength(1);
+    expect(countRows('SELECT COUNT(*) AS count FROM paid_benchmark_requests')).toBe(1);
+    expect(countRows('SELECT COUNT(*) AS count FROM benchmark_case_runs')).toBe(0);
+    expect(billing).toHaveLength(0);
+
+    // Once the saved pin names the current target there is nothing left to ask for.
+    const settled = await post({
+      action: 'quote',
+      ownerType: 'user',
+      ownerId: 'user-1',
+      routerId: ROUTER_ID,
+      poolVersion: 'pool-v1',
+      poolSlug: 'pool-one',
+      context: {
+        ...CONTEXT,
+        entries: [
+          {
+            kind: 'gateway' as const,
+            model: ALIAS,
+            servingPin: { model: NEW_TARGET, pinnedAt: '2026-01-02T00:00:00.000Z' },
+          },
+        ],
+      },
+    });
+    expect(await parseBody(settled, PaidBenchmarkQuoteSchema)).toEqual({ status: 'empty' });
+  });
+
+  it('completes and pins a mixed quote when its new target readies before the click', async () => {
+    const ALIAS = '~vendor/latest';
+    catalog = {
+      data: [...CATALOG.data, { id: ALIAS, alias_target: 'vendor/alpha', pricing: null }],
+    };
+    // The launcher resolves the run identity before it reads the plan, and the shared fixture
+    // seeds a saved override the bot-token mint refuses. A real deployment runs an internal
+    // bot user, so install one to reach the branch under test instead of failing on config.
+    sqlite.prepare(`UPDATE benchmark_config SET benchmark_user_id = 'bot-internal-1'`).run();
+    // The serving alias target is already measured; the new concrete target is not.
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles
+          (router, model, variant, engine_identity, repetitions, status, run_id, requested_at,
+            updated_at)
+        VALUES ('efficient', 'vendor/alpha', 'high', ?, 3, 'ready', 'run-ready',
+          '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`
+      )
+      .run(ENGINE);
+    const context = {
+      ...CONTEXT,
+      entries: [
+        { kind: 'gateway' as const, model: ALIAS },
+        { kind: 'gateway' as const, model: 'vendor/cheap' },
+      ],
+    };
+    const quoted = await parseBody(
+      await post({
+        action: 'quote',
+        ownerType: 'user',
+        ownerId: 'user-1',
+        routerId: ROUTER_ID,
+        poolVersion: 'pool-v1',
+        poolSlug: 'pool-one',
+        context,
+      }),
+      PaidBenchmarkQuoteSchema
+    );
+    expect(quoted.status).toBe('ready');
+    if (quoted.status !== 'ready') return;
+    // Only the new target is demand; the alias target is a free reuse.
+    expect(quoted.cases).toEqual({ reused: SLOTS, covered: 0, shared: 0, exclusive: SLOTS });
+    expect(quoted.aliases).toEqual([{ model: ALIAS, target: 'vendor/alpha' }]);
+
+    // Another measurement readies the new target before this owner clicks. The launch then
+    // finds every non-serving quoted pair ready and completes without claiming a run.
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles
+          (router, model, variant, engine_identity, repetitions, status, run_id, requested_at,
+            updated_at)
+        VALUES ('efficient', 'vendor/cheap', '', ?, 3, 'ready', 'run-ready',
+          '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`
+      )
+      .run(ENGINE);
+
+    const started = await startResult(await post(startRequest(quoted.id, { context })));
+    if (started.status !== 'started') throw new Error('start refused');
+    let progress = started.request;
+    for (let attempt = 0; attempt < 20 && progress.status === 'preparing'; attempt += 1)
+      progress = await progressBody(await post(progressRequest()));
+    expect(progress.status).toBe('completed');
+    if (progress.status !== 'completed') return;
+    // Nothing was measured or charged: every target already serves, so completion cancels the
+    // staged placeholder rows and claims no run.
+    expect(progress.chargedMicrodollars).toBe(0);
+    expect(
+      countRows(
+        "SELECT COUNT(*) AS count FROM benchmark_case_runs WHERE status IN ('queued', 'running')"
+      )
+    ).toBe(0);
+    expect(countRows('SELECT COUNT(*) AS count FROM benchmark_runs')).toBe(0);
+    expect(countRows('SELECT COUNT(*) AS count FROM paid_model_requests')).toBe(0);
+    expect(billing).toHaveLength(0);
+
+    // The completion batch carried the pin intent; the real drain delivers the confirmed alias.
+    await reconcilePaidBenchmarkRequests(paidBindings(db));
+    expect(pins).toHaveLength(1);
+    const pinsBody = CustomRouterPoolPinsRequestSchema.parse(pins[0]?.body);
+    expect(pinsBody.aliases).toEqual([{ model: ALIAS, target: 'vendor/alpha' }]);
+    expect(pinsBody.requestId).toBe(startedRequestId(progress));
+    expect(
+      countRows(
+        "SELECT COUNT(*) AS count FROM paid_benchmark_billing_outbox WHERE status = 'delivered'"
+      )
+    ).toBe(1);
+
+    const caseRunsBeforeReplay = countRows('SELECT COUNT(*) AS count FROM benchmark_case_runs');
+    // A replay neither starts a run nor delivers a second pin.
+    const replay = await startResult(await post(startRequest(quoted.id, { context })));
+    expect(replay.status).toBe('started');
+    await reconcilePaidBenchmarkRequests(paidBindings(db));
+    expect(pins).toHaveLength(1);
+    expect(countRows('SELECT COUNT(*) AS count FROM paid_benchmark_requests')).toBe(1);
+    expect(countRows('SELECT COUNT(*) AS count FROM benchmark_case_runs')).toBe(
+      caseRunsBeforeReplay
+    );
+    expect(billing).toHaveLength(0);
+  });
+
+  it('refuses a pin move whose ready evidence is gone, before consuming', async () => {
+    const ALIAS = '~vendor/latest';
+    const OLD_TARGET = 'vendor/old-target';
+    const NEW_TARGET = 'vendor/alpha';
+    catalog = {
+      data: [...CATALOG.data, { id: ALIAS, alias_target: NEW_TARGET, pricing: null }],
+    };
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles
+          (router, model, variant, engine_identity, repetitions, status, run_id, requested_at,
+            updated_at)
+        VALUES ('efficient', 'vendor/alpha', 'high', ?, 3, 'ready', 'run-ready',
+          '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`
+      )
+      .run(ENGINE);
+    const context = {
+      ...CONTEXT,
+      entries: [
+        {
+          kind: 'gateway' as const,
+          model: ALIAS,
+          servingPin: { model: OLD_TARGET, pinnedAt: '2026-01-01T00:00:00.000Z' },
+        },
+      ],
+    };
+    const quoted = await parseBody(
+      await post({
+        action: 'quote',
+        ownerType: 'user',
+        ownerId: 'user-1',
+        routerId: ROUTER_ID,
+        poolVersion: 'pool-v1',
+        poolSlug: 'pool-one',
+        context,
+      }),
+      PaidBenchmarkQuoteSchema
+    );
+    expect(quoted.status).toBe('ready');
+    if (quoted.status !== 'ready') return;
+    expect(quoted.maximumMicrodollars).toBe(0);
+
+    // The ready profile behind the quote is removed before the owner clicks.
+    sqlite
+      .prepare("DELETE FROM benchmark_profiles WHERE model = 'vendor/alpha' AND status = 'ready'")
+      .run();
+
+    const started = await startResult(await post(startRequest(quoted.id, { context })));
+    expect(started).toEqual({
+      status: 'blocked',
+      reason: SERVING_EVIDENCE_GONE_REASON,
+      retryable: true,
+    });
+    // Nothing was consumed, staged, measured or pinned.
+    expect(countRows('SELECT COUNT(*) AS count FROM paid_benchmark_requests')).toBe(0);
+    expect(countRows('SELECT COUNT(*) AS count FROM paid_benchmark_request_cases')).toBe(0);
+    expect(countRows('SELECT COUNT(*) AS count FROM benchmark_case_runs')).toBe(0);
+    expect(countRows('SELECT COUNT(*) AS count FROM paid_model_requests')).toBe(0);
+    expect(countRows('SELECT COUNT(*) AS count FROM paid_benchmark_billing_outbox')).toBe(0);
+    const quoteRow = sqlite
+      .prepare('SELECT started_request_id FROM paid_benchmark_quotes')
+      .get() as { started_request_id: string | null };
+    expect(quoteRow.started_request_id).toBeNull();
+    expect(pins).toHaveLength(0);
+    expect(billing).toHaveLength(0);
+
+    // A re-inserted `ready` row with no measuring run is still not serving evidence: the same
+    // quote refuses while it points nowhere, and confirms once provenance returns.
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles
+          (router, model, variant, engine_identity, repetitions, status, run_id, requested_at,
+            updated_at)
+        VALUES ('efficient', 'vendor/alpha', 'high', ?, 3, 'ready', NULL,
+          '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`
+      )
+      .run(ENGINE);
+    expect(await startResult(await post(startRequest(quoted.id, { context })))).toEqual({
+      status: 'blocked',
+      reason: SERVING_EVIDENCE_GONE_REASON,
+      retryable: true,
+    });
+    expect(countRows('SELECT COUNT(*) AS count FROM paid_benchmark_requests')).toBe(0);
+    sqlite
+      .prepare("UPDATE benchmark_profiles SET run_id = 'run-ready' WHERE model = 'vendor/alpha'")
+      .run();
+    const retried = await startResult(await post(startRequest(quoted.id, { context })));
+    expect(retried.status).toBe('started');
+    expect(countRows('SELECT COUNT(*) AS count FROM paid_benchmark_requests')).toBe(1);
+    expect(countRows('SELECT COUNT(*) AS count FROM benchmark_case_runs')).toBe(0);
+    expect(billing).toHaveLength(0);
+  });
 });
 
 describe('unfunded pause', () => {
@@ -574,9 +886,9 @@ describe('quote and staging fences', () => {
     sqlite
       .prepare(
         `INSERT INTO benchmark_profiles
-          (router, model, variant, engine_identity, repetitions, status, requested_at,
+          (router, model, variant, engine_identity, repetitions, status, run_id, requested_at,
             updated_at)
-        VALUES ('efficient', 'vendor/alpha', 'high', ?, 3, 'ready',
+        VALUES ('efficient', 'vendor/alpha', 'high', ?, 3, 'ready', 'run-ready',
           '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`
       )
       .run(ENGINE);
@@ -589,9 +901,9 @@ describe('quote and staging fences', () => {
     sqlite
       .prepare(
         `INSERT INTO benchmark_profiles
-          (router, model, variant, engine_identity, repetitions, status, requested_at,
+          (router, model, variant, engine_identity, repetitions, status, run_id, requested_at,
             updated_at)
-        VALUES ('efficient', 'vendor/alpha', 'high', ?, 3, 'ready',
+        VALUES ('efficient', 'vendor/alpha', 'high', ?, 3, 'ready', 'run-ready',
           '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`
       )
       .run(ENGINE);
@@ -1409,9 +1721,9 @@ describe('stage reuse eligibility', () => {
     sqlite
       .prepare(
         `INSERT INTO benchmark_profiles
-          (router, model, variant, engine_identity, repetitions, status, requested_at,
+          (router, model, variant, engine_identity, repetitions, status, run_id, requested_at,
             updated_at)
-        VALUES ('efficient', 'vendor/alpha', 'high', ?, 3, 'ready',
+        VALUES ('efficient', 'vendor/alpha', 'high', ?, 3, 'ready', 'run-ready',
           '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`
       )
       .run(ENGINE);

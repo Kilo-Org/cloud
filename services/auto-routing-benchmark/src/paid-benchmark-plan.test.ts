@@ -381,9 +381,9 @@ describe('paid benchmark plan', () => {
     sqlite
       .prepare(
         `INSERT INTO benchmark_profiles
-          (router, model, variant, engine_identity, repetitions, status, requested_at,
+          (router, model, variant, engine_identity, repetitions, status, run_id, requested_at,
             updated_at)
-        VALUES ('efficient', 'vendor/alpha', 'high', ?, 3, 'ready',
+        VALUES ('efficient', 'vendor/alpha', 'high', ?, 3, 'ready', 'run-ready',
           '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`
       )
       .run(ENGINE);
@@ -407,9 +407,9 @@ describe('paid benchmark plan', () => {
     sqlite
       .prepare(
         `INSERT INTO benchmark_profiles
-          (router, model, variant, engine_identity, repetitions, status, requested_at,
+          (router, model, variant, engine_identity, repetitions, status, run_id, requested_at,
             updated_at)
-        VALUES ('efficient', 'vendor/alpha', 'high', ?, 3, 'ready',
+        VALUES ('efficient', 'vendor/alpha', 'high', ?, 3, 'ready', 'run-ready',
           '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`
       )
       .run(ENGINE);
@@ -463,6 +463,219 @@ describe('paid benchmark plan', () => {
     if (outcome.status !== 'ready') return;
     expect(outcome.plan.counts.exclusive).toBe(9);
     expect(outcome.plan.maximumMicrodollars).toBeGreaterThan(0);
+  });
+
+  it('quotes a zero plan that moves a saved pin to the alias current target', async () => {
+    const { db, sqlite } = openPaidDatabase();
+    // The alias now resolves to vendor/alpha, and a ready measurement for that target already
+    // exists from another pool's shared result. This pool still pins the old target, so the
+    // only thing left is the owner's explicit decision to move that pin.
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles
+          (router, model, variant, engine_identity, repetitions, status, run_id, requested_at,
+            updated_at)
+        VALUES ('efficient', 'vendor/alpha', 'high', ?, 3, 'ready', 'run-ready',
+          '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`
+      )
+      .run(ENGINE);
+    const outcome = await buildPaidBenchmarkPlan(
+      { db, env: { KILO_WEB_API_BASE_URL: 'https://web.test' }, fetchImpl: fetchCatalog() },
+      {
+        context: context([
+          {
+            kind: 'gateway',
+            model: '~vendor/latest',
+            servingPin: { model: 'vendor/old-target', pinnedAt: '2026-01-01T00:00:00.000Z' },
+          },
+        ]),
+        engineIdentity: ENGINE,
+        projectId: PROJECT_ID,
+        config: CONFIG,
+        cases: CASES,
+      }
+    );
+    expect(outcome.status).toBe('ready');
+    if (outcome.status !== 'ready') return;
+    // Every slot is a free reuse of the already measured target: nothing is staged as work.
+    expect(outcome.plan.counts).toEqual({ reused: 9, covered: 0, shared: 0, exclusive: 0 });
+    expect(outcome.plan.estimateMicrodollars).toBe(0);
+    expect(outcome.plan.maximumMicrodollars).toBe(0);
+    expect(outcome.plan.pairs).toHaveLength(1);
+    expect(outcome.plan.pairs[0]).toMatchObject({ model: 'vendor/alpha', serving: true });
+    // The plan names the exact alias and its current target, so the callback moves that pin.
+    expect(outcome.plan.aliases).toEqual([{ model: '~vendor/latest', target: 'vendor/alpha' }]);
+  });
+
+  it('publishes only the alias whose pin must move, never an unchanged sibling alias', async () => {
+    const { db, sqlite } = openPaidDatabase();
+    // Both aliases resolve to ready targets, and only `~vendor/latest` still pins a stale one.
+    const insertProfile = sqlite.prepare(
+      `INSERT INTO benchmark_profiles
+        (router, model, variant, engine_identity, repetitions, status, run_id, requested_at,
+          updated_at)
+      VALUES ('efficient', ?, ?, ?, 3, 'ready', 'run-ready',
+        '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`
+    );
+    insertProfile.run('vendor/alpha', 'high', ENGINE);
+    insertProfile.run('vendor/cheap', '', ENGINE);
+    const twoAliasCatalog = {
+      data: [
+        ...CATALOG.data,
+        { id: '~vendor/settled', alias_target: 'vendor/cheap', pricing: null },
+      ],
+    };
+    const outcome = await buildPaidBenchmarkPlan(
+      {
+        db,
+        env: { KILO_WEB_API_BASE_URL: 'https://web.test' },
+        fetchImpl: (async () =>
+          new Response(JSON.stringify(twoAliasCatalog), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          })) as unknown as typeof fetch,
+      },
+      {
+        context: context([
+          {
+            kind: 'gateway',
+            model: '~vendor/latest',
+            servingPin: { model: 'vendor/old-target', pinnedAt: '2026-01-01T00:00:00.000Z' },
+          },
+          {
+            kind: 'gateway',
+            model: '~vendor/settled',
+            servingPin: { model: 'vendor/cheap', pinnedAt: '2026-01-01T00:00:00.000Z' },
+          },
+        ]),
+        engineIdentity: ENGINE,
+        projectId: PROJECT_ID,
+        config: CONFIG,
+        cases: CASES,
+      }
+    );
+    expect(outcome.status).toBe('ready');
+    if (outcome.status !== 'ready') return;
+    expect(outcome.plan.pairs.every(pair => pair.serving)).toBe(true);
+    expect(outcome.plan.maximumMicrodollars).toBe(0);
+    // Only the stale pin is republished; the already-correct pin is neither moved nor churned.
+    expect(outcome.plan.aliases).toEqual([{ model: '~vendor/latest', target: 'vendor/alpha' }]);
+  });
+
+  it('quotes nothing when the saved pin already names the alias current target', async () => {
+    const { db, sqlite } = openPaidDatabase();
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles
+          (router, model, variant, engine_identity, repetitions, status, run_id, requested_at,
+            updated_at)
+        VALUES ('efficient', 'vendor/alpha', 'high', ?, 3, 'ready', 'run-ready',
+          '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`
+      )
+      .run(ENGINE);
+    const outcome = await buildPaidBenchmarkPlan(
+      { db, env: { KILO_WEB_API_BASE_URL: 'https://web.test' }, fetchImpl: fetchCatalog() },
+      {
+        context: context([
+          {
+            kind: 'gateway',
+            model: '~vendor/latest',
+            servingPin: { model: 'vendor/alpha', pinnedAt: '2026-01-01T00:00:00.000Z' },
+          },
+        ]),
+        engineIdentity: ENGINE,
+        projectId: PROJECT_ID,
+        config: CONFIG,
+        cases: CASES,
+      }
+    );
+    expect(outcome).toEqual({ status: 'empty' });
+  });
+
+  it('quotes nothing for a fully ready alias pool that saved no pin', async () => {
+    const { db, sqlite } = openPaidDatabase();
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles
+          (router, model, variant, engine_identity, repetitions, status, run_id, requested_at,
+            updated_at)
+        VALUES ('efficient', 'vendor/alpha', 'high', ?, 3, 'ready', 'run-ready',
+          '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`
+      )
+      .run(ENGINE);
+    const outcome = await buildPaidBenchmarkPlan(
+      { db, env: { KILO_WEB_API_BASE_URL: 'https://web.test' }, fetchImpl: fetchCatalog() },
+      {
+        context: context([{ kind: 'gateway', model: '~vendor/latest' }]),
+        engineIdentity: ENGINE,
+        projectId: PROJECT_ID,
+        config: CONFIG,
+        cases: CASES,
+      }
+    );
+    expect(outcome).toEqual({ status: 'empty' });
+  });
+
+  it('quotes nothing for a fully ready concrete entry that carries a saved pin', async () => {
+    const { db, sqlite } = openPaidDatabase();
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles
+          (router, model, variant, engine_identity, repetitions, status, run_id, requested_at,
+            updated_at)
+        VALUES ('efficient', 'vendor/alpha', 'high', ?, 3, 'ready', 'run-ready',
+          '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`
+      )
+      .run(ENGINE);
+    const outcome = await buildPaidBenchmarkPlan(
+      { db, env: { KILO_WEB_API_BASE_URL: 'https://web.test' }, fetchImpl: fetchCatalog() },
+      {
+        context: context([
+          {
+            kind: 'gateway',
+            model: 'vendor/alpha',
+            servingPin: { model: 'vendor/cheap', pinnedAt: '2026-01-01T00:00:00.000Z' },
+          },
+        ]),
+        engineIdentity: ENGINE,
+        projectId: PROJECT_ID,
+        config: CONFIG,
+        cases: CASES,
+      }
+    );
+    // Only a resolved `~` alias can move a pin; a concrete entry serves what it names.
+    expect(outcome).toEqual({ status: 'empty' });
+  });
+
+  it('quotes nothing for a pin move on a measuredAs entry', async () => {
+    const { db, sqlite } = openPaidDatabase();
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_profiles
+          (router, model, variant, engine_identity, repetitions, status, run_id, requested_at,
+            updated_at)
+        VALUES ('efficient', 'vendor/alpha', 'high', ?, 3, 'ready', 'run-ready',
+          '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`
+      )
+      .run(ENGINE);
+    const outcome = await buildPaidBenchmarkPlan(
+      { db, env: { KILO_WEB_API_BASE_URL: 'https://web.test' }, fetchImpl: fetchCatalog() },
+      {
+        context: context([
+          {
+            kind: 'gateway',
+            model: '~vendor/latest',
+            measuredAs: 'vendor/alpha',
+            servingPin: { model: 'vendor/old-target', pinnedAt: '2026-01-01T00:00:00.000Z' },
+          },
+        ]),
+        engineIdentity: ENGINE,
+        projectId: PROJECT_ID,
+        config: CONFIG,
+        cases: CASES,
+      }
+    );
+    expect(outcome).toEqual({ status: 'empty' });
   });
 
   it('resolves an alias to its concrete target and records both', async () => {

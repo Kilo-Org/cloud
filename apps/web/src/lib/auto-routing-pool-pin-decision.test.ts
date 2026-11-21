@@ -154,4 +154,52 @@ describe('decideServingPins', () => {
 
     expect(outcome.entries[0]).toBe(other);
   });
+
+  describe('observed pins', () => {
+    const observed = (model: string): CustomRouterServingPin => ({
+      model,
+      pinnedAt: PINNED_AT,
+      source: 'observed',
+    });
+
+    test('turns an observation of the same target into a confirmed pin', () => {
+      const outcome = decide({ pool: [gateway(ALIAS, observed(NEW_TARGET))] });
+
+      expect(outcome.applied).toEqual([{ model: ALIAS, target: NEW_TARGET, pinnedAt: PINNED_AT }]);
+      expect(servingPinOf(outcome.entries[0])).toEqual({
+        model: NEW_TARGET,
+        pinnedAt: PINNED_AT,
+        requestId: 'req-late',
+        confirmedAt: CONFIRMED_LATE,
+      });
+    });
+
+    test('replaces a differing observation and never keeps the observed marker', () => {
+      const outcome = decide({ pool: [gateway(ALIAS, observed(OLD_TARGET))] });
+
+      expect(outcome.applied).toEqual([{ model: ALIAS, target: NEW_TARGET, pinnedAt: PINNED_AT }]);
+      expect(servingPinOf(outcome.entries[0])).toEqual({
+        model: NEW_TARGET,
+        pinnedAt: PINNED_AT,
+        requestId: 'req-late',
+        confirmedAt: CONFIRMED_LATE,
+      });
+    });
+
+    test('refuses an equal or older confirmation over an existing later confirmation', () => {
+      const pool = [gateway(ALIAS, pin(NEW_TARGET, CONFIRMED_LATE, 'req-new'))];
+      const equal = decideServingPins({
+        entries: pool,
+        aliases: [{ model: ALIAS, target: OLD_TARGET }],
+        poolUnchanged: true,
+        requestId: 'req-equal',
+        confirmedAt: CONFIRMED_LATE,
+        pinnedAt: PINNED_AT,
+      });
+      expect(equal.applied).toEqual([]);
+      expect(equal.skipped).toEqual([{ model: ALIAS, reason: 'superseded' }]);
+      expect(servingPinOf(equal.entries[0])?.model).toBe(NEW_TARGET);
+      expect(servingPinOf(equal.entries[0])?.source).toBeUndefined();
+    });
+  });
 });

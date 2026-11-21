@@ -130,7 +130,7 @@ vi.mock('./db', async importOriginal => {
     releaseProfileClaims: vi.fn(),
     listQueuedRemeasures: vi.fn().mockResolvedValue([]),
     copyRemeasureBaselines: vi.fn().mockResolvedValue(0),
-    settleRemeasuresForRun: vi.fn().mockResolvedValue(undefined),
+    settleRemeasuresForRun: vi.fn().mockResolvedValue('published'),
   };
 });
 
@@ -444,7 +444,7 @@ beforeEach(() => {
   vi.mocked(markProfilesRunningForRun).mockImplementation(async (_db, _runId, entries) => [
     ...entries,
   ]);
-  vi.mocked(markProfilesReadyForRun).mockResolvedValue(undefined);
+  vi.mocked(markProfilesReadyForRun).mockResolvedValue('published');
   vi.mocked(markProfilesFailedForEntries).mockResolvedValue(undefined);
   vi.mocked(markProfilesFailedForRun).mockResolvedValue(undefined);
   vi.mocked(markRunCompleted).mockResolvedValue(undefined);

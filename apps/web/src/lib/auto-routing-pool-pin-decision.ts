@@ -30,6 +30,8 @@ export type ServingPinOutcome = {
  *   entry the pool no longer has stays unpinned.
  * - Only an unlinked gateway entry can pin: a `measuredAs` entry reuses a platform measurement and
  *   never dispatches its own target.
+ * - An `observed` pin records a target a shared measurement proved; it carries no confirmation, so
+ *   every confirmation outranks it and rewriting its entry stores the confirmed shape.
  */
 export function decideServingPins(input: {
   entries: readonly CustomRouterEntry[];
@@ -71,19 +73,18 @@ export function decideServingPins(input: {
       // The same target is already pinned. A newer confirmation must still advance `confirmedAt`:
       // otherwise a delayed callback from an older, differing confirmation would look newer than
       // the pin and overwrite it. A replay of this very request advances nothing.
-      const existing = entry.servingPin;
-      if (confirmedAtOf(existing) >= Date.parse(confirmedAt)) {
+      if (confirmedAtOf(entry.servingPin) >= Date.parse(confirmedAt)) {
         skipped.push({ model: alias.model, reason: 'unchanged' });
         continue;
       }
       entries[index] = {
         ...entry,
-        servingPin: { ...existing, requestId, confirmedAt, pinnedAt },
+        servingPin: { model: alias.target, pinnedAt, requestId, confirmedAt },
       };
       applied.push({ model: alias.model, target: alias.target, pinnedAt });
       continue;
     }
-    if (confirmedAtOf(entry.servingPin) > Date.parse(confirmedAt)) {
+    if (confirmedAtOf(entry.servingPin) >= Date.parse(confirmedAt)) {
       skipped.push({ model: alias.model, reason: 'superseded' });
       continue;
     }

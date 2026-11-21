@@ -101,6 +101,8 @@ export type ResolvedCustomRouterEntry =
       servingPin: CustomRouterServingPin | null;
       /** True when the pin names a target the current catalog no longer lists. */
       servingFallback: boolean;
+      /** The pinned concrete model while the catalog still lists it, or null when absent. */
+      pinnedTarget: string | null;
       /** The concrete model the live catalog resolves this entry to now, or null when unknown. */
       currentTarget: string | null;
     };
@@ -161,6 +163,7 @@ export async function resolveCustomRouterEntries(
         pairs: served?.variants.map(variant => ({ model: served.model, variant })) ?? null,
         servingPin,
         servingFallback: Boolean(servingPin && !pinned),
+        pinnedTarget: pinned?.model ?? null,
         currentTarget: concrete?.model ?? null,
       };
     })
@@ -235,8 +238,6 @@ type ReadyPlatformRow = {
   pair: BenchmarkPair;
   runId: string;
   stale: boolean;
-  /** Set when a saved pin backs this measurement, so the entry dispatches that target. */
-  servingPinModel: string | null;
   candidate: string;
 };
 
@@ -301,8 +302,6 @@ async function resolveReadyPlatformRows(
         runId: served.row.run_id,
         stale: served.stale,
         pinned,
-        // A pin is usable for this pair only when its target is the pair being served.
-        servingPinModel: pinned && item.servingPin?.model === pair.model ? pair.model : null,
       });
     }
   }
@@ -396,6 +395,15 @@ export async function assembleCustomRouterTable(
 ): Promise<CustomRoutingTableResponse> {
   const { current, resolved, catalog, platformRows, clientRows } =
     await loadCustomRouterMeasurements(db, config, context, source);
+  const servingFallback = resolved.flatMap(item =>
+    item.measuredBy === 'platform' &&
+    item.servingFallback &&
+    item.currentTarget !== null &&
+    !item.currentTarget.startsWith('~')
+      ? [customRouterEntryKey(item.entry)]
+      : []
+  );
+  const fallback = servingFallback.length > 0 ? { servingFallback } : {};
   const platformReady: {
     /** Ranked candidate, which can differ from its measured concrete pair. */
     entry: BenchmarkPair;
@@ -403,8 +411,6 @@ export async function assembleCustomRouterTable(
     measured: BenchmarkPair;
     runId: string;
     stale: boolean;
-    /** Set when the ready measurement backs a saved pin, so the entry dispatches that target. */
-    servingPinModel: string | null;
   }[] = [];
   const linkedReady: {
     entry: BenchmarkPair;
@@ -468,6 +474,19 @@ export async function assembleCustomRouterTable(
       if (served) clientReady.push({ profile: served.row, stale: served.stale });
     }
   }
+  // A saved pin dispatches its concrete target while the catalog still lists it, even with no
+  // measurement yet: the serving Worker reads this map independently of `table`, so the pool's
+  // default and fallback dispatch reach the pinned target before a ranked candidate exists.
+  // A pin whose target left the catalog is omitted, so the live alias serves and `servingFallback`
+  // warns instead.
+  const servingPins = Object.fromEntries(
+    resolved.flatMap(item =>
+      item.measuredBy === 'platform' && item.pinnedTarget !== null
+        ? [[customRouterEntryKey(item.entry), item.pinnedTarget] as const]
+        : []
+    )
+  );
+  const pinned = Object.keys(servingPins).length > 0 ? { servingPins } : {};
   // Duplicate source rows stay in `platformReady` for the version hash (the deployed artifact
   // counted an alias and its own concrete entry separately); only the emission below dedupes.
   for (const ready of platformReadyRows) {
@@ -476,12 +495,11 @@ export async function assembleCustomRouterTable(
       measured: ready.pair,
       runId: ready.runId,
       stale: ready.stale,
-      servingPinModel: ready.servingPinModel,
     });
   }
 
   if (platformReady.length === 0 && linkedReady.length === 0 && clientReady.length === 0) {
-    return { table: null };
+    return { table: null, ...fallback, ...pinned };
   }
 
   const measuredReadies = platformReady.map(ready => ({
@@ -535,20 +553,6 @@ export async function assembleCustomRouterTable(
       },
     ];
   });
-  // A pin is usable only with a ready measurement behind it; entries without one are absent here
-  // and dispatch their own (live alias) model instead.
-  const servingPins = Object.fromEntries(
-    platformReady.flatMap(ready =>
-      ready.servingPinModel
-        ? [
-            [
-              customRouterEntryKey({ kind: 'gateway', model: ready.entry.model }),
-              ready.servingPinModel,
-            ] as const,
-          ]
-        : []
-    )
-  );
   // A profile's run id changes with every upload, so new results produce a new table version.
   const clientEntries = clientReady.map(({ profile, stale }) => {
     const runId = `client-profile:${profile.id}:${profile.results}`;
@@ -630,7 +634,8 @@ export async function assembleCustomRouterTable(
   });
   return {
     table,
-    ...(Object.keys(servingPins).length > 0 ? { servingPins } : {}),
+    ...fallback,
+    ...pinned,
   };
 }
 
@@ -845,8 +850,8 @@ export async function lookupCustomRouterStatuses(
           ],
         };
       }
-      // A pin is usable only while its target has a ready measurement; otherwise the live alias
-      // target serves and the variant reports the fallback.
+      // `servingModel` needs a ready measurement behind the pin; the dispatch target itself is
+      // reported by `servingPins`, so a listed pin with no evidence stays a plain `missing` row.
       const pinUsable = Boolean(
         item.servingPin &&
         item.pairs.some(

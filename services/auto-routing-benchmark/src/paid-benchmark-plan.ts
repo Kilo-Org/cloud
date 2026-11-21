@@ -741,7 +741,10 @@ export async function buildPaidBenchmarkPlan(
   // today: the routing table can rank it, so it is not asked for again just because the
   // measured case set grew (revision-3 probes, the pwd-base case). This read has no side
   // effects and creates no demand — only an unmeasured pair, or a new alias target the owner
-  // selected, is quoted at the current revision.
+  // selected, is quoted at the current revision. A `ready` row whose `run_id` is null or empty
+  // names no measuring run, so it is not counted as serving here either (the same readiness
+  // custom table assembly and alias promotion read): such a pair must not back a zero-cost
+  // pin move.
   const readyPairs = new Set(
     (
       await listReadyCurrentProfilesForEntries(
@@ -749,7 +752,9 @@ export async function buildPaidBenchmarkPlan(
         { router, engineIdentity: input.engineIdentity, repetitions },
         resolved.pairs
       )
-    ).map(row => exactPairKey(row.model, variantFromStorage(row.variant)))
+    )
+      .filter(row => row.run_id != null && row.run_id !== '')
+      .map(row => exactPairKey(row.model, variantFromStorage(row.variant)))
   );
 
   // Durable platform ownership, read once per plan: a pair the live platform queue requested
@@ -921,10 +926,26 @@ export async function buildPaidBenchmarkPlan(
     });
   }
 
+  // A saved pool can keep serving an older concrete target than the alias now resolves to.
+  // When every resolved pair already serves, the only work left is the owner's explicit
+  // decision to move that pin, so it is quoted at zero: staging writes reused rows only, and
+  // no case run, permit or usage can be created for it. Only a resolved alias with a saved
+  // pin on a different target qualifies; a `measuredAs` entry never dispatches its own target.
+  const pinMoves =
+    servingPairs === resolved.pairs.length
+      ? input.context.entries.flatMap(entry => {
+          if (entry.kind !== 'gateway' || entry.measuredAs !== undefined) return [];
+          if (!entry.model.startsWith('~') || entry.servingPin === undefined) return [];
+          const resolvedTarget = resolved.aliases.find(alias => alias.model === entry.model);
+          if (resolvedTarget === undefined || resolvedTarget.target === entry.servingPin.model)
+            return [];
+          return [resolvedTarget];
+        })
+      : [];
   // Nothing left to measure: an already-benchmarked pool serves without a quote at all, so
   // no quote row is written and no progress screen suggests a purchase. A pool with one
   // serving pair and one new target still quotes the new target only.
-  if (servingPairs === resolved.pairs.length) return { status: 'empty' };
+  if (servingPairs === resolved.pairs.length && pinMoves.length === 0) return { status: 'empty' };
 
   const plan: PaidBenchmarkPlan = {
     version: 1,
@@ -937,7 +958,9 @@ export async function buildPaidBenchmarkPlan(
     counts,
     estimateMicrodollars,
     maximumMicrodollars,
-    aliases: resolved.aliases,
+    // A pin-move quote has no measured pair, so only the aliases it asks the owner to move are
+    // published; a full quote keeps every alias it priced.
+    aliases: servingPairs === resolved.pairs.length ? pinMoves : resolved.aliases,
     projectId: input.projectId,
   };
   // A quote row must stay far below D1's 2 MB row limit; refuse to write one that cannot.
@@ -948,6 +971,51 @@ export async function buildPaidBenchmarkPlan(
       retryable: false,
     };
   return { status: 'ready', plan };
+}
+
+/**
+ * A quote that asks only to move a saved pin onto an alias target another measurement already
+ * made usable. By construction every pair is `serving` (a plan with all pairs serving exists
+ * only for a pin move), nothing is priced and nothing is measured, so its one effect is the
+ * settlement callback that writes the pin.
+ */
+export function isPinOnlyPlan(plan: PaidBenchmarkPlan): boolean {
+  return plan.pairs.length > 0 && plan.pairs.every(pair => pair.serving);
+}
+
+/** Refusal for a pin move whose ready evidence is gone: only a fresh estimate can re-serve it. */
+export const SERVING_EVIDENCE_GONE_REASON =
+  'The benchmark result this estimate relies on is gone; request a new estimate.';
+
+/**
+ * Whether every pair this plan treats as serving still has a ready profile with usable
+ * provenance at the quoted engine and repetition count. Reads only the plan's own pairs, so a
+ * caller can refuse a pin move whose ready evidence disappeared before anything is staged or
+ * pinned.
+ */
+export async function readServingPairsStillReady(
+  db: D1Database,
+  plan: Pick<PaidBenchmarkPlan, 'pairs' | 'engineIdentity' | 'repetitions' | 'router'>
+): Promise<boolean> {
+  const entries = plan.pairs.map(pair => ({
+    model: pair.model,
+    variant: variantFromStorage(pair.variant),
+  }));
+  if (entries.length === 0) return false;
+  const ready = await listReadyCurrentProfilesForEntries(
+    db,
+    { router: plan.router, engineIdentity: plan.engineIdentity, repetitions: plan.repetitions },
+    entries
+  );
+  const proven = new Set(
+    ready
+      // A ready row with no `run_id` (null or empty) names no measuring run, so it cannot be
+      // ranked or bound to a summary — the same readiness table assembly and alias promotion
+      // require, and the reason it is not serving evidence here.
+      .filter(row => row.run_id != null && row.run_id !== '')
+      .map(row => exactPairKey(row.model, variantFromStorage(row.variant)))
+  );
+  return entries.every(entry => proven.has(exactPairKey(entry.model, entry.variant)));
 }
 
 /** Canonical JSON so two equal contexts compare equal whatever their key order. */

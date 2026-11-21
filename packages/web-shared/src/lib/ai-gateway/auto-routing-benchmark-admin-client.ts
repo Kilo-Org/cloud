@@ -10,6 +10,9 @@ import {
   BenchmarkRunsResponseSchema,
   BenchmarkRunSummariesResponseSchema,
   BenchmarkRunCancelResponseSchema,
+  BENCHMARK_ALIAS_PROMOTION_PATH,
+  AliasPromotionAcquireResponseSchema,
+  AliasPromotionReleaseResponseSchema,
   CUSTOM_ROUTER_BLOCKED_MODELS_PATH,
   CUSTOM_ROUTER_STATUS_PATH,
   CUSTOM_ROUTER_TABLE_PATH,
@@ -34,6 +37,7 @@ import {
   RequeueBenchmarkRegistryResponseSchema,
   StartBenchmarkRunResponseSchema,
   type BenchmarkConfig,
+  type AliasPromotionRequest,
   type BenchmarkPair,
   type BenchmarkProfileQuotaError,
   type BenchmarkSchedulerOverrides,
@@ -516,5 +520,39 @@ export function getPaidBenchmarkAdminRoutingTable(requestId: string) {
       body: JSON.stringify({ requestId }),
     },
     PaidBenchmarkAdminRoutingTableResponseSchema
+  );
+}
+
+/**
+ * The short readiness fence an alias move holds while it saves the observed concrete targets. The
+ * reply is `busy` while another holder's lease is live; `held` lists the ready current-engine pairs
+ * of the asked ids. It reads the registry only and never starts or admits a benchmark.
+ */
+export function acquireAliasPromotion(
+  request: Extract<AliasPromotionRequest, { action: 'acquire' }>
+) {
+  return fetchBenchmarkAdmin(
+    BENCHMARK_ALIAS_PROMOTION_PATH,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+    AliasPromotionAcquireResponseSchema
+  );
+}
+
+/** Releases only this token's fence; another holder's lease is never cleared. */
+export function releaseAliasPromotion(
+  request: Extract<AliasPromotionRequest, { action: 'release' }>
+) {
+  return fetchBenchmarkAdmin(
+    BENCHMARK_ALIAS_PROMOTION_PATH,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+    AliasPromotionReleaseResponseSchema
   );
 }

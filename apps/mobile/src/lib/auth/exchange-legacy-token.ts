@@ -9,14 +9,14 @@ import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 import { AUTH_TOKEN_KEY, LEGACY_EXCHANGE_DONE_KEY } from '@/lib/storage-keys';
 import { CONTROL_PLANE_DEADLINE_MS, withDeadline } from '@kilocode/event-service';
 
-/** The exchange response and the bodies read under the deadline that bounds the call. */
-type ExchangeResponseBodies = {
-  response: Response;
-  /** The parsed refusal body; undefined for a success and an unreadable refusal. */
-  refusedBody: unknown;
-  /** The parsed success body; undefined while the status is a failure. */
-  successBody: unknown;
-};
+/**
+ * One exchange outcome: the parsed body of the single state the response is in.
+ * `ok: true` holds the parsed 2xx body; `ok: false` holds the parsed refusal
+ * body, undefined when the refusal body could not be read.
+ */
+type ExchangeOutcome =
+  | { ok: true; body: unknown }
+  | { ok: false; refusedBody: unknown };
 
 export async function exchangeLegacyToken(): Promise<{
   token: string;
@@ -70,9 +70,9 @@ export async function exchangeLegacyToken(): Promise<{
     // request that never settles would hold the app behind the spinner forever.
     // Both bodies are read inside that deadline: a body that stalls after its
     // headers would otherwise leave this promise pending the same way.
-    const { response, refusedBody, successBody } = await withDeadline(
+    const outcome = await withDeadline(
       CONTROL_PLANE_DEADLINE_MS,
-      async (signal): Promise<ExchangeResponseBodies> => {
+      async (signal): Promise<ExchangeOutcome> => {
         const res = await fetch(`${API_BASE_URL}/api/auth/native/exchange`, {
           method: 'POST',
           headers: {
@@ -86,29 +86,25 @@ export async function exchangeLegacyToken(): Promise<{
           signal,
         });
         if (!res.ok) {
-          return {
-            response: res,
-            refusedBody: await res.json().catch(() => undefined),
-            successBody: undefined,
-          };
+          return { ok: false, refusedBody: await res.json().catch(() => undefined) };
         }
         const body: unknown = await res.json();
-        return { response: res, refusedBody: undefined, successBody: body };
+        return { ok: true, body };
       }
     );
 
-    if (!response.ok) {
+    if (!outcome.ok) {
       // A refusal can name a key the server does not know, for example when a
       // first exchange verified but its response was lost. Drop the stored key
       // id so the next launch attests again instead of replaying an assertion
       // the server can never accept.
-      await clearAttestKeyOnRefusal(parseAuthError(refusedBody)?.code);
+      await clearAttestKeyOnRefusal(parseAuthError(outcome.refusedBody)?.code);
       // One-time exchange failure: retain old token, do not set the done
       // marker. Retry on the next app launch.
       return null;
     }
 
-    const parsed = parseTokenPair(successBody);
+    const parsed = parseTokenPair(outcome.body);
 
     if (!parsed?.refreshToken || !parsed.expiresIn) {
       return null;

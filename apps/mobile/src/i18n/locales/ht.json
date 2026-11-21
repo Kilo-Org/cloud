@@ -4696,6 +4696,7 @@
     "disconnected": "{{provider}} dekonekte",
     "disconnectFailed": "Pa t ka dekonekte {{provider}}",
     "disconnectRetry": "Slack pa t ka konfime dekoneksyon an. Eseye ankò.",
+    "disconnectNeedsSupport": "Kilo pa t ka li aksè Slack ki anrejistre pou koneksyon sa a. Kontakte ekip sipò a pou fini dekoneksyon an.",
     "couldNotLoad": "Pa t ka chaje entegrasyon yo",
     "permissionDenied": "Ou pa gen pèmisyon pou jere entegrasyon sa yo.",
     "managedByOwner": "Mande yon pwopriyetè òganizasyon pou chanje yon koneksyon ou pa ka chanje.",

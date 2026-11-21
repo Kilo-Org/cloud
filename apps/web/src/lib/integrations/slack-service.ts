@@ -19,7 +19,10 @@ import {
   getSlackCredentialByIntegrationId,
   writeSlackCredential,
 } from '@/lib/integrations/platforms/slack/credential-store';
-import { SLACK_DISCONNECT_UNCONFIRMED_MESSAGE } from '@kilocode/app-shared/integrations-errors';
+import {
+  SLACK_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
+  SLACK_DISCONNECT_UNCONFIRMED_MESSAGE,
+} from '@kilocode/app-shared/integrations-errors';
 import { SlackCredentialDecryptionError } from '@/lib/integrations/platforms/slack/credential-encryption';
 import { captureException } from '@sentry/nextjs';
 
@@ -422,15 +425,16 @@ export function getOwnerFromInstallation(integration: PlatformIntegration): Owne
 export type SlackBotTokenRead =
   | { status: 'available'; token: string }
   | { status: 'absent' }
-  | { status: 'unavailable'; reason: 'read_failed' | 'decrypt_failed' };
+  | { status: 'unavailable'; reason: 'read_failed' | 'owner_missing' | 'decrypt_failed' };
 
 /**
  * Load the bot token for an integration from the encrypted credential store,
  * reporting why a token is not available.
  *
  * Failures are reported to the error tracker with the integration id only. An
- * integration with no exclusive owner is reported as `read_failed`: the row records
- * a connection this code cannot address, which is not the same as having none.
+ * integration with no exclusive owner reports `owner_missing`: the row records a
+ * connection this code cannot address, which is not the same as having none, and
+ * no retry of this read changes that.
  *
  * A credential row already marked revoked reports `absent`: the store refuses to
  * decrypt it, and Slack has already given up that token.
@@ -440,12 +444,13 @@ export async function readSlackBotToken(
 ): Promise<SlackBotTokenRead> {
   const owner = getOwnerFromInstallation(integration);
   if (!owner) {
+    // Terminal for this read path: re-reading the same row cannot produce an owner.
     captureException(new Error('Slack integration has no exclusive owner'), {
       level: 'error',
       tags: { component: 'slack-service', op: 'read-slack-credential' },
       extra: { integrationId: integration.id },
     });
-    return { status: 'unavailable', reason: 'read_failed' };
+    return { status: 'unavailable', reason: 'owner_missing' };
   }
 
   let credential: SlackOAuthCredential | null;
@@ -675,9 +680,14 @@ export async function uninstallApp(owner: Owner, options: SlackUninstallOptions 
   if (shouldDeleteSlackInstallation) {
     const tokenRead = await readSlackBotToken(integration);
     if (tokenRead.status === 'unavailable') {
+      // A stored credential that cannot be read, or a row with no usable owner,
+      // cannot be fixed by retrying, so its copy must not offer a retry.
       throw new TRPCError({
         code: 'SERVICE_UNAVAILABLE',
-        message: SLACK_DISCONNECT_UNCONFIRMED_MESSAGE,
+        message:
+          tokenRead.reason === 'read_failed'
+            ? SLACK_DISCONNECT_UNCONFIRMED_MESSAGE
+            : SLACK_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
       });
     }
     if (tokenRead.status === 'available') {

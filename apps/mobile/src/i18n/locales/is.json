@@ -4696,6 +4696,7 @@
     "disconnected": "{{provider}} aftengt",
     "disconnectFailed": "Ekki tókst að aftengja {{provider}}",
     "disconnectRetry": "Slack gat ekki staðfest aftenginguna. Reyndu aftur.",
+    "disconnectNeedsSupport": "Kilo gat ekki lesið vistaðan Slack-aðgang fyrir þessa tengingu. Hafðu samband við þjónustuver til að ljúka aftengingunni.",
     "couldNotLoad": "Ekki tókst að hlaða inn samþættingum",
     "permissionDenied": "Þú hefur ekki heimild til að stjórna þessum samþættingum.",
     "managedByOwner": "Biddu eiganda stofnunarinnar um að breyta tengingu sem þú getur ekki breytt.",

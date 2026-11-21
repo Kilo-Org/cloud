@@ -4775,6 +4775,7 @@
     "disconnected": "{{provider}} scollegato",
     "disconnectFailed": "Impossibile scollegare {{provider}}",
     "disconnectRetry": "Slack non è riuscito a confermare lo scollegamento. Riprova.",
+    "disconnectNeedsSupport": "Kilo non è riuscito a leggere l'accesso a Slack salvato per questo collegamento. Contatta l'assistenza per completare lo scollegamento.",
     "couldNotLoad": "Impossibile caricare le integrazioni",
     "permissionDenied": "Non hai l'autorizzazione per gestire queste integrazioni.",
     "managedByOwner": "Chiedi a un proprietario dell'organizzazione di modificare un collegamento che non puoi modificare.",

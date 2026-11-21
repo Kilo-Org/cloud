@@ -75,7 +75,10 @@ import type { Owner } from '@/lib/integrations/core/types';
 import type { SlackInstallation } from '@chat-adapter/slack';
 import type { WebClientOptions } from '@slack/web-api';
 import type { PlatformIntegration } from '@kilocode/db/schema';
-import { SLACK_DISCONNECT_UNCONFIRMED_MESSAGE } from '@kilocode/app-shared/integrations-errors';
+import {
+  SLACK_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
+  SLACK_DISCONNECT_UNCONFIRMED_MESSAGE,
+} from '@kilocode/app-shared/integrations-errors';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import { SlackCredentialDecryptionError } from '@/lib/integrations/platforms/slack/credential-encryption';
 import {
@@ -311,9 +314,30 @@ describe('slack-service uninstallApp', () => {
       uninstallApp(owner, { deleteChatSdkInstallation, deleteChatSdkIdentityCache })
     ).rejects.toMatchObject({
       code: 'SERVICE_UNAVAILABLE',
-      message: SLACK_DISCONNECT_UNCONFIRMED_MESSAGE,
+      message: SLACK_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
     });
 
+    expect(mockAuthRevoke).not.toHaveBeenCalled();
+    expect(mockDeleteWhere).not.toHaveBeenCalled();
+    expect(deleteChatSdkInstallation).not.toHaveBeenCalled();
+    expect(deleteChatSdkIdentityCache).not.toHaveBeenCalled();
+  });
+
+  it('keeps the platform integration row when the row has no exclusive owner', async () => {
+    mockLimit.mockResolvedValue([
+      buildSlackIntegration({ owned_by_user_id: null, owned_by_organization_id: null }),
+    ]);
+    const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {});
+    const deleteChatSdkIdentityCache = jest.fn(async (_teamId: string): Promise<void> => {});
+
+    await expect(
+      uninstallApp(owner, { deleteChatSdkInstallation, deleteChatSdkIdentityCache })
+    ).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: SLACK_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
+    });
+
+    expect(mockGetSlackCredentialByIntegrationId).not.toHaveBeenCalled();
     expect(mockAuthRevoke).not.toHaveBeenCalled();
     expect(mockDeleteWhere).not.toHaveBeenCalled();
     expect(deleteChatSdkInstallation).not.toHaveBeenCalled();
@@ -388,7 +412,7 @@ describe('slack-service readSlackBotToken', () => {
     expect(mockCaptureException).toHaveBeenCalledWith(failure, expect.anything());
   });
 
-  it('reports a read failure when the row has no exclusive owner', async () => {
+  it('reports a missing owner when the row has no exclusive owner', async () => {
     const read = await readSlackBotToken(
       buildSlackIntegration({
         owned_by_user_id: null,
@@ -396,7 +420,7 @@ describe('slack-service readSlackBotToken', () => {
       }) as PlatformIntegration
     );
 
-    expect(read).toEqual({ status: 'unavailable', reason: 'read_failed' });
+    expect(read).toEqual({ status: 'unavailable', reason: 'owner_missing' });
     expect(mockGetSlackCredentialByIntegrationId).not.toHaveBeenCalled();
     expect(mockCaptureException).toHaveBeenCalledTimes(1);
   });

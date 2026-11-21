@@ -4696,6 +4696,7 @@
     "disconnected": "{{provider}} er koblet fra",
     "disconnectFailed": "Kunne ikke koble fra {{provider}}",
     "disconnectRetry": "Slack kunne ikke bekrefte frakoblingen. Prøv igjen.",
+    "disconnectNeedsSupport": "Kilo kunne ikke lese den lagrede Slack-tilgangen for denne tilkoblingen. Kontakt kundestøtte for å fullføre frakoblingen.",
     "couldNotLoad": "Kunne ikke laste inn integrasjoner",
     "permissionDenied": "Du har ikke tillatelse til å administrere disse integrasjonene.",
     "managedByOwner": "Be en eier i organisasjonen om å endre en tilkobling du ikke kan endre.",

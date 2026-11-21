@@ -4696,6 +4696,7 @@
     "disconnected": "{{provider}} waa la gooyay",
     "disconnectFailed": "Lama goyn karo {{provider}}",
     "disconnectRetry": "Slack ma xaqiijin karin goynta isku-xidhka. Mar kale isku day.",
+    "disconnectNeedsSupport": "Kilo ma akhrin karin gelitaanka Slack ee isku-xidhkan loo kaydiyay. La xiriir taageerada si aad u dhammaystirto goynta isku-xidhka.",
     "couldNotLoad": "Lama soo gelin karo isku-xidhka",
     "permissionDenied": "Ma haysatid ogolaansho aad ku maamusho isku-xidhkan.",
     "managedByOwner": "Weydii milkiilaha ururka si uu u beddelo isku-xidhka aadan beddeli karin.",

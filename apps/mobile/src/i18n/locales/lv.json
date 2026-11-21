@@ -4775,6 +4775,7 @@
     "disconnected": "Pakalpojums {{provider}} atvienots",
     "disconnectFailed": "Neizdevās atvienot {{provider}}",
     "disconnectRetry": "Slack neizdevās apstiprināt atvienošanu. Mēģini vēlreiz.",
+    "disconnectNeedsSupport": "Kilo neizdevās nolasīt šim savienojumam saglabāto Slack piekļuvi. Lai pabeigtu atvienošanu, sazinies ar atbalsta dienestu.",
     "couldNotLoad": "Neizdevās ielādēt integrācijas",
     "permissionDenied": "Jums nav atļaujas pārvaldīt šīs integrācijas.",
     "managedByOwner": "Lūdziet organizācijas īpašniekam mainīt savienojumu, kuru nevarat mainīt.",

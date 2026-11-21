@@ -4696,6 +4696,7 @@
     "disconnected": "Akwụsịla njikọ {{provider}}",
     "disconnectFailed": "Enweghị ike ịkwụsị njikọ {{provider}}",
     "disconnectRetry": "Slack enweghị ike ịkwụsị njikọ ahụ. Nwaa ọzọ.",
+    "disconnectNeedsSupport": "Kilo enweghị ike ịgụ ohere Slack echekwara maka njikọ a. Kpọtụrụ ndị nkwado ka ha mechaa ịkwụsị njikọ ahụ.",
     "couldNotLoad": "Enweghị ike ibudata njikọ",
     "permissionDenied": "Ị nweghị ikike ijikwa njikọ ndị a.",
     "managedByOwner": "Gwa onye nwe nzukọ ka ọ gbanwee njikọ ị na-enweghị ike ịgbanwe.",

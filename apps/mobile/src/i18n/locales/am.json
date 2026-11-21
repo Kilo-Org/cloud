@@ -4696,6 +4696,7 @@
     "disconnected": "የ{{provider}} ግንኙነት ተቋርጧል",
     "disconnectFailed": "የ{{provider}} ግንኙነትን ማቋረጥ አልተቻለም",
     "disconnectRetry": "Slack ግንኙነቱ መቋረጡን ማረጋገጥ አልቻለም። እንደገና ሞክር።",
+    "disconnectNeedsSupport": "Kilo ለዚህ ግንኙነት የተቀመጠውን የSlack መዳረሻ ማንበብ አልቻለም። ግንኙነቱን ለመጨረስ የድጋፍ ቡድኑን ያግኙ።",
     "couldNotLoad": "ውህደቶችን መጫን አልተቻለም",
     "permissionDenied": "እነዚህን ውህደቶች የማስተዳደር ፈቃድ የለዎትም።",
     "managedByOwner": "መቀየር የማይችሉትን ግንኙነት ለመቀየር የድርጅቱን ባለቤት ይጠይቁ።",

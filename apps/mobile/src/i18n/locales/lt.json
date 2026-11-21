@@ -4854,6 +4854,7 @@
     "disconnected": "Atjungta: {{provider}}",
     "disconnectFailed": "Nepavyko atjungti {{provider}}",
     "disconnectRetry": "Slack nepavyko patvirtinti atjungimo. Bandykite dar kartą.",
+    "disconnectNeedsSupport": "Kilo nepavyko nuskaityti šiam ryšiui išsaugotos Slack prieigos. Norėdami užbaigti atjungimą, kreipkitės į pagalbos tarnybą.",
     "couldNotLoad": "Nepavyko įkelti integracijų",
     "permissionDenied": "Neturite teisių tvarkyti šių integracijų.",
     "managedByOwner": "Paprašykite organizacijos savininko pakeisti jungtį, kurios negalite pakeisti.",

@@ -4696,6 +4696,7 @@
     "disconnected": "Kua wetekia a {{provider}}",
     "disconnectFailed": "Kāore i taea te wetewete i {{provider}}",
     "disconnectRetry": "Kāore i taea e Slack te whakaū i te wetewete. Whakamātau anō.",
+    "disconnectNeedsSupport": "Kāore i taea e Kilo te pānui i te urunga Slack kua tiakina mō tēnei hononga. Whakapā atu ki te rōpū tautoko kia oti ai te wetewete.",
     "couldNotLoad": "Kāore i taea te uta i ngā tūhononga",
     "permissionDenied": "Kāore ōu whakaaetanga ki te whakahaere i ēnei tūhononga.",
     "managedByOwner": "Tonoa tētahi kaipupuri o te rōpū kia whakarerekē i tētahi hononga kāore e taea e koe te whakarerekē.",

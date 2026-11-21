@@ -4775,6 +4775,7 @@
     "disconnected": "{{provider}} desconectado",
     "disconnectFailed": "No se pudo desconectar {{provider}}",
     "disconnectRetry": "Slack no pudo confirmar la desconexión. Inténtalo de nuevo.",
+    "disconnectNeedsSupport": "Kilo no pudo leer el acceso a Slack guardado para esta conexión. Contacta con soporte técnico para terminar de desconectarla.",
     "couldNotLoad": "No se pudieron cargar las integraciones",
     "permissionDenied": "No tienes permiso para gestionar estas integraciones.",
     "managedByOwner": "Pide a un propietario de la organización que cambie una conexión que no puedas cambiar.",

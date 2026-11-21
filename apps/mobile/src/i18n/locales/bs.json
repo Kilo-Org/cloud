@@ -4775,6 +4775,7 @@
     "disconnected": "Veza s {{provider}} je prekinuta",
     "disconnectFailed": "Nije moguće prekinuti vezu s {{provider}}",
     "disconnectRetry": "Slack nije mogao potvrditi prekid veze. Pokušaj ponovo.",
+    "disconnectNeedsSupport": "Kilo nije mogao pročitati sačuvani Slack pristup za ovu vezu. Obrati se podršci da dovršiš prekid veze.",
     "couldNotLoad": "Nije moguće učitati integracije",
     "permissionDenied": "Nemate dozvolu za upravljanje ovim integracijama.",
     "managedByOwner": "Zamolite vlasnika organizacije da promijeni vezu koju ne možete promijeniti.",

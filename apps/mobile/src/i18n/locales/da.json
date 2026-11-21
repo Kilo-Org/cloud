@@ -4696,6 +4696,7 @@
     "disconnected": "Forbindelsen til {{provider}} er afbrudt",
     "disconnectFailed": "Forbindelsen til {{provider}} kunne ikke afbrydes",
     "disconnectRetry": "Slack kunne ikke bekræfte afbrydelsen. Prøv igen.",
+    "disconnectNeedsSupport": "Kilo kunne ikke læse den gemte Slack-adgang for denne forbindelse. Kontakt support for at afslutte afbrydelsen.",
     "couldNotLoad": "Integrationerne kunne ikke indlæses",
     "permissionDenied": "Du har ikke tilladelse til at administrere disse integrationer.",
     "managedByOwner": "Bed en ejer i organisationen om at ændre en forbindelse, du ikke kan ændre.",

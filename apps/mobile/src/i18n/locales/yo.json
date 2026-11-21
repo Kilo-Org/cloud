@@ -4696,6 +4696,7 @@
     "disconnected": "A ti já ìsopọ̀ {{provider}}",
     "disconnectFailed": "Kò ṣeé ṣe láti já ìsopọ̀ {{provider}}",
     "disconnectRetry": "Slack kò lè jẹ́rìí pípa ìsopọ̀ náà. Gbìyànjú lẹ́ẹ̀kan sí i.",
+    "disconnectNeedsSupport": "Kilo kò lè kà àwọn àǹfààní Slack tí a fipamọ́ fún ìsopọ̀ yìí. Kàn sí ẹgbẹ́ ìrànlọ́wọ́ láti parí pípa ìsopọ̀ náà.",
     "couldNotLoad": "Kò ṣeé ṣe láti gbé àwọn ìsopọ̀ wá",
     "permissionDenied": "O kò ní àṣẹ láti ṣàkóso àwọn ìsopọ̀ wọ̀nyí.",
     "managedByOwner": "Bèèrè lọ́wọ́ ẹni tó ni àjọ náà láti yí ìsopọ̀ kan tí o kò lè yí padà.",

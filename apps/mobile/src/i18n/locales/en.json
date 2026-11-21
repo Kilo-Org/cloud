@@ -4696,6 +4696,7 @@
     "disconnected": "{{provider}} disconnected",
     "disconnectFailed": "Could not disconnect {{provider}}",
     "disconnectRetry": "Slack could not confirm the disconnect. Try again.",
+    "disconnectNeedsSupport": "Kilo could not read the Slack access saved for this connection. Contact support to finish disconnecting it.",
     "couldNotLoad": "Could not load integrations",
     "permissionDenied": "You do not have permission to manage these integrations.",
     "managedByOwner": "Ask an organization owner to change connections you can't edit.",

@@ -4696,6 +4696,7 @@
     "disconnected": "Sambungan {{provider}} telah diputuskan",
     "disconnectFailed": "Tidak dapat memutuskan sambungan {{provider}}",
     "disconnectRetry": "Slack tidak dapat mengesahkan pemutusan sambungan. Cuba lagi.",
+    "disconnectNeedsSupport": "Kilo tidak dapat membaca akses Slack yang disimpan untuk sambungan ini. Hubungi sokongan untuk melengkapkan pemutusan sambungan.",
     "couldNotLoad": "Tidak dapat memuatkan integrasi",
     "permissionDenied": "Anda tidak mempunyai kebenaran untuk mengurus integrasi ini.",
     "managedByOwner": "Minta pemilik organisasi untuk menukar sambungan yang anda tidak boleh tukar.",

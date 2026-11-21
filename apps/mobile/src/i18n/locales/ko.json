@@ -4696,6 +4696,7 @@
     "disconnected": "{{provider}} 연결이 해제되었습니다",
     "disconnectFailed": "{{provider}} 연결을 해제하지 못했습니다",
     "disconnectRetry": "Slack에서 연결 해제를 확인하지 못했습니다. 다시 시도하세요.",
+    "disconnectNeedsSupport": "Kilo가 이 연결에 저장된 Slack 액세스를 읽지 못했습니다. 연결 해제를 마치려면 지원팀에 문의하세요.",
     "couldNotLoad": "연동 목록을 불러오지 못했습니다",
     "permissionDenied": "이 연동을 관리할 권한이 없습니다.",
     "managedByOwner": "변경할 수 없는 연결은 조직 소유자에게 변경을 요청하세요.",

@@ -53,6 +53,7 @@ import {
 import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
 import {
   deleteStoredValue,
+  deleteStoredValueWithRetry,
   readStoredValue,
   readStoredValueSafe,
 } from '@/lib/auth/secure-store-value';
@@ -592,7 +593,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             }),
             // The next sign-in can belong to a different account.
             cause === 'user' && Platform.OS === 'ios'
-              ? deleteStoredValue(ATTEST_KEY_ID_KEY)
+              ? deleteStoredValueWithRetry(ATTEST_KEY_ID_KEY)
               : undefined,
             deleteAccountMetadata(ACTIVE_USER_ID_KEY),
             deleteAccountMetadata(CHAT_BACKENDS_KEY),

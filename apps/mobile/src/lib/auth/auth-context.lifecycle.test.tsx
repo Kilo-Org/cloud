@@ -841,6 +841,33 @@ describe('sign-out teardown ordering', () => {
     unmount();
   });
 
+  it('retries a transient App Attest key deletion before sign-out completes', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    let storedAttestId: string | undefined = 'previous-account-key';
+    let refused = false;
+
+    await hoisted.secureStore.deleteItemAsync.withImplementation(
+      (key: string) => {
+        if (key === ATTEST_KEY_ID_KEY) {
+          if (!refused) {
+            refused = true;
+            return Promise.reject(new Error('Keychain temporarily unavailable'));
+          }
+          storedAttestId = undefined;
+        }
+        return Promise.resolve();
+      },
+      async () => {
+        await act(async () => {
+          await ctx.signOut();
+        });
+      }
+    );
+
+    expect(storedAttestId).toBeUndefined();
+    unmount();
+  });
+
   it('binds the pending deep-link user id on sign-in from the token', async () => {
     const { ctx, unmount } = await mountAndGetContext();
 

@@ -18,7 +18,7 @@ describe('verifyAppleJwtWithJwks', () => {
     jest.restoreAllMocks();
   });
 
-  const jwksResponse = (keys: ReturnType<typeof jwkForKey>[]) =>
+  const jwksResponse = (keys: unknown[]) =>
     new Response(JSON.stringify({ keys }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -84,9 +84,9 @@ describe('verifyAppleJwtWithJwks', () => {
     const fetchMock = jest
       .spyOn(global, 'fetch')
       .mockResolvedValueOnce(
-        // A 200 body whose entries omit kty, n, and e must not be treated as
-        // keys, and must not be cached as an empty set.
-        new Response(JSON.stringify({ keys: [{ kid: 'known-key' }] }), {
+        // A 200 body whose `keys` is not an array must not be treated as a
+        // key set, and must not be cached as an empty one.
+        new Response(JSON.stringify({ keys: 'known-key' }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         })
@@ -115,6 +115,110 @@ describe('verifyAppleJwtWithJwks', () => {
     const payload = await verifyAppleJwtWithJwks(token, 'com.kilocode.kiloapp');
     expect(payload.aud).toBe('com.kilocode.kiloapp');
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('treats a key set body without keys as a refresh failure', async () => {
+    const { verifyAppleJwtWithJwks, AppleJwtClientError } = await loadFreshModule();
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify({}), { status: 200 }));
+
+    const rejected = await verifyAppleJwtWithJwks(
+      signToken('known-key'),
+      'com.kilocode.kiloapp'
+    ).catch((error: unknown) => error);
+    expect(rejected).not.toBeInstanceOf(AppleJwtClientError);
+    expect(rejected instanceof Error ? rejected.message : String(rejected)).toBe(
+      'Apple JWKS response has an unexpected shape'
+    );
+  });
+
+  it('treats a key set whose entries are all unreadable as a refresh failure', async () => {
+    const { verifyAppleJwtWithJwks, AppleJwtClientError } = await loadFreshModule();
+    let now = 1_700_000_000_000;
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      // Entries missing kty, n, and e cannot be used, so the refresh fails and
+      // caches nothing rather than holding an empty key set.
+      .mockImplementation(async () => jwksResponse([{ kid: 'known-key' }]));
+    const token = signToken('known-key');
+
+    const rejected = await verifyAppleJwtWithJwks(token, 'com.kilocode.kiloapp').catch(
+      (error: unknown) => error
+    );
+    expect(rejected).not.toBeInstanceOf(AppleJwtClientError);
+    expect(rejected instanceof Error ? rejected.message : String(rejected)).toBe(
+      'Apple JWKS response has no usable keys'
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // The failure was not cached, only recorded: the next call within the
+    // cooldown serves that recorded failure without a fetch ...
+    await expect(verifyAppleJwtWithJwks(token, 'com.kilocode.kiloapp')).rejects.toThrow(
+      'Apple JWKS response has no usable keys'
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // ... and past the cooldown it fetches again instead of serving an empty
+    // key set.
+    now += 31_000;
+    await expect(verifyAppleJwtWithJwks(token, 'com.kilocode.kiloapp')).rejects.toThrow(
+      'Apple JWKS response has no usable keys'
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('treats a key set holding only EC entries as a refresh failure', async () => {
+    const { verifyAppleJwtWithJwks, AppleJwtClientError } = await loadFreshModule();
+    jest.spyOn(global, 'fetch').mockResolvedValue(
+      jwksResponse([
+        {
+          kty: 'EC',
+          kid: 'elliptic-key',
+          crv: 'P-256',
+          x: 'f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU',
+          y: 'x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0',
+        },
+      ])
+    );
+
+    const rejected = await verifyAppleJwtWithJwks(
+      signToken('elliptic-key'),
+      'com.kilocode.kiloapp'
+    ).catch((error: unknown) => error);
+    expect(rejected).not.toBeInstanceOf(AppleJwtClientError);
+    expect(rejected instanceof Error ? rejected.message : String(rejected)).toBe(
+      'Apple JWKS response has no usable keys'
+    );
+  });
+
+  it('serves the usable keys when one entry of the key set is unreadable', async () => {
+    const { verifyAppleJwtWithJwks } = await loadFreshModule();
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(
+      jwksResponse([
+        // A key set that gains an entry this module cannot use must still
+        // serve the keys it can.
+        {
+          kty: 'EC',
+          kid: 'unreadable-key',
+          crv: 'P-256',
+          x: 'f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU',
+          y: 'x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0',
+        },
+        jwkForKey('known-key'),
+      ])
+    );
+
+    const payload = await verifyAppleJwtWithJwks(
+      signToken('known-key', { sub: 'user-1' }),
+      'com.kilocode.kiloapp'
+    );
+    expect(payload.sub).toBe('user-1');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(
+      jest.requireMock<{ captureException: jest.Mock }>('@sentry/nextjs').captureException
+    ).not.toHaveBeenCalled();
   });
 
   it('rejects repeated unknown-kid tokens with a bounded number of key-set fetches', async () => {

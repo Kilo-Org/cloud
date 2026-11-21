@@ -17,8 +17,9 @@ function appleJwksUrl(): string {
 /** Thrown for malformed tokens or unresolvable keys — caller error, not a server fault. */
 export class AppleJwtClientError extends Error {}
 
-// The module reads only the four fields the key set is validated on; a JWK may
-// carry `use` and `alg` too, which are accepted but never inspected.
+// The module reads only the four fields each parsed entry carries; a JWK may
+// also carry `use` and `alg`, which the entry schema drops and the module never
+// inspects, so they stay optional here.
 type AppleJWK = {
   kty: string;
   kid: string;
@@ -46,16 +47,19 @@ export const STALE_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 const REFRESH_COOLDOWN_MS = 30 * 1000;
 const JWKS_FETCH_TIMEOUT_MS = 10_000;
 
-const appleJwksResponseSchema = z.object({
-  keys: z.array(
-    z.object({
-      kty: z.string(),
-      kid: z.string(),
-      n: z.string(),
-      e: z.string(),
-    })
-  ),
+// One entry of the key set. The module verifies RS256 only, so a non-RSA entry
+// is unusable here and must not be handed to `createPublicKey`; unknown extra
+// members (`use`, `alg`, …) are dropped by the default object behaviour.
+const appleJwkSchema = z.object({
+  kty: z.literal('RSA'),
+  kid: z.string().min(1),
+  n: z.string().min(1),
+  e: z.string().min(1),
 });
+
+// Only the envelope is validated here; entries are checked one at a time so a
+// single unreadable entry cannot discard the rest of the key set.
+const appleJwksResponseSchema = z.object({ keys: z.array(z.unknown()) });
 
 /**
  * Throws the recorded refresh failure after marking the outage reported.
@@ -82,7 +86,17 @@ async function fetchApplePublicKeys(): Promise<AppleJWK[]> {
   if (!parsed.success) {
     throw new Error('Apple JWKS response has an unexpected shape');
   }
-  return parsed.data.keys;
+
+  // Unreadable entries are dropped instead of failing the refresh: a key set
+  // that gains one entry this module cannot use must still serve the rest.
+  const keys: AppleJWK[] = parsed.data.keys.flatMap(entry => {
+    const key = appleJwkSchema.safeParse(entry);
+    return key.success ? [key.data] : [];
+  });
+  if (keys.length === 0) {
+    throw new Error('Apple JWKS response has no usable keys');
+  }
+  return keys;
 }
 
 async function refreshAppleKeys(): Promise<AppleJWK[]> {

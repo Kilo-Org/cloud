@@ -1,4 +1,3 @@
-import { useQuery } from '@tanstack/react-query';
 import { type Href } from 'expo-router';
 import { Building2, User } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
@@ -12,20 +11,13 @@ import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PERSONAL_SCOPE } from '@/lib/hooks/use-code-reviewer';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
-import { useTRPC } from '@/lib/trpc';
 
 export function ScopeListScreen() {
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
-  const trpc = useTRPC();
-  const {
-    data: orgs,
-    isLoading,
-    isError,
-    isFetching,
-    refetch,
-  } = useQuery(trpc.organizations.list.queryOptions());
+  const { data: orgs, isLoading, isError, isFetching, refetch } = useOrganizationsList();
 
   const openScope = (scope: string) => {
     pushOnce(`/(app)/code-reviewer/${scope}` as Href);

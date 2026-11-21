@@ -1,8 +1,6 @@
 import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { type TOptions } from 'i18next';
 
-import { type GlanceableCountFormat } from './count-format';
-
 /**
  * Maps the snapshot plus optional surface flags to the locked copy keys, the
  * compact primary count, and the spoken-label shape. Precedence:

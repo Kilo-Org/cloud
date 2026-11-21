@@ -5100,5 +5100,19 @@
       "au": "Australien",
       "jp": "Japan"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "Einstellungen suchen",
+    "noMatches": "Keine passenden Einstellungen",
+    "emptyDescription": "Versuche es mit einem anderen Einstellungsnamen oder Suchbegriff.",
+    "resultsStatus": "Gefundene Einstellungen: {{resultCount}}",
+    "keywords": {
+      "signOut": "abmelden|ausloggen|Abmeldung",
+      "appearance": "Farbschema|Dunkelmodus|Darstellung",
+      "appUnlock": "Biometrie|Gesichtserkennung|Fingerabdruck",
+      "language": "Sprache|Übersetzung|App-Sprache",
+      "notifications": "Mitteilungen|Hinweise|Push-Benachrichtigungen",
+      "privacy": "Nutzungsanalyse|Nachverfolgung|Datenschutz"
+    }
   }
 }

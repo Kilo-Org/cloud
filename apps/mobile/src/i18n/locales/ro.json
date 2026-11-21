@@ -5187,5 +5187,19 @@
       "au": "Australia",
       "jp": "Japonia"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "Căutare preferințe",
+    "noMatches": "Nu s-au găsit preferințe",
+    "emptyDescription": "Încearcă alt nume de preferință sau alt cuvânt-cheie.",
+    "resultsStatus": "Preferințe găsite: {{resultCount}}",
+    "keywords": {
+      "signOut": "deconectare|ieșire din cont",
+      "appearance": "temă|schemă de culori",
+      "appUnlock": "biometrie|recunoaștere facială|amprentă",
+      "language": "limbă|traducere",
+      "notifications": "alerte|notificări",
+      "privacy": "statistici|urmărire"
+    }
   }
 }

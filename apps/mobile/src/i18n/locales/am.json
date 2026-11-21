@@ -5100,5 +5100,19 @@
       "au": "አውስትራሊያ",
       "jp": "ጃፓን"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "የምርጫዎች ፍለጋ",
+    "noMatches": "የሚዛመዱ ምርጫዎች የሉም",
+    "emptyDescription": "ሌላ የምርጫ ስም ወይም ቁልፍ ቃል ሞክር።",
+    "resultsStatus": "የተገኙ ምርጫዎች፦ {{resultCount}}",
+    "keywords": {
+      "signOut": "መውጣት|ዘግቶ መውጣት",
+      "appearance": "ገጽታ|ቀለም|ጨለማ",
+      "appUnlock": "ባዮሜትሪክስ|የፊት መለያ|የጣት አሻራ",
+      "language": "ቋንቋ|ትርጉም",
+      "notifications": "ማንቂያዎች|ማሳወቂያዎች",
+      "privacy": "ትንታኔ|ክትትል"
+    }
   }
 }

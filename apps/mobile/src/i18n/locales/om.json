@@ -5100,5 +5100,19 @@
       "au": "Awustraaliyaa",
       "jp": "Jaappaan"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "Barbaacha filannoowwanii",
+    "noMatches": "Filannoowwan walsiman hin jiran",
+    "emptyDescription": "Maqaa filannoo ykn jecha ijoo biraa yaali.",
+    "resultsStatus": "Filannoowwan argaman: {{resultCount}}",
+    "keywords": {
+      "signOut": "ba'uu|keessaa ba'uu",
+      "appearance": "bifa|halluu",
+      "appUnlock": "fuula|ashaaraa qubaa",
+      "language": "afaan|hiikkaa",
+      "notifications": "beeksisa|akeekkachiisa",
+      "privacy": "iccitii|xiinxala|hordoffii"
+    }
   }
 }

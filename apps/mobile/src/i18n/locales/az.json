@@ -5100,5 +5100,19 @@
       "au": "Avstraliya",
       "jp": "Yaponiya"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "Seçim axtarışı",
+    "noMatches": "Uyğun seçim tapılmadı",
+    "emptyDescription": "Başqa seçim adı və ya açar sözlə axtarın.",
+    "resultsStatus": "Tapılan seçimlər: {{resultCount}}",
+    "keywords": {
+      "signOut": "çıxış|hesabdan çıxış",
+      "appearance": "mövzu|rəng sxemi|qaranlıq rejim",
+      "appUnlock": "biometriya|üz tanıma|barmaq izi",
+      "language": "dil|tərcümə",
+      "notifications": "bildiriş|xəbərdarlıq",
+      "privacy": "analitika|izləmə"
+    }
   }
 }

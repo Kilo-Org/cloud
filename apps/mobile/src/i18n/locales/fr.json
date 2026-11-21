@@ -5187,5 +5187,19 @@
       "au": "Australie",
       "jp": "Japon"
     }
+  },
+  "settingsSearch": {
+    "placeholder": "Rechercher une préférence",
+    "noMatches": "Aucune préférence correspondante",
+    "emptyDescription": "Essayez un autre nom de préférence ou un autre mot-clé.",
+    "resultsStatus": "Préférences trouvées : {{resultCount}}",
+    "keywords": {
+      "signOut": "déconnexion|se déconnecter",
+      "appearance": "thème|couleurs|mode sombre",
+      "appUnlock": "biométrie|visage|empreinte digitale",
+      "language": "langue|traduction",
+      "notifications": "alertes|notifications",
+      "privacy": "statistiques|suivi|confidentialité"
+    }
   }
 }

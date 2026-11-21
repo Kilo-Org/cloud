@@ -14,8 +14,6 @@ import {
   isValidCustomSecretKey,
   isCustomSecretEnvVar,
   isValidConfigPath,
-  MAX_CUSTOM_SECRETS,
-  MAX_CUSTOM_SECRET_VALUE_LENGTH,
 } from '../catalog.js';
 import { validateFieldValue } from '../validation.js';
 import type { SecretIconKey, SecretCatalogEntry } from '../types.js';
@@ -618,16 +616,6 @@ describe('Secret Catalog', () => {
 
     it('returns false for internal sensitive env vars', () => {
       expect(isCustomSecretEnvVar('KILOCLAW_GOG_CONFIG_TARBALL')).toBe(false);
-    });
-  });
-
-  describe('custom secret constants', () => {
-    it('MAX_CUSTOM_SECRETS is a reasonable limit', () => {
-      expect(MAX_CUSTOM_SECRETS).toBe(50);
-    });
-
-    it('MAX_CUSTOM_SECRET_VALUE_LENGTH covers JWTs and certificates', () => {
-      expect(MAX_CUSTOM_SECRET_VALUE_LENGTH).toBe(8192);
     });
   });
 

@@ -1620,6 +1620,8 @@
       "alreadyClaimedMessage": "वह GitHub इंस्टॉलेशन पहले से किसी दूसरे Kilo खाते से कनेक्ट है। पहले वहाँ इसे डिस्कनेक्ट करें।",
       "installationUnavailableMessage": "यह GitHub App इंस्टॉलेशन सस्पेंड है या अब उपलब्ध नहीं है। इसे GitHub में रीस्टोर करें या फिर से इंस्टॉल करें, फिर दोबारा शुरू करें।",
       "multipleInstallationsMessage": "यह Kilo संगठन अभी सिर्फ़ एक ही GitHub संगठन से कनेक्ट हो सकता है।",
+      "pendingRequestMessage": "इस खाते के लिए GitHub इंस्टॉलेशन का एक लंबित अनुरोध पहले से मौजूद है। इस अनुरोध को शुरू करने वाले Kilo खाते या संगठन से इसे रद्द करने के लिए कहें, फिर दोबारा कोशिश करें।",
+      "pendingRequestUnidentifiedMessage": "Kilo यह पुष्टि नहीं कर सका कि यह अनुरोध किस GitHub खाते के लिए है। जिस खाते को जोड़ना चाहते हैं, उससे GitHub सेटअप फिर से शुरू करें।",
       "didNotCompleteTitle": "इंस्टॉलेशन पूरा नहीं हुआ",
       "didNotCompleteMessage": "GitHub ऐप का इंस्टॉलेशन पूरा नहीं हुआ। ऐप से फिर से कोशिश करें।"
     },

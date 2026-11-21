@@ -2181,6 +2181,8 @@
       "alreadyClaimedMessage": "Enstalasyon GitHub sa a deja konekte ak yon lòt kont Kilo. Dekonekte li nan kont sa a anvan.",
       "installationUnavailableMessage": "Enstalasyon GitHub App sa a sispann oswa li pa disponib ankò. Retabli oswa reenstale li nan GitHub, epi rekòmanse.",
       "multipleInstallationsMessage": "Oganizasyon Kilo sa a ka konekte sèlman yon sèl oganizasyon GitHub pou kounye a.",
+      "pendingRequestMessage": "Yon demann enstalasyon GitHub deja egziste pou kont sa a. Mande kont Kilo oswa oganizasyon Kilo ki te kòmanse li pou l anile l, epi eseye ankò.",
+      "pendingRequestUnidentifiedMessage": "Kilo pa t kapab konfime pou ki kont GitHub demann sa a ye. Rekòmanse konfigirasyon GitHub nan kont ou vle konekte a.",
       "didNotCompleteTitle": "Enstalasyon an pa fini",
       "didNotCompleteMessage": "Enstalasyon aplikasyon GitHub la pa fini. Eseye ankò nan aplikasyon an."
     },

@@ -2277,6 +2277,8 @@
       "alreadyClaimedMessage": "Táto inštalácia aplikácie pre GitHub je už pripojená k inému účtu Kilo. Najprv ju tam odpoj.",
       "installationUnavailableMessage": "Táto inštalácia aplikácie pre GitHub je pozastavená alebo už nie je dostupná. Obnov ju alebo znova nainštaluj v GitHube a potom začni odznova.",
       "multipleInstallationsMessage": "Táto organizácia Kilo môže mať momentálne pripojenú len jednu organizáciu GitHub.",
+      "pendingRequestMessage": "Pre tento účet už existuje čakajúca žiadosť o inštaláciu z GitHubu. Popros účet alebo organizáciu Kilo, ktorá ju spustila, aby ju zrušila, a potom to skús znova.",
+      "pendingRequestUnidentifiedMessage": "Kilo nedokázalo zistiť, ku ktorému účtu GitHub patrí táto žiadosť. Začni nastavenie GitHubu znova z účtu, ktorý chceš pripojiť.",
       "didNotCompleteTitle": "Inštalácia sa nedokončila",
       "didNotCompleteMessage": "Inštalácia aplikácie pre GitHub sa nedokončila. Skús to znova z aplikácie."
     },

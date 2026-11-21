@@ -2181,6 +2181,8 @@
       "alreadyClaimedMessage": "Ìfìsórí GitHub yẹn ti sopọ̀ mọ́ àkọọ́lẹ̀ Kilo mìíràn tẹ́lẹ̀. Kọ́kọ́ gé àsopọ̀ rẹ̀ níbẹ̀.",
       "installationUnavailableMessage": "Ìfìsórí GitHub App yìí ti daduro tàbí kò sí mọ́. Mú un padà bọ̀ sípò tàbí tún un ṣe ìfìsórí ní GitHub, kí o sì tún bẹ̀rẹ̀.",
       "multipleInstallationsMessage": "Àjọ Kilo yìí lè sopọ̀ mọ́ àjọ GitHub kan péré ṣo fún ìgbà yìí.",
+      "pendingRequestMessage": "Ìbéèrè ìfìsórí GitHub tí ó ń dúró ti wà tẹ́lẹ̀ fún àkọọ́lẹ̀ yìí. Sọ fún àkọọ́lẹ̀ Kilo tàbí àjọ Kilo tí ó bẹ̀rẹ̀ rẹ̀ pé kí ó fagilé rẹ̀, kí o sì tún gbìyànjú.",
+      "pendingRequestUnidentifiedMessage": "Kilo kò lè dá wa àkọọ́lẹ̀ GitHub tí ìbéèrè yìí yẹ sí. Tún bẹ̀rẹ̀ ètò GitHub láti inú àkọọ́lẹ̀ tí o fẹ́ so mọ́.",
       "didNotCompleteTitle": "Ìfìsórí kò parí",
       "didNotCompleteMessage": "A kò parí ìfìsórí ìṣàfilọ́lẹ̀ GitHub náà. Tún gbìyànjú láti inú ìṣàfilọ́lẹ̀."
     },

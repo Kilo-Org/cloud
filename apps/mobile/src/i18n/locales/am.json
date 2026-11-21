@@ -2181,6 +2181,8 @@
       "alreadyClaimedMessage": "ያ የGitHub መተግበሪያ ጭነት አስቀድሞ ከሌላ የKilo መለያ ጋር ተገናኝቷል። በመጀመሪያ ከዚያ መለያ ግንኙነቱን አቋርጥ።",
       "installationUnavailableMessage": "ይህ የGitHub መተግበሪያ ጭነት ታግዷል ወይም ከእንግዲህ አይገኝም። በGitHub ውስጥ መልሰው አስተካክለው ወይም እንደገና ጫነው፣ ከዚያ እንደገና ጀምር።",
       "multipleInstallationsMessage": "ይህ የKilo ድርጅት በአሁኑ ጊዜ አንድ ብቻ የGitHub ድርጅት ማገናኘት ይችላል።",
+      "pendingRequestMessage": "ለዚህ መለያ ቀድሞውኑ በመጠባበቅ ላይ ያለ የGitHub ጭነት ጥያቄ አለ። ይህን ጥያቄ የጀመረው የKilo መለያ ወይም ድርጅት እንዲሰርዘው ጠይቅ፣ ከዚያ እንደገና ሞክር።",
+      "pendingRequestUnidentifiedMessage": "Kilo ይህ ጥያቄ ለየትኛው የGitHub መለያ እንደሆነ ማረጋገጥ አልቻለም። ለማገናኘት ከምትፈልገው መለያ የGitHub ማዋቀሩን እንደገና ጀምር።",
       "didNotCompleteTitle": "መጫኑ አልተጠናቀቀም",
       "didNotCompleteMessage": "የGitHub መተግበሪያው ጭነት አልተጠናቀቀም። ከመተግበሪያው እንደገና ሞክር።"
     },

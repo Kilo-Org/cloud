@@ -2229,6 +2229,8 @@
       "alreadyClaimedMessage": "Šī GitHub instalācija jau ir savienota ar citu Kilo kontu. Vispirms atvieno to šajā kontā.",
       "installationUnavailableMessage": "Šī GitHub App instalācija ir apturēta vai vairs nav pieejama. Atjauno to vai pārinstalē GitHub vidē, pēc tam sāc no jauna.",
       "multipleInstallationsMessage": "Šī Kilo organizācija pašlaik var izveidot savienojumu tikai ar vienu GitHub organizāciju.",
+      "pendingRequestMessage": "Šim kontam jau ir gaidošs GitHub instalēšanas pieprasījums. Lūg Kilo kontam vai Kilo organizācijai, kas to sāka, to atcelt, pēc tam mēģini vēlreiz.",
+      "pendingRequestUnidentifiedMessage": "Kilo nevarēja noteikt, uz kuru GitHub kontu attiecas šis pieprasījums. Sāc GitHub iestatīšanu no jauna no konta, kuru vēlies pievienot.",
       "didNotCompleteTitle": "Instalēšana netika pabeigta",
       "didNotCompleteMessage": "GitHub lietotnes instalēšana netika pabeigta. Mēģini vēlreiz lietotnē."
     },

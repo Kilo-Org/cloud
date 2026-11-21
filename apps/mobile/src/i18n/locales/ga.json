@@ -2325,6 +2325,8 @@
       "alreadyClaimedMessage": "Tá an tsuiteáil GitHub sin nasctha cheana le cuntas Kilo eile. Dícheangail í ansin ar dtús.",
       "installationUnavailableMessage": "Tá an tsuiteáil GitHub App seo ar fionraí nó níl sí ar fáil a thuilleadh. Athchóirigh nó athshuiteáil í i GitHub, ansin tosaigh arís.",
       "multipleInstallationsMessage": "Ní féidir leis an eagraíocht Kilo seo ach eagraíocht GitHub amháin a nascadh faoi láthair.",
+      "pendingRequestMessage": "Tá iarratas suiteála GitHub ar feitheamh cheana don chuntas seo. Iarr ar chuntas Kilo nó ar an eagraíocht a thosaigh é é a chealú, ansin bain triail as arís.",
+      "pendingRequestUnidentifiedMessage": "Níorbh fhéidir le Kilo a dheimhniú cé acu cuntas GitHub a bhaineann an t-iarratas seo leis. Tosaigh socrú GitHub arís ón gcuntas ar mhaith leat a nascadh.",
       "didNotCompleteTitle": "Níor críochnaíodh an tsuiteáil",
       "didNotCompleteMessage": "Níor críochnaíodh suiteáil na haipe GitHub. Bain triail as arís ón aip."
     },

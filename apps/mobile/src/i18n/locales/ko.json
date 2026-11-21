@@ -1620,6 +1620,8 @@
       "alreadyClaimedMessage": "해당 GitHub 앱 설치는 이미 다른 Kilo 계정에 연결되어 있습니다. 먼저 해당 계정에서 연결을 해제하세요.",
       "installationUnavailableMessage": "이 GitHub App 설치는 일시 중단되었거나 더 이상 사용할 수 없습니다. GitHub에서 복원하거나 다시 설치한 후 다시 시작하세요.",
       "multipleInstallationsMessage": "이 Kilo 조직은 현재 하나의 GitHub 조직만 연결할 수 있습니다.",
+      "pendingRequestMessage": "해당 계정에 대기 중인 GitHub 설치 요청이 이미 있습니다. 이 요청을 시작한 Kilo 계정 또는 Kilo 조직에 요청 취소를 요청한 후 다시 시도하세요.",
+      "pendingRequestUnidentifiedMessage": "Kilo에서 이 요청이 어떤 GitHub 계정의 것인지 확인하지 못했습니다. 연결하려는 계정에서 GitHub 설정을 다시 시작하세요.",
       "didNotCompleteTitle": "설치 미완료",
       "didNotCompleteMessage": "GitHub 앱 설치가 완료되지 않았습니다. 앱에서 다시 시도하세요."
     },

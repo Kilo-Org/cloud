@@ -60,6 +60,25 @@ describe('GET /api/cron/dispatch-spend-alerts', () => {
     );
   });
 
+  test('reports a skipped rollup as a successful tick', async () => {
+    mockRunSpendAlertSweep.mockResolvedValue({
+      sweptScopes: 0,
+      candidateScopes: 0,
+      fired: 0,
+      cleared: 0,
+      deliveriesEnqueued: 0,
+      rollupStatus: 'locked',
+    });
+
+    const response = await GET(request('cron-secret'));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      summary: { scopesTouched: 0, alertsFired: 0, rollup: 'locked' },
+    });
+  });
+
   test('exports a bounded function duration', () => {
     expect(maxDuration).toBe(300);
   });

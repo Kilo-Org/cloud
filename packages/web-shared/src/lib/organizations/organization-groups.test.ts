@@ -726,10 +726,7 @@ describe('organization group policy revision', () => {
         assigned_by_kilo_user_id: 'seeded-by-another-admin',
       }))
     );
-    const survivingBefore = membershipRow(
-      await readGroupMemberships(group.id),
-      survivingMember.id
-    );
+    const survivingBefore = membershipRow(await readGroupMemberships(group.id), survivingMember.id);
 
     const { policyRevision } = await updateOrganizationGroupDetails({
       organizationId: organization.id,
@@ -775,9 +772,7 @@ describe('organization group policy revision', () => {
     expect(unchanged.policyRevision).toBe(8);
     expect(await readPolicyRevision(organization.id)).toBe(8);
     expect(await readGroupMemberships(keptGroup.id)).toEqual(before);
-    expect(membershipRow(before, user.id).assigned_by_kilo_user_id).toBe(
-      'seeded-by-another-admin'
-    );
+    expect(membershipRow(before, user.id).assigned_by_kilo_user_id).toBe('seeded-by-another-admin');
 
     const added = await setOrganizationMemberGroups({
       organizationId: organization.id,

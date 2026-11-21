@@ -250,6 +250,34 @@ describe('refresh terminal classification', () => {
     expect(events[0]?.fingerprint).toEqual(['auth-terminal', '/api/auth/native/refresh', '401']);
   });
 
+  it('stays terminal on a 401 whose body stalls, without the blocked copy', async () => {
+    store.set(AUTH_TOKEN_KEY, 'dead-token');
+    store.set(REFRESH_TOKEN_KEY, 'dead-refresh');
+    store.set(TOKEN_EXPIRES_AT_KEY, '123');
+    // A response whose body never settles after its headers: the session is
+    // over whatever the body says, so the refusal must not wait on it and must
+    // not fall through to the retryable outcome.
+    const stalled = {
+      ok: false,
+      status: 401,
+      headers: new Headers(),
+      text: () => new Promise<string>(() => undefined),
+    } as unknown as Response;
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(stalled);
+    const events = recordEvents();
+
+    const outcome = await performRefresh();
+
+    expect(outcome).toEqual({
+      kind: 'refused',
+      sessionVersion: currentAuthEpoch(),
+    });
+    // No body, so no blocked copy, and the dead pair is gone all the same.
+    expect(store.get(REFRESH_TOKEN_KEY)).toBeUndefined();
+    expect(events).toHaveLength(1);
+    expect(events[0]?.fingerprint).toEqual(['auth-terminal', '/api/auth/native/refresh', '401']);
+  });
+
   it('scopes a refusal to the session that owned it when the epoch moves mid-clear', async () => {
     store.set(AUTH_TOKEN_KEY, 'dead-token');
     store.set(REFRESH_TOKEN_KEY, 'dead-refresh');

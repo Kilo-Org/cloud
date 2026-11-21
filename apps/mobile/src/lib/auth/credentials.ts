@@ -293,6 +293,14 @@ async function hasStoredCredentialMember(): Promise<boolean> {
 const REFUSAL_BODY_MAX_CHARS = 1_024;
 
 /**
+ * The most a refused 401 may spend on its body before the call decides on the
+ * status alone. A dead session is terminal whatever its body says; the body
+ * only supplies the blocked-account copy, so it must never be able to hold the
+ * refresh open, and it must never turn the refusal into a retry.
+ */
+const REFUSAL_BODY_BUDGET_MS = 1_500;
+
+/**
  * The first {@link REFUSAL_BODY_MAX_CHARS} of a refusal body, read inside the
  * deadline that bounds the refresh. A body that stalls after its headers cannot
  * hold the single-flight refresh open, and nothing past the cap can be the
@@ -304,6 +312,21 @@ async function readRefusalText(response: Response): Promise<string | null> {
     return text.slice(0, REFUSAL_BODY_MAX_CHARS);
   } catch {
     return null;
+  }
+}
+
+/**
+ * The 401's optional explanation, bounded on its own so the terminal
+ * classification can never depend on it. A stalled body answers `null` and the
+ * refusal stands on the status; the abandoned read is left to settle on its own.
+ */
+async function readAuthRefusalText(response: Response): Promise<string | null> {
+  const expiry = Promise.withResolvers<null>();
+  const timer = setTimeout(() => expiry.resolve(null), REFUSAL_BODY_BUDGET_MS);
+  try {
+    return await Promise.race([readRefusalText(response), expiry.promise]);
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -376,21 +399,24 @@ async function doRefresh(): Promise<RefreshOutcome> {
           body: JSON.stringify({ refreshToken: storedRefreshToken }),
           signal,
         });
-        // A 403 needs its body read: the refresh route has no 403 branch, so
-        // the body is what tells its own refusal apart from an intermediary's
-        // (an edge firewall, a WAF, a proxy) refusal, which proves nothing
-        // about the stored pair. Every other failure status is classified on
-        // the status alone, and a 2xx body must be read whole to parse.
+        // A 401 is terminal on the status alone: its body only supplies the
+        // blocked-account copy, so the read is bounded on its own and a body
+        // that stalls answers no copy instead of costing the deadline, which
+        // would turn a dead session into a retry. A 403 needs its body read
+        // under the call's deadline: the route has no 403 branch, so the body
+        // is what tells its own refusal apart from an intermediary's (an edge
+        // firewall, a WAF, a proxy) refusal, which proves nothing about the
+        // stored pair. Every other failure status is classified on the status
+        // alone, and a 2xx body must be read whole to parse.
         if (!res.ok) {
           return {
             response: res,
-            // A 401 and a 403 both need their body read: the 403 body tells the
-            // route's own refusal apart from an intermediary's, and the 401 body
-            // names the one refusal that explains the session — `USER_BLOCKED`.
-            // Every other failure status is classified on the status alone, and
-            // a 2xx body must be read whole to parse.
             refusalText:
-              res.status === 403 || res.status === 401 ? await readRefusalText(res) : null,
+              res.status === 401
+                ? await readAuthRefusalText(res)
+                : res.status === 403
+                  ? await readRefusalText(res)
+                  : null,
             successBody: undefined,
           };
         }

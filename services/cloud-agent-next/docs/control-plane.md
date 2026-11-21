@@ -844,11 +844,14 @@ keep environment snapshots and existing history/worktree recovery.
   longer exists. A release does not remove it, because release only stops the session and the record
   survives with its obligation. A record that still names another directory never satisfies the
   obligation, because the rules it carries belong to that directory; the marker waits for the record
-  the import re-points. The remembered ruleset and a record's own permission are parsed as rulesets
-  before use: a value that is not a ruleset is never applied and never becomes the record's grants,
-  because a ruleset widens what the agent may do. A marker that is present but not a ruleset fails the
-  prepare with a permanent session-import reason instead of reading as nothing owed, since reading it
-  as nothing owed would drop rules the record never received.
+  the import re-points, and the settle first replaces the marker's metadata copy with that record's
+  own value, because the re-pointing import clears the column and that read is the last that can see
+  it. A marker that owes only a ruleset still takes that value. The remembered ruleset and a
+  record's own permission are parsed as rulesets before use: a value that is not a ruleset is never
+  applied and never becomes the record's grants, because a ruleset widens what the agent may do. A
+  marker that is present but not a ruleset fails the prepare with a permanent session-import reason
+  instead of reading as nothing owed, since reading it as nothing owed would drop rules the record
+  never received.
   The marker directory is created `0700` and tightened to `0700` when it exists, and the file is
   `0600`. There is no fallback to a shared temporary directory: a process without a home
   directory cannot name the store, so recording or reading an obligation fails retryably instead of

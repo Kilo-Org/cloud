@@ -65,9 +65,11 @@ jest.mock('./processUsage.shared', () => {
 });
 
 const mockedErrorExceptInTest = jest.fn();
+const mockedLogExceptInTest = jest.fn();
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   ...(jest.requireActual('@kilocode/web-shared/lib/utils.server') as Record<string, unknown>),
   errorExceptInTest: (...args: unknown[]) => mockedErrorExceptInTest(...args),
+  logExceptInTest: (...args: unknown[]) => mockedLogExceptInTest(...args),
 }));
 
 import {
@@ -484,6 +486,7 @@ describe('countAndStoreEmbeddingUsage', () => {
     jest.mocked(sharedUsage.selectUsageCostFields).mockClear();
     jest.mocked(captureException).mockClear();
     jest.mocked(captureMessage).mockClear();
+    mockedLogExceptInTest.mockClear();
   });
 
   describe.each(['openrouter', 'vercel'] as const)('%s generation recovery', provider => {
@@ -707,7 +710,7 @@ describe('countAndStoreEmbeddingUsage', () => {
     expect(captureMessage).not.toHaveBeenCalled();
   });
 
-  it('reports a successful response without usage', async () => {
+  it('logs a successful response without usage at info level without reporting it', async () => {
     const usageContext: MicrodollarUsageContext = {
       ...createMockUsageContext('user-id', 'embedding@example.com', 0),
       api_kind: 'embeddings',
@@ -719,10 +722,11 @@ describe('countAndStoreEmbeddingUsage', () => {
     countAndStoreEmbeddingUsage(response, usageContext, undefined);
     await new Promise(resolve => setImmediate(resolve));
 
-    expect(captureMessage).toHaveBeenCalledWith(
-      'SUSPICIOUS: No embedding usage information',
-      expect.anything()
+    expect(mockedLogExceptInTest).toHaveBeenCalledWith(
+      '[extractEmbeddingUsage] No embedding usage information',
+      { model: 'test/embedding', statusCode: 200 }
     );
+    expect(captureMessage).not.toHaveBeenCalled();
   });
 
   it.each([

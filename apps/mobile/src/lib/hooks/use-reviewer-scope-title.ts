@@ -1,4 +1,3 @@
-import { useQuery } from '@tanstack/react-query';
 import { useEffect, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -14,7 +13,7 @@ import {
   reviewerScopeTitle,
   type ScopeOrganization,
 } from '@/lib/code-reviewer-scope-title';
-import { useTRPC } from '@/lib/trpc';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 
 /**
  * The remembered name for a scope, plus the effect that records the name the
@@ -50,16 +49,12 @@ export function useReviewerScopeName(
 /**
  * `reviewerScopeTitle` for a screen that has no membership list of its own: it
  * reads the shared `organizations.list` entry and fetches it only when the
- * scope is an organization. The personal scope needs no membership row, so it
- * never joins that query's pause/resume path.
+ * scope is an organization. The personal scope needs no membership row, so its
+ * own observer stays off — the app-wide read still serves it.
  */
 export function useReviewerScopeTitle(scope: string): string {
   const { t } = useTranslation();
-  const trpc = useTRPC();
-  const organizations = useQuery({
-    ...trpc.organizations.list.queryOptions(),
-    enabled: scope !== PERSONAL_SCOPE,
-  });
+  const organizations = useOrganizationsList({ enabled: scope !== PERSONAL_SCOPE });
   const knownName = useReviewerScopeName(scope, organizations.data);
   return reviewerScopeTitle(
     scope,

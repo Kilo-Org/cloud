@@ -68,6 +68,9 @@ vi.mock('@/lib/trpc', async () => {
 });
 vi.mock('@react-native-community/netinfo', () => ({ addEventListener: netinfo.addEventListener }));
 vi.mock('@/lib/config', () => ({ API_BASE_URL: 'https://force-state.test' }));
+// The reviewer permission hook now observes the shared memberships read, whose
+// owner gates it on the auth token; this suite forces the list's states.
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
   useNavigation: () => ({ isFocused: () => true }),

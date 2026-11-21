@@ -963,9 +963,9 @@ export function createWrapperKiloClient(
         // skip this call. The outstanding entry makes the next prepare apply
         // the ruleset instead of accepting the record as complete.
         if (signal?.aborted) {
-          // The caller gave up (a step timeout or a release), so the route must
-          // keep that classification and its retry budget instead of reporting
-          // a permanent ruleset failure. The marker stays, so the next prepare
+          // The step budget aborted this signal, so the route must keep that
+          // classification and its retry budget instead of reporting a
+          // permanent ruleset failure. The marker stays, so the next prepare
           // applies it.
           throw signal.reason instanceof Error
             ? signal.reason

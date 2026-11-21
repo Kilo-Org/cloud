@@ -1674,9 +1674,9 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
         sessionId,
         { id: sessionId, directory: otherDirectory, permission },
         {
-          // The caller gives up while its permission update is in flight, which
-          // is what a step timeout or a release does.
-          onPermissionUpdate: () => controller.abort(new Error('kilo_session aborted')),
+          // The step budget aborts with this reason while the permission
+          // update is in flight, which is the only abort this signal sees.
+          onPermissionUpdate: () => controller.abort(new Error('kilo_session timed out')),
         }
       );
       try {
@@ -1688,7 +1688,7 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
         // classification and retry budget, so it must not carry the permanent one.
         expect(error).not.toBeInstanceOf(SessionRulesetError);
         expect(error).toBeInstanceOf(Error);
-        expect((error as Error).message).toBe('kilo_session aborted');
+        expect((error as Error).message).toBe('kilo_session timed out');
         // The obligation is durable, so the next prepare applies it.
         expect(await readOutstandingRuleset(sessionId)).toEqual(permission);
       } finally {

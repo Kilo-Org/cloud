@@ -2,8 +2,10 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   statSync,
@@ -1846,8 +1848,13 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
         expect(read).toBeInstanceOf(SessionRulesetUnverifiedError);
 
         // Nothing could have been written, so nothing is removed and no path is
-        // derived from a shared directory.
+        // derived from a shared directory. The shared store is the one place a
+        // fallback would have gone.
+        const shared = join(tmpdir(), '.kilo-control', 'rulesets');
+        const before = existsSync(shared) ? readdirSync(shared).length : 0;
         await forgetSessionObligations(sessionId);
+        const after = existsSync(shared) ? readdirSync(shared).length : 0;
+        expect(after).toBe(before);
       } finally {
         if (originalHome === undefined) delete process.env.HOME;
         else process.env.HOME = originalHome;
@@ -1967,6 +1974,51 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
           { queryDirectory: directory, body: { permission: recordRules } },
         ]);
         expect(await readSessionObligations(sessionId)).toBeUndefined();
+      } finally {
+        await forgetSessionObligations(sessionId).catch(() => undefined);
+        if (originalHome === undefined) delete process.env.HOME;
+        else process.env.HOME = originalHome;
+      }
+    });
+
+    it('rewrites a stale metadata copy without dropping the permission it owes', async () => {
+      const sessionId = 'ses_record_metadata_supersede';
+      const directory = temporaryDirectory('kilo-api-metadata-supersede-target-');
+      const otherDirectory = temporaryDirectory('kilo-api-metadata-supersede-other-');
+      const home = temporaryDirectory('kilo-api-metadata-supersede-home-');
+      const marker = join(
+        home,
+        '.kilo-control',
+        'rulesets',
+        `${encodeURIComponent(sessionId)}.json`
+      );
+      const owedRules = [{ permission: 'bash', pattern: 'git push*', action: 'allow' as const }];
+      const olderMetadata = { 'kilo.goal': { text: 'the goal at import time', updatedAt: 6 } };
+      const newerMetadata = { 'kilo.goal': { text: 'a goal written later', updatedAt: 40 } };
+      const originalHome = process.env.HOME;
+      process.env.HOME = home;
+      let markerAtImport: unknown;
+      try {
+        await rememberSessionObligations(sessionId, {
+          permission: owedRules,
+          metadata: olderMetadata,
+        });
+        // The record carries no permission of its own and a newer goal than the
+        // marker kept, so the metadata half alone makes the copy stale.
+        const stub = startEnsureSessionStub(
+          sessionId,
+          { id: sessionId, directory: otherDirectory, metadata: newerMetadata },
+          { onImport: () => (markerAtImport = JSON.parse(readFileSync(marker, 'utf8'))) }
+        );
+
+        await createClient(stub.url).ensureSession(sessionId, directory);
+
+        // The stale goal is replaced by the record's own, and the rules the
+        // record never carried are still owed because the marker held them.
+        expect(markerAtImport).toEqual({
+          permission: owedRules,
+          metadata: newerMetadata,
+        });
       } finally {
         await forgetSessionObligations(sessionId).catch(() => undefined);
         if (originalHome === undefined) delete process.env.HOME;

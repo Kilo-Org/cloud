@@ -43,6 +43,26 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+/**
+ * A stable JSON rendering, so two equal metadata values compare equal whatever
+ * their key order. Undefined object members are dropped, as `JSON.stringify`
+ * drops them, and an undefined value renders as `null`.
+ *
+ * This decides whether a durable copy must be rewritten, never whether to send
+ * an update: an update is decided by whether the record carries a value at all.
+ */
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(item => stableJson(item)).join(',')}]`;
+  if (isRecord(value)) {
+    const members = Object.keys(value)
+      .filter(key => value[key] !== undefined)
+      .sort()
+      .map(key => `${JSON.stringify(key)}:${stableJson(value[key])}`);
+    return `{${members.join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
+
 function isKiloEvent(value: unknown): value is KiloEvent {
   return isRecord(value) && typeof value.type === 'string';
 }
@@ -1313,14 +1333,25 @@ export function createWrapperKiloClient(
       // record never held. It is rewritten to the owed set before the import,
       // and a rewrite that fails fails the route retryably with the record
       // still untouched, so the retried prepare narrows the same marker again.
+      //
+      // A marker whose metadata is not the record's own is stale for the same
+      // reason and is rewritten in the same write: the import clears the
+      // column, so a later settle restores whatever the marker holds, and a copy
+      // older than the record would put a superseded goal back.
       const superseded =
-        recordRuleset !== undefined &&
-        remembered?.permission !== undefined &&
-        !rulesetCovers(recordRuleset, remembered.permission);
+        (recordRuleset !== undefined &&
+          remembered?.permission !== undefined &&
+          !rulesetCovers(recordRuleset, remembered.permission)) ||
+        (recordMetadata !== undefined &&
+          remembered?.metadata !== undefined &&
+          stableJson(recordMetadata) !== stableJson(remembered.metadata));
       if (superseded) {
         try {
+          // `owed` rather than `recordRuleset`: the two are the same value when
+          // the record carries one, and when it does not the marker's permission
+          // is the obligation a later settle must still apply, so it stays.
           await rememberSessionObligations(sessionId, {
-            permission: recordRuleset,
+            ...(owed === undefined ? {} : { permission: owed }),
             ...(metadataObligation === undefined ? {} : { metadata: metadataObligation }),
           });
         } catch (error) {
@@ -1330,9 +1361,9 @@ export function createWrapperKiloClient(
       // The obligation is already durable when the marker covers what the record
       // carries, so it is not rewritten: a directory that refuses the write must
       // not fail a route whose obligations are already recorded. A marker that
-      // already names a metadata value is durable whatever its bytes, because it
-      // is settled against the record either way and the record's own value wins
-      // there, so rewriting it would only repeat the write.
+      // already names a metadata value is durable whatever its bytes, because
+      // `superseded` above rewrites it whenever the record carries a different
+      // one, so reaching here means the marker is the newest copy available.
       const durable =
         (owed === undefined ||
           (remembered?.permission !== undefined && rulesetCovers(remembered.permission, owed))) &&

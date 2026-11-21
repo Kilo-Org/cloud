@@ -813,13 +813,14 @@ keep environment snapshots and existing history/worktree recovery.
   The record's own `permission` is authoritative: when the marker and the record both hold a
   ruleset, the record's set is the one applied, because the marker exists only because the native
   import clears the row, and it is a durable copy of an obligation rather than a second source of
-  truth. The marker is rewritten to the record's set before the import and only when it does not
-  already cover it, so a directory that refuses the write cannot fail a route whose obligation is
-  already recorded. A rule that only the marker held is dropped rather than applied: the record's
-  authenticated permission is the state of the session, and this module is its only writer through
-  the native API. Once the record's set is applied, the marker is reduced to what is still owed and
-  removed when nothing remains, so a rule the record does not carry is not left behind as a standing
-  obligation.
+  truth. The marker is rewritten before the import and only when it does not already name what the
+  record carries, so a directory that refuses the write cannot fail a route whose obligation is
+  already recorded. A rewrite that fails fails the route retryably with the record untouched, so the
+  retried prepare makes the same comparison again. A rule that only the marker held is dropped
+  rather than applied: the record's authenticated permission is the state of the session, and this
+  module is its only writer through the native API. Once the record's set is applied, the marker is
+  reduced to what is still owed and removed when nothing remains, so a rule the record does not
+  carry is not left behind as a standing obligation.
   The wrapper restores `metadata` right after the import and before it applies the ruleset, because
   metadata holds the session goal a user sees: a ruleset that cannot be applied throws, and the
   next prepare settles that obligation without running the create path again, so a restore placed
@@ -867,13 +868,14 @@ keep environment snapshots and existing history/worktree recovery.
   update, because the retried step reads the same durable state and the native update appends. A
   marker that cannot be written before the import fails as retryable too, because no record is
   committed yet; a marker that reads but is not a ruleset, and a record whose permission is not a
-  ruleset, fail as the permanent session-import reason, whose message names the marker path and the
-  underlying cause in the wrapper log only, while the session frame still carries the session-import
-  reason with no detail. A settle whose permission update fails fails retryably and reports the same
-  session-import reason, because the marker is intact and the retried step reads it again. An apply
-  or a settle interrupted by the step budget's abort reports the abort rather than the permanent or
-  retryable ruleset classification, so the step keeps its own classification and retry budget, and
-  the marker stays for the next prepare.
+  ruleset, fail as the permanent session-import reason. The message names the store path and the
+  underlying cause in the wrapper log only — the marker path for a marker that cannot be
+  interpreted, the record's id for a record whose permission is not a ruleset — while the session
+  frame still carries the session-import reason with no detail. A settle whose permission update
+  fails fails retryably and reports the same session-import reason, because the marker is intact and
+  the retried step reads it again. An apply or a settle interrupted by the step budget's abort
+  reports the abort rather than the permanent or retryable ruleset classification, so the step keeps
+  its own classification and retry budget, and the marker stays for the next prepare.
   New chats and later siblings share that runtime and directory without resetting files.
 
   On a shared-workspace Kilo v2 runtime start without a workspace snapshot, the wrapper also preloads

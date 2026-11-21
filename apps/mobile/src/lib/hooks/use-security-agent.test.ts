@@ -203,6 +203,19 @@ describe('useSecurityAgentCapability status derivation', () => {
     expect(capability.status).toBe('denied');
     expect(capability.canManage).toBe(false);
   });
+
+  it('reports a failed refetch whose cache has no role for this scope as an error, not a denial', () => {
+    // A cached list that cannot answer for this scope is not a role: reading it
+    // as "member" would disable every control with no way to retry.
+    queryState.data = [{ organizationId: 'org_UNRELATED', role: 'owner' }];
+    queryState.isError = true;
+    queryState.isPending = false;
+    const capability = capabilityFor('org_123');
+
+    expect(capability.status).toBe('error');
+    expect(capability.canManage).toBe(false);
+    expect(capability.isError).toBe(true);
+  });
 });
 
 describe('useSecurityAnalysisCapacity', () => {

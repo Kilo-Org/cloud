@@ -228,12 +228,16 @@ export function useSecurityAgentCapability(scope: string) {
   let status: SecurityAgentCapabilityStatus = 'loading';
   if (isPersonalSecurityScope(scope)) {
     status = 'allowed';
+  } else if (isError && (!hasData || role === undefined)) {
+    // Mirrors `classifyPermission`: a settled role stays authoritative, but
+    // only a role for THIS scope. A cached list that cannot answer for this
+    // scope plus a failed refetch is a retryable failure, not "no access" — a
+    // denial would disable the controls with no Retry offered.
+    status = 'error';
   } else if (hasData) {
     // A settled role stays authoritative: a failed background refetch must
     // never demote an already-resolved capability to 'error'.
     status = canManage ? 'allowed' : 'denied';
-  } else if (isError) {
-    status = 'error';
   } else if (isPending) {
     // Covers a cold launch whose read is still in flight: pending with no
     // data yet.

@@ -15,6 +15,7 @@ import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { classifyListBody } from '@/lib/query/list-body-state';
+import { classifyReadFailureKind, readFailureKindVariant } from '@/lib/query/read-failure-variant';
 
 export function ScopeListScreen() {
   const pushOnce = useSinglePushRoute();
@@ -23,7 +24,7 @@ export function ScopeListScreen() {
   // options. A second observer with defaulted options would replace those
   // options while this screen is mounted and leave every other consumer's read
   // paused with no data.
-  const { data: orgs, isError, isFetching, fetchStatus, refetch } = useOrganizationsList();
+  const { data: orgs, error, isError, isFetching, fetchStatus, refetch } = useOrganizationsList();
   const connectivity = useCommittedConnectivityStatus();
 
   const openScope = (scope: string) => {
@@ -42,6 +43,17 @@ export function ScopeListScreen() {
     fetchStatus,
     connectivityKnown: connectivity !== 'unknown',
   });
+  // The read settles instead of pausing, so `classifyListBody` can no longer
+  // reach its paused cause here: the failure's own cause decides the copy. The
+  // kind orders a control-plane deadline first, then the connection, so a
+  // slow-but-reachable server never reads as an unreachable one.
+  const failureVariant = readFailureKindVariant(
+    classifyReadFailureKind({
+      errors: error ? [error] : [],
+      isPaused: false,
+      connectivity,
+    })
+  );
 
   return (
     <View className="flex-1 bg-background">
@@ -50,9 +62,10 @@ export function ScopeListScreen() {
         {orgsBody.status === 'error' ? (
           <QueryError
             // Only a read that delivered nothing reaches here. Its cause picks
-            // the icon and wording: a read the connection stopped says so, a
-            // read that failed names the organizations it could not answer for.
-            variant={orgsBody.cause === 'offline' ? 'offline' : 'server'}
+            // the icon and wording, from the failure itself rather than the
+            // list body: a read the connection stopped says so, a read that
+            // failed names the organizations it could not answer for.
+            variant={failureVariant}
             title={t('common.couldNotLoadOrganizations')}
             message={t('codeReviewer.scopeList.personalStillAvailable')}
             placement="top"

@@ -17,6 +17,7 @@ type Membership = { organizationId: string; organizationName: string; role: stri
 
 type ListState = {
   data: Membership[] | undefined;
+  error: unknown;
   isError: boolean;
   isFetching: boolean;
   fetchStatus: 'fetching' | 'paused' | 'idle';
@@ -26,14 +27,18 @@ type ListState = {
 /** The memberships read, driven per test: the screen's only input. */
 const memberships = vi.hoisted(() => ({
   data: undefined as Membership[] | undefined,
+  error: undefined as unknown,
   isError: false,
   isFetching: false,
   fetchStatus: 'idle' as ListState['fetchStatus'],
   refetch: vi.fn<() => void>(),
 }));
 
+/** The connection the offline banner state reports, driven per test. */
+const connectivity = vi.hoisted(() => ({ status: 'online' as 'online' | 'offline' | 'unknown' }));
+
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
-  useCommittedConnectivityStatus: () => 'online',
+  useCommittedConnectivityStatus: () => connectivity.status,
 }));
 
 const MEMBERSHIPS: Membership[] = [
@@ -101,10 +106,12 @@ let view: RenderWithProvidersResult | undefined = undefined;
 
 beforeEach(() => {
   memberships.data = undefined;
+  memberships.error = undefined;
   memberships.isError = false;
   memberships.isFetching = false;
   memberships.fetchStatus = 'idle';
   memberships.refetch.mockReset();
+  connectivity.status = 'online';
 });
 
 afterEach(() => {
@@ -148,7 +155,13 @@ describe('ScopeListScreen organization rows', () => {
   });
 
   it('paints the error banner alone, with no placeholder that could outlive it', async () => {
+    // A served answer is the server's failure, so the banner keeps the system
+    // wording even when the device also reports itself offline.
     memberships.isError = true;
+    // A tRPC envelope is what `readTrpcErrorField` reads as a server answer.
+    memberships.error = Object.assign(new Error('boom'), {
+      data: { code: 'INTERNAL_SERVER_ERROR', message: 'boom' },
+    });
     const root = await mountScreen();
 
     const banner = findByType(root, 'QueryErrorMock')[0];
@@ -157,6 +170,21 @@ describe('ScopeListScreen organization rows', () => {
     expect(texts(root)).toContain('Personal repositories are still available below.');
     expect(findByType(root, 'RowSkeleton')).toHaveLength(0);
     // The banner promises Personal is still below, so the row stays.
+    expect(rows(root).map(row => row.title)).toEqual(['Personal']);
+  });
+
+  it('names the connection for a failed read that never reached the server', async () => {
+    // The shared read settles instead of pausing (`networkMode: 'always'`), so
+    // a confirmed-offline cold start fails with a transport error rather than
+    // a paused read; the failure's own cause, not the list body, picks the copy.
+    memberships.isError = true;
+    memberships.error = new TypeError('Network request failed');
+    connectivity.status = 'offline';
+    const root = await mountScreen();
+
+    const banner = findByType(root, 'QueryErrorMock')[0];
+    expect(banner?.props.variant).toBe('offline');
+    expect(findByType(root, 'RowSkeleton')).toHaveLength(0);
     expect(rows(root).map(row => row.title)).toEqual(['Personal']);
   });
 

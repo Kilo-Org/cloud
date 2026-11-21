@@ -182,7 +182,7 @@ describe('review memory aggregation', () => {
     }
   });
 
-  it('forwards a caller supplied signal to the gateway call', async () => {
+  it('forwards a caller supplied signal to the structured output call', async () => {
     const user = await insertTestUser();
     const owner = { type: 'user' as const, id: user.id };
     // One-shot stubs keep the call-through defaults intact for the remaining tests.
@@ -198,24 +198,46 @@ describe('review memory aggregation', () => {
       tokensOut: null,
     } as never);
     const controller = new AbortController();
-    // A caller signal must reach the gateway unchanged, with no default deadline alongside it.
+    // A caller signal must reach the structured output call unchanged.
+    const result = await generateReviewMemoryProposalWithGateway({
+      owner,
+      platform: 'github',
+      repoFullName: 'acme/widgets',
+      events: [],
+      signal: controller.signal,
+    });
+
+    expect(result.draft).toEqual({ status: 'no_change' });
+    expect(structuredOutput).toHaveBeenCalledWith(
+      expect.objectContaining({ abortSignal: controller.signal })
+    );
+  });
+
+  it('passes a caller supplied signal to the generator instead of arming a deadline', async () => {
+    const user = await insertTestUser();
+    const owner = { type: 'user' as const, id: user.id };
+    await seedFeedback(owner);
+    let capturedSignal: AbortSignal | undefined;
+    // The default deadline only shows up as a call, so record whether one is armed.
     const realTimeout = AbortSignal.timeout;
     const timeoutSpy = jest.spyOn(AbortSignal, 'timeout').mockImplementation(realTimeout);
+    const controller = new AbortController();
 
     try {
-      const result = await generateReviewMemoryProposalWithGateway({
+      const result = await runReviewMemoryAnalysis({
         owner,
         platform: 'github',
         repoFullName: 'acme/widgets',
-        events: [],
+        generate: async input => {
+          capturedSignal = input.signal;
+          return { draft: { status: 'no_change' } };
+        },
         signal: controller.signal,
       });
 
-      expect(result.draft).toEqual({ status: 'no_change' });
-      expect(structuredOutput).toHaveBeenCalledWith(
-        expect.objectContaining({ abortSignal: controller.signal })
-      );
+      expect(result).toEqual({ status: 'no_change' });
       expect(timeoutSpy).not.toHaveBeenCalled();
+      expect(capturedSignal).toBe(controller.signal);
     } finally {
       timeoutSpy.mockRestore();
     }

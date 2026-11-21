@@ -69,6 +69,45 @@ describe('createDrizzleClient', () => {
       expect.objectContaining({ types: databaseTypeParsers })
     );
   });
+
+  it('keeps the reserved connection settings authoritative for a widened poolConfig', () => {
+    delete process.env.DATABASE_CA;
+    const widened: pg.PoolConfig = {
+      connectionString: 'postgres://widener:widener-secret@widened.example:6543/widened',
+      user: 'widener',
+      password: 'widener-secret',
+      host: 'widened.example',
+      port: 6543,
+      database: 'widened',
+      ssl: { ca: 'widened' },
+      types: { getTypeParser: jest.fn() },
+      max: 7,
+      application_name: 'widened-pool',
+    };
+
+    createDrizzleClient({
+      connectionString: 'postgres://alice:secret@derived.example:5432/derived',
+      poolConfig: widened,
+    });
+
+    expect(pg.Pool).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        user: 'alice',
+        password: 'secret',
+        host: 'derived.example',
+        port: 5432,
+        database: 'derived',
+        ssl: false,
+        types: databaseTypeParsers,
+        max: 7,
+        application_name: 'widened-pool',
+      })
+    );
+    const calls = jest.mocked(pg.Pool).mock.calls;
+    const config = calls[calls.length - 1]?.[0] as pg.PoolConfig;
+    expect(Object.hasOwn(config, 'connectionString')).toBe(true);
+    expect(config.connectionString).toBeUndefined();
+  });
 });
 
 // Compile-time guards: the helpers own the int8 parser, so their option types must reject

@@ -13,7 +13,7 @@ import type { PlatformIntegration } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { decryptKeyedEnvelope } from '@kilocode/encryption';
 import {
@@ -80,6 +80,7 @@ let getOrCreateProjectAccessToken: typeof GitLabService.getOrCreateProjectAccess
 let removeStoredProjectAccessToken: typeof GitLabProjectTokenHandles.removeStoredProjectAccessToken;
 let listProjectIdsWithStoredTokens: typeof GitLabProjectTokenHandles.listProjectIdsWithStoredTokens;
 let describeSettlementFailure: typeof GitLabProjectTokenHandles.describeSettlementFailure;
+let classifyCredentialResolutionFailure: typeof GitLabProjectTokenHandles.classifyCredentialResolutionFailure;
 let disconnectGitLabIntegration: typeof GitLabService.disconnectGitLabIntegration;
 let settleStoredProjectTokens: typeof GitLabService.settleStoredProjectTokens;
 
@@ -113,8 +114,12 @@ describe('GitLab encrypted credential persistence', () => {
       disconnectGitLabIntegration,
       settleStoredProjectTokens,
     } = await import('./gitlab-service'));
-    ({ removeStoredProjectAccessToken, listProjectIdsWithStoredTokens, describeSettlementFailure } =
-      await import('./platforms/gitlab/project-token-handles'));
+    ({
+      removeStoredProjectAccessToken,
+      listProjectIdsWithStoredTokens,
+      describeSettlementFailure,
+      classifyCredentialResolutionFailure,
+    } = await import('./platforms/gitlab/project-token-handles'));
   });
 
   beforeEach(() => {
@@ -1034,7 +1039,7 @@ describe('GitLab encrypted credential persistence', () => {
         },
       })
       .where(eq(platform_integrations.id, initial.integration.id));
-    mockFetchGitLabCredential.mockResolvedValue({ status: 'temporarily_unavailable' });
+    mockFetchGitLabCredential.mockResolvedValue({ status: 'not_connected' });
 
     const noCredentialRefusal = await connectWithPAT(
       { type: 'user', id: user.id },
@@ -1063,6 +1068,268 @@ describe('GitLab encrypted credential persistence', () => {
       })
     );
     expect(mockRevokeProjectAccessToken).not.toHaveBeenCalled();
+    expect(mockFetchGitLabCredential).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a transient credential outage as retryable', async () => {
+    const user = await insertTestUser();
+    const initial = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-initial-token',
+      'https://gitlab.com',
+      user.id
+    );
+    const [initialIntegration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, initial.integration.id));
+    await db
+      .update(platform_integrations)
+      .set({
+        metadata: {
+          ...(initialIntegration.metadata as Record<string, unknown>),
+          project_tokens: {
+            '99': {
+              token_id: 999,
+              token: 'glpat-project-token',
+              expires_at: '2027-07-13',
+              created_at: '2026-07-13T00:00:00.000Z',
+              name: 'Kilo Code Review Bot',
+            },
+          },
+        },
+      })
+      .where(eq(platform_integrations.id, initial.integration.id));
+    await db.insert(platform_access_token_credentials).values({
+      platform_integration_id: initial.integration.id,
+      token_encrypted: 'encrypted-project-token',
+      provider_credential_type: 'project_access_token',
+      provider_resource_id: '99',
+      provider_base_url: 'https://gitlab.com',
+      provider_metadata: { providerCredentialId: '999', expiresOn: '2027-07-13' },
+    });
+    mockFetchGitLabCredential.mockResolvedValue({ status: 'temporarily_unavailable' });
+
+    const refusal = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-other-instance-token',
+      'https://self.gitlab.example/',
+      user.id
+    ).catch((error: unknown) => error);
+
+    expect(refusal).toMatchObject({ code: 'PRECONDITION_FAILED' });
+    const refusalMessage = refusal instanceof Error ? refusal.message : '';
+    expect(refusalMessage).toContain('projects: 99');
+    expect(refusalMessage).toContain('the stored credential could not be reached');
+    expect(refusalMessage).toContain('Try again in a moment.');
+    expect(refusalMessage).not.toContain('Disconnect the integration');
+
+    expect(mockFetchGitLabCredential).toHaveBeenCalledTimes(2);
+    expect(mockRevokeProjectAccessToken).not.toHaveBeenCalled();
+    const [unchanged] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, initial.integration.id));
+    expect(unchanged.metadata).toEqual(
+      expect.objectContaining({
+        gitlab_instance_url: 'https://gitlab.com',
+        project_tokens: { '99': expect.objectContaining({ token_id: 999 }) },
+      })
+    );
+    await expect(
+      db
+        .select()
+        .from(platform_access_token_credentials)
+        .where(
+          and(
+            eq(platform_access_token_credentials.platform_integration_id, initial.integration.id),
+            eq(platform_access_token_credentials.provider_resource_id, '99')
+          )
+        )
+    ).resolves.toHaveLength(1);
+  });
+
+  it('allows an instance change when a transient credential outage clears on a repeat', async () => {
+    const user = await insertTestUser();
+    const initial = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-initial-token',
+      'https://gitlab.com',
+      user.id
+    );
+    const [initialIntegration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, initial.integration.id));
+    await db
+      .update(platform_integrations)
+      .set({
+        metadata: {
+          ...(initialIntegration.metadata as Record<string, unknown>),
+          project_tokens: {
+            '99': {
+              token_id: 999,
+              token: 'glpat-project-token',
+              expires_at: '2027-07-13',
+              created_at: '2026-07-13T00:00:00.000Z',
+              name: 'Kilo Code Review Bot',
+            },
+          },
+        },
+      })
+      .where(eq(platform_integrations.id, initial.integration.id));
+    await db.insert(platform_access_token_credentials).values({
+      platform_integration_id: initial.integration.id,
+      token_encrypted: 'encrypted-project-token',
+      provider_credential_type: 'project_access_token',
+      provider_resource_id: '99',
+      provider_base_url: 'https://gitlab.com',
+      provider_metadata: { providerCredentialId: '999', expiresOn: '2027-07-13' },
+    });
+    mockFetchGitLabCredential
+      .mockResolvedValueOnce({ status: 'temporarily_unavailable' })
+      .mockResolvedValueOnce({
+        status: 'available',
+        token: 'glpat-primary-token',
+        instanceUrl: 'https://gitlab.com',
+        glabIsOAuth2: false,
+      });
+
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-other-instance-token',
+      'https://self.gitlab.example/',
+      user.id
+    );
+
+    expect(connected.success).toBe(true);
+    expect(mockRevokeProjectAccessToken).toHaveBeenCalledWith(
+      'glpat-primary-token',
+      '99',
+      999,
+      'https://gitlab.com',
+      expect.any(AbortSignal)
+    );
+    await expect(
+      db
+        .select()
+        .from(platform_access_token_credentials)
+        .where(
+          and(
+            eq(platform_access_token_credentials.platform_integration_id, initial.integration.id),
+            eq(platform_access_token_credentials.provider_resource_id, '99')
+          )
+        )
+    ).resolves.toHaveLength(0);
+  });
+
+  it('lists each blocked project under its own cause', async () => {
+    const user = await insertTestUser();
+    const initial = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-initial-token',
+      'https://gitlab.com',
+      user.id
+    );
+    const [initialIntegration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, initial.integration.id));
+    await db
+      .update(platform_integrations)
+      .set({
+        metadata: {
+          ...(initialIntegration.metadata as Record<string, unknown>),
+          project_tokens: {
+            '99': {
+              token_id: 999,
+              token: 'glpat-project-token',
+              expires_at: '2027-07-13',
+              created_at: '2026-07-13T00:00:00.000Z',
+              name: 'Kilo Code Review Bot',
+            },
+            '77': {
+              token_id: 777,
+              token: 'glpat-second-project-token',
+              expires_at: '2027-07-13',
+              created_at: '2026-07-13T00:00:00.000Z',
+              name: 'Kilo Code Review Bot',
+            },
+          },
+        },
+      })
+      .where(eq(platform_integrations.id, initial.integration.id));
+    await db.insert(platform_access_token_credentials).values([
+      {
+        platform_integration_id: initial.integration.id,
+        token_encrypted: 'encrypted-project-token',
+        provider_credential_type: 'project_access_token',
+        provider_resource_id: '99',
+        provider_base_url: 'https://gitlab.com',
+        provider_metadata: { providerCredentialId: '999', expiresOn: '2027-07-13' },
+      },
+      {
+        platform_integration_id: initial.integration.id,
+        token_encrypted: 'encrypted-second-project-token',
+        provider_credential_type: 'project_access_token',
+        provider_resource_id: '77',
+        provider_base_url: 'https://gitlab.com',
+        provider_metadata: { providerCredentialId: '777', expiresOn: '2027-07-13' },
+      },
+    ]);
+    mockRevokeProjectAccessToken.mockImplementation(async (_token, projectId) => {
+      if (String(projectId) === '99') {
+        throw new GitLabProjectAccessTokenPermissionError(99, 403, 'x');
+      }
+      throw new GitLabProjectAccessTokenRevocationError(77, 503, 'GitLab responded with HTTP 503.');
+    });
+
+    const refusal = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-other-instance-token',
+      'https://self.gitlab.example/',
+      user.id
+    ).catch((error: unknown) => error);
+
+    expect(refusal).toMatchObject({ code: 'PRECONDITION_FAILED' });
+    const refusalMessage = refusal instanceof Error ? refusal.message : '';
+    const [rejectedClause, unconfirmedClause] = refusalMessage.split(
+      'Other project tokens are also blocked because'
+    );
+    expect(rejectedClause).toContain('projects: 99');
+    expect(rejectedClause).toContain('GitLab refused the connected credential while revoking them');
+    expect(rejectedClause).toContain(
+      'Disconnect the integration, then reconnect the current instance with a credential that can revoke them.'
+    );
+    expect(unconfirmedClause).toContain('projects: 77');
+    expect(unconfirmedClause).toContain('a revocation could not be confirmed');
+    expect(unconfirmedClause).toContain('Try again in a moment.');
+    expect(unconfirmedClause).not.toContain('99');
+
+    const [unchanged] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, initial.integration.id));
+    expect(unchanged.metadata).toEqual(
+      expect.objectContaining({
+        gitlab_instance_url: 'https://gitlab.com',
+        project_tokens: {
+          '99': expect.objectContaining({ token_id: 999 }),
+          '77': expect.objectContaining({ token_id: 777 }),
+        },
+      })
+    );
+    await expect(
+      db
+        .select()
+        .from(platform_access_token_credentials)
+        .where(
+          and(
+            eq(platform_access_token_credentials.platform_integration_id, initial.integration.id),
+            isNotNull(platform_access_token_credentials.provider_resource_id)
+          )
+        )
+    ).resolves.toHaveLength(2);
   });
 
   it('refuses an instance change when the stored instance address is unusable', async () => {
@@ -2611,6 +2878,17 @@ describe('GitLab encrypted credential persistence', () => {
     expect(
       describeSettlementFailure(new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'x' }))
     ).toEqual({ retryable: true, reason: 'provider_unconfirmed' });
+    expect(
+      classifyCredentialResolutionFailure(
+        new TRPCError({ code: 'SERVICE_UNAVAILABLE', message: 'x' })
+      )
+    ).toBe('credential_unresolved');
+    expect(classifyCredentialResolutionFailure(new TypeError('fetch failed'))).toBe(
+      'credential_unresolved'
+    );
+    expect(
+      classifyCredentialResolutionFailure(new TRPCError({ code: 'NOT_FOUND', message: 'x' }))
+    ).toBe('no_credential');
   });
 
   it('drops a legacy entry that names no revocable id on disconnect', async () => {

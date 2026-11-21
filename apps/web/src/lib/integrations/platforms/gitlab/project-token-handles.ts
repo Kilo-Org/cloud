@@ -255,14 +255,33 @@ export type StoredProjectTokenRemoval =
       reason: ProjectTokenRetentionReason;
     };
 
+/**
+ * Kind a settlement reports for a credential it could not resolve. A definite
+ * answer means the integration holds no usable credential; a broker outage or a
+ * transport failure is reported as retryable.
+ */
+export function classifyCredentialResolutionFailure(
+  error: unknown
+): 'no_credential' | 'credential_unresolved' {
+  if (error instanceof TRPCError && error.code !== 'SERVICE_UNAVAILABLE') return 'no_credential';
+  return 'credential_unresolved';
+}
+
+/** Why one stored project token still blocks an instance change. */
+export type ProjectTokenBlockerReason =
+  | ProjectTokenRetentionReason
+  | 'no_credential'
+  | 'credential_unresolved'
+  | 'not_attempted';
+
 /** One stored project token that still blocks an instance change, and why. */
 export type ProjectTokenBlocker = {
   projectId: string;
-  reason: ProjectTokenRetentionReason | 'no_credential' | 'not_attempted';
+  reason: ProjectTokenBlockerReason;
 };
 
 /** What to do about one refusal, and the kind it reports. */
-const BLOCKER_MESSAGES: Record<ProjectTokenBlocker['reason'], { cause: string; remedy: string }> = {
+const BLOCKER_MESSAGES: Record<ProjectTokenBlockerReason, { cause: string; remedy: string }> = {
   stored_instance_unusable: {
     cause: 'the stored GitLab instance address could not be used',
     remedy: 'Ask Kilo support to repair the stored integration record, then reconnect.',
@@ -293,24 +312,29 @@ const BLOCKER_MESSAGES: Record<ProjectTokenBlocker['reason'], { cause: string; r
     cause: 'a revocation could not be attempted',
     remedy: 'Try again in a moment.',
   },
+  credential_unresolved: {
+    cause: 'the stored credential could not be reached',
+    remedy: 'Try again in a moment.',
+  },
 };
 
 /**
- * The kinds a settlement reports in the order a refusal prefers: the kinds a
- * request cannot retry away on its own come first, a bare retry last.
+ * Order a refusal reports its causes in: a cause a request cannot clear on its
+ * own comes first, a bare retry last.
  */
-const BLOCKER_PRECEDENCE: readonly ProjectTokenBlocker['reason'][] = [
-  'stored_instance_unusable',
-  'stored_credential_unreadable',
-  'provider_rejected',
-  'no_credential',
-  'provider_unconfirmed',
-  'not_attempted',
-  'stored_handle_changed',
-];
+const BLOCKER_RANK: Record<ProjectTokenBlockerReason, number> = {
+  stored_instance_unusable: 0,
+  stored_credential_unreadable: 1,
+  provider_rejected: 2,
+  no_credential: 3,
+  provider_unconfirmed: 4,
+  credential_unresolved: 5,
+  not_attempted: 6,
+  stored_handle_changed: 7,
+};
 
 function instanceChangeBlockerMessage(
-  reason: ProjectTokenBlocker['reason'],
+  reason: ProjectTokenBlockerReason,
   projectIds: readonly string[]
 ): string {
   const { cause, remedy } = BLOCKER_MESSAGES[reason];
@@ -331,20 +355,27 @@ export const GITLAB_PROJECT_TOKENS_LIST_UNREADABLE_MESSAGE =
 
 /**
  * Refusal that names the stored handles blocking an instance change, with the
- * remedy of the most actionable failure kind among them. Returns null when
- * nothing blocks the change.
+ * remedy that applies to each cause among them. Returns null when nothing
+ * blocks the change.
  */
 export function describeInstanceChangeBlockers(
   blocking: readonly ProjectTokenBlocker[]
 ): string | null {
   if (blocking.length === 0) return null;
-  const reason =
-    BLOCKER_PRECEDENCE.find(candidate => blocking.some(blocker => blocker.reason === candidate)) ??
-    'provider_unconfirmed';
-  return instanceChangeBlockerMessage(
-    reason,
-    blocking.map(blocker => blocker.projectId)
-  );
+  const byReason = new Map<ProjectTokenBlockerReason, string[]>();
+  for (const blocker of blocking) {
+    const projectIds = byReason.get(blocker.reason);
+    if (projectIds === undefined) byReason.set(blocker.reason, [blocker.projectId]);
+    else projectIds.push(blocker.projectId);
+  }
+  const groups = [...byReason].sort(([a], [b]) => BLOCKER_RANK[a] - BLOCKER_RANK[b]);
+  const [[firstReason, firstProjectIds], ...others] = groups;
+  let message = instanceChangeBlockerMessage(firstReason, firstProjectIds);
+  for (const [reason, projectIds] of others) {
+    const { cause, remedy } = BLOCKER_MESSAGES[reason];
+    message += ` Other project tokens are also blocked because ${cause} (projects: ${projectIds.join(', ')}). ${remedy}`;
+  }
+  return message;
 }
 
 /**

@@ -62,6 +62,7 @@ import {
 } from '@/lib/integrations/platforms/gitlab/project-credential-lifecycle';
 import {
   GITLAB_PROJECT_TOKENS_LIST_UNREADABLE_MESSAGE,
+  classifyCredentialResolutionFailure,
   describeInstanceChangeBlockers,
   describeProjectTokenReplacementBlocker,
   describeSettlementFailure,
@@ -444,6 +445,38 @@ function waitForSettlementRetry(): Promise<void> {
   return promise;
 }
 
+/** Connected credential a settlement revokes with, or why it is missing. */
+type SettlementCredential =
+  | { userToken: string }
+  | { missing: 'no_credential' | 'credential_unresolved' };
+
+/**
+ * Resolves the connected credential a settlement revokes with. A definitely
+ * absent credential needs no repeat; an unreachable broker does, so a transient
+ * failure is attempted again within the settlement attempt bound.
+ */
+async function resolveSettlementCredential(
+  integration: Pick<PlatformIntegration, 'id' | 'metadata'>,
+  actor: GitLabCredentialActor
+): Promise<SettlementCredential> {
+  let missing: 'no_credential' | 'credential_unresolved' = 'credential_unresolved';
+  for (let attempt = 1; attempt <= PROJECT_TOKEN_SETTLEMENT_ATTEMPTS; attempt++) {
+    try {
+      return { userToken: await getValidGitLabToken(integration, actor) };
+    } catch (error) {
+      missing = classifyCredentialResolutionFailure(error);
+      logExceptInTest('[resolveSettlementCredential] Stored credential unavailable', {
+        integrationId: integration.id,
+        reason: missing,
+        error,
+      });
+      if (missing === 'no_credential') return { missing };
+    }
+    if (attempt < PROJECT_TOKEN_SETTLEMENT_ATTEMPTS) await waitForSettlementRetry();
+  }
+  return { missing };
+}
+
 /**
  * Settles the credential a failed rotation tried to replace. An outcome a
  * repeat can change is attempted again, within the same bound the settlement
@@ -504,12 +537,16 @@ type ProjectTokenSettlement = {
  * off with live handles unattempted.
  *
  * Returns null when the stored project list cannot be read, which a caller
- * reports separately from a token the provider refused.
+ * reports separately from a token the provider refused. A credential the
+ * caller could not resolve keeps the retry answer when its failure can clear.
  */
 export async function settleStoredProjectTokens(
   integration: Pick<PlatformIntegration, 'id' | 'metadata'>,
   userToken: string | undefined,
-  options: { signal?: AbortSignal } = {}
+  options: {
+    signal?: AbortSignal;
+    missingCredentialReason?: 'no_credential' | 'credential_unresolved';
+  } = {}
 ): Promise<ProjectTokenSettlement | null> {
   let projectIds: string[];
   try {
@@ -539,6 +576,7 @@ export async function settleStoredProjectTokens(
       }
     }
     // No credential was resolved, so none of these could be attempted.
+    const missingCredentialReason = options.missingCredentialReason ?? 'no_credential';
     return {
       revoked: 0,
       scrubbed: noCredentialScrubbed,
@@ -546,7 +584,7 @@ export async function settleStoredProjectTokens(
       unattempted: noCredentialOutstanding.size,
       blocking: [...noCredentialOutstanding].map(projectId => ({
         projectId,
-        reason: 'no_credential' as const,
+        reason: missingCredentialReason,
       })),
     };
   }
@@ -621,36 +659,30 @@ export async function settleStoredProjectTokens(
  * The refusal names the blocking project ids and the kind of failure, because
  * the remedy differs: an unusable stored instance address, a refused
  * credential, an unresolvable credential, and an unconfirmed revocation each
- * call for a different next step.
+ * call for a different next step. A credential that cannot be reached is
+ * reported as retryable.
  */
 export async function ensureStoredProjectTokensSettledBeforeInstanceChange(
   integration: Pick<PlatformIntegration, 'id' | 'metadata'>,
   actor: GitLabCredentialActor
 ): Promise<void> {
-  let userToken: string | undefined;
-  try {
-    userToken = await getValidGitLabToken(integration, actor);
-  } catch (error) {
-    logExceptInTest(
-      '[ensureStoredProjectTokensSettledBeforeInstanceChange] Stored credential unavailable',
-      {
-        integrationId: integration.id,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    );
-  }
-
-  const settlement = await settleStoredProjectTokens(integration, userToken);
+  // A row whose instance value cannot be used yields no resolvable credential,
+  // so the answer is definite and names that address as the cause.
+  const storedInstance = readStoredInstanceUrl(integration.metadata);
+  const credential: SettlementCredential = storedInstance.ok
+    ? await resolveSettlementCredential(integration, actor)
+    : { missing: 'no_credential' };
+  const settlement = await settleStoredProjectTokens(
+    integration,
+    'userToken' in credential ? credential.userToken : undefined,
+    'missing' in credential ? { missingCredentialReason: credential.missing } : {}
+  );
   if (settlement === null) {
     throw new TRPCError({
       code: 'PRECONDITION_FAILED',
       message: GITLAB_PROJECT_TOKENS_LIST_UNREADABLE_MESSAGE,
     });
   }
-  // A row whose instance value cannot be used explains a settlement that found
-  // no credential at all: nothing can be resolved against an instance the row
-  // does not name, so name that cause instead of the symptom.
-  const storedInstance = readStoredInstanceUrl(integration.metadata);
   const blocking = storedInstance.ok
     ? settlement.blocking
     : settlement.blocking.map(blocker =>
@@ -733,15 +765,7 @@ export async function disconnectGitLabIntegration(owner: Owner, actingUserId: st
   // can revoke project tokens must be resolved before the suspension. It is
   // resolved even when no project token is visible yet: a review that is
   // already running can store one before the suspension commits.
-  let userToken: string | undefined;
-  try {
-    userToken = await getValidGitLabToken(integration, actor);
-  } catch (error) {
-    logExceptInTest('[disconnectGitLabIntegration] Connected credential unavailable', {
-      integrationId: integration.id,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
+  const credential = await resolveSettlementCredential(integration, actor);
 
   const updatedMetadata = await db.transaction(async tx => {
     const nextMetadata = await mutateGitLabMetadataInTransaction(tx, integration.id, {
@@ -780,7 +804,11 @@ export async function disconnectGitLabIntegration(owner: Owner, actingUserId: st
   // between the first credential lookup and the suspension. The integration is
   // suspended already, so an unreadable project list cannot fail the disconnect;
   // the kept handles stay unusable through it.
-  const settlement = await settleStoredProjectTokens(integration, userToken);
+  const settlement = await settleStoredProjectTokens(
+    integration,
+    'userToken' in credential ? credential.userToken : undefined,
+    'missing' in credential ? { missingCredentialReason: credential.missing } : {}
+  );
 
   logExceptInTest(
     '[disconnectGitLabIntegration] Integration suspended (preserved webhook config)',

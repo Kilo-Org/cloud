@@ -85,10 +85,16 @@ describe('buildOverviewRows model label', () => {
     ).toBe('Auto Effizient');
   });
 
-  it('keeps the stored slug for a model the catalogue no longer carries', () => {
-    expect(modelSubtitle(makeConfig({ modelSlug: 'kilo-auto/retired' }), [])).toBe(
-      'kilo-auto/retired'
-    );
+  it('shows the readable reference for a model the catalogue no longer carries', () => {
+    expect(modelSubtitle(makeConfig({ modelSlug: 'kilo-auto/retired' }), [])).toBe('retired');
+  });
+
+  it('never prints a raw vendor/model slug, even with an empty catalogue', () => {
+    // The overview printed `deepseek/deepseek-v4.1-flash-1017` while the model
+    // button on the same screen named it `DeepSeek V4.1 Flash 1017`.
+    expect(
+      modelSubtitle(makeConfig({ modelSlug: 'deepseek/deepseek-v4.1-flash-1017' }), [])
+    ).toBe('deepseek v4.1 flash 1017');
   });
 });
 

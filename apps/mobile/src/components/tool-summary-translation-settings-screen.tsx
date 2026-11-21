@@ -20,10 +20,7 @@ import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useOrganization } from '@/lib/organization-context';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
-import {
-  TRANSLATE_SUMMARIES_SETTING,
-  TRANSLATION_MODEL_SETTING,
-} from '@/lib/settings-search/preference-sources';
+import { TOOL_SUMMARY_TRANSLATION_SETTINGS } from '@/lib/settings-search/preference-sources';
 import { useToolSummaryTranslationPreference } from '@/lib/tool-summary-translation/tool-summary-translation-preference';
 
 /**
@@ -111,20 +108,20 @@ export function ToolSummaryTranslationSettingsScreen({
       >
         <Section>
           <RowGroup leadingTile>
-            <SettingsTarget item={TRANSLATE_SUMMARIES_SETTING}>
+            <SettingsTarget item={TOOL_SUMMARY_TRANSLATION_SETTINGS.translateSummaries}>
               <PreferenceRow
                 icon={WandSparkles}
-                title={t(TRANSLATE_SUMMARIES_SETTING.label)}
+                title={t(TOOL_SUMMARY_TRANSLATION_SETTINGS.translateSummaries.label)}
                 value={enabled}
                 disabled={!hasLoaded}
                 onValueChange={setEnabled}
                 resolveValue={getRequestedEnabled}
               />
             </SettingsTarget>
-            <SettingsTarget item={TRANSLATION_MODEL_SETTING}>
+            <SettingsTarget item={TOOL_SUMMARY_TRANSLATION_SETTINGS.model}>
               <ConfigureRow
                 icon={Cpu}
-                title={t(TRANSLATION_MODEL_SETTING.label)}
+                title={t(TOOL_SUMMARY_TRANSLATION_SETTINGS.model.label)}
                 subtitle={modelSubtitle}
                 disabled={modelRowDisabled}
                 onPress={() => {

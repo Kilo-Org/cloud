@@ -19,11 +19,7 @@ import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useOrganization } from '@/lib/organization-context';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
-import {
-  GATEWAY_TRANSCRIPTION_SETTING,
-  TRANSCRIPTION_MODEL_SETTING,
-  VOICE_LANGUAGE_SETTING,
-} from '@/lib/settings-search/preference-sources';
+import { VOICE_INPUT_SETTINGS } from '@/lib/settings-search/preference-sources';
 import { useGatewayTranscriptionModelSelection } from '@/lib/voice-input/gateway/gateway-transcription-model-selection';
 import { useGatewayTranscriptionPreference } from '@/lib/voice-input/gateway/gateway-transcription-preference';
 import { voiceInputLanguageDisplayName } from '@/lib/voice-input/voice-input-language';
@@ -113,20 +109,20 @@ export function VoiceInputSettingsScreen({
       >
         <Section>
           <RowGroup leadingTile>
-            <SettingsTarget item={GATEWAY_TRANSCRIPTION_SETTING}>
+            <SettingsTarget item={VOICE_INPUT_SETTINGS.gatewayTranscription}>
               <PreferenceRow
                 icon={Mic}
-                title={t(GATEWAY_TRANSCRIPTION_SETTING.label)}
+                title={t(VOICE_INPUT_SETTINGS.gatewayTranscription.label)}
                 value={gatewayTranscriptionEnabled}
                 disabled={!gatewayTranscriptionLoaded}
                 onValueChange={setGatewayTranscriptionEnabled}
                 resolveValue={getRequestedGatewayTranscriptionEnabled}
               />
             </SettingsTarget>
-            <SettingsTarget item={TRANSCRIPTION_MODEL_SETTING}>
+            <SettingsTarget item={VOICE_INPUT_SETTINGS.transcriptionModel}>
               <ConfigureRow
                 icon={Cpu}
-                title={t(TRANSCRIPTION_MODEL_SETTING.label)}
+                title={t(VOICE_INPUT_SETTINGS.transcriptionModel.label)}
                 subtitle={modelSubtitle}
                 disabled={modelRowDisabled}
                 onPress={() => {
@@ -134,10 +130,10 @@ export function VoiceInputSettingsScreen({
                 }}
               />
             </SettingsTarget>
-            <SettingsTarget item={VOICE_LANGUAGE_SETTING}>
+            <SettingsTarget item={VOICE_INPUT_SETTINGS.language}>
               <ConfigureRow
                 icon={Globe}
-                title={t(VOICE_LANGUAGE_SETTING.label)}
+                title={t(VOICE_INPUT_SETTINGS.language.label)}
                 subtitle={languageSubtitle}
                 disabled={!languageLoaded}
                 onPress={() => {

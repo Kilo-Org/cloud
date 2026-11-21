@@ -30,15 +30,7 @@ import { usePrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-pr
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
-import {
-  APP_UNLOCK_SETTING,
-  AUTO_EXPAND_THINKING_SETTING,
-  CONDENSE_TOOL_CALLS_SETTING,
-  HIDE_THINKING_SETTING,
-  KEEP_SCREEN_ON_SETTING,
-  PR_REVIEW_ATTRIBUTION_SETTING,
-  RETURN_SENDS_MESSAGE_SETTING,
-} from '@/lib/settings-search/preference-sources';
+import { GENERAL_SETTINGS } from '@/lib/settings-search/preference-sources';
 
 /**
  * General settings subpage. Rows are moved verbatim from the former
@@ -105,10 +97,10 @@ export function GeneralSettingsScreen({
       >
         <Section>
           <RowGroup>
-            <SettingsTarget item={APP_UNLOCK_SETTING}>
+            <SettingsTarget item={GENERAL_SETTINGS.appUnlock}>
               <PreferenceRow
                 icon={Shield}
-                title={t(APP_UNLOCK_SETTING.label)}
+                title={t(GENERAL_SETTINGS.appUnlock.label)}
                 subtitle={t('preferences.biometricUnlockSubtitle')}
                 value={unlock.enabled}
                 disabled={unlock.busy || unlock.status !== 'unlocked'}
@@ -120,10 +112,10 @@ export function GeneralSettingsScreen({
           <AppUnlockFeedback outcome={unlock.purpose === 'setting' ? unlock.outcome : null} />
         </Section>
         <RowGroup>
-          <SettingsTarget item={AUTO_EXPAND_THINKING_SETTING}>
+          <SettingsTarget item={GENERAL_SETTINGS.autoExpandThinking}>
             <PreferenceRow
               icon={Brain}
-              title={t(AUTO_EXPAND_THINKING_SETTING.label)}
+              title={t(GENERAL_SETTINGS.autoExpandThinking.label)}
               subtitle={
                 hideThinking
                   ? t('preferences.autoExpandThinkingInactiveSubtitle')
@@ -141,50 +133,50 @@ export function GeneralSettingsScreen({
               onValueChange={setDefaultExpanded}
             />
           </SettingsTarget>
-          <SettingsTarget item={HIDE_THINKING_SETTING}>
+          <SettingsTarget item={GENERAL_SETTINGS.hideThinking}>
             <PreferenceRow
               icon={EyeOff}
-              title={t(HIDE_THINKING_SETTING.label)}
+              title={t(GENERAL_SETTINGS.hideThinking.label)}
               subtitle={t('preferences.hideThinkingSubtitle')}
               value={hideThinking}
               disabled={!hideThinkingLoaded}
               onValueChange={setHideThinking}
             />
           </SettingsTarget>
-          <SettingsTarget item={CONDENSE_TOOL_CALLS_SETTING}>
+          <SettingsTarget item={GENERAL_SETTINGS.condenseToolCalls}>
             <PreferenceRow
               icon={Rows3}
-              title={t(CONDENSE_TOOL_CALLS_SETTING.label)}
+              title={t(GENERAL_SETTINGS.condenseToolCalls.label)}
               subtitle={t('preferences.condenseToolCallsSubtitle')}
               value={condenseToolCalls}
               disabled={!condenseToolCallsLoaded}
               onValueChange={setCondenseToolCalls}
             />
           </SettingsTarget>
-          <SettingsTarget item={KEEP_SCREEN_ON_SETTING}>
+          <SettingsTarget item={GENERAL_SETTINGS.keepScreenOn}>
             <PreferenceRow
               icon={Smartphone}
-              title={t(KEEP_SCREEN_ON_SETTING.label)}
+              title={t(GENERAL_SETTINGS.keepScreenOn.label)}
               subtitle={t('preferences.keepScreenOnSubtitle')}
               value={keepScreenOn}
               disabled={!keepScreenOnLoaded}
               onValueChange={setKeepScreenOn}
             />
           </SettingsTarget>
-          <SettingsTarget item={PR_REVIEW_ATTRIBUTION_SETTING}>
+          <SettingsTarget item={GENERAL_SETTINGS.prReviewAttribution}>
             <PreferenceRow
               icon={MessageSquare}
-              title={t(PR_REVIEW_ATTRIBUTION_SETTING.label)}
+              title={t(GENERAL_SETTINGS.prReviewAttribution.label)}
               subtitle={t('preferences.prReviewAttributionSubtitle')}
               value={prReviewFooter}
               disabled={!prReviewFooterLoaded}
               onValueChange={setPrReviewFooter}
             />
           </SettingsTarget>
-          <SettingsTarget item={RETURN_SENDS_MESSAGE_SETTING}>
+          <SettingsTarget item={GENERAL_SETTINGS.returnSendsMessage}>
             <PreferenceRow
               icon={CornerDownLeft}
-              title={t(RETURN_SENDS_MESSAGE_SETTING.label)}
+              title={t(GENERAL_SETTINGS.returnSendsMessage.label)}
               subtitle={t('preferences.returnSendsMessageSubtitle')}
               value={returnSendsMessage}
               disabled={!hasLoaded}

@@ -36,6 +36,22 @@ describe('dispatch epoch', () => {
     expect(isFromCurrentDispatchSession(error)).toBe(false);
   });
 
+  it('tracks the session per error, not the latest tag', () => {
+    const earlier = new Error('refused in the session that ended');
+    const later = new Error('refused in the current session');
+    const untagged = new Error('never tagged');
+
+    tagDispatchSession(earlier);
+
+    bumpAuthEpoch();
+
+    tagDispatchSession(later);
+
+    expect(isFromCurrentDispatchSession(earlier)).toBe(false);
+    expect(isFromCurrentDispatchSession(later)).toBe(true);
+    expect(isFromCurrentDispatchSession(untagged)).toBe(false);
+  });
+
   it('ignores non-objects on both sides', () => {
     expect(() => {
       tagDispatchSession(undefined);

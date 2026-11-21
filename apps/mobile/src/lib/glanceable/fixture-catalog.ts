@@ -4,6 +4,7 @@ import { type SessionLiveOutcomeKind } from '@kilocode/notifications/schemas';
 import { APPROVAL_ROWS, combinationRows, many, mixedRows, roundWake } from './fixture-rows';
 import { SESSION_CARD_FIXTURES } from './session-fixture-catalog';
 import { type GlanceableActionFeedback } from './surface-extras';
+import { TITLE_FIXTURES } from './title-fixture-catalog';
 
 /**
  * Dev-only named visual states for the glanceable surfaces. A fixture is tray
@@ -162,40 +163,6 @@ export const GLANCEABLE_FIXTURES = {
       ...many({ status: 'idle', count: 5, ago: 40 }),
     ],
   },
-  'long-title': {
-    description: 'Mixed counts with a very long newest-session title.',
-    rows: () => [
-      { status: 'permission', ago: 17, title: 'Migrate the billing webhooks' },
-      {
-        status: 'busy',
-        ago: 1,
-        title:
-          'Refactor the authentication middleware so expired refresh tokens rotate before the websocket reconnects on flaky networks',
-      },
-      { status: 'busy', ago: 9, title: 'Write the release notes' },
-      { status: 'idle', ago: 33, title: 'Triage new issues' },
-    ],
-  },
-  'thai-titles': {
-    description: 'Only running, with Thai session titles (tall fallback line box).',
-    rows: () => [
-      { status: 'busy', ago: 2, title: 'แก้ไขการทดสอบเข้าสู่ระบบที่ไม่เสถียร' },
-      { status: 'busy', ago: 11, title: 'เขียนบันทึกประจำรุ่น' },
-      { status: 'busy', ago: 19, title: 'ตรวจสอบรายการเซสชัน' },
-    ],
-  },
-  'myanmar-titles': {
-    description: 'Only running, with Myanmar session titles (tallest fallback line box).',
-    rows: () => [
-      {
-        status: 'busy',
-        ago: 2,
-        title: 'မတည်ငြိမ်သော လော့ဂ်အင် စမ်းသပ်မှုကို ပြင်ဆင်ခြင်း',
-      },
-      { status: 'busy', ago: 11, title: 'ထွက်ရှိမှု မှတ်စုများ ရေးသားခြင်း' },
-      { status: 'busy', ago: 19, title: 'ဆက်ရှင်စာရင်းကို စစ်ဆေးခြင်း' },
-    ],
-  },
   approving: {
     description: 'Needs approval while the in-place Approve runs: the Approving line.',
     rows: APPROVAL_ROWS,
@@ -329,6 +296,7 @@ export const GLANCEABLE_FIXTURES = {
     description: 'Working, scheduled, and idle.',
     rows: combinationRows(['running', 'scheduled', 'idle']),
   },
+  ...TITLE_FIXTURES,
   ...SESSION_CARD_FIXTURES,
 } satisfies Record<string, GlanceableFixture>;
 

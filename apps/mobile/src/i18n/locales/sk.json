@@ -3841,7 +3841,7 @@
     "emailDeliveryFailed": "Doručovanie e-mailov je dočasne nedostupné. Skús to neskôr.",
     "admissionRequired": "Tvoje zariadenie sa nedá overiť. Použi „$t(login.moreSignInOptions)“ a prihlás sa na inom zariadení alebo cez web.",
     "default": "Vyskytla sa chyba. Skús to znova.",
-    "retryableAdmission": "Toto zariadenie sa nepodarilo overiť. Skúste to znova.",
+    "retryableAdmission": "Toto zariadenie sa nepodarilo overiť. Skús to znova.",
     "startSignInFailed": "Prihlásenie sa nepodarilo spustiť. Skús to znova.",
     "couldNotOpenBrowser": "Prehliadač sa nepodarilo otvoriť. Skús to znova.",
     "signInTimedOut": "Čas na prihlásenie vypršal. Skús to znova.",

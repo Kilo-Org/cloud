@@ -3713,7 +3713,7 @@
     "emailDeliveryFailed": "E-posta gönderimi geçici olarak kullanılamıyor. Lütfen daha sonra tekrar dene.",
     "admissionRequired": "Cihazın doğrulanamıyor. Başka bir cihazdan veya web üzerinden oturum açmak için '$t(login.moreSignInOptions)' seçeneğini kullan.",
     "default": "Bir sorun oluştu. Lütfen tekrar dene.",
-    "retryableAdmission": "Bu cihaz doğrulanamadı. Tekrar deneyin.",
+    "retryableAdmission": "Bu cihaz doğrulanamadı. Tekrar dene.",
     "startSignInFailed": "Oturum açma işlemi başlatılamadı. Lütfen tekrar dene.",
     "couldNotOpenBrowser": "Tarayıcı açılamadı. Lütfen tekrar dene.",
     "signInTimedOut": "Oturum açma işlemi zaman aşımına uğradı. Lütfen tekrar dene.",

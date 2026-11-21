@@ -3841,7 +3841,7 @@
     "emailDeliveryFailed": "Šiuo metu el. laiškų pristatyti negalima. Bandyk dar kartą vėliau.",
     "admissionRequired": "Nepavyksta patikrinti tavo įrenginio. Pasirink „$t(login.moreSignInOptions)“, kad prisijungtum kitame įrenginyje arba svetainėje.",
     "default": "Įvyko klaida. Bandyk dar kartą.",
-    "retryableAdmission": "Nepavyko patikrinti šio įrenginio. Bandykite dar kartą.",
+    "retryableAdmission": "Nepavyko patikrinti šio įrenginio. Bandyk dar kartą.",
     "startSignInFailed": "Nepavyko pradėti prisijungimo. Bandyk dar kartą.",
     "couldNotOpenBrowser": "Nepavyko atidaryti naršyklės. Bandyk dar kartą.",
     "signInTimedOut": "Prisijungimui skirtas laikas baigėsi. Bandyk dar kartą.",

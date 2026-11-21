@@ -1,4 +1,5 @@
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import type {
@@ -297,10 +298,38 @@ export async function connectVerifiedGitHubInstallation(
     if (existing && existing.github_connection_role === null && !canRecoverLegacyWorkflow) {
       return { ok: false, reason: 'installation_unavailable' };
     }
-    const role: 'workflow' | 'agent_only' =
+    const roleFromOwnership: 'workflow' | 'agent_only' =
       existing?.github_connection_role === 'workflow' || otherOwnerHolders.length === 0
         ? 'workflow'
         : 'agent_only';
+
+    // A personal owner does not take the workflow role from an organization.
+    // The organization workflow connection definition
+    // (`organizationWorkflowGitHubConnectionSql`) matches organization-owned
+    // rows only, so an organization demoted here would lose its workflow
+    // installation — Security Agent and review sync included — until its owner
+    // disconnects, and the healthy personal holder would then block it from
+    // recovering. An organization association relinquishes the installation
+    // only by a local disconnect, which is also the condition the
+    // single-installation slot check reads, so a suspended or auth-invalid
+    // organization association keeps the role until its owner restores it.
+    //
+    // A new personal association is refused, as it was before the role followed
+    // the health condition, and an existing personal association keeps the role
+    // it already stores — including `workflow` when it holds that role.
+    const organizationHoldsInstallation =
+      owner.type === 'user' &&
+      otherOwnerAssociations.some(
+        association =>
+          association.owned_by_organization_id !== null &&
+          association.github_disconnected_at === null
+      );
+    const role: 'workflow' | 'agent_only' =
+      roleFromOwnership === 'workflow' &&
+      organizationHoldsInstallation &&
+      existing?.github_connection_role !== 'workflow'
+        ? 'agent_only'
+        : roleFromOwnership;
     if (!existing && role === 'agent_only' && owner.type !== 'org') {
       return { ok: false, reason: 'claimed_by_other_owner' };
     }
@@ -315,19 +344,43 @@ export async function connectVerifiedGitHubInstallation(
       // this association reached `workflow` either because it already stored
       // that role, which the same unique index denies to every peer of the
       // identity, or because no other association of the identity passes
-      // `isPlatformIntegrationHealthy`. A demoted association keeps its
-      // canonical link, which is the authority its owner has when it connects
-      // again; an unbound association carries no role instead.
+      // `isPlatformIntegrationHealthy`.
+      //
+      // The demotion is a transfer, not a suspension, and nothing reverses it
+      // on its own: `observeGitHubInstallationLifecycle` restores a suspended
+      // association to active without touching its role, and runtime
+      // authorization never promotes a healthy secondary association. The
+      // demoted owner regains the role by connecting again once the current
+      // holder stops holding the installation, which is the same path a second
+      // owner already follows. The write below leaves `updated_at` alone,
+      // because that column is the tie-breaker of
+      // `personalGitHubIntegrationOrder()` and the connection state of this
+      // association did not change.
       for (const association of otherOwnerAssociations) {
         if (association.github_connection_role !== 'workflow') continue;
         if (isPlatformIntegrationHealthy(association)) continue;
+        const demotedRole = association.github_installation_id ? 'agent_only' : null;
         await tx
           .update(platform_integrations)
           .set({
-            github_connection_role: association.github_installation_id ? 'agent_only' : null,
-            updated_at: now,
+            github_connection_role: demotedRole,
+            updated_at: association.updated_at,
           })
           .where(eq(platform_integrations.id, association.id));
+        logExceptInTest('[connectVerifiedGitHubInstallation] Workflow role transferred', {
+          installationId: data.platformInstallationId,
+          appType: data.githubAppType,
+          integrationId: association.id,
+          demotedTo: demotedRole ?? 'none',
+          reason: association.github_disconnected_at
+            ? 'disconnected'
+            : association.suspended_at !== null
+              ? 'suspended'
+              : association.auth_invalid_at !== null
+                ? 'auth_invalid'
+                : 'inactive_status',
+          successorOwner: `${owner.type}:${owner.id}`,
+        });
       }
     }
 

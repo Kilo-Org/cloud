@@ -319,6 +319,12 @@ describe('creditGrantReasonOf', () => {
     expect(creditGrantReasonOf('organization_custom')).toBe('adjustment');
   });
 
+  it('maps an admin-created campaign category to grant', () => {
+    // A campaign writes `c-<slug>` built at grant time, so it is never in the
+    // promo registry; it is still a member-visible signup bonus.
+    expect(creditGrantReasonOf('c-summer-bonus')).toBe('grant');
+  });
+
   it('fails closed on an unclassified category', () => {
     // The fail-closed case: a new writer must not inflate apparent free credit.
     expect(creditGrantReasonOf('some-future-credit')).toBe('adjustment');

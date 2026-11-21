@@ -176,12 +176,19 @@ const WELCOME_CREDIT_CATEGORIES: Readonly<Record<string, true>> = {
 };
 
 /**
+ * The prefix `credit_categoryForSlug` gives an admin-managed credit campaign.
+ * A campaign is a database row, so its category never reaches the promo
+ * registry, yet it funds the account like any other signup bonus.
+ */
+const CREDIT_CAMPAIGN_CATEGORY_PREFIX = 'c-';
+
+/**
  * Classifies the category of a positive free credit row for display.
  *
  * Fails closed: a category nobody has classified prints as an adjustment
  * rather than as credit the member received, so a new reconciliation or
- * migration writer cannot inflate the apparent free credit. Only a category
- * the promo registry defines as a member-visible grant prints as one.
+ * migration writer cannot inflate the apparent free credit. A category the
+ * promo registry defines, or an admin-created campaign, prints as a grant.
  */
 export function creditGrantReasonOf(creditCategory: string | null): CreditGrantReason {
   // `referral` is the admin Referral/Review grant; the two self-service bonuses
@@ -196,6 +203,11 @@ export function creditGrantReasonOf(creditCategory: string | null): CreditGrantR
     return 'kilo_pass';
   }
   if (creditCategory != null && !Object.hasOwn(INTERNAL_CREDIT_CATEGORIES, creditCategory)) {
+    // An admin-managed campaign writes its own category, which is built from
+    // its slug at grant time and so is never in the registry.
+    if (creditCategory.startsWith(CREDIT_CAMPAIGN_CATEGORY_PREFIX)) {
+      return 'grant';
+    }
     // Self-service promo codes are stored encrypted and decrypted at runtime,
     // so the registry is the only place that knows them. `obsolete` still marks
     // member-visible grants that predate the current catalogue, so it does not

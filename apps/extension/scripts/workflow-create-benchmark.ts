@@ -10,8 +10,11 @@
  *
  * Security contract:
  * - The Kilo CLI token lives only inside the throwaway browser profile, which
- *   is removed and verified after each attempt. It is never printed or
- *   persisted in an artifact.
+ *   is deleted and its absence verified after every attempt. It is never
+ *   printed or persisted in an artifact. When cleanup cannot confirm the
+ *   directory is gone, the blocker leads with the operator action and names
+ *   the directory: blocker.json keeps the capped reason, stderr prints the
+ *   full path.
  * - Chat-completions traffic must have the exact `https://app.kilo.ai`
  *   origin (parsed, not prefix-matched); the first URL with any other
  *   origin aborts the batch as a blocker.
@@ -26,6 +29,7 @@ import { createHash } from 'node:crypto';
 import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve as resolvePath } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import {
   readExtensionLocalStorage,
@@ -223,6 +227,7 @@ interface BlockerRecord {
   readonly gitHead: string;
   readonly startedAtIso: string;
   readonly wallClockSeconds: number;
+  readonly survivingProfilePath?: string;
 }
 
 interface ParsedArgs {
@@ -274,10 +279,13 @@ class GatewayBlockerError extends BatchBlockerError {
   }
 }
 
-class CleanupBlockerError extends BatchBlockerError {
-  constructor(reason: string) {
+export class CleanupBlockerError extends BatchBlockerError {
+  readonly survivingProfilePath: string | null;
+
+  constructor(reason: string, options: { survivingProfilePath?: string | null } = {}) {
     super('cleanup', reason);
     this.name = 'CleanupBlockerError';
+    this.survivingProfilePath = options.survivingProfilePath ?? null;
   }
 }
 
@@ -586,6 +594,7 @@ const makeBlockerRecord = (input: {
   httpStatus: number | null;
   gitHead: string;
   batchStartedAtMs: number;
+  survivingProfilePath?: string;
 }): BlockerRecord => ({
   kind: 'blocker',
   reason: capString(input.reason, 120),
@@ -595,6 +604,9 @@ const makeBlockerRecord = (input: {
   gitHead: input.gitHead,
   startedAtIso: new Date(input.batchStartedAtMs).toISOString(),
   wallClockSeconds: Math.round((Date.now() - input.batchStartedAtMs) / 1000),
+  ...(input.survivingProfilePath === undefined
+    ? {}
+    : { survivingProfilePath: input.survivingProfilePath }),
 });
 
 const writeBlockerArtifact = async (outDir: string, blocker: BlockerRecord): Promise<void> => {
@@ -1831,120 +1843,167 @@ const redactTranscript = (
 };
 
 // ── Cleanup ─────────────────────────────────────────────────────────────────
+//
+// Cleanup runs in two independently bounded phases. Settlement closes the
+// browser side that holds the token profile; destruction deletes the profile
+// directory and verifies it is gone. Destruction has its own fresh deadline,
+// so a browser operation that hangs can never skip it.
 
-const cleanupAttempt = async (
+const defaultSettlementCapMs = 15_000;
+const defaultRemovalCapMs = 15_000;
+const removalRetryWaitMs = 2000;
+
+// Every cleanup blocker leads with this action, so the operator still knows
+// what to do after blocker.json caps the reason at 120 characters.
+const cleanupOperatorAction =
+  'delete the throwaway profile and revoke the Kilo session this run used';
+
+interface CleanupPhase {
+  readonly capMs: number;
+  readonly controller: AbortController;
+  readonly remainingMs: () => number;
+}
+
+const makeCleanupPhase = (capMs: number): CleanupPhase => {
+  const startedAtMs = Date.now();
+  return {
+    capMs,
+    controller: new AbortController(),
+    remainingMs: () => Math.max(0, capMs - (Date.now() - startedAtMs)),
+  };
+};
+
+// A cleanup step produces a value or a detail explaining why it produced none;
+// it never throws, so the phase keeps ownership of the outcome mapping.
+type CleanupStepResult<Value> =
+  | { readonly ok: true; readonly value: Value }
+  | { readonly ok: false; readonly detail: string };
+
+// Runs one step inside its phase deadline. Crossing the cap abandons the
+// operation with a rejection handler attached, aborts the phase controller,
+// and reports a detail instead of throwing.
+const runCleanupStep = async <Value>(
+  phase: CleanupPhase,
+  label: string,
+  op: Promise<Value>
+): Promise<CleanupStepResult<Value>> => {
+  const capDetail = `${label} exceeded the ${String(phase.capMs)}ms cleanup cap`;
+  const cap = Promise.withResolvers<never>();
+  const timer = setTimeout(() => {
+    cap.reject(new CleanupCapError(capDetail));
+  }, phase.remainingMs());
+  try {
+    const value = await Promise.race([op, cap.promise]);
+    return { ok: true, value };
+  } catch (error) {
+    if (error instanceof CleanupCapError) {
+      phase.controller.abort();
+      void op.catch(() => undefined);
+      return { ok: false, detail: capDetail };
+    }
+    return { ok: false, detail: `${label} failed: ${errorToReason(error)}` };
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+// Playwright's close() returns a promise; the async wrapper also turns a
+// synchronous throw into a settlement rejection instead of escaping cleanup.
+const closeBrowserContext = async (context: BrowserContext): Promise<void> => {
+  await context.close();
+};
+
+export const cleanupAttempt = async (
   context: BrowserContext | undefined,
   userDataDir: string,
   pendingCleanup: Promise<void> | undefined,
-  initialContextCloseFailure: string | null
+  initialContextCloseFailure: string | null,
+  caps: { readonly settlementCapMs?: number; readonly removalCapMs?: number } = {}
 ): Promise<void> => {
-  // One bounded 15-second lifecycle: every step observes the same deadline, no
-  // step starts after it. Crossing the cap emits a cleanup blocker and skips
-  // profile removal, so an unresolved browser operation cannot reopen the
-  // token profile after cleanup.
-  const cleanupController = new AbortController();
-  const cleanupCapMs = 15_000;
-  const startedAtMs = Date.now();
-  const remainingMs = (): number => Math.max(0, cleanupCapMs - (Date.now() - startedAtMs));
-  const exceeded = (): boolean => Date.now() - startedAtMs >= cleanupCapMs;
+  // Phase A: settle the browser so it stops writing to the profile. Either the
+  // context close or, when the launch never settled during setup, the pending
+  // launch/close operation. Its outcome is data, never an exception: a hung or
+  // rejected settlement is folded into the blocker below, after destruction.
+  const settlementOp: Promise<void> | undefined =
+    context === undefined ? pendingCleanup : closeBrowserContext(context);
+  const settlementLabel = context === undefined ? 'browser launch settlement' : 'context close';
+  let settlementFailure: string | null =
+    initialContextCloseFailure === null
+      ? null
+      : `context close failed: ${initialContextCloseFailure}`;
+  if (settlementOp !== undefined) {
+    const settlement = makeCleanupPhase(caps.settlementCapMs ?? defaultSettlementCapMs);
+    const outcome = await runCleanupStep(settlement, settlementLabel, settlementOp);
+    if (!outcome.ok) {
+      settlementFailure = outcome.detail;
+    }
+  }
 
-  // Runs one cleanup step under the shared deadline. When the cap fires first,
-  // attach a rejection handler and stop before profile removal.
-  const runStep = async <Value>(label: string, op: Promise<Value>): Promise<Value> => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    try {
-      return await Promise.race([
-        op,
-        new Promise<never>((_resolve, reject) => {
-          timer = setTimeout(() => {
-            reject(new CleanupCapError(`${label} exceeded the 15-second cleanup cap`));
-          }, remainingMs());
-        }),
-      ]);
-    } catch (error) {
-      if (!(error instanceof CleanupCapError)) {
-        throw new CleanupBlockerError(errorToReason(error));
-      }
-      cleanupController.abort();
-      void op.catch(() => undefined);
-      throw new CleanupBlockerError(`${label} exceeded the 15-second cleanup cap`);
-    } finally {
-      if (timer !== undefined) {
-        clearTimeout(timer);
-      }
-    }
-  };
-
-  // A failed context close can leave a live browser process holding the token
-  // profile, so it is never silently accepted: the failure is recorded, the
-  // profile removal and absence verification still run (cleanup guarantees are
-  // not weakened), and the attempt then fails as a cleanup blocker.
-  let contextCloseFailure: string | null = initialContextCloseFailure;
-  try {
-    if (context !== undefined) {
-      try {
-        await runStep('context close', context.close());
-      } catch (error) {
-        // Record the failure but continue: profile removal and absence
-        // verification must still run so the token profile never survives.
-        contextCloseFailure = error instanceof Error ? error.message : String(error);
-      }
-    } else if (pendingCleanup !== undefined) {
-      // The browser launch or close did not settle during setup. Cleanup owns
-      // the operation and skips profile removal when the shared cap expires.
-      await runStep('browser launch settlement', pendingCleanup);
-    }
-    if (exceeded()) {
-      throw new CleanupBlockerError('cleanup exceeded the 15-second cap');
-    }
-    await runStep('profile removal', rm(userDataDir, { force: true, recursive: true }));
-    let gone = false;
-    for (let retry = 0; retry < 2 && !gone; retry += 1) {
-      if (exceeded()) {
-        throw new CleanupBlockerError('cleanup exceeded the 15-second cap');
-      }
-      // Only a confirmed missing directory counts as gone; a permission or
-      // I/O error rejects here and runStep raises it as a cleanup blocker.
-      // The ENOENT mapping happens before runStep's wrapping so the code is
-      // still readable on the raw error.
-      const exists = await runStep(
-        'profile absence check',
-        access(userDataDir).then(
-          () => true,
-          (error: unknown) => {
-            const code = (error as NodeJS.ErrnoException | undefined)?.code;
-            if (code !== 'ENOENT') {
-              throw error;
-            }
-            return false;
-          }
-        )
+  // Phase B: destroy the profile under a fresh deadline that never inherits
+  // the settlement budget, so destruction starts even after phase A spent its
+  // whole allowance. Only a confirmed ENOENT counts as gone; any other access
+  // error is a failure.
+  const removal = makeCleanupPhase(caps.removalCapMs ?? defaultRemovalCapMs);
+  let removalFailure: string | null = null;
+  let gone = false;
+  for (let attempt = 0; attempt < 2 && !gone && removalFailure === null; attempt += 1) {
+    if (attempt > 0) {
+      const wait = await runCleanupStep(
+        removal,
+        'cleanup retry wait',
+        sleep(removalRetryWaitMs, removal.controller.signal)
       );
-      if (exceeded()) {
-        throw new CleanupBlockerError('cleanup exceeded the 15-second cap');
+      if (!wait.ok) {
+        removalFailure = wait.detail;
+        break;
       }
-      gone = !exists;
-      if (!gone && retry === 0) {
-        await runStep('cleanup wait', sleep(2000, cleanupController.signal));
-        if (exceeded()) {
-          throw new CleanupBlockerError('cleanup exceeded the 15-second cap');
+    }
+    const removed = await runCleanupStep(
+      removal,
+      'profile removal',
+      rm(userDataDir, { force: true, recursive: true })
+    );
+    if (!removed.ok) {
+      removalFailure = removed.detail;
+      break;
+    }
+    const existence = await runCleanupStep(
+      removal,
+      'profile absence check',
+      access(userDataDir).then(
+        () => true,
+        (error: unknown) => {
+          const code = (error as NodeJS.ErrnoException | undefined)?.code;
+          if (code !== 'ENOENT') {
+            throw error;
+          }
+          return false;
         }
-        await runStep('profile removal retry', rm(userDataDir, { force: true, recursive: true }));
-      }
+      )
+    );
+    if (!existence.ok) {
+      removalFailure = existence.detail;
+      break;
     }
-    if (!gone) {
-      throw new CleanupBlockerError(`profile directory survived cleanup: ${userDataDir}`);
-    }
-    // The profile is verifiably gone; a failed context close is still a blocker.
-    if (contextCloseFailure !== null) {
-      throw new CleanupBlockerError(`context close failed: ${contextCloseFailure}`);
-    }
-  } catch (error) {
-    cleanupController.abort();
-    if (error instanceof CleanupBlockerError) {
-      throw error;
-    }
-    throw new CleanupBlockerError(errorToReason(error));
+    gone = !existence.value;
+  }
+  if (!gone && removalFailure === null) {
+    removalFailure = `profile directory survived cleanup: ${userDataDir}`;
+  }
+
+  // The operator action leads the reason so blocker.json's 120-character cap
+  // can never truncate it.
+  if (removalFailure !== null) {
+    throw new CleanupBlockerError(`${cleanupOperatorAction}: ${removalFailure}`, {
+      survivingProfilePath: userDataDir,
+    });
+  }
+  if (settlementFailure !== null) {
+    // The profile is verifiably gone, but the browser never settled (or the
+    // close failed during setup), so the token session it held is still live.
+    throw new CleanupBlockerError(`${cleanupOperatorAction}: ${settlementFailure}`, {
+      survivingProfilePath: userDataDir,
+    });
   }
 };
 
@@ -2644,6 +2703,8 @@ const main = async (): Promise<number> => {
     return summaryStats.successCount === attemptFiles.length ? 0 : 1;
   } catch (error) {
     if (error instanceof BatchBlockerError) {
+      const survivingProfilePath =
+        error instanceof CleanupBlockerError ? error.survivingProfilePath : null;
       const blocker = makeBlockerRecord({
         stage: error.stage,
         reason: error.message,
@@ -2651,22 +2712,31 @@ const main = async (): Promise<number> => {
         httpStatus: error.httpStatus,
         gitHead,
         batchStartedAtMs,
+        ...(survivingProfilePath === null ? {} : { survivingProfilePath }),
       });
       await writeBlockerArtifact(outDir, blocker);
+      // blocker.json caps the reason; stderr keeps the full path actionable.
+      if (survivingProfilePath !== null) {
+        console.error(
+          `cleanup could not verify the throwaway profile is gone: ${survivingProfilePath}; ${cleanupOperatorAction}`
+        );
+      }
       return 2;
     }
     throw error;
   }
 };
 
-main()
-  .then(code => {
-    process.exitCode = code;
-    return code;
-  })
-  .catch(error => {
-    console.error(
-      `benchmark driver crashed: ${error instanceof Error ? error.message : String(error)}`
-    );
-    process.exitCode = 2;
-  });
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main()
+    .then(code => {
+      process.exitCode = code;
+      return code;
+    })
+    .catch(error => {
+      console.error(
+        `benchmark driver crashed: ${error instanceof Error ? error.message : String(error)}`
+      );
+      process.exitCode = 2;
+    });
+}

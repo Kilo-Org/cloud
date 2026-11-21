@@ -130,7 +130,12 @@ change was reverted; the error text stays.
 - A valid production Kilo CLI token in `~/.local/share/kilo/auth.json`. The
   driver validates it against `https://app.kilo.ai/api/user` before any
   attempt. The token lives only inside the throwaway browser profile, which is
-  deleted and verified after each attempt.
+  deleted and its absence verified after every attempt, in a destruction step
+  that has its own deadline and never inherits the browser-close deadline.
+  When cleanup cannot confirm the directory is gone — or the browser did not
+  close — the run exits `2` with a blocker that leads with the operator
+  action and carries the surviving path: delete that directory and revoke the
+  Kilo session the run used.
 - Network access to `app.kilo.ai` and the scenario sites.
 - A display for headed Chromium. If the headed launch fails, the driver
   retries headless automatically and records which mode each attempt used.
@@ -184,7 +189,14 @@ The driver writes into `--out`:
   `speedGatePassed`, `mixedModes`, medians, and `maxCreateToSavedSeconds`.
 - `blocker.json` — written and exit code `2` when the batch aborts on a
   blocker (build, auth, setup, non-production gateway URL, org hash
-  mismatch, or cleanup failure).
+  mismatch, or cleanup failure). A cleanup blocker's `reason` starts with the
+  operator action `delete the throwaway profile and revoke the Kilo session
+  this run used`, and the record also carries `survivingProfilePath` with the
+  absolute profile directory of that run whenever cleanup cannot certify the
+  directory is gone for good: either removal was not verified, or the browser
+  never settled and can write the directory again after the absence check.
+  The reason is capped at 120 characters; the same command prints the full
+  path and the action to stderr.
 
 Exit codes: `0` every attempt passed the correctness check; `1` at least one
 attempt failed; `2` usage error or blocker.

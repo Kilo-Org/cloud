@@ -364,11 +364,17 @@ async function doRefresh(): Promise<RefreshOutcome> {
       // intermediary's (an edge firewall, a WAF, a proxy) refusal, which proves
       // nothing about the stored pair — so it is read for as long as the one
       // deadline allows and classified on the status alone if it never comes.
-      const refusalText = answer.ok
-        ? null
-        : await answer.text(
+      // Only the two statuses whose refusal the body can change are read: a 401
+      // names the blocked account, and a 403 says whether the refusal came from
+      // the route. A 429 keeps the `Retry-After` it sent at the head and every
+      // other status is classified on the status alone, so a body that stalls
+      // there cannot delay the answer at all.
+      const readsRefusalBody = !answer.ok && (answer.status === 401 || answer.status === 403);
+      const refusalText = readsRefusalBody
+        ? await answer.text(
             answer.status === 401 ? REFUSAL_BODY_BUDGET_MS : CONTROL_PLANE_DEADLINE_MS
-          );
+          )
+        : null;
       const successText = answer.ok ? await answer.text(CONTROL_PLANE_DEADLINE_MS) : null;
       return { answer, refusalText, successText };
     });

@@ -281,12 +281,16 @@ export async function getPrimaryGitHubIntegrationForOrganization(organizationId:
 /**
  * The installation slots an organization's live GitHub associations occupy, in
  * the shape the shared slot predicate reads. One definition serves the readers
- * that must agree with the writers applying the single-installation rule.
+ * that must agree with the writers applying the single-installation rule, so a
+ * writer that already holds the organization lock reads the same rows through
+ * its own transaction instead of a second copy of this query.
  */
 export async function getOrganizationGitHubInstallationSlots(
-  organizationId: string
+  organizationId: string,
+  transaction?: DrizzleTransaction
 ): Promise<GitHubInstallationSlot[]> {
-  return await db
+  const client = transaction ?? db;
+  return await client
     .select({
       installationId: platform_integrations.platform_installation_id,
       appType: platform_integrations.github_app_type,
@@ -1061,20 +1065,7 @@ export async function autoCompleteInstallation(
     const organizationId = pending.owned_by_organization_id;
     if (organizationId && !canOrganizationUseMultipleGitHubInstallations(organizationId)) {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`org:${organizationId}`}))`);
-      const ownerIntegrations = await tx
-        .select({
-          installationId: platform_integrations.platform_installation_id,
-          appType: platform_integrations.github_app_type,
-        })
-        .from(platform_integrations)
-        .where(
-          and(
-            eq(platform_integrations.owned_by_organization_id, organizationId),
-            eq(platform_integrations.platform, PLATFORM.GITHUB),
-            // A locally disconnected connection has relinquished its slot.
-            isNull(platform_integrations.github_disconnected_at)
-          )
-        );
+      const ownerIntegrations = await getOrganizationGitHubInstallationSlots(organizationId, tx);
       if (
         ownerIntegrations.some(integration =>
           occupiesAnotherGitHubInstallationSlot(integration, {

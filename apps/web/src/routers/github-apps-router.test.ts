@@ -558,10 +558,10 @@ describe('githubAppsRouter organization install capability', () => {
   });
 
   it('mints an install state when the organization has no live workflow connection', async () => {
-    // A locally disconnected association, a pending request awaiting a GitHub
-    // organization admin's approval and a suspended association all leave the
-    // slot free; the DB-level contract for those rows lives with the workflow
-    // connection predicate (`github-installations.test.ts`).
+    // A pending request awaiting a GitHub organization admin's approval carries no
+    // installation id yet, and a locally disconnected association has relinquished
+    // its slot, so both leave the slot free; a suspended or auth-invalid association
+    // keeps its installation id and holds the slot until it is disconnected.
     mockEnsureOrganizationAccess.mockResolvedValue('owner');
     mockGetOrganizationGitHubInstallationSlots.mockResolvedValue([
       { installationId: null, appType: 'standard' },

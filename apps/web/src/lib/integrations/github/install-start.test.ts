@@ -90,7 +90,7 @@ describe('beginGitHubAppInstall organization installation slot rule', () => {
     expect(mockSlots).not.toHaveBeenCalled();
   });
 
-  test('still refuses a personal owner install when the organization rule does not apply', async () => {
+  test('still allows a personal owner install when the organization rule does not apply', async () => {
     mockOwner.mockResolvedValue({ type: 'user', id: 'user-1' });
 
     await expect(beginGitHubAppInstall(ctx, { returnTo: null })).resolves.toEqual({

@@ -25,10 +25,18 @@ const toolsSchema = z.array(z.string());
 /** What SQLite takes as a bound value here. Chats hold text and numbers. */
 type SqlValue = string | number;
 
-/** The part of an Expo database this file uses, so a test can supply one. */
+/**
+ * The part of an Expo database this file uses, so a test can supply one.
+ *
+ * These are the members taken from the `SQLiteDatabase` that
+ * `encryptedDatabase()` hands back. `withTransactionSync` runs the work inside
+ * one transaction and undoes all of it when the work throws, which is what lets
+ * a delete across the two owners be all or nothing.
+ */
 export type ChatDatabase = {
   readonly getAllSync: <T>(source: string, params: SqlValue[]) => T[];
   readonly runSync: (source: string, params: SqlValue[]) => void;
+  readonly withTransactionSync: (work: () => void) => void;
 };
 
 /** One row of the chat list. */
@@ -292,16 +300,31 @@ export function deleteChat(db: ChatDatabase, sessionId: string): void {
  * The identifiers are answered back so the settings kept beside each chat — the
  * per-chat MCP preference — go with the rows rather than being left behind for
  * a session that no longer exists.
+ *
+ * One transaction, and one statement per table rather than one delete per chat:
+ * signing out must not block the thread in proportion to how much history the
+ * account has, and a refusal halfway through must not leave the list pointing
+ * at conversations whose turns are already gone. Rolled back, the whole account
+ * is still there and the next sign-out retries it.
  */
 export function wipeChats(db: ChatDatabase, userId: string | null): readonly string[] {
-  const rows =
+  const account =
     userId === null
-      ? db.getAllSync<{ session_id: string }>('select session_id from chats', [])
-      : db.getAllSync<{ session_id: string }>('select session_id from chats where scope like ?', [
-          `${userId}:%`,
-        ]);
-  for (const { session_id: sessionId } of rows) {
-    deleteChat(db, sessionId);
+      ? { where: '', args: [] as SqlValue[] }
+      : { where: 'where scope like ?', args: [`${userId}:%`] as SqlValue[] };
+  const rows = db.getAllSync<{ session_id: string }>(
+    `select session_id from chats ${account.where}`,
+    account.args
+  );
+  if (rows.length === 0) {
+    return [];
   }
+  db.withTransactionSync(() => {
+    const owned = `(select session_id from chats ${account.where})`;
+    db.runSync(`delete from parts where session_id in ${owned}`, account.args);
+    db.runSync(`delete from turns where session_id in ${owned}`, account.args);
+    db.runSync(`delete from sessions where id in ${owned}`, account.args);
+    db.runSync(`delete from chats ${account.where}`, account.args);
+  });
   return rows.map(row => row.session_id);
 }

@@ -395,7 +395,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     };
   }),
 
-  // Get overview KPIs
   getOverviewStats: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const conditions = buildBaseConditions(input);
     const statusTable =
@@ -498,11 +497,8 @@ export const adminCodeReviewsRouter = createTRPCRouter({
       inProgressCount,
       billingErrorCount,
       billingRate: terminalCount > 0 ? (billingErrorCount / terminalCount) * 100 : 0,
-      // Success rate = completed / terminal states
       successRate: terminalCount > 0 ? (completedCount / terminalCount) * 100 : 0,
-      // Failure rate = (failed + interrupted) / terminal states
       failureRate: terminalCount > 0 ? ((failedCount + interruptedCount) / terminalCount) * 100 : 0,
-      // Cancelled rate = cancelled / terminal states (the remainder to reach 100%)
       cancelledRate: terminalCount > 0 ? (cancelledCount / terminalCount) * 100 : 0,
       avgDurationSeconds: Number(stats.avg_duration_seconds) || 0,
       waitStartedCount,
@@ -515,7 +511,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     };
   }),
 
-  // Get daily time series data
   getDailyStats: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const conditions = buildBaseConditions(input);
     const dayExpr = accountingDayExpr(input);
@@ -541,7 +536,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
         day: sql<string>`${dayExpr}::date::text`,
         total: sql<number>`COUNT(*)`,
         completed: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'completed')`,
-        // Exclude billing errors from system failure count
         failed: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'failed' AND ${excludeBilling} AND ${excludeModelUnavailable})`,
         cancelled: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'cancelled' OR (${statusTable.status} = 'failed' AND ${modelUnavailable}))`,
         interrupted: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'interrupted')`,
@@ -577,7 +571,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     }));
   }),
 
-  // Get cancellation reasons analysis
   getCancellationAnalysis: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const createdAt = accountingCreatedAt(input);
     const statusTable =
@@ -636,7 +629,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     }));
   }),
 
-  // Get error analysis (excludes billing errors — those have their own KPI bucket)
   getErrorAnalysis: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const createdAt = accountingCreatedAt(input);
     const statusTable =
@@ -665,7 +657,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
       ...buildBaseConditions(input),
     ] as SQL[];
 
-    // Categorized error summary
     const categorizedQuery = db
       .select({
         category: errorCategory,
@@ -690,7 +681,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
             .groupBy(errorCategory)
             .orderBy(desc(sql`COUNT(*)`));
 
-    // Raw error messages (top 50, for drill-down table)
     const rawQuery = db
       .select({
         error_type: sql<string>`COALESCE(SUBSTRING(${errorMessageColumn} FROM 1 FOR 200), 'Unknown Error')`,
@@ -735,7 +725,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     };
   }),
 
-  // Get the 20 most recent sessions for a specific error message pattern (drill-down from error table)
   getErrorSessions: adminProcedure.input(ErrorSessionsFilterSchema).query(async ({ input }) => {
     const { errorMessage } = input;
     const statusTable =
@@ -850,13 +839,11 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     const waitSeconds =
       input.retryAccountingMode === 'all_attempts' ? attemptWaitSecondsExpr : waitSecondsExpr;
 
-    // Personal vs Org breakdown
     const ownershipBreakdownQuery = db
       .select({
         ownership_type: ownershipTypeExpr,
         count: sql<number>`COUNT(*)`,
         completed: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'completed')`,
-        // Exclude billing errors from failed count
         failed: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'failed' AND ${excludeBilling} AND ${excludeModelUnavailable})`,
         wait_started_count: sql<number>`COUNT(*) FILTER (WHERE ${waitCondition})`,
         avg_wait_seconds: sql<number>`AVG(${waitSeconds}) FILTER (WHERE ${waitCondition})`,
@@ -875,7 +862,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
             .groupBy(ownershipTypeExpr)
         : await ownershipBreakdownQuery.where(and(...baseConditions)).groupBy(ownershipTypeExpr);
 
-    // Top users (only show if not filtering by specific user)
     const topUsers = userId
       ? []
       : input.retryAccountingMode === 'all_attempts'
@@ -926,7 +912,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
             .orderBy(desc(sql`COUNT(*)`))
             .limit(10);
 
-    // Top organizations (only show if not filtering by specific org)
     const topOrgs = organizationId
       ? []
       : input.retryAccountingMode === 'all_attempts'
@@ -1008,7 +993,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     };
   }),
 
-  // Get daily queue wait percentiles (wait time = started_at - created_at)
   getWaitTimeStats: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const waitCondition =
       input.retryAccountingMode === 'all_attempts'
@@ -1056,7 +1040,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     }));
   }),
 
-  // Get daily performance percentiles (execution time = completed_at - started_at)
   getPerformanceStats: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const statusTable =
       input.retryAccountingMode === 'all_attempts'
@@ -1115,7 +1098,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     }));
   }),
 
-  // Get CSV export data
   getExportData: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const conditions = buildBaseConditions(input);
 
@@ -1209,7 +1191,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
       .limit(10000);
   }),
 
-  // Search users for filter dropdown
   searchUsers: adminProcedure
     .input(z.object({ query: z.string().min(1) }))
     .query(async ({ input }) => {
@@ -1232,7 +1213,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
       return result;
     }),
 
-  // Search organizations for filter dropdown
   searchOrganizations: adminProcedure
     .input(z.object({ query: z.string().min(1) }))
     .query(async ({ input }) => {

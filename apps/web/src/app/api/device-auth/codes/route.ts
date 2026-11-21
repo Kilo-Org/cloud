@@ -4,6 +4,8 @@ import {
   createDeviceAuthRequest,
   DEVICE_AUTH_REFUSAL_CODES,
   DeviceAuthPendingLimitError,
+  refusalCopyFor,
+  type DeviceAuthRefusalCode,
 } from '@/lib/device-auth/device-auth';
 import {
   requestingClientSchema,
@@ -23,26 +25,61 @@ import { getPendingLinkBySecret } from '@/lib/auth/pending-link';
 /**
  * The optional body of a pairing request. A caller that names the OAuth client
  * it is asking about gets that client shown on the approval page and confirmed
- * by the approver; a caller that sends no body keeps the plain flow.
+ * by the approver. A caller that sends no body keeps the plain flow; a body
+ * that cannot be read is refused; a field that fails its schema is named by its
+ * own refusal code.
  */
 const CreateCodesBodySchema = z.object({
   requesting_client: requestingClientSchema.optional(),
   pendingLinkToken: z.string().trim().min(1).max(512).optional(),
 });
 
+type ReadRequestBodyResult =
+  | { ok: true; client: RequestingClient | null; pendingLinkToken?: string }
+  | { ok: false; code: DeviceAuthRefusalCode };
+
 /**
- * The requesting client named by the body, or null when it names none.
- * A body that names an unusable client is refused rather than trimmed, so the
- * page never shows a description the approver cannot decide on.
+ * The pairing request a caller sent: the client it names, the pending link it
+ * carries, or the reason the body could not be used.
+ *
+ * No body at all keeps the plain flow, because the shipped clients send none. A
+ * named client that fails its schema is refused rather than trimmed, so the page
+ * never shows a description the approver cannot decide on. The failing field
+ * decides which refusal names it.
  */
-async function readRequestingClient(
-  request: Request
-): Promise<
-  { ok: true; client: RequestingClient | null; pendingLinkToken?: string } | { ok: false }
-> {
-  const body: unknown = await request.json().catch(() => null);
-  const parsed = CreateCodesBodySchema.safeParse(body ?? {});
-  if (!parsed.success) return { ok: false };
+async function readPairingBody(request: Request): Promise<ReadRequestBodyResult> {
+  let rawBody: string;
+  try {
+    rawBody = await request.text();
+  } catch {
+    return { ok: false, code: DEVICE_AUTH_REFUSAL_CODES.invalidRequestBody };
+  }
+
+  if (rawBody.trim() === '') return { ok: true, client: null };
+
+  let body: unknown;
+  try {
+    body = JSON.parse(rawBody);
+  } catch {
+    return { ok: false, code: DEVICE_AUTH_REFUSAL_CODES.invalidRequestBody };
+  }
+
+  // A client that serializes an empty payload as `null` is still sending no
+  // pairing request, so it keeps the plain flow the way an absent body does.
+  if (body === null) return { ok: true, client: null };
+
+  const parsed = CreateCodesBodySchema.safeParse(body);
+  if (!parsed.success) {
+    const field = parsed.error.issues[0]?.path[0];
+    if (field === 'requesting_client') {
+      return { ok: false, code: DEVICE_AUTH_REFUSAL_CODES.invalidRequestingClient };
+    }
+    if (field === 'pendingLinkToken') {
+      return { ok: false, code: DEVICE_AUTH_REFUSAL_CODES.pendingLinkInvalid };
+    }
+    return { ok: false, code: DEVICE_AUTH_REFUSAL_CODES.invalidRequestBody };
+  }
+
   const payload = parsed.data.requesting_client;
   return {
     ok: true,
@@ -56,25 +93,25 @@ export const POST = withRestTiming('/api/device-auth/codes', async (request: Req
   const userAgent = headersList.get('user-agent') || undefined;
   const ipAddress = callerAddressOrNull(headersList) ?? undefined;
 
-  const requestingClient = await readRequestingClient(request);
-  if (!requestingClient.ok) {
+  const pairingBody = await readPairingBody(request);
+  if (!pairingBody.ok) {
     return NextResponse.json(
       {
-        error: DEVICE_AUTH_REFUSAL_CODES.invalidRequestingClient,
-        message: 'Invalid requesting client',
+        error: pairingBody.code,
+        message: refusalCopyFor(pairingBody.code),
       },
       { status: 400 }
     );
   }
 
   if (
-    requestingClient.pendingLinkToken &&
-    !(await getPendingLinkBySecret(requestingClient.pendingLinkToken))
+    pairingBody.pendingLinkToken &&
+    !(await getPendingLinkBySecret(pairingBody.pendingLinkToken))
   ) {
     return NextResponse.json(
       {
         error: DEVICE_AUTH_REFUSAL_CODES.pendingLinkExpired,
-        message: 'This sign-in link has expired. Start the sign-in again.',
+        message: refusalCopyFor(DEVICE_AUTH_REFUSAL_CODES.pendingLinkExpired),
       },
       { status: 400 }
     );
@@ -90,10 +127,8 @@ export const POST = withRestTiming('/api/device-auth/codes', async (request: Req
     } = await createDeviceAuthRequest({
       userAgent,
       ipAddress,
-      ...(requestingClient.client ? { requestingClient: requestingClient.client } : {}),
-      ...(requestingClient.pendingLinkToken
-        ? { pendingLinkToken: requestingClient.pendingLinkToken }
-        : {}),
+      ...(pairingBody.client ? { requestingClient: pairingBody.client } : {}),
+      ...(pairingBody.pendingLinkToken ? { pendingLinkToken: pairingBody.pendingLinkToken } : {}),
     });
 
     const verificationUrl = buildDeviceAuthVerificationUrl(APP_URL, userCode, {

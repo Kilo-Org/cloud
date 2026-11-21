@@ -1,3 +1,4 @@
+import { withinSchemaBudget } from '@kilocode/web-shared/lib/ai-gateway/providers/client-schema-budget';
 import {
   forEachChildSchema,
   isRecord,
@@ -248,27 +249,6 @@ function distributeAnyOfSiblings(node: Record<string, unknown>): boolean {
   return true;
 }
 
-// Bounds the walk over a client-supplied schema, like sanitize-json-ref-tool-results.ts.
-const SCHEMA_NODE_BUDGET = 100_000;
-const SCHEMA_MAX_DEPTH = 64;
-
-function withinBudget(schema: unknown): boolean {
-  const pending: { node: unknown; depth: number }[] = [{ node: schema, depth: 0 }];
-  let visited = 0;
-  let overBudget = false;
-  for (let frame = pending.pop(); frame !== undefined; frame = pending.pop()) {
-    if (!isRecord(frame.node)) continue;
-    if (++visited > SCHEMA_NODE_BUDGET || frame.depth > SCHEMA_MAX_DEPTH) return false;
-    const depth = frame.depth + 1;
-    forEachChildSchema(frame.node, child => {
-      if (visited + pending.length >= SCHEMA_NODE_BUDGET) overBudget = true;
-      else pending.push({ node: child, depth });
-    });
-    if (overBudget) return false;
-  }
-  return true;
-}
-
 /**
  * Rewrites the schema nodes below the root that Gemini rejects. The root of a
  * tool schema stays an object schema, and a schema over the node or depth
@@ -276,7 +256,7 @@ function withinBudget(schema: unknown): boolean {
  * of nodes rewritten.
  */
 export function repairGeminiJsonSchema(schema: unknown): number {
-  if (!isRecord(schema) || !withinBudget(schema)) return 0;
+  if (!isRecord(schema) || !withinSchemaBudget(schema)) return 0;
   let repaired = 0;
   const visit = (node: unknown) => {
     if (!isRecord(node)) return;

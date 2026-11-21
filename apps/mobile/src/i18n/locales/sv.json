@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}, privat kodarkiv",
     "legalDocumentEnglishOnly": "Det här dokumentet finns endast på engelska.",
     "organizationTrialEndedBilling": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. Du kan uppdatera faktureringen och sedan försöka igen.",
-    "organizationTrialEndedBillingAtKiloAi": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. Du kan uppdatera faktureringen på kilo.ai och sedan försöka igen."
+    "organizationTrialEndedBillingAtKiloAi": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. Du kan uppdatera faktureringen på kilo.ai och sedan försöka igen.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Punkt",
+        "nestedBulletPoint": "Indragen punkt",
+        "orderedItem": "Listobjekt {n}",
+        "nestedOrderedItem": "Indraget listobjekt {n}"
+      },
+      "blockquote": {
+        "quote": "Citat",
+        "nestedQuote": "Indraget citat"
+      },
+      "table": {
+        "row": "Rad {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematik: {latex}"
+      },
+      "rotor": {
+        "headings": "Rubriker",
+        "links": "Länkar",
+        "images": "Bilder"
+      }
+    }
   },
   "language": {
     "restarting": "Startar om för att byta språk",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "Utfallet av överklagandet visas på den här skärmen.",
       "nextStepFinal": "Överklagandebeslutet är slutgiltigt. Det går inte att överklaga igen.",
       "viewReceipt": "Visa kvitto"
+    },
+    "reportReceipts": {
+      "title": "Anmälningar",
+      "rowSubtitle": "Anmälningar du skickat in och deras utfall",
+      "emptyTitle": "Inga anmälningar än",
+      "emptyDescription": "Anmälningar du skickar in från en kommentar eller ett AI-svar visas här.",
+      "couldNotLoad": "Det gick inte att läsa in dina anmälningar",
+      "capped": "Visar dina senaste anmälningar."
     },
     "changelog": "Nyheter",
     "changelogVersionPending": "Nyheter för version {{version}} kommer med nästa appuppdatering.",
@@ -1277,7 +1308,7 @@
       "couldNotGetLatest": "Kunde inte hämta de senaste uppgifterna.",
       "byline": "#{{number}} av {{author}}",
       "noFindings": "Inga fynd",
-      "findingsUnavailable": "Resultaten är inte tillgängliga eftersom den här granskningen misslyckades.",
+      "findingsUnavailable": "Resultaten är inte tillgängliga.",
       "findingsInProgress": "Den här granskningen pågår fortfarande. Fynden visas här när den är klar.",
       "findingsEndedWithoutResults": "Den här granskningen avslutades innan den gav några fynd.",
       "serviceUnavailable": "Kunde inte ansluta till tjänsten för kodgranskning. Gör om granskningen när tjänsten är tillgänglig.",
@@ -3591,6 +3622,7 @@
       "identifierLabel": "Identifierare",
       "identifierRequired": "Ange en identifierare.",
       "identifierTaken": "Ett annat läge använder redan den här identifieraren.",
+      "identifierTooLong": "Håll identifieraren till {{max}} tecken eller färre.",
       "nameLabel": "Lägesnamn",
       "nameRequired": "Ange ett lägesnamn.",
       "notFound": "Det här läget finns inte längre.",
@@ -3681,7 +3713,7 @@
     "emailDeliveryFailed": "Det går inte att skicka e-post just nu. Försök igen senare.",
     "admissionRequired": "Din enhet kan inte verifieras. Välj ”$t(login.moreSignInOptions)” för att logga in på en annan enhet eller via webben.",
     "default": "Något gick fel. Försök igen.",
-    "retryableAdmission": "Vi kunde inte verifiera den här enheten. Kontrollera anslutningen och försök igen.",
+    "retryableAdmission": "Det gick inte att verifiera den här enheten. Försök igen.",
     "startSignInFailed": "Kunde inte starta inloggningen. Försök igen.",
     "couldNotOpenBrowser": "Kunde inte öppna webbläsaren. Försök igen.",
     "signInTimedOut": "Inloggningen tog för lång tid. Försök igen.",
@@ -3753,6 +3785,34 @@
     "nextScheduled": "Nästa schemalagda",
     "answerNeeded": "Väntar på svar",
     "waitingToRetry": "Väntar på nytt försök",
+    "countNoun": {
+      "needsInput_one": "Behöver inmatning",
+      "needsInput_other": "Behöver inmatning",
+      "running_one": "Arbetar",
+      "running_other": "Arbetar",
+      "scheduled_one": "Schemalagd",
+      "scheduled_other": "Schemalagda",
+      "idle_one": "Vilande",
+      "idle_other": "Vilande"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Behöver inmatning",
+      "needsInput_other": "{{displayCount}} Behöver inmatning",
+      "running_one": "{{displayCount}} Arbetar",
+      "running_other": "{{displayCount}} Arbetar",
+      "scheduled_one": "{{displayCount}} Schemalagd",
+      "scheduled_other": "{{displayCount}} Schemalagda",
+      "idle_one": "{{displayCount}} Vilande",
+      "idle_other": "{{displayCount}} Vilande"
+    },
+    "footer": {
+      "checked": "Kontrollerad {{time}}",
+      "lastKnown": "Senast kända · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Nästa körning {{time}}",
+      "wasDue": "Förväntades {{time}}"
+    },
     "step": {
       "editing": "Redigerar",
       "reading": "Läser",
@@ -3998,7 +4058,8 @@
         "space": "Det finns inte tillräckligt med ledigt utrymme för den här modellen. Frigör utrymme och försök igen.",
         "network": "Nedladdningen slutfördes inte. Kontrollera anslutningen och försök igen.",
         "invalidFile": "Den nedladdade filen är inte en modell som den här appen kan köra, så den har tagits bort.",
-        "checksum": "Den nedladdade filen matchar inte sin publicerade kontrollsumma, så den har tagits bort. Försök ladda ner den igen."
+        "checksum": "Den nedladdade filen matchar inte sin publicerade kontrollsumma, så den har tagits bort. Försök ladda ner den igen.",
+        "writeFailed": "Den här enheten kunde inte spara modellen. Försök ladda ner den igen."
       }
     },
     "catalog": {
@@ -4176,7 +4237,7 @@
     "personalDefaultDescription": "Laddas automatiskt när inget kodarkiv har en fäst profil.",
     "organizationDefaultDescription": "Laddas automatiskt för medlemmar som inte har någon personlig standard.",
     "setAsDefault": "Ställ in som standard",
-    "saveFailed": "Det gick inte att spara profilen",
+    "saveFailed": "Det gick inte att spara profilen. Försök igen.",
     "organizationRoleRequired": "Endast organisationsägare och administratörer kan ändra organisationsprofiler.",
     "deleteTitle": "Ta bort profil",
     "deleteMessage": "Detta tar bort profilen och dess inställningar permanent. Detta kan inte ångras.",
@@ -4440,6 +4501,7 @@
         "balanceNeutral": "Saldoneutral",
         "deduction": "Avdrag",
         "grant": "Kredittilldelning",
+        "welcomeCredits": "Välkomstkrediter",
         "purchase": "Köp"
       },
       "purchaseFallback": "Kreditköp",
@@ -4695,6 +4757,8 @@
     "connectedTo": "Ansluten till {{account}}",
     "disconnected": "{{provider}} har kopplats från",
     "disconnectFailed": "Det gick inte att koppla från {{provider}}",
+    "disconnectRetry": "Slack kunde inte bekräfta frånkopplingen. Försök igen.",
+    "disconnectNeedsSupport": "Kilo kunde inte läsa den sparade Slack-åtkomsten för den här anslutningen. Kontakta supporten för att slutföra frånkopplingen.",
     "couldNotLoad": "Det gick inte att läsa in integrationerna",
     "permissionDenied": "Du har inte behörighet att hantera de här integrationerna.",
     "managedByOwner": "Be en ägare i organisationen att ändra en anslutning som du inte kan ändra.",

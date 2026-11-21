@@ -8,7 +8,7 @@ import type * as AdmissionTypes from '@/lib/auth/admission';
 import type * as AuthFetchTypes from '@/lib/auth/auth-fetch';
 import { type PendingLinkOffer } from '@/lib/auth/native-auth-contract';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 
 const authMock = vi.hoisted(() => ({ signIn: vi.fn() }));
 
@@ -539,7 +539,7 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
     });
 
     expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.error).toBe(
-      'We could not verify this device. Check your connection and try again.'
+      i18n.t('authErrors.retryableAdmission')
     );
     expect(mockPostAuth).not.toHaveBeenCalled();
     expect(authMock.signIn).not.toHaveBeenCalled();
@@ -551,6 +551,7 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
     await act(() => {
       (otpForm.props.onVerify as (code: string) => void)('123456');
     });
+    expect(authMock.signIn).toHaveBeenCalledExactlyOnceWith('at', 'rt', 3600);
     act(() => {
       renderer.unmount();
     });

@@ -1,3 +1,4 @@
+import { withinSchemaBudget } from '@kilocode/web-shared/lib/ai-gateway/providers/client-schema-budget';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
@@ -49,30 +50,30 @@ function requiredByCombinator(keyword: Combinator, branches: unknown[]): string[
     return names.flat();
   }
   const [first = [], ...rest] = names;
-  return first.filter(name => rest.every(branchNames => branchNames.includes(name)));
+  const requiredByOtherBranches = rest.map(branchNames => new Set(branchNames));
+  return first.filter(name => requiredByOtherBranches.every(branchNames => branchNames.has(name)));
 }
 
-/**
- * Removes `allOf`, `anyOf` and `oneOf` from the root of a tool schema, which
- * loosens validation rather than rejecting the tool. Properties that only a
- * branch declares are kept so `additionalProperties: false` does not forbid
- * them, and properties every applicable branch requires stay required.
- * Mutates the schema in place and returns the removed constraints as text for
- * the model, or undefined when there are none.
- */
-export function removeTopLevelSchemaCombinators(schema: unknown): string | undefined {
+type CombinatorRemoval = { constraints: string | undefined; combinators: Combinator[] };
+
+function removeCombinators(schema: unknown): CombinatorRemoval {
   if (!isRecord(schema)) {
-    return undefined;
+    return { constraints: undefined, combinators: [] };
   }
-  let removed = false;
+  const present = COMBINATORS.filter(([keyword]) => schema[keyword] !== undefined);
+  if (present.length === 0) {
+    return { constraints: undefined, combinators: [] };
+  }
+  // A schema over the client walk budget is left unchanged rather than partially rewritten.
+  if (!withinSchemaBudget(schema)) {
+    return { constraints: undefined, combinators: [] };
+  }
   const constraints: string[] = [];
-  for (const [keyword, description] of COMBINATORS) {
+  const combinators: Combinator[] = [];
+  for (const [keyword, description] of present) {
     const branches = schema[keyword];
-    if (branches === undefined) {
-      continue;
-    }
     delete schema[keyword];
-    removed = true;
+    combinators.push(keyword);
     if (!Array.isArray(branches)) {
       continue;
     }
@@ -86,10 +87,23 @@ export function removeTopLevelSchemaCombinators(schema: unknown): string | undef
       `The input must also match ${description} these JSON schemas: ${JSON.stringify(branches)}`
     );
   }
-  if (removed && schema.type === undefined) {
+  if (schema.type === undefined) {
     schema.type = 'object';
   }
-  return constraints.length > 0 ? constraints.join('\n') : undefined;
+  return { constraints: constraints.length > 0 ? constraints.join('\n') : undefined, combinators };
+}
+
+/**
+ * Removes `allOf`, `anyOf` and `oneOf` from the root of a tool schema, which
+ * loosens validation rather than rejecting the tool. Properties that only a
+ * branch declares are kept so `additionalProperties: false` does not forbid
+ * them, and properties every applicable branch requires stay required. A schema
+ * over the client walk budget is left unchanged rather than partially
+ * rewritten. Mutates the schema in place and returns the removed constraints as
+ * text for the model, or undefined when there are none.
+ */
+export function removeTopLevelSchemaCombinators(schema: unknown): string | undefined {
+  return removeCombinators(schema).constraints;
 }
 
 function appendConstraints(description: string | null | undefined, constraints: string): string {
@@ -104,13 +118,11 @@ function appendConstraints(description: string | null | undefined, constraints: 
 export function removeTopLevelToolSchemaCombinators(request: GatewayRequest): void {
   const changedTools: { name: string; combinators: Combinator[]; strict: boolean }[] = [];
   const rewrite = (name: string, schema: unknown, strict: boolean | null | undefined) => {
-    const combinators = isRecord(schema)
-      ? COMBINATORS.flatMap(([keyword]) => (schema[keyword] === undefined ? [] : [keyword]))
-      : [];
-    if (combinators.length > 0) {
-      changedTools.push({ name, combinators, strict: strict === true });
+    const removal = removeCombinators(schema);
+    if (removal.combinators.length > 0) {
+      changedTools.push({ name, combinators: removal.combinators, strict: strict === true });
     }
-    return removeTopLevelSchemaCombinators(schema);
+    return removal.constraints;
   };
 
   switch (request.kind) {

@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "این سند تنها به زبان انگلیسی در دسترس است.",
     "organizationTrialEndedBilling": "دوره آزمایشی سازمان به پایان رسیده است و هیچ طرح فعالی ندارد. شما می‌توانید صورتحساب را به‌روزرسانی کنید و سپس دوباره تلاش کنید.",
     "organizationTrialEndedBillingAtKiloAi": "دوره آزمایشی سازمان به پایان رسیده است و هیچ طرح فعالی ندارد. شما می‌توانید صورتحساب را در kilo.ai به‌روزرسانی کنید و سپس دوباره تلاش کنید.",
-    "viewOnGitHub": "مشاهدهٔ PR در GitHub"
+    "viewOnGitHub": "مشاهدهٔ PR در GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "نقطه فهرست",
+        "nestedBulletPoint": "نقطه فهرست تو در تو",
+        "orderedItem": "مورد فهرست {n}",
+        "nestedOrderedItem": "مورد فهرست تو در تو {n}"
+      },
+      "blockquote": {
+        "quote": "نقل قول",
+        "nestedQuote": "نقل قول تو در تو"
+      },
+      "table": {
+        "row": "ردیف {n}: {content}"
+      },
+      "math": {
+        "equation": "ریاضی: {latex}"
+      },
+      "rotor": {
+        "headings": "عنوان‌ها",
+        "links": "پیوندها",
+        "images": "تصاویر"
+      }
+    }
   },
   "language": {
     "restarting": "در حال راه‌اندازی مجدد برای تغییر زبان",
@@ -505,6 +528,14 @@
       "nextStepAppeal": "نتیجه درخواست تجدیدنظر در همین صفحه نمایش داده می‌شود.",
       "nextStepFinal": "تصمیم مربوط به درخواست تجدیدنظر قطعی است. امکان ارسال درخواست تجدیدنظر دیگری وجود ندارد.",
       "viewReceipt": "مشاهده رسید"
+    },
+    "reportReceipts": {
+      "title": "گزارش‌ها",
+      "rowSubtitle": "گزارش‌هایی که ثبت کرده‌اید و نتایج آن‌ها",
+      "emptyTitle": "هنوز گزارشی ثبت نکرده‌اید",
+      "emptyDescription": "گزارش‌هایی که از یک نظر یا یک پاسخ هوش مصنوعی ثبت می‌کنید اینجا نمایش داده می‌شوند.",
+      "couldNotLoad": "گزارش‌های شما بارگذاری نشد",
+      "capped": "جدیدترین گزارش‌های شما نمایش داده می‌شوند."
     },
     "changelog": "تازه‌ها",
     "changelogVersionPending": "یادداشت‌های نسخهٔ {{version}} با به‌روزرسانی بعدی برنامه می‌رسند.",
@@ -1277,7 +1308,7 @@
       "couldNotGetLatest": "دریافت آخرین اطلاعات ممکن نشد.",
       "byline": "#{{number}} توسط {{author}}",
       "noFindings": "یافته‌ای وجود ندارد.",
-      "findingsUnavailable": "نتایج در دسترس نیستند، چون این بررسی ناموفق بود.",
+      "findingsUnavailable": "نتایج در دسترس نیستند.",
       "findingsInProgress": "این بررسی هنوز در جریان است. پس از پایان آن، یافته‌ها در این بخش نمایش داده می‌شوند.",
       "findingsEndedWithoutResults": "این بررسی پیش از ایجاد هر یافته‌ای به پایان رسید.",
       "serviceUnavailable": "اتصال به سرویس بررسی کد ممکن نشد. وقتی سرویس در دسترس بود، بررسی را دوباره انجام دهید.",
@@ -3591,6 +3622,7 @@
       "identifierLabel": "شناسه",
       "identifierRequired": "شناسه را وارد کنید.",
       "identifierTaken": "حالت دیگری از این شناسه استفاده می‌کند.",
+      "identifierTooLong": "شناسه را حداکثر {{max}} نویسه نگه دارید.",
       "nameLabel": "نام حالت",
       "nameRequired": "نام حالت را وارد کنید.",
       "notFound": "این حالت دیگر وجود ندارد.",
@@ -3681,7 +3713,7 @@
     "emailDeliveryFailed": "ارسال ایمیل موقتاً ممکن نیست. لطفاً بعداً دوباره تلاش کنید.",
     "admissionRequired": "دستگاه شما قابل تأیید نیست. از «$t(login.moreSignInOptions)» استفاده کنید تا در دستگاه دیگری یا از طریق وب وارد شوید.",
     "default": "مشکلی پیش آمد. لطفاً دوباره تلاش کنید.",
-    "retryableAdmission": "ما نتوانستیم این دستگاه را تأیید کنیم. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
+    "retryableAdmission": "تأیید این دستگاه ممکن نشد. دوباره تلاش کنید.",
     "startSignInFailed": "شروع ورود ممکن نشد. لطفاً دوباره تلاش کنید.",
     "couldNotOpenBrowser": "باز کردن مرورگر ممکن نشد. لطفاً دوباره تلاش کنید.",
     "signInTimedOut": "مهلت ورود تمام شد. لطفاً دوباره تلاش کنید.",
@@ -3753,6 +3785,34 @@
     "nextScheduled": "زمانبندی‌های بعدی",
     "answerNeeded": "نیازمند پاسخ",
     "waitingToRetry": "در انتظار تلاش مجدد",
+    "countNoun": {
+      "needsInput_one": "در انتظار ورودی",
+      "needsInput_other": "در انتظار ورودی",
+      "running_one": "در حال کار",
+      "running_other": "در حال کار",
+      "scheduled_one": "زمانبندیشده",
+      "scheduled_other": "زمانبندیشده",
+      "idle_one": "بیکار",
+      "idle_other": "بیکار"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} در انتظار ورودی",
+      "needsInput_other": "{{displayCount}} در انتظار ورودی",
+      "running_one": "{{displayCount}} در حال کار",
+      "running_other": "{{displayCount}} در حال کار",
+      "scheduled_one": "{{displayCount}} زمانبندیشده",
+      "scheduled_other": "{{displayCount}} زمانبندیشده",
+      "idle_one": "{{displayCount}} بیکار",
+      "idle_other": "{{displayCount}} بیکار"
+    },
+    "footer": {
+      "checked": "آخرین بررسی {{time}}",
+      "lastKnown": "آخرین وضعیت شناخته‌شده · {{time}}"
+    },
+    "wake": {
+      "nextRun": "اجرای بعدی {{time}}",
+      "wasDue": "قرار بود {{time}}"
+    },
     "step": {
       "editing": "ویرایش",
       "reading": "خواندن",
@@ -3998,7 +4058,8 @@
         "space": "فضای خالی کافی برای این مدل وجود ندارد. فضا آزاد کنید و دوباره تلاش کنید.",
         "network": "دانلود کامل نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
         "invalidFile": "فایل دانلودشده مدلی نیست که این برنامه بتواند اجرا کند، بنابراین حذف شد.",
-        "checksum": "فایل دانلودشده با کد بررسی منتشرشده‌اش مطابقت ندارد، بنابراین حذف شد. دوباره دانلود را امتحان کنید."
+        "checksum": "فایل دانلودشده با کد بررسی منتشرشده‌اش مطابقت ندارد، بنابراین حذف شد. دوباره دانلود را امتحان کنید.",
+        "writeFailed": "این دستگاه نتوانست مدل را ذخیره کند. دوباره دانلود را امتحان کنید."
       }
     },
     "catalog": {
@@ -4176,7 +4237,7 @@
     "personalDefaultDescription": "زمانی که هیچ مخزنی نمایه پین شده نداشته باشد، به صورت خودکار بارگذاری می شود.",
     "organizationDefaultDescription": "بارگیری خودکار برای اعضایی که هیچ پیش فرض شخصی ندارند.",
     "setAsDefault": "به عنوان پیش فرض تنظیم کنید",
-    "saveFailed": "نمایه ذخیره نشد",
+    "saveFailed": "نمایه ذخیره نشد. دوباره تلاش کنید.",
     "organizationRoleRequired": "فقط مالکان سازمان و مدیران می‌توانند نمایه‌های سازمان را تغییر دهند.",
     "deleteTitle": "حذف نمایه",
     "deleteMessage": "با این کار نمایه و تنظیمات آن برای همیشه حذف می شود. این قابل واگرد نیست.",
@@ -4440,6 +4501,7 @@
         "balanceNeutral": "بدون تأثیر بر موجودی",
         "deduction": "کسر",
         "grant": "اعطای اعتبار",
+        "welcomeCredits": "اعتبار خوش‌آمد",
         "purchase": "خرید"
       },
       "purchaseFallback": "خرید اعتبار",
@@ -4695,6 +4757,8 @@
     "connectedTo": "متصل به {{account}}",
     "disconnected": "اتصال {{provider}} قطع شد",
     "disconnectFailed": "قطع اتصال {{provider}} ممکن نشد",
+    "disconnectRetry": "Slack نتوانست قطع اتصال را تأیید کند. دوباره تلاش کنید.",
+    "disconnectNeedsSupport": "Kilo نتوانست دسترسی Slack ذخیره‌شده برای این اتصال را بخواند. برای تکمیل قطع اتصال با پشتیبانی تماس بگیرید.",
     "couldNotLoad": "بارگیری یکپارچه‌سازی‌ها ممکن نشد",
     "permissionDenied": "شما اجازهٔ مدیریت این یکپارچه‌سازی‌ها را ندارید.",
     "managedByOwner": "برای تغییر اتصالی که نمی‌توانید تغییر دهید، از مالک سازمان درخواست کنید.",

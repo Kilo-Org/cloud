@@ -22,7 +22,7 @@ export const MAX_PROFILE_VARS = ENVIRONMENT_LIMITS.MAX_VARS;
 /**
  * Encrypt a value using the agent env vars public key (base64-encoded).
  */
-function encryptValue(publicKeyBase64: string, value: string): string {
+export function encryptProfileSecret(publicKeyBase64: string, value: string): string {
   if (!publicKeyBase64) {
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
@@ -33,6 +33,47 @@ function encryptValue(publicKeyBase64: string, value: string): string {
   const publicKey = Buffer.from(publicKeyBase64, 'base64');
   const envelope = encryptWithPublicKey(value, publicKey);
   return JSON.stringify(envelope);
+}
+
+/**
+ * A network secret's policy, without the key and value the caller also passes.
+ */
+export type ProfileNetworkSecretPolicy = Omit<NetworkSecretInput, 'key' | 'value'>;
+
+/**
+ * The columns one variable contributes to its row, env variable or network
+ * secret, before the profile id. Every write path builds its rows here so a
+ * payload's delivery mode and its policy cannot be dropped by one path while
+ * another honours them.
+ */
+export function profileVarColumns(
+  publicKeyBase64: string,
+  variable: {
+    key: string;
+    value: string;
+    isSecret: boolean;
+    networkSecret?: ProfileNetworkSecretPolicy;
+  }
+) {
+  if (variable.networkSecret) {
+    const input = {
+      key: variable.key,
+      value: variable.value,
+      ...variable.networkSecret,
+    };
+    validateNetworkSecretChanges([input]);
+    return networkSecretColumns(publicKeyBase64, input);
+  }
+  return {
+    key: variable.key,
+    value: variable.isSecret
+      ? encryptProfileSecret(publicKeyBase64, variable.value)
+      : variable.value,
+    is_secret: variable.isSecret,
+    delivery: 'env' as const,
+    allowed_hosts: null,
+    injection_locations: null,
+  };
 }
 
 /**
@@ -51,20 +92,10 @@ export async function setVar(
   value: string,
   isSecret: boolean,
   owner: ProfileOwner,
-  networkSecret?: Omit<NetworkSecretInput, 'key' | 'value'>
+  networkSecret?: ProfileNetworkSecretPolicy
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, owner);
-  if (networkSecret) validateNetworkSecretChanges([{ key, value, ...networkSecret }]);
-  const columns = networkSecret
-    ? networkSecretColumns(publicKeyBase64, { key, value, ...networkSecret })
-    : {
-        key,
-        value: isSecret ? encryptValue(publicKeyBase64, value) : value,
-        is_secret: isSecret,
-        delivery: 'env' as const,
-        allowed_hosts: null,
-        injection_locations: null,
-      };
+  const columns = profileVarColumns(publicKeyBase64, { key, value, isSecret, networkSecret });
 
   await db.transaction(async tx => {
     // Lock the owning profile row so the key lookup, the cap check and the

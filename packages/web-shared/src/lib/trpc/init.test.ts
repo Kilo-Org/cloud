@@ -157,9 +157,8 @@ describe('adminProcedure admin_access telemetry', () => {
   });
 
   test('emits a denied privileged_access event for a non-admin bearer caller', async () => {
-    const caller = createCaller(
-      ctxFor({ user: defineTestUser({ is_admin: false }), authViaToken: true })
-    );
+    const user = defineTestUser({ is_admin: false });
+    const caller = createCaller(ctxFor({ user, authViaToken: true }));
 
     await expect(caller.ping()).rejects.toThrow();
 
@@ -169,8 +168,11 @@ describe('adminProcedure admin_access telemetry', () => {
       credential: 'human_bearer',
       outcome: 'denied',
       actionClass: 'platform_read',
+      // A resolved non-admin is attributable to its account, but carries no
+      // tier: the denial itself is the finding.
+      kiloUserId: user.id,
+      email: user.google_user_email,
       adminTier: null,
-      email: null,
       wouldBlock: true,
     });
   });

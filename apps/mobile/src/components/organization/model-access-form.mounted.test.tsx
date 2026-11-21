@@ -14,6 +14,7 @@ import { act, type ReactTestInstance, TestRenderer } from '@/test/renderer';
 import { i18n } from '@/i18n';
 import { ModelAccessForm } from './model-access-form';
 import {
+  type AvailableModel,
   type CatalogModel,
   type ModelAccessDraft,
   setModelsAllowed,
@@ -109,6 +110,21 @@ const CATALOG = [model('anthropic/claude', ['anthropic']), model('openai/gpt', [
 /** The catalog plus a model no saved deny list names, so an edit stays valid. */
 const WIDE_CATALOG = [...CATALOG, model('google/gemini', ['google'])];
 
+/** One entry as `organizations.settings.listAvailableModels` answers it. */
+function availableModel(id: string, providers: readonly string[]): AvailableModel {
+  return {
+    id,
+    name: id,
+    created: 0,
+    description: '',
+    architecture: { input_modalities: ['text'], output_modalities: ['text'], tokenizer: 'test' },
+    top_provider: { is_moderated: false },
+    pricing: { prompt: '0', completion: '0' },
+    context_length: 0,
+    inference_provider_ids: [...providers],
+  };
+}
+
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
 function element(
@@ -119,13 +135,14 @@ function element(
     onRetryCatalog?: () => void;
     modelDenyList?: readonly string[];
     catalog?: readonly CatalogModel[];
+    models?: readonly AvailableModel[];
   } = {}
 ) {
   return createElement(ModelAccessForm, {
     organizationId: 'org-1',
     canEdit: true,
     canManageBilling: true,
-    models: [],
+    models: overrides.models ?? [],
     catalog: overrides.catalogUnavailable === true ? [] : (overrides.catalog ?? CATALOG),
     catalogUnavailable: overrides.catalogUnavailable === true,
     catalogIsFetching: overrides.catalogIsFetching ?? false,
@@ -147,6 +164,7 @@ function render(
     onRetryCatalog?: () => void;
     modelDenyList?: readonly string[];
     catalog?: readonly CatalogModel[];
+    models?: readonly AvailableModel[];
   } = {}
 ) {
   saved.mutateAsync.mockResolvedValue(undefined);
@@ -166,6 +184,7 @@ function renderWithCatalog(
     catalogUnavailable?: boolean;
     modelDenyList?: readonly string[];
     catalog?: readonly CatalogModel[];
+    models?: readonly AvailableModel[];
   } = {}
 ) {
   if (!renderer) {
@@ -650,9 +669,156 @@ describe('ModelAccessForm with no provider rows', () => {
     selectTab(root, 'providers');
 
     expect(list(root, 'ProviderAllowList').props.providers).toEqual(['anthropic']);
-    expect(root.findAllByType('Text' as never).map(node => node.props.children)).not.toContain(
+    // A saved slug is the only row and covers no provider the catalog left out,
+    // so the tab says the provider list did not load instead of passing the row
+    // off as the whole universe.
+    expect(root.findAllByType('Text' as never).map(node => node.props.children)).toContain(
       i18n.t('organizationModelAccess.providersUnavailable')
     );
+  });
+});
+
+describe('ModelAccessForm with a catalog that names no provider', () => {
+  // The catalog's own provider slugs are the phone's only provider evidence. A
+  // saved slug gives the tab a row to hold, but it says nothing about the
+  // providers a policy filter dropped, so the rows are not the whole universe:
+  // the tab stays read-only and a save leaves the stored list alone.
+  const UNNAMED = [model('anthropic/claude', []), model('openai/gpt', [])];
+
+  it('keeps the saved rows visible and locked until the catalog names providers', () => {
+    const root = render(['anthropic', 'openai'], { catalog: UNNAMED });
+
+    selectTab(root, 'providers');
+    expect(list(root, 'ProviderAllowList').props.providers).toEqual(['anthropic', 'openai']);
+    expect(list(root, 'ProviderAllowList').props.disabled).toBe(true);
+    expect(root.findAllByType('Text' as never).map(node => node.props.children)).toContain(
+      i18n.t('organizationModelAccess.providersNeedCatalog')
+    );
+    // The caption sends the reader to the retry above, so the notice tile that
+    // carries the Retry button shows here even though the saved list gave the
+    // tab rows.
+    expect(root.findAllByType('Text' as never).map(node => node.props.children)).toContain(
+      i18n.t('organizationModelAccess.providersUnavailable')
+    );
+  });
+
+  it('writes no provider list when only the organization own models name a provider', async () => {
+    // The saved policy holds no provider list, so a save may omit it; the rows
+    // are the organization's own models alone, which drop every provider a
+    // policy filter hides. Writing them would persist that narrow list as the
+    // organization's whole allow list, so the save leaves the stored one unset.
+    const root = render(undefined, {
+      catalog: [model('anthropic/claude', []), model('openai/gpt', [])],
+      models: [availableModel('anthropic/claude-sonnet', ['anthropic'])],
+    });
+
+    selectTab(root, 'providers');
+    expect(list(root, 'ProviderAllowList').props.providers).toEqual(['anthropic']);
+    selectTab(root, 'models');
+    const draft = list(root, 'ModelDenyList').props.draft as ModelAccessDraft;
+    changeDraft(root, toggleModel(draft, 'openai/gpt', false));
+    await pressSave(root);
+
+    expect(saved.mutateAsync).toHaveBeenCalledTimes(1);
+    expect(saved.mutateAsync.mock.calls[0]?.[0]).toEqual({
+      organizationId: 'org-1',
+      model_deny_list: ['openai/gpt'],
+    });
+  });
+
+  it('refuses a provider edit when a refetch names no provider', async () => {
+    // The admin turns a provider off against the whole catalog, and a refetch
+    // answers no provider ids. The rows behind the edit are no longer the whole
+    // universe, so the save cannot write them and must not report the edit as
+    // saved: it is refused until the catalog names providers again.
+    const root = render(['anthropic', 'openai']);
+
+    selectTab(root, 'providers');
+    const start = list(root, 'ProviderAllowList').props.draft as ModelAccessDraft;
+    changeProviders(root, toggleProvider(start, 'openai', false));
+    renderWithCatalog(['anthropic', 'openai'], { catalog: UNNAMED });
+    await pressSave(root);
+
+    expect(saved.mutateAsync).not.toHaveBeenCalled();
+    expect(statusMessage(root)).toBe(i18n.t('organizationModelAccess.providersNeedCatalog'));
+    // The status line under the tabs carries that sentence, so the list must
+    // not print the same sentence again as its caption. The status is stubbed
+    // to a non-Text node here, so no Text may hold the sentence at all.
+    const rendered = root
+      .findAllByType('Text' as never)
+      .filter(
+        node => node.props.children === i18n.t('organizationModelAccess.providersNeedCatalog')
+      );
+    expect(rendered).toHaveLength(0);
+  });
+
+  it('keeps the read-only caption when a failed save owns the status line', async () => {
+    // A failure outranks the refusal in the status line, so the sentence that
+    // explains the disabled switches has no other home: the caption must stay.
+    // The order matters: an edit retires an earlier failure, so the failed save
+    // has to come after the provider toggle.
+    const root = render(['anthropic', 'openai']);
+    saved.mutateAsync.mockRejectedValueOnce(
+      Object.assign(new Error('Failed to update allow lists'), {
+        data: { code: 'INTERNAL_SERVER_ERROR', message: 'Failed to update allow lists' },
+      })
+    );
+
+    selectTab(root, 'providers');
+    changeProviders(
+      root,
+      toggleProvider(
+        list(root, 'ProviderAllowList').props.draft as ModelAccessDraft,
+        'openai',
+        false
+      )
+    );
+    await pressSave(root);
+    expect(saved.mutateAsync).toHaveBeenCalledTimes(1);
+
+    renderWithCatalog(['anthropic', 'openai'], { catalog: UNNAMED });
+
+    expect(String(statusMessage(root))).not.toBe(
+      i18n.t('organizationModelAccess.providersNeedCatalog')
+    );
+    expect(statusMessage(root)).toBeDefined();
+    const rendered = root
+      .findAllByType('Text' as never)
+      .filter(
+        node => node.props.children === i18n.t('organizationModelAccess.providersNeedCatalog')
+      );
+    expect(rendered).toHaveLength(1);
+  });
+});
+
+describe('ModelAccessForm with a catalog that names every provider', () => {
+  it('keeps a provider saved off as a row with its switch off, and allows it again', async () => {
+    // The finding's own promise: the catalog names the provider, so turning it
+    // off writes the list without it while the row stays, switched off, and the
+    // same row turns it back on.
+    const root = render(['anthropic', 'openai']);
+
+    selectTab(root, 'providers');
+    const start = list(root, 'ProviderAllowList').props.draft as ModelAccessDraft;
+    changeProviders(root, toggleProvider(start, 'openai', false));
+    await pressSave(root);
+
+    // The form rebases on the saved policy, and the row the provider lost is
+    // still there: rows come from the catalog plus the saved list. A row's
+    // switch reads the draft, so the row listed without `openai` is the switch
+    // drawn off.
+    expect(list(root, 'ProviderAllowList').props.providers).toEqual(['anthropic', 'openai']);
+    const off = list(root, 'ProviderAllowList').props.draft as ModelAccessDraft;
+    expect(off.providerAllowList).toEqual(['anthropic']);
+
+    changeProviders(root, toggleProvider(off, 'openai', true));
+    await pressSave(root);
+
+    expect(saved.mutateAsync.mock.calls.at(-1)?.[0]).toEqual({
+      organizationId: 'org-1',
+      provider_allow_list: ['anthropic', 'openai'],
+      model_deny_list: [],
+    });
   });
 });
 

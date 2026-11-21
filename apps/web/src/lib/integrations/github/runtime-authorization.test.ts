@@ -1,8 +1,10 @@
 import {
   assertGitHubInstallationRuntimeAuthorized,
+  getGitHubInstallationHolderRejectionReason,
   getGitHubRuntimeAssociationRejectionReason,
   GitHubRuntimeAuthorizationError,
   isGitHubRuntimeAssociationAuthorized,
+  type GitHubInstallationHolderState,
 } from './runtime-authorization';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 
@@ -32,6 +34,114 @@ const association = {
   userBlockedAt: null,
   userBlockedReason: null,
 } as const;
+
+describe('getGitHubInstallationHolderRejectionReason', () => {
+  it('admits a healthy personal row', () => {
+    expect(getGitHubInstallationHolderRejectionReason(association)).toBeNull();
+  });
+
+  it('admits a healthy organization row', () => {
+    expect(
+      getGitHubInstallationHolderRejectionReason({
+        ...association,
+        integration: {
+          ...association.integration,
+          owned_by_user_id: null,
+          owned_by_organization_id: 'organization-1',
+        },
+        userRecordId: null,
+      })
+    ).toBeNull();
+  });
+
+  it('admits a roleless organization row', () => {
+    // The holder contract stores no connection role: the organization workflow
+    // connection definition matches a row without one, so a missing role cannot
+    // disqualify a holder.
+    const rolelessOrganization: GitHubInstallationHolderState = {
+      integration: {
+        owned_by_user_id: null,
+        owned_by_organization_id: 'organization-1',
+        integration_status: 'active',
+        suspended_at: null,
+        auth_invalid_at: null,
+        github_disconnected_at: null,
+      },
+      organizationDeletedAt: null,
+      userRecordId: null,
+      userBlockedAt: null,
+      userBlockedReason: null,
+    };
+
+    expect(getGitHubInstallationHolderRejectionReason(rolelessOrganization)).toBeNull();
+  });
+
+  it('admits an absent row because there is no holder to reject', () => {
+    expect(getGitHubInstallationHolderRejectionReason(null)).toBeNull();
+  });
+
+  it.each([
+    [
+      'integration_status',
+      { ...association, integration: { ...association.integration, integration_status: null } },
+    ],
+    [
+      'integration_status',
+      {
+        ...association,
+        integration: { ...association.integration, integration_status: 'suspended' },
+      },
+    ],
+    [
+      'suspended',
+      { ...association, integration: { ...association.integration, suspended_at: '2026-09-04' } },
+    ],
+    [
+      'auth_invalid',
+      {
+        ...association,
+        integration: { ...association.integration, auth_invalid_at: '2026-09-04' },
+      },
+    ],
+    [
+      'disconnected',
+      {
+        ...association,
+        integration: { ...association.integration, github_disconnected_at: '2026-09-04' },
+      },
+    ],
+    ['blocked_personal_owner', { ...association, userBlockedReason: 'blocked' }],
+    ['blocked_personal_owner', { ...association, userBlockedAt: '2026-09-04T00:00:00.000Z' }],
+    [
+      'deleted_organization',
+      {
+        ...association,
+        integration: {
+          ...association.integration,
+          owned_by_user_id: null,
+          owned_by_organization_id: 'organization-1',
+        },
+        userRecordId: null,
+        organizationDeletedAt: '2026-09-04',
+      },
+    ],
+    ['missing_personal_owner', { ...association, userRecordId: null }],
+    ['missing_personal_owner', { ...association, userRecordId: 'different-user' }],
+    [
+      'malformed_owner',
+      { ...association, integration: { ...association.integration, owned_by_user_id: null } },
+    ],
+    [
+      'malformed_owner',
+      {
+        ...association,
+        integration: { ...association.integration, owned_by_organization_id: 'organization-1' },
+      },
+    ],
+  ] as const)('rejects a holder with %s', (reason, candidate) => {
+    expect(getGitHubInstallationHolderRejectionReason(candidate)).toBe(reason);
+  });
+});
 
 describe('isGitHubRuntimeAssociationAuthorized', () => {
   it('allows a healthy association with an active canonical installation', () => {

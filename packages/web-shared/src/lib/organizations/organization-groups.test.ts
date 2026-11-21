@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
+import * as z from 'zod';
 import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import {
   kilocode_users,
@@ -15,9 +16,11 @@ import type { AuditLogAction } from '@kilocode/web-shared/lib/organizations/audi
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   OrganizationGroupInputSchema,
+  OrganizationGroupModelAccessPolicyWriteSchema,
   OrganizationGroupPoliciesSchema,
   OrganizationGroupPolicySchema,
 } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
+import { MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.schema';
 import {
   deleteOrganizationGroup,
   listOrganizationGroupsForManager,
@@ -88,6 +91,45 @@ describe('organization group policies', () => {
         provider_allow_list: ['openai'],
       },
     });
+  });
+
+  it('returns the value the write schema parsed for a selected model access policy', () => {
+    const policy = {
+      type: 'model_access' as const,
+      data: {
+        mode: 'selected' as const,
+        model_allow_list: [' openai/gpt-4o '],
+        provider_allow_list: [' openai '],
+      },
+    };
+
+    expect(normalizeOrganizationGroupPolicy(policy)).toEqual(
+      OrganizationGroupModelAccessPolicyWriteSchema.parse(policy)
+    );
+  });
+
+  it('refuses a selected policy entry over the documented length', () => {
+    let refused: unknown = undefined;
+    try {
+      normalizeOrganizationGroupPolicy({
+        type: 'model_access',
+        data: {
+          mode: 'selected',
+          model_allow_list: ['m'.repeat(MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH + 1)],
+          provider_allow_list: [],
+        },
+      });
+    } catch (error) {
+      refused = error;
+    }
+
+    expect(refused).toBeInstanceOf(TRPCError);
+    if (!(refused instanceof TRPCError)) throw new Error('Expected a TRPCError refusal');
+    expect(refused.code).toBe('BAD_REQUEST');
+    expect(refused.message).toBe(
+      `A model id at index 0 ("${'m'.repeat(32)}…") must be at most ${MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH} characters long.`
+    );
+    expect(refused.cause).toBeInstanceOf(z.ZodError);
   });
 });
 

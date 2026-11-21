@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}, özel depo",
     "legalDocumentEnglishOnly": "Bu belge yalnızca İngilizce olarak mevcuttur.",
     "organizationTrialEndedBilling": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. Faturalandırmayı güncelleyip ardından tekrar deneyebilirsin.",
-    "organizationTrialEndedBillingAtKiloAi": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. kilo.ai adresinden faturalandırmayı güncelleyip ardından tekrar deneyebilirsin."
+    "organizationTrialEndedBillingAtKiloAi": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. kilo.ai adresinden faturalandırmayı güncelleyip ardından tekrar deneyebilirsin.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Madde işareti",
+        "nestedBulletPoint": "İç içe madde işareti",
+        "orderedItem": "Liste öğesi {n}",
+        "nestedOrderedItem": "İç içe liste öğesi {n}"
+      },
+      "blockquote": {
+        "quote": "Alıntı",
+        "nestedQuote": "İç içe alıntı"
+      },
+      "table": {
+        "row": "Satır {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematik: {latex}"
+      },
+      "rotor": {
+        "headings": "Başlıklar",
+        "links": "Bağlantılar",
+        "images": "Görseller"
+      }
+    }
   },
   "language": {
     "restarting": "Dil değişikliğini uygulamak için yeniden başlatılıyor",
@@ -506,6 +529,14 @@
       "nextStepFinal": "İtiraz kararı kesindir. Başka itiraz gönderilemez.",
       "viewReceipt": "Alındıyı görüntüle"
     },
+    "reportReceipts": {
+      "title": "Raporlar",
+      "rowSubtitle": "Gönderdiğiniz raporlar ve sonuçları",
+      "emptyTitle": "Henüz rapor yok",
+      "emptyDescription": "Bir yorumdan veya bir yapay zeka yanıtından gönderdiğiniz raporlar burada görünür.",
+      "couldNotLoad": "Raporlarınız yüklenemedi",
+      "capped": "En son raporlarınız gösteriliyor."
+    },
     "changelog": "Yenilikler",
     "changelogVersionPending": "{{version}} sürümünün notları sonraki uygulama güncellemesiyle gelir.",
     "changelogGroupNew": "Yeni",
@@ -774,7 +805,7 @@
       "gateHidden": "Gizli",
       "gateNone": "Yok",
       "noFindings": "Bulgu yok.",
-      "findingsUnavailable": "Bu inceleme başarısız olduğu için sonuçlar kullanılamıyor.",
+      "findingsUnavailable": "Sonuçlar kullanılamıyor.",
       "findingsInProgress": "Bu inceleme hâlâ sürüyor. İnceleme tamamlandığında bulgular burada görünür.",
       "findingsEndedWithoutResults": "Bu inceleme, herhangi bir bulgu üretmeden sona erdi.",
       "serviceUnavailable": "Kod inceleme hizmetine ulaşılamadı. Hizmet kullanılabilir olduğunda incelemeyi tekrar dene.",
@@ -3595,6 +3626,7 @@
       "identifierLabel": "Tanımlayıcı",
       "identifierRequired": "Bir tanımlayıcı girin.",
       "identifierTaken": "Bu tanımlayıcıyı başka bir mod zaten kullanıyor.",
+      "identifierTooLong": "Tanımlayıcıyı {{max}} karakter veya daha az tutun.",
       "nameLabel": "Mod adı",
       "nameRequired": "Bir mod adı girin.",
       "notFound": "Bu mod artık mevcut değil.",
@@ -3681,7 +3713,7 @@
     "emailDeliveryFailed": "E-posta gönderimi geçici olarak kullanılamıyor. Lütfen daha sonra tekrar dene.",
     "admissionRequired": "Cihazın doğrulanamıyor. Başka bir cihazdan veya web üzerinden oturum açmak için '$t(login.moreSignInOptions)' seçeneğini kullan.",
     "default": "Bir sorun oluştu. Lütfen tekrar dene.",
-    "retryableAdmission": "Bu cihaz doğrulanamadı. Bağlantını kontrol et ve tekrar dene.",
+    "retryableAdmission": "Bu cihaz doğrulanamadı. Tekrar dene.",
     "startSignInFailed": "Oturum açma işlemi başlatılamadı. Lütfen tekrar dene.",
     "couldNotOpenBrowser": "Tarayıcı açılamadı. Lütfen tekrar dene.",
     "signInTimedOut": "Oturum açma işlemi zaman aşımına uğradı. Lütfen tekrar dene.",
@@ -3753,6 +3785,34 @@
     "nextScheduled": "Sıradaki zamanlananlar",
     "answerNeeded": "Yanıt bekliyor",
     "waitingToRetry": "Yeniden deneme bekleniyor",
+    "countNoun": {
+      "needsInput_one": "Yanıt bekliyor",
+      "needsInput_other": "Yanıt bekliyor",
+      "running_one": "Çalışıyor",
+      "running_other": "Çalışıyor",
+      "scheduled_one": "Zamanlandı",
+      "scheduled_other": "Zamanlandı",
+      "idle_one": "Boşta",
+      "idle_other": "Boşta"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Yanıt bekliyor",
+      "needsInput_other": "{{displayCount}} Yanıt bekliyor",
+      "running_one": "{{displayCount}} Çalışıyor",
+      "running_other": "{{displayCount}} Çalışıyor",
+      "scheduled_one": "{{displayCount}} Zamanlandı",
+      "scheduled_other": "{{displayCount}} Zamanlandı",
+      "idle_one": "{{displayCount}} Boşta",
+      "idle_other": "{{displayCount}} Boşta"
+    },
+    "footer": {
+      "checked": "Kontrol edildi {{time}}",
+      "lastKnown": "Son bilinen · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Sonraki çalışma {{time}}",
+      "wasDue": "Bekleniyordu {{time}}"
+    },
     "step": {
       "editing": "Düzenleniyor",
       "reading": "Okunuyor",
@@ -3998,7 +4058,8 @@
         "space": "Bu model için yeterli boş depolama alanı yok. Yer açıp yeniden deneyin.",
         "network": "İndirme tamamlanamadı. Bağlantınızı denetleyip yeniden deneyin.",
         "invalidFile": "İndirilen dosya bu uygulamanın çalıştırabileceği bir model değil, bu yüzden kaldırıldı.",
-        "checksum": "İndirilen dosya yayımlanan sağlama toplamıyla eşleşmiyor, bu yüzden kaldırıldı. İndirmeyi yeniden deneyin."
+        "checksum": "İndirilen dosya yayımlanan sağlama toplamıyla eşleşmiyor, bu yüzden kaldırıldı. İndirmeyi yeniden deneyin.",
+        "writeFailed": "Bu cihaz modeli kaydedemedi. İndirmeyi yeniden deneyin."
       }
     },
     "catalog": {
@@ -4176,7 +4237,7 @@
     "personalDefaultDescription": "Hiçbir deponun sabitlenmiş profili olmadığında otomatik olarak yüklenir.",
     "organizationDefaultDescription": "Kişisel varsayılanı olmayan üyeler için otomatik olarak yüklenir.",
     "setAsDefault": "Varsayılan olarak ayarla",
-    "saveFailed": "Profil kaydedilemedi",
+    "saveFailed": "Profil kaydedilemedi. Tekrar deneyin.",
     "organizationRoleRequired": "Kuruluş profillerini yalnızca kuruluş sahipleri ve yöneticiler değiştirebilir.",
     "deleteTitle": "Profili sil",
     "deleteMessage": "Bu, profili ve ayarlarını kalıcı olarak kaldırır. Bu geri alınamaz.",
@@ -4440,6 +4501,7 @@
         "balanceNeutral": "Bakiyeyi etkilemez",
         "deduction": "Düşüm",
         "grant": "Kredi hediyesi",
+        "welcomeCredits": "Hoş geldin kredisi",
         "purchase": "Satın alım"
       },
       "purchaseFallback": "Kredi satın alımı",
@@ -4695,6 +4757,8 @@
     "connectedTo": "Bağlı hesap: {{account}}",
     "disconnected": "{{provider}} bağlantısı kesildi",
     "disconnectFailed": "{{provider}} bağlantısı kesilemedi",
+    "disconnectRetry": "Slack bağlantı kesme işlemini doğrulayamadı. Tekrar dene.",
+    "disconnectNeedsSupport": "Kilo bu bağlantı için kaydedilen Slack erişimini okuyamadı. Bağlantı kesmeyi tamamlamak için destekle iletişime geç.",
     "couldNotLoad": "Entegrasyonlar yüklenemedi",
     "permissionDenied": "Bu entegrasyonları yönetme izniniz yok.",
     "managedByOwner": "Değiştiremediğiniz bir bağlantıyı değiştirmesi için bir kuruluş sahibine başvurun.",

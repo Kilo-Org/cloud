@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "この文書は英語でのみご利用いただけます。",
     "organizationTrialEndedBilling": "組織のトライアルは終了し、有効なプランがありません。請求情報を更新してから、もう一度お試しください。",
     "organizationTrialEndedBillingAtKiloAi": "組織のトライアルは終了し、有効なプランがありません。kilo.ai で請求情報を更新してから、もう一度お試しください。",
-    "viewOnGitHub": "GitHubでPRを表示"
+    "viewOnGitHub": "GitHubでPRを表示",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "箇条書きの項目",
+        "nestedBulletPoint": "ネストされた箇条書きの項目",
+        "orderedItem": "リスト項目 {n}",
+        "nestedOrderedItem": "ネストされたリスト項目 {n}"
+      },
+      "blockquote": {
+        "quote": "引用",
+        "nestedQuote": "ネストされた引用"
+      },
+      "table": {
+        "row": "行 {n}：{content}"
+      },
+      "math": {
+        "equation": "数式：{latex}"
+      },
+      "rotor": {
+        "headings": "見出し",
+        "links": "リンク",
+        "images": "画像"
+      }
+    }
   },
   "language": {
     "restarting": "言語設定を適用するために再起動中",
@@ -506,6 +529,14 @@
       "nextStepFinal": "異議申し立ての決定は確定しました。これ以上異議を申し立てることはできません。",
       "viewReceipt": "受付確認を表示"
     },
+    "reportReceipts": {
+      "title": "通報一覧",
+      "rowSubtitle": "通報した内容とその結果",
+      "emptyTitle": "通報はまだありません",
+      "emptyDescription": "コメントまたはAIの回答から通報した内容がここに表示されます。",
+      "couldNotLoad": "通報を読み込めませんでした",
+      "capped": "最新の通報を表示しています。"
+    },
     "changelog": "新着情報",
     "changelogVersionPending": "バージョン{{version}}のリリースノートは、次回のアプリアップデートで届きます。",
     "changelogGroupNew": "新機能",
@@ -774,7 +805,7 @@
       "gateHidden": "非表示",
       "gateNone": "なし",
       "noFindings": "指摘はありません。",
-      "findingsUnavailable": "このレビューが失敗したため、結果を表示できません。",
+      "findingsUnavailable": "結果を表示できません。",
       "findingsInProgress": "このレビューはまだ進行中です。完了すると、ここに指摘が表示されます。",
       "findingsEndedWithoutResults": "このレビューは、指摘が生成される前に終了しました。",
       "serviceUnavailable": "コードレビューサービスに接続できませんでした。サービスが利用可能になったら、レビューを再試行してください。",
@@ -3595,6 +3626,7 @@
       "identifierLabel": "識別子",
       "identifierRequired": "識別子を入力してください。",
       "identifierTaken": "この識別子は別のモードで既に使用されています。",
+      "identifierTooLong": "識別子は{{max}}文字以内にしてください。",
       "nameLabel": "モード名",
       "nameRequired": "モード名を入力してください。",
       "notFound": "このモードは存在しません。",
@@ -3681,7 +3713,7 @@
     "emailDeliveryFailed": "現在、メールを送信できません。しばらくしてからもう一度お試しください。",
     "admissionRequired": "このデバイスを確認できません。「$t(login.moreSignInOptions)」を選択し、別のデバイスまたはウェブからサインインしてください。",
     "default": "問題が発生しました。もう一度お試しください。",
-    "retryableAdmission": "このデバイスを確認できませんでした。接続を確認して、もう一度お試しください。",
+    "retryableAdmission": "このデバイスを確認できませんでした。もう一度お試しください。",
     "startSignInFailed": "サインインを開始できませんでした。もう一度お試しください。",
     "couldNotOpenBrowser": "ブラウザーを開けませんでした。もう一度お試しください。",
     "signInTimedOut": "サインインがタイムアウトしました。もう一度お試しください。",
@@ -3753,6 +3785,34 @@
     "nextScheduled": "次の予定",
     "answerNeeded": "回答が必要",
     "waitingToRetry": "再試行待ち",
+    "countNoun": {
+      "needsInput_one": "入力が必要",
+      "needsInput_other": "入力が必要",
+      "running_one": "作業中",
+      "running_other": "作業中",
+      "scheduled_one": "予定",
+      "scheduled_other": "予定",
+      "idle_one": "待機中",
+      "idle_other": "待機中"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} 入力が必要",
+      "needsInput_other": "{{displayCount}} 入力が必要",
+      "running_one": "{{displayCount}} 作業中",
+      "running_other": "{{displayCount}} 作業中",
+      "scheduled_one": "{{displayCount}} 予定",
+      "scheduled_other": "{{displayCount}} 予定",
+      "idle_one": "{{displayCount}} 待機中",
+      "idle_other": "{{displayCount}} 待機中"
+    },
+    "footer": {
+      "checked": "最終確認 {{time}}",
+      "lastKnown": "最終記録 · {{time}}"
+    },
+    "wake": {
+      "nextRun": "次回実行 {{time}}",
+      "wasDue": "予定でした {{time}}"
+    },
     "step": {
       "editing": "編集",
       "reading": "読み取り",
@@ -3998,7 +4058,8 @@
         "space": "このモデルに必要な空き容量が足りません。空き容量を増やして、もう一度お試しください。",
         "network": "ダウンロードが完了しませんでした。接続を確認して、もう一度お試しください。",
         "invalidFile": "ダウンロードしたファイルはこのアプリで実行できるモデルではないため、削除されました。",
-        "checksum": "ダウンロードしたファイルが公開されているチェックサムと一致しないため、削除されました。もう一度ダウンロードしてください。"
+        "checksum": "ダウンロードしたファイルが公開されているチェックサムと一致しないため、削除されました。もう一度ダウンロードしてください。",
+        "writeFailed": "このデバイスではモデルを保存できませんでした。もう一度ダウンロードしてください。"
       }
     },
     "catalog": {
@@ -4176,7 +4237,7 @@
     "personalDefaultDescription": "リポジトリに固定プロフィールがない場合に自動ロードされます。",
     "organizationDefaultDescription": "個人のデフォルトがないメンバーの場合は自動ロードされます。",
     "setAsDefault": "デフォルトとして設定",
-    "saveFailed": "プロフィールを保存できませんでした",
+    "saveFailed": "プロフィールを保存できませんでした。もう一度お試しください。",
     "organizationRoleRequired": "組織のプロフィールを変更できるのは組織のオーナーと管理者のみです。",
     "deleteTitle": "プロフィールの削除",
     "deleteMessage": "これにより、プロフィールとその設定が完全に削除されます。これを元に戻すことはできません。",
@@ -4440,6 +4501,7 @@
         "balanceNeutral": "残高変動なし",
         "deduction": "差し引き",
         "grant": "クレジット付与",
+        "welcomeCredits": "ウェルカムクレジット",
         "purchase": "購入"
       },
       "purchaseFallback": "クレジットの購入",
@@ -4695,6 +4757,8 @@
     "connectedTo": "{{account}} に接続済み",
     "disconnected": "{{provider}} の接続を解除しました",
     "disconnectFailed": "{{provider}} の接続を解除できませんでした",
+    "disconnectRetry": "Slack が接続の解除を確認できませんでした。もう一度お試しください。",
+    "disconnectNeedsSupport": "Kilo はこの接続用に保存された Slack へのアクセスを読み取れませんでした。接続の解除を完了するには、サポートに連絡してください。",
     "couldNotLoad": "連携を読み込めませんでした",
     "permissionDenied": "これらの連携を管理する権限がありません。",
     "managedByOwner": "変更できない接続については、組織のオーナーに変更を依頼してください。",

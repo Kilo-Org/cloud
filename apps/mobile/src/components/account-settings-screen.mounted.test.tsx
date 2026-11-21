@@ -10,6 +10,13 @@ const push = vi.hoisted(() => vi.fn());
 const setLanguagePickerBridge = vi.hoisted(() => vi.fn());
 const confirm = vi.hoisted(() => vi.fn());
 const signOutWeb = vi.hoisted(() => vi.fn());
+// The signed-in account read: a test flips one field to reach the state it
+// exercises, and the default is the resolved account every other case sees.
+const currentUser = vi.hoisted(() => ({
+  isLoading: false,
+  isFetchError: false,
+  refetch: vi.fn(),
+}));
 
 vi.mock('react-native', () => ({
   View: 'View',
@@ -26,6 +33,7 @@ vi.mock('@/components/ui/icons', () => ({
   Ban: 'Ban',
   Cpu: 'Cpu',
   FileText: 'FileText',
+  Flag: 'Flag',
   Globe: 'Globe',
   KeyRound: 'KeyRound',
   Lock: 'Lock',
@@ -36,12 +44,19 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
+vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalLogOut: 'DirectionalLogOut' }));
 vi.mock('@/lib/auth/push-registration-reconciliation', () => ({
   attemptPushRegistrationReconciliation: vi.fn(),
 }));
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
-  useCurrentUserId: () => ({ userId: 'user-1' }),
+  useCurrentUserId: () => ({
+    userId: 'user-1',
+    isLoading: currentUser.isLoading,
+    isFetchError: currentUser.isFetchError,
+    refetch: currentUser.refetch,
+  }),
 }));
 vi.mock('@/lib/hooks/use-language-preference', () => ({
   getResolvedLanguage: () => 'en',
@@ -80,19 +95,26 @@ async function mountAccount(): Promise<ReactTestRenderer> {
   });
   return view.renderer;
 }
-function findConfigureRow(renderer: ReactTestRenderer, title: string) {
-  const rows = renderer.root.findAll(
+function findConfigureRows(renderer: ReactTestRenderer) {
+  return renderer.root.findAll(
     node => typeof node.type === 'string' && (node.type as string) === 'ConfigureRow'
   );
-  const row = rows.find(item => item.props.title === title);
+}
+function findConfigureRow(renderer: ReactTestRenderer, title: string) {
+  const row = findConfigureRows(renderer).find(item => item.props.title === title);
   if (!row) {
     throw new Error(`ConfigureRow for ${title} not found`);
   }
   return row;
 }
+function findStateNodes(renderer: ReactTestRenderer, type: 'QueryError' | 'RowSkeleton') {
+  return renderer.root.findAll(node => String(node.type) === type);
+}
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.resetAllMocks();
+  currentUser.isLoading = false;
+  currentUser.isFetchError = false;
 });
 
 describe('AccountSettingsScreen', () => {
@@ -161,6 +183,18 @@ describe('AccountSettingsScreen', () => {
     }
   });
 
+  it('opens the reports this reader filed from the Reports row', async () => {
+    const renderer = await mountAccount();
+
+    const reports = findConfigureRow(renderer, 'Reports');
+    expect(reports.props).toMatchObject({ icon: 'Flag' });
+
+    act(() => {
+      (reports.props.onPress as () => void)();
+    });
+    expect(push).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/report-receipts');
+  });
+
   it('asks before revoking every web session', async () => {
     const renderer = await mountAccount();
 
@@ -185,5 +219,49 @@ describe('AccountSettingsScreen', () => {
       asked.onConfirm();
     });
     expect(signOutWeb).toHaveBeenCalledTimes(1);
+  });
+
+  it('reserves the rows with skeletons while the account read is pending', async () => {
+    currentUser.isLoading = true;
+    const renderer = await mountAccount();
+
+    expect(findConfigureRows(renderer)).toEqual([]);
+    expect(findStateNodes(renderer, 'RowSkeleton').length).toBeGreaterThan(0);
+  });
+
+  it('offers a failed account read a retry in place of the rows', async () => {
+    currentUser.isFetchError = true;
+    const renderer = await mountAccount();
+
+    expect(findConfigureRows(renderer)).toEqual([]);
+    const [retry] = findStateNodes(renderer, 'QueryError');
+    if (!retry) {
+      throw new Error('missing retry state');
+    }
+
+    act(() => {
+      (retry.props.onRetry as () => void)();
+    });
+    expect(currentUser.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders the rows and neither state once the account read resolves', async () => {
+    const renderer = await mountAccount();
+
+    expect(findConfigureRows(renderer).map(row => row.props.title)).toEqual([
+      'Edit profile',
+      'Sign-in methods',
+      'Language',
+      'Trusted hosts',
+      'Passkeys',
+      'Provider keys',
+      'Your data',
+      'Blocked and muted people',
+      'Reports',
+      'Device sessions',
+      'Sign out of all web sessions',
+    ]);
+    expect(findStateNodes(renderer, 'QueryError')).toEqual([]);
+    expect(findStateNodes(renderer, 'RowSkeleton')).toEqual([]);
   });
 });

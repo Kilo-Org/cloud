@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "यह दस्तावेज़ केवल अंग्रेज़ी में उपलब्ध है।",
     "organizationTrialEndedBilling": "संगठन का परीक्षण समाप्त हो गया है और इसकी कोई सक्रिय योजना नहीं है। आप बिलिंग अपडेट कर सकते हैं, फिर दोबारा प्रयास करें।",
     "organizationTrialEndedBillingAtKiloAi": "संगठन का परीक्षण समाप्त हो गया है और इसकी कोई सक्रिय योजना नहीं है। आप kilo.ai पर बिलिंग अपडेट कर सकते हैं, फिर दोबारा प्रयास करें।",
-    "viewOnGitHub": "GitHub पर PR देखें"
+    "viewOnGitHub": "GitHub पर PR देखें",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "बुलेट पॉइंट",
+        "nestedBulletPoint": "नेस्टेड बुलेट पॉइंट",
+        "orderedItem": "सूची आइटम {n}",
+        "nestedOrderedItem": "नेस्टेड सूची आइटम {n}"
+      },
+      "blockquote": {
+        "quote": "उद्धरण",
+        "nestedQuote": "नेस्टेड उद्धरण"
+      },
+      "table": {
+        "row": "पंक्ति {n}: {content}"
+      },
+      "math": {
+        "equation": "गणित: {latex}"
+      },
+      "rotor": {
+        "headings": "शीर्षक",
+        "links": "लिंक",
+        "images": "छवियाँ"
+      }
+    }
   },
   "language": {
     "restarting": "भाषा बदलने के लिए ऐप फिर से शुरू हो रहा है",
@@ -232,7 +255,7 @@
     "passkeyCancelled": "पासकी से साइन इन रद्द कर दिया गया। कृपया फिर से प्रयास करें।",
     "passkeyNotFound": "इस डिवाइस के लिए कोई पासकी सहेजी नहीं गई है। इसके बजाय Apple, Google या अपने ईमेल से साइन इन करें।",
     "passkeyUnsupported": "इस डिवाइस पर पासकी उपलब्ध नहीं हैं। इसके बजाय Apple, Google या अपने ईमेल से साइन इन करें।",
-    "passkeyFailed": "पासकी से साइन इन नहीं हो सका। कृपया फिर से प्रयास करें।",
+    "passkeyFailed": "पासकी से साइन इन नहीं हो सका। इसके बजाय Apple, Google या अपने ईमेल से साइन इन करें।",
     "couldNotCompleteSignIn": "साइन इन पूरा नहीं हो सका। कृपया फिर से कोशिश करें।",
     "sessionEnded": "आपका सत्र समाप्त हो गया। कृपया फिर से साइन इन करें।",
     "signInCodeExpired": "आपके साइन-इन कोड की समय सीमा खत्म हो गई है। कृपया फिर से कोशिश करें।",
@@ -506,6 +529,14 @@
       "nextStepFinal": "अपील का निर्णय अंतिम है। अब और कोई अपील दर्ज नहीं की जा सकती।",
       "viewReceipt": "रसीद देखें"
     },
+    "reportReceipts": {
+      "title": "रिपोर्टें",
+      "rowSubtitle": "आपके द्वारा दर्ज की गई रिपोर्टें और उनके परिणाम",
+      "emptyTitle": "अभी तक कोई रिपोर्ट नहीं",
+      "emptyDescription": "किसी कमेंट या AI प्रतिक्रिया से आप जो रिपोर्टें दर्ज करते हैं, वे यहाँ दिखाई देती हैं।",
+      "couldNotLoad": "आपकी रिपोर्टें लोड नहीं हो सकीं",
+      "capped": "आपकी सबसे हाल की रिपोर्टें दिखाई जा रही हैं।"
+    },
     "changelog": "नया क्या है",
     "changelogVersionPending": "वर्शन {{version}} के नोट्स अगले ऐप अपडेट के साथ आएंगे।",
     "changelogGroupNew": "नया",
@@ -774,7 +805,7 @@
       "gateHidden": "छिपा हुआ",
       "gateNone": "कोई नहीं",
       "noFindings": "कोई समस्या नहीं मिली।",
-      "findingsUnavailable": "यह समीक्षा विफल होने के कारण परिणाम उपलब्ध नहीं हैं।",
+      "findingsUnavailable": "परिणाम उपलब्ध नहीं हैं।",
       "findingsInProgress": "यह समीक्षा अभी चल रही है। पूरा होने पर निष्कर्ष यहाँ दिखाई देंगे।",
       "findingsEndedWithoutResults": "यह समीक्षा कोई निष्कर्ष दिए बिना ही समाप्त हो गई।",
       "serviceUnavailable": "कोड समीक्षा सेवा से संपर्क नहीं हो सका। सेवा उपलब्ध होने पर समीक्षा फिर से करें।",
@@ -2658,7 +2689,7 @@
     "cadenceMonthly": "मासिक",
     "cadenceYearly": "वार्षिक",
     "renews": "नवीनीकरण",
-    "activeUntil": "सक्रिय तक",
+    "activeUntil": "सक्रिय रहने की तिथि",
     "resumes": "पुनः आरंभ",
     "usageThisMonth": "इस महीने का उपयोग",
     "bonusFree": "मुफ़्त बोनस",
@@ -2672,7 +2703,7 @@
     "purchaseMissingSignedTransaction": "App Store की खरीदारी में लेन-देन का हस्ताक्षरित JWS शामिल नहीं था।",
     "couldNotConnectToPlay": "Google Play से कनेक्ट नहीं हो सका। अपना कनेक्शन जाँचें और फिर से प्रयास करें।",
     "productsUnavailablePlay": "Google Play उत्पाद उपलब्ध नहीं",
-    "purchaseDifferentAccountPlay": "यह Google Play खरीदारी आपके Kilo खाते से लिंक नहीं है। खरीदारी के लिए उपयोग किए गए Google खाते में साइन इन करें, फिर फिर से प्रयास करें।",
+    "purchaseDifferentAccountPlay": "यह Google Play खरीदारी आपके Kilo खाते से लिंक नहीं है। खरीदारी के लिए उपयोग किए गए Google खाते में साइन इन करें, फिर से कोशिश करें।",
     "purchaseMissingPurchaseToken": "Google Play खरीद में खरीद टोकन शामिल नहीं था।"
   },
   "consent": {
@@ -2747,10 +2778,10 @@
     "productAnalyticsWhat": "ऐप में होने वाली गतिविधियाँ (खोलना, स्क्रीन देखना, सुविधाओं का उपयोग), डिवाइस का प्रकार और ऐप का संस्करण।",
     "productAnalyticsWhy": "ऐप की परफ़ॉर्मेंस मापने और सुविधाओं के उपयोग को समझने के लिए।",
     "productAnalyticsWho": "PostHog.",
-    "errorScreenshotsWhat": "त्रुटि के समय लिए गए स्क्रीनशॉट और कुछ चुने हुए सत्रों की रिकॉर्डिंग, जिनमें टेक्स्ट और छवियाँ छिपा दी गई हैं।",
+    "errorScreenshotsWhat": "त्रुटि के समय लिए गए स्क्रीनशॉट और सत्रों के एक छोटे नमूने की रिकॉर्डिंग, जिनमें टेक्स्ट और छवियाँ छिपा दी गई हैं।",
     "errorScreenshotsWhy": "यह देखने के लिए कि समस्या आने पर ऐप में क्या दिखाई दे रहा था।",
     "performanceProfilingTitle": "परफ़ॉर्मेंस प्रोफ़ाइलिंग",
-    "performanceProfilingWhat": "कुछ चुने हुए सत्रों के CPU प्रोफ़ाइल, जिनमें फ़ंक्शन नाम और कॉल स्टैक शामिल हैं।",
+    "performanceProfilingWhat": "सत्रों के एक छोटे नमूने से बने CPU प्रोफ़ाइल, जिनमें फ़ंक्शन नाम और कॉल स्टैक शामिल हैं।",
     "performanceProfilingWhy": "ऐप को धीमा करने वाला कोड ढूँढ़कर ठीक करना।",
     "performanceProfilingNote": "प्रोफ़ाइल में फ़ंक्शन नाम और कॉल स्टैक होते हैं, आपके प्रॉम्प्ट या बातचीत की सामग्री कभी नहीं।",
     "installAttributionWhat": "इंस्टॉल का स्रोत और अभियान के पहचानकर्ता।",
@@ -2762,7 +2793,7 @@
     "what": "क्या",
     "why": "क्यों",
     "who": "किसके साथ",
-    "installAttributionPromptMessage": "Kilo, Apple की ट्रैकिंग अनुमति का उपयोग केवल यह जानने के लिए करता है कि आप किस माध्यम से यहाँ आए। इसके लिए आपके प्रॉम्प्ट और बातचीत का कभी उपयोग नहीं होता।",
+    "installAttributionPromptMessage": "Kilo, Apple की ट्रैकिंग अनुमति का उपयोग केवल यह जानने के लिए करता है कि आप किस माध्यम से यहाँ आए। आपके प्रॉम्प्ट और बातचीत का कभी उपयोग नहीं होता।",
     "installAttributionPromptTitle": "इंस्टॉल के स्रोत की पहचान करने की अनुमति दें?"
   },
   "prReview": {
@@ -3500,7 +3531,7 @@
       "separateEmailsHint": "एक से ज़्यादा ईमेल पते हों, तो उन्हें अल्पविराम से अलग करें।",
       "thresholdLabel": "इस राशि से कम होने पर चेतावनी (USD)",
       "title": "कम बैलेंस की चेतावनी",
-      "emailsInvalid": "एक से ज़्यादा ईमेल पते मान्य नहीं हैं।",
+      "emailsInvalid": "एक या अधिक ईमेल पते मान्य नहीं हैं।",
       "emailsRequired": "कम से कम एक ईमेल पता दर्ज करें।",
       "saveEmailsError": "कुछ ईमेल पते स्वीकार नहीं किए गए। उन्हें जाँचें और दोबारा कोशिश करें।",
       "saveError": "कम बैलेंस की चेतावनी सहेजी नहीं जा सकी।",
@@ -3595,6 +3626,7 @@
       "identifierLabel": "आइडेंटिफ़ायर",
       "identifierRequired": "आइडेंटिफ़ायर दर्ज करें।",
       "identifierTaken": "कोई दूसरा मोड पहले से इस आइडेंटिफ़ायर का उपयोग करता है।",
+      "identifierTooLong": "आइडेंटिफ़ायर को {{max}} अक्षरों या उससे कम तक रखें।",
       "nameLabel": "मोड नाम",
       "nameRequired": "मोड नाम दर्ज करें।",
       "notFound": "यह मोड अब मौजूद नहीं है।",
@@ -3646,8 +3678,8 @@
       "notSubscribed": "सदस्यता नहीं ली गई",
       "overallocated": "आवंटित पास की संख्या खरीदी गई सीटों से ज़्यादा है",
       "paidSeat_one": "{{displayCount}} खरीदी गई सीट",
-      "paidSeat": "{{displayCount}} सशुल्क सीटें",
-      "paidSeat_other": "{{displayCount}} सशुल्क सीटें",
+      "paidSeat": "{{displayCount}} खरीदी गई सीटें",
+      "paidSeat_other": "{{displayCount}} खरीदी गई सीटें",
       "paymentNeedsAttention": "भुगतान पर ध्यान देना ज़रूरी है",
       "paymentPending": "भुगतान लंबित",
       "processingBlocked": "प्रोसेसिंग अवरुद्ध",
@@ -3681,7 +3713,7 @@
     "emailDeliveryFailed": "फ़िलहाल ईमेल नहीं भेजा जा सकता। कृपया बाद में फिर से कोशिश करें।",
     "admissionRequired": "आपके डिवाइस की पुष्टि नहीं की जा सकती। किसी दूसरे डिवाइस पर या वेब के माध्यम से साइन इन करने के लिए '$t(login.moreSignInOptions)' का उपयोग करें।",
     "default": "कुछ गड़बड़ हो गई। कृपया फिर से कोशिश करें।",
-    "retryableAdmission": "हम इस डिवाइस की पुष्टि नहीं कर सके। अपना कनेक्शन जाँचें और फिर से कोशिश करें।",
+    "retryableAdmission": "इस डिवाइस की पुष्टि नहीं हो सकी। फिर से प्रयास करें।",
     "startSignInFailed": "साइन-इन शुरू नहीं हो सका। कृपया फिर से कोशिश करें।",
     "couldNotOpenBrowser": "ब्राउज़र नहीं खुल सका। कृपया फिर से कोशिश करें।",
     "signInTimedOut": "साइन-इन का समय समाप्त हो गया। कृपया फिर से कोशिश करें।",
@@ -3753,6 +3785,34 @@
     "nextScheduled": "अगला निर्धारित रन",
     "answerNeeded": "जवाब चाहिए",
     "waitingToRetry": "फिर कोशिश का इंतज़ार",
+    "countNoun": {
+      "needsInput_one": "इनपुट चाहिए",
+      "needsInput_other": "इनपुट चाहिए",
+      "running_one": "काम जारी",
+      "running_other": "काम जारी",
+      "scheduled_one": "निर्धारित",
+      "scheduled_other": "निर्धारित",
+      "idle_one": "निष्क्रिय",
+      "idle_other": "निष्क्रिय"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} इनपुट चाहिए",
+      "needsInput_other": "{{displayCount}} इनपुट चाहिए",
+      "running_one": "{{displayCount}} काम जारी",
+      "running_other": "{{displayCount}} काम जारी",
+      "scheduled_one": "{{displayCount}} निर्धारित",
+      "scheduled_other": "{{displayCount}} निर्धारित",
+      "idle_one": "{{displayCount}} निष्क्रिय",
+      "idle_other": "{{displayCount}} निष्क्रिय"
+    },
+    "footer": {
+      "checked": "जाँच की गई {{time}}",
+      "lastKnown": "अंतिम ज्ञात · {{time}}"
+    },
+    "wake": {
+      "nextRun": "अगला रन {{time}}",
+      "wasDue": "अपेक्षित था {{time}}"
+    },
     "step": {
       "editing": "संपादन",
       "reading": "पढ़ना",
@@ -3998,7 +4058,8 @@
         "space": "इस मॉडल के लिए पर्याप्त खाली स्टोरेज नहीं है। जगह खाली करें और फिर कोशिश करें।",
         "network": "डाउनलोड पूरा नहीं हुआ। अपना कनेक्शन जाँचें और फिर कोशिश करें।",
         "invalidFile": "डाउनलोड की गई फ़ाइल कोई ऐसा मॉडल नहीं है जिसे यह ऐप चला सके, इसलिए इसे हटा दिया गया।",
-        "checksum": "डाउनलोड की गई फ़ाइल उसके प्रकाशित चेकसम से मेल नहीं खाती, इसलिए इसे हटा दिया गया। फिर से डाउनलोड करके देखें।"
+        "checksum": "डाउनलोड की गई फ़ाइल उसके प्रकाशित चेकसम से मेल नहीं खाती, इसलिए इसे हटा दिया गया। फिर से डाउनलोड करके देखें।",
+        "writeFailed": "यह डिवाइस मॉडल को सहेज नहीं सका। डाउनलोड फिर से करके देखें।"
       }
     },
     "catalog": {
@@ -4176,7 +4237,7 @@
     "personalDefaultDescription": "जब किसी रिपॉज़िटरी में पिन की गई प्रोफ़ाइल न हो तो स्वतः लोड हो जाता है।",
     "organizationDefaultDescription": "उन सदस्यों के लिए स्वतः लोड किया गया जिनका कोई व्यक्तिगत डिफ़ॉल्ट नहीं है।",
     "setAsDefault": "डिफ़ॉल्ट के रूप में सेट",
-    "saveFailed": "प्रोफ़ाइल सहेजी नहीं जा सकी",
+    "saveFailed": "प्रोफ़ाइल सहेजी नहीं जा सकी। फिर से कोशिश करें।",
     "organizationRoleRequired": "केवल संगठन के मालिक और एडमिन ही संगठन की प्रोफ़ाइल बदल सकते हैं।",
     "deleteTitle": "प्रोफ़ाइल हटाएँ",
     "deleteMessage": "यह प्रोफ़ाइल और उसकी सेटिंग्स को स्थायी रूप से हटा देता है। इसे पूर्ववत नहीं किया जा सकता।",
@@ -4439,7 +4500,8 @@
         "adjustment": "समायोजन",
         "balanceNeutral": "बैलेंस पर असर नहीं",
         "deduction": "कटौती",
-        "grant": "मुफ़्त क्रेडिट",
+        "grant": "क्रेडिट अनुदान",
+        "welcomeCredits": "स्वागत क्रेडिट",
         "purchase": "खरीदारी"
       },
       "purchaseFallback": "क्रेडिट खरीदारी",
@@ -4696,6 +4758,8 @@
     "connectedTo": "{{account}} से कनेक्ट है",
     "disconnected": "{{provider}} डिस्कनेक्ट हो गया",
     "disconnectFailed": "{{provider}} को डिस्कनेक्ट नहीं किया जा सका",
+    "disconnectRetry": "Slack डिस्कनेक्ट होने की पुष्टि नहीं कर सका। फिर से कोशिश करें।",
+    "disconnectNeedsSupport": "Kilo इस कनेक्शन के लिए सहेजे गए Slack एक्सेस को पढ़ नहीं सका। डिस्कनेक्ट पूरा करने के लिए सहायता टीम से संपर्क करें।",
     "couldNotLoad": "इंटीग्रेशन लोड नहीं किए जा सके",
     "permissionDenied": "आपके पास इन इंटीग्रेशन को प्रबंधित करने की अनुमति नहीं है।",
     "managedByOwner": "जिस कनेक्शन को आप नहीं बदल सकते, उसे बदलने के लिए संगठन के किसी मालिक से कहें।",

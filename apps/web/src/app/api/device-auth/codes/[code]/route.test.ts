@@ -2,7 +2,12 @@ process.env.NEXTAUTH_SECRET ||= 'test-nextauth-secret';
 
 import { NextRequest } from 'next/server';
 
-jest.mock('@/lib/device-auth/device-auth');
+jest.mock('@/lib/device-auth/device-auth', () => ({
+  ...jest.requireActual('@/lib/device-auth/device-auth'),
+  pollDeviceAuthRequest: jest.fn(),
+  denyDeviceAuthRequest: jest.fn(),
+  cancelDeviceAuthRequest: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@/lib/device-auth/device-auth-viewer-token');
 jest.mock('@vercel/firewall');
@@ -12,6 +17,8 @@ import {
   pollDeviceAuthRequest,
   denyDeviceAuthRequest,
   cancelDeviceAuthRequest,
+  DEVICE_AUTH_REFUSAL_CODES,
+  DeviceAuthRefusalError,
 } from '@/lib/device-auth/device-auth';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { verifyDeviceAuthViewerToken } from '@/lib/device-auth/device-auth-viewer-token';
@@ -217,7 +224,9 @@ describe('DELETE /api/device-auth/codes/[code] (deny with viewer token)', () => 
 
   test('returns 409 on second deny (controlled refusal, not 500)', async () => {
     mockVerifyToken.mockReturnValue({ code: 'ABCD-EFGH', userId: 'user-1' });
-    mockDeny.mockRejectedValue(new Error('Device authorization request is not pending'));
+    mockDeny.mockRejectedValue(
+      new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestNotPending)
+    );
 
     const response = await DELETE(
       createRequest('ABCD-EFGH', { 'x-device-auth-viewer-token': 'valid-token' }),
@@ -225,21 +234,27 @@ describe('DELETE /api/device-auth/codes/[code] (deny with viewer token)', () => 
     );
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({
-      error: 'Device authorization request can no longer be denied',
+      error: DEVICE_AUTH_REFUSAL_CODES.requestNotPending,
+      message: 'Device authorization request can no longer be denied',
     });
     expect(mockDeny).toHaveBeenCalledWith('ABCD-EFGH');
   });
 
   test('returns 404 when deny targets a non-existent request', async () => {
     mockVerifyToken.mockReturnValue({ code: 'ABCD-EFGH', userId: 'user-1' });
-    mockDeny.mockRejectedValue(new Error('Device authorization request not found'));
+    mockDeny.mockRejectedValue(
+      new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestNotFound)
+    );
 
     const response = await DELETE(
       createRequest('ABCD-EFGH', { 'x-device-auth-viewer-token': 'valid-token' }),
       { params: Promise.resolve({ code: 'ABCD-EFGH' }) }
     );
     expect(response.status).toBe(404);
-    expect(await response.json()).toEqual({ error: 'Not found' });
+    expect(await response.json()).toEqual({
+      error: DEVICE_AUTH_REFUSAL_CODES.requestNotFound,
+      message: 'Not found',
+    });
   });
 });
 
@@ -270,18 +285,25 @@ describe('DELETE /api/device-auth/codes/[code] (cancel from the device)', () => 
   });
 
   test('returns 404 for a poll secret that matches no request', async () => {
-    mockCancel.mockRejectedValue(new Error('Device authorization request not found'));
+    mockCancel.mockRejectedValue(
+      new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestNotFound)
+    );
 
     const response = await DELETE(createRequest(pollSecret), {
       params: Promise.resolve({ code: pollSecret }),
     });
 
     expect(response.status).toBe(404);
-    expect(await response.json()).toEqual({ error: 'Not found' });
+    expect(await response.json()).toEqual({
+      error: DEVICE_AUTH_REFUSAL_CODES.requestNotFound,
+      message: 'Not found',
+    });
   });
 
   test('returns 409 when the request was already approved', async () => {
-    mockCancel.mockRejectedValue(new Error('Device authorization request is not pending'));
+    mockCancel.mockRejectedValue(
+      new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestNotPending)
+    );
 
     const response = await DELETE(createRequest(pollSecret), {
       params: Promise.resolve({ code: pollSecret }),
@@ -289,7 +311,8 @@ describe('DELETE /api/device-auth/codes/[code] (cancel from the device)', () => 
 
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({
-      error: 'Device authorization request can no longer be cancelled',
+      error: DEVICE_AUTH_REFUSAL_CODES.requestNotPending,
+      message: 'Device authorization request can no longer be cancelled',
     });
   });
 

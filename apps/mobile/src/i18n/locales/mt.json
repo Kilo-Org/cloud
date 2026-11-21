@@ -189,7 +189,30 @@
     "legalDocumentEnglishOnly": "Dan id-dokument huwa disponibbli bl-Ingliż biss.",
     "organizationTrialEndedBilling": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Tista' taġġorna l-fatturazzjoni, imbagħad terġa' tipprova.",
     "organizationTrialEndedBillingAtKiloAi": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Tista' taġġorna l-fatturazzjoni fuq kilo.ai, imbagħad terġa' tipprova.",
-    "viewOnGitHub": "Ara l-PR fuq GitHub"
+    "viewOnGitHub": "Ara l-PR fuq GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Punt tal-lista",
+        "nestedBulletPoint": "Punt tal-lista mnidif",
+        "orderedItem": "Element tal-lista {n}",
+        "nestedOrderedItem": "Element tal-lista mnidif {n}"
+      },
+      "blockquote": {
+        "quote": "Kwotazzjoni",
+        "nestedQuote": "Kwotazzjoni mnidifa"
+      },
+      "table": {
+        "row": "Ringiela {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Titli",
+        "links": "Ħoloq",
+        "images": "Immaġnijiet"
+      }
+    }
   },
   "language": {
     "restarting": "L-app qed terġa' tibda biex tapplika l-lingwa",
@@ -508,6 +531,14 @@
       "nextStepAppeal": "Ir-riżultat tal-appell se jidher fuq dan l-iskrin.",
       "nextStepFinal": "Id-deċiżjoni tal-appell hija finali. Ma jistax jiġi ppreżentat appell ieħor.",
       "viewReceipt": "Ara l-irċevuta"
+    },
+    "reportReceipts": {
+      "title": "Rapporti",
+      "rowSubtitle": "Rapporti li ppreżentajt u l-eżiti tagħhom",
+      "emptyTitle": "Għad m'hemmx rapporti",
+      "emptyDescription": "Rapporti li tippreżenta minn kumment jew minn risposta tal-AI jidhru hawn.",
+      "couldNotLoad": "Ir-rapporti tiegħek ma setgħux jitgħabbew",
+      "capped": "Qed jintwerew l-aktar rapporti reċenti tiegħek."
     },
     "changelog": "X'hemm ġdid",
     "changelogVersionPending": "In-noti għall-verżjoni {{version}} jaslu mal-aġġornament li jmiss tal-app.",
@@ -1358,7 +1389,7 @@
       "couldNotGetLatest": "Ma setgħetx tinkiseb l-aħħar dejta.",
       "byline": "#{{number}} minn {{author}}",
       "noFindings": "M'hemm l-ebda sejba.",
-      "findingsUnavailable": "Ir-riżultati mhumiex disponibbli għax din ir-reviżjoni falliet.",
+      "findingsUnavailable": "Ir-riżultati mhumiex disponibbli.",
       "findingsInProgress": "Din ir-reviżjoni għadha għaddejja. Is-sejbiet jidhru hawn meta tispiċċa.",
       "findingsEndedWithoutResults": "Din ir-reviżjoni spiċċat qabel ma pproduċiet l-ebda sejbiet.",
       "serviceUnavailable": "Ma setax isir kuntatt mas-servizz tar-reviżjoni tal-kodiċi. Erġa' pprova r-reviżjoni meta s-servizz ikun disponibbli.",
@@ -3777,6 +3808,7 @@
       "identifierLabel": "Identifikatur",
       "identifierRequired": "Daħħal identifikatur.",
       "identifierTaken": "Mod ieħor diġà juża dan l-identifikatur.",
+      "identifierTooLong": "Żomm l-identifikatur fi {{max}} karattri jew inqas.",
       "nameLabel": "Isem il-mod",
       "nameRequired": "Daħħal isem il-mod.",
       "notFound": "Dan il-mod m'għadux jeżisti.",
@@ -3873,7 +3905,7 @@
     "emailDeliveryFailed": "Bħalissa ma nistgħux nibagħtu emails. Erġa' pprova aktar tard.",
     "admissionRequired": "L-apparat tiegħek ma jistax jiġi vverifikat. Uża '$t(login.moreSignInOptions)' biex tidħol minn apparat ieħor jew mill-web.",
     "default": "Xi ħaġa marret ħażin. Erġa' pprova.",
-    "retryableAdmission": "Ma stajniex nivverifikaw dan l-apparat. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
+    "retryableAdmission": "Dan l-apparat ma setax jiġi vverifikat. Erġa' pprova.",
     "startSignInFailed": "Ma setax jibda d-dħul. Jekk jogħġbok erġa' pprova.",
     "couldNotOpenBrowser": "Ma setax jinfetaħ il-brawżer. Erġa' pprova.",
     "signInTimedOut": "Il-ħin biex tidħol skada. Erġa' pprova.",
@@ -3945,6 +3977,58 @@
     "nextScheduled": "Ipprogrammati li jmiss",
     "answerNeeded": "Tweġiba meħtieġa",
     "waitingToRetry": "Jistenna biex jerġa’ jipprova",
+    "countNoun": {
+      "needsInput_one": "Jistenna tweġiba",
+      "needsInput_two": "Jistenna tweġiba",
+      "needsInput_few": "Jistenna tweġiba",
+      "needsInput_many": "Jistenna tweġiba",
+      "needsInput_other": "Jistenna tweġiba",
+      "running_one": "Fix-xogħol",
+      "running_two": "Fix-xogħol",
+      "running_few": "Fix-xogħol",
+      "running_many": "Fix-xogħol",
+      "running_other": "Fix-xogħol",
+      "scheduled_one": "Ipprogrammat",
+      "scheduled_two": "Ipprogrammati",
+      "scheduled_few": "Ipprogrammati",
+      "scheduled_many": "Ipprogrammati",
+      "scheduled_other": "Ipprogrammati",
+      "idle_one": "Bla attività",
+      "idle_two": "Bla attività",
+      "idle_few": "Bla attività",
+      "idle_many": "Bla attività",
+      "idle_other": "Bla attività"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Jistenna tweġiba",
+      "needsInput_two": "{{displayCount}} Jistenna tweġiba",
+      "needsInput_few": "{{displayCount}} Jistenna tweġiba",
+      "needsInput_many": "{{displayCount}} Jistenna tweġiba",
+      "needsInput_other": "{{displayCount}} Jistenna tweġiba",
+      "running_one": "{{displayCount}} Fix-xogħol",
+      "running_two": "{{displayCount}} Fix-xogħol",
+      "running_few": "{{displayCount}} Fix-xogħol",
+      "running_many": "{{displayCount}} Fix-xogħol",
+      "running_other": "{{displayCount}} Fix-xogħol",
+      "scheduled_one": "{{displayCount}} Ipprogrammat",
+      "scheduled_two": "{{displayCount}} Ipprogrammati",
+      "scheduled_few": "{{displayCount}} Ipprogrammati",
+      "scheduled_many": "{{displayCount}} Ipprogrammati",
+      "scheduled_other": "{{displayCount}} Ipprogrammati",
+      "idle_one": "{{displayCount}} Bla attività",
+      "idle_two": "{{displayCount}} Bla attività",
+      "idle_few": "{{displayCount}} Bla attività",
+      "idle_many": "{{displayCount}} Bla attività",
+      "idle_other": "{{displayCount}} Bla attività"
+    },
+    "footer": {
+      "checked": "Iċċekkjat {{time}}",
+      "lastKnown": "L-aħħar magħruf · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Tħaddim li jmiss {{time}}",
+      "wasDue": "Kien mistenni {{time}}"
+    },
     "step": {
       "editing": "Editjar",
       "reading": "Qari",
@@ -4193,7 +4277,8 @@
         "space": "M'hemmx biżżejjed spazju ħieles għal dan il-mudell. Illibera spazju u erġa' pprova.",
         "network": "It-tniżżil ma tlestiex. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
         "invalidFile": "Il-fajl imniżżel mhuwiex mudell li din l-app tista' tmexxi, għalhekk tneħħa.",
-        "checksum": "Il-fajl imniżżel ma jaqbilx mal-checksum ippubblikat tiegħu, għalhekk tneħħa. Erġa' pprova t-tniżżil."
+        "checksum": "Il-fajl imniżżel ma jaqbilx mal-checksum ippubblikat tiegħu, għalhekk tneħħa. Erġa' pprova t-tniżżil.",
+        "writeFailed": "Dan l-apparat ma setax isalva l-mudell. Erġa' pprova t-tniżżil."
       }
     },
     "catalog": {
@@ -4386,7 +4471,7 @@
     "personalDefaultDescription": "Imgħabba awtomatikament meta l-ebda repożitorju ma jkollu profil ippinjat.",
     "organizationDefaultDescription": "Auto-loaded għal membri li m'għandhom l-ebda default personali.",
     "setAsDefault": "Issettja bħala default",
-    "saveFailed": "Ma setax isalva l-profil",
+    "saveFailed": "Ma setax isalva l-profil. Erġa' pprova.",
     "organizationRoleRequired": "Is-sidien u l-amministraturi tal-organizzazzjoni biss jistgħu jibdlu l-profil tal-organizzazzjoni.",
     "deleteTitle": "Ħassar il-profil",
     "deleteMessage": "Dan ineħħi b'mod permanenti l-profil u s-settings tiegħu. Dan ma jistax jitneħħa.",
@@ -4653,6 +4738,7 @@
         "balanceNeutral": "Newtrali għall-bilanċ",
         "deduction": "Tnaqqis",
         "grant": "Għotja ta' krediti",
+        "welcomeCredits": "Krediti tal-merħba",
         "purchase": "Xiri"
       },
       "purchaseFallback": "Xiri ta' krediti",
@@ -4932,6 +5018,8 @@
     "connectedTo": "Konness ma' {{account}}",
     "disconnected": "{{provider}} ġie skonnettjat",
     "disconnectFailed": "L-iskonnettjar ta' {{provider}} ma rnexxiex",
+    "disconnectRetry": "Slack ma setgħetx tikkonferma l-iskonnettjar. Erġa' pprova.",
+    "disconnectNeedsSupport": "Kilo ma setgħetx taqra l-aċċess għal Slack li nħażen għal din il-konnessjoni. Ikkuntattja l-appoġġ biex tlesti l-iskonnettjar.",
     "couldNotLoad": "L-integrazzjonijiet ma setgħux jitgħabbew",
     "permissionDenied": "M'għandekx permess timmaniġġja dawn l-integrazzjonijiet.",
     "managedByOwner": "Itlob lil sid tal-organizzazzjoni biex ibiddel konnessjoni li ma tistax tbiddel.",

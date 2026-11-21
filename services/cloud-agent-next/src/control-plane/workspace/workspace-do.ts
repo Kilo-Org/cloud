@@ -42,6 +42,16 @@ const UNADOPTABLE_RECHECK_MS = 10 * 60_000;
 const CHILD_PREFIX = 'child:';
 
 const childSessionIdSchema = workspaceSessionIdSchema;
+
+/** A session id this Worker allocated; an RPC caller never chooses one. */
+function serverAllocatedSessionId(candidate: string): string {
+  const parsed = childSessionIdSchema.safeParse(candidate);
+  if (!parsed.success) {
+    throw new Error('Cloud Agent delegation requires a server-allocated session id');
+  }
+  return parsed.data;
+}
+
 const childEntrySchema = z
   .object({
     initialMessageId: z.string().min(1).optional(),
@@ -164,9 +174,12 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
     authority: CloudAgentAuthority;
     childSessionId: string;
   }): Promise<{ token: string; seal: string }> {
+    // The Worker allocates the child session id, so this boundary refuses any other
+    // value and delegates authority only to a session id this service created.
+    const childSessionId = serverAllocatedSessionId(input.childSessionId);
     const record = await this.record();
     assertWorkspaceAuthority(record, input.authority);
-    return this.delegate(record, input.childSessionId, input.authority);
+    return this.delegate(record, childSessionId, input.authority);
   }
 
   /** Delegates the workspace authority to a new chat in this workspace (a callback chat). */
@@ -176,11 +189,12 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
     worktreeId: string | null;
     organizationId: string | null;
   }> {
+    const chatSessionId = serverAllocatedSessionId(input.chatSessionId);
     const record = await this.record();
     if (record === undefined || workspaceAuthorityUnavailableReason(record, Date.now())) {
       throw denied();
     }
-    const delegated = await this.delegate(record, input.chatSessionId);
+    const delegated = await this.delegate(record, chatSessionId);
     return { ...delegated, worktreeId: record.worktreeId, organizationId: record.organizationId };
   }
 

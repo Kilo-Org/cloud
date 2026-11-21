@@ -1,5 +1,4 @@
 import 'server-only';
-import { z } from 'zod';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import {
@@ -28,7 +27,6 @@ import {
   createProjectAccessToken,
   findKiloProjectAccessToken,
   rotateProjectAccessToken,
-  revokeProjectAccessToken,
   calculateProjectAccessTokenExpiry,
   isProjectAccessTokenExpiringSoon,
   validateProjectAccessToken,
@@ -58,16 +56,31 @@ import {
 } from '@/lib/integrations/platforms/gitlab/credential-encryption';
 import {
   deleteStoredProjectCredential,
-  deleteStoredProjectTokenMetadataEntry,
   readGitLabAccountId,
-  readProjectRevocationStatus,
-  retireProjectCredentialsForReplacedAccount,
   retireStoredProjectCredential,
   type StoredProjectCredential,
 } from '@/lib/integrations/platforms/gitlab/project-credential-lifecycle';
 import {
+  GITLAB_PROJECT_TOKENS_LIST_UNREADABLE_MESSAGE,
+  classifyCredentialResolutionFailure,
+  describeInstanceChangeBlockers,
+  describeProjectTokenReplacementBlocker,
+  describeSettlementFailure,
+  dropUnrevokableProjectTokenEntry,
+  getStoredProjectCredential,
+  gitlabProjectTokensUnsettledMessage,
+  hasStoredProjectTokenHandle,
+  listProjectIdsWithStoredTokens,
+  readStoredInstanceUrl,
+  removeStoredProjectAccessToken,
+  requireGitLabProjectId,
+  retireProjectCredentialsForReplacedAccount,
+  storedInstanceUrlChanges,
+  type ProjectTokenBlocker,
+  type StoredProjectTokenRemoval,
+} from '@/lib/integrations/platforms/gitlab/project-token-handles';
+import {
   GitLabPersonalAccessTokenMetadataSchema,
-  GitLabProjectAccessTokenCredentialRowSchema,
   GitLabProjectAccessTokenMetadataSchema,
 } from '@kilocode/worker-utils/gitlab-credential';
 import {
@@ -136,14 +149,6 @@ function getGitLabIntegrationOwner(integration: PlatformIntegration): Owner {
     return { type: 'org', id: integration.owned_by_organization_id };
   }
   throw new Error('GitLab integration must have exactly one owner');
-}
-
-function requireGitLabProjectId(projectId: string | number): string {
-  const value = String(projectId);
-  if (!/^[1-9][0-9]*$/.test(value)) {
-    throw new Error('GitLab project ID must be a positive decimal');
-  }
-  return value;
 }
 
 /**
@@ -418,39 +423,6 @@ export function gitLabCredentialActor(owner: Owner, actingUserId: string): GitLa
 }
 
 /**
- * Project ids whose access token belongs to the integration: the encrypted
- * rows it holds and any legacy metadata entry it still carries. Malformed
- * metadata keys are not GitLab project ids and cannot be revoked.
- */
-async function listIntegrationProjectIds(
-  integration: Pick<PlatformIntegration, 'id' | 'metadata'>
-): Promise<string[]> {
-  const projectIds = new Set<string>();
-  const metadata = requireMetadataRecord(integration.metadata);
-  const storedTokens = metadata.project_tokens;
-  if (typeof storedTokens === 'object' && storedTokens !== null && !Array.isArray(storedTokens)) {
-    for (const projectId of Object.keys(storedTokens)) {
-      if (/^[1-9][0-9]*$/.test(projectId)) projectIds.add(projectId);
-    }
-  }
-
-  const rows = await db
-    .select({ projectId: platform_access_token_credentials.provider_resource_id })
-    .from(platform_access_token_credentials)
-    .where(
-      and(
-        eq(platform_access_token_credentials.platform_integration_id, integration.id),
-        eq(platform_access_token_credentials.provider_credential_type, 'project_access_token')
-      )
-    );
-  for (const row of rows) {
-    if (row.projectId !== null) projectIds.add(row.projectId);
-  }
-
-  return [...projectIds];
-}
-
-/**
  * Attempts the settlement makes to revoke a project token the provider did not
  * settle. Every attempt needs the credential the caller holds, which the
  * suspension drops, so the attempts share one request.
@@ -474,15 +446,81 @@ function waitForSettlementRetry(): Promise<void> {
   return promise;
 }
 
+/** Connected credential a settlement revokes with, or why it is missing. */
+type SettlementCredential =
+  | { userToken: string }
+  | { missing: 'no_credential' | 'credential_unresolved' };
+
+/**
+ * Resolves the connected credential a settlement revokes with. A definitely
+ * absent credential needs no repeat; an unreachable broker does, so a transient
+ * failure is attempted again within the settlement attempt bound.
+ */
+async function resolveSettlementCredential(
+  integration: Pick<PlatformIntegration, 'id' | 'metadata'>,
+  actor: GitLabCredentialActor
+): Promise<SettlementCredential> {
+  let missing: 'no_credential' | 'credential_unresolved' = 'credential_unresolved';
+  for (let attempt = 1; attempt <= PROJECT_TOKEN_SETTLEMENT_ATTEMPTS; attempt++) {
+    try {
+      return { userToken: await getValidGitLabToken(integration, actor) };
+    } catch (error) {
+      missing = classifyCredentialResolutionFailure(error);
+      logExceptInTest('[resolveSettlementCredential] Stored credential unavailable', {
+        integrationId: integration.id,
+        reason: missing,
+        error,
+      });
+      if (missing === 'no_credential') return { missing };
+    }
+    if (attempt < PROJECT_TOKEN_SETTLEMENT_ATTEMPTS) await waitForSettlementRetry();
+  }
+  return { missing };
+}
+
+/**
+ * Settles the credential a failed rotation tried to replace. An outcome a
+ * repeat can change is attempted again, within the same bound the settlement
+ * uses, so a transient provider answer does not refuse a replacement the
+ * caller can still make.
+ */
+async function settleReplacedProjectCredential(
+  integration: Pick<PlatformIntegration, 'id' | 'metadata'>,
+  projectId: string,
+  options: { userToken: string; expectedCredential: StoredProjectCredential }
+): Promise<StoredProjectTokenRemoval> {
+  let removal = await removeStoredProjectAccessToken(integration, projectId, {
+    userToken: options.userToken,
+    expectedCredential: options.expectedCredential,
+  });
+  for (let attempt = 1; attempt < PROJECT_TOKEN_SETTLEMENT_ATTEMPTS; attempt++) {
+    if (removal.outcome !== 'retained' || !removal.retryable) return removal;
+    logExceptInTest('[settleReplacedProjectCredential] Retrying an unconfirmed revocation', {
+      projectId,
+    });
+    await waitForSettlementRetry();
+    removal = await removeStoredProjectAccessToken(integration, projectId, {
+      userToken: options.userToken,
+      expectedCredential: options.expectedCredential,
+    });
+  }
+  return removal;
+}
+
 type ProjectTokenSettlement = {
   /** Tokens the provider confirmed revoked, whose stored handles are gone. */
   revoked: number;
-  /** Entries dropped because they named no revocable token id. */
+  /**
+   * Entries dropped because they named no revocable token id, and entries
+   * whose handles another attempt settled first, which needed no revocation.
+   */
   scrubbed: number;
   /** Stored handles that remain, including the ones not attempted. */
   retained: number;
   /** Handles that were listed but never attempted, for lack of credential or budget. */
   unattempted: number;
+  /** Every stored handle that remains, with the reason it was kept. */
+  blocking: ProjectTokenBlocker[];
 };
 
 /**
@@ -503,17 +541,20 @@ type ProjectTokenSettlement = {
  * off with live handles unattempted.
  *
  * Returns null when the stored project list cannot be read, which a caller
- * reports separately from a token the provider refused.
+ * reports separately from a token the provider refused. A credential the
+ * caller could not resolve keeps the retry answer when its failure can clear.
  */
 export async function settleStoredProjectTokens(
   integration: Pick<PlatformIntegration, 'id' | 'metadata'>,
-  actor: GitLabCredentialActor,
   userToken: string | undefined,
-  options: { signal?: AbortSignal } = {}
+  options: {
+    signal?: AbortSignal;
+    missingCredentialReason?: 'no_credential' | 'credential_unresolved';
+  } = {}
 ): Promise<ProjectTokenSettlement | null> {
   let projectIds: string[];
   try {
-    projectIds = await listIntegrationProjectIds(integration);
+    projectIds = await listProjectIdsWithStoredTokens(integration);
   } catch (error) {
     logExceptInTest('[settleStoredProjectTokens] Project token list unavailable', {
       integrationId: integration.id,
@@ -526,23 +567,59 @@ export async function settleStoredProjectTokens(
     // The cleanup that needs no provider call runs before the credential check,
     // so one request settles those entries too.
     const noCredentialOutstanding = new Set(projectIds);
+    const noCredentialReasons = new Map<string, ProjectTokenBlocker['reason']>();
     let noCredentialScrubbed = 0;
     for (const projectId of projectIds) {
-      const dropped = await getStoredProjectCredential(integration.id, projectId)
-        .then(storedCredential =>
-          dropUnrevokableProjectTokenEntry(integration, projectId, storedCredential)
-        )
-        .catch(() => false);
-      if (dropped) {
+      let storedCredential: StoredProjectCredential | null;
+      try {
+        storedCredential = await getStoredProjectCredential(integration.id, projectId);
+      } catch (error) {
+        // A row that cannot be read fails the same way on every repeat, so it
+        // names the repair; every other failure can clear, so it asks for a retry.
+        const { retryable } = describeSettlementFailure(error);
+        noCredentialReasons.set(
+          projectId,
+          retryable ? 'not_attempted' : 'stored_credential_unreadable'
+        );
+        logExceptInTest('[settleStoredProjectTokens] Stored project credential unreadable', {
+          integrationId: integration.id,
+          projectId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        continue;
+      }
+      let settled: boolean;
+      try {
+        settled = !hasStoredProjectTokenHandle(integration, projectId, storedCredential)
+          ? true
+          : await dropUnrevokableProjectTokenEntry(integration, projectId, storedCredential);
+      } catch (error) {
+        // A cleanup that did not complete leaves the handle in place, so the
+        // project stays outstanding and a repeat can settle it.
+        noCredentialReasons.set(projectId, 'not_attempted');
+        logExceptInTest('[settleStoredProjectTokens] Credential-free cleanup did not complete', {
+          integrationId: integration.id,
+          projectId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        continue;
+      }
+      if (settled) {
         noCredentialOutstanding.delete(projectId);
         noCredentialScrubbed += 1;
       }
     }
+    // No credential was resolved, so none of these could be attempted.
+    const missingCredentialReason = options.missingCredentialReason ?? 'no_credential';
     return {
       revoked: 0,
       scrubbed: noCredentialScrubbed,
       retained: noCredentialOutstanding.size,
       unattempted: noCredentialOutstanding.size,
+      blocking: [...noCredentialOutstanding].map(projectId => ({
+        projectId,
+        reason: noCredentialReasons.get(projectId) ?? missingCredentialReason,
+      })),
     };
   }
 
@@ -550,6 +627,7 @@ export async function settleStoredProjectTokens(
   const outstandingProjectIds = new Set(projectIds);
   const attemptedProjectIds = new Set<string>();
   const retryProjectIds = new Set<string>();
+  const retainedReasons = new Map<string, ProjectTokenBlocker['reason']>();
   let revoked = 0;
   let scrubbed = 0;
   for (let attempt = 0; attempt < PROJECT_TOKEN_SETTLEMENT_ATTEMPTS; attempt++) {
@@ -563,7 +641,7 @@ export async function settleStoredProjectTokens(
     for (const projectId of attemptProjectIds) {
       if (signal.aborted) break;
       attemptedProjectIds.add(projectId);
-      const outcome = await removeStoredProjectAccessToken(integration, projectId, actor, {
+      const outcome = await removeStoredProjectAccessToken(integration, projectId, {
         userToken,
         signal,
       }).catch(error => {
@@ -572,7 +650,10 @@ export async function settleStoredProjectTokens(
           projectId,
           error: error instanceof Error ? error.message : String(error),
         });
-        return { outcome: 'retained' as const, retryable: false };
+        return {
+          outcome: 'retained' as const,
+          ...describeSettlementFailure(error),
+        };
       });
       if (outcome.outcome === 'removed') {
         outstandingProjectIds.delete(projectId);
@@ -580,8 +661,14 @@ export async function settleStoredProjectTokens(
       } else if (outcome.outcome === 'scrubbed') {
         outstandingProjectIds.delete(projectId);
         scrubbed += 1;
-      } else if (outcome.outcome === 'retained' && outcome.retryable) {
-        retryProjectIds.add(projectId);
+      } else if (outcome.outcome === 'absent') {
+        // Another attempt settled this project's handles first, so nothing is
+        // left to revoke and nothing is retained.
+        outstandingProjectIds.delete(projectId);
+        scrubbed += 1;
+      } else if (outcome.outcome === 'retained') {
+        retainedReasons.set(projectId, outcome.reason);
+        if (outcome.retryable) retryProjectIds.add(projectId);
       }
     }
   }
@@ -589,7 +676,67 @@ export async function settleStoredProjectTokens(
   const unattempted = [...outstandingProjectIds].filter(
     projectId => !attemptedProjectIds.has(projectId)
   ).length;
-  return { revoked, scrubbed, retained: outstandingProjectIds.size, unattempted };
+  return {
+    revoked,
+    scrubbed,
+    retained: outstandingProjectIds.size,
+    unattempted,
+    blocking: [...outstandingProjectIds].map(projectId => ({
+      projectId,
+      reason: retainedReasons.get(projectId) ?? ('not_attempted' as const),
+    })),
+  };
+}
+
+/**
+ * Requires every project token handle stored for the integration's current
+ * instance to be settled before the stored instance URL is replaced. The
+ * settlement revokes each handle against the instance it was minted on; a
+ * handle the provider retains — or a stored project list that cannot be read —
+ * refuses the change, so the handles are never dropped alone.
+ *
+ * The refusal names the blocking project ids and the kind of failure, because
+ * the remedy differs: an unusable stored instance address, a refused
+ * credential, an unresolvable credential, and an unconfirmed revocation each
+ * call for a different next step. A credential that cannot be reached is
+ * reported as retryable.
+ */
+export async function ensureStoredProjectTokensSettledBeforeInstanceChange(
+  integration: Pick<PlatformIntegration, 'id' | 'metadata'>,
+  actor: GitLabCredentialActor
+): Promise<void> {
+  // A row whose instance value cannot be used yields no resolvable credential,
+  // so the answer is definite and names that address as the cause.
+  const storedInstance = readStoredInstanceUrl(integration.metadata);
+  const credential: SettlementCredential = storedInstance.ok
+    ? await resolveSettlementCredential(integration, actor)
+    : { missing: 'no_credential' };
+  const settlement = await settleStoredProjectTokens(
+    integration,
+    'userToken' in credential ? credential.userToken : undefined,
+    'missing' in credential ? { missingCredentialReason: credential.missing } : {}
+  );
+  if (settlement === null) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: GITLAB_PROJECT_TOKENS_LIST_UNREADABLE_MESSAGE,
+    });
+  }
+  const blocking = storedInstance.ok
+    ? settlement.blocking
+    : settlement.blocking.map(blocker =>
+        blocker.reason === 'no_credential'
+          ? { projectId: blocker.projectId, reason: 'stored_instance_unusable' as const }
+          : blocker
+      );
+  const message = describeInstanceChangeBlockers(blocking);
+  if (message !== null) {
+    logExceptInTest(
+      '[ensureStoredProjectTokensSettledBeforeInstanceChange] Instance change refused',
+      { integrationId: integration.id, blocking }
+    );
+    throw new TRPCError({ code: 'PRECONDITION_FAILED', message });
+  }
 }
 
 /**
@@ -657,15 +804,7 @@ export async function disconnectGitLabIntegration(owner: Owner, actingUserId: st
   // can revoke project tokens must be resolved before the suspension. It is
   // resolved even when no project token is visible yet: a review that is
   // already running can store one before the suspension commits.
-  let userToken: string | undefined;
-  try {
-    userToken = await getValidGitLabToken(integration, actor);
-  } catch (error) {
-    logExceptInTest('[disconnectGitLabIntegration] Connected credential unavailable', {
-      integrationId: integration.id,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
+  const credential = await resolveSettlementCredential(integration, actor);
 
   const updatedMetadata = await db.transaction(async tx => {
     const nextMetadata = await mutateGitLabMetadataInTransaction(tx, integration.id, {
@@ -704,7 +843,11 @@ export async function disconnectGitLabIntegration(owner: Owner, actingUserId: st
   // between the first credential lookup and the suspension. The integration is
   // suspended already, so an unreadable project list cannot fail the disconnect;
   // the kept handles stay unusable through it.
-  const settlement = await settleStoredProjectTokens(integration, actor, userToken);
+  const settlement = await settleStoredProjectTokens(
+    integration,
+    'userToken' in credential ? credential.userToken : undefined,
+    'missing' in credential ? { missingCredentialReason: credential.missing } : {}
+  );
 
   logExceptInTest(
     '[disconnectGitLabIntegration] Integration suspended (preserved webhook config)',
@@ -806,88 +949,6 @@ export type GitLabIntegrationMetadata = {
  * Default name for Kilo Code Review Bot tokens
  */
 const KILO_BOT_TOKEN_NAME = 'Kilo Code Review Bot';
-
-/** The only field of a legacy metadata entry that can still revoke its token. */
-const LegacyStoredProjectAccessTokenSchema = z
-  .object({ token_id: z.number().int().positive() })
-  .passthrough();
-
-const GitLabProjectTokenMetadataSchema = z
-  .object({ project_tokens: z.record(z.string(), z.unknown()).optional() })
-  .passthrough();
-
-/**
- * Token id named by a legacy plaintext metadata entry, or null when the entry
- * is absent or does not carry a usable id.
- */
-function readLegacyProjectTokenId(metadata: unknown, projectId: string): number | null {
-  const parsedMetadata = GitLabProjectTokenMetadataSchema.safeParse(metadata);
-  if (!parsedMetadata.success) return null;
-  const entry = parsedMetadata.data.project_tokens?.[projectId];
-  const parsedEntry = LegacyStoredProjectAccessTokenSchema.safeParse(entry);
-  return parsedEntry.success ? parsedEntry.data.token_id : null;
-}
-
-/** True when the integration still carries any metadata entry for the project. */
-function hasLegacyProjectTokenEntry(metadata: unknown, projectId: string): boolean {
-  const parsedMetadata = GitLabProjectTokenMetadataSchema.safeParse(metadata);
-  if (!parsedMetadata.success) return false;
-  return parsedMetadata.data.project_tokens?.[projectId] !== undefined;
-}
-
-/**
- * Drops one stored project token entry that a provider call cannot settle.
- * Returns true when it dropped one. Needs no provider credential.
- */
-async function dropUnrevokableProjectTokenEntry(
-  integration: Pick<PlatformIntegration, 'id' | 'metadata'>,
-  projectId: string,
-  storedCredential: StoredProjectCredential | null
-): Promise<boolean> {
-  if (storedCredential !== null) return false;
-  if (readLegacyProjectTokenId(integration.metadata, projectId) !== null) return false;
-  if (!hasLegacyProjectTokenEntry(integration.metadata, projectId)) return false;
-  await deleteStoredProjectTokenMetadataEntry({ integrationId: integration.id, projectId });
-  logExceptInTest('[removeStoredProjectAccessToken] Dropped entry with no revocable token id', {
-    projectId,
-  });
-  return true;
-}
-
-async function getStoredProjectCredential(integrationId: string, projectId: string) {
-  const [row] = await db
-    .select()
-    .from(platform_access_token_credentials)
-    .where(
-      and(
-        eq(platform_access_token_credentials.platform_integration_id, integrationId),
-        eq(platform_access_token_credentials.provider_credential_type, 'project_access_token'),
-        eq(platform_access_token_credentials.provider_resource_id, projectId)
-      )
-    )
-    .limit(1);
-
-  if (!row) return null;
-
-  const parsed = GitLabProjectAccessTokenCredentialRowSchema.safeParse(row);
-  const tokenId = parsed.success
-    ? Number(parsed.data.provider_metadata.providerCredentialId)
-    : Number.NaN;
-  if (!parsed.success || !Number.isSafeInteger(tokenId)) {
-    throw new TRPCError({
-      code: 'UNAUTHORIZED',
-      message: 'GitLab project credential must be recreated',
-    });
-  }
-  return {
-    credentialId: parsed.data.id,
-    credentialVersion: parsed.data.credential_version,
-    tokenId,
-    expiresAt: parsed.data.provider_metadata.expiresOn,
-    authorizedAccountId: parsed.data.provider_metadata.authorizedAccountId ?? null,
-    unusable: parsed.data.provider_metadata.unusableReason !== undefined,
-  } satisfies StoredProjectCredential;
-}
 
 async function validateStoredProjectAccessToken(
   token: string,
@@ -1024,10 +1085,10 @@ export async function getOrCreateProjectAccessToken(
         expiresAt: storedCredential.expiresAt,
       });
 
+      let replacedTokenUnsettled: StoredProjectCredential | null = null;
       let rotatedToken: GitLabProjectAccessToken | null = null;
+      const userToken = await getValidGitLabToken(integration, actor);
       try {
-        // Get a valid user token for the rotation API call
-        const userToken = await getValidGitLabToken(integration, actor);
         const newExpiresAt = calculateProjectAccessTokenExpiry(365);
 
         rotatedToken = await rotateProjectAccessToken(
@@ -1046,11 +1107,26 @@ export async function getOrCreateProjectAccessToken(
           });
         }
       } catch (error) {
-        // If rotation fails, try to create a new token
+        if (error instanceof GitLabAuthenticationError) {
+          throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message:
+              'GitLab rejected the connected credential. Reconnect the GitLab integration and try again.',
+            cause: error,
+          });
+        }
+        if (error instanceof GitLabProjectAccessTokenPermissionError) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: `Cannot rotate bot token for project ${projectId}. You need Maintainer role or higher.`,
+            cause: error,
+          });
+        }
         logExceptInTest('[getOrCreateProjectAccessToken] Rotation failed, creating new token', {
           projectId,
           error: error instanceof Error ? error.message : String(error),
         });
+        replacedTokenUnsettled = storedCredential;
       }
 
       if (rotatedToken?.token) {
@@ -1064,6 +1140,28 @@ export async function getOrCreateProjectAccessToken(
         });
 
         return rotatedToken.token;
+      }
+
+      if (replacedTokenUnsettled) {
+        const removal = await settleReplacedProjectCredential(integration, projectIdStr, {
+          userToken,
+          expectedCredential: replacedTokenUnsettled,
+        });
+        if (removal.outcome === 'retained') {
+          logExceptInTest(
+            '[getOrCreateProjectAccessToken] Replaced credential not settled; refusing replacement',
+            {
+              projectId,
+              expectedTokenId: replacedTokenUnsettled.tokenId,
+              retryable: removal.retryable,
+              reason: removal.reason,
+            }
+          );
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: describeProjectTokenReplacementBlocker(removal.reason),
+          });
+        }
       }
     }
   }
@@ -1254,113 +1352,6 @@ async function updateStoredProjectAccessToken(
 }
 
 /**
- * Outcome of removing one stored project token. A retained outcome says whether
- * a repeated attempt can settle it, so a caller that can try again does not
- * repeat a refusal the provider will keep answering. Only a missing answer, a
- * rate limit, or a server error can change on a repeat; a permission or
- * authentication refusal cannot. A scrubbed outcome drops an entry that named
- * no revocable token id, so nothing is left at the provider that this path
- * could reach.
- */
-export type StoredProjectTokenRemoval =
-  | { outcome: 'removed' }
-  | { outcome: 'absent' }
-  | { outcome: 'scrubbed' }
-  | { outcome: 'retained'; retryable: boolean };
-
-/**
- * Removes the stored Project Access Token for a project
- * Called when a project is removed from code reviews, and by every project on
- * disconnect
- *
- * The metadata entry and the encrypted credential row are deleted only after
- * GitLab settles the revocation, either by confirming it or by reporting the
- * token as already gone (404). Any other outcome keeps both handles so a later
- * removal can try again. A legacy metadata entry names a token id too, and it
- * keeps the same contract: every stored id for the project is revoked before
- * either handle is dropped. An entry that names no revocable id is dropped
- * instead of kept, because no stored reader uses its plaintext token.
- *
- * `userToken` lets a caller that already resolved the connected credential — a
- * disconnect resolves it before the integration stops counting as connected —
- * reuse it instead of asking the token service per project. `signal` carries
- * that caller's deadline into the provider request.
- */
-export async function removeStoredProjectAccessToken(
-  integration: Pick<PlatformIntegration, 'id' | 'metadata'>,
-  projectId: string | number,
-  actor: GitLabCredentialActor,
-  options: { userToken?: string; signal?: AbortSignal } = {}
-): Promise<StoredProjectTokenRemoval> {
-  const metadata = integration.metadata as GitLabIntegrationMetadata | null;
-  const projectIdStr = requireGitLabProjectId(projectId);
-  const storedCredential = await getStoredProjectCredential(integration.id, projectIdStr);
-  const tokenIds = [
-    ...new Set(
-      [
-        storedCredential?.tokenId,
-        readLegacyProjectTokenId(integration.metadata, projectIdStr),
-      ].filter((tokenId): tokenId is number => tokenId !== null && tokenId !== undefined)
-    ),
-  ];
-  if (tokenIds.length === 0) {
-    const dropped = await dropUnrevokableProjectTokenEntry(
-      integration,
-      projectIdStr,
-      storedCredential
-    );
-    return { outcome: dropped ? 'scrubbed' : 'absent' };
-  }
-  const instanceUrl = normalizeInstanceUrl(metadata?.gitlab_instance_url);
-
-  try {
-    const userToken = options.userToken ?? (await getValidGitLabToken(integration, actor));
-    for (const tokenId of tokenIds) {
-      await revokeProjectAccessToken(userToken, projectId, tokenId, instanceUrl, options.signal);
-    }
-  } catch (error) {
-    const status = readProjectRevocationStatus(error);
-    logExceptInTest(
-      '[removeStoredProjectAccessToken] Revocation unsettled; keeping stored project credential',
-      {
-        projectId,
-        tokenIds,
-        status,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    );
-    return {
-      outcome: 'retained',
-      retryable: status === undefined || status === 429 || status >= 500,
-    };
-  }
-
-  logExceptInTest('[removeStoredProjectAccessToken] Token revoked in GitLab', {
-    projectId,
-    tokenIds,
-  });
-
-  if (storedCredential) {
-    await deleteStoredProjectCredential({
-      integrationId: integration.id,
-      projectId: projectIdStr,
-      credential: storedCredential,
-    });
-  } else {
-    await deleteStoredProjectTokenMetadataEntry({
-      integrationId: integration.id,
-      projectId: projectIdStr,
-    });
-  }
-
-  logExceptInTest('[removeStoredProjectAccessToken] Token removed from metadata', {
-    projectId,
-  });
-
-  return { outcome: 'removed' };
-}
-
-/**
  * Finds an existing Kilo bot token on GitLab and imports it into metadata
  * Useful for recovering from lost metadata or migrating existing tokens
  */
@@ -1541,34 +1532,57 @@ export async function connectWithPAT(
     const connectedAccountId = String(validatedUser.id);
     if (
       existingIntegration.integration_status === INTEGRATION_STATUS.SUSPENDED &&
-      !instanceUrlChanged(
-        readOptionalMetadataString(
-          requireMetadataRecord(existingIntegration.metadata),
-          'gitlab_instance_url'
-        ),
+      !storedInstanceUrlChanges(
+        readStoredInstanceUrl(existingIntegration.metadata),
         normalizedInstanceUrl
       ) &&
       (existingAccountId === null || existingAccountId === connectedAccountId)
     ) {
-      const settlement = await settleStoredProjectTokens(
-        existingIntegration,
-        gitLabCredentialActor(owner, authorizedByUserId),
-        token
-      );
+      const settlement = await settleStoredProjectTokens(existingIntegration, token);
       logExceptInTest('[connectWithPAT] Reconnect settled retained project tokens', {
         integrationId: existingIntegration.id,
         settledProjectTokens: settlement === null ? null : settlement,
       });
     }
 
+    const instanceChangeRequested = storedInstanceUrlChanges(
+      readStoredInstanceUrl(existingIntegration.metadata),
+      normalizedInstanceUrl
+    );
+    if (instanceChangeRequested) {
+      await ensureStoredProjectTokensSettledBeforeInstanceChange(
+        existingIntegration,
+        gitLabCredentialActor(owner, authorizedByUserId)
+      );
+    }
+
     await db.transaction(async tx => {
       existingMetadata = await readGitLabMetadataInTransaction(tx, existingIntegration.id);
-      isInstanceChange = instanceUrlChanged(
-        readOptionalMetadataString(existingMetadata, 'gitlab_instance_url'),
+      isInstanceChange = storedInstanceUrlChanges(
+        readStoredInstanceUrl(existingMetadata),
         normalizedInstanceUrl
       );
       isAccountChange =
         !isInstanceChange && existingAccountId !== null && existingAccountId !== connectedAccountId;
+      if (!instanceChangeRequested && isInstanceChange) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message:
+            'GitLab integration changed while connecting. Reload the integration and try again.',
+        });
+      }
+      if (isInstanceChange) {
+        const remaining = await listProjectIdsWithStoredTokens({
+          id: existingIntegration.id,
+          metadata: existingMetadata,
+        });
+        if (remaining.length > 0) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: gitlabProjectTokensUnsettledMessage(remaining),
+          });
+        }
+      }
       const [existingPrimaryCredential] = await tx
         .select()
         .from(platform_access_token_credentials)
@@ -1607,7 +1621,6 @@ export async function connectWithPAT(
           'client_id',
           'client_secret',
           ...(isInstanceChange ? ['configured_webhooks', 'project_tokens'] : []),
-          ...(isAccountChange ? ['project_tokens'] : []),
         ],
       });
 
@@ -1698,9 +1711,8 @@ export async function connectWithPAT(
 
     if (isAccountChange) {
       const retirement = await retireProjectCredentialsForReplacedAccount({
-        integrationId: existingIntegration.id,
+        integration: { id: existingIntegration.id, metadata: existingMetadata },
         userToken: token,
-        instanceUrl: normalizedInstanceUrl,
         currentAccountId: connectedAccountId,
       });
       logExceptInTest('[connectWithPAT] Connected account changed — retired project credentials', {

@@ -57,6 +57,9 @@ catalog:
   google-auth-library: 10.6.2
   hono: 4.13.16
   jose: 6.2.17
+  # Named by the root and apps/web manifests and by the `overrides` entry
+  # below, so the catalog pin is the one place all three readers take it from.
+  js-yaml: 4.3.2
   jsonwebtoken: 9.0.3
   # One Next release for the three apps and web-shared. web-shared must resolve
   # the same `next` instance as apps/web for request-scoped APIs, and the
@@ -314,7 +317,7 @@ overrides:
   toml: 5.0.1
   '@opentelemetry/core': 2.8.0
   body-parser: 2.4.0
-  js-yaml: 4.3.2
+  js-yaml: 'catalog:'
   linkify-it: 5.0.2
   protobufjs: 7.6.5
   sharp: 0.35.5

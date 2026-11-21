@@ -53,6 +53,7 @@ import {
 import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
 import {
   deleteStoredValue,
+  deleteStoredValueWithRetry,
   readStoredValue,
   readStoredValueSafe,
 } from '@/lib/auth/secure-store-value';
@@ -90,6 +91,7 @@ import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
 import { clearViewedFiles } from '@/lib/pr-review/viewed-files';
 import {
   ACTIVE_USER_ID_KEY,
+  ATTEST_KEY_ID_KEY,
   AUTH_TOKEN_KEY,
   CHAT_BACKENDS_KEY,
   LEGACY_EXCHANGE_DONE_KEY,
@@ -107,7 +109,7 @@ import {
 import { clearTelemetryDecision } from '@/lib/telemetry/controller';
 import { clearSentryUser } from '@/lib/sentry-context';
 import { purgePostHogPersistence } from '@/lib/telemetry/posthog-storage';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { beginAuthenticatedOwner, markRestoredAuthenticatedOwner } from '@/lib/context-scope';
 
 // Pre-load tokens at module level so they're available before React mounts.
@@ -589,6 +591,10 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
               await deleteStoredValue(TOKEN_EXPIRES_AT_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
               await deleteStoredValue(LEGACY_EXCHANGE_DONE_KEY);
             }),
+            // The next sign-in can belong to a different account.
+            cause === 'user' && Platform.OS === 'ios'
+              ? deleteStoredValueWithRetry(ATTEST_KEY_ID_KEY)
+              : undefined,
             deleteAccountMetadata(ACTIVE_USER_ID_KEY),
             deleteAccountMetadata(CHAT_BACKENDS_KEY),
             deleteAccountMetadata(ORGANIZATION_STORAGE_KEY),

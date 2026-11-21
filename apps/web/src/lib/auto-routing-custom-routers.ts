@@ -428,6 +428,11 @@ type BenchmarkAdmissionPlan = {
   models: string[];
 };
 
+type AdmittedBenchmarks = {
+  plan: BenchmarkAdmissionPlan;
+  measured: ReadonlySet<string> | null;
+};
+
 function benchmarkAdmissionPlan(
   baseRouter: AutoRouter,
   entries: readonly CustomRouterEntry[]
@@ -473,10 +478,11 @@ async function withOwnerAdmissionSlot<T>(
 async function requestPlatformBenchmarks(params: {
   owner: CustomRouterOwner;
   plan: BenchmarkAdmissionPlan;
+  measured: ReadonlySet<string>;
 }): Promise<void> {
-  const measurements = await platformMeasurements(params.plan.baseRouter);
-  const measured = new Set(measurements.models.map(entry => entry.model));
-  const models = params.plan.models.filter(model => measured.has(model)).map(model => ({ model }));
+  const models = params.plan.models
+    .filter(model => params.measured.has(model))
+    .map(model => ({ model }));
   if (models.length === 0) return;
   const signal = AbortSignal.timeout(BENCHMARK_ADMISSION_TIMEOUT_MS);
   for (let start = 0; start < models.length; start += BENCHMARK_REGISTER_BATCH_SIZE) {
@@ -539,13 +545,19 @@ async function admitPlatformBenchmarks(params: {
   owner: CustomRouterOwner;
   baseRouter: AutoRouter;
   entries: readonly CustomRouterEntry[];
-}): Promise<BenchmarkAdmissionPlan> {
+  previous?: AdmittedBenchmarks;
+}): Promise<AdmittedBenchmarks> {
   const plan = benchmarkAdmissionPlan(params.baseRouter, params.entries);
-  if (plan.models.length === 0) return plan;
+  if (plan.models.length === 0) return { plan, measured: null };
+  const reusable =
+    params.previous?.plan.baseRouter === plan.baseRouter ? params.previous.measured : null;
+  const measured =
+    reusable ??
+    new Set((await platformMeasurements(plan.baseRouter)).models.map(entry => entry.model));
   await withOwnerAdmissionSlot(params.owner, () =>
-    requestPlatformBenchmarks({ owner: params.owner, plan })
+    requestPlatformBenchmarks({ owner: params.owner, plan, measured })
   );
-  return plan;
+  return { plan, measured };
 }
 
 export async function lockOwner(tx: DrizzleTransaction, owner: CustomRouterOwner): Promise<void> {
@@ -779,14 +791,16 @@ export async function updateCustomRouterResponse(
     }
     if (
       admitted !== null &&
-      !sameAdmissionPlan(admitted, benchmarkAdmissionPlan(next.baseRouter, next.entries))
+      !sameAdmissionPlan(admitted.plan, benchmarkAdmissionPlan(next.baseRouter, next.entries))
     ) {
       // A concurrent save changed the base router or pool between the pre-lock read and the lock.
       // Admission is idempotent, so registering the locked plan keeps the persisted router measured.
+      // The measurements read before the lock are reused unless the base router changed.
       await admitPlatformBenchmarks({
         owner,
         baseRouter: next.baseRouter,
         entries: next.entries,
+        previous: admitted,
       });
     }
     return saveRouter(tx, next);

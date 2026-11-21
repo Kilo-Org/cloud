@@ -1879,10 +1879,13 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
         const error = await readSessionObligations(sessionId).catch((error: unknown) => error);
 
         // A permanent failure is diagnosable: it names the file and what the
-        // parse rejected, and both values are wrapper-generated.
+        // parse rejected, and both values are wrapper-generated. The cause text
+        // is asserted rather than a bare field name, because the session id the
+        // message also carries already contains "permission".
         expect(error).toBeInstanceOf(SessionRulesetNotAppliedError);
         expect((error as Error).message).toContain(marker);
-        expect((error as Error).message).toContain('permission');
+        expect((error as Error).message).toContain('is not a ruleset:');
+        expect((error as Error).message).toContain('expected object, received array');
       } finally {
         await forgetSessionObligations(sessionId).catch(() => undefined);
         if (originalHome === undefined) delete process.env.HOME;

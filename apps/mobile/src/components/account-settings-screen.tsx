@@ -39,18 +39,7 @@ import { useTRPC } from '@/lib/trpc';
 import { LANGUAGE_ENDONYMS } from '@/i18n/languages';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { setLanguagePickerBridge } from '@/lib/picker-bridge';
-import {
-  ACCOUNT_BLOCKED_PEOPLE_SETTING,
-  ACCOUNT_DATA_EXPORT_SETTING,
-  ACCOUNT_DEVICE_SESSIONS_SETTING,
-  ACCOUNT_LANGUAGE_SETTING,
-  ACCOUNT_PASSKEYS_SETTING,
-  ACCOUNT_PROFILE_SETTING,
-  ACCOUNT_PROVIDER_KEYS_SETTING,
-  ACCOUNT_REPORT_RECEIPTS_SETTING,
-  ACCOUNT_SIGN_IN_METHODS_SETTING,
-  ACCOUNT_TRUSTED_HOSTS_SETTING,
-} from '@/lib/settings-search/preference-sources';
+import { ACCOUNT_SETTINGS } from '@/lib/settings-search/preference-sources';
 
 /**
  * Rows the skeleton reserves while the account read is pending: enough to fill
@@ -106,30 +95,30 @@ export function AccountSettingsScreen({
   } else {
     body = (
       <RowGroup leadingTile>
-        <SettingsTarget item={ACCOUNT_PROFILE_SETTING}>
+        <SettingsTarget item={ACCOUNT_SETTINGS.profile}>
           <ConfigureRow
             icon={UserRound}
-            title={t(ACCOUNT_PROFILE_SETTING.label)}
+            title={t(ACCOUNT_SETTINGS.profile.label)}
             subtitle={t('profile.editProfile.rowSubtitle')}
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/profile-edit' as Href);
             }}
           />
         </SettingsTarget>
-        <SettingsTarget item={ACCOUNT_SIGN_IN_METHODS_SETTING}>
+        <SettingsTarget item={ACCOUNT_SETTINGS.signInMethods}>
           <ConfigureRow
             icon={Lock}
-            title={t(ACCOUNT_SIGN_IN_METHODS_SETTING.label)}
+            title={t(ACCOUNT_SETTINGS.signInMethods.label)}
             subtitle={t('profile.linkedAccounts')}
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/login-methods' as Href);
             }}
           />
         </SettingsTarget>
-        <SettingsTarget item={ACCOUNT_LANGUAGE_SETTING}>
+        <SettingsTarget item={ACCOUNT_SETTINGS.language}>
           <ConfigureRow
             icon={Globe}
-            title={t(ACCOUNT_LANGUAGE_SETTING.label)}
+            title={t(ACCOUNT_SETTINGS.language.label)}
             subtitle={languageSubtitle}
             onPress={() => {
               setLanguagePickerBridge({
@@ -143,10 +132,10 @@ export function AccountSettingsScreen({
             }}
           />
         </SettingsTarget>
-        <SettingsTarget item={ACCOUNT_TRUSTED_HOSTS_SETTING}>
+        <SettingsTarget item={ACCOUNT_SETTINGS.trustedHosts}>
           <ConfigureRow
             icon={Shield}
-            title={t(ACCOUNT_TRUSTED_HOSTS_SETTING.label)}
+            title={t(ACCOUNT_SETTINGS.trustedHosts.label)}
             subtitle={t('trustedHosts.subtitle')}
             disabled={!trustedHostsLoaded}
             onPress={() => {
@@ -154,83 +143,85 @@ export function AccountSettingsScreen({
             }}
           />
         </SettingsTarget>
-        <SettingsTarget item={ACCOUNT_PASSKEYS_SETTING}>
+        <SettingsTarget item={ACCOUNT_SETTINGS.passkeys}>
           <ConfigureRow
             icon={KeyRound}
-            title={t(ACCOUNT_PASSKEYS_SETTING.label)}
+            title={t(ACCOUNT_SETTINGS.passkeys.label)}
             subtitle={t('profile.passkeysSubtitle')}
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/passkeys' as Href);
             }}
           />
         </SettingsTarget>
-        <SettingsTarget item={ACCOUNT_PROVIDER_KEYS_SETTING}>
+        <SettingsTarget item={ACCOUNT_SETTINGS.providerKeys}>
           <ConfigureRow
             icon={Cpu}
-            title={t(ACCOUNT_PROVIDER_KEYS_SETTING.label)}
+            title={t(ACCOUNT_SETTINGS.providerKeys.label)}
             subtitle={t('profile.providerKeys.rowSubtitle')}
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/provider-keys' as Href);
             }}
           />
         </SettingsTarget>
-        <SettingsTarget item={ACCOUNT_DATA_EXPORT_SETTING}>
+        <SettingsTarget item={ACCOUNT_SETTINGS.dataExport}>
           <ConfigureRow
             icon={FileText}
-            title={t(ACCOUNT_DATA_EXPORT_SETTING.label)}
+            title={t(ACCOUNT_SETTINGS.dataExport.label)}
             subtitle={t('profile.dataExport.rowSubtitle')}
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/data-export' as Href);
             }}
           />
         </SettingsTarget>
-        <SettingsTarget item={ACCOUNT_BLOCKED_PEOPLE_SETTING}>
+        <SettingsTarget item={ACCOUNT_SETTINGS.blockedPeople}>
           <ConfigureRow
             icon={Ban}
-            title={t(ACCOUNT_BLOCKED_PEOPLE_SETTING.label)}
+            title={t(ACCOUNT_SETTINGS.blockedPeople.label)}
             subtitle={t('profile.blockedPeople.rowSubtitle')}
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/blocked-people' as Href);
             }}
           />
         </SettingsTarget>
-        <SettingsTarget item={ACCOUNT_REPORT_RECEIPTS_SETTING}>
+        <SettingsTarget item={ACCOUNT_SETTINGS.reportReceipts}>
           <ConfigureRow
             icon={Flag}
-            title={t(ACCOUNT_REPORT_RECEIPTS_SETTING.label)}
+            title={t(ACCOUNT_SETTINGS.reportReceipts.label)}
             subtitle={t('profile.reportReceipts.rowSubtitle')}
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/report-receipts' as Href);
             }}
           />
         </SettingsTarget>
-        <SettingsTarget item={ACCOUNT_DEVICE_SESSIONS_SETTING}>
+        <SettingsTarget item={ACCOUNT_SETTINGS.deviceSessions}>
           <ConfigureRow
             icon={Smartphone}
-            title={t(ACCOUNT_DEVICE_SESSIONS_SETTING.label)}
+            title={t(ACCOUNT_SETTINGS.deviceSessions.label)}
             subtitle={t('profile.deviceSessionsSubtitle')}
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/device-sessions' as Href);
             }}
           />
         </SettingsTarget>
-        <ConfigureRow
-          icon={DirectionalLogOut}
-          title={t('profile.signOutWeb.title')}
-          subtitle={t('profile.signOutWeb.rowSubtitle')}
-          tone="danger"
-          accessibilityLabel={t('profile.signOutWeb.title')}
-          onPress={() => {
-            confirm({
-              title: t('profile.signOutWeb.confirmTitle'),
-              message: t('profile.signOutWeb.confirmMessage'),
-              confirmLabel: t('common.signOut'),
-              onConfirm: () => {
-                signOutWeb.mutate(undefined);
-              },
-            });
-          }}
-        />
+        <SettingsTarget item={ACCOUNT_SETTINGS.browserSignOut}>
+          <ConfigureRow
+            icon={DirectionalLogOut}
+            title={t(ACCOUNT_SETTINGS.browserSignOut.label)}
+            subtitle={t('profile.signOutWeb.rowSubtitle')}
+            tone="danger"
+            accessibilityLabel={t(ACCOUNT_SETTINGS.browserSignOut.label)}
+            onPress={() => {
+              confirm({
+                title: t('profile.signOutWeb.confirmTitle'),
+                message: t('profile.signOutWeb.confirmMessage'),
+                confirmLabel: t('common.signOut'),
+                onConfirm: () => {
+                  signOutWeb.mutate(undefined);
+                },
+              });
+            }}
+          />
+        </SettingsTarget>
       </RowGroup>
     );
   }

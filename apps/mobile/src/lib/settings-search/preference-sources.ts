@@ -1,254 +1,154 @@
 import { defineSetting, type SettingsSearchSource } from '@/lib/settings-search/definitions';
 
 /**
- * Settings search index for the Preferences surfaces. Every definition here is
- * the one the screen also renders from, so the indexed label can never drift
- * from the visible row (a row added without a definition, or a definition
- * without a row, fails the mounted coverage tests).
+ * Settings search index for the Preferences surfaces.
  *
- * Order follows the current screens and their menu order.
+ * Each screen renders the same named definition object its source publishes
+ * through `Object.values`, so a row cannot be added (or removed) in the UI
+ * without the index following, and the index cannot name a row the screen does
+ * not render.
  */
 
-// Preferences hub.
-const GENERAL_SETTING = defineSetting('general', 'preferences.general');
-const VOICE_INPUT_SETTING = defineSetting('voice-input', 'preferences.voiceInput');
-const TOOL_SUMMARY_TRANSLATION_SETTING = defineSetting(
-  'tool-summary-translation',
-  'preferences.toolSummaryTranslation',
-  'language'
-);
-const APPEARANCE_SETTING = defineSetting('appearance', 'preferences.appearance', 'appearance');
-const APPEARANCE_SYSTEM_SETTING = defineSetting(
-  'appearance.system',
-  'preferences.appearanceSystem',
-  'appearance'
-);
-const APPEARANCE_LIGHT_SETTING = defineSetting(
-  'appearance.light',
-  'preferences.appearanceLight',
-  'appearance'
-);
-const APPEARANCE_DARK_SETTING = defineSetting(
-  'appearance.dark',
-  'preferences.appearanceDark',
-  'appearance'
-);
-const ACCOUNT_SETTING = defineSetting('account', 'preferences.account', 'language');
-const NOTIFICATIONS_SETTING = defineSetting(
-  'notifications',
-  'common.notifications',
-  'notifications'
-);
-const NOTIFICATION_HISTORY_SETTING = defineSetting(
-  'notification-history',
-  'notifications.history.title',
-  'notifications'
-);
-const SPEND_ALERTS_SETTING = defineSetting(
-  'spend-alerts',
-  'notifications.channel.spend',
-  'notifications'
-);
+/** Every row on the Preferences hub. `appearance` labels its section. */
+const PREFERENCES_HUB_SETTINGS = {
+  general: defineSetting('general', 'preferences.general'),
+  voiceInput: defineSetting('voice-input', 'preferences.voiceInput'),
+  toolSummaryTranslation: defineSetting(
+    'tool-summary-translation',
+    'preferences.toolSummaryTranslation',
+    'language'
+  ),
+  appearance: defineSetting('appearance', 'preferences.appearance', 'appearance'),
+  appearanceSystem: defineSetting(
+    'appearance.system',
+    'preferences.appearanceSystem',
+    'appearance'
+  ),
+  appearanceLight: defineSetting(
+    'appearance.light',
+    'preferences.appearanceLight',
+    'appearance'
+  ),
+  appearanceDark: defineSetting(
+    'appearance.dark',
+    'preferences.appearanceDark',
+    'appearance'
+  ),
+  account: defineSetting('account', 'preferences.account', 'language'),
+  notifications: defineSetting('notifications', 'common.notifications', 'notifications'),
+  notificationHistory: defineSetting(
+    'notification-history',
+    'notifications.history.title',
+    'notifications'
+  ),
+  spendAlerts: defineSetting(
+    'spend-alerts',
+    'notifications.channel.spend',
+    'notifications'
+  ),
+} as const;
 
-// General.
-const APP_UNLOCK_SETTING = defineSetting(
-  'general.app-unlock',
-  'preferences.biometricUnlock',
-  'appUnlock'
-);
-const AUTO_EXPAND_THINKING_SETTING = defineSetting(
-  'general.auto-expand-thinking',
-  'preferences.autoExpandThinking'
-);
-const HIDE_THINKING_SETTING = defineSetting('general.hide-thinking', 'preferences.hideThinking');
-const CONDENSE_TOOL_CALLS_SETTING = defineSetting(
-  'general.condense-tool-calls',
-  'preferences.condenseToolCalls'
-);
-const KEEP_SCREEN_ON_SETTING = defineSetting(
-  'general.keep-screen-on',
-  'preferences.keepScreenOn'
-);
-const PR_REVIEW_ATTRIBUTION_SETTING = defineSetting(
-  'general.pr-review-attribution',
-  'preferences.prReviewAttribution'
-);
-const RETURN_SENDS_MESSAGE_SETTING = defineSetting(
-  'general.return-sends-message',
-  'preferences.returnSendsMessage'
-);
+const GENERAL_SETTINGS = {
+  appUnlock: defineSetting('general.app-unlock', 'preferences.biometricUnlock', 'appUnlock'),
+  autoExpandThinking: defineSetting(
+    'general.auto-expand-thinking',
+    'preferences.autoExpandThinking'
+  ),
+  hideThinking: defineSetting('general.hide-thinking', 'preferences.hideThinking'),
+  condenseToolCalls: defineSetting(
+    'general.condense-tool-calls',
+    'preferences.condenseToolCalls'
+  ),
+  keepScreenOn: defineSetting('general.keep-screen-on', 'preferences.keepScreenOn'),
+  prReviewAttribution: defineSetting(
+    'general.pr-review-attribution',
+    'preferences.prReviewAttribution'
+  ),
+  returnSendsMessage: defineSetting(
+    'general.return-sends-message',
+    'preferences.returnSendsMessage'
+  ),
+} as const;
 
-// Voice input.
-const GATEWAY_TRANSCRIPTION_SETTING = defineSetting(
-  'voice-input.gateway-transcription',
-  'preferences.gatewayTranscription'
-);
-const TRANSCRIPTION_MODEL_SETTING = defineSetting(
-  'voice-input.model',
-  'preferences.transcriptionModel'
-);
-const VOICE_LANGUAGE_SETTING = defineSetting('voice-input.language', 'common.language', 'language');
+const VOICE_INPUT_SETTINGS = {
+  gatewayTranscription: defineSetting(
+    'voice-input.gateway-transcription',
+    'preferences.gatewayTranscription'
+  ),
+  transcriptionModel: defineSetting(
+    'voice-input.model',
+    'preferences.transcriptionModel'
+  ),
+  language: defineSetting('voice-input.language', 'common.language', 'language'),
+} as const;
 
-// Tool summary translation.
-const TRANSLATE_SUMMARIES_SETTING = defineSetting(
-  'tool-summary-translation.enabled',
-  'preferences.translateSummaries',
-  'language'
-);
-const TRANSLATION_MODEL_SETTING = defineSetting(
-  'tool-summary-translation.model',
-  'common.model',
-  'language'
-);
+const TOOL_SUMMARY_TRANSLATION_SETTINGS = {
+  translateSummaries: defineSetting(
+    'tool-summary-translation.enabled',
+    'preferences.translateSummaries',
+    'language'
+  ),
+  model: defineSetting('tool-summary-translation.model', 'common.model', 'language'),
+} as const;
 
-// Account.
-const ACCOUNT_PROFILE_SETTING = defineSetting('account.profile', 'profile.editProfile.title');
-const ACCOUNT_SIGN_IN_METHODS_SETTING = defineSetting(
-  'account.sign-in-methods',
-  'profile.signInMethods.title'
-);
-const ACCOUNT_LANGUAGE_SETTING = defineSetting('account.language', 'common.language', 'language');
-const ACCOUNT_TRUSTED_HOSTS_SETTING = defineSetting(
-  'account.trusted-hosts',
-  'trustedHosts.title',
-  'privacy'
-);
-const ACCOUNT_PASSKEYS_SETTING = defineSetting(
-  'account.passkeys',
-  'profile.passkeysTitle',
-  'privacy'
-);
-const ACCOUNT_PROVIDER_KEYS_SETTING = defineSetting(
-  'account.provider-keys',
-  'profile.providerKeys.title'
-);
-const ACCOUNT_DATA_EXPORT_SETTING = defineSetting(
-  'account.data-export',
-  'profile.dataExport.title',
-  'privacy'
-);
-const ACCOUNT_BLOCKED_PEOPLE_SETTING = defineSetting(
-  'account.blocked-people',
-  'profile.blockedPeople.title',
-  'privacy'
-);
-const ACCOUNT_REPORT_RECEIPTS_SETTING = defineSetting(
-  'account.report-receipts',
-  'profile.reportReceipts.title',
-  'privacy'
-);
-const ACCOUNT_DEVICE_SESSIONS_SETTING = defineSetting(
-  'account.device-sessions',
-  'common.deviceSessions',
-  'privacy'
-);
-
-export {
-  APPEARANCE_SETTING,
-  APPEARANCE_SYSTEM_SETTING,
-  APPEARANCE_LIGHT_SETTING,
-  APPEARANCE_DARK_SETTING,
-};
-export {
-  GENERAL_SETTING,
-  VOICE_INPUT_SETTING,
-  TOOL_SUMMARY_TRANSLATION_SETTING,
-  ACCOUNT_SETTING,
-  NOTIFICATIONS_SETTING,
-  NOTIFICATION_HISTORY_SETTING,
-  SPEND_ALERTS_SETTING,
-};
-export {
-  APP_UNLOCK_SETTING,
-  AUTO_EXPAND_THINKING_SETTING,
-  HIDE_THINKING_SETTING,
-  CONDENSE_TOOL_CALLS_SETTING,
-  KEEP_SCREEN_ON_SETTING,
-  PR_REVIEW_ATTRIBUTION_SETTING,
-  RETURN_SENDS_MESSAGE_SETTING,
-};
-export {
-  GATEWAY_TRANSCRIPTION_SETTING,
-  TRANSCRIPTION_MODEL_SETTING,
-  VOICE_LANGUAGE_SETTING,
-};
-export { TRANSLATE_SUMMARIES_SETTING, TRANSLATION_MODEL_SETTING };
-export {
-  ACCOUNT_PROFILE_SETTING,
-  ACCOUNT_SIGN_IN_METHODS_SETTING,
-  ACCOUNT_LANGUAGE_SETTING,
-  ACCOUNT_TRUSTED_HOSTS_SETTING,
-  ACCOUNT_PASSKEYS_SETTING,
-  ACCOUNT_PROVIDER_KEYS_SETTING,
-  ACCOUNT_DATA_EXPORT_SETTING,
-  ACCOUNT_BLOCKED_PEOPLE_SETTING,
-  ACCOUNT_REPORT_RECEIPTS_SETTING,
-  ACCOUNT_DEVICE_SESSIONS_SETTING,
-};
+const ACCOUNT_SETTINGS = {
+  profile: defineSetting('account.profile', 'profile.editProfile.title'),
+  signInMethods: defineSetting('account.sign-in-methods', 'profile.signInMethods.title'),
+  language: defineSetting('account.language', 'common.language', 'language'),
+  trustedHosts: defineSetting('account.trusted-hosts', 'trustedHosts.title', 'privacy'),
+  passkeys: defineSetting('account.passkeys', 'profile.passkeysTitle', 'privacy'),
+  providerKeys: defineSetting('account.provider-keys', 'profile.providerKeys.title'),
+  dataExport: defineSetting('account.data-export', 'profile.dataExport.title', 'privacy'),
+  blockedPeople: defineSetting(
+    'account.blocked-people',
+    'profile.blockedPeople.title',
+    'privacy'
+  ),
+  reportReceipts: defineSetting(
+    'account.report-receipts',
+    'profile.reportReceipts.title',
+    'privacy'
+  ),
+  deviceSessions: defineSetting(
+    'account.device-sessions',
+    'common.deviceSessions',
+    'privacy'
+  ),
+  browserSignOut: defineSetting(
+    'account.browser-sign-out',
+    'profile.signOutWeb.title',
+    'signOut'
+  ),
+} as const;
 
 const PREFERENCES_HUB_SOURCE: SettingsSearchSource = {
   context: ['common.preferences'],
   path: '/(app)/(tabs)/(3_profile)/preferences',
-  settings: [
-    GENERAL_SETTING,
-    VOICE_INPUT_SETTING,
-    TOOL_SUMMARY_TRANSLATION_SETTING,
-    APPEARANCE_SETTING,
-    APPEARANCE_SYSTEM_SETTING,
-    APPEARANCE_LIGHT_SETTING,
-    APPEARANCE_DARK_SETTING,
-    ACCOUNT_SETTING,
-    NOTIFICATIONS_SETTING,
-    NOTIFICATION_HISTORY_SETTING,
-    SPEND_ALERTS_SETTING,
-  ],
+  settings: Object.values(PREFERENCES_HUB_SETTINGS),
 };
 
 const GENERAL_SOURCE: SettingsSearchSource = {
   context: ['common.preferences', 'preferences.general'],
   path: '/(app)/(tabs)/(3_profile)/general',
-  settings: [
-    APP_UNLOCK_SETTING,
-    AUTO_EXPAND_THINKING_SETTING,
-    HIDE_THINKING_SETTING,
-    CONDENSE_TOOL_CALLS_SETTING,
-    KEEP_SCREEN_ON_SETTING,
-    PR_REVIEW_ATTRIBUTION_SETTING,
-    RETURN_SENDS_MESSAGE_SETTING,
-  ],
+  settings: Object.values(GENERAL_SETTINGS),
 };
 
 const VOICE_INPUT_SOURCE: SettingsSearchSource = {
   context: ['common.preferences', 'preferences.voiceInput'],
   path: '/(app)/(tabs)/(3_profile)/voice-input',
-  settings: [
-    GATEWAY_TRANSCRIPTION_SETTING,
-    TRANSCRIPTION_MODEL_SETTING,
-    VOICE_LANGUAGE_SETTING,
-  ],
+  settings: Object.values(VOICE_INPUT_SETTINGS),
 };
 
 const TOOL_SUMMARY_TRANSLATION_SOURCE: SettingsSearchSource = {
   context: ['common.preferences', 'preferences.toolSummaryTranslation'],
   path: '/(app)/(tabs)/(3_profile)/tool-summary-translation',
-  settings: [TRANSLATE_SUMMARIES_SETTING, TRANSLATION_MODEL_SETTING],
+  settings: Object.values(TOOL_SUMMARY_TRANSLATION_SETTINGS),
 };
 
 const ACCOUNT_SOURCE: SettingsSearchSource = {
   context: ['common.preferences', 'preferences.account'],
   path: '/(app)/(tabs)/(3_profile)/account',
-  settings: [
-    ACCOUNT_PROFILE_SETTING,
-    ACCOUNT_SIGN_IN_METHODS_SETTING,
-    ACCOUNT_LANGUAGE_SETTING,
-    ACCOUNT_TRUSTED_HOSTS_SETTING,
-    ACCOUNT_PASSKEYS_SETTING,
-    ACCOUNT_PROVIDER_KEYS_SETTING,
-    ACCOUNT_DATA_EXPORT_SETTING,
-    ACCOUNT_BLOCKED_PEOPLE_SETTING,
-    ACCOUNT_REPORT_RECEIPTS_SETTING,
-    ACCOUNT_DEVICE_SESSIONS_SETTING,
-  ],
+  settings: Object.values(ACCOUNT_SETTINGS),
 };
 
 export const PREFERENCE_SETTINGS_SOURCES: readonly SettingsSearchSource[] = [
@@ -258,3 +158,11 @@ export const PREFERENCE_SETTINGS_SOURCES: readonly SettingsSearchSource[] = [
   TOOL_SUMMARY_TRANSLATION_SOURCE,
   ACCOUNT_SOURCE,
 ];
+
+export {
+  ACCOUNT_SETTINGS,
+  GENERAL_SETTINGS,
+  PREFERENCES_HUB_SETTINGS,
+  TOOL_SUMMARY_TRANSLATION_SETTINGS,
+  VOICE_INPUT_SETTINGS,
+};

@@ -27,19 +27,7 @@ import {
 } from '@/lib/hooks/use-theme-preference';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
-import {
-  ACCOUNT_SETTING,
-  APPEARANCE_DARK_SETTING,
-  APPEARANCE_LIGHT_SETTING,
-  APPEARANCE_SETTING,
-  APPEARANCE_SYSTEM_SETTING,
-  GENERAL_SETTING,
-  NOTIFICATION_HISTORY_SETTING,
-  NOTIFICATIONS_SETTING,
-  SPEND_ALERTS_SETTING,
-  TOOL_SUMMARY_TRANSLATION_SETTING,
-  VOICE_INPUT_SETTING,
-} from '@/lib/settings-search/preference-sources';
+import { PREFERENCES_HUB_SETTINGS } from '@/lib/settings-search/preference-sources';
 
 /**
  * Preferences hub: each group s1 split into a subpage is one navigation row
@@ -67,28 +55,28 @@ export function PreferencesScreen({
       >
         <Section>
           <RowGroup leadingTile>
-            <SettingsTarget item={GENERAL_SETTING}>
+            <SettingsTarget item={PREFERENCES_HUB_SETTINGS.general}>
               <ConfigureRow
                 icon={SlidersHorizontal}
-                title={t(GENERAL_SETTING.label)}
+                title={t(PREFERENCES_HUB_SETTINGS.general.label)}
                 onPress={() => {
                   router.push('/(app)/(tabs)/(3_profile)/general' as Href);
                 }}
               />
             </SettingsTarget>
-            <SettingsTarget item={VOICE_INPUT_SETTING}>
+            <SettingsTarget item={PREFERENCES_HUB_SETTINGS.voiceInput}>
               <ConfigureRow
                 icon={Mic}
-                title={t(VOICE_INPUT_SETTING.label)}
+                title={t(PREFERENCES_HUB_SETTINGS.voiceInput.label)}
                 onPress={() => {
                   router.push('/(app)/(tabs)/(3_profile)/voice-input' as Href);
                 }}
               />
             </SettingsTarget>
-            <SettingsTarget item={TOOL_SUMMARY_TRANSLATION_SETTING}>
+            <SettingsTarget item={PREFERENCES_HUB_SETTINGS.toolSummaryTranslation}>
               <ConfigureRow
                 icon={WandSparkles}
-                title={t(TOOL_SUMMARY_TRANSLATION_SETTING.label)}
+                title={t(PREFERENCES_HUB_SETTINGS.toolSummaryTranslation.label)}
                 subtitle={t('preferences.toolSummaryTranslationSubtitle')}
                 onPress={() => {
                   router.push('/(app)/(tabs)/(3_profile)/tool-summary-translation' as Href);
@@ -98,21 +86,21 @@ export function PreferencesScreen({
           </RowGroup>
         </Section>
 
-        <Section label={t(APPEARANCE_SETTING.label)}>
+        <Section label={t(PREFERENCES_HUB_SETTINGS.appearance.label)}>
           <SettingsTarget
-            item={APPEARANCE_SETTING}
+            item={PREFERENCES_HUB_SETTINGS.appearance}
             targetIds={[
-              APPEARANCE_SYSTEM_SETTING.id,
-              APPEARANCE_LIGHT_SETTING.id,
-              APPEARANCE_DARK_SETTING.id,
+              PREFERENCES_HUB_SETTINGS.appearanceSystem.id,
+              PREFERENCES_HUB_SETTINGS.appearanceLight.id,
+              PREFERENCES_HUB_SETTINGS.appearanceDark.id,
             ]}
           >
             <SegmentedControl<ThemePreference>
-              accessibilityLabel={t(APPEARANCE_SETTING.label)}
+              accessibilityLabel={t(PREFERENCES_HUB_SETTINGS.appearance.label)}
               options={[
-                { value: 'system', label: t(APPEARANCE_SYSTEM_SETTING.label) },
-                { value: 'light', label: t(APPEARANCE_LIGHT_SETTING.label) },
-                { value: 'dark', label: t(APPEARANCE_DARK_SETTING.label) },
+                { value: 'system', label: t(PREFERENCES_HUB_SETTINGS.appearanceSystem.label) },
+                { value: 'light', label: t(PREFERENCES_HUB_SETTINGS.appearanceLight.label) },
+                { value: 'dark', label: t(PREFERENCES_HUB_SETTINGS.appearanceDark.label) },
               ]}
               value={themePreference}
               onChange={setThemePreference}
@@ -121,40 +109,40 @@ export function PreferencesScreen({
         </Section>
 
         <RowGroup leadingTile>
-          <SettingsTarget item={ACCOUNT_SETTING}>
+          <SettingsTarget item={PREFERENCES_HUB_SETTINGS.account}>
             <ConfigureRow
               icon={Globe}
-              title={t(ACCOUNT_SETTING.label)}
+              title={t(PREFERENCES_HUB_SETTINGS.account.label)}
               subtitle={t('preferences.accountSubtitle')}
               onPress={() => {
                 router.push('/(app)/(tabs)/(3_profile)/account' as Href);
               }}
             />
           </SettingsTarget>
-          <SettingsTarget item={NOTIFICATIONS_SETTING}>
+          <SettingsTarget item={PREFERENCES_HUB_SETTINGS.notifications}>
             <ConfigureRow
               icon={Bell}
-              title={t(NOTIFICATIONS_SETTING.label)}
+              title={t(PREFERENCES_HUB_SETTINGS.notifications.label)}
               subtitle={t('preferences.notificationsSubtitle')}
               onPress={() => {
                 router.push('/(app)/notifications' as Href);
               }}
             />
           </SettingsTarget>
-          <SettingsTarget item={NOTIFICATION_HISTORY_SETTING}>
+          <SettingsTarget item={PREFERENCES_HUB_SETTINGS.notificationHistory}>
             <ConfigureRow
               icon={History}
-              title={t(NOTIFICATION_HISTORY_SETTING.label)}
+              title={t(PREFERENCES_HUB_SETTINGS.notificationHistory.label)}
               subtitle={t('notifications.history.subtitle')}
               onPress={() => {
                 router.push('/(app)/(tabs)/(3_profile)/notification-history' as Href);
               }}
             />
           </SettingsTarget>
-          <SettingsTarget item={SPEND_ALERTS_SETTING}>
+          <SettingsTarget item={PREFERENCES_HUB_SETTINGS.spendAlerts}>
             <ConfigureRow
               icon={Wallet}
-              title={t(SPEND_ALERTS_SETTING.label)}
+              title={t(PREFERENCES_HUB_SETTINGS.spendAlerts.label)}
               onPress={() => {
                 router.push('/(app)/(tabs)/(3_profile)/spend-alerts' as Href);
               }}

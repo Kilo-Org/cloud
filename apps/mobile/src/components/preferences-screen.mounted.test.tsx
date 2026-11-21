@@ -59,6 +59,15 @@ function row(renderer: ReactTestRenderer, title: string): ReactTestInstance {
   }
   return found;
 }
+function settingsTargetAncestors(node: ReactTestInstance): ReactTestInstance[] {
+  const ancestors: ReactTestInstance[] = [];
+  for (let parent = node.parent; parent !== null; parent = parent.parent) {
+    if (String(parent.type) === 'SettingsTarget') {
+      ancestors.push(parent);
+    }
+  }
+  return ancestors;
+}
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('__DEV__', false);
@@ -138,7 +147,7 @@ describe('PreferencesScreen hub', () => {
     expect(control[0]?.props.value).toBe('system');
   });
 
-  it('renders a search target for every indexed hub entry', async () => {
+  it('keeps every rendered row and segment paired with its source definition', async () => {
     const renderer = await mountPreferences();
     const source = PREFERENCE_SETTINGS_SOURCES.find(
       candidate => candidate.path === '/(app)/(tabs)/(3_profile)/preferences'
@@ -146,6 +155,57 @@ describe('PreferencesScreen hub', () => {
     if (!source) {
       throw new Error('preferences hub source missing');
     }
+    const sourceByLabel = new Map(
+      source.settings.map(setting => [i18n.t(setting.label), setting] as const)
+    );
+
+    // Each rendered navigation row: the target names the same definition the
+    // index publishes, so a label cannot drift from its source. A bare row
+    // added without a target fails the ancestor assertion even though the
+    // flattened id list below still matches.
+    for (const renderedRow of hubRows(renderer)) {
+      const title = String(renderedRow.props.title);
+      const [target] = settingsTargetAncestors(renderedRow);
+      expect(target, `"${title}" renders without a SettingsTarget`).toBeDefined();
+      const setting = sourceByLabel.get(title);
+      expect(setting, `"${title}" is not in the hub source`).toBeDefined();
+      expect(target?.props.item).toBe(setting);
+    }
+
+    const [control] = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'SegmentedControl'
+    );
+    if (!control) {
+      throw new Error('appearance control missing');
+    }
+    const [controlTarget] = settingsTargetAncestors(control);
+    expect(
+      controlTarget,
+      'the appearance control renders without a SettingsTarget'
+    ).toBeDefined();
+    const options = control.props.options as { label: string }[];
+    for (const option of options) {
+      const setting = sourceByLabel.get(option.label);
+      expect(setting, `"${option.label}" is not in the hub source`).toBeDefined();
+      expect([controlTarget?.props.item.id, ...(controlTarget?.props.targetIds ?? [])]).toContain(
+        setting?.id
+      );
+    }
+
+    // Nothing the index publishes is invisible: the navigation rows, the three
+    // segment labels, and the labelled section account for every source label.
+    const sectionLabels = renderer.root
+      .findAll(node => typeof node.type === 'function' && node.type.name === 'Section')
+      .map(node => node.props.label)
+      .filter((label): label is string => typeof label === 'string');
+    const visibleLabels = [
+      ...hubRows(renderer).map(renderedRow => String(renderedRow.props.title)),
+      ...options.map(option => option.label),
+      ...sectionLabels,
+    ];
+    expect(new Set(visibleLabels)).toEqual(
+      new Set(source.settings.map(setting => i18n.t(setting.label)))
+    );
 
     const renderedIds = renderer.root
       .findAll(node => typeof node.type === 'string' && node.type === 'SettingsTarget')
@@ -155,9 +215,6 @@ describe('PreferencesScreen hub', () => {
         return [item.id, ...aliases];
       });
 
-    // Set equality both ways: a row added without a definition, and a
-    // definition whose row is not rendered, both fail here instead of a
-    // tautological id list compared with itself.
     expect(renderedIds).toEqual(source.settings.map(setting => setting.id));
   });
 });

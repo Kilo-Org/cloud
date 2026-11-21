@@ -1,7 +1,7 @@
-import { act, type ReactTestRenderer } from '@/test/renderer';
+import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { AccountSettingsScreen } from '@/components/account-settings-screen';
 import { PREFERENCE_SETTINGS_SOURCES } from '@/lib/settings-search/preference-sources';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -93,8 +93,8 @@ vi.mock('@/lib/trpc', () => ({
 }));
 
 let view: Awaited<ReturnType<typeof renderWithProviders>> | undefined = undefined;
-async function mountAccount(): Promise<ReactTestRenderer> {
-  view = await renderWithProviders(<AccountSettingsScreen />);
+async function mountAccount(settingsTarget?: string): Promise<ReactTestRenderer> {
+  view = await renderWithProviders(<AccountSettingsScreen settingsTarget={settingsTarget} />);
   await act(async () => {
     await vi.dynamicImportSettled();
   });
@@ -114,6 +114,15 @@ function findConfigureRow(renderer: ReactTestRenderer, title: string) {
 }
 function findStateNodes(renderer: ReactTestRenderer, type: 'QueryError' | 'RowSkeleton') {
   return renderer.root.findAll(node => String(node.type) === type);
+}
+function settingsTargetAncestors(node: ReactTestInstance): ReactTestInstance[] {
+  const ancestors: ReactTestInstance[] = [];
+  for (let parent = node.parent; parent !== null; parent = parent.parent) {
+    if (String(parent.type) === 'SettingsTarget') {
+      ancestors.push(parent);
+    }
+  }
+  return ancestors;
 }
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -270,7 +279,7 @@ describe('AccountSettingsScreen', () => {
     expect(findStateNodes(renderer, 'RowSkeleton')).toEqual([]);
   });
 
-  it('renders a search target for every indexed Account row but the sign-out action', async () => {
+  it('wraps every rendered row in the search target its source publishes', async () => {
     const renderer = await mountAccount();
     const source = PREFERENCE_SETTINGS_SOURCES.find(
       candidate => candidate.path === '/(app)/(tabs)/(3_profile)/account'
@@ -279,12 +288,39 @@ describe('AccountSettingsScreen', () => {
       throw new Error('account settings source missing');
     }
 
-    const renderedIds = renderer.root
-      .findAll(node => typeof node.type === 'string' && node.type === 'SettingsTarget')
-      .map(node => node.props.item.id);
+    const rows = findConfigureRows(renderer);
+    expect(rows.map(renderedRow => String(renderedRow.props.title))).toEqual(
+      source.settings.map(setting => i18n.t(setting.label))
+    );
 
-    expect(renderedIds).toEqual(source.settings.map(setting => setting.id));
-    // Signing out mutates the session, so it is not a search destination.
-    expect(renderedIds).not.toContain('account.sign-out');
+    // Each real row names the definition the index publishes. A row added
+    // without its SettingsTarget has no ancestor and fails here even though a
+    // flattened id list would still match.
+    const sourceByLabel = new Map(
+      source.settings.map(setting => [i18n.t(setting.label), setting] as const)
+    );
+    for (const renderedRow of rows) {
+      const title = String(renderedRow.props.title);
+      const [target] = settingsTargetAncestors(renderedRow);
+      expect(target, `"${title}" renders without a SettingsTarget`).toBeDefined();
+      expect(target?.props.item).toBe(sourceByLabel.get(title));
+    }
+
+    expect(sourceByLabel.get(i18n.t('profile.signOutWeb.title'))?.id).toBe(
+      'account.browser-sign-out'
+    );
+  });
+
+  it('reveals the browser sign-out row without asking or revoking sessions', async () => {
+    // A search result only reveals its row; the mutation stays behind the
+    // row's own confirmation dialog.
+    const renderer = await mountAccount('account.browser-sign-out');
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(signOutWeb).not.toHaveBeenCalled();
+    const signOutRow = findConfigureRow(renderer, i18n.t('profile.signOutWeb.title'));
+    const [target] = settingsTargetAncestors(signOutRow);
+    expect(target?.props.item.id).toBe('account.browser-sign-out');
+    expect(target?.props.onPress).toBeUndefined();
   });
 });

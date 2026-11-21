@@ -37,8 +37,17 @@ function analyseLine(value: string, element: HtmlElement): LineInfo {
   const newline = value.indexOf('\n', element.end);
   const end = newline === -1 ? value.length : newline;
   BREAK_BLOCKED_LINE.lastIndex = start;
-  const pipe = value.indexOf('|', start);
-  const blocked = BREAK_BLOCKED_LINE.test(value) || (pipe !== -1 && pipe < end);
+  // The pipe is searched inside this line only: a search from `start` runs to
+  // the end of the whole value even when the answer lies on another line, and
+  // one such scan per line would cost the message length per break line.
+  let pipe = false;
+  for (let at = start; at < end; at += 1) {
+    if (value[at] === '|') {
+      pipe = true;
+      break;
+    }
+  }
+  const blocked = BREAK_BLOCKED_LINE.test(value) || pipe;
   let at = element.start - 1;
   while (at >= start) {
     const character = value[at];

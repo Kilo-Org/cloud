@@ -370,7 +370,10 @@ export function gateMarkdownImages(
       return onePass;
     }
   }
-  for (const href of hrefs) {
+  // The guarded path keeps one pass per report, duplicates included: an href
+  // that overlaps the load scheme can be spelled out again by an earlier
+  // replacement, so each reported copy gets the pass it had before.
+  for (const href of unfoundHrefs) {
     rewritten = rewritten.replaceAll(href, IMAGE_LOAD_SCHEME);
   }
   return rewritten;

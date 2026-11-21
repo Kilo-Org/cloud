@@ -3785,6 +3785,34 @@
     "nextScheduled": "次の予定",
     "answerNeeded": "回答が必要",
     "waitingToRetry": "再試行待ち",
+    "countNoun": {
+      "needsInput_one": "入力が必要",
+      "needsInput_other": "入力が必要",
+      "running_one": "作業中",
+      "running_other": "作業中",
+      "scheduled_one": "予定",
+      "scheduled_other": "予定",
+      "idle_one": "待機中",
+      "idle_other": "待機中"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} 入力が必要",
+      "needsInput_other": "{{displayCount}} 入力が必要",
+      "running_one": "{{displayCount}} 作業中",
+      "running_other": "{{displayCount}} 作業中",
+      "scheduled_one": "{{displayCount}} 予定",
+      "scheduled_other": "{{displayCount}} 予定",
+      "idle_one": "{{displayCount}} 待機中",
+      "idle_other": "{{displayCount}} 待機中"
+    },
+    "footer": {
+      "checked": "最終確認 {{time}}",
+      "lastKnown": "最終記録 · {{time}}"
+    },
+    "wake": {
+      "nextRun": "次回実行 {{time}}",
+      "wasDue": "予定でした {{time}}"
+    },
     "step": {
       "editing": "編集",
       "reading": "読み取り",

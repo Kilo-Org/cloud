@@ -3785,6 +3785,34 @@
     "nextScheduled": "Дараагийн товлол",
     "answerNeeded": "Хариу хүлээж байна",
     "waitingToRetry": "Дахин оролдохыг хүлээж байна",
+    "countNoun": {
+      "needsInput_one": "Хариу хүлээж байна",
+      "needsInput_other": "Хариу хүлээж байна",
+      "running_one": "Ажиллаж байна",
+      "running_other": "Ажиллаж байна",
+      "scheduled_one": "Товлосон",
+      "scheduled_other": "Товлосон",
+      "idle_one": "Хүлээж байна",
+      "idle_other": "Хүлээж байна"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Хариу хүлээж байна",
+      "needsInput_other": "{{displayCount}} Хариу хүлээж байна",
+      "running_one": "{{displayCount}} Ажиллаж байна",
+      "running_other": "{{displayCount}} Ажиллаж байна",
+      "scheduled_one": "{{displayCount}} Товлосон",
+      "scheduled_other": "{{displayCount}} Товлосон",
+      "idle_one": "{{displayCount}} Хүлээж байна",
+      "idle_other": "{{displayCount}} Хүлээж байна"
+    },
+    "footer": {
+      "checked": "Шалгасан {{time}}",
+      "lastKnown": "Сүүлд мэдэгдсэн · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Дараагийн ажиллах цаг {{time}}",
+      "wasDue": "Хүлээгдэж байсан {{time}}"
+    },
     "step": {
       "editing": "Засварлах",
       "reading": "Унших",

@@ -3913,6 +3913,50 @@
     "nextScheduled": "Ďalšie naplánované",
     "answerNeeded": "Čaká na odpoveď",
     "waitingToRetry": "Čaká na opakovanie",
+    "countNoun": {
+      "needsInput_one": "Čaká na odpoveď",
+      "needsInput_other": "Čaká na odpoveď",
+      "needsInput_few": "Čaká na odpoveď",
+      "needsInput_many": "Čaká na odpoveď",
+      "running_one": "Pracuje sa",
+      "running_other": "Pracuje sa",
+      "running_few": "Pracuje sa",
+      "running_many": "Pracuje sa",
+      "scheduled_one": "Naplánované",
+      "scheduled_other": "Naplánované",
+      "scheduled_few": "Naplánované",
+      "scheduled_many": "Naplánované",
+      "idle_one": "V nečinnosti",
+      "idle_other": "V nečinnosti",
+      "idle_few": "V nečinnosti",
+      "idle_many": "V nečinnosti"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Čaká na odpoveď",
+      "needsInput_other": "{{displayCount}} Čaká na odpoveď",
+      "needsInput_few": "{{displayCount}} Čaká na odpoveď",
+      "needsInput_many": "{{displayCount}} Čaká na odpoveď",
+      "running_one": "{{displayCount}} Pracuje sa",
+      "running_other": "{{displayCount}} Pracuje sa",
+      "running_few": "{{displayCount}} Pracuje sa",
+      "running_many": "{{displayCount}} Pracuje sa",
+      "scheduled_one": "{{displayCount}} Naplánované",
+      "scheduled_other": "{{displayCount}} Naplánované",
+      "scheduled_few": "{{displayCount}} Naplánované",
+      "scheduled_many": "{{displayCount}} Naplánované",
+      "idle_one": "{{displayCount}} V nečinnosti",
+      "idle_other": "{{displayCount}} V nečinnosti",
+      "idle_few": "{{displayCount}} V nečinnosti",
+      "idle_many": "{{displayCount}} V nečinnosti"
+    },
+    "footer": {
+      "checked": "Overené {{time}}",
+      "lastKnown": "Posledný známy stav · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Ďalšie spustenie {{time}}",
+      "wasDue": "Očakávalo sa {{time}}"
+    },
     "step": {
       "editing": "Úprava",
       "reading": "Čítanie",

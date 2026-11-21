@@ -3913,6 +3913,50 @@
     "nextScheduled": "Artimiausi suplanuoti",
     "answerNeeded": "Laukia atsakymo",
     "waitingToRetry": "Laukiama pakartojimo",
+    "countNoun": {
+      "needsInput_one": "Laukia atsakymo",
+      "needsInput_other": "Laukia atsakymo",
+      "needsInput_few": "Laukia atsakymo",
+      "needsInput_many": "Laukia atsakymo",
+      "running_one": "Vykdoma",
+      "running_other": "Vykdomos",
+      "running_few": "Vykdomos",
+      "running_many": "Vykdomų",
+      "scheduled_one": "Suplanuota",
+      "scheduled_other": "Suplanuotos",
+      "scheduled_few": "Suplanuotos",
+      "scheduled_many": "Suplanuotų",
+      "idle_one": "Laukia",
+      "idle_other": "Laukia",
+      "idle_few": "Laukia",
+      "idle_many": "Laukia"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Laukia atsakymo",
+      "needsInput_other": "{{displayCount}} Laukia atsakymo",
+      "needsInput_few": "{{displayCount}} Laukia atsakymo",
+      "needsInput_many": "{{displayCount}} Laukia atsakymo",
+      "running_one": "{{displayCount}} Vykdoma",
+      "running_other": "{{displayCount}} Vykdomos",
+      "running_few": "{{displayCount}} Vykdomos",
+      "running_many": "{{displayCount}} Vykdomų",
+      "scheduled_one": "{{displayCount}} Suplanuota",
+      "scheduled_other": "{{displayCount}} Suplanuotos",
+      "scheduled_few": "{{displayCount}} Suplanuotos",
+      "scheduled_many": "{{displayCount}} Suplanuotų",
+      "idle_one": "{{displayCount}} Laukia",
+      "idle_other": "{{displayCount}} Laukia",
+      "idle_few": "{{displayCount}} Laukia",
+      "idle_many": "{{displayCount}} Laukia"
+    },
+    "footer": {
+      "checked": "Patikrinta {{time}}",
+      "lastKnown": "Paskutinė žinoma · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Kitas vykdymas {{time}}",
+      "wasDue": "Buvo numatyta {{time}}"
+    },
     "step": {
       "editing": "Redagavimas",
       "reading": "Skaitymas",

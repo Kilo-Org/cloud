@@ -3785,6 +3785,34 @@
     "nextScheduled": "다음 예약",
     "answerNeeded": "답변 필요",
     "waitingToRetry": "재시도 대기",
+    "countNoun": {
+      "needsInput_one": "입력 필요",
+      "needsInput_other": "입력 필요",
+      "running_one": "작업 중",
+      "running_other": "작업 중",
+      "scheduled_one": "예약됨",
+      "scheduled_other": "예약됨",
+      "idle_one": "대기 중",
+      "idle_other": "대기 중"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} 입력 필요",
+      "needsInput_other": "{{displayCount}} 입력 필요",
+      "running_one": "{{displayCount}} 작업 중",
+      "running_other": "{{displayCount}} 작업 중",
+      "scheduled_one": "{{displayCount}} 예약됨",
+      "scheduled_other": "{{displayCount}} 예약됨",
+      "idle_one": "{{displayCount}} 대기 중",
+      "idle_other": "{{displayCount}} 대기 중"
+    },
+    "footer": {
+      "checked": "마지막 확인 {{time}}",
+      "lastKnown": "마지막 알려진 상태 · {{time}}"
+    },
+    "wake": {
+      "nextRun": "다음 실행 {{time}}",
+      "wasDue": "예정이었음 {{time}}"
+    },
     "step": {
       "editing": "편집 중",
       "reading": "읽는 중",

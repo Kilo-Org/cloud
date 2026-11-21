@@ -3849,6 +3849,42 @@
     "nextScheduled": "Sledeće zakazano",
     "answerNeeded": "Potreban odgovor",
     "waitingToRetry": "Čeka ponovni pokušaj",
+    "countNoun": {
+      "needsInput_one": "Čeka unos",
+      "needsInput_other": "Čeka unos",
+      "needsInput_few": "Čeka unos",
+      "running_one": "U radu",
+      "running_other": "U radu",
+      "running_few": "U radu",
+      "scheduled_one": "Zakazano",
+      "scheduled_other": "Zakazano",
+      "scheduled_few": "Zakazano",
+      "idle_one": "U mirovanju",
+      "idle_other": "U mirovanju",
+      "idle_few": "U mirovanju"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Čeka unos",
+      "needsInput_other": "{{displayCount}} Čeka unos",
+      "needsInput_few": "{{displayCount}} Čeka unos",
+      "running_one": "{{displayCount}} U radu",
+      "running_other": "{{displayCount}} U radu",
+      "running_few": "{{displayCount}} U radu",
+      "scheduled_one": "{{displayCount}} Zakazano",
+      "scheduled_other": "{{displayCount}} Zakazano",
+      "scheduled_few": "{{displayCount}} Zakazano",
+      "idle_one": "{{displayCount}} U mirovanju",
+      "idle_other": "{{displayCount}} U mirovanju",
+      "idle_few": "{{displayCount}} U mirovanju"
+    },
+    "footer": {
+      "checked": "Provereno {{time}}",
+      "lastKnown": "Poslednje poznato · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Sledeće pokretanje {{time}}",
+      "wasDue": "Očekivalo se {{time}}"
+    },
     "step": {
       "editing": "Uređivanje",
       "reading": "Čitanje",

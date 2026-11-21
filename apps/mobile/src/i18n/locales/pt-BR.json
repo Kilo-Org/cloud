@@ -3913,6 +3913,50 @@
     "nextScheduled": "Próximas agendadas",
     "answerNeeded": "Aguardando resposta",
     "waitingToRetry": "Aguardando nova tentativa",
+    "countNoun": {
+      "needsInput_one": "Aguardando resposta",
+      "needsInput_zero": "Aguardando resposta",
+      "needsInput_many": "Aguardando resposta",
+      "needsInput_other": "Aguardando resposta",
+      "running_one": "Em execução",
+      "running_zero": "Em execução",
+      "running_many": "Em execução",
+      "running_other": "Em execução",
+      "scheduled_one": "Agendada",
+      "scheduled_zero": "Agendadas",
+      "scheduled_many": "Agendadas",
+      "scheduled_other": "Agendadas",
+      "idle_one": "Em espera",
+      "idle_zero": "Em espera",
+      "idle_many": "Em espera",
+      "idle_other": "Em espera"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Aguardando resposta",
+      "needsInput_zero": "{{displayCount}} Aguardando resposta",
+      "needsInput_many": "{{displayCount}} Aguardando resposta",
+      "needsInput_other": "{{displayCount}} Aguardando resposta",
+      "running_one": "{{displayCount}} Em execução",
+      "running_zero": "{{displayCount}} Em execução",
+      "running_many": "{{displayCount}} Em execução",
+      "running_other": "{{displayCount}} Em execução",
+      "scheduled_one": "{{displayCount}} Agendada",
+      "scheduled_zero": "{{displayCount}} Agendadas",
+      "scheduled_many": "{{displayCount}} Agendadas",
+      "scheduled_other": "{{displayCount}} Agendadas",
+      "idle_one": "{{displayCount}} Em espera",
+      "idle_zero": "{{displayCount}} Em espera",
+      "idle_many": "{{displayCount}} Em espera",
+      "idle_other": "{{displayCount}} Em espera"
+    },
+    "footer": {
+      "checked": "Verificado {{time}}",
+      "lastKnown": "Último status conhecido · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Próxima execução {{time}}",
+      "wasDue": "Estava previsto {{time}}"
+    },
     "step": {
       "editing": "Editando",
       "reading": "Lendo",

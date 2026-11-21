@@ -3785,6 +3785,34 @@
     "nextScheduled": "Næste planlagte",
     "answerNeeded": "Afventer svar",
     "waitingToRetry": "Afventer nyt forsøg",
+    "countNoun": {
+      "needsInput_one": "Afventer svar",
+      "needsInput_other": "Afventer svar",
+      "running_one": "I gang",
+      "running_other": "I gang",
+      "scheduled_one": "Planlagt",
+      "scheduled_other": "Planlagte",
+      "idle_one": "Inaktiv",
+      "idle_other": "Inaktive"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Afventer svar",
+      "needsInput_other": "{{displayCount}} Afventer svar",
+      "running_one": "{{displayCount}} I gang",
+      "running_other": "{{displayCount}} I gang",
+      "scheduled_one": "{{displayCount}} Planlagt",
+      "scheduled_other": "{{displayCount}} Planlagte",
+      "idle_one": "{{displayCount}} Inaktiv",
+      "idle_other": "{{displayCount}} Inaktive"
+    },
+    "footer": {
+      "checked": "Kontrolleret {{time}}",
+      "lastKnown": "Sidst kendt · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Næste kørsel {{time}}",
+      "wasDue": "Forventedes {{time}}"
+    },
     "step": {
       "editing": "Redigerer",
       "reading": "Læser",

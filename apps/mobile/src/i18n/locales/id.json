@@ -3785,6 +3785,34 @@
     "nextScheduled": "Jadwal berikutnya",
     "answerNeeded": "Perlu jawaban",
     "waitingToRetry": "Menunggu percobaan ulang",
+    "countNoun": {
+      "needsInput_one": "Perlu masukan",
+      "needsInput_other": "Perlu masukan",
+      "running_one": "Bekerja",
+      "running_other": "Bekerja",
+      "scheduled_one": "Terjadwal",
+      "scheduled_other": "Terjadwal",
+      "idle_one": "Siaga",
+      "idle_other": "Siaga"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Perlu masukan",
+      "needsInput_other": "{{displayCount}} Perlu masukan",
+      "running_one": "{{displayCount}} Bekerja",
+      "running_other": "{{displayCount}} Bekerja",
+      "scheduled_one": "{{displayCount}} Terjadwal",
+      "scheduled_other": "{{displayCount}} Terjadwal",
+      "idle_one": "{{displayCount}} Siaga",
+      "idle_other": "{{displayCount}} Siaga"
+    },
+    "footer": {
+      "checked": "Diperiksa {{time}}",
+      "lastKnown": "Terakhir diketahui · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Eksekusi berikutnya {{time}}",
+      "wasDue": "Seharusnya {{time}}"
+    },
     "step": {
       "editing": "Mengedit",
       "reading": "Membaca",

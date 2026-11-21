@@ -3785,6 +3785,34 @@
     "nextScheduled": "Susunod na naka-iskedyul",
     "answerNeeded": "Kailangan ng sagot",
     "waitingToRetry": "Naghihintay ng muling pagsubok",
+    "countNoun": {
+      "needsInput_one": "Naghihintay ng sagot",
+      "needsInput_other": "Naghihintay ng sagot",
+      "running_one": "Nagtatrabaho",
+      "running_other": "Nagtatrabaho",
+      "scheduled_one": "Naka-iskedyul",
+      "scheduled_other": "Naka-iskedyul",
+      "idle_one": "Walang ginagawa",
+      "idle_other": "Walang ginagawa"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Naghihintay ng sagot",
+      "needsInput_other": "{{displayCount}} Naghihintay ng sagot",
+      "running_one": "{{displayCount}} Nagtatrabaho",
+      "running_other": "{{displayCount}} Nagtatrabaho",
+      "scheduled_one": "{{displayCount}} Naka-iskedyul",
+      "scheduled_other": "{{displayCount}} Naka-iskedyul",
+      "idle_one": "{{displayCount}} Walang ginagawa",
+      "idle_other": "{{displayCount}} Walang ginagawa"
+    },
+    "footer": {
+      "checked": "Nakumpirma {{time}}",
+      "lastKnown": "Huling nalaman · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Susunod na pagpapatakbo {{time}}",
+      "wasDue": "Inasahan {{time}}"
+    },
     "step": {
       "editing": "Nag-e-edit",
       "reading": "Nagbabasa",

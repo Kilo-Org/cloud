@@ -3913,6 +3913,50 @@
     "nextScheduled": "Наступні заплановані",
     "answerNeeded": "Очікує відповіді",
     "waitingToRetry": "Очікує повторної спроби",
+    "countNoun": {
+      "needsInput_one": "Очікує відповіді",
+      "needsInput_other": "Очікує відповіді",
+      "needsInput_few": "Очікує відповіді",
+      "needsInput_many": "Очікує відповіді",
+      "running_one": "У роботі",
+      "running_other": "У роботі",
+      "running_few": "У роботі",
+      "running_many": "У роботі",
+      "scheduled_one": "Заплановано",
+      "scheduled_other": "Заплановано",
+      "scheduled_few": "Заплановано",
+      "scheduled_many": "Заплановано",
+      "idle_one": "Очікування",
+      "idle_other": "Очікування",
+      "idle_few": "Очікування",
+      "idle_many": "Очікувань"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Очікує відповіді",
+      "needsInput_other": "{{displayCount}} Очікує відповіді",
+      "needsInput_few": "{{displayCount}} Очікує відповіді",
+      "needsInput_many": "{{displayCount}} Очікує відповіді",
+      "running_one": "{{displayCount}} У роботі",
+      "running_other": "{{displayCount}} У роботі",
+      "running_few": "{{displayCount}} У роботі",
+      "running_many": "{{displayCount}} У роботі",
+      "scheduled_one": "{{displayCount}} Заплановано",
+      "scheduled_other": "{{displayCount}} Заплановано",
+      "scheduled_few": "{{displayCount}} Заплановано",
+      "scheduled_many": "{{displayCount}} Заплановано",
+      "idle_one": "{{displayCount}} Очікування",
+      "idle_other": "{{displayCount}} Очікування",
+      "idle_few": "{{displayCount}} Очікування",
+      "idle_many": "{{displayCount}} Очікувань"
+    },
+    "footer": {
+      "checked": "Перевірено {{time}}",
+      "lastKnown": "Останній відомий стан · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Наступний запуск {{time}}",
+      "wasDue": "Очікувалося {{time}}"
+    },
     "step": {
       "editing": "Редагування",
       "reading": "Читання",

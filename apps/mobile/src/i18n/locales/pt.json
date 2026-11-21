@@ -3913,6 +3913,50 @@
     "nextScheduled": "Próximos agendamentos",
     "answerNeeded": "Resposta necessária",
     "waitingToRetry": "À espera de nova tentativa",
+    "countNoun": {
+      "needsInput_one": "À espera de resposta",
+      "needsInput_zero": "À espera de resposta",
+      "needsInput_many": "À espera de resposta",
+      "needsInput_other": "À espera de resposta",
+      "running_one": "A trabalhar",
+      "running_zero": "A trabalhar",
+      "running_many": "A trabalhar",
+      "running_other": "A trabalhar",
+      "scheduled_one": "Agendada",
+      "scheduled_zero": "Agendadas",
+      "scheduled_many": "Agendadas",
+      "scheduled_other": "Agendadas",
+      "idle_one": "Em espera",
+      "idle_zero": "Em espera",
+      "idle_many": "Em espera",
+      "idle_other": "Em espera"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} À espera de resposta",
+      "needsInput_zero": "{{displayCount}} À espera de resposta",
+      "needsInput_many": "{{displayCount}} À espera de resposta",
+      "needsInput_other": "{{displayCount}} À espera de resposta",
+      "running_one": "{{displayCount}} A trabalhar",
+      "running_zero": "{{displayCount}} A trabalhar",
+      "running_many": "{{displayCount}} A trabalhar",
+      "running_other": "{{displayCount}} A trabalhar",
+      "scheduled_one": "{{displayCount}} Agendada",
+      "scheduled_zero": "{{displayCount}} Agendadas",
+      "scheduled_many": "{{displayCount}} Agendadas",
+      "scheduled_other": "{{displayCount}} Agendadas",
+      "idle_one": "{{displayCount}} Em espera",
+      "idle_zero": "{{displayCount}} Em espera",
+      "idle_many": "{{displayCount}} Em espera",
+      "idle_other": "{{displayCount}} Em espera"
+    },
+    "footer": {
+      "checked": "Verificado {{time}}",
+      "lastKnown": "Último estado conhecido · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Próxima execução {{time}}",
+      "wasDue": "Estava previsto {{time}}"
+    },
     "step": {
       "editing": "A editar",
       "reading": "A ler",

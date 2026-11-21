@@ -3785,6 +3785,34 @@
     "nextScheduled": "ಮುಂದಿನ ನಿಗದಿತ ಕಾರ್ಯಗಳು",
     "answerNeeded": "ಉತ್ತರ ಅಗತ್ಯ",
     "waitingToRetry": "ಮರುಪ್ರಯತ್ನಕ್ಕಾಗಿ ಕಾಯುತ್ತಿದೆ",
+    "countNoun": {
+      "needsInput_one": "ನಿಮ್ಮ ಪ್ರತಿಕ್ರಿಯೆ ಅಗತ್ಯ",
+      "needsInput_other": "ನಿಮ್ಮ ಪ್ರತಿಕ್ರಿಯೆ ಅಗತ್ಯ",
+      "running_one": "ಕೆಲಸ ಮಾಡುತ್ತಿದೆ",
+      "running_other": "ಕೆಲಸ ಮಾಡುತ್ತಿದೆ",
+      "scheduled_one": "ನಿಗದಿತ",
+      "scheduled_other": "ನಿಗದಿತ",
+      "idle_one": "ಕೆಲಸವಿಲ್ಲ",
+      "idle_other": "ಕೆಲಸವಿಲ್ಲ"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} ನಿಮ್ಮ ಪ್ರತಿಕ್ರಿಯೆ ಅಗತ್ಯ",
+      "needsInput_other": "{{displayCount}} ನಿಮ್ಮ ಪ್ರತಿಕ್ರಿಯೆ ಅಗತ್ಯ",
+      "running_one": "{{displayCount}} ಕೆಲಸ ಮಾಡುತ್ತಿದೆ",
+      "running_other": "{{displayCount}} ಕೆಲಸ ಮಾಡುತ್ತಿದೆ",
+      "scheduled_one": "{{displayCount}} ನಿಗದಿತ",
+      "scheduled_other": "{{displayCount}} ನಿಗದಿತ",
+      "idle_one": "{{displayCount}} ಕೆಲಸವಿಲ್ಲ",
+      "idle_other": "{{displayCount}} ಕೆಲಸವಿಲ್ಲ"
+    },
+    "footer": {
+      "checked": "ಪರಿಶೀಲಿಸಲಾಗಿದೆ {{time}}",
+      "lastKnown": "ಕೊನೆಯದಾಗಿ ತಿಳಿದ ಸ್ಥಿತಿ · {{time}}"
+    },
+    "wake": {
+      "nextRun": "ಮುಂದಿನ ಚಾಲನೆ {{time}}",
+      "wasDue": "ನಿರೀಕ್ಷಿತವಾಗಿತ್ತು {{time}}"
+    },
     "step": {
       "editing": "ಸಂಪಾದಿಸುತ್ತಿದೆ",
       "reading": "ಓದುತ್ತಿದೆ",

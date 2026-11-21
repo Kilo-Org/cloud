@@ -3785,6 +3785,34 @@
     "nextScheduled": "Հաջորդ պլանավորվածները",
     "answerNeeded": "Սպասում է պատասխանի",
     "waitingToRetry": "Սպասում է կրկնափորձի",
+    "countNoun": {
+      "needsInput_one": "Սպասում է պատասխանի",
+      "needsInput_other": "Սպասում է պատասխանի",
+      "running_one": "Աշխատում է",
+      "running_other": "Աշխատում է",
+      "scheduled_one": "Պլանավորված",
+      "scheduled_other": "Պլանավորված",
+      "idle_one": "Պարապ",
+      "idle_other": "Պարապ"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Սպասում է պատասխանի",
+      "needsInput_other": "{{displayCount}} Սպասում է պատասխանի",
+      "running_one": "{{displayCount}} Աշխատում է",
+      "running_other": "{{displayCount}} Աշխատում է",
+      "scheduled_one": "{{displayCount}} Պլանավորված",
+      "scheduled_other": "{{displayCount}} Պլանավորված",
+      "idle_one": "{{displayCount}} Պարապ",
+      "idle_other": "{{displayCount}} Պարապ"
+    },
+    "footer": {
+      "checked": "Ստուգված {{time}}",
+      "lastKnown": "Վերջին հայտնի · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Հաջորդ գործարկումը {{time}}",
+      "wasDue": "Սպասվում էր {{time}}"
+    },
     "step": {
       "editing": "Խմբագրում",
       "reading": "Ընթերցում",

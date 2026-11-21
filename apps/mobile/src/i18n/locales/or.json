@@ -3785,6 +3785,34 @@
     "nextScheduled": "ପରବର୍ତ୍ତୀ ନିର୍ଧାରିତ",
     "answerNeeded": "ଆପଣଙ୍କ ଉତ୍ତର ଆବଶ୍ୟକ",
     "waitingToRetry": "ପୁନଃଚେଷ୍ଟା ଅପେକ୍ଷାରେ",
+    "countNoun": {
+      "needsInput_one": "ଆପଣଙ୍କ ଉତ୍ତର ଆବଶ୍ୟକ",
+      "needsInput_other": "ଆପଣଙ୍କ ଉତ୍ତର ଆବଶ୍ୟକ",
+      "running_one": "କାମ କରୁଛି",
+      "running_other": "କାମ କରୁଛି",
+      "scheduled_one": "ନିର୍ଧାରିତ",
+      "scheduled_other": "ନିର୍ଧାରିତ",
+      "idle_one": "ଅପେକ୍ଷାରେ",
+      "idle_other": "ଅପେକ୍ଷାରେ"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} ଆପଣଙ୍କ ଉତ୍ତର ଆବଶ୍ୟକ",
+      "needsInput_other": "{{displayCount}} ଆପଣଙ୍କ ଉତ୍ତର ଆବଶ୍ୟକ",
+      "running_one": "{{displayCount}} କାମ କରୁଛି",
+      "running_other": "{{displayCount}} କାମ କରୁଛି",
+      "scheduled_one": "{{displayCount}} ନିର୍ଧାରିତ",
+      "scheduled_other": "{{displayCount}} ନିର୍ଧାରିତ",
+      "idle_one": "{{displayCount}} ଅପେକ୍ଷାରେ",
+      "idle_other": "{{displayCount}} ଅପେକ୍ଷାରେ"
+    },
+    "footer": {
+      "checked": "ଯାଞ୍ଚ ହୋଇଛି {{time}}",
+      "lastKnown": "ଶେଷ ଜଣା ସ୍ଥିତି · {{time}}"
+    },
+    "wake": {
+      "nextRun": "ପରବର୍ତ୍ତୀ ଚାଳନା {{time}}",
+      "wasDue": "ଆଶାକରାଯାଉଥିଲା {{time}}"
+    },
     "step": {
       "editing": "ସମ୍ପାଦନ କରୁଛି",
       "reading": "ପଢ଼ୁଛି",

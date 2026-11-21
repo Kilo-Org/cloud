@@ -3785,6 +3785,34 @@
     "nextScheduled": "آئندہ شیڈول",
     "answerNeeded": "جواب درکار",
     "waitingToRetry": "دوبارہ کوشش کا انتظار",
+    "countNoun": {
+      "needsInput_one": "ان پٹ درکار",
+      "needsInput_other": "ان پٹ درکار",
+      "running_one": "کام جاری ہے",
+      "running_other": "کام جاری ہے",
+      "scheduled_one": "شیڈول شدہ",
+      "scheduled_other": "شیڈول شدہ",
+      "idle_one": "فارغ",
+      "idle_other": "فارغ"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} ان پٹ درکار",
+      "needsInput_other": "{{displayCount}} ان پٹ درکار",
+      "running_one": "{{displayCount}} کام جاری ہے",
+      "running_other": "{{displayCount}} کام جاری ہے",
+      "scheduled_one": "{{displayCount}} شیڈول شدہ",
+      "scheduled_other": "{{displayCount}} شیڈول شدہ",
+      "idle_one": "{{displayCount}} فارغ",
+      "idle_other": "{{displayCount}} فارغ"
+    },
+    "footer": {
+      "checked": "آخری تصدیق {{time}}",
+      "lastKnown": "آخری معلوم حالت · {{time}}"
+    },
+    "wake": {
+      "nextRun": "اگلا اجرا {{time}}",
+      "wasDue": "متوقع تھا {{time}}"
+    },
     "step": {
       "editing": "ترمیم",
       "reading": "پڑھ رہا ہے",

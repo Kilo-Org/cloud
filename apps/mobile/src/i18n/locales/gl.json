@@ -3785,6 +3785,34 @@
     "nextScheduled": "Próximas tarefas programadas",
     "answerNeeded": "Agardando resposta",
     "waitingToRetry": "Agardando para reintentar",
+    "countNoun": {
+      "needsInput_one": "Agardando resposta",
+      "needsInput_other": "Agardando resposta",
+      "running_one": "Traballando",
+      "running_other": "Traballando",
+      "scheduled_one": "Programada",
+      "scheduled_other": "Programadas",
+      "idle_one": "En espera",
+      "idle_other": "En espera"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Agardando resposta",
+      "needsInput_other": "{{displayCount}} Agardando resposta",
+      "running_one": "{{displayCount}} Traballando",
+      "running_other": "{{displayCount}} Traballando",
+      "scheduled_one": "{{displayCount}} Programada",
+      "scheduled_other": "{{displayCount}} Programadas",
+      "idle_one": "{{displayCount}} En espera",
+      "idle_other": "{{displayCount}} En espera"
+    },
+    "footer": {
+      "checked": "Comprobado {{time}}",
+      "lastKnown": "Último estado coñecido · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Próxima execución {{time}}",
+      "wasDue": "Estaba previsto {{time}}"
+    },
     "step": {
       "editing": "Edición",
       "reading": "Lectura",

@@ -3849,6 +3849,42 @@
     "nextScheduled": "Următoarele programate",
     "answerNeeded": "Așteaptă un răspuns",
     "waitingToRetry": "Așteaptă reîncercarea",
+    "countNoun": {
+      "needsInput_one": "Așteaptă un răspuns",
+      "needsInput_other": "Așteaptă un răspuns",
+      "needsInput_few": "Așteaptă un răspuns",
+      "running_one": "În lucru",
+      "running_other": "În lucru",
+      "running_few": "În lucru",
+      "scheduled_one": "Programată",
+      "scheduled_other": "Programate",
+      "scheduled_few": "Programate",
+      "idle_one": "Inactiv",
+      "idle_other": "Inactive",
+      "idle_few": "Inactive"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Așteaptă un răspuns",
+      "needsInput_other": "{{displayCount}} Așteaptă un răspuns",
+      "needsInput_few": "{{displayCount}} Așteaptă un răspuns",
+      "running_one": "{{displayCount}} În lucru",
+      "running_other": "{{displayCount}} În lucru",
+      "running_few": "{{displayCount}} În lucru",
+      "scheduled_one": "{{displayCount}} Programată",
+      "scheduled_other": "{{displayCount}} Programate",
+      "scheduled_few": "{{displayCount}} Programate",
+      "idle_one": "{{displayCount}} Inactiv",
+      "idle_other": "{{displayCount}} Inactive",
+      "idle_few": "{{displayCount}} Inactive"
+    },
+    "footer": {
+      "checked": "Verificat {{time}}",
+      "lastKnown": "Ultima stare cunoscută · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Următoarea rulare {{time}}",
+      "wasDue": "Era programat {{time}}"
+    },
     "step": {
       "editing": "Editare",
       "reading": "Citire",

@@ -3877,6 +3877,34 @@
     "nextScheduled": "Next scheduled",
     "answerNeeded": "Answer needed",
     "waitingToRetry": "Waiting to retry",
+    "countNoun": {
+      "needsInput_one": "Needs input",
+      "needsInput_other": "Needs input",
+      "running_one": "Working",
+      "running_other": "Working",
+      "scheduled_one": "Scheduled",
+      "scheduled_other": "Scheduled",
+      "idle_one": "Idle",
+      "idle_other": "Idle"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Needs input",
+      "needsInput_other": "{{displayCount}} Needs input",
+      "running_one": "{{displayCount}} Working",
+      "running_other": "{{displayCount}} Working",
+      "scheduled_one": "{{displayCount}} Scheduled",
+      "scheduled_other": "{{displayCount}} Scheduled",
+      "idle_one": "{{displayCount}} Idle",
+      "idle_other": "{{displayCount}} Idle"
+    },
+    "footer": {
+      "checked": "Checked {{time}}",
+      "lastKnown": "Last known · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Next run {{time}}",
+      "wasDue": "Was due {{time}}"
+    },
     "step": {
       "editing": "Editing",
       "reading": "Reading",

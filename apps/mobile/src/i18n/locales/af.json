@@ -3785,6 +3785,34 @@
     "nextScheduled": "Volgende geskeduleerde",
     "answerNeeded": "Antwoord nodig",
     "waitingToRetry": "Wag om weer te probeer",
+    "countNoun": {
+      "needsInput_one": "Wag op invoer",
+      "needsInput_other": "Wag op invoer",
+      "running_one": "Besig",
+      "running_other": "Besig",
+      "scheduled_one": "Geskeduleer",
+      "scheduled_other": "Geskeduleer",
+      "idle_one": "Onaktief",
+      "idle_other": "Onaktief"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Wag op invoer",
+      "needsInput_other": "{{displayCount}} Wag op invoer",
+      "running_one": "{{displayCount}} Besig",
+      "running_other": "{{displayCount}} Besig",
+      "scheduled_one": "{{displayCount}} Geskeduleer",
+      "scheduled_other": "{{displayCount}} Geskeduleer",
+      "idle_one": "{{displayCount}} Onaktief",
+      "idle_other": "{{displayCount}} Onaktief"
+    },
+    "footer": {
+      "checked": "Gekontroleer {{time}}",
+      "lastKnown": "Laas bekend · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Volgende uitvoering {{time}}",
+      "wasDue": "Was verwag {{time}}"
+    },
     "step": {
       "editing": "Wysig",
       "reading": "Lees",

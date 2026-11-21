@@ -3785,6 +3785,34 @@
     "nextScheduled": "Nästa schemalagda",
     "answerNeeded": "Väntar på svar",
     "waitingToRetry": "Väntar på nytt försök",
+    "countNoun": {
+      "needsInput_one": "Behöver inmatning",
+      "needsInput_other": "Behöver inmatning",
+      "running_one": "Arbetar",
+      "running_other": "Arbetar",
+      "scheduled_one": "Schemalagd",
+      "scheduled_other": "Schemalagda",
+      "idle_one": "Vilande",
+      "idle_other": "Vilande"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Behöver inmatning",
+      "needsInput_other": "{{displayCount}} Behöver inmatning",
+      "running_one": "{{displayCount}} Arbetar",
+      "running_other": "{{displayCount}} Arbetar",
+      "scheduled_one": "{{displayCount}} Schemalagd",
+      "scheduled_other": "{{displayCount}} Schemalagda",
+      "idle_one": "{{displayCount}} Vilande",
+      "idle_other": "{{displayCount}} Vilande"
+    },
+    "footer": {
+      "checked": "Kontrollerad {{time}}",
+      "lastKnown": "Senast kända · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Nästa körning {{time}}",
+      "wasDue": "Förväntades {{time}}"
+    },
     "step": {
       "editing": "Redigerar",
       "reading": "Läser",

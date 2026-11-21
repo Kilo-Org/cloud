@@ -3785,6 +3785,34 @@
     "nextScheduled": "આગામી નિર્ધારિત",
     "answerNeeded": "જવાબ જરૂરી",
     "waitingToRetry": "ફરી પ્રયાસની રાહમાં",
+    "countNoun": {
+      "needsInput_one": "જવાબ જરૂરી",
+      "needsInput_other": "જવાબ જરૂરી",
+      "running_one": "કામ ચાલુ છે",
+      "running_other": "કામ ચાલુ છે",
+      "scheduled_one": "નિર્ધારિત",
+      "scheduled_other": "નિર્ધારિત",
+      "idle_one": "નિષ્ક્રિય",
+      "idle_other": "નિષ્ક્રિય"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} જવાબ જરૂરી",
+      "needsInput_other": "{{displayCount}} જવાબ જરૂરી",
+      "running_one": "{{displayCount}} કામ ચાલુ છે",
+      "running_other": "{{displayCount}} કામ ચાલુ છે",
+      "scheduled_one": "{{displayCount}} નિર્ધારિત",
+      "scheduled_other": "{{displayCount}} નિર્ધારિત",
+      "idle_one": "{{displayCount}} નિષ્ક્રિય",
+      "idle_other": "{{displayCount}} નિષ્ક્રિય"
+    },
+    "footer": {
+      "checked": "ચકાસ્યું {{time}}",
+      "lastKnown": "છેલ્લે જાણીતું · {{time}}"
+    },
+    "wake": {
+      "nextRun": "આગામી રન {{time}}",
+      "wasDue": "અપેક્ષિત હતું {{time}}"
+    },
     "step": {
       "editing": "સંપાદન",
       "reading": "વાંચન",

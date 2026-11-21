@@ -3785,6 +3785,34 @@
     "nextScheduled": "Neste planlagte",
     "answerNeeded": "Venter på svar",
     "waitingToRetry": "Venter på nytt forsøk",
+    "countNoun": {
+      "needsInput_one": "Venter på svar",
+      "needsInput_other": "Venter på svar",
+      "running_one": "Jobber",
+      "running_other": "Jobber",
+      "scheduled_one": "Planlagt",
+      "scheduled_other": "Planlagte",
+      "idle_one": "Ledig",
+      "idle_other": "Ledige"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Venter på svar",
+      "needsInput_other": "{{displayCount}} Venter på svar",
+      "running_one": "{{displayCount}} Jobber",
+      "running_other": "{{displayCount}} Jobber",
+      "scheduled_one": "{{displayCount}} Planlagt",
+      "scheduled_other": "{{displayCount}} Planlagte",
+      "idle_one": "{{displayCount}} Ledig",
+      "idle_other": "{{displayCount}} Ledige"
+    },
+    "footer": {
+      "checked": "Sjekket {{time}}",
+      "lastKnown": "Sist kjent · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Neste kjøring {{time}}",
+      "wasDue": "Forventet {{time}}"
+    },
     "step": {
       "editing": "Redigerer",
       "reading": "Leser",

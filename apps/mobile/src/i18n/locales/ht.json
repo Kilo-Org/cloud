@@ -3785,6 +3785,34 @@
     "nextScheduled": "Pwochen ki pwograme",
     "answerNeeded": "Bezwen repons",
     "waitingToRetry": "Ap tann pou reeseye",
+    "countNoun": {
+      "needsInput_one": "Bezwen repons",
+      "needsInput_other": "Bezwen repons",
+      "running_one": "Ap travay",
+      "running_other": "Ap travay",
+      "scheduled_one": "Pwograme",
+      "scheduled_other": "Pwograme",
+      "idle_one": "San aktivite",
+      "idle_other": "San aktivite"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Bezwen repons",
+      "needsInput_other": "{{displayCount}} Bezwen repons",
+      "running_one": "{{displayCount}} Ap travay",
+      "running_other": "{{displayCount}} Ap travay",
+      "scheduled_one": "{{displayCount}} Pwograme",
+      "scheduled_other": "{{displayCount}} Pwograme",
+      "idle_one": "{{displayCount}} San aktivite",
+      "idle_other": "{{displayCount}} San aktivite"
+    },
+    "footer": {
+      "checked": "Verifye {{time}}",
+      "lastKnown": "Dènye eta koni · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Pwochen ekzekisyon {{time}}",
+      "wasDue": "Te dwe {{time}}"
+    },
     "step": {
       "editing": "Modifikasyon",
       "reading": "Lekti",

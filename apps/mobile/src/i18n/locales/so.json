@@ -3785,6 +3785,34 @@
     "nextScheduled": "Qorshaha xiga",
     "answerNeeded": "Jawaab loo baahan yahay",
     "waitingToRetry": "Dib-u-tijaabin sugaya",
+    "countNoun": {
+      "needsInput_one": "Jawaab sugaya",
+      "needsInput_other": "Jawaab sugaya",
+      "running_one": "Shaqaynaya",
+      "running_other": "Shaqaynaya",
+      "scheduled_one": "La qorsheeyay",
+      "scheduled_other": "La qorsheeyay",
+      "idle_one": "Hawl la'aan",
+      "idle_other": "Hawl la'aan"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Jawaab sugaya",
+      "needsInput_other": "{{displayCount}} Jawaab sugaya",
+      "running_one": "{{displayCount}} Shaqaynaya",
+      "running_other": "{{displayCount}} Shaqaynaya",
+      "scheduled_one": "{{displayCount}} La qorsheeyay",
+      "scheduled_other": "{{displayCount}} La qorsheeyay",
+      "idle_one": "{{displayCount}} Hawl la'aan",
+      "idle_other": "{{displayCount}} Hawl la'aan"
+    },
+    "footer": {
+      "checked": "La hubiyay {{time}}",
+      "lastKnown": "Ugu dambayn la ogaa · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Hawlgalka xiga {{time}}",
+      "wasDue": "La filayay {{time}}"
+    },
     "step": {
       "editing": "Tafatirid",
       "reading": "Akhris",

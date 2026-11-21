@@ -3785,6 +3785,34 @@
     "nextScheduled": "അടുത്ത ഷെഡ്യൂൾ",
     "answerNeeded": "മറുപടി വേണം",
     "waitingToRetry": "വീണ്ടും ശ്രമിക്കാൻ കാത്തിരിക്കുന്നു",
+    "countNoun": {
+      "needsInput_one": "നിങ്ങളുടെ പ്രതികരണം വേണം",
+      "needsInput_other": "നിങ്ങളുടെ പ്രതികരണം വേണം",
+      "running_one": "പ്രവർത്തിക്കുന്നു",
+      "running_other": "പ്രവർത്തിക്കുന്നു",
+      "scheduled_one": "ഷെഡ്യൂൾ ചെയ്തത്",
+      "scheduled_other": "ഷെഡ്യൂൾ ചെയ്തത്",
+      "idle_one": "നിഷ്ക്രിയം",
+      "idle_other": "നിഷ്ക്രിയം"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} നിങ്ങളുടെ പ്രതികരണം വേണം",
+      "needsInput_other": "{{displayCount}} നിങ്ങളുടെ പ്രതികരണം വേണം",
+      "running_one": "{{displayCount}} പ്രവർത്തിക്കുന്നു",
+      "running_other": "{{displayCount}} പ്രവർത്തിക്കുന്നു",
+      "scheduled_one": "{{displayCount}} ഷെഡ്യൂൾ ചെയ്തത്",
+      "scheduled_other": "{{displayCount}} ഷെഡ്യൂൾ ചെയ്തത്",
+      "idle_one": "{{displayCount}} നിഷ്ക്രിയം",
+      "idle_other": "{{displayCount}} നിഷ്ക്രിയം"
+    },
+    "footer": {
+      "checked": "പരിശോധിച്ചത് {{time}}",
+      "lastKnown": "അവസാനം അറിയപ്പെട്ടത് · {{time}}"
+    },
+    "wake": {
+      "nextRun": "അടുത്ത പ്രവർത്തനം {{time}}",
+      "wasDue": "പ്രതീക്ഷിച്ചിരുന്നു {{time}}"
+    },
     "step": {
       "editing": "എഡിറ്റ് ചെയ്യുന്നു",
       "reading": "വായിക്കുന്നു",

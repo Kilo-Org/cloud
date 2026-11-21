@@ -3785,6 +3785,34 @@
     "nextScheduled": "Zilizopangwa zinazofuata",
     "answerNeeded": "Inasubiri jibu",
     "waitingToRetry": "Inasubiri kujaribu tena",
+    "countNoun": {
+      "needsInput_one": "Inasubiri jibu",
+      "needsInput_other": "Inasubiri jibu",
+      "running_one": "Inafanya kazi",
+      "running_other": "Inafanya kazi",
+      "scheduled_one": "Imepangwa",
+      "scheduled_other": "Imepangwa",
+      "idle_one": "Bila kazi",
+      "idle_other": "Bila kazi"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} Inasubiri jibu",
+      "needsInput_other": "{{displayCount}} Inasubiri jibu",
+      "running_one": "{{displayCount}} Inafanya kazi",
+      "running_other": "{{displayCount}} Inafanya kazi",
+      "scheduled_one": "{{displayCount}} Imepangwa",
+      "scheduled_other": "{{displayCount}} Imepangwa",
+      "idle_one": "{{displayCount}} Bila kazi",
+      "idle_other": "{{displayCount}} Bila kazi"
+    },
+    "footer": {
+      "checked": "Imethibitishwa {{time}}",
+      "lastKnown": "Hali ya mwisho iliyojulikana · {{time}}"
+    },
+    "wake": {
+      "nextRun": "Utekelezaji unaofuata {{time}}",
+      "wasDue": "Ilitarajiwa {{time}}"
+    },
     "step": {
       "editing": "Kuhariri",
       "reading": "Kusoma",

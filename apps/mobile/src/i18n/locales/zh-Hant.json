@@ -3785,6 +3785,34 @@
     "nextScheduled": "下次排程",
     "answerNeeded": "等待回答",
     "waitingToRetry": "等待重試",
+    "countNoun": {
+      "needsInput_one": "等待輸入",
+      "needsInput_other": "等待輸入",
+      "running_one": "處理中",
+      "running_other": "處理中",
+      "scheduled_one": "已排程",
+      "scheduled_other": "已排程",
+      "idle_one": "閒置",
+      "idle_other": "閒置"
+    },
+    "count": {
+      "needsInput_one": "{{displayCount}} 等待輸入",
+      "needsInput_other": "{{displayCount}} 等待輸入",
+      "running_one": "{{displayCount}} 處理中",
+      "running_other": "{{displayCount}} 處理中",
+      "scheduled_one": "{{displayCount}} 已排程",
+      "scheduled_other": "{{displayCount}} 已排程",
+      "idle_one": "{{displayCount}} 閒置",
+      "idle_other": "{{displayCount}} 閒置"
+    },
+    "footer": {
+      "checked": "上次確認 {{time}}",
+      "lastKnown": "最後已知 · {{time}}"
+    },
+    "wake": {
+      "nextRun": "下次執行 {{time}}",
+      "wasDue": "原定 {{time}}"
+    },
     "step": {
       "editing": "編輯中",
       "reading": "讀取中",

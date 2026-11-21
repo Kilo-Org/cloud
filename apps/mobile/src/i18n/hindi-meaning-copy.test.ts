@@ -36,6 +36,13 @@ describe('Hindi wording that changes the meaning', () => {
     expect(i18n.t('credits.history.kind.grant')).toBe('क्रेडिट अनुदान');
   });
 
+  it('names the welcome grant as a welcome, not as a purchase', () => {
+    expect(i18n.t('credits.history.kind.welcomeCredits')).toBe('स्वागत क्रेडिट');
+    expect(i18n.t('credits.history.kind.welcomeCredits')).not.toContain(
+      i18n.t('credits.history.kind.purchase')
+    );
+  });
+
   it('labels the active-until row with a noun that fits its date value', () => {
     expect(i18n.t('kiloPass.activeUntil')).toBe('सक्रिय रहने की तिथि');
   });

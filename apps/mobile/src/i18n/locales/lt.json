@@ -4614,6 +4614,7 @@
         "balanceNeutral": "Balanso nekeičia",
         "deduction": "Nurašymas",
         "grant": "Kreditų suteikimas",
+        "welcomeCredits": "Sveikinimo kreditai",
         "purchase": "Pirkimas"
       },
       "purchaseFallback": "Kreditų pirkimas",

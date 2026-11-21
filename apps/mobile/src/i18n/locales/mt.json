@@ -4685,6 +4685,7 @@
         "balanceNeutral": "Newtrali għall-bilanċ",
         "deduction": "Tnaqqis",
         "grant": "Għotja ta' krediti",
+        "welcomeCredits": "Krediti tal-merħba",
         "purchase": "Xiri"
       },
       "purchaseFallback": "Xiri ta' krediti",

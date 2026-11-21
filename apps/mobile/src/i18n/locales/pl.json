@@ -4614,6 +4614,7 @@
         "balanceNeutral": "Bez wpływu na saldo",
         "deduction": "Pobranie",
         "grant": "Przyznane kredyty",
+        "welcomeCredits": "Kredyty powitalne",
         "purchase": "Zakup"
       },
       "purchaseFallback": "Zakup kredytów",

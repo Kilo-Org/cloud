@@ -4472,6 +4472,7 @@
         "balanceNeutral": "Tsy manova ny sisa",
         "deduction": "Fanalana",
         "grant": "Kredita nomena",
+        "welcomeCredits": "Kredita tongasoa",
         "purchase": "Fividianana"
       },
       "purchaseFallback": "Fividianana kredita",

@@ -4685,6 +4685,7 @@
         "balanceNeutral": "Neodrach don iarmhéid",
         "deduction": "Asbhaint",
         "grant": "Deontas creidmheasa",
+        "welcomeCredits": "Creidmheas fáilte",
         "purchase": "Ceannach"
       },
       "purchaseFallback": "Ceannach creidmheasa",

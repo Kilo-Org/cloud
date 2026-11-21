@@ -4614,6 +4614,7 @@
         "balanceNeutral": "Brez vpliva na stanje",
         "deduction": "Odbitek",
         "grant": "Dodelitev kreditov",
+        "welcomeCredits": "Krediti dobrodošlice",
         "purchase": "Nakup"
       },
       "purchaseFallback": "Nakup kreditov",

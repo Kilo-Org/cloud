@@ -4472,6 +4472,7 @@
         "balanceNeutral": "ไม่กระทบยอดคงเหลือ",
         "deduction": "การหักเครดิต",
         "grant": "เครดิตที่ได้รับ",
+        "welcomeCredits": "เครดิตต้อนรับ",
         "purchase": "การซื้อ"
       },
       "purchaseFallback": "การซื้อเครดิต",

@@ -4472,6 +4472,7 @@
         "balanceNeutral": "Saldonøytral",
         "deduction": "Trekk",
         "grant": "Tildelte kreditter",
+        "welcomeCredits": "Velkomstkreditter",
         "purchase": "Kjøp"
       },
       "purchaseFallback": "Kjøp av kreditter",

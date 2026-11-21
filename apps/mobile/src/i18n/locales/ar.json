@@ -4756,6 +4756,7 @@
         "balanceNeutral": "دون تأثير على الرصيد",
         "deduction": "خصم",
         "grant": "منحة رصيد",
+        "welcomeCredits": "رصيد الترحيب",
         "purchase": "شراء"
       },
       "purchaseFallback": "شراء رصيد",

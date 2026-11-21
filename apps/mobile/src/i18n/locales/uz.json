@@ -4472,6 +4472,7 @@
         "balanceNeutral": "Balansga ta’sir qilmaydi",
         "deduction": "Yechib olish",
         "grant": "Bepul kredit",
+        "welcomeCredits": "Xush kelibsiz krediti",
         "purchase": "Xarid"
       },
       "purchaseFallback": "Kredit xaridi",

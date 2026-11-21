@@ -4472,6 +4472,7 @@
         "balanceNeutral": "Балансқа әсер етпейді",
         "deduction": "Шегерім",
         "grant": "Берілген кредит",
+        "welcomeCredits": "Қош келу кредиттері",
         "purchase": "Сатып алу"
       },
       "purchaseFallback": "Кредит сатып алу",

@@ -4756,6 +4756,7 @@
         "balanceNeutral": "Dim effaith ar y balans",
         "deduction": "Didyniad",
         "grant": "Credyd am ddim",
+        "welcomeCredits": "Credydau croeso",
         "purchase": "Pryniant"
       },
       "purchaseFallback": "Pryniant credyd",

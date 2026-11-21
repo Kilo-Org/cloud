@@ -4543,6 +4543,7 @@
         "balanceNeutral": "Fără impact asupra soldului",
         "deduction": "Deducere",
         "grant": "Credite acordate",
+        "welcomeCredits": "Credite de bun venit",
         "purchase": "Achiziție"
       },
       "purchaseFallback": "Achiziție de credite",

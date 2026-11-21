@@ -4472,6 +4472,7 @@
         "balanceNeutral": "Sen efecto no saldo",
         "deduction": "Dedución",
         "grant": "Concesión de créditos",
+        "welcomeCredits": "Créditos de benvida",
         "purchase": "Compra"
       },
       "purchaseFallback": "Compra de créditos",

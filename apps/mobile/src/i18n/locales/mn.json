@@ -4472,6 +4472,7 @@
         "balanceNeutral": "Үлдэгдэлд нөлөөгүй",
         "deduction": "Хасалт",
         "grant": "Кредит олголт",
+        "welcomeCredits": "Тавтай морилын кредит",
         "purchase": "Худалдан авалт"
       },
       "purchaseFallback": "Кредит худалдан авалт",

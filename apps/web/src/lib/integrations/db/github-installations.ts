@@ -406,7 +406,7 @@ export async function connectVerifiedGitHubInstallation(
     //
     // A soft-deleted organization is the exception: it has no restore path, so
     // it must not keep the installation from a personal claimant. The deletion
-    // is read from the joined owner record below.
+    // is read from the joined owner record above.
     //
     // A new personal association is refused while an organization still holds
     // the installation, and an existing personal association keeps the role it

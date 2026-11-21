@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Ez a dokumentum csak angol nyelven érhető el.",
     "organizationTrialEndedBilling": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. Frissítheti a számlázást, majd próbálja újra.",
     "organizationTrialEndedBillingAtKiloAi": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. Frissítheti a számlázást a kilo.ai oldalon, majd próbálja újra.",
-    "viewOnGitHub": "PR megtekintése a GitHubon"
+    "viewOnGitHub": "PR megtekintése a GitHubon",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Felsorolásjel",
+        "nestedBulletPoint": "Beágyazott felsorolásjel",
+        "orderedItem": "Listaelem {n}",
+        "nestedOrderedItem": "Beágyazott listaelem {n}"
+      },
+      "blockquote": {
+        "quote": "Idézet",
+        "nestedQuote": "Beágyazott idézet"
+      },
+      "table": {
+        "row": "Sor {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Címsorok",
+        "links": "Hivatkozások",
+        "images": "Képek"
+      }
+    }
   },
   "language": {
     "restarting": "Újraindítás a nyelv beállításához",
@@ -280,6 +303,9 @@
     "credits": "Kreditek",
     "failedToLoadBalance": "Nem sikerült betölteni az egyenleget. Az újrapróbáláshoz koppints.",
     "balanceLoadFailed": "Nem tölthető be az egyenleg",
+    "balanceUnreachable": "A kiszolgáló nem érhető el. Próbáld újra.",
+    "balanceAccessDenied": "Nincs jogosultságod megtekinteni ezt az egyenleget.",
+    "balanceUnavailable": "Az egyenleg betöltése nem sikerült.",
     "hideBalance": "Egyenleg elrejtése",
     "showBalance": "Egyenleg megjelenítése",
     "balanceHidden": "Egyenleg elrejtve",
@@ -5030,6 +5056,7 @@
     "providersNeedCatalog": "A szolgáltatók kapcsolói csak olvashatók maradnak, amíg a teljes modellkatalógus be nem töltődik. A szerkesztésükhöz koppintson fent az Újrapróbálkozás gombra.",
     "providersEmpty": "Nincs a keresésnek megfelelő szolgáltató.",
     "providersNone": "Ennél a szervezetnél nem érhetők el szolgáltatók.",
+    "providersUnavailable": "A szolgáltatók listáját nem sikerült betölteni.",
     "allowAllShown": "Az összes megjelenített engedélyezése",
     "denyAllShown": "Az összes megjelenített letiltása",
     "gatewaysDescription": "A Kilo a modellkéréseket a Vercel AI Gateway vagy az OpenRouter használatával irányítja. A letiltott átjáró sikertelenné teszi ezeket a kéréseket.",

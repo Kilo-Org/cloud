@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "این سند تنها به زبان انگلیسی در دسترس است.",
     "organizationTrialEndedBilling": "دوره آزمایشی سازمان به پایان رسیده است و هیچ طرح فعالی ندارد. شما می‌توانید صورتحساب را به‌روزرسانی کنید و سپس دوباره تلاش کنید.",
     "organizationTrialEndedBillingAtKiloAi": "دوره آزمایشی سازمان به پایان رسیده است و هیچ طرح فعالی ندارد. شما می‌توانید صورتحساب را در kilo.ai به‌روزرسانی کنید و سپس دوباره تلاش کنید.",
-    "viewOnGitHub": "مشاهدهٔ PR در GitHub"
+    "viewOnGitHub": "مشاهدهٔ PR در GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "نقطه فهرست",
+        "nestedBulletPoint": "نقطه فهرست تو در تو",
+        "orderedItem": "مورد فهرست {n}",
+        "nestedOrderedItem": "مورد فهرست تو در تو {n}"
+      },
+      "blockquote": {
+        "quote": "نقل قول",
+        "nestedQuote": "نقل قول تو در تو"
+      },
+      "table": {
+        "row": "ردیف {n}: {content}"
+      },
+      "math": {
+        "equation": "ریاضی: {latex}"
+      },
+      "rotor": {
+        "headings": "عنوان‌ها",
+        "links": "پیوندها",
+        "images": "تصاویر"
+      }
+    }
   },
   "language": {
     "restarting": "در حال راه‌اندازی مجدد برای تغییر زبان",
@@ -280,6 +303,9 @@
     "credits": "اعتبار",
     "failedToLoadBalance": "بارگذاری موجودی ممکن نشد. برای تلاش مجدد ضربه بزنید.",
     "balanceLoadFailed": "بارگذاری موجودی ممکن نشد",
+    "balanceUnreachable": "اتصال به سرور برقرار نشد. دوباره تلاش کنید.",
+    "balanceAccessDenied": "اجازه دیدن این موجودی را ندارید.",
+    "balanceUnavailable": "موجودی بارگذاری نشد.",
     "hideBalance": "پنهان کردن موجودی",
     "showBalance": "نمایش موجودی",
     "balanceHidden": "موجودی پنهان است",
@@ -5030,6 +5056,7 @@
     "providersNeedCatalog": "کلیدهای ارائه‌دهنده تا زمانی که فهرست کامل مدل‌ها بارگیری نشود فقط‌خواندنی می‌مانند. برای ویرایش آن‌ها، روی تلاش مجدد در بالا ضربه بزنید.",
     "providersEmpty": "هیچ ارائه‌دهنده‌ای با این جست‌وجو مطابقت ندارد.",
     "providersNone": "هیچ ارائه‌دهنده‌ای برای این سازمان در دسترس نیست.",
+    "providersUnavailable": "فهرست ارائه‌دهندگان بارگیری نشد.",
     "allowAllShown": "مجاز کردن همه موارد نمایش‌داده‌شده",
     "denyAllShown": "ممنوع کردن همه موارد نمایش‌داده‌شده",
     "gatewaysDescription": "Kilo درخواست‌های مدل را از طریق Vercel AI Gateway یا OpenRouter هدایت می‌کند. اگر درگاهی غیرفعال باشد، این درخواست‌ها ناموفق می‌شوند.",

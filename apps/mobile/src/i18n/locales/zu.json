@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}, inqolobane yekhodi eyimfihlo",
     "legalDocumentEnglishOnly": "Leli dokhumenti litholakala ngesiNgisi kuphela.",
     "organizationTrialEndedBilling": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Ungabuyekeza ukukhokhela, bese uzama futhi.",
-    "organizationTrialEndedBillingAtKiloAi": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Ungabuyekeza ukukhokhela ku-kilo.ai, bese uzama futhi."
+    "organizationTrialEndedBillingAtKiloAi": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Ungabuyekeza ukukhokhela ku-kilo.ai, bese uzama futhi.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Iphuzu lohlu",
+        "nestedBulletPoint": "Iphuzu lohlu olungaphakathi",
+        "orderedItem": "Into yohlu {n}",
+        "nestedOrderedItem": "Into yohlu engaphakathi {n}"
+      },
+      "blockquote": {
+        "quote": "Isicaphucaphu",
+        "nestedQuote": "Isicaphucaphu esingaphakathi"
+      },
+      "table": {
+        "row": "Umugqa {n}: {content}"
+      },
+      "math": {
+        "equation": "Izibalo: {latex}"
+      },
+      "rotor": {
+        "headings": "Izihloko",
+        "links": "Izixhumanisi",
+        "images": "Izithombe"
+      }
+    }
   },
   "language": {
     "restarting": "Kuqaliswa kabusha ukuze kusetshenziswe ulimi olukhethiwe",
@@ -280,6 +303,9 @@
     "credits": "Amakhredithi",
     "failedToLoadBalance": "Asikwazanga ukulayisha ibhalansi. Thepha ukuze uzame futhi.",
     "balanceLoadFailed": "Asikwazanga ukulayisha ibhalansi",
+    "balanceUnreachable": "Asikwazanga ukufinyelela iseva. Zama futhi.",
+    "balanceAccessDenied": "Awunalo ilungelo lokubona leli balansi.",
+    "balanceUnavailable": "Ibhalansi ayikwazanga ukulayishwa.",
     "hideBalance": "Fihla ibhalansi",
     "showBalance": "Bonisa ibhalansi",
     "balanceHidden": "Ibhalansi ifihliwe",
@@ -5030,6 +5056,7 @@
     "providersNeedCatalog": "Amaswishi abahlinzeki ahlala engokufunda kuphela kuze kulayishwe ikhathalogi ephelele yamamodeli. Thepha Zama futhi ngenhla ukuze uwahlele.",
     "providersEmpty": "Abekho abahlinzeki abahambisana nalokhu kusesha.",
     "providersNone": "Akukho bahlinzeki abatholakalayo kule nhlangano.",
+    "providersUnavailable": "Uhlu lwabahlinzeki alukwazanga ukulayishwa.",
     "allowAllShown": "Vumela konke okubonisiwe",
     "denyAllShown": "Nqaba konke okubonisiwe",
     "gatewaysDescription": "I-Kilo idlulisela izicelo zamamodeli nge-Vercel AI Gateway noma nge-OpenRouter. Isango elikhutshaziwe lehluleka lezo zicelo.",

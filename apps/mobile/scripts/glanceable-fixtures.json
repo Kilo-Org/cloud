@@ -63,6 +63,14 @@
       "description": "Mixed counts with a very long newest-session title."
     },
     {
+      "name": "thai-titles",
+      "description": "Only running, with Thai session titles (tall fallback line box)."
+    },
+    {
+      "name": "myanmar-titles",
+      "description": "Only running, with Myanmar session titles (tallest fallback line box)."
+    },
+    {
       "name": "approving",
       "description": "Needs approval while the in-place Approve runs: the Approving line."
     },

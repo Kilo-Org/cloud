@@ -188,7 +188,30 @@
     "legalDocumentEnglishOnly": "Ten dokument jest dostępny wyłącznie w języku angielskim.",
     "organizationTrialEndedBilling": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia, a następnie spróbować ponownie.",
     "organizationTrialEndedBillingAtKiloAi": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia na kilo.ai, a następnie spróbować ponownie.",
-    "viewOnGitHub": "Zobacz PR w serwisie GitHub"
+    "viewOnGitHub": "Zobacz PR w serwisie GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Punkt listy",
+        "nestedBulletPoint": "Zagnieżdżony punkt listy",
+        "orderedItem": "Element listy {n}",
+        "nestedOrderedItem": "Zagnieżdżony element listy {n}"
+      },
+      "blockquote": {
+        "quote": "Cytat",
+        "nestedQuote": "Zagnieżdżony cytat"
+      },
+      "table": {
+        "row": "Wiersz {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematyka: {latex}"
+      },
+      "rotor": {
+        "headings": "Nagłówki",
+        "links": "Odnośniki",
+        "images": "Obrazy"
+      }
+    }
   },
   "language": {
     "restarting": "Ponowne uruchamianie po zmianie języka",
@@ -282,6 +305,9 @@
     "credits": "Środki",
     "failedToLoadBalance": "Nie udało się wczytać salda. Dotknij, aby spróbować ponownie.",
     "balanceLoadFailed": "Nie udało się wczytać salda",
+    "balanceUnreachable": "Nie można połączyć się z serwerem. Spróbuj ponownie.",
+    "balanceAccessDenied": "Nie masz uprawnień do wyświetlenia tego salda.",
+    "balanceUnavailable": "Nie udało się wczytać salda.",
     "hideBalance": "Ukryj saldo",
     "showBalance": "Pokaż saldo",
     "balanceHidden": "Saldo ukryte",
@@ -5204,6 +5230,7 @@
     "providersNeedCatalog": "Przełączniki dostawców pozostają tylko do odczytu, dopóki nie wczyta się pełny katalog modeli. Aby je edytować, dotknij przycisku Spróbuj ponownie powyżej.",
     "providersEmpty": "Żaden dostawca nie pasuje do tego wyszukiwania.",
     "providersNone": "Żaden dostawca nie jest dostępny dla tej organizacji.",
+    "providersUnavailable": "Nie udało się załadować listy dostawców.",
     "allowAllShown": "Zezwól na wszystkie widoczne",
     "denyAllShown": "Zablokuj wszystkie widoczne",
     "gatewaysDescription": "Kilo kieruje żądania modeli przez Vercel AI Gateway lub OpenRouter. Wyłączona brama powoduje niepowodzenie tych żądań.",

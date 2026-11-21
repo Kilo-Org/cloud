@@ -4,9 +4,8 @@ import { Pressable, View } from 'react-native';
 import { Text } from '@/components/ui/text';
 import { tabEntryA11y } from '@/lib/a11y/tab-entry';
 import { TAB_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { type AgentsView } from '@/lib/agents-view';
 import { cn } from '@/lib/utils';
-
-export type AgentsView = 'sessions' | 'todos';
 
 export function AgentsViewSegment({
   value,

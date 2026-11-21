@@ -47,6 +47,29 @@ describe('selectDiscussionTabView', () => {
     ).toEqual({ kind: 'retryable' });
   });
 
+  // A confirmed-offline device is why the page is paused, so the connection
+  // owns that copy; a pause with no confirmed cause keeps the read's copy.
+  it('names the connection for a paused page on a confirmed-offline device', () => {
+    expect(
+      selectDiscussionTabView({
+        ...base,
+        isPending: true,
+        isPaused: true,
+        isOffline: true,
+        isEmpty: true,
+      })
+    ).toEqual({ kind: 'offline' });
+    expect(
+      selectDiscussionTabView({
+        ...base,
+        isPending: true,
+        isPaused: true,
+        isOffline: false,
+        isEmpty: true,
+      })
+    ).toEqual({ kind: 'retryable' });
+  });
+
   it('returns empty when there is no error, no pending, and no items', () => {
     expect(selectDiscussionTabView({ ...base, isEmpty: true })).toEqual({ kind: 'empty' });
   });

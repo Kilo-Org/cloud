@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "ឯកសារនេះអាចរកបានតែជាភាសាអង់គ្លេសប៉ុណ្ណោះ។",
     "organizationTrialEndedBilling": "ការសាកល្បងរបស់ស្ថាប័នបានបញ្ចប់ ហើយវាមិនមានគម្រោងសកម្មទេ។ អ្នកអាចធ្វើបច្ចុប្បន្នភាពវិក្កយបត្រ បន្ទាប់មកព្យាយាមម្តងទៀត។",
     "organizationTrialEndedBillingAtKiloAi": "ការសាកល្បងរបស់ស្ថាប័នបានបញ្ចប់ ហើយវាមិនមានគម្រោងសកម្មទេ។ អ្នកអាចធ្វើបច្ចុប្បន្នភាពវិក្កយបត្រនៅ kilo.ai បន្ទាប់មកព្យាយាមម្តងទៀត។",
-    "viewOnGitHub": "មើល PR នៅលើ GitHub"
+    "viewOnGitHub": "មើល PR នៅលើ GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "ចំណុចបញ្ជី",
+        "nestedBulletPoint": "ចំណុចបញ្ជីជាប់",
+        "orderedItem": "ធាតុបញ្ជី {n}",
+        "nestedOrderedItem": "ធាតុបញ្ជីជាប់ {n}"
+      },
+      "blockquote": {
+        "quote": "សម្រង់",
+        "nestedQuote": "សម្រង់ជាប់"
+      },
+      "table": {
+        "row": "ជួរដេក {n}៖ {content}"
+      },
+      "math": {
+        "equation": "គណិតវិទ្យា៖ {latex}"
+      },
+      "rotor": {
+        "headings": "ចំណងជើង",
+        "links": "តំណ",
+        "images": "រូបភាព"
+      }
+    }
   },
   "language": {
     "restarting": "កំពុងចាប់ផ្តើមឡើងវិញដើម្បីប្រើភាសាដែលបានជ្រើសរើស",
@@ -280,6 +303,9 @@
     "credits": "ឥណទាន",
     "failedToLoadBalance": "មិនអាចផ្ទុកសមតុល្យបានទេ។ ប៉ះដើម្បីព្យាយាមម្តងទៀត។",
     "balanceLoadFailed": "មិនអាចផ្ទុកសមតុល្យបានទេ",
+    "balanceUnreachable": "មិនអាចភ្ជាប់ទៅម៉ាស៊ីនមេបានទេ។ ព្យាយាមម្តងទៀត។",
+    "balanceAccessDenied": "អ្នកមិនមានសិទ្ធិមើលសមតុល្យនេះទេ។",
+    "balanceUnavailable": "មិនអាចផ្ទុកសមតុល្យបានទេ។",
     "hideBalance": "លាក់សមតុល្យ",
     "showBalance": "បង្ហាញសមតុល្យ",
     "balanceHidden": "សមតុល្យត្រូវបានលាក់",
@@ -5030,6 +5056,7 @@
     "providersNeedCatalog": "កុងតាក់អ្នកផ្តល់សេវានៅតែអាចអានបានតែប៉ុណ្ណោះ រហូតដល់កាតាឡុកម៉ូដែលពេញលេញត្រូវបានផ្ទុក។ ចុច ព្យាយាមម្តងទៀត ខាងលើ ដើម្បីកែសម្រួលវា។",
     "providersEmpty": "គ្មានអ្នកផ្តល់សេវាត្រូវនឹងការស្វែងរកនេះទេ។",
     "providersNone": "មិនមានអ្នកផ្តល់សេវាណាមួយដែលអាចប្រើបានសម្រាប់អង្គការនេះទេ។",
+    "providersUnavailable": "មិនអាចផ្ទុកបញ្ជីអ្នកផ្តល់សេវាបានទេ។",
     "allowAllShown": "អនុញ្ញាតទាំងអស់ដែលបានបង្ហាញ",
     "denyAllShown": "បដិសេធទាំងអស់ដែលបានបង្ហាញ",
     "gatewaysDescription": "Kilo បញ្ជូនសំណើម៉ូដែលតាមរយៈ Vercel AI Gateway ឬ OpenRouter។ ច្រកផ្លូវដែលបានបិទ នឹងធ្វើឱ្យសំណើទាំងនោះបរាជ័យ។",

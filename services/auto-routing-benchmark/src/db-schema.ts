@@ -120,9 +120,16 @@ export const benchmarkRuns = sqliteTable(
     // Which registry queue this run drained: 'platform' (saved platform decider
     // list) or 'user' (owner pools). Classifier runs are always 'platform'.
     purpose: text('purpose').$type<BenchmarkRunPurpose>().notNull().default('platform'),
+    // ACTIVE_MEASUREMENT_REVISION the run started under: which cases it runs and how it grades them.
+    // Runs from before the column existed measured revision 2.
+    measurement_revision: integer('measurement_revision').notNull().default(2),
   },
   table => [
-    uniqueIndex('UQ_benchmark_runs_one_running_per_router_kind_purpose')
+    // Decider queues run several runs at once; a classifier run derives one winner.
+    uniqueIndex('UQ_benchmark_runs_one_running_classifier_per_router_purpose')
+      .on(table.router, table.purpose)
+      .where(sql`${table.status} = 'running' AND ${table.kind} = 'classifier'`),
+    index('IX_benchmark_runs_running')
       .on(table.router, table.kind, table.purpose)
       .where(sql`${table.status} = 'running'`),
   ]
@@ -161,6 +168,10 @@ export const modelSummaries = sqliteTable(
     avg_latency_ms: real('avg_latency_ms').notNull(),
     p50_latency_ms: real('p50_latency_ms'),
     cases: integer('cases').notNull(),
+    // Rows whose cost_usd was reported: the denominator of avg_cost_usd. Null
+    // on rows written before it was captured, which the console reads as
+    // "unknown", never as "every case was priced".
+    costed_cases: integer('costed_cases'),
     errors: integer('errors').notNull(),
     p95_latency_ms: real('p95_latency_ms'),
     timeouts: integer('timeouts').notNull().default(0),
@@ -201,11 +212,17 @@ export const caseResults = sqliteTable(
     output_prefix: text('output_prefix'),
     event_count: integer('event_count'),
     last_event_types: text('last_event_types'),
+    // Tool evidence of the measured turn (src/kilo-events.ts ToolEvidence); null before it was
+    // recorded. tool_names is a JSON array of distinct names in first-use order.
+    tool_calls: integer('tool_calls'),
+    tool_names: text('tool_names'),
+    step_count: integer('step_count'),
+    final_finish_reason: text('final_finish_reason'),
     // Repetition index (0-based); together with run_id/model/variant/case_id forms the PK.
     rep: integer('rep').notNull().default(0),
     // 1 when the case was killed by the wall-clock timeout, 0 otherwise.
     timed_out: integer('timed_out').notNull().default(0),
-    // PROMPT_TRANSPORT_REVISION of the CLI call that produced this result.
+    // Measurement revision (src/measurement-revision.ts) of the call that produced this result.
     prompt_revision: integer('prompt_revision').notNull().default(1),
   },
   // The composite PK's leftmost column already serves run_id-prefix lookups
@@ -508,6 +525,51 @@ export const profileRemeasures = sqliteTable(
       columns: [table.router, table.model, table.variant, table.engine_identity, table.repetitions],
     }),
     index('IDX_profile_remeasures_run').on(table.run_id),
+  ]
+);
+
+/**
+ * One-shot activation queue for a measurement revision: `remeasure` rows to queue in
+ * `profile_remeasures` and `readmit` rows to move back to `pending`, both written by the
+ * activating migration and consumed by the drain of the worker that ships with it
+ * (`applyProbeActivations` in `src/probe-activation.ts`).
+ *
+ * The rows exist only so the activation can ship as reviewed data before the new image
+ * is live: a migration applies before the container deploy, and the worker still serving
+ * during that window claims `profile_remeasures` rows and `pending` profiles directly, so
+ * a queue row written by the migration itself would be measured at the old revision. That
+ * worker never reads this table, and the apply is a no-op while the active revision is
+ * below the row's `required_revision` (see `applyProbeActivations`).
+ */
+export const probeActivations = sqliteTable(
+  'probe_activations',
+  {
+    router: text('router').$type<AutoRouter>().notNull(),
+    /** `remeasure` queues the pair in `profile_remeasures`; `readmit` re-admits it. */
+    action: text('action').$type<'remeasure' | 'readmit'>().notNull(),
+    /**
+     * The measurement revision the action needs. `applyProbeActivations` is a no-op below
+     * it and leaves the row staged, so deploying a worker that starts runs under an older
+     * `ACTIVE_MEASUREMENT_REVISION` never moves a row it cannot measure yet.
+     */
+    required_revision: integer('required_revision').notNull(),
+    model: text('model').notNull(),
+    variant: text('variant').notNull().default(''),
+    engine_identity: text('engine_identity').notNull(),
+    repetitions: integer('repetitions').notNull(),
+    requested_at: text('requested_at').notNull(),
+  },
+  table => [
+    primaryKey({
+      columns: [
+        table.router,
+        table.action,
+        table.model,
+        table.variant,
+        table.engine_identity,
+        table.repetitions,
+      ],
+    }),
   ]
 );
 

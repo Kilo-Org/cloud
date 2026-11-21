@@ -188,7 +188,30 @@
     "privateRepositoryA11y": "{{name}}, súkromné úložisko",
     "legalDocumentEnglishOnly": "Tento dokument je dostupný len v angličtine.",
     "organizationTrialEndedBilling": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Môžete aktualizovať fakturáciu a potom to skúsiť znova.",
-    "organizationTrialEndedBillingAtKiloAi": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Môžete aktualizovať fakturáciu na kilo.ai a potom to skúsiť znova."
+    "organizationTrialEndedBillingAtKiloAi": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Môžete aktualizovať fakturáciu na kilo.ai a potom to skúsiť znova.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Odrážka",
+        "nestedBulletPoint": "Vnorená odrážka",
+        "orderedItem": "Položka zoznamu {n}",
+        "nestedOrderedItem": "Vnorená položka zoznamu {n}"
+      },
+      "blockquote": {
+        "quote": "Citácia",
+        "nestedQuote": "Vnorená citácia"
+      },
+      "table": {
+        "row": "Riadok {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Nadpisy",
+        "links": "Odkazy",
+        "images": "Obrázky"
+      }
+    }
   },
   "language": {
     "restarting": "Aplikácia sa reštartuje na zmenu jazyka",
@@ -282,6 +305,9 @@
     "credits": "Kredity",
     "failedToLoadBalance": "Zostatok sa nepodarilo načítať. Klepnutím to skús znova.",
     "balanceLoadFailed": "Zostatok sa nepodarilo načítať",
+    "balanceUnreachable": "Server je nedostupný. Skúste to znova.",
+    "balanceAccessDenied": "Nemáte oprávnenie zobraziť tento zostatok.",
+    "balanceUnavailable": "Zostatok sa nepodarilo načítať.",
     "hideBalance": "Skryť zostatok",
     "showBalance": "Zobraziť zostatok",
     "balanceHidden": "Zostatok je skrytý",
@@ -5204,6 +5230,7 @@
     "providersNeedCatalog": "Prepínače poskytovateľov zostanú iba na čítanie, kým sa nenačíta celý katalóg modelov. Ak ich chcete upraviť, ťuknite vyššie na Skúsiť znova.",
     "providersEmpty": "Tomuto hľadaniu nezodpovedajú žiadni poskytovatelia.",
     "providersNone": "Pre túto organizáciu nie sú k dispozícii žiadni poskytovatelia.",
+    "providersUnavailable": "Zoznam poskytovateľov sa nepodarilo načítať.",
     "allowAllShown": "Povoliť všetky zobrazené",
     "denyAllShown": "Zamietnuť všetky zobrazené",
     "gatewaysDescription": "Kilo smeruje požiadavky na modely cez Vercel AI Gateway alebo OpenRouter. Vypnutá brána spôsobí zlyhanie týchto požiadaviek.",

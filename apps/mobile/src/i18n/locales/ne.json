@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "यो कागजात अङ्ग्रेजीमा मात्र उपलब्ध छ।",
     "organizationTrialEndedBilling": "संस्थाको परीक्षण अवधि सकिएको छ र यसको कुनै सक्रिय योजना छैन। तपाईंले बिलिङ अद्यावधिक गर्न सक्नुहुन्छ, त्यसपछि फेरि प्रयास गर्नुहोस्।",
     "organizationTrialEndedBillingAtKiloAi": "संस्थाको परीक्षण अवधि सकिएको छ र यसको कुनै सक्रिय योजना छैन। तपाईंले kilo.ai मा बिलिङ अद्यावधिक गर्न सक्नुहुन्छ, त्यसपछि फेरि प्रयास गर्नुहोस्।",
-    "viewOnGitHub": "GitHub मा PR हेर्नुहोस्"
+    "viewOnGitHub": "GitHub मा PR हेर्नुहोस्",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "बुलेट बिन्दु",
+        "nestedBulletPoint": "नेस्टेड बुलेट बिन्दु",
+        "orderedItem": "सूची वस्तु {n}",
+        "nestedOrderedItem": "नेस्टेड सूची वस्तु {n}"
+      },
+      "blockquote": {
+        "quote": "उद्धरण",
+        "nestedQuote": "नेस्टेड उद्धरण"
+      },
+      "table": {
+        "row": "पङ्क्ति {n}: {content}"
+      },
+      "math": {
+        "equation": "गणित: {latex}"
+      },
+      "rotor": {
+        "headings": "शीर्षकहरू",
+        "links": "लिङ्कहरू",
+        "images": "तस्बिरहरू"
+      }
+    }
   },
   "language": {
     "restarting": "भाषा लागू गर्न पुनः सुरु गर्दै",
@@ -280,6 +303,9 @@
     "credits": "क्रेडिटहरू",
     "failedToLoadBalance": "मौज्दात लोड गर्न सकिएन। पुनः प्रयास गर्न ट्याप गर्नुहोस्।",
     "balanceLoadFailed": "मौज्दात लोड गर्न सकिएन",
+    "balanceUnreachable": "सर्भरमा पुग्न सकिएन। फेरि प्रयास गर्नुहोस्।",
+    "balanceAccessDenied": "यो ब्यालेन्स हेर्न तपाईंलाई अनुमति छैन।",
+    "balanceUnavailable": "ब्यालेन्स लोड गर्न सकिएन।",
     "hideBalance": "मौज्दात लुकाउनुहोस्",
     "showBalance": "मौज्दात देखाउनुहोस्",
     "balanceHidden": "मौज्दात लुकाइएको छ",
@@ -5030,6 +5056,7 @@
     "providersNeedCatalog": "पूर्ण मोडेल क्याटलग लोड नभएसम्म प्रदायक स्विचहरू पढ्न मात्र मिल्ने रहन्छन्। तिनलाई सम्पादन गर्न माथिको फेरि प्रयास गर्नुहोस् मा ट्याप गर्नुहोस्।",
     "providersEmpty": "यो खोजसँग कुनै प्रदायक मेल खाँदैन।",
     "providersNone": "यो संस्थाका लागि कुनै पनि प्रदायक उपलब्ध छैन।",
+    "providersUnavailable": "प्रदायक सूची लोड गर्न सकिएन।",
     "allowAllShown": "देखाइएका सबैलाई अनुमति दिनुहोस्",
     "denyAllShown": "देखाइएका सबैलाई अस्वीकार गर्नुहोस्",
     "gatewaysDescription": "Kilo ले मोडेल अनुरोधहरू Vercel AI Gateway वा OpenRouter मार्फत रुट गर्छ। अक्षम गरिएको गेटवेले ती अनुरोधहरू असफल बनाउँछ।",

@@ -187,7 +187,30 @@
     "legalDocumentEnglishOnly": "Questo documento è disponibile solo in inglese.",
     "organizationTrialEndedBilling": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Puoi aggiornare la fatturazione, poi riprova.",
     "organizationTrialEndedBillingAtKiloAi": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Puoi aggiornare la fatturazione su kilo.ai, poi riprova.",
-    "viewOnGitHub": "Visualizza la PR su GitHub"
+    "viewOnGitHub": "Visualizza la PR su GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Punto elenco",
+        "nestedBulletPoint": "Punto elenco annidato",
+        "orderedItem": "Elemento elenco {n}",
+        "nestedOrderedItem": "Elemento elenco annidato {n}"
+      },
+      "blockquote": {
+        "quote": "Citazione",
+        "nestedQuote": "Citazione annidata"
+      },
+      "table": {
+        "row": "Riga {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematica: {latex}"
+      },
+      "rotor": {
+        "headings": "Intestazioni",
+        "links": "Collegamenti",
+        "images": "Immagini"
+      }
+    }
   },
   "language": {
     "restarting": "Riavvio per applicare la lingua selezionata",
@@ -281,6 +304,9 @@
     "credits": "Crediti",
     "failedToLoadBalance": "Impossibile caricare il saldo. Tocca per riprovare.",
     "balanceLoadFailed": "Impossibile caricare il saldo",
+    "balanceUnreachable": "Impossibile raggiungere il server. Riprova.",
+    "balanceAccessDenied": "Non hai il permesso di vedere questo saldo.",
+    "balanceUnavailable": "Impossibile caricare il saldo.",
     "hideBalance": "Nascondi saldo",
     "showBalance": "Mostra saldo",
     "balanceHidden": "Saldo nascosto",
@@ -5117,6 +5143,7 @@
     "providersNeedCatalog": "Gli interruttori dei fornitori restano in sola lettura finché non viene caricato il catalogo completo dei modelli. Tocca Riprova qui sopra per modificarli.",
     "providersEmpty": "Nessun fornitore corrisponde a questa ricerca.",
     "providersNone": "Nessun fornitore è disponibile per questa organizzazione.",
+    "providersUnavailable": "Impossibile caricare l'elenco dei fornitori.",
     "allowAllShown": "Consenti tutti quelli mostrati",
     "denyAllShown": "Nega tutti quelli mostrati",
     "gatewaysDescription": "Kilo instrada le richieste dei modelli tramite Vercel AI Gateway o OpenRouter. Un canale di accesso disattivato fa fallire tali richieste.",

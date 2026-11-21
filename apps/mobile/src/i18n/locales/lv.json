@@ -187,7 +187,30 @@
     "legalDocumentEnglishOnly": "Šis dokuments ir pieejams tikai angļu valodā.",
     "organizationTrialEndedBilling": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Jūs varat atjaunināt norēķinu informāciju un pēc tam mēģināt vēlreiz.",
     "organizationTrialEndedBillingAtKiloAi": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Jūs varat atjaunināt norēķinu informāciju vietnē kilo.ai un pēc tam mēģināt vēlreiz.",
-    "viewOnGitHub": "Skatīt PR GitHub"
+    "viewOnGitHub": "Skatīt PR GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Saraksta punkts",
+        "nestedBulletPoint": "Iekļautais saraksta punkts",
+        "orderedItem": "Saraksta vienums {n}",
+        "nestedOrderedItem": "Iekļautais saraksta vienums {n}"
+      },
+      "blockquote": {
+        "quote": "Citāts",
+        "nestedQuote": "Iekļautais citāts"
+      },
+      "table": {
+        "row": "Rinda {n}: {content}"
+      },
+      "math": {
+        "equation": "Matemātika: {latex}"
+      },
+      "rotor": {
+        "headings": "Virsraksti",
+        "links": "Saites",
+        "images": "Attēli"
+      }
+    }
   },
   "language": {
     "restarting": "Notiek restartēšana, lai lietotu izvēlēto valodu",
@@ -281,6 +304,9 @@
     "credits": "Kredīti",
     "failedToLoadBalance": "Neizdevās ielādēt atlikumu. Pieskaries, lai mēģinātu vēlreiz.",
     "balanceLoadFailed": "Neizdevās ielādēt atlikumu",
+    "balanceUnreachable": "Neizdevās sazināties ar serveri. Mēģiniet vēlreiz.",
+    "balanceAccessDenied": "Jums nav atļaujas skatīt šo atlikumu.",
+    "balanceUnavailable": "Atlikumu neizdevās ielādēt.",
     "hideBalance": "Slēpt atlikumu",
     "showBalance": "Rādīt atlikumu",
     "balanceHidden": "Atlikums ir paslēpts",
@@ -5117,6 +5143,7 @@
     "providersNeedCatalog": "Nodrošinātāju slēdži paliek tikai lasāmi, līdz tiek ielādēts pilns modeļu katalogs. Lai tos rediģētu, augstāk nospiediet Mēģināt vēlreiz.",
     "providersEmpty": "Neviens nodrošinātājs neatbilst šim meklējumam.",
     "providersNone": "Šai organizācijai nav pieejams neviens nodrošinātājs.",
+    "providersUnavailable": "Neizdevās ielādēt nodrošinātāju sarakstu.",
     "allowAllShown": "Atļaut visus redzamos",
     "denyAllShown": "Liegt visus redzamos",
     "gatewaysDescription": "Kilo maršrutē modeļu pieprasījumus caur Vercel AI Gateway vai OpenRouter. Atspējota vārteja liek šiem pieprasījumiem neizdoties.",

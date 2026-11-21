@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "この文書は英語でのみご利用いただけます。",
     "organizationTrialEndedBilling": "組織のトライアルは終了し、有効なプランがありません。請求情報を更新してから、もう一度お試しください。",
     "organizationTrialEndedBillingAtKiloAi": "組織のトライアルは終了し、有効なプランがありません。kilo.ai で請求情報を更新してから、もう一度お試しください。",
-    "viewOnGitHub": "GitHubでPRを表示"
+    "viewOnGitHub": "GitHubでPRを表示",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "箇条書きの項目",
+        "nestedBulletPoint": "ネストされた箇条書きの項目",
+        "orderedItem": "リスト項目 {n}",
+        "nestedOrderedItem": "ネストされたリスト項目 {n}"
+      },
+      "blockquote": {
+        "quote": "引用",
+        "nestedQuote": "ネストされた引用"
+      },
+      "table": {
+        "row": "行 {n}：{content}"
+      },
+      "math": {
+        "equation": "数式：{latex}"
+      },
+      "rotor": {
+        "headings": "見出し",
+        "links": "リンク",
+        "images": "画像"
+      }
+    }
   },
   "language": {
     "restarting": "言語設定を適用するために再起動中",
@@ -280,6 +303,9 @@
     "credits": "クレジット",
     "failedToLoadBalance": "残高を読み込めませんでした。タップして再試行してください。",
     "balanceLoadFailed": "残高を読み込めませんでした",
+    "balanceUnreachable": "サーバーに接続できませんでした。もう一度お試しください。",
+    "balanceAccessDenied": "この残高を表示する権限がありません。",
+    "balanceUnavailable": "残高を読み込めませんでした。",
     "hideBalance": "残高を非表示",
     "showBalance": "残高を表示",
     "balanceHidden": "残高は非表示です",
@@ -5030,6 +5056,7 @@
     "providersNeedCatalog": "モデルカタログ全体が読み込まれるまで、プロバイダーのスイッチは読み取り専用です。編集するには、上の再試行をタップしてください。",
     "providersEmpty": "この検索に一致するプロバイダーはありません。",
     "providersNone": "この組織で利用できるプロバイダーはありません。",
+    "providersUnavailable": "プロバイダー一覧を読み込めませんでした",
     "allowAllShown": "表示されているすべてを許可",
     "denyAllShown": "表示されているすべてを拒否",
     "gatewaysDescription": "KiloはモデルリクエストをVercel AI GatewayまたはOpenRouter経由でルーティングします。無効なゲートウェイはそれらのリクエストを失敗させます。",

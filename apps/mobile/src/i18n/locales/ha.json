@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Wannan takarda tana samuwa cikin Turanci kawai.",
     "organizationTrialEndedBilling": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Za ka iya sabunta lissafin kuɗi, sannan ka sake gwadawa.",
     "organizationTrialEndedBillingAtKiloAi": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Za ka iya sabunta lissafin kuɗi a kilo.ai, sannan ka sake gwadawa.",
-    "viewOnGitHub": "Duba PR a GitHub"
+    "viewOnGitHub": "Duba PR a GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Dige",
+        "nestedBulletPoint": "Dige na ciki",
+        "orderedItem": "Abu na jeri {n}",
+        "nestedOrderedItem": "Abu na jeri na ciki {n}"
+      },
+      "blockquote": {
+        "quote": "Ambato",
+        "nestedQuote": "Ambato na ciki"
+      },
+      "table": {
+        "row": "Layi {n}: {content}"
+      },
+      "math": {
+        "equation": "Lissafi: {latex}"
+      },
+      "rotor": {
+        "headings": "Kanuna",
+        "links": "Mahaɗa",
+        "images": "Hotuna"
+      }
+    }
   },
   "language": {
     "restarting": "Ana sake kunnawa don amfani da harshen da aka zaɓa",
@@ -280,6 +303,9 @@
     "credits": "Kuɗin amfani",
     "failedToLoadBalance": "An kasa loda ragowar kuɗi. Danna don sake gwadawa.",
     "balanceLoadFailed": "An kasa loda ragowar kuɗi",
+    "balanceUnreachable": "Ba a iya isa uwar garken ba. Sake gwadawa.",
+    "balanceAccessDenied": "Ba ka da izinin ganin wannan ma'auni.",
+    "balanceUnavailable": "An kasa loda ma'aunin.",
     "hideBalance": "Ɓoye ragowar kuɗi",
     "showBalance": "Nuna ragowar kuɗi",
     "balanceHidden": "An ɓoye ragowar kuɗi",
@@ -5030,6 +5056,7 @@
     "providersNeedCatalog": "Maɓallan masu bayarwa za su kasance na karatu kawai har sai cikakken kundin samfura ya loda. Danna Sake gwadawa a sama don gyara su.",
     "providersEmpty": "Babu masu bayarwa da suka dace da wannan bincike.",
     "providersNone": "Babu masu bayarwa da ke samuwa ga wannan ƙungiya.",
+    "providersUnavailable": "Ba a iya loda jerin masu bayarwa ba.",
     "allowAllShown": "Ba da izini ga duk waɗanda aka nuna",
     "denyAllShown": "Hana duk waɗanda aka nuna",
     "gatewaysDescription": "Kilo yana tura buƙatun samfuri ta Vercel AI Gateway ko OpenRouter. Ƙofar shiga da aka kashe tana sa waɗannan buƙatun su gaza.",

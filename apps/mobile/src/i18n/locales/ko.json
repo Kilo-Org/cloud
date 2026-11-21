@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "이 문서는 영어로만 제공됩니다.",
     "organizationTrialEndedBilling": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. 결제 정보를 업데이트한 후 다시 시도할 수 있습니다.",
     "organizationTrialEndedBillingAtKiloAi": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. kilo.ai에서 결제 정보를 업데이트한 후 다시 시도할 수 있습니다.",
-    "viewOnGitHub": "GitHub에서 PR 보기"
+    "viewOnGitHub": "GitHub에서 PR 보기",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "글머리 기호",
+        "nestedBulletPoint": "중첩 글머리 기호",
+        "orderedItem": "목록 항목 {n}",
+        "nestedOrderedItem": "중첩 목록 항목 {n}"
+      },
+      "blockquote": {
+        "quote": "인용",
+        "nestedQuote": "중첩 인용"
+      },
+      "table": {
+        "row": "행 {n}: {content}"
+      },
+      "math": {
+        "equation": "수학: {latex}"
+      },
+      "rotor": {
+        "headings": "제목",
+        "links": "링크",
+        "images": "이미지"
+      }
+    }
   },
   "language": {
     "restarting": "언어 적용을 위해 다시 시작 중",
@@ -280,6 +303,9 @@
     "credits": "크레딧",
     "failedToLoadBalance": "잔액을 불러오지 못했습니다. 눌러서 다시 시도하세요.",
     "balanceLoadFailed": "잔액을 불러오지 못했습니다",
+    "balanceUnreachable": "서버에 연결할 수 없습니다. 다시 시도하세요.",
+    "balanceAccessDenied": "이 잔액을 볼 권한이 없습니다.",
+    "balanceUnavailable": "잔액을 불러오지 못했습니다.",
     "hideBalance": "잔액 숨기기",
     "showBalance": "잔액 표시",
     "balanceHidden": "잔액이 숨겨짐",
@@ -5030,6 +5056,7 @@
     "providersNeedCatalog": "전체 모델 카탈로그가 로드될 때까지 공급자 스위치는 읽기 전용입니다. 편집하려면 위에서 다시 시도를 누르세요.",
     "providersEmpty": "이 검색과 일치하는 공급자가 없습니다.",
     "providersNone": "이 조직에서 사용할 수 있는 공급자가 없습니다.",
+    "providersUnavailable": "공급자 목록을 불러오지 못했습니다",
     "allowAllShown": "표시된 항목 모두 허용",
     "denyAllShown": "표시된 항목 모두 거부",
     "gatewaysDescription": "Kilo는 모델 요청을 Vercel AI Gateway 또는 OpenRouter를 통해 라우팅합니다. 비활성화된 게이트웨이는 해당 요청을 실패 처리합니다.",

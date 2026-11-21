@@ -6,11 +6,13 @@ import {
   FIREFOX_PLATFORM_LIMIT,
   FIREFOX_UNSUPPORTED_BROWSER_TOOLS,
   MAX_BROWSER_TOOL_CONSOLE_MESSAGES,
+  MAX_BROWSER_TOOL_MESSAGE_TEXT_LENGTH,
   MAX_BROWSER_TOOL_NETWORK_REQUESTS,
   MAX_BROWSER_TOOL_REFS,
   createBrowserToolSession,
   getFirefoxUnsupportedToolError,
 } from './browser-tool-session';
+import { BROWSER_TOOL_DIALOG_OPEN_ERROR } from './browser-tool-dialog';
 import { TAB_NOT_INSPECTABLE_ERROR } from './tab-debugger';
 import { STALE_REF_ERROR } from './browser-agent-checks';
 import { TAB_TAKEN_ERROR } from './browser-caller';
@@ -79,6 +81,7 @@ const createDebuggerApi = ({
   emitDetach: (tabId: number, reason?: string) => void;
   emitEvent: (tabId: number, method: string, params?: Record<string, unknown>) => void;
   setDocumentNodeId: (nextDocumentNodeId: number) => void;
+  setFrameTree: (payload: Record<string, unknown>) => void;
   setVisibilityState: (nextVisibilityState: string) => void;
 } => {
   const attachCalls: number[] = [];
@@ -87,6 +90,7 @@ const createDebuggerApi = ({
   const detachListeners: ChromeDebuggerDetachListener[] = [];
   const eventListeners: ChromeDebuggerEventListener[] = [];
   let currentDocumentNodeId = documentNodeId;
+  let frameTree: Record<string, unknown> | undefined = undefined;
   let currentVisibilityState = visibilityState;
 
   const api: ChromeDebuggerApi = {
@@ -134,6 +138,10 @@ const createDebuggerApi = ({
 
       if (method === 'DOM.querySelectorAll') {
         return { nodeIds: selectorMatches };
+      }
+
+      if (method === 'Page.getFrameTree' && frameTree !== undefined) {
+        return frameTree;
       }
 
       if (method === 'Page.getLayoutMetrics') {
@@ -185,6 +193,9 @@ const createDebuggerApi = ({
     },
     setDocumentNodeId: nextDocumentNodeId => {
       currentDocumentNodeId = nextDocumentNodeId;
+    },
+    setFrameTree: payload => {
+      frameTree = payload;
     },
     setVisibilityState: nextVisibilityState => {
       currentVisibilityState = nextVisibilityState;
@@ -523,6 +534,16 @@ const createFramedScriptingSession = () => {
   ];
   const isolatedKinds: string[] = [];
   const mainWorldFrames: (number | undefined)[] = [];
+  const pressedIn = new Set<string>();
+
+  for (const [name, dom] of [
+    ['shop', shop],
+    ['pay', pay],
+  ] as const) {
+    dom.window.document.addEventListener('keydown', () => {
+      pressedIn.add(name);
+    });
+  }
   const updatedListeners: TabUpdatedListener[] = [];
   const scriptingApi: BrowserScriptingApi = {
     executeScript: async details => {
@@ -550,6 +571,11 @@ const createFramedScriptingSession = () => {
         });
         await withPageGlobals(
           {
+            Event: dom.window.Event,
+            HTMLInputElement: dom.window.HTMLInputElement,
+            HTMLSelectElement: dom.window.HTMLSelectElement,
+            HTMLTextAreaElement: dom.window.HTMLTextAreaElement,
+            KeyboardEvent: dom.window.KeyboardEvent,
             MouseEvent: dom.window.MouseEvent,
             document: dom.window.document,
             location: dom.window.location,
@@ -586,6 +612,8 @@ const createFramedScriptingSession = () => {
     isolatedKinds,
     mainWorldFrames,
     pay,
+    // Where a dispatched key landed, by document name: the tab's own document versus the frame's.
+    pressedIn: () => [...pressedIn].toSorted(),
     session: createBrowserToolSession({ scriptingApi, tabId: 7, tabsApi }),
     shop,
   };
@@ -1044,6 +1072,116 @@ describe('browser tool session', () => {
     debuggerApi.emitEvent(7, 'Page.javascriptDialogClosed', {});
 
     expect(session.takeDialog()).toBeUndefined();
+  });
+
+  it('forgets a frame origin when its frame detaches, keeping the frames that remain', async () => {
+    const { debuggerApi, session } = createSession();
+
+    await session.attach();
+    // The fake answers this one read: the origins a dialog is judged by come from the frame tree.
+    debuggerApi.setFrameTree({
+      frameTree: {
+        childFrames: [
+          { frame: { id: 'gone', securityOrigin: 'https://gone.example.com', url: 'about:blank' } },
+          { frame: { id: 'kept', securityOrigin: 'https://kept.example.com', url: 'about:blank' } },
+        ],
+        frame: {
+          id: 'main',
+          securityOrigin: 'https://main.example.com',
+          url: 'https://main.example.com/',
+        },
+      },
+    });
+    await session.send('Page.getFrameTree');
+
+    debuggerApi.emitEvent(7, 'Page.frameDetached', { frameId: 'gone', reason: 'remove' });
+
+    // A dialog in the detached frame names no origin any more, while the remaining frame still does.
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogOpening', {
+      frameId: 'gone',
+      message: 'Gone',
+      type: 'alert',
+    });
+    expect(session.takeDialog()?.origin).toBeUndefined();
+
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogOpening', {
+      frameId: 'kept',
+      message: 'Kept',
+      type: 'alert',
+    });
+    expect(session.takeDialog()?.origin).toBe('https://kept.example.com');
+  });
+
+  it('bounds the page-written dialog message like every other page text', async () => {
+    const { debuggerApi, session } = createSession();
+
+    await session.attach();
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogOpening', {
+      defaultPrompt: 'x'.repeat(10_000),
+      message: 'y'.repeat(10_000),
+      type: 'prompt',
+    });
+    const dialog = session.takeDialog();
+
+    expect(dialog?.message).toBe(`${'y'.repeat(MAX_BROWSER_TOOL_MESSAGE_TEXT_LENGTH)}...`);
+    expect(dialog?.defaultValue).toBe(`${'x'.repeat(MAX_BROWSER_TOOL_MESSAGE_TEXT_LENGTH)}...`);
+  });
+
+  it('refuses page commands while a dialog is open, sends its answer, and takes commands again once it closes', async () => {
+    const { debuggerApi, session } = createSession();
+
+    await session.attach();
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogOpening', { message: 'Hi', type: 'alert' });
+    const sentBefore = debuggerApi.commands.length;
+
+    await expect(session.send('Runtime.evaluate', { expression: '1' })).rejects.toThrow(
+      BROWSER_TOOL_DIALOG_OPEN_ERROR
+    );
+    await expect(
+      session.send('Input.dispatchMouseEvent', { type: 'mousePressed' })
+    ).rejects.toThrow(BROWSER_TOOL_DIALOG_OPEN_ERROR);
+    // A refused command never reaches the page, so it cannot wait behind the dialog.
+    expect(debuggerApi.commands).toHaveLength(sentBefore);
+
+    await session.send('Page.handleJavaScriptDialog', { accept: true });
+    expect(debuggerApi.commands.at(-1)).toStrictEqual({
+      method: 'Page.handleJavaScriptDialog',
+      params: { accept: true },
+    });
+
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogClosed', { result: true });
+    await expect(session.send('Runtime.evaluate', { expression: '2' })).resolves.toStrictEqual({});
+  });
+
+  it('stops waiting for a page read in flight when the page opens a dialog', async () => {
+    const { debuggerApi, session } = createSession({
+      gate: { command: 'Page.getFrameTree', wait: Promise.withResolvers<void>().promise },
+    });
+
+    await session.attach();
+    const read = session.send('Page.getFrameTree');
+
+    await vi.waitFor(() => {
+      expect(debuggerApi.commands.at(-1)?.method).toBe('Page.getFrameTree');
+    });
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogOpening', { message: 'Hi', type: 'alert' });
+
+    await expect(read).rejects.toThrow(BROWSER_TOOL_DIALOG_OPEN_ERROR);
+  });
+
+  it('refuses a page-code eval at once while a dialog is open, instead of waiting it out', async () => {
+    const { debuggerApi, session } = createSession();
+
+    await session.attach();
+    debuggerApi.emitEvent(7, 'Page.javascriptDialogOpening', { message: 'Hi', type: 'alert' });
+    const sentBefore = debuggerApi.commands.length;
+
+    // The workflow eval path runs page code through the session; on an open dialog it would sit out its 5 s timeout.
+    await expect(session.evaluateInTab('return 1')).resolves.toStrictEqual({
+      error: BROWSER_TOOL_DIALOG_OPEN_ERROR,
+      ok: false,
+    });
+    expect(debuggerApi.commands).toHaveLength(sentBefore);
   });
 
   it('resolves a snapshot ref to its backend node id and a selector through the DOM domain', async () => {
@@ -1907,13 +2045,19 @@ describe('browser tool session scripting backend', () => {
       session.callTool('browser_snapshot', {}, { readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] })
     ).resolves.toStrictEqual({
       ok: true,
-      value: ['- button "Top" [ref=e1]', '- iframe', '  - button "Buy"', '  - textbox'].join('\n'),
+      value: [
+        '- button "Top" [ref=e1]',
+        '- iframe',
+        '  - button "Buy" [ref=e3]',
+        '  - textbox [ref=e4]',
+      ].join('\n'),
     });
     await expect(session.resolveTarget('e2')).resolves.toBeUndefined();
     expect(isolatedKinds).toStrictEqual(['frame']);
   });
 
-  it('splices from the call’s frame inventory instead of probing the frames again', async () => {
+  it('resolves the hosted frame from the frames read after the snapshot, not the call’s earlier inventory', async () => {
+    // The inventory was read before the snapshot ran; this fake says it saw no iframe at all.
     const { isolatedKinds, session } = createFramedScriptingSession();
     const readFrames = vi.fn(() =>
       Promise.resolve({
@@ -1924,7 +2068,7 @@ describe('browser tool session scripting backend', () => {
           { id: '4', origin: PAY_ORIGIN, parentId: '0', url: `${PAY_ORIGIN}/` },
         ],
         owners: new Map<string, readonly (string | undefined)[]>([
-          ['0', ['4']],
+          ['0', []],
           ['4', []],
         ]),
       })
@@ -1938,10 +2082,15 @@ describe('browser tool session scripting backend', () => {
       )
     ).resolves.toStrictEqual({
       ok: true,
-      value: ['- button "Top" [ref=e1]', '- iframe', '  - button "Buy"', '  - textbox'].join('\n'),
+      value: [
+        '- button "Top" [ref=e1]',
+        '- iframe',
+        '  - button "Buy" [ref=e3]',
+        '  - textbox [ref=e4]',
+      ].join('\n'),
     });
-    expect(readFrames.mock.calls).toStrictEqual([[]]);
-    expect(isolatedKinds).toStrictEqual([]);
+    // Frame owners come from a read taken after the snapshot, so they align with the lines it printed.
+    expect(isolatedKinds).toStrictEqual(['frame']);
   });
 
   it('makes every scripting ref stale once the tab starts loading another document', async () => {
@@ -1959,6 +2108,119 @@ describe('browser tool session scripting backend', () => {
       error: STALE_REF_ERROR,
       ok: false,
     });
+  });
+
+  it('runs a ref from a granted frame in that frame, never in the top document', async () => {
+    const { mainWorldFrames, pay, session, shop } = createFramedScriptingSession();
+    const clicked: string[] = [];
+
+    shop.window.document.querySelector('button')?.addEventListener('click', () => {
+      clicked.push('shop');
+    });
+    pay.window.document.querySelector('button')?.addEventListener('click', () => {
+      clicked.push('pay');
+    });
+
+    await session.callTool('browser_snapshot', {}, { readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] });
+    // Both documents name their button `body > button`; only the frame id tells them apart.
+    await expect(session.resolveTarget('e3')).resolves.toStrictEqual({
+      frameId: 4,
+      kind: 'selector',
+      nodeId: 0,
+      selector: 'body > button',
+    });
+    await expect(session.resolveTarget('e1')).resolves.toStrictEqual({
+      kind: 'selector',
+      nodeId: 0,
+      selector: 'body > button',
+    });
+    // The input exists only in the frame, so its match is counted in the frame's document.
+    await expect(session.resolveTarget('e4')).resolves.toStrictEqual({
+      frameId: 4,
+      kind: 'selector',
+      nodeId: 0,
+      selector: 'body > input',
+    });
+
+    mainWorldFrames.length = 0;
+
+    await expect(session.callTool('browser_click', { target: 'e3' })).resolves.toStrictEqual({
+      ok: true,
+      value: 'Clicked ref=e3 with the left button.',
+    });
+    expect(clicked).toStrictEqual(['pay']);
+    expect(mainWorldFrames).toStrictEqual([4]);
+
+    await expect(
+      session.callTool('browser_fill_form', {
+        fields: [
+          { name: 'Top', target: 'e1', type: 'textbox', value: 'a' },
+          { name: 'Card', target: 'e4', type: 'textbox', value: 'b' },
+        ],
+      })
+    ).resolves.toStrictEqual({
+      error:
+        'browser_fill_form fields live in different frames: fill each frame with its own call.',
+      ok: false,
+    });
+
+    await expect(session.callTool('browser_snapshot', { target: 'e3' })).resolves.toStrictEqual({
+      ok: true,
+      value: '- button "Buy" [ref=e5]',
+    });
+    await expect(session.resolveTarget('e5')).resolves.toStrictEqual({
+      frameId: 4,
+      kind: 'selector',
+      nodeId: 0,
+      selector: 'body > button',
+    });
+  });
+
+  it('presses a key in the frame a typed ref focused, across the separate calls the runtime makes', async () => {
+    const { mainWorldFrames, pressedIn, session } = createFramedScriptingSession();
+
+    // The runtime binds a fresh view per tool message; only the caller key is the same.
+    const typeCall = session.bindCaller('cli-session');
+    const pressCall = session.bindCaller('cli-session');
+
+    await typeCall.callTool('browser_snapshot', {}, { readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] });
+    const typed = await typeCall.callTool(
+      'browser_type',
+      { target: 'e4', text: 'igor@example.com' },
+      { readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] }
+    );
+
+    expect(typed).toMatchObject({ ok: true });
+    mainWorldFrames.length = 0;
+
+    await expect(pressCall.callTool('browser_press_key', { key: 'Enter' })).resolves.toStrictEqual({
+      ok: true,
+      value: 'Pressed Enter.',
+    });
+    // Enter must reach the field's own document: the top document's <iframe> element would swallow it.
+    expect(pressedIn()).toStrictEqual(['pay']);
+    expect(mainWorldFrames).toStrictEqual([4]);
+  });
+
+  it('keeps the previous focus when a type call fails', async () => {
+    const { mainWorldFrames, pressedIn, session } = createFramedScriptingSession();
+
+    const typeCall = session.bindCaller('cli-session');
+    const pressCall = session.bindCaller('cli-session');
+
+    const failed = await typeCall.callTool(
+      'browser_type',
+      { target: 'e404', text: 'x' },
+      { readableOrigins: [SHOP_ORIGIN, PAY_ORIGIN] }
+    );
+
+    expect(failed.ok).toBe(false);
+    mainWorldFrames.length = 0;
+
+    await pressCall.callTool('browser_press_key', { key: 'Enter' });
+
+    expect(pressedIn()).toStrictEqual(['shop']);
+    expect(mainWorldFrames).toStrictEqual([undefined]);
   });
 
   it('caps a caller’s merged refs, dropping the oldest earlier refs first', async () => {

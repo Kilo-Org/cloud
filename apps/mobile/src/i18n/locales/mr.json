@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "हा दस्तऐवज फक्त इंग्रजीत उपलब्ध आहे.",
     "organizationTrialEndedBilling": "संस्थेची चाचणी संपली आहे आणि तिच्याकडे कोणतीही सक्रिय योजना नाही. तुम्ही बिलिंग अपडेट करू शकता, त्यानंतर पुन्हा प्रयत्न करा.",
     "organizationTrialEndedBillingAtKiloAi": "संस्थेची चाचणी संपली आहे आणि तिच्याकडे कोणतीही सक्रिय योजना नाही. तुम्ही kilo.ai वर बिलिंग अपडेट करू शकता, त्यानंतर पुन्हा प्रयत्न करा.",
-    "viewOnGitHub": "GitHub वर PR पहा"
+    "viewOnGitHub": "GitHub वर PR पहा",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "बुलेट पॉइंट",
+        "nestedBulletPoint": "नेस्टेड बुलेट पॉइंट",
+        "orderedItem": "यादी आयटम {n}",
+        "nestedOrderedItem": "नेस्टेड यादी आयटम {n}"
+      },
+      "blockquote": {
+        "quote": "अवतरण",
+        "nestedQuote": "नेस्टेड अवतरण"
+      },
+      "table": {
+        "row": "ओळ {n}: {content}"
+      },
+      "math": {
+        "equation": "गणित: {latex}"
+      },
+      "rotor": {
+        "headings": "शीर्षके",
+        "links": "लिंक",
+        "images": "प्रतिमा"
+      }
+    }
   },
   "language": {
     "restarting": "निवडलेली भाषा लागू करण्यासाठी पुन्हा सुरू होत आहे",
@@ -280,6 +303,9 @@
     "credits": "क्रेडिट",
     "failedToLoadBalance": "शिल्लक लोड करता आली नाही. पुन्हा प्रयत्न करण्यासाठी टॅप करा.",
     "balanceLoadFailed": "शिल्लक लोड करता आली नाही",
+    "balanceUnreachable": "सर्व्हरशी संपर्क होऊ शकला नाही. पुन्हा प्रयत्न करा.",
+    "balanceAccessDenied": "तुम्हाला हे शिल्लक पाहण्याची परवानगी नाही.",
+    "balanceUnavailable": "शिल्लक लोड होऊ शकली नाही.",
     "hideBalance": "शिल्लक लपवा",
     "showBalance": "शिल्लक दाखवा",
     "balanceHidden": "शिल्लक लपवली आहे",
@@ -5030,6 +5056,7 @@
     "providersNeedCatalog": "संपूर्ण मॉडेल कॅटलॉग लोड होईपर्यंत प्रदाता स्विच केवळ-वाचनीय राहतात. ते संपादित करण्यासाठी वरील पुन्हा प्रयत्न करा वर टॅप करा.",
     "providersEmpty": "या शोधाशी कोणताही प्रदाता जुळत नाही.",
     "providersNone": "या संस्थेसाठी कोणताही प्रदाता उपलब्ध नाही.",
+    "providersUnavailable": "प्रदात्यांची यादी लोड होऊ शकली नाही.",
     "allowAllShown": "दाखवलेले सर्व अनुमत करा",
     "denyAllShown": "दाखवलेले सर्व नाकारा",
     "gatewaysDescription": "Kilo मॉडेल विनंत्या Vercel AI Gateway किंवा OpenRouter मार्फत राउट करते. बंद केलेला गेटवे त्या विनंत्या अयशस्वी करतो.",

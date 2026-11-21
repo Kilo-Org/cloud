@@ -189,7 +189,30 @@
     "legalDocumentEnglishOnly": "Dan id-dokument huwa disponibbli bl-Ingliż biss.",
     "organizationTrialEndedBilling": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Tista' taġġorna l-fatturazzjoni, imbagħad terġa' tipprova.",
     "organizationTrialEndedBillingAtKiloAi": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Tista' taġġorna l-fatturazzjoni fuq kilo.ai, imbagħad terġa' tipprova.",
-    "viewOnGitHub": "Ara l-PR fuq GitHub"
+    "viewOnGitHub": "Ara l-PR fuq GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Punt tal-lista",
+        "nestedBulletPoint": "Punt tal-lista mnidif",
+        "orderedItem": "Element tal-lista {n}",
+        "nestedOrderedItem": "Element tal-lista mnidif {n}"
+      },
+      "blockquote": {
+        "quote": "Kwotazzjoni",
+        "nestedQuote": "Kwotazzjoni mnidifa"
+      },
+      "table": {
+        "row": "Ringiela {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Titli",
+        "links": "Ħoloq",
+        "images": "Immaġnijiet"
+      }
+    }
   },
   "language": {
     "restarting": "L-app qed terġa' tibda biex tapplika l-lingwa",
@@ -283,6 +306,9 @@
     "credits": "Krediti",
     "failedToLoadBalance": "Ma setax jitgħabba l-bilanċ. Tektek biex terġa' tipprova.",
     "balanceLoadFailed": "Ma setax jitgħabba l-bilanċ",
+    "balanceUnreachable": "Ma setgħetx waslet għas-server. Erġa' pprova.",
+    "balanceAccessDenied": "M'għandekx permess tara dan il-bilanċ.",
+    "balanceUnavailable": "Il-bilanċ ma setax jitgħabba.",
     "hideBalance": "Aħbi l-bilanċ",
     "showBalance": "Uri l-bilanċ",
     "balanceHidden": "Il-bilanċ huwa moħbi",
@@ -5291,6 +5317,7 @@
     "providersNeedCatalog": "Is-swiċċijiet tal-fornituri jibqgħu biss għall-qari sakemm jitgħabba l-katalgu sħiħ tal-mudelli. Agħfas Erġa' pprova hawn fuq biex teditjahom.",
     "providersEmpty": "Ebda fornitur ma jaqbel ma' din it-tfittxija.",
     "providersNone": "M'hemm l-ebda fornitur disponibbli għal din l-organizzazzjoni.",
+    "providersUnavailable": "Il-lista tal-fornituri ma setgħetx titgħabba.",
     "allowAllShown": "Ippermetti kollha li jidhru",
     "denyAllShown": "Irrifjuta kollha li jidhru",
     "gatewaysDescription": "Kilo jidderieġi t-talbiet tal-mudelli permezz ta' Vercel AI Gateway jew OpenRouter. Portal mitfi jfalli dawk it-talbiet.",

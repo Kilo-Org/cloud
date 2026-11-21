@@ -188,7 +188,30 @@
     "legalDocumentEnglishOnly": "Šis dokumentas prieinamas tik anglų kalba.",
     "organizationTrialEndedBilling": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Galite atnaujinti atsiskaitymo duomenis, tada bandykite dar kartą.",
     "organizationTrialEndedBillingAtKiloAi": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Galite atnaujinti atsiskaitymo duomenis adresu kilo.ai, tada bandykite dar kartą.",
-    "viewOnGitHub": "Peržiūrėti PR GitHub platformoje"
+    "viewOnGitHub": "Peržiūrėti PR GitHub platformoje",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Sąrašo punktas",
+        "nestedBulletPoint": "Įdėtasis sąrašo punktas",
+        "orderedItem": "Sąrašo elementas {n}",
+        "nestedOrderedItem": "Įdėtasis sąrašo elementas {n}"
+      },
+      "blockquote": {
+        "quote": "Citata",
+        "nestedQuote": "Įdėtoji citata"
+      },
+      "table": {
+        "row": "Eilutė {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Antraštės",
+        "links": "Nuorodos",
+        "images": "Paveikslėliai"
+      }
+    }
   },
   "language": {
     "restarting": "Paleidžiama iš naujo, kad būtų pakeista kalba",
@@ -282,6 +305,9 @@
     "credits": "Kreditai",
     "failedToLoadBalance": "Nepavyko įkelti likučio. Bakstelėkite, kad bandytumėte dar kartą.",
     "balanceLoadFailed": "Nepavyko įkelti likučio",
+    "balanceUnreachable": "Nepavyko prisijungti prie serverio. Bandykite dar kartą.",
+    "balanceAccessDenied": "Neturite teisės matyti šio likučio.",
+    "balanceUnavailable": "Likučio įkelti nepavyko.",
     "hideBalance": "Slėpti likutį",
     "showBalance": "Rodyti likutį",
     "balanceHidden": "Likutis paslėptas",
@@ -5204,6 +5230,7 @@
     "providersNeedCatalog": "Teikėjų jungikliai lieka tik skaitomi, kol neįkeliamas visas modelių katalogas. Norėdami juos redaguoti, viršuje bakstelėkite Bandyti dar kartą.",
     "providersEmpty": "Nė vienas teikėjas neatitinka šios paieškos.",
     "providersNone": "Šioje organizacijoje nėra prieinamų teikėjų.",
+    "providersUnavailable": "Nepavyko įkelti teikėjų sąrašo.",
     "allowAllShown": "Leisti visus rodomus",
     "denyAllShown": "Drausti visus rodomus",
     "gatewaysDescription": "Kilo nukreipia modelių užklausas per Vercel AI Gateway arba OpenRouter. Kai vartai išjungti, tos užklausos nepavyksta.",

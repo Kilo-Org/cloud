@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "ເອກະສານນີ້ມີໃຫ້ໃນພາສາອັງກິດເທົ່ານັ້ນ.",
     "organizationTrialEndedBilling": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າສາມາດອັບເດດການຮຽກເກັບເງິນໄດ້, ແລ້ວລອງອີກຄັ້ງ.",
     "organizationTrialEndedBillingAtKiloAi": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າສາມາດອັບເດດການເກັບເງິນໄດ້ທີ່ kilo.ai, ແລ້ວລອງອີກຄັ້ງ.",
-    "viewOnGitHub": "ເບິ່ງ PR ໃນ GitHub"
+    "viewOnGitHub": "ເບິ່ງ PR ໃນ GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "ຈຸດລາຍການ",
+        "nestedBulletPoint": "ຈຸດລາຍການຊ້ອນ",
+        "orderedItem": "ຂໍ້ລາຍການ {n}",
+        "nestedOrderedItem": "ຂໍ້ລາຍການຊ້ອນ {n}"
+      },
+      "blockquote": {
+        "quote": "ຄຳອ້າງອີງ",
+        "nestedQuote": "ຄຳອ້າງອີງຊ້ອນ"
+      },
+      "table": {
+        "row": "ແຖວ {n}: {content}"
+      },
+      "math": {
+        "equation": "ຄະນິດສາດ: {latex}"
+      },
+      "rotor": {
+        "headings": "ຫົວຂໍ້",
+        "links": "ລິ້ງ",
+        "images": "ຮູບພາບ"
+      }
+    }
   },
   "language": {
     "restarting": "ກຳລັງເປີດແອັບໃໝ່ເພື່ອໃຊ້ພາສາທີ່ເລືອກ",
@@ -280,6 +303,9 @@
     "credits": "ເຄຣດິດ",
     "failedToLoadBalance": "ບໍ່ສາມາດໂຫຼດຍອດເງິນຄົງເຫຼືອໄດ້. ແຕະເພື່ອລອງອີກຄັ້ງ.",
     "balanceLoadFailed": "ໂຫຼດຍອດເງິນຄົງເຫຼືອບໍ່ໄດ້",
+    "balanceUnreachable": "ບໍ່ສາມາດເຊື່ອມຕໍ່ເຊີບເວີໄດ້. ລອງອີກຄັ້ງ.",
+    "balanceAccessDenied": "ທ່ານບໍ່ມີສິດເບິ່ງຍອດເງິນນີ້.",
+    "balanceUnavailable": "ບໍ່ສາມາດໂຫຼດຍອດເງິນໄດ້.",
     "hideBalance": "ເຊື່ອງຍອດເງິນຄົງເຫຼືອ",
     "showBalance": "ສະແດງຍອດເງິນຄົງເຫຼືອ",
     "balanceHidden": "ເຊື່ອງຍອດເງິນຄົງເຫຼືອແລ້ວ",
@@ -5030,6 +5056,7 @@
     "providersNeedCatalog": "ສະວິດຜູ້ໃຫ້ບໍລິການຈະອ່ານໄດ້ຢ່າງດຽວຈົນກວ່າລາຍການໂມເດວທັງໝົດຈະໂຫຼດແລ້ວ. ກົດ ລອງໃໝ່ ຂ້າງເທິງເພື່ອແກ້ໄຂ.",
     "providersEmpty": "ບໍ່ມີຜູ້ໃຫ້ບໍລິການທີ່ກົງກັບການຄົ້ນຫານີ້.",
     "providersNone": "ບໍ່ມີຜູ້ໃຫ້ບໍລິການທີ່ມີຢູ່ສຳລັບອົງກອນນີ້.",
+    "providersUnavailable": "ບໍ່ສາມາດໂຫຼດລາຍການຜູ້ໃຫ້ບໍລິການໄດ້",
     "allowAllShown": "ອະນຸຍາດທັງໝົດທີ່ສະແດງ",
     "denyAllShown": "ປະຕິເສດທັງໝົດທີ່ສະແດງ",
     "gatewaysDescription": "Kilo ກຳນົດເສັ້ນທາງຄຳຮ້ອງຂໍຕົວແບບຜ່ານ Vercel AI Gateway ຫຼື OpenRouter. ປະຕູເຊື່ອມຕໍ່ທີ່ປິດຈະເຮັດໃຫ້ຄຳຮ້ອງຂໍເຫຼົ່ານັ້ນລົ້ມເຫຼວ.",

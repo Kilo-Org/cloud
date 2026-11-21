@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Dokumen ini hanya tersedia dalam bahasa Inggris.",
     "organizationTrialEndedBilling": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Anda dapat memperbarui penagihan, lalu coba lagi.",
     "organizationTrialEndedBillingAtKiloAi": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Anda dapat memperbarui penagihan di kilo.ai, lalu coba lagi.",
-    "viewOnGitHub": "Lihat PR di GitHub"
+    "viewOnGitHub": "Lihat PR di GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Poin butir",
+        "nestedBulletPoint": "Poin butir bersarang",
+        "orderedItem": "Item daftar {n}",
+        "nestedOrderedItem": "Item daftar bersarang {n}"
+      },
+      "blockquote": {
+        "quote": "Kutipan",
+        "nestedQuote": "Kutipan bersarang"
+      },
+      "table": {
+        "row": "Baris {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematika: {latex}"
+      },
+      "rotor": {
+        "headings": "Judul",
+        "links": "Tautan",
+        "images": "Gambar"
+      }
+    }
   },
   "language": {
     "restarting": "Memulai ulang untuk menerapkan bahasa",
@@ -280,6 +303,9 @@
     "credits": "Kredit",
     "failedToLoadBalance": "Gagal memuat saldo. Ketuk untuk mencoba lagi.",
     "balanceLoadFailed": "Gagal memuat saldo",
+    "balanceUnreachable": "Tidak dapat menghubungi server. Coba lagi.",
+    "balanceAccessDenied": "Anda tidak memiliki izin untuk melihat saldo ini.",
+    "balanceUnavailable": "Saldo tidak dapat dimuat.",
     "hideBalance": "Sembunyikan saldo",
     "showBalance": "Tampilkan saldo",
     "balanceHidden": "Saldo tersembunyi",
@@ -5030,6 +5056,7 @@
     "providersNeedCatalog": "Sakelar penyedia tetap hanya-baca hingga katalog model lengkap dimuat. Coba lagi di atas untuk mengeditnya.",
     "providersEmpty": "Tidak ada penyedia yang cocok dengan pencarian ini.",
     "providersNone": "Tidak ada penyedia yang tersedia untuk organisasi ini.",
+    "providersUnavailable": "Daftar penyedia tidak dapat dimuat.",
     "allowAllShown": "Izinkan semua yang ditampilkan",
     "denyAllShown": "Tolak semua yang ditampilkan",
     "gatewaysDescription": "Kilo merutekan permintaan model melalui Vercel AI Gateway atau OpenRouter. Gerbang yang dinonaktifkan menggagalkan permintaan tersebut.",

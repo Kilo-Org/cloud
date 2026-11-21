@@ -8,7 +8,6 @@ import {
   type BenchmarkSchedulerSettingKey,
 } from '@kilocode/auto-routing-contracts';
 import * as z from 'zod';
-import { PROMPT_TRANSPORT_REVISION } from './prompt-transport';
 
 export type PaidExecutionKey = {
   runId: string;
@@ -479,6 +478,20 @@ export function releaseInitializationLease(db: D1Database, token: string): Promi
 }
 
 /**
+ * True while a dispatcher pass or a container deploy holds the dispatch lock row. The
+ * deploy takes it before it applies migrations and holds it through the rollout, so an
+ * activation that must not be visible to the previous image waits for this to be false:
+ * until the lock is free, no instance of that image can be told apart from this one.
+ */
+export async function dispatchLockHeld(db: D1Database, now: number): Promise<boolean> {
+  const row = await db
+    .prepare('SELECT 1 FROM scheduler_dispatch_lock WHERE id = ? AND lease_until > ?')
+    .bind(DISPATCH_LEASE_ID, now)
+    .first();
+  return row !== null;
+}
+
+/**
  * Claims up to the free slot budget in one pass, holding the dispatch lease while
  * it reads live occupancy, so slot and model caps are applied to a
  * stable snapshot. A dispatcher that finds the lease held returns no claims
@@ -869,7 +882,8 @@ export async function beginPaidCase(
     .prepare(`
     INSERT INTO scheduler_executions (run_id, model, variant, rep, case_id, token, started_at,
       prompt_revision)
-    SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (
+    SELECT ?, ?, ?, ?, ?, ?, ?, (SELECT measurement_revision FROM benchmark_runs WHERE id = ?)
+    WHERE EXISTS (
       SELECT 1 FROM scheduler_chunks WHERE run_id = ? AND model = ? AND variant = ? AND rep = ?
         AND token = ? AND status = 'active' AND lease_until > ?
         AND EXISTS (SELECT 1 FROM json_each(case_ids) WHERE value = ?)
@@ -889,7 +903,7 @@ export async function beginPaidCase(
       key.caseId,
       key.token,
       now,
-      PROMPT_TRANSPORT_REVISION,
+      key.runId,
       key.runId,
       key.model,
       key.variant,

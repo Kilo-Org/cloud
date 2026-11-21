@@ -187,7 +187,30 @@
     "privateRepositoryA11y": "{{name}}, repository privat",
     "legalDocumentEnglishOnly": "Acest document este disponibil doar în engleză.",
     "organizationTrialEndedBilling": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Poți actualiza facturarea, apoi poți încerca din nou.",
-    "organizationTrialEndedBillingAtKiloAi": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Poți actualiza facturarea pe kilo.ai, apoi poți încerca din nou."
+    "organizationTrialEndedBillingAtKiloAi": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Poți actualiza facturarea pe kilo.ai, apoi poți încerca din nou.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Marcator",
+        "nestedBulletPoint": "Marcator imbricat",
+        "orderedItem": "Element de listă {n}",
+        "nestedOrderedItem": "Element de listă imbricat {n}"
+      },
+      "blockquote": {
+        "quote": "Citat",
+        "nestedQuote": "Citat imbricat"
+      },
+      "table": {
+        "row": "Rând {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematică: {latex}"
+      },
+      "rotor": {
+        "headings": "Titluri",
+        "links": "Legături",
+        "images": "Imagini"
+      }
+    }
   },
   "language": {
     "restarting": "Se repornește aplicația pentru a schimba limba",
@@ -281,6 +304,9 @@
     "credits": "Credite",
     "failedToLoadBalance": "Încărcarea soldului a eșuat. Atinge pentru a reîncerca.",
     "balanceLoadFailed": "Încărcarea soldului a eșuat",
+    "balanceUnreachable": "Serverul nu a putut fi contactat. Încearcă din nou.",
+    "balanceAccessDenied": "Nu ai permisiunea de a vedea acest sold.",
+    "balanceUnavailable": "Soldul nu a putut fi încărcat.",
     "hideBalance": "Ascunde soldul",
     "showBalance": "Afișează soldul",
     "balanceHidden": "Sold ascuns",
@@ -5117,6 +5143,7 @@
     "providersNeedCatalog": "Comutatoarele furnizorilor rămân doar pentru citire până la încărcarea catalogului complet de modele. Atingeți Reîncearcă mai sus pentru a le edita.",
     "providersEmpty": "Niciun furnizor nu corespunde acestei căutări.",
     "providersNone": "Nu există furnizori disponibili pentru această organizație.",
+    "providersUnavailable": "Lista furnizorilor nu s-a putut încărca.",
     "allowAllShown": "Permite toate cele afișate",
     "denyAllShown": "Interzice toate cele afișate",
     "gatewaysDescription": "Kilo direcționează cererile către modele prin Vercel AI Gateway sau OpenRouter. O poartă de acces dezactivată face ca aceste cereri să eșueze.",

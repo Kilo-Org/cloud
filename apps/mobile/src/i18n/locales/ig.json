@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "Akwụkwọ a dị naanị n'asụsụ Bekee.",
     "organizationTrialEndedBilling": "Oge nnwale nke òtù ahụ agwụla na o nweghị atụmatụ na-arụ ọrụ. Ị nwere ike imelite nhazi ụgwọ, wee nwaa ọzọ.",
     "organizationTrialEndedBillingAtKiloAi": "Oge nnwale nke òtù ahụ agwụla na o nweghị atụmatụ na-arụ ọrụ. Ị nwere ike imelite nhazi ụgwọ na kilo.ai, wee nwaa ọzọ.",
-    "viewOnGitHub": "Lelee PR na GitHub"
+    "viewOnGitHub": "Lelee PR na GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Bọlite",
+        "nestedBulletPoint": "Bọlite dị n’ime",
+        "orderedItem": "Ihe ndepụta {n}",
+        "nestedOrderedItem": "Ihe ndepụta dị n’ime {n}"
+      },
+      "blockquote": {
+        "quote": "Nhọta",
+        "nestedQuote": "Nhọta dị n’ime"
+      },
+      "table": {
+        "row": "Ahịrị {n}: {content}"
+      },
+      "math": {
+        "equation": "Mgbakọ: {latex}"
+      },
+      "rotor": {
+        "headings": "Isiokwu",
+        "links": "Njikọ",
+        "images": "Onyonyo"
+      }
+    }
   },
   "language": {
     "restarting": "Na-amalitegharị iji asụsụ ahọpụtara",
@@ -280,6 +303,9 @@
     "credits": "Ego ojiji",
     "failedToLoadBalance": "Enweghị ike ibudata ego fọdụrụ. Pịa ka ị nwaa ọzọ.",
     "balanceLoadFailed": "Enweghị ike ibudata ego fọdụrụ",
+    "balanceUnreachable": "Enweghị ike iru sava ahụ. Nwaa ọzọ.",
+    "balanceAccessDenied": "Ị nweghị ikike ịhụ nguzozi a.",
+    "balanceUnavailable": "Enweghị ike ibudata nguzozi a.",
     "hideBalance": "Zoo ego fọdụrụ",
     "showBalance": "Gosi ego fọdụrụ",
     "balanceHidden": "Ezoro ego fọdụrụ",
@@ -5030,6 +5056,7 @@
     "providersNeedCatalog": "Mgba ọkụ ndị na-enye ọrụ ga-anọgide naanị maka ịgụ ruo mgbe katalọgụ ụdị niile ebudatara. Nwaa ọzọ n'elu iji dezie ha.",
     "providersEmpty": "Ọnweghị onye na-enye ọrụ dabara na nchọta a.",
     "providersNone": "Ọnweghị onye na-enye ọrụ dị maka nzukọ a.",
+    "providersUnavailable": "Enweghị ike ibudata ndepụta ndị na-enye ọrụ.",
     "allowAllShown": "Kwe ka ihe niile egosiri",
     "denyAllShown": "Jụ ihe niile egosiri",
     "gatewaysDescription": "Kilo na-eziga arịrịọ ihe nlere site na Vercel AI Gateway ma ọ bụ OpenRouter. Ọnụ ụzọ agbanyụrụ na-eme ka arịrịọ ndị ahụ daa.",

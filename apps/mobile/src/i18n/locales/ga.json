@@ -189,7 +189,30 @@
     "legalDocumentEnglishOnly": "Tá an doiciméad seo ar fáil i mBéarla amháin.",
     "organizationTrialEndedBilling": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir leat an billeáil a nuashonrú agus ansin triail a bhaint as arís.",
     "organizationTrialEndedBillingAtKiloAi": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir leat an billeáil a nuashonrú ag kilo.ai agus ansin triail a bhaint as arís.",
-    "viewOnGitHub": "Féach ar an PR ar GitHub"
+    "viewOnGitHub": "Féach ar an PR ar GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Urphointe",
+        "nestedBulletPoint": "Urphointe neadaithe",
+        "orderedItem": "Mír liosta {n}",
+        "nestedOrderedItem": "Mír liosta neadaithe {n}"
+      },
+      "blockquote": {
+        "quote": "Lua",
+        "nestedQuote": "Lua neadaithe"
+      },
+      "table": {
+        "row": "Ró {n}: {content}"
+      },
+      "math": {
+        "equation": "Matamaitic: {latex}"
+      },
+      "rotor": {
+        "headings": "Ceannteidil",
+        "links": "Naisc",
+        "images": "Íomhánna"
+      }
+    }
   },
   "language": {
     "restarting": "Ag atosú chun an teanga a chur i bhfeidhm",
@@ -283,6 +306,9 @@
     "credits": "Creidmheasanna",
     "failedToLoadBalance": "Níorbh fhéidir an t-iarmhéid a lódáil. Tapáil chun triail eile a bhaint as.",
     "balanceLoadFailed": "Níorbh fhéidir an t-iarmhéid a lódáil",
+    "balanceUnreachable": "Níorbh fhéidir an freastalaí a bhaint amach. Triail arís.",
+    "balanceAccessDenied": "Níl cead agat an iarmhéid seo a fheiceáil.",
+    "balanceUnavailable": "Níorbh fhéidir an t-iarmhéid a lódáil.",
     "hideBalance": "Folaigh an t-iarmhéid",
     "showBalance": "Taispeáin an t-iarmhéid",
     "balanceHidden": "Tá an t-iarmhéid folaithe",
@@ -5291,6 +5317,7 @@
     "providersNeedCatalog": "Fanann lasca na soláthraithe inléite amháin go dtí go lódálfar an catalóg iomlán samhlacha. Bain triail eile as thuas chun iad a chur in eagar.",
     "providersEmpty": "Níl aon soláthraí ag teacht leis an gcuardach seo.",
     "providersNone": "Níl aon soláthraí ar fáil don eagraíocht seo.",
+    "providersUnavailable": "Níorbh fhéidir liosta na soláthraithe a lódáil.",
     "allowAllShown": "Ceadaigh gach rud atá le feiceáil",
     "denyAllShown": "Diúltaigh do gach rud atá le feiceáil",
     "gatewaysDescription": "Ródálann Kilo iarratais samhla trí Vercel AI Gateway nó OpenRouter. Teipeann geata atá múchta ar na hiarratais sin.",

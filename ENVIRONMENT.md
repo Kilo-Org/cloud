@@ -187,7 +187,7 @@ Usage-accounting transport is selected from deployment labels alone: staging wit
 - `INTERNAL_BOT_RESOURCE_TOKENS_ENABLED` - Default-off family gate for internal bot tokens from `POST /api/internal/bot-token`; requires the master and exact `true`. [SERVER]
 - `CALLBACK_TOKEN_SECRET` - Secret for signing callback tokens. Required for local development. `[SECRET]`
 - `INTERNAL_SECRET` - Alias/fallback for `INTERNAL_API_SECRET`; used in KiloClaw E2E scripts (`services/kiloclaw/e2e/`). `[SECRET]`
-- Native (mobile) sign-in rate limits are Vercel Firewall rules configured in the project's firewall configuration, not environment variables. `native-token-address` counts token exchanges per caller address before the admission gate; `native-token-user` counts them per account after it. Both belong in that configuration, and `apps/web/src/lib/auth/native-token-rate-limit.ts` reports a rule that is not configured at most once a minute. The address rule must answer: when it is absent, the exchange is refused before any provider call.
+- Native (mobile) sign-in rate limits are Vercel Firewall rules configured in the project's firewall configuration, not environment variables. `native-token-address` counts token exchanges per caller address before the admission gate; `native-token-user` counts them per account after it. Both belong in that configuration, and `apps/web/src/lib/auth/native-token-rate-limit.ts` checks them through the shared firewall helper, which reports a rule that is not configured or an answer the firewall blocked at most once a minute. The address rule must answer: when it is absent, the exchange is refused before any provider call.
 - Sign-in code email rate limits are Vercel Firewall rules configured in the project's firewall configuration, not environment variables. `magic-link-email` counts sends per normalized address; `sign-in-code-email-ip` counts sends per caller address. `apps/web/src/lib/auth/email-signin-eligibility.ts` sends a magic link or sign-in code only when both rules answer that the caller may proceed; an unconfigured or unevaluable rule refuses the send and is reported to Sentry at most once a minute, so both rules are required configuration.
 - Native admission rate limiting is a Vercel Firewall rule configured in the project's firewall configuration, not an environment variable. `native-admission-challenge` counts challenge issuance per caller address at `POST /api/auth/native/admission-challenge`; it belongs in that configuration, because `apps/web/src/lib/auth/native-admission.ts` checks it through the shared helper and refuses the request when the rule is unconfigured or cannot be evaluated, reporting that answer to Sentry at most once a minute.
 
@@ -331,8 +331,8 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `NATIVE_ADMISSION_DEV_SENTINEL` - When `true`, non-production accepts the fixed device-attestation sentinel from devices that cannot attest (simulator, emulator without Play Services). Ignored when `NODE_ENV=production`. The mobile build reads the same name. [SERVER]
 - `GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER` - Google Cloud project number for Play Integrity API. Also read by the mobile build, where it ships in the bundle; it is an identifier, not a secret. [SERVER]
 - `GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY` - Service account JSON key for Play Integrity API. `[SECRET]`
-- `GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME` - Expected Android package name (e.g., `com.kilocode.app`), verified against the Play Integrity verdict. [SERVER]
-- `GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS` - Comma-separated SHA-256 signing certificate digests (hex) accepted for the Android app. [SERVER]
+- `GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME` - Android package name (`com.kilocode.kiloapp`), verified against the Play Integrity verdict. [SERVER]
+- `GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS` - Comma-separated SHA-256 digests of accepted Play signing certificates. Use the base64url encoding from `certificateSha256Digest`, not the hex fingerprint. [SERVER]
 
 ### Ablation / Experimentation
 
@@ -342,11 +342,11 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 
 - `POSTGRES_URL` - Primary Postgres connection string. `[SECRET]`
 - `POSTGRES_REPLICA_US_URL` - US read replica used by `readDb` in US Vercel regions (`sfo1`); see `packages/web-shared/src/lib/drizzle.ts`. When unset, `readDb` falls back to the primary, so it must be set on every project that runs in `sfo1`, including `kilocode-ai-gateway`. `[SECRET]`
-- `POSTGRES_REPLICA_EU_URL`, `POSTGRES_REPLICA_EU_URL_2` - EU read replicas; `readDb` picks one at random in EU regions and falls back to the primary when neither is set. `[SECRET]`
+- `POSTGRES_REPLICA_EU_URL`, `POSTGRES_REPLICA_EU_URL_2` - EU read replicas; in EU regions `readDb` picks one per request by hashing the client IP (per instance at random when there is no IP) and falls back to the primary when neither is set. `[SECRET]`
+- `POSTGRES_REPLICAS_DISABLED` - Comma-separated read replica names to switch off without deleting their URLs: `us-west`, `eu-central-1`, `eu-central-2` (the names in replication health alerts). `readDb` skips them and falls back as if their URL were unset. The replication health check logs the disabled names and skips their probes. Disabling every replica is a health check error in production. An unknown name triggers a startup warning and a health check error. Set it on every project that reads replicas (`kilocode-app` and `kilocode-ai-gateway`) and redeploy; see `packages/web-shared/src/lib/read-replicas.ts`. [SERVER]
 - `POSTGRES_SCRIPT_URL` - Alternate Postgres URL used by one-off scripts/backfills in `src/scripts/` and tests. `[SECRET]`
 - `POSTGRES_URL_PRODUCTION` - Production Postgres connection string override; used by `packages/db/src/database-url.ts`. `[SECRET]`
 - `POSTGRES_CONNECT_TIMEOUT` - Postgres connect timeout in ms (required; typical: 10000). [SERVER]
-- `POSTGRES_MAX_QUERY_TIME` - Max allowed query time in ms. [SERVER]
 - `USE_PRODUCTION_DB` - Forces use of the production DB URL in non-production contexts; used by `packages/db/src/database-url.ts`. [SERVER]
 - `DATABASE_CA` - CA certificate content (PEM) for TLS connections to Postgres; used by `packages/db/src/database-url.ts` in tests and scripts. When unset, the connection string's `sslmode` parameter decides: `require`/`prefer`/`no-verify` encrypt, `verify-ca`/`verify-full` also verify the server certificate against the system trust store, `disable` or no `sslmode` keeps TLS off for local development. [SERVER]
 - `DATABASE_URL` - Generic/alternate Postgres URL used by E2E tests and some services (`cloud-agent-next`, `kiloclaw`). `[SECRET]`

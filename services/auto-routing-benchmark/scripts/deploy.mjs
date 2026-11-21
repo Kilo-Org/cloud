@@ -22,6 +22,42 @@ const transientRenewalFailures = new Set([
   'command_timeout',
   'invalid_d1_response',
 ]);
+const COMMAND_OUTPUT_LINES = 40;
+const COMMAND_OUTPUT_BYTES = 16_384;
+
+const keepTail = (current, chunk) => {
+  const next = current + chunk;
+  return next.length > COMMAND_OUTPUT_BYTES ? next.slice(-COMMAND_OUTPUT_BYTES) : next;
+};
+
+function redact(text) {
+  const values = [
+    token,
+    ...Object.entries(process.env)
+      .filter(
+        ([name, value]) => value.length >= 6 && /TOKEN|SECRET|KEY|PASSWORD|CREDENTIAL/i.test(name)
+      )
+      .map(([, value]) => value),
+  ].sort((a, b) => b.length - a.length);
+  let output = text;
+  for (const value of values) output = output.split(value).join('[redacted]');
+  return output.replace(
+    /\b([a-z0-9_]*(?:token|secret|password|key)|authorization)\s*([:=])\s*(['"]?)(?:Bearer\s+)?[^\s'"]{6,}\3/gi,
+    (_, name, separator, quote) => `${name}${separator}${quote}[redacted]${quote}`
+  );
+}
+
+function printCommandOutput(error) {
+  const output = error?.output;
+  if (output === undefined) return;
+  for (const stream of ['stdout', 'stderr']) {
+    const lines = output[stream].trimEnd().split('\n').slice(-COMMAND_OUTPUT_LINES);
+    if (lines.length === 1 && lines[0] === '') continue;
+    process.stderr.write(`--- wrangler ${stream} (last ${lines.length} lines) ---\n`);
+    process.stderr.write(`${redact(lines.join('\n'))}\n`);
+  }
+  process.stderr.write('--- end wrangler output ---\n');
+}
 
 class DeploymentError extends Error {
   constructor(code) {
@@ -65,10 +101,17 @@ function runWrangler(args, timeoutMs, signal = abort.signal, capture = false) {
       detached: true,
     });
     let stdout = '';
+    let stdoutTail = '';
+    let stderrTail = '';
     let commandFailure;
     let killTimer;
+    const commandError = code => {
+      const error = new DeploymentError(code);
+      error.output = { stdout: stdoutTail, stderr: stderrTail };
+      return error;
+    };
     const terminate = code => {
-      commandFailure ??= new DeploymentError(code);
+      commandFailure ??= commandError(code);
       const kill = signalName => {
         if (child.pid === undefined) return;
         try {
@@ -85,20 +128,24 @@ function runWrangler(args, timeoutMs, signal = abort.signal, capture = false) {
     signal.addEventListener('abort', onAbort, { once: true });
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', chunk => {
+      stdoutTail = keepTail(stdoutTail, chunk);
       if (!capture) return;
       if (stdout.length + chunk.length > 1_048_576) terminate('invalid_d1_response');
       else stdout += chunk;
     });
-    child.stderr.resume();
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', chunk => {
+      stderrTail = keepTail(stderrTail, chunk);
+    });
     child.on('error', () => {
-      commandFailure ??= new DeploymentError('command_start_failed');
+      commandFailure ??= commandError('command_start_failed');
     });
     child.on('close', code => {
       clearTimeout(timer);
       clearTimeout(killTimer);
       signal.removeEventListener('abort', onAbort);
       if (commandFailure) reject(commandFailure);
-      else if (code !== 0) reject(new DeploymentError('command_failed'));
+      else if (code !== 0) reject(commandError('command_failed'));
       else resolve(stdout);
     });
   });
@@ -369,6 +416,28 @@ async function deploy() {
    * application leaves it unchanged, so its marker is never trusted. Anything
    * unreadable or ambiguous is unknown.
    */
+  const markerOf = async versionId => {
+    const version = await readJson(
+      ['versions', 'view', versionId, '--json'],
+      workerVersion,
+      commandTimeoutMs
+    );
+    const message = version?.annotations?.['workers/message'];
+    return message?.startsWith(CONTAINER_INPUTS_PREFIX)
+      ? message.slice(CONTAINER_INPUTS_PREFIX.length)
+      : undefined;
+  };
+  const liveDeployment = async () => {
+    const deployments = await readJson(
+      ['deployments', 'list', '--json'],
+      workerDeployments,
+      commandTimeoutMs
+    );
+    const newest = deployments?.sort((a, b) => b.created_on - a.created_on)[0];
+    return newest?.versions.length === 1 && newest.versions[0].percentage === 100
+      ? newest
+      : undefined;
+  };
   const rolledOutContainerInputs = async () => {
     const tracked = await trackedApplications(commandTimeoutMs);
     if (!tracked) return undefined;
@@ -382,15 +451,41 @@ async function deploy() {
       ?.filter(deployment => deployment.created_on <= changedAt)
       .sort((a, b) => b.created_on - a.created_on)[0];
     if (live?.versions.length !== 1 || live.versions[0].percentage !== 100) return undefined;
-    const version = await readJson(
-      ['versions', 'view', live.versions[0].version_id, '--json'],
-      workerVersion,
-      commandTimeoutMs
-    );
-    const message = version?.annotations?.['workers/message'];
-    return message?.startsWith(CONTAINER_INPUTS_PREFIX)
-      ? message.slice(CONTAINER_INPUTS_PREFIX.length)
-      : undefined;
+    return markerOf(live.versions[0].version_id);
+  };
+  /**
+   * A deploy that failed after its Worker version went live leaves new code beside
+   * the previous container image. When this deploy's marker is the live version and
+   * the containers never took it, re-run the container step once: `wrangler deploy`
+   * is the only command that applies the container configuration, and with the
+   * image already pushed it only restarts the rollout.
+   */
+  const recoverHalfApplied = async error => {
+    const live = await liveDeployment();
+    const liveMarker = live && (await markerOf(live.versions[0].version_id));
+    const applied = await rolledOutContainerInputs();
+    const state = marker =>
+      marker === undefined ? 'unknown' : marker === inputs.hash ? 'ours' : 'other';
+    const liveState = state(liveMarker);
+    const appliedState = state(applied);
+    report('deploy_failure_state', { live: liveState, applied: appliedState });
+    // Only a positively observed half-apply is re-run: this deploy's code is the
+    // live Worker version and the containers are on another image. An unreadable
+    // container state may be a rollout still in flight, and re-running would cut
+    // it off, so the state is reported and the failure rethrown untouched.
+    if (liveState !== 'ours' || appliedState !== 'other') throw error;
+    report('half_applied', { rollout: 'rerun' });
+    try {
+      await runWrangler(deployArgs, deployTimeoutMs);
+      await awaitRollout();
+      deployed = true;
+      report('half_applied', { rollout: 'rerun-ok' });
+    } catch (rerun) {
+      if (abort.signal.aborted) throw rerun;
+      report('half_applied', { rollout: 'rerun-failed' });
+      printCommandOutput(rerun);
+    }
+    throw error;
   };
   const rollingApplications = async timeoutMs => {
     const tracked = await trackedApplications(timeoutMs);
@@ -578,9 +673,15 @@ async function deploy() {
     await renew();
     phase = 'deploy';
     report('started', { containersRollout: skipRollout ? 'none' : 'configured' });
-    if (!(skipRollout && (await deployWithoutRollout()))) {
-      if (skipRollout) await renew();
-      await runWrangler(deployArgs, deployTimeoutMs);
+    try {
+      if (!(skipRollout && (await deployWithoutRollout()))) {
+        if (skipRollout) await renew();
+        await runWrangler(deployArgs, deployTimeoutMs);
+      }
+    } catch (error) {
+      if (!(error instanceof DeploymentError) || error.code !== 'command_failed') throw error;
+      phase = 'recover';
+      await recoverHalfApplied(error);
     }
     report('completed');
     deployed = true;
@@ -637,9 +738,12 @@ process.on('SIGINT', onSignal);
 try {
   await deploy();
 } catch (error) {
-  report('failed', {
-    reason: failure?.code ?? (error instanceof DeploymentError ? error.code : 'deployment_failed'),
-  });
+  const reason =
+    failure?.code ?? (error instanceof DeploymentError ? error.code : 'deployment_failed');
+  report('failed', { reason });
+  if (reason === 'command_failed' || reason === 'command_timeout') {
+    printCommandOutput(failure ?? error);
+  }
   process.exitCode = 1;
 } finally {
   clearTimeout(deadlineTimer);

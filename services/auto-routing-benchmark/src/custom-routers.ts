@@ -49,7 +49,17 @@ import {
   type ProfileRow,
 } from './profiles';
 import { variantFromStorage } from './reasoning-effort';
-import { deciderCasesForRouter } from './run';
+import {
+  ACTIVE_MEASUREMENT_REVISION,
+  CLIENT_EVAL_REVISION,
+  deciderCasesForRouter,
+  PROBE_REVISION,
+} from './measurement-revision';
+import {
+  dropIneligibleAgenticResults,
+  dropIneligibleAgenticSummaries,
+  pairsMissingProbeResults,
+} from './probe/eligibility';
 import { buildCustomRoutingTable, filterSummariesByProvenance } from './routing-table-builder';
 
 type ModelCatalog = z.infer<typeof BenchmarkModelCatalogSchema>;
@@ -154,7 +164,7 @@ const platformMeasuredAt = (row: ProfileRow) => row.completed_at ?? row.updated_
 const clientMeasuredAt = (row: ClientProfileRow) => row.updated_at;
 
 function clientProfileComplete(router: AutoRouter, repetitions: number) {
-  const planned = deciderCasesForRouter(router).length * repetitions;
+  const planned = deciderCasesForRouter(router, CLIENT_EVAL_REVISION).length * repetitions;
   return (row: ClientProfileRow) => row.results >= planned;
 }
 
@@ -324,7 +334,7 @@ export async function assembleCustomRouterTable(
     return { table: null };
   }
 
-  const [platformSummaries, platformCases, clientCases] = await Promise.all([
+  const [allPlatformSummaries, allPlatformCases, clientCases] = await Promise.all([
     getSummariesForRuns(db, [...new Set([...platformReady, ...linkedReady].map(r => r.runId))]),
     getRoutingCaseResultsForEntries(db, [...platformReady, ...linkedReady]),
     getClientRoutingCaseResults(
@@ -332,6 +342,19 @@ export async function assembleCustomRouterTable(
       clientReady.map(r => r.profile)
     ),
   ]);
+  // Same route-scoped rule as the platform table (src/probe/eligibility.ts): a platform pair
+  // whose run lacks complete probe results keeps every route the owner chose except the
+  // agentic ones, and a route it alone covered is omitted from this sparse table.
+  const probesActive =
+    context.baseRouter === 'efficient' && ACTIVE_MEASUREMENT_REVISION >= PROBE_REVISION;
+  const ineligible = probesActive
+    ? await pairsMissingProbeResults(db, {
+        entries: [...platformReady, ...linkedReady],
+        revision: PROBE_REVISION,
+      })
+    : new Set<string>();
+  const platformSummaries = dropIneligibleAgenticSummaries(allPlatformSummaries, ineligible);
+  const platformCases = dropIneligibleAgenticResults(allPlatformCases, ineligible);
   // A profile's run id changes with every upload, so new results produce a new table version.
   const clientEntries = clientReady.map(({ profile, stale }) => {
     const runId = `client-profile:${profile.id}:${profile.results}`;
@@ -395,6 +418,9 @@ export async function assembleCustomRouterTable(
       summaries: [
         ...filterSummariesByProvenance(platformReady, platformSummaries),
         ...linkedEntries.flatMap(c => c.summaries),
+        // The probe gate above covers only pairs this benchmark measured: a client-uploaded
+        // profile carries the owner's own measurements, which include the agentic routes, so
+        // it keeps every route it reports (src/custom-routers-probe.test.ts).
         ...clientEntries.flatMap(c => c.summaries),
       ],
       perCaseResults: [

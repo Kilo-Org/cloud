@@ -186,7 +186,30 @@
     "legalDocumentEnglishOnly": "E wātea ana tēnei tuhinga i te reo Ingarihi anake.",
     "organizationTrialEndedBilling": "Kua mutu te whakamātautau o te rōpū, ā, kāore ōna mahere kaha. Ka taea e koe te whakahou i te nama, kātahi ka whakamātau anō.",
     "organizationTrialEndedBillingAtKiloAi": "Kua mutu te whakamātautau o te rōpū, ā, kāore ōna mahere kaha. Ka taea e koe te whakahou i te nama i kilo.ai, kātahi ka whakamātau anō.",
-    "viewOnGitHub": "Tirohia te PR i GitHub"
+    "viewOnGitHub": "Tirohia te PR i GitHub",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Tohu rārangi",
+        "nestedBulletPoint": "Tohu rārangi whakauru",
+        "orderedItem": "Tūemi rārangi {n}",
+        "nestedOrderedItem": "Tūemi rārangi whakauru {n}"
+      },
+      "blockquote": {
+        "quote": "Whakahua",
+        "nestedQuote": "Whakahua whakauru"
+      },
+      "table": {
+        "row": "Rārangi {n}: {content}"
+      },
+      "math": {
+        "equation": "Pāngarau: {latex}"
+      },
+      "rotor": {
+        "headings": "Upoko",
+        "links": "Hono",
+        "images": "Whakaahua"
+      }
+    }
   },
   "language": {
     "restarting": "Kei te tīmata anō hei whakamahi i te reo",
@@ -280,6 +303,9 @@
     "credits": "Ngā moni tōmua",
     "failedToLoadBalance": "Kāore i taea te uta i te toenga. Pāwhiria hei whakamātau anō.",
     "balanceLoadFailed": "Kāore i taea te uta i te toenga",
+    "balanceUnreachable": "Kāore i taea te toro atu ki te tūmau. Whakamātauria anō.",
+    "balanceAccessDenied": "Kāore ōu mana ki te tiro i tēnei toenga.",
+    "balanceUnavailable": "Kāore i taea te uta i te toenga.",
     "hideBalance": "Hunaia te toenga",
     "showBalance": "Whakaaturia te toenga",
     "balanceHidden": "Kua huna te toenga",
@@ -5030,6 +5056,7 @@
     "providersNeedCatalog": "Ka noho pānui-anake ngā pana kaiwhakarato kia uta katoa rā anō te rārangi tauira. Pēhia te Whakamātau anō i runga ake nei kia taea ai te whakatika.",
     "providersEmpty": "Kāore he kaiwhakarato e hāngai ana ki tēnei rapunga.",
     "providersNone": "Kāore he kaiwhakarato e wātea ana mō tēnei whakahaere.",
+    "providersUnavailable": "Kāore i taea te uta i te rārangi kaiwhakarato.",
     "allowAllShown": "Whakaaetia ngā mea katoa e whakaatuhia ana",
     "denyAllShown": "Whakakāhoretia ngā mea katoa e whakaatuhia ana",
     "gatewaysDescription": "Ka tuku a Kilo i ngā tono tauira mā Vercel AI Gateway, mā OpenRouter rānei. Ka rahua ērā tono i tētahi kuwaha kua whakawetohia.",

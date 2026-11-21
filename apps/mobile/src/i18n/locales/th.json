@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}, รีโพซิทอรีส่วนตัว",
     "legalDocumentEnglishOnly": "เอกสารนี้มีเฉพาะในภาษาอังกฤษเท่านั้น",
     "organizationTrialEndedBilling": "การทดลองใช้งานขององค์กรสิ้นสุดลงแล้วและองค์กรไม่มีแผนที่ใช้งานอยู่ คุณสามารถอัปเดตการเรียกเก็บเงินได้ แล้วลองอีกครั้ง",
-    "organizationTrialEndedBillingAtKiloAi": "การทดลองใช้งานขององค์กรสิ้นสุดลงแล้วและองค์กรไม่มีแผนที่ใช้งานอยู่ คุณสามารถอัปเดตการเรียกเก็บเงินได้ที่ kilo.ai แล้วลองอีกครั้ง"
+    "organizationTrialEndedBillingAtKiloAi": "การทดลองใช้งานขององค์กรสิ้นสุดลงแล้วและองค์กรไม่มีแผนที่ใช้งานอยู่ คุณสามารถอัปเดตการเรียกเก็บเงินได้ที่ kilo.ai แล้วลองอีกครั้ง",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "จุดหัวข้อ",
+        "nestedBulletPoint": "จุดหัวข้อซ้อน",
+        "orderedItem": "รายการที่ {n}",
+        "nestedOrderedItem": "รายการที่ซ้อน {n}"
+      },
+      "blockquote": {
+        "quote": "คำอ้างอิง",
+        "nestedQuote": "คำอ้างอิงซ้อน"
+      },
+      "table": {
+        "row": "แถว {n}: {content}"
+      },
+      "math": {
+        "equation": "คณิตศาสตร์: {latex}"
+      },
+      "rotor": {
+        "headings": "หัวข้อ",
+        "links": "ลิงก์",
+        "images": "รูปภาพ"
+      }
+    }
   },
   "language": {
     "restarting": "กำลังเริ่มแอปใหม่เพื่อเปลี่ยนภาษา",
@@ -280,6 +303,9 @@
     "credits": "เครดิต",
     "failedToLoadBalance": "โหลดยอดคงเหลือไม่สำเร็จ แตะเพื่อลองอีกครั้ง",
     "balanceLoadFailed": "โหลดยอดคงเหลือไม่สำเร็จ",
+    "balanceUnreachable": "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ลองอีกครั้ง",
+    "balanceAccessDenied": "คุณไม่มีสิทธิ์ดูยอดคงเหลือนี้",
+    "balanceUnavailable": "โหลดยอดคงเหลือไม่ได้",
     "hideBalance": "ซ่อนยอดคงเหลือ",
     "showBalance": "แสดงยอดคงเหลือ",
     "balanceHidden": "ยอดคงเหลือถูกซ่อน",
@@ -5030,6 +5056,7 @@
     "providersNeedCatalog": "สวิตช์ผู้ให้บริการจะเป็นแบบอ่านอย่างเดียวจนกว่าแค็ตตาล็อกโมเดลทั้งหมดจะโหลดเสร็จ แตะลองอีกครั้งด้านบนเพื่อแก้ไข",
     "providersEmpty": "ไม่มีผู้ให้บริการที่ตรงกับการค้นหานี้",
     "providersNone": "ไม่มีผู้ให้บริการที่พร้อมใช้งานสำหรับองค์กรนี้",
+    "providersUnavailable": "โหลดรายการผู้ให้บริการไม่สำเร็จ",
     "allowAllShown": "อนุญาตทั้งหมดที่แสดง",
     "denyAllShown": "ปฏิเสธทั้งหมดที่แสดง",
     "gatewaysDescription": "Kilo กำหนดเส้นทางคำขอของโมเดลผ่าน Vercel AI Gateway หรือ OpenRouter เกตเวย์ที่ปิดใช้งานจะทำให้คำขอเหล่านั้นล้มเหลว",

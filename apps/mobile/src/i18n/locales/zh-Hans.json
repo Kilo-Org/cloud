@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}，私有仓库",
     "legalDocumentEnglishOnly": "本文件仅提供英文版本。",
     "organizationTrialEndedBilling": "组织的试用期已结束，且没有生效的套餐。您可以更新账单信息，然后重试。",
-    "organizationTrialEndedBillingAtKiloAi": "组织的试用期已结束，且没有生效的套餐。您可以在 kilo.ai 更新账单信息，然后重试。"
+    "organizationTrialEndedBillingAtKiloAi": "组织的试用期已结束，且没有生效的套餐。您可以在 kilo.ai 更新账单信息，然后重试。",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "项目符号",
+        "nestedBulletPoint": "嵌套项目符号",
+        "orderedItem": "列表项 {n}",
+        "nestedOrderedItem": "嵌套列表项 {n}"
+      },
+      "blockquote": {
+        "quote": "引用",
+        "nestedQuote": "嵌套引用"
+      },
+      "table": {
+        "row": "行 {n}：{content}"
+      },
+      "math": {
+        "equation": "数学：{latex}"
+      },
+      "rotor": {
+        "headings": "标题",
+        "links": "链接",
+        "images": "图片"
+      }
+    }
   },
   "language": {
     "restarting": "正在重启以应用语言设置",
@@ -280,6 +303,9 @@
     "credits": "额度",
     "failedToLoadBalance": "加载余额失败。点击重试。",
     "balanceLoadFailed": "加载余额失败",
+    "balanceUnreachable": "无法连接到服务器。请重试。",
+    "balanceAccessDenied": "你没有查看此余额的权限。",
+    "balanceUnavailable": "无法加载余额。",
     "hideBalance": "隐藏余额",
     "showBalance": "显示余额",
     "balanceHidden": "余额已隐藏",
@@ -5030,6 +5056,7 @@
     "providersNeedCatalog": "在完整模型目录加载完成前，提供商开关为只读状态。点按上方的重试即可编辑。",
     "providersEmpty": "没有匹配此搜索的提供商。",
     "providersNone": "此组织没有可用的提供商。",
+    "providersUnavailable": "无法加载提供商列表。",
     "allowAllShown": "允许所有显示的项",
     "denyAllShown": "拒绝所有显示的项",
     "gatewaysDescription": "Kilo 通过 Vercel AI Gateway 或 OpenRouter 路由模型请求。已禁用的网关会使这些请求失败。",

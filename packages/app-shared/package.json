@@ -47,6 +47,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@kilocode/organization-entitlement": "workspace:*",
     "@kilocode/session-ingest-contracts": "workspace:*",
     "zod": "catalog:"
   },

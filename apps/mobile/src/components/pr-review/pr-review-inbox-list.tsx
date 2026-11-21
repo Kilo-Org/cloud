@@ -27,6 +27,7 @@ import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useOrganization } from '@/lib/organization-context';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import {
   providerPrRefLabel,
@@ -82,9 +83,11 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
     setOrganizationId(null);
   };
   const reconnectOnly = inbox.githubNeedsReconnect && !inbox.isPending && inbox.items.length === 0;
+  const connectivity = useCommittedConnectivityStatus();
   const view = selectPrInboxView({
     isPending: inbox.isPending,
     isFetching: inbox.isFetching,
+    isOffline: connectivity === 'offline',
     itemCount: inbox.items.length,
     firstPageErrorState:
       inbox.firstPageErrorState ?? (reconnectOnly ? { kind: 'reconnect' } : null),

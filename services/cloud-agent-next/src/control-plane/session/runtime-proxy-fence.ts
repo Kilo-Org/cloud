@@ -1,4 +1,8 @@
 import { TRPCError } from '@trpc/server';
+import {
+  RuntimeAuthorizationExpiredError,
+  RuntimeAuthorizationRevokedError,
+} from '@kilocode/worker-utils/runtime-authorization';
 import { withDORetry } from '../../utils/do-retry.js';
 import { logger } from '../../logger.js';
 import type {
@@ -30,6 +34,7 @@ type RuntimeProxyFencePeer = {
     kiloSessionId: string;
     directory: string;
     handle: string;
+    originProof?: string;
   }): Promise<ControlRuntimeCredentialProxyFenceScope | null>;
 };
 
@@ -67,16 +72,44 @@ export class RuntimeProxyFenceTransportError extends TRPCError {
 }
 
 /**
- * How the Session DO answers a fence-read failure. `deny` is a 401 (no scope
- * view, no fallback); `retry` rethrows the retryable 503; `fallback` keeps the
- * existing scope resolution for a revoked/expired local authorization.
+ * How the Session DO answers a failed local grant resolution.
+ *
+ * - `deny`: a 401. The handle is not valid for the caller's grant, so neither
+ *   the scope view nor a shared-scope fallback is served.
+ * - `retry`: rethrow, and the facade answers its retryable 503
+ *   `Credential unavailable`.
+ * - `fallback`: only a revoked or expired local runtime authorization, which a
+ *   surviving member of the canonical scope may still serve with its own
+ *   backing credential.
  */
 export type RuntimeProxyFenceErrorOutcome = 'deny' | 'retry' | 'fallback';
 
+/**
+ * Classifies a failure from the local grant resolution. The exact contract:
+ *
+ * - `RuntimeProxyScopeViewDenialError` -> `deny`.
+ * - `RuntimeProxyFenceTransportError` -> `retry`.
+ * - `RuntimeAuthorizationRevokedError` or `RuntimeAuthorizationExpiredError` ->
+ *   `fallback`.
+ * - Every other value, including `null` and non-`Error` throws -> `retry`.
+ *
+ * The classification is exhaustive and the default is retryable. A storage or
+ * database fault is not evidence about the credential, so it keeps the
+ * retryable 503 `Credential unavailable` answer and is not reported as a
+ * denial. Only the two authorization outcomes above use the scope fallback.
+ *
+ * Matching is by `instanceof`, so a value that merely carries one of these
+ * names is not treated as an authorization failure.
+ */
 export function classifyRuntimeProxyFenceError(error: unknown): RuntimeProxyFenceErrorOutcome {
   if (isRuntimeProxyScopeViewDenialError(error)) return 'deny';
   if (error instanceof RuntimeProxyFenceTransportError) return 'retry';
-  return 'fallback';
+  if (
+    error instanceof RuntimeAuthorizationRevokedError ||
+    error instanceof RuntimeAuthorizationExpiredError
+  )
+    return 'fallback';
+  return 'retry';
 }
 
 export function logRuntimeProxyFenceFailure(
@@ -108,6 +141,7 @@ export async function readRuntimeProxyFence(input: {
     kiloSessionId: string;
     directory: string;
     handle: string;
+    originProof?: string;
   };
   correlation: RuntimeProxyFenceCorrelation;
 }): Promise<{ fence: ControlRuntimeCredentialProxyFence; scopeView?: ScopeGrantView } | null> {

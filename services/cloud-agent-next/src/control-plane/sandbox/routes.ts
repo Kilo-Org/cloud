@@ -44,6 +44,7 @@ import {
   OrganizationMembershipUnavailableError,
 } from './organization-membership.js';
 import { VercelScmContainmentError } from '../../scm-broker/vercel-identity.js';
+import { NetworkSecretConfigurationError } from '../../network-secrets/errors.js';
 
 export type RouteDatabase = ReturnType<typeof drizzle>;
 
@@ -393,6 +394,12 @@ export function grantIssueFailure(
   error: unknown,
   fallbackStage: string
 ): { reason: ControlPlaneFailureReason; stage: string } {
+  if (error instanceof NetworkSecretConfigurationError) {
+    return {
+      reason: 'network_secret_configuration_invalid',
+      stage: 'network_secret_configuration_invalid',
+    };
+  }
   if (error instanceof OrganizationAccessRevokedError) {
     // The owner left the organization the session belongs to: the route cannot
     // run on organization authority, and no retry of the same attempt mints it.

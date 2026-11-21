@@ -4,11 +4,12 @@ import { buildWorkflowPageCode } from './agent-workflow-runner';
 import { TAB_TAKEN_ERROR } from './browser-caller';
 import { STALE_REF_ERROR } from './browser-agent-checks';
 import { runIsolatedAgentProbe } from './browser-agent-isolated-probe-script';
-import { readIsolatedFrames } from './browser-agent-isolated-probe';
-import type { IsolatedAgentProbe } from './browser-agent-isolated-probe';
+import { MAIN_FRAME_ID, readIsolatedFrames } from './browser-agent-isolated-probe';
+import type { IsolatedAgentProbe, IsolatedFrameTree } from './browser-agent-isolated-probe';
 import type { AgentFrameInventory } from './browser-agent-frames';
 import { spliceScriptingFrames } from './browser-tool-scripting-frames';
 import { KILO_BROWSER_TOOL_PREFIX, toKiloBrowserToolName } from './browser-tool-contract';
+import { BROWSER_TOOL_DIALOG_OPEN_ERROR, BrowserToolDialogOpenError } from './browser-tool-dialog';
 import {
   redactSensitiveBody,
   redactSensitiveHeaders,
@@ -95,6 +96,8 @@ export const getFirefoxUnsupportedToolError = (tool: string): string | undefined
 export const MAX_BROWSER_TOOL_WAIT_MS = 15_000;
 /** Refs one caller's registry keeps: merged snapshots and finds would otherwise grow it for as long as a document lives. */
 export const MAX_BROWSER_TOOL_REFS = 5000;
+/** The key the session's own (unbound) view uses for its refs and focus. */
+const UNBOUND_CALLER_KEY = '';
 /** Soft timeout for one scripting tool action; larger than the debugger's default for snapshot-sized results. */
 const SCRIPTING_ACTION_TIMEOUT_MS = 20_000;
 /** Longest a navigation waits for the browser to report the new page complete; the debugger path waits as long. */
@@ -155,6 +158,14 @@ const DETACH_REASON_TARGET_CLOSED = 'target_closed';
  * Evidence: https://github.com/BrowserMCP/mcp/blob/main/packages/mcp/spikes/hidden-tabs/RESULTS.md
  */
 const INPUT_COMMAND_TIMEOUT_MS = 5000;
+/** The one command a session sends while a JavaScript dialog blocks the page: the dialog's own answer. */
+const DIALOG_ANSWER_METHOD = 'Page.handleJavaScriptDialog';
+/**
+ * Commands that carry no page work and answer while a dialog is open: the
+ * download interceptor is armed and released around the answer, and its
+ * `Fetch.*` calls are the tab's, not the blocked renderer's.
+ */
+const DIALOG_SAFE_COMMAND_PREFIX = 'Fetch.';
 /**
  * Bound on the frame a background tab's screencast is asked for. Chrome makes
  * that frame on the request in about 11 ms (measured on the click-then-
@@ -313,7 +324,15 @@ export interface BrowserToolDownload {
 
 export interface BrowserToolDialog {
   readonly defaultValue?: string;
+  /**
+   * The frame that opened the dialog. The browser reports it with the event, and
+   * its `Page.getFrameTree` entry carries the origin the browser computed for
+   * that frame — including an inherited one — so the answer is judged there.
+   */
+  readonly frameId?: string;
   readonly message: string;
+  /** That frame's security origin, read from the frame tree while the dialog opened. */
+  readonly origin?: string;
   readonly type: string;
   readonly url?: string;
 }
@@ -321,6 +340,8 @@ export interface BrowserToolDialog {
 /** One snapshot element reference: the ref the snapshot surfaced, and how to get back to the node. */
 export interface BrowserToolRefEntry {
   readonly backendNodeId?: number;
+  /** The scripting frame whose document `selector` names a node in; absent for the tab's top-level document. */
+  readonly frameId?: number;
   readonly ref: string;
   readonly selector?: string;
 }
@@ -339,6 +360,8 @@ export type BrowserToolResolvedTarget =
       readonly ref: string;
     }
   | {
+      /** The scripting frame the selector matched in; absent for the tab's top-level document. */
+      readonly frameId?: number;
       readonly kind: 'selector';
       readonly nodeId: number;
       readonly selector: string;
@@ -548,10 +571,27 @@ export interface BrowserToolSession {
     params?: Record<string, unknown>,
     sessionId?: string
   ) => Promise<Record<string, unknown> | undefined>;
+  /** The dialog open on the page right now, without answering it; `undefined` when none is open. */
+  readonly pendingDialog: () => BrowserToolDialog | undefined;
   /** Returns the pending dialog and clears it, so a second call cannot re-answer it. */
   readonly takeDialog: () => BrowserToolDialog | undefined;
+  /**
+   * Calls `listener` each time the page opens a dialog, and returns the
+   * function that stops it. A call races its page action against this: the
+   * action that opened a dialog is not answered until the dialog is.
+   */
+  readonly watchDialogs: (listener: (dialog: BrowserToolDialog) => void) => () => void;
   /** Returns the downloads seen since the last call and clears them. */
   readonly takeDownloads: () => readonly BrowserToolDownload[];
+  /**
+   * Calls `listener` for every `Fetch.requestPaused` the tab reports, and
+   * returns the function that stops it. A response-stage interceptor arms the
+   * pause and answers every one it receives: a pause nobody answers holds the
+   * page forever, so this is the only door to the event.
+   */
+  readonly watchFetchPauses: (
+    listener: (params: Record<string, unknown> | undefined) => void
+  ) => () => void;
   /**
    * Calls `listener` for every download the tab announces as it arrives, and
    * returns the function that stops it. A guard that keeps listening for a late
@@ -634,14 +674,33 @@ const loadingFailedParamsSchema = z.object({
 });
 const javascriptDialogOpeningParamsSchema = z.object({
   defaultPrompt: z.string().optional(),
+  frameId: z.string().optional(),
   message: z.string().optional(),
   type: z.string().optional(),
   url: z.string().optional(),
 });
+/** One frame of a `Page.getFrameTree` answer: the browser reports its own computed origin. */
+const frameTreeFrameSchema = z.object({
+  id: z.string(),
+  securityOrigin: z.string().optional(),
+});
+/** One level of `Page.getFrameTree`; children stay unknown here and are parsed a level at a time as the walk descends. */
+const frameTreeLevelSchema = z.object({
+  childFrames: z.array(z.unknown()).optional(),
+  frame: frameTreeFrameSchema,
+});
+const frameTreeResponseSchema = z.object({ frameTree: frameTreeLevelSchema });
+/** The one frame-list read whose answer also records each frame's origin. */
+const FRAME_TREE_METHOD = 'Page.getFrameTree';
+/** A frame that left the tree, so its recorded origin can go with it. */
+const FRAME_DETACHED_METHOD = 'Page.frameDetached';
+const frameDetachedParamsSchema = z.object({ frameId: z.string() });
+
 const frameNavigatedParamsSchema = z.object({
   frame: z.object({
     id: z.string().optional(),
     parentId: z.string().optional(),
+    securityOrigin: z.string().optional(),
     url: z.string().optional(),
   }),
 });
@@ -816,7 +875,7 @@ const __ariaAttributes = (el) => {
   if (document.activeElement === el) { parts.push('[active]'); }
   return parts;
 };
-const __buildAria = (root, maxDepth, withBoxes, refStart, withRefs) => {
+const __buildAria = (root, maxDepth, withBoxes, refStart) => {
   const interactiveRoles = [
     'button', 'checkbox', 'combobox', 'link', 'listbox', 'menuitem', 'option',
     'radio', 'searchbox', 'slider', 'spinbutton', 'switch', 'tab', 'textbox',
@@ -828,7 +887,6 @@ const __buildAria = (root, maxDepth, withBoxes, refStart, withRefs) => {
   const owners = Array.from(document.querySelectorAll('iframe, frame'));
   let nextRef = refStart;
   const refFor = (el) => {
-    if (!withRefs) { return ''; }
     nextRef += 1;
     refs.push({ ref: 'e' + nextRef, selector: __selectorFor(el) });
     return ' [ref=e' + nextRef + ']';
@@ -838,9 +896,7 @@ const __buildAria = (root, maxDepth, withBoxes, refStart, withRefs) => {
     if (!__visible(el)) { return; }
     if (el.localName === 'iframe' || el.localName === 'frame') {
       const frameRef = refFor(el);
-      const frame = { depth: depth, line: lines.length, owner: owners.indexOf(el) };
-      if (frameRef !== '') { frame.ref = 'e' + nextRef; }
-      frames.push(frame);
+      frames.push({ depth: depth, line: lines.length, owner: owners.indexOf(el), ref: 'e' + nextRef });
       lines.push('  '.repeat(depth) + '- iframe' + frameRef);
       return;
     }
@@ -934,19 +990,20 @@ const __fillElement = (el, value) => {
 const __finish = (value) => ({ done: true, result: value });
 `;
 
+/**
+ * One document's snapshot. Refs are numbered from `refStart`, so a child
+ * frame's refs, read after the top-level document's, never reuse its numbers.
+ */
 const buildSnapshotPageScript = ({
   boxes,
   depth,
   refStart,
   targetSelector,
-  withRefs,
 }: {
   readonly boxes: boolean;
   readonly depth: number | undefined;
   readonly refStart: number;
   readonly targetSelector: string | undefined;
-  /** A child frame's lines carry no refs: actions resolve refs in the top-level document only. */
-  readonly withRefs: boolean;
 }): string =>
   `${SCRIPTING_PAGE_PREAMBLE}
 const rootSelector = ${scriptJson(targetSelector ?? null)};
@@ -954,7 +1011,7 @@ const maxDepth = ${scriptJson(depth ?? null)};
 const withBoxes = ${scriptJson(boxes)};
 const refStart = ${scriptJson(refStart)};
 const root = rootSelector === null ? (document.body || document.documentElement) : __element(rootSelector);
-const aria = __buildAria(root, maxDepth, withBoxes, refStart, ${scriptJson(withRefs)});
+const aria = __buildAria(root, maxDepth, withBoxes, refStart);
 return __finish({
   frames: aria.frames,
   lines: aria.lines,
@@ -1237,7 +1294,14 @@ window.resizeTo(width, height);
 return __finish('Resized the window to ' + width + 'x' + height + '.');`;
 
 /** The caller a scripting tool runs for: its ref registry, and its read grants when it is an agent. */
+/** The scripting frame a caller's last `browser_type` focused; `undefined` means the tab's own document. */
+interface FocusedFrame {
+  frameId: number | undefined;
+}
+
 interface ScriptingCallContext {
+  /** The caller's focus for this tab; kept beside its refs so it outlives one call's view. */
+  readonly callerKey: string;
   readonly refs: Map<string, BrowserToolRefEntry>;
   readonly scope?: BrowserToolCallScope | undefined;
 }
@@ -1322,12 +1386,17 @@ const resolveScriptingTarget = (
   refs: ReadonlyMap<string, BrowserToolRefEntry>,
   target: string
 ):
-  | { readonly kind: 'ok'; readonly description: string; readonly selector: string }
+  | {
+      readonly description: string;
+      readonly frameId: number | undefined;
+      readonly kind: 'ok';
+      readonly selector: string;
+    }
   | { readonly error: string; readonly kind: 'error' } => {
   const ref = parseRef(target);
 
   if (ref === undefined) {
-    return { description: target, kind: 'ok', selector: target };
+    return { description: target, frameId: undefined, kind: 'ok', selector: target };
   }
 
   const entry = refs.get(ref);
@@ -1336,7 +1405,12 @@ const resolveScriptingTarget = (
     return { error: STALE_REF_ERROR, kind: 'error' };
   }
 
-  return { description: `ref=${ref}`, kind: 'ok', selector: entry.selector };
+  return {
+    description: `ref=${ref}`,
+    frameId: entry.frameId,
+    kind: 'ok',
+    selector: entry.selector,
+  };
 };
 
 const browserToolTargetArgsSchema = z.object({ target: z.string().min(1) });
@@ -1590,6 +1664,8 @@ export const createBrowserToolSession = ({
   const downloadBuffer: BrowserToolDownload[] = [];
   // Listeners a still-armed guard registered for the announcement itself, not the buffer it drains.
   const downloadListeners = new Set<(download: BrowserToolDownload) => void>();
+  // Listeners a live response interceptor registered for the pauses it must answer, one per armed interceptor.
+  const fetchPauseListeners = new Set<(params: Record<string, unknown> | undefined) => void>();
   const networkById = new Map<string, MutableNetworkRequest>();
   // Refs belong to a caller, not a tab: two side-panel conversations (or a workflow and a panel) must not invalidate each other's snapshots.
   const refsByCaller = new Map<string, Map<string, BrowserToolRefEntry>>();
@@ -1613,6 +1689,8 @@ export const createBrowserToolSession = ({
   let detachCount = 0;
   let documentNodeId: number | undefined = undefined;
   let dialog: BrowserToolDialog | undefined = undefined;
+  // Calls racing their page action against a dialog: the action that opened one is not answered until it is closed.
+  const dialogListeners = new Set<(opened: BrowserToolDialog) => void>();
   // Monotonic ref numbering for scripting snapshots, so refs stay e1, e2, ... rather than restarting per snapshot.
   let scriptingRefCount = 0;
   // Console messages pushed since the last main-frame navigation, for `all: false`.
@@ -1621,10 +1699,27 @@ export const createBrowserToolSession = ({
   const frameIdByExecutionContext = new Map<number, string>();
   // Out-of-process iframes auto-attached under this tab, keyed by frame id (for an OOPIF the frame id is the target id). `Page.getFrameTree` omits them, so this map is the tab's only record of them.
   const childFrames = new Map<string, BrowserToolChildFrame>();
+  /** Each frame's security origin, as `Page.frameNavigated` reports it: the browser's own inheritance. */
+  const frameOrigins = new Map<string, string>();
   // The tab's main frame id, learned from `Page.frameNavigated`. A `Document` request in this frame is a page load.
   let mainFrameId: string | undefined = undefined;
   let webMcpDiscovery: { documentId: string; tools: readonly WebMcpToolDescriptor[] } | undefined =
     undefined;
+
+  // The frame each caller's last successful `browser_type` focused, so its next `browser_press_key` types there. It lives beside the caller's refs because a view is rebuilt per call.
+  const focusedFrames = new Map<string, FocusedFrame>();
+
+  const callerFocus = (callerKey: string): FocusedFrame => {
+    const existing = focusedFrames.get(callerKey);
+
+    if (existing !== undefined) {
+      return existing;
+    }
+
+    const created: FocusedFrame = { frameId: undefined };
+    focusedFrames.set(callerKey, created);
+    return created;
+  };
 
   const callerRefs = (callerKey: string): Map<string, BrowserToolRefEntry> => {
     const existing = refsByCaller.get(callerKey);
@@ -1645,6 +1740,8 @@ export const createBrowserToolSession = ({
       refs.clear();
     }
     refsByCaller.clear();
+    // A new document has no focus to inherit: the next press belongs to the tab's own document until a type focuses a frame again.
+    focusedFrames.clear();
   };
 
   const clearState = (): void => {
@@ -1653,6 +1750,7 @@ export const createBrowserToolSession = ({
     networkById.clear();
     mainFrameId = undefined;
     childFrames.clear();
+    frameOrigins.clear();
     clearRefs();
     documentNodeId = undefined;
     dialog = undefined;
@@ -1880,6 +1978,30 @@ export const createBrowserToolSession = ({
     return requests.slice(startIndex);
   };
 
+  /** One frame of a `Page.getFrameTree` answer: its id, its origin, and the frames it holds. */
+  const recordFrameTree = (tree: z.infer<typeof frameTreeLevelSchema>): void => {
+    if (tree.frame.securityOrigin !== undefined) {
+      frameOrigins.set(tree.frame.id, tree.frame.securityOrigin);
+    }
+
+    for (const child of tree.childFrames ?? []) {
+      const nested = frameTreeLevelSchema.safeParse(child);
+
+      if (nested.success) {
+        recordFrameTree(nested.data);
+      }
+    }
+  };
+
+  /** Records every frame's security origin from one `Page.getFrameTree` answer, at any depth. */
+  const recordFrameOrigins = (answer: Record<string, unknown> | undefined): void => {
+    const parsed = frameTreeResponseSchema.safeParse(answer);
+
+    if (parsed.success) {
+      recordFrameTree(parsed.data.frameTree);
+    }
+  };
+
   const handleDialogOpening = (params: Record<string, unknown> | undefined): void => {
     const parsed = javascriptDialogOpeningParamsSchema.safeParse(params);
 
@@ -1887,26 +2009,54 @@ export const createBrowserToolSession = ({
       return;
     }
 
-    const { defaultPrompt, message, type, url } = parsed.data;
+    const { defaultPrompt, frameId, message, type, url } = parsed.data;
+    const origin = frameId === undefined ? undefined : frameOrigins.get(frameId);
 
-    dialog = {
-      message: message ?? '',
+    const opened: BrowserToolDialog = {
+      // The page writes this text and every other bounded page text has the same cap: a dialog cannot flood the model.
+      message: truncateText(message ?? ''),
       type: type ?? 'alert',
-      ...(defaultPrompt === undefined ? {} : { defaultValue: defaultPrompt }),
+      ...(defaultPrompt === undefined ? {} : { defaultValue: truncateText(defaultPrompt) }),
+      ...(frameId === undefined ? {} : { frameId }),
+      ...(origin === undefined ? {} : { origin }),
       ...(url === undefined ? {} : { url }),
     };
+
+    dialog = opened;
+
+    for (const listener of dialogListeners) {
+      listener(opened);
+    }
   };
 
   // Only a main-frame navigation replaces the document; a subframe navigation leaves the main document's node ids valid and its network boundary untouched.
   const handleFrameNavigated = (params: Record<string, unknown> | undefined): void => {
     const parsed = frameNavigatedParamsSchema.safeParse(params);
 
-    if (!parsed.success || parsed.data.frame.parentId !== undefined) {
+    if (!parsed.success) {
       return;
     }
 
-    if (parsed.data.frame.id !== undefined) {
-      mainFrameId = parsed.data.frame.id;
+    const { frame } = parsed.data;
+
+    if (frame.id !== undefined && frame.securityOrigin !== undefined) {
+      // The browser computes a frame's origin — an `about:blank` child of a cross-origin frame inherits that frame's — and reports it here.
+      frameOrigins.set(frame.id, frame.securityOrigin);
+    }
+
+    if (frame.parentId !== undefined) {
+      return;
+    }
+
+    if (frame.id !== undefined) {
+      mainFrameId = frame.id;
+    }
+
+    // A new top-level document replaces every frame the old one held: only its own origin is still known.
+    frameOrigins.clear();
+
+    if (frame.id !== undefined && frame.securityOrigin !== undefined) {
+      frameOrigins.set(frame.id, frame.securityOrigin);
     }
 
     invalidateDocument();
@@ -1935,6 +2085,7 @@ export const createBrowserToolSession = ({
 
     if (parsed.data.targetId !== undefined) {
       childFrames.delete(parsed.data.targetId);
+      frameOrigins.delete(parsed.data.targetId);
       return;
     }
 
@@ -1942,6 +2093,7 @@ export const createBrowserToolSession = ({
     for (const [frameId, frame] of childFrames) {
       if (frame.sessionId === parsed.data.sessionId) {
         childFrames.delete(frameId);
+        frameOrigins.delete(frameId);
         return;
       }
     }
@@ -2013,6 +2165,15 @@ export const createBrowserToolSession = ({
       return;
     }
 
+    if (method === 'Fetch.requestPaused') {
+      // One interceptor at a time per tab: every listener answers, and an armed interceptor owns the tab's pauses.
+      for (const listener of fetchPauseListeners) {
+        listener(params);
+      }
+
+      return;
+    }
+
     if (method === 'Page.frameNavigated') {
       handleFrameNavigated(params);
       return;
@@ -2025,6 +2186,17 @@ export const createBrowserToolSession = ({
 
     if (method === 'Target.detachedFromTarget') {
       handleDetachedFromTarget(params);
+      return;
+    }
+
+    if (method === FRAME_DETACHED_METHOD) {
+      // A same-process frame that went away: its id and origin are not reused, and keeping them would grow with every iframe the page loads.
+      const detached = frameDetachedParamsSchema.safeParse(params);
+
+      if (detached.success) {
+        frameOrigins.delete(detached.data.frameId);
+      }
+
       return;
     }
 
@@ -2214,12 +2386,48 @@ export const createBrowserToolSession = ({
     attachPromise = undefined;
   };
 
+  /**
+   * One command the page's renderer answers. It answers none while a
+   * JavaScript dialog is open (see `browser-tool-dialog.ts`), so a command is
+   * refused at once while one is open, and stops waiting when one opens before
+   * it answered: its late answer is dropped.
+   */
+  const pageCommand = async (
+    method: string,
+    params?: Record<string, unknown>,
+    commandTarget: ChromeDebuggerTarget = target
+  ): Promise<Record<string, unknown> | undefined> => {
+    if (debuggerApi === undefined) {
+      throw new Error(`${method} is not available in Firefox: ${FIREFOX_PLATFORM_LIMIT}.`);
+    }
+
+    if (dialog !== undefined) {
+      throw new BrowserToolDialogOpenError();
+    }
+
+    const { promise: dialogOpened, reject } = Promise.withResolvers<never>();
+    const refuse = (): void => {
+      reject(new BrowserToolDialogOpenError());
+    };
+
+    dialogListeners.add(refuse);
+
+    try {
+      return await Promise.race([
+        Promise.resolve(debuggerApi.sendCommand(commandTarget, method, params)),
+        dialogOpened,
+      ]);
+    } finally {
+      dialogListeners.delete(refuse);
+    }
+  };
+
   const applyFocusEmulation = async (): Promise<void> => {
     if (debuggerApi === undefined) {
       return;
     }
 
-    await debuggerApi.sendCommand(target, FOCUS_EMULATION_METHOD, { enabled: true });
+    await pageCommand(FOCUS_EMULATION_METHOD, { enabled: true });
     focusEmulated = true;
   };
 
@@ -2228,7 +2436,7 @@ export const createBrowserToolSession = ({
       return undefined;
     }
 
-    const response = await debuggerApi.sendCommand(target, 'Runtime.evaluate', {
+    const response = await pageCommand('Runtime.evaluate', {
       expression: 'document.visibilityState',
       returnByValue: true,
     });
@@ -2424,6 +2632,12 @@ export const createBrowserToolSession = ({
     }
   };
 
+  /**
+   * Every command but the dialog's own answer goes through the dialog guard. An
+   * input command is refused while a dialog is open but left to finish once
+   * sent, because abandoning a press would leave its release unsent; the call
+   * that sent it races the dialog itself.
+   */
   const send = async (
     method: string,
     params?: Record<string, unknown>,
@@ -2442,14 +2656,37 @@ export const createBrowserToolSession = ({
 
     await attach();
 
+    if (method === DIALOG_ANSWER_METHOD) {
+      return debuggerApi.sendCommand(target, method, params);
+    }
+
+    // Arming or releasing the download interceptor is not page work: it answers with a dialog open, and the answer's own file must be held by it.
+    if (method.startsWith(DIALOG_SAFE_COMMAND_PREFIX)) {
+      return debuggerApi.sendCommand(target, method, params);
+    }
+
     if (method.startsWith('Input.')) {
+      // Checked after the attach: a dialog can open while it is awaited.
+      if (dialog !== undefined) {
+        throw new BrowserToolDialogOpenError();
+      }
+
       return sendInputCommand(method, params);
     }
 
     // A child session runs in its own process, so the tab's input timing rules do not apply to it.
-    return sessionId === undefined
-      ? debuggerApi.sendCommand(target, method, params)
-      : debuggerApi.sendCommand({ ...target, sessionId }, method, params);
+    const answer = await pageCommand(
+      method,
+      params,
+      sessionId === undefined ? target : { ...target, sessionId }
+    );
+
+    if (method === FRAME_TREE_METHOD) {
+      // Every frame read also refreshes the origins a dialog is judged by: the page cannot be asked again while one is open.
+      recordFrameOrigins(answer);
+    }
+
+    return answer;
   };
 
   const getDocumentNodeId = async (): Promise<number | undefined> => {
@@ -2461,7 +2698,7 @@ export const createBrowserToolSession = ({
       return undefined;
     }
 
-    const response = await debuggerApi.sendCommand(target, 'DOM.getDocument', { depth: 0 });
+    const response = await pageCommand('DOM.getDocument', { depth: 0 });
     const parsed = domGetDocumentResponseSchema.safeParse(response);
 
     if (!parsed.success || parsed.data.root === undefined) {
@@ -2479,7 +2716,8 @@ export const createBrowserToolSession = ({
    * timeout as the other action injections and surfaces its real error.
    */
   const countScriptingSelectorMatches = async (
-    selector: string
+    selector: string,
+    frameId: number | undefined
   ): Promise<
     | { readonly kind: 'count'; readonly matches: number }
     | { readonly kind: 'error'; readonly error: string }
@@ -2490,6 +2728,7 @@ export const createBrowserToolSession = ({
 
     const result = await evalInTabWithScripting({
       code: `return document.querySelectorAll(${JSON.stringify(selector)}).length;`,
+      ...(frameId === undefined ? {} : { frameId }),
       scriptingApi,
       tabId,
       timeoutMs: SCRIPTING_ACTION_TIMEOUT_MS,
@@ -2507,12 +2746,13 @@ export const createBrowserToolSession = ({
   };
 
   const resolveSelector = async (
-    selector: string
+    selector: string,
+    frameId?: number
   ): Promise<BrowserToolResolvedTarget | undefined> => {
     if (debuggerApi === undefined) {
-      // The scripting path resolves a target by selector; there is no debugger node id, so the tool implementations in `callTool` use `selector` and never `nodeId`. The match count still has to be unique.
+      // The scripting path resolves a target by selector; there is no debugger node id, so the tool implementations in `callTool` use `selector` and never `nodeId`. The match count still has to be unique, in the document the selector belongs to.
       await attach();
-      const counted = await countScriptingSelectorMatches(selector);
+      const counted = await countScriptingSelectorMatches(selector, frameId);
 
       if (counted.kind === 'error') {
         throw new Error(counted.error);
@@ -2528,7 +2768,12 @@ export const createBrowserToolSession = ({
         return { kind: 'ambiguous', matches, selector };
       }
 
-      return { kind: 'selector', nodeId: 0, selector };
+      return {
+        kind: 'selector',
+        nodeId: 0,
+        selector,
+        ...(frameId === undefined ? {} : { frameId }),
+      };
     }
 
     await attach();
@@ -2540,7 +2785,7 @@ export const createBrowserToolSession = ({
     }
 
     // A selector must name exactly one element: querySelector would silently take the first match, so an ambiguous selector would type into an arbitrary field.
-    const response = await debuggerApi.sendCommand(target, 'DOM.querySelectorAll', {
+    const response = await pageCommand('DOM.querySelectorAll', {
       nodeId: rootNodeId,
       selector,
     });
@@ -2587,7 +2832,7 @@ export const createBrowserToolSession = ({
       return undefined;
     }
 
-    const resolved = await resolveSelector(entry.selector);
+    const resolved = await resolveSelector(entry.selector, entry.frameId);
 
     return resolved;
   };
@@ -2669,6 +2914,16 @@ export const createBrowserToolSession = ({
     };
   };
 
+  const watchFetchPauses = (
+    listener: (params: Record<string, unknown> | undefined) => void
+  ): (() => void) => {
+    fetchPauseListeners.add(listener);
+
+    return () => {
+      fetchPauseListeners.delete(listener);
+    };
+  };
+
   const takeDownloads = (): readonly BrowserToolDownload[] => {
     const seen = [...downloadBuffer];
 
@@ -2685,9 +2940,17 @@ export const createBrowserToolSession = ({
     return pending;
   };
 
+  const watchDialogs = (listener: (opened: BrowserToolDialog) => void): (() => void) => {
+    dialogListeners.add(listener);
+
+    return () => {
+      dialogListeners.delete(listener);
+    };
+  };
+
   const runPageTool = async (
     script: string,
-    timeoutMs?: number
+    options: { readonly frameId?: number | undefined; readonly timeoutMs?: number } = {}
   ): Promise<BrowserToolCallResult> => {
     try {
       await attach();
@@ -2699,22 +2962,26 @@ export const createBrowserToolSession = ({
     }
 
     return runScriptingPageScript({
+      ...(options.frameId === undefined ? {} : { frameId: options.frameId }),
       script,
       scriptingApi,
       tabId,
-      ...(timeoutMs === undefined ? {} : { timeoutMs }),
+      ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
     });
   };
 
   /**
-   * One scripting snapshot: the top-level document's lines and refs, and for an
-   * agent caller every child frame spliced in or withheld by its read grants.
-   * `merge` keeps the refs earlier snapshots registered (a targeted snapshot, a find).
+   * One scripting snapshot: the lines and refs of the top-level document, or of
+   * the child frame `frameId` names for a target inside it, and for an agent
+   * caller every child frame spliced in or withheld by its read grants. Every
+   * ref outside the top-level document carries its frame id. `merge` keeps the
+   * refs earlier snapshots registered (a targeted snapshot, a find).
    */
   const captureScriptingSnapshot = async (
     options: {
       readonly boxes: boolean;
       readonly depth: number | undefined;
+      readonly frameId: number | undefined;
       readonly merge: boolean;
       readonly targetSelector: string | undefined;
     },
@@ -2723,15 +2990,10 @@ export const createBrowserToolSession = ({
     | { readonly lines: readonly string[]; readonly ok: true }
     | { readonly error: string; readonly ok: false }
   > => {
-    const { boxes, depth, merge, targetSelector } = options;
+    const { boxes, depth, frameId, merge, targetSelector } = options;
     const result = await runPageTool(
-      buildSnapshotPageScript({
-        boxes,
-        depth,
-        refStart: scriptingRefCount,
-        targetSelector,
-        withRefs: true,
-      })
+      buildSnapshotPageScript({ boxes, depth, refStart: scriptingRefCount, targetSelector }),
+      { frameId }
     );
 
     if (!result.ok) {
@@ -2746,37 +3008,48 @@ export const createBrowserToolSession = ({
 
     scriptingRefCount = snapshot.data.nextRef;
 
+    const rootRefs: readonly BrowserToolRefEntry[] =
+      frameId === undefined
+        ? snapshot.data.refs
+        : snapshot.data.refs.map(ref => ({ ...ref, frameId }));
     const { scope } = call;
 
     if (scope === undefined) {
-      registerRefs(call.refs, shownRefEntries(snapshot.data.refs, snapshot.data.lines), { merge });
+      registerRefs(call.refs, shownRefEntries(rootRefs, snapshot.data.lines), { merge });
 
       return { lines: snapshot.data.lines, ok: true };
     }
 
+    // The page walker numbered each frame line by its own `querySelectorAll` over the live document, so the owners must be read after it, never from an inventory taken earlier: a frame added, removed or reordered in between would shift the indices and nest one frame's document under another's line.
+    const frameTree = async (): Promise<IsolatedFrameTree | undefined> => {
+      if (isolatedProbe === undefined) {
+        return undefined;
+      }
+
+      const probed = await readIsolatedFrames(isolatedProbe);
+
+      // Without the probe the inventory is the only frame list there is, and its owners cannot be re-read.
+      if (probed.complete) {
+        return probed;
+      }
+
+      const inventory = await scope.readFrames?.();
+
+      return inventory?.owners === undefined
+        ? undefined
+        : { complete: inventory.complete, frames: inventory.frames, owners: inventory.owners };
+    };
+
     const spliced = await spliceScriptingFrames(snapshot.data, depth, {
-      frameTree: async () => {
-        const inventory = await scope.readFrames?.();
-
-        if (inventory?.owners !== undefined) {
-          return {
-            complete: inventory.complete,
-            frames: inventory.frames,
-            owners: inventory.owners,
-          };
-        }
-
-        return isolatedProbe === undefined ? undefined : readIsolatedFrames(isolatedProbe);
-      },
-      readFrame: async (frameId, maxDepth, timeoutMs) => {
+      frameTree,
+      readFrame: async (childFrameId, maxDepth, timeoutMs) => {
         const frame = await runScriptingPageScript({
-          frameId,
+          frameId: childFrameId,
           script: buildSnapshotPageScript({
             boxes: false,
             depth: maxDepth,
-            refStart: 0,
+            refStart: scriptingRefCount,
             targetSelector: undefined,
-            withRefs: false,
           }),
           scriptingApi,
           tabId,
@@ -2786,16 +3059,23 @@ export const createBrowserToolSession = ({
           ? browserToolSnapshotResultSchema.safeParse(frame.value)
           : undefined;
 
-        return parsed?.success === true ? parsed.data : undefined;
+        const part = parsed?.success === true ? parsed.data : undefined;
+
+        if (part !== undefined) {
+          scriptingRefCount = part.nextRef;
+        }
+
+        return part;
       },
       readableOrigins: scope.readableOrigins,
+      rootFrameId: frameId ?? MAIN_FRAME_ID,
     });
     const dropped = new Set(spliced.readableFrameRefs);
 
     registerRefs(
       call.refs,
       shownRefEntries(
-        snapshot.data.refs.filter(entry => !dropped.has(entry.ref)),
+        [...rootRefs.filter(entry => !dropped.has(entry.ref)), ...spliced.refs],
         spliced.lines
       ),
       { merge }
@@ -2807,7 +3087,13 @@ export const createBrowserToolSession = ({
   const resolveTargetArg = (
     refs: ReadonlyMap<string, BrowserToolRefEntry>,
     targetText: string
-  ): { readonly description: string; readonly selector: string } | { readonly error: string } => {
+  ):
+    | {
+        readonly description: string;
+        readonly frameId: number | undefined;
+        readonly selector: string;
+      }
+    | { readonly error: string } => {
     const resolved = resolveScriptingTarget(refs, targetText);
 
     return resolved.kind === 'error' ? { error: resolved.error } : resolved;
@@ -3114,7 +3400,8 @@ export const createBrowserToolSession = ({
             doubleClick: parsed.data.doubleClick ?? false,
             modifiers: parsed.data.modifiers ?? [],
             selector: resolved.selector,
-          })
+          }),
+          { frameId: resolved.frameId }
         );
       }
 
@@ -3136,7 +3423,8 @@ export const createBrowserToolSession = ({
             data: parsed.data.data ?? {},
             paths: parsed.data.paths ?? [],
             selector: resolved.selector,
-          })
+          }),
+          { frameId: resolved.frameId }
         );
       }
 
@@ -3148,6 +3436,7 @@ export const createBrowserToolSession = ({
         }
 
         let selector: string | undefined = undefined;
+        let frameId: number | undefined = undefined;
 
         if (parsed.data.target !== undefined) {
           const resolved = resolveTargetArg(refs, parsed.data.target);
@@ -3156,11 +3445,12 @@ export const createBrowserToolSession = ({
             return { error: resolved.error, ok: false };
           }
 
-          ({ selector } = resolved);
+          ({ frameId, selector } = resolved);
         }
 
         return runPageTool(
-          buildEvaluatePageScript({ functionText: parsed.data.function, selector })
+          buildEvaluatePageScript({ functionText: parsed.data.function, selector }),
+          { frameId }
         );
       }
 
@@ -3177,6 +3467,7 @@ export const createBrowserToolSession = ({
           readonly type: string;
           readonly value: string | boolean;
         }[] = [];
+        const fieldFrameIds = new Set<number | undefined>();
 
         for (const field of parsed.data.fields) {
           const resolved = resolveTargetArg(refs, field.target);
@@ -3184,6 +3475,8 @@ export const createBrowserToolSession = ({
           if ('error' in resolved) {
             return { error: resolved.error, ok: false };
           }
+
+          fieldFrameIds.add(resolved.frameId);
 
           const value = field.value ?? '';
           const parsedBoolean = booleanValueSchema.safeParse(value);
@@ -3196,7 +3489,17 @@ export const createBrowserToolSession = ({
           });
         }
 
-        return runPageTool(buildFillFormPageScript({ fields }));
+        if (fieldFrameIds.size > 1) {
+          return {
+            error:
+              'browser_fill_form fields live in different frames: fill each frame with its own call.',
+            ok: false,
+          };
+        }
+
+        const [frameId] = fieldFrameIds;
+
+        return runPageTool(buildFillFormPageScript({ fields }), { frameId });
       }
 
       case 'browser_find': {
@@ -3211,6 +3514,7 @@ export const createBrowserToolSession = ({
         }
 
         let targetSelector: string | undefined = undefined;
+        let targetFrameId: number | undefined = undefined;
 
         if (parsed.data.target !== undefined) {
           const resolved = resolveTargetArg(refs, parsed.data.target);
@@ -3219,7 +3523,7 @@ export const createBrowserToolSession = ({
             return { error: resolved.error, ok: false };
           }
 
-          targetSelector = resolved.selector;
+          ({ frameId: targetFrameId, selector: targetSelector } = resolved);
         }
 
         let matches: (line: string) => boolean = () => false;
@@ -3240,7 +3544,13 @@ export const createBrowserToolSession = ({
 
         // A find reads the same tree a snapshot does and only adds refs: the last snapshot's refs keep resolving.
         const captured = await captureScriptingSnapshot(
-          { boxes: false, depth: parsed.data.depth, merge: true, targetSelector },
+          {
+            boxes: false,
+            depth: parsed.data.depth,
+            frameId: targetFrameId,
+            merge: true,
+            targetSelector,
+          },
           call
         );
 
@@ -3288,7 +3598,9 @@ export const createBrowserToolSession = ({
           return { error: resolved.error, ok: false };
         }
 
-        return runPageTool(buildHoverPageScript({ selector: resolved.selector }));
+        return runPageTool(buildHoverPageScript({ selector: resolved.selector }), {
+          frameId: resolved.frameId,
+        });
       }
 
       case 'browser_navigate': {
@@ -3316,7 +3628,10 @@ export const createBrowserToolSession = ({
           return { error: 'browser_press_key needs a key.', ok: false };
         }
 
-        return runPageTool(buildPressKeyPageScript({ key: parsed.data.key }));
+        // The key goes to the document that holds the focus: the frame of the last successful type, else the tab's own.
+        return runPageTool(buildPressKeyPageScript({ key: parsed.data.key }), {
+          frameId: callerFocus(call.callerKey).frameId,
+        });
       }
 
       case 'browser_resize': {
@@ -3356,7 +3671,8 @@ export const createBrowserToolSession = ({
           buildSelectOptionPageScript({
             selector: resolved.selector,
             values: parsed.data.values,
-          })
+          }),
+          { frameId: resolved.frameId }
         );
       }
 
@@ -3368,6 +3684,7 @@ export const createBrowserToolSession = ({
         }
 
         let targetSelector: string | undefined = undefined;
+        let targetFrameId: number | undefined = undefined;
 
         if (parsed.data.target !== undefined) {
           const resolved = resolveTargetArg(refs, parsed.data.target);
@@ -3376,13 +3693,14 @@ export const createBrowserToolSession = ({
             return { error: resolved.error, ok: false };
           }
 
-          targetSelector = resolved.selector;
+          ({ frameId: targetFrameId, selector: targetSelector } = resolved);
         }
 
         const captured = await captureScriptingSnapshot(
           {
             boxes: parsed.data.boxes ?? false,
             depth: parsed.data.depth,
+            frameId: targetFrameId,
             merge: targetSelector !== undefined,
             targetSelector,
           },
@@ -3453,14 +3771,22 @@ export const createBrowserToolSession = ({
           return { error: resolved.error, ok: false };
         }
 
-        return runPageTool(
+        const typed = await runPageTool(
           buildTypePageScript({
             selector: resolved.selector,
             slowly: parsed.data.slowly ?? false,
             submit: parsed.data.submit ?? false,
             text: parsed.data.text,
-          })
+          }),
+          { frameId: resolved.frameId }
         );
+
+        // A following `browser_press_key` (Enter to submit, Tab to move on) belongs to this field's document, not the top one. A type that failed moved no focus, so the previous target stands.
+        if (typed.ok) {
+          callerFocus(call.callerKey).frameId = resolved.frameId;
+        }
+
+        return typed;
       }
 
       case 'browser_wait_for': {
@@ -3492,7 +3818,7 @@ export const createBrowserToolSession = ({
             textGone: parsed.data.textGone,
             waitMs,
           }),
-          waitMs + 2000
+          { timeoutMs: waitMs + 2000 }
         );
       }
 
@@ -3573,6 +3899,11 @@ export const createBrowserToolSession = ({
       return { error: BROWSER_TOOL_SESSION_DISPOSED_ERROR, ok: false };
     }
 
+    // Page code answers nothing while a dialog is open: refusing here fails at once instead of sitting out the eval's timeout.
+    if (dialog !== undefined) {
+      return { error: BROWSER_TOOL_DIALOG_OPEN_ERROR, ok: false };
+    }
+
     try {
       await attach();
     } catch (error) {
@@ -3645,7 +3976,8 @@ export const createBrowserToolSession = ({
       bindCaller: nextKey => createCallerView(nextKey, callerRefs(nextKey), guard),
       callTool: (toolName, args, scope) => {
         throwIfCancelled();
-        return runCallTool(toolName, args ?? {}, { refs, scope });
+
+        return runCallTool(toolName, args ?? {}, { callerKey, refs, scope });
       },
       captureViewportImage: (format, options, callGuard) => {
         throwIfCancelled();
@@ -3658,11 +3990,13 @@ export const createBrowserToolSession = ({
       dispose: () => {
         refs.clear();
         refsByCaller.delete(callerKey);
+        focusedFrames.delete(callerKey);
         return Promise.resolve();
       },
       disposeCaller: key => {
         refsByCaller.get(key)?.clear();
         refsByCaller.delete(key);
+        focusedFrames.delete(key);
       },
       downloads: () => [...downloadBuffer],
       evaluateInTab,
@@ -3670,6 +4004,7 @@ export const createBrowserToolSession = ({
       isAttached: () => attached,
       networkRequests: () => [...networkById.values()],
       networkRequestsSinceLoad,
+      pendingDialog: () => dialog,
       registerRefs: (entries, options) => {
         registerRefs(refs, entries, options);
       },
@@ -3684,7 +4019,9 @@ export const createBrowserToolSession = ({
       takeDialog,
       takeDownloads,
       viewportState,
+      watchDialogs,
       watchDownloads,
+      watchFetchPauses,
     };
   };
 
@@ -3703,7 +4040,11 @@ export const createBrowserToolSession = ({
     ...isolatedProbeMember,
     bindCaller: (callerKey, guard) => createCallerView(callerKey, callerRefs(callerKey), guard),
     callTool: (toolName, args, scope) =>
-      runCallTool(toolName, args ?? {}, { refs: defaultRefs, scope }),
+      runCallTool(toolName, args ?? {}, {
+        callerKey: UNBOUND_CALLER_KEY,
+        refs: defaultRefs,
+        scope,
+      }),
     captureViewportImage,
     childFrames: () => new Map(childFrames),
     consoleMessages: () => [...consoleBuffer],
@@ -3711,6 +4052,7 @@ export const createBrowserToolSession = ({
     disposeCaller: callerKey => {
       refsByCaller.get(callerKey)?.clear();
       refsByCaller.delete(callerKey);
+      focusedFrames.delete(callerKey);
     },
     downloads: () => [...downloadBuffer],
     evaluateInTab,
@@ -3718,6 +4060,7 @@ export const createBrowserToolSession = ({
     isAttached: () => attached,
     networkRequests: () => [...networkById.values()],
     networkRequestsSinceLoad,
+    pendingDialog: () => dialog,
     registerRefs: (entries, options) => {
       registerRefs(defaultRefs, entries, options);
     },
@@ -3726,6 +4069,8 @@ export const createBrowserToolSession = ({
     takeDialog,
     takeDownloads,
     viewportState,
+    watchDialogs,
     watchDownloads,
+    watchFetchPauses,
   };
 };

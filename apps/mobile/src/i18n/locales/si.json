@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}, පුද්ගලික කේත ගබඩාව",
     "legalDocumentEnglishOnly": "මෙම ලේඛනය ඉංග්‍රීසි භාෂාවෙන් පමණක් ලබා ගත හැක.",
     "organizationTrialEndedBilling": "සංවිධානයේ පරීක්ෂණ කාලය අවසන් වී ඇති අතර එයට සක්‍රීය සැලැස්මක් නොමැත. ඔබට බිල්පත් යාවත්කාලීන කර නැවත උත්සාහ කළ හැක.",
-    "organizationTrialEndedBillingAtKiloAi": "සංවිධානයේ පරීක්ෂණ කාලය අවසන් වී ඇති අතර එයට සක්‍රීය සැලැස්මක් නොමැත. ඔබට kilo.ai හි බිල්පත් යාවත්කාලීන කර නැවත උත්සාහ කළ හැක."
+    "organizationTrialEndedBillingAtKiloAi": "සංවිධානයේ පරීක්ෂණ කාලය අවසන් වී ඇති අතර එයට සක්‍රීය සැලැස්මක් නොමැත. ඔබට kilo.ai හි බිල්පත් යාවත්කාලීන කර නැවත උත්සාහ කළ හැක.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "බුලට් ලක්ෂ්‍යය",
+        "nestedBulletPoint": "කැදැලි බුලට් ලක්ෂ්‍යය",
+        "orderedItem": "ලැයිස්තු අයිතමය {n}",
+        "nestedOrderedItem": "කැදැලි ලැයිස්තු අයිතමය {n}"
+      },
+      "blockquote": {
+        "quote": "උද්ධෘතය",
+        "nestedQuote": "කැදැලි උද්ධෘතය"
+      },
+      "table": {
+        "row": "පේළිය {n}: {content}"
+      },
+      "math": {
+        "equation": "ගණිතය: {latex}"
+      },
+      "rotor": {
+        "headings": "ශීර්ෂ",
+        "links": "සබැඳි",
+        "images": "රූප"
+      }
+    }
   },
   "language": {
     "restarting": "භාෂාව යෙදීමට නැවත ආරම්භ කරමින්",
@@ -280,6 +303,9 @@
     "credits": "ක්‍රෙඩිට්",
     "failedToLoadBalance": "ශේෂය පූරණය කළ නොහැකි විය. නැවත උත්සාහ කිරීමට තට්ටු කරන්න.",
     "balanceLoadFailed": "ශේෂය පූරණය කළ නොහැකි විය",
+    "balanceUnreachable": "සේවාදායකය වෙත ළඟා විය නොහැක. නැවත උත්සාහ කරන්න.",
+    "balanceAccessDenied": "මෙම ශේෂය බැලීමට ඔබට අවසර නැත.",
+    "balanceUnavailable": "ශේෂය පූරණය කළ නොහැක.",
     "hideBalance": "ශේෂය සඟවන්න",
     "showBalance": "ශේෂය පෙන්වන්න",
     "balanceHidden": "ශේෂය සඟවා ඇත",
@@ -5030,6 +5056,7 @@
     "providersNeedCatalog": "සම්පූර්ණ මාදිලි නාමාවලිය පූරණය වන තුරු සපයන්නන්ගේ ස්විච කියවීමට පමණි. ඒවා සංස්කරණය කිරීමට ඉහත ඇති නැවත උත්සාහ කරන්න බොත්තම තට්ටු කරන්න.",
     "providersEmpty": "මෙම සෙවුමට ගැළපෙන සපයන්නන් නැත.",
     "providersNone": "මෙම සංවිධානය සඳහා ලබා ගත හැකි සපයන්නන් නොමැත.",
+    "providersUnavailable": "සපයන්නන් ලැයිස්තුව පූරණය කළ නොහැකි විය.",
     "allowAllShown": "පෙන්වා ඇති සියල්ලට ඉඩ දෙන්න",
     "denyAllShown": "පෙන්වා ඇති සියල්ල ප්‍රතික්ෂේප කරන්න",
     "gatewaysDescription": "Kilo ආකෘති ඉල්ලීම් Vercel AI Gateway හෝ OpenRouter හරහා මාර්ගගත කරයි. ක්‍රියා විරහිත ද්වාරයක් එම ඉල්ලීම් අසාර්ථක කරයි.",

@@ -19,6 +19,7 @@ import { AnthropicUserProfilesContent } from '@/app/admin/gateway/AnthropicUserP
 import ApiRequestLogPage from '@/app/admin/api-request-log/page';
 import { ProviderMetadataContent } from '@/app/admin/gateway/ProviderMetadataContent';
 import RequestLoggingOptInsContent from '@/app/admin/request-logging-opt-ins/RequestLoggingOptInsContent';
+import { EnkryptCallsContent } from '@/app/admin/gateway/EnkryptCallsContent';
 
 const VALID_TABS: readonly string[] = [
   'sync-providers',
@@ -33,6 +34,7 @@ const VALID_TABS: readonly string[] = [
   'anthropic-user-profiles',
   'api-request-log',
   'provider-metadata',
+  'enkrypt-calls',
 ];
 type Tab =
   | 'sync-providers'
@@ -46,7 +48,8 @@ type Tab =
   | 'organization-features'
   | 'anthropic-user-profiles'
   | 'api-request-log'
-  | 'provider-metadata';
+  | 'provider-metadata'
+  | 'enkrypt-calls';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
 
@@ -122,6 +125,9 @@ export default function AdminGatewayPage() {
             <TabsTrigger value="provider-metadata" className={tabTriggerClass}>
               Provider Metadata
             </TabsTrigger>
+            <TabsTrigger value="enkrypt-calls" className={tabTriggerClass}>
+              Enkrypt Calls
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="sync-providers" className="mt-4">
             <SyncProvidersContent />
@@ -186,6 +192,9 @@ export default function AdminGatewayPage() {
           </TabsContent>
           <TabsContent value="provider-metadata" className="mt-4">
             <ProviderMetadataContent />
+          </TabsContent>
+          <TabsContent value="enkrypt-calls" className="mt-4">
+            <EnkryptCallsContent />
           </TabsContent>
         </Tabs>
       </div>

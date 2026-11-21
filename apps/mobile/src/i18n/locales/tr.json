@@ -186,7 +186,30 @@
     "privateRepositoryA11y": "{{name}}, özel depo",
     "legalDocumentEnglishOnly": "Bu belge yalnızca İngilizce olarak mevcuttur.",
     "organizationTrialEndedBilling": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. Faturalandırmayı güncelleyip ardından tekrar deneyebilirsin.",
-    "organizationTrialEndedBillingAtKiloAi": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. kilo.ai adresinden faturalandırmayı güncelleyip ardından tekrar deneyebilirsin."
+    "organizationTrialEndedBillingAtKiloAi": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. kilo.ai adresinden faturalandırmayı güncelleyip ardından tekrar deneyebilirsin.",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "Madde işareti",
+        "nestedBulletPoint": "İç içe madde işareti",
+        "orderedItem": "Liste öğesi {n}",
+        "nestedOrderedItem": "İç içe liste öğesi {n}"
+      },
+      "blockquote": {
+        "quote": "Alıntı",
+        "nestedQuote": "İç içe alıntı"
+      },
+      "table": {
+        "row": "Satır {n}: {content}"
+      },
+      "math": {
+        "equation": "Matematik: {latex}"
+      },
+      "rotor": {
+        "headings": "Başlıklar",
+        "links": "Bağlantılar",
+        "images": "Görseller"
+      }
+    }
   },
   "language": {
     "restarting": "Dil değişikliğini uygulamak için yeniden başlatılıyor",
@@ -280,6 +303,9 @@
     "credits": "Krediler",
     "failedToLoadBalance": "Bakiye yüklenemedi. Tekrar denemek için dokun.",
     "balanceLoadFailed": "Bakiye yüklenemedi",
+    "balanceUnreachable": "Sunucuya ulaşılamadı. Tekrar deneyin.",
+    "balanceAccessDenied": "Bu bakiyeyi görüntüleme izniniz yok.",
+    "balanceUnavailable": "Bakiye yüklenemedi.",
     "hideBalance": "Bakiyeyi gizle",
     "showBalance": "Bakiyeyi göster",
     "balanceHidden": "Bakiye gizli",
@@ -5030,6 +5056,7 @@
     "providersNeedCatalog": "Tam model kataloğu yüklenene kadar sağlayıcı anahtarları salt okunur kalır. Bunları düzenlemek için yukarıdaki Tekrar dene düğmesine dokunun.",
     "providersEmpty": "Bu aramayla eşleşen sağlayıcı yok.",
     "providersNone": "Bu kuruluş için kullanılabilir sağlayıcı yok.",
+    "providersUnavailable": "Sağlayıcı listesi yüklenemedi.",
     "allowAllShown": "Gösterilenlerin tümüne izin ver",
     "denyAllShown": "Gösterilenlerin tümünü reddet",
     "gatewaysDescription": "Kilo, model isteklerini Vercel AI Gateway veya OpenRouter üzerinden yönlendirir. Devre dışı bırakılan bir ağ geçidi bu istekleri başarısız kılar.",

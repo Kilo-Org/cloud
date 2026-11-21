@@ -165,7 +165,9 @@ process.once('exit', () => {
   }
 });
 
-const copyExtensionWithGrantedPermissions = async (granted: readonly string[]): Promise<string> => {
+export const copyExtensionWithGrantedPermissions = async (
+  granted: readonly string[]
+): Promise<string> => {
   const key = [...granted].toSorted().join(',');
   const existing = grantedExtensionCopies.get(key);
 

@@ -556,8 +556,11 @@
     "changelogFixesIn": "Correções e melhorias em {{areas}}.",
     "changelogFixesPolish": "Correções e melhorias em todo o app.",
     "changelogAreas": {
-      "signIn": "Acesso",
-      "profileOrganizations": "Perfil & organizações"
+      "signIn": "acesso",
+      "profileOrganizations": "perfil & organizações",
+      "chat": "conversa",
+      "notifications": "notificações",
+      "integrations": "integrações"
     }
   },
   "notifications": {

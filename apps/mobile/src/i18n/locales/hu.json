@@ -554,8 +554,11 @@
     "changelogFixesIn": "Javítások és fejlesztések a következő területeken: {{areas}}.",
     "changelogFixesPolish": "Javítások és fejlesztések az egész alkalmazásban.",
     "changelogAreas": {
-      "signIn": "Bejelentkezés",
-      "profileOrganizations": "Profil & szervezetek"
+      "signIn": "bejelentkezés",
+      "profileOrganizations": "profil & szervezetek",
+      "chat": "csevegés",
+      "notifications": "értesítések",
+      "integrations": "integrációk"
     }
   },
   "preferences": {

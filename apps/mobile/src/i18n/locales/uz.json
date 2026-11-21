@@ -554,8 +554,11 @@
     "changelogFixesIn": "Quyidagi bo‘limlarda tuzatishlar va yaxshilanishlar: {{areas}}.",
     "changelogFixesPolish": "Butun ilova bo‘ylab tuzatishlar va yaxshilanishlar.",
     "changelogAreas": {
-      "signIn": "Kirish",
-      "profileOrganizations": "Profil hamda tashkilotlar"
+      "signIn": "kirish",
+      "profileOrganizations": "profil hamda tashkilotlar",
+      "chat": "suhbat",
+      "notifications": "bildirishnomalar",
+      "integrations": "integratsiyalar"
     }
   },
   "preferences": {

@@ -555,7 +555,10 @@
     "changelogFixesPolish": "رفع اشکالات و بهبودها در سراسر برنامه.",
     "changelogAreas": {
       "signIn": "ورود",
-      "profileOrganizations": "نمایه & سازمان‌ها"
+      "profileOrganizations": "نمایه & سازمان‌ها",
+      "chat": "گفت‌وگو",
+      "notifications": "اعلان‌ها",
+      "integrations": "یکپارچه‌سازی‌ها"
     }
   },
   "preferences": {

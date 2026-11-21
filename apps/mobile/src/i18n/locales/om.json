@@ -554,8 +554,11 @@
     "changelogFixesIn": "Sirreeffamaa fi fooyya'iinsota {{areas}} keessatti.",
     "changelogFixesPolish": "Sirreeffamaa fi fooyya'iinsota appii guutuu keessatti.",
     "changelogAreas": {
-      "signIn": "Seenuu",
-      "profileOrganizations": "Piroofaayilii fi dhaabbilee"
+      "signIn": "seenuu",
+      "profileOrganizations": "piroofaayilii fi dhaabbilee",
+      "chat": "marii",
+      "notifications": "beeksisota",
+      "integrations": "walitti hidhamiinsota"
     }
   },
   "preferences": {

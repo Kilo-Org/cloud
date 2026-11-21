@@ -555,7 +555,10 @@
     "changelogFixesPolish": "සම්පූර්ණ යෙදුම පුරා නිවැරදි කිරීම් සහ වැඩිදියුණු කිරීම්.",
     "changelogAreas": {
       "signIn": "පුරනය වීම",
-      "profileOrganizations": "පැතිකඩ හා සංවිධාන"
+      "profileOrganizations": "පැතිකඩ හා සංවිධාන",
+      "chat": "කතාබස්",
+      "notifications": "දැනුම්දීම්",
+      "integrations": "ඒකාබද්ධ කිරීම්"
     }
   },
   "preferences": {

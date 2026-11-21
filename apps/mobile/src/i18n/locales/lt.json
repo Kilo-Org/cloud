@@ -556,8 +556,11 @@
     "changelogFixesIn": "Pataisymai ir patobulinimai šiose srityse: {{areas}}.",
     "changelogFixesPolish": "Pataisymai ir patobulinimai visoje programėlėje.",
     "changelogAreas": {
-      "signIn": "Prisijungimas",
-      "profileOrganizations": "Profilis bei organizacijos"
+      "signIn": "prisijungimas",
+      "profileOrganizations": "profilis bei organizacijos",
+      "chat": "pokalbis",
+      "notifications": "pranešimai",
+      "integrations": "integracijos"
     }
   },
   "preferences": {

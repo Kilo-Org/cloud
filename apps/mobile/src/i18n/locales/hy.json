@@ -554,8 +554,11 @@
     "changelogFixesIn": "Ուղղումներ և բարելավումներ հետևյալ բաժիններում՝ {{areas}}։",
     "changelogFixesPolish": "Ուղղումներ և բարելավումներ ամբողջ հավելվածում։",
     "changelogAreas": {
-      "signIn": "Մուտք",
-      "profileOrganizations": "Պրոֆիլ ու կազմակերպություններ"
+      "signIn": "մուտք",
+      "profileOrganizations": "պրոֆիլ ու կազմակերպություններ",
+      "chat": "զրույց",
+      "notifications": "ծանուցումներ",
+      "integrations": "ինտեգրումներ"
     }
   },
   "preferences": {

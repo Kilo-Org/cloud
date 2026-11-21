@@ -554,8 +554,11 @@
     "changelogFixesIn": "Ngā whakatika me ngā whakapainga i ēnei wāhanga: {{areas}}.",
     "changelogFixesPolish": "Ngā whakatika me ngā whakapainga puta noa i te taupānga.",
     "changelogAreas": {
-      "signIn": "Takiuru",
-      "profileOrganizations": "Kōtaha me ngā whakahaere"
+      "signIn": "takiuru",
+      "profileOrganizations": "kōtaha me ngā whakahaere",
+      "chat": "kōrerorero",
+      "notifications": "ngā whakamōhiotanga",
+      "integrations": "ngā tūhononga"
     }
   },
   "preferences": {

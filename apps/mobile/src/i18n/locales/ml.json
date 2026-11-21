@@ -555,7 +555,10 @@
     "changelogFixesPolish": "ആപ്പിലുടനീളം പരിഹാരങ്ങളും മെച്ചപ്പെടുത്തലുകളും.",
     "changelogAreas": {
       "signIn": "സൈൻ ഇൻ",
-      "profileOrganizations": "പ്രൊഫൈലും സ്ഥാപനങ്ങളും"
+      "profileOrganizations": "പ്രൊഫൈലും സ്ഥാപനങ്ങളും",
+      "chat": "ചാറ്റ്",
+      "notifications": "അറിയിപ്പുകൾ",
+      "integrations": "ഇന്റഗ്രേഷനുകൾ"
     }
   },
   "preferences": {

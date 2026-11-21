@@ -555,7 +555,10 @@
     "changelogFixesPolish": "앱 전반의 수정 및 개선 사항.",
     "changelogAreas": {
       "signIn": "로그인",
-      "profileOrganizations": "프로필과 조직"
+      "profileOrganizations": "프로필과 조직",
+      "chat": "채팅",
+      "notifications": "알림",
+      "integrations": "연동"
     }
   },
   "preferences": {

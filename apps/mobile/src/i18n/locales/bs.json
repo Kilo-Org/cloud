@@ -555,8 +555,11 @@
     "changelogFixesIn": "Ispravke i poboljšanja u odjeljcima: {{areas}}.",
     "changelogFixesPolish": "Ispravke i poboljšanja u cijeloj aplikaciji.",
     "changelogAreas": {
-      "signIn": "Prijava",
-      "profileOrganizations": "Profil te organizacije"
+      "signIn": "prijava",
+      "profileOrganizations": "profil te organizacije",
+      "chat": "razgovor",
+      "notifications": "obavijesti",
+      "integrations": "integracije"
     }
   },
   "preferences": {

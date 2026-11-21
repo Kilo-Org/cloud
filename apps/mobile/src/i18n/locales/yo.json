@@ -554,8 +554,11 @@
     "changelogFixesIn": "Àtúnṣe àti ìlọsíwájú nínú {{areas}}.",
     "changelogFixesPolish": "Àtúnṣe àti ìlọsíwájú jákèjádò áàpù.",
     "changelogAreas": {
-      "signIn": "Wíwọlé",
-      "profileOrganizations": "Àkọsílẹ̀ ara ẹni pẹ̀lú àwọn àjọ"
+      "signIn": "wíwọlé",
+      "profileOrganizations": "àkọsílẹ̀ ara ẹni pẹ̀lú àwọn àjọ",
+      "chat": "ìfọ̀rọ̀wérọ̀",
+      "notifications": "àwọn ìfitónilétí",
+      "integrations": "àwọn ìsopọ̀"
     }
   },
   "preferences": {

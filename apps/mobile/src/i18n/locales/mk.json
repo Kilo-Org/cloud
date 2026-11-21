@@ -554,8 +554,11 @@
     "changelogFixesIn": "Поправки и подобрувања во следниве области: {{areas}}.",
     "changelogFixesPolish": "Поправки и подобрувања низ целата апликација.",
     "changelogAreas": {
-      "signIn": "Најава",
-      "profileOrganizations": "Профил & организации"
+      "signIn": "најава",
+      "profileOrganizations": "профил & организации",
+      "chat": "разговор",
+      "notifications": "известувања",
+      "integrations": "интеграции"
     }
   },
   "preferences": {

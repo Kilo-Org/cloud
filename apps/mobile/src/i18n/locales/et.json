@@ -554,8 +554,11 @@
     "changelogFixesIn": "Parandused ja täiustused järgmistes osades: {{areas}}.",
     "changelogFixesPolish": "Parandused ja täiustused kogu rakenduses.",
     "changelogAreas": {
-      "signIn": "Sisselogimine",
-      "profileOrganizations": "Profiil ning organisatsioonid"
+      "signIn": "sisselogimine",
+      "profileOrganizations": "profiil ning organisatsioonid",
+      "chat": "vestlus",
+      "notifications": "teavitused",
+      "integrations": "integratsioonid"
     }
   },
   "preferences": {

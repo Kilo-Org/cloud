@@ -554,8 +554,11 @@
     "changelogFixesIn": "Fanitsiana sy fanatsarana amin'ireto sehatra ireto: {{areas}}.",
     "changelogFixesPolish": "Fanitsiana sy fanatsarana manerana ny fampiharana.",
     "changelogAreas": {
-      "signIn": "Fidirana",
-      "profileOrganizations": "Mombamomba sy fikambanana"
+      "signIn": "fidirana",
+      "profileOrganizations": "mombamomba sy fikambanana",
+      "chat": "resaka",
+      "notifications": "fampandrenesana",
+      "integrations": "fampifandraisana"
     }
   },
   "preferences": {

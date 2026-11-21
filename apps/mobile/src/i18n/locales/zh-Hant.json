@@ -555,7 +555,10 @@
     "changelogFixesPolish": "整個應用程式的修正與改進。",
     "changelogAreas": {
       "signIn": "登入",
-      "profileOrganizations": "個人資料與組織"
+      "profileOrganizations": "個人資料與組織",
+      "chat": "聊天",
+      "notifications": "通知",
+      "integrations": "整合"
     }
   },
   "preferences": {

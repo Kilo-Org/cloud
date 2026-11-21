@@ -554,8 +554,11 @@
     "changelogFixesIn": "Gyare-gyare da ingantawa a {{areas}}.",
     "changelogFixesPolish": "Gyare-gyare da ingantawa a duk faɗin manhajar.",
     "changelogAreas": {
-      "signIn": "Shiga",
-      "profileOrganizations": "Bayanan martaba & ƙungiyoyi"
+      "signIn": "shiga",
+      "profileOrganizations": "bayanan martaba & ƙungiyoyi",
+      "chat": "tattaunawa",
+      "notifications": "sanarwa",
+      "integrations": "haɗe-haɗe"
     }
   },
   "preferences": {

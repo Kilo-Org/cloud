@@ -555,7 +555,10 @@
     "changelogFixesPolish": "পুরো অ্যাপ জুড়ে সংশোধন ও উন্নতি।",
     "changelogAreas": {
       "signIn": "সাইন-ইন",
-      "profileOrganizations": "প্রোফাইল ও সংস্থা"
+      "profileOrganizations": "প্রোফাইল ও সংস্থা",
+      "chat": "চ্যাট",
+      "notifications": "বিজ্ঞপ্তি",
+      "integrations": "ইন্টিগ্রেশন"
     }
   },
   "preferences": {

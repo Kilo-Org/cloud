@@ -558,8 +558,11 @@
     "changelogFixesIn": "Atgyweiriadau a gwelliannau i'r canlynol: {{areas}}.",
     "changelogFixesPolish": "Atgyweiriadau a gwelliannau ar draws yr ap.",
     "changelogAreas": {
-      "signIn": "Mewngofnodi",
-      "profileOrganizations": "Proffil a sefydliadau"
+      "signIn": "mewngofnodi",
+      "profileOrganizations": "proffil a sefydliadau",
+      "chat": "sgwrs",
+      "notifications": "hysbysiadau",
+      "integrations": "integreiddiadau"
     }
   },
   "preferences": {

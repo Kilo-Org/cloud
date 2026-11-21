@@ -554,8 +554,11 @@
     "changelogFixesIn": "Feilrettinger og forbedringer i {{areas}}.",
     "changelogFixesPolish": "Feilrettinger og forbedringer i hele appen.",
     "changelogAreas": {
-      "signIn": "Innlogging",
-      "profileOrganizations": "Profil & organisasjoner"
+      "signIn": "innlogging",
+      "profileOrganizations": "profil & organisasjoner",
+      "chat": "samtale",
+      "notifications": "varsler",
+      "integrations": "integrasjoner"
     }
   },
   "preferences": {

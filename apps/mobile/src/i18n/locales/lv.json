@@ -555,8 +555,11 @@
     "changelogFixesIn": "Labojumi un uzlabojumi šajās jomās: {{areas}}.",
     "changelogFixesPolish": "Labojumi un uzlabojumi visā lietotnē.",
     "changelogAreas": {
-      "signIn": "Pierakstīšanās",
-      "profileOrganizations": "Profils & organizācijas"
+      "signIn": "pierakstīšanās",
+      "profileOrganizations": "profils & organizācijas",
+      "chat": "tērzēšana",
+      "notifications": "paziņojumi",
+      "integrations": "integrācijas"
     }
   },
   "preferences": {

@@ -555,7 +555,10 @@
     "changelogFixesPolish": "ການແກ້ໄຂ ແລະ ການປັບປຸງທົ່ວທັງແອັບ.",
     "changelogAreas": {
       "signIn": "ການເຂົ້າສູ່ລະບົບ",
-      "profileOrganizations": "ໂປຣໄຟລ໌ ກັບ ອົງກອນ"
+      "profileOrganizations": "ໂປຣໄຟລ໌ ກັບ ອົງກອນ",
+      "chat": "ສົນທະນາ",
+      "notifications": "ການແຈ້ງເຕືອນ",
+      "integrations": "ການເຊື່ອມໂຍງ"
     }
   },
   "preferences": {

@@ -554,8 +554,11 @@
     "changelogFixesIn": "Regstellings en verbeterings in {{areas}}.",
     "changelogFixesPolish": "Regstellings en verbeterings regdeur die app.",
     "changelogAreas": {
-      "signIn": "Aanmelding",
-      "profileOrganizations": "Profiel & organisasies"
+      "signIn": "aanmelding",
+      "profileOrganizations": "profiel & organisasies",
+      "chat": "klets",
+      "notifications": "kennisgewings",
+      "integrations": "integrasies"
     }
   },
   "preferences": {

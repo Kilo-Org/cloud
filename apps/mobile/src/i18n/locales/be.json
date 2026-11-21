@@ -556,8 +556,11 @@
     "changelogFixesIn": "Выпраўленні і паляпшэнні ў раздзелах: {{areas}}.",
     "changelogFixesPolish": "Выпраўленні і паляпшэнні ва ўсёй праграме.",
     "changelogAreas": {
-      "signIn": "Уваход",
-      "profileOrganizations": "Профіль ды арганізацыі"
+      "signIn": "уваход",
+      "profileOrganizations": "профіль ды арганізацыі",
+      "chat": "чат",
+      "notifications": "апавяшчэнні",
+      "integrations": "інтэграцыі"
     }
   },
   "preferences": {

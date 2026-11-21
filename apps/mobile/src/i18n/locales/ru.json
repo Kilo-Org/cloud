@@ -556,8 +556,11 @@
     "changelogFixesIn": "Исправления и улучшения в разделах: {{areas}}.",
     "changelogFixesPolish": "Исправления и улучшения во всём приложении.",
     "changelogAreas": {
-      "signIn": "Вход",
-      "profileOrganizations": "Профиль & организации"
+      "signIn": "вход",
+      "profileOrganizations": "профиль & организации",
+      "chat": "чат",
+      "notifications": "уведомления",
+      "integrations": "интеграции"
     }
   },
   "preferences": {

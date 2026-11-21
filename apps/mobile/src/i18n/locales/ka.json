@@ -555,7 +555,10 @@
     "changelogFixesPolish": "შესწორებები და გაუმჯობესებები მთელ აპში.",
     "changelogAreas": {
       "signIn": "შესვლა",
-      "profileOrganizations": "პროფილი & ორგანიზაციები"
+      "profileOrganizations": "პროფილი & ორგანიზაციები",
+      "chat": "ჩატი",
+      "notifications": "შეტყობინებები",
+      "integrations": "ინტეგრაციები"
     }
   },
   "preferences": {

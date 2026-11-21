@@ -554,8 +554,11 @@
     "changelogFixesIn": "Rregullime dhe përmirësime në {{areas}}.",
     "changelogFixesPolish": "Rregullime dhe përmirësime në të gjithë aplikacionin.",
     "changelogAreas": {
-      "signIn": "Hyrja",
-      "profileOrganizations": "Profili & organizatat"
+      "signIn": "hyrja",
+      "profileOrganizations": "profili & organizatat",
+      "chat": "biseda",
+      "notifications": "njoftimet",
+      "integrations": "integrimet"
     }
   },
   "preferences": {

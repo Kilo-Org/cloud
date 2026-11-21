@@ -554,8 +554,11 @@
     "changelogFixesIn": "Дараах хэсгүүдэд засвар, сайжруулалт хийгдсэн: {{areas}}.",
     "changelogFixesPolish": "Апп даяар засвар, сайжруулалт хийгдсэн.",
     "changelogAreas": {
-      "signIn": "Нэвтрэх",
-      "profileOrganizations": "Профайл ба байгууллагууд"
+      "signIn": "нэвтрэх",
+      "profileOrganizations": "профайл ба байгууллагууд",
+      "chat": "чат",
+      "notifications": "мэдэгдэл",
+      "integrations": "интеграцууд"
     }
   },
   "preferences": {

@@ -559,7 +559,10 @@
     "changelogFixesPolish": "إصلاحات وتحسينات في جميع أنحاء التطبيق.",
     "changelogAreas": {
       "signIn": "تسجيل الدخول",
-      "profileOrganizations": "الملف الشخصي & المؤسسات"
+      "profileOrganizations": "الملف الشخصي & المؤسسات",
+      "chat": "الدردشة",
+      "notifications": "الإشعارات",
+      "integrations": "التكاملات"
     }
   },
   "preferences": {

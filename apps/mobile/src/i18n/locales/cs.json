@@ -556,8 +556,11 @@
     "changelogFixesIn": "Opravy a vylepšení v oblastech: {{areas}}.",
     "changelogFixesPolish": "Opravy a vylepšení v celé aplikaci.",
     "changelogAreas": {
-      "signIn": "Přihlášení",
-      "profileOrganizations": "Profil i organizace"
+      "signIn": "přihlášení",
+      "profileOrganizations": "profil i organizace",
+      "chat": "konverzace",
+      "notifications": "oznámení",
+      "integrations": "integrace"
     }
   },
   "preferences": {

@@ -554,8 +554,11 @@
     "changelogFixesIn": "Zuzenketak eta hobekuntzak atal hauetan: {{areas}}.",
     "changelogFixesPolish": "Zuzenketak eta hobekuntzak aplikazio osoan.",
     "changelogAreas": {
-      "signIn": "Saioa hastea",
-      "profileOrganizations": "Profila zein erakundeak"
+      "signIn": "saioa hastea",
+      "profileOrganizations": "profila zein erakundeak",
+      "chat": "txata",
+      "notifications": "jakinarazpenak",
+      "integrations": "integrazioak"
     }
   },
   "preferences": {

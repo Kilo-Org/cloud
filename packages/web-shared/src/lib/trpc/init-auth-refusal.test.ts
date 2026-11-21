@@ -13,7 +13,12 @@ jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: jest
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 
-const REQUEST = new Request('http://localhost/api/trpc/user.getMe');
+/** A request the way the fetch adapter builds it, optionally naming its client. */
+function requestAt(path: string, client?: string): Request {
+  return new Request(`http://localhost${path}`, {
+    headers: client === undefined ? undefined : { 'x-kilo-client': client },
+  });
+}
 
 /** A failed auth read carries the response the caller would have returned. */
 function failedAuthResponse(extra: {
@@ -27,8 +32,19 @@ function failedAuthResponse(extra: {
   };
 }
 
-function createContext(): Promise<unknown> {
-  return createTRPCContext({ req: REQUEST });
+function createContext(client?: string): Promise<unknown> {
+  return createTRPCContext({ req: requestAt('/api/trpc/user.getMe', client) });
+}
+
+function errorData(error: TRPCError, path: string) {
+  return trpcErrorFormatter({
+    shape: {
+      message: error.message,
+      code: -32603,
+      data: { code: error.code, httpStatus: 403, path, stack: '' },
+    },
+    error,
+  } as never).data;
 }
 
 function caught(promise: Promise<unknown>): Promise<unknown> {
@@ -45,7 +61,7 @@ beforeEach(() => {
 });
 
 describe('createTRPCContext blocked-account refusal', () => {
-  test('refuses a blocked account with FORBIDDEN and the accountBlocked cause', async () => {
+  test('refuses a blocked mobile account with FORBIDDEN and the accountBlocked cause', async () => {
     mockedGetUserFromAuth.mockResolvedValue(
       failedAuthResponse({
         authorizationRefused: true,
@@ -53,7 +69,7 @@ describe('createTRPCContext blocked-account refusal', () => {
       })
     );
 
-    const error = await caught(createContext());
+    const error = await caught(createContext('mobile'));
 
     expect(error).toBeInstanceOf(TRPCError);
     const trpcError = error as TRPCError;
@@ -63,16 +79,9 @@ describe('createTRPCContext blocked-account refusal', () => {
 
     // What the mobile client actually reads: blocked-account data, and no
     // sign-out flag.
-    const shape = trpcErrorFormatter({
-      shape: {
-        message: trpcError.message,
-        code: -32603,
-        data: { code: trpcError.code, httpStatus: 403, path: 'user.getMe', stack: '' },
-      },
-      error: trpcError,
-    } as never);
-    expect(shape.data.accountBlocked).toBe(true);
-    expect(shape.data.authRequired).toBeUndefined();
+    const data = errorData(trpcError, 'user.getMe');
+    expect(data.accountBlocked).toBe(true);
+    expect(data.authRequired).toBeUndefined();
   });
 
   test('keeps a genuine missing session on UNAUTHORIZED with the auth context cause', async () => {
@@ -96,6 +105,48 @@ describe('createTRPCContext blocked-account refusal', () => {
     expect(trpcError.code).toBe('UNAUTHORIZED');
     expect(trpcError.cause).toBeInstanceOf(AuthContextError);
   });
+
+  test('answers a blocked account without the client header on UNAUTHORIZED', async () => {
+    mockedGetUserFromAuth.mockResolvedValue(
+      failedAuthResponse({
+        authorizationRefused: true,
+        refusalReason: 'account_blocked',
+      })
+    );
+
+    const error = await caught(createContext());
+
+    expect(error).toBeInstanceOf(TRPCError);
+    const trpcError = error as TRPCError;
+    expect(trpcError.code).toBe('UNAUTHORIZED');
+    expect(trpcError.cause).toBeInstanceOf(AuthContextError);
+
+    // The merge-base web answer: sign-in -> after-sign-in -> /account-blocked
+    // reads `authRequired`, and nothing reads `accountBlocked`.
+    const data = errorData(trpcError, 'user.getMe');
+    expect(data.authRequired).toBe(true);
+    expect(data.accountBlocked).toBeUndefined();
+  });
+
+  test('answers a blocked account that names another client on UNAUTHORIZED', async () => {
+    mockedGetUserFromAuth.mockResolvedValue(
+      failedAuthResponse({
+        authorizationRefused: true,
+        refusalReason: 'account_blocked',
+      })
+    );
+
+    const error = await caught(createContext('web'));
+
+    expect(error).toBeInstanceOf(TRPCError);
+    const trpcError = error as TRPCError;
+    expect(trpcError.code).toBe('UNAUTHORIZED');
+    expect(trpcError.cause).toBeInstanceOf(AuthContextError);
+
+    const data = errorData(trpcError, 'user.getMe');
+    expect(data.authRequired).toBe(true);
+    expect(data.accountBlocked).toBeUndefined();
+  });
 });
 
 describe('createTRPCContext revoked-account admission', () => {
@@ -115,7 +166,7 @@ describe('createTRPCContext revoked-account admission', () => {
     mockedGetUserFromAuth.mockResolvedValue(blockedAccountAuthRead() as never);
 
     const context = (await createTRPCContext({
-      req: new Request('http://localhost/api/trpc/user.revokeCurrentDeviceSession'),
+      req: requestAt('/api/trpc/user.revokeCurrentDeviceSession'),
       info: DEVICE as never,
     })) as { user: { id: string }; deviceSessionId?: string };
 
@@ -128,6 +179,63 @@ describe('createTRPCContext revoked-account admission', () => {
     expect(context.deviceSessionId).toBe('device-1');
   });
 
+  // Sign-out deletes the device's own token rows too; without that the device
+  // keeps receiving notifications for the account it was told it cannot use.
+  test.each([['user.unregisterPushToken'], ['user.unregisterActivityToken']])(
+    'admits the account for its own %s',
+    async path => {
+      mockedGetUserFromAuth.mockResolvedValue(blockedAccountAuthRead() as never);
+
+      const context = (await createTRPCContext({
+        req: requestAt(`/api/trpc/${path}`),
+        info: { calls: [{ path }] } as never,
+      })) as { user: { id: string } };
+
+      expect(mockedGetUserFromAuth).toHaveBeenCalledWith(
+        expect.objectContaining({ allowRefusedAccountSelfCleanup: true })
+      );
+      expect(context.user).toEqual({ id: 'user-1' });
+    }
+  );
+
+  // tRPC reports a batched call's path with its query string; the gate matches
+  // the bare procedure, so the strip is what admits a batched cleanup.
+  test('admits a cleanup path that carries a query string', async () => {
+    mockedGetUserFromAuth.mockResolvedValue(blockedAccountAuthRead() as never);
+
+    const context = (await createTRPCContext({
+      req: requestAt('/api/trpc/user.unregisterPushToken?batch=1'),
+      info: { calls: [{ path: 'user.unregisterPushToken?batch=1' }] } as never,
+    })) as { user: { id: string } };
+
+    expect(mockedGetUserFromAuth).toHaveBeenCalledWith(
+      expect.objectContaining({ allowRefusedAccountSelfCleanup: true })
+    );
+    expect(context.user).toEqual({ id: 'user-1' });
+  });
+
+  test('admits a batch of the three sign-out cleanups', async () => {
+    mockedGetUserFromAuth.mockResolvedValue(blockedAccountAuthRead() as never);
+
+    const context = (await createTRPCContext({
+      req: requestAt(
+        '/api/trpc/user.revokeCurrentDeviceSession,user.unregisterPushToken,user.unregisterActivityToken'
+      ),
+      info: {
+        calls: [
+          { path: 'user.unregisterPushToken' },
+          { path: 'user.unregisterActivityToken' },
+          { path: 'user.revokeCurrentDeviceSession' },
+        ],
+      } as never,
+    })) as { user: { id: string } };
+
+    expect(mockedGetUserFromAuth).toHaveBeenCalledWith(
+      expect.objectContaining({ allowRefusedAccountSelfCleanup: true })
+    );
+    expect(context.user).toEqual({ id: 'user-1' });
+  });
+
   test('refuses a batch that mixes the revocation with another call', async () => {
     mockedGetUserFromAuth.mockResolvedValue(
       failedAuthResponse({
@@ -138,10 +246,56 @@ describe('createTRPCContext revoked-account admission', () => {
 
     const error = await caught(
       createTRPCContext({
-        req: new Request('http://localhost/api/trpc/user.revokeCurrentDeviceSession,user.getMe'),
+        req: requestAt('/api/trpc/user.revokeCurrentDeviceSession,user.getMe', 'mobile'),
         info: {
           calls: [{ path: 'user.revokeCurrentDeviceSession' }, { path: 'user.getMe' }],
         } as never,
+      })
+    );
+
+    expect(error).toBeInstanceOf(TRPCError);
+    expect((error as TRPCError).cause).toBeInstanceOf(AccountBlockedError);
+    expect(mockedGetUserFromAuth).toHaveBeenCalledWith(
+      expect.objectContaining({ allowRefusedAccountSelfCleanup: false })
+    );
+  });
+
+  test('refuses a batch that mixes a token cleanup with another call', async () => {
+    mockedGetUserFromAuth.mockResolvedValue(
+      failedAuthResponse({
+        authorizationRefused: true,
+        refusalReason: 'account_blocked',
+      })
+    );
+
+    const error = await caught(
+      createTRPCContext({
+        req: requestAt('/api/trpc/user.unregisterPushToken,user.getMe', 'mobile'),
+        info: {
+          calls: [{ path: 'user.unregisterPushToken' }, { path: 'user.getMe' }],
+        } as never,
+      })
+    );
+
+    expect(error).toBeInstanceOf(TRPCError);
+    expect((error as TRPCError).cause).toBeInstanceOf(AccountBlockedError);
+    expect(mockedGetUserFromAuth).toHaveBeenCalledWith(
+      expect.objectContaining({ allowRefusedAccountSelfCleanup: false })
+    );
+  });
+
+  test('refuses a read that names none of the cleanup procedures', async () => {
+    mockedGetUserFromAuth.mockResolvedValue(
+      failedAuthResponse({
+        authorizationRefused: true,
+        refusalReason: 'account_blocked',
+      })
+    );
+
+    const error = await caught(
+      createTRPCContext({
+        req: requestAt('/api/trpc/user.getMe', 'mobile'),
+        info: { calls: [{ path: 'user.getMe' }] } as never,
       })
     );
 
@@ -160,7 +314,9 @@ describe('createTRPCContext revoked-account admission', () => {
       })
     );
 
-    const error = await caught(createTRPCContext({ req: REQUEST }));
+    const error = await caught(
+      createTRPCContext({ req: requestAt('/api/trpc/user.getMe', 'mobile') })
+    );
 
     expect(error).toBeInstanceOf(TRPCError);
     expect((error as TRPCError).cause).toBeInstanceOf(AccountBlockedError);

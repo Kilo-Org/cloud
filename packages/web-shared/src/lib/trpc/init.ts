@@ -67,22 +67,33 @@ import {
 export { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
 
 /**
- * The one procedure a refused account may still call: revoking its own device
- * session. Signing out has to end the session server-side even while the block
- * stands, otherwise the app clears its credentials but leaves a usable session
- * behind. The web logout route already admits a blocked account for the same
- * cleanup (`apps/web/src/app/api/auth/revoke-web-session/route.ts`).
+ * The only procedures a refused account may still call: the three cleanups its
+ * sign-out issues. A blocked account's sign-out must end the session
+ * server-side *and* delete the device's own push and activity token rows; a
+ * device that skips the latter keeps receiving notifications for an account it
+ * was just told it cannot use. The web logout route admits a blocked account
+ * for the same session cleanup
+ * (`apps/web/src/app/api/auth/revoke-web-session/route.ts`).
+ *
+ * Each of the three only deletes rows where `user_id` is the caller's own
+ * (`apps/web/src/routers/user-router.ts` `revokeCurrentDeviceSession` /
+ * `unregisterPushToken` / `unregisterActivityToken`), so the admission cannot
+ * carry a read or reach another account.
  *
  * The admission is keyed on the whole request, never on the first call: a
- * batch that mixes this procedure with any other call is refused as before, so
- * the exemption cannot carry another procedure through the gate.
+ * batch that mixes a cleanup with any other call is refused as before, so the
+ * exemption cannot carry another procedure through the gate.
  */
-const SELF_SESSION_REVOCATION_PATH = 'user.revokeCurrentDeviceSession';
+const SELF_CLEANUP_PATHS: ReadonlySet<string> = new Set([
+  'user.revokeCurrentDeviceSession',
+  'user.unregisterPushToken',
+  'user.unregisterActivityToken',
+]);
 
 function admitsRefusedAccount(info: ControlPlaneRequestInfo | null | undefined): boolean {
   const calls = info?.calls;
   if (!calls || calls.length === 0) return false;
-  return calls.every(call => call.path.split('?')[0] === SELF_SESSION_REVOCATION_PATH);
+  return calls.every(call => SELF_CLEANUP_PATHS.has(call.path.split('?')[0]));
 }
 
 // Define the context type
@@ -202,8 +213,9 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
         requestHeaders: headersList,
         requestPathname: opts?.req ? new URL(opts.req.url).pathname : undefined,
         // A refused account still owns the session it is signing out of. The
-        // admission covers exactly one procedure (see admitsRefusedAccount), so
-        // every other call keeps the block refusal below.
+        // admission covers only the cleanup procedures (see
+        // admitsRefusedAccount), so every other call keeps the block refusal
+        // below.
         allowRefusedAccountSelfCleanup: admitsRefusedAccount(opts?.info),
       }),
     startedAt,
@@ -211,10 +223,18 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
   });
   // Authorization refused the account itself (R0 domain blacklist / R1 blocked
   // account) while the session is intact. That is a different answer from a
-  // missing session: the app must show why the account cannot be used and keep
-  // the user signed in, so this refuses with its own cause and never reaches
-  // the AuthContextError branch below.
-  if (refusalReason === 'account_blocked') {
+  // missing session: the mobile app must show why the account cannot be used
+  // and keep the user signed in, so this refuses with its own cause instead of
+  // reaching the AuthContextError branch below.
+  //
+  // Only the first-party mobile client gets that answer. The web app already
+  // routes a blocked account to /account-blocked from its UNAUTHORIZED path
+  // (sign-in -> after-sign-in -> /account-blocked), and no web consumer reads
+  // `data.accountBlocked`, so every other client falls through to the
+  // merge-base UNAUTHORIZED answer unchanged.
+  const blockedAccountAnswerable =
+    refusalReason === 'account_blocked' && isMobileClient(headersList?.get(APP_CLIENT_HEADER));
+  if (blockedAccountAnswerable) {
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: 'Account access is blocked',

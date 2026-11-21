@@ -41,11 +41,15 @@ export const UNBATCHED_PROCEDURES = new Set([
   'user.getMe',
   'activeSessions.list',
   'cliSessionsV2.getSessionMessagesPage',
-  // Sign-out issues the session revoke and a push-token unregister in one
-  // tick. Batching them would put a second procedure on the revoke's HTTP
-  // request, and the context admits a refused account only when that request
-  // carries the revoke alone — the server gate covers exactly one procedure.
+  // Self-cleanup: the context admits a blocked account only for a request
+  // whose every call is one of these procedures, so each must travel alone.
+  // Sign-out and the logout reconciliation both fire cleanups in the same
+  // tick (the revoke with a push-token unregister, an activity-token unregister
+  // with a push-token unregister); batching even two of them, or a cleanup
+  // with any ordinary call, makes the server refuse the whole request.
   'user.revokeCurrentDeviceSession',
+  'user.unregisterPushToken',
+  'user.unregisterActivityToken',
 ]);
 
 /**

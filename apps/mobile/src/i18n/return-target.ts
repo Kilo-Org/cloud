@@ -1,4 +1,5 @@
 import * as SecureStore from '@/lib/auth/secure-store';
+import { deleteStoredValueSafe, writeStoredValueSafe } from '@/lib/auth/secure-store-value';
 
 import { LANGUAGE_RETURN_TARGET_KEY } from '@/lib/storage-keys';
 
@@ -25,22 +26,16 @@ function isLanguageReturnTarget(value: string | null): value is LanguageReturnTa
 }
 
 /**
- * Disarms the marker, and never rejects: a launch whose keychain refuses the
- * delete or the overwrite has nothing left to do about it, and the wrapper has
- * already reported each refusal. The caller's own read decides the outcome.
+ * Disarms the marker through the total keychain helpers, so neither step can
+ * reject. A refused delete or overwrite is the keychain's own policy: the
+ * reporting layer files an event for a real failure and only a breadcrumb for
+ * a locked-device refusal, and the caller keeps the value it already read.
  */
 async function consumeLanguageReturnTarget(): Promise<void> {
-  try {
-    await SecureStore.deleteItemAsync(LANGUAGE_RETURN_TARGET_KEY);
+  if (await deleteStoredValueSafe(LANGUAGE_RETURN_TARGET_KEY)) {
     return;
-  } catch {
-    // The overwrite below still disarms the marker.
   }
-  try {
-    await SecureStore.setItemAsync(LANGUAGE_RETURN_TARGET_KEY, CONSUMED_TARGET);
-  } catch {
-    // Both refusals are already reported by the wrapper.
-  }
+  await writeStoredValueSafe(LANGUAGE_RETURN_TARGET_KEY, CONSUMED_TARGET);
 }
 
 export async function readLanguageReturnTarget(): Promise<LanguageReturnTarget | null> {

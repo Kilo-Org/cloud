@@ -68,15 +68,17 @@ describe('createBoundedStatusLog', () => {
     expect(log.droppedCount()).toBe(0);
   });
 
-  it('keeps the newest line even when it pushes the log past the total-length ceiling', () => {
+  it('always keeps the newest line when the total ceiling is exceeded', () => {
     const log = createBoundedStatusLog();
     const filler = 'z'.repeat(STATUS_LOG_MAX_LINE_LENGTH);
+    const pushes = Math.floor(STATUS_LOG_MAX_TOTAL_LENGTH / STATUS_LOG_MAX_LINE_LENGTH);
 
-    for (let i = 0; i < STATUS_LOG_MAX_TOTAL_LENGTH / STATUS_LOG_MAX_LINE_LENGTH; i++) {
+    for (let i = 0; i < pushes; i++) {
       log.push(filler);
     }
     expect(totalLength(log.entries())).toBeLessThanOrEqual(STATUS_LOG_MAX_TOTAL_LENGTH);
 
+    // The newest line must survive even though it cannot fit beside the kept ones.
     const newest = 'n'.repeat(STATUS_LOG_MAX_LINE_LENGTH);
     log.push(newest);
 

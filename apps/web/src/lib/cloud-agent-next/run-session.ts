@@ -368,10 +368,12 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
   );
 
   const droppedCount = log.droppedCount();
+  // The Discord caller keeps only the first ~2000 characters of this reply, so
+  // the note must sit at the front to survive that cut.
   const omittedNote = droppedCount > 0 ? `(+${droppedCount} earlier lines omitted)` : undefined;
 
   if (hasError) {
-    const details = [errorMessage, ...log.entries(), omittedNote].filter(Boolean).join('\n');
+    const details = [errorMessage, omittedNote, ...log.entries()].filter(Boolean).join('\n');
     return {
       response: `Cloud Agent session ${sessionId} encountered errors:\n${details}`,
       sessionId,
@@ -389,7 +391,7 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
     };
   }
 
-  const tail = [...log.entries().slice(-5), omittedNote].filter(Boolean).join('\n');
+  const tail = [omittedNote, ...log.entries().slice(-5)].filter(Boolean).join('\n');
   return {
     response: `Cloud Agent session ${sessionId} completed successfully.\n\nStatus:\n${tail}`,
     sessionId,

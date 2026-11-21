@@ -10,6 +10,7 @@ import {
 
 import { recordReplyFeedbackEvent, type ReviewMemoryOwner } from './db';
 import {
+  REVIEW_MEMORY_GATEWAY_TIMEOUT_MS,
   REVIEW_MEMORY_PROPOSAL_LIMITS,
   ReviewMemoryProposalOutputSchema,
   generateReviewMemoryProposalWithGateway,
@@ -145,31 +146,40 @@ describe('review memory aggregation', () => {
     const owner = { type: 'user' as const, id: user.id };
     const events = await seedFeedback(owner);
     let capturedSignal: AbortSignal | undefined;
+    // A real deadline is not observable from the signal, so record the duration it is armed with.
+    const realTimeout = AbortSignal.timeout;
+    const timeoutSpy = jest.spyOn(AbortSignal, 'timeout').mockImplementation(realTimeout);
 
-    const result = await runReviewMemoryAnalysis({
-      owner,
-      platform: 'github',
-      repoFullName: 'acme/widgets',
-      generate: async input => {
-        capturedSignal = input.signal;
-        return {
-          draft: {
-            status: 'propose',
-            title: 'Deadline response',
-            rationale: 'Maintainers repeatedly corrected generated fixture comments.',
-            proposedMarkdown: '- Do not flag generated fixtures.',
-            positiveCount: 0,
-            negativeCount: 2,
-            neutralCount: 0,
-            evidenceEventIds: [events[0].id],
-          },
-        };
-      },
-    });
+    try {
+      const result = await runReviewMemoryAnalysis({
+        owner,
+        platform: 'github',
+        repoFullName: 'acme/widgets',
+        generate: async input => {
+          capturedSignal = input.signal;
+          return {
+            draft: {
+              status: 'propose',
+              title: 'Deadline response',
+              rationale: 'Maintainers repeatedly corrected generated fixture comments.',
+              proposedMarkdown: '- Do not flag generated fixtures.',
+              positiveCount: 0,
+              negativeCount: 2,
+              neutralCount: 0,
+              evidenceEventIds: [events[0].id],
+            },
+          };
+        },
+      });
 
-    expect(result.status).toBe('proposed');
-    expect(capturedSignal).toBeInstanceOf(AbortSignal);
-    expect(capturedSignal?.aborted).toBe(false);
+      expect(result.status).toBe('proposed');
+      expect(timeoutSpy).toHaveBeenCalledTimes(1);
+      expect(timeoutSpy).toHaveBeenCalledWith(REVIEW_MEMORY_GATEWAY_TIMEOUT_MS);
+      expect(capturedSignal).toBeInstanceOf(AbortSignal);
+      expect(capturedSignal?.aborted).toBe(false);
+    } finally {
+      timeoutSpy.mockRestore();
+    }
   });
 
   it('forwards a caller supplied signal to the gateway call', async () => {
@@ -188,19 +198,27 @@ describe('review memory aggregation', () => {
       tokensOut: null,
     } as never);
     const controller = new AbortController();
+    // A caller signal must reach the gateway unchanged, with no default deadline alongside it.
+    const realTimeout = AbortSignal.timeout;
+    const timeoutSpy = jest.spyOn(AbortSignal, 'timeout').mockImplementation(realTimeout);
 
-    const result = await generateReviewMemoryProposalWithGateway({
-      owner,
-      platform: 'github',
-      repoFullName: 'acme/widgets',
-      events: [],
-      signal: controller.signal,
-    });
+    try {
+      const result = await generateReviewMemoryProposalWithGateway({
+        owner,
+        platform: 'github',
+        repoFullName: 'acme/widgets',
+        events: [],
+        signal: controller.signal,
+      });
 
-    expect(result.draft).toEqual({ status: 'no_change' });
-    expect(structuredOutput).toHaveBeenCalledWith(
-      expect.objectContaining({ abortSignal: controller.signal })
-    );
+      expect(result.draft).toEqual({ status: 'no_change' });
+      expect(structuredOutput).toHaveBeenCalledWith(
+        expect.objectContaining({ abortSignal: controller.signal })
+      );
+      expect(timeoutSpy).not.toHaveBeenCalled();
+    } finally {
+      timeoutSpy.mockRestore();
+    }
   });
 });
 

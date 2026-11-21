@@ -9,7 +9,7 @@ import { reviewMemoryRetentionCutoff } from './retention';
 
 const REVIEW_MEMORY_FORBIDDEN_PROPOSAL_PATTERN =
   /\b(?:review\s+memory|kilo|feedback\s+systems?|this\s+analysis|llms?)\b/i;
-const REVIEW_MEMORY_GATEWAY_TIMEOUT_MS = 120_000;
+export const REVIEW_MEMORY_GATEWAY_TIMEOUT_MS = 120_000;
 
 /**
  * Caps applied in `validateReviewMemoryProposalDraft`, never in the schema the model

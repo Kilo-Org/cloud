@@ -38,6 +38,11 @@ export async function beginGitHubAppInstall(
     // no installation id yet, and a locally disconnected association has
     // relinquished its slot, so neither blocks the page; a suspended or
     // auth-invalid association still holds its slot until it is disconnected.
+    //
+    // This read answers the common case before the install page opens. It is
+    // not the admission check for the rule: each writer applies the rule
+    // under the owner's installation slot lock, so the stored slot count
+    // follows the rule whatever order the requests arrive in.
     const slots = await getOrganizationGitHubInstallationSlots(owner.id);
     if (slots.some(slot => slot.installationId !== null)) {
       throw new TRPCError({

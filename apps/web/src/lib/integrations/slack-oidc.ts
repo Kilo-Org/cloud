@@ -85,8 +85,14 @@ export function getSlackOidcRedirectUri(): string {
 /**
  * Authorization URL for Sign in with Slack. `state` is the signed bot-link
  * state; Slack returns it unchanged to `getSlackOidcRedirectUri()`.
+ *
+ * `team` names the Slack workspace the pending link was issued for. When the
+ * browser is already signed in to that workspace Slack skips the workspace
+ * picker and signs in there directly, so a person signed in to several
+ * workspaces cannot land in the wrong one and fail the callback's identity
+ * comparison.
  */
-export function getSlackOidcAuthorizeUrl(state: string): string {
+export function getSlackOidcAuthorizeUrl(state: string, team: string): string {
   const { clientId } = requireSlackOidcClientCredentials();
 
   const params = new URLSearchParams({
@@ -95,6 +101,7 @@ export function getSlackOidcAuthorizeUrl(state: string): string {
     scope: 'openid',
     redirect_uri: getSlackOidcRedirectUri(),
     state,
+    team,
   });
 
   return `${SLACK_OIDC_AUTHORIZE_URL}?${params.toString()}`;

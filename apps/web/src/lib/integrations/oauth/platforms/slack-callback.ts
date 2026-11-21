@@ -147,9 +147,14 @@ async function handleSlackBotLinkCallback({
   };
 
   if (provenIdentity.teamId !== identity.teamId || provenIdentity.userId !== identity.userId) {
+    const workspace = integration.platform_account_login?.trim();
+    const expectedAccount = workspace
+      ? `the one this link was issued for in the "${workspace}" Slack workspace`
+      : 'the one this link was issued for';
     return errorPage(
       'Link Failed',
-      'You signed in to a different Slack account than the one this link was issued for. No changes were made.',
+      `You signed in to a different Slack account than ${expectedAccount}. No changes were made. ` +
+        `Please go back to your chat and mention Kilo again to start a new link.`,
       403
     );
   }

@@ -290,7 +290,8 @@ export function createSlackBotPlatform(slackAdapter: SlackAdapter): BotPlatform 
           slackTeamId: identity.teamId,
           slackUserId: identity.userId,
           contextKey,
-        })
+        }),
+        identity.teamId
       );
     },
     async withAuthContext({ platformIntegration, fn }) {

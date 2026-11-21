@@ -199,6 +199,7 @@ beforeEach(() => {
     id: 'integration-1',
     platform: 'slack',
     platform_installation_id: SLACK_TEAM_ID,
+    platform_account_login: 'Acme Workspace',
     owned_by_user_id: KILO_USER_ID,
     owned_by_organization_id: null,
   } as never);
@@ -229,10 +230,37 @@ describe('handleSlackOAuthCallback Slack bot-link', () => {
     const response = await callCallback({ state: botLinkState(contextKey) });
 
     expect(response.status).toBe(403);
-    await expect(response.text()).resolves.toContain('different Slack account');
+    const body = await response.text();
+    expect(body).toContain('different Slack account');
+    expect(body).toContain('Acme Workspace');
+    expect(body).toContain(
+      'Please go back to your chat and mention Kilo again to start a new link.'
+    );
     await expect(mappedKiloUser()).resolves.toBeNull();
     expect(state.values.has(`${contextKey}:consumed`)).toBe(false);
     expect(mockAfter).not.toHaveBeenCalled();
+  });
+
+  it('describes the expected account without naming a workspace when the row has none', async () => {
+    const contextKey = await seedPendingLink();
+    mockedGetPlatformIntegration.mockResolvedValue({
+      id: 'integration-1',
+      platform: 'slack',
+      platform_installation_id: SLACK_TEAM_ID,
+      platform_account_login: null,
+      owned_by_user_id: KILO_USER_ID,
+      owned_by_organization_id: null,
+    } as never);
+    mockFetchSlackIdentity.mockResolvedValue(slackIdentity(SLACK_TEAM_ID, 'U_SOMEONE_ELSE'));
+
+    const response = await callCallback({ state: botLinkState(contextKey) });
+
+    expect(response.status).toBe(403);
+    const body = await response.text();
+    expect(body).toContain('different Slack account than the one this link was issued for');
+    expect(body).toContain(
+      'Please go back to your chat and mention Kilo again to start a new link.'
+    );
   });
 
   it('rejects a workspace mismatch from the same Slack user id', async () => {

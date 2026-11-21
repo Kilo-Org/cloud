@@ -53,7 +53,7 @@ describe('getSlackOidcAuthorizeUrl', () => {
   });
 
   test('requests only the openid scope and returns to the registered Slack callback', () => {
-    const url = new URL(getSlackOidcAuthorizeUrl('signed-state'));
+    const url = new URL(getSlackOidcAuthorizeUrl('signed-state', 'T123'));
 
     expect(url.origin + url.pathname).toBe('https://slack.com/openid/connect/authorize');
     expect(url.searchParams.get('response_type')).toBe('code');
@@ -62,6 +62,14 @@ describe('getSlackOidcAuthorizeUrl', () => {
     expect(url.searchParams.get('state')).toBe('signed-state');
     expect(url.searchParams.get('redirect_uri')).toBe(getSlackOidcRedirectUri());
     expect(url.searchParams.get('redirect_uri')).toContain('/api/integrations/slack/callback');
+  });
+
+  test('names the workspace the link is for as the team parameter', () => {
+    const first = new URL(getSlackOidcAuthorizeUrl('signed-state', 'T123'));
+    const second = new URL(getSlackOidcAuthorizeUrl('signed-state', 'T456'));
+
+    expect(first.searchParams.get('team')).toBe('T123');
+    expect(second.searchParams.get('team')).toBe('T456');
   });
 });
 

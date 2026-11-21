@@ -77,19 +77,23 @@ export const STORAGE_ORIGIN = 'https://0123456789abcdef0123456789abcdef.r2.cloud
 const TOKEN_EXPIRES_SECONDS = 3600;
 const POLL_TIMEOUT_MS = 30_000;
 const POLL_INTERVAL_MS = 500;
-/** Gap between the stamp and its confirming read, so a late ingest re-stamp shows up. */
-const SETTLE_INTERVAL_MS = 2_000;
 const BASE_TIME = Date.UTC(2026, 0, 2, 0, 0, 0);
 
-/** Newest first after the seed's post-ingest write, so the terminal sessions lead the list. */
+/**
+ * Ordered newest first. These sit far in the future on purpose: ingest stamps
+ * `updated_at` when it processes a part, asynchronously and possibly minutes
+ * later, so a nearer value would be outranked and the fixture's order would
+ * invert after the seed had already verified it. Fixed values also keep the
+ * mirror from reading every reseed as a change.
+ */
 const SESSION_UPDATED_AT = [
-  '2026-01-02T00:07:00.000Z',
-  '2026-01-02T00:06:00.000Z',
-  '2026-01-02T00:05:00.000Z',
-  '2026-01-02T00:04:00.000Z',
-  '2026-01-02T00:03:00.000Z',
-  '2026-01-02T00:02:00.000Z',
-  '2026-01-02T00:01:00.000Z',
+  '2099-01-01T00:00:07.000Z',
+  '2099-01-01T00:00:06.000Z',
+  '2099-01-01T00:00:05.000Z',
+  '2099-01-01T00:00:04.000Z',
+  '2099-01-01T00:00:03.000Z',
+  '2099-01-01T00:00:02.000Z',
+  '2099-01-01T00:00:01.000Z',
 ] as const;
 
 function printUsage(): void {
@@ -363,56 +367,40 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     messageCount += await pollForHistory(sessionIngestUrl, sessionId, token);
   }
 
-  // Ingest stamps `updated_at` on its own, and it does so asynchronously, so the
-  // order the list page sorts by is set here, after every session's history is
-  // readable: `SESSION_UPDATED_AT` is newest first, and the crawl's budget walks
-  // that order. Without this the terminal sessions sit at the back and the
-  // fixture never exercises a stuck front page.
-  //
-  // A session can still re-stamp `updated_at` after the first rewrite, so stamp,
-  // read back, and accept the order only when two consecutive reads agree; a
-  // late re-stamp then costs another round instead of silently inverting the
-  // fixture.
-  const fixtureIds = new Set(sessionIds);
-  const expectedOrder = sessionIds.join(',');
-  const readOrder = async (): Promise<string> => {
-    const rows = await db
-      .select({ sessionId: cli_sessions_v2.session_id, updatedAt: cli_sessions_v2.updated_at })
-      .from(cli_sessions_v2)
-      .where(eq(cli_sessions_v2.kilo_user_id, user.userId));
-    return rows
-      .filter(row => fixtureIds.has(row.sessionId))
-      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-      .map(row => row.sessionId)
-      .join(',');
-  };
-
-  let settled = false;
-  for (let round = 0; round < 5 && !settled; round += 1) {
-    for (const [index, sessionId] of sessionIds.entries()) {
-      await db
-        .update(cli_sessions_v2)
-        .set({ updated_at: SESSION_UPDATED_AT[index] ?? SESSION_UPDATED_AT.at(-1) })
-        .where(
-          and(
-            eq(cli_sessions_v2.kilo_user_id, user.userId),
-            eq(cli_sessions_v2.session_id, sessionId)
-          )
-        );
-    }
-    if ((await readOrder()) !== expectedOrder) {
-      // A late ingest re-stamped a row; wait for it to finish and try again.
-      await sleep(SETTLE_INTERVAL_MS);
-      continue;
-    }
-    await sleep(SETTLE_INTERVAL_MS);
-    settled = (await readOrder()) === expectedOrder;
+  // Ingest stamps `updated_at` on its own, and it does so asynchronously, so a
+  // rewrite here can be outranked minutes later by a late ingest write. The
+  // order therefore comes from a band no ingest write can reach: the seven rows
+  // take `SESSION_UPDATED_AT`, which sits far in the future and is fixed, so the
+  // crawl's budget always meets the stuck sessions first. The band is also
+  // stable across reseeds, so the mirror does not mistake it for a change and
+  // restart every crawl.
+  for (const [index, sessionId] of sessionIds.entries()) {
+    await db
+      .update(cli_sessions_v2)
+      .set({ updated_at: SESSION_UPDATED_AT[index] ?? SESSION_UPDATED_AT.at(-1) })
+      .where(
+        and(
+          eq(cli_sessions_v2.kilo_user_id, user.userId),
+          eq(cli_sessions_v2.session_id, sessionId)
+        )
+      );
   }
 
-  if (!settled) {
+  const ordered = await db
+    .select({ sessionId: cli_sessions_v2.session_id, updatedAt: cli_sessions_v2.updated_at })
+    .from(cli_sessions_v2)
+    .where(eq(cli_sessions_v2.kilo_user_id, user.userId));
+  // Scoped to this fixture's ids: the user may own other sessions, and only the
+  // relative order of the seven below decides what the crawl meets first.
+  const fixtureIds = new Set(sessionIds);
+  const actual = ordered
+    .filter(row => fixtureIds.has(row.sessionId))
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .map(row => row.sessionId);
+  if (actual.join(',') !== sessionIds.join(',')) {
     throw new Error(
-      'Fixture order did not settle; the crawl would not meet the stuck sessions first. ' +
-        'Re-run the seed once the session-ingest queue has drained.'
+      'Fixture order is wrong; the crawl would not meet the stuck sessions first.\n' +
+        `expected: ${sessionIds.join(',')}\nactual:   ${actual.join(',')}`
     );
   }
 

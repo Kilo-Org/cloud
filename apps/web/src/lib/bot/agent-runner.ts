@@ -10,7 +10,7 @@ import {
   updateBotRequest,
 } from '@/lib/bot/request-logging';
 import { getNextBotCallbackStep, getRemainingBotIterations } from '@/lib/bot/step-budget';
-import { resolveBotRunModel } from '@/lib/bot/model';
+import { resolveBotModelSettings, resolveBotRunModel } from '@/lib/bot/model';
 import spawnCloudAgentSession, {
   spawnCloudAgentInputSchema,
   type SpawnCloudAgentInput,
@@ -209,7 +209,11 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
     headers,
   });
 
+  // The model is resolved through the owner's current policy, while the
+  // thinking effort is the stored setting: policy decides which model runs, the
+  // effort is the user's own preference for it.
   const modelSlug = await resolveBotRunModel(params.platformIntegration);
+  const { thinkingEffort } = resolveBotModelSettings(params.platformIntegration);
   const owner = ownerFromIntegration(params.platformIntegration);
   const chatPlatform = params.thread.adapter.name;
   const botPlatform = botPlatforms.requireByAdapter(params.thread.adapter);
@@ -339,6 +343,7 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
               chatPlatform,
               currentStep,
               attachments: params.attachments,
+              ...(thinkingEffort ? { variant: thinkingEffort } : {}),
               payerUserId: params.user.id,
               actorLogin: params.actorLogin,
               threadRepository: getGitHubRepositoryFullNameFromThread(params.thread.id),

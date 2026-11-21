@@ -6,31 +6,41 @@
 // this path a mid-session block first shows a generic error on whatever surface
 // the person touched.
 //
-// The fences match the read hook's and one more: no raise while an auth
-// transition owns the credentials (`isSignOutActive`, and the teardown guard
-// that also covers the sign-in window between its start and its credential
-// publication — a refusal from the previous session settling in that window
-// must not raise an explanation for the account just signed in), and a raise
-// never publishes over an already-raised state (the identity read owns the
-// clear).
+// The raise requires both that no auth transition owns the credentials and that
+// the refusal belongs to the session the app is now serving. The fences cover
+// the transition windows (`isSignOutActive`, and the teardown guard that also
+// covers the sign-in window between its start and its credential publication),
+// a raise never publishes over an already-raised state (the identity read owns
+// the clear), and `isFromCurrentDispatchSession` covers the case the booleans
+// cannot: a refusal dispatched by the previous session that settles AFTER a new
+// sign-in cleared every boolean fence. Only the auth epoch names the session
+// that issued the call, so a refusal from an earlier epoch never raises an
+// explanation over the account just signed in.
 
 import { isBlockedAccountActive, setBlockedAccountActive } from '@/lib/auth/blocked-account-state';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import { isSignOutTeardownActive } from '@/lib/auth/auth-transition-state';
+import { isFromCurrentDispatchSession } from '@/lib/auth/dispatch-epoch';
 import { isAccountBlockedTrpcError } from '@/lib/trpc-error';
 
 /**
  * Raises the blocked-account explanation from any procedure's refusal. Total:
  * never throws, and a refusal that arrives during an auth transition (sign-out
- * teardown, or the sign-in window before its credentials publish), or for an
- * already-raised state, changes nothing — the identity read's hook owns the
- * clear.
+ * teardown, or the sign-in window before its credentials publish), that was
+ * dispatched by an earlier auth session, or for an already-raised state, changes
+ * nothing — the identity read's hook owns the clear.
  */
 export function raiseBlockedAccountFromRefusal(error: unknown): void {
   if (!isAccountBlockedTrpcError(error)) {
     return;
   }
   if (isSignOutActive() || isSignOutTeardownActive() || isBlockedAccountActive()) {
+    return;
+  }
+  // A refusal dispatched by the previous session can settle after a new sign-in
+  // opened every boolean fence above; the dispatch epoch is what still names the
+  // session that issued the call.
+  if (!isFromCurrentDispatchSession(error)) {
     return;
   }
   setBlockedAccountActive(true);

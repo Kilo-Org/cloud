@@ -1,6 +1,14 @@
 import { type MobileRouter } from '@kilocode/trpc/mobile';
 import { type SelfCleanupProcedure } from '@kilocode/app-shared/auth';
-import { createTRPCClient, httpBatchLink, httpLink, splitLink } from '@trpc/client';
+import {
+  createTRPCClient,
+  httpBatchLink,
+  httpLink,
+  type OperationResultObservable,
+  type OperationResultObserver,
+  splitLink,
+  type TRPCLink,
+} from '@trpc/client';
 import { createTRPCContext } from '@trpc/tanstack-react-query';
 import { CONTROL_PLANE_DEADLINE_MS, withDeadline } from '@kilocode/event-service';
 import * as SecureStore from '@/lib/auth/secure-store';
@@ -15,6 +23,8 @@ import { postLatencyBatch } from '@/lib/telemetry/latency-ingest';
 import { createLatencyBuffer, createLatencyFetch } from '@/lib/telemetry/request-latency';
 import { requestUrlString } from '@/lib/telemetry/request-target';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
+import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { tagDispatchSessionAt } from '@/lib/auth/dispatch-epoch';
 import { isForcedProcedure, withForceState } from '@/lib/force-state-fixture';
 import {
   type ActiveTokenSnapshot,
@@ -391,6 +401,53 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 // sends every forced procedure to the single link, and a batched call passes.
 const linkFetch = __DEV__ ? withForceState(measuredFetch) : measuredFetch;
 
+/** The observer a link's result is subscribed with. */
+type ObserverOf = Partial<OperationResultObserver<MobileRouter, unknown>>;
+
+/**
+ * Tags every operation's error with the auth epoch captured when the operation
+ * started, so the shared raises can tell a refusal dispatched by the previous
+ * session from one the current session dispatched (see
+ * `auth/dispatch-epoch.ts`). It is first in `trpcLinks` so every call is tagged,
+ * including the ones the split sends to the single link.
+ */
+export function createDispatchSessionLink(): TRPCLink<MobileRouter> {
+  return () =>
+    ({ op, next }) => {
+      // Captured when the operation starts: the session that issued this call.
+      const epoch = currentAuthEpoch();
+      const result = {
+        subscribe(observer: ObserverOf) {
+          const subscription = next(op).subscribe({
+            next: value => {
+              observer.next?.(value);
+            },
+            error: error => {
+              tagDispatchSessionAt(error, epoch);
+              observer.error?.(error);
+            },
+            complete: () => {
+              observer.complete?.();
+            },
+          });
+          return {
+            unsubscribe: () => {
+              subscription.unsubscribe();
+            },
+          };
+        },
+      };
+      // `OperationResultObservable` also declares `pipe`, which only the
+      // `observable` helper in `@trpc/server` builds. The app cannot depend on
+      // that server package, and `@trpc/client` does not re-export the helper;
+      // the chain only ever calls `subscribe` on a link's result (its own
+      // `createChain` wraps each link in an observable and subscribes once), so
+      // the object above is the whole runtime contract, and `pipe` is the only
+      // member left to bridge.
+      return result as OperationResultObservable<MobileRouter, unknown>;
+    };
+}
+
 const singleLink = httpLink({
   url: trpcUrl,
   headers: getAuthHeaders,
@@ -406,6 +463,7 @@ const batchLink = httpBatchLink({
 });
 
 const trpcLinks = [
+  createDispatchSessionLink(),
   splitLink({
     condition: op =>
       op.context.skipBatch === true ||

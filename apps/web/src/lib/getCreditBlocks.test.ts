@@ -271,27 +271,60 @@ describe('creditGrantReasonOf', () => {
   it('maps the referral grant categories to referral', () => {
     // `referral` is the admin Referral/Review grant, which carries no prefix.
     expect(creditGrantReasonOf('referral')).toBe('referral');
+    expect(creditGrantReasonOf('referral-referring-bonus')).toBe('referral');
     expect(creditGrantReasonOf('referral-redeeming-bonus')).toBe('referral');
   });
 
-  it('maps the welcome grant to welcome', () => {
+  it('maps the welcome grants, including the validation grants they replaced, to welcome', () => {
     expect(creditGrantReasonOf('automatic-welcome-credits')).toBe('welcome');
+    expect(creditGrantReasonOf('welcome15')).toBe('welcome');
+    expect(creditGrantReasonOf('welcome20')).toBe('welcome');
+    expect(creditGrantReasonOf('stytch-validation')).toBe('welcome');
+    expect(creditGrantReasonOf('card-validation-no-stytch')).toBe('welcome');
+    expect(creditGrantReasonOf('card-validation-upgrade')).toBe('welcome');
   });
 
   it('maps the Pass bonus to kilo_pass', () => {
     expect(creditGrantReasonOf('kilo-pass-bonus')).toBe('kilo_pass');
   });
 
-  it('maps the ledger reconciliation row to adjustment', () => {
-    expect(creditGrantReasonOf('accounting_adjustment')).toBe('adjustment');
+  it('maps a registered member-visible promo category to grant', () => {
+    // Retail categories whose plaintext is in source; the self-service promo
+    // codes are encrypted, so no test may name one of those.
+    expect(creditGrantReasonOf('github-promo-2025-07-03')).toBe('grant');
+    // `obsolete` marks a grant that predates the current catalogue, not a
+    // balance correction, so it still prints as credit.
+    expect(creditGrantReasonOf('multiplier-promo')).toBe('grant');
   });
 
-  it('maps the Orb migration row to adjustment', () => {
+  it('maps ledger accounting rows to adjustment', () => {
+    expect(creditGrantReasonOf('accounting_adjustment')).toBe('adjustment');
     expect(creditGrantReasonOf('orb_migration_accounting_adjustment')).toBe('adjustment');
   });
 
-  it('maps everything else to grant', () => {
-    expect(creditGrantReasonOf(null)).toBe('grant');
-    expect(creditGrantReasonOf('some-other-credit')).toBe('grant');
+  it('maps refund debt restorations to adjustment', () => {
+    expect(creditGrantReasonOf('refund_debt_restored:2f6f7c1e-5b0a-4b8e-9c4d-1a2b3c4d5e6f')).toBe(
+      'adjustment'
+    );
+  });
+
+  it('maps registered balance corrections to adjustment', () => {
+    expect(creditGrantReasonOf('manual_decrement')).toBe('adjustment');
+    expect(creditGrantReasonOf('orb_manual_decrement')).toBe('adjustment');
+    expect(creditGrantReasonOf('orb_credit_expired')).toBe('adjustment');
+    expect(creditGrantReasonOf('orb_credit_voided')).toBe('adjustment');
+    expect(creditGrantReasonOf('credits_expired')).toBe('adjustment');
+    expect(creditGrantReasonOf('admin-cancel-refund-kilo-pass')).toBe('adjustment');
+    expect(creditGrantReasonOf('admin-cancel-kilo-pass-no-refund')).toBe('adjustment');
+    expect(creditGrantReasonOf('organization_custom')).toBe('adjustment');
+  });
+
+  it('fails closed on an unclassified category', () => {
+    // The fail-closed case: a new writer must not inflate apparent free credit.
+    expect(creditGrantReasonOf('some-future-credit')).toBe('adjustment');
+  });
+
+  it('maps a missing category to adjustment', () => {
+    expect(creditGrantReasonOf(null)).toBe('adjustment');
   });
 });

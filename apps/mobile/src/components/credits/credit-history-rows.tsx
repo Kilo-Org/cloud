@@ -12,6 +12,7 @@ import {
   type CreditDeduction,
   type CreditGrant,
   type CreditGrantKind,
+  type CreditGrantReason,
   creditGrantKind,
   creditPurchaseChannel,
   type CreditPurchaseEntry,
@@ -72,7 +73,7 @@ const GRANT_TITLE_KEYS = {
   kilo_pass: 'kiloPass.title',
   grant: 'credits.history.kind.grant',
   adjustment: 'credits.history.kind.adjustment',
-} satisfies Record<CreditGrant['kind'], string>;
+} satisfies Record<CreditGrantReason, string>;
 
 /** A signed credit amount, kept in its own left-to-right run. */
 function creditAmountLabel(amountMicrodollars: number): string {

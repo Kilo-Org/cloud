@@ -19,6 +19,13 @@ export type CreditDeduction = RouterOutputs['user']['getCreditBlocks']['deductio
 export type CreditGrant = RouterOutputs['user']['getCreditGrantHistory']['grants'][number];
 
 /**
+ * Why a grant row was written, which decides its title. The server names the
+ * categories (`referral`, `welcome`, `kilo_pass`, `grant`, `adjustment`); this
+ * is not {@link CreditGrantKind}, which captions a ledger row's source.
+ */
+export type CreditGrantReason = CreditGrant['kind'];
+
+/**
  * Where a paid credit grant came from. The web credits page reads the same
  * column to label a grant, and the purchase row needs it to decide between a
  * Stripe receipt and the store that sold the pack.

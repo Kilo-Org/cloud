@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { CreditTransactionForBlocks } from '@kilocode/web-shared/lib/creditExpiration';
+import { promoCreditCategoriesByKey } from '@kilocode/web-shared/lib/promoCreditCategories';
 import { computeExpiration, computeCreditLotAllocations } from '@kilocode/db/credit-expiration';
 import { toNonNullish } from '@/lib/utils';
 
@@ -147,26 +148,62 @@ export const CreditGrantReasonSchema = z.enum([
 export type CreditGrantReason = z.infer<typeof CreditGrantReasonSchema>;
 
 /**
- * Ledger-cache reconciliation and the Orb migration write their corrections as
- * positive free rows that never funded the balance, so they are their own kind.
+ * Ledger-cache reconciliation, the Orb migration, expirations and admin
+ * corrections write their adjustments as credit rows that never funded the
+ * balance, so they are never shown as credit the member received.
+ */
+const INTERNAL_CREDIT_CATEGORIES: Readonly<Record<string, true>> = {
+  accounting_adjustment: true,
+  orb_migration_accounting_adjustment: true,
+  manual_decrement: true,
+  orb_manual_decrement: true,
+  orb_credit_expired: true,
+  orb_credit_voided: true,
+  credits_expired: true,
+  'admin-cancel-refund-kilo-pass': true,
+  'admin-cancel-kilo-pass-no-refund': true,
+  organization_custom: true,
+};
+
+/** The welcome grants, including the validation grants they replaced. */
+const WELCOME_CREDIT_CATEGORIES: Readonly<Record<string, true>> = {
+  'automatic-welcome-credits': true,
+  welcome20: true,
+  welcome15: true,
+  'stytch-validation': true,
+  'card-validation-no-stytch': true,
+  'card-validation-upgrade': true,
+};
+
+/**
+ * Classifies the category of a positive free credit row for display.
+ *
+ * Fails closed: a category nobody has classified prints as an adjustment
+ * rather than as credit the member received, so a new reconciliation or
+ * migration writer cannot inflate the apparent free credit. Only a category
+ * the promo registry defines as a member-visible grant prints as one.
  */
 export function creditGrantReasonOf(creditCategory: string | null): CreditGrantReason {
-  if (
-    creditCategory === 'accounting_adjustment' ||
-    creditCategory === 'orb_migration_accounting_adjustment'
-  ) {
-    return 'adjustment';
-  }
   // `referral` is the admin Referral/Review grant; the two self-service bonuses
   // carry the `referral-` prefix.
   if (creditCategory === 'referral' || creditCategory?.startsWith('referral-')) {
     return 'referral';
   }
-  if (creditCategory === 'automatic-welcome-credits') {
+  if (creditCategory != null && Object.hasOwn(WELCOME_CREDIT_CATEGORIES, creditCategory)) {
     return 'welcome';
   }
   if (creditCategory === 'kilo-pass-bonus') {
     return 'kilo_pass';
   }
-  return 'grant';
+  if (creditCategory != null && !Object.hasOwn(INTERNAL_CREDIT_CATEGORIES, creditCategory)) {
+    // Self-service promo codes are stored encrypted and decrypted at runtime,
+    // so the registry is the only place that knows them. `obsolete` still marks
+    // member-visible grants that predate the current catalogue, so it does not
+    // disqualify one; only a category written as a debit does.
+    const promo = promoCreditCategoriesByKey.get(creditCategory);
+    if (promo != null && !promo.expect_negative_amount) {
+      return 'grant';
+    }
+  }
+  return 'adjustment';
 }

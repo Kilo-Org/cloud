@@ -2,6 +2,7 @@ import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobil
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
+import { creditGrantHistoryQueryFn } from '@/lib/credits/credit-grant-history-read';
 import { type CreditPurchaseEntry } from '@/lib/credits/credit-history';
 import {
   hasRetentionBudget,
@@ -33,11 +34,20 @@ export function usePersonalCreditBlocks(enabled: boolean) {
 /**
  * The positive free grants the personal credit history lists. They are their
  * own bounded read, so a screen that never renders history does not fetch them.
+ *
+ * A server that predates the procedure answers `NOT_FOUND`; that one answer is
+ * read as an empty page so a grant-only account still lists its history, while
+ * every other failure keeps the screen's own error state (`queryFn` is
+ * replaced, the key is not, so the cache entry stays the one the tRPC options
+ * name).
  */
 export function useCreditGrantHistory(enabled: boolean) {
   const trpc = useTRPC();
+  const options = trpc.user.getCreditGrantHistory.queryOptions({});
+  const queryFn = options.queryFn;
   return useQuery({
-    ...trpc.user.getCreditGrantHistory.queryOptions({}),
+    ...options,
+    queryFn: queryFn && creditGrantHistoryQueryFn(queryFn),
     enabled,
     ...SETTLE_WHILE_OFFLINE,
   });

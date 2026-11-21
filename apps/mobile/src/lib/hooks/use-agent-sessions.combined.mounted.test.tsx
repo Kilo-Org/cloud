@@ -298,10 +298,10 @@ describe('combined and live refresh callers', () => {
   });
 
   it('queues a departure reconcile behind an in-flight next page', async () => {
-    // A session leaving the active set reconciles page one. It shares the
-    // stored operation coordinator with the next-page fetch: a reconcile
-    // started over an in-flight next page joins that fetch instead of running
-    // its own, so the terminated session never reaches history.
+    // A session leaving the active set reconciles page one. Through the shared
+    // stored operation coordinator it waits for a next-page fetch already in
+    // flight and then fetches page one, so both operations run and the
+    // terminated session reaches history.
     client.setQueryData(STORED_KEY, {
       pages: [{ ...history('Old history'), nextCursor: 'next' }],
       pageParams: [null],

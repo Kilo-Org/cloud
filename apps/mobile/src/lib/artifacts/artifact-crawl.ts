@@ -81,7 +81,7 @@ export type MaterializedArtifact = {
  * succeed later: a transport error, a timeout, a retryable status (408, 429,
  * 5xx), or a presign error that does not prove absence.
  */
-export type ArtifactMaterializeFailure =
+type ArtifactMaterializeFailure =
   | { cause: 'missing'; kind: 'terminal'; status: number | null }
   | { cause: 'too-large'; kind: 'terminal'; status: null }
   | { kind: 'temporary'; status: number | null };

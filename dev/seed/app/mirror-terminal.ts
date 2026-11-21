@@ -31,8 +31,10 @@ export const usage = '<email>';
  *
  * Every artifact here is a stored `https` URL on the artifact storage origin
  * family, so the crawl downloads through its real path. One local TLS fixture
- * answers them, and the emulator reaches it through the DNAT and CA-trust setup
- * of `skill://android-download-short-response-fixture`:
+ * answers them, and the emulator reaches it by pointing the artifact storage
+ * origin at a local TLS server: a CA trusted from the emulator's system store,
+ * and a DNAT rule sending port 443 to the server, so the crawl's own URL checks
+ * and TLS stack both accept the response:
  *
  * - `OVER_CAP_PATH` declares a length over the mirror's cap, so the crawl must
  *   write the artifact off once and move its cursor past the page;
@@ -396,12 +398,15 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   }
 
   console.log('');
-  console.log('Seeded the artifact mirror terminal-outcome fixture.');
-  console.log(`Over-cap session:  ${OVER_CAP_SESSION_ID}  (${OVER_CAP_PATH})`);
-  console.log(`Missing one:       ${MISSING_SESSION_ID}  (${MISSING_PATH})`);
-  console.log(`Always-500 one:    ${FLAKY_SESSION_ID}  (${FLAKY_PATH})`);
-  console.log(`Tail sessions:     ${TAIL_SESSION_IDS.join(', ')}`);
-  console.log('Bring the app to the foreground so the mirror sync runs.');
+  console.log('This fixture represents: seven sessions the artifact mirror must crawl.');
+  console.log('Three of their artifacts can never be materialized (one over the size cap,');
+  console.log('one answering 404, one answering 500) and four are ordinary documents.');
+  console.log('The list order puts the three impossible ones first, so a run that holds');
+  console.log('their pages would never reach the four behind them.');
+  console.log('');
+  console.log('Note: every artifact URL names the local TLS fixture origin, so start it');
+  console.log('and trust its CA on the device before the app syncs.');
+  console.log('Suggested next step: foreground the app so the mirror sync runs.');
   console.log('');
 
   return {

@@ -1,9 +1,38 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { DERIVED_CHAT_TEXT_MAX_LENGTH, derivedChatText } from './title';
+import { clearMarkdownParseCachesForTests } from '@/components/agents/markdown-parse-cache';
+import type * as MarkdownParseCache from '@/components/agents/markdown-parse-cache';
+import {
+  DERIVED_CHAT_TEXT_MAX_LENGTH,
+  DERIVED_CHAT_TEXT_SOURCE_WINDOW,
+  derivedChatText,
+} from './title';
+
+// The lengths `derivedChatText` hands the lexer, in order. `vi.mock` factories
+// are hoisted above this file's imports, so the recorder lives in a hoisted
+// object the factory can reach.
+const lexedLengths = vi.hoisted(() => [] as number[]);
+
+vi.mock('@/components/agents/markdown-parse-cache', async () => {
+  const actual = await vi.importActual<typeof MarkdownParseCache>(
+    '@/components/agents/markdown-parse-cache'
+  );
+  return {
+    ...actual,
+    lexMarkdown: (value: string) => {
+      lexedLengths.push(value.length);
+      return actual.lexMarkdown(value);
+    },
+  };
+});
 
 /** The label a message of `count` repeated graphemes becomes: the cut, then the ellipsis. */
 const cutTo = (grapheme: string, count: number) => `${grapheme.repeat(count)}…`;
+
+beforeEach(() => {
+  lexedLengths.length = 0;
+  clearMarkdownParseCachesForTests();
+});
 
 describe('derivedChatText', () => {
   it('leaves a short message as the one line it already is', () => {
@@ -66,6 +95,38 @@ describe('derivedChatText', () => {
 
   it('counts a digit outside the BMP as one character', () => {
     expect(derivedChatText('😀'.repeat(200))).toBe(cutTo('😀', DERIVED_CHAT_TEXT_MAX_LENGTH - 1));
+  });
+});
+
+describe('derivedChatText over a message longer than the source window', () => {
+  it('reads at most the window and labels from its start, not from the whole body', () => {
+    const body = 'tell me about the composer '.repeat(2_000);
+    expect(body.length).toBeGreaterThan(DERIVED_CHAT_TEXT_SOURCE_WINDOW);
+
+    const derived = derivedChatText(body);
+
+    expect(lexedLengths.length).toBeGreaterThan(0);
+    expect(Math.max(...lexedLengths)).toBeLessThanOrEqual(DERIVED_CHAT_TEXT_SOURCE_WINDOW);
+    expect(derived).toHaveLength(DERIVED_CHAT_TEXT_MAX_LENGTH);
+    expect(derived.endsWith('…')).toBe(true);
+    expect(derived.startsWith('tell me about the composer')).toBe(true);
+    // The same label the window alone produces: the rest of the body is never read.
+    expect(derived).toBe(derivedChatText(body.slice(0, DERIVED_CHAT_TEXT_SOURCE_WINDOW)));
+  });
+
+  it('hands a short message to the lexer unchanged', () => {
+    const body = 'short and sweet';
+
+    expect(derivedChatText(body)).toBe(body);
+    expect(lexedLengths).toEqual([body.length]);
+  });
+
+  it('labels a body whose window is whitespace as empty, which is the accepted degradation', () => {
+    // The window holds the first 4,096 code units, all blanks here, so the
+    // words past it are never read. A label costs the label, not the body.
+    const body = `${' '.repeat(5_000)}late words`;
+
+    expect(derivedChatText(body)).toBe('');
   });
 });
 

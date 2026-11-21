@@ -1,17 +1,28 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   Table,
   TableBody,
@@ -21,6 +32,198 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { AlertTriangle, CheckCircle2, Shield, Users } from 'lucide-react';
+import { unblockPreviewMessage, unblockResultMessage } from './blacklist-unblock-copy';
+
+function RemoveDomain({ version, domains }: { version: string | null; domains: string[] }) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const [domainInput, setDomainInput] = useState('');
+  const [confirming, setConfirming] = useState(false);
+  const [unblockUsers, setUnblockUsers] = useState(false);
+
+  const domain = domainInput.trim().toLowerCase();
+  const preview = useQuery({
+    ...trpc.admin.blacklistDomains.removeDomainPreview.queryOptions({ domain }),
+    enabled: confirming && domain.length > 0,
+  });
+
+  const mutation = useMutation(
+    trpc.admin.blacklistDomains.removeDomain.mutationOptions({
+      onSuccess: (result, variables) => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.blacklistDomains.get.queryKey(),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.blacklistDomains.stats.queryKey(),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.blacklistDomains.suspicious.queryKey(),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: ['block-blacklisted-domains-counts'],
+        });
+
+        const outcome = unblockResultMessage(variables.domain.trim().toLowerCase(), result);
+        if (outcome.kind === 'success') {
+          toast.success(outcome.message);
+        } else {
+          toast.warning(outcome.message);
+        }
+        setConfirming(false);
+        setUnblockUsers(false);
+        setDomainInput('');
+      },
+      onError: error => {
+        toast.error(error.message || 'Failed to remove the domain');
+        setConfirming(false);
+      },
+    })
+  );
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!domain) {
+      toast.error('Enter a domain to remove.');
+      return;
+    }
+    setUnblockUsers(false);
+    setConfirming(true);
+  }
+
+  function closeDialog(open: boolean) {
+    if (open || mutation.isPending) return;
+    setConfirming(false);
+    setUnblockUsers(false);
+  }
+
+  const previewData = preview.data;
+  const stillBlacklisted = previewData?.stillBlacklistedBy ?? null;
+  const unblockUnavailable =
+    unblockUsers &&
+    (preview.isLoading ||
+      preview.isError ||
+      previewData === undefined ||
+      stillBlacklisted !== null);
+  const confirmDisabled = mutation.isPending || version === null || unblockUnavailable;
+  const matchingAccounts = previewData ? previewData.unblockable + previewData.keptBlocked : 0;
+
+  return (
+    <div className="flex flex-col gap-3 rounded-md border p-4">
+      <div className="flex flex-col gap-1">
+        <h3 className="text-sm font-medium">Remove domain</h3>
+        <p className="text-muted-foreground text-xs">
+          Removing a domain in the editor above removes the entry only. It does not unblock existing
+          accounts. Use this action to remove the entry and optionally unblock the domain-blocked
+          accounts that still have a balance.
+        </p>
+      </div>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-2 sm:flex-row sm:items-end">
+        <div className="flex flex-1 flex-col gap-2">
+          <Label htmlFor="remove-domain">Domain</Label>
+          <Input
+            id="remove-domain"
+            placeholder="example.com"
+            value={domainInput}
+            onChange={event => setDomainInput(event.target.value)}
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </div>
+        <Button
+          type="submit"
+          variant="outline"
+          size="sm"
+          disabled={!version || domain.length === 0 || mutation.isPending}
+        >
+          Remove domain
+        </Button>
+      </form>
+      <p className="text-muted-foreground text-xs">
+        Subdomains are included when unblocking. If a parent domain is still blacklisted, remove
+        that entry first.
+        {domains.length === 0 && ' The blacklist is currently empty.'}
+      </p>
+
+      <AlertDialog open={confirming} onOpenChange={closeDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {domain} from the blacklist?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes {domain} from the blacklist. Existing user blocks stay in place unless
+              you also choose to unblock them.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="flex flex-col gap-3">
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="also-unblock"
+                checked={unblockUsers}
+                disabled={stillBlacklisted !== null || preview.isLoading || preview.isError}
+                onCheckedChange={checked => setUnblockUsers(checked === true)}
+                className="mt-0.5"
+              />
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="also-unblock" className="text-sm font-normal">
+                  Also unblock users with a balance greater than 0
+                </Label>
+                <p className="text-muted-foreground text-xs">
+                  Only accounts blocked by this domain that still have a positive balance are
+                  unblocked. Accounts with no remaining balance stay blocked.
+                </p>
+              </div>
+            </div>
+
+            <div className="text-sm" aria-live="polite">
+              {preview.isLoading ? (
+                <span className="text-muted-foreground">Counting blocked accounts…</span>
+              ) : preview.isError ? (
+                <span className="text-muted-foreground">
+                  Could not count blocked accounts. You can still remove the domain without
+                  unblocking anyone.
+                </span>
+              ) : previewData ? (
+                stillBlacklisted !== null ? (
+                  <span className="text-destructive">{unblockPreviewMessage(previewData)}</span>
+                ) : unblockUsers ? (
+                  <span>{unblockPreviewMessage(previewData)}</span>
+                ) : (
+                  <span className="text-muted-foreground">
+                    {matchingAccounts > 0
+                      ? `${matchingAccounts.toLocaleString()} domain-blocked ${
+                          matchingAccounts === 1
+                            ? 'account keeps its block'
+                            : 'accounts keep their blocks'
+                        }.`
+                      : 'No accounts are currently blocked by this domain.'}
+                  </span>
+                )
+              ) : null}
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={mutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={confirmDisabled}
+              onClick={() => {
+                if (!version) return;
+                mutation.mutate({ domain, expected_version: version, unblockUsers });
+              }}
+            >
+              {mutation.isPending
+                ? 'Removing…'
+                : unblockUsers
+                  ? 'Remove domain and unblock'
+                  : 'Remove domain'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
 
 function EditTab() {
   const trpc = useTRPC();
@@ -130,7 +333,8 @@ function EditTab() {
               Email domains that are blocked from registration and access. Enter one domain per line
               (or paste a pipe-separated list). Subdomains are automatically blocked (e.g. blocking
               example.com also blocks subdomain.example.com). Adding a domain also blocks existing
-              non-admin accounts on it that are not already blocked.
+              non-admin accounts on it that are not already blocked. Removing a domain from this
+              list does not unblock existing accounts; use Remove domain below.
             </CardDescription>
           </div>
           <Badge variant="secondary" className="px-3 py-1">
@@ -193,6 +397,11 @@ function EditTab() {
             </span>
           )}
         </div>
+
+        <RemoveDomain
+          version={loadedVersion === data.version ? loadedVersion : null}
+          domains={data.domains}
+        />
 
         <div className="text-muted-foreground text-xs">
           <p>

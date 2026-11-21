@@ -89,9 +89,11 @@ function nextDelimiter(text: string, from: number): number {
  * The text after that last `@` must read as a host, since it stands for the
  * authority's host, port and path; a single label with no colon qualifies,
  * because nothing after the last `@` can be userinfo. When it is neither, the
- * result is the scheme alone. A query or fragment before that `@` does not earn
- * its own reading: a run that reads as a host keeps its origin, and any other
- * run reports the scheme alone.
+ * result is the scheme alone. A single label with a numeric port reports the
+ * scheme alone when its `@` follows a query or fragment: that run is both a
+ * host with a port and a userinfo pair whose value starts with digits, so
+ * neither reading is chosen. Every other such run keeps the userinfo reading and
+ * reports the host after the last `@`.
  *
  * A single label with a numeric port is not read as a host, though: `api:3000`
  * is the same text as a userinfo pair whose value starts with digits. Such a

@@ -104,10 +104,13 @@ describe('benchmark cleanup', () => {
 
   it('reports the surviving profile when removal cannot finish', async () => {
     const dir = await makeProfileDir();
-    await chmod(dir, 0o500);
     try {
       const failure = await captureFailure(
-        cleanupAttempt(undefined, dir, undefined, null, { removalCapMs: 10_000 })
+        cleanupAttempt(undefined, dir, undefined, null, {
+          removalCapMs: 10_000,
+          // Privilege-independent failure: a root runner ignores file modes.
+          removeProfile: () => Promise.reject(new Error('EACCES: permission denied, unlink')),
+        })
       );
 
       expect(failure).toBeInstanceOf(CleanupBlockerError);

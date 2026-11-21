@@ -227,7 +227,14 @@ interface BlockerRecord {
   readonly gitHead: string;
   readonly startedAtIso: string;
   readonly wallClockSeconds: number;
+  /**
+   * `survivingProfilePath` is the profile directory of the run. It is still
+   * present when `outcome` is `profile-unverified`; when `outcome` is
+   * `browser-unsettled` the absence check passed, but an unsettled browser can
+   * write it again, so it is the location to re-check.
+   */
   readonly survivingProfilePath?: string;
+  readonly outcome?: CleanupOutcome;
 }
 
 interface ParsedArgs {
@@ -608,6 +615,7 @@ const makeBlockerRecord = (input: {
   gitHead: string;
   batchStartedAtMs: number;
   survivingProfilePath?: string;
+  outcome?: CleanupOutcome;
 }): BlockerRecord => ({
   kind: 'blocker',
   reason: capString(input.reason, 120),
@@ -620,6 +628,7 @@ const makeBlockerRecord = (input: {
   ...(input.survivingProfilePath === undefined
     ? {}
     : { survivingProfilePath: input.survivingProfilePath }),
+  ...(input.outcome === undefined ? {} : { outcome: input.outcome }),
 });
 
 const writeBlockerArtifact = async (outDir: string, blocker: BlockerRecord): Promise<void> => {
@@ -1931,7 +1940,13 @@ export const cleanupAttempt = async (
   userDataDir: string,
   pendingCleanup: Promise<void> | undefined,
   initialContextCloseFailure: string | null,
-  caps: { readonly settlementCapMs?: number; readonly removalCapMs?: number } = {}
+  caps: {
+    readonly settlementCapMs?: number;
+    readonly removalCapMs?: number;
+    // Injectable so the removal-failure branch is testable without depending
+    // on file privileges.
+    readonly removeProfile?: (dir: string) => Promise<void>;
+  } = {}
 ): Promise<void> => {
   // Phase A: settle the browser so it stops writing to the profile. Either the
   // context close or, when the launch never settled during setup, the pending
@@ -1957,6 +1972,8 @@ export const cleanupAttempt = async (
   // whole allowance. Only a confirmed ENOENT counts as gone; any other access
   // error is a failure.
   const removal = makeCleanupPhase(caps.removalCapMs ?? defaultRemovalCapMs);
+  const removeProfile =
+    caps.removeProfile ?? ((dir: string) => rm(dir, { force: true, recursive: true }));
   let removalFailure: string | null = null;
   let gone = false;
   for (let attempt = 0; attempt < 2 && !gone && removalFailure === null; attempt += 1) {
@@ -1971,11 +1988,7 @@ export const cleanupAttempt = async (
         break;
       }
     }
-    const removed = await runCleanupStep(
-      removal,
-      'profile removal',
-      rm(userDataDir, { force: true, recursive: true })
-    );
+    const removed = await runCleanupStep(removal, 'profile removal', removeProfile(userDataDir));
     if (!removed.ok) {
       removalFailure = removed.detail;
       break;
@@ -2450,7 +2463,7 @@ const runAttempt = async (input: {
         throw error;
       }
       // An unexpected cleanup failure proves nothing about the directory.
-      throw new CleanupBlockerError(errorToReason(error), {
+      throw new CleanupBlockerError(`${cleanupOperatorAction}: ${errorToReason(error)}`, {
         outcome: 'profile-unverified',
         survivingProfilePath: userDataDir,
       });
@@ -2722,8 +2735,8 @@ const main = async (): Promise<number> => {
     return summaryStats.successCount === attemptFiles.length ? 0 : 1;
   } catch (error) {
     if (error instanceof BatchBlockerError) {
-      const survivingProfilePath =
-        error instanceof CleanupBlockerError ? error.survivingProfilePath : null;
+      const cleanupError = error instanceof CleanupBlockerError ? error : null;
+      const survivingProfilePath = cleanupError?.survivingProfilePath ?? null;
       const blocker = makeBlockerRecord({
         stage: error.stage,
         reason: error.message,
@@ -2732,6 +2745,7 @@ const main = async (): Promise<number> => {
         gitHead,
         batchStartedAtMs,
         ...(survivingProfilePath === null ? {} : { survivingProfilePath }),
+        ...(cleanupError === null ? {} : { outcome: cleanupError.outcome }),
       });
       await writeBlockerArtifact(outDir, blocker);
       // blocker.json caps the reason; stderr keeps the full path actionable and

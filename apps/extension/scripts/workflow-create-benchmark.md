@@ -134,8 +134,9 @@ change was reverted; the error text stays.
   that has its own deadline and never inherits the browser-close deadline.
   When cleanup cannot confirm the directory is gone — or the browser did not
   close — the run exits `2` with a blocker that leads with the operator
-  action and carries the surviving path: delete that directory and revoke the
-  Kilo session the run used.
+  action and carries the surviving path and its cleanup `outcome`: check that
+  directory again, delete it if it reappeared, and revoke the Kilo session the
+  run used.
 - Network access to `app.kilo.ai` and the scenario sites.
 - A display for headed Chromium. If the headed launch fails, the driver
   retries headless automatically and records which mode each attempt used.
@@ -195,6 +196,10 @@ The driver writes into `--out`:
   absolute profile directory of that run whenever cleanup cannot certify the
   directory is gone for good: either removal was not verified, or the browser
   never settled and can write the directory again after the absence check.
+  The accompanying `outcome` says which: `profile-unverified` leaves the
+  directory present, so it must be deleted; `browser-unsettled` passed the
+  absence check, so the directory is the location to re-check and delete if it
+  reappeared.
   The reason is capped at 120 characters; the same command prints the full
   path and the action to stderr, and that line distinguishes an unverified
   removal from a browser that did not stop.

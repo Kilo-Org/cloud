@@ -1,5 +1,5 @@
 import type { EncryptedEnvelope } from '@kilocode/web-shared/lib/encryption';
-import type { InstanceTierKey, InstanceType } from '@kilocode/kiloclaw-instance-tiers';
+import type { InstanceTierKey, InstanceType, MachineSize } from '@kilocode/kiloclaw-instance-tiers';
 import type { SecretFieldKey } from '@kilocode/kiloclaw-secret-catalog';
 import type { KiloClawProvider } from '@kilocode/db/schema-types';
 
@@ -150,12 +150,7 @@ export type DevicePairingApproveResponse = {
   message: string;
 };
 
-/** Fly Machine guest spec (CPU/memory configuration) */
-export type MachineSize = {
-  cpus: number;
-  memory_mb: number;
-  cpu_kind?: 'shared' | 'performance';
-};
+export type { MachineSize };
 
 export type ProviderRolloutConfig = {
   northflank: {

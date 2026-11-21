@@ -840,8 +840,12 @@ async function validateUserAuthorization({
       tokenSource,
       cloudAgentAuthority,
     });
-  } else if (await isUserBlacklistedByDomain(user, readDb)) {
-    if (!opts.allowRefusedAccountSelfCleanup) {
+  }
+
+  // The self-cleanup admission covers only the account refusals below, so every
+  // other gate — including `adminOnly` — still runs for a cleanup request.
+  if (!opts.allowRefusedAccountSelfCleanup) {
+    if (await isUserBlacklistedByDomain(user, readDb)) {
       return authError(403, 'Access denied (R0)', kiloUserId, {
         authorizationRefused: true,
         refusalReason: 'account_blocked',
@@ -850,19 +854,19 @@ async function validateUserAuthorization({
         cloudAgentAuthority,
       });
     }
-  } else if (
-    !opts.DANGEROUS_allowBlockedUsers &&
-    !opts.allowRefusedAccountSelfCleanup &&
-    isBlockedAccount(user)
-  ) {
-    return authError(403, 'Access denied (R1)', kiloUserId, {
-      authorizationRefused: true,
-      refusalReason: 'account_blocked',
-      internalApiUse,
-      tokenSource,
-      cloudAgentAuthority,
-    });
-  } else if (opts.adminOnly && !user.is_admin) {
+
+    if (!opts.DANGEROUS_allowBlockedUsers && isBlockedAccount(user)) {
+      return authError(403, 'Access denied (R1)', kiloUserId, {
+        authorizationRefused: true,
+        refusalReason: 'account_blocked',
+        internalApiUse,
+        tokenSource,
+        cloudAgentAuthority,
+      });
+    }
+  }
+
+  if (opts.adminOnly && !user.is_admin) {
     return authError(403, 'Access denied (nonadmin)', kiloUserId, {
       authorizationRefused: true,
       internalApiUse,

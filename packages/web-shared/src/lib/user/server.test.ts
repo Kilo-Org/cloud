@@ -762,6 +762,32 @@ describe('getUserFromAuth', () => {
     expect(admitted.user?.id).toBe(user.id);
   });
 
+  test('still refuses a self-cleanup request that lands on an admin-only gate', async () => {
+    const user = await insertTestUser({
+      is_admin: false,
+      blocked_reason: 'blocked for test',
+      api_token_pepper: 'cleanup-blocked-nonadmin-pepper',
+    });
+    mockHeaders.mockResolvedValue(
+      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+    );
+
+    // The admission covers the account refusal only, so an admin-only surface
+    // still answers with the non-admin refusal instead of admitting the account.
+    const result = await getUserFromAuth({
+      adminOnly: true,
+      allowRefusedAccountSelfCleanup: true,
+    });
+
+    expect(result.authFailedResponse).not.toBeNull();
+    expect(result.authFailedResponse?.status).toBe(403);
+    await expect(result.authFailedResponse?.json()).resolves.toEqual({
+      success: false,
+      error: 'Access denied (nonadmin)',
+    });
+    expect(result.user).toBeNull();
+  });
+
   test('admits a blocked account whose block timestamp is set for its own session cleanup', async () => {
     const user = await insertTestUser({
       blocked_reason: null,

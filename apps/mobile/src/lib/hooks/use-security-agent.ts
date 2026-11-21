@@ -178,6 +178,11 @@ export function useSecurityAgentLastSyncTime(scope: string, repoFullName?: strin
 // `undefined` role as "still loading" and "genuinely unauthorized", which
 // callers used to read as permission-denied. `useSecurityAgentCapability`
 // below tells those apart; it's the only exported consumer of this query.
+//
+// This observer writes defaulted options over the shared `organizations.list`
+// entry while mounted, so the owning hook's offline settle is not guaranteed
+// for other observers then. Accepted: the settings screen reports a paused
+// read as a connection failure; new observers belong in `useOrganizationsList`.
 function useSecurityAgentOrgRoleQuery(scope: string) {
   const trpc = useTRPC();
   const isPersonal = isPersonalSecurityScope(scope);

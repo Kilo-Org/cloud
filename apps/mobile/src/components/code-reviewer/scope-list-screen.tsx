@@ -17,7 +17,7 @@ import { SCREEN_BODY_CLASS } from '@/lib/layout';
 export function ScopeListScreen() {
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
-  const { data: orgs, isLoading, isError, isFetching, refetch } = useOrganizationsList();
+  const { data: orgs, isError, isFetching, refetch } = useOrganizationsList();
 
   const openScope = (scope: string) => {
     pushOnce(`/(app)/code-reviewer/${scope}` as Href);
@@ -47,10 +47,12 @@ export function ScopeListScreen() {
               openScope(PERSONAL_SCOPE);
             }}
           />
-          {isLoading ? (
+          {/* A token-gated read is not `isLoading` before the token resolves,
+              so the placeholder follows the payload's absence instead. */}
+          {orgs === undefined ? (
             <RowSkeleton tile subtitle />
           ) : (
-            orgs?.map(org => (
+            orgs.map(org => (
               <ConfigureRow
                 key={org.organizationId}
                 icon={Building2}

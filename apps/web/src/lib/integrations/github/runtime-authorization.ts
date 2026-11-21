@@ -194,8 +194,24 @@ export async function assertGitHubInstallationRuntimeAuthorized(
   const allowAgentOnly = exactAssociationId !== undefined && purpose !== 'workflow';
   const associations = await db
     .select({
-      integration: platform_integrations,
-      installation: github_app_installations,
+      integration: {
+        id: platform_integrations.id,
+        owned_by_user_id: platform_integrations.owned_by_user_id,
+        owned_by_organization_id: platform_integrations.owned_by_organization_id,
+        integration_status: platform_integrations.integration_status,
+        suspended_at: platform_integrations.suspended_at,
+        auth_invalid_at: platform_integrations.auth_invalid_at,
+        github_disconnected_at: platform_integrations.github_disconnected_at,
+        github_installation_id: platform_integrations.github_installation_id,
+        github_connection_role: platform_integrations.github_connection_role,
+      },
+      installation: {
+        lifecycle_state: github_app_installations.lifecycle_state,
+        sharing_mode: github_app_installations.sharing_mode,
+        suspended_at: github_app_installations.suspended_at,
+        deleted_at: github_app_installations.deleted_at,
+        auth_invalid_at: github_app_installations.auth_invalid_at,
+      },
       organizationDeletedAt: organizations.deleted_at,
       userRecordId: kilocode_users.id,
       userBlockedAt: kilocode_users.blocked_at,

@@ -11,6 +11,7 @@ import {
 } from './settings-search';
 
 const platform = vi.hoisted(() => ({ OS: 'ios' }));
+const lookups = vi.hoisted(() => ({ keyword: {} as Record<string, number> }));
 const copy = vi.hoisted(() => ({
   values: {
     'settingsSearch.placeholder': 'Search settings',
@@ -19,12 +20,12 @@ const copy = vi.hoisted(() => ({
     'settingsSearch.resultsStatus': 'Settings found: {{resultCount}}',
     'settingsSearch.keywords.appearance': 'theme|color scheme',
     'settingsSearch.keywords.privacy': 'analytics|tracking',
-    'profile.appearance': 'Appearance',
-    'profile.themeSystem': 'System',
-    'profile.themeDark': 'Dark',
-    'profile.language': 'Language',
-    'profile.privacyAnalytics': 'Share analytics',
-    'profile.hidden': 'Hidden setting',
+    'preferences.appearance': 'Appearance',
+    'preferences.appearanceSystem': 'System',
+    'preferences.appearanceDark': 'Dark',
+    'common.language': 'Language',
+    'consent.helpImprove': 'Help improve Kilo',
+    'preferences.hideThinking': 'Hide thinking details',
   } as Record<string, string>,
 }));
 const announce = vi.hoisted(() => vi.fn());
@@ -36,17 +37,22 @@ vi.mock('react-native', () => ({
   TextInput: 'TextInput',
   View: 'View',
 }));
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string, options?: Readonly<{ resultCount?: number }>) => {
-      const value = copy.values[key] ?? key;
-      return options?.resultCount === undefined
-        ? value
-        : value.replace('{{resultCount}}', String(options.resultCount));
-    },
-    i18n: { resolvedLanguage: 'en', language: 'en' },
-  }),
-}));
+vi.mock('react-i18next', () => {
+  // One stable `t` per language, like the real hook: the index memo must not
+  // rebuild on a keystroke because the translator identity changed.
+  const t = (key: string, options?: Readonly<{ resultCount?: number }>) => {
+    if (key.startsWith('settingsSearch.keywords.')) {
+      lookups.keyword[key] = (lookups.keyword[key] ?? 0) + 1;
+    }
+    const value = copy.values[key] ?? key;
+    return options?.resultCount === undefined
+      ? value
+      : value.replace('{{resultCount}}', String(options.resultCount));
+  };
+  return {
+    useTranslation: () => ({ t, i18n: { resolvedLanguage: 'en', language: 'en' } }),
+  };
+});
 // The real matcher is owned by another slice; this double keeps the hook's
 // index contract (label/context/keyword lookup, label-only ranges).
 vi.mock('@/lib/settings-search/match', () => ({
@@ -96,17 +102,17 @@ vi.mock('@/lib/font-scale/system-font-scale-context', () => ({
 
 const SOURCES: readonly SettingsSearchSource[] = [
   {
-    context: ['profile.appearance'],
+    context: ['preferences.appearance'],
     settings: [
-      defineSetting('appearance.system', 'profile.themeSystem', 'appearance'),
-      defineSetting('appearance.dark', 'profile.themeDark'),
-      defineSetting('language', 'profile.language'),
+      defineSetting('appearance.system', 'preferences.appearanceSystem', 'appearance'),
+      defineSetting('appearance.dark', 'preferences.appearanceDark'),
+      defineSetting('language', 'common.language'),
     ],
   },
   {
     settings: [
-      defineSetting('privacy.analytics', 'profile.privacyAnalytics', 'privacy'),
-      { id: 'hidden', label: 'profile.hidden', available: false },
+      defineSetting('privacy.analytics', 'consent.helpImprove', 'privacy'),
+      { id: 'hidden', label: 'preferences.hideThinking', available: false },
     ],
   },
 ];
@@ -158,6 +164,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   platform.OS = 'ios';
   announce.mockReset();
+  lookups.keyword = {};
 });
 
 afterEach(() => {
@@ -209,6 +216,15 @@ describe('useSettingsSearch with SettingsSearchField/Results', () => {
     expect(bold).toEqual([]);
   });
 
+  it('resolves each keyword catalog entry once per index, not per keystroke', () => {
+    const root = render();
+    typeQuery(root, 't');
+    typeQuery(root, 'th');
+
+    expect(lookups.keyword['settingsSearch.keywords.appearance']).toBe(1);
+    expect(lookups.keyword['settingsSearch.keywords.privacy']).toBe(1);
+  });
+
   it('matches the localized breadcrumb and every row under it', () => {
     const root = render();
     typeQuery(root, 'appearance');
@@ -218,7 +234,7 @@ describe('useSettingsSearch with SettingsSearchField/Results', () => {
 
   it('drops an unavailable definition from the index', () => {
     const root = render();
-    typeQuery(root, 'hidden');
+    typeQuery(root, 'thinking');
 
     expect(rows(root)).toEqual([]);
     const empty = root.findByType('EmptyState');
@@ -278,6 +294,6 @@ describe('useSettingsSearch with SettingsSearchField/Results', () => {
     });
 
     expect(selected).toHaveLength(1);
-    expect(selected[0]).toMatchObject({ id: 'privacy.analytics', label: 'Share analytics' });
+    expect(selected[0]).toMatchObject({ id: 'privacy.analytics', label: 'Help improve Kilo' });
   });
 });

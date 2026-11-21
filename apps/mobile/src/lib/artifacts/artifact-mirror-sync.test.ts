@@ -191,6 +191,11 @@ function setFiles(h: ReturnType<typeof harness>, sessionId: string, files: FileI
 function harness(overrides: Partial<ArtifactMirrorSyncDeps> = {}) {
   const store = new Map<string, string>();
   const applied: ArtifactMirrorManifest[] = [];
+  // What the snapshot reports about the tree it found. This suite keeps paths in
+  // a set, not a real tree, so a case that needs the snapshot to have repaired
+  // something says so instead of modelling the repair; anything else gets the
+  // report of a snapshot that found the tree as it left it.
+  let repaired = false;
   const sessions: SessionInput[] = [];
   const pages = new Map<string, { messages: unknown[]; nextCursor: string | null }>();
   const downloads = new Map<string, () => Promise<File>>();
@@ -220,6 +225,7 @@ function harness(overrides: Partial<ArtifactMirrorSyncDeps> = {}) {
   const deps: ArtifactMirrorSyncDeps = {
     applySnapshot: manifest => {
       applied.push(manifest);
+      return repaired;
     },
     downloadFile,
     getSessionMessagesPage,
@@ -261,6 +267,9 @@ function harness(overrides: Partial<ArtifactMirrorSyncDeps> = {}) {
     },
     setNow: (value: number) => {
       now = value;
+    },
+    setRepaired: (value: boolean) => {
+      repaired = value;
     },
   };
 }
@@ -850,6 +859,37 @@ describe('syncArtifactMirror manifest stability', () => {
     expect(h.lastManifest().updatedAt).toBe(first.updatedAt);
     expect(h.notify).toHaveBeenCalledOnce();
     expect(h.downloadFile).toHaveBeenCalledOnce();
+  });
+
+  it('a run that only repairs the tree notifies while the index stays identical', async () => {
+    // A session with no files publishes an empty file list, so re-creating its
+    // folder after the platform file browser deleted it changes nothing in the
+    // index: `changed` is false and no artifact was materialized. The snapshot's
+    // report is the only evidence the tree moved, and an open browser that
+    // showed the folder as missing has to re-read.
+    const h = harness();
+    h.sessions.push({ id: 's1', updatedAt: T1 });
+
+    expect(await syncArtifactMirror({ deps: h.deps })).toEqual({
+      failed: 0,
+      files: 0,
+      sessions: 1,
+      status: 'synced',
+    });
+    const first = h.lastManifest();
+    expect(h.notify).toHaveBeenCalledOnce();
+
+    h.setNow(NOW + MIRROR_SYNC_MIN_INTERVAL_MS);
+    h.setRepaired(true);
+    expect(await syncArtifactMirror({ deps: h.deps })).toEqual({
+      failed: 0,
+      files: 0,
+      sessions: 1,
+      status: 'synced',
+    });
+
+    expect(h.lastManifest()).toEqual(first);
+    expect(h.notify).toHaveBeenCalledTimes(2);
   });
 
   it('a run that adds an artifact restamps and notifies', async () => {

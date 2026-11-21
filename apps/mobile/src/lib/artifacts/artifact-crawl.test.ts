@@ -19,6 +19,7 @@ import {
 
 const fakeFs = vi.hoisted(() => {
   type Tracked = {
+    aborted: boolean;
     created: boolean;
     deleted: boolean;
     size: number;
@@ -28,6 +29,7 @@ const fakeFs = vi.hoisted(() => {
   const files: Tracked[] = [];
 
   class FileMock {
+    aborted = false;
     created = false;
     deleted = false;
     size = 0;
@@ -58,6 +60,11 @@ const fakeFs = vi.hoisted(() => {
         write: chunk => {
           this.streamed += chunk.byteLength;
           this.size += chunk.byteLength;
+        },
+        abort: () => {
+          // The sink's abort releases the file handle; a stream left to an
+          // abandoned pipe never reaches it.
+          this.aborted = true;
         },
       });
     }
@@ -650,6 +657,7 @@ describe('materializeArtifact', () => {
     vi.useFakeTimers();
     try {
       const downloadSignals: AbortSignal[] = [];
+      let cancelled = false;
       probeFetch.mockImplementation(async (_url, init) => {
         if (init?.headers !== undefined) {
           return new Response('x', {
@@ -665,6 +673,9 @@ describe('materializeArtifact', () => {
             // The read a stalled transfer represents: the stream never delivers
             // another chunk and never closes.
             pull: () => Promise.withResolvers<undefined>().promise,
+            cancel: () => {
+              cancelled = true;
+            },
           }),
           { status: 200 }
         );
@@ -686,6 +697,10 @@ describe('materializeArtifact', () => {
       expect(tracked.deleted).toBe(true);
       expect(tracked.streamed).toBe(0);
       expect(tracked.writes).toEqual([]);
+      // A transfer that stalls until the deadline must release both ends: the
+      // destination's writer (the file handle) and the body it was reading.
+      expect(tracked.aborted).toBe(true);
+      expect(cancelled).toBe(true);
     } finally {
       vi.useRealTimers();
     }

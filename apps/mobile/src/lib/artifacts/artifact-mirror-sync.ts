@@ -102,8 +102,12 @@ type MirrorSyncState = z.infer<typeof syncStateSchema>;
  * member has a production default; a caller overrides only what a test drives.
  */
 export type ArtifactMirrorSyncDeps = Partial<ArtifactCrawlDeps> & {
-  /** Applies the reconciled snapshot; the mirror's own best-effort writer. */
-  applySnapshot: (manifest: ArtifactMirrorManifest) => void;
+  /**
+   * Applies the reconciled snapshot; the mirror's own best-effort writer. Its
+   * result is the tree-repair report: whether the applied snapshot created or
+   * pruned an entry, which is a change the index bytes cannot show.
+   */
+  applySnapshot: (manifest: ArtifactMirrorManifest) => boolean;
   /** The folder for one session's files, or null with no browsable container. */
   mirrorSessionDir: (sessionId: string) => Directory | null;
   /** Tells the platform provider the tree changed. */
@@ -286,7 +290,7 @@ async function runSyncOnce(
     // skipping it would leave a pruned session's folder behind.
     const published: ArtifactMirrorManifest =
       previous !== null && !changed ? { ...candidate, updatedAt: previous.updatedAt } : candidate;
-    deps.applySnapshot(published);
+    const repaired = deps.applySnapshot(published);
     await deps.writeState(scope, key, JSON.stringify({ lastRunAt: now, sessions: run.states }));
     // The state write is awaited as well, so the fence is read once more before
     // the provider is signalled: a sign-out during the write has cleared the
@@ -294,19 +298,24 @@ async function runSyncOnce(
     if (!canPublish(epoch)) {
       return { status: 'discarded' };
     }
-    // Only a changed tree is announced: the provider is told to re-query when
-    // what the snapshot describes actually differs from the index on disk, and
-    // the bytes-on-disk guard in `writeManifest` then keeps the file untouched
-    // too. Notifying on an unchanged tree makes an open browser re-query a listing
-    // that cannot have changed.
+    // The provider is told to re-query when the tree moved in any of three
+    // ways: the index differs from the document on disk (the first index, an
+    // added or dropped artifact), the run materialized bytes, or the applied
+    // snapshot repaired the tree. A tree that stayed as it was stays quiet:
+    // signalling it makes an open browser re-query a listing that cannot have
+    // changed, and the bytes-on-disk guard in `writeManifest` leaves the index
+    // untouched too.
     //
-    // A run that rewrote a file counts as a change even when the index bytes are
-    // identical: the disk reconcile can drop a file whose bytes the device removed
-    // and the crawl then materializes it again under the same id, size and name, so
-    // the listing is unchanged while the file behind it is new. That repair is
-    // invisible to an open browser until it re-reads, which is what the notify is
-    // for.
-    if (changed || advanced.files > 0) {
+    // The last two are invisible in the index bytes. A run that rewrote a file
+    // counts as a change because the disk reconcile can drop a file whose
+    // bytes the device removed and the crawl then materializes it again under
+    // the same id, size and name, so the listing is unchanged while the file
+    // behind it is new. And a snapshot-only repair -- a session with no files
+    // whose folder the file browser deleted is re-created, or a crashed run's
+    // staging file is pruned -- changes the tree while the listing reads exactly
+    // the same. Both are invisible to an open browser until it re-reads, which
+    // is what the notify is for.
+    if (changed || repaired || advanced.files > 0) {
       deps.notify();
     }
     return {

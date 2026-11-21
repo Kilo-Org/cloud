@@ -205,11 +205,11 @@ function abortAfter(controller: AbortController, ms: number): () => void {
 
 /**
  * Settle with `work`, or reject as soon as `signal` aborts. `fetch` rejects a
- * pending request on abort, but `pipeTo` takes no signal at all, and a request
- * whose transport ignores the abort would otherwise hang the deadline. So the
- * deadline is enforced here on the promise, not left to the transport. The side
- * that loses the race is abandoned, so its rejection is kept handled, and the
- * abort listener is removed once the race settles.
+ * pending request on abort, but a stream read or write it feeds takes no signal,
+ * and a request whose transport ignores the abort would otherwise hang the
+ * deadline. So the deadline is enforced here on the promise, not left to the
+ * transport. The side that loses the race is abandoned, so its rejection is
+ * kept handled, and the abort listener is removed once the race settles.
  */
 async function raceAgainstAbort<T>(
   work: Promise<T>,
@@ -427,24 +427,108 @@ async function fetchAllowedArtifact(
 }
 
 /**
+ * Start a stream teardown without waiting for it. A transport that ignores
+ * `cancel()`, or a sink that never runs `abort()`, must not hold a lost
+ * deadline open, so the release is detached and its rejection swallowed: the
+ * transfer's own failure is what the caller has to see.
+ */
+function releaseQuietly(release: Promise<unknown>): void {
+  void (async () => {
+    try {
+      await release;
+    } catch {
+      // The stream is left as its transport ended it.
+    }
+  })();
+}
+
+/**
+ * Move one response body into one write stream, releasing both ends on any
+ * failure. The two ends are owned here — a reader and a writer acquired
+ * explicitly — rather than handed to `pipeTo`, which takes no signal: a pipe
+ * raced against the deadline stays locked after the race is lost, so the
+ * abandoned transfer could neither cancel the body nor abort the file handle,
+ * and the stall this bounds would hold the file open. Reading and writing in
+ * this loop lets each step settle against the abort, and lets the failure path
+ * below release both ends itself.
+ *
+ * Release never waits: a transport that ignores `cancel()` must not keep the
+ * deadline open, so the teardown promises are started and their rejections
+ * swallowed. Both locks are dropped afterwards, so a later attempt can reuse the
+ * streams and no release outlives the transfer.
+ */
+async function pumpArtifactBody(
+  body: ReadableStream<Uint8Array>,
+  destination: WritableStream<Uint8Array>,
+  signal: AbortSignal
+): Promise<void> {
+  const reader = body.getReader();
+  const writer = destination.getWriter();
+  try {
+    for (;;) {
+      // eslint-disable-next-line no-await-in-loop -- a stream is read one chunk after the previous one, which is the whole point
+      const { done, value } = await raceAgainstAbort(
+        reader.read(),
+        signal,
+        'Artifact download timed out'
+      );
+      if (done) {
+        break;
+      }
+      // eslint-disable-next-line no-await-in-loop -- each chunk is written before the next is read, so the body never sits in memory whole
+      await raceAgainstAbort(writer.write(value), signal, 'Artifact download timed out');
+    }
+    await raceAgainstAbort(writer.close(), signal, 'Artifact download timed out');
+  } catch (error) {
+    // A transfer the deadline raced out has nothing observing its other side, so
+    // both ends are released here. Neither release is awaited: the file handle
+    // must come back even from a transport that never answers, and the original
+    // failure is what the caller must see.
+    releaseQuietly(reader.cancel());
+    releaseQuietly(writer.abort());
+    throw error;
+  } finally {
+    releaseLockQuietly(reader);
+    releaseLockQuietly(writer);
+  }
+}
+
+/**
+ * Drop a reader's or writer's lock so the stream can be used again. A stream
+ * still tearing down after the deadline may refuse the release; the lock then
+ * belongs to the abandoned stream, and nothing the caller does with it, so a
+ * refusal must not raise over the transfer's own failure.
+ */
+function releaseLockQuietly(lock: { releaseLock: () => void }): void {
+  try {
+    lock.releaseLock();
+  } catch {
+    // The lock stays with the abandoned stream.
+  }
+}
+
+/**
  * Download an allowed artifact URL into `target`, following only redirects that
- * stay on the allowed origins; a refused hop leaves no bytes behind. The body is
- * piped through the file handle, so a download never sits in memory whole while
- * it is written, and every failure path releases the body.
+ * stay on the allowed origins; a refused hop leaves no bytes behind. The body
+ * streams through the file handle one chunk at a time, so a download never sits
+ * in memory whole, and {@link pumpArtifactBody} owns both ends of the transfer
+ * so every failure releases the file handle as well as the body.
  *
  * The whole transfer — headers and body — is bounded by
- * {@link ARTIFACT_DOWNLOAD_TIMEOUT_MS} through one controller: the signal
- * reaches every redirect hop and errors the response body, and because `pipeTo`
- * takes no signal the pipe itself is raced against the abort. An aborted
- * transfer becomes the retryable `download-failed` through
- * {@link materializeArtifact}, so the cursor is held and the artifact is retried
- * on the next run instead of stalling it forever.
+ * {@link ARTIFACT_DOWNLOAD_TIMEOUT_MS} through one controller whose signal
+ * reaches every redirect hop and every step of the pump. An aborted transfer
+ * becomes the retryable `download-failed` through {@link materializeArtifact},
+ * so the cursor is held and the artifact is retried on the next run instead of
+ * stalling it forever.
  */
 async function downloadAllowedArtifact(url: string, target: File): Promise<File> {
   const controller = new AbortController();
   const clearDeadline = abortAfter(controller, ARTIFACT_DOWNLOAD_TIMEOUT_MS);
   let response: Response | null = null;
-  let destination: WritableStream<Uint8Array> | null = null;
+  // A body this function still owes a release for: set once the status is kept
+  // and cleared as soon as the pump owns it. The pump releases its own ends, so
+  // only a body no pump acquired is left to the catch below.
+  let unattachedBody: ReadableStream<Uint8Array> | null = null;
   try {
     response = await raceAgainstAbort(
       fetchAllowedArtifact(url, { method: 'GET', signal: controller.signal }),
@@ -460,32 +544,26 @@ async function downloadAllowedArtifact(url: string, target: File): Promise<File>
       await response.body?.cancel();
       throw new Error(`Artifact download failed with status ${response.status}`);
     }
+    const body = response.body ?? new Blob([]).stream();
+    unattachedBody = body;
     // `writableStream()` opens a write-only handle: iOS throws when the file does
     // not exist, and neither platform truncates there. Creating it first makes
     // the staging path a fresh empty file, so a leftover of the same name cannot
     // leave a tail behind the new bytes.
     target.create({ intermediates: true, overwrite: true });
-    destination = target.writableStream();
-    // `pipeTo` accepts no signal, so the transfer is raced against the abort. The
-    // destination is held here because a raced-out pipe is abandoned: the deadline
-    // errors the body, and the catch below then aborts the write stream so its
-    // file handle is released instead of being left to the abandoned pipe.
-    await raceAgainstAbort(
-      (response.body ?? new Blob([]).stream()).pipeTo(destination),
-      controller.signal,
-      'Artifact download timed out'
-    );
+    const destination = target.writableStream();
+    // Both ends are acquired, so the pump takes the body over from here: it
+    // aborts the destination and cancels the body itself, and no failed transfer
+    // is left holding the file handle.
+    unattachedBody = null;
+    await pumpArtifactBody(body, destination, controller.signal);
     return target;
   } catch (error) {
-    try {
-      await response?.body?.cancel();
-    } catch {
-      // A failed pipe already released the body stream, so nothing is left to cancel.
-    }
-    try {
-      await destination?.abort();
-    } catch {
-      // A pipe that already aborted the destination released its handle there.
+    // A body no pump acquired has never been read, so release it here. A transport
+    // that ignores cancel must not keep this failure waiting, so the release is
+    // started and not awaited, and its rejection is swallowed.
+    if (unattachedBody !== null) {
+      releaseQuietly(unattachedBody.cancel());
     }
     deleteQuietly(target);
     throw error;

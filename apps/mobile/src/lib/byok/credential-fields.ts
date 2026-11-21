@@ -196,10 +196,10 @@ function canonicalPrivateKey(value: string): string {
     return typed;
   }
   const [, beginLabel, rawBody, endLabel] = match;
-  if (beginLabel !== endLabel) {
+  if (beginLabel !== endLabel || rawBody === undefined) {
     return typed;
   }
-  const body = rawBody.replace(/\s+/g, '');
+  const body = rawBody.replaceAll(/\s+/g, '');
   if (!/^[A-Za-z0-9+/]+={0,2}$/.test(body) || body.length % 4 !== 0) {
     return typed;
   }

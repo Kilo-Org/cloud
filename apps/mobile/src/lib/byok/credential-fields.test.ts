@@ -1,3 +1,4 @@
+// eslint-disable-next-line import/no-nodejs-modules -- test-only reference parse of the stored key
 import { createPrivateKey, generateKeyPairSync } from 'node:crypto';
 
 import { VertexCredentialsSchema } from '@kilocode/app-shared/byok-credentials';
@@ -100,15 +101,16 @@ describe('credentialPayload', () => {
   }
 
   const { privateKey: signedKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
-  const PEM = signedKey.export({ type: 'pkcs8', format: 'pem' });
+  const exported = signedKey.export({ type: 'pkcs8', format: 'pem' });
+  const PEM = typeof exported === 'string' ? exported : exported.toString('utf8');
 
   it('stores a pasted key so the gateway can sign with it, whatever line breaks the paste kept', () => {
-    const folded = PEM.replace(/\n/g, '');
+    const folded = PEM.replaceAll('\n', '');
     expect(() => createPrivateKey(folded)).toThrow();
     for (const pasted of [
       PEM,
       folded,
-      PEM.replace(/\n/g, '\r\n'),
+      PEM.replaceAll('\n', '\r\n'),
       PEM.split('\n')
         .map(line => `  ${line}`)
         .join('\n'),

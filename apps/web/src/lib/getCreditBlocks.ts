@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { CreditTransactionForBlocks } from '@kilocode/web-shared/lib/creditExpiration';
 import { promoCreditCategoriesByKey } from '@kilocode/web-shared/lib/promoCreditCategories';
+import { CREDIT_CAMPAIGN_CATEGORY_PREFIX } from '@/lib/credit-campaigns-shared';
 import { computeExpiration, computeCreditLotAllocations } from '@kilocode/db/credit-expiration';
 import { toNonNullish } from '@/lib/utils';
 
@@ -174,13 +175,6 @@ const WELCOME_CREDIT_CATEGORIES: Readonly<Record<string, true>> = {
   'card-validation-no-stytch': true,
   'card-validation-upgrade': true,
 };
-
-/**
- * The prefix `credit_categoryForSlug` gives an admin-managed credit campaign.
- * A campaign is a database row, so its category never reaches the promo
- * registry, yet it funds the account like any other signup bonus.
- */
-const CREDIT_CAMPAIGN_CATEGORY_PREFIX = 'c-';
 
 /**
  * Classifies the category of a positive free credit row for display.

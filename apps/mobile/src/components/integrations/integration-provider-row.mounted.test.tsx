@@ -11,14 +11,17 @@
 import { createElement, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { TEXT_ACTION_SKELETON_CLASS } from '@/components/ui/row-trailing';
 import {
   textActionRowOverhangDp,
   textActionTargetClass,
+  textActionTargetDp,
   TOUCH_TARGET_DP,
   TOUCH_TARGET_OVERHANG_DP,
 } from '@/lib/a11y/tap-target';
 import { type IntegrationRow } from '@/lib/integrations/integration-rows';
 import { type IntegrationScope } from '@/lib/integrations/provider-catalog';
+import { compiledDimensions } from '@/test/native-dimensions';
 import { act, TestRenderer } from '@/test/renderer';
 
 import { IntegrationProviderRow } from './integration-provider-row';
@@ -227,6 +230,54 @@ describe('IntegrationProviderRow action cell', () => {
 
     expect(controls(root)).toHaveLength(0);
     expect(root.findAllByType('Skeleton')).toHaveLength(1);
+    // The settled row's button cancels its target's overhang out of the frame,
+    // so the cell lays out on the row's 27pt content band; the placeholder
+    // takes that same band instead of the 36pt frame it used to hold, so the
+    // row does not shrink when the read lands.
+    expect(root.findAllByType('Skeleton')[0]?.props.className).toBe(TEXT_ACTION_SKELETON_CLASS);
+    expect(TEXT_ACTION_SKELETON_CLASS).toContain('h-[27px]');
+  });
+
+  // The outline buttons rendered their `sm` 36pt frame, a box a control-size
+  // audit reads under the 44pt the design requires and under Android's 48dp
+  // minimum. Each takes the platform target on its own node and cancels the
+  // overhang out of the row, so the frame keeps the height its neighbours have.
+  it.each<{ name: string; row: Partial<IntegrationRow> }>([
+    { name: 'manage on the web', row: { installed: true, webManaged: true } },
+    {
+      name: 'disconnect',
+      row: {
+        installed: true,
+        accountLabel: 'octocat',
+        disconnectIntegrationId: 'gh-1',
+        canDisconnectNatively: true,
+      },
+    },
+    { name: 'retry', row: { provider: 'bitbucket', installed: true, canDisconnectNatively: false } },
+  ])('gives the $name button the platform touch target on the row band', async ({ name, row }) => {
+    const root = renderRow({
+      row: integrationRow(row),
+      scope: 'organization',
+      role: 'owner',
+    });
+    const [button] = root.findAll(node => Object.is(node.type, 'Button'));
+    if (!button) {
+      throw new Error(`the ${name} row rendered no button`);
+    }
+
+    expect(button.props.className).toBe(textActionTargetClass());
+    const style: unknown = button.props.style;
+    if (typeof style !== 'object' || style === null) {
+      throw new Error(`the ${name} button carries no style`);
+    }
+    const margin: unknown = 'marginVertical' in style ? style.marginVertical : undefined;
+    expect(margin).toBe(-textActionRowOverhangDp());
+
+    const declarations = (await compiledDimensions(button.props.className as string)) as {
+      minHeight?: number;
+    }[];
+    const box = Object.assign({}, ...declarations) as { minHeight: number };
+    expect(box.minHeight).toBe(textActionTargetDp());
   });
 
   it('offers the failed connection read again on an installed row it cannot name', () => {

@@ -11,9 +11,15 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
-import { renderRowTrailing, type RowTrailingSpec } from '@/components/ui/row-trailing';
+import {
+  renderRowTrailing,
+  type RowTrailingSpec,
+  TEXT_ACTION_SKELETON_CLASS,
+  textActionBoxStyle,
+} from '@/components/ui/row-trailing';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { textActionTargetClass } from '@/lib/a11y/tap-target';
 import { type IntegrationRow } from '@/lib/integrations/integration-rows';
 import {
   canManageProvider,
@@ -104,8 +110,10 @@ export function IntegrationProviderRow({
   let action: RowTrailingSpec | undefined = undefined;
   if (row.actionPending) {
     // The connections read that decides between Disconnect and the web page has
-    // not landed, so the row holds the button's space instead of guessing.
-    action = { kind: 'node', node: <Skeleton className="h-9 w-24 rounded-md" /> };
+    // not landed, so the row holds the button's space instead of guessing. The
+    // placeholder takes the band the action's overhang leaves, so the row keeps
+    // the height it settles at.
+    action = { kind: 'node', node: <Skeleton className={TEXT_ACTION_SKELETON_CLASS} /> };
   } else if (row.installed && row.webManaged) {
     action = canDisconnect
       ? {
@@ -114,6 +122,8 @@ export function IntegrationProviderRow({
             <Button
               size="sm"
               variant="outline"
+              className={textActionTargetClass()}
+              style={textActionBoxStyle()}
               onPress={onOpenOnWeb}
               accessibilityLabel={namedAction(t('common.manageOnWeb'))}
             >
@@ -130,6 +140,8 @@ export function IntegrationProviderRow({
             <Button
               size="sm"
               variant="outline"
+              className={textActionTargetClass()}
+              style={textActionBoxStyle()}
               loading={disconnecting}
               onPress={onDisconnect}
               accessibilityLabel={namedAction(t('integrations.disconnect'))}
@@ -150,6 +162,8 @@ export function IntegrationProviderRow({
             <Button
               size="sm"
               variant="outline"
+              className={textActionTargetClass()}
+              style={textActionBoxStyle()}
               loading={retryingConnection}
               onPress={onRetryConnection}
               accessibilityLabel={namedAction(t('common.retry'))}

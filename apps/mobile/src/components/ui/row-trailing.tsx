@@ -43,9 +43,20 @@ const SWITCH_BOX_STYLE = {
  * is what keeps its touches inside the row's bounds (Android delivers a touch
  * only inside a parent view).
  */
-function textActionBoxStyle() {
+export function textActionBoxStyle() {
   return { marginVertical: -textActionRowOverhangDp() };
 }
+
+/**
+ * The box a placeholder takes when it holds a row's trailing action space
+ * before that action is known — a pending read that decides between two
+ * buttons. The action's own margin cancels its target down to the row's 27pt
+ * content band, so the placeholder lays out on that band instead of the
+ * compact button's 36pt frame and the row does not shrink when the read lands.
+ * The band is 27pt on both platforms: `textActionTargetDp()` less twice
+ * `textActionRowOverhangDp()` is `(44 or 48) - (44 or 48 - 27)`.
+ */
+export const TEXT_ACTION_SKELETON_CLASS = 'h-[27px] w-24 rounded-md';
 
 /**
  * The trailing cell of a row. Every variant shares the row's height, so a mark,

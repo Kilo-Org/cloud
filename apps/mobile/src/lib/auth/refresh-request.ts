@@ -19,7 +19,21 @@
  * `onreadystatechange` handler is assigned before `send()`; a listener added
  * with `addEventListener` does not switch that on. The handler assignment below
  * is therefore a correctness requirement, not a style choice.
+ *
+ * Because this module talks to the raw client, it owns the telemetry the
+ * wrapped global `fetch` used to provide for this route
+ * (`install-error-reporting.ts`): an error answer the app does not handle files
+ * the process's event, and a request that got no response is reported as the
+ * endpoint's `failed` outcome with the rejection attached. The policy itself
+ * stays in `network-errors.ts`; only the call lives here.
  */
+
+import { classifyAuthResponse } from '@/lib/auth/auth-response-class';
+import {
+  isExpectedHttpStatus,
+  normalizeUrlPath,
+  reportNetworkError,
+} from '@/lib/telemetry/network-errors';
 
 /** One refresh answer, available at the response head. */
 export type RefreshAnswer = {
@@ -91,6 +105,55 @@ function readBody(xhr: XMLHttpRequest, budgetMs: number): Promise<string | null>
 }
 
 /**
+ * What one answered refresh request offers a report. The status decides whether
+ * there is anything to report at all, so it is part of the descriptor rather
+ * than a separate argument.
+ */
+type AnswerReport = {
+  readonly url: string;
+  readonly status: number;
+  readonly statusText: string | undefined;
+  /** When the request was sent, so the report's duration starts there. */
+  readonly startedAt: number;
+};
+
+/**
+ * Report one answered refresh request whose status names a defect. This mirrors
+ * what the wrapped global `fetch` did for this route before the transport moved
+ * to `XMLHttpRequest`, which had two halves:
+ *
+ * - an expected answer (`isExpectedHttpStatus`) is the app's own, so 401, 403
+ *   and 429 record nothing; and
+ * - a terminal refusal on a sign-in route is filed by the auth layer itself
+ *   (`reportAuthTerminalFailure`), so the wrapper never filed it a second time.
+ *
+ * Both halves matter here: this route is a sign-in route, so a 400 is already
+ * reported once by that layer and a second event would be a duplicate. What
+ * remains reportable is the retryable family — a 408 and the 5xx statuses —
+ * which is exactly `classifyAuthResponse` answering `retry`. The body is never
+ * read for this.
+ */
+function reportErrorAnswer({ url, status, statusText, startedAt }: AnswerReport): void {
+  if (status < 400 || isExpectedHttpStatus(status)) {
+    return;
+  }
+  // The path only refines a 401 (does it clear the pair) and a 403 (came it from
+  // the route), and both are expected answers filtered above, so no status that
+  // reaches here classifies differently on any sign-in route.
+  if (classifyAuthResponse({ path: normalizeUrlPath(url), status }).kind !== 'retry') {
+    return;
+  }
+  reportNetworkError({
+    source: 'fetch',
+    url,
+    method: 'POST',
+    status,
+    ...(statusText === undefined || statusText.length === 0 ? {} : { statusText }),
+    durationMs: Date.now() - startedAt,
+  });
+}
+
+/**
  * The `XMLHttpRequest` route. A Node test worker has no `XMLHttpRequest`, so it
  * takes the `fetch` route below and the suites that spy on `fetch` still see the
  * request; a device needs this one, because neither client it has reports the
@@ -103,6 +166,7 @@ function viaXhr(
   const answered = Promise.withResolvers<RefreshAnswer>();
   const xhr = new Xhr();
   let headSeen = false;
+  let startedAt = 0;
 
   signal.addEventListener('abort', () => {
     xhr.abort();
@@ -115,6 +179,7 @@ function viaXhr(
       return;
     }
     headSeen = true;
+    reportErrorAnswer({ url, status: xhr.status, statusText: xhr.statusText, startedAt });
     answered.resolve({
       status: xhr.status,
       ok: xhr.status >= 200 && xhr.status < 300,
@@ -127,22 +192,56 @@ function viaXhr(
   };
   // oxlint-disable-next-line unicorn/prefer-add-event-listener -- one owner for the pre-head failure
   xhr.onerror = () => {
-    answered.reject(new Error('refresh request failed'));
+    const error = new Error('refresh request failed');
+    // An answer already reported at its head owns the exchange: a failure while
+    // its body is read is the caller's `text()` returning null, which is what
+    // the wrapped `fetch` left to the caller too, so it adds no second report.
+    if (!headSeen) {
+      reportNetworkError({
+        source: 'fetch',
+        url,
+        method: 'POST',
+        durationMs: Date.now() - startedAt,
+        error,
+      });
+    }
+    answered.reject(error);
   };
 
   xhr.open('POST', url);
   xhr.setRequestHeader('Content-Type', 'application/json');
+  // The duration the report carries starts at the send, like the wrapped
+  // `fetch` this route replaced measured it.
+  startedAt = Date.now();
   xhr.send(body);
   return answered.promise;
 }
 
 /** The `fetch` route, for a runtime without `XMLHttpRequest` (a Node test worker). */
 async function viaFetch({ url, body, signal }: RefreshRequest): Promise<RefreshAnswer> {
+  const startedAt = Date.now();
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body,
     signal,
+  }).catch((error: unknown) => {
+    // The rejection still reaches the caller unchanged; the report records the
+    // request as the endpoint's `failed` outcome, as the wrapped `fetch` did.
+    reportNetworkError({
+      source: 'fetch',
+      url,
+      method: 'POST',
+      durationMs: Date.now() - startedAt,
+      error,
+    });
+    throw error;
+  });
+  reportErrorAnswer({
+    url,
+    status: response.status,
+    statusText: response.statusText,
+    startedAt,
   });
   return {
     status: response.status,

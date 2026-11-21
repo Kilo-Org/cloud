@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { sendRefreshRequest } from '@/lib/auth/refresh-request';
+import { reportNetworkError } from '@/lib/telemetry/network-errors';
+
+// The transport owns the reporting the wrapped global `fetch` used to provide
+// for this route, so these cases observe the reporter itself: spy mode keeps
+// the real policy and implementation, only making the call countable.
+vi.mock('@/lib/telemetry/network-errors', { spy: true });
+
+const reporter = vi.mocked(reportNetworkError);
 
 /**
  * The refresh answer must be readable at the response head, because a 401
@@ -80,6 +88,7 @@ const request = () => ({
 afterEach(() => {
   vi.unstubAllGlobals();
   FakeXhr.instances = [];
+  reporter.mockClear();
 });
 
 describe('sendRefreshRequest over XMLHttpRequest', () => {
@@ -207,5 +216,113 @@ describe('sendRefreshRequest without XMLHttpRequest', () => {
 
     expect(answer.status).toBe(401);
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * The wrapped global `fetch` reported this route before the transport moved to
+ * `XMLHttpRequest`; the transport keeps that parity itself, because the raw
+ * client never passes through the wrapper.
+ */
+describe('refresh request telemetry', () => {
+  it('reports a 500 answer once', async () => {
+    vi.stubGlobal('XMLHttpRequest', FakeXhr);
+
+    const answerPromise = sendRefreshRequest(request());
+    FakeXhr.instances[0]?.receiveHead(500);
+    await answerPromise;
+
+    expect(reporter).toHaveBeenCalledTimes(1);
+    expect(reporter).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'fetch',
+        url: 'http://localhost/api/auth/native/refresh',
+        method: 'POST',
+        status: 500,
+        durationMs: expect.any(Number),
+      })
+    );
+  });
+
+  it('reports nothing for a 401 answer', async () => {
+    vi.stubGlobal('XMLHttpRequest', FakeXhr);
+
+    const answerPromise = sendRefreshRequest(request());
+    FakeXhr.instances[0]?.receiveHead(401);
+    await answerPromise;
+
+    // 401 is the app's own answer: it names the blocked-account copy and signs
+    // the session out, so a report would describe no defect.
+    expect(reporter).not.toHaveBeenCalled();
+  });
+
+  it('reports a pre-head failure as a transport failure and still rejects', async () => {
+    vi.stubGlobal('XMLHttpRequest', FakeXhr);
+
+    const answerPromise = sendRefreshRequest(request());
+    FakeXhr.instances[0]?.fail();
+
+    await expect(answerPromise).rejects.toThrow('refresh request failed');
+    expect(reporter).toHaveBeenCalledTimes(1);
+    const context = reporter.mock.lastCall?.[0];
+    expect(context).toMatchObject({ source: 'fetch', method: 'POST' });
+    // A failure before the head has no status to name, so it is reported as the
+    // endpoint's `failed` outcome with the rejection attached.
+    expect(context).not.toHaveProperty('status');
+    expect(context?.error).toBeInstanceOf(Error);
+  });
+
+  it('reports nothing for a 400 the auth layer already files', async () => {
+    vi.stubGlobal('XMLHttpRequest', FakeXhr);
+
+    const answerPromise = sendRefreshRequest(request());
+    FakeXhr.instances[0]?.receiveHead(400);
+    await answerPromise;
+
+    // The auth layer reports a terminal refusal on this route itself
+    // (`reportAuthTerminalFailure`), and the wrapped fetch never filed a second
+    // event for the same answer. A transport report here would duplicate it.
+    expect(reporter).not.toHaveBeenCalled();
+  });
+
+  it('does not report a failure after the head a second time', async () => {
+    vi.stubGlobal('XMLHttpRequest', FakeXhr);
+
+    const answerPromise = sendRefreshRequest(request());
+    const xhr = FakeXhr.instances[0];
+    xhr?.receiveHead(500);
+    await answerPromise;
+    expect(reporter).toHaveBeenCalledTimes(1);
+
+    // A body that dies after a reported head is the caller's `text()` answering
+    // null, so it must not add a second report for the same exchange.
+    xhr?.fail();
+
+    expect(reporter).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a 500 answer and a rejection on the fetch route too', async () => {
+    vi.stubGlobal('XMLHttpRequest', undefined);
+    const fetchMock = vi
+      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+      .mockResolvedValue(new Response('upstream failed', { status: 500 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const answer = await sendRefreshRequest(request());
+
+    expect(answer.status).toBe(500);
+    expect(reporter).toHaveBeenCalledTimes(1);
+    expect(reporter).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 500, method: 'POST' })
+    );
+
+    reporter.mockClear();
+    fetchMock.mockRejectedValueOnce(new Error('network down'));
+
+    await expect(sendRefreshRequest(request())).rejects.toThrow('network down');
+    expect(reporter).toHaveBeenCalledTimes(1);
+    const context = reporter.mock.lastCall?.[0];
+    expect(context).not.toHaveProperty('status');
+    expect(context?.error).toBeInstanceOf(Error);
   });
 });

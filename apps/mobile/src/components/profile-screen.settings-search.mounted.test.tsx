@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The mock harness registers every product-module mock before the screen loads.
 import {
@@ -140,6 +140,19 @@ describe('ProfileScreen settings search', () => {
     expect(renderedRowTitles(root)).toContain(signOutLabel);
     expect(targetHighlights(root)).toHaveLength(1);
     expect(signOutFn).not.toHaveBeenCalled();
+  });
+
+  it('indexes the dev-only native remote row only while it renders', async () => {
+    vi.stubGlobal('__DEV__', true);
+    const view = await mountProfile();
+    const root = view.renderer.root;
+    const title = i18n.t('nativeRemote.title');
+    expect(renderedRowTitles(root)).toContain(title);
+
+    query(root, title);
+    expect(
+      results(root).some(result => result.entry.path === undefined && result.entry.label === title)
+    ).toBe(true);
   });
 
   it('opens a nested result on its screen with the row target and source params', async () => {

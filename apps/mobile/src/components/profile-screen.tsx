@@ -119,47 +119,101 @@ function linkedAccountsView(
 }
 
 /**
- * Every permanent row on the Profile tab, as data. The same definition renders
- * the row's label and feeds the Settings search index, so a row cannot be
- * rendered without being searchable. Ids travel as the `settingsTarget` route
- * param: keep them stable.
+ * Every permanent row on the Profile tab, grouped the way the screen renders it.
+ * A section's `settings` object is both the render lookup and the search index
+ * source (its values), so adding a definition to a section indexes it without a
+ * second registration. Ids travel as the `settingsTarget` route param: keep
+ * them stable.
  *
  * Credits, linked accounts and the header's account picker are not settings:
  * their values (a balance, a provider email, the active scope) change with the
  * account and are deliberately absent from the index.
  */
-const PROFILE_SETTINGS = {
-  usage: defineSetting('profile.usage', 'usage.title'),
-  codeReviewer: defineSetting('profile.codeReviewer', 'common.codeReviewer'),
-  securityAgent: defineSetting('profile.securityAgent', 'common.securityAgent'),
-  profiles: defineSetting('profile.profiles', 'profiles.title'),
-  triggers: defineSetting('profile.triggers', 'cloudAgent.triggers.title'),
-  prReview: defineSetting('profile.prReview', 'common.prReview'),
-  selectOrganization: defineSetting(
-    'profile.organization.select',
-    'organization.boundary.selectOrganization'
-  ),
-  viewOrganization: defineSetting('profile.organization.view', 'profile.viewOrganization'),
-  manageOrganization: defineSetting('profile.organization.manage', 'profile.manageOrganization'),
-  createOrganization: defineSetting('profile.organization.create', 'organization.create.title'),
-  nativeRemote: defineSetting('profile.nativeRemote', 'nativeRemote.title'),
-  preferences: defineSetting('profile.preferences', 'common.preferences', 'appearance'),
-  agentBriefing: defineSetting('profile.agentBriefing', 'agentBriefing.title'),
-  tutorial: defineSetting('profile.tutorial', 'tour.tutorialLabel'),
-  changelog: defineSetting('profile.changelog', 'profile.changelog'),
-  integrations: defineSetting('profile.integrations', 'integrations.title'),
-  feedback: defineSetting('profile.feedback', 'profile.feedback'),
-  privacyChoices: defineSetting('profile.privacyChoices', 'profile.privacyChoices', 'privacy'),
-  signOut: defineSetting('profile.signOut', 'common.signOut', 'signOut'),
-  deleteAccount: defineSetting('profile.deleteAccount', 'profile.deleteAccount'),
+const PROFILE_SETTING_SECTIONS = {
+  usage: {
+    settings: {
+      usage: defineSetting('profile.usage', 'usage.title'),
+    },
+  },
+  agents: {
+    context: ['common.agents'],
+    settings: {
+      codeReviewer: defineSetting('profile.codeReviewer', 'common.codeReviewer'),
+      securityAgent: defineSetting('profile.securityAgent', 'common.securityAgent'),
+      profiles: defineSetting('profile.profiles', 'profiles.title'),
+      triggers: defineSetting('profile.triggers', 'cloudAgent.triggers.title'),
+    },
+  },
+  reviews: {
+    context: ['profile.reviews'],
+    settings: {
+      prReview: defineSetting('profile.prReview', 'common.prReview'),
+    },
+  },
+  organization: {
+    context: ['common.organization'],
+    settings: {
+      createOrganization: defineSetting('profile.organization.create', 'organization.create.title'),
+    },
+  },
+  app: {
+    context: ['profile.app'],
+    settings: {
+      nativeRemote: defineSetting('profile.nativeRemote', 'nativeRemote.title'),
+      preferences: defineSetting('profile.preferences', 'common.preferences', 'appearance'),
+      agentBriefing: defineSetting('profile.agentBriefing', 'agentBriefing.title'),
+      tutorial: defineSetting('profile.tutorial', 'tour.tutorialLabel'),
+      changelog: defineSetting('profile.changelog', 'profile.changelog'),
+    },
+  },
+  integrations: {
+    context: ['integrations.sectionTitle'],
+    settings: {
+      integrations: defineSetting('profile.integrations', 'integrations.title'),
+    },
+  },
+  actions: {
+    settings: {
+      feedback: defineSetting('profile.feedback', 'profile.feedback'),
+      privacyChoices: defineSetting('profile.privacyChoices', 'profile.privacyChoices', 'privacy'),
+      signOut: defineSetting('profile.signOut', 'common.signOut', 'signOut'),
+      deleteAccount: defineSetting('profile.deleteAccount', 'profile.deleteAccount'),
+    },
+  },
 } as const;
+
+/**
+ * The organization row's visible label follows the active scope. The three
+ * variants share one rendered row, so only the selected one joins the index.
+ */
+const PROFILE_ORGANIZATION_ROWS = {
+  select: defineSetting('profile.organization.select', 'organization.boundary.selectOrganization'),
+  view: defineSetting('profile.organization.view', 'profile.viewOrganization'),
+  manage: defineSetting('profile.organization.manage', 'profile.manageOrganization'),
+} as const;
+
+/** Every row the JSX renders, by name. Derived from the sections above. */
+const PROFILE_SETTINGS = {
+  ...PROFILE_SETTING_SECTIONS.usage.settings,
+  ...PROFILE_SETTING_SECTIONS.agents.settings,
+  ...PROFILE_SETTING_SECTIONS.reviews.settings,
+  ...PROFILE_SETTING_SECTIONS.organization.settings,
+  ...PROFILE_SETTING_SECTIONS.app.settings,
+  ...PROFILE_SETTING_SECTIONS.integrations.settings,
+  ...PROFILE_SETTING_SECTIONS.actions.settings,
+  selectOrganization: PROFILE_ORGANIZATION_ROWS.select,
+  viewOrganization: PROFILE_ORGANIZATION_ROWS.view,
+  manageOrganization: PROFILE_ORGANIZATION_ROWS.manage,
+};
 
 /** The organization row's label and destination depend on the active scope. */
 function organizationSetting(organizationId: string | null, role: string | undefined) {
   if (organizationId == null) {
     return PROFILE_SETTINGS.selectOrganization;
   }
-  return role === 'member' ? PROFILE_SETTINGS.viewOrganization : PROFILE_SETTINGS.manageOrganization;
+  return role === 'member'
+    ? PROFILE_SETTINGS.viewOrganization
+    : PROFILE_SETTINGS.manageOrganization;
 }
 
 export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetProps = {}) {
@@ -240,50 +294,39 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
   const organizationRowSetting = organizationSetting(organizationId, orgRole);
   const integrationSettingsSource = useIntegrationSearchSource();
   const searchSources = useMemo<readonly SettingsSearchSource[]>(() => {
+    const sections = PROFILE_SETTING_SECTIONS;
     const sources: SettingsSearchSource[] = [
-      { settings: [PROFILE_SETTINGS.usage] },
+      { settings: Object.values(sections.usage.settings) },
       {
-        context: ['common.agents'],
-        settings: [
-          PROFILE_SETTINGS.codeReviewer,
-          PROFILE_SETTINGS.securityAgent,
-          PROFILE_SETTINGS.profiles,
-          PROFILE_SETTINGS.triggers,
-        ],
+        context: sections.agents.context,
+        settings: Object.values(sections.agents.settings),
       },
-      { context: ['profile.reviews'], settings: [PROFILE_SETTINGS.prReview] },
+      {
+        context: sections.reviews.context,
+        settings: Object.values(sections.reviews.settings),
+      },
     ];
     if (showOrganizationSection && !organizationsError) {
-      const organizationSettings: SettingDefinition[] = [];
+      const organizationSettings: SettingDefinition[] = [
+        ...Object.values(sections.organization.settings),
+      ];
       if (showOrganizationRow) {
-        organizationSettings.push(organizationRowSetting);
+        // The chosen scope's row shares the section's one rendered control.
+        organizationSettings.unshift(organizationRowSetting);
       }
-      organizationSettings.push(PROFILE_SETTINGS.createOrganization);
-      sources.push({ context: ['common.organization'], settings: organizationSettings });
+      sources.push({ context: sections.organization.context, settings: organizationSettings });
     }
-    const appSettings: SettingDefinition[] = [];
-    if (showNativeRemote) {
-      appSettings.push(PROFILE_SETTINGS.nativeRemote);
-    }
-    appSettings.push(
-      PROFILE_SETTINGS.preferences,
-      PROFILE_SETTINGS.agentBriefing,
-      PROFILE_SETTINGS.tutorial,
-      PROFILE_SETTINGS.changelog
-    );
-    sources.push({ context: ['profile.app'], settings: appSettings });
     sources.push({
-      context: ['integrations.sectionTitle'],
-      settings: [PROFILE_SETTINGS.integrations],
+      context: sections.app.context,
+      settings: Object.values(sections.app.settings).filter(
+        setting => showNativeRemote || setting.id !== sections.app.settings.nativeRemote.id
+      ),
     });
     sources.push({
-      settings: [
-        PROFILE_SETTINGS.feedback,
-        PROFILE_SETTINGS.privacyChoices,
-        PROFILE_SETTINGS.signOut,
-        PROFILE_SETTINGS.deleteAccount,
-      ],
+      context: sections.integrations.context,
+      settings: Object.values(sections.integrations.settings),
     });
+    sources.push({ settings: Object.values(sections.actions.settings) });
     sources.push(PRIVACY_SETTINGS_SOURCE);
     if (integrationSettingsSource) {
       sources.push(integrationSettingsSource);

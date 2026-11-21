@@ -32,6 +32,7 @@ import {
 } from './gguf-transfers';
 import { createProgressReporter } from './gguf-transfer-progress';
 import { verifyModel } from './gguf-verify';
+import { notifySubscribers } from './gguf-subscribers';
 
 /**
  * Downloaded GGUF models and the one download in progress. A download the
@@ -65,15 +66,7 @@ export function ggufDownloads({
   const publish = () => {
     const download = active === undefined ? null : downloadProgress(active);
     snapshot = { models, download, failure, loadFailed };
-    // Isolate subscribers: a view that throws while rendering the finished state
-    // must not fail a download the saved list already names, nor block other views.
-    for (const listener of listeners) {
-      try {
-        listener();
-      } catch {
-        // A subscriber's own error must not break the download's notification.
-      }
-    }
+    notifySubscribers(listeners);
   };
 
   /**
@@ -270,9 +263,7 @@ export function ggufDownloads({
     snapshot: () => snapshot,
     subscribe: (listener: () => void) => {
       listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
+      return () => listeners.delete(listener);
     },
     model: (fileId: string) => models.find(model => model.fileId === fileId),
     /** The file of a downloaded model, or undefined when fileId names no stored model. */
@@ -321,8 +312,7 @@ export function ggufDownloads({
       return true;
     },
     pause: (fileId: string) => {
-      const download = active;
-      if (download?.fileId === fileId && requestPause(download)) {
+      if (active?.fileId === fileId && requestPause(active)) {
         publish();
       }
     },

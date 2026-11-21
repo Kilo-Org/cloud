@@ -1,10 +1,11 @@
 /* eslint-disable typescript-eslint/consistent-type-assertions -- a llama.rn context is a JSI object: a test double can only be built by asserting its shape */
-import { type ModelEvent, type ModelRequest } from '@kilocode/harness-sdk';
+import { ModelError, type ModelEvent, type ModelRequest } from '@kilocode/harness-sdk';
 import { Effect, Stream } from 'effect';
 import { expect, it, vi } from 'vitest';
 
 import { type GgufContext, ggufModelClient, RELEASE_WAIT_MS } from './gguf-client';
 import { type GgufModelFile } from './gguf-records';
+import { LocalModelError } from './local-model-error';
 
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key } }));
 
@@ -71,7 +72,7 @@ function throwingContext(): GgufContext {
   } as unknown as GgufContext;
 }
 
-function clientWith(contexts: readonly GgufContext[], timeline: Timeline) {
+function clientWith(contexts: readonly GgufContext[], timeline: Timeline, file = FILE) {
   let index = 0;
   const init = vi.fn(() => {
     const context = contexts[index];
@@ -86,7 +87,7 @@ function clientWith(contexts: readonly GgufContext[], timeline: Timeline) {
     init,
     ...ggufModelClient({
       runtime: { init, gpu: false },
-      fileOf: id => (id === 'b' ? OTHER : FILE),
+      fileOf: id => (id === 'b' ? { ...file, path: OTHER.path } : file),
     }),
   };
 }
@@ -270,6 +271,37 @@ it('keeps loading after a native release throws as it is called', async () => {
   expect(timeline).toEqual(['open 1', 'open 2']);
 });
 
+it('fails a projector-mismatched context as unsupported when its native release throws', async () => {
+  const timeline: Timeline = [];
+  // A handle llama.rn already freed throws where `release` is read, so the throw
+  // never becomes a promise a `settled` could contain.
+  const mismatched = {
+    ...contextOf(timeline, 'mismatched', () => Promise.resolve()),
+    initMultimodal: vi.fn(() => Promise.resolve(true)),
+    // The verdict about the bytes: the projector loaded and reads no images.
+    getMultimodalSupport: vi.fn(() => Promise.resolve({ vision: false, audio: false })),
+    release: vi.fn(() => {
+      throw new Error('context already released');
+    }),
+  } as unknown as GgufContext;
+  const vision: GgufModelFile = { ...FILE, projector: '/models/a.mmproj.gguf' };
+  const { client, init } = clientWith([mismatched], timeline, vision);
+
+  const answer: unknown = await settle(collect(client.stream(request)));
+
+  // The answer is the projector refusal the client reports when a context cannot
+  // do what the record promised, not the generic stream failure a leaked throw
+  // would become: the native failure stays inside the teardown.
+  expect(answer).toBeInstanceOf(ModelError);
+  expect(answer).toMatchObject({ reason: 'unsupported' });
+  const cause: unknown = (answer as ModelError).cause;
+  expect(cause).toBeInstanceOf(LocalModelError);
+  expect(cause).toMatchObject({ problem: 'unavailable' });
+  // The mismatched context was freed once, before the answer gave up on it.
+  expect(mismatched.release).toHaveBeenCalledTimes(1);
+  expect(init).toHaveBeenCalledTimes(1);
+});
+
 it('reports a teardown that never settles instead of waiting on it forever', async () => {
   const timeline: Timeline = [];
   const gate = Promise.withResolvers<undefined>();
@@ -294,6 +326,25 @@ it('reports a teardown that never settles instead of waiting on it forever', asy
   // teardown still owns the chain: nothing opened a second context beside it.
   expect(Array.isArray(outcome)).toBe(false);
   expect(outcome).toMatchObject({ reason: 'unsupported' });
+  expect(init).toHaveBeenCalledTimes(1);
+  expect(timeline).toEqual(['open 1']);
+
+  // The stall is remembered: a second send refuses at once instead of paying the
+  // whole wait again, and still opens nothing beside the context being freed.
+  vi.useFakeTimers();
+  try {
+    const refusedAgain = settle(collect(client.stream(request)));
+    // Draining the microtask queue without moving the clock is all the fast path
+    // needs. A send that still awaited the timer would leave this pending, since
+    // no timer is advanced here.
+    await vi.advanceTimersByTimeAsync(0);
+    const again = await Promise.race([refusedAgain, Promise.resolve('still waiting')]);
+    expect(again).not.toBe('still waiting');
+    expect(Array.isArray(again)).toBe(false);
+    expect(again).toMatchObject({ reason: 'unsupported' });
+  } finally {
+    vi.useRealTimers();
+  }
   expect(init).toHaveBeenCalledTimes(1);
   expect(timeline).toEqual(['open 1']);
 

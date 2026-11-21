@@ -82,19 +82,17 @@ function failure(problem: LocalModelProblem, started: boolean): ModelError {
 export const RELEASE_WAIT_MS = 30_000;
 
 /**
- * Waits for `teardown`, and throws once `RELEASE_WAIT_MS` passes without it:
- * the promise itself is left running, since a context may still be freeing.
+ * Waits for `teardown`, and reports whether `RELEASE_WAIT_MS` passed without
+ * it: the promise itself is left running, since a context may still be freeing.
  */
-async function waitForTeardown(teardown: Promise<void>): Promise<void> {
+async function waitForTeardown(teardown: Promise<void>): Promise<'settled' | 'stalled'> {
   const stalled = Symbol('teardown stalled');
   const { promise, resolve } = Promise.withResolvers<symbol>();
   const timer = setTimeout(() => {
     resolve(stalled);
   }, RELEASE_WAIT_MS);
   try {
-    if ((await Promise.race([teardown, promise])) === stalled) {
-      throw new Error('teardown stalled');
-    }
+    return (await Promise.race([teardown, promise])) === stalled ? 'stalled' : 'settled';
   } finally {
     clearTimeout(timer);
   }
@@ -131,6 +129,14 @@ export function ggufModelClient({
    * first, and every caller that would open one waits here.
    */
   let freeing: Promise<void> = Promise.resolve();
+  /**
+   * The teardown whose own wait timed out, while it is still pending. Every send
+   * would otherwise await it and pay the whole wait again before reporting
+   * `unavailable`. The number is the teardown's, so a chain that settles late
+   * clears only its own record and never a newer stall.
+   */
+  let freeingGeneration = 0;
+  let stalledGeneration: number | undefined = undefined;
   let busy = false;
   let sequence = 0;
   /**
@@ -143,36 +149,46 @@ export function ggufModelClient({
 
   const free = async (
     previous: Promise<void>,
-    current: { readonly context: Promise<GgufContext> }
+    current: { readonly context: Promise<GgufContext> },
+    generation: number
   ) => {
     // Every await is a `settled`/`attempt`, so nothing here rejects: the chain
     // every later load waits on never stays rejected.
-    await settled(previous);
-    const context = await settled(current.context);
-    if (!context.ok) {
-      return;
-    }
-    const running = inflight;
-    if (running !== undefined) {
-      // A freed handle throws where the method is called, so the stop is a
-      // thunk. It must not skip the release below, which frees the context the
-      // one-context invariant depends on.
-      const stopped = await attempt(() => context.value.stopCompletion());
-      // A stop that never ran cannot interrupt the answer: its completion may
-      // never settle, so waiting for it would hold the chain every later load
-      // waits on, and the answer has to give up its ownership of the client.
-      // The release below still frees the weights.
-      if (stopped.ok) {
-        await settled(running);
-      } else {
-        // llama.rn 0.12.9: a throw here means the id is already gone from
-        // `g_llamaContexts`, and `llamaReleaseContext` waits on
-        // `TaskManager::waitForContext` before deleting, so freeing now cannot pull
-        // the weights out from under a running native completion.
-        abandon?.();
+    try {
+      await settled(previous);
+      const context = await settled(current.context);
+      if (!context.ok) {
+        return;
+      }
+      const running = inflight;
+      if (running !== undefined) {
+        // A freed handle throws where the method is called, so the stop is a
+        // thunk. It must not skip the release below, which frees the context the
+        // one-context invariant depends on.
+        const stopped = await attempt(() => context.value.stopCompletion());
+        // A stop that never ran cannot interrupt the answer: its completion may
+        // never settle, so waiting for it would hold the chain every later load
+        // waits on, and the answer has to give up its ownership of the client.
+        // The release below still frees the weights.
+        if (stopped.ok) {
+          await settled(running);
+        } else {
+          // llama.rn 0.12.9: a throw here means the id is already gone from
+          // `g_llamaContexts`, and `llamaReleaseContext` waits on
+          // `TaskManager::waitForContext` before deleting, so freeing now cannot pull
+          // the weights out from under a running native completion.
+          abandon?.();
+        }
+      }
+      await attempt(() => context.value.release());
+    } finally {
+      // This chain has done its work, so its stall is over. Clearing inside the
+      // body runs before the promise settles, so the send that settlement wakes
+      // waits on a finished chain instead of a stale record.
+      if (stalledGeneration === generation) {
+        stalledGeneration = undefined;
       }
     }
-    await attempt(() => context.value.release());
   };
 
   const release = (fileId?: string): Promise<void> => {
@@ -183,7 +199,8 @@ export function ggufModelClient({
       return freeing;
     }
     loaded = undefined;
-    freeing = free(freeing, current);
+    freeingGeneration += 1;
+    freeing = free(freeing, current, freeingGeneration);
     return freeing;
   };
 
@@ -203,7 +220,8 @@ export function ggufModelClient({
     // cannot do what the record promised, so it is freed and the answer fails.
     const vision = await settled(loadProjector(context, file.projector, runtime.gpu));
     if (!vision.ok || vision.value !== 'vision') {
-      await settled(context.release());
+      // A freed handle throws where the method is called, before a promise exists.
+      await attempt(() => context.release());
       throw new Error('projector');
     }
     return context;
@@ -213,10 +231,21 @@ export function ggufModelClient({
     if (loaded?.fileId === fileId) {
       return loaded.context;
     }
+    const teardown = release();
+    const generation = freeingGeneration;
+    // This teardown already timed out and is still pending, so it cannot settle
+    // while this send runs: refusing at once is the same `unavailable` answer
+    // without paying the whole wait again. Nothing opens beside it either way.
+    if (stalledGeneration === generation) {
+      throw new Error('teardown stalled');
+    }
     // A teardown that never settles rejects this load rather than waiting
     // forever, which takes the caller's `unavailable` path; the teardown itself
     // stays pending, so it still keeps the next context from opening beside it.
-    await waitForTeardown(release());
+    if ((await waitForTeardown(teardown)) === 'stalled') {
+      stalledGeneration = generation;
+      throw new Error('teardown stalled');
+    }
     const context = open(file);
     loaded = { fileId, context };
     return context;

@@ -83,11 +83,17 @@ const POLL_INTERVAL_MS = 500;
 const BASE_TIME = Date.UTC(2026, 0, 2, 0, 0, 0);
 
 /**
- * Ordered newest first. These sit far in the future on purpose: ingest stamps
- * `updated_at` when it processes a part, asynchronously and possibly minutes
- * later, so a nearer value would be outranked and the fixture's order would
- * invert after the seed had already verified it. Fixed values also keep the
- * mirror from reading every reseed as a change.
+ * The `updated_at` every fixture row starts at. Ingest replaces it with the time
+ * it processed the session, so a row still carrying this value has not been
+ * written yet.
+ */
+const INGEST_PENDING_AT = '2000-01-01T00:00:00.000Z';
+/** How long to wait for every ingest write to land. */
+const INGEST_WRITE_TIMEOUT_MS = 60_000;
+
+/**
+ * Ordered newest first. Stamped only after every ingest write has landed,
+ * because ingest overwrites this column with the time it processed the session.
  */
 const SESSION_UPDATED_AT = [
   '2099-01-01T00:00:07.000Z',
@@ -279,6 +285,30 @@ async function pollForHistory(baseUrl: string, sessionId: string, token: string)
   }
 }
 
+/**
+ * Wait until a predicate holds, polling at {@link POLL_INTERVAL_MS}. Used for the
+ * ingest writes, which the ingest API never reports: a row still carrying the
+ * seed's sentinel `updated_at` has not been written yet.
+ */
+async function waitFor(
+  isSettled: () => Promise<boolean>,
+  describePending: () => string
+): Promise<void> {
+  const deadline = Date.now() + INGEST_WRITE_TIMEOUT_MS;
+  for (;;) {
+    if (await isSettled()) {
+      return;
+    }
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `Ingest did not write every session within the wait (${describePending()}); ` +
+          'the fixture order cannot be set reliably yet. Re-run the seed.'
+      );
+    }
+    await sleep(POLL_INTERVAL_MS);
+  }
+}
+
 export async function run(...args: string[]): Promise<SeedResult | void> {
   if (args.includes('--help') || args.includes('-h')) {
     printUsage();
@@ -351,13 +381,13 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       );
   }
 
-  for (const [index, sessionId] of sessionIds.entries()) {
+  for (const sessionId of sessionIds) {
     await db.insert(cli_sessions_v2).values({
       session_id: sessionId,
       kilo_user_id: user.userId,
       title: fixtures.get(sessionId)?.title ?? sessionId,
       created_on_platform: 'cloud-agent-web',
-      updated_at: SESSION_UPDATED_AT[index] ?? SESSION_UPDATED_AT.at(-1),
+      updated_at: INGEST_PENDING_AT,
     });
   }
 
@@ -370,13 +400,30 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     messageCount += await pollForHistory(sessionIngestUrl, sessionId, token);
   }
 
-  // Ingest stamps `updated_at` on its own, and it does so asynchronously, so a
-  // rewrite here can be outranked minutes later by a late ingest write. The
-  // order therefore comes from a band no ingest write can reach: the seven rows
-  // take `SESSION_UPDATED_AT`, which sits far in the future and is fixed, so the
-  // crawl's budget always meets the stuck sessions first. The band is also
-  // stable across reseeds, so the mirror does not mistake it for a change and
-  // restart every crawl.
+  // Ingest rewrites `updated_at` with the time it processed a session, and it
+  // does so asynchronously: a session it finishes last overwrites whatever the
+  // seed wrote, even a value far in the future. So the order cannot be set until
+  // every ingest write has provably landed. The rows start at a sentinel, and
+  // the seed waits until none carries it, which can only be true once ingest has
+  // written each one.
+  //
+  // Only then does it stamp `SESSION_UPDATED_AT`, newest first, which is the
+  // order the crawl's budget walks: the artifacts that can never be materialized
+  // must lead, or the fixture does not demonstrate the starvation. The stamped
+  // values are fixed, so a reseed is not a change the mirror would restart for.
+  const fixtureIdSet = new Set(sessionIds);
+  await waitFor(
+    async () => {
+      const rows = await db
+        .select({ sessionId: cli_sessions_v2.session_id, updatedAt: cli_sessions_v2.updated_at })
+        .from(cli_sessions_v2)
+        .where(eq(cli_sessions_v2.kilo_user_id, user.userId));
+      return rows
+        .filter(row => fixtureIdSet.has(row.sessionId))
+        .every(row => new Date(row.updatedAt).getTime() !== new Date(INGEST_PENDING_AT).getTime());
+    },
+    () => 'sentinel updated_at still present'
+  );
   for (const [index, sessionId] of sessionIds.entries()) {
     await db
       .update(cli_sessions_v2)

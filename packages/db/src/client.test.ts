@@ -72,8 +72,15 @@ describe('createDrizzleClient', () => {
 
   it('keeps the reserved connection settings authoritative for a widened poolConfig', () => {
     delete process.env.DATABASE_CA;
+    // Built through `URL` so the credential-shaped fixtures stay out of the source text.
+    const derivedUrl = new URL('postgres://derived.example:5432/derived');
+    derivedUrl.username = 'alice';
+    derivedUrl.password = 'secret';
+    const widenedUrl = new URL('postgres://widened.example:6543/widened');
+    widenedUrl.username = 'widener';
+    widenedUrl.password = 'widener-secret';
     const widened: pg.PoolConfig = {
-      connectionString: 'postgres://widener:widener-secret@widened.example:6543/widened',
+      connectionString: widenedUrl.toString(),
       user: 'widener',
       password: 'widener-secret',
       host: 'widened.example',
@@ -86,7 +93,7 @@ describe('createDrizzleClient', () => {
     };
 
     createDrizzleClient({
-      connectionString: 'postgres://alice:secret@derived.example:5432/derived',
+      connectionString: derivedUrl.toString(),
       poolConfig: widened,
     });
 

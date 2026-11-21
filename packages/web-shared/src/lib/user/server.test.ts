@@ -763,29 +763,39 @@ describe('getUserFromAuth', () => {
   });
 
   test('still refuses a self-cleanup request that lands on an admin-only gate', async () => {
+    // The domain-blacklist branch, not the block branch: before the fix the
+    // admission left that branch without an answer and the else-if chain ended
+    // there, so `adminOnly` was never evaluated. Only this fixture fails on the
+    // previous shape; a blocked account already reached the admin check.
+    const blockedDomain = `${crypto.randomUUID()}.blocked.example`;
     const user = await insertTestUser({
+      google_user_email: `cleanup-domain-nonadmin@mail.${blockedDomain}`,
       is_admin: false,
-      blocked_reason: 'blocked for test',
-      api_token_pepper: 'cleanup-blocked-nonadmin-pepper',
+      api_token_pepper: 'cleanup-domain-nonadmin-pepper',
     });
+    await db.insert(blacklisted_domains).values({ domain: blockedDomain });
     mockHeaders.mockResolvedValue(
       new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
     );
 
-    // The admission covers the account refusal only, so an admin-only surface
-    // still answers with the non-admin refusal instead of admitting the account.
-    const result = await getUserFromAuth({
-      adminOnly: true,
-      allowRefusedAccountSelfCleanup: true,
-    });
+    try {
+      // The admission covers the account refusal only, so an admin-only surface
+      // still answers with the non-admin refusal instead of admitting the account.
+      const result = await getUserFromAuth({
+        adminOnly: true,
+        allowRefusedAccountSelfCleanup: true,
+      });
 
-    expect(result.authFailedResponse).not.toBeNull();
-    expect(result.authFailedResponse?.status).toBe(403);
-    await expect(result.authFailedResponse?.json()).resolves.toEqual({
-      success: false,
-      error: 'Access denied (nonadmin)',
-    });
-    expect(result.user).toBeNull();
+      expect(result.authFailedResponse).not.toBeNull();
+      expect(result.authFailedResponse?.status).toBe(403);
+      await expect(result.authFailedResponse?.json()).resolves.toEqual({
+        success: false,
+        error: 'Access denied (nonadmin)',
+      });
+      expect(result.user).toBeNull();
+    } finally {
+      await db.delete(blacklisted_domains).where(eq(blacklisted_domains.domain, blockedDomain));
+    }
   });
 
   test('admits a blocked account whose block timestamp is set for its own session cleanup', async () => {

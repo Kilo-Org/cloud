@@ -32,7 +32,7 @@ import {
   ContextControl,
   useContextPicker,
 } from '@/components/context-control';
-import { CreditsCard } from '@/components/profile-credits-card';
+import { CreditsCard, type CreditsCardOrgList } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -128,6 +128,7 @@ export function ProfileScreen() {
     data: orgs,
     isFetching: organizationsFetching,
     isError: organizationsError,
+    error: organizationsFailure,
     refetch: refetchOrganizations,
   } = useQuery({
     ...trpc.organizations.list.queryOptions(),
@@ -160,6 +161,29 @@ export function ProfileScreen() {
   const showOrganizationSection =
     organizationId != null ||
     (organizationContextLoaded && (organizationsError || orgs !== undefined));
+
+  // The credits card draws a money role's organization balance from this list,
+  // so it needs the read's pending and failed windows kept apart: one
+  // `undefined` would make it paint the member spend balance — `$0.00` for a
+  // billing manager — while the list is still on its way.
+  //
+  // Rows come first: React Query keeps `data` through a failed background
+  // refetch, so a list that already answered keeps painting its balances even
+  // while the retry fails, and the error arm is only for a read with no rows.
+  // That arm carries the read's own error, because the card's failure kind
+  // names the cause from it: a refusal must not paint as a retryable failure.
+  let creditsOrgList: CreditsCardOrgList = { status: 'loading' };
+  if (orgs !== undefined) {
+    creditsOrgList = { status: 'ready', orgs };
+  } else if (organizationsError) {
+    creditsOrgList = {
+      status: 'error',
+      error: organizationsFailure,
+      retry: () => {
+        void refetchOrganizations();
+      },
+    };
+  }
 
   const { userId } = useCurrentUserId({ enabled: isAuthenticated });
   // The prompt's surface is platform-specific (`feedback-prompt-platform.ts`);
@@ -297,7 +321,7 @@ export function ProfileScreen() {
             because spend and remaining credits are the two halves of the same
             question. */}
         <Section>
-          <CreditsCard orgs={orgs} enabled={isAuthenticated} />
+          <CreditsCard orgList={creditsOrgList} enabled={isAuthenticated} />
           <RowGroup leadingTile>
             <ConfigureRow
               icon={LineChart}

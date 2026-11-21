@@ -138,28 +138,27 @@ async function getSettingsRow(
   return settings;
 }
 
-/**
- * Create the organization's settings row with the default policies, or bump its
- * policy revision. Callers hold the policy advisory lock. The mutation wrapper
- * writes the revision before running `mutate` so the row exists for mutations
- * that update `default_policies`.
- */
+/** Create the settings row at revision 1. Callers hold the policy advisory lock. */
+async function createOrganizationGroupPolicySettingsRow(
+  tx: DrizzleTransaction,
+  organizationId: string,
+  actorUserId: string | null
+) {
+  await tx.insert(organization_group_policy_settings).values({
+    organization_id: organizationId,
+    default_policies: DEFAULT_ORGANIZATION_GROUP_POLICIES,
+    policy_revision: 1,
+    updated_by_kilo_user_id: actorUserId,
+  });
+}
+
+/** Publish `policyRevision` on an existing settings row. */
 async function writeOrganizationGroupPolicyRevision(
   tx: DrizzleTransaction,
   organizationId: string,
   actorUserId: string | null,
-  existing: { policy_revision: number } | undefined
-): Promise<number> {
-  if (!existing) {
-    await tx.insert(organization_group_policy_settings).values({
-      organization_id: organizationId,
-      default_policies: DEFAULT_ORGANIZATION_GROUP_POLICIES,
-      policy_revision: 1,
-      updated_by_kilo_user_id: actorUserId,
-    });
-    return 1;
-  }
-  const policyRevision = existing.policy_revision + 1;
+  policyRevision: number
+) {
   await tx
     .update(organization_group_policy_settings)
     .set({
@@ -168,7 +167,6 @@ async function writeOrganizationGroupPolicyRevision(
       updated_at: sql`now()`,
     })
     .where(eq(organization_group_policy_settings.organization_id, organizationId));
-  return policyRevision;
 }
 
 export async function bumpOrganizationGroupPolicyRevision(
@@ -178,7 +176,13 @@ export async function bumpOrganizationGroupPolicyRevision(
 ) {
   await lockOrganizationGroupPolicy(tx, organizationId);
   const existing = await getSettingsRow(organizationId, tx);
-  return await writeOrganizationGroupPolicyRevision(tx, organizationId, actorUserId, existing);
+  if (!existing) {
+    await createOrganizationGroupPolicySettingsRow(tx, organizationId, actorUserId);
+    return 1;
+  }
+  const policyRevision = existing.policy_revision + 1;
+  await writeOrganizationGroupPolicyRevision(tx, organizationId, actorUserId, policyRevision);
+  return policyRevision;
 }
 
 export async function getOrganizationGroupPolicySettings(
@@ -189,6 +193,12 @@ export async function getOrganizationGroupPolicySettings(
   return canonicalSettingsFrom(await getSettingsRow(organizationId, client), organizationId);
 }
 
+/**
+ * Run `mutate` under the organization's policy advisory lock. The settings row
+ * is created at revision 1 when absent; afterwards the revision advances only
+ * when `mutate` reports `policyStateChanged`, and the returned `policyRevision`
+ * is the revision actually published.
+ */
 export async function withOrganizationGroupPolicyMutation<T>(
   organizationId: string,
   actorUserId: string,
@@ -197,24 +207,30 @@ export async function withOrganizationGroupPolicyMutation<T>(
     organization: Organization;
     currentSettings: CanonicalOrganizationGroupPolicySettings;
     policyRevision: number;
-  }) => Promise<T>
+  }) => Promise<{ result: T; policyStateChanged: boolean }>
 ): Promise<{ result: T; policyRevision: number }> {
   return await db.transaction(async tx => {
     await lockOrganizationGroupPolicy(tx, organizationId);
     const organization = await assertEnterpriseOrganization(organizationId, tx);
     const existingSettings = await getSettingsRow(organizationId, tx);
     const currentSettings = canonicalSettingsFrom(existingSettings, organizationId);
+    const nextPolicyRevision = existingSettings ? existingSettings.policy_revision + 1 : 1;
 
-    const policyRevision = await writeOrganizationGroupPolicyRevision(
+    if (!existingSettings) {
+      await createOrganizationGroupPolicySettingsRow(tx, organizationId, actorUserId);
+    }
+
+    const { result, policyStateChanged } = await mutate({
       tx,
-      organizationId,
-      actorUserId,
-      existingSettings
-    );
+      organization,
+      currentSettings,
+      policyRevision: nextPolicyRevision,
+    });
 
-    const result = await mutate({ tx, organization, currentSettings, policyRevision });
-
-    return { result, policyRevision };
+    if (!existingSettings) return { result, policyRevision: 1 };
+    if (!policyStateChanged) return { result, policyRevision: existingSettings.policy_revision };
+    await writeOrganizationGroupPolicyRevision(tx, organizationId, actorUserId, nextPolicyRevision);
+    return { result, policyRevision: nextPolicyRevision };
   });
 }
 
@@ -258,25 +274,45 @@ async function assertDirectMembers(
   }
 }
 
-/** Replace a group's members with `userIds`, which must already be unique. */
-async function replaceOrganizationGroupMembers(
+async function listOrganizationGroupMemberIds(
   tx: DrizzleTransaction,
   organizationId: string,
-  groupId: string,
-  userIds: string[],
-  actorId: string
-) {
-  await tx
-    .delete(organization_group_memberships)
+  groupId: string
+): Promise<string[]> {
+  const rows = await tx
+    .select({ userId: organization_group_memberships.kilo_user_id })
+    .from(organization_group_memberships)
     .where(
       and(
         eq(organization_group_memberships.organization_id, organizationId),
         eq(organization_group_memberships.group_id, groupId)
       )
     );
-  if (userIds.length > 0) {
+  return rows.map(({ userId }) => userId);
+}
+
+/** Delete only the removed ids and insert only the added ids, keeping unchanged rows intact. */
+async function applyOrganizationGroupMemberDiff(
+  tx: DrizzleTransaction,
+  organizationId: string,
+  groupId: string,
+  diff: { added: string[]; removed: string[] },
+  actorId: string
+) {
+  if (diff.removed.length > 0) {
+    await tx
+      .delete(organization_group_memberships)
+      .where(
+        and(
+          eq(organization_group_memberships.organization_id, organizationId),
+          eq(organization_group_memberships.group_id, groupId),
+          inArray(organization_group_memberships.kilo_user_id, diff.removed)
+        )
+      );
+  }
+  if (diff.added.length > 0) {
     await tx.insert(organization_group_memberships).values(
-      userIds.map(userId => ({
+      diff.added.map(userId => ({
         organization_id: organizationId,
         group_id: groupId,
         kilo_user_id: userId,
@@ -284,6 +320,14 @@ async function replaceOrganizationGroupMembers(
       }))
     );
   }
+}
+
+function diffMemberIds(current: string[], next: string[]) {
+  const currentIds = new Set(current);
+  const nextIds = new Set(next);
+  const added = next.filter(id => !currentIds.has(id));
+  const removed = current.filter(id => !nextIds.has(id));
+  return { added, removed, changed: added.length > 0 || removed.length > 0 };
 }
 
 function permissionPolicyTypes(policies: OrganizationGroupPolicies) {
@@ -354,26 +398,15 @@ async function guardGroupPermissionPolicyChange(
 async function guardGroupMembershipChange(
   tx: DrizzleTransaction,
   group: OrganizationGroup,
+  current: string[],
   userIds: string[],
   permissionPolicyAdmin: boolean | undefined
 ) {
   const policyTypes = groupPermissionPolicyTypes(group);
   const namedPolicies = await getActiveNamedGroupPolicyLinks(tx, group.organization_id, [group.id]);
   if (policyTypes.length === 0 && namedPolicies.length === 0) return { policyTypes, namedPolicies };
-  const current = await tx
-    .select({ userId: organization_group_memberships.kilo_user_id })
-    .from(organization_group_memberships)
-    .where(
-      and(
-        eq(organization_group_memberships.organization_id, group.organization_id),
-        eq(organization_group_memberships.group_id, group.id)
-      )
-    );
   const nextUserIds = new Set(userIds);
-  if (
-    current.length === nextUserIds.size &&
-    current.every(({ userId }) => nextUserIds.has(userId))
-  ) {
+  if (current.length === nextUserIds.size && current.every(userId => nextUserIds.has(userId))) {
     return { policyTypes: [], namedPolicies: [] };
   }
   await guardGroupPermissionPolicyChange(
@@ -569,7 +602,7 @@ export async function createOrganizationGroup(params: {
         organization_id: params.organizationId,
         tx,
       });
-      return { ...group, policies };
+      return { result: { ...group, policies }, policyStateChanged: policies.length > 0 };
     }
   );
 }
@@ -615,7 +648,7 @@ export async function updateOrganizationGroupMetadata(params: {
         organization_id: params.organizationId,
         tx,
       });
-      return updated;
+      return { result: updated, policyStateChanged: false };
     }
   );
 }
@@ -637,9 +670,16 @@ export async function updateOrganizationGroupDetails(params: {
       await assertGroupNameAvailable(tx, params.organizationId, params.name.trim(), params.groupId);
       const userIds = [...new Set(params.userIds)];
       await assertDirectMembers(tx, params.organizationId, userIds);
+      const currentMemberIds = await listOrganizationGroupMemberIds(
+        tx,
+        params.organizationId,
+        params.groupId
+      );
+      const memberDiff = diffMemberIds(currentMemberIds, userIds);
       const { policyTypes, namedPolicies } = await guardGroupMembershipChange(
         tx,
         existing,
+        currentMemberIds,
         userIds,
         params.permissionPolicyAdmin
       );
@@ -657,11 +697,11 @@ export async function updateOrganizationGroupDetails(params: {
           )
         )
         .returning();
-      await replaceOrganizationGroupMembers(
+      await applyOrganizationGroupMemberDiff(
         tx,
         params.organizationId,
         params.groupId,
-        userIds,
+        memberDiff,
         params.actor.id
       );
       await createAuditLog({
@@ -671,7 +711,10 @@ export async function updateOrganizationGroupDetails(params: {
         organization_id: params.organizationId,
         tx,
       });
-      return { ...group, memberIds: userIds };
+      return {
+        result: { ...group, memberIds: userIds },
+        policyStateChanged: memberDiff.changed,
+      };
     }
   );
 }
@@ -717,7 +760,7 @@ export async function setOrganizationGroupPolicy(params: {
         organization_id: params.organizationId,
         tx,
       });
-      return policies;
+      return { result: policies, policyStateChanged: true };
     }
   );
 }
@@ -736,11 +779,13 @@ export async function removeOrganizationGroupPolicy(params: {
       if (params.policyType !== 'model_access') {
         await assertOrganizationPermissionPolicyWriteEnabled(params.organizationId, tx);
       }
-      const policies = parseOrganizationGroupPolicies(group.policies, {
+      const currentPolicies = parseOrganizationGroupPolicies(group.policies, {
         organizationId: params.organizationId,
         groupId: group.id,
         source: 'group',
-      }).filter(policy => policy.type !== params.policyType);
+      });
+      const removed = currentPolicies.some(policy => policy.type === params.policyType);
+      const policies = currentPolicies.filter(policy => policy.type !== params.policyType);
       await tx
         .update(organization_groups)
         .set({ policies, updated_at: sql`now()` })
@@ -753,11 +798,13 @@ export async function removeOrganizationGroupPolicy(params: {
       await createAuditLog({
         action: 'organization.group.policy.remove',
         ...actorAudit(params.actor),
-        message: `Removed ${params.policyType} policy from group "${group.name}" (${group.id}) at revision ${policyRevision}`,
+        message: removed
+          ? `Removed ${params.policyType} policy from group "${group.name}" (${group.id}) at revision ${policyRevision}`
+          : `Removed ${params.policyType} policy from group "${group.name}" (${group.id})`,
         organization_id: params.organizationId,
         tx,
       });
-      return policies;
+      return { result: policies, policyStateChanged: removed };
     }
   );
 }
@@ -776,17 +823,24 @@ export async function setOrganizationGroupMembers(params: {
       const group = await getGroupForUpdate(tx, params.organizationId, params.groupId);
       const userIds = [...new Set(params.userIds)];
       await assertDirectMembers(tx, params.organizationId, userIds);
+      const currentMemberIds = await listOrganizationGroupMemberIds(
+        tx,
+        params.organizationId,
+        params.groupId
+      );
+      const memberDiff = diffMemberIds(currentMemberIds, userIds);
       const { policyTypes, namedPolicies } = await guardGroupMembershipChange(
         tx,
         group,
+        currentMemberIds,
         userIds,
         params.permissionPolicyAdmin
       );
-      await replaceOrganizationGroupMembers(
+      await applyOrganizationGroupMemberDiff(
         tx,
         params.organizationId,
         params.groupId,
-        userIds,
+        memberDiff,
         params.actor.id
       );
       await createAuditLog({
@@ -796,7 +850,7 @@ export async function setOrganizationGroupMembers(params: {
         organization_id: params.organizationId,
         tx,
       });
-      return userIds;
+      return { result: userIds, policyStateChanged: memberDiff.changed };
     }
   );
 }
@@ -846,6 +900,10 @@ export async function setOrganizationMemberGroups(params: {
       const changedGroups = groups.filter(
         group => nextGroupIds.has(group.id) !== (group.currentGroupId !== null)
       );
+      const memberGroupDiff = diffMemberIds(
+        groups.filter(group => group.currentGroupId !== null).map(group => group.id),
+        groupIds
+      );
       const policyTypes = [...new Set(changedGroups.flatMap(groupPermissionPolicyTypes))].sort();
       const namedPolicies = await getActiveNamedGroupPolicyLinks(
         tx,
@@ -868,23 +926,32 @@ export async function setOrganizationMemberGroups(params: {
           .limit(1);
         auditTarget = `organization member ${member?.email ?? params.userId} (${params.userId})`;
       }
-      await tx
-        .delete(organization_group_memberships)
-        .where(
-          and(
-            eq(organization_group_memberships.organization_id, params.organizationId),
-            eq(organization_group_memberships.kilo_user_id, params.userId)
+      if (memberGroupDiff.removed.length > 0) {
+        await tx
+          .delete(organization_group_memberships)
+          .where(
+            and(
+              eq(organization_group_memberships.organization_id, params.organizationId),
+              eq(organization_group_memberships.kilo_user_id, params.userId),
+              inArray(organization_group_memberships.group_id, memberGroupDiff.removed)
+            )
+          );
+      }
+      if (memberGroupDiff.added.length > 0) {
+        // No group row lock serializes this path, so a concurrent write for the
+        // same member can insert the same row between the read above and this
+        // insert. A duplicate add is a no-op, not a conflict.
+        await tx
+          .insert(organization_group_memberships)
+          .values(
+            memberGroupDiff.added.map(groupId => ({
+              organization_id: params.organizationId,
+              group_id: groupId,
+              kilo_user_id: params.userId,
+              assigned_by_kilo_user_id: params.actor.id,
+            }))
           )
-        );
-      if (groupIds.length > 0) {
-        await tx.insert(organization_group_memberships).values(
-          groupIds.map(groupId => ({
-            organization_id: params.organizationId,
-            group_id: groupId,
-            kilo_user_id: params.userId,
-            assigned_by_kilo_user_id: params.actor.id,
-          }))
-        );
+          .onConflictDoNothing();
       }
       await createAuditLog({
         action: 'organization.group.member_groups.set',
@@ -893,7 +960,7 @@ export async function setOrganizationMemberGroups(params: {
         organization_id: params.organizationId,
         tx,
       });
-      return groupIds;
+      return { result: groupIds, policyStateChanged: memberGroupDiff.changed };
     }
   );
 }
@@ -980,7 +1047,7 @@ export async function deleteOrganizationGroup(params: {
         organization_id: params.organizationId,
         tx,
       });
-      return group.id;
+      return { result: group.id, policyStateChanged: true };
     }
   );
 }
@@ -1012,7 +1079,7 @@ export async function setDefaultOrganizationGroupPolicy(params: {
         organization_id: params.organizationId,
         tx,
       });
-      return defaultPolicies;
+      return { result: defaultPolicies, policyStateChanged: true };
     }
   );
 }
@@ -1029,6 +1096,9 @@ export async function removeDefaultOrganizationGroupPolicy(params: {
       if (params.policyType !== 'model_access') {
         await assertOrganizationPermissionPolicyWriteEnabled(params.organizationId, tx);
       }
+      const removed = currentSettings.defaultPolicies.some(
+        policy => policy.type === params.policyType
+      );
       const defaultPolicies = currentSettings.defaultPolicies.filter(
         policy => policy.type !== params.policyType
       );
@@ -1039,11 +1109,13 @@ export async function removeDefaultOrganizationGroupPolicy(params: {
       await createAuditLog({
         action: 'organization.group.default_policy.remove',
         ...actorAudit(params.actor),
-        message: `Removed default ${params.policyType} group policy at revision ${policyRevision}`,
+        message: removed
+          ? `Removed default ${params.policyType} group policy at revision ${policyRevision}`
+          : `Removed default ${params.policyType} group policy`,
         organization_id: params.organizationId,
         tx,
       });
-      return defaultPolicies;
+      return { result: defaultPolicies, policyStateChanged: removed };
     }
   );
 }

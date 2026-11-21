@@ -2,7 +2,11 @@ jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: { get: jest.fn(), set: jest.fn() },
 }));
 
+// The Sentry client is the reporting boundary: the mock counts reports without sending them.
+jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
+
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
+import { captureException } from '@sentry/nextjs';
 import { blacklisted_domains, blacklisted_domains_settings } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
@@ -15,10 +19,12 @@ import {
   listBlacklistedDomains,
   normalizeSignupTlds,
   readBlacklistDomainsSettings,
+  resetSignupTldReportWindowForTest,
 } from '@kilocode/web-shared/lib/blacklist-domains-config';
 
 const mockedRedisGet = jest.mocked(redisClient.get);
 const mockedRedisSet = jest.mocked(redisClient.set);
+const mockedCaptureException = jest.mocked(captureException);
 const settings = (blocked_signup_tlds: string[]) => ({
   blocked_signup_tlds,
   updated_at: '2026-04-29 01:16:12.945+00',
@@ -33,8 +39,10 @@ async function insertBlacklistedDomains(domains: string[]): Promise<void> {
 beforeEach(async () => {
   await cleanupDbForTest();
   clearEmailBlacklistCache();
+  resetSignupTldReportWindowForTest();
   mockedRedisGet.mockReset();
   mockedRedisSet.mockReset();
+  mockedCaptureException.mockReset();
 });
 
 afterEach(() => {
@@ -201,7 +209,7 @@ describe('getBlockedSignupTlds', () => {
     await expect(getBlockedSignupTlds()).resolves.toEqual(['shop', 'top']);
   });
 
-  test('surfaces database failures and retries immediately after recovery', async () => {
+  test('reports a database failure and serves the deployment list, retrying after recovery', async () => {
     await db.insert(blacklisted_domains_settings).values(settings(['asia']));
     const failure = new Error('database unavailable');
     const select = jest.spyOn(db, 'select').mockImplementation(() => {
@@ -209,21 +217,60 @@ describe('getBlockedSignupTlds', () => {
     });
     mockedRedisGet.mockResolvedValue(JSON.stringify(settings(['shop'])));
 
-    await expect(getBlockedSignupTlds()).rejects.toBe(failure);
+    // Pre-#11609 the cached read caught the same reported error and served its null default, so
+    // the gate relaxed to the deployment list instead of refusing every new signup.
+    await expect(getBlockedSignupTlds()).resolves.toEqual(['shop', 'top']);
+    expect(mockedCaptureException).toHaveBeenCalledTimes(1);
+    expect(mockedCaptureException).toHaveBeenCalledWith(failure, {
+      tags: { source: 'blacklist_domains_config' },
+    });
+
     select.mockRestore();
     await expect(getBlockedSignupTlds()).resolves.toEqual(['asia']);
+
+    const failingSelect = jest.spyOn(db, 'select').mockImplementation(() => {
+      throw failure;
+    });
+    try {
+      // Inside the window, a repeated failure still falls back but reports nothing new.
+      await expect(getBlockedSignupTlds()).resolves.toEqual(['shop', 'top']);
+      expect(mockedCaptureException).toHaveBeenCalledTimes(1);
+      expect(mockedRedisGet).not.toHaveBeenCalled();
+      expect(mockedRedisSet).not.toHaveBeenCalled();
+    } finally {
+      failingSelect.mockRestore();
+    }
+  });
+
+  test('reports a later failure again once the report window passes', async () => {
+    const failure = new Error('database unavailable');
+    const now = Date.now();
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(now);
     jest.spyOn(db, 'select').mockImplementation(() => {
       throw failure;
     });
-    await expect(getBlockedSignupTlds()).rejects.toBe(failure);
-    expect(mockedRedisGet).not.toHaveBeenCalled();
-    expect(mockedRedisSet).not.toHaveBeenCalled();
+
+    await expect(getBlockedSignupTlds()).resolves.toEqual(['shop', 'top']);
+    expect(mockedCaptureException).toHaveBeenCalledTimes(1);
+
+    clock.mockReturnValue(now + 30_000);
+    await expect(getBlockedSignupTlds()).resolves.toEqual(['shop', 'top']);
+    expect(mockedCaptureException).toHaveBeenCalledTimes(2);
+  });
+
+  test('does not report a successful read', async () => {
+    await db.insert(blacklisted_domains_settings).values(settings(['asia']));
+
+    await expect(getBlockedSignupTlds()).resolves.toEqual(['asia']);
+    expect(mockedCaptureException).not.toHaveBeenCalled();
   });
 
   test('uses BLOCKED_SIGNUP_TLDS as the fallback when it is set', async () => {
     const previous = process.env.BLOCKED_SIGNUP_TLDS;
     process.env.BLOCKED_SIGNUP_TLDS = '.ASIA|xyz';
     try {
+      // A dynamic import re-runs module init so `envFallbackSignupTlds` is built from the test
+      // value; a static import would freeze the value the suite loaded first.
       await jest.isolateModulesAsync(async () => {
         const config = await import('@kilocode/web-shared/lib/blacklist-domains-config');
         await expect(config.getBlockedSignupTlds()).resolves.toEqual(['asia', 'xyz']);

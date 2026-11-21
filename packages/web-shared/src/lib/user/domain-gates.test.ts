@@ -2,19 +2,30 @@ jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: { get: jest.fn(), set: jest.fn() },
 }));
 
+// The Sentry client is the reporting boundary: the mock counts reports without sending them.
+jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
+
 import { beforeEach, describe, expect, test } from '@jest/globals';
+import { captureException } from '@sentry/nextjs';
 import { blacklisted_domains, blacklisted_domains_settings } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { clearEmailBlacklistCache } from '@kilocode/web-shared/lib/blacklist-domains-config';
+import {
+  clearEmailBlacklistCache,
+  resetSignupTldReportWindowForTest,
+} from '@kilocode/web-shared/lib/blacklist-domains-config';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
 import { isBlockedTLD, isEmailOnBlockedTld, isUserBlacklistedByDomain } from './domain-gates';
 
+const mockedCaptureException = jest.mocked(captureException);
+
 describe('signup TLD settings', () => {
   beforeEach(async () => {
     await cleanupDbForTest();
     clearEmailBlacklistCache();
+    resetSignupTldReportWindowForTest();
+    mockedCaptureException.mockReset();
     jest.mocked(redisClient.get).mockReset();
     jest.mocked(redisClient.get).mockImplementation(async <T>(key: string) =>
       key === BLACKLIST_DOMAINS_SETTINGS_REDIS_KEY
@@ -78,6 +89,24 @@ describe('signup TLD settings', () => {
     await expect(
       isUserBlacklistedByDomain({ google_user_email: 'existing@notblocked.example' })
     ).resolves.toBe(false);
+  });
+
+  test('reports an unreadable settings row and still decides signups from the deployment list', async () => {
+    const failure = new Error('database unavailable');
+    const select = jest.spyOn(db, 'select').mockImplementation(() => {
+      throw failure;
+    });
+    try {
+      // A settings outage must not reject every new signup: the gate reports and applies the
+      // deployment default, which is what the cached read did before the Postgres rewrite.
+      await expect(isBlockedTLD('new@example.shop')).resolves.toBe(true);
+      await expect(isBlockedTLD('new@example.com')).resolves.toBe(false);
+      expect(mockedCaptureException).toHaveBeenCalledWith(failure, {
+        tags: { source: 'blacklist_domains_config' },
+      });
+    } finally {
+      select.mockRestore();
+    }
   });
 });
 

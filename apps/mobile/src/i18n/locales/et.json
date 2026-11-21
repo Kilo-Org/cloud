@@ -1308,7 +1308,7 @@
       "couldNotGetLatest": "Uusimaid andmeid ei õnnestunud laadida.",
       "byline": "#{{number}}, autor {{author}}",
       "noFindings": "Leide ei leitud.",
-      "findingsUnavailable": "Tulemused pole saadaval, sest see ülevaatus ebaõnnestus.",
+      "findingsUnavailable": "Tulemused pole saadaval.",
       "findingsInProgress": "See ülevaatus on veel käimas. Leiud ilmuvad siia, kui see lõpeb.",
       "findingsEndedWithoutResults": "See ülevaatus lõppes, ilma et ühtegi leidu oleks ilmnenud.",
       "serviceUnavailable": "Koodi ülevaatuse teenusega ei õnnestunud ühendust luua. Proovi ülevaatust uuesti, kui teenus on saadaval.",

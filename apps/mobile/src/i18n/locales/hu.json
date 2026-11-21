@@ -1308,7 +1308,7 @@
       "couldNotGetLatest": "Nem sikerült lekérni a legfrissebb adatokat.",
       "byline": "#{{number}}, szerző: {{author}}",
       "noFindings": "Nincsenek találatok.",
-      "findingsUnavailable": "Az eredmények nem érhetők el, mert ez a kódellenőrzés sikertelen volt.",
+      "findingsUnavailable": "Az eredmények nem érhetők el.",
       "findingsInProgress": "A kódellenőrzés még folyamatban van. A találatok a befejezése után jelennek meg itt.",
       "findingsEndedWithoutResults": "A kódellenőrzés véget ért, mielőtt bármilyen találat elkészült volna.",
       "serviceUnavailable": "Nem sikerült csatlakozni a kódellenőrzési szolgáltatáshoz. Próbáld újra a kódellenőrzést, amikor a szolgáltatás elérhető.",

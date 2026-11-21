@@ -1308,7 +1308,7 @@
       "couldNotGetLatest": "Tsy nety nalaina ny angona farany.",
       "byline": "#{{number}} nataon'i {{author}}",
       "noFindings": "Tsy misy olana hita.",
-      "findingsUnavailable": "Tsy misy valiny azo jerena satria tsy nahomby ity fanamarinana ity.",
+      "findingsUnavailable": "Tsy hita ny valiny.",
       "findingsInProgress": "Mbola mandeha ity fanamarinana ity. Hiseho eto ny olana hita rehefa vita izy.",
       "findingsEndedWithoutResults": "Nifarana ity fanamarinana ity nefa tsy nisy olana hita mihitsy.",
       "serviceUnavailable": "Tsy afaka nifandray tamin'ny tolotra fanamarinana kaody. Andramo indray ny fanamarinana rehefa azo ampiasaina ny tolotra.",

@@ -805,7 +805,7 @@
       "gateHidden": "Gizli",
       "gateNone": "Yok",
       "noFindings": "Bulgu yok.",
-      "findingsUnavailable": "Bu inceleme başarısız olduğu için sonuçlar kullanılamıyor.",
+      "findingsUnavailable": "Sonuçlar kullanılamıyor.",
       "findingsInProgress": "Bu inceleme hâlâ sürüyor. İnceleme tamamlandığında bulgular burada görünür.",
       "findingsEndedWithoutResults": "Bu inceleme, herhangi bir bulgu üretmeden sona erdi.",
       "serviceUnavailable": "Kod inceleme hizmetine ulaşılamadı. Hizmet kullanılabilir olduğunda incelemeyi tekrar dene.",

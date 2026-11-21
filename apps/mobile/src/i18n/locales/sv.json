@@ -1308,7 +1308,7 @@
       "couldNotGetLatest": "Kunde inte hämta de senaste uppgifterna.",
       "byline": "#{{number}} av {{author}}",
       "noFindings": "Inga fynd",
-      "findingsUnavailable": "Resultaten är inte tillgängliga eftersom den här granskningen misslyckades.",
+      "findingsUnavailable": "Resultaten är inte tillgängliga.",
       "findingsInProgress": "Den här granskningen pågår fortfarande. Fynden visas här när den är klar.",
       "findingsEndedWithoutResults": "Den här granskningen avslutades innan den gav några fynd.",
       "serviceUnavailable": "Kunde inte ansluta till tjänsten för kodgranskning. Gör om granskningen när tjänsten är tillgänglig.",

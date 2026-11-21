@@ -1308,7 +1308,7 @@
       "couldNotGetLatest": "የቅርብ ጊዜ መረጃውን ማግኘት አልተቻለም።",
       "byline": "#{{number}} በ{{author}}",
       "noFindings": "ምንም ግኝቶች የሉም።",
-      "findingsUnavailable": "ይህ ግምገማ ስላልተሳካ ውጤቶች አይገኙም።",
+      "findingsUnavailable": "ውጤቶቹ አይገኙም።",
       "findingsInProgress": "ይህ ግምገማ እስካሁን በሂደት ላይ ነው። ሲጠናቀቅ ግኝቶች እዚህ ይታያሉ።",
       "findingsEndedWithoutResults": "ይህ ግምገማ ምንም ግኝቶች ሳያመነጭ አብቅቷል።",
       "serviceUnavailable": "ከኮድ ግምገማ አገልግሎቱ ጋር መገናኘት አልተቻለም። አገልግሎቱ ሲገኝ ግምገማውን እንደገና ይሞክሩ።",

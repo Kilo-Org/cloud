@@ -1308,7 +1308,7 @@
       "couldNotGetLatest": "An kasa samun sabbin bayanai.",
       "byline": "#{{number}} daga {{author}}",
       "noFindings": "Ba a gano wata matsala ba.",
-      "findingsUnavailable": "Babu sakamako saboda wannan bita ta gaza.",
+      "findingsUnavailable": "Sakamako ba su samuwa.",
       "findingsInProgress": "Wannan bitar na ci gaba har yanzu. Sakamakon zai bayyana a nan a lokacin da ta kammala.",
       "findingsEndedWithoutResults": "Wannan bitar ta ƙare kafin ta samar da wani sakamako.",
       "serviceUnavailable": "An kasa haɗawa da sabis ɗin bitar lambar shiri. Sake gwada bitar lokacin da sabis ɗin ya samu.",

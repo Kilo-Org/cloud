@@ -1308,7 +1308,7 @@
       "couldNotGetLatest": "Nou pa t ka jwenn dènye done yo.",
       "byline": "#{{number}} pa {{author}}",
       "noFindings": "Pa gen okenn konsta.",
-      "findingsUnavailable": "Rezilta yo pa disponib paske revizyon sa a echwe.",
+      "findingsUnavailable": "Rezilta yo pa disponib.",
       "findingsInProgress": "Revizyon sa a poko fini. Konsta yo ap parèt la a lè l fini.",
       "findingsEndedWithoutResults": "Revizyon sa a fini anvan l fè nenpòt konsta.",
       "serviceUnavailable": "Nou pa t ka konekte ak sèvis revizyon kòd la. Eseye revizyon an ankò lè sèvis la disponib.",

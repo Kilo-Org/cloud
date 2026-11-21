@@ -1308,7 +1308,7 @@
       "couldNotGetLatest": "Tidak dapat mendapatkan maklumat terkini.",
       "byline": "#{{number}} oleh {{author}}",
       "noFindings": "Tiada penemuan.",
-      "findingsUnavailable": "Keputusan tidak tersedia kerana semakan ini gagal.",
+      "findingsUnavailable": "Keputusan tidak tersedia.",
       "findingsInProgress": "Semakan ini masih dijalankan. Penemuan akan dipaparkan di sini apabila ia selesai.",
       "findingsEndedWithoutResults": "Semakan ini tamat sebelum menghasilkan sebarang penemuan.",
       "serviceUnavailable": "Tidak dapat menghubungi perkhidmatan semakan kod. Cuba semakan semula apabila perkhidmatan tersedia.",

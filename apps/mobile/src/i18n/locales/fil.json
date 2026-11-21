@@ -1308,7 +1308,7 @@
       "couldNotGetLatest": "Hindi makuha ang pinakabagong data.",
       "byline": "#{{number}} ni {{author}}",
       "noFindings": "Walang natukoy na isyu.",
-      "findingsUnavailable": "Hindi available ang mga resulta dahil nabigo ang pagsusuring ito.",
+      "findingsUnavailable": "Hindi available ang mga resulta.",
       "findingsInProgress": "Nagpapatuloy pa ang pagsusuri. Lalabas dito ang mga resulta kapag natapos na ito.",
       "findingsEndedWithoutResults": "Natapos ang pagsusuri nang hindi nakalikha ng anumang resulta.",
       "serviceUnavailable": "Hindi makakonekta sa serbisyo ng pagsusuri ng code. Subukang muli ang pagsusuri kapag available na ang serbisyo.",

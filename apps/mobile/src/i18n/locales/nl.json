@@ -805,7 +805,7 @@
       "gateHidden": "Verborgen",
       "gateNone": "Geen",
       "noFindings": "Er zijn geen bevindingen.",
-      "findingsUnavailable": "De resultaten zijn niet beschikbaar omdat deze review is mislukt.",
+      "findingsUnavailable": "De resultaten zijn niet beschikbaar.",
       "findingsInProgress": "Deze review is nog niet afgerond. De bevindingen verschijnen hier zodra hij klaar is.",
       "findingsEndedWithoutResults": "Deze review is beëindigd voordat er bevindingen waren.",
       "serviceUnavailable": "De codereviewservice kon niet worden bereikt. Probeer de review opnieuw wanneer de service beschikbaar is.",

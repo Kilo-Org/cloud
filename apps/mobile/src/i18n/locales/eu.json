@@ -1308,7 +1308,7 @@
       "couldNotGetLatest": "Ezin izan da azken egoera lortu.",
       "byline": "#{{number}} · Egilea: {{author}}",
       "noFindings": "Ez dago aurkikuntzarik.",
-      "findingsUnavailable": "Emaitzak ez daude erabilgarri, berrikuspen honek huts egin duelako.",
+      "findingsUnavailable": "Emaitzak ez daude erabilgarri.",
       "findingsInProgress": "Berrikuspen hau oraindik abian da. Aurkikuntzak hemen agertuko dira amaitzean.",
       "findingsEndedWithoutResults": "Berrikuspena amaitu egin da aurkikuntzarik sortu gabe.",
       "serviceUnavailable": "Ezin izan da kodea berrikusteko zerbitzuarekin konektatu. Egin berrikuspena berriro zerbitzua erabilgarri dagoenean.",

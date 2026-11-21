@@ -16,6 +16,12 @@ import { i18n } from '@/i18n';
 import ar from '@/i18n/locales/ar.json';
 import en from '@/i18n/locales/en.json';
 import ur from '@/i18n/locales/ur.json';
+import {
+  NOTIFICATION_CATEGORY_SETTINGS,
+  NOTIFICATION_DEVICE_SETTING,
+  NOTIFICATION_GLANCEABLE_SETTING,
+  NOTIFICATION_SETTINGS_SOURCES,
+} from '@/lib/settings-search/notification-sources';
 
 const prefsQueryFn = vi.hoisted(() => vi.fn());
 const pushTokensQueryFn = vi.hoisted(() => vi.fn());
@@ -159,8 +165,24 @@ vi.mock('@/components/ui/preference-row', () => ({
 vi.mock('@/components/agent-briefing/briefing-notification-toggle', () => ({
   BriefingNotificationCategoryRow: () => null,
 }));
-vi.mock('@/components/tab-screen', () => ({
-  TabScreenScrollView: ({ children }: { children?: ReactNode }): ReactNode => children,
+// The settings-search wrappers read the route's target from the scroll context.
+// The mock keeps each target addressable so the suite can assert which controls
+// the index can reach, and renders the rows exactly as the real one does.
+vi.mock('@/components/settings-search/settings-target', () => ({
+  SettingsSearchScrollView: ({
+    settingsTarget,
+    children,
+  }: {
+    settingsTarget?: string;
+    children?: ReactNode;
+  }): ReactNode => createElement('SettingsSearchScrollView', { settingsTarget }, children),
+  SettingsTarget: ({
+    item,
+    children,
+  }: {
+    item: { id: string };
+    children?: ReactNode;
+  }): ReactNode => createElement('SettingsTarget', { item }, children),
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -1097,6 +1119,119 @@ describe('NotificationsScreen enable flow', () => {
       await waitFor(() => registerForPushNotifications.mock.calls.length > 0, 200);
       expect(requestPermissionsAsync).toHaveBeenCalledTimes(1);
       expect(registerForPushNotifications).toHaveBeenCalledTimes(1);
+    } finally {
+      unmount();
+    }
+  });
+});
+
+describe('NotificationsScreen settings search', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getNotificationPermissionStatus.mockResolvedValue('granted');
+    getDevicePushToken.mockResolvedValue('device-token');
+    pushTokensQueryFn.mockResolvedValue([{ token: 'device-token', platform: 'android' }]);
+    prefsQueryFn.mockResolvedValue(fullPrefs());
+    setPreferenceMutationFn.mockResolvedValue({});
+    registerTokenMutationFn.mockResolvedValue({ success: true });
+  });
+
+  afterEach(async () => {
+    platform.os = 'ios';
+    await i18n.changeLanguage('en');
+  });
+
+  const NOTIFICATION_SOURCES = NOTIFICATION_SETTINGS_SOURCES.filter(
+    source => source.path === '/(app)/notifications'
+  );
+
+  // The test renderer types host props as `unknown`; these name the props the
+  // mocked settings-search wrappers receive.
+  type MockSettingsTargetProps = { item: { id: string } };
+  type MockSettingsScrollProps = { settingsTarget?: string };
+
+  function targetIds(root: I): string[] {
+    return root
+      .findAll(n => typeof n.type === 'string' && (n.type as string) === 'SettingsTarget')
+      .map(target => {
+        const props = target.props as MockSettingsTargetProps;
+        return props.item.id;
+      });
+  }
+
+  it('indexes the notification screen and only it', () => {
+    expect(NOTIFICATION_SOURCES.length).toBeGreaterThan(0);
+    for (const source of NOTIFICATION_SOURCES) {
+      expect(source.path).toBe('/(app)/notifications');
+      expect(source.settings.length).toBeGreaterThan(0);
+    }
+    const ids = NOTIFICATION_SOURCES.flatMap(source => source.settings.map(item => item.id));
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('registers a target for every indexed notification setting', async () => {
+    const { renderer, unmount } = await renderScreen();
+    try {
+      // An enabled sibling proves the master gate settled and preferences loaded.
+      await waitForEnabledSwitch(renderer, i18n.t('notifications.category.agentUpdatesTitle'));
+
+      const indexed = NOTIFICATION_SOURCES.flatMap(source =>
+        source.settings.map(item => item.id)
+      );
+      const rendered = new Set(targetIds(renderer.root));
+      expect(indexed.filter(id => !rendered.has(id))).toEqual([]);
+    } finally {
+      unmount();
+    }
+  });
+
+  it('names the target rows with the index labels', async () => {
+    const { renderer, unmount } = await renderScreen();
+    try {
+      await waitForEnabledSwitch(renderer, i18n.t('notifications.category.agentUpdatesTitle'));
+
+      // The device row, the glanceable row, and the six categories render their
+      // definition label as the visible title; the preview row (value title) and
+      // the agent brief row (its own component) are covered by the target test.
+      const labelled = [
+        NOTIFICATION_DEVICE_SETTING,
+        NOTIFICATION_GLANCEABLE_SETTING,
+        ...Object.values(NOTIFICATION_CATEGORY_SETTINGS),
+      ];
+      for (const setting of labelled) {
+        expect(textWithChildren(renderer.root, i18n.t(setting.label))).toHaveLength(1);
+      }
+    } finally {
+      unmount();
+    }
+  });
+
+  it('forwards the route target to the scroll surface and keeps it across the gate states', async () => {
+    getDevicePushToken.mockResolvedValue(null);
+    pushTokensQueryFn.mockResolvedValue([]);
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(NotificationsScreen, {
+        settingsTarget: NOTIFICATION_DEVICE_SETTING.id,
+      })
+    );
+    try {
+      await waitFor(
+        () =>
+          renderer.root.findAll(
+            n =>
+              typeof n.type === 'string' &&
+              (n.type as string) === 'Pressable' &&
+              n.props.accessibilityLabel === 'Enable notifications'
+          ).length === 1,
+        200
+      );
+      const surface = renderer.root.find(
+        n => typeof n.type === 'string' && (n.type as string) === 'SettingsSearchScrollView'
+      );
+      const surfaceProps = surface.props as MockSettingsScrollProps;
+      expect(surfaceProps.settingsTarget).toBe(NOTIFICATION_DEVICE_SETTING.id);
+      // The gate is off, so its target is the Enable card, still one target.
+      expect(targetIds(renderer.root)).toContain(NOTIFICATION_DEVICE_SETTING.id);
     } finally {
       unmount();
     }

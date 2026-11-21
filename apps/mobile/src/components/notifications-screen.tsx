@@ -35,7 +35,10 @@ import { Section } from '@/components/ui/section';
 import { liveActivitiesAllowedBySystem } from '@/glanceable-ios/system-switch';
 import { createSubmitLock } from '@/lib/submit-lock';
 import { ScreenHeader } from '@/components/screen-header';
-import { TabScreenScrollView } from '@/components/tab-screen';
+import {
+  SettingsSearchScrollView,
+  SettingsTarget,
+} from '@/components/settings-search/settings-target';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -70,6 +73,14 @@ import {
 } from '@/lib/notifications';
 import { useTRPC } from '@/lib/trpc';
 import { readTrpcErrorField } from '@/lib/trpc-error';
+import {
+  NOTIFICATION_AGENT_BRIEF_SETTING,
+  NOTIFICATION_CATEGORY_SETTINGS,
+  NOTIFICATION_DEVICE_SETTING,
+  NOTIFICATION_GLANCEABLE_SETTING,
+  NOTIFICATION_PREVIEW_SETTING,
+} from '@/lib/settings-search/notification-sources';
+import { type SettingsTargetProps } from '@/lib/settings-search/definitions';
 import { cn } from '@/lib/utils';
 
 const permissionQueryKey = ['notificationPermission'] as const;
@@ -160,31 +171,31 @@ function InlineRetry({ label, color, onPress }: InlineRetryProps) {
 const CATEGORY_META = [
   {
     key: 'agentAttention',
-    titleKey: 'notifications.category.agentAttentionTitle',
+    setting: NOTIFICATION_CATEGORY_SETTINGS.agentAttention,
     subtitleKey: 'notifications.category.agentAttentionSubtitle',
     icon: KeyRound,
   },
   {
     key: 'agentUpdates',
-    titleKey: 'notifications.category.agentUpdatesTitle',
+    setting: NOTIFICATION_CATEGORY_SETTINGS.agentUpdates,
     subtitleKey: 'notifications.category.agentUpdatesSubtitle',
     icon: Bot,
   },
   {
     key: 'sessionStatus',
-    titleKey: 'notifications.category.sessionStatusTitle',
+    setting: NOTIFICATION_CATEGORY_SETTINGS.sessionStatus,
     subtitleKey: 'notifications.category.sessionStatusSubtitle',
     icon: ListTodo,
   },
   {
     key: 'balanceAlerts',
-    titleKey: 'notifications.channel.balance',
+    setting: NOTIFICATION_CATEGORY_SETTINGS.balanceAlerts,
     subtitleKey: 'notifications.category.balanceAlertsSubtitle',
     icon: Wallet,
   },
   {
     key: 'spendAlerts',
-    titleKey: 'notifications.channel.spend',
+    setting: NOTIFICATION_CATEGORY_SETTINGS.spendAlerts,
     subtitleKey: 'notifications.category.spendAlertsSubtitle',
     icon: Wallet,
     // A dedicated label for the device scene: the spend view owns a switch with
@@ -194,7 +205,7 @@ const CATEGORY_META = [
   },
   {
     key: 'securityFindings',
-    titleKey: 'notifications.channel.security',
+    setting: NOTIFICATION_CATEGORY_SETTINGS.securityFindings,
     subtitleKey: 'notifications.category.securityFindingsSubtitle',
     icon: ShieldAlert,
   },
@@ -287,7 +298,7 @@ function CategoryRow({
   const unavailable = capability?.available === false;
   const unavailableReasonCode = capability?.unavailableReasonCode;
   const isDisabled = disabled || !editable || unavailable;
-  const title = t(meta.titleKey);
+  const title = t(meta.setting.label);
   // The server names the reason with a code, never a sentence: a known code
   // resolves to catalog copy, and an unknown one falls back to the category's
   // own localized subtitle.
@@ -303,27 +314,29 @@ function CategoryRow({
   // Most rows take the visible title as their control label; the spend row
   // carries its own so the device scene can address it unambiguously.
   const accessibilityLabel =
-    'accessibilityLabelKey' in meta ? t(meta.accessibilityLabelKey) : t(meta.titleKey);
+    'accessibilityLabelKey' in meta ? t(meta.accessibilityLabelKey) : title;
   return (
-    <PreferenceRow
-      icon={Icon}
-      title={title}
-      subtitle={subtitle}
-      value={displayedValue}
-      disabled={isDisabled}
-      busy={isPending}
-      resolveValue={() => readAgentPushPreference(queryClient, queryKey, meta.key)}
-      // The switch cell is the one the LIVE UPDATES and PUSH rows use, so the
-      // three sections share one switch column instead of the category rows
-      // landing a few points nearer the screen edge.
-      accessibilityLabel={accessibilityLabel}
-      onValueChange={value => {
-        if (isDisabled) {
-          return;
-        }
-        onChange(value);
-      }}
-    />
+    <SettingsTarget item={meta.setting}>
+      <PreferenceRow
+        icon={Icon}
+        title={title}
+        subtitle={subtitle}
+        value={displayedValue}
+        disabled={isDisabled}
+        busy={isPending}
+        resolveValue={() => readAgentPushPreference(queryClient, queryKey, meta.key)}
+        // The switch cell is the one the LIVE UPDATES and PUSH rows use, so the
+        // three sections share one switch column instead of the category rows
+        // landing a few points nearer the screen edge.
+        accessibilityLabel={accessibilityLabel}
+        onValueChange={value => {
+          if (isDisabled) {
+            return;
+          }
+          onChange(value);
+        }}
+      />
+    </SettingsTarget>
   );
 }
 
@@ -333,7 +346,7 @@ function CategoryRow({
  */
 type EnablePhase = 'requesting-permission' | 'registering-token' | null;
 
-export function NotificationsScreen() {
+export function NotificationsScreen({ settingsTarget }: Readonly<SettingsTargetProps>) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const colors = useThemeColors();
@@ -713,7 +726,7 @@ export function NotificationsScreen() {
           kind: 'switch',
           value: notificationsEnabled,
           disabled: isMasterBusy,
-          accessibilityLabel: t('notifications.deviceTitle'),
+          accessibilityLabel: t(NOTIFICATION_DEVICE_SETTING.label),
           accessibilityState: { disabled: isMasterBusy, busy: isMasterBusy },
           onValueChange: value => {
             if (value) {
@@ -734,7 +747,8 @@ export function NotificationsScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('common.notifications')} />
-      <TabScreenScrollView
+      <SettingsSearchScrollView
+        settingsTarget={settingsTarget}
         className="flex-1"
         contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
@@ -745,14 +759,16 @@ export function NotificationsScreen() {
             a Live Activity on iOS, a Live Update on Android. */}
         <Section label={isIos ? t('notifications.liveActivities') : t('notifications.liveUpdates')}>
           <RowGroup>
-            <PreferenceRow
-              icon={Smartphone}
-              title={t('glanceable.channelName')}
-              subtitle={t(glanceableSubtitleKey(systemAllowsGlanceable, isIos))}
-              value={systemAllowsGlanceable && liveActivityEnabled}
-              disabled={liveActivityRowDisabled}
-              onValueChange={setLiveActivityEnabled}
-            />
+            <SettingsTarget item={NOTIFICATION_GLANCEABLE_SETTING}>
+              <PreferenceRow
+                icon={Smartphone}
+                title={t(NOTIFICATION_GLANCEABLE_SETTING.label)}
+                subtitle={t(glanceableSubtitleKey(systemAllowsGlanceable, isIos))}
+                value={systemAllowsGlanceable && liveActivityEnabled}
+                disabled={liveActivityRowDisabled}
+                onValueChange={setLiveActivityEnabled}
+              />
+            </SettingsTarget>
           </RowGroup>
           {/* Our switch cannot turn ActivityKit's back on, so the row offers
               the only thing that can instead of pretending otherwise. Android
@@ -774,45 +790,44 @@ export function NotificationsScreen() {
         <Section label={t('notifications.push')}>
           {/* While the gate reads, fails or is on, the row carries that state.
               Once it has settled off, the row and the card below would describe
-              one state twice, so the card alone stands as the notice. */}
-          {showEnableNotice ? null : (
-            <RowGroup>
-              <RowFrame
-                // The leading tile keeps its 30 dp frame in all three states, so
-                // the title never moves when the permission settles into "on" or
-                // "off". While it is unsettled the tile holds a neutral mark
-                // instead of the off bell: painting "off" before the answer would
-                // assert a state nobody has read yet.
-                icon={masterLeading === 'neutral' ? undefined : MASTER_GATE_ICON[masterLeading]}
-                iconContent={
-                  masterLeading === 'neutral' ? <Skeleton className="h-4 w-4 rounded" /> : undefined
-                }
-                title={t('notifications.deviceTitle')}
-                subtitle={masterSubtitle === undefined ? undefined : { text: masterSubtitle }}
-                subtitlePlaceholder={
-                  masterLeading === 'neutral' ? <Skeleton className="mt-0.5 h-4 w-52" /> : undefined
-                }
-                trailing={{ kind: 'node', node: masterTrailing }}
-              />
-            </RowGroup>
-          )}
-
-          {/* The one push notice while the gate is off: what the switch would
-              turn on, and the action that turns it on. It replaces the row that
-              used to repeat the same state above it. */}
-          {showEnableNotice && (
-            <Card>
-              <Text variant="caption">{t('notifications.enableDescription')}</Text>
-              <Button
-                className="w-full"
-                loading={isMasterBusy}
-                accessibilityLabel={t('notifications.enable')}
-                onPress={() => void handleEnableNotifications()}
-              >
-                <Text>{t('notifications.enable')}</Text>
-              </Button>
-            </Card>
-          )}
+              one state twice, so the card alone stands as the notice. One
+              target wraps whichever control the gate shows: the row while push
+              works, the card's action while it does not. */}
+          <SettingsTarget item={NOTIFICATION_DEVICE_SETTING}>
+            {showEnableNotice ? (
+              <Card>
+                <Text variant="caption">{t('notifications.enableDescription')}</Text>
+                <Button
+                  className="w-full"
+                  loading={isMasterBusy}
+                  accessibilityLabel={t('notifications.enable')}
+                  onPress={() => void handleEnableNotifications()}
+                >
+                  <Text>{t('notifications.enable')}</Text>
+                </Button>
+              </Card>
+            ) : (
+              <RowGroup>
+                <RowFrame
+                  // The leading tile keeps its 30 dp frame in all three states, so
+                  // the title never moves when the permission settles into "on" or
+                  // "off". While it is unsettled the tile holds a neutral mark
+                  // instead of the off bell: painting "off" before the answer would
+                  // assert a state nobody has read yet.
+                  icon={masterLeading === 'neutral' ? undefined : MASTER_GATE_ICON[masterLeading]}
+                  iconContent={
+                    masterLeading === 'neutral' ? <Skeleton className="h-4 w-4 rounded" /> : undefined
+                  }
+                  title={t(NOTIFICATION_DEVICE_SETTING.label)}
+                  subtitle={masterSubtitle === undefined ? undefined : { text: masterSubtitle }}
+                  subtitlePlaceholder={
+                    masterLeading === 'neutral' ? <Skeleton className="mt-0.5 h-4 w-52" /> : undefined
+                  }
+                  trailing={{ kind: 'node', node: masterTrailing }}
+                />
+              </RowGroup>
+            )}
+          </SettingsTarget>
         </Section>
 
         {/* Everything below waits for the master gate. The gate's settled
@@ -868,10 +883,14 @@ export function NotificationsScreen() {
                       }}
                     />
                   ))}
-                  <BriefingNotificationCategoryRow disabled={!notificationsEnabled} />
+                  <SettingsTarget item={NOTIFICATION_AGENT_BRIEF_SETTING}>
+                    <BriefingNotificationCategoryRow disabled={!notificationsEnabled} />
+                  </SettingsTarget>
                 </RowGroup>
               ) : (
-                <BriefingNotificationCategoryRow disabled={!notificationsEnabled} />
+                <SettingsTarget item={NOTIFICATION_AGENT_BRIEF_SETTING}>
+                  <BriefingNotificationCategoryRow disabled={!notificationsEnabled} />
+                </SettingsTarget>
               )}
             </Section>
 
@@ -893,53 +912,55 @@ export function NotificationsScreen() {
               )}
               {preferences && (
                 <RowGroup>
-                  <ConfigureRow
-                    icon={MessageSquare}
-                    title={
-                      previewIsFull
-                        ? t('notifications.previewAlways')
-                        : t('notifications.previewWhenUnlocked')
-                    }
-                    subtitle={
-                      previewIsFull
-                        ? t('notifications.previewFullDescription')
-                        : t('notifications.previewGenericDescription')
-                    }
-                    variant="action"
-                    disabled={previewDisabled}
-                    trailing={
-                      <View className="flex-row items-center gap-2">
-                        {isPreviewPending && (
-                          <ActivityIndicator size="small" color={colors.mutedForeground} />
-                        )}
-                        {previewErrorCode !== undefined && !previewTerminal && (
-                          <InlineRetry
-                            label={t('notifications.retrySavingPreviews')}
-                            color={colors.destructive}
-                            onPress={() => {
-                              handlePreviewChange(previewIntent);
-                            }}
-                          />
-                        )}
-                        {renderRowTrailing({
-                          kind: 'switch',
-                          value: previewIsFull,
-                          disabled: previewDisabled,
-                          accessibilityLabel: t('notifications.showFullPreviews'),
-                          accessibilityState: {
+                  <SettingsTarget item={NOTIFICATION_PREVIEW_SETTING}>
+                    <ConfigureRow
+                      icon={MessageSquare}
+                      title={
+                        previewIsFull
+                          ? t('notifications.previewAlways')
+                          : t('notifications.previewWhenUnlocked')
+                      }
+                      subtitle={
+                        previewIsFull
+                          ? t('notifications.previewFullDescription')
+                          : t('notifications.previewGenericDescription')
+                      }
+                      variant="action"
+                      disabled={previewDisabled}
+                      trailing={
+                        <View className="flex-row items-center gap-2">
+                          {isPreviewPending && (
+                            <ActivityIndicator size="small" color={colors.mutedForeground} />
+                          )}
+                          {previewErrorCode !== undefined && !previewTerminal && (
+                            <InlineRetry
+                              label={t('notifications.retrySavingPreviews')}
+                              color={colors.destructive}
+                              onPress={() => {
+                                handlePreviewChange(previewIntent);
+                              }}
+                            />
+                          )}
+                          {renderRowTrailing({
+                            kind: 'switch',
+                            value: previewIsFull,
                             disabled: previewDisabled,
-                            busy: isPreviewPending,
-                          },
-                          onValueChange: value => {
-                            if (previewDisabled) {
-                              return;
-                            }
-                            handlePreviewChange(value ? 'full' : 'generic');
-                          },
-                        })}
-                      </View>
-                    }
-                  />
+                            accessibilityLabel: t(NOTIFICATION_PREVIEW_SETTING.label),
+                            accessibilityState: {
+                              disabled: previewDisabled,
+                              busy: isPreviewPending,
+                            },
+                            onValueChange: value => {
+                              if (previewDisabled) {
+                                return;
+                              }
+                              handlePreviewChange(value ? 'full' : 'generic');
+                            },
+                          })}
+                        </View>
+                      }
+                    />
+                  </SettingsTarget>
                 </RowGroup>
               )}
             </Section>
@@ -959,7 +980,7 @@ export function NotificationsScreen() {
             )}
           </>
         )}
-      </TabScreenScrollView>
+      </SettingsSearchScrollView>
     </View>
   );
 }

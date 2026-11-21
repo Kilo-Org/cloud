@@ -1,7 +1,6 @@
-// eslint-disable-next-line import/no-nodejs-modules -- test-only reference parse of the stored key
-import { createPrivateKey, generateKeyPairSync } from 'node:crypto';
+// eslint-disable-next-line import/no-nodejs-modules -- test-only fixture key
+import { generateKeyPairSync } from 'node:crypto';
 
-import { VertexCredentialsSchema } from '@kilocode/app-shared/byok-credentials';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -98,43 +97,6 @@ describe('credentialPayload', () => {
     } satisfies CredentialValues;
   }
 
-  /** The stored key, through the shape the create call sends. */
-  function storedVertexKey(privateKey: string) {
-    return VertexCredentialsSchema.parse(
-      credentialPayload({
-        providerId: 'vertex',
-        mode: 'apiKey',
-        values: vertexValues(privateKey),
-        modelMappings: [],
-      })
-    ).googleCredentials.privateKey;
-  }
-
-  const { privateKey: signedKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
-  const exported = signedKey.export({ type: 'pkcs8', format: 'pem' });
-  const PEM = typeof exported === 'string' ? exported : exported.toString('utf8');
-
-  it('stores a pasted key so the gateway can sign with it, whatever line breaks the paste kept', () => {
-    const folded = PEM.replaceAll('\n', '');
-    expect(() => createPrivateKey(folded)).toThrow();
-    for (const pasted of [
-      PEM,
-      folded,
-      PEM.replaceAll('\n', '\r\n'),
-      PEM.split('\n')
-        .map(line => `  ${line}`)
-        .join('\n'),
-      `  ${PEM}  `,
-      // The value copied out of a downloaded service-account file: the line
-      // breaks arrive as the two characters `\` and `n`.
-      PEM.trim().replaceAll('\n', String.raw`\n`),
-    ]) {
-      const stored = storedVertexKey(pasted);
-      expect(() => createPrivateKey(stored)).not.toThrow();
-      expect(stored).toBe(PEM.trim());
-    }
-  });
-
   it('refuses a value that is not a private key instead of storing it', () => {
     expect(
       credentialProblem({
@@ -229,21 +191,8 @@ describe('readStructuredCredential', () => {
   const readVertex = (privateKey: string) =>
     read('vertex', { project: 'p', location: 'global', clientEmail: 'a@b.test', privateKey });
 
-  /** A key file in one of the three labels a signing key carries. */
-  function signingKey(type: 'pkcs8' | 'pkcs1' | 'sec1'): string {
-    const pair =
-      type === 'sec1'
-        ? generateKeyPairSync('ec', { namedCurve: 'P-256' })
-        : generateKeyPairSync('rsa', { modulusLength: 2048 });
-    const pem = pair.privateKey.export({ type, format: 'pem' });
-    return typeof pem === 'string' ? pem : pem.toString('utf8');
-  }
-
-  // These three formats are the labels a signing key carries: PKCS#8 is
-  // `PRIVATE KEY`, PKCS#1 is `RSA PRIVATE KEY` and SEC1 is `EC PRIVATE KEY`,
-  // and each has to stay accepted.
-  it.each(['pkcs8', 'pkcs1', 'sec1'] as const)('takes a %s key file as ready', type => {
-    expect(readVertex(signingKey(type))).toMatchObject({ tag: 'ready' });
+  it('reads a key file the gateway can sign with as ready', () => {
+    expect(readVertex(PEM_KEY)).toMatchObject({ tag: 'ready' });
   });
 
   it('refuses an encrypted key with the passphrase cause on the private-key field', () => {

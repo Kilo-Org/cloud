@@ -2599,7 +2599,10 @@ describe('GitLab encrypted credential persistence', () => {
     });
     expect(
       describeSettlementFailure(
-        new TRPCError({ code: 'UNAUTHORIZED', message: 'GitLab project credential must be recreated' })
+        new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'GitLab project credential must be recreated',
+        })
       )
     ).toEqual({
       retryable: false,

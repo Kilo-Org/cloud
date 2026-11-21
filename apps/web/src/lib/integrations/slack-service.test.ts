@@ -69,8 +69,11 @@ jest.mock('@sentry/nextjs', () => ({
 
 const { WebClient: MockWebClient } = jest.requireMock<{ WebClient: jest.Mock }>('@slack/web-api');
 
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import type { Owner } from '@/lib/integrations/core/types';
 import type { SlackInstallation } from '@chat-adapter/slack';
+import type { WebClientOptions } from '@slack/web-api';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { SLACK_DISCONNECT_UNCONFIRMED_MESSAGE } from '@kilocode/app-shared/integrations-errors';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
@@ -411,10 +414,11 @@ describe('slack-service revokeSlackToken', () => {
     expect(MockWebClient).toHaveBeenCalledTimes(1);
     const [token, options] = MockWebClient.mock.calls[0] as [
       string,
-      { retryConfig: { retries: number } },
+      { retryConfig: { retries: number }; rejectRateLimitedCalls: boolean },
     ];
     expect(token).toBe('xoxb-token');
     expect(options.retryConfig.retries).toBe(1);
+    expect(options.rejectRateLimitedCalls).toBe(true);
   });
 
   it('reports revoked when Slack accepts the revoke', async () => {
@@ -449,6 +453,47 @@ describe('slack-service revokeSlackToken', () => {
     });
     expect(mockCaptureException).toHaveBeenCalledTimes(1);
   });
+
+  it('answers at once when the real SDK meets a 429 with a retry-after', async () => {
+    const { WebClient: ActualWebClient } = jest.requireActual<{
+      WebClient: new (token: string, options: WebClientOptions) => unknown;
+    }>('@slack/web-api');
+    // The mock stands in for the SDK, so only the real client shows that a 429
+    // turns into an immediate coded error instead of a sleep inside the attempt.
+    const arrivals: number[] = [];
+    const server = createServer((_request, response) => {
+      arrivals.push(Date.now());
+      response.writeHead(429, { 'retry-after': '5', 'content-type': 'application/json' });
+      response.end(JSON.stringify({ ok: false, error: 'ratelimited' }));
+    });
+    const listening = Promise.withResolvers<void>();
+    server.listen(0, '127.0.0.1', () => listening.resolve());
+    await listening.promise;
+    const { port } = server.address() as AddressInfo;
+    const originalImplementation = MockWebClient.getMockImplementation();
+    MockWebClient.mockImplementation(
+      (token: string, options: WebClientOptions) =>
+        new ActualWebClient(token, { ...options, slackApiUrl: `http://127.0.0.1:${port}/` })
+    );
+
+    try {
+      const startedAt = Date.now();
+      const result = await revokeSlackToken('xoxb-token');
+      const elapsedMs = Date.now() - startedAt;
+
+      // The bound is the defect: without the option the SDK sleeps out the
+      // retry-after on every attempt, so the call takes about 10 s, not 3 s.
+      expect(elapsedMs).toBeLessThan(3_000);
+      expect(arrivals).toHaveLength(1);
+      expect(result).toEqual({ status: 'temporary_failure', reason: 'rate_limited' });
+      expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    } finally {
+      MockWebClient.mockImplementation(originalImplementation);
+      const closed = Promise.withResolvers<void>();
+      server.close(() => closed.resolve());
+      await closed.promise;
+    }
+  }, 20_000);
 
   it('reports a temporary failure when Slack answers with an HTTP error', async () => {
     mockAuthRevoke.mockRejectedValue({ code: 'slack_webapi_http_error', statusCode: 503 });

@@ -240,10 +240,11 @@ function reportRevocationFailure(
  */
 export async function revokeSlackToken(accessToken: string): Promise<SlackTokenRevocation> {
   // The SDK's default policy retries for about thirty minutes, well past the tRPC
-  // route's 800 s budget; one bounded retry keeps a single blip from failing the
-  // disconnect while still letting the caller answer with the retryable error.
+  // route's 800 s budget; one bounded retry covers a single blip, and a 429 answers
+  // at once as a rate-limit result instead of sleeping out the retry-after.
   const client = new WebClient(accessToken, {
     retryConfig: { retries: 1, minTimeout: 500, maxTimeout: 2_000 },
+    rejectRateLimitedCalls: true,
   });
 
   try {

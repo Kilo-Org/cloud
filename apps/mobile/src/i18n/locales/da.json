@@ -4207,7 +4207,7 @@
     "personalDefaultDescription": "Automatisk indlæst, når intet lager har en fastgjort profil.",
     "organizationDefaultDescription": "Automatisk indlæst for medlemmer, der ikke har nogen personlig standard.",
     "setAsDefault": "Indstil som standard",
-    "saveFailed": "Profilen kunne ikke gemmes",
+    "saveFailed": "Profilen kunne ikke gemmes. Prøv igen.",
     "organizationRoleRequired": "Kun organisationsejere og administratorer kan ændre organisationens profiler.",
     "deleteTitle": "Slet profil",
     "deleteMessage": "Dette fjerner permanent profilen og dens indstillinger. Dette kan ikke fortrydes.",

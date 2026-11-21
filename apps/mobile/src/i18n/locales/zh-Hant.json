@@ -4207,7 +4207,7 @@
     "personalDefaultDescription": "當沒有儲存庫具有固定設定檔時自動載入。",
     "organizationDefaultDescription": "為沒有個人預設值的會員自動載入。",
     "setAsDefault": "設為預設",
-    "saveFailed": "無法儲存設定檔",
+    "saveFailed": "無法儲存設定檔。請再試一次。",
     "organizationRoleRequired": "只有組織擁有者和管理員可以變更組織設定檔。",
     "deleteTitle": "刪除設定檔",
     "deleteMessage": "這將永久刪除設定檔及其設定。此操作無法撤銷。",

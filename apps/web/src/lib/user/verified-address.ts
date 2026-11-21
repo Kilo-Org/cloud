@@ -11,9 +11,10 @@ import { getDeliveredEmailAddress } from '@kilocode/web-shared/lib/email-address
  *
  * Apple is excluded because the browser path stores the ID token's address
  * without checking `email_verified`, which Apple leaves false for some Work &
- * School accounts. WorkOS is excluded because directory sync provisions a new
- * address without a domain check, so its rows can carry an address nobody
- * verified.
+ * School accounts. WorkOS is excluded because directory sync also writes
+ * `workos` rows, for addresses no sign-in proved. `hasSsoVerifiedPrimaryAddress`
+ * tells an SSO sign-in's row apart and checks its authority; only the Pages
+ * exchange applies it.
  */
 const VERIFIED_ADDRESS_PROVIDERS: Partial<Record<AuthProviderId, true>> = {
   google: true,

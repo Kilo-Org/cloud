@@ -23,8 +23,8 @@ export const DERIVED_CHAT_TEXT_MAX_LENGTH = 80;
  * A label is at most {@link DERIVED_CHAT_TEXT_MAX_LENGTH} characters, so the
  * derivation reads at most this much of the message and costs the label rather
  * than a long body. A message no longer than the window is read whole; a
- * longer one is labelled from its first
- * {@link DERIVED_CHAT_TEXT_SOURCE_WINDOW} code units.
+ * longer one is labelled from its start, at most one code unit past this many
+ * when the cut falls inside a surrogate pair (see {@link windowStart}).
  */
 export const DERIVED_CHAT_TEXT_SOURCE_WINDOW = 4096;
 
@@ -148,10 +148,11 @@ function markedTokenText(token: MarkedToken): string {
 }
 
 /**
- * A message reduced to one short line derived from at most its first
- * {@link DERIVED_CHAT_TEXT_SOURCE_WINDOW} code units: inline markdown is
- * reduced to the text it wraps, whitespace runs (line breaks included) collapse
- * to single spaces, the ends are trimmed, and a line longer than
+ * A message reduced to one short line derived from its start, at most
+ * {@link DERIVED_CHAT_TEXT_SOURCE_WINDOW} code units of it (one more when the
+ * window ends inside a surrogate pair): inline markdown is reduced to the text
+ * it wraps, whitespace runs (line breaks included) collapse to single spaces,
+ * the ends are trimmed, and a line longer than
  * {@link DERIVED_CHAT_TEXT_MAX_LENGTH} characters is cut short at that cap with
  * a trailing ellipsis. A line that fits keeps its characters: the ellipsis
  * means a cut happened, never that the cap was counted in a different unit.

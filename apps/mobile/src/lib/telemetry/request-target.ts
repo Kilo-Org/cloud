@@ -49,6 +49,17 @@ function isHostLike(text: string): boolean {
   );
 }
 
+/** The index of the first `/`, `?` or `#` at or after `from`, else the length. */
+function nextDelimiter(text: string, from: number): number {
+  for (let i = from; i < text.length; i += 1) {
+    const c = text[i];
+    if (c === '/' || c === '?' || c === '#') {
+      return i;
+    }
+  }
+  return text.length;
+}
+
 /**
  * Reduce a URL to its origin and path: drop the query string, the fragment and
  * any authority userinfo, which ends at its last `@` whatever characters it
@@ -87,6 +98,14 @@ export function stripQueryString(url: string): string {
       }
     }
     if (lastAt === -1) {
+      return cutAtQueryOrFragment(url);
+    }
+    // An `@` inside a query or fragment belongs to that text, not to the
+    // authority. It terminates userinfo only when what follows it reads as a
+    // host, which is the shape an authority takes.
+    const queryStart = url.search(/[?#]/u);
+    const atInQuery = queryStart !== -1 && url.search(/[?#]/u) < lastAt;
+    if (atInQuery && !isHostLike(url.slice(lastAt + 1, nextDelimiter(url, lastAt + 1)))) {
       return cutAtQueryOrFragment(url);
     }
     return url.slice(0, schemeEnd) + cutAtQueryOrFragment(url.slice(lastAt + 1));

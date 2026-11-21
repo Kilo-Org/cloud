@@ -105,6 +105,21 @@ describe('stripQueryString', () => {
     expect(stripQueryString(url)).toBe(`https://${HOST}`);
   });
 
+  it('keeps the origin and path when an at-sign in a query is followed by no host', () => {
+    const procedure = ['x', 'y'].join('.');
+    const value = ['token=abc', 'secret=zzz'].join('@');
+    const url = `http://host:3000${TRPC_PATH}${procedure}?${value}`;
+
+    expect(stripQueryString(url)).toBe(`http://host:3000${TRPC_PATH}${procedure}`);
+  });
+
+  it('keeps the origin and path when an at-sign in a fragment is followed by no host', () => {
+    const value = ['invite=abc', 'secret=zzz'].join('@');
+    const url = `http://host:3000${TRPC_PATH_FIXTURE}#${value}`;
+
+    expect(stripQueryString(url)).toBe(`http://host:3000${TRPC_PATH_FIXTURE}`);
+  });
+
   it('keeps origin and path when the userinfo spans a separator and a delimiter', () => {
     const userinfo = ['user', ['ab', 'cd'].join('/')].join(':');
     const url = `https://${userinfo}?${['ef', HOST].join('@')}${TRPC_PATH_FIXTURE}`;

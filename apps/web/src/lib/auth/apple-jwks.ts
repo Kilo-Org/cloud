@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { createPublicKey } from 'node:crypto';
 import { captureException } from '@sentry/nextjs';
+import { z } from 'zod';
 
 const APPLE_JWKS_URL = 'https://appleid.apple.com/auth/keys';
 // Local verification runs can serve a fixture key set through this override.
@@ -16,11 +17,13 @@ function appleJwksUrl(): string {
 /** Thrown for malformed tokens or unresolvable keys — caller error, not a server fault. */
 export class AppleJwtClientError extends Error {}
 
+// The module reads only the four fields the key set is validated on; a JWK may
+// carry `use` and `alg` too, which are accepted but never inspected.
 type AppleJWK = {
   kty: string;
   kid: string;
-  use: string;
-  alg: string;
+  use?: string;
+  alg?: string;
   n: string;
   e: string;
 };
@@ -43,6 +46,17 @@ export const STALE_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 const REFRESH_COOLDOWN_MS = 30 * 1000;
 const JWKS_FETCH_TIMEOUT_MS = 10_000;
 
+const appleJwksResponseSchema = z.object({
+  keys: z.array(
+    z.object({
+      kty: z.string(),
+      kid: z.string(),
+      n: z.string(),
+      e: z.string(),
+    })
+  ),
+});
+
 /**
  * Throws the recorded refresh failure after marking the outage reported.
  * Propagating hands the error to a route or the framework handler, which
@@ -64,8 +78,11 @@ async function fetchApplePublicKeys(): Promise<AppleJWK[]> {
     throw new Error(`Failed to fetch Apple JWKS: ${response.status}`);
   }
 
-  const { keys } = (await response.json()) as { keys: AppleJWK[] };
-  return keys;
+  const parsed = appleJwksResponseSchema.safeParse(await response.json());
+  if (!parsed.success) {
+    throw new Error('Apple JWKS response has an unexpected shape');
+  }
+  return parsed.data.keys;
 }
 
 async function refreshAppleKeys(): Promise<AppleJWK[]> {

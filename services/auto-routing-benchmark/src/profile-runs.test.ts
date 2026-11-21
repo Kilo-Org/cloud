@@ -4,7 +4,7 @@ import type * as CliRunnerModule from './cli-runner';
 import type * as SchedulerModule from './scheduler';
 import type * as SubscriptionsModule from './subscriptions';
 import type * as EligibilityModule from './probe/eligibility';
-import { TAXONOMY_ROUTE_KEYS, benchmarkPairKey } from '@kilocode/auto-routing-contracts';
+import { TAXONOMY_ROUTE_KEYS } from '@kilocode/auto-routing-contracts';
 import type {
   PolicySettingComputedMap,
   PolicySettingOverrides,
@@ -1190,7 +1190,7 @@ describe('decider run completion', () => {
     ).toEqual(['platform/a', 'platform/b']);
   });
 
-  it('drops a pair without probe results from the agentic routes after activation', async () => {
+  it('keeps a pair without probe results on the agentic routes at the revision-2 hold', async () => {
     vi.mocked(getLatestRoutingTable).mockResolvedValue(
       liveRoutingTable([
         { model: 'platform/a', variant: null },
@@ -1244,17 +1244,17 @@ describe('decider run completion', () => {
       ...summariesFor('platform/a', null, 'revision-3-a'),
       ...summariesFor('platform/b', 'high', 'revision-2-b'),
     ]);
-    missingProbeResults.mockResolvedValueOnce(
-      new Set([benchmarkPairKey({ model: 'platform/b', variant: 'high' })])
-    );
-
     await expect(publishPlatformRoutingTable(env, fetch)).resolves.not.toBeNull();
 
-    // Revision 3 is active: `b` lacks the probes, so its agentic results are dropped and
-    // every other route keeps both pairs' measurements.
+    // The hold: `probesActive` is false, so the publish never asks which pairs lack probes
+    // and `b` keeps its agentic results alongside `a`. Revision 3's drop is covered by
+    // `src/probe/publish.test.ts` and `src/platform-publish-revision-hold.test.ts`.
+    expect(ACTIVE_MEASUREMENT_REVISION).toBe(2);
+    expect(missingProbeResults).not.toHaveBeenCalled();
     const [, table] = vi.mocked(saveRoutingTable).mock.calls[0];
     expect(table.routes['agentic_execution/tool_usage'].map(candidate => candidate.model)).toEqual([
       'platform/a',
+      'platform/b',
     ]);
     expect(
       table.routes['implementation/code_generation'].map(candidate => candidate.model)

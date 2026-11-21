@@ -15,6 +15,7 @@ import {
   ACTIVE_MEASUREMENT_REVISION,
   deciderCasesForRouter,
   minimumCaseRevisions,
+  PROBE_REVISION,
 } from './measurement-revision';
 import {
   PROBE_ACTIVATION_CASE_IDS,
@@ -69,7 +70,7 @@ describe('probe activation migration (real SQLite)', () => {
         startedAt,
         PROBE_ACTIVATION_REPETITIONS,
         PROBE_ACTIVATION_ENGINE_IDENTITY,
-        ACTIVE_MEASUREMENT_REVISION
+        PROBE_REVISION
       );
   }
 
@@ -196,6 +197,77 @@ describe('probe activation migration (real SQLite)', () => {
     expect(MIGRATION).toContain(`'${PROBE_ACTIVATION_REQUESTED_AT}'`);
   });
 
+  it('applies nothing at the revision-2 hold and leaves the staged rows for a later deploy', async () => {
+    // The hold's first promise: a deploy at revision 2 consumes nothing. A drain's default
+    // call takes the active revision, so nothing is queued and no Ember row moves.
+    expect(ACTIVE_MEASUREMENT_REVISION).toBe(2);
+    expect(PROBE_REVISION).toBe(3);
+
+    for (const pair of PROBE_ACTIVATION_REMEASURE_PAIRS) seedReadyPair(pair);
+    seedFailedEmber();
+    const at = Date.parse('2026-11-20T12:00:00.000Z');
+
+    expect(await applyProbeActivations(db, PROBE_ACTIVATION_ROUTER, at)).toEqual({
+      queued: 0,
+      readmitted: 0,
+    });
+    expect(queuedPairs()).toEqual([]);
+    for (const pair of PROBE_ACTIVATION_READMIT_PAIRS) {
+      expect(profileRow(pair.model, pair.variant)).toMatchObject({
+        status: 'failed',
+        failure_class: 'unknown',
+        run_id: 'ember-failed',
+      });
+    }
+    expect(await listQueuedRemeasures(db, current, 'platform')).toEqual([]);
+    expect(await listPendingCurrentProfiles(db, current, 'platform')).toEqual([]);
+    // Nothing is consumed, so a later deploy that raises the revision finds the whole
+    // activation rather than a half-applied one.
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM probe_activations').get()).toEqual({ n: 30 });
+  });
+
+  it('has nothing staged in production and nothing re-stages it', async () => {
+    // The 2026-11-20 deploy applied the whole activation and the table is empty since: every
+    // row is gone, so even a deploy that raised the revision back would queue nothing. Only
+    // the migration ever inserts rows (no writer in `src/` inserts into `probe_activations`),
+    // and it is already applied, so this is the state a hold deploy reads.
+    for (const pair of PROBE_ACTIVATION_REMEASURE_PAIRS) seedReadyPair(pair);
+    seedFailedEmber();
+    const at = Date.parse('2026-11-20T12:00:00.000Z');
+    expect(await applyProbeActivations(db, PROBE_ACTIVATION_ROUTER, at, PROBE_REVISION)).toEqual({
+      queued: 24,
+      readmitted: 6,
+    });
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM probe_activations').get()).toEqual({ n: 0 });
+
+    // Production's leftovers, read-only: the queued rows the stalled run claimed are gone and
+    // Ember's six rows sit pending in it, so the queue has nothing this hold can act on.
+    sqlite.prepare('DELETE FROM profile_remeasures').run();
+    sqlite
+      .prepare(`UPDATE benchmark_profiles SET status = 'pending' WHERE model = 'meta/muse-ember'`)
+      .run();
+    const before = sqlite
+      .prepare('SELECT model, variant, status FROM benchmark_profiles ORDER BY model, variant')
+      .all();
+
+    expect(await applyProbeActivations(db, PROBE_ACTIVATION_ROUTER, at + 60_000)).toEqual({
+      queued: 0,
+      readmitted: 0,
+    });
+    expect(queuedPairs()).toEqual([]);
+    expect(
+      sqlite
+        .prepare('SELECT model, variant, status FROM benchmark_profiles ORDER BY model, variant')
+        .all()
+    ).toEqual(before);
+    // Even at revision 3 the drained drain queues nothing: no row is left to apply.
+    expect(await applyProbeActivations(db, PROBE_ACTIVATION_ROUTER, at + 120_000, 3)).toEqual({
+      queued: 0,
+      readmitted: 0,
+    });
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM probe_activations').get()).toEqual({ n: 0 });
+  });
+
   it('stages nothing the live worker can claim, then applies it once', async () => {
     for (const pair of PROBE_ACTIVATION_REMEASURE_PAIRS) seedReadyPair(pair);
     seedFailedEmber();
@@ -218,7 +290,12 @@ describe('probe activation migration (real SQLite)', () => {
     });
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM probe_activations').get()).toEqual({ n: 30 });
 
-    expect(await applyProbeActivations(db)).toEqual({ queued: 24, readmitted: 6 });
+    expect(
+      await applyProbeActivations(db, PROBE_ACTIVATION_ROUTER, Date.now(), PROBE_REVISION)
+    ).toEqual({
+      queued: 24,
+      readmitted: 6,
+    });
 
     expect(queuedPairs()).toEqual(
       PROBE_ACTIVATION_REMEASURE_PAIRS.map(pair => ({
@@ -268,7 +345,9 @@ describe('probe activation migration (real SQLite)', () => {
     expect(profileRow('meta/muse-ember', 'low')).toMatchObject({ status: 'failed' });
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM probe_activations').get()).toEqual({ n: 30 });
 
-    expect(await applyProbeActivations(db, PROBE_ACTIVATION_ROUTER, deployLease + 1)).toEqual({
+    expect(
+      await applyProbeActivations(db, PROBE_ACTIVATION_ROUTER, deployLease + 1, PROBE_REVISION)
+    ).toEqual({
       queued: 24,
       readmitted: 6,
     });
@@ -347,15 +426,12 @@ describe('probe activation migration (real SQLite)', () => {
       runId: 'ember-failed',
       failureClass: 'unknown',
     });
-    await applyProbeActivations(db);
+    await applyProbeActivations(db, PROBE_ACTIVATION_ROUTER, Date.now(), PROBE_REVISION);
 
     insertRun('ember-new', { status: 'running', startedAt: PROBE_ACTIVATION_REQUESTED_AT });
     const claimed = await markProfilesRunningForRun(db, 'ember-new', [pair], current);
     expect(claimed).toEqual([pair]);
-    const minimumRevisions = minimumCaseRevisions(
-      PROBE_ACTIVATION_ROUTER,
-      ACTIVE_MEASUREMENT_REVISION
-    );
+    const minimumRevisions = minimumCaseRevisions(PROBE_ACTIVATION_ROUTER, PROBE_REVISION);
     expect(await copyRemeasureBaselines(db, { runId: 'ember-new', minimumRevisions })).toBe(0);
     expect(
       await reuseDeciderCaseResults(db, {
@@ -409,7 +485,7 @@ describe('probe activation migration (real SQLite)', () => {
       .run();
     insertChunk('other-engine', otherIdentity.model, otherIdentity.variant);
 
-    await applyProbeActivations(db);
+    await applyProbeActivations(db, PROBE_ACTIVATION_ROUTER, Date.now(), PROBE_REVISION);
 
     expect(profileRow(permanent.model, permanent.variant)).toMatchObject({
       status: 'unavailable',
@@ -446,7 +522,12 @@ describe('probe activation migration (real SQLite)', () => {
     seedReadyPair(OUTSIDE);
     seedFailedEmber();
 
-    const report = await applyProbeActivations(db);
+    const report = await applyProbeActivations(
+      db,
+      PROBE_ACTIVATION_ROUTER,
+      Date.now(),
+      PROBE_REVISION
+    );
 
     expect(queuedPairs()).toEqual([
       {
@@ -466,7 +547,7 @@ describe('probe activation migration (real SQLite)', () => {
       insertResult('old', pair.model, pair.variant, caseId, { revision: 2 });
     }
 
-    await applyProbeActivations(db);
+    await applyProbeActivations(db, PROBE_ACTIVATION_ROUTER, Date.now(), PROBE_REVISION);
 
     expect(queuedPairs()).toHaveLength(1);
   });
@@ -474,7 +555,7 @@ describe('probe activation migration (real SQLite)', () => {
   it('schedules exactly the probe and pwd cases for a queued pair', async () => {
     const pair = { model: MODEL, variant: VARIANT };
     seedReadyPair(pair);
-    await applyProbeActivations(db);
+    await applyProbeActivations(db, PROBE_ACTIVATION_ROUTER, Date.now(), PROBE_REVISION);
 
     const runId = 'remeasure';
     insertRun(runId, { status: 'running' });
@@ -486,10 +567,7 @@ describe('probe activation migration (real SQLite)', () => {
       PROBE_ACTIVATION_REQUESTED_AT
     );
     expect(claimed).toEqual([pair]);
-    const minimumRevisions = minimumCaseRevisions(
-      PROBE_ACTIVATION_ROUTER,
-      ACTIVE_MEASUREMENT_REVISION
-    );
+    const minimumRevisions = minimumCaseRevisions(PROBE_ACTIVATION_ROUTER, PROBE_REVISION);
     // Every decider case is reused except `supp-agent-term-pwd-base`, whose grading changed.
     expect(await copyRemeasureBaselines(db, { runId, minimumRevisions })).toBe(
       (DECIDER_CASES.length - 1) * PROBE_ACTIVATION_REPETITIONS
@@ -502,7 +580,7 @@ describe('probe activation migration (real SQLite)', () => {
       entries: [pair],
       minimumRevisions,
     });
-    const caseIds = deciderCasesForRouter(PROBE_ACTIVATION_ROUTER, ACTIVE_MEASUREMENT_REVISION).map(
+    const caseIds = deciderCasesForRouter(PROBE_ACTIVATION_ROUTER, PROBE_REVISION).map(
       benchCase => benchCase.id
     );
     await scheduleRunChunks(db, {

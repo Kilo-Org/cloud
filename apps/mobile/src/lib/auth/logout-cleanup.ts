@@ -338,7 +338,7 @@ export async function runLogoutCleanup(): Promise<void> {
           () => ({ status: 'fulfilled' as const }),
           () => ({ status: 'rejected' as const })
         )
-      : ({ status: 'fulfilled' as const });
+      : { status: 'fulfilled' as const };
 
     // Last, and its failure is not recorded: the device has already destroyed
     // the refresh token, so an orphaned session row dies with the access token.

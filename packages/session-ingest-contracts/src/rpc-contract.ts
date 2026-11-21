@@ -10,6 +10,7 @@ import {
   KILO_SESSION_ID_PREFIX,
   storedSessionIdSchema,
 } from './kilo-session-id';
+import { storedMessageIdSchema } from './message-id';
 import { needsPartTextRepair } from './part-text';
 import { sessionLiveSummarySchema } from './session-live-summary';
 
@@ -263,18 +264,16 @@ export type CanDestroyCloudAgentWorktreeSandboxResult = z.infer<
   typeof canDestroyCloudAgentWorktreeSandboxResultSchema
 >;
 
-// Message and part ids become storage and item identities, so both refuse `/`
-// and U+0000.
-function createIdSchema(prefix: string, label: string) {
-  return z
-    .string()
-    .startsWith(prefix)
-    .refine(id => !id.includes('/') && !id.includes('\u0000'), {
-      message: `${label} must not contain / or U+0000`,
-    });
-}
-export const messageIdSchema = createIdSchema('msg', 'message IDs');
-export const partIdSchema = createIdSchema('prt', 'part IDs');
+/** The boundary name for the stored message-id rule; see `storedMessageIdSchema`. */
+export const messageIdSchema = storedMessageIdSchema;
+
+// Part ids become storage and item identities, so they refuse `/` and U+0000.
+export const partIdSchema = z
+  .string()
+  .startsWith('prt')
+  .refine(id => !id.includes('/') && !id.includes('\u0000'), {
+    message: 'part IDs must not contain / or U+0000',
+  });
 const sdkMetadataSchema = z.record(z.string(), z.unknown());
 
 export const createSessionForCloudAgentSchema = z.object({

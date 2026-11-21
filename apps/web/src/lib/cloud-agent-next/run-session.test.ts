@@ -3,6 +3,7 @@ import type { CloudAgentNextClient } from './cloud-agent-client';
 
 const mockDisconnect = jest.fn();
 let mockEventToEmit: CloudAgentEvent | undefined;
+let mockEventsToEmit: CloudAgentEvent[] | undefined;
 
 jest.mock('@kilocode/web-shared/lib/dotenvx', () => ({
   getEnvVariable: (name: string) =>
@@ -24,8 +25,8 @@ jest.mock('@/lib/cloud-agent/stream-ticket', () => ({
 jest.mock('./websocket-manager', () => ({
   createWebSocketManager: jest.fn((config: { onEvent: (event: CloudAgentEvent) => void }) => ({
     connect: () => {
-      if (mockEventToEmit) {
-        config.onEvent(mockEventToEmit);
+      for (const event of mockEventsToEmit ?? (mockEventToEmit ? [mockEventToEmit] : [])) {
+        config.onEvent(event);
       }
     },
     disconnect: mockDisconnect,
@@ -33,11 +34,13 @@ jest.mock('./websocket-manager', () => ({
 }));
 
 import { runSessionToCompletion, INSUFFICIENT_CREDITS_RESPONSE } from './run-session';
+import { STATUS_LOG_MAX_ENTRIES, STATUS_LOG_MAX_TOTAL_LENGTH } from './bounded-status-log';
 
 describe('runSessionToCompletion', () => {
   beforeEach(() => {
     mockDisconnect.mockClear();
     mockEventToEmit = undefined;
+    mockEventsToEmit = undefined;
   });
 
   it('resolves queued-delivery failures without waiting for the stream timeout', async () => {
@@ -124,5 +127,57 @@ describe('runSessionToCompletion', () => {
     expect(result.sessionId).toBe('agent-credits');
     expect(cleanupSession).toHaveBeenCalledWith('agent-credits');
     expect(mockDisconnect).not.toHaveBeenCalled();
+  });
+
+  it('caps retained diagnostics and names the omitted count on a long stream', async () => {
+    const eventCount = STATUS_LOG_MAX_ENTRIES * 3;
+    const events: CloudAgentEvent[] = [];
+
+    for (let i = 0; i < eventCount; i++) {
+      events.push({
+        eventId: i,
+        sessionId: 'agent-long-stream',
+        streamEventType: 'status',
+        timestamp: new Date().toISOString(),
+        data: { message: `status line ${i}` },
+      });
+      events.push({
+        eventId: eventCount + i,
+        sessionId: 'agent-long-stream',
+        streamEventType: 'output',
+        timestamp: new Date().toISOString(),
+        data: { source: 'stderr', content: `stderr line ${i}` },
+      });
+    }
+    events.push({
+      eventId: eventCount * 2,
+      sessionId: 'agent-long-stream',
+      streamEventType: 'complete',
+      timestamp: new Date().toISOString(),
+      data: { exitCode: 0 },
+    });
+    mockEventsToEmit = events;
+
+    const client = {
+      prepareSession: jest.fn().mockResolvedValue({
+        cloudAgentSessionId: 'agent-long-stream',
+        kiloSessionId: 'kilo-long-stream',
+      }),
+      initiateFromPreparedSession: jest.fn().mockResolvedValue({
+        streamUrl: '/sessions/user/agent-long-stream/stream',
+      }),
+    } as unknown as CloudAgentNextClient;
+
+    const result = await runSessionToCompletion({
+      client,
+      prepareInput: {} as never,
+      ticketPayload: { userId: 'user-long-stream' },
+      streamTimeoutMs: 60_000,
+    });
+
+    expect(result.statusMessages.length).toBeLessThanOrEqual(STATUS_LOG_MAX_ENTRIES);
+    const retainedLength = result.statusMessages.reduce((sum, line) => sum + line.length, 0);
+    expect(retainedLength).toBeLessThanOrEqual(STATUS_LOG_MAX_TOTAL_LENGTH);
+    expect(result.response).toMatch(/\(\+\d+ earlier lines omitted\)/);
   });
 });

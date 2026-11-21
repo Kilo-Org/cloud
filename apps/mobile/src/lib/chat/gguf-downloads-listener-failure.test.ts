@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CATALOG, finish, harness, taskAt } from './gguf-downloads.test-helpers';
 import { ggufModelName } from './gguf-records';
@@ -9,6 +9,12 @@ const sink = vi.fn<() => void>();
 beforeEach(() => {
   sink.mockClear();
   setTelemetrySink(sink);
+});
+
+afterEach(() => {
+  // The sink is module state: leaving it installed would route another suite's
+  // telemetry here.
+  setTelemetrySink(null);
 });
 
 describe('a listener that throws as a download ends', () => {

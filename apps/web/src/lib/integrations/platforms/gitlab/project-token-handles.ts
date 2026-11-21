@@ -359,9 +359,13 @@ function instanceChangeBlockerMessage(
   return `GitLab project tokens stored for the current instance could not be revoked because ${cause} (projects: ${projectIds.join(', ')}). ${remedy}`;
 }
 
-/** Refusal for an in-transaction instance change that finds a stored handle. */
+/**
+ * Refusal for a re-check that finds a stored handle appearing after the
+ * settlement already reported nothing blocking, so no revocation was
+ * attempted for it. A repeat of the same request settles it first.
+ */
 export function gitlabProjectTokensUnsettledMessage(projectIds: readonly string[]): string {
-  return `GitLab project tokens stored for the current instance could not be revoked (projects: ${projectIds.join(', ')}). Disconnect the integration, then reconnect the current instance with a credential that can revoke them.`;
+  return instanceChangeBlockerMessage('not_attempted', projectIds);
 }
 
 /**

@@ -567,17 +567,30 @@ export async function settleStoredProjectTokens(
     // The cleanup that needs no provider call runs before the credential check,
     // so one request settles those entries too.
     const noCredentialOutstanding = new Set(projectIds);
+    const noCredentialReasons = new Map<string, ProjectTokenBlocker['reason']>();
     let noCredentialScrubbed = 0;
     for (const projectId of projectIds) {
-      const settled = await getStoredProjectCredential(integration.id, projectId)
-        .then(async storedCredential => {
-          if (!hasStoredProjectTokenHandle(integration, projectId, storedCredential)) {
-            // Nothing is stored for the project, so there is nothing to settle.
-            return true;
-          }
-          return dropUnrevokableProjectTokenEntry(integration, projectId, storedCredential);
-        })
-        .catch(() => false);
+      let storedCredential: StoredProjectCredential | null;
+      try {
+        storedCredential = await getStoredProjectCredential(integration.id, projectId);
+      } catch (error) {
+        // A row that cannot be read fails the same way on every repeat, so it
+        // names the repair; every other failure can clear, so it asks for a retry.
+        const { retryable } = describeSettlementFailure(error);
+        noCredentialReasons.set(
+          projectId,
+          retryable ? 'not_attempted' : 'stored_credential_unreadable'
+        );
+        logExceptInTest('[settleStoredProjectTokens] Stored project credential unreadable', {
+          integrationId: integration.id,
+          projectId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        continue;
+      }
+      const settled = !hasStoredProjectTokenHandle(integration, projectId, storedCredential)
+        ? true
+        : await dropUnrevokableProjectTokenEntry(integration, projectId, storedCredential);
       if (settled) {
         noCredentialOutstanding.delete(projectId);
         noCredentialScrubbed += 1;
@@ -592,7 +605,7 @@ export async function settleStoredProjectTokens(
       unattempted: noCredentialOutstanding.size,
       blocking: [...noCredentialOutstanding].map(projectId => ({
         projectId,
-        reason: missingCredentialReason,
+        reason: noCredentialReasons.get(projectId) ?? missingCredentialReason,
       })),
     };
   }

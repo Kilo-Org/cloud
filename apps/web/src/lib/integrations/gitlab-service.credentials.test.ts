@@ -1510,9 +1510,8 @@ describe('GitLab encrypted credential persistence', () => {
     const inTransactionMessage =
       inTransactionRefusal instanceof Error ? inTransactionRefusal.message : '';
     expect(inTransactionMessage).toContain('projects: 77');
-    expect(inTransactionMessage).toContain(
-      'Disconnect the integration, then reconnect the current instance with a credential that can revoke them.'
-    );
+    expect(inTransactionMessage).toContain('a revocation could not be attempted');
+    expect(inTransactionMessage).toContain('Try again in a moment.');
 
     const [unchanged] = await db
       .select()
@@ -2899,6 +2898,58 @@ describe('GitLab encrypted credential persistence', () => {
       'Ask Kilo support to repair the stored integration record, then reconnect.'
     );
     expect(refusalMessage).not.toContain('Try again in a moment');
+  });
+
+  it('reports an unreadable stored credential row without a resolved credential as the permanent cause', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    const [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await getOrCreateProjectAccessToken(integration, 42, { userId: user.id });
+    await db
+      .update(platform_access_token_credentials)
+      .set({ provider_metadata: { expiresOn: '2027-07-13' } })
+      .where(
+        and(
+          eq(platform_access_token_credentials.platform_integration_id, connected.integration.id),
+          eq(platform_access_token_credentials.provider_resource_id, '42')
+        )
+      );
+    mockFetchGitLabCredential.mockResolvedValueOnce({ status: 'not_connected' });
+
+    await expect(
+      settleStoredProjectTokens(integration, undefined, {
+        missingCredentialReason: 'credential_unresolved',
+      })
+    ).resolves.toEqual({
+      revoked: 0,
+      scrubbed: 0,
+      retained: 1,
+      unattempted: 1,
+      blocking: [{ projectId: '42', reason: 'stored_credential_unreadable' }],
+    });
+
+    const refusal = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.example.com',
+      user.id
+    ).catch((error: unknown) => error);
+
+    expect(refusal).toMatchObject({ code: 'PRECONDITION_FAILED' });
+    const refusalMessage = refusal instanceof Error ? refusal.message : '';
+    expect(refusalMessage).toContain('a stored project credential could not be read');
+    expect(refusalMessage).toContain(
+      'Ask Kilo support to repair the stored integration record, then reconnect.'
+    );
+    expect(refusalMessage).not.toContain('no stored credential can revoke them');
   });
 
   it('reports only an unreadable stored credential as a permanent settlement failure', () => {

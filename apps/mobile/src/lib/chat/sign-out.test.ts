@@ -34,7 +34,7 @@ vi.mock('./registry', () => ({
 }));
 
 vi.mock('./store', () => ({
-  wipeChats: vi.fn(() => ['gone']),
+  wipeChats: vi.fn(() => Promise.resolve(['gone'])),
 }));
 
 // The Kilo MCP module runs for real. What a boundary has to drop is the cache

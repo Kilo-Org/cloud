@@ -29,14 +29,17 @@ type SqlValue = string | number;
  * The part of an Expo database this file uses, so a test can supply one.
  *
  * These are the members taken from the `SQLiteDatabase` that
- * `encryptedDatabase()` hands back: a read, and a write. Nothing here opens a
- * transaction, because this connection is the one the harness SDK's store keeps
- * its conversations on and that store holds units of its own across awaits;
- * the one delete that needs a unit nests a savepoint inside whatever it finds.
+ * `encryptedDatabase()` hands back. `withTransactionSync` runs its work between
+ * a `BEGIN` and a `COMMIT` of its own; `isInTransactionSync` says whether a unit
+ * is already open, which is what this connection can be asked because the
+ * harness SDK's store keeps the conversations here and holds units of its own
+ * across awaits.
  */
 export type ChatDatabase = {
   readonly getAllSync: <T>(source: string, params: SqlValue[]) => T[];
   readonly runSync: (source: string, params: SqlValue[]) => void;
+  readonly withTransactionSync: (work: () => void) => void;
+  readonly isInTransactionSync?: () => boolean;
 };
 
 /** One row of the chat list. */
@@ -287,12 +290,37 @@ export function deleteChat(db: ChatDatabase, sessionId: string): void {
 }
 
 /**
- * The savepoint the wipe's deletes run inside.
+ * How long the wipe lets the store finish a unit it left open, in milliseconds.
  *
- * A savepoint takes an identifier and SQLite binds no parameter there, so the
- * name has to be a literal in the statement and a constant in the source.
+ * That unit belongs to a write whose answer was interrupted: its promise chain
+ * keeps running and reaches its own `COMMIT` or `ROLLBACK` on the next turns of
+ * the loop. A sign-out happens once, so waiting is free; a store locked past
+ * this bound is a database that is not finishing anything, and the wipe throws
+ * rather than deleting inside a unit it does not own.
  */
-const WIPE = 'wipe_chats';
+const STORE_UNIT_WAIT_MS = 5_000;
+
+/** One turn of the loop, which is what lets an interrupted write reach its end. */
+const turn = (): Promise<void> => {
+  const { promise, resolve } = Promise.withResolvers<undefined>();
+  setTimeout(resolve, 0);
+  return promise;
+};
+
+/**
+ * Answers once no unit is open on this connection, or throws when the store is
+ * still inside one after the wait.
+ */
+async function ownUnit(db: ChatDatabase): Promise<void> {
+  const until = Date.now() + STORE_UNIT_WAIT_MS;
+  while (db.isInTransactionSync?.() === true && Date.now() < until) {
+    // eslint-disable-next-line no-await-in-loop -- each turn lets the write that holds the unit run on
+    await turn();
+  }
+  if (db.isInTransactionSync?.() === true) {
+    throw new Error('the store did not finish its write, so the chats were not wiped');
+  }
+}
 
 /**
  * Forgets every chat of one account, which is what signing out does.
@@ -309,21 +337,22 @@ const WIPE = 'wipe_chats';
  * per-chat MCP preference — go with the rows rather than being left behind for
  * a session that no longer exists.
  *
- * One unit, and one statement per table rather than one delete per chat:
- * signing out must not block the thread in proportion to how much history the
- * account has, and a refusal halfway through must not leave the list pointing
- * at conversations whose turns are already gone. Rolled back, the whole account
- * is still there and the next sign-out retries it.
+ * One transaction of its own, and one statement per table rather than one delete
+ * per chat: signing out must not block the thread in proportion to how much
+ * history the account has, and a refusal halfway through must not leave the list
+ * pointing at conversations whose turns are already gone. Rolled back, the whole
+ * account is still there and the next sign-out retries it.
  *
- * The unit is a savepoint, not a transaction, because the SDK's store keeps
- * the conversations on this same connection and opens a transaction of its own
- * for the exchange it is writing — across awaits, so an interrupted answer can
- * leave that `BEGIN` standing when this runs. A `BEGIN` of ours inside it is
- * refused, and a unit of our own would be undone by its `COMMIT` failing later.
- * A savepoint is legal either way, undoes nothing but these deletes, and leaves
- * the store's unit exactly as it found it.
+ * The unit is this call's own because the rows have to be gone from the file,
+ * not only from this connection's view: a delete joined to the SDK store's unit
+ * would live or die with that write. That store keeps the conversations here and
+ * holds a unit across awaits, so the wipe waits for it to close first — an
+ * interrupted answer leaves one standing, and its own chain finishes it.
  */
-export function wipeChats(db: ChatDatabase, userId: string | null): readonly string[] {
+export async function wipeChats(
+  db: ChatDatabase,
+  userId: string | null
+): Promise<readonly string[]> {
   const account =
     userId === null
       ? { where: '', args: [] as SqlValue[] }
@@ -335,24 +364,13 @@ export function wipeChats(db: ChatDatabase, userId: string | null): readonly str
   if (rows.length === 0) {
     return [];
   }
+  await ownUnit(db);
   const owned = `(select session_id from chats ${account.where})`;
-  db.runSync(`savepoint ${WIPE}`, []);
-  try {
+  db.withTransactionSync(() => {
     db.runSync(`delete from parts where session_id in ${owned}`, account.args);
     db.runSync(`delete from turns where session_id in ${owned}`, account.args);
     db.runSync(`delete from sessions where id in ${owned}`, account.args);
     db.runSync(`delete from chats ${account.where}`, account.args);
-    db.runSync(`release ${WIPE}`, []);
-  } catch (error) {
-    /* The refusal is what the caller needs to see, so a savepoint that cannot
-       be undone is not allowed to replace it. */
-    try {
-      db.runSync(`rollback to ${WIPE}`, []);
-      db.runSync(`release ${WIPE}`, []);
-    } catch {
-      /* Nothing left to undo, and the error below says why the wipe stopped. */
-    }
-    throw error;
-  }
+  });
   return rows.map(row => row.session_id);
 }

@@ -43,7 +43,7 @@ export async function clearChatsForSignOut(userId: string | null): Promise<void>
   await releaseEveryChat();
   forgetChatPlaces();
   forgetMcpState();
-  const sessionIds = wipeChats(await encryptedDatabase(), userId);
+  const sessionIds = await wipeChats(await encryptedDatabase(), userId);
   await Promise.all([
     forgetMcpEnabled(sessionIds),
     forgetWebSearchEnabled(sessionIds),

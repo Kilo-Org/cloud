@@ -18,6 +18,8 @@ import {
 import { getGoogleServiceAccountAccessToken } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/google-service-account';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 
+const id = 'vertex-byok';
+
 /**
  * Vertex AI serves Gemini and the managed open and partner models through its
  * OpenAI-compatible Chat Completions endpoint, Grok's reasoning models through
@@ -229,28 +231,44 @@ export async function resolveGcpVertexUpstream(
 }
 
 export default {
-  id: 'vertex-byok',
+  id,
   openrouter_inference_provider_id: 'google-vertex',
   models_dev_id: 'google-vertex',
   transformRequest(context) {
     const { request } = context;
-    if (request.kind === 'messages') {
-      dropThinkingBlocksOnPrefixMismatch(context);
-      // rawPredict takes the model from the URL and the API version from the body.
-      Reflect.deleteProperty(request.body, 'model');
-      Reflect.set(request.body, 'anthropic_version', VERTEX_ANTHROPIC_VERSION);
-      return;
-    }
-    if (request.kind === 'chat_completions') {
-      if (isGcpVertexMistralModelId(request.body.model)) {
+    // The route passes the served model metadata. A context built anywhere else carries none, and
+    // then the requested `<provider>/<model>` id without its provider prefix classifies the model.
+    const endpoint = getGcpVertexEndpoint(
+      context.directByokModel ?? { id: context.model.slice(context.model.indexOf('/') + 1) }
+    );
+    switch (endpoint) {
+      case 'anthropic':
+        dropThinkingBlocksOnPrefixMismatch(context);
+        // rawPredict takes the model from the URL and the API version from the body.
+        Reflect.deleteProperty(request.body, 'model');
+        Reflect.set(request.body, 'anthropic_version', VERTEX_ANTHROPIC_VERSION);
+        return;
+      case 'mistral':
         // rawPredict takes the model from the URL but still requires it in the body.
         toMistralChatCompletionsBody(request.body);
         return;
-      }
-      request.body.model = toGcpVertexOpenApiModelId(request.body.model);
+      case 'openapi':
+        // `GCP_VERTEX_ENDPOINTS` serves this endpoint over Chat Completions, so the route sends
+        // that kind and the body carries its model.
+        if (request.kind === 'chat_completions') {
+          request.body.model = toGcpVertexOpenApiModelId(request.body.model);
+        }
+        return;
+      case 'openapi-responses':
+        // This endpoint serves `xai/grok-*` ids only, and those ids always carry their publisher
+        // prefix, so the body needs no rewrite.
+        return;
+      default:
+        // A fifth endpoint fails to compile here instead of silently skipping its rewrite.
+        return endpoint satisfies never;
     }
   },
-  models: cachedDirectByokModelList('vertex-byok'),
+  models: cachedDirectByokModelList(id),
   chatCompletionsHeaders: credentialHeaders,
   async resolveUpstream({ credential, model, stream }) {
     return resolveGcpVertexUpstream(credential, model, stream);

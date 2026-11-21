@@ -6,15 +6,17 @@ import {
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
+const id = 'neuralwatt';
+
 export default {
-  id: 'neuralwatt',
+  id,
   models_dev_id: 'neuralwatt',
   ...apiKeyUpstream({
     apiUrl: 'https://api.neuralwatt.com/v1',
     supportedChatApis: ['chat_completions'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,
   }),
-  models: cachedDirectByokModelList('neuralwatt'),
+  models: cachedDirectByokModelList(id),
   provider_listing: {
     dataPolicy: {
       training: false,

@@ -6,8 +6,10 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import type { CustomLlmProvider, OpenRouterProvider } from '@kilocode/db/schema-types';
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import { directByokProviderList } from './direct-byok-definitions';
+import { formatModelId, modelIdPrefixOf } from './model-id';
 import {
   getEnabledByokProviders,
   type ByokOwner,
@@ -47,8 +49,21 @@ export function getDirectByokProviderListings(): OpenRouterProvider[] {
 }
 
 export function formatDirectByokModelId(provider: DirectByokProvider, model: DirectByokModel) {
-  return (provider.id + '/' + model.id).toLowerCase();
+  return formatModelId(provider.id, model.id);
 }
+
+/**
+ * A direct BYOK model as `/api/v1/models` lists it: the OpenRouter model contract, plus the fields
+ * older clients read that the catalog schema does not describe.
+ */
+export type DirectByokModelListing = OpenRouterModel & {
+  canonical_slug: string;
+  hugging_face_id: string;
+  architecture: { instruct_type: string | null };
+  default_parameters: Record<string, never>;
+  /** Every direct BYOK listing states its reasoning settings, even when the model has none. */
+  opencode: NonNullable<OpenRouterModel['opencode']>;
+};
 
 const AI_SDK_PROVIDER_FOR_CHAT_API = {
   chat_completions: undefined,
@@ -56,19 +71,32 @@ const AI_SDK_PROVIDER_FOR_CHAT_API = {
   responses: 'openai',
 } as const satisfies Record<GatewayChatApiKind, CustomLlmProvider | undefined>;
 
+/**
+ * The chat API `provider` assigns `model` itself, or null when its chat APIs do not vary per
+ * model.
+ */
+function getAssignedModelChatApi(
+  provider: DirectByokProvider,
+  model: DirectByokModel
+): GatewayChatApiKind | null {
+  return provider.getModelChatApi ? provider.getModelChatApi(model) : null;
+}
+
 function getDirectByokAiSdkProvider(
   provider: DirectByokProvider,
   model: DirectByokModel,
   id: string
 ): DirectByokAiSdkProvider | undefined {
-  if (provider.getModelChatApi) {
-    return AI_SDK_PROVIDER_FOR_CHAT_API[provider.getModelChatApi(model)];
-  }
+  const assignedChatApi = getAssignedModelChatApi(provider, model);
+  if (assignedChatApi !== null) return AI_SDK_PROVIDER_FOR_CHAT_API[assignedChatApi];
   const choice = provider.getAiSdkProvider?.(id);
   return choice ? choice.aiSdkProvider : getAiSdkProvider(id);
 }
 
-function convertModel(provider: DirectByokProvider, model: DirectByokModel) {
+function convertModel(
+  provider: DirectByokProvider,
+  model: DirectByokModel
+): DirectByokModelListing {
   const id = formatDirectByokModelId(provider, model);
   const name = DIRECT_BYOK_PROVIDERS_META[provider.id] + ': ' + model.name;
   return {
@@ -121,7 +149,13 @@ export function getDirectByokModelChatApis(
   provider: DirectByokProvider,
   model: DirectByokModel
 ): ReadonlyArray<GatewayChatApiKind> {
-  return provider.getModelChatApi ? [provider.getModelChatApi(model)] : provider.supportedChatApis;
+  const assignedChatApi = getAssignedModelChatApi(provider, model);
+  if (assignedChatApi === null) {
+    // A null assignment means the provider states one chat API set for every model, which the
+    // provider type carries as an optional property.
+    return provider.supportedChatApis ?? [];
+  }
+  return [assignedChatApi];
 }
 
 export function findDirectByokProvider(providerId: string): DirectByokProvider | undefined {
@@ -301,7 +335,7 @@ export async function createDirectByokReferenceResolver(
   };
 }
 
-async function getDirectByokModels(keys: EnabledByokProvider[]) {
+async function getDirectByokModels(keys: EnabledByokProvider[]): Promise<DirectByokModelListing[]> {
   // A catalog-mode key serves only catalog ids, so its bespoke models are not listed.
   const enabledProviders = directByokProviderList.filter(provider =>
     keys.some(key => key.providerId === provider.id && !isCatalogModeKey(key))
@@ -323,7 +357,7 @@ export async function getDirectByokModel(
 ): Promise<{ provider: DirectByokProvider; model: DirectByokModel } | null> {
   const canonicalModelId = requestedModel.toLowerCase();
   const provider = directByokProviderList.find(provider =>
-    canonicalModelId.startsWith(`${provider.id}/`)
+    canonicalModelId.startsWith(modelIdPrefixOf(provider.id))
   );
   if (!provider) return null;
   const model = (await provider.models()).find(
@@ -359,6 +393,10 @@ function fetchInputUrlString(input: RequestInfo | URL): string {
  * key tests. It applies the resolved upstream's Chat Completions URL and auth;
  * the model is resolved by id alone, so it must be one the provider serves over
  * Chat Completions.
+ *
+ * The upstream comes from the credential, so the Chat Completions check reads the
+ * credential-resolved `supportedChatApis` rather than the per-model set
+ * `getDirectByokModelChatApis` returns.
  */
 export async function createAiSdkProvider(
   directByokProvider: DirectByokProvider,

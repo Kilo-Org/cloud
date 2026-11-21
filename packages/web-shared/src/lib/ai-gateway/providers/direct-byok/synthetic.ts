@@ -6,15 +6,17 @@ import {
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
+const id = 'synthetic';
+
 export default {
-  id: 'synthetic',
+  id,
   models_dev_id: 'synthetic',
   ...apiKeyUpstream({
     apiUrl: 'https://api.synthetic.new/v1',
     supportedChatApis: ['chat_completions'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,
   }),
-  models: cachedDirectByokModelList('synthetic'),
+  models: cachedDirectByokModelList(id),
   provider_listing: {
     dataPolicy: {
       training: false,

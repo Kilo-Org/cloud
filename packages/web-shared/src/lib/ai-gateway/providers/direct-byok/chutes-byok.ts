@@ -5,8 +5,10 @@ import {
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
+const id = 'chutes-byok';
+
 export default {
-  id: 'chutes-byok',
+  id,
   openrouter_inference_provider_id: 'chutes',
   models_dev_id: 'chutes',
   ...apiKeyUpstream({
@@ -14,5 +16,5 @@ export default {
     supportedChatApis: ['chat_completions'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,
   }),
-  models: cachedDirectByokModelList('chutes-byok'),
+  models: cachedDirectByokModelList(id),
 } satisfies DirectByokProvider;

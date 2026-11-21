@@ -201,6 +201,10 @@ async function directByokRoute(
     model: directByokModel,
     stream: request.body.stream === true,
   });
+  const modelMetadata: Readonly<Pick<DirectByokModel, 'id' | 'endpoint'>> = {
+    id: directByokModel.id,
+    endpoint: directByokModel.endpoint,
+  };
 
   return {
     provider: {
@@ -210,7 +214,7 @@ async function directByokRoute(
       async transformRequest(context) {
         context.request.body.model = directByokModel.id;
         delete context.request.body.provider;
-        directByok.transformRequest(context);
+        directByok.transformRequest({ ...context, directByokModel: modelMetadata });
       },
     } satisfies Provider,
     userByok: [{ decryptedAPIKey: credential.decryptedAPIKey, providerId: credential.providerId }],

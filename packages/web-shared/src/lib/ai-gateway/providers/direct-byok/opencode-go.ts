@@ -18,8 +18,10 @@ function sessionHeaders(session: string): Record<string, string> {
   return { [SESSION_HEADER]: session };
 }
 
+const id = 'opencode-go';
+
 export default {
-  id: 'opencode-go',
+  id,
   models_dev_id: 'opencode-go',
   ...apiKeyUpstream({
     apiUrl: 'https://opencode.ai/zen/go/v1',
@@ -53,7 +55,7 @@ export default {
   getAiSdkProvider(model) {
     return isMinimaxModel(model) || isQwenModel(model) ? { aiSdkProvider: 'anthropic' } : null;
   },
-  models: cachedDirectByokModelList('opencode-go'),
+  models: cachedDirectByokModelList(id),
   provider_listing: {
     dataPolicy: {
       training: true,

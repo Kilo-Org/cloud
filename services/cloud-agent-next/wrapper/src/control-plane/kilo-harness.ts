@@ -85,7 +85,7 @@ export function createKiloHarness(options: KiloHarnessOptions): Harness {
       // Every prepare passes through here, whether it reuses the record or
       // restores history: settle a ruleset that a committed record still owes
       // before the route can accept work.
-      await client.settleOutstandingRuleset?.(input.sessionId, input.directory, signal);
+      await client.settleOutstandingRuleset(input.sessionId, input.directory, signal);
       if (
         await (options.sessionExists ?? sessionExists)(
           client,
@@ -129,7 +129,7 @@ export function createKiloHarness(options: KiloHarnessOptions): Harness {
         }
         // The restore re-imported the record, so a marker kept past the probe
         // is applied here; with no marker this is one fast absent read.
-        await client.settleOutstandingRuleset?.(input.sessionId, input.directory, signal);
+        await client.settleOutstandingRuleset(input.sessionId, input.directory, signal);
         return true;
       }
       if (restored.code !== 404 && !restored.emptySnapshot) {

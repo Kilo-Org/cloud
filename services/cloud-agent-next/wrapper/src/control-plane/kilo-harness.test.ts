@@ -500,6 +500,7 @@ describe('Kilo harness', () => {
           server: { url: native.url.toString() },
           serverUrl: native.url.toString(),
           ensureSession: async (id: string) => void ensured.push(id),
+          settleOutstandingRuleset: async () => undefined,
         } as unknown as WrapperKiloClient,
       });
       expect(
@@ -671,6 +672,7 @@ describe('Kilo harness', () => {
           server: { url: native.url.toString() },
           serverUrl: native.url.toString(),
           ensureSession: async (id: string) => void ensured.push(id),
+          settleOutstandingRuleset: async () => undefined,
         } as unknown as WrapperKiloClient,
       });
       expect(

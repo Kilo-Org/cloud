@@ -934,6 +934,7 @@ function createHarness(
           stopProcessCalls.push(opts.sessionId);
           if (cleanupFailure) throw new Error('stop failed');
         },
+        settleOutstandingRuleset: async () => undefined,
       } as unknown as WrapperKiloClient;
       currentClient = createKiloHarness({
         client,

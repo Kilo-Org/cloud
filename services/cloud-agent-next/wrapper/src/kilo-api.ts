@@ -302,9 +302,15 @@ export const isPermanentRulesetFailure = (error: unknown): boolean =>
  *
  * `action` stays a plain string because a record or marker may carry an action
  * VALUE this build does not know, and refusing it would throw away the whole
- * ruleset instead of the one rule. The keys stay strict: the pinned server
- * strips unknown rule keys itself, so accepting them here would only widen what
- * this wrapper treats as a grant.
+ * ruleset instead of the one rule.
+ *
+ * Unknown rule keys are dropped by the parse, not refused: `z.object` strips
+ * them in Zod 4. That is harmless because the pinned server drops the same
+ * unknown rule keys before it stores a rule, so the parsed value, the
+ * comparison and the applied body agree on exactly `permission`, `pattern` and
+ * `action`. `.strict()` is deliberately not used: a record or marker carrying
+ * an extra key must still parse and apply, or the route would wedge on a rule
+ * the server would have dropped anyway.
  */
 const permissionRuleSchema = z.object({
   permission: z.string(),
@@ -314,7 +320,9 @@ const permissionRuleSchema = z.object({
 
 // Parses a ruleset that arrives as JSON (a remembered marker) or as an
 // unvalidated session-read field; a ruleset becomes permission grants, so it is
-// never applied unparsed.
+// never applied unparsed. A rule's unknown keys are dropped by this parse rather
+// than refused, which is safe because the pinned server drops the same keys
+// before storing a rule, so the parsed value and the applied body agree.
 const permissionRulesetSchema = z.array(permissionRuleSchema);
 
 /**
@@ -1390,6 +1398,16 @@ export function createWrapperKiloClient(
       // The record read is unvalidated JSON. The record's slug names the share
       // URL it carries, so a re-point carries that slug instead of renaming the
       // record and leaving the share URL naming the old one.
+      //
+      // The wrapper validates only the fields it dereferences or makes a
+      // decision on — `directory`, `permission`, `share`, `slug` — because
+      // reading `.url` off a non-object would throw inside the wrapper. Every
+      // other field is forwarded verbatim to the import endpoint that owns it,
+      // so a shape the import rejects fails the import exactly as it would
+      // without this change, and projecting those fields down to a hand-written
+      // subset would silently drop values the server does send: a carried
+      // `summary` with `diffs` and a `revert` with `diff` are measured to
+      // round-trip.
       const shareURL = carriedShareUrl(record?.share);
       const imported = await v2Client.kilocode.sessionImport.session(
         {
@@ -1449,6 +1467,11 @@ export function createWrapperKiloClient(
     },
 
     settleOutstandingRuleset: async (sessionId, directory, signal) => {
+      // Without a home directory the wrapper cannot name the store that would
+      // hold an obligation, so this read reports the misconfiguration
+      // retryably instead of preparing a route as if nothing were owed.
+      // Bootstrap sets `HOME` for every allocation, so this is diagnosis for a
+      // broken allocation, not a normal path.
       const obligations = await readSessionObligations(sessionId);
       if (obligations === undefined) return;
       const readTimeout = AbortSignal.timeout(8_000);

@@ -277,6 +277,19 @@ function recoveryStatuses(renderer: TestRenderer.ReactTestRenderer) {
   return renderer.root.findAll(node => String(node.type) === 'SettingsRecoveryStatus');
 }
 
+// The orphaned-findings card's Clear is irreversible, so the grant its stub
+// receives is part of the role read's contract; a missing or doubled card
+// fails loudly instead of reading undefined.
+function orphanedCardCanManage(renderer: TestRenderer.ReactTestRenderer): unknown {
+  const cards = renderer.root.findAll(node => String(node.type) === 'OrphanedFindingsCard');
+  const card = cards[0];
+  if (cards.length !== 1 || !card) {
+    throw new Error(`expected one orphaned-findings card, found ${cards.length}`);
+  }
+  const props: { canManage?: unknown } = card.props;
+  return props.canManage;
+}
+
 // The banner's Retry is the screen's own handler; reading it through a guard
 // makes a missing or non-callable handler fail loudly.
 function queryErrorRetry(renderer: TestRenderer.ReactTestRenderer): () => void {
@@ -443,6 +456,32 @@ describe('RepositorySettingsScreen repository picker', () => {
     // The validation line belongs to the rows it is about, so it rides with
     // them instead of disappearing with the failure.
     expect(textContents(renderer)).toContain(i18n.t('securityAgent.repositories.selectAtLeastOne'));
+  });
+
+  it('keeps the failure banner above a stale empty grant', async () => {
+    // A refetch that failed over a delivered `[]` must not pass the cached
+    // empty grant off as current: the banner names the failure above the
+    // EmptyState, whose grant action stays the way out.
+    repositories.data = [];
+    repositories.isError = true;
+    repositories.error = Object.assign(new Error('boom'), {
+      data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500 },
+    });
+    const { renderer } = await mount();
+
+    const errors = renderer.root.findAll(node => String(node.type) === 'QueryError');
+    expect(errors).toHaveLength(1);
+    const banner = errors[0];
+    if (!banner) {
+      throw new Error('stale empty grant rendered no failure banner');
+    }
+    const props: { variant?: unknown } = banner.props;
+    expect(props.variant).toBe('server');
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(1);
+    expect(emptyStateActionLabel(renderer)).toBe(i18n.t('securityAgent.repositories.manageAccess'));
+
+    act(queryErrorRetry(renderer));
+    expect(repositoriesRetry.retry).toHaveBeenCalledTimes(1);
   });
 
   it('names the connection on a failed refetch that never reached the server', async () => {
@@ -744,6 +783,33 @@ describe('role read states', () => {
 
     expect(recoveryStatuses(renderer)).toHaveLength(1);
     expect(textContents(renderer)).not.toContain(i18n.t('securityAgent.sla.permissionNote'));
+  });
+
+  it('offers the Clear action only on a settled grant', async () => {
+    // The card's Clear is irreversible, so the controls staying usable on an
+    // unanswered role read does not extend to it: only a settled grant opens it.
+    capability.canManage = false;
+    capability.status = 'error';
+    const failed = await mount(ORG_SCOPE);
+    expect(orphanedCardCanManage(failed.renderer)).toBe(false);
+
+    capability.status = 'loading';
+    capability.isPending = true;
+    capability.fetchStatus = 'paused';
+    const paused = await mount(ORG_SCOPE);
+    expect(orphanedCardCanManage(paused.renderer)).toBe(false);
+
+    capability.status = 'allowed';
+    capability.canManage = true;
+    capability.isPending = false;
+    capability.fetchStatus = 'idle';
+    const allowed = await mount(ORG_SCOPE);
+    expect(orphanedCardCanManage(allowed.renderer)).toBe(true);
+
+    capability.status = 'denied';
+    capability.canManage = false;
+    const denied = await mount(ORG_SCOPE);
+    expect(orphanedCardCanManage(denied.renderer)).toBe(false);
   });
 
   it('locks the controls and names the rule only on a settled denial', async () => {

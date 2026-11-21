@@ -85,6 +85,9 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   // Only a settled denial disables the controls: a failed or still-unanswered role
   // read is not evidence that the viewer cannot manage the settings.
   const readOnly = capability.status === 'denied';
+  // The card's Clear is irreversible, so it opens only on a settled grant: a
+  // role read that is still pending or has failed is not one.
+  const canManageOrphanedFindings = capability.status === 'allowed';
   const settingsRecovery = useRetrySecurityAgentSettings(scope);
   const config = useSecurityAgentConfig(scope);
   const repositories = useSecurityAgentRepositories(scope);
@@ -253,7 +256,10 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   });
   const repositoriesFailed =
     repositoriesBody.status === 'error' ||
-    (repositoriesBody.status === 'rows' && repositories.isError);
+    (repositoriesBody.status === 'rows' && repositories.isError) ||
+    // A refetch that failed over a delivered `[]` still has to say so: the
+    // cached empty grant is not evidence that the access is still empty.
+    (repositoriesBody.status === 'empty' && repositories.isError);
   // A settled empty grant leaves nothing to choose between: both modes select
   // from the same empty list, so the pair stays visible (it says what the
   // setting is) but no longer claims a choice the reader cannot make.
@@ -305,7 +311,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
           {t('securityAgent.sla.permissionNote')}
         </Text>
       )}
-      <OrphanedFindingsCard scope={scope} canManage={!readOnly} />
+      <OrphanedFindingsCard scope={scope} canManage={canManageOrphanedFindings} />
       <RadioGroup label={t('common.repositories')}>
         <RowGroup>
           {(['all', 'selected'] as const).map(option => (

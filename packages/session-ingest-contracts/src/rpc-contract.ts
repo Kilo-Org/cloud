@@ -949,7 +949,8 @@ export const kiloSdkAssistantMessageSchema = z.object({
   role: z.literal('assistant'),
   time: z.object({ created: z.number(), completed: z.number().optional() }),
   error: sdkAssistantErrorSchema.optional(),
-  parentID: messageIdSchema,
+  // The v2 display projection uses an empty parent for unparented system messages.
+  parentID: z.union([messageIdSchema, z.literal('')]),
   modelID: z.string(),
   providerID: z.string(),
   mode: z.string(),
@@ -971,13 +972,27 @@ export const kiloSdkMessageSchema = z.discriminatedUnion('role', [
 export type KiloSdkMessageInfo = z.infer<typeof kiloSdkMessageSchema>;
 
 const sdkPartBaseShape = {
-  id: partIdSchema,
+  // Native v2 display parts retain the identity shared by history and live replay.
+  id: z.union([
+    partIdSchema,
+    createIdSchema('msg_', 'native display part IDs').regex(/_[0-9]{6}(?:_summary|_file_[0-9]+)?$/),
+  ]),
   /** Same stored-session rule as the stored messages. */
   sessionID: storedSessionIdSchema,
   messageID: messageIdSchema,
 };
 const sdkPartBaseSchema = z.object(sdkPartBaseShape);
 export type KiloSdkPartBase = z.infer<typeof sdkPartBaseSchema>;
+
+function sdkPartIdMatchesMessage(part: KiloSdkPartBase): boolean {
+  if (part.id.startsWith('prt')) return true;
+  const prefix = `${part.messageID}_`;
+  return (
+    part.messageID.startsWith('msg_') &&
+    part.id.startsWith(prefix) &&
+    /^[0-9]{6}(?:_summary|_file_[0-9]+)?$/.test(part.id.slice(prefix.length))
+  );
+}
 
 /**
  * The identity a part is PERSISTED under: `id` + `messageID`, with no
@@ -991,11 +1006,11 @@ export type KiloSdkPartBase = z.infer<typeof sdkPartBaseSchema>;
  * understand.
  */
 const persistedSdkPartIdentitySchema = z.object({
-  id: sdkPartBaseShape.id,
+  id: partIdSchema,
   messageID: sdkPartBaseShape.messageID,
 });
 
-export const sdkFilePartSchema = z.object({
+const sdkFilePartObjectSchema = z.object({
   ...sdkPartBaseShape,
   type: z.literal('file'),
   mime: z.string(),
@@ -1028,6 +1043,10 @@ export const sdkFilePartSchema = z.object({
     ])
     .optional(),
 });
+export const sdkFilePartSchema = sdkFilePartObjectSchema.refine(sdkPartIdMatchesMessage, {
+  message: 'Native display part ID must belong to its message',
+  path: ['id'],
+});
 export type KiloSdkFilePart = z.infer<typeof sdkFilePartSchema>;
 
 export const sdkToolStateSchema = z.discriminatedUnion('status', [
@@ -1058,7 +1077,7 @@ export const sdkToolStateSchema = z.discriminatedUnion('status', [
 ]);
 export type KiloSdkToolState = z.infer<typeof sdkToolStateSchema>;
 
-export const kiloSdkPartSchema = z.discriminatedUnion('type', [
+const sdkPartVariantsSchema = z.discriminatedUnion('type', [
   z.object({
     ...sdkPartBaseShape,
     type: z.literal('text'),
@@ -1093,7 +1112,11 @@ export const kiloSdkPartSchema = z.discriminatedUnion('type', [
     state: sdkToolStateSchema,
     metadata: sdkMetadataSchema.optional(),
   }),
-  z.object({ ...sdkPartBaseShape, type: z.literal('step-start'), snapshot: z.string().optional() }),
+  z.object({
+    ...sdkPartBaseShape,
+    type: z.literal('step-start'),
+    snapshot: z.string().optional(),
+  }),
   z.object({
     ...sdkPartBaseShape,
     type: z.literal('step-finish'),
@@ -1131,6 +1154,10 @@ export const kiloSdkPartSchema = z.discriminatedUnion('type', [
     tail_start_id: messageIdSchema.optional(),
   }),
 ]);
+export const kiloSdkPartSchema = sdkPartVariantsSchema.refine(sdkPartIdMatchesMessage, {
+  message: 'Native display part ID must belong to its message',
+  path: ['id'],
+});
 export type KiloSdkPart = z.infer<typeof kiloSdkPartSchema>;
 
 export const kiloSdkStoredMessageSchema = z.object({

@@ -258,6 +258,49 @@ afterEach(async () => {
 });
 
 describe('hosted session cold reads', { timeout: 30_000 }, () => {
+  it('reads v2 DO history without starting a sandbox or a billing interval', async () => {
+    const cold = await registerColdSession();
+    await seedRoot({ kiloSessionId, cloudAgentSessionId });
+    const source = {
+      version: 'v2',
+      session: {
+        id: kiloSessionId,
+        location: { directory: '/workspace/private' },
+        time: { created: 1, updated: 2 },
+      },
+    };
+    await cold.stub.onEvents({
+      events: [
+        { type: 'conversation.source', properties: { sessionID: kiloSessionId, source } },
+        {
+          type: 'conversation.message.updated',
+          properties: {
+            sessionID: kiloSessionId,
+            source,
+            message: {
+              id: 'msg_cold_history',
+              type: 'user',
+              text: 'durable transcript',
+              time: { created: 1 },
+            },
+          },
+        },
+      ],
+    });
+    const response = await facadeRequest(`/kilo/session/${kiloSessionId}/message?limit=1`);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject([
+      {
+        info: { id: 'msg_cold_history', role: 'user' },
+        parts: [{ id: 'msg_cold_history_000000', type: 'text', text: 'durable transcript' }],
+      },
+    ]);
+    expect(cold.provider.createCalls).toBe(0);
+    expect(cold.provider.launchEnvs).toHaveLength(0);
+    expect(cold.meter.recordStartInputs).toHaveLength(0);
+    await expect(readBillingContext(cold.sandboxStub)).resolves.toBeUndefined();
+  });
+
   it('serves discovery, detail, transcript and attach without allocating compute or billing', async () => {
     const cold = await registerColdSession();
     try {

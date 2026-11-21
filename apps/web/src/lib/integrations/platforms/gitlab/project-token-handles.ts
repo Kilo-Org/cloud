@@ -12,6 +12,7 @@ import {
   deleteStoredProjectCredential,
   deleteStoredProjectTokenMetadataEntry,
   markStoredProjectCredentialUnusable,
+  ProjectCredentialReplacedError,
   readProjectCredentialAccountId,
   readProjectRevocationStatus,
   type StoredProjectCredential,
@@ -196,14 +197,42 @@ export const GITLAB_PROJECT_TOKEN_REPLACEMENT_UNSETTLED_MESSAGE =
  *
  * The caller passes the credential it already holds as `options.userToken`;
  * `options.signal` carries that caller's deadline into the provider request.
+ *
+ * A caller that already read the credential it means to settle names it as
+ * `options.expectedCredential`. The removal then acts only on that credential:
+ * a stored row that is absent or differs on its id, version, or token id is
+ * reported as retained without a provider call or any write, and the same
+ * answer replaces the replacement error of a conditional delete.
  */
 export async function removeStoredProjectAccessToken(
   integration: Pick<PlatformIntegration, 'id' | 'metadata'>,
   projectId: string | number,
-  options: { userToken: string; signal?: AbortSignal }
+  options: {
+    userToken: string;
+    signal?: AbortSignal;
+    expectedCredential?: StoredProjectCredential;
+  }
 ): Promise<StoredProjectTokenRemoval> {
   const projectIdStr = requireGitLabProjectId(projectId);
   const storedCredential = await getStoredProjectCredential(integration.id, projectIdStr);
+  const expectedCredential = options.expectedCredential;
+  if (
+    expectedCredential !== undefined &&
+    (storedCredential === null ||
+      storedCredential.credentialId !== expectedCredential.credentialId ||
+      storedCredential.credentialVersion !== expectedCredential.credentialVersion ||
+      storedCredential.tokenId !== expectedCredential.tokenId)
+  ) {
+    logExceptInTest(
+      '[removeStoredProjectAccessToken] Stored credential is not the one named for settlement',
+      {
+        projectId,
+        expectedTokenId: expectedCredential.tokenId,
+        currentTokenId: storedCredential?.tokenId ?? null,
+      }
+    );
+    return { outcome: 'retained', retryable: false };
+  }
   const tokenIds = [
     ...new Set(
       [
@@ -255,11 +284,22 @@ export async function removeStoredProjectAccessToken(
   });
 
   if (storedCredential) {
-    await deleteStoredProjectCredential({
-      integrationId: integration.id,
-      projectId: projectIdStr,
-      credential: storedCredential,
-    });
+    try {
+      await deleteStoredProjectCredential({
+        integrationId: integration.id,
+        projectId: projectIdStr,
+        credential: storedCredential,
+      });
+    } catch (error) {
+      if (!(expectedCredential !== undefined && error instanceof ProjectCredentialReplacedError)) {
+        throw error;
+      }
+      logExceptInTest(
+        '[removeStoredProjectAccessToken] Named credential replaced before its rows were dropped',
+        { projectId, tokenId: expectedCredential.tokenId }
+      );
+      return { outcome: 'retained', retryable: false };
+    }
   } else {
     await deleteStoredProjectTokenMetadataEntry({
       integrationId: integration.id,

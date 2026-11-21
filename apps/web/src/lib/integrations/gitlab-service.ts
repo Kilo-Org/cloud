@@ -995,25 +995,18 @@ export async function getOrCreateProjectAccessToken(
       }
 
       if (replacedTokenUnsettled) {
-        const current = await getStoredProjectCredential(integration.id, projectIdStr);
-        if (current === null || current.tokenId !== replacedTokenUnsettled.tokenId) {
+        const removal = await removeStoredProjectAccessToken(integration, projectIdStr, {
+          userToken,
+          expectedCredential: replacedTokenUnsettled,
+        });
+        if (removal.outcome === 'retained') {
           logExceptInTest(
-            '[getOrCreateProjectAccessToken] Replaced credential changed before settlement',
+            '[getOrCreateProjectAccessToken] Replaced credential not settled; refusing replacement',
             {
               projectId,
               expectedTokenId: replacedTokenUnsettled.tokenId,
-              currentTokenId: current?.tokenId ?? null,
             }
           );
-          throw new TRPCError({
-            code: 'PRECONDITION_FAILED',
-            message: GITLAB_PROJECT_TOKEN_REPLACEMENT_UNSETTLED_MESSAGE,
-          });
-        }
-        const removal = await removeStoredProjectAccessToken(integration, projectIdStr, {
-          userToken,
-        });
-        if (removal.outcome === 'retained') {
           throw new TRPCError({
             code: 'PRECONDITION_FAILED',
             message: GITLAB_PROJECT_TOKEN_REPLACEMENT_UNSETTLED_MESSAGE,

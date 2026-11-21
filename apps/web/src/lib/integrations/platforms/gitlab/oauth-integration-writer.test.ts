@@ -17,6 +17,7 @@ import {
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type * as GitLabAdapter from '@/lib/integrations/platforms/gitlab/adapter';
+import type * as GitLabMetadataMutation from '@/lib/integrations/platforms/gitlab/metadata-mutation';
 import type { GitLabCredentialBrokerResult } from '@/lib/integrations/platforms/gitlab/credential-broker-client';
 import { storeGitLabOAuthIntegration } from './oauth-integration-writer';
 
@@ -62,11 +63,34 @@ jest.mock('@/lib/integrations/platforms/gitlab/credential-broker-client', () => 
   fetchGitLabCredential: async () => mockFetchGitLabCredentialResult,
 }));
 
+let mockMovedMetadata: Record<string, unknown> | null = null;
+
+jest.mock('@/lib/integrations/platforms/gitlab/metadata-mutation', () => {
+  const actual = jest.requireActual<typeof GitLabMetadataMutation>(
+    '@/lib/integrations/platforms/gitlab/metadata-mutation'
+  );
+  return {
+    ...actual,
+    readGitLabMetadataInTransaction: async (
+      tx: Parameters<typeof actual.readGitLabMetadataInTransaction>[0],
+      integrationId: Parameters<typeof actual.readGitLabMetadataInTransaction>[1]
+    ) => {
+      if (mockMovedMetadata !== null) {
+        const moved = mockMovedMetadata;
+        mockMovedMetadata = null;
+        return moved;
+      }
+      return actual.readGitLabMetadataInTransaction(tx, integrationId);
+    },
+  };
+});
+
 describe('GitLab OAuth integration writer', () => {
   beforeEach(() => {
     mockRevokeProjectAccessTokenCalls.length = 0;
     mockRevokeProjectAccessTokenBehavior = async () => {};
     mockFetchGitLabCredentialResult = { status: 'temporarily_unavailable' };
+    mockMovedMetadata = null;
     mockCredentialEncryptionConfig.keyId = TEST_KEY_ID;
     mockCredentialEncryptionConfig.publicKey = Buffer.from(testKeyPair.publicKey).toString(
       'base64'
@@ -623,6 +647,63 @@ describe('GitLab OAuth integration writer', () => {
       })
     );
     expect(updatedIntegration?.metadata).not.toHaveProperty('client_secret');
+  });
+
+  it('refuses a connect whose stored instance moved after the pre-transaction read', async () => {
+    const user = await insertTestUser();
+    const providerBaseUrl = 'https://gitlab.example.com/root';
+    const [integration] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: user.id,
+        platform: 'gitlab',
+        integration_type: 'oauth',
+        platform_account_id: 'provider-id',
+        platform_account_login: 'provider-login',
+        integration_status: 'active',
+        metadata: {
+          gitlab_instance_url: providerBaseUrl,
+          webhook_secret: 'old-webhook-secret',
+          auth_type: 'oauth',
+        },
+      })
+      .returning();
+    if (!integration) throw new Error('Expected existing integration');
+    mockMovedMetadata = {
+      gitlab_instance_url: 'https://gitlab.example.com/moved',
+      webhook_secret: 'moved-webhook-secret',
+      auth_type: 'oauth',
+    };
+
+    await expect(
+      storeGitLabOAuthIntegration({
+        owner: { type: 'user', id: user.id },
+        authorizedByUserId: user.id,
+        providerBaseUrl,
+        providerUser: { id: 'provider-id', login: 'provider-login' },
+        accessToken: 'oauth-access-secret',
+        refreshToken: 'oauth-refresh-secret',
+        accessTokenExpiresAt: '2031-01-01T00:00:00.000Z',
+        oauthClientId: null,
+        oauthClientSecret: null,
+        scopes: ['api'],
+        repositories: null,
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+    const [unchanged] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, integration.id));
+    expect(unchanged?.metadata).toEqual(
+      expect.objectContaining({ gitlab_instance_url: providerBaseUrl })
+    );
+    await expect(
+      db
+        .select()
+        .from(platform_oauth_credentials)
+        .where(eq(platform_oauth_credentials.platform_integration_id, integration.id))
+    ).resolves.toEqual([]);
   });
 
   it('leaves existing state unchanged when credential encryption is unavailable', async () => {

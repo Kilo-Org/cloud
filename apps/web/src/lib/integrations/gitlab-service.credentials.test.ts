@@ -2988,6 +2988,88 @@ describe('GitLab encrypted credential persistence', () => {
     );
   });
 
+  it('refuses a replacement when another writer settles the replaced credential first', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    let [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await getOrCreateProjectAccessToken(integration, 42, { userId: user.id });
+    [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    const nearExpiry = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    await db
+      .update(platform_access_token_credentials)
+      .set({
+        provider_metadata: {
+          providerCredentialId: '777',
+          expiresOn: nearExpiry,
+          authorizedAccountId: '123',
+        },
+      })
+      .where(
+        and(
+          eq(platform_access_token_credentials.platform_integration_id, connected.integration.id),
+          eq(platform_access_token_credentials.provider_resource_id, '42')
+        )
+      );
+    mockRotateProjectAccessToken.mockRejectedValueOnce(new Error('rotation failed'));
+    mockRevokeProjectAccessToken.mockImplementationOnce(async () => {
+      await db
+        .update(platform_access_token_credentials)
+        .set({
+          credential_version: 2,
+          provider_metadata: {
+            providerCredentialId: '888',
+            expiresOn: '2027-07-13',
+            authorizedAccountId: '123',
+          },
+        })
+        .where(
+          and(
+            eq(platform_access_token_credentials.platform_integration_id, connected.integration.id),
+            eq(platform_access_token_credentials.provider_resource_id, '42')
+          )
+        );
+    });
+    mockCreateProjectAccessToken.mockClear();
+
+    await expect(
+      getOrCreateProjectAccessToken(integration, 42, { userId: user.id })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+
+    expect(mockRevokeProjectAccessToken).toHaveBeenCalledTimes(1);
+    expect(mockRevokeProjectAccessToken).toHaveBeenCalledWith(
+      'glpat-primary-token',
+      '42',
+      777,
+      'https://gitlab.com',
+      undefined
+    );
+    expect(mockCreateProjectAccessToken).not.toHaveBeenCalled();
+    const [credential] = await db
+      .select()
+      .from(platform_access_token_credentials)
+      .where(
+        and(
+          eq(platform_access_token_credentials.platform_integration_id, connected.integration.id),
+          eq(platform_access_token_credentials.provider_resource_id, '42')
+        )
+      );
+    expect(credential.provider_metadata).toEqual(
+      expect.objectContaining({ providerCredentialId: '888' })
+    );
+    expect(credential.credential_version).toBe(2);
+  });
+
   it('revokes a legacy project token id when the connected account changes', async () => {
     const user = await insertTestUser();
     const connected = await connectWithPAT(

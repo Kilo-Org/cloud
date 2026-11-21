@@ -25,6 +25,18 @@ type ProjectCredentialRef = { credentialId: string; credentialVersion: number };
 
 export type ProjectCredentialRetirement = 'retired' | 'retained';
 
+/**
+ * A conditional write found a different stored credential than the one it named.
+ * Callers that narrowed their write to one credential map this to a retained
+ * outcome; callers that did not must fail the operation.
+ */
+export class ProjectCredentialReplacedError extends Error {
+  constructor() {
+    super('GitLab project access token was replaced concurrently');
+    this.name = 'ProjectCredentialReplacedError';
+  }
+}
+
 export function readGitLabAccountId(
   integration: Pick<PlatformIntegration, 'platform_account_id' | 'platform_installation_id'>
 ): string | null {
@@ -81,7 +93,7 @@ export async function deleteStoredProjectCredential(input: {
       )
       .returning({ id: platform_access_token_credentials.id });
     if (deleted.length !== 1) {
-      throw new Error('GitLab project access token was replaced concurrently');
+      throw new ProjectCredentialReplacedError();
     }
   });
 }
@@ -125,7 +137,7 @@ export async function markStoredProjectCredentialUnusable(input: {
       )
       .limit(1);
     if (!row) {
-      throw new Error('GitLab project access token was replaced concurrently');
+      throw new ProjectCredentialReplacedError();
     }
     const providerMetadata = GitLabProjectAccessTokenMetadataSchema.parse({
       ...GitLabProjectAccessTokenMetadataSchema.parse(row.provider_metadata),
@@ -145,7 +157,7 @@ export async function markStoredProjectCredentialUnusable(input: {
       )
       .returning({ id: platform_access_token_credentials.id });
     if (updated.length !== 1) {
-      throw new Error('GitLab project access token was replaced concurrently');
+      throw new ProjectCredentialReplacedError();
     }
   });
 }

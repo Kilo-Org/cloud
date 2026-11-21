@@ -3451,7 +3451,7 @@
       "manageOnWeb": "Fakturazio-ezarpenak webean",
       "changePlan": "Aldatu plana",
       "buySeats": "Erosi lizentziak",
-      "managedOnWeb": "Plana, lizentziak eta birkarga automatikoa webean kudeatzen dira.",
+      "managedOnWeb": "Plana, lizentziak eta birkarga automatikoa kilo.ai-n kudeatzen dira.",
       "setupAutoTopUp": "Konfiguratu birkarga automatikoa",
       "manageAutoTopUp": "Kudeatu birkarga automatikoa",
       "opensOnWeb": "Webean irekitzen da"

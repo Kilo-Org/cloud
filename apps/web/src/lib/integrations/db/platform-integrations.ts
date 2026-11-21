@@ -22,6 +22,7 @@ import {
   effectiveAppTypeCondition,
   occupiesAnotherGitHubInstallationSlot,
   ownerCondition,
+  type GitHubInstallationSlot,
 } from './predicates';
 import { getPostgresErrorCode, RETRYABLE_TRANSACTION_SQLSTATES } from '@/lib/db-errors';
 
@@ -275,6 +276,30 @@ export async function getPrimaryGitHubIntegrationForOrganization(organizationId:
     .limit(1);
 
   return integration ?? null;
+}
+
+/**
+ * The installation slots an organization's live GitHub associations occupy, in
+ * the shape the shared slot predicate reads. One definition serves the readers
+ * that must agree with the writers applying the single-installation rule.
+ */
+export async function getOrganizationGitHubInstallationSlots(
+  organizationId: string
+): Promise<GitHubInstallationSlot[]> {
+  return await db
+    .select({
+      installationId: platform_integrations.platform_installation_id,
+      appType: platform_integrations.github_app_type,
+    })
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.owned_by_organization_id, organizationId),
+        eq(platform_integrations.platform, PLATFORM.GITHUB),
+        // A locally disconnected connection has relinquished its slot.
+        isNull(platform_integrations.github_disconnected_at)
+      )
+    );
 }
 
 export async function getAllIntegationsForOrganization(organizationId: string) {

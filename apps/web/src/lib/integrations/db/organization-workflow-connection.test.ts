@@ -8,6 +8,7 @@ import {
   type PlatformIntegration,
 } from '@kilocode/db/schema';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { eq } from 'drizzle-orm';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { assertGitHubInstallationRuntimeAuthorized } from '@/lib/integrations/github/runtime-authorization';
 import { fetchAllGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
@@ -15,6 +16,7 @@ import {
   getGitHubConnectionStatusForOwner,
   getIntegrationsByOrganization,
   getIntegrationForOwner,
+  getOrganizationGitHubInstallationSlots,
   getPrimaryGitHubIntegrationForOrganization,
 } from './platform-integrations';
 
@@ -377,5 +379,41 @@ describe('organization GitHub workflow connection lookups', () => {
     await expect(
       getIntegrationForOwner({ type: 'user', id: ownerId }, PLATFORM.GITHUB)
     ).resolves.toMatchObject({ id: lowerId });
+  });
+
+  test('reports the live installation slots an organization holds, and no slot for a pending request', async () => {
+    const organization = await createTestOrganization('Installation slots', ownerId, 0);
+    const liveInstallationId = nextInstallationId();
+    await insertAssociation(
+      organizationAssociation(organization.id, { installationId: liveInstallationId })
+    );
+    await db.insert(platform_integrations).values({
+      owned_by_organization_id: organization.id,
+      platform: PLATFORM.GITHUB,
+      integration_type: 'app',
+      integration_status: 'pending',
+      github_app_type: 'standard',
+      platform_installation_id: null,
+      repository_access: 'all',
+    });
+
+    await expect(getOrganizationGitHubInstallationSlots(organization.id)).resolves.toEqual([
+      { installationId: liveInstallationId, appType: 'standard' },
+      { installationId: null, appType: 'standard' },
+    ]);
+  });
+
+  test('releases the organization slot when the association is disconnected locally', async () => {
+    const organization = await createTestOrganization('Disconnected slot', ownerId, 0);
+    const installationId = nextInstallationId();
+    const association = await insertAssociation(
+      organizationAssociation(organization.id, { installationId })
+    );
+    await db
+      .update(platform_integrations)
+      .set({ github_disconnected_at: new Date().toISOString() })
+      .where(eq(platform_integrations.id, association.id));
+
+    await expect(getOrganizationGitHubInstallationSlots(organization.id)).resolves.toEqual([]);
   });
 });

@@ -3,6 +3,7 @@ import {
   AUTO_DECISION_HEADER,
   customRouterModelId,
   isCustomRouterModelId,
+  isVirtualAutoModelId,
   type AutoRouter,
   type CustomRouterErrorCode,
   type CustomRouterReference,
@@ -174,15 +175,16 @@ async function autoRoutingDenials(
     candidateIds: () => Promise<ReadonlyArray<string>>;
   }
 ): Promise<string[]> {
+  const groupPolicy = await ctx.organizationGroupPolicyPromise;
   const regionDenials = async () => {
     const scope = await fromRegion.scope();
     if (!scope) return [];
     return inferenceRegionIneligibleCandidates({
       ...scope,
+      policy: groupPolicy,
       candidateIds: await fromRegion.candidateIds(),
     });
   };
-  const groupPolicy = await ctx.organizationGroupPolicyPromise;
   const [deniedFromPolicy, deniedFromPrivacy, deniedFromRegion] = await Promise.all([
     groupPolicy ? fromPolicy(groupPolicy) : [],
     isDataCollectionExplicitlyDisallowed(ctx.effectivePrivacy)
@@ -278,7 +280,24 @@ async function resolveAutoModelId(
       deniedModelIds,
     });
     classifierCostUsd = result?.costUsd ?? 0;
-    return result?.decision ?? null;
+    const decision = result?.decision ?? null;
+    if (!decision || isVirtualAutoModelId(decision.model)) return decision;
+    // The worker can pick from a newer routing table than the gateway's cached copy, or from
+    // any table when the gateway's is unavailable, so the denials above may not cover its pick.
+    const scope = await getInferenceRegionScope();
+    if (
+      scope &&
+      (
+        await inferenceRegionIneligibleCandidates({
+          ...scope,
+          policy: await ctx.organizationGroupPolicyPromise,
+          candidateIds: [decision.model],
+        })
+      ).length > 0
+    ) {
+      return null;
+    }
+    return decision;
   };
   const customRouterDecision = async (reference: CustomRouterReference) => {
     const auth = await authenticatedRoutingCaller(ctx.callerPromise);
@@ -357,6 +376,7 @@ async function resolveAutoModelId(
               region: regionScope.region,
               candidateIds: [modelId],
               byokOwner: null,
+              policy: null,
             })
           ).length === 0
         );

@@ -1,4 +1,4 @@
-import { describe, expect, it } from '@jest/globals';
+import { afterEach, describe, expect, it } from '@jest/globals';
 import type { jest as JestGlobal } from '@jest/globals';
 
 // `jest.mock` is hoisted above the compiled `require`s only when it is called on
@@ -35,6 +35,16 @@ import pg, { types } from 'pg';
 import { createDrizzleClient, databaseTypeParsers, getWorkerDb } from './client';
 
 const workerConnectionString = 'postgres://worker.example/db';
+
+const originalDatabaseCa = process.env.DATABASE_CA;
+
+afterEach(() => {
+  if (originalDatabaseCa === undefined) {
+    delete process.env.DATABASE_CA;
+  } else {
+    process.env.DATABASE_CA = originalDatabaseCa;
+  }
+});
 
 describe('getWorkerDb', () => {
   it('creates separate Worker DB transports for identical inputs', () => {

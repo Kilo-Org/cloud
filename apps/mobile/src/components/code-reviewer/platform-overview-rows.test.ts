@@ -92,9 +92,9 @@ describe('buildOverviewRows model label', () => {
   it('never prints a raw vendor/model slug, even with an empty catalogue', () => {
     // The overview printed `deepseek/deepseek-v4.1-flash-1017` while the model
     // button on the same screen named it `DeepSeek V4.1 Flash 1017`.
-    expect(
-      modelSubtitle(makeConfig({ modelSlug: 'deepseek/deepseek-v4.1-flash-1017' }), [])
-    ).toBe('deepseek v4.1 flash 1017');
+    expect(modelSubtitle(makeConfig({ modelSlug: 'deepseek/deepseek-v4.1-flash-1017' }), [])).toBe(
+      'deepseek v4.1 flash 1017'
+    );
   });
 });
 

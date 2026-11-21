@@ -1946,6 +1946,52 @@ describe('GitHub installation persistence', () => {
     expect(rows.filter(row => row.github_connection_role === 'workflow')).toHaveLength(1);
   });
 
+  test('gives the workflow role to the next owner when the earlier association is suspended', async () => {
+    const predecessor = await createTestOrganization('Suspended peer predecessor', ownerId, 0);
+    const successor = await createTestOrganization('Suspended peer successor', otherOwnerId, 0);
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: predecessor.id },
+      data('990110')
+    );
+    if (!first.ok) throw new Error('Expected the predecessor organization to connect');
+
+    // The association carries the suspended status and the suspension stamp,
+    // which the health condition treats as not acting for the installation.
+    await db
+      .update(platform_integrations)
+      .set({
+        integration_status: 'suspended',
+        suspended_at: new Date().toISOString(),
+        suspended_by: 'webhook-sender',
+      })
+      .where(eq(platform_integrations.id, first.integrationId));
+
+    // The successor attaches as the workflow connection, and the suspended
+    // association keeps secondary access.
+    expect(process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS).toBeFalsy();
+    const second = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: successor.id },
+      { ...data('990110'), kiloUserId: otherOwnerId }
+    );
+    expect(second).toEqual({ ok: true, integrationId: expect.any(String) });
+    if (!second.ok) throw new Error('Expected the successor organization to connect');
+
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, '990110'));
+    expect(rows.find(row => row.id === first.integrationId)).toMatchObject({
+      github_connection_role: 'agent_only',
+      github_disconnected_at: null,
+      github_installation_id: expect.any(String),
+    });
+    expect(rows.find(row => row.id === second.integrationId)).toMatchObject({
+      github_connection_role: 'workflow',
+      integration_status: 'active',
+    });
+    expect(rows.filter(row => row.github_connection_role === 'workflow')).toHaveLength(1);
+  });
+
   test('reconnects an earlier shared-installation organization as a secondary association', async () => {
     const organizationA = await createTestOrganization('Takeover predecessor org', ownerId, 0);
     const organizationB = await createTestOrganization('Takeover successor org', otherOwnerId, 0);

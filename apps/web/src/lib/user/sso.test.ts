@@ -51,11 +51,13 @@ import {
   addSsoUserToOrganization,
   skipCustomerSourceSurveyForOrgJoin,
 } from '@kilocode/web-shared/lib/organizations/organizations';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { processSSOUserLogin } from './sso';
 
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
 const mockAddSsoUserToOrganization = jest.mocked(addSsoUserToOrganization);
 const mockSkipCustomerSourceSurveyForOrgJoin = jest.mocked(skipCustomerSourceSurveyForOrgJoin);
+const mockCreateAuditLog = jest.mocked(createAuditLog);
 const { mockWorkOSInstance } = jest.requireMock('@workos-inc/node') as {
   mockWorkOSInstance: { organizations: { listOrganizations: jest.Mock } };
 };
@@ -100,7 +102,13 @@ describe('processSSOUserLogin', () => {
     };
 
     await expect(
-      processSSOUserLogin(accountInfo, requestHeaders, 'impact-click-123', trackingContext)
+      processSSOUserLogin(
+        accountInfo,
+        'workos-org',
+        requestHeaders,
+        'impact-click-123',
+        trackingContext
+      )
     ).resolves.toBe(true);
 
     expect(mockCreateOrUpdateUser).toHaveBeenCalledWith(
@@ -139,7 +147,14 @@ describe('processSSOUserLogin', () => {
       };
 
       await expect(
-        processSSOUserLogin(accountInfo, undefined, undefined, undefined, 'invite-token')
+        processSSOUserLogin(
+          accountInfo,
+          'workos-org',
+          undefined,
+          undefined,
+          undefined,
+          'invite-token'
+        )
       ).resolves.toBe(true);
       expect(mockAddSsoUserToOrganization).toHaveBeenCalledWith('org-local', 'user-workos', {
         isNewUser: isNew,
@@ -160,7 +175,7 @@ describe('processSSOUserLogin', () => {
       provider_account_id: 'workos-user-123',
     };
 
-    await expect(processSSOUserLogin(accountInfo)).resolves.toBe(true);
+    await expect(processSSOUserLogin(accountInfo, 'workos-org')).resolves.toBe(true);
 
     expect(mockSkipCustomerSourceSurveyForOrgJoin).toHaveBeenCalledWith('user-workos');
   });
@@ -176,8 +191,40 @@ describe('processSSOUserLogin', () => {
       provider_account_id: 'workos-user-123',
     };
 
-    await expect(processSSOUserLogin(accountInfo)).resolves.toBe(true);
+    await expect(processSSOUserLogin(accountInfo, 'workos-org')).resolves.toBe(true);
 
     expect(mockSkipCustomerSourceSurveyForOrgJoin).not.toHaveBeenCalled();
+  });
+
+  describe('profile organization', () => {
+    const accountInfo = {
+      google_user_email: 'new-user@example.com',
+      google_user_name: 'New User',
+      google_user_image_url: 'https://example.com/avatar.png',
+      hosted_domain: 'example.com',
+      provider: 'workos' as const,
+      provider_account_id: 'workos-user-123',
+    };
+
+    it('accepts a profile issued for the domain organization', async () => {
+      await expect(processSSOUserLogin(accountInfo, 'workos-org')).resolves.toBe(true);
+
+      expect(getMockListOrganizations()).toHaveBeenCalledWith({ domains: ['example.com'] });
+      expect(mockCreateOrUpdateUser).toHaveBeenCalledTimes(1);
+      expect(mockAddSsoUserToOrganization).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ['another organization', 'workos-other-org'],
+      ['no organization', null],
+    ])('rejects a profile issued for %s', async (_label, profileOrganizationId) => {
+      await expect(processSSOUserLogin(accountInfo, profileOrganizationId)).resolves.toBe(
+        '/users/sign_in?error=OAUTH_ERROR'
+      );
+
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+      expect(mockAddSsoUserToOrganization).not.toHaveBeenCalled();
+      expect(mockCreateAuditLog).not.toHaveBeenCalled();
+    });
   });
 });

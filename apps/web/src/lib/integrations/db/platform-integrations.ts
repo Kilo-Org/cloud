@@ -1418,22 +1418,8 @@ export async function upsertPlatformIntegrationForOwner(
             existing.owned_by_user_id === null));
       if (existing && !sameOwner) return { ok: false, reason: 'claimed_by_other_owner' };
 
-      if (requiresOwnerCardinalityLock) {
-        const ownerIntegrations = await tx
-          .select({
-            installationId: platform_integrations.platform_installation_id,
-            appType: platform_integrations.github_app_type,
-          })
-          .from(platform_integrations)
-          .where(
-            and(
-              eq(platform_integrations.owned_by_organization_id, owner.id),
-              eq(platform_integrations.platform, PLATFORM.GITHUB),
-              // A locally disconnected connection has relinquished its slot;
-              // it must not block attaching a different installation.
-              isNull(platform_integrations.github_disconnected_at)
-            )
-          );
+      if (requiresOwnerCardinalityLock && owner.type === 'org') {
+        const ownerIntegrations = await getOrganizationGitHubInstallationSlots(owner.id, tx);
         if (
           ownerIntegrations.some(integration =>
             occupiesAnotherGitHubInstallationSlot(integration, {

@@ -17753,6 +17753,7 @@
               "organization.group.default_policy.remove",
               "organization.group.policy_type.enable",
               "organization.group.policy_type.disable",
+              "organization.named_policy.change",
               "organization.created",
               "organization.token.generate",
               "organization.funds.distribute_to_children",

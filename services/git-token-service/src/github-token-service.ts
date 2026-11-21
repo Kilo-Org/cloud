@@ -206,7 +206,8 @@ export class GitHubTokenService {
 
   async refreshInstallationAccountLoginIfDue(
     installationId: string,
-    appType: GitHubAppType = 'standard'
+    appType: GitHubAppType = 'standard',
+    requestTimeoutMs?: number
   ): Promise<string | null> {
     const cooldownKey = `${INSTALLATION_LOGIN_REFRESH_CACHE_KEY_PREFIX}${appType}:${installationId}`;
     if (this.env.TOKEN_CACHE) {
@@ -229,7 +230,12 @@ export class GitHubTokenService {
       });
       const { token } = await auth({ type: 'app' });
       const octokit = new Octokit({ auth: token });
-      const { data } = await octokit.apps.getInstallation({ installation_id: numericId });
+      const { data } = await octokit.apps.getInstallation({
+        installation_id: numericId,
+        ...(requestTimeoutMs === undefined
+          ? {}
+          : { request: { signal: AbortSignal.timeout(requestTimeoutMs) } }),
+      });
       const parsed = GitHubInstallationAccountSchema.safeParse(data);
       if (!parsed.success) {
         console.warn(

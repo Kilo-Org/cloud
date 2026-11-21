@@ -9,7 +9,7 @@ import { readBoundedJsonBody } from './lib/bounded-read.js';
 const PAGE_SIZE = 100;
 const MAX_PAGE = 100;
 const MAX_PAGE_BYTES = 1024 * 1024;
-const GITHUB_TIMEOUT_MS = 10_000;
+export const HOSTED_GITHUB_REQUEST_TIMEOUT_MS = 4_000;
 const fullNameSchema = z.string().regex(/^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/);
 const repositoryIdSchema = z.int().positive();
 const pageSchema = z.int().min(1).max(MAX_PAGE);
@@ -79,7 +79,7 @@ function findPrimary(repositories: Repository[], primaryRepo: string): Repositor
 
 export class HostedWorkspaceGitHubRepositories {
   constructor(
-    private readonly lookup: Pick<InstallationLookupService, 'findHostedWorkspaceInstallation'>,
+    private readonly findInstallation: InstallationLookupService['findHostedWorkspaceInstallation'],
     private readonly tokens: Pick<
       GitHubTokenService,
       'getToken' | 'getFreshTokenForRepositorySelection'
@@ -94,16 +94,16 @@ export class HostedWorkspaceGitHubRepositories {
     const page = pageSchema.safeParse(params.page);
     if (!page.success) return unavailable('repository_unavailable');
 
-    return this.withInstallation(scope.data, async (installation, signal) => {
+    return this.withInstallation(scope.data, async installation => {
       const token = await this.tokens.getToken(
         installation.installationId,
         installation.githubAppType,
-        signal
+        AbortSignal.timeout(HOSTED_GITHUB_REQUEST_TIMEOUT_MS)
       );
-      const { repositories, hasNextPage } = await this.readPage(token, page.data, signal);
+      const { repositories, hasNextPage } = await this.readPage(token, page.data);
       const primary =
         findPrimary(repositories, scope.data.primaryRepo) ??
-        (await this.readPrimary(installation, scope.data.primaryRepo, signal));
+        (await this.readPrimary(installation, scope.data.primaryRepo));
       if (!primary || !isEligible(primary, installation))
         return unavailable('repository_unavailable');
       if (hasNextPage && page.data === MAX_PAGE) return unavailable('temporarily_unavailable');
@@ -133,8 +133,8 @@ export class HostedWorkspaceGitHubRepositories {
       return unavailable('repository_unavailable');
     }
 
-    return this.withInstallation(scope.data, async (installation, signal) => {
-      const primary = await this.readPrimary(installation, scope.data.primaryRepo, signal);
+    return this.withInstallation(scope.data, async installation => {
+      const primary = await this.readPrimary(installation, scope.data.primaryRepo);
       if (!primary || !isEligible(primary, installation)) {
         return unavailable('repository_unavailable');
       }
@@ -152,9 +152,9 @@ export class HostedWorkspaceGitHubRepositories {
         installation.installationId,
         installation.githubAppType,
         { repositoryIds: otherIds },
-        signal
+        AbortSignal.timeout(HOSTED_GITHUB_REQUEST_TIMEOUT_MS)
       );
-      const { repositories, hasNextPage } = await this.readPage(token, 1, signal);
+      const { repositories, hasNextPage } = await this.readPage(token, 1);
       const additional: RepositoryIdentity[] = [];
       for (const id of ids.data) {
         const repo =
@@ -177,10 +177,10 @@ export class HostedWorkspaceGitHubRepositories {
 
   private async withInstallation<T>(
     scope: Scope,
-    action: (installation: HostedWorkspaceInstallation, signal: AbortSignal) => Promise<T | Failure>
+    action: (installation: HostedWorkspaceInstallation) => Promise<T | Failure>
   ): Promise<T | Failure> {
     try {
-      const installation = await this.lookup.findHostedWorkspaceInstallation({
+      const installation = await this.findInstallation({
         userId: scope.userId,
         orgId: scope.organizationId,
         expectedIntegrationId: scope.integrationId,
@@ -193,7 +193,7 @@ export class HostedWorkspaceGitHubRepositories {
           return unavailable('repository_unavailable');
         return unavailable('access_denied');
       }
-      return await action(installation, AbortSignal.timeout(GITHUB_TIMEOUT_MS));
+      return await action(installation);
     } catch (error) {
       if (error instanceof GitHubTokenGenerationError) {
         if (error.reason === 'no_installation_found') return unavailable('access_denied');
@@ -207,23 +207,22 @@ export class HostedWorkspaceGitHubRepositories {
 
   private async readPrimary(
     installation: HostedWorkspaceInstallation,
-    primaryRepo: string,
-    signal: AbortSignal
+    primaryRepo: string
   ): Promise<Repository | undefined> {
     const repoName = primaryRepo.slice(primaryRepo.indexOf('/') + 1);
     const token = await this.tokens.getFreshTokenForRepositorySelection(
       installation.installationId,
       installation.githubAppType,
       { repositoryNames: [repoName] },
-      signal
+      AbortSignal.timeout(HOSTED_GITHUB_REQUEST_TIMEOUT_MS)
     );
-    const { repositories, hasNextPage } = await this.readPage(token, 1, signal);
+    const { repositories, hasNextPage } = await this.readPage(token, 1);
     const primary = findPrimary(repositories, primaryRepo);
     if (!primary && hasNextPage) throw new Error('Incomplete scoped GitHub primary inventory');
     return primary;
   }
 
-  private async readPage(token: string, page: number, signal: AbortSignal) {
+  private async readPage(token: string, page: number) {
     const url = new URL('https://api.github.com/installation/repositories');
     url.searchParams.set('per_page', String(PAGE_SIZE));
     url.searchParams.set('page', String(page));
@@ -235,7 +234,7 @@ export class HostedWorkspaceGitHubRepositories {
       },
       cache: 'no-store',
       redirect: 'manual',
-      signal,
+      signal: AbortSignal.timeout(HOSTED_GITHUB_REQUEST_TIMEOUT_MS),
     });
     if (!response.ok || !response.body) {
       await response.body?.cancel();

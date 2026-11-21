@@ -80,6 +80,7 @@ import {
   type InstallationLookupFailure,
 } from './installation-lookup-service.js';
 import {
+  HOSTED_GITHUB_REQUEST_TIMEOUT_MS,
   HostedWorkspaceGitHubRepositories,
   type ListHostedWorkspaceGitHubRepositoriesParams,
   type ListHostedWorkspaceGitHubRepositoriesResult,
@@ -528,7 +529,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     this.githubService = new GitHubTokenService(env);
     this.installationLookupService = new InstallationLookupService(env);
     this.hostedWorkspaceGitHubRepositories = new HostedWorkspaceGitHubRepositories(
-      this.installationLookupService,
+      params => this.findHostedWorkspaceInstallationWithLoginRepair(params),
       this.githubService
     );
     this.gitlabLookupService = new GitLabLookupService(env);
@@ -538,7 +539,8 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 
   private async refreshGitHubInstallationLogins(
     params: GetCloudAgentAuthForRepoParams,
-    authorizationMode: 'generic' | 'managed' = 'generic'
+    authorizationMode: 'generic' | 'managed' = 'generic',
+    requestTimeoutMs?: number
   ): Promise<void> {
     const candidates = await this.installationLookupService.findRefreshCandidates(
       params,
@@ -551,7 +553,8 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     for (const candidate of candidates.candidates) {
       const refreshedAccountLogin = await this.githubService.refreshInstallationAccountLoginIfDue(
         candidate.installationId,
-        candidate.githubAppType
+        candidate.githubAppType,
+        requestTimeoutMs
       );
       if (
         !refreshedAccountLogin ||
@@ -619,6 +622,21 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       installation = await this.installationLookupService.findManagedInstallationForRepo(params);
     }
     return installation;
+  }
+
+  private async findHostedWorkspaceInstallationWithLoginRepair(
+    params: Parameters<InstallationLookupService['findHostedWorkspaceInstallation']>[0]
+  ) {
+    const installation =
+      await this.installationLookupService.findHostedWorkspaceInstallation(params);
+    if (installation.success || installation.reason !== 'integration_mismatch') return installation;
+
+    await this.refreshGitHubInstallationLogins(
+      { ...params, accessPurpose: 'workflow' },
+      'managed',
+      HOSTED_GITHUB_REQUEST_TIMEOUT_MS
+    );
+    return this.installationLookupService.findHostedWorkspaceInstallation(params);
   }
 
   /**

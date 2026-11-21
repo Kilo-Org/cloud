@@ -18,6 +18,12 @@ const scope = {
   integrationId: '00000000-0000-4000-8000-000000000002',
   primaryRepo: 'org/main',
 };
+const lookupScope = {
+  userId: scope.userId,
+  orgId: scope.organizationId,
+  expectedIntegrationId: scope.integrationId,
+  githubRepo: scope.primaryRepo,
+};
 const installation = {
   success: true,
   installationId: '123',
@@ -51,6 +57,10 @@ describe('hosted workspace GitHub repository RPCs', () => {
       InstallationLookupService.prototype,
       'findHostedWorkspaceInstallation'
     ).mockResolvedValue(installation);
+    vi.spyOn(InstallationLookupService.prototype, 'findRefreshCandidates').mockResolvedValue({
+      success: true,
+      candidates: [],
+    });
     vi.spyOn(
       GitHubTokenService.prototype,
       'getFreshTokenForRepositorySelection'
@@ -102,12 +112,7 @@ describe('hosted workspace GitHub repository RPCs', () => {
     });
     expect(
       InstallationLookupService.prototype.findHostedWorkspaceInstallation
-    ).toHaveBeenCalledWith({
-      userId: scope.userId,
-      orgId: scope.organizationId,
-      expectedIntegrationId: scope.integrationId,
-      githubRepo: scope.primaryRepo,
-    });
+    ).toHaveBeenCalledExactlyOnceWith(lookupScope);
     expect(githubFetch).toHaveBeenCalledExactlyOnceWith(
       new URL('https://api.github.com/installation/repositories?per_page=100&page=1'),
       expect.objectContaining({
@@ -149,6 +154,39 @@ describe('hosted workspace GitHub repository RPCs', () => {
     });
   });
 
+  it.each(['list', 'resolve'] as const)(
+    'uses independent provider timeouts for each upstream call during %s',
+    async operation => {
+      const timeouts = vi.spyOn(AbortSignal, 'timeout');
+      const rpc = createEntrypoint();
+      if (operation === 'list') {
+        githubFetch.mockResolvedValueOnce(inventory([additional], 101));
+        githubFetch.mockResolvedValueOnce(inventory([primary]));
+        await expect(
+          rpc.listHostedWorkspaceGitHubRepositories({ ...scope, page: 2 })
+        ).resolves.toMatchObject({ success: true });
+      } else {
+        githubFetch.mockResolvedValueOnce(inventory([primary]));
+        githubFetch.mockResolvedValueOnce(inventory([additional]));
+        await expect(
+          rpc.resolveHostedWorkspaceGitHubRepositories({ ...scope, additionalRepositoryIds: [202] })
+        ).resolves.toMatchObject({ success: true });
+      }
+
+      const tokenSignals = [
+        ...vi.mocked(GitHubTokenService.prototype.getToken).mock.calls.map(call => call[2]),
+        ...vi
+          .mocked(GitHubTokenService.prototype.getFreshTokenForRepositorySelection)
+          .mock.calls.map(call => call[3]),
+      ];
+      const inventorySignals = githubFetch.mock.calls.map(([, init]) => init?.signal);
+      const signals = [...tokenSignals, ...inventorySignals];
+      expect(timeouts.mock.calls).toEqual([[4_000], [4_000], [4_000], [4_000]]);
+      expect(new Set(signals).size).toBe(4);
+      expect(new Set(signals)).toEqual(new Set(timeouts.mock.results.map(result => result.value)));
+    }
+  );
+
   it('does not expose the catalog when the previously installed primary is gone', async () => {
     githubFetch.mockResolvedValueOnce(inventory([additional]));
     githubFetch.mockResolvedValueOnce(inventory([]));
@@ -180,20 +218,106 @@ describe('hosted workspace GitHub repository RPCs', () => {
     }
   );
 
-  it('enforces the exact association before contacting GitHub', async () => {
+  it.each(['list', 'resolve'] as const)(
+    'repairs an exact pinned organization login after a GitHub rename during %s',
+    async operation => {
+      const lookups = vi.mocked(
+        InstallationLookupService.prototype.findHostedWorkspaceInstallation
+      );
+      lookups.mockResolvedValueOnce({ success: false, reason: 'integration_mismatch' });
+      vi.mocked(InstallationLookupService.prototype.findRefreshCandidates).mockResolvedValue({
+        success: true,
+        candidates: [
+          {
+            integrationId: scope.integrationId,
+            installationId: installation.installationId,
+            githubAppType: installation.githubAppType,
+            accountLogin: 'OldOrg',
+          },
+        ],
+      });
+      const refresh = vi
+        .spyOn(GitHubTokenService.prototype, 'refreshInstallationAccountLoginIfDue')
+        .mockResolvedValue('Org');
+      const update = vi
+        .spyOn(InstallationLookupService.prototype, 'updateAccountLogin')
+        .mockResolvedValue(true);
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      const rpc = createEntrypoint();
+      if (operation === 'list') {
+        githubFetch.mockResolvedValueOnce(inventory([primary, additional]));
+        await expect(
+          rpc.listHostedWorkspaceGitHubRepositories({ ...scope, page: 1 })
+        ).resolves.toEqual({
+          success: true,
+          repositories: [{ id: 202, fullName: 'Org/Tools', private: true }],
+        });
+      } else {
+        githubFetch.mockResolvedValueOnce(inventory([primary]));
+        githubFetch.mockResolvedValueOnce(inventory([additional]));
+        await expect(
+          rpc.resolveHostedWorkspaceGitHubRepositories({ ...scope, additionalRepositoryIds: [202] })
+        ).resolves.toEqual({
+          success: true,
+          primary: { id: 101, fullName: 'Org/Main' },
+          additional: [{ id: 202, fullName: 'Org/Tools' }],
+        });
+      }
+
+      expect(
+        InstallationLookupService.prototype.findRefreshCandidates
+      ).toHaveBeenCalledExactlyOnceWith({ ...lookupScope, accessPurpose: 'workflow' }, 'managed');
+      expect(refresh).toHaveBeenCalledExactlyOnceWith('123', 'lite', 4_000);
+      expect(update).toHaveBeenCalledExactlyOnceWith(scope.integrationId, 'Org');
+      expect(lookups.mock.calls).toEqual([[lookupScope], [lookupScope]]);
+    }
+  );
+
+  it('denies a wrong pin without refreshing or using any other installation', async () => {
+    const wrongPin = '00000000-0000-4000-8000-000000000003';
     vi.mocked(
       InstallationLookupService.prototype.findHostedWorkspaceInstallation
     ).mockResolvedValue({ success: false, reason: 'integration_mismatch' });
+    const refresh = vi.spyOn(GitHubTokenService.prototype, 'refreshInstallationAccountLoginIfDue');
     const rpc = createEntrypoint();
     for (const result of await Promise.all([
-      rpc.listHostedWorkspaceGitHubRepositories({ ...scope, page: 1 }),
-      rpc.resolveHostedWorkspaceGitHubRepositories({ ...scope, additionalRepositoryIds: [202] }),
+      rpc.listHostedWorkspaceGitHubRepositories({ ...scope, integrationId: wrongPin, page: 1 }),
+      rpc.resolveHostedWorkspaceGitHubRepositories({
+        ...scope,
+        integrationId: wrongPin,
+        additionalRepositoryIds: [202],
+      }),
     ])) {
       expect(result).toEqual({ success: false, reason: 'access_denied' });
     }
+    const repairScope = {
+      ...lookupScope,
+      expectedIntegrationId: wrongPin,
+      accessPurpose: 'workflow',
+    };
+    expect(vi.mocked(InstallationLookupService.prototype.findRefreshCandidates).mock.calls).toEqual(
+      [
+        [repairScope, 'managed'],
+        [repairScope, 'managed'],
+      ]
+    );
+    expect(refresh).not.toHaveBeenCalled();
     expect(githubFetch).not.toHaveBeenCalled();
     expect(GitHubTokenService.prototype.getFreshTokenForRepositorySelection).not.toHaveBeenCalled();
     expect(GitHubTokenService.prototype.getToken).not.toHaveBeenCalled();
+  });
+
+  it('does not attempt login repair when the primary is outside stored repository access', async () => {
+    vi.mocked(
+      InstallationLookupService.prototype.findHostedWorkspaceInstallation
+    ).mockResolvedValue({ success: false, reason: 'repository_not_installed' });
+
+    await expect(
+      createEntrypoint().listHostedWorkspaceGitHubRepositories({ ...scope, page: 1 })
+    ).resolves.toEqual({ success: false, reason: 'repository_unavailable' });
+    expect(InstallationLookupService.prototype.findRefreshCandidates).not.toHaveBeenCalled();
+    expect(githubFetch).not.toHaveBeenCalled();
   });
 
   it('returns the current primary ID for prepare without minting an additional or broad token', async () => {

@@ -9,6 +9,7 @@ import {
   type CredentialGrantPreparation,
 } from './session-credentials.js';
 import { createControlPlaneCredential } from './managed-credential.js';
+import { createGrantDiagnostic } from './grant-diagnostic.js';
 
 const sessionId = 'workspace_11111111-1111-4111-8111-111111111111';
 const kiloSessionId = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -325,10 +326,11 @@ describe('hosted multi-repository grants', () => {
     expect(payload.git?.token).toBe(persisted.additionalRepositories?.[0]?.scm.alias);
     expect(JSON.stringify(payload)).not.toContain(integrationId);
     expect(JSON.stringify(payload)).not.toContain('hostedRepositoryId');
+    expect(JSON.stringify(payload)).not.toContain('hostedRepositoryVerifiedAt');
     expect(JSON.stringify(payload)).not.toContain('kgh2.');
   });
 
-  it('denies renamed members on recovery and replacement IDs when reusing a cached capability', async () => {
+  it('denies renamed members on recovery even when the warm authorization cache is fresh', async () => {
     const { input, resolve, issue } = hostedPreparation();
     const { grant } = await prepareCredentialGrant(input);
     issue.mockClear();
@@ -342,31 +344,66 @@ describe('hosted multi-repository grants', () => {
       cause: new Error('repository_unavailable'),
     });
     expect(resolve).toHaveBeenLastCalledWith(primaryScope);
+    expect(issue).not.toHaveBeenCalled();
+  });
 
+  it('reuses a recent positive check only for the selected repository and rejects a replacement ID after expiry', async () => {
+    const { input, resolve, issue } = hostedPreparation();
+    const { grant } = await prepareCredentialGrant(input);
+    const persisted = persistedSessionCredentialGrantSchema.parse(
+      JSON.parse(JSON.stringify(grant))
+    );
+    issue.mockClear();
+    resolve.mockClear();
     const request = {
       env: input.env,
-      grant,
+      grant: persisted,
       credential: grant.scm?.alias ?? '',
       url: `https://github.com/${additional.fullName}.git/info/refs?service=git-upload-pack`,
       method: 'GET',
       outboundContainerId: 'allocation-binding',
-      now: 1001,
     };
-    resolve.mockResolvedValueOnce({ success: true, primary: additional, additional: [] });
-    await expect(resolveSessionCredential(request)).resolves.toMatchObject({
+    const warm = await resolveSessionCredential({ ...request, now: 30_999 });
+    expect(warm).toMatchObject({
       credential: `kgh2.${additional.fullName}`,
     });
+    if (!warm) throw new Error('Missing warm grant');
+    expect(resolve).not.toHaveBeenCalled();
+
+    resolve.mockResolvedValueOnce({ success: true, primary: additional, additional: [] });
+    const renewed = await resolveSessionCredential({ ...request, grant: warm.grant, now: 31_000 });
+    expect(renewed).toMatchObject({ credential: `kgh2.${additional.fullName}` });
+    if (!renewed) throw new Error('Missing renewed grant');
+    expect(resolve).toHaveBeenCalledExactlyOnceWith({
+      ...primaryScope,
+      primaryRepo: additional.fullName,
+      additionalRepositoryIds: [],
+    });
+    await expect(
+      resolveSessionCredential({ ...request, grant: renewed.grant, now: 31_001 })
+    ).resolves.toMatchObject({ credential: `kgh2.${additional.fullName}` });
+    expect(resolve).toHaveBeenCalledTimes(1);
+
+    resolve.mockResolvedValueOnce({ success: false, reason: 'access_denied' });
+    await expect(
+      resolveSessionCredential({
+        ...request,
+        grant: renewed.grant,
+        url: `https://github.com/${primary.fullName}.git/info/refs?service=git-upload-pack`,
+        now: 31_001,
+      })
+    ).resolves.toBeNull();
+    expect(resolve).toHaveBeenLastCalledWith({ ...primaryScope, additionalRepositoryIds: [] });
+
     resolve.mockResolvedValueOnce({
       success: true,
       primary: { ...additional, id: additional.id + 100 },
       additional: [],
     });
-    await expect(resolveSessionCredential(request)).resolves.toBeNull();
-    expect(resolve).toHaveBeenLastCalledWith({
-      ...primaryScope,
-      primaryRepo: additional.fullName,
-      additionalRepositoryIds: [],
-    });
+    await expect(
+      resolveSessionCredential({ ...request, grant: renewed.grant, now: 61_000 })
+    ).resolves.toBeNull();
+    expect(resolve).toHaveBeenCalledTimes(3);
     expect(issue).not.toHaveBeenCalled();
   });
 
@@ -375,6 +412,32 @@ describe('hosted multi-repository grants', () => {
     Object.assign(input.env, { GIT_TOKEN_SERVICE: { issueGitHubSessionCapability: issue } });
     await expect(prepareCredentialGrant(input)).rejects.toMatchObject({
       cause: new Error('temporarily_unavailable'),
+    });
+    expect(issue).not.toHaveBeenCalled();
+  });
+
+  it('reauthorizes before issuing a capability for a different container even inside the cache window', async () => {
+    const { input, resolve, issue } = hostedPreparation();
+    const { grant } = await prepareCredentialGrant(input);
+    const outboundContainerId = 'new-allocation-binding';
+    resolve.mockClear();
+    issue.mockClear();
+    resolve.mockResolvedValueOnce({ success: false, reason: 'access_denied' });
+    await expect(
+      resolveSessionCredential({
+        env: input.env,
+        grant: { ...grant, outboundContainerId },
+        credential: grant.scm?.alias ?? '',
+        url: `https://github.com/${additional.fullName}.git/info/refs?service=git-upload-pack`,
+        method: 'GET',
+        outboundContainerId,
+        now: 1_001,
+      })
+    ).resolves.toBeNull();
+    expect(resolve).toHaveBeenCalledExactlyOnceWith({
+      ...primaryScope,
+      primaryRepo: additional.fullName,
+      additionalRepositoryIds: [],
     });
     expect(issue).not.toHaveBeenCalled();
   });
@@ -395,6 +458,37 @@ describe('hosted multi-repository grants', () => {
     expect(resolve).toHaveBeenCalledExactlyOnceWith(primaryScope);
     expect(issue).not.toHaveBeenCalled();
   });
+
+  it('does not start a duplicate broker call when authorization reaches its deadline', async () => {
+    vi.useFakeTimers();
+    try {
+      const { input, resolve, issue } = hostedPreparation();
+      resolve.mockImplementation(() => new Promise(() => {}));
+      const result = expect(prepareCredentialGrant(input)).rejects.toMatchObject({
+        cause: new Error('temporarily_unavailable'),
+      });
+      await vi.advanceTimersByTimeAsync(23_000);
+      await result;
+      expect(resolve).toHaveBeenCalledTimes(1);
+      expect(issue).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each(['access_denied', 'repository_unavailable'] as const)(
+    'preserves the hosted authorization failure reason %s in diagnostics',
+    async reason => {
+      const { input, resolve } = hostedPreparation();
+      const diagnostic = createGrantDiagnostic();
+      resolve.mockResolvedValueOnce({ success: false, reason });
+      await expect(prepareCredentialGrant(input, diagnostic)).rejects.toThrow();
+      expect(diagnostic.snapshot()).toMatchObject({
+        grantPhase: 'broker_authorization',
+        grantFailureReason: reason,
+      });
+    }
+  );
 
   it('rejects a non-installation capability even after confirming access', async () => {
     const { input, issue } = hostedPreparation();

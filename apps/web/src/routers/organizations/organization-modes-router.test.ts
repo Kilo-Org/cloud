@@ -581,6 +581,28 @@ describe('organization modes tRPC router', () => {
       );
     });
 
+    it('refuses an update slug one character past the bound with the inclusive message', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const created = await caller.organizations.modes.create({
+        organizationId: testOrganization.id,
+        name: 'Update Slug Bound Mode',
+        slug: 'update-slug-bound',
+      });
+
+      await expect(
+        caller.organizations.modes.update({
+          organizationId: testOrganization.id,
+          modeId: created.mode.id,
+          slug: 'a'.repeat(MODE_SLUG_MAX_LENGTH + 1),
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining(
+          `Mode slug must be ${MODE_SLUG_MAX_LENGTH} characters or fewer`
+        ),
+      });
+    });
+
     it('should throw error for non-existent mode', async () => {
       const caller = await createCallerForUser(owner.id);
       const nonExistentId = randomUUID();

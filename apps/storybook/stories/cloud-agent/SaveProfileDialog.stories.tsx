@@ -115,7 +115,6 @@ function SaveProfileDialogPresentation({
             </Label>
           </div>
 
-          {/* Summary of what will be saved */}
           <div className="bg-muted rounded-md p-3 text-sm">
             <p className="font-medium">This profile will include:</p>
             <ul className="text-muted-foreground mt-1 list-inside list-disc">
@@ -157,7 +156,6 @@ function SaveProfileDialogPresentation({
   );
 }
 
-// Wrapper component to handle state
 function SaveProfileDialogWrapper({
   initialOpen = false,
   envVars = [],

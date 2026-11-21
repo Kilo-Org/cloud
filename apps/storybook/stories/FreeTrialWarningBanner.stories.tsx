@@ -13,7 +13,6 @@ const meta: Meta<typeof FreeTrialWarningBanner> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Owner-specific examples for specific states
 export const Owner_ActiveEarly: Story = {
   args: {
     organization: mockOrganization,
@@ -41,7 +40,6 @@ export const Owner_ExpiresToday: Story = {
   },
 };
 
-// Member-specific examples for specific states
 export const Member_ActiveEarly: Story = {
   args: {
     organization: mockOrganization,

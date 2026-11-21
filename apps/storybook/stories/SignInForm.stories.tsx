@@ -25,10 +25,6 @@ const meta: Meta<typeof SignInForm> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// ============================================================================
-// LANDING STATE - Tier 2: New User (Default)
-// ============================================================================
-
 export const LandingNewUser: Story = {
   args: {
     storybookInitialState: {
@@ -123,10 +119,6 @@ export const LandingNewUserWithError: Story = {
   },
 };
 
-// ============================================================================
-// LANDING STATE - Tier 1: Returning User
-// ============================================================================
-
 export const LandingReturningOAuthGoogle: Story = {
   args: {
     storybookInitialState: {
@@ -188,10 +180,6 @@ export const LandingReturningSSO: Story = {
   },
 };
 
-// ============================================================================
-// LANDING STATE - Tier 3: Invite
-// ============================================================================
-
 export const LandingInvite: Story = {
   args: {
     searchParams: {
@@ -219,10 +207,6 @@ export const LandingInviteWithOrgName: Story = {
     },
   },
 };
-
-// ============================================================================
-// PROVIDER SELECT STATE - New User
-// ============================================================================
 
 export const ProviderSelectNewUser: Story = {
   args: {
@@ -267,10 +251,6 @@ export const ProviderSelectNewUserGoogleFirst: Story = {
     },
   },
 };
-
-// ============================================================================
-// PROVIDER SELECT STATE - Existing User
-// ============================================================================
 
 export const ProviderSelectExistingUserSingle: Story = {
   args: {
@@ -319,10 +299,6 @@ export const ProviderSelectExistingUserWithError: Story = {
   },
 };
 
-// ============================================================================
-// TURNSTILE STATES
-// ============================================================================
-
 export const TurnstileVerificationWithEmail: Story = {
   args: {
     storybookInitialState: {
@@ -368,10 +344,6 @@ export const TurnstileError: Story = {
   },
 };
 
-// ============================================================================
-// MAGIC LINK SENT STATE
-// ============================================================================
-
 export const MagicLinkSent: Story = {
   args: {
     storybookInitialState: {
@@ -390,10 +362,6 @@ export const MagicLinkSentWithTitle: Story = {
     },
   },
 };
-
-// ============================================================================
-// REDIRECTING STATE
-// ============================================================================
 
 export const Redirecting: Story = {
   args: {
@@ -424,10 +392,6 @@ export const RedirectingWithTitle: Story = {
     },
   },
 };
-
-// ============================================================================
-// CUSTOM TITLES AND SUBTITLES
-// ============================================================================
 
 export const LandingNewUserWithCustomTitle: Story = {
   args: {

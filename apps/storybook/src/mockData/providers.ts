@@ -19,7 +19,6 @@ function generateModel(): OpenRouterModel {
   const base = generateMock(OpenRouterModelSchema) as Partial<OpenRouterModel> | null | undefined;
   const modelName = randomChoice(rng, MODELS);
 
-  // Ensure all required fields have defaults
   const inputModalities =
     Array.isArray(base?.input_modalities) && base.input_modalities.length > 0
       ? base.input_modalities

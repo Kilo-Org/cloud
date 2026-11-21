@@ -588,9 +588,22 @@ export async function settleStoredProjectTokens(
         });
         continue;
       }
-      const settled = !hasStoredProjectTokenHandle(integration, projectId, storedCredential)
-        ? true
-        : await dropUnrevokableProjectTokenEntry(integration, projectId, storedCredential);
+      let settled: boolean;
+      try {
+        settled = !hasStoredProjectTokenHandle(integration, projectId, storedCredential)
+          ? true
+          : await dropUnrevokableProjectTokenEntry(integration, projectId, storedCredential);
+      } catch (error) {
+        // A cleanup that did not complete leaves the handle in place, so the
+        // project stays outstanding and a repeat can settle it.
+        noCredentialReasons.set(projectId, 'not_attempted');
+        logExceptInTest('[settleStoredProjectTokens] Credential-free cleanup did not complete', {
+          integrationId: integration.id,
+          projectId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        continue;
+      }
       if (settled) {
         noCredentialOutstanding.delete(projectId);
         noCredentialScrubbed += 1;

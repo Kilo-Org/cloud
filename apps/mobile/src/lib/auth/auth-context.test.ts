@@ -765,21 +765,24 @@ describe('exchangeLegacyToken', () => {
     store.set(AUTH_TOKEN_KEY, 'old-token');
     // Never settles: only the deadline can end this request.
     const neverSettles = Promise.withResolvers<Response>();
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockImplementation(() => neverSettles.promise);
+    const reachedFetch = Promise.withResolvers<boolean>();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() => {
+      reachedFetch.resolve(true);
+      return neverSettles.promise;
+    });
     // Suppress Node.js 24 unhandledRejection from AbortController.abort()
     // with a non-DOMException reason during fake-timer tests.
     process.on('unhandledRejection', swallowUnhandledRejection);
     vi.useFakeTimers();
     try {
       const exchange = exchangeLegacyToken();
-      // Let the SecureStore and admission reads resolve so the deadline timer
-      // registers, then cross it.
-      await vi.advanceTimersByTimeAsync(0);
+      const settled = expect(exchange).resolves.toBeNull();
+      // The deadline timer is armed before the request runs, so waiting for the
+      // fetch to be reached leaves only the deadline between here and the result.
+      await reachedFetch.promise;
       await vi.advanceTimersByTimeAsync(CONTROL_PLANE_DEADLINE_MS + 1);
+      await settled;
 
-      await expect(exchange).resolves.toBeNull();
       // The call is bounded: the deadline signal reached the request.
       expect(fetchSpy.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
       // Retry next launch: the old token stays and no done marker is set.
@@ -804,15 +807,22 @@ describe('exchangeLegacyToken', () => {
       }),
       { status: 200 }
     );
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(stalled);
+    const reachedFetch = Promise.withResolvers<boolean>();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() => {
+      reachedFetch.resolve(true);
+      return Promise.resolve(stalled);
+    });
     process.on('unhandledRejection', swallowUnhandledRejection);
     vi.useFakeTimers();
     try {
       const exchange = exchangeLegacyToken();
-      await vi.advanceTimersByTimeAsync(0);
+      const settled = expect(exchange).resolves.toBeNull();
+      // The headers are in and the body read is stalling: only the deadline is
+      // left, and it was armed before the request ran.
+      await reachedFetch.promise;
       await vi.advanceTimersByTimeAsync(CONTROL_PLANE_DEADLINE_MS + 1);
+      await settled;
 
-      await expect(exchange).resolves.toBeNull();
       // No partial pair was written and no completion marker was set.
       expect(store.get(AUTH_TOKEN_KEY)).toBe('old-token');
       expect(store.get(LEGACY_EXCHANGE_DONE_KEY)).toBeUndefined();
@@ -838,15 +848,20 @@ describe('exchangeLegacyToken', () => {
       }),
       { status: 403 }
     );
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(stalled);
+    const reachedFetch = Promise.withResolvers<boolean>();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() => {
+      reachedFetch.resolve(true);
+      return Promise.resolve(stalled);
+    });
     process.on('unhandledRejection', swallowUnhandledRejection);
     vi.useFakeTimers();
     try {
       const exchange = exchangeLegacyToken();
-      await vi.advanceTimersByTimeAsync(0);
+      const settled = expect(exchange).resolves.toBeNull();
+      await reachedFetch.promise;
       await vi.advanceTimersByTimeAsync(CONTROL_PLANE_DEADLINE_MS + 1);
+      await settled;
 
-      await expect(exchange).resolves.toBeNull();
       // Retry next launch: the old token stays and no done marker is set.
       expect(store.get(AUTH_TOKEN_KEY)).toBe('old-token');
       expect(store.get(LEGACY_EXCHANGE_DONE_KEY)).toBeUndefined();

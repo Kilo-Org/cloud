@@ -24,20 +24,30 @@ const PROJECTOR_FILE: GgufTransfer = {
   sha256: PROJECTOR_SHA,
 };
 
-/** A device holding both partial files, so a pass can hash and read them. */
-function storageOf(): GgufStorage & { readonly hashed: string[] } {
+/**
+ * A device holding both partial files, so a pass can hash and read them.
+ * `refuseMove` makes every move throw, as a permission or I/O refusal does; `hideFiles`
+ * omits both names from the listing, so the move finds no file to place.
+ */
+function storageOf(
+  options: { readonly refuseMove?: boolean; readonly hideFiles?: boolean } = {}
+): GgufStorage & { readonly hashed: string[] } {
   const hashed: string[] = [];
   return {
     hashed,
     freeBytes: () => 8_000_000_000,
-    list: () => [MODEL_FILE.part, PROJECTOR_FILE.part],
+    list: () => (options.hideFiles === true ? [] : [MODEL_FILE.part, PROJECTOR_FILE.part]),
     size: () => 0,
     sha256: async name => {
       hashed.push(name);
       return name === MODEL_FILE.part ? MODEL_SHA : PROJECTOR_SHA;
     },
     remove: () => undefined,
-    move: () => undefined,
+    move: () => {
+      if (options.refuseMove === true) {
+        throw new Error('move refused');
+      }
+    },
     path: name => `/models/${name}`,
     readIndex: () => null,
     writeIndex: () => undefined,
@@ -99,5 +109,35 @@ describe('verifying a downloaded model', () => {
 
     expect(verdict).toEqual({ ok: false, problem: 'invalidFile' });
     expect(inspect).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports a refused move as a write failure, not a bad file', async () => {
+    const storage = storageOf({ refuseMove: true });
+    const inspect = vi.fn(async (): Promise<GgufInspection> => ({
+      contextWindow: 4096,
+      tools: false,
+      vision: true,
+      thinking: false,
+    }));
+
+    const verdict = await verifyModel(storage, inspect, INPUT);
+
+    expect(verdict).toEqual({ ok: false, problem: 'writeFailed' });
+    // The device refused the move, so the bytes are never read a second time.
+    expect(inspect).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a file at neither place as an invalid file', async () => {
+    const storage = storageOf({ hideFiles: true });
+    const inspect = vi.fn(async (): Promise<GgufInspection> => ({
+      contextWindow: 4096,
+      tools: false,
+      vision: true,
+      thinking: false,
+    }));
+
+    const verdict = await verifyModel(storage, inspect, INPUT);
+
+    expect(verdict).toEqual({ ok: false, problem: 'invalidFile' });
   });
 });

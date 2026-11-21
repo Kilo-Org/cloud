@@ -73,15 +73,21 @@ export function activeDownload(input: {
   };
 }
 
+/** How the finished files ended up: in place, refused by the device, or gone. */
+export type GgufMove = 'moved' | 'refused' | 'missing';
+
 /**
  * Moves every finished transfer that is still a partial file to its model name.
  * A move that failed is no verdict on the bytes, so a file an earlier attempt
- * left at a model name is cleared and the remaining moves run once more. False
- * when a file is neither a partial nor in place afterwards.
+ * left at a model name is cleared and the remaining moves run once more.
+ * `moved` when every file ends at its model name, `refused` when the device
+ * refused a move and the file is still partial or its state is unknown, and
+ * `missing` when no move was refused and a file is at neither place.
  */
-export function moveIntoPlace(storage: GgufStorage, transfers: readonly GgufTransfer[]): boolean {
-  if (moveAll(storage, transfers)) {
-    return true;
+export function moveIntoPlace(storage: GgufStorage, transfers: readonly GgufTransfer[]): GgufMove {
+  const first = moveAll(storage, transfers);
+  if (first === 'moved') {
+    return 'moved';
   }
   const names = new Set(storage.list());
   for (const transfer of transfers) {
@@ -90,24 +96,30 @@ export function moveIntoPlace(storage: GgufStorage, transfers: readonly GgufTran
       removeQuietly(storage, transfer.name);
     }
   }
-  return moveAll(storage, transfers);
+  const second = moveAll(storage, transfers);
+  if (second === 'moved') {
+    return 'moved';
+  }
+  // A refusal is the actionable cause even when a file also vanished: the
+  // device state is unknown, so the file is not called missing.
+  return first === 'refused' || second === 'refused' ? 'refused' : 'missing';
 }
 
-function moveAll(storage: GgufStorage, transfers: readonly GgufTransfer[]): boolean {
+function moveAll(storage: GgufStorage, transfers: readonly GgufTransfer[]): GgufMove {
   const names = new Set(storage.list());
   try {
     for (const transfer of transfers) {
       // A move that already happened is never repeated or undone: its partial is gone.
       if (!names.has(transfer.part) && !names.has(transfer.name)) {
-        return false;
+        return 'missing';
       }
       if (names.has(transfer.part)) {
         storage.move(transfer.part, transfer.name);
       }
     }
-    return true;
+    return 'moved';
   } catch {
-    return false;
+    return 'refused';
   }
 }
 

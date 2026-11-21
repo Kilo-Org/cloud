@@ -35,7 +35,11 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { TRPCError } from '@trpc/server';
 import { eq, inArray, sql } from 'drizzle-orm';
 import { NextRequest, type NextResponse } from 'next/server';
-import { MAX_CUSTOM_ROUTER_BODY_BYTES, lockOwner } from '@/lib/auto-routing-custom-routers';
+import {
+  MAX_CUSTOM_ROUTER_BODY_BYTES,
+  lockOwner,
+  platformBenchmarkAdmission,
+} from '@/lib/auto-routing-custom-routers';
 import { GET as listRouters, POST as createRouter } from './route';
 import {
   DELETE as deleteRouter,
@@ -208,11 +212,12 @@ describe('/api/auto-routing/custom-routers', () => {
     user = await insertTestUser();
     signIn(user);
     mockedRequireActiveSubscription.mockResolvedValue({ isReadOnly: false, daysRemaining: 30 });
+    platformBenchmarkAdmission.enabled = true;
     mockedRegister.mockResolvedValue({ ok: true });
-    mockedGetPlatformMeasurements.mockImplementation(async baseRouter => ({
+    mockedGetPlatformMeasurements.mockResolvedValue({
       status: 200,
-      body: { baseRouter, models: [SONNET, FLASH].map(model => ({ model, variants: [null] })) },
-    }));
+      body: { baseRouter: 'efficient', models: [{ model: SONNET, variants: [null] }] },
+    });
     mockedGetEnhanced.mockResolvedValue({ data: [model(SONNET), model(FLASH), model(DENIED)] });
     mockedGetByokUser.mockResolvedValue([model(BYOK)] as never);
     mockedGetByokOrg.mockResolvedValue([]);
@@ -229,7 +234,30 @@ describe('/api/auto-routing/custom-routers', () => {
   });
 
   afterEach(async () => {
+    platformBenchmarkAdmission.enabled = false;
     await cleanupDbForTest();
+  });
+
+  test('saves a pool without requesting platform benchmarks while admission is paused', async () => {
+    platformBenchmarkAdmission.enabled = false;
+
+    const created = await create(routerBody());
+    const updated = await updateRouter(
+      request('/user/coding', {
+        method: 'PATCH',
+        body: {
+          entries: [gateway(SONNET), gateway(FLASH)],
+          defaultEntryKey: customRouterEntryKey(gateway(SONNET)),
+        },
+      }),
+      params('user', 'coding')
+    );
+
+    expect(created.status).toBe(201);
+    expect(updated.status).toBe(200);
+    expect(mockedRegister).not.toHaveBeenCalled();
+    const [row] = await db.select().from(auto_routing_custom_routers);
+    expect(row?.entries).toEqual([gateway(SONNET), gateway(FLASH)]);
   });
 
   describe('migrated owner pools', () => {
@@ -535,8 +563,8 @@ describe('/api/auto-routing/custom-routers', () => {
       expect(await db.select().from(auto_routing_custom_routers)).toHaveLength(1);
     });
 
-    test('admits only measured, platform-servable gateway entries for platform benchmarks', async () => {
-      const entries = [gateway(SONNET), gateway(DENIED), gateway(BYOK), clientEntry('qwen3:8b')];
+    test('admits only platform-servable gateway entries for platform benchmarks', async () => {
+      const entries = [gateway(SONNET), gateway(BYOK), clientEntry('qwen3:8b')];
 
       const created = await create(
         routerBody({
@@ -547,7 +575,6 @@ describe('/api/auto-routing/custom-routers', () => {
       );
 
       expect(created.status).toBe(201);
-      expect(mockedGetPlatformMeasurements).toHaveBeenCalledWith('frontier');
       expect(mockedRegister).toHaveBeenCalledTimes(1);
       expect(mockedRegister).toHaveBeenCalledWith(
         {
@@ -562,13 +589,6 @@ describe('/api/auto-routing/custom-routers', () => {
 
     test('uses one deadline across benchmark registration batches', async () => {
       const entries = Array.from({ length: 11 }, (_, index) => gateway(`vendor/model-${index}`));
-      mockedGetPlatformMeasurements.mockResolvedValue({
-        status: 200,
-        body: {
-          baseRouter: 'efficient',
-          models: entries.map(({ model }) => ({ model, variants: [null] })),
-        },
-      });
       mockedGetEnhanced.mockResolvedValue({
         data: entries.map(entry => model(entry.model)),
       });

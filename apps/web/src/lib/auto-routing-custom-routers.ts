@@ -49,6 +49,9 @@ import { NextResponse, type NextRequest } from 'next/server';
 import * as z from 'zod';
 import { buildEligibleCatalog, type EligibleCatalog } from '@/lib/auto-routing-pool-validation';
 
+// Paused: custom router saves do not request platform benchmarks, so a pool model without a
+// measurement stays unmeasured.
+export const platformBenchmarkAdmission = { enabled: false };
 const BENCHMARK_REGISTER_BATCH_SIZE = 10;
 const BENCHMARK_ADMISSION_TIMEOUT_MS = 10_000;
 // The entry bounds count UTF-16 code units while this limit counts UTF-8 bytes, so it carries
@@ -474,9 +477,7 @@ async function requestPlatformBenchmarks(params: {
   owner: CustomRouterOwner;
   plan: BenchmarkAdmissionPlan;
 }): Promise<void> {
-  const measurements = await platformMeasurements(params.plan.baseRouter);
-  const measured = new Set(measurements.models.map(entry => entry.model));
-  const models = params.plan.models.filter(model => measured.has(model)).map(model => ({ model }));
+  const models = params.plan.models.map(model => ({ model }));
   if (models.length === 0) return;
   const signal = AbortSignal.timeout(BENCHMARK_ADMISSION_TIMEOUT_MS);
   for (let start = 0; start < models.length; start += BENCHMARK_REGISTER_BATCH_SIZE) {
@@ -541,7 +542,7 @@ async function admitPlatformBenchmarks(params: {
   entries: readonly CustomRouterEntry[];
 }): Promise<BenchmarkAdmissionPlan> {
   const plan = benchmarkAdmissionPlan(params.baseRouter, params.entries);
-  if (plan.models.length === 0) return plan;
+  if (!platformBenchmarkAdmission.enabled || plan.models.length === 0) return plan;
   await withOwnerAdmissionSlot(params.owner, () =>
     requestPlatformBenchmarks({ owner: params.owner, plan })
   );

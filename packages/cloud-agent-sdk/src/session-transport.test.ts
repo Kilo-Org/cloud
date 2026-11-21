@@ -2604,7 +2604,12 @@ describe('workspace DO-only session transport', () => {
       try {
         session.connect();
         await jest.advanceTimersByTimeAsync(0);
-        expect(fetchSnapshotPage).toHaveBeenCalledWith(routeId, {});
+        // The live transport passes its abort signal; the historical transport
+        // keeps its own bounded read and passes no options.
+        expect(fetchSnapshotPage).toHaveBeenCalledWith(
+          routeId,
+          type === 'remote' ? { signal: expect.any(AbortSignal) } : {}
+        );
         expect(fetchCloudSnapshotPage).not.toHaveBeenCalled();
       } finally {
         session.destroy();

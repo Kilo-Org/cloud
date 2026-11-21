@@ -8,6 +8,7 @@ import {
 import { fetchNativeSnapshot, type NativeSnapshot } from './native-sync-snapshot';
 import type * as NativeSnapshotModule from './native-sync-snapshot';
 import { kilo2AssetKey } from './kilo2-source-messages';
+import { NATIVE_SYNC_TICKET_MINT_DEADLINE_MS } from './limits';
 import { readNativeConversation } from './native-conversation-source';
 import { z } from 'zod';
 
@@ -266,6 +267,114 @@ test('reauthorizes proactively and exchanges an expired grant again', async () =
   await flush();
   expect(calls.filter(call => call.path.endsWith('/exchange'))).toHaveLength(2);
   expect(socket.sent).toContainEqual({ type: 'reauth', ticket: 'private-ticket' });
+  connection.close();
+});
+
+/** A fetcher whose `reauth_required` ticket mint can be held open, to observe work beside it. */
+function heldTicketFixture() {
+  const calls: { path: string }[] = [];
+  let held: ((value: Response) => void) | undefined;
+  let stall = false;
+  const fetcher = jest.fn(async (input: string | URL | Request) => {
+    const path = new URL(String(input)).pathname;
+    calls.push({ path });
+    if (path.endsWith('/exchange'))
+      return Response.json({
+        token: 'grant',
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      });
+    if (path.endsWith('live-ticket')) {
+      if (!stall)
+        return Response.json({
+          ticket: 'private-ticket',
+          expiresAt: new Date(Date.now() + 90_000).toISOString(),
+        });
+      // ES2022/Hermes consumers do not provide Promise.withResolvers.
+      return new Promise<Response>(resolve => {
+        held = resolve;
+      });
+    }
+    return Response.json({ status: 'queued' });
+  });
+  const client = new NativeSyncClient({
+    baseUrl: 'https://sync.test',
+    getCredential: async () => 'kilo-credential',
+    fetch: fetcher,
+    WebSocket: FakeSocket,
+  });
+  return {
+    client,
+    stall: () => {
+      stall = true;
+    },
+    resume: () => {
+      stall = false;
+    },
+    release: (ticket: string) =>
+      held?.(Response.json({ ticket, expiresAt: new Date(Date.now() + 90_000).toISOString() })),
+    ticketPosts: () => calls.filter(call => call.path.endsWith('/live-ticket')).length,
+  };
+}
+
+test('a stalled reauth mint keeps draining the queue and reconnects at its deadline', async () => {
+  const random = jest.spyOn(Math, 'random').mockReturnValue(0);
+  const { client, stall, resume, ticketPosts } = heldTicketFixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  try {
+    await flush();
+    const socket = connectedSocket();
+    socket.frame('hello', hello(), 3);
+    await flush();
+    expect(ticketPosts()).toBe(1);
+    stall();
+    socket.frame('reauth_required', {}, 4);
+    socket.frame(
+      'session.status',
+      { syncPosition: 2, data: { data: { status: 'running' } } },
+      5,
+      'events'
+    );
+    await flush();
+    // The queued frame is projected while the mint is still outstanding.
+    expect(state?.events.some(event => event['seq'] === 5)).toBe(true);
+    expect(ticketPosts()).toBe(2);
+    expect(socket.sent.filter(value => value['type'] === 'reauth')).toEqual([]);
+    // The deadline retires the epoch instead of holding the queue until the mint settles.
+    await jest.advanceTimersByTimeAsync(NATIVE_SYNC_TICKET_MINT_DEADLINE_MS);
+    await flush();
+    expect(state?.connection).toBe('disconnected');
+    resume();
+    await jest.advanceTimersByTimeAsync(2000);
+    await flush();
+    expect(FakeSocket.sockets).toHaveLength(2);
+  } finally {
+    random.mockRestore();
+    connection.close();
+  }
+});
+
+test('coalesces reauth_required frames onto one in-flight ticket mint', async () => {
+  const { client, stall, release, ticketPosts } = heldTicketFixture();
+  const connection = client.connectSession('ses_a', () => {});
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 3);
+  await flush();
+  stall();
+  socket.frame('reauth_required', {}, 4);
+  socket.frame('reauth_required', {}, 5);
+  await flush();
+  expect(ticketPosts()).toBe(2);
+  expect(socket.sent.filter(value => value['type'] === 'reauth')).toEqual([]);
+  release('second-ticket');
+  await flush();
+  expect(ticketPosts()).toBe(2);
+  expect(socket.sent.filter(value => value['type'] === 'reauth')).toEqual([
+    { type: 'reauth', ticket: 'second-ticket' },
+  ]);
   connection.close();
 });
 

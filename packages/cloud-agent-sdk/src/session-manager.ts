@@ -361,7 +361,10 @@ type SessionManagerConfig = {
   getTicket: (
     sessionId: CloudAgentSessionId
   ) => CloudAgentStreamTicketResult | Promise<CloudAgentStreamTicketResult>;
-  fetchSnapshot: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
+  fetchSnapshot: (
+    kiloSessionId: KiloSessionId,
+    options?: { signal?: AbortSignal }
+  ) => Promise<SessionSnapshot>;
   /**
    * Page-aware root snapshot fetch. Called by transports for the initial
    * bounded load and by the manager for `loadOlderMessages`. Optional so the
@@ -373,7 +376,7 @@ type SessionManagerConfig = {
    */
   fetchSnapshotPage?: (
     kiloSessionId: KiloSessionId,
-    options: { cursor?: string }
+    options: { cursor?: string; signal?: AbortSignal }
   ) => Promise<SessionSnapshotPageOutcome | null>;
   fetchCloudSession?: (sessionId: CloudAgentSessionId) => Promise<CloudSessionMetadata>;
   fetchCloudSnapshotPage?: (

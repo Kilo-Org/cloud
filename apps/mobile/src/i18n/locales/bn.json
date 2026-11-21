@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "রিপোজিটরি অনুসন্ধান",
       "noMatches": "কোনো মিল পাওয়া যায়নি",
       "noRepositories": "কোনো রিপোজিটরি নেই",
-      "noRepositoriesDescription": "আপনার অ্যাকাউন্টে কোনো রিপোজিটরি সংযুক্ত নেই।",
+      "noRepositoriesDescription": "রিপোজিটরি লোড করতে $t(integrations.sectionTitle) অংশে GitHub বা GitLab সংযুক্ত করুন।",
       "loading": "লোড হচ্ছে…",
       "accessibility": "রিপোজিটরি: {{label}}",
       "platformBitbucket": "Bitbucket"

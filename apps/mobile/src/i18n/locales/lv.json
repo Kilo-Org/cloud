@@ -2609,7 +2609,7 @@
       "searchPlaceholder": "Meklēt repozitorijus",
       "noMatches": "Nav atbilstību",
       "noRepositories": "Nav pieejamu repozitoriju",
-      "noRepositoriesDescription": "Tavam kontam nav pievienotu repozitoriju.",
+      "noRepositoriesDescription": "Lai ielādētu repozitorijus, pievieno GitHub vai GitLab kontu sadaļā $t(integrations.sectionTitle).",
       "loading": "Ielādē…",
       "accessibility": "Repozitorijs: {{label}}",
       "platformBitbucket": "Bitbucket"

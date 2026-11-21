@@ -2048,7 +2048,7 @@
       "searchPlaceholder": "Пошук репозиторіїв",
       "noMatches": "Немає збігів",
       "noRepositories": "Немає доступних репозиторіїв",
-      "noRepositoriesDescription": "До вашого облікового запису не підключено жодних репозиторіїв.",
+      "noRepositoriesDescription": "Щоб завантажити репозиторії, підключіть GitHub або GitLab у розділі $t(integrations.sectionTitle).",
       "loading": "Завантаження…",
       "accessibility": "Репозиторій: {{label}}",
       "platformBitbucket": "Bitbucket"

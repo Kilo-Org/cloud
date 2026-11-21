@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "रिपॉझिटरी शोधा",
       "noMatches": "जुळणारे परिणाम नाहीत",
       "noRepositories": "रिपॉझिटरी उपलब्ध नाहीत",
-      "noRepositoriesDescription": "तुमच्या खात्याशी कोणतीही रिपॉझिटरी जोडलेली नाही.",
+      "noRepositoriesDescription": "रिपॉझिटरी लोड करण्यासाठी $t(integrations.sectionTitle) मध्ये GitHub किंवा GitLab खाते जोडा.",
       "loading": "लोड होत आहे…",
       "accessibility": "रिपॉझिटरी: {{label}}",
       "platformBitbucket": "Bitbucket"

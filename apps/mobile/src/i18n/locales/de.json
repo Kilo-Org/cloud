@@ -1996,7 +1996,7 @@
       "searchPlaceholder": "Code-Repositories suchen",
       "noMatches": "Keine Treffer",
       "noRepositories": "Keine Repositorys verfügbar",
-      "noRepositoriesDescription": "Mit deinem Konto sind keine Repositorys verbunden.",
+      "noRepositoriesDescription": "Verbinde GitHub oder GitLab unter $t(integrations.sectionTitle), um Repositorys zu laden.",
       "loading": "Wird geladen…",
       "accessibility": "Code-Repository: {{label}}",
       "platformBitbucket": "Bitbucket"

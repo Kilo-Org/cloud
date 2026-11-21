@@ -2717,7 +2717,7 @@
       "searchPlaceholder": "Cuardach stór",
       "noMatches": "Níl aon toradh ann",
       "noRepositories": "Níl aon stór ar fáil",
-      "noRepositoriesDescription": "Níl aon stór ceangailte le do chuntas.",
+      "noRepositoriesDescription": "Ceangail le GitHub nó le GitLab i $t(integrations.sectionTitle) chun stór a lódáil.",
       "loading": "Ag lódáil…",
       "accessibility": "Stór: {{label}}",
       "platformBitbucket": "Bitbucket"

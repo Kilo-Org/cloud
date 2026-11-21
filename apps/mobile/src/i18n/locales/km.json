@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "ស្វែងរកឃ្លាំងកូដ",
       "noMatches": "គ្មានលទ្ធផលត្រូវគ្នា",
       "noRepositories": "គ្មានឃ្លាំងកូដអាចប្រើបានទេ",
-      "noRepositoriesDescription": "គ្មានឃ្លាំងកូដណាមួយភ្ជាប់ទៅគណនីរបស់អ្នកទេ។",
+      "noRepositoriesDescription": "ដើម្បីផ្ទុកឃ្លាំងកូដ សូមភ្ជាប់ GitHub ឬ GitLab នៅក្នុង $t(integrations.sectionTitle)។",
       "loading": "កំពុងផ្ទុក…",
       "accessibility": "ឃ្លាំងកូដ: {{label}}",
       "platformBitbucket": "Bitbucket"

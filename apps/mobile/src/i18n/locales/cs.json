@@ -2661,7 +2661,7 @@
       "searchPlaceholder": "Hledat repozitáře",
       "noMatches": "Žádné shody",
       "noRepositories": "Žádné repozitáře nejsou k dispozici",
-      "noRepositoriesDescription": "K vašemu účtu nejsou připojeny žádné repozitáře.",
+      "noRepositoriesDescription": "Chcete-li načíst repozitáře, připojte GitHub nebo GitLab v části „$t(integrations.sectionTitle)“.",
       "loading": "Načítání…",
       "accessibility": "Repozitář: {{label}}",
       "platformBitbucket": "Bitbucket"

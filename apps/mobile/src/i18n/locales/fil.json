@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "Maghanap ng mga repositoryo",
       "noMatches": "Walang tugma",
       "noRepositories": "Walang magagamit na imbakan ng code",
-      "noRepositoriesDescription": "Walang imbakan ng code na konektado sa iyong akawnt.",
+      "noRepositoriesDescription": "Ikonekta ang GitHub o GitLab sa $t(integrations.sectionTitle) para ma-load ang mga imbakan ng code.",
       "loading": "Naglo-load…",
       "accessibility": "Imbakan ng code: {{label}}",
       "platformBitbucket": "Bitbucket"

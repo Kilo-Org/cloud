@@ -2661,7 +2661,7 @@
       "searchPlaceholder": "Пошук рэпазіторыяў",
       "noMatches": "Няма супадзенняў",
       "noRepositories": "Няма даступных рэпазіторыяў",
-      "noRepositoriesDescription": "Да вашага ўліковага запісу не падключаны ніводны рэпазіторый.",
+      "noRepositoriesDescription": "Каб загрузіць рэпазіторыі, падключыце GitHub або GitLab у раздзеле «$t(integrations.sectionTitle)».",
       "loading": "Загрузка…",
       "accessibility": "Рэпазіторый: {{label}}",
       "platformBitbucket": "Bitbucket"

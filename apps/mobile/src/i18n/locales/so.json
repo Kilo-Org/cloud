@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "Raadinta kaydadka",
       "noMatches": "Wax u dhigma lama helin",
       "noRepositories": "Ma jiraan kaydad la heli karo",
-      "noRepositoriesDescription": "Ma jiraan kaydad ku xiran akoonkaaga.",
+      "noRepositoriesDescription": "Si aad u soo shubto kaydadka, ku xir GitHub ama GitLab qaybta $t(integrations.sectionTitle).",
       "loading": "Waa la soo shubayaa…",
       "accessibility": "Kaydka: {{label}}",
       "platformBitbucket": "Bitbucket"

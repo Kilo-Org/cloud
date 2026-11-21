@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "રિપોઝિટરીઓ શોધો",
       "noMatches": "કોઈ મેળ નથી",
       "noRepositories": "કોઈ રિપોઝિટરી ઉપલબ્ધ નથી",
-      "noRepositoriesDescription": "તમારા એકાઉન્ટ સાથે કોઈ રિપોઝિટરી કનેક્ટ થયેલી નથી.",
+      "noRepositoriesDescription": "રિપોઝિટરીઓ લોડ કરવા માટે $t(integrations.sectionTitle) માં GitHub અથવા GitLab જોડો.",
       "loading": "લોડ થઈ રહ્યું છે…",
       "accessibility": "રિપોઝિટરી: {{label}}",
       "platformBitbucket": "Bitbucket"

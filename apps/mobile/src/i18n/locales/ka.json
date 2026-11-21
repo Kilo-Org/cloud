@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "რეპოზიტორიების ძიება",
       "noMatches": "დამთხვევები არ არის",
       "noRepositories": "ხელმისაწვდომი რეპოზიტორიები არ არის",
-      "noRepositoriesDescription": "თქვენს ანგარიშთან არცერთი რეპოზიტორია არ არის დაკავშირებული.",
+      "noRepositoriesDescription": "რეპოზიტორიების ჩატვირთვისთვის დააკავშირე GitHub ან GitLab $t(integrations.sectionTitle) გვერდზე.",
       "loading": "ჩატვირთვა…",
       "accessibility": "რეპოზიტორია: {{label}}",
       "platformBitbucket": "Bitbucket"

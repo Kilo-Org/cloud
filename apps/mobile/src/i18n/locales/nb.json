@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "Søk etter kodelagre",
       "noMatches": "Ingen treff",
       "noRepositories": "Ingen kodelagre tilgjengelige",
-      "noRepositoriesDescription": "Ingen kodelagre er koblet til kontoen din.",
+      "noRepositoriesDescription": "For å laste inn kodelagre, koble til en GitHub- eller GitLab-konto under $t(integrations.sectionTitle).",
       "loading": "Laster inn…",
       "accessibility": "Kodelager: {{label}}",
       "platformBitbucket": "Bitbucket"

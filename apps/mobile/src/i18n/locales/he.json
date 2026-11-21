@@ -2026,7 +2026,7 @@
       "searchPlaceholder": "חיפוש מאגרים",
       "noMatches": "אין התאמות",
       "noRepositories": "אין מאגרים זמינים",
-      "noRepositoriesDescription": "אין מאגרים שמחוברים לחשבון שלך.",
+      "noRepositoriesDescription": "כדי לטעון מאגרים, יש לחבר את GitHub או GitLab באזור $t(integrations.sectionTitle).",
       "loading": "טוען…",
       "accessibility": "מאגר: {{label}}",
       "platformBitbucket": "Bitbucket"

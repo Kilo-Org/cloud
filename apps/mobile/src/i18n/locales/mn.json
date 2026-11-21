@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "Кодын сан хайх",
       "noMatches": "Тохирох илэрц алга",
       "noRepositories": "Ашиглах боломжтой кодын сан алга",
-      "noRepositoriesDescription": "Таны бүртгэлд холбосон кодын сан алга.",
+      "noRepositoriesDescription": "Кодын санг ачаалахын тулд $t(integrations.sectionTitle) хэсэгт GitHub эсвэл GitLab бүртгэлээ холбоно уу.",
       "loading": "Ачаалж байна…",
       "accessibility": "Кодын сан: {{label}}",
       "platformBitbucket": "Bitbucket"

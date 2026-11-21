@@ -2048,7 +2048,7 @@
       "searchPlaceholder": "Wyszukiwanie repozytoriów",
       "noMatches": "Brak wyników",
       "noRepositories": "Brak dostępnych repozytoriów",
-      "noRepositoriesDescription": "Z twoim kontem nie są połączone żadne repozytoria.",
+      "noRepositoriesDescription": "Aby wczytać repozytoria, połącz konto GitHub lub GitLab w sekcji $t(integrations.sectionTitle).",
       "loading": "Wczytywanie…",
       "accessibility": "Repozytorium: {{label}}",
       "platformBitbucket": "Bitbucket"

@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "Որոնեք պահոցները…",
       "noMatches": "Համընկնումներ չկան",
       "noRepositories": "Հասանելի պահոցներ չկան",
-      "noRepositoriesDescription": "Ձեր հաշվին միացված պահոցներ չկան։",
+      "noRepositoriesDescription": "Պահոցները բեռնելու համար միացրու GitHub-ը կամ GitLab-ը $t(integrations.sectionTitle) բաժնում։",
       "loading": "Բեռնվում է…",
       "accessibility": "Պահոց՝ {{label}}",
       "platformBitbucket": "Bitbucket"

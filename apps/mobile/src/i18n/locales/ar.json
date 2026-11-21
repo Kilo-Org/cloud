@@ -2100,7 +2100,7 @@
       "searchPlaceholder": "البحث في المستودعات",
       "noMatches": "لا توجد نتائج مطابقة",
       "noRepositories": "لا توجد مستودعات متاحة",
-      "noRepositoriesDescription": "لا توجد مستودعات مرتبطة بحسابك.",
+      "noRepositoriesDescription": "اربط GitHub أو GitLab في $t(integrations.sectionTitle) لتحميل المستودعات.",
       "loading": "جارٍ التحميل…",
       "accessibility": "المستودع: {{label}}",
       "platformBitbucket": "Bitbucket"

@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "റിപ്പോസിറ്ററി തിരയൽ",
       "noMatches": "പൊരുത്തങ്ങളൊന്നുമില്ല",
       "noRepositories": "ലഭ്യമായ റിപ്പോസിറ്ററികളൊന്നുമില്ല",
-      "noRepositoriesDescription": "നിങ്ങളുടെ അക്കൗണ്ടുമായി റിപ്പോസിറ്ററികളൊന്നും കണക്റ്റ് ചെയ്തിട്ടില്ല.",
+      "noRepositoriesDescription": "റിപ്പോസിറ്ററികൾ ലോഡ് ചെയ്യാൻ $t(integrations.sectionTitle)-ൽ GitHub അല്ലെങ്കിൽ GitLab അക്കൗണ്ട് ബന്ധിപ്പിക്കുക.",
       "loading": "ലോഡ് ചെയ്യുന്നു…",
       "accessibility": "റിപ്പോസിറ്ററി: {{label}}",
       "platformBitbucket": "Bitbucket"

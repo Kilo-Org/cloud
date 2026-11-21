@@ -2661,7 +2661,7 @@
       "searchPlaceholder": "Pesquisar repositórios",
       "noMatches": "Sem resultados",
       "noRepositories": "Nenhum repositório disponível",
-      "noRepositoriesDescription": "Nenhum repositório está ligado à sua conta.",
+      "noRepositoriesDescription": "Para carregar repositórios, ligue uma conta do GitHub ou do GitLab em $t(integrations.sectionTitle).",
       "loading": "A carregar…",
       "accessibility": "Repositório: {{label}}",
       "platformBitbucket": "Bitbucket"

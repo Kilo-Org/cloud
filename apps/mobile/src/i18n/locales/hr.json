@@ -2613,7 +2613,7 @@
       "searchPlaceholder": "Pretraga repozitorija",
       "noMatches": "Nema podudaranja",
       "noRepositories": "Nema dostupnih repozitorija",
-      "noRepositoriesDescription": "Nijedan repozitorij nije povezan s tvojim računom.",
+      "noRepositoriesDescription": "Poveži GitHub ili GitLab u $t(integrations.sectionTitle) da bi učitao repozitorije.",
       "loading": "Učitavanje…",
       "accessibility": "Repozitorij: {{label}}",
       "platformBitbucket": "Bitbucket"

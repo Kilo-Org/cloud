@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "Wá àwọn ibi ìpamọ́ kóòdù",
       "noMatches": "Kò sí ohun tó bá a mu",
       "noRepositories": "Kò sí ibi ìpamọ́ kóòdù tó wà",
-      "noRepositoriesDescription": "Kò sí ibi ìpamọ́ kóòdù tó sopọ̀ mọ́ àkọọ́lẹ̀ rẹ.",
+      "noRepositoriesDescription": "Láti gbé àwọn ibi ìpamọ́ kóòdù wọlé, sopọ̀ mọ́ GitHub tàbí GitLab nínú $t(integrations.sectionTitle).",
       "loading": "Ń gbé wọlé…",
       "accessibility": "Ibi ìpamọ́ kóòdù: {{label}}",
       "platformBitbucket": "Bitbucket"

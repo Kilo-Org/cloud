@@ -1989,7 +1989,7 @@
       "searchPlaceholder": "Cerca repository",
       "noMatches": "Nessun risultato",
       "noRepositories": "Nessun repository disponibile",
-      "noRepositoriesDescription": "Nessun repository è collegato al tuo account.",
+      "noRepositoriesDescription": "Collega GitHub o GitLab in $t(integrations.sectionTitle) per caricare i repository.",
       "loading": "Caricamento…",
       "accessibility": "Repository selezionato: {{label}}",
       "platformBitbucket": "Bitbucket"

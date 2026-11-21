@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "Tafuta hazina",
       "noMatches": "Hakuna matokeo yanayolingana",
       "noRepositories": "Hakuna hazina zinazopatikana",
-      "noRepositoriesDescription": "Hakuna hazina zilizounganishwa kwenye akaunti yako.",
+      "noRepositoriesDescription": "Ili kupakia hazina, unganisha GitHub au GitLab katika $t(integrations.sectionTitle).",
       "loading": "Inapakia…",
       "accessibility": "Hazina: {{label}}",
       "platformBitbucket": "Bitbucket"

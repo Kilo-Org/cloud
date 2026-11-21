@@ -2000,7 +2000,7 @@
       "searchPlaceholder": "Cari repositori",
       "noMatches": "Tidak ada hasil yang cocok",
       "noRepositories": "Tidak ada repositori yang tersedia",
-      "noRepositoriesDescription": "Tidak ada repositori yang terhubung ke akunmu.",
+      "noRepositoriesDescription": "Hubungkan GitHub atau GitLab di $t(integrations.sectionTitle) untuk memuat repositori.",
       "loading": "Memuat…",
       "accessibility": "Repositori: {{label}}",
       "platformBitbucket": "Bitbucket"

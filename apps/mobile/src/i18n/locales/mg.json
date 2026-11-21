@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "Fikarohana tahirin-kaody",
       "noMatches": "Tsy misy mifanaraka",
       "noRepositories": "Tsy misy tahirin-kaody azo ampiasaina",
-      "noRepositoriesDescription": "Tsy misy tahirin-kaody mifandray amin'ny kaontinao.",
+      "noRepositoriesDescription": "Mba hahazoana tahirin-kaody, ampifandraiso amin'ny GitHub na GitLab ao amin'ny $t(integrations.sectionTitle).",
       "loading": "Maka angona…",
       "accessibility": "Tahirin-kaody: {{label}}",
       "platformBitbucket": "Bitbucket"

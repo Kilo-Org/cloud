@@ -2609,7 +2609,7 @@
       "searchPlaceholder": "Căutare depozite de cod",
       "noMatches": "Niciun rezultat",
       "noRepositories": "Nu este disponibil niciun depozit",
-      "noRepositoriesDescription": "Nu este conectat niciun depozit la contul tău.",
+      "noRepositoriesDescription": "Pentru a încărca depozite, conectează un cont GitHub sau GitLab în $t(integrations.sectionTitle).",
       "loading": "Se încarcă…",
       "accessibility": "Depozit: {{label}}",
       "platformBitbucket": "Bitbucket"

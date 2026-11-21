@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "Repozitoriya axtarışı",
       "noMatches": "Uyğunluq yoxdur",
       "noRepositories": "Mövcud repozitoriya yoxdur",
-      "noRepositoriesDescription": "Hesabına qoşulmuş repozitoriya yoxdur.",
+      "noRepositoriesDescription": "Repozitoriyaları yükləmək üçün GitHub və ya GitLab-ı $t(integrations.sectionTitle) bölməsində qoş.",
       "loading": "Yüklənir…",
       "accessibility": "Repozitoriya: {{label}}",
       "platformBitbucket": "Bitbucket"

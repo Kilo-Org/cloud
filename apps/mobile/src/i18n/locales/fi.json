@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "Hae koodivarastoja",
       "noMatches": "Ei osumia",
       "noRepositories": "Ei koodivarastoja käytettävissä",
-      "noRepositoriesDescription": "Tiliisi ei ole yhdistetty koodivarastoja.",
+      "noRepositoriesDescription": "Yhdistä GitHub tai GitLab kohdassa $t(integrations.sectionTitle), jotta voit ladata koodivarastoja.",
       "loading": "Ladataan…",
       "accessibility": "Koodivarasto: {{label}}",
       "platformBitbucket": "Bitbucket"

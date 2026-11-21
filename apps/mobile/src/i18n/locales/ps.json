@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "د زېرمتونونو لټون",
       "noMatches": "هېڅ پایله ونه موندل شوه",
       "noRepositories": "هېڅ زېرمتون نشته",
-      "noRepositoriesDescription": "ستاسو له حساب سره هېڅ زېرمتون نه دی نښلول شوی.",
+      "noRepositoriesDescription": "د زېرمتونونو د بارولو لپاره، په $t(integrations.sectionTitle) کې GitHub یا GitLab حساب ونښلوئ.",
       "loading": "بارېږي…",
       "accessibility": "زېرمتون: {{label}}",
       "platformBitbucket": "Bitbucket"

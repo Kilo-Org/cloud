@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "جست‌وجوی مخازن",
       "noMatches": "موردی پیدا نشد",
       "noRepositories": "هیچ مخزنی در دسترس نیست",
-      "noRepositoriesDescription": "هیچ مخزنی به حساب شما وصل نیست.",
+      "noRepositoriesDescription": "برای بارگذاری مخازن، GitHub یا GitLab را در $t(integrations.sectionTitle) وصل کنید.",
       "loading": "در حال بارگذاری…",
       "accessibility": "مخزن: {{label}}",
       "platformBitbucket": "Bitbucket"

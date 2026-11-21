@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "Репозиторийлерді іздеу",
       "noMatches": "Сәйкестіктер жоқ",
       "noRepositories": "Қолжетімді репозиторийлер жоқ",
-      "noRepositoriesDescription": "Тіркелгіңізге қосылған репозиторийлер жоқ.",
+      "noRepositoriesDescription": "Репозиторийлерді жүктеу үшін $t(integrations.sectionTitle) бөлімінде GitHub немесе GitLab қосыңыз.",
       "loading": "Жүктелуде…",
       "accessibility": "Репозиторий: {{label}}",
       "platformBitbucket": "Bitbucket"

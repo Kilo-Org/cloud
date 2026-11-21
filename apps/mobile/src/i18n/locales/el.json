@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "Αναζήτηση αποθετηρίων",
       "noMatches": "Δεν βρέθηκαν αποτελέσματα",
       "noRepositories": "Κανένα διαθέσιμο αποθετήριο",
-      "noRepositoriesDescription": "Δεν υπάρχουν αποθετήρια συνδεδεμένα με τον λογαριασμό σου.",
+      "noRepositoriesDescription": "Για να φορτώσεις αποθετήρια, σύνδεσε το GitHub ή το GitLab στις $t(integrations.sectionTitle).",
       "loading": "Φόρτωση…",
       "accessibility": "Αποθετήριο: {{label}}",
       "platformBitbucket": "Bitbucket"

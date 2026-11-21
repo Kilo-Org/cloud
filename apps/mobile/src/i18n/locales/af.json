@@ -2557,7 +2557,7 @@
       "searchPlaceholder": "Soek bewaarplekke",
       "noMatches": "Geen treffers nie",
       "noRepositories": "Geen bewaarplekke beskikbaar nie",
-      "noRepositoriesDescription": "Geen bewaarplekke is aan jou rekening gekoppel nie.",
+      "noRepositoriesDescription": "Koppel GitHub of GitLab in $t(integrations.sectionTitle) om bewaarplekke te laai.",
       "loading": "Laai…",
       "accessibility": "Bewaarplek: {{label}}",
       "platformBitbucket": "Bitbucket"

@@ -12,8 +12,8 @@ import {
   type CreditDeduction,
   type CreditGrant,
   type CreditGrantKind,
-  type CreditGrantReason,
   creditGrantKind,
+  type CreditGrantReason,
   creditPurchaseChannel,
   type CreditPurchaseEntry,
 } from '@/lib/credits/credit-history';

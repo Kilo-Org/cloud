@@ -26,6 +26,7 @@ const REQUIRED_KEYS: readonly string[] = [
   'USER_DELETION_AUDIT_HMAC_KEY',
   'USER_DELETION_ENCRYPTION_KEY',
   'INTERNAL_API_SECRET',
+  'BYOC_INTERNAL_API_SECRET',
   'STRIPE_SECRET_KEY',
   'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY',
 ];
@@ -33,6 +34,7 @@ const REQUIRED_KEYS: readonly string[] = [
 const SECRET_KEYS = new Set<string>([
   'NEXTAUTH_SECRET',
   'INTERNAL_API_SECRET',
+  'BYOC_INTERNAL_API_SECRET',
   'CALLBACK_TOKEN_SECRET',
   'BYOK_ENCRYPTION_KEY',
   'USER_DELETION_AUDIT_HMAC_KEY',
@@ -135,6 +137,8 @@ const KEY_DESCRIPTIONS: Record<string, string> = {
   USER_DELETION_AUDIT_HMAC_KEY: 'HMAC key for user-deletion email hashes',
   USER_DELETION_ENCRYPTION_KEY: 'AES key for user-deletion effect checkpoints and credentials',
   INTERNAL_API_SECRET: 'Internal API authentication secret',
+  BYOC_INTERNAL_API_SECRET:
+    'Authenticates only the internal BYOC Vercel credential routes; cloud-agent-next reads it as BYOC_INTERNAL_API_SECRET_PROD',
   STRIPE_SECRET_KEY:
     'Stripe secret key — get test keys at https://dashboard.stripe.com/test/apikeys',
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY:

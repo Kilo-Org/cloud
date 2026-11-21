@@ -6,7 +6,7 @@ import { z } from 'zod';
 
 import { byoc_connections } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { BYOC_INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 
 import { decodeVercelConnection } from '@/lib/byoc/vercel-connection';
 
@@ -15,7 +15,7 @@ const responseHeaders = { 'Cache-Control': 'no-store' };
 function isAuthorized(request: NextRequest): boolean {
   const presented = request.headers.get('x-internal-api-key');
   return Boolean(
-    INTERNAL_API_SECRET && presented && timingSafeEqual(presented, INTERNAL_API_SECRET)
+    BYOC_INTERNAL_API_SECRET && presented && timingSafeEqual(presented, BYOC_INTERNAL_API_SECRET)
   );
 }
 

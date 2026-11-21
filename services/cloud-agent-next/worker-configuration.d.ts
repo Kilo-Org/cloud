@@ -8,6 +8,7 @@ interface __BaseEnv_Env {
 	CALLBACK_QUEUE: Queue;
 	CLOUD_AGENT_REPORT_QUEUE: Queue;
 	INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
+	BYOC_INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
 	ENVIRONMENT: "development" | "production";
 	GITHUB_APP_SLUG: "kiloconnect-development" | "kiloconnect";
 	GITHUB_APP_BOT_USER_ID: "242397087" | "240665456";
@@ -67,6 +68,7 @@ declare namespace Cloudflare {
 		CALLBACK_QUEUE: Queue;
 		CLOUD_AGENT_REPORT_QUEUE: Queue;
 		INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
+		BYOC_INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
 		ENVIRONMENT: "development";
 		GITHUB_APP_SLUG: "kiloconnect-development";
 		GITHUB_APP_BOT_USER_ID: "242397087";

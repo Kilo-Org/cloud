@@ -14,6 +14,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { and, eq, isNull } from 'drizzle-orm';
+import { TRPCError } from '@trpc/server';
 import { decryptKeyedEnvelope } from '@kilocode/encryption';
 import {
   GITLAB_PERSONAL_ACCESS_TOKEN_ENVELOPE_SCHEME,
@@ -78,6 +79,7 @@ let getValidGitLabProjectAccessToken: typeof GitLabService.getValidGitLabProject
 let getOrCreateProjectAccessToken: typeof GitLabService.getOrCreateProjectAccessToken;
 let removeStoredProjectAccessToken: typeof GitLabProjectTokenHandles.removeStoredProjectAccessToken;
 let listProjectIdsWithStoredTokens: typeof GitLabProjectTokenHandles.listProjectIdsWithStoredTokens;
+let describeSettlementFailure: typeof GitLabProjectTokenHandles.describeSettlementFailure;
 let disconnectGitLabIntegration: typeof GitLabService.disconnectGitLabIntegration;
 let settleStoredProjectTokens: typeof GitLabService.settleStoredProjectTokens;
 
@@ -111,7 +113,7 @@ describe('GitLab encrypted credential persistence', () => {
       disconnectGitLabIntegration,
       settleStoredProjectTokens,
     } = await import('./gitlab-service'));
-    ({ removeStoredProjectAccessToken, listProjectIdsWithStoredTokens } =
+    ({ removeStoredProjectAccessToken, listProjectIdsWithStoredTokens, describeSettlementFailure } =
       await import('./platforms/gitlab/project-token-handles'));
   });
 
@@ -2584,6 +2586,28 @@ describe('GitLab encrypted credential persistence', () => {
       'Ask Kilo support to repair the stored integration record, then reconnect.'
     );
     expect(refusalMessage).not.toContain('Try again in a moment');
+  });
+
+  it('reports only an unreadable stored credential as a permanent settlement failure', () => {
+    expect(describeSettlementFailure(new Error('connection terminated unexpectedly'))).toEqual({
+      retryable: true,
+      reason: 'provider_unconfirmed',
+    });
+    expect(describeSettlementFailure(new TypeError('fetch failed'))).toEqual({
+      retryable: true,
+      reason: 'provider_unconfirmed',
+    });
+    expect(
+      describeSettlementFailure(
+        new TRPCError({ code: 'UNAUTHORIZED', message: 'GitLab project credential must be recreated' })
+      )
+    ).toEqual({
+      retryable: false,
+      reason: 'stored_credential_unreadable',
+    });
+    expect(
+      describeSettlementFailure(new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'x' }))
+    ).toEqual({ retryable: true, reason: 'provider_unconfirmed' });
   });
 
   it('drops a legacy entry that names no revocable id on disconnect', async () => {

@@ -220,6 +220,23 @@ export type ProjectTokenRetentionReason =
   | 'stored_handle_changed';
 
 /**
+ * How a settlement that threw is reported. Only a stored credential row that
+ * cannot be read is permanent, because it fails the same way on every repeat.
+ * Every other failure — a database error, a lost connection — can clear, so it
+ * keeps the retryable answer instead of naming a repair.
+ */
+export function describeSettlementFailure(error: unknown): {
+  retryable: boolean;
+  reason: ProjectTokenRetentionReason;
+} {
+  const unreadable = error instanceof TRPCError && error.code === 'UNAUTHORIZED';
+  return {
+    retryable: !unreadable,
+    reason: unreadable ? 'stored_credential_unreadable' : 'provider_unconfirmed',
+  };
+}
+
+/**
  * Outcome of removing one stored project token. A retained outcome says whether
  * a repeated attempt can settle it, so a caller that can try again does not
  * repeat a refusal the provider will keep answering. Only a missing answer, a

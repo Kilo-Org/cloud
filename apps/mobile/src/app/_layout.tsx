@@ -66,6 +66,7 @@ import {
   setBlockedAccountActive,
   subscribeBlockedAccount,
 } from '@/lib/auth/blocked-account-state';
+import { buildBlockedAccountSupportLink } from '@/lib/auth/blocked-account-support';
 import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 import { openExternalUrl } from '@/lib/external-link';
 import { resolveBootstrapDecision, shouldShowBootstrapLoading } from '@/lib/bootstrap-decision';
@@ -1109,7 +1110,14 @@ function RootLayoutNav({
             retrying={userIdFetching}
             onRetry={refetchUserId}
             onContactSupport={() => {
-              void openExternalUrl(`mailto:${SUPPORT_EMAIL}`, { label: SUPPORT_EMAIL });
+              // `email` is absent precisely when the identity read was refused,
+              // which is the common blocked case: the builder omits the body
+              // then rather than naming a placeholder account.
+              const link = buildBlockedAccountSupportLink({
+                subject: t('accountBlocked.title'),
+                email,
+              });
+              void openExternalUrl(link, { label: SUPPORT_EMAIL });
             }}
             onSignOut={() => {
               // The escape hatch must actually reach the login screen: the

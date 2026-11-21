@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { LEADERBOARD_MODEL_SQL, normalizeLeaderboardModel } from '@/lib/leaderboard-model';
 import { normalizePublicInferenceProvider } from '@/lib/public-inference-provider';
 import {
   createPublicSnowflakeReport,
@@ -12,10 +13,7 @@ const MAXIMUM_ERROR_RATE = 0.5;
 
 const LEADERBOARD_MODEL_PROVIDER_USAGE_QUERY = `
 select
-     case
-        when mu.requested_model like '~%' then coalesce(mu.model, mu.requested_model)
-        else mu.requested_model
-      end as "model"
+     ${LEADERBOARD_MODEL_SQL} as "model"
     , mu.inference_provider as "provider"
     , sum(mu.total_cost_microdollars) as "sum_cost"
     , sum(mu.total_input_tokens) + sum(mu.total_output_tokens) as "sum_tokens"
@@ -65,23 +63,6 @@ type AggregatedUsage = {
   sumErrorCount: number;
 };
 
-function normalizeModel(model: string): string {
-  const withoutTrailingSlashes = model.replace(/\/+$/, '');
-  const slashIndex = withoutTrailingSlashes.lastIndexOf('/');
-  const withoutProvider = withoutTrailingSlashes.startsWith('openrouter/')
-    ? withoutTrailingSlashes
-    : slashIndex >= 0
-      ? withoutTrailingSlashes.slice(slashIndex + 1)
-      : withoutTrailingSlashes;
-  const colonIndex = withoutProvider.indexOf(':');
-
-  if (colonIndex < 0 || withoutProvider.slice(colonIndex) === ':free') {
-    return withoutProvider;
-  }
-
-  return withoutProvider.slice(0, colonIndex);
-}
-
 function ratio(numerator: number, denominator: number): number {
   return denominator === 0 ? 0 : numerator / denominator;
 }
@@ -93,7 +74,7 @@ function parseAndAggregateUsage(rows: string[][]): ModelProviderUsage[] {
     const [rawModel, rawProvider, ...rawAggregates] = row;
     const [sumCost, sumTokens, sumInputTokens, sumCacheHitTokens, sumRequestCount, sumErrorCount] =
       rawAggregates.map(Number);
-    const model = normalizeModel(rawModel?.trim() || '');
+    const model = normalizeLeaderboardModel(rawModel || '');
     const provider = normalizePublicInferenceProvider(rawProvider?.trim() || 'unknown');
 
     if (

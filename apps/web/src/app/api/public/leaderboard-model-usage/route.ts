@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { LEADERBOARD_MODEL_SQL, normalizeLeaderboardModel } from '@/lib/leaderboard-model';
 import {
   createPublicSnowflakeReport,
   publicSnowflakeReportOptions,
@@ -9,10 +10,7 @@ import { LEADERBOARD_MODEL_USAGE_REDIS_KEY } from '@kilocode/web-shared/lib/redi
 const LEADERBOARD_MODEL_USAGE_QUERY = `
 select
     to_char(mu.usage_date, 'YYYY-MM-DD') as usage_date
-    , case
-        when mu.requested_model like '~%' then coalesce(mu.model, mu.requested_model)
-        else coalesce(mu.requested_model, mu.model)
-      end as "model"
+    , ${LEADERBOARD_MODEL_SQL} as "model"
     , case
         when mu.mode ilike '%code%' then 'code'
         when mu.mode ilike '%review%' then 'review'
@@ -48,8 +46,11 @@ const modelUsageSchema = z.array(
 type ModelUsage = z.infer<typeof modelUsageSchema>[number];
 
 function parseModelUsage(rows: string[][]): ModelUsage[] {
-  return rows.map(row => {
-    const [usageDate, model, modeValue, tokenValue] = row;
+  const usageByKey = new Map<string, ModelUsage>();
+
+  for (const row of rows) {
+    const [usageDate, rawModel, modeValue, tokenValue] = row;
+    const model = normalizeLeaderboardModel(rawModel || '');
     const tokens = Number(tokenValue);
     const mode = modeValue || null;
 
@@ -57,13 +58,23 @@ function parseModelUsage(rows: string[][]): ModelUsage[] {
       throw new Error('Snowflake returned an invalid model usage row');
     }
 
-    return modelUsageSchema.element.parse({
-      usageDate,
-      model,
-      mode,
-      tokens,
-    });
-  });
+    const key = `${usageDate}\0${model}\0${mode ?? ''}`;
+    const existing = usageByKey.get(key);
+
+    if (existing) {
+      existing.tokens += tokens;
+    } else {
+      usageByKey.set(key, modelUsageSchema.element.parse({ usageDate, model, mode, tokens }));
+    }
+  }
+
+  return [...usageByKey.values()].sort(
+    (left, right) =>
+      right.usageDate.localeCompare(left.usageDate) ||
+      right.tokens - left.tokens ||
+      left.model.localeCompare(right.model) ||
+      (left.mode ?? '').localeCompare(right.mode ?? '')
+  );
 }
 
 export const GET = createPublicSnowflakeReport({

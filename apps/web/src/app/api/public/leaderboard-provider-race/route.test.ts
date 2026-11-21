@@ -216,9 +216,36 @@ describe('GET /api/public/leaderboard-model-usage', () => {
 
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual([
-        { usageDate: '2026-11-01', model: 'acme/model', mode: null, tokens: 12_000_000 },
+        { usageDate: '2026-11-01', model: 'model', mode: null, tokens: 12_000_000 },
       ]);
       expect(executeStatement).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  test('merges rows whose models normalize to the same leaderboard name', async () => {
+    await jest.isolateModulesAsync(async () => {
+      const snowflake = await import('@/lib/snowflake');
+      jest.mocked(snowflake.resolveSnowflakeConfig).mockReturnValue(FAKE_CONFIG);
+      jest.mocked(snowflake.executeSnowflakeStatement).mockReset().mockResolvedValue([
+        ['2026-11-01', 'acme/model', 'code', '1000000'],
+        ['2026-11-01', 'other/acme/model:nitro', 'code', '2000000'],
+        ['2026-11-01', 'acme/model:free', 'code', '4000000'],
+        ['2026-11-01', 'openrouter/free', 'code', '500000'],
+        ['2026-11-01', 'acme/model', 'plan', '3500000'],
+        ['2026-11-02', 'acme/model', 'code', '100'],
+      ]);
+      const { GET } = await import('../leaderboard-model-usage/route');
+
+      const response = await GET();
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual([
+        { usageDate: '2026-11-02', model: 'model', mode: 'code', tokens: 100 },
+        { usageDate: '2026-11-01', model: 'model:free', mode: 'code', tokens: 4_000_000 },
+        { usageDate: '2026-11-01', model: 'model', mode: 'plan', tokens: 3_500_000 },
+        { usageDate: '2026-11-01', model: 'model', mode: 'code', tokens: 3_000_000 },
+        { usageDate: '2026-11-01', model: 'openrouter/free', mode: 'code', tokens: 500_000 },
+      ]);
     });
   });
 });
@@ -233,7 +260,7 @@ describe('leaderboard model alias attribution', () => {
       route: 'leaderboard-model-provider-usage',
       loadRoute: () => import('../leaderboard-model-provider-usage/route'),
     },
-  ])('$route groups tilde aliases by the model that served each request', async ({ loadRoute }) => {
+  ])('$route attributes aliases and router ids to the model that served each request', async ({ loadRoute }) => {
     await jest.isolateModulesAsync(async () => {
       const snowflake = await import('@/lib/snowflake');
       jest.mocked(snowflake.resolveSnowflakeConfig).mockReturnValue(FAKE_CONFIG);
@@ -244,7 +271,7 @@ describe('leaderboard model alias attribution', () => {
       expect((await GET()).status).toBe(200);
       const statement = executeStatement.mock.calls[0][0].statement;
       const modelExpression = statement.match(
-        /(case[\s\S]*?end|coalesce\(mu\.requested_model, mu\.model\)|mu\.requested_model) as "model"/
+        /(case[\s\S]*?end) as "model"/
       )?.[1];
       if (!modelExpression) {
         throw new Error('Missing leaderboard model projection');
@@ -258,6 +285,9 @@ describe('leaderboard model alias attribution', () => {
           ('~deepseek/deepseek-pro-latest', 'deepseek/deepseek-v4-pro-1101', 12000000),
           ('deepseek/deepseek-v4-pro-0813:free', 'deepseek/deepseek-v4-pro-0813', 3000000),
           ('~deepseek/unresolved-latest', null, 2000000),
+          ('openrouter/auto', 'anthropic/claude-sonnet-4.5', 1500000),
+          ('openrouter/free', null, 1200000),
+          ('~acme/model', 'upstream/model', 1100000),
           ('acme/model~latest', 'upstream/model', 1000000)
         ) as mu(requested_model, model, tokens)
         group by 1
@@ -269,6 +299,9 @@ describe('leaderboard model alias attribution', () => {
         { model: 'deepseek/deepseek-v4-pro-1101', tokens: 12000000 },
         { model: 'deepseek/deepseek-v4-pro-0813:free', tokens: 3000000 },
         { model: '~deepseek/unresolved-latest', tokens: 2000000 },
+        { model: 'anthropic/claude-sonnet-4.5', tokens: 1500000 },
+        { model: 'openrouter/free', tokens: 1200000 },
+        { model: '~acme/model', tokens: 1100000 },
         { model: 'acme/model~latest', tokens: 1000000 },
       ]);
     });
@@ -284,7 +317,7 @@ describe('public custom model leaderboard usage', () => {
       expected: [
         {
           usageDate: '2026-11-01',
-          model: 'acme/deleted-public-model',
+          model: 'deleted-public-model',
           mode: 'code',
           tokens: 12_000_000,
         },

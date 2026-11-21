@@ -26,6 +26,7 @@ import {
   KiloPassCadence,
   KiloPassTier,
 } from '@kilocode/db/schema-types';
+import { TRPCError } from '@trpc/server';
 import { and, asc, desc, eq, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { reconcileCreditExpirationsInTransaction } from '@kilocode/db/credit-expiration';
@@ -1546,17 +1547,19 @@ export const organizationKiloPassService: OrganizationKiloPassService = {
             billingCycle: organization_seats_purchases.billing_cycle,
             expiresAt: organization_seats_purchases.expires_at,
             seatCount: organization_seats_purchases.seat_count,
+            status: organization_seats_purchases.subscription_status,
           })
           .from(organization_seats_purchases)
-          .where(
-            and(
-              eq(organization_seats_purchases.organization_id, organizationId),
-              eq(organization_seats_purchases.subscription_status, 'active')
-            )
-          )
+          .where(eq(organization_seats_purchases.organization_id, organizationId))
           .orderBy(desc(organization_seats_purchases.created_at))
           .limit(1);
-    if (!row && !seatPurchase) throw new Error('active organization seat subscription required');
+    if (!row && seatPurchase?.status !== 'active') {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message:
+          'Kilo Pass for Organizations is added to a paid seat subscription. Subscribe to seats first, then add Kilo Pass.',
+      });
+    }
     const renewalAt = row
       ? (row.agreement.paid_until ?? row.agreement.issuance_anchor_at)
       : seatPurchase.expiresAt;

@@ -166,7 +166,7 @@ describe('OrganizationTrialWrapper effective roles', () => {
     role => {
       const html = renderTrial(role);
 
-      expect(html).toContain('Upgrade Now');
+      expect(html).toContain('Checkout Now');
       expect(html).toContain('Organization content');
       expect(html).not.toContain('Contact an owner');
     }
@@ -177,7 +177,7 @@ describe('OrganizationTrialWrapper effective roles', () => {
     role => {
       const html = renderTrial(role);
 
-      expect(html).not.toContain('Upgrade Now');
+      expect(html).not.toContain('Checkout Now');
       expect(html).toContain('Contact an owner');
     }
   );
@@ -185,6 +185,6 @@ describe('OrganizationTrialWrapper effective roles', () => {
   it('preserves the assumed member role on trial pages', () => {
     mockAssumedRole = 'member';
 
-    expect(renderTrial('owner')).not.toContain('Upgrade Now');
+    expect(renderTrial('owner')).not.toContain('Checkout Now');
   });
 });

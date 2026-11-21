@@ -28,6 +28,12 @@ export function OrgKiloPassGroup({
       { enabled: Boolean(organizationId) }
     )
   );
+  const seatSubscriptionQuery = useQuery(
+    trpc.organizations.subscription.get.queryOptions(
+      { organizationId },
+      { enabled: Boolean(organizationId) }
+    )
+  );
   const organization = organizationQuery.data;
   const summary = summaryQuery.data;
   const agreement = summary?.agreement;
@@ -35,23 +41,37 @@ export function OrgKiloPassGroup({
   const commercialState = summary?.commercialState ?? undefined;
   const condition = toCondition(summary?.processingCondition ?? null);
   const isEnded = commercialState === 'ended';
+  const hasVisibleAgreement = Boolean(agreement && terms && (!isEnded || showTerminal));
+  const hasRequiredQueryError = summaryQuery.isError || organizationQuery.isError;
+  const seatSubscriptionState =
+    seatSubscriptionQuery.isSuccess && seatSubscriptionQuery.data
+      ? seatSubscriptionQuery.data.latestSeatPurchaseStatus === 'active'
+        ? 'active'
+        : 'inactive'
+      : 'unavailable';
 
   return (
     <OrgKiloPassGroupShell
-      isLoading={summaryQuery.isPending || organizationQuery.isPending}
-      isError={summaryQuery.isError || organizationQuery.isError}
+      isLoading={
+        !hasRequiredQueryError &&
+        (summaryQuery.isPending ||
+          organizationQuery.isPending ||
+          (!hasVisibleAgreement && seatSubscriptionQuery.isPending))
+      }
+      isError={hasRequiredQueryError}
       error={summaryQuery.error ?? organizationQuery.error}
       unframed={unframed}
       onRetry={() => {
         void summaryQuery.refetch();
         void organizationQuery.refetch();
+        void seatSubscriptionQuery.refetch();
       }}
     >
       <OrgKiloPassSubscriptionCard
         organizationId={organizationId}
         paidSeatCount={agreement?.paidSeatCount ?? organization?.seat_count ?? 0}
         agreement={
-          agreement && terms && (!isEnded || showTerminal)
+          hasVisibleAgreement && agreement && terms
             ? {
                 status: commercialState ?? 'pending_payment',
                 tierName: terms.tierName,
@@ -74,13 +94,17 @@ export function OrgKiloPassGroup({
               }
             : undefined
         }
+        seatSubscriptionState={seatSubscriptionState}
+        onRetrySeatSubscription={() => void seatSubscriptionQuery.refetch()}
         availableActionLabel={isEnded ? 'Add Kilo Pass again' : 'Add Kilo Pass'}
         availableDetails={
           isEnded && agreement ? (
             <p className="type-label text-muted-foreground">
               Your previous Kilo Pass for Organizations ended
               {agreement.paidThrough ? ` on ${formatDateLabel(agreement.paidThrough)}` : ''}.
-              Monthly Credits can restart right away.
+              {seatSubscriptionState === 'active'
+                ? ' Monthly Credits can restart right away.'
+                : null}
             </p>
           ) : undefined
         }

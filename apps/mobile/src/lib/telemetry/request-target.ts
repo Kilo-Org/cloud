@@ -63,10 +63,10 @@ function isHostLike(text: string): boolean {
 const SINGLE_LABEL = /^[a-z\d](?:[a-z\d-]*[a-z\d])?$/iu;
 
 /**
- * A single label with a numeric port: a local backend's authority, and the same
- * text as a userinfo pair whose value starts with digits.
+ * A run with no dot that ends in a numeric port: a single-label authority with a
+ * port, and the same text as a userinfo pair whose value starts with digits.
  */
-const PORTED_LABEL = /^[a-z\d](?:[a-z\d-]*[a-z\d])?:\d{1,5}$/iu;
+const PORTED_LABEL = /^[^.:@/?#\\]+:\d{1,5}$/iu;
 
 /** The index of the first `/`, `?` or `#` at or after `from`, else the length. */
 function nextDelimiter(text: string, from: number): number {

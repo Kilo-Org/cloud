@@ -106,6 +106,15 @@ describe('stripQueryString', () => {
     expect(stripQueryString(url)).toBe('https://');
   });
 
+  it('reports the scheme alone for a non-host ported run before a query at-sign', () => {
+    // A run with no dot that ends in a numeric port is a host with a port and a
+    // userinfo pair whose value starts with digits, so neither reading is chosen.
+    const label = ['api', 'server'].join('_');
+    const url = `https://${label}:3000${TRPC_PATH}${['x', 'y'].join('.')}?email=${MEMBER}`;
+
+    expect(stripQueryString(url)).toBe('https://');
+  });
+
   it('reports no run when an at-sign in a query follows a ported single label', () => {
     // `host:3000` is the same text as a userinfo pair whose value starts with
     // digits, so the run is not kept: the value is the scheme alone.

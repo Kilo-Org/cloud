@@ -1215,17 +1215,27 @@ const QUOTE_PAIRS = [
 const escapeRegExp = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
+ * One matcher per quote pair, compiled once for the process. The pattern
+ * depends only on the pair, and `String.prototype.matchAll` clones the expression
+ * it is handed, so a shared instance keeps no position between values; building
+ * them per call repeated the same sixteen compiles for every catalog value.
+ */
+const QUOTE_PATTERNS = QUOTE_PAIRS.map(
+  ([open, close]) =>
+    new RegExp(
+      `${escapeRegExp(open)}([^${escapeRegExp(close)}\n]{2,60})${escapeRegExp(close)}`,
+      'gu'
+    )
+);
+
+/**
  * Every quoted run short enough to name a control. A translator who spells a
  * button label instead of naming its key leaves the run here, where the
  * English-label check below can see it.
  */
 function quotedRuns(value) {
   const runs = new Set();
-  for (const [open, close] of QUOTE_PAIRS) {
-    const pattern = new RegExp(
-      `${escapeRegExp(open)}([^${escapeRegExp(close)}\n]{2,60})${escapeRegExp(close)}`,
-      'gu'
-    );
+  for (const pattern of QUOTE_PATTERNS) {
     for (const match of value.matchAll(pattern)) {
       runs.add(match[1].trim());
     }
@@ -1630,13 +1640,29 @@ const SCRIPT_ENTRIES = Object.entries(SCRIPT_PATTERNS);
 /** Languages whose own orthography needs more than one script. */
 const MULTI_SCRIPT_LANGUAGES = { ja: ['Hiragana', 'Katakana', 'Han'] };
 
+/**
+ * The script of each character already resolved. A letter matches the first few
+ * entries, but a space, digit, punctuation mark or placeholder brace matches
+ * none and would pay the whole table on every appearance; the answer depends
+ * only on the character, so it is looked up once. `null` is the "no script
+ * claims it" answer, cached with the rest.
+ */
+const SCRIPT_OF_CHARACTER = new Map();
+
 function scriptOf(char) {
-  for (const [name, pattern] of SCRIPT_ENTRIES) {
+  const known = SCRIPT_OF_CHARACTER.get(char);
+  if (known !== undefined) {
+    return known;
+  }
+  let name = null;
+  for (const [candidate, pattern] of SCRIPT_ENTRIES) {
     if (pattern.test(char)) {
-      return name;
+      name = candidate;
+      break;
     }
   }
-  return null;
+  SCRIPT_OF_CHARACTER.set(char, name);
+  return name;
 }
 
 /** Every script in `values`, counted, so the dominant one can be picked. */
@@ -1685,6 +1711,9 @@ function pushBaseKey(key) {
  */
 const COUNT_PLACEHOLDERS = new Set(['count', 'displayCount', 'itemCount', 'steps']);
 
+/** Placeholder sets already built, per English catalog and family base. */
+const FAMILY_PLACEHOLDERS = new WeakMap();
+
 /**
  * Every `{{token}}` an English plural family uses, across the base key and all
  * of its categories. A language may need one of those tokens in a category
@@ -1694,8 +1723,22 @@ const COUNT_PLACEHOLDERS = new Set(['count', 'displayCount', 'itemCount', 'steps
  * singular form for 21, 101 and the like, so their `_one` value has to
  * interpolate the count. A category may therefore add a token its English
  * family already uses; it may never drop one English requires in that category.
+ *
+ * The set depends only on the English map and the base, so it is built once per
+ * catalog and base and read afterwards: the locale loop asks for the same few
+ * bases once per added plural category and once per placeholder mismatch.
+ * Callers treat a returned set as read-only.
  */
 function familyPlaceholders(english, base) {
+  let families = FAMILY_PLACEHOLDERS.get(english);
+  if (families === undefined) {
+    families = new Map();
+    FAMILY_PLACEHOLDERS.set(english, families);
+  }
+  const known = families.get(base);
+  if (known !== undefined) {
+    return known;
+  }
   const tokens = new Set();
   for (const [key, value] of english) {
     if (key !== base && pluralBaseKey(key) !== base) {
@@ -1705,6 +1748,7 @@ function familyPlaceholders(english, base) {
       tokens.add(token);
     }
   }
+  families.set(base, tokens);
   return tokens;
 }
 

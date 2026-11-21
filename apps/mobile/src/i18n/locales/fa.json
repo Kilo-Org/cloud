@@ -450,6 +450,17 @@
       "location": "موقعیت Vertex",
       "clientEmail": "ایمیل حساب سرویس",
       "privateKey": "کلید خصوصی حساب سرویس",
+      "privateKeyBlockRequired": "بلوک کلید خصوصی را بهطور کامل، از خط BEGIN تا خط END جای‌گذاری کنید.",
+      "privateKeyEncrypted": "این بلوک کلید با عبارت عبور محافظت شده است. کلید حساب سرویسی را جای‌گذاری کنید که عبارت عبور ندارد.",
+      "names": {
+        "codestral": "فقط Codestral قدیمی",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ورود با ChatGPT)",
+        "xiaomi": "Xiaomi (پرداخت به‌ازای مصرف)",
+        "zai": "Z.ai (پرداخت به‌ازای مصرف)",
+        "bedrockByok": "Amazon Bedrock (مستقیم)",
+        "vertexByok": "Google Vertex AI (مستقیم)"
+      },
       "modelMappings": "نگاشت‌های مدل",
       "modelMappingsDescription": "یک مدل درگاه را به یک نام استقرار سفارشی هدایت کنید.",
       "mappingTitle": "نگاشت {{number}}",

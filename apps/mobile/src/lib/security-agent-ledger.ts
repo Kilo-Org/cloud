@@ -14,6 +14,7 @@
 
 import { i18n } from '@/i18n';
 import {
+  SECURITY_ANALYSIS_REJECTED_MESSAGE,
   SECURITY_CONFIG_CONFLICT_CODE,
   SECURITY_REMEDIATION_REJECTED_MESSAGE,
   SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
@@ -223,6 +224,11 @@ function markerKeyFor(error: Error, canManageBilling: boolean): string | null {
     // The remediation client's definitive non-5xx rejection: a stable server
     // sentence, mapped so a non-English device does not render it verbatim.
     case SECURITY_REMEDIATION_REJECTED_MESSAGE: {
+      return 'securityAgent.mutations.actionBlocked';
+    }
+    // The analysis client's definitive non-auth rejection: same stable sentence
+    // contract, so a non-English device does not render it verbatim either.
+    case SECURITY_ANALYSIS_REJECTED_MESSAGE: {
       return 'securityAgent.mutations.actionBlocked';
     }
     default: {

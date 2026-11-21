@@ -450,6 +450,17 @@
       "location": "Vertex ലൊക്കേഷൻ",
       "clientEmail": "സർവീസ് അക്കൗണ്ട് ഇമെയിൽ",
       "privateKey": "സർവീസ് അക്കൗണ്ട് പ്രൈവറ്റ് കീ",
+      "privateKeyBlockRequired": "മുഴുവൻ കീ ബ്ലോക്കും BEGIN ലൈൻ മുതൽ END ലൈൻ വരെ പേസ്റ്റ് ചെയ്യുക.",
+      "privateKeyEncrypted": "ഈ കീ ബ്ലോക്ക് പാസ്ഫ്രേസ് ഉപയോഗിച്ച് സംരക്ഷിച്ചിരിക്കുന്നു. പാസ്ഫ്രേസ് ഇല്ലാത്ത സർവീസ് അക്കൗണ്ട് കീ പേസ്റ്റ് ചെയ്യുക.",
+      "names": {
+        "codestral": "പഴയ Codestral മാത്രം",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT ഉപയോഗിച്ച് സൈൻ ഇൻ ചെയ്യുക)",
+        "xiaomi": "Xiaomi (ഉപയോഗത്തിനനുസരിച്ച് പേയ്മെന്റ്)",
+        "zai": "Z.ai (ഉപയോഗത്തിനനുസരിച്ച് പേയ്മെന്റ്)",
+        "bedrockByok": "Amazon Bedrock (നേരിട്ട്)",
+        "vertexByok": "Google Vertex AI (നേരിട്ട്)"
+      },
       "modelMappings": "മോഡൽ മാപ്പിംഗുകൾ",
       "modelMappingsDescription": "ഒരു ഗേറ്റ്‌വേ മോഡലിനെ ഇഷ്ടാനുസൃത ഡിപ്ലോയ്‌മെന്റ് നാമത്തിലേക്ക് അയയ്ക്കുക.",
       "mappingTitle": "മാപ്പിംഗ് {{number}}",

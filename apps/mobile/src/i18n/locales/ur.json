@@ -450,6 +450,17 @@
       "location": "Vertex مقام",
       "clientEmail": "سروس اکاؤنٹ ای میل",
       "privateKey": "سروس اکاؤنٹ کی نجی کلید",
+      "privateKeyBlockRequired": "پورا کلید بلاک پیسٹ کریں، BEGIN لائن سے END لائن تک۔",
+      "privateKeyEncrypted": "یہ کلید بلاک پاس فریز سے محفوظ ہے۔ ایسی سروس اکاؤنٹ کلید پیسٹ کریں جس میں کوئی پاس فریز نہ ہو۔",
+      "names": {
+        "codestral": "صرف پرانا Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT سے سائن ان کریں)",
+        "xiaomi": "Xiaomi (استعمال کے مطابق ادائیگی)",
+        "zai": "Z.ai (استعمال کے مطابق ادائیگی)",
+        "bedrockByok": "Amazon Bedrock (براہ راست)",
+        "vertexByok": "Google Vertex AI (براہ راست)"
+      },
       "modelMappings": "ماڈل میپنگز",
       "modelMappingsDescription": "گیٹ وے ماڈل کو حسب ضرورت ڈیپلائمنٹ نام پر بھیجیں۔",
       "mappingTitle": "میپنگ {{number}}",

@@ -38,9 +38,10 @@ vi.mock('expo-router', () => ({
   useRouter: () => router,
   useNavigation: () => navigation,
 }));
-vi.mock('@tanstack/react-query', () => ({ useQuery: () => organizations }));
-vi.mock('@/lib/trpc', () => ({
-  useTRPC: () => ({ organizations: { list: { queryOptions: () => ({}) } } }),
+// The fixture must observe the shared memberships entry through the hook that
+// owns its options, so the suite mocks that hook rather than the query itself.
+vi.mock('@/lib/hooks/use-organizations-list', () => ({
+  useOrganizationsList: () => organizations,
 }));
 vi.mock('@/components/context-control', () => ({ useContextPicker: () => ({ openPicker }) }));
 

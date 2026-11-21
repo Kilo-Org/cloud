@@ -175,7 +175,7 @@ describe('readJsonWithinBudget', () => {
 
   test('cancels a real response body that never finishes', async () => {
     // A real `Response`, because the interesting state only a real body
-    // produces is a locked stream: `text()` would lock it for the whole read,
+    // produces is the one `response.json()` leaves behind: it locks the stream,
     // and a locked stream cannot be cancelled. The upstream here sends a
     // partial body and then stalls, so an expiry that did not cancel its own
     // reader would keep the transfer alive after the caller gave up.
@@ -220,7 +220,7 @@ describe('readJsonWithinBudget', () => {
     // hundred milliseconds. Logs and Sentry must still show the budget the read
     // was configured with, or a 4,500 ms read looks like a 120 ms one.
     const response = {
-      text: () => new Promise<never>(() => {}),
+      json: () => new Promise<never>(() => {}),
       body: null,
     } as unknown as Response;
 
@@ -238,7 +238,7 @@ describe('readJsonWithinBudget', () => {
     // Cancelling a locked stream throws, so a mid-read body is abandoned.
     const cancel = jest.fn(async () => undefined);
     const response = {
-      text: () => new Promise<never>(() => {}),
+      json: () => new Promise<never>(() => {}),
       body: { locked: true, cancel },
     } as unknown as Response;
 

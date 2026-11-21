@@ -55,6 +55,7 @@ import { triggersListHref } from '@/lib/cloud-triggers/trigger-routes';
 import { useAfterIdle } from '@/lib/hooks/use-after-idle';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useOrganization } from '@/lib/organization-context';
 import { CREATE_ORGANIZATION_HREF } from '@/lib/organization-navigation';
@@ -129,13 +130,9 @@ export function ProfileScreen() {
     isFetching: organizationsFetching,
     isError: organizationsError,
     refetch: refetchOrganizations,
-  } = useQuery({
-    ...trpc.organizations.list.queryOptions(),
-    enabled: isAuthenticated && afterIdle,
-    // The Agents section resolves its scope from this list, so a paused read
-    // leaves the organization section and its rows waiting.
-    ...SETTLE_WHILE_OFFLINE,
-  });
+  } = useOrganizationsList({ enabled: afterIdle });
+  // The Agents section resolves its scope from this list, so the read waits out
+  // the first paint instead of joining it.
   const agentScope = organizationContextLoaded
     ? getProfileAgentScope(organizationId, orgs)
     : undefined;

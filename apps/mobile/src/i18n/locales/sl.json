@@ -452,6 +452,17 @@
       "location": "Lokacija Vertex",
       "clientEmail": "E-poštni naslov računa storitve",
       "privateKey": "Zasebni ključ računa storitve",
+      "privateKeyBlockRequired": "Prilepi celoten blok ključa, od vrstice BEGIN do vrstice END.",
+      "privateKeyEncrypted": "Ta blok ključa je zaščiten z geslom. Prilepi ključ računa storitve, ki nima gesla.",
+      "names": {
+        "codestral": "Samo za starejši Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Prijavi se z računom ChatGPT)",
+        "xiaomi": "Xiaomi (plačilo po porabi)",
+        "zai": "Z.ai (plačilo po porabi)",
+        "bedrockByok": "Amazon Bedrock (neposredno)",
+        "vertexByok": "Google Vertex AI (neposredno)"
+      },
       "modelMappings": "Preslikave modelov",
       "modelMappingsDescription": "Preusmeri model prehoda na ime namestitve po meri.",
       "mappingTitle": "Preslikava {{number}}",

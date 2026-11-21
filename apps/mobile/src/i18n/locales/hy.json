@@ -450,6 +450,17 @@
       "location": "Vertex-ի գտնվելու վայր",
       "clientEmail": "Ծառայողական հաշվի էլ. փոստ",
       "privateKey": "Ծառայողական հաշվի մասնավոր բանալի",
+      "privateKeyBlockRequired": "Տեղադրեք բանալու ամբողջ բլոկը՝ BEGIN տողից մինչև END տողը։",
+      "privateKeyEncrypted": "Բանալու այս բլոկը պաշտպանված է անցաբառով։ Տեղադրեք ծառայողական հաշվի բանալի, որը անցաբառ չունի։",
+      "names": {
+        "codestral": "Հնացած Codestral-միայն",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Մուտք գործել ChatGPT-ով)",
+        "xiaomi": "Xiaomi (ըստ օգտագործման վճարում)",
+        "zai": "Z.ai (ըստ օգտագործման վճարում)",
+        "bedrockByok": "Amazon Bedrock (ուղղակի)",
+        "vertexByok": "Google Vertex AI (ուղղակի)"
+      },
       "modelMappings": "Մոդելների համապատասխանեցումներ",
       "modelMappingsDescription": "Ուղղորդեք gateway մոդելը դեպի տեղակայման հատուկ անվանում։",
       "mappingTitle": "Համապատասխանեցում {{number}}",

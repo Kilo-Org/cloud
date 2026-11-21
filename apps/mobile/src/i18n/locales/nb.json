@@ -450,6 +450,17 @@
       "location": "Vertex-plassering",
       "clientEmail": "E-postadresse for tjenestekonto",
       "privateKey": "Privat nøkkel for tjenestekonto",
+      "privateKeyBlockRequired": "Lim inn hele nøkkelblokken, fra BEGIN-linjen til END-linjen.",
+      "privateKeyEncrypted": "Denne nøkkelblokken er passfrasebeskyttet. Lim inn en nøkkel for tjenestekonto uten passfrase.",
+      "names": {
+        "codestral": "Kun eldre Codestral",
+        "openai": "OpenAI-API",
+        "openaiChatgpt": "OpenAI (Logg inn med ChatGPT)",
+        "xiaomi": "Xiaomi (betal etter bruk)",
+        "zai": "Z.ai (betal etter bruk)",
+        "bedrockByok": "Amazon Bedrock (direkte)",
+        "vertexByok": "Google Vertex AI (direkte)"
+      },
       "modelMappings": "Modelltilordninger",
       "modelMappingsDescription": "Send en gateway-modell til et egendefinert deployment-navn.",
       "mappingTitle": "Tilordning {{number}}",

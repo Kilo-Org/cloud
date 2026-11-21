@@ -453,6 +453,17 @@
       "location": "Suíomh Vertex",
       "clientEmail": "Ríomhphost an chuntais seirbhíse",
       "privateKey": "Eochair phríobháideach an chuntais seirbhíse",
+      "privateKeyBlockRequired": "Greamaigh an bloc eochrach iomlán, ón líne BEGIN go dtí an líne END.",
+      "privateKeyEncrypted": "Tá an bloc eochrach seo cosanta ag pasfhrása. Greamaigh eochair chuntais seirbhíse nach bhfuil pasfhrása uirthi.",
+      "names": {
+        "codestral": "Codestral oidhreachta amháin",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Sínigh isteach le ChatGPT)",
+        "xiaomi": "Xiaomi (íoc de réir úsáide)",
+        "zai": "Z.ai (íoc de réir úsáide)",
+        "bedrockByok": "Amazon Bedrock (díreach)",
+        "vertexByok": "Google Vertex AI (díreach)"
+      },
       "modelMappings": "Mapálacha samhlacha",
       "modelMappingsDescription": "Seol samhail ón ngeata chuig ainm imscartha saincheaptha.",
       "mappingTitle": "Mapáil {{number}}",

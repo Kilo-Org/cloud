@@ -450,6 +450,17 @@
       "location": "Bakka Vertex",
       "clientEmail": "Imeelii herrega tajaajilaa",
       "privateKey": "Furtuu dhuunfaa herrega tajaajilaa",
+      "privateKeyBlockRequired": "Boolloo furtuu guutuu, sarara BEGIN irraa hanga sarara END tti maxxansi.",
+      "privateKeyEncrypted": "Boolloon furtuu kun jecha darbiitiin eegamaa jira. Furtuu herrega tajaajilaa jecha darbii hin qabne maxxansi.",
+      "names": {
+        "codestral": "Codestral qofa kan duraa",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT fayyadamuun seeni)",
+        "xiaomi": "Xiaomi (akka fayyadamaatti kaffaluu)",
+        "zai": "Z.ai (akka fayyadamaatti kaffaluu)",
+        "bedrockByok": "Amazon Bedrock (kallattiin kaffalamu)",
+        "vertexByok": "Google Vertex AI (kallattiin kaffalamu)"
+      },
       "modelMappings": "Walqabsiisa moodeelaa",
       "modelMappingsDescription": "Moodeela gateway gara maqaa deployment addaatti ergi.",
       "mappingTitle": "Walqabsiisa {{number}}",

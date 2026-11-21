@@ -451,6 +451,17 @@
       "location": "מיקום Vertex",
       "clientEmail": "כתובת האימייל של חשבון השירות",
       "privateKey": "המפתח הפרטי של חשבון השירות",
+      "privateKeyBlockRequired": "הדבק את כל בלוק המפתח, מהשורה של BEGIN ועד לשורה של END.",
+      "privateKeyEncrypted": "בלוק המפתח הזה מוגן במילת צופן. הדבק מפתח של חשבון השירות ללא מילת צופן.",
+      "names": {
+        "codestral": "Codestral מדור קודם בלבד",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (כניסה באמצעות ChatGPT)",
+        "xiaomi": "Xiaomi (תשלום לפי שימוש)",
+        "zai": "Z.ai (תשלום לפי שימוש)",
+        "bedrockByok": "Amazon Bedrock (ישיר)",
+        "vertexByok": "Google Vertex AI (ישיר)"
+      },
       "modelMappings": "מיפויי מודלים",
       "modelMappingsDescription": "ניתוב מודל gateway לשם פריסה מותאם אישית.",
       "mappingTitle": "מיפוי {{number}}",

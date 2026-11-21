@@ -49,6 +49,9 @@ function isHostLike(text: string): boolean {
   );
 }
 
+/** A single label with a numeric port, the shape a local backend prints. */
+const PORTED_LABEL = /^[a-z\d](?:[a-z\d-]*[a-z\d])?:\d{1,5}$/iu;
+
 /** The index of the first `/`, `?` or `#` at or after `from`, else the length. */
 function nextDelimiter(text: string, from: number): number {
   for (let i = from; i < text.length; i += 1) {
@@ -104,9 +107,12 @@ export function stripQueryString(url: string): string {
     // authority. It terminates userinfo only when what follows it reads as a
     // host, which is the shape an authority takes.
     const queryStart = url.search(/[?#]/u);
-    const atInQuery = queryStart !== -1 && url.search(/[?#]/u) < lastAt;
+    const atInQuery = queryStart !== -1 && queryStart < lastAt;
     if (atInQuery && !isHostLike(url.slice(lastAt + 1, nextDelimiter(url, lastAt + 1)))) {
-      return cutAtQueryOrFragment(url);
+      // The run before the delimiter is kept only when it reads as a ported
+      // host; any other run is userinfo, which must not reach the value at all.
+      const run = url.slice(schemeEnd, nextDelimiter(url, schemeEnd));
+      return PORTED_LABEL.test(run) ? cutAtQueryOrFragment(url) : url.slice(0, schemeEnd);
     }
     return url.slice(0, schemeEnd) + cutAtQueryOrFragment(url.slice(lastAt + 1));
   } catch {

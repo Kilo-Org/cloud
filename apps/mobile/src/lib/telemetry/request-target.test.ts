@@ -120,6 +120,21 @@ describe('stripQueryString', () => {
     expect(stripQueryString(url)).toBe(`http://host:3000${TRPC_PATH_FIXTURE}`);
   });
 
+  it('keeps the origin and path when a ported run precedes a query carrying an at-sign', () => {
+    const value = ['x', ['api', 'path'].join('@')].join('=');
+    const url = `https://host:3000/?${value}`;
+
+    expect(stripQueryString(url)).toBe('https://host:3000/');
+  });
+
+  it('reports no run when a userinfo precedes a query carrying an at-sign', () => {
+    const userinfo = ['user', 'pass'].join(':');
+    const value = ['x', ['api', 'path'].join('@')].join('=');
+    const url = `https://${userinfo}?${value}`;
+
+    expect(stripQueryString(url)).toBe('https://');
+  });
+
   it('keeps origin and path when the userinfo spans a separator and a delimiter', () => {
     const userinfo = ['user', ['ab', 'cd'].join('/')].join(':');
     const url = `https://${userinfo}?${['ef', HOST].join('@')}${TRPC_PATH_FIXTURE}`;

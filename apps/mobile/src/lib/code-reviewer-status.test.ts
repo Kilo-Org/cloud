@@ -265,6 +265,24 @@ describe('classifyPermission', () => {
     });
   });
 
+  it('is an error when a failed refetch leaves a cached list without this scope', () => {
+    // A cached list that lacks this scope carries no role, so the only honest
+    // answer is the retryable failure, not a silent "neither capability".
+    const refetch = vi.fn<() => void>();
+    const result = classifyPermission({
+      ...base,
+      isError: true,
+      hasData: true,
+      role: undefined,
+      refetch,
+    });
+    expect(result.status).toBe('error');
+    if (result.status === 'error') {
+      result.refetch();
+      expect(refetch).toHaveBeenCalledTimes(1);
+    }
+  });
+
   it('grants edit for owner and billing_manager roles once loaded', () => {
     for (const role of ['owner', 'billing_manager'] as const) {
       expect(classifyPermission({ ...base, role })).toEqual({

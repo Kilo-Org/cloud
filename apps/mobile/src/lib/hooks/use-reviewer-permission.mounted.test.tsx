@@ -50,7 +50,7 @@ function callsTo(procedure: string): number {
     .length;
 }
 
-function respondWithMembership() {
+function respondWithMembership(organizationId = SCOPE) {
   transport.mockImplementation(async input => {
     await Promise.resolve();
     const procedure = procedureOf(input);
@@ -59,7 +59,7 @@ function respondWithMembership() {
     }
     return Response.json({
       result: {
-        data: [{ organizationId: SCOPE, organizationName: 'Org One', role: membershipRole }],
+        data: [{ organizationId, organizationName: 'Org One', role: membershipRole }],
       },
     });
   });
@@ -188,6 +188,37 @@ describe('code reviewer permission read', () => {
 
     expect(callsTo('organizations.list')).toBe(served + 1);
     expect(holder.state).toEqual({ status: 'ready', canEdit: true, canManage: true });
+    view.unmount();
+  });
+
+  it('reports a failed refetch as retryable when the cached list lacks this scope', async () => {
+    // A stale cache without this scope cannot prove edit rights, so the screen
+    // keeps its Retry surface instead of reading as a plain member.
+    authState.token = 'tok';
+    onlineManager.setOnline(true);
+    respondWithMembership('org-2');
+    const { view, queryClient, holder } = await mountPermission(PermissionProbe);
+    await waitFor(() => holder.state?.status === 'ready' && !holder.state.canEdit);
+
+    const served = callsTo('organizations.list');
+    transport.mockImplementation(() => Promise.reject(new TypeError('Network request failed')));
+    onlineManager.setOnline(false);
+    await act(async () => {
+      await queryClient.refetchQueries();
+    });
+    await waitFor(() => callsTo('organizations.list') > served);
+    await flush();
+
+    expect(holder.state?.status).toBe('error');
+    const failed = holder.state;
+    if (failed?.status !== 'error') {
+      throw new Error('expected the failed refetch to stay an error');
+    }
+    const beforeRetry = callsTo('organizations.list');
+    await act(() => {
+      failed.refetch();
+    });
+    expect(callsTo('organizations.list')).toBe(beforeRetry + 1);
     view.unmount();
   });
 

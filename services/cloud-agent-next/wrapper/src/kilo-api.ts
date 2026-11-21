@@ -1101,7 +1101,7 @@ export function createWrapperKiloClient(
           // diagnosis; the detail is the SDK result message, which carries no
           // token, header or record payload.
           const detail = error instanceof Error ? error.message : String(error);
-          logToFile(`session metadata restore for ${sessionId} failed: ${detail}`);
+          logToFile(`session ${sessionId}: metadata restore did not complete: ${detail}`);
         }
       }
       if (owed !== undefined) await applyRuleset(owed);

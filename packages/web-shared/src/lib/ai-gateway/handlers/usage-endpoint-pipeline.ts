@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest, type NextResponse as NextResponseType }
 import { setTag, startInactiveSpan, type Span } from '@sentry/nextjs';
 import type { User } from '@kilocode/db/schema';
 import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { gatewayReplicaReader } from '@kilocode/web-shared/lib/ai-gateway/gateway-replica-read';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
@@ -185,7 +185,11 @@ export async function handleUsageEndpointRequest<Body>(
   }
 
   const authSpan = startInactiveSpan({ name: 'auth-check' });
-  const auth = await getUserFromAuth({ adminOnly: false, expectedAudience: KILO_GATEWAY_AUDIENCE });
+  const auth = await getUserFromAuth({
+    adminOnly: false,
+    expectedAudience: KILO_GATEWAY_AUDIENCE,
+    runReplicaRead: gatewayReplicaReader('auth'),
+  });
   const caller = endpoint.allowAnonymousFreeModels
     ? resolveGatewayCaller(auth, {
         allowAnonymous: isFreeModel(requestedModelLowerCased),
@@ -226,7 +230,7 @@ export async function handleUsageEndpointRequest<Body>(
             organizationId,
             kiloUserId: user.id,
             modelId: requestedModelLowerCased,
-            fromDb: readDb,
+            runReadTransaction: gatewayReplicaReader('organization-group-policy'),
           }).then(({ decision }) => decision)
         : Promise.resolve(undefined));
 

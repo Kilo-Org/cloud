@@ -14,7 +14,11 @@ import {
   cloud_agent_code_reviews,
   kilocode_users,
 } from '@kilocode/db/schema';
-import type { DrizzleConnection, DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import type {
+  DrizzleConnection,
+  DrizzleTransaction,
+  ReadTransactionRunner,
+} from '@kilocode/web-shared/lib/drizzle';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, sql, gte, lte, not, inArray, count, exists } from 'drizzle-orm';
 import type { AnyColumn } from 'drizzle-orm';
@@ -73,12 +77,16 @@ export type BalanceAndOrgSettings = {
 };
 
 /**
- * @param fromDb - Database instance to use (defaults to primary db, pass readDb for replica)
+ * Where the organization balance row is read: a database (the primary `db` by default, `readDb`
+ * for the replica), or a runner that opens the read's transaction, such as the AI gateway's
+ * bounded replica read. Lazy credit expiry and auto top-up write to the primary either way.
  */
+export type BalanceReadSource = typeof db | ReadTransactionRunner;
+
 export async function getBalanceAndOrgSettings(
   organizationId: string | undefined,
   user: User,
-  fromDb: typeof db = db,
+  fromDb: BalanceReadSource = db,
   funding?: 'usage'
 ): Promise<BalanceAndOrgSettings> {
   const balanceSpan = startInactiveSpan({ name: 'balance-check' });
@@ -120,8 +128,7 @@ export async function getBalanceForOrganizationUser(
   options: {
     /** Limit type to check (defaults to 'daily') */
     limitType?: OrganizationUserLimitType;
-    /** Database instance to use (defaults to primary db, pass readDb for replica) */
-    fromDb?: typeof db;
+    fromDb?: BalanceReadSource;
     funding?: 'usage';
     /** Instant the expiry cut-off is measured from. Defaults to the current time. */
     now?: Date;
@@ -141,7 +148,10 @@ export async function getBalanceForOrganizationUser(
     `[getBalanceForOrganizationUser] Starting balance check for user ${userId} in org ${organizationId}`
   );
 
-  const row = await findOrganizationMemberBalanceRow(fromDb, organizationId, userId, limitType);
+  const row =
+    typeof fromDb === 'function'
+      ? await fromDb(tx => findOrganizationMemberBalanceRow(tx, organizationId, userId, limitType))
+      : await findOrganizationMemberBalanceRow(fromDb, organizationId, userId, limitType);
 
   if (!row) {
     const endTime = performance.now();
@@ -165,7 +175,8 @@ export async function getBalanceForOrganizationUser(
 
   let { microdollars_used, total_microdollars_acquired } = row;
 
-  // Lazy credit expiry check (mirrors user pattern in getBalanceForUser)
+  // Lazy credit expiry check (mirrors user pattern in getBalanceForUser). It writes, so it runs on
+  // the primary after the balance read's transaction has ended, whichever source read the row.
   const expireBefore = subHours(now, expiryJitterHours);
   const needsExpirationComputation =
     next_credit_expiration_at && expireBefore >= new Date(next_credit_expiration_at);

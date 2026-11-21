@@ -1,4 +1,5 @@
 import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
+import { withReplicaReadUnavailableResponse } from '@kilocode/web-shared/lib/ai-gateway/gateway-replica-read';
 import { type NextRequest } from 'next/server';
 import { getEmbeddingProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
@@ -199,8 +200,7 @@ const embeddingsEndpoint: UsageEndpoint<EmbeddingProxyRequest> = {
   },
 };
 
-export async function handleEmbeddingsRequest(
-  request: NextRequest
-): Promise<NextResponseType<unknown>> {
-  return await handleUsageEndpointRequest(request, embeddingsEndpoint);
-}
+export const handleEmbeddingsRequest = withReplicaReadUnavailableResponse(
+  async (request: NextRequest): Promise<NextResponseType<unknown>> =>
+    await handleUsageEndpointRequest(request, embeddingsEndpoint)
+);

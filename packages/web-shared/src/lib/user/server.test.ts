@@ -44,7 +44,11 @@ import {
   getUserFromSessionForCredentialIssuance,
   getUserFromSessionForCredentialIssuanceOrRedirect,
 } from './server';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, sql, type ReadTransactionRunner } from '@kilocode/web-shared/lib/drizzle';
+import {
+  GatewayReplicaReadUnavailableError,
+  gatewayReplicaReader,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-replica-read';
 import {
   setAdminAccessSinkForTest,
   type AdminAccessEvent,
@@ -2247,5 +2251,55 @@ describe('getUserFromAuth admin_access telemetry (REST)', () => {
 
     expect(result.user?.id).toBe(admin.id);
     expect(events).toHaveLength(0);
+  });
+});
+
+describe('getUserFromAuth replica reads', () => {
+  test('runs the user and organization access reads through runReplicaRead', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'bounded-replica-read-pepper' });
+    const organization = await createTestOrganization(
+      `Bounded Read Organization ${crypto.randomUUID()}`,
+      user.id,
+      0
+    );
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        Authorization: `Bearer ${generateApiToken(user)}`,
+        [ORGANIZATION_ID_HEADER]: organization.id,
+      })
+    );
+    const statementTimeouts: string[] = [];
+    const bounded = gatewayReplicaReader('auth');
+    const runReplicaRead: ReadTransactionRunner = (read, config) =>
+      bounded(async tx => {
+        const { rows } = await tx.execute<{ statement_timeout: string }>(
+          sql`select current_setting('statement_timeout') as statement_timeout`
+        );
+        statementTimeouts.push(rows[0].statement_timeout);
+        return await read(tx);
+      }, config);
+
+    const result = await getUserFromAuth({ adminOnly: false, runReplicaRead });
+
+    expect(result.authFailedResponse).toBeNull();
+    expect(result.user?.id).toBe(user.id);
+    expect(result.organizationId).toBe(organization.id);
+    expect(statementTimeouts).toEqual(['3s', '3s']);
+  });
+
+  test('propagates a bounded read failure instead of answering it as an auth failure', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'bounded-replica-failure-pepper' });
+    mockHeaders.mockResolvedValue(
+      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+    );
+    const failure = new GatewayReplicaReadUnavailableError(
+      'auth',
+      '57014',
+      Object.assign(new Error('canceling statement due to statement timeout'), { code: '57014' })
+    );
+
+    await expect(
+      getUserFromAuth({ adminOnly: false, runReplicaRead: () => Promise.reject(failure) })
+    ).rejects.toBe(failure);
   });
 });

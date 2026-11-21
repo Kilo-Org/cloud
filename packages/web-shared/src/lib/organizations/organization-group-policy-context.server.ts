@@ -15,7 +15,11 @@ import {
 } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies.server';
 import { and, eq, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import {
+  db,
+  type DrizzleTransaction,
+  type ReadTransactionRunner,
+} from '@kilocode/web-shared/lib/drizzle';
 
 export type OrganizationPolicySubject =
   | {
@@ -82,14 +86,24 @@ export async function getOrganizationGroupPolicyContext(params: {
   /** Organization row the caller already loaded; avoids re-reading it. */
   organization?: Organization;
   tx?: DrizzleTransaction;
-  /** Ignored when `tx` is given. AI gateway callers pass `readDb`. */
+  /** Ignored when `tx` or `runReadTransaction` is given. */
   fromDb?: typeof db;
+  /**
+   * Opens the transaction when `tx` is absent. AI gateway callers pass `gatewayReplicaReader`,
+   * which bounds the read on the replica.
+   */
+  runReadTransaction?: ReadTransactionRunner;
 }): Promise<OrganizationGroupPolicyContext> {
   if (!params.tx) {
-    return await (params.fromDb ?? db).transaction(
-      async tx => await getOrganizationGroupPolicyContext({ ...params, tx }),
-      { isolationLevel: 'repeatable read', accessMode: 'read only' }
-    );
+    const read = async (tx: DrizzleTransaction) =>
+      await getOrganizationGroupPolicyContext({ ...params, tx });
+    if (params.runReadTransaction) {
+      return await params.runReadTransaction(read, { isolationLevel: 'repeatable read' });
+    }
+    return await (params.fromDb ?? db).transaction(read, {
+      isolationLevel: 'repeatable read',
+      accessMode: 'read only',
+    });
   }
   const client = params.tx;
   const organization = await resolveOrganization(client, params);

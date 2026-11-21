@@ -3,7 +3,11 @@ import {
   KNOWN_READ_REPLICA_NAMES,
   readReplicaInventory,
 } from '@kilocode/web-shared/lib/read-replicas';
-import { createDrizzleClient, pg } from '@kilocode/db/client';
+import {
+  createDrizzleClient,
+  pg,
+  releaseConnectionsOnFailedTransactionStart,
+} from '@kilocode/db/client';
 import { computeDatabaseUrl, getDatabaseClientConfig } from '@kilocode/db';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { attachDatabasePool } from '@vercel/functions';
@@ -239,6 +243,11 @@ const replicas = usesSeparateReplica
     )
   : [primary];
 const replicaPools = usesSeparateReplica ? replicas.map(replica => replica.pool) : [];
+// The AI gateway opens a transaction for each bounded admission read (see
+// `ai-gateway/gateway-replica-read.ts`), so a failed `BEGIN` must not keep a replica slot.
+for (const replica of replicas) {
+  releaseConnectionsOnFailedTransactionStart(replica.pool);
+}
 
 // Attach pools to ensure idle connections close before suspension
 // Skip in test environment as it interferes with Jest's cleanup
@@ -395,6 +404,17 @@ export async function closeAllDrizzleConnections(): Promise<void> {
 }
 
 export type DrizzleTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+export type ReadTransactionConfig = { isolationLevel?: 'read committed' | 'repeatable read' };
+
+/**
+ * Opens a read-only transaction and runs `read` in it. A helper accepts one where its caller
+ * decides how the read runs, such as the AI gateway's bounded replica read.
+ */
+export type ReadTransactionRunner = <T>(
+  read: (tx: DrizzleTransaction) => Promise<T>,
+  config?: ReadTransactionConfig
+) => Promise<T>;
 
 // Public tables that are not partitions; a partitioned root covers its partitions.
 const cleanupRoots = drizzleSql`

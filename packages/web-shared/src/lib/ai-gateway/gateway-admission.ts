@@ -8,7 +8,7 @@ import {
 } from '@kilocode/web-shared/lib/anonymous';
 import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import type { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { gatewayReplicaReader } from '@kilocode/web-shared/lib/ai-gateway/gateway-replica-read';
 import {
   getBalanceAndOrgSettings,
   type BalanceAndOrgSettings,
@@ -204,7 +204,10 @@ export function resolveGatewayCaller(
   return { kind: 'rejected', response: paidModelAuthRequiredResponse() };
 }
 
-/** Free models are not usage-funded, so reading their balance skips auto top-up. */
+/**
+ * Free models are not usage-funded, so reading their balance skips auto top-up. The organization
+ * balance row is a bounded replica read; see `boundedGatewayReplicaRead`.
+ */
 export function readGatewayBalance(
   user: User,
   organizationId: string | undefined,
@@ -213,7 +216,7 @@ export function readGatewayBalance(
   return getBalanceAndOrgSettings(
     organizationId,
     user,
-    readDb,
+    gatewayReplicaReader('balance'),
     isFreeModel(model) ? undefined : 'usage'
   );
 }

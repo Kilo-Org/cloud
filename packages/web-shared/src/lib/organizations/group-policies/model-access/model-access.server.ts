@@ -21,7 +21,7 @@ import {
   type CustomLlmGrantee,
   type ProviderLookup,
 } from '@kilocode/web-shared/lib/model-allow.server';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type ReadTransactionRunner } from '@kilocode/web-shared/lib/drizzle';
 import {
   getOrganizationGroupPolicyContext,
   type OrganizationGroupPolicyContext,
@@ -277,6 +277,8 @@ export async function resolveOrganizationMemberModelPolicy(params: {
   /** See `allowNonMember` on the member policy subject. */
   allowNonMember?: boolean;
   fromDb?: typeof db;
+  /** See `runReadTransaction` on `getOrganizationGroupPolicyContext`. */
+  runReadTransaction?: ReadTransactionRunner;
 }): Promise<EffectiveOrganizationModelPolicy> {
   return evaluateEffectiveModelAccessPolicy(
     await getOrganizationGroupPolicyContext({
@@ -287,6 +289,7 @@ export async function resolveOrganizationMemberModelPolicy(params: {
         allowNonMember: params.allowNonMember,
       },
       fromDb: params.fromDb,
+      runReadTransaction: params.runReadTransaction,
     })
   );
 }
@@ -314,6 +317,7 @@ export async function resolveOrganizationMemberModelDecision(params: {
   modelId: string;
   providerLookup?: ProviderLookup;
   fromDb?: typeof db;
+  runReadTransaction?: ReadTransactionRunner;
 }) {
   const policy = await resolveOrganizationMemberModelPolicy(params);
   return {

@@ -32,8 +32,12 @@ export async function withBoundedReplicaRead<T>(
   });
 }
 
-/** Whether `error` is the replica cancelling a read because of its time bounds or a recovery conflict. */
-export function isBoundedReadError(error: unknown): boolean {
+/**
+ * The SQLSTATE when `error`, or an error in its `cause` chain (such as Drizzle's
+ * `DrizzleQueryError`), is the replica cancelling a read because of its time bounds or a recovery
+ * conflict.
+ */
+export function boundedReadErrorSqlState(error: unknown): string | null {
   const seen = new Set<unknown>();
   let current: unknown = error;
   while (typeof current === 'object' && current !== null && !seen.has(current)) {
@@ -43,9 +47,14 @@ export function isBoundedReadError(error: unknown): boolean {
       typeof current.code === 'string' &&
       BOUNDED_READ_ERROR_CODES.has(current.code)
     ) {
-      return true;
+      return current.code;
     }
     current = 'cause' in current ? current.cause : undefined;
   }
-  return false;
+  return null;
+}
+
+/** Whether `error` is the replica cancelling a read because of its time bounds or a recovery conflict. */
+export function isBoundedReadError(error: unknown): boolean {
+  return boundedReadErrorSqlState(error) !== null;
 }

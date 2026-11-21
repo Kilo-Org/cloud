@@ -42,7 +42,10 @@ import {
   hasMiddleOutTransform,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { redactProviderHints } from '@kilocode/auto-routing-contracts';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import {
+  gatewayReplicaReader,
+  withReplicaReadUnavailableResponse,
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-replica-read';
 import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
 import { evaluateEffectiveModelAccessPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import {
@@ -94,9 +97,10 @@ function llmProxyPath(url: URL): LlmProxyPath | null {
   }
 }
 
-export async function handleLlmProxyRequest(
-  request: NextRequest
-): Promise<NextResponseType<unknown>> {
+/** Answers a bounded admission read that hit its bound with a retryable 503. */
+export const handleLlmProxyRequest = withReplicaReadUnavailableResponse(serveLlmProxyRequest);
+
+async function serveLlmProxyRequest(request: NextRequest): Promise<NextResponseType<unknown>> {
   const requestStartedAt = performance.now();
   // Wall-clock start for bouncer's `occurredAt`; the monotonic clock above
   // cannot date the event.
@@ -126,6 +130,7 @@ export async function handleLlmProxyRequest(
   const callerPromise = getUserFromAuth({
     adminOnly: false,
     expectedAudience: KILO_GATEWAY_AUDIENCE,
+    runReplicaRead: gatewayReplicaReader('auth'),
   }).then(auth => resolveGatewayCaller(auth, { allowAnonymous: true, ipAddress: rawIpAddress }));
   // Invalid requests return before anything awaits auth. Keep those paths from
   // surfacing auth failures as unhandled rejections.
@@ -160,7 +165,7 @@ export async function handleLlmProxyRequest(
     return await getOrganizationGroupPolicyContext({
       organizationId: caller.organizationId,
       subject: { type: 'member', kiloUserId: caller.user.id },
-      fromDb: readDb,
+      runReadTransaction: gatewayReplicaReader('organization-group-policy'),
     });
   });
   const organizationGroupPolicyPromise = organizationGroupContextPromise.then(

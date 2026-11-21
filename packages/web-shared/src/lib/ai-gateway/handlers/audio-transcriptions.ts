@@ -1,4 +1,5 @@
 import { type NextResponse as NextResponseType } from 'next/server';
+import { withReplicaReadUnavailableResponse } from '@kilocode/web-shared/lib/ai-gateway/gateway-replica-read';
 import { type NextRequest } from 'next/server';
 import { getTranscriptionProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { debugSaveLog, debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
@@ -194,8 +195,7 @@ const transcriptionsEndpoint: UsageEndpoint<ParsedTranscriptionRequest> = {
     accountAndRewriteUsageResponse(upstream, countAndStoreTranscriptionUsage),
 };
 
-export async function handleAudioTranscriptionsRequest(
-  request: NextRequest
-): Promise<NextResponseType<unknown>> {
-  return await handleUsageEndpointRequest(request, transcriptionsEndpoint);
-}
+export const handleAudioTranscriptionsRequest = withReplicaReadUnavailableResponse(
+  async (request: NextRequest): Promise<NextResponseType<unknown>> =>
+    await handleUsageEndpointRequest(request, transcriptionsEndpoint)
+);

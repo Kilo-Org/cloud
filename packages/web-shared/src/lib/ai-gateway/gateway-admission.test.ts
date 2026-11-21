@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { User } from '@kilocode/db/schema';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { INVALID_TOKEN_CODE } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { gatewayReplicaReader } from '@kilocode/web-shared/lib/ai-gateway/gateway-replica-read';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { createAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import {
@@ -36,6 +36,9 @@ import { DEFAULT_BENCHMARK_USER_ID } from '@kilocode/auto-routing-contracts';
 
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
   getBalanceAndOrgSettings: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-replica-read', () => ({
+  gatewayReplicaReader: jest.fn((operation: string) => ({ replicaReader: operation })),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
   ...jest.requireActual<Record<string, unknown>>(
@@ -213,19 +216,21 @@ describe('readGatewayBalance', () => {
     jest.mocked(getBalanceAndOrgSettings).mockReset().mockResolvedValue({ balance: 3 });
   });
 
-  it('reads a paid model balance from the replica as usage funding', async () => {
+  it('reads a paid model balance through the bounded replica reader as usage funding', async () => {
     await expect(readGatewayBalance(user, 'org-1', 'openai/gpt-4o')).resolves.toEqual({
       balance: 3,
     });
+    expect(gatewayReplicaReader).toHaveBeenCalledWith('balance');
     expect(jest.mocked(getBalanceAndOrgSettings).mock.calls).toEqual([
-      ['org-1', user, readDb, 'usage'],
+      ['org-1', user, { replicaReader: 'balance' }, 'usage'],
     ]);
   });
 
-  it('reads a free model balance from the replica without usage funding', async () => {
+  it('reads a free model balance through the bounded replica reader without usage funding', async () => {
     await readGatewayBalance(user, undefined, 'vendor/model:free');
+    expect(gatewayReplicaReader).toHaveBeenCalledWith('balance');
     expect(jest.mocked(getBalanceAndOrgSettings).mock.calls).toEqual([
-      [undefined, user, readDb, undefined],
+      [undefined, user, { replicaReader: 'balance' }, undefined],
     ]);
   });
 });

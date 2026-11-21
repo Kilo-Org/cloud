@@ -16,7 +16,12 @@ import { headers } from 'next/headers';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/domain-gates';
 import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
-import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
+import {
+  db,
+  readDb,
+  type DrizzleConnection,
+  type ReadTransactionRunner,
+} from '@kilocode/web-shared/lib/drizzle';
 import type { NextAuthOptions, JWT, LoggerInstance, Session } from 'next-auth';
 import { getServerSession } from 'next-auth';
 import { IS_DEVELOPMENT, ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
@@ -164,6 +169,13 @@ export type RequiredPermissions = {
   requestPathname?: string;
   /** The actual Request method when the caller has one; preferred over headers. */
   requestMethod?: string;
+  /**
+   * Runs the user row and organization access reads that use the replica. AI gateway inference
+   * routes pass `gatewayReplicaReader`, which bounds them. Without it they read `readDb`
+   * directly. The domain blacklist is cached in process and reads `readDb` only on a miss, so it
+   * does not take a transaction for every request.
+   */
+  runReplicaRead?: ReadTransactionRunner;
   requestHeaders?: Headers;
   /** How this admin read arrived; server components are not REST routes. */
   stepUpSurface?: 'rest' | 'server-component';
@@ -400,6 +412,16 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
   return result;
 }
 
+/** Runs a read on one connection, which the function chooses. */
+type ConnectionRead = <T>(read: (connection: DrizzleConnection) => Promise<T>) => Promise<T>;
+
+const readPrimary: ConnectionRead = read => read(db);
+
+function replicaRead(opts: RequiredPermissions): ConnectionRead {
+  const run = opts.runReplicaRead;
+  return run ? read => run(read) : read => read(readDb);
+}
+
 /**
  * Reads the browser session only. A request that presents a credential is
  * refused, never downgraded to its session, because these callers mint or
@@ -415,7 +437,7 @@ async function resolveSessionOnly(opts: RequiredPermissions): Promise<GetAuthRes
     return authError(401, 'Unauthorized', '?');
   }
 
-  return resolveUserFromSession(opts, db);
+  return resolveUserFromSession(opts, readPrimary);
 }
 
 export async function getUserFromSessionForCredentialIssuance(): Promise<GetAuthResponse> {
@@ -439,7 +461,10 @@ export async function getUserFromSessionForCredentialIssuanceOrRedirect(
   }
 
   return userOrRedirect(
-    await resolveUserFromSession({ adminOnly: false, DANGEROUS_allowBlockedUsers: true }, db),
+    await resolveUserFromSession(
+      { adminOnly: false, DANGEROUS_allowBlockedUsers: true },
+      readPrimary
+    ),
     loggedOutRedirectUrl
   );
 }
@@ -610,8 +635,9 @@ async function resolveUserFromAuth(
         cloudAgentAuthority: scope,
       });
     }
-    const fromDb = scope ? db : readDb;
-    const user = await findUserById(authorizationValidationResult.kiloUserId, fromDb);
+    const read = scope ? readPrimary : replicaRead(opts);
+    const { kiloUserId } = authorizationValidationResult;
+    const user = await read(connection => findUserById(kiloUserId, connection));
 
     if (
       user &&
@@ -653,7 +679,7 @@ async function resolveUserFromAuth(
       isNewUser: false,
       organizationId,
       internalApiUse,
-      fromDb,
+      read,
       botId,
       tokenSource,
       deviceSessionId,
@@ -671,19 +697,19 @@ async function resolveUserFromAuth(
     return result;
   }
 
-  return resolveUserFromSession(opts, readDb);
+  return resolveUserFromSession(opts, replicaRead(opts));
 }
 
 async function resolveUserFromSession(
   opts: RequiredPermissions,
-  fromDb: typeof db
+  read: ConnectionRead
 ): Promise<GetAuthResponse> {
   const session = await readSession();
   const maybeKiloUserId = session?.kiloUserId;
 
   if (!maybeKiloUserId) return authError(401, 'Unauthorized', '?');
 
-  const user = await findUserById(maybeKiloUserId, fromDb);
+  const user = await read(connection => findUserById(maybeKiloUserId, connection));
   if (!user) return authError(401, 'Unauthorized (D)', maybeKiloUserId);
 
   if (!isWebSessionCurrent(session.webSessionPepper, user))
@@ -695,7 +721,7 @@ async function resolveUserFromSession(
     user,
     opts,
     isNewUser: session.isNewUser,
-    fromDb,
+    read,
     webSession: {
       id: session.webSessionId,
       pepper: session.webSessionPepper,
@@ -785,7 +811,8 @@ type UserAuthorizationRequest = {
   isNewUser?: boolean;
   organizationId?: Organization['id'];
   internalApiUse?: boolean;
-  fromDb?: typeof db;
+  /** Runs the organization access check; the primary by default. */
+  read?: ConnectionRead;
   botId?: string;
   tokenSource?: string;
   deviceSessionId?: string;
@@ -807,7 +834,7 @@ async function validateUserAuthorization({
   isNewUser,
   organizationId,
   internalApiUse,
-  fromDb = db,
+  read = readPrimary,
   botId,
   tokenSource,
   deviceSessionId,
@@ -882,10 +909,9 @@ async function validateUserAuthorization({
     // permitted role (owner, admin, billing_manager) on its live parent
     // organization. The balance and member-allowance rules are separate and do
     // not follow inheritance.
-    const hasAccess = await hasEffectiveOrganizationAccess(fromDb, {
-      kiloUserId,
-      organizationId,
-    });
+    const hasAccess = await read(connection =>
+      hasEffectiveOrganizationAccess(connection, { kiloUserId, organizationId })
+    );
     if (!hasAccess) {
       return authError(403, 'Access denied (not a member of the organization)', kiloUserId, {
         authorizationRefused: true,

@@ -2,7 +2,8 @@ import { describe, test, expect, afterEach } from '@jest/globals';
 import { after } from 'next/server';
 import { sendBalanceAlertEmail } from '@kilocode/web-shared/lib/email';
 import { dispatchLowBalancePush } from '@kilocode/web-shared/lib/notifications-worker-client';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type ReadTransactionRunner } from '@kilocode/web-shared/lib/drizzle';
+import { gatewayReplicaReader } from '@kilocode/web-shared/lib/ai-gateway/gateway-replica-read';
 import {
   credit_transactions,
   organizations,
@@ -250,6 +251,35 @@ describe('Organization Usage Functions', () => {
       const result = await getBalanceForOrganizationUser(organization.id, owner.id, { now });
       await drainAfterCallbacks();
 
+      expect(result.balance).toBe(0);
+      expect(await readExpirationState(organization.id)).toEqual({
+        total_microdollars_acquired: 0,
+        microdollars_balance: 0,
+        next_credit_expiration_at: null,
+        expired: [{ amount_microdollars: -1_000_000 }],
+      });
+    });
+
+    test('reads the row through a bounded runner and still writes the expiry', async () => {
+      const { owner, organization } = await createOrganizationWithDueCredit();
+      const statementTimeouts: string[] = [];
+      const bounded = gatewayReplicaReader('balance');
+      const runner: ReadTransactionRunner = (read, config) =>
+        bounded(async tx => {
+          const { rows } = await tx.execute<{ statement_timeout: string }>(
+            sql`select current_setting('statement_timeout') as statement_timeout`
+          );
+          statementTimeouts.push(rows[0].statement_timeout);
+          return await read(tx);
+        }, config);
+
+      const result = await getBalanceForOrganizationUser(organization.id, owner.id, {
+        now,
+        fromDb: runner,
+      });
+      await drainAfterCallbacks();
+
+      expect(statementTimeouts).toEqual(['3s']);
       expect(result.balance).toBe(0);
       expect(await readExpirationState(organization.id)).toEqual({
         total_microdollars_acquired: 0,

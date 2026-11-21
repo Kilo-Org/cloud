@@ -7,7 +7,7 @@ import {
   paidUsageRejection,
   readGatewayBalance,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { gatewayReplicaReader } from '@kilocode/web-shared/lib/ai-gateway/gateway-replica-read';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 
 export type DirectProviderAccessResult =
@@ -55,7 +55,7 @@ export async function checkDirectProviderAccess(params: {
       organizationId,
       kiloUserId: user.id,
       modelId: model,
-      fromDb: readDb,
+      runReadTransaction: gatewayReplicaReader('organization-group-policy'),
     });
     if (
       !decision.allowed ||

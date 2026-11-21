@@ -274,7 +274,16 @@ describe('GitHubIntegrationDetails pending approval state', () => {
       hasPending: true,
       pendingOrganizationId: 'organization-1',
       pendingIntegrationId: 'pending-integration',
-      pendingApprovalStatus: 'blocked_by_existing_installation',
+      pendingRequestState: 'blocked_by_existing_installation',
+    };
+  }
+
+  function startAgainPendingCheck() {
+    mockPendingCheck.value = {
+      hasPending: true,
+      pendingOrganizationId: 'organization-1',
+      pendingIntegrationId: 'pending-integration',
+      pendingRequestState: 'start_again',
     };
   }
 
@@ -295,17 +304,40 @@ describe('GitHubIntegrationDetails pending approval state', () => {
     const html = render();
 
     expect(html).toContain('This organization already has a GitHub installation.');
+    expect(html).toContain('To use this installation instead');
     expect(html).toContain(
-      'An owner or admin must remove that installation in Kilo (Disconnect, or Uninstall GitHub App) before this request can complete.'
+      'an owner or admin removes that one in Kilo (Disconnect, or Uninstall GitHub App)'
     );
     expect(html).toContain('cancel this request and start the connection again');
+    expect(html).not.toContain('must remove that installation');
     expect(html).toContain('Cancel Request');
     expect(html).toContain('Installation Pending Admin Approval');
     expect(html).not.toContain('Waiting for organization admin approval');
     expect(html).not.toContain('Install Kilo GitHub App');
   });
 
-  it('keeps the admin approval copy for a request still awaiting installation', () => {
+  it('tells the requester to start again without naming a removal step once the blocker is gone', () => {
+    mockInstallationData.value = {
+      installed: false,
+      installation: { id: 'pending-integration', status: null },
+    };
+    startAgainPendingCheck();
+
+    const html = render();
+
+    expect(html).toContain(
+      'This request did not complete because another installation was connected at the time.'
+    );
+    expect(html).toContain('That installation has since been removed');
+    expect(html).toContain('cancel this request and start the connection again');
+    expect(html).not.toContain('Disconnect');
+    expect(html).not.toContain('Uninstall GitHub App');
+    expect(html).not.toContain('already has a GitHub installation');
+    expect(html).toContain('Cancel Request');
+    expect(html).toContain('Installation Pending Admin Approval');
+  });
+
+  it('keeps the admin approval copy for a request still awaiting approval', () => {
     mockInstallationData.value = {
       installed: false,
       installation: { id: 'pending-integration', status: 'awaiting_installation' },
@@ -314,7 +346,7 @@ describe('GitHubIntegrationDetails pending approval state', () => {
       hasPending: true,
       pendingOrganizationId: 'organization-1',
       pendingIntegrationId: 'pending-integration',
-      pendingApprovalStatus: 'awaiting_installation',
+      pendingRequestState: 'awaiting_approval',
     };
 
     const html = render();
@@ -324,6 +356,7 @@ describe('GitHubIntegrationDetails pending approval state', () => {
     );
     expect(html).toContain('Waiting for organization admin approval');
     expect(html).not.toContain('already has a GitHub installation');
+    expect(html).not.toContain('That installation has since been removed');
     expect(html).not.toContain('Install Kilo GitHub App');
   });
 
@@ -343,6 +376,24 @@ describe('GitHubIntegrationDetails pending approval state', () => {
     expect(html).not.toContain('GitHub App installed');
     expect(html).not.toContain('Awaiting admin approval');
     expect(html).not.toContain('Open GitHub setup');
+  });
+
+  it('heads the start-again app return card without claiming an existing installation blocks it', () => {
+    mockInstallationData.value = {
+      installed: false,
+      installation: { id: 'pending-integration', status: null },
+    };
+    startAgainPendingCheck();
+
+    const html = render({ fromApp: true });
+
+    expect(html).toContain('Start the connection again');
+    expect(html).toContain('That installation has since been removed');
+    expect(html).not.toContain('Existing installation blocks this request');
+    expect(html).not.toContain('already has a GitHub installation');
+    expect(html).not.toContain('Disconnect');
+    expect(html).not.toContain('Uninstall GitHub App');
+    expect(html).not.toContain('GitHub App installed');
   });
 });
 

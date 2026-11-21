@@ -35,6 +35,19 @@ export function buildAppReturnHref(
 export const INSTALLATION_UNAVAILABLE_MESSAGE =
   'This GitHub App installation is suspended or no longer available. Restore or reinstall it in GitHub, then start again.';
 
+/**
+ * What a pending GitHub installation request still needs. The stored status
+ * records why the request did not complete at the time; the resolved state
+ * decides whether the reason still applies, so the copy describes the current
+ * situation instead of ordering a removal that may have already happened.
+ */
+export const PENDING_REQUEST_EXPLANATION = {
+  blocked_by_existing_installation:
+    'This organization already has a GitHub installation. To use this installation instead, an owner or admin removes that one in Kilo (Disconnect, or Uninstall GitHub App); then cancel this request and start the connection again.',
+  start_again:
+    'This request did not complete because another installation was connected at the time. That installation has since been removed, so cancel this request and start the connection again.',
+} as const;
+
 export type AppReturnOutcomeView = {
   kind: 'installed' | 'pending' | 'blocked' | 'retryable';
   title: string;

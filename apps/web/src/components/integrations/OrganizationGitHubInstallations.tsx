@@ -7,7 +7,6 @@ import { TRPCClientError } from '@trpc/client';
 import { ChevronDown, ExternalLink, Github, MoreHorizontal, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
-import { PENDING_APPROVAL_STATUS } from '@/lib/integrations/core/constants';
 import { buildGitHubInstallState } from './github-install-state';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +25,7 @@ import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/pro
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { GitHubConnectionAttemptState } from './GitHubConnectionAttemptState';
+import { PENDING_REQUEST_EXPLANATION } from './github-app-outcome';
 
 type OrganizationGitHubInstallationsProps = {
   organizationId: string;
@@ -311,6 +311,14 @@ export function OrganizationGitHubInstallations({
                   ? 'All repositories'
                   : `${selectedCount} selected ${selectedCount === 1 ? 'repository' : 'repositories'}`;
               const accountName = installation.accountLogin ?? 'GitHub organization';
+              const pendingRequestExplanation =
+                installation.status !== 'pending'
+                  ? null
+                  : installation.pendingRequestState === 'blocked_by_existing_installation'
+                    ? PENDING_REQUEST_EXPLANATION.blocked_by_existing_installation
+                    : installation.pendingRequestState === 'start_again'
+                      ? PENDING_REQUEST_EXPLANATION.start_again
+                      : null;
               return (
                 <Collapsible key={installation.id}>
                   <div className="space-y-4 px-4 py-4 sm:px-5">
@@ -339,16 +347,11 @@ export function OrganizationGitHubInstallations({
                           )}
                         </div>
                         <p className="mt-1 text-sm text-muted-foreground">{repositoryScope}</p>
-                        {installation.status === 'pending' &&
-                          installation.pendingApprovalStatus ===
-                            PENDING_APPROVAL_STATUS.BLOCKED_BY_EXISTING_INSTALLATION && (
-                            <p className="mt-1 text-sm text-muted-foreground">
-                              This organization already has a GitHub installation, so this request
-                              cannot complete. Remove that installation in Kilo (Disconnect, or
-                              Uninstall GitHub App), then cancel this request and start the
-                              connection again.
-                            </p>
-                          )}
+                        {pendingRequestExplanation && (
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {pendingRequestExplanation}
+                          </p>
+                        )}
                         {installation.connectionRole === 'agent_only' &&
                           (installation.status === 'connected' ? (
                             <p className="mt-1 text-sm text-muted-foreground">

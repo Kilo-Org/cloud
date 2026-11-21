@@ -4,8 +4,11 @@ import { OrganizationGitHubInstallations } from './OrganizationGitHubInstallatio
 
 let mockRole: 'workflow' | 'agent_only' | null | undefined = 'workflow';
 let mockStatus = 'connected';
-let mockPendingApprovalStatus: 'awaiting_installation' | 'blocked_by_existing_installation' | null =
-  null;
+let mockPendingRequestState:
+  | 'awaiting_approval'
+  | 'blocked_by_existing_installation'
+  | 'start_again'
+  | null = null;
 const previousReact = Reflect.get(globalThis, 'React');
 beforeAll(() => Object.assign(globalThis, { React }));
 afterAll(() => {
@@ -71,7 +74,7 @@ jest.mock('@tanstack/react-query', () => ({
                 canManageModel: true,
                 canDisconnect: true,
                 canUninstall: false,
-                pendingApprovalStatus: mockPendingApprovalStatus,
+                pendingRequestState: mockPendingRequestState,
               },
             ],
           }
@@ -124,7 +127,7 @@ test.each([null, undefined])(
 test('disconnected agent access is not represented as currently available', () => {
   mockRole = 'agent_only';
   mockStatus = 'disconnected';
-  mockPendingApprovalStatus = null;
+  mockPendingRequestState = null;
   const html = renderToStaticMarkup(
     React.createElement(OrganizationGitHubInstallations, { organizationId: 'org-1' })
   );
@@ -134,26 +137,47 @@ test('disconnected agent access is not represented as currently available', () =
   expect(html).not.toContain('github-model-selector');
 });
 
-test('a request blocked by the organization installation states the remedy', () => {
+test('a request blocked by the organization installation states the conditional remedy', () => {
   mockRole = null;
   mockStatus = 'pending';
-  mockPendingApprovalStatus = 'blocked_by_existing_installation';
+  mockPendingRequestState = 'blocked_by_existing_installation';
   const html = renderToStaticMarkup(
     React.createElement(OrganizationGitHubInstallations, { organizationId: 'org-1' })
   );
   expect(html).toContain('Pending approval');
-  expect(html).toContain('This organization already has a GitHub installation, so this request');
-  expect(html).toContain('Remove that installation in Kilo (Disconnect, or Uninstall GitHub App)');
+  expect(html).toContain('This organization already has a GitHub installation.');
+  expect(html).toContain('To use this installation instead');
+  expect(html).toContain('removes that one in Kilo (Disconnect, or Uninstall GitHub App)');
   expect(html).toContain('cancel this request and start the connection again');
+  expect(html).not.toContain('That installation has since been removed');
 });
 
-test('a request still awaiting installation carries no blocking remedy', () => {
+test('a start-again request names no removal step', () => {
   mockRole = null;
   mockStatus = 'pending';
-  mockPendingApprovalStatus = 'awaiting_installation';
+  mockPendingRequestState = 'start_again';
+  const html = renderToStaticMarkup(
+    React.createElement(OrganizationGitHubInstallations, { organizationId: 'org-1' })
+  );
+  expect(html).toContain('Pending approval');
+  expect(html).toContain(
+    'This request did not complete because another installation was connected at the time.'
+  );
+  expect(html).toContain('That installation has since been removed');
+  expect(html).toContain('cancel this request and start the connection again');
+  expect(html).not.toContain('Disconnect');
+  expect(html).not.toContain('Uninstall GitHub App');
+  expect(html).not.toContain('already has a GitHub installation');
+});
+
+test('a request still awaiting approval carries no blocking remedy', () => {
+  mockRole = null;
+  mockStatus = 'pending';
+  mockPendingRequestState = 'awaiting_approval';
   const html = renderToStaticMarkup(
     React.createElement(OrganizationGitHubInstallations, { organizationId: 'org-1' })
   );
   expect(html).toContain('Pending approval');
   expect(html).not.toContain('already has a GitHub installation');
+  expect(html).not.toContain('That installation has since been removed');
 });

@@ -18,6 +18,7 @@ import {
   findIntegrationByInstallationId,
   findGitLabIntegrationByWebhookToken,
   findGitHubBotLinkIntegrations,
+  resolvePendingRequestState,
   suspendIntegration,
   suspendIntegrationForOwner,
   unsuspendIntegration,
@@ -1828,6 +1829,32 @@ describe('findGitLabIntegrationByWebhookToken', () => {
     await insertGitLabIntegration({ metadata: { auth_type: 'oauth' } });
 
     expect(await findGitLabIntegrationByWebhookToken('secret-known')).toBeNull();
+  });
+});
+
+describe('resolvePendingRequestState', () => {
+  test.each([
+    ['awaiting_installation', null, 'awaiting_approval'],
+    ['awaiting_installation', [], 'awaiting_approval'],
+    [
+      'awaiting_installation',
+      [{ installationId: 'inst-live', appType: 'standard' }],
+      'awaiting_approval',
+    ],
+    ['blocked_by_existing_installation', null, 'blocked_by_existing_installation'],
+    [
+      'blocked_by_existing_installation',
+      [{ installationId: 'inst-live', appType: 'standard' }],
+      'blocked_by_existing_installation',
+    ],
+    [
+      'blocked_by_existing_installation',
+      [{ installationId: null, appType: 'standard' }],
+      'start_again',
+    ],
+    ['blocked_by_existing_installation', [], 'start_again'],
+  ] as const)('resolves stored %s with slots %j as %s', (storedStatus, slots, expected) => {
+    expect(resolvePendingRequestState(storedStatus, slots)).toBe(expected);
   });
 });
 

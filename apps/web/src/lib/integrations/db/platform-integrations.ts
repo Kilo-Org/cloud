@@ -13,7 +13,7 @@ import type {
   PlatformRepository,
 } from '../core/types';
 import { INTEGRATION_STATUS, PLATFORM, PENDING_APPROVAL_STATUS } from '../core/constants';
-import type { IntegrationStatus } from '../core/constants';
+import type { IntegrationStatus, PendingApprovalStatus } from '../core/constants';
 import { isPlatformIntegrationHealthy, platformIntegrationHealthSql } from '../core/health';
 import { PendingInstallationMetadataWrapperSchema } from '../core/schemas';
 import type { GitHubAppType } from '../platforms/github/app-selector';
@@ -24,6 +24,7 @@ import {
   getOrganizationGitHubInstallationSlots,
   occupiesAnotherGitHubInstallationSlot,
   ownerCondition,
+  type GitHubInstallationSlot,
 } from './predicates';
 import { lockGitHubInstallationIdentity } from './github-installations';
 import {
@@ -908,6 +909,31 @@ export async function findPendingInstallations() {
       status === PENDING_APPROVAL_STATUS.BLOCKED_BY_EXISTING_INSTALLATION
     );
   });
+}
+
+/**
+ * What a pending GitHub installation request means to a reader right now.
+ *
+ * The stored status records why the request did not complete at the time it
+ * was written, and nothing rewrites it when the organization's live
+ * installations change. A viewer must therefore resolve it against the
+ * organization's current installation slots: the blocking installation may be
+ * gone, which leaves nothing to remove and the request merely unfinished.
+ */
+export type PendingRequestState =
+  | 'awaiting_approval'
+  | 'blocked_by_existing_installation'
+  | 'start_again';
+
+export function resolvePendingRequestState(
+  storedStatus: PendingApprovalStatus,
+  organizationSlots: readonly GitHubInstallationSlot[] | null
+): PendingRequestState {
+  if (storedStatus === PENDING_APPROVAL_STATUS.AWAITING_INSTALLATION) return 'awaiting_approval';
+  if (organizationSlots === null) return 'blocked_by_existing_installation';
+  return organizationSlots.some(slot => slot.installationId !== null)
+    ? 'blocked_by_existing_installation'
+    : 'start_again';
 }
 
 /**

@@ -16,10 +16,12 @@ import {
   findIntegrationByInstallationId,
   getIntegrationForOwner,
   getGitHubIntegrationById,
+  resolvePendingRequestState,
   upsertPlatformIntegrationForOwner,
   updateRepositoriesForIntegration,
   syncIntegrationInstallationDetails,
 } from '@/lib/integrations/db/platform-integrations';
+import { getOrganizationGitHubInstallationSlots } from '@/lib/integrations/db/predicates';
 import {
   fetchGitHubInstallationDetails,
   fetchGitHubRepositories,
@@ -258,6 +260,7 @@ export const githubAppsRouter = createTRPCRouter({
         integration => !integration.github_disconnected_at
       ).length;
       const primaryId = integrations.find(isPlatformIntegrationHealthy)?.id ?? null;
+      const organizationSlots = await getOrganizationGitHubInstallationSlots(input.organizationId);
       const canManageModel = canManageOrganizationBilling(role);
       const canManageConnections =
         canManageOrganization(role) && isGitHubConnectionManagementEnabled();
@@ -326,10 +329,14 @@ export const githubAppsRouter = createTRPCRouter({
                   role === 'admin') &&
                 (await canUninstallGitHubInstallation(integration)),
               canCancel,
-              // Why a pending request cannot complete, so the organization list
-              // can name the remedy. Null for every other row.
-              pendingApprovalStatus: pendingMetadata.success
-                ? pendingMetadata.data.pending_approval.status
+              // What the pending request means now, so the organization list
+              // can describe the actual remedy. Null for every other row and
+              // for a row whose metadata does not parse.
+              pendingRequestState: pendingMetadata.success
+                ? resolvePendingRequestState(
+                    pendingMetadata.data.pending_approval.status,
+                    organizationSlots
+                  )
                 : null,
               modelSlug: (metadata?.model_slug as string) || null,
               canManageModel,
@@ -533,26 +540,35 @@ export const githubAppsRouter = createTRPCRouter({
           hasPending: false,
           pendingOrganizationId: null,
           pendingIntegrationId: null,
-          pendingApprovalStatus: null,
+          pendingRequestState: null,
         };
       }
 
-      // Why the request cannot complete, so the requester's own view can name
-      // the remedy: `getInstallation` returns the owner's live association, so
-      // it never shows this row's status once another installation holds the
-      // slot. A row whose metadata does not parse reports no status.
+      // What the request means now, so the requester's own view can name the
+      // actual remedy: `getInstallation` returns the owner's live association,
+      // so it never shows this row's state once another installation holds the
+      // slot. A personal request is not organization-scoped and carries its
+      // stored state; a row whose metadata does not parse reports no state.
       const pendingMetadata = PendingInstallationMetadataWrapperSchema.safeParse(
         pendingInstallation.metadata
       );
+      const organizationId = pendingInstallation.owned_by_organization_id;
+      const organizationSlots =
+        pendingMetadata.success && organizationId
+          ? await getOrganizationGitHubInstallationSlots(organizationId)
+          : null;
 
       return {
         hasPending: true,
-        pendingOrganizationId: pendingInstallation.owned_by_organization_id,
+        pendingOrganizationId: organizationId,
         // Names the exact pending row this response describes, so a cancel is
         // pinned to it instead of to whichever pending row matches the owner.
         pendingIntegrationId: pendingInstallation.id,
-        pendingApprovalStatus: pendingMetadata.success
-          ? pendingMetadata.data.pending_approval.status
+        pendingRequestState: pendingMetadata.success
+          ? resolvePendingRequestState(
+              pendingMetadata.data.pending_approval.status,
+              organizationSlots
+            )
           : null,
       };
     }),

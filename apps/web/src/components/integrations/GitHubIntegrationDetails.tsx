@@ -24,13 +24,13 @@ import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { buildGitHubInstallState } from './github-install-state';
-import { PENDING_APPROVAL_STATUS } from '@/lib/integrations/core/constants';
 import { useConfirm } from '@/components/ui/confirm';
 import { OrganizationGitHubInstallations } from './OrganizationGitHubInstallations';
 import { GitHubIdentityCard } from './GitHubIdentityCard';
 import {
   APP_RETURN_PATH,
   INSTALLATION_UNAVAILABLE_MESSAGE,
+  PENDING_REQUEST_EXPLANATION,
   appReturnBasePath,
   buildAppReturnHref,
   buildAppReturnOutcomeView,
@@ -307,16 +307,21 @@ function GitHubIntegrationDetailsContent({
 
   const status = installationData?.installation?.status;
   const isPendingApproval = status === 'awaiting_installation';
-  // A blocked request never reaches `installation.status`: the organization
-  // holds its live installation, and the installation lookup returns that row.
-  // The requester's own pending row is the only place the refusal is visible,
-  // and that lookup is user-scoped, so it only applies to the owner this view
-  // shows.
+  // A blocked or start-again request never reaches `installation.status`: the
+  // organization holds or held its live installation, and the installation
+  // lookup returns that row. The requester's own pending row is the only place
+  // the refusal is visible, and that lookup is user-scoped, so it only applies
+  // to the owner this view shows.
+  const pendingRequestState =
+    pendingCheck?.pendingOrganizationId === (organizationId ?? null)
+      ? pendingCheck.pendingRequestState
+      : null;
   const isBlockedPending =
-    pendingCheck?.pendingOrganizationId === (organizationId ?? null) &&
-    pendingCheck.pendingApprovalStatus === PENDING_APPROVAL_STATUS.BLOCKED_BY_EXISTING_INSTALLATION;
-  // A blocked request is still awaiting completion, so it keeps every waiting
-  // surface. The installation card below keeps describing the row it displays.
+    pendingRequestState === 'blocked_by_existing_installation' ||
+    pendingRequestState === 'start_again';
+  // A blocked or start-again request is still awaiting completion, so it keeps
+  // every waiting surface. The installation card below keeps describing the row
+  // it displays.
   const isPendingRequest = isPendingApproval || isBlockedPending;
 
   const uninstallApp = useMutation(
@@ -763,10 +768,9 @@ function GitHubIntegrationDetailsContent({
                 <h4 className="font-medium">Installation Pending Admin Approval</h4>
                 {isBlockedPending ? (
                   <p className="text-muted-foreground text-sm">
-                    This organization already has a GitHub installation. An owner or admin must
-                    remove that installation in Kilo (Disconnect, or Uninstall GitHub App) before
-                    this request can complete. Then cancel this request and start the connection
-                    again.
+                    {pendingRequestState === 'start_again'
+                      ? PENDING_REQUEST_EXPLANATION.start_again
+                      : PENDING_REQUEST_EXPLANATION.blocked_by_existing_installation}
                   </p>
                 ) : (
                   <>
@@ -1044,14 +1048,18 @@ function GitHubIntegrationDetailsContent({
                   <RefreshCw className="h-8 w-8 text-amber-500" />
                   <div className="space-y-1">
                     <h3 className="text-lg font-semibold">
-                      {isBlockedPending
-                        ? 'Existing installation blocks this request'
-                        : 'Awaiting admin approval'}
+                      {pendingRequestState === 'start_again'
+                        ? 'Start the connection again'
+                        : isBlockedPending
+                          ? 'Existing installation blocks this request'
+                          : 'Awaiting admin approval'}
                     </h3>
                     <p className="text-muted-foreground text-sm">
-                      {isBlockedPending
-                        ? 'This organization already has a GitHub installation. An owner or admin must remove that installation in Kilo (Disconnect, or Uninstall GitHub App) before this request can complete. Then cancel this request and start the connection again.'
-                        : 'An organization admin must approve the installation request. Return to the Kilo App to check later.'}
+                      {pendingRequestState === 'start_again'
+                        ? PENDING_REQUEST_EXPLANATION.start_again
+                        : isBlockedPending
+                          ? PENDING_REQUEST_EXPLANATION.blocked_by_existing_installation
+                          : 'An organization admin must approve the installation request. Return to the Kilo App to check later.'}
                     </p>
                   </div>
                   <Button asChild variant="outline" className="mt-2">

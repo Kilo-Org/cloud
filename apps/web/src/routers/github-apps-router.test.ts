@@ -136,25 +136,31 @@ jest.mock('@/lib/integrations/github/install-state', () => ({
     mockCreateInstallState(input),
 }));
 
-jest.mock('@/lib/integrations/db/platform-integrations', () => ({
-  getIntegrationForOwner: (owner: Owner, platform: string) =>
-    mockGetIntegrationForOwner(owner, platform),
-  getGitHubIntegrationById: (owner: Owner, integrationId: string) =>
-    mockGetGitHubIntegrationById(owner, integrationId),
-  upsertPlatformIntegrationForOwner: (owner: Owner, details: Record<string, unknown>) =>
-    mockUpsertPlatformIntegrationForOwner(owner, details),
-  updateRepositoriesForIntegration: (integrationId: string, repositories: unknown[]) =>
-    mockUpdateRepositoriesForIntegration(integrationId, repositories),
-  findIntegrationByInstallationId: (
-    platform: string,
-    installationId: string,
-    appType: GitHubAppType
-  ) => mockFindIntegrationByInstallationId(platform, installationId, appType),
-  syncIntegrationInstallationDetails: (integrationId: string, details: Record<string, unknown>) =>
-    mockSyncIntegrationInstallationDetails(integrationId, details),
-  getPrimaryGitHubIntegrationForOrganization: (organizationId: string) =>
-    mockGetPrimaryGitHubIntegrationForOrganization(organizationId),
-}));
+jest.mock('@/lib/integrations/db/platform-integrations', () => {
+  const actual = jest.requireActual<{
+    resolvePendingRequestState: (storedStatus: string, slots: unknown) => string;
+  }>('@/lib/integrations/db/platform-integrations');
+  return {
+    resolvePendingRequestState: actual.resolvePendingRequestState,
+    getIntegrationForOwner: (owner: Owner, platform: string) =>
+      mockGetIntegrationForOwner(owner, platform),
+    getGitHubIntegrationById: (owner: Owner, integrationId: string) =>
+      mockGetGitHubIntegrationById(owner, integrationId),
+    upsertPlatformIntegrationForOwner: (owner: Owner, details: Record<string, unknown>) =>
+      mockUpsertPlatformIntegrationForOwner(owner, details),
+    updateRepositoriesForIntegration: (integrationId: string, repositories: unknown[]) =>
+      mockUpdateRepositoriesForIntegration(integrationId, repositories),
+    findIntegrationByInstallationId: (
+      platform: string,
+      installationId: string,
+      appType: GitHubAppType
+    ) => mockFindIntegrationByInstallationId(platform, installationId, appType),
+    syncIntegrationInstallationDetails: (integrationId: string, details: Record<string, unknown>) =>
+      mockSyncIntegrationInstallationDetails(integrationId, details),
+    getPrimaryGitHubIntegrationForOrganization: (organizationId: string) =>
+      mockGetPrimaryGitHubIntegrationForOrganization(organizationId),
+  };
+});
 jest.mock('@/lib/integrations/db/predicates', () => ({
   getOrganizationGitHubInstallationSlots: (organizationId: string) =>
     mockGetOrganizationGitHubInstallationSlots(organizationId),
@@ -235,7 +241,11 @@ let createCaller: (ctx: { user: User }) => {
     hasPending: boolean;
     pendingOrganizationId: string | null;
     pendingIntegrationId: string | null;
-    pendingApprovalStatus: string | null;
+    pendingRequestState:
+      | 'awaiting_approval'
+      | 'blocked_by_existing_installation'
+      | 'start_again'
+      | null;
   }>;
   cancelPendingInstallation: (input: {
     organizationId?: string;
@@ -462,8 +472,11 @@ describe('githubAppsRouter organization install capability', () => {
     expect(listed.installations).toHaveLength(1);
   });
 
-  it('reports why a pending request is blocked and keeps it cancellable by its requester', async () => {
+  it('resolves a blocked pending request as blocked while the organization holds an installation', async () => {
     mockEnsureOrganizationAccess.mockResolvedValue('member');
+    mockGetOrganizationGitHubInstallationSlots.mockResolvedValue([
+      { installationId: '98765', appType: 'standard' },
+    ]);
     const pending = organizationIntegration();
     pending.integration_status = 'pending';
     pending.platform_installation_id = null;
@@ -485,12 +498,73 @@ describe('githubAppsRouter organization install capability', () => {
 
     expect(listed.installations[0]).toMatchObject({
       status: 'pending',
-      pendingApprovalStatus: 'blocked_by_existing_installation',
+      pendingRequestState: 'blocked_by_existing_installation',
       canCancel: true,
     });
   });
 
-  it('reports no pending approval status for a row whose metadata does not parse', async () => {
+  it('resolves a blocked pending request as start-again once the organization holds no installation', async () => {
+    mockEnsureOrganizationAccess.mockResolvedValue('member');
+    mockGetOrganizationGitHubInstallationSlots.mockResolvedValue([
+      { installationId: null, appType: 'standard' },
+    ]);
+    const pending = organizationIntegration();
+    pending.integration_status = 'pending';
+    pending.platform_installation_id = null;
+    pending.metadata = {
+      pending_approval: {
+        status: 'blocked_by_existing_installation',
+        requester: {
+          kilo_user_id: 'user-1',
+          kilo_user_email: 'requester@example.com',
+          kilo_user_name: 'Requester',
+          requested_at: '2026-01-01T00:00:00.000Z',
+        },
+      },
+    };
+    mockListIntegrations.mockResolvedValue([pending]);
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    const listed = await caller.listOrganizationInstallations({ organizationId });
+
+    expect(listed.installations[0]).toMatchObject({
+      status: 'pending',
+      pendingRequestState: 'start_again',
+      canCancel: true,
+    });
+  });
+
+  it('resolves an awaiting pending request as awaiting approval', async () => {
+    mockEnsureOrganizationAccess.mockResolvedValue('member');
+    mockGetOrganizationGitHubInstallationSlots.mockResolvedValue([
+      { installationId: '98765', appType: 'standard' },
+    ]);
+    const pending = organizationIntegration();
+    pending.integration_status = 'pending';
+    pending.platform_installation_id = null;
+    pending.metadata = {
+      pending_approval: {
+        status: 'awaiting_installation',
+        requester: {
+          kilo_user_id: 'user-1',
+          kilo_user_email: 'requester@example.com',
+          kilo_user_name: 'Requester',
+          requested_at: '2026-01-01T00:00:00.000Z',
+        },
+      },
+    };
+    mockListIntegrations.mockResolvedValue([pending]);
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    const listed = await caller.listOrganizationInstallations({ organizationId });
+
+    expect(listed.installations[0]).toMatchObject({
+      status: 'pending',
+      pendingRequestState: 'awaiting_approval',
+    });
+  });
+
+  it('reports no pending request state for a row whose metadata does not parse', async () => {
     mockEnsureOrganizationAccess.mockResolvedValue('owner');
     const pending = organizationIntegration();
     pending.integration_status = 'pending';
@@ -503,8 +577,23 @@ describe('githubAppsRouter organization install capability', () => {
 
     expect(listed.installations[0]).toMatchObject({
       status: 'pending',
-      pendingApprovalStatus: null,
+      pendingRequestState: null,
     });
+  });
+
+  it('reads the organization installation slots once for the whole list', async () => {
+    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockListIntegrations.mockResolvedValue([
+      organizationIntegration(),
+      { ...organizationIntegration(), id: '00000000-0000-4000-8000-000000000003' },
+      { ...organizationIntegration(), id: '00000000-0000-4000-8000-000000000004' },
+    ]);
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await caller.listOrganizationInstallations({ organizationId });
+
+    expect(mockGetOrganizationGitHubInstallationSlots).toHaveBeenCalledTimes(1);
+    expect(mockGetOrganizationGitHubInstallationSlots).toHaveBeenCalledWith(organizationId);
   });
 
   it('exposes local disconnect independently from upstream uninstall for an agent connection', async () => {
@@ -958,6 +1047,9 @@ describe('githubAppsRouter pending installation cancel', () => {
       github_app_type: 'standard',
     });
     mockCancelPendingInstallation.mockResolvedValue({ success: true });
+    mockGetOrganizationGitHubInstallationSlots.mockResolvedValue([
+      { installationId: '98765', appType: 'standard' },
+    ]);
   });
 
   it('reports the pending row id it describes', async () => {
@@ -982,11 +1074,11 @@ describe('githubAppsRouter pending installation cancel', () => {
       hasPending: true,
       pendingOrganizationId: null,
       pendingIntegrationId: integrationId,
-      pendingApprovalStatus: 'awaiting_installation',
+      pendingRequestState: 'awaiting_approval',
     });
   });
 
-  it('reports a blocked pending request so the requester sees the remedy', async () => {
+  it('maps a personal pending request from its stored status without reading organization slots', async () => {
     mockCheckUserPendingInstallation.mockResolvedValue({
       id: integrationId,
       owned_by_organization_id: null,
@@ -1008,11 +1100,68 @@ describe('githubAppsRouter pending installation cancel', () => {
       hasPending: true,
       pendingOrganizationId: null,
       pendingIntegrationId: integrationId,
-      pendingApprovalStatus: 'blocked_by_existing_installation',
+      pendingRequestState: 'blocked_by_existing_installation',
+    });
+    expect(mockGetOrganizationGitHubInstallationSlots).not.toHaveBeenCalled();
+  });
+
+  it('reports an organization-owned blocked request as blocked while the organization holds an installation', async () => {
+    mockCheckUserPendingInstallation.mockResolvedValue({
+      id: integrationId,
+      owned_by_organization_id: organizationId,
+      metadata: {
+        pending_approval: {
+          status: 'blocked_by_existing_installation',
+          requester: {
+            kilo_user_id: 'user-1',
+            kilo_user_email: 'requester@example.com',
+            kilo_user_name: 'Requester',
+            requested_at: '2026-01-01T00:00:00.000Z',
+          },
+        },
+      },
+    });
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await expect(caller.checkUserPendingInstallation()).resolves.toEqual({
+      hasPending: true,
+      pendingOrganizationId: organizationId,
+      pendingIntegrationId: integrationId,
+      pendingRequestState: 'blocked_by_existing_installation',
+    });
+    expect(mockGetOrganizationGitHubInstallationSlots).toHaveBeenCalledWith(organizationId);
+  });
+
+  it('reports an organization-owned blocked request as start-again once the organization holds no installation', async () => {
+    mockGetOrganizationGitHubInstallationSlots.mockResolvedValue([
+      { installationId: null, appType: 'standard' },
+    ]);
+    mockCheckUserPendingInstallation.mockResolvedValue({
+      id: integrationId,
+      owned_by_organization_id: organizationId,
+      metadata: {
+        pending_approval: {
+          status: 'blocked_by_existing_installation',
+          requester: {
+            kilo_user_id: 'user-1',
+            kilo_user_email: 'requester@example.com',
+            kilo_user_name: 'Requester',
+            requested_at: '2026-01-01T00:00:00.000Z',
+          },
+        },
+      },
+    });
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await expect(caller.checkUserPendingInstallation()).resolves.toEqual({
+      hasPending: true,
+      pendingOrganizationId: organizationId,
+      pendingIntegrationId: integrationId,
+      pendingRequestState: 'start_again',
     });
   });
 
-  it('reports no pending approval status for a request whose metadata does not parse', async () => {
+  it('reports no pending request state for a request whose metadata does not parse', async () => {
     mockCheckUserPendingInstallation.mockResolvedValue({
       id: integrationId,
       owned_by_organization_id: null,
@@ -1024,7 +1173,7 @@ describe('githubAppsRouter pending installation cancel', () => {
       hasPending: true,
       pendingOrganizationId: null,
       pendingIntegrationId: integrationId,
-      pendingApprovalStatus: null,
+      pendingRequestState: null,
     });
   });
 
@@ -1036,8 +1185,9 @@ describe('githubAppsRouter pending installation cancel', () => {
       hasPending: false,
       pendingOrganizationId: null,
       pendingIntegrationId: null,
-      pendingApprovalStatus: null,
+      pendingRequestState: null,
     });
+    expect(mockGetOrganizationGitHubInstallationSlots).not.toHaveBeenCalled();
   });
 
   it('rejects a cancel without an integration id instead of choosing a pending row', async () => {

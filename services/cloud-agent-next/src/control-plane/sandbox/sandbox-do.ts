@@ -5335,9 +5335,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       // the rows, the accepted set and the adoption marker agree. Otherwise the
       // claim continues to verification and the accepted-entry transaction below.
       if (updated === grant) {
-        const accepted = acceptedDigests.has(
-          candidateDigest ?? (await digestRuntimeProxyHandle(finalHandle))
-        );
+        const accepted = acceptedDigests.has(await digestRuntimeProxyHandle(finalHandle));
         if (accepted) return { kind: 'handle', handle: finalHandle };
       }
 

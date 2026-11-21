@@ -22,11 +22,13 @@ import { RUNTIME_AUTHORIZATION_KEY } from '../../src/session/runtime-authorizati
 import worker from '../../src/server.js';
 import { markHistoryHydrated } from '../../src/control-plane/session/history-hydration.js';
 import {
+  ACCEPTED_HANDLES_MAX,
   addAcceptedHandleSync,
   digestRuntimeProxyHandle,
   type AcceptedHandleFence,
   type ScopeHandleResolution,
 } from '../../src/control-plane/sandbox/accepted-handles.js';
+import { readScopeGrant, writeScopeGrant } from '../../src/control-plane/sandbox/scope-grants.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
 import { sessionDoName } from '../../src/session-identity.js';
 import type { AgentSandboxProvider, Env } from '../../src/types.js';
@@ -844,5 +846,137 @@ describe('adopted-handle claim and accepted-set consistency', () => {
       return Object.values(store ?? {}).flat();
     });
     expect(entries.some(entry => entry.handleDigest === foreignDigest)).toBe(false);
+  });
+
+  it('serves the canonical the row holds when a full accepted set rejects the candidate and the canonical issuer left', async () => {
+    const { sandbox, scopeGrantId, members } = await createSharedScope(2);
+    const [creator, sibling] = members;
+    if (!creator || !sibling) throw new Error('Expected two scope members');
+    // Both rows already serve the same canonical, minted by the creator.
+    expect(sibling.handle).toBe(creator.handle);
+    const fence = await currentFence(sandbox);
+
+    // The canonical's issuer stops being a scope member; the sibling's row keeps
+    // it. The issuer leaves both member projections together, as membership
+    // removal does, because the persisted grant requires a runtime-proxy member
+    // to also be a scope member.
+    await runInDurableObject(sandbox, (_instance, state) => {
+      const db = drizzle(state.storage);
+      const grant = readScopeGrant(db, scopeGrantId);
+      if (grant === null) throw new Error('missing scope grant');
+      const proxy = grant.kilo.runtimeProxy;
+      if (proxy === undefined) throw new Error('missing runtime proxy grant');
+      writeScopeGrant(db, {
+        ...grant,
+        members: grant.members.filter(member => member.sessionId !== creator.sessionId),
+        kilo: {
+          ...grant.kilo,
+          runtimeProxy: {
+            ...proxy,
+            members: proxy.members.filter(member => member.sessionId !== creator.sessionId),
+          },
+        },
+      });
+    });
+
+    // A full accepted set that carries the canonical, so the fallback below can
+    // keep serving it. The canonical's own entry sits a minute inside the reissue
+    // threshold, which makes the claim adopt the later candidate rather than keep
+    // the canonical, without relying on how long the fixture takes.
+    await seedAccepted(
+      sandbox,
+      scopeGrantId,
+      creator.handle,
+      creator,
+      fence,
+      Date.now() + 3_540_000
+    );
+    for (let index = 1; index < ACCEPTED_HANDLES_MAX; index += 1) {
+      const extra = await issueRuntimeCredentialProxyHandle(
+        env,
+        createRuntimeProxyGrant({
+          plane: 'control',
+          authorizationId: crypto.randomUUID(),
+          sessionId: creator.sessionId,
+          kiloSessionId: creator.kiloId,
+          userId: USER_ID,
+          orgId: ORG_ID,
+          mode: 'direct',
+          allocationId: fence.allocationId,
+          providerInstanceId: fence.providerInstanceId,
+          connectionId: fence.connectionId,
+          wrapperInstanceId: fence.wrapperInstanceId,
+          leaseExpiresAt: Date.now() + 3_600_000,
+          state: 'active',
+        })
+      );
+      await seedAccepted(sandbox, scopeGrantId, extra, creator, fence);
+    }
+    // The set is at the cap, so the candidate cannot be appended.
+    const acceptedCount = await runInDurableObject(sandbox, instance => {
+      const store = instance.ctx.storage.kv.get<Record<string, unknown[]>>(
+        'runtime_proxy_accepted_handles'
+      );
+      return (store?.[scopeGrantId] ?? []).length;
+    });
+    expect(acceptedCount).toBe(ACCEPTED_HANDLES_MAX);
+
+    // The canonical is near its reissue threshold and the candidate outlives it,
+    // so the claim adopts-candidate and the full set rejects the candidate.
+    const candidate = await issueRuntimeCredentialProxyHandle(
+      env,
+      createRuntimeProxyGrant({
+        plane: 'control',
+        authorizationId: crypto.randomUUID(),
+        sessionId: sibling.sessionId,
+        kiloSessionId: sibling.kiloId,
+        userId: USER_ID,
+        orgId: ORG_ID,
+        mode: 'direct',
+        allocationId: fence.allocationId,
+        providerInstanceId: fence.providerInstanceId,
+        connectionId: fence.connectionId,
+        wrapperInstanceId: fence.wrapperInstanceId,
+        leaseExpiresAt: Date.now() + 5 * 3_600_000,
+        state: 'active',
+      })
+    );
+    expect(candidate).not.toBe(sibling.handle);
+    // The fixture minted this handle, so its signed `exp` is the field the claim
+    // compares; `jwt.decode` types its result only as an object.
+    const candidateClaims = jwt.decode(candidate) as { exp: number };
+    const exp = candidateClaims.exp * 1000;
+
+    const outcome = await runInDurableObject(sandbox, async (instance, state) => {
+      const holder = instance as unknown as {
+        claimAdoptedScopeHandle(input: {
+          sessionId: string;
+          attemptId: string;
+          ownerId: string;
+          kiloSessionId: string;
+          candidate: { handle: string; exp: number; issuerSessionId: string } | null;
+          mintFence: AcceptedHandleFence;
+        }): Promise<{ kind: string; handle?: string }>;
+      };
+      const db = drizzle(state.storage);
+      const route = await readRoute(db, sibling.sessionId);
+      if (route === null) throw new Error('missing route');
+      db.update(routes)
+        .set({ state: 'preparing' })
+        .where(eq(routes.session_id, sibling.sessionId))
+        .run();
+      return holder.claimAdoptedScopeHandle({
+        sessionId: sibling.sessionId,
+        attemptId: route.attemptId,
+        ownerId: USER_ID,
+        kiloSessionId: sibling.kiloId,
+        candidate: { handle: candidate, exp, issuerSessionId: sibling.sessionId },
+        mintFence: fence,
+      });
+    });
+
+    // The row already serves the canonical, so the claim serves that string
+    // rather than the rejected candidate or a failure.
+    expect(outcome).toEqual({ kind: 'handle', handle: sibling.handle });
   });
 });

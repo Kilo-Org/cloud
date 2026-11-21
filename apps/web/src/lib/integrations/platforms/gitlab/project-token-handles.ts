@@ -197,9 +197,10 @@ export async function dropUnrevokableProjectTokenEntry(
 
 /**
  * Why a stored project token stays stored after a removal attempt. It names the
- * remedy: an unusable stored instance and a changed handle both need the stored
- * rows repaired, a provider rejection needs a credential that may revoke, and an
- * unconfirmed answer can be retried.
+ * remedy: an unusable stored integration record must be repaired before the
+ * integration can be reconnected, a refused or unresolvable credential needs a
+ * disconnect followed by a reconnect with a credential that can revoke, and an
+ * unconfirmed answer or a changed handle can be retried in a moment.
  */
 export type ProjectTokenRetentionReason =
   | 'provider_rejected'
@@ -236,15 +237,18 @@ export type ProjectTokenBlocker = {
 const BLOCKER_MESSAGES: Record<ProjectTokenBlocker['reason'], { cause: string; remedy: string }> = {
   stored_instance_unusable: {
     cause: 'the stored GitLab instance address could not be used',
-    remedy: 'Reconnect the current instance and try again.',
+    remedy:
+      'The stored GitLab integration record must be repaired before this integration can be reconnected.',
   },
   provider_rejected: {
     cause: 'GitLab refused the connected credential while revoking them',
-    remedy: 'Reconnect the current instance with a token that can revoke them, then connect again.',
+    remedy:
+      'Disconnect the integration, then reconnect the current instance with a credential that can revoke them.',
   },
   no_credential: {
     cause: 'no stored credential can revoke them',
-    remedy: 'Reconnect the current instance with a token that can revoke them, then connect again.',
+    remedy:
+      'Disconnect the integration, then reconnect the current instance with a credential that can revoke them.',
   },
   stored_handle_changed: {
     cause: 'a stored handle changed while they were being revoked',
@@ -283,7 +287,7 @@ function instanceChangeBlockerMessage(
 
 /** Refusal for an in-transaction instance change that finds a stored handle. */
 export function gitlabProjectTokensUnsettledMessage(projectIds: readonly string[]): string {
-  return `GitLab project tokens stored for the current instance could not be revoked (projects: ${projectIds.join(', ')}). Reconnect the current instance with a token that can revoke them, then connect again.`;
+  return `GitLab project tokens stored for the current instance could not be revoked (projects: ${projectIds.join(', ')}). Disconnect the integration, then reconnect the current instance with a credential that can revoke them.`;
 }
 
 /**

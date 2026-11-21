@@ -975,6 +975,9 @@ describe('GitLab encrypted credential persistence', () => {
     const refusalMessage = refusal instanceof Error ? refusal.message : '';
     expect(refusalMessage).toContain('projects: 99');
     expect(refusalMessage).toContain('GitLab refused the connected credential');
+    expect(refusalMessage).toContain(
+      'Disconnect the integration, then reconnect the current instance with a credential that can revoke them.'
+    );
 
     const [unchanged] = await db
       .select()
@@ -1041,6 +1044,9 @@ describe('GitLab encrypted credential persistence', () => {
       noCredentialRefusal instanceof Error ? noCredentialRefusal.message : '';
     expect(noCredentialMessage).toContain('projects: 99');
     expect(noCredentialMessage).toContain('no stored credential can revoke them');
+    expect(noCredentialMessage).toContain(
+      'Disconnect the integration, then reconnect the current instance with a credential that can revoke them.'
+    );
 
     const [unchanged] = await db
       .select()
@@ -1105,6 +1111,10 @@ describe('GitLab encrypted credential persistence', () => {
     const refusalMessage = refusal instanceof Error ? refusal.message : '';
     expect(refusalMessage).toContain('projects: 99');
     expect(refusalMessage).toContain('stored GitLab instance address could not be used');
+    expect(refusalMessage).toContain(
+      'The stored GitLab integration record must be repaired before this integration can be reconnected.'
+    );
+    expect(refusalMessage).not.toContain('Reconnect the current instance');
     expect(mockRevokeProjectAccessToken).not.toHaveBeenCalled();
 
     const [unchanged] = await db
@@ -1128,6 +1138,54 @@ describe('GitLab encrypted credential persistence', () => {
           )
         )
     ).resolves.toHaveLength(1);
+  });
+
+  it('refuses a plain reconnect to the same instance when the stored address is unusable', async () => {
+    const user = await insertTestUser();
+    const initial = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-initial-token',
+      'https://gitlab.com',
+      user.id
+    );
+    const [initialIntegration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, initial.integration.id));
+    await db
+      .update(platform_integrations)
+      .set({
+        metadata: {
+          ...(initialIntegration.metadata as Record<string, unknown>),
+          gitlab_instance_url: 42,
+        },
+      })
+      .where(eq(platform_integrations.id, initial.integration.id));
+    await db.insert(platform_access_token_credentials).values({
+      platform_integration_id: initial.integration.id,
+      token_encrypted: 'encrypted-project-token',
+      provider_credential_type: 'project_access_token',
+      provider_resource_id: '99',
+      provider_base_url: 'https://gitlab.com',
+      provider_metadata: { providerCredentialId: '999', expiresOn: '2027-07-13' },
+    });
+
+    const refusal = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-other-instance-token',
+      'https://gitlab.com',
+      user.id
+    ).catch((error: unknown) => error);
+
+    expect(refusal).toMatchObject({ code: 'PRECONDITION_FAILED' });
+    const refusalMessage = refusal instanceof Error ? refusal.message : '';
+    expect(refusalMessage).toContain('projects: 99');
+    expect(refusalMessage).toContain('stored GitLab instance address could not be used');
+    expect(refusalMessage).toContain(
+      'The stored GitLab integration record must be repaired before this integration can be reconnected.'
+    );
+    expect(refusalMessage).not.toContain('Reconnect the current instance');
+    expect(mockRevokeProjectAccessToken).not.toHaveBeenCalled();
   });
 
   it('refuses an instance change when a project token appears after the settlement', async () => {
@@ -1170,14 +1228,20 @@ describe('GitLab encrypted credential persistence', () => {
       });
     });
 
-    await expect(
-      connectWithPAT(
-        { type: 'user', id: user.id },
-        'glpat-other-instance-token',
-        'https://self.gitlab.example/',
-        user.id
-      )
-    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+    const inTransactionRefusal = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-other-instance-token',
+      'https://self.gitlab.example/',
+      user.id
+    ).catch((error: unknown) => error);
+
+    expect(inTransactionRefusal).toMatchObject({ code: 'PRECONDITION_FAILED' });
+    const inTransactionMessage =
+      inTransactionRefusal instanceof Error ? inTransactionRefusal.message : '';
+    expect(inTransactionMessage).toContain('projects: 77');
+    expect(inTransactionMessage).toContain(
+      'Disconnect the integration, then reconnect the current instance with a credential that can revoke them.'
+    );
 
     const [unchanged] = await db
       .select()

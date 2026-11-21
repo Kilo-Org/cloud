@@ -430,6 +430,7 @@
       "clientEmail": "E-mail účtu služby",
       "privateKey": "Soukromý klíč účtu služby",
       "privateKeyBlockRequired": "Vložte celý blok klíče, od řádku BEGIN po řádek END.",
+      "privateKeyEncrypted": "Tento blok klíče je chráněný přístupovou frází. Vložte klíč účtu služby, který nemá přístupovou frázi.",
       "names": {
         "codestral": "Pouze starší Codestral",
         "openai": "OpenAI API",

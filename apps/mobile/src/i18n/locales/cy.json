@@ -432,6 +432,7 @@
       "clientEmail": "E-bost cyfrif gwasanaeth",
       "privateKey": "Allwedd breifat cyfrif gwasanaeth",
       "privateKeyBlockRequired": "Gludwch y bloc allwedd cyfan, o'r llinell BEGIN i'r llinell END.",
+      "privateKeyEncrypted": "Mae'r bloc allwedd hwn wedi'i ddiogelu â chyfrinymadrodd. Gludwch allwedd cyfrif gwasanaeth heb gyfrinymadrodd.",
       "names": {
         "codestral": "Hen Codestral yn unig",
         "openai": "OpenAI API",

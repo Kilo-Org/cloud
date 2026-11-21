@@ -428,6 +428,7 @@
       "clientEmail": "Imel na asusun sabis",
       "privateKey": "Maɓallin sirri na asusun sabis",
       "privateKeyBlockRequired": "Liƙa dukan shingen maɓallin, daga layin BEGIN zuwa layin END.",
+      "privateKeyEncrypted": "Wannan shingen maɓallin yana da kariya ta kalmar sirri. Liƙa maɓallin asusun sabis wanda ba shi da kalmar sirri.",
       "names": {
         "codestral": "Tsohon Codestral kawai",
         "openai": "OpenAI API",

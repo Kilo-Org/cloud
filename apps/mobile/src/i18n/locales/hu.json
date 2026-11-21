@@ -428,6 +428,7 @@
       "clientEmail": "Szolgáltatásfiók e-mail-címe",
       "privateKey": "Szolgáltatásfiók privát kulcsa",
       "privateKeyBlockRequired": "Illeszd be a teljes kulcsblokkot, a BEGIN sortól az END sorig.",
+      "privateKeyEncrypted": "Ez a kulcsblokk jelmondattal védett. Illessz be egy jelmondat nélküli szolgáltatásfiók-kulcsot.",
       "names": {
         "codestral": "Csak a régi Codestral",
         "openai": "OpenAI API",

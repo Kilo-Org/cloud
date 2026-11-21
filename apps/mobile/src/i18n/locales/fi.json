@@ -428,6 +428,7 @@
       "clientEmail": "Palvelutilin sähköpostiosoite",
       "privateKey": "Palvelutilin yksityinen avain",
       "privateKeyBlockRequired": "Liitä koko avainlohko BEGIN-riviltä END-riville.",
+      "privateKeyEncrypted": "Tämä avainlohko on suojattu salalauseella. Liitä palvelutilin avain, jossa ei ole salalausetta.",
       "names": {
         "codestral": "Vain vanha Codestral",
         "openai": "OpenAI-API",

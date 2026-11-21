@@ -428,6 +428,7 @@
       "clientEmail": "د service account برېښنالیک",
       "privateKey": "د service account خصوصي کیلي",
       "privateKeyBlockRequired": "د کیلي ټول بلاک پیسټ کړئ، له BEGIN کرښې څخه تر END کرښې پورې.",
+      "privateKeyEncrypted": "دا د کیلي بلاک په پاسفریز خوندي شوی دی. د service account هغه کیلي پیسټ کړئ چې پاسفریز نه لري.",
       "names": {
         "codestral": "پخوانی یوازې Codestral",
         "openai": "OpenAI API",

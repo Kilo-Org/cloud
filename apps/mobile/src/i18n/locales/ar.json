@@ -432,6 +432,7 @@
       "clientEmail": "البريد الإلكتروني لحساب الخدمة",
       "privateKey": "المفتاح الخاص لحساب الخدمة",
       "privateKeyBlockRequired": "الصق كتلة المفتاح بأكملها، من سطر BEGIN إلى سطر END.",
+      "privateKeyEncrypted": "كتلة المفتاح هذه محمية بعبارة مرور. الصق مفتاح حساب خدمة بدون عبارة مرور.",
       "names": {
         "codestral": "Codestral القديم فقط",
         "openai": "OpenAI API",

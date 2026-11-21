@@ -431,6 +431,7 @@
       "clientEmail": "Email tal-kont tas-servizz",
       "privateKey": "Ċavetta privata tal-kont tas-servizz",
       "privateKeyBlockRequired": "Waħħal il-blokka kollha taċ-ċavetta, mil-linja BEGIN sal-linja END.",
+      "privateKeyEncrypted": "Dan il-blokk taċ-ċavetta huwa protett b'passphrase. Waħħal ċavetta tal-kont tas-servizz mingħajr passphrase.",
       "names": {
         "codestral": "Codestral antik biss",
         "openai": "OpenAI API",

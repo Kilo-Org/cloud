@@ -429,6 +429,7 @@
       "clientEmail": "Correo electrónico de la cuenta de servicio",
       "privateKey": "Clave privada de la cuenta de servicio",
       "privateKeyBlockRequired": "Pega todo el bloque de clave, desde la línea BEGIN hasta la línea END.",
+      "privateKeyEncrypted": "Este bloque de clave está protegido por una frase de contraseña. Pega una clave de cuenta de servicio que no tenga frase de contraseña.",
       "names": {
         "codestral": "Solo Codestral heredado",
         "openai": "OpenAI API",

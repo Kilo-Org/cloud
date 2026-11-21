@@ -428,6 +428,7 @@
       "clientEmail": "Imèl kont sèvis",
       "privateKey": "Kle prive kont sèvis",
       "privateKeyBlockRequired": "Kole tout blòk kle a, soti nan liy BEGIN rive nan liy END.",
+      "privateKeyEncrypted": "Blòk kle sa a pwoteje pa yon pasfraz. Kole yon kle kont sèvis ki pa gen pasfraz.",
       "names": {
         "codestral": "Ansyen Codestral sèlman",
         "openai": "OpenAI API",

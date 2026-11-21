@@ -428,6 +428,7 @@
       "clientEmail": "सेवा खात्याचा ईमेल",
       "privateKey": "सेवा खात्याची खाजगी की",
       "privateKeyBlockRequired": "BEGIN ओळीपासून END ओळीपर्यंत संपूर्ण की ब्लॉक पेस्ट करा.",
+      "privateKeyEncrypted": "हा की ब्लॉक पासफ्रेजद्वारे संरक्षित आहे. पासफ्रेज नसलेली सेवा खात्याची की पेस्ट करा.",
       "names": {
         "codestral": "फक्त जुने Codestral",
         "openai": "OpenAI API",

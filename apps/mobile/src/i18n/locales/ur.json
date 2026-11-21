@@ -428,6 +428,7 @@
       "clientEmail": "سروس اکاؤنٹ ای میل",
       "privateKey": "سروس اکاؤنٹ کی نجی کلید",
       "privateKeyBlockRequired": "پورا کلید بلاک پیسٹ کریں، BEGIN لائن سے END لائن تک۔",
+      "privateKeyEncrypted": "یہ کلید بلاک پاس فریز سے محفوظ ہے۔ ایسی سروس اکاؤنٹ کلید پیسٹ کریں جس میں کوئی پاس فریز نہ ہو۔",
       "names": {
         "codestral": "صرف پرانا Codestral",
         "openai": "OpenAI API",

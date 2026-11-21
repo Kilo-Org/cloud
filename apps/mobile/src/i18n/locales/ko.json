@@ -428,6 +428,7 @@
       "clientEmail": "서비스 계정 이메일",
       "privateKey": "서비스 계정 비공개 키",
       "privateKeyBlockRequired": "BEGIN 줄부터 END 줄까지 전체 키 블록을 붙여넣으세요.",
+      "privateKeyEncrypted": "이 키 블록은 패스프레이즈로 보호되어 있습니다. 패스프레이즈가 없는 서비스 계정 키를 붙여넣으세요.",
       "names": {
         "codestral": "이전 버전 Codestral 전용",
         "openai": "OpenAI API",

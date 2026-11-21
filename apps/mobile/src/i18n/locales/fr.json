@@ -429,6 +429,7 @@
       "clientEmail": "E-mail du compte de service",
       "privateKey": "Clé privée du compte de service",
       "privateKeyBlockRequired": "Collez le bloc de clé entier, de la ligne BEGIN à la ligne END.",
+      "privateKeyEncrypted": "Ce bloc de clé est protégé par une phrase secrète. Collez une clé de compte de service sans phrase secrète.",
       "names": {
         "codestral": "Codestral hérité uniquement",
         "openai": "OpenAI API",

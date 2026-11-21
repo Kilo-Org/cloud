@@ -428,6 +428,7 @@
       "clientEmail": "ອີເມວບັນຊີບໍລິການ",
       "privateKey": "ຄີສ່ວນຕົວຂອງບັນຊີບໍລິການ",
       "privateKeyBlockRequired": "ວາງບລັອກຄີທັງໝົດ, ຕັ້ງແຕ່ແຖວ BEGIN ຈົນເຖິງແຖວ END.",
+      "privateKeyEncrypted": "ບລັອກຄີນີ້ຖືກປ້ອງກັນດ້ວຍປະໂຫຍກລະຫັດ. ວາງຄີບັນຊີບໍລິການທີ່ບໍ່ມີປະໂຫຍກລະຫັດ.",
       "names": {
         "codestral": "ສະເພາະ Codestral ສະບັບເກົ່າ",
         "openai": "OpenAI API",

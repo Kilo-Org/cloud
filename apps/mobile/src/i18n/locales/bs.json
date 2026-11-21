@@ -429,6 +429,7 @@
       "clientEmail": "E-mail adresa servisnog naloga",
       "privateKey": "Privatni ključ servisnog naloga",
       "privateKeyBlockRequired": "Zalijepi cijeli blok ključa, od linije BEGIN do linije END.",
+      "privateKeyEncrypted": "Ovaj blok ključa zaštićen je pristupnom frazom. Zalijepi ključ servisnog naloga koji nema pristupnu frazu.",
       "names": {
         "codestral": "Samo zastario Codestral",
         "openai": "OpenAI API",

@@ -428,6 +428,7 @@
       "clientEmail": "Email ng service account",
       "privateKey": "Private key ng service account",
       "privateKeyBlockRequired": "I-paste ang buong key block, mula sa linyang BEGIN hanggang sa linyang END.",
+      "privateKeyEncrypted": "Protektado ng passphrase ang key block na ito. I-paste ang service account key na walang passphrase.",
       "names": {
         "codestral": "Codestral na luma lamang",
         "openai": "OpenAI API",

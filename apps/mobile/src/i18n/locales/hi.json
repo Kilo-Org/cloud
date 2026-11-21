@@ -428,6 +428,7 @@
       "clientEmail": "सर्विस अकाउंट ईमेल",
       "privateKey": "सर्विस अकाउंट प्राइवेट कुंजी",
       "privateKeyBlockRequired": "BEGIN पंक्ति से END पंक्ति तक पूरा कुंजी ब्लॉक पेस्ट करें।",
+      "privateKeyEncrypted": "यह कुंजी ब्लॉक पासफ़्रेज़ से सुरक्षित है। ऐसी सर्विस अकाउंट कुंजी पेस्ट करें जिसमें कोई पासफ़्रेज़ न हो।",
       "names": {
         "codestral": "केवल पुराना Codestral",
         "openai": "OpenAI API",

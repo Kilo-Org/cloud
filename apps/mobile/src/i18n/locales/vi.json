@@ -428,6 +428,7 @@
       "clientEmail": "Email tài khoản dịch vụ",
       "privateKey": "Khóa riêng tư của tài khoản dịch vụ",
       "privateKeyBlockRequired": "Dán toàn bộ khối khóa, từ dòng BEGIN đến dòng END.",
+      "privateKeyEncrypted": "Khối khóa này được bảo vệ bằng cụm mật khẩu. Dán khóa tài khoản dịch vụ không có cụm mật khẩu.",
       "names": {
         "codestral": "Chỉ hỗ trợ Codestral cũ",
         "openai": "OpenAI API",

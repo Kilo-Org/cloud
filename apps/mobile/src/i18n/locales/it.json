@@ -429,6 +429,7 @@
       "clientEmail": "Email dell'account di servizio",
       "privateKey": "Chiave privata dell'account di servizio",
       "privateKeyBlockRequired": "Incolla l'intero blocco della chiave, dalla riga BEGIN alla riga END.",
+      "privateKeyEncrypted": "Questo blocco della chiave è protetto da passphrase. Incolla una chiave dell'account di servizio senza passphrase.",
       "names": {
         "codestral": "Solo Codestral obsoleto",
         "openai": "OpenAI API",

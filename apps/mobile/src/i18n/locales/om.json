@@ -428,6 +428,7 @@
       "clientEmail": "Imeelii herrega tajaajilaa",
       "privateKey": "Furtuu dhuunfaa herrega tajaajilaa",
       "privateKeyBlockRequired": "Boolloo furtuu guutuu, sarara BEGIN irraa hanga sarara END tti maxxansi.",
+      "privateKeyEncrypted": "Boolloon furtuu kun jecha darbiitiin eegamaa jira. Furtuu herrega tajaajilaa jecha darbii hin qabne maxxansi.",
       "names": {
         "codestral": "Codestral qofa kan duraa",
         "openai": "OpenAI API",

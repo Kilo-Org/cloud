@@ -428,6 +428,7 @@
       "clientEmail": "Email nke service account",
       "privateKey": "Igodo nkeonwe nke service account",
       "privateKeyBlockRequired": "Mado ngalaba igodo ahụ dum, site n'ahịrị BEGIN ruo n'ahịrị END.",
+      "privateKeyEncrypted": "Pasfres na-echebe ngalaba igodo a. Mado igodo nke service account na-enweghị pasfres.",
       "names": {
         "codestral": "Codestral naanị nke oge gara aga",
         "openai": "OpenAI API",

@@ -430,6 +430,7 @@
       "clientEmail": "Adres e-mail konta usługi",
       "privateKey": "Klucz prywatny konta usługi",
       "privateKeyBlockRequired": "Wklej cały blok klucza, od wiersza BEGIN do wiersza END.",
+      "privateKeyEncrypted": "Ten blok klucza jest chroniony frazą hasłową. Wklej klucz konta usługi, który nie ma frazy hasłowej.",
       "names": {
         "codestral": "Starsza wersja tylko dla Codestral",
         "openai": "OpenAI API",

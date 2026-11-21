@@ -428,6 +428,7 @@
       "clientEmail": "Xidmət hesabının e-poçtu",
       "privateKey": "Xidmət hesabının şəxsi açarı",
       "privateKeyBlockRequired": "Bütün açar blokunu BEGIN sətrindən END sətrinə qədər yapışdır.",
+      "privateKeyEncrypted": "Bu açar bloku parol ifadəsi ilə qorunur. Parol ifadəsi olmayan xidmət hesabı açarını yapışdır.",
       "names": {
         "codestral": "Yalnız köhnə Codestral",
         "openai": "OpenAI API",

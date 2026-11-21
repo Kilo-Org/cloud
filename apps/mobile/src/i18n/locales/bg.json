@@ -428,6 +428,7 @@
       "clientEmail": "Имейл на акаунта за услуга",
       "privateKey": "Частен ключ на акаунта за услуга",
       "privateKeyBlockRequired": "Постави целия блок на ключа, от реда BEGIN до реда END.",
+      "privateKeyEncrypted": "Този блок на ключа е защитен с парола. Постави ключ на акаунт за услуга без парола.",
       "names": {
         "codestral": "Само за стар Codestral",
         "openai": "OpenAI API",

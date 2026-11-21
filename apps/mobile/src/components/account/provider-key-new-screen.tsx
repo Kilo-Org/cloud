@@ -223,11 +223,18 @@ export function ProviderKeyNewScreen() {
     }
     if (credential.tag === 'incomplete-mapping' || credential.tag === 'refused') {
       // A half-filled mapping is on screen, so its number points at the row to
-      // fix. A refused private key is masked, so the sentence naming the shape
-      // it wants sits under that field; every other refusal names no value the
-      // reader can see.
+      // fix. A refused private key is masked, so the sentence naming what it
+      // wants sits under that field; every other refusal names no value the
+      // reader can see. The sentence follows the cause: a complete block a
+      // passphrase protects is already whole, so only the encrypted case names
+      // the passphrase.
       if (credential.tag === 'refused' && credential.field === 'privateKey') {
-        setFieldErrors({ privateKey: t('profile.providerKeys.privateKeyBlockRequired') });
+        setFieldErrors({
+          privateKey:
+            credential.cause === 'key-encrypted'
+              ? t('profile.providerKeys.privateKeyEncrypted')
+              : t('profile.providerKeys.privateKeyBlockRequired'),
+        });
       }
       attempt.fail({
         kind: 'refused',

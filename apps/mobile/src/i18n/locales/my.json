@@ -428,6 +428,7 @@
       "clientEmail": "Service account အီးမေးလ်",
       "privateKey": "Service account သီးသန့် ကီး",
       "privateKeyBlockRequired": "BEGIN လိုင်းမှ END လိုင်းအထိ ကီးဘလောက်တစ်ခုလုံးကို ကူးထည့်ပါ။",
+      "privateKeyEncrypted": "ဤကီးဘလောက်ကို ပတ်စ်ဖရေ့စ်ဖြင့် ကာကွယ်ထားသည်။ ပတ်စ်ဖရေ့စ်မပါသော Service account ကီးကို ကူးထည့်ပါ။",
       "names": {
         "codestral": "အဟောင်း Codestral သီးသန့်",
         "openai": "OpenAI API",

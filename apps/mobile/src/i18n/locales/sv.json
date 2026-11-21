@@ -428,6 +428,7 @@
       "clientEmail": "E-postadress för tjänstkonto",
       "privateKey": "Privat nyckel för tjänstkonto",
       "privateKeyBlockRequired": "Klistra in hela nyckelblocket, från BEGIN-raden till END-raden.",
+      "privateKeyEncrypted": "Det här nyckelblocket är skyddat med en lösenfras. Klistra in en nyckel för tjänstkonto som inte har någon lösenfras.",
       "names": {
         "codestral": "Endast äldre Codestral",
         "openai": "OpenAI-API",

@@ -428,6 +428,7 @@
       "clientEmail": "Barua pepe ya akaunti ya huduma",
       "privateKey": "Ufunguo binafsi wa akaunti ya huduma",
       "privateKeyBlockRequired": "Bandika kizuizi kizima cha ufunguo, kutoka mstari wa BEGIN hadi mstari wa END.",
+      "privateKeyEncrypted": "Kizuizi hiki cha ufunguo kinalindwa kwa kaulisiri. Bandika ufunguo wa akaunti ya huduma ambao hauna kaulisiri.",
       "names": {
         "codestral": "Codestral ya zamani pekee",
         "openai": "OpenAI API",

@@ -429,6 +429,7 @@
       "clientEmail": "Correu electrònic del compte de servei",
       "privateKey": "Clau privada del compte de servei",
       "privateKeyBlockRequired": "Enganxa tot el bloc de clau, des de la línia BEGIN fins a la línia END.",
+      "privateKeyEncrypted": "Aquest bloc de clau està protegit amb una frase de contrasenya. Enganxa una clau del compte de servei que no tingui cap frase de contrasenya.",
       "names": {
         "codestral": "Només Codestral antic",
         "openai": "OpenAI API",

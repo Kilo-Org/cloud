@@ -428,6 +428,7 @@
       "clientEmail": "Email akun layanan",
       "privateKey": "Kunci pribadi akun layanan",
       "privateKeyBlockRequired": "Tempel seluruh blok kunci, dari baris BEGIN sampai baris END.",
+      "privateKeyEncrypted": "Blok kunci ini dilindungi frasa sandi. Tempel kunci akun layanan yang tidak memiliki frasa sandi.",
       "names": {
         "codestral": "Hanya Codestral lama",
         "openai": "OpenAI API",

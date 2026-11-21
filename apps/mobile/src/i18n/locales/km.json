@@ -428,6 +428,7 @@
       "clientEmail": "អ៊ីមែល service account",
       "privateKey": "សោឯកជនរបស់ service account",
       "privateKeyBlockRequired": "បិទភ្ជាប់ប្លុកសោទាំងមូល ពីបន្ទាត់ BEGIN ដល់បន្ទាត់ END",
+      "privateKeyEncrypted": "ប្លុកសោនេះត្រូវបានការពារដោយឃ្លាសម្ងាត់។ បិទភ្ជាប់សោ service account ដែលគ្មានឃ្លាសម្ងាត់។",
       "names": {
         "codestral": "មានតែ Codestral ចាស់ប៉ុណ្ណោះ",
         "openai": "OpenAI API",

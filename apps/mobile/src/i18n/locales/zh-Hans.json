@@ -428,6 +428,7 @@
       "clientEmail": "服务账号邮箱",
       "privateKey": "服务账号私钥",
       "privateKeyBlockRequired": "请粘贴完整密钥块，从 BEGIN 行到 END 行。",
+      "privateKeyEncrypted": "此密钥块受口令保护。请粘贴不含口令的服务账号密钥。",
       "names": {
         "codestral": "旧版仅 Codestral",
         "openai": "OpenAI API",

@@ -428,6 +428,7 @@
       "clientEmail": "সার্ভিস অ্যাকাউন্টের ইমেল",
       "privateKey": "সার্ভিস অ্যাকাউন্টের প্রাইভেট কী",
       "privateKeyBlockRequired": "BEGIN লাইন থেকে END লাইন পর্যন্ত সম্পূর্ণ কী ব্লকটি পেস্ট করুন।",
+      "privateKeyEncrypted": "এই কী ব্লকটি পাসফ্রেজ দিয়ে সুরক্ষিত। পাসফ্রেজবিহীন একটি সার্ভিস অ্যাকাউন্টের কী পেস্ট করুন।",
       "names": {
         "codestral": "শুধু পুরোনো Codestral",
         "openai": "OpenAI API",

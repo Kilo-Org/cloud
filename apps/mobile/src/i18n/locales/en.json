@@ -520,6 +520,7 @@
       "clientEmail": "Service account email",
       "privateKey": "Service account private key",
       "privateKeyBlockRequired": "Paste the whole key block, from the BEGIN line to the END line.",
+      "privateKeyEncrypted": "This key block is passphrase-protected. Paste a service account key that has no passphrase.",
       "names": {
         "codestral": "Legacy Codestral-only",
         "openai": "OpenAI API",

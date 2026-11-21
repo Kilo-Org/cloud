@@ -428,6 +428,7 @@
       "clientEmail": "服務帳戶電子郵件",
       "privateKey": "服務帳戶私密金鑰",
       "privateKeyBlockRequired": "貼上完整金鑰區塊，從 BEGIN 行到 END 行。",
+      "privateKeyEncrypted": "此金鑰區塊受密碼短語保護。請貼上沒有密碼短語的服務帳戶金鑰。",
       "names": {
         "codestral": "舊版僅限 Codestral",
         "openai": "OpenAI API",

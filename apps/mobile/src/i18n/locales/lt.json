@@ -430,6 +430,7 @@
       "clientEmail": "Paslaugos paskyros el. paštas",
       "privateKey": "Paslaugos paskyros privatusis raktas",
       "privateKeyBlockRequired": "Įklijuokite visą rakto bloką nuo BEGIN eilutės iki END eilutės.",
+      "privateKeyEncrypted": "Šis rakto blokas apsaugotas slaptafraze. Įklijuokite paslaugos paskyros raktą be slaptafrazės.",
       "names": {
         "codestral": "Tik pasenęs Codestral",
         "openai": "OpenAI API",

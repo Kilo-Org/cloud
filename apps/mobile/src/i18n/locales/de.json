@@ -428,6 +428,7 @@
       "clientEmail": "E-Mail-Adresse des Dienstkontos",
       "privateKey": "Privater Schlüssel des Dienstkontos",
       "privateKeyBlockRequired": "Füge den gesamten Schlüsselblock ein, von der BEGIN-Zeile bis zur END-Zeile.",
+      "privateKeyEncrypted": "Dieser Schlüsselblock ist mit einer Passphrase geschützt. Füge einen Schlüssel des Dienstkontos ein, der keine Passphrase hat.",
       "names": {
         "codestral": "Nur veraltetes Codestral",
         "openai": "OpenAI-API",

@@ -428,6 +428,7 @@
       "clientEmail": "ایمیل حساب سرویس",
       "privateKey": "کلید خصوصی حساب سرویس",
       "privateKeyBlockRequired": "بلوک کلید خصوصی را بهطور کامل، از خط BEGIN تا خط END جای‌گذاری کنید.",
+      "privateKeyEncrypted": "این بلوک کلید با عبارت عبور محافظت شده است. کلید حساب سرویسی را جای‌گذاری کنید که عبارت عبور ندارد.",
       "names": {
         "codestral": "فقط Codestral قدیمی",
         "openai": "OpenAI API",

@@ -428,6 +428,7 @@
       "clientEmail": "Teenusekonto e-posti aadress",
       "privateKey": "Teenusekonto privaatvõti",
       "privateKeyBlockRequired": "Kleebi terve võtmeplokk, alates BEGIN-reast kuni END-reani.",
+      "privateKeyEncrypted": "See võtmeplokk on paroolifraasiga kaitstud. Kleebi teenusekonto võti, millel paroolifraas puudub.",
       "names": {
         "codestral": "Ainult vana Codestral",
         "openai": "OpenAI API",

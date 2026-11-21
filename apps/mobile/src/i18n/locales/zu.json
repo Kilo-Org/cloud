@@ -428,6 +428,7 @@
       "clientEmail": "I-imeyili ye-service account",
       "privateKey": "Ukhiye oyimfihlo we-service account",
       "privateKeyBlockRequired": "Namathisela ukhiye wonke, kusukela emugqeni othi BEGIN kuya emugqeni othi END.",
+      "privateKeyEncrypted": "Le ngxenye yokhiye ivikelwe nge-passphrase. Namathisela ukhiye we-service account ongenayo i-passphrase.",
       "names": {
         "codestral": "Codestral yakudala kuphela",
         "openai": "OpenAI API",

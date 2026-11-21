@@ -242,11 +242,11 @@ describe('readStructuredCredential', () => {
   // These three formats are the labels a signing key carries: PKCS#8 is
   // `PRIVATE KEY`, PKCS#1 is `RSA PRIVATE KEY` and SEC1 is `EC PRIVATE KEY`,
   // and each has to stay accepted.
-  it.each(['pkcs8', 'pkcs1', 'sec1'] as const)('takes a %s key file', type => {
-    expect(readVertex(signingKey(type)).tag).toBe('ready');
+  it.each(['pkcs8', 'pkcs1', 'sec1'] as const)('takes a %s key file as ready', type => {
+    expect(readVertex(signingKey(type))).toMatchObject({ tag: 'ready' });
   });
 
-  it('refuses an encrypted key on the private-key field', () => {
+  it('refuses an encrypted key with the passphrase cause on the private-key field', () => {
     const encrypted = fixtureKey.export({
       type: 'pkcs8',
       format: 'pem',
@@ -255,11 +255,31 @@ describe('readStructuredCredential', () => {
     });
     const pem = typeof encrypted === 'string' ? encrypted : encrypted.toString('utf8');
     expect(pem.startsWith('-----BEGIN ENCRYPTED PRIVATE KEY-----')).toBe(true);
-    expect(readVertex(pem)).toEqual({ tag: 'refused', field: 'privateKey' });
+    expect(readVertex(pem)).toEqual({
+      tag: 'refused',
+      field: 'privateKey',
+      cause: 'key-encrypted',
+    });
+  });
+
+  it('refuses a truncated key block with the block cause, not the passphrase cause', () => {
+    const truncated = PEM_KEY.trim()
+      .split('\n')
+      .filter(line => !line.startsWith('-----END '))
+      .join('\n');
+    expect(readVertex(truncated)).toEqual({
+      tag: 'refused',
+      field: 'privateKey',
+      cause: 'key-block',
+    });
   });
 
   it('refuses a value that is not a key on the private-key field', () => {
-    expect(readVertex('not a key')).toEqual({ tag: 'refused', field: 'privateKey' });
+    expect(readVertex('not a key')).toEqual({
+      tag: 'refused',
+      field: 'privateKey',
+      cause: 'key-block',
+    });
   });
 
   it('names the row a half-filled mapping sits in', () => {

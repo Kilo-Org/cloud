@@ -428,6 +428,7 @@
       "clientEmail": "อีเมลบัญชีบริการ",
       "privateKey": "คีย์ส่วนตัวของบัญชีบริการ",
       "privateKeyBlockRequired": "วางบล็อกคีย์ทั้งหมด ตั้งแต่บรรทัด BEGIN ถึงบรรทัด END",
+      "privateKeyEncrypted": "บล็อกคีย์นี้ได้รับการป้องกันด้วยพาสเฟรส วางคีย์บัญชีบริการที่ไม่มีพาสเฟรส",
       "names": {
         "codestral": "แบบเดิมสำหรับ Codestral เท่านั้น",
         "openai": "OpenAI API",

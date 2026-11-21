@@ -428,6 +428,7 @@
       "clientEmail": "Netfang þjónustureiknings",
       "privateKey": "Einkalykill þjónustureiknings",
       "privateKeyBlockRequired": "Límdu alla lyklablokkina, frá BEGIN línunni til END línunnar.",
+      "privateKeyEncrypted": "Þessi lyklablokk er varin með lykilsetningu. Límdu lykil þjónustureiknings sem hefur enga lykilsetningu.",
       "names": {
         "codestral": "Eldri Codestral-eingöngu",
         "openai": "OpenAI-API",

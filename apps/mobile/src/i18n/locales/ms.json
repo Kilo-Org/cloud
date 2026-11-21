@@ -428,6 +428,7 @@
       "clientEmail": "E-mel akaun perkhidmatan",
       "privateKey": "Kunci peribadi akaun perkhidmatan",
       "privateKeyBlockRequired": "Tampal seluruh blok kunci, dari baris BEGIN hingga baris END.",
+      "privateKeyEncrypted": "Blok kunci ini dilindungi frasa laluan. Tampal kunci akaun perkhidmatan yang tiada frasa laluan.",
       "names": {
         "codestral": "Codestral legasi sahaja",
         "openai": "OpenAI API",

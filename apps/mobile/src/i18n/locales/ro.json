@@ -429,6 +429,7 @@
       "clientEmail": "E-mailul contului de serviciu",
       "privateKey": "Cheia privată a contului de serviciu",
       "privateKeyBlockRequired": "Lipește întregul bloc de cheie, de la linia BEGIN până la linia END.",
+      "privateKeyEncrypted": "Acest bloc de cheie este protejat cu o frază de acces. Lipește o cheie de cont de serviciu fără frază de acces.",
       "names": {
         "codestral": "Doar Codestral vechi",
         "openai": "API OpenAI",

@@ -428,6 +428,7 @@
       "clientEmail": "સર્વિસ એકાઉન્ટ ઇમેઇલ",
       "privateKey": "સર્વિસ એકાઉન્ટ પ્રાઇવેટ કી",
       "privateKeyBlockRequired": "BEGIN લીટીથી END લીટી સુધીનો આખો કી બ્લોક પેસ્ટ કરો.",
+      "privateKeyEncrypted": "આ કી બ્લોક પાસફ્રેઝથી સુરક્ષિત છે. પાસફ્રેઝ વગરની સર્વિસ એકાઉન્ટ કી પેસ્ટ કરો.",
       "names": {
         "codestral": "ફક્ત જૂનું Codestral",
         "openai": "OpenAI API",

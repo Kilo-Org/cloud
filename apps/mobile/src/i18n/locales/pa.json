@@ -428,6 +428,7 @@
       "clientEmail": "ਸੇਵਾ ਖਾਤਾ ਈਮੇਲ",
       "privateKey": "ਸੇਵਾ ਖਾਤੇ ਦੀ ਨਿੱਜੀ ਕੁੰਜੀ",
       "privateKeyBlockRequired": "ਪੂਰਾ ਕੁੰਜੀ ਬਲਾਕ ਪੇਸਟ ਕਰੋ, BEGIN ਲਾਈਨ ਤੋਂ END ਲਾਈਨ ਤੱਕ।",
+      "privateKeyEncrypted": "ਇਹ ਕੁੰਜੀ ਬਲਾਕ ਪਾਸਫ਼ਰੇਜ਼ ਨਾਲ ਸੁਰੱਖਿਅਤ ਹੈ। ਸੇਵਾ ਖਾਤੇ ਦੀ ਅਜਿਹੀ ਕੁੰਜੀ ਪੇਸਟ ਕਰੋ ਜਿਸ ਵਿੱਚ ਕੋਈ ਪਾਸਫ਼ਰੇਜ਼ ਨਹੀਂ ਹੈ।",
       "names": {
         "codestral": "ਸਿਰਫ਼ ਪੁਰਾਣਾ Codestral",
         "openai": "OpenAI API",

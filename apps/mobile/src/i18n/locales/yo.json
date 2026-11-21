@@ -428,6 +428,7 @@
       "clientEmail": "Ímeèlì service account",
       "privateKey": "Kọ́kọ́rọ́ àdáni service account",
       "privateKeyBlockRequired": "Lẹ gbogbo àkójọ kọ́kọ́rọ́ náà síbí, láti ìlà BEGIN sí ìlà END.",
+      "privateKeyEncrypted": "Àkójọ kọ́kọ́rọ́ yìí wà lábẹ́ ààbò passphrase. Lẹ kọ́kọ́rọ́ service account kan tí kò ní passphrase síbí.",
       "names": {
         "codestral": "Àtijọ́ Codestral nìkan",
         "openai": "OpenAI API",

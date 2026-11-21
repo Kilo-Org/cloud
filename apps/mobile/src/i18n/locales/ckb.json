@@ -428,6 +428,7 @@
       "clientEmail": "ئیمەیڵی service account",
       "privateKey": "کلیلی تایبەتی service account",
       "privateKeyBlockRequired": "تەواوی بلۆکی کلیلەکە بلکێنە، لە هێڵی BEGIN تا هێڵی END.",
+      "privateKeyEncrypted": "ئەم بلۆکی کلیلە بە پاسفرێز پارێزراوە. کلیلی service account بلکێنە کە پاسفرێزی نییە.",
       "names": {
         "codestral": "تەنها Codestralی کۆن",
         "openai": "OpenAI API",

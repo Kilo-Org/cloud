@@ -430,6 +430,7 @@
       "clientEmail": "Email сервисного аккаунта",
       "privateKey": "Закрытый ключ сервисного аккаунта",
       "privateKeyBlockRequired": "Вставьте весь блок ключа, от строки BEGIN до строки END.",
+      "privateKeyEncrypted": "Этот блок ключа защищён парольной фразой. Вставьте ключ сервисного аккаунта без парольной фразы.",
       "names": {
         "codestral": "Устаревший только для Codestral",
         "openai": "OpenAI API",

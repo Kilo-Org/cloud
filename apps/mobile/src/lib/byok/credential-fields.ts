@@ -191,8 +191,36 @@ const SIGNING_KEY_LABELS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * A service-account private key in the shape the gateway signs with, or null
- * when the value is not one.
+ * The PEM label a passphrase-protected PKCS#8 key carries. It is a complete key
+ * block the gateway still cannot sign with, because it holds no passphrase, so
+ * reading it as a malformed value would tell its reader to paste what they
+ * already pasted.
+ */
+const ENCRYPTED_KEY_LABEL = 'ENCRYPTED PRIVATE KEY';
+
+/**
+ * The header a key encrypted in the older PEM style carries inside one of the
+ * signing labels: `Proc-Type: 4,ENCRYPTED` and a matching `DEK-Info` line. It is
+ * the same passphrase-protected case under a different label.
+ */
+const LEGACY_ENCRYPTED_HEADER = /^[ \t]*Proc-Type:[ \t]*4,[ \t]*ENCRYPTED/im;
+
+/**
+ * Why a pasted Vertex private key is not one the gateway can sign with: the
+ * value is not a complete key block, or it is a complete block a passphrase
+ * protects, which the gateway cannot open. A complete encrypted block is
+ * otherwise well formed, and telling its reader to paste the whole block names
+ * what they already pasted, so the two cases need their own sentences.
+ */
+export type PrivateKeyCause = 'key-block' | 'key-encrypted';
+
+type PrivateKeyRead =
+  | { readonly tag: 'key'; readonly pem: string }
+  | { readonly tag: 'refused'; readonly cause: PrivateKeyCause };
+
+/**
+ * A service-account private key in the shape the gateway signs with, or why the
+ * value is not one.
  *
  * The key is pasted as a whole value into a single-line field, and a paste can
  * arrive with its line breaks folded away or escaped by the JSON file it came
@@ -208,36 +236,40 @@ const SIGNING_KEY_LABELS: ReadonlySet<string> = new Set([
  * value that is not a PEM at all, which the credential shape accepts (it only
  * asks for a non-empty string) and which would otherwise be stored and fail at
  * the first request that tries to sign. The label has to be one of the three a
- * signing key carries, so an encrypted key — which needs a passphrase the
- * gateway does not have — is refused here as well.
+ * signing key carries; an encrypted key — which needs a passphrase the gateway
+ * does not have — is refused here as well, with its own cause.
  */
-function canonicalPrivateKey(value: string): string | null {
+function canonicalPrivateKey(value: string): PrivateKeyRead {
   const typed = value
     .replaceAll(String.raw`\r\n`, '\n')
     .replaceAll(String.raw`\n`, '\n')
     .trim();
   const match = /^-----BEGIN ([A-Z0-9 ]+)-----([\s\S]*)-----END ([A-Z0-9 ]+)-----$/.exec(typed);
   if (!match) {
-    return null;
+    return { tag: 'refused', cause: 'key-block' };
   }
   const [, beginLabel, rawBody, endLabel] = match;
-  if (
-    beginLabel === undefined ||
-    rawBody === undefined ||
-    beginLabel !== endLabel ||
-    !SIGNING_KEY_LABELS.has(beginLabel)
-  ) {
-    return null;
+  if (beginLabel === undefined || rawBody === undefined || beginLabel !== endLabel) {
+    return { tag: 'refused', cause: 'key-block' };
+  }
+  if (beginLabel === ENCRYPTED_KEY_LABEL || LEGACY_ENCRYPTED_HEADER.test(rawBody)) {
+    return { tag: 'refused', cause: 'key-encrypted' };
+  }
+  if (!SIGNING_KEY_LABELS.has(beginLabel)) {
+    return { tag: 'refused', cause: 'key-block' };
   }
   const body = rawBody.replaceAll(/\s+/g, '');
   if (!/^[A-Za-z0-9+/]+={0,2}$/.test(body) || body.length % 4 !== 0) {
-    return null;
+    return { tag: 'refused', cause: 'key-block' };
   }
   const lines = body.match(/.{1,64}/g);
   if (!lines) {
-    return null;
+    return { tag: 'refused', cause: 'key-block' };
   }
-  return [`-----BEGIN ${beginLabel}-----`, ...lines, `-----END ${beginLabel}-----`].join('\n');
+  return {
+    tag: 'key',
+    pem: [`-----BEGIN ${beginLabel}-----`, ...lines, `-----END ${beginLabel}-----`].join('\n'),
+  };
 }
 
 /** The Vertex credential one form's fields add up to, with its key in canonical form. */
@@ -280,14 +312,14 @@ export function credentialPayload(input: {
     case 'vertex': {
       const { googleCredentials, ...rest } = vertexCredential(input.values);
       const stored = googleCredentials.privateKey;
-      // `credentialProblem` refuses a key that is not a PEM, so a null here has
-      // already stopped the submit; the wire value stays a string so a JSON null
-      // can never reach the server.
+      // `credentialProblem` refuses a key the gateway cannot sign with, so a
+      // refused read here has already stopped the submit; the wire value stays
+      // a string so a JSON null can never reach the server.
       return {
         ...rest,
         googleCredentials: {
           clientEmail: googleCredentials.clientEmail,
-          privateKey: stored ?? value('privateKey'),
+          privateKey: stored.tag === 'key' ? stored.pem : value('privateKey'),
         },
       };
     }
@@ -301,16 +333,17 @@ export function credentialPayload(input: {
 }
 
 /**
- * Whether the Vertex private key the fields hold is not a PEM the gateway can
- * sign with. It is the one refusal here about a single field's value rather
- * than about the credential the fields add up to, so the form points at the
- * field instead of at the whole form.
+ * Why the Vertex private key the fields hold is not one the gateway can sign
+ * with, or null when it is. It is the one refusal here about a single field's
+ * value rather than about the credential the fields add up to, so the form
+ * points at the field instead of at the whole form, and names its cause.
  */
-function refusesPrivateKey(providerId: string, values: CredentialValues): boolean {
-  return (
-    getStructuredCredentialKind(providerId) === 'vertex' &&
-    vertexCredential(values).googleCredentials.privateKey === null
-  );
+function privateKeyRefusal(providerId: string, values: CredentialValues): PrivateKeyCause | null {
+  if (getStructuredCredentialKind(providerId) !== 'vertex') {
+    return null;
+  }
+  const key = vertexCredential(values).googleCredentials.privateKey;
+  return key.tag === 'key' ? null : key.cause;
 }
 
 /**
@@ -325,7 +358,7 @@ export function credentialProblem(input: {
   values: CredentialValues;
   modelMappings: readonly ModelMapping[];
 }): StructuredCredentialProblem | null {
-  if (refusesPrivateKey(input.providerId, input.values)) {
+  if (privateKeyRefusal(input.providerId, input.values) !== null) {
     return { code: 'invalid-credential' };
   }
   return validateStructuredCredential(input.providerId, credentialPayload(input));
@@ -348,9 +381,15 @@ export type CredentialRead =
    * The credential's shape is refused. `field` names the one field whose own
    * value the check refuses, when the refusal is about that value rather than
    * about the fields together: the field is masked, so a form-wide sentence
-   * would leave the reader with no value to look at and fix.
+   * would leave the reader with no value to look at and fix. `cause` names why
+   * that value is refused, when the refusal has more than one reason; a field
+   * whose value is refused for one reason carries no cause.
    */
-  | { readonly tag: 'refused'; readonly field?: CredentialFieldId };
+  | {
+      readonly tag: 'refused';
+      readonly field?: CredentialFieldId;
+      readonly cause?: PrivateKeyCause;
+    };
 
 /**
  * The credential a structured form holds. `rows` are Azure's mapping rows as
@@ -386,11 +425,14 @@ export function readStructuredCredential(input: {
     modelMappings,
   };
   // The private-key refusal names its field, because the field is masked: a
-  // form-wide sentence would leave the reader nothing to look at.
+  // form-wide sentence would leave the reader nothing to look at. Its cause
+  // decides which sentence the form shows, because the two refusals ask for
+  // different things.
+  const keyRefusal = privateKeyRefusal(input.providerId, input.values);
   if (credentialProblem(credential)) {
-    return refusesPrivateKey(input.providerId, input.values)
-      ? { tag: 'refused', field: 'privateKey' }
-      : { tag: 'refused' };
+    return keyRefusal === null
+      ? { tag: 'refused' }
+      : { tag: 'refused', field: 'privateKey', cause: keyRefusal };
   }
   return { tag: 'ready', credential: JSON.stringify(credentialPayload(credential)) };
 }

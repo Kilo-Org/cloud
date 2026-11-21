@@ -492,7 +492,43 @@ describe('ProviderKeyNewScreen', () => {
     });
 
     expect(state.mutateAsync).not.toHaveBeenCalled();
-    expect(Object.keys(credentialForm(root).errors)).toEqual(['privateKey']);
+    expect(credentialForm(root).errors).toEqual({
+      privateKey: 'Paste the whole key block, from the BEGIN line to the END line.',
+    });
+    expect(statusMessages(root)).toHaveLength(1);
+  });
+
+  // A complete block a passphrase protects is already whole, so the sentence
+  // asking for the whole block names what the reader has pasted and offers no
+  // way forward. The form names the passphrase instead.
+  it('names the passphrase under an encrypted Vertex key, not a missing block', async () => {
+    state.params = { provider: 'vertex' };
+    state.providers = [{ id: 'vertex', name: 'Google Vertex AI' }];
+    const root = await mount();
+    const encrypted = fixtureKey.export({
+      type: 'pkcs8',
+      format: 'pem',
+      cipher: 'aes-256-cbc',
+      passphrase: 'x',
+    });
+
+    act(() => {
+      credentialForm(root).values.current = {
+        project: 'project',
+        location: 'global',
+        clientEmail: 'service@example.test',
+        privateKey: typeof encrypted === 'string' ? encrypted : encrypted.toString('utf8'),
+      };
+    });
+    await act(() => {
+      (addButton(root).props.onPress as () => void)();
+    });
+
+    expect(state.mutateAsync).not.toHaveBeenCalled();
+    expect(credentialForm(root).errors).toEqual({
+      privateKey:
+        'This key block is passphrase-protected. Paste a service account key that has no passphrase.',
+    });
     expect(statusMessages(root)).toHaveLength(1);
   });
 

@@ -50,8 +50,9 @@ describe('migration journal', () => {
    * green because the latest snapshot was intact.
    *
    * The five gaps listed below predate this guard (2026-04..08) and are left
-   * alone. The assertion is exact rather than permissive: the observed sets must
-   * equal these, so a *new* gap or a new dangling `prevId` fails the suite.
+   * alone. They are allowed, not required: the assertions are subset checks, so
+   * repairing one of them later keeps the suite green, while any new gap or a
+   * newly dangling `prevId` fails.
    */
   it('keeps every journal entry backed by a snapshot and every prevId resolvable', () => {
     const migrationsDir = path.join(__dirname, 'migrations');
@@ -63,22 +64,21 @@ describe('migration journal', () => {
       entries: { idx: number; tag: string }[];
     };
 
+    // A snapshot document is over a megabyte. Read each one, keep only the two
+    // ids the chain needs, and let the parsed document go.
     const snapshotByIdx = new Map<number, { id: string; prevId: string }>();
     const missing: number[] = [];
     for (const entry of journal.entries) {
-      const name = `${entry.idx.toString().padStart(4, '0')}_snapshot.json`;
-      const file = path.join(metaDir, name);
+      const file = path.join(metaDir, `${entry.idx.toString().padStart(4, '0')}_snapshot.json`);
       if (!fs.existsSync(file)) {
         missing.push(entry.idx);
         continue;
       }
-      snapshotByIdx.set(
-        entry.idx,
-        JSON.parse(fs.readFileSync(file, 'utf-8')) as {
-          id: string;
-          prevId: string;
-        }
-      );
+      const { id, prevId } = JSON.parse(fs.readFileSync(file, 'utf-8')) as {
+        id: string;
+        prevId: string;
+      };
+      snapshotByIdx.set(entry.idx, { id, prevId });
     }
 
     const ids = new Set([...snapshotByIdx.values()].map(snapshot => snapshot.id));
@@ -88,25 +88,25 @@ describe('migration journal', () => {
       if (!ids.has(snapshot.prevId)) dangling.push(idx);
     }
 
-    const expectedDangling = [...legacyGaps]
-      .map(gap => gap + 1)
-      .filter(idx => snapshotByIdx.has(idx));
-    const sortedMissing = [...missing].sort((a, b) => a - b);
-    const sortedDangling = [...dangling].sort((a, b) => a - b);
+    // Each legacy gap leaves the entry right after it prevId-ing a snapshot that
+    // never existed. Every other unresolved `prevId` is new breakage.
+    const allowedDangling = new Set(
+      [...legacyGaps].map(gap => gap + 1).filter(idx => snapshotByIdx.has(idx))
+    );
 
-    expect(sortedMissing).toEqual([...legacyGaps].sort((a, b) => a - b));
-    expect(sortedDangling).toEqual(expectedDangling.sort((a, b) => a - b));
+    expect(missing.filter(idx => !legacyGaps.has(idx))).toEqual([]);
+    expect(dangling.filter(idx => !allowedDangling.has(idx))).toEqual([]);
 
     // Beyond the legacy gaps the chain must close exactly: prevId of each
-    // snapshot is the id of the previous existing one. The entry right after a
-    // legacy gap is excluded — its prevId names the snapshot that never
-    // existed, which is exactly why it is reported as dangling above.
+    // snapshot is the id of the previous existing one. An entry right after a
+    // legacy gap is exempt only while that gap is still unfilled — if someone
+    // restores the snapshot later, its successor is held to the exact check too.
     const indexes = [...snapshotByIdx.keys()].sort((a, b) => a - b);
     for (let position = 1; position < indexes.length; position++) {
       const current = indexes[position];
       const previous = indexes[position - 1];
       if (current === undefined || previous === undefined) continue;
-      if (legacyGaps.has(current - 1)) continue;
+      if (legacyGaps.has(current - 1) && !snapshotByIdx.has(current - 1)) continue;
       const currentSnapshot = snapshotByIdx.get(current);
       const previousSnapshot = snapshotByIdx.get(previous);
       if (!currentSnapshot || !previousSnapshot) continue;

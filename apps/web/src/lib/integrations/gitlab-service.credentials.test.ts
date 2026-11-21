@@ -2688,6 +2688,52 @@ describe('GitLab encrypted credential persistence', () => {
     );
   });
 
+  it('counts a project whose stored handles another attempt settled as settled', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    const [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await getOrCreateProjectAccessToken(integration, 42, { userId: user.id });
+    mockRevokeProjectAccessToken.mockImplementationOnce(async () => {
+      await db
+        .delete(platform_access_token_credentials)
+        .where(
+          and(
+            eq(platform_access_token_credentials.platform_integration_id, connected.integration.id),
+            eq(platform_access_token_credentials.provider_resource_id, '42')
+          )
+        );
+      throw new GitLabProjectAccessTokenRevocationError(42, 503, 'GitLab responded with HTTP 503.');
+    });
+
+    await expect(settleStoredProjectTokens(integration, 'glpat-primary-token')).resolves.toEqual({
+      revoked: 0,
+      scrubbed: 1,
+      retained: 0,
+      unattempted: 0,
+      blocking: [],
+    });
+
+    expect(mockRevokeProjectAccessToken).toHaveBeenCalledTimes(1);
+    const credentials = await db
+      .select()
+      .from(platform_access_token_credentials)
+      .where(
+        and(
+          eq(platform_access_token_credentials.platform_integration_id, connected.integration.id),
+          eq(platform_access_token_credentials.provider_credential_type, 'project_access_token')
+        )
+      );
+    expect(credentials).toEqual([]);
+  });
+
   it('keeps a project token whose revocation fails twice with a server error', async () => {
     const user = await insertTestUser();
     const connected = await connectWithPAT(

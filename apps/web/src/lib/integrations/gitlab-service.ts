@@ -69,6 +69,7 @@ import {
   dropUnrevokableProjectTokenEntry,
   getStoredProjectCredential,
   gitlabProjectTokensUnsettledMessage,
+  hasStoredProjectTokenHandle,
   listProjectIdsWithStoredTokens,
   readStoredInstanceUrl,
   removeStoredProjectAccessToken,
@@ -509,7 +510,10 @@ async function settleReplacedProjectCredential(
 type ProjectTokenSettlement = {
   /** Tokens the provider confirmed revoked, whose stored handles are gone. */
   revoked: number;
-  /** Entries dropped because they named no revocable token id. */
+  /**
+   * Entries dropped because they named no revocable token id, and entries
+   * whose handles another attempt settled first, which needed no revocation.
+   */
   scrubbed: number;
   /** Stored handles that remain, including the ones not attempted. */
   retained: number;
@@ -565,12 +569,16 @@ export async function settleStoredProjectTokens(
     const noCredentialOutstanding = new Set(projectIds);
     let noCredentialScrubbed = 0;
     for (const projectId of projectIds) {
-      const dropped = await getStoredProjectCredential(integration.id, projectId)
-        .then(storedCredential =>
-          dropUnrevokableProjectTokenEntry(integration, projectId, storedCredential)
-        )
+      const settled = await getStoredProjectCredential(integration.id, projectId)
+        .then(async storedCredential => {
+          if (!hasStoredProjectTokenHandle(integration, projectId, storedCredential)) {
+            // Nothing is stored for the project, so there is nothing to settle.
+            return true;
+          }
+          return dropUnrevokableProjectTokenEntry(integration, projectId, storedCredential);
+        })
         .catch(() => false);
-      if (dropped) {
+      if (settled) {
         noCredentialOutstanding.delete(projectId);
         noCredentialScrubbed += 1;
       }
@@ -625,6 +633,11 @@ export async function settleStoredProjectTokens(
         outstandingProjectIds.delete(projectId);
         revoked += 1;
       } else if (outcome.outcome === 'scrubbed') {
+        outstandingProjectIds.delete(projectId);
+        scrubbed += 1;
+      } else if (outcome.outcome === 'absent') {
+        // Another attempt settled this project's handles first, so nothing is
+        // left to revoke and nothing is retained.
         outstandingProjectIds.delete(projectId);
         scrubbed += 1;
       } else if (outcome.outcome === 'retained') {

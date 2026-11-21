@@ -186,8 +186,26 @@ export async function listProjectIdsWithStoredTokens(
 }
 
 /**
- * Drops one stored project token entry that a provider call cannot settle.
- * Returns true when it dropped one. Needs no provider credential.
+ * True when a stored handle for the project still needs a provider call to
+ * settle: an encrypted credential row, a legacy token id, or a legacy entry.
+ */
+export function hasStoredProjectTokenHandle(
+  integration: Pick<PlatformIntegration, 'metadata'>,
+  projectId: string,
+  storedCredential: StoredProjectCredential | null
+): boolean {
+  return (
+    storedCredential !== null ||
+    readLegacyProjectTokenId(integration.metadata, projectId) !== null ||
+    hasLegacyProjectTokenEntry(integration.metadata, projectId)
+  );
+}
+
+/**
+ * Drops one stored project token entry that exists and names no revocable
+ * token id, which a provider call cannot settle. Returns true when it dropped
+ * one, and false when the project still has a handle or has none. Needs no
+ * provider credential.
  */
 export async function dropUnrevokableProjectTokenEntry(
   integration: Pick<PlatformIntegration, 'id' | 'metadata'>,

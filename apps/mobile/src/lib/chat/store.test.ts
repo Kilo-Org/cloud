@@ -67,10 +67,16 @@ const chatDatabase = (database: DatabaseSync): ChatDatabase => {
  * refusal is the wipe's own.
  */
 const watchedDatabase = (database: DatabaseSync, refuseAt?: number) => {
-  const counts = { statements: [] as string[], transactions: 0 };
+  const counts = { statements: [] as string[], transactions: 0, reads: [] as number[] };
   const plain = chatDatabase(database);
   const db: ChatDatabase = {
     ...plain,
+    getAllSync: <T>(source: string, params: (string | number)[]) => {
+      /* The transaction count at the moment of the read, so a test can tell
+         whether the ids were read inside the unit that deletes them. */
+      counts.reads.push(counts.transactions);
+      return plain.getAllSync<T>(source, params);
+    },
     runSync: (source: string, params: (string | number)[]) => {
       counts.statements.push(source);
       if (counts.statements.length === refuseAt) {
@@ -484,6 +490,11 @@ describe('wipeChats', () => {
     expect(await wipeChats(watched.db, 'me')).toEqual(['a', 'b', 'c']);
     expect(watched.counts.statements).toHaveLength(4);
     expect(watched.counts.transactions).toBe(1);
+    /* The ids are read inside the unit that deletes them, so a chat that lands
+       between the read and the deletes cannot be deleted without being named —
+       its pending question and its settings are dropped by the ids the wipe
+       answers, and one missing there outlives the account. */
+    expect(watched.counts.reads).toEqual([1]);
     for (const table of ['chats', 'sessions', 'turns', 'parts']) {
       expect(tally(`select count(*) as n from ${table}`)).toBe(0);
     }

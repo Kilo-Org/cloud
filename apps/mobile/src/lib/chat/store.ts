@@ -349,6 +349,11 @@ async function ownUnit(db: ChatDatabase): Promise<void> {
  * would live or die with that write. That store keeps the conversations here and
  * holds a unit across awaits, so the wipe waits for it to close first — an
  * interrupted answer leaves one standing, and its own chain finishes it.
+ *
+ * The identifiers are read inside that unit, not before the wait: a chat started
+ * while the store was finishing its write would otherwise be deleted by the
+ * subquery and missing from the answer, which leaves its pending question and
+ * its settings behind for a session that no longer exists.
  */
 export async function wipeChats(
   db: ChatDatabase,
@@ -358,20 +363,20 @@ export async function wipeChats(
     userId === null
       ? { where: '', args: [] as SqlValue[] }
       : { where: 'where scope like ?', args: [`${userId}:%`] as SqlValue[] };
-  const rows = db.getAllSync<{ session_id: string }>(
-    `select session_id from chats ${account.where}`,
-    account.args
-  );
-  if (rows.length === 0) {
-    return [];
-  }
   await ownUnit(db);
   const owned = `(select session_id from chats ${account.where})`;
+  let stored: readonly string[] = [];
   db.withTransactionSync(() => {
+    stored = db
+      .getAllSync<{ session_id: string }>(
+        `select session_id from chats ${account.where}`,
+        account.args
+      )
+      .map(row => row.session_id);
     db.runSync(`delete from parts where session_id in ${owned}`, account.args);
     db.runSync(`delete from turns where session_id in ${owned}`, account.args);
     db.runSync(`delete from sessions where id in ${owned}`, account.args);
     db.runSync(`delete from chats ${account.where}`, account.args);
   });
-  return rows.map(row => row.session_id);
+  return stored;
 }

@@ -124,8 +124,13 @@ export function ggufModelClient({
       // A freed handle throws where the method is called, so the stop is a
       // thunk. It must not skip the release below, which frees the context the
       // one-context invariant depends on.
-      await attempt(() => context.value.stopCompletion());
-      await settled(running);
+      const stopped = await attempt(() => context.value.stopCompletion());
+      // A stop that never ran cannot interrupt the answer: its completion may
+      // never settle, and waiting for it would hold the chain every later load
+      // waits on. The release below still frees the weights.
+      if (stopped.ok) {
+        await settled(running);
+      }
     }
     await attempt(() => context.value.release());
   };

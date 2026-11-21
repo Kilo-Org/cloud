@@ -454,11 +454,9 @@ const routeSpecObjectSchema = z
     continuation: z.literal(true).optional(),
     git: controlPlaneRouteGitSchema.optional(),
     /**
-     * The git roots of a V2 environment session: each repository checkout
-     * and the branch it runs on. `directory` is the cwd. Only a V2 route carries
-     * this; a route without it has one root at `directory` and clones `git`, as
-     * every route did before V2. It holds no credential: each root's alias comes
-     * from the grant by host.
+     * Explicit git roots and their branches. `directory` is the cwd. Without
+     * `roots`, the wrapper clones `git` at `directory`. Each root's credential
+     * alias comes from the grant by host.
      */
     roots: z.array(controlPlaneWorkspaceRootSchema).min(1).max(100).optional(),
     kilo: controlPlaneRouteKiloSchema.optional(),
@@ -606,6 +604,16 @@ export const controlPlaneRegistrationRouteSpecSchema = controlPlaneRouteSpecSche
  * and re-issue the route's Git and Kilo credential grant. It must never be
  * serialized into a wrapper frame.
  */
+export const hostedGitHubRepositoryIdentitySchema = z
+  .object({
+    id: z.number().int().positive(),
+    fullName: z
+      .string()
+      .max(500)
+      .regex(/^[A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+$/),
+  })
+  .strict();
+
 export const controlPlaneCredentialRepositorySchema = z.discriminatedUnion('type', [
   z
     .object({
@@ -614,6 +622,7 @@ export const controlPlaneCredentialRepositorySchema = z.discriminatedUnion('type
       pullRequestNumber: z.number().int().positive().optional(),
       token: z.string().min(1).optional(),
       githubIntegrationId: z.string().uuid().optional(),
+      hostedRepositoryId: hostedGitHubRepositoryIdentitySchema.shape.id.optional(),
       githubAccessPurpose: z.enum(['workflow', 'agent']).optional(),
       allowUserAuthorization: z.boolean().optional(),
     })
@@ -661,6 +670,11 @@ export const controlPlaneCredentialSourceSchema = z
     /** Worker-owned origin; client platform claims do not select runtime harnesses. */
     billingOrigin: z.string().max(100).optional(),
     repository: controlPlaneCredentialRepositorySchema.optional(),
+    additionalHostedGitHubRepositories: z
+      .array(hostedGitHubRepositoryIdentitySchema)
+      .min(1)
+      .max(5)
+      .optional(),
     /**
      * Worker-encrypted `profile.mcpServers` snapshot. Persisted only inside this
      * DO-private source; the Sandbox DO re-validates it and decrypts it only when

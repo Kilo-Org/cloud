@@ -4,6 +4,7 @@ import {
   type WorkspaceSnapshotIdentity,
 } from '../sandbox/workspace-snapshot.js';
 import { readCustomerBillingFailure } from '../../persistence/customer-billing-failure.js';
+import { sameHostedGitHubRepositories } from '../../persistence/hosted-github-repositories.js';
 import { DurableObject } from 'cloudflare:workers';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
@@ -1834,6 +1835,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       (existing.allowSubagentSessions ?? false) === (metadata.allowSubagentSessions ?? false) &&
       existing.parentCloudAgentSessionId === metadata.parentCloudAgentSessionId &&
       sameRepository(existing.repository, metadata.repository) &&
+      sameHostedGitHubRepositories(
+        existing.hostedGitHubRepositories,
+        metadata.hostedGitHubRepositories
+      ) &&
+      (existing.hostedGitHubRepositories === undefined ||
+        existing.workspace?.generatedBranchName === metadata.workspace?.generatedBranchName) &&
       sameSandboxProviderBinding(
         getSandboxProviderBinding(existing),
         getSandboxProviderBinding(metadata)

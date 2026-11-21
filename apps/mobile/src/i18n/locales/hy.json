@@ -985,8 +985,9 @@
       "checkActiveConnection": "Միացումն ակտիվ է, բայց այս տարրը դեռ հնարավոր չէ բեռնել։",
       "bitbucketOrgOnlyDescription": "Վերեւի հաշիվը փոխիր կազմակերպության՝ դրա Bitbucket-ի pull request-ները վերանայելու համար։",
       "bitbucketOrgOnlyNoOrganizationDescription": "Այս հաշիվն առայժմ չունի որեւէ կազմակերպություն։ Bitbucket-ի pull request-ները հնարավոր կլինի վերանայել, երբ ստեղծես կամ միանաս կազմակերպության։",
-      "gitlabReconnectAdminOnlyDescription": "Խնդրիր կազմակերպության սեփականատերերին, ադմինիստրատորներին կամ վճարումների կառավարիչներին նորից միացնել այն։",
+      "reconnectAdminOnlyDescription": "Խնդրիր կազմակերպության սեփականատերերին, ադմինիստրատորներին կամ վճարումների կառավարիչներին նորից միացնել այն։",
       "bitbucketNotConnectedTitle": "Bitbucket-ը միացված չէ",
+      "bitbucketAdminOnlyDescription": "Խնդրիր կազմակերպության սեփականատիրոջը, ադմինիստրատորին կամ վճարումների կառավարչին միացնել այն։",
       "adminOnlyConnectDescription": "Միայն կազմակերպության սեփականատերերը, ադմինիստրատորները և վճարումների կառավարիչները կարող են այն միացնել։",
       "contextLine": "{{organization}}-ի համար",
       "contextLinePersonal": "Անձնական հաշվի համար"

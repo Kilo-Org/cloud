@@ -194,7 +194,7 @@ describe('bitbucketConnectionFailure', () => {
           )
         ).toEqual({
           kind: 'role-refused',
-          message: 'prReview.connect.adminOnlyConnectDescription',
+          message: 'prReview.connect.bitbucketAdminOnlyDescription',
         });
       }
     }

@@ -104,7 +104,7 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     !(readiness.isError && readiness.data == null) &&
     !(status.isError && status.data == null);
   let title = t('agentChat.repoPicker.platformBitbucket');
-  let deniedDescription = t('prReview.connect.gitlabReconnectAdminOnlyDescription');
+  let deniedDescription = t('prReview.connect.reconnectAdminOnlyDescription');
   // The lapsed plan's second paragraph under the role sentence, and `undefined`
   // in every denial that has one reason only. The two reasons are unrelated
   // blockers, so they stay apart instead of forming one dense paragraph the
@@ -118,7 +118,11 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
       deniedDescription = t('integrations.managedByOwner');
     } else if (integrationId === null) {
       title = t('common.connectBitbucket');
-      const roleDenial = t('prReview.connect.adminOnlyConnectDescription');
+      // The role is not the only blocker a member meets here, so the sentence
+      // names the next step they can take instead of only the roles that hold
+      // the permission. This state's title already states the missing
+      // connection, so the description does not repeat it.
+      const roleDenial = t('prReview.connect.bitbucketAdminOnlyDescription');
       // The same organization's lapsed plan refuses every organization change,
       // so a member must not read the role as the only blocker: the plan line
       // under the role names the owner and the billing step that unblocks it.
@@ -182,7 +186,7 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     if (status.isError && status.data == null) {
       return isPermissionDeniedError(status.error) ? (
         <PermissionDenied
-          description={t('prReview.connect.adminOnlyConnectDescription')}
+          description={t('prReview.connect.bitbucketAdminOnlyDescription')}
           showBack={false}
         />
       ) : (
@@ -198,7 +202,7 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     if (readiness.isError && readiness.data == null) {
       return isPermissionDeniedError(readiness.error) ? (
         <PermissionDenied
-          description={t('prReview.connect.adminOnlyConnectDescription')}
+          description={t('prReview.connect.bitbucketAdminOnlyDescription')}
           showBack={false}
         />
       ) : (

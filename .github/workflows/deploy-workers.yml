@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       worker:
-        description: 'Worker folder to deploy (e.g. services/session-ingest)'
+        description: 'Worker folder to deploy (e.g. services/session-ingest). A manual dispatch must come from main.'
         required: true
         type: string
       target_environment:
-        description: 'Worker environment to deploy to'
+        description: 'Worker environment to deploy to. A manual dispatch must come from main.'
         required: false
         default: production
         type: choice
@@ -71,12 +71,39 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # This workflow runs only from main. The job holds no credential, so it can
+  # report the reason a run was rejected instead of skipping silently; the
+  # deploy jobs below need it. Reusable calls keep their caller-side gates.
+  verify-main:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+
+    steps:
+      - name: Verify main branch
+        run: |
+          if [ "$GITHUB_REPOSITORY" != "Kilo-Org/cloud" ]; then
+            echo "::error::This workflow must be run from the canonical Kilo-Org/cloud repository. Got: $GITHUB_REPOSITORY"
+            exit 1
+          fi
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::This workflow must be run from main. Got: $GITHUB_REF"
+            exit 1
+          fi
+
   deploy-manual:
+    needs: verify-main
     # Guard: this workflow_dispatch is reachable from a fork, and it deploys
     # Cloudflare Workers using repo secrets. Only the canonical repo may run
-    # it. (Also called as a reusable workflow from deploy-staging.yml, whose
-    # caller job is itself guarded.)
-    if: inputs.worker != '' && github.repository == 'Kilo-Org/cloud'
+    # it, and only from main.
+    # (Also called as a reusable workflow from deploy-staging.yml, whose
+    # caller job is itself guarded — deploy-manual does not run on calls
+    # because `worker` is empty.)
+    # The ref check is named here: this job deploys with repo secrets, so a
+    # failed verify-main must block it.
+    if: >-
+      inputs.worker != '' &&
+      github.repository == 'Kilo-Org/cloud' &&
+      needs.verify-main.result == 'success'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: ${{ inputs.worker == 'services/cloud-agent-next' && 75 || inputs.worker == 'services/auto-routing-benchmark' && inputs.target_environment == 'production' && 60 || 25 }}
     name: Deploy ${{ inputs.worker }}
@@ -433,7 +460,16 @@ jobs:
           exit 1
 
   deploy-changed:
-    if: inputs.worker_matrix != '[]' && inputs.worker_matrix != '' && github.repository == 'Kilo-Org/cloud'
+    needs: verify-main
+    # A deploy call reaches this job only through a caller that already gates
+    # the call on main (deploy-production.yml / deploy-staging.yml). The ref
+    # check is named here as well: this job deploys with repo secrets, so a
+    # failed verify-main must block it even if a caller stops gating.
+    if: >-
+      inputs.worker_matrix != '[]' &&
+      inputs.worker_matrix != '' &&
+      github.repository == 'Kilo-Org/cloud' &&
+      needs.verify-main.result == 'success'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: ${{ matrix.worker == 'services/cloud-agent-next' && 75 || matrix.worker == 'services/auto-routing-benchmark' && inputs.target_environment == 'production' && 60 || 25 }}
     environment: ${{ inputs.target_environment }}
@@ -584,11 +620,16 @@ jobs:
         run: pnpm run sentry:sourcemaps
 
   deploy-session-ingest:
+    needs: verify-main
     # Guard: this reusable workflow can be invoked from a fork, and the job
     # deploys to the target environment with inherited repo secrets. Only the
     # canonical repo may run it. The ordered path comes from the detection call,
-    # because a deploy call does not run detection.
-    if: github.repository == 'Kilo-Org/cloud' && inputs.deploy_cloud_agent_after_session_ingest == 'true'
+    # because a deploy call does not run detection. The ref check is named here
+    # too: this job deploys with repo secrets.
+    if: >-
+      github.repository == 'Kilo-Org/cloud' &&
+      needs.verify-main.result == 'success' &&
+      inputs.deploy_cloud_agent_after_session_ingest == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 25
     environment: ${{ inputs.target_environment }}
@@ -648,11 +689,13 @@ jobs:
           command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}
 
   deploy-cloud-agent-after-session-ingest:
-    needs: deploy-session-ingest
+    needs: [verify-main, deploy-session-ingest]
     # GitHub skips a dependent job when a needed job fails: cloud-agent-next never
-    # deploys after an unsuccessful session-ingest deployment.
+    # deploys after an unsuccessful session-ingest deployment. The ref check is
+    # named here too: this job deploys with repo secrets.
     if: >-
       github.repository == 'Kilo-Org/cloud' &&
+      needs.verify-main.result == 'success' &&
       inputs.deploy_cloud_agent_after_session_ingest == 'true' &&
       needs.deploy-session-ingest.result == 'success'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}

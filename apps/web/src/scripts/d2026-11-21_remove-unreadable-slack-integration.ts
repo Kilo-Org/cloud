@@ -19,6 +19,10 @@ import { db, closeAllDrizzleConnections } from '@kilocode/web-shared/lib/drizzle
 import { platform_integrations } from '@kilocode/db/schema';
 import type { SlackCredentialOwner } from '@kilocode/worker-utils/slack-credential';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import {
+  SlackCredentialKeysetError,
+  isSlackCredentialEncryptionConfigured,
+} from '@/lib/integrations/platforms/slack/credential-keyset';
 import { SlackCredentialDecryptionError } from '@/lib/integrations/platforms/slack/credential-encryption';
 import {
   decryptSlackBotToken,
@@ -85,6 +89,12 @@ async function decide(integrationId: string, owner: SlackCredentialOwner): Promi
       code: token === null ? 'stored_credential_revoked' : 'stored_credential_usable',
     };
   } catch (error) {
+    // A keyset problem is not evidence about this one credential: it fails every row the
+    // same way, so it must never reach the removal branch. The decryption error wraps the
+    // keyset error as its cause, which is why the check reads the cause too.
+    const cause = error instanceof Error ? error.cause : undefined;
+    if (cause instanceof SlackCredentialKeysetError) throw cause;
+    if (error instanceof SlackCredentialKeysetError) throw error;
     if (error instanceof SlackCredentialDecryptionError) return { action: 'remove' };
     throw error;
   }
@@ -94,6 +104,14 @@ async function main(): Promise<void> {
   const { integrationId, execute } = parseArgs();
 
   console.log(`Mode: ${execute ? 'EXECUTE' : 'DRY RUN'}`);
+
+  // Fail before touching a row: with no usable keyset every credential is undecryptable,
+  // so the eligibility check below cannot tell a broken key from a stale ciphertext.
+  if (!isSlackCredentialEncryptionConfigured()) {
+    console.error('Refused: keyset_not_configured');
+    process.exitCode = 1;
+    return;
+  }
 
   const [integration] = await db
     .select({

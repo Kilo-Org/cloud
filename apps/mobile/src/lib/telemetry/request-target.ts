@@ -49,9 +49,6 @@ function isHostLike(text: string): boolean {
   );
 }
 
-/** A single label with a numeric port, the shape a local backend prints. */
-const PORTED_LABEL = /^[a-z\d](?:[a-z\d-]*[a-z\d])?:\d{1,5}$/iu;
-
 /** The index of the first `/`, `?` or `#` at or after `from`, else the length. */
 function nextDelimiter(text: string, from: number): number {
   for (let i = from; i < text.length; i += 1) {
@@ -69,6 +66,13 @@ function nextDelimiter(text: string, from: number): number {
  * carries. Fields built from this — the `network.url` context, the synthesized
  * message, the fingerprint path — carry origin and path. Returns empty string
  * on a non-string.
+ *
+ * A single label with a numeric port is not read as a host, though: `api:3000`
+ * is the same text as a userinfo pair whose value starts with digits. Such a
+ * run is read as userinfo, so a later `@` ends the value at the scheme alone
+ * when the text after it is not a host, and at that host when it is. A dotted
+ * name, `localhost`, an IPv4 literal and a bracketed IPv6 authority never take
+ * that reading and keep their own origin, port and path.
  */
 export function stripQueryString(url: string): string {
   try {
@@ -109,10 +113,9 @@ export function stripQueryString(url: string): string {
     const queryStart = url.search(/[?#]/u);
     const atInQuery = queryStart !== -1 && queryStart < lastAt;
     if (atInQuery && !isHostLike(url.slice(lastAt + 1, nextDelimiter(url, lastAt + 1)))) {
-      // The run before the delimiter is kept only when it reads as a ported
-      // host; any other run is userinfo, which must not reach the value at all.
-      const run = url.slice(schemeEnd, nextDelimiter(url, schemeEnd));
-      return PORTED_LABEL.test(run) ? cutAtQueryOrFragment(url) : url.slice(0, schemeEnd);
+      // The run before the delimiter may be userinfo, and userinfo must not
+      // reach the value at all: report no origin and path rather than risk it.
+      return url.slice(0, schemeEnd);
     }
     return url.slice(0, schemeEnd) + cutAtQueryOrFragment(url.slice(lastAt + 1));
   } catch {

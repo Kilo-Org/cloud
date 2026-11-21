@@ -105,26 +105,29 @@ describe('stripQueryString', () => {
     expect(stripQueryString(url)).toBe(`https://${HOST}`);
   });
 
-  it('keeps the origin and path when an at-sign in a query is followed by no host', () => {
+  it('reports no run when an at-sign in a query follows a ported single label', () => {
+    // `host:3000` is the same text as a userinfo pair whose value starts with
+    // digits, so the run is not kept: the value is the scheme alone.
     const procedure = ['x', 'y'].join('.');
     const value = ['token=abc', 'secret=zzz'].join('@');
     const url = `http://host:3000${TRPC_PATH}${procedure}?${value}`;
 
-    expect(stripQueryString(url)).toBe(`http://host:3000${TRPC_PATH}${procedure}`);
+    expect(stripQueryString(url)).toBe('http://');
   });
 
-  it('keeps the origin and path when an at-sign in a fragment is followed by no host', () => {
+  it('reports no run when an at-sign in a fragment follows a ported single label', () => {
     const value = ['invite=abc', 'secret=zzz'].join('@');
     const url = `http://host:3000${TRPC_PATH_FIXTURE}#${value}`;
 
-    expect(stripQueryString(url)).toBe(`http://host:3000${TRPC_PATH_FIXTURE}`);
+    expect(stripQueryString(url)).toBe('http://');
   });
 
-  it('keeps the origin and path when a ported run precedes a query carrying an at-sign', () => {
-    const value = ['x', ['api', 'path'].join('@')].join('=');
-    const url = `https://host:3000/?${value}`;
+  it('reports no run when a numeric password precedes a query carrying an at-sign', () => {
+    const userinfo = ['user', '1234'].join(':');
+    const value = ['x', ['a', 'path'].join('@')].join('=');
+    const url = `https://${userinfo}?${value}`;
 
-    expect(stripQueryString(url)).toBe('https://host:3000/');
+    expect(stripQueryString(url)).toBe('https://');
   });
 
   it('reports no run when a userinfo precedes a query carrying an at-sign', () => {

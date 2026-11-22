@@ -141,7 +141,7 @@ export function buildAppReturnOutcomeView(input: {
                         ? 'This connection was started from the Kilo App signed in as a different account. Sign in to the web with that account, or start again from the app.'
                         : input.error === 'installation_listing_too_large'
                           ? INSTALLATION_LISTING_TOO_LARGE_MESSAGE
-                        : 'The installation did not complete. Try again or return to the Kilo App.';
+                          : 'The installation did not complete. Try again or return to the Kilo App.';
   const cta = isSuccess ? 'Continue' : isPending ? 'Done' : isNonRetryable ? 'Back' : 'Try again';
 
   return {

@@ -52,6 +52,7 @@ const h = vi.hoisted(() => ({
     repositories: [] as TestRepoOption[],
     isLoading: false,
     isError: false,
+    error: undefined as unknown,
     isRefetching: false,
     refetch: vi.fn(),
   },

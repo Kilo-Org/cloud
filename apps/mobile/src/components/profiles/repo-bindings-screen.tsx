@@ -311,6 +311,7 @@ export function RepoBindingsScreen({
           repositories={repoOptions.repositories}
           isLoading={repoOptions.isLoading}
           isError={repoOptions.isError}
+          error={repoOptions.error}
           onRetry={() => {
             repoOptions.refetch();
           }}
@@ -331,6 +332,7 @@ export function RepoBindingsScreen({
           profiles={profileChoices}
           isLoading={profileList.isLoading}
           isError={profileList.isError}
+          error={profileList.error}
           isRefetching={profileList.isRefetching}
           selectedProfileId={selectedProfileId}
           emptyDescription={pickerEmptyDescription}

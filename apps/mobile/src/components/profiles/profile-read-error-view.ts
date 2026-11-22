@@ -15,7 +15,13 @@
 //
 // 1. A terminal coded tRPC verdict wins. The server answered and no retry can
 //    change the answer, so the state and the absence of Retry follow the code
-//    however the device reports its network.
+//    however the device reports its network. Two terminal verdicts are access
+//    outcomes and read as the permission state: a procedure-level refusal
+//    (`FORBIDDEN`, an `UNAUTHORIZED` without the context-level flag) and a
+//    refused session credential (the `data.authRequired` flag the auth layer
+//    signs the user out on). Only the procedure-level one names who can grant
+//    access, because a refused session has no owner to ask — that case keeps the
+//    variant's own permission description.
 // 2. A confirmed-offline device is then a connectivity failure, not a server
 //    one, and stays retryable. A coded refusal that is not terminal (a server
 //    fault, a deadline) still yields to it here: the device cannot reach the
@@ -26,6 +32,7 @@
 // and the organization Members list classify an error the same way.
 
 import { type QueryErrorVariant } from '@/components/query-error';
+import { isUnauthorizedTrpcError } from '@/lib/auth/trpc-unauthorized';
 import { type BannerState } from '@/lib/offline-banner-state';
 import {
   isPermissionDeniedError,
@@ -54,14 +61,19 @@ export function selectProfileReadErrorView({
   // the answer, and the answer is not a connectivity problem however the device
   // reports its network.
   if (isTerminalTrpcCode(code)) {
-    if (isPermissionDeniedError(error)) {
-      // The permission title already says access was denied, so the variant's
-      // own description would repeat it. The added line names who can act.
+    // A refused session credential is an access outcome too, and the auth layer
+    // ends the session itself; see the permission branch below.
+    const sessionRefused = isUnauthorizedTrpcError(error);
+    if (isPermissionDeniedError(error) || sessionRefused) {
+      // A procedure-level refusal names who can grant access, so the added line
+      // replaces the variant's description, which would only repeat the title.
+      // A refused session has no owner to ask, so that case keeps the variant's
+      // own description and adds nothing.
       return {
         variant: 'permission',
         showRetry: false,
         titleKey: null,
-        descriptionKey: 'organization.boundary.accessDeniedDescription',
+        descriptionKey: sessionRefused ? null : 'organization.boundary.accessDeniedDescription',
       };
     }
     // A terminal refusal that is not an access outcome (a malformed id in a deep
@@ -98,4 +110,26 @@ export function selectProfileReadErrorView({
     titleKey: answered === 'server' ? 'profiles.loadFailed' : null,
     descriptionKey: null,
   };
+}
+
+/**
+ * The error a caller must classify when more than one read feeds the same
+ * surface (the merged GitHub + GitLab repository options).
+ *
+ * Two parallel reads can fail for different reasons at once, and only one of
+ * them explains what the reader sees: a terminal refusal is the cause, because
+ * the same request can never start succeeding, while the other read's retryable
+ * fault may clear on the next attempt. So the first terminal error wins.
+ * Without a terminal one, any error stands for the failure (the first that is
+ * not nullish, in the caller's fixed order), and a surface whose reads all
+ * settled without an error gets `null`.
+ */
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- the selector's own input is `error: unknown`; a named type here would have to lie about an arbitrary server/transport error
+export function pickReadError(errors: readonly unknown[]): unknown {
+  for (const error of errors) {
+    if (isTerminalTrpcCode(readTrpcErrorField(error, 'code'))) {
+      return error;
+    }
+  }
+  return errors.find(error => error != null) ?? null;
 }

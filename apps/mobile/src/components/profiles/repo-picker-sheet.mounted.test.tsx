@@ -34,6 +34,11 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#888', foreground: '#000' }),
 }));
+// The selector reads the committed connectivity to separate a coded verdict
+// from a connectivity failure; this suite exercises the coded states online.
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
+}));
 // The sheet stays mounted through the native dismiss animation, so the stub
 // renders `children` whatever `visible` says and exposes `onDismiss` for the
 // suite to report the finished dismissal.
@@ -92,7 +97,28 @@ function sheetProps(): SheetProps[] {
   return nodesOfType('SessionPageSheet').map(node => node.props as SheetProps);
 }
 
-function mountSheet(href: Href, options: { isLoading?: boolean; isError?: boolean } = {}) {
+function queryErrorProps(): {
+  variant?: string;
+  title?: string;
+  message?: string;
+  onRetry?: () => void;
+} {
+  const [error] = nodesOfType('QueryError');
+  if (!error) {
+    throw new Error('the query error did not render');
+  }
+  return error.props as {
+    variant?: string;
+    title?: string;
+    message?: string;
+    onRetry?: () => void;
+  };
+}
+
+function mountSheet(
+  href: Href,
+  options: { isLoading?: boolean; isError?: boolean; error?: unknown; onRetry?: () => void } = {}
+) {
   const onClose = vi.fn<() => void>();
   act(() => {
     renderer = TestRenderer.create(
@@ -100,7 +126,8 @@ function mountSheet(href: Href, options: { isLoading?: boolean; isError?: boolea
         repositories: [],
         isLoading: options.isLoading ?? false,
         isError: options.isError ?? false,
-        onRetry: vi.fn<() => void>(),
+        error: options.error,
+        onRetry: options.onRetry ?? vi.fn<() => void>(),
         selectedKey: null,
         onSelect: vi.fn<() => void>(),
         onClose,
@@ -198,18 +225,37 @@ describe('RepoPickerSheet empty state', () => {
     expect(actionProps()).toBeUndefined();
   });
 
-  it('keeps the loading and error states actionless', () => {
+  it('renders the loading state with no failure body', () => {
     mountSheet(connectedServicesHref(), { isLoading: true });
 
     expect(nodesOfType('RowSkeleton').length).toBeGreaterThan(0);
     expect(nodesOfType('EmptyState')).toHaveLength(0);
     expect(actionProps()).toBeUndefined();
+  });
 
-    act(() => renderer?.unmount());
-    mountSheet(connectedServicesHref(), { isError: true });
+  it('names an access refusal as the permission state and offers no retry', () => {
+    mountSheet(connectedServicesHref(), {
+      isError: true,
+      error: { data: { code: 'FORBIDDEN' } },
+    });
 
-    expect(nodesOfType('QueryError')).toHaveLength(1);
-    expect(nodesOfType('EmptyState')).toHaveLength(0);
-    expect(actionProps()).toBeUndefined();
+    const props = queryErrorProps();
+    expect(props.variant).toBe('permission');
+    expect(props.title).toBeUndefined();
+    expect(props.onRetry).toBeUndefined();
+  });
+
+  it('offers a retry for a server fault', () => {
+    const onRetry = vi.fn<() => void>();
+    mountSheet(connectedServicesHref(), {
+      isError: true,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+      onRetry,
+    });
+
+    const props = queryErrorProps();
+    expect(props.variant).toBe('server');
+    expect(props.title).toBe(i18n.t('profiles.loadFailed'));
+    expect(props.onRetry).toBe(onRetry);
   });
 });

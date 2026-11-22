@@ -218,6 +218,7 @@ export function ProfileRepoPinsSection({
           repositories={repoOptions.repositories}
           isLoading={repoOptions.isLoading}
           isError={repoOptions.isError}
+          error={repoOptions.error}
           onRetry={() => {
             repoOptions.refetch();
           }}

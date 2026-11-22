@@ -1,7 +1,7 @@
 import { RequestDeadlineError } from '@kilocode/event-service';
 import { describe, expect, it } from 'vitest';
 
-import { selectProfileReadErrorView } from './profile-read-error-view';
+import { pickReadError, selectProfileReadErrorView } from './profile-read-error-view';
 
 function makeTrpcError(code: string): unknown {
   return { data: { code } };
@@ -21,6 +21,24 @@ describe('selectProfileReadErrorView', () => {
       });
     }
   );
+
+  it('names a refused session credential as a permission state without the boundary line', () => {
+    // `data.authRequired` is the context-level flag: the server refused the
+    // request's session credential, which the auth layer ends itself. Nobody
+    // owns a grant here, so the boundary description would point at an owner
+    // who does not exist; the variant's own permission copy stands.
+    expect(
+      selectProfileReadErrorView({
+        error: { data: { code: 'UNAUTHORIZED', authRequired: true } },
+        connectivity: 'online',
+      })
+    ).toEqual({
+      variant: 'permission',
+      showRetry: false,
+      titleKey: null,
+      descriptionKey: null,
+    });
+  });
 
   it('names NOT_FOUND as missing and offers no retry', () => {
     expect(
@@ -132,5 +150,27 @@ describe('selectProfileReadErrorView', () => {
       titleKey: 'profiles.loadFailed',
       descriptionKey: null,
     });
+  });
+});
+
+describe('pickReadError', () => {
+  it('prefers the terminal error over a retryable one, wherever it sits', () => {
+    // Two parallel reads fail for different reasons: only the terminal one says
+    // why the surface cannot show anything, so it is the error to classify even
+    // when the other read answered first.
+    const retryable = makeTrpcError('INTERNAL_SERVER_ERROR');
+    const terminal = makeTrpcError('FORBIDDEN');
+    expect(pickReadError([retryable, terminal])).toBe(terminal);
+    expect(pickReadError([terminal, retryable])).toBe(terminal);
+  });
+
+  it('takes the first non-nullish error when none is terminal', () => {
+    const networkError = new Error('network request failed');
+    expect(pickReadError([null, networkError, makeTrpcError('TIMEOUT')])).toBe(networkError);
+  });
+
+  it('returns null when every read settled without an error', () => {
+    expect(pickReadError([undefined, null])).toBeNull();
+    expect(pickReadError([])).toBeNull();
   });
 });

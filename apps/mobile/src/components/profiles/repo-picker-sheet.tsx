@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
 import { EmptyState, StateAction } from '@/components/empty-state';
+import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
 import {
   filterRepositoryOptions,
   type RepoOption,
@@ -20,12 +21,15 @@ import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { SearchField } from '@/components/ui/search-field';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 
 type RepoPickerSheetProps = Readonly<{
   repositories: readonly RepoOption[];
   isLoading: boolean;
   isError: boolean;
+  /** The failed read's error, classified by the shared selector. */
+  error: unknown;
   onRetry: () => void;
   selectedKey: string | null;
   onSelect: (repo: RepoOption) => void;
@@ -107,6 +111,7 @@ export function RepoPickerSheet({
   repositories,
   isLoading,
   isError,
+  error,
   onRetry,
   selectedKey,
   onSelect,
@@ -116,6 +121,8 @@ export function RepoPickerSheet({
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const connectivity = useCommittedConnectivityStatus();
+  const readError = selectProfileReadErrorView({ error, connectivity });
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
   // The sheet presents in place and the caller unmounts it from `onClose`, so
@@ -159,11 +166,12 @@ export function RepoPickerSheet({
   } else if (isError) {
     body = (
       <QueryError
-        variant="server"
+        variant={readError.variant}
         placement="top"
         inset="gutter"
-        title={t('profiles.loadFailed')}
-        onRetry={onRetry}
+        title={readError.titleKey ? t(readError.titleKey) : undefined}
+        message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
+        onRetry={readError.showRetry ? onRetry : undefined}
       />
     );
   } else if (visibleRepos.length === 0) {

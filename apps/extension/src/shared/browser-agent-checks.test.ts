@@ -302,7 +302,11 @@ describe('step tokens', () => {
     // A human takes half a minute: no download record survives that long, and the token still names the file.
     clock += 30_000;
 
-    expect(store.take(token, binding)).toStrictEqual({ need, ok: true });
+    expect(store.take(token, binding)).toStrictEqual({
+      need,
+      ok: true,
+      reason: SENSITIVE_REASON.download,
+    });
     // The token is spent whether or not the next call matches: a replay cannot probe for a valid binding.
     expect(store.take(token, binding)).toStrictEqual({ ok: false });
   });

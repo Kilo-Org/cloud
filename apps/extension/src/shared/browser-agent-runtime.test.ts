@@ -965,6 +965,63 @@ describe('agent browser calls', () => {
     expect(expectStepToken(refused)).toBeDefined();
   });
 
+  it('runs one guard on the retry a step approval covers', async () => {
+    // A granted `downloads` permission and no hold means the item guard is this browser's one guard.
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    let presses = 0;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': params => {
+        if (params?.['type'] === 'mousePressed') {
+          presses += 1;
+
+          // The approved repeat is the press that starts the file: the refused call never ran the tool.
+          if (presses === 1) {
+            downloads.emit({ id: 61, tabId: TAB_ID, url: `${MAIN_ORIGIN}/report.txt` });
+          }
+        }
+
+        return {};
+      },
+    });
+
+    const consent = 'https://github.com';
+    const click = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: {
+          authorized: [readGrant, actGrant, { class: 'act' as const, origin: consent }],
+          sensitive: [...sensitive],
+        },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    // A consent page is a sensitive step with no element, so its token binds no element either.
+    cdp.setFrameUrl(`${consent}/login/oauth/authorize?client_id=fixture`);
+    const sensitiveRefusal = await click([]);
+
+    expect(sensitiveRefusal).toMatchObject({
+      items: [{ class: 'sensitive', reason: SENSITIVE_REASON.oauthConsent }],
+      kind: 'needs_permission',
+    });
+
+    // The same origin answers as an ordinary page, so the gate classifies no step for the retry: the runtime alone
+    // Redeems the token it carries, and that token names no file.
+    cdp.setFrameUrl(`${consent}/settings`);
+    const retried = await click([expectStepToken(sensitiveRefusal)]);
+
+    // A step approval buys the step. The retry still runs one guard, so the file it starts is stopped and named.
+    expect(retried).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+    expect(downloads.cancelled).toStrictEqual([61]);
+  });
+
   it('fails the response of a file a payment-form submit starts when the downloads permission is withheld', async () => {
     // No downloads API and no hold: the response that would become a file is the one guard this browser has.
     const { cdp, runtime } = await createHarness({ downloadsGranted: false });

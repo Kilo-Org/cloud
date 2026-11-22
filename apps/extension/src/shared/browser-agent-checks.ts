@@ -575,10 +575,12 @@ export interface StepTokenIssue extends StepTokenBinding {
   readonly reason: string;
 }
 
-/** What consuming a token answered: whether it named the call, and the file its approval buys. */
+/** What consuming a token answered: whether it named the call, the file its approval buys, and what it approved. */
 export interface StepTokenTake {
   readonly need?: StepTokenNeed | undefined;
   readonly ok: boolean;
+  /** The reason the token was issued for, so a caller can tell the step an approval buys from a download's file. */
+  readonly reason?: string | undefined;
 }
 
 export interface StepTokenStore {
@@ -719,7 +721,11 @@ export const createStepTokenStore = ({
       return { ok: false };
     }
 
-    return stored.need === undefined ? { ok: true } : { need: stored.need, ok: true };
+    return {
+      ok: true,
+      reason: stored.reason,
+      ...(stored.need === undefined ? {} : { need: stored.need }),
+    };
   };
 
   return {

@@ -438,11 +438,17 @@ interface DownloadGuard {
   readonly settle: () => Promise<GuardSettlement>;
 }
 
-/** What this call redeemed, and what it buys: nothing, the step alone, or the one file its approval names. */
+/**
+ * What a call redeemed, and what it buys: nothing, the step alone, the one file an approval names, or an approval
+ * whose refusal named no url.
+ */
 type RedeemedApproval =
   | { readonly kind: 'none' }
+  /** A step approval buys the step alone: it exempts no file, so the call runs one guard. */
   | { readonly kind: 'step' }
-  | { readonly kind: 'file'; readonly need?: StepTokenNeed | undefined };
+  | { readonly kind: 'file'; readonly need: StepTokenNeed }
+  /** An approval whose refusal named no url: it exempts the one file its step starts. */
+  | { readonly kind: 'unbounded' };
 
 /**
  * The text an approved navigate reports when the file it started was kept.
@@ -3410,20 +3416,24 @@ export const createBrowserRuntime = ({
               toolName: stepToolName,
             });
 
-            // A take that names a file wins; one that names none fills a call that redeemed nothing yet.
+            // A take that names a file wins. One that names none buys the step alone unless its refusal was a
+            // Download's, which is the approval that exempts the one file its step starts.
             if (take.ok && take.need !== undefined) {
               redeemed = { kind: 'file', need: take.need };
               break;
             }
 
             if (take.ok && redeemed.kind === 'none') {
-              redeemed = { kind: 'file' };
+              redeemed =
+                take.reason === SENSITIVE_REASON.download
+                  ? { kind: 'unbounded' }
+                  : { kind: 'step' };
             }
           }
         }
 
-        // Whether the human approved this call: its step, or the one file the approval names.
-        const downloadApproved = redeemed.kind !== 'none';
+        // Whether the human approved this call: its step, the one file the approval names, or a download's own file.
+        const downloadApproved = redeemed.kind === 'file' || redeemed.kind === 'unbounded';
         // The one file the approval buys, when it names one: that file is exempt, and every other file this call
         // Starts is guarded as usual and reported with its own token.
         const approvedNeed = redeemed.kind === 'file' ? redeemed.need : undefined;
@@ -3622,7 +3632,9 @@ export const createBrowserRuntime = ({
           canIntercept: debuggerApi !== undefined,
           hasHold: downloadHold !== undefined,
           hasPermission: downloadsPermission !== undefined,
-          namesFile: redeemed.kind !== 'file' || redeemed.need !== undefined,
+          // A step approval exempts no file, so its guard still runs; only an approval with no url to exempt leaves
+          // The legacy guard nothing to decide, exactly as its refusal said.
+          namesFile: redeemed.kind !== 'unbounded',
         });
         // An act call runs guarded: an unapproved one denies downloads outright, and an approved one listens and
         // Stops every download but the file its approval bought, so a second file is neither kept nor silent.

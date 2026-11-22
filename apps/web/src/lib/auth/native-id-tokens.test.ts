@@ -833,7 +833,7 @@ describe('exchangeNativeGoogleAuthCode', () => {
       hd: 'example.com',
     });
     expect(mockGetToken).toHaveBeenCalledWith('auth-code');
-    expect(mockGetFederatedSignonCertsAsync).toHaveBeenCalled();
+    expect(mockGetFederatedSignonCertsAsync).toHaveBeenCalledTimes(1);
     expect(mockVerifySignedJwtWithCertsAsync).toHaveBeenCalledWith(
       'exchanged-id-token',
       { key: 'certificate' },
@@ -925,6 +925,32 @@ describe('exchangeNativeGoogleAuthCode', () => {
     mockGetFederatedSignonCertsAsync.mockRejectedValue(certError);
 
     await expect(exchangeNativeGoogleAuthCode('auth-code')).rejects.toBe(certError);
+    expect(mockGetToken).not.toHaveBeenCalled();
+  });
+
+  it('leaves the code unspent so a retry after the certificate fault succeeds', async () => {
+    const certError = new Error('Failed to retrieve verification certificates: network');
+    mockGetFederatedSignonCertsAsync.mockRejectedValueOnce(certError);
+    mockGetFederatedSignonCertsAsync.mockResolvedValue({ certs: { key: 'certificate' } });
+    mockGetToken.mockResolvedValue({ tokens: { id_token: 'exchanged-id-token' } });
+    mockVerifySignedJwtWithCertsAsync.mockResolvedValue({
+      getPayload: () => ({
+        sub: 'google-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+      }),
+    });
+
+    await expect(exchangeNativeGoogleAuthCode('auth-code')).rejects.toBe(certError);
+    // The code is unspent, so the client's retry can redeem it after the
+    // certificate fault clears instead of re-submitting a spent code (401).
+    expect(mockGetToken).not.toHaveBeenCalled();
+
+    const result = await exchangeNativeGoogleAuthCode('auth-code');
+
+    expect(result).toEqual({ sub: 'google-sub-1', email: 'user@example.com' });
+    expect(mockGetToken).toHaveBeenCalledTimes(1);
+    expect(mockGetToken).toHaveBeenCalledWith('auth-code');
   });
 
   it('throws a plain Error when credentials are not configured', async () => {

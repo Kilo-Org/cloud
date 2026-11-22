@@ -4493,6 +4493,7 @@
       "promptPlaceholder": "You are a …",
       "tools": "Tools",
       "wholeToolRule": "This agent applies one rule for every tool at once: {{rule}}. These switches are read-only.",
+      "toolRule": "Stored rule: {{rule}}",
       "visibility": "Visibility",
       "visibilityPrimary": "Primary — shown in the picker",
       "visibilitySubagent": "Subagent — only callable from others",

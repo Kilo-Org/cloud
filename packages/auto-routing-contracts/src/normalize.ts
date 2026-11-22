@@ -630,8 +630,10 @@ function isSensitiveToken(token: string) {
   return false;
 }
 
+// True only for a non-array object, so the narrowed type matches what the
+// predicate promises: an array is not a string-keyed record.
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 // ---------- Capability-aware routing helpers ----------

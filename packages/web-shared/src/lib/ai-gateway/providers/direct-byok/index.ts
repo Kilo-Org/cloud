@@ -6,7 +6,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import type { CustomLlmProvider, OpenRouterProvider } from '@kilocode/db/schema-types';
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import { directByokProviderList } from './direct-byok-definitions';
 import { formatModelId, modelIdPrefixOf } from './model-id';
@@ -56,13 +56,13 @@ export function formatDirectByokModelId(provider: DirectByokProvider, model: Dir
  * A direct BYOK model as `/api/v1/models` lists it: the OpenRouter model contract, plus the fields
  * older clients read that the catalog schema does not describe.
  */
-export type DirectByokModelListing = OpenRouterModel & {
+export type DirectByokModelListing = OpenRouterCatalogModel & {
   canonical_slug: string;
   hugging_face_id: string;
   architecture: { instruct_type: string | null };
   default_parameters: Record<string, never>;
   /** Every direct BYOK listing states its reasoning settings, even when the model has none. */
-  opencode: NonNullable<OpenRouterModel['opencode']>;
+  opencode: NonNullable<OpenRouterCatalogModel['opencode']>;
 };
 
 const AI_SDK_PROVIDER_FOR_CHAT_API = {

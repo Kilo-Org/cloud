@@ -169,7 +169,9 @@ export function RepoPickerSheet({
         variant={readError.variant}
         placement="top"
         inset="gutter"
-        title={readError.titleKey ? t(readError.titleKey) : undefined}
+        // This sheet lists repositories, so the read's own load-failure title
+        // names the repository list instead of the profiles one it defaults to.
+        title={readError.titleKey === null ? undefined : t('common.couldNotLoadRepositories')}
         message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
         onRetry={readError.showRetry ? onRetry : undefined}
       />

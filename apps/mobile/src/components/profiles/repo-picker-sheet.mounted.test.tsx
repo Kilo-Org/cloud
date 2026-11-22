@@ -225,6 +225,20 @@ describe('RepoPickerSheet empty state', () => {
     expect(actionProps()).toBeUndefined();
   });
 
+  it('names the repository list, not the profiles, when the repository read fails', () => {
+    mountSheet(connectedServicesHref(), { isError: true });
+
+    const [error] = nodesOfType('QueryError');
+    if (!error) {
+      throw new Error('the query error did not render');
+    }
+    const { title } = error.props as { title?: string };
+    expect(title).toBe(i18n.t('common.couldNotLoadRepositories'));
+    // The sheet lists repositories; the profile catalog's sentence describes a
+    // different list and must not head this failure.
+    expect(title).not.toBe(i18n.t('profiles.loadFailed'));
+  });
+
   it('renders the loading state with no failure body', () => {
     mountSheet(connectedServicesHref(), { isLoading: true });
 
@@ -255,7 +269,8 @@ describe('RepoPickerSheet empty state', () => {
 
     const props = queryErrorProps();
     expect(props.variant).toBe('server');
-    expect(props.title).toBe(i18n.t('profiles.loadFailed'));
+    // The sheet names its own list on a load failure, not the profiles one.
+    expect(props.title).toBe(i18n.t('common.couldNotLoadRepositories'));
     expect(props.onRetry).toBe(onRetry);
   });
 });

@@ -105,7 +105,8 @@ describe('collapsed-connect-ctas store', () => {
       await readGate.promise;
       return '["github"]';
     });
-    // Importing the shipped module starts its disk read (store.preload()).
+    // Importing the shipped module constructs the store, and construction
+    // starts its disk read.
     const { setConnectCtaCollapsed } = await import('./use-collapsed-connect-ctas-preference');
 
     // The write races the initial disk read: both platforms must survive.

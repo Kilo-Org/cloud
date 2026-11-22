@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "Du er en…",
       "tools": "Verktøy",
       "wholeToolRule": "Denne agenten bruker én regel på alle verktøy samtidig: {{rule}}. Disse bryterne er skrivebeskyttede.",
+      "toolRule": "Lagret regel: {{rule}}",
       "visibility": "Synlighet",
       "visibilityPrimary": "Primær — vist i velgeren",
       "visibilitySubagent": "Subagent — kan kun ringes opp fra andre",

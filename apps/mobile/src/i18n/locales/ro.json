@@ -4480,6 +4480,7 @@
       "promptPlaceholder": "esti un…",
       "tools": "Instrumente",
       "wholeToolRule": "Acest agent aplică o singură regulă tuturor instrumentelor simultan: {{rule}}. Aceste comutatoare sunt doar pentru citire.",
+      "toolRule": "Regulă memorată: {{rule}}",
       "visibility": "Vizibilitate",
       "visibilityPrimary": "Primar — afișat în selector",
       "visibilitySubagent": "Subagent — apelabil numai de la alții",

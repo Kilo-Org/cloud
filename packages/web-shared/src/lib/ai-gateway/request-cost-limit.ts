@@ -16,7 +16,7 @@ import {
   getCustomPricing,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
   getWorstCaseModelPricing,
   type EndpointPricing,
@@ -84,7 +84,7 @@ function combineRates(a: TextPricingRates, b: TextPricingRates): TextPricingRate
 function pickerRequestPrice(
   modelId: string,
   models: GatewayModelMap,
-  catalog: OpenRouterModel[],
+  catalog: OpenRouterCatalogModel[],
   preferredProviderOrderConfig: PreferredProviderOrderConfig,
   vercelPricingMetadata: VercelPricingMetadata,
   customPricingConfig: CustomPricingConfig,

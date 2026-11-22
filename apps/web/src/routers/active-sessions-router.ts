@@ -328,8 +328,8 @@ export const activeSessionsRouter = createTRPCRouter({
           CONTROL_PLANE_UPSTREAM_BUDGET_MS,
           INSTANCE_ERROR_LOG_EXCERPT_CHARS
         );
-        // The first 200 characters of the upstream error body, whatever its
-        // content type.
+        // The first INSTANCE_ERROR_LOG_EXCERPT_CHARS characters of the upstream
+        // error body, whatever its content type.
         excerpt = text;
       } catch {
         // A body that outlives the budget adds no note; the status below is the

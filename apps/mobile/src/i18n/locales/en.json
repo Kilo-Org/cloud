@@ -4380,6 +4380,9 @@
       "fieldName": "Display name",
       "fieldUrl": "Server URL",
       "fieldUrlInvalid": "Enter a valid server URL.",
+      "fieldUrlCredentials": "Remove the user name and password from the address.",
+      "fieldUrlFragment": "Remove the # part of the address.",
+      "fieldUrlInsecure": "Enter an https address, or http only for localhost.",
       "duplicateUrl": "That URL is already saved.",
       "serverNotFound": "This server is no longer saved.",
       "enableServer": "Enable this server: {{name}}",
@@ -4405,6 +4408,7 @@
       "app": {
         "label": "Tool interface",
         "failed": "This tool's interface couldn't load.",
+        "tooLarge": "This tool's interface is larger than the {{size}} limit.",
         "empty": "This tool's interface has nothing to show."
       }
     },

@@ -4328,6 +4328,9 @@
       "fieldName": "Ainm taispeána",
       "fieldUrl": "URL an fhreastalaí",
       "fieldUrlInvalid": "Cuir URL bailí freastalaí isteach.",
+      "fieldUrlCredentials": "Bain an t-ainm úsáideora agus an pasfhocal as an URL.",
+      "fieldUrlFragment": "Bain an chuid # den URL.",
+      "fieldUrlInsecure": "Cuir URL https isteach, nó http do localhost amháin.",
       "duplicateUrl": "Tá an URL sin sábháilte cheana féin.",
       "serverNotFound": "Níl an freastalaí seo sábháilte a thuilleadh.",
       "enableServer": "Cumasaigh an freastalaí seo: {{name}}",
@@ -4356,6 +4359,7 @@
       "app": {
         "label": "Comhéadan na huirlise",
         "failed": "Níorbh fhéidir comhéadan na huirlise seo a lódáil.",
+        "tooLarge": "Tá comhéadan na huirlise seo níos mó ná an teorainn {{size}}.",
         "empty": "Níl aon rud le taispeáint ar chomhéadan na huirlise seo."
       }
     },

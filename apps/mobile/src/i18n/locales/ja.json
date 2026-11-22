@@ -4094,6 +4094,9 @@
       "fieldName": "表示名",
       "fieldUrl": "サーバーURL",
       "fieldUrlInvalid": "有効なサーバーURLを入力してください。",
+      "fieldUrlCredentials": "URLからユーザー名とパスワードを削除してください。",
+      "fieldUrlFragment": "URLから#の部分を削除してください。",
+      "fieldUrlInsecure": "httpsのURLを入力し、httpはlocalhostの場合に限り使用できます。",
       "duplicateUrl": "そのURLはすでに保存されています。",
       "serverNotFound": "このサーバーはもう保存されていません。",
       "enableServer": "このサーバーを有効にする：{{name}}",
@@ -4119,6 +4122,7 @@
       "app": {
         "label": "ツールインターフェース",
         "failed": "このツールのインターフェースを読み込めませんでした。",
+        "tooLarge": "このツールのインターフェースは{{size}}の上限を超えています。",
         "empty": "このツールのインターフェースには表示するものがありません。"
       }
     },

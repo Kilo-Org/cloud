@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { formatNumber } from '@/lib/format';
+
 /**
  * The document one MCP Apps view is drawn from, and the sandbox it is drawn in.
  *
@@ -45,6 +47,20 @@ export function viewArguments(input: Readonly<Record<string, unknown>>) {
  * refused rather than turned into a bridge message.
  */
 export const MAX_VIEW_BYTES = 1_000_000;
+
+/**
+ * The cap as copy names it, in the reader's own locale. The catalog
+ * interpolates this string, so a changed `MAX_VIEW_BYTES` cannot leave the
+ * sentence saying an old limit, and a reader whose language does not write
+ * "MB" the way English does still reads a unit in their own script.
+ */
+export function viewSizeLimit(locale: string): string {
+  return formatNumber(MAX_VIEW_BYTES / 1_000_000, locale, {
+    style: 'unit',
+    unit: 'megabyte',
+    unitDisplay: 'short',
+  });
+}
 
 /**
  * One origin a policy may name: a scheme, an exact host and an optional port.

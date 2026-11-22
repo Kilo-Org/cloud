@@ -4094,6 +4094,9 @@
       "fieldName": "Aha a na-egosi",
       "fieldUrl": "URL ihe nkesa",
       "fieldUrlInvalid": "Tinye URL ihe nkesa ziri ezi.",
+      "fieldUrlCredentials": "Wepụ aha onye ọrụ na paswọọdụ n'ime URL ahụ.",
+      "fieldUrlFragment": "Wepụ akụkụ # dị na URL ahụ.",
+      "fieldUrlInsecure": "Tinye URL https, ma ọ bụ http naanị maka localhost.",
       "duplicateUrl": "URL a echekwalarị.",
       "serverNotFound": "Ihe nkesa a echekwaghịzi.",
       "enableServer": "Mee ka ihe nkesa a rụọ ọrụ: {{name}}",
@@ -4119,6 +4122,7 @@
       "app": {
         "label": "Interface ngwá ọrụ",
         "failed": "Enweghị ike ibu interface ngwá ọrụ a.",
+        "tooLarge": "Interface ngwá ọrụ a karịrị oke {{size}}.",
         "empty": "Interface ngwá ọrụ a enweghị ihe ọ ga-egosi."
       }
     },

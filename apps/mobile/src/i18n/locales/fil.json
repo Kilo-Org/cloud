@@ -4094,6 +4094,9 @@
       "fieldName": "Pangalang ipinapakita",
       "fieldUrl": "URL ng server",
       "fieldUrlInvalid": "Maglagay ng valid na URL ng server.",
+      "fieldUrlCredentials": "Alisin ang user name at password mula sa URL.",
+      "fieldUrlFragment": "Alisin ang # na bahagi ng URL.",
+      "fieldUrlInsecure": "Maglagay ng https na URL, o http lamang para sa localhost.",
       "duplicateUrl": "Naka-save na ang URL na iyon.",
       "serverNotFound": "Hindi na naka-save ang server na ito.",
       "enableServer": "Paganahin ang server na ito: {{name}}",
@@ -4119,6 +4122,7 @@
       "app": {
         "label": "Interface ng tool",
         "failed": "Hindi na-load ang interface ng tool na ito.",
+        "tooLarge": "Mas malaki ang interface ng tool na ito kaysa sa limit na {{size}}.",
         "empty": "Walang maipapakita ang interface ng tool na ito."
       }
     },

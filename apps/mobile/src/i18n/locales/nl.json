@@ -4094,6 +4094,9 @@
       "fieldName": "Weergavenaam",
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Voer een geldige server-URL in.",
+      "fieldUrlCredentials": "Verwijder de gebruikersnaam en het wachtwoord uit de URL.",
+      "fieldUrlFragment": "Verwijder het #-gedeelte uit de URL.",
+      "fieldUrlInsecure": "Voer een https-URL in, of http alleen voor localhost.",
       "duplicateUrl": "Die URL is al opgeslagen.",
       "serverNotFound": "Deze server is niet meer opgeslagen.",
       "enableServer": "Deze server inschakelen: {{name}}",
@@ -4119,6 +4122,7 @@
       "app": {
         "label": "Interface van de tool",
         "failed": "De interface van deze tool kon niet worden geladen.",
+        "tooLarge": "De interface van deze tool is groter dan de limiet van {{size}}.",
         "empty": "De interface van deze tool heeft niets te tonen."
       }
     },

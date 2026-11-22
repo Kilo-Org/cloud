@@ -4094,6 +4094,9 @@
       "fieldName": "显示名称",
       "fieldUrl": "服务器 URL",
       "fieldUrlInvalid": "请输入有效的服务器 URL。",
+      "fieldUrlCredentials": "请从服务器 URL 中删除用户名和密码。",
+      "fieldUrlFragment": "请删除服务器 URL 中的 # 部分。",
+      "fieldUrlInsecure": "请输入 https 地址，仅 localhost 可使用 http。",
       "duplicateUrl": "该 URL 已保存。",
       "serverNotFound": "该服务器已不再保存。",
       "enableServer": "启用此服务器：{{name}}",
@@ -4119,6 +4122,7 @@
       "app": {
         "label": "工具界面",
         "failed": "无法加载此工具的界面。",
+        "tooLarge": "此工具的界面超过了 {{size}} 的限制。",
         "empty": "此工具的界面没有可显示的内容。"
       }
     },

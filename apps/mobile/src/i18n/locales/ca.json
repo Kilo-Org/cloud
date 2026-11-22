@@ -4172,6 +4172,9 @@
       "fieldName": "Nom que es mostra",
       "fieldUrl": "URL del servidor",
       "fieldUrlInvalid": "Introdueix una URL de servidor vàlida.",
+      "fieldUrlCredentials": "Elimina el nom d'usuari i la contrasenya de la URL.",
+      "fieldUrlFragment": "Elimina la part # de la URL.",
+      "fieldUrlInsecure": "Introdueix una URL https, o http només per a localhost.",
       "duplicateUrl": "Aquesta URL ja està desada.",
       "serverNotFound": "Aquest servidor ja no està desat.",
       "enableServer": "Activa aquest servidor: {{name}}",
@@ -4198,6 +4201,7 @@
       "app": {
         "label": "Interfície de l'eina",
         "failed": "No s'ha pogut carregar la interfície d'aquesta eina.",
+        "tooLarge": "La interfície d'aquesta eina és més gran que el límit de {{size}}.",
         "empty": "La interfície d'aquesta eina no té res a mostrar."
       }
     },

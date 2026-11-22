@@ -4094,6 +4094,9 @@
       "fieldName": "دکھایا جانے والا نام",
       "fieldUrl": "سرور URL",
       "fieldUrlInvalid": "درست سرور URL درج کریں۔",
+      "fieldUrlCredentials": "URL سے صارف نام اور پاس ورڈ ہٹا دیں۔",
+      "fieldUrlFragment": "URL کا # والا حصہ ہٹا دیں۔",
+      "fieldUrlInsecure": "https URL درج کریں، یا صرف localhost کے لیے http درج کریں۔",
       "duplicateUrl": "یہ URL پہلے ہی محفوظ ہے۔",
       "serverNotFound": "یہ سرور اب مزید محفوظ نہیں ہے۔",
       "enableServer": "اس سرور کو فعال کریں: {{name}}",
@@ -4119,6 +4122,7 @@
       "app": {
         "label": "ٹول کا انٹرفیس",
         "failed": "اس ٹول کا انٹرفیس لوڈ نہیں ہو سکا۔",
+        "tooLarge": "اس ٹول کا انٹرفیس {{size}} کی حد سے بڑا ہے۔",
         "empty": "اس ٹول کے انٹرفیس میں دکھانے کے لیے کچھ نہیں ہے۔"
       }
     },

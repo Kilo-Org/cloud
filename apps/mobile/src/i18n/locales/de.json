@@ -4094,6 +4094,9 @@
       "fieldName": "Anzeigename",
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Gib eine gültige Server-URL ein.",
+      "fieldUrlCredentials": "Entferne den Benutzernamen und das Passwort aus der Adresse.",
+      "fieldUrlFragment": "Entferne den #-Teil aus der Adresse.",
+      "fieldUrlInsecure": "Gib eine https-Adresse ein, oder http nur für localhost.",
       "duplicateUrl": "Diese URL ist bereits gespeichert.",
       "serverNotFound": "Dieser Server ist nicht mehr gespeichert.",
       "enableServer": "Diesen Server aktivieren: {{name}}",
@@ -4119,6 +4122,7 @@
       "app": {
         "label": "Tool-Oberfläche",
         "failed": "Die Oberfläche dieses Tools konnte nicht geladen werden.",
+        "tooLarge": "Die Oberfläche dieses Tools ist größer als das Limit von {{size}}.",
         "empty": "Die Oberfläche dieses Tools hat nichts anzuzeigen."
       }
     },

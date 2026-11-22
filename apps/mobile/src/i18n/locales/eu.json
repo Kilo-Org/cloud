@@ -4094,6 +4094,9 @@
       "fieldName": "Erakusteko izena",
       "fieldUrl": "Zerbitzariaren URLa",
       "fieldUrlInvalid": "Sartu baliozko zerbitzari URLa.",
+      "fieldUrlCredentials": "Kendu erabiltzaile-izena eta pasahitza URLtik.",
+      "fieldUrlFragment": "Kendu URLaren # zatia.",
+      "fieldUrlInsecure": "Sartu https URL bat, edo http soilik localhostentzat.",
       "duplicateUrl": "URLa jada gordeta dago.",
       "serverNotFound": "Zerbitzari hau ez dago jada gordeta.",
       "enableServer": "Gaitu zerbitzari hau: {{name}}",
@@ -4119,6 +4122,7 @@
       "app": {
         "label": "Tresnaren interfazea",
         "failed": "Ezin izan da tresna honen interfazea kargatu.",
+        "tooLarge": "Tresna honen interfazea {{size}} muga baino handiagoa da.",
         "empty": "Tresna honen interfazeak ez du ezer erakusteko."
       }
     },

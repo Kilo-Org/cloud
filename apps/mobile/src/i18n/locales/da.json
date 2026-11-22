@@ -4094,6 +4094,9 @@
       "fieldName": "Vist navn",
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Indtast en gyldig server-URL.",
+      "fieldUrlCredentials": "Fjern brugernavn og adgangskode fra server-URL'en.",
+      "fieldUrlFragment": "Fjern #-delen af server-URL'en.",
+      "fieldUrlInsecure": "Indtast en https-URL, eller kun http for localhost.",
       "duplicateUrl": "Denne URL er allerede gemt.",
       "serverNotFound": "Denne server er ikke længere gemt.",
       "enableServer": "Aktivér denne server: {{name}}",
@@ -4119,6 +4122,7 @@
       "app": {
         "label": "Værktøjsgrænseflade",
         "failed": "Grænsefladen til dette værktøj kunne ikke indlæses.",
+        "tooLarge": "Grænsefladen til dette værktøj er større end grænsen på {{size}}.",
         "empty": "Grænsefladen til dette værktøj har intet at vise."
       }
     },

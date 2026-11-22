@@ -4094,6 +4094,9 @@
       "fieldName": "ಪ್ರದರ್ಶಿತ ಹೆಸರು",
       "fieldUrl": "ಸರ್ವರ್ URL",
       "fieldUrlInvalid": "ಮಾನ್ಯ ಸರ್ವರ್ URL ನಮೂದಿಸಿ.",
+      "fieldUrlCredentials": "ವಿಳಾಸದಿಂದ ಬಳಕೆದಾರ ಹೆಸರು ಮತ್ತು ಪಾಸ್‌ವರ್ಡ್ ಅನ್ನು ತೆಗೆದುಹಾಕಿ.",
+      "fieldUrlFragment": "ವಿಳಾಸದ # ಭಾಗವನ್ನು ತೆಗೆದುಹಾಕಿ.",
+      "fieldUrlInsecure": "https ವಿಳಾಸವನ್ನು ನಮೂದಿಸಿ, localhost ಗೆ ಮಾತ್ರ http ಬಳಸಿ.",
       "duplicateUrl": "ಈ URL ಈಗಾಗಲೇ ಉಳಿಸಲಾಗಿದೆ.",
       "serverNotFound": "ಈ ಸರ್ವರ್ ಇನ್ನು ಉಳಿಸಲಾಗಿಲ್ಲ.",
       "enableServer": "ಈ ಸರ್ವರ್ ಸಕ್ರಿಯಗೊಳಿಸಿ: {{name}}",
@@ -4117,6 +4120,7 @@
       "app": {
         "label": "ಉಪಕರಣ ಇಂಟರ್ಫೇಸ್",
         "failed": "ಈ ಉಪಕರಣದ ಇಂಟರ್ಫೇಸ್ ಅನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ.",
+        "tooLarge": "ಈ ಉಪಕರಣದ ಇಂಟರ್ಫೇಸ್ {{size}} ಮಿತಿಗಿಂತ ದೊಡ್ಡದಾಗಿದೆ.",
         "empty": "ಈ ಉಪಕರಣದ ಇಂಟರ್ಫೇಸ್‌ನಲ್ಲಿ ತೋರಿಸಲು ಏನೂ ಇಲ್ಲ."
       },
       "serverToolCount_one": "{{count}} ಸಾಧನ",

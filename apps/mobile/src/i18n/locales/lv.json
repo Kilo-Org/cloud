@@ -4172,6 +4172,9 @@
       "fieldName": "Parādāmais nosaukums",
       "fieldUrl": "Servera URL",
       "fieldUrlInvalid": "Ievadi derīgu servera URL.",
+      "fieldUrlCredentials": "Noņem lietotājvārdu un paroli no adreses.",
+      "fieldUrlFragment": "Noņem no adreses # daļu.",
+      "fieldUrlInsecure": "Ievadi https adresi; http drīkst izmantot tikai localhost.",
       "duplicateUrl": "Šis URL jau ir saglabāts.",
       "serverNotFound": "Šis serveris vairs nav saglabāts.",
       "enableServer": "Iespējot šo serveri: {{name}}",
@@ -4195,6 +4198,7 @@
       "app": {
         "label": "Rīka saskarne",
         "failed": "Neizdevās ielādēt šī rīka saskarni.",
+        "tooLarge": "Šī rīka saskarne ir lielāka par {{size}} ierobežojumu.",
         "empty": "Šī rīka saskarnē nav ko parādīt."
       },
       "serverToolCount_zero": "{{count}} rīku",

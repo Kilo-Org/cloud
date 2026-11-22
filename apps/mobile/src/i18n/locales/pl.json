@@ -4250,6 +4250,9 @@
       "fieldName": "Wyświetlana nazwa",
       "fieldUrl": "Adres URL serwera",
       "fieldUrlInvalid": "Wprowadź prawidłowy adres URL serwera.",
+      "fieldUrlCredentials": "Usuń nazwę użytkownika i hasło z adresu.",
+      "fieldUrlFragment": "Usuń fragment adresu zawierający znak #.",
+      "fieldUrlInsecure": "Wprowadź adres https, a http tylko w przypadku localhost.",
       "duplicateUrl": "Ten adres URL jest już zapisany.",
       "serverNotFound": "Ten serwer nie jest już zapisany.",
       "enableServer": "Włącz ten serwer: {{name}}",
@@ -4277,6 +4280,7 @@
       "app": {
         "label": "Interfejs narzędzia",
         "failed": "Nie udało się załadować interfejsu tego narzędzia.",
+        "tooLarge": "Interfejs tego narzędzia jest większy niż limit {{size}}.",
         "empty": "Interfejs tego narzędzia nie ma nic do pokazania."
       }
     },

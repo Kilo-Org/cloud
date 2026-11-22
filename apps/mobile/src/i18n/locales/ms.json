@@ -4094,6 +4094,9 @@
       "fieldName": "Nama paparan",
       "fieldUrl": "URL pelayan",
       "fieldUrlInvalid": "Masukkan URL pelayan yang sah.",
+      "fieldUrlCredentials": "Buang nama pengguna dan kata laluan daripada URL itu.",
+      "fieldUrlFragment": "Buang bahagian # daripada URL itu.",
+      "fieldUrlInsecure": "Masukkan URL https, atau http hanya untuk localhost.",
       "duplicateUrl": "URL pelayan itu sudah disimpan.",
       "serverNotFound": "Pelayan ini tidak lagi disimpan.",
       "enableServer": "Dayakan pelayan ini: {{name}}",
@@ -4119,6 +4122,7 @@
       "app": {
         "label": "Antara muka alat",
         "failed": "Antara muka alat ini tidak dapat dimuatkan.",
+        "tooLarge": "Antara muka alat ini lebih besar daripada had {{size}}.",
         "empty": "Antara muka alat ini tiada apa-apa untuk dipaparkan."
       }
     },

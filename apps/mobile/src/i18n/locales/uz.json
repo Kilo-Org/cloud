@@ -4094,6 +4094,9 @@
       "fieldName": "Koʻrsatiladigan nom",
       "fieldUrl": "Server URL manzili",
       "fieldUrlInvalid": "Toʻgʻri server URL manzilini kiriting.",
+      "fieldUrlCredentials": "Manzildan foydalanuvchi nomi va parolni olib tashlang.",
+      "fieldUrlFragment": "Manzildagi # qismini olib tashlang.",
+      "fieldUrlInsecure": "https manzilini kiriting, http faqat localhost uchun ruxsat etiladi.",
       "duplicateUrl": "Bu URL allaqachon saqlangan.",
       "serverNotFound": "Bu server boshqa saqlanmaydi.",
       "enableServer": "Bu serverni yoqish: {{name}}",
@@ -4119,6 +4122,7 @@
       "app": {
         "label": "Vosita interfeysi",
         "failed": "Ushbu vositanning interfeysini yuklab bo‘lmadi.",
+        "tooLarge": "Ushbu vositaning interfeysi {{size}} chegarasidan kattaroq.",
         "empty": "Ushbu vositanning interfeysida ko‘rsatish uchun hech narsa yo‘q."
       }
     },

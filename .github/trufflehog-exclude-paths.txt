@@ -64,3 +64,10 @@ services/cloud-agent-next/src/shared/sentry\.test\.ts
 # paths so the historical commit does not fail the scan.
 apps/web/src/db/require-reset-target\.test\.ts
 apps/web/src/db/reset-target\.test\.ts
+
+# URL refusal fixtures. mcp-settings-state-remote-servers.test.ts asserts which
+# copy key a refused MCP server address maps to, so it lists synthetic credential
+# URLs. The earlier commit on the branch used a literal URI and a later commit
+# assembles it from parts, but that commit stays in branch history. Exclude the
+# fixture path so the historical commit does not fail the scan.
+apps/mobile/src/components/chat/mcp-settings-state-remote-servers\.test\.ts

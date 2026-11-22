@@ -4094,6 +4094,9 @@
       "fieldName": "Jina linaloonyeshwa",
       "fieldUrl": "URL ya seva",
       "fieldUrlInvalid": "Weka URL sahihi ya seva.",
+      "fieldUrlCredentials": "Ondoa jina la mtumiaji na nenosiri kutoka kwenye URL.",
+      "fieldUrlFragment": "Ondoa sehemu ya # kutoka kwenye URL.",
+      "fieldUrlInsecure": "Weka URL ya https, au http tu kwa localhost.",
       "duplicateUrl": "URL hiyo tayari imehifadhiwa.",
       "serverNotFound": "Seva hii haihifadhiwi tena.",
       "enableServer": "Washa seva hii: {{name}}",
@@ -4119,6 +4122,7 @@
       "app": {
         "label": "Kiolesura cha zana",
         "failed": "Kiolesura cha zana hii hakukuweza kupakiwa.",
+        "tooLarge": "Kiolesura cha zana hii ni kikubwa kuliko kikomo cha {{size}}.",
         "empty": "Kiolesura cha zana hii hakina kitu cha kuonyesha."
       }
     },

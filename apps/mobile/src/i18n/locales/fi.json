@@ -4094,6 +4094,9 @@
       "fieldName": "Näyttönimi",
       "fieldUrl": "Palvelimen URL",
       "fieldUrlInvalid": "Anna kelvollinen palvelimen URL.",
+      "fieldUrlCredentials": "Poista käyttäjätunnus ja salasana URL:stä.",
+      "fieldUrlFragment": "Poista #-osa URL:stä.",
+      "fieldUrlInsecure": "Anna https-URL tai http vain localhostille.",
       "duplicateUrl": "Tämä URL on jo tallennettu.",
       "serverNotFound": "Tätä palvelinta ei ole enää tallennettu.",
       "enableServer": "Ota tämä palvelin käyttöön: {{name}}",
@@ -4119,6 +4122,7 @@
       "app": {
         "label": "Työkalun käyttöliittymä",
         "failed": "Tämän työkalun käyttöliittymää ei voitu ladata.",
+        "tooLarge": "Tämän työkalun käyttöliittymä on suurempi kuin {{size}}:n raja.",
         "empty": "Tämän työkalun käyttöliittymässä ei ole näytettävää."
       }
     },

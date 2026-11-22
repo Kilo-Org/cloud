@@ -4172,6 +4172,9 @@
       "fieldName": "שם תצוגה",
       "fieldUrl": "כתובת URL של השרת",
       "fieldUrlInvalid": "הזינו כתובת URL חוקית של שרת.",
+      "fieldUrlCredentials": "הסירו את שם המשתמש והסיסמה מהכתובת.",
+      "fieldUrlFragment": "הסירו את החלק עם # מהכתובת.",
+      "fieldUrlInsecure": "הזינו כתובת https, או http רק עבור localhost.",
       "duplicateUrl": "כתובת URL זו כבר שמורה.",
       "serverNotFound": "השרת הזה כבר לא שמור.",
       "enableServer": "הפעלת השרת הזה: {{name}}",
@@ -4198,6 +4201,7 @@
       "app": {
         "label": "ממשק הכלי",
         "failed": "לא הייתה אפשרות לטעון את הממשק של הכלי הזה.",
+        "tooLarge": "הממשק של הכלי הזה גדול מהמגבלה של {{size}}.",
         "empty": "אין מה להציג בממשק של הכלי הזה."
       }
     },

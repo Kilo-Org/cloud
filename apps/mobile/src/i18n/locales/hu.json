@@ -4094,6 +4094,9 @@
       "fieldName": "Megjelenített név",
       "fieldUrl": "Szerver URL-címe",
       "fieldUrlInvalid": "Adj meg érvényes szerver URL-címet.",
+      "fieldUrlCredentials": "Távolítsd el a felhasználónevet és a jelszót az URL-címből.",
+      "fieldUrlFragment": "Távolítsd el a # részt az URL-címből.",
+      "fieldUrlInsecure": "Adj meg egy https URL-címet, a http csak localhost esetén engedélyezett.",
       "duplicateUrl": "Ez az URL már el van mentve.",
       "serverNotFound": "Ez a szerver már nincs elmentve.",
       "enableServer": "Szerver engedélyezése: {{name}}",
@@ -4119,6 +4122,7 @@
       "app": {
         "label": "Eszköz felülete",
         "failed": "Az eszköz felületét nem sikerült betölteni.",
+        "tooLarge": "Az eszköz felülete nagyobb a {{size}} korlátnál.",
         "empty": "Az eszköz felületén nincs mit megjeleníteni."
       }
     },

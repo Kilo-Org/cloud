@@ -4094,6 +4094,9 @@
       "fieldName": "Göstərilən ad",
       "fieldUrl": "Server URL-i",
       "fieldUrlInvalid": "Etibarlı server URL-i daxil edin.",
+      "fieldUrlCredentials": "URL-dən istifadəçi adını və parolu silin.",
+      "fieldUrlFragment": "URL-in # hissəsini silin.",
+      "fieldUrlInsecure": "https URL-i daxil edin, http isə yalnız localhost üçün icazəlidir.",
       "duplicateUrl": "Bu URL artıq yadda saxlanılıb.",
       "serverNotFound": "Bu server artıq yadda saxlanılmır.",
       "enableServer": "Bu serveri aktiv et: {{name}}",
@@ -4119,6 +4122,7 @@
       "app": {
         "label": "Alətin interfeysi",
         "failed": "Bu alətin interfeysi yüklənə bilmədi.",
+        "tooLarge": "Bu alətin interfeysi {{size}} həddindən böyükdür.",
         "empty": "Bu alətin interfeysində göstəriləcək heç nə yoxdur."
       }
     },

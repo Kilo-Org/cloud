@@ -4094,6 +4094,9 @@
       "fieldName": "Ingoa whakaatu",
       "fieldUrl": "URL o te tūmau",
       "fieldUrlInvalid": "Whakaurua he URL tūmau tika.",
+      "fieldUrlCredentials": "Tangohia te ingoa kaiwhakamahi me te kupuhipa i te URL.",
+      "fieldUrlFragment": "Tangohia te wāhanga # o te URL.",
+      "fieldUrlInsecure": "Whakaurua he URL https, he http rānei mō localhost anake.",
       "duplicateUrl": "Kua tiakina kētia tērā URL.",
       "serverNotFound": "Kua kore tēnei tūmau e tiakina ināianei.",
       "enableServer": "Whakahohea tēnei tūmau: {{name}}",
@@ -4119,6 +4122,7 @@
       "app": {
         "label": "Atanga taputapu",
         "failed": "Kāore i taea te uta i te atanga o tēnei taputapu.",
+        "tooLarge": "He nui ake te atanga o tēnei taputapu i te tepe {{size}}.",
         "empty": "Kāore he mea hei whakaatu i te atanga o tēnei taputapu."
       }
     },

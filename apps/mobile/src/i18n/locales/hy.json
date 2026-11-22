@@ -4094,6 +4094,9 @@
       "fieldName": "Ցուցադրվող անուն",
       "fieldUrl": "Սերվերի URL",
       "fieldUrlInvalid": "Մուտքագրեք սերվերի վավեր URL։",
+      "fieldUrlCredentials": "Հեռացրեք օգտանունը և գաղտնաբառը URL-ից։",
+      "fieldUrlFragment": "Հեռացրեք URL-ի # մասը։",
+      "fieldUrlInsecure": "Մուտքագրեք https URL, կամ http՝ միայն localhost-ի համար։",
       "duplicateUrl": "Այս URL-ն արդեն պահված է։",
       "serverNotFound": "Այս սերվերն այլևս պահված չէ։",
       "enableServer": "Միացնել այս սերվերը: {{name}}",
@@ -4119,6 +4122,7 @@
       "app": {
         "label": "Գործիքի միջերես",
         "failed": "Այս գործիքի միջերեսը չհաջողվեց բեռնել։",
+        "tooLarge": "Այս գործիքի միջերեսը գերազանցում է {{size}} սահմանաչափը։",
         "empty": "Այս գործիքի միջերեսում ցուցադրելու ոչինչ չկա։"
       }
     },

@@ -4094,6 +4094,9 @@
       "fieldName": "የሚታይ ስም",
       "fieldUrl": "የአገልጋይ URL",
       "fieldUrlInvalid": "ትክክለኛ የአገልጋይ URL ያስገቡ።",
+      "fieldUrlCredentials": "ከአድራሻው የተጠቃሚ ስምና የይለፍ ቃል ያስወግዱ።",
+      "fieldUrlFragment": "ከአድራሻው የ # ክፍሉን ያስወግዱ።",
+      "fieldUrlInsecure": "የ https አድራሻ ያስገቡ፣ ወይም http ለ localhost ብቻ።",
       "duplicateUrl": "ይህ URL አስቀድሞ ተቀምጧል።",
       "serverNotFound": "ይህ አገልጋይ ከእንግዲህ አልተቀመጠም።",
       "enableServer": "ይህን አገልጋይ አንቃ: {{name}}",
@@ -4119,6 +4122,7 @@
       "app": {
         "label": "የመሣሪያ በይነገጽ",
         "failed": "የዚህ መሣሪያ በይነገጽ መጫን አልተቻለም።",
+        "tooLarge": "የዚህ መሣሪያ በይነገጽ ከ {{size}} ገደብ ይበልጣል።",
         "empty": "የዚህ መሣሪያ በይነገጽ የሚያሳየ ነገር የለውም።"
       }
     },

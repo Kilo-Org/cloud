@@ -4094,6 +4094,9 @@
       "fieldName": "Non ki parèt",
       "fieldUrl": "URL sèvè a",
       "fieldUrlInvalid": "Antre yon URL sèvè ki valab.",
+      "fieldUrlCredentials": "Retire non itilizatè a ak modpas la nan adrès la.",
+      "fieldUrlFragment": "Retire pati # a nan adrès la.",
+      "fieldUrlInsecure": "Antre yon adrès https, oswa http sèlman pou localhost.",
       "duplicateUrl": "URL sa a deja anrejistre.",
       "serverNotFound": "Sèvè sa a pa anrejistre ankò.",
       "enableServer": "Aktive sèvè sa a: {{name}}",
@@ -4119,6 +4122,7 @@
       "app": {
         "label": "Entèfas zouti a",
         "failed": "Entèfas zouti sa a pa ka chaje.",
+        "tooLarge": "Entèfas zouti sa a pi gwo pase limit {{size}} a.",
         "empty": "Entèfas zouti sa a pa gen anyen pou montre."
       }
     },

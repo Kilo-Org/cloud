@@ -4094,6 +4094,9 @@
       "fieldName": "ଦେଖାଯାଉଥିବା ନାମ",
       "fieldUrl": "ସର୍ଭର URL",
       "fieldUrlInvalid": "ବୈଧ ସର୍ଭର URL ଦିଅନ୍ତୁ।",
+      "fieldUrlCredentials": "URL ରୁ ବ୍ୟବହାରକାରୀ ନାମ ଓ ପାସୱାର୍ଡ ହଟାନ୍ତୁ।",
+      "fieldUrlFragment": "URL ର # ଅଂଶ ହଟାନ୍ତୁ।",
+      "fieldUrlInsecure": "https URL ଦିଅନ୍ତୁ, କିମ୍ବା କେବଳ localhost ପାଇଁ http ଦିଅନ୍ତୁ।",
       "duplicateUrl": "ଏହି URL ପୂର୍ବରୁ ସଞ୍ଚିତ ହୋଇଛି।",
       "serverNotFound": "ଏହି ସର୍ଭର ଆଉ ସଞ୍ଚିତ ହୋଇନାହିଁ।",
       "enableServer": "ଏହି ସର୍ଭର ସକ୍ଷମ କରନ୍ତୁ: {{name}}",
@@ -4119,6 +4122,7 @@
       "app": {
         "label": "ସାଧନ ଇଣ୍ଟରଫେସ୍",
         "failed": "ଏହି ସାଧନର ଇଣ୍ଟରଫେସ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ.",
+        "tooLarge": "ଏହି ସାଧନର ଇଣ୍ଟରଫେସ୍ {{size}} ସୀମାଠାରୁ ବଡ଼।",
         "empty": "ଏହି ସାଧନର ଇଣ୍ଟରଫେସ୍ରେ ଦେଖାଇବାକୁ କିଛି ନାହିଁ."
       }
     },

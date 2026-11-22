@@ -4094,6 +4094,9 @@
       "fieldName": "Nome mostrado",
       "fieldUrl": "URL do servidor",
       "fieldUrlInvalid": "Introduce un URL de servidor válido.",
+      "fieldUrlCredentials": "Elimina o nome de usuario e o contrasinal do URL.",
+      "fieldUrlFragment": "Elimina a parte do URL que comeza con #.",
+      "fieldUrlInsecure": "Introduce un URL https, ou http só para localhost.",
       "duplicateUrl": "Ese URL xa está gardado.",
       "serverNotFound": "Este servidor xa non está gardado.",
       "enableServer": "Activar este servidor: {{name}}",
@@ -4119,6 +4122,7 @@
       "app": {
         "label": "Interface da ferramenta",
         "failed": "Non se puido cargar a interface desta ferramenta.",
+        "tooLarge": "A interface desta ferramenta é maior que o límite de {{size}}.",
         "empty": "A interface desta ferramenta non ten nada que mostrar."
       }
     },

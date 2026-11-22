@@ -70,9 +70,7 @@ function isRegionalIndicatorEndingAt(value: string, end: number): boolean {
     return false;
   }
   const code = value.codePointAt(end - 2);
-  return (
-    code !== undefined && code >= REGIONAL_INDICATOR_FIRST && code <= REGIONAL_INDICATOR_LAST
-  );
+  return code !== undefined && code >= REGIONAL_INDICATOR_FIRST && code <= REGIONAL_INDICATOR_LAST;
 }
 
 /**
@@ -91,6 +89,11 @@ function isRegionalIndicatorEndingAt(value: string, end: number): boolean {
  * opens at the start of a regional-indicator run, because the segmenter pairs
  * indicators from the start of their run and a window opened inside one would
  * pair the wrong two.
+ *
+ * The run-start walk is bounded by the same window, so a cut costs the same
+ * whatever the payload. A run of more than 256 flags in a row is longer than
+ * that bound; a cut inside one backs off to the window's own start, which is
+ * never inside a surrogate pair, and may sit between two indicators.
  */
 export function graphemePrefixWithin(value: string, maxCodeUnits: number): string {
   if (value.length <= maxCodeUnits) {
@@ -100,9 +103,14 @@ export function graphemePrefixWithin(value: string, maxCodeUnits: number): strin
   if (start > 0 && /[\uD800-\uDBFF]/u.test(value.charAt(start - 1))) {
     start -= 1;
   }
-  while (start > 0 && isRegionalIndicatorEndingAt(value, start)) {
+  const anchorLimit = Math.max(0, start - CUT_WINDOW);
+  while (start > anchorLimit && isRegionalIndicatorEndingAt(value, start)) {
     start -= 2;
   }
+  // The walk stopped at its bound while still inside a run, so this start's own
+  // pairing is unknown: cut there rather than report a boundary that may split
+  // a pair.
+  const anchored = !isRegionalIndicatorEndingAt(value, start);
   const window = value.slice(start, Math.min(value.length, maxCodeUnits + CUT_WINDOW));
   const budget = maxCodeUnits - start;
   let index = 0;
@@ -116,6 +124,9 @@ export function graphemePrefixWithin(value: string, maxCodeUnits: number): strin
     if ((start === 0 || count > 1) && index <= budget) {
       end = index;
     }
+  }
+  if (!anchored) {
+    return value.slice(0, start);
   }
   return value.slice(0, end === -1 ? start : start + end);
 }

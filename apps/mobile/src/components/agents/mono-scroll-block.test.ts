@@ -132,6 +132,17 @@ describe('prepareMonoScrollContent', () => {
     expect(result.isTruncated).toBe(true);
   });
 
+  // A run longer than the anchor bound cannot be walked to its start, so the cut
+  // falls back to the window start rather than report a boundary that may split
+  // a pair; it still ends on a whole code point.
+  it('backs off to the window start inside a run longer than the anchor bound', () => {
+    const content = `${'q'.repeat(1000)}${'\u{1F1E6}'.repeat(4000)}${'z'.repeat(100)}`;
+    const result = prepareMonoScrollContent(content, 4000);
+    expect(result.displayText.length).toBe(4000 - 1024 * 2);
+    expect(/[\uD800-\uDBFF]$/u.test(result.displayText)).toBe(false);
+    expect(result.isTruncated).toBe(true);
+  });
+
   // The window starts mid-value: segmenting it must not report a boundary that
   // only exists because the window began there, and the text is exactly the
   // prefix the cap holds, never half a pair.

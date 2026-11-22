@@ -157,9 +157,9 @@ export type SendCloudAgentSessionNotificationResult = z.infer<
 
 /**
  * The refresh hint lists, declared once so the input schema and the subset
- * rule below read the same set: a new hint list is checked automatically, and
- * dropping or renaming one fails to compile in the rule instead of silently
- * turning it into a no-op.
+ * rule below read the same set. The rule derives its field list from these
+ * keys, so a new hint list is subset-checked without a second edit and a
+ * dropped or renamed one cannot leave the rule checking a stale name.
  */
 const refreshGlanceableSessionsHintShape = {
   /**

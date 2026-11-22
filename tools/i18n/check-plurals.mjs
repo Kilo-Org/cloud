@@ -471,7 +471,8 @@ function objectKeys(initializer) {
 /**
  * The noun phrase naming the initialiser shape `objectKeys` could not read.
  * `unwrap` already reads through the TypeScript wrappers, so the shape is the
- * node the check actually saw; spelling the node type as words keeps an
+ * node the check actually saw. One node type has a name the generic form would
+ * get wrong; every other node spells its own type as words, which keeps an
  * unlisted expression readable in the diagnostic.
  */
 function initializerShape(initializer) {
@@ -479,19 +480,8 @@ function initializerShape(initializer) {
     return 'no initializer';
   }
   const node = unwrap(initializer);
-  if (node.type === 'Identifier') {
-    return 'an identifier';
-  }
-  if (node.type === 'CallExpression') {
-    return 'a call expression';
-  }
-  if (node.type === 'TemplateLiteral') {
-    return 'a template literal';
-  }
-  if (node.type === 'MemberExpression') {
-    return 'a member expression';
-  }
   if (node.type === 'ArrayExpression') {
+    // It says "literal", where the generic formatter would say "array expression".
     return 'an array literal';
   }
   const words = node.type.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase();

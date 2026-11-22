@@ -28,6 +28,7 @@ import {
   useRepoOptions,
 } from '@/lib/hooks/use-repo-bindings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { connectedServicesHref } from '@/lib/profile-navigation';
 import {
   COMPACT_CONTROL_BOX_CLASS,
   COMPACT_CONTROL_HIT_SLOP_DP,
@@ -208,6 +209,7 @@ export function ProfileRepoPinsSection({
           onClose={() => {
             setPickerOpen(false);
           }}
+          connectedServicesHref={connectedServicesHref(organizationId)}
         />
       ) : null}
     </Section>

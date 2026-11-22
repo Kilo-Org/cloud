@@ -2665,7 +2665,7 @@
       "searchPlaceholder": "Iskanje repozitorijev",
       "noMatches": "Ni zadetkov",
       "noRepositories": "Ni razpoložljivih skladišč",
-      "noRepositoriesDescription": "Nobeno skladišče ni povezano s tvojim računom.",
+      "noRepositoriesDescription": "Za nalaganje skladišč poveži GitHub ali GitLab.",
       "loading": "Nalaganje…",
       "accessibility": "Skladišče: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4559,6 +4559,7 @@
       "promptPlaceholder": "ti si …",
       "tools": "Orodja",
       "wholeToolRule": "Ta agent uporabi eno pravilo za vsa orodja hkrati: {{rule}}. Ta stikala so samo za branje.",
+      "toolRule": "Shranjeno pravilo: {{rule}}",
       "visibility": "Vidnost",
       "visibilityPrimary": "Primarno — prikazano v izbirniku",
       "visibilitySubagent": "Subagent — na klic samo od drugih",

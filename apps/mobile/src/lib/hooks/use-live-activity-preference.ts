@@ -26,8 +26,9 @@ const store = createSecureStorePreference<boolean>({
 });
 
 // Mirror the persisted value into the React-Native-free holder the sink reads.
-// Subscribing also starts the disk read, so the mirror is correct from the
-// first emit rather than from the first render of the settings screen.
+// The store starts its read at construction, and this subscription keeps the
+// holder in step with every emit — including the one the read settles with — so
+// the mirror is correct before the settings screen's first render.
 store.subscribe(() => {
   setLiveActivityEnabledValue(store.get());
 });

@@ -2617,7 +2617,7 @@
       "searchPlaceholder": "Pretraga repozitorija",
       "noMatches": "Nema podudaranja",
       "noRepositories": "Nema dostupnih repozitorija",
-      "noRepositoriesDescription": "Nijedan repozitorij nije povezan s tvojim računom.",
+      "noRepositoriesDescription": "Poveži GitHub ili GitLab da bi učitao repozitorije.",
       "loading": "Učitavanje…",
       "accessibility": "Repozitorij: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4480,6 +4480,7 @@
       "promptPlaceholder": "ti si…",
       "tools": "Alati",
       "wholeToolRule": "Ovaj agent primjenjuje jedno pravilo na sve alate odjednom: {{rule}}. Ovi su prekidači samo za čitanje.",
+      "toolRule": "Spremljeno pravilo: {{rule}}",
       "visibility": "Vidljivost",
       "visibilityPrimary": "Primarno — prikazano u alatu za odabir",
       "visibilitySubagent": "Subagent — samo poziv od drugih",

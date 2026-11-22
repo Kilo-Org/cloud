@@ -13,6 +13,7 @@ import {
   assertGitHubInstallationRuntimeAuthorized,
   GitHubRuntimeAuthorizationError,
 } from '../../github/runtime-authorization';
+import { assertGitHubInstallationDeletable } from './protected-installation';
 
 export type { GitHubAppType } from './app-selector';
 
@@ -269,6 +270,9 @@ export async function deleteGitHubInstallation(
   installationId: string,
   appType: GitHubAppType = 'standard'
 ): Promise<void> {
+  // A local stack runs on the fixture app, and deleting its installation takes every forge fixture
+  // offline. The guard runs before the credentials are read, so no request leaves Kilo.
+  assertGitHubInstallationDeletable(installationId);
   const credentials = getGitHubAppCredentials(appType);
 
   if (!credentials.appId || !credentials.privateKey) {
@@ -293,6 +297,7 @@ export async function verifyAndDeleteGitHubOrganizationInstallation(params: {
   accountId: string;
   appType: GitHubAppType;
 }): Promise<void> {
+  assertGitHubInstallationDeletable(params.installationId);
   const credentials = getGitHubAppCredentials(params.appType);
   if (!credentials.appId || !credentials.privateKey)
     throw new Error('GitHub App credentials unavailable');

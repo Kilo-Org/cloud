@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "ରିପୋଜିଟୋରୀ ସନ୍ଧାନ",
       "noMatches": "କୌଣସି ମେଳ ନାହିଁ",
       "noRepositories": "କୌଣସି ରିପୋଜିଟୋରୀ ଉପଲବ୍ଧ ନାହିଁ",
-      "noRepositoriesDescription": "ଆପଣଙ୍କ ଆକାଉଣ୍ଟ ସହିତ କୌଣସି ରିପୋଜିଟୋରୀ ସଂଯୋଜିତ ନାହିଁ।",
+      "noRepositoriesDescription": "ରିପୋଜିଟୋରୀ ଲୋଡ୍ କରିବାକୁ GitHub କିମ୍ବା GitLab ଆକାଉଣ୍ଟ ସଂଯୋଗ କରନ୍ତୁ।",
       "loading": "ଲୋଡ୍ ହେଉଛି…",
       "accessibility": "ରିପୋଜିଟୋରୀ: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "ତୁମେ ଏକ …",
       "tools": "ସାଧନଗୁଡ଼ିକ।",
       "wholeToolRule": "ଏହି ଏଜେଣ୍ଟ ଏକସାଥେ ପ୍ରତ୍ୟେକ ସାଧନ ଉପରେ ଗୋଟିଏ ନିୟମ ପ୍ରୟୋଗ କରେ: {{rule}}। ଏହି ସୁଇଚଗୁଡ଼ିକ କେବଳ ପଠନଯୋଗ୍ୟ।",
+      "toolRule": "ସଂରକ୍ଷିତ ନିୟମ: {{rule}}",
       "visibility": "ଦୃଶ୍ୟମାନତା।",
       "visibilityPrimary": "ପ୍ରାଥମିକ — ପିକଚରରେ ଦର୍ଶାଯାଇଛି।",
       "visibilitySubagent": "ସବଜେଣ୍ଟ୍ — କେବଳ ଅନ୍ୟମାନଙ୍କଠାରୁ କଲ୍ ଯୋଗ୍ୟ।",

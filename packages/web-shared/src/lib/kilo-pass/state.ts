@@ -3,7 +3,7 @@ import 'server-only';
 import { kilo_pass_store_purchases, kilo_pass_subscriptions } from '@kilocode/db/schema';
 import type { StripeSubscriptionStatus } from '@kilocode/db/schema-types';
 
-import type { DrizzleTransaction, db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
+import type { DrizzleConnection } from '@kilocode/web-shared/lib/drizzle';
 import { and, desc, eq } from 'drizzle-orm';
 import {
   type KiloPassPaymentProvider,
@@ -15,9 +15,6 @@ import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/st
 import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import { getOpenPauseEvent } from '@kilocode/web-shared/lib/kilo-pass/pause-events';
 import { pickKiloPassSubscriptionForProjection } from '@kilocode/worker-utils/kilo-pass-bonus-projection';
-
-type Db = typeof defaultDb;
-type DbOrTx = Db | DrizzleTransaction;
 
 export type KiloPassSubscriptionState = {
   subscriptionId: string;
@@ -92,7 +89,7 @@ function isExpiredAtOrBeforeNow(expiresAt: string | null, nowIso: string): boole
 }
 
 export async function getKiloPassStateForUser(
-  db: DbOrTx,
+  db: DrizzleConnection,
   kiloUserId: string,
   options: { forUpdate?: boolean } = {}
 ): Promise<KiloPassSubscriptionState | null> {

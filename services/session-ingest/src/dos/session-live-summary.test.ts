@@ -162,6 +162,31 @@ describe('foldSessionLiveSummary', () => {
     expect(state.plan).toEqual({ done: 1, total: 3, current: 'second' });
   });
 
+  it('counts a todo with an unknown status as an outstanding step', () => {
+    const state = run([
+      part('todowrite', 'running', {
+        todos: [
+          { content: 'one', status: 'completed' },
+          { content: 'two', status: 'in_progress' },
+          { content: 'queued', status: 'queued' },
+        ],
+      }),
+    ]);
+    expect(state.plan).toEqual({ done: 1, total: 3, current: 'two' });
+  });
+
+  it('keeps a plan of only unknown statuses and marks none done or current', () => {
+    const state = run([
+      part('todowrite', 'running', {
+        todos: [
+          { content: 'a', status: 'complete' },
+          { content: 'b', status: 'done' },
+        ],
+      }),
+    ]);
+    expect(state.plan).toEqual({ done: 0, total: 2, current: null });
+  });
+
   it('drops the plan when every todo is cancelled', () => {
     const state = run([
       part('todowrite', 'running', { todos: [{ content: 'never', status: 'cancelled' }] }),

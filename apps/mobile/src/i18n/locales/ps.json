@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "د زېرمتونونو لټون",
       "noMatches": "هېڅ پایله ونه موندل شوه",
       "noRepositories": "هېڅ زېرمتون نشته",
-      "noRepositoriesDescription": "ستاسو له حساب سره هېڅ زېرمتون نه دی نښلول شوی.",
+      "noRepositoriesDescription": "د زېرمتونونو د بارولو لپاره، GitHub یا GitLab حساب ونښلوئ.",
       "loading": "بارېږي…",
       "accessibility": "زېرمتون: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "تاسو یو…",
       "tools": "وسیلې",
       "wholeToolRule": "دا اجنټ په یو وخت کې پر هرې وسیلې یوه قاعده پلي کوي: {{rule}}. دا سویچونه یوازې د لوستلو وړ دي.",
+      "toolRule": "زېرمه شوې قاعده: {{rule}}",
       "visibility": "لید",
       "visibilityPrimary": "لومړني — په غوره کونکي کې ښودل شوي",
       "visibilitySubagent": "فرعي اجنټ — یوازې د نورو څخه د غوښتنې وړ",

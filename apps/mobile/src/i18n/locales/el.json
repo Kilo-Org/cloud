@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "Αναζήτηση αποθετηρίων",
       "noMatches": "Δεν βρέθηκαν αποτελέσματα",
       "noRepositories": "Κανένα διαθέσιμο αποθετήριο",
-      "noRepositoriesDescription": "Δεν υπάρχουν αποθετήρια συνδεδεμένα με τον λογαριασμό σου.",
+      "noRepositoriesDescription": "Για να φορτώσεις αποθετήρια, σύνδεσε το GitHub ή το GitLab.",
       "loading": "Φόρτωση…",
       "accessibility": "Αποθετήριο: {{label}}",
       "platformBitbucket": "Bitbucket"
@@ -4401,6 +4401,7 @@
       "promptPlaceholder": "Είσαι μια…",
       "tools": "Εργαλεία",
       "wholeToolRule": "Αυτός ο πράκτορας εφαρμόζει έναν κανόνα σε κάθε εργαλείο ταυτόχρονα: {{rule}}. Αυτοί οι διακόπτες είναι μόνο για ανάγνωση.",
+      "toolRule": "Αποθηκευμένος κανόνας: {{rule}}",
       "visibility": "Ορατότητα",
       "visibilityPrimary": "Κύριο — εμφανίζεται στο εργαλείο επιλογής",
       "visibilitySubagent": "Υποπράκτορας — καλείται μόνο από άλλους",

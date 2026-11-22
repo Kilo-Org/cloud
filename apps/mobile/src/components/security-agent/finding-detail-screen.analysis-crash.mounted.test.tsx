@@ -98,6 +98,7 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
 }));
 vi.mock('@/lib/hooks/use-security-findings', () => ({
   useSecurityFinding: () => finding,
+  useRetrySecurityFinding: () => ({ retry: vi.fn(), isRetrying: false }),
   useSecurityAnalysis: () => analysis,
 }));
 vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({

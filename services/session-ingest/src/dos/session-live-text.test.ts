@@ -170,9 +170,15 @@ describe('sessionLiveText', () => {
     }
   });
 
-  it('returns null for non-strings, blanks, and joiner-only text', () => {
+  it('returns null for non-strings, blanks, joiner-only text, and a limit below one', () => {
     expect(sessionLiveText(null, 40)).toBeNull();
     expect(sessionLiveText('\u200B\uFEFF\n', 40)).toBeNull();
     expect(sessionLiveText('\u200C\u200D', 40)).toBeNull();
+    // A limit below one has no room to draw anything, so even a real line reads null.
+    expect(sessionLiveText('a long line', 0)).toBeNull();
+    expect(sessionLiveText('a long line', -5)).toBeNull();
+    // The smallest usable limit still draws: the guard only rejects what has no room.
+    expect(sessionLiveText('abcdef', 1)).toBe('…');
+    expect(sessionLiveText('a', 1)).toBe('a');
   });
 });

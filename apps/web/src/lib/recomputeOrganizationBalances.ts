@@ -279,7 +279,7 @@ async function applyOrganizationBalanceUpdates(
 
     if (updates.accounting_error_mUsd !== 0) {
       await tx.insert(credit_transactions).values({
-        kilo_user_id: 'system',
+        kilo_user_id: ORGANIZATION_CREDIT_ACTOR,
         organization_id: updates.org.id,
         amount_microdollars: updates.accounting_error_mUsd,
         is_free: true,

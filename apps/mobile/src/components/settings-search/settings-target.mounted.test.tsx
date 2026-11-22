@@ -1,4 +1,11 @@
-import { createElement, type ReactElement, type ReactNode, type Ref, type RefObject } from 'react';
+import {
+  createElement,
+  type ReactElement,
+  type ReactNode,
+  type Ref,
+  type RefObject,
+  StrictMode,
+} from 'react';
 import { type ScrollViewInstance } from 'react-native';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -13,24 +20,24 @@ import {
 
 const fake = vi.hoisted(() => {
   const content = { node: 'content' };
+  // The scroller's committed geometry and offset. `scrollTo` clamps like the
+  // native view does, so a dispatch that lands before the taller body commits
+  // stops at the shorter body's range instead of pretending it scrolled.
+  const state = { top: 40, contentHeight: 0, frameHeight: 0, offset: 0 };
   const scroll = {
     getInnerViewRef: () => content,
     getInnerViewNode: () => undefined,
-    scrollTo: vi.fn(),
+    scrollTo: vi.fn(({ y }: { y: number }) => {
+      const max = Math.max(0, state.contentHeight - state.frameHeight);
+      state.offset = Math.min(Math.max(0, y), max);
+    }),
   };
-  return { content, scroll };
+  return { content, state, scroll };
 });
 
 type RevealNode = {
   measureLayout: (relative: unknown, onSuccess: (left: number, top: number) => void) => void;
 };
-
-/** The row wrapper instance the reveal measures, reporting a 40pt top edge. */
-const revealNode = vi.hoisted((): RevealNode => ({
-  measureLayout: (_relative, onSuccess) => {
-    onSuccess(0, 40);
-  },
-}));
 
 vi.mock('react-native', async () => {
   // A vi.mock factory is hoisted above the module's static imports, so React is
@@ -43,7 +50,15 @@ vi.mock('react-native', async () => {
     children,
     ...props
   }: { ref?: Ref<RevealNode>; children?: ReactNode } & Record<string, unknown>) {
-    react.useImperativeHandle(ref, () => revealNode, []);
+    react.useImperativeHandle(
+      ref,
+      () => ({
+        measureLayout: (_relative: unknown, onSuccess: (left: number, top: number) => void) => {
+          onSuccess(0, fake.state.top);
+        },
+      }),
+      []
+    );
     return react.createElement('View', props, children);
   }
   return { View: MockView };
@@ -65,6 +80,7 @@ vi.mock('@/components/tab-screen', () => ({
 
 const system = defineSetting('appearance.system', 'preferences.appearanceSystem');
 const dark = defineSetting('appearance.dark', 'preferences.appearanceDark');
+const signOut = defineSetting('profile.signOut', 'common.signOut', 'signOut');
 
 let renderer: ReactTestRenderer | undefined = undefined;
 
@@ -83,6 +99,15 @@ function mount(element: ReactElement) {
   return renderer.root;
 }
 
+function update(element: ReactElement) {
+  if (renderer === undefined) {
+    throw new Error('Missing renderer');
+  }
+  act(() => {
+    renderer?.update(element);
+  });
+}
+
 function row(testID = 'row') {
   return createElement('Row', { testID });
 }
@@ -96,6 +121,10 @@ function overlays(root: ReactTestInstance) {
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
+  fake.state.top = 40;
+  fake.state.contentHeight = 0;
+  fake.state.frameHeight = 0;
+  fake.state.offset = 0;
   fake.scroll.scrollTo.mockClear();
 });
 
@@ -106,10 +135,32 @@ function wrapper(root: ReactTestInstance) {
   )[0];
 }
 
-/** Fire the layout pass that triggers the one reveal for the active row. */
+/** Fire the layout pass that registers the active row for its one reveal. */
 function layout(node: ReactTestInstance | undefined) {
   act(() => {
     (node?.props.onLayout as (() => void) | undefined)?.();
+  });
+}
+
+/** The scroller's committed content size, as its post-layout report. */
+function contentSize(root: ReactTestInstance, height: number) {
+  fake.state.contentHeight = height;
+  const handler = root.findByType('TabScroll').props.onContentSizeChange as
+    | ((width: number, height: number) => void)
+    | undefined;
+  act(() => {
+    handler?.(0, height);
+  });
+}
+
+/** The scroller's committed viewport frame. */
+function frame(root: ReactTestInstance, height: number) {
+  fake.state.frameHeight = height;
+  const handler = root.findByType('TabScroll').props.onLayout as
+    | ((event: { nativeEvent: { layout: { height: number } } }) => void)
+    | undefined;
+  act(() => {
+    handler?.({ nativeEvent: { layout: { height } } });
   });
 }
 
@@ -210,5 +261,153 @@ describe('SettingsSearchScrollView', () => {
 
     expect(root.findByProps({ testID: 'row' })).toBeTruthy();
     expect(overlays(root)).toEqual([]);
+  });
+
+  it('reveals the selected row against the body that replaces the results', () => {
+    const action = vi.fn();
+    const body = (target?: string) => (
+      <SettingsSearchScrollView settingsTarget={target}>
+        {target === undefined ? (
+          row('results')
+        ) : (
+          <SettingsTarget item={signOut}>
+            {createElement('Pressable', { testID: 'signOut', onPress: action })}
+          </SettingsTarget>
+        )}
+      </SettingsSearchScrollView>
+    );
+
+    const root = mount(body());
+    contentSize(root, 200);
+    frame(root, 800);
+    expect(fake.state.offset).toBe(0);
+
+    fake.state.top = 900;
+    update(body('profile.signOut'));
+    // The replacing body's row lays out while the scroller still holds the
+    // short results body, so the dispatch is clamped to the top — the Android
+    // failure this regression pins.
+    layout(wrapper(root));
+    expect(fake.state.offset).toBe(0);
+
+    // The taller body reports its size after the row's layout; the reveal is
+    // re-measured against it instead of staying clamped at the top.
+    contentSize(root, 2000);
+    expect(fake.state.offset).toBe(888);
+    expect(action).not.toHaveBeenCalled();
+  });
+
+  it('reveals the same row again when a repeated selection bumps the key', () => {
+    fake.state.top = 900;
+    const body = (revealKey?: number) => (
+      <SettingsSearchScrollView settingsTarget="profile.signOut" revealKey={revealKey}>
+        <SettingsTarget item={signOut}>{row('signOut')}</SettingsTarget>
+      </SettingsSearchScrollView>
+    );
+
+    const root = mount(body());
+    contentSize(root, 2000);
+    frame(root, 800);
+    layout(wrapper(root));
+    expect(fake.state.offset).toBe(888);
+
+    // The person scrolls away; a second tap on the same result must bring the
+    // row back even though the target id never changed.
+    fake.state.offset = 0;
+    update(body(1));
+    expect(fake.state.offset).toBe(888);
+  });
+
+  it('reveals a re-mounted row for the same id after the search body replaced it', () => {
+    fake.state.top = 900;
+    const body = (searching: boolean) => (
+      <SettingsSearchScrollView settingsTarget="profile.signOut">
+        {searching ? (
+          row('results')
+        ) : (
+          <SettingsTarget item={signOut}>{row('signOut')}</SettingsTarget>
+        )}
+      </SettingsSearchScrollView>
+    );
+
+    const root = mount(body(false));
+    contentSize(root, 2000);
+    frame(root, 800);
+    layout(wrapper(root));
+    expect(fake.state.offset).toBe(888);
+
+    // A new search replaces the full body, so the row unmounts while the
+    // selected id stays.
+    update(body(true));
+    contentSize(root, 200);
+    fake.state.offset = 0;
+
+    // Selecting the same result again mounts a new row. The retained id must
+    // not suppress its reveal.
+    update(body(false));
+    contentSize(root, 2000);
+    layout(wrapper(root));
+    expect(fake.state.offset).toBe(888);
+  });
+
+  it('reveals under StrictMode, whose simulated cleanup runs before the remount', () => {
+    const root = mount(
+      <StrictMode>
+        <SettingsSearchScrollView settingsTarget="profile.signOut">
+          <SettingsTarget item={signOut}>{row('signOut')}</SettingsTarget>
+        </SettingsSearchScrollView>
+      </StrictMode>
+    );
+
+    layout(wrapper(root));
+    expect(fake.scroll.scrollTo).toHaveBeenCalledWith({ y: 28, animated: true });
+  });
+
+  it('does not jump back to a settled row when a section below it grows', () => {
+    fake.state.top = 900;
+    const root = mount(
+      <SettingsSearchScrollView settingsTarget="profile.signOut">
+        <SettingsTarget item={signOut}>{row('signOut')}</SettingsTarget>
+      </SettingsSearchScrollView>
+    );
+
+    contentSize(root, 2000);
+    frame(root, 800);
+    layout(wrapper(root));
+    expect(fake.state.offset).toBe(888);
+
+    // The row has not moved and the reveal was not clamped, so a taller body
+    // below it must not pull the screen back to the row.
+    const calls = fake.scroll.scrollTo.mock.calls.length;
+    contentSize(root, 2400);
+    expect(fake.scroll.scrollTo).toHaveBeenCalledTimes(calls);
+    expect(fake.state.offset).toBe(888);
+  });
+
+  it('re-measures when the viewport frame settles after the first reveal', () => {
+    fake.state.top = 900;
+    const root = mount(
+      <SettingsSearchScrollView settingsTarget="profile.signOut">
+        <SettingsTarget item={signOut}>{row('signOut')}</SettingsTarget>
+      </SettingsSearchScrollView>
+    );
+
+    contentSize(root, 1000);
+    // The scroller's first frame is measured against the shorter body, so the
+    // dispatch stops at the range available then, short of the row's offset.
+    frame(root, 300);
+    layout(wrapper(root));
+    expect(fake.state.offset).toBe(700);
+
+    // A later keyboard frame changes the scrollable range; the same row must be
+    // revealed against the final frame instead of staying where the first one
+    // stopped it.
+    frame(root, 100);
+    expect(fake.state.offset).toBe(888);
+
+    // Later frame reports at the settled height must not move the screen again.
+    const calls = fake.scroll.scrollTo.mock.calls.length;
+    frame(root, 100);
+    expect(fake.scroll.scrollTo).toHaveBeenCalledTimes(calls);
   });
 });

@@ -343,11 +343,15 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
   ]);
 
   const settingsSearch = useSettingsSearch(searchSources);
-  // The row a root result selected. It stays while the query clears, so the
-  // person lands on the highlighted control instead of the results vanishing
-  // with nothing shown. Nested results navigate instead; neither path runs the
-  // row's own action.
-  const [settingsTarget, setSettingsTarget] = useState(routeTarget);
+  // The row a root result selected and the selection that asked for it. It
+  // stays while the query clears, so the person lands on the highlighted
+  // control instead of the results vanishing with nothing shown. The counter
+  // distinguishes a second tap on the same result from the first, so the row is
+  // revealed again instead of staying where the previous scroll left it.
+  // Nested results navigate instead; neither path runs the row's own action.
+  const [settingsTarget, setSettingsTarget] = useState(
+    routeTarget === undefined ? undefined : { id: routeTarget, attempt: 0 }
+  );
 
   const selectSetting = useCallback(
     (entry: SettingsSearchResult['entry']) => {
@@ -367,7 +371,7 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
         router.push(href as Href);
         return;
       }
-      setSettingsTarget(entry.id);
+      setSettingsTarget(current => ({ id: entry.id, attempt: (current?.attempt ?? 0) + 1 }));
     },
     [router, settingsSearch]
   );
@@ -490,7 +494,8 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
       />
       <SettingsSearchScrollView
         ref={deleteScrollRef}
-        settingsTarget={settingsTarget}
+        settingsTarget={settingsTarget?.id}
+        revealKey={settingsTarget?.attempt}
         className="flex-1"
         contentContainerClassName={settingsSearch.active ? undefined : SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}

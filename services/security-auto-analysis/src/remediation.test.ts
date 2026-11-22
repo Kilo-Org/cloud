@@ -273,8 +273,9 @@ describe('security remediation launch contract', () => {
     // The backlink travels in the commit message, because the pull request body
     // comes from that commit.
     expect(prompt).toContain('Put the summary and the Kilo finding backlink');
-    // The draft choice stays conditional.
-    expect(prompt).toContain('Open the pull request as a draft when validation is incomplete');
+    // The create command is named, and the draft choice stays conditional.
+    expect(prompt).toContain('gh pr create --fill');
+    expect(prompt).toContain('Add --draft only when validation is incomplete');
   });
 });
 

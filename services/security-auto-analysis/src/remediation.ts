@@ -523,7 +523,7 @@ Rules:
 - Create and check out branch ${params.branchName} from the current checkout before changing files, unless already on that branch.
 - Do not open no-change PR. If no changes are needed, return no_changes_needed.
 - Write the commit message with the file-writing tool and pass it with git commit -F <file>. Put the summary and the Kilo finding backlink ${params.findingUrl} in that message body, because the pull request title and body come from the commit.
-- Open the pull request as a draft when validation is incomplete or risk is nontrivial.
+- Open the pull request with gh pr create --fill, which reads the title and body from that commit. Add --draft only when validation is incomplete or risk is nontrivial.
 - A command that carries a quote character is refused, so pass no text on a command line.
 - Final assistant response must contain only normal summary plus machine-readable result block:
 

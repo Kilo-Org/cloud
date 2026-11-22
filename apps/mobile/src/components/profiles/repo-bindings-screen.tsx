@@ -274,27 +274,31 @@ export function RepoBindingsScreen({
           ) : null}
 
           {/* The form opens from the header's create control, so the slot holds
-              the form or the sentence that names who may add one. */}
-          <ProfileManageSlot permission={profilePermission}>
-            {isAdding ? (
-              <RepoBindingsAddForm
-                chosenRepo={chosenRepo}
-                chosenProfile={chosenProfile}
-                isPending={bind.isPending}
-                canAdd={canAdd}
-                onPickRepo={() => {
-                  setRepoPickerOpen(true);
-                }}
-                onPickProfile={() => {
-                  setProfilePickerOpen(true);
-                }}
-                onCancel={resetAdd}
-                onAdd={() => {
-                  void handleAdd();
-                }}
-              />
-            ) : null}
-          </ProfileManageSlot>
+              the form or the sentence that names who may add one. A terminal
+              read failure already states who can grant access, so the slot
+              would repeat it under the same state. */}
+          {readErrorTerminal ? null : (
+            <ProfileManageSlot permission={profilePermission}>
+              {isAdding ? (
+                <RepoBindingsAddForm
+                  chosenRepo={chosenRepo}
+                  chosenProfile={chosenProfile}
+                  isPending={bind.isPending}
+                  canAdd={canAdd}
+                  onPickRepo={() => {
+                    setRepoPickerOpen(true);
+                  }}
+                  onPickProfile={() => {
+                    setProfilePickerOpen(true);
+                  }}
+                  onCancel={resetAdd}
+                  onAdd={() => {
+                    void handleAdd();
+                  }}
+                />
+              ) : null}
+            </ProfileManageSlot>
+          )}
         </TabScreenScrollView>
       )}
 

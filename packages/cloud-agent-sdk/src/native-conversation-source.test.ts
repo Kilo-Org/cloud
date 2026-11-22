@@ -751,6 +751,22 @@ test('reports an unreadable live form by identity and keeps valid pending questi
   ).toBe(pending);
 });
 
+test('a form of another kind never becomes a question notice', () => {
+  const pending = {
+    permissions: [],
+    questions: [],
+    unreadableQuestions: [],
+    unreadablePermissions: [],
+  };
+  for (const form of [
+    { id: 'form-1', metadata: { kind: 'permission' }, fields: 'not an array' },
+    { id: 'form-2', metadata: {}, fields: 'not an array' },
+    { id: 'form-3', fields: 'not an array' },
+  ]) {
+    expect(reduceNativePendingRequests(pending, frame('form.created', { form }))).toBe(pending);
+  }
+});
+
 test('a live form with no fields is a notice and removes a card already shown for its id', () => {
   const pending = {
     permissions: [],

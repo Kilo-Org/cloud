@@ -911,7 +911,9 @@ const questionListSchema = z
 
 export const questionAskedDataSchema = z.object({
   id: z.string(),
-  tool: z.object({ callID: z.string() }).optional(),
+  // The question path never forwards `tool`, so a tool call id this app cannot
+  // read must not decide whether the question list is readable.
+  tool: z.object({ callID: z.string() }).optional().catch(undefined),
   questions: questionListSchema.optional().catch(undefined),
 });
 export type QuestionAskedData = z.infer<typeof questionAskedDataSchema>;

@@ -1181,6 +1181,16 @@ describe('normalize', () => {
       expect(result).toEqual({ type: 'question.unreadable', requestId: 'q-1' });
     });
 
+    it('keeps a readable list when the tool call id cannot be read', () => {
+      const data = { id: 'q-1', tool: null, questions: [question] };
+      const result = normalize(createRaw('question.asked', data));
+      expect(result).toEqual({
+        type: 'question.asked',
+        requestId: 'q-1',
+        questions: [question],
+      });
+    });
+
     it('treats a question list that is not an array as unreadable', () => {
       const data = { id: 'q-1', questions: 'not-an-array' };
       const result = normalize(createRaw('question.asked', data));

@@ -52,8 +52,18 @@ const inventoryQuestionSchema = z
   .passthrough();
 /** What an entry still says about itself when its scope cannot be read. */
 const inventoryIdentitySchema = z.object({ requestID: z.string().min(1) }).passthrough();
-/** What a live form still says about itself when its fields cannot be read. */
-const formIdentitySchema = z.object({ id: z.string().min(1) }).passthrough();
+/**
+ * What a live form still says about itself when its fields cannot be read. The
+ * question kind stays required: a form this list never held — another kind, or
+ * one whose metadata cannot be read — is not a question request, so announcing
+ * it as one would name a request this list does not own and could not clear.
+ */
+const formIdentitySchema = z
+  .object({
+    id: z.string().min(1),
+    metadata: z.object({ kind: z.literal('question') }).passthrough(),
+  })
+  .passthrough();
 const inventorySchema = z.object({
   permissions: z.array(z.unknown()).optional(),
   questions: z.array(z.unknown()).optional(),

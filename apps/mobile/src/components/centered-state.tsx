@@ -69,9 +69,12 @@ type MeasuredViewport = { frame: StateFrame; surface: StateFrame };
  * native geometry is still arriving is such a band too, for the same reason: any
  * placement built before the probe reports moves when the safe-area answer
  * lands, so the content waits one commit for the frame. The scroller's own
- * layout event starts the one measurement of that layout, so the state paints
- * at the estimate and takes the measured placement as soon as the native answer
- * arrives — for the bands above, the two placements are the same position. It
+ * layout event starts the one measurement of that layout — one request per
+ * layout, not one from the ref callback beside one from a mount effect, which
+ * the token guard could only discard. On a band that can be estimated, the
+ * state paints at the estimate and takes the measured placement as soon as the
+ * native answer arrives, and the two placements are the same position. On a
+ * band that cannot be estimated, that same answer is what first places it. It
  * also paints at the estimate whenever a measurement cannot place it at all,
  * because a state that doesn't appear is worse than one placed by the estimate
  * — except on a surface whose native geometry never reports at all, where the

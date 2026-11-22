@@ -334,10 +334,11 @@ const SECURITY_REMEDIATION_ALLOWED_COMMANDS = [
 //
 // git can also take the refspec and the force flag from its own configuration,
 // where a rule that reads only the command text cannot see them. A configuration
-// write that names a push key, a force key or an alias is therefore refused too.
-// The forms below also refuse the reads of those keys: a rule that admits a read
-// would also admit a write appended to it, because a trailing `*` cannot stop
-// before the next argument.
+// write that names a push key, a force key, a mirror key or an alias is
+// therefore refused too, whether the write is `git config` or the `-c
+// key=value` form on the command line. The forms below also refuse the reads of
+// those keys: a rule that admits a read would also admit a write appended to it,
+// because a trailing `*` cannot stop before the next argument.
 //
 // The denies are installed after the `git push` allow, and the last matching
 // rule decides. A ref that is deleted by name, with `--delete` or with an empty
@@ -395,6 +396,11 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   'git -?* config -?* --add *',
   'git -?* config -?* --replace-all *',
   'git -?* config -?* --unset *',
+  // The `-c key=value` form sets the same keys on the command line.
+  'git *-c *push*',
+  'git *-c *force*',
+  'git *-c *mirror*',
+  'git *-c *alias*',
 ];
 
 const SECURITY_REMEDIATION_DENIED_COMMAND_PATTERNS = [

@@ -39,6 +39,11 @@ export const TWO_DOWNLOADS_PAGE_PATH = '/two';
  * same gesture starts is a second one the step's approval does not buy.
  */
 export const CARD_PAGE_PATH = '/card';
+/**
+ * An attachment-shaped control whose response is an error: the guard still has to decide the click, but the browser
+ * gets a plain error body instead of a file, so there is never an item to keep.
+ */
+export const BROKEN_DOWNLOAD_PATH = '/assets/broken-report.txt';
 /** The page whose drop zone reports the names of the files a drop handed it. */
 export const DROP_PAGE_PATH = '/drop';
 /** Where the drop page reports those names: the fixture answers 204 and records the list. */
@@ -57,6 +62,7 @@ const DOWNLOAD_PAGE_HTML = `<!doctype html>
     <h1>Download page</h1>
     <p>A link that hands the browser a file instead of a document.</p>
     <a href="${DOWNLOAD_PATH}">Download report</a>
+    <a href="${BROKEN_DOWNLOAD_PATH}" download>Broken report</a>
     <a id="slow-download" href="#slow">Download slow report</a>
     <button type="button">Plain button</button>
     <iframe name="slow-sink" hidden></iframe>
@@ -171,6 +177,8 @@ const USER_PAGE_HTML = `<!doctype html>
 
 export interface DownloadFixture {
   readonly close: () => Promise<void>;
+  /** How many times the attachment route answered an error: a click the guard still decided reached the fixture. */
+  readonly brokenHits: () => number;
   /** The name lists the drop page reported, one entry per drop that reached it: the page's own record of the files. */
   readonly dropReceived: () => readonly (readonly string[])[];
   /** How many times the attachment route served a body: a cancelled download still reaches it. */
@@ -193,6 +201,7 @@ export const startDownloadFixture = async (): Promise<DownloadFixture> => {
   let lateHits = 0;
   let secondHits = 0;
   let userHits = 0;
+  let brokenHits = 0;
   /** One entry per drop the page reported, in arrival order: the file names its own `dataTransfer` carried. */
   const dropsReceived: (readonly string[])[] = [];
   /** The routes waiting for the test: answering one makes the browser create its download. */
@@ -225,6 +234,18 @@ export const startDownloadFixture = async (): Promise<DownloadFixture> => {
       dropsReceived.push(reported);
       response.writeHead(204, { 'cache-control': 'no-store' });
       response.end();
+
+      return;
+    }
+
+    if (path === BROKEN_DOWNLOAD_PATH) {
+      brokenHits += 1;
+      // No `content-disposition`: the browser gets an error page, not a file it could ever write to the folder.
+      response.writeHead(500, {
+        'cache-control': 'no-store',
+        'content-type': 'text/plain; charset=utf-8',
+      });
+      response.end('fixture attachment failure\n');
 
       return;
     }
@@ -342,6 +363,7 @@ export const startDownloadFixture = async (): Promise<DownloadFixture> => {
       await once(server, 'close');
     },
     dropReceived: () => dropsReceived,
+    brokenHits: () => brokenHits,
     hits: () => hits,
     lateHits: () => lateHits,
     releaseLate: () => {

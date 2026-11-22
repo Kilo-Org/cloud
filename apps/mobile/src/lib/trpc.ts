@@ -17,6 +17,7 @@ import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import { isForcedProcedure, withForceState } from '@/lib/force-state-fixture';
 import {
   type ActiveTokenSnapshot,
+  expiryAtMs,
   getActiveToken,
   getActiveTokenSnapshot,
   getAuthTokenForRequest,
@@ -215,13 +216,13 @@ const measuredFetch = createLatencyFetch(withJsonBody, latencyBuffer, {
 });
 
 /**
- * The cold expiry read, as the owner has no expiry yet. While iOS protected
- * data is unavailable the keychain refuses every read and that refusal is the
- * documented, unreported state (see `lib/protected-data`): the read is skipped
- * and the expiry stays unknown, so the request goes out on the held token and
- * a later unlocked request resolves the expiry. Nothing is published on that
- * path — an unknown expiry must not become a known-`null` one. The guard's own
- * check runs synchronously inside `SecureStore.getItemAsync`, so the check here
+ * The cold expiry read, as the owner has no resolved expiry yet. While iOS
+ * protected data is unavailable the keychain refuses every read and that
+ * refusal is the documented, unreported state (see `lib/protected-data`): the
+ * read is skipped, nothing is published, and the expiry stays unknown — so the
+ * request goes out on the held token and a later unlocked request resolves it.
+ * An unknown expiry must not become a known-absent one. The guard's own check
+ * runs synchronously inside `SecureStore.getItemAsync`, so the check here
  * decides the call it wraps. Any other rejection keeps the caller's behavior.
  */
 async function readColdExpiry(active: ActiveTokenSnapshot | null): Promise<number | null> {
@@ -230,11 +231,17 @@ async function readColdExpiry(active: ActiveTokenSnapshot | null): Promise<numbe
   }
   const expiresAtStr = await SecureStore.getItemAsync(TOKEN_EXPIRES_AT_KEY);
   const resolvedExpiresAtMs = expiresAtStr ? Number(expiresAtStr) : null;
-  // Publish the resolved expiry into the owner that the cold read warmed.
-  // A newer owner published while the expiry was read keeps its own token
-  // and expiry.
+  // The read completed: publish what it found so this runs once per token.
+  // `absent` is a resolved answer, so a session with a token but no stored
+  // expiry never reads the keychain again. A newer owner published while the
+  // expiry was read keeps its own token and expiry.
   if (active) {
-    publishActiveTokenExpiry(active, resolvedExpiresAtMs);
+    publishActiveTokenExpiry(
+      active,
+      resolvedExpiresAtMs === null
+        ? { kind: 'absent' }
+        : { kind: 'known', atMs: resolvedExpiresAtMs }
+    );
   }
   return resolvedExpiresAtMs;
 }
@@ -325,14 +332,18 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 
   // Proactive refresh: if the token is expiring within the margin, rotate
   // before this request hits a 401. performRefresh handles single-flight
-  // so concurrent requests share one rotation. The expiry comes from the
-  // in-memory owner when available; only the cold path (owner warmed by
-  // getAuthTokenForRequest without an expiry) reads TOKEN_EXPIRES_AT_KEY,
-  // and the resolved value is published back into the owner so normal
-  // requests never reread it. A refused read leaves the expiry unknown, so no
-  // rotation is attempted and the held token is used as it is.
+  // so concurrent requests share one rotation. A completed cold read is
+  // recorded in the owner as known or known-absent, so TOKEN_EXPIRES_AT_KEY is
+  // read once per token: a session with a token but no stored expiry reads it
+  // once and is answered `absent` from then on. A locked read publishes
+  // nothing and leaves the expiry unknown, so the next unlocked request reads
+  // it; while it is unknown no rotation is attempted and the held token is
+  // used as it is.
   const active = getActiveTokenSnapshot();
-  const expiresAtMs = active?.expiresAtMs ?? (await readColdExpiry(active));
+  const expiresAtMs =
+    active && active.expiry.kind !== 'unknown'
+      ? expiryAtMs(active.expiry)
+      : await readColdExpiry(active);
   // Prefer the newest owner token: a sign-in or refresh may have published a
   // newer one while the cold reads were in flight.
   const newest = getActiveToken();

@@ -35,14 +35,7 @@ import type { ImportIssue, ImportPreview, ParsedLocalConfig } from './types';
  * built-in (for example `disable: true` or a model override) instead of
  * defining a profile agent, so the import ignores it.
  */
-const CLI_BUILTIN_AGENT_SLUGS = new Set([
-  ...RUNTIME_BUILTIN_AGENT_SLUGS,
-  'general',
-  'explore',
-  'compaction',
-  'title',
-  'summary',
-]);
+const CLI_BUILTIN_AGENT_SLUGS = RUNTIME_BUILTIN_AGENT_SLUGS;
 
 /** Global config globs name the config directory itself, which is the archive root. */
 const GLOBAL_CONFIG_DIRECTORY_PREFIX = '~/.config/kilo/';

@@ -179,4 +179,46 @@ describe('ReportReceiptScreen on a dropped connection', () => {
       });
     expect(texts).toEqual(expect.arrayContaining([RECEIPT_ID]));
   });
+
+  it('names the deadline for a read that ran out of time', async () => {
+    state.receipt.mockImplementation(() =>
+      Promise.reject(
+        Object.assign(new Error('Control-plane request timed out'), {
+          name: 'TRPCClientError',
+          data: { code: 'TIMEOUT', message: 'Control-plane request timed out' },
+        })
+      )
+    );
+
+    const renderer = await mount();
+    await settle();
+    await settle();
+
+    const [failure] = queryErrors(renderer);
+    expect(failure?.props.variant).toBe('timeout');
+    expect(failure?.props.onRetry).toBeTypeOf('function');
+  });
+
+  it('names the refusal and offers no retry for a failure asking again cannot fix', async () => {
+    // A refusal is a server answer, so the connection is settled online; on a
+    // confirmed-offline device the shared classifier names the connection,
+    // which is the case above.
+    state.connectivity = 'online';
+    state.receipt.mockImplementation(() =>
+      Promise.reject(
+        Object.assign(new Error('Forbidden'), {
+          name: 'TRPCClientError',
+          data: { code: 'FORBIDDEN', message: 'Forbidden' },
+        })
+      )
+    );
+
+    const renderer = await mount();
+    await settle();
+    await settle();
+
+    const [failure] = queryErrors(renderer);
+    expect(failure?.props.variant).toBe('permission');
+    expect(failure?.props.onRetry).toBeUndefined();
+  });
 });

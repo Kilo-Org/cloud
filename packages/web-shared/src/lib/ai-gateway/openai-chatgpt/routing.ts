@@ -2,10 +2,7 @@ import { z } from 'zod';
 import { ReasoningEffortSchema, type ReasoningEffort } from '@kilocode/db/schema-types';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { claimReportWindow } from '@kilocode/web-shared/lib/ai-gateway/report-window';
-import {
-  markByokAvailable,
-  type ByokAvailableModel,
-} from '@kilocode/web-shared/lib/ai-gateway/byok/available-model';
+import { markByokAvailable } from '@kilocode/web-shared/lib/ai-gateway/byok/available-model';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import { isGptOssModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -306,13 +303,14 @@ export async function getOpenAiChatGptByokModelIds(
  * Returns `models` with the ChatGPT-served ones marked BYOK-available, so the
  * model picker and the extension show the BYOK badge like pasted BYOK keys. A
  * marked model comes back with `hasUserByokAvailable: true` and `isFree: false`,
- * including one that already carried the badge, and the return type shows it. The
- * list is returned unchanged when the person has no usable connection. The caller
- * runs it after `addUserByokAvailability`.
+ * including one that already carried the badge; the constraint names `isFree`
+ * because this helper is one of the places that rewrites it. The list is
+ * returned unchanged when the person has no usable connection. The caller runs
+ * it after `addUserByokAvailability`.
  */
 export async function tagOpenAiChatGptByokModels<
   T extends { id: string; hasUserByokAvailable?: boolean; isFree?: boolean },
->(owner: OpenAiChatGptOwner, models: T[]): Promise<(T | ByokAvailableModel<T>)[]> {
+>(owner: OpenAiChatGptOwner, models: T[]): Promise<T[]> {
   const byokModelIds = await getOpenAiChatGptByokModelIds(
     owner,
     models.map(model => model.id)

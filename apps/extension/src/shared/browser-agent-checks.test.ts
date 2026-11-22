@@ -135,7 +135,7 @@ describe('download tier choice', () => {
     canIntercept: true,
     hasHold: true,
     hasPermission: true,
-    namesFile: true,
+    legacyGuardCanExempt: true,
   } as const;
 
   it('holds on a browser with the event and the permission', () => {
@@ -152,14 +152,14 @@ describe('download tier choice', () => {
     expect(downloadTierOf({ ...base, hasHold: false })).toBe('legacy');
   });
 
-  it('leaves the legacy guard unarmed for an approval that names no file', () => {
+  it('leaves the legacy guard unarmed for an approval that buys no file', () => {
     expect(
       downloadTierOf({
         canDownload: true,
         canIntercept: true,
         hasHold: false,
         hasPermission: true,
-        namesFile: false,
+        legacyGuardCanExempt: false,
       })
     ).toBe('none');
     expect(
@@ -168,7 +168,7 @@ describe('download tier choice', () => {
         canIntercept: true,
         hasHold: false,
         hasPermission: true,
-        namesFile: true,
+        legacyGuardCanExempt: true,
       })
     ).toBe('legacy');
   });
@@ -282,15 +282,15 @@ describe('step tokens', () => {
     const store = createStepTokenStore({ now: () => 1000, random: () => 'token-1' });
     const token = store.issue({ ...binding, reason: SENSITIVE_REASON.password });
 
-    expect(store.consume(token, binding)).toBe(true);
-    expect(store.consume(token, binding)).toBe(false);
+    expect(store.take(token, binding).ok).toBe(true);
+    expect(store.take(token, binding).ok).toBe(false);
   });
 
   it('rejects a token bound to another tab, tool, element or argument set', () => {
     const store = createStepTokenStore({ now: () => 1000, random: () => 'token-2' });
     const token = store.issue({ ...binding, reason: SENSITIVE_REASON.password });
 
-    expect(store.consume(token, { ...binding, tabId: 8 })).toBe(false);
+    expect(store.take(token, { ...binding, tabId: 8 }).ok).toBe(false);
   });
 
   it('keeps the file an approval is for, for the whole life of the token', () => {
@@ -317,11 +317,11 @@ describe('step tokens', () => {
     const token = store.issue({ ...binding, reason: SENSITIVE_REASON.password });
 
     clock += 59_999;
-    expect(store.consume(token, binding)).toBe(true);
+    expect(store.take(token, binding).ok).toBe(true);
 
     const second = store.issue({ ...binding, reason: SENSITIVE_REASON.password });
     clock += 60_000;
-    expect(store.consume(second, binding)).toBe(false);
+    expect(store.take(second, binding).ok).toBe(false);
     expect(store.size()).toBe(0);
   });
 });

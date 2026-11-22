@@ -159,7 +159,7 @@ export const downloadTierOf = ({
   canIntercept,
   hasHold,
   hasPermission,
-  namesFile,
+  legacyGuardCanExempt,
 }: {
   /** Whether this call is an agent call that can start a download at all. */
   readonly canDownload: boolean;
@@ -170,10 +170,10 @@ export const downloadTierOf = ({
   /** Whether the optional `downloads` permission is granted right now. */
   readonly hasPermission: boolean;
   /**
-   * Whether the legacy guard has a file to exempt: true when this call carries no approval for a file, including a
-   * step approval that buys none, and false only for a download approval that names no file.
+   * Whether the legacy guard has something to decide: a file it can exempt, from the approval or from the step, or an
+   * unapproved call to refuse. It is false only for an approval that buys no file, its own or its step's.
    */
-  readonly namesFile: boolean;
+  readonly legacyGuardCanExempt: boolean;
 }): DownloadTier => {
   if (!canDownload) {
     return 'none';
@@ -185,7 +185,7 @@ export const downloadTierOf = ({
   }
 
   if (!hasHold) {
-    return namesFile ? 'legacy' : 'none';
+    return legacyGuardCanExempt ? 'legacy' : 'none';
   }
 
   return 'hold';
@@ -586,8 +586,6 @@ export interface StepTokenTake {
 export interface StepTokenStore {
   /** Issues a single-use token bound to one call; the clock is the store's, not the caller's. */
   readonly issue: (input: StepTokenIssue) => string;
-  /** Consumes a token: true only when it names the same call and has not expired. */
-  readonly consume: (token: string, binding: StepTokenBinding) => boolean;
   /**
    * Consumes a token and answers what it carried. The need lives exactly as long as the token — a human may take
    * Minutes to approve — so it is never tied to a download record the browser's own pruning removes.
@@ -729,7 +727,6 @@ export const createStepTokenStore = ({
   };
 
   return {
-    consume: (token, binding) => take(token, binding).ok,
     issue: input => {
       prune();
 

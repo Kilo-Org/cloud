@@ -178,7 +178,7 @@ const approvalOutcome =
   (input: BrowserToolRunInput): BrowserToolRunOutcome => {
     const [presented] = input.agent?.sensitive ?? [];
 
-    if (presented !== undefined && tokens.consume(presented, binding)) {
+    if (presented !== undefined && tokens.take(presented, binding).ok) {
       return {
         kind: 'result',
         result: { ok: true, value: 'report.txt: The file was downloaded.' },
@@ -527,7 +527,7 @@ describe('local agent browser bridge', () => {
       content: [{ text: 'report.txt: The file was downloaded.', type: 'text' }],
     });
     // The token was redeemed by the repeat: the same token cannot approve a second call.
-    expect(tokens.consume(token, binding)).toBe(false);
+    expect(tokens.take(token, binding).ok).toBe(false);
     expect(tokens.size()).toBe(0);
   });
 

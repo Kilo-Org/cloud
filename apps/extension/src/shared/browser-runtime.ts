@@ -3659,9 +3659,9 @@ export const createBrowserRuntime = ({
           canIntercept: debuggerApi !== undefined,
           hasHold: downloadHold !== undefined,
           hasPermission: downloadsPermission !== undefined,
-          // A step approval exempts no file, so its guard still runs; only an approval with no url to exempt leaves
+          // A step approval exempts no file, so its guard still runs; only an approval that buys no file at all leaves
           // The legacy guard nothing to decide, exactly as its refusal said.
-          namesFile: redeemed.kind !== 'unbounded',
+          legacyGuardCanExempt: redeemed.kind !== 'unbounded',
         });
         // An act call runs guarded: an unapproved one denies downloads outright, and an approved one listens and
         // Stops every download but the file its approval bought, so a second file is neither kept nor silent.

@@ -193,9 +193,7 @@ describe('secure backend profiles', () => {
     expect((failure as InstanceType<typeof store.BackendInputError>).problem).toBe('invalidInput');
     expect(failure.message).toBe('invalidInput');
 
-    const wrongType = captureError(() =>
-      store.validateChatBackendDraft({ ...draft, apiKey: 42 })
-    );
+    const wrongType = captureError(() => store.validateChatBackendDraft({ ...draft, apiKey: 42 }));
     expect((wrongType as InstanceType<typeof store.BackendInputError>).problem).toBe(
       'invalidInput'
     );

@@ -489,16 +489,16 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
     `${tool} *config`,
     `${tool} *confi?`,
     // The same target written with a one-character glob or a quoted segment.
+    // The separator before it may be a space, a tab or a run, so it takes `*`.
     `${tool} * con?ig`,
     `${tool} * c?nfig`,
-    `${tool} * "con"*`,
-    `${tool} * 'con'*`,
-    // The whole target quoted.
-    `${tool} * "config"*`,
-    `${tool} * 'config'*`,
-    `${tool} * "confi?"*`,
-    `${tool} * 'confi?'*`,
-    `${tool} * "con?ig"*`,
+    `${tool} *"config"*`,
+    `${tool} *'config'*`,
+    `${tool} *"confi?"*`,
+    `${tool} *'confi?'*`,
+    `${tool} *"con?ig"*`,
+    `${tool} *"con"*`,
+    `${tool} *'con'*`,
   ]),
   // The subcommand form compares a key without regard to case, so a rule names
   // the upper-case spelling as well as the lower-case one. The `include` key
@@ -527,16 +527,14 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   // rules do.
   'git*-c\t?*.*',
   'git*-c\t?*=*',
-  // The redirect operator is written with or without a space before the target,
-  // so one rule covers both spellings and either operator. A rule sees the
-  // command text the runtime classifies, which for a compound line is one node
-  // at a time and not the redirection that node carries, so that redirection
-  // stays outside these rules; a write whose target is an argument, such as a
-  // copy or a move, keeps its target in that text and stays covered.
-  '*> *config',
-  '*> *confi?',
-  '*>config',
-  '*>confi?',
+  // One rule per operator absorbs the whole run before the target, so any
+  // spacing or tab is covered. A rule reads the command text the runtime
+  // classifies, which for a compound line is one node at a time and not the
+  // redirection that node carries, so that redirection stays outside these
+  // rules; a write whose target is an argument, such as a copy or a move, keeps
+  // its target in that text and stays covered.
+  '*>*config',
+  '*>*confi?',
   '*gitconfig*',
 ];
 

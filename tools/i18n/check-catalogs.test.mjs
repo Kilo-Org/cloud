@@ -495,12 +495,12 @@ test('folds a Devanagari danda as sentence-final punctuation', () => {
   assert.deepEqual(found, []);
 });
 
-test('accepts the Devanagari danda in a catalog that writes it', () => {
+test('accepts the Devanagari danda in a catalog that joins sentences with it', () => {
   const found = run({
     language: 'hi',
-    english: { first: 'Choose a model', second: 'Try again' },
-    translated: { first: 'मॉडल चुनें।', second: 'फिर से प्रयास करें।' },
-    source: "t('first'); t('second');",
+    english: { common: { sentenceJoiner: '. ' }, first: 'Choose a model', second: 'Try again' },
+    translated: { common: { sentenceJoiner: '। ' }, first: 'मॉडल चुनें।', second: 'फिर से प्रयास करें।' },
+    source: "t('common.sentenceJoiner'); t('first'); t('second');",
   });
   assert.deepEqual(found, []);
 });
@@ -508,14 +508,30 @@ test('accepts the Devanagari danda in a catalog that writes it', () => {
 test('rejects a borrowed Devanagari danda in a catalog that writes another mark', () => {
   const found = run({
     language: 'kn',
-    english: { first: 'Choose a model', second: 'Try again' },
-    translated: { first: 'ಮಾದರಿ ಆಯ್ಕೆಮಾಡಿ।', second: 'ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.' },
-    source: "t('first'); t('second');",
+    english: { common: { sentenceJoiner: '. ' }, first: 'Choose a model', second: 'Try again' },
+    translated: { common: { sentenceJoiner: '.' }, first: 'ಮಾದರಿ ಆಯ್ಕೆಮಾಡಿ।', second: 'ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.' },
+    source: "t('common.sentenceJoiner'); t('first'); t('second');",
   });
   assert.equal(found.length, 1, found.join('\n'));
   assert.match(found[0], /mobile\/kn/);
   assert.match(found[0], /«।»/);
   assert.match(found[0], /"first"/);
+});
+
+test('rejects a borrowed Devanagari danda in Marathi, which closes sentences with the full stop', () => {
+  const found = run({
+    language: 'mr',
+    english: { common: { sentenceJoiner: '. ' }, first: 'Choose a model', second: 'Try again' },
+    translated: {
+      common: { sentenceJoiner: '.' },
+      first: 'मॉडेल निवडा।',
+      second: 'पुन्हा प्रयत्न करा.',
+    },
+    source: "t('common.sentenceJoiner'); t('first'); t('second');",
+  });
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.match(found[0], /mobile\/mr/);
+  assert.match(found[0], /«।»/);
 });
 
 for (const [language, title, badge] of [

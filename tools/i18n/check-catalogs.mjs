@@ -1098,16 +1098,16 @@ function checkArmenianSentenceTerminator(tag, values, label) {
 
 /**
  * The Devanagari danda `।` (U+0964) closes a sentence in the scripts that
- * write it. A catalog whose own mark is something else must not borrow it: a
- * batch imported from a danda source leaves one screen with two sentence
+ * write it. A catalog states its own sentence mark in `common.sentenceJoiner`,
+ * so a catalog that joins its sentences with another mark must not borrow it:
+ * a batch imported from a danda source leaves one screen with two sentence
  * terminators, and the mark belongs to another script.
  */
-const DANDA_SENTENCE_TERMINATORS = new Set(['bn', 'hi', 'mr', 'ne', 'or', 'pa']);
-
-/** Reject a borrowed Devanagari danda in a catalog that writes its own mark. */
-function checkBorrowedDanda(tag, values, label) {
+function checkBorrowedDanda(values, label) {
   const problems = [];
-  if (DANDA_SENTENCE_TERMINATORS.has(tag)) {
+  const joiner = values.get('common.sentenceJoiner');
+  // Key parity guarantees the joiner; a catalog parsed without one stays silent.
+  if (typeof joiner !== 'string' || joiner.startsWith('\u0964')) {
     return problems;
   }
   for (const [key, value] of values) {
@@ -1115,7 +1115,7 @@ function checkBorrowedDanda(tag, values, label) {
       continue;
     }
     problems.push(
-      `${label}: "${key}" writes the Devanagari danda «।»; this catalog closes its sentences with its own mark`
+      `${label}: "${key}" writes the Devanagari danda «।» while this catalog joins its sentences with "${joiner}"`
     );
   }
   return problems;
@@ -2625,7 +2625,7 @@ function checkCatalogLocales({
     problems.push(...checkAgentEditorCopy(translated, english, label));
     problems.push(...checkPullRequestTerm(translated, label));
     problems.push(...checkArmenianSentenceTerminator(tag, translated, label));
-    problems.push(...checkBorrowedDanda(tag, translated, label));
+    problems.push(...checkBorrowedDanda(translated, label));
     problems.push(...checkChangelogAreaLabels(tag, translated, label));
 
     // The families this locale declares itself, through a member key with a

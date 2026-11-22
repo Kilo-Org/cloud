@@ -324,9 +324,9 @@ describe('OrganizationAuditLogScreen', () => {
 
     const denied = renderer.root.findAllByType('PermissionDenied');
     expect(denied).toHaveLength(1);
-    expect(denied[0]?.props.description).toBe(
-      'Only an organization owner, admin or billing manager on the Enterprise plan can read its audit log.'
-    );
+    // The refusal's copy lives in the catalog; this pins that the state reads
+    // this screen's own key, so a member sees the roles and the next step.
+    expect(denied[0]?.props.description).toBe(i18n.t('organization.auditLog.permissionDenied'));
     expect(renderer.root.findAllByType('FlashList')).toHaveLength(0);
     unmount();
   });

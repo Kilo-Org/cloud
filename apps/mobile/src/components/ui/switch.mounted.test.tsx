@@ -217,49 +217,43 @@ describe('Switch', () => {
     expect(onValueChange).not.toHaveBeenCalled();
   });
 
-  it('paints the neutral disabled pair on a disabled on switch and keeps it on', () => {
+  it('keeps the on hue at reduced opacity on a disabled on switch and keeps it on', () => {
     native.os = 'android';
     native.scheme = 'light';
     const props = nativeProps(renderSwitch({ disabled: true, value: true }).root);
     expect(props.value).toBe(true);
-    expect(props.trackColor?.true).toBe(lightColors.primaryDisabled);
-    expect(props.trackColor?.false).toBe(lightColors.mutedSoft);
-    // A neutral grip: light's enabled off row paints this same track under a
-    // white thumb, so an enabled grip here would match a live off row.
-    expect(props.thumbColor).toBe(lightColors.mutedSoft);
+    // `primary` #4F5A10 at 0.8; the off half keeps `mutedSoft` at 0.8.
+    expect(props.trackColor?.true).toBe('rgba(79, 90, 16, 0.8)');
+    expect(props.trackColor?.false).toBe('rgba(169, 163, 154, 0.8)');
+    expect(props.thumbColor).toBe(lightColors.ink2);
     expect(props.thumbColor).not.toBe(lightColors.primaryForeground);
   });
 
-  it('paints the same two neutral tracks on a disabled off switch', () => {
+  it('keeps the off hue at reduced opacity on a disabled off switch', () => {
     native.os = 'android';
     native.scheme = 'light';
     const props = nativeProps(renderSwitch({ disabled: true, value: false }).root);
     expect(props.value).toBe(false);
-    expect(props.trackColor?.true).toBe(lightColors.primaryDisabled);
-    expect(props.trackColor?.false).toBe(lightColors.mutedSoft);
-    // Off dims its grip instead: the light off track has no neutral beneath it.
-    expect(props.thumbColor).toBe(lightColors.mutedForeground);
-    expect(props.thumbColor).not.toBe(lightColors.primaryForeground);
+    expect(props.trackColor?.true).toBe('rgba(79, 90, 16, 0.8)');
+    expect(props.trackColor?.false).toBe('rgba(169, 163, 154, 0.8)');
+    expect(props.thumbColor).toBe(lightColors.ink2);
   });
 
-  it('keeps the disabled positions apart with two different neutral tracks', () => {
+  it('keeps the disabled positions apart with their own hues', () => {
     native.os = 'android';
     native.scheme = 'light';
     const on = nativeProps(renderSwitch({ disabled: true, value: true }).root);
     const off = nativeProps(renderSwitch({ disabled: true, value: false }).root);
-    const enabledOff = nativeProps(renderSwitch({ value: false }).root);
     // The stored value stays readable while the control cannot be changed.
     expect(on.trackColor?.true).not.toBe(on.trackColor?.false);
     expect(on.trackColor?.true).not.toBe(lightColors.primary);
+    expect(on.trackColor?.false).not.toBe(lightColors.mutedSoft);
     expect(off.trackColor).toEqual(on.trackColor);
-    expect(on.thumbColor).not.toBe(off.thumbColor);
-    // Light has no neutral beneath the enabled off track, so off dims its grip
-    // where on changes its track.
-    expect(off.trackColor?.false).toBe(enabledOff.trackColor?.false);
-    expect(off.thumbColor).not.toBe(enabledOff.thumbColor);
+    // One neutral grip serves both positions.
+    expect(on.thumbColor).toBe(off.thumbColor);
   });
 
-  it('never paints a disabled on switch the grip a live off row shows', () => {
+  it('never paints a disabled on switch the pair a live off row shows', () => {
     native.os = 'android';
     for (const [scheme, colors] of [
       ['light', lightColors],
@@ -268,38 +262,38 @@ describe('Switch', () => {
       native.scheme = scheme;
       const disabledOn = nativeProps(renderSwitch({ disabled: true, value: true }).root);
       const enabledOff = nativeProps(renderSwitch({ value: false }).root);
-      expect(disabledOn.thumbColor, `disabled on grip (${scheme})`).not.toBe(enabledOff.thumbColor);
-      // A live off row is `PreferenceRow`'s light override: the
-      // `mutedForeground` track under a white thumb.
-      expect(disabledOn.trackColor?.false).not.toBe(colors.mutedForeground);
+      expect(disabledOn.thumbColor, `disabled on grip (${scheme})`).toBe(colors.ink2);
+      expect(disabledOn.thumbColor).not.toBe(enabledOff.thumbColor);
+      // `PreferenceRow`'s light enabled off row: `mutedForeground` (the
+      // `primaryDisabled` token) under a white thumb.
       expect(`${disabledOn.trackColor?.true}/${disabledOn.thumbColor}`).not.toBe(
         `${colors.mutedForeground}/${colors.primaryForeground}`
       );
+      expect(disabledOn.trackColor?.true).not.toBe(colors.mutedForeground);
     }
   });
 
-  it('paints the neutral disabled pair in dark mode, off the brand accent', () => {
+  it('reduces the on hue further in dark mode, off the brand accent', () => {
     native.os = 'android';
     native.scheme = 'dark';
     const on = nativeProps(renderSwitch({ disabled: true, value: true }).root);
     const off = nativeProps(renderSwitch({ disabled: true, value: false }).root);
-    expect(on.trackColor?.true).toBe(darkColors.primaryDisabled);
-    expect(on.trackColor?.false).toBe(darkColors.mutedSoft);
+    // `selection` #647214 at 0.5; the off half keeps `mutedForeground` at 0.8.
+    expect(on.trackColor?.true).toBe('rgba(100, 114, 20, 0.5)');
+    expect(on.trackColor?.false).toBe('rgba(138, 134, 128, 0.8)');
     expect(on.trackColor?.true).not.toBe(darkColors.selection);
     expect(off.trackColor).toEqual(on.trackColor);
-    expect(on.thumbColor).toBe(darkColors.mutedSoft);
-    expect(on.thumbColor).not.toBe(darkColors.primaryForeground);
-    // Dark's disabled off track is `mutedSoft`, not its `mutedForeground`
-    // enabled off track.
-    expect(off.thumbColor).toBe(darkColors.mutedForeground);
-    expect(off.trackColor?.false).not.toBe(darkColors.mutedForeground);
+    expect(on.thumbColor).toBe(darkColors.ink2);
+    expect(on.thumbColor).not.toBe(darkColors.selectionForeground);
+    expect(off.thumbColor).toBe(on.thumbColor);
   });
 
   it('takes the disabled state from the accessibility state', () => {
     native.os = 'android';
     native.scheme = 'light';
     const props = nativeProps(renderSwitch({ accessibilityState: { disabled: true } }).root);
-    expect(props.trackColor?.true).toBe(lightColors.primaryDisabled);
+    expect(props.trackColor?.true).toBe('rgba(79, 90, 16, 0.8)');
+    expect(props.thumbColor).toBe(lightColors.ink2);
   });
 
   it('leaves the pair to the platform on iOS, which fades a disabled switch itself', () => {

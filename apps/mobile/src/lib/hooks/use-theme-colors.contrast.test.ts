@@ -8,6 +8,7 @@ import {
   MUTED_COLOR,
   TOKEN_DARK_LIGHT,
 } from '@/lib/pr-review/diff/syntax-colors';
+import { resolveAlphaColor } from '@/lib/theme-color';
 
 vi.mock('react-native', () => ({ useColorScheme: () => 'light' }));
 vi.mock('expo-router', () => ({ DarkTheme: {}, DefaultTheme: {} }));
@@ -402,128 +403,113 @@ describe('idle composer control and ring track contrast (non-text)', () => {
 });
 
 describe('disabled switch pair contrast (non-text)', () => {
-  // The shared switch paints this pair for a disabled control on Android, in
-  // place of the brand pair: `primary-disabled` on and `muted-soft` off under
-  // the `muted-soft` and `muted-foreground` grips. iOS keeps the brand pair and
-  // fades it itself. The switch sits on a `secondary` row, so its tracks are
-  // measured over that. The floors are perception floors: the pair has to read
-  // as a control, the two positions have to stay apart, and no disabled half
-  // may equal an enabled one. The positions stay apart because the two tracks
-  // are separate neutral tokens, not because of a hue at reduced opacity — a
-  // hue pair measured under this floor in both schemes. Light has no third
-  // neutral for the off track — `control-idle` equals `secondary` there — so
-  // the light disabled off track is the same neutral as the enabled off track
-  // and only its grip dims; dark's disabled off track is `muted-soft`, not its
-  // `muted-foreground` enabled off track.
+  // A disabled control keeps each half's own hue at reduced opacity, under the
+  // scheme's `ink2` grip: the enabled on track at `DISABLED_ON_TRACK_ALPHA`
+  // (light 0.8, dark 0.5) and the enabled off track at
+  // `DISABLED_OFF_TRACK_ALPHA` (0.8). iOS keeps the enabled pair and fades it
+  // itself. The switch sits on a `secondary` row, so each painted track is
+  // flattened over that row before it is measured: the translucent token never
+  // reaches the screen on its own. The floors are perception floors: the pair
+  // has to read as a control, the two positions have to stay apart, and no
+  // disabled half may equal an enabled one.
   const MIN_VISIBLE_SURFACE_RATIO = 1.6;
-  const themes = [
-    ['light', lightColors],
-    ['dark', darkColors],
-  ] as const;
-
-  it('every theme: the disabled on track reads on the row surface', () => {
-    for (const [themeName, colors] of themes) {
-      expect(
-        contrastRatio(colors.primaryDisabled, colors.secondary),
-        `primary-disabled vs secondary (${themeName})`
-      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
-    }
-  });
-
-  it('every theme: the disabled off track reads on the row surface', () => {
-    for (const [themeName, colors] of themes) {
-      expect(
-        contrastRatio(colors.mutedSoft, colors.secondary),
-        `muted-soft vs secondary (${themeName})`
-      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
-    }
+  // Mirrors the constants in `components/ui/switch.tsx`.
+  const DISABLED_ON_TRACK_ALPHA = { light: 0.8, dark: 0.5 } as const;
+  const DISABLED_OFF_TRACK_ALPHA = 0.8;
+  const pairs = (
+    [
+      ['light', lightColors],
+      ['dark', darkColors],
+    ] as const
+  ).map(([themeName, colors]) => {
+    const enabledOnTrack = themeName === 'dark' ? colors.selection : colors.primary;
+    const enabledOffTrack = themeName === 'dark' ? colors.mutedForeground : colors.mutedSoft;
+    return {
+      themeName,
+      colors,
+      enabledOn: {
+        track: enabledOnTrack,
+        grip: themeName === 'dark' ? colors.selectionForeground : colors.primaryForeground,
+      },
+      enabledOff: {
+        track: enabledOffTrack,
+        grip: themeName === 'dark' ? colors.foreground : colors.primaryForeground,
+      },
+      on: {
+        track: compositeToken(
+          resolveAlphaColor(enabledOnTrack, DISABLED_ON_TRACK_ALPHA[themeName]),
+          colors.secondary
+        ),
+        grip: colors.ink2,
+      },
+      off: {
+        track: compositeToken(
+          resolveAlphaColor(enabledOffTrack, DISABLED_OFF_TRACK_ALPHA),
+          colors.secondary
+        ),
+        grip: colors.ink2,
+      },
+    };
   });
 
   it('every theme: the disabled on track stays apart from the disabled off track', () => {
-    for (const [themeName, colors] of themes) {
+    for (const { themeName, on, off } of pairs) {
       expect(
-        contrastRatio(colors.primaryDisabled, colors.mutedSoft),
-        `primary-disabled vs muted-soft (${themeName})`
+        contrastRatio(on.track, off.track),
+        `on vs off track (${themeName})`
       ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
     }
   });
 
-  it('every theme: the disabled off grip reads on its own track', () => {
-    for (const [themeName, colors] of themes) {
-      expect(
-        contrastRatio(colors.mutedForeground, colors.mutedSoft),
-        `muted-foreground vs muted-soft (${themeName})`
-      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
-    }
-  });
-
-  it('every theme: the disabled on grip reads on its own track', () => {
-    for (const [themeName, colors] of themes) {
-      expect(
-        contrastRatio(colors.mutedSoft, colors.primaryDisabled),
-        `muted-soft vs primary-disabled (${themeName})`
-      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
-    }
-  });
-
-  // Android's thumb is wider than the track, so its outer arc lands on the row
-  // itself and each grip has to read there, not only against its own fill.
-  it('every theme: each disabled grip reads on the row its arc overhangs', () => {
-    for (const [themeName, colors] of themes) {
-      for (const [gripName, grip] of [
-        ['on grip', colors.mutedSoft],
-        ['off grip', colors.mutedForeground],
+  it('every theme: each disabled track reads on the row surface', () => {
+    for (const { themeName, colors, on, off } of pairs) {
+      for (const [name, track] of [
+        ['on', on.track],
+        ['off', off.track],
       ] as const) {
         expect(
-          contrastRatio(grip, colors.secondary),
-          `${gripName} vs secondary (${themeName})`
+          contrastRatio(track, colors.secondary),
+          `${name} track vs secondary (${themeName})`
         ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
       }
     }
   });
 
-  // A disabled row has to read as unavailable even beside a live one, so no
-  // disabled half may reuse an enabled half. Light's enabled off row in
-  // `PreferenceRow` paints `primaryDisabled` under a `primaryForeground` thumb,
-  // which is why the disabled on grip is a neutral.
-  it('every theme: a disabled pair is not either enabled pair', () => {
-    for (const [themeName, colors] of themes) {
-      const enabledOn = {
-        track: themeName === 'dark' ? colors.selection : colors.primary,
-        grip: themeName === 'dark' ? colors.selectionForeground : colors.primaryForeground,
-      };
-      const enabledOff = {
-        track: themeName === 'dark' ? colors.mutedForeground : colors.mutedSoft,
-        grip: themeName === 'dark' ? colors.foreground : colors.primaryForeground,
-      };
-      for (const [position, enabled] of [
-        ['on', enabledOn],
-        ['off', enabledOff],
-      ] as const) {
-        const disabled =
-          position === 'on'
-            ? { track: colors.primaryDisabled, grip: colors.mutedSoft }
-            : { track: colors.mutedSoft, grip: colors.mutedForeground };
-        expect(
-          `${disabled.track}/${disabled.grip}`,
-          `disabled ${position} vs enabled ${position} (${themeName})`
-        ).not.toBe(`${enabled.track}/${enabled.grip}`);
-      }
+  // Android's thumb is wider than the track, so its outer arc lands on the row
+  // itself and the grip has to read there too, not only on its own fill.
+  it('every theme: the disabled grip reads on each track and on the row', () => {
+    for (const { themeName, colors, on, off } of pairs) {
+      expect(
+        contrastRatio(on.grip, on.track),
+        `grip vs on track (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+      expect(
+        contrastRatio(off.grip, off.track),
+        `grip vs off track (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+      expect(
+        contrastRatio(on.grip, colors.secondary),
+        `grip vs secondary (${themeName})`
+      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
     }
   });
 
-  // Regression: the disabled on grip once fell back to `primaryForeground` in
-  // both schemes, which dark defines as the near-black card colour. Android's
-  // thumb is wider than the track, so its outer arc lands on the row itself —
-  // 1.1:1 there, and the dark scheme draws no shadow to outline it, so what
-  // remained of the pill read as a blank grey bar. The dark grip is the mid
-  // neutral instead: darker than its fill, and still a visible step off the
-  // near-black row its arc sits on.
-  it('dark theme: the disabled on grip reads on the row its arc overhangs', () => {
-    expect(
-      contrastRatio(darkColors.mutedSoft, darkColors.secondary),
-      'muted-soft vs secondary (dark)'
-    ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+  // A disabled row has to read as unavailable beside a live one, so no disabled
+  // half may reuse an enabled half. `PreferenceRow`'s light enabled off row is
+  // the pair to beat there: `mutedForeground` (the `primaryDisabled` token)
+  // under a `primaryForeground` thumb.
+  it('every theme: a disabled pair is not either enabled pair', () => {
+    for (const { themeName, colors, enabledOn, enabledOff, on, off } of pairs) {
+      expect(`${on.track}/${on.grip}`, `disabled on vs enabled on (${themeName})`).not.toBe(
+        `${enabledOn.track}/${enabledOn.grip}`
+      );
+      expect(`${off.track}/${off.grip}`, `disabled off vs enabled off (${themeName})`).not.toBe(
+        `${enabledOff.track}/${enabledOff.grip}`
+      );
+      expect(`${on.track}/${on.grip}`, `disabled on vs live light off row (${themeName})`).not.toBe(
+        `${colors.mutedForeground}/${colors.primaryForeground}`
+      );
+    }
   });
 });
 

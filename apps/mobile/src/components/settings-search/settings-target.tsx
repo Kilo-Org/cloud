@@ -132,7 +132,8 @@ export function SettingsSearchTargetScope({
       if (content == null) {
         return;
       }
-      const attempt = ++attemptRef.current;
+      attemptRef.current += 1;
+      const attempt = attemptRef.current;
       armed.node.measureLayout(
         content,
         (_left, top) => {
@@ -150,15 +151,11 @@ export function SettingsSearchTargetScope({
               ? undefined
               : Math.max(0, committed.contentHeight - committed.frameHeight);
           const landed = landedRef.current;
-          const clamped =
-            landed !== null &&
-            landed.maxOffset !== undefined &&
-            landed.requested > landed.maxOffset;
+          const clamped = landed?.maxOffset !== undefined && landed.requested > landed.maxOffset;
           const settled =
             !force &&
-            landed !== null &&
+            landed?.maxOffset !== undefined &&
             landed.target === target &&
-            landed.maxOffset !== undefined &&
             landed.top === top &&
             !clamped;
           if (settled) {
@@ -183,7 +180,7 @@ export function SettingsSearchTargetScope({
         return;
       }
       const armed = armedRef.current;
-      if (armed !== null && armed.target === target && armed.node === node) {
+      if (armed?.target === target && armed?.node === node) {
         return;
       }
       armedRef.current = { target, node };

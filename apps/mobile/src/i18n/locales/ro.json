@@ -3705,10 +3705,10 @@
       "nameLabel": "Nume mod",
       "nameRequired": "Introdu un nume pentru mod.",
       "notFound": "Acest mod nu mai există.",
-      "restrictionHint": "Pot fi editate numai fișierele care corespund acestui șablon. Lasă câmpul gol pentru a permite orice fișier.",
-      "restrictionInvalid": "Introdu un șablon valid.",
+      "restrictionHint": "O expresie regulată selectează fișierele pe care acest mod le poate edita, de exemplu `\\.md$` numai pentru fișierele markdown. Lasă câmpul gol pentru a permite orice fișier.",
+      "restrictionInvalid": "Introdu o expresie regulată validă.",
       "restrictionLabel": "Etichetă restricție",
-      "restrictionPattern": "Șablon de fișier",
+      "restrictionPattern": "Restricție de fișiere",
       "roleLabel": "Definiție rol",
       "roleRequired": "Descrie ce face acest mod.",
       "tool": {

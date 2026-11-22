@@ -3643,10 +3643,10 @@
       "nameLabel": "Tilstandens navn",
       "nameRequired": "Angiv et tilstandsnavn.",
       "notFound": "Denne tilstand findes ikke længere.",
-      "restrictionHint": "Kun filer, der matcher dette mønster, kan redigeres. Lad feltet være tomt for at tillade alle filer.",
-      "restrictionInvalid": "Angiv et gyldigt mønster.",
+      "restrictionHint": "Et regulært udtryk vælger, hvilke filer denne tilstand må redigere, for eksempel `\\.md$` kun for markdown-filer. Lad feltet være tomt for at tillade alle filer.",
+      "restrictionInvalid": "Angiv et gyldigt regulært udtryk.",
       "restrictionLabel": "Begrænsningsetiket",
-      "restrictionPattern": "Filmønster",
+      "restrictionPattern": "Filbegrænsning",
       "roleLabel": "Rolledefinition",
       "roleRequired": "Beskriv, hvad denne tilstand gør.",
       "tool": {

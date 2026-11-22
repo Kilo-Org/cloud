@@ -3747,10 +3747,10 @@
       "nameLabel": "Mode name",
       "nameRequired": "Enter a mode name.",
       "notFound": "This mode no longer exists.",
-      "restrictionHint": "Only files that match this pattern can be edited. Leave it empty to allow every file.",
-      "restrictionInvalid": "Enter a valid pattern.",
+      "restrictionHint": "A regular expression selects the files this mode may edit, for example `\\.md$` for markdown files only. Leave it empty to allow every file.",
+      "restrictionInvalid": "Enter a valid regular expression.",
       "restrictionLabel": "Restriction label",
-      "restrictionPattern": "File pattern",
+      "restrictionPattern": "File restriction",
       "roleLabel": "Role definition",
       "roleRequired": "Describe what this mode does.",
       "tool": {

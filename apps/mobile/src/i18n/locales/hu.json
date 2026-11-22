@@ -3643,10 +3643,10 @@
       "nameLabel": "Mód neve",
       "nameRequired": "Adjon meg egy módnevet.",
       "notFound": "Ez a mód már nem létezik.",
-      "restrictionHint": "Csak a mintának megfelelő fájlok szerkeszthetők. Hagyja üresen, hogy minden fájl engedélyezett legyen.",
-      "restrictionInvalid": "Adjon meg egy érvényes mintát.",
+      "restrictionHint": "A reguláris kifejezés kiválasztja, hogy ez a mód mely fájlokat szerkesztheti; például a `\\.md$` csak a markdown-fájlokat engedi. Hagyja üresen, hogy minden fájl engedélyezett legyen.",
+      "restrictionInvalid": "Adjon meg egy érvényes reguláris kifejezést.",
       "restrictionLabel": "Korlátozás címkéje",
-      "restrictionPattern": "Fájlminta",
+      "restrictionPattern": "Fájlkorlátozás",
       "roleLabel": "Szerepkör meghatározása",
       "roleRequired": "Írja le, mit csinál ez a mód.",
       "tool": {

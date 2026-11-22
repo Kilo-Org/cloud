@@ -3647,10 +3647,10 @@
       "nameLabel": "模式名稱",
       "nameRequired": "請輸入模式名稱。",
       "notFound": "此模式已不存在。",
-      "restrictionHint": "僅能編輯符合此樣式的檔案。留空則允許所有檔案。",
-      "restrictionInvalid": "請輸入有效的樣式。",
+      "restrictionHint": "正規表示式選擇此模式可以編輯哪些檔案，例如 `\\.md$` 僅符合 markdown 檔案。留空則允許所有檔案。",
+      "restrictionInvalid": "請輸入有效的正規表示式。",
       "restrictionLabel": "限制標籤",
-      "restrictionPattern": "檔案樣式",
+      "restrictionPattern": "檔案限制",
       "roleLabel": "角色定義",
       "roleRequired": "請描述此模式的用途。",
       "tool": {

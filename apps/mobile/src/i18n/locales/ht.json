@@ -3643,10 +3643,10 @@
       "nameLabel": "Non mòd",
       "nameRequired": "Antre yon non mòd.",
       "notFound": "Mòd sa a pa egziste ankò.",
-      "restrictionHint": "Se sèlman fichye ki koresponn ak modèl sa a ki ka modifye. Kite li vid pou pèmèt tout fichye.",
-      "restrictionInvalid": "Antre yon modèl ki valab.",
+      "restrictionHint": "Yon ekspresyon regilye chwazi fichye mòd sa a ka modifye, pa egzanp `\\.md$` pou fichye markdown sèlman. Kite li vid pou pèmèt tout fichye.",
+      "restrictionInvalid": "Antre yon ekspresyon regilye ki valab.",
       "restrictionLabel": "Etikèt restriksyon",
-      "restrictionPattern": "Modèl fichye",
+      "restrictionPattern": "Restriksyon fichye",
       "roleLabel": "Definisyon wòl",
       "roleRequired": "Dekri sa mòd sa a fè.",
       "tool": {

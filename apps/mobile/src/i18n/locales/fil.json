@@ -3643,10 +3643,10 @@
       "nameLabel": "Pangalan ng modo",
       "nameRequired": "Maglagay ng pangalan ng modo.",
       "notFound": "Wala na ang modong ito.",
-      "restrictionHint": "Mga file lamang na tumutugma sa pattern na ito ang maaaring i-edit. Iwanan itong walang laman para payagan ang lahat ng file.",
-      "restrictionInvalid": "Maglagay ng wastong pattern.",
+      "restrictionHint": "Pinipili ng isang regular expression kung aling mga file ang maaaring i-edit ng modong ito, halimbawa `\\.md$` para sa mga markdown file lamang. Iwanan itong walang laman para payagan ang lahat ng file.",
+      "restrictionInvalid": "Maglagay ng wastong regular expression.",
       "restrictionLabel": "Label ng paghihigpit",
-      "restrictionPattern": "Pattern ng file",
+      "restrictionPattern": "Paghihigpit sa file",
       "roleLabel": "Depinisyon ng role",
       "roleRequired": "Ilarawan ang ginagawa ng modong ito.",
       "tool": {

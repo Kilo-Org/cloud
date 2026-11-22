@@ -3643,10 +3643,10 @@
       "nameLabel": "Tilan nimi",
       "nameRequired": "Anna tilalle nimi.",
       "notFound": "Tätä tilaa ei enää ole.",
-      "restrictionHint": "Vain tähän kaavaan sopivia tiedostoja voi muokata. Jätä tyhjäksi, jos sallit kaikki tiedostot.",
-      "restrictionInvalid": "Anna kelvollinen kaava.",
+      "restrictionHint": "Säännöllinen lauseke valitsee, mitä tiedostoja tämä tila voi muokata, esimerkiksi `\\.md$` vain markdown-tiedostoille. Jätä tyhjäksi, jos sallit kaikki tiedostot.",
+      "restrictionInvalid": "Anna kelvollinen säännöllinen lauseke.",
       "restrictionLabel": "Rajoituksen nimi",
-      "restrictionPattern": "Tiedostokaava",
+      "restrictionPattern": "Tiedostorajoitus",
       "roleLabel": "Roolin määritelmä",
       "roleRequired": "Kuvaile, mitä tämä tila tekee.",
       "tool": {

@@ -3643,10 +3643,10 @@
       "nameLabel": "Modusnavn",
       "nameRequired": "Skriv inn et modusnavn.",
       "notFound": "Denne modusen finnes ikke lenger.",
-      "restrictionHint": "Bare filer som samsvarer med dette mønsteret, kan redigeres. La det stå tomt for å tillate alle filer.",
-      "restrictionInvalid": "Skriv inn et gyldig mønster.",
+      "restrictionHint": "Et regulært uttrykk velger hvilke filer denne modusen kan redigere, for eksempel `\\.md$` for bare markdown-filer. La det stå tomt for å tillate alle filer.",
+      "restrictionInvalid": "Skriv inn et gyldig regulært uttrykk.",
       "restrictionLabel": "Begrensningsetikett",
-      "restrictionPattern": "Mønster for filer",
+      "restrictionPattern": "Filbegrensning",
       "roleLabel": "Roledefinisjon",
       "roleRequired": "Beskriv hva denne modusen gjør.",
       "tool": {

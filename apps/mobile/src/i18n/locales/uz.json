@@ -3643,10 +3643,10 @@
       "nameLabel": "Rejim nomi",
       "nameRequired": "Rejim nomini kiriting.",
       "notFound": "Bu rejim endi mavjud emas.",
-      "restrictionHint": "Faqat ushbu naqshga mos fayllarni tahrirlash mumkin. Barcha fayllarga ruxsat berish uchun bo‘sh qoldiring.",
-      "restrictionInvalid": "Yaroqli naqsh kiriting.",
+      "restrictionHint": "Muntazam ifoda ushbu rejim tahrirlashi mumkin bo‘lgan fayllarni tanlaydi, masalan, faqat markdown fayllari uchun `\\.md$`. Barcha fayllarga ruxsat berish uchun bo‘sh qoldiring.",
+      "restrictionInvalid": "Yaroqli muntazam ifoda kiriting.",
       "restrictionLabel": "Cheklov yorlig‘i",
-      "restrictionPattern": "Fayl naqshi",
+      "restrictionPattern": "Fayl cheklovi",
       "roleLabel": "Rol ta’rifi",
       "roleRequired": "Bu rejim nima qilishini ta’riflang.",
       "tool": {

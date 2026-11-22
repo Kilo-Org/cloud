@@ -3647,10 +3647,10 @@
       "nameLabel": "モード名",
       "nameRequired": "モード名を入力してください。",
       "notFound": "このモードは存在しません。",
-      "restrictionHint": "このパターンに一致するファイルのみ編集できます。空欄にするとすべてのファイルを許可します。",
-      "restrictionInvalid": "有効なパターンを入力してください。",
+      "restrictionHint": "正規表現はこのモードが編集できるファイルを選択します。たとえば `\\.md$` はマークダウンファイルのみを対象にします。空欄にするとすべてのファイルを許可します。",
+      "restrictionInvalid": "有効な正規表現を入力してください。",
       "restrictionLabel": "制限ラベル",
-      "restrictionPattern": "ファイルパターン",
+      "restrictionPattern": "ファイル制限",
       "roleLabel": "ロール定義",
       "roleRequired": "このモードの役割を説明してください。",
       "tool": {

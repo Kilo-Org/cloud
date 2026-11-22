@@ -3643,10 +3643,10 @@
       "nameLabel": "Igama lemodi",
       "nameRequired": "Faka igama lemodi.",
       "notFound": "Le modi ayisekho.",
-      "restrictionHint": "Amafayela ahambisana naleli phethini kuphela angahlelwa. Shiya kungenalutho ukuze kuvunyelwe wonke amafayela.",
-      "restrictionInvalid": "Faka iphethini evumelekile.",
+      "restrictionHint": "Isisho esijwayelekile sikhetha amafayela le modi engawahlela, isibonelo `\\.md$` kumafayela e-markdown kuphela. Shiya kungenalutho ukuze kuvunyelwe wonke amafayela.",
+      "restrictionInvalid": "Faka isisho esijwayelekile esivumelekile.",
       "restrictionLabel": "Ilebula yomkhawulo",
-      "restrictionPattern": "Iphethini yefayela",
+      "restrictionPattern": "Umkhawulo wamafayela",
       "roleLabel": "Incazelo yendima",
       "roleRequired": "Chaza okwenziwa yile modi.",
       "tool": {

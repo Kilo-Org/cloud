@@ -3767,10 +3767,10 @@
       "nameLabel": "Názov režimu",
       "nameRequired": "Zadajte názov režimu.",
       "notFound": "Tento režim už neexistuje.",
-      "restrictionHint": "Upravovať možno iba súbory, ktoré zodpovedajú tomuto vzoru. Ak ho necháte prázdny, budú povolené všetky súbory.",
-      "restrictionInvalid": "Zadajte platný vzor.",
+      "restrictionHint": "Regulárny výraz vyberá súbory, ktoré môže tento režim upravovať, napríklad `\\.md$` len pre súbory markdown. Ak ho necháte prázdny, budú povolené všetky súbory.",
+      "restrictionInvalid": "Zadajte platný regulárny výraz.",
       "restrictionLabel": "Označenie obmedzenia",
-      "restrictionPattern": "Vzor súborov",
+      "restrictionPattern": "Obmedzenie súborov",
       "roleLabel": "Definícia roly",
       "roleRequired": "Opíšte, čo tento režim robí.",
       "tool": {

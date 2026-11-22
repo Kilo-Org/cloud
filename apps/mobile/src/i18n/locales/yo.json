@@ -3643,10 +3643,10 @@
       "nameLabel": "Orúkọ ipò",
       "nameRequired": "Tẹ orúkọ ipò kan.",
       "notFound": "Ipò yìí kò sí mọ́.",
-      "restrictionHint": "Àwọn fáìlì tó bá àpẹẹrẹ yìí mu nìkan ni a lè ṣàtúnṣe. Fi sílẹ̀ òfìfo láti gbà gbogbo fáìlì.",
-      "restrictionInvalid": "Tẹ àpẹẹrẹ tó tọ́.",
+      "restrictionHint": "Ìfọ̀rọ̀wérọ̀ deede ń yan àwọn fáìlì tí ipò yìí lè ṣàtúnṣe, fún àpẹẹrẹ `\\.md$` fún àwọn fáìlì markdown nìkan. Fi sílẹ̀ òfìfo láti gbà gbogbo fáìlì.",
+      "restrictionInvalid": "Tẹ ìfọ̀rọ̀wérọ̀ deede tó tọ́.",
       "restrictionLabel": "Àmì ìhámọ́",
-      "restrictionPattern": "Àpẹẹrẹ fáìlì",
+      "restrictionPattern": "Ìhámọ́ fáìlì",
       "roleLabel": "Ìtumọ̀ ipa",
       "roleRequired": "Ṣàpèjúwe ohun tí ipò yìí ń ṣe.",
       "tool": {

@@ -3643,10 +3643,10 @@
       "nameLabel": "የሁነታ ስም",
       "nameRequired": "የሁነታ ስም አስገባ።",
       "notFound": "ይህ ሁነታ ከእንግዲህ የለም።",
-      "restrictionHint": "ከዚህ ንድፍ ጋር የሚዛመዱ ፋይሎች ብቻ ሊታረሙ ይችላሉ። ሁሉንም ፋይሎች ለመፍቀድ ባዶ ተወው።",
-      "restrictionInvalid": "ትክክለኛ ንድፍ አስገባ።",
+      "restrictionHint": "መደበኛ አገላለጽ ይህ ሁነታ ማርትዕ የሚችላቸውን ፋይሎች ይመርጣል፣ ለምሳሌ `\\.md$` ለማርክዳውን ፋይሎች ብቻ። ሁሉንም ፋይሎች ለመፍቀድ ባዶ ተወው።",
+      "restrictionInvalid": "ትክክለኛ መደበኛ አገላለጽ አስገባ።",
       "restrictionLabel": "የገደብ መለያ",
-      "restrictionPattern": "የፋይል ንድፍ",
+      "restrictionPattern": "የፋይል ገደብ",
       "roleLabel": "የሚና ፍቺ",
       "roleRequired": "ይህ ሁነታ ምን እንደሚሰራ ግለጽ።",
       "tool": {

@@ -3647,10 +3647,10 @@
       "nameLabel": "Modusnaam",
       "nameRequired": "Voer een modusnaam in.",
       "notFound": "Deze modus bestaat niet meer.",
-      "restrictionHint": "Alleen bestanden die overeenkomen met dit patroon kunnen worden bewerkt. Laat dit leeg om elk bestand toe te staan.",
-      "restrictionInvalid": "Voer een geldig patroon in.",
+      "restrictionHint": "Een reguliere expressie selecteert de bestanden die deze modus mag bewerken, bijvoorbeeld `\\.md$` voor alleen markdown-bestanden. Laat dit leeg om elk bestand toe te staan.",
+      "restrictionInvalid": "Voer een geldige reguliere expressie in.",
       "restrictionLabel": "Beperkingslabel",
-      "restrictionPattern": "Bestandspatroon",
+      "restrictionPattern": "Bestandsbeperking",
       "roleLabel": "Roldefinitie",
       "roleRequired": "Beschrijf wat deze modus doet.",
       "tool": {

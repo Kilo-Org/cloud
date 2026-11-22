@@ -3705,10 +3705,10 @@
       "nameLabel": "Naziv načina rada",
       "nameRequired": "Unesite naziv načina rada.",
       "notFound": "Ovaj način rada više ne postoji.",
-      "restrictionHint": "Mogu se uređivati samo datoteke koje odgovaraju ovom uzorku. Ostavite prazno da dopustite sve datoteke.",
-      "restrictionInvalid": "Unesite valjani uzorak.",
+      "restrictionHint": "Regularni izraz odabire datoteke koje ovaj način smije uređivati, na primjer `\\.md$` samo za markdown datoteke. Ostavite prazno da dopustite sve datoteke.",
+      "restrictionInvalid": "Unesite valjani regularni izraz.",
       "restrictionLabel": "Oznaka ograničenja",
-      "restrictionPattern": "Uzorak datoteke",
+      "restrictionPattern": "Ograničenje datoteka",
       "roleLabel": "Definicija uloge",
       "roleRequired": "Opišite što ovaj način rada radi.",
       "tool": {

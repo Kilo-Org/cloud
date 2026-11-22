@@ -3767,10 +3767,10 @@
       "nameLabel": "Ime načina",
       "nameRequired": "Vnesi ime načina.",
       "notFound": "Ta način ne obstaja več.",
-      "restrictionHint": "Urejati je mogoče samo datoteke, ki ustrezajo temu vzorcu. Pusti prazno, da dovoliš vse datoteke.",
-      "restrictionInvalid": "Vnesi veljaven vzorec.",
+      "restrictionHint": "Regularni izraz izbere datoteke, ki jih ta način lahko ureja, na primer `\\.md$` samo za datoteke markdown. Pusti prazno, da dovoliš vse datoteke.",
+      "restrictionInvalid": "Vnesi veljaven regularni izraz.",
       "restrictionLabel": "Oznaka omejitve",
-      "restrictionPattern": "Vzorec datotek",
+      "restrictionPattern": "Omejitev datotek",
       "roleLabel": "Opredelitev vloge",
       "roleRequired": "Opiši, kaj ta način počne.",
       "tool": {

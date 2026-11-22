@@ -3709,10 +3709,10 @@
       "nameLabel": "Nom du mode",
       "nameRequired": "Saisissez un nom de mode.",
       "notFound": "Ce mode n'existe plus.",
-      "restrictionHint": "Seuls les fichiers correspondant à ce motif peuvent être modifiés. Laissez-le vide pour autoriser tous les fichiers.",
-      "restrictionInvalid": "Saisissez un motif valide.",
+      "restrictionHint": "Une expression régulière sélectionne les fichiers que ce mode peut modifier, par exemple `\\.md$` pour les fichiers markdown uniquement. Laissez-le vide pour autoriser tous les fichiers.",
+      "restrictionInvalid": "Saisissez une expression régulière valide.",
       "restrictionLabel": "Libellé de restriction",
-      "restrictionPattern": "Motif de fichier",
+      "restrictionPattern": "Restriction de fichier",
       "roleLabel": "Définition du rôle",
       "roleRequired": "Décrivez ce que fait ce mode.",
       "tool": {

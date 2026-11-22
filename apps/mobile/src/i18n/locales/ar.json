@@ -3895,10 +3895,10 @@
       "nameLabel": "اسم الوضع",
       "nameRequired": "أدخل اسم وضع.",
       "notFound": "هذا الوضع لم يعد موجودًا.",
-      "restrictionHint": "يمكن تحرير الملفات المطابقة لهذا النمط فقط. اتركه فارغًا للسماح بكل الملفات.",
-      "restrictionInvalid": "أدخل نمطًا صالحًا.",
+      "restrictionHint": "يحدد التعبير النمطي الملفات التي يمكن لهذا الوضع تحريرها، مثل `\\.md$` لملفات Markdown فقط. اتركه فارغًا للسماح بكل الملفات.",
+      "restrictionInvalid": "أدخل تعبيرًا نمطيًا صالحًا.",
       "restrictionLabel": "تسمية القيد",
-      "restrictionPattern": "نمط الملف",
+      "restrictionPattern": "قيد الملف",
       "roleLabel": "تعريف الدور",
       "roleRequired": "صِف ما يفعله هذا الوضع.",
       "tool": {

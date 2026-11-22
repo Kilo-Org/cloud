@@ -3709,10 +3709,10 @@
       "nameLabel": "Nome modalità",
       "nameRequired": "Inserisci un nome per la modalità.",
       "notFound": "Questa modalità non esiste più.",
-      "restrictionHint": "Solo i file che corrispondono a questo pattern possono essere modificati. Lascia vuoto per consentire tutti i file.",
-      "restrictionInvalid": "Inserisci un pattern valido.",
+      "restrictionHint": "Un'espressione regolare seleziona i file che questa modalità può modificare, ad esempio `\\.md$` solo per i file markdown. Lascia vuoto per consentire tutti i file.",
+      "restrictionInvalid": "Inserisci un'espressione regolare valida.",
       "restrictionLabel": "Etichetta restrizione",
-      "restrictionPattern": "Pattern file",
+      "restrictionPattern": "Restrizione file",
       "roleLabel": "Definizione del ruolo",
       "roleRequired": "Descrivi cosa fa questa modalità.",
       "tool": {

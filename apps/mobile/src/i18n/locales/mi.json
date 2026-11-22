@@ -3643,10 +3643,10 @@
       "nameLabel": "Ingoa aratau",
       "nameRequired": "Whakaurua he ingoa aratau.",
       "notFound": "Kua kore tēnei aratau.",
-      "restrictionHint": "Ka taea anake te whakatika i ngā kōnae e ō ana ki tēnei tauira. Waiho kia wātea kia āhei ai ngā kōnae katoa.",
-      "restrictionInvalid": "Whakaurua he tauira tika.",
+      "restrictionHint": "Ka tīpakohia e tētahi kīanga auau (regex) ngā kōnae ka taea e tēnei aratau te whakatika, hei tauira `\\.md$` mō ngā kōnae markdown anake. Waiho kia wātea kia āhei ai ngā kōnae katoa.",
+      "restrictionInvalid": "Whakaurua he kīanga auau (regex) tika.",
       "restrictionLabel": "Tapanga here",
-      "restrictionPattern": "Tauira kōnae",
+      "restrictionPattern": "Here kōnae",
       "roleLabel": "Whakamārama tūranga",
       "roleRequired": "Whakaahuahia ngā mahi a tēnei aratau.",
       "tool": {

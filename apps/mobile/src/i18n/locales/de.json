@@ -3647,10 +3647,10 @@
       "nameLabel": "Modusname",
       "nameRequired": "Modusnamen eingeben.",
       "notFound": "Dieser Modus existiert nicht mehr.",
-      "restrictionHint": "Nur Dateien, die diesem Muster entsprechen, können bearbeitet werden. Leer lassen, um alle Dateien zuzulassen.",
-      "restrictionInvalid": "Gültiges Muster eingeben.",
+      "restrictionHint": "Ein regulärer Ausdruck legt fest, welche Dateien dieser Modus bearbeiten darf, zum Beispiel `\\.md$` nur für Markdown-Dateien. Lass das Feld leer, um alle Dateien zuzulassen.",
+      "restrictionInvalid": "Gib einen gültigen regulären Ausdruck ein.",
       "restrictionLabel": "Bezeichnung der Einschränkung",
-      "restrictionPattern": "Dateimuster",
+      "restrictionPattern": "Dateieinschränkung",
       "roleLabel": "Rollendefinition",
       "roleRequired": "Beschreiben, was dieser Modus tut.",
       "tool": {

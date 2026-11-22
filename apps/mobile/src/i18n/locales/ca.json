@@ -3705,10 +3705,10 @@
       "nameLabel": "Nom del mode",
       "nameRequired": "Introdueix un nom de mode.",
       "notFound": "Aquest mode ja no existeix.",
-      "restrictionHint": "Només es poden editar els fitxers que coincideixin amb aquest patró. Deixa'l buit per permetre tots els fitxers.",
-      "restrictionInvalid": "Introdueix un patró vàlid.",
+      "restrictionHint": "Una expressió regular selecciona quins fitxers pot editar aquest mode, per exemple `\\.md$` només per a fitxers markdown. Deixa'l buit per permetre tots els fitxers.",
+      "restrictionInvalid": "Introdueix una expressió regular vàlida.",
       "restrictionLabel": "Etiqueta de restricció",
-      "restrictionPattern": "Patró de fitxer",
+      "restrictionPattern": "Restricció de fitxers",
       "roleLabel": "Definició del rol",
       "roleRequired": "Descriu què fa aquest mode.",
       "tool": {

@@ -101,12 +101,14 @@ vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' })
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', () => ({
   EmptyState: (props: { action?: ReactNode }) => createElement('EmptyState', props, props.action),
+  StateAction: 'StateAction',
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   Plus: 'Plus',
+  CreditCard: 'CreditCard',
   Check: 'Check',
   ChevronDown: 'ChevronDown',
   GitBranch: 'GitBranch',

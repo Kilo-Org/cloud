@@ -4,8 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { EmptyState, StateAction } from '@/components/empty-state';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
+import { RepoBindingsEmptyState } from '@/components/profiles/repo-bindings-empty-state';
 import { type ProfileOwnerChoice } from '@/components/profiles/profile-owner-model';
 import { RepoBindingsAddForm } from '@/components/profiles/repo-bindings-add-form';
 import {
@@ -24,7 +24,7 @@ import { RepoPickerSheet } from '@/components/profiles/repo-picker-sheet';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { CreditCard, GitBranch, Plus } from '@/components/ui/icons';
+import { Plus } from '@/components/ui/icons';
 import { IconButton } from '@/components/ui/icon-button';
 import { RowGroup } from '@/components/ui/row-group';
 import { useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
@@ -39,7 +39,7 @@ import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { getNewProfilePath, type ProfileManagementStack } from '@/lib/profile-agent-navigation';
 import { connectedServicesHref } from '@/lib/profile-navigation';
 import { type ProfileExternalOpener } from '@/lib/profile-route-stack';
-import { billingHrefFor, trialRefusalCopyKey } from '@/lib/trial-refusal';
+import { billingHrefFor } from '@/lib/trial-refusal';
 
 /** The mutation hook toasts `error.message`; the screen supplies a fallback otherwise. */
 function hasUsableMessage(error: unknown): boolean {
@@ -193,16 +193,6 @@ export function RepoBindingsScreen({
   // branch, so the state carries the refusal here. That reader holds a role that
   // can change the plan, so the state pairs the `'offered'` sentence with the
   // billing step under it.
-  const planEnded = profilePermission === 'plan-ended';
-  const planEndedDescription = planEnded ? t(trialRefusalCopyKey(true, 'offered')) : undefined;
-  const roleDescription =
-    profilePermission === 'read-only' ? t('profiles.organizationRoleRequired') : undefined;
-  const withheldDescription = planEndedDescription ?? roleDescription;
-  // A lapsed plan would otherwise read as an empty list, because the generic
-  // title says nothing is configured while the list cannot be written at all.
-  const emptyTitle = planEnded
-    ? t('profiles.repoBindings.planEndedTitle')
-    : t('profiles.repoBindings.empty');
 
   return (
     <View className="flex-1 bg-background">
@@ -223,27 +213,11 @@ export function RepoBindingsScreen({
         }
       />
       {emptySurface ? (
-        <EmptyState
-          icon={GitBranch}
-          title={emptyTitle}
-          // The empty state must not name an action the screen withholds: a
-          // member cannot add a default, so its state names the role instead.
-          description={
-            canManage ? t('profiles.repoBindings.emptyDescription') : withheldDescription
-          }
-          // The plan state carries its own way out: the billing screen where the
-          // reader can end the state, so the blocking state is not a dead end.
-          action={
-            planEnded ? (
-              <StateAction
-                label={t('organization.hub.manageBilling')}
-                icon={CreditCard}
-                onPress={() => {
-                  router.push(billingHrefFor(organizationId));
-                }}
-              />
-            ) : undefined
-          }
+        <RepoBindingsEmptyState
+          permission={profilePermission}
+          onBilling={() => {
+            router.push(billingHrefFor(organizationId));
+          }}
         />
       ) : (
         <TabScreenScrollView

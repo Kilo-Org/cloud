@@ -101,6 +101,10 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 // reached at import time; the node environment cannot load the native module.
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/components/settings-search/settings-target', () => ({
+  SettingsSearchScrollView: 'ScrollView',
+  SettingsTarget: 'SettingsTarget',
+}));
 // The row skeleton's shimmer is a Reanimated clock, and the node environment
 // cannot load that native module; the screens only render skeletons while loading.
 vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));

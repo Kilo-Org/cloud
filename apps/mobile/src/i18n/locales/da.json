@@ -554,8 +554,11 @@
     "changelogFixesIn": "Rettelser og forbedringer i {{areas}}.",
     "changelogFixesPolish": "Rettelser og forbedringer i hele appen.",
     "changelogAreas": {
-      "signIn": "Log-ind",
-      "profileOrganizations": "Profil & organisationer"
+      "signIn": "log-ind",
+      "profileOrganizations": "profil & organisationer",
+      "chat": "samtale",
+      "notifications": "notifikationer",
+      "integrations": "integrationer"
     }
   },
   "preferences": {
@@ -4506,20 +4509,34 @@
       "deductionFallback": "Kreditfradrag",
       "emptyDescription": "Kreditkøb, kvitteringer og forbrug vises her.",
       "emptyTitle": "Ingen kredithistorik",
+      "expiredGrant": "Udløbet: {{description}}",
       "googlePlayReceipt": "Kvittering fra Google Play",
       "kind": {
         "adjustment": "Justering",
         "balanceNeutral": "Saldoneutral",
         "deduction": "Fradrag",
         "grant": "Tildelt kredit",
+        "promotionalCredits": "Kampagnekreditter",
         "welcomeCredits": "Velkomstkredit",
         "purchase": "Køb"
+      },
+      "program": {
+        "adminBulkGrant": "Administratorkredittildeling",
+        "contributorChampion": "Topbidragsyderkredit",
+        "feedback": "Feedbackkredit",
+        "influencer": "Influencerkredit",
+        "ossMonthlyReset": "Nulstilling af sponsorat af åben kildekode",
+        "ossSponsorship": "Kredit for sponsorat af åben kildekode",
+        "pullRequest": "PR-kredit",
+        "usageIssue": "Kredit for forbrugsproblem",
+        "vibeDay": "Vibe day-kredit"
       },
       "purchaseFallback": "Kreditkøb",
       "receipt": "Kvittering",
       "receiptA11y": "Åbn kvitteringen for {{description}}, {{amount}}, fra {{date}}",
       "receiptUnavailable": "Der er ingen kvittering for dette køb.",
-      "retentionLimit": "Viser den seneste kredithistorik."
+      "retentionLimit": "Viser den seneste kredithistorik.",
+      "voidedGrant": "Annulleret: {{description}}"
     },
     "title": "Køb kreditter",
     "description": "Kreditter er et engangskøb, der lægges til din Kilo-saldo til at køre AI-kodningssessioner i Kilo App. Butikken opkræver betaling på din konto, og kreditterne tilføjes, når butikken bekræfter betalingen.",
@@ -5099,6 +5116,20 @@
       "eu": "Den Europæiske Union",
       "au": "Australien",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Søg efter indstillinger",
+    "noMatches": "Ingen matchende indstillinger",
+    "emptyDescription": "Prøv et andet indstillingsnavn eller søgeord.",
+    "resultsStatus": "Indstillinger fundet: {{resultCount}}",
+    "keywords": {
+      "signOut": "log ud|log af",
+      "appearance": "tema|farveskema",
+      "appUnlock": "biometri|ansigtsgenkendelse|fingeraftryk",
+      "language": "sprog|oversættelse",
+      "notifications": "notifikationer|advarsler|pushbeskeder",
+      "privacy": "analyse|sporing"
     }
   }
 }

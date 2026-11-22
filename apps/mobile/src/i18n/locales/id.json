@@ -554,8 +554,11 @@
     "changelogFixesIn": "Perbaikan dan peningkatan pada {{areas}}.",
     "changelogFixesPolish": "Perbaikan dan peningkatan di seluruh aplikasi.",
     "changelogAreas": {
-      "signIn": "Masuk",
-      "profileOrganizations": "Profil & organisasi"
+      "signIn": "masuk",
+      "profileOrganizations": "profil & organisasi",
+      "chat": "obrolan",
+      "notifications": "notifikasi",
+      "integrations": "integrasi"
     }
   },
   "preferences": {
@@ -4506,20 +4509,34 @@
       "deductionFallback": "Pengurangan kredit",
       "emptyDescription": "Pembelian kredit, tanda terima, dan penggunaan akan muncul di sini.",
       "emptyTitle": "Tidak ada riwayat kredit",
+      "expiredGrant": "Kedaluwarsa: {{description}}",
       "googlePlayReceipt": "Tanda terima dari Google Play",
       "kind": {
         "adjustment": "Penyesuaian",
         "balanceNeutral": "Saldo tetap",
         "deduction": "Pengurangan",
         "grant": "Kredit gratis",
+        "promotionalCredits": "Kredit promosi",
         "welcomeCredits": "Kredit selamat datang",
         "purchase": "Pembelian"
+      },
+      "program": {
+        "adminBulkGrant": "Pemberian kredit admin",
+        "contributorChampion": "Kredit juara kontributor",
+        "feedback": "Kredit masukan",
+        "influencer": "Kredit influencer",
+        "ossMonthlyReset": "Pengaturan ulang sponsor sumber terbuka bulanan",
+        "ossSponsorship": "Kredit sponsor sumber terbuka",
+        "pullRequest": "Kredit PR",
+        "usageIssue": "Kredit masalah penggunaan",
+        "vibeDay": "Kredit Vibe day"
       },
       "purchaseFallback": "Pembelian kredit",
       "receipt": "Tanda terima",
       "receiptA11y": "Buka tanda terima untuk {{description}}, {{amount}}, dari {{date}}",
       "receiptUnavailable": "Tanda terima tidak tersedia untuk pembelian ini.",
-      "retentionLimit": "Menampilkan riwayat kredit terbaru."
+      "retentionLimit": "Menampilkan riwayat kredit terbaru.",
+      "voidedGrant": "Dibatalkan: {{description}}"
     },
     "title": "Beli kredit",
     "description": "Kredit adalah pembelian satu kali yang ditambahkan ke saldo Kilo Anda untuk menjalankan sesi coding AI di Kilo App. Toko menagih akun Anda dan kredit ditambahkan setelah toko mengonfirmasi pembayaran.",
@@ -5099,6 +5116,20 @@
       "eu": "Uni Eropa",
       "au": "Australia",
       "jp": "Jepang"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Cari preferensi",
+    "noMatches": "Tidak ada preferensi yang cocok",
+    "emptyDescription": "Coba nama preferensi atau kata kunci lain.",
+    "resultsStatus": "Preferensi ditemukan: {{resultCount}}",
+    "keywords": {
+      "signOut": "keluar|keluar akun",
+      "appearance": "tema|skema warna",
+      "appUnlock": "biometrik|wajah|sidik jari",
+      "language": "bahasa|terjemahan",
+      "notifications": "peringatan|pemberitahuan",
+      "privacy": "analitik|pelacakan"
     }
   }
 }

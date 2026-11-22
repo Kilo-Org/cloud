@@ -19,9 +19,10 @@ export type CreditDeduction = RouterOutputs['user']['getCreditBlocks']['deductio
 export type CreditGrant = RouterOutputs['user']['getCreditGrantHistory']['grants'][number];
 
 /**
- * Why a grant row was written, which decides its title. The server names the
- * categories (`referral`, `welcome`, `kilo_pass`, `grant`, `adjustment`); this
- * is not {@link CreditGrantKind}, which captions a ledger row's source.
+ * Why a grant row was written, which decides its title. The server classifies
+ * its own categories (`referral`, `welcome`, `kilo_pass`, `promotional`, the
+ * standing programs, `adjustment`); this is not {@link CreditGrantKind}, which
+ * captions a ledger row's source.
  */
 export type CreditGrantReason = CreditGrant['kind'];
 

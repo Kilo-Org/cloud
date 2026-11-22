@@ -554,8 +554,11 @@
     "changelogFixesIn": "Regstellings en verbeterings in {{areas}}.",
     "changelogFixesPolish": "Regstellings en verbeterings regdeur die app.",
     "changelogAreas": {
-      "signIn": "Aanmelding",
-      "profileOrganizations": "Profiel & organisasies"
+      "signIn": "aanmelding",
+      "profileOrganizations": "profiel & organisasies",
+      "chat": "klets",
+      "notifications": "kennisgewings",
+      "integrations": "integrasies"
     }
   },
   "preferences": {
@@ -4506,20 +4509,34 @@
       "deductionFallback": "Kredietaftrekking",
       "emptyDescription": "Kredietaankope, kwitansies en gebruik sal hier verskyn.",
       "emptyTitle": "Geen kredietgeskiedenis nie",
+      "expiredGrant": "Verval: {{description}}",
       "googlePlayReceipt": "Kwitansie van Google Play",
       "kind": {
         "adjustment": "Aanpassing",
         "balanceNeutral": "Saldoneutraal",
         "deduction": "Aftrekking",
         "grant": "Kredniettoekenning",
+        "promotionalCredits": "Promosiekrediete",
         "welcomeCredits": "Welkomkrediete",
         "purchase": "Aankoop"
+      },
+      "program": {
+        "adminBulkGrant": "Administrateur-krediettoekenning",
+        "contributorChampion": "Bydraer-kampioenkrediet",
+        "feedback": "Terugvoerkrediet",
+        "influencer": "Influënserkrediet",
+        "ossMonthlyReset": "Herstel van oopbronborgskap",
+        "ossSponsorship": "Oopbronborgskapkrediet",
+        "pullRequest": "Trekversoekkrediet",
+        "usageIssue": "Gebruiksprobleemkrediet",
+        "vibeDay": "Vibe-dagkrediet"
       },
       "purchaseFallback": "Kredietaankoop",
       "receipt": "Kwitansie",
       "receiptA11y": "Maak die kwitansie vir {{description}}, {{amount}}, vanaf {{date}} oop",
       "receiptUnavailable": "Geen kwitansie is vir hierdie aankoop beskikbaar nie.",
-      "retentionLimit": "Die mees onlangse kredietgeskiedenis word gewys."
+      "retentionLimit": "Die mees onlangse kredietgeskiedenis word gewys.",
+      "voidedGrant": "Nietig gemaak: {{description}}"
     },
     "title": "Koop krediete",
     "description": "Krediete is 'n eenmalige aankoop wat by jou Kilo-saldo gevoeg word om AI-koderingsessies in Kilo App te laat loop. Die winkel hef jou rekening en krediete word bygevoeg nadat die winkel betaling bevestig.",
@@ -5099,6 +5116,20 @@
       "eu": "Europese Unie",
       "au": "Australië",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Soek voorkeure",
+    "noMatches": "Geen ooreenstemmende voorkeure",
+    "emptyDescription": "Probeer ’n ander voorkeurnaam of sleutelwoord.",
+    "resultsStatus": "Voorkeure gevind: {{resultCount}}",
+    "keywords": {
+      "signOut": "afmeld|meld af",
+      "appearance": "tema|kleurskema",
+      "appUnlock": "biometrie|gesigherkenning|vingerafdruk",
+      "language": "taal|vertaling",
+      "notifications": "waarskuwings|stootkennisgewings",
+      "privacy": "ontleding|nasporing"
     }
   }
 }

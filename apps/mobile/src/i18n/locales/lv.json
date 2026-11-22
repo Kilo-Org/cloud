@@ -555,8 +555,11 @@
     "changelogFixesIn": "Labojumi un uzlabojumi šajās jomās: {{areas}}.",
     "changelogFixesPolish": "Labojumi un uzlabojumi visā lietotnē.",
     "changelogAreas": {
-      "signIn": "Pierakstīšanās",
-      "profileOrganizations": "Profils & organizācijas"
+      "signIn": "pierakstīšanās",
+      "profileOrganizations": "profils & organizācijas",
+      "chat": "tērzēšana",
+      "notifications": "paziņojumi",
+      "integrations": "integrācijas"
     }
   },
   "preferences": {
@@ -4585,20 +4588,34 @@
       "deductionFallback": "Kredītu norakstīšana",
       "emptyDescription": "Šeit būs redzami kredītu pirkumi, kvītis un lietojums.",
       "emptyTitle": "Nav kredītu vēstures",
+      "expiredGrant": "Termiņš beidzies: {{description}}",
       "googlePlayReceipt": "Kvīts pakalpojumā Google Play",
       "kind": {
         "adjustment": "Korekcija",
         "balanceNeutral": "Neietekmē atlikumu",
         "deduction": "Norakstīšana",
         "grant": "Kredītu piešķīrums",
+        "promotionalCredits": "Promocijas kredīti",
         "welcomeCredits": "Sveiciena kredīti",
         "purchase": "Pirkums"
+      },
+      "program": {
+        "adminBulkGrant": "Administratora kredītu piešķīrums",
+        "contributorChampion": "Līdzstrādnieku čempiona kredīts",
+        "feedback": "Kredīts par atsauksmi",
+        "influencer": "Influenceru kredīts",
+        "ossMonthlyReset": "OSS sponsorēšanas ikmēneša atiestatīšana",
+        "ossSponsorship": "OSS sponsorēšanas kredīts",
+        "pullRequest": "Kredīts par izmaiņu pieprasījumu",
+        "usageIssue": "Kredīts par lietojuma problēmu",
+        "vibeDay": "Vibe dienas kredīts"
       },
       "purchaseFallback": "Kredītu pirkums",
       "receipt": "Kvīts",
       "receiptA11y": "Atvērt kvīti: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Šim pirkumam kvīts nav pieejama.",
-      "retentionLimit": "Tiek rādīta jaunākā kredītu vēsture."
+      "retentionLimit": "Tiek rādīta jaunākā kredītu vēsture.",
+      "voidedGrant": "Anulēts: {{description}}"
     },
     "title": "Pirkt kredītus",
     "description": "Kredīti ir vienreizējs pirkums, kas tiek pievienots tavam Kilo bilancei AI kodēšanas sesiju vadīšanai Kilo App. Veikals iekasē maksu no tava konta, un kredīti tiek pievienoti pēc tam, kad veikals apstiprina maksājumu.",
@@ -5186,6 +5203,20 @@
       "eu": "Eiropas Savienība",
       "au": "Austrālija",
       "jp": "Japāna"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Iestatījumu meklēšana",
+    "noMatches": "Nav atbilstošu iestatījumu",
+    "emptyDescription": "Mēģiniet citu iestatījuma nosaukumu vai atslēgvārdu.",
+    "resultsStatus": "Atrastie iestatījumi: {{resultCount}}",
+    "keywords": {
+      "signOut": "izrakstīties|iziet|beigt sesiju",
+      "appearance": "tēma|krāsu shēma",
+      "appUnlock": "biometrija|sejas atpazīšana|pirksta nospiedums",
+      "language": "valoda|tulkojums",
+      "notifications": "brīdinājumi|paziņojumi",
+      "privacy": "analītika|izsekošana"
     }
   }
 }

@@ -148,18 +148,23 @@ export async function loadOutboxRow(
  * Removes one outbox row. Serialized behind any in-flight write for the same
  * key. Not epoch-fenced: removal is explicit settle intent and must work
  * regardless of auth transitions. Remove failures are reported to Sentry and
- * swallowed.
+ * swallowed, but the returned boolean mirrors `clearDraft` in `drafts.ts`:
+ * it says whether the row is actually gone, so the caller can keep the row
+ * visible and the reconcile state honest when the durable delete did not
+ * commit, instead of reporting a settle the store never applied.
  */
-export async function removeOutboxRow(userId: string, fingerprint: string): Promise<void> {
+export async function removeOutboxRow(userId: string, fingerprint: string): Promise<boolean> {
   if (!userId) {
-    return;
+    return true;
   }
   try {
     await chainSave(fullKey(userId, fingerprint), async () => {
       await encryptedKv.removeItem(outboxScope(userId), fingerprint);
     });
+    return true;
   } catch (error) {
     reportOutboxFailure(error, 'remove');
+    return false;
   }
 }
 

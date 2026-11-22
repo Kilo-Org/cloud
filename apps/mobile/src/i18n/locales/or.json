@@ -555,7 +555,10 @@
     "changelogFixesPolish": "ସମଗ୍ର ଆପରେ ସମାଧାନ ଓ ଉନ୍ନତି।",
     "changelogAreas": {
       "signIn": "ସାଇନ୍ ଇନ୍",
-      "profileOrganizations": "ପ୍ରୋଫାଇଲ୍ ଏବଂ ସଂଗଠନ"
+      "profileOrganizations": "ପ୍ରୋଫାଇଲ୍ ଏବଂ ସଂଗଠନ",
+      "chat": "ଚାଟ୍",
+      "notifications": "ବିଜ୍ଞପ୍ତି",
+      "integrations": "ଇଣ୍ଟିଗ୍ରେସନ୍"
     }
   },
   "preferences": {
@@ -4506,20 +4509,34 @@
       "deductionFallback": "କ୍ରେଡିଟ୍ କଟାଣ",
       "emptyDescription": "କ୍ରେଡିଟ୍ କ୍ରୟ, ରସିଦ ଏବଂ ବ୍ୟବହାର ଏଠାରେ ଦେଖାଯିବ।",
       "emptyTitle": "କୌଣସି କ୍ରେଡିଟ୍ ଇତିହାସ ନାହିଁ",
+      "expiredGrant": "ମିଆଦ ସମାପ୍ତ: {{description}}",
       "googlePlayReceipt": "Google Playରୁ ରସିଦ",
       "kind": {
         "adjustment": "ସମାୟୋଜନ",
         "balanceNeutral": "ବାଲାନ୍ସ ଅପରିବର୍ତ୍ତିତ",
         "deduction": "କଟାଣ",
         "grant": "କ୍ରେଡିଟ୍ ଅନୁଦାନ",
+        "promotionalCredits": "ପ୍ରୋମୋସନାଲ୍ କ୍ରେଡିଟ୍",
         "welcomeCredits": "ସ୍ୱାଗତ କ୍ରେଡିଟ୍",
         "purchase": "କ୍ରୟ"
+      },
+      "program": {
+        "adminBulkGrant": "ପ୍ରଶାସକ କ୍ରେଡିଟ୍ ଅନୁଦାନ",
+        "contributorChampion": "ଅବଦାନକାରୀ ଚାମ୍ପିଅନ୍ କ୍ରେଡିଟ୍",
+        "feedback": "ମତାମତ କ୍ରେଡିଟ୍",
+        "influencer": "ଇନଫ୍ଲୁଏନ୍ସର୍ କ୍ରେଡିଟ୍",
+        "ossMonthlyReset": "OSS ମାସିକ ରିସେଟ୍",
+        "ossSponsorship": "OSS ପ୍ରାୟୋଜନ କ୍ରେଡିଟ୍",
+        "pullRequest": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ କ୍ରେଡିଟ୍",
+        "usageIssue": "ବ୍ୟବହାର ସମସ୍ୟା କ୍ରେଡିଟ୍",
+        "vibeDay": "Vibe day କ୍ରେଡିଟ୍"
       },
       "purchaseFallback": "କ୍ରେଡିଟ୍ କ୍ରୟ",
       "receipt": "ରସିଦ",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} ପାଇଁ ରସିଦ ଖୋଲନ୍ତୁ",
       "receiptUnavailable": "ଏହି କ୍ରୟ ପାଇଁ କୌଣସି ରସିଦ ଉପଲବ୍ଧ ନାହିଁ।",
-      "retentionLimit": "ସର୍ବାଧିକ ନୂଆ କ୍ରେଡିଟ୍ ଇତିହାସ ଦେଖାଯାଉଛି।"
+      "retentionLimit": "ସର୍ବାଧିକ ନୂଆ କ୍ରେଡିଟ୍ ଇତିହାସ ଦେଖାଯାଉଛି।",
+      "voidedGrant": "ବାତିଲ: {{description}}"
     },
     "title": "କ୍ରେଡିଟ୍ କିଣନ୍ତୁ",
     "description": "କ୍ରେଡିଟ୍ ହେଉଛି Kilo App ରେ AI କୋଡିଂ ସେସନ୍ ଚଲାଇବା ପାଇଁ ଆପଣଙ୍କ Kilo ବାଲାନ୍ସରେ ଯୋଡ଼ାଯାଉଥିବା ଏକ-ଥର କ୍ରୟ। ଷ୍ଟୋର ଆପଣଙ୍କ ଖାତାରୁ ଶୁଳ୍କ ନେଇଥାଏ ଏବଂ ଷ୍ଟୋର ଦେୟ ନିଶ୍ଚିତ କରିବା ପରେ କ୍ରେଡିଟ୍ ଯୋଡ଼ାଯାଏ।",
@@ -5099,6 +5116,20 @@
       "eu": "ୟୁରୋପୀୟ ସଂଘ",
       "au": "ଅଷ୍ଟ୍ରେଲିଆ",
       "jp": "ଜାପାନ"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "ପସନ୍ଦ ଖୋଜନ୍ତୁ",
+    "noMatches": "ମେଳ ଖାଉଥିବା ପସନ୍ଦ ନାହିଁ",
+    "emptyDescription": "ଅନ୍ୟ ଏକ ପସନ୍ଦର ନାମ କିମ୍ବା ଖୋଜ ଶବ୍ଦ ଦେଇ ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "resultsStatus": "ମିଳିଥିବା ପସନ୍ଦ: {{resultCount}}",
+    "keywords": {
+      "signOut": "ବାହାରିବା|ଖାତାରୁ ବାହାରିବା",
+      "appearance": "ରଙ୍ଗ|ଦେଖାଶୁଣା|ରଙ୍ଗ ଯୋଜନା",
+      "appUnlock": "ମୁହଁ|ଆଙ୍ଗୁଠି ଛାପ|ବାୟୋମେଟ୍ରିକ୍ସ",
+      "language": "ଭାଷା|ଅନୁବାଦ",
+      "notifications": "ସୂଚନା|ସତର୍କତା|ବିଜ୍ଞପ୍ତି",
+      "privacy": "ଗୋପନୀୟତା|ବିଶ୍ଳେଷଣ|ଅନୁସରଣ"
     }
   }
 }

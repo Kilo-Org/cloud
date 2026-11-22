@@ -167,6 +167,57 @@ describe('createMemoryStorage', () => {
       const part = parts.find(p => p.id === 'p-1');
       expect(part?.type === 'tool' ? part.state.status : undefined).toBe('completed');
     });
+
+    test('a rejected stale lifecycle update publishes nothing', () => {
+      s.upsertPart('msg-1', makeToolPart('p-1', 'running', { start: 2000 }), 200);
+      const before = s.getParts('msg-1');
+      const cb = jest.fn();
+      s.subscribe('parts:msg-1', cb);
+
+      // A terminal whose event time predates the stored running update is
+      // dropped, so the parts channel and the cached snapshot must stay
+      // untouched.
+      s.upsertPart('msg-1', makeToolPart('p-1', 'completed', { start: 1000, end: 1500 }), 150);
+
+      expect(cb).not.toHaveBeenCalled();
+      expect(s.getParts('msg-1')).toBe(before);
+
+      // Control: an accepted update still notifies once and rebuilds.
+      s.upsertPart('msg-1', makeToolPart('p-2', 'running', { start: 300 }), 300);
+      expect(cb).toHaveBeenCalledTimes(1);
+      expect(s.getParts('msg-1')).not.toBe(before);
+    });
+
+    test('a bounded preview of a stored tool publishes nothing', () => {
+      s.upsertPart('msg-1', makeToolPart('p-1', 'completed', { start: 1, end: 2 }), 200);
+      const before = s.getParts('msg-1');
+      const cb = jest.fn();
+      s.subscribe('parts:msg-1', cb);
+
+      // The same settled call, carrying only a bounded preview marker. Its
+      // event time postdates the stored one, so only the preview guard can
+      // reject it, and a rejection must stay invisible to readers.
+      const preview = {
+        ...makeToolPart('p-1', 'completed', { start: 1, end: 2 }),
+        cloudDetail: {
+          version: 1,
+          revision: 1,
+          omitted: ['state.output'],
+          omittedCount: 1,
+          omittedBytes: 64,
+        },
+      } as unknown as Part;
+      s.upsertPart('msg-1', preview, 300);
+
+      expect(cb).not.toHaveBeenCalled();
+      expect(s.getParts('msg-1')).toBe(before);
+      expect(Reflect.get(s.getPart('msg-1', 'p-1') ?? {}, 'cloudDetail')).toBeUndefined();
+
+      // Control: an accepted update still notifies once and rebuilds.
+      s.upsertPart('msg-1', makeToolPart('p-2', 'running', { start: 300 }), 300);
+      expect(cb).toHaveBeenCalledTimes(1);
+      expect(s.getParts('msg-1')).not.toBe(before);
+    });
   });
 
   describe('applyPartDelta', () => {

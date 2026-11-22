@@ -554,8 +554,11 @@
     "changelogFixesIn": "Ուղղումներ և բարելավումներ հետևյալ բաժիններում՝ {{areas}}։",
     "changelogFixesPolish": "Ուղղումներ և բարելավումներ ամբողջ հավելվածում։",
     "changelogAreas": {
-      "signIn": "Մուտք",
-      "profileOrganizations": "Պրոֆիլ ու կազմակերպություններ"
+      "signIn": "մուտք",
+      "profileOrganizations": "պրոֆիլ ու կազմակերպություններ",
+      "chat": "զրույց",
+      "notifications": "ծանուցումներ",
+      "integrations": "ինտեգրումներ"
     }
   },
   "preferences": {
@@ -4506,19 +4509,33 @@
       "deductionFallback": "Կրեդիտների դուրսգրում",
       "emptyDescription": "Կրեդիտների գնումները, անդորրագրերը և օգտագործումը կհայտնվեն այստեղ։",
       "emptyTitle": "Կրեդիտների պատմություն չկա",
+      "expiredGrant": "Ժամկետանց՝ {{description}}",
       "googlePlayReceipt": "Անդորրագիր Google Play-ից",
       "purchaseFallback": "Կրեդիտների գնում",
       "receipt": "Անդորրագիր",
       "receiptA11y": "Բացել անդորրագիրը՝ {{description}}, {{amount}}, {{date}}-ից",
       "receiptUnavailable": "Այս գնման համար անդորրագիր հասանելի չէ։",
       "retentionLimit": "Ցուցադրվում է կրեդիտների ամենավերջին պատմությունը։",
+      "voidedGrant": "Չեղարկված՝ {{description}}",
       "kind": {
         "adjustment": "Ճշգրտում",
         "balanceNeutral": "Առանց հաշվեկշռի փոփոխության",
         "deduction": "Դուրսգրում",
         "grant": "Կրեդիտների տրամադրում",
+        "promotionalCredits": "Պրոմո կրեդիտներ",
         "welcomeCredits": "Ողջույնի կրեդիտներ",
         "purchase": "Գնում"
+      },
+      "program": {
+        "adminBulkGrant": "Ադմինիստրատորի կրեդիտների տրամադրում",
+        "contributorChampion": "Ներդրող-չեմպիոնի կրեդիտներ",
+        "feedback": "Հետադարձ կապի կրեդիտներ",
+        "influencer": "Ինֆլուենսերների կրեդիտներ",
+        "ossMonthlyReset": "Բաց կոդով նախագծերի կրեդիտների ամսական վերականգնում",
+        "ossSponsorship": "Բաց կոդով նախագծերի հովանավորության կրեդիտներ",
+        "pullRequest": "Ձգման հարցման կրեդիտներ",
+        "usageIssue": "Օգտագործման խնդրի կրեդիտներ",
+        "vibeDay": "Vibe Day-ի կրեդիտներ"
       }
     },
     "title": "Գնել կրեդիտներ",
@@ -5099,6 +5116,20 @@
       "eu": "Եվրոպական Միություն",
       "au": "Ավստրալիա",
       "jp": "Ճապոնիա"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Նախապատվությունների որոնում",
+    "noMatches": "Համապատասխան նախապատվություններ չկան",
+    "emptyDescription": "Փորձեք նախապատվության այլ անուն կամ հիմնաբառ։",
+    "resultsStatus": "Գտնված նախապատվություններ՝ {{resultCount}}",
+    "keywords": {
+      "signOut": "դուրս գալ|ելք",
+      "appearance": "թեմա|գունային սխեմա|մուգ ռեժիմ",
+      "appUnlock": "կենսաչափություն|դեմքի ճանաչում|մատնահետք",
+      "language": "լեզու|թարգմանություն",
+      "notifications": "ծանուցումներ|ազդանշաններ",
+      "privacy": "վերլուծություն|հետևում"
     }
   }
 }

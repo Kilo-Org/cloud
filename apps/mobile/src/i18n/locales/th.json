@@ -555,7 +555,10 @@
     "changelogFixesPolish": "การแก้ไขและปรับปรุงทั่วทั้งแอป",
     "changelogAreas": {
       "signIn": "การลงชื่อเข้าใช้",
-      "profileOrganizations": "โปรไฟล์กับองค์กร"
+      "profileOrganizations": "โปรไฟล์กับองค์กร",
+      "chat": "แชท",
+      "notifications": "การแจ้งเตือน",
+      "integrations": "การเชื่อมต่อ"
     }
   },
   "preferences": {
@@ -4506,20 +4509,34 @@
       "deductionFallback": "การหักเครดิต",
       "emptyDescription": "การซื้อเครดิต ใบเสร็จ และการใช้งานจะแสดงที่นี่",
       "emptyTitle": "ไม่มีประวัติเครดิต",
+      "expiredGrant": "หมดอายุแล้ว: {{description}}",
       "googlePlayReceipt": "ใบเสร็จจาก Google Play",
       "kind": {
         "adjustment": "การปรับปรุง",
         "balanceNeutral": "ไม่กระทบยอดคงเหลือ",
         "deduction": "การหักเครดิต",
         "grant": "เครดิตที่ได้รับ",
+        "promotionalCredits": "เครดิตโปรโมชัน",
         "welcomeCredits": "เครดิตต้อนรับ",
         "purchase": "การซื้อ"
+      },
+      "program": {
+        "adminBulkGrant": "เครดิตที่ผู้ดูแลระบบมอบให้",
+        "contributorChampion": "เครดิตแชมป์ผู้มีส่วนร่วม",
+        "feedback": "เครดิตข้อเสนอแนะ",
+        "influencer": "เครดิตอินฟลูเอนเซอร์",
+        "ossMonthlyReset": "การรีเซ็ตเครดิต OSS รายเดือน",
+        "ossSponsorship": "เครดิตสนับสนุน OSS",
+        "pullRequest": "เครดิต PR",
+        "usageIssue": "เครดิตปัญหาการใช้งาน",
+        "vibeDay": "เครดิต Vibe day"
       },
       "purchaseFallback": "การซื้อเครดิต",
       "receipt": "ใบเสร็จ",
       "receiptA11y": "เปิดใบเสร็จสำหรับ {{description}} จำนวน {{amount}} วันที่ {{date}}",
       "receiptUnavailable": "ไม่มีใบเสร็จสำหรับการซื้อนี้",
-      "retentionLimit": "กำลังแสดงประวัติเครดิตล่าสุด"
+      "retentionLimit": "กำลังแสดงประวัติเครดิตล่าสุด",
+      "voidedGrant": "ยกเลิกแล้ว: {{description}}"
     },
     "title": "ซื้อเครดิต",
     "description": "เครดิตคือการซื้อครั้งเดียวที่เพิ่มเข้าสู่ยอดคงเหลือ Kilo ของคุณสำหรับการรันเซสชันการเขียนโค้ด AI ใน Kilo App สโตร์เรียกเก็บเงินจากบัญชีของคุณ และเครดิตจะถูกเพิ่มหลังจากที่สโตร์ยืนยันการชำระเงิน",
@@ -5099,6 +5116,20 @@
       "eu": "สหภาพยุโรป",
       "au": "ออสเตรเลีย",
       "jp": "ญี่ปุ่น"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "ค้นหาการตั้งค่า",
+    "noMatches": "ไม่พบการตั้งค่าที่ตรงกัน",
+    "emptyDescription": "ลองใช้ชื่อการตั้งค่าหรือคำค้นอื่น",
+    "resultsStatus": "พบการตั้งค่า: {{resultCount}}",
+    "keywords": {
+      "signOut": "ออกจากระบบ|ออกจากบัญชี",
+      "appearance": "ธีม|โทนสี",
+      "appUnlock": "ชีวมิติ|ใบหน้า|ลายนิ้วมือ",
+      "language": "ภาษา|การแปล",
+      "notifications": "แจ้งเตือน|การเตือน",
+      "privacy": "การวิเคราะห์|การติดตาม"
     }
   }
 }

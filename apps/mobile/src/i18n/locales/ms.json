@@ -554,8 +554,11 @@
     "changelogFixesIn": "Pembetulan dan penambahbaikan dalam {{areas}}.",
     "changelogFixesPolish": "Pembetulan dan penambahbaikan di seluruh aplikasi.",
     "changelogAreas": {
-      "signIn": "Log masuk",
-      "profileOrganizations": "Profil & organisasi"
+      "signIn": "log masuk",
+      "profileOrganizations": "profil & organisasi",
+      "chat": "sembang",
+      "notifications": "pemberitahuan",
+      "integrations": "integrasi"
     }
   },
   "preferences": {
@@ -4506,20 +4509,34 @@
       "deductionFallback": "Potongan kredit",
       "emptyDescription": "Pembelian kredit, resit dan penggunaan akan dipaparkan di sini.",
       "emptyTitle": "Tiada sejarah kredit",
+      "expiredGrant": "Tamat tempoh: {{description}}",
       "googlePlayReceipt": "Resit daripada Google Play",
       "kind": {
         "adjustment": "Pelarasan",
         "balanceNeutral": "Neutral baki",
         "deduction": "Potongan",
         "grant": "Pemberian kredit",
+        "promotionalCredits": "Kredit promosi",
         "welcomeCredits": "Kredit selamat datang",
         "purchase": "Pembelian"
+      },
+      "program": {
+        "adminBulkGrant": "Pemberian kredit pentadbir",
+        "contributorChampion": "Kredit juara penyumbang",
+        "feedback": "Kredit maklum balas",
+        "influencer": "Kredit pempengaruh",
+        "ossMonthlyReset": "Pembaharuan penajaan OSS",
+        "ossSponsorship": "Kredit penajaan OSS",
+        "pullRequest": "Kredit PR",
+        "usageIssue": "Kredit isu penggunaan",
+        "vibeDay": "Kredit Vibe Day"
       },
       "purchaseFallback": "Pembelian kredit",
       "receipt": "Resit",
       "receiptA11y": "Buka resit untuk {{description}}, {{amount}}, dari {{date}}",
       "receiptUnavailable": "Resit tidak tersedia untuk pembelian ini.",
-      "retentionLimit": "Memaparkan sejarah kredit terkini."
+      "retentionLimit": "Memaparkan sejarah kredit terkini.",
+      "voidedGrant": "Dibatalkan: {{description}}"
     },
     "title": "Beli kredit",
     "description": "Kredit ialah pembelian sekali sahaja yang ditambah pada baki Kilo anda untuk menjalankan sesi pengekodan AI dalam Apl Kilo. Kedai mengenakan caj pada akaun anda dan kredit ditambah selepas kedai mengesahkan pembayaran.",
@@ -5099,6 +5116,20 @@
       "eu": "Kesatuan Eropah",
       "au": "Australia",
       "jp": "Jepun"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Cari keutamaan",
+    "noMatches": "Tiada keutamaan yang sepadan",
+    "emptyDescription": "Cuba nama keutamaan atau kata kunci lain.",
+    "resultsStatus": "Keutamaan ditemui: {{resultCount}}",
+    "keywords": {
+      "signOut": "log keluar|keluar akaun",
+      "appearance": "tema|skema warna",
+      "appUnlock": "biometrik|wajah|cap jari",
+      "language": "bahasa|terjemahan",
+      "notifications": "makluman|amaran|pemberitahuan",
+      "privacy": "analitik|penjejakan"
     }
   }
 }

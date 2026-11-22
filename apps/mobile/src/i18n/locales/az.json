@@ -555,7 +555,10 @@
     "changelogFixesPolish": "Bütün tətbiqdə düzəlişlər və təkmilləşdirmələr.",
     "changelogAreas": {
       "signIn": "Giriş",
-      "profileOrganizations": "Profil ilə təşkilatlar"
+      "profileOrganizations": "Profil ilə təşkilatlar",
+      "chat": "Söhbət",
+      "notifications": "Bildirişlər",
+      "integrations": "İnteqrasiyalar"
     }
   },
   "preferences": {
@@ -4506,20 +4509,34 @@
       "deductionFallback": "Kredit çıxılması",
       "emptyDescription": "Kredit alışları, qəbzlər və istifadə burada görünəcək.",
       "emptyTitle": "Kredit tarixçəsi yoxdur",
+      "expiredGrant": "Müddəti bitib: {{description}}",
       "googlePlayReceipt": "Google Play qəbzi",
       "kind": {
         "adjustment": "Düzəliş",
         "balanceNeutral": "Balansa təsirsiz",
         "deduction": "Çıxılma",
         "grant": "Kredit hədiyyəsi",
+        "promotionalCredits": "Promosyon kreditlər",
         "welcomeCredits": "Xoş gəlmə krediti",
         "purchase": "Alış"
+      },
+      "program": {
+        "adminBulkGrant": "İnzibatçı kredit hədiyyəsi",
+        "contributorChampion": "Töhfəçi çempion krediti",
+        "feedback": "Rəy krediti",
+        "influencer": "İnfluenser krediti",
+        "ossMonthlyReset": "OSS sponsorluğu yenilənməsi",
+        "ossSponsorship": "OSS sponsorluğu krediti",
+        "pullRequest": "Birləşdirmə sorğusu krediti",
+        "usageIssue": "İstifadə problemi krediti",
+        "vibeDay": "Vibe Day krediti"
       },
       "purchaseFallback": "Kredit alışı",
       "receipt": "Qəbz",
       "receiptA11y": "{{description}} üçün {{amount}}, {{date}} tarixli qəbzi açın",
       "receiptUnavailable": "Bu alış üçün qəbz mövcud deyil.",
-      "retentionLimit": "Ən son kredit tarixçəsi göstərilir."
+      "retentionLimit": "Ən son kredit tarixçəsi göstərilir.",
+      "voidedGrant": "Ləğv edilib: {{description}}"
     },
     "title": "Kredit al",
     "description": "Kredit Kilo App-də AI kodlaşdırma sessiyalarını işə salmaq üçün Kilo balansına əlavə olunan birdəfəlik alışdır. Mağaza hesabından ödəniş alır və mağaza ödənişi təsdiqlədikdən sonra kredit əlavə olunur.",
@@ -5099,6 +5116,20 @@
       "eu": "Avropa İttifaqı",
       "au": "Avstraliya",
       "jp": "Yaponiya"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Seçim axtarışı",
+    "noMatches": "Uyğun seçim tapılmadı",
+    "emptyDescription": "Başqa seçim adı və ya açar sözlə axtarın.",
+    "resultsStatus": "Tapılan seçimlər: {{resultCount}}",
+    "keywords": {
+      "signOut": "çıxış|hesabdan çıxış",
+      "appearance": "mövzu|rəng sxemi|qaranlıq rejim",
+      "appUnlock": "biometriya|üz tanıma|barmaq izi",
+      "language": "dil|tərcümə",
+      "notifications": "bildiriş|xəbərdarlıq",
+      "privacy": "analitika|izləmə"
     }
   }
 }

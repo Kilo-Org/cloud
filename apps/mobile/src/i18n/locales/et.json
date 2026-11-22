@@ -554,8 +554,11 @@
     "changelogFixesIn": "Parandused ja täiustused järgmistes osades: {{areas}}.",
     "changelogFixesPolish": "Parandused ja täiustused kogu rakenduses.",
     "changelogAreas": {
-      "signIn": "Sisselogimine",
-      "profileOrganizations": "Profiil ning organisatsioonid"
+      "signIn": "sisselogimine",
+      "profileOrganizations": "profiil ning organisatsioonid",
+      "chat": "vestlus",
+      "notifications": "teavitused",
+      "integrations": "integratsioonid"
     }
   },
   "preferences": {
@@ -4506,20 +4509,34 @@
       "deductionFallback": "Krediidi mahaarvamine",
       "emptyDescription": "Krediidiostud, kviitungid ja kasutus kuvatakse siin.",
       "emptyTitle": "Krediitide ajalugu puudub",
+      "expiredGrant": "Aegunud: {{description}}",
       "googlePlayReceipt": "Kviitung Google Playst",
       "kind": {
         "adjustment": "Korrigeerimine",
         "balanceNeutral": "Saldot ei mõjuta",
         "deduction": "Mahaarvamine",
         "grant": "Tasuta krediit",
+        "promotionalCredits": "Kampaaniakrediit",
         "welcomeCredits": "Tervituskrediit",
         "purchase": "Ost"
+      },
+      "program": {
+        "adminBulkGrant": "Administraatori krediidieraldis",
+        "contributorChampion": "Panustajate šempionikrediit",
+        "feedback": "Tagasisidekrediit",
+        "influencer": "Influencer'i krediit",
+        "ossMonthlyReset": "OSS-i igakuine lähtestamine",
+        "ossSponsorship": "OSS-toetuskrediit",
+        "pullRequest": "Tõmbetaotluse krediit",
+        "usageIssue": "Kasutusprobleemi krediit",
+        "vibeDay": "Vibe day krediit"
       },
       "purchaseFallback": "Krediidiost",
       "receipt": "Kviitung",
       "receiptA11y": "Ava kviitung: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Selle ostu kohta kviitung puudub.",
-      "retentionLimit": "Kuvatakse kõige hiljutisem krediitide ajalugu."
+      "retentionLimit": "Kuvatakse kõige hiljutisem krediitide ajalugu.",
+      "voidedGrant": "Tühistatud: {{description}}"
     },
     "title": "Osta krediiti",
     "description": "Krediit on ühekordne ost, mis lisatakse sinu Kilo saldole AI kodeerimisseansside käitamiseks Kilo Appis. Pood võtab tasu sinu kontolt ja krediit lisatakse pärast seda, kui pood makse kinnitab.",
@@ -5099,6 +5116,20 @@
       "eu": "Euroopa Liit",
       "au": "Austraalia",
       "jp": "Jaapan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Eelistuste otsing",
+    "noMatches": "Sobivaid eelistusi ei leitud",
+    "emptyDescription": "Proovi mõnda muud eelistuse nime või märksõna.",
+    "resultsStatus": "Leitud eelistusi: {{resultCount}}",
+    "keywords": {
+      "signOut": "logi välja|väljalogimine",
+      "appearance": "teema|värviskeem",
+      "appUnlock": "biomeetria|näotuvastus|sõrmejälg",
+      "language": "keel|tõlge",
+      "notifications": "märguanded|tõuketeavitused",
+      "privacy": "analüütika|jälgimine"
     }
   }
 }

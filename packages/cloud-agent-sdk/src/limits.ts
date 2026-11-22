@@ -30,3 +30,25 @@ export const NATIVE_SYNC_RETAINED_WORK_BYTES = 4 * 1024 * 1024;
 
 /** Retained live frames a native session keeps; model discovery shares the same frame budget. */
 export const NATIVE_SYNC_RETAINED_WORK_FRAMES = 1024;
+
+/**
+ * Longest the CLI live transport waits for one snapshot page read before it
+ * stops gating live delivery on it. Matches the per-request deadline the native
+ * snapshot reader already applies, so a stalled store degrades the same way on
+ * both transports.
+ */
+export const CLI_SNAPSHOT_REPLAY_DEADLINE_MS = 15_000;
+
+/**
+ * Live CLI events the transport holds while one snapshot page read is
+ * outstanding. A read that lets the buffer reach this size is stalled, so the
+ * transport releases it instead of growing without bound.
+ */
+export const CLI_SNAPSHOT_BUFFER_MAX_EVENTS = 1024;
+
+/**
+ * Longest a `reauth_required` ticket mint may take before the socket retires and
+ * reconnects. A mint is a single small POST, so a read this old is not
+ * progressing and must not hold the queued transcript frames.
+ */
+export const NATIVE_SYNC_TICKET_MINT_DEADLINE_MS = 15_000;

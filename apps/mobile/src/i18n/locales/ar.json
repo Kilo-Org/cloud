@@ -559,7 +559,10 @@
     "changelogFixesPolish": "إصلاحات وتحسينات في جميع أنحاء التطبيق.",
     "changelogAreas": {
       "signIn": "تسجيل الدخول",
-      "profileOrganizations": "الملف الشخصي & المؤسسات"
+      "profileOrganizations": "الملف الشخصي & المؤسسات",
+      "chat": "الدردشة",
+      "notifications": "الإشعارات",
+      "integrations": "التكاملات"
     }
   },
   "preferences": {
@@ -4822,20 +4825,34 @@
       "deductionFallback": "خصم من الرصيد",
       "emptyDescription": "ستظهر هنا مشتريات الرصيد والإيصالات والاستخدام.",
       "emptyTitle": "لا يوجد سجل للرصيد",
+      "expiredGrant": "منتهي الصلاحية: {{description}}",
       "googlePlayReceipt": "الإيصال من Google Play",
       "kind": {
         "adjustment": "تعديل",
         "balanceNeutral": "دون تأثير على الرصيد",
         "deduction": "خصم",
         "grant": "منحة رصيد",
+        "promotionalCredits": "رصيد ترويجي",
         "welcomeCredits": "رصيد الترحيب",
         "purchase": "شراء"
+      },
+      "program": {
+        "adminBulkGrant": "منحة رصيد من المشرف",
+        "contributorChampion": "رصيد بطل المساهمين",
+        "feedback": "رصيد الملاحظات",
+        "influencer": "رصيد المؤثرين",
+        "ossMonthlyReset": "إعادة ضبط رصيد رعاية البرمجيات مفتوحة المصدر",
+        "ossSponsorship": "رصيد رعاية البرمجيات مفتوحة المصدر",
+        "pullRequest": "رصيد طلب السحب",
+        "usageIssue": "رصيد مشكلة في الاستخدام",
+        "vibeDay": "رصيد يوم Vibe"
       },
       "purchaseFallback": "شراء رصيد",
       "receipt": "الإيصال",
       "receiptA11y": "فتح إيصال {{description}}، {{amount}}، من {{date}}",
       "receiptUnavailable": "لا يتوفر إيصال لعملية الشراء هذه.",
-      "retentionLimit": "يتم عرض أحدث حركات سجل الرصيد."
+      "retentionLimit": "يتم عرض أحدث حركات سجل الرصيد.",
+      "voidedGrant": "ملغى: {{description}}"
     },
     "title": "شراء الرصيد",
     "description": "الرصيد عملية شراء لمرة واحدة تُضاف إلى رصيدك في Kilo لتشغيل جلسات البرمجة بالذكاء الاصطناعي في تطبيق Kilo. يتقاضى المتجر المبلغ من حسابك وتُضاف الأرصدة بعد تأكيد المتجر للدفع.",
@@ -5447,6 +5464,20 @@
       "eu": "الاتحاد الأوروبي",
       "au": "أستراليا",
       "jp": "اليابان"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "البحث في الإعدادات",
+    "noMatches": "لا توجد إعدادات مطابقة",
+    "emptyDescription": "جرّب اسم إعداد آخر أو كلمة مفتاحية مختلفة.",
+    "resultsStatus": "عدد الإعدادات المطابقة: {{resultCount}}",
+    "keywords": {
+      "signOut": "تسجيل الخروج|خروج",
+      "appearance": "سمة|ألوان|الوضع الداكن",
+      "appUnlock": "قياسات حيوية|بصمة الوجه|بصمة الإصبع",
+      "language": "لغة|ترجمة",
+      "notifications": "تنبيهات|إشعارات",
+      "privacy": "تحليلات|تتبع"
     }
   }
 }

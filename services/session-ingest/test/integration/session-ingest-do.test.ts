@@ -4699,7 +4699,7 @@ describe('SessionIngestDO raw row export', () => {
   }
 
   /** The stored body of one exported row, parsed and checked for the field asked for. */
-  function storedBodyField(row: Record<string, unknown>, field: 'id' | 'text'): string {
+  function storedBodyField(row: Record<string, unknown>, field: 'id' | 'text' | 'content'): string {
     const body: unknown = JSON.parse(String(row.item_data));
     if (typeof body !== 'object' || body === null || !(field in body)) {
       throw new Error(`stored body did not carry ${field}`);
@@ -4748,6 +4748,73 @@ describe('SessionIngestDO raw row export', () => {
     });
     expect(lines.some(line => line.t === 'meta')).toBe(true);
     expect(lines.at(-1)).toEqual({ t: 'end', rows: rows.length });
+  });
+
+  it('orders rows by id even when a row is rewritten with a later ingest time', async () => {
+    const suffix = crypto.randomUUID().replaceAll('-', '');
+    const kiloUserId = `usr_raw_export_order_${suffix}`;
+    const sessionId = `ses_${suffix.slice(0, 26)}`;
+    const stub = getStub(kiloUserId, sessionId);
+
+    await stub.ingest(
+      [
+        { type: 'message', data: { id: 'msg_one', role: 'user' } },
+        { type: 'message', data: { id: 'msg_two', role: 'assistant' } },
+      ],
+      kiloUserId,
+      sessionId,
+      1,
+      1000
+    );
+    // `ingested_at` moves, `id` does not: `(ingested_at, id)` order would put
+    // `msg_one` after `msg_two`.
+    await stub.ingest(
+      [{ type: 'message', data: { id: 'msg_one', role: 'user', content: 'rewritten' } }],
+      kiloUserId,
+      sessionId,
+      1,
+      3000
+    );
+
+    const rows = parseNdjson(
+      await new Response(await stub.exportSessionRowsStream()).text()
+    ).filter(line => line.t === 'row');
+
+    expect(rows.map(row => row.item_id)).toEqual(['message/msg_one', 'message/msg_two']);
+    expect(storedBodyField(rows[0], 'content')).toBe('rewritten');
+  });
+
+  it('never repeats or appends a row written after the stream was created', async () => {
+    const suffix = crypto.randomUUID().replaceAll('-', '');
+    const kiloUserId = `usr_raw_export_frozen_${suffix}`;
+    const sessionId = `ses_${suffix.slice(0, 26)}`;
+    const stub = getStub(kiloUserId, sessionId);
+    const firstPage = Array.from({ length: 205 }, (_, index) => ({
+      type: 'message' as const,
+      data: { id: `msg_${index}`, role: 'user' },
+    }));
+
+    await stub.ingest(firstPage, kiloUserId, sessionId, 1, 1000);
+
+    // One page was already read when the stream was created: the first row is
+    // behind the cursor, and the only remaining page ends at the frozen id.
+    const stream = await stub.exportSessionRowsStream();
+    await stub.ingest(
+      [
+        { type: 'message', data: { id: 'msg_0', role: 'user', content: 'rewritten' } },
+        { type: 'message', data: { id: 'msg_new', role: 'assistant' } },
+      ],
+      kiloUserId,
+      sessionId,
+      1,
+      3000
+    );
+
+    const rows = parseNdjson(await new Response(stream).text()).filter(line => line.t === 'row');
+
+    expect(rows).toHaveLength(205);
+    expect(new Set(rows.map(row => row.item_id)).size).toBe(205);
+    expect(rows.at(-1)).toMatchObject({ item_id: 'message/msg_204' });
   });
 
   it('pages past one SQLite page without dropping or reordering rows', async () => {

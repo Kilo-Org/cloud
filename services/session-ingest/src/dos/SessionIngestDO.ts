@@ -459,8 +459,6 @@ const COMPLETED_MESSAGE_SCAN_LIMIT = 50;
  */
 const RAW_EXPORT_PAGE_ROWS = 200;
 const RAW_EXPORT_PAGE_MAX_BYTES = 4 * 1024 * 1024;
-/** Ids per body lookup; Durable Object SQLite rejects statements with ~100 bind variables. */
-const RAW_EXPORT_BODY_QUERY_IDS = 50;
 
 type PartExcerptRow = {
   id: number;
@@ -2474,10 +2472,12 @@ export class SessionIngestDO extends DurableObject<Env> {
    * Stream every row this session stores, as NDJSON, for an authorised export.
    *
    * Read-only by construction — the method only selects — so it is safe against a
-   * live session and adds nothing to a Durable Object that holds no rows. Rows
-   * arrive in `(ingested_at, id)` order, the same order the clone and metrics
-   * readers use, so a partially received file can be resumed and merged without a
-   * second sort. `item_data` is the body exactly as stored: a body offloaded at
+   * live session and adds nothing to a Durable Object that holds no rows. The
+   * export walks the immutable autoincrement `id` and stops at the highest id
+   * present when the stream is created, so a row rewritten in place while the
+   * export runs is emitted once (with the value it had when its page was read),
+   * a row inserted later is not emitted, and the sequence never repeats or skips
+   * a position. `item_data` is the body exactly as stored: a body offloaded at
    * ingest is `{}` beside its `item_data_r2_key`, and that key is the whole
    * resolution rule — the consumer reads the object directly. The stream
    * deliberately does not fetch those objects itself: a session can hold many
@@ -2490,7 +2490,14 @@ export class SessionIngestDO extends DurableObject<Env> {
   async exportSessionRowsStream(): Promise<ReadableStream<Uint8Array>> {
     const db = this.db;
     const encoder = new TextEncoder();
-    let cursor: IngestOrderCursor | null = null;
+    // `id` never changes and is never reused, so the highest id present now
+    // freezes the set of rows this export covers.
+    const maxId =
+      db
+        .select({ id: sql<number | null>`max(${ingestItems.id})` })
+        .from(ingestItems)
+        .get()?.id ?? 0;
+    let cursor = 0;
     let metaSent = false;
     let rows = 0;
 
@@ -2521,8 +2528,8 @@ export class SessionIngestDO extends DurableObject<Env> {
             body_bytes: sql<number>`length(cast(${ingestItems.item_data} as blob))`,
           })
           .from(ingestItems)
-          .where(cursor === null ? undefined : afterIngestOrderCursor(cursor))
-          .orderBy(ingestItems.ingested_at, ingestItems.id)
+          .where(and(gt(ingestItems.id, cursor), lte(ingestItems.id, maxId)))
+          .orderBy(ingestItems.id)
           .limit(RAW_EXPORT_PAGE_ROWS)
           .all();
 
@@ -2542,20 +2549,17 @@ export class SessionIngestDO extends DurableObject<Env> {
           return;
         }
 
-        // Fetch only the bodies that fit the budget. Durable Object SQLite caps
-        // bound variables per statement, so the ids go in small batches. A row
-        // deleted between the two reads has no body and is skipped; the cursor
-        // still moves past it.
+        // Kept ids are contiguous, so one rowid range fetches exactly their
+        // bodies without a bind-variable-sized id list. A row deleted between
+        // the two reads has no body and is skipped; the cursor still moves past
+        // it.
         const bodies = new Map<number, string>();
-        for (let start = 0; start < chosen.length; start += RAW_EXPORT_BODY_QUERY_IDS) {
-          const ids = chosen.slice(start, start + RAW_EXPORT_BODY_QUERY_IDS).map(row => row.id);
-          for (const row of db
-            .select({ id: ingestItems.id, item_data: ingestItems.item_data })
-            .from(ingestItems)
-            .where(inArray(ingestItems.id, ids))
-            .all()) {
-            bodies.set(row.id, row.item_data);
-          }
+        for (const row of db
+          .select({ id: ingestItems.id, item_data: ingestItems.item_data })
+          .from(ingestItems)
+          .where(and(gt(ingestItems.id, cursor), lte(ingestItems.id, chosen[chosen.length - 1].id)))
+          .all()) {
+          bodies.set(row.id, row.item_data);
         }
 
         let emitted = 0;
@@ -2579,8 +2583,7 @@ export class SessionIngestDO extends DurableObject<Env> {
           emitted += 1;
         }
 
-        const lastRow = chosen[chosen.length - 1];
-        cursor = { ingestedAt: lastRow.ingested_at, id: lastRow.id };
+        cursor = chosen[chosen.length - 1].id;
         rows += emitted;
 
         // Short page and every inspected row kept: nothing follows, so close

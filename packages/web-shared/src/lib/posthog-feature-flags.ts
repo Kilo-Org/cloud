@@ -64,15 +64,17 @@ type FlagRead = {
 
 /**
  * Canonical cache key. Person properties take part in targeting, so they take
- * part in the key; a sorted pair list makes their order irrelevant, and an
- * absent and an empty object are the same key.
+ * part in the key; sorting the pairs makes their order irrelevant, and
+ * `JSON.stringify` keeps the encoding injective so no two property sets can
+ * share a key. An absent and an empty object are the same key.
  */
 function cacheKey({ flagName, distinctId, personProperties }: FlagRead): string {
   const properties = personProperties
-    ? Object.entries(personProperties)
-        .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-        .map(([name, value]) => `${name}=${value}`)
-        .join('&')
+    ? JSON.stringify(
+        Object.entries(personProperties).sort(([left], [right]) =>
+          left < right ? -1 : left > right ? 1 : 0
+        )
+      )
     : '';
   return `${flagName}\u0000${distinctId}\u0000${properties}`;
 }

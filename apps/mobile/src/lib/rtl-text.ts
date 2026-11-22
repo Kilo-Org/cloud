@@ -336,7 +336,7 @@ export function rtlBaseMarkedChildren(children: ReactNode, holdsRtlScript: boole
     return children;
   }
   const strong = firstStrong(children);
-  if (strong === undefined || directionOfStrong(strong) === RTL_TEXT_DIRECTION) {
+  if (strong === undefined || directionOfStrong(strong)?.direction === 'rtl') {
     return children;
   }
   if (isStringChild(children)) {

@@ -52,6 +52,9 @@ const fakeFs = vi.hoisted(() => {
   let protectedIndexUri: string | null = null;
   const directIndexWrites: string[] = [];
   const indexReplacements: IndexReplacement[] = [];
+  // Paths whose delete the filesystem refuses, standing in for an entry that
+  // another process holds open.
+  const refusedDeletes = new Set<string>();
   const appGroup = { id: 'group.com.kilocode.kiloapp', uri: 'file:///app-group' };
 
   // eslint-disable-next-line unicorn/consistent-function-scoping -- vi.hoisted runs before module scope
@@ -142,6 +145,9 @@ const fakeFs = vi.hoisted(() => {
         return node.content;
       },
       delete() {
+        if (refusedDeletes.has(uri)) {
+          throw new Error(`refused: ${uri}`);
+        }
         if (!nodes.has(uri)) {
           throw new Error(`missing: ${uri}`);
         }
@@ -223,6 +229,14 @@ const fakeFs = vi.hoisted(() => {
         }
       }
     },
+    /** Make the next delete of `uri` throw, as a held-open entry does. */
+    refuseDelete: (uri: string) => {
+      refusedDeletes.add(uri);
+    },
+    /** Let `uri` be deleted again. */
+    restoreDelete: (uri: string) => {
+      refusedDeletes.delete(uri);
+    },
     /** Deep, order-independent snapshot of the whole tree. */
     snapshot: () =>
       [...nodes.entries()]
@@ -233,6 +247,7 @@ const fakeFs = vi.hoisted(() => {
       operations.length = 0;
       directIndexWrites.length = 0;
       indexReplacements.length = 0;
+      refusedDeletes.clear();
       // The guard outlives a reset: a case that resets mid-case keeps the
       // protection, so no apply can write the index in place unnoticed.
     },
@@ -316,6 +331,30 @@ describe('applyArtifactSnapshot', () => {
     expect(fakeFs.has(`${SESSIONS_DIR}/gone`)).toBe(false);
     expect(fakeFs.has(`${SESSIONS_DIR}/s1/stale.txt`)).toBe(false);
     expect(fakeFs.readFile(`${SESSIONS_DIR}/s1/keep`)).toBe('bytes');
+  });
+
+  it('keeps an entry the filesystem refuses to delete, then prunes it next run', () => {
+    applyArtifactSnapshot(snapshotOf([{ id: 's1', files: ['keep', 'held'] }]));
+    fakeFs.seedFile(`${SESSIONS_DIR}/s1/keep`, 'bytes');
+    fakeFs.seedFile(`${SESSIONS_DIR}/s1/held`, 'bytes');
+    fakeFs.seedFile(`${SESSIONS_DIR}/s1/stale`, 'stale');
+    fakeFs.refuseDelete(`${SESSIONS_DIR}/s1/held`);
+
+    const next = snapshotOf([{ id: 's1', files: ['keep'] }]);
+    expect(applyArtifactSnapshot(next)).toBe(true);
+
+    // The refused entry survives, and it does not hold the index write back.
+    expect(fakeFs.readFile(MANIFEST_URI)).toBe(JSON.stringify(next));
+    expect(readArtifactMirror()).toEqual(next);
+    expect(fakeFs.has(`${SESSIONS_DIR}/s1/held`)).toBe(true);
+    expect(fakeFs.has(`${SESSIONS_DIR}/s1/stale`)).toBe(false);
+    expect(fakeFs.readFile(`${SESSIONS_DIR}/s1/keep`)).toBe('bytes');
+
+    // The next run still sees the entry as stale and removes it.
+    fakeFs.restoreDelete(`${SESSIONS_DIR}/s1/held`);
+    expect(applyArtifactSnapshot(next)).toBe(true);
+
+    expect(fakeFs.has(`${SESSIONS_DIR}/s1/held`)).toBe(false);
   });
 
   it('reports a repair when it re-creates a session folder the browser deleted', () => {

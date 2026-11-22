@@ -181,9 +181,33 @@ const buttonLabelClasses = Object.fromEntries(
  * variant's ink, so no two colour utilities compete. A caller that paints its
  * own mark on this fill takes `useMutedDisabledInk` from
  * `@/lib/hooks/use-theme-colors`.
+ *
+ * `--muted` sits about 1.1:1 off the page in both themes, so this face carries
+ * an inline control but gives a full-width action no plate. A caller whose
+ * control is its screen's one primary action asks for `disabledFace="primary"`
+ * instead; see the pair below.
  */
 const MUTED_DISABLED_FILL_CLASS = 'bg-muted';
 const MUTED_DISABLED_LABEL_CLASS = 'text-center text-sm font-semibold text-muted-foreground';
+
+/**
+ * The face a disabled (not busy) primary action paints when the caller declares
+ * it the screen's one primary action: `--primary-disabled-action` in both
+ * themes, with the ink that reads on it.
+ *
+ * The muted face above cannot carry a full-width plate. Measured against the
+ * page, `--muted` is 1.1:1 in light and 1.18:1 in dark, so a disabled Save in a
+ * pinned footer read as no control at all beside the outlined Cancel sharing its
+ * row — the reviewer of this screen reported exactly that. The plate stands
+ * 5.1:1 off the light page and 2.6:1 off the dark one, stays 5.4:1 below the
+ * enabled brand fill in dark so it never reads as tappable, and carries
+ * `--primary-foreground` in light (5.4:1) and `--foreground` in dark (6.4:1).
+ * `--primary-disabled` keeps its own job as the shared Switch's disabled
+ * on-track, which is a grip on a track rather than a plate.
+ */
+const PLATED_DISABLED_FILL_CLASS = 'bg-primary-disabled-action';
+const PLATED_DISABLED_LABEL_CLASS =
+  'text-center text-sm font-semibold text-primary-foreground dark:text-foreground';
 
 const buttonTextVariants = cva('text-foreground text-center text-sm font-semibold', {
   variants: {
@@ -208,6 +232,16 @@ type ButtonProps = Omit<React.ComponentProps<typeof Pressable>, 'children'> &
     /** Disables the button and replaces its label with a centered ActivityIndicator. */
     loading?: boolean;
     children?: React.ReactNode;
+    /**
+     * The face a disabled (not busy) primary paints. `muted` (default) is the
+     * shared inactive pair, which is right for a control inside a form or a
+     * card. `primary` gives the plate the screen's one primary action needs
+     * when it is disabled: a pinned footer's full-width button, which the muted
+     * fill leaves at 1.1:1 off the page, beside an outlined Cancel that still
+     * reads as a control. Ignored for a non-primary variant, a busy control and
+     * an enabled one.
+     */
+    disabledFace?: 'muted' | 'primary';
   };
 
 function Button({
@@ -216,6 +250,7 @@ function Button({
   size,
   loading,
   disabled,
+  disabledFace = 'muted',
   accessibilityState,
   accessibilityLabel,
   hitSlop,
@@ -243,6 +278,9 @@ function Button({
   // signal, and dimming it would read as unavailable instead of working.
   const isFaceDisabled = isDisabled && busy !== true;
   const isMutedDisabled = isFaceDisabled && !loading && isPrimary;
+  // The plate a screen's one primary action needs while it is disabled. A
+  // caller opts in; every other disabled primary keeps the shared muted pair.
+  const isPlatedDisabled = isMutedDisabled && disabledFace === 'primary';
   // Dimming is a disabled signal, and a busy control has nothing visible to
   // signal with: the label is already transparent and the spinner sits alone in
   // the slot. Halving the control's opacity then halves the indicator too, which
@@ -318,14 +356,21 @@ function Button({
   // oxlint-enable anti-slop/no-runtime-typeof
   return (
     <TextClassContext.Provider
-      value={isMutedDisabled ? MUTED_DISABLED_LABEL_CLASS : buttonTextVariants({ variant, size })}
+      value={
+        isPlatedDisabled
+          ? PLATED_DISABLED_LABEL_CLASS
+          : isMutedDisabled
+            ? MUTED_DISABLED_LABEL_CLASS
+            : buttonTextVariants({ variant, size })
+      }
     >
       <Pressable
         className={cn(
           isDimmed && 'opacity-50',
           buttonVariants({ variant, size }),
           buttonGapVariants({ size }),
-          isMutedDisabled && MUTED_DISABLED_FILL_CLASS,
+          isPlatedDisabled && PLATED_DISABLED_FILL_CLASS,
+          isMutedDisabled && !isPlatedDisabled && MUTED_DISABLED_FILL_CLASS,
           className
         )}
         role="button"

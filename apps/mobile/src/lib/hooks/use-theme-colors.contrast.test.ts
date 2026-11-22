@@ -248,6 +248,44 @@ describe('disabled primary action fill contrast (WCAG AA text)', () => {
   });
 });
 
+describe('plated disabled primary action contrast (WCAG non-text and text)', () => {
+  // A disabled primary that a caller declares its screen's one primary action
+  // (`disabledFace="primary"`) paints `--primary-disabled-action`, because the
+  // muted pair above sits about 1.1:1 off the page in both themes: a full-width
+  // Save in a pinned footer read as no control at all beside the outlined Cancel
+  // sharing its row. The plate must stand off the page as a non-text surface,
+  // stay clear of the enabled brand fill, and carry its own label ink.
+  it('every theme: the plate reads as an object on the page', () => {
+    const ratios = {
+      light: contrastRatio(lightColors.primaryDisabledAction, lightColors.background),
+      dark: contrastRatio(darkColors.primaryDisabledAction, darkColors.background),
+    } as const;
+    // Dark measures 2.64:1 and light 5.14:1; the floor is the larger share of
+    // the non-text minimum the plate can reach without outshining the page.
+    expect(ratios.dark, 'primary-disabled-action vs background (dark)').toBeGreaterThanOrEqual(2.6);
+    expect(ratios.light, 'primary-disabled-action vs background (light)').toBeGreaterThanOrEqual(
+      MIN_NON_TEXT_RATIO
+    );
+  });
+
+  it('light theme: the plate label clears WCAG AA text', () => {
+    const ratio = contrastRatio(lightColors.primaryForeground, lightColors.primaryDisabledAction);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  });
+
+  it('dark theme: the plate label clears WCAG AA text', () => {
+    const ratio = contrastRatio(darkColors.foreground, darkColors.primaryDisabledAction);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  });
+
+  it('dark theme: the plate stays well below the enabled brand fill', () => {
+    // A disabled action must never read as tappable. The enabled accent is the
+    // brightest thing on the dark page, so the plate keeps a wide margin.
+    const separation = contrastRatio(darkColors.primary, darkColors.primaryDisabledAction);
+    expect(separation).toBeGreaterThanOrEqual(5);
+  });
+});
+
 describe('selected tab pill contrast (WCAG AA text)', () => {
   // An in-page tab paints `--selection-foreground` on `--selection`. The fill is
   // the light theme's olive at the value the dark page needs: the dark accent

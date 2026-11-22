@@ -494,6 +494,7 @@ export function ModelAccessForm({
                 </Button>
                 <Button
                   className="flex-1"
+                  disabledFace="primary"
                   loading={saving}
                   disabled={cannotSave}
                   onPress={() => void onSave()}

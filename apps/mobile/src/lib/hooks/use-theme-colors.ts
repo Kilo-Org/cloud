@@ -22,3 +22,15 @@ export function useMutedDisabledInk(): string {
   const colors = useThemeColors();
   return colors.mutedForeground;
 }
+
+/**
+ * The ink a caller-painted mark takes on the plate a disabled primary paints
+ * when the caller opted into `disabledFace="primary"` — the face the Button
+ * gives a screen's one primary action while it is disabled. The plate carries
+ * `--primary-foreground` in light and `--foreground` in dark, so the mark
+ * follows the same pair as the label beside it.
+ */
+export function usePlatedDisabledInk(): string {
+  const colors = useThemeColors();
+  return useColorScheme() === 'dark' ? colors.foreground : colors.primaryForeground;
+}

@@ -717,13 +717,37 @@ export async function encryptedDatabase(): Promise<SQLite.SQLiteDatabase> {
 }
 
 /**
+ * Resolves once the store's own open attempt has settled, whether it succeeded
+ * or rejected, and never rejects itself.
+ *
+ * The reset that writes the notice marker runs inside that first open. A
+ * caller that read the marker at mount, before the open settled, would read
+ * "no reset" on exactly the launch whose open cleared the file, and the loss
+ * would show as an ordinary empty store until the next relaunch. Awaiting this
+ * is what makes the notice appear on the launch that lost the data.
+ */
+export async function whenEncryptedStoreOpenSettled(): Promise<void> {
+  try {
+    await openDatabase();
+  } catch {
+    // An open that failed says nothing about the marker: the read below still
+    // returns whatever the reset wrote before it failed.
+  }
+}
+
+/**
  * Whether the encrypted store was reset and the person has not been told yet.
  *
  * True only for the marker's own value: any other stored value, a failed read,
  * or a locked keychain reads as "no notice", because a notice about a loss the
  * marker cannot prove must never appear.
+ *
+ * The read waits for the store's first open to settle first: the reset writes
+ * the marker as part of that open, so a read that raced it would miss the one
+ * launch the notice exists for.
  */
 export async function readPersistedResetNotice(): Promise<boolean> {
+  await whenEncryptedStoreOpenSettled();
   return (await readStoredValueSafe(PERSIST_RESET_NOTICE_KEY)) === '1';
 }
 

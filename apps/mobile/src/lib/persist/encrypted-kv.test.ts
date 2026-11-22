@@ -853,6 +853,16 @@ describe('reset notice marker', () => {
     await expect(readPersistedResetNotice()).resolves.toBe(false);
   });
 
+  it('reads the flag on the very launch whose open performs the reset', async () => {
+    // No open has run yet, exactly as on the launch that finds the file
+    // unreadable: the read arrives before the open, and the reset writes the
+    // marker inside it. A reader that raced the open would answer false and the
+    // loss would show as an ordinary empty store until the next relaunch.
+    failNextProbe = true;
+
+    await expect(readPersistedResetNotice()).resolves.toBe(true);
+  });
+
   it('reads only the flag value as a notice', async () => {
     store.set(PERSIST_RESET_NOTICE_KEY, 'yes');
 

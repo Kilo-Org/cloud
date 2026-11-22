@@ -390,14 +390,33 @@ export function pendingDeepLinkOptionsForData(data: PushData): PendingDeepLinkOp
   return { organizationId: data.organizationId ?? null, sessionBound: true };
 }
 
-async function dismissResponseNotification(
-  response: Notifications.NotificationResponse
-): Promise<void> {
+/** Dismiss one notification, reporting a failure and never rejecting. */
+async function dismissNotificationContaining(identifier: string): Promise<void> {
   try {
-    await Notifications.dismissNotificationAsync(response.notification.request.identifier);
+    await Notifications.dismissNotificationAsync(identifier);
   } catch (error) {
     reportActionFailure('dismiss', error);
   }
+}
+
+/**
+ * Whether the OS still shows this notification. An unreadable tray counts as
+ * not shown, which keeps the other identifier: one duplicate is better than
+ * clearing the only carrier left.
+ */
+async function isStillPresented(identifier: string): Promise<boolean> {
+  try {
+    const presented = await Notifications.getPresentedNotificationsAsync();
+    return presented.some(notification => notification.request.identifier === identifier);
+  } catch {
+    return false;
+  }
+}
+
+async function dismissResponseNotification(
+  response: Notifications.NotificationResponse
+): Promise<void> {
+  await dismissNotificationContaining(response.notification.request.identifier);
 }
 
 type ResultPresentation = {
@@ -570,9 +589,12 @@ async function refreshGlanceableAfterAnswer(deps: NeedsInputActionDeps): Promise
  * both platforms take the same path.
  *
  * `keptIdentifier` is the notification the user tapped. It is the only carrier
- * of the outcome when the result post fails, so it is never dismissed; the
- * other identifier may still be, because in the inline-reply shape that one is
- * the app-owned session raise, and leaving it on screen duplicates the session.
+ * of the outcome when the result post fails, so it is never dismissed — though
+ * it may already be gone on iOS, where the OS removes a replied notification
+ * itself, which is why a failed post weighs the other identifier against what
+ * the OS still presents. That other identifier may go, because in the
+ * inline-reply shape it is the app-owned session raise, and leaving it on
+ * screen duplicates the session.
  */
 function resultIdentities(
   response: Notifications.NotificationResponse,
@@ -590,12 +612,14 @@ function resultIdentities(
  * `resultIdentifier`, and dismiss `replacedIdentifier` when it is a different
  * one, so one raise never ends with two notifications.
  *
- * Dismissing the acted-on notification (`keptIdentifier`) follows a post that
- * landed. A rejected post is reported and still dismisses the other identifier
- * — in the inline-reply shape that is the app-owned session raise, which the
- * result would have replaced — but never the acted-on one: with no result in
- * existence it is the only carrier left of the outcome and, for a retryable
- * result, of the Approve/Reply actions the user retries with.
+ * The dismissal of `replacedIdentifier` follows a post that landed. After a
+ * rejected post the acted-on notification (`keptIdentifier`) is always kept —
+ * with no result in existence it carries the outcome and, for a retryable
+ * result, the Approve/Reply actions the user retries with — and the other
+ * identifier is dismissed only while the acted-on one is still presented: iOS
+ * removes a replied notification itself, while Android keeps it, so there the
+ * acted-on push is the retry carrier and the app-owned session raise is the
+ * duplicate that goes.
  *
  * Resolves to whether the result post landed, so the caller records a reply
  * result only for a notification that exists.
@@ -643,20 +667,26 @@ async function replaceNotification(args: {
   } catch (error) {
     reportActionFailure('publish', error);
   }
-  // The replace target is the acted-on notification only in the Approve shape,
-  // and a failed post then keeps it: it is the only carrier left of the outcome
-  // and of the Approve/Reply actions the user retries with. In the inline-reply
-  // shape the target is the app-owned session raise, which the result would
-  // have replaced, so a failed post still dismisses it.
-  const keepsActedOn = !posted && replacedIdentifier === keptIdentifier;
-  if (!keepsActedOn && replacedIdentifier !== resultIdentifier) {
-    try {
-      await Notifications.dismissNotificationAsync(replacedIdentifier);
-    } catch (error) {
-      reportActionFailure('dismiss', error);
+  if (posted) {
+    if (replacedIdentifier !== resultIdentifier) {
+      await dismissNotificationContaining(replacedIdentifier);
     }
+    return true;
   }
-  return posted;
+  // No result exists. The notification the user acted on carries the outcome and,
+  // for a retryable result, the Approve/Reply actions the user retries with, so a
+  // failed post never dismisses it. The other identifier is the app-owned session
+  // raise in the inline-reply shape; it goes too only while the OS confirms the
+  // acted-on notification is still on screen. iOS removes a replied notification
+  // itself, so there the session raise is the only carrier left and stays.
+  if (
+    replacedIdentifier !== resultIdentifier &&
+    replacedIdentifier !== keptIdentifier &&
+    (await isStillPresented(keptIdentifier))
+  ) {
+    await dismissNotificationContaining(replacedIdentifier);
+  }
+  return false;
 }
 
 function reportActionFailure(

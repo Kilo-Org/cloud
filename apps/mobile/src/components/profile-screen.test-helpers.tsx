@@ -6,7 +6,6 @@ import { afterEach, beforeEach, vi } from 'vitest';
 import '@/i18n';
 import type * as ProfileAgentNavigation from '@/lib/profile-agent-navigation';
 import type * as SecurityAgent from '@/lib/security-agent';
-import type * as SettingsSearch from '@/components/settings-search/settings-search';
 import { ProfileScreen } from '@/components/profile-screen';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -188,17 +187,17 @@ vi.mock('@/components/ui/dialog', () => ({
 // The field and the results body belong to the settings-search surface; this
 // harness renders them as markers so its minimal react-native stub keeps
 // working, while the real index hook stays available to the coverage spec.
-vi.mock('@/components/settings-search/settings-search', async importOriginal => ({
-  ...(await importOriginal<typeof SettingsSearch>()),
+vi.mock('@/components/settings-search/settings-search', () => ({
   SettingsSearchField: 'SettingsSearchField',
   SettingsSearchResults: 'SettingsSearchResults',
 }));
 
 // The integration index reads a cached tRPC setup-status query this harness
 // does not model; an empty source keeps each Profile spec on the root rows.
-vi.mock('@/lib/settings-search/integration-source', () => ({
-  useIntegrationSearchSource: () => undefined,
-}));
+vi.mock('@/lib/settings-search/integration-source', () => {
+  const source = { settings: [] };
+  return { useIntegrationSearchSource: () => source };
+});
 
 vi.mock('@/components/ui/icons', () => ({
   BookOpenCheck: 'BookOpenCheck',

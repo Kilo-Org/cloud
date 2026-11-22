@@ -42,7 +42,7 @@ import {
 } from '@/lib/integrations/provider-catalog';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { type SettingsTargetProps } from '@/lib/settings-search/definitions';
-import { INTEGRATION_PROVIDER_SETTINGS } from '@/lib/settings-search/integration-source';
+import { INTEGRATION_PROVIDER_SETTINGS } from '@/lib/settings-search/integration-provider-settings';
 import { isPermissionDeniedError, trpcErrorVariant } from '@/lib/trpc-error';
 
 /**

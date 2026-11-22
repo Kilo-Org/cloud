@@ -35,8 +35,5 @@ export function isDeletionInProgressBlockedReason(reason: string | null): boolea
 }
 
 export function isGoneOrDeletingBlockedReason(reason: string | null): boolean {
-  return (
-    reason !== null &&
-    GONE_OR_DELETING_BLOCK_REASON_PREFIXES.some(prefix => reason.startsWith(prefix))
-  );
+  return GONE_OR_DELETING_BLOCK_REASON_PREFIXES.some(prefix => reason?.startsWith(prefix) ?? false);
 }

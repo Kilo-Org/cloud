@@ -94,6 +94,22 @@ describe('computeRelevantChangesForOrg', () => {
     expect(changes.removedFromAllowedProviders).toEqual([]);
   });
 
+  test('allow-list mode: a stored mixed-case slug names the same provider as the catalog', () => {
+    const org = buildEnterpriseOrg({
+      settings: {
+        provider_allow_list: ['Z-AI'],
+      },
+    });
+    const oldSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5'] }]);
+    const newSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5', 'z-ai/glm-5.1'] }]);
+
+    const diff = computeSnapshotDiff(oldSnapshot, newSnapshot);
+    const changes = computeRelevantChangesForOrg(org, diff);
+
+    expect(changes.addedByReasonProvider.get('z-ai')).toEqual(['z-ai/glm-5.1']);
+    expect(relevantChangesIsEmpty(changes)).toBe(false);
+  });
+
   test('allow-list mode: new model from non-allowed provider is NOT relevant', () => {
     const org = buildEnterpriseOrg({
       settings: {

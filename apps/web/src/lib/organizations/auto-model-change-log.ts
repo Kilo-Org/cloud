@@ -4,6 +4,7 @@ import type { Organization } from '@kilocode/db/schema';
 import { organization_seats_purchases, organizations } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { normalizeInferenceProviderIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 import type { ModelRestrictions } from '@kilocode/web-shared/lib/model-allow.server';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
@@ -33,7 +34,7 @@ function precompute(restrictions: ModelRestrictions): PrecomputedRestrictions {
   return {
     modelDenySet: new Set(restrictions.modelDenyList.map(normalizeModelId)),
     providerAllowSet: restrictions.providerAllowList
-      ? new Set(restrictions.providerAllowList)
+      ? new Set(normalizeInferenceProviderIds(restrictions.providerAllowList))
       : undefined,
   };
 }

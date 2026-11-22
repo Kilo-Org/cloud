@@ -11,6 +11,7 @@ import { MonoScrollBlock } from '../mono-scroll-block';
 import { useOpenPartDetail } from '../open-part-detail-context';
 import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
 import { toolStatusLabel } from '../tool-status-label';
+import { TOOL_VALUE_SURFACE_CLASS } from './value-surface';
 
 const bashToolInputSchema = z.object({ command: z.string() });
 
@@ -30,7 +31,7 @@ export function BashToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
   return (
     <View className="gap-2">
       {command.length > 0 ? (
-        <View className="rounded bg-neutral-100 px-2 py-1 dark:bg-neutral-900">
+        <View className={TOOL_VALUE_SURFACE_CLASS}>
           <SelectableText className="font-mono text-xs leading-[1rem] text-foreground">
             {commandText}
           </SelectableText>

@@ -2196,6 +2196,8 @@
       "alreadyClaimedMessage": "Lokho kufakwa kwe-GitHub sekuxhumene nenye i-akhawunti ye-Kilo. Kunqamule kuleyo akhawunti kuqala.",
       "installationUnavailableMessage": "Ukufakwa kwe-GitHub App kumisiwe noma akusatholakali. Kubuyisele noma uphinde ukufake ku-GitHub, bese uqala futhi.",
       "multipleInstallationsMessage": "Le nhlangano ye-Kilo kwamanje ingaxhuma inhlangano eyodwa ye-GitHub kuphela.",
+      "pendingRequestMessage": "Isicelo sokufaka se-GitHub esilindile sesikhona kule akhawunti. Cela i-akhawunti ye-Kilo noma inhlangano ye-Kilo eyasiqalayo ukuthi isikhansela, bese uzama futhi.",
+      "pendingRequestUnidentifiedMessage": "I-Kilo akikwazanga ukuqinisekisa ukuthi lesi sicelo singesaluphi i-akhawunti ye-GitHub. Qala kabusha ukusethwa kwe-GitHub kusukela ku-akhawunti ofuna ukuyixhuma.",
       "didNotCompleteTitle": "Ukufaka akuqedwanga",
       "didNotCompleteMessage": "Ukufakwa kwe-GitHub App akuqedwanga. Zama futhi ohlelweni lokusebenza."
     },

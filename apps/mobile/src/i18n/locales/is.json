@@ -2196,6 +2196,8 @@
       "alreadyClaimedMessage": "Þessi GitHub-uppsetning er þegar tengd öðrum Kilo-reikningi. Aftengdu hana þar fyrst.",
       "installationUnavailableMessage": "Þessi GitHub App-uppsetning er í biðstöðu eða ekki lengur tiltæk. Endurheimtu hana eða settu hana upp aftur á GitHub og byrjaðu svo aftur.",
       "multipleInstallationsMessage": "Þessi Kilo-stofnun getur sem stendur aðeins tengt eina GitHub-stofnun.",
+      "pendingRequestMessage": "GitHub-uppsetningarbeiðni er þegar í bið fyrir þennan reikning. Biddu Kilo-reikningnum eða Kilo-stofnuninni sem hóf hana að hætta við hana og reyndu svo aftur.",
+      "pendingRequestUnidentifiedMessage": "Kilo gat ekki staðfest við hvaða GitHub-reikning þessi beiðni á við. Byrjaðu uppsetningu GitHub aftur frá reikningnum sem þú vilt tengja.",
       "didNotCompleteTitle": "Uppsetningu var ekki lokið",
       "didNotCompleteMessage": "Ekki var lokið við uppsetningu GitHub-forritsins. Reyndu aftur í appinu."
     },

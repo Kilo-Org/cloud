@@ -257,6 +257,38 @@ describe('buildGitHubInstallOutcomeAlert (C13 outcome states)', () => {
       buttons: [{ text: 'Back' }],
     });
   });
+
+  it('pending request state: explains the pending request and offers no retry', () => {
+    const onRetry = vi.fn<() => void>();
+    const alert = buildGitHubInstallOutcomeAlert(
+      { kind: 'error', code: 'pending_request_exists' },
+      onRetry
+    );
+    expect(alert).toEqual({
+      title: 'Cannot complete installation',
+      message:
+        'A pending GitHub installation request already exists for this account. Ask the Kilo account or organization that started it to cancel it, then try again.',
+      buttons: [{ text: 'Back' }],
+    });
+    expect(alert?.buttons[0]?.onPress).toBeUndefined();
+    expect(onRetry).not.toHaveBeenCalled();
+  });
+
+  it('unidentified request state: explains the cause and keeps a working retry', () => {
+    const onRetry = vi.fn<() => void>();
+    const alert = buildGitHubInstallOutcomeAlert(
+      { kind: 'error', code: 'pending_request_unidentified' },
+      onRetry
+    );
+    expect(alert).toEqual({
+      title: 'Installation did not complete',
+      message:
+        'Kilo could not confirm which GitHub account this request is for. Start the GitHub setup again from the account you want to connect.',
+      buttons: [{ text: 'Try again', onPress: expect.any(Function) }],
+    });
+    alert?.buttons[0]?.onPress?.();
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('Agents tab return-outcome rendering', () => {

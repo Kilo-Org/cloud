@@ -1723,6 +1723,8 @@
       "alreadyClaimedMessage": "تثبيت تطبيق GitHub هذا مرتبط بالفعل بحساب Kilo آخر. ألغِ ربطه هناك أولًا.",
       "installationUnavailableMessage": "تثبيت GitHub App هذا موقوف أو لم يعد متاحًا. استعده أو أعد تثبيته في GitHub، ثم ابدأ من جديد.",
       "multipleInstallationsMessage": "يمكن لمؤسسة Kilo هذه حاليًا ربط مؤسسة GitHub واحدة فقط.",
+      "pendingRequestMessage": "يوجد بالفعل طلب تثبيت GitHub معلّق لهذا الحساب. اطلب من حساب Kilo أو المؤسسة التي بدأت هذا الطلب إلغاءه، ثم حاول مرة أخرى.",
+      "pendingRequestUnidentifiedMessage": "تعذّر على Kilo تحديد الحساب على GitHub الذي يخصه هذا الطلب. ابدأ إعداد GitHub من جديد من الحساب الذي تريد ربطه.",
       "didNotCompleteTitle": "لم يكتمل التثبيت",
       "didNotCompleteMessage": "لم يكتمل تثبيت تطبيق GitHub. حاول مرة أخرى من التطبيق."
     },

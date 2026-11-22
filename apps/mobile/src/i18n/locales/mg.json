@@ -2196,6 +2196,8 @@
       "alreadyClaimedMessage": "Efa mifandray amin'ny kaonty Kilo hafa io fametrahana GitHub io. Tapaho any aloha ny fifandraisana.",
       "installationUnavailableMessage": "Ity fametrahana GitHub App ity dia naato na tsy misy intsony. Avereno na apetraho indray ao amin'ny GitHub izy, dia atombohy indray.",
       "multipleInstallationsMessage": "Ity fikambanana Kilo ity dia afaka mifandray amin'ny fikambanana GitHub iray ihany amin'izao fotoana izao.",
+      "pendingRequestMessage": "Efa misy fangatahana fametrahana GitHub miandry ho an'ity kaonty ity. Angataho ny kaonty na ny fikambanana Kilo izay nanomboka azy hamoana azy, dia andramo indray.",
+      "pendingRequestUnidentifiedMessage": "Tsy afaka nanamarina hoe kaonty GitHub inona no momba io fangatahana io ny Kilo. Atombohy indray ny fametrahana GitHub avy amin'ny kaonty tianao ampifandraisina.",
       "didNotCompleteTitle": "Tsy vita ny fametrahana",
       "didNotCompleteMessage": "Tsy vita ny fametrahana ny rindranasa GitHub. Andramo indray ao amin'ny rindranasa."
     },

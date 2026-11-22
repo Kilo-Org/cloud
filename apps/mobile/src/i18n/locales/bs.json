@@ -2244,6 +2244,8 @@
       "alreadyClaimedMessage": "Ta instalacija aplikacije za GitHub već je povezana s drugim Kilo računom. Prvo je tamo odspoji.",
       "installationUnavailableMessage": "Ova instalacija GitHub App je suspendovana ili više nije dostupna. Obnovi je ili ponovo instaliraj na GitHubu, pa počni ponovo.",
       "multipleInstallationsMessage": "Ova Kilo organizacija trenutno može povezati samo jednu GitHub organizaciju.",
+      "pendingRequestMessage": "Za ovaj račun već postoji zahtjev za instalaciju aplikacije za GitHub na čekanju. Zamoli Kilo račun ili organizaciju koja ga je pokrenula da ga otkaže, pa pokušaj ponovo.",
+      "pendingRequestUnidentifiedMessage": "Kilo nije mogao utvrditi kojem GitHub računu pripada ovaj zahtjev. Ponovo pokreni postavljanje GitHuba s računom koji želiš povezati.",
       "didNotCompleteTitle": "Instalacija nije dovršena",
       "didNotCompleteMessage": "Instalacija aplikacije za GitHub nije dovršena. Pokušaj ponovo iz aplikacije."
     },

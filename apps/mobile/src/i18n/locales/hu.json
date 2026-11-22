@@ -2196,6 +2196,8 @@
       "alreadyClaimedMessage": "Ez a GitHub-telepítés már egy másik Kilo-fiókhoz kapcsolódik. Először válaszd le ott.",
       "installationUnavailableMessage": "Ez a GitHub App-telepítés fel van függesztve, vagy már nem érhető el. Állítsd vissza vagy telepítsd újra a GitHubon, majd kezdd újra.",
       "multipleInstallationsMessage": "Ehhez a Kilo-szervezethez jelenleg csak egyetlen GitHub-szervezetet lehet csatlakoztatni.",
+      "pendingRequestMessage": "Ehhez a fiókhoz már tartozik egy függőben lévő GitHub-telepítési kérelem. Kérd meg a Kilo-fiókot vagy a Kilo-szervezetet, amelyik elindította, hogy vonja vissza, majd próbáld újra.",
+      "pendingRequestUnidentifiedMessage": "A Kilo nem tudta megállapítani, melyik GitHub-fiókhoz tartozik ez a kérelem. Indítsd újra a GitHub beállítását abból a fiókból, amelyiket csatlakoztatni szeretnéd.",
       "didNotCompleteTitle": "A telepítés nem fejeződött be",
       "didNotCompleteMessage": "A GitHub-alkalmazás telepítése nem fejeződött be. Próbáld újra az alkalmazásból."
     },

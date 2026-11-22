@@ -120,7 +120,7 @@
     "connectBitbucket": "Bitbucket සම්බන්ධ කරන්න",
     "connectGitlab": "GitLab සම්බන්ධ කරන්න",
     "connectProvider": "සැපයුම්කරුවෙකු සම්බන්ධ කරන්න",
-"providerActionName": "{{provider}} {{action}}",
+    "providerActionName": "{{provider}} {{action}}",
     "contentTruncated": "අන්තර්ගතය කෙටි කර ඇත",
     "copyLink": "සබැඳිය පිටපත් කරන්න",
     "couldNotLoadOrganizations": "සංවිධාන පූරණය කළ නොහැකි විය.",

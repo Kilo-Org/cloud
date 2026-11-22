@@ -122,7 +122,7 @@
     "connectBitbucket": "Prijungti Bitbucket",
     "connectGitlab": "Prijungti GitLab",
     "connectProvider": "Prijungti paslaugų teikėją",
-"providerActionName": "{{action}} {{provider}}",
+    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Turinys sutrumpintas",
     "copyLink": "Kopijuoti nuorodą",
     "couldNotLoadOrganizations": "Nepavyko įkelti organizacijų",

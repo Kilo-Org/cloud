@@ -120,7 +120,7 @@
     "connectBitbucket": "Bitbucket जडान गर्नुहोस्",
     "connectGitlab": "GitLab जडान गर्नुहोस्",
     "connectProvider": "प्रदायक जडान गर्नुहोस्",
-"providerActionName": "{{provider}} {{action}}",
+    "providerActionName": "{{provider}} {{action}}",
     "contentTruncated": "सामग्रीको केही भाग मात्र देखाइएको छ",
     "copyLink": "लिङ्क प्रतिलिपि गर्नुहोस्",
     "couldNotLoadOrganizations": "संस्थाहरू लोड गर्न सकिएन।",

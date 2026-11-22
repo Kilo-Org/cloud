@@ -120,7 +120,7 @@
     "connectBitbucket": "Haɗa Bitbucket",
     "connectGitlab": "Haɗa GitLab",
     "connectProvider": "Haɗa mai ba da sabis",
-"providerActionName": "{{action}} {{provider}}",
+    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Ba a nuna duk abin da ke ciki ba",
     "copyLink": "Kwafa hanyar haɗi",
     "couldNotLoadOrganizations": "An kasa loda ƙungiyoyi.",

@@ -120,7 +120,7 @@
     "connectBitbucket": "Jikọọ Bitbucket",
     "connectGitlab": "Jikọọ GitLab",
     "connectProvider": "Jikọọ onye na-enye ọrụ",
-"providerActionName": "{{action}} {{provider}}",
+    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Ebipụrụ akụkụ ọdịnaya",
     "copyLink": "Detuo njikọ",
     "couldNotLoadOrganizations": "Enweghị ike ibudata òtù.",

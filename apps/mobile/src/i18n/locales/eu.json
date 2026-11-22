@@ -120,7 +120,7 @@
     "connectBitbucket": "Konektatu Bitbucket",
     "connectGitlab": "Konektatu GitLab",
     "connectProvider": "Konektatu hornitzaile bat",
-"providerActionName": "{{action}} {{provider}}",
+    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Edukia moztuta",
     "copyLink": "Kopiatu esteka",
     "couldNotLoadOrganizations": "Ezin izan dira erakundeak kargatu.",

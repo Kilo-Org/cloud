@@ -122,7 +122,7 @@
     "connectBitbucket": "Połącz konto Bitbucket",
     "connectGitlab": "Połącz konto GitLab",
     "connectProvider": "Połącz konto dostawcy",
-"providerActionName": "{{action}} {{provider}}",
+    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Skrócono treść",
     "copyLink": "Kopiuj link",
     "couldNotLoadOrganizations": "Nie udało się wczytać organizacji.",

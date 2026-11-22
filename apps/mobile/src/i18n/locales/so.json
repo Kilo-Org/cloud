@@ -120,7 +120,7 @@
     "connectBitbucket": "Ku xir Bitbucket",
     "connectGitlab": "Ku xir GitLab",
     "connectProvider": "Ku xidh bixiye",
-"providerActionName": "{{action}} {{provider}}",
+    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Nuxurka waa la gaabiyay",
     "copyLink": "Nuqul ka samee xiriiriyaha",
     "couldNotLoadOrganizations": "Ururrada lama soo rari karin.",

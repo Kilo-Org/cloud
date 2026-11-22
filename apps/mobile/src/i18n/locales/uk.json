@@ -122,7 +122,7 @@
     "connectBitbucket": "Підключити Bitbucket",
     "connectGitlab": "Підключити GitLab",
     "connectProvider": "Підключіть сервіс",
-"providerActionName": "{{action}} {{provider}}",
+    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Вміст обрізано",
     "copyLink": "Скопіювати посилання",
     "couldNotLoadOrganizations": "Не вдалося завантажити організації.",

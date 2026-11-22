@@ -122,7 +122,7 @@
     "connectBitbucket": "Ligar ao Bitbucket",
     "connectGitlab": "Ligar ao GitLab",
     "connectProvider": "Ligar um fornecedor",
-"providerActionName": "{{action}} {{provider}}",
+    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Conteúdo truncado",
     "copyLink": "Copiar ligação",
     "couldNotLoadOrganizations": "Não foi possível carregar as organizações.",

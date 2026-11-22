@@ -122,7 +122,7 @@
     "connectBitbucket": "Падключыць Bitbucket",
     "connectGitlab": "Падключыць GitLab",
     "connectProvider": "Падключыце платформу",
-"providerActionName": "{{action}} {{provider}}",
+    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Змест абрэзаны",
     "copyLink": "Скапіяваць спасылку",
     "couldNotLoadOrganizations": "Не атрымалася загрузіць арганізацыі.",

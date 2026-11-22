@@ -120,7 +120,7 @@
     "connectBitbucket": "Bitbucket ಸಂಪರ್ಕ ಕಲ್ಪಿಸಿ",
     "connectGitlab": "GitLab ಸಂಪರ್ಕ ಕಲ್ಪಿಸಿ",
     "connectProvider": "ಸೇವಾ ಪೂರೈಕೆದಾರರನ್ನು ಸಂಪರ್ಕಿಸಿ",
-"providerActionName": "{{provider}} {{action}}",
+    "providerActionName": "{{provider}} {{action}}",
     "contentTruncated": "ವಿಷಯವನ್ನು ಮೊಟಕುಗೊಳಿಸಲಾಗಿದೆ",
     "copyLink": "ಲಿಂಕ್ ನಕಲಿಸಿ",
     "couldNotLoadOrganizations": "ಸಂಸ್ಥೆಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",

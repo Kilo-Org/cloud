@@ -120,7 +120,7 @@
     "connectBitbucket": "Kết nối Bitbucket",
     "connectGitlab": "Kết nối GitLab",
     "connectProvider": "Kết nối nhà cung cấp",
-"providerActionName": "{{action}} {{provider}}",
+    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Nội dung bị cắt bớt",
     "copyLink": "Sao chép liên kết",
     "couldNotLoadOrganizations": "Không thể tải danh sách tổ chức.",

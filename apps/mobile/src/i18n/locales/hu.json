@@ -120,7 +120,7 @@
     "connectBitbucket": "Bitbucket csatlakoztatása",
     "connectGitlab": "GitLab csatlakoztatása",
     "connectProvider": "Szolgáltató csatlakoztatása",
-"providerActionName": "{{provider}} {{action}}",
+    "providerActionName": "{{provider}} {{action}}",
     "contentTruncated": "Tartalom csonkolva",
     "copyLink": "Hivatkozás másolása",
     "couldNotLoadOrganizations": "Nem sikerült betölteni a szervezeteket.",

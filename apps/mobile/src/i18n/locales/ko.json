@@ -120,7 +120,7 @@
     "connectBitbucket": "Bitbucket 연결",
     "connectGitlab": "GitLab 연결",
     "connectProvider": "서비스 연결",
-"providerActionName": "{{provider}} {{action}}",
+    "providerActionName": "{{provider}} {{action}}",
     "contentTruncated": "내용 일부 생략됨",
     "copyLink": "링크 복사",
     "couldNotLoadOrganizations": "조직을 불러오지 못했습니다.",

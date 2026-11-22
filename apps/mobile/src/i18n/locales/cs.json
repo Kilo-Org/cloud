@@ -122,7 +122,7 @@
     "connectBitbucket": "Připojit Bitbucket",
     "connectGitlab": "Připojit GitLab",
     "connectProvider": "Připojení poskytovatele",
-"providerActionName": "{{action}} {{provider}}",
+    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Obsah zkrácen",
     "copyLink": "Kopírovat odkaz",
     "couldNotLoadOrganizations": "Organizace se nepodařilo načíst.",

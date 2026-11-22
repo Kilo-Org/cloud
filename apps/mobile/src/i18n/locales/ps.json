@@ -120,7 +120,7 @@
     "connectBitbucket": "Bitbucket ونښلوئ",
     "connectGitlab": "GitLab ونښلوئ",
     "connectProvider": "د خدمت چمتو کوونکی ونښلوئ",
-"providerActionName": "{{provider}} {{action}}",
+    "providerActionName": "{{provider}} {{action}}",
     "contentTruncated": "منځپانګه پرې شوې",
     "copyLink": "لینک کاپي کړئ",
     "couldNotLoadOrganizations": "سازمانونه بار نه شول.",

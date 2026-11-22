@@ -120,7 +120,7 @@
     "connectBitbucket": "Bitbucket ချိတ်ဆက်ပါ",
     "connectGitlab": "GitLab ချိတ်ဆက်ပါ",
     "connectProvider": "ဝန်ဆောင်မှုပေးသူနှင့် ချိတ်ဆက်ပါ",
-"providerActionName": "{{provider}} {{action}}",
+    "providerActionName": "{{provider}} {{action}}",
     "contentTruncated": "အကြောင်းအရာကို ဖြတ်တောက်ထား",
     "copyLink": "လင့်ခ်ကို ကူးယူပါ",
     "couldNotLoadOrganizations": "အဖွဲ့အစည်းများကို မရယူနိုင်ပါ။",

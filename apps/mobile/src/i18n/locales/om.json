@@ -120,7 +120,7 @@
     "connectBitbucket": "Bitbucket walitti hidhi",
     "connectGitlab": "GitLab walitti hidhi",
     "connectProvider": "Waltajjii walqabsiisi",
-"providerActionName": "{{provider}} {{action}}",
+    "providerActionName": "{{provider}} {{action}}",
     "contentTruncated": "Qabiyyeen gabaabfame",
     "copyLink": "Geessituu garagalchi",
     "couldNotLoadOrganizations": "Dhaabbilee fe'uun hin danda'amne.",

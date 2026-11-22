@@ -120,7 +120,7 @@
     "connectBitbucket": "Ikonekta ang Bitbucket",
     "connectGitlab": "Ikonekta ang GitLab",
     "connectProvider": "Ikonekta ang isang provider",
-"providerActionName": "{{action}} {{provider}}",
+    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Pinaikli ang nilalaman",
     "copyLink": "Kopyahin ang link",
     "couldNotLoadOrganizations": "Hindi ma-load ang mga organisasyon.",

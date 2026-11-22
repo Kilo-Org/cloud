@@ -120,7 +120,7 @@
     "connectBitbucket": "Bitbucketను కనెక్ట్ చేయండి",
     "connectGitlab": "GitLabను కనెక్ట్ చేయండి",
     "connectProvider": "ప్రొవైడర్‌ను కనెక్ట్ చేయండి",
-"providerActionName": "{{provider}} {{action}}",
+    "providerActionName": "{{provider}} {{action}}",
     "contentTruncated": "విషయాన్ని కుదించారు",
     "copyLink": "లింక్ కాపీ చేయండి",
     "couldNotLoadOrganizations": "సంస్థలను లోడ్ చేయలేకపోయాం.",

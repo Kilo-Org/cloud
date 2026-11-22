@@ -120,7 +120,7 @@
     "connectBitbucket": "Bitbucket-თან დაკავშირება",
     "connectGitlab": "GitLab-თან დაკავშირება",
     "connectProvider": "პროვაიდერის დაკავშირება",
-"providerActionName": "{{provider}} {{action}}",
+    "providerActionName": "{{provider}} {{action}}",
     "contentTruncated": "შიგთავსი შეკვეცილია",
     "copyLink": "ბმულის კოპირება",
     "couldNotLoadOrganizations": "ორგანიზაციების ჩატვირთვა ვერ მოხერხდა.",

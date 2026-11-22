@@ -132,6 +132,13 @@ describe('validateOrganizationAutoTarget catalog load client', () => {
     expect(mockedCatalog).toHaveBeenCalledWith({ countryCode: null, fromDb: undefined });
   });
 
+  test('keeps the catalog primary default when no options are passed', async () => {
+    await expect(
+      validateOrganizationAutoTarget(organization(), 'moonshotai/kimi-k2.6')
+    ).resolves.toEqual({ kind: 'ok', modelId: 'moonshotai/kimi-k2.6' });
+    expect(mockedCatalog).toHaveBeenCalledWith({ countryCode: null, fromDb: undefined });
+  });
+
   test('propagates the client through a catalog-id recursion', async () => {
     mockedGetEnabledByokProviders.mockResolvedValue([key(true)]);
     mockedGetCatalogModelId.mockResolvedValue('moonshotai/kimi-k2.6');

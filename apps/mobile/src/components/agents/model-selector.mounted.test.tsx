@@ -52,6 +52,7 @@ vi.mock('@/components/ui/icons', () => ({
   Brain: 'Brain',
   Check: 'Check',
   ChevronDown: 'ChevronDown',
+  Lock: 'Lock',
   Star: 'Star',
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -205,15 +206,21 @@ describe('ModelPickerOptionRow unavailable row', () => {
     expect(checkAccessories(renderer)).toEqual([{ color: '#6F6A61', size: 18 }]);
   });
 
-  it('draws no check on a selected unavailable row the all-unavailable sheet shows', () => {
+  it('draws the muted check and speaks the selection on a selected unavailable row', () => {
     const renderer = renderRow(cliCatalogOption({ unavailable: true, name: 'Minimax M2.5' }), {
       selected: true,
-      suppressUnavailableCheck: true,
     });
 
-    // Nothing is pickable in that sheet, so a check would claim a selection
-    // the state above denies.
-    expect(checkAccessories(renderer)).toHaveLength(0);
+    // The all-unavailable sheet still draws the check: the row's spoken state
+    // says selected too, so dropping it would hide a state it announces.
+    expect(checkAccessories(renderer)).toEqual([{ color: '#6F6A61', size: 18 }]);
+    const [row] = renderer.root.findAll(node => node.props.accessibilityRole === 'button');
+    expect(String(row?.props.accessibilityLabel)).toContain(
+      i18n.t('agentChat.modelSelector.selectedState')
+    );
+    expect(
+      (row?.props.accessibilityState as { selected?: boolean } | undefined)?.selected
+    ).toBe(true);
   });
 
   it('still draws the check on a selected available row', () => {
@@ -659,20 +666,78 @@ describe('ModelSelector chip availability disclosure', () => {
     expect(routerPush).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps a chip with no options disabled, so it never opens a blank picker', () => {
+  it('states an empty catalog in the pill and still opens the picker', () => {
     routerPush.mockClear();
-    const renderer = renderSelector({ value: 'missing-model', options: [] });
+    const renderer = renderSelector({ options: [] });
     const pill = chip(renderer);
 
-    expect(pill.props.disabled).toBe(true);
-    expect(pill.props.accessibilityState).toEqual({ disabled: true });
+    // The pill says the state itself, and the spoken value repeats it: a
+    // disabled pill would hide both the reason and the picker's Retry.
+    expect(textStrings(renderer.root)).toContain(i18n.t('common.noModelsAvailable'));
+    expect(pill.props.disabled).toBe(false);
+    expect(String(pill.props.accessibilityLabel)).toContain(i18n.t('common.noModelsAvailable'));
 
     TestRenderer.act(() => {
       const press = pill.props.onPress as (() => void) | undefined;
       press?.();
     });
 
-    expect(routerPush).not.toHaveBeenCalled();
+    expect(routerPush).toHaveBeenCalledTimes(1);
+  });
+
+  it('draws a lock marker beside a locked chip and keeps its value at full contrast', () => {
+    const option = cliCatalogOption({ name: 'Minimax M2.5' });
+    const renderer = renderSelector({
+      value: option.id,
+      options: [option],
+      disabled: true,
+      lockLabel: 'Reviewer',
+    });
+
+    // The chip announces the lock reason, so the pill draws the same state.
+    expect(renderer.root.findAll(node => (node.type as string) === 'Lock')).toHaveLength(1);
+    const value = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.children === option.name
+    )[0];
+    expect(String(value?.props.className)).toContain('text-foreground');
+  });
+
+  it('draws the unavailable marker instead of a lock for a selected unavailable model', () => {
+    const option = cliCatalogOption({ unavailable: true });
+    const renderer = renderSelector({ value: option.id, options: [option] });
+
+    expect(textStrings(renderer.root)).toContain(i18n.t('agentChat.modelSelector.unavailable'));
+    expect(renderer.root.findAll(node => (node.type as string) === 'Lock')).toHaveLength(0);
+  });
+
+  it('speaks a pinned effort of a single-variant locked model, matching the drawn badge', () => {
+    const option = cliCatalogOption({ variants: ['high'] });
+    const renderer = renderSelector({
+      value: option.id,
+      variant: 'high',
+      options: [option],
+      disabled: true,
+      lockLabel: 'Reviewer',
+    });
+
+    // The badge renders for a pinned variant even when the option carries one,
+    // so the spoken name states the effort too.
+    expect(String(chip(renderer).props.accessibilityLabel)).toContain(
+      i18n.t('agentChat.modelSelector.thinkingEffortWithModel', {
+        model: option.name,
+        variant: 'high',
+      })
+    );
+  });
+
+  it('names a provider-aware catalog miss as unknown', () => {
+    const option = cliCatalogOption({ modelRef: { providerID: 'gone', modelID: 'model' } });
+    const renderer = renderSelector({ value: 'gone/model', options: [option] });
+
+    expect(textStrings(renderer.root)).toContain(i18n.t('common.unknown'));
   });
 
   it('reads a locked chip as one sentence with the lock reason', () => {

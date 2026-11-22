@@ -758,11 +758,11 @@ export function SessionDetailContent({
   const { hideThinking, hasLoaded: hideThinkingLoaded } = useHideThinkingPreference();
   const { keepScreenOn, hasLoaded: keepScreenOnLoaded } = useKeepScreenOnPreference();
   const { condenseToolCalls } = useCondenseToolCallsPreference();
-  const { models: catalogModels, isLoading: gatewayCatalogLoading } = useAvailableModels(
-    organizationId,
-    'member',
-    { enabled: sessionDataLoaded }
-  );
+  const {
+    models: catalogModels,
+    isLoading: gatewayCatalogLoading,
+    refetch: refetchCatalog,
+  } = useAvailableModels(organizationId, 'member', { enabled: sessionDataLoaded });
   // The picker lists models only once the session's scope is resolved. Until
   // then it holds its loading state, so it never presents a model list for a
   // scope the screen has not settled.
@@ -1921,6 +1921,17 @@ export function SessionDetailContent({
       toast.error(t('agentChat.session.failedToStopExecution'));
     }
   }, [manager, t]);
+
+  // The model chip's Retry for an empty catalog. A remote session's catalog is
+  // the CLI's model list, so the ask goes back through the connection; every
+  // other session lists the gateway catalog, which is the query the chip reads.
+  const handleRetryModels = useCallback(() => {
+    if (activeSessionType === 'remote') {
+      manager.retryRemoteModels();
+    } else {
+      void refetchCatalog();
+    }
+  }, [activeSessionType, manager, refetchCatalog]);
 
   const handleModelSelect = useCallback(
     (value: string, variant: string, pickerSelection?: ModelPickerSelection) => {
@@ -3404,6 +3415,8 @@ export function SessionDetailContent({
                 modelOptions={modelOptionsForToolbar}
                 modelLocked={modelLocked}
                 modelLockLabel={pinned.agentName}
+                isLoadingModels={sessionModels.isLoading}
+                onRetryModels={handleRetryModels}
                 onModelSelect={handleModelSelect}
                 organizationId={organizationId}
                 attachmentsEnabled={supportsAttachments}

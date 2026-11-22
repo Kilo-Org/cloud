@@ -7,6 +7,7 @@ import {
   Check,
   ChevronDown,
   ImageIcon,
+  Lock,
   Star,
   Wrench,
 } from '@/components/ui/icons';
@@ -60,6 +61,8 @@ type ModelSelectorProps = {
   isLoading?: boolean;
   /** Agent name that pins the model; when set with `disabled`, the chip is locked. */
   lockLabel?: string;
+  /** Refetches the model catalog; the picker's empty state offers it as Retry. */
+  onRetryModels?: () => void;
   /**
    * `chip` is the composer's inline pill, beside the mode chip. `field` is the
    * form's picker: a label above the 48pt select box, on the field-label
@@ -131,6 +134,8 @@ export function openModelPicker(
     acceptsVariant: boolean;
     onSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;
     selectionScope?: ModelPickerSelectionScopeContextValue;
+    /** Refetches the catalog the picker lists; the picker's empty state offers it as Retry. */
+    onRetryModels?: () => void;
   }
 ) {
   const {
@@ -140,6 +145,7 @@ export function openModelPicker(
     acceptsVariant,
     onSelect,
     selectionScope = UNFENCED_SELECTION_CONTEXT,
+    onRetryModels,
   } = params;
   const routeKey = selectionScope.selectionScope.sessionId;
   modelPickerSlot.set(routeKey, {
@@ -152,6 +158,7 @@ export function openModelPicker(
     onSelect: selection => {
       onSelect(selection.option.id, selection.variant, selection);
     },
+    retryCatalog: onRetryModels,
   });
   // The sheet anchors over the keyboard only at its first layout and never
   // re-anchors when the keyboard hides afterwards: opened while the composer
@@ -172,6 +179,7 @@ export function ModelSelector({
   disabled = false,
   isLoading = false,
   lockLabel,
+  onRetryModels,
   presentation = 'chip',
 }: Readonly<ModelSelectorProps>) {
   const pushOnce = useSinglePushRoute();
@@ -231,7 +239,7 @@ export function ModelSelector({
   );
   // A matched option can be one of Kilo's own Auto models, whose backend name no
   // catalog translates, so resolve its label first and let the helper fall back
-  // to the short name (or the generic label) for a stored reference the catalog
+  // to the readable reference (or `unknown`) for a stored model the catalog
   // does not carry.
   const label = resolveModelSelectorLabel({
     selectedName: selectedModel
@@ -239,7 +247,7 @@ export function ModelSelector({
       : undefined,
     value,
     providerAware,
-    fallbackLabel: t('common.model'),
+    unknownLabel: t('common.unknown'),
     notSelectedLabel: t('common.notSelected'),
   });
   // With no model chosen the label is a placeholder, so it takes the muted ink
@@ -248,14 +256,23 @@ export function ModelSelector({
   const { byok, collectsData } = modelSelectorBadges(selectedModel);
   const hasVariants = selectedModel ? selectedModel.variants.length > 1 : false;
   const variantLabel = variant ? thinkingEffortLabel(variant) : '';
+  const catalogEmpty = pickerOptions.length === 0;
+  // An empty catalog has no value to name, so the pill states the state itself
+  // in the value slot; the spoken name reads the same words.
+  const shownLabel = catalogEmpty ? t('common.noModelsAvailable') : label;
   const chipParts = [
-    label,
+    shownLabel,
     collectsData ? freeModelDataLabel() : undefined,
     byok ? BYOK_MODEL_LABEL : undefined,
   ].filter((part): part is string => part !== undefined);
   const modelLabel = formatList(chipParts, i18n.language);
+  // A pinned variant is meaningful even when the locked option carries a single
+  // variant, so surface the badge whenever a lock label is present.
+  const showVariantBadge = variantLabel !== '' && (hasVariants || Boolean(lockLabel));
+  // The spoken name follows the drawn badge: the effort is announced exactly
+  // when the chip draws it, so the one state never contradicts the other.
   const spokenModel =
-    hasVariants && variantLabel
+    showVariantBadge && variantLabel
       ? t('agentChat.modelSelector.thinkingEffortWithModel', {
           model: modelLabel,
           variant: variantLabel,
@@ -264,10 +281,9 @@ export function ModelSelector({
   // The chip names one model, so it states that model's state. Every option
   // being unavailable is therefore not what decides the announcement.
   const selectedUnavailable = selectedModel?.unavailable === true;
-  // An empty catalog has nothing to choose, so the chip stays disabled instead
-  // of opening a sheet with no rows; an unavailable catalog keeps its press so
-  // the picker can explain each model.
-  const chipDisabled = disabled || pickerOptions.length === 0;
+  // The empty catalog states itself in the pill's value and keeps the press so
+  // the picker can offer Retry; a locked or disabled composer still refuses.
+  const chipDisabled = disabled;
   const accessibilityLabel = [
     // "Not selected" alone would not say what is not selected.
     nothingChosen ? t('common.model') : undefined,
@@ -279,9 +295,6 @@ export function ModelSelector({
   ]
     .filter((part): part is string => part !== undefined)
     .join(t('common.sentenceJoiner'));
-  // A pinned variant is meaningful even when the locked option carries a single
-  // variant, so surface the badge whenever a lock label is present.
-  const showVariantBadge = variantLabel !== '' && (hasVariants || Boolean(lockLabel));
 
   function handlePress() {
     if (chipDisabled) {
@@ -295,6 +308,7 @@ export function ModelSelector({
       acceptsVariant,
       onSelect,
       selectionScope: selectionContext,
+      onRetryModels,
     });
   }
 
@@ -307,12 +321,27 @@ export function ModelSelector({
         className={cn(
           'shrink font-medium',
           presentation === 'field' ? 'text-base' : 'text-sm',
-          nothingChosen ? 'text-muted-foreground' : 'text-foreground'
+          nothingChosen || catalogEmpty ? 'text-muted-foreground' : 'text-foreground'
         )}
         numberOfLines={1}
       >
-        {label}
+        {shownLabel}
       </Text>
+      {/* These markers exist because every state the chip announces must also
+       * be drawn: the lock reason and the unavailable model each have a spoken
+       * part, and the pill shows a sighted reader the same state. They follow
+       * the value, so the model name keeps the chip's start and no marker can
+       * push it off its line. */}
+      {lockLabel && disabled ? <Lock size={12} color={colors.mutedForeground} /> : null}
+      {selectedUnavailable ? (
+        <View className="rounded-full bg-neutral-200 px-1.5 py-0.5 dark:bg-neutral-800">
+          {/* Text on the badge surface, so it keeps full theme contrast for the
+           * same reason the effort label below does (D2). */}
+          <Text className="text-xs font-medium text-foreground" numberOfLines={1}>
+            {t('agentChat.modelSelector.unavailable')}
+          </Text>
+        </View>
+      ) : null}
       {byok ? (
         <View className="rounded-full bg-neutral-200 px-1.5 py-0.5 dark:bg-neutral-700">
           <Text className="text-xs font-medium text-foreground" numberOfLines={1}>
@@ -391,7 +420,6 @@ export function ModelPickerOptionRow({
   acceptsVariant,
   isFavorite,
   showProvider,
-  suppressUnavailableCheck = false,
   onSelectModel,
   onSelectVariant,
   onToggleFavorite,
@@ -412,13 +440,6 @@ export function ModelPickerOptionRow({
    * accessibility label keeps the name either way.
    */
   showProvider: boolean;
-  /**
-   * Whether a selected unavailable row drops its check. The all-unavailable
-   * sheet sets it, because its state already says nothing can be picked;
-   * elsewhere the muted check still marks an unavailable row that is the
-   * session's model.
-   */
-  suppressUnavailableCheck?: boolean;
   onSelectModel: (option: SessionModelOption) => void;
   onSelectVariant: (variant: string) => void;
   onToggleFavorite: (option: SessionModelOption) => void;
@@ -558,12 +579,11 @@ export function ModelPickerOptionRow({
             ) : null}
           </View>
         </Pressable>
-        {/* The all-unavailable sheet drops the check from an unavailable row:
-         * a check there would claim a selection its state denies. Elsewhere a
-         * muted check still marks an unavailable row that is the session's
-         * model. The column stays reserved so nothing moves. */}
+        {/* The selected row always draws its muted check, including in the
+         * all-unavailable sheet: the row's spoken state says selected too. The
+         * column stays reserved so nothing moves. */}
         <View className="items-center justify-center" style={{ width: CHECK_COLUMN_DP }}>
-          {selected && !(option.unavailable && suppressUnavailableCheck) ? (
+          {selected ? (
             <Check size={CHECK_COLUMN_DP} color={selectionCheckColor(colors, option.unavailable)} />
           ) : null}
         </View>

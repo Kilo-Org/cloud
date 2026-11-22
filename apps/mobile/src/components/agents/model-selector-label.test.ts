@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { resolveModelSelectorLabel } from './model-selector-label';
 
-const FALLBACK = 'Model';
+const UNKNOWN = 'Unknown';
 const NOT_SELECTED = 'Not selected';
 
 describe('resolveModelSelectorLabel', () => {
@@ -12,7 +12,7 @@ describe('resolveModelSelectorLabel', () => {
         selectedName: 'DeepSeek V4 Flash 0731',
         value: 'deepseek/deepseek-v4-flash-0731',
         providerAware: false,
-        fallbackLabel: FALLBACK,
+        unknownLabel: UNKNOWN,
         notSelectedLabel: NOT_SELECTED,
       })
     ).toBe('DeepSeek V4 Flash 0731');
@@ -27,7 +27,7 @@ describe('resolveModelSelectorLabel', () => {
         selectedName: undefined,
         value: 'DeepSeek: DeepSeek V4 Flash 0731',
         providerAware: false,
-        fallbackLabel: FALLBACK,
+        unknownLabel: UNKNOWN,
         notSelectedLabel: NOT_SELECTED,
       })
     ).toBe('DeepSeek V4 Flash 0731');
@@ -41,7 +41,7 @@ describe('resolveModelSelectorLabel', () => {
         selectedName: undefined,
         value: 'deepseek/deepseek-v4.1-flash-1017',
         providerAware: false,
-        fallbackLabel: FALLBACK,
+        unknownLabel: UNKNOWN,
         notSelectedLabel: NOT_SELECTED,
       })
     ).toBe('deepseek v4.1 flash 1017');
@@ -53,7 +53,7 @@ describe('resolveModelSelectorLabel', () => {
         selectedName: undefined,
         value: 'custom-model-id',
         providerAware: false,
-        fallbackLabel: FALLBACK,
+        unknownLabel: UNKNOWN,
         notSelectedLabel: NOT_SELECTED,
       })
     ).toBe('custom-model-id');
@@ -65,21 +65,21 @@ describe('resolveModelSelectorLabel', () => {
         selectedName: undefined,
         value: '',
         providerAware: false,
-        fallbackLabel: FALLBACK,
+        unknownLabel: UNKNOWN,
         notSelectedLabel: NOT_SELECTED,
       })
     ).toBe(NOT_SELECTED);
   });
 
-  it('falls back to the generic label for a provider-aware catalog miss', () => {
+  it('reads a provider-aware catalog miss as unknown, not the generic field label', () => {
     expect(
       resolveModelSelectorLabel({
         selectedName: undefined,
         value: 'DeepSeek: DeepSeek V4 Flash 0731',
         providerAware: true,
-        fallbackLabel: FALLBACK,
+        unknownLabel: UNKNOWN,
         notSelectedLabel: NOT_SELECTED,
       })
-    ).toBe(FALLBACK);
+    ).toBe(UNKNOWN);
   });
 });

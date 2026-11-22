@@ -449,12 +449,18 @@ export type IngestResult =
 const COMPLETED_MESSAGE_SCAN_LIMIT = 50;
 
 /**
- * Rows one raw-export page asks SQLite for, and the most bytes one pull emits.
- * A row can hold a whole inline body (up to `MAX_INGEST_ITEM_BYTES`), so the byte
- * cap — not the row count — is what keeps a pull's allocation bounded.
+ * Rows one raw-export page inspects, and the most stored body bytes one pull
+ * materialises. A row can hold a whole inline body (up to
+ * `MAX_INGEST_ITEM_BYTES`), so the page reads ids and body sizes first, keeps the
+ * longest prefix that fits the byte budget, and only then fetches those bodies:
+ * a pull's allocation is bounded by the budget plus one row, not by the page
+ * size. The first row is always kept so an oversized body cannot stall the
+ * cursor.
  */
 const RAW_EXPORT_PAGE_ROWS = 200;
 const RAW_EXPORT_PAGE_MAX_BYTES = 4 * 1024 * 1024;
+/** Ids per body lookup; Durable Object SQLite rejects statements with ~100 bind variables. */
+const RAW_EXPORT_BODY_QUERY_IDS = 50;
 
 type PartExcerptRow = {
   id: number;
@@ -2502,15 +2508,17 @@ export class SessionIngestDO extends DurableObject<Env> {
           }
         }
 
+        // Row metadata and body sizes only: fetching the bodies here would
+        // materialise the whole page before the byte budget applied.
         const page = db
           .select({
             id: ingestItems.id,
             item_id: ingestItems.item_id,
             item_type: ingestItems.item_type,
-            item_data: ingestItems.item_data,
             item_data_r2_key: ingestItems.item_data_r2_key,
             ingested_at: ingestItems.ingested_at,
             cost_usd: ingestItems.cost_usd,
+            body_bytes: sql<number>`length(cast(${ingestItems.item_data} as blob))`,
           })
           .from(ingestItems)
           .where(cursor === null ? undefined : afterIngestOrderCursor(cursor))
@@ -2518,38 +2526,66 @@ export class SessionIngestDO extends DurableObject<Env> {
           .limit(RAW_EXPORT_PAGE_ROWS)
           .all();
 
-        let bytes = 0;
-        let taken = 0;
+        const chosen: typeof page = [];
+        let pageBytes = 0;
         for (const row of page) {
-          const line = encoder.encode(
-            ndjsonLine({
-              t: 'row',
-              id: row.id,
-              item_id: row.item_id,
-              item_type: row.item_type,
-              item_data: row.item_data,
-              item_data_r2_key: row.item_data_r2_key,
-              ingested_at: row.ingested_at,
-              cost_usd: row.cost_usd,
-            })
+          // Always keep the first row of a page so one oversized body cannot
+          // stall the cursor; the budget only trims the rest of the page.
+          if (chosen.length > 0 && pageBytes + row.body_bytes > RAW_EXPORT_PAGE_MAX_BYTES) break;
+          chosen.push(row);
+          pageBytes += row.body_bytes;
+        }
+
+        if (chosen.length === 0) {
+          controller.enqueue(encoder.encode(ndjsonLine({ t: 'end', rows })));
+          controller.close();
+          return;
+        }
+
+        // Fetch only the bodies that fit the budget. Durable Object SQLite caps
+        // bound variables per statement, so the ids go in small batches. A row
+        // deleted between the two reads has no body and is skipped; the cursor
+        // still moves past it.
+        const bodies = new Map<number, string>();
+        for (let start = 0; start < chosen.length; start += RAW_EXPORT_BODY_QUERY_IDS) {
+          const ids = chosen.slice(start, start + RAW_EXPORT_BODY_QUERY_IDS).map(row => row.id);
+          for (const row of db
+            .select({ id: ingestItems.id, item_data: ingestItems.item_data })
+            .from(ingestItems)
+            .where(inArray(ingestItems.id, ids))
+            .all()) {
+            bodies.set(row.id, row.item_data);
+          }
+        }
+
+        let emitted = 0;
+        for (const row of chosen) {
+          const itemData = bodies.get(row.id);
+          if (itemData === undefined) continue;
+          controller.enqueue(
+            encoder.encode(
+              ndjsonLine({
+                t: 'row',
+                id: row.id,
+                item_id: row.item_id,
+                item_type: row.item_type,
+                item_data: itemData,
+                item_data_r2_key: row.item_data_r2_key,
+                ingested_at: row.ingested_at,
+                cost_usd: row.cost_usd,
+              })
+            )
           );
-          // Always carry the first row of a page so one oversized body cannot
-          // stall the cursor; the byte cap only trims the rest of the page, and
-          // the next pull re-reads the trimmed rows from the same cursor.
-          if (taken > 0 && bytes + line.byteLength > RAW_EXPORT_PAGE_MAX_BYTES) break;
-          controller.enqueue(line);
-          bytes += line.byteLength;
-          taken += 1;
+          emitted += 1;
         }
 
-        if (taken > 0) {
-          cursor = ingestOrderCursor(page[taken - 1]);
-          rows += taken;
-        }
+        const lastRow = chosen[chosen.length - 1];
+        cursor = { ingestedAt: lastRow.ingested_at, id: lastRow.id };
+        rows += emitted;
 
-        // Short page and every fetched row emitted: nothing follows, so close
+        // Short page and every inspected row kept: nothing follows, so close
         // with the end line. A trimmed page keeps the stream open.
-        if (page.length < RAW_EXPORT_PAGE_ROWS && taken === page.length) {
+        if (page.length < RAW_EXPORT_PAGE_ROWS && chosen.length === page.length) {
           controller.enqueue(encoder.encode(ndjsonLine({ t: 'end', rows })));
           controller.close();
         }

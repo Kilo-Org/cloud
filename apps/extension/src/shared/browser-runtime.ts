@@ -3584,10 +3584,10 @@ export const createBrowserRuntime = ({
          * The navigation result this call answers with, when the tab it drove settled on an origin the call may not open or
          * read. One spelling for every call whose answer is about the navigation it sent, whichever tool carried it.
          */
-        const stepNavigationResult = async (): Promise<BrowserOriginChanged | undefined> =>
+        const stepNavigationResult = (): Promise<BrowserOriginChanged | undefined> | undefined =>
           agentContext === undefined || navigatedOrigin === undefined
             ? undefined
-            : await postAgentNavigate(runSession, navigatedOrigin, agentContext.authorized);
+            : postAgentNavigate(runSession, navigatedOrigin, agentContext.authorized);
 
         if (downloadCapable) {
           takeOverDownloads(tabId);

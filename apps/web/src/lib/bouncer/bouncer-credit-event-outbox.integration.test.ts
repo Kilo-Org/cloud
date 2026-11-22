@@ -433,6 +433,33 @@ describe('bouncer credit-event outbox (integration)', () => {
     expect(claimed?.claimed_at).not.toBeNull();
   });
 
+  it('claims only one row when an event id has several event types', async () => {
+    const createdAt = new Date().toISOString();
+    await insertOutboxRow({
+      event_id: 'evt-two-types',
+      event_type: 'charge.failed',
+      user_id: 'user-1',
+      payload: { type: 'charge.failed' },
+      created_at: createdAt,
+    });
+    await insertOutboxRow({
+      event_id: 'evt-two-types',
+      event_type: 'charge.refunded',
+      user_id: 'user-1',
+      payload: { type: 'charge.refunded' },
+      created_at: createdAt,
+    });
+
+    const claimed = await claimBouncerCreditEventByEventId(db, 'evt-two-types');
+    expect(claimed?.status).toBe('sending');
+
+    // The sibling must stay claimable by the drainer, not be stamped `sending` and delivered by
+    // nobody until the stale-claim window reclaims it.
+    const rows = await db.select().from(bouncer_credit_event_outbox);
+    expect(rows.filter(row => row.status === 'sending')).toHaveLength(1);
+    expect(rows.filter(row => row.status === 'pending')).toHaveLength(1);
+  });
+
   it('does not reclaim a fresh claim when the caller clock runs ahead', async () => {
     const now = Date.now();
     await insertOutboxRow({

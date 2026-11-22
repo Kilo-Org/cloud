@@ -198,12 +198,18 @@ function duePendingClaimIds(limit: number): SQL {
     FOR UPDATE SKIP LOCKED`;
 }
 
-/** Selects the `pending` row for `eventId`, ignoring any retry backoff. */
+/**
+ * Selects one `pending` row for `eventId`, ignoring any retry backoff. `event_id` is not unique on
+ * its own (the unique key is the `(event_id, event_type)` pair), so the ordering and `LIMIT 1` keep
+ * this a single-row claim and leave any sibling event type `pending` for the drainer.
+ */
 function pendingClaimIdsForEvent(eventId: string): SQL {
   return sql`SELECT ${bouncer_credit_event_outbox.id}
     FROM ${bouncer_credit_event_outbox}
     WHERE ${bouncer_credit_event_outbox.event_id} = ${eventId}
       AND ${bouncer_credit_event_outbox.status} = 'pending'
+    ORDER BY ${bouncer_credit_event_outbox.created_at} ASC, ${bouncer_credit_event_outbox.id} ASC
+    LIMIT 1
     FOR UPDATE SKIP LOCKED`;
 }
 
@@ -226,7 +232,9 @@ export async function claimDueBouncerCreditEvents(
  * row is absent, already claimed by the drainer, or already terminal, so the immediate delivery
  * never races the drainer. The predicate deliberately omits the retry-backoff check the drainer's
  * predicate applies, because a charge verdict must not wait out a retry backoff window, so this
- * path claims a row the drainer is holding until `next_attempt_at`.
+ * path claims a row the drainer is holding until `next_attempt_at`. It claims exactly one row,
+ * oldest-first, so a sibling row for the same `event_id` with another `event_type` stays `pending`
+ * for the drainer instead of being stamped `sending` and delivered by nobody.
  */
 export async function claimBouncerCreditEventByEventId(
   database: BouncerCreditEventOutboxDatabase,

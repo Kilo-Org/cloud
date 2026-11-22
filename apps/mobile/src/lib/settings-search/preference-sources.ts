@@ -9,8 +9,13 @@ import { defineSetting, type SettingsSearchSource } from '@/lib/settings-search/
  * not render.
  */
 
-/** Every row on the Preferences hub. `appearance` labels its section. */
-const PREFERENCES_HUB_SETTINGS = {
+/**
+ * The rows above the Appearance control. Each group below is composed into the
+ * hub object, so the screen renders every group row and the index publishes the
+ * same values automatically; only the Appearance control needs its options in a
+ * second source so they carry that section's breadcrumb.
+ */
+const PREFERENCES_HUB_TOP_SETTINGS = {
   general: defineSetting('general', 'preferences.general'),
   voiceInput: defineSetting('voice-input', 'preferences.voiceInput'),
   toolSummaryTranslation: defineSetting(
@@ -19,13 +24,17 @@ const PREFERENCES_HUB_SETTINGS = {
     'language'
   ),
   appearance: defineSetting('appearance', 'preferences.appearance', 'appearance'),
-  appearanceSystem: defineSetting(
-    'appearance.system',
-    'preferences.appearanceSystem',
-    'appearance'
-  ),
-  appearanceLight: defineSetting('appearance.light', 'preferences.appearanceLight', 'appearance'),
-  appearanceDark: defineSetting('appearance.dark', 'preferences.appearanceDark', 'appearance'),
+} as const;
+
+/** The three names the Appearance segmented control shows, in screen order. */
+const APPEARANCE_OPTION_SETTINGS = {
+  appearanceSystem: defineSetting('appearance.system', 'preferences.appearanceSystem'),
+  appearanceLight: defineSetting('appearance.light', 'preferences.appearanceLight'),
+  appearanceDark: defineSetting('appearance.dark', 'preferences.appearanceDark'),
+} as const;
+
+/** Every row below the Appearance section. */
+const PREFERENCES_HUB_REST_SETTINGS = {
   account: defineSetting('account', 'preferences.account', 'language'),
   notifications: defineSetting('notifications', 'common.notifications', 'notifications'),
   notificationHistory: defineSetting(
@@ -34,6 +43,13 @@ const PREFERENCES_HUB_SETTINGS = {
     'notifications'
   ),
   spendAlerts: defineSetting('spend-alerts', 'notifications.channel.spend', 'notifications'),
+} as const;
+
+/** Every row on the Preferences hub, in screen order. `appearance` labels its section. */
+const PREFERENCES_HUB_SETTINGS = {
+  ...PREFERENCES_HUB_TOP_SETTINGS,
+  ...APPEARANCE_OPTION_SETTINGS,
+  ...PREFERENCES_HUB_REST_SETTINGS,
 } as const;
 
 const GENERAL_SETTINGS = {
@@ -77,24 +93,39 @@ const ACCOUNT_SETTINGS = {
   profile: defineSetting('account.profile', 'profile.editProfile.title'),
   signInMethods: defineSetting('account.sign-in-methods', 'profile.signInMethods.title'),
   language: defineSetting('account.language', 'common.language', 'language'),
-  trustedHosts: defineSetting('account.trusted-hosts', 'trustedHosts.title', 'privacy'),
-  passkeys: defineSetting('account.passkeys', 'profile.passkeysTitle', 'privacy'),
+  trustedHosts: defineSetting('account.trusted-hosts', 'trustedHosts.title'),
+  passkeys: defineSetting('account.passkeys', 'profile.passkeysTitle'),
   providerKeys: defineSetting('account.provider-keys', 'profile.providerKeys.title'),
-  dataExport: defineSetting('account.data-export', 'profile.dataExport.title', 'privacy'),
-  blockedPeople: defineSetting('account.blocked-people', 'profile.blockedPeople.title', 'privacy'),
-  reportReceipts: defineSetting(
-    'account.report-receipts',
-    'profile.reportReceipts.title',
-    'privacy'
-  ),
-  deviceSessions: defineSetting('account.device-sessions', 'common.deviceSessions', 'privacy'),
+  dataExport: defineSetting('account.data-export', 'profile.dataExport.title'),
+  blockedPeople: defineSetting('account.blocked-people', 'profile.blockedPeople.title'),
+  reportReceipts: defineSetting('account.report-receipts', 'profile.reportReceipts.title'),
+  deviceSessions: defineSetting('account.device-sessions', 'common.deviceSessions'),
   browserSignOut: defineSetting('account.browser-sign-out', 'profile.signOutWeb.title', 'signOut'),
 } as const;
 
-const PREFERENCES_HUB_SOURCE: SettingsSearchSource = {
+/**
+ * The hub renders one Appearance control whose three options are named rows,
+ * so its source splits in screen order: the rows above the control, the
+ * options under it, and the rows below. Each option carries the Appearance
+ * breadcrumb — never the `theme` synonym, which stays on the group itself — so
+ * a themed search yields one result while the option names still locate them.
+ */
+const PREFERENCES_HUB_TOP_SOURCE: SettingsSearchSource = {
   context: ['common.preferences'],
   path: '/(app)/(tabs)/(3_profile)/preferences',
-  settings: Object.values(PREFERENCES_HUB_SETTINGS),
+  settings: Object.values(PREFERENCES_HUB_TOP_SETTINGS),
+};
+
+const APPEARANCE_OPTIONS_SOURCE: SettingsSearchSource = {
+  context: ['common.preferences', 'preferences.appearance'],
+  path: '/(app)/(tabs)/(3_profile)/preferences',
+  settings: Object.values(APPEARANCE_OPTION_SETTINGS),
+};
+
+const PREFERENCES_HUB_REST_SOURCE: SettingsSearchSource = {
+  context: ['common.preferences'],
+  path: '/(app)/(tabs)/(3_profile)/preferences',
+  settings: Object.values(PREFERENCES_HUB_REST_SETTINGS),
 };
 
 const GENERAL_SOURCE: SettingsSearchSource = {
@@ -122,7 +153,9 @@ const ACCOUNT_SOURCE: SettingsSearchSource = {
 };
 
 export const PREFERENCE_SETTINGS_SOURCES: readonly SettingsSearchSource[] = [
-  PREFERENCES_HUB_SOURCE,
+  PREFERENCES_HUB_TOP_SOURCE,
+  APPEARANCE_OPTIONS_SOURCE,
+  PREFERENCES_HUB_REST_SOURCE,
   GENERAL_SOURCE,
   VOICE_INPUT_SOURCE,
   TOOL_SUMMARY_TRANSLATION_SOURCE,

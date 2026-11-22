@@ -5450,10 +5450,10 @@
     }
   },
   "settingsSearch": {
-    "placeholder": "البحث في التفضيلات",
-    "noMatches": "لا توجد تفضيلات مطابقة",
-    "emptyDescription": "جرّب اسم تفضيل آخر أو كلمة مفتاحية مختلفة.",
-    "resultsStatus": "عدد التفضيلات المطابقة: {{resultCount}}",
+    "placeholder": "البحث في الإعدادات",
+    "noMatches": "لا توجد إعدادات مطابقة",
+    "emptyDescription": "جرّب اسم إعداد آخر أو كلمة مفتاحية مختلفة.",
+    "resultsStatus": "عدد الإعدادات المطابقة: {{resultCount}}",
     "keywords": {
       "signOut": "تسجيل الخروج|خروج",
       "appearance": "سمة|ألوان|الوضع الداكن",

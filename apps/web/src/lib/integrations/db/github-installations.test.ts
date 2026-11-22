@@ -1372,6 +1372,40 @@ describe('GitHub installation persistence', () => {
     expect(associations).toHaveLength(2);
   });
 
+  test('refuses to uninstall the forge fixture installation before any local or upstream write', async () => {
+    const organization = await createTestOrganization('Forge fixture pool GitHub', ownerId, 0);
+    process.env.GITHUB_FORGE_INSTALLATION_IDS = '175846100,175846101';
+    try {
+      const connected = await connectVerifiedGitHubInstallation(
+        { type: 'org', id: organization.id },
+        data('175846100')
+      );
+      if (!connected.ok) throw new Error('Expected canonical connection');
+      let upstreamDeletes = 0;
+      await expect(
+        uninstallExclusiveGitHubInstallation({
+          owner: { type: 'org', id: organization.id },
+          integrationId: connected.integrationId,
+          deleteUpstream: async () => {
+            upstreamDeletes += 1;
+          },
+        })
+      ).rejects.toThrow('belongs to the local forge fixture app');
+      expect(upstreamDeletes).toBe(0);
+      const [row] = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, connected.integrationId));
+      expect(row).toMatchObject({
+        github_disconnected_at: null,
+        integration_status: 'active',
+        platform_installation_id: '175846100',
+      });
+    } finally {
+      delete process.env.GITHUB_FORGE_INSTALLATION_IDS;
+    }
+  });
+
   test('serializes upstream uninstall against a concurrent shared attach', async () => {
     const organizationA = await createTestOrganization('Uninstall race GitHub A', ownerId, 0);
     const organizationB = await createTestOrganization('Uninstall race GitHub B', otherOwnerId, 0);

@@ -34,6 +34,7 @@ import {
   cancelActiveCodeReviewsForIntegration,
   settleCancelledReviews,
 } from '@/lib/code-reviews/db/code-reviews';
+import { assertGitHubInstallationDeletable } from '@/lib/integrations/platforms/github/protected-installation';
 
 export type DbTransaction = DrizzleTransaction;
 
@@ -666,6 +667,8 @@ export async function uninstallExclusiveGitHubInstallation(input: {
     if (!identity?.installationId) throw new Error('GitHub connection not found');
     if (identity.role !== 'workflow')
       throw new Error('GitHub installation must be disconnected locally');
+    // Refused before any local write, so a fixture app installation keeps its association too.
+    assertGitHubInstallationDeletable(identity.installationId);
     const appType = identity.appType ?? 'standard';
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtext(${`${appType}:${identity.installationId}`}))`

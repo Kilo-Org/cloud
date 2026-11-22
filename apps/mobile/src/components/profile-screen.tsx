@@ -360,10 +360,11 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
         // Expo Router's per-route Href union cannot associate this union of
         // static pathnames with a single arm. SettingsPath excludes routes
         // whose params are required, so each indexed pathname accepts this shape.
-        router.push({
+        const href = {
           pathname: entry.path,
           params: { ...entry.params, settingsTarget: entry.id },
-        } as Href);
+        };
+        router.push(href as Href);
         return;
       }
       setSettingsTarget(entry.id);

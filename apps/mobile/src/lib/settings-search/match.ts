@@ -40,8 +40,16 @@ type SearchResult<T> = {
  * away. Kana voicing, Thai tones and Indic vowel signs sit outside these
  * ranges (and `\p{Diacritic}` would fold the first two), so they stay.
  */
-const FOLDED_MARK =
-  /[\u0300-\u036F\u0591-\u05C7\u064B-\u065F\u0670\u1AB0-\u1AFF\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F]/u;
+const FOLDED_MARK_RANGES = [
+  ['\u0300', '\u036F'],
+  ['\u0591', '\u05C7'],
+  ['\u064B', '\u065F'],
+  ['\u0670', '\u0670'],
+  ['\u1AB0', '\u1AFF'],
+  ['\u1DC0', '\u1DFF'],
+  ['\u20D0', '\u20FF'],
+  ['\uFE20', '\uFE2F'],
+] as const;
 
 const SERBIAN_CYRILLIC = 'абвгдђежзијклљмнњопрстћуфхцчџш';
 // Same order as SERBIAN_CYRILLIC; diacritics stay for the fold below to strip.
@@ -117,7 +125,7 @@ function fold(value: string, rules: LocaleRules, mapping?: FoldMapping): string 
 
   const foldPart = (part: string, start: number, end: number) => {
     if (MARK.test(part)) {
-      if (FOLDED_MARK.test(part)) {
+      if (FOLDED_MARK_RANGES.some(([first, last]) => part >= first && part <= last)) {
         extendLast(end);
       } else {
         append(part, start, end);

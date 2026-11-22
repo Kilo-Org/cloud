@@ -365,9 +365,13 @@ export function ModelAccessForm({
               caption stays to keep the read-only explanation on screen. */}
           {providerRowsIncomplete &&
           !(savePayload.kind === 'provider-catalog-unavailable' && feedback.status !== 'failed') ? (
-            <Text variant="caption" className="px-4 pb-2" style={sideInsetStyle}>
-              {t('organizationModelAccess.providersNeedCatalog')}
-            </Text>
+            // The inset rides on this wrapper: an inline padding on the text
+            // would replace the page gutter its class draws.
+            <View style={sideInsetStyle}>
+              <Text variant="caption" className="px-4 pb-2">
+                {t('organizationModelAccess.providersNeedCatalog')}
+              </Text>
+            </View>
           ) : null}
           <ProviderAllowList
             providers={providers}

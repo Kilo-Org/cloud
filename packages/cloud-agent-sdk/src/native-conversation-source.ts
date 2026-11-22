@@ -218,9 +218,7 @@ export function readNativeConversation(state: NativeSessionState): NativeConvers
   const blocked = complete.filter(item =>
     hasUnresolvedKilo2Assets(item.message, state.assetURLs, unavailable)
   );
-  const withheld = complete.filter(item =>
-    hasWithheldKilo2Assets(item.message, state.assetURLs)
-  );
+  const withheld = complete.filter(item => hasWithheldKilo2Assets(item.message, state.assetURLs));
   const incompleteMessageIDs = [
     ...new Set([
       ...state.messages.filter(item => item.incomplete).map(item => item.message.id),

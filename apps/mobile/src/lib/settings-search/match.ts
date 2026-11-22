@@ -41,14 +41,14 @@ type SearchResult<T> = {
  * ranges (and `\p{Diacritic}` would fold the first two), so they stay.
  */
 const FOLDED_MARK_BLOCKS: readonly (readonly [number, number])[] = [
-  [0x0300, 0x036f],
-  [0x0591, 0x05c7],
-  [0x064b, 0x065f],
+  [0x0300, 0x036F],
+  [0x0591, 0x05C7],
+  [0x064B, 0x065F],
   [0x0670, 0x0670],
-  [0x1ab0, 0x1aff],
-  [0x1dc0, 0x1dff],
-  [0x20d0, 0x20ff],
-  [0xfe20, 0xfe2f],
+  [0x1AB0, 0x1AFF],
+  [0x1DC0, 0x1DFF],
+  [0x20D0, 0x20FF],
+  [0xFE20, 0xFE2F],
 ];
 
 const SERBIAN_CYRILLIC = 'абвгдђежзијклљмнњопрстћуфхцчџш';
@@ -113,9 +113,11 @@ function fold(value: string, rules: LocaleRules, mapping?: FoldMapping): string 
     if (mapping === undefined) {
       return;
     }
-    for (let index = 0; index < chunk.length; index += 1) {
+    let remaining = chunk.length;
+    while (remaining > 0) {
       mapping.starts.push(start);
       mapping.ends.push(end);
+      remaining -= 1;
     }
   };
 
@@ -126,6 +128,26 @@ function fold(value: string, rules: LocaleRules, mapping?: FoldMapping): string 
     const last = mapping.ends.at(-1);
     if (last !== undefined) {
       mapping.ends[mapping.ends.length - 1] = Math.max(last, end);
+    }
+  };
+
+  const foldPart = (part: string, start: number, end: number) => {
+    if (MARK.test(part)) {
+      if (isFoldedMark(part)) {
+        extendLast(end);
+      } else {
+        append(part, start, end);
+      }
+      return;
+    }
+    if (part === 'ß') {
+      append('ss', start, end);
+    } else if (part === 'đ') {
+      append(rules.djDigraph ? 'dj' : 'd', start, end);
+    } else if (part === 'ς') {
+      append('σ', start, end);
+    } else {
+      append(part, start, end);
     }
   };
 
@@ -153,21 +175,7 @@ function fold(value: string, rules: LocaleRules, mapping?: FoldMapping): string 
           ? transliterateSerbian(loweredChar)
           : loweredChar;
         for (const part of transliterated.normalize('NFD')) {
-          if (MARK.test(part)) {
-            if (isFoldedMark(part)) {
-              extendLast(end);
-            } else {
-              append(part, start, end);
-            }
-          } else if (part === 'ß') {
-            append('ss', start, end);
-          } else if (part === 'đ') {
-            append(rules.djDigraph ? 'dj' : 'd', start, end);
-          } else if (part === 'ς') {
-            append('σ', start, end);
-          } else {
-            append(part, start, end);
-          }
+          foldPart(part, start, end);
         }
       }
     }
@@ -259,7 +267,7 @@ export function searchSettings<T extends SettingsSearchText>(
         labelMatched = true;
       } else {
         const otherFieldMatched =
-          (context !== null && context.includes(token)) ||
+          context?.includes(token) === true ||
           keywords.some(keyword => keyword.includes(token));
         if (!otherFieldMatched) {
           allTokensMatched = false;

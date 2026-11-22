@@ -4,7 +4,7 @@ import { searchSettings } from '@/lib/settings-search/match';
 
 import { CATALOG_LOADERS } from './catalogs';
 import { SUPPORTED_LANGUAGES, type SupportedLanguage } from './languages';
-import en from './locales/en.json';
+import type en from './locales/en.json';
 
 /**
  * The localized Settings search, read against every shipped catalog. The
@@ -53,8 +53,8 @@ type Highlight = { start: number; end: number };
  * script marks live elsewhere gets the added-mark direction instead, which a
  * fold of this block alone still resolves.
  */
-const FOLDABLE_DIACRITICS = /[\u0300-\u036f]/gu;
-const FOLDABLE_DIACRITIC = /[\u0300-\u036f]/u;
+const FOLDABLE_DIACRITICS = /[\u0300-\u036F]/gu;
+const FOLDABLE_DIACRITIC = /[\u0300-\u036F]/u;
 
 type SettingsSearchResult = {
   entry: SearchableEntry;
@@ -93,7 +93,7 @@ function entriesOf(catalog: SettingsCatalog): SearchableEntry[] {
 
 /** Folds case before marks, so Turkish İ becomes i instead of a bare I. */
 function foldForContainment(value: string): string {
-  return value.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '');
+  return value.toLowerCase().normalize('NFD').replaceAll(/\p{M}/gu, '');
 }
 
 /** Drops the foldable diacritics, lowering first so Turkish İ folds to i. */
@@ -112,7 +112,7 @@ function independentKeyword(
   for (const [name, label] of settingRows(catalog)) {
     const folded = foldForContainment(label);
     for (const keyword of alternatives(catalog.settingsSearch, name)) {
-      const words = keyword.split(/\s+/).map(foldForContainment);
+      const words = keyword.split(/\s+/).map(word => foldForContainment(word));
       if (words.every(word => !folded.includes(word))) {
         return { label, keyword };
       }
@@ -183,7 +183,7 @@ describe('settings search copy', () => {
     // Removing the keywords must remove the same hit: it came from a keyword,
     // not from any part of the label.
     const withoutKeywords = entries.map(entry =>
-      entry.label === label ? { ...entry, keywords: [] } : entry
+      entry.label === label ? { label: entry.label, keywords: [] } : entry
     );
     const control = searchSettings(withoutKeywords, keyword, tag);
     expect(

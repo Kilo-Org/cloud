@@ -21,6 +21,7 @@ import {
   isApprovableGlanceableStatus,
   isTerminalGlanceableStatus,
   type BuildGlanceableSnapshotInput,
+  type GlanceableAgentsSnapshotStatus,
   type GlanceableNeedsInputKind,
   type GlanceableSessionRow,
   type GlanceableStatusKind,
@@ -155,12 +156,23 @@ const QUIET_REFRESH_MS = 2 * 60 * 60 * 1000;
 const WAKE_RETRY_MS = 15 * 60 * 1000;
 
 /**
+ * The one terminal narrowing: the status when it ends the surface, else null.
+ * Callers read this value instead of testing the predicate and keeping a
+ * boolean beside a status a later branch can contradict.
+ */
+function terminalStatusOf(
+  status: GlanceableAgentsSnapshotStatus
+): GlanceableTerminalStatus | null {
+  return isTerminalGlanceableStatus(status) ? status : null;
+}
+
+/**
  * The one cadence rule: every caller that needs a snapshot's refresh interval
  * reads this function. A terminal snapshot is quiet regardless of the counts
  * that survive beside it, so auth/privacy termination cannot keep polling.
  */
 function refreshInterval(snapshot: GlanceableAgentsSnapshot): number {
-  if (isTerminalGlanceableStatus(snapshot.status)) return QUIET_REFRESH_MS;
+  if (terminalStatusOf(snapshot.status) !== null) return QUIET_REFRESH_MS;
   return snapshot.status === 'waiting' ||
     snapshot.status === 'stale' ||
     snapshot.status === 'expired' ||
@@ -262,11 +274,10 @@ export function buildHomeWidgetData(
   }
 ): HomeWidgetData {
   const snapshot = buildGlanceableSnapshot(input);
+  const terminal = terminalStatusOf(snapshot.status);
   return {
     snapshot,
-    details: isTerminalGlanceableStatus(snapshot.status)
-      ? emptyHomeWidgetDetails()
-      : buildHomeWidgetDetails(input.sessions),
+    details: terminal === null ? buildHomeWidgetDetails(input.sessions) : emptyHomeWidgetDetails(),
   };
 }
 
@@ -287,7 +298,7 @@ function staleness(data: HomeWidgetData): {
   staleAt: number | null;
 } {
   const { snapshot } = data;
-  const terminal = isTerminalGlanceableStatus(snapshot.status) ? snapshot.status : null;
+  const terminal = terminalStatusOf(snapshot.status);
   const primaryKind = terminal === null ? primaryKindOf(snapshot) : null;
   const checkedAt =
     terminal !== null || (primaryKind === null && snapshot.status !== 'empty')
@@ -400,7 +411,7 @@ export function buildHomeWidgetPresentation(
  */
 export function homeWidgetRefreshAt(data: HomeWidgetData, now: number): number {
   const { snapshot } = data;
-  const terminal = isTerminalGlanceableStatus(snapshot.status) ? snapshot.status : null;
+  const { terminal } = staleness(data);
   const next = now + refreshInterval(snapshot);
   const wake = scheduledWake(snapshot, terminal);
   // Both instants come from the snapshot, so a passed wake cannot create a busy refresh loop.

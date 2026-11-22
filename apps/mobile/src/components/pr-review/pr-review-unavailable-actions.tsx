@@ -37,24 +37,31 @@ import { useTRPC } from '@/lib/trpc';
  *
  * The retry is the state's one primary, the shared `StateAction`, as on the
  * connect gate and the GitHub install CTA: it is the action that can recover
- * the item from here. The connection check stays the outlined secondary below
+ * the item from here. The connection check stays the outlined control below
  * it, at the same compact size with its own leading icon, because it answers a
  * different question — whether the account is still connected — and a state
  * with two equally weighted buttons has no primary at all.
  *
  * That primary belongs to a whole-surface unavailable state. A caller that
- * embeds the row inside a body owning its own primary passes `secondary`
- * instead, which leaves both controls secondary and the body's primary alone.
+ * embeds the row inside a body owning its own primary passes
+ * `presentation="embedded"` instead: the retry takes the outlined face and the
+ * connection check the ghost one, so neither competes with the body's filled
+ * primary and the outlined retry still leads the row. The row also drops the
+ * margin it uses as a whole surface — the card's own gap spaces it from the
+ * copy above — and spaces its two controls by that same gap.
  */
 export function PrReviewUnavailableActions({
   onRetry,
   isRetrying,
-  emphasis = 'primary',
+  presentation = 'surface',
 }: Readonly<{
   onRetry: () => void;
   isRetrying: boolean;
-  /** `secondary` when the surrounding body already shows its own primary action. */
-  emphasis?: 'primary' | 'secondary';
+  /**
+   * `embedded` when the surrounding body already shows its own primary action:
+   * an outlined retry above a ghost connection check, with no margin of its own.
+   */
+  presentation?: 'surface' | 'embedded';
 }>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -131,19 +138,20 @@ export function PrReviewUnavailableActions({
     return null;
   }
 
+  const embedded = presentation === 'embedded';
   return (
-    <View className="mt-3 items-center gap-2">
+    <View className={embedded ? 'w-full items-center gap-3' : 'mt-3 items-center gap-2'}>
       <StateAction
         label={t('common.retry')}
         icon={RotateCcw}
         onPress={onRetry}
         loading={isRetrying}
-        emphasis={emphasis}
+        {...(embedded ? { variant: 'outline' as const } : {})}
       />
       <Button
         size="sm"
         className={STATE_ACTION_CLASS}
-        variant="outline"
+        variant={embedded ? 'ghost' : 'outline'}
         onPress={() => {
           void checkConnection();
         }}

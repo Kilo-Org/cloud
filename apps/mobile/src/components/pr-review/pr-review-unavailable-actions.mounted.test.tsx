@@ -44,7 +44,7 @@ beforeEach(() => {
   providerConnection.mutateAsync.mockResolvedValue({ connected: false, instanceUrl: null });
 });
 
-async function mount(scope: ProviderPrScope) {
+async function mount(scope: ProviderPrScope, presentation?: 'surface' | 'embedded') {
   const mounted = await renderWithProviders(
     <ProviderPrScopeProvider value={scope}>
       {createElement(PrReviewUnavailableActions, {
@@ -52,6 +52,7 @@ async function mount(scope: ProviderPrScope) {
           onRetry();
         },
         isRetrying: false,
+        presentation,
       })}
     </ProviderPrScopeProvider>
   );
@@ -75,6 +76,20 @@ function findButtons(renderer: { root: { findAll: (f: (n: unknown) => boolean) =
   ) as ActionInstance[];
 }
 
+/** The row's own root: the only `View` the component draws. */
+type RowRoot = { props: { className?: string } };
+
+function findRowRoot(renderer: { root: { findAll: (f: (n: unknown) => boolean) => unknown[] } }) {
+  const roots = renderer.root.findAll(
+    node => String((node as { type: unknown }).type) === 'View'
+  ) as RowRoot[];
+  const [root] = roots;
+  if (!root) {
+    throw new Error('the recovery row drew no root');
+  }
+  return root;
+}
+
 describe('PrReviewUnavailableActions', () => {
   it('renders Retry and Check connection for a GitLab scope and wires both', async () => {
     const scope: ProviderPrScope = {
@@ -89,8 +104,8 @@ describe('PrReviewUnavailableActions', () => {
       throw new Error('the two recovery buttons did not render');
     }
     // The retry is the shared state action, the one primary that carries the
-    // recovery; the provider check stays the outlined secondary under it, so
-    // the state does not offer two equal choices.
+    // recovery; the provider check stays the outlined control under it, so the
+    // state does not offer two equal choices.
     expect(String(retryButton.type)).toBe('StateAction');
     expect(retryButton.props.label).toBe('Retry');
     expect(String(checkButton.type)).toBe('Button');
@@ -140,6 +155,44 @@ describe('PrReviewUnavailableActions', () => {
     };
     const { renderer, unmount } = await mount(scope);
     expect(findButtons(renderer)).toHaveLength(0);
+    unmount();
+  });
+
+  it('leads the embedded row with the outlined retry and a ghost check', async () => {
+    const scope: ProviderPrScope = {
+      ref: { platform: 'gitlab', projectPath: 'group/repo', mrIid: 1 },
+      organizationId: null,
+    };
+    const { renderer, unmount } = await mount(scope, 'embedded');
+    const [retryButton, checkButton] = findButtons(renderer);
+    if (!retryButton || !checkButton) {
+      throw new Error('the two recovery buttons did not render');
+    }
+    // Neither control takes the brand fill: the body the row is embedded in
+    // owns its primary, so the outlined retry carries the row and the ghost
+    // check sits under it.
+    expect(retryButton.props.variant).toBe('outline');
+    expect(checkButton.props.variant).toBe('ghost');
+    // The card's own gap spaces the row, so the appended margin a whole-surface
+    // row needs would double it.
+    expect(String(findRowRoot(renderer).props.className)).not.toContain('mt-3');
+    unmount();
+  });
+
+  it('keeps the whole-surface row on its filled retry and outlined check', async () => {
+    const scope: ProviderPrScope = {
+      ref: { platform: 'gitlab', projectPath: 'group/repo', mrIid: 1 },
+      organizationId: null,
+    };
+    const { renderer, unmount } = await mount(scope);
+    const [retryButton, checkButton] = findButtons(renderer);
+    if (!retryButton || !checkButton) {
+      throw new Error('the two recovery buttons did not render');
+    }
+    // No variant override: the state action keeps the filled default face.
+    expect(retryButton.props.variant).toBeUndefined();
+    expect(checkButton.props.variant).toBe('outline');
+    expect(String(findRowRoot(renderer).props.className)).toContain('mt-3');
     unmount();
   });
 });

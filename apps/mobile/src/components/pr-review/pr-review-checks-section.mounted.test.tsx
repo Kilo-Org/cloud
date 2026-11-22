@@ -518,9 +518,10 @@ describe('PrReviewChecksSection not-found arm', () => {
       const actions = unavailableActions(renderer);
       expect(actions).toHaveLength(1);
       // The card sits in the overview body, whose merge section owns the single
-      // filled primary, so the row asks for the secondary face rather than the
-      // whole-surface primary the sibling states use.
-      expect(actions[0]?.props.emphasis).toBe('secondary');
+      // filled primary, so the row asks for the embedded presentation: an
+      // outlined retry above a ghost check rather than the whole-surface
+      // primary the sibling states use.
+      expect(actions[0]?.props.presentation).toBe('embedded');
       const retry = actions[0]?.props.onRetry as (() => void) | undefined;
       if (!retry) {
         throw new Error('the recovery rows did not render');

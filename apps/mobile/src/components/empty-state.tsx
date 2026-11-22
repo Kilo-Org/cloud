@@ -208,10 +208,10 @@ type StateActionProps = {
   accessibilityHint?: string;
   /**
    * Which of the two faces the action takes: `primary` is the filled default
-   * the slot's single primary paints, `secondary` the filled neutral a caller
+   * the slot's single primary paints, `outline` the bordered surface a caller
    * embedded in a body that owns its own primary passes instead.
    */
-  emphasis?: 'primary' | 'secondary';
+  variant?: 'primary' | 'outline';
 };
 
 /**
@@ -219,7 +219,7 @@ type StateActionProps = {
  * label-sized button, with its leading icon centred together with the label and
  * the shared 48pt state-action floor. Callers own nothing visual — the slot
  * above owns the gap, and this component owns the style — so no state can
- * invent a full-width, outlined or shadowed way out.
+ * invent a full-width or shadowed way out of its own.
  *
  * `loading` is a busy state, not a different face of the control: the label and
  * its strength never change while the request runs, only the leading icon
@@ -227,9 +227,10 @@ type StateActionProps = {
  * instead of collapsing to a ring. The button announces the wait, reports
  * itself disabled, and refuses presses until it clears.
  *
- * `emphasis` only picks the fill: `secondary` keeps every other piece of the
- * control — the compact size, the tap-target floor, the busy face — and gives
- * up the brand fill, for a caller whose body already shows its own primary.
+ * `variant` only picks the face: `primary` is the filled control the slot's
+ * one primary paints, and `outline` is the same control with a border instead
+ * of the fill, for a caller whose body already shows its own primary — the
+ * compact size, the tap-target floor and the busy face are all the same.
  */
 export function StateAction({
   label,
@@ -240,26 +241,26 @@ export function StateAction({
   testID,
   accessibilityLabel,
   accessibilityHint,
-  emphasis = 'primary',
+  variant = 'primary',
 }: Readonly<StateActionProps>) {
   const colors = useThemeColors();
   const mutedDisabledInk = useMutedDisabledInk();
   const busy = Boolean(loading);
-  const secondary = emphasis === 'secondary';
-  // A busy action keeps its enabled face — the brand fill and the label ink the
-  // button paints on it (`Button` never dims or mutes a control that announces
-  // busy) — so its mark must take that same ink. The muted ink is only for the
-  // disabled face, whose fill is the palette's muted surface; on the brand fill
-  // it measures about 1.4:1 and the spinner all but disappears. The secondary
-  // face paints the label in its own ink, so the mark follows
-  // `BUTTON_INK.secondary.mark` and reads the way that variant's label does.
-  const enabledMark = secondary ? colors.secondaryForeground : colors.primaryForeground;
+  const outlined = variant === 'outline';
+  // A busy action keeps its enabled face — the fill or border and the label ink
+  // the button paints on it (`Button` never dims or mutes a control that
+  // announces busy) — so its mark must take that same ink. The muted ink is
+  // only for the disabled face, whose fill is the palette's muted surface; on
+  // the brand fill it measures about 1.4:1 and the spinner all but disappears.
+  // The two faces follow `BUTTON_INK` in `@/components/ui/button`: `default`
+  // marks in `primaryForeground`, `outline` in `foreground`.
+  const enabledMark = outlined ? colors.foreground : colors.primaryForeground;
   const markColor = disabled === true && !busy ? mutedDisabledInk : enabledMark;
   return (
     <Button
       size="sm"
       className={STATE_ACTION_CLASS}
-      {...(secondary ? { variant: 'secondary' as const } : {})}
+      {...(outlined ? { variant: 'outline' as const } : {})}
       disabled={Boolean(disabled) || busy}
       testID={testID}
       accessibilityLabel={accessibilityLabel ?? label}

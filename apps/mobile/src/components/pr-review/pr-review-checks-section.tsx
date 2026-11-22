@@ -252,16 +252,18 @@ export function PrReviewChecksSection({ owner, repo, number, checks }: PrReviewC
       // Bitbucket does the same for its workspace failures, so those scopes
       // get the read retry plus the connection check instead of a dead end.
       // This card sits in the overview body, whose merge section below owns
-      // the single filled primary, so the recovery row stays secondary.
+      // the single filled primary, so the recovery row is embedded: an
+      // outlined retry above a ghost connection check, on the same centred
+      // axis as the copy and spaced by the card's own gap.
       if (isProviderPlatform(queries.platform)) {
         return (
           <Section label={t('prReview.checks.title')}>
-            <Card key={CONTENT_CARD_KEY} className="gap-3">
-              <Text className="text-sm text-muted-foreground">
+            <Card key={CONTENT_CARD_KEY} className="items-center gap-3">
+              <Text className="text-center text-sm text-muted-foreground">
                 {t('prReview.terms.unavailableDescription')}
               </Text>
               <PrReviewUnavailableActions
-                emphasis="secondary"
+                presentation="embedded"
                 onRetry={() => {
                   checks.refetch();
                 }}

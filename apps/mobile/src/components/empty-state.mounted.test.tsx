@@ -53,7 +53,11 @@ vi.mock('@/components/ui/activity-indicator', () => ({
   ActivityIndicator: 'ActivityIndicator',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#777777', primaryForeground: '#ffffff' }),
+  useThemeColors: () => ({
+    foreground: '#111111',
+    mutedForeground: '#777777',
+    primaryForeground: '#ffffff',
+  }),
   useMutedDisabledInk: () => '#777777',
 }));
 
@@ -278,10 +282,16 @@ describe('EmptyState presentation', () => {
 // drawn and only the leading icon becomes the spinner, so a retry never
 // collapses to a ring and the reader can still tell what is running. The
 // control announces the wait and admits no press until it clears.
-async function mountAction(loading?: boolean) {
+async function mountAction(options?: { loading?: boolean; variant?: 'outline' }) {
   const onPress = vi.fn<() => void>();
   const mounted = await renderWithProviders(
-    <StateAction label="Try again" icon={SearchX} onPress={onPress} loading={loading} />
+    <StateAction
+      label="Try again"
+      icon={SearchX}
+      onPress={onPress}
+      loading={options?.loading}
+      variant={options?.variant}
+    />
   );
   const button = mounted.renderer.root.findAllByType('Button')[0];
   if (!button) {
@@ -322,7 +332,7 @@ describe('StateAction busy', () => {
   });
 
   it('keeps the label and replaces only the icon while it is busy', async () => {
-    const { mounted, button, onPress, busy, drawsLabel } = await mountAction(true);
+    const { mounted, button, onPress, busy, drawsLabel } = await mountAction({ loading: true });
 
     expect(mounted.renderer.root.findAllByType(SearchX)).toHaveLength(0);
     expect(mounted.renderer.root.findAllByType('ActivityIndicator')).toHaveLength(1);
@@ -353,5 +363,21 @@ describe('StateAction busy', () => {
     );
     expect(disabledAction.renderer.root.findByType(SearchX).props.color).toBe('#777777');
     disabledAction.unmount();
+  });
+
+  it('takes the outlined face, and its ink, for an embedded state', async () => {
+    // The outlined control paints its label in `foreground`, so the face has to
+    // be the button's `outline` variant rather than a fill of another token.
+    const outlined = await mountAction({ variant: 'outline' });
+    expect(outlined.button.props.variant).toBe('outline');
+    expect(outlined.drawsLabel).toBe(true);
+    outlined.mounted.unmount();
+
+    // Busy keeps the enabled face, so the spinner follows that face's ink too.
+    const busyOutlined = await mountAction({ variant: 'outline', loading: true });
+    expect(busyOutlined.mounted.renderer.root.findByType('ActivityIndicator').props.color).toBe(
+      '#111111'
+    );
+    busyOutlined.mounted.unmount();
   });
 });

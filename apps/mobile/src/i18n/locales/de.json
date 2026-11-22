@@ -974,7 +974,7 @@
         "recoveryLabel": "GitLab-Integration aktualisieren"
       },
       "byokInvalidKey": {
-        "description": "Der Code-Prüfer wurde deaktiviert, weil der ausgewählte BYOK-API-Schlüssel ungültig ist, widerrufen wurde oder nicht die nötigen Berechtigungen hat. Aktualisiere den Schlüssel oder wähle ein anderes Modell. Aktiviere ihn anschließend wieder.",
+        "description": "Der Code-Prüfer wurde deaktiviert, weil der ausgewählte BYOK-API-Schlüssel ungültig ist, widerrufen wurde oder nicht die nötigen Berechtigungen hat. Aktualisiere den Schlüssel oder wähle ein anderes Modell. Aktiviere den Code-Prüfer anschließend wieder.",
         "recoveryLabel": "BYOK-Einstellungen aktualisieren"
       },
       "selectedModelUnavailable": {

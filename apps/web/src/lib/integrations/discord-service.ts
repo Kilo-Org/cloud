@@ -106,16 +106,19 @@ export const DISCORD_DISCONNECT_NEEDS_SUPPORT_MESSAGE =
  *
  * `left` is Discord's 204. `already_absent` is its 404 answer, which is the
  * answer for a server the bot is not in, so the membership this disconnect
- * revokes is already gone. A 403 means the token may not act on the guild and
- * does not prove the bot left, so it stays a reported failure. Every outcome
- * other than a confirmed membership that is gone must be reported instead of a
- * disconnect.
+ * revokes is already gone. `unavailable` names an outcome no repeat of the same
+ * request can change: no configured token, an unusable server id, a rejected
+ * token, or a guild the token may not act on. Every other outcome is a failure
+ * the owner can retry.
  */
 export type DiscordBotRemoval =
   | { status: 'left' }
   | { status: 'already_absent' }
   | { status: 'temporary_failure'; reason: 'rate_limited' | 'response_error' | 'network' }
-  | { status: 'unavailable'; reason: 'not_configured' | 'invalid_guild_id' | 'rejected_token' };
+  | {
+      status: 'unavailable';
+      reason: 'not_configured' | 'invalid_guild_id' | 'rejected_token' | 'forbidden';
+    };
 
 /**
  * Discord OAuth2 token response shape
@@ -545,11 +548,16 @@ export async function removeBotFromGuild(
     }
 
     // 404 is an unknown server, which is the answer for a server the bot is not
-    // in, so the membership is already gone. 403 is not that answer: Discord
-    // reports it when the token may not act on the guild, which does not prove
-    // the bot left, so it stays a reported failure.
+    // in, so the membership is already gone.
     if (response.status === 404) {
       return { status: 'already_absent' };
+    }
+
+    // 403 means Discord will not let this token act on that guild. It does not
+    // confirm the bot left, and repeating the same request cannot change that,
+    // so it needs the support step rather than a retry.
+    if (response.status === 403) {
+      return { status: 'unavailable', reason: 'forbidden' };
     }
 
     return {

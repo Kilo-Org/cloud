@@ -76,6 +76,7 @@ describe('Discord installation lifecycle', () => {
   });
 
   afterEach(async () => {
+    jest.restoreAllMocks();
     await db
       .delete(platform_integrations)
       .where(eq(platform_integrations.owned_by_user_id, userId));
@@ -442,8 +443,6 @@ describe('Discord installation lifecycle', () => {
     expect(remaining.map(row => row.id)).not.toContain(canonicalId);
     expect(remaining.map(row => row.id)).not.toContain(legacyId);
     expect(remaining).toHaveLength(0);
-
-    jest.restoreAllMocks();
   });
 
   it('serializes two owners connecting the same server', async () => {

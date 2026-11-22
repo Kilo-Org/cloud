@@ -160,6 +160,8 @@ describe('ReportReceiptScreen on a dropped connection', () => {
   it('renders the receipt once the read answers', async () => {
     state.receipt.mockResolvedValue({
       receiptId: RECEIPT_ID,
+      targetKind: 'message',
+      reason: 'harmful',
       triageStatus: 'actioned',
       appealStatus: 'none',
     });

@@ -3,7 +3,10 @@ import 'server-only';
 import { and, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { platform_integrations, platform_oauth_credentials } from '@kilocode/db/schema';
-import { BitbucketOAuthCredentialRowSchema } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
+import {
+  BITBUCKET_MAX_REPOSITORY_ITEMS,
+  BitbucketOAuthCredentialRowSchema,
+} from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { after } from 'next/server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -29,7 +32,7 @@ export const CachedBitbucketRepositoryListResultSchema = z.discriminatedUnion('s
   z
     .object({
       status: z.literal('available'),
-      repositories: z.array(BitbucketRepositorySchema),
+      repositories: z.array(BitbucketRepositorySchema).max(BITBUCKET_MAX_REPOSITORY_ITEMS),
       syncedAt: z.iso.datetime(),
     })
     .strict(),
@@ -73,7 +76,10 @@ function readCachedRepositories(
   workspace: BitbucketWorkspace
 ): Extract<CachedBitbucketRepositoryListResult, { status: 'available' }> | null {
   if (value === null || !syncedAt) return null;
-  const repositories = z.array(CachedBitbucketRepositorySchema).safeParse(value);
+  const repositories = z
+    .array(CachedBitbucketRepositorySchema)
+    .max(BITBUCKET_MAX_REPOSITORY_ITEMS)
+    .safeParse(value);
   if (!repositories.success) return null;
   return {
     status: 'available',

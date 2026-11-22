@@ -194,6 +194,11 @@ function setFiles(h: ReturnType<typeof harness>, sessionId: string, files: FileI
 function harness(overrides: Partial<ArtifactMirrorSyncDeps> = {}) {
   const store = new Map<string, string>();
   const applied: ArtifactMirrorManifest[] = [];
+  // What the snapshot reports about the tree it found. This suite keeps paths in
+  // a set, not a real tree, so a case that needs the snapshot to have repaired
+  // something says so instead of modelling the repair; anything else gets the
+  // report of a snapshot that found the tree as it left it.
+  let repaired = false;
   const sessions: SessionInput[] = [];
   const pages = new Map<string, { messages: unknown[]; nextCursor: string | null }>();
   const downloads = new Map<string, () => Promise<File>>();
@@ -223,6 +228,7 @@ function harness(overrides: Partial<ArtifactMirrorSyncDeps> = {}) {
   const deps: ArtifactMirrorSyncDeps = {
     applySnapshot: manifest => {
       applied.push(manifest);
+      return repaired;
     },
     downloadFile,
     getSessionMessagesPage,
@@ -233,6 +239,10 @@ function harness(overrides: Partial<ArtifactMirrorSyncDeps> = {}) {
     presignAttachmentDownload: vi.fn(async () => ({ signedUrl: `${STORAGE_ORIGIN}/signed` })),
     probeContentLength: vi.fn(async () => null),
     readState: async (scope, key) => store.get(`${scope}/${key}`) ?? null,
+    // The index on disk is whatever the last applied snapshot set it to: the
+    // mirror writes exactly the bytes it was handed, so a second run sees the
+    // first run's manifest the way the device would.
+    readSnapshot: (): ArtifactMirrorManifest | null => applied.at(-1) ?? null,
     resolveUserId: () => USER_ID,
     writeState: async (scope, key, value) => {
       store.set(`${scope}/${key}`, value);
@@ -260,6 +270,9 @@ function harness(overrides: Partial<ArtifactMirrorSyncDeps> = {}) {
     },
     setNow: (value: number) => {
       now = value;
+    },
+    setRepaired: (value: boolean) => {
+      repaired = value;
     },
   };
 }
@@ -495,6 +508,8 @@ describe('syncArtifactMirror crawling', () => {
     await syncArtifactMirror({ deps: h.deps });
     expect(h.downloadFile).toHaveBeenCalledTimes(2);
     fakeFs.remove('file:///mirror/sessions/f1');
+    // Only the first run announced the tree so far.
+    expect(h.notify).toHaveBeenCalledOnce();
 
     h.setNow(NOW + MIRROR_SYNC_MIN_INTERVAL_MS);
     await syncArtifactMirror({ deps: h.deps });
@@ -504,6 +519,36 @@ describe('syncArtifactMirror crawling', () => {
       h.downloadFile.mock.calls.filter(([url]) => url === `${STORAGE_ORIGIN}/f2`)
     ).toHaveLength(1);
     expect(sessionFiles(h.lastManifest(), 's1').toSorted()).toEqual(['f1', 'f2']);
+    // The re-materialized file may land in a different index position, which is
+    // itself a change; either way the provider is told, because the run wrote
+    // bytes and the browser has to re-read them.
+    expect(h.notify).toHaveBeenCalledTimes(2);
+  });
+
+  it('notifies when a repair rewrites a file without changing the index', async () => {
+    // The reconcile drops a file whose bytes the device removed, and the crawl
+    // materializes it again. When the lost file is the last one in the session,
+    // restoring it appends to the same position the index already holds, so the
+    // published content is byte-identical while the file behind it is new. The
+    // provider still has to be told, which the content comparison alone misses.
+    const h = harness();
+    h.sessions.push({ id: 's1', updatedAt: T1 });
+    setFiles(h, 's1', [
+      { id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` },
+      { id: 'f2', size: 20, url: `${STORAGE_ORIGIN}/f2` },
+    ]);
+
+    await syncArtifactMirror({ deps: h.deps });
+    const beforeRepair = h.lastManifest();
+    expect(h.notify).toHaveBeenCalledOnce();
+
+    fakeFs.remove('file:///mirror/sessions/f2');
+    h.setNow(NOW + MIRROR_SYNC_MIN_INTERVAL_MS);
+    await syncArtifactMirror({ deps: h.deps });
+
+    // Same index, new bytes: only the new condition announces it.
+    expect(h.lastManifest()).toEqual(beforeRepair);
+    expect(h.notify).toHaveBeenCalledTimes(2);
   });
 
   it('keeps reconciling the other sessions when one cannot be inspected', async () => {
@@ -1027,5 +1072,222 @@ describe('syncArtifactMirror terminal outcomes', () => {
       terminal: {},
       updatedAt: T1,
     });
+  });
+});
+
+describe('syncArtifactMirror manifest stability', () => {
+  it('a run that finds nothing new keeps the manifest bytes and does not notify', async () => {
+    const h = harness();
+    h.sessions.push({ id: 's1', updatedAt: T1 });
+    setFiles(h, 's1', [{ id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` }]);
+
+    await syncArtifactMirror({ deps: h.deps });
+    const first = h.lastManifest();
+    expect(h.notify).toHaveBeenCalledOnce();
+    expect(h.downloadFile).toHaveBeenCalledOnce();
+
+    // The same tree a run later: the snapshot is still applied (it is the
+    // idempotent tree writer that prunes stale entries) but it carries the
+    // stamp already on disk, so the index bytes are untouched, and nothing is
+    // announced because no listing can have changed.
+    h.setNow(NOW + MIRROR_SYNC_MIN_INTERVAL_MS);
+    expect(await syncArtifactMirror({ deps: h.deps })).toMatchObject({ status: 'synced' });
+
+    expect(h.applied).toHaveLength(2);
+    expect(h.lastManifest()).toEqual(first);
+    expect(h.lastManifest().updatedAt).toBe(first.updatedAt);
+    expect(h.notify).toHaveBeenCalledOnce();
+    expect(h.downloadFile).toHaveBeenCalledOnce();
+  });
+
+  it('a run that only repairs the tree notifies while the index stays identical', async () => {
+    // A session with no files publishes an empty file list, so re-creating its
+    // folder after the platform file browser deleted it changes nothing in the
+    // index: `changed` is false and no artifact was materialized. The snapshot's
+    // report is the only evidence the tree moved, and an open browser that
+    // showed the folder as missing has to re-read.
+    const h = harness();
+    h.sessions.push({ id: 's1', updatedAt: T1 });
+
+    expect(await syncArtifactMirror({ deps: h.deps })).toEqual({
+      failed: 0,
+      files: 0,
+      sessions: 1,
+      status: 'synced',
+    });
+    const first = h.lastManifest();
+    expect(h.notify).toHaveBeenCalledOnce();
+
+    h.setNow(NOW + MIRROR_SYNC_MIN_INTERVAL_MS);
+    h.setRepaired(true);
+    expect(await syncArtifactMirror({ deps: h.deps })).toEqual({
+      failed: 0,
+      files: 0,
+      sessions: 1,
+      status: 'synced',
+    });
+
+    expect(h.lastManifest()).toEqual(first);
+    expect(h.notify).toHaveBeenCalledTimes(2);
+  });
+
+  it('a run that adds an artifact restamps and notifies', async () => {
+    const h = harness();
+    h.sessions.push({ id: 's1', updatedAt: T1 });
+    setFiles(h, 's1', [{ id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` }]);
+
+    await syncArtifactMirror({ deps: h.deps });
+    const firstStamp = h.lastManifest().updatedAt;
+
+    // An unchanged run leaves both the stamp and the provider alone.
+    h.setNow(NOW + MIRROR_SYNC_MIN_INTERVAL_MS);
+    await syncArtifactMirror({ deps: h.deps });
+    expect(h.lastManifest().updatedAt).toBe(firstStamp);
+    expect(h.notify).toHaveBeenCalledOnce();
+
+    // The session grows a second artifact, so the tree really changed: that run
+    // restamps and announces once.
+    h.sessions[0] = { id: 's1', updatedAt: T2 };
+    setFiles(h, 's1', [
+      { id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` },
+      { id: 'f2', size: 10, url: `${STORAGE_ORIGIN}/f2` },
+    ]);
+    h.setNow(NOW + 2 * MIRROR_SYNC_MIN_INTERVAL_MS);
+    expect(await syncArtifactMirror({ deps: h.deps })).toMatchObject({
+      status: 'synced',
+      files: 1,
+    });
+
+    expect(sessionFiles(h.lastManifest(), 's1').toSorted()).toEqual(['f1', 'f2']);
+    expect(h.lastManifest().updatedAt).toBe(
+      new Date(NOW + 2 * MIRROR_SYNC_MIN_INTERVAL_MS).toISOString()
+    );
+    expect(h.lastManifest().updatedAt).not.toBe(firstStamp);
+    expect(h.notify).toHaveBeenCalledTimes(2);
+  });
+
+  it('a run that prunes a session also notifies', async () => {
+    const h = harness();
+    h.sessions.push({ id: 's1', updatedAt: T1 }, { id: 's2', updatedAt: T1 });
+    setFiles(h, 's1', [{ id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` }]);
+    setFiles(h, 's2', [{ id: 'f2', size: 10, url: `${STORAGE_ORIGIN}/f2` }]);
+
+    await syncArtifactMirror({ deps: h.deps });
+    expect(sessionIds(h.lastManifest())).toEqual(['s1', 's2']);
+
+    // A session leaving the list page removes its folder from the tree, so the
+    // run that prunes it restamps and announces.
+    h.sessions.length = 1;
+    h.setNow(NOW + MIRROR_SYNC_MIN_INTERVAL_MS);
+    await syncArtifactMirror({ deps: h.deps });
+    expect(sessionIds(h.lastManifest())).toEqual(['s1']);
+    expect(h.notify).toHaveBeenCalledTimes(2);
+    const pruned = h.lastManifest();
+
+    // The run after the prune sees the pruned index on disk and is quiet again.
+    h.setNow(NOW + 2 * MIRROR_SYNC_MIN_INTERVAL_MS);
+    await syncArtifactMirror({ deps: h.deps });
+    expect(sessionIds(h.lastManifest())).toEqual(['s1']);
+    expect(h.lastManifest().updatedAt).toBe(pruned.updatedAt);
+    expect(h.notify).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('syncArtifactMirror failed runs', () => {
+  /** The persisted crawl state, parsed: the part a failed run must not advance. */
+  function storedState(store: Map<string, string>): {
+    lastRunAt: number | null;
+    sessions: Record<string, unknown>;
+  } {
+    const raw = store.get(`cache:${USER_ID}:2/artifact-mirror:${USER_ID}`);
+    if (raw === undefined) {
+      throw new Error('no sync state was written');
+    }
+    return JSON.parse(raw) as { lastRunAt: number | null; sessions: Record<string, unknown> };
+  }
+
+  it('a failed run records the attempt so the next trigger is gated', async () => {
+    // A run that throws used to leave `lastRunAt` untouched, so the next
+    // foreground refresh or remount started another full crawl at once against
+    // the condition that had just failed.
+    const h = harness();
+    h.sessions.push({ id: 's1', updatedAt: T1 });
+    const failing = vi.fn(async () => {
+      throw new Error('the session list is unreachable');
+    });
+    h.deps.listSessions = failing;
+
+    expect(await syncArtifactMirror({ deps: h.deps })).toEqual({ status: 'failed' });
+    expect(failing).toHaveBeenCalledTimes(1);
+    expect(storedState(h.store).lastRunAt).toBe(NOW);
+
+    // The next trigger is inside the interval, so the gate answers before any
+    // list request is made.
+    const working = vi.fn(async () => ({ cliSessions: [], nextCursor: null }));
+    h.deps.listSessions = working;
+    expect(await syncArtifactMirror({ deps: h.deps })).toEqual({
+      status: 'skipped',
+      reason: 'interval',
+    });
+    expect(working).not.toHaveBeenCalled();
+    expect(failing).toHaveBeenCalledTimes(1);
+  });
+
+  it('a failed run does not persist the partial crawl state', async () => {
+    // The run can advance a session's cursor and file list in memory before a
+    // later step throws. None of that reached the mirror, so persisting it
+    // would record a cursor that hides the page it never finished and files
+    // whose bytes may not be on disk.
+    const h = harness();
+    h.sessions.push({ id: 's1', updatedAt: T1 });
+    setFiles(h, 's1', [{ id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` }]);
+    await syncArtifactMirror({ deps: h.deps });
+    const before = storedState(h.store);
+    expect(Object.keys(before.sessions)).toEqual(['s1']);
+
+    // A new page advances the crawl state, then the publication throws, so the
+    // run fails after `advanceSessions` already wrote into `run.states`.
+    h.sessions[0] = { id: 's1', updatedAt: T2 };
+    setFiles(h, 's1', [
+      { id: 'f1', size: 10, url: `${STORAGE_ORIGIN}/f1` },
+      { id: 'f2', size: 10, url: `${STORAGE_ORIGIN}/f2` },
+    ]);
+    h.setNow(NOW + MIRROR_SYNC_MIN_INTERVAL_MS);
+    h.deps.applySnapshot = () => {
+      throw new Error('the mirror refused the snapshot');
+    };
+
+    expect(await syncArtifactMirror({ deps: h.deps })).toEqual({ status: 'failed' });
+    const after = storedState(h.store);
+    // The attempt is stamped, but the crawl state is the one from before it.
+    expect(after.lastRunAt).toBe(NOW + MIRROR_SYNC_MIN_INTERVAL_MS);
+    expect(after.sessions).toEqual(before.sessions);
+  });
+
+  it('a failed run writes no state after a sign-out', async () => {
+    // The fence exists to stop a run that resolves after teardown from
+    // repopulating what sign-out just cleared, and the attempt stamp is a write
+    // like any other.
+    const h = harness();
+    h.sessions.push({ id: 's1', updatedAt: T1 });
+    h.deps.listSessions = vi.fn(async () => {
+      throw new Error('the session list is unreachable');
+    });
+
+    // Still signed in, the same failure does record the attempt, so the check
+    // below is about the fence and not about the stamp being missing.
+    expect(await syncArtifactMirror({ deps: h.deps })).toEqual({ status: 'failed' });
+    expect(storedState(h.store).lastRunAt).toBe(NOW);
+
+    h.store.clear();
+    setSignOutActive(false);
+    resetArtifactMirrorSyncState();
+    h.deps.listSessions = vi.fn(async () => {
+      setSignOutActive(true);
+      throw new Error('the session list failed after sign-out');
+    });
+
+    expect(await syncArtifactMirror({ deps: h.deps })).toEqual({ status: 'failed' });
+    expect(h.store.size).toBe(0);
   });
 });

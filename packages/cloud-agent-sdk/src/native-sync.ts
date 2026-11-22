@@ -18,7 +18,9 @@ import {
   readKilo2FileReferences,
   type Kilo2FileReference,
 } from './kilo2-source-messages';
+import { NativeSnapshotBlobCache } from './native-snapshot-blobs';
 import {
+  NATIVE_SNAPSHOT_BLOB_CACHE_BYTES,
   NATIVE_SYNC_REQUEST_DEADLINE_MS,
   NATIVE_SYNC_RETAINED_WORK_BYTES,
   NATIVE_SYNC_RETAINED_WORK_FRAMES,
@@ -466,6 +468,7 @@ export class NativeSyncClient {
   private readonly fetcher: typeof fetch;
   private readonly socketConstructor: NativeSocketConstructor;
   private readonly grants = new Map<string, Promise<z.infer<typeof grantSchema>>>();
+  private readonly snapshotBlobs = new NativeSnapshotBlobCache(NATIVE_SNAPSHOT_BLOB_CACHE_BYTES);
   constructor(private readonly options: NativeSyncOptions) {
     this.fetcher = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.socketConstructor = options.WebSocket ?? globalThis.WebSocket;
@@ -992,7 +995,8 @@ export class NativeSyncClient {
       sessionID,
       signal,
       (route: string, advertisedBytes: number, init?: RequestInit) =>
-        this.requestAsset(route, advertisedBytes, init, organizationID)
+        this.requestAsset(route, advertisedBytes, init, organizationID),
+      this.snapshotBlobs
     );
   }
 
@@ -1625,6 +1629,9 @@ export class NativeSyncClient {
         closed = true;
         connection.close();
         recovery?.cancel();
+        // The closed session's snapshot history is gone, so its retained attachment bodies
+        // leave with it instead of occupying the shared budget.
+        this.snapshotBlobs.forgetSession(sessionID);
         state = {
           ...state,
           session: undefined,

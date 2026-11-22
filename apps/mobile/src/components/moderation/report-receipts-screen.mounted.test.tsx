@@ -16,7 +16,14 @@ import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { ReportReceiptsScreen } from './report-receipts-screen';
 import type * as ReactQuery from '@tanstack/react-query';
 
-type Row = { receiptId: string; triageStatus: string; appealStatus: string; createdAt: string };
+type Row = {
+  receiptId: string;
+  targetKind: string;
+  reason: string;
+  triageStatus: string;
+  appealStatus: string;
+  createdAt: string;
+};
 
 type Page = { items: Row[]; nextCursor: string | null };
 
@@ -239,6 +246,8 @@ function cursorAfterPage(pageNumber: number): string {
 function pageOf(pageNumber: number, hasMore = true): Page {
   const items = Array.from({ length: PAGE_ROWS }, (_, index) => ({
     receiptId: `receipt-${pageNumber}-${index}`,
+    targetKind: index % 2 === 0 ? 'message' : 'comment',
+    reason: index % 2 === 0 ? 'harmful' : 'spam',
     triageStatus: index % 2 === 0 ? 'received' : 'actioned',
     appealStatus: 'none',
     createdAt: receiptCreatedAt(pageNumber, index),
@@ -502,12 +511,16 @@ describe('ReportReceiptsScreen', () => {
         items: [
           {
             receiptId: 'receipt-newest',
+            targetKind: 'message',
+            reason: 'harmful',
             triageStatus: 'actioned',
             appealStatus: 'none',
             createdAt: '2026-11-15T11:00:00.000Z',
           },
           {
             receiptId: 'receipt-older',
+            targetKind: 'comment',
+            reason: 'spam',
             triageStatus: 'received',
             appealStatus: 'none',
             createdAt: '2026-11-14T11:00:00.000Z',
@@ -519,7 +532,10 @@ describe('ReportReceiptsScreen', () => {
     const root = await mount();
 
     const listed = rows(root);
-    expect(listed.map(row => rowTexts(row)).map(texts => texts[0])).toEqual(['Upheld', 'Received']);
+    expect(listed.map(row => rowTexts(row)).map(texts => texts[0])).toEqual([
+      'AI response · Harmful content',
+      'PR comment · Spam',
+    ]);
 
     act(() => {
       const row = mustExist(listed[1], 'a second report row');
@@ -534,6 +550,8 @@ describe('ReportReceiptsScreen', () => {
         items: [
           {
             receiptId: 'receipt-unappealed',
+            targetKind: 'message',
+            reason: 'harmful',
             triageStatus: 'actioned',
             appealStatus: 'none',
             createdAt: '2026-11-15T11:00:00.000Z',
@@ -544,11 +562,12 @@ describe('ReportReceiptsScreen', () => {
     ];
     const root = await mount();
 
-    // The row is its triage status and its age, nothing more: an unappealed
-    // report has no outcome to add, not even the receipt's "None submitted",
-    // and the row frame draws no line where none is passed.
+    // The row leads with what was reported and why, then says how it was
+    // decided and how long ago: an unappealed report has no outcome to add, not
+    // even the receipt's "None submitted", and the row frame draws no line
+    // where none is passed.
     const row = mustExist(rows(root)[0], 'the report row');
-    expect(rowTexts(row)).toEqual(['Upheld', '1 hour ago']);
+    expect(rowTexts(row)).toEqual(['AI response · Harmful content', 'Upheld · 1 hour ago']);
     for (const label of APPEAL_LABELS) {
       expect(screenTexts(root)).not.toContain(label);
     }
@@ -560,12 +579,16 @@ describe('ReportReceiptsScreen', () => {
         items: [
           {
             receiptId: 'receipt-appealed',
+            targetKind: 'comment',
+            reason: 'harassment',
             triageStatus: 'rejected',
             appealStatus: 'submitted',
             createdAt: '2026-11-15T11:00:00.000Z',
           },
           {
             receiptId: 'receipt-decided',
+            targetKind: 'user',
+            reason: 'other',
             triageStatus: 'actioned',
             appealStatus: 'accepted',
             createdAt: '2026-11-15T10:00:00.000Z',
@@ -576,12 +599,57 @@ describe('ReportReceiptsScreen', () => {
     ];
     const root = await mount();
 
-    // The same words the receipt screen prints for the appeal, on the row's
-    // second line beneath the title and the age.
+    // The report on the first line, the outcome and the age on the second, and
+    // the appeal outcome — the same words the receipt screen prints for it — on
+    // the third.
     expect(rows(root).map(row => rowTexts(row))).toEqual([
-      ['Not upheld', '1 hour ago', 'Under review'],
-      ['Upheld', '2 hours ago', 'Accepted'],
+      ['PR comment · Harassment', 'Not upheld · 1 hour ago', 'Under review'],
+      ['Person · Another reason', 'Upheld · 2 hours ago', 'Accepted'],
     ]);
+    // The three lines are separate nodes, so the row's own name joins them: a
+    // screen reader hears one sentence per report, appeal outcome last.
+    expect(rows(root).map(row => row.props.accessibilityLabel)).toEqual([
+      'PR comment · Harassment. Not upheld · 1 hour ago. Under review',
+      'Person · Another reason. Upheld · 2 hours ago. Accepted',
+    ]);
+  });
+
+  it('tells two reports of the same outcome on the same day apart by what was reported', async () => {
+    state.pages = [
+      {
+        items: [
+          {
+            receiptId: 'receipt-message',
+            targetKind: 'message',
+            reason: 'harmful',
+            triageStatus: 'actioned',
+            appealStatus: 'none',
+            createdAt: '2026-11-15T11:00:00.000Z',
+          },
+          {
+            receiptId: 'receipt-user',
+            targetKind: 'user',
+            reason: 'other',
+            triageStatus: 'actioned',
+            appealStatus: 'none',
+            createdAt: '2026-11-15T09:00:00.000Z',
+          },
+        ],
+        nextCursor: null,
+      },
+    ];
+    const root = await mount();
+
+    const listed = rows(root);
+    const first = mustExist(listed[0], 'the first report row');
+    const second = mustExist(listed[1], 'the second report row');
+    expect(rowTexts(first)).toEqual(['AI response · Harmful content', 'Upheld · 1 hour ago']);
+    expect(rowTexts(second)).toEqual(['Person · Another reason', 'Upheld · 3 hours ago']);
+    expect(first.props.accessibilityLabel).toBe(
+      'AI response · Harmful content. Upheld · 1 hour ago'
+    );
+    expect(second.props.accessibilityLabel).toBe('Person · Another reason. Upheld · 3 hours ago');
+    expect(first.props.accessibilityLabel).not.toBe(second.props.accessibilityLabel);
   });
 
   it('keeps the retry for a failure that could pass', async () => {
@@ -636,6 +704,8 @@ describe('ReportReceiptsScreen', () => {
         items: [
           {
             receiptId: 'receipt-newest',
+            targetKind: 'message',
+            reason: 'spam',
             triageStatus: 'received',
             appealStatus: 'none',
             createdAt: '2026-11-15T11:00:00.000Z',
@@ -656,12 +726,16 @@ describe('ReportReceiptsScreen', () => {
         items: [
           {
             receiptId: 'receipt-newest',
+            targetKind: 'message',
+            reason: 'spam',
             triageStatus: 'received',
             appealStatus: 'none',
             createdAt: '2026-11-15T11:00:00.000Z',
           },
           {
             receiptId: 'receipt-older',
+            targetKind: 'message',
+            reason: 'spam',
             triageStatus: 'actioned',
             appealStatus: 'none',
             createdAt: '2026-11-14T11:00:00.000Z',

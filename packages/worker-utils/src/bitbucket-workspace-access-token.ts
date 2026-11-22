@@ -10,6 +10,12 @@ export const BITBUCKET_WORKSPACE_ACCESS_TOKEN_INTEGRATION_TYPE = 'workspace_acce
 export const BITBUCKET_WORKSPACE_ACCESS_TOKEN_PROVIDER_CREDENTIAL_TYPE =
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_INTEGRATION_TYPE;
 export const BITBUCKET_ACCESS_TOKEN_FAMILY_PREFIX = 'ATCT';
+/**
+ * The most repositories one Bitbucket workspace listing may hold. Every reader
+ * and cache of that listing applies this same ceiling, so a listing within the
+ * provider page walk's own budget always fits.
+ */
+export const BITBUCKET_MAX_REPOSITORY_ITEMS = 5000;
 export const BITBUCKET_WORKSPACE_ACCESS_TOKEN_INVALIDATION_REASONS = [
   'expired',
   'provider_rejected',

@@ -20,6 +20,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { eq } from 'drizzle-orm';
+import { BITBUCKET_MAX_REPOSITORY_ITEMS } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import type { BitbucketRepositoryListResult } from './token-service-client';
 import type {
   listBitbucketRepositories as ListBitbucketRepositories,
@@ -201,6 +202,36 @@ describe('Bitbucket repository cache', () => {
       syncedAt: CACHED_AT,
     });
     expect(mockFetchBitbucketRepositoriesFromTokenService).not.toHaveBeenCalled();
+  });
+
+  it('refreshes when the stored repository list is longer than the maximum repository count', async () => {
+    const tooLong = Array.from({ length: BITBUCKET_MAX_REPOSITORY_ITEMS + 1 }, (_, index) => ({
+      ...CACHED_REPOSITORY,
+      id: `123e4567-e89b-12d3-a456-${String(index).padStart(12, '0')}`,
+      full_name: `acme/repository-${index}`,
+    }));
+    const integration = await insertActiveIntegration(user.id, { repositories: tooLong });
+    mockFetchBitbucketRepositoriesFromTokenService.mockResolvedValue({
+      status: 'available',
+      repositories: [LIVE_REPOSITORY],
+    });
+
+    await expect(
+      listBitbucketRepositories({
+        owner: { type: 'user', id: user.id },
+        kiloUserId: user.id,
+      })
+    ).resolves.toMatchObject({
+      status: 'available',
+      repositories: [LIVE_REPOSITORY],
+    });
+    expect(mockFetchBitbucketRepositoriesFromTokenService).toHaveBeenCalledTimes(1);
+
+    const [updated] = await db
+      .select({ repositories: platform_integrations.repositories })
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, integration.id));
+    expect(updated?.repositories).toEqual([CACHED_REPOSITORY]);
   });
 
   it('fetches and persists repositories when the cache is uninitialized', async () => {

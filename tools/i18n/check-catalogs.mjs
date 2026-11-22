@@ -173,6 +173,10 @@ const TWO_SENSE_COPY = new Map([
   ['files', 'the files in a pull request, versus the iOS Files app in the attachment picker'],
   ['plan', 'a billing plan, versus the agent plan mode'],
   ['copied', 'a file copied in a diff, versus the toast after a copy to the clipboard'],
+  [
+    '{{values}}',
+    'two format-only sentences a key builds from its parts: the list of advanced-policy changes an audit row scanned, versus the joined pair of counted clauses a review-agent secret rotation reports',
+  ],
 ]);
 
 /**
@@ -324,6 +328,62 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'common.durationHourShort',
   'common.durationMinuteShort',
   'cloudAgent.compute.perHour',
+  // The organization audit log's detail lines. Most of them are a formatted
+  // event whose words belong to another key: a `$t()` reference to the field,
+  // role, region or brand label the app already translates, or a lone
+  // `{{placeholder}}` the row fills with a value the reader supplied. A
+  // catalog that keeps the reference resolves it to its own language, so an
+  // identical value there is the finished translation, not a missing one. The
+  // keys that do carry words are absent from this list and must be translated.
+  'organization.auditLog.detail.autoRoutingAdded',
+  'organization.auditLog.detail.brand.github',
+  'organization.auditLog.detail.brand.gitlab',
+  'organization.auditLog.detail.brand.bitbucket',
+  'organization.auditLog.detail.brand.discord',
+  'organization.auditLog.detail.brand.slack',
+  'organization.auditLog.detail.brand.linear',
+  'organization.auditLog.detail.disabled',
+  'organization.auditLog.detail.enabled',
+  'organization.auditLog.detail.field.name',
+  'organization.auditLog.detail.field.slug',
+  'organization.auditLog.detail.field.roleDefinition',
+  'organization.auditLog.detail.field.whenToUse',
+  'organization.auditLog.detail.field.description',
+  'organization.auditLog.detail.field.customInstructions',
+  'organization.auditLog.detail.field.groups',
+  'organization.auditLog.detail.fieldChange',
+  'organization.auditLog.detail.fundsGranted',
+  'organization.auditLog.detail.guardrailIdentity',
+  'organization.auditLog.detail.guardrailStatus',
+  'organization.auditLog.detail.guardrailEnforcement',
+  'organization.auditLog.detail.guardrailSkill',
+  'organization.auditLog.detail.guardrailTarget.mcp',
+  'organization.auditLog.detail.guardrailTarget.skill',
+  'organization.auditLog.detail.memberRole',
+  'organization.auditLog.detail.region.us',
+  'organization.auditLog.detail.region.eu',
+  'organization.auditLog.detail.region.au',
+  'organization.auditLog.detail.region.jp',
+  'organization.auditLog.detail.reviewAgentPlatform',
+  // The rotation sentence is format only: the renderer joins two counted
+  // clauses, each translated in this catalog, so `{{values}}` reads the same in
+  // every language on purpose.
+  'organization.auditLog.detail.reviewAgentSecretRotated',
+  'organization.auditLog.detail.role.owner',
+  'organization.auditLog.detail.role.admin',
+  'organization.auditLog.detail.role.billing_manager',
+  'organization.auditLog.detail.role.member',
+  'organization.auditLog.detail.settingAdvancedPolicies',
+  'organization.auditLog.detail.settingBrowserControl',
+  'organization.auditLog.detail.settingDataCollection',
+  'organization.auditLog.detail.settingDefaultBehavior.auto',
+  'organization.auditLog.detail.settingDefaultBehavior.specific',
+  'organization.auditLog.detail.settingDefaultModelSet',
+  'organization.auditLog.detail.settingDefaultModelRemoved',
+  // The threshold on its own, for a balance-alert row whose recipient list was
+  // emptied. It is the money value the row already formats, so `{{threshold}}`
+  // reads the same in every language.
+  'organization.auditLog.detail.settingMinimumBalanceThreshold',
 ]);
 
 /**
@@ -407,6 +467,10 @@ const MOBILE_ENGLISH_COPY_EXCEPTIONS = {
     '{{count}} agents': 'Catalan spells the plural agents the same way',
     '{{count}} secret': 'Catalan spells secret the same way in the singular',
     '{{count}} secrets': 'Catalan spells the plural secrets the same way',
+    '{{displayCount}} error':
+      'Catalan spells the noun "error" identically in the singular (DIEC: l\'error), so the counted one form matches',
+    '{{displayCount}} errors':
+      'Catalan plurals "error" as "errors", which is spelled identically to English, so the counted base and other forms match',
   },
   cs: {
     '{{count}} agent':
@@ -439,6 +503,10 @@ const MOBILE_ENGLISH_COPY_EXCEPTIONS = {
   },
   eu: {
     token: 'Basque "token" is a loaned root (plural "tokenak"), so the one-category value matches',
+  },
+  es: {
+    '{{displayCount}} error':
+      'Spanish spells the noun "error" identically in the singular (RAE: el error), so the counted one form matches; the plural (errores) and the many form (de errores) are translated',
   },
   fi: {
     token: 'Finnish keeps the nominative singular token unchanged; its partitive is tokenia',

@@ -358,6 +358,7 @@ async function executeGrant({
       actor_id: user.id,
       actor_email: user.google_user_email,
       actor_name: user.google_user_name,
+      details: { id: 'funds.granted', amount: amount_usd },
       organization_id: organization_id,
       message: `Granted $${amount_usd} promotional credit: ${description}`,
       tx: dbOrTx,

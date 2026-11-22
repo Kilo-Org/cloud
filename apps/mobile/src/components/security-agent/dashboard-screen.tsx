@@ -310,8 +310,9 @@ function DashboardHeader({
 // One placeholder tile per metric card the loaded grid shows, on the cards' own
 // class and line boxes, so the grid that replaces them keeps every frame it
 // painted. `nothingRecorded` decides whether a tile carries a detail line; a
-// caller that cannot read the sync status yet lays out the synced shape, which
-// is the one three of the four tiles carry in a scope that has synced.
+// caller that has not read both the sync status and the scope's finding rows
+// yet lays out the measured shape, which is the one three of the four tiles
+// carry in a scope that has synced.
 function DashboardMetricTiles({ nothingRecorded }: Readonly<{ nothingRecorded: boolean }>) {
   return (
     <View className="flex-row flex-wrap gap-3">
@@ -459,6 +460,14 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
     ? data.status.open + data.status.fixed + data.status.ignored > 0
     : false;
   const nothingRecorded = lastSync.data?.lastSyncTime === null && !hasRecordedFindings;
+  // The loading branch can only paint the unrecorded shape once the stats read
+  // has answered it: until then the scope's finding rows are unknown, and the
+  // guess above reads as unrecorded for want of data. Painting that shape early
+  // shrinks the page — a detail line per tile plus the Manage repositories link
+  // — and everything below moves down when the answer lands. The measured shape
+  // is the one three of the four tiles carry, so it is what the placeholder
+  // keeps until the data proves otherwise.
+  const placeholderNothingRecorded = data === undefined ? false : nothingRecorded;
   const metrics = data ? buildLocalizedMetrics(data, slaEnabled, nothingRecorded) : [];
 
   const lastSyncTime = lastSync.data?.lastSyncTime;
@@ -957,35 +966,40 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             resolved, which moves the whole dashboard. The section cards join it
             for the same reason — they render below the tiles only once both
             reads settle — so their placeholders keep the page's height until
-            then instead of letting the cards push it down. The placeholder
-            takes that shape as soon as the read has answered it: a scope that
+            then instead of letting the cards push it down. Once both reads have
+            answered, the placeholder takes the shape they name: a scope that
             has recorded nothing replaces these tiles with two-line ones and its
-            Act-first card with a single line, so laying out the synced shape
-            over it would move everything below by a line whenever the stats
-            read outlasts the sync-status read. While the read is still pending
-            the detail line stays, because that is the shape three of the four
-            tiles carry in a scope that has synced and the one a synced scope's
-            first paint must not lose. */}
+            Act-first card with a single line. Until the stats read answers,
+            though, the scope's own finding rows are unknown, so the placeholder
+            keeps the measured shape — the one three of the four tiles carry —
+            rather than shrinking to a guess the answer may undo. */}
         {dashboardStats.isPending || lastSync.isPending ? (
           <View className="gap-4">
-            <DashboardMetricTiles nothingRecorded={nothingRecorded} />
-            {nothingRecorded && slaEnabled && !repositoryPolicyReadOnly && !repositoryScopeEmpty ? (
+            <DashboardMetricTiles nothingRecorded={placeholderNothingRecorded} />
+            {placeholderNothingRecorded &&
+            slaEnabled &&
+            !repositoryPolicyReadOnly &&
+            !repositoryScopeEmpty ? (
               // The Manage repositories link renders whenever SLA tracking is
               // on, nothing carries a deadline, and the reader may change the
               // repository policy. A scope that has recorded nothing has no
               // deadline at all, so that is certain, and the placeholder holds
               // the link's own inline box so the sections below keep their
-              // place when the link arrives. Once the tiles are measured the
-              // link needs a measured total, which the placeholder cannot read,
-              // so a scope that has recorded a finding keeps it out of the
-              // loading state. A settled empty grant keeps it out too: the
-              // repository card below holds that state's step, and the
-              // placeholder already knows that shape.
+              // place when the link arrives. Only a read that has answered can
+              // say so: until the stats read lands this box stays out, because
+              // a measured scope keeps it out of the loaded screen and drawing
+              // it over the answer would add a row to everything below. A
+              // settled empty grant keeps it out too: the repository card below
+              // holds that state's step, and the placeholder already knows that
+              // shape.
               <View className="flex-row items-center gap-4">
                 <Skeleton className={cn('w-32', INLINE_LINK_BOX_CLASS)} />
               </View>
             ) : null}
-            <DashboardSectionsSkeleton slaEnabled={slaEnabled} nothingRecorded={nothingRecorded} />
+            <DashboardSectionsSkeleton
+              slaEnabled={slaEnabled}
+              nothingRecorded={placeholderNothingRecorded}
+            />
           </View>
         ) : (
           <View className="flex-row flex-wrap gap-3">

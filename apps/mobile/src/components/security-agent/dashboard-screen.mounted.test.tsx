@@ -2054,8 +2054,9 @@ describe('DashboardScreen pending stats', () => {
   });
 
   /**
-   * The line boxes the loading state paints: three per metric tile, or two
-   * once the sync-status read has said the tiles carry no detail line.
+   * The line boxes the loading state paints. The placeholder holds the measured
+   * shape — three per metric tile — until the stats read says otherwise, so a
+   * loading frame carries twelve.
    */
   function skeletonBars(root: I): I[] {
     return root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Skeleton');
@@ -2149,12 +2150,81 @@ describe('DashboardScreen pending stats', () => {
     expect(sectionsProps.props).toHaveLength(0);
   });
 
-  it('paints the tiles and the link an unrecorded scope loads once that read has answered', () => {
-    // The tiles wait for the sync-status read, and a scope with no recorded
-    // finding drops their detail line and shows the Manage repositories link
-    // under them. When the stats read outlasts that read, the placeholder
-    // already knows both shapes and must hold them: a three-line placeholder
-    // and a missing link moved every card below when the reads resolved.
+  it('holds the measured shape until the stats answer, then lands on it without moving', () => {
+    // A missing sync time and no stats yet is not a scope that recorded
+    // nothing: the finding rows that would prove either way are exactly what
+    // the pending read holds. Painting the unrecorded shape here — two-line
+    // tiles and the Manage repositories link box — shrank the page by a line
+    // per tile plus a row, and the answer moved everything below it down. The
+    // placeholder keeps the measured shape, which is the one three of the four
+    // tiles carry, until the read proves otherwise.
+    dashboardStats.isPending = true;
+    dashboardStats.data = undefined;
+    lastSync.isPending = false;
+    lastSync.data = { lastSyncTime: null };
+    sharedMetrics.build.mockReturnValue([dashboardMetric('openFindings')]);
+
+    const root = renderScreen();
+    const pendingBars = skeletonBars(root.root);
+
+    expect(tileFrames(root.root)).toHaveLength(4);
+    // Four three-line tiles and no link box after them.
+    expect(pendingBars).toHaveLength(12);
+    expect(pendingBars.some(bar => String(bar.props.className).includes('min-h-[28px]'))).toBe(
+      false
+    );
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+    expect(sectionsSkeletonProps.props.at(-1)).toEqual({
+      slaEnabled: true,
+      nothingRecorded: false,
+    });
+
+    // The scope recorded one open finding, so the answer agrees with the shape
+    // the placeholder held: the same tiles, now with their detail lines.
+    act(() => {
+      dashboardStats.isPending = false;
+      dashboardStats.data = statsFixture({ status: { open: 1, fixed: 0, ignored: 0 } });
+      sharedMetrics.build.mockReturnValue(
+        ['openFindings', 'exploitable', 'needsReview', 'analysisIncomplete'].map(id =>
+          Object.assign(dashboardMetric(id), { label: id })
+        )
+      );
+      root.update(dashboardTree());
+    });
+
+    expect(skeletonBars(root.root)).toHaveLength(0);
+    const loadedTiles = root.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'View' &&
+        String(n.props.className ?? '').includes('basis-2/5')
+    );
+    expect(loadedTiles).toHaveLength(4);
+    const loadedDetails = loadedTiles.flatMap(tile =>
+      tile.findAll(
+        n =>
+          typeof n.type === 'string' &&
+          (n.type as string) === 'Text' &&
+          n.props.variant === 'caption' &&
+          typeof n.props.children === 'string' &&
+          (n.props.children as string).length > 0
+      )
+    );
+    expect(loadedDetails).toHaveLength(4);
+    expect(sectionsProps.props.at(-1)?.nothingRecorded).toBe(false);
+    // The pending frame pushed the one placeholder; the loaded frame adds no
+    // second one, so the cards replace it rather than stack under it.
+    expect(sectionsSkeletonProps.props).toHaveLength(1);
+  });
+
+  it('keeps the link out of the placeholder while SLA tracking is off', () => {
+    // The link is the empty state's way to the repositories, and a scope
+    // without SLA tracking has no deadline column to explain: the loaded
+    // screen does not draw it either. The placeholder holds the measured shape
+    // before the stats answer, so it draws no link box to drop here either.
+    config.data = { slaEnabled: false };
     dashboardStats.isPending = true;
     dashboardStats.data = undefined;
     lastSync.isPending = false;
@@ -2164,31 +2234,14 @@ describe('DashboardScreen pending stats', () => {
     const root = renderScreen();
     const bars = skeletonBars(root.root);
 
-    expect(tileFrames(root.root)).toHaveLength(4);
-    // Four two-line tiles, then the link's own box.
-    expect(bars).toHaveLength(9);
-    expect(bars.at(-1)?.props.className).toContain('min-h-[28px]');
-    expect(sectionsSkeletonProps.props).toEqual([{ slaEnabled: true, nothingRecorded: true }]);
-    expect(sectionsProps.props).toHaveLength(0);
+    expect(bars).toHaveLength(12);
+    expect(bars.some(bar => String(bar.props.className).includes('min-h-[28px]'))).toBe(false);
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.dashboard.manageRepositories')
+    );
   });
 
-  it('keeps the link out of the placeholder while SLA tracking is off', () => {
-    // The link is the empty state's way to the repositories, and a scope
-    // without SLA tracking has no deadline column to explain: the loaded
-    // screen does not draw it either.
-    config.data = { slaEnabled: false };
-    dashboardStats.isPending = true;
-    dashboardStats.data = undefined;
-    lastSync.isPending = false;
-    lastSync.data = { lastSyncTime: null };
-    sharedMetrics.build.mockReturnValue([dashboardMetric('openFindings')]);
-
-    const root = renderScreen();
-
-    expect(skeletonBars(root.root)).toHaveLength(8);
-  });
-
-  it('loads an unrecorded scope without the detail line the placeholder dropped', () => {
+  it('loads an unrecorded scope without a detail line on its tiles', () => {
     dashboardStats.isPending = false;
     dashboardStats.data = unrecordedData;
     lastSync.isPending = false;

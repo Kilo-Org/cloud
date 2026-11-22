@@ -10,6 +10,7 @@ const mockUpdateWhere = jest.fn();
 const mockUpdateReturning = jest.fn();
 const mockInsertValues = jest.fn();
 const mockInsertReturning = jest.fn();
+const mockDeleteWhere = jest.fn();
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
@@ -30,7 +31,7 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
       values: mockInsertValues,
     })),
     delete: jest.fn(() => ({
-      where: jest.fn(),
+      where: mockDeleteWhere,
     })),
   },
 }));
@@ -56,9 +57,13 @@ jest.mock('@/lib/organizations/model-restrictions', () => ({
 import type { Owner } from '@/lib/integrations/core/types';
 import {
   addDiscordReaction,
+  DISCORD_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
+  DISCORD_DISCONNECT_UNCONFIRMED_MESSAGE,
   postDiscordMessage,
+  removeBotFromGuild,
   removeDiscordReaction,
   testConnection,
+  uninstallApp,
   upsertDiscordInstallation,
 } from './discord-service';
 
@@ -245,5 +250,142 @@ describe('discord-service organization install model', () => {
     const inserted = mockInsertValues.mock.calls[0][0] as { metadata: Record<string, unknown> };
     expect(inserted.metadata.model_slug).toBe('test/caller-model');
     expect(mockGetDefaultAllowedModel).not.toHaveBeenCalled();
+  });
+});
+
+describe('discord-service bot removal', () => {
+  const guildId = '123456789012345678';
+
+  beforeEach(() => {
+    jest.restoreAllMocks();
+    mockDeleteWhere.mockReset();
+  });
+
+  it('removes the bot from the recorded server with the bot token', async () => {
+    const fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(null, { status: 204 }));
+
+    await expect(removeBotFromGuild(guildId)).resolves.toEqual({ status: 'left' });
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      `https://discord.com/api/v10/users/%40me/guilds/${guildId}`,
+      expect.objectContaining({
+        method: 'DELETE',
+        headers: { Authorization: 'Bot bot-token' },
+      })
+    );
+  });
+
+  it.each([403, 404])('treats a %i answer as a membership that is already gone', async status => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status }));
+
+    await expect(removeBotFromGuild(guildId)).resolves.toEqual({ status: 'already_absent' });
+  });
+
+  it.each([
+    [429, 'rate_limited'],
+    [500, 'response_error'],
+    [503, 'response_error'],
+  ] as const)('reports a %i answer as a temporary failure', async (status, reason) => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status }));
+
+    await expect(removeBotFromGuild(guildId)).resolves.toEqual({
+      status: 'temporary_failure',
+      reason,
+    });
+  });
+
+  it('reports a transport failure as a temporary failure', async () => {
+    jest.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('socket hang up'));
+
+    await expect(removeBotFromGuild(guildId)).resolves.toEqual({
+      status: 'temporary_failure',
+      reason: 'network',
+    });
+  });
+
+  it.each([[null], ['']])('reports a connection without a server id as unavailable', async id => {
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
+
+    await expect(removeBotFromGuild(id)).resolves.toEqual({
+      status: 'unavailable',
+      reason: 'invalid_guild_id',
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('reports a malformed server id as unavailable', async () => {
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
+
+    await expect(removeBotFromGuild('guild/1')).resolves.toEqual({
+      status: 'unavailable',
+      reason: 'invalid_guild_id',
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('discord-service uninstall', () => {
+  beforeEach(() => {
+    jest.restoreAllMocks();
+    mockLimit.mockReset();
+    mockDeleteWhere.mockReset();
+  });
+
+  it('leaves the server before deleting the association', async () => {
+    mockLimit.mockResolvedValue([buildDiscordIntegration()]);
+    const fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(null, { status: 204 }));
+
+    await expect(uninstallApp(owner)).resolves.toEqual({ success: true });
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://discord.com/api/v10/users/%40me/guilds/123456789012345678',
+      expect.objectContaining({ method: 'DELETE' })
+    );
+    expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
+  });
+
+  it('disconnects a suspended association', async () => {
+    mockLimit.mockResolvedValue([buildDiscordIntegration({ integration_status: 'suspended' })]);
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+
+    await expect(uninstallApp(owner)).resolves.toEqual({ success: true });
+    expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the association when Discord does not confirm the removal', async () => {
+    mockLimit.mockResolvedValue([buildDiscordIntegration()]);
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 500 }));
+
+    await expect(uninstallApp(owner)).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: DISCORD_DISCONNECT_UNCONFIRMED_MESSAGE,
+    });
+    expect(mockDeleteWhere).not.toHaveBeenCalled();
+  });
+
+  it('keeps the association when the server cannot be identified', async () => {
+    mockLimit.mockResolvedValue([
+      buildDiscordIntegration({ platform_installation_id: null, platform_account_id: null }),
+    ]);
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
+
+    await expect(uninstallApp(owner)).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: DISCORD_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockDeleteWhere).not.toHaveBeenCalled();
+  });
+
+  it('reports a missing association without calling Discord', async () => {
+    mockLimit.mockResolvedValue([]);
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
+
+    await expect(uninstallApp(owner)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

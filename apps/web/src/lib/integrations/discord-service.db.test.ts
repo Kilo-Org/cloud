@@ -2,7 +2,8 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, organizations, platform_integrations } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import type { Owner } from './core/types';
-import { PLATFORM } from './core/constants';
+import { INTEGRATION_STATUS, PLATFORM } from './core/constants';
+import { isPlatformIntegrationActive } from './core/health';
 import { withWorkspaceInstallationLock } from './oauth/workspace-installation-lock';
 import {
   DiscordGuildAlreadyConnectedError,
@@ -387,5 +388,65 @@ describe('Discord installation lifecycle', () => {
         .where(eq(platform_integrations.owned_by_organization_id, otherOrgId));
       await db.delete(organizations).where(eq(organizations.id, otherOrgId));
     }
+  });
+});
+
+describe('Discord re-authorization of a recorded association', () => {
+  const userId = crypto.randomUUID();
+
+  beforeAll(async () => {
+    await db.insert(kilocode_users).values({
+      id: userId,
+      google_user_email: `${userId}@example.com`,
+      google_user_name: 'Discord Suspension Test',
+      google_user_image_url: 'https://example.com/avatar.png',
+      stripe_customer_id: `cus_discord_susp_${userId}`,
+    });
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_user_id, userId));
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
+  });
+
+  it('records an active association without a suspension', async () => {
+    const owner: Owner = { type: 'user', id: userId };
+    const guild = { id: '345678901234567890', name: 'Suspension Server', icon: null };
+    const created = await upsertDiscordInstallation(owner, {
+      access_token: 'test-access',
+      refresh_token: 'test-refresh',
+      token_type: 'Bearer',
+      expires_in: 3600,
+      scope: 'bot guilds',
+      guild,
+    });
+    await db
+      .update(platform_integrations)
+      .set({
+        integration_status: 'suspended',
+        suspended_at: '2026-11-20T00:00:00.000Z',
+        suspended_by: 'integration-operator',
+      })
+      .where(eq(platform_integrations.id, created.id));
+
+    const reauthorized = await upsertDiscordInstallation(owner, {
+      access_token: 'test-access-2',
+      refresh_token: 'test-refresh-2',
+      token_type: 'Bearer',
+      expires_in: 3600,
+      scope: 'bot guilds',
+      guild: { ...guild, name: 'Renamed Server' },
+    });
+
+    expect(reauthorized.id).toBe(created.id);
+    expect(reauthorized.integration_status).toBe(INTEGRATION_STATUS.ACTIVE);
+    expect(reauthorized.suspended_at).toBeNull();
+    expect(reauthorized.suspended_by).toBeNull();
+    expect(isPlatformIntegrationActive(reauthorized)).toBe(true);
   });
 });

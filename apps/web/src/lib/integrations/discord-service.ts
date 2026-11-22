@@ -56,6 +56,39 @@ export class DiscordGuildRebindNotAllowedError extends Error {
   }
 }
 
+/** How long a single bot-removal request may take before it counts as failed. */
+const DISCORD_BOT_REMOVAL_TIMEOUT_MS = 10_000;
+
+/**
+ * The message the server puts on a Discord disconnect Discord did not confirm.
+ *
+ * The row and its server id are kept, so repeating the same Disconnect action
+ * once Discord answers settles the connection.
+ */
+export const DISCORD_DISCONNECT_UNCONFIRMED_MESSAGE =
+  'Discord could not confirm the disconnect, so the bot is still in the server. Try again.';
+
+/**
+ * The message the server puts on a Discord disconnect it cannot attempt at all:
+ * no bot token is configured, or the connection records no usable server id, so
+ * no retry of the same request can revoke the bot's membership.
+ */
+export const DISCORD_DISCONNECT_NEEDS_SUPPORT_MESSAGE =
+  'Kilo could not identify the Discord server saved for this connection. Contact support to finish disconnecting it.';
+
+/**
+ * Outcome of asking Discord to remove the bot from a server.
+ *
+ * `left` is Discord's 204. `already_absent` is its 403/404 answer for a server
+ * the bot no longer belongs to, where the membership this disconnect revokes is
+ * already gone. Every other outcome must be reported instead of a disconnect.
+ */
+export type DiscordBotRemoval =
+  | { status: 'left' }
+  | { status: 'already_absent' }
+  | { status: 'temporary_failure'; reason: 'rate_limited' | 'response_error' | 'network' }
+  | { status: 'unavailable'; reason: 'not_configured' | 'invalid_guild_id' };
+
 /**
  * Discord OAuth2 token response shape
  */
@@ -364,6 +397,10 @@ export async function upsertDiscordInstallation(
         platform_account_login: guildName,
         scopes,
         integration_status: INTEGRATION_STATUS.ACTIVE,
+        // A re-authorization replaces the connection, so the status and both
+        // suspension columns describe the new authorization.
+        suspended_at: null,
+        suspended_by: null,
         metadata: updatedMetadata,
         updated_at: new Date().toISOString(),
       })
@@ -411,15 +448,92 @@ export async function upsertDiscordInstallation(
 }
 
 /**
- * Uninstall Discord integration for an owner
+ * Remove the bot from a server through the Discord API.
+ *
+ * `DELETE /users/@me/guilds/{guild.id}` is the endpoint a bot uses to leave a
+ * server. The OAuth exchange stores no user token, deliberately, so this call is
+ * the one that ends the membership the integration holds. Discord answers 204
+ * when the bot left, and 403 or 404 when the bot is not a member of that server.
+ */
+export async function removeBotFromGuild(guildId: string | null): Promise<DiscordBotRemoval> {
+  if (!DISCORD_BOT_TOKEN) {
+    return { status: 'unavailable', reason: 'not_configured' };
+  }
+
+  if (!guildId) {
+    return { status: 'unavailable', reason: 'invalid_guild_id' };
+  }
+
+  let validatedGuildId: string;
+  try {
+    validatedGuildId = parseDiscordSnowflake(guildId, 'guild ID');
+  } catch {
+    return { status: 'unavailable', reason: 'invalid_guild_id' };
+  }
+
+  try {
+    const response = await fetch(buildDiscordApiUrl(['users', '@me', 'guilds', validatedGuildId]), {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bot ${DISCORD_BOT_TOKEN}`,
+      },
+      signal: AbortSignal.timeout(DISCORD_BOT_REMOVAL_TIMEOUT_MS),
+    });
+
+    if (response.ok) {
+      return { status: 'left' };
+    }
+
+    // 404 is an unknown server and 403 a server the bot is not in; in both
+    // cases the membership is already gone, so there is nothing left to revoke.
+    if (response.status === 403 || response.status === 404) {
+      return { status: 'already_absent' };
+    }
+
+    return {
+      status: 'temporary_failure',
+      reason: response.status === 429 ? 'rate_limited' : 'response_error',
+    };
+  } catch {
+    return { status: 'temporary_failure', reason: 'network' };
+  }
+}
+
+/**
+ * Uninstall Discord integration for an owner.
+ *
+ * Disconnecting ends the access the installation holds: a bot installation's
+ * durable grant is its membership in the recorded server, so the bot leaves that
+ * server through the Discord API before the association is discarded. When the
+ * removal does not settle, the association is kept and the caller reports the
+ * failure, so the owner can repeat the same action.
  */
 export async function uninstallApp(owner: Owner) {
   const integration = await getInstallation(owner);
 
-  if (!integration || integration.integration_status !== INTEGRATION_STATUS.ACTIVE) {
+  if (!integration) {
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'Discord installation not found',
+    });
+  }
+
+  // A suspended association still holds a live membership in the server, so its
+  // disconnect revokes that membership like any other.
+  const guildId = integration.platform_installation_id ?? integration.platform_account_id;
+  const removal = await removeBotFromGuild(guildId);
+
+  if (removal.status === 'unavailable') {
+    throw new TRPCError({
+      code: 'SERVICE_UNAVAILABLE',
+      message: DISCORD_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
+    });
+  }
+
+  if (removal.status === 'temporary_failure') {
+    throw new TRPCError({
+      code: 'SERVICE_UNAVAILABLE',
+      message: DISCORD_DISCONNECT_UNCONFIRMED_MESSAGE,
     });
   }
 

@@ -169,6 +169,16 @@ describe('pickReadError', () => {
     expect(pickReadError([null, networkError, makeTrpcError('TIMEOUT')])).toBe(networkError);
   });
 
+  it('counts a terminal code only inside a tRPC envelope, as the selector does', () => {
+    // A bare top-level code is a transport or domain error: the selector reads
+    // it as retryable, so preferring it would pick a Retry that cannot work and
+    // hide the envelope that explains the surface.
+    const bareCode = { code: 'FORBIDDEN' };
+    const envelope = makeTrpcError('INTERNAL_SERVER_ERROR');
+    expect(pickReadError([bareCode, envelope])).toBe(bareCode);
+    expect(pickReadError([envelope, bareCode])).toBe(envelope);
+  });
+
   it('returns null when every read settled without an error', () => {
     expect(pickReadError([undefined, null])).toBeNull();
     expect(pickReadError([])).toBeNull();

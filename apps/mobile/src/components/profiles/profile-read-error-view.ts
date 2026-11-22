@@ -123,11 +123,17 @@ export function selectProfileReadErrorView({
  * Without a terminal one, any error stands for the failure (the first that is
  * not nullish, in the caller's fixed order), and a surface whose reads all
  * settled without an error gets `null`.
+ *
+ * A terminal code counts only inside a tRPC envelope, the same rule
+ * {@link selectProfileReadErrorView} applies: a bare top-level `code` belongs to
+ * a transport or domain error, which the selector reads as retryable, so
+ * preferring it here would pick the error whose Retry cannot work and hide the
+ * envelope that explains the surface.
  */
 // oxlint-disable-next-line anti-slop/no-unknown-returns -- the selector's own input is `error: unknown`; a named type here would have to lie about an arbitrary server/transport error
 export function pickReadError(errors: readonly unknown[]): unknown {
   for (const error of errors) {
-    if (isTerminalTrpcCode(readTrpcErrorField(error, 'code'))) {
+    if (isTrpcClientError(error) && isTerminalTrpcCode(readTrpcErrorField(error, 'code'))) {
       return error;
     }
   }

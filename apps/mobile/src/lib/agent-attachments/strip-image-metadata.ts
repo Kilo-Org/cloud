@@ -92,7 +92,10 @@ async function renderBounded(uri: string): Promise<ImageManipulator.ImageRef> {
  * Re-encode an image with no operations, which drops EXIF, GPS, and maker
  * notes. Each decode is bounded to `AGENT_ATTACHMENT_IMAGE_MAX_EDGE` per edge,
  * and a render whose loader ignored that bound is resized down from the
- * rendered pixels, so a full-resolution photo is never materialized.
+ * rendered pixels, so the saved file is never full-resolution. The bound is
+ * therefore the saved file's; a loader that ignores `maxWidth`/`maxHeight`
+ * still decodes the source at its native size before the resize, which is
+ * exactly why the resize exists.
  * `ImageRef.saveAsync` writes the image to the cache directory as a new file on
  * every call, so the returned URI is that new cache file and never the input —
  * the original URI is never returned as a success value, and a caller can never

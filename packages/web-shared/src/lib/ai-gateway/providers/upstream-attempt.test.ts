@@ -25,7 +25,7 @@ jest.mock('./preferred-provider-order-config', () => ({
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'crypto';
 import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/eligibility';
@@ -68,7 +68,7 @@ describe('bounded spending provider enforcement', () => {
       { tag: 'expensive-route', pricing: { prompt: '0.000002', completion: '0.000004' } },
     ],
   };
-  const catalogEntry: OpenRouterModel = {
+  const catalogEntry: OpenRouterCatalogModel = {
     id: model.id,
     name: model.name,
     created: 0,

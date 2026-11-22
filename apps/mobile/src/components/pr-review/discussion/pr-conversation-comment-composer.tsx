@@ -22,7 +22,11 @@ import {
   View,
 } from 'react-native';
 import { ComposerInlineError } from '@/components/pr-review/composer-inline-error';
-import { PrFormSheetFooter, PrFormSheetHeader } from '@/components/pr-review/pr-form-sheet-chrome';
+import {
+  PrFormSheetFooter,
+  PrFormSheetHeader,
+  useFormSheetKeyboardVisible,
+} from '@/components/pr-review/pr-form-sheet-chrome';
 import { CommentBodyField } from '@/components/pr-review/pr-review-comment-composer-parts';
 import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/reply-input';
 import { Button } from '@/components/ui/button';
@@ -33,6 +37,7 @@ import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { type SurfaceAttempt } from '@/lib/surface-feedback';
+import { cn } from '@/lib/utils';
 import { clearDraft, prConversationCommentDraftKey, saveDraft } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
@@ -82,6 +87,7 @@ export function PrConversationCommentComposer({
   onDismiss,
 }: PrConversationCommentComposerProps) {
   const { t } = useTranslation();
+  const keyboardVisible = useFormSheetKeyboardVisible();
   const { confirm, dialog } = useConfirmDialog();
   const addComment = useAddPrCommentMutation(prRef);
 
@@ -338,7 +344,19 @@ export function PrConversationCommentComposer({
               defaultValue={bodyRef.current}
               onChangeText={handleBodyChange}
             />
-          ) : null}
+          ) : (
+            // Keep the field's own box while the durable draft loads: the
+            // sheet then opens on the same geometry it keeps, the footer does
+            // not jump when the field mounts, and the first ink of the scroll
+            // body stays at its top (a body with no first block would leave
+            // the footer label as the first thing the screen shows).
+            <View
+              className={cn(
+                'rounded-md border border-transparent',
+                keyboardVisible ? 'min-h-12' : 'min-h-14'
+              )}
+            />
+          )}
           <ComposerInlineError feedback={feedback} />
         </View>
 

@@ -284,7 +284,13 @@ export async function validateOrganizationAutoTarget(
 
   let models;
   try {
-    models = await getEnhancedOpenRouterModels({ countryCode: null });
+    // The catalog's model-stats snapshot follows the seam only when the caller names one: a
+    // transaction caller reads the primary, and a replica read sends the snapshot to that replica.
+    // A caller that names no seam keeps the catalog's documented primary default.
+    models = await getEnhancedOpenRouterModels({
+      countryCode: null,
+      fromDb: options.read && 'fromDb' in options.read ? options.read.fromDb : undefined,
+    });
   } catch {
     return {
       kind: 'error',

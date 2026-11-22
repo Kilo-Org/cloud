@@ -547,12 +547,25 @@ const failureReasonMessages = {
 type KnownFailureReason = keyof typeof failureReasonMessages;
 
 /**
+ * Stripe decline codes arrive as an open string, so one lookup decides both the message and
+ * whether the code is catalogued. Own keys only: an inherited name such as `toString` is not a
+ * failure reason, and the catalog owns the fallback message.
+ */
+function isKnownFailureReason(reason: string): reason is KnownFailureReason {
+  return Object.hasOwn(failureReasonMessages, reason);
+}
+
+function resolveFailureReason(reason: string): { message: string; isUnmappedCode: boolean } {
+  return isKnownFailureReason(reason)
+    ? { message: failureReasonMessages[reason], isUnmappedCode: false }
+    : { message: failureReasonMessages.unknown_error, isUnmappedCode: true };
+}
+
+/**
  * Disable auto-top-up for an entity (user or organization).
  */
 async function disableAutoTopUpForEntity(entity: AutoTopUpEntity, reason: string): Promise<void> {
-  const message =
-    failureReasonMessages[reason as KnownFailureReason] ?? failureReasonMessages.unknown_error;
-  const isUnmappedCode = !(reason in failureReasonMessages);
+  const { message, isUnmappedCode } = resolveFailureReason(reason);
   const { ownerColumn, ownerId, label: entityLabel } = entityIdentity(entity);
 
   sentryLogger('auto-topup', 'info')(`Disabling auto-top-up for ${entityLabel}: ${reason}`, {

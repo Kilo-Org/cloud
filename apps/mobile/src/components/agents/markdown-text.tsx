@@ -98,6 +98,20 @@ function previousLineStart(value: string, at: number): number {
   return at <= 1 ? 0 : value.lastIndexOf('\n', at - 2) + 1;
 }
 
+/**
+ * The start of the last line of `value` that holds a non-whitespace character,
+ * or 0 when it holds none. An append can change a decision only on the last
+ * line that carries content: it is the line whose trailing break the append
+ * decides between a paragraph break and a continuation.
+ */
+function lastContentLineStart(value: string): number {
+  let end = value.length;
+  while (end > 0 && /^\s$/.test(value[end - 1] ?? '')) {
+    end -= 1;
+  }
+  return end === 0 ? 0 : value.lastIndexOf('\n', end - 1) + 1;
+}
+
 /** The record for a publish whose composition the gate declined: one whole conversion. */
 function declined(value: string): TailRecord {
   const { markdown, tail } = wholeConversion(value);
@@ -130,29 +144,30 @@ export function extendsPreviousRaw(
   const boundary = conversion.start;
   const converted = prior.tail.value;
   if (boundary >= rawValue.length) {
-    // Every byte of the previous conversion is final. The appended text starts
-    // on a fresh line, so only a construct that reads what precedes it can
-    // convert differently here than alone: a root block needs its blank line
-    // and a `<br>` the text before it, an indented line continues a paragraph,
-    // and an inline construct reads the character before it, which has to stay
-    // a line break.
-    if (LEADING_ROOT.test(appended) || INDENTED_LINE.test(appended) || !converted.endsWith('\n')) {
-      return declined(value);
-    }
-    const appendedConverted = convertHtmlToMarkdown(appended);
-    if (appendedConverted.startsWith('\n')) {
-      // The isolated conversion inserted a block separator because its own
-      // output was still empty, while in place the previous text already ends
-      // the block. Join the last line and the append and require the same
-      // conversion as that region in the value, so the composed string stays
-      // byte-identical to the whole conversion.
-      const anchor = previousLineStart(rawValue, rawValue.length);
-      if (
-        `${convertHtmlToMarkdown(rawValue.slice(anchor))}${appendedConverted}` !==
-        convertHtmlToMarkdown(value.slice(anchor))
-      ) {
-        return declined(value);
+    // Every byte of the previous conversion is final, so the appended text is
+    // the only region that can still change — but its isolated conversion is
+    // not the proof. A root block, a `<br>`, an indented line, a block
+    // separator, and the code-span scan all read what precedes them, and a
+    // backtick on the last content line becomes an open code span only once the
+    // append changes that line's trailing break. Anchor the check on the last
+    // line that carries content, the only line whose decisions the append can
+    // change, and compose only when joining that line's conversion reproduces
+    // the same region's conversion exactly. The check converts that line twice
+    // and the appended text twice, so its work is bounded by one line plus the
+    // append, never by the message.
+    const anchor = lastContentLineStart(rawValue);
+    // A value whose only content line is its first has no shorter region to
+    // compare, so the region of the value is the whole value: convert it once
+    // here and reuse it if the check declines, which keeps this publish at the
+    // single whole conversion a publish without reuse pays.
+    const whole = anchor === 0 ? wholeConversion(value) : undefined;
+    const reconverted = whole?.markdown ?? convertHtmlToMarkdown(value.slice(anchor));
+    const previousRegion = anchor === 0 ? converted : convertHtmlToMarkdown(rawValue.slice(anchor));
+    if (`${previousRegion}${convertHtmlToMarkdown(appended)}` !== reconverted) {
+      if (whole !== undefined) {
+        return { mode: 'whole', wholeConverted: whole.markdown, conversion: whole.tail };
       }
+      return declined(value);
     }
     // The appended text is the only region that can still change, so its own
     // open region — offset by where it begins — is the whole value's. Scanning

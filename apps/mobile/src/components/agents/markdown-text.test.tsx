@@ -1429,15 +1429,16 @@ describe('MarkdownText streaming conversion tail', () => {
           0
         );
         expectWholeValueRender(renderer, value, `publish ${index}`);
-        // The gate's verification re-converts from just past the previous
-        // value's last non-blank character, so a gated publish folds only the
-        // final block plus the appended region. The publish work stays flat
-        // while the value grows: bounded by a small multiple of the appended
-        // step, and under half the value's length once the value is several
-        // steps long.
-        expect(convertedCharacters, `publish ${index}`).toBeLessThanOrEqual(3 * step.length);
-        if (index >= 5) {
-          expect(convertedCharacters, `publish ${index}`).toBeLessThan(value.length / 2);
+        // The gate's verification converts the last content line plus the
+        // appended region and compares them with the same region of the value,
+        // so a gated publish folds at most about five steps: the anchor line,
+        // the append, the region both together, and the tail's own scan. The
+        // work stays flat while the value grows, which is what the fixed budget
+        // and the length ratio below measure; a whole-value publish would pass
+        // both as soon as the value is several steps long.
+        expect(convertedCharacters, `publish ${index}`).toBeLessThanOrEqual(5 * step.length);
+        if (index >= 8) {
+          expect(convertedCharacters, `publish ${index}`).toBeLessThan(value.length);
         }
         // The composition closure saw exactly the appended region.
         expect(componentCalls, `publish ${index}`).toContain(appended);
@@ -1641,7 +1642,11 @@ describe('MarkdownText streaming conversion tail', () => {
       });
       const publishCalls = [...calls];
       const convertedCharacters = publishCalls.reduce((total, source) => total + source.length, 0);
-      expect(convertedCharacters, 'post-remount publish work').toBeLessThanOrEqual(3 * step.length);
+      // The gate converts the previous value's last content line and the
+      // appended text, then that same region of the new value: three regions,
+      // each at most one step here. The publish stays region-bounded, never
+      // whole-value.
+      expect(convertedCharacters, 'post-remount publish work').toBeLessThanOrEqual(5 * step.length);
       expect(publishCalls, 'post-remount publish').not.toContain(after);
       expectWholeValueRender(second, after, 'post-remount publish');
       // The remount itself must not have re-converted the whole value either:

@@ -238,24 +238,43 @@ describe('IntegrationProviderRow action cell', () => {
     expect(calls.connect).not.toHaveBeenCalled();
   });
 
-  it('holds the action cell while the connections read has not landed', () => {
-    const root = renderRow({ row: integrationRow({ actionPending: true }), scope: 'personal' });
+  it.each([
+    // Personal scope belongs to the viewer, so the settled row offers
+    // Disconnect and the placeholder reserves its stacked target line.
+    { scope: 'personal' as const, role: undefined, trailingIsTarget: true },
+    // A plain organization member may not disconnect GitHub (the procedure
+    // asks for `owner` or `admin`, `ORGANIZATION_MANAGE_ROLES`), so every
+    // settled branch resolves to no cell: the placeholder must leave the
+    // stacked line flat, or the row shrinks when the read lands.
+    { scope: 'organization' as const, role: 'member', trailingIsTarget: false },
+  ])(
+    'holds the action cell while the connections read has not landed ($scope)',
+    ({ scope, role, trailingIsTarget }) => {
+      const root = renderRow({
+        row: integrationRow({ actionPending: true }),
+        scope,
+        role,
+      });
 
-    expect(controls(root)).toHaveLength(0);
-    expect(root.findAllByType('Skeleton')).toHaveLength(1);
-    // The settled row's button cancels its target's overhang out of the frame,
-    // so the cell lays out on the row's 27pt content band; the placeholder
-    // takes that same band instead of the 36pt frame it used to hold, so the
-    // row does not shrink when the read lands.
-    expect(root.findAllByType('Skeleton')[0]?.props.className).toBe(TEXT_ACTION_SKELETON_CLASS);
-    expect(TEXT_ACTION_SKELETON_CLASS).toContain('h-[27px]');
-    // The placeholder is not a control, but it must hold the same stacked line
-    // the settled target takes: the real cell carries the platform target on a
-    // stacked row, and a line sized to the flat band alone would grow when the
-    // read lands. The flat frame ignores the mark, so the band the placeholder
-    // exists for still holds where the row does not stack.
-    expect(sharedRow(root).props.trailingIsTarget).toBe(true);
-  });
+      expect(controls(root)).toHaveLength(0);
+      expect(root.findAllByType('Skeleton')).toHaveLength(1);
+      // The settled row's button cancels its target's overhang out of the frame,
+      // so the cell lays out on the row's 27pt content band; the placeholder
+      // takes that same band instead of the 36pt frame it used to hold, so the
+      // row does not shrink when the read lands.
+      expect(root.findAllByType('Skeleton')[0]?.props.className).toBe(TEXT_ACTION_SKELETON_CLASS);
+      expect(TEXT_ACTION_SKELETON_CLASS).toContain('h-[27px]');
+      // The placeholder is not a control, and it must hold the same stacked line
+      // the settled target takes — but only where a cell lands: the real cell
+      // carries the platform target on a stacked row, and a line sized to the
+      // flat band alone would grow when the read lands. A row whose viewer
+      // cannot disconnect settles without a cell, so its placeholder stays off
+      // the target and the line keeps its 30pt icon tile. The flat frame ignores
+      // the mark, so the band the placeholder exists for still holds where the
+      // row does not stack.
+      expect(sharedRow(root).props.trailingIsTarget).toBe(trailingIsTarget);
+    }
+  );
 
   it('gives the stacked row the host for its Connect cell too', () => {
     // A row that offers Connect uses the text-action variant, whose pressable

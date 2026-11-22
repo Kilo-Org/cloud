@@ -112,13 +112,17 @@ export function IntegrationProviderRow({
     // The connections read that decides between Disconnect and the web page has
     // not landed, so the row holds the button's space instead of guessing.
     // The placeholder takes the band the action's overhang leaves, so the row keeps
-    // the height it settles at. It also reserves the target on a stacked row: the
-    // settled cell below carries the platform target there, and a stacked line
-    // sized to the flat band alone would grow when that cell lands. The flat frame
+    // the height it settles at. Where a cell will land, it also reserves the target
+    // on a stacked row: that cell carries the platform target there, and a stacked
+    // line sized to the flat band alone would grow when it lands. The flat frame
     // ignores the mark, so the band still holds where the row does not stack.
+    // The placeholder reserves the stacked target line only when a cell will
+    // land: every settled branch is gated on the same permission, so a row
+    // whose viewer cannot disconnect keeps the plain line and does not shrink
+    // when the read lands.
     action = {
       kind: 'node',
-      target: true,
+      target: canDisconnect,
       node: <Skeleton className={TEXT_ACTION_SKELETON_CLASS} />,
     };
   } else if (row.installed && row.webManaged) {

@@ -1,6 +1,5 @@
 import 'server-only';
 
-import { openai_chatgpt_connections } from '@kilocode/db/schema';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import { OPENAI_CLIENT_ID, OPENAI_CLIENT_SECRET } from '@kilocode/web-shared/lib/config.server';
@@ -12,10 +11,9 @@ import {
   decryptOpenAiChatGptConnection,
   healthyOpenAiChatGptConnection,
   markOpenAiChatGptConnectionErrored,
-  openAiChatGptOwnerWhere,
   openAiChatGptOwnerKey,
   readOpenAiChatGptConnectionRow,
-  serializeOpenAiChatGptConnection,
+  writeOpenAiChatGptConnection,
   type OpenAiChatGptDatabase,
   type OpenAiChatGptOwner,
 } from './store';
@@ -322,10 +320,7 @@ async function attemptRefresh(
         token_type: readStringField(body, 'token_type') ?? connection.token_type,
       });
 
-      await tx
-        .update(openai_chatgpt_connections)
-        .set({ encrypted_connection: serializeOpenAiChatGptConnection(updated), is_enabled: true })
-        .where(openAiChatGptOwnerWhere(owner));
+      await writeOpenAiChatGptConnection(tx, owner, updated);
 
       return { kind: 'access_token', accessToken };
     }

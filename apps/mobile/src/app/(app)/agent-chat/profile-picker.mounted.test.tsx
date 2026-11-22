@@ -35,6 +35,7 @@ vi.mock('@/components/agents/use-effective-agent-profile', () => ({
     effectiveDefaultProfile: null,
     isLoading: false,
     isError: false,
+    error: undefined,
     refetch: vi.fn(),
   }),
 }));

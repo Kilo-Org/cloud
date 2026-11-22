@@ -48,6 +48,32 @@ describe('providersAndModelsAllowListsReducer', () => {
     expect(state.draftProviderAllowList).toEqual(['hidden', 'one']);
   });
 
+  test('bulk selection stores the canonical form of a mixed-case provider slug', () => {
+    let state = providersAndModelsAllowListsReducer(
+      createProvidersAndModelsAllowListsInitialState(),
+      {
+        type: 'INIT_FROM_SERVER',
+        modelDenyList: [],
+        providerAllowList: ['openai'],
+      }
+    );
+    state = providersAndModelsAllowListsReducer(state, {
+      type: 'SET_PROVIDERS_ENABLED',
+      providerSlugs: ['OpenAI'],
+      nextEnabled: true,
+    });
+    if (state.status !== 'ready') throw new Error('expected ready state');
+    expect(state.draftProviderAllowList).toEqual(['openai']);
+
+    state = providersAndModelsAllowListsReducer(state, {
+      type: 'SET_PROVIDERS_ENABLED',
+      providerSlugs: ['OpenAI'],
+      nextEnabled: false,
+    });
+    if (state.status !== 'ready') throw new Error('expected ready state');
+    expect(state.draftProviderAllowList).toEqual([]);
+  });
+
   test('init -> toggle -> reset returns to initial', () => {
     let state: ProvidersAndModelsAllowListsState = createProvidersAndModelsAllowListsInitialState();
 

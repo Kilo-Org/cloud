@@ -12,6 +12,7 @@ import {
   collectDynamicCountedCalls,
   DYNAMIC_COUNTED_KEYS,
   findCountlessFamilies,
+  findOrphanedNoAgreementEntries,
   findUnlistedDynamicCalls,
   findUnparsedFiles,
   NO_AGREEMENT,
@@ -62,6 +63,21 @@ describe('plural families', () => {
     for (const [key, reason] of NO_AGREEMENT) {
       expect(reason.length, key).toBeGreaterThan(0);
     }
+  });
+
+  it('leaves no NO_AGREEMENT entry without a counted call', () => {
+    const scan = auditCountedCalls();
+    // A scan that could not read or parse every file proves nothing about a
+    // missing call, and the projection answers with no orphan for exactly that
+    // reason, so the tree must be complete before the assertion below means
+    // anything.
+    expect(findUnparsedFiles(scan), 'a file the scan could not read or parse').toEqual([]);
+    // An exemption outlives the call it was reviewed for unless the table is
+    // read back against the scan, so the app tree is checked the other way too.
+    expect(
+      findOrphanedNoAgreementEntries(scan),
+      'a reviewed exemption with no counted call'
+    ).toEqual([]);
   });
 
   it('selects the count form for a condensed tool run in English', () => {

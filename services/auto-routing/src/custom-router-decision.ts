@@ -29,7 +29,11 @@ import { CustomRouterError, DEPENDENCY_RETRY_AFTER_SECONDS } from './caller-auth
 import type { CustomRouterOwner } from './custom-router-store';
 import { customRouterDecisionScope } from './decision-cache';
 import type { DecisionRun, DecisionTarget } from './decide';
-import { contextProvablyTooSmall, satisfiesRequiredModalities } from './decision-engine';
+import {
+  contextProvablyTooSmall,
+  isCapabilityActive,
+  satisfiesRequiredModalities,
+} from './decision-engine';
 import { getModelCapabilities, type ModelCapabilities } from './model-capabilities';
 
 const CUSTOM_ROUTER_TABLE_CACHE_TTL_MS = 60_000;
@@ -342,13 +346,19 @@ export function customRouterTarget(
       const gatewayCapabilities = await getModelCapabilities(env, {
         router: router.baseRouter,
         waitUntil,
-        // A pinned entry is served as its concrete target, whose capabilities are the ones that
+        // An alias entry is served as its concrete target, whose capabilities are the ones that
         // decide modality and context fit; the pool model itself may be an alias with no row.
-        additionalModelIds: router.entries.flatMap(entry =>
-          entry.kind === 'gateway' && !isDirectByokModelId(entry.model)
-            ? [entry.model, ...(entry.servingPin ? [entry.servingPin.model] : [])]
-            : []
-        ),
+        // That target is the saved pin while the benchmark worker still serves it, otherwise the
+        // live target this caller's snapshot stores for the alias.
+        additionalModelIds: router.entries.flatMap(entry => {
+          if (entry.kind !== 'gateway' || isDirectByokModelId(entry.model)) return [];
+          const liveTarget = routing.aliasTargets.get(entry.model);
+          return [
+            entry.model,
+            ...(entry.servingPin ? [entry.servingPin.model] : []),
+            ...(liveTarget === undefined ? [] : [liveTarget]),
+          ];
+        }),
       });
       timings.capabilitiesMs = performance.now() - capabilitiesStartedAt;
       const capabilities = new Map(gatewayCapabilities);
@@ -358,12 +368,16 @@ export function customRouterTarget(
           capabilities.set(customRouterCandidateModel(entry), caps);
           continue;
         }
-        const pinnedCaps =
-          entry.kind === 'gateway' && entry.servingPin
-            ? gatewayCapabilities.get(entry.servingPin.model)
-            : undefined;
-        // Rank and filter the logical pool entry with its pinned target's capabilities.
-        if (pinnedCaps) capabilities.set(customRouterCandidateModel(entry), pinnedCaps);
+        // A gateway entry's own row comes from the map above when the id has one. An alias id has
+        // none (aliases never appear in `model_stats`), so rank and filter the logical pool entry
+        // with the concrete model it would run: the saved pin the worker still serves, otherwise
+        // the live target this caller's snapshot stores for the alias. A bare alias whose target
+        // this request cannot name keeps no row here and is resolved or refused at redemption.
+        if (entry.kind !== 'gateway') continue;
+        const dispatchModel = entry.servingPin?.model ?? routing.aliasTargets.get(entry.model);
+        const dispatchCaps =
+          dispatchModel === undefined ? undefined : gatewayCapabilities.get(dispatchModel);
+        if (dispatchCaps) capabilities.set(customRouterCandidateModel(entry), dispatchCaps);
       }
       return {
         routingMode: router.mode,
@@ -466,10 +480,11 @@ export function customRouterDecision(
 }
 
 // Same capability rules as the decision engine, without its largest-context rescue: a
-// fallback entry that is inactive, lacks a required modality, or is provably too small fails.
+// fallback entry with no active capability row, that lacks a required modality, or that is
+// provably too small fails. Client and direct-BYOK entries carry their own active row.
 function fitsRequest(entry: CustomRouterEntry, run: DecisionRun): boolean {
   const caps = run.capabilities.get(customRouterCandidateModel(entry));
-  if (caps?.isActive === false) return false;
+  if (!isCapabilityActive(caps)) return false;
   if (run.constraints === undefined) return true;
   return (
     satisfiesRequiredModalities(caps, run.constraints) &&

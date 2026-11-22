@@ -69,7 +69,7 @@ export function RepoSelector({
       <View
         accessible
         accessibilityLabel={t('agentChat.repoPicker.accessibility', {
-          label: t('agentChat.repoPicker.loading'),
+          label: t('common.loading'),
         })}
         accessibilityState={{ busy: true }}
         className={FIELD_TRIGGER_FRAME_CLASS}

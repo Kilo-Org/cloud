@@ -68,6 +68,29 @@ describe('computeProviderSelectionsForSummaryCard', () => {
     ]);
   });
 
+  test('matches a stored mixed-case provider slug to the catalog slug', () => {
+    const openRouterProviders = [
+      {
+        slug: 'openai',
+        models: [{ slug: 'openai/gpt-4', endpoint: 'chat' }],
+      },
+    ];
+
+    const selections = computeProviderSelectionsForSummaryCard({
+      openRouterProviders,
+      providerAllowList: ['OpenAI'],
+      modelDenyList: undefined,
+      availableModelIds: ['openai/gpt-4'],
+    });
+
+    expect(selections).toEqual([
+      {
+        slug: 'openai',
+        models: ['openai/gpt-4'],
+      },
+    ]);
+  });
+
   test('lists only models in the available model list', () => {
     const openRouterProviders = [
       {

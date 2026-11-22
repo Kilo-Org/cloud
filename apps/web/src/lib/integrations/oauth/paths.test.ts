@@ -1,6 +1,10 @@
 import { describe, expect, it } from '@jest/globals';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { STANDARD_OAUTH_PLATFORMS, getPlatformOAuthConnectPath } from './paths';
+import {
+  STANDARD_OAUTH_PLATFORMS,
+  getPlatformOAuthCallbackPath,
+  getPlatformOAuthConnectPath,
+} from './paths';
 
 describe('STANDARD_OAUTH_PLATFORMS', () => {
   it('does not compose Bitbucket OAuth in V1', () => {
@@ -55,6 +59,19 @@ describe('getPlatformOAuthConnectPath', () => {
   it('builds the Bitbucket connect path', () => {
     expect(getPlatformOAuthConnectPath(PLATFORM.BITBUCKET, { organizationId: 'org_123' })).toBe(
       '/api/integrations/bitbucket/connect?organizationId=org_123'
+    );
+  });
+});
+
+describe('getPlatformOAuthCallbackPath', () => {
+  it.each([...STANDARD_OAUTH_PLATFORMS])('returns the callback path for %s', platform => {
+    expect(getPlatformOAuthCallbackPath(platform)).toBe(`/api/integrations/${platform}/callback`);
+  });
+
+  it('shares its base with the connect path', () => {
+    const connectPath = getPlatformOAuthConnectPath(PLATFORM.SLACK);
+    expect(connectPath.replace(/\/connect$/, '/callback')).toBe(
+      getPlatformOAuthCallbackPath(PLATFORM.SLACK)
     );
   });
 });

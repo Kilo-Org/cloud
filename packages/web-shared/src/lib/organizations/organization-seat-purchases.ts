@@ -1,14 +1,29 @@
 import type { Organization, OrganizationSeatsPurchase } from '@kilocode/db/schema';
-import { organization_seats_purchases } from '@kilocode/db/schema';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { organization_seats_purchases, organizations } from '@kilocode/db/schema';
+import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { and, desc, eq } from 'drizzle-orm';
+
+/**
+ * The rule for this table: it is append-only, so the most recently created row
+ * is the organization's current subscription state. This is the rule expressed
+ * as a correlated subquery. Lazily built: suites that mock the drizzle module
+ * must not see the template evaluated at import time.
+ */
+export function latestSeatPurchaseStatusSql() {
+  return sql<OrganizationSeatsPurchase['subscription_status'] | null>`(
+    SELECT ${organization_seats_purchases.subscription_status}
+    FROM ${organization_seats_purchases}
+    WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
+    ORDER BY ${organization_seats_purchases.created_at} DESC
+    LIMIT 1
+  )`;
+}
 
 /**
  * Returns the most recently created seat purchase for an organization.
  *
- * organization_seats_purchases is append-only: every subscription event
- * (creation, renewal, cancellation) inserts a new row.  The most recently
- * created row therefore always reflects the current subscription state.
+ * This expresses the same append-only rule as `latestSeatPurchaseStatusSql`:
+ * one rule, two shapes, an entity read and a correlated subquery.
  */
 export async function getMostRecentSeatPurchase(
   organizationId: Organization['id'],

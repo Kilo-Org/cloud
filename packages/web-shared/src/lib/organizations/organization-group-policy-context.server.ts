@@ -2,7 +2,6 @@ import 'server-only';
 
 import {
   organization_group_memberships,
-  organization_group_policy_settings,
   organization_groups,
   organization_memberships,
   type Organization,
@@ -11,6 +10,7 @@ import { type OrganizationGroupPolicies } from '@kilocode/web-shared/lib/organiz
 import {
   parseGroupPolicies,
   canonicalSettingsFrom,
+  readOrganizationGroupPolicySettingsRow,
 } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies.server';
 import { readLiveOrganization } from '@kilocode/web-shared/lib/organizations/organization-read.server';
 import { and, eq } from 'drizzle-orm';
@@ -104,11 +104,7 @@ export async function getOrganizationGroupPolicyContext(params: {
     }
   }
 
-  const [settings] = await client
-    .select()
-    .from(organization_group_policy_settings)
-    .where(eq(organization_group_policy_settings.organization_id, params.organizationId))
-    .limit(1);
+  const settings = await readOrganizationGroupPolicySettingsRow(client, params.organizationId);
 
   const { defaultPolicies, policyRevision } = canonicalSettingsFrom(
     settings,

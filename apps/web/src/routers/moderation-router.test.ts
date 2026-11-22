@@ -306,6 +306,8 @@ describe('moderation-router', () => {
     const receipt = await caller.moderation.getReportReceipt({ receiptId });
     expect(receipt).toEqual({
       receiptId,
+      targetKind: 'message',
+      reason: 'other',
       triageStatus: 'actioned',
       appealStatus: 'submitted',
     });
@@ -347,6 +349,8 @@ describe('moderation-router', () => {
       userId: string;
       createdAt: string;
       targetId: string;
+      targetKind?: string;
+      reason?: string;
       triageStatus?: string;
       appealStatus?: string;
     }): Promise<string> {
@@ -355,9 +359,9 @@ describe('moderation-router', () => {
         .values({
           kilo_user_id: input.userId,
           surface: 'ai_output',
-          target_kind: 'message',
+          target_kind: input.targetKind ?? 'message',
           target_id: input.targetId,
-          reason: 'other',
+          reason: input.reason ?? 'other',
           created_at: input.createdAt,
           ...(input.triageStatus === undefined ? {} : { triage_status: input.triageStatus }),
           ...(input.appealStatus === undefined ? {} : { appeal_status: input.appealStatus }),
@@ -379,11 +383,14 @@ describe('moderation-router', () => {
         userId: user.id,
         createdAt: '2026-02-01T00:00:00.000Z',
         targetId: 'msg-middle',
+        targetKind: 'comment',
+        reason: 'spam',
       });
       const newest = await insertReport({
         userId: user.id,
         createdAt: '2026-03-01T00:00:00.000Z',
         targetId: 'msg-newest',
+        reason: 'harassment',
       });
 
       const page = await caller.moderation.listReportReceipts({});
@@ -391,6 +398,8 @@ describe('moderation-router', () => {
       expect(
         page.items.map(item => ({
           receiptId: item.receiptId,
+          targetKind: item.targetKind,
+          reason: item.reason,
           createdAt: new Date(item.createdAt).toISOString(),
           triageStatus: item.triageStatus,
           appealStatus: item.appealStatus,
@@ -398,18 +407,24 @@ describe('moderation-router', () => {
       ).toEqual([
         {
           receiptId: newest,
+          targetKind: 'message',
+          reason: 'harassment',
           createdAt: '2026-03-01T00:00:00.000Z',
           triageStatus: 'received',
           appealStatus: 'none',
         },
         {
           receiptId: middle,
+          targetKind: 'comment',
+          reason: 'spam',
           createdAt: '2026-02-01T00:00:00.000Z',
           triageStatus: 'received',
           appealStatus: 'none',
         },
         {
           receiptId: oldest,
+          targetKind: 'message',
+          reason: 'other',
           createdAt: '2026-01-01T00:00:00.000Z',
           triageStatus: 'actioned',
           appealStatus: 'submitted',
@@ -424,6 +439,8 @@ describe('moderation-router', () => {
         userId: user.id,
         createdAt: '2026-01-01T00:00:00.000Z',
         targetId: 'msg-oldest',
+        targetKind: 'comment',
+        reason: 'spam',
       });
       const middle = await insertReport({
         userId: user.id,
@@ -446,6 +463,16 @@ describe('moderation-router', () => {
       });
       expect(second.items.map(item => item.receiptId)).toEqual([oldest]);
       expect(second.nextCursor).toBeNull();
+
+      const newestItem = first.items.find(item => item.receiptId === newest);
+      if (!newestItem) throw new Error('expected the newest row on the first page');
+      expect(second.items[0]).toMatchObject({
+        receiptId: oldest,
+        targetKind: 'comment',
+        reason: 'spam',
+      });
+      expect(second.items[0]?.targetKind).not.toBe(newestItem.targetKind);
+      expect(second.items[0]?.reason).not.toBe(newestItem.reason);
 
       const firstPageIds = new Set(first.items.map(item => item.receiptId));
       expect(second.items.filter(item => firstPageIds.has(item.receiptId))).toEqual([]);

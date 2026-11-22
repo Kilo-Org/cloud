@@ -383,6 +383,11 @@ observable behavior is the same.
 5. Approve MUST answer at most once per request and MUST NOT be dropped because
    another answer is in flight: a repeat tap of the same ask while its answer
    runs MUST be suppressed, and a tap on a different ask MUST be answered.
+6. A post that does not land MUST leave every action of the card still in the
+   shade bound to the request that card shows, and the superseded Approve
+   record MUST be retired only after the newer card is posted. The record of an
+   ask therefore carries the ask as well as the session, so preparing a newer
+   card cannot rewrite the record of the request the surviving card shows.
 
 ### Android: updates and ending
 
@@ -423,6 +428,14 @@ observable behavior is the same.
    the notification's data for routing and approval only.
 
 ## Changelog
+
+### 2026-11-22 -- A failed post leaves the card answering the request it shows
+
+- Added Actions rule 6: an Approve record names the ask it answers as well as
+  the session, so preparing a newer card cannot rebind the action of a card
+  still in the shade. A post that does not land restores the facts of the card
+  that is still posted and drops the record of the newer ask, and the
+  superseded ask's record is retired only once the newer card is posted.
 
 ### 2026-10-27 -- Android answers keep their own ask, and cards survive a failed write
 

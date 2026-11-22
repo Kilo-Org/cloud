@@ -61,13 +61,12 @@ export function readCloudAgentErrorFields(error: unknown): CloudAgentErrorFields
   const code = firstString([dataCode, shapeDataCode, shapeCode]);
   const httpStatus = firstFiniteNumber([dataHttpStatus, shapeDataHttpStatus]);
 
-  // A JSON-RPC error envelope can carry only the numeric `shape.code` and no
-  // `data` bag, so that number still proves the server answered even though it
-  // is never returned as a code.
+  // `code` already folds the three string candidates, so the string half is that
+  // one check. The numeric tests stay explicit: they accept the numeric JSON-RPC
+  // `shape.code`, which is never returned as a code, and any numeric
+  // `httpStatus`, including a non-finite one that `firstFiniteNumber` rejects.
   const answeredByServer =
-    typeof dataCode === 'string' ||
-    typeof shapeDataCode === 'string' ||
-    typeof shapeCode === 'string' ||
+    code !== undefined ||
     typeof shapeCode === 'number' ||
     typeof dataHttpStatus === 'number' ||
     typeof shapeDataHttpStatus === 'number';

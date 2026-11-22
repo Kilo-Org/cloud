@@ -147,6 +147,10 @@ export function useEffectiveAgentProfile(
     // Keep successful background refreshes visible; only error retries load here.
     isLoading: query.isPending || (query.isError && query.isFetching),
     isError: query.isError,
+    // The active query's error, so a screen can name the cause (an access
+    // denial is not a server fault) instead of reporting every failure the same
+    // way.
+    error: query.error,
     refetch: query.refetch,
   };
 }

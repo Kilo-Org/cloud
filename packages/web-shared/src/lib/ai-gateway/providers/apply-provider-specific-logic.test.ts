@@ -1184,6 +1184,59 @@ describe('applyProviderSpecificLogic with a user gateway key', () => {
     expect(request.body.provider).toEqual({ order: USER_GATEWAY_TEST_ORDER });
   });
 
+  it('treats an empty key list as a user BYOK request, not a Kilo request', async () => {
+    const request = makeRequest(requestedModel);
+    const serverFeatures = { plugins: [{ id: 'web' }] };
+    Object.assign(request.body, structuredClone(serverFeatures));
+
+    await applyProviderSpecificLogic({
+      provider: makeProvider(null),
+      requestedModel,
+      requestToMutate: request,
+      extraHeaders: {},
+      userByok: [],
+      originalHeaders: EmptyFraudDetectionHeaders,
+      userId: 'user-1',
+      organizationId: null,
+      sessionId: null,
+      taskId: null,
+      isNonTrialEnterprise: true,
+      dataRegion: null,
+    });
+
+    expect(request.body).not.toMatchObject(serverFeatures);
+    expect(request.body.provider).toBeUndefined();
+  });
+
+  it('classifies a list that holds a gateway key and an inference key as a gateway key', async () => {
+    const userByok: BYOKResult[] = [
+      { providerId: 'anthropic', decryptedAPIKey: 'inference-key' },
+      { providerId: 'vercel-ai-gateway', decryptedAPIKey: 'gateway-key' },
+    ];
+    const request = makeRequest(requestedModel);
+    const serverFeatures = { plugins: [{ id: 'web' }] };
+    Object.assign(request.body, structuredClone(serverFeatures));
+
+    await applyProviderSpecificLogic({
+      provider: VERCEL_AI_GATEWAY,
+      requestedModel,
+      requestToMutate: request,
+      extraHeaders: {},
+      userByok,
+      originalHeaders: EmptyFraudDetectionHeaders,
+      userId: 'user-1',
+      organizationId: null,
+      sessionId: null,
+      taskId: null,
+      isNonTrialEnterprise: true,
+      dataRegion: 'eu',
+    });
+
+    expect(request.body).toMatchObject(serverFeatures);
+    expect(request.body.provider).toBeUndefined();
+    expect(applyVercelSettings).toHaveBeenCalledWith(requestedModel, request, null, null);
+  });
+
   it.each([
     { providerId: 'openrouter', provider: makeProvider(null), tool: 'openrouter:web_search' },
     {

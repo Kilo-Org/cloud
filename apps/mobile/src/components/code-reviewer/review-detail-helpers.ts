@@ -31,11 +31,25 @@ export function findingsEmptyCopyKey(status: string): string {
   return 'codeReviewer.reviewDetail.noFindings';
 }
 
-export function reviewFailureLabel(
+export type ReviewConclusionCopy = {
+  message: string;
+  /** The sentence already ends with its own next step. */
+  namesRecovery: boolean;
+};
+
+// The conclusion sentence for a failed review, and whether that sentence already
+// carries its next step. Four of the five paths end with their own instruction —
+// an action-required description says what to fix and then to enable Code
+// Reviewer again, and the service-unavailable copy names the moment to retry —
+// so the caller must not print a second instruction under them. Only the generic
+// failure statement has no next step of its own, and it does not promise one
+// either: the caller renders the recovery control and this copy never asks for a
+// retry the screen may not be able to offer.
+export function reviewFailureCopy(
   t: typeof i18n.t,
   errorMessage: string | null,
   terminalReason?: string | null
-): string {
+): ReviewConclusionCopy {
   if (
     terminalReason === 'github_installation_required' ||
     terminalReason === 'github_ip_allow_list' ||
@@ -44,16 +58,16 @@ export function reviewFailureLabel(
     terminalReason === 'selected_model_unavailable' ||
     terminalReason === 'repeated_repository_clone_timeout'
   ) {
-    return t(ACTION_REQUIRED_KEYS[terminalReason].description);
+    return { message: t(ACTION_REQUIRED_KEYS[terminalReason].description), namesRecovery: true };
   }
   if (
     errorMessage ===
     'Dispatch failed: could not reach the code review service. ' +
       'It may be offline — retry the review once it is running.'
   ) {
-    return t('codeReviewer.reviewDetail.serviceUnavailable');
+    return { message: t('codeReviewer.reviewDetail.serviceUnavailable'), namesRecovery: true };
   }
-  return t('codeReviewer.reviewDetail.reviewFailed');
+  return { message: t('codeReviewer.reviewDetail.reviewFailed'), namesRecovery: false };
 }
 
 // The copy of a finding severity badge. Only these four labels need a key of
@@ -83,17 +97,25 @@ export function severityLabelKey(severity: string): string {
 // them to a sentence that explains the outcome instead of echoing the phrase.
 const INTEGRATION_DISCONNECTED_MESSAGE = 'Platform integration disconnected';
 
-const CANCELLATION_REASON_KEYS = new Map<string, string>([
+// Two of the mapped causes end with their own instruction, so the map carries
+// whether each one names the reader's next step beside its catalog key.
+const CANCELLATION_REASONS = new Map<string, { messageKey: string; namesRecovery: boolean }>([
   // A Map, not an object literal: the key is the raw `error_message` column, so
   // an inherited member such as `constructor` would resolve truthy and defeat
   // the lookup. terminal-reason-copy.ts uses the same shape for the same reason.
   [
     'Bitbucket Code Reviewer disabled',
-    'codeReviewer.reviewDetail.cancelReasonBitbucketReviewerDisabled',
+    {
+      messageKey: 'codeReviewer.reviewDetail.cancelReasonBitbucketReviewerDisabled',
+      namesRecovery: true,
+    },
   ],
   [
     'Bitbucket pull request state superseded this review',
-    'codeReviewer.reviewDetail.cancelReasonBitbucketPullRequestChanged',
+    {
+      messageKey: 'codeReviewer.reviewDetail.cancelReasonBitbucketPullRequestChanged',
+      namesRecovery: false,
+    },
   ],
 ]);
 
@@ -102,8 +124,13 @@ const CANCELLATION_REASON_KEYS = new Map<string, string>([
  * null when the row carries no stored message to explain. Every message gets
  * copy: the causes the row can tell apart say so, and the rest fall back to a
  * sentence that names the outcome without inventing a cause.
+ *
+ * `namesRecovery` tells the caller whether that sentence already states its next
+ * step. Only the two causes the row can act on end with their own instruction —
+ * reconnect the integration, enable the reviewer again — so a replacement or a
+ * plain cancellation does not claim a way forward it never names.
  */
-export function reviewCancellationLabel(
+export function reviewCancellationCopy(
   t: typeof i18n.t,
   args: {
     status: string;
@@ -111,7 +138,7 @@ export function reviewCancellationLabel(
     terminalReason?: string | null;
     platformLabel: string;
   }
-): string | null {
+): ReviewConclusionCopy | null {
   if (args.status !== 'cancelled' && args.status !== 'interrupted') {
     return null;
   }
@@ -119,25 +146,31 @@ export function reviewCancellationLabel(
     return null;
   }
   if (args.errorMessage === INTEGRATION_DISCONNECTED_MESSAGE) {
-    return t('codeReviewer.reviewDetail.cancelReasonIntegrationDisconnected', {
-      platform: args.platformLabel,
-    });
+    return {
+      message: t('codeReviewer.reviewDetail.cancelReasonIntegrationDisconnected', {
+        platform: args.platformLabel,
+      }),
+      namesRecovery: true,
+    };
   }
-  const reasonKey = CANCELLATION_REASON_KEYS.get(args.errorMessage);
-  if (reasonKey) {
-    return t(reasonKey);
+  const reason = CANCELLATION_REASONS.get(args.errorMessage);
+  if (reason) {
+    return { message: t(reason.messageKey), namesRecovery: reason.namesRecovery };
   }
   if (args.terminalReason === 'superseded' || args.errorMessage.startsWith('Superseded by ')) {
-    return t('codeReviewer.reviewDetail.cancelReasonSuperseded');
+    return { message: t('codeReviewer.reviewDetail.cancelReasonSuperseded'), namesRecovery: false };
   }
   // The status callback persists a cloud-agent interrupt as `cancelled` with
   // reason `interrupted`, so the reason decides the outcome sentence.
   const interrupted = args.status === 'interrupted' || args.terminalReason === 'interrupted';
-  return t(
-    interrupted
-      ? 'codeReviewer.reviewDetail.cancelReasonInterrupted'
-      : 'codeReviewer.reviewDetail.cancelReasonCancelled'
-  );
+  return {
+    message: t(
+      interrupted
+        ? 'codeReviewer.reviewDetail.cancelReasonInterrupted'
+        : 'codeReviewer.reviewDetail.cancelReasonCancelled'
+    ),
+    namesRecovery: false,
+  };
 }
 
 export function gateThresholdLabel(threshold: string): string {

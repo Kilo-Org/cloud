@@ -5,7 +5,9 @@
 //
 // The Kilo user token is passed in the request body and injected only as a
 // child-process env var (KILO_AUTH_CONTENT). It is never written to disk and
-// never logged.
+// never logged. Every captured child stream this server returns or delivers
+// keeps whole lines only: a cap drops the line it cut, and every remaining value
+// is returned with the placeholder.
 
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
@@ -661,6 +663,22 @@ function runCase(
   });
 }
 
+// Nothing the child writes reaches a caller unread: each captured stream is scrubbed
+// with the one credential this server injects before it is returned or delivered.
+function redactToken(text, kiloToken) {
+  return typeof kiloToken === 'string' && kiloToken.length > 0
+    ? text.split(kiloToken).join('[redacted]')
+    : text;
+}
+
+// A cap ends inside a line, so a capped edge keeps whole lines only and drops the line
+// the cap cut.
+function dropCutLine(text, edge) {
+  const cut = edge === 'end' ? text.lastIndexOf('\n') : text.indexOf('\n');
+  if (cut === -1) return '';
+  return edge === 'end' ? text.slice(0, cut + 1) : text.slice(cut + 1);
+}
+
 async function runCli({ args, cwd, stdin, env, timeoutMs, kiloToken, context }, job) {
   const startedAt = Date.now();
   const result = await new Promise(resolve => {
@@ -673,6 +691,7 @@ async function runCli({ args, cwd, stdin, env, timeoutMs, kiloToken, context }, 
     if (job?.cancelled) {
       throw new NotStartedError('case cancelled', 'cancelled');
     }
+    let stderrTruncated = false;
     // The kilo wrapper spawns a grandchild; a timeout or a cancel must kill its whole group.
     let child;
     try {
@@ -706,13 +725,15 @@ async function runCli({ args, cwd, stdin, env, timeoutMs, kiloToken, context }, 
       finished = true;
       clearTimeout(killTimer);
       clearTimeout(finishTimer);
+      const retainedStdout = stdoutTruncated ? dropCutLine(stdout, 'end') : stdout;
+      const retainedStderr = stderrTruncated ? dropCutLine(stderrTail, 'start') : stderrTail;
       resolve({
         exitCode,
-        stdoutLines: stdout.split('\n').filter(line => line.length > 0),
-        stderrTail:
-          typeof kiloToken === 'string' && kiloToken.length > 0
-            ? stderrTail.split(kiloToken).join('[redacted]')
-            : stderrTail,
+        stdoutLines: retainedStdout
+          .split('\n')
+          .filter(line => line.length > 0)
+          .map(line => redactToken(line, kiloToken)),
+        stderrTail: redactToken(retainedStderr, kiloToken),
         timedOut,
         ...(cancelled ? { cancelled: true } : {}),
       });
@@ -760,10 +781,14 @@ async function runCli({ args, cwd, stdin, env, timeoutMs, kiloToken, context }, 
       }
     });
     child.stderr.on('data', chunk => {
-      stderrTail = (stderrTail + chunk.toString('utf8')).slice(-STDERR_CAP_BYTES);
+      const text = chunk.toString('utf8');
+      if (stderrTail.length + text.length > STDERR_CAP_BYTES) stderrTruncated = true;
+      stderrTail = (stderrTail + text).slice(-STDERR_CAP_BYTES);
     });
     child.on('error', error => {
-      stderrTail = (stderrTail + `\nspawn error: ${error.message}`).slice(-STDERR_CAP_BYTES);
+      const text = `\nspawn error: ${error.message}`;
+      if (stderrTail.length + text.length > STDERR_CAP_BYTES) stderrTruncated = true;
+      stderrTail = (stderrTail + text).slice(-STDERR_CAP_BYTES);
       finish(-1);
     });
     child.on('close', code => finish(code ?? -1));
@@ -974,6 +999,8 @@ const server = createServer(
             }
           } catch (err) {
             // A case may only be reported as never started when no child was spawned.
+            // `failure` holds a parent-side message about workspace or process setup, not text
+            // captured from the child's streams, so the placeholder substitution does not apply.
             if (err instanceof NotStartedError) {
               outcome = { kind: 'not_started' };
               category = err.category;

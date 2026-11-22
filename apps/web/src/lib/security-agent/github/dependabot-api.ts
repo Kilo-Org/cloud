@@ -144,6 +144,11 @@ const DEPENDABOT_DISABLED_HINTS = [
 const ACCESS_BLOCKED_HINTS = ['repository access blocked'] as const;
 
 const DEPENDABOT_AVAILABILITY_CACHE_TTL_MS = 30 * 60_000;
+// A non-definitive probe answer can turn definitive once a transient provider condition
+// clears, so it is retried far sooner than a definitive answer. It is still cached for
+// that short window so one repository-list read cannot repeat the same outbound request
+// on the very next read.
+const DEPENDABOT_AVAILABILITY_UNKNOWN_RETRY_TTL_MS = 2 * 60_000;
 const DEPENDABOT_AVAILABILITY_CACHE_MAX_ENTRIES = 10_000;
 // Mobile control-plane procedures time out after 10 s. Probing stops starting new
 // GitHub requests after this budget so large installations still get a response.
@@ -200,7 +205,10 @@ export function classifyFetchAlertsError(
  * Ambiguous permission, authentication, and transient failures remain unknown so the UI
  * never labels a repository as disabled without a definitive GitHub response.
  * Repositories not checked within the probing budget also remain unknown. Probes already
- * in flight still populate the cache, so later calls cover more repositories.
+ * in flight still populate the cache, so later calls cover more repositories. A
+ * non-definitive outcome is cached briefly and retried after that short TTL, so a
+ * transient provider condition does not pin the repository to an unknown answer for the
+ * full cache window. A cached non-definitive outcome is never reported as disabled.
  */
 export async function checkDependabotAlertsAvailability(
   installationId: string,
@@ -306,13 +314,11 @@ async function checkRepositoryDependabotAlertsAvailability(input: {
 
   try {
     const status = await promise;
-    if (status !== 'unknown') {
-      dependabotAvailabilityCache.set(cacheKey, {
-        status,
-        expiresAtMs: Date.now() + DEPENDABOT_AVAILABILITY_CACHE_TTL_MS,
-      });
-      sweepDependabotAvailabilityCache(Date.now());
-    }
+    dependabotAvailabilityCache.set(cacheKey, {
+      status,
+      expiresAtMs: Date.now() + dependabotAvailabilityTtlMs(status),
+    });
+    sweepDependabotAvailabilityCache(Date.now());
     return status;
   } finally {
     dependabotAvailabilityInFlight.delete(cacheKey);
@@ -341,6 +347,12 @@ async function fetchRepositoryDependabotAlertsAvailability(
       ? 'disabled'
       : 'unknown';
   }
+}
+
+function dependabotAvailabilityTtlMs(status: DependabotAlertsAvailability): number {
+  return status === 'unknown'
+    ? DEPENDABOT_AVAILABILITY_UNKNOWN_RETRY_TTL_MS
+    : DEPENDABOT_AVAILABILITY_CACHE_TTL_MS;
 }
 
 function dependabotAvailabilityCacheKey(

@@ -227,6 +227,11 @@ pnpm dev:db:reset
 pnpm drizzle migrate
 ```
 
+The reset empties the database that `POSTGRES_SCRIPT_URL` names, because it runs as a script.
+The `pnpm drizzle migrate` step re-creates the schema on the database that `POSTGRES_URL` names.
+Both must name the same database for the pair to work, and the reset refuses to run when they
+disagree. `pnpm dev:setup-env` and `pnpm dev:infra-env` write the same local database to both.
+
 To smoke-test that migrations still bootstrap correctly from a fresh empty database, run:
 
 ```bash
@@ -392,7 +397,7 @@ An empty credit block list shows no expiring credits, not an error.
 | `pnpm lint` | Lint all source files |
 | `pnpm format` | Format all supported files with oxfmt |
 | `pnpm format:changed` | Format only files changed since `main` |
-| `pnpm validate` | Run the root typecheck, lint, and test scripts, then the dependency cycle check |
+| `pnpm validate` | Run the shared chain: typecheck, lint, test, then the dependency cycle check |
 | `pnpm drizzle migrate` | Apply pending database migrations |
 | `pnpm drizzle generate` | Generate a new migration after schema changes |
 | `pnpm drizzle:verify-bootstrap` | Create a temporary empty database and verify `pnpm drizzle migrate` bootstraps it cleanly |

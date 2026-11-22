@@ -91,6 +91,7 @@ import {
   requestedLogprobs,
   requestedSamples,
   claudeBillingReconnectResponse,
+  claudeBillingUnavailableResponse,
 } from './llm-proxy-helpers';
 import { createControlledClock } from '@kilocode/web-shared/tests/helpers/timed-body.helper';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
@@ -110,6 +111,30 @@ describe('claudeBillingReconnectResponse', () => {
     expect(body.error_type).toBe(ProxyErrorType.byok_error);
     expect(body.message).toContain('An organization owner must link Claude billing again');
     expect(body.message).toContain(`/organizations/${organizationId}/byok`);
+    expect(body.error).toBe(body.message);
+  });
+});
+
+describe('claudeBillingUnavailableResponse', () => {
+  it('emits the caller message verbatim as a 400', async () => {
+    const message = "Claude billing is temporarily unavailable on Kilo's side.";
+    const response = claudeBillingUnavailableResponse(message);
+
+    expect(response.status).toBe(400);
+    expect(response.headers.get('retry-after')).toBeNull();
+    const body = (await response.json()) as { error: string; error_type: string; message: string };
+    expect(body.error_type).toBe(ProxyErrorType.byok_error);
+    expect(body.message).toBe(message);
+    expect(body.error).toBe(body.message);
+  });
+
+  it('emits the caller message verbatim as a retryable 503', async () => {
+    const response = claudeBillingUnavailableResponse('Some retryable reason.', true);
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBe('1');
+    const body = (await response.json()) as { error: string; message: string };
+    expect(body.message).toBe('Some retryable reason.');
     expect(body.error).toBe(body.message);
   });
 });

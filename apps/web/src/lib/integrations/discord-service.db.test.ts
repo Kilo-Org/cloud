@@ -20,6 +20,13 @@ jest.mock('@/lib/slack-bot/model-allow-list', () => ({
   getDefaultAllowedModel: jest.fn(async () => 'test-model'),
 }));
 
+// The removal path returns `unavailable` before it fetches when no bot token is
+// configured, so the authenticated-test environment supplies one.
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/config.server'),
+  DISCORD_BOT_TOKEN: 'bot-token',
+}));
+
 const mockCaptureException = jest.fn();
 jest.mock('@sentry/nextjs', () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
@@ -404,6 +411,39 @@ describe('Discord installation lifecycle', () => {
         .where(eq(platform_integrations.owned_by_user_id, otherUserId));
       await db.delete(kilocode_users).where(eq(kilocode_users.id, otherUserId));
     }
+  });
+
+  it('removes the rows of this owner that record the released server', async () => {
+    // A connection can carry the server in both identifier columns, so a
+    // disconnect removes each row that records the server it released.
+    const guild = { id: '543210987654321098', name: 'Sibling Row Server', icon: null };
+
+    const canonicalId = await insertDiscordRow({ type: 'user', id: userId }, guild);
+    const legacyId = await insertDiscordRow({ type: 'user', id: userId }, guild, {
+      installationId: null,
+    });
+    const fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(null, { status: 204 }));
+
+    await expect(uninstallApp({ type: 'user', id: userId })).resolves.toEqual({ success: true });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const remaining = await db
+      .select({ id: platform_integrations.id })
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.platform, PLATFORM.DISCORD),
+          eq(platform_integrations.owned_by_user_id, userId),
+          eq(platform_integrations.platform_account_id, guild.id)
+        )
+      );
+    expect(remaining.map(row => row.id)).not.toContain(canonicalId);
+    expect(remaining.map(row => row.id)).not.toContain(legacyId);
+    expect(remaining).toHaveLength(0);
+
+    jest.restoreAllMocks();
   });
 
   it('serializes two owners connecting the same server', async () => {

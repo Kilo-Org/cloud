@@ -625,10 +625,10 @@ const DISCORD_DISCONNECT_ATTEMPTS = 2;
 /**
  * The disconnect's serialized section. It holds the locks the connect path takes
  * for this owner and server, reads the row, requires the server to be
- * exclusively this connection's, removes the bot, and deletes the row only for a
- * server it just removed. It runs at most three statements (row read, ownership
- * check, delete), which is what `DISCORD_DISCONNECT_REMOVAL_TIMEOUT_MS` budgets
- * for.
+ * exclusively this connection's, removes the bot, and deletes the rows this
+ * owner records that server in, only for a server it just removed. It runs at
+ * most three statements (row read, ownership check, delete), which is what
+ * `DISCORD_DISCONNECT_REMOVAL_TIMEOUT_MS` budgets for.
  */
 async function runLockedDiscordDisconnect(
   owner: Owner,
@@ -671,12 +671,18 @@ async function runLockedDiscordDisconnect(
         return { kind: 'removal', removal };
       }
 
-      // The row was re-read and the row and server were both checked above, so
-      // the delete names them both: a row that moved matches nothing here.
+      // The row was re-read and the server was checked above, so the delete
+      // names the owner and the server: a row that moved matches nothing here.
+      // Naming the owner and the server covers every row that records the
+      // server, whichever identifier column carries it.
       await tx
         .delete(platform_integrations)
         .where(
-          and(eq(platform_integrations.id, current.id), recordsDiscordGuildCondition(guildId))
+          and(
+            eq(platform_integrations.platform, PLATFORM.DISCORD),
+            recordsDiscordGuildCondition(guildId),
+            ...getOwnershipConditions(owner)
+          )
         );
 
       return { kind: 'removal', removal };
@@ -698,9 +704,9 @@ async function runLockedDiscordDisconnect(
  * and server locks the connect path takes, so a connect that moves this owner's
  * connection to another server cannot interleave with it. Inside the locks it
  * reads the row, requires the server to be exclusively this connection's, and
- * removes the bot; its delete then names both the row it read and the server it
- * removed, so it only removes the row it decided on. Every delete this call
- * makes names a row it read in the same locked section.
+ * removes the bot; its delete then names the owner and the server it removed, so
+ * it removes the rows of that server. Every delete this call makes names a
+ * server it checked in the same locked section.
  *
  * A row that records a different server when the lock is held is followed to
  * that server, at most `DISCORD_DISCONNECT_ATTEMPTS` times, so the call acts on

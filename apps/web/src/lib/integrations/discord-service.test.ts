@@ -780,7 +780,7 @@ describe('discord-service uninstall', () => {
     });
   });
 
-  it('names the server in the guarded delete', async () => {
+  it('names the owner and the server in the guarded delete', async () => {
     mockLimit.mockResolvedValue([buildDiscordIntegration()]);
     mockTxReadLimit.mockResolvedValue([buildDiscordIntegration()]);
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
@@ -789,8 +789,12 @@ describe('discord-service uninstall', () => {
 
     const predicate = mockDeleteWhere.mock.calls[0][0];
     const rendered = new PgDialect().sqlToQuery(predicate as SQL);
-    expect(rendered.params).toContain(guildId);
-    expect(rendered.params).toContain('integration-1');
+    // The server id appears twice: once per identifier column the predicate
+    // covers.
+    expect(rendered.params.filter(param => param === guildId)).toHaveLength(2);
+    expect(rendered.params).toContain(owner.id);
+    expect(rendered.sql).toContain('"platform_installation_id"');
+    expect(rendered.sql).toContain('"platform_account_id"');
   });
 
   it('follows the row to the server it moved to before removing anything', async () => {

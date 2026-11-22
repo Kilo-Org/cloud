@@ -459,6 +459,8 @@ const COMPLETED_MESSAGE_SCAN_LIMIT = 50;
  */
 const RAW_EXPORT_PAGE_ROWS = 200;
 const RAW_EXPORT_PAGE_MAX_BYTES = 4 * 1024 * 1024;
+/** Set while an empty export's reset is pending; cleared or consumed by the alarm. */
+const EMPTY_CLEANUP_KEY = 'emptyCleanupPending';
 /** Delay so the reset alarm cannot race the response of the export that asked for it. */
 const EMPTY_CLEANUP_DELAY_MS = 1000;
 
@@ -2024,18 +2026,26 @@ export class SessionIngestDO extends DurableObject<Env> {
 
   /** Emits session metrics after close drain or inactivity, once per turn. */
   async alarm(): Promise<void> {
-    // An alarm on an object that stores nothing was scheduled by an empty
-    // export: ingest writes its meta rows before any item, so a metrics alarm
-    // always runs on stored data. The checks and the reset share one synchronous
-    // stretch; deleteAll() drops the schema too, so the object is restarted and
-    // the next request runs the constructor migration. An object that gained a
-    // row since the export is left alone.
-    if (!this.hasAnyData()) {
-      await this.ctx.storage.deleteAlarm();
-      if (this.hasAnyData()) return;
-      await this.ctx.storage.deleteAll();
-      this.ctx.abort();
-      return;
+    // Only an empty export arms an alarm on an object that stores nothing, and
+    // this marker tells that alarm apart from a metrics alarm the session armed
+    // itself. The checks and the reset share one synchronous stretch around the
+    // marker read, and deleteAll() drops the schema too, so the object is
+    // restarted and the next request runs the constructor migration.
+    if ((await this.ctx.storage.get(EMPTY_CLEANUP_KEY)) === true) {
+      if (!this.hasAnyData()) {
+        await this.ctx.storage.deleteAlarm();
+        if (!this.hasAnyData()) {
+          await this.ctx.storage.deleteAll();
+          this.ctx.abort();
+          return;
+        }
+      }
+      // The object gained data after the export asked for the reset. Drop the
+      // marker, and run metrics only when the session armed its own metrics
+      // time: this alarm belongs to the cleanup, so it must not emit with the
+      // fallback close reason or latch the emitted flag.
+      await this.ctx.storage.delete(EMPTY_CLEANUP_KEY);
+      if (readIngestMetaValue(this.db, 'metricsAlarmAt') === null) return;
     }
 
     const metaRows = this.db
@@ -2519,11 +2529,12 @@ export class SessionIngestDO extends DurableObject<Env> {
    *
    * With `deleteIfEmpty`, an object that stores nothing at all — no item row and
    * no meta row, so only the constructor's migration has ever written there —
-   * is reset instead of streamed, and the single `end` line carries
-   * `deleted_empty: true`. The reset runs in the alarm because `deleteAll()`
-   * drops the live instance's schema: the object restarts, the next request
-   * migrates a fresh schema, and an object that gained a row in the meantime is
-   * left alone.
+   * is scheduled for a storage reset instead of being streamed, and the single
+   * `end` line carries `empty_cleanup_scheduled: true`. The reset runs in the
+   * alarm because `deleteAll()` drops the live instance's schema: the object
+   * restarts, the next request migrates a fresh schema, and an object that
+   * gained a row before the alarm keeps it (the flag says the cleanup was
+   * scheduled, not that the reset was applied).
    */
   async exportSessionRowsStream({
     deleteIfEmpty = false,
@@ -2534,14 +2545,14 @@ export class SessionIngestDO extends DurableObject<Env> {
     if (deleteIfEmpty && !this.hasAnyData()) {
       // deleteAll() also drops this instance's SQLite schema (the constructor
       // migration runs once), so it cannot run while a caller waits on the
-      // response. The alarm applies the reset, and an empty object can only have
-      // a pending alarm because this export scheduled it: ingest writes its meta
-      // rows before any item, so a metrics alarm always runs on stored data.
+      // response. The marker identifies the pending reset, and the alarm applies
+      // it once it can restart the object without racing a caller.
+      await this.ctx.storage.put(EMPTY_CLEANUP_KEY, true);
       await this.ctx.storage.setAlarm(Date.now() + EMPTY_CLEANUP_DELAY_MS);
       return new ReadableStream<Uint8Array>({
         start: controller => {
           controller.enqueue(
-            encoder.encode(ndjsonLine({ t: 'end', rows: 0, deleted_empty: true }))
+            encoder.encode(ndjsonLine({ t: 'end', rows: 0, empty_cleanup_scheduled: true }))
           );
           controller.close();
         },

@@ -4882,7 +4882,7 @@ describe('SessionIngestDO raw row export', () => {
       await new Response(await stub.exportSessionRowsStream({ deleteIfEmpty: true })).text()
     );
 
-    expect(lines).toEqual([{ t: 'end', rows: 0, deleted_empty: true }]);
+    expect(lines).toEqual([{ t: 'end', rows: 0, empty_cleanup_scheduled: true }]);
 
     // The reset is applied by the alarm, so it cannot race this response. The
     // abort that follows the reset surfaces to the alarm's caller.
@@ -4905,12 +4905,13 @@ describe('SessionIngestDO raw row export', () => {
     const lines = parseNdjson(
       await new Response(await stub.exportSessionRowsStream({ deleteIfEmpty: true })).text()
     );
-    expect(lines).toEqual([{ t: 'end', rows: 0, deleted_empty: true }]);
+    expect(lines).toEqual([{ t: 'end', rows: 0, empty_cleanup_scheduled: true }]);
 
-    // A row lands before the alarm runs: the reset must stand down. The alarm
-    // then continues into the metrics path, and the test worker has no O11Y
-    // service binding; the DO keeps its bindings on a plain property, so a test
-    // can replace them as the other alarm tests do.
+    // A row lands before the alarm runs, from a batch that does not arm metrics.
+    // The reset must stand down, and because this alarm belongs to the cleanup
+    // it must neither emit metrics nor latch the emitted flag. The O11Y stub
+    // fails the test if metrics run; the DO keeps its bindings on a plain
+    // property, so a test can replace them.
     await stub.ingest(
       [{ type: 'message', data: { id: 'msg_late', role: 'user' } }],
       kiloUserId,
@@ -4921,11 +4922,25 @@ describe('SessionIngestDO raw row export', () => {
     await runInDurableObject(stub, instance => {
       const doInstance = instance as unknown as { env: Record<string, unknown> };
       Object.defineProperty(doInstance, 'env', {
-        value: { ...doInstance.env, O11Y: { ingestSessionMetrics: async () => {} } },
+        value: {
+          ...doInstance.env,
+          O11Y: {
+            ingestSessionMetrics: async () => {
+              throw new Error('cleanup alarm must not emit metrics');
+            },
+          },
+        },
         configurable: true,
       });
     });
     expect(await runDurableObjectAlarm(stub)).toBe(true);
+
+    const metricsEmitted = await runInDurableObject(stub, (_instance, state) => [
+      ...state.storage.sql.exec<{ value: string }>(
+        "SELECT value FROM ingest_meta WHERE key = 'metricsEmitted'"
+      ),
+    ]);
+    expect(metricsEmitted).toEqual([]);
 
     const after = parseNdjson(await new Response(await stub.exportSessionRowsStream()).text());
     expect(after.filter(line => line.t === 'row').map(row => row.item_id)).toEqual([

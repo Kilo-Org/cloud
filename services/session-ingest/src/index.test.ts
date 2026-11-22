@@ -858,7 +858,7 @@ describe('internal session-rows export route', () => {
   it('passes the opt-in empty cleanup to the Durable Object', async () => {
     const stub = {
       exportSessionRowsStream: vi.fn(
-        async () => new Response('{"t":"end","rows":0,"deleted_empty":true}\n').body!
+        async () => new Response('{"t":"end","rows":0,"empty_cleanup_scheduled":true}\n').body!
       ),
     };
     vi.mocked(getSessionIngestDO).mockReturnValue(stub as never);
@@ -874,7 +874,7 @@ describe('internal session-rows export route', () => {
     );
 
     expect(res.status).toBe(200);
-    expect(await res.text()).toBe('{"t":"end","rows":0,"deleted_empty":true}\n');
+    expect(await res.text()).toBe('{"t":"end","rows":0,"empty_cleanup_scheduled":true}\n');
     expect(stub.exportSessionRowsStream).toHaveBeenCalledWith({ deleteIfEmpty: true });
   });
 

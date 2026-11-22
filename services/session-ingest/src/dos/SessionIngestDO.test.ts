@@ -662,7 +662,12 @@ describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
       operations.push('deleteAlarm');
     });
     const state = {
-      storage: { setAlarm: vi.fn(), deleteAlarm, transactionSync: (fn: () => unknown) => fn() },
+      storage: {
+        setAlarm: vi.fn(),
+        get: vi.fn(async () => undefined),
+        deleteAlarm,
+        transactionSync: (fn: () => unknown) => fn(),
+      },
       blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
     } as unknown as DurableObjectState;
 
@@ -1159,6 +1164,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
       setAlarm: vi.fn(async (at: number) => {
         alarmAt = at;
       }),
+      get: vi.fn(async () => undefined),
       getAlarm: vi.fn(async () => alarmAt),
       deleteAlarm: vi.fn(async () => {
         alarmAt = null;

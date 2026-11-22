@@ -25,7 +25,9 @@ import type { SlaConfig } from './security-config-types';
 import {
   getSecurityAgentCommandFailureTitle,
   getSecurityAgentDismissalTerminalTitle,
+  isSecurityCommandInProgressError,
   securityAgentCommandAdmissionCopy,
+  securityCommandInProgressCopy,
 } from './security-agent-command-copy';
 import {
   deletedSecurityAgentFindingsScopes,
@@ -789,6 +791,11 @@ function useSecurityAgentProviderValue(
       },
       onError: error => {
         const message = error instanceof Error ? error.message : String(error);
+        const inProgress = securityCommandInProgressCopy('sync');
+        if (inProgress && isSecurityCommandInProgressError(error)) {
+          toast.info(inProgress.title, { description: inProgress.description });
+          return;
+        }
         if (isGitHubIntegrationError(error)) {
           dispatchProviderState({ type: 'set-github-error', error: message });
           toast.error('GitHub integration error', {
@@ -810,6 +817,11 @@ function useSecurityAgentProviderValue(
         trackCommand(data.commandId);
       },
       onError: error => {
+        const inProgress = securityCommandInProgressCopy('dismiss_finding');
+        if (inProgress && isSecurityCommandInProgressError(error)) {
+          toast.info(inProgress.title, { description: inProgress.description });
+          return;
+        }
         toast.error('Failed to dismiss finding', { description: error.message });
       },
     })
@@ -979,6 +991,11 @@ function useSecurityAgentProviderValue(
       },
       onError: error => {
         const message = error instanceof Error ? error.message : String(error);
+        const inProgress = securityCommandInProgressCopy('sync');
+        if (inProgress && isSecurityCommandInProgressError(error)) {
+          toast.info(inProgress.title, { description: inProgress.description });
+          return;
+        }
         if (isGitHubIntegrationError(error)) {
           dispatchProviderState({ type: 'set-github-error', error: message });
           toast.error('GitHub integration error', {
@@ -1000,6 +1017,11 @@ function useSecurityAgentProviderValue(
         trackCommand(data.commandId);
       },
       onError: error => {
+        const inProgress = securityCommandInProgressCopy('dismiss_finding');
+        if (inProgress && isSecurityCommandInProgressError(error)) {
+          toast.info(inProgress.title, { description: inProgress.description });
+          return;
+        }
         toast.error('Failed to dismiss finding', { description: error.message });
       },
     })

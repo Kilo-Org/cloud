@@ -1,9 +1,12 @@
 import { describe, expect, it } from '@jest/globals';
+import { SECURITY_OPERATION_IN_PROGRESS_MESSAGE } from '@kilocode/app-shared/security-agent';
 import {
   getSecurityAgentCommandFailureTitle,
   getSecurityAgentDismissalTerminalTitle,
+  isSecurityCommandInProgressError,
   manualAnalysisAdmissionCopy,
   securityAgentCommandAdmissionCopy,
+  securityCommandInProgressCopy,
 } from './security-agent-command-copy';
 
 describe('securityAgentCommandAdmissionCopy', () => {
@@ -27,5 +30,24 @@ describe('securityAgentCommandAdmissionCopy', () => {
   it('describes dismissal terminal states separately from queued admission', () => {
     expect(getSecurityAgentDismissalTerminalTitle('succeeded')).toBe('Finding dismissed');
     expect(getSecurityAgentDismissalTerminalTitle('no_op')).toBe('Finding already dismissed');
+  });
+
+  it('matches the in-progress marker by exact message', () => {
+    expect(
+      isSecurityCommandInProgressError(new Error(SECURITY_OPERATION_IN_PROGRESS_MESSAGE))
+    ).toBe(true);
+    expect(isSecurityCommandInProgressError(new Error('Queue unavailable'))).toBe(false);
+  });
+
+  it('offers wait copy for queue-backed actions only', () => {
+    expect(securityCommandInProgressCopy('sync')).toEqual({
+      title: 'A sync is already running',
+      description: 'Wait for it to finish. Findings update when it completes.',
+    });
+    expect(securityCommandInProgressCopy('dismiss_finding')).toEqual({
+      title: 'Dismissal already in progress',
+      description: 'Wait for it to finish before trying again.',
+    });
+    expect(securityCommandInProgressCopy('start_analysis')).toBeNull();
   });
 });

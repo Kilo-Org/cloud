@@ -1,4 +1,7 @@
-import type { SecurityCommandType } from '@kilocode/app-shared/security-agent';
+import {
+  SECURITY_OPERATION_IN_PROGRESS_MESSAGE,
+  type SecurityCommandType,
+} from '@kilocode/app-shared/security-agent';
 
 export type SecurityAgentAdmissionAction =
   | SecurityCommandType
@@ -58,4 +61,35 @@ export function getSecurityAgentCommandFailureTitle(commandType: SecurityAgentAd
 
 export function getSecurityAgentDismissalTerminalTitle(status: SecurityAgentCommandStatus) {
   return status === 'no_op' ? 'Finding already dismissed' : 'Finding dismissed';
+}
+
+export type SecurityCommandInProgressCopy = { title: string; description: string };
+
+/**
+ * Toast for a submission that lost the admission race to the command already
+ * in flight, so the reader waits instead of reading a raw conflict marker.
+ */
+export function securityCommandInProgressCopy(
+  action: SecurityAgentAdmissionAction
+): SecurityCommandInProgressCopy | null {
+  switch (action) {
+    case 'sync':
+      return {
+        title: 'A sync is already running',
+        description: 'Wait for it to finish. Findings update when it completes.',
+      };
+    case 'dismiss_finding':
+      return {
+        title: 'Dismissal already in progress',
+        description: 'Wait for it to finish before trying again.',
+      };
+    default:
+      return null;
+  }
+}
+
+/** True when the submission lost to the command already in flight. */
+export function isSecurityCommandInProgressError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message === SECURITY_OPERATION_IN_PROGRESS_MESSAGE;
 }

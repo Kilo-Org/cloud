@@ -87,6 +87,7 @@ import {
   REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS,
 } from '@kilocode/worker-utils/security-finding-audit';
 import {
+  SECURITY_OPERATION_IN_PROGRESS_MESSAGE,
   SECURITY_SYNC_PRECONDITION_CODES,
   type SecuritySyncPreconditionCode,
 } from '@kilocode/app-shared/security-agent';
@@ -148,6 +149,7 @@ import {
 } from '@/lib/security-agent/services/audit-log-service';
 import {
   admitOperation,
+  getOperation,
   isTerminalOperationStatus,
   markReconcilePending,
   recordOperationAcceptance,
@@ -351,18 +353,20 @@ async function assembleAuditReportResponse<TExtra>(params: {
   }
 }
 
-// The manual sync and finding dismissal procedures accept an optional
-// `operationKey`. When present, the handler admits a `security`-domain ledger
-// row BEFORE submitting to the security-sync Worker, and only then runs the
-// submission. Later same-key calls dedupe, replay the canonical result, or
-// conflict. The Worker dedupes the command itself by `operation_key`, so the
-// Worker settles the ledger row from the terminal command state. The
-// `getCommandStatus` handler retries that settle as a fallback, joined by the
-// stored `provider_ref` (the Worker's `commandId`). A
-// definitive pre-acceptance rejection (4xx, disabled routing, unconfigured
-// service) settles the row `failed`; an ambiguous transport outcome
-// (network/5xx/lost correlation ids) marks the row `reconcile_pending` so a
-// same-key retry re-submits instead of re-executing blind.
+// Every manual sync and dismissal submission is admitted through the
+// `security`-domain ledger BEFORE it reaches the security-sync Worker, so
+// admission is not optional. A client `operationKey` is kept as sent, and a
+// keyless client gets a server-minted key over the owner scope, the intent and
+// the target (`mintedSubmissionOperationKey`), so a repeated intent replays the
+// settled result or conflicts instead of queueing a second command. The Worker
+// dedupes the command itself by `operation_key`, so the Worker settles the
+// ledger row from the terminal command state. The `getCommandStatus` handler
+// retries that settle as a fallback, joined by the stored `provider_ref` (the
+// Worker's `commandId`). A definitive pre-acceptance rejection (4xx, disabled
+// routing, unconfigured service) settles the row `failed`; an ambiguous
+// transport outcome (network/5xx/lost correlation ids) marks the row
+// `reconcile_pending` so a same-key retry re-submits instead of re-executing
+// blind.
 
 type SecurityLedgerIntent =
   | 'manual_sync'
@@ -436,6 +440,77 @@ function enableSyncOperationKey(owner: SecurityReviewOwner, configRevision: numb
     .update(`security:enable_sync:${securityOwnerScopeKey(owner)}:${configRevision}`)
     .digest('hex');
   return `enable_sync:${digest}`;
+}
+
+/**
+ * Window in which two submissions that arrive without a client operation key
+ * are the same intent. It is longer than a manual sync normally takes, so a
+ * repeat that arrives while the first command is queued or running settles as
+ * a duplicate instead of queueing a second command.
+ */
+const SUBMISSION_DEDUPE_WINDOW_MS = 5 * 60_000;
+
+/** Terminal outcomes that release a window: the intent did not happen. */
+const RELEASED_SUBMISSION_STATUSES: ReadonlySet<string> = new Set([
+  'failed',
+  'interrupted',
+  'superseded',
+]);
+
+/** Bounded chain depth for released windows, so a repeated failure still retries. */
+const SUBMISSION_RELEASE_CHAIN_LIMIT = 4;
+
+function submissionKeyDigest(value: string, length: number): string {
+  return createHash('sha256').update(value).digest('hex').slice(0, length);
+}
+
+/**
+ * Operation key minted on the server for a submission whose client sent none.
+ *
+ * It digests the owner scope, the intent, the ledger resource key of the target
+ * and the current dedupe window, so two submissions for one target inside a
+ * window share an identity: the ledger replays a settled command or conflicts
+ * while it is in flight. Another repository, finding or dismissal input is
+ * another target and gets its own key, and a submission in a later window is
+ * another intent that runs.
+ *
+ * A window whose submission settled as failed, or that was interrupted, is
+ * released instead: a settled failure cannot replay, so the key is re-derived
+ * from that row and the next attempt runs. Each release generation is consumed
+ * once along a bounded chain, so a retry after a failure runs, a repeat of that
+ * retry dedupes, and a run of repeated failures still yields a runnable key
+ * without an unbounded read.
+ */
+async function mintedSubmissionOperationKey(params: {
+  ctx: TRPCContext;
+  owner: SecurityReviewOwner;
+  intent: 'manual_sync' | 'dismiss_finding';
+  resourceKey: string;
+}): Promise<string> {
+  const window = Math.floor(Date.now() / SUBMISSION_DEDUPE_WINDOW_MS);
+  const base = `mt:${params.intent}:${submissionKeyDigest(
+    [
+      'security:submission',
+      securityOwnerScopeKey(params.owner),
+      params.intent,
+      params.resourceKey,
+      String(window),
+    ].join(':'),
+    48
+  )}`;
+  let key = base;
+  for (let step = 0; step < SUBMISSION_RELEASE_CHAIN_LIMIT; step += 1) {
+    const previous = await getOperation(db, {
+      userId: params.ctx.user.id,
+      domain: 'security',
+      operationKey: key,
+    });
+    if (!previous || !RELEASED_SUBMISSION_STATUSES.has(previous.status)) {
+      return key;
+    }
+    key = `${base}:r${submissionKeyDigest(previous.id, 16)}`;
+  }
+  return key;
 }
 
 /** Trimmed, whitespace-collapsed comment, so cosmetic spacing is not a key-reuse mismatch. */
@@ -651,7 +726,10 @@ async function runSecurityLedgerSubmit(args: {
       return { kind: 'replayed', canonical: replaySettledSecurityRow(admission.row) };
     case 'duplicate_in_flight':
     case 'duplicate_reconcile_in_progress':
-      throw new TRPCError({ code: 'CONFLICT', message: 'operation_in_progress' });
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: SECURITY_OPERATION_IN_PROGRESS_MESSAGE,
+      });
   }
 }
 
@@ -1688,6 +1766,16 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           syncScope = { syncType: 'all_repos', repoCount: repositoriesToSync.length };
         }
 
+        const resourceKey = securitySyncLedgerResourceKey(securityOwner, input.repoFullName);
+        const operationKey =
+          input.operationKey ??
+          (await mintedSubmissionOperationKey({
+            ctx,
+            owner: securityOwner,
+            intent: 'manual_sync',
+            resourceKey,
+          }));
+
         const submitParams = {
           owner: securityOwner,
           actor: {
@@ -1697,23 +1785,20 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           },
           origin: 'dashboard_refresh' as const,
           repoFullName: input.repoFullName,
-          operationKey: input.operationKey,
+          operationKey,
         };
 
-        // With an `operationKey`, admit a `security`-domain ledger row before
-        // submitting (P1-A-08e). A replayed settled duplicate returns the
-        // recorded correlation ids without re-triggering tracking or audit.
-        const result: SecurityCommandResult =
-          input.operationKey === undefined
-            ? { kind: 'accepted', accepted: await submitManualSecuritySync(submitParams) }
-            : await runSecurityLedgerSubmit({
-                ctx,
-                owner: securityOwner,
-                intent: 'manual_sync',
-                operationKey: input.operationKey,
-                resourceKey: securitySyncLedgerResourceKey(securityOwner, input.repoFullName),
-                submit: () => submitManualSecuritySync(submitParams),
-              });
+        // Every submission is admitted (P1-A-08e): a client key is used as
+        // sent, and a keyless client gets a server-minted key, so a repeated
+        // intent replays or conflicts instead of queueing another command.
+        const result: SecurityCommandResult = await runSecurityLedgerSubmit({
+          ctx,
+          owner: securityOwner,
+          intent: 'manual_sync',
+          operationKey,
+          resourceKey,
+          submit: () => submitManualSecuritySync(submitParams),
+        });
         if (result.kind === 'replayed') {
           return replayedSecurityResponse(result.canonical);
         }
@@ -1796,6 +1881,21 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
+        const resourceKey = securityDismissLedgerResourceKey(
+          securityOwner,
+          input.findingId,
+          input.reason,
+          input.comment
+        );
+        const operationKey =
+          input.operationKey ??
+          (await mintedSubmissionOperationKey({
+            ctx,
+            owner: securityOwner,
+            intent: 'dismiss_finding',
+            resourceKey,
+          }));
+
         const submitParams = {
           owner: securityOwner,
           actor: { id: ctx.user.id, email: ctx.user.google_user_email },
@@ -1803,28 +1903,20 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           installationId,
           reason: input.reason,
           comment: input.comment,
-          operationKey: input.operationKey,
+          operationKey,
         };
 
-        // With an `operationKey`, admit a `security`-domain ledger row before
-        // submitting (P1-A-08e). A replayed settled duplicate returns the
-        // recorded correlation ids without re-triggering tracking.
-        const result: SecurityCommandResult =
-          input.operationKey === undefined
-            ? { kind: 'accepted', accepted: await submitManualFindingDismissal(submitParams) }
-            : await runSecurityLedgerSubmit({
-                ctx,
-                owner: securityOwner,
-                intent: 'dismiss_finding',
-                operationKey: input.operationKey,
-                resourceKey: securityDismissLedgerResourceKey(
-                  securityOwner,
-                  input.findingId,
-                  input.reason,
-                  input.comment
-                ),
-                submit: () => submitManualFindingDismissal(submitParams),
-              });
+        // Every submission is admitted (P1-A-08e): a client key is used as
+        // sent, and a keyless client gets a server-minted key, so a repeated
+        // intent replays or conflicts instead of queueing another command.
+        const result: SecurityCommandResult = await runSecurityLedgerSubmit({
+          ctx,
+          owner: securityOwner,
+          intent: 'dismiss_finding',
+          operationKey,
+          resourceKey,
+          submit: () => submitManualFindingDismissal(submitParams),
+        });
         if (result.kind === 'replayed') {
           return replayedSecurityResponse(result.canonical);
         }

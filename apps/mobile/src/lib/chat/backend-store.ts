@@ -165,7 +165,8 @@ const draftSchema = z
     apiKey: z
       .string()
       .trim()
-      .refine(value => /^[\u0020-\u007E\u0080-\u00FF]*$/.test(value)),
+      // Printable set the app can send: an invisible control is a paste mistake.
+      .refine(value => /^[\u0020-\u007E\u00A0-\u00FF]*$/.test(value)),
     headers: backendHeadersSchema,
     models: z
       .array(backendModelSchema)

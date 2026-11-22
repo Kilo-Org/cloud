@@ -186,6 +186,30 @@ describe('secure backend profiles', () => {
     );
   });
 
+  it('refuses an invisible C1 control inside the API key without quoting the key', async () => {
+    const store = await import('./backend-store');
+    const failure = captureError(() =>
+      store.validateChatBackendDraft({ ...draft, apiKey: 'sec\u0085ret' })
+    );
+    expect(failure).toBeInstanceOf(store.BackendInputError);
+    expect((failure as InstanceType<typeof store.BackendInputError>).problem).toBe('invalidApiKey');
+    expect(failure.message).not.toContain('sec');
+    expect(failure.message).not.toContain('ret');
+
+    const connection = captureError(() =>
+      store.validateBackendConnection({ ...draft, apiKey: 'sec\u0085ret' })
+    );
+    expect((connection as InstanceType<typeof store.BackendInputError>).problem).toBe(
+      'invalidApiKey'
+    );
+  });
+
+  it('keeps a printable Latin-1 letter in the API key intact', async () => {
+    const store = await import('./backend-store');
+    const parsed = store.validateChatBackendDraft({ ...draft, apiKey: 'señor-key' });
+    expect(parsed.apiKey).toBe('señor-key');
+  });
+
   it('reports a failure that names no field as invalidInput', async () => {
     const store = await import('./backend-store');
     const failure = captureError(() => store.validateChatBackendDraft({ ...draft, name: ' ' }));

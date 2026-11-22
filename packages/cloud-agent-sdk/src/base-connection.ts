@@ -216,6 +216,10 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
             // that just failed auth. Report the loss and retry with backoff.
             console.error('[Connection] Failed to refresh auth:', err);
             if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
+            // An abandoned attempt does not own the connection state any more:
+            // reporting its loss or spending the retry budget would disturb the
+            // socket the attempt that replaced it is opening or holding.
+            if (!entry.holdingGate || inflightRefresh !== entry) return;
             config.onUnexpectedDisconnect?.();
             scheduleReconnect(reconnectAttempt, expectedGeneration);
             return;

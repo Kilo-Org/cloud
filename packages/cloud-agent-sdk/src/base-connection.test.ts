@@ -1224,6 +1224,66 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
 
       connection.destroy();
     });
+
+    it('does not report a loss for an abandoned auth-close refresh that rejects later', async () => {
+      jest.spyOn(Math, 'random').mockReturnValue(0);
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+      // The first refresh never settles: a mobile auth call on a dead link.
+      // This package's `lib` target predates `Promise.withResolvers`.
+      let rejectStuckRefresh!: (err: Error) => void;
+      const stuckRefresh = new Promise<void>((_resolve, reject) => {
+        rejectStuckRefresh = reject;
+      });
+      const refreshAuth = jest
+        .fn()
+        .mockImplementationOnce(() => stuckRefresh)
+        .mockImplementationOnce(() => Promise.reject(new Error('refresh failed')))
+        .mockImplementation(() => Promise.resolve());
+      const { connection, onUnexpectedDisconnect } = createTestConnection({
+        refreshAuth,
+        maxReconnectAttempts: 20,
+        isAuthFailure: event => event.code === 4001,
+      });
+      connection.connect();
+      connectSocket(0);
+
+      closeSocket(0, 4001);
+      expect(refreshAuth).toHaveBeenCalledTimes(1);
+      expect(onUnexpectedDisconnect).not.toHaveBeenCalled();
+
+      // Past the join window this resume trigger abandons the stuck auth-close
+      // attempt and starts its own refresh, which rejects. A resume rejection
+      // keeps the existing ticket, so it opens one socket and reports nothing.
+      jest.advanceTimersByTime(20_000);
+      mockWindow.dispatchEvent(new Event('online'));
+      expect(refreshAuth).toHaveBeenCalledTimes(2);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(onUnexpectedDisconnect).not.toHaveBeenCalled();
+      expect(sockets).toHaveLength(2);
+
+      // The abandoned attempt's own rejection is what must stay silent: a newer
+      // attempt owns the connection and its retry budget now.
+      rejectStuckRefresh(new Error('refresh failed'));
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(consoleError).toHaveBeenCalledWith(
+        '[Connection] Failed to refresh auth:',
+        expect.any(Error)
+      );
+      expect(onUnexpectedDisconnect).not.toHaveBeenCalled();
+      expect(sockets).toHaveLength(2);
+
+      // No socket from a retry the abandoned attempt must not schedule either.
+      jest.advanceTimersByTime(60_000);
+      expect(sockets).toHaveLength(2);
+      expect(onUnexpectedDisconnect).not.toHaveBeenCalled();
+
+      // Two refreshes only: the stuck auth-close attempt, then the resume one.
+      expect(refreshAuth).toHaveBeenCalledTimes(2);
+
+      connection.destroy();
+    });
   });
 
   describe('pause while hidden (hiddenPauseDelayMs)', () => {

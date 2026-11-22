@@ -73,7 +73,7 @@ describe('the remote MCP server form', () => {
 
     expect(saveButton().disabled).toBe(true);
     expect(fields()[1]?.validate?.('ftp://remote.example/mcp')).toBe(
-      'modelChat.mcp.fieldUrlInvalid'
+      'modelChat.mcp.fieldUrlInsecure'
     );
   });
 

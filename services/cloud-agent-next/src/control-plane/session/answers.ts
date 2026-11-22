@@ -1,5 +1,6 @@
 import type {
   ControlPlaneAnswerReply,
+  ControlPlaneContinuationIntent,
   ControlPlanePromptPayload,
 } from '../../shared/control-plane-protocol.js';
 import type { SessionMessage } from './messages.js';
@@ -34,6 +35,43 @@ export function answerPromptText(reply: ControlPlaneAnswerReply): string | null 
 }
 
 /**
+ * Whether two continuation intents are the same admitted turn. The Worker
+ * preflights the intent `answer` produced and returns it to the DO for
+ * admission, so the DO compares that intent with the one this session's current
+ * state produces before it writes anything.
+ */
+export function sameContinuationIntent(
+  left: ControlPlanePromptPayload,
+  right: ControlPlaneContinuationIntent
+): boolean {
+  // A stored intent is a prompt turn; a command intent can never be a continuation.
+  if (left.turn.type !== 'prompt') return false;
+  return (
+    left.messageId === right.messageId &&
+    left.turn.prompt === right.turn.prompt &&
+    left.agent.mode === right.agent.mode &&
+    left.agent.model === right.agent.model &&
+    left.agent.variant === right.agent.variant &&
+    left.finalization?.autoCommit === right.finalization?.autoCommit &&
+    left.finalization?.condenseOnComplete === right.finalization?.condenseOnComplete
+  );
+}
+
+/**
+ * The admitted payload for a continuation. `answerMessageIntent` emits no
+ * server-owned `context`, attachment, or synthetic part, so this widens the
+ * continuation into the admitted shape the Session DO stores and nothing else.
+ */
+export function admittedPayload(intent: ControlPlaneContinuationIntent): ControlPlanePromptPayload {
+  return {
+    messageId: intent.messageId,
+    turn: { type: 'prompt', prompt: intent.turn.prompt },
+    agent: intent.agent,
+    ...(intent.finalization === undefined ? {} : { finalization: intent.finalization }),
+  };
+}
+
+/**
  * Spec §5: an answer for a turn that already settled becomes a new message. The
  * new message continues the session's last turn, so it reuses that intent's
  * agent, model and finalization and only its content is the answer. A command
@@ -46,7 +84,7 @@ export function answerMessageIntent(
   reply: ControlPlaneAnswerReply,
   messageId: string,
   fallbackModel?: string
-): ControlPlanePromptPayload | null {
+): ControlPlaneContinuationIntent | null {
   const last = messages[messages.length - 1];
   if (last === undefined) return null;
   const prompt = answerPromptText(reply);
@@ -56,7 +94,7 @@ export function answerMessageIntent(
   if (resolvedModel === undefined) return null;
   return {
     messageId,
-    turn: { type: 'prompt', prompt },
+    turn: { type: 'prompt' as const, prompt },
     agent: { mode, model: resolvedModel, ...(variant === undefined ? {} : { variant }) },
     ...(last.intent.finalization === undefined ? {} : { finalization: last.intent.finalization }),
   };

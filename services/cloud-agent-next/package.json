@@ -49,6 +49,7 @@
     "@hono/trpc-server": "0.4.2",
     "@kilocode/app-shared": "workspace:*",
     "@kilocode/cloud-agent-profile": "workspace:*",
+    "@kilocode/cloud-agent-sdk": "workspace:*",
     "@kilocode/container-usage": "workspace:*",
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",

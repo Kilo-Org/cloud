@@ -18,6 +18,9 @@ import { prepareMonoScrollContent } from '../mono-scroll-block-model';
 
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
+  // `SelectableText` renders its read-only `TextInput` on iOS only; the walker
+  // below invokes it directly, so the mock names the platform it assumes.
+  Platform: { OS: 'ios' },
   View: 'View',
   TextInput: 'TextInput',
 }));

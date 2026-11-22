@@ -159,6 +159,46 @@ describe('createSecureStorePreference', () => {
     }
   });
 
+  it('settles whenLoaded() while the lock outlasts the wait and reads once at unlock', async () => {
+    // A headless press handler cannot wait for an unlock that may not come. The
+    // bounded wait ends with the value unknown rather than absent, so
+    // whenLoaded() settles with nothing claimed and no read against the locked
+    // keychain, and the first read after the unlock applies what the disk holds.
+    getItemAsync.mockResolvedValue('true');
+    setProtectedDataAvailable(false);
+
+    // Tracking the timers before construction: the store starts its bounded
+    // wait as it is built.
+    vi.useFakeTimers();
+    try {
+      const store = createSecureStorePreference<boolean>({
+        key: 'k',
+        defaultValue: false,
+        parse: raw => raw === 'true',
+        serialize: value => (value ? 'true' : 'false'),
+      });
+
+      // The bound runs out with the device still locked.
+      await vi.advanceTimersByTimeAsync(5_000);
+
+      await expect(store.whenLoaded()).resolves.toBeUndefined();
+      expect(getItemAsync).not.toHaveBeenCalled();
+      expect(store.getHasLoaded()).toBe(false);
+      expect(store.getRequested()).toBe(false);
+
+      // The unlock is the store's one re-read, and it applies the value.
+      setProtectedDataAvailable(true);
+      await vi.waitFor(() => {
+        expect(store.getRequested()).toBe(true);
+      });
+      expect(getItemAsync).toHaveBeenCalledTimes(1);
+      expect(store.getHasLoaded()).toBe(true);
+    } finally {
+      setProtectedDataAvailable(true);
+      vi.useRealTimers();
+    }
+  });
+
   it('retries a rejected read and applies the value from the retry', async () => {
     getItemAsync
       .mockRejectedValueOnce(new Error('keychain unavailable'))

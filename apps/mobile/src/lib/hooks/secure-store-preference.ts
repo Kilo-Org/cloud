@@ -6,7 +6,19 @@ import {
   setAccountMetadata,
 } from '@/lib/auth/account-metadata-write';
 import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
-import { isProtectedDataAvailable, whenProtectedDataAvailable } from '@/lib/protected-data';
+import {
+  assertProtectedDataAvailable,
+  isProtectedDataAvailable,
+  whenProtectedDataAvailable,
+  whenProtectedDataAvailableWithin,
+} from '@/lib/protected-data';
+
+/**
+ * How long a read waits for the keychain before treating the value as unknown:
+ * a headless press handler or a background push cannot spend its budget on an
+ * unlock that may not come.
+ */
+const LOCKED_KEYCHAIN_WAIT_MS = 1_000;
 
 function noop(): void {
   // Placeholder until the promise executor hands over its resolve.
@@ -80,6 +92,11 @@ export function createSecureStorePreference<T>(options: {
    * cleared value back into memory and back onto disk.
    */
   let clearDeletion: Promise<boolean> | undefined = undefined;
+  /**
+   * Whether a re-read is waiting for the next unlock. One per locked window: a
+   * read that finds the keychain locked again must not stack a second waiter.
+   */
+  let awaitingUnlock = false;
   /**
    * Bumped by clear(), and by the `mergeOnLoad` reconcile that repaints the
    * value. A write that started under an earlier epoch still lands (the delete
@@ -207,6 +224,24 @@ export function createSecureStorePreference<T>(options: {
     });
   };
 
+  /**
+   * Reads once more at the next unlock after a read found the keychain locked.
+   * The re-read is the same `load()` path, so every fence it carries applies,
+   * and a value a later write already settled needs no read.
+   */
+  const rereadAtUnlock = async (): Promise<void> => {
+    if (awaitingUnlock) {
+      return;
+    }
+    awaitingUnlock = true;
+    await whenProtectedDataAvailable();
+    awaitingUnlock = false;
+    if (hasLoaded) {
+      return;
+    }
+    await load();
+  };
+
   const load = async () => {
     // A clear() that runs after this read starts must win over the bytes it
     // returns, so the read remembers the epoch it began under.
@@ -216,14 +251,21 @@ export function createSecureStorePreference<T>(options: {
     // locked keychain is not an absent value, so wait for unlock instead of
     // latching the default for the rest of the process. While the data is
     // available the check is synchronous, so the read still starts in the
-    // construction turn.
+    // construction turn, and the wait is bounded so a headless caller settles.
     if (!isProtectedDataAvailable()) {
-      await whenProtectedDataAvailable();
+      await whenProtectedDataAvailableWithin(LOCKED_KEYCHAIN_WAIT_MS);
     }
     // Read after the wait: a clear() that ran meanwhile queued a delete this
     // read must observe and await.
     const deletion = clearDeletion;
+    // Set when the keychain was still locked, so the value is unknown rather
+    // than absent and this read cannot report it as read.
+    let locked = false;
     try {
+      // The wait above is bounded, so the device may still be locked here. The
+      // read must not run against it: the refusal would leave the value
+      // unknown, which the catch below handles like any other locked attempt.
+      assertProtectedDataAvailable();
       if (deletion && !(await deletion)) {
         // The delete a clear() queued never landed, so the disk still holds the
         // snapshot that clear removed. The clear wins: drop it.
@@ -254,15 +296,29 @@ export function createSecureStorePreference<T>(options: {
         void drainWrites();
       }
     } catch {
-      // Keep the default on read failure — this runs at construction, before
+      if (!isProtectedDataAvailable()) {
+        // The device stayed locked for the whole bound, or locked again before
+        // the read could land. The value is unknown, not absent: nothing may
+        // claim it loaded, but `whenLoaded()` still settles so a headless
+        // caller returns, and the store reads again at the next unlock. A
+        // clear() that ran meanwhile owns the disk, so it schedules nothing.
+        locked = true;
+        if (loadEpoch === clearEpoch) {
+          void rereadAtUnlock();
+        }
+      }
+      // Keep the default on a read failure — this runs at construction, before
       // the user has done anything, so there's nothing actionable to tell them.
-      // The read waits for keychain availability first, so a rejection here is
-      // a real read failure rather than a locked-device refusal. The SecureStore
-      // read path already reports that rejection once: a second record here
-      // would only duplicate it.
+      // The SecureStore read path already reports that rejection once: a second
+      // record here would only duplicate it.
     } finally {
-      loadSettled = true;
-      hasLoaded = true;
+      if (!locked) {
+        // Only a read that saw the disk settles the store: an unknown value is
+        // still described by the re-read at unlock, and a write that fails
+        // meanwhile must let that read report what is stored.
+        loadSettled = true;
+        hasLoaded = true;
+      }
       markLoaded();
       emit();
     }

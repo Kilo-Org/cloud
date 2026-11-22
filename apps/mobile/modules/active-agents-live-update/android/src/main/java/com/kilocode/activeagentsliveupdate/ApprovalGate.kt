@@ -57,6 +57,21 @@ internal object ApprovalGate {
     )
 
   /**
+   * Cancel the Approve record of one card. The record is found by the same
+   * request code and intent `pendingIntent` built it from, and `FLAG_NO_CREATE`
+   * answers null instead of making one, so a card that was never posted leaves
+   * nothing behind.
+   */
+  fun cancel(context: Context, requestCode: Int, sessionId: String?, approvalKey: String?) {
+    PendingIntent.getActivity(
+      context,
+      requestCode,
+      intent(context, sessionId, approvalKey),
+      PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+    )?.cancel()
+  }
+
+  /**
    * The Approve action. From API 31 the platform holds the tap until the device
    * is unlocked and shows the keyguard itself; below it the gate activity is
    * what asks, because the action's own authentication flag does not exist.

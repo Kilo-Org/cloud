@@ -78,4 +78,29 @@ class SessionNotificationIdentityTest {
     )
     assertEquals("session", SessionNotificationIdentity.LEGACY_TAG)
   }
+
+  @Test
+  fun `the published build's four action offsets are the ones it used`() {
+    // That build numbered one session's actions Open, Approve, Dismiss and the
+    // quiet alarm from zero, so each offset here names a real record of it.
+    assertEquals(0, SessionNotificationIdentity.LEGACY_OPEN_OFFSET)
+    assertEquals(1, SessionNotificationIdentity.LEGACY_APPROVE_OFFSET)
+    assertEquals(2, SessionNotificationIdentity.LEGACY_DELETE_OFFSET)
+    assertEquals(3, SessionNotificationIdentity.LEGACY_QUIET_OFFSET)
+  }
+
+  @Test
+  fun `one session's legacy action records never share a request code`() {
+    val sessionId = "ses_01JQ8ZK4M2XW3T7YB6NCV0000"
+    val offsets = listOf(
+      SessionNotificationIdentity.LEGACY_OPEN_OFFSET,
+      SessionNotificationIdentity.LEGACY_APPROVE_OFFSET,
+      SessionNotificationIdentity.LEGACY_DELETE_OFFSET,
+      SessionNotificationIdentity.LEGACY_QUIET_OFFSET
+    )
+    val codes = offsets.map { SessionNotificationIdentity.legacyRequestCode(sessionId, it) }
+    // Retiring one session's four records is four cancellations of four
+    // different records, so none of the offsets can answer another's record.
+    assertEquals(codes.size, codes.toSet().size)
+  }
 }

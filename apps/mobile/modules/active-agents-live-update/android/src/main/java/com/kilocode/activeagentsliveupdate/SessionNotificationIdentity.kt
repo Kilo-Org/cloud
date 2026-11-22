@@ -11,9 +11,13 @@ package com.kilocode.activeagentsliveupdate
  * own action records, whatever the ids are. Request codes are constants per
  * action kind, because the data URI names the session.
  *
+ * One card means one record per action it shows, and the card and its records
+ * are retired together: `SessionNotifications.cancel` reads the stored card,
+ * then names each of its records through these values and cancels it.
+ *
  * [legacyNotificationId] and [legacyRequestCode] name the record identity that
- * an earlier app version used, so an update can still cancel a card that
- * version posted.
+ * an earlier app version used, so an update retires the card that version
+ * posted together with its own action records, not only the card.
  *
  * Pure Kotlin, with no Android import, so the JVM unit test beside it runs
  * without a device.
@@ -30,6 +34,16 @@ internal object SessionNotificationIdentity {
 
   /** The id base that version added the low 16 hash bits of the session id to. */
   private const val LEGACY_ID_BASE = 20_000
+
+  /**
+   * The request-code offset that version gave one action kind: Open, Approve,
+   * Dismiss and the quiet alarm, in that order. Its code was
+   * `(hash and 0xFFFF) * 4 + offset`, so these four stay together and apart.
+   */
+  const val LEGACY_OPEN_OFFSET = 0
+  const val LEGACY_APPROVE_OFFSET = 1
+  const val LEGACY_DELETE_OFFSET = 2
+  const val LEGACY_QUIET_OFFSET = 3
 
   private const val TAG_PREFIX = "followed-session:"
   private const val DATA_BASE = "kiloapp://active-agents/session/"

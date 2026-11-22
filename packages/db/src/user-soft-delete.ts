@@ -4,6 +4,8 @@ import {
   SOFT_DELETED_BLOCK_REASON_PREFIX,
 } from './user-soft-delete-reasons';
 
+// Server path: this module imports drizzle-orm. Browser code must import
+// `@kilocode/db/user-soft-delete-reasons` instead.
 export * from './user-soft-delete-reasons';
 
 export function goneOrDeletingBlockedReasonSql(column: Column) {

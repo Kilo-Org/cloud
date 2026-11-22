@@ -81,8 +81,9 @@ const hello = (runnerConnected = true) => ({
   reauthAt: new Date(Date.now() + 60_000).toISOString(),
   expiresAt: new Date(Date.now() + 90_000).toISOString(),
 });
+/** Drains enough microtask hops to reach the socket: the mint crosses the bounded credential lookup. */
 async function flush() {
-  for (let index = 0; index < 25; index++) await Promise.resolve();
+  for (let index = 0; index < 60; index++) await Promise.resolve();
 }
 /** Records how a promise settles without leaving its rejection unhandled. */
 function trackOutcome(operation: Promise<unknown>) {
@@ -3335,6 +3336,50 @@ test('a stalled grant exchange times out, aborts its request, and is replaced on
   expect(exchanges).toBe(2);
 });
 
+test('a stalled credential lookup times out and leaves the grant cache', async () => {
+  // The credential is fetched before the exchange, so a lookup that never settles would leave
+  // the cached mint pending forever and every later caller would join it. The lookup is bounded
+  // by the same deadline, and its failure evicts the entry so the next call mints again.
+  let exchanges = 0;
+  let release: (credential: string) => void = () => {};
+  // ES2022/Hermes consumers do not provide Promise.withResolvers.
+  const held = new Promise<string>(resolve => {
+    release = resolve;
+  });
+  const fetcher = jest.fn(async (input: string | URL | Request) => {
+    const path = new URL(String(input)).pathname;
+    if (path === '/v1/auth/exchange') {
+      exchanges++;
+      return Response.json({
+        token: 'grant',
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      });
+    }
+    return Response.json({ items: [], cursor: null });
+  });
+  const client = new NativeSyncClient({
+    baseUrl: 'https://sync.test',
+    getCredential: () => held,
+    fetch: fetcher,
+    WebSocket: FakeSocket,
+  });
+  const call = client.listSessions();
+  const settled = trackOutcome(call);
+  await flush();
+  // No exchange is attempted while the credential is unread.
+  expect(settled.code).toBe('pending');
+  expect(exchanges).toBe(0);
+  await jest.advanceTimersByTimeAsync(NATIVE_SYNC_REQUEST_DEADLINE_MS);
+  await flush();
+  expect(settled.code).toBe('request_timeout');
+  await expect(call).rejects.toMatchObject({ code: 'request_timeout' });
+  release('kilo-credential');
+  // The dead entry left the cache, so this call mints once more instead of joining it.
+  await expect(client.listSessions()).resolves.toMatchObject({ items: [] });
+  expect(exchanges).toBe(1);
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});
+
 test('two callers minting at once keep the newer grant when the older exchange fails', async () => {
   // Both callers see the same expired entry and start their own exchange. The older one fails
   // after the newer one was cached; the shared entry must stay, and later calls reuse it.
@@ -3429,6 +3474,8 @@ test('two concurrent 401s renew the grant once', async () => {
   await flush();
   expect(first.code).toBe('resolved');
   expect(second.code).toBe('resolved');
+  // A second renewal round after both calls settled would raise this beyond two.
+  expect(exchanges).toBe(2);
 });
 
 test('a stalled ticket mint reaches the connect backoff', async () => {

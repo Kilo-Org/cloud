@@ -491,7 +491,7 @@ export class NativeSyncClient {
       if (Date.parse(grant.expiresAt) > Date.now() + 30_000) return { entry: existing, grant };
     }
     const pending = (async () => {
-      const credential = await this.options.getCredential();
+      const credential = await this.credential();
       return grantSchema.parse(
         await this.exchange(
           '/v1/auth/exchange',
@@ -512,6 +512,24 @@ export class NativeSyncClient {
       // Delete only this exchange, so a newer cached grant survives its predecessor's failure.
       if (this.grants.get(key) === pending) this.grants.delete(key);
       throw error;
+    }
+  }
+  /**
+   * Both consumers fetch the credential over the network, so a lookup that black-holes would
+   * leave the cached mint pending forever: it could never settle, its catch could never evict
+   * it, and every later caller would join the dead entry. Bound it like the exchange itself.
+   */
+  private async credential(): Promise<string> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), NATIVE_SYNC_REQUEST_DEADLINE_MS);
+    try {
+      return await raceAbort(
+        controller.signal,
+        () => new NativeSyncError('request_timeout'),
+        () => this.options.getCredential()
+      );
+    } finally {
+      clearTimeout(timer);
     }
   }
   private async exchange<T>(

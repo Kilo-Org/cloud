@@ -510,10 +510,7 @@ export type ByokCredential = BYOKResult & { serveCatalogModels: boolean };
  * The one construction of a decrypted credential: the routing and list paths differ only in the
  * settings they add, so a new credential field needs one edit. An undefined priority is omitted.
  */
-async function toByokResult(
-  row: ByokKeyRow,
-  settings: ByokApiKeySettings
-): Promise<BYOKResult> {
+async function toByokResult(row: ByokKeyRow, settings: ByokApiKeySettings): Promise<BYOKResult> {
   const priority = getByokKeyPriority(settings);
   return { ...(await decryptByokRow(row)), ...(priority !== undefined && { priority }) };
 }

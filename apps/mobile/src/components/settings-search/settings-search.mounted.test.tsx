@@ -212,11 +212,10 @@ describe('useSettingsSearch with SettingsSearchField/Results', () => {
     expect(marked).toHaveLength(1);
     expect(marked?.[0]?.props.children).toBe('Sys');
     expect(marked?.[0]?.props.className).toContain('underline');
-    const remainder = row?.findAll(
-      node => Object.is(node.type, 'Text') && node.props.children === 'tem'
-    );
-    expect(remainder).toHaveLength(1);
-    expect(remainder?.[0]?.props.className).toContain('text-foreground');
+    const title = marked?.[0]?.parent;
+    expect(title?.children).toHaveLength(2);
+    expect(title?.children[1]).toBe('tem');
+    expect(title?.props.className).toContain('text-foreground');
   });
 
   it('keeps the theme synonym on the Appearance group only', () => {

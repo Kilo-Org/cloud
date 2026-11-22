@@ -12,7 +12,7 @@ import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 
 // Imports here must be type-only, and this file never imports the provider modules that import it
 // (for example mistral.ts, openai.ts and reflection.ts), which is what keeps the cycle broken. Its
-// own `reasoning-details` and `inference-provider-id` imports are the permitted kind: types only.
+// own `reasoning-details` and `byok-credentials` imports are the permitted kind: types only.
 
 export type OpenRouterProviderConfig = {
   order?: string[];

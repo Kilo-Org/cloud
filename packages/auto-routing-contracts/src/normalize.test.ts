@@ -969,7 +969,11 @@ describe('estimateRoutingTokens', () => {
     expect(estimate).toBeGreaterThanOrEqual(1);
   });
 
-  it('treats an array as no record, so it contributes no text', () => {
+  // Request bodies arrive as parsed JSON, so an array in any of these positions
+  // must contribute no text. Every assertion also held before the guard
+  // excluded arrays; they keep that result and fail if a walker starts reading
+  // array indices as record fields.
+  it('contributes no text from an array in a body, message or content position', () => {
     expect(estimateRoutingTokens([])).toBe(0);
     expect(estimateRoutingTokens(['x'.repeat(400)])).toBe(0);
     expect(estimateRoutingTokens({ messages: [['x'.repeat(400)]] })).toBe(0);

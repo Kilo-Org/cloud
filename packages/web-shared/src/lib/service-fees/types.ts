@@ -40,7 +40,11 @@ export type PersonalServiceFeeFlow = {
     : never;
 }[ServiceFeeFlow];
 
-export type OrganizationServiceFeeFlow = Exclude<ServiceFeeFlow, PersonalServiceFeeFlow>;
+export type OrganizationServiceFeeFlow = {
+  [Flow in ServiceFeeFlow]: (typeof SERVICE_FEE_FLOW_OWNER_KIND)[Flow] extends 'organization'
+    ? Flow
+    : never;
+}[ServiceFeeFlow];
 
 export const PERSONAL_SERVICE_FEE_FLOWS: readonly PersonalServiceFeeFlow[] =
   SERVICE_FEE_FLOWS.filter(

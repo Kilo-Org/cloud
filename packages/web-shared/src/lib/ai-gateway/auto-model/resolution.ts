@@ -51,8 +51,10 @@ import {
   getOrganizationAutoRoute,
   isOrganizationAutoTargetModel,
   validateOrganizationAutoTarget,
+  type OrganizationAutoTargetValidationResult,
 } from '@kilocode/web-shared/lib/organizations/organization-auto-model';
 import { getModelVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import type { OpenCodeVariant } from '@kilocode/db/schema-types';
 
 type ResolveAutoModelParams = {
@@ -194,8 +196,10 @@ async function resolveOrganizationAutoModel(
     };
   }
 
-  let validation: Awaited<ReturnType<typeof validateOrganizationAutoTarget>>;
+  let validation: OrganizationAutoTargetValidationResult;
   try {
+    // The gateway runs in `sfo1`, so validation reads the US replica; web routers keep the primary
+    // default because they validate right after a write.
     validation = await validateOrganizationAutoTarget(
       {
         id: organizationContext.organizationId,
@@ -203,7 +207,7 @@ async function resolveOrganizationAutoModel(
         settings: organizationContext.settings,
       },
       targetModelId,
-      { apiKind: params.apiKind ?? undefined }
+      { apiKind: params.apiKind ?? undefined, fromDb: readDb }
     );
   } catch {
     return {

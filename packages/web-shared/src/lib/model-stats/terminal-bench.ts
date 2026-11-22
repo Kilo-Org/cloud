@@ -79,7 +79,8 @@ function summariesOf(snapshot: ModelStatsSnapshot): TerminalBenchSummaries {
 /**
  * Reports one failure per failed load. During its cooldown the snapshot cache rethrows the recorded
  * error on every call, so keying the warning on that error object keeps an outage to one line
- * instead of one per catalog request.
+ * instead of one per catalog request. A successful load clears it, so a later failure reports even
+ * when it reuses an error object that already warned.
  */
 let reportedFailure: unknown = undefined;
 
@@ -101,5 +102,7 @@ export async function getTerminalBenchSummaries({
     reportLoadFailure(error);
     return null;
   });
-  return snapshot ? summariesOf(snapshot) : new Map();
+  if (!snapshot) return new Map();
+  reportedFailure = undefined;
+  return summariesOf(snapshot);
 }

@@ -15,6 +15,7 @@ import {
   modelsServedByOrganizationInferenceProviderUserByok,
 } from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
 import { isModelAllowedForProviderKey } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
+import type { ModelStatsLoadClient } from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
 import { validateOrganizationAutoTarget } from './organization-auto-model';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
@@ -102,6 +103,41 @@ beforeEach(() => {
   jest.mocked(getEnhancedOpenRouterModels).mockResolvedValue({
     data: [{ id: 'moonshotai/kimi-k2.6' }],
   } as never);
+});
+
+describe('validateOrganizationAutoTarget catalog load client', () => {
+  const mockedCatalog = getEnhancedOpenRouterModels as unknown as jest.Mock<
+    (options: { countryCode: string | null; fromDb?: object }) => Promise<unknown>
+  >;
+
+  test('forwards the model-stats load client to the catalog read', async () => {
+    const replica = { select: jest.fn() } as unknown as ModelStatsLoadClient;
+
+    await expect(
+      validateOrganizationAutoTarget(organization(), 'moonshotai/kimi-k2.6', { fromDb: replica })
+    ).resolves.toEqual({ kind: 'ok', modelId: 'moonshotai/kimi-k2.6' });
+    expect(mockedCatalog).toHaveBeenCalledWith({ countryCode: null, fromDb: replica });
+  });
+
+  test('keeps the primary default when no client is passed', async () => {
+    await expect(
+      validateOrganizationAutoTarget(organization(), 'moonshotai/kimi-k2.6')
+    ).resolves.toEqual({ kind: 'ok', modelId: 'moonshotai/kimi-k2.6' });
+    expect(mockedCatalog).toHaveBeenCalledWith({ countryCode: null, fromDb: undefined });
+  });
+
+  test('propagates the client through a catalog-id recursion', async () => {
+    mockedGetEnabledByokProviders.mockResolvedValue([key(true)]);
+    mockedGetCatalogModelId.mockResolvedValue('moonshotai/kimi-k2.6');
+    const replica = { select: jest.fn() } as unknown as ModelStatsLoadClient;
+
+    await expect(
+      validateOrganizationAutoTarget(organization(), 'synthetic/hf:moonshotai/kimi-k2.6', {
+        fromDb: replica,
+      })
+    ).resolves.toEqual({ kind: 'ok', modelId: 'moonshotai/kimi-k2.6' });
+    expect(mockedCatalog).toHaveBeenCalledWith({ countryCode: null, fromDb: replica });
+  });
 });
 
 describe('validateOrganizationAutoTarget with direct BYOK targets', () => {

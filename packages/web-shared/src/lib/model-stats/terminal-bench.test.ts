@@ -228,6 +228,21 @@ describe('getTerminalBenchSummaries', () => {
 
     expect(mockWarn).toHaveBeenCalledTimes(2);
   });
+
+  it('reports the same error object again after a successful load', async () => {
+    const outage = new Error('snapshot unavailable');
+    mockSnapshot
+      .mockRejectedValueOnce(outage)
+      .mockResolvedValueOnce(snapshot([row()]))
+      .mockRejectedValueOnce(outage);
+
+    await getTerminalBenchSummaries();
+    await getTerminalBenchSummaries();
+    await getTerminalBenchSummaries();
+
+    expect(mockSnapshot).toHaveBeenCalledTimes(3);
+    expect(mockWarn).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('terminalBenchFor', () => {

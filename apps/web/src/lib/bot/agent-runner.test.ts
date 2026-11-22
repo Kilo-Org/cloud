@@ -476,6 +476,8 @@ describe.each(['slack', 'linear'] as const)('%s repository selection', platform 
           'bot-user-1',
           gitlabProject
         );
+        expect(validateGitLabRepoAccessForUser).toHaveBeenCalledWith('user-1', gitlabProject);
+        expect(getGitLabInstanceUrlForUser).toHaveBeenCalledWith('user-1');
         expect(getGitLabTokenForOrganization).toHaveBeenCalledWith('org-1', 'bot-user-1');
         expect(mockPrepareSession).toHaveBeenCalledWith(
           expect.objectContaining({

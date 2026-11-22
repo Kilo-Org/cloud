@@ -42,6 +42,7 @@ import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { resolveGitHubRepositoryForOwner } from '@/lib/slack-bot/github-repository-context';
 import { getGitHubIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { authorizeGitHubRepository } from '@/lib/bot/github-repository-permission';
+import { authorizeGitLabProject } from '@/lib/bot/gitlab-project-permission';
 
 function buildBotCallbackUrl(botRequestId: string, currentStep: number | undefined): string {
   const url = new URL(`/api/internal/bot-session-callback/${botRequestId}`, APP_URL);
@@ -106,6 +107,8 @@ export default async function spawnCloudAgentSession(
     attachments?: CloudAgentAttachments;
     /** Linked Kilo user the caller authenticates as; selects the balance-check client for org payers. */
     payerUserId?: string;
+    /** Linked Kilo user who triggered this run; authorizes their GitLab project access. */
+    requesterUserId?: string;
     /** GitHub login of the account that triggered this bot run. */
     actorLogin?: string;
     /** Repository of the conversation the bot was mentioned in. */
@@ -173,17 +176,36 @@ export default async function spawnCloudAgentSession(
       return { response: 'Error: No acting user is configured for this GitLab organization.' };
     }
 
-    let projectResolved: boolean;
+    let instanceUrl: string;
     try {
+      let projectResolved: boolean;
       if (owner.type === 'org') {
-        normalizeGitLabInstanceUrl(await getGitLabInstanceUrlForOrganization(owner.id));
+        instanceUrl = await getGitLabInstanceUrlForOrganization(owner.id);
+        normalizeGitLabInstanceUrl(instanceUrl);
         projectResolved = await validateGitLabRepoAccessForOrganization(
           owner.id,
           gitLabActorUserId,
           args.gitlabProject
         );
       } else {
+        instanceUrl = await getGitLabInstanceUrlForUser(owner.id);
         projectResolved = await validateGitLabRepoAccessForUser(owner.id, args.gitlabProject);
+      }
+      if (!projectResolved) {
+        return {
+          response:
+            "Error: That GitLab project is not available through this account's GitLab integration.",
+        };
+      }
+
+      const projectAuthorization = await authorizeGitLabProject({
+        project: args.gitlabProject,
+        projectInstanceUrl: instanceUrl,
+        requesterUserId: options?.requesterUserId ?? (owner.type === 'user' ? owner.id : undefined),
+        threadRepository: options?.threadRepository,
+      });
+      if (!projectAuthorization.allowed) {
+        return { response: projectAuthorization.markdown };
       }
     } catch (error) {
       if (error instanceof GitLabInstanceUrlError) {
@@ -200,14 +222,8 @@ export default async function spawnCloudAgentSession(
         response: 'Error: Could not verify access to that GitLab project. Please try again.',
       };
     }
-    if (!projectResolved) {
-      return {
-        response:
-          "Error: That GitLab project is not available through this account's GitLab integration.",
-      };
-    }
 
-    // GitLab path: get token + instance URL, build clone URL, use gitUrl/gitToken
+    // GitLab path: get token, build the clone URL from the resolved instance
     const gitlabToken =
       owner.type === 'org'
         ? await getGitLabTokenForOrganization(owner.id, gitLabActorUserId)
@@ -219,11 +235,6 @@ export default async function spawnCloudAgentSession(
           'Error: No GitLab token available. Please ensure a GitLab integration is connected in your Kilo Code settings.',
       };
     }
-
-    const instanceUrl =
-      owner.type === 'org'
-        ? await getGitLabInstanceUrlForOrganization(owner.id)
-        : await getGitLabInstanceUrlForUser(owner.id);
 
     const gitUrl = buildGitLabCloneUrl(args.gitlabProject, instanceUrl);
 

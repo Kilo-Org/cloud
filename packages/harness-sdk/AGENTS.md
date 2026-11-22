@@ -280,7 +280,7 @@ and `tsx` all emit code where every `createIs` and `createAssert` call throws
 | Tests | `pnpm test` (vitest, transformed by `@ttsc/unplugin`) |
 | Timing | `pnpm test:perf` (`vitest.perf.config.ts`, one file at a time) |
 | End-to-end | `pnpm test:e2e` (`ttsx`, not `tsx`) |
-| One live run | `pnpm test:e2e:<name>`, where `<name>` is a `test:e2e:*` script in `package.json`. That file is the list, so a new run is added there and nowhere else |
+| One live run | `pnpm test:e2e:<name>`, where `<name>` is a `test:e2e:*` script in `package.json` other than `all` and `probe`. Add the name to `e2e/all.ts`'s `runs` as well, or the sweep skips it |
 | Every live run | `pnpm test:e2e:all` (add names to pick a few, `full` for all eleven models) |
 | Raw frames | `pnpm test:e2e:probe <shape> <model>` (asserts nothing) |
 

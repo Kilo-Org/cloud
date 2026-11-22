@@ -102,7 +102,9 @@ export const EYEBROW_RTL_SCRIPT_DISPLAY = 'text-[13px]';
  * must not depend on it: one explicit height, and both sizes sit inside it.
  * Emitted unscaled: React Native multiplies an explicit `lineHeight` by the
  * system font scale itself, bounded by `maxFontSizeMultiplier`, so this is the
- * dp at scale 1 and the native pipeline carries it to the live scale once.
+ * dp at scale 1 and the native pipeline carries it to the live scale once
+ * (pre-scaling it as well would apply the system scale twice; see
+ * `use-text-height.tsx`, `scaledLineHeight`).
  */
 export const EYEBROW_LINE_HEIGHT_DP = 22;
 
@@ -121,9 +123,9 @@ function Text({
      * The paragraph's base direction. App copy omits it and names the
      * interface's. `auto` is for copy the app did not write — a server's
      * message, a finding's description, a user's own text — which names its
-     * own direction, so English content keeps its left edge and the
-     * punctuation that ends it inside a right-to-left interface
-     * (`contentTextDirection`).
+     * own direction, named for the node's layout as well, which is what makes
+     * English content keep its left edge and the punctuation that ends it
+     * inside a right-to-left interface (`contentTextDirection`).
      */
     direction?: 'auto';
   }) {
@@ -153,15 +155,6 @@ function Text({
   // take a spacing no Hebrew reader asked for — while Latin copy, in either
   // direction, keeps the tracking its class asks for (`NATURAL_LETTER_SPACING`).
   const resetsTracking = joinedScript || (isRTL && isRtlScript);
-  // One line box for the eyebrow in every script: the reserve in
-  // `screen-header.tsx` can never know the arriving label's script, so the box
-  // must not depend on it, and the 10px Latin size and the 13px RTL-script twin
-  // both sit inside `EYEBROW_LINE_HEIGHT_DP`. The value stays at font scale 1
-  // here: React Native scales an explicit `lineHeight` through the native text
-  // pipeline exactly as it scales the font size, bounded by the same
-  // `maxFontSizeMultiplier`, so pre-scaling it as well would apply the system
-  // scale twice (`use-text-height.tsx`, `scaledLineHeight`). A caller's own
-  // `lineHeight` still wins: the computed entry comes before `props.style`.
   const eyebrowLineHeight: TextStyle | undefined =
     variant === 'eyebrow' ? { lineHeight: EYEBROW_LINE_HEIGHT_DP } : undefined;
   const headingA11y = HEADING_A11Y.get(variant ?? 'default');
@@ -174,10 +167,6 @@ function Text({
     textClass,
     className
   );
-  // The paragraph's base direction: the interface's for app copy, and the
-  // copy's own first letter's for content (`direction="auto"`), named for the
-  // node's layout as well, which is what makes a Latin sentence keep its left
-  // edge and the punctuation that ends it inside a right-to-left interface.
   const interfaceDirection: TextStyle | undefined = isRTL ? RTL_WRITING_DIRECTION : undefined;
   const writingDirection =
     direction === 'auto'

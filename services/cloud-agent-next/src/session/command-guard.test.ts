@@ -542,6 +542,10 @@ describe('security-remediation push command guard policy', () => {
       'find . -execdir mv /tmp/evil config ;',
       // The subcommand word split by a continuation.
       'git pu\\sh --force',
+      // The transport commands carry the same options as the push subcommand.
+      'git send-pack --force origin main',
+      'git send-pack origin +main',
+      'git -C . send-pack --mirror origin',
       // A shell hands a line continuation to git inside one command; the
       // matcher normalizes the backslash to a slash, so the push rules reach it.
       'git push \\\n--force',

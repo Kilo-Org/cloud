@@ -391,6 +391,11 @@ const SECURITY_REMEDIATION_PUSH_DENIED_PATTERNS = [
   // the word.
   'git pu/s*',
   'git pus/h*',
+  // The transport commands carry the same refspec and force options as the push
+  // subcommand, and the plain push runs them, so the reachable push forms stay
+  // the two plain subcommand forms below.
+  'git*send-pack*',
+  'git*receive-pack*',
 ];
 
 // The repository's own directory name, written once as text and once for each

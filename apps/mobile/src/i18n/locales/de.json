@@ -184,8 +184,8 @@
     "organizationTrialEnded": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Ein Inhaber der Organisation kann die Abrechnung unter kilo.ai aktualisieren und es dann erneut versuchen.",
     "privateRepositoryA11y": "{{name}}, privates Repository",
     "legalDocumentEnglishOnly": "Dieses Dokument ist nur auf Englisch verfügbar.",
-    "organizationTrialEndedBilling": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Sie können die Abrechnung aktualisieren und es dann erneut versuchen.",
-    "organizationTrialEndedBillingAtKiloAi": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Sie können die Abrechnung unter kilo.ai aktualisieren und es dann erneut versuchen.",
+    "organizationTrialEndedBilling": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Du kannst die Abrechnung aktualisieren und es dann erneut versuchen.",
+    "organizationTrialEndedBillingAtKiloAi": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Du kannst die Abrechnung unter kilo.ai aktualisieren und es dann erneut versuchen.",
     "viewOnGitHub": "PR auf GitHub ansehen",
     "markdownA11y": {
       "list": {
@@ -1406,7 +1406,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Installiere die Kilo-GitHub-App, um Dependabot-Warnungen automatisch zu synchronisieren und Sicherheitsbefunde in deinen Repositories zu verwalten.",
-      "connectOwnerOnly": "Bitten Sie einen Organisationsinhaber oder Admin, {{platform}} zu verbinden.",
+      "connectOwnerOnly": "Bitte einen Organisationsinhaber oder Admin, {{platform}} zu verbinden.",
       "connectTitle": "GitHub verbinden, um loszulegen",
       "couldNotLoad": "Der Sicherheitsagent konnte nicht geladen werden.",
       "installApp": "GitHub-App installieren",
@@ -2174,11 +2174,11 @@
       "detailUnknown": "Wird noch vorbereitet",
       "errorPreparationTimeout": "Zeitüberschreitung bei der Umgebungsvorbereitung",
       "errorWorkspaceSetupFailed": "Workspace-Einrichtung fehlgeschlagen",
-      "errorCredentialUpgradeRequired": "Für diese Sitzung fehlt ein erforderliches Credential-Upgrade. Starten Sie eine neue Sitzung, um fortzufahren.",
+      "errorCredentialUpgradeRequired": "Für diese Sitzung fehlt ein erforderliches Credential-Upgrade. Starte eine neue Sitzung, um fortzufahren.",
       "errorAgentUnavailable": "Der Agent ist nicht mehr verfügbar",
       "errorBillingBlocked": "Für die Sandbox-Abrechnung sind zusätzliche Credits erforderlich",
-      "errorBillingUnavailable": "Sandbox-Abrechnung oder Kapazitätsprüfung ist derzeit nicht verfügbar. Versuchen Sie es später erneut.",
-      "errorContainerLimitReached": "Containerlimit erreicht. Stoppen Sie einen vorhandenen Container, bevor Sie einen anderen starten.",
+      "errorBillingUnavailable": "Sandbox-Abrechnung oder Kapazitätsprüfung ist derzeit nicht verfügbar. Versuche es später erneut.",
+      "errorContainerLimitReached": "Containerlimit erreicht. Stoppe einen vorhandenen Container, bevor du einen anderen startest.",
       "errorInvalidConfiguration": "Die Sandbox-Konfiguration ist ungültig oder wird nicht unterstützt",
       "errorRuntimeArtifactUnauthorized": "Der Runtime-Download wurde nicht autorisiert",
       "errorRuntimeArtifactInvalid": "Verifizierung des Runtime-Artefakts fehlgeschlagen",
@@ -3611,7 +3611,7 @@
       "resendInviteError": "Die Einladung konnte nicht erneut gesendet werden.",
       "inviteNotResendable": "Diese Einladung kann nicht mehr erneut gesendet werden.",
       "ownerAuthority": "Nur ein Organisationsinhaber kann Inhaber verwalten.",
-      "ownRoleChange": "Sie können Ihre eigene Rolle nicht ändern.",
+      "ownRoleChange": "Du kannst deine eigene Rolle nicht ändern.",
       "inviteExpired": "Diese Einladung ist abgelaufen.",
       "inviteAccepted": "Diese Einladung wurde bereits angenommen."
     },
@@ -4191,9 +4191,9 @@
     "confirmTitle": "Diese Änderung bestätigen?",
     "guarded": {
       "spendAlertsOff": "Ausgabenwarnungen ausschalten? Sie würden keine Benachrichtigungen mehr über Überschreitungen der Ausgabenschwellen und stündliche Spitzen erhalten.",
-      "balanceAlertsOff": "Guthabenwarnungen ausschalten? Sie würden keine Benachrichtigungen mehr erhalten, wenn Ihr Guthaben knapp wird.",
+      "balanceAlertsOff": "Guthabenwarnungen ausschalten? Sie würden keine Benachrichtigungen mehr erhalten, wenn dein Guthaben knapp wird.",
       "securityFindingsOff": "Sicherheitsbefunde ausschalten? Sie würden keine Benachrichtigungen mehr über neue Sicherheitsbefunde erhalten.",
-      "hideBalanceOn": "Guthaben ausblenden? Ihre Guthaben würden dann nicht mehr auf den Profilseiten und im Organisations-Hub angezeigt."
+      "hideBalanceOn": "Guthaben ausblenden? Deine Guthaben würden dann nicht mehr auf den Profilseiten und im Organisations-Hub angezeigt."
     }
   },
   "appActions": {
@@ -4285,8 +4285,8 @@
     "keyReserved": "Dieser Schlüssel ist reserviert",
     "keyWillBeSavedAs": "Wird als {{key}} gespeichert",
     "valueLabel": "Wert",
-    "valueRequired": "Geben Sie einen Wert ein",
-    "tooLong": "Verwenden Sie höchstens {{max}} Zeichen",
+    "valueRequired": "Gib einen Wert ein",
+    "tooLong": "Verwende höchstens {{max}} Zeichen",
     "secrets": {
       "markSecret": "Als geheim markieren",
       "masked": "Versteckter Wert",

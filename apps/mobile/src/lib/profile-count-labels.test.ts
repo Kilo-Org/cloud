@@ -95,6 +95,49 @@ describe('formatProfileCountItems', () => {
     expect(formatProfileCountItems(t, [])).toEqual([]);
   });
 
+  it('inflects the agents count where the language has more than two forms', async () => {
+    // Arabic reads a dual for two, the plural for 3-10 and an accusative
+    // singular from eleven, so one string for every count cannot agree.
+    await i18n.changeLanguage('ar');
+    try {
+      const agents = (count: number) => formatProfileCountItems(t, [{ kind: 'agents', count }]);
+      expect(agents(1)).toEqual(['1 وكيل']);
+      expect(agents(2)).toEqual(['2 وكيلان']);
+      expect(agents(3)).toEqual(['3 وكلاء']);
+      expect(agents(11)).toEqual(['11 وكيلًا']);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+
+    // Irish keeps the noun singular after a numeral, lenited after 2-6 and
+    // eclipsed after 7-10.
+    await i18n.changeLanguage('ga');
+    try {
+      const agents = (count: number) => formatProfileCountItems(t, [{ kind: 'agents', count }]);
+      expect(agents(1)).toEqual(['1 gníomhaire']);
+      expect(agents(2)).toEqual(['2 ghníomhaire']);
+      expect(agents(5)).toEqual(['5 ghníomhaire']);
+      expect(agents(7)).toEqual(['7 ngníomhaire']);
+      expect(agents(11)).toEqual(['11 gníomhaire']);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+
+    // Welsh keeps the singular after a numeral and uses the plural only where
+    // its `other` category selects it, as the sibling counts do.
+    await i18n.changeLanguage('cy');
+    try {
+      expect(formatProfileCountItems(t, [{ kind: 'agents', count: 2 }])).toEqual(['2 asiant']);
+      expect(formatProfileCountItems(t, [{ kind: 'agents', count: 3 }])).toEqual(['3 asiant']);
+      expect(formatProfileCountItems(t, [{ kind: 'agents', count: 5 }])).toEqual(['5 asiantau']);
+      expect(formatProfileCountItems(t, [{ kind: 'agents', count: 100 }])).toEqual([
+        '100 asiantau',
+      ]);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+
   it('summarizes a draft profile with each count agreed', async () => {
     expect(draftProfileCountItems(2, 0)).toEqual([{ kind: 'vars', count: 2 }]);
     expect(draftProfileCountItems(0, 0)).toEqual([]);

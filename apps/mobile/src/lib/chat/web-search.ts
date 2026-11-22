@@ -46,8 +46,8 @@ const OVER_BUDGET =
   `This question already used ${String(MAX_SEARCHES_PER_QUESTION)} web searches, the limit. ` +
   'Do not search again: answer with what you have.';
 const OVER_ATTEMPTS =
-  `Web search has failed ${String(MAX_ATTEMPTS_PER_QUESTION)} times for this question. ` +
-  'Do not search again: answer with what you have, and say the search did not work.';
+  `This question has used all ${String(MAX_ATTEMPTS_PER_QUESTION)} of its web search attempts. ` +
+  'Do not search again: answer with what you have.';
 const ALLOWANCE_EXHAUSTED =
   "The account's free web searches for this month are used up and it has no credit balance. " +
   'Tell the person they can add credits in Kilo to search again.';

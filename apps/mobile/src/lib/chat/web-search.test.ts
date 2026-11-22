@@ -108,8 +108,7 @@ beforeEach(() => {
 
 /**
  * One question's searches as the chat runs them: the same tool call repeated,
- * against a counter this helper owns so the test can read what was charged.
- * The effect starts at once, and `answers` resolves with every attempt's result.
+ * against a counter this helper owns, so the test can read what was charged.
  */
 function askQuestion(calls: number) {
   const spent = { used: 0, attempts: 0 };
@@ -223,44 +222,23 @@ describe('a web search', () => {
     expect(spent.used).toBe(0);
   });
 
-  it('allows five answered searches and refuses the sixth with the limit reason', async () => {
-    const { spent, answers } = askQuestion(6);
-    const outcome = await answers;
+  it('charges nothing for a 402 allowance refusal or a failing status', async () => {
+    world.response = { status: 500, body: '{"error":"upstream exploded"}' };
 
-    expect(outcome.map(answer => Result.isSuccess(answer))).toEqual([
-      true,
-      true,
-      true,
-      true,
-      true,
-      false,
-    ]);
-    expect(world.requests).toHaveLength(5);
-    expect(spent.used).toBe(5);
-    expect(reasonOf(outcome[5])).toContain('5 web searches, the limit');
-  });
+    const broken = askQuestion(1);
+    const [brokenAnswer] = await broken.answers;
+    expect(Result.isFailure(brokenAnswer ?? Result.fail(undefined))).toBe(true);
+    expect(broken.spent.used).toBe(0);
 
-  it('charges nothing when the proxy answers 402 for used-up free searches', async () => {
     world.response = {
       status: 402,
       body: '{"error":"Exa free allowance exhausted and no credit balance available"}',
     };
 
-    const { spent, answers } = askQuestion(1);
-    const [answer] = await answers;
-
-    expect(Result.isFailure(answer ?? Result.fail(undefined))).toBe(true);
-    expect(spent.used).toBe(0);
-  });
-
-  it('charges nothing when the proxy fails with status 500', async () => {
-    world.response = { status: 500, body: '{"error":"upstream exploded"}' };
-
-    const { spent, answers } = askQuestion(1);
-    const [answer] = await answers;
-
-    expect(Result.isFailure(answer ?? Result.fail(undefined))).toBe(true);
-    expect(spent.used).toBe(0);
+    const refused = askQuestion(1);
+    const [refusedAnswer] = await refused.answers;
+    expect(Result.isFailure(refusedAnswer ?? Result.fail(undefined))).toBe(true);
+    expect(refused.spent.used).toBe(0);
   });
 
   it('charges a search Kilo answered whose body is not the results shape', async () => {
@@ -286,25 +264,6 @@ describe('a web search', () => {
     expect(spent.used).toBe(1);
   });
 
-  it('charges nothing when the search times out at fifteen seconds', async () => {
-    vi.useFakeTimers();
-    try {
-      world.hang = true;
-
-      const { spent, answers } = askQuestion(1);
-      await vi.advanceTimersByTimeAsync(15_000);
-      const [answer] = await answers;
-      // A fiber that ran under the timeout must not leak past the test.
-      await vi.runAllTimersAsync();
-
-      expect(Result.isFailure(answer ?? Result.fail(undefined))).toBe(true);
-      expect(reasonOf(answer)).toContain('took too long');
-      expect(spent.used).toBe(0);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
   it('bounds a failing loop at fifteen attempts and spends no allowance', async () => {
     world.transportFailures = 20;
 
@@ -313,7 +272,7 @@ describe('a web search', () => {
 
     expect(world.requests).toHaveLength(15);
     expect(outcome.slice(0, 15).every(answer => Result.isFailure(answer))).toBe(true);
-    expect(reasonOf(outcome[15])).toContain('15 times');
+    expect(reasonOf(outcome[15])).toContain('all 15 of its web search attempts');
     expect(spent.used).toBe(0);
     expect(spent.attempts).toBe(15);
   });
@@ -333,20 +292,23 @@ describe('a web search', () => {
     // The five-search limit stops the sixth, so attempts never reach fifteen.
     expect(reasonOf(outcome[5])).toContain('5 web searches, the limit');
     expect(world.requests).toHaveLength(5);
+    expect(spent.used).toBe(5);
     expect(spent.attempts).toBe(5);
   });
 
-  it('counts a timed-out search as one attempt', async () => {
+  it('counts a timed-out search as one attempt and charges nothing', async () => {
     vi.useFakeTimers();
     try {
       world.hang = true;
 
       const { spent, answers } = askQuestion(1);
       await vi.advanceTimersByTimeAsync(15_000);
-      await answers;
+      const [answer] = await answers;
       // A fiber that ran under the timeout must not leak past the test.
       await vi.runAllTimersAsync();
 
+      expect(Result.isFailure(answer ?? Result.fail(undefined))).toBe(true);
+      expect(reasonOf(answer)).toContain('took too long');
       expect(spent.used).toBe(0);
       expect(spent.attempts).toBe(1);
     } finally {

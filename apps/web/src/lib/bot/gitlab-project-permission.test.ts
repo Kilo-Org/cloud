@@ -10,9 +10,7 @@ jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
 let mockValidateGitLabRepoAccessForUser: jest.MockedFunction<
   (userId: string, projectPath: string) => Promise<boolean>
 >;
-let mockGetGitLabInstanceUrlForUser: jest.MockedFunction<
-  (userId: string) => Promise<string>
->;
+let mockGetGitLabInstanceUrlForUser: jest.MockedFunction<(userId: string) => Promise<string>>;
 let authorizeGitLabProject: typeof AuthorizeGitLabProject;
 
 function refusalMarkdown(result: GitLabProjectAuthorization): string {

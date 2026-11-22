@@ -6,9 +6,7 @@ import {
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { normalizeGitLabInstanceUrl } from '@/lib/integrations/platforms/gitlab/instance-url';
 
-export type GitLabProjectAuthorization =
-  | { allowed: true }
-  | { allowed: false; markdown: string };
+export type GitLabProjectAuthorization = { allowed: true } | { allowed: false; markdown: string };
 
 function projectAccessRequiredMarkdown(project: string): string {
   return (

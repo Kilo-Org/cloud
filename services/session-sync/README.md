@@ -1303,8 +1303,13 @@ Repeated snapshot failures are bounded per connection: after three failed read c
 a hello/reset read that throws, or a recovery that ends without converging — the client
 stops automatic reads and reconnection, publishes `snapshotFailure` with the reason, and
 resumes only through `NativeSessionConnection.refresh()`, which re-reads the authoritative
-transcript, or a new connection. A stored reference with no authorized asset mapping is terminal
-on its first read, because no retry can make it resolvable.
+transcript, or a new connection. A stored reference with no authorized asset mapping does
+not fail the read: the producer stores a message and its asset mappings in one batch, so
+such an attachment can never resolve. The snapshot reports its key in
+`unavailableAssetKeys`, that file part is withheld from the display, and the message keeps
+its text, reasoning and tool output. The withheld message stays in `incompleteMessageIDs`
+and in the reader's incomplete count, and it is never a recovery gap, because no retry can
+bind it.
 
 Native stored-media and tool-file references retain their original canonical
 values. The native reader resolves only authorized asset mappings using the same
@@ -1314,6 +1319,10 @@ identity, native URI and MIME. Replacing non-content-addressed local file result
 invalidates previously resolved bytes until a newer authoritative snapshot
 reauthorizes them. Unresolved live attachments remain visibly incomplete; they do
 not crash the transcript or silently expose local paths as fetchable display URLs.
+A reference no authorization can bind — an absolute `http(s)` reference, or one the
+snapshot reported as unmapped — withholds only its own file part. The containing
+message still displays, and every reader reports it as incomplete rather than
+presenting the transcript as complete.
 
 Snapshot fetching, relay cursors, replay and recovery remain native-owned.
 `session.moved` requires an authoritative canonical snapshot because its event does

@@ -7,7 +7,7 @@ import {
 } from './native-sync';
 import { fetchNativeSnapshot, type NativeSnapshot } from './native-sync-snapshot';
 import type * as NativeSnapshotModule from './native-sync-snapshot';
-import { kilo2AssetKey } from './kilo2-source-messages';
+import { kilo2AssetKey, kilo2MessageFileId } from './kilo2-source-messages';
 import { NATIVE_SYNC_TICKET_MINT_DEADLINE_MS } from './limits';
 import { readNativeConversation } from './native-conversation-source';
 import { z } from 'zod';
@@ -940,7 +940,7 @@ test('a missing session snapshot stays retryable', async () => {
   connection.close();
 });
 
-test('three failed snapshot cycles settle the transport until an explicit refresh', async () => {
+test('a transport failure keeps its retry budget without the asset shortcut', async () => {
   snapshot.mockRejectedValue(new Error('Native state read failed'));
   const { client } = fixture();
   let state: NativeSessionState | undefined;
@@ -966,6 +966,30 @@ test('three failed snapshot cycles settle the transport until an explicit refres
   await flush();
   expect(FakeSocket.sockets).toHaveLength(3);
   expect(snapshot).toHaveBeenCalledTimes(3);
+  // An asset code no longer short-circuits the budget: three asset-coded read failures cost
+  // the same three cycles as any other failure before the transport latches.
+  snapshot.mockRejectedValue(
+    Object.assign(new Error('asset file is not readable'), { code: 'native_asset_not_found' })
+  );
+  connection.refresh();
+  await flush();
+  await jest.advanceTimersByTimeAsync(2001);
+  await flush();
+  for (const index of [3, 4]) {
+    connectedSocket(index).frame('hello', hello());
+    await flush();
+    // Two failed cycles have not spent the budget the removed shortcut consumed at once.
+    expect(state?.snapshotFailure).toBeUndefined();
+    await jest.advanceTimersByTimeAsync(2001);
+    await flush();
+  }
+  connectedSocket(5).frame('hello', hello());
+  await flush();
+  expect(state?.connection).toBe('disconnected');
+  expect(state?.snapshotFailure?.error).toBe(
+    'Native transcript is unavailable: asset file is not readable. Open the session again to retry.'
+  );
+  expect(snapshot).toHaveBeenCalledTimes(6);
   connection.close();
 });
 
@@ -1284,10 +1308,39 @@ test('a retry during a recovery still settles the transcript', async () => {
   connection.close();
 });
 
-test('an unreadable native asset latches on the first snapshot read', async () => {
-  snapshot.mockRejectedValueOnce(
-    Object.assign(new Error('asset file is not readable'), { code: 'native_asset_not_found' })
-  );
+test('a stored attachment with no mapping keeps the transcript readable', async () => {
+  const reference = `media:${'e'.repeat(64)}`;
+  const permanentKey = kilo2AssetKey(kilo2MessageFileId('msg_held', 0), reference, 'image/png');
+  snapshot.mockResolvedValueOnce({
+    position: 4,
+    revision: 2,
+    session: sessionMetadata,
+    entities: [],
+    unavailableAssetKeys: [permanentKey],
+    messages: [
+      {
+        message: {
+          id: 'msg_readable',
+          type: 'assistant',
+          time: { created: 1, completed: 1 },
+          content: [{ type: 'text', text: 'readable' }],
+        },
+        seq: 1,
+      },
+      {
+        message: {
+          id: 'msg_held',
+          type: 'user',
+          time: { created: 2 },
+          text: 'inspect',
+          files: [
+            { mime: 'image/png', name: 'gone.png', uri: reference, source: { type: 'inline' } },
+          ],
+        },
+        seq: 2,
+      },
+    ],
+  });
   const { client } = fixture();
   let state: NativeSessionState | undefined;
   const connection = client.connectSession('ses_a', value => {
@@ -1296,12 +1349,18 @@ test('an unreadable native asset latches on the first snapshot read', async () =
   await flush();
   connectedSocket().frame('hello', hello());
   await flush();
-  expect(state?.connection).toBe('disconnected');
-  expect(state?.snapshotFailure?.error).toBe(
-    'Native transcript is unavailable: asset file is not readable. Open the session again to retry.'
-  );
+  // A key the snapshot reported as unmapped is permanent, not a failed read: the cycle
+  // settles, the readable message stays, and recovery never chases the attachment.
+  expect(state?.connection).toBe('connected');
+  expect(state?.snapshotFailure).toBeUndefined();
+  expect(state?.unavailableAssetKeys).toEqual([permanentKey]);
+  expect(state?.messages.some(item => item.message.id === 'msg_readable')).toBe(true);
   expect(snapshot).toHaveBeenCalledTimes(1);
-  await jest.advanceTimersByTimeAsync(120_000);
+  if (!state) throw new Error('Missing native state');
+  const conversation = readNativeConversation(state);
+  expect(conversation.recoveryGaps).toBe(0);
+  expect(conversation.incompleteMessageIDs).toContain('msg_held');
+  await jest.advanceTimersByTimeAsync(2001);
   await flush();
   expect(FakeSocket.sockets).toHaveLength(1);
   expect(snapshot).toHaveBeenCalledTimes(1);

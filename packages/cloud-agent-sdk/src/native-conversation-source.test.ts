@@ -910,7 +910,7 @@ test('unresolved live media stays explicit without hiding other messages or cras
   ).toEqual(['msg_media']);
 });
 
-test('a native message whose attachment can never display is omitted without a recovery signal', () => {
+test('a native message whose attachment can never display keeps its text and reports the withheld file', () => {
   const messages: NativeSnapshotMessage[] = [
     {
       seq: 1,
@@ -946,12 +946,43 @@ test('a native message whose attachment can never display is omitted without a r
     },
   ];
   const conversation = readNativeConversation({ ...state, messages });
-  // No snapshot can authorize this reference, so it is neither displayed nor a gap.
-  expect(conversation.messages.map(item => item.info.id)).toEqual(['msg_after']);
-  expect(conversation.incompleteMessageIDs).toEqual([]);
+  // No snapshot can authorize this reference, so only its file part is withheld: the
+  // message still displays, its id reports the omission, and it is not a recovery gap.
+  expect(conversation.messages.map(item => item.info.id)).toEqual(['msg_remote_file', 'msg_after']);
+  expect(conversation.messages[0]?.parts.map(part => part.type)).toEqual(['text', 'tool']);
+  expect(conversation.incompleteMessageIDs).toEqual(['msg_remote_file']);
+  expect(conversation.recoveryGaps).toBe(0);
   expect(conversation.error).toBeUndefined();
   expect(JSON.stringify(conversation.messages)).not.toContain('https://example.test/report.png');
   expect(conversation.nativeMessages).toBe(messages);
+});
+
+test('a snapshot-reported unavailable media key displays the message without a recovery signal', () => {
+  const uri = `media:${'c'.repeat(64)}`;
+  const messages: NativeSnapshotMessage[] = [
+    {
+      seq: 1,
+      message: {
+        id: 'msg_unavailable_media',
+        type: 'user',
+        time: { created: 1 },
+        text: 'Attached',
+        files: [{ uri, mime: 'image/png', source: { type: 'inline' } }],
+      },
+    },
+  ];
+  const conversation = readNativeConversation({
+    ...state,
+    messages,
+    // The producer wrote this message without its mapping, so this key never resolves.
+    unavailableAssetKeys: [kilo2AssetKey('msg_unavailable_media_000001', uri, 'image/png')],
+  });
+  expect(conversation.messages.map(item => item.info.id)).toEqual(['msg_unavailable_media']);
+  expect(conversation.messages[0]?.parts.map(part => part.type)).toEqual(['text']);
+  expect(conversation.incompleteMessageIDs).toEqual(['msg_unavailable_media']);
+  expect(conversation.recoveryGaps).toBe(0);
+  expect(conversation.error).toBeUndefined();
+  expect(JSON.stringify(conversation.messages)).not.toContain(uri);
 });
 
 test.each<[string, Record<string, unknown>]>([

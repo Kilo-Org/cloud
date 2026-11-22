@@ -19,20 +19,26 @@
  * still that `sending` claim. A late mark from a sender whose claim was
  * reclaimed and re-claimed is a no-op.
  *
- * `enqueueBouncerCreditEvent` is idempotent on the unique `event_id`, so a
- * webhook/notification replay enqueues nothing new and a caller can re-enqueue
- * after an already-processed short-circuit without duplicating a side effect.
+ * Both claim paths write the same `pending` → `sending` transition and differ
+ * only in which `pending` rows they select. The immediate path deliberately
+ * ignores the retry backoff; see `claimBouncerCreditEventByEventId`.
+ *
+ * `enqueueBouncerCreditEvent` is idempotent on the unique
+ * `(event_id, event_type)` pair, the table's only unique index, so a replay of
+ * the same source event and event type enqueues nothing new and a caller can
+ * re-enqueue after an already-processed short-circuit without duplicating a side
+ * effect. The same `event_id` with a different `event_type` is a new row.
  *
  * `purgeExpiredBouncerCreditEvents` keeps storage bounded: `delivered` rows are
- * pruned after `..._DELIVERED_RETENTION_DAYS`, `failed` rows after
- * `..._FAILED_RETENTION_DAYS`.
+ * pruned `..._DELIVERED_RETENTION_DAYS` after `delivered_at`, `failed` rows
+ * `..._FAILED_RETENTION_DAYS` after `created_at`.
  *
  * This mirrors the conventions of `analytics-outbox.ts` and
  * `external-side-effect-outbox.ts`; it is a dedicated table because those rows
  * are email/analytics-specific.
  */
 import { and, eq, sql } from 'drizzle-orm';
-import type { ExtractTablesWithRelations } from 'drizzle-orm';
+import type { ExtractTablesWithRelations, SQL } from 'drizzle-orm';
 import type { NodePgDatabase, NodePgQueryResultHKT } from 'drizzle-orm/node-postgres';
 import type { PgTransaction } from 'drizzle-orm/pg-core';
 
@@ -79,7 +85,10 @@ export type BouncerCreditEventOutboxDatabase =
 // ----- result types -----------------------------------------------------------
 
 export type EnqueueBouncerCreditEventResult = {
-  /** False when the unique `event_id` already had a row (an idempotent replay). */
+  /**
+   * False when the unique `(event_id, event_type)` pair already had a row (an idempotent replay of
+   * the same event type).
+   */
   enqueued: boolean;
 };
 
@@ -166,6 +175,38 @@ export async function deleteBouncerCreditEvent(
 
 // ----- claim ------------------------------------------------------------------
 
+/** The one `pending` → `sending` transition both claim paths write; `pendingIds` selects the rows. */
+function claimPendingRows(
+  database: BouncerCreditEventOutboxDatabase,
+  pendingIds: SQL
+): Promise<BouncerCreditEventOutboxRow[]> {
+  return database
+    .update(bouncer_credit_event_outbox)
+    .set({ status: 'sending', claimed_at: sql`now()` })
+    .where(sql`${bouncer_credit_event_outbox.id} IN (${pendingIds})`)
+    .returning();
+}
+
+/** Selects the drain's due `pending` rows: backoff elapsed, oldest-first, bounded by `limit`. */
+function duePendingClaimIds(limit: number): SQL {
+  return sql`SELECT ${bouncer_credit_event_outbox.id}
+    FROM ${bouncer_credit_event_outbox}
+    WHERE ${bouncer_credit_event_outbox.status} = 'pending'
+      AND coalesce(${bouncer_credit_event_outbox.next_attempt_at}, '-infinity'::timestamptz) <= now()
+    ORDER BY ${bouncer_credit_event_outbox.created_at} ASC, ${bouncer_credit_event_outbox.id} ASC
+    LIMIT ${limit}
+    FOR UPDATE SKIP LOCKED`;
+}
+
+/** Selects the `pending` row for `eventId`, ignoring any retry backoff. */
+function pendingClaimIdsForEvent(eventId: string): SQL {
+  return sql`SELECT ${bouncer_credit_event_outbox.id}
+    FROM ${bouncer_credit_event_outbox}
+    WHERE ${bouncer_credit_event_outbox.event_id} = ${eventId}
+      AND ${bouncer_credit_event_outbox.status} = 'pending'
+    FOR UPDATE SKIP LOCKED`;
+}
+
 /**
  * Claims due `pending` rows in a bounded batch: transitions them to `sending`
  * with `claimed_at`, ordered oldest-first, `FOR UPDATE SKIP LOCKED` so
@@ -176,45 +217,22 @@ export async function claimDueBouncerCreditEvents(
   database: BouncerCreditEventOutboxDatabase,
   limit: number
 ): Promise<BouncerCreditEventOutboxRow[]> {
-  return database
-    .update(bouncer_credit_event_outbox)
-    .set({
-      status: 'sending',
-      claimed_at: sql`now()`,
-    })
-    .where(sql`${bouncer_credit_event_outbox.id} IN (
-      SELECT ${bouncer_credit_event_outbox.id}
-      FROM ${bouncer_credit_event_outbox}
-      WHERE ${bouncer_credit_event_outbox.status} = 'pending'
-        AND coalesce(${bouncer_credit_event_outbox.next_attempt_at}, '-infinity'::timestamptz) <= now()
-      ORDER BY ${bouncer_credit_event_outbox.created_at} ASC, ${bouncer_credit_event_outbox.id} ASC
-      LIMIT ${limit}
-      FOR UPDATE SKIP LOCKED
-    )`)
-    .returning();
+  return claimPendingRows(database, duePendingClaimIds(limit));
 }
 
 /**
  * Claims the one `pending` row for `eventId`, for a webhook's immediate delivery so a declined
  * charge reaches bouncer before the same webhook asks for the charge verdict. Returns null when the
  * row is absent, already claimed by the drainer, or already terminal, so the immediate delivery
- * never races the drainer.
+ * never races the drainer. The predicate deliberately omits the retry-backoff check the drainer's
+ * predicate applies, because a charge verdict must not wait out a retry backoff window, so this
+ * path claims a row the drainer is holding until `next_attempt_at`.
  */
 export async function claimBouncerCreditEventByEventId(
   database: BouncerCreditEventOutboxDatabase,
   eventId: string
 ): Promise<BouncerCreditEventOutboxRow | null> {
-  const [row] = await database
-    .update(bouncer_credit_event_outbox)
-    .set({ status: 'sending', claimed_at: sql`now()` })
-    .where(sql`${bouncer_credit_event_outbox.id} IN (
-      SELECT ${bouncer_credit_event_outbox.id}
-      FROM ${bouncer_credit_event_outbox}
-      WHERE ${bouncer_credit_event_outbox.event_id} = ${eventId}
-        AND ${bouncer_credit_event_outbox.status} = 'pending'
-      FOR UPDATE SKIP LOCKED
-    )`)
-    .returning();
+  const [row] = await claimPendingRows(database, pendingClaimIdsForEvent(eventId));
   return row ?? null;
 }
 
@@ -274,9 +292,8 @@ export async function markBouncerCreditEventRetry(
     return null;
   }
 
-  return row.attempts >= BOUNCER_CREDIT_EVENT_OUTBOX_MAX_ATTEMPTS
-    ? { outcome: 'failed', row }
-    : { outcome: 'retried', row };
+  // The outcome reads the status the update above persisted, so it cannot contradict the row.
+  return { outcome: row.status === 'failed' ? 'failed' : 'retried', row };
 }
 
 /**
@@ -309,15 +326,13 @@ export async function markBouncerCreditEventFailed(
  * Reclaims `sending` rows whose claim is older than
  * `BOUNCER_CREDIT_EVENT_OUTBOX_STALE_SENDING_WINDOW_MS`: they return to
  * `pending` and become due again. Covers the crash window where a drainer died
- * after claiming.
+ * after claiming. The window is measured on the same clock that wrote
+ * `claimed_at`, so the reclaim does not depend on a drain host's clock.
  */
 export async function reclaimStaleBouncerCreditEvents(
   database: BouncerCreditEventOutboxDatabase,
   limit: number
 ): Promise<BouncerCreditEventOutboxRow[]> {
-  const staleBefore = new Date(
-    Date.now() - BOUNCER_CREDIT_EVENT_OUTBOX_STALE_SENDING_WINDOW_MS
-  ).toISOString();
   return database
     .update(bouncer_credit_event_outbox)
     .set({ status: 'pending', claimed_at: null })
@@ -325,7 +340,7 @@ export async function reclaimStaleBouncerCreditEvents(
       SELECT ${bouncer_credit_event_outbox.id}
       FROM ${bouncer_credit_event_outbox}
       WHERE ${bouncer_credit_event_outbox.status} = 'sending'
-        AND ${bouncer_credit_event_outbox.claimed_at} <= ${staleBefore}::timestamptz
+        AND ${bouncer_credit_event_outbox.claimed_at} <= now() - (${BOUNCER_CREDIT_EVENT_OUTBOX_STALE_SENDING_WINDOW_MS} * interval '1 millisecond')
       ORDER BY ${bouncer_credit_event_outbox.claimed_at} ASC, ${bouncer_credit_event_outbox.id} ASC
       LIMIT ${limit}
       FOR UPDATE SKIP LOCKED
@@ -336,36 +351,58 @@ export async function reclaimStaleBouncerCreditEvents(
 // ----- purge and retention -------------------------------------------------------
 
 /**
+ * Deletes up to `limit` terminal rows of one `status` whose `timestampColumn` is older than
+ * `retentionDays`, oldest first, and returns how many were deleted.
+ */
+async function purgeTerminalRows(
+  database: BouncerCreditEventOutboxDatabase,
+  params: {
+    status: 'delivered' | 'failed';
+    timestampColumn: 'delivered_at' | 'created_at';
+    retentionDays: number;
+    limit: number;
+  }
+): Promise<number> {
+  const timestamp =
+    params.timestampColumn === 'delivered_at'
+      ? bouncer_credit_event_outbox.delivered_at
+      : bouncer_credit_event_outbox.created_at;
+  const deleted = await database
+    .delete(bouncer_credit_event_outbox)
+    .where(sql`${bouncer_credit_event_outbox.id} IN (
+      SELECT ${bouncer_credit_event_outbox.id}
+      FROM ${bouncer_credit_event_outbox}
+      WHERE ${bouncer_credit_event_outbox.status} = ${params.status}
+        AND ${timestamp} < now() - make_interval(days => ${params.retentionDays})
+      ORDER BY ${timestamp} ASC
+      LIMIT ${params.limit}
+    )`)
+    .returning({ id: bouncer_credit_event_outbox.id });
+  return deleted.length;
+}
+
+/**
  * Deletes terminal rows past their retention window, so the outbox cannot grow
- * without bound. Runs on the same cron pass as the drain.
+ * without bound. Runs on the same cron pass as the drain. Delivered rows count
+ * retention from `delivered_at`; failed rows count from `created_at`, because
+ * the schema has no failed-at column, so a row that retried before failing gets
+ * less post-failure retention than a delivered twin with the same constant.
  */
 export async function purgeExpiredBouncerCreditEvents(
   database: BouncerCreditEventOutboxDatabase,
   limit: number
 ): Promise<PurgeBouncerCreditEventOutboxResult> {
-  const delivered = await database
-    .delete(bouncer_credit_event_outbox)
-    .where(sql`${bouncer_credit_event_outbox.id} IN (
-      SELECT ${bouncer_credit_event_outbox.id}
-      FROM ${bouncer_credit_event_outbox}
-      WHERE ${bouncer_credit_event_outbox.status} = 'delivered'
-        AND ${bouncer_credit_event_outbox.delivered_at} < now() - make_interval(days => ${BOUNCER_CREDIT_EVENT_OUTBOX_DELIVERED_RETENTION_DAYS})
-      ORDER BY ${bouncer_credit_event_outbox.delivered_at} ASC
-      LIMIT ${limit}
-    )`)
-    .returning({ id: bouncer_credit_event_outbox.id });
-
-  const failed = await database
-    .delete(bouncer_credit_event_outbox)
-    .where(sql`${bouncer_credit_event_outbox.id} IN (
-      SELECT ${bouncer_credit_event_outbox.id}
-      FROM ${bouncer_credit_event_outbox}
-      WHERE ${bouncer_credit_event_outbox.status} = 'failed'
-        AND ${bouncer_credit_event_outbox.created_at} < now() - make_interval(days => ${BOUNCER_CREDIT_EVENT_OUTBOX_FAILED_RETENTION_DAYS})
-      ORDER BY ${bouncer_credit_event_outbox.created_at} ASC
-      LIMIT ${limit}
-    )`)
-    .returning({ id: bouncer_credit_event_outbox.id });
-
-  return { deliveredPurged: delivered.length, failedPurged: failed.length };
+  const deliveredPurged = await purgeTerminalRows(database, {
+    status: 'delivered',
+    timestampColumn: 'delivered_at',
+    retentionDays: BOUNCER_CREDIT_EVENT_OUTBOX_DELIVERED_RETENTION_DAYS,
+    limit,
+  });
+  const failedPurged = await purgeTerminalRows(database, {
+    status: 'failed',
+    timestampColumn: 'created_at',
+    retentionDays: BOUNCER_CREDIT_EVENT_OUTBOX_FAILED_RETENTION_DAYS,
+    limit,
+  });
+  return { deliveredPurged, failedPurged };
 }

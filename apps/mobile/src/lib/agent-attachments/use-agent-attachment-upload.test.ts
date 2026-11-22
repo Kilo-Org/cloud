@@ -363,8 +363,8 @@ describe('feature-state matrix — send-admission behavior', () => {
   });
 });
 
-describe('size limits (20 MB / 5 files) — constant parity', () => {
-  it('exposes the 20 MB constant for both web and mobile parity', () => {
+describe('size limits (20 MB / 5 files) — decimal cap', () => {
+  it('holds the composer to the decimal 20 MB the refusal copy states', () => {
     expect(AGENT_ATTACHMENT_MAX_BYTES).toBe(20_000_000);
   });
 });

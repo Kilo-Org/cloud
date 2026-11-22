@@ -179,5 +179,11 @@ describe('runSessionToCompletion', () => {
     const retainedLength = result.statusMessages.reduce((sum, line) => sum + line.length, 0);
     expect(retainedLength).toBeLessThanOrEqual(STATUS_LOG_MAX_TOTAL_LENGTH);
     expect(result.response).toMatch(/\(\+\d+ earlier lines omitted\)/);
+
+    // The posted reply keeps the first part only, so it must carry the newest
+    // lines rather than spend that space on the oldest ones.
+    const posted = result.response.slice(0, 2000);
+    expect(posted).toContain('[stderr] stderr line 599');
+    expect(posted).not.toContain('[stderr] stderr line 1\n');
   });
 });

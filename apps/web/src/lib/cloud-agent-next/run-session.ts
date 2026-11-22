@@ -21,6 +21,10 @@ const CLOUD_AGENT_NEXT_API_URL = getEnvVariable('CLOUD_AGENT_NEXT_API_URL');
 
 const DEFAULT_STREAM_TIMEOUT_MS = 15 * 60 * 1000;
 const COMPLETE_GRACE_MS = 1000; // Wait 1s after 'complete' for final events
+// The chat surface posts at most 2000 characters of a reply. Leave room for the
+// header, the error text and the omitted-line note so the newest detail lines
+// are the part that survives.
+const REPLY_DETAIL_BUDGET = 1500;
 
 /**
  * Resolve a (possibly relative) stream URL returned by initiateFromPreparedSession
@@ -79,6 +83,23 @@ export function extractTextFromMessage(message: ProcessedMessage): string {
 export const INSUFFICIENT_CREDITS_RESPONSE =
   'Cannot start a Cloud Agent session: this account or organization has insufficient credits. ' +
   'Add credits in Kilo Code settings and try again.';
+/**
+ * Keep the newest lines whose joined length fits the budget, oldest first, so a
+ * reader who sees only the start of the reply still sees the latest state.
+ */
+function newestLines(lines: readonly string[], budget: number): readonly string[] {
+  const kept: string[] = [];
+  let used = 0;
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index];
+    if (line === undefined) break;
+    if (used + line.length + 1 > budget) break;
+    kept.unshift(line);
+    used += line.length + 1;
+  }
+  return kept;
+}
+
 /** Input for runSessionToCompletion */
 export type RunSessionInput = {
   /** An already-constructed CloudAgentNextClient (caller owns auth / balance-check config). */
@@ -373,7 +394,12 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
   const omittedNote = droppedCount > 0 ? `(+${droppedCount} earlier lines omitted)` : undefined;
 
   if (hasError) {
-    const details = [errorMessage, omittedNote, ...log.entries()].filter(Boolean).join('\n');
+    // The chat surface posts only the first part of this reply, so build the
+    // details from the newest lines that fit the budget: a forward slice would
+    // spend the visible space on the oldest diagnostics.
+    const details = [errorMessage, omittedNote, ...newestLines(log.entries(), REPLY_DETAIL_BUDGET)]
+      .filter(Boolean)
+      .join('\n');
     return {
       response: `Cloud Agent session ${sessionId} encountered errors:\n${details}`,
       sessionId,

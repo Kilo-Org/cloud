@@ -483,7 +483,7 @@ describe('PrReviewChecksSection not-found arm', () => {
     return renderer.root.findAllByType('StateAction' as never);
   }
 
-  /** The recovery row's one primary, the shared state action that re-reads. */
+  /** The recovery row's retry: the shared state action that re-reads checks. */
   function retryAction(renderer: TestRenderer.ReactTestRenderer) {
     const [retry] = recoveryActions(renderer);
     if (!retry) {

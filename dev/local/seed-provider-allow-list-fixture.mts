@@ -104,8 +104,10 @@ await db.delete(modelsByProvider).where(sql`true`);
 await db.insert(modelsByProvider).values({ data: snapshot });
 
 // `require_seats: false` bypasses trial enforcement, so the owner may write the
-// allow list without a seat purchase.
+// allow list without a seat purchase. An older `created_at` keeps the dashboard
+// from replacing its cards with the new-organization welcome panel.
 const settings = { provider_allow_list: [storedSlug] };
+const createdAt = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 await db
   .insert(organizations)
   .values({
@@ -114,11 +116,12 @@ await db
     plan: 'enterprise',
     require_seats: false,
     created_by_kilo_user_id: ownerId,
+    created_at: createdAt.toISOString(),
     settings,
   })
   .onConflictDoUpdate({
     target: organizations.id,
-    set: { settings, plan: 'enterprise', require_seats: false },
+    set: { settings, plan: 'enterprise', require_seats: false, created_at: createdAt.toISOString() },
   });
 
 await db

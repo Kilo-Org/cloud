@@ -3699,31 +3699,12 @@ describe('GitHub installation persistence', () => {
     let backfill: Promise<GitHubInstallationBackfillResult> | undefined;
     let observationError: unknown;
     try {
-      const holderPid = await lockHeld.promise;
+      const holderPid = await githubTestTimeout(lockHeld.promise, 'backfill lock holder');
       backfill = backfillGitHubInstallations();
-      let blocked = false;
-      for (let attempt = 0; attempt < 2000 && !blocked; attempt += 1) {
-        const waiting = await db.execute(sql`
-          SELECT 1 FROM pg_stat_activity
-          WHERE datname = current_database()
-            AND wait_event_type = 'Lock'
-            AND ${holderPid} = ANY(pg_blocking_pids(pid))`);
-        blocked = waiting.rows.length > 0;
-      }
-      if (!blocked) {
-        const activity = await db.execute<{
-          pid: number;
-          state: string | null;
-          wait_event_type: string | null;
-          query: string | null;
-        }>(sql`
-          SELECT pid, state, wait_event_type, left(query, 120) AS query
-          FROM pg_stat_activity
-          WHERE datname = current_database()`);
-        throw new Error(
-          `Backfill did not queue on the installation lock: ${JSON.stringify(activity.rows)}`
-        );
-      }
+      await githubTestTimeout(
+        waitForBlockedGitHubOwnerLock(holderPid, 'standard:990011'),
+        'backfill lock wait'
+      );
     } catch (error) {
       observationError = error;
     } finally {

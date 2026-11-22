@@ -1451,6 +1451,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} үшін Bitbucket қосылымы компьютерден веб арқылы басқарылады.",
+      "deniedManagedByOwner": "Сіз өзгерте алмайтын қосылымды өзгертуді {{organization}} иесінен сұраңыз.",
+      "deniedConnectRole": "Оны тек {{organization}} иелері, әкімшілері мен төлем менеджерлері қоса алады.",
+      "deniedReconnectRole": "Оны қайта қосу үшін {{organization}} иесіне, әкімшісіне немесе төлем менеджеріне жүгініңіз.",
       "managedOnWebTitle": "Веб арқылы басқарылады",
       "managedOnWebShort": "Бұл қосылым компьютерден веб арқылы басқарылады.",
       "managedOnWebRepositories": "{{organization}} үшін репозиторийлерді компьютерден веб арқылы таңдаңыз.",

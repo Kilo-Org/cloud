@@ -1451,6 +1451,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Връзката на {{organization}} с Bitbucket се управлява в уеб версията от компютър.",
+      "deniedManagedByOwner": "Помолете собственик на {{organization}} да промени връзка, която не можете да промените.",
+      "deniedConnectRole": "Само собствениците, администраторите и отговорниците за плащанията на {{organization}} могат да я установят.",
+      "deniedReconnectRole": "Поискайте от собственик, администратор или отговорник за плащанията на {{organization}} да я свържат.",
       "managedOnWebTitle": "Управлява се в уеб версията",
       "managedOnWebShort": "Тази връзка се управлява в уеб версията от компютър.",
       "managedOnWebRepositories": "Избери хранилищата за {{organization}} в уеб версията от компютър.",

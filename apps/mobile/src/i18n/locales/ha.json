@@ -1451,6 +1451,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Ana sarrafa haɗin Bitbucket da {{organization}} a yanar gizo daga kwamfuta.",
+      "deniedManagedByOwner": "Ka roƙi mamallakin {{organization}} ya canza haɗin da ba za ka iya canza ba.",
+      "deniedConnectRole": "Masu ƙungiya, masu gudanarwa, da manajannin biyan kuɗi na {{organization}} kawai za su iya haɗa shi.",
+      "deniedReconnectRole": "Nemi Mai ƙungiya, Mai gudanarwa, ko Manajan biyan kuɗi na {{organization}} ya sake haɗa shi.",
       "managedOnWebTitle": "Ana sarrafa a yanar gizo",
       "managedOnWebShort": "Ana sarrafa wannan haɗin a yanar gizo daga kwamfuta.",
       "managedOnWebRepositories": "Zaɓi ma'ajiyoyi don {{organization}} a yanar gizo daga kwamfuta.",

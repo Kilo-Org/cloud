@@ -1451,6 +1451,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} Bitbucket-kapcsolata a weben, számítógépről kezelhető.",
+      "deniedManagedByOwner": "Kérd meg {{organization}} egyik tulajdonosát, hogy módosítsa a kapcsolatot, amelyet te nem tudsz módosítani.",
+      "deniedConnectRole": "Csak {{organization}} tulajdonosai, adminisztrátorai és számlázási felelősei csatlakoztathatják.",
+      "deniedReconnectRole": "Kérd meg {{organization}} egy tulajdonosát, adminisztrátorát vagy számlázási felelősét, hogy újracsatlakoztassa.",
       "managedOnWebTitle": "A weben kezelve",
       "managedOnWebShort": "Ezt a kapcsolatot a weben, számítógépről kezelheti.",
       "managedOnWebRepositories": "Válassza ki {{organization}} tárolóit a weben, számítógépről.",

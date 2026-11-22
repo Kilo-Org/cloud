@@ -1535,6 +1535,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Il-konnessjoni ta' Bitbucket ta' {{organization}} tiġi ġestita fuq il-web minn kompjuter.",
+      "deniedManagedByOwner": "Itlob lil sid ta' {{organization}} biex ibiddel il-konnessjoni li ma tistax tbiddel.",
+      "deniedConnectRole": "Is-sidien, l-amministraturi u l-maniġers tal-ħlasijiet ta' {{organization}} biss jistgħu jikkonnettjawh.",
+      "deniedReconnectRole": "Itlob lis-sid ta' {{organization}}, lill-amministratur jew lill-maniġer tal-ħlasijiet biex jikkonnettjaha.",
       "managedOnWebTitle": "Tiġi ġestita fuq il-web",
       "managedOnWebShort": "Din il-konnessjoni tiġi ġestita fuq il-web minn kompjuter.",
       "managedOnWebRepositories": "Agħżel ir-repożitorji għal {{organization}} fuq il-web minn kompjuter.",

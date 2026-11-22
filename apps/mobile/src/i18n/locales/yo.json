@@ -1451,6 +1451,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "A ń ṣàkóso ìsopọ̀ Bitbucket ti {{organization}} lórí wẹ́ẹ̀bù láti orí kọ̀ǹpútà.",
+      "deniedManagedByOwner": "Bèèrè lọ́wọ́ ẹni tó ni {{organization}} láti yí ìsopọ̀ tí o kò lè yí padà.",
+      "deniedConnectRole": "Àwọn ẹni tó ni {{organization}}, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè so ó pọ̀.",
+      "deniedReconnectRole": "Ẹ bẹ̀ Ẹni tó ni {{organization}}, Alákòóso, tàbí Olùṣàkóso ìsanwó kí wọ́n tún so ó pọ̀.",
       "managedOnWebTitle": "A ń ṣàkóso lórí wẹ́ẹ̀bù",
       "managedOnWebShort": "A ń ṣàkóso ìsopọ̀ yìí lórí wẹ́ẹ̀bù láti orí kọ̀ǹpútá.",
       "managedOnWebRepositories": "Yan àwọn ibi ìpamọ́ kóòdù fún {{organization}} lórí wẹ́ẹ̀bù láti orí kọ̀ǹpútà.",

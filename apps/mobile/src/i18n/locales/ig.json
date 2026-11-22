@@ -1451,6 +1451,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "A na-elekọta njikọ Bitbucket nke {{organization}} na weebụ site na kọmputa.",
+      "deniedManagedByOwner": "Gwa onye nwe {{organization}} ka ọ gbanwee njikọ ị na-enweghị ike ịgbanwe.",
+      "deniedConnectRole": "Naanị ndị nwe {{organization}}, ndị nchịkwa, na ndị njikwa ịgba ụgwọ nwere ike ijikọ ya.",
+      "deniedReconnectRole": "Rịọ onye nwe {{organization}}, onye nchịkwa, ma ọ bụ onye njikwa ịgba ụgwọ ka ha jikọọ ya.",
       "managedOnWebTitle": "A na-elekọta na weebụ",
       "managedOnWebShort": "A na-elekọta njikọ a na weebụ site na kọmputa.",
       "managedOnWebRepositories": "Họrọ ebe nchekwa maka {{organization}} na weebụ site na kọmputa.",

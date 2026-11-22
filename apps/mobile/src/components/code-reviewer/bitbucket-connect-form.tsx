@@ -100,7 +100,8 @@ export function BitbucketConnectForm({
             bitbucketConnectionFailure(
               error,
               t,
-              integrationId === null ? 'first-connect' : 'replace-token'
+              integrationId === null ? 'first-connect' : 'replace-token',
+              organizationName
             )
           );
         }
@@ -109,9 +110,11 @@ export function BitbucketConnectForm({
   };
 
   const failure = feedback.status === 'failed' ? feedback.failure : null;
-  // A refused token is worth another submit once a different one is pasted; a
-  // lost role or a changed connection is not, so submit waits for a reopen.
-  const blockedByFailure = failure !== null && !repairNeedsAnotherToken(failure.kind);
+  // A refused token judged the token itself, so submit waits for a different
+  // one; only a failure that never judged it (a network or server fault) lets
+  // the same token go again. A lost role or a changed connection waits for a
+  // reopen either way.
+  const blockedByFailure = failure !== null && !allowsResubmitOfSameToken(failure.kind);
 
   return (
     <View className="gap-5">
@@ -185,10 +188,13 @@ export function BitbucketConnectForm({
 }
 
 /**
- * Whether the failure leaves this form a next step: a rejected token can be
- * replaced in the field below. Neither other kind can, so an edit keeps them on
- * screen: a lost role needs the sheet reopened with one, and a connection that
- * changed underneath is managed on the page beside its message.
+ * Whether an edit in the field answers this failure: a rejected token is
+ * replaced by typing, so the sentence retires with it. `retryable` is a
+ * transport fault that judged no token, so the same token can go again and an
+ * edit is only a draft change. Neither other kind can be answered here, so an
+ * edit keeps them on screen: a lost role needs the sheet reopened with one, and
+ * a connection that changed underneath is managed on the page beside its
+ * message.
  */
 function repairNeedsAnotherToken(kind: BitbucketFailure['kind']): boolean {
   switch (kind) {
@@ -196,6 +202,29 @@ function repairNeedsAnotherToken(kind: BitbucketFailure['kind']): boolean {
     case 'retryable': {
       return true;
     }
+    case 'role-refused':
+    case 'connection-changed': {
+      return false;
+    }
+    default: {
+      return assertSurfaceFailureHandled(kind);
+    }
+  }
+}
+
+/**
+ * Whether the failure leaves the same token worth submitting again. Only a
+ * fault that never judged the token — a rate limit, a timeout, an outage, a
+ * lost connection — qualifies. A refused token was judged, so it needs a
+ * different one; a lost role or a changed connection refuses every token, so
+ * submit waits for a reopen.
+ */
+function allowsResubmitOfSameToken(kind: BitbucketFailure['kind']): boolean {
+  switch (kind) {
+    case 'retryable': {
+      return true;
+    }
+    case 'token-refused':
     case 'role-refused':
     case 'connection-changed': {
       return false;

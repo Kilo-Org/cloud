@@ -30,10 +30,11 @@ export function BitbucketRepositoriesState({
 }>) {
   const { t } = useTranslation();
   // The body names the organization the web page manages the connection for,
-  // read from the same membership row the rest of the screen uses. A row that
-  // has not resolved, or a list read that failed, leaves the line off rather
-  // than putting a stand-alone label where the name belongs: the heading alone
-  // still states the connection's state.
+  // and the recovery card's role sentence names it too, from the same membership
+  // row the rest of the screen uses. The managed-on-web line is left off when
+  // the row has not resolved, rather than putting a stand-alone label where the
+  // name belongs; the card falls back to the generic stand-in so its sentence
+  // still reads as one claim.
   const orgBoundary = useOrgBoundary(scope);
   const organizationName = orgBoundary.org?.organizationName;
 
@@ -86,6 +87,10 @@ export function BitbucketRepositoriesState({
         <BitbucketSetupRecovery
           scope={scope}
           readiness={readiness}
+          /* An unresolved membership read keeps the same generic stand-in the
+             overview header paints, so the role sentence still reads as one
+             claim about one organization. */
+          organizationName={organizationName ?? t('common.organization')}
           message={t('common.couldNotLoadRepositories')}
         />
       ) : (

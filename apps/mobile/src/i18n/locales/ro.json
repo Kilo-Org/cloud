@@ -1479,6 +1479,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Conexiunea Bitbucket pentru {{organization}} se gestionează pe web, de pe un computer.",
+      "deniedManagedByOwner": "Cere unui proprietar al {{organization}} să modifice conexiunea pe care nu o poți modifica.",
+      "deniedConnectRole": "Doar proprietarii, administratorii și managerii de facturare ai {{organization}} îl pot conecta.",
+      "deniedReconnectRole": "Cere unui proprietar de {{organization}}, unui administrator sau unui manager de facturare să o reconecteze.",
       "managedOnWebTitle": "Gestionată pe web",
       "managedOnWebShort": "Această conexiune se gestionează pe web, de pe un computer.",
       "managedOnWebRepositories": "Alege repository-urile pentru {{organization}} pe web, de pe un computer.",

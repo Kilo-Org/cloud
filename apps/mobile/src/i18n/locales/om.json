@@ -1451,6 +1451,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Walqunnamtiin Bitbucket {{organization}}iif weebii irratti kompiitara irraa bulfama.",
+      "deniedManagedByOwner": "Walitti hidhamiinsa ati jijjiiruu hin dandeenye jijjiiruuf abbaa {{organization}} gaafadhu.",
+      "deniedConnectRole": "Abbootiin {{organization}}, bulchitootaa fi bulchitoonni kaffaltii qofa isa walqabsiisuu danda'u.",
+      "deniedReconnectRole": "Isa irra deebi'ii akka walqabsiisuuf abbaa {{organization}}, bulchaa, ykn bulchaa kaffaltii tokko gaafadhu.",
       "managedOnWebTitle": "Weebii irratti bulfama",
       "managedOnWebShort": "Walqunnamtiin kun weebii irratti kompiitara irraa bulfama.",
       "managedOnWebRepositories": "{{organization}}iif kuusaalee weebii irratti kompiitara irraa filadhu.",

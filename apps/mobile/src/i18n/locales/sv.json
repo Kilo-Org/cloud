@@ -1451,6 +1451,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-anslutningen för {{organization}} hanteras på webben från en dator.",
+      "deniedManagedByOwner": "Be en ägare i {{organization}} att ändra anslutningen som du inte kan ändra.",
+      "deniedConnectRole": "Endast ägare, administratörer och faktureringsansvariga i {{organization}} kan ansluta den.",
+      "deniedReconnectRole": "Be en ägare, administratör eller faktureringsansvarig i {{organization}} att ansluta den på nytt.",
       "managedOnWebTitle": "Hanteras på webben",
       "managedOnWebShort": "Den här anslutningen hanteras på webben från en dator.",
       "managedOnWebRepositories": "Välj repositorier för {{organization}} på webben från en dator.",

@@ -1451,6 +1451,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Pinamamahalaan sa web gamit ang computer ang koneksyon sa Bitbucket ng {{organization}}.",
+      "deniedManagedByOwner": "Hilingin sa isang may-ari ng {{organization}} na baguhin ang koneksyong hindi mo mababago.",
+      "deniedConnectRole": "Mga may-ari ng {{organization}}, admin, at tagapamahala ng pagsingil lang ang maaaring magkonekta nito.",
+      "deniedReconnectRole": "Hilingin sa isang may-ari ng {{organization}}, admin, o tagapamahala ng pagsingil na ikonekta itong muli.",
       "managedOnWebTitle": "Pinamamahalaan sa web",
       "managedOnWebShort": "Ang koneksyong ito ay pinamamahalaan sa web gamit ang computer.",
       "managedOnWebRepositories": "Pumili ng mga repository para sa {{organization}} sa web gamit ang computer.",

@@ -1451,6 +1451,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Ny fifandraisana Bitbucket amin'ny {{organization}} dia tantanana amin'ny tranonkala, avy amin'ny solosaina.",
+      "deniedManagedByOwner": "Angataho amin'ny tompon'ny {{organization}} hanova fifandraisana izay tsy azonao ovaina.",
+      "deniedConnectRole": "Ny tompon'ny {{organization}}, ny mpitantana, ary ny mpitantana ny faktiora ihany no afaka mampifandray azy.",
+      "deniedReconnectRole": "Mangataha ny Tompony, Mpitantana, na Mpitantana faktiora ao amin'ny {{organization}} mba hampifandray azy indray.",
       "managedOnWebTitle": "Tantanana amin'ny tranonkala",
       "managedOnWebShort": "Ity fifandraisana ity dia tantanana amin'ny tranonkala, avy amin'ny solosaina.",
       "managedOnWebRepositories": "Safidio ny fitahirizana kaody ho an'ny {{organization}} amin'ny tranonkala, avy amin'ny solosaina.",

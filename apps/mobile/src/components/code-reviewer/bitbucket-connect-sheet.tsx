@@ -104,47 +104,11 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     !(readiness.isError && readiness.data == null) &&
     !(status.isError && status.data == null);
   let title = t('agentChat.repoPicker.platformBitbucket');
-  let deniedDescription = t('prReview.connect.gitlabReconnectAdminOnlyDescription');
-  // The lapsed plan's second paragraph under the role sentence, and `undefined`
-  // in every denial that has one reason only. The two reasons are unrelated
-  // blockers, so they stay apart instead of forming one dense paragraph the
-  // reader takes as a single claim.
-  let deniedPlanLine: string | undefined = undefined;
-  // The denial's way out, offered only where the sheet joins the two refusals
-  // below: a retry here re-reads the three answers the page was decided from.
-  let deniedAction: ReactNode = undefined;
-  if (readsSettled) {
-    if (managesExisting) {
-      deniedDescription = t('integrations.managedByOwner');
-    } else if (integrationId === null) {
-      title = t('common.connectBitbucket');
-      const roleDenial = t('prReview.connect.adminOnlyConnectDescription');
-      // The same organization's lapsed plan refuses every organization change,
-      // so a member must not read the role as the only blocker: the plan line
-      // under the role names the owner and the billing step that unblocks it.
-      // It is this sheet's own key because the retry below carries the step the
-      // shared ended-plan sentence keeps for the surfaces that have no control.
-      if (org?.isTrialExpiredForEnforcement === true) {
-        deniedDescription = roleDenial;
-        deniedPlanLine = t('codeReviewer.bitbucket.notConnectedReadOnlyPlan');
-        deniedAction = (
-          <StateAction
-            label={t('common.retry')}
-            icon={RotateCcw}
-            loading={readiness.isFetching || status.isFetching || isOrgFetching}
-            onPress={() => {
-              void refetch();
-              void readiness.refetch();
-              void status.refetch();
-            }}
-          />
-        );
-      } else {
-        deniedDescription = roleDenial;
-      }
-    } else {
-      title = t('prReview.connect.reconnectTitleBitbucket');
-    }
+  if (readsSettled && !managesExisting) {
+    title =
+      integrationId === null
+        ? t('common.connectBitbucket')
+        : t('prReview.connect.reconnectTitleBitbucket');
   }
 
   // One body per state, so the guard's confirmation renders beside all of them:
@@ -182,7 +146,9 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     if (status.isError && status.data == null) {
       return isPermissionDeniedError(status.error) ? (
         <PermissionDenied
-          description={t('prReview.connect.adminOnlyConnectDescription')}
+          description={t('codeReviewer.bitbucketConnect.deniedConnectRole', {
+            organization: org.organizationName,
+          })}
           showBack={false}
         />
       ) : (
@@ -198,7 +164,9 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     if (readiness.isError && readiness.data == null) {
       return isPermissionDeniedError(readiness.error) ? (
         <PermissionDenied
-          description={t('prReview.connect.adminOnlyConnectDescription')}
+          description={t('codeReviewer.bitbucketConnect.deniedConnectRole', {
+            organization: org.organizationName,
+          })}
           showBack={false}
         />
       ) : (
@@ -212,7 +180,49 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     }
 
     if (!canManage) {
-      // The role sentence stays the state's description. The plan line is a
+      // `org` is narrowed here, so the sentences name the organization whose
+      // role rule refused: a person in several of them cannot tell whose rule
+      // this is from the role alone.
+      const { organizationName } = org;
+      // The repair this sheet would offer decides which trio can make it: an
+      // OAuth connection is an owner's to change, a first connect needs
+      // anyone who may connect, and a stored token needs anyone who may
+      // reconnect it.
+      const deniedDescription = managesExisting
+        ? t('codeReviewer.bitbucketConnect.deniedManagedByOwner', {
+            organization: organizationName,
+          })
+        : t(
+            integrationId === null
+              ? 'codeReviewer.bitbucketConnect.deniedConnectRole'
+              : 'codeReviewer.bitbucketConnect.deniedReconnectRole',
+            { organization: organizationName }
+          );
+      // The same organization's lapsed plan refuses every organization change,
+      // so a member must not read the role as the only blocker: the plan line
+      // under the role names the owner and the billing step that unblocks it.
+      // It is this sheet's own key because the retry below carries the step the
+      // shared ended-plan sentence keeps for the surfaces that have no control.
+      const deniedPlanLine =
+        !managesExisting && integrationId === null && org.isTrialExpiredForEnforcement
+          ? t('codeReviewer.bitbucket.notConnectedReadOnlyPlan')
+          : undefined;
+      // The denial's way out, offered only with the plan line: a retry here
+      // re-reads the three answers the page was decided from.
+      const deniedAction =
+        deniedPlanLine === undefined ? undefined : (
+          <StateAction
+            label={t('common.retry')}
+            icon={RotateCcw}
+            loading={readiness.isFetching || status.isFetching || isOrgFetching}
+            onPress={() => {
+              void refetch();
+              void readiness.refetch();
+              void status.refetch();
+            }}
+          />
+        );
+      // The denial sentence stays the state's description. The plan line is a
       // second paragraph in the same muted body token, one paragraph gap under
       // it, so the reader sees two reasons rather than one cramped paragraph at
       // a different size.

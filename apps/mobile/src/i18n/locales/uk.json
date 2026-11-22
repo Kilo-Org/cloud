@@ -759,6 +759,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Підключенням Bitbucket для {{organization}} можна керувати лише у вебверсії з комп'ютера.",
+      "deniedManagedByOwner": "Попросіть власника {{organization}} змінити підключення, яке ви не можете змінити.",
+      "deniedConnectRole": "Підключити його можуть лише власники, адміністратори та менеджери з оплати {{organization}}.",
+      "deniedReconnectRole": "Попросіть власника, адміністратора або менеджера з оплати {{organization}} повторно підключити його.",
       "managedOnWebTitle": "Керується у вебверсії",
       "managedOnWebShort": "Це підключення керується у вебверсії з комп'ютера.",
       "managedOnWebRepositories": "Виберіть репозиторії для {{organization}} у вебверсії з комп'ютера.",

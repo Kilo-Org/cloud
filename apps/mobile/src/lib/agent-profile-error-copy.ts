@@ -5,8 +5,9 @@ import { trialRefusalCopyKey } from '@/lib/trial-refusal-copy';
 /**
  * The sentence `ensureOrganizationAccess` (`packages/web-shared/src/routers/
  * organizations/utils.ts`) throws with code `UNAUTHORIZED` when the caller's
- * role is narrower than `ORGANIZATION_MANAGE_ROLES` — the write gate every
- * organization profile mutation passes through after the plan gate.
+ * role is narrower than `ORGANIZATION_MANAGE_ROLES`. Shared with the plan gate
+ * by every organization profile write: the role check runs first, so a member
+ * always reads this sentence and never the plan one.
  */
 export const ORGANIZATION_ROLE_DENIED_MESSAGE =
   'You do not have the required organizational role to access this feature';

@@ -615,10 +615,16 @@ export function getCommandGuardPermissions(
   const securityRemediationPolicy = policy.policyName === 'security-remediation-pr';
   return {
     edit: securityRemediationPolicy
-      ? // The edit tool writes any path without a shell command, and the
-        // repository's own configuration file decides what a push does, so that
-        // file stays out of reach while every other path stays writable.
-        { '*': 'allow', '.git/*': 'deny', '*.git/*': 'deny' }
+      ? // The edit tool writes any path without a shell command, and git reads
+        // its configuration from both the repository's own file and the user's
+        // file, so both stay out of reach while every other path stays writable.
+        {
+          '*': 'allow',
+          '.git/*': 'deny',
+          '*.git/*': 'deny',
+          '*gitconfig*': 'deny',
+          '*/git/config*': 'deny',
+        }
       : bitbucketReviewPolicy && bitbucketReviewId
         ? {
             '*': 'deny',

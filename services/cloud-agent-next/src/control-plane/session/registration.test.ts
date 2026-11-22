@@ -411,7 +411,13 @@ describe('migrated origin permissions', () => {
         question: 'deny',
         edit:
           createdOnPlatform === 'security-remediation'
-            ? { '*': 'allow', '.git/*': 'deny', '*.git/*': 'deny' }
+            ? {
+                '*': 'allow',
+                '.git/*': 'deny',
+                '*.git/*': 'deny',
+                '*gitconfig*': 'deny',
+                '*/git/config*': 'deny',
+              }
             : 'deny',
         webfetch: 'deny',
         websearch: 'deny',

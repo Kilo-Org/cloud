@@ -445,39 +445,83 @@ describe('handleNeedsInputNotificationResponse — approve and reply', () => {
     expect(mocks.dismissNotificationAsync).toHaveBeenCalledWith('fcm-remote-1');
   });
 
-  const publishFailureCases: { shape: string; input: ResponseInput }[] = [
-    { shape: 'Approve', input: { identifier: 'fcm-remote-1' } },
-    {
-      shape: 'inline reply',
-      input: {
+  it('keeps the acted-on raise when an Approve result cannot be published', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('retryable');
+    mocks.scheduleNotificationAsync.mockRejectedValue(new Error('native scheduler unavailable'));
+
+    const handled = await handleNeedsInputNotificationResponse(
+      raiseResponse({ identifier: 'fcm-remote-1' }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    expect(handled).toBe(true);
+    // Approve targets the session identifier, so the only other name the
+    // replacement carries is the push the user just tapped: the new rule leaves
+    // both alone, and the raise stays the sole carrier of the outcome and its
+    // retry actions.
+    expect(mocks.dismissNotificationAsync).not.toHaveBeenCalled();
+    expect(mocks.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({ 'error.operation': 'needs_input_action_publish' }),
+      })
+    );
+  });
+
+  it('dismisses only the session raise when an inline reply result cannot be published', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('retryable');
+    mocks.scheduleNotificationAsync.mockRejectedValue(new Error('native scheduler unavailable'));
+
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
         identifier: 'fcm-remote-1',
         actionIdentifier: NEEDS_INPUT_ACTION_IDS.reply,
         userText: 'ship it',
-      },
-    },
-  ];
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
 
-  it.each(publishFailureCases)(
-    'keeps the acted-on raise when the $shape result cannot be published',
-    async ({ input }) => {
-      mocks.runNeedsInputInteraction.mockResolvedValue('retryable');
-      mocks.scheduleNotificationAsync.mockRejectedValue(new Error('native scheduler unavailable'));
+    // The result would have replaced the app-owned session raise under the
+    // push's identifier; with no result posted, the session notification is the
+    // duplicate that goes, while the replied push survives as the retry
+    // carrier the user acts on again.
+    expect(mocks.dismissNotificationAsync.mock.calls).toEqual([['needs-input:ses_1']]);
+    expect(mocks.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({ 'error.operation': 'needs_input_action_publish' }),
+      })
+    );
+  });
 
-      const handled = await handleNeedsInputNotificationResponse(raiseResponse(input), {
-        runInteraction: mocks.runNeedsInputInteraction,
-      });
+  it('does not record a reply result for an inline reply whose post failed', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+    mocks.scheduleNotificationAsync.mockRejectedValue(new Error('native scheduler unavailable'));
+    const report = vi.fn<(error: unknown) => void>();
 
-      expect(handled).toBe(true);
-      // The raise is the only carrier of the outcome and its retry actions.
-      expect(mocks.dismissNotificationAsync).not.toHaveBeenCalled();
-      expect(mocks.captureException).toHaveBeenCalledWith(
-        expect.any(Error),
-        expect.objectContaining({
-          tags: expect.objectContaining({ 'error.operation': 'needs_input_action_publish' }),
-        })
-      );
-    }
-  );
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        identifier: 'fcm-remote-1',
+        actionIdentifier: NEEDS_INPUT_ACTION_IDS.reply,
+        userText: 'ship it',
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    expect(mocks.dismissNotificationAsync.mock.calls).toEqual([['needs-input:ses_1']]);
+    expect(mocks.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({ 'error.operation': 'needs_input_action_publish' }),
+      })
+    );
+    // The reply-result record drives the session plan's retirement, and it
+    // describes a result that exists: a failed post must not leave the plan
+    // dismissing the push the user retries on.
+    await retireNeedsInputReplyResult('ses_1', report);
+    expect(mocks.dismissNotificationAsync.mock.calls).toEqual([['needs-input:ses_1']]);
+    expect(report).not.toHaveBeenCalled();
+  });
 
   it('keeps the acted-on raise but still republishes when an answered raise fails to publish', async () => {
     mocks.runNeedsInputInteraction.mockResolvedValue('ok');

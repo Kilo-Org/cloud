@@ -30,6 +30,11 @@ export const TERMINAL_MESSAGE_STATES = ['completed', 'failed', 'cancelled'] as c
  */
 export const QUEUED_MESSAGE_LIMIT = 10;
 
+/** Whether a new message would exceed the queued bound. */
+export function queuedBoundReached(messages: readonly SessionMessage[]): boolean {
+  return messages.filter(message => message.state === 'queued').length >= QUEUED_MESSAGE_LIMIT;
+}
+
 /** One message row: identity, immutable intent, one state, timestamps, reason. */
 export type SessionMessage = {
   messageId: string;
@@ -84,7 +89,7 @@ export function queueMessage(
   if (messages.some(message => message.messageId === intent.messageId)) {
     return { messages: [...messages], changed: [] };
   }
-  if (messages.filter(message => message.state === 'queued').length >= QUEUED_MESSAGE_LIMIT) {
+  if (queuedBoundReached(messages)) {
     return { messages: [...messages], changed: [], rejected: 'queue-full' };
   }
   const message: SessionMessage = {

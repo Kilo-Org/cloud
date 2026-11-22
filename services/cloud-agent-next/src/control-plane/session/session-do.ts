@@ -190,6 +190,7 @@ import {
   oldestOpenMessage,
   openMessages,
   queueMessage,
+  queuedBoundReached,
   renderQueuedMessageContent,
   settleAcceptedUpTo,
   settleMessages,
@@ -2158,8 +2159,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         } catch {
           return 'not_connected';
         }
-        if (result === 'sent') await this.resolvePendingInteraction(parsed.reply);
-        return result;
+        // The Sandbox DO only answers a live turn, so it cannot report capacity.
+        if (result !== 'sent') return 'not_connected';
+        await this.resolvePendingInteraction(parsed.reply);
+        return 'sent';
       }
       // The asking turn already settled: the answer would become a new message
       // that continues the chat (spec §5). A new message costs a turn, so this
@@ -2175,6 +2178,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         this.metadata?.agent?.model
       );
       if (intent === null) return 'not_connected';
+      // A session that cannot queue the new turn refuses it for capacity here,
+      // before the caller reads the payer balance, so the retryable capacity
+      // error is what the user sees rather than a payment error.
+      if (queuedBoundReached(this.messages)) return { result: 'queue-full' };
       return { result: 'continuation', intent };
     });
   }
@@ -2190,7 +2197,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * a pending interaction of the same kind, that is a different interaction whose
    * rendered text happens to match, and the replay is refused rather than
    * resolving it. A live turn that appeared after the preflight takes the reply
-   * through the wrapper, exactly like a live answer.
+   * through the wrapper, exactly like a live answer. A queue that filled after
+   * the preflight refuses the continuation for capacity and keeps the
+   * interaction pending.
    */
   async admitAnswerContinuation(
     payload: ControlPlaneAdmitAnswerPayload
@@ -2224,7 +2233,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       const admitted = await this.admitMessage(
         await this.withSessionCallbackContext(admittedPayload(parsed.intent))
       );
-      if (admitted === 'queue-full') return 'not_connected';
+      if (admitted === 'queue-full') return 'queue-full';
       await this.resolvePendingInteraction(parsed.reply);
       return 'sent';
     });

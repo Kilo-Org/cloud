@@ -2,7 +2,8 @@
  * Admission for an answer to a question or permission the session no longer
  * runs. A settled answer becomes a new Cloud Agent turn, so it must pass the
  * same payer balance and model preflight every prompt and command mutation
- * passes before it is queued.
+ * passes before it is queued. A session whose queue is already full reports the
+ * same retryable capacity refusal a prompt reports, before any balance read.
  *
  * The Session DO decides whether the answer reaches a live turn or becomes a
  * continuation, and it owns the pending-interaction set. It therefore returns
@@ -39,6 +40,8 @@ export type AnswerAdmissionOutcome =
   | { outcome: 'sent' }
   /** Nothing waited on this interaction, or the session moved past it. */
   | { outcome: 'not_pending' }
+  /** The pending queue cannot take the new turn; the interaction stays pending. */
+  | { outcome: 'queue-full' }
   /** The payer balance refused the new turn; the interaction stays pending. */
   | { outcome: 'balance'; status: 402 | 404 | 500 | 503; message: string }
   /** The caller holds no verified bearer, so the preflight cannot run. */
@@ -72,6 +75,7 @@ export async function answerWithAdmission(params: {
   );
   if (dispatch === 'sent') return { outcome: 'sent' };
   if (dispatch === 'not_connected') return { outcome: 'not_pending' };
+  if (dispatch.result === 'queue-full') return { outcome: 'queue-full' };
   const authToken = params.authToken;
   if (!authToken) return { outcome: 'unavailable' };
 
@@ -111,5 +115,7 @@ export async function answerWithAdmission(params: {
         'admitAnswerContinuation'
       )
   );
-  return admitted === 'sent' ? { outcome: 'sent' } : { outcome: 'not_pending' };
+  if (admitted === 'sent') return { outcome: 'sent' };
+  if (admitted === 'queue-full') return { outcome: 'queue-full' };
+  return { outcome: 'not_pending' };
 }

@@ -212,6 +212,29 @@ describe('answerQuestion', () => {
     }
   });
 
+  it('reports a capacity refusal before reading the payer balance', async () => {
+    fetchSessionMetadataMock.mockResolvedValue({ identity: { sessionId: SESSION_ID } });
+    const harness = setup();
+    harness.stub.answer.mockResolvedValue({ result: 'queue-full' });
+    const fetchMock = vi.fn<typeof fetch>();
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      await expect(
+        harness.caller.answerQuestion({
+          sessionId: SESSION_ID,
+          questionId: 'q_1',
+          answers: [['yes']],
+        })
+      ).rejects.toMatchObject({
+        code: 'TOO_MANY_REQUESTS',
+        cause: { error: 'PENDING_QUEUE_FULL', retryable: true },
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('reports an unreachable payer scope as a missing session', async () => {
     fetchSessionMetadataMock.mockResolvedValue({ identity: { sessionId: SESSION_ID } });
     requireCurrentSessionAccessMock.mockReset();

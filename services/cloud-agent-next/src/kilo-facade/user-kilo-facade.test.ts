@@ -41,6 +41,7 @@ import {
   type KiloFacadeNativeTailOpener,
 } from './user-kilo-facade';
 import type { NativeEventTail, NativeTailOpenResult, NativeTailSink } from './native-event-tail.js';
+import { pendingQueueFullAdmissionFailure } from '../session/queue-message.js';
 
 function nativeTailDouble(
   options: { run?: (sink: NativeTailSink) => Promise<void> } = {}
@@ -3094,6 +3095,57 @@ describe('hosted native routes', () => {
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toMatchObject({ error: 'KILO_FACADE_UNAVAILABLE' });
     expect(validatePromptBalance).not.toHaveBeenCalled();
+  });
+
+  it('refuses a settled answer for capacity without reading the payer balance', async () => {
+    const env = envStub();
+    vi.mocked(env.SANDBOX_SESSION).get = vi.fn(() => ({
+      answer: vi.fn(async () => ({ result: 'queue-full' as const })),
+    })) as never;
+    const validatePromptBalance = vi.fn();
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/question/q_1/reply?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`,
+        { method: 'POST', body: JSON.stringify({ answers: [['Blue']] }) }
+      ),
+      env,
+      userId: 'usr_1',
+      authToken: 'caller-bearer',
+      deps: hostedDeps({ validatePromptBalance }),
+    });
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toEqual({
+      error: 'KILO_PROMPT_QUEUE_FULL',
+      message: pendingQueueFullAdmissionFailure().error,
+    });
+    expect(validatePromptBalance).not.toHaveBeenCalled();
+  });
+
+  it('refuses the preflighted continuation when the queue filled after the preflight', async () => {
+    const env = envStub();
+    const continuation = {
+      messageId: 'msg_answer_full',
+      turn: { type: 'prompt' as const, prompt: 'Blue' },
+      agent: { mode: 'code', model: 'test/model' },
+    };
+    vi.mocked(env.SANDBOX_SESSION).get = vi.fn(() => ({
+      answer: vi.fn(async () => ({ result: 'continuation' as const, intent: continuation })),
+      admitAnswerContinuation: vi.fn(async () => 'queue-full' as const),
+    })) as never;
+    const validatePromptBalance = vi.fn(async () => ({ success: true as const }));
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/question/q_1/reply?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`,
+        { method: 'POST', body: JSON.stringify({ answers: [['Blue']] }) }
+      ),
+      env,
+      userId: 'usr_1',
+      authToken: 'caller-bearer',
+      deps: hostedDeps({ validatePromptBalance }),
+    });
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toMatchObject({ error: 'KILO_PROMPT_QUEUE_FULL' });
+    expect(validatePromptBalance).toHaveBeenCalledTimes(1);
   });
 
   it('answers a live turn without reading the balance', async () => {

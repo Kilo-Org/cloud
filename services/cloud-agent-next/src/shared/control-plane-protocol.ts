@@ -1101,7 +1101,11 @@ export const controlPlaneAdmitAnswerPayloadSchema = z
   })
   .strict();
 
-export const controlPlaneContinuationAdmissionResultSchema = z.enum(['sent', 'not_connected']);
+export const controlPlaneContinuationAdmissionResultSchema = z.enum([
+  'sent',
+  'not_connected',
+  'queue-full',
+]);
 
 export const controlPlaneDispatchResultSchema = z.union([
   z.literal('sent'),
@@ -1113,6 +1117,11 @@ export const controlPlaneDispatchResultSchema = z.union([
       intent: controlPlaneContinuationIntentSchema,
     })
     .strict(),
+  /**
+   * A settled answer the session cannot queue reports capacity instead of
+   * building a continuation.
+   */
+  z.object({ result: z.literal('queue-full') }).strict(),
 ]);
 
 export const controlPlaneStatusResultSchema = z

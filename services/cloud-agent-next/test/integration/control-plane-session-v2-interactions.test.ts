@@ -6,6 +6,7 @@ import type { SandboxSessionV2 } from '../../src/control-plane/session/session-d
 import { generateSandboxId } from '../../src/sandbox-id.js';
 import { sessionDoName } from '../../src/session-identity.js';
 import { createMessageId, MESSAGE_ID_PATTERN } from '../../src/session/message-id.js';
+import { QUEUED_MESSAGE_LIMIT } from '../../src/control-plane/session/messages.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
@@ -692,6 +693,51 @@ describe('SandboxSessionV2 Stop, answers and permissions', () => {
     });
   });
 
+  it('refuses a settled answer for capacity before it reaches the payer preflight', async () => {
+    // No sandbox route goes ready, so every prompt stays queued and fills the bound.
+    const { sessionId, stub } = await registerOnlySession();
+    for (let index = 0; index < QUEUED_MESSAGE_LIMIT; index += 1) {
+      await stub.send(promptPayload(messageId(), `start ${index}`));
+    }
+    await stub.onEvents({ events: [{ type: 'question.asked', properties: { id: 'q_1' } }] });
+
+    await expect(
+      stub.answer({
+        sessionId,
+        reply: { action: 'answer', questionId: 'q_1', answers: [['yes']] },
+      })
+    ).resolves.toEqual({ result: 'queue-full' });
+    // The interaction stays answerable once the queue drains.
+    await expect(stub.getPendingInteractions()).resolves.toMatchObject({
+      questions: [{ id: 'q_1' }],
+    });
+  });
+
+  it('refuses the preflighted continuation when the queue filled after the preflight', async () => {
+    const { sessionId, stub } = await registerOnlySession();
+    await stub.send(promptPayload(messageId(), 'start'));
+    await stub.onEvents({ events: [{ type: 'question.asked', properties: { id: 'q_1' } }] });
+    const reply = { action: 'answer' as const, questionId: 'q_1', answers: [['yes']] };
+    const continuation = await stub.answer({ sessionId, reply });
+    if (typeof continuation === 'string') throw new Error('expected a continuation');
+
+    // The queue fills after the preflight, so admission refuses the turn.
+    for (let index = 0; index < QUEUED_MESSAGE_LIMIT - 1; index += 1) {
+      await stub.send(promptPayload(messageId(), `later ${index}`));
+    }
+    await expect(
+      stub.admitAnswerContinuation({ sessionId, reply, intent: continuation.intent })
+    ).resolves.toBe('queue-full');
+    await expect(stub.getPendingInteractions()).resolves.toMatchObject({
+      questions: [{ id: 'q_1' }],
+    });
+    const snapshot = await stub.getSession();
+    if (snapshot.type !== 'found') throw new Error('session disappeared');
+    expect(
+      snapshot.messages.some(message => message.messageId === continuation.intent.messageId)
+    ).toBe(false);
+  });
+
   it('keeps a settled answer pending until its preflighted intent is admitted', async () => {
     const { sessionId, stub } = await registerOnlySession();
     await stub.send(promptPayload(messageId(), 'start'));
@@ -778,7 +824,7 @@ describe('SandboxSessionV2 Stop, answers and permissions', () => {
     ).toBe(false);
   });
 
-  it('admits only the continuation the session currently produces', async () => {
+  it('refuses a continuation that carries a model or text the session does not produce', async () => {
     const { sessionId, stub } = await registerOnlySession();
     await stub.send(promptPayload(messageId(), 'start'));
     await stub.onEvents({ events: [{ type: 'question.asked', properties: { id: 'q_1' } }] });
@@ -815,7 +861,7 @@ describe('SandboxSessionV2 Stop, answers and permissions', () => {
     ).toBe(false);
   });
 
-  it('admits only the continuation the session produces', async () => {
+  it('admits the preflighted continuation once and refuses a replay for another interaction', async () => {
     const { sessionId, stub } = await registerOnlySession();
     await stub.send(promptPayload(messageId(), 'start'));
     await stub.onEvents({

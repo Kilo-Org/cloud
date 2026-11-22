@@ -210,7 +210,7 @@ afterAll(async () => {
 function postAnswer(params: {
   reply: unknown;
   answer: () => Promise<unknown>;
-  admitAnswerContinuation: () => Promise<'sent' | 'not_connected'>;
+  admitAnswerContinuation: () => Promise<'sent' | 'not_connected' | 'queue-full'>;
 }) {
   const stub = {
     getMetadata: async () => sessionMetadata(personalCloudAgentSessionId, null),
@@ -290,6 +290,33 @@ describe('facade answer admission against PostgreSQL', () => {
     expect((await response).status).toBe(200);
     expect(balanceRequests()).toEqual([]);
     expect(stub.admitAnswerContinuation).not.toHaveBeenCalled();
+  });
+
+  it('reports the retryable capacity refusal and reads no payer balance', async () => {
+    balanceAnswer = { balance: 0, isDepleted: true };
+    const { stub, response } = postAnswer({
+      reply: { answers: [['Blue']] },
+      answer: async () => ({ result: 'queue-full' }),
+      admitAnswerContinuation: async () => 'sent',
+    });
+
+    expect((await response).status).toBe(429);
+    expect(balanceRequests()).toEqual([]);
+    expect(stub.admitAnswerContinuation).not.toHaveBeenCalled();
+    expect(recorded.some(entry => new URL(entry.url).pathname.endsWith('/models/validate'))).toBe(
+      false
+    );
+  });
+
+  it('reports the capacity refusal when the queue filled after the preflight', async () => {
+    const { response } = postAnswer({
+      reply: { answers: [['Blue']] },
+      answer: async () => ({ result: 'continuation', intent: CONTINUATION }),
+      admitAnswerContinuation: async () => 'queue-full',
+    });
+
+    expect((await response).status).toBe(429);
+    expect(balanceRequests()).toHaveLength(1);
   });
 });
 

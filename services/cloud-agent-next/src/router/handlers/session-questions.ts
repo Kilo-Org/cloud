@@ -7,6 +7,10 @@ import { protectedProcedure } from '../auth.js';
 import { sessionIdSchema } from '../schemas.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
 import { answerWithAdmission } from '../../session/answer-admission.js';
+import {
+  pendingQueueFullAdmissionFailure,
+  throwAdmissionError,
+} from '../../session/queue-message.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import type { ControlPlaneAnswerReply } from '../../shared/control-plane-protocol.js';
 import { withDORetry } from '../../utils/do-retry.js';
@@ -41,6 +45,9 @@ async function answerControlPlane(
       return { success: true };
     case 'not_pending':
       return { success: false };
+    case 'queue-full':
+      // The same retryable capacity refusal a prompt reports.
+      return throwAdmissionError(pendingQueueFullAdmissionFailure());
     case 'unavailable':
       throw new TRPCError({
         code: 'SERVICE_UNAVAILABLE',

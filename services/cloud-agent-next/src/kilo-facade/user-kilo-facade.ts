@@ -1548,6 +1548,10 @@ async function answerHostedNativeInteraction(params: {
   if (outcome.outcome === 'unavailable') {
     return facadeError(500, 'KILO_FACADE_UNAVAILABLE', 'Durable prompt admission is unavailable');
   }
+  if (outcome.outcome === 'queue-full') {
+    // The same retryable capacity refusal a prompt reports.
+    return facadeError(429, 'KILO_PROMPT_QUEUE_FULL', pendingQueueFullAdmissionFailure().error);
+  }
   return facadeError(
     409,
     'KILO_INTERACTION_UNAVAILABLE',

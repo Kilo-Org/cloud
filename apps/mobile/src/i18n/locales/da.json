@@ -120,7 +120,6 @@
     "connectBitbucket": "Tilknyt Bitbucket",
     "connectGitlab": "Tilknyt GitLab",
     "connectProvider": "Tilslut en udbyder",
-    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Indhold afkortet",
     "copyLink": "Kopiér link",
     "couldNotLoadOrganizations": "Organisationerne kunne ikke indlæses.",

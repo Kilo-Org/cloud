@@ -121,7 +121,6 @@
     "connectBitbucket": "Conectează Bitbucket",
     "connectGitlab": "Conectează GitLab",
     "connectProvider": "Conectează un furnizor",
-    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Conținut trunchiat",
     "copyLink": "Copiază linkul",
     "couldNotLoadOrganizations": "Nu s-au putut încărca organizațiile.",

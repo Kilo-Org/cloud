@@ -123,7 +123,6 @@
     "connectBitbucket": "Ceangail le Bitbucket",
     "connectGitlab": "Ceangail le GitLab",
     "connectProvider": "Ceangail soláthraí",
-    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Ábhar teasctha",
     "copyLink": "Cóipeáil an nasc",
     "couldNotLoadOrganizations": "Níorbh fhéidir na heagraíochtaí a lódáil.",

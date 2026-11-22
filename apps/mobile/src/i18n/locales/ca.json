@@ -121,7 +121,6 @@
     "connectBitbucket": "Connecta Bitbucket",
     "connectGitlab": "Connecta GitLab",
     "connectProvider": "Connecta un proveïdor",
-    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Contingut truncat",
     "copyLink": "Copia l'enllaç",
     "couldNotLoadOrganizations": "No s'han pogut carregar les organitzacions.",

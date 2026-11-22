@@ -120,7 +120,6 @@
     "connectBitbucket": "Ühenda Bitbucket",
     "connectGitlab": "Ühenda GitLab",
     "connectProvider": "Ühenda teenusepakkuja",
-    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Sisu kärbitud",
     "copyLink": "Kopeeri link",
     "couldNotLoadOrganizations": "Organisatsioone ei õnnestunud laadida.",

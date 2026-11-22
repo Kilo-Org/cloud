@@ -120,7 +120,6 @@
     "connectBitbucket": "Bitbucket जोडा",
     "connectGitlab": "GitLab जोडा",
     "connectProvider": "सेवा पुरवठादार जोडा",
-    "providerActionName": "{{provider}} {{action}}",
     "contentTruncated": "काही मजकूर वगळला आहे",
     "copyLink": "लिंक कॉपी करा",
     "couldNotLoadOrganizations": "संस्थांची यादी लोड करता आली नाही.",

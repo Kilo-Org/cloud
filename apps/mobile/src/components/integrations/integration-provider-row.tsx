@@ -98,9 +98,6 @@ export function IntegrationProviderRow({
   } else if (row.accountLabel) {
     subtitle = t('integrations.connectedTo', { account: row.accountLabel });
   }
-  const namedAction = (action: string) =>
-    t('common.providerActionName', { action, provider: label });
-
   // The row's one action lives in its trailing cell: the contract allows one
   // primary action per screen, and a hub of four filled buttons read as four of
   // them. Connect is that cell's text action; a management action stays a
@@ -143,7 +140,7 @@ export function IntegrationProviderRow({
               size="sm"
               variant="outline"
               onPress={onOpenOnWeb}
-              accessibilityLabel={namedAction(t('common.manageOnWeb'))}
+              accessibilityLabel={t('common.manageOnWeb')}
             >
               <Text>{t('common.manageOnWeb')}</Text>
             </Button>
@@ -163,7 +160,7 @@ export function IntegrationProviderRow({
               variant="outline"
               loading={disconnecting}
               onPress={onDisconnect}
-              accessibilityLabel={namedAction(t('integrations.disconnect'))}
+              accessibilityLabel={t('integrations.disconnect')}
             >
               <Text>{t('integrations.disconnect')}</Text>
             </Button>
@@ -185,7 +182,7 @@ export function IntegrationProviderRow({
               variant="outline"
               loading={retryingConnection}
               onPress={onRetryConnection}
-              accessibilityLabel={namedAction(t('common.retry'))}
+              accessibilityLabel={t('common.retry')}
             >
               <Text>{t('common.retry')}</Text>
             </Button>
@@ -206,7 +203,10 @@ export function IntegrationProviderRow({
       tone: 'neutral',
       onPress: onConnect,
       disabled: connecting,
-      accessibilityLabel: namedAction(t('common.connect')),
+      // The row's own title names the provider, so the cell names only the
+      // action it offers: appending the brand produced a broken phrase in
+      // languages that attach a connector to it.
+      accessibilityLabel: t('common.connect'),
       accessibilityState: { disabled: connecting, busy: connecting },
     };
   }

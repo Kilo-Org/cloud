@@ -340,7 +340,7 @@ describe('IntegrationsScreen', () => {
     expect(rowTitled(root, 'GitHub').props.subtitle).toBeUndefined();
 
     const connect = actionOf(rowTitled(root, 'GitHub'));
-    expect(connect?.props.accessibilityLabel).toBe('Connect GitHub');
+    expect(connect?.props.accessibilityLabel).toBe('Connect');
     press(connect);
     expect(calls.connect).toHaveBeenCalledWith('github');
   });
@@ -355,7 +355,9 @@ describe('IntegrationsScreen', () => {
     for (const title of ['GitHub', 'Linear']) {
       const row = rowTitled(renderer.root, title);
       expect(row.props.subtitle).toBeUndefined();
-      expect(actionOf(row)?.props.accessibilityLabel).toBe(`Connect ${title}`);
+      // The row title above the cell already names the provider, so the cell
+      // names its own action alone.
+      expect(actionOf(row)?.props.accessibilityLabel).toBe('Connect');
     }
   });
 
@@ -373,9 +375,7 @@ describe('IntegrationsScreen', () => {
     const renderer = mount('org-1');
     const root = renderer.root;
 
-    expect(actionOf(rowTitled(root, 'GitHub'))?.props.accessibilityLabel).toBe(
-      'Manage on the web GitHub'
-    );
+    expect(actionOf(rowTitled(root, 'GitHub'))?.props.accessibilityLabel).toBe('Manage on the web');
     // The GitHub row's web management link is the shell's integration page,
     // reached through a one-time hand-off rather than a full-web URL.
     press(actionOf(rowTitled(root, 'GitHub')));
@@ -388,7 +388,7 @@ describe('IntegrationsScreen', () => {
     // Bitbucket's connection is changed in the app, so an owner's installed row
     // disconnects instead of opening the web page.
     const bitbucket = actionOf(rowTitled(root, 'Bitbucket'));
-    expect(bitbucket?.props.accessibilityLabel).toBe('Disconnect Bitbucket');
+    expect(bitbucket?.props.accessibilityLabel).toBe('Disconnect');
   });
 
   it('opens the Bitbucket connect sheet for an organization without a workspace', () => {
@@ -397,7 +397,7 @@ describe('IntegrationsScreen', () => {
     const renderer = mount('org-1');
 
     const connect = actionOf(rowTitled(renderer.root, 'Bitbucket'));
-    expect(connect?.props.accessibilityLabel).toBe('Connect Bitbucket');
+    expect(connect?.props.accessibilityLabel).toBe('Connect');
     press(connect);
 
     expect(calls.connect).not.toHaveBeenCalled();
@@ -451,7 +451,7 @@ describe('IntegrationsScreen', () => {
     const renderer = mount('org-1');
 
     const retry = actionOf(rowTitled(renderer.root, 'Bitbucket'));
-    expect(retry?.props.accessibilityLabel).toBe('Retry Bitbucket');
+    expect(retry?.props.accessibilityLabel).toBe('Retry');
     press(retry);
 
     expect(calls.bitbucketRefetch).toHaveBeenCalledOnce();
@@ -466,7 +466,7 @@ describe('IntegrationsScreen', () => {
     const renderer = mount('org-1');
 
     const disconnect = actionOf(rowTitled(renderer.root, 'Slack'));
-    expect(disconnect?.props.accessibilityLabel).toBe('Disconnect Slack');
+    expect(disconnect?.props.accessibilityLabel).toBe('Disconnect');
     press(disconnect);
 
     expect(calls.confirm).toHaveBeenCalledTimes(1);
@@ -653,7 +653,7 @@ describe('IntegrationsScreen', () => {
 
     state.githubConnections = { data: [GITHUB_CONNECTION], isPending: false };
     const settled = actionOf(rowTitled(mount().root, 'GitHub'));
-    expect(settled?.props.accessibilityLabel).toBe('Disconnect GitHub');
+    expect(settled?.props.accessibilityLabel).toBe('Disconnect');
   });
 
   it('waits on the organization boundary before reading any connection', () => {

@@ -120,7 +120,6 @@
     "connectBitbucket": "Bitbucket hesabını qoş",
     "connectGitlab": "GitLab-ı qoş",
     "connectProvider": "Provayder qoş",
-    "providerActionName": "{{provider}} {{action}}",
     "contentTruncated": "Məzmun qısaldılıb",
     "copyLink": "Keçidi kopyala",
     "couldNotLoadOrganizations": "Təşkilatları yükləmək mümkün olmadı.",

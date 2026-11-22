@@ -120,7 +120,6 @@
     "connectBitbucket": "Bitbucket உடன் இணைக்கவும்",
     "connectGitlab": "GitLab உடன் இணைக்கவும்",
     "connectProvider": "ஒரு வழங்குநரை இணைக்கவும்",
-    "providerActionName": "{{provider}} {{action}}",
     "contentTruncated": "உள்ளடக்கம் துண்டிக்கப்பட்டது",
     "copyLink": "இணைப்பை நகலெடுக்கவும்",
     "couldNotLoadOrganizations": "நிறுவனங்களை ஏற்ற முடியவில்லை.",

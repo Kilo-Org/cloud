@@ -120,7 +120,6 @@
     "connectBitbucket": "Sambungkan Bitbucket",
     "connectGitlab": "Sambungkan GitLab",
     "connectProvider": "Sambungkan penyedia",
-    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Kandungan dipotong",
     "copyLink": "Salin pautan",
     "couldNotLoadOrganizations": "Tidak dapat memuatkan organisasi.",

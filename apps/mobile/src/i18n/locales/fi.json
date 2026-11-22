@@ -120,7 +120,6 @@
     "connectBitbucket": "Yhdistä Bitbucket-tili",
     "connectGitlab": "Yhdistä GitLab-tili",
     "connectProvider": "Yhdistä palveluntarjoaja",
-    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Sisältö katkaistu",
     "copyLink": "Kopioi linkki",
     "couldNotLoadOrganizations": "Organisaatioiden lataaminen epäonnistui.",

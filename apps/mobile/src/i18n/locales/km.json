@@ -120,7 +120,6 @@
     "connectBitbucket": "ភ្ជាប់ Bitbucket",
     "connectGitlab": "ភ្ជាប់ GitLab",
     "connectProvider": "ភ្ជាប់អ្នកផ្តល់សេវា",
-    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "មាតិកាត្រូវបានកាត់ឱ្យខ្លី",
     "copyLink": "ចម្លងតំណ",
     "couldNotLoadOrganizations": "មិនអាចផ្ទុកស្ថាប័នបានទេ។",

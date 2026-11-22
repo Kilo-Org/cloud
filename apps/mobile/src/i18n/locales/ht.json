@@ -120,7 +120,6 @@
     "connectBitbucket": "Konekte Bitbucket",
     "connectGitlab": "Konekte GitLab",
     "connectProvider": "Konekte yon founisè",
-    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Kontni koupe",
     "copyLink": "Kopye lyen an",
     "couldNotLoadOrganizations": "Nou pa t kapab chaje òganizasyon yo.",

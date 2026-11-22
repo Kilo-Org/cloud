@@ -120,7 +120,6 @@
     "connectBitbucket": "連結 Bitbucket",
     "connectGitlab": "連結 GitLab",
     "connectProvider": "連結平台",
-    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "內容已截斷",
     "copyLink": "複製連結",
     "couldNotLoadOrganizations": "無法載入組織。",

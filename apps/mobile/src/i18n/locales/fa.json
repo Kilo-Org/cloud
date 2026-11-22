@@ -120,7 +120,6 @@
     "connectBitbucket": "اتصال به Bitbucket",
     "connectGitlab": "اتصال به GitLab",
     "connectProvider": "یک ارائه‌دهنده را متصل کنید",
-    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "بخشی از محتوا نمایش داده نمی‌شود",
     "copyLink": "کپی پیوند",
     "couldNotLoadOrganizations": "بارگذاری سازمان‌ها ناموفق بود.",

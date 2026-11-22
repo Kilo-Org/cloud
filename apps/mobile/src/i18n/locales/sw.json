@@ -120,7 +120,6 @@
     "connectBitbucket": "Unganisha Bitbucket",
     "connectGitlab": "Unganisha GitLab",
     "connectProvider": "Unganisha mtoa huduma",
-    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Maudhui yamepunguzwa",
     "copyLink": "Nakili kiungo",
     "couldNotLoadOrganizations": "Imeshindikana kupakia mashirika.",

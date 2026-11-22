@@ -120,7 +120,6 @@
     "connectBitbucket": "Anslut Bitbucket",
     "connectGitlab": "Anslut GitLab",
     "connectProvider": "Anslut en leverantör",
-    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Innehållet har kortats av",
     "copyLink": "Kopiera länk",
     "couldNotLoadOrganizations": "Det gick inte att läsa in organisationerna.",

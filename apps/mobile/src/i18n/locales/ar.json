@@ -124,7 +124,6 @@
     "connectBitbucket": "ربط Bitbucket",
     "connectGitlab": "ربط GitLab",
     "connectProvider": "اربط مزوّدًا",
-    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "تم اقتطاع المحتوى",
     "copyLink": "نسخ الرابط",
     "couldNotLoadOrganizations": "تعذّر تحميل المؤسسات.",

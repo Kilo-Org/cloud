@@ -120,7 +120,6 @@
     "connectBitbucket": "Bitbucket холбох",
     "connectGitlab": "GitLab холбох",
     "connectProvider": "Үйлчилгээ үзүүлэгчийг холбох",
-    "providerActionName": "{{provider}} {{action}}",
     "contentTruncated": "Агуулгыг хэсэгчлэн харуулж байна",
     "copyLink": "Холбоосыг хуулах",
     "couldNotLoadOrganizations": "Байгууллагуудыг ачаалж чадсангүй.",

@@ -120,7 +120,6 @@
     "connectBitbucket": "Bitbucketን አገናኝ",
     "connectGitlab": "GitLabን አገናኝ",
     "connectProvider": "አቅራቢን ያገናኙ",
-    "providerActionName": "{{provider}} {{action}}",
     "contentTruncated": "ይዘቱ ተቆርጧል",
     "copyLink": "አገናኙን ቅዳ",
     "couldNotLoadOrganizations": "ድርጅቶችን መጫን አልተቻለም።",

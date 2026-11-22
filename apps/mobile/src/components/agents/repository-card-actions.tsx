@@ -61,9 +61,12 @@ export function RepositoryRefreshButton({
  * name adds the provider only when the label does not carry it: a label that
  * already reads "Open GitHub" must not announce GitHub a second time. Brand
  * names are not translated, so the comparison is case-insensitive and safe in
- * every catalog. The phrase comes from the catalog because joining the two
- * with a sentence joiner splits the name where the language puts the brand
- * first or uses a sentence stop.
+ * every catalog. The phrase the name uses is the provider's own catalog connect
+ * phrase, the same words as its card title: joining the action and the brand
+ * with `common.sentenceJoiner` splits the name where the catalog puts the brand
+ * first or ends a sentence, and the phrase also carries the connector or case
+ * marker its language attaches to the brand, which a two-placeholder template
+ * cannot.
  */
 export function repositoryActionAccessibleLabel(input: {
   action: string;
@@ -98,7 +101,7 @@ export function RepositoryActionRow({
   const accessibilityLabel = repositoryActionAccessibleLabel({
     action,
     provider,
-    providerPhrase: t('common.providerActionName', { action, provider }),
+    providerPhrase: t(PROVIDER_COPY[platform].connectTitle),
   });
   // The icon and the label share the row's centre as one group, so the glyph
   // sits beside its text instead of at the start edge. The label stays on one

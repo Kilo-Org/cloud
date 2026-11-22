@@ -123,7 +123,6 @@
     "connectBitbucket": "Qabbad Bitbucket",
     "connectGitlab": "Qabbad GitLab",
     "connectProvider": "Ikkonnettja fornitur",
-    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Il-kontenut tqassar",
     "copyLink": "Ikkopja l-ħolqa",
     "couldNotLoadOrganizations": "Ma stajniex ngħabbu l-organizzazzjonijiet.",

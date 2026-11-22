@@ -120,7 +120,6 @@
     "connectBitbucket": "Свържи Bitbucket",
     "connectGitlab": "Свържи GitLab",
     "connectProvider": "Свържи доставчик",
-    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Съдържанието е съкратено",
     "copyLink": "Копирай връзката",
     "couldNotLoadOrganizations": "Организациите не се заредиха.",

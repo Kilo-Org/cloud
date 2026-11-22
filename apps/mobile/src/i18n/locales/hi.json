@@ -120,7 +120,6 @@
     "connectBitbucket": "Bitbucket जोड़ें",
     "connectGitlab": "GitLab जोड़ें",
     "connectProvider": "एक प्रदाता कनेक्ट करें",
-    "providerActionName": "{{provider}} {{action}}",
     "contentTruncated": "सामग्री का कुछ हिस्सा नहीं दिखाया गया",
     "copyLink": "लिंक कॉपी करें",
     "couldNotLoadOrganizations": "संगठन लोड नहीं हो सके।",

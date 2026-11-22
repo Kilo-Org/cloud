@@ -122,7 +122,6 @@
     "connectBitbucket": "Pripojiť Bitbucket",
     "connectGitlab": "Pripojiť GitLab",
     "connectProvider": "Pripojte poskytovateľa",
-    "providerActionName": "{{action}} {{provider}}",
     "contentTruncated": "Obsah skrátený",
     "copyLink": "Kopírovať odkaz",
     "couldNotLoadOrganizations": "Nepodarilo sa načítať organizácie.",

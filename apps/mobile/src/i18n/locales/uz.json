@@ -120,7 +120,6 @@
     "connectBitbucket": "Bitbucketni ulash",
     "connectGitlab": "GitLabni ulash",
     "connectProvider": "Provayderni ulash",
-    "providerActionName": "{{provider}} {{action}}",
     "contentTruncated": "Matnning bir qismi ko‘rsatilmagan",
     "copyLink": "Havolani nusxalash",
     "couldNotLoadOrganizations": "Tashkilotlarni yuklab bo‘lmadi.",

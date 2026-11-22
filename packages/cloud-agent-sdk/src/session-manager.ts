@@ -355,6 +355,18 @@ type PrepareInput = {
   initialMessageId?: string;
 };
 
+/**
+ * One durable per-session delivery record as read back by a
+ * `SessionManagerConfig` reader. `items` may be partial, so `complete` is what
+ * separates "nothing was recorded" from "the record could not be vouched for".
+ */
+export type DurableDeliveryRecord<T> = {
+  /** What the record still holds; may be partial. */
+  readonly items: readonly T[];
+  /** False when the record could not be read, or when ids it should hold were dropped. */
+  readonly complete: boolean;
+};
+
 type SessionManagerConfig = {
   store: JotaiStore;
   resolveSession: (kiloSessionId: KiloSessionId) => Promise<ResolvedSession>;
@@ -463,8 +475,16 @@ type SessionManagerConfig = {
    * and the failed response row it re-sent — so the transcript keeps hiding
    * them after a relaunch. Callers without a reader (web, tests) keep the
    * in-memory-only behaviour.
+   *
+   * `complete: false` means the caller cannot vouch for the whole record: it
+   * could not be read, or its caps dropped ids it should hold. The manager
+   * then suppresses failures for that session rather than trusting an empty
+   * list, because an absent id would let the DO's replay restore a footer the
+   * person already resolved.
    */
-  readResolvedDeliveryFailures?: (kiloSessionId: KiloSessionId) => Promise<readonly string[]>;
+  readResolvedDeliveryFailures?: (
+    kiloSessionId: KiloSessionId
+  ) => Promise<DurableDeliveryRecord<string>>;
   /**
    * Optional sink for a message id the user resolved by retrying, so the next
    * open can drop its replayed `cloud.message.failed` and keep a replaced row
@@ -1592,6 +1612,18 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * only way to reach any set.
    */
   const resolvedDeliveryFailuresBySession = new Map<KiloSessionId, Set<string>>();
+  /**
+   * Sessions whose durable resolution record could not be vouched for. An
+   * unverifiable record must not read as "nothing was resolved": the manager
+   * then knows only that it cannot answer, and the session predicate hides
+   * failures instead of letting the DO's replay restore a footer the person
+   * already resolved. Bounded like the sibling per-session records, with the
+   * active session protected: an entry is dropped by a later read for that
+   * session that comes back complete, and the cap only has to hold sessions
+   * opened in this process — a fresh manager reads every record again on open,
+   * so a dropped entry is re-established before its predicate is consulted.
+   */
+  const resolvedFailuresUncertain = new Set<KiloSessionId>();
   /**
    * Failed rows a re-send superseded while it is still in flight, keyed by the
    * session that owns the row. The transcript filter needs the row hidden
@@ -3221,6 +3253,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * awaited: if it lands after the DO's replay already applied a resolved
    * failure, the prune below removes the whole failure; if it lands first,
    * the predicate suppresses it.
+   *
+   * A record the reader cannot vouch for marks the session uncertain instead
+   * of seeding an empty list, because an empty list would let the replay
+   * restore a footer the person already resolved.
    */
   function seedResolvedDeliveryFailures(
     kiloSessionId: KiloSessionId,
@@ -3230,8 +3266,19 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (!config.readResolvedDeliveryFailures) return resolvedFailures;
     void config
       .readResolvedDeliveryFailures(kiloSessionId)
-      .then(ids => {
+      .then(record => {
         if (expectedGeneration !== switchGeneration) return;
+        if (record.complete) {
+          resolvedFailuresUncertain.delete(kiloSessionId);
+        } else {
+          addBoundedKeeping(
+            resolvedFailuresUncertain,
+            kiloSessionId,
+            RESOLVED_DELIVERY_MEMORY_MAX_SESSIONS,
+            activeSessionId
+          );
+        }
+        const ids = record.items;
         for (const id of ids) {
           resolvedFailures.add(id);
         }
@@ -3254,7 +3301,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         }
       })
       .catch(() => {
-        // An unreadable memory is a miss, never a failed open.
+        // A rejected read is a record that could not be read: never a miss.
+        // The open still succeeds, but the session's failures stay hidden
+        // rather than allowing one the person already resolved to return.
+        if (expectedGeneration !== switchGeneration) return;
+        addBoundedKeeping(
+          resolvedFailuresUncertain,
+          kiloSessionId,
+          RESOLVED_DELIVERY_MEMORY_MAX_SESSIONS,
+          activeSessionId
+        );
       });
     return resolvedFailures;
   }
@@ -4057,7 +4113,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       storage,
       onToolAttachment: config.onToolAttachment,
       onFilePart: config.onFilePart,
-      isDeliveryFailureResolved: messageId => resolvedFailures.has(messageId),
+      // An unverifiable durable record hides the footer for this session
+      // rather than risking a restored error for a message that was delivered:
+      // a later read that comes back complete clears the flag and restores the
+      // normal behaviour.
+      isDeliveryFailureResolved: messageId =>
+        resolvedFailuresUncertain.has(kiloSessionId) || resolvedFailures.has(messageId),
       ...callbacks,
     });
     return session;
@@ -4680,6 +4741,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     clearAllAtoms();
     remoteOptimisticIds.clear();
     resolvedDeliveryFailuresBySession.clear();
+    resolvedFailuresUncertain.clear();
     supersededInFlightBySession.clear();
     failedPromptBySession.clear();
     pendingConfirmationBySession.clear();

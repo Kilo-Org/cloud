@@ -13,3 +13,17 @@ export const READ_CACHE_SCOPE_PREFIX = 'cache:';
 export function readCacheScope(userId: string): string {
   return `${READ_CACHE_SCOPE_PREFIX}${userId}:${SCHEMA_VERSION}`;
 }
+
+/**
+ * Prefix of the per-account delivery records (the unconfirmed-send memory and
+ * the resolved delivery-failure memory). It deliberately shares nothing with
+ * `cache:`: those records guard a composer draft and a replayed failure event,
+ * both of which outlive the read cache, so sign-out's `cache:<userId>:` sweep
+ * and a `SCHEMA_VERSION` bump must not reach them.
+ */
+export const DELIVERY_SCOPE_PREFIX = 'delivery:';
+
+/** One user's delivery-record scope: account-scoped, not schema-versioned. */
+export function deliveryScope(userId: string): string {
+  return `${DELIVERY_SCOPE_PREFIX}${userId}`;
+}

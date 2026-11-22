@@ -5,6 +5,7 @@ import {
   formatError,
   INTERRUPT_ABORT_SUPPRESSION_MS,
   type SessionManagerConfig,
+  type DurableDeliveryRecord,
   type StoredMessage,
   type SnapshotHistoryFailure,
 } from './session-manager';
@@ -8860,7 +8861,9 @@ describe('createSessionManager', () => {
     it('seeds the resolved ids from the durable reader and persists a retry', async () => {
       const persistResolvedDeliveryFailure = jest.fn();
       const config = createMockConfig({
-        readResolvedDeliveryFailures: jest.fn().mockResolvedValue(['m-original']),
+        readResolvedDeliveryFailures: jest
+          .fn()
+          .mockResolvedValue({ items: ['m-original'], complete: true }),
         persistResolvedDeliveryFailure,
       });
       const mgr = createSessionManager(config);
@@ -8882,7 +8885,7 @@ describe('createSessionManager', () => {
     it('persists a retry under the session that owns the row, not the switched-to one', async () => {
       const persistResolvedDeliveryFailure = jest.fn();
       const config = createMockConfig({
-        readResolvedDeliveryFailures: jest.fn().mockResolvedValue([]),
+        readResolvedDeliveryFailures: jest.fn().mockResolvedValue({ items: [], complete: true }),
         persistResolvedDeliveryFailure,
       });
       const mgr = createSessionManager(config);
@@ -8904,7 +8907,7 @@ describe('createSessionManager', () => {
       // The durable store never sees the retry: the fire-and-forget write has
       // not landed yet, so both reads return the pre-write list.
       const config = createMockConfig({
-        readResolvedDeliveryFailures: jest.fn().mockResolvedValue([]),
+        readResolvedDeliveryFailures: jest.fn().mockResolvedValue({ items: [], complete: true }),
         persistResolvedDeliveryFailure: jest.fn(),
       });
       const mgr = createSessionManager(config);
@@ -8924,7 +8927,7 @@ describe('createSessionManager', () => {
     });
 
     it('undoes the terminal error a failure pruned by the durable read had set', async () => {
-      const read = deferred<readonly string[]>();
+      const read = deferred<DurableDeliveryRecord<string>>();
       const config = createMockConfig({
         readResolvedDeliveryFailures: jest.fn(() => read.promise),
       });
@@ -8945,7 +8948,7 @@ describe('createSessionManager', () => {
       );
 
       mockSession.state.clearFailedMessage.mockReturnValueOnce(true);
-      read.resolve(['m-original']);
+      read.resolve({ items: ['m-original'], complete: true });
       await read.promise;
       await Promise.resolve();
 
@@ -8956,7 +8959,9 @@ describe('createSessionManager', () => {
     });
 
     it('reads the durable memory for the session being opened', async () => {
-      const readResolvedDeliveryFailures = jest.fn().mockResolvedValue([]);
+      const readResolvedDeliveryFailures = jest
+        .fn()
+        .mockResolvedValue({ items: [], complete: true });
       const config = createMockConfig({ readResolvedDeliveryFailures });
       const mgr = createSessionManager(config);
 
@@ -8966,7 +8971,7 @@ describe('createSessionManager', () => {
     });
 
     it('prunes a replayed failure that landed before the durable read resolved', async () => {
-      const read = deferred<readonly string[]>();
+      const read = deferred<DurableDeliveryRecord<string>>();
       const config = createMockConfig({
         readResolvedDeliveryFailures: jest.fn(() => read.promise),
       });
@@ -8978,7 +8983,7 @@ describe('createSessionManager', () => {
       // The DO's stored-event replay delivered the failure first.
       expect(sessionConfig?.isDeliveryFailureResolved?.('m-original')).toBe(false);
 
-      read.resolve(['m-original']);
+      read.resolve({ items: ['m-original'], complete: true });
       await read.promise;
       await Promise.resolve();
 
@@ -8987,11 +8992,11 @@ describe('createSessionManager', () => {
     });
 
     it('ignores a durable read that resolves after the session switched', async () => {
-      const read = deferred<readonly string[]>();
+      const read = deferred<DurableDeliveryRecord<string>>();
       const readResolvedDeliveryFailures = jest
         .fn()
         .mockReturnValueOnce(read.promise)
-        .mockResolvedValue([]);
+        .mockResolvedValue({ items: [], complete: true });
       const config = createMockConfig({ readResolvedDeliveryFailures });
       const mgr = createSessionManager(config);
 
@@ -8999,7 +9004,7 @@ describe('createSessionManager', () => {
       await mgr.switchSession(kiloId('ses-2'));
       const secondConfig = lastSessionConfig();
 
-      read.resolve(['m-original']);
+      read.resolve({ items: ['m-original'], complete: true });
       await read.promise;
       await Promise.resolve();
 
@@ -9007,11 +9012,38 @@ describe('createSessionManager', () => {
       expect(mockSession.state.clearFailedMessage).not.toHaveBeenCalledWith('m-original');
     });
 
+    it('hides a replayed failure for a session whose durable record is incomplete', async () => {
+      // The record could not be read (or its caps dropped ids), so an empty
+      // list does not mean "nothing was resolved". Treating it as empty would
+      // let the DO's replay restore a footer the person already resolved.
+      let complete = false;
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn(async () => ({ items: [], complete })),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await Promise.resolve();
+
+      expect(lastSessionConfig()?.isDeliveryFailureResolved?.('m-original')).toBe(true);
+
+      // A later read that can vouch for the record restores the normal
+      // behaviour for that session.
+      complete = true;
+      await mgr.switchSession(kiloId('ses-2'));
+      await mgr.switchSession(kiloId('ses-1'));
+      await Promise.resolve();
+
+      expect(lastSessionConfig()?.isDeliveryFailureResolved?.('m-original')).toBe(false);
+    });
+
     it('projects the seeded durable ids on the resolvedDeliveryFailures atom', async () => {
       // A relaunch: the row a retry superseded is server history and comes back
       // with the snapshot, so the transcript filter needs the durable record.
       const config = createMockConfig({
-        readResolvedDeliveryFailures: jest.fn().mockResolvedValue(['m-confirmed']),
+        readResolvedDeliveryFailures: jest
+          .fn()
+          .mockResolvedValue({ items: ['m-confirmed'], complete: true }),
       });
       const mgr = createSessionManager(config);
 
@@ -9040,9 +9072,10 @@ describe('createSessionManager', () => {
 
     it('projects per session and drops the previous session on a switch', async () => {
       const config = createMockConfig({
-        readResolvedDeliveryFailures: jest.fn().mockImplementation(async id => {
-          return id === kiloId('ses-1') ? ['m-one'] : ['m-two'];
-        }),
+        readResolvedDeliveryFailures: jest.fn().mockImplementation(async id => ({
+          items: id === kiloId('ses-1') ? ['m-one'] : ['m-two'],
+          complete: true,
+        })),
       });
       const mgr = createSessionManager(config);
 

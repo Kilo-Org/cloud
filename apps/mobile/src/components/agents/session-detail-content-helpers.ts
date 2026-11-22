@@ -259,6 +259,35 @@ export function unansweredPromptMessageId(
 }
 
 /**
+ * Whether the confirmed transcript already holds this prompt as a delivered
+ * user row.
+ *
+ * The composer restores the text of a send whose outcome the transport could
+ * not confirm, and the manager withdraws that restore when the server confirms
+ * the row. The durable record of those sends can be truncated by its caps or
+ * unreadable, and then nothing withdraws: the text is both delivered and sitting
+ * in the composer, one Send away from being posted twice. This is how the
+ * composer asks the transcript instead — a user row carrying this exact text is
+ * that message, already delivered.
+ *
+ * A `synthetic` user row is a client-materialised submission the server has not
+ * confirmed, so it is the same unknown-outcome send rather than evidence of
+ * delivery: it never makes this true. The compared text is
+ * {@link firstHumanText}, the one the composer restores.
+ */
+export function hasConfirmedSentPrompt(
+  messages: readonly StoredMessage[],
+  text: string
+): boolean {
+  return messages.some(
+    message =>
+      message.info.role === 'user' &&
+      message.info.synthetic !== true &&
+      firstHumanText(message.parts) === text
+  );
+}
+
+/**
  * The last message `mergeSessionTranscript` renders, or `undefined` when it
  * renders none. A dropped message is invisible, so the row above the footer is
  * the one before it.

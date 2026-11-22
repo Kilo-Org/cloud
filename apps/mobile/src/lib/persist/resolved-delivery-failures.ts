@@ -3,8 +3,20 @@ import { z } from 'zod';
 import { isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import { chainSave } from '@/lib/hooks/save-chain';
+import { deliveryScope, readCacheScope } from '@/lib/persist/cache-scope';
+import {
+  capDeliveryItems,
+  type DeliveryRecordRead,
+  emptyDeliveryRecord,
+  encodeDeliveryRecord,
+  incompleteDeliveryRecord,
+  type LegacyDeliveryRecord,
+  readStoredDeliveryRecord,
+  removeLegacyDeliveryRecord,
+  seedDeliveryRecord,
+  tombstoneOldSessions,
+} from '@/lib/persist/delivery-record';
 import * as encryptedKv from '@/lib/persist/encrypted-kv';
-import { readCacheScope } from '@/lib/persist/read-cache';
 
 /**
  * Bounded, per-user memory of delivery failures the user already resolved by
@@ -14,30 +26,45 @@ import { readCacheScope } from '@/lib/persist/read-cache';
  * the footer returns after a relaunch (`MUST stop showing after a successful
  * retry`, `.specs/cloud-agent-session.md` Errors 3).
  *
- * Scope and retirement reuse the read cache: the blob lives in
- * `readCacheScope(userId)`, so sign-out's `cache:<userId>:` prefix clear
- * removes it and a `SCHEMA_VERSION` bump retires it without extra cleanup. The
- * item key is `resolved-delivery:<sessionId>`.
+ * Lifetime: the record lives in `delivery:<userId>` (see `cache-scope.ts`), as
+ * long as the replayed event it suppresses, not as long as the read cache. The
+ * replay does not care that the user signed out, updated the app, or changed
+ * `SCHEMA_VERSION`, and the footer's absence is a decision the user already
+ * made; so the record must survive the `cache:<userId>:` sweep and a schema
+ * bump. It is the same data class as a composer draft: account-scoped, in the
+ * SQLCipher store, write-fenced on the auth epoch and on sign-out.
  *
- * Every failure is swallowed: this is a footer-suppression hint, never a
- * source of truth, so an unreadable or unwritable entry must never affect the
- * open or the retry path.
+ * The stored value is `{ items, complete }` per session. The item cap keeps
+ * the newest {@link RESOLVED_DELIVERY_MAX_IDS} ids and marks a cut record
+ * incomplete; the session cap retires the oldest session into an incomplete
+ * tombstone instead of deleting it, because a deleted record reads as "never
+ * resolved" — exactly the answer that restores a footer the user dismissed.
+ * Only a session with nothing stored at all reads as a complete, empty record,
+ * which is the ordinary state of a session whose footers were never dismissed.
+ *
+ * Records written before this scope existed are migrated on first read: the
+ * legacy `readCacheScope(userId)` id array is adopted into `delivery:<userId>`
+ * and never written again. Every failure is swallowed: this is a
+ * footer-suppression hint, never a source of truth, so an unreadable or
+ * unwritable entry must never affect the open or the retry path.
  */
 
-/** At most this many resolved ids per session; the oldest are evicted. */
+/** At most this many resolved ids per session; the oldest are dropped. */
 export const RESOLVED_DELIVERY_MAX_IDS = 100;
 
 /**
- * At most this many sessions keep a recorded resolution per user. Like the
- * transcript cache, the scope is otherwise cleared only on sign-out, so
- * without a cap a long-lived install would accumulate one entry per session
- * the user ever retried.
+ * At most this many sessions keep a recorded resolution per user. The delivery
+ * scope is cleared only on an explicit account purge, so without a cap a
+ * long-lived install would accumulate one entry per session the user retried.
  */
-export const RESOLVED_DELIVERY_MAX_SESSIONS = 20;
+export const RESOLVED_DELIVERY_MAX_SESSIONS = 200;
 
 const RESOLVED_DELIVERY_KEY_PREFIX = 'resolved-delivery:';
 
-const resolvedIdsSchema = z.array(z.string().min(1));
+const resolvedIdSchema = z.string().min(1);
+
+// The pre-migration shape: a bare array of message ids in the read-cache scope.
+const legacyResolvedIdsSchema = z.array(resolvedIdSchema);
 
 function resolvedDeliveryKey(sessionId: string): string {
   return `${RESOLVED_DELIVERY_KEY_PREFIX}${sessionId}`;
@@ -53,43 +80,117 @@ function resolvedDeliveryChainKey(userId: string, sessionId: string): string {
 }
 
 /**
- * Drops the oldest session entries beyond the cap for this key family only;
- * the read-cache blob and transcript pages in the same scope are untouched.
- * `listEntries` is ascending by `updatedAt`.
+ * The stored record, read without the chain. Callers inside `chainSave` must
+ * use this rather than the public read, which may itself take the chain for the
+ * legacy migration and would deadlock on the same key.
  */
-async function evictOldestSessions(scope: string): Promise<void> {
-  const entries = await encryptedKv.listEntries(scope);
-  const resolved = entries.filter(entry => entry.k.startsWith(RESOLVED_DELIVERY_KEY_PREFIX));
-  const excess = resolved.length - RESOLVED_DELIVERY_MAX_SESSIONS;
-  if (excess <= 0) {
-    return;
-  }
-  await Promise.all(
-    resolved.slice(0, excess).map(async entry => {
-      await encryptedKv.removeItem(scope, entry.k);
-    })
+function readStoredResolvedDelivery(
+  userId: string,
+  sessionId: string
+): Promise<DeliveryRecordRead<string> | null> {
+  return readStoredDeliveryRecord(
+    deliveryScope(userId),
+    resolvedDeliveryKey(sessionId),
+    resolvedIdSchema
   );
 }
 
-/** Reads the resolved delivery-failure ids for a session; `[]` on any miss. */
-export async function readResolvedDeliveryFailures(
+/**
+ * The pre-migration id array. `absent` and `unreadable` are kept apart: a
+ * session that never had a record is complete, while a value this build cannot
+ * parse must not be reported as one.
+ */
+async function probeLegacyResolvedDelivery(
   userId: string,
   sessionId: string
-): Promise<readonly string[]> {
-  if (userId === '' || sessionId === '') {
-    return [];
-  }
+): Promise<LegacyDeliveryRecord<string>> {
   try {
     const raw = await encryptedKv.getItem(readCacheScope(userId), resolvedDeliveryKey(sessionId));
     if (raw === null) {
-      return [];
+      return { state: 'absent' };
     }
     const parsed: unknown = JSON.parse(raw);
-    const result = resolvedIdsSchema.safeParse(parsed);
-    return result.success ? result.data : [];
+    const result = legacyResolvedIdsSchema.safeParse(parsed);
+    return result.success ? { state: 'found', items: result.data } : { state: 'unreadable' };
   } catch {
-    return [];
+    return { state: 'unreadable' };
   }
+}
+
+/**
+ * Adopts the legacy array into the delivery scope. Best effort: the caller
+ * already has the items, and a failed write only means the next read migrates
+ * again.
+ */
+async function migrateLegacyResolvedDelivery(
+  userId: string,
+  sessionId: string
+): Promise<DeliveryRecordRead<string>> {
+  const legacy = await probeLegacyResolvedDelivery(userId, sessionId);
+  if (legacy.state === 'absent') {
+    // Nothing was ever recorded for this session anywhere: a complete, empty
+    // answer, not a cut-short one. A footer is shown or hidden on that
+    // difference.
+    return emptyDeliveryRecord();
+  }
+  if (legacy.state === 'unreadable') {
+    return incompleteDeliveryRecord();
+  }
+  const adopted = capDeliveryItems(legacy.items, RESOLVED_DELIVERY_MAX_IDS, true);
+  const scope = deliveryScope(userId);
+  const legacyScope = readCacheScope(userId);
+  const key = resolvedDeliveryKey(sessionId);
+  try {
+    await chainSave(resolvedDeliveryChainKey(userId, sessionId), async () => {
+      // A migration during teardown would write into a scope that is no longer
+      // the active account's, and the legacy blob is not cleared with it.
+      if (isSignOutActive()) {
+        return;
+      }
+      const current = await readStoredResolvedDelivery(userId, sessionId);
+      if (current === null) {
+        // Sign-out can start while that read was in flight, so the flag is
+        // re-read here with no await in between.
+        if (isSignOutActive()) {
+          return;
+        }
+        await encryptedKv.setItem(scope, key, encodeDeliveryRecord(adopted));
+        await tombstoneOldSessions({
+          scope,
+          prefix: RESOLVED_DELIVERY_KEY_PREFIX,
+          max: RESOLVED_DELIVERY_MAX_SESSIONS,
+          keepKey: key,
+        });
+      }
+      // Either this call adopted the legacy array or a concurrent one already
+      // had: in both cases `delivery:<userId>` is now authoritative, so the old
+      // copy must go. Kept here, it would be adopted again the first time the
+      // record empties, restoring a footer the user already resolved.
+      await removeLegacyDeliveryRecord(legacyScope, key);
+    });
+  } catch {
+    // The migration is a convenience; the read still answers with the ids.
+  }
+  return adopted;
+}
+
+/**
+ * Reads the resolved delivery-failure ids for a session. A session with no
+ * record anywhere is a complete, empty answer; a record this build cannot read
+ * is reported as `{ items: [], complete: false }`.
+ */
+export async function readResolvedDeliveryFailures(
+  userId: string,
+  sessionId: string
+): Promise<DeliveryRecordRead<string>> {
+  if (userId === '' || sessionId === '') {
+    return incompleteDeliveryRecord();
+  }
+  const stored = await readStoredResolvedDelivery(userId, sessionId);
+  if (stored !== null) {
+    return stored;
+  }
+  return migrateLegacyResolvedDelivery(userId, sessionId);
 }
 
 /**
@@ -122,6 +223,8 @@ export async function persistResolvedDeliveryFailure(
   if (userId === '' || sessionId === '' || messageId === '') {
     return;
   }
+  const scope = deliveryScope(userId);
+  const key = resolvedDeliveryKey(sessionId);
   try {
     await chainSave(resolvedDeliveryChainKey(userId, sessionId), async () => {
       // Early exit, and the fence for the queued case: a write that chained
@@ -129,22 +232,42 @@ export async function persistResolvedDeliveryFailure(
       if (isSignOutActive() || !isCurrentAuthEpoch(authEpoch)) {
         return;
       }
-      const existing = await readResolvedDeliveryFailures(userId, sessionId);
-      if (existing.includes(messageId)) {
+      const stored = await readStoredResolvedDelivery(userId, sessionId);
+      // A write can arrive before any read migrated the legacy array; seeding
+      // from it here keeps those ids instead of overwriting them with `[]`.
+      // Once this write lands the delivery record is authoritative, so the
+      // legacy copy is dropped below: kept, it would be adopted again after a
+      // later empty leaves no record behind.
+      const legacy = stored === null ? await probeLegacyResolvedDelivery(userId, sessionId) : null;
+      const existing =
+        stored ?? seedDeliveryRecord(legacy ?? { state: 'absent' }, RESOLVED_DELIVERY_MAX_IDS);
+      const seededFromLegacy = legacy?.state === 'found';
+      if (existing.items.includes(messageId)) {
         return;
       }
-      const next = [...existing, messageId].slice(-RESOLVED_DELIVERY_MAX_IDS);
-      const scope = readCacheScope(userId);
-      // The fence is re-read after the awaited read and before the write, with
+      const next = capDeliveryItems(
+        [...existing.items, messageId],
+        RESOLVED_DELIVERY_MAX_IDS,
+        existing.complete
+      );
+      // The fence is re-read after the awaited reads and before the write, with
       // no await in between: sign-out flips its flag and bumps the epoch
-      // synchronously, before it clears `cache:<userId>:`, so a read that
-      // resolved past that moment must not repopulate the scope teardown just
-      // cleared. Same fence as `session-transcript-cache.ts`.
+      // synchronously, so a read that resolved past that moment must not
+      // repopulate the scope teardown just cleared. Same fence as
+      // `session-transcript-cache.ts`.
       if (isSignOutActive() || !isCurrentAuthEpoch(authEpoch)) {
         return;
       }
-      await encryptedKv.setItem(scope, resolvedDeliveryKey(sessionId), JSON.stringify(next));
-      await evictOldestSessions(scope);
+      await encryptedKv.setItem(scope, key, encodeDeliveryRecord(next));
+      if (seededFromLegacy) {
+        await removeLegacyDeliveryRecord(readCacheScope(userId), key);
+      }
+      await tombstoneOldSessions({
+        scope,
+        prefix: RESOLVED_DELIVERY_KEY_PREFIX,
+        max: RESOLVED_DELIVERY_MAX_SESSIONS,
+        keepKey: key,
+      });
     });
   } catch {
     // A failed write costs one restored footer, never a broken retry.

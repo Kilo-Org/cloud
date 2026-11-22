@@ -119,6 +119,7 @@ import {
 } from '@/components/agents/session-working-state';
 import {
   countInFlightMessages,
+  hasConfirmedSentPrompt,
   lastVisibleMessageFailure,
   resolveRetryPrompt,
   resolveRetryTarget,
@@ -217,6 +218,7 @@ import { useCliAgents } from '@/lib/hooks/use-cli-agents';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { agentComposerDraftKey } from '@/lib/persist/drafts';
+import { readPendingSendConfirmations } from '@/lib/persist/pending-send-confirmations';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { useKeepAwake } from '@/lib/keep-awake';
@@ -607,6 +609,33 @@ export function SessionDetailContent({
     isIdentityLoading,
     entityKey: sessionComposerDraftKey,
   });
+
+  // A truncated or unreadable record of unknown-outcome sends cannot say whether
+  // an already-delivered prompt is still waiting in the composer. The confirmed
+  // transcript can: a restored draft whose text is already a delivered user row
+  // is that message, so it is withdrawn rather than offered for a second send.
+  // An absent record reads as complete, so an ordinary session never takes this
+  // path.
+  const [pendingSendGuardIncomplete, setPendingSendGuardIncomplete] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+
+    const readGuard = async () => {
+      if (!userId || isIdentityLoading) {
+        return;
+      }
+      const record = await readPendingSendConfirmations(userId, sessionId);
+      if (cancelled) {
+        return;
+      }
+      setPendingSendGuardIncomplete(!record.complete);
+    };
+    void readGuard();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, sessionId, isIdentityLoading]);
 
   // Composer remount identity. An account CHANGE must remount the composer, so
   // one account's typed text never surfaces under another. Identity RESOLVING
@@ -1566,6 +1595,24 @@ export function SessionDetailContent({
       setConsumedDeliveredSequence(deliveredFailedPrompt.sequence);
     }
   }, [deliveredFailedPrompt]);
+
+  // The record of unknown-outcome sends is the only thing that retires a
+  // restored draft when its confirmation lands. When that record is truncated
+  // or unreadable, the confirmed transcript stands in: a restored draft whose
+  // text already sits in a delivered user row is a message the server took, so
+  // it is withdrawn instead of offered for a second send. The composer ignores
+  // a withdrawal of text that is not the unedited restored draft, so a repeated
+  // run costs nothing and a draft the reader typed or edited is never taken.
+  const restoredDraftValue = composerDraft.value;
+  useEffect(() => {
+    if (!pendingSendGuardIncomplete || !composerDraft.settled || !restoredDraftValue) {
+      return;
+    }
+    if (!hasConfirmedSentPrompt(messages, restoredDraftValue)) {
+      return;
+    }
+    composerControlRef.current?.withdrawRestoredSend(restoredDraftValue);
+  }, [pendingSendGuardIncomplete, composerDraft.settled, restoredDraftValue, messages]);
 
   // Where the account settles a turn its balance refused. The action reads no
   // session state, so it stays wired for a read-only transcript too. It reads

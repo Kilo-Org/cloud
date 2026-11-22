@@ -53,11 +53,11 @@ vi.mock('@/components/agents/mobile-session-page-adapter', () => ({
 // The resolved-delivery-failure memory owns the encrypted KV (SQLCipher)
 // chain; this suite is pure and only needs the call seam.
 vi.mock('@/lib/persist/resolved-delivery-failures', () => ({
-  readResolvedDeliveryFailures: vi.fn(async () => []),
+  readResolvedDeliveryFailures: vi.fn(async () => ({ items: [], complete: true })),
   persistResolvedDeliveryFailure: vi.fn(async () => undefined),
 }));
 vi.mock('@/lib/persist/pending-send-confirmations', () => ({
-  readPendingSendConfirmations: vi.fn(async () => []),
+  readPendingSendConfirmations: vi.fn(async () => ({ items: [], complete: true })),
   persistPendingSendConfirmation: vi.fn(async () => undefined),
   clearPendingSendConfirmation: vi.fn(async () => undefined),
 }));

@@ -105,11 +105,11 @@ vi.mock('@/components/agents/mobile-session-page-adapter', () => ({
 // chain, so without this mock it pulls the native encrypted KV (and its
 // `react-native` promise shim) into this node suite.
 vi.mock('@/lib/persist/resolved-delivery-failures', () => ({
-  readResolvedDeliveryFailures: vi.fn(async () => []),
+  readResolvedDeliveryFailures: vi.fn(async () => ({ items: [], complete: true })),
   persistResolvedDeliveryFailure: vi.fn(async () => undefined),
 }));
 vi.mock('@/lib/persist/pending-send-confirmations', () => ({
-  readPendingSendConfirmations: vi.fn(async () => []),
+  readPendingSendConfirmations: vi.fn(async () => ({ items: [], complete: true })),
   persistPendingSendConfirmation: vi.fn(async () => undefined),
   clearPendingSendConfirmation: vi.fn(async () => undefined),
 }));

@@ -330,10 +330,13 @@ export function createMobileAgentSessionManager({
     },
     // Durable memory of sends whose outcome the transport could not confirm:
     // the route that sent one may be gone before the server's record arrives,
-    // and the draft the composer restored survives that teardown.
-    // eslint-disable-next-line @typescript-eslint/promise-function-async -- passthrough returns the promise directly
-    readPendingSendConfirmations: (id: KiloSessionId) =>
-      readPendingSendConfirmations(resolvedDeliveryOwner.userId, id),
+    // and the draft the composer restored survives that teardown. The manager
+    // consumes only the ids it can act on; whether the stored record was whole
+    // is the screen's question, which reads it directly.
+    readPendingSendConfirmations: async (id: KiloSessionId) => {
+      const record = await readPendingSendConfirmations(resolvedDeliveryOwner.userId, id);
+      return record.items;
+    },
     persistPendingSendConfirmation: (id: KiloSessionId, messageId: string, text: string) => {
       void persistPendingSendConfirmation({
         owner: resolvedDeliveryOwner,

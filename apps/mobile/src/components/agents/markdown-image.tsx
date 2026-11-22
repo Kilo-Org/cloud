@@ -7,9 +7,11 @@ import { AlertCircle, Download, RotateCcw } from '@/components/ui/icons';
 import { Image } from '@/components/ui/image';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { TOUCH_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatList } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { formatTrustedImageHost } from '@/lib/hooks/use-trusted-image-hosts';
+import { cn } from '@/lib/utils';
 
 import {
   isMarkdownImageLoadAllowed,
@@ -76,7 +78,10 @@ function BlockedImageChip({
   return (
     <Pressable
       onLongPress={onShowLinkActions}
-      className="flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900"
+      className={cn(
+        TOUCH_TARGET_CLASS,
+        'flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900'
+      )}
       accessibilityRole="text"
       accessibilityLabel={label}
       accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}

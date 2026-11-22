@@ -26,6 +26,11 @@ import { once } from 'node:events';
 export const DOWNLOAD_PATH = '/assets/report.txt';
 export const DOWNLOAD_FILENAME = 'report.txt';
 export const DOWNLOAD_BODY = 'fixture download body\n';
+/**
+ * The route that serves the attachment once and answers every later request with a redirect to the `next` url it is
+ * given: a repeat of the same step loads a page instead of a file, and reports where that page settled.
+ */
+export const ONCE_DOWNLOAD_PATH = '/assets/once-report.txt';
 /** The held route: an attachment whose response lands only when the test says so. */
 export const LATE_DOWNLOAD_PATH = '/assets/late-report.txt';
 /** The second attachment one click starts on the `/two` page: the file no approval covers. */
@@ -109,6 +114,8 @@ export interface DownloadFixture {
   readonly hits: () => number;
   /** How many times the held attachment route was asked for the file. */
   readonly lateHits: () => number;
+  /** How many times the attachment that answers once was asked: the repeat's request is counted here too. */
+  readonly onceHits: () => number;
   /** Answers every held request: the browser creates the download only now, long after the click answered. */
   readonly releaseLate: () => void;
   /** How many times the second attachment of a `/two` click was served. */
@@ -123,6 +130,7 @@ export interface DownloadFixture {
 export const startDownloadFixture = async (): Promise<DownloadFixture> => {
   let hits = 0;
   let lateHits = 0;
+  let onceHits = 0;
   let secondHits = 0;
   let userHits = 0;
   /** The routes waiting for the test: answering one makes the browser create its download. */
@@ -167,6 +175,30 @@ export const startDownloadFixture = async (): Promise<DownloadFixture> => {
         'content-type': 'application/octet-stream',
       });
       response.end(SECOND_DOWNLOAD_BODY);
+
+      return;
+    }
+
+    if (path === ONCE_DOWNLOAD_PATH) {
+      onceHits += 1;
+
+      // The first request is the file the step asked for; every later one is a page the browser loads instead, so a
+      // Repeat of the step loads a document and the answer describes that document.
+      const next = new URL(request.url ?? '/', 'http://127.0.0.1').searchParams.get('next');
+
+      if (onceHits > 1 && next !== null) {
+        response.writeHead(302, { 'cache-control': 'no-store', location: next });
+        response.end();
+
+        return;
+      }
+
+      response.writeHead(200, {
+        'cache-control': 'no-store',
+        'content-disposition': `attachment; filename="${DOWNLOAD_FILENAME}"`,
+        'content-type': 'application/octet-stream',
+      });
+      response.end(DOWNLOAD_BODY);
 
       return;
     }
@@ -241,6 +273,7 @@ export const startDownloadFixture = async (): Promise<DownloadFixture> => {
     },
     hits: () => hits,
     lateHits: () => lateHits,
+    onceHits: () => onceHits,
     releaseLate: () => {
       for (const answer of held.splice(0)) {
         answer();

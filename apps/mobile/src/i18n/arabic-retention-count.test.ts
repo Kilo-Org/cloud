@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
 
+import { CATALOG_LOADERS } from './catalogs';
 import { SUPPORTED_LANGUAGES } from './languages';
 
 /**
@@ -53,12 +54,30 @@ describe('Arabic retention sentence', () => {
 });
 
 describe('retention sentence at the count the app renders', () => {
-  it('renders the number and no unresolved placeholder in every language', () => {
+  const declared = (tag: (typeof SUPPORTED_LANGUAGES)[number], key: string) => {
+    let node: unknown = CATALOG_LOADERS[tag]();
+    for (const part of key.split('.')) {
+      node = (node as Record<string, unknown>)[part];
+    }
+    return typeof node === 'string' ? node : undefined;
+  };
+
+  it('renders the number and no unresolved placeholder in every language', async () => {
     for (const tag of SUPPORTED_LANGUAGES) {
-      const rendered = i18n.t(KEY, { lng: tag, count: RETENTION_DAYS, days: RETENTION_DAYS });
-      expect(rendered, tag).toContain(String(RETENTION_DAYS));
-      expect(rendered, tag).not.toContain('{{');
-      expect(rendered, tag).not.toBe(KEY);
+      // The app bundles only English and loads a catalog through its backend on
+      // `changeLanguage`; `lng` on a call resolves the missing catalog through
+      // the English fallback instead of reading it.
+      // eslint-disable-next-line no-await-in-loop
+      await i18n.changeLanguage(tag);
+      const rendered = i18n.t(KEY, { count: RETENTION_DAYS, days: RETENTION_DAYS });
+      const category = new Intl.PluralRules(tag).select(RETENTION_DAYS);
+      const value = declared(tag, `${KEY}_${category}`) ?? declared(tag, KEY);
+      expect(value, `${tag} ${category}`).toBeDefined();
+      expect(value, `${tag} ${category}`).toContain('{{days}}');
+      expect(rendered, `${tag} ${category}`).not.toContain('{{');
+      expect(rendered, `${tag} ${category}`).toBe(
+        (value as string).replace(`{{days}}`, String(RETENTION_DAYS))
+      );
     }
   });
 });

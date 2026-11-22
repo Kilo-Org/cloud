@@ -2,6 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { foldForSearch } from './fold-for-search';
 
+// A call without a locale list follows the device locale, which the fold must
+// never do; a pinned locale that keeps the ASCII result is fine.
+const usesDeviceLocale = (locales: Intl.LocalesArgument | undefined): boolean =>
+  locales === undefined || (Array.isArray(locales) && locales.length === 0);
+
 describe('foldForSearch', () => {
   it('strips diacritics and folds case', () => {
     expect(foldForSearch('Türkçe')).toBe('turkce');
@@ -26,23 +31,20 @@ describe('foldForSearch', () => {
   it('folds case without consulting the device locale', () => {
     // A tr/az device lowers 'I' to 'ı', so a locale-sensitive fold would make
     // a search for "indonesian" miss "Indonesian". The fold must not follow
-    // the device locale, so only the no-locale call is stubbed; a pinned
-    // locale is allowed, because 'en' still folds to the ASCII 'i'.
-    const original = String.prototype.toLocaleLowerCase;
-    const toLocaleLowerCase = vi
-      .spyOn(String.prototype, 'toLocaleLowerCase')
-      .mockImplementation(function (this: string, locales?: Intl.LocalesArgument) {
-        const noLocaleList =
-          locales === undefined || (Array.isArray(locales) && locales.length === 0);
-        if (noLocaleList) {
-          return 'ındonesıan';
-        }
-        return original.call(this, locales);
-      });
+    // the device locale: a pinned locale such as 'en' still yields the ASCII
+    // 'i', so callers may pin one, but no call may omit the locale list.
+    const toLocaleLowerCase = vi.spyOn(String.prototype, 'toLocaleLowerCase');
+    let folded = '';
+    let deviceLocaleCalls = 0;
     try {
-      expect(foldForSearch('Indonesian')).toBe('indonesian');
+      folded = foldForSearch('Indonesian');
+      deviceLocaleCalls = toLocaleLowerCase.mock.calls.filter(([locales]) =>
+        usesDeviceLocale(locales)
+      ).length;
     } finally {
       toLocaleLowerCase.mockRestore();
     }
+    expect(folded).toBe('indonesian');
+    expect(deviceLocaleCalls).toBe(0);
   });
 });

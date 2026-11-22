@@ -13,8 +13,8 @@ import {
 } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import {
-  activeOrganizationJoinCondition,
   directOrganizationMembershipCondition,
+  liveOrganizationCondition,
 } from './organization-membership';
 
 export type OrganizationTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
@@ -96,7 +96,8 @@ export async function mutateOrganizationUsage(
       AND EXISTS (
         SELECT 1
         FROM ${organizations}
-        WHERE ${activeOrganizationJoinCondition(organization_id)}
+        WHERE ${organizations.id} = ${organization_id}
+          AND ${liveOrganizationCondition(organizations)}
       )
     ON CONFLICT (organization_id, kilo_user_id, limit_type, usage_date)
     DO UPDATE SET

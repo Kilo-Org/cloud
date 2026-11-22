@@ -301,8 +301,8 @@ public stream has no reconnecting status today, so `reconnecting` changes no cli
   rebuilds it from the session's current state and reports `sent`, `queue-full`, `retry` or
   `not_connected`. `retry` means the named interaction is still pending and this reply could not be
   taken, so the caller can use the same reply again; `not_connected` is terminal for that reply.
-  A reply that carries no text reports a non-terminal `invalid` refusal, so the interaction stays
-  answerable by a different reply.
+  The answer call reports a non-terminal `invalid` refusal instead when the reply of a settled turn
+  carries no text, so the interaction stays answerable by a different reply.
 - Each terminal message produces one report. The batch callback fires when no `queued` or
   `accepted` message remains (current callback semantics).
 - The per-user facade serves native `/event` and `/global/event`. `/event` first opens the same

@@ -3,7 +3,7 @@ import 'server-only';
 import { organizations, type Organization } from '@kilocode/db/schema';
 import { TRPCError } from '@trpc/server';
 import { and, eq, isNull } from 'drizzle-orm';
-import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { type db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 
 /**
  * Read the live organization row.

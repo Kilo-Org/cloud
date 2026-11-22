@@ -73,31 +73,30 @@ type InstructionNameHintLineProps = Readonly<{
  */
 function InstructionNameHintLine({ hint, nameError }: InstructionNameHintLineProps) {
   const { t } = useTranslation();
+  const rule = t('profiles.instructionNameInvalid');
   const shown = hint.kind === 'preview' || (hint.kind === 'rule' && nameError === undefined);
   return (
     <View>
-      {/* The reserved copy is the longest of the two shown lines and stays
-          mounted, so the row's height never depends on which line shows. */}
+      {/* The rule sentence holds the row's height in native layout, invisible,
+          so the row never depends on which line shows. The preview may be
+          longer than the rule once a name folds to a long slug, so it stays one
+          line with an ellipsis and always fits the room the rule reserved. */}
       <Text
-        className="w-full shrink-0 text-xs opacity-0"
+        className="text-xs opacity-0"
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
         pointerEvents="none"
       >
-        {t('profiles.instructionNameInvalid')}
+        {rule}
       </Text>
       {shown ? (
         <View className="absolute inset-x-0 top-0">
           {hint.kind === 'preview' ? (
-            <Text variant="muted" className="text-xs">
+            <Text variant="muted" className="text-xs" numberOfLines={1}>
               {t('profiles.instructionNamePreview', { name: hint.slug })}
             </Text>
           ) : (
-            <AccessibleStatus
-              message={t('profiles.instructionNameInvalid')}
-              tone="status"
-              className="text-xs"
-            />
+            <AccessibleStatus message={rule} tone="status" className="text-xs" />
           )}
         </View>
       ) : null}

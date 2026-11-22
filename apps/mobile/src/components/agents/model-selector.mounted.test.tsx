@@ -709,7 +709,11 @@ describe('ModelSelector chip availability disclosure', () => {
   // disabled chip over an empty catalog would hide the sheet's Retry.
   it('keeps an empty catalog pressable under a disabled composer', () => {
     routerPush.mockClear();
-    const renderer = renderSelector({ options: [], disabled: true });
+    const renderer = renderSelector({
+      options: [],
+      disabled: true,
+      onRetryModels: () => undefined,
+    });
     const pill = chip(renderer);
 
     expect(pill.props.disabled).toBe(false);
@@ -723,9 +727,33 @@ describe('ModelSelector chip availability disclosure', () => {
     expect(routerPush).toHaveBeenCalledTimes(1);
   });
 
+  // The press outlives the composer only because a Retry waits behind the
+  // sheet. A caller with nothing to refetch gets a zero-row sheet with no
+  // action, so its chip keeps the composer's refusal.
+  it('keeps an empty catalog without a retry disabled', () => {
+    routerPush.mockClear();
+    const renderer = renderSelector({ options: [], disabled: true });
+    const pill = chip(renderer);
+
+    expect(pill.props.disabled).toBe(true);
+    expect(pill.props.accessibilityState).toEqual({ disabled: true });
+
+    TestRenderer.act(() => {
+      const press = pill.props.onPress as (() => void) | undefined;
+      press?.();
+    });
+
+    expect(routerPush).not.toHaveBeenCalled();
+  });
+
   it('keeps an empty catalog locked on an agent-pinned chip', () => {
     routerPush.mockClear();
-    const renderer = renderSelector({ options: [], disabled: true, lockLabel: 'Reviewer' });
+    const renderer = renderSelector({
+      options: [],
+      disabled: true,
+      lockLabel: 'Reviewer',
+      onRetryModels: () => undefined,
+    });
     const pill = chip(renderer);
 
     expect(pill.props.disabled).toBe(true);

@@ -55,6 +55,7 @@ export function renderSelector(
     isLoading: boolean;
     disabled: boolean;
     lockLabel: string;
+    onRetryModels: () => void;
   }> = {}
 ): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
@@ -69,6 +70,7 @@ export function renderSelector(
         disabled: overrides.disabled ?? false,
         lockLabel: overrides.lockLabel,
         onSelect: vi.fn<(modelId: string, variant: string) => void>(),
+        onRetryModels: overrides.onRetryModels,
       })
     );
   });

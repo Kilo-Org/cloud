@@ -283,10 +283,11 @@ export function ModelSelector({
   // The chip names one model, so it states that model's state. Every option
   // being unavailable is therefore not what decides the announcement.
   const selectedUnavailable = selectedModel?.unavailable === true;
-  // An empty catalog keeps the press so the picker can offer its Retry, even
-  // under a composer disabled by that same failed read; a chip that is locked
-  // to an agent model keeps refusing.
-  const chipDisabled = disabled && !(catalogEmpty && lockLabel === undefined);
+  // An empty catalog keeps the press only when the sheet has a Retry behind
+  // it, so a composer disabled by that same failed read still reaches it; a
+  // locked chip, or one whose caller offers no retry, keeps refusing.
+  const retryBehindEmptyCatalog = catalogEmpty && onRetryModels !== undefined;
+  const chipDisabled = disabled && !(retryBehindEmptyCatalog && lockLabel === undefined);
   const accessibilityLabel = [
     // "Not selected" alone would not say what is not selected.
     nothingChosen ? t('common.model') : undefined,

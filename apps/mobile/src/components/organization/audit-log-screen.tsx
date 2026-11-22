@@ -277,6 +277,7 @@ export function OrganizationAuditLogScreen() {
     body = (
       <FlashList
         style={listStyle}
+        testID="organization-audit-log-list"
         data={entries}
         keyExtractor={item => item.id}
         renderItem={renderItem}

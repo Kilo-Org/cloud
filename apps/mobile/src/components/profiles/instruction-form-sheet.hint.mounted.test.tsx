@@ -176,10 +176,11 @@ describe('InstructionFormSheet file-name line', () => {
     const rule = i18n.t('profiles.instructionNameInvalid');
     expect(nameField(renderer.root).props.error).toBe(rule);
     expect(doneDisabled(renderer.root)).toBe(true);
-    // The row no longer states the rule in its own status line.
-    expect(
-      findAll(renderer.root, 'AccessibleStatus').filter(node => node.props.message === rule)
-    ).toHaveLength(0);
+    // The row no longer states the rule in its own line: the rule reaches the
+    // screen only through the field's error, so no text the sheet renders
+    // carries it. A Text that repeated the rule here would fail this check.
+    const texts = findAll(renderer.root, 'Text').map(node => node.props.children);
+    expect(texts).not.toContain(rule);
 
     unmount();
   });

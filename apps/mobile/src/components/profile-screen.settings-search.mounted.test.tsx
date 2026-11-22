@@ -206,6 +206,23 @@ describe('ProfileScreen settings search', () => {
     });
   });
 
+  it('keeps the Dark option distinct from its parent control', async () => {
+    const { renderer } = await mountProfile();
+    query(renderer.root, i18n.t('preferences.appearanceDark'));
+    const option = results(renderer.root).find(result => result.entry.id === 'appearance.dark');
+    if (!option) {
+      throw new Error('the Dark option is not indexed');
+    }
+    expect(option.entry.context).toBe(
+      `${i18n.t('common.preferences')} · ${i18n.t('preferences.appearance')}`
+    );
+    selectResult(renderer.root, option);
+    expect(routerPush).toHaveBeenCalledWith({
+      pathname: '/(app)/(tabs)/(3_profile)/preferences',
+      params: { settingsTarget: 'appearance.dark' },
+    });
+  });
+
   it('opens the privacy analytics setting on the consent review screen', async () => {
     const view = await mountProfile();
     const root = view.renderer.root;

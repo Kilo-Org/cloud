@@ -44,14 +44,15 @@ export type PostgresConnectionTarget = {
 };
 
 /**
- * The database a connection string names, as the pool will connect to it.
+ * The database a connection string names, as `getDatabaseClientConfig` reports it.
  *
- * This is the one parse every caller uses: the pool configuration below, and every caller that
- * has to name the target without handling the URL. `new URL()` leaves a non-special scheme such
- * as `postgres:` unnormalized, so the host keeps its case and the path keeps its escapes, while
- * the pool receives decoded values. Query parameters are not part of the target: `pg` reads
- * `?host=` and `?port=` only when it parses a `connectionString` itself, and this package never
- * hands it one.
+ * This is the one parse for the connection this package builds field by field: the pool
+ * configuration below, and every caller that has to name the target without handling the URL.
+ * `new URL()` leaves a non-special scheme such as `postgres:` unnormalized, so the host keeps its
+ * case and the path keeps its escapes, while the pool receives decoded values. Query parameters
+ * are not part of this target, because this parse is paired with the field-built connection and
+ * never with a `connectionString`. A client that hands `pg` a `connectionString` directly, such as
+ * `getWorkerDb`, is parsed by `pg` itself, which does read `?host=` and `?port=`.
  */
 export function postgresConnectionTarget(connectionString: string): PostgresConnectionTarget {
   const url = new URL(connectionString);

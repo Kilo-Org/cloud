@@ -258,11 +258,11 @@ export function InstructionFormSheet({
             }
           }}
         />
-        {/* One line under the name field, always mounted and always one line
-            tall, so the content field never moves while a name is typed. A
-            name that saves as typed leaves the row empty instead of removing
-            it. The rule is not repeated while the field's own error already
-            says the same sentence. */}
+        {/* The line under the name field, always mounted at the height the rule
+            sentence wraps to, so the content field never moves while a name is
+            typed. A name that saves as typed leaves the row blank instead of
+            removing it. The rule is not repeated while the field's own error
+            already says the same sentence. */}
         <View className="-mt-2">
           <InstructionNameHintLine hint={nameHint} nameError={nameError} />
         </View>

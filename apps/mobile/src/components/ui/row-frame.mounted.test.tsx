@@ -3,13 +3,12 @@ import { type ComponentProps, createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
-import { compiledDimensions, compiledLengthDp } from '@/test/native-dimensions';
+import { compiledDimensions } from '@/test/native-dimensions';
 
 import {
   ROW_FRAME_CONTENT_PRESS_CLASS,
   ROW_TARGET_CLASS,
   rowTargetHostClass,
-  textActionRowOverhangDp,
   textActionTargetDp,
 } from '@/lib/a11y/tap-target';
 
@@ -240,16 +239,16 @@ describe('RowFrame trailing cell', () => {
     expect(classes).toEqual(expect.arrayContaining(rowTargetHostClass().split(' ')));
     expect(classes).toContain('shrink-0');
     // The host's own box is the platform target, not the 27pt band the line
-    // lays it out on, and it cancels exactly the control's per-side overhang,
-    // so the host adds back no height the row did not already have.
+    // lays it out on. It does not cancel the overhang: it is the ancestor the
+    // platform measures, so its layout box must be the target, not the row's
+    // 27pt band — a cancelling margin would shrink it back and reintroduce the
+    // clipping.
     const declarations = (await compiledDimensions(host.props.className as string)) as {
       minHeight?: number;
     }[];
     const box = Object.assign({}, ...declarations) as { minHeight: number };
     expect(box.minHeight).toBe(textActionTargetDp());
-    expect(await compiledLengthDp(host.props.className as string, 'marginBlock')).toBe(
-      -textActionRowOverhangDp()
-    );
+    expect(classes.some(name => /^-my-|^my-/.test(name))).toBe(false);
   });
 
   it('keeps the plain wrapper for a stacked node that is not a target', () => {

@@ -279,7 +279,8 @@ export function RowFrame({
       // would be delivered through this wrapper's band, not the row's padded
       // bounds: Android delivers a touch only inside every ancestor view. A
       // spec that marks its node as such (`target`) takes the host at the
-      // target, which cancels the same overhang and keeps the band.
+      // target, which grows this line to the target in the stacked
+      // presentation only (`rowTargetHostClass`).
       const trailingClass =
         trailing?.kind === 'node' && trailing.target === true
           ? cn('shrink-0', rowTargetHostClass())

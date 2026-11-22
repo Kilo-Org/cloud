@@ -519,17 +519,18 @@ export function textActionRowOverhangDp(): number {
  * 36pt frame the platform target replaced — while a control-size audit still
  * read the control's own 44/48pt rect.
  *
- * The host takes the target as its own height and cancels exactly the overhang
- * the control cancels, so it contributes the same 27pt band to the line and the
- * row does not grow. Its `justify-center` keeps the control on that band's
- * centre. The values are {@link textActionTargetDp} and
- * {@link textActionRowOverhangDp} spelled as classes, because NativeWind reads
+ * The host is that ancestor, so it takes the platform target as its own layout
+ * height and does not cancel the control's overhang: the delivered area is the
+ * host's layout box, and cancelling the overhang would shrink it back to the
+ * 27pt band and reintroduce the clipping. The stacked line therefore grows to
+ * the target — in the stacked presentation only — while the flat frame keeps the
+ * row's own band, because the control overhangs the row's padding there.
+ * `justify-center` keeps the control on the host's centre. The value is
+ * {@link textActionTargetDp} spelled as classes, because NativeWind reads
  * literals at build time.
  */
 export function rowTargetHostClass(): string {
-  return Platform.OS === 'android'
-    ? 'min-h-[48px] -my-[10.5px] justify-center'
-    : 'min-h-[44px] -my-[8.5px] justify-center';
+  return Platform.OS === 'android' ? 'min-h-[48px] justify-center' : 'min-h-[44px] justify-center';
 }
 
 /**

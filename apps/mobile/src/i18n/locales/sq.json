@@ -1214,6 +1214,8 @@
       "emptyTitle": "Nuk ka ende njoftime",
       "emptyCategoryTitle": "Nuk ka njoftime në këtë kategori",
       "emptyBody": "Njoftimet që merr kjo llogari shfaqen këtu. Ato ruhen për {{days}} ditë.",
+      "emptyBody_one": "Njoftimet që merr kjo llogari shfaqen këtu. Ato ruhen për {{days}} ditë.",
+      "emptyBody_other": "Njoftimet që merr kjo llogari shfaqen këtu. Ato ruhen për {{days}} ditë.",
       "capped": "Po shfaqen njoftimet më të fundit.",
       "loadError": "Nuk u arrit të ngarkohej historiku i njoftimeve.",
       "openFailed": "Ky njoftim nuk hapet më askund."

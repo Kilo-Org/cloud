@@ -1214,6 +1214,8 @@
       "emptyTitle": "Még nincsenek értesítések",
       "emptyCategoryTitle": "Ebben a kategóriában nincsenek értesítések",
       "emptyBody": "Az ehhez a fiókhoz beérkező értesítések itt jelennek meg. {{days}} napig maradnak meg.",
+      "emptyBody_one": "Az ehhez a fiókhoz beérkező értesítések itt jelennek meg. {{days}} napig maradnak meg.",
+      "emptyBody_other": "Az ehhez a fiókhoz beérkező értesítések itt jelennek meg. {{days}} napig maradnak meg.",
       "capped": "A legutóbbi értesítések láthatók.",
       "loadError": "Nem sikerült betölteni az értesítési előzményeket.",
       "openFailed": "Ez az értesítés már sehol nem nyitható meg."

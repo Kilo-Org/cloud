@@ -1214,6 +1214,8 @@
       "emptyTitle": "Inga aviseringar än",
       "emptyCategoryTitle": "Inga aviseringar i den här kategorin",
       "emptyBody": "Aviseringar som det här kontot tar emot visas här. De sparas i {{days}} dagar.",
+      "emptyBody_one": "Aviseringar som det här kontot tar emot visas här. De sparas i {{days}} dagar.",
+      "emptyBody_other": "Aviseringar som det här kontot tar emot visas här. De sparas i {{days}} dagar.",
       "capped": "Visar de senaste aviseringarna.",
       "loadError": "Kunde inte läsa in aviseringshistoriken.",
       "openFailed": "Den här aviseringen öppnas inte längre någonstans."

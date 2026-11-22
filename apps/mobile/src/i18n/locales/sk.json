@@ -1268,6 +1268,10 @@
       "emptyTitle": "Zatiaľ žiadne upozornenia",
       "emptyCategoryTitle": "Žiadne upozornenia v tejto kategórii",
       "emptyBody": "Upozornenia, ktoré tento účet dostáva, sa zobrazujú tu. Uchovávajú sa {{days}} dní.",
+      "emptyBody_one": "Upozornenia, ktoré tento účet dostáva, sa zobrazujú tu. Uchovávajú sa {{days}} dní.",
+      "emptyBody_few": "Upozornenia, ktoré tento účet dostáva, sa zobrazujú tu. Uchovávajú sa {{days}} dní.",
+      "emptyBody_many": "Upozornenia, ktoré tento účet dostáva, sa zobrazujú tu. Uchovávajú sa {{days}} dní.",
+      "emptyBody_other": "Upozornenia, ktoré tento účet dostáva, sa zobrazujú tu. Uchovávajú sa {{days}} dní.",
       "capped": "Zobrazujú sa najnovšie upozornenia.",
       "loadError": "Históriu upozornení sa nepodarilo načítať.",
       "openFailed": "Toto upozornenie sa už nikde neotvorí."

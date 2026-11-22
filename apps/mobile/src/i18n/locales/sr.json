@@ -1241,6 +1241,9 @@
       "emptyTitle": "Još nema obaveštenja",
       "emptyCategoryTitle": "Nema obaveštenja u ovoj kategoriji",
       "emptyBody": "Obaveštenja koja ovaj nalog prima prikazuju se ovde. Čuvaju se {{days}} dana.",
+      "emptyBody_one": "Obaveštenja koja ovaj nalog prima prikazuju se ovde. Čuvaju se {{days}} dana.",
+      "emptyBody_few": "Obaveštenja koja ovaj nalog prima prikazuju se ovde. Čuvaju se {{days}} dana.",
+      "emptyBody_other": "Obaveštenja koja ovaj nalog prima prikazuju se ovde. Čuvaju se {{days}} dana.",
       "capped": "Prikazuju se najnovija obaveštenja.",
       "loadError": "Učitavanje istorije obaveštenja nije uspelo.",
       "openFailed": "Ovo obaveštenje se više ne otvara nigde."

@@ -1214,6 +1214,8 @@
       "emptyTitle": "Belum ada pemberitahuan",
       "emptyCategoryTitle": "Tiada pemberitahuan dalam kategori ini",
       "emptyBody": "Pemberitahuan yang diterima oleh akaun ini muncul di sini. Ia disimpan selama {{days}} hari.",
+      "emptyBody_one": "Pemberitahuan yang diterima oleh akaun ini muncul di sini. Ia disimpan selama {{days}} hari.",
+      "emptyBody_other": "Pemberitahuan yang diterima oleh akaun ini muncul di sini. Ia disimpan selama {{days}} hari.",
       "capped": "Memaparkan pemberitahuan terkini.",
       "loadError": "Tidak dapat memuatkan sejarah pemberitahuan.",
       "openFailed": "Pemberitahuan ini tidak lagi boleh dibuka di mana-mana."

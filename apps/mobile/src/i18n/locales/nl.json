@@ -625,6 +625,8 @@
       "emptyTitle": "Nog geen meldingen",
       "emptyCategoryTitle": "Nog geen meldingen in deze categorie",
       "emptyBody": "Meldingen die dit account ontvangt, verschijnen hier. Ze worden {{days}} dagen bewaard.",
+      "emptyBody_one": "Meldingen die dit account ontvangt, verschijnen hier. Ze worden {{days}} dagen bewaard.",
+      "emptyBody_other": "Meldingen die dit account ontvangt, verschijnen hier. Ze worden {{days}} dagen bewaard.",
       "capped": "De meest recente meldingen worden weergegeven.",
       "loadError": "Meldingsgeschiedenis kon niet worden geladen.",
       "openFailed": "Deze melding opent nergens meer."

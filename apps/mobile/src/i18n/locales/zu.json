@@ -1214,6 +1214,8 @@
       "emptyTitle": "Akukho izaziso okwamanje",
       "emptyCategoryTitle": "Akukho izaziso kulesi sigaba",
       "emptyBody": "Izaziso ezitholwa yile akhawunti zibonakala lapha. Zigcinwa izinsuku ezingama-{{days}}.",
+      "emptyBody_one": "Izaziso ezitholwa yile akhawunti zibonakala lapha. Zigcinwa izinsuku ezingama-{{days}}.",
+      "emptyBody_other": "Izaziso ezitholwa yile akhawunti zibonakala lapha. Zigcinwa izinsuku ezingama-{{days}}.",
       "capped": "Kuboniswa izaziso zakamuva.",
       "loadError": "Asikwazanga ukulayisha umlando wezaziso.",
       "openFailed": "Lesi saziso asisavuleki ndawo."

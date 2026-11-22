@@ -1241,6 +1241,9 @@
       "emptyTitle": "Encara no hi ha notificacions",
       "emptyCategoryTitle": "No hi ha notificacions en aquesta categoria",
       "emptyBody": "Les notificacions que rep aquest compte apareixen aquí. Es conserven durant {{days}} dies.",
+      "emptyBody_one": "Les notificacions que rep aquest compte apareixen aquí. Es conserven durant {{days}} dies.",
+      "emptyBody_many": "Les notificacions que rep aquest compte apareixen aquí. Es conserven durant {{days}} dies.",
+      "emptyBody_other": "Les notificacions que rep aquest compte apareixen aquí. Es conserven durant {{days}} dies.",
       "capped": "Es mostren les notificacions més recents.",
       "loadError": "No s'ha pogut carregar l'historial de notificacions.",
       "openFailed": "Aquesta notificació ja no s'obre enlloc."

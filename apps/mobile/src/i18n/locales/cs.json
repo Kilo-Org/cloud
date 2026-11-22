@@ -1268,6 +1268,10 @@
       "emptyTitle": "Zatím žádná oznámení",
       "emptyCategoryTitle": "V této kategorii nejsou žádná oznámení",
       "emptyBody": "Oznámení, která tento účet obdrží, se zobrazují zde. Uchovávají se {{days}} dní.",
+      "emptyBody_one": "Oznámení, která tento účet obdrží, se zobrazují zde. Uchovávají se {{days}} dní.",
+      "emptyBody_few": "Oznámení, která tento účet obdrží, se zobrazují zde. Uchovávají se {{days}} dní.",
+      "emptyBody_many": "Oznámení, která tento účet obdrží, se zobrazují zde. Uchovávají se {{days}} dní.",
+      "emptyBody_other": "Oznámení, která tento účet obdrží, se zobrazují zde. Uchovávají se {{days}} dní.",
       "capped": "Zobrazují se nejnovější oznámení.",
       "loadError": "Historii oznámení se nepodařilo načíst.",
       "openFailed": "Toto oznámení se už nikde neotevře."

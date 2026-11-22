@@ -1214,6 +1214,8 @@
       "emptyTitle": "Oraindik ez dago jakinarazpenik",
       "emptyCategoryTitle": "Kategoria honetan ez dago jakinarazpenik",
       "emptyBody": "Kontu honek jasotzen dituen jakinarazpenak hemen agertzen dira. {{days}} egunez gordetzen dira.",
+      "emptyBody_one": "Kontu honek jasotzen dituen jakinarazpenak hemen agertzen dira. {{days}} egunez gordetzen dira.",
+      "emptyBody_other": "Kontu honek jasotzen dituen jakinarazpenak hemen agertzen dira. {{days}} egunez gordetzen dira.",
       "capped": "Azken jakinarazpenak erakusten dira.",
       "loadError": "Ezin izan da jakinarazpenen historia kargatu.",
       "openFailed": "Jakinarazpen hau jada ez da inon irekitzen."

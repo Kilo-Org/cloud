@@ -1214,6 +1214,8 @@
       "emptyTitle": "Kò tíì sí ìfitónilétí",
       "emptyCategoryTitle": "Kò sí ìfitónilétí kankan ní ẹ̀ka yìí",
       "emptyBody": "Àwọn ìfitónilétí tí àkáńtì yìí ń gbà máa ń farahàn síbí. A máa ń tọ́jú wọn fún {{days}} ọjọ́.",
+      "emptyBody_one": "Àwọn ìfitónilétí tí àkáńtì yìí ń gbà máa ń farahàn síbí. A máa ń tọ́jú wọn fún {{days}} ọjọ́.",
+      "emptyBody_other": "Àwọn ìfitónilétí tí àkáńtì yìí ń gbà máa ń farahàn síbí. A máa ń tọ́jú wọn fún {{days}} ọjọ́.",
       "capped": "Ń ṣàfihàn àwọn ìfitónilétí tuntun jùlọ.",
       "loadError": "A kò lè gbé ìtàn àwọn ìfitónilétí wọ.",
       "openFailed": "Ìfitónilétí yìí kò tún ṣí níbikíbi mọ́."

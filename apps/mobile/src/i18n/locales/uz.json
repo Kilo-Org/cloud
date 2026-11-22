@@ -1214,6 +1214,8 @@
       "emptyTitle": "Hozircha bildirishnomalar yo'q",
       "emptyCategoryTitle": "Bu toifada bildirishnomalar yo'q",
       "emptyBody": "Ushbu hisob oladigan bildirishnomalar shu yerda ko'rinadi. Ular {{days}} kun saqlanadi.",
+      "emptyBody_one": "Ushbu hisob oladigan bildirishnomalar shu yerda ko'rinadi. Ular {{days}} kun saqlanadi.",
+      "emptyBody_other": "Ushbu hisob oladigan bildirishnomalar shu yerda ko'rinadi. Ular {{days}} kun saqlanadi.",
       "capped": "Eng so'nggi bildirishnomalar ko'rsatilmoqda.",
       "loadError": "Bildirishnomalar tarixini yuklab bo'lmadi.",
       "openFailed": "Bu bildirishnoma endi hech qayerda ochilmaydi."

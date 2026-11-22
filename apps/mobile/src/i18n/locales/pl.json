@@ -655,6 +655,10 @@
       "emptyTitle": "Nie ma jeszcze powiadomień",
       "emptyCategoryTitle": "Brak powiadomień w tej kategorii",
       "emptyBody": "Powiadomienia otrzymywane przez to konto pojawiają się tutaj. Są przechowywane przez {{days}} dni.",
+      "emptyBody_one": "Powiadomienia otrzymywane przez to konto pojawiają się tutaj. Są przechowywane przez {{days}} dni.",
+      "emptyBody_few": "Powiadomienia otrzymywane przez to konto pojawiają się tutaj. Są przechowywane przez {{days}} dni.",
+      "emptyBody_many": "Powiadomienia otrzymywane przez to konto pojawiają się tutaj. Są przechowywane przez {{days}} dni.",
+      "emptyBody_other": "Powiadomienia otrzymywane przez to konto pojawiają się tutaj. Są przechowywane przez {{days}} dni.",
       "capped": "Wyświetlane są najnowsze powiadomienia.",
       "loadError": "Nie udało się wczytać historii powiadomień.",
       "openFailed": "Tego powiadomienia nie można już nigdzie otworzyć."

@@ -1214,6 +1214,8 @@
       "emptyTitle": "Ei vielä ilmoituksia",
       "emptyCategoryTitle": "Ei ilmoituksia tässä kategoriassa",
       "emptyBody": "Tämän tilin vastaanottamat ilmoitukset näkyvät täällä. Ne säilytetään {{days}} päivää.",
+      "emptyBody_one": "Tämän tilin vastaanottamat ilmoitukset näkyvät täällä. Ne säilytetään {{days}} päivää.",
+      "emptyBody_other": "Tämän tilin vastaanottamat ilmoitukset näkyvät täällä. Ne säilytetään {{days}} päivää.",
       "capped": "Näytetään uusimmat ilmoitukset.",
       "loadError": "Ilmoitushistoriaa ei voitu ladata.",
       "openFailed": "Tämä ilmoitus ei enää avaudu missään."

@@ -22,13 +22,21 @@ export type SettingsKeyword =
  */
 export type SettingDefinition = {
   id: string;
-  label: ParseKeys<'translation'>;
+  label: ParseKeys;
   keyword?: SettingsKeyword;
   available?: boolean;
 };
 
-/** The pathname form of a typed route, as a destination screen's search target uses it. */
-export type SettingsPath = Extract<Href, { pathname: string }>['pathname'];
+/**
+ * The pathname of a typed route whose params are optional, as a destination
+ * screen's search target uses it. A route that requires params is left out:
+ * its Href variant cannot be built from a pathname alone, and every indexed
+ * destination is reachable without them.
+ */
+export type SettingsPath = Exclude<
+  Extract<Href, { pathname: string }>,
+  { params: object }
+>['pathname'];
 
 /**
  * One group of settings sharing a screen. `context` names the containing
@@ -38,7 +46,7 @@ export type SettingsPath = Extract<Href, { pathname: string }>['pathname'];
  * destination needs them (the consent review surface).
  */
 export type SettingsSearchSource = {
-  context?: readonly ParseKeys<'translation'>[];
+  context?: readonly ParseKeys[];
   path?: SettingsPath;
   params?: Readonly<Record<string, string>>;
   settings: readonly SettingDefinition[];
@@ -50,7 +58,7 @@ export type SettingsTargetProps = { settingsTarget?: string };
 /** Declare one searchable setting without spelling the definition's shape. */
 export function defineSetting(
   id: string,
-  label: ParseKeys<'translation'>,
+  label: ParseKeys,
   keyword?: SettingsKeyword
 ): SettingDefinition {
   return { id, label, keyword };

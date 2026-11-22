@@ -1,8 +1,19 @@
-import { createElement, type ReactElement, type ReactNode, type RefObject } from 'react';
-import type { ScrollViewInstance } from 'react-native';
+import {
+  createElement,
+  type ReactElement,
+  type ReactNode,
+  type Ref,
+  type RefObject,
+} from 'react';
+import { type ScrollViewInstance } from 'react-native';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { act, TestRenderer, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
+import {
+  act,
+  type ReactTestInstance,
+  type ReactTestRenderer,
+  TestRenderer,
+} from '@/test/renderer';
 
 import { defineSetting } from '@/lib/settings-search/definitions';
 import {
@@ -21,9 +32,35 @@ const fake = vi.hoisted(() => {
   return { content, scroll };
 });
 
-vi.mock('react-native', () => ({
-  View: 'View',
-}));
+type RevealNode = {
+  measureLayout: (relative: unknown, onSuccess: (left: number, top: number) => void) => void;
+};
+
+/** The row wrapper instance the reveal measures, reporting a 40pt top edge. */
+const revealNode = vi.hoisted(
+  (): RevealNode => ({
+    measureLayout: (_relative, onSuccess) => {
+      onSuccess(0, 40);
+    },
+  })
+);
+
+vi.mock('react-native', async () => {
+  // A vi.mock factory is hoisted above the module's static imports, so React is
+  // imported inside it. The reveal measures through the row wrapper's own ref,
+  // so the mock hands that ref a real instance: a host string gives the
+  // renderer's inert node, whose `measureLayout` never reports a frame.
+  const react = await import('react');
+  function MockView({
+    ref,
+    children,
+    ...props
+  }: { ref?: Ref<RevealNode>; children?: ReactNode } & Record<string, unknown>) {
+    react.useImperativeHandle(ref, () => revealNode, []);
+    return react.createElement('View', props, children);
+  }
+  return { View: MockView };
+});
 // Stands in for the wrapper: it hands the scope the instance the real scroll
 // view's forwarded ref would hold, and records the props it received.
 vi.mock('@/components/tab-screen', () => ({
@@ -72,60 +109,81 @@ function overlays(root: ReactTestInstance) {
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
+  fake.scroll.scrollTo.mockClear();
 });
+
+/** The wrapper the active row draws around itself. */
+function wrapper(root: ReactTestInstance) {
+  return root.findAll(
+    node => Object.is(node.type, 'View') && node.props.className === 'relative'
+  )[0];
+}
+
+/** Fire the layout pass that triggers the one reveal for the active row. */
+function layout(node: ReactTestInstance | undefined) {
+  act(() => {
+    (node?.props.onLayout as (() => void) | undefined)?.();
+  });
+}
 
 describe('SettingsTarget', () => {
   it('returns the row untouched without an active target scope', () => {
-    const root = mount(createElement(SettingsTarget, { item: system }, row('alone')));
+    const root = mount(<SettingsTarget item={system}>{row('alone')}</SettingsTarget>);
 
     expect(root.findByProps({ testID: 'alone' })).toBeTruthy();
     expect(root.findAll(node => Object.is(node.type, 'View'))).toEqual([]);
     expect(overlays(root)).toEqual([]);
   });
 
-  it('reveals and highlights the matching row without changing its node', () => {
+  it('reveals and highlights the matching row once, without changing its node', () => {
     const root = mount(
-      createElement(
-        SettingsSearchTargetScope,
-        { settingsTarget: 'appearance.dark', scrollRef: scrollTarget(fake.scroll) },
-        createElement(SettingsTarget, { item: dark }, row())
-      )
+      <SettingsSearchTargetScope
+        settingsTarget="appearance.dark"
+        scrollRef={scrollTarget(fake.scroll)}
+      >
+        <SettingsTarget item={dark}>{row()}</SettingsTarget>
+      </SettingsSearchTargetScope>
     );
 
     expect(root.findByProps({ testID: 'row' })).toBeTruthy();
     expect(overlays(root)).toHaveLength(1);
-    const wrapper = root.findAll(
-      node => Object.is(node.type, 'View') && node.props.className === 'relative'
-    )[0];
-    expect(wrapper?.props.accessibilityRole).toBeUndefined();
-    expect(wrapper?.props.accessible).toBeUndefined();
+    const box = wrapper(root);
+    expect(box?.props.accessibilityRole).toBeUndefined();
+    expect(box?.props.accessible).toBeUndefined();
+
+    layout(box);
+    // A later layout pass must not scroll the screen back to the row.
+    layout(box);
+    expect(fake.scroll.scrollTo).toHaveBeenCalledTimes(1);
+    expect(fake.scroll.scrollTo).toHaveBeenCalledWith({ y: 28, animated: true });
   });
 
   it('leaves a non-matching row and its group geometry alone', () => {
     const root = mount(
-      createElement(
-        SettingsSearchTargetScope,
-        { settingsTarget: 'appearance.system', scrollRef: scrollTarget(fake.scroll) },
-        createElement(SettingsTarget, { item: dark }, row())
-      )
+      <SettingsSearchTargetScope
+        settingsTarget="appearance.system"
+        scrollRef={scrollTarget(fake.scroll)}
+      >
+        <SettingsTarget item={dark}>{row()}</SettingsTarget>
+      </SettingsSearchTargetScope>
     );
 
     expect(root.findByProps({ testID: 'row' })).toBeTruthy();
     expect(overlays(root)).toEqual([]);
     expect(root.findAll(node => Object.is(node.type, 'View'))).toEqual([]);
+    expect(fake.scroll.scrollTo).not.toHaveBeenCalled();
   });
 
   it('matches an alias id for a control shared by several definitions', () => {
     const root = mount(
-      createElement(
-        SettingsSearchTargetScope,
-        { settingsTarget: 'appearance.dark', scrollRef: scrollTarget(fake.scroll) },
-        createElement(
-          SettingsTarget,
-          { item: system, targetIds: ['appearance.dark', 'appearance.light'] },
-          row()
-        )
-      )
+      <SettingsSearchTargetScope
+        settingsTarget="appearance.dark"
+        scrollRef={scrollTarget(fake.scroll)}
+      >
+        <SettingsTarget item={system} targetIds={['appearance.dark', 'appearance.light']}>
+          {row()}
+        </SettingsTarget>
+      </SettingsSearchTargetScope>
     );
 
     expect(overlays(root)).toHaveLength(1);
@@ -136,16 +194,14 @@ describe('SettingsSearchScrollView', () => {
   it('forwards tab-scroll props and the scroll ref while supplying the target', () => {
     const forwarded = scrollTarget(null);
     const root = mount(
-      createElement(
-        SettingsSearchScrollView,
-        {
-          settingsTarget: 'appearance.dark',
-          ref: forwarded,
-          contentContainerClassName: 'gap-6 px-4 pt-3',
-          keyboardShouldPersistTaps: 'handled',
-        },
-        createElement(SettingsTarget, { item: dark }, row())
-      )
+      <SettingsSearchScrollView
+        settingsTarget="appearance.dark"
+        ref={forwarded}
+        contentContainerClassName="gap-6 px-4 pt-3"
+        keyboardShouldPersistTaps="handled"
+      >
+        <SettingsTarget item={dark}>{row()}</SettingsTarget>
+      </SettingsSearchScrollView>
     );
 
     const scroller = root.findByType('TabScroll');
@@ -153,15 +209,16 @@ describe('SettingsSearchScrollView', () => {
     expect(scroller.props.keyboardShouldPersistTaps).toBe('handled');
     expect(forwarded.current).toBe(fake.scroll);
     expect(overlays(root)).toHaveLength(1);
+
+    layout(wrapper(root));
+    expect(fake.scroll.scrollTo).toHaveBeenCalledWith({ y: 28, animated: true });
   });
 
   it('renders the plain body when the route names no target', () => {
     const root = mount(
-      createElement(
-        SettingsSearchScrollView,
-        { contentContainerClassName: 'gap-6' },
-        createElement(SettingsTarget, { item: dark }, row())
-      )
+      <SettingsSearchScrollView contentContainerClassName="gap-6">
+        <SettingsTarget item={dark}>{row()}</SettingsTarget>
+      </SettingsSearchScrollView>
     );
 
     expect(root.findByProps({ testID: 'row' })).toBeTruthy();

@@ -102,6 +102,7 @@ import type {
 import {
   CONTROL_PLANE_SETUP_EVENTS,
   CONTROL_PLANE_WRAPPER_FINALIZING_EVENT,
+  controlPlaneAdmitAnswerPayloadSchema,
   controlPlaneAnswerPayloadSchema,
   controlPlaneCredentialSourceSchema,
   controlPlaneEventsNotificationSchema,
@@ -115,8 +116,11 @@ import {
   controlPlaneWorkspaceStoppedPayloadSchema,
   type ControlPlaneAnswerPayload,
   type ControlPlaneAnswerReply,
+  type ControlPlaneAnswerResult,
+  type ControlPlaneAdmitAnswerPayload,
   type ControlPlaneCancelWorkspacePayload,
   type ControlPlaneCancelWorkspaceResult,
+  type ControlPlaneContinuationAdmissionResult,
   type ControlPlaneControlResult,
   type ControlPlaneDeliverPayload,
   type ControlPlaneDeliverResult,
@@ -186,6 +190,7 @@ import {
   oldestOpenMessage,
   openMessages,
   queueMessage,
+  queuedBoundReached,
   renderQueuedMessageContent,
   settleAcceptedUpTo,
   settleMessages,
@@ -193,7 +198,12 @@ import {
   type SessionMessage,
   type SessionMessageState,
 } from './messages.js';
-import { answerMessageIntent } from './answers.js';
+import {
+  admittedPayload,
+  answerMessageIntent,
+  answerPromptText,
+  sameContinuationIntent,
+} from './answers.js';
 import { messageFailureText } from './failure-messages.js';
 import { projectMessageResult } from './message-result-projection.js';
 import {
@@ -553,7 +563,7 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
   cancelWorkspace(
     payload: ControlPlaneCancelWorkspacePayload
   ): Promise<ControlPlaneCancelWorkspaceResult>;
-  answer(payload: ControlPlaneAnswerPayload): Promise<ControlPlaneDispatchResult>;
+  answer(payload: ControlPlaneAnswerPayload): Promise<ControlPlaneAnswerResult>;
   release(payload: ControlPlaneReleasePayload): Promise<void>;
   /** H4: the Sandbox DO returns the connected allocation fence for a bound handle. */
   getRuntimeCredentialProxyFence(input: {
@@ -2130,7 +2140,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
   }
 
-  async answer(payload: ControlPlaneAnswerPayload): Promise<ControlPlaneDispatchResult> {
+  async answer(payload: ControlPlaneAnswerPayload): Promise<ControlPlaneAnswerResult> {
     await this.initialized;
     if (this.registration === null) return 'not_connected';
     const parsed = controlPlaneAnswerPayloadSchema.parse(payload);
@@ -2140,21 +2150,25 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       // A live turn takes the answer directly (spec §5). The route is named by
       // this DO, never by the caller, so a wrong id cannot reach a sibling.
       if (this.messages.some(message => message.state === 'accepted')) {
-        const peer = this.sandboxPeer();
-        if (peer === null) return 'not_connected';
-        let result: ControlPlaneDispatchResult;
-        try {
-          result = await peer.answer({ sessionId: this.sessionId, reply: parsed.reply });
-        } catch {
-          return 'not_connected';
-        }
-        if (result === 'sent') await this.resolvePendingInteraction(parsed.reply);
-        return result;
+        const forwarded = await this.forwardToLiveTurn(parsed.reply);
+        if (forwarded === 'sent') return 'sent';
+        // The forward resolves the interaction only when it succeeds, so a
+        // refusal while the interaction still waits is retryable, exactly as
+        // `admitAnswerContinuation` reports it.
+        return this.hasPendingInteraction(target.collection, target.id) ? 'retry' : 'not_connected';
       }
-      // The asking turn already settled: the answer becomes a new message that
-      // continues the chat (spec §5), admitted through the send path. Only a
-      // question/permission this session still waits on may do so, so a retry,
-      // an unknown id or an already-answered one cannot admit another turn.
+      // The asking turn already settled: the answer would become a new message
+      // that continues the chat (spec §5). A new message costs a turn, so this
+      // call only builds the intent; the Worker runs the same balance and model
+      // preflight every prompt mutation runs, then admits it through
+      // `admitAnswerContinuation`. Only a question/permission this session still
+      // waits on may do so, so a retry, an unknown id or an already-answered one
+      // cannot admit another turn.
+      //
+      // A reply with no text is its own result. It queues nothing, so capacity
+      // cannot be the cause, and the interaction still waits, so it is not the
+      // terminal refusal. The user can send a different reply instead.
+      if (answerPromptText(parsed.reply) === null) return 'invalid';
       const intent = answerMessageIntent(
         this.messages,
         parsed.reply,
@@ -2162,11 +2176,136 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         this.metadata?.agent?.model
       );
       if (intent === null) return 'not_connected';
-      const admitted = await this.admitMessage(intent);
-      if (admitted === 'queue-full') return 'not_connected';
+      // A session that cannot queue the new turn refuses it for capacity here,
+      // before the caller reads the payer balance, so the retryable capacity
+      // error is what the user sees rather than a payment error.
+      if (queuedBoundReached(this.messages)) return { result: 'queue-full' };
+      return { result: 'continuation', intent };
+    });
+  }
+
+  /**
+   * Admits the continuation a settled answer preflighted. The caller returns the
+   * exact intent `answer` produced; this call rebuilds it from the session's
+   * current state and refuses when the two differ, so the admitted turn is always
+   * the one that passed the preflight.
+   *
+   * The admitting call resolves its interaction, so a message that already exists
+   * for this id proves that interaction was resolved. When the reply still names
+   * a pending interaction of the same kind, that is a different interaction whose
+   * rendered text happens to match, and the replay is refused rather than
+   * resolving it. A live turn that appeared after the preflight takes the reply
+   * through the wrapper, exactly like a live answer. A queue that filled after
+   * the preflight refuses the continuation for capacity and keeps the
+   * interaction pending.
+   *
+   * A refusal only proves the reply is dead when the session no longer waits on
+   * the interaction or the caller's own reply disagrees with the intent it sent;
+   * a session that merely moved on (newer last turn, or a live forward that
+   * nothing took) reports `retry`, because the same reply is still admissible
+   * once the session settles again.
+   */
+  async admitAnswerContinuation(
+    payload: ControlPlaneAdmitAnswerPayload
+  ): Promise<ControlPlaneContinuationAdmissionResult> {
+    await this.initialized;
+    if (this.registration === null) return 'not_connected';
+    const parsed = controlPlaneAdmitAnswerPayloadSchema.parse(payload);
+    return this.enqueue(async () => {
+      const target = pendingInteractionTarget(parsed.reply);
+      const pending = this.hasPendingInteraction(target.collection, target.id);
+      const existing = this.messages.find(message => message.messageId === parsed.intent.messageId);
+      if (existing !== undefined) {
+        if (!sameContinuationIntent(existing.intent, parsed.intent)) return 'not_connected';
+        return pending ? 'not_connected' : 'sent';
+      }
+      if (!pending) return 'not_connected';
+      const rebuilt = answerMessageIntent(
+        this.messages,
+        parsed.reply,
+        parsed.intent.messageId,
+        this.metadata?.agent?.model
+      );
+      if (rebuilt === null) return 'not_connected';
+      if (!sameContinuationIntent(rebuilt, parsed.intent)) {
+        // The session's last turn changed since `answer` built this intent (a
+        // prompt with a different model queued from another tab, a newer
+        // finalization). When the caller's reply still renders the text it
+        // preflighted, the caller is consistent and only the session moved on:
+        // the interaction is still pending, so the same reply can be admitted
+        // once the session settles again instead of reading as gone.
+        return answerPromptText(parsed.reply) === parsed.intent.turn.prompt
+          ? 'retry'
+          : 'not_connected';
+      }
+      if (this.messages.some(message => message.state === 'accepted')) {
+        const forwarded = await this.forwardToLiveTurn(parsed.reply);
+        if (forwarded !== 'not_connected') return forwarded;
+        // The live turn did not take the reply, but the interaction is still
+        // pending, so this refusal is retryable rather than terminal. A forward
+        // that resolved the interaction reports `sent` above.
+        return this.hasPendingInteraction(target.collection, target.id) ? 'retry' : 'not_connected';
+      }
+      // Same callback context `send` injects, so a subagent the continuation
+      // spawns can route its completion back to this chat.
+      const admitted = await this.admitMessage(
+        await this.withSessionCallbackContext(admittedPayload(parsed.intent))
+      );
+      if (admitted === 'queue-full') return 'queue-full';
       await this.resolvePendingInteraction(parsed.reply);
       return 'sent';
     });
+  }
+
+  /**
+   * Hands a reply to the live turn that now owns it (spec §5). It only reports
+   * whether the route took the reply; the caller decides whether a failure is
+   * retryable, because the caller knows the interaction it named.
+   *
+   * A refusal is reported as retryable, so a reply that can never be delivered
+   * would otherwise show up only as repeated client retries. Each failure is
+   * logged once here, with the interaction it named and the cause; the reply
+   * text is never logged.
+   */
+  private async forwardToLiveTurn(
+    reply: ControlPlaneAnswerReply
+  ): Promise<'sent' | 'not_connected'> {
+    const target = pendingInteractionTarget(reply);
+    const logRefusal = (reason: 'no_peer' | 'rpc_failed' | 'refused', error?: unknown) => {
+      logger
+        .withFields({
+          sessionId: this.sessionId,
+          interaction: `${target.collection}:${target.id}`,
+          forwardReason: reason,
+          ...(error === undefined
+            ? {}
+            : {
+                errorName: error instanceof Error ? error.name : typeof error,
+                error: errorMessage(error),
+              }),
+        })
+        .warn('Live answer forward was not taken');
+    };
+    const peer = this.sandboxPeer();
+    if (peer === null) {
+      logRefusal('no_peer');
+      return 'not_connected';
+    }
+    let result: ControlPlaneAnswerResult;
+    try {
+      result = await peer.answer({ sessionId: this.sessionId, reply });
+    } catch (error) {
+      logRefusal('rpc_failed', error);
+      return 'not_connected';
+    }
+    // The Sandbox DO only answers a live turn, so it cannot report capacity or
+    // build a continuation.
+    if (result !== 'sent') {
+      logRefusal('refused');
+      return 'not_connected';
+    }
+    await this.resolvePendingInteraction(reply);
+    return 'sent';
   }
 
   /**

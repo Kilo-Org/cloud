@@ -7,7 +7,7 @@
 // keep the reserved line blank.
 
 import { createElement } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { formatDate } from '@/lib/format';
@@ -111,12 +111,27 @@ function startedAtLabel(createdAt: string): string {
 }
 
 // The date the subtitle prints for the same payload timestamp, in the language
-// the screen formats with.
+// the screen formats with. The screen adds the year to a session from an
+// earlier year and leaves it off one from the current year, comparing the
+// years the locale itself prints, so the expectation reads the same clock and
+// calendar.
 function subtitleDateLabel(createdAt: string): string {
-  return formatDate(new Date(createdAt), i18n.language, { month: 'short', day: 'numeric' });
+  const date = new Date(createdAt);
+  const currentYear = formatDate(new Date(), i18n.language, { year: 'numeric' });
+  const sessionYear = formatDate(date, i18n.language, { year: 'numeric' });
+  return formatDate(date, i18n.language, {
+    month: 'short',
+    day: 'numeric',
+    ...(sessionYear === currentYear ? {} : { year: 'numeric' }),
+  });
 }
 
+// A fixed clock keeps both the current-year and the prior-year expectation
+// deterministic: the payload year is compared with the reader's own year.
+const NOW = new Date('2026-11-22T12:00:00.000Z');
+
 beforeEach(() => {
+  vi.useFakeTimers({ now: NOW });
   query.data = undefined;
   query.isPending = false;
   query.isError = false;
@@ -124,6 +139,10 @@ beforeEach(() => {
   query.error = null;
   query.refetch.mockClear();
   headers.rendered = [];
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('shared session header eyebrow', () => {
@@ -265,6 +284,47 @@ describe('shared session subtitle', () => {
       expect(segment.startsWith(ISOLATE_OPEN)).toBe(true);
       expect(segment.endsWith(ISOLATE_CLOSE)).toBe(true);
     }
+    renderer.unmount();
+  });
+
+  it('shows the year when the session started before the current calendar year', () => {
+    const priorYear = '2025-10-08T19:40:00.000Z';
+    query.data = sharedSession({
+      title: 'Fix login',
+      ownerName: 'alice',
+      gitUrl: 'Kilo-Org/cloud',
+      gitBranch: 'main',
+      createdAt: priorYear,
+    });
+    const renderer = renderScreen();
+
+    // A permanent share outlives its year, so a month and a day alone would
+    // read it as this year's date. The last segment carries the year.
+    const dateLabel = subtitleDateLabel(priorYear);
+    expect(dateLabel).toContain('2025');
+    expect(headers.rendered[0]?.subtitle).toBe(
+      [isolated(sharedByLabel('alice')), isolated('main'), isolated(dateLabel)].join(' · ')
+    );
+    renderer.unmount();
+  });
+
+  it('keeps the short date for a session from the current calendar year', () => {
+    query.data = sharedSession({
+      title: 'Fix login',
+      ownerName: 'alice',
+      gitUrl: 'Kilo-Org/cloud',
+      gitBranch: 'main',
+      createdAt: CREATED_AT,
+    });
+    const renderer = renderScreen();
+
+    // The clock is pinned inside the current calendar year, so this date does
+    // not need the year it would repeat.
+    const dateLabel = subtitleDateLabel(CREATED_AT);
+    expect(dateLabel).not.toContain('2026');
+    expect(headers.rendered[0]?.subtitle).toBe(
+      [isolated(sharedByLabel('alice')), isolated('main'), isolated(dateLabel)].join(' · ')
+    );
     renderer.unmount();
   });
 });

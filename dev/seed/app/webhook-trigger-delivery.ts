@@ -34,8 +34,7 @@ const TRIGGER_PROMPT_TEMPLATE = 'Investigate this webhook delivery.\n\n{{body}}'
 
 /** The two messages `--messages` ingests into the prepared session. */
 const MESSAGE_USER_TEXT = 'Triage the failed deploy of payments-api.';
-const MESSAGE_ASSISTANT_TEXT =
-  'The deploy failed at the build step; the failing job is `test`.';
+const MESSAGE_ASSISTANT_TEXT = 'The deploy failed at the build step; the failing job is `test`.';
 const DELIVERY_MESSAGE_COUNT = 2;
 const MESSAGE_BASE_CREATED_AT = 1_700_400_000_000;
 
@@ -59,6 +58,29 @@ const HYDRATION_POLL_TIMEOUT_MS = 15_000;
 const HYDRATION_POLL_INTERVAL_MS = 500;
 
 type SeedMode = 'default' | 'messages' | 'empty';
+
+/** The parsed command line: one account, one personal trigger, one seeding mode. */
+type SeedInvocation = {
+  readonly email: string;
+  readonly triggerId: string;
+  readonly mode: SeedMode;
+};
+
+/** A control-plane session `main` seeds against: the runtime id and the stored id. */
+type PreparedSession = {
+  readonly cloudAgentSessionId: string | null;
+  readonly kiloSessionId: string;
+};
+
+/**
+ * `result.data` of a tRPC call. Every procedure this seed reads answers a JSON
+ * document, so one module-level schema names what `trpc` hands back.
+ */
+const TrpcDataSchema = z.json();
+type TrpcData = z.infer<typeof TrpcDataSchema>;
+
+const TrpcEnvelopeSchema = z.union([z.array(z.unknown()), z.unknown()]);
+const TrpcResultSchema = z.object({ result: z.object({ data: TrpcDataSchema }) });
 
 const PrepareSessionOutputSchema = z.object({
   cloudAgentSessionId: z.string().min(1),
@@ -122,9 +144,7 @@ const SessionIngestMessagesResponseSchema = z
  * a typed failure; `null` means the session has no stored transcript yet.
  */
 const StoredHistorySchema = z.union([
-  z
-    .object({ messages: z.array(z.unknown()), nextCursor: z.string().nullable() })
-    .loose(),
+  z.object({ messages: z.array(z.unknown()), nextCursor: z.string().nullable() }).loose(),
   z.object({ kind: z.string() }).loose(),
 ]);
 
@@ -135,11 +155,13 @@ const StoredPageSchema = z
   })
   .loose();
 
-function readStoredPageCount(page: unknown): number {
+function readStoredPageCount(page: TrpcData): number {
   const parsed = StoredPageSchema.parse(page);
   if (parsed.history === null) return 0;
   if ('kind' in parsed.history) {
-    throw new Error(`session-ingest reported ${parsed.history.kind} for ${parsed.kiloSessionId}`);
+    throw new Error(
+      `session-ingest reported ${String(parsed.history.kind)} for ${parsed.kiloSessionId}`
+    );
   }
   return parsed.history.messages.length;
 }
@@ -166,7 +188,7 @@ function printUsage(): void {
   console.log('  pnpm -s dev:seed app:webhook-trigger-delivery e2e-fake@example.com --empty');
 }
 
-function parseArgs(args: string[]): { email: string; triggerId: string; mode: SeedMode } {
+function parseArgs(args: string[]): SeedInvocation {
   const positionals: string[] = [];
   let triggerId = DEFAULT_TRIGGER_ID;
   let messages = false;
@@ -200,31 +222,30 @@ function parseArgs(args: string[]): { email: string; triggerId: string; mode: Se
 }
 
 /** One tRPC procedure call over the web app's HTTP endpoint; answers `result.data`. */
-async function trpc(path: string, token: string, input: unknown): Promise<unknown> {
+async function trpc(path: string, token: string, input: unknown): Promise<TrpcData> {
   const response = await fetch(`${BACKEND_URL}/api/trpc/${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(input),
   });
-  const body: unknown = await response.json().catch(() => null);
-  const envelope = z
-    .union([z.array(z.unknown()), z.unknown()])
-    .parse(body);
+  const body: TrpcData = await response.json().catch(() => null);
+  const envelope = TrpcEnvelopeSchema.parse(body);
   const single = Array.isArray(envelope) ? envelope[0] : envelope;
   if (!response.ok) {
     throw new Error(`${path} failed (${response.status}): ${JSON.stringify(single ?? body)}`);
   }
-  const result = z.object({ result: z.object({ data: z.unknown() }) }).parse(single);
-  return result.result.data;
+  return TrpcResultSchema.parse(single).result.data;
 }
 
-function readMessageCount(page: unknown): number {
+function readMessageCount(page: TrpcData): number {
   const parsed = MessagesPageSchema.parse(page);
   return parsed.messages.length;
 }
 
 function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  const { promise, resolve } = Promise.withResolvers<void>();
+  setTimeout(resolve, ms);
+  return promise;
 }
 
 function readSessionIngestStatusJson(): string {
@@ -334,7 +355,7 @@ function buildDeliveryMessageIngestItems(sessionId: string): SessionIngestItem[]
 async function readCloudAgentPageCount(
   token: string,
   cloudAgentSessionId: string
-): Promise<{ count: number; page: unknown }> {
+): Promise<{ count: number; page: TrpcData }> {
   const page = await trpc('cloudAgentNext.getSessionMessagesPage', token, {
     sessionId: cloudAgentSessionId,
   });
@@ -346,7 +367,7 @@ async function pollStoredPage(
   token: string,
   kiloSessionId: string,
   expected: number
-): Promise<{ count: number; page: unknown }> {
+): Promise<{ count: number; page: TrpcData }> {
   const deadline = Date.now() + HYDRATION_POLL_TIMEOUT_MS;
   for (;;) {
     const page = await trpc('cliSessionsV2.getSessionMessagesPage', token, {
@@ -454,7 +475,7 @@ async function main(args: string[]): Promise<SeedResult> {
   }
   const sessionIngestUrl = `http://localhost:${serviceStatus.port}`;
 
-  let prepared: { cloudAgentSessionId: string | null; kiloSessionId: string };
+  let prepared: PreparedSession;
   let emptySessionId: string | null = null;
   if (mode === 'empty') {
     // `prepareSession`'s non-clone input requires a non-empty prompt, so a
@@ -532,7 +553,7 @@ async function main(args: string[]): Promise<SeedResult> {
   //    session-ingest id (a session item first, then the two messages), so the
   //    stored page every reader falls back to carries it.
   let hydratedMessageCount: number;
-  let page: unknown = null;
+  let page: TrpcData = null;
   let storedPageCount: number;
   if (mode === 'messages') {
     if (prepared.cloudAgentSessionId === null) throw new Error('prepared session is missing');
@@ -615,5 +636,6 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     printUsage();
     return;
   }
-  return await main(args);
+  const result = await main(args);
+  return result;
 }

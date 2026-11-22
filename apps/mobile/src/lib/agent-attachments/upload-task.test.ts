@@ -1,18 +1,21 @@
 /* eslint-disable class-methods-use-this -- the File mock mirrors the instance-only native File surface. */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { trpcClient } from '@/lib/trpc';
+import { classifyUploadFailure } from './agent-attachment-types';
+import { AGENT_ATTACHMENT_UPLOAD_STALL_MS, uploadOne } from './upload-task';
 import { classifyAttachment } from './validate';
-import { uploadOne } from './upload-task';
 
 vi.mock('@/lib/trpc', () => ({
   trpcClient: {
     cloudAgentNext: {
       getAttachmentUploadUrl: { mutate: vi.fn() },
+      releasePendingUploads: { mutate: vi.fn() },
     },
     organizations: {
       cloudAgentNext: {
         getAttachmentUploadUrl: { mutate: vi.fn() },
+        releasePendingUploads: { mutate: vi.fn() },
       },
     },
   },
@@ -22,26 +25,63 @@ vi.mock('@/lib/trpc', () => ({
 type NativeUploadProgress = { bytesSent: number | bigint; totalBytes: number | bigint };
 type UploadTaskOptions = { onProgress?: (progress: NativeUploadProgress) => void };
 
-const createUploadTaskMock = vi.fn((_url: string, _options: UploadTaskOptions) => ({
-  uploadAsync: vi.fn().mockResolvedValue({ status: 200, body: '', headers: {} }),
-  cancel: vi.fn(),
+/** The fake native task a test drives: its transfer and its cancel handle. */
+type FakeUploadTask = { uploadAsync: () => Promise<unknown>; cancel: () => void };
+
+/** The native transfer each test gets; a stall test replaces it with a pending one. */
+let uploadAsyncImpl: () => Promise<unknown> = () =>
+  Promise.resolve({ status: 200, body: '', headers: {} });
+
+const createUploadTaskMock = vi.fn((_url: string, _options: UploadTaskOptions): FakeUploadTask => ({
+  uploadAsync: vi.fn(() => uploadAsyncImpl()),
+  cancel: vi.fn<() => void>(),
 }));
 vi.mock('expo-file-system', () => ({
   UploadType: { BINARY_CONTENT: 'binary-content', MULTIPART: 'multipart' },
   File: class {
-    createUploadTask = (url: string, options: UploadTaskOptions): unknown =>
+    createUploadTask = (url: string, options: UploadTaskOptions): FakeUploadTask =>
       createUploadTaskMock(url, options);
   },
 }));
 
+/** The single fake native task the last `uploadOne` call created. */
+function createdTask(): FakeUploadTask {
+  const task = createUploadTaskMock.mock.results[0]?.value;
+  if (!task) {
+    throw new Error('no upload task was created');
+  }
+  return task;
+}
+
+/** Awaits `promise` and answers its rejection, so a test never races a handler. */
+async function rejectionOf(promise: Promise<unknown>): Promise<unknown> {
+  try {
+    await promise;
+    return undefined;
+  } catch (error) {
+    return error;
+  }
+}
+
 describe('uploadOne', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    uploadAsyncImpl = () => Promise.resolve({ status: 200, body: '', headers: {} });
     vi.mocked(trpcClient.cloudAgentNext.getAttachmentUploadUrl.mutate).mockResolvedValue({
       signedUrl: 'https://r2.example.com/signed',
       key: 'key.bin',
       expiresAt: new Date().toISOString(),
     });
+    vi.mocked(trpcClient.cloudAgentNext.releasePendingUploads.mutate).mockResolvedValue({
+      success: true,
+    });
+    vi.mocked(
+      trpcClient.organizations.cloudAgentNext.releasePendingUploads.mutate
+    ).mockResolvedValue({ success: true });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('sends the classified extension to the presign (invalid-suffix filename → bin)', async () => {
@@ -137,5 +177,136 @@ describe('uploadOne', () => {
     emit?.({ bytesSent: 10n, totalBytes: 0n });
 
     expect(reported).toEqual([0.25, 1, null]);
+  });
+
+  it('releases the admitted key when a cancel lands during the presign', async () => {
+    await expect(
+      uploadOne({
+        attachmentId: 'att-5',
+        path: 'path-5',
+        extension: 'pdf',
+        contentType: 'application/pdf',
+        contentLength: 100,
+        localUri: 'file:///cache/cancelled.pdf',
+        onProgress: () => undefined,
+        isCancelled: () => true,
+      })
+    ).rejects.toThrow('Upload cancelled');
+
+    const release = vi.mocked(trpcClient.cloudAgentNext.releasePendingUploads.mutate);
+    expect(release).toHaveBeenCalledTimes(1);
+    expect(release).toHaveBeenCalledWith({ objectKeys: ['key.bin'] });
+    expect(createUploadTaskMock).not.toHaveBeenCalled();
+  });
+
+  it('releases the admitted key through the organization mutation for an organization upload', async () => {
+    vi.mocked(
+      trpcClient.organizations.cloudAgentNext.getAttachmentUploadUrl.mutate
+    ).mockResolvedValue({
+      signedUrl: 'https://r2.example.com/org-signed',
+      key: 'org/2026/08/uuid/doc.pdf',
+      expiresAt: new Date().toISOString(),
+    });
+
+    await expect(
+      uploadOne({
+        organizationId: 'org-1',
+        attachmentId: 'att-6',
+        path: 'path-6',
+        extension: 'pdf',
+        contentType: 'application/pdf',
+        contentLength: 100,
+        localUri: 'file:///cache/org.pdf',
+        onProgress: () => undefined,
+        isCancelled: () => true,
+      })
+    ).rejects.toThrow('Upload cancelled');
+
+    const release = vi.mocked(trpcClient.organizations.cloudAgentNext.releasePendingUploads.mutate);
+    expect(release).toHaveBeenCalledTimes(1);
+    expect(release).toHaveBeenCalledWith({
+      organizationId: 'org-1',
+      objectKeys: ['org/2026/08/uuid/doc.pdf'],
+    });
+    expect(trpcClient.cloudAgentNext.releasePendingUploads.mutate).not.toHaveBeenCalled();
+  });
+
+  it('still rejects with "Upload cancelled" when the release itself fails', async () => {
+    vi.mocked(trpcClient.cloudAgentNext.releasePendingUploads.mutate).mockRejectedValue(
+      new Error('release unavailable')
+    );
+
+    await expect(
+      uploadOne({
+        attachmentId: 'att-7',
+        path: 'path-7',
+        extension: 'pdf',
+        contentType: 'application/pdf',
+        contentLength: 100,
+        localUri: 'file:///cache/release-fails.pdf',
+        onProgress: () => undefined,
+        isCancelled: () => true,
+      })
+    ).rejects.toThrow('Upload cancelled');
+  });
+
+  it('settles a stalled upload as "Upload stalled", cancels the native request, and stays retryable', async () => {
+    vi.useFakeTimers();
+    uploadAsyncImpl = () => new Promise(() => undefined);
+
+    const pending = uploadOne({
+      attachmentId: 'att-8',
+      path: 'path-8',
+      extension: 'pdf',
+      contentType: 'application/pdf',
+      contentLength: 100,
+      localUri: 'file:///cache/stalled.pdf',
+      onProgress: () => undefined,
+    });
+    const error = rejectionOf(pending);
+
+    await vi.advanceTimersByTimeAsync(AGENT_ATTACHMENT_UPLOAD_STALL_MS);
+
+    expect(await error).toEqual(new Error('Upload stalled'));
+    expect(createdTask().cancel).toHaveBeenCalledTimes(1);
+    expect(classifyUploadFailure(await error)).toEqual({
+      retryable: true,
+      reason: expect.any(String),
+    });
+  });
+
+  it('re-arms the stall window on every progress event', async () => {
+    vi.useFakeTimers();
+    uploadAsyncImpl = () => new Promise(() => undefined);
+
+    const pending = uploadOne({
+      attachmentId: 'att-9',
+      path: 'path-9',
+      extension: 'pdf',
+      contentType: 'application/pdf',
+      contentLength: 100,
+      localUri: 'file:///cache/progressing.pdf',
+      onProgress: () => undefined,
+    });
+    let settled = false;
+    const outcome = (async () => {
+      const error = await rejectionOf(pending);
+      settled = true;
+      return error;
+    })();
+
+    await vi.advanceTimersByTimeAsync(AGENT_ATTACHMENT_UPLOAD_STALL_MS - 1);
+    const emit = createUploadTaskMock.mock.calls[0]?.[1].onProgress;
+    emit?.({ bytesSent: 40, totalBytes: 100 });
+    await vi.advanceTimersByTimeAsync(AGENT_ATTACHMENT_UPLOAD_STALL_MS - 1);
+
+    // Both windows ran out short of the limit, so the transfer is still live.
+    expect(settled).toBe(false);
+    expect(createdTask().cancel).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(AGENT_ATTACHMENT_UPLOAD_STALL_MS);
+
+    expect(await outcome).toEqual(new Error('Upload stalled'));
+    expect(createdTask().cancel).toHaveBeenCalledTimes(1);
   });
 });

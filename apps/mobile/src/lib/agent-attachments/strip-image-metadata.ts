@@ -2,7 +2,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as Sentry from '@sentry/react-native';
 import { z } from 'zod';
 
-import { type AgentAttachmentExtension } from './constants';
+import { AGENT_ATTACHMENT_IMAGE_MAX_EDGE, type AgentAttachmentExtension } from './constants';
 
 /**
  * Output extension after a metadata strip. PNG and WebP re-encode to their own
@@ -38,9 +38,6 @@ const MAX_FINGERPRINT_PART_LENGTH = 120;
 /** Fingerprint part for a cause that carries neither a code nor a name. */
 const UNKNOWN_CAUSE_DETAIL = 'unknown';
 
-/** Cause parts for a manipulator that resolved while pointing at the input file. */
-const INPUT_URI_CAUSE = ['input-uri'];
-
 /** Expo sets `code` on the errors its native modules reject with. */
 const ERROR_CODE_SCHEMA = z.string().min(1);
 
@@ -63,15 +60,16 @@ function encoderCause(cause: Error): string[] {
 
 /**
  * Re-encode an image with no operations, which drops EXIF, GPS, and maker
- * notes. Returns the new cache URI and the extension of the produced file. If
- * the format-matched re-encode fails, PNG and WebP inputs retry once with a
- * forced JPEG output (the one format every platform's encoder supports);
- * JPEG-family inputs (jpg, jpeg, gif, heic, heif) already encode to JPEG and
- * keep their single attempt. Only a total failure says so in the result — the
- * original URI is never returned as a success value, so a caller can never
- * treat an unstripped image as sanitized. The report names the cause in its
- * fingerprint, so an encoder failure and a manipulator that resolved to the
- * input file stay separate issues.
+ * notes. The decode is bounded to `AGENT_ATTACHMENT_IMAGE_MAX_EDGE` per edge,
+ * so a full-resolution photo is never materialized, and the saved file is a new
+ * cache file. Returns its URI and the extension of the produced file. If the
+ * format-matched re-encode fails, PNG and WebP inputs retry once with a forced
+ * JPEG output (the one format every platform's encoder supports); JPEG-family
+ * inputs (jpg, jpeg, gif, heic, heif) already encode to JPEG and keep their
+ * single attempt. Only a total failure says so in the result — the original URI
+ * is never returned as a success value, so a caller can never treat an
+ * unstripped image as sanitized. The report names the encoder failure in its
+ * fingerprint, so distinct causes stay in separate issues.
  */
 export async function stripImageMetadata(
   uri: string,
@@ -93,19 +91,19 @@ export async function stripImageMetadata(
     return { ok: false };
   };
   try {
-    // eslint-disable-next-line typescript-eslint/no-deprecated -- manipulateAsync is the documented no-op re-encode; the contextual API adds no benefit for a zero-transformation re-encode
-    const result = await ImageManipulator.manipulateAsync(uri, [], {
-      compress: 1,
-      format: saveFormatFor(extension),
-    });
-    // A manipulator that resolves while pointing at the input file has not
-    // stripped anything, so the contract treats it like a failure here, where
-    // the guarantee lives — no caller can be handed that URI as a success.
-    if (result.uri === uri) {
-      lastError = new Error('Re-encode resolved to the input URI');
-      return failure(INPUT_URI_CAUSE);
+    // The bounded decode is released however this attempt ends, including a
+    // failed save: the ref holds the decoded pixels, and nothing else does.
+    let live: ImageManipulator.ImageRef | undefined = undefined;
+    try {
+      live = await ImageManipulator.ImageManipulator.manipulate(uri, {
+        maxWidth: AGENT_ATTACHMENT_IMAGE_MAX_EDGE,
+        maxHeight: AGENT_ATTACHMENT_IMAGE_MAX_EDGE,
+      }).renderAsync();
+      const saved = await live.saveAsync({ compress: 1, format: saveFormatFor(extension) });
+      return { ok: true, uri: saved.uri, extension: strippedExtension(extension) };
+    } finally {
+      live?.release();
     }
-    return { ok: true, uri: result.uri, extension: strippedExtension(extension) };
   } catch (firstError) {
     lastError = firstError instanceof Error ? firstError : new Error(String(firstError));
     // JPEG-family inputs (jpg, jpeg, gif, heic, heif) already encode to JPEG,
@@ -114,16 +112,20 @@ export async function stripImageMetadata(
     // has an untried fallback left.
     if (saveFormatFor(extension) !== ImageManipulator.SaveFormat.JPEG) {
       try {
-        // eslint-disable-next-line typescript-eslint/no-deprecated -- see above
-        const result = await ImageManipulator.manipulateAsync(uri, [], {
-          compress: 1,
-          format: ImageManipulator.SaveFormat.JPEG,
-        });
-        if (result.uri === uri) {
-          lastError = new Error('Re-encode resolved to the input URI');
-          return failure(INPUT_URI_CAUSE);
+        let live: ImageManipulator.ImageRef | undefined = undefined;
+        try {
+          live = await ImageManipulator.ImageManipulator.manipulate(uri, {
+            maxWidth: AGENT_ATTACHMENT_IMAGE_MAX_EDGE,
+            maxHeight: AGENT_ATTACHMENT_IMAGE_MAX_EDGE,
+          }).renderAsync();
+          const saved = await live.saveAsync({
+            compress: 1,
+            format: ImageManipulator.SaveFormat.JPEG,
+          });
+          return { ok: true, uri: saved.uri, extension: 'jpg' };
+        } finally {
+          live?.release();
         }
-        return { ok: true, uri: result.uri, extension: 'jpg' };
       } catch (retryError) {
         lastError = retryError instanceof Error ? retryError : new Error(String(retryError));
       }

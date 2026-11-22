@@ -118,25 +118,25 @@ const backendModelSchema = z
   })
   .strip();
 
-const backendHeadersSchema = z.record(z.string(), z.string()).superRefine((headers, ctx) => {
+/** The printable text the app sends: one rule for the key and every header value. */
+const SENDABLE_TEXT = /^[\u0020-\u007E\u00A0-\u00FF]*$/;
+
+/** Names the transport sets itself, or that would rewrite the header object. */
+const RESERVED_HEADER_NAMES = new Set(
+  'host content-length content-type connection transfer-encoding proxy-authorization __proto__ constructor prototype'.split(
+    ' '
+  )
+);
+
+/** The header rules a save and a stored read share: every name and its shape. */
+const storedBackendHeadersSchema = z.record(z.string(), z.string()).superRefine((headers, ctx) => {
   const names = new Set<string>();
-  for (const [name, value] of Object.entries(headers)) {
+  for (const name of Object.keys(headers)) {
     const lower = name.toLowerCase();
     if (
       !/^[!#$%&'*+.^_`|~\da-z-]+$/i.test(name) ||
-      !/^[\u0020-\u007E\u0080-\u00FF]*$/.test(value) ||
       lower.startsWith('x-kilo') ||
-      [
-        'host',
-        'content-length',
-        'content-type',
-        'connection',
-        'transfer-encoding',
-        'proxy-authorization',
-        '__proto__',
-        'constructor',
-        'prototype',
-      ].includes(lower) ||
+      RESERVED_HEADER_NAMES.has(lower) ||
       names.has(lower)
     ) {
       ctx.addIssue({ code: 'custom', message: 'Invalid headers' });
@@ -144,6 +144,11 @@ const backendHeadersSchema = z.record(z.string(), z.string()).superRefine((heade
     names.add(lower);
   }
 });
+
+/** A save also refuses a header value outside the printable set, as it does the key. */
+const backendHeadersSchema = storedBackendHeadersSchema.refine(headers =>
+  Object.values(headers).every(value => SENDABLE_TEXT.test(value))
+);
 
 export function parseChatBackendHeaders(input: string): ChatBackendDraft['headers'] {
   try {
@@ -154,38 +159,53 @@ export function parseChatBackendHeaders(input: string): ChatBackendDraft['header
   }
 }
 
+/** Fields every draft shares. Only the API key and header character rules differ per mode. */
+const draftFields = {
+  name: z.string().trim().min(1),
+  baseUrl: z.string(),
+  apiKind: z.enum(['chat_completions', 'responses', 'messages']),
+  completionTokenField: z
+    .enum(['max_completion_tokens', 'max_tokens'])
+    .default('max_completion_tokens'),
+  models: z
+    .array(backendModelSchema)
+    .min(1)
+    .refine(models => new Set(models.map(model => model.id)).size === models.length),
+  allowLocalHttp: z.boolean(),
+};
+
+/** Printable text only: an invisible control is a paste mistake, not a credential. */
+const apiKeySchema = z
+  .string()
+  .trim()
+  .refine(value => SENDABLE_TEXT.test(value));
+
 const draftSchema = z
-  .object({
-    name: z.string().trim().min(1),
-    baseUrl: z.string(),
-    apiKind: z.enum(['chat_completions', 'responses', 'messages']),
-    completionTokenField: z
-      .enum(['max_completion_tokens', 'max_tokens'])
-      .default('max_completion_tokens'),
-    apiKey: z
-      .string()
-      .trim()
-      // Printable set the app can send: an invisible control is a paste mistake.
-      .refine(value => /^[\u0020-\u007E\u00A0-\u00FF]*$/.test(value)),
-    headers: backendHeadersSchema,
-    models: z
-      .array(backendModelSchema)
-      .min(1)
-      .refine(models => new Set(models.map(model => model.id)).size === models.length),
-    allowLocalHttp: z.boolean(),
-  })
+  .object({ ...draftFields, apiKey: apiKeySchema, headers: backendHeadersSchema })
   .strip();
+/**
+ * A stored profile keeps a key or header value a tightened rule would refuse, so it
+ * stays listed and can be opened and fixed; the next save applies the strict rules.
+ */
+const storedDraftSchema = z
+  .object({ ...draftFields, apiKey: z.string().trim(), headers: storedBackendHeadersSchema })
+  .strip();
+
+/** A draft can fail several fields at once and the form shows one line, so this order decides it. */
+type NamedProblem = { field: string; problem: BackendInputProblem };
+const NAMED_PROBLEMS: readonly NamedProblem[] = [{ field: 'apiKey', problem: 'invalidApiKey' }];
 
 /**
  * The problem a failed draft names. Read the issue PATH and its code, never its
- * message: an issue can quote a credential or a custom header. The only custom
- * issue at the key's path is the character rule, so a value of the wrong type
+ * message: an issue can quote a credential or a custom header. A custom issue at a
+ * named field's path is that field's character rule, so a value of the wrong type
  * still names no field.
  */
 function inputProblem(error: z.ZodError): BackendInputProblem {
-  return error.issues.some(issue => issue.code === 'custom' && issue.path[0] === 'apiKey')
-    ? 'invalidApiKey'
-    : 'invalidInput';
+  const named = NAMED_PROBLEMS.find(({ field }) =>
+    error.issues.some(issue => issue.code === 'custom' && issue.path[0] === field)
+  );
+  return named?.problem ?? 'invalidInput';
 }
 
 export function validateChatBackendDraft(input: unknown): ChatBackendDraft {
@@ -235,6 +255,22 @@ function freezeBackend(backend: StoredChatBackend): StoredChatBackend {
   return Object.freeze(backend);
 }
 
+/** One stored profile read leniently; a structurally wrong one drops alone, never the list. */
+function readStoredBackend(item: unknown): StoredChatBackend | null {
+  const identity = storedIdentitySchema.safeParse(item);
+  const parsed = storedDraftSchema.safeParse(item);
+  if (!identity.success || !parsed.success) {
+    return null;
+  }
+  try {
+    const baseUrl = normalizeBackendUrl(parsed.data.baseUrl, parsed.data.allowLocalHttp);
+    return freezeBackend({ ...parsed.data, baseUrl, ...identity.data });
+  } catch {
+    // Drop only the invalid profile, without reporting secret-bearing data.
+    return null;
+  }
+}
+
 export function parseChatBackends(raw: string | null): StoredChatBackend[] {
   if (raw === null) {
     return [];
@@ -247,15 +283,10 @@ export function parseChatBackends(raw: string | null): StoredChatBackend[] {
     const profiles: StoredChatBackend[] = [];
     const ids = new Set<string>();
     for (const item of data) {
-      const identity = storedIdentitySchema.safeParse(item);
-      if (identity.success && !ids.has(identity.data.id)) {
-        try {
-          const draft = validateChatBackendDraft(item);
-          profiles.push(freezeBackend({ ...draft, ...identity.data }));
-          ids.add(identity.data.id);
-        } catch {
-          // Drop only the invalid profile, without reporting secret-bearing data.
-        }
+      const backend = readStoredBackend(item);
+      if (backend !== null && !ids.has(backend.id)) {
+        ids.add(backend.id);
+        profiles.push(backend);
       }
     }
     Object.freeze(profiles);

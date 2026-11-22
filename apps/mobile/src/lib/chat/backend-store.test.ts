@@ -204,6 +204,65 @@ describe('secure backend profiles', () => {
     );
   });
 
+  it('keeps a stored profile whose key holds a C1 control, while a save still refuses it', async () => {
+    const store = await import('./backend-store');
+    const stored = { ...draft, apiKey: 'sec\u0085ret', id: firstId, revision: 3 };
+    expect(store.parseChatBackends(JSON.stringify([stored]))).toMatchObject([
+      {
+        id: firstId,
+        revision: 3,
+        name: 'Local model',
+        baseUrl: 'https://models.example/v1',
+        apiKey: 'sec\u0085ret',
+        models: draft.models,
+      },
+    ]);
+    expect(store.parseChatBackends(JSON.stringify([stored]))[0]?.apiKey).toBe('sec\u0085ret');
+
+    const save = captureError(() => store.validateChatBackendDraft(stored));
+    expect((save as InstanceType<typeof store.BackendInputError>).problem).toBe('invalidApiKey');
+    const connection = captureError(() => store.validateBackendConnection(stored));
+    expect((connection as InstanceType<typeof store.BackendInputError>).problem).toBe(
+      'invalidApiKey'
+    );
+  });
+
+  it('keeps a stored profile whose header value holds a C1 control, while a save refuses it', async () => {
+    const store = await import('./backend-store');
+    const stored = {
+      ...draft,
+      headers: { Authorization: 'Bearer sec\u0085ret' },
+      id: secondId,
+      revision: 1,
+    };
+    expect(store.parseChatBackends(JSON.stringify([stored]))).toMatchObject([
+      { id: secondId, headers: { Authorization: 'Bearer sec\u0085ret' } },
+    ]);
+
+    const save = captureError(() => store.validateChatBackendDraft(stored));
+    expect(save).toBeInstanceOf(store.BackendInputError);
+    expect((save as InstanceType<typeof store.BackendInputError>).problem).toBe('invalidInput');
+  });
+
+  it('names the API key before a blank name, so one line reports the credential problem', async () => {
+    const store = await import('./backend-store');
+    const failure = captureError(() =>
+      store.validateChatBackendDraft({ ...draft, name: ' ', apiKey: 'sec\u0085ret' })
+    );
+    expect((failure as InstanceType<typeof store.BackendInputError>).problem).toBe('invalidApiKey');
+  });
+
+  it('refuses a C1 control inside a header value on the save path and the header parser', async () => {
+    const store = await import('./backend-store');
+    const failure = captureError(() =>
+      store.validateChatBackendDraft({ ...draft, headers: { Authorization: 'a\u0085b' } })
+    );
+    expect((failure as InstanceType<typeof store.BackendInputError>).problem).toBe('invalidInput');
+    expect(() => store.parseChatBackendHeaders(String.raw`{"Authorization":"a\u0085b"}`)).toThrow(
+      /^invalidInput$/u
+    );
+  });
+
   it('keeps a printable Latin-1 letter in the API key intact', async () => {
     const store = await import('./backend-store');
     const parsed = store.validateChatBackendDraft({ ...draft, apiKey: 'señor-key' });

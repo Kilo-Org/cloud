@@ -161,14 +161,23 @@ describe('TriggerDetailScreen read-only values', () => {
   });
 
   it('translates a localized Auto model name', async () => {
+    // The English Auto name equals the catalogue name, so only another
+    // language tells the localized label apart from the catalogue's own.
+    await i18n.changeLanguage('hi');
     state.detail = { ...state.detail, model: 'kilo-auto/efficient' };
     state.models = [
       { id: 'kilo-auto/efficient', name: 'Auto Efficient', variants: [], isPreferred: false },
     ];
 
-    const root = await mount();
+    try {
+      const root = await mount();
 
-    expect(rowValue(root, 'Model')).toBe(i18n.t('models.auto.efficient'));
+      const model = rowValue(root, i18n.t('common.model'));
+      expect(model).toBe(i18n.t('models.auto.efficient'));
+      expect(model).not.toBe('Auto Efficient');
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 
   it('shows a custom agent slug as itself', async () => {

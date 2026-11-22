@@ -29,6 +29,7 @@ import {
   fetchGitLabBoundToAddress,
   fetchGitLabRootTextFileAtRef,
   fetchGitLabRepositorySize,
+  fetchGitLabProjectAccessLevel,
   findKiloProjectAccessToken,
   findKiloReviewNote,
   findKiloWebhook,
@@ -45,6 +46,7 @@ import {
   updateProjectWebhook,
   fetchMRInlineComments,
   GITLAB_LISTING_TIMEOUT_MS,
+  GITLAB_ACCESS_LEVELS,
   MAX_GITLAB_LISTING_BYTES,
   MAX_MR_NOTE_BODY_BYTES,
 } from './adapter';
@@ -876,6 +878,98 @@ describe('fetchGitLabRepositorySize', () => {
     });
 
     await expect(fetchGitLabRepositorySize('test-token', 'group/project')).resolves.toBe('0 MiB');
+  });
+});
+
+describe('fetchGitLabProjectAccessLevel', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('returns the project access level from permissions.project_access', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ permissions: { project_access: { access_level: 30 } } }),
+    });
+
+    await expect(fetchGitLabProjectAccessLevel('test-token', 'group/project')).resolves.toBe(30);
+  });
+
+  it('returns the higher of the project and group access levels', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        permissions: {
+          project_access: { access_level: 20 },
+          group_access: { access_level: 40 },
+        },
+      }),
+    });
+
+    await expect(fetchGitLabProjectAccessLevel('test-token', 'group/project')).resolves.toBe(40);
+  });
+
+  it('returns null when the response carries no permissions', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: 1, path: 'project' }),
+    });
+
+    await expect(fetchGitLabProjectAccessLevel('test-token', 'group/project')).resolves.toBeNull();
+  });
+
+  it('returns null when neither permission entry carries a numeric access level', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        permissions: {
+          project_access: { access_level: null },
+          group_access: { access_level: '40' },
+        },
+      }),
+    });
+
+    await expect(fetchGitLabProjectAccessLevel('test-token', 'group/project')).resolves.toBeNull();
+  });
+
+  it('returns null for a 404 response', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      text: async () => 'Not found',
+    });
+
+    await expect(fetchGitLabProjectAccessLevel('test-token', 'group/project')).resolves.toBeNull();
+  });
+
+  it('throws for non-404 failures', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      text: async () => 'Server error',
+    });
+
+    await expect(fetchGitLabProjectAccessLevel('test-token', 'group/project')).rejects.toThrow(
+      'GitLab project access level fetch failed: 500'
+    );
+  });
+
+  it('requests the encoded project path with the minimum access level and the credential', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ permissions: { project_access: { access_level: 30 } } }),
+    });
+
+    await fetchGitLabProjectAccessLevel('test-token', 'group/subgroup/project');
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      `https://gitlab.com/api/v4/projects/group%2Fsubgroup%2Fproject?min_access_level=${GITLAB_ACCESS_LEVELS.GUEST}`,
+      expect.objectContaining({
+        headers: {
+          Authorization: 'Bearer test-token',
+        },
+      })
+    );
   });
 });
 

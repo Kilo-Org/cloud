@@ -201,6 +201,7 @@ export default async function spawnCloudAgentSession(
       const projectAuthorization = await authorizeGitLabProject({
         project: args.gitlabProject,
         projectInstanceUrl: instanceUrl,
+        organizationOwned: owner.type === 'org',
         requesterUserId: options?.requesterUserId ?? (owner.type === 'user' ? owner.id : undefined),
         threadRepository: options?.threadRepository,
       });

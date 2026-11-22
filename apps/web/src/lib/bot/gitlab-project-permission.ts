@@ -1,8 +1,9 @@
 import 'server-only';
-import {
-  getGitLabInstanceUrlForUser,
-  getGitLabTokenForUser,
-} from '@/lib/cloud-agent/gitlab-integration-helpers';
+import type { PlatformIntegration } from '@kilocode/db/schema';
+import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
+import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
 import {
   fetchGitLabProjectAccessLevel,
   GITLAB_ACCESS_LEVELS,
@@ -47,9 +48,46 @@ function isSameProject(left: string, right: string): boolean {
   return left.trim().toLowerCase() === right.trim().toLowerCase();
 }
 
+/** The instance URL a GitLab connection stores, defaulting to gitlab.com. */
+function readInstanceUrl(integration: Pick<PlatformIntegration, 'metadata'>): string {
+  const { metadata } = integration;
+  if (typeof metadata !== 'object' || metadata === null || Array.isArray(metadata)) {
+    return DEFAULT_GITLAB_INSTANCE_URL;
+  }
+  if (!('gitlab_instance_url' in metadata)) {
+    return DEFAULT_GITLAB_INSTANCE_URL;
+  }
+  const raw = metadata.gitlab_instance_url;
+  return typeof raw === 'string' && raw ? raw : DEFAULT_GITLAB_INSTANCE_URL;
+}
+
+/**
+ * The requester's own GitLab connection and the credential it stores. A row is
+ * usable only when it is healthy: a suspended or reauthorization-required row
+ * cannot answer for the account.
+ */
+async function requesterGitLabConnection(
+  requesterUserId: string
+): Promise<{ integration: PlatformIntegration; token: string } | null> {
+  const integration = await getIntegrationForOwner(
+    { type: 'user', id: requesterUserId },
+    PLATFORM.GITLAB
+  );
+  if (!integration || !isPlatformIntegrationHealthy(integration)) {
+    return null;
+  }
+
+  try {
+    const token = await getValidGitLabToken(integration, { userId: requesterUserId });
+    return { integration, token };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Requires a GitLab identity that reaches the requested project with write
- * access.
+ * access, for organization-owned connections.
  *
  * A GitLab integration belongs to an organization or a user, and its
  * connection reaches the projects of one instance. A caller without a
@@ -66,12 +104,20 @@ export async function authorizeGitLabProject(params: {
   project: string;
   /** Instance URL of the connection whose credential the session will use. */
   projectInstanceUrl: string;
+  /** True when the session runs on an organization-owned connection's credential. */
+  organizationOwned: boolean;
   /** The person who triggered this run, when the platform supplied a verified account. */
   requesterUserId?: string;
   /** Repository of the conversation the bot was mentioned in. */
   threadRepository?: string | null;
 }): Promise<GitLabProjectAuthorization> {
-  const { project, projectInstanceUrl, requesterUserId, threadRepository } = params;
+  const { project, projectInstanceUrl, organizationOwned, requesterUserId, threadRepository } =
+    params;
+
+  // A personally owned connection is controlled by its owner, whose own
+  // credential starts the session, so it needs no separate project
+  // authorization.
+  if (!organizationOwned) return { allowed: true };
 
   if (!requesterUserId) {
     if (threadRepository && isSameProject(project, threadRepository)) {
@@ -80,15 +126,21 @@ export async function authorizeGitLabProject(params: {
     return { allowed: false, markdown: projectAccessRequiredMarkdown(project) };
   }
 
-  const requesterInstanceUrl = await getGitLabInstanceUrlForUser(requesterUserId);
+  // One row supplies both the instance and the credential, so the access read
+  // cannot pair an instance from one connection with a token from another.
+  const connection = await requesterGitLabConnection(requesterUserId);
+  if (!connection) {
+    return { allowed: false, markdown: projectAccessRequiredMarkdown(project) };
+  }
+  const requesterInstanceUrl = readInstanceUrl(connection.integration);
+
   // Comparing the normalized URLs, base path included, keeps two self-managed
   // instances apart that share a host. An unreadable value leaves the
   // comparison unanswered, never allowed.
+  let requesterInstance: string;
   try {
     const projectInstance = normalizeGitLabInstanceUrl(projectInstanceUrl);
-    const requesterInstance = normalizeGitLabInstanceUrl(
-      requesterInstanceUrl || DEFAULT_GITLAB_INSTANCE_URL
-    );
+    requesterInstance = normalizeGitLabInstanceUrl(requesterInstanceUrl);
     if (requesterInstance !== projectInstance) {
       return { allowed: false, markdown: instanceMismatchMarkdown(project) };
     }
@@ -98,14 +150,10 @@ export async function authorizeGitLabProject(params: {
 
   // Write access is read with the requester's own credential, so the answer
   // covers the project the session will use on this instance.
-  const requesterToken = await getGitLabTokenForUser(requesterUserId);
-  if (!requesterToken) {
-    return { allowed: false, markdown: projectAccessRequiredMarkdown(project) };
-  }
   const accessLevel = await fetchGitLabProjectAccessLevel(
-    requesterToken,
+    connection.token,
     project,
-    requesterInstanceUrl || DEFAULT_GITLAB_INSTANCE_URL
+    requesterInstance
   );
   if (accessLevel === null || accessLevel < GITLAB_ACCESS_LEVELS.DEVELOPER) {
     return { allowed: false, markdown: projectWriteAccessRequiredMarkdown(project) };

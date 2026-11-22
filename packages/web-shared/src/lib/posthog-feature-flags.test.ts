@@ -220,6 +220,94 @@ describe('shared flag cache', () => {
     expect(mockGetFeatureFlag).toHaveBeenCalledTimes(2);
   });
 
+  test('masks a key for the 10 s first-miss window instead of 30 s', async () => {
+    jest.useFakeTimers();
+    mockGetFeatureFlag.mockReturnValue(new Promise(() => {}));
+
+    const first = isReleaseToggleEnabled('first-miss-flag', 'user-h');
+    await jest.advanceTimersByTimeAsync(1_000);
+    await expect(first).resolves.toBe(false);
+    const missedAt = Date.now();
+    expect(mockGetFeatureFlag).toHaveBeenCalledTimes(1);
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+
+    jest.setSystemTime(missedAt + 9_999);
+    await expect(isReleaseToggleEnabled('first-miss-flag', 'user-h')).resolves.toBe(false);
+    expect(mockGetFeatureFlag).toHaveBeenCalledTimes(1);
+
+    jest.setSystemTime(missedAt + 10_001);
+    const afterWindow = isReleaseToggleEnabled('first-miss-flag', 'user-h');
+    await jest.advanceTimersByTimeAsync(1_000);
+    await expect(afterWindow).resolves.toBe(false);
+    expect(mockGetFeatureFlag).toHaveBeenCalledTimes(2);
+  });
+
+  test('opens the 30 s window after a second consecutive miss', async () => {
+    jest.useFakeTimers();
+    mockGetFeatureFlag.mockReturnValue(new Promise(() => {}));
+
+    const first = isReleaseToggleEnabled('stalled-twice-flag', 'user-i');
+    await jest.advanceTimersByTimeAsync(1_000);
+    await expect(first).resolves.toBe(false);
+    const firstMissAt = Date.now();
+    expect(mockGetFeatureFlag).toHaveBeenCalledTimes(1);
+
+    // The read after the first window misses too, which opens the longer window.
+    jest.setSystemTime(firstMissAt + 10_001);
+    const second = isReleaseToggleEnabled('stalled-twice-flag', 'user-i');
+    await jest.advanceTimersByTimeAsync(1_000);
+    await expect(second).resolves.toBe(false);
+    const secondMissAt = Date.now();
+    expect(mockGetFeatureFlag).toHaveBeenCalledTimes(2);
+
+    jest.setSystemTime(secondMissAt + 29_000);
+    await expect(isReleaseToggleEnabled('stalled-twice-flag', 'user-i')).resolves.toBe(false);
+    expect(mockGetFeatureFlag).toHaveBeenCalledTimes(2);
+    expect(mockCaptureException).toHaveBeenCalledTimes(2);
+
+    jest.setSystemTime(secondMissAt + 30_001);
+    const third = isReleaseToggleEnabled('stalled-twice-flag', 'user-i');
+    await jest.advanceTimersByTimeAsync(1_000);
+    await expect(third).resolves.toBe(false);
+    expect(mockGetFeatureFlag).toHaveBeenCalledTimes(3);
+  });
+
+  test('resets the miss count after a successful read', async () => {
+    jest.useFakeTimers();
+    mockGetFeatureFlag.mockReturnValue(new Promise(() => {}));
+
+    const first = isReleaseToggleEnabled('recovering-flag', 'user-j');
+    await jest.advanceTimersByTimeAsync(1_000);
+    await expect(first).resolves.toBe(false);
+    const firstMissAt = Date.now();
+
+    // The read after the first window succeeds, so the streak ends here.
+    jest.setSystemTime(firstMissAt + 10_001);
+    mockGetFeatureFlag.mockResolvedValueOnce(true);
+    await expect(isReleaseToggleEnabled('recovering-flag', 'user-j')).resolves.toBe(true);
+    const recoveredAt = Date.now();
+    expect(mockGetFeatureFlag).toHaveBeenCalledTimes(2);
+
+    // The resolved value serves its TTL, then the next read misses. That miss
+    // starts a new streak, so it masks for 10 s rather than 30 s.
+    jest.setSystemTime(recoveredAt + 30_001);
+    const nextMiss = isReleaseToggleEnabled('recovering-flag', 'user-j');
+    await jest.advanceTimersByTimeAsync(1_000);
+    await expect(nextMiss).resolves.toBe(false);
+    const missedAt = Date.now();
+    expect(mockGetFeatureFlag).toHaveBeenCalledTimes(3);
+
+    jest.setSystemTime(missedAt + 9_999);
+    await expect(isReleaseToggleEnabled('recovering-flag', 'user-j')).resolves.toBe(false);
+    expect(mockGetFeatureFlag).toHaveBeenCalledTimes(3);
+
+    jest.setSystemTime(missedAt + 10_001);
+    const afterWindow = isReleaseToggleEnabled('recovering-flag', 'user-j');
+    await jest.advanceTimersByTimeAsync(1_000);
+    await expect(afterWindow).resolves.toBe(false);
+    expect(mockGetFeatureFlag).toHaveBeenCalledTimes(4);
+  });
+
   test('evicts a settled key before the oldest in-flight read', async () => {
     const pinned = Promise.withResolvers<unknown>();
     mockGetFeatureFlag.mockReturnValueOnce(pinned.promise);

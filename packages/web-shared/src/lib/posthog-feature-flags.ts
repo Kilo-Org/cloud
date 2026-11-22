@@ -30,12 +30,21 @@ const FLAG_CACHE_TTL_MS = 30_000;
 const FLAG_READ_TIMEOUT_MS = 1_000;
 
 /**
- * After a read outlives the deadline or throws, every read of that key answers
- * with its caller's default for this window. A short window reports one failure
- * per window instead of one per request, and keeps an unreachable PostHog from
- * costing a deadline on every request path.
+ * Window a second consecutive miss of the same key opens. Reads of that key
+ * answer with their caller's default for this window, so an unreachable PostHog
+ * costs one deadline per key per window instead of one per request, and reports
+ * one failure per window instead of one per failed check.
  */
 const FLAG_FAILURE_BACKOFF_MS = 30_000;
+
+/**
+ * Window the first miss of a key opens. One slow PostHog response must not mask
+ * a key for the whole window above, because release toggles fail closed: a
+ * single 1-2 s response would otherwise read as disabled for 30 seconds and look
+ * like rollout flapping. A second consecutive miss means the upstream is not
+ * merely slow, so it opens `FLAG_FAILURE_BACKOFF_MS` instead.
+ */
+const FLAG_FIRST_FAILURE_BACKOFF_MS = 10_000;
 
 /**
  * Keys carry a distinct id and optionally person properties, so a user- or
@@ -54,7 +63,7 @@ type FlagReadResult = { ok: true; value: FlagValue } | { ok: false; error: unkno
 /** One key's cache state. A key is in exactly one of these states. */
 type FlagCacheEntry =
   | { kind: 'fresh'; value: FlagValue; readAt: number }
-  | { kind: 'failed'; retryAfterMs: number }
+  | { kind: 'failed'; retryAfterMs: number; misses: number }
   | { kind: 'reading'; result: Promise<FlagReadResult> };
 
 /** Sentinel for the deadline race; a symbol cannot collide with a flag value. */
@@ -160,6 +169,10 @@ async function readFlag(meta: FlagRead): Promise<FlagValue> {
   const key = cacheKey(meta);
   const entry = flagCache.get(key);
   const now = Date.now();
+  // Consecutive misses this read continues: only a `failed` entry carries its
+  // count forward. A success, an eviction or a fresh key starts at zero, so the
+  // next miss is again the first and opens the shorter window.
+  const previousMisses = entry?.kind === 'failed' ? entry.misses : 0;
 
   if (entry?.kind === 'fresh' && now - entry.readAt < FLAG_CACHE_TTL_MS) {
     storeEntry(key, entry);
@@ -189,7 +202,13 @@ async function readFlag(meta: FlagRead): Promise<FlagValue> {
     tags: { source: meta.source },
     extra: meta.extra,
   });
-  storeEntry(key, { kind: 'failed', retryAfterMs: Date.now() + FLAG_FAILURE_BACKOFF_MS });
+  const misses = previousMisses + 1;
+  storeEntry(key, {
+    kind: 'failed',
+    misses,
+    retryAfterMs:
+      Date.now() + (misses >= 2 ? FLAG_FAILURE_BACKOFF_MS : FLAG_FIRST_FAILURE_BACKOFF_MS),
+  });
   return undefined;
 }
 

@@ -26,8 +26,10 @@ jest.mock('@sentry/nextjs', () => {
 });
 
 import {
+  isFeatureFlagEnabled,
   isFeatureFlagEnabledOrDevelopment,
   isReleaseToggleEnabled,
+  resetFeatureFlagCache,
 } from '@kilocode/web-shared/lib/posthog-feature-flags';
 
 const posthogMock: {
@@ -40,6 +42,12 @@ const sentryMock: {
 
 const { mockGetFeatureFlag } = posthogMock;
 const { mockCaptureException } = sentryMock;
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  jest.useRealTimers();
+  resetFeatureFlagCache();
+});
 
 describe('isFeatureFlagEnabledOrDevelopment', () => {
   beforeEach(() => {
@@ -123,5 +131,104 @@ describe('isReleaseToggleEnabled', () => {
 
     await expect(isReleaseToggleEnabled('kiloclaw', 'user-4')).resolves.toBe(false);
     expect(mockCaptureException).toHaveBeenCalled();
+  });
+});
+
+describe('shared flag cache', () => {
+  test('reuses one resolved value for sequential reads inside the TTL', async () => {
+    mockGetFeatureFlag.mockResolvedValue(true);
+
+    await expect(isFeatureFlagEnabled('cached-flag', 'user-a')).resolves.toBe(true);
+    await expect(isFeatureFlagEnabled('cached-flag', 'user-a')).resolves.toBe(true);
+    await expect(isFeatureFlagEnabled('cached-flag', 'user-a')).resolves.toBe(true);
+
+    expect(mockGetFeatureFlag).toHaveBeenCalledTimes(1);
+  });
+
+  test('reads PostHog again once the cached value is older than the TTL', async () => {
+    jest.useFakeTimers();
+    mockGetFeatureFlag.mockResolvedValue(true);
+
+    await isFeatureFlagEnabled('expiring-flag', 'user-b');
+    jest.setSystemTime(Date.now() + 29_999);
+    await isFeatureFlagEnabled('expiring-flag', 'user-b');
+    expect(mockGetFeatureFlag).toHaveBeenCalledTimes(1);
+
+    jest.setSystemTime(Date.now() + 1);
+    await isFeatureFlagEnabled('expiring-flag', 'user-b');
+    expect(mockGetFeatureFlag).toHaveBeenCalledTimes(2);
+  });
+
+  test('shares one read between concurrent callers of the same key', async () => {
+    const read = Promise.withResolvers<unknown>();
+    mockGetFeatureFlag.mockReturnValue(read.promise);
+
+    const first = isFeatureFlagEnabled('deduped-flag', 'user-c');
+    const second = isFeatureFlagEnabled('deduped-flag', 'user-c');
+    read.resolve(true);
+
+    await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
+    expect(mockGetFeatureFlag).toHaveBeenCalledTimes(1);
+  });
+
+  test('keeps distinct ids and person properties in separate cache entries', async () => {
+    mockGetFeatureFlag.mockResolvedValue(true);
+
+    await isFeatureFlagEnabled('scoped-flag', 'user-d');
+    await isFeatureFlagEnabled('scoped-flag', 'user-e');
+    await isReleaseToggleEnabled('scoped-flag', 'user-d', { plan: 'team' });
+    await isReleaseToggleEnabled('scoped-flag', 'user-d', { plan: 'enterprise' });
+
+    expect(mockGetFeatureFlag).toHaveBeenCalledTimes(4);
+  });
+
+  test('applies the caller default when PostHog does not answer within the deadline', async () => {
+    jest.useFakeTimers();
+    mockGetFeatureFlag.mockReturnValue(new Promise(() => {}));
+
+    const read = isReleaseToggleEnabled('slow-flag', 'user-f');
+    await jest.advanceTimersByTimeAsync(1_000);
+
+    await expect(read).resolves.toBe(false);
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining('did not answer') }),
+      expect.objectContaining({
+        tags: { source: 'posthog_feature_flag_boolean_enabled' },
+      })
+    );
+  });
+
+  test('reports one deadline failure per window and reads again after it', async () => {
+    jest.useFakeTimers();
+    mockGetFeatureFlag.mockReturnValue(new Promise(() => {}));
+
+    const first = isReleaseToggleEnabled('stalled-flag', 'user-g');
+    await jest.advanceTimersByTimeAsync(1_000);
+    await first;
+
+    const second = isReleaseToggleEnabled('stalled-flag', 'user-g');
+    await jest.advanceTimersByTimeAsync(1_000);
+    await expect(second).resolves.toBe(false);
+    expect(mockGetFeatureFlag).toHaveBeenCalledTimes(1);
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+
+    jest.setSystemTime(Date.now() + 30_001);
+    const third = isFeatureFlagEnabled('stalled-flag', 'user-g');
+    await jest.advanceTimersByTimeAsync(1_000);
+    await expect(third).resolves.toBe(false);
+    expect(mockGetFeatureFlag).toHaveBeenCalledTimes(2);
+  });
+
+  test('evicts the least recently used key so the cache stays bounded', async () => {
+    mockGetFeatureFlag.mockResolvedValue(true);
+
+    for (let index = 0; index < 501; index++) {
+      await isFeatureFlagEnabled('bounded-flag', `user-${index}`);
+    }
+    expect(mockGetFeatureFlag).toHaveBeenCalledTimes(501);
+
+    await isFeatureFlagEnabled('bounded-flag', 'user-0');
+    expect(mockGetFeatureFlag).toHaveBeenCalledTimes(502);
   });
 });

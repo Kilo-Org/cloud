@@ -55,9 +55,7 @@ describe('Telugu tool-card labels name the tool', () => {
 
 describe('Telugu declarative and label copy', () => {
   it('makes Start agent the subject that cannot use the repository', () => {
-    expect(
-      i18n.t('appActions.start.repositoryUnsupported', { repository: 'acme/widgets' })
-    ).toBe(
+    expect(i18n.t('appActions.start.repositoryUnsupported', { repository: 'acme/widgets' })).toBe(
       'acme/widgets ఒక Bitbucket రిపోజిటరీ — ఏజెంట్ ప్రారంభించడం ఇంకా దాన్ని ఉపయోగించలేకపోతుంది. Kiloలో మరో రిపోజిటరీని ఎంచుకోండి.'
     );
   });
@@ -126,18 +124,14 @@ describe('Telugu analytics copy', () => {
 
 describe('Telugu council copy', () => {
   it('names the repository whose council is enabled', () => {
-    expect(i18n.t('codeReviewer.council.labelsDescription')).toContain(
-      'మండలి ప్రారంభించబడిన రిపోజిటరీ'
-    );
-    expect(i18n.t('codeReviewer.council.labelsDescription')).not.toContain(
-      'మండలి ప్రారంభంలో ఉన్న'
-    );
+    expect(i18n.t('codeReviewer.council.labelsDescription')).toContain('మండలి ప్రారంభించబడిన రిపోజిటరీ');
+    expect(i18n.t('codeReviewer.council.labelsDescription')).not.toContain('మండలి ప్రారంభంలో ఉన్న');
   });
 
   it('puts the selected count in a frame that fits any count', () => {
-    expect(
-      i18n.t('codeReviewer.council.minSpecialists', { minimum: '2', selected: '1' })
-    ).toBe('కనీసం 2 నిపుణులను ఎంచుకోండి. ఎంచుకున్న నిపుణులు: 1');
+    expect(i18n.t('codeReviewer.council.minSpecialists', { minimum: '2', selected: '1' })).toBe(
+      'కనీసం 2 నిపుణులను ఎంచుకోండి. ఎంచుకున్న నిపుణులు: 1'
+    );
   });
 
   it('keeps missing coverage distinct from weak coverage', () => {

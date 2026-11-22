@@ -1,7 +1,8 @@
 import { type JsonSchema } from '@kilocode/harness-sdk';
+import { settingsTools } from '@kilocode/harness-sdk/plugins/tools';
 import { describe, expect, it, vi } from 'vitest';
 
-import { nativeSchemaOf, nativeTools } from './native-tool-schema';
+import { nativeSchemaOf, nativeTools, omittedTools } from './native-tool-schema';
 
 const tool = (parameters: JsonSchema) => ({ name: 'tool', description: 'A tool', parameters });
 
@@ -102,29 +103,29 @@ describe('native tool schema', () => {
   });
 
   it.each([
-    ['a real union', { anyOf: [{ type: 'string' }, { type: 'number' }] }, 'tool.value: anyOf'],
-    ['a type list', { type: ['string', 'number'] }, 'tool.value: a type list'],
-    ['a reference', { $ref: '#/$defs/value' }, 'tool.value: $ref'],
-    ['an intersection', { allOf: [{ type: 'string' }] }, 'tool.value: allOf'],
-    ['a constant', { type: 'string', const: 'x' }, 'tool.value: const'],
+    ['a real union', { anyOf: [{ type: 'string' }, { type: 'number' }] }, 'value: anyOf'],
+    ['a type list', { type: ['string', 'number'] }, 'value: a type list'],
+    ['a reference', { $ref: '#/$defs/value' }, 'value: $ref'],
+    ['an intersection', { allOf: [{ type: 'string' }] }, 'value: allOf'],
+    ['a constant', { type: 'string', const: 'x' }, 'value: const'],
     [
       'a number enum',
       { type: 'integer', enum: [1, 2] },
-      'tool.value: an enum that is not a list of strings',
+      'value: an enum that is not a list of strings',
     ],
-    ['an empty enum', { enum: [] }, 'tool.value: an enum that is not a list of strings'],
+    ['an empty enum', { enum: [] }, 'value: an enum that is not a list of strings'],
     [
       'a tuple',
       { type: 'array', items: [{ type: 'string' }] },
-      'tool.value: an array without one item schema',
+      'value: an array without one item schema',
     ],
-    ['an array without items', { type: 'array' }, 'tool.value: an array without one item schema'],
+    ['an array without items', { type: 'array' }, 'value: an array without one item schema'],
     [
       'a map with free keys',
       { type: 'object', additionalProperties: { type: 'string' } },
-      'tool.value: an object with free keys',
+      'value: an object with free keys',
     ],
-    ['no type', { description: 'Anything' }, 'tool.value: no supported type'],
+    ['no type', { description: 'Anything' }, 'value: no supported type'],
   ])('refuses a required argument with %s', (_label, value, reason) => {
     expect(
       nativeSchemaOf(tool({ type: 'object', properties: { value }, required: ['value'] }))
@@ -145,7 +146,7 @@ describe('native tool schema', () => {
       )
     ).toEqual({
       ok: true,
-      omitted: ['tool.filter: anyOf'],
+      omitted: [{ argument: 'filter', reason: 'anyOf' }],
       schema: {
         type: 'object',
         properties: [{ name: 'query', optional: false, schema: { type: 'string' } }],
@@ -153,9 +154,9 @@ describe('native tool schema', () => {
     });
   });
 
-  it('logs and leaves out a tool it cannot express, and keeps the others', () => {
+  it('answers the tools it can express and everything it left out, and keeps logging', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const kept = nativeTools([
+    const { tools, omitted } = nativeTools([
       { ...tool({ type: 'object', properties: {} }), name: 'clock' },
       {
         ...tool({
@@ -170,12 +171,55 @@ describe('native tool schema', () => {
         name: 'partial',
       },
     ]);
-    expect(kept.map(one => one.name)).toEqual(['clock', 'partial']);
-    expect(JSON.parse(kept[0]?.parameters ?? '')).toEqual({ type: 'object', properties: [] });
+    expect(tools.map(one => one.name)).toEqual(['clock', 'partial']);
+    expect(JSON.parse(tools[0]?.parameters ?? '')).toEqual({ type: 'object', properties: [] });
+    // The answer is the record a screen names the omitted tools from.
+    expect(omitted).toEqual([
+      { kind: 'tool', tool: 'broken', reason: 'value: $ref' },
+      { kind: 'argument', tool: 'partial', argument: 'note', reason: 'allOf' },
+    ]);
     expect(warn.mock.calls).toEqual([
-      ['[native-model] tool left out: broken.value: $ref'],
+      ['[native-model] tool left out: broken: value: $ref'],
       ['[native-model] optional argument left out: partial.note: allOf'],
     ]);
+    warn.mockRestore();
+  });
+
+  it('names a nested omitted argument by its path, without logging, for a screen', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const omitted = omittedTools([
+      tool({
+        type: 'object',
+        properties: {
+          where: { type: 'object', properties: { region: { allOf: [] } } },
+          filter: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+        },
+      }),
+    ]);
+    expect(omitted).toEqual([
+      { kind: 'argument', tool: 'tool', argument: 'where.region', reason: 'allOf' },
+      { kind: 'argument', tool: 'tool', argument: 'filter', reason: 'anyOf' },
+    ]);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('drops settings_set and keeps settings_list, for the real settings tool schemas', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const service = {
+      settings: [],
+      read: () => {
+        throw new Error('no read in this test');
+      },
+      write: () => {
+        throw new Error('no write in this test');
+      },
+    };
+    const { tools, omitted } = nativeTools(
+      settingsTools(service as never).map(one => one.definition)
+    );
+    expect(tools.map(one => one.name)).toEqual(['settings_list']);
+    expect(omitted).toEqual([{ kind: 'tool', tool: 'settings_set', reason: 'value: a type list' }]);
     warn.mockRestore();
   });
 });

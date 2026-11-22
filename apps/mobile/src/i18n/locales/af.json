@@ -4178,7 +4178,8 @@
       "download": "Laai model op die toestel af",
       "downloading": "Laai tans af…",
       "downloadProgress": "Laai tans af… {{percent}}%",
-      "downloadFailed": "Die aflaai is nie voltooi nie. Kontroleer jou verbinding en vrye berging, en probeer dan weer."
+      "downloadFailed": "Die aflaai is nie voltooi nie. Kontroleer jou verbinding en vrye berging, en probeer dan weer.",
+      "cannotUse": "Hierdie model kan nie die volgende gebruik nie: {{items}}."
     },
     "reasoningEffort": {
       "modelFlag": "Hierdie model ondersteun denkinspanning"

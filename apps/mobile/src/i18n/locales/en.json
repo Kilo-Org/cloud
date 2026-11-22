@@ -4201,7 +4201,8 @@
       "download": "Download on-device model",
       "downloading": "Downloading…",
       "downloadProgress": "Downloading… {{percent}}%",
-      "downloadFailed": "The download didn't finish. Check your connection and free storage, then try again."
+      "downloadFailed": "The download didn't finish. Check your connection and free storage, then try again.",
+      "cannotUse": "This model can't use: {{items}}."
     },
     "webSearch": {
       "title": "Search the web",

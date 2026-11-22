@@ -4178,7 +4178,8 @@
       "download": "Last ned modell på enheten",
       "downloading": "Laster ned …",
       "downloadProgress": "Laster ned … {{percent}} %",
-      "downloadFailed": "Nedlastingen ble ikke fullført. Sjekk tilkoblingen og ledig lagringsplass, og prøv igjen."
+      "downloadFailed": "Nedlastingen ble ikke fullført. Sjekk tilkoblingen og ledig lagringsplass, og prøv igjen.",
+      "cannotUse": "Denne modellen kan ikke bruke: {{items}}."
     },
     "reasoningEffort": {
       "modelFlag": "Denne modellen støtter resonneringsinnsats"

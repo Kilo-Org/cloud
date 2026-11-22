@@ -4252,7 +4252,8 @@
       "download": "Preuzmi model na uređaju",
       "downloading": "Preuzimanje…",
       "downloadProgress": "Preuzimanje… {{percent}} %",
-      "downloadFailed": "Preuzimanje nije dovršeno. Provjerite vezu i slobodnu pohranu pa pokušajte ponovno."
+      "downloadFailed": "Preuzimanje nije dovršeno. Provjerite vezu i slobodnu pohranu pa pokušajte ponovno.",
+      "cannotUse": "Ovaj model ne može koristiti: {{items}}."
     },
     "reasoningEffort": {
       "modelFlag": "Ovaj model podržava intenzitet razmišljanja"

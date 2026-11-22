@@ -4326,7 +4326,8 @@
       "download": "Prenesi model v napravo",
       "downloading": "Prenašanje …",
       "downloadProgress": "Prenašanje … {{percent}} %",
-      "downloadFailed": "Prenos se ni dokončal. Preverite povezavo in prosti prostor za shranjevanje ter poskusite znova."
+      "downloadFailed": "Prenos se ni dokončal. Preverite povezavo in prosti prostor za shranjevanje ter poskusite znova.",
+      "cannotUse": "Ta model ne podpira: {{items}}."
     },
     "reasoningEffort": {
       "modelFlag": "Ta model podpira stopnjo razmišljanja"

@@ -4326,7 +4326,8 @@
       "download": "Descarregar modelo no dispositivo",
       "downloading": "A descarregar…",
       "downloadProgress": "A descarregar… {{percent}}%",
-      "downloadFailed": "A transferência não foi concluída. Verifique a ligação e o armazenamento livre e tente novamente."
+      "downloadFailed": "A transferência não foi concluída. Verifique a ligação e o armazenamento livre e tente novamente.",
+      "cannotUse": "Este modelo não consegue usar: {{items}}."
     },
     "reasoningEffort": {
       "modelFlag": "Este modelo suporta esforço de raciocínio"

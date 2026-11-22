@@ -73,9 +73,7 @@ describe('native on-device model client with tools', () => {
     };
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     await said(nativeModelClient(bridge), asked);
-    expect(warn).toHaveBeenCalledExactlyOnceWith(
-      '[native-model] tool left out: merge.value: anyOf'
-    );
+    expect(warn).toHaveBeenCalledExactlyOnceWith('[native-model] tool left out: merge: value: anyOf');
     warn.mockRestore();
     expect(bridge.generate).toHaveBeenCalledExactlyOnceWith({
       id: expect.any(String),

@@ -4178,7 +4178,8 @@
       "download": "下載裝置端模型",
       "downloading": "下載中…",
       "downloadProgress": "下載中… {{percent}}%",
-      "downloadFailed": "下載未完成。請檢查網路連線和可用儲存空間，然後再試一次。"
+      "downloadFailed": "下載未完成。請檢查網路連線和可用儲存空間，然後再試一次。",
+      "cannotUse": "此模型無法使用：{{items}}。"
     },
     "reasoningEffort": {
       "modelFlag": "此模型支援思考程度"

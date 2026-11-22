@@ -4178,7 +4178,8 @@
       "download": "Dawuniloda imodeli esedivayisini",
       "downloading": "Iyadawuniloda…",
       "downloadProgress": "Iyadawuniloda… {{percent}}%",
-      "downloadFailed": "Ukudawuniloda akuqedanga. Hlola uxhumano lwakho nendawo yokugcina ekhululekile, bese uzama futhi."
+      "downloadFailed": "Ukudawuniloda akuqedanga. Hlola uxhumano lwakho nendawo yokugcina ekhululekile, bese uzama futhi.",
+      "cannotUse": "Le modeli ayikwazi ukusebenzisa: {{items}}."
     },
     "reasoningEffort": {
       "modelFlag": "Le modeli isekela umzamo wokucabanga"

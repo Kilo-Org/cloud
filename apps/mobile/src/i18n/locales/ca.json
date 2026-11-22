@@ -4252,7 +4252,8 @@
       "download": "Baixa el model al dispositiu",
       "downloading": "S'està baixant…",
       "downloadProgress": "S'està baixant… {{percent}}%",
-      "downloadFailed": "La baixada no s'ha completat. Comprova la connexió i l'espai lliure i torna-ho a provar."
+      "downloadFailed": "La baixada no s'ha completat. Comprova la connexió i l'espai lliure i torna-ho a provar.",
+      "cannotUse": "Aquest model no pot utilitzar: {{items}}."
     },
     "reasoningEffort": {
       "modelFlag": "Aquest model admet l'esforç de raonament"

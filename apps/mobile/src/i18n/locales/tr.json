@@ -4178,7 +4178,8 @@
       "download": "Cihazdaki modeli indir",
       "downloading": "İndiriliyor…",
       "downloadProgress": "İndiriliyor… %{{percent}}",
-      "downloadFailed": "İndirme tamamlanamadı. Bağlantınızı ve boş depolama alanınızı kontrol edip yeniden deneyin."
+      "downloadFailed": "İndirme tamamlanamadı. Bağlantınızı ve boş depolama alanınızı kontrol edip yeniden deneyin.",
+      "cannotUse": "Bu model şunları kullanamaz: {{items}}."
     },
     "reasoningEffort": {
       "modelFlag": "Bu model düşünme düzeyini destekler"

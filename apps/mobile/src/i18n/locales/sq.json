@@ -4178,7 +4178,8 @@
       "download": "Shkarko modelin në pajisje",
       "downloading": "Po shkarkohet…",
       "downloadProgress": "Po shkarkohet… {{percent}}%",
-      "downloadFailed": "Shkarkimi nuk përfundoi. Kontrollo lidhjen dhe hapësirën e lirë, pastaj provo përsëri."
+      "downloadFailed": "Shkarkimi nuk përfundoi. Kontrollo lidhjen dhe hapësirën e lirë, pastaj provo përsëri.",
+      "cannotUse": "Ky model nuk mund t'i përdorë: {{items}}."
     },
     "reasoningEffort": {
       "modelFlag": "Ky model mbështet nivelin e arsyetimit"

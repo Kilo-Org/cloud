@@ -4178,7 +4178,8 @@
       "download": "Sækja líkan í tækið",
       "downloading": "Sæki…",
       "downloadProgress": "Sæki… {{percent}}%",
-      "downloadFailed": "Niðurhalinu lauk ekki. Athugaðu nettenginguna og laust geymslupláss og reyndu svo aftur."
+      "downloadFailed": "Niðurhalinu lauk ekki. Athugaðu nettenginguna og laust geymslupláss og reyndu svo aftur.",
+      "cannotUse": "Þetta líkan getur ekki notað: {{items}}."
     },
     "reasoningEffort": {
       "modelFlag": "Þetta líkan styður dýpt rökhugsunar"

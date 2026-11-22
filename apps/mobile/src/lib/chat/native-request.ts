@@ -140,7 +140,7 @@ export function nativeRequest(request: ModelRequest, options: RequestOptions): N
     }
   }
   const toolSchemas =
-    tools && request.tools !== undefined ? nativeTools(offeredTools(request.tools)) : [];
+    tools && request.tools !== undefined ? nativeTools(offeredTools(request.tools)).tools : [];
   return {
     id,
     system: request.prompt.system.map(block => block.text).join('\n\n'),

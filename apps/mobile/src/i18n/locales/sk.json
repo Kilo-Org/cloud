@@ -4326,7 +4326,8 @@
       "download": "Stiahnuť model do zariadenia",
       "downloading": "Sťahuje sa…",
       "downloadProgress": "Sťahuje sa… {{percent}} %",
-      "downloadFailed": "Sťahovanie sa nedokončilo. Skontrolujte pripojenie a voľné miesto v úložisku a skúste to znova."
+      "downloadFailed": "Sťahovanie sa nedokončilo. Skontrolujte pripojenie a voľné miesto v úložisku a skúste to znova.",
+      "cannotUse": "Tento model nemôže používať: {{items}}."
     },
     "reasoningEffort": {
       "modelFlag": "Tento model podporuje intenzitu uvažovania"

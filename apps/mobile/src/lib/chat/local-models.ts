@@ -1,6 +1,10 @@
-import { type ModelClientService, type ModelFacts } from '@kilocode/harness-sdk';
+import {
+  type ModelClientService,
+  type ModelFacts,
+  type ToolDefinition,
+} from '@kilocode/harness-sdk';
 import { type NativeModule, requireOptionalNativeModule } from 'expo';
-import { useEffect, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
 
 import { type LocalProvider, localTargetId } from './backend-target';
@@ -11,6 +15,8 @@ import {
   nativeModelClient,
   type NativeModelEvent,
 } from './native-model-client';
+import { type NativeOmission, omittedTools } from './native-tool-schema';
+import { offeredTools } from './offered-tools';
 
 /** One on-device provider. The harness still owns the conversation; this supplies inference. */
 export type LocalModelProvider = {
@@ -29,6 +35,18 @@ export type LocalModelProvider = {
 
 type SystemProvider = Exclude<LocalProvider, 'gguf'>;
 
+/**
+ * What one model can do with the tools the person enabled.
+ *
+ * `unknown` is the store's own answer before anyone has handed it the offered
+ * tools; `none` is a model that takes every tool it is offered; `some` names
+ * the tools, and the arguments of a tool, this model cannot run.
+ */
+export type LocalModelToolUse =
+  | { readonly kind: 'unknown' }
+  | { readonly kind: 'none' }
+  | { readonly kind: 'some'; readonly unusable: readonly string[] };
+
 /** What the settings sheet and the model picker show for one system provider. */
 export type LocalModelStatus = {
   readonly provider: SystemProvider;
@@ -36,6 +54,8 @@ export type LocalModelStatus = {
   readonly nameKey: string;
   /** Undefined while the first check runs. */
   readonly availability: NativeAvailability | undefined;
+  /** What this model can do with the enabled tools, once they are known. */
+  readonly toolUse: LocalModelToolUse;
 };
 
 type SystemModelModule = InstanceType<
@@ -166,7 +186,39 @@ function statusesOf(): readonly LocalModelStatus[] {
     targetId: localTargetId(provider),
     nameKey,
     availability: known.get(provider),
+    toolUse: { kind: 'unknown' },
   }));
+}
+
+/**
+ * What one model can do with the tools a chat offers.
+ *
+ * Only a check that has not answered is `unknown`: before the answer there is
+ * nothing to say. Every settled answer is one of two facts. A model that runs
+ * no tool loop runs none of the offered tools, whatever their schemas look
+ * like, so it names all of them. A model that runs the loop names only what the
+ * converter leaves out.
+ */
+export function toolUseOf(
+  availability: NativeAvailability | undefined,
+  offered: readonly ToolDefinition[]
+): LocalModelToolUse {
+  if (availability === undefined) {
+    return { kind: 'unknown' };
+  }
+  if (availability.tools !== true) {
+    return offered.length === 0
+      ? { kind: 'none' }
+      : { kind: 'some', unusable: offered.map(tool => tool.name) };
+  }
+  const unusable = [
+    ...new Set(
+      omittedTools(offeredTools(offered)).map((omission: NativeOmission) =>
+        omission.kind === 'tool' ? omission.tool : `${omission.tool}.${omission.argument}`
+      )
+    ),
+  ];
+  return unusable.length === 0 ? { kind: 'none' } : { kind: 'some', unusable };
 }
 
 statuses = statusesOf();
@@ -185,14 +237,35 @@ function subscribe(listener: () => void): () => void {
   };
 }
 
+/** What a screen that offers no tools passes: one array, so the memo does not recompute. */
+const NO_TOOLS: readonly ToolDefinition[] = [];
+
 const currentStatuses = () => statuses;
 
-/** The registered providers' availability, checked again whenever a screen using it mounts. */
-export function useLocalModels(): readonly LocalModelStatus[] {
+/**
+ * The registered providers' availability, and what each can do with the tools
+ * the chat offers, checked again whenever a screen using it mounts.
+ *
+ * `offered` is the enabled tool set the caller would send. Its answer is
+ * computed here rather than in the screen, so a status is the one place that
+ * says which tools this model cannot run. Without it every status reads
+ * `unknown`, which is what a screen that never offers tools needs.
+ */
+export function useLocalModels(
+  offered: readonly ToolDefinition[] = NO_TOOLS
+): readonly LocalModelStatus[] {
   useEffect(() => {
     for (const { model } of system) {
       void model.availability();
     }
   }, []);
-  return useSyncExternalStore(subscribe, currentStatuses, currentStatuses);
+  const stored = useSyncExternalStore(subscribe, currentStatuses, currentStatuses);
+  return useMemo(
+    () =>
+      stored.map(status => ({
+        ...status,
+        toolUse: toolUseOf(status.availability, offered),
+      })),
+    [stored, offered]
+  );
 }

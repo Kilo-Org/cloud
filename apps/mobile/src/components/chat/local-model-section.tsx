@@ -4,6 +4,8 @@ import { View } from 'react-native';
 import { Text } from '@/components/ui/text';
 import { type NativeAvailability } from '@/lib/chat/native-model-client';
 import { type LocalModelStatus, useLocalModels } from '@/lib/chat/local-models';
+import { useOfferedTools } from '@/lib/chat/use-offered-tools';
+import { useOrganization } from '@/lib/organization-context';
 
 import { BackendProviderChoice, type ProviderSelection } from './backend-provider-choices';
 import { ModelDownloadControl } from './model-download-control';
@@ -52,7 +54,7 @@ function LocalModelRow({
   ...selection
 }: Readonly<{ status: LocalModelStatus }> & ProviderSelection) {
   const { t } = useTranslation();
-  const { availability } = status;
+  const { availability, toolUse } = status;
   let statusKey: string | undefined = 'modelChat.localModels.notAvailable';
   if (availability === undefined) {
     statusKey = 'modelChat.localModels.checking';
@@ -76,14 +78,36 @@ function LocalModelRow({
       {reasonKey !== undefined && (
         <Text className="text-sm text-muted-foreground">{t(reasonKey)}</Text>
       )}
+      {toolUse.kind === 'some' && (
+        <Text
+          testID={`local-model-unusable-${status.provider}`}
+          className="text-sm text-muted-foreground"
+        >
+          {t('modelChat.localModels.cannotUse', { items: toolUse.unusable.join(', ') })}
+        </Text>
+      )}
       <ModelDownloadControl status={status} />
     </View>
   );
 }
 
-/** The system providers this build registers, each with its availability and download control. */
-export function LocalModelSection(selection: ProviderSelection) {
-  const localModels = useLocalModels();
+/**
+ * The system providers this build registers, each with its availability, the
+ * tools it cannot run and its download control.
+ *
+ * `statuses` is the seam a capture or a proof injects a status through: the real
+ * store never reports an available Apple model on a machine without one, so the
+ * row's own copy is measured on a device that refuses nothing. Without it the
+ * registered providers answer.
+ */
+export function LocalModelSection({
+  statuses,
+  ...selection
+}: Readonly<{ statuses?: readonly LocalModelStatus[] }> & ProviderSelection) {
+  const { organizationId } = useOrganization();
+  const offered = useOfferedTools(organizationId ?? undefined);
+  const stored = useLocalModels(offered);
+  const localModels = statuses ?? stored;
   if (localModels.length === 0) {
     return null;
   }

@@ -4252,7 +4252,8 @@
       "download": "Descarcă modelul pe dispozitiv",
       "downloading": "Se descarcă…",
       "downloadProgress": "Se descarcă… {{percent}}%",
-      "downloadFailed": "Descărcarea nu s-a finalizat. Verifică-ți conexiunea și spațiul de stocare liber, apoi încearcă din nou."
+      "downloadFailed": "Descărcarea nu s-a finalizat. Verifică-ți conexiunea și spațiul de stocare liber, apoi încearcă din nou.",
+      "cannotUse": "Acest model nu poate rula: {{items}}."
     },
     "reasoningEffort": {
       "modelFlag": "Acest model acceptă efort de raționament"

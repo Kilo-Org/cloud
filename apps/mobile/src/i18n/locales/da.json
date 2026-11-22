@@ -4178,7 +4178,8 @@
       "download": "Download model til enheden",
       "downloading": "Downloader…",
       "downloadProgress": "Downloader… {{percent}}%",
-      "downloadFailed": "Downloaden blev ikke fuldført. Tjek din forbindelse og ledig lagerplads, og prøv igen."
+      "downloadFailed": "Downloaden blev ikke fuldført. Tjek din forbindelse og ledig lagerplads, og prøv igen.",
+      "cannotUse": "Denne model kan ikke bruge: {{items}}."
     },
     "reasoningEffort": {
       "modelFlag": "Denne model understøtter ræsonnementsniveau"

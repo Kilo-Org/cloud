@@ -4178,7 +4178,8 @@
       "download": "Eszközön futó modell letöltése",
       "downloading": "Letöltés…",
       "downloadProgress": "Letöltés… {{percent}}%",
-      "downloadFailed": "A letöltés nem fejeződött be. Ellenőrizze a kapcsolatot és a szabad tárhelyet, majd próbálja újra."
+      "downloadFailed": "A letöltés nem fejeződött be. Ellenőrizze a kapcsolatot és a szabad tárhelyet, majd próbálja újra.",
+      "cannotUse": "Ez a modell nem tudja használni a következő eszközöket: {{items}}."
     },
     "reasoningEffort": {
       "modelFlag": "Ez a modell támogatja a gondolkodás szintjét"

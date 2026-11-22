@@ -4178,7 +4178,8 @@
       "download": "Descargar o modelo no dispositivo",
       "downloading": "Descargando…",
       "downloadProgress": "Descargando… {{percent}}%",
-      "downloadFailed": "A descarga non rematou. Comproba a conexión e o espazo libre e téntao de novo."
+      "downloadFailed": "A descarga non rematou. Comproba a conexión e o espazo libre e téntao de novo.",
+      "cannotUse": "Este modelo non pode usar: {{items}}."
     },
     "reasoningEffort": {
       "modelFlag": "Este modelo admite esforzo de razoamento"

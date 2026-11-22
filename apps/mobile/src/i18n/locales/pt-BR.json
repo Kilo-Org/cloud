@@ -4326,7 +4326,8 @@
       "download": "Baixar modelo no dispositivo",
       "downloading": "Baixando…",
       "downloadProgress": "Baixando… {{percent}}%",
-      "downloadFailed": "O download não foi concluído. Verifique sua conexão e o espaço livre e tente novamente."
+      "downloadFailed": "O download não foi concluído. Verifique sua conexão e o espaço livre e tente novamente.",
+      "cannotUse": "Este modelo não pode usar: {{items}}."
     },
     "reasoningEffort": {
       "modelFlag": "Este modelo aceita esforço de raciocínio"

@@ -4252,7 +4252,8 @@
       "download": "Scarica il modello sul dispositivo",
       "downloading": "Download in corso…",
       "downloadProgress": "Download in corso… {{percent}}%",
-      "downloadFailed": "Il download non è stato completato. Controlla la connessione e lo spazio libero, poi riprova."
+      "downloadFailed": "Il download non è stato completato. Controlla la connessione e lo spazio libero, poi riprova.",
+      "cannotUse": "Questo modello non può usare: {{items}}."
     },
     "reasoningEffort": {
       "modelFlag": "Questo modello supporta il livello di ragionamento"

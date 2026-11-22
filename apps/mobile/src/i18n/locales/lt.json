@@ -4326,7 +4326,8 @@
       "download": "Atsisiųsti įrenginio modelį",
       "downloading": "Atsisiunčiama…",
       "downloadProgress": "Atsisiunčiama… {{percent}}%",
-      "downloadFailed": "Atsisiuntimas nebaigtas. Patikrinkite ryšį ir laisvą vietą saugykloje, tada bandykite dar kartą."
+      "downloadFailed": "Atsisiuntimas nebaigtas. Patikrinkite ryšį ir laisvą vietą saugykloje, tada bandykite dar kartą.",
+      "cannotUse": "Šis modelis nepalaiko: {{items}}."
     },
     "reasoningEffort": {
       "modelFlag": "Šis modelis palaiko mąstymo intensyvumą"

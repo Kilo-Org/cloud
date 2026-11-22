@@ -4178,7 +4178,8 @@
       "download": "Muat turun model pada peranti",
       "downloading": "Memuat turun…",
       "downloadProgress": "Memuat turun… {{percent}}%",
-      "downloadFailed": "Muat turun tidak selesai. Semak sambungan dan ruang storan kosong anda, kemudian cuba lagi."
+      "downloadFailed": "Muat turun tidak selesai. Semak sambungan dan ruang storan kosong anda, kemudian cuba lagi.",
+      "cannotUse": "Model ini tidak boleh menggunakan: {{items}}."
     },
     "reasoningEffort": {
       "modelFlag": "Model ini menyokong tahap pemikiran"

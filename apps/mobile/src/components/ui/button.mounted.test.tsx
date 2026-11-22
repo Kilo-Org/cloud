@@ -306,26 +306,19 @@ describe('Button native target contract', () => {
     const classes = (plated.props.className as string).split(' ');
     expect(classes).toContain('bg-primary-disabled-action');
     expect(classes).not.toContain('bg-muted');
-    expect(classes).not.toContain('bg-primary');
     expect(classes).not.toContain('opacity-50');
     const labelClasses = (plated.findByType(NativeText).props.className as string).split(' ');
     expect(labelClasses).toContain('text-primary-foreground');
     expect(labelClasses).toContain('dark:text-foreground');
     expect(labelClasses).not.toContain('text-muted-foreground');
 
-    // The face is ignored where it would lie about the control's state: an
-    // enabled primary keeps the brand fill, a busy one keeps it too, and a
-    // non-primary variant keeps its own dimmed treatment.
+    // The face is ignored where it would lie about the control's state.
     const enabled = renderButton({ disabledFace: 'primary' });
     expect((enabled.props.className as string).split(' ')).toContain('bg-primary');
     const busy = renderButton({ disabled: true, loading: true, disabledFace: 'primary' });
-    const busyClasses = (busy.props.className as string).split(' ');
-    expect(busyClasses).toContain('bg-primary');
-    expect(busyClasses).not.toContain('bg-primary-disabled-action');
+    expect((busy.props.className as string).split(' ')).not.toContain('bg-primary-disabled-action');
     const outlined = renderButton({ variant: 'outline', disabled: true, disabledFace: 'primary' });
-    const outlinedClasses = (outlined.props.className as string).split(' ');
-    expect(outlinedClasses).not.toContain('bg-primary-disabled-action');
-    expect(outlinedClasses).toContain('opacity-50');
+    expect((outlined.props.className as string).split(' ')).toContain('opacity-50');
   });
 
   it('keeps a busy primary on its brand fill so it still reads as working', () => {

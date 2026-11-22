@@ -359,16 +359,16 @@ function Button({
     });
   }
   // oxlint-enable anti-slop/no-runtime-typeof
+  // The disabled faces replace the whole label class set rather than overriding
+  // the variant's ink, so no two colour utilities compete.
+  let labelClass = buttonTextVariants({ variant, size });
+  if (isPlatedDisabled) {
+    labelClass = PLATED_DISABLED_LABEL_CLASS;
+  } else if (isMutedDisabled) {
+    labelClass = MUTED_DISABLED_LABEL_CLASS;
+  }
   return (
-    <TextClassContext.Provider
-      value={
-        isPlatedDisabled
-          ? PLATED_DISABLED_LABEL_CLASS
-          : isMutedDisabled
-            ? MUTED_DISABLED_LABEL_CLASS
-            : buttonTextVariants({ variant, size })
-      }
-    >
+    <TextClassContext.Provider value={labelClass}>
       <Pressable
         className={cn(
           isDimmed && 'opacity-50',

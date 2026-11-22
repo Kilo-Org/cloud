@@ -4945,7 +4945,9 @@
     "unavailableTitle": "使用状況を利用できません",
     "unavailableDescription": "このワークスペースでは使用状況が設定されていません。ここに使用状況が表示されるはずの場合は、サポートにお問い合わせください。",
     "orgSelfNotice": "この組織でのあなた自身の使用状況を表示しています。",
-    "viewDetails": "使用状況の詳細を表示"
+    "viewDetails": "使用状況の詳細を表示",
+    "orgSelfEntryTitle": "あなたの使用状況",
+    "orgSelfEntrySubtitle": "この組織でのあなた自身の使用状況"
   },
   "integrations": {
     "title": "連携",

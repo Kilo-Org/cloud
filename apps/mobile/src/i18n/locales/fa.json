@@ -4945,7 +4945,9 @@
     "unavailableTitle": "مصرف در دسترس نیست",
     "unavailableDescription": "مصرف برای این فضای کار تنظیم نشده است. اگر انتظار دارید مصرف را اینجا ببینید، با پشتیبانی تماس بگیرید.",
     "orgSelfNotice": "شما مصرف خودتان در این سازمان را می‌بینید.",
-    "viewDetails": "مشاهده جزئیات مصرف"
+    "viewDetails": "مشاهده جزئیات مصرف",
+    "orgSelfEntryTitle": "مصرف شما",
+    "orgSelfEntrySubtitle": "مصرف خودتان در این سازمان"
   },
   "integrations": {
     "title": "یکپارچه‌سازی‌ها",

@@ -446,6 +446,60 @@ describe('Organization hub card', () => {
   });
 });
 
+describe('Organization hub usage entry', () => {
+  it('hands the usage card the organization entry point for a money role', async () => {
+    boundary.role = 'owner';
+
+    const { renderer, unmount } = await renderHub();
+
+    const [card] = renderer.root.findAllByType('OrgUsageStats');
+    if (card === undefined) {
+      throw new Error('the hub shows the usage card');
+    }
+    const onPress = card.props.onPress as (() => void) | undefined;
+    if (onPress === undefined) {
+      throw new Error('a money role reaches the organization usage screen from the card');
+    }
+    act(() => {
+      onPress();
+    });
+    expect(routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/organization/usage');
+    unmount();
+  });
+
+  it('leaves the usage card informational for a role whose usage screen is self-scoped', async () => {
+    boundary.role = 'member';
+
+    const { renderer, unmount } = await renderHub();
+
+    // The tiles stay organization-wide totals, so the grid never opens a screen
+    // that would answer with the viewer's own numbers alone.
+    const [card] = renderer.root.findAllByType('OrgUsageStats');
+    if (card === undefined) {
+      throw new Error('the hub shows the usage card');
+    }
+    expect(card.props.onPress).toBeUndefined();
+    unmount();
+  });
+
+  it('names the usage destination row for the scope a member reads', async () => {
+    boundary.role = 'member';
+
+    const { renderer, unmount } = await renderHub();
+
+    const rows = renderer.root.findAllByType('ConfigureRow');
+    const row = rows.find(node => node.props.title === i18n.t('usage.orgSelfEntryTitle'));
+    if (row === undefined) {
+      throw new Error('the hub shows the self-scoped usage row');
+    }
+    expect(row.props.subtitle).toBe(i18n.t('usage.orgSelfEntrySubtitle'));
+    expect(
+      rows.some(node => node.props.title === i18n.t('organization.settingsOnWeb.usageDetails'))
+    ).toBe(false);
+    unmount();
+  });
+});
+
 describe('Organization hub plan', () => {
   const planRow = (renderer: TestRenderer.ReactTestRenderer) =>
     renderer.root

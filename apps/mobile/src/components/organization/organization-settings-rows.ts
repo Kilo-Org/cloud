@@ -45,15 +45,16 @@ import { WEB_BASE_URL } from '@/lib/config';
  * Usage, the audit log, request logs, Model Access, guardrails, custom modes,
  * groups and BYOK are the areas the app reads and writes itself, so their rows
  * open the app's own screens instead of a page. Usage is visible to every
- * member, as on the web sidebar; the audit log's gate is the one its procedure
- * applies (billing role and the enterprise plan); groups take the enterprise
- * plan they are sold with; request logs and BYOK take the sidebar's billing-role
- * gate, which their procedures apply too; Model Access takes the sidebar's
- * billing-role gate and the enterprise plan its page refuses below; guardrails
- * take `owner`/`admin` and the organization's Kilo Encrypt setting, which the
- * guardrails procedure enforces; custom modes take no gate, which is the gate
- * their page has. BYOK additionally opens the app's own provider-keys screen
- * with the organization's scope.
+ * member, as on the web sidebar, and its row names the viewer's own usage for a
+ * role the server answers self-scoped; the audit log's gate is the one its
+ * procedure applies (billing role and the enterprise plan); groups take the
+ * enterprise plan they are sold with; request logs and BYOK take the sidebar's
+ * billing-role gate, which their procedures apply too; Model Access takes the
+ * sidebar's billing-role gate and the enterprise plan its page refuses below;
+ * guardrails take `owner`/`admin` and the organization's Kilo Encrypt setting,
+ * which the guardrails procedure enforces; custom modes take no gate, which is
+ * the gate their page has. BYOK additionally opens the app's own provider-keys
+ * screen with the organization's scope.
  *
  * Three sidebar destinations have no row here at all: `sub-organizations` and
  * its `distribute-funds` section are a parent-only administration area this app
@@ -97,6 +98,8 @@ type OrgInAppSettingsArea =
 export type OrgInAppSettingsRow = Readonly<{
   area: OrgInAppSettingsArea;
   title: string;
+  /** Names the scope the destination reads, where the role changes it. */
+  subtitle?: string;
   icon: LucideIcon;
   /** The in-app screen that shows the area. */
   href: Href;
@@ -267,6 +270,24 @@ const IN_APP_TITLE_KEYS = {
 } satisfies Record<OrgInAppSettingsArea, string>;
 
 /**
+ * The usage screen reads the whole organization for a billing role and only the
+ * viewer's own usage for every other role, so the row that opens it is named for
+ * the scope that role reads. Every other area has one name for every role.
+ */
+function titleForArea(
+  area: OrgInAppSettingsArea,
+  gate: OrgInAppSettingsGate
+): Pick<OrgInAppSettingsRow, 'title' | 'subtitle'> {
+  if (area === 'usageDetails' && !canManageOrganizationBilling(gate.role)) {
+    return {
+      title: i18n.t('usage.orgSelfEntryTitle'),
+      subtitle: i18n.t('usage.orgSelfEntrySubtitle'),
+    };
+  }
+  return { title: i18n.t(IN_APP_TITLE_KEYS[area]) };
+}
+
+/**
  * The rows this plan may open, in the order the section shows them. A row whose
  * gate fails is absent rather than disabled: the web page would refuse it too,
  * and a control that cannot work is not a control.
@@ -300,10 +321,14 @@ export function visibleInAppSettingsRows(
   gate: OrgInAppSettingsGate,
   organizationId: string
 ): readonly OrgInAppSettingsRow[] {
-  return IN_APP_ROW_SPECS.filter(spec => spec.visible(gate)).map(spec => ({
-    area: spec.area,
-    title: i18n.t(IN_APP_TITLE_KEYS[spec.area]),
-    icon: spec.icon,
-    href: spec.href(organizationId),
-  }));
+  return IN_APP_ROW_SPECS.filter(spec => spec.visible(gate)).map(spec => {
+    const { title, subtitle } = titleForArea(spec.area, gate);
+    return {
+      area: spec.area,
+      title,
+      subtitle,
+      icon: spec.icon,
+      href: spec.href(organizationId),
+    };
+  });
 }

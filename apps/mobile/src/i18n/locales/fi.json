@@ -4945,7 +4945,9 @@
     "unavailableTitle": "Käyttö ei ole saatavilla",
     "unavailableDescription": "Käyttöä ei ole määritetty tälle työtilalle. Ota yhteyttä tukeen, jos käytön pitäisi näkyä tässä.",
     "orgSelfNotice": "Näet oman käyttösi tässä organisaatiossa.",
-    "viewDetails": "Näytä käytön tiedot"
+    "viewDetails": "Näytä käytön tiedot",
+    "orgSelfEntryTitle": "Sinun käyttösi",
+    "orgSelfEntrySubtitle": "Oma käyttösi tässä organisaatiossa."
   },
   "integrations": {
     "title": "Integraatiot",

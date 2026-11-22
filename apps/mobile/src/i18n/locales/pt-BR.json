@@ -5133,7 +5133,9 @@
     "unavailableTitle": "Uso indisponível",
     "unavailableDescription": "O uso não está configurado para este workspace. Entre em contato com o suporte se você espera ver o uso aqui.",
     "orgSelfNotice": "Você está vendo seu próprio uso nesta organização.",
-    "viewDetails": "Ver detalhes de uso"
+    "viewDetails": "Ver detalhes de uso",
+    "orgSelfEntryTitle": "Seu uso",
+    "orgSelfEntrySubtitle": "Seu próprio uso nesta organização."
   },
   "integrations": {
     "title": "Integrações",

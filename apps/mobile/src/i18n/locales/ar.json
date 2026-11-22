@@ -5321,7 +5321,9 @@
     "unavailableTitle": "الاستخدام غير متاح",
     "unavailableDescription": "لم يتم إعداد الاستخدام لمساحة العمل هذه. تواصل مع الدعم إذا كنت تتوقع ظهور الاستخدام هنا.",
     "orgSelfNotice": "أنت تشاهد استخدامك الخاص في هذه المؤسسة.",
-    "viewDetails": "عرض تفاصيل الاستخدام"
+    "viewDetails": "عرض تفاصيل الاستخدام",
+    "orgSelfEntryTitle": "استخدامك",
+    "orgSelfEntrySubtitle": "استخدامك الخاص في هذه المؤسسة"
   },
   "integrations": {
     "title": "التكاملات",

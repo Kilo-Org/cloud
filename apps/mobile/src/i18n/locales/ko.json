@@ -4945,7 +4945,9 @@
     "unavailableTitle": "사용량을 사용할 수 없습니다",
     "unavailableDescription": "이 워크스페이스에는 사용량이 설정되어 있지 않습니다. 여기에 사용량이 표시되어야 한다면 지원팀에 문의하세요.",
     "orgSelfNotice": "이 조직에서 내 사용량을 보고 있습니다.",
-    "viewDetails": "사용량 세부 정보 보기"
+    "viewDetails": "사용량 세부 정보 보기",
+    "orgSelfEntryTitle": "내 사용량",
+    "orgSelfEntrySubtitle": "이 조직에서의 내 사용량"
   },
   "integrations": {
     "title": "연동",

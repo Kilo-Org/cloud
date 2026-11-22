@@ -4945,7 +4945,9 @@
     "unavailableTitle": "Användning är inte tillgänglig",
     "unavailableDescription": "Användning är inte konfigurerad för den här arbetsytan. Kontakta supporten om du förväntar dig att se användning här.",
     "orgSelfNotice": "Du ser din egen användning i den här organisationen.",
-    "viewDetails": "Visa användningsdetaljer"
+    "viewDetails": "Visa användningsdetaljer",
+    "orgSelfEntryTitle": "Din användning",
+    "orgSelfEntrySubtitle": "Din egen användning i den här organisationen"
   },
   "integrations": {
     "title": "Integrationer",

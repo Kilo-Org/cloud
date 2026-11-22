@@ -4945,7 +4945,9 @@
     "unavailableTitle": "Penggunaan tidak tersedia",
     "unavailableDescription": "Penggunaan belum disiapkan untuk workspace ini. Hubungi dukungan jika Anda berharap melihat penggunaan di sini.",
     "orgSelfNotice": "Anda melihat penggunaan Anda sendiri di organisasi ini.",
-    "viewDetails": "Lihat detail penggunaan"
+    "viewDetails": "Lihat detail penggunaan",
+    "orgSelfEntryTitle": "Penggunaan Anda",
+    "orgSelfEntrySubtitle": "Penggunaan Anda sendiri di organisasi ini."
   },
   "integrations": {
     "title": "Integrasi",

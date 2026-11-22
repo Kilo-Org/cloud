@@ -35,7 +35,7 @@ vi.mock('@/lib/format', () => ({
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable' }));
 
 beforeEach(() => {
   query.data = undefined;
@@ -113,6 +113,51 @@ describe('Organization usage availability', () => {
     // behind the number in a right-to-left paragraph.
     expect(text).toEqual(expect.arrayContaining(['\u2066$2\u2069', '12', '34', '56']));
     expect(renderer.root.findAllByType('Button')).toHaveLength(0);
+    unmount();
+  });
+
+  it('makes the whole grid one button for a role the usage screen answers organization-wide', async () => {
+    query.data = {
+      totalCost: 2_000_000,
+      totalRequestCount: 12,
+      totalInputTokens: 34,
+      totalOutputTokens: 56,
+    };
+    const onPress = vi.fn<() => void>();
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(OrgUsageStats, { organizationId: 'org-1', onPress })
+    );
+
+    const grid = renderer.root.findAllByType('Pressable');
+    expect(grid).toHaveLength(1);
+    const [button] = grid;
+    if (button === undefined) {
+      throw new Error('the grid is not one pressable');
+    }
+    expect(button.props.accessibilityRole).toBe('button');
+    expect(button.props.accessibilityHint).toBe(i18n.t('usage.viewDetails'));
+    expect(button.findAllByType('Text').length).toBeGreaterThan(0);
+    act(() => {
+      (button.props.onPress as () => void)();
+    });
+    expect(onPress).toHaveBeenCalledOnce();
+    unmount();
+  });
+
+  it('leaves the grid informational for a role the usage screen answers self-scoped', async () => {
+    query.data = {
+      totalCost: 2_000_000,
+      totalRequestCount: 12,
+      totalInputTokens: 34,
+      totalOutputTokens: 56,
+    };
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(OrgUsageStats, { organizationId: 'org-1' })
+    );
+
+    expect(renderer.root.findAllByType('Pressable')).toHaveLength(0);
+    const text = renderer.root.findAllByType('Text').map(node => node.props.children);
+    expect(text).toEqual(expect.arrayContaining(['\u2066$2\u2069', '12', '34', '56']));
     unmount();
   });
 });

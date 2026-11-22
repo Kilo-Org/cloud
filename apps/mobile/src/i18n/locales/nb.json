@@ -4945,7 +4945,9 @@
     "unavailableTitle": "Forbruk er ikke tilgjengelig",
     "unavailableDescription": "Forbruk er ikke satt opp for dette arbeidsområdet. Kontakt brukerstøtte hvis du forventer å se forbruk her.",
     "orgSelfNotice": "Du ser ditt eget forbruk i denne organisasjonen.",
-    "viewDetails": "Vis forbruksdetaljer"
+    "viewDetails": "Vis forbruksdetaljer",
+    "orgSelfEntryTitle": "Ditt forbruk",
+    "orgSelfEntrySubtitle": "Ditt eget forbruk i denne organisasjonen"
   },
   "integrations": {
     "title": "Integrasjoner",

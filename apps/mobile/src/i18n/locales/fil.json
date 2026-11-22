@@ -4945,7 +4945,9 @@
     "unavailableTitle": "Hindi available ang paggamit",
     "unavailableDescription": "Hindi pa naisasaayos ang paggamit para sa workspace na ito. Makipag-ugnayan sa suporta kung inaasahan mong may makikitang paggamit dito.",
     "orgSelfNotice": "Nakikita mo ang sarili mong paggamit sa organisasyong ito.",
-    "viewDetails": "Tingnan ang detalye ng paggamit"
+    "viewDetails": "Tingnan ang detalye ng paggamit",
+    "orgSelfEntryTitle": "Paggamit mo",
+    "orgSelfEntrySubtitle": "Sarili mong paggamit sa organisasyong ito"
   },
   "integrations": {
     "title": "Mga Integration",

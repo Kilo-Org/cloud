@@ -4945,7 +4945,9 @@
     "unavailableTitle": "Ìlò kò ṣeé rí",
     "unavailableDescription": "A kò tíì ṣètò ìlò fún ibi-iṣẹ́ yìí. Kàn sí ẹgbẹ́ àtìlẹ́yìn tí o bá ń retí láti rí ìlò níbí.",
     "orgSelfNotice": "Ìlò tìrẹ nínú àjọ yìí ni ò ń rí.",
-    "viewDetails": "Wo àlàyé ìlò"
+    "viewDetails": "Wo àlàyé ìlò",
+    "orgSelfEntryTitle": "Ìlò tìrẹ",
+    "orgSelfEntrySubtitle": "Ìlò tìrẹ nínú àjọ yìí"
   },
   "integrations": {
     "title": "Àwọn Ìsopọ̀",

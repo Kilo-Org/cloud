@@ -4945,7 +4945,9 @@
     "unavailableTitle": "ਵਰਤੋਂ ਉਪਲਬਧ ਨਹੀਂ",
     "unavailableDescription": "ਇਸ ਵਰਕਸਪੇਸ ਲਈ ਵਰਤੋਂ ਦੀ ਸੰਰਚਨਾ ਨਹੀਂ ਕੀਤੀ ਗਈ। ਜੇ ਤੁਸੀਂ ਇੱਥੇ ਵਰਤੋਂ ਵੇਖਣ ਦੀ ਉਮੀਦ ਕਰਦੇ ਹੋ ਤਾਂ ਸਹਾਇਤਾ ਨਾਲ ਸੰਪਰਕ ਕਰੋ।",
     "orgSelfNotice": "ਤੁਸੀਂ ਇਸ ਸੰਗਠਨ ਵਿੱਚ ਆਪਣੀ ਵਰਤੋਂ ਦੇਖ ਰਹੇ ਹੋ।",
-    "viewDetails": "ਵਰਤੋਂ ਦੇ ਵੇਰਵੇ ਦੇਖੋ"
+    "viewDetails": "ਵਰਤੋਂ ਦੇ ਵੇਰਵੇ ਦੇਖੋ",
+    "orgSelfEntryTitle": "ਤੁਹਾਡੀ ਵਰਤੋਂ",
+    "orgSelfEntrySubtitle": "ਇਸ ਸੰਗਠਨ ਵਿੱਚ ਆਪਣੀ ਵਰਤੋਂ"
   },
   "integrations": {
     "title": "ਇੰਟੀਗ੍ਰੇਸ਼ਨ",

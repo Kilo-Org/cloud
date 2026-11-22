@@ -5039,7 +5039,9 @@
     "unavailableTitle": "Ús no disponible",
     "unavailableDescription": "L'ús no està configurat per a aquest espai de treball. Contacta amb el servei d'assistència si esperes veure l'ús aquí.",
     "orgSelfNotice": "Estàs veient el teu propi ús en aquesta organització.",
-    "viewDetails": "Mostra els detalls d'ús"
+    "viewDetails": "Mostra els detalls d'ús",
+    "orgSelfEntryTitle": "El teu ús",
+    "orgSelfEntrySubtitle": "El teu propi ús en aquesta organització."
   },
   "integrations": {
     "title": "Integracions",

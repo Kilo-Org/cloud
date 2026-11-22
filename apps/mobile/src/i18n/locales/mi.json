@@ -4945,7 +4945,9 @@
     "unavailableTitle": "Kāore te whakamahinga i te wātea",
     "unavailableDescription": "Kāore anō te whakamahinga kia whakaritea mō tēnei wāhi mahi. Whakapā atu ki te tautoko mēnā e tūmanako ana koe ki te kite i te whakamahinga i konei.",
     "orgSelfNotice": "Ko tāu ake whakamahinga i tēnei whakahaere e kitea ana e koe.",
-    "viewDetails": "Tirohia ngā taipitopito whakamahinga"
+    "viewDetails": "Tirohia ngā taipitopito whakamahinga",
+    "orgSelfEntryTitle": "Tāu whakamahinga",
+    "orgSelfEntrySubtitle": "Ko tāu ake whakamahinga i tēnei whakahaere"
   },
   "integrations": {
     "title": "Ngā Tūhononga",

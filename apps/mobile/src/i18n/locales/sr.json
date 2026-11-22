@@ -5039,7 +5039,9 @@
     "unavailableTitle": "Korišćenje nije dostupno",
     "unavailableDescription": "Korišćenje nije podešeno za ovaj radni prostor. Obratite se podršci ako ovde očekujete podatke o korišćenju.",
     "orgSelfNotice": "Vidite sopstveno korišćenje u ovoj organizaciji.",
-    "viewDetails": "Prikaži detalje korišćenja"
+    "viewDetails": "Prikaži detalje korišćenja",
+    "orgSelfEntryTitle": "Vaše korišćenje",
+    "orgSelfEntrySubtitle": "Vaše sopstveno korišćenje u ovoj organizaciji."
   },
   "integrations": {
     "title": "Integracije",

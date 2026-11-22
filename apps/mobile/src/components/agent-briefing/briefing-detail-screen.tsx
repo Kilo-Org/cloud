@@ -114,17 +114,26 @@ export function BriefingDetailScreen() {
     access.canRead(query.data.context.organizationId)
       ? query.data
       : undefined;
+  const announcedFailureFor = useRef<string | null>(null);
   const read = useMutation(
     trpc.agentBriefing.read.mutationOptions({
-      onError: () => {
+      onError: (_error, variables) => {
+        // The mark retries on a later payload, so a brief whose summary is still
+        // generating polls and can fail more than once; the person hears the
+        // failure once per report in this visit.
+        if (announcedFailureFor.current === variables.reportId) {
+          return;
+        }
+        announcedFailureFor.current = variables.reportId;
         announcingToast.error(t('agentBriefing.readMarkFailed'));
       },
     })
   );
-  // One announced attempt per fetched payload. A keyed-by-report-id attempt made
-  // a failure sticky for the rest of the visit; keying by the payload generation
-  // reports a failed mark once and tries again on the next fetch or the next
-  // visit, without a retry timer or a counter that could loop.
+  // One attempt per fetched payload. A keyed-by-report-id attempt made a failure
+  // sticky for the rest of the visit; keying by the payload generation tries the
+  // mark again on the next fetch or the next visit, without a retry timer or a
+  // counter that could loop. The failure itself is announced once per report, so
+  // a poll while the summary is still generating does not repeat it.
   const attemptedAt = useRef<number | null>(null);
   useEffect(() => {
     if (!report || offline || report.readAt || attemptedAt.current === query.dataUpdatedAt) {

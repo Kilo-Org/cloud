@@ -17,7 +17,9 @@ const state = vi.hoisted(() => ({
 }));
 const readMark = vi.hoisted(() => ({
   mutate: vi.fn(),
-  options: undefined as undefined | { onError?: (error: Error) => void },
+  options: undefined as
+    | undefined
+    | { onError?: (error: Error, variables: { reportId: string }) => void },
 }));
 const announce = vi.hoisted(() => ({ error: vi.fn() }));
 const sonner = vi.hoisted(() => ({ error: vi.fn() }));
@@ -255,11 +257,32 @@ const unreadReport: BriefingReport = { ...report, readAt: null };
 it('announces one localized failure when the read mark fails', () => {
   state.report = unreadReport;
   mount();
-  readMark.options?.onError?.(new Error('read mark failed'));
+  readMark.options?.onError?.(new Error('read mark failed'), { reportId: 'report-1' });
   expect(announce.error).toHaveBeenCalledTimes(1);
   expect(announce.error).toHaveBeenCalledWith('agentBriefing.readMarkFailed');
   expect(announce.error).not.toHaveBeenCalledWith('common.somethingWentWrong');
   expect(sonner.error).not.toHaveBeenCalled();
+});
+
+it('announces a failing mark once per report in the visit', () => {
+  state.report = unreadReport;
+  mount();
+  readMark.options?.onError?.(new Error('first failure'), { reportId: 'report-1' });
+  readMark.options?.onError?.(new Error('second failure'), { reportId: 'report-1' });
+  expect(announce.error).toHaveBeenCalledTimes(1);
+});
+
+it('does not announce the same report again after a later payload fails', () => {
+  state.report = unreadReport;
+  const mounted = mount();
+  readMark.options?.onError?.(new Error('first failure'), { reportId: 'report-1' });
+  state.dataUpdatedAt = 2;
+  act(() => {
+    mounted.update(createElement(BriefingDetailScreen));
+  });
+  expect(readMark.mutate).toHaveBeenCalledTimes(2);
+  readMark.options?.onError?.(new Error('polled failure'), { reportId: 'report-1' });
+  expect(announce.error).toHaveBeenCalledTimes(1);
 });
 
 it('marks an unread report once per mount and payload', () => {

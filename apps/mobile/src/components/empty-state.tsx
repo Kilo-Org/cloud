@@ -251,9 +251,9 @@ export function StateAction({
   // busy) — so its mark must take that same ink. The muted ink is only for the
   // disabled face, whose fill is the palette's muted surface; on the brand fill
   // it measures about 1.4:1 and the spinner all but disappears. The secondary
-  // face paints `--secondary-fill` instead, where the enabled mark is the
-  // regular foreground rather than the brand fill's own contrasting ink.
-  const enabledMark = secondary ? colors.foreground : colors.primaryForeground;
+  // face paints the label in its own ink, so the mark follows
+  // `BUTTON_INK.secondary.mark` and reads the way that variant's label does.
+  const enabledMark = secondary ? colors.secondaryForeground : colors.primaryForeground;
   const markColor = disabled === true && !busy ? mutedDisabledInk : enabledMark;
   return (
     <Button

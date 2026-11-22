@@ -326,6 +326,22 @@ function GitHubIntegrationDetailsContent({
   // every waiting surface. The installation card below keeps describing the row
   // it displays.
   const isPendingRequest = isPendingApproval || isBlockedPending;
+  // Each pending state hands the app a different outcome: a retry, the removal
+  // remedy for an organization whose slot is already taken, or the approval
+  // wait. The blocked state must not send the app to the approval wait, which
+  // names no remedy.
+  const pendingReturnQuery =
+    pendingRequestState === 'start_again'
+      ? 'error=github_installation_restart'
+      : pendingRequestState === 'blocked_by_existing_installation'
+        ? 'error=github_installation_blocked'
+        : 'github_pending_approval=true';
+  const pendingReturnCta =
+    pendingRequestState === 'start_again'
+      ? 'Try again'
+      : pendingRequestState === 'blocked_by_existing_installation'
+        ? 'Back'
+        : 'Done';
 
   const uninstallApp = useMutation(
     trpc.githubApps.uninstallApp.mutationOptions({
@@ -1073,15 +1089,9 @@ function GitHubIntegrationDetailsContent({
                   </div>
                   <Button asChild variant="outline" className="mt-2">
                     <Link
-                      href={buildAppReturnHref(
-                        pendingRequestState === 'start_again'
-                          ? 'error=github_installation_restart'
-                          : 'github_pending_approval=true',
-                        organizationId,
-                        appBasePath
-                      )}
+                      href={buildAppReturnHref(pendingReturnQuery, organizationId, appBasePath)}
                     >
-                      {pendingRequestState === 'start_again' ? 'Try again' : 'Done'}
+                      {pendingReturnCta}
                     </Link>
                   </Button>
                 </>

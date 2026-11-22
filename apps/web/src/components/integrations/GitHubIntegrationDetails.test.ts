@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import {
   buildAppReturnOutcomeView,
   INSTALLATION_LISTING_TOO_LARGE_MESSAGE,
+  PENDING_REQUEST_EXPLANATION,
 } from './github-app-outcome';
 import {
   buildGitHubManagementInput,
@@ -378,6 +379,9 @@ describe('GitHubIntegrationDetails pending approval state', () => {
 
     expect(html).toContain('Existing installation blocks this request');
     expect(html).toContain('already has a GitHub installation');
+    expect(html).toContain('error=github_installation_blocked');
+    expect(html).toContain('>Back<');
+    expect(html).not.toContain('github_pending_approval=true');
     expect(html).not.toContain('GitHub App installed');
     expect(html).not.toContain('Awaiting admin approval');
     expect(html).not.toContain('Open GitHub setup');
@@ -432,6 +436,7 @@ describe('GitHubIntegrationDetails pending approval state', () => {
 
     expect(html).toContain('github_pending_approval=true');
     expect(html).not.toContain('github_installation_restart');
+    expect(html).not.toContain('github_installation_blocked');
   });
 });
 
@@ -485,6 +490,30 @@ describe('GitHubIntegrationDetails fromApp outcome CTA behavior', () => {
     expect(view.description).not.toContain('another installation was connected');
     expect(view.href).toBe(
       '/cloud/sessions?error=github_installation_restart&organizationId=org-123'
+    );
+  });
+
+  it('blocked existing installation: Back with the removal remedy, never an approval wait', () => {
+    expect(buildAppReturnOutcomeView({ error: 'github_installation_blocked' })).toEqual({
+      kind: 'blocked',
+      title: 'Existing installation blocks this request',
+      description: PENDING_REQUEST_EXPLANATION.blocked_by_existing_installation,
+      cta: 'Back',
+      href: '/cloud/sessions?error=github_installation_blocked',
+    });
+  });
+
+  it('blocked existing installation copy names the removal remedy, not an approval wait', () => {
+    const view = buildAppReturnOutcomeView({
+      error: 'github_installation_blocked',
+      organizationId: 'org-123',
+    });
+    expect(view.description).not.toBe(
+      'An organization admin must approve the installation request.'
+    );
+    expect(view.description).toBe(PENDING_REQUEST_EXPLANATION.blocked_by_existing_installation);
+    expect(view.href).toBe(
+      '/cloud/sessions?error=github_installation_blocked&organizationId=org-123'
     );
   });
 

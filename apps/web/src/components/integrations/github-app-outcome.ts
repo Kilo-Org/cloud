@@ -99,6 +99,10 @@ export function buildAppReturnOutcomeView(input: {
     input.error === 'incompatible_workflow' ||
     input.error === 'installation_unavailable' ||
     input.error === 'multiple_installations_disabled' ||
+    // A retry from the app meets the same installation-slot refusal, so the
+    // card names the removal remedy instead of offering a press that fails
+    // the same way.
+    input.error === 'github_installation_blocked' ||
     // The start route refused to mint an install state for this reader's
     // organization role, so no retry can mint one either; the card names who
     // can start it instead of offering a press that fails the same way.
@@ -112,36 +116,40 @@ export function buildAppReturnOutcomeView(input: {
     ? 'GitHub App installed'
     : isPending
       ? 'Awaiting admin approval'
-      : isNonRetryable
-        ? 'Cannot complete installation'
-        : input.error === 'github_installation_restart'
-          ? 'Start the connection again'
-          : 'Installation failed';
+      : input.error === 'github_installation_blocked'
+        ? 'Existing installation blocks this request'
+        : isNonRetryable
+          ? 'Cannot complete installation'
+          : input.error === 'github_installation_restart'
+            ? 'Start the connection again'
+            : 'Installation failed';
   const description = isSuccess
     ? 'Your repositories are now connected.'
     : isPending
       ? 'An organization admin must approve the installation request.'
       : input.error === 'not_installation_admin'
         ? 'Only a GitHub admin of that account can connect it. Ask an organization admin to install Kilo.'
-        : input.error === 'installation_already_claimed'
-          ? 'That GitHub installation is already connected to another Kilo account. Disconnect it there first.'
-          : input.error === 'shared_installation_disabled'
-            ? 'That GitHub installation is connected elsewhere, and shared access is not approved for this organization.'
-            : input.error === 'incompatible_workflow'
-              ? 'That GitHub installation has an existing workflow that is not yet compatible with shared access.'
-              : input.error === 'multiple_installations_disabled'
-                ? 'This Kilo organization can currently connect only one GitHub organization.'
-                : input.error === 'installation_start_refused'
-                  ? 'This installation could not be started from this account. An organization owner or admin can start it; if the organization already holds its installation, they must remove that installation in Kilo first.'
-                  : input.error === 'installation_unavailable'
-                    ? INSTALLATION_UNAVAILABLE_MESSAGE
-                    : input.error === 'github_installation_restart'
-                      ? 'This request is still pending. Start the connection again to complete it.'
-                      : input.error === 'install_state_user_mismatch'
-                        ? 'This connection was started from the Kilo App signed in as a different account. Sign in to the web with that account, or start again from the app.'
-                        : input.error === 'installation_listing_too_large'
-                          ? INSTALLATION_LISTING_TOO_LARGE_MESSAGE
-                          : 'The installation did not complete. Try again or return to the Kilo App.';
+        : input.error === 'github_installation_blocked'
+          ? PENDING_REQUEST_EXPLANATION.blocked_by_existing_installation
+          : input.error === 'installation_already_claimed'
+            ? 'That GitHub installation is already connected to another Kilo account. Disconnect it there first.'
+            : input.error === 'shared_installation_disabled'
+              ? 'That GitHub installation is connected elsewhere, and shared access is not approved for this organization.'
+              : input.error === 'incompatible_workflow'
+                ? 'That GitHub installation has an existing workflow that is not yet compatible with shared access.'
+                : input.error === 'multiple_installations_disabled'
+                  ? 'This Kilo organization can currently connect only one GitHub organization.'
+                  : input.error === 'installation_start_refused'
+                    ? 'This installation could not be started from this account. An organization owner or admin can start it; if the organization already holds its installation, they must remove that installation in Kilo first.'
+                    : input.error === 'installation_unavailable'
+                      ? INSTALLATION_UNAVAILABLE_MESSAGE
+                      : input.error === 'github_installation_restart'
+                        ? 'This request is still pending. Start the connection again to complete it.'
+                        : input.error === 'install_state_user_mismatch'
+                          ? 'This connection was started from the Kilo App signed in as a different account. Sign in to the web with that account, or start again from the app.'
+                          : input.error === 'installation_listing_too_large'
+                            ? INSTALLATION_LISTING_TOO_LARGE_MESSAGE
+                            : 'The installation did not complete. Try again or return to the Kilo App.';
   const cta = isSuccess ? 'Continue' : isPending ? 'Done' : isNonRetryable ? 'Back' : 'Try again';
 
   return {

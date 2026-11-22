@@ -221,6 +221,7 @@ describe('buildGitHubInstallOutcomeAlert (C13 outcome states)', () => {
       'installation_already_claimed',
       'installation_unavailable',
       'multiple_installations_disabled',
+      'github_installation_blocked',
     ] as const) {
       const alert = buildGitHubInstallOutcomeAlert({ kind: 'error', code }, () => undefined);
       expect(alert?.buttons).toEqual([{ text: 'Back' }]);
@@ -249,6 +250,16 @@ describe('buildGitHubInstallOutcomeAlert (C13 outcome states)', () => {
     expect(
       buildGitHubInstallOutcomeAlert(
         { kind: 'error', code: 'multiple_installations_disabled' },
+        () => undefined
+      )
+    ).toEqual({
+      title: 'Cannot complete installation',
+      message: 'This Kilo organization can currently connect only one GitHub organization.',
+      buttons: [{ text: 'Back' }],
+    });
+    expect(
+      buildGitHubInstallOutcomeAlert(
+        { kind: 'error', code: 'github_installation_blocked' },
         () => undefined
       )
     ).toEqual({

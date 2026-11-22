@@ -15,7 +15,7 @@ const routerBack = vi.hoisted(() => vi.fn());
 const routerReplace = vi.hoisted(() => vi.fn());
 // The hand-off's router. A literal `router.replace` swaps the tour and the
 // new-session page in one native-stack commit, which crashes Android Fabric
-// (KILO-APP-25), so the shell must route the hand-off through the stack-safe
+//, so the shell must route the hand-off through the stack-safe
 // replace instead.
 const stackSafeReplace = vi.hoisted(() => vi.fn());
 // Models the navigator's own history: false means the tour is the app's first
@@ -349,15 +349,19 @@ describe('TourScreen', () => {
 
     expect(recordCompleted).toHaveBeenCalledTimes(1);
     expect(routerBack).not.toHaveBeenCalled();
-    expect(routerReplace).toHaveBeenCalledTimes(1);
-    expect(routerReplace).toHaveBeenCalledWith(HOME_TAB_ROOT);
+    // The dismiss swap goes through the stack-safe replace its caller passes
+    // in; a literal `router.replace` there is the Android Fabric `addViewAt`
+    // crash.
+    expect(stackSafeReplace).toHaveBeenCalledTimes(1);
+    expect(stackSafeReplace).toHaveBeenCalledWith(HOME_TAB_ROOT);
+    expect(routerReplace).not.toHaveBeenCalled();
 
     // Hardware Back dismisses through the same guarded path.
     act(() => {
       backHandler.press();
     });
     expect(routerBack).not.toHaveBeenCalled();
-    expect(routerReplace).toHaveBeenCalledTimes(2);
+    expect(stackSafeReplace).toHaveBeenCalledTimes(2);
 
     unmount();
   });

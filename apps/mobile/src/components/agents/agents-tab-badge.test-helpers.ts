@@ -54,10 +54,17 @@ vi.mock('expo-router', () => ({
   usePathname: () => '/',
   useSegments: () => segments.current,
   useLocalSearchParams: () => ({}),
-  useRouter: () => ({ replace: routerReplace, setParams: vi.fn() }),
+  useRouter: () => ({ setParams: vi.fn() }),
   useNavigation: () => ({ isFocused: () => false }),
   useFocusEffect: () => undefined,
   useScrollToTop: () => undefined,
+}));
+// The "Back to profile" recovery goes through the push-then-retire hook that
+// keeps Android Fabric alive; its own mechanics have their own
+// suite, so here it stands in for the navigation call, which these suites
+// assert stays uncalled while the tab is covered.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: routerReplace }),
 }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('expo-secure-store', () => ({ getItemAsync: vi.fn().mockResolvedValue(null) }));

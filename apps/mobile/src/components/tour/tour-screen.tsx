@@ -154,14 +154,14 @@ export function TourScreen() {
   // GO_BACK banner instead of dismissing.
   const dismiss = useCallback(() => {
     recordCompleted();
-    dismissTour(router);
-  }, [recordCompleted, router]);
+    dismissTour(router, stackSafeRouter.replace);
+  }, [recordCompleted, router, stackSafeRouter]);
 
   // The hand-off ends the tour: record the decision, then open the
   // new-session page over the tour. The tour route and `/agent-chat/new` are
   // screens of the same native Stack, so a literal `router.replace` would swap
   // both in one native-stack commit — the Android Fabric `addViewAt` crash the
-  // stack-safe replace exists for (KILO-APP-25). It pushes instead and drops
+  // stack-safe replace exists for. It pushes instead and drops
   // the tour route once the push transition has ended, the same end state
   // `replace` produces. The run-on param is transient — the stored run-on
   // preference is never written here. The computer card preselects the

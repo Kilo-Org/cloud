@@ -42,6 +42,7 @@ const status = vi.hoisted(() => ({
   mutate: vi.fn(),
   refetch: vi.fn(),
   push: vi.fn(),
+  replace: vi.fn(),
 }));
 // The footer reads its keyboard lift from the root `KeyboardProvider` instead of
 // listening to React Native's keyboard events. The store below is driven per
@@ -143,6 +144,12 @@ vi.mock('expo-haptics', () => ({
 vi.mock('expo-router', () => ({
   useRouter: () => ({ replace: vi.fn(), push: status.push }),
   useFocusEffect: () => undefined,
+}));
+// The success hand-off goes through the push-then-retire hook (a literal
+// `router.replace` crashes Android Fabric); the suite pins the
+// destination it is handed.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: status.replace }),
 }));
 // The connect actions read the reader's organization role for a trial refusal.
 vi.mock('@/lib/organization-context', () => ({
@@ -373,6 +380,7 @@ beforeEach(() => {
   status.mutate.mockReset();
   status.refetch.mockClear();
   status.push.mockClear();
+  status.replace.mockClear();
   operationKey.reset();
   operationKey.getKey.mockClear();
   operationKey.rotateKey.mockClear();
@@ -883,6 +891,10 @@ describe('ManualReviewScreen start operation key', () => {
     // The fulfilled intent ends, so a later Start of the same draft is a new
     // review rather than a replay of this one.
     expect(operationKey.rotateKey).toHaveBeenCalledTimes(1);
+    // The review replaces this form once it exists.
+    expect(status.replace).toHaveBeenCalledExactlyOnceWith(
+      '/(app)/code-reviewer/personal/reviews/review-1'
+    );
 
     unmount();
   });
@@ -940,6 +952,8 @@ describe('ManualReviewScreen start operation key', () => {
     act(() => starts[0]?.callbacks.onSuccess?.({ reviewId: 'review-old-draft' }));
 
     expect(operationKey.rotateKey).not.toHaveBeenCalled();
+    // A withdrawn draft's review is not the one on screen, so the form stays.
+    expect(status.replace).not.toHaveBeenCalled();
 
     unmount();
   });

@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { BackHandler } from 'react-native';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 
 /**
  * Terminal screen for a URL no route matches.
@@ -16,6 +17,10 @@ import { InvalidRouteState } from '@/components/invalid-route-state';
  */
 export default function NotFound() {
   const router = useRouter();
+  // The hand-off swaps this dead route for the app root, so it goes through the
+  // push-then-retire hook: a literal `router.replace` swaps both in one
+  // native-stack commit and crashes Android Fabric.
+  const { replace } = useStackSafeReplace();
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -23,13 +28,13 @@ export default function NotFound() {
         // Let the navigator pop to the screen beneath.
         return false;
       }
-      router.replace('/');
+      replace('/');
       return true;
     });
     return () => {
       subscription.remove();
     };
-  }, [router]);
+  }, [replace, router]);
 
   return <InvalidRouteState backTo="/" />;
 }

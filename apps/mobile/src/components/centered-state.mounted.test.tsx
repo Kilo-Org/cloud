@@ -88,6 +88,12 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ replace: vi.fn<() => void>() }) }));
+// The invalid-route state's Back hands off through the push-then-retire hook (a
+// literal `router.replace` crashes Android Fabric); this suite only
+// renders the state's placement.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: vi.fn() }),
+}));
 
 const contentLayout: Partial<LayoutChangeEvent> = {
   nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 700 } },

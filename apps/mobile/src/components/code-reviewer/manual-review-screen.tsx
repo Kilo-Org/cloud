@@ -1,9 +1,10 @@
 /* eslint-disable max-lines -- one form surface: platform choice, URL field with its validation, instructions, model choice, and the pinned action share the scroll body */
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic } from '@/lib/haptics';
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { GitPullRequest } from '@/components/ui/icons';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -108,7 +109,7 @@ const FORM_EDGE_GAP = 16;
 const INSTRUCTIONS_COUNTER_VISIBLE_REMAINING = 1_000;
 
 export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
-  const router = useRouter();
+  const stackSafeRouter = useStackSafeReplace();
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const scopeTitle = useReviewerScopeTitle(scope);
@@ -220,7 +221,9 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             // review, not a replay of this one.
             rotateKey();
             notificationHaptic(Haptics.NotificationFeedbackType.Success);
-            router.replace(`/(app)/code-reviewer/${scope}/reviews/${reviewId}` as Href);
+            // The hand-off swaps this form for the review in one commit, which
+            // crashes Android Fabric: push, then retire the form.
+            stackSafeRouter.replace(`/(app)/code-reviewer/${scope}/reviews/${reviewId}` as Href);
           },
           onError: error => {
             // A client-deadline rejection is the stall, not a server reason:

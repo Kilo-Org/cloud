@@ -29,6 +29,12 @@ vi.mock('react-i18next', async importOriginal => {
   };
 });
 vi.mock('expo-router', () => ({ useRouter: () => router }));
+// The Back hand-off goes through the push-then-retire hook (a literal
+// `router.replace` crashes Android Fabric); the assertions below
+// pin the destination it is handed.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: router.replace }),
+}));
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalArrowLeft: 'DirectionalArrowLeft',
 }));

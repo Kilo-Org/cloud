@@ -34,6 +34,7 @@ import {
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { isReadPausedBeforeData } from '@/lib/query/read-failure-variant';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { findingDetailBackTarget, findingDetailHasLocalHistory } from '@/lib/finding-detail-back';
 import { getSecurityAgentPath } from '@/lib/security-agent';
@@ -68,6 +69,7 @@ type FindingDetailScreenProps = {
 
 export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetailScreenProps>) {
   const router = useRouter();
+  const stackSafeRouter = useStackSafeReplace();
   const pushOnce = useSinglePushRoute();
   const navigation = useNavigation();
   const colors = useThemeColors();
@@ -130,7 +132,9 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
     if (target.kind === 'pop') {
       router.back();
     } else {
-      router.replace(target.href);
+      // A swap here is the Android Fabric crash `stack-safe-replace` avoids
+      //, so the findings list is pushed and this route retired.
+      stackSafeRouter.replace(target.href);
     }
   };
 

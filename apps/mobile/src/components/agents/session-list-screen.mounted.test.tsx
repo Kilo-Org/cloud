@@ -262,14 +262,21 @@ vi.mock('expo-router', () => ({
     push: (path: string) => {
       state.destination = path;
     },
-    replace: (path: string) => {
-      state.destination = path;
-    },
     setParams: (params: Record<string, string | undefined>) => {
       Object.assign(state.routeParams, params);
     },
   }),
   useScrollToTop: () => undefined,
+}));
+// The "Back to profile" recovery goes through the push-then-retire hook that
+// keeps Android Fabric alive; its own mechanics have their own
+// suite, so here it stands in for the navigation call.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({
+    replace: (path: string) => {
+      state.destination = path;
+    },
+  }),
 }));
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: state.invalidate }),
@@ -2267,7 +2274,7 @@ describe('AgentSessionListScreen live filtering', () => {
     });
     expect(compact()).toBe(false);
 
-    // ...no longer holds it once Dynamic Type grows the title, the hint and the
+    //...no longer holds it once Dynamic Type grows the title, the hint and the
     // action, so the state must drop the icon bubble and tighten the gaps.
     state.fontScale = 2;
     await renderScreen();
@@ -2336,7 +2343,7 @@ describe('AgentSessionListScreen live filtering', () => {
     });
     expect(compact()).toBe(false);
 
-    // ...no longer holds it once reduced motion reserves RefreshProgress's h-9
+    //...no longer holds it once reduced motion reserves RefreshProgress's h-9
     // box (31.5dp) inside the band, so the state must go compact instead of
     // running its hint and Clear action under the bar.
     state.reducedMotion = true;

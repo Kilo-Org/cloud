@@ -1,9 +1,10 @@
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { DirectionalArrowLeft } from '@/components/ui/directional-icons';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 
 /**
  * Terminal state for a route whose params fail runtime validation (bad
@@ -20,7 +21,7 @@ import { DirectionalArrowLeft } from '@/components/ui/directional-icons';
  * would leave for Home instead of the surface the link was about.
  */
 export function InvalidRouteState({ backTo }: Readonly<{ backTo: Href }>) {
-  const router = useRouter();
+  const stackSafeRouter = useStackSafeReplace();
   const { t } = useTranslation();
 
   return (
@@ -34,7 +35,9 @@ export function InvalidRouteState({ backTo }: Readonly<{ backTo: Href }>) {
           label={t('common.goBack')}
           icon={DirectionalArrowLeft}
           onPress={() => {
-            router.replace(backTo);
+            // Swapping this terminal route for its parent in one commit crashes
+            // Android Fabric, so it pushes then retires.
+            stackSafeRouter.replace(backTo);
           }}
         />
       }

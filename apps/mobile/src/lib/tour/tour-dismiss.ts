@@ -10,7 +10,6 @@ export const HOME_TAB_ROOT = '/(app)/(tabs)/(0_home)' as Href;
 type TourDismissRouter = {
   canGoBack: () => boolean;
   back: () => void;
-  replace: (href: Href) => void;
 };
 
 /**
@@ -26,10 +25,14 @@ type TourDismissRouter = {
  * Skip/Done action bar. Falling back to the home tab makes Back, Skip and
  * Done dismiss in every state, exactly like the finding-detail back target.
  */
-export function dismissTour(router: TourDismissRouter): void {
+export function dismissTour(router: TourDismissRouter, replace: (href: Href) => void): void {
   if (router.canGoBack()) {
     router.back();
     return;
   }
-  router.replace(HOME_TAB_ROOT);
+  // The tour is the app's first route here, so the home tab replaces it. That
+  // swap goes through the stack-safe replace its caller passes in: a literal
+  // `router.replace` swaps both screens in one native-stack commit and crashes
+  // Android Fabric.
+  replace(HOME_TAB_ROOT);
 }

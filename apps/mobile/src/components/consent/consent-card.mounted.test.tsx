@@ -46,7 +46,13 @@ const mockedPush = vi.hoisted(() => vi.fn());
 const mockedBack = vi.hoisted(() => vi.fn());
 
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ replace: mockedReplace, push: mockedPush, back: mockedBack }),
+  useRouter: () => ({ push: mockedPush, back: mockedBack }),
+}));
+// The accept hand-off goes through the push-then-retire hook that keeps Android
+// Fabric alive; its own mechanics have their own suite, so here it
+// stands in for the navigation call and the assertion stays about the route.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: mockedReplace }),
 }));
 vi.mock('@/components/ui/icons', () => ({
   ChevronRight: 'ChevronRight',
@@ -429,6 +435,8 @@ describe('ConsentCard', () => {
       (btn.props.onPress as () => void)();
     });
     expect(mockedAcceptConsent).toHaveBeenCalledWith('test-user-1', true);
+    // The hand-off still lands on the tabs, now through the push-then-retire hook.
+    expect(mockedReplace).toHaveBeenCalledWith('/(app)/(tabs)');
   });
 
   it('calls acceptConsent with optional value on primary action', async () => {

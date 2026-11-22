@@ -12,11 +12,18 @@ import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 
 const navigateSpy = vi.hoisted(() => vi.fn());
 const dismissToSpy = vi.hoisted(() => vi.fn());
+const replaceSpy = vi.hoisted(() => vi.fn());
 const sessionDestination = vi.hoisted(() => ({ id: '' }));
 const connectivity = vi.hoisted(() => ({ offline: false, connected: true, exhausted: false }));
 const queryClient = new ReactQuery.QueryClient();
 vi.mock('expo-router', () => ({
   useRouter: () => ({ navigate: navigateSpy, dismissTo: dismissToSpy }),
+}));
+// The "Back to profile" recovery goes through the push-then-retire hook that
+// keeps Android Fabric alive; its own mechanics have their own
+// suite, so here it stands in for the navigation call.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: replaceSpy }),
 }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
@@ -220,6 +227,7 @@ beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   navigateSpy.mockClear();
   dismissToSpy.mockClear();
+  replaceSpy.mockClear();
   sessionDestination.id = '';
   connectivity.offline = false;
   connectivity.connected = true;
@@ -314,6 +322,13 @@ describe('Home live section', () => {
     expect(navigateSpy.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
       dismissToSpy.mock.invocationCallOrder[0] ?? 0
     );
+  });
+
+  it('sends the unavailable-organization recovery to the profile tab', async () => {
+    await render(settled, { ...context, isReady: false, isResolving: false, isError: false });
+    const action = node('QueryError').props.action as { props: { onPress: () => void } };
+    action.props.onPress();
+    expect(replaceSpy).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)');
   });
 
   it('opens the agents index narrowed to the tapped status', async () => {

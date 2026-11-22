@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 
 import { useContextPicker } from '@/components/context-control';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 
 /**
  * The Home header's account picker, opened. A design-gate run cannot press the
@@ -22,6 +23,10 @@ import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
  */
 export function AccountPickerSheetFixture() {
   const router = useRouter();
+  // The no-history exit swaps this blank fixture for the app root, so it goes
+  // through the push-then-retire hook: a literal `router.replace` swaps both in
+  // one native-stack commit and crashes Android Fabric.
+  const { replace } = useStackSafeReplace();
   const navigation = useNavigation();
   // Reads the shared memberships entry through the hook that owns its options:
   // a second observer with defaulted options would replace them while this
@@ -57,9 +62,9 @@ export function AccountPickerSheetFixture() {
           router.back();
           return;
         }
-        router.replace('/');
+        replace('/');
       }),
-    [navigation, opened, router]
+    [navigation, opened, replace, router]
   );
 
   return null;

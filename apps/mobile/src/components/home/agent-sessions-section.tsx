@@ -1,4 +1,4 @@
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type ScrollViewProps, View } from 'react-native';
@@ -22,6 +22,7 @@ import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
 import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { createSubmitLock } from '@/lib/submit-lock';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { cn } from '@/lib/utils';
@@ -69,7 +70,10 @@ export function LiveSessionFeedback({
   compact?: boolean;
 }) {
   const { t } = useTranslation();
-  const router = useRouter();
+  // The recovery hand-off swaps this screen for the profile tab in one
+  // native-stack commit; a literal `router.replace` crashes Android Fabric
+  // there, so it goes through the push-then-retire hook.
+  const stackSafeRouter = useStackSafeReplace();
   const internet = useCommittedConnectivityStatus();
   const { isConnected, reconnectExhausted } = useUserWebConnectionHealth();
   const connection = useUserWebConnection();
@@ -177,7 +181,7 @@ export function LiveSessionFeedback({
             label={t('organization.boundary.backToProfile')}
             icon={DirectionalArrowLeft}
             onPress={() => {
-              router.replace('/(app)/(tabs)/(3_profile)' as Href);
+              stackSafeRouter.replace('/(app)/(tabs)/(3_profile)' as Href);
             }}
           />
         }

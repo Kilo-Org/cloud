@@ -33,6 +33,9 @@ const backHandler = vi.hoisted(() => {
 });
 
 vi.mock('expo-router', () => ({ useRouter: () => router }));
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: router.replace }),
+}));
 vi.mock('react-native', () => ({ BackHandler: backHandler }));
 vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
 

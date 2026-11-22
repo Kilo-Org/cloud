@@ -170,6 +170,19 @@ describe('model stats snapshot cache', () => {
     expect(mockSelect).toHaveBeenCalledTimes(1);
   });
 
+  it('serves the last known-good snapshot when a warm refresh fails, and retries once', async () => {
+    // This is the case the derived views cannot see: the cache swallows the failure and returns
+    // its cached snapshot, so the report has to happen here, not in a caller's catch.
+    const first = await cache.getModelStatsSnapshot();
+    jest.advanceTimersByTime(TTL);
+    mockOrderBy.mockRejectedValueOnce(new Error('unavailable'));
+
+    expect(await cache.getModelStatsSnapshot()).toBe(first);
+    // Still inside the failure window, so the next call serves the cache without querying again.
+    expect(await cache.getModelStatsSnapshot()).toBe(first);
+    expect(mockSelect).toHaveBeenCalledTimes(2);
+  });
+
   it('selects only each row verification alongside nested stats in one ordered left join', async () => {
     await cache.getModelStatsSnapshot();
     const { modelStats, enkrypt_sync_state } = await import('@kilocode/db/schema');

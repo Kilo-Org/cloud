@@ -1,8 +1,6 @@
 import { ModelStatsBenchmarksSchema } from '@kilocode/db/schema';
-import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   getModelStatsSnapshot,
-  modelStatsLoadClient,
   type ModelStatsCacheEntry,
   type ModelStatsLoadClient,
   type ModelStatsSnapshot,
@@ -84,35 +82,12 @@ function summariesOf(snapshot: ModelStatsSnapshot): TerminalBenchSummaries {
 }
 
 /**
- * Reports one failure per failed load, per read client. The snapshot cache keeps one state per
- * client and rethrows its recorded error during that client's cooldown, so keying the warning on
- * the client and that error keeps an outage to one line per client instead of one per catalog
- * request. A successful load clears the client's marker, so a later failure reports even when it
- * reuses an error object that already warned.
+ * The snapshot cache reports each failed load once per read client, warm or cold, so this view only
+ * degrades: no summaries when there is nothing cached, the last known-good ones otherwise.
  */
-const reportedFailureByClient = new WeakMap<ModelStatsLoadClient, unknown>();
-
-function reportLoadFailure(fromDb: ModelStatsLoadClient, error: unknown): void {
-  if (reportedFailureByClient.get(fromDb) === error) return;
-  reportedFailureByClient.set(fromDb, error);
-  const reason = (error instanceof Error ? error.message : String(error))
-    .replace(/\s+/g, ' ')
-    .trim();
-  warnExceptInTest(
-    `[model-stats] terminal-bench summaries unavailable: ${reason}; serving no benchmark summaries`
-  );
-}
-
 export async function getTerminalBenchSummaries({
   fromDb,
 }: { fromDb?: ModelStatsLoadClient } = {}): Promise<TerminalBenchSummaries> {
-  // The marker keys on the client the snapshot cache uses, so it dedupes per client.
-  const client = modelStatsLoadClient(fromDb);
-  const snapshot = await getModelStatsSnapshot({ fromDb }).catch((error: unknown) => {
-    reportLoadFailure(client, error);
-    return null;
-  });
-  if (!snapshot) return new Map();
-  reportedFailureByClient.delete(client);
-  return summariesOf(snapshot);
+  const snapshot = await getModelStatsSnapshot({ fromDb }).catch(() => null);
+  return snapshot ? summariesOf(snapshot) : new Map();
 }

@@ -6,28 +6,17 @@ import {
   terminalBenchFor,
 } from './terminal-bench';
 import { getModelStatsSnapshot } from './model-stats-cache';
-import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type {
   ModelStatsCacheEntry,
   ModelStatsLoadClient,
   ModelStatsSnapshot,
 } from './model-stats-cache';
 
-jest.mock('./model-stats-cache', () => {
-  const primaryClient = { select: jest.fn() };
-  return {
-    getModelStatsSnapshot: jest.fn(),
-    // Mirrors the real resolver: the caller's client, or the primary when it passes none.
-    modelStatsLoadClient: jest.fn((fromDb?: unknown) => fromDb ?? primaryClient),
-  };
-});
-
-jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
-  warnExceptInTest: jest.fn(),
+jest.mock('./model-stats-cache', () => ({
+  getModelStatsSnapshot: jest.fn(),
 }));
 
 const mockSnapshot = jest.mocked(getModelStatsSnapshot);
-const mockWarn = jest.mocked(warnExceptInTest);
 
 const summary = { overallScore: 0.551, avgAttemptCostUsd: 53.37 };
 
@@ -86,7 +75,6 @@ function snapshot(
 
 beforeEach(() => {
   mockSnapshot.mockReset();
-  mockWarn.mockReset();
 });
 
 describe('summarizeTerminalBench', () => {
@@ -198,74 +186,10 @@ describe('getTerminalBenchSummaries', () => {
     );
   });
 
-  it('resolves an empty map and warns once when the snapshot load rejects', async () => {
-    mockSnapshot.mockRejectedValue(new Error('snapshot\n  unavailable'));
+  it('degrades to an empty map when the snapshot load rejects', async () => {
+    mockSnapshot.mockRejectedValue(new Error('snapshot unavailable'));
 
     await expect(getTerminalBenchSummaries()).resolves.toEqual(new Map());
-
-    expect(mockWarn).toHaveBeenCalledTimes(1);
-    expect(mockWarn).toHaveBeenCalledWith(
-      '[model-stats] terminal-bench summaries unavailable: snapshot unavailable; serving no benchmark summaries'
-    );
-  });
-
-  it('reports a repeated failure once, not once per request', async () => {
-    // The snapshot cache rethrows its recorded error during the retry cooldown, so every caller
-    // sees the same error object; an outage must not log one line per catalog request.
-    const outage = new Error('snapshot unavailable');
-    mockSnapshot.mockRejectedValue(outage);
-
-    await getTerminalBenchSummaries();
-    await getTerminalBenchSummaries();
-    await getTerminalBenchSummaries();
-
-    expect(mockSnapshot).toHaveBeenCalledTimes(3);
-    expect(mockWarn).toHaveBeenCalledTimes(1);
-  });
-
-  it('reports each distinct failure', async () => {
-    mockSnapshot
-      .mockRejectedValueOnce(new Error('first outage'))
-      .mockRejectedValueOnce(new Error('second outage'));
-
-    await getTerminalBenchSummaries();
-    await getTerminalBenchSummaries();
-
-    expect(mockWarn).toHaveBeenCalledTimes(2);
-  });
-
-  it('reports the same error object again after a successful load', async () => {
-    const outage = new Error('snapshot unavailable');
-    mockSnapshot
-      .mockRejectedValueOnce(outage)
-      .mockResolvedValueOnce(snapshot([row()]))
-      .mockRejectedValueOnce(outage);
-
-    await getTerminalBenchSummaries();
-    await getTerminalBenchSummaries();
-    await getTerminalBenchSummaries();
-
-    expect(mockSnapshot).toHaveBeenCalledTimes(3);
-    expect(mockWarn).toHaveBeenCalledTimes(2);
-  });
-
-  it('keeps the dedupe per read client', async () => {
-    // The snapshot cache keeps one state per client, so another client's successful load must not
-    // re-arm this client's warning while its own cooldown still rethrows the same error.
-    const primary = { select: jest.fn() } as unknown as ModelStatsLoadClient;
-    const replica = { select: jest.fn() } as unknown as ModelStatsLoadClient;
-    const outage = new Error('replica unavailable');
-    mockSnapshot.mockImplementation(async ({ fromDb } = {}) => {
-      if (fromDb === replica) throw outage;
-      return snapshot([row()]);
-    });
-
-    await getTerminalBenchSummaries({ fromDb: replica });
-    await getTerminalBenchSummaries({ fromDb: primary });
-    await getTerminalBenchSummaries({ fromDb: replica });
-
-    expect(mockSnapshot).toHaveBeenCalledTimes(3);
-    expect(mockWarn).toHaveBeenCalledTimes(1);
   });
 });
 

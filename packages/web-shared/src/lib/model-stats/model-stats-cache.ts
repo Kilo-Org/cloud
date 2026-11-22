@@ -5,6 +5,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { enkrypt_sync_state, modelStats, type ModelStats } from '@kilocode/db/schema';
 import { desc, eq, sql } from 'drizzle-orm';
 import { requireCustomLlmsById } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const FAILURE_RETRY_MS = 15 * 1000;
@@ -27,6 +28,8 @@ type CacheState = {
   cached: ModelStatsSnapshot | null;
   inFlight: Promise<ModelStatsSnapshot> | null;
   failure: { retryAt: number; error: unknown } | null;
+  /** The error this client last reported, so one outage logs one line per client. */
+  reportedError?: unknown;
 };
 
 /**
@@ -75,6 +78,18 @@ export function modelStatsLoadClient(fromDb?: ModelStatsLoadClient): ModelStatsL
   return fromDb ?? db;
 }
 
+/** Reports every failed load once per client, warm or cold, so an outage stays observable. */
+function reportLoadFailure(state: CacheState, error: unknown): void {
+  if (state.reportedError === error) return;
+  state.reportedError = error;
+  const reason = (error instanceof Error ? error.message : String(error))
+    .replace(/\s+/g, ' ')
+    .trim();
+  warnExceptInTest(
+    `[model-stats] snapshot unavailable: ${reason}; serving the last known-good snapshot`
+  );
+}
+
 export async function getModelStatsSnapshot({
   fromDb,
 }: { fromDb?: ModelStatsLoadClient } = {}): Promise<ModelStatsSnapshot> {
@@ -103,11 +118,15 @@ export async function getModelStatsSnapshot({
       if (generation === startGeneration) {
         state.cached = snapshot;
         state.failure = null;
+        state.reportedError = undefined;
       }
       return snapshot;
     } catch (error) {
       if (generation === startGeneration) {
         state.failure = { retryAt: Date.now() + FAILURE_RETRY_MS, error };
+        // Report here, not only in the derived views: this catch serves the last known-good
+        // snapshot when it has one, so a warm failure never reaches a caller as a rejection.
+        reportLoadFailure(state, error);
       }
       if (state.cached) return state.cached;
       throw error;

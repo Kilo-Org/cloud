@@ -21,10 +21,7 @@ import type {
   ControlPlaneContinuationAdmissionResult,
   ControlPlaneDispatchResult,
 } from '../shared/control-plane-protocol.js';
-import {
-  preflightAndAdmitPromptMessage,
-  type QueueMessageInput,
-} from './queue-message.js';
+import { preflightAndAdmitPromptMessage, type QueueMessageInput } from './queue-message.js';
 
 /** The payer balance preflight, injectable in tests exactly like the prompt route. */
 export type AnswerBalancePreflight = (params: {

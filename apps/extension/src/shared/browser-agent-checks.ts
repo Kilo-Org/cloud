@@ -9,8 +9,23 @@ import { z } from 'zod';
  */
 export type BrowserGrantClass = 'read' | 'act' | 'navigate';
 
-/** A file upload always needs a human-approved step token. */
-export const isUploadTool = (toolName: string): boolean => toolName === 'browser_file_upload';
+/** A `browser_drop`'s `paths`, as the contract carries them: a list of local files the page may read. */
+const dropPathsSchema = z.array(z.string()).min(1);
+
+/**
+ * Whether a call hands local file contents to the page: `browser_file_upload` does, and so
+ * does `browser_drop` when its `paths` names at least one local file. A drop that carries
+ * only `data` is not an upload.
+ */
+export const isUploadCall = (toolName: string, args: Record<string, unknown> = {}): boolean => {
+  if (toolName === 'browser_file_upload') {
+    return true;
+  }
+
+  const paths = dropPathsSchema.safeParse(args['paths']);
+
+  return toolName === 'browser_drop' && paths.success && paths.data.some(path => path !== '');
+};
 
 export interface BrowserGrant {
   readonly class: BrowserGrantClass;
@@ -115,14 +130,16 @@ export const canStartDownload = (toolName: string, args: Record<string, unknown>
 };
 
 /**
- * The one guard a call runs, chosen once from the browser and the optional
+ * The one guard a call runs, chosen once from the browser and the live optional
  * `downloads` permission — never two at a time, because each one decides the
- * same item and the later one would only overrule the earlier.
+ * same item and the later one would only overrule the earlier. The one file an
+ * approval buys is exempted by the guard's own exempt predicate, so a guard that
+ * has none decides every file of the call alike.
  * - `hold`: `chrome.downloads.onDeterminingFilename` exists, so the item is held before its file exists.
  * - `intercept`: Chrome without the permission, so the response that would become a file is failed.
  * - `legacy`: neither the event nor a permission to hold with (`downloadsApi` is `undefined` only on a browser
  *   whose `chrome.downloads` cannot be read), so the item is cancelled after it starts.
- * - `none`: this call cannot start a download, or its approval already names the one file it buys.
+ * - `none`: this call cannot start a download, or this browser offers no guard it can arm for it.
  *
  * `holdsDownloads` is whether this browser has the event at all, which is what the hold object exists for; a hold
  * without the permission cannot answer it, so the permission picks `intercept` there and never `hold`.
@@ -134,20 +151,16 @@ export type DownloadTier =
   | 'intercept'
   /** The item is cancelled after it starts: a browser with neither the event nor the permission. */
   | 'legacy'
-  /** This call cannot start a download, or its approval already names the one file it buys. */
+  /** This call cannot start a download, or this browser offers no guard it can arm for it. */
   | 'none';
 
 export const downloadTierOf = ({
-  approved,
   canDownload,
   canIntercept,
   hasHold,
   hasPermission,
-  needsTheFile,
-  sensitiveToken,
+  namesFile,
 }: {
-  /** Whether this call redeemed a download approval. */
-  readonly approved: boolean;
   /** Whether this call is an agent call that can start a download at all. */
   readonly canDownload: boolean;
   /** Whether this tab can pause a response at all: a debugger backend, so Chrome and not Firefox. */
@@ -156,12 +169,13 @@ export const downloadTierOf = ({
   readonly hasHold: boolean;
   /** Whether the optional `downloads` permission is granted right now. */
   readonly hasPermission: boolean;
-  /** Whether the approval still names the one file it buys: without it nothing could be exempt from the guard. */
-  readonly needsTheFile: boolean;
-  /** Set when the gate already refused this step for a sensitive target: the guard would only repeat that. */
-  readonly sensitiveToken: boolean;
+  /**
+   * Whether this call has a file for the guard to exempt: its approval names one, or it carries no approval that
+   * needs one.
+   */
+  readonly namesFile: boolean;
 }): DownloadTier => {
-  if (!canDownload || sensitiveToken) {
+  if (!canDownload) {
     return 'none';
   }
 
@@ -171,7 +185,7 @@ export const downloadTierOf = ({
   }
 
   if (!hasHold) {
-    return approved && !needsTheFile ? 'none' : 'legacy';
+    return namesFile ? 'legacy' : 'none';
   }
 
   return 'hold';

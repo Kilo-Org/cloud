@@ -2924,6 +2924,9 @@ export const createBrowserRuntime = ({
         ? undefined
         : tokens.issue({
             argumentHash: step.argumentHash,
+            // The step's own element, when the gate classified one: the token binds the step that started this file,
+            // So the retry is the same approval the gate already answered.
+            element: step.element,
             ...(file.url === undefined
               ? {}
               : { need: needOfUrl(file.tabId, file.url, context.scope ?? 'page') }),
@@ -2986,6 +2989,9 @@ export const createBrowserRuntime = ({
         ? undefined
         : tokens.issue({
             argumentHash: step.argumentHash,
+            // The step's own element, when the gate classified one: the retry carries the same binding, so the
+            // Approval it holds buys the file this report names.
+            element: step.element,
             ...(need === undefined ? {} : { need }),
             origin: step.origin,
             reason: SENSITIVE_REASON.download,
@@ -3185,7 +3191,10 @@ export const createBrowserRuntime = ({
           sensitive: BrowserSensitiveStep,
           /** The tab the step ran on: a `browser_tabs new` step runs on the tab it opened. */
           tokenTabId: number = tabId,
-          /** The one download this approval is for, when the step was refused for a file. */
+          /**
+           * The one download this approval is for, when the step was refused for a file. A download approval on a
+           * sensitive step also binds the element the gate classified, so its retry matches that same binding.
+           */
           need?: StepTokenNeed
         ): string =>
           tokens.issue({
@@ -3216,8 +3225,16 @@ export const createBrowserRuntime = ({
           readonly step: DownloadStep | undefined;
           readonly tokenTabId: number;
         }): BrowserToolRunOutcome => {
+          // A download approval issued for a call the gate classified on an element binds that same element, so the
+          // Retry carries the binding the gate recomputes for it.
+          // The preflight here is still the full union, so its ok branch is what the element is read through.
+          const element = preflight?.ok === true ? preflight.sensitiveToken?.element : undefined;
           const token = issueSensitiveToken(
-            { origin, reason: SENSITIVE_REASON.download },
+            {
+              element,
+              origin,
+              reason: SENSITIVE_REASON.download,
+            },
             tokenTabId,
             need
           );
@@ -3268,7 +3285,7 @@ export const createBrowserRuntime = ({
             : await preflightAgentCall({
                 args: argsRecord,
                 authorized: agentContext.authorized,
-                consumeStepToken: (token, binding) => tokens.consume(token, binding),
+                consumeStepToken: (token, binding) => tokens.take(token, binding),
                 // The page cannot report its frames while a dialog blocks it, so the answer is judged against the frame that opened the dialog: its handler resumes there.
                 ...(openDialog === undefined
                   ? {}
@@ -3358,9 +3375,22 @@ export const createBrowserRuntime = ({
         }
 
         // A download approval is post-action, so the gate cannot classify it on retry; a presented token bound to this
-        // Session, tab, tool and argument set disables the guard once, and carries the one file it is for.
-        let approval: StepTokenTake = { ok: false };
+        // A download approval is post-action, so the gate cannot classify it on retry; a presented token bound to this
+        // Session, tab, tool and argument set is what an approval for a file looks like. The approval the gate
+        // Redeemed is one source of it.
+        let approval: StepTokenTake =
+          preflight?.ok === true && preflight.sensitiveToken !== undefined
+            ? {
+                ok: true,
+                ...(preflight.sensitiveToken.need === undefined
+                  ? {}
+                  : { need: preflight.sensitiveToken.need }),
+              }
+            : { ok: false };
 
+        // The tokens the gate redeemed are burnt, so their take fails here without spending anything else: this loop
+        // Redeems the download approval a call carries besides its step approval. A redemption that names a file wins
+        // Over one that names none, so a call carrying both approvals keeps the file the human approved.
         if (agentContext !== undefined && preflight !== undefined && preflight.ok) {
           for (const token of presentedTokens) {
             const redeemed = tokens.take(token, {
@@ -3371,13 +3401,18 @@ export const createBrowserRuntime = ({
               toolName: stepToolName,
             });
 
-            if (redeemed.ok) {
+            if (redeemed.ok && redeemed.need !== undefined) {
               approval = redeemed;
               break;
+            }
+
+            if (redeemed.ok && !approval.ok) {
+              approval = redeemed;
             }
           }
         }
 
+        // The one file the approval buys, when it names one: that file is exempt from the guard.
         const downloadApproved = approval.ok;
         /** The approval's one file, armed on the hold once this call's step is known. */
         let approvedFile: {
@@ -3408,15 +3443,10 @@ export const createBrowserRuntime = ({
             (preflight !== undefined &&
               (preflight.class === 'act' || preflight.class === 'navigate')));
 
-        // Whether this call is one a guard applies to at all: an agent call that its step token does not already
-        // Cover, whose page action can start a download. Which guard that is — hold, intercept or legacy — is chosen
-        // Once, after the tab exists, from the live permission and the browser, because either can change while the
-        // Call runs (`browser_tabs new` opens its tab before the guard is armed).
-        const couldGuard =
-          agentContext !== undefined &&
-          downloadCapable &&
-          preflight !== undefined &&
-          preflight.sensitiveToken === undefined;
+        // Whether this call is one a guard applies to at all: an agent call whose page action can start a download.
+        // Every such call runs one guard, chosen once after the tab exists from the live permission and the browser,
+        // Because either can change while the call runs (`browser_tabs new` opens its tab before the guard is armed).
+        const couldGuard = agentContext !== undefined && downloadCapable && preflight !== undefined;
 
         // An approved repeat of a `browser_tabs new` download owns the tab that step opened: sending the tool again
         // Would open a second tab and download the file twice, and the kept file would go unreported. The repeat
@@ -3577,13 +3607,11 @@ export const createBrowserRuntime = ({
         // Is what makes a revoke or grant during that open land on the guard that actually arms.
         const downloadsPermission = downloadsApi?.();
         const downloadTier: DownloadTier = downloadTierOf({
-          approved: downloadApproved,
           canDownload: couldGuard,
           canIntercept: debuggerApi !== undefined,
           hasHold: downloadHold !== undefined,
           hasPermission: downloadsPermission !== undefined,
-          needsTheFile: approvedNeeds.get(sessionKey) !== undefined,
-          sensitiveToken: false,
+          namesFile: !downloadApproved || approval.need !== undefined,
         });
         // An act call runs guarded: an unapproved one denies downloads outright, and an approved one listens and
         // Stops every download but the file its approval bought, so a second file is neither kept nor silent.
@@ -3665,6 +3693,7 @@ export const createBrowserRuntime = ({
             ? {
                 argumentHash: stepHash,
                 ...downloadStepText(stepToolName, stepArgumentsRecord),
+                element: preflight.sensitiveToken?.element,
                 origin: preflight.origin,
                 session: sessionKey,
                 // The tab the step runs on, which for `browser_tabs new` is the tab it opened: the repeat lands there.
@@ -4129,7 +4158,10 @@ export const createBrowserRuntime = ({
                 tabId: runTabId,
                 url: signed?.url,
               },
-              { keptFiles: [], origin: preflight?.ok ? preflight.origin : '' },
+              {
+                keptFiles: [],
+                origin: preflight?.ok ? preflight.origin : '',
+              },
               runTabId
             );
           }
@@ -4173,7 +4205,13 @@ export const createBrowserRuntime = ({
           const refusedFile = own?.file;
           const stepToken = preflight?.ok
             ? issueSensitiveToken(
-                { origin, reason },
+                {
+                  // The gate classified this call on an element, and its binding carries that element: a download
+                  // Approval on the same call must match it on the retry instead of asking for the step again.
+                  element: preflight.sensitiveToken?.element,
+                  origin,
+                  reason,
+                },
                 runTabId,
                 refusedFile?.url === undefined
                   ? undefined

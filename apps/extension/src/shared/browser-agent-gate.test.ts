@@ -314,7 +314,7 @@ const run = (
   preflightAgentCall({
     args: input.args ?? {},
     authorized: input.authorized ?? grants,
-    consumeStepToken: (token, binding) => tokens.consume(token, binding),
+    consumeStepToken: (token, binding) => tokens.take(token, binding),
     ...(input.readFrames === undefined ? {} : { readFrames: input.readFrames }),
     session:
       input.session ?? createSession(input.probe === undefined ? {} : { probe: input.probe }),
@@ -875,7 +875,7 @@ describe('sensitive steps', () => {
       tokens
     );
 
-    expect(allowed).toMatchObject({ ok: true, sensitiveToken: token });
+    expect(allowed).toMatchObject({ ok: true, sensitiveToken: { token } });
 
     const replay = await run(
       { args, session, stepTokens: [token], toolName: 'browser_fill_form' },
@@ -1191,7 +1191,7 @@ describe('sensitive steps', () => {
       tokens
     );
 
-    expect(result).toMatchObject({ ok: true, sensitiveToken: token });
+    expect(result).toMatchObject({ ok: true, sensitiveToken: { token } });
 
     const replay = await run(
       { args, probe: passwordProbe, stepTokens: [token], toolName: 'browser_type' },
@@ -1296,6 +1296,88 @@ describe('sensitive steps', () => {
     expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.fileUpload);
   });
 
+  it('classifies a drop that hands the page local paths as sensitive, and allows the bound retry', async () => {
+    const tokens = createStepTokenStore({ now: () => 1000, random: () => 'token-d' });
+    const args = { paths: ['/tmp/receipt.pdf'], target: 'e1' };
+
+    const result = await run({ args, stepTokens: [], toolName: 'browser_drop' }, tokens);
+
+    expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.fileUpload);
+
+    const token = tokens.issue({
+      argumentHash: hashBrowserToolArguments(args),
+      origin: 'https://app.example.com',
+      reason: SENSITIVE_REASON.fileUpload,
+      session: 'session-1',
+      tabId: 7,
+      toolName: 'browser_drop',
+    });
+    const allowed = await run({ args, stepTokens: [token], toolName: 'browser_drop' }, tokens);
+
+    // The step names no file, so its approval buys the step alone.
+    expect(allowed).toMatchObject({ ok: true, sensitiveToken: { token } });
+  });
+
+  it('refuses a drop retry that hands the page a different file', async () => {
+    const tokens = createStepTokenStore({ now: () => 1000, random: () => 'token-e' });
+    const approved = { paths: ['/tmp/receipt.pdf'], target: 'e1' };
+    const token = tokens.issue({
+      argumentHash: hashBrowserToolArguments(approved),
+      origin: 'https://app.example.com',
+      reason: SENSITIVE_REASON.fileUpload,
+      session: 'session-1',
+      tabId: 7,
+      toolName: 'browser_drop',
+    });
+    const result = await run(
+      {
+        args: { paths: ['/tmp/other.pdf'], target: 'e1' },
+        stepTokens: [token],
+        toolName: 'browser_drop',
+      },
+      tokens
+    );
+
+    expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.fileUpload);
+  });
+
+  it('allows a drop that carries page-made data with no approval', async () => {
+    const result = await run({
+      args: { data: { 'text/plain': 'x' }, target: 'e1' },
+      toolName: 'browser_drop',
+    });
+
+    expect(result).toMatchObject({ class: 'act', ok: true });
+    expect(result).not.toHaveProperty('sensitiveToken');
+  });
+
+  it('hands the redeemed approval its one file back with the sensitive step', async () => {
+    const tokens = createStepTokenStore({ now: () => 1000, random: () => 'token-f' });
+    const args = { target: 'e12', text: 'hunter2' };
+    const need = {
+      kind: 'exact' as const,
+      tabId: 7,
+      url: 'https://app.example.com/invoice.pdf',
+    };
+    const token = tokens.issue({
+      argumentHash: hashBrowserToolArguments(args),
+      element: 'e12',
+      need,
+      origin: 'https://app.example.com',
+      reason: SENSITIVE_REASON.password,
+      session: 'session-1',
+      tabId: 7,
+      toolName: 'browser_type',
+    });
+
+    const result = await run(
+      { args, probe: passwordProbe, stepTokens: [token], toolName: 'browser_type' },
+      tokens
+    );
+
+    expect(result).toMatchObject({ ok: true, sensitiveToken: { element: 'e12', need, token } });
+  });
+
   it('leaves an ordinary text field alone', async () => {
     const result = await run({
       args: { target: 'e12', text: 'igor@example.com' },
@@ -1377,7 +1459,7 @@ describe('script calls', () => {
       tokens
     );
 
-    expect(result).toMatchObject({ ok: true, sensitiveToken: token });
+    expect(result).toMatchObject({ ok: true, sensitiveToken: { token } });
 
     const replay = await run(
       { args, session, stepTokens: [token], toolName: 'browser_evaluate' },

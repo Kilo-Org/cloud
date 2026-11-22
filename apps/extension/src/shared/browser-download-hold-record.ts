@@ -16,6 +16,7 @@ export const DOWNLOAD_HOLD_STATE_KEY = 'session:kiloDownloadHoldState' as const;
 const stepSchema = z.object({
   argumentHash: z.string(),
   description: z.string(),
+  element: z.string().optional(),
   noun: z.string(),
   origin: z.string(),
   session: z.string(),

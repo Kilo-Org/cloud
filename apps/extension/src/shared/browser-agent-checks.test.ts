@@ -9,6 +9,7 @@ import {
   hashBrowserToolArguments,
   isOAuthConsentUrl,
   isOriginGranted,
+  isUploadCall,
   maskSensitiveValues,
   MASKED_VALUE,
   originPatternMatches,
@@ -103,15 +104,38 @@ describe('download-capable tools', () => {
   });
 });
 
+describe('file handoff to the page', () => {
+  it('counts an upload, whatever arguments it carries', () => {
+    expect(isUploadCall('browser_file_upload')).toBe(true);
+    expect(isUploadCall('browser_file_upload', { paths: [] })).toBe(true);
+  });
+
+  it('counts a drop that hands the page local file paths', () => {
+    expect(isUploadCall('browser_drop', { paths: ['/tmp/a.txt'], target: 'e1' })).toBe(true);
+  });
+
+  it('leaves a drop of page-made data alone', () => {
+    expect(isUploadCall('browser_drop', { data: { 'text/plain': 'x' }, target: 'e1' })).toBe(false);
+  });
+
+  it('treats an empty or malformed paths value as no file list', () => {
+    expect(isUploadCall('browser_drop', { paths: [], target: 'e1' })).toBe(false);
+    expect(isUploadCall('browser_drop', { paths: [42], target: 'e1' })).toBe(false);
+    expect(isUploadCall('browser_drop', { target: 'e1' })).toBe(false);
+  });
+
+  it('leaves every other tool alone', () => {
+    expect(isUploadCall('browser_click', { target: 'e1' })).toBe(false);
+  });
+});
+
 describe('download tier choice', () => {
   const base = {
-    approved: false,
     canDownload: true,
     canIntercept: true,
     hasHold: true,
     hasPermission: true,
-    needsTheFile: false,
-    sensitiveToken: false,
+    namesFile: true,
   } as const;
 
   it('holds on a browser with the event and the permission', () => {
@@ -126,6 +150,27 @@ describe('download tier choice', () => {
 
   it('keeps the legacy cancel-after-start guard on a browser with the permission but no event', () => {
     expect(downloadTierOf({ ...base, hasHold: false })).toBe('legacy');
+  });
+
+  it('leaves the legacy guard unarmed for an approval that names no file', () => {
+    expect(
+      downloadTierOf({
+        canDownload: true,
+        canIntercept: true,
+        hasHold: false,
+        hasPermission: true,
+        namesFile: false,
+      })
+    ).toBe('none');
+    expect(
+      downloadTierOf({
+        canDownload: true,
+        canIntercept: true,
+        hasHold: false,
+        hasPermission: true,
+        namesFile: true,
+      })
+    ).toBe('legacy');
   });
 
   it('names one tier per permission and browser combination, never two', () => {
@@ -150,16 +195,8 @@ describe('download tier choice', () => {
     ]);
   });
 
-  it('chooses no guard for a call that cannot start a download or already spent its token', () => {
+  it('chooses no guard for a call that cannot start a download', () => {
     expect(downloadTierOf({ ...base, canDownload: false })).toBe('none');
-    expect(downloadTierOf({ ...base, sensitiveToken: true })).toBe('none');
-  });
-
-  it('guards nothing on a browser whose only guard is the legacy one, when the approval names no file', () => {
-    expect(downloadTierOf({ ...base, approved: true, hasHold: false })).toBe('none');
-    expect(downloadTierOf({ ...base, approved: true, hasHold: false, needsTheFile: true })).toBe(
-      'legacy'
-    );
   });
 });
 

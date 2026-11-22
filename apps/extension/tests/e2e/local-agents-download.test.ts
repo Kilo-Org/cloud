@@ -1,12 +1,17 @@
 /* eslint-disable import/max-dependencies, import/no-nodejs-modules, max-lines, promise/avoid-new, vitest/no-conditional-in-test -- the spec reads a real downloads directory and drives a real hub session */
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { z } from 'zod';
 import { hashBrowserToolArguments } from '../../src/shared/browser-agent-checks';
 import {
+  CARD_PAGE_PATH,
   DOWNLOAD_BODY,
   DOWNLOAD_FILENAME,
   DOWNLOAD_PATH,
+  DROP_PAGE_PATH,
   SECOND_DOWNLOAD_FILENAME,
   startDownloadFixture,
   TWO_DOWNLOADS_PAGE_PATH,
@@ -851,6 +856,183 @@ test("the user's own download in another tab lands during an approved call and i
     expect(nextText).not.toContain(USER_DOWNLOAD_FILENAME);
     expect(await downloadFiles(downloadsPath)).toContain(USER_DOWNLOAD_FILENAME);
   } finally {
+    await launch.close();
+    await hub.close();
+    await fixture.close();
+  }
+});
+
+test('a payment-form submit receives its own approval, and so does the file it starts', async () => {
+  test.setTimeout(180_000);
+  const fixture = await startDownloadFixture();
+  const hub = await startFakeHub();
+  const launch = await launchRealDownloadBrowser();
+  const { context, downloadsPath, extensionId } = launch;
+  await mockKiloApi(context, {});
+  await context.addInitScript({
+    content:
+      "Object.defineProperty(chrome.permissions, 'request', { value: () => Promise.resolve(true) });",
+  });
+
+  try {
+    const sidePanel = await context.newPage();
+    const agentPage = await context.newPage();
+
+    await agentPage.goto(`${fixture.url}${CARD_PAGE_PATH}`);
+
+    const origin = fixture.url;
+    const grants = grant(origin);
+    const session = await openPairedAgentSession({
+      beforeShare: async () => {
+        await activateTab(sidePanel, `${fixture.url}${CARD_PAGE_PATH}`);
+      },
+      context,
+      extensionId,
+      hub,
+      sidePanel,
+      title: 'Card download E2E session',
+    });
+
+    const navigated = await session.callTool(
+      'browser_navigate',
+      { url: `${fixture.url}${CARD_PAGE_PATH}` },
+      grants
+    );
+
+    expect(navigated).toMatchObject({ isError: false, kind: 'result' });
+
+    const target = await controlRef(session, grants, /button "Get receipt" \[ref=(e\d+)\]/u);
+    const args = { element: 'Get receipt', target };
+
+    // 1. The submit is a sensitive step: the call is refused before the page runs, with no `afterAction`.
+    const asked = await session.callTool('browser_click', args, grants);
+
+    expect(asked).toMatchObject({ code: -32_010, kind: 'error' });
+    expect(asked.kind === 'error' ? asked.afterAction : 'not a refusal').toBeUndefined();
+    const askedItems = z
+      .array(permissionItemSchema)
+      .parse(asked.kind === 'error' ? asked.items : []);
+
+    expect(askedItems).toStrictEqual([
+      { class: 'sensitive', origin, reason: 'submitting a form with payment fields' },
+    ]);
+    const sensitiveToken = asked.kind === 'error' ? (asked.stepToken ?? '') : '';
+
+    expect(sensitiveToken).not.toBe('');
+    await expectNothingSaved(downloadsPath);
+
+    // 2. The submit runs on the form's approval; the file it starts takes an approval of its own.
+    const guarded = await session.callTool('browser_click', args, grants, [sensitiveToken]);
+
+    expect(guarded).toMatchObject({ afterAction: true, code: -32_010, kind: 'error' });
+    const guardedItems = z
+      .array(permissionItemSchema)
+      .parse(guarded.kind === 'error' ? guarded.items : []);
+
+    expect(guardedItems).toStrictEqual([
+      { class: 'sensitive', origin, reason: 'downloading a file' },
+    ]);
+    const downloadToken = guarded.kind === 'error' ? (guarded.stepToken ?? '') : '';
+
+    expect(downloadToken).not.toBe('');
+    // The refusal names the file, and the attachment route served it: the click ran.
+    expect(guarded.kind === 'error' ? guarded.message : '').toContain(DOWNLOAD_FILENAME);
+    expect(fixture.hits()).toBeGreaterThan(0);
+    await expectNothingSaved(downloadsPath);
+
+    // 3. The file's own approval keeps that file; its token binds the element the gate classified.
+    const approved = await session.callTool('browser_click', args, grants, [downloadToken]);
+
+    expect(approved).toMatchObject({ isError: false, kind: 'result' });
+    await expectOnlyFinishedFile(downloadsPath, DOWNLOAD_FILENAME);
+    expect(await readDownloadedFile(downloadsPath, DOWNLOAD_FILENAME)).toBe(DOWNLOAD_BODY);
+  } finally {
+    await launch.close();
+    await hub.close();
+    await fixture.close();
+  }
+});
+
+test('a drop that carries local file paths needs the upload approval', async () => {
+  test.setTimeout(180_000);
+  const fixture = await startDownloadFixture();
+  const hub = await startFakeHub();
+  const launch = await launchRealDownloadBrowser();
+  const { context, extensionId } = launch;
+  await mockKiloApi(context, {});
+  await context.addInitScript({
+    content:
+      "Object.defineProperty(chrome.permissions, 'request', { value: () => Promise.resolve(true) });",
+  });
+
+  // A real file outside the browser's profile: the drop hands the page its contents, which is what an approval covers.
+  const localDir = await mkdtemp(join(tmpdir(), 'kilo-drop-proof-'));
+  const localPath = join(localDir, 'drop-proof.txt');
+
+  await writeFile(localPath, 'drop fixture body\n');
+
+  try {
+    const sidePanel = await context.newPage();
+    const agentPage = await context.newPage();
+
+    await agentPage.goto(`${fixture.url}${DROP_PAGE_PATH}`);
+
+    const origin = fixture.url;
+    const grants = grant(origin);
+    const session = await openPairedAgentSession({
+      beforeShare: async () => {
+        await activateTab(sidePanel, `${fixture.url}${DROP_PAGE_PATH}`);
+      },
+      context,
+      extensionId,
+      hub,
+      sidePanel,
+      title: 'Drop upload E2E session',
+    });
+
+    const navigated = await session.callTool(
+      'browser_navigate',
+      { url: `${fixture.url}${DROP_PAGE_PATH}` },
+      grants
+    );
+
+    expect(navigated).toMatchObject({ isError: false, kind: 'result' });
+
+    // A `region` is not an interactive role, so it carries no `[ref=eN]`: the drop names a unique CSS selector.
+    const args = { element: 'Drop zone', paths: [localPath], target: '#zone' };
+
+    // 1. A drop of local paths is an upload: the call is refused before it runs, so the page reports no drop.
+    const guarded = await session.callTool('browser_drop', args, grants);
+
+    expect(guarded).toMatchObject({ code: -32_010, kind: 'error' });
+    const items = z
+      .array(permissionItemSchema)
+      .parse(guarded.kind === 'error' ? guarded.items : []);
+
+    expect(items).toStrictEqual([{ class: 'sensitive', origin, reason: 'uploading a file' }]);
+    const token = guarded.kind === 'error' ? (guarded.stepToken ?? '') : '';
+
+    expect(token).not.toBe('');
+    await expect.poll(() => fixture.dropReceived(), { timeout: 5000 }).toStrictEqual([]);
+
+    // 2. The human approved: the same drop runs and the page receives the one file.
+    const approved = await session.callTool('browser_drop', args, grants, [token]);
+
+    expect(approved).toMatchObject({ isError: false, kind: 'result' });
+    await expect
+      .poll(() => fixture.dropReceived(), { timeout: 20_000 })
+      .toStrictEqual([['drop-proof.txt']]);
+
+    // 3. A drop of page-made data is not an upload: it runs on its own.
+    const dataOnly = await session.callTool(
+      'browser_drop',
+      { data: { 'text/plain': 'hello' }, element: 'Drop zone', target: '#zone' },
+      grants
+    );
+
+    expect(dataOnly).toMatchObject({ isError: false, kind: 'result' });
+  } finally {
+    await rm(localDir, { force: true, recursive: true });
     await launch.close();
     await hub.close();
     await fixture.close();

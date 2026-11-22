@@ -34,6 +34,8 @@ export interface DownloadStep {
   readonly argumentHash: string;
   /** How a report names the step: `click on 'Download report'`, `navigation to https://…`. */
   readonly description: string;
+  /** The element the gate classified this step on, when it classified one: an approval for its file binds it too. */
+  readonly element?: string | undefined;
   /** The noun a report tells the model to repeat: `click`, `navigation`. */
   readonly noun: string;
   readonly origin: string;

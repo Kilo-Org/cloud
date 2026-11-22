@@ -830,8 +830,8 @@ function utilityOf(token) {
  * - L12 judges a side inset at 5 or more, because the page gutter is 14pt.
  * - L2 judges the page inset on a scroll content container, a `CenteredState`
  *   content container and a header's own `className`: the first two must be
- *   exactly `px-4`/`p-4`, and a header owns its own gutter, so it takes no
- *   padding at all.
+ *   exactly `px-4`/`p-4`, except a margin of `auto` (centring) or `0` (no
+ *   inset), and a header owns its own gutter, so it takes no padding at all.
  */
 function parseInset(token) {
   const match = /^-?([a-z]+)-(.+)$/.exec(utilityOf(token));

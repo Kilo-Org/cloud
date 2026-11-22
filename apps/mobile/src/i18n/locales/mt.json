@@ -1375,6 +1375,7 @@
       "manageAccess": "Immaniġġja l-aċċess",
       "bitbucketNoRepositoriesDescription": "M'hemm l-ebda repożitorju disponibbli f'dan l-ispazju tax-xogħol ta' Bitbucket.",
       "gitlabNoRepositoriesDescription": "Jista' jkollok bżonn tagħti aċċess għal aktar gruppi jew proġetti fuq GitLab.",
+      "githubNoRepositoriesDescription": "Iċċekkja l-aċċess għar-repożitorji tal-applikazzjoni Kilo għal GitHub, imbagħad aġġorna.",
       "installGithubApp": "Installa l-app ta' GitHub fuq ir-repożitorji",
       "installGithubAppDescription": "Agħti lill-app ta' Kilo fuq GitHub aċċess għar-repożitorji li trid jiġu riveduti.",
       "repositoryAccess": "aċċess għar-repożitorju",

@@ -733,6 +733,7 @@
       "manageAccess": "Quản lý quyền truy cập",
       "bitbucketNoRepositoriesDescription": "Không có kho lưu trữ nào có thể truy cập trong không gian làm việc Bitbucket này.",
       "gitlabNoRepositoriesDescription": "Bạn có thể cần cấp quyền truy cập thêm nhóm hoặc dự án trên GitLab.",
+      "githubNoRepositoriesDescription": "Hãy kiểm tra quyền truy cập kho mã của ứng dụng Kilo trên GitHub, rồi làm mới danh sách.",
       "installGithubApp": "Cài đặt ứng dụng GitHub cho các kho lưu trữ",
       "installGithubAppDescription": "Cấp quyền truy cập cho ứng dụng Kilo trên GitHub vào các kho lưu trữ bạn muốn rà soát.",
       "repositoryAccess": "quyền truy cập kho lưu trữ",

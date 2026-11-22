@@ -104,14 +104,14 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
       : null;
   const statusFailure = bitbucketConnection?.kind === 'error' ? bitbucketConnection : null;
   // A paused read (offline with no cache) is pending while it fetches nothing, so
-  // `isLoading` is false with `data` still undefined. An unanswered list is not an
-  // empty one: the empty state and its copy wait for the answer, exactly as the
-  // new-session picker keeps that shape on its loading state. Bitbucket resolves
-  // the same window through its own connection classification below.
-  const reposUnanswered =
-    platform !== 'bitbucket' && reposQuery.data === undefined && !reposQuery.isError;
+  // `isLoading` is false while the list has no answer yet. The query's own
+  // `isPending` covers both: an unanswered list is not an empty one, so the empty
+  // state and its copy wait for the answer, exactly as the new-session picker
+  // keeps that shape on its loading state. Bitbucket resolves the same window
+  // through its own connection classification below.
   const reposLoading =
-    reposQuery.isLoading || reposUnanswered || bitbucketConnection?.kind === 'loading';
+    (platform === 'bitbucket' ? reposQuery.isLoading : reposQuery.isPending) ||
+    bitbucketConnection?.kind === 'loading';
   const reposError = reposQuery.isError;
   const reposFetching = reposQuery.isFetching || statusFailure?.isRetrying === true;
   const refetchRepos = () => void reposQuery.refetch();

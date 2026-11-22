@@ -213,6 +213,9 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   useSaveReviewConfig: () => ({ mutate: vi.fn() }),
   useGitHubRepositories: () => ({
     isLoading: state.reposLoading,
+    // A paused read is pending with nothing in flight, so the mock reports the
+    // same predicate the screen reads: pending until the list answers.
+    isPending: state.reposLoading || state.reposUnanswered,
     isError: state.reposError,
     isFetching: false,
     refetch: vi.fn(),
@@ -226,6 +229,7 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   }),
   useGitLabRepositories: () => ({
     isLoading: state.reposLoading,
+    isPending: state.reposLoading || state.reposUnanswered,
     isError: state.reposError,
     isFetching: false,
     refetch: vi.fn(),
@@ -719,8 +723,7 @@ describe('all repositories mode body', () => {
     // widens it.
     expect(emptyState(renderer)).toEqual({
       title: 'No repositories found',
-      description:
-        'No repositories visible. Check repository access for the Kilo GitHub App, then refresh.',
+      description: 'Check repository access for the Kilo GitHub App, then refresh.',
     });
     expect(button(renderer, 'Manage access')).toBeDefined();
     unmount();
@@ -740,7 +743,7 @@ describe('all repositories mode body', () => {
     expect(renderer.root.findAll(node => String(node.type) === 'ChoiceRow')).toHaveLength(2);
     expect(emptyState(renderer).title).toBe('No repositories found');
     expect(emptyState(renderer).description).toBe(
-      'No repositories visible. Check repository access for the Kilo GitHub App, then refresh.'
+      'Check repository access for the Kilo GitHub App, then refresh.'
     );
     unmount();
   });

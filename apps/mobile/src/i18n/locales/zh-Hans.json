@@ -733,6 +733,7 @@
       "manageAccess": "管理访问权限",
       "bitbucketNoRepositoriesDescription": "此 Bitbucket 工作区中没有可用的仓库。",
       "gitlabNoRepositoriesDescription": "你可能需要授予对 GitLab 上更多群组或项目的访问权限。",
+      "githubNoRepositoriesDescription": "请检查 Kilo GitHub 应用的仓库访问权限，然后刷新。",
       "installGithubApp": "为仓库安装 GitHub 应用",
       "installGithubAppDescription": "请授予 Kilo GitHub 应用访问待审查仓库的权限。",
       "repositoryAccess": "仓库访问权限",

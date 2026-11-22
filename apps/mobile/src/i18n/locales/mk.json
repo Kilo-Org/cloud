@@ -1294,6 +1294,7 @@
       "manageAccess": "Управувај со пристапот",
       "bitbucketNoRepositoriesDescription": "Нема достапни складишта во овој работен простор на Bitbucket.",
       "gitlabNoRepositoriesDescription": "Можеби треба да дадеш пристап до повеќе групи или проекти на GitLab.",
+      "githubNoRepositoriesDescription": "Провери дали апликацијата Kilo за GitHub има пристап до репозиториумите, па освежи.",
       "installGithubApp": "Инсталирај ја апликацијата на GitHub за складиштата",
       "installGithubAppDescription": "Дозволи ѝ на апликацијата Kilo за GitHub да пристапи до складиштата што сакаш да се прегледуваат.",
       "repositoryAccess": "пристап до складиштето",

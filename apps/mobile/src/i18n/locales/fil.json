@@ -1294,6 +1294,7 @@
       "manageAccess": "Pamahalaan ang access",
       "bitbucketNoRepositoriesDescription": "Walang magagamit na repository sa workspace na ito sa Bitbucket.",
       "gitlabNoRepositoriesDescription": "Maaaring kailangan mong magbigay ng access sa mas maraming grupo o proyekto sa GitLab.",
+      "githubNoRepositoriesDescription": "Suriin kung may access ang Kilo GitHub App sa mga imbakan ng code, saka i-refresh.",
       "installGithubApp": "I-install ang GitHub app sa mga repository",
       "installGithubAppDescription": "Bigyan ang Kilo GitHub App ng access sa mga repository na gusto mong suriin.",
       "repositoryAccess": "access sa repository",

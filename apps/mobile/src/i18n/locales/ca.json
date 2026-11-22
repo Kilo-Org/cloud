@@ -1321,6 +1321,7 @@
       "manageAccess": "Gestiona l'accés",
       "bitbucketNoRepositoriesDescription": "No hi ha cap repositori disponible en aquest espai de treball de Bitbucket.",
       "gitlabNoRepositoriesDescription": "Pot ser que hagis de concedir accés a més grups o projectes a GitLab.",
+      "githubNoRepositoriesDescription": "Comprova que l'aplicació de Kilo per a GitHub tingui accés als repositoris i actualitza la llista.",
       "installGithubApp": "Instal·la l'aplicació de GitHub als repositoris",
       "installGithubAppDescription": "Concedeix a l'aplicació de GitHub de Kilo accés als repositoris que vols revisar.",
       "repositoryAccess": "accés als repositoris",

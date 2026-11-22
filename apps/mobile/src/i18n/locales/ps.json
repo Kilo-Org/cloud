@@ -1294,6 +1294,7 @@
       "manageAccess": "لاسرسی مدیریت کړئ",
       "bitbucketNoRepositoriesDescription": "د Bitbucket په دې کاري چاپېریال کې هېڅ زېرمتون نشته.",
       "gitlabNoRepositoriesDescription": "ښايي په GitLab کې نورو ډلو یا پروژو ته هم د لاسرسي اجازه ورکړئ.",
+      "githubNoRepositoriesDescription": "وګورئ چې د Kilo GitHub اپلیکیشن زېرمتونونو ته لاسرسی لري، بیا لېست تازه کړئ.",
       "installGithubApp": "د GitHub اپ نصب کړئ",
       "installGithubAppDescription": "د Kilo د GitHub اپ ته هغو زېرمتونونو ته لاسرسی ورکړئ چې غواړئ بیاکتنه یې وشي.",
       "repositoryAccess": "زېرمتون ته لاسرسی",

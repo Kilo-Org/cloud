@@ -1294,6 +1294,7 @@
       "manageAccess": "Кіру рұқсаттарын басқару",
       "bitbucketNoRepositoriesDescription": "Бұл Bitbucket жұмыс кеңістігінде қолжетімді репозиторийлер жоқ.",
       "gitlabNoRepositoriesDescription": "GitLab-та қосымша топтарға немесе жобаларға кіруге рұқсат беру қажет болуы мүмкін.",
+      "githubNoRepositoriesDescription": "Kilo GitHub қолданбасының репозиторийлерге кіру рұқсатын тексеріп, тізімді жаңартыңыз.",
       "installGithubApp": "GitHub қолданбасын репозиторийлерге орнатыңыз",
       "installGithubAppDescription": "GitHub-тағы Kilo қолданбасына тексерілетін репозиторийлерге кіруге рұқсат беріңіз.",
       "repositoryAccess": "репозиторийге кіру рұқсаты",

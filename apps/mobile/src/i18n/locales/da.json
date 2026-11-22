@@ -1294,6 +1294,7 @@
       "manageAccess": "Administrér adgang",
       "bitbucketNoRepositoriesDescription": "Der er ingen tilgængelige kodelagre i dette Bitbucket-arbejdsområde.",
       "gitlabNoRepositoriesDescription": "Du skal muligvis give adgang til flere grupper eller projekter på GitLab.",
+      "githubNoRepositoriesDescription": "Kontrollér, at Kilos GitHub-app har adgang til dine kodelagre, og opdatér derefter listen.",
       "installGithubApp": "Installér GitHub-appen på kodelagre",
       "installGithubAppDescription": "Giv Kilos GitHub-app adgang til de kodelagre, du vil have gennemgået.",
       "repositoryAccess": "adgang til kodelagre",

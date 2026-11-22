@@ -1294,6 +1294,7 @@
       "manageAccess": "Tantano ny alalana hidirana",
       "bitbucketNoRepositoriesDescription": "Tsy misy tahirin-kaody azo ampiasaina ao amin'ity sehatra fiasana Bitbucket ity.",
       "gitlabNoRepositoriesDescription": "Mety mila manome alalana hidirana amin'ny vondrona na tetikasa fanampiny ao amin'ny GitLab ianao.",
+      "githubNoRepositoriesDescription": "Hamarino ny alalan'ny rindranasa Kilo ao amin'ny GitHub hiditra amin'ny tahirin-kaody, dia havaozy ny lisitra.",
       "installGithubApp": "Apetraho amin'ny tahirin-kaody ny rindranasa GitHub",
       "installGithubAppDescription": "Omeo alalana hiditra amin'ny tahirin-kaody tianao hohamarinina ny rindranasa Kilo ao amin'ny GitHub.",
       "repositoryAccess": "alalana hidirana amin'ny tahirin-kaody",

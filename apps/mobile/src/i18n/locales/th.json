@@ -1294,6 +1294,7 @@
       "manageAccess": "จัดการสิทธิ์เข้าถึง",
       "bitbucketNoRepositoriesDescription": "ไม่มีคลังโค้ดที่ใช้งานได้ในพื้นที่ทำงาน Bitbucket นี้",
       "gitlabNoRepositoriesDescription": "คุณอาจต้องให้สิทธิ์เข้าถึงกลุ่มหรือโปรเจกต์เพิ่มเติมบน GitLab",
+      "githubNoRepositoriesDescription": "ตรวจสอบสิทธิ์เข้าถึงคลังโค้ดของแอป Kilo บน GitHub แล้วรีเฟรช",
       "installGithubApp": "ติดตั้ง GitHub App สำหรับคลังโค้ด",
       "installGithubAppDescription": "ให้สิทธิ์ Kilo GitHub App เข้าถึงคลังโค้ดที่คุณต้องการให้ตรวจสอบ",
       "repositoryAccess": "สิทธิ์เข้าถึงคลังโค้ด",

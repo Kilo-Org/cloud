@@ -1294,6 +1294,7 @@
       "manageAccess": "ଅନୁମତି ପରିଚାଳନା କରନ୍ତୁ",
       "bitbucketNoRepositoriesDescription": "ଏହି Bitbucket କାର୍ଯ୍ୟକ୍ଷେତ୍ରରେ କୌଣସି ରିପୋଜିଟୋରୀ ଉପଲବ୍ଧ ନାହିଁ।",
       "gitlabNoRepositoriesDescription": "ଆପଣଙ୍କୁ GitLab ରେ ଅଧିକ ଗୋଷ୍ଠୀ କିମ୍ବା ପ୍ରୋଜେକ୍ଟ ବ୍ୟବହାର କରିବାର ଅନୁମତି ଦେବାକୁ ପଡ଼ିପାରେ।",
+      "githubNoRepositoriesDescription": "Kilo GitHub ଆପ୍‌ର ରିପୋଜିଟୋରୀ ପ୍ରବେଶ ଅନୁମତି ଯାଞ୍ଚ କରି ରିଫ୍ରେସ୍ କରନ୍ତୁ।",
       "installGithubApp": "ରିପୋଜିଟୋରୀଗୁଡ଼ିକରେ GitHub ଆପ୍ ସଂସ୍ଥାପନ କରନ୍ତୁ",
       "installGithubAppDescription": "ଆପଣ ସମୀକ୍ଷା କରାଇବାକୁ ଚାହୁଁଥିବା ରିପୋଜିଟୋରୀଗୁଡ଼ିକୁ ବ୍ୟବହାର କରିବା ପାଇଁ Kilo GitHub ଆପ୍‌କୁ ଅନୁମତି ଦିଅନ୍ତୁ।",
       "repositoryAccess": "ରିପୋଜିଟୋରୀ ବ୍ୟବହାରର ଅନୁମତି",

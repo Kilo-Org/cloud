@@ -1348,6 +1348,7 @@
       "manageAccess": "Spravovat přístup",
       "bitbucketNoRepositoriesDescription": "V tomto pracovním prostoru služby Bitbucket nejsou k dispozici žádné repozitáře.",
       "gitlabNoRepositoriesDescription": "Možná bude nutné udělit přístup k dalším skupinám nebo projektům na GitLabu.",
+      "githubNoRepositoriesDescription": "Zkontrolujte přístup aplikace Kilo k repozitářům ve službě GitHub a obnovte seznam.",
       "installGithubApp": "Instalace aplikace GitHub pro repozitáře",
       "installGithubAppDescription": "Udělte aplikaci Kilo na GitHubu přístup k repozitářům, které chcete nechat zkontrolovat.",
       "repositoryAccess": "přístup k repozitářům",

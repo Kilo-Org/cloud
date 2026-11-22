@@ -1294,6 +1294,7 @@
       "manageAccess": "Хандах эрхийг удирдах",
       "bitbucketNoRepositoriesDescription": "Энэ Bitbucket ажлын талбарт репозитори байхгүй байна.",
       "gitlabNoRepositoriesDescription": "GitLab дээр илүү олон бүлэг эсвэл төсөлд хандах эрх өгөх шаардлагатай байж болно.",
+      "githubNoRepositoriesDescription": "Kilo GitHub аппын кодын санд хандах эрхийг шалгаад жагсаалтыг шинэчилнэ үү.",
       "installGithubApp": "Репозиториудад GitHub апп суулгах",
       "installGithubAppDescription": "Kilo GitHub аппад шалгуулах репозиториуддаа хандах эрх олгоно уу.",
       "repositoryAccess": "репозиторийн хандах эрх",

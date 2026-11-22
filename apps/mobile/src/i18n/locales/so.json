@@ -1294,6 +1294,7 @@
       "manageAccess": "Maamul oggolaanshaha gelitaanka",
       "bitbucketNoRepositoriesDescription": "Ma jiraan kaydad laga heli karo goobtan shaqada ee Bitbucket.",
       "gitlabNoRepositoriesDescription": "Waxaa laga yaabaa inaad u baahato inaad oggolaato gelitaanka kooxo ama mashaariic dheeraad ah oo ku jira GitLab.",
+      "githubNoRepositoriesDescription": "Hubi in barnaamijka Kilo GitHub uu geli karo kaydadka, ka dibna cusboonaysii.",
       "installGithubApp": "Abka GitHub ku rakib kaydadka",
       "installGithubAppDescription": "U oggolow abka Kilo ee GitHub inuu galo kaydadka aad rabto in dib loo eego.",
       "repositoryAccess": "oggolaanshaha gelitaanka kaydka",

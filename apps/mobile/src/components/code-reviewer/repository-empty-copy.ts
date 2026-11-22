@@ -19,11 +19,12 @@ const EMPTY_COPY_KEYS = {
 // can review nothing, so the state is an install prompt; an installed app that
 // lists no repository has an installation to widen instead, and a status that
 // has not answered yet is not evidence the app is missing, so it reads the
-// same as installed.
+// same as installed. The title already says no repositories were found, so the
+// installed description only names widening the installation's access.
 const GITHUB_EMPTY_COPY_KEYS = {
   installed: {
     title: 'common.noRepositoriesFound',
-    description: 'agentChat.newSession.noRepositoriesVisible',
+    description: 'codeReviewer.repos.githubNoRepositoriesDescription',
   },
   notInstalled: {
     title: 'codeReviewer.repos.installGithubApp',

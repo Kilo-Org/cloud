@@ -1386,6 +1386,7 @@
       "manageAccess": "Manage access",
       "bitbucketNoRepositoriesDescription": "No repositories are available in this Bitbucket workspace.",
       "gitlabNoRepositoriesDescription": "You may need to grant access to more groups or projects on GitLab.",
+      "githubNoRepositoriesDescription": "Check repository access for the Kilo GitHub App, then refresh.",
       "installGithubApp": "Install the GitHub app",
       "installGithubAppDescription": "Grant it access to the repositories you want reviewed.",
       "repositoryAccess": "repository access",

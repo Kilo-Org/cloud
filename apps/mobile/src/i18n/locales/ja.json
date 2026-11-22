@@ -733,6 +733,7 @@
       "manageAccess": "アクセス権を管理",
       "bitbucketNoRepositoriesDescription": "このBitbucketワークスペースに利用可能なリポジトリはありません。",
       "gitlabNoRepositoriesDescription": "GitLabで、追加のグループやプロジェクトへのアクセスを許可する必要がある場合があります。",
+      "githubNoRepositoriesDescription": "KiloのGitHubアプリがリポジトリにアクセスできるか確認してから、一覧を更新してください。",
       "installGithubApp": "リポジトリにGitHub Appをインストール",
       "installGithubAppDescription": "レビュー対象のリポジトリへのアクセスをKilo GitHub Appに許可してください。",
       "repositoryAccess": "リポジトリへのアクセス権",

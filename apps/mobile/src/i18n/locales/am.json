@@ -1294,6 +1294,7 @@
       "manageAccess": "መዳረሻን ያስተዳድሩ",
       "bitbucketNoRepositoriesDescription": "በዚህ የBitbucket የሥራ ቦታ ውስጥ ማከማቻዎች የሉም።",
       "gitlabNoRepositoriesDescription": "በGitLab ላይ ወደ ተጨማሪ ቡድኖች ወይም ፕሮጀክቶች የመድረስ ፈቃድ መስጠት ሊያስፈልግዎ ይችላል።",
+      "githubNoRepositoriesDescription": "የKilo GitHub መተግበሪያ ማከማቻዎቹን የመድረስ ፈቃድ እንዳለው ያረጋግጡ፣ ከዚያ ያድሱ።",
       "installGithubApp": "የGitHub መተግበሪያን በማከማቻዎች ላይ ይጫኑ",
       "installGithubAppDescription": "ለKilo የGitHub መተግበሪያ እንዲገመገሙ ወደሚፈልጓቸው ማከማቻዎች የመድረስ ፈቃድ ይስጡ።",
       "repositoryAccess": "የማከማቻ መዳረሻ",

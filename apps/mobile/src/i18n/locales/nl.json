@@ -733,6 +733,7 @@
       "manageAccess": "Toegang beheren",
       "bitbucketNoRepositoriesDescription": "Er zijn geen repositories beschikbaar in deze Bitbucket-werkruimte.",
       "gitlabNoRepositoriesDescription": "Je moet mogelijk toegang verlenen tot meer groepen of projecten op GitLab.",
+      "githubNoRepositoriesDescription": "Controleer of de Kilo GitHub-app toegang heeft tot je repositories en vernieuw de lijst.",
       "installGithubApp": "Installeer de GitHub-app op repositories",
       "installGithubAppDescription": "Geef de Kilo GitHub-app toegang tot de repositories die je wilt laten beoordelen.",
       "repositoryAccess": "toegang tot repositories",

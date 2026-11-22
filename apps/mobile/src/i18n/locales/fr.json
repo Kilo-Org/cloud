@@ -701,6 +701,7 @@
       "manageAccess": "Gérer l'accès",
       "bitbucketNoRepositoriesDescription": "Aucun dépôt n'est disponible dans cet espace de travail Bitbucket.",
       "gitlabNoRepositoriesDescription": "Vous devrez peut-être accorder l'accès à d'autres groupes ou projets sur GitLab.",
+      "githubNoRepositoriesDescription": "Vérifiez les droits d'accès de l'application Kilo aux dépôts GitHub, puis actualisez.",
       "installGithubApp": "Installer l'application GitHub sur les dépôts",
       "installGithubAppDescription": "Accordez à l'application GitHub de Kilo l'accès aux dépôts dont vous souhaitez faire examiner le code.",
       "repositoryAccess": "accès au dépôt",

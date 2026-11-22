@@ -1321,6 +1321,7 @@
       "manageAccess": "Upravljaj pristupom",
       "bitbucketNoRepositoriesDescription": "Nema dostupnih repozitorijuma u ovom Bitbucket radnom prostoru.",
       "gitlabNoRepositoriesDescription": "Možda treba da odobriš pristup za više grupa ili projekata na GitLab-u.",
+      "githubNoRepositoriesDescription": "Proveri da li aplikacija Kilo GitHub ima pristup repozitorijumima, pa osveži spisak.",
       "installGithubApp": "Instaliraj GitHub aplikaciju na repozitorijume",
       "installGithubAppDescription": "Dodeli Kilo GitHub aplikaciji pristup repozitorijumima koje želiš da pregleda.",
       "repositoryAccess": "pristup repozitorijumu",

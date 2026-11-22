@@ -1348,6 +1348,7 @@
       "manageAccess": "Кіраваць доступам",
       "bitbucketNoRepositoriesDescription": "У гэтай працоўнай прасторы Bitbucket няма даступных рэпазіторыяў.",
       "gitlabNoRepositoriesDescription": "Магчыма, вам трэба даць доступ да большай колькасці груп або праектаў на GitLab.",
+      "githubNoRepositoriesDescription": "Праверце, ці мае праграма Kilo для GitHub доступ да іх, і абнавіце спіс.",
       "installGithubApp": "Усталюйце праграму GitHub для рэпазіторыяў",
       "installGithubAppDescription": "Дайце праграме Kilo для GitHub доступ да рэпазіторыяў, якія хочаце правяраць.",
       "repositoryAccess": "доступ да рэпазіторыяў",

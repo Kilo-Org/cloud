@@ -1294,6 +1294,7 @@
       "manageAccess": "ප්‍රවේශය කළමනාකරණය කරන්න",
       "bitbucketNoRepositoriesDescription": "මෙම Bitbucket වැඩබිමේ ගබඩා නොමැත.",
       "gitlabNoRepositoriesDescription": "GitLab හි තවත් කණ්ඩායම් හෝ ව්‍යාපෘති වෙත ප්‍රවේශ වීමට අවසර දීමට ඔබට සිදු විය හැක.",
+      "githubNoRepositoriesDescription": "Kilo GitHub යෙදුමට ගබඩා වෙත ප්‍රවේශ වීමට අවසර තිබේදැයි පරීක්ෂා කර නැවුම් කරන්න.",
       "installGithubApp": "ගබඩා සඳහා GitHub යෙදුම ස්ථාපනය කරන්න",
       "installGithubAppDescription": "සමාලෝචනය කිරීමට අවශ්‍ය ගබඩාවලට ප්‍රවේශ වීමට Kilo GitHub යෙදුමට අවසර දෙන්න.",
       "repositoryAccess": "ගබඩා ප්‍රවේශය",

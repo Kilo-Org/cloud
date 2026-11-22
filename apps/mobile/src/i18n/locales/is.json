@@ -1294,6 +1294,7 @@
       "manageAccess": "Stjórna aðgangi",
       "bitbucketNoRepositoriesDescription": "Engar geymslur eru tiltækar á þessu Bitbucket-vinnusvæði.",
       "gitlabNoRepositoriesDescription": "Þú gætir þurft að veita aðgang að fleiri hópum eða verkefnum á GitLab.",
+      "githubNoRepositoriesDescription": "Athugaðu aðgang GitHub-forritsins frá Kilo að kóðasöfnum og endurnýjaðu svo.",
       "installGithubApp": "Settu upp GitHub-forritið á geymslum",
       "installGithubAppDescription": "Veittu GitHub-forriti Kilo aðgang að geymslunum sem þú vilt láta yfirfara.",
       "repositoryAccess": "aðgang að geymslum",

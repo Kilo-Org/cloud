@@ -1294,6 +1294,7 @@
       "manageAccess": "Կառավարել հասանելիությունը",
       "bitbucketNoRepositoriesDescription": "Bitbucket-ի այս աշխատանքային տարածքում հասանելի պահոցներ չկան։",
       "gitlabNoRepositoriesDescription": "Հնարավոր է՝ պետք է GitLab-ում ավելի շատ խմբերի կամ նախագծերի հասանելիություն տրամադրես։",
+      "githubNoRepositoriesDescription": "Ստուգեք Kilo-ի GitHub հավելվածի՝ պահոցների մուտքի թույլտվությունները, ապա թարմացրեք ցանկը։",
       "installGithubApp": "GitHub հավելվածի տեղադրում պահոցներում",
       "installGithubAppDescription": "Kilo-ի GitHub հավելվածին տրամադրիր այն պահոցների հասանելիությունը, որոնք ուզում ես ստուգել։",
       "repositoryAccess": "պահոցի հասանելիություն",

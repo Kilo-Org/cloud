@@ -1294,6 +1294,7 @@
       "manageAccess": "Girişi idarə et",
       "bitbucketNoRepositoriesDescription": "Bu Bitbucket iş sahəsində repozitoriya mövcud deyil.",
       "gitlabNoRepositoriesDescription": "GitLab-da daha çox qrupa və ya layihəyə giriş icazəsi verməyin lazım ola bilər.",
+      "githubNoRepositoriesDescription": "Kilo GitHub tətbiqinin repozitoriyalara giriş icazəsini yoxla, sonra siyahını yenilə.",
       "installGithubApp": "GitHub tətbiqini repozitoriyalarda quraşdır",
       "installGithubAppDescription": "Kilo GitHub tətbiqinə yoxlanmasını istədiyin repozitoriyalara giriş icazəsi ver.",
       "repositoryAccess": "repozitoriyaya giriş",

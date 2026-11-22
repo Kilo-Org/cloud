@@ -1294,6 +1294,7 @@
       "manageAccess": "Kirish huquqlarini boshqarish",
       "bitbucketNoRepositoriesDescription": "Bu Bitbucket ish maydonida repozitoriyalar mavjud emas.",
       "gitlabNoRepositoriesDescription": "GitLabda qo'shimcha guruh yoki loyihalarga kirish huquqini berishingiz kerak bo'lishi mumkin.",
+      "githubNoRepositoriesDescription": "Kilo GitHub ilovasining repozitoriyalarga kirish ruxsatlarini tekshiring, so'ng ro'yxatni yangilang.",
       "installGithubApp": "GitHub ilovasini repozitoriyalarga o'rnating",
       "installGithubAppDescription": "Kilo GitHub ilovasiga ko'rib chiqilishini xohlagan repozitoriyalaringizga kirish huquqini bering.",
       "repositoryAccess": "repozitoriyaga kirish huquqi",

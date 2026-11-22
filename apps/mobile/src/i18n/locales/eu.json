@@ -1294,6 +1294,7 @@
       "manageAccess": "Kudeatu sarbidea",
       "bitbucketNoRepositoriesDescription": "Ez dago biltegirik erabilgarri Bitbucket-eko lan-eremu honetan.",
       "gitlabNoRepositoriesDescription": "Baliteke GitLab-eko talde edo proiektu gehiagorako sarbidea eman behar izatea.",
+      "githubNoRepositoriesDescription": "Egiaztatu Kilo-ren GitHub aplikazioak biltegietarako sarbidea duela, eta gero freskatu zerrenda.",
       "installGithubApp": "Instalatu GitHub aplikazioa biltegietan",
       "installGithubAppDescription": "Eman Kiloren GitHub aplikazioari berrikusi nahi dituzun biltegietarako sarbidea.",
       "repositoryAccess": "biltegietarako sarbidea",

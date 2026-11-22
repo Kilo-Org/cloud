@@ -1294,6 +1294,7 @@
       "manageAccess": "Phatha ukufinyelela",
       "bitbucketNoRepositoriesDescription": "Azikho izinqolobane zekhodi ezitholakalayo kule ndawo yokusebenza ye-Bitbucket.",
       "gitlabNoRepositoriesDescription": "Kungenzeka udinge ukunikeza ukufinyelela kumaqembu noma amaphrojekthi engeziwe ku-GitLab.",
+      "githubNoRepositoriesDescription": "Hlola imvume yohlelo lokusebenza lwe-Kilo ku-GitHub yokufinyelela ezinqolobaneni zekhodi, bese uvuselela.",
       "installGithubApp": "Faka uhlelo lokusebenza lwe-GitHub ezinqolobaneni zekhodi",
       "installGithubAppDescription": "Nika uhlelo lokusebenza lwe-Kilo ku-GitHub imvume yokufinyelela ezinqolobaneni zekhodi ofuna zihlolwe.",
       "repositoryAccess": "ukufinyelela enqolobaneni yekhodi",

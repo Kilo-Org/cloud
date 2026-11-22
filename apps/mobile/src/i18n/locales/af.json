@@ -1294,6 +1294,7 @@
       "manageAccess": "Bestuur toegang",
       "bitbucketNoRepositoriesDescription": "Geen bewaarplekke is in hierdie Bitbucket-werkruimte beskikbaar nie.",
       "gitlabNoRepositoriesDescription": "Jy moet dalk toegang tot meer groepe of projekte op GitLab verleen.",
+      "githubNoRepositoriesDescription": "Gaan die Kilo GitHub-toep se toegang tot bewaarplekke na en verfris dan die lys.",
       "installGithubApp": "Installeer die GitHub-app op bewaarplekke",
       "installGithubAppDescription": "Gee die Kilo GitHub-app toegang tot die bewaarplekke wat jy wil laat hersien.",
       "repositoryAccess": "bewaarplektoegang",

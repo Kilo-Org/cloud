@@ -1294,6 +1294,7 @@
       "manageAccess": "Ṣàkóso àṣẹ ìwọlé",
       "bitbucketNoRepositoriesDescription": "Kò sí ibi ìpamọ́ nínú àyè iṣẹ́ Bitbucket yìí.",
       "gitlabNoRepositoriesDescription": "Ó ṣeé ṣe kí o nílò láti fúnni ní àṣẹ láti wọlé sí àwọn ẹgbẹ́ tàbí iṣẹ́ sí i lórí GitLab.",
+      "githubNoRepositoriesDescription": "Ṣàyẹ̀wò àṣẹ ìwọlé sí ibi ìpamọ́ kóòdù fún ohun èlò Kilo lórí GitHub, lẹ́yìn náà tún àkójọ náà gbé wọlé.",
       "installGithubApp": "Fi ohun èlò GitHub sórí àwọn ibi ìpamọ́",
       "installGithubAppDescription": "Fún ohun èlò Kilo fún GitHub ní àṣẹ láti wọlé sí àwọn ibi ìpamọ́ tí o fẹ́ kí a ṣàtúnyẹ̀wò.",
       "repositoryAccess": "àṣẹ ìwọlé sí ibi ìpamọ́",

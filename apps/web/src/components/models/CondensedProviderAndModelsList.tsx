@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ChevronDown, ChevronUp, Settings, Lock } from 'lucide-react';
-import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { providerDisplayNames } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/provider-display-names';
 import type { ProviderSelection } from './util';
 
 interface CondensedProviderAndModelsListProps {
@@ -17,17 +17,14 @@ interface CondensedProviderAndModelsListProps {
 }
 
 /**
- * The catalog's display names keyed by the canonical provider slug, which is
- * what a provider selection carries.
+ * The gateway snapshot's display names, keyed by the canonical provider slug
+ * that a provider selection carries. The slug rule and the first-name-wins
+ * dedupe live in `providerDisplayNames`.
  */
-export function providerDisplayNamesBySlug(
+export function displayNamesBySlug(
   providers: ReadonlyArray<{ slug: string; displayName: string }>
 ): Map<string, string> {
-  const map = new Map<string, string>();
-  providers.forEach(provider => {
-    map.set(normalizeInferenceProviderId(provider.slug), provider.displayName);
-  });
-  return map;
+  return new Map(providerDisplayNames({ providers }).map(name => [name.slug, name.displayName]));
 }
 
 export function CondensedProviderAndModelsList({
@@ -39,7 +36,7 @@ export function CondensedProviderAndModelsList({
   const [showAll, setShowAll] = useState(false);
   const { providers, isLoading } = useOpenRouterModelsAndProviders();
 
-  const providerDisplayNames = useMemo(() => providerDisplayNamesBySlug(providers), [providers]);
+  const providerNamesBySlug = useMemo(() => displayNamesBySlug(providers), [providers]);
 
   // Filter selections to only include providers with selected models
   const providersWithSelections = useMemo(() => {
@@ -49,11 +46,11 @@ export function CondensedProviderAndModelsList({
       .filter(selection => selection.models.length > 0)
       .map(selection => ({
         slug: selection.slug,
-        displayName: providerDisplayNames.get(selection.slug) || selection.slug,
+        displayName: providerNamesBySlug.get(selection.slug) || selection.slug,
         modelCount: selection.models.length,
       }))
       .sort((a, b) => a.displayName.localeCompare(b.displayName));
-  }, [selections, providerDisplayNames]);
+  }, [selections, providerNamesBySlug]);
 
   const maxVisible = 4;
   const visibleProviders = showAll

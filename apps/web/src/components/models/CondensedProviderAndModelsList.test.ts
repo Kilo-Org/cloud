@@ -1,17 +1,17 @@
 import { describe, expect, test } from '@jest/globals';
-import { providerDisplayNamesBySlug } from '@/components/models/CondensedProviderAndModelsList';
+import { displayNamesBySlug } from '@/components/models/CondensedProviderAndModelsList';
 
-describe('providerDisplayNamesBySlug', () => {
+describe('displayNamesBySlug', () => {
   test('keys a mixed-case catalog slug by its canonical form', () => {
-    const names = providerDisplayNamesBySlug([{ slug: 'OpenAI', displayName: 'OpenAI' }]);
+    const names = displayNamesBySlug([{ slug: 'OpenAI', displayName: 'OpenAI' }]);
 
     expect(names.get('openai')).toBe('OpenAI');
   });
 
-  test('leaves one entry for rows that canonicalize to one slug', () => {
-    const names = providerDisplayNamesBySlug([
+  test('keeps the first display name when two rows normalize to one slug', () => {
+    const names = displayNamesBySlug([
       { slug: 'OpenAI', displayName: 'OpenAI' },
-      { slug: 'openai', displayName: 'OpenAI' },
+      { slug: 'openai', displayName: 'OpenAI Legacy' },
     ]);
 
     expect(names.size).toBe(1);

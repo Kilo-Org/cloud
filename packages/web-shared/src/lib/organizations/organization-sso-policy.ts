@@ -219,7 +219,9 @@ async function loadOrganizationSsoInput(
   }
 
   return {
-    organizationsById: new Map(organizationRows.map(organization => [organization.id, organization])),
+    organizationsById: new Map(
+      organizationRows.map(organization => [organization.id, organization])
+    ),
     authoritiesByDomain,
   };
 }

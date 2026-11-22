@@ -1918,6 +1918,35 @@ describe('agent browser calls', () => {
     expect([cdp.downloadsDenied(), cdp.downloadsRestored()]).toStrictEqual([1, 1]);
   });
 
+  it('runs one download guard on the retry an upload approval covers', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+
+    const drop = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { paths: ['/tmp/receipt.pdf'], target: '#zone' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_drop',
+      });
+
+    // This call needs the upload approval, and the approval is asked before any work runs.
+    const refused = await drop([]);
+
+    expect(refused).toMatchObject({
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.fileUpload }],
+      kind: 'needs_permission',
+    });
+    // A call that ran nothing arms no guard.
+    expect(cdp.downloadsDenied()).toBe(0);
+
+    // The approval buys the step alone, so the retry it covers still runs exactly one download guard.
+    await drop([expectStepToken(refused)]);
+
+    expect(cdp.downloadsDenied()).toBe(1);
+  });
+
   it('cancels the download whose referrer is this tab\u2019s page', async () => {
     const downloads = createFakeDownloads();
     const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });

@@ -305,6 +305,10 @@ describe('Button native target contract', () => {
     const plated = renderButton({ disabled: true, disabledFace: 'primary' });
     const classes = (plated.props.className as string).split(' ');
     expect(classes).toContain('bg-primary-disabled-action');
+    // The plate must replace the brand fill, not sit beside it: with both
+    // present the stylesheet's order decides the paint, and a disabled Save
+    // that paints brand yellow is the failure this plate exists to prevent.
+    expect(classes).not.toContain('bg-primary');
     expect(classes).not.toContain('bg-muted');
     expect(classes).not.toContain('opacity-50');
     const labelClasses = (plated.findByType(NativeText).props.className as string).split(' ');

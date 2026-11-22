@@ -63,23 +63,23 @@ const DISABLED_OFF_TRACK_ALPHA = { light: 0.8, dark: 0.65 } as const;
  * dark's near-black `primaryForeground` did not (1.1:1 there, with no shadow in
  * the dark scheme to outline it, so the pill read as a blank grey bar).
  *
- * The guarantee, and the only one the tests assert, is that the GRIP separates a
- * disabled control from every live control: it is never a live grip, and it
- * reads on both disabled tracks and on the row. The track distance from a live
- * track is measured on `PreferenceRow`'s light row, whose override makes its
- * live off track `mutedForeground` — light gives 1.83 on↔off, 3.33 on the row,
- * 1.82 off the row, 3.02 and 5.53 grip on each track, 1.94 against the live on
- * track, 2.55 against that live off track and 11.67 against either live grip;
- * dark gives 1.69, 1.60, 2.71, 2.83, 1.67, 1.93, 1.67 and 3.18. On a host that
- * keeps the shared light off pair the disabled off track is that same token at
- * reduced opacity, so it sits close to its live twin by construction and only
- * the grip separates the two; that host therefore relies on the grip, not on a
- * track distance, and the suite asserts exactly that. A disabled half
- * deliberately keeps its position's live hue, so a cross-position comparison is
- * not claimed either. An olive accent track was rejected earlier, when it read
- * as active (`app-notifications` gate, 2026-11-18); keeping the hue at reduced
- * opacity is what separates an unavailable row from a live one now, and every
- * figure above is pinned by `use-theme-colors.contrast.test.ts`.
+ * Two things separate a disabled control from a live one, and
+ * `use-theme-colors.contrast.test.ts` asserts both. The GRIP is never a live
+ * grip and reads on both disabled tracks and on the row, in every scheme. The
+ * TRACK distance from the live track is measured on `PreferenceRow`'s light row,
+ * whose override makes its live off track `mutedForeground` — light gives 1.83
+ * on↔off, 3.33 on the row, 1.82 off the row, 3.02 and 5.53 grip on each track,
+ * 1.94 against the live on track, 2.55 against that live off track and 11.67
+ * against either live grip; dark gives 1.69, 1.60, 2.71, 2.83, 1.67, 1.93, 1.67
+ * and 3.18. On a host that keeps the shared light off pair the disabled off
+ * track is that same token at reduced opacity, so it sits close to its live twin
+ * by construction; there only the grip separates the two, and the suite pins
+ * that case too: the shared off track stays under the floor and the grip clears
+ * it. A disabled half deliberately keeps its position's live hue, so no
+ * cross-position distance is claimed. An olive accent track was rejected
+ * earlier, when it read as active (`app-notifications` gate, 2026-11-18);
+ * keeping the hue at reduced opacity is what separates an unavailable row from a
+ * live one now.
  *
  * Both halves once took the `ringTrack` ink, so the positions looked alike
  * (Android critic, 2026-11-19), and before that `mutedSoft` under the

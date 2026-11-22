@@ -536,10 +536,17 @@ describe('disabled switch pair contrast (non-text)', () => {
   // separation from a live control is the grip alone, and that must hold on the
   // shared pair literally, not only against `PreferenceRow`'s override.
   it('light: on the shared off pair the grip alone separates a disabled row from a live one', () => {
-    const { colors, off, grip } = pairs[0];
-    const liveOffTrack = colors.mutedSoft;
-    expect(contrastRatio(off.track, liveOffTrack)).toBeLessThan(MIN_VISIBLE_SURFACE_RATIO);
-    expect(contrastRatio(grip, liveOffTrack)).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+    // By scheme, not by index: `noUncheckedIndexedAccess` makes a positional
+    // read possibly-undefined, and this case is about light specifically.
+    const light = pairs.find(pair => pair.themeName === 'light');
+    if (light === undefined) {
+      throw new Error('the light scheme is missing from the disabled-pair table');
+    }
+    const liveOffTrack = light.colors.mutedSoft;
+    expect(contrastRatio(light.off.track, liveOffTrack)).toBeLessThan(MIN_VISIBLE_SURFACE_RATIO);
+    expect(contrastRatio(light.grip, liveOffTrack)).toBeGreaterThanOrEqual(
+      MIN_VISIBLE_SURFACE_RATIO
+    );
   });
 
   // The figures the primitive's doc comment cites, so a palette or alpha change

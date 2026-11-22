@@ -13,6 +13,7 @@ import {
   type KiloCommandSource,
 } from '@/components/profiles/profile-kilo-commands-model';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
+import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -34,6 +35,7 @@ import { isolateLtrBidiText } from '@/lib/bidi';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
@@ -57,6 +59,11 @@ export function ProfileKiloCommandsScreen({
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const profileQuery = useAgentProfileKiloCommands(profileId, organizationId);
+  const committedConnectivity = useCommittedConnectivityStatus();
+  const readError = selectProfileReadErrorView({
+    error: profileQuery.error,
+    connectivity: committedConnectivity,
+  });
   const {
     createKiloCommand,
     updateKiloCommand,
@@ -157,10 +164,11 @@ export function ProfileKiloCommandsScreen({
   if (profileQuery.isError) {
     content = (
       <QueryError
-        variant="server"
+        variant={readError.variant}
         placement="top"
-        title={t('profiles.loadFailed')}
-        onRetry={() => void profileQuery.refetch()}
+        title={readError.titleKey ? t(readError.titleKey) : undefined}
+        message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
+        onRetry={readError.showRetry ? () => void profileQuery.refetch() : undefined}
         isRetrying={profileQuery.isRefetching}
       />
     );

@@ -7,6 +7,7 @@ import { toast } from 'sonner-native';
 
 import { EmptyState, StateAction } from '@/components/empty-state';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
+import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { skillRowSubtitle } from '@/components/profiles/skill-markdown';
 import { SkillFormSheet, type SkillFormSubmission } from '@/components/profiles/skill-form-sheet';
@@ -28,6 +29,7 @@ import {
   useAgentProfileSkills,
 } from '@/lib/hooks/use-agent-profiles';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
@@ -161,6 +163,11 @@ export function ProfileSkillsScreen({
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const profileQuery = useAgentProfileSkills(profileId, organizationId);
+  const committedConnectivity = useCommittedConnectivityStatus();
+  const readError = selectProfileReadErrorView({
+    error: profileQuery.error,
+    connectivity: committedConnectivity,
+  });
   const { createCustomSkill, updateSkill, deleteSkill, setSkillEnabled } =
     useAgentProfileMutations(organizationId);
   const permission = useOrganizationProfilePermission(organizationId);
@@ -263,10 +270,11 @@ export function ProfileSkillsScreen({
   if (profileQuery.isError) {
     content = (
       <QueryError
-        variant="server"
+        variant={readError.variant}
         placement="top"
-        title={t('profiles.loadFailed')}
-        onRetry={() => void profileQuery.refetch()}
+        title={readError.titleKey ? t(readError.titleKey) : undefined}
+        message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
+        onRetry={readError.showRetry ? () => void profileQuery.refetch() : undefined}
         isRetrying={profileQuery.isRefetching}
       />
     );

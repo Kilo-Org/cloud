@@ -64,7 +64,7 @@
     "takingLonger": "يستغرق هذا وقتًا أطول من المتوقع. يمكنك إغلاق هذه النافذة والتحقق مرة أخرى.",
     "model": "النموذج",
     "notSelected": "غير محدد",
-    "accessDenied": "لا تملك صلاحية الوصول.",
+    "accessDenied": "تم رفض الوصول",
     "allRepositories": "جميع المستودعات",
     "personal": "شخصي",
     "connectGithub": "ربط GitHub",

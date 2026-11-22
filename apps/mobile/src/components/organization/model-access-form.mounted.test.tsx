@@ -1064,10 +1064,12 @@ describe('ModelAccessForm durable draft', () => {
       });
     });
 
-    it('shows the saved lists to a viewer who changes tab', () => {
-      // The tab control stays available to a viewer, so the read-only state has
-      // to hold across a tab change and a later return to a role that may edit:
-      // the lists come from the saved policy throughout.
+    it('adopts the stored draft when the role returns after a viewer changes tab', () => {
+      // The tab control stays available to a viewer, and looking at another
+      // tab is not an edit: the viewer's tab change must not count as touching
+      // the form, or the stored draft would never be adopted once the role
+      // arrives in the same mount and the person's next edit would overwrite
+      // the account's unfinished work.
       draftStore.kind = 'ready';
       draftStore.value = { providerAllowList: ['openai'], modelDenyList: [] };
       const root = render(['anthropic'], { canEdit: false });
@@ -1076,9 +1078,31 @@ describe('ModelAccessForm durable draft', () => {
       const editorRoot = rerender(['anthropic'], { canEdit: true });
 
       expect(list(editorRoot, 'ProviderAllowList').props.draft).toEqual({
+        providerAllowList: ['openai'],
+        modelDenyList: [],
+      });
+    });
+
+    it('ignores a stored draft that lands while the person is still a viewer', () => {
+      // A draft the store answers late belongs to a session that held the role:
+      // it must not move the lists a viewer is reading, and it stays in the
+      // store for the editor mount that will hold the role again.
+      const root = render(['anthropic'], { canEdit: false });
+
+      selectTab(root, 'providers');
+
+      draftStore.kind = 'ready';
+      draftStore.value = { providerAllowList: ['openai'], modelDenyList: ['anthropic/claude'] };
+      const viewerRoot = rerender(['anthropic'], { canEdit: false });
+      // The deny list renders only on its own tab, so this reads the pair the
+      // form still shows the viewer.
+      selectTab(viewerRoot, 'models');
+
+      expect(list(viewerRoot, 'ModelDenyList').props.draft).toEqual({
         providerAllowList: ['anthropic'],
         modelDenyList: [],
       });
+      expect(draftStore.clear).not.toHaveBeenCalled();
     });
   });
 });

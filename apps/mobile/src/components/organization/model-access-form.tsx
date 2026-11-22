@@ -325,8 +325,15 @@ export function ModelAccessForm({
           value={tab}
           onChange={nextTab => {
             // A tab change is the person looking elsewhere: a draft that lands
-            // after it must not move the lists under the tab they chose.
-            touchedRef.current = true;
+            // after it must not move the lists under the tab they chose. A
+            // viewer has no edits of their own on the form, because the lists
+            // show the saved policy either way, so looking at another tab is
+            // not the person touching anything: marking the form touched would
+            // keep a stored draft from being adopted if the role arrives later
+            // in the same mount, and the person's next edit would overwrite it.
+            if (canEdit) {
+              touchedRef.current = true;
+            }
             setTab(nextTab);
           }}
           accessibilityLabel={t('organization.settingsOnWeb.providersAndModels')}

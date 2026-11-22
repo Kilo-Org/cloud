@@ -3,14 +3,19 @@ import type { authorizeGitLabProject as AuthorizeGitLabProject } from './gitlab-
 import type { GitLabProjectAuthorization } from './gitlab-project-permission';
 
 jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
-  validateGitLabRepoAccessForUser: jest.fn(),
-  getGitLabInstanceUrlForUser: jest.fn(),
+  fetchGitLabRepositoriesForUser: jest.fn(),
 }));
 
-let mockValidateGitLabRepoAccessForUser: jest.MockedFunction<
-  (userId: string, projectPath: string) => Promise<boolean>
+let mockFetchGitLabRepositoriesForUser: jest.MockedFunction<
+  (
+    userId: string,
+    forceRefresh?: boolean
+  ) => Promise<{
+    integrationInstalled: boolean;
+    repositories: { id: number; name: string; fullName: string; private: boolean }[];
+    instanceUrl?: string;
+  }>
 >;
-let mockGetGitLabInstanceUrlForUser: jest.MockedFunction<(userId: string) => Promise<string>>;
 let authorizeGitLabProject: typeof AuthorizeGitLabProject;
 
 function refusalMarkdown(result: GitLabProjectAuthorization): string {
@@ -20,16 +25,18 @@ function refusalMarkdown(result: GitLabProjectAuthorization): string {
 
 beforeAll(async () => {
   const gitlab = await import('@/lib/cloud-agent/gitlab-integration-helpers');
-  mockValidateGitLabRepoAccessForUser = jest.mocked(gitlab.validateGitLabRepoAccessForUser);
-  mockGetGitLabInstanceUrlForUser = jest.mocked(gitlab.getGitLabInstanceUrlForUser);
+  mockFetchGitLabRepositoriesForUser = jest.mocked(gitlab.fetchGitLabRepositoriesForUser);
   authorizeGitLabProject = (await import('./gitlab-project-permission')).authorizeGitLabProject;
 });
 
 describe('authorizeGitLabProject', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockValidateGitLabRepoAccessForUser.mockResolvedValue(true);
-    mockGetGitLabInstanceUrlForUser.mockResolvedValue('https://gitlab.com');
+    mockFetchGitLabRepositoriesForUser.mockResolvedValue({
+      integrationInstalled: true,
+      repositories: [{ id: 1, name: 'project', fullName: 'group/project', private: true }],
+      instanceUrl: 'https://gitlab.com',
+    });
   });
 
   it('allows the conversation project when the run has no requesting account', async () => {
@@ -40,7 +47,7 @@ describe('authorizeGitLabProject', () => {
         threadRepository: ' Group/Project ',
       })
     ).resolves.toEqual({ allowed: true });
-    expect(mockValidateGitLabRepoAccessForUser).not.toHaveBeenCalled();
+    expect(mockFetchGitLabRepositoriesForUser).not.toHaveBeenCalled();
   });
 
   it('refuses another project when the run has no requesting account', async () => {
@@ -54,7 +61,7 @@ describe('authorizeGitLabProject', () => {
 
     expect(markdown).toContain('`group/other`');
     expect(markdown).toContain('GitLab connection in Kilo Code settings');
-    expect(mockValidateGitLabRepoAccessForUser).not.toHaveBeenCalled();
+    expect(mockFetchGitLabRepositoriesForUser).not.toHaveBeenCalled();
   });
 
   it('refuses a project when the run has no requesting account and no conversation project', async () => {
@@ -70,7 +77,11 @@ describe('authorizeGitLabProject', () => {
   });
 
   it('allows a project the requester connection reaches on the same instance', async () => {
-    mockGetGitLabInstanceUrlForUser.mockResolvedValue('https://gitlab.example.test/');
+    mockFetchGitLabRepositoriesForUser.mockResolvedValue({
+      integrationInstalled: true,
+      repositories: [{ id: 2, name: 'project', fullName: 'group/subgroup/project', private: true }],
+      instanceUrl: 'https://gitlab.example.test/',
+    });
 
     await expect(
       authorizeGitLabProject({
@@ -80,15 +91,16 @@ describe('authorizeGitLabProject', () => {
         threadRepository: 'other/thread',
       })
     ).resolves.toEqual({ allowed: true });
-    expect(mockValidateGitLabRepoAccessForUser).toHaveBeenCalledWith(
-      'user-1',
-      'group/subgroup/project'
-    );
-    expect(mockGetGitLabInstanceUrlForUser).toHaveBeenCalledWith('user-1');
+    expect(mockFetchGitLabRepositoriesForUser).toHaveBeenCalledWith('user-1', false);
+    expect(mockFetchGitLabRepositoriesForUser).toHaveBeenCalledWith('user-1', false);
   });
 
   it('refuses a project the requester connection does not reach', async () => {
-    mockValidateGitLabRepoAccessForUser.mockResolvedValue(false);
+    mockFetchGitLabRepositoriesForUser.mockResolvedValue({
+      integrationInstalled: true,
+      repositories: [{ id: 1, name: 'project', fullName: 'group/other', private: true }],
+      instanceUrl: 'https://gitlab.com',
+    });
 
     const markdown = refusalMarkdown(
       await authorizeGitLabProject({
@@ -101,11 +113,15 @@ describe('authorizeGitLabProject', () => {
 
     expect(markdown).toContain('`group/project`');
     expect(markdown).toContain('GitLab connection in Kilo Code settings');
-    expect(mockGetGitLabInstanceUrlForUser).not.toHaveBeenCalled();
+    expect(mockFetchGitLabRepositoriesForUser).toHaveBeenCalledTimes(1);
   });
 
   it('refuses a reachable project when the requester connection is on another instance', async () => {
-    mockGetGitLabInstanceUrlForUser.mockResolvedValue('https://gitlab.example.test');
+    mockFetchGitLabRepositoriesForUser.mockResolvedValue({
+      integrationInstalled: true,
+      repositories: [{ id: 1, name: 'project', fullName: 'group/project', private: true }],
+      instanceUrl: 'https://gitlab.example.test',
+    });
 
     const markdown = refusalMarkdown(
       await authorizeGitLabProject({
@@ -120,7 +136,7 @@ describe('authorizeGitLabProject', () => {
   });
 
   it('propagates a failed requester lookup', async () => {
-    mockValidateGitLabRepoAccessForUser.mockRejectedValue(new Error('lookup failed'));
+    mockFetchGitLabRepositoriesForUser.mockRejectedValue(new Error('lookup failed'));
 
     await expect(
       authorizeGitLabProject({

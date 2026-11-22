@@ -1,9 +1,6 @@
 import 'server-only';
 import { gitlabInstanceOrigin } from '@kilocode/app-shared/provider-review';
-import {
-  getGitLabInstanceUrlForUser,
-  validateGitLabRepoAccessForUser,
-} from '@/lib/cloud-agent/gitlab-integration-helpers';
+import { fetchGitLabRepositoriesForUser } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { normalizeGitLabInstanceUrl } from '@/lib/integrations/platforms/gitlab/instance-url';
 
 export type GitLabProjectAuthorization = { allowed: true } | { allowed: false; markdown: string };
@@ -40,6 +37,11 @@ function instanceOrigin(instanceUrl: string): string | null {
   }
 }
 
+/** The case-insensitive exact full-path compare used by every GitLab scope check. */
+function isSameProject(left: string, right: string): boolean {
+  return left.trim().toLowerCase() === right.trim().toLowerCase();
+}
+
 /**
  * Requires a GitLab identity that reaches the requested project.
  *
@@ -65,25 +67,36 @@ export async function authorizeGitLabProject(params: {
   const { project, projectInstanceUrl, requesterUserId, threadRepository } = params;
 
   if (!requesterUserId) {
-    const conversationProject = threadRepository?.trim().toLowerCase();
-    if (conversationProject && project.trim().toLowerCase() === conversationProject) {
+    if (threadRepository && isSameProject(project, threadRepository)) {
       return { allowed: true };
     }
     return { allowed: false, markdown: projectAccessRequiredMarkdown(project) };
   }
 
-  if (!(await validateGitLabRepoAccessForUser(requesterUserId, project))) {
+  // The requester's own project list, not a single-row lookup: an account can
+  // hold more than one GitLab connection, and the one that answers must be the
+  // one that reaches this project on this instance.
+  const requesterRepositories = await fetchGitLabRepositoriesForUser(requesterUserId, false);
+  if (
+    !requesterRepositories.integrationInstalled ||
+    !requesterRepositories.repositories.some(repository =>
+      isSameProject(repository.fullName, project)
+    )
+  ) {
     return { allowed: false, markdown: projectAccessRequiredMarkdown(project) };
   }
 
   const projectOrigin = instanceOrigin(projectInstanceUrl);
-  const requesterOrigin = instanceOrigin(await getGitLabInstanceUrlForUser(requesterUserId));
-  // An origin that cannot be read leaves the instances unconfirmed, which is
-  // the same answer as an access refusal: allow nothing on a guess.
+  // The requester's connection must be readable and on the session's instance:
+  // the result carries the instance it was read from, so an unreadable value
+  // leaves the comparison unanswered, never allowed.
+  const requesterOrigin = requesterRepositories.instanceUrl
+    ? instanceOrigin(requesterRepositories.instanceUrl)
+    : null;
   if (!projectOrigin || !requesterOrigin) {
     return { allowed: false, markdown: projectAccessRequiredMarkdown(project) };
   }
-  if (projectOrigin !== requesterOrigin) {
+  if (requesterOrigin !== projectOrigin) {
     return { allowed: false, markdown: instanceMismatchMarkdown(project) };
   }
 

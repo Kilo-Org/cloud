@@ -63,10 +63,11 @@ type InstructionNameHintLineProps = Readonly<{
 }>;
 
 /**
- * The one line under the name field: the slug a save will store, or the rule a
- * name must follow when the fold leaves nothing to store. The row keeps one
- * text line's height in every state, with no copy or a transparent copy, so the
- * content field below never moves while the name is typed. The rule goes
+ * The line under the name field: the slug a save will store, or the rule a name
+ * must follow when the fold leaves nothing to store. The row is reserved at the
+ * height the rule sentence wraps to in the current catalog, with a transparent
+ * copy in native layout, so the content field below never moves while the name
+ * is typed and the rule always fits without growing the form. The rule goes
  * through `AccessibleStatus`, so a reader using a screen reader hears it while
  * typing instead of at Save, and it stays quiet while the field's own error
  * already states the same sentence.
@@ -78,12 +79,14 @@ function InstructionNameHintLine({ hint, nameError }: InstructionNameHintLinePro
   return (
     <View>
       {/* The rule sentence holds the row's height in native layout, invisible,
-          so the row never depends on which line shows. The preview may be
-          longer than the rule once a name folds to a long slug, so it stays one
-          line and always fits the room the rule reserved. Its ellipsis sits in
-          the middle, the app's treatment for an identifier: the stored file
-          name is the only new information on the line, so both its ends stay
-          readable, including in the catalogs that put the slug last. */}
+          so the row never depends on which line shows and the rule is never
+          clipped. A long catalog sentence therefore reserves more than one text
+          line; that is the price of stating the rule in full without moving the
+          content field when it appears. The preview can be longer than the rule
+          once a name folds to a long slug, so it stays one line and its ellipsis
+          sits in the middle, the app's treatment for an identifier: both ends of
+          the stored file name stay readable, including in the catalogs that put
+          the slug last. */}
       <Text
         className="text-xs opacity-0"
         accessibilityElementsHidden

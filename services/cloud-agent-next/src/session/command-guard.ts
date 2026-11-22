@@ -317,12 +317,12 @@ const SECURITY_REMEDIATION_ALLOWED_COMMANDS = [
   'rm',
 ];
 
-// This policy admits the plain push, and requires every other push form to
+// This policy admits the plain push and requires every other push form to
 // resolve to deny. A push rewrites remote history only when it carries an
-// option or a `+` before a refspec, and a rule is anchored at both ends of the
-// whole command text with neither a character class nor a way to see one
-// argument token. So the requirement is stated as one rule per position: a push
-// that carries an option, and a push that carries a `+` refspec.
+// option or a `+` refspec, or when git reads a force from its own
+// configuration. A rule is anchored at both ends of the whole command text,
+// with neither a character class nor a way to see one argument token, so the
+// requirement is stated as one rule per position.
 //
 // A shell hands git the command after its own word splitting, so any run of
 // spaces or tabs is one separator. A rule cannot bound a run, so the head takes
@@ -332,13 +332,29 @@ const SECURITY_REMEDIATION_ALLOWED_COMMANDS = [
 // separator, so a command whose own text names a push option is refused too; the
 // reachable push forms are the plain ones below.
 //
-// git can also take the refspec and the force flag from its own configuration,
+// A shell expands a `$` or a backtick before git sees the command, and no
+// anchored rule can see the split or the substituted text, so the whole policy
+// refuses both characters.
+//
+// A shell also hands git one command for a line continuation. The matcher
+// normalizes a backslash to a slash in both the pattern and the command, so a
+// continuation reads as a slash before a newline, and the push rule for it
+// reaches both a continued line and a literal slash before a newline.
+//
+// git can take the refspec and the force flag from its own configuration,
 // where a rule that reads only the command text cannot see them. A configuration
 // write that names a push key, a force key, a mirror key or an alias is
 // therefore refused too, whether the write is `git config` or the `-c
 // key=value` form on the command line. The forms below also refuse the reads of
 // those keys: a rule that admits a read would also admit a write appended to it,
 // because a trailing `*` cannot stop before the next argument.
+//
+// The repository's own configuration file is refused by the directory spelling
+// and the file-name prefix, for the literal spelling and the one-character glob
+// spelling, and a command that enters that directory is refused as well so a
+// relative write of the file cannot follow. The bound: a command that writes the
+// configuration through a differently spelled path is not covered by these
+// rules; the edit tool's own map denies the same file separately.
 //
 // The denies are installed after the `git push` allow, and the last matching
 // rule decides. A ref that is deleted by name, with `--delete` or with an empty
@@ -361,11 +377,17 @@ const SECURITY_REMEDIATION_PUSH_DENIED_PATTERNS = [
   `${SECURITY_REMEDIATION_PUSH_HEAD}*'*`,
   `${SECURITY_REMEDIATION_PUSH_HEAD}*"*`,
   // The matcher normalizes a backslash to a slash in both the pattern and the
-  // command, so these two rules reach a command that carries a backslash before
-  // the option or the `+`.
+  // command, so these rules reach a command that carries a backslash before the
+  // option or the `+`. The same normalization makes the last rule reach a line
+  // continuation, which a shell hands to git inside one command.
   `${SECURITY_REMEDIATION_PUSH_HEAD}*/-*`,
   `${SECURITY_REMEDIATION_PUSH_HEAD}*/+*`,
+  `${SECURITY_REMEDIATION_PUSH_HEAD}*/\n*`,
 ];
+
+// The repository's own directory name, written once as text and once for each
+// glob spelling a shell would resolve to the same directory.
+const SECURITY_REMEDIATION_GIT_DIR_SPELLINGS = ['.git', '.g?t', '.g*t'];
 
 const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   'git config *push*',
@@ -407,10 +429,19 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   'git*-c*.*=*',
   'git*-c*?=*',
   // git reads the same configuration from the repository's own file, which a
-  // shell command can rewrite directly, so a command that names that file is
-  // refused as well.
-  '*.git/config*',
-  '*git/config*',
+  // shell command can rewrite directly. The file is refused by the directory
+  // spelling and the file-name prefix, so `config`, `confi?` and `con?ig` are
+  // all covered, and a command that enters the directory is refused as well so
+  // a relative write of the file cannot follow. The second `cd` form also
+  // covers a trailing slash, because `*` matches an empty run. The user's own
+  // configuration file is refused by name. The bound: a path spelled some other
+  // way is not covered here; the edit tool's own map denies the same file.
+  ...SECURITY_REMEDIATION_GIT_DIR_SPELLINGS.flatMap(spelling => [
+    `cd *${spelling}`,
+    `cd *${spelling}/*`,
+    `*${spelling}/con*`,
+  ]),
+  '*gitconfig*',
 ];
 
 // Installed after the denies, and only for the branch-creation form, whose `-c`
@@ -471,6 +502,10 @@ export function getCommandGuardPolicy(
       allowed: SECURITY_REMEDIATION_ALLOWED_COMMANDS,
       denied: [...DEFAULT_DENIED_COMMAND_PATTERNS, ...SECURITY_REMEDIATION_DENIED_COMMAND_PATTERNS],
       allowedAfterDenied: SECURITY_REMEDIATION_GIT_INLINE_ALLOWED_AFTER_DENIED,
+      // A shell expands a `$` or a backtick before git sees the command, so the
+      // text a rule reads is not the text git runs. Installed last, so it
+      // decides every command that carries either character.
+      terminalDenied: ['*$*', '*`*'],
     };
   }
 

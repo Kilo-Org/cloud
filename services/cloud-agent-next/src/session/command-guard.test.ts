@@ -498,6 +498,33 @@ describe('security-remediation push command guard policy', () => {
       'git push ""--force',
       'git push ""+main',
       "git push ''--force",
+      // A shell expands `$` and a backtick before git sees the command, so the
+      // whole policy refuses both characters.
+      'git push${IFS}--force',
+      'git push${IFS}-f',
+      'git push${IFS}--mirror',
+      'git push$IFS--force',
+      'git push ${IFS}--force',
+      'git push `cat /tmp/ref`',
+      'git push $(cat /tmp/ref)',
+      // The repository's own configuration file, by directory spelling and file
+      // name prefix, through a literal and a glob path, and through a `cd` into
+      // the directory that would let a relative write follow.
+      'echo "[alias]" >> ~/.gitconfig',
+      'echo "p = push --force" >> ~/.gitconfig',
+      'cat ~/.gitconfig',
+      'cp /tmp/evil .git/confi?',
+      'cp /tmp/evil .g?t/config',
+      'mv /tmp/evil .git/con?ig',
+      'cd .git',
+      'cd .git/',
+      'cd /tmp/repo/.git',
+      'cd .git/refs',
+      // A shell hands a line continuation to git inside one command; the
+      // matcher normalizes the backslash to a slash, so the push rules reach it.
+      'git push \\\n--force',
+      'git push \\\n--mirror',
+      'git push origin \\\n+main',
     ]) {
       expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('deny');
     }
@@ -529,6 +556,18 @@ describe('security-remediation push command guard policy', () => {
       'git branch -c a b',
       'git -C . branch -c a b',
       'git commit -m "tidy the retry path"',
+      'cd .github',
+      'cd .github/workflows',
+      'cat .gitignore',
+      'cat .github/workflows/ci.yml',
+      'cat package/config.json',
+      "sed -i 's/^x/y/' src/app.ts",
+      "jq '.a' package.json",
+      'echo "all done"',
+      'git push origin fix-cache',
+      'git checkout -b fix-cache',
+      'git commit -m "fix pre-commit hook"',
+      'pnpm test -- package',
     ]) {
       expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('allow');
     }

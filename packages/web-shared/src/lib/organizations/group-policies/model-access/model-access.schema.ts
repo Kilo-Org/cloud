@@ -156,7 +156,7 @@ export const OrganizationGroupModelAccessPolicySchema = z
 // `never` would even satisfy `extends true`, so neither fails typecheck alone.
 type AssertTrue<T extends true> = T;
 
-export type _AssertModelAccessMatchesDb = AssertTrue<
+type _AssertModelAccessMatchesDb = AssertTrue<
   z.infer<
     typeof OrganizationGroupModelAccessPolicySchema
   > extends OrganizationGroupModelAccessPolicy

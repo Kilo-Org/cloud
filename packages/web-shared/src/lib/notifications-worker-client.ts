@@ -42,7 +42,7 @@ const GLANCEABLE_REFRESH_ENDPOINT: InternalWorkerEndpointSpec = {
   tag: 'glanceable-refresh',
 };
 
-type InternalWorkerEndpoint = { url: URL; secret: string; failureLabel: string; tag: string };
+type InternalWorkerEndpoint = { url: URL; secret: string; failureLabel: string };
 
 type InternalPostResult =
   | { ok: true; response: Response }
@@ -77,7 +77,7 @@ function resolveInternalWorkerEndpoint(
     );
     return null;
   }
-  return { url, secret: INTERNAL_API_SECRET, failureLabel: spec.failureLabel, tag: spec.tag };
+  return { url, secret: INTERNAL_API_SECRET, failureLabel: spec.failureLabel };
 }
 
 /**

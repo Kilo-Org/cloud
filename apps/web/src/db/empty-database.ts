@@ -1,4 +1,7 @@
 import '../lib/load-env';
+// Settles the script connection before drizzle reads it, so the reset and the documented
+// `pnpm drizzle migrate` follow-up always name the same database.
+import './require-reset-target';
 import { sql } from 'drizzle-orm';
 import { db, primaryDatabaseHost } from '@kilocode/web-shared/lib/drizzle';
 import { isLoopbackHostname } from '@kilocode/web-shared/lib/loopback-host';

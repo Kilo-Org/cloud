@@ -25,7 +25,6 @@ import type {
   DownloadTier,
   StepTokenNeed,
   StepTokenStore,
-  StepTokenTake,
 } from './browser-agent-checks';
 import { postAgentNavigate, preflightAgentCall, takeStartedDownloads } from './browser-agent-gate';
 import type { BrowserSensitiveStep } from './browser-agent-gate';
@@ -438,6 +437,12 @@ interface GuardSettlement {
 interface DownloadGuard {
   readonly settle: () => Promise<GuardSettlement>;
 }
+
+/** What this call redeemed, and what it buys: nothing, the step alone, or the one file its approval names. */
+type RedeemedApproval =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'step' }
+  | { readonly kind: 'file'; readonly need?: StepTokenNeed | undefined };
 
 /**
  * The text an approved navigate reports when the file it started was kept.
@@ -3375,45 +3380,53 @@ export const createBrowserRuntime = ({
         }
 
         // A download approval is post-action, so the gate cannot classify it on retry; a presented token bound to this
-        // A download approval is post-action, so the gate cannot classify it on retry; a presented token bound to this
-        // Session, tab, tool and argument set is what an approval for a file looks like. The approval the gate
-        // Redeemed is one source of it.
-        let approval: StepTokenTake =
-          preflight?.ok === true && preflight.sensitiveToken !== undefined
-            ? {
-                ok: true,
-                ...(preflight.sensitiveToken.need === undefined
-                  ? {}
-                  : { need: preflight.sensitiveToken.need }),
-              }
-            : { ok: false };
+        // A call redeems one approval per token it presents; only an approval that names a file exempts it.
+        const gateApproval = preflight?.ok === true ? preflight.sensitiveToken : undefined;
+        const redeemedFromGate = (): RedeemedApproval => {
+          if (gateApproval === undefined) {
+            return { kind: 'none' };
+          }
+
+          return gateApproval.need === undefined
+            ? { kind: 'step' }
+            : { kind: 'file', need: gateApproval.need };
+        };
+
+        let redeemed: RedeemedApproval = redeemedFromGate();
 
         // The tokens the gate redeemed are burnt, so their take fails here without spending anything else: this loop
-        // Redeems the download approval a call carries besides its step approval. A redemption that names a file wins
-        // Over one that names none, so a call carrying both approvals keeps the file the human approved.
+        // Redeems the file approval a call carries besides its step approval; a take that names a file wins.
         if (agentContext !== undefined && preflight !== undefined && preflight.ok) {
           for (const token of presentedTokens) {
-            const redeemed = tokens.take(token, {
+            const take = tokens.take(token, {
               argumentHash: stepHash,
+              // The element the gate classified this call on, when it did.
+              ...(preflight.sensitiveToken?.element === undefined
+                ? {}
+                : { element: preflight.sensitiveToken.element }),
               origin: preflight.origin,
               session: sessionKey,
               tabId: stepTab ?? tabId,
               toolName: stepToolName,
             });
 
-            if (redeemed.ok && redeemed.need !== undefined) {
-              approval = redeemed;
+            // A take that names a file wins; one that names none fills a call that redeemed nothing yet.
+            if (take.ok && take.need !== undefined) {
+              redeemed = { kind: 'file', need: take.need };
               break;
             }
 
-            if (redeemed.ok && !approval.ok) {
-              approval = redeemed;
+            if (take.ok && redeemed.kind === 'none') {
+              redeemed = { kind: 'file' };
             }
           }
         }
 
-        // The one file the approval buys, when it names one: that file is exempt from the guard.
-        const downloadApproved = approval.ok;
+        // Whether the human approved this call: its step, or the one file the approval names.
+        const downloadApproved = redeemed.kind !== 'none';
+        // The one file the approval buys, when it names one: that file is exempt, and every other file this call
+        // Starts is guarded as usual and reported with its own token.
+        const approvedNeed = redeemed.kind === 'file' ? redeemed.need : undefined;
         /** The approval's one file, armed on the hold once this call's step is known. */
         let approvedFile: {
           readonly need: StepTokenNeed;
@@ -3425,11 +3438,9 @@ export const createBrowserRuntime = ({
         if (downloadApproved) {
           lastApprovedAt.set(sessionKey, Date.now());
 
-          const { need } = approval;
-
-          if (need !== undefined) {
-            approvedNeeds.set(sessionKey, { itemId: undefined, ...need });
-            approvedFile = { need, session: sessionKey };
+          if (approvedNeed !== undefined) {
+            approvedNeeds.set(sessionKey, { itemId: undefined, ...approvedNeed });
+            approvedFile = { need: approvedNeed, session: sessionKey };
           }
         }
 
@@ -3611,7 +3622,7 @@ export const createBrowserRuntime = ({
           canIntercept: debuggerApi !== undefined,
           hasHold: downloadHold !== undefined,
           hasPermission: downloadsPermission !== undefined,
-          namesFile: !downloadApproved || approval.need !== undefined,
+          namesFile: redeemed.kind !== 'file' || redeemed.need !== undefined,
         });
         // An act call runs guarded: an unapproved one denies downloads outright, and an approved one listens and
         // Stops every download but the file its approval bought, so a second file is neither kept nor silent.
@@ -4125,20 +4136,15 @@ export const createBrowserRuntime = ({
           // A Document this call started and the browser has not answered yet is not blocked either: its item can
           // Still arrive, and calling it blocked would spend the human's approval on a file the browser is writing.
           if (
-            downloadApproved &&
+            approvedNeed !== undefined &&
             settled.ok &&
             ownLate.length === 0 &&
             settleState !== 'waiting_for_item' &&
             !hasUnansweredDocument() &&
             downloadHold.needOf(sessionKey)?.kind === 'armed'
           ) {
-            const approvedNeed = approvedFile?.need;
-
             return browserBlockedRefusal({
-              need:
-                approvedNeed === undefined
-                  ? undefined
-                  : { kind: 'page', tabId: approvedNeed.tabId, url: approvedNeed.url },
+              need: { kind: 'page', tabId: approvedNeed.tabId, url: approvedNeed.url },
               origin: preflight?.ok ? preflight.origin : '',
               step: downloadStep,
               tokenTabId: runTabId,
@@ -4351,8 +4357,9 @@ export const createBrowserRuntime = ({
         // For it, Chrome's own multiple-downloads limiter has refused the file: a plain success would hide it, and a
         // Spent approval would ask a human again for a file the browser swallowed. The approval stays unspent, and
         // The same step token is issued again so the repeat needs no second decision once the site is allowed.
+        // A call whose approval names no file owes none: a success that names no item is its answer.
         if (
-          downloadApproved &&
+          approvedNeed !== undefined &&
           // Only the item-level guard can tell "no file was created" from "another guard owns the decision".
           downloadGuard !== undefined &&
           successText === undefined &&

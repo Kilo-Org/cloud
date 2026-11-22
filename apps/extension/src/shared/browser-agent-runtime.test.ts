@@ -919,6 +919,52 @@ describe('agent browser calls', () => {
     expect(suggested).toStrictEqual([51, 52]);
   });
 
+  it('gives the file a step-approved submit starts its own approval', async () => {
+    // A granted `downloads` permission and no hold is the legacy tier.
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+
+    // A submit inside a form that holds a payment field: the gate refuses the first call before the tool runs.
+    cdp.setProbe({ fields: [], paymentFormSubmit: true });
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': params => {
+        if (params?.['type'] === 'mousePressed') {
+          downloads.emit({ id: 61, tabId: TAB_ID, url: `${MAIN_ORIGIN}/report.txt` });
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    const sensitiveRefusal = await click([]);
+
+    expect(sensitiveRefusal).toMatchObject({
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.cardFormSubmit }],
+      kind: 'needs_permission',
+    });
+
+    // The submit runs on the step approval, and the file it starts takes an approval of its own.
+    const refused = await click([expectStepToken(sensitiveRefusal)]);
+
+    expect(refused).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+    // The guard cancelled the file through chrome.downloads and named it.
+    expect(downloads.cancelled).toStrictEqual([61]);
+    expect(expectStepToken(refused)).toBeDefined();
+  });
+
   it('fails the response of a file a payment-form submit starts when the downloads permission is withheld', async () => {
     // No downloads API and no hold: the response that would become a file is the one guard this browser has.
     const { cdp, runtime } = await createHarness({ downloadsGranted: false });

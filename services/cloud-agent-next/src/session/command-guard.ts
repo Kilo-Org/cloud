@@ -389,9 +389,11 @@ const SECURITY_REMEDIATION_SPLIT_WORD_DENIED_PATTERNS =
   SECURITY_REMEDIATION_SPLITTABLE_WORDS.flatMap(word =>
     Array.from({ length: word.length - 1 }, (_, index) => {
       const split = `${word.slice(0, index + 1)}/${word.slice(index + 1)}`;
-      // A split inside `git` itself would name the command root, so that one
-      // position keeps the generic head.
-      return split.startsWith('git/') ? '*git/*' : `*${split}*`;
+      // A split of the command word itself must stay anchored to the command
+      // start, or the rule would refuse any path that happens to contain those
+      // characters. A split of a subcommand word sits inside the command, so it
+      // takes a wildcard on each side.
+      return word === 'git' ? `${split} *` : `*${split}*`;
     })
   );
 

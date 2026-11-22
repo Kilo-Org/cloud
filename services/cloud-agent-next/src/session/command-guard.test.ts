@@ -601,6 +601,8 @@ describe('security-remediation push command guard policy', () => {
       'mv src/config.ts src/conf.ts',
       'cp config.example.json config.test.json',
       'cat .gitignore',
+      'cat assets/g/it.png',
+      'cat docs/gi/t.md',
       'cat .github/workflows/ci.yml',
       'cat package/config.json',
       "sed -i 's/^x/y/' src/app.ts",

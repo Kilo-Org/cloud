@@ -554,6 +554,46 @@ describe('ScreenHeader mounted', () => {
     ).toHaveLength(0);
   });
 
+  it('reflows on the row the side insets leave, not on the raw window width', () => {
+    // A landscape cutout pads the inner wrapper, so the row is narrower than
+    // the window. At 340dp the 130dp cluster leaves the title 155.5dp
+    // (340 - 44 - 10.5 - 130), above its 120dp minimum: one row. With the
+    // window's 47 + 59 side insets the same header has 49.5dp for the title
+    // (340 - 47 - 59 - 44 - 10.5 - 130), so the slots take rows of their own.
+    Object.assign(layout, { width: 340, fontScale: 1 });
+    Object.assign(safeArea, { left: 47, right: 59 });
+
+    const stackedCluster = renderHeader({
+      title: 'Sessions',
+      headerRight: slotView(),
+      headerRightWidth: 130,
+    });
+    expect(stackedCluster.root.findAll(isStackedActionsRow)).toHaveLength(1);
+
+    const stackedInline = renderHeader({
+      title: 'Agents',
+      inlineActions: slotView(),
+      inlineActionsWidth: 130,
+    });
+    expect(stackedInline.root.findAll(isStackedActionsRow)).toHaveLength(1);
+
+    // Without the side insets the row is the window, and both keep one row.
+    Object.assign(safeArea, { left: 0, right: 0 });
+    const singleCluster = renderHeader({
+      title: 'Sessions',
+      headerRight: slotView(),
+      headerRightWidth: 130,
+    });
+    expect(singleCluster.root.findAll(isStackedActionsRow)).toHaveLength(0);
+
+    const singleInline = renderHeader({
+      title: 'Agents',
+      inlineActions: slotView(),
+      inlineActionsWidth: 130,
+    });
+    expect(singleInline.root.findAll(isStackedActionsRow)).toHaveLength(0);
+  });
+
   it("keeps a mark-only heading's inlineActions on the row when the caller forbids a reflow", () => {
     // The shared-row check reserves 120dp of readable title per font-scale
     // unit: at a 1.5x scale in a 220dp window that reserve is 180dp against
@@ -968,7 +1008,10 @@ describe('ScreenHeader mounted', () => {
     }
   );
 
-  it('labels the title with its own text and hints at the action', () => {
+  it('announces the title first and its action second', () => {
+    // iOS reads the action from the hint beside the name. Android's hint is
+    // only a tooltip (`ConfigureRow` documents the same rule), so its name
+    // carries the action after the title.
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
     const title = findTitlePressable(renderer.root);
     expect(title.props.accessibilityLabel).toBe('Sessions');
@@ -982,6 +1025,21 @@ describe('ScreenHeader mounted', () => {
     const custom = findTitlePressable(customRenderer.root);
     expect(custom.props.accessibilityLabel).toBe('Sessions');
     expect(custom.props.accessibilityHint).toBe('Rename session');
+
+    platform.OS = 'android';
+    const android = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
+    const androidTitle = findTitlePressable(android.root);
+    expect(androidTitle.props.accessibilityLabel).toBe('Sessions, Open menu for Sessions');
+    expect(androidTitle.props.accessibilityHint).toBe('Open menu for Sessions');
+
+    const androidCustom = renderHeader({
+      title: 'Sessions',
+      onTitlePress: () => undefined,
+      onTitlePressAccessibilityHint: 'Rename session',
+    });
+    const androidCustomTitle = findTitlePressable(androidCustom.root);
+    expect(androidCustomTitle.props.accessibilityLabel).toBe('Sessions, Rename session');
+    expect(androidCustomTitle.props.accessibilityHint).toBe('Rename session');
   });
 
   it('renders the close icon and label for backIcon="close"', () => {

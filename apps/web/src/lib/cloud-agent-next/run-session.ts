@@ -389,17 +389,20 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
   );
 
   const droppedCount = log.droppedCount();
-  // The Discord caller keeps only the first ~2000 characters of this reply, so
-  // the note must sit at the front to survive that cut.
-  const omittedNote = droppedCount > 0 ? `(+${droppedCount} earlier lines omitted)` : undefined;
+  // The Discord caller keeps only the first ~2000 characters of this reply.
+  // Two kinds of line never reach it: the ones the log let go, and the retained
+  // ones too old to fit what the reply shows. One note counts both.
+  const missingNote = (shown: number) => {
+    const missing = droppedCount + log.entries().length - shown;
+    return missing > 0 ? `(+${missing} earlier lines omitted)` : undefined;
+  };
 
   if (hasError) {
     // The chat surface posts only the first part of this reply, so build the
     // details from the newest lines that fit the budget: a forward slice would
     // spend the visible space on the oldest diagnostics.
-    const details = [errorMessage, omittedNote, ...newestLines(log.entries(), REPLY_DETAIL_BUDGET)]
-      .filter(Boolean)
-      .join('\n');
+    const shown = newestLines(log.entries(), REPLY_DETAIL_BUDGET);
+    const details = [errorMessage, missingNote(shown.length), ...shown].filter(Boolean).join('\n');
     return {
       response: `Cloud Agent session ${sessionId} encountered errors:\n${details}`,
       sessionId,
@@ -417,7 +420,8 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
     };
   }
 
-  const tail = [omittedNote, ...log.entries().slice(-5)].filter(Boolean).join('\n');
+  const recent = log.entries().slice(-5);
+  const tail = [missingNote(recent.length), ...recent].filter(Boolean).join('\n');
   return {
     response: `Cloud Agent session ${sessionId} completed successfully.\n\nStatus:\n${tail}`,
     sessionId,

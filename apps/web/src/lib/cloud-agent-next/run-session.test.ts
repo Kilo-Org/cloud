@@ -178,12 +178,22 @@ describe('runSessionToCompletion', () => {
     expect(result.statusMessages.length).toBeLessThanOrEqual(STATUS_LOG_MAX_ENTRIES);
     const retainedLength = result.statusMessages.reduce((sum, line) => sum + line.length, 0);
     expect(retainedLength).toBeLessThanOrEqual(STATUS_LOG_MAX_TOTAL_LENGTH);
-    expect(result.response).toMatch(/\(\+\d+ earlier lines omitted\)/);
 
     // The posted reply keeps the first part only, so it must carry the newest
     // lines rather than spend that space on the oldest ones.
     const posted = result.response.slice(0, 2000);
     expect(posted).toContain('[stderr] stderr line 599');
     expect(posted).not.toContain('[stderr] stderr line 1\n');
+
+    // The note must account for every streamed line the reply does not show:
+    // the ones the log let go plus the retained ones too old to fit the reply
+    // budget. The completion line is also shown but is not a streamed status or
+    // stderr line, so it appears in neither term.
+    const shown = posted
+      .split('\n')
+      .filter(line => /^(?:status line|\[stderr\])/.test(line)).length;
+    const noteMatch = /\(\+(\d+) earlier lines omitted\)/.exec(result.response);
+    expect(noteMatch).not.toBeNull();
+    expect(Number(noteMatch?.[1])).toBe(eventCount * 2 - shown);
   });
 });

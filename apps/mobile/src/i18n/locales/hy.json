@@ -4513,6 +4513,7 @@
       "receiptA11y": "Բացել անդորրագիրը՝ {{description}}, {{amount}}, {{date}}-ից",
       "receiptUnavailable": "Այս գնման համար անդորրագիր հասանելի չէ։",
       "retentionLimit": "Ցուցադրվում է կրեդիտների ամենավերջին պատմությունը։",
+      "voidedGrant": "Չեղարկված՝ {{description}}",
       "kind": {
         "adjustment": "Ճշգրտում",
         "balanceNeutral": "Առանց հաշվեկշռի փոփոխության",

@@ -4611,7 +4611,8 @@
       "receipt": "Ricevuta",
       "receiptA11y": "Apri la ricevuta di {{description}}, {{amount}}, del {{date}}",
       "receiptUnavailable": "Nessuna ricevuta disponibile per questo acquisto.",
-      "retentionLimit": "Viene mostrata la cronologia crediti più recente."
+      "retentionLimit": "Viene mostrata la cronologia crediti più recente.",
+      "voidedGrant": "Annullato: {{description}}"
     },
     "title": "Acquista crediti",
     "description": "I crediti sono un acquisto una tantum che viene aggiunto al tuo saldo Kilo per eseguire sessioni di coding AI in Kilo App. Lo store addebita il tuo account e i crediti vengono aggiunti dopo che lo store conferma il pagamento.",

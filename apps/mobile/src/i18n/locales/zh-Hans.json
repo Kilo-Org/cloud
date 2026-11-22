@@ -4532,7 +4532,8 @@
       "receipt": "收据",
       "receiptA11y": "打开 {{description}}，{{amount}}，{{date}} 的收据",
       "receiptUnavailable": "此购买暂无可用收据。",
-      "retentionLimit": "仅显示最近的积分记录。"
+      "retentionLimit": "仅显示最近的积分记录。",
+      "voidedGrant": "已作废：{{description}}"
     },
     "title": "购买额度",
     "description": "额度是一次性购买，会添加到你的 Kilo 余额中，用于在 Kilo App 中运行 AI 编程会话。商店会向你的账户收费，商店确认付款后额度才会到账。",

@@ -281,13 +281,19 @@ export const LedgerHistoryRow = memo(function LedgerHistoryRow({
     deduction.description,
     t('credits.history.deductionFallback')
   );
-  // Only a row whose own category is an expiry, and whose grant is loaded, gets
-  // the expiry frame: anything else keeps the ledger's own description, which
-  // already names its expiry.
+  // Only a row whose own category is an expiry or a voidance, and whose grant
+  // is loaded, gets the framed line: anything else keeps the ledger's own
+  // description, which already names what happened. A voided grant was
+  // cancelled rather than left to run out, so it never reads as expired.
   const expiryTitle =
     deduction.expiry == null || grant == null
       ? null
-      : t('credits.history.expiredGrant', { description: grantName });
+      : t(
+          deduction.expiry === 'voided'
+            ? 'credits.history.voidedGrant'
+            : 'credits.history.expiredGrant',
+          { description: grantName }
+        );
   const rowTitle = grantName ?? storedDescription;
   // Alone, the expiry line is the whole event: the grant it ended already has
   // its own purchase row above.

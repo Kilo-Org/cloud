@@ -4769,7 +4769,8 @@
       "receipt": "Irċevuta",
       "receiptA11y": "Iftaħ l-irċevuta għal {{description}}, {{amount}}, minn {{date}}",
       "receiptUnavailable": "M'hemmx irċevuta disponibbli għal dan ix-xiri.",
-      "retentionLimit": "Qed tintwera l-istorja tal-krediti l-aktar reċenti."
+      "retentionLimit": "Qed tintwera l-istorja tal-krediti l-aktar reċenti.",
+      "voidedGrant": "Annullat: {{description}}"
     },
     "title": "Ixtri krediti",
     "description": "Il-krediti huma xiri ta' darba li jiżdied mal-bilanċ Kilo tiegħek biex imexxi sessjonijiet ta' kodifikazzjoni bl-AI fl-App Kilo. Il-ħanut jaddebita l-kont tiegħek u l-krediti jiżdiedu wara li l-ħanut jikkonferma l-ħlas.",

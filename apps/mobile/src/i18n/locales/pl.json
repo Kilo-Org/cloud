@@ -4690,7 +4690,8 @@
       "receipt": "Potwierdzenie",
       "receiptA11y": "Otwórz potwierdzenie dla: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Potwierdzenie dla tego zakupu nie jest dostępne.",
-      "retentionLimit": "Wyświetlana jest najnowsza historia kredytów."
+      "retentionLimit": "Wyświetlana jest najnowsza historia kredytów.",
+      "voidedGrant": "Unieważniono: {{description}}"
     },
     "title": "Kup kredyty",
     "description": "Kredyty to jednorazowy zakup dodawany do Twojego salda Kilo na potrzeby sesji kodowania AI w aplikacji Kilo. Sklep obciąża Twoje konto, a kredyty są dodawane po potwierdzeniu płatności przez sklep.",

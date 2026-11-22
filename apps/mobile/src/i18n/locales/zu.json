@@ -4532,7 +4532,8 @@
       "receipt": "Irisidi",
       "receiptA11y": "Vula irisidi ye-{{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Ayikho irisidi etholakalayo yalokhu kuthenga.",
-      "retentionLimit": "Kuboniswa umlando wamakhredithi wakamuva."
+      "retentionLimit": "Kuboniswa umlando wamakhredithi wakamuva.",
+      "voidedGrant": "Ikhanseliwe: {{description}}"
     },
     "title": "Thenga amakhredithi",
     "description": "Amakhredithi ukuthenga kwesikhathi esisodwa okwengezwa kubhalansi yakho ye-Kilo ukuze usebenzise amaseshini okubhala ikhodi e-AI ku-Kilo App. Isitolo sikhokhisa i-akhawunti yakho futhi amakhredithi engezwa ngemva kokuba isitolo siqinisekise inkokhelo.",

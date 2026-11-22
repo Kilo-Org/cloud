@@ -4532,7 +4532,8 @@
       "receipt": "Biên lai",
       "receiptA11y": "Mở biên lai cho {{description}}, {{amount}}, từ {{date}}",
       "receiptUnavailable": "Không có biên lai cho giao dịch mua này.",
-      "retentionLimit": "Đang hiển thị lịch sử tín dụng gần đây nhất."
+      "retentionLimit": "Đang hiển thị lịch sử tín dụng gần đây nhất.",
+      "voidedGrant": "Đã hủy: {{description}}"
     },
     "title": "Mua tín dụng",
     "description": "Tín dụng là giao dịch mua một lần được thêm vào số dư Kilo của bạn để chạy các phiên lập trình AI trong Kilo App. Cửa hàng tính phí vào tài khoản của bạn và tín dụng được thêm sau khi cửa hàng xác nhận thanh toán.",

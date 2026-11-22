@@ -4611,7 +4611,8 @@
       "receipt": "Rebut",
       "receiptA11y": "Obre el rebut de {{description}}, {{amount}}, del {{date}}",
       "receiptUnavailable": "No hi ha cap rebut disponible per a aquesta compra.",
-      "retentionLimit": "Es mostra l'historial de crèdits més recent."
+      "retentionLimit": "Es mostra l'historial de crèdits més recent.",
+      "voidedGrant": "Anul·lat: {{description}}"
     },
     "title": "Compra crèdits",
     "description": "Els crèdits són una compra única que s'afegeix al teu saldo de Kilo per executar sessions de programació amb IA a l'aplicació Kilo. La botiga cobra al teu compte i els crèdits s'afegeixen quan la botiga confirma el pagament.",

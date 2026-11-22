@@ -4848,7 +4848,8 @@
       "receipt": "Derbynneb",
       "receiptA11y": "Agor y dderbynneb ar gyfer {{description}}, {{amount}}, o {{date}}",
       "receiptUnavailable": "Nid oes derbynneb ar gael ar gyfer y pryniant hwn.",
-      "retentionLimit": "Yn dangos yr hanes credydau diweddaraf."
+      "retentionLimit": "Yn dangos yr hanes credydau diweddaraf.",
+      "voidedGrant": "Wedi'i ddirymu: {{description}}"
     },
     "title": "Prynu credydau",
     "description": "Mae credydau yn bryniant un-tro sy'n cael ei ychwanegu at eich balans Kilo ar gyfer rhedeg sesiynau codio AI yn Kilo App. Mae'r siop yn codi eich cyfrif ac mae credydau'n cael eu hychwanegu ar ôl i'r siop gadarnhau'r taliad.",

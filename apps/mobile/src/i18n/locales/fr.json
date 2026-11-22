@@ -4611,7 +4611,8 @@
       "receipt": "Reçu",
       "receiptA11y": "Ouvrir le reçu pour {{description}}, {{amount}}, du {{date}}",
       "receiptUnavailable": "Aucun reçu n'est disponible pour cet achat.",
-      "retentionLimit": "Affichage de l'historique de crédits le plus récent."
+      "retentionLimit": "Affichage de l'historique de crédits le plus récent.",
+      "voidedGrant": "Annulé : {{description}}"
     },
     "title": "Acheter des crédits",
     "description": "Les crédits sont un achat unique ajouté à votre solde Kilo pour lancer des sessions de codage IA dans Kilo App. La boutique débite votre compte et les crédits sont ajoutés après confirmation du paiement par la boutique.",

@@ -94,6 +94,8 @@ const CREDIT_KEYS = [
   'accounting-adjustment',
   'program-grant',
   'program-grant-expiry',
+  'voided-grant',
+  'voided-grant-row',
 ] as const;
 
 /** Stable UUID for one account's fixture key: a rerun replaces the same rows. */
@@ -480,12 +482,35 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       credit_source: 'promotion',
       created_at: iso(-20 * DAY_MS),
     },
+    {
+      id: creditIds[10],
+      kilo_user_id: userId,
+      amount_microdollars: 1_000_000,
+      is_free: true,
+      description: 'OSS Sponsorship Program initial credits',
+      credit_category: 'oss-sponsorship',
+      credit_source: 'promotion',
+      expiry_date: iso(-30 * DAY_MS),
+      created_at: iso(-120 * DAY_MS),
+    },
+    {
+      id: creditIds[11],
+      kilo_user_id: userId,
+      amount_microdollars: -1_000_000,
+      is_free: true,
+      description: 'Credit voided from Orb system',
+      credit_category: 'orb_credit_voided',
+      original_transaction_id: creditIds[10],
+      credit_source: 'promotion',
+      created_at: iso(-30 * DAY_MS),
+    },
   ]);
 
   console.log('This fixture represents:');
   console.log('  Passkeys, blocked and muted people, recorded notifications, two provider keys');
   console.log('  and a credit ledger with purchases, an expired campaign grant, a program');
-  console.log('  grant with its own expiry, an unspent grant that still expires, and a deduction.');
+  console.log('  grant with its own expiry, a voided program grant, an unspent grant that');
+  console.log('  still expires, and a deduction.');
   console.log('  The passkey rows list but cannot sign in: no device holds their private key.');
   console.log('The empty states of the blocked-people and passkey lists need no seed: a fresh');
   console.log('account already shows them. Data export needs the cloud-data-export-ui release');

@@ -4532,7 +4532,8 @@
       "receipt": "Chek",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} chekini ochish",
       "receiptUnavailable": "Bu xarid uchun chek mavjud emas.",
-      "retentionLimit": "Kreditlarning eng so'nggi tarixi ko'rsatilmoqda."
+      "retentionLimit": "Kreditlarning eng so'nggi tarixi ko'rsatilmoqda.",
+      "voidedGrant": "Bekor qilingan: {{description}}"
     },
     "title": "Kredit sotib olish",
     "description": "Kreditlar Kilo App'da AI kodlash sessiyalarini ishga tushirish uchun Kilo balansingizga qo'shiladigan bir martalik xariddir. Do'kon hisobingizdan to'lov oladi va do'kon to'lovni tasdiqlaganidan keyin kreditlar qo'shiladi.",

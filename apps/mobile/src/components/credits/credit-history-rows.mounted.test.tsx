@@ -413,6 +413,23 @@ describe('LedgerHistoryRow', () => {
     expect(painted).not.toContain('Expired: Expired: Promotional credit');
     renderer.unmount();
   });
+
+  it('reads a voided grant as voided instead of expired', async () => {
+    const renderer = await renderLedgerRow(
+      deduction({
+        description: 'Credit voided from Orb system',
+        expiry: 'voided',
+        purchase: deductionGrant({ description: 'oss-bonus', kind: 'oss_sponsorship' }),
+      })
+    );
+
+    const painted = texts(renderer).map(text => readable(text));
+    // The server says the grant was cancelled, not that its term ran out, so
+    // the line must not claim an expiry.
+    expect(painted).toContain('Voided: OSS sponsorship credit');
+    expect(painted.some(text => text.startsWith('Expired: '))).toBe(false);
+    renderer.unmount();
+  });
 });
 
 describe('GrantHistoryRow', () => {

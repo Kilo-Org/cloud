@@ -4611,7 +4611,8 @@
       "receipt": "Chitanță",
       "receiptA11y": "Deschide chitanța pentru {{description}}, {{amount}}, din {{date}}",
       "receiptUnavailable": "Nu există o chitanță disponibilă pentru această achiziție.",
-      "retentionLimit": "Se afișează cel mai recent istoric de credite."
+      "retentionLimit": "Se afișează cel mai recent istoric de credite.",
+      "voidedGrant": "Anulat: {{description}}"
     },
     "title": "Cumpără credite",
     "description": "Creditele sunt o achiziție unică adăugată la soldul tău Kilo pentru rularea sesiunilor de codare AI în Kilo App. Magazinul îți debitează contul, iar creditele sunt adăugate după ce magazinul confirmă plata.",

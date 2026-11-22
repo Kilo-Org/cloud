@@ -4532,7 +4532,8 @@
       "receipt": "Kuitti",
       "receiptA11y": "Avaa kuitti: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Tälle ostolle ei ole saatavilla kuittia.",
-      "retentionLimit": "Näytetään uusin krediittihistoria."
+      "retentionLimit": "Näytetään uusin krediittihistoria.",
+      "voidedGrant": "Mitätöity: {{description}}"
     },
     "title": "Osta krediittejä",
     "description": "Krediitit ovat kertaostos, joka lisätään Kilo-saldoosi AI-koodausistuntojen ajamista varten Kilo-sovelluksessa. Kauppa veloittaa tiliäsi ja krediitit lisätään, kun kauppa vahvistaa maksun.",

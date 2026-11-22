@@ -4532,7 +4532,8 @@
       "receipt": "Kvittering",
       "receiptA11y": "Åpne kvitteringen for {{description}}, {{amount}}, fra {{date}}",
       "receiptUnavailable": "Det finnes ingen kvittering for dette kjøpet.",
-      "retentionLimit": "Viser den nyeste kreditthistorikken."
+      "retentionLimit": "Viser den nyeste kreditthistorikken.",
+      "voidedGrant": "Annullert: {{description}}"
     },
     "title": "Kjøp kreditter",
     "description": "Kreditter er et engangskjøp som legges til Kilo-saldoen din for å kjøre AI-kodeøkter i Kilo App. Butikken belaster kontoen din, og kredittene legges til etter at butikken bekrefter betalingen.",

@@ -4624,7 +4624,8 @@
       "receipt": "Receipt",
       "receiptA11y": "Open the receipt for {{description}}, {{amount}}, from {{date}}",
       "receiptUnavailable": "A receipt is not available for this purchase.",
-      "retentionLimit": "Showing the most recent credit history."
+      "retentionLimit": "Showing the most recent credit history.",
+      "voidedGrant": "Voided: {{description}}"
     },
     "title": "Buy credits",
     "description": "Credits are a one-time purchase added to your Kilo balance for running AI coding sessions in Kilo App. The store charges your account and credits are added after the store confirms payment.",

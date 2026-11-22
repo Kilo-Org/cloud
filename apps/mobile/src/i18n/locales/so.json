@@ -4532,7 +4532,8 @@
       "receipt": "Rasiid",
       "receiptA11y": "Fur rasiidka {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Iibsashadan rasiid looma hayo.",
-      "retentionLimit": "Waxaa la muujinayaa taariikhda kireditka ugu dambeysa."
+      "retentionLimit": "Waxaa la muujinayaa taariikhda kireditka ugu dambeysa.",
+      "voidedGrant": "La buriyay: {{description}}"
     },
     "title": "Iibso lacag adeeg",
     "description": "Lacagta adeeg waa iib hal mar ah oo lagu daraa dheelitirkaaga Kilo si loogu shaqeeyo kalfadhiyada codeynta AI ee app-ka Kilo. Dukaanku wuxuu ka qaadaa akoonkaaga, lacagta adeegna waxaa lagu daraa ka dib marka dukaanku xaqiijiyo lacag bixinta.",

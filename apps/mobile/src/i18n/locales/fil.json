@@ -4532,7 +4532,8 @@
       "receipt": "Resibo",
       "receiptA11y": "Buksan ang resibo para sa {{description}}, {{amount}}, mula noong {{date}}",
       "receiptUnavailable": "Walang available na resibo para sa pagbiling ito.",
-      "retentionLimit": "Ipinapakita ang pinakabagong kasaysayan ng credit."
+      "retentionLimit": "Ipinapakita ang pinakabagong kasaysayan ng credit.",
+      "voidedGrant": "Kinansela: {{description}}"
     },
     "title": "Bumili ng kredito",
     "description": "Ang kredito ay isang besesang pagbili na idinaragdag sa iyong Kilo balance para sa pagpapatakbo ng mga AI coding session sa Kilo App. Sinisingil ng store ang iyong account at idinaragdag ang kredito pagkatapos kumpirmahin ng store ang bayad.",

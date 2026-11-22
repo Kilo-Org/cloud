@@ -4769,7 +4769,8 @@
       "receipt": "Admháil",
       "receiptA11y": "Oscail an admháil do {{description}}, {{amount}}, ó {{date}}",
       "receiptUnavailable": "Níl admháil ar fáil don cheannach seo.",
-      "retentionLimit": "Taispeántar an stair chreidmheasa is déanaí."
+      "retentionLimit": "Taispeántar an stair chreidmheasa is déanaí.",
+      "voidedGrant": "Cealaithe: {{description}}"
     },
     "title": "Ceannaigh creidmheasanna",
     "description": "Is ceannach aonuaire iad creidmheasanna a chuirtear le do chothromas Kilo chun seisiúin chódaithe AI a rith in Kilo App. Gearrann an siopa do chuntas agus cuirtear creidmheasanna leis tar éis don siopa an íocaíocht a dhearbhú.",

@@ -4532,7 +4532,8 @@
       "receipt": "Rasiti",
       "receiptA11y": "Buɗe rasitin {{description}}, {{amount}}, daga {{date}}",
       "receiptUnavailable": "Babu rasiti don wannan sayayya.",
-      "retentionLimit": "Ana nuna tarihin kiredit na baya-bayan nan."
+      "retentionLimit": "Ana nuna tarihin kiredit na baya-bayan nan.",
+      "voidedGrant": "An soke: {{description}}"
     },
     "title": "Sayi kuɗin amfani",
     "description": "Kuɗin amfani saye ne na lokaci ɗaya da ake ƙarawa a ma'aunin Kilo naka don gudanar da zaman shirye-shiryen AI a cikin Kilo App. Shagon yana cajin asusunka kuma ana ƙara kuɗin amfani bayan shagon ya tabbatar da biyan kuɗi.",

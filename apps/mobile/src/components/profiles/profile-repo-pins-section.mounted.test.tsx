@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- one mounted suite pins the card's skeleton, both error classifications, rows, pin and unbind */
+import { QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -320,6 +321,45 @@ describe('ProfileRepoPinsSection', () => {
       repoFullName: 'acme/infra',
       platform: 'gitlab',
     });
+
+    unmount();
+  });
+
+  it('closes the pin sheet when the read turns terminal under it', async () => {
+    Object.assign(h.bindingsQuery, { isLoading: false });
+
+    const { renderer, queryClient, unmount } = await mountSection();
+    pressPressable(renderer.root, 'Pin a repo');
+    expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(1);
+
+    // The same read now answers terminally, so the sheet it opened closes with
+    // it; leaving the state set would reopen it without a tap once the key
+    // answered successfully again.
+    Object.assign(h.bindingsQuery, { isError: true, error: { data: { code: 'FORBIDDEN' } } });
+    await act(async () => {
+      renderer.update(
+        createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          createElement(ProfileRepoPinsSection, { profileId: 'profile-1', canManage: true })
+        )
+      );
+      await Promise.resolve();
+    });
+    expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(0);
+
+    Object.assign(h.bindingsQuery, { isError: false, error: undefined });
+    await act(async () => {
+      renderer.update(
+        createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          createElement(ProfileRepoPinsSection, { profileId: 'profile-1', canManage: true })
+        )
+      );
+      await Promise.resolve();
+    });
+    expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(0);
 
     unmount();
   });

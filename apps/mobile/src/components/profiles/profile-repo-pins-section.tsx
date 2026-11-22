@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -83,6 +83,17 @@ export function ProfileRepoPinsSection({
   const repoOptions = useRepoOptions(organizationId, pickerOpen);
 
   const pinned = bindingsForProfile(bindingsQuery.bindings, profileId);
+
+  // A terminal read failure means the section is not showing this profile's
+  // pins at all, so its action and the sheet it opens are withheld. The sheet's
+  // own state closes with the read that offered it: leaving it set would
+  // reopen it without a tap if the same key later answered successfully.
+  const readErrorTerminal = bindingsQuery.isError && !readError.showRetry;
+  useEffect(() => {
+    if (readErrorTerminal) {
+      setPickerOpen(false);
+    }
+  }, [readErrorTerminal]);
 
   const handlePin = async (repo: RepoOption) => {
     setPickerOpen(false);
@@ -187,11 +198,6 @@ export function ProfileRepoPinsSection({
       </RowGroup>
     );
   }
-
-  // A terminal read failure means the section is not showing this profile's
-  // pins at all, so its action and the sheet it opens are withheld: an owner
-  // would otherwise be offered a write over a state that names a read failure.
-  const readErrorTerminal = bindingsQuery.isError && !readError.showRetry;
 
   return (
     <Section

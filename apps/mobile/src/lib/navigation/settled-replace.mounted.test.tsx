@@ -146,6 +146,86 @@ describe('useSettledReplace', () => {
     unmount(renderer);
   });
 
+  it('dispatches a destination whose transition end never arrives', () => {
+    vi.useFakeTimers();
+    try {
+      const renderer = mount();
+
+      fire('transitionStart');
+      latestReplace?.('/(app)/security-agent/personal/settings');
+
+      // A real push or pop animates for a few hundred milliseconds: the end
+      // may still be on its way, so the destination must keep waiting.
+      act(() => {
+        vi.advanceTimersByTime(999);
+      });
+      expect(replaceMock).not.toHaveBeenCalled();
+
+      // Past the bound the end was lost, so the navigator counts as settled.
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(replaceMock).toHaveBeenCalledExactlyOnceWith(
+        '/(app)/security-agent/personal/settings'
+      );
+
+      unmount(renderer);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('dispatches once on a transition end and does nothing when the bound expires', () => {
+    vi.useFakeTimers();
+    try {
+      const renderer = mount();
+
+      fire('transitionStart');
+      latestReplace?.('/(app)/security-agent/personal/settings');
+      fire('transitionEnd');
+
+      expect(replaceMock).toHaveBeenCalledExactlyOnceWith(
+        '/(app)/security-agent/personal/settings'
+      );
+
+      // Nothing is queued any more, so the bound must not dispatch a second swap.
+      act(() => {
+        vi.advanceTimersByTime(5_000);
+      });
+      expect(replaceMock).toHaveBeenCalledTimes(1);
+
+      unmount(renderer);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the next-task dispatch with no transition running, and dispatches once', () => {
+    vi.useFakeTimers();
+    try {
+      const renderer = mount();
+
+      latestReplace?.('/(app)/security-agent/personal/settings');
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(replaceMock).toHaveBeenCalledExactlyOnceWith(
+        '/(app)/security-agent/personal/settings'
+      );
+
+      // The bound only covers a transition that never ended; it must not add a
+      // second dispatch to the plain next-task path.
+      act(() => {
+        vi.advanceTimersByTime(5_000);
+      });
+      expect(replaceMock).toHaveBeenCalledTimes(1);
+
+      unmount(renderer);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('does not dispatch after unmount', async () => {
     const renderer = mount();
 

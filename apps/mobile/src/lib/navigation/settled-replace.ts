@@ -7,6 +7,17 @@ export type SettledReplaceRouter = {
 };
 
 /**
+ * How long a queued destination waits for `transitionEnd` before it is
+ * dispatched anyway. A native-stack push or pop animates for a few hundred
+ * milliseconds, so a real end arrives well inside this bound and the fallback
+ * only fires when that event was lost. It must stay comfortably longer than an
+ * animation: firing while a transition is still running would commit a route
+ * swap inside the running animation, which is the Fabric crash this hook
+ * exists to prevent.
+ */
+const SETTLE_FALLBACK_MS = 1_000;
+
+/**
  * A `router.replace` dispatched only once the navigator has settled.
  *
  * A guard that bounces a screen it has just been focused on — a settings
@@ -36,6 +47,16 @@ export type SettledReplaceRouter = {
  * already running before this screen mounted is not observable here, so the
  * one-task deferral is what covers that case — the swap still lands later than
  * a literal `router.replace` in every path, never earlier.
+ *
+ * Waiting for `transitionEnd` waits on an event that can be lost: an
+ * interrupted animation, or a navigator that emits no transition events at
+ * all, leaves every later commit looking in flight, and the guard's redirect
+ * would never land — the reader stays on the screen the guard meant to leave.
+ * So that wait is bounded by `SETTLE_FALLBACK_MS`: past it the transition
+ * never ended, the navigator is treated as settled, and the queued destination
+ * is dispatched. The bound is a whole second, several times a native-stack
+ * animation, so a real end always wins; a real end that still arrives later
+ * finds nothing queued and does nothing.
  */
 export function useSettledReplace(): SettledReplaceRouter {
   const router = useRouter();
@@ -43,16 +64,17 @@ export function useSettledReplace(): SettledReplaceRouter {
   // The one destination waiting for the navigator to settle.
   const queuedRef = useRef<Href | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // The bound on a lost `transitionEnd`; armed only while a destination waits
+  // on a transition.
+  const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // Whether the navigator is animating right now, from its own events.
   const inFlightRef = useRef(false);
 
-  const dispatchQueued = useCallback(() => {
+  /** Dispatch the queued destination now: no transition owns the next commit. */
+  const settleNow = useCallback(() => {
     timerRef.current = undefined;
-    // A transition started after this dispatch was scheduled: its own end
-    // dispatches the queued destination, so this task must not commit a swap.
-    if (inFlightRef.current) {
-      return;
-    }
+    clearTimeout(fallbackTimerRef.current);
+    fallbackTimerRef.current = undefined;
     const href = queuedRef.current;
     if (href === null) {
       return;
@@ -61,9 +83,42 @@ export function useSettledReplace(): SettledReplaceRouter {
     router.replace(href);
   }, [router]);
 
+  /** The transition this destination waited on never reported its end. */
+  const expireTransition = useCallback(() => {
+    fallbackTimerRef.current = undefined;
+    inFlightRef.current = false;
+    settleNow();
+  }, [settleNow]);
+
+  /** Bound the wait for the running transition's end, restarting an armed one. */
+  const armFallback = useCallback(() => {
+    clearTimeout(fallbackTimerRef.current);
+    fallbackTimerRef.current = setTimeout(expireTransition, SETTLE_FALLBACK_MS);
+  }, [expireTransition]);
+
+  const dispatchQueued = useCallback(() => {
+    timerRef.current = undefined;
+    const href = queuedRef.current;
+    if (href === null) {
+      return;
+    }
+    // A transition started after this dispatch was scheduled: its own end
+    // dispatches the queued destination, so this task must not commit a swap.
+    if (inFlightRef.current) {
+      armFallback();
+      return;
+    }
+    settleNow();
+  }, [armFallback, settleNow]);
+
   useEffect(() => {
     const unsubscribeStart = navigation.addListener('transitionStart', () => {
       inFlightRef.current = true;
+      // A destination queued now waits on this transition's end, so its bound
+      // starts (or restarts) with this animation rather than an earlier one.
+      if (queuedRef.current !== null) {
+        armFallback();
+      }
     });
     const unsubscribeEnd = navigation.addListener('transitionEnd', () => {
       inFlightRef.current = false;
@@ -74,18 +129,26 @@ export function useSettledReplace(): SettledReplaceRouter {
     return () => {
       unsubscribeStart();
       unsubscribeEnd();
-      // The mount is gone: neither the task nor a lost event may dispatch.
+      // The mount is gone: neither task nor a lost event may dispatch.
       clearTimeout(timerRef.current);
       timerRef.current = undefined;
+      clearTimeout(fallbackTimerRef.current);
+      fallbackTimerRef.current = undefined;
       queuedRef.current = null;
     };
-  }, [navigation, dispatchQueued]);
+  }, [navigation, armFallback, dispatchQueued]);
 
   const replace = useCallback(
     (href: Href) => {
       queuedRef.current = href;
+      // This destination replaces whatever was queued, so a bound armed for
+      // the earlier one is dropped; it is armed again below when a transition
+      // still owns the commit.
+      clearTimeout(fallbackTimerRef.current);
+      fallbackTimerRef.current = undefined;
       // An animation owns the next commit: its end dispatches the destination.
       if (inFlightRef.current) {
+        armFallback();
         return;
       }
       // An already scheduled task reads the destination set above.
@@ -94,7 +157,7 @@ export function useSettledReplace(): SettledReplaceRouter {
       }
       timerRef.current = setTimeout(dispatchQueued, 0);
     },
-    [dispatchQueued]
+    [armFallback, dispatchQueued]
   );
 
   return useMemo(() => ({ replace }), [replace]);

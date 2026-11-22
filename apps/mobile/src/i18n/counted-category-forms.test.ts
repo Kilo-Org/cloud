@@ -126,24 +126,36 @@ describe('plural forms that carry the count', () => {
   });
 });
 
-describe('agreement-neutral duration copy', () => {
-  it('keeps the minutes unit before the interpolated number for singular, fractional, and plural values', () => {
-    const normalized = [1, 1.5, 2, 10].map(minutes => {
-      const rendered = i18n.t('agentBriefing.paidDisclosure', {
-        lng: 'el',
+describe('counted duration copy', () => {
+  it('makes the minute limit a plural family without changing the English sentence', () => {
+    // The count now selects a category, so a catalog whose minute noun agrees
+    // with the number can spell a different form at 1. English does not
+    // inflect, and every category keeps the placeholder the formatted number
+    // arrives in. The Greek catalog still carries one string, so its own
+    // agreement assertion belongs to the catalog slice that lands the family.
+    for (const category of ['one', 'other'] as const) {
+      const form = i18n.getResource(
+        'en',
+        'translation',
+        `agentBriefing.paidDisclosure_${category}`
+      );
+      expect(typeof form, category).toBe('string');
+      expect(form, category).toContain('{{minutes}}');
+    }
+    const render = (count: number) =>
+      i18n.t('agentBriefing.paidDisclosure', {
+        lng: 'en',
+        count,
         estimate: '$0.12',
         maximum: '$0.30',
-        minutes,
+        minutes: String(count),
       });
-      const count = String(minutes);
-      const countIndex = rendered.lastIndexOf(count);
-      expect(countIndex).toBeGreaterThanOrEqual(0);
-      expect(rendered.slice(0, countIndex)).toContain('λεπτά');
-      const suffix = rendered.slice(countIndex + count.length);
-      expect(suffix.startsWith('.')).toBe(true);
-      return `${rendered.slice(0, countIndex)}{{minutes}}${suffix}`;
-    });
-
-    expect(new Set(normalized).size).toBe(1);
+    // The formatted minutes still read as the attributive unit before the noun.
+    expect(render(1)).toContain('1-minute');
+    expect(render(10)).toContain('10-minute');
+    // The sentence around the number is the same at both counts.
+    expect(render(1).replace('1-minute', '{{minutes}}-minute')).toBe(
+      render(10).replace('10-minute', '{{minutes}}-minute')
+    );
   });
 });

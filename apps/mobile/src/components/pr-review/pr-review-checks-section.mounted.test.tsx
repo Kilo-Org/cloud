@@ -478,9 +478,14 @@ describe('PrReviewChecksSection not-found arm', () => {
     return renderer.root.findAllByType(PrReviewUnavailableActions);
   }
 
+  /** The recovery row's actions in render order: the retry, then the check. */
+  function recoveryActions(renderer: TestRenderer.ReactTestRenderer) {
+    return renderer.root.findAllByType('StateAction' as never);
+  }
+
   /** The recovery row's one primary, the shared state action that re-reads. */
   function retryAction(renderer: TestRenderer.ReactTestRenderer) {
-    const [retry] = renderer.root.findAllByType('StateAction' as never);
+    const [retry] = recoveryActions(renderer);
     if (!retry) {
       throw new Error('the retry action did not render');
     }
@@ -531,10 +536,10 @@ describe('PrReviewChecksSection not-found arm', () => {
       });
       expect(query.refetch).toHaveBeenCalledTimes(1);
 
-      // The real component drew both of its controls: the outlined provider
+      // The real component drew both of its controls: the quiet provider
       // connection check under the retry, and the retry's own state action,
       // which re-reads the checks when pressed.
-      const [connectionCheck] = renderer.root.findAllByType('Button' as never);
+      const [, connectionCheck] = recoveryActions(renderer);
       expect(connectionCheck?.props.accessibilityLabel).toBe('prReview.checkConnection');
       act(() => {
         (retryAction(renderer).props.onPress as () => void)();

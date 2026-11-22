@@ -17,11 +17,8 @@ vi.mock('react-native', () => ({
   Text: 'Text',
   ActivityIndicator: 'ActivityIndicator',
 }));
-vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/empty-state', () => ({ StateAction: 'StateAction' }));
 vi.mock('@/components/ui/icons', () => ({ PlugZap: 'PlugZap', RotateCcw: 'RotateCcw' }));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 const toastMock = vi.hoisted(() => Object.assign(vi.fn(), { error: vi.fn() }));
 vi.mock('sonner-native', () => ({ toast: toastMock }));
 vi.mock('@/lib/trpc', () => ({
@@ -63,17 +60,23 @@ type ActionInstance = {
   type: unknown;
   props: {
     onPress: () => void;
-    variant?: string;
     emphasis?: string;
     label?: string;
     accessibilityLabel?: string;
   };
 };
 
+type HostNode = { type: unknown };
+
+/** Narrows a renderer node to its host `type`, the field the string mocks above set. */
+function isHostNode(node: unknown): node is HostNode {
+  return typeof node === 'object' && node !== null && 'type' in node;
+}
+
 /** The state's recovery actions in render order: the retry, then the check. */
-function findButtons(renderer: { root: { findAll: (f: (n: unknown) => boolean) => unknown[] } }) {
-  return renderer.root.findAll(node =>
-    ['StateAction', 'Button'].includes(String((node as { type: unknown }).type))
+function findActions(renderer: { root: { findAll: (f: (n: unknown) => boolean) => unknown[] } }) {
+  return renderer.root.findAll(
+    node => isHostNode(node) && String(node.type) === 'StateAction'
   ) as ActionInstance[];
 }
 
@@ -82,7 +85,7 @@ type RowRoot = { props: { className?: string } };
 
 function findRowRoot(renderer: { root: { findAll: (f: (n: unknown) => boolean) => unknown[] } }) {
   const roots = renderer.root.findAll(
-    node => String((node as { type: unknown }).type) === 'View'
+    node => isHostNode(node) && String(node.type) === 'View'
   ) as RowRoot[];
   const [root] = roots;
   if (!root) {
@@ -98,26 +101,26 @@ describe('PrReviewUnavailableActions', () => {
       organizationId: null,
     };
     const { renderer, unmount } = await mount(scope);
-    const buttons = findButtons(renderer);
-    expect(buttons).toHaveLength(2);
-    const [retryButton, checkButton] = buttons;
-    if (!retryButton || !checkButton) {
-      throw new Error('the two recovery buttons did not render');
+    const actions = findActions(renderer);
+    expect(actions).toHaveLength(2);
+    const [retryAction, checkAction] = actions;
+    if (!retryAction || !checkAction) {
+      throw new Error('the two recovery actions did not render');
     }
-    // The retry is the shared state action, the one primary that carries the
-    // recovery; the provider check stays the outlined control under it, so the
+    // The retry is the shared state action that carries the recovery; the
+    // provider check is the same frame at the quiet weight under it, so the
     // state does not offer two equal choices.
-    expect(String(retryButton.type)).toBe('StateAction');
-    expect(retryButton.props.label).toBe('Retry');
-    expect(String(checkButton.type)).toBe('Button');
-    expect(checkButton.props.accessibilityLabel).toBe('Check connection');
-    expect(checkButton.props.variant).toBe('outline');
+    expect(String(retryAction.type)).toBe('StateAction');
+    expect(retryAction.props.label).toBe('Retry');
+    expect(String(checkAction.type)).toBe('StateAction');
+    expect(checkAction.props.accessibilityLabel).toBe('Check connection');
+    expect(checkAction.props.emphasis).toBe('quiet');
     act(() => {
-      retryButton.props.onPress();
+      retryAction.props.onPress();
     });
     expect(onRetry).toHaveBeenCalledOnce();
     await act(async () => {
-      checkButton.props.onPress();
+      checkAction.props.onPress();
       await Promise.resolve();
     });
     expect(providerConnection.mutateAsync).toHaveBeenCalledWith({
@@ -133,8 +136,8 @@ describe('PrReviewUnavailableActions', () => {
       organizationId: 'org_1',
     };
     const { renderer, unmount } = await mount(scope);
-    const buttons = findButtons(renderer);
-    const check = buttons[1];
+    const actions = findActions(renderer);
+    const check = actions[1];
     if (!check) {
       throw new Error('the connection check button did not render');
     }
@@ -155,37 +158,42 @@ describe('PrReviewUnavailableActions', () => {
       organizationId: null,
     };
     const { renderer, unmount } = await mount(scope);
-    expect(findButtons(renderer)).toHaveLength(0);
+    expect(findActions(renderer)).toHaveLength(0);
     unmount();
   });
 
-  it('keeps one primary face on both presentations and leaves the check outlined', async () => {
+  it('leads with the brand fill only on the whole-surface row', async () => {
     const scope: ProviderPrScope = {
       ref: { platform: 'gitlab', projectPath: 'group/repo', mrIid: 1 },
       organizationId: null,
     };
     const embedded = await mount(scope, 'embedded');
-    const [embeddedRetry, embeddedCheck] = findButtons(embedded.renderer);
+    const [embeddedRetry, embeddedCheck] = findActions(embedded.renderer);
     if (!embeddedRetry || !embeddedCheck) {
-      throw new Error('the two recovery buttons did not render');
+      throw new Error('the two recovery actions did not render');
     }
-    // The retry paints the same filled primary face in both places: the row
-    // differs by its spacing, never by which control carries the fill.
-    expect(embeddedRetry.props.emphasis).toBeUndefined();
-    expect(embeddedCheck.props.variant).toBe('outline');
+    // The overview body this row rides already owns its primary — the Merge
+    // CTA — so both controls of the card take the same quiet face and the card
+    // adds no second brand fill.
+    expect(embeddedRetry.type).toBe('StateAction');
+    expect(embeddedRetry.props.emphasis).toBe('quiet');
+    expect(embeddedCheck.props.emphasis).toBe('quiet');
     // The card's own gap spaces the embedded row, so the appended margin a
     // whole-surface row needs would double it.
     expect(String(findRowRoot(embedded.renderer).props.className)).not.toContain('mt-3');
     embedded.unmount();
 
     const surface = await mount(scope);
-    const [surfaceRetry, surfaceCheck] = findButtons(surface.renderer);
+    const [surfaceRetry, surfaceCheck] = findActions(surface.renderer);
     if (!surfaceRetry || !surfaceCheck) {
-      throw new Error('the two recovery buttons did not render');
+      throw new Error('the two recovery actions did not render');
     }
+    // Where the row is the whole surface it is the one action there, so the
+    // same shared state action keeps its brand fill and the check stays quiet
+    // under it.
     expect(surfaceRetry.type).toBe(embeddedRetry.type);
     expect(surfaceRetry.props.emphasis).toBeUndefined();
-    expect(surfaceCheck.props.variant).toBe('outline');
+    expect(surfaceCheck.props.emphasis).toBe('quiet');
     expect(String(findRowRoot(surface.renderer).props.className)).toContain('mt-3');
     surface.unmount();
   });
@@ -214,9 +222,9 @@ describe('PrReviewUnavailableActions — check outcome', () => {
     toastMock.mockClear();
     providerConnection.mutateAsync.mockResolvedValue(status);
     const { renderer, unmount } = await mount(scope);
-    const check = findButtons(renderer)[1];
+    const check = findActions(renderer)[1];
     if (!check) {
-      throw new Error('the connection check button did not render');
+      throw new Error('the connection check action did not render');
     }
     await act(async () => {
       check.props.onPress();

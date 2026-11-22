@@ -50,11 +50,8 @@ vi.mock('react-native', () => ({
   Text: 'Text',
   ActivityIndicator: 'ActivityIndicator',
 }));
-vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/empty-state', () => ({ StateAction: 'StateAction' }));
 vi.mock('@/components/ui/icons', () => ({ PlugZap: 'PlugZap', RotateCcw: 'RotateCcw' }));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 
 const SCOPE: ProviderPrScope = {
   ref: {
@@ -123,14 +120,14 @@ type ButtonInstance = {
   };
 };
 
-function findButtons(renderer: { root: { findAll: (f: (n: unknown) => boolean) => unknown[] } }) {
+function findActions(renderer: { root: { findAll: (f: (n: unknown) => boolean) => unknown[] } }) {
   return renderer.root.findAll(
-    node => String((node as { type: unknown }).type) === 'Button'
+    node => String((node as { type: unknown }).type) === 'StateAction'
   ) as ButtonInstance[];
 }
 
 async function pressCheckConnection(mounted: Mounted) {
-  const check = findButtons(mounted.renderer).find(
+  const check = findActions(mounted.renderer).find(
     button => button.props.accessibilityLabel === 'Check connection'
   );
   if (!check) {

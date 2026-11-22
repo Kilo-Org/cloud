@@ -4,11 +4,7 @@ import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { StateAction } from '@/components/empty-state';
-import { Button } from '@/components/ui/button';
 import { PlugZap, RotateCcw } from '@/components/ui/icons';
-import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { gitlabInstanceMismatch } from '@/lib/pr-review/pr-review-connect-gate-view';
 import { useProviderPrScopeOrNull } from '@/lib/pr-review/provider-pr-ref';
 import { useCheckProviderConnection } from '@/lib/pr-review/use-check-provider-connection';
@@ -35,19 +31,23 @@ import { useTRPC } from '@/lib/trpc';
  * CTA and its connectivity is the GitHub App authorization, not an
  * integration status this hook can check.
  *
- * The retry is the state's one primary, the shared `StateAction`, as on the
- * connect gate and the GitHub install CTA: it is the action that can recover
- * the item from here, and it paints that same brand fill in both schemes. The
- * connection check stays the outlined secondary below it at the same compact
+ * Both controls are the shared `StateAction`, so each carries the one state
+ * frame and the emphasis decides only its weight. The retry is the state's way
+ * out, as on the connect gate and the GitHub install CTA: where the row is the
+ * whole surface it leads with the one brand-filled primary. Embedded in the
+ * overview scroll body, that body already owns its primary — the Merge CTA — so
+ * both controls take the same outlined face, and the card adds no second brand
+ * fill. The check is the outlined secondary in both places at that same compact
  * size with its own leading icon, because it answers a different question —
  * whether the account is still connected. The column stretches both controls to
- * one width, so the pair reads as one stack of two ranked actions instead of two
- * differently sized boxes, and the retry is the one that carries the fill.
+ * one width, so the pair reads as one stack of ranked actions instead of two
+ * differently sized boxes.
  *
- * `presentation` picks only the spacing the row needs where it sits: as a whole
- * surface it adds its own top margin above the copy; embedded in a body whose
- * card already spaces its children, it takes the card's gap for its own pair
- * instead, so the gap above the row and the gap inside it read as one distance.
+ * `presentation` picks the spacing the row needs where it sits and whether the
+ * retry carries the fill: as a whole surface it adds its own top margin above
+ * the copy; embedded in a body whose card already spaces its children, it takes
+ * the card's gap for its own pair instead, so the gap above the row and the gap
+ * inside it read as one distance.
  */
 export function PrReviewUnavailableActions({
   onRetry,
@@ -59,12 +59,12 @@ export function PrReviewUnavailableActions({
   /**
    * `embedded` when the row sits inside a body that spaces its own children:
    * the row takes that gap for its pair and drops the top margin it adds as a
-   * whole surface. The two faces are the same either way.
+   * whole surface, and the retry drops its brand fill for the outlined face
+   * the check already carries.
    */
   presentation?: 'surface' | 'embedded';
 }>) {
   const { t } = useTranslation();
-  const colors = useThemeColors();
   const scope = useProviderPrScopeOrNull();
   const providerConnection = useCheckProviderConnection();
   const queryClient = useQueryClient();
@@ -143,28 +143,28 @@ export function PrReviewUnavailableActions({
     // No `items-center`: a centred column shrinks each control to its own
     // label, and the pair then reads as two differently sized boxes. The
     // default cross-axis stretch sizes both controls to the wider label, so the
-    // retry leads on the brand fill and the check follows at that same width as
-    // the outlined secondary.
+    // pair sits on one width. Only the whole-surface row lets the retry carry
+    // the brand fill; embedded, the card rides a body that already owns its
+    // primary, so there both controls take the same outlined face and the card
+    // adds no second brand fill.
     <View className={embedded ? 'gap-3' : 'mt-3 gap-2'}>
       <StateAction
         label={t('common.retry')}
         icon={RotateCcw}
         onPress={onRetry}
         loading={isRetrying}
+        {...(embedded ? { emphasis: 'quiet' as const } : {})}
       />
-      <Button
-        size="sm"
-        className={STATE_ACTION_CLASS}
-        variant="outline"
+      <StateAction
+        label={t('prReview.checkConnection')}
+        icon={PlugZap}
         onPress={() => {
           void checkConnection();
         }}
         loading={providerConnection.isPending}
         accessibilityLabel={t('prReview.checkConnection')}
-      >
-        <PlugZap size={16} color={colors.foreground} />
-        <Text>{t('prReview.checkConnection')}</Text>
-      </Button>
+        emphasis="quiet"
+      />
     </View>
   );
 }

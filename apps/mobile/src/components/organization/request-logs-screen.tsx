@@ -12,7 +12,7 @@ import { RequestLogRow } from '@/components/organization/request-log-row';
 import { RequestLogsSkeleton } from '@/components/organization/request-logs-skeleton';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { useTabBarBottomPadding } from '@/components/tab-screen';
+import { TabScreenScrollView, useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import {
   DirectionalArrowLeft,
@@ -178,7 +178,6 @@ export function OrganizationRequestLogsScreen() {
             message={failure === 'retryable' ? t('organization.requestLogs.loadError') : undefined}
             onRetry={readFailureKindIsRetryable(failure) ? () => void logs.refetch() : undefined}
             isRetrying={logs.isFetching}
-            refreshControl={refreshControl}
           />
         );
       }
@@ -197,7 +196,6 @@ export function OrganizationRequestLogsScreen() {
                 ? t('organization.requestLogs.emptyDescription')
                 : t('organization.requestLogs.emptyBoundDescription')
             }
-            refreshControl={refreshControl}
           />
         );
       }
@@ -232,18 +230,28 @@ export function OrganizationRequestLogsScreen() {
     }
   };
 
+  // The empty hour and the failure body are `placement="top"` states, which
+  // render their own content and no scroller (`empty-state.tsx`), so a
+  // `refreshControl` handed to one would be dropped and a pull over it would
+  // never reach the read. They ride in a scroller instead — the list keeps its
+  // own FlashList pull and is never nested in it — and that scroller's frame
+  // applies the side insets itself, so those two bodies are not wrapped in the
+  // padded view the list and the skeleton need.
+  const bodyPulls = body.kind === 'empty' || body.kind === 'failure';
+  const bodyContent = renderBody(body);
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={t('organization.settingsOnWeb.requestLogs')}
         backFallback={ORGANIZATION_HUB_PATH}
       />
-      <View className="flex-1" style={sideInsetStyle}>
-        {/* The window the rows below belong to, and the only filter the phone
-            needs: the procedure answers one hour at a time, so moving the window
-            is both the time range and the paging. The hint states the window's
-            one rule in place, and it never changes, so no row moves when a
-            window loads. */}
+      {/* The window the rows below belong to, and the only filter the phone
+          needs: the procedure answers one hour at a time, so moving the window
+          is both the time range and the paging. The hint states the window's
+          one rule in place, and it never changes, so no row moves when a
+          window loads. */}
+      <View style={sideInsetStyle}>
         <View className="gap-2 px-4 pt-3">
           <View className="gap-0.5">
             <Text className="text-sm font-medium text-foreground">
@@ -302,8 +310,25 @@ export function OrganizationRequestLogsScreen() {
             </Button>
           </View>
         </View>
-        {renderBody(body)}
       </View>
+      {bodyPulls ? (
+        // `flex-grow` lets short content still pull: a content box only as tall
+        // as the state cannot be dragged far enough to trigger the gesture. The
+        // state draws its own gutter through `inset="gutter"`, so this body
+        // adds none.
+        <TabScreenScrollView
+          className="flex-1"
+          contentContainerClassName="flex-grow"
+          showsVerticalScrollIndicator={false}
+          refreshControl={refreshControl}
+        >
+          {bodyContent}
+        </TabScreenScrollView>
+      ) : (
+        <View className="flex-1" style={sideInsetStyle}>
+          {bodyContent}
+        </View>
+      )}
     </View>
   );
 }

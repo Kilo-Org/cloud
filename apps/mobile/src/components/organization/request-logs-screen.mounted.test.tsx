@@ -71,7 +71,8 @@ vi.mock('@/lib/hooks/use-org-billing-queries', () => ({
 // `vi.mock` factories are hoisted above this file's imports, so they import
 // `createElement` themselves rather than closing over the top-level import.
 // The list is a native list in production; here it renders the rows and the
-// footer element it was given, so the suite can read them.
+// footer element it was given, and forwards its own props (the pull control
+// among them) onto the host node, so the suite reads them from there.
 vi.mock('@shopify/flash-list', async () => {
   const { createElement: h, Fragment: fragment } = await import('react');
   return {
@@ -82,7 +83,7 @@ vi.mock('@shopify/flash-list', async () => {
     }) =>
       h(
         'FlashList',
-        null,
+        props,
         props.data.map((item, index) =>
           h(fragment, { key: index }, props.renderItem({ item, index }) as never)
         ),
@@ -91,7 +92,18 @@ vi.mock('@shopify/flash-list', async () => {
   };
 });
 
-vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
+// The screen's empty and failure bodies ride in `TabScreenScrollView`, so a
+// pull handed to a `placement="top"` state (which renders no scroller and drops
+// the prop) would never reach the gesture. The stub forwards every prop onto a
+// host node, so the suite reads the control from the scroller the screen
+// actually renders.
+vi.mock('@/components/tab-screen', async () => {
+  const { createElement: h } = await import('react');
+  return {
+    useTabBarBottomPadding: () => 0,
+    TabScreenScrollView: (props: { children?: unknown }) => h('TabScreenScrollView', props),
+  };
+});
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: 'black' }),
@@ -467,16 +479,20 @@ describe('OrganizationRequestLogsScreen', () => {
 });
 
 describe('OrganizationRequestLogsScreen pull to refresh', () => {
-  it('refetches the window from the control it hands the empty state', async () => {
-    // The hour settled with no rows, so the empty state carries the only pull.
+  // The pull is read from the scroller the screen actually renders, never from
+  // the state inside it: a `placement="top"` state renders no scroller and
+  // drops a `refreshControl`, so a pull handed to one would leave the gesture
+  // with nowhere to land while the suite still passed.
+  it('puts the pull on the scroller over the empty hour and refetches from it', async () => {
+    // The hour settled with no rows, so this scroller carries the only pull.
     logsQuery.data = [];
     const { renderer, unmount } = await mount();
 
-    const [empty] = renderer.root.findAllByType('EmptyState');
-    if (!empty) {
-      throw new Error('the empty state did not render');
+    const [scroller] = renderer.root.findAllByType('TabScreenScrollView');
+    if (!scroller) {
+      throw new Error('the empty hour rendered no scroller');
     }
-    const control = pullControl(empty);
+    const control = pullControl(scroller);
     expect(control.type).toBe('RefreshControl');
     expect(control.props.refreshing).toBe(false);
     expect(logsQuery.refetch).not.toHaveBeenCalled();
@@ -491,20 +507,42 @@ describe('OrganizationRequestLogsScreen pull to refresh', () => {
     unmount();
   });
 
-  it('announces a failed pull and keeps the empty copy on screen', async () => {
+  it('puts the pull on the scroller over the failure body and refetches from it', async () => {
+    // A failure that never left the device: the body is the only surface, so a
+    // reader with no connection must still be able to pull the read again.
+    logsQuery.error = new TypeError('Network request failed');
+    const { renderer, unmount } = await mount();
+
+    const [scroller] = renderer.root.findAllByType('TabScreenScrollView');
+    if (!scroller) {
+      throw new Error('the failure body rendered no scroller');
+    }
+    const control = pullControl(scroller);
+    expect(control.type).toBe('RefreshControl');
+    expect(logsQuery.refetch).not.toHaveBeenCalled();
+
+    await act(async () => {
+      control.props.onRefresh();
+      await Promise.resolve();
+    });
+    expect(logsQuery.refetch).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('announces a failed pull once and keeps the empty copy on screen', async () => {
     // The read already settled empty; only the pull's own verdict fails, so the
     // screen announces it instead of replacing what is on screen.
     logsQuery.data = [];
     logsQuery.refetch.mockResolvedValue({ isError: true });
     const { renderer, unmount } = await mount();
 
-    const [empty] = renderer.root.findAllByType('EmptyState');
-    if (!empty) {
-      throw new Error('the empty state did not render');
+    const [scroller] = renderer.root.findAllByType('TabScreenScrollView');
+    if (!scroller) {
+      throw new Error('the empty hour rendered no scroller');
     }
 
     await act(async () => {
-      pullControl(empty).props.onRefresh();
+      pullControl(scroller).props.onRefresh();
       await Promise.resolve();
     });
 
@@ -512,6 +550,28 @@ describe('OrganizationRequestLogsScreen pull to refresh', () => {
     expect(announcingToast.error).toHaveBeenCalledWith(i18n.t('common.couldNotRefresh'));
     const [stillEmpty] = renderer.root.findAllByType('EmptyState');
     expect(stillEmpty?.props.title).toBe('No requests in this hour');
+    unmount();
+  });
+
+  it('keeps the list branch on its own pull, not in the state scroller', async () => {
+    logsQuery.data = entries(2);
+    const { renderer, unmount } = await mount();
+
+    // The rows are a virtualized list, so its own pull is the only one; nesting
+    // it in the state scroller would break the list's recycling.
+    expect(renderer.root.findAllByType('TabScreenScrollView')).toHaveLength(0);
+    const [list] = renderer.root.findAllByType('FlashList');
+    if (!list) {
+      throw new Error('the rows were not handed to the list');
+    }
+    const control = pullControl(list);
+    expect(control.type).toBe('RefreshControl');
+
+    await act(async () => {
+      control.props.onRefresh();
+      await Promise.resolve();
+    });
+    expect(logsQuery.refetch).toHaveBeenCalledTimes(1);
     unmount();
   });
 });

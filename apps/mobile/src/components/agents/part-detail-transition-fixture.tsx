@@ -181,6 +181,13 @@ const ignoreExit = () => Promise.resolve();
  * the part id stays latched. `superseded` resets the cache while the base64
  * write is still in flight, so that attempt publishes nothing (no URI, no
  * pending mark, no latch) into the next generation.
+ *
+ * The busy surface a card paints while its write is in flight is deliberately
+ * not reachable here. That write resolves inside a single frame on an emulator
+ * — a body large enough to notice either finishes before the next frame or
+ * faults outright — so a fixture link cannot hold the state still, and marking
+ * the part pending without a write would add a code path that only a fixture
+ * takes. The mounted suite covers it instead, by deferring the real write.
  */
 function seedMediaState(media: 'loaded' | 'failed' | 'superseded'): void {
   // A fresh generation: one target can run twice in one app process.
@@ -233,12 +240,16 @@ function OpenInitialPart({ partId }: Readonly<{ partId: string | undefined }>) {
  * and the row have only the input path to name the file with.
  *
  * `media` swaps the transcript for a completed image send and opens the sheet on
- * it, so the tool card's three settled image surfaces are reachable without a
- * live session: `loaded` paints the cached PNG, `failed` shows the unavailable
- * row. Both `failed` and `superseded` render that same row; they differ only in
- * cache state, and only a device can produce either one, because a failed write
+ * it, so the tool card's settled image surfaces are reachable without a live
+ * session: `loaded` paints the cached PNG, `failed` shows the unavailable row.
+ * Both `failed` and `superseded` render that same row; they differ only in cache
+ * state, and only a device can produce either one, because a failed write
  * latches the part id while a write superseded by a cache reset publishes
  * nothing at all — no URI, no pending mark, no latch.
+ *
+ * These are capture and inspection states, not gate cells: `failed` and
+ * `superseded` differ only in a cache directory the screen never shows, so a
+ * design gate comparison would read them as one identical cell.
  */
 export function PartDetailTransitionFixture({
   initialPartId,

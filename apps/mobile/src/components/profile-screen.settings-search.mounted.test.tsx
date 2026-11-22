@@ -176,10 +176,12 @@ describe('ProfileScreen settings search', () => {
     ).toBe(true);
   });
 
-  it('takes a theme search to the Appearance control first', async () => {
+  it('takes a theme search to one Appearance control instead of its individual options', async () => {
     const { renderer } = await mountProfile();
     query(renderer.root, 'theme');
-    const [first] = results(renderer.root);
+    const matches = results(renderer.root);
+    expect(matches).toHaveLength(1);
+    const [first] = matches;
     if (!first) {
       throw new Error('no result for theme');
     }
@@ -198,7 +200,12 @@ describe('ProfileScreen settings search', () => {
     // The privacy review's analytics control is reachable by its synonym, and
     // its source carries the review-mode route parameter.
     query(root, 'analytics');
-    const entry = results(root).find(result => result.entry.id === 'consent.helpImprove');
+    const matches = results(root);
+    expect(matches.map(result => result.entry.id)).toEqual([
+      'profile.privacyChoices',
+      'consent.helpImprove',
+    ]);
+    const entry = matches.find(result => result.entry.id === 'consent.helpImprove');
     if (!entry) {
       throw new Error('the privacy analytics setting is not indexed');
     }

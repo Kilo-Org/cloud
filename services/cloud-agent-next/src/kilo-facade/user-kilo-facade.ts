@@ -12,11 +12,8 @@ import type {
   GetCloudAgentRootSessionMessagesParams,
   ListCloudAgentRootSessionsParams,
 } from '../session-ingest-binding.js';
-import {
-  fetchOrgIdForSession,
-  validateBalanceOnly,
-  type BalanceOnlyResult,
-} from '../balance-validation.js';
+import { validateBalanceOnly, type BalanceOnlyResult } from '../balance-validation.js';
+import { requireCurrentSessionAccess } from '../session-access.js';
 import type {
   QueueExecutionTurnCommand,
   SubmittedSessionMessageRequest,
@@ -238,6 +235,18 @@ function isSessionIngestKiloSessionId(kiloSessionId: string): boolean {
 
 function missingRootKiloSessionResponse(): Response {
   return facadeError(404, 'KILO_SESSION_NOT_FOUND', 'Cloud Agent root Kilo session was not found');
+}
+
+/**
+ * Projects a failed payer balance check. A payer scope the caller cannot reach
+ * reads as a hidden root, so it does not confirm that the session exists.
+ */
+function promptBalanceFailureResponse(
+  balance: Extract<BalanceOnlyResult, { success: false }>
+): Response {
+  return balance.status === 404
+    ? missingRootKiloSessionResponse()
+    : facadeError(balance.status, 'KILO_BALANCE_VALIDATION_FAILED', balance.message);
 }
 
 function pendingSessionSnapshotResponse(): Response {
@@ -555,14 +564,40 @@ async function readRequestJson(request: Request): Promise<ReadRequestJsonResult>
   }
 }
 
+function promptPayerScopeFailure(error: unknown): BalanceOnlyResult {
+  if (error instanceof TRPCError && error.code === 'FORBIDDEN') {
+    return { success: false, status: 404, message: 'Cloud Agent session was not found' };
+  }
+  return {
+    success: false,
+    status: 503,
+    message: 'Session access is temporarily unavailable; retry the request',
+  };
+}
+
+/**
+ * Resolves the payer from the stored session ownership record, the same source
+ * the tRPC balance middleware uses, so a facade prompt and a tRPC prompt check
+ * one payer. A scope that cannot be read fails the gate closed; the caller may
+ * retry a 503.
+ */
 async function defaultValidatePromptBalance(params: {
   env: Env;
   authToken: string;
   userId: string;
   cloudAgentSessionId: string;
 }): Promise<BalanceOnlyResult> {
-  const orgId = await fetchOrgIdForSession(params.env, params.userId, params.cloudAgentSessionId);
-  return validateBalanceOnly(params.authToken, orgId, params.env);
+  let organizationId: string | null;
+  try {
+    ({ organizationId } = await requireCurrentSessionAccess({
+      env: params.env,
+      kiloUserId: params.userId,
+      cloudAgentSessionId: params.cloudAgentSessionId,
+    }));
+  } catch (error) {
+    return promptPayerScopeFailure(error);
+  }
+  return validateBalanceOnly(params.authToken, organizationId ?? undefined, params.env);
 }
 
 async function defaultAdmitPrompt(params: {
@@ -650,7 +685,7 @@ async function admitBasicPrompt(params: {
     cloudAgentSessionId: params.cloudAgentSessionId,
   });
   if (!balance.success) {
-    return facadeError(balance.status, 'KILO_BALANCE_VALIDATION_FAILED', balance.message);
+    return promptBalanceFailureResponse(balance);
   }
   const command = {
     turn: {
@@ -1546,7 +1581,7 @@ async function admitHostedCommand(params: {
     cloudAgentSessionId: params.cloudAgentSessionId,
   });
   if (!balance.success) {
-    return facadeError(balance.status, 'KILO_BALANCE_VALIDATION_FAILED', balance.message);
+    return promptBalanceFailureResponse(balance);
   }
   const messageId = params.body.messageID ?? createMessageId();
   const command = {

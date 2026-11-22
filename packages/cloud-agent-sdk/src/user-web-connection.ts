@@ -672,19 +672,24 @@ function createUserWebConnection(config: UserWebConnectionConfig): UserWebConnec
         return;
       }
 
-      connectPromise = tokenResult.then(openWithToken, rejectAuthFailure).finally(() => {
-        if (expectedGeneration !== generation) return;
+      // The attempt owns the latch only while `connectPromise` is still its
+      // own promise. A consumer may start a new attempt synchronously from
+      // `onError` or a signal listener, and this attempt's settlement must not
+      // drop that attempt's deadline or single-flight.
+      const attempt = tokenResult.then(openWithToken, rejectAuthFailure).finally(() => {
+        if (connectPromise !== attempt) return;
         clearInitialAuthTimeout();
         connectPromise = null;
       });
+      connectPromise = attempt;
       initialAuthStartedAt = Date.now();
       // One bound for "the connection did not open": the same wait a queued
       // command tolerates. A token call that outlives it is abandoned so the
       // bounded retry series owns the failure, instead of a promise that never
       // settles parking every later retry and resume behind its latch.
       initialAuthTimeout = setTimeout(() => {
+        if (destroyed || connectPromise !== attempt || expectedGeneration !== generation) return;
         initialAuthTimeout = null;
-        if (destroyed || expectedGeneration !== generation) return;
         // The token call never answered. Abandon this attempt the way a
         // superseded one is abandoned — the generation bump makes a ticket that
         // arrives later a no-op — then route into the same bounded backoff or

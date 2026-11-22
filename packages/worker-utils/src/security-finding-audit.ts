@@ -508,7 +508,7 @@ function auditJsonKeyTokens(key: string): string[] {
     .map(token => token.toLowerCase());
 }
 
-function isDisallowedAuditJsonKey(key: string): boolean {
+export function isDisallowedAuditJsonKey(key: string): boolean {
   if (DISALLOWED_AUDIT_JSON_KEY_PATTERN.test(key)) return true;
 
   const tokens = auditJsonKeyTokens(key);

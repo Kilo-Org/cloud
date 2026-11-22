@@ -470,6 +470,51 @@ describe('getSecurityAgentAuditReport', () => {
     }
   }, 20_000);
 
+  it('keeps stored evidence to the fields that an action records', async () => {
+    const owner = await createIntegrationOwner();
+    const findingId = randomUUID();
+    const occurredAt = new Date(Date.now() - 1_000).toISOString();
+
+    await db.insert(security_audit_log).values({
+      id: randomUUID(),
+      owned_by_user_id: owner.id,
+      actor_type: SecurityAuditLogActorType.System,
+      action: SecurityAuditLogAction.RemediationPrOpened,
+      resource_type: 'security_finding',
+      resource_id: findingId,
+      finding_id: findingId,
+      occurred_at: occurredAt,
+      finding_snapshot: findingSnapshot(findingId),
+      before_state: { remediation_status: { apiKey: 'a', attempt: 1 } },
+      metadata: {
+        origin: 'manual',
+        pr_url: 'https://example.test/pr/41',
+        validation_count: { private_key: 'b', pat: 'c', passphrase: 'd', key: 'e', attempt: 2 },
+      },
+      after_state: { remediation_status: 'opened', pr_number: 41 },
+    });
+
+    const report = await getSecurityAgentAuditReport({
+      owner,
+      input: { startDate: dateOnly(occurredAt), endDate: dateOnly(occurredAt) },
+      isRequestingUserKiloAdmin: false,
+    });
+
+    expect(report.summary.activityCount).toBe(1);
+    expect(report.findings[0].events[0].metadata).toEqual({
+      origin: 'manual',
+      pr_url: 'https://example.test/pr/41',
+      validation_count: { attempt: 2 },
+    });
+    expect(report.findings[0].events[0].beforeState).toEqual({
+      remediation_status: { attempt: 1 },
+    });
+    expect(report.findings[0].events[0].afterState).toEqual({
+      remediation_status: 'opened',
+      pr_number: 41,
+    });
+  }, 20_000);
+
   it.each([
     { label: 'query budget', timeoutMs: { requestMs: 20_000, queryMs: 300 }, budgetMs: 300 },
     {
@@ -1153,6 +1198,47 @@ describe('buildSecurityAgentAuditReportFromRows', () => {
     expect(report.findings[0].events[0].metadata).not.toHaveProperty('attempt_id');
     expect(report.findings[0].events[0].metadata).not.toHaveProperty('branch_name');
     expect(report.findings[0].events[0].metadata).not.toHaveProperty('remediation_model_slug');
+  });
+
+  it('reports only the evidence fields that an action records', () => {
+    const report = buildSecurityAgentAuditReportFromRows({
+      owner: {
+        type: 'organization',
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        displayName: 'Acme',
+      },
+      period,
+      generatedAt: '2026-06-12T15:00:00.000Z',
+      dataThrough: '2026-06-12T15:00:00.000Z',
+      isRequestingUserKiloAdmin: false,
+      rows: [
+        row({
+          action: SecurityAuditLogAction.RemediationPrOpened,
+          metadata: {
+            origin: 'manual',
+            pr_url: 'https://example.test/pr/1',
+            validation_count: {
+              apiKey: 'a',
+              private_key: 'b',
+              pat: 'c',
+              passphrase: 'd',
+              key: 'e',
+              attempt: 2,
+            },
+          },
+          before_state: { remediation_status: { accessKey: 'f', attempt: 1 }, status: 'queued' },
+        }),
+      ],
+    });
+
+    expect(report.findings[0].events[0].metadata).toEqual({
+      origin: 'manual',
+      pr_url: 'https://example.test/pr/1',
+      validation_count: { attempt: 2 },
+    });
+    expect(report.findings[0].events[0].beforeState).toEqual({
+      remediation_status: { attempt: 1 },
+    });
   });
 
   it('builds a max-event report under the serialized byte budget without truncation', () => {

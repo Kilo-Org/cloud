@@ -170,8 +170,8 @@ export const downloadTierOf = ({
   /** Whether the optional `downloads` permission is granted right now. */
   readonly hasPermission: boolean;
   /**
-   * Whether the legacy guard has something to decide: an unapproved call to refuse, or an approval that names a file to
-   * exempt. It is false only for an approval whose refusal named no file, so the step it buys has no file to single out.
+   * Whether the legacy guard has something to decide: an unapproved call to refuse, a step approval whose retry it still
+   * guards, or an approval that names a file to exempt. It is false only for an approval whose refusal named no file.
    */
   readonly legacyGuardCanExempt: boolean;
 }): DownloadTier => {

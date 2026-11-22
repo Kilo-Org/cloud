@@ -2337,6 +2337,55 @@ test('accepts a mobile value its catalog lists as English on purpose', () => {
   assert.equal(result.stderr, '');
 });
 
+test('stays silent when every catalog lists the prose value as English on purpose', () => {
+  // A reviewed entry is the decision that the value stays English in that
+  // catalog, so a key every catalog exempts is not a defect. Only the per-locale
+  // rule reads the map, which is why it, and not the every-locale rule, decides
+  // what a prose value means.
+  const english = { agents: { title: 'Your agents' } };
+  const source = "t('agents.title');";
+  const mapBody = /const MOBILE_ENGLISH_COPY_EXCEPTIONS = \{[\s\S]*?\n\};/.exec(
+    CHECKER_SOURCE
+  )?.[0];
+  assert.ok(mapBody, 'the shipped checker ships the exception map literal');
+  const filled = entries => {
+    const patched = CHECKER_SOURCE.replace(
+      mapBody,
+      ['const MOBILE_ENGLISH_COPY_EXCEPTIONS = {', ...entries, '};'].join('\n')
+    );
+    assert.notEqual(patched, CHECKER_SOURCE, 'the case must fill the exception map');
+    return patched;
+  };
+  const tree = checker =>
+    cliFixture(
+      {
+        ...standardFiles({ english, translated: english, source }),
+        ...PER_CATALOG_FRENCH_PUSH,
+        'apps/mobile/src/i18n/languages.ts': PER_CATALOG_LANGUAGES,
+        'apps/mobile/src/i18n/locales/fr.json': JSON.stringify(english),
+        'apps/mobile/src/i18n/locales/ru.json': JSON.stringify(english),
+      },
+      checker
+    );
+
+  const both = cli(
+    tree(filled([`  fr: { 'Your agents': 'reviewed' },`, `  ru: { 'Your agents': 'reviewed' },`]))
+  );
+  assert.equal(both.status, 0, both.stderr);
+  assert.equal(both.stderr, '');
+
+  // One catalog without the entry still reports, so the silence above is the
+  // reviewed entry's doing and not a rule that stopped seeing the value.
+  const one = cli(tree(filled([`  fr: { 'Your agents': 'reviewed' },`])));
+  assert.equal(one.status, 1, one.stderr);
+  assert.match(
+    one.stderr,
+    /^mobile\/ru: "agents\.title" is English; translate it, or list the value for "ru" in MOBILE_ENGLISH_COPY_EXCEPTIONS$/m
+  );
+  assert.doesNotMatch(one.stderr, /^mobile\/fr: /m);
+  assert.doesNotMatch(one.stderr, /equals English in every locale/);
+});
+
 test('reports one line per locale for a prose value left in English everywhere', () => {
   const found = run({
     english: { agents: { title: 'Your agents' } },

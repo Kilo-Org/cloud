@@ -1,3 +1,7 @@
+import {
+  normalizeInferenceProviderId,
+  normalizeInferenceProviderIds,
+} from '@kilocode/app-shared/organizations/model-access-providers';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { i18n } from '@/i18n';
 import { formatDate } from '@/lib/format';
@@ -68,7 +72,7 @@ function sortedUnique(values: readonly string[]): string[] {
  */
 export function catalogProviderSlugs(models: readonly CatalogModel[]): string[] {
   const slugs = models.flatMap(model => model.inference_provider_ids ?? []);
-  return sortedUnique(slugs);
+  return sortedUnique(normalizeInferenceProviderIds(slugs));
 }
 
 /**
@@ -86,10 +90,12 @@ export function providerRows(params: {
   available: readonly CatalogModel[];
   savedAllowList: readonly string[] | undefined;
 }): string[] {
-  return sortedUnique([
-    ...catalogProviderSlugs([...params.catalog, ...params.available]),
-    ...(params.savedAllowList ?? []),
-  ]);
+  return sortedUnique(
+    normalizeInferenceProviderIds([
+      ...catalogProviderSlugs([...params.catalog, ...params.available]),
+      ...(params.savedAllowList ?? []),
+    ])
+  );
 }
 
 /** One row of the deny list: a model an admin may allow or deny, by its bare id. */
@@ -172,7 +178,9 @@ export function initialDraft(
 ): ModelAccessDraft {
   const denied = (settings.model_deny_list ?? []).map(modelId => normalizeModelId(modelId));
   return {
-    providerAllowList: sortedUnique(settings.provider_allow_list ?? catalogProviders),
+    providerAllowList: sortedUnique(
+      normalizeInferenceProviderIds(settings.provider_allow_list ?? catalogProviders)
+    ),
     modelDenyList: sortedUnique(denied),
   };
 }
@@ -183,10 +191,11 @@ export function toggleProvider(
   nextAllowed: boolean
 ): ModelAccessDraft {
   const allowed = new Set(draft.providerAllowList);
+  const canonical = normalizeInferenceProviderId(providerSlug);
   if (nextAllowed) {
-    allowed.add(providerSlug);
+    allowed.add(canonical);
   } else {
-    allowed.delete(providerSlug);
+    allowed.delete(canonical);
   }
   return { ...draft, providerAllowList: sortedUnique([...allowed]) };
 }
@@ -213,10 +222,11 @@ export function setProvidersAllowed(
 ): ModelAccessDraft {
   const allowed = new Set(draft.providerAllowList);
   for (const slug of providerSlugs) {
+    const canonical = normalizeInferenceProviderId(slug);
     if (nextAllowed) {
-      allowed.add(slug);
+      allowed.add(canonical);
     } else {
-      allowed.delete(slug);
+      allowed.delete(canonical);
     }
   }
   return { ...draft, providerAllowList: sortedUnique([...allowed]) };
@@ -261,7 +271,7 @@ export function usableModelIds(params: {
   const usable = new Set<string>();
   for (const model of params.models) {
     const id = normalizeModelId(model.id);
-    const providers = model.inference_provider_ids ?? [];
+    const providers = normalizeInferenceProviderIds(model.inference_provider_ids ?? []);
     const servedByAllowedProvider =
       providers.length === 0 || providers.some(slug => allowedProviders.has(slug));
     if (!denied.has(id) && servedByAllowedProvider) {

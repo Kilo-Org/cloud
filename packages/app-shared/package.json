@@ -12,6 +12,7 @@
     "./auth": "./src/auth/index.ts",
     "./code-review": "./src/code-review/index.ts",
     "./organizations": "./src/organizations/index.ts",
+    "./organizations/model-access-providers": "./src/organizations/model-access-providers.ts",
     "./platforms": "./src/platforms.ts",
     "./universal-links": "./src/universal-links/index.ts",
     "./opencode": "./src/opencode.ts",

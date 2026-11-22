@@ -4927,7 +4927,7 @@
     "revokeTitle": "లింక్‌ను ఉపసంహరించాలా?",
     "revokeMessage": "ప్రస్తుత లింక్ వెంటనే పనిచేయడం ఆగిపోతుంది.",
     "revokeFailed": "లింక్‌ను ఉపసంహరించలేకపోయాము.",
-    "expiresIn": "{{duration}} తర్వాత గడువు ముగుస్తుంది",
+    "expiresIn": "గడువు: {{duration}}",
     "neverExpires": "గడువు ఎప్పటికీ ముగియదు",
     "includesNewMessages": "కొత్త సందేశాలు చేర్చబడ్డాయి.",
     "excludesNewMessages": "కొత్త సందేశాలు మినహాయించబడ్డాయి.",

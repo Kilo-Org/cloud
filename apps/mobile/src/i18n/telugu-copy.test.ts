@@ -331,9 +331,9 @@ describe('Telugu session share durations and expiry sentence', () => {
     expect(i18n.t('sessionShare.duration30d')).toBe('30 రోజులు');
   });
 
-  it('keeps the duration a bare label inside the expiry sentence', () => {
+  it('keeps the duration a bare label inside the expiry line', () => {
     const duration = i18n.t('sessionShare.duration7d');
-    expect(i18n.t('sessionShare.expiresIn', { duration })).toBe(`${duration} తర్వాత గడువు ముగుస్తుంది`);
+    expect(i18n.t('sessionShare.expiresIn', { duration })).toBe(`గడువు: ${duration}`);
   });
 });
 

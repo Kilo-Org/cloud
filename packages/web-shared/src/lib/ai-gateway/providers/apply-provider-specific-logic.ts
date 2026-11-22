@@ -238,8 +238,9 @@ export function applyReasoningDetailsTransform(
 
 /**
  * Whose account the upstream provider bills, as the request-level routing and
- * billing rules see it. Distinct from the `Payer` of a routing decision, which
- * names the selected route rather than the account that pays.
+ * billing rules see it. Not the `Payer` of a routing decision
+ * (`providers/routing-decision.ts`), which names the selected route: that one
+ * has no user-gateway-key case, so the two vocabularies stay separate.
  */
 type RequestPayer = 'kilo' | 'user_gateway' | 'user_byok';
 

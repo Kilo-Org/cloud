@@ -1228,7 +1228,7 @@ jobs:
         run: pnpm install --frozen-lockfile --filter 'web...' --filter kilocode-monorepo
 
       - name: Dependency cycle check
-        run: pnpm run dependency-cycle-check
+        run: pnpm run web:dependency-cycle-check
 
   # Required check. A skipped job (nothing relevant changed) passes; a failed
   # or cancelled job fails this one. Besides the web tests it covers the web

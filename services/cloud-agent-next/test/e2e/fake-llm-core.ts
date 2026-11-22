@@ -1426,11 +1426,66 @@ function readToolResultBody(
 }
 
 /**
+ * `bash:<tag>:<command>` — one native `bash` call carrying the caller's command
+ * verbatim, then a plain confirmation once the tool result comes back.
+ *
+ * The command is the rest of the trailing argument, so it may contain spaces,
+ * colons and shell punctuation; only the appended `<environment_details>` block
+ * is stripped. The tool call id is `bash_<tag>`, so a replay of the same request
+ * sees its own result instead of running the command a second time.
+ */
+function bashScenario(args: string[], ctx: ScenarioContext): void {
+  const parsed = /^([A-Za-z0-9_-]{1,64}):([\s\S]*)$/.exec(args[0] ?? '');
+  const command = parsed ? stripPromptContext(parsed[2]) : '';
+  if (!parsed || command === '') {
+    ctx.emit.json(400, { error: 'expected bash:<tag>:<command>' });
+    return;
+  }
+  const [, tag] = parsed;
+  if (!ctx.tools.some(advertised => advertised.name === 'bash')) {
+    ctx.emit.json(422, { error: 'bash fixture requires native bash' });
+    return;
+  }
+  const id = `bash_${tag}`;
+
+  if (hasToolResult(ctx.body, id)) {
+    writeChunk(
+      ctx.emit,
+      makeChunk(ctx.id, ctx.model, { role: 'assistant', content: `bash-done-${tag}` })
+    );
+    writeFinish(ctx.emit, ctx.id, ctx.model, 1);
+    ctx.emit.end();
+    return;
+  }
+
+  writeChunk(
+    ctx.emit,
+    makeChunk(ctx.id, ctx.model, {
+      role: 'assistant',
+      tool_calls: [
+        {
+          index: 0,
+          id,
+          type: 'function',
+          function: {
+            name: 'bash',
+            arguments: JSON.stringify({ command, description: 'Fixture bash command' }),
+          },
+        },
+      ],
+    })
+  );
+  writeFinish(ctx.emit, ctx.id, ctx.model, 1, 'tool_calls');
+  ctx.emit.end();
+}
+
+/**
  * Scenario registry. Each handler writes SSE chunks through `ctx.emit` and is
  * responsible for closing the response (or leaving it open for `hang`/`gate`).
  */
 export const scenarioRegistry: Record<string, ScenarioHandler> = {
   supervision: supervisionScenario,
+  bash: bashScenario,
   echo(args, ctx) {
     // Harness `echo:<token>` only takes the first identifier so kilo's
     // appended `<environment_details>` cannot leak into the transcript.

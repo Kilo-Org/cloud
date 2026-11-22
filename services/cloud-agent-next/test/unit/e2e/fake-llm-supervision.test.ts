@@ -1,6 +1,73 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { startFakeLlmServer, type FakeLlmServerHandle } from '../../e2e/fake-llm-server.js';
 
+describe('bash directive fake scenario', () => {
+  let server: FakeLlmServerHandle;
+  beforeEach(async () => {
+    server = await startFakeLlmServer({ host: '127.0.0.1' });
+  });
+  afterEach(async () => server.close());
+
+  const tools = (names: string[]) =>
+    names.map(name => ({
+      type: 'function',
+      function: { name, parameters: { type: 'object', properties: {} } },
+    }));
+
+  const post = (messages: unknown[], names = ['bash']) =>
+    fetch(`${server.url}/api/openrouter/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'fake-deterministic', messages, tools: tools(names) }),
+    });
+
+  it('emits one bash tool call with the exact command, colons and plus signs included', async () => {
+    const command = 'git push origin +main && printf "a:b"';
+    const response = await post([{ role: 'user', content: `__fake__:bash:probe1:${command}` }]);
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    const calls = body
+      .split('\n')
+      .filter(line => line.startsWith('data: ') && line !== 'data: [DONE]')
+      .map(line => JSON.parse(line.slice('data: '.length)))
+      .flatMap(chunk => chunk.choices?.[0]?.delta?.tool_calls ?? []);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].id).toBe('bash_probe1');
+    expect(JSON.parse(calls[0].function.arguments)).toEqual({
+      command,
+      description: 'Fixture bash command',
+    });
+    expect(body).toContain('"finish_reason":"tool_calls"');
+  });
+
+  it('replies with the done text and no tool call once the tool result is present', async () => {
+    const response = await post([
+      { role: 'user', content: '__fake__:bash:probe2:printf hi' },
+      { role: 'assistant', content: '' },
+      { role: 'tool', tool_call_id: 'bash_probe2', content: 'hi' },
+    ]);
+    const body = await response.text();
+    expect(body).toContain('bash-done-probe2');
+    expect(body).not.toContain('tool_calls');
+    expect(body).toContain('"finish_reason":"stop"');
+  });
+
+  it.each(['probe3:', 'probe3'])('rejects a missing command: %s', async args => {
+    const response = await post([{ role: 'user', content: `__fake__:bash:${args}` }]);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'expected bash:<tag>:<command>' });
+  });
+
+  it('refuses when the bash tool is not advertised', async () => {
+    const response = await post(
+      [{ role: 'user', content: '__fake__:bash:probe4:printf hi' }],
+      ['goal_report']
+    );
+    expect(response.status).toBe(422);
+    expect(await response.json()).toEqual({ error: 'bash fixture requires native bash' });
+  });
+});
+
 describe('supervision fake request boundaries', () => {
   let server: FakeLlmServerHandle;
   beforeEach(async () => {

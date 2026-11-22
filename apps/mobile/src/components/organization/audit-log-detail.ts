@@ -447,10 +447,7 @@ function renderAuditDetail(detail: AuditDetail, tools: Tools): Render | undefine
       }
       return parts.length === 0
         ? undefined
-        : {
-            key: 'organization.auditLog.detail.settingAdvancedPolicies',
-            values: { values: list(parts) },
-          };
+        : { key: 'organization.auditLog.detail.autoRouting', values: { values: list(parts) } };
     },
 
     'namedPolicy.created': d => policyEvent(tools, d, 'namedPolicyCreated'),

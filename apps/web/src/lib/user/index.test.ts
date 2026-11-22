@@ -5417,6 +5417,9 @@ describe('User', () => {
         actor_email: user.google_user_email,
         actor_name: user.google_user_name,
         message: 'User joined org',
+        // A row whose structured detail names a member's address. The address
+        // must not survive the deletion, and the row's English message does.
+        details: { id: 'invite.accepted', email: user.google_user_email },
       });
 
       await softDeleteUser(user.id);
@@ -5430,6 +5433,8 @@ describe('User', () => {
       expect(logs[0].actor_name).toBeNull();
       expect(logs[0].actor_id).toBe(user.id); // actor_id preserved for reference
       expect(logs[0].message).toBe('User joined org'); // message preserved
+      // The structured detail keeps its event, and no longer carries the address.
+      expect(logs[0].details).toEqual({ id: 'invite.accepted' });
     });
 
     it('should clear organization group attribution fields', async () => {

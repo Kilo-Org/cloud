@@ -1954,10 +1954,19 @@ export async function anonymizeCloudUserData(
       )
     );
 
-  // Organization audit logs: keep the log entries, strip actor PII
+  // Organization audit logs: keep the log entries, strip actor PII. A row's
+  // structured detail can name a member's address too, so its `email` key is
+  // dropped in the same statement rather than left in the JSON. The detail
+  // schema requires that key, so a redacted row's detail no longer parses and
+  // the row falls back to its event name — the same outcome as a row written
+  // before details existed.
   await tx
     .update(organization_audit_logs)
-    .set({ actor_email: null, actor_name: null })
+    .set({
+      actor_email: null,
+      actor_name: null,
+      details: sql`case when ${organization_audit_logs.details} is null then null else ${organization_audit_logs.details} - 'email' end`,
+    })
     .where(eq(organization_audit_logs.actor_id, userId));
 
   await tx

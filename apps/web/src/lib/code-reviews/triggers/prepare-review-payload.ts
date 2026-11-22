@@ -199,7 +199,6 @@ export async function prepareReviewPayload(
   });
 
   try {
-    // 1. Get the review from DB
     const review = await getCodeReviewById(reviewId);
     if (!review) {
       throw new Error(`Review ${reviewId} not found`);
@@ -238,7 +237,6 @@ export async function prepareReviewPayload(
       headRef: review.head_ref,
     });
 
-    // 2. Get the user by userId
     const [user] = await db
       .select()
       .from(kilocode_users)
@@ -406,7 +404,6 @@ export async function prepareReviewPayload(
       }
     }
 
-    // 3. Get platform token and build review state based on platform
     let githubToken: string | undefined;
     let gitlabToken: string | undefined;
     let gitlabInstanceUrl: string | undefined;
@@ -426,7 +423,6 @@ export async function prepareReviewPayload(
 
       if (platform === 'github' && integration?.platform_installation_id) {
         const installationId = integration.platform_installation_id;
-        // Use the stored app type (defaults to 'standard' for existing integrations)
         const appType: GitHubAppType = integration.github_app_type || 'standard';
         // GitHub: Use installation token. Auth failures here (e.g. IP allow list
         // blocking, suspended/uninstalled app) are hard failures: without a token
@@ -491,7 +487,6 @@ export async function prepareReviewPayload(
           );
         }
 
-        // Build complete review state for intelligent update/create decisions
         const summaryLookup = findKiloReviewComment(
           installationId,
           repoOwner,
@@ -500,7 +495,6 @@ export async function prepareReviewPayload(
           appType
         );
         try {
-          // Fetch all state in parallel for efficiency
           const [summaryComment, inlineComments, headCommitSha, reviewInstructions] =
             await Promise.all([
               summaryLookup,
@@ -555,7 +549,6 @@ export async function prepareReviewPayload(
           instanceUrl,
         });
 
-        // Get or create Project Access Token (PrAT) for all GitLab operations
         const projectId = review.platform_project_id;
 
         if (!projectId) {
@@ -632,13 +625,10 @@ export async function prepareReviewPayload(
             })
           : undefined;
 
-        // Build complete review state for GitLab (using PrAT for reading)
         const mrIid = review.pr_number;
-        // Use repo_full_name as the project path for GitLab API calls
         const repoPath = review.repo_full_name;
         const summaryLookup = findKiloReviewNote(gitlabToken, repoPath, mrIid, instanceUrl);
         try {
-          // Fetch all state in parallel for efficiency (using PrAT)
           const [summaryNote, inlineComments, headCommitSha, diffRefs, reviewInstructions] =
             await Promise.all([
               summaryLookup,
@@ -650,12 +640,10 @@ export async function prepareReviewPayload(
             ]);
           repositoryReviewInstructionsLookup = reviewInstructions;
 
-          // Convert GitLab note format to common format
           const summaryComment = summaryNote
             ? { commentId: summaryNote.noteId, body: summaryNote.body }
             : null;
 
-          // Convert GitLab inline comments to common format
           const convertedInlineComments = inlineComments.map(c => ({
             id: c.id,
             path: c.path,
@@ -672,7 +660,6 @@ export async function prepareReviewPayload(
           );
           summaryObservation = { observed: true, body: summaryNote?.body ?? null };
 
-          // Store GitLab diff context for prompt generation
           gitlabContext = {
             baseSha: diffRefs.baseSha,
             startSha: diffRefs.startSha,
@@ -796,7 +783,6 @@ export async function prepareReviewPayload(
       }),
     ]);
 
-    // 5. Generate auth token for cloud agent with bot identifier
     const authToken = generateCloudAgentWorkflowToken(await prepareCloudAgentWorkflowUser(user), {
       organizationId: owner.type === 'org' ? owner.id : undefined,
       tokenSource: 'code-review',
@@ -812,7 +798,6 @@ export async function prepareReviewPayload(
     const councilConfig = config.council;
     const councilActive = review.review_type === 'council' && isCouncilActive(councilConfig);
 
-    // 6. Generate dynamic review prompt
     const { prompt, version } = await generateReviewPrompt(
       config,
       review.repo_full_name,
@@ -839,11 +824,7 @@ export async function prepareReviewPayload(
       hasRepositoryReviewInstructions: repositoryReviewInstructionsLookup.used,
     });
 
-    // 7. Prepare session input
     // Note: cloud-agent automatically sets GH_TOKEN/GITLAB_TOKEN from token parameters
-    // Build platform-specific session input
-    // GitHub: uses githubRepo (owner/repo format) + githubToken
-    // GitLab: uses gitUrl (full HTTPS URL) + gitToken
     const variant = config.thinking_effort ?? undefined;
     // Single source for the standard reviewer's model so the session input and the
     // forward-shaped `reviewAgents[0]` can never drift apart.
@@ -866,7 +847,6 @@ export async function prepareReviewPayload(
           }
         : platform === 'gitlab'
           ? {
-              // GitLab: use full git URL for cloning
               gitUrl: `${gitlabInstanceUrl || 'https://gitlab.com'}/${review.repo_full_name}.git`,
               gitToken: gitlabToken,
               platform: 'gitlab',
@@ -879,7 +859,6 @@ export async function prepareReviewPayload(
               ...(gateThreshold !== 'off' ? { gateThreshold } : {}),
             }
           : {
-              // GitHub: use owner/repo format
               githubRepo: review.repo_full_name,
               githubToken,
               githubPullRequestNumber: review.pr_number,
@@ -941,7 +920,6 @@ export async function prepareReviewPayload(
       });
     }
 
-    // Log the session input for GitLab
     if (platform === 'gitlab') {
       logExceptInTest('[prepareReviewPayload] GitLab session input prepared', {
         gitUrl: sessionInput.gitUrl,
@@ -961,7 +939,6 @@ export async function prepareReviewPayload(
       });
     }
 
-    // 8. Build complete payload
     const payload: CodeReviewPayload = {
       reviewId,
       authToken,
@@ -1109,7 +1086,6 @@ function buildReviewState(
   inlineComments: InlineComment[],
   headCommitSha: string
 ): ExistingReviewState {
-  // Determine previous status from summary body
   let previousStatus: PreviousReviewStatus = 'no-review';
   if (summaryComment) {
     const currentSummary = getCurrentReviewSummaryForContext(summaryComment.body);

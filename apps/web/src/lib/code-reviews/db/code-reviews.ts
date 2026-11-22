@@ -1,10 +1,3 @@
-/**
- * Code Reviews - Database Operations
- *
- * Database operations for cloud agent code reviews.
- * Follows Drizzle ORM patterns used throughout the codebase.
- */
-
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_configs,
@@ -333,10 +326,6 @@ export async function admitCodeReviewLedgerRow(params: {
   }
 }
 
-/**
- * Creates a new code review record
- * Returns the created review ID
- */
 export async function createCodeReview(params: CreateReviewParams): Promise<string> {
   try {
     CreateReviewParamsSchema.parse(params);
@@ -368,10 +357,6 @@ export async function createCodeReview(params: CreateReviewParams): Promise<stri
   }
 }
 
-/**
- * Gets a code review by ID
- * Returns null if not found
- */
 export async function getCodeReviewById(reviewId: string): Promise<CloudAgentCodeReview | null> {
   try {
     // Do NOT select the heavy `council_result` or `repository_review_instructions_imports`
@@ -1251,7 +1236,6 @@ function buildCodeReviewStatusUpdateData(
   if (updates.totalTokensOut !== undefined) updateData.total_tokens_out = updates.totalTokensOut;
   if (updates.totalCostMusd !== undefined) updateData.total_cost_musd = updates.totalCostMusd;
 
-  // Auto-set timestamps based on status
   if (status === 'running' && !updates.startedAt) {
     updateData.started_at = new Date().toISOString();
   }
@@ -1673,17 +1657,14 @@ export async function listCodeReviews(params: ListReviewsParams): Promise<CodeRe
   try {
     const { owner, limit = 50, offset = 0, status, repoFullName, platform } = params;
 
-    // Build WHERE conditions
     const conditions = [];
 
-    // Owner condition
     if (owner.type === 'org') {
       conditions.push(eq(cloud_agent_code_reviews.owned_by_organization_id, owner.id));
     } else {
       conditions.push(eq(cloud_agent_code_reviews.owned_by_user_id, owner.id));
     }
 
-    // Optional filters
     if (status) {
       conditions.push(eq(cloud_agent_code_reviews.status, status));
     }
@@ -1741,17 +1722,14 @@ export async function countCodeReviews(params: {
   try {
     const { owner, status, repoFullName, platform } = params;
 
-    // Build WHERE conditions
     const conditions = [];
 
-    // Owner condition
     if (owner.type === 'org') {
       conditions.push(eq(cloud_agent_code_reviews.owned_by_organization_id, owner.id));
     } else {
       conditions.push(eq(cloud_agent_code_reviews.owned_by_user_id, owner.id));
     }
 
-    // Optional filters
     if (status) {
       conditions.push(eq(cloud_agent_code_reviews.status, status));
     }

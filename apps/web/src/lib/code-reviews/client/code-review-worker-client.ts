@@ -5,11 +5,9 @@ import { CODE_REVIEW_WORKER_AUTH_TOKEN } from '@kilocode/web-shared/lib/config.s
 import { fetchWithTimeout } from '@/lib/fetch-with-timeout';
 import * as z from 'zod';
 
-// Fetch timeout in milliseconds
 const FETCH_TIMEOUT_MS = 10000;
 const CODE_REVIEW_WORKER_URL = process.env.CODE_REVIEW_WORKER_URL;
 
-// Types for API responses
 export type DispatchReviewResponse = {
   reviewId: string;
   attemptId?: string;

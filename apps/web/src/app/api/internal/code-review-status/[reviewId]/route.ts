@@ -242,11 +242,9 @@ function normalizePayload(raw: StatusUpdatePayload): {
   gateResult?: 'pass' | 'fail';
   failure?: CloudAgentSafeFailure;
 } {
-  // Map cloud-agent-next 'interrupted' → 'cancelled'
   let status: 'running' | 'completed' | 'failed' | 'cancelled' =
     raw.status === 'interrupted' ? 'cancelled' : raw.status;
 
-  // Map cloud-agent-next 'kiloSessionId' → 'cliSessionId'
   const cliSessionId =
     'cliSessionId' in raw
       ? raw.cliSessionId
@@ -254,7 +252,6 @@ function normalizePayload(raw: StatusUpdatePayload): {
         ? raw.kiloSessionId
         : undefined;
 
-  // Map cloud-agent-next 'cloudAgentSessionId' → 'sessionId' as fallback
   const sessionId =
     raw.sessionId ?? ('cloudAgentSessionId' in raw ? raw.cloudAgentSessionId : undefined);
   const failure =

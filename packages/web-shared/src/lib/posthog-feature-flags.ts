@@ -69,13 +69,10 @@ type FlagRead = {
  * share a key. An absent and an empty object are the same key.
  */
 function cacheKey({ flagName, distinctId, personProperties }: FlagRead): string {
-  const properties = personProperties
-    ? JSON.stringify(
-        Object.entries(personProperties).sort(([left], [right]) =>
-          left < right ? -1 : left > right ? 1 : 0
-        )
-      )
-    : '';
+  const entries = Object.entries(personProperties ?? {}).sort(([left], [right]) =>
+    left < right ? -1 : left > right ? 1 : 0
+  );
+  const properties = entries.length > 0 ? JSON.stringify(entries) : '';
   return `${flagName}\u0000${distinctId}\u0000${properties}`;
 }
 

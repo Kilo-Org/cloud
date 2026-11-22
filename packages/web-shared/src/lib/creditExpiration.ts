@@ -260,11 +260,10 @@ export async function processOrganizationExpirationsBatch(
     openTransactions,
     transaction => transaction.organization_id
   );
-  const prepared = organizationIds.flatMap(organizationId => {
-    const org = organizationsById.get(organizationId);
-    if (!org) return [];
-
-    const transactions = transactionsByOrganizationId.get(organizationId) ?? [];
+  // Iterating the map's own values keeps insertion order and makes every entry defined, so the
+  // mapper needs no miss guard.
+  const prepared = [...organizationsById.values()].flatMap(org => {
+    const transactions = transactionsByOrganizationId.get(org.id) ?? [];
     const expirationResult = computeExpiration(transactions, org, now, 'system');
     const expiredTransactionIds = new Set(
       expirationResult.newTransactions.map(transaction => transaction.original_transaction_id)

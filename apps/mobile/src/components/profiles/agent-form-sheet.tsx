@@ -378,7 +378,9 @@ export function AgentFormSheet({
           <RowGroup>
             {PERMISSION_TOOLS.map(tool => {
               const enabled = !disabledTools.includes(tool);
-              const rule = toolRules.get(tool);
+              // A row names a stored rule only while its switch is on, so the
+              // caption and its hint always agree with the rule the save keeps.
+              const rule = enabled ? toolRules.get(tool) : undefined;
               const noteText =
                 rule === undefined ? undefined : t('profiles.agents.toolRule', { rule });
               return (
@@ -410,7 +412,7 @@ export function AgentFormSheet({
                     <Text
                       variant="mono"
                       numberOfLines={1}
-                      ellipsizeMode="tail"
+                      ellipsizeMode="middle"
                       {...HIDDEN_LABEL_PROPS}
                       className="mt-0.5 text-xs text-muted-foreground"
                     >

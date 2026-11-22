@@ -269,6 +269,13 @@ export function createSecureStorePreference<T>(options: {
       }
       retryArmed = false;
       release();
+      // A write that landed while the device was locked (`setAsync`, or a
+      // `set()` whose write reached the disk) already said what the disk holds,
+      // so the value is no longer unknown and a read here would only spend a
+      // keychain call and repaint it.
+      if (hasLoaded) {
+        return;
+      }
       // A read already running saw the same unlock and settles the store; the
       // JS thread cannot interleave an unlock between the failed read and this
       // subscription, so the subscription always starts from a locked state.

@@ -220,6 +220,23 @@ describe('shared flag cache', () => {
     expect(mockGetFeatureFlag).toHaveBeenCalledTimes(2);
   });
 
+  test('evicts a settled key before the oldest in-flight read', async () => {
+    const pinned = Promise.withResolvers<unknown>();
+    mockGetFeatureFlag.mockReturnValueOnce(pinned.promise);
+    mockGetFeatureFlag.mockResolvedValue(true);
+
+    const pinnedFirst = isFeatureFlagEnabled('pinned-flag', 'user-pinned');
+    for (let index = 0; index < 500; index++) {
+      await isFeatureFlagEnabled('burst-flag', `user-${index}`);
+    }
+
+    const pinnedSecond = isFeatureFlagEnabled('pinned-flag', 'user-pinned');
+    pinned.resolve(true);
+
+    await expect(Promise.all([pinnedFirst, pinnedSecond])).resolves.toEqual([true, true]);
+    expect(mockGetFeatureFlag).toHaveBeenCalledTimes(501);
+  });
+
   test('evicts the least recently used key so the cache stays bounded', async () => {
     mockGetFeatureFlag.mockResolvedValue(true);
 

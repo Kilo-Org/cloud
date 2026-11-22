@@ -22,8 +22,10 @@ const FLAG_CACHE_TTL_MS = 30_000;
 
 /**
  * Upper bound on one flag read, as the caller waits for it. posthog-node takes no
- * per-call signal, and its own flag request deadline is 3000 ms, so the bound the
- * request path relies on lives here.
+ * per-call signal. The SDK's stateless default flag request deadline is 3000 ms and
+ * the stateful client's default is 10000 ms; the shared client in `posthog.ts` sets
+ * 2000 ms, so an abandoned read releases its socket one second after this 1000 ms
+ * caller deadline.
  */
 const FLAG_READ_TIMEOUT_MS = 1_000;
 
@@ -38,7 +40,8 @@ const FLAG_FAILURE_BACKOFF_MS = 30_000;
 /**
  * Keys carry a distinct id and optionally person properties, so a user- or
  * email-keyed flag would otherwise grow this map without limit in a long-lived
- * isolate. The least recently used key is evicted first.
+ * isolate. Settled entries are evicted first, least recently used key first; an
+ * in-flight read is kept unless every key is in flight.
  */
 const MAX_CACHED_FLAGS = 500;
 
@@ -92,9 +95,19 @@ function storeEntry(key: string, entry: FlagCacheEntry): void {
   flagCache.delete(key);
   flagCache.set(key, entry);
   while (flagCache.size > MAX_CACHED_FLAGS) {
-    const oldest = flagCache.keys().next();
-    if (oldest.done) break;
-    flagCache.delete(oldest.value);
+    let victim: string | undefined;
+    for (const [candidate, cached] of flagCache) {
+      if (cached.kind !== 'reading') {
+        victim = candidate;
+        break;
+      }
+    }
+    if (victim === undefined) {
+      const oldest = flagCache.keys().next();
+      if (oldest.done) break;
+      victim = oldest.value;
+    }
+    flagCache.delete(victim);
   }
 }
 

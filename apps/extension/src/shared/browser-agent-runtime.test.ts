@@ -2937,6 +2937,127 @@ describe('agent browser calls', () => {
     ).toContain('report.txt: The file was downloaded; the page did not change.');
   });
 
+  it('answers an approved repeat with the navigation result of the tab it drove', async () => {
+    const downloads = createFakeDownloads();
+    const created: Record<string, unknown>[] = [];
+    const openedListeners: ((tab: {
+      readonly id?: number;
+      readonly openerTabId?: number;
+    }) => void)[] = [];
+    const newTab = TAB_ID + 6;
+    const landing = 'https://accounts.example.org/login';
+    let navigates = 0;
+    /**
+     * The opened tab's url, as the browser reports it: the step's destination until the repeat's navigation commits,
+     * then the url that navigation landed on.
+     */
+    let tabUrl = `${MAIN_ORIGIN}/report.txt`;
+
+    const tabsApi = {
+      create: async (properties: { readonly url?: string } = {}) => {
+        created.push({ ...properties });
+
+        // The browser opens the tab, so the call owns it.
+        for (const listener of openedListeners) {
+          listener({ id: newTab, openerTabId: TAB_ID });
+        }
+
+        return { id: newTab, title: '', url: properties.url ?? 'about:blank', windowId: 1 };
+      },
+      get: async (tabId: number) =>
+        tabId === newTab
+          ? { id: newTab, title: '', url: tabUrl, windowId: 1 }
+          : { id: TAB_ID, title: 'Example', url: MAIN_ORIGIN },
+      onCreated: {
+        addListener: (
+          listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+        ) => {
+          openedListeners.push(listener);
+        },
+        removeListener: (
+          listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+        ) => {
+          const index = openedListeners.indexOf(listener);
+
+          if (index !== -1) {
+            openedListeners.splice(index, 1);
+          }
+        },
+      },
+      query: async () => [
+        { active: true, id: TAB_ID, title: 'Example', url: MAIN_ORIGIN, windowId: 1 },
+      ],
+    };
+    const { controller } = createGroups();
+    const { cdp, runtime } = await createHarness({
+      downloadsApi: downloads.api,
+      tabGroups: controller,
+      tabsApi,
+    });
+
+    // The step's navigate answers with an aborted load and names the download it started; the approved repeat's
+    // Navigate loads a page, so no file exists for the approval to claim and the result is the page it landed on.
+    cdp.setHandlers({
+      'Page.navigate': () => {
+        navigates += 1;
+
+        if (navigates === 1) {
+          downloads.emit({ id: 71, tabId: newTab });
+
+          return { errorText: 'net::ERR_ABORTED' };
+        }
+
+        return { frameId: 'main' };
+      },
+    });
+
+    const url = `${MAIN_ORIGIN}/report.txt`;
+    const openTab = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: {
+          authorized: [readGrant, actGrant, { class: 'navigate', origin: MAIN_ORIGIN }],
+          sensitive: [...sensitive],
+        },
+        arguments: { action: 'new', url },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_tabs',
+      });
+
+    const guarded = await openTab([]);
+
+    if (guarded.kind !== 'needs_permission') {
+      throw new Error(`expected a refusal, got ${JSON.stringify(guarded)}`);
+    }
+
+    expect([created.length, created[0]?.['url'], downloads.cancelled]).toStrictEqual([
+      1,
+      'about:blank',
+      [71],
+    ]);
+
+    // The repeat's navigation commits on the url it loaded, so the frame tree and the tab the browser reports both
+    // Show where the repeat settled.
+    cdp.setFrameUrl(landing);
+    tabUrl = landing;
+
+    const approved = await openTab([expectStepToken(guarded)]);
+
+    expect(approved).toMatchObject({
+      from: MAIN_ORIGIN,
+      kind: 'origin_changed',
+      to: 'https://accounts.example.org',
+    });
+    // The repeat navigated the tab the refused step opened, not the caller's, and it opened no second tab.
+    expect(cdp.sent().findLast(command => command.method === 'Page.navigate')).toStrictEqual({
+      method: 'Page.navigate',
+      params: { url },
+      tabId: newTab,
+      url,
+    });
+    expect([created.length, downloads.cancelled]).toStrictEqual([1, [71]]);
+  });
+
   it('leaves a later download of the same url alone when the record for it is stale', async () => {
     const downloads = createFakeDownloads();
     const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });

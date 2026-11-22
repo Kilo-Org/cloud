@@ -89,6 +89,53 @@ const LAYOUT_ALLOWLIST = [
 const LAYOUT_EXEMPT_TREES = ['src/glanceable-ios/', 'src/glanceable-android/'];
 
 /**
+ * Every utility that can write a page inset, with both facts a rule reads off
+ * it: the `side` it moves and the `property` it writes, a padding or a margin.
+ * One table so the two inset rules below cannot drift on which sides exist, and
+ * so no caller probes the utility name to work out what it insets; each rule
+ * still states its own policy on top of it.
+ *
+ * The family is horizontal only: a page inset is the column a screen's content
+ * sits in, so `mt-6` or `py-6` moves an element's own box and is not one. The
+ * all-side `p`/`m` entries are here because L2 judges them when they are not
+ * the `p-4` gutter; L12 leaves them out below, because it owns the side insets.
+ */
+const INSET_UTILITIES = new Map([
+  ['p', { side: 'all', property: 'padding' }],
+  ['px', { side: 'x', property: 'padding' }],
+  ['ps', { side: 's', property: 'padding' }],
+  ['pe', { side: 'e', property: 'padding' }],
+  ['pl', { side: 'l', property: 'padding' }],
+  ['pr', { side: 'r', property: 'padding' }],
+  ['m', { side: 'all', property: 'margin' }],
+  ['mx', { side: 'x', property: 'margin' }],
+  ['ms', { side: 's', property: 'margin' }],
+  ['me', { side: 'e', property: 'margin' }],
+  ['ml', { side: 'l', property: 'margin' }],
+  ['mr', { side: 'r', property: 'margin' }],
+]);
+
+/**
+ * L12's own share of the table: the side-specific insets. The all-side `p`/`m`
+ * entries are left out because L12 judges a side, and it does not own the
+ * all-side policy L2 states.
+ */
+const L12_UTILITIES = [...INSET_UTILITIES]
+  .filter(([, entry]) => entry.side !== 'all')
+  .map(([utility]) => utility);
+
+/**
+ * L12's pattern, built from the table above rather than spelled again, so a
+ * side added there is judged by both rules at once. A side inset at 5 or more
+ * is wider than the 14pt page gutter; the lookbehind and lookahead keep it off
+ * a longer utility name and off a fractional or arbitrary value.
+ */
+const L12_PATTERN = new RegExp(
+  `(?<![\\w-])-?(?:${L12_UTILITIES.join('|')})-(?:[5-9]|\\d{2,})(?![\\w.\\-/])`,
+  'g'
+);
+
+/**
  * The layout contract's rules. Each entry states one rule once: `id` (the id a
  * diagnostic and the baseline key carry) and `advice` (the primitive the
  * contract names for the concern, so every diagnostic points at the replacement
@@ -191,8 +238,10 @@ export const LAYOUT_RULES = [
       // inset is one number; a call site that writes a wider one puts its
       // content on a column the rest of the app does not share — the 21pt
       // sheet-header label and 28pt empty-state paragraph the design gate read
-      // as double insets both started as a class wider than the gutter.
-      /(?<![\w-])-?(?:px|ps|pe|pl|pr|mx|ms|me)-(?:[5-9]|\d{2,})(?![\w.\-/])/g,
+      // as double insets both started as a class wider than the gutter. The
+      // sides come from `INSET_UTILITIES`, so a side added to that table is
+      // judged here without this pattern being edited.
+      L12_PATTERN,
     ],
     advice:
       'a page inset is the 14pt gutter: use SCREEN_GUTTER_CLASS, or the primitive that owns its own inset (SheetHeader, ScreenHeader, the state and row primitives)',
@@ -373,9 +422,14 @@ const SCROLL_CONTAINERS = new Set([
   'KeyboardAwareScrollView',
 ]);
 
+/** A tag's name without an `Animated.` wrapper: `Animated.X` and `X` are one element. */
+function bareTagName(name) {
+  return name.replace(/^Animated\./, '');
+}
+
 /** The inventory's answer for one tag, with any `Animated.` wrapper removed. */
 function isScrollContainer(name) {
-  return SCROLL_CONTAINERS.has(name.replace(/^Animated\./, ''));
+  return SCROLL_CONTAINERS.has(bareTagName(name));
 }
 
 /**
@@ -752,10 +806,10 @@ const HEADER_TAGS = new Set(['ScreenHeader', 'SheetHeader']);
  * The utility part of one class token, with any variant prefix and the token's
  * leading `!` removed. A variant (`md:`, `landscape:`, `ios:`) selects when the
  * utility applies and `!` only raises its specificity, so neither changes what
- * the utility does: the inset rules read the same padding a bare token writes —
+ * the utility does: every rule below reads the same inset a bare token writes —
  * the same way L12's lookbehind sees a variant-prefixed `px-6`.
- * `checkScrollPadding` reads `anyPadding` here for the same reason the L2
- * gutter rule does: a prefixed `ios:px-4` insets the content exactly as a bare
+ * `checkScrollPadding` reads `anyPadding` for the same reason L2's header
+ * policy does: a prefixed `ios:px-4` insets the surface exactly as a bare
  * `px-4` does.
  */
 function utilityOf(token) {
@@ -763,27 +817,71 @@ function utilityOf(token) {
   return segments[segments.length - 1].replace(/^!/, '');
 }
 
-/** True when one class token writes a horizontal page inset other than `px-4`. */
-function wrongGutter(token) {
-  const match = /^-?(p|px|ps|pe|pl|pr)-(.+)$/.exec(utilityOf(token));
+/**
+ * One class token read as a page inset, or null when it is not one.
+ *
+ * `property` is what the utility insets — a padding or a margin — and `side`
+ * is the side it moves; both come from the token's entry in `INSET_UTILITIES`,
+ * so a rule states only the policy it owns on top of the same parse. A negative
+ * token (`-mt-2`) parses the same way: the sign only decides which direction
+ * the inset moves.
+ *
+ * The two inset rules read this one parse with different policies:
+ * - L12 judges a side inset at 5 or more, because the page gutter is 14pt.
+ * - L2 judges the page inset on a scroll content container, a `CenteredState`
+ *   content container and a header's own `className`: the first two must be
+ *   exactly `px-4`/`p-4`, except a margin of `auto` (centring) or `0` (no
+ *   inset), and a header owns its own gutter, so it takes no padding at all.
+ */
+function parseInset(token) {
+  const match = /^-?([a-z]+)-(.+)$/.exec(utilityOf(token));
   if (match === null) {
-    return false;
+    return null;
   }
-  return !((match[1] === 'px' || match[1] === 'p') && match[2] === '4');
+  const [, utility, value] = match;
+  const entry = INSET_UTILITIES.get(utility);
+  if (entry === undefined) {
+    return null;
+  }
+  return { ...entry, utility, value };
 }
 
-/** True when a class token writes an all-side or horizontal padding at all. */
+/** True when one class token writes a page inset other than the `px-4`/`p-4` gutter. */
+function wrongGutter(token) {
+  const inset = parseInset(token);
+  if (inset === null) {
+    return false;
+  }
+  // A margin of `auto` is centering geometry and a margin of `0` writes no
+  // inset at all, so neither moves the page column this rule judges; L12's
+  // 5-or-more threshold does not reach either value either, so no rule judges
+  // them. A padding is not exempt: `px-0` on a content container is exactly the
+  // gutterless column this rule exists for.
+  if (inset.property === 'margin' && (inset.value === 'auto' || inset.value === '0')) {
+    return false;
+  }
+  return !((inset.utility === 'px' || inset.utility === 'p') && inset.value === '4');
+}
+
+/** True when a class token writes a padding at all: the header's own gutter policy. */
 function anyPadding(token) {
-  return /^-?(?:p|px|ps|pe|pl|pr)-/.test(utilityOf(token));
+  return parseInset(token)?.property === 'padding';
 }
 
 /**
- * A page gutter written on a scroll container's content container other than
- * `px-4` — or horizontal padding on a `CenteredState` content container, which
- * is the same page inset inside the centered band — and any horizontal padding
- * on a `ScreenHeader`/`SheetHeader` `className`: both move the page inset the
- * contract fixed, and the header's own gutter is what the next screen lines up
- * against.
+ * The page inset written on a surface that owns one, with L2's two policies on
+ * top of the one inset family: a scroll container's content container or a
+ * `CenteredState` content container must be exactly the `px-4`/`p-4` gutter
+ * (any other inset there — padding or margin — moves the page column), while a
+ * `ScreenHeader`/`SheetHeader` owns its own gutter, so a screen writes no
+ * padding on its `className`. Both move the page inset the contract fixed, and
+ * the header's own gutter is what the next screen lines up against.
+ *
+ * The one carve-out is a margin of `auto` or `0` on a content container: an
+ * auto margin centres the container instead of moving the page column, and a
+ * zero margin writes no inset, which is why `wrongGutter` passes both. A
+ * padding of `0` is not carved out — a content container with no gutter is the
+ * gutterless column that policy exists for.
  */
 function detectScrollGutters({ program, chunks, text, lineOf }) {
   const problems = [];
@@ -793,7 +891,7 @@ function detectScrollGutters({ program, chunks, text, lineOf }) {
     }
     // `Animated.X` and `X` are one element to every rule here, so the wrapper
     // is removed once and each lookup below reads the same bare tag.
-    const name = tagName(node, text).replace(/^Animated\./, '');
+    const name = bareTagName(tagName(node, text));
     const gutter =
       SCROLL_CONTAINERS.has(name) || CENTERED_BODIES.has(name)
         ? 'contentContainerClassName'
@@ -1342,8 +1440,12 @@ export function checkCompilerStillDropsThese() {
   }
 
   // The `left` control fixture, which the runtime accepts, proves the read
-  // selects a real declaration rather than an empty stylesheet: the pins only
-  // mean something once reading a declaration that exists is known to work.
+  // selects a real declaration rather than an empty stylesheet. It is the
+  // precondition for EVERY pin below: each one reads an emitted declaration
+  // through the same read, so a read that cannot see a declaration the
+  // compiler definitely emits would make every absent-declaration pin pass
+  // vacuously, holding a ban nothing is checking. When the control is absent
+  // the run reports that one problem and no pin runs.
   let control;
   try {
     control = emittedValue('.x { text-align: left; }', undefined, 'textAlign');
@@ -1352,7 +1454,7 @@ export function checkCompilerStillDropsThese() {
   }
   if (control !== undefined && !control.present) {
     problems.push(
-      'check-classes: the text-align: left control fixture emits no textAlign declaration — the text-align pins cannot be verified without it'
+      'check-classes: the text-align: left control fixture emits no textAlign declaration — the compiler pins cannot be verified without it'
     );
   }
   if (control?.present) {
@@ -1369,42 +1471,42 @@ export function checkCompilerStillDropsThese() {
         return `check-classes: text-align: ${keyword} is no longer dropped — drop the text-${keyword} rule`;
       });
     }
+
+    // A `/opacity` modifier on an `@theme inline` variable is emitted as a
+    // deferred colorMix over the variable; the runtime cannot decompose it and
+    // drops the declaration. When the compiler resolves it instead, this stops
+    // matching and the rule above can go.
+    pin(
+      'the color-mix over an @theme inline variable fixture',
+      declarationPin({
+        subject: 'color-mix over an @theme inline variable',
+        css:
+          '@theme inline { --color-destructive: var(--destructive); }\n' +
+          ':root { --destructive: #b0483a; }\n' +
+          '.x { background-color: color-mix(in oklab, var(--color-destructive) 10%, transparent); }',
+        options: undefined,
+        property: 'backgroundColor',
+        call: 'colorMix',
+        rule: 'theme-token opacity',
+      })
+    );
+
+    // With `inlineVariables: false` (apps/mobile/metro.config.js) the spacing
+    // scale reaches the runtime as a deferred calc inside the line-height
+    // function, which multiplies the result by the font size. When the compiler
+    // folds it to a length instead, this stops matching and the rule can go.
+    pin(
+      'the spacing-scale line-height fixture',
+      declarationPin({
+        subject: 'a spacing-scale line height',
+        css: ':root { --spacing: 0.25rem; }\n.x { line-height: calc(var(--spacing) * 5); }',
+        options: { inlineVariables: false },
+        property: 'lineHeight',
+        call: 'calc',
+        rule: 'numeric leading',
+      })
+    );
   }
-
-  // A `/opacity` modifier on an `@theme inline` variable is emitted as a
-  // deferred colorMix over the variable; the runtime cannot decompose it and
-  // drops the declaration. When the compiler resolves it instead, this stops
-  // matching and the rule above can go.
-  pin(
-    'the color-mix over an @theme inline variable fixture',
-    declarationPin({
-      subject: 'color-mix over an @theme inline variable',
-      css:
-        '@theme inline { --color-destructive: var(--destructive); }\n' +
-        ':root { --destructive: #b0483a; }\n' +
-        '.x { background-color: color-mix(in oklab, var(--color-destructive) 10%, transparent); }',
-      options: undefined,
-      property: 'backgroundColor',
-      call: 'colorMix',
-      rule: 'theme-token opacity',
-    })
-  );
-
-  // With `inlineVariables: false` (apps/mobile/metro.config.js) the spacing
-  // scale reaches the runtime as a deferred calc inside the line-height
-  // function, which multiplies the result by the font size. When the compiler
-  // folds it to a length instead, this stops matching and the rule can go.
-  pin(
-    'the spacing-scale line-height fixture',
-    declarationPin({
-      subject: 'a spacing-scale line height',
-      css: ':root { --spacing: 0.25rem; }\n.x { line-height: calc(var(--spacing) * 5); }',
-      options: { inlineVariables: false },
-      property: 'lineHeight',
-      call: 'calc',
-      rule: 'numeric leading',
-    })
-  );
 
   return problems;
 }
@@ -1489,16 +1591,72 @@ function layoutFindings(findings) {
   return byFile;
 }
 
-/** The baseline as written, or an empty one when the file is absent. */
+/** One parsed value is a plain object (not an array, not null). */
+function isPlainObject(value) {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Why the parsed baseline is not one rule map per file path, or null when it
+ * is. The file is checked once, where it is read, so the comparison never runs
+ * over a shape that would misreport: a string count compares as neither
+ * greater nor smaller than a number and silently passes every file, and a
+ * top-level array has no `path` key to admit anything.
+ */
+function layoutBaselineFailure(baseline) {
+  if (!isPlainObject(baseline)) {
+    return 'the file does not hold one rule map per file path';
+  }
+  for (const [path, rules] of Object.entries(baseline)) {
+    if (!isPlainObject(rules)) {
+      return `${path} is not one rule map per file path`;
+    }
+    for (const [id, count] of Object.entries(rules)) {
+      if (!Number.isInteger(count) || count < 0) {
+        return `${path} ${id} is not a non-negative integer`;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * The baseline as written, with the reason it could not be used when it is
+ * malformed. An absent file is an empty baseline, not a failure: the migration
+ * may not have written one yet. A read error that is neither that nor a parse
+ * error (EACCES, EISDIR) still throws, because it is an environment problem the
+ * caller reports as its own.
+ *
+ * The file's own defects — unparseable text, and a malformed shape — are kept
+ * apart from the comparison instead: the check reports each as an instrument
+ * problem and skips the comparison, the same way a theme read failure skips
+ * only its one rule. Reporting the comparison's own verdict over a file the
+ * check could not read would be a guess.
+ */
 function readLayoutBaseline() {
+  let parsed;
   try {
-    return JSON.parse(readFileSync(join(ROOT, LAYOUT_BASELINE_PATH), 'utf8'));
+    parsed = JSON.parse(readFileSync(join(ROOT, LAYOUT_BASELINE_PATH), 'utf8'));
   } catch (error) {
     if (error.code === 'ENOENT') {
-      return {};
+      return { baseline: {}, failure: null };
+    }
+    if (error instanceof SyntaxError) {
+      return {
+        baseline: {},
+        failure: `check-classes: cannot read the layout baseline from ${LAYOUT_BASELINE_PATH} (${firstLine(error)}) — the layout baseline comparison cannot run without it and was skipped`,
+      };
     }
     throw error;
   }
+  const failure = layoutBaselineFailure(parsed);
+  if (failure !== null) {
+    return {
+      baseline: {},
+      failure: `check-classes: cannot read the layout baseline from ${LAYOUT_BASELINE_PATH} (${failure}) — the layout baseline comparison cannot run without it and was skipped`,
+    };
+  }
+  return { baseline: parsed, failure: null };
 }
 
 /** Rewrite the baseline from this run's own counts: the migration's new floor. */
@@ -1574,13 +1732,35 @@ function compareLayoutBaseline(findings, baseline) {
 /**
  * The whole audit: every source file, then the compiler pins, then the report.
  *
- * `read`, `writeBaseline` and `readBaseline` exist so a test can drive one run
- * without the process's own arguments or files: `read` is handed to the walk in
- * place of the filesystem, `writeBaseline` is the writer a
- * `--write-layout-baseline` run uses (null otherwise), and `readBaseline`
- * supplies the checked-in baseline for the comparison.
+ * Four seams let a test drive one run without the process's own arguments or
+ * files, and each replaces exactly what it names:
+ * - `read` is handed to the walk in place of the filesystem.
+ * - `writeBaseline` is the writer a `--write-layout-baseline` run uses (null on
+ *   an ordinary run), and it receives this run's findings instead of the file.
+ * - `readBaseline` supplies both the checked-in baseline for the comparison and
+ *   the failure that skips it, so a run never compares against a file it could
+ *   not read.
+ * - `readTheme` supplies the `@theme inline` tokens and their failure.
+ *
+ * The theme read and the ban list are scoped to the run: the memos are seeded
+ * from this run's reader, and the caches the module held before it are
+ * restored when it ends, so a theme a caller injects serves that run alone.
  */
-export function run({
+export function run({ readTheme = readThemeTokens, ...options } = {}) {
+  const previousTheme = themeTokenCache;
+  const previousRules = ruleCache;
+  themeTokenCache = readTheme();
+  ruleCache = undefined;
+  try {
+    return auditRun(options);
+  } finally {
+    themeTokenCache = previousTheme;
+    ruleCache = previousRules;
+  }
+}
+
+/** The audit body `run` drives, with this run's theme memo already seeded. */
+function auditRun({
   read = readFileSync,
   writeBaseline = process.argv.includes('--write-layout-baseline') ? writeLayoutBaseline : null,
   readBaseline = readLayoutBaseline,
@@ -1625,14 +1805,22 @@ export function run({
     return;
   }
 
-  // The theme problem belongs with the instrument problems: the file problems
-  // print first, then what the audit could not check, then the summary.
+  // The theme and baseline problems belong with the instrument problems: the
+  // file problems print first, then what the audit could not check, then the
+  // summary.
+  const { baseline, failure: baselineFailure } = readBaseline();
   if (themeFailure !== null) {
     problems.push(themeFailure);
   }
+  if (baselineFailure !== null) {
+    problems.push(baselineFailure);
+  }
   problems.push(...checkCompilerStillDropsThese());
 
-  const layoutProblems = compareLayoutBaseline(findings, readBaseline());
+  // A baseline that could not be read is not compared: its own failure above
+  // says why, and a comparison against the empty shape would report every
+  // finding as new.
+  const layoutProblems = baselineFailure === null ? compareLayoutBaseline(findings, baseline) : [];
 
   if (problems.length > 0 || layoutProblems.length > 0) {
     for (const problem of problems) {

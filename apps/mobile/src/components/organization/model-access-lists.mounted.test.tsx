@@ -144,14 +144,16 @@ async function mountBothLists() {
  * the list node and that host node, so the walk skips it.
  */
 function listFrames(root: ReactTestRenderer['root']) {
-  return root.findAll(node => Object.is(node.type, 'FlashList')).map(list => {
-    for (let node = list.parent; node; node = node.parent) {
-      if (Object.is(node.type, 'View')) {
-        return node;
+  return root
+    .findAll(node => Object.is(node.type, 'FlashList'))
+    .map(list => {
+      for (let node = list.parent; node; node = node.parent) {
+        if (Object.is(node.type, 'View')) {
+          return node;
+        }
       }
-    }
-    throw new Error('the list renders outside its frame');
-  });
+      throw new Error('the list renders outside its frame');
+    });
 }
 
 /** The margin each list's frame reserves at the window's bottom edge. */

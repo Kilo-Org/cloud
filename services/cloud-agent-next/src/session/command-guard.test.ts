@@ -650,6 +650,11 @@ describe('security-remediation push command guard policy', () => {
       'git push origin feature/force-fix',
       'git push origin a+b',
       'git push origin :old',
+      // The remediation prompt names these four forms for its own workflow.
+      'git add src/app.ts',
+      'git commit -F /tmp/commit-message.txt',
+      'git push origin security-remediation/npm-ghsa-1234-5678-9abc/1',
+      'gh pr create --fill --head security-remediation/npm-ghsa-1234-5678-9abc/1',
       'git status',
       'git diff --stat',
       'git log --oneline -5',

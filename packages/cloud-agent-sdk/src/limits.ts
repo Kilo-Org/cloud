@@ -32,9 +32,11 @@ export const NATIVE_SYNC_RETAINED_WORK_BYTES = 4 * 1024 * 1024;
 export const NATIVE_SYNC_RETAINED_WORK_FRAMES = 1024;
 
 /**
- * Attachment bytes a native snapshot reader retains across reads of one client, in advertised
- * blob bytes. Blobs are content addressed, so a retained body can answer any later read of the
- * same hash. Sized to hold four maximum-size blobs (the service caps one blob at 8 MiB).
+ * Retained memory a native snapshot reader may hold for settled attachment bodies, in UTF-16
+ * bytes of the base64 strings it keeps. Blobs are content addressed, so a retained body can
+ * answer any later read of the same hash; the cache evicts the oldest entries to stay inside
+ * this bound. A retained body costs about 2.67 times its raw size, so this budget holds one
+ * maximum-size blob (the service caps one at 8 MiB) with room to spare.
  */
 export const NATIVE_SNAPSHOT_BLOB_CACHE_BYTES = 32 * 1024 * 1024;
 

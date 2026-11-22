@@ -1792,19 +1792,25 @@ describe('retained native attachment bodies', () => {
   });
 
   it('resolves a snapshot larger than the cache budget and reuses its own bodies across a retry', async () => {
-    // Three advertised 3-byte blobs against a 5-byte budget: the cache cannot retain them all,
-    // so only this call's own settled bodies keep the final asset loop answerable.
-    const cache = new NativeSnapshotBlobCache(5);
+    // Three bodies of eight retained bytes each against a twenty-byte budget: the cache cannot
+    // hold them all, so only this call's own settled bodies keep the final asset loop
+    // answerable.
+    const cache = new NativeSnapshotBlobCache(20);
     const entities = mediaSnapshot([0, 1, 2]);
     const readAsset = reader();
     await readAssets([0, 1, 2], 3, readAsset, cache);
     expect(readAsset).toHaveBeenCalledTimes(3);
+    // The budget held two bodies, so a second call re-downloads only the evicted oldest one.
+    await readAssets([0, 1, 2], 3, readAsset, cache);
+    expect(readAsset).toHaveBeenCalledTimes(4);
 
-    // A retry inside one call reuses every body an earlier attempt settled.
-    let reclaimed = false;
+    // Within one call, a retry reuses every body the earlier attempt settled. A budget that
+    // holds a single body keeps this independent of the shared cache: attempt two must serve
+    // two bodies from the call's own store and read only the one that failed.
+    let failed = false;
     const retrying = jest.fn(async (path: string, bytes: number) => {
-      if (!reclaimed && path.endsWith(hashOf(1))) {
-        reclaimed = true;
+      if (!failed && path.endsWith(hashOf(2))) {
+        failed = true;
         throw Object.assign(new Error('Reclaimed'), { code: 'blob_not_found' });
       }
       return new Uint8Array(bytes).fill(1).buffer;
@@ -1819,16 +1825,16 @@ describe('retained native attachment bodies', () => {
       sessionID,
       undefined,
       retrying,
-      cache
+      new NativeSnapshotBlobCache(8)
     );
     expect(resolved.assetURLs).toEqual(expectedURLs([0, 1, 2]));
-    // Only the reclaimed body is read again; the other two settled before the failure.
+    // Two bodies settled before the failure; only the reclaimed one is read a second time.
     const asked = (index: number) =>
       retrying.mock.calls.filter(([path]) => path.endsWith(hashOf(index))).length;
-    expect([asked(0), asked(1), asked(2)]).toEqual([1, 2, 1]);
+    expect([asked(0), asked(1), asked(2)]).toEqual([1, 1, 2]);
 
-    // A budget below one advertised blob retains nothing, so each call reads all three again.
-    const tiny = new NativeSnapshotBlobCache(2);
+    // A budget below one retained body keeps nothing, so each call reads all three again.
+    const tiny = new NativeSnapshotBlobCache(7);
     const again = reader();
     await readAssets([0, 1, 2], 3, again, tiny);
     await readAssets([0, 1, 2], 3, again, tiny);
@@ -1836,8 +1842,8 @@ describe('retained native attachment bodies', () => {
   });
 
   it('evicts the oldest retained body so re-reading it downloads again', async () => {
-    // A 3-byte budget holds exactly one 3-byte body.
-    const cache = new NativeSnapshotBlobCache(3);
+    // An eight-byte budget holds exactly one retained body.
+    const cache = new NativeSnapshotBlobCache(8);
     const readAsset = reader();
     await readAssets([0], 3, readAsset, cache);
     expect(readAsset).toHaveBeenCalledTimes(1);

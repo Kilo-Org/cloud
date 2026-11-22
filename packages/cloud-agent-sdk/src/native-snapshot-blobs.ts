@@ -7,7 +7,16 @@
 /** One resolved attachment body, already in the form the snapshot publishes. */
 export type NativeSnapshotBlob = { bytes: number; base64: string };
 
-type Entry = NativeSnapshotBlob & { sessionID: string; hash: string };
+type Entry = NativeSnapshotBlob & { sessionID: string; hash: string; retained: number };
+
+/**
+ * Memory one settled body keeps, in UTF-16 bytes. `base64` is the only retained copy of the
+ * bytes, and a JavaScript string spends two bytes per character, so a body costs about 2.67
+ * times its raw size: four thirds for base64, doubled for the string.
+ */
+function retainedBytes(base64: string): number {
+  return base64.length * 2;
+}
 
 /** One key per retained body; the separator cannot appear in a session ID. */
 function entryKey(sessionID: string, hash: string): string {
@@ -16,7 +25,7 @@ function entryKey(sessionID: string, hash: string): string {
 
 /**
  * Attachment bodies retained across snapshot reads, keyed by session and content hash. The
- * budget counts advertised blob bytes over every session of one client; the oldest entries
+ * budget counts the retained UTF-16 text over every session of one client; the oldest entries
  * go first (insertion order), and a session's entries leave together when it closes.
  */
 export class NativeSnapshotBlobCache {
@@ -32,7 +41,8 @@ export class NativeSnapshotBlobCache {
     if (!entry) return undefined;
     if (entry.bytes !== bytes) {
       // The advertised size disagrees with the settled body, so this entry cannot answer the
-      // read. Drop it rather than serve bytes the caller did not authorize.
+      // read. Drop it rather than serve bytes the caller did not authorize; the caller then
+      // re-downloads and the existing length check validates the fresh body.
       this.drop(key, entry);
       return undefined;
     }
@@ -44,14 +54,15 @@ export class NativeSnapshotBlobCache {
 
   /** Retain one resolved body, evicting the oldest entries until it fits the budget. */
   write(sessionID: string, hash: string, blob: NativeSnapshotBlob): void {
-    // A body larger than the whole budget is never retained: it would evict every other entry
-    // and the cache would still exceed its bound.
-    if (blob.bytes > this.budgetBytes) return;
+    const retained = retainedBytes(blob.base64);
+    // A body that exceeds the whole budget alone is never retained: it would evict every other
+    // entry and the cache would still be over its bound.
+    if (retained > this.budgetBytes) return;
     const key = entryKey(sessionID, hash);
     const previous = this.entries.get(key);
     if (previous) this.drop(key, previous);
-    this.entries.set(key, { ...blob, sessionID, hash });
-    this.retained += blob.bytes;
+    this.entries.set(key, { ...blob, sessionID, hash, retained });
+    this.retained += retained;
     while (this.retained > this.budgetBytes) {
       const oldest = this.entries.entries().next().value;
       if (!oldest) {
@@ -70,6 +81,6 @@ export class NativeSnapshotBlobCache {
 
   private drop(key: string, entry: Entry): void {
     this.entries.delete(key);
-    this.retained -= entry.bytes;
+    this.retained -= entry.retained;
   }
 }

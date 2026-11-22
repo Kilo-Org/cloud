@@ -630,7 +630,16 @@ export async function fetchNativeSnapshot(
   const settled = localBlobStore();
   const blobStore: SnapshotBlobStore = blobs
     ? {
-        read: (hash, bytes) => settled.read(hash, bytes) ?? blobs.read(sessionID, hash, bytes),
+        read: (hash, bytes) => {
+          const local = settled.read(hash, bytes);
+          if (local) return local;
+          const shared = blobs.read(sessionID, hash, bytes);
+          // Pin a shared-cache hit for the rest of this call. A later write in the same call
+          // can evict it from the shared cache, and this call still has to publish every body
+          // it used; the string is shared by reference, so this pins no extra bytes.
+          if (shared) settled.write(hash, shared);
+          return shared;
+        },
         write: (hash, blob) => {
           settled.write(hash, blob);
           blobs.write(sessionID, hash, blob);

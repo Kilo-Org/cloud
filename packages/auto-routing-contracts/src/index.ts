@@ -123,11 +123,6 @@ export const ClassifierOutputSchema = z
   });
 export type ClassifierOutput = z.infer<typeof ClassifierOutputSchema>;
 
-// The decision fields a classification supplies. Each one is null only on a
-// fallback decision, and each is reported separately when a non-fallback
-// decision omits it.
-const CLASSIFICATION_FIELDS = ['taskType', 'subtaskType', 'tableVersion'] as const;
-
 /** Variant precedence: {@link refineVariantExclusivity}. */
 export const AutoRoutingDecisionSchema = z
   .object({
@@ -166,7 +161,7 @@ export const AutoRoutingDecisionSchema = z
     // reported at its own path. One issue fixed to a single path would name a
     // field that is present in the decision it rejects.
     if (decision.fallback !== true) {
-      for (const field of CLASSIFICATION_FIELDS) {
+      for (const field of ['taskType', 'subtaskType', 'tableVersion'] as const) {
         if (decision[field] === null) {
           ctx.addIssue({
             code: 'custom',

@@ -14,20 +14,11 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { type TriggerDraft, type TriggerDraftProblems } from '@/lib/cloud-triggers/trigger-draft';
+import { type TriggerFormFailure } from '@/lib/cloud-triggers/trigger-save-failure';
 
 import { type TriggerAgentSheet, TriggerFormAgent } from './trigger-form-agent';
 import { TriggerFormBasics } from './trigger-form-basics';
 import { TriggerFormBehaviour } from './trigger-form-behaviour';
-
-/**
- * A save that failed, with the message the server or the network gave.
- *
- * `retryable` is a failure the same request can plausibly clear (the network,
- * a deadline, a 5xx); `rejected` is the server refusing this input (a taken
- * name, a cron it will not accept, a sandbox rule), where Retry would fail
- * again and the message is what the person acts on.
- */
-export type TriggerFormFailure = Readonly<{ kind: 'retryable' | 'rejected'; message: string }>;
 
 type TriggerFormProps = Readonly<{
   mode: 'create' | 'edit';
@@ -50,7 +41,7 @@ type TriggerFormProps = Readonly<{
   footer?: ReactNode;
 }>;
 
-function FailureBand({
+export function FailureBand({
   failure,
   onRetry,
   onDismiss,

@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   isControlPlaneTimeout,
+  isRetryableTrpcError,
+  isTerminalTrpcCode,
   isUsageSourceUnavailable,
   readTrpcServerMessage,
   trpcErrorVariant,
@@ -93,6 +95,34 @@ describe('trpcErrorVariant', () => {
     expect(trpcErrorVariant(new Error('network down'))).toBe('server');
     expect(trpcErrorVariant(undefined)).toBe('server');
     expect(trpcErrorVariant(null)).toBe('server');
+  });
+});
+
+describe('isTerminalTrpcCode', () => {
+  it.each(['CONFLICT', 'BAD_REQUEST', 'NOT_FOUND'])('is terminal for %s', code => {
+    expect(isTerminalTrpcCode(code)).toBe(true);
+  });
+
+  it.each(['TOO_MANY_REQUESTS', 'PRECONDITION_FAILED', 'INTERNAL_SERVER_ERROR'])(
+    'stays retryable for %s',
+    code => {
+      expect(isTerminalTrpcCode(code)).toBe(false);
+    }
+  );
+
+  it('stays retryable for a failure with no code', () => {
+    expect(isTerminalTrpcCode(undefined)).toBe(false);
+  });
+
+  it('offers no retry for a conflict in either envelope shape', () => {
+    // A conflict names a state that already exists, so the same request repeats
+    // the same refusal.
+    const direct = Object.assign(new Error('Trigger Name "take-one" already exists'), {
+      name: 'TRPCClientError',
+      data: { code: 'CONFLICT' },
+    });
+    expect(isRetryableTrpcError(direct)).toBe(false);
+    expect(isRetryableTrpcError({ shape: { data: { code: 'CONFLICT' } } })).toBe(false);
   });
 });
 

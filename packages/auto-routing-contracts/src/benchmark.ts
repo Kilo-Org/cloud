@@ -638,11 +638,11 @@ export type ClassifierWinnerResponse = z.infer<typeof ClassifierWinnerResponseSc
 
 /**
  * One row per requested profile. `failure` is the structured failure and wins when
- * present; `failureReason` is the bounded flat text a failed row always carries, so a
- * reader shows `failure.reason` first and falls back to `failureReason`. A pending or
- * ready row carries neither. Both stay valid on the wire because the registry reports
- * a profile that was never admitted (and a subscription resolution error) as `failed`
- * with the flat text only.
+ * present; `failureReason` is the bounded flat text and is the fallback, null even on a
+ * failed row when the stored row has no reason. A reader shows `failure.reason` first,
+ * then `failureReason`. A pending or ready row carries neither. Both stay valid on the
+ * wire because the registry reports a profile that was never admitted (and a
+ * subscription resolution error) as `failed` with the flat text only.
  */
 export const BenchmarkProfileEntryStatusSchema = z.object({
   entry: BenchmarkPairSchema,

@@ -423,6 +423,20 @@ describe('MarkdownHtml block direction', () => {
     }
   });
 
+  it('replaces a content-written direction class with the computed one', async () => {
+    const renderer = await mountHtml(
+      '<p class="kilo-block-rtl">Alpha beta</p>' +
+        '<blockquote class="kilo-block-ltr"><p>بيتا</p></blockquote>'
+    );
+    const blocks = hostStyles(renderer, 'View');
+    const paragraphs = blocks.filter(entry => entry.tag === 'p');
+
+    // The content's own class names the wrong direction for both elements: a
+    // block's class is recomputed from its own text, a container's is dropped.
+    expect(paragraphs.map(entry => entry.style.direction)).toEqual(['ltr', 'rtl']);
+    expect(blocks.find(entry => entry.tag === 'blockquote')?.style).not.toHaveProperty('direction');
+  });
+
   it('gives one block per element, not one direction for a merged input', async () => {
     const renderer = await mountHtml('<p>alpha</p><p>بيتا</p><h2>gamma</h2>');
     const blocks = hostStyles(renderer, 'View').filter(entry =>

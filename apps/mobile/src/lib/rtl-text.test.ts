@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one suite for every direction helper the app resolves copy with: the script, joining, mono-family, block-direction, mark and input rules share fixtures and must read together */
 import { createElement, Fragment } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -221,11 +222,11 @@ describe('contentTextDirection', () => {
   const LTR = { direction: 'ltr', writingDirection: 'ltr' };
   const RTL = { direction: 'rtl', writingDirection: 'rtl' };
 
-  // Copy the app did not write takes the direction of its own first letter, so
-  // an English sentence keeps its left edge inside an Arabic interface, and an
-  // Arabic one still aligns to the right. The node's layout `direction` is
-  // named too: iOS resolves a paragraph's alignment from it, not from
-  // `writingDirection`.
+  // Copy the app did not write takes the direction of its own first strong
+  // character, so an English sentence keeps its left edge inside an Arabic
+  // interface, and an Arabic one still aligns to the right. The node's layout
+  // `direction` is named too: iOS resolves a paragraph's alignment from it, not
+  // from `writingDirection`.
   it.each([false, true])('names English content left to right (isRTL=%s)', isRTL => {
     i18nManager.isRTL = isRTL;
     expect(contentTextDirection('1. Prototype pollution: لا')).toEqual(LTR);
@@ -253,7 +254,19 @@ describe('contentTextDirection', () => {
     expect(contentTextDirection('Русский')).toEqual(LTR);
   });
 
-  it('leaves copy with no letter to the interface', () => {
+  // The paragraph direction comes from the first strong character, and a bidi
+  // mark names a direction itself, before any letter is read: the right-to-left
+  // and Arabic letter marks name right to left, the left-to-right mark left to
+  // right, whatever letters follow them.
+  it.each([
+    ['\u200FAlpha beta', RTL],
+    ['\u200Eبيتا', LTR],
+    ['\u061CAlpha beta', RTL],
+  ])('names the direction a leading mark chooses', (text, expected) => {
+    expect(contentTextDirection(text)).toEqual(expected);
+  });
+
+  it('leaves copy with no strong character to the interface', () => {
     expect(contentTextDirection(['42 · ', 7])).toBeUndefined();
   });
 });

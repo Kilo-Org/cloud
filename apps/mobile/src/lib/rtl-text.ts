@@ -170,26 +170,31 @@ export function codeFieldTextStyle(): TextStyle {
   };
 }
 
-/** A letter: the strong characters a paragraph's direction resolves from. */
-const LETTER = /\p{L}/u;
+/**
+ * A strong character: the characters a paragraph's direction resolves from. A
+ * letter, or one of the bidi marks that name a direction themselves — the
+ * Arabic letter mark (U+061C) and the right-to-left mark (U+200F) name right to
+ * left, the left-to-right mark (U+200E) names left to right.
+ */
+const STRONG = /\p{L}|[\u061C\u200E\u200F]/u;
 
-/** The first letter of a React child tree, or `undefined` when it has none. */
-function firstLetter(node: ReactNode): string | undefined {
+/** The first strong character of a React child tree, or `undefined` when it has none. */
+function firstStrong(node: ReactNode): string | undefined {
   if (Array.isArray(node)) {
     for (const child of node as ReactNode[]) {
-      const letter = firstLetter(child);
-      if (letter !== undefined) {
-        return letter;
+      const strong = firstStrong(child);
+      if (strong !== undefined) {
+        return strong;
       }
     }
     return undefined;
   }
   if (isValidElement<{ children?: ReactNode }>(node)) {
-    return firstLetter(node.props.children);
+    return firstStrong(node.props.children);
   }
   // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ReactNode has no non-typeof way to detect its plain-string variant
   if (typeof node === 'string') {
-    return LETTER.exec(node)?.[0];
+    return STRONG.exec(node)?.[0];
   }
   return undefined;
 }
@@ -209,21 +214,28 @@ function firstLetter(node: ReactNode): string | undefined {
 const RTL_LETTER =
   /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\u{1E800}-\u{1EFFF}]/u;
 
-/** The direction a leading letter names, or `undefined` when there is none. */
-function directionOfLetter(letter: string | undefined): TextStyle | undefined {
-  if (letter === undefined) {
+/** The direction a leading strong character names, or `undefined` when there is none. */
+function directionOfStrong(strong: string | undefined): TextStyle | undefined {
+  if (strong === undefined) {
     return undefined;
   }
-  return RTL_LETTER.test(letter) ? RTL_TEXT_DIRECTION : LTR_TEXT_DIRECTION;
+  if (strong === '\u200E') {
+    return LTR_TEXT_DIRECTION;
+  }
+  if (strong === '\u200F' || strong === '\u061C') {
+    return RTL_TEXT_DIRECTION;
+  }
+  return RTL_LETTER.test(strong) ? RTL_TEXT_DIRECTION : LTR_TEXT_DIRECTION;
 }
 
 /**
  * Base direction for copy the app did not write — a server's message, a user's
  * own text, an issue body. The paragraph takes the direction of its own first
- * letter, so English content keeps its left edge and the punctuation that ends
- * it inside a right-to-left interface, and Arabic content still aligns to the
- * right. `undefined` when the copy has no letter: it then keeps the interface's
- * direction.
+ * strong character, so English content keeps its left edge and the punctuation
+ * that ends it inside a right-to-left interface, and Arabic content still
+ * aligns to the right. A leading direction mark names the direction itself.
+ * `undefined` when the copy has no strong character: it then keeps the
+ * interface's direction.
  *
  * The text node's own layout `direction` is named as well as its
  * `writingDirection`. iOS takes a paragraph's alignment from the node's layout
@@ -239,17 +251,18 @@ function directionOfLetter(letter: string | undefined): TextStyle | undefined {
  * the `Text` itself, so the box still sits where the interface's flexbox puts it.
  */
 export function contentTextDirection(children: ReactNode): TextStyle | undefined {
-  return directionOfLetter(firstLetter(children));
+  return directionOfStrong(firstStrong(children));
 }
 
 /**
  * `contentTextDirection` for copy that arrives as a string rather than as a
  * React child tree — an HTML block's own text, which no element wraps. Same
- * rule: the copy's own first letter names the block's base direction, and
- * `undefined` (no letter) leaves the interface's direction.
+ * rule: the copy's own first strong character names the block's base
+ * direction, and `undefined` (no strong character) leaves the interface's
+ * direction.
  */
 export function contentStringDirection(text: string): TextStyle | undefined {
-  return directionOfLetter(LETTER.exec(text)?.[0]);
+  return directionOfStrong(STRONG.exec(text)?.[0]);
 }
 
 /**
@@ -293,7 +306,8 @@ export function pinsTextDirection(style: StyleProp<TextStyle> | undefined): bool
 
 /**
  * `children` with a right-to-left mark in front when an app label has to lay
- * out right to left for the interface's sake, not its own first letter's.
+ * out right to left for the interface's sake, not its own first strong
+ * character's.
  * Android resolves a paragraph's direction from its first strong character, and
  * React Native never sets a text view's own direction, so a label that opens on
  * a Latin product name inside a right-to-left interface otherwise lays out left
@@ -303,14 +317,14 @@ export function pinsTextDirection(style: StyleProp<TextStyle> | undefined): bool
  *
  * The mark applies only when the interface is right to left, `holdsRtlScript`
  * is true — the tree holds an Arabic or Hebrew letter (`hasRtlScript`) — and
- * the tree's first letter is not a right-to-left one (`RTL_LETTER`). Copy that
- * already opens right to left needs no mark, and Latin-only copy such as
- * `Sentry.` keeps its own base direction, so its full stop stays at the end of
- * the word.
+ * the tree's first strong character does not name a right-to-left direction
+ * itself (`directionOfStrong`). Copy that already opens right to left needs no
+ * mark, and Latin-only copy such as `Sentry.` keeps its own base direction, so
+ * its full stop stays at the end of the word.
  *
  * The caller passes the script flag it already computed, so this helper reads
- * one letter instead of scanning the whole tree again: `firstLetter` stops at
- * the first one.
+ * one strong character instead of scanning the whole tree again: `firstStrong`
+ * stops at the first one.
  *
  * A string child takes the mark in front of it, in one run. Any other node gets
  * the mark as its first sibling, in a fragment: the child keeps its own
@@ -321,8 +335,8 @@ export function rtlBaseMarkedChildren(children: ReactNode, holdsRtlScript: boole
   if (!I18nManager.isRTL || !holdsRtlScript) {
     return children;
   }
-  const letter = firstLetter(children);
-  if (letter === undefined || RTL_LETTER.test(letter)) {
+  const strong = firstStrong(children);
+  if (strong === undefined || directionOfStrong(strong) === RTL_TEXT_DIRECTION) {
     return children;
   }
   if (isStringChild(children)) {

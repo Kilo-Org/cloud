@@ -40,30 +40,14 @@ type SearchResult<T> = {
  * away. Kana voicing, Thai tones and Indic vowel signs sit outside these
  * ranges (and `\p{Diacritic}` would fold the first two), so they stay.
  */
-const FOLDED_MARK_BLOCKS: readonly (readonly [number, number])[] = [
-  [0x0300, 0x036F],
-  [0x0591, 0x05C7],
-  [0x064B, 0x065F],
-  [0x0670, 0x0670],
-  [0x1AB0, 0x1AFF],
-  [0x1DC0, 0x1DFF],
-  [0x20D0, 0x20FF],
-  [0xFE20, 0xFE2F],
-];
+const FOLDED_MARK =
+  /[\u0300-\u036F\u0591-\u05C7\u064B-\u065F\u0670\u1AB0-\u1AFF\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F]/u;
 
 const SERBIAN_CYRILLIC = 'абвгдђежзијклљмнњопрстћуфхцчџш';
 // Same order as SERBIAN_CYRILLIC; diacritics stay for the fold below to strip.
 const SERBIAN_LATIN = 'a b v g d dj e ž z i j k l lj m n nj o p r s t ć u f h c č dž š'.split(' ');
 
 const MARK = /\p{M}/u;
-
-function isFoldedMark(char: string): boolean {
-  const codePoint = char.codePointAt(0);
-  if (codePoint === undefined) {
-    return false;
-  }
-  return FOLDED_MARK_BLOCKS.some(([start, end]) => codePoint >= start && codePoint <= end);
-}
 
 function primaryLanguage(locale: string): string {
   const primary = locale.toLocaleLowerCase('en').split(/[-_]/u)[0] ?? '';
@@ -133,7 +117,7 @@ function fold(value: string, rules: LocaleRules, mapping?: FoldMapping): string 
 
   const foldPart = (part: string, start: number, end: number) => {
     if (MARK.test(part)) {
-      if (isFoldedMark(part)) {
+      if (FOLDED_MARK.test(part)) {
         extendLast(end);
       } else {
         append(part, start, end);
@@ -267,8 +251,7 @@ export function searchSettings<T extends SettingsSearchText>(
         labelMatched = true;
       } else {
         const otherFieldMatched =
-          context?.includes(token) === true ||
-          keywords.some(keyword => keyword.includes(token));
+          context?.includes(token) === true || keywords.some(keyword => keyword.includes(token));
         if (!otherFieldMatched) {
           allTokensMatched = false;
           break;

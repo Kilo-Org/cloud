@@ -1,9 +1,4 @@
-import {
-  type ReactNode,
-  type RefObject,
-  useEffect,
-  useState,
-} from 'react';
+import { type ReactNode, type RefObject, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, type TextInput, View } from 'react-native';
 

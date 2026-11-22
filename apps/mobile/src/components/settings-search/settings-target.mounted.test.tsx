@@ -1,19 +1,8 @@
-import {
-  createElement,
-  type ReactElement,
-  type ReactNode,
-  type Ref,
-  type RefObject,
-} from 'react';
+import { createElement, type ReactElement, type ReactNode, type Ref, type RefObject } from 'react';
 import { type ScrollViewInstance } from 'react-native';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  act,
-  type ReactTestInstance,
-  type ReactTestRenderer,
-  TestRenderer,
-} from '@/test/renderer';
+import { act, type ReactTestInstance, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 
 import { defineSetting } from '@/lib/settings-search/definitions';
 import {
@@ -37,13 +26,11 @@ type RevealNode = {
 };
 
 /** The row wrapper instance the reveal measures, reporting a 40pt top edge. */
-const revealNode = vi.hoisted(
-  (): RevealNode => ({
-    measureLayout: (_relative, onSuccess) => {
-      onSuccess(0, 40);
-    },
-  })
-);
+const revealNode = vi.hoisted((): RevealNode => ({
+  measureLayout: (_relative, onSuccess) => {
+    onSuccess(0, 40);
+  },
+}));
 
 vi.mock('react-native', async () => {
   // A vi.mock factory is hoisted above the module's static imports, so React is

@@ -1,12 +1,7 @@
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  act,
-  type ReactTestInstance,
-  type ReactTestRenderer,
-  TestRenderer,
-} from '@/test/renderer';
+import { act, type ReactTestInstance, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 
 import { defineSetting, type SettingsSearchSource } from '@/lib/settings-search/definitions';
 import { SettingsSearchField, SettingsSearchResults } from './settings-search';

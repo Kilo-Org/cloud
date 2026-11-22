@@ -1518,6 +1518,39 @@ describe('inert pending rows are not queue work (real migrated SQLite)', () => {
   const markCutover = () =>
     sqlite.prepare('INSERT INTO benchmark_cutover (id, cutover_at) VALUES (1, ?)').run(CUTOVER);
 
+  /** A live paid request with one queued case for the pair, as the paid launch leaves it. */
+  function paidRequest(row: {
+    model?: string;
+    requestStatus?: 'preparing' | 'active' | 'paused' | 'completed' | 'failed';
+    caseStatus?: 'queued' | 'running' | 'reused' | 'done' | 'failed' | 'paused';
+    ownerId?: string;
+    router?: 'efficient' | 'frontier';
+  }) {
+    const requestId = `req-${Math.random().toString(36).slice(2)}`;
+    sqlite
+      .prepare(
+        `INSERT INTO paid_benchmark_requests (id, owner_type, owner_id, router, router_id,
+          pool_version, engine_identity, status, quote_id, estimate_microdollars,
+          maximum_microdollars, actor_user_id, context, created_at, updated_at, activated_at)
+         VALUES (?, 'user', ?, ?, 'router-id', 'v1', ?, ?, 'quote', 0, 0, 'actor', '{}',
+           '2026-11-19T00:00:00.000Z', '2026-11-19T00:00:00.000Z', '2026-11-19T00:00:00.000Z')`
+      )
+      .run(
+        requestId,
+        row.ownerId ?? 'user-inert',
+        row.router ?? 'efficient',
+        ENGINE,
+        row.requestStatus ?? 'active'
+      );
+    sqlite
+      .prepare(
+        `INSERT INTO paid_benchmark_request_cases (request_id, engine_identity, model, variant,
+          rep, case_id, status, updated_at)
+         VALUES (?, ?, ?, '', 0, 'case-1', ?, '2026-11-19T00:00:00.000Z')`
+      )
+      .run(requestId, ENGINE, row.model ?? 'vendor/gw', row.caseStatus ?? 'queued');
+  }
+
   function profile(row: {
     status: string;
     requestedAt: string;
@@ -1786,5 +1819,63 @@ describe('inert pending rows are not queue work (real migrated SQLite)', () => {
       availability: 'unbenchmarked',
     });
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM benchmark_cutover').get()).toEqual({ n: 1 });
+  });
+
+  // The deferred explicit-paid path: `enrollPaidPairStatements` creates the row with both
+  // demand flags off, and a capped launch's release returns it to `pending` keeping its old
+  // request time. Only the durable paid request proves it is work.
+  it('presents a deferred paid request with a flag-0 pre-cutover pending row as benchmarking', async () => {
+    markCutover();
+    profile({
+      status: 'pending',
+      requestedAt: BEFORE,
+      platformRequested: false,
+      userRequested: false,
+    });
+    paidRequest({ requestStatus: 'active', caseStatus: 'queued' });
+    expect(await statusVariant()).toMatchObject({
+      status: 'pending',
+      availability: 'benchmarking',
+    });
+  });
+
+  it('presents a preparing paid request whose case is already running as benchmarking', async () => {
+    markCutover();
+    profile({ status: 'pending', requestedAt: PARKED, userRequested: false });
+    paidRequest({ requestStatus: 'preparing', caseStatus: 'running' });
+    expect(await statusVariant()).toMatchObject({
+      status: 'pending',
+      availability: 'benchmarking',
+    });
+  });
+
+  it('keeps a flag-0 pending row missing when the only paid request case is terminal', async () => {
+    markCutover();
+    profile({
+      status: 'pending',
+      requestedAt: AFTER,
+      platformRequested: false,
+      userRequested: false,
+    });
+    paidRequest({ requestStatus: 'completed', caseStatus: 'done' });
+    expect(await statusVariant()).toMatchObject({
+      status: 'missing',
+      availability: 'unbenchmarked',
+    });
+  });
+
+  it("does not adopt another owner's paid request for this pair", async () => {
+    markCutover();
+    profile({
+      status: 'pending',
+      requestedAt: AFTER,
+      platformRequested: false,
+      userRequested: false,
+    });
+    paidRequest({ requestStatus: 'active', caseStatus: 'queued', ownerId: 'someone-else' });
+    expect(await statusVariant()).toMatchObject({
+      status: 'missing',
+      availability: 'unbenchmarked',
+    });
   });
 });

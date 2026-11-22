@@ -991,6 +991,53 @@ export async function listPaidRequestCasePlan(
   return rows.results;
 }
 
+/**
+ * Exact (model, variant) pairs a live paid request of this owner still owes work for, in one
+ * scoped read.
+ *
+ * These are the pairs `enrollPaidPairStatements` creates with both demand flags off and
+ * `releaseUncommittedRunClaimsStatement` returns to `pending` after a capped launch, and whose
+ * `ready`→`pending` reopen keeps the original request time. The registry row therefore looks
+ * inert to a queue probe while the explicit request is really waiting on it, so the status
+ * readers consult this scoped evidence instead of loosening the flag rule.
+ *
+ * Rows come from this owner's request for this router and engine identity only, across all
+ * repetitions (a reopen is not repetition-scoped), and only while the request is `preparing` or
+ * `active`. A pair whose request cases are all terminal (`reused`, `done`, `failed`, `paused`)
+ * is not waiting: it falls back to the registry row alone.
+ */
+export async function listPaidRequestedPairs(
+  db: D1Database,
+  input: {
+    ownerType: 'user' | 'org';
+    ownerId: string;
+    router: AutoRouter;
+    engineIdentity: string;
+    models: readonly string[];
+  }
+): Promise<Set<string>> {
+  if (input.models.length === 0) return new Set();
+  const rows = await db
+    .prepare(
+      `SELECT DISTINCT rq.model, rq.variant
+      FROM paid_benchmark_requests AS req
+      JOIN paid_benchmark_request_cases AS rq ON rq.request_id = req.id
+      WHERE req.owner_type = ? AND req.owner_id = ? AND req.router = ?
+        AND req.engine_identity = ? AND req.status IN ('preparing', 'active')
+        AND rq.model IN (SELECT value FROM json_each(?))
+        AND rq.status IN ('queued', 'running')`
+    )
+    .bind(
+      input.ownerType === 'org' ? 'organization' : 'user',
+      input.ownerId,
+      input.router,
+      input.engineIdentity,
+      JSON.stringify([...new Set(input.models)])
+    )
+    .all<{ model: string; variant: string }>();
+  return new Set(rows.results.map(row => exactPairKey(row.model, row.variant)));
+}
+
 /** True while the exact pair is a member of the automatic platform pool. */
 export async function isPlatformPoolPair(
   db: D1Database,

@@ -53,14 +53,19 @@ function textActionBoxStyle() {
  * buttons.
  *
  * Two placeholders, chosen by whether a cell will land. `TEXT_ACTION_SKELETON_CLASS`
- * holds the compact button's own frame contract — the same `min-h-[36px]` and
- * padding as `COMPACT_BUTTON_FRAME_CLASS` — for the case where the settled row
+ * holds the compact button's own minimum height (`min-h-[36px]`, the rule
+ * `COMPACT_BUTTON_FRAME_CLASS` also names) for the case where the settled row
  * renders that button, so the row does not move when it lands: the button's
- * 36pt frame plus `py-3`'s 21 lays out the same 57pt band. The frame is a
- * minimum because it lets a label scaled by large Dynamic Type grow the button
- * instead of clipping it; the placeholder has no label of its own, so it cannot
- * grow with Dynamic Type, and the row still moves by the difference at a large
- * font scale.
+ * 36pt frame plus `py-3`'s 21 lays out the same 57pt band. The placeholder
+ * spells that minimum itself rather than reusing the button's class, because a
+ * placeholder is a block of its own width (`w-24`) and must not inherit the
+ * button's `px-3 py-1.5`, which would make it wider than the cell it reserves.
+ * The mounted suite compiles both classes and asserts the two heights agree, so
+ * a change to the compact frame cannot desynchronise them silently. The frame
+ * is a minimum because it lets a label scaled by large Dynamic Type grow the
+ * button instead of clipping it; the placeholder has no label of its own, so it
+ * cannot grow with Dynamic Type, and the row still moves by the difference at a
+ * large font scale.
  * `TEXT_ACTION_PENDING_BAND_CLASS` holds the row's own content band, for the
  * case where the settled row renders no cell at all (a viewer whose role cannot
  * manage): such a row settles on its text column, which a 36px placeholder

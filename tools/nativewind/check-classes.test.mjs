@@ -979,6 +979,48 @@ test('flags arbitrary spacing outside the allowlist and passes it inside', () =>
   assert.deepEqual(layoutProblems(ALLOWLISTED, screen('<View className="mt-[6px]" />')), []);
 });
 
+// A class that is the first thing on its source line is the closest a match can
+// sit to the chunk's origin, so every source character the chunk spends before
+// it — an escape, a line continuation — is a line the diagnostic can lose. Each
+// source below writes `mt-[6px]` at the start of its fifth line: the template
+// cooks six spaces and a newline ahead of it, and the quoted literal joins its
+// line continuation onto the class's line.
+test('names the line a layout class is written on, past the escape before it', () => {
+  const sources = [
+    [
+      'a template chunk that opens six escapes before the newline',
+      [
+        'export function Screen() {',
+        '  return (',
+        '    <View',
+        '      className={`\\u0020\\u0020\\u0020\\u0020\\u0020\\u0020',
+        'mt-[6px]`} />',
+        '  );',
+        '}',
+      ].join('\n'),
+    ],
+    [
+      'a quoted literal whose line continuation joins the class onto the next line',
+      [
+        'export function Screen() {',
+        '  return (',
+        '    <View',
+        '      className="px-4\\',
+        'mt-[6px]" />',
+        '  );',
+        '}',
+      ].join('\n'),
+    ],
+  ];
+  for (const [name, source] of sources) {
+    const found = layoutProblems(SCREEN_FILE, source);
+    assert.equal(found.length, 1, name);
+    const line = source.split('\n').findIndex(text => text.includes('mt-[6px]')) + 1;
+    assert.equal(line, 5, `${name}: the fixture writes the class on line 5`);
+    assert.match(found[0], new RegExp(`screen\\.tsx:${line}: \\[L1\\] "mt-\\[6px\\]"`), name);
+  }
+});
+
 test('flags an arbitrary text size but not an arbitrary text colour', () => {
   assert.match(
     layoutProblems(SCREEN_FILE, screen('<Text className="text-[13px]" />')).join('\n'),

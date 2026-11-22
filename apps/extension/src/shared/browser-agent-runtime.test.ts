@@ -3002,7 +3002,7 @@ describe('agent browser calls', () => {
         navigates += 1;
 
         if (navigates === 1) {
-          downloads.emit({ id: 71, tabId: newTab });
+          downloads.emit({ id: 71, tabId: newTab, url });
 
           return { errorText: 'net::ERR_ABORTED' };
         }
@@ -3041,21 +3041,152 @@ describe('agent browser calls', () => {
     cdp.setFrameUrl(landing);
     tabUrl = landing;
 
-    const approved = await openTab([expectStepToken(guarded)]);
+    // The repeat runs on a later instant than the file the guarded call created: a download search's window is
+    // Millisecond-granular, so the two calls only stay apart if the clock does. Only `Date` is faked, so every guard
+    // Window still runs on the real timers it waits with.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.now() + 1000);
 
-    expect(approved).toMatchObject({
-      from: MAIN_ORIGIN,
-      kind: 'origin_changed',
-      to: 'https://accounts.example.org',
+    try {
+      const approved = await openTab([expectStepToken(guarded)]);
+
+      expect(approved).toMatchObject({
+        from: MAIN_ORIGIN,
+        kind: 'origin_changed',
+        to: 'https://accounts.example.org',
+      });
+      // The repeat navigated the tab the refused step opened, not the caller's, and it opened no second tab.
+      expect(cdp.sent().findLast(command => command.method === 'Page.navigate')).toStrictEqual({
+        method: 'Page.navigate',
+        params: { url },
+        tabId: newTab,
+        url,
+      });
+      expect([created.length, downloads.cancelled]).toStrictEqual([1, [71]]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("answers an approved repeat on its approved destination with the browser's refusal", async () => {
+    const downloads = createFakeDownloads();
+    const created: Record<string, unknown>[] = [];
+    const openedListeners: ((tab: {
+      readonly id?: number;
+      readonly openerTabId?: number;
+    }) => void)[] = [];
+    const newTab = TAB_ID + 6;
+    // The opened tab's url, as the browser reports it: the step's destination, which the repeat stays on when the
+    // Browser refuses its file instead of loading a page.
+    const tabUrl = `${MAIN_ORIGIN}/report.txt`;
+
+    const tabsApi = {
+      create: async (properties: { readonly url?: string } = {}) => {
+        created.push({ ...properties });
+
+        // The browser opens the tab, so the call owns it.
+        for (const listener of openedListeners) {
+          listener({ id: newTab, openerTabId: TAB_ID });
+        }
+
+        return { id: newTab, title: '', url: properties.url ?? 'about:blank', windowId: 1 };
+      },
+      get: async (tabId: number) =>
+        tabId === newTab
+          ? { id: newTab, title: '', url: tabUrl, windowId: 1 }
+          : { id: TAB_ID, title: 'Example', url: MAIN_ORIGIN },
+      onCreated: {
+        addListener: (
+          listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+        ) => {
+          openedListeners.push(listener);
+        },
+        removeListener: (
+          listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+        ) => {
+          const index = openedListeners.indexOf(listener);
+
+          if (index !== -1) {
+            openedListeners.splice(index, 1);
+          }
+        },
+      },
+      query: async () => [
+        { active: true, id: TAB_ID, title: 'Example', url: MAIN_ORIGIN, windowId: 1 },
+      ],
+    };
+    const { controller } = createGroups();
+    const { cdp, runtime } = await createHarness({
+      downloadsApi: downloads.api,
+      tabGroups: controller,
+      tabsApi,
     });
-    // The repeat navigated the tab the refused step opened, not the caller's, and it opened no second tab.
-    expect(cdp.sent().findLast(command => command.method === 'Page.navigate')).toStrictEqual({
-      method: 'Page.navigate',
-      params: { url },
-      tabId: newTab,
-      url,
+
+    // The step's navigate answers with an aborted load and names the download it started; the approved repeat stays on
+    // Its approved destination, so no page changed and the browser's own limiter is what refused the file.
+    let navigates = 0;
+
+    cdp.setHandlers({
+      'Page.navigate': () => {
+        navigates += 1;
+
+        if (navigates === 1) {
+          downloads.emit({ id: 71, tabId: newTab, url });
+
+          return { errorText: 'net::ERR_ABORTED' };
+        }
+
+        return { frameId: 'main' };
+      },
     });
-    expect([created.length, downloads.cancelled]).toStrictEqual([1, [71]]);
+
+    const url = `${MAIN_ORIGIN}/report.txt`;
+    const openTab = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: {
+          authorized: [readGrant, actGrant, { class: 'navigate', origin: MAIN_ORIGIN }],
+          sensitive: [...sensitive],
+        },
+        arguments: { action: 'new', url },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_tabs',
+      });
+
+    const guarded = await openTab([]);
+
+    if (guarded.kind !== 'needs_permission') {
+      throw new Error(`expected a refusal, got ${JSON.stringify(guarded)}`);
+    }
+
+    expect([created.length, created[0]?.['url'], downloads.cancelled]).toStrictEqual([
+      1,
+      'about:blank',
+      [71],
+    ]);
+
+    // The repeat runs on a later instant than the file the guarded call created, so that file is never inside this
+    // Call's own download window: only the clock keeps the two apart, and a search's window is millisecond-granular.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.now() + 1000);
+
+    try {
+      const approved = await openTab([expectStepToken(guarded)]);
+
+      // The tab never left the origin the call was approved for, so the answer is the browser's download refusal with
+      // The step token a repeat needs, not a navigation result that would hide it.
+      expect(approved.kind).toBe('needs_permission');
+      expect(approved.kind === 'needs_permission' && !approved.result.ok).toBe(true);
+      expect(
+        approved.kind === 'needs_permission' && !approved.result.ok ? approved.result.error : ''
+      ).toContain(DOWNLOAD_BLOCKED_BY_BROWSER_ERROR);
+      expect(approved.kind === 'needs_permission' ? approved.stepToken !== undefined : false).toBe(
+        true
+      );
+      expect([created.length, downloads.cancelled]).toStrictEqual([1, [71]]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('leaves a later download of the same url alone when the record for it is stale', async () => {

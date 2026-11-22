@@ -535,30 +535,37 @@ export async function assembleCustomRouterTable(
   const platformCases = dropIneligibleAgenticResults(allPlatformCases, ineligible);
   // A pool holding both an alias and its concrete target resolves both to one measured pair. The
   // deployed table published that pair once (its summaries were keyed by the stored pair), so the
-  // emission dedupes here — after the fingerprint above already counted both source rows.
-  const emittedMeasurementKeys = new Set<string>();
-  const platformEntries = platformReady.flatMap(ready => {
-    const key = `${ready.entry.model}\u0000${ready.entry.variant ?? ''}\u0000${ready.runId}`;
-    if (emittedMeasurementKeys.has(key)) return [];
-    emittedMeasurementKeys.add(key);
-    return [
-      {
-        summaries: platformSummaries
-          .filter(
-            summary =>
-              summary.model === ready.measured.model &&
-              (summary.variant ?? null) === ready.measured.variant &&
-              summary.runId === ready.runId
-          )
-          .map(summary => ({ ...summary, model: ready.entry.model })),
-        cases: platformCases
-          .filter(
-            pair => pair.model === ready.measured.model && pair.variant === ready.measured.variant
-          )
-          .map(pair => ({ ...pair, model: ready.entry.model })),
-      },
-    ];
-  });
+  // emission dedupes here — after the fingerprint above already counted both source rows. One
+  // measured row expands to every candidate that measured it, in candidate-id order, so the pool's
+  // entry order cannot reach the table.
+  const candidatesByMeasurement = new Map<string, Set<string>>();
+  const candidatesByMeasuredPair = new Map<string, Set<string>>();
+  for (const ready of platformReady) {
+    const measuredPair = `${ready.measured.model}\u0000${ready.measured.variant ?? ''}`;
+    const measurement = `${measuredPair}\u0000${ready.runId}`;
+    candidatesByMeasurement.set(
+      measurement,
+      (candidatesByMeasurement.get(measurement) ?? new Set()).add(ready.entry.model)
+    );
+    candidatesByMeasuredPair.set(
+      measuredPair,
+      (candidatesByMeasuredPair.get(measuredPair) ?? new Set()).add(ready.entry.model)
+    );
+  }
+  const platformSummariesOut = platformSummaries.flatMap(summary =>
+    [
+      ...(candidatesByMeasurement.get(
+        `${summary.model}\u0000${summary.variant ?? ''}\u0000${summary.runId}`
+      ) ?? []),
+    ]
+      .sort()
+      .map(model => ({ ...summary, model }))
+  );
+  const platformCasesOut = platformCases.flatMap(pair =>
+    [...(candidatesByMeasuredPair.get(`${pair.model}\u0000${pair.variant ?? ''}`) ?? [])]
+      .sort()
+      .map(model => ({ ...pair, model }))
+  );
   // A profile's run id changes with every upload, so new results produce a new table version.
   const clientEntries = clientReady.map(({ profile, stale }) => {
     const runId = `client-profile:${profile.id}:${profile.results}`;
@@ -624,18 +631,14 @@ export async function assembleCustomRouterTable(
       ...clientEntries.map(c => c.ready),
     ],
     summaries: [
-      ...platformEntries.flatMap(c => c.summaries),
+      ...platformSummariesOut,
       ...linkedEntries.flatMap(c => c.summaries),
       // The probe gate above covers only pairs this benchmark measured: a client-uploaded
       // profile carries the owner's own measurements, which include the agentic routes, so
       // it keeps every route it reports (src/custom-routers-probe.test.ts).
       ...clientEntries.flatMap(c => c.summaries),
     ],
-    perCaseResults: [
-      ...platformEntries.flatMap(c => c.cases),
-      ...linkedEntries.flatMap(c => c.cases),
-      ...clientCases,
-    ],
+    perCaseResults: [...platformCasesOut, ...linkedEntries.flatMap(c => c.cases), ...clientCases],
     complexityLabels: ComplexityLabelsSchema.parse(caseComplexity),
   });
   return {

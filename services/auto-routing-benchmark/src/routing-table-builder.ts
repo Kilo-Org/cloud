@@ -319,6 +319,40 @@ export function filterSummariesByProvenance(
 }
 
 /**
+ * Re-establish the order the deployed table published: the `model_summaries`
+ * primary key `(run_id, model, variant, route_key)`, which is the order an
+ * unqualified scan returned. The ranker is stable, so tied candidates keep
+ * whatever row order reaches it; without this a caller's order decides routes.
+ */
+function canonicalSummaryOrder(
+  summaries: readonly BenchmarkModelSummaryWithRun[]
+): BenchmarkModelSummaryWithRun[] {
+  return summaries
+    .map(summary => ({
+      summary,
+      key: `${summary.runId}\u0000${summary.model}\u0000${summary.variant ?? ''}\u0000${summary.routeKey}`,
+    }))
+    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
+    .map(entry => entry.summary);
+}
+
+/**
+ * Order case results as the deployed projection emitted them: by measured pair,
+ * then case id and repetition (`case_results` primary key order).
+ */
+function canonicalCaseOrder(pairs: OfflineSweep['pairs']): OfflineSweep['pairs'] {
+  return pairs
+    .map(pair => ({ pair, key: `${pair.model}\u0000${pair.variant ?? ''}` }))
+    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
+    .map(({ pair }) => ({
+      ...pair,
+      results: [...pair.results].sort((a, b) =>
+        a.caseId !== b.caseId ? (a.caseId < b.caseId ? -1 : 1) : a.rep - b.rep
+      ),
+    }));
+}
+
+/**
  * Assemble a SPARSE custom routing table for the requested ready Pool entries
  * only. Uses per-route summaries from each profile's provenance run only —
  * exact (model, variant) AND run_id must match; no cross-run leakage. Omits
@@ -364,7 +398,7 @@ export function buildCustomRoutingTable(params: {
 
   if (readyEntries.length === 0) return null;
 
-  const filtered = filterSummariesByProvenance(readyEntries, summaries);
+  const filtered = canonicalSummaryOrder(filterSummariesByProvenance(readyEntries, summaries));
   const stalePairs = new Set(readyEntries.filter(r => r.stale).map(r => benchmarkPairKey(r.entry)));
 
   const routes: CustomRoutingTable['routes'] = {};
@@ -402,7 +436,7 @@ export function buildCustomRoutingTable(params: {
     params.perCaseResults && params.complexityLabels
       ? buildEffortByComplexity(
           routes,
-          params.perCaseResults,
+          canonicalCaseOrder(params.perCaseResults),
           params.complexityLabels,
           minAccuracy,
           params.productionTokenProfile ?? null,

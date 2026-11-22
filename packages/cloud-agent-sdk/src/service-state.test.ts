@@ -2747,23 +2747,25 @@ describe('createServiceState', () => {
       expect(kept[kept.length - 1] ?? 0).not.toBe(0x200d);
     });
 
-    it('keeps the base of the last combining mark before the cut', () => {
+    it('keeps a combining mark with its base when the cut falls inside the cluster', () => {
       const state = createServiceState(makeConfig());
 
       state.process({
         type: 'autocommit_completed',
         success: true,
         ...localCommit,
-        commitMessage: 'e\u0301'.repeat(80),
+        commitMessage: 'a' + 'e\u0301'.repeat(80),
       });
 
       const status = state.getStatus();
-      // Each `e` plus its combining acute is one 2-unit cluster, so the cap
-      // keeps 36 whole clusters and no mark is left without its base.
+      // The leading `a` offsets every cluster by one unit, so the 72-unit cap
+      // lands between an `e` and its combining acute. A plain code-unit cut
+      // would keep the bare base and drop the mark; the cluster boundary stops
+      // one unit earlier, keeping `a` plus 35 whole clusters.
       expect(status).toEqual({
         type: 'autocommit',
         step: 'completed',
-        message: `aaaaaaa · ${'e\u0301'.repeat(36)}…`,
+        message: `aaaaaaa · a${'e\u0301'.repeat(35)}…`,
         commitHash: localCommit.commitHash,
       });
       if (status.type !== 'autocommit') throw new Error('Expected autocommit status');
@@ -2772,10 +2774,10 @@ describe('createServiceState', () => {
       const kept = Array.from(message.slice(0, -1)).map(char => char.codePointAt(0) ?? 0);
       const marks = kept.filter(code => code >= 0x0300 && code <= 0x036f).length;
       const bases = kept.filter(code => code === 0x65).length;
-      // The last kept cluster is a whole `e` + acute: the mark is not stranded
-      // without its base, and no cluster is split across the cut.
+      // The last kept code point is the acute of a whole cluster and the one
+      // before it is its base, so no mark is stranded by the cut.
       expect([kept[kept.length - 2], kept[kept.length - 1]]).toEqual([0x65, 0x301]);
-      expect(bases).toBe(36);
+      expect(bases).toBe(35);
       expect(marks).toBe(bases);
     });
 

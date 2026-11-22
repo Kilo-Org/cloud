@@ -1704,9 +1704,12 @@ function runLayoutFixture(context, sources, baseline) {
 
 /**
  * Run the entry point over a fixture whose baseline is written as raw text:
- * the shapes the shape check must reject do not survive a JSON round trip
- * through the helper above (`{"L1": "3"}` would, `[]` would, but the point is
- * to state the file's own bytes).
+ * the helper above always `JSON.stringify`s the baseline it is given, so it
+ * cannot produce a file whose text is not valid JSON, and rewriting that file's
+ * bytes is the only way to state one. Some shapes the shape check must reject
+ * would round-trip through the helper unchanged (`{"L1": "3"}` does, `[]` does),
+ * but unparseable text — a trailing comma — cannot, so this helper writes the
+ * file's own bytes for both kinds of defect.
  */
 function runRawBaselineFixture(context, sources, baselineText) {
   return runFixtureRoot(context, {
@@ -1816,15 +1819,44 @@ test('reports a malformed baseline as an instrument problem and skips the compar
   }
 });
 
-test('passes a well-formed baseline exactly as before', context => {
-  const result = runLayoutFixture(
+test('reports an unparseable baseline as an instrument problem and keeps the stale comparison', context => {
+  // Unparseable text is the one defect the shape check never sees: JSON.parse
+  // throws before it reaches. It is reported where the shape failure is, and
+  // the comparison is skipped rather than run against the empty shape.
+  const unparseable = runRawBaselineFixture(
     context,
     { 'apps/mobile/src/screen.tsx': screen('<View className="mt-[6px]" />') },
-    { 'apps/mobile/src/screen.tsx': { L1: 1 } }
+    '{"apps/mobile/src/screen.tsx": {"L1": 1,}}'
   );
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stderr, '');
-  assert.match(result.stdout, /1 layout violation\(s\) admitted/);
+  assert.equal(unparseable.status, 1, unparseable.stdout);
+  assert.match(
+    unparseable.stderr,
+    /cannot read the layout baseline from tools\/nativewind\/layout-baseline\.json \(Expected .* in JSON/
+  );
+  assert.match(
+    unparseable.stderr,
+    /the layout baseline comparison cannot run without it and was skipped/
+  );
+  assert.doesNotMatch(unparseable.stderr, /exceeded|lower it to|now has \d+ violation/);
+  assert.match(unparseable.stderr, /check-classes: 1 problem\(s\)/);
+  // No stack trace: the failure is reported, not thrown. The parse detail ends
+  // in "at position N", so only a stack frame's leading indentation is a tell.
+  assert.doesNotMatch(unparseable.stderr, /Error:/);
+  assert.doesNotMatch(unparseable.stderr, /^\s+at /m);
+
+  // A baseline that parses still compares: the same file with a stale entry
+  // keeps its own line and never mentions the instrument.
+  const stale = runLayoutFixture(
+    context,
+    { 'apps/mobile/src/screen.tsx': screen('<View className="mt-[6px]" />') },
+    { 'apps/mobile/src/screen.tsx': { L1: 2 } }
+  );
+  assert.equal(stale.status, 1, stale.stdout);
+  assert.match(
+    stale.stderr,
+    /layout-baseline\.json: apps\/mobile\/src\/screen\.tsx L1 baseline is 2 but the file now has 1; lower it to 1/
+  );
+  assert.doesNotMatch(stale.stderr, /cannot read the layout baseline/);
 });
 
 test('writes the baseline with --write-layout-baseline', context => {

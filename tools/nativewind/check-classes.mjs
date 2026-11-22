@@ -1606,13 +1606,15 @@ function layoutBaselineFailure(baseline) {
 /**
  * The baseline as written, with the reason it could not be used when it is
  * malformed. An absent file is an empty baseline, not a failure: the migration
- * may not have written one yet. A read or parse error still throws, because
- * that is an environment problem the caller reports as its own.
+ * may not have written one yet. A read error that is neither that nor a parse
+ * error (EACCES, EISDIR) still throws, because it is an environment problem the
+ * caller reports as its own.
  *
- * A malformed shape is kept apart from the comparison instead: the check
- * reports it as an instrument problem and skips the comparison, the same way a
- * theme read failure skips only its one rule. Reporting the comparison's own
- * verdict over an unreadable shape would be a guess.
+ * The file's own defects — unparseable text, and a malformed shape — are kept
+ * apart from the comparison instead: the check reports each as an instrument
+ * problem and skips the comparison, the same way a theme read failure skips
+ * only its one rule. Reporting the comparison's own verdict over a file the
+ * check could not read would be a guess.
  */
 function readLayoutBaseline() {
   let parsed;
@@ -1621,6 +1623,12 @@ function readLayoutBaseline() {
   } catch (error) {
     if (error.code === 'ENOENT') {
       return { baseline: {}, failure: null };
+    }
+    if (error instanceof SyntaxError) {
+      return {
+        baseline: {},
+        failure: `check-classes: cannot read the layout baseline from ${LAYOUT_BASELINE_PATH} (${firstLine(error)}) — the layout baseline comparison cannot run without it and was skipped`,
+      };
     }
     throw error;
   }
@@ -1713,7 +1721,7 @@ function compareLayoutBaseline(findings, baseline) {
  * - `writeBaseline` is the writer a `--write-layout-baseline` run uses (null on
  *   an ordinary run), and it receives this run's findings instead of the file.
  * - `readBaseline` supplies both the checked-in baseline for the comparison and
- *   the failure that skips it, so a run never compares against a shape it could
+ *   the failure that skips it, so a run never compares against a file it could
  *   not read.
  * - `readTheme` supplies the `@theme inline` tokens and their failure.
  */

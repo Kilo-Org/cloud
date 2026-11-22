@@ -66,4 +66,14 @@ describe('truncateText', () => {
     expect(astral.length).toBe(20);
     expect(truncateText(astral, 12)).toBe(astral);
   });
+
+  it('never returns a cluster truncated by the reading probe', () => {
+    // A long run of combining marks must not be handed back as whole characters
+    // when the probe stops inside it: the cap counts characters, so the cut
+    // keeps the run's base letter and drops the run.
+    const content = `${'x'.repeat(300)}${'\u0301'.repeat(4000)}tail`;
+    const result = truncateText(content, 200);
+    expect(result).toBe(`${'x'.repeat(200)}\u2026`);
+    expect(/^x+\u2026$/.test(result)).toBe(true);
+  });
 });

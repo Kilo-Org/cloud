@@ -120,12 +120,26 @@ describe('prepareMonoScrollContent', () => {
     expect(result.isTruncated).toBe(true);
   });
 
+  // A window that opens inside a regional-indicator run must still pair the
+  // indicators from the start of that run: the cut keeps whole flags only, and
+  // never the split pair an offset window would report.
+  it('pairs a flag from the run start when the window opens inside the run', () => {
+    const content = `${'q'.repeat(2048)}${'\u{1F1E6}'.repeat(1200)}${'z'.repeat(100)}`;
+    // The window opens one indicator into the run, so an unanchored window
+    // would end the cut on a half flag two code units later.
+    const result = prepareMonoScrollContent(content, 3074);
+    expect(result.displayText).toBe(`${'q'.repeat(2048)}${'\u{1F1E6}'.repeat(512)}`);
+    expect(result.isTruncated).toBe(true);
+  });
+
   // The window starts mid-value: segmenting it must not report a boundary that
-  // only exists because the window began there, and the cut never emits half a pair.
+  // only exists because the window began there, and the text is exactly the
+  // prefix the cap holds, never half a pair.
   it('never ends on a lone surrogate in a payload cut mid-window', () => {
-    const content = `a${'\u0301'.repeat(3000)}${'\u{1F468}\u200D\u{1F469}'.repeat(500)}`;
-    const result = prepareMonoScrollContent(content, 2000);
-    expect(/[\uD800-\uDBFF]$/u.test(result.displayText)).toBe(false);
+    const family = '\u{1F468}\u200D\u{1F469}';
+    const content = `${'x'.repeat(1500)}${family}${'y'.repeat(1200)}`;
+    const result = prepareMonoScrollContent(content, 1502);
+    expect(result.displayText).toBe('x'.repeat(1500));
     expect(result.isTruncated).toBe(true);
   });
 });

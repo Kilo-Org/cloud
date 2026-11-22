@@ -474,6 +474,8 @@ const server = createServer(
                 : 'cli_error';
           } catch (err) {
             // A case may only be reported as never started when no child was spawned.
+            // `failure` holds a parent-side message about workspace or process setup, not text
+            // captured from the child's streams, so the placeholder substitution does not apply.
             if (err instanceof NotStartedError) {
               outcome = { kind: 'not_started' };
               category = err.category;

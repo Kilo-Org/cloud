@@ -10,6 +10,7 @@ import {
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
+import type { AuditDetail } from '@kilocode/app-shared/organizations';
 import type { SeedResult } from '../index';
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 
@@ -202,18 +203,30 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       message: 'Organization settings updated',
       actor_email: ownerEmail,
       actor_name: 'Org admin lab owner',
+      details: { id: 'setting.dataCollection', mode: 'followSetting' } satisfies AuditDetail,
     },
     {
       action: 'organization.user.send_invite' as const,
       message: `Invitation sent to ${memberEmail}`,
       actor_email: ownerEmail,
       actor_name: 'Org admin lab owner',
+      details: {
+        id: 'invite.sent',
+        email: memberEmail,
+        role: 'member',
+      } satisfies AuditDetail,
     },
     {
       action: 'organization.member.change_role' as const,
       message: `${adminEmail} was made an admin`,
       actor_email: ownerEmail,
       actor_name: 'Org admin lab owner',
+      details: {
+        id: 'member.role',
+        email: adminEmail,
+        previous: 'member',
+        next: 'admin',
+      } satisfies AuditDetail,
     },
     // A message that runs past the audit row's two clamped lines, so the
     // mobile screen's disclosure has a row that actually needs it.
@@ -222,6 +235,12 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       message: `${adminEmail} was made a billing manager for the quarterly close; the invite that followed adds them to the seats purchase that renews next month`,
       actor_email: ownerEmail,
       actor_name: 'Org admin lab owner',
+      details: {
+        id: 'member.role',
+        email: adminEmail,
+        previous: 'member',
+        next: 'billing_manager',
+      } satisfies AuditDetail,
     },
   ];
   for (const [index, row] of auditRows.entries()) {
@@ -235,6 +254,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         actor_name: row.actor_name,
         action: row.action,
         message: row.message,
+        details: row.details,
       })
       .onConflictDoNothing();
   }

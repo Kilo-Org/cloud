@@ -50,12 +50,29 @@ function textActionBoxStyle() {
 /**
  * The box a placeholder takes when it holds a row's trailing action space
  * before that action is known — a pending read that decides between two
- * buttons. The placeholder holds the compact button's own `sm` frame
- * (`min-h-[36px]`), so the row does not move when the action's compact button
- * lands in its place. Explicit px, because NativeWind's rem is 14pt here and
- * `h-9` would measure 31.5pt against the button's 36pt frame.
+ * buttons.
+ *
+ * Two placeholders, chosen by whether a cell will land. `TEXT_ACTION_SKELETON_CLASS`
+ * holds the compact button's own `sm` frame (`min-h-[36px]`), for the case
+ * where the settled row renders that button, so the row does not move when it
+ * lands. `TEXT_ACTION_PENDING_BAND_CLASS` holds the row's own content band, for
+ * the case where the settled row renders no cell at all (a viewer whose role
+ * cannot manage): a 36px box would make that row 57pt tall inside its `py-3`,
+ * and the row would shrink to 48pt when the read landed.
+ *
+ * Explicit px, because NativeWind's rem is 14pt here and `h-9` would measure
+ * 31.5pt against the button's 36pt frame.
  */
 export const TEXT_ACTION_SKELETON_CLASS = 'h-[36px] w-24 rounded-md';
+
+/**
+ * The placeholder for a pending read that settles without a cell. The flat row
+ * is `min-h-[48px] px-4 py-3`, and `py-3` is 10.5pt a side, so its content band
+ * is `48 - 2 * 10.5 = 27pt`; the placeholder matches that band, so a row with
+ * no settled cell neither grows while pending nor shrinks when the read lands.
+ * Spelled in px because an `h-6`/`h-7` rem height does not land on 27pt.
+ */
+export const TEXT_ACTION_PENDING_BAND_CLASS = 'h-[27px] w-24 rounded-md';
 
 /**
  * The trailing cell of a row. Every variant shares the row's height, so a mark,

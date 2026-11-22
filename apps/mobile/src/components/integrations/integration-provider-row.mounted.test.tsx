@@ -8,7 +8,10 @@
 import { createElement, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { TEXT_ACTION_SKELETON_CLASS } from '@/components/ui/row-trailing';
+import {
+  TEXT_ACTION_PENDING_BAND_CLASS,
+  TEXT_ACTION_SKELETON_CLASS,
+} from '@/components/ui/row-trailing';
 import {
   COMPACT_BUTTON_HIT_SLOP,
   tapTargetReachDp,
@@ -246,38 +249,30 @@ describe('IntegrationProviderRow action cell', () => {
     expect(calls.connect).not.toHaveBeenCalled();
   });
 
-  it.each([
-    // Personal scope belongs to the viewer, so the settled row offers
-    // Disconnect and the placeholder reserves its stacked target line.
-    { scope: 'personal' as const, role: undefined, trailingIsTarget: true },
-    // A plain organization member may not disconnect GitHub (the procedure
-    // asks for `owner` or `admin`, `ORGANIZATION_MANAGE_ROLES`), so every
-    // settled branch resolves to no cell: the placeholder must leave the
-    // stacked line flat, or the row shrinks when the read lands.
-    { scope: 'organization' as const, role: 'member', trailingIsTarget: false },
+  it.each<[IntegrationScope, string | undefined, boolean, string]>([
+    // Personal scope belongs to the viewer, so the settled row offers Disconnect:
+    // the placeholder reserves that compact `sm` frame and marks the line.
+    ['personal', undefined, true, TEXT_ACTION_SKELETON_CLASS],
+    // A plain organization member may not disconnect, so every settled branch
+    // resolves to no cell: the placeholder takes the row's 27pt content band.
+    ['organization', 'member', false, TEXT_ACTION_PENDING_BAND_CLASS],
   ])(
-    'holds the action cell while the connections read has not landed ($scope)',
-    async ({ scope, role, trailingIsTarget }) => {
-      const root = renderRow({
-        row: integrationRow({ actionPending: true }),
-        scope,
-        role,
-      });
+    'holds the action cell while the connections read has not landed (%s)',
+    async (scope, role, trailingIsTarget, skeletonClass) => {
+      const root = renderRow({ row: integrationRow({ actionPending: true }), scope, role });
 
       expect(controls(root)).toHaveLength(0);
       expect(root.findAllByType('Skeleton')).toHaveLength(1);
-      // The settled cell is the shared compact button's own `sm` frame, so the
-      // placeholder holds that same height and the row does not move when the
-      // read lands. Both heights are compiled, not compared as strings:
-      // NativeWind's rem is 14pt, so `h-9` would reserve 31.5pt, not 36pt.
-      expect(root.findAllByType('Skeleton')[0]?.props.className).toBe(TEXT_ACTION_SKELETON_CLASS);
-      const buttonHeight = await compiledBoxHeight(COMPACT_BUTTON_CLASS);
-      expect(await compiledBoxHeight(TEXT_ACTION_SKELETON_CLASS)).toBe(buttonHeight);
-      // The placeholder is not a control, and it must hold the same stacked line
-      // the settled cell takes — but only where a cell lands: a stacked frame
-      // hosts the cell at the platform target so Android delivers its reach. A
-      // row whose viewer cannot disconnect settles without a cell, so its
-      // placeholder stays off the target and the line keeps its 30pt tile.
+      expect(root.findAllByType('Skeleton')[0]?.props.className).toBe(skeletonClass);
+      // Compiled, not compared as a string: NativeWind's rem is 14pt, so `h-9`
+      // would reserve 31.5pt. A cell that lands is the compact button, so its
+      // placeholder holds that same height; a row that settles with no cell
+      // holds the content band instead: `48 - 2 * 10.5 = 27pt`.
+      expect(await compiledBoxHeight(skeletonClass)).toBe(
+        trailingIsTarget ? await compiledBoxHeight(COMPACT_BUTTON_CLASS) : 27
+      );
+      // Only a row that will host a cell marks its stacked line: a stacked frame
+      // hosts the cell at the target so Android delivers its reach.
       expect(sharedRow(root).props.trailingIsTarget).toBe(trailingIsTarget);
     }
   );
@@ -300,10 +295,8 @@ describe('IntegrationProviderRow action cell', () => {
     );
   });
 
-  // The outline buttons keep the base's compact `sm` frame and reach the design
-  // target through the shared `Button`'s own `sm` `hitSlop` (5pt a side), not
-  // through a taller box: a full-height box filled each row and outweighed the
-  // integration names beside it.
+  // The outline buttons keep the base's compact `sm` frame and reach the target
+  // through the shared `Button`'s own `sm` `hitSlop` (5pt a side).
   it.each<{ name: string; row: Partial<IntegrationRow> }>([
     { name: 'manage on the web', row: { installed: true, webManaged: true } },
     {
@@ -330,25 +323,20 @@ describe('IntegrationProviderRow action cell', () => {
       throw new Error(`the ${name} row rendered no button`);
     }
 
-    // The compact base frame, exactly as the shared `Button` renders `sm`: no
-    // height class of the row's own and no negative margin cancelling an
-    // overhang, so the cell stays label-sized instead of filling the row.
+    // Exactly as the shared `Button` renders `sm`: no height class of the row's
+    // own and no margin cancel, so the cell stays label-sized.
     expect(button.props.size).toBe('sm');
     expect(button.props.className).toBeUndefined();
     expect(button.props.style).toBeUndefined();
 
-    // The reach still clears the design target: the shared `Button`'s `sm` class
-    // list (`COMPACT_BUTTON_CLASS`) compiled through the app's own theme, plus
-    // the `hitSlop` the button gives every `sm` pressable.
+    // The compiled compact frame plus the `hitSlop` every `sm` pressable gets.
     const reach = tapTargetReachDp(
       (await compiledBoxHeight(COMPACT_BUTTON_CLASS)) as number,
       COMPACT_BUTTON_HIT_SLOP.top
     );
     expect(reach).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
 
-    // The cell still marks the line for the target: without that, a stacked frame
-    // lays the wrapper out on the row's band and Android delivers its touches
-    // through it, however far the `hitSlop` reaches.
+    // Without the mark a stacked frame delivers the touches through its band.
     expect(sharedRow(root).props.trailingIsTarget).toBe(true);
   });
 

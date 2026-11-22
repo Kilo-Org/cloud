@@ -14,6 +14,7 @@ import { ConfigureRow } from '@/components/ui/configure-row';
 import {
   renderRowTrailing,
   type RowTrailingSpec,
+  TEXT_ACTION_PENDING_BAND_CLASS,
   TEXT_ACTION_SKELETON_CLASS,
 } from '@/components/ui/row-trailing';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -108,22 +109,24 @@ export function IntegrationProviderRow({
   let action: RowTrailingSpec | undefined = undefined;
   if (row.actionPending) {
     // The connections read that decides between Disconnect and the web page has
-    // not landed, so the row holds the button's space instead of guessing. The
-    // placeholder holds the compact button's own 36pt frame, which is what the
-    // settled cell lays out, so the row does not move when the read lands.
-    // Where a cell will land, it also marks the line for the target: a stacked
-    // row must host the cell at the platform target, and a stacked line sized
-    // to the cell's compact frame alone would not deliver its touches. The flat
-    // frame ignores the mark, so the row's own padding still holds where the
-    // row does not stack.
-    // The placeholder asks for the stacked target line only when a cell will
-    // land: every settled branch is gated on the same permission, so a row
-    // whose viewer cannot disconnect keeps the plain line and does not grow
-    // when the read lands.
+    // not landed, so the row holds the settled cell's space instead of guessing.
+    // Where a cell will land, the placeholder holds the compact button's own
+    // 36pt frame, which is what the settled cell lays out, and marks the line
+    // for the target: a stacked row must host the cell at the platform target,
+    // and a stacked line sized to the compact frame alone would not deliver its
+    // touches. The flat frame ignores the mark, so the row's own padding still
+    // holds where the row does not stack. Every settled branch is gated on the
+    // same permission, so a viewer who cannot disconnect settles with no cell
+    // at all: that placeholder takes the row's 27pt content band instead, and
+    // the row neither grows while pending nor shrinks when the read lands.
     action = {
       kind: 'node',
       target: canDisconnect,
-      node: <Skeleton className={TEXT_ACTION_SKELETON_CLASS} />,
+      node: (
+        <Skeleton
+          className={canDisconnect ? TEXT_ACTION_SKELETON_CLASS : TEXT_ACTION_PENDING_BAND_CLASS}
+        />
+      ),
     };
   } else if (row.installed && row.webManaged) {
     action = canDisconnect

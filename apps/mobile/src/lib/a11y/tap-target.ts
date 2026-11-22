@@ -489,15 +489,21 @@ export function textActionTargetDp(): number {
  * cancellation ({@link TOUCH_TARGET_OVERHANG_DP}), taken at the action's
  * target.
  *
- * The action keeps {@link textActionTargetClass}'s box on its own node, because
- * a control-size audit reads that node's rect. Without the margin the node
- * contributes its whole target to the frame: a row with a text action laid out
- * at 65pt on iOS and 69dp on Android beside a two-line row's 57.75pt, so a
- * group grew when one of its rows swapped a text action for a button (the
- * Integrations hub's Connect and Disconnect rows, 2026-11-18 gate). Cancelling
- * to {@link ROW_FRAME_CONTENT_DP} leaves the node inside the row's own `py-3`
- * padding, which keeps every touch on it inside the row's bounds — Android
- * delivers a touch only inside a parent view.
+ * This is the text-action variant's geometry only — the Integrations hub's
+ * Connect cell. It keeps {@link textActionTargetClass}'s box on its own node,
+ * because a control-size audit reads that node's rect, and cancels the box's
+ * overhang with `textActionBoxStyle` in `row-trailing.tsx`. Without the margin
+ * the node contributes its whole target to the frame: a row with a text action
+ * laid out at 65pt on iOS and 69dp on Android beside a two-line row's 57.75pt,
+ * so a group grew when one of its rows carried the action (2026-11-18 gate).
+ * Cancelling to {@link ROW_FRAME_CONTENT_DP} leaves the node inside the row's
+ * own `py-3` padding, which keeps every touch on it inside the row's bounds —
+ * Android delivers a touch only inside a parent view.
+ *
+ * A plain compact button, such as the hub's outline cells, takes neither: it
+ * carries no target box of its own, so it reaches the target through the shared
+ * `Button`'s `sm` {@link COMPACT_BUTTON_HIT_SLOP} and needs no overhang cancel,
+ * because its 36pt frame already lays out inside the row's `py-3`.
  */
 export function textActionRowOverhangDp(): number {
   return (textActionTargetDp() - ROW_FRAME_CONTENT_DP) / 2;
@@ -509,23 +515,28 @@ export function textActionRowOverhangDp(): number {
  *
  * A stacked row puts the leading cell and the trailing cell on a line of their
  * own, above the text column, and that line lays its children out on the row's
- * {@link ROW_FRAME_CONTENT_DP} band. The control still carries
+ * {@link ROW_FRAME_CONTENT_DP} band. Two cells arrive at the target by
+ * different means. A text action (the hub's Connect cell) carries
  * {@link textActionTargetClass}'s box on its own node and cancels
  * {@link textActionRowOverhangDp} per side, which is right for a flat row: the
- * control overhangs the frame's own `py-3` padding, inside the row's bounds.
- * Stacked, the control's touches are delivered through the wrapper this class
- * names, not through the row, and Android delivers a touch only inside every
- * ancestor view: a 27pt wrapper held the delivered target at 27pt — under the
- * 36pt frame the platform target replaced — while a control-size audit still
- * read the control's own 44/48pt rect.
+ * box overhangs the frame's own `py-3` padding, inside the row's bounds. A plain
+ * compact button (the hub's outline cells) carries no target box of its own: it
+ * relies on the shared `Button`'s `sm` {@link COMPACT_BUTTON_HIT_SLOP}, and its
+ * 36pt frame sits inside the row's `py-3` without any cancel. Stacked, either
+ * cell's touches are delivered through the wrapper this class names, not
+ * through the row, and Android delivers a touch only inside every ancestor
+ * view: a 27pt wrapper held the delivered area at 27pt — under both the action's
+ * target box and the compact button's slop-widened frame — while a control-size
+ * audit still read the cell's own rect.
  *
  * The host is that ancestor, so it takes the platform target as its own layout
- * height and does not cancel the control's overhang: the delivered area is the
+ * height and does not cancel the cell's overhang: the delivered area is the
  * host's layout box, and cancelling the overhang would shrink it back to the
  * 27pt band and reintroduce the clipping. The stacked line therefore grows to
  * the target — in the stacked presentation only — while the flat frame keeps the
- * row's own band, because the control overhangs the row's padding there.
- * `justify-center` keeps the control on the host's centre. The value is
+ * row's own band, where the action's box overhangs the row's padding and the
+ * compact button's slop already reaches outside its frame.
+ * `justify-center` keeps the cell on the host's centre. The value is
  * {@link textActionTargetDp} spelled as classes, because NativeWind reads
  * literals at build time.
  */

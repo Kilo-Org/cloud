@@ -2533,7 +2533,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           ...(parsed.gateResult === undefined ? {} : { gateResult: parsed.gateResult }),
         },
         'wrapper_outcome',
-        parsed.lastMessageId
+        reduction.changed.at(-1)?.messageId
       );
       // The turn ended: the route is ready for the next one (spec §10).
       if (reduction.changed.length > 0) this.emitCloudStatus({ type: 'ready' });
@@ -4368,7 +4368,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private settlementFor(
     message: SessionMessage,
     facts: ControlPlaneReportFacts | undefined,
-    outcomeMessageId?: string
+    answerPromptId?: string
   ): MessageSettlement {
     const metadata = this.metadata;
     const settlement: MessageSettlement = {
@@ -4385,7 +4385,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       }
     }
     const kiloSessionId = metadata?.auth.kiloSessionId;
-    if (message.state === 'completed' && message.messageId === outcomeMessageId && kiloSessionId) {
+    if (message.state === 'completed' && message.messageId === answerPromptId && kiloSessionId) {
       try {
         this.partText.flush();
         settlement.assistantMessageId =
@@ -4414,7 +4414,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     reduction: MessageReduction,
     facts?: ControlPlaneReportFacts,
     source: ControlPlaneMessageSource = 'coordinator',
-    outcomeMessageId?: string
+    answerPromptId?: string
   ): Promise<void> {
     if (reduction.changed.length === 0) {
       await this.armAlarm();
@@ -4424,7 +4424,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       this.messages.map(message => [message.messageId, message.state])
     );
     const { messages, changed } = withMessageSettlements(reduction, message =>
-      this.settlementFor(message, facts, outcomeMessageId)
+      this.settlementFor(message, facts, answerPromptId)
     );
     this.messages = messages;
     await this.persistMessages(changed);

@@ -116,9 +116,12 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   // prompt, and a code-review session rejects every prompt, so a utility whose
   // only permitted forms cannot be written as a rule keeps no allow rule.
   // `sort` writes the file named by its output option, so that option is refused
-  // for the same reason the write tools' targets are.
-  'sort *-o*',
-  'sort *--output*',
+  // at each position it can take. The option is named with its separator, because
+  // a bare `-o` inside a file name is not an option.
+  'sort -o *',
+  'sort * -o *',
+  'sort --output*',
+  'sort * --output*',
   'find *-exec*',
   'find *-ok*',
   'find *-delete*',
@@ -581,9 +584,12 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   // The allowed search programs run another program or write a named file
   // through these options, so each is refused, as the review policy already does.
   // `sort` writes the file named by its output option, so that option is refused
-  // for the same reason the write tools' targets are.
-  'sort *-o*',
-  'sort *--output*',
+  // at each position it can take. The option is named with its separator, because
+  // a bare `-o` inside a file name is not an option.
+  'sort -o *',
+  'sort * -o *',
+  'sort --output*',
+  'sort * --output*',
   'find *-exec*',
   'find *-execdir*',
   'find *-ok*',
@@ -797,7 +803,7 @@ export function getCommandGuardPermissions(
           '.g*t': 'deny',
           '.g*t/*': 'deny',
           '*gitconfig*': 'deny',
-          '*/git/config*': 'deny',
+          '*/.git/config*': 'deny',
         }
       : bitbucketReviewPolicy && bitbucketReviewId
         ? {

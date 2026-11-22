@@ -522,9 +522,9 @@ Rules:
 - Change manifests, lockfiles, Dockerfiles, CI, or build/deploy files only when directly required.
 - Create and check out branch ${params.branchName} from the current checkout before changing files, unless already on that branch.
 - Do not open no-change PR. If no changes are needed, return no_changes_needed.
-- Open draft PR when validation is incomplete or risk is nontrivial.
-- Write the commit message and the pull request body with the file-writing tool, not with a shell command, then pass the file: git commit -F <file> and gh pr create --fill --body-file <file> --draft. A command that carries a quote character is refused, and --fill takes the title from the commits.
-- Include Kilo finding backlink in PR body: ${params.findingUrl}
+- Write the commit message with the file-writing tool and pass it with git commit -F <file>. Put the summary and the Kilo finding backlink ${params.findingUrl} in that message body, because the pull request title and body come from the commit.
+- Open the pull request as a draft when validation is incomplete or risk is nontrivial.
+- A command that carries a quote character is refused, so pass no text on a command line.
 - Final assistant response must contain only normal summary plus machine-readable result block:
 
 SECURITY_REMEDIATION_RESULT

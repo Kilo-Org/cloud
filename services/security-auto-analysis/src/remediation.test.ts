@@ -270,7 +270,11 @@ describe('security remediation launch contract', () => {
     // The policy refuses a command that carries a quote character, so the prompt
     // must name the file form of both commands it requires.
     expect(prompt).toContain('git commit -F <file>');
-    expect(prompt).toContain('gh pr create --fill --body-file <file> --draft');
+    // The backlink travels in the commit message, because the pull request body
+    // comes from that commit.
+    expect(prompt).toContain('Put the summary and the Kilo finding backlink');
+    // The draft choice stays conditional.
+    expect(prompt).toContain('Open the pull request as a draft when validation is incomplete');
   });
 });
 

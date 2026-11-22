@@ -422,7 +422,7 @@ describe('migrated origin permissions', () => {
                 '.g*t': 'deny',
                 '.g*t/*': 'deny',
                 '*gitconfig*': 'deny',
-                '*/git/config*': 'deny',
+                '*/.git/config*': 'deny',
               }
             : 'deny',
         webfetch: 'deny',

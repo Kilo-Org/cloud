@@ -582,6 +582,9 @@ describe('security-remediation push command guard policy', () => {
       'git p\\u\\s\\h origin +main',
       'git c\\o\\n\\f\\i\\g remote.origin.mirror true',
       'sort -o .git//config /tmp/payload',
+      'sort -o out.txt src/a.ts',
+      'sort src/a.ts -o out.txt',
+      'sort --output=out.txt src/a.ts',
       'sort --output=.git//config /tmp/payload',
       'sort -o .git/./config /tmp/payload',
       'uniq /tmp/payload .git//config',
@@ -647,6 +650,8 @@ describe('security-remediation push command guard policy', () => {
       'cp src/a.ts src/b.ts',
       'sed -i s/a/b/ src/app.ts',
       'sort src/a.ts',
+      // A file name that carries the option letters is not an option.
+      'sort changelog-old.txt',
       'uniq -c src/a.ts',
       'mv src/config.ts src/conf.ts',
       'cp config.example.json config.test.json',

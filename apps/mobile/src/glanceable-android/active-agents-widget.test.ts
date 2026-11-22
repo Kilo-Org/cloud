@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { _resetHomeWidgetDataForTests } from '@/lib/glanceable/home-widget-data';
 import { setSurfaceExtras } from '@/lib/glanceable/surface-extras';
-import { lightColors } from '@/lib/hooks/theme-colors.generated';
+import { darkColors, lightColors } from '@/lib/hooks/theme-colors.generated';
 
 import { sizeClassFor } from './active-agents-widget';
 import {
@@ -318,5 +318,30 @@ describe('Home widget design coordinates at the design frames', () => {
         }
       }
     }
+  });
+});
+
+// The idle dot is the widget's only mark for a connected agent doing nothing,
+// so it takes the muted text ink. `mutedSoft` measured about 2.2:1 on the
+// widget's own surfaces and left the dot invisible. See the palette guard in
+// `use-theme-colors.contrast.test.ts` for the measured floors.
+describe('Home widget status mark ink', () => {
+  it('paints the idle dot with the muted text ink in both schemes', () => {
+    const props = stateProps(STATES.idle);
+    const { light, dark } = render(props, DESIGN.row);
+    expect(nodes(light).find(node => node.key === 'dot')?.props.style?.backgroundColor).toBe(
+      lightColors.mutedForeground
+    );
+    expect(nodes(dark).find(node => node.key === 'dot')?.props.style?.backgroundColor).toBe(
+      darkColors.mutedForeground
+    );
+  });
+
+  it('paints the idle secondary count dot with the muted text ink', () => {
+    const props = stateProps(STATES.mixed);
+    const { light } = render(props, DESIGN.large);
+    expect(byKey(light, 'count-idle-dot').props.style?.backgroundColor).toBe(
+      lightColors.mutedForeground
+    );
   });
 });

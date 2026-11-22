@@ -492,6 +492,8 @@ describe('security-remediation push command guard policy', () => {
       'git -c remote.origin.mirror push',
       'git    -c remote.origin.mirror push',
       'git\t-c x=y status',
+      'echo \'[remote "origin"]\' >> .git/config',
+      'sed -i s/a/b/ .git/config',
       "git -c alias.p='push --force' p",
       'git push ""--force',
       'git push ""+main',

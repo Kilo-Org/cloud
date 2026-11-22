@@ -399,6 +399,11 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   // admitted again below: the flag consumes the rest of its argument, so a
   // setting cannot follow it.
   'git*-c*',
+  // git reads the same configuration from the repository's own file, which a
+  // shell command can rewrite directly, so a command that names that file is
+  // refused as well.
+  '*.git/config*',
+  '*git/config*',
 ];
 
 // Installed after the denies, and only for the branch-creation form, whose `-c`

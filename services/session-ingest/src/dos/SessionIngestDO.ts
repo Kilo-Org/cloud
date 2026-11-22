@@ -2546,8 +2546,10 @@ export class SessionIngestDO extends DurableObject<Env> {
    * The three line kinds are `meta` (one per `ingest_meta` row, emitted first),
    * `row` (one per `ingest_items` row) and a final `end` carrying the row count.
    *
-   * With `deleteIfEmpty`, an object that stores nothing at all — no item row and
-   * no meta row, so only the constructor's migration has ever written there —
+   * With `deleteIfEmpty`, an object that stores nothing at all — no row in any
+   * data table (`ingest_items`, `ingest_meta`, `sessions`,
+   * `agent_notification_dispatch`; see `hasAnyData()`), so only the
+   * constructor's migration has ever written there —
    * is scheduled for a storage reset instead of being streamed, and the single
    * `end` line carries `empty_cleanup_scheduled: true`. The reset runs in the
    * alarm because `deleteAll()` drops the live instance's schema: the object

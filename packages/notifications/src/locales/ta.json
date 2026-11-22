@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "புதிய பாதுகாப்பு கண்டுபிடிப்பு ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "மிகக் கடுமை",
+      "high": "அதிகம்",
+      "medium": "மிதம்",
+      "low": "குறைவு"
+    },
     "securityFindingSlaWarning": {
       "title": "SLA எச்சரிக்கை"
     },

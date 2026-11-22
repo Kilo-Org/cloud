@@ -47,11 +47,6 @@ const modelStore = createSecureStorePreference<GatewayTranscriptionModel | null>
   serialize: value => JSON.stringify(value),
 });
 
-// Warm both disk reads at module scope so the settings row and the first
-// toggle see the persisted value without waiting for a React mount.
-enabledStore.preload();
-modelStore.preload();
-
 export function isGatewayTranscriptionEnabled(): boolean {
   return enabledStore.getRequested();
 }

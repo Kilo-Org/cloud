@@ -36,6 +36,13 @@ const findCustomRouterById = vi.hoisted(() => vi.fn());
 const classifyNormalizedInput = vi.hoisted(() => vi.fn());
 const findEffectiveOrganizationMemberRole = vi.hoisted(() => vi.fn());
 const findOrganizationMemberBalanceRow = vi.hoisted(() => vi.fn());
+const capabilityRows = vi.hoisted(
+  () =>
+    new Map<
+      string,
+      { inputModalities: Set<string>; contextLength: number | null; isActive: boolean | null }
+    >()
+);
 const dbRows = vi.hoisted(() => ({
   user: [] as unknown[],
   organization: [] as unknown[],
@@ -58,13 +65,7 @@ vi.mock('./model-classifier', async importOriginal => ({
 
 vi.mock('./model-capabilities', async importOriginal => ({
   ...(await importOriginal<typeof ModelCapabilitiesModule>()),
-  getModelCapabilities: async () =>
-    new Map([
-      [
-        'anthropic/claude-sonnet-4.6',
-        { inputModalities: new Set(['text', 'image']), contextLength: 200_000, isActive: true },
-      ],
-    ]),
+  getModelCapabilities: async () => new Map(capabilityRows),
 }));
 
 vi.mock('./classifier-config', async importOriginal => ({
@@ -391,6 +392,12 @@ beforeEach(() => {
   platformModes.clear();
   getPlatformMode.mockClear();
   customTable = rankedTable;
+  capabilityRows.clear();
+  capabilityRows.set(SONNET, {
+    inputModalities: new Set(['text', 'image']),
+    contextLength: 200_000,
+    isActive: true,
+  });
   gatewayDeniedModelIds = [];
   gatewayFailuresLeft = 0;
   gatewayFailureStatus = 503;
@@ -577,6 +584,39 @@ describe('public custom router decide', () => {
       subtaskType: null,
       tableVersion: 'custom-table-1',
     });
+  });
+
+  it('falls back past a default entry that has no capability row', async () => {
+    findCustomRouter.mockResolvedValue(
+      customRouter({ entries: [sonnet, ollama], defaultEntryKey: `gateway:${SONNET}` })
+    );
+    capabilityRows.clear();
+    classifyNormalizedInput.mockRejectedValue(new Error('classifier down'));
+    const { decision } = await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    expect(decision).toMatchObject({ model: 'client:ollama/qwen3:32b', fallback: true });
+  });
+
+  it('fails with custom_router_unavailable when the only entry has no capability row', async () => {
+    findCustomRouter.mockResolvedValue(customRouter({ entries: [sonnet] }));
+    capabilityRows.clear();
+    classifyNormalizedInput.mockRejectedValue(new Error('classifier down'));
+    const res = await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody());
+    expect(res.status).toBe(422);
+    expect(await errorCode(res)).toBe('custom_router_unavailable');
+  });
+
+  it('falls back past an inactive entry', async () => {
+    findCustomRouter.mockResolvedValue(
+      customRouter({ entries: [sonnet, ollama], defaultEntryKey: `gateway:${SONNET}` })
+    );
+    capabilityRows.set(SONNET, {
+      inputModalities: new Set(['text', 'image']),
+      contextLength: 200_000,
+      isActive: false,
+    });
+    classifyNormalizedInput.mockRejectedValue(new Error('classifier down'));
+    const { decision } = await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody()));
+    expect(decision).toMatchObject({ model: 'client:ollama/qwen3:32b', fallback: true });
   });
 
   const imageMessages = [

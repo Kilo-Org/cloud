@@ -256,4 +256,21 @@ describe('useEffectiveAgentProfile', () => {
     expect(result.allProfiles.map(p => p.id)).toEqual(['org', 'personal']);
     expect(result.profileId).toBe('personal');
   });
+
+  it('exposes the failed read to the caller, so the sheet can name the cause', () => {
+    // `isError` alone cannot tell an access refusal from a server fault; the
+    // sheet classifies the error through the shared selector.
+    const failed = { data: { code: 'FORBIDDEN' } };
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- partial query result; the hook reads only data/isPending/isError/error/refetch
+    vi.mocked(useQuery).mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: true,
+      error: failed,
+      refetch: vi.fn(),
+    } as never);
+
+    expect(mountProfile().error).toBe(failed);
+    expect(mountProfile('org-1').error).toBe(failed);
+  });
 });

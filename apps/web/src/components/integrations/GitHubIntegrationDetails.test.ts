@@ -1,6 +1,9 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { buildAppReturnOutcomeView } from './github-app-outcome';
+import {
+  buildAppReturnOutcomeView,
+  INSTALLATION_LISTING_TOO_LARGE_MESSAGE,
+} from './github-app-outcome';
 import {
   buildGitHubManagementInput,
   getGitHubUserConnectionErrorMessage,
@@ -274,6 +277,31 @@ describe('GitHubIntegrationDetails fromApp outcome CTA behavior', () => {
     expect(view.kind).toBe('retryable');
     expect(view.cta).toBe('Try again');
     expect(view.href).toBe('/cloud/sessions?error=github_authorization_required');
+  });
+
+  it('retryable listing over the bound: Try again with the listing-bound copy', () => {
+    expect(buildAppReturnOutcomeView({ error: 'installation_listing_too_large' })).toEqual({
+      kind: 'retryable',
+      title: 'Installation failed',
+      description: INSTALLATION_LISTING_TOO_LARGE_MESSAGE,
+      cta: 'Try again',
+      href: '/cloud/sessions?error=installation_listing_too_large',
+    });
+  });
+
+  it('retryable listing over the bound: return href carries organizationId for app retry', () => {
+    expect(
+      buildAppReturnOutcomeView({
+        error: 'installation_listing_too_large',
+        organizationId: 'org-123',
+      })
+    ).toEqual({
+      kind: 'retryable',
+      title: 'Installation failed',
+      description: INSTALLATION_LISTING_TOO_LARGE_MESSAGE,
+      cta: 'Try again',
+      href: '/cloud/sessions?error=installation_listing_too_large&organizationId=org-123',
+    });
   });
 
   it('non-retryable admin error: Back and no retry', () => {

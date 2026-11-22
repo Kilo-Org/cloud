@@ -309,6 +309,7 @@
     "hideBalance": "Skjul saldo",
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",
+    "availableToSpendInOrganization": "Tilgjengelig for forbruk i denne organisasjonen",
     "signOutTitle": "Logge ut?",
     "signOutMessage": "Du må logge inn igjen for å få tilgang til arbeidsområdet ditt.",
     "deleteAccountTitle": "Slette kontoen?",
@@ -526,7 +527,7 @@
       "triageActioned": "Tatt til følge",
       "triageRejected": "Ikke tatt til følge",
       "appealNone": "Ingen sendt inn",
-      "appealSubmitted": "Under behandling",
+      "appealSubmitted": "Klagen er under behandling",
       "appealAccepted": "Godtatt",
       "appealRejected": "Avvist",
       "appeal": "Klag på denne avgjørelsen",
@@ -538,7 +539,17 @@
       "nextStepInReview": "Resultatet vises på denne skjermen, og du kan klage etter at avgjørelsen er tatt.",
       "nextStepAppeal": "Resultatet av klagen vises på denne skjermen.",
       "nextStepFinal": "Klageavgjørelsen er endelig. Du kan ikke klage på nytt.",
-      "viewReceipt": "Vis kvittering"
+      "viewReceipt": "Vis kvittering",
+      "targetLabel": "Rapportert element",
+      "reasonLabel": "Årsak til rapport",
+      "targetMessage": "AI-svar",
+      "targetComment": "PR-kommentar",
+      "targetUser": "Bruker",
+      "reasonHarmful": "Skadelig innhold",
+      "reasonIllegal": "Ulovlig innhold",
+      "reasonHarassment": "Trakassering",
+      "reasonSpam": "Uønsket reklame",
+      "reasonOther": "Annen årsak"
     },
     "reportReceipts": {
       "title": "Rapporter",
@@ -554,8 +565,11 @@
     "changelogFixesIn": "Feilrettinger og forbedringer i {{areas}}.",
     "changelogFixesPolish": "Feilrettinger og forbedringer i hele appen.",
     "changelogAreas": {
-      "signIn": "Innlogging",
-      "profileOrganizations": "Profil & organisasjoner"
+      "signIn": "innlogging",
+      "profileOrganizations": "profil & organisasjoner",
+      "chat": "samtale",
+      "notifications": "varsler",
+      "integrations": "integrasjoner"
     }
   },
   "preferences": {
@@ -996,8 +1010,9 @@
       "checkActiveConnection": "Tilkoblingen er aktiv, men dette elementet kan fortsatt ikke lastes inn.",
       "bitbucketOrgOnlyDescription": "Bytt kontoen over til en organisasjon for å gå gjennom dens PR-er på Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Denne kontoen har ingen organisasjoner ennå. Du kan gå gjennom PR-er på Bitbucket når du oppretter eller blir med i en organisasjon.",
-      "gitlabReconnectAdminOnlyDescription": "Be en eier, administrator eller faktureringsansvarlig i organisasjonen om å koble den til på nytt.",
+      "reconnectAdminOnlyDescription": "Be en eier, administrator eller faktureringsansvarlig i organisasjonen om å koble den til på nytt.",
       "bitbucketNotConnectedTitle": "Bitbucket er ikke tilkoblet",
+      "bitbucketAdminOnlyDescription": "Be en eier, administrator eller faktureringsansvarlig i organisasjonen om å koble den til.",
       "adminOnlyConnectDescription": "Bare organisasjonseiere, administratorer og faktureringsansvarlige kan opprette tilkoblingen.",
       "contextLine": "For {{organization}}",
       "contextLinePersonal": "For personlig konto"
@@ -1210,6 +1225,8 @@
       "emptyTitle": "Ingen varsler ennå",
       "emptyCategoryTitle": "Ingen varsler i denne kategorien",
       "emptyBody": "Varsler denne kontoen mottar, vises her. De oppbevares i {{days}} dager.",
+      "emptyBody_one": "Varsler denne kontoen mottar, vises her. De oppbevares i {{days}} dager.",
+      "emptyBody_other": "Varsler denne kontoen mottar, vises her. De oppbevares i {{days}} dager.",
       "capped": "Viser de nyeste varslene.",
       "loadError": "Kunne ikke laste varslingshistorikk.",
       "openFailed": "Dette varselet åpnes ikke lenger noe sted."
@@ -1290,6 +1307,7 @@
       "manageAccess": "Administrer tilgang",
       "bitbucketNoRepositoriesDescription": "Ingen kodelagre er tilgjengelige i dette Bitbucket-arbeidsområdet.",
       "gitlabNoRepositoriesDescription": "Du må kanskje gi tilgang til flere grupper eller prosjekter på GitLab.",
+      "githubNoRepositoriesDescription": "Sjekk hvilke kodelagre Kilos GitHub-app har tilgang til, og oppdater listen.",
       "installGithubApp": "Installer GitHub-appen for kodelagre",
       "installGithubAppDescription": "Gi Kilos GitHub-app tilgang til kodelagrene du vil ha gjennomgått.",
       "repositoryAccess": "tilgang til kodelagre",
@@ -1323,7 +1341,7 @@
       "findingsInProgress": "Denne gjennomgangen pågår fortsatt. Funn vises her når den er fullført.",
       "findingsEndedWithoutResults": "Denne gjennomgangen ble avsluttet før den ga noen funn.",
       "serviceUnavailable": "Kunne ikke koble til tjenesten for kodegjennomgang. Prøv gjennomgangen på nytt når tjenesten er tilgjengelig.",
-      "reviewFailed": "Gjennomgangen mislyktes. Prøv på nytt.",
+      "reviewFailed": "Gjennomgangen mislyktes.",
       "showMore": "Vis mer",
       "created": "Opprettet",
       "started": "Startet",
@@ -1445,6 +1463,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-tilkoblingen for {{organization}} administreres på nettet fra en datamaskin.",
+      "deniedManagedByOwner": "Be en eier i {{organization}} om å endre tilkoblingen du ikke kan redigere.",
+      "deniedConnectRole": "Bare eiere, administratorer og faktureringsansvarlige i {{organization}} kan opprette tilkoblingen.",
+      "deniedReconnectRole": "Be en eier, administrator eller faktureringsansvarlig i {{organization}} om å koble den til på nytt.",
       "managedOnWebTitle": "Administreres på nettet",
       "managedOnWebShort": "Denne tilkoblingen administreres på nettet fra en datamaskin.",
       "managedOnWebRepositories": "Velg repositorier for {{organization}} på nettet fra en datamaskin.",
@@ -1582,7 +1603,9 @@
       "unavailablePersonallySwitchAction": "Bytt organisasjon",
       "unavailableOrganizationTitle": "Panelvurdering er ikke tilgjengelig",
       "unavailableForOrganization": "Panelvurdering krever Enterprise-planen med et aktivt abonnement eller en prøveperiode. Denne organisasjonen har det ikke akkurat nå.",
-      "unavailableForOrganizationNeutral": "Panelvurdering er ikke tilgjengelig for denne organisasjonen akkurat nå. Prøv igjen senere.",
+      "unavailablePlanCheck": "Panelvurdering kunne ikke kontrollere planen til denne organisasjonen. Prøv igjen for å kontrollere på nytt.",
+      "unavailableFlagRollout": "Panelvurdering er ikke tilgjengelig for denne organisasjonen ennå. Oppdater appen til den nyeste versjonen for å få den.",
+      "unavailableForOrganizationMember": "Panelvurdering krever Enterprise-planen med et aktivt abonnement eller en prøveperiode. En organisasjonseier kan endre planen.",
       "unavailableOnBitbucket": "Panelvurdering er ikke tilgjengelig for Bitbucket-kodelagre.",
       "noRepositories": "Ingen kodelagre er valgt ennå. Velg kodelagre i kodelagerinnstillingene først.",
       "specialists": "Spesialister",
@@ -2557,8 +2580,7 @@
       "searchPlaceholder": "Søk etter kodelagre",
       "noMatches": "Ingen treff",
       "noRepositories": "Ingen kodelagre tilgjengelige",
-      "noRepositoriesDescription": "Ingen kodelagre er koblet til kontoen din.",
-      "loading": "Laster inn…",
+      "noRepositoriesDescription": "For å laste inn kodelagre, koble til en GitHub- eller GitLab-konto.",
       "accessibility": "Kodelager: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3457,7 +3479,7 @@
       "manageOnWeb": "Faktureringsinnstillinger på nettet",
       "changePlan": "Endre plan",
       "buySeats": "Kjøp brukerplasser",
-      "managedOnWeb": "Planen, brukerplassene og automatisk påfylling administreres på nettet.",
+      "managedOnWeb": "Planen, brukerplassene og automatisk påfylling administreres på kilo.ai.",
       "setupAutoTopUp": "Sett opp automatisk påfylling",
       "manageAutoTopUp": "Administrer automatisk påfylling",
       "opensOnWeb": "Åpnes på nettet"
@@ -3643,10 +3665,10 @@
       "nameLabel": "Modusnavn",
       "nameRequired": "Skriv inn et modusnavn.",
       "notFound": "Denne modusen finnes ikke lenger.",
-      "restrictionHint": "Bare filer som samsvarer med dette mønsteret, kan redigeres. La det stå tomt for å tillate alle filer.",
-      "restrictionInvalid": "Skriv inn et gyldig mønster.",
+      "restrictionHint": "Et regulært uttrykk velger hvilke filer denne modusen kan redigere, for eksempel `\\.md$` for bare markdown-filer. La det stå tomt for å tillate alle filer.",
+      "restrictionInvalid": "Skriv inn et gyldig regulært uttrykk.",
       "restrictionLabel": "Begrensningsetikett",
-      "restrictionPattern": "Mønster for filer",
+      "restrictionPattern": "Filbegrensning",
       "roleLabel": "Roledefinisjon",
       "roleRequired": "Beskriv hva denne modusen gjør.",
       "tool": {
@@ -4403,6 +4425,7 @@
       "promptPlaceholder": "Du er en…",
       "tools": "Verktøy",
       "wholeToolRule": "Denne agenten bruker én regel på alle verktøy samtidig: {{rule}}. Disse bryterne er skrivebeskyttede.",
+      "toolRule": "Lagret regel: {{rule}}",
       "visibility": "Synlighet",
       "visibilityPrimary": "Primær — vist i velgeren",
       "visibilitySubagent": "Subagent — kan kun ringes opp fra andre",
@@ -4512,20 +4535,34 @@
       "deductionFallback": "Kredittrekk",
       "emptyDescription": "Kjøp av kreditter, kvitteringer og forbruk vises her.",
       "emptyTitle": "Ingen kreditthistorikk",
+      "expiredGrant": "Utløpt: {{description}}",
       "googlePlayReceipt": "Kvittering fra Google Play",
       "kind": {
         "adjustment": "Justering",
         "balanceNeutral": "Saldonøytral",
         "deduction": "Trekk",
         "grant": "Tildelte kreditter",
+        "promotionalCredits": "Kampanjekreditter",
         "welcomeCredits": "Velkomstkreditter",
         "purchase": "Kjøp"
+      },
+      "program": {
+        "adminBulkGrant": "Administratorkreditt",
+        "contributorChampion": "Bidragsytermesterkreditt",
+        "feedback": "Tilbakemeldingskreditt",
+        "influencer": "Påvirkerkreditt",
+        "ossMonthlyReset": "Nullstilling av støtte til åpen kildekode",
+        "ossSponsorship": "Kreditt for støtte til åpen kildekode",
+        "pullRequest": "PR-kreditt",
+        "usageIssue": "Kreditt for bruksproblem",
+        "vibeDay": "Vibe day-kreditt"
       },
       "purchaseFallback": "Kjøp av kreditter",
       "receipt": "Kvittering",
       "receiptA11y": "Åpne kvitteringen for {{description}}, {{amount}}, fra {{date}}",
       "receiptUnavailable": "Det finnes ingen kvittering for dette kjøpet.",
-      "retentionLimit": "Viser den nyeste kreditthistorikken."
+      "retentionLimit": "Viser den nyeste kreditthistorikken.",
+      "voidedGrant": "Annullert: {{description}}"
     },
     "title": "Kjøp kreditter",
     "description": "Kreditter er et engangskjøp som legges til Kilo-saldoen din for å kjøre AI-kodeøkter i Kilo App. Butikken belaster kontoen din, og kredittene legges til etter at butikken bekrefter betalingen.",
@@ -4861,6 +4898,9 @@
       "runAsCreator": "Kjør som meg",
       "runAsCreatorDescription": "Hver kjøring bruker kontoen din, så hemmelighetsheaderen er påkrevd.",
       "saveFailedTitle": "Kunne ikke lagre triggeren",
+      "nameTaken": "Det finnes allerede en trigger med navnet «{{name}}».",
+      "saveFailedRetry": "Fikk ikke kontakt med serveren. Sjekk forbindelsen og prøv igjen.",
+      "saveFailedCheck": "Sjekk verdiene i skjemaet og prøv igjen.",
       "deleteTitle": "Slette denne triggeren?",
       "deleteMessage": "Kall til {{name}} vil mislykkes. Dette kan ikke angres.",
       "deleteMessageScheduled": "Planlagte kjøringer av {{name}} stopper. Dette kan ikke angres.",
@@ -5105,6 +5145,20 @@
       "eu": "Den europeiske union",
       "au": "Australia",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Søk etter innstillinger…",
+    "noMatches": "Ingen treff i innstillingene",
+    "emptyDescription": "Prøv et annet innstillingsnavn eller søkeord.",
+    "resultsStatus": "Innstillinger funnet: {{resultCount}}",
+    "keywords": {
+      "signOut": "logg ut|utlogging",
+      "appearance": "tema|fargeskjema|farger",
+      "appUnlock": "biometri|ansiktsgjenkjenning|fingeravtrykk",
+      "language": "språk|oversettelse",
+      "notifications": "varsler|pushvarsler",
+      "privacy": "analyse|sporing"
     }
   }
 }

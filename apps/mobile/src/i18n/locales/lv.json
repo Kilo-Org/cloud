@@ -310,6 +310,7 @@
     "hideBalance": "Slēpt atlikumu",
     "showBalance": "Rādīt atlikumu",
     "balanceHidden": "Atlikums ir paslēpts",
+    "availableToSpendInOrganization": "Pieejams iztērēšanai šajā organizācijā",
     "signOutTitle": "Izrakstīties?",
     "signOutMessage": "Lai piekļūtu savai darbvietai, tev būs jāpierakstās vēlreiz.",
     "deleteAccountTitle": "Dzēst kontu?",
@@ -539,7 +540,17 @@
       "nextStepInReview": "Rezultāts parādīsies šajā ekrānā, un pēc lēmuma varēsiet iesniegt pārsūdzību.",
       "nextStepAppeal": "Pārsūdzības rezultāts parādīsies šajā ekrānā.",
       "nextStepFinal": "Pārsūdzības lēmums ir galīgs. Papildu pārsūdzību iesniegt nevar.",
-      "viewReceipt": "Skatīt apstiprinājumu"
+      "viewReceipt": "Skatīt apstiprinājumu",
+      "targetLabel": "Ziņotā vienība",
+      "reasonLabel": "Ziņojuma iemesls",
+      "targetMessage": "AI atbilde",
+      "targetComment": "Izmaiņu pieprasījuma komentārs",
+      "targetUser": "Lietotājs",
+      "reasonHarmful": "Kaitīgs saturs",
+      "reasonIllegal": "Nelikumīgs saturs",
+      "reasonHarassment": "Uzmākšanās",
+      "reasonSpam": "Mēstules",
+      "reasonOther": "Cits iemesls"
     },
     "reportReceipts": {
       "title": "Ziņojumi",
@@ -555,8 +566,11 @@
     "changelogFixesIn": "Labojumi un uzlabojumi šajās jomās: {{areas}}.",
     "changelogFixesPolish": "Labojumi un uzlabojumi visā lietotnē.",
     "changelogAreas": {
-      "signIn": "Pierakstīšanās",
-      "profileOrganizations": "Profils & organizācijas"
+      "signIn": "pierakstīšanās",
+      "profileOrganizations": "profils & organizācijas",
+      "chat": "tērzēšana",
+      "notifications": "paziņojumi",
+      "integrations": "integrācijas"
     }
   },
   "preferences": {
@@ -1015,8 +1029,9 @@
       "checkActiveConnection": "Savienojums ir aktīvs, bet šo vienumu joprojām nevar ielādēt.",
       "bitbucketOrgOnlyDescription": "Pārslēdz augstāk redzamo kontu uz organizāciju, lai pārskatītu tās Bitbucket izmaiņu pieprasījumus.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Šim kontam vēl nav organizāciju. Bitbucket izmaiņu pieprasījumus varēs pārskatīt, kad izveidosi organizāciju vai tai pievienosies.",
-      "gitlabReconnectAdminOnlyDescription": "Lūdziet organizācijas īpašniekam, administratoram vai norēķinu pārvaldniekam to pievienot no jauna.",
+      "reconnectAdminOnlyDescription": "Lūdziet organizācijas īpašniekam, administratoram vai norēķinu pārvaldniekam to pievienot no jauna.",
       "bitbucketNotConnectedTitle": "Bitbucket nav pievienots",
+      "bitbucketAdminOnlyDescription": "Lūdziet īpašniekam, administratoram vai norēķinu pārvaldniekam to pievienot.",
       "adminOnlyConnectDescription": "To var pievienot tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki.",
       "contextLine": "Priekš {{organization}}",
       "contextLinePersonal": "Priekš personīgā konta"
@@ -1237,6 +1252,9 @@
       "emptyTitle": "Vēl nav paziņojumu",
       "emptyCategoryTitle": "Šajā kategorijā nav paziņojumu",
       "emptyBody": "Paziņojumi, ko šis konts saņem, parādās šeit. Tie tiek glabāti {{days}} dienas.",
+      "emptyBody_zero": "Paziņojumi, ko šis konts saņem, parādās šeit. Tie tiek glabāti {{days}} dienas.",
+      "emptyBody_one": "Paziņojumi, ko šis konts saņem, parādās šeit. Tie tiek glabāti {{days}} dienas.",
+      "emptyBody_other": "Paziņojumi, ko šis konts saņem, parādās šeit. Tie tiek glabāti {{days}} dienas.",
       "capped": "Tiek rādīti jaunākie paziņojumi.",
       "loadError": "Neizdevās ielādēt paziņojumu vēsturi.",
       "openFailed": "Šis paziņojums vairs nekur neatveras."
@@ -1317,6 +1335,7 @@
       "manageAccess": "Pārvaldīt piekļuvi",
       "bitbucketNoRepositoriesDescription": "Šajā Bitbucket darbvietā nav pieejamu repozitoriju.",
       "gitlabNoRepositoriesDescription": "Iespējams, tev jāpiešķir piekļuve papildu grupām vai projektiem pakalpojumā GitLab.",
+      "githubNoRepositoriesDescription": "Pārbaudi Kilo GitHub lietotnes piekļuvi repozitorijiem, pēc tam atsvaidzini sarakstu.",
       "installGithubApp": "Instalē GitHub lietotni repozitorijos",
       "installGithubAppDescription": "Piešķir Kilo GitHub lietotnei piekļuvi repozitorijiem, kuru kodu vēlies pārskatīt.",
       "repositoryAccess": "piekļuve repozitorijiem",
@@ -1350,7 +1369,7 @@
       "findingsInProgress": "Šī pārskatīšana vēl notiek. Konstatējumi šeit parādīsies, kad tā tiks pabeigta.",
       "findingsEndedWithoutResults": "Šī pārskatīšana tika pārtraukta, pirms tika iegūti kādi konstatējumi.",
       "serviceUnavailable": "Neizdevās izveidot savienojumu ar koda pārskatīšanas pakalpojumu. Atkārtojiet koda pārskatīšanu, kad pakalpojums būs pieejams.",
-      "reviewFailed": "Koda pārskatīšana neizdevās. Lūdzu, mēģiniet vēlreiz.",
+      "reviewFailed": "Koda pārskatīšana neizdevās.",
       "showMore": "Rādīt vairāk",
       "created": "Izveidota",
       "started": "Sākta",
@@ -1472,6 +1491,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} Bitbucket savienojums tiek pārvaldīts tīmeklī no datora.",
+      "deniedManagedByOwner": "Lūdziet {{organization}} īpašniekam mainīt savienojumu, kuru nevarat mainīt.",
+      "deniedConnectRole": "To var pievienot tikai {{organization}} īpašnieki, administratori un norēķinu pārvaldnieki.",
+      "deniedReconnectRole": "Lūdziet {{organization}} īpašniekam, administratoram vai norēķinu pārvaldniekam to pievienot no jauna.",
       "managedOnWebTitle": "Pārvaldīts tīmeklī",
       "managedOnWebShort": "Šis savienojums tiek pārvaldīts tīmeklī no datora.",
       "managedOnWebRepositories": "Izvēlies repozitorijus priekš {{organization}} tīmeklī no datora.",
@@ -1611,7 +1633,9 @@
       "unavailablePersonallySwitchAction": "Pārslēgt organizāciju",
       "unavailableOrganizationTitle": "Padomes pārskatīšana šobrīd nav pieejama",
       "unavailableForOrganization": "Padomes pārskatīšanai ir nepieciešams Enterprise plāns ar aktīvu abonementu vai izmēģinājuma periodu. Šai organizācijai tas šobrīd nav pieejams.",
-      "unavailableForOrganizationNeutral": "Padomes pārskatīšana šai organizācijai šobrīd nav pieejama. Mēģiniet vēlreiz vēlāk.",
+      "unavailablePlanCheck": "Padomes pārskatīšana nevarēja pārbaudīt šīs organizācijas plānu. Mēģiniet vēlreiz, lai pārbaudītu vēlreiz.",
+      "unavailableFlagRollout": "Padomes pārskatīšana šai organizācijai vēl nav pieejama. Atjauniniet lietotni uz jaunāko versiju, lai to iegūtu.",
+      "unavailableForOrganizationMember": "Padomes pārskatīšanai ir nepieciešams Enterprise plāns ar aktīvu abonementu vai izmēģinājuma periodu. Organizācijas īpašnieks var mainīt plānu.",
       "unavailableOnBitbucket": "Padomes pārskatīšana nav pieejama Bitbucket repozitorijiem.",
       "noRepositories": "Vēl nav izvēlēts neviens repozitorijs. Vispirms izvēlies repozitorijus repozitoriju iestatījumos.",
       "specialists": "Speciālisti",
@@ -2609,8 +2633,7 @@
       "searchPlaceholder": "Meklēt repozitorijus",
       "noMatches": "Nav atbilstību",
       "noRepositories": "Nav pieejamu repozitoriju",
-      "noRepositoriesDescription": "Tavam kontam nav pievienotu repozitoriju.",
-      "loading": "Ielādē…",
+      "noRepositoriesDescription": "Lai ielādētu repozitorijus, pievieno GitHub vai GitLab kontu.",
       "accessibility": "Repozitorijs: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3519,7 +3542,7 @@
       "manageOnWeb": "Norēķinu iestatījumi tīmeklī",
       "changePlan": "Mainīt plānu",
       "buySeats": "Pirkt vietas",
-      "managedOnWeb": "Plāns, vietas un automātiskā papildināšana tiek pārvaldīti tīmeklī.",
+      "managedOnWeb": "Plāns, vietas un automātiskā papildināšana tiek pārvaldīti vietnē kilo.ai.",
       "setupAutoTopUp": "Iestatīt automātisko papildināšanu",
       "manageAutoTopUp": "Pārvaldi automātisko papildināšanu",
       "opensOnWeb": "Tiek atvērts tīmeklī"
@@ -3705,10 +3728,10 @@
       "nameLabel": "Režīma nosaukums",
       "nameRequired": "Ievadiet režīma nosaukumu.",
       "notFound": "Šis režīms vairs neeksistē.",
-      "restrictionHint": "Rediģēt var tikai failus, kas atbilst šim šablonam. Atstājiet tukšu, lai atļautu visus failus.",
-      "restrictionInvalid": "Ievadiet derīgu šablonu.",
+      "restrictionHint": "Regulārā izteiksme izvēlas failus, ko šis režīms drīkst rediģēt, piemēram, `\\.md$` tikai markdown failiem. Atstājiet to tukšu, lai atļautu visus failus.",
+      "restrictionInvalid": "Ievadiet derīgu regulāro izteiksmi.",
       "restrictionLabel": "Ierobežojuma apzīmējums",
-      "restrictionPattern": "Faila šablons",
+      "restrictionPattern": "Failu ierobežojums",
       "roleLabel": "Lomas definīcija",
       "roleRequired": "Aprakstiet, ko šis režīms dara.",
       "tool": {
@@ -4482,6 +4505,7 @@
       "promptPlaceholder": "Tu esi…",
       "tools": "Rīki",
       "wholeToolRule": "Šis aģents vienlaikus piemēro vienu noteikumu visiem rīkiem: {{rule}}. Šie slēdži ir tikai lasāmi.",
+      "toolRule": "Saglabātais noteikums: {{rule}}",
       "visibility": "Redzamība",
       "visibilityPrimary": "Primārais — parādīts atlasītājā",
       "visibilitySubagent": "Subaģents — izsaucams tikai no citiem",
@@ -4591,20 +4615,34 @@
       "deductionFallback": "Kredītu norakstīšana",
       "emptyDescription": "Šeit būs redzami kredītu pirkumi, kvītis un lietojums.",
       "emptyTitle": "Nav kredītu vēstures",
+      "expiredGrant": "Termiņš beidzies: {{description}}",
       "googlePlayReceipt": "Kvīts pakalpojumā Google Play",
       "kind": {
         "adjustment": "Korekcija",
         "balanceNeutral": "Neietekmē atlikumu",
         "deduction": "Norakstīšana",
         "grant": "Kredītu piešķīrums",
+        "promotionalCredits": "Promocijas kredīti",
         "welcomeCredits": "Sveiciena kredīti",
         "purchase": "Pirkums"
+      },
+      "program": {
+        "adminBulkGrant": "Administratora kredītu piešķīrums",
+        "contributorChampion": "Līdzstrādnieku čempiona kredīts",
+        "feedback": "Kredīts par atsauksmi",
+        "influencer": "Influenceru kredīts",
+        "ossMonthlyReset": "OSS sponsorēšanas ikmēneša atiestatīšana",
+        "ossSponsorship": "OSS sponsorēšanas kredīts",
+        "pullRequest": "Kredīts par izmaiņu pieprasījumu",
+        "usageIssue": "Kredīts par lietojuma problēmu",
+        "vibeDay": "Vibe dienas kredīts"
       },
       "purchaseFallback": "Kredītu pirkums",
       "receipt": "Kvīts",
       "receiptA11y": "Atvērt kvīti: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Šim pirkumam kvīts nav pieejama.",
-      "retentionLimit": "Tiek rādīta jaunākā kredītu vēsture."
+      "retentionLimit": "Tiek rādīta jaunākā kredītu vēsture.",
+      "voidedGrant": "Anulēts: {{description}}"
     },
     "title": "Pirkt kredītus",
     "description": "Kredīti ir vienreizējs pirkums, kas tiek pievienots tavam Kilo bilancei AI kodēšanas sesiju vadīšanai Kilo App. Veikals iekasē maksu no tava konta, un kredīti tiek pievienoti pēc tam, kad veikals apstiprina maksājumu.",
@@ -4948,6 +4986,9 @@
       "runAsCreator": "Palaist manā vārdā",
       "runAsCreatorDescription": "Katra palaišana izmanto jūsu kontu, tāpēc noslēpuma galvene ir obligāta.",
       "saveFailedTitle": "Neizdevās saglabāt trigeri",
+      "nameTaken": "Trigeris ar nosaukumu „{{name}}” jau pastāv.",
+      "saveFailedRetry": "Neizdevās sazināties ar serveri. Pārbaudiet savienojumu un mēģiniet vēlreiz.",
+      "saveFailedCheck": "Pārbaudiet veidlapas vērtības un mēģiniet vēlreiz.",
       "deleteTitle": "Dzēst šo trigeri?",
       "deleteMessage": "Izsaukumi uz {{name}} neizdosies. To nevar atsaukt.",
       "deleteMessageScheduled": "Trigera {{name}} ieplānotās palaišanas apstāsies. To nevar atsaukt.",
@@ -5192,6 +5233,20 @@
       "eu": "Eiropas Savienība",
       "au": "Austrālija",
       "jp": "Japāna"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Iestatījumu meklēšana",
+    "noMatches": "Nav atbilstošu iestatījumu",
+    "emptyDescription": "Mēģiniet citu iestatījuma nosaukumu vai atslēgvārdu.",
+    "resultsStatus": "Atrastie iestatījumi: {{resultCount}}",
+    "keywords": {
+      "signOut": "izrakstīties|iziet|beigt sesiju",
+      "appearance": "tēma|krāsu shēma",
+      "appUnlock": "biometrija|sejas atpazīšana|pirksta nospiedums",
+      "language": "valoda|tulkojums",
+      "notifications": "brīdinājumi|paziņojumi",
+      "privacy": "analītika|izsekošana"
     }
   }
 }

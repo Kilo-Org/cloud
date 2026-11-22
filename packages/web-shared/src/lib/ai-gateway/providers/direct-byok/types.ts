@@ -62,12 +62,21 @@ export type DirectByokAiSdkProviderChoice = {
   aiSdkProvider: DirectByokAiSdkProvider | undefined;
 };
 
+/**
+ * What a direct BYOK transform receives: the request context, plus the served model with the
+ * endpoint metadata its definition declares. The route that resolves the credential is the one
+ * place that knows the model, so it always passes it.
+ */
+export type DirectByokTransformRequestContext = TransformRequestContext & {
+  directByokModel: Readonly<Pick<DirectByokModel, 'id' | 'endpoint'>>;
+};
+
 type DirectByokProviderBase = {
   id: DirectByokProviderMetaId;
   /** models.dev provider key; omitted for providers models.dev does not list. */
   models_dev_id?: string;
   models: () => Promise<ReadonlyArray<DirectByokModel>>;
-  transformRequest(context: TransformRequestContext): void;
+  transformRequest(context: DirectByokTransformRequestContext): void;
   /**
    * Builds the upstream for a request from the stored credential. Most providers
    * use `apiKeyUpstream`; cloud providers can derive regions or signed requests.
@@ -157,9 +166,33 @@ export function apiKeyUpstream(upstream: {
   };
 }
 
-export function faviconIcon(siteUrl: string): DirectByokProviderListing['icon'] {
+/** The favicon a provider's own site serves, which the provider list shows next to its name. */
+function faviconIcon(siteUrl: string): DirectByokProviderListing['icon'] {
   return {
     url: `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${siteUrl}&size=256`,
+  };
+}
+
+/**
+ * The listing a direct BYOK provider publishes: the policy flags and links it states, with the one
+ * data policy every such listing shares supplied here.
+ */
+export function providerListing(listing: {
+  siteUrl: string;
+  training: boolean;
+  retainsPrompts: boolean;
+  termsOfServiceURL: string;
+  privacyPolicyURL: string;
+}): DirectByokProviderListing {
+  return {
+    dataPolicy: {
+      training: listing.training,
+      retainsPrompts: listing.retainsPrompts,
+      canPublish: false,
+      termsOfServiceURL: listing.termsOfServiceURL,
+      privacyPolicyURL: listing.privacyPolicyURL,
+    },
+    icon: faviconIcon(listing.siteUrl),
   };
 }
 

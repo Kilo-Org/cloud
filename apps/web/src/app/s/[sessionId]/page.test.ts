@@ -142,6 +142,61 @@ describe('SharedSessionPage', () => {
     expect(html).toContain('data-unavailable="true"');
   });
 
+  it('decodes a percent-encoded stored branch in the header', async () => {
+    const shareToken = 'encoded.branch.token';
+    mockFetchSharedSessionMetadata.mockResolvedValue({
+      title: 'Encoded branch',
+      ownerName: 'Ada Lovelace',
+      gitUrl: null,
+      gitBranch: 'fix/%E8%AB%8B%E6%B1%82%E6%9B%B8',
+      createdAt: null,
+    });
+    mockFetchSharedSessionSnapshot.mockResolvedValue({ info: { id: 'ses_3' }, messages: [] });
+
+    const html = renderToStaticMarkup(
+      await SharedSessionPage({ params: Promise.resolve({ sessionId: shareToken }) })
+    );
+
+    expect(html).toContain('fix/請求書');
+    expect(html).not.toContain('%E8%AB%8B');
+  });
+
+  it('paints a plain branch unchanged', async () => {
+    const shareToken = 'plain.branch.token';
+    mockFetchSharedSessionMetadata.mockResolvedValue({
+      title: 'Plain branch',
+      ownerName: 'Ada Lovelace',
+      gitUrl: null,
+      gitBranch: 'fix/plain-branch',
+      createdAt: null,
+    });
+    mockFetchSharedSessionSnapshot.mockResolvedValue({ info: { id: 'ses_4' }, messages: [] });
+
+    const html = renderToStaticMarkup(
+      await SharedSessionPage({ params: Promise.resolve({ sessionId: shareToken }) })
+    );
+
+    expect(html).toContain('fix/plain-branch');
+  });
+
+  it('paints a malformed branch verbatim without throwing', async () => {
+    const shareToken = 'malformed.branch.token';
+    mockFetchSharedSessionMetadata.mockResolvedValue({
+      title: 'Malformed branch',
+      ownerName: 'Ada Lovelace',
+      gitUrl: null,
+      gitBranch: 'fix/100%',
+      createdAt: null,
+    });
+    mockFetchSharedSessionSnapshot.mockResolvedValue({ info: { id: 'ses_5' }, messages: [] });
+
+    const html = renderToStaticMarkup(
+      await SharedSessionPage({ params: Promise.resolve({ sessionId: shareToken }) })
+    );
+
+    expect(html).toContain('fix/100%');
+  });
+
   it('uses not-found behavior when metadata cannot be resolved', async () => {
     const shareToken = 'rejected.share.token';
     mockFetchSharedSessionMetadata.mockResolvedValue(null);

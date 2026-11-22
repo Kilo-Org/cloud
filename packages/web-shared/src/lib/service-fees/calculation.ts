@@ -5,8 +5,11 @@ import {
   SERVICE_FEE_RATE_DENOMINATOR,
 } from '@kilocode/web-shared/lib/service-fees/constants';
 import type { CalculateCumulativeFeeRefundInput } from '@kilocode/web-shared/lib/service-fees/types';
+import {
+  ISO_CURRENCY_PATTERN,
+  assertNonNegativeSafeInteger,
+} from '@kilocode/web-shared/lib/service-fees/values';
 
-const ISO_CURRENCY_PATTERN = /^[a-z]{3}$/;
 const ROUND_HALF_UP_OFFSET = BigInt(SERVICE_FEE_RATE_DENOMINATOR / 2);
 const MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER);
 
@@ -127,13 +130,6 @@ function assertCurrency(currency: string, expectedCurrency: string): void {
   }
 }
 
-function assertNonNegativeSafeInteger(value: number, label: string): void {
-  assertSafeInteger(value, label);
-  if (value < 0) {
-    throw new Error(`${label} must be a non-negative safe integer`);
-  }
-}
-
 function assertSafeInteger(value: number, label: string): void {
   if (typeof value !== 'number' || !Number.isSafeInteger(value)) {
     throw new Error(`${label} must be a safe integer`);
@@ -141,7 +137,7 @@ function assertSafeInteger(value: number, label: string): void {
 }
 
 function bigintToSafeInteger(value: bigint, label: string): number {
-  if (value < BigInt(0) && value < -MAX_SAFE_INTEGER) {
+  if (value < -MAX_SAFE_INTEGER) {
     throw new Error(`${label} exceeds safe integer range`);
   }
   if (value > MAX_SAFE_INTEGER) {

@@ -2,19 +2,28 @@ import 'server-only';
 
 import { and, eq, isNull } from 'drizzle-orm';
 import { kilo_pass_pause_events } from '@kilocode/db/schema';
-import type { DrizzleTransaction, db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
-import { getPreviousIssueMonth } from '@kilocode/web-shared/lib/kilo-pass/issue-month';
+import type { DrizzleConnection } from '@kilocode/web-shared/lib/drizzle';
+import {
+  getPreviousIssueMonth,
+  parseIssueMonth,
+  shiftIssueMonth,
+} from '@kilocode/web-shared/lib/kilo-pass/issue-month';
 import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 
-type Db = typeof defaultDb;
-type DbOrTx = Db | DrizzleTransaction;
+/** The predicate that identifies the open pause event of one subscription. */
+function openPauseEventWhere(kiloPassSubscriptionId: string) {
+  return and(
+    eq(kilo_pass_pause_events.kilo_pass_subscription_id, kiloPassSubscriptionId),
+    isNull(kilo_pass_pause_events.resumed_at)
+  );
+}
 
 /**
  * Opens a pause event for a subscription. If an open event already exists,
  * updates resumes_at (idempotent). Otherwise inserts a new row.
  */
 export async function openPauseEvent(
-  dbOrTx: DbOrTx,
+  dbOrTx: DrizzleConnection,
   params: {
     kiloPassSubscriptionId: string;
     pausedAt: string;
@@ -26,24 +35,14 @@ export async function openPauseEvent(
   const existing = await dbOrTx
     .select({ id: kilo_pass_pause_events.id })
     .from(kilo_pass_pause_events)
-    .where(
-      and(
-        eq(kilo_pass_pause_events.kilo_pass_subscription_id, kiloPassSubscriptionId),
-        isNull(kilo_pass_pause_events.resumed_at)
-      )
-    )
+    .where(openPauseEventWhere(kiloPassSubscriptionId))
     .limit(1);
 
   if (existing.length > 0) {
     await dbOrTx
       .update(kilo_pass_pause_events)
       .set({ resumes_at: resumesAt })
-      .where(
-        and(
-          eq(kilo_pass_pause_events.kilo_pass_subscription_id, kiloPassSubscriptionId),
-          isNull(kilo_pass_pause_events.resumed_at)
-        )
-      );
+      .where(openPauseEventWhere(kiloPassSubscriptionId));
   } else {
     await dbOrTx.insert(kilo_pass_pause_events).values({
       kilo_pass_subscription_id: kiloPassSubscriptionId,
@@ -58,7 +57,7 @@ export async function openPauseEvent(
  * No-op if no open event exists (idempotent).
  */
 export async function closePauseEvent(
-  dbOrTx: DbOrTx,
+  dbOrTx: DrizzleConnection,
   params: {
     kiloPassSubscriptionId: string;
     resumedAt: string;
@@ -69,19 +68,14 @@ export async function closePauseEvent(
   await dbOrTx
     .update(kilo_pass_pause_events)
     .set({ resumed_at: resumedAt })
-    .where(
-      and(
-        eq(kilo_pass_pause_events.kilo_pass_subscription_id, kiloPassSubscriptionId),
-        isNull(kilo_pass_pause_events.resumed_at)
-      )
-    );
+    .where(openPauseEventWhere(kiloPassSubscriptionId));
 }
 
 /**
  * Returns the open pause event (where resumed_at IS NULL) or null.
  */
 export async function getOpenPauseEvent(
-  dbOrTx: DbOrTx,
+  dbOrTx: DrizzleConnection,
   params: {
     kiloPassSubscriptionId: string;
   }
@@ -89,12 +83,7 @@ export async function getOpenPauseEvent(
   const rows = await dbOrTx
     .select()
     .from(kilo_pass_pause_events)
-    .where(
-      and(
-        eq(kilo_pass_pause_events.kilo_pass_subscription_id, params.kiloPassSubscriptionId),
-        isNull(kilo_pass_pause_events.resumed_at)
-      )
-    )
+    .where(openPauseEventWhere(params.kiloPassSubscriptionId))
     .limit(1);
 
   return rows[0] ?? null;
@@ -110,7 +99,7 @@ export async function getOpenPauseEvent(
  * Walks backwards from fromIssueMonth for maxMonthsBack months.
  */
 export async function getPausedMonthSet(
-  dbOrTx: DbOrTx,
+  dbOrTx: DrizzleConnection,
   params: {
     kiloPassSubscriptionId: string;
     fromIssueMonth: string;
@@ -137,8 +126,8 @@ export async function getPausedMonthSet(
   // Walk backwards from fromIssueMonth for maxMonthsBack months
   let currentMonth = fromIssueMonth;
   for (let i = 0; i < maxMonthsBack; i++) {
-    const monthStart = dayjs(`${currentMonth}T00:00:00.000Z`).utc();
-    const nextMonthStart = monthStart.add(1, 'month');
+    const monthStart = parseIssueMonth(currentMonth);
+    const nextMonthStart = shiftIssueMonth(monthStart, 1);
 
     for (const event of pauseEvents) {
       const pausedAtMs = dayjs(event.paused_at).valueOf();

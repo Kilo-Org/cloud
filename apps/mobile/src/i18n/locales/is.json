@@ -309,6 +309,7 @@
     "hideBalance": "Fela inneign",
     "showBalance": "Sýna inneign",
     "balanceHidden": "Inneign falin",
+    "availableToSpendInOrganization": "Í boði til eyðslu í þessu fyrirtæki",
     "signOutTitle": "Skrá út?",
     "signOutMessage": "Þú þarft að skrá þig aftur inn til að fá aðgang að vinnusvæðinu þínu.",
     "deleteAccountTitle": "Eyða reikningi?",
@@ -526,7 +527,7 @@
       "triageActioned": "Tekin til greina",
       "triageRejected": "Ekki tekin til greina",
       "appealNone": "Engin send inn",
-      "appealSubmitted": "Í yfirferð",
+      "appealSubmitted": "Áfrýjun í yfirferð",
       "appealAccepted": "Samþykkt",
       "appealRejected": "Hafnað",
       "appeal": "Áfrýja þessari ákvörðun",
@@ -538,7 +539,17 @@
       "nextStepInReview": "Niðurstaðan birtist á þessum skjá og þú getur áfrýjað eftir ákvörðun.",
       "nextStepAppeal": "Niðurstaða áfrýjunarinnar birtist á þessum skjá.",
       "nextStepFinal": "Ákvörðun um áfrýjun er endanleg. Ekki er hægt að senda inn frekari áfrýjun.",
-      "viewReceipt": "Skoða kvittun"
+      "viewReceipt": "Skoða kvittun",
+      "targetLabel": "Tilkynnt atriði",
+      "reasonLabel": "Ástæða tilkynningar",
+      "targetMessage": "Svar gervigreindar",
+      "targetComment": "Athugasemd í sameiningarbeiðni",
+      "targetUser": "Notandi",
+      "reasonHarmful": "Skaðlegt efni",
+      "reasonIllegal": "Ólöglegt efni",
+      "reasonHarassment": "Áreitni",
+      "reasonSpam": "Ruslpóstur",
+      "reasonOther": "Önnur ástæða"
     },
     "reportReceipts": {
       "title": "Tilkynningar",
@@ -554,8 +565,11 @@
     "changelogFixesIn": "Lagfæringar og endurbætur á eftirfarandi sviðum: {{areas}}.",
     "changelogFixesPolish": "Lagfæringar og endurbætur í öllu forritinu.",
     "changelogAreas": {
-      "signIn": "Innskráning",
-      "profileOrganizations": "Prófíll & stofnanir"
+      "signIn": "innskráning",
+      "profileOrganizations": "prófíll & stofnanir",
+      "chat": "spjall",
+      "notifications": "tilkynningar",
+      "integrations": "samþættingar"
     }
   },
   "preferences": {
@@ -996,8 +1010,9 @@
       "checkActiveConnection": "Tengingin er virk, en samt er ekki hægt að hlaða þessu atriði.",
       "bitbucketOrgOnlyDescription": "Skiptu reikningnum hér að ofan yfir í stofnun til að yfirfara sameiningarbeiðnir hennar á Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Þessi reikningur er ekki með neinar stofnanir ennþá. Hægt er að yfirfara sameiningarbeiðnir á Bitbucket um leið og þú býrð til eða þiggur boð um aðild að stofnun.",
-      "gitlabReconnectAdminOnlyDescription": "Biddu eiganda, stjórnanda eða innheimtustjóra samtakanna um að tengja það aftur.",
+      "reconnectAdminOnlyDescription": "Biddu eiganda, stjórnanda eða innheimtustjóra samtakanna um að tengja það aftur.",
       "bitbucketNotConnectedTitle": "Bitbucket er ekki tengt",
+      "bitbucketAdminOnlyDescription": "Biddu eiganda, stjórnanda eða innheimtustjóra samtakanna um að tengja það.",
       "adminOnlyConnectDescription": "Aðeins eigendur fyrirtækisins, stjórnendur og innheimtustjórar geta tengt það.",
       "contextLine": "Fyrir {{organization}}",
       "contextLinePersonal": "Fyrir persónulegan reikning"
@@ -1210,6 +1225,8 @@
       "emptyTitle": "Engar tilkynningar ennþá",
       "emptyCategoryTitle": "Engar tilkynningar í þessum flokki",
       "emptyBody": "Tilkynningar sem þessi reikningur fær birtast hér. Þær eru geymdar í {{days}} daga.",
+      "emptyBody_one": "Tilkynningar sem þessi reikningur fær birtast hér. Þær eru geymdar í {{days}} daga.",
+      "emptyBody_other": "Tilkynningar sem þessi reikningur fær birtast hér. Þær eru geymdar í {{days}} daga.",
       "capped": "Nýjustu tilkynningarnar eru sýndar.",
       "loadError": "Ekki tókst að hlaða tilkynningasögu.",
       "openFailed": "Þessi tilkynning opnast hvergi lengur."
@@ -1290,6 +1307,7 @@
       "manageAccess": "Stjórna aðgangi",
       "bitbucketNoRepositoriesDescription": "Engar geymslur eru tiltækar á þessu Bitbucket-vinnusvæði.",
       "gitlabNoRepositoriesDescription": "Þú gætir þurft að veita aðgang að fleiri hópum eða verkefnum á GitLab.",
+      "githubNoRepositoriesDescription": "Athugaðu aðgang GitHub-forritsins frá Kilo að kóðasöfnum og endurnýjaðu svo.",
       "installGithubApp": "Settu upp GitHub-forritið á geymslum",
       "installGithubAppDescription": "Veittu GitHub-forriti Kilo aðgang að geymslunum sem þú vilt láta yfirfara.",
       "repositoryAccess": "aðgang að geymslum",
@@ -1323,7 +1341,7 @@
       "findingsInProgress": "Þessi yfirferð er enn í gangi. Frávik birtast hér þegar henni er lokið.",
       "findingsEndedWithoutResults": "Þessari yfirferð lauk áður en nein frávik komu fram.",
       "serviceUnavailable": "Ekki náðist samband við kóðayfirferðarþjónustuna. Reyndu yfirferðina aftur þegar þjónustan er tiltæk.",
-      "reviewFailed": "Yfirferðin mistókst. Vinsamlegast reyndu aftur.",
+      "reviewFailed": "Yfirferðin mistókst.",
       "showMore": "Sýna meira",
       "created": "Búin til",
       "started": "Hófst",
@@ -1445,6 +1463,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket-tengingu við {{organization}} er stjórnað á vefnum í tölvu.",
+      "deniedManagedByOwner": "Biddu eiganda {{organization}} um að breyta tengingu sem þú getur ekki breytt.",
+      "deniedConnectRole": "Aðeins eigendur {{organization}}, stjórnendur og innheimtustjórar geta tengt það.",
+      "deniedReconnectRole": "Biddu eiganda, stjórnanda eða innheimtustjóra {{organization}} um að tengja það aftur.",
       "managedOnWebTitle": "Stjórnað á vefnum",
       "managedOnWebShort": "Þessari tengingu er stjórnað á vefnum í tölvu.",
       "managedOnWebRepositories": "Veldu geymslur fyrir {{organization}} á vefnum í tölvu.",
@@ -1582,7 +1603,9 @@
       "unavailablePersonallySwitchAction": "Skipta um stofnun",
       "unavailableOrganizationTitle": "Ráðsyfirferð er ekki í boði eins og er",
       "unavailableForOrganization": "Ráðsyfirferð þarf Enterprise-áætlun með virkri áskrift eða virku próftímabili. Þetta félag hefur hana ekki núna.",
-      "unavailableForOrganizationNeutral": "Ráðsyfirferð er ekki í boði fyrir þetta félag eins og er. Reyndu aftur síðar.",
+      "unavailablePlanCheck": "Ráðsyfirferð gat ekki athugað áætlun þessa félags. Reyndu aftur til að athuga aftur.",
+      "unavailableFlagRollout": "Ráðsyfirferð er ekki í boði fyrir þetta félag ennþá. Uppfærðu appið í nýjustu útgáfu til að fá hana.",
+      "unavailableForOrganizationMember": "Ráðsyfirferð þarf Enterprise-áætlun með virkri áskrift eða próftímabili. Eigandi félagsins getur breytt áætluninni.",
       "unavailableOnBitbucket": "Ráðsyfirferð er ekki í boði fyrir Bitbucket-geymslur.",
       "noRepositories": "Engar geymslur valdar ennþá. Veldu geymslur í stillingum geymslna fyrst.",
       "specialists": "Sérfræðingar",
@@ -2557,8 +2580,7 @@
       "searchPlaceholder": "Leita að kóðasöfnum",
       "noMatches": "Engar samsvaranir",
       "noRepositories": "Engin kóðasöfn tiltæk",
-      "noRepositoriesDescription": "Engin kóðasöfn eru tengd við reikninginn þinn.",
-      "loading": "Hleður…",
+      "noRepositoriesDescription": "Tengdu GitHub eða GitLab til að hlaða kóðasöfnum.",
       "accessibility": "Kóðasafn: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3457,7 +3479,7 @@
       "manageOnWeb": "Greiðslustillingar á vefnum",
       "changePlan": "Breyta áætlun",
       "buySeats": "Kaupa notendasæti",
-      "managedOnWeb": "Áætluninni, notendasætum og sjálfvirkri áfyllingu er stjórnað á vefnum.",
+      "managedOnWeb": "Áætluninni, notendasætum og sjálfvirkri áfyllingu er stjórnað á kilo.ai.",
       "setupAutoTopUp": "Setja upp sjálfvirka áfyllingu",
       "manageAutoTopUp": "Stjórna sjálfvirkri áfyllingu",
       "opensOnWeb": "Opnast á vefnum"
@@ -3643,10 +3665,10 @@
       "nameLabel": "Heiti hams",
       "nameRequired": "Sláðu inn heiti hams.",
       "notFound": "Þessi hamur er ekki lengur til.",
-      "restrictionHint": "Aðeins er hægt að breyta skrám sem passa við þetta mynstur. Skildu það eftir autt til að leyfa allar skrár.",
-      "restrictionInvalid": "Sláðu inn gilt mynstur.",
+      "restrictionHint": "Regluleg segð velur hvaða skrár þessi hamur má breyta, til dæmis `\\.md$` fyrir aðeins markdown-skrár. Skildu það eftir autt til að leyfa allar skrár.",
+      "restrictionInvalid": "Sláðu inn gilda reglulega segð.",
       "restrictionLabel": "Merki takmörkunar",
-      "restrictionPattern": "Skráamynstur",
+      "restrictionPattern": "Skráartakmörkun",
       "roleLabel": "Skilgreining hlutverks",
       "roleRequired": "Lýstu því hvað þessi hamur gerir.",
       "tool": {
@@ -4403,6 +4425,7 @@
       "promptPlaceholder": "Þú ert a…",
       "tools": "Verkfæri",
       "wholeToolRule": "Þessi agent beitir einni reglu á öll verkfæri í einu: {{rule}}. Þessir rofar eru skrifvarðir.",
+      "toolRule": "Geymd regla: {{rule}}",
       "visibility": "Skyggni",
       "visibilityPrimary": "Aðal — sýnt í veljarann",
       "visibilitySubagent": "Subagent — aðeins hægt að hringja frá öðrum",
@@ -4512,20 +4535,34 @@
       "deductionFallback": "Frádráttur inneignar",
       "emptyDescription": "Kaup á inneign, kvittanir og notkun birtast hér.",
       "emptyTitle": "Enginn inneignarferill",
+      "expiredGrant": "Útrunnið: {{description}}",
       "googlePlayReceipt": "Kvittun frá Google Play",
       "kind": {
         "adjustment": "Leiðrétting",
         "balanceNeutral": "Hefur ekki áhrif á stöðu",
         "deduction": "Frádráttur",
         "grant": "Úthlutuð inneign",
+        "promotionalCredits": "Kynningarinnieign",
         "welcomeCredits": "Velkomuinneign",
         "purchase": "Kaup"
+      },
+      "program": {
+        "adminBulkGrant": "Inneignarúthlutun stjórnanda",
+        "contributorChampion": "Inneign framlagsmeistara",
+        "feedback": "Inneign fyrir ábendingar",
+        "influencer": "Inneign áhrifavalds",
+        "ossMonthlyReset": "Mánaðarleg endurstilling OSS-inneignar",
+        "ossSponsorship": "Inneign OSS-styrks",
+        "pullRequest": "Inneign samrunabeiðni",
+        "usageIssue": "Inneign vegna notkunarvandamáls",
+        "vibeDay": "Vibe day inneign"
       },
       "purchaseFallback": "Kaup á inneign",
       "receipt": "Kvittun",
       "receiptA11y": "Opna kvittun fyrir {{description}}, {{amount}}, frá {{date}}",
       "receiptUnavailable": "Engin kvittun er tiltæk fyrir þessi kaup.",
-      "retentionLimit": "Nýjasti inneignarferillinn er sýndur."
+      "retentionLimit": "Nýjasti inneignarferillinn er sýndur.",
+      "voidedGrant": "Ógilt: {{description}}"
     },
     "title": "Kaupa inneign",
     "description": "Inneign er einstakt kaup sem bætist við Kilo-stöðuna þína til að keyra AI-forritunarlotur í Kilo App. Verslunin rukkar reikninginn þinn og inneign bætist við eftir að verslunin staðfestir greiðsluna.",
@@ -4861,6 +4898,9 @@
       "runAsCreator": "Keyra sem ég",
       "runAsCreatorDescription": "Sérhver keyrsla notar reikninginn þinn, svo leyndarhausinn er nauðsynlegur.",
       "saveFailedTitle": "Gat ekki vistað kveikjuna",
+      "nameTaken": "Kveikja sem heitir „{{name}}“ er þegar til.",
+      "saveFailedRetry": "Náði ekki sambandi við þjóninn. Athugaðu nettenginguna og reyndu aftur.",
+      "saveFailedCheck": "Athugaðu gildin í forminu og reyndu aftur.",
       "deleteTitle": "Eyða þessari kveikju?",
       "deleteMessage": "Köll til {{name}} munu mistakast. Þetta er ekki hægt að afturkalla.",
       "deleteMessageScheduled": "Áætlaðar keyrslur kveikjunnar {{name}} stöðvast. Þetta er ekki hægt að afturkalla.",
@@ -5105,6 +5145,20 @@
       "eu": "Evrópusambandið",
       "au": "Ástralía",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Leita að kjörstillingum",
+    "noMatches": "Engar kjörstillingar fundust",
+    "emptyDescription": "Prófaðu annað heiti eða leitarorð.",
+    "resultsStatus": "Kjörstillingar sem fundust: {{resultCount}}",
+    "keywords": {
+      "signOut": "skrá út|útskráning",
+      "appearance": "þema|litasamsetning",
+      "appUnlock": "lífkenni|andlitsgreining|fingrafar",
+      "language": "tungumál|þýðing",
+      "notifications": "viðvaranir|tilkynningar|ýtitilkynningar",
+      "privacy": "notkunargreining|rakning"
     }
   }
 }

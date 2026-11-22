@@ -7,14 +7,18 @@ import { EmptyState, StateAction } from '@/components/empty-state';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { Plus, SlidersHorizontal } from '@/components/ui/icons';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
 import { QueryError } from '@/components/query-error';
 import { SheetHeader } from '@/components/sheet-header';
 import { type AgentProfileListItem } from '@/lib/hooks/use-agent-profiles';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 
 type ProfilePickerSheetProps = Readonly<{
   profiles: readonly AgentProfileListItem[];
   isLoading: boolean;
   isError: boolean;
+  /** The failed read's error, classified by the shared selector. */
+  error: unknown;
   isRefetching: boolean;
   selectedProfileId: string;
   /** The empty state's explanation, worded for the context the list reads. */
@@ -40,6 +44,7 @@ export function ProfilePickerSheet({
   profiles,
   isLoading,
   isError,
+  error,
   isRefetching,
   selectedProfileId,
   emptyDescription,
@@ -50,6 +55,8 @@ export function ProfilePickerSheet({
 }: Readonly<ProfilePickerSheetProps>) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const connectivity = useCommittedConnectivityStatus();
+  const readError = selectProfileReadErrorView({ error, connectivity });
 
   let body = null;
   if (isLoading) {
@@ -57,11 +64,12 @@ export function ProfilePickerSheet({
   } else if (isError) {
     body = (
       <QueryError
-        variant="server"
+        variant={readError.variant}
         placement="top"
         inset="gutter"
-        title={t('profiles.loadFailed')}
-        onRetry={onRetry}
+        title={readError.titleKey ? t(readError.titleKey) : undefined}
+        message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
+        onRetry={readError.showRetry ? onRetry : undefined}
         isRetrying={isRefetching}
       />
     );

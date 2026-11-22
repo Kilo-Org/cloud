@@ -108,15 +108,25 @@ export function getCreditBlocks(
       const source = tx.original_transaction_id
         ? transactionById.get(tx.original_transaction_id)
         : undefined;
+      // The row's own category decides: only a closed grant expires or is
+      // voided, and every other deduction is neither.
+      const expiry: 'expired' | 'voided' | null =
+        tx.credit_category === 'credits_expired' || tx.credit_category === 'orb_credit_expired'
+          ? 'expired'
+          : tx.credit_category === 'orb_credit_voided'
+            ? 'voided'
+            : null;
       // Not every expiring source is a purchase: promotional, referral, Pass,
       // and admin credits are grants the user did not pay for directly. The
-      // pair needs the grant's own free flag and recorded source to label it.
+      // pair needs the grant's own free flag and recorded source to label it,
+      // and its reason so the client can title the grant in its own language.
       return {
         id: tx.id,
         date: tx.created_at,
         description: tx.description ?? tx.credit_category ?? 'Credit deduction',
         credit_category: tx.credit_category,
         amount_mUsd: tx.amount_microdollars, // negative
+        expiry,
         purchase:
           source && source.amount_microdollars > 0
             ? {
@@ -126,6 +136,7 @@ export function getCreditBlocks(
                 amount_mUsd: source.amount_microdollars,
                 is_free: source.is_free,
                 credit_source: source.credit_source ?? null,
+                kind: creditGrantReasonOf(source.credit_category ?? null),
               }
             : null,
       };
@@ -143,7 +154,16 @@ export const CreditGrantReasonSchema = z.enum([
   'referral',
   'welcome',
   'kilo_pass',
-  'grant',
+  'promotional',
+  'influencer',
+  'usage_issue',
+  'pull_request',
+  'vibe_day',
+  'feedback',
+  'admin_bulk_grant',
+  'oss_sponsorship',
+  'oss_monthly_reset',
+  'contributor_champion',
   'adjustment',
 ]);
 export type CreditGrantReason = z.infer<typeof CreditGrantReasonSchema>;
@@ -166,6 +186,22 @@ const INTERNAL_CREDIT_CATEGORIES: Readonly<Record<string, true>> = {
   organization_custom: true,
 };
 
+/**
+ * Standing programs write their own category, and each names how the member
+ * earned the grant, so it never reads as a plain promotion.
+ */
+const STANDING_PROGRAM_CREDIT_REASONS: Readonly<Record<string, CreditGrantReason>> = {
+  influencer: 'influencer',
+  usage_issue: 'usage_issue',
+  pull_request: 'pull_request',
+  vibeday: 'vibe_day',
+  feedback: 'feedback',
+  'admin-bulk-grant': 'admin_bulk_grant',
+  'oss-sponsorship': 'oss_sponsorship',
+  'oss-monthly-reset': 'oss_monthly_reset',
+  'contributor-champion-credits': 'contributor_champion',
+};
+
 /** The welcome grants, including the validation grants they replaced. */
 const WELCOME_CREDIT_CATEGORIES: Readonly<Record<string, true>> = {
   'automatic-welcome-credits': true,
@@ -181,8 +217,9 @@ const WELCOME_CREDIT_CATEGORIES: Readonly<Record<string, true>> = {
  *
  * Fails closed: a category nobody has classified prints as an adjustment
  * rather than as credit the member received, so a new reconciliation or
- * migration writer cannot inflate the apparent free credit. A category the
- * promo registry defines, or an admin-created campaign, prints as a grant.
+ * migration writer cannot inflate the apparent free credit. A standing
+ * program names how the grant was earned; a category the promo registry
+ * defines, or an admin-created campaign, prints as a promotion.
  */
 export function creditGrantReasonOf(creditCategory: string | null): CreditGrantReason {
   // `referral` is the admin Referral/Review grant; the two self-service bonuses
@@ -196,11 +233,14 @@ export function creditGrantReasonOf(creditCategory: string | null): CreditGrantR
   if (creditCategory === 'kilo-pass-bonus') {
     return 'kilo_pass';
   }
+  if (creditCategory != null && Object.hasOwn(STANDING_PROGRAM_CREDIT_REASONS, creditCategory)) {
+    return STANDING_PROGRAM_CREDIT_REASONS[creditCategory];
+  }
   if (creditCategory != null && !Object.hasOwn(INTERNAL_CREDIT_CATEGORIES, creditCategory)) {
     // An admin-managed campaign writes its own category, which is built from
     // its slug at grant time and so is never in the registry.
     if (creditCategory.startsWith(CREDIT_CAMPAIGN_CATEGORY_PREFIX)) {
-      return 'grant';
+      return 'promotional';
     }
     // Self-service promo codes are stored encrypted and decrypted at runtime,
     // so the registry is the only place that knows them. `obsolete` still marks
@@ -208,7 +248,7 @@ export function creditGrantReasonOf(creditCategory: string | null): CreditGrantR
     // disqualify one; only a category written as a debit does.
     const promo = promoCreditCategoriesByKey.get(creditCategory);
     if (promo != null && !promo.expect_negative_amount) {
-      return 'grant';
+      return 'promotional';
     }
   }
   return 'adjustment';

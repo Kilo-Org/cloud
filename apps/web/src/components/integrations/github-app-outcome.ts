@@ -35,6 +35,10 @@ export function buildAppReturnHref(
 export const INSTALLATION_UNAVAILABLE_MESSAGE =
   'This GitHub App installation is suspended or no longer available. Restore or reinstall it in GitHub, then start again.';
 
+/** Shown when a GitHub installation listing is larger than one connect attempt reads. */
+export const INSTALLATION_LISTING_TOO_LARGE_MESSAGE =
+  "Kilo could not check this GitHub account's installations because there are too many. Remove the Kilo App installations you no longer need in GitHub, then try again.";
+
 export type AppReturnOutcomeView = {
   kind: 'installed' | 'pending' | 'blocked' | 'retryable';
   title: string;
@@ -118,7 +122,9 @@ export function buildAppReturnOutcomeView(input: {
                     ? INSTALLATION_UNAVAILABLE_MESSAGE
                     : input.error === 'install_state_user_mismatch'
                       ? 'This connection was started from the Kilo App signed in as a different account. Sign in to the web with that account, or start again from the app.'
-                      : 'The installation did not complete. Try again or return to the Kilo App.';
+                      : input.error === 'installation_listing_too_large'
+                        ? INSTALLATION_LISTING_TOO_LARGE_MESSAGE
+                        : 'The installation did not complete. Try again or return to the Kilo App.';
   const cta = isSuccess ? 'Continue' : isPending ? 'Done' : isNonRetryable ? 'Back' : 'Try again';
 
   return {

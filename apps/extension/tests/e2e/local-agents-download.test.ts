@@ -3,10 +3,12 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { z } from 'zod';
 import { hashBrowserToolArguments } from '../../src/shared/browser-agent-checks';
+import { LOCAL_AGENT_ERROR_CODES } from '../../src/shared/local-agents/jsonrpc';
 import {
   DOWNLOAD_BODY,
   DOWNLOAD_FILENAME,
   DOWNLOAD_PATH,
+  ONCE_DOWNLOAD_PATH,
   SECOND_DOWNLOAD_FILENAME,
   startDownloadFixture,
   TWO_DOWNLOADS_PAGE_PATH,
@@ -619,6 +621,101 @@ test('a first browser_tabs new to an attachment asks first, and its approved rep
   } finally {
     await launch.close();
     await hub.close();
+    await fixture.close();
+  }
+});
+
+test('an approved repeat of a browser_tabs new download reports where its navigation settled', async () => {
+  test.setTimeout(120_000);
+  const fixture = await startDownloadFixture();
+  // A second loopback server is where the repeat's request redirects: it is not named in the grants.
+  const landing = await startFakeHub();
+  const hub = await startFakeHub();
+  const launch = await launchRealDownloadBrowser();
+  const { context, downloadsPath, extensionId } = launch;
+  await mockKiloApi(context, {});
+  await context.addInitScript({
+    content:
+      "Object.defineProperty(chrome.permissions, 'request', { value: () => Promise.resolve(true) });",
+  });
+
+  try {
+    const sidePanel = await context.newPage();
+    const agentPage = await context.newPage();
+
+    await agentPage.goto(`${fixture.url}/page`);
+
+    const grants = grant(fixture.url);
+    const session = await openPairedAgentSession({
+      beforeShare: async () => {
+        await activateTab(sidePanel, `${fixture.url}/page`);
+      },
+      context,
+      extensionId,
+      hub,
+      sidePanel,
+      title: 'Tabs-new repeat download E2E session',
+    });
+
+    await session.callTool('browser_navigate', { url: `${fixture.url}/page` }, grants);
+
+    const landingOrigin = `http://127.0.0.1:${String(landing.port)}`;
+    // The same `browser_tabs` call, twice: the route serves the attachment to the first request and redirects every
+    // Later one to the landing server, so the repeat loads a page and the tab settles on the landing origin.
+    const url = `${fixture.url}${ONCE_DOWNLOAD_PATH}?next=${encodeURIComponent(landing.pageUrl)}`;
+    const params = { action: 'new', url };
+    const call = (id: number, sensitive?: readonly string[]) =>
+      sendAgentRpc(hub, session.controllerId, id, 'tools.call', {
+        arguments: params,
+        authorized: grants,
+        name: 'browser_tabs',
+        ...(sensitive === undefined ? {} : { sensitive }),
+        sessionHandle: session.sessionHandle,
+      });
+
+    // 1. Guarded: the first request is an attachment, its download is refused, and its step token is issued.
+    const guarded = await call(900);
+
+    const guardedError = z
+      .object({ code: z.number(), data: z.record(z.string(), z.unknown()), message: z.string() })
+      .parse(guarded.error);
+
+    expect(guardedError.code).toBe(LOCAL_AGENT_ERROR_CODES.needsPermission);
+    expect(guardedError.data['afterAction']).toBe(true);
+    expect(guardedError.data['step']).toStrictEqual({
+      argumentsHash: hashBrowserToolArguments(params),
+      tool: 'browser_tabs',
+    });
+    expect(z.array(permissionItemSchema).parse(guardedError.data['items'])).toStrictEqual([
+      { class: 'sensitive', origin: fixture.url, reason: 'downloading a file' },
+    ]);
+    await expectNothingSaved(downloadsPath);
+
+    const token = z.string().parse(guardedError.data['stepToken']);
+    // The refused call opened the tab its repeat runs on, so a second tab would be a second download.
+    const tabsAfterGuard = await openTabIds(sidePanel);
+
+    // 2. The human approved: the identical call with the token requests the route again, which answers a redirect.
+    const approved = await call(901, [token]);
+
+    const changed = z
+      .object({ code: z.number(), data: z.record(z.string(), z.unknown()) })
+      .parse(approved.error);
+
+    // The tab settled on the landing origin, so the answer names both origins the navigation involved.
+    expect([changed.code, changed.data]).toStrictEqual([
+      LOCAL_AGENT_ERROR_CODES.originChanged,
+      { from: fixture.url, to: landingOrigin },
+    ]);
+
+    // The repeat reached the route and got the redirect, kept no file, and opened no second tab.
+    expect(fixture.onceHits()).toBe(2);
+    await expectNothingSaved(downloadsPath);
+    expect(await openTabIds(sidePanel)).toStrictEqual(tabsAfterGuard);
+  } finally {
+    await launch.close();
+    await hub.close();
+    await landing.close();
     await fixture.close();
   }
 });

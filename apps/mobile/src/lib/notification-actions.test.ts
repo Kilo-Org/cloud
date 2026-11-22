@@ -31,6 +31,7 @@ const mocks = vi.hoisted(() => ({
   setNotificationCategoryAsync: vi.fn(),
   scheduleNotificationAsync: vi.fn(),
   dismissNotificationAsync: vi.fn(),
+  getPresentedNotificationsAsync: vi.fn(),
   clearLastNotificationResponse: vi.fn(),
   runNeedsInputInteraction: vi.fn(),
   refreshGlanceableSurfacesFromTray: vi.fn(),
@@ -41,6 +42,7 @@ vi.mock('expo-notifications', () => ({
   setNotificationCategoryAsync: mocks.setNotificationCategoryAsync,
   scheduleNotificationAsync: mocks.scheduleNotificationAsync,
   dismissNotificationAsync: mocks.dismissNotificationAsync,
+  getPresentedNotificationsAsync: mocks.getPresentedNotificationsAsync,
   clearLastNotificationResponse: mocks.clearLastNotificationResponse,
 }));
 
@@ -124,6 +126,9 @@ beforeEach(() => {
   mocks.setNotificationCategoryAsync.mockReset().mockResolvedValue(undefined);
   mocks.scheduleNotificationAsync.mockReset().mockResolvedValue(undefined);
   mocks.dismissNotificationAsync.mockReset().mockResolvedValue(undefined);
+  // The default models a tray with nothing presented; a suite that expects the
+  // OS to still show the acted-on notification sets its own list.
+  mocks.getPresentedNotificationsAsync.mockReset().mockResolvedValue([]);
   mocks.clearLastNotificationResponse.mockReset();
   mocks.runNeedsInputInteraction.mockReset();
   mocks.refreshGlanceableSurfacesFromTray.mockReset().mockResolvedValue(undefined);
@@ -443,6 +448,165 @@ describe('handleNeedsInputNotificationResponse — approve and reply', () => {
       expect.objectContaining({ identifier: 'needs-input:ses_1' })
     );
     expect(mocks.dismissNotificationAsync).toHaveBeenCalledWith('fcm-remote-1');
+  });
+
+  it('keeps the acted-on raise when an Approve result cannot be published', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('retryable');
+    mocks.scheduleNotificationAsync.mockRejectedValue(new Error('native scheduler unavailable'));
+
+    const handled = await handleNeedsInputNotificationResponse(
+      raiseResponse({ identifier: 'fcm-remote-1' }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    expect(handled).toBe(true);
+    // Approve targets the session identifier, so the only other name the
+    // replacement carries is the push the user just tapped: the new rule leaves
+    // both alone, and the raise stays the sole carrier of the outcome and its
+    // retry actions.
+    expect(mocks.dismissNotificationAsync).not.toHaveBeenCalled();
+    expect(mocks.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({ 'error.operation': 'needs_input_action_publish' }),
+      })
+    );
+  });
+
+  it('dismisses only the session raise when an inline reply result cannot be published', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('retryable');
+    mocks.scheduleNotificationAsync.mockRejectedValue(new Error('native scheduler unavailable'));
+    // Android keeps the replied notification on screen, so the push is the retry carrier.
+    mocks.getPresentedNotificationsAsync.mockResolvedValue([
+      { request: { identifier: 'fcm-remote-1' } },
+    ]);
+
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        identifier: 'fcm-remote-1',
+        actionIdentifier: NEEDS_INPUT_ACTION_IDS.reply,
+        userText: 'ship it',
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    // The result would have replaced the app-owned session raise under the
+    // push's identifier; with no result posted, the session notification is the
+    // duplicate that goes, while the replied push survives as the retry
+    // carrier the user acts on again.
+    expect(mocks.dismissNotificationAsync.mock.calls).toEqual([['needs-input:ses_1']]);
+    expect(mocks.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({ 'error.operation': 'needs_input_action_publish' }),
+      })
+    );
+  });
+
+  it('does not record a reply result for an inline reply whose post failed', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+    mocks.scheduleNotificationAsync.mockRejectedValue(new Error('native scheduler unavailable'));
+    // Android keeps the replied notification on screen, so the push is the retry carrier.
+    mocks.getPresentedNotificationsAsync.mockResolvedValue([
+      { request: { identifier: 'fcm-remote-1' } },
+    ]);
+    const report = vi.fn<(error: unknown) => void>();
+
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        identifier: 'fcm-remote-1',
+        actionIdentifier: NEEDS_INPUT_ACTION_IDS.reply,
+        userText: 'ship it',
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    expect(mocks.dismissNotificationAsync.mock.calls).toEqual([['needs-input:ses_1']]);
+    expect(mocks.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({ 'error.operation': 'needs_input_action_publish' }),
+      })
+    );
+    // The reply-result record drives the session plan's retirement, and it
+    // describes a result that exists: a failed post must not leave the plan
+    // dismissing the push the user retries on.
+    await retireNeedsInputReplyResult('ses_1', report);
+    expect(mocks.dismissNotificationAsync.mock.calls).toEqual([['needs-input:ses_1']]);
+    expect(report).not.toHaveBeenCalled();
+  });
+
+  it('keeps the session raise when the replied push is already gone, as iOS removes it', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('retryable');
+    mocks.scheduleNotificationAsync.mockRejectedValue(new Error('native scheduler unavailable'));
+    // iOS removes a replied notification itself, so the session raise is all that is left.
+    mocks.getPresentedNotificationsAsync.mockResolvedValue([]);
+
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        identifier: 'fcm-remote-1',
+        actionIdentifier: NEEDS_INPUT_ACTION_IDS.reply,
+        userText: 'ship it',
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    // Dismissing the session raise here would empty the tray with no result and
+    // no retry carrier to show for the failed post.
+    expect(mocks.dismissNotificationAsync).not.toHaveBeenCalled();
+    expect(mocks.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({ 'error.operation': 'needs_input_action_publish' }),
+      })
+    );
+  });
+
+  it('keeps the session raise when the presented list cannot be read', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('retryable');
+    mocks.scheduleNotificationAsync.mockRejectedValue(new Error('native scheduler unavailable'));
+    mocks.getPresentedNotificationsAsync.mockRejectedValue(new Error('tray unavailable'));
+
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        identifier: 'fcm-remote-1',
+        actionIdentifier: NEEDS_INPUT_ACTION_IDS.reply,
+        userText: 'ship it',
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    // The tray confirms nothing, so both notifications stay: one duplicate beats
+    // clearing the only carrier left.
+    expect(mocks.dismissNotificationAsync).not.toHaveBeenCalled();
+    expect(mocks.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({ 'error.operation': 'needs_input_action_publish' }),
+      })
+    );
+  });
+
+  it('keeps the acted-on raise but still republishes when an answered raise fails to publish', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+    mocks.scheduleNotificationAsync.mockRejectedValue(new Error('native scheduler unavailable'));
+    const refreshGlanceableSurfaces = vi.fn().mockResolvedValue(undefined);
+
+    await handleNeedsInputNotificationResponse(raiseResponse({ identifier: 'fcm-remote-1' }), {
+      runInteraction: mocks.runNeedsInputInteraction,
+      refreshGlanceableSurfaces,
+    });
+
+    // The post never landed, so the acted-on push is the only thing on screen.
+    expect(mocks.dismissNotificationAsync).not.toHaveBeenCalled();
+    // The raise was still answered, so the surfaces that count tray rows catch up.
+    expect(refreshGlanceableSurfaces).toHaveBeenCalledTimes(1);
+    expect(mocks.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({ 'error.operation': 'needs_input_action_publish' }),
+      })
+    );
   });
 
   it('replaces an inline reply in place, because Android keeps it for the reply', async () => {

@@ -309,6 +309,7 @@
     "hideBalance": "隱藏餘額",
     "showBalance": "顯示餘額",
     "balanceHidden": "餘額已隱藏",
+    "availableToSpendInOrganization": "可於此組織內花費",
     "signOutTitle": "登出？",
     "signOutMessage": "登出後，你需要重新登入才能存取工作區。",
     "deleteAccountTitle": "刪除帳戶？",
@@ -526,7 +527,7 @@
       "triageActioned": "成立",
       "triageRejected": "不成立",
       "appealNone": "未提交",
-      "appealSubmitted": "審查中",
+      "appealSubmitted": "申訴審查中",
       "appealAccepted": "已接受",
       "appealRejected": "已駁回",
       "appeal": "對此決定提出申訴",
@@ -538,7 +539,17 @@
       "nextStepInReview": "結果會顯示於此畫面，決定後即可提出申訴。",
       "nextStepAppeal": "申訴結果會顯示於此畫面。",
       "nextStepFinal": "申訴決定為最終決定，無法再次申訴。",
-      "viewReceipt": "檢視回執"
+      "viewReceipt": "檢視回執",
+      "targetLabel": "檢舉項目",
+      "reasonLabel": "檢舉原因",
+      "targetMessage": "AI 回覆",
+      "targetComment": "提取請求留言",
+      "targetUser": "使用者",
+      "reasonHarmful": "有害內容",
+      "reasonIllegal": "違法內容",
+      "reasonHarassment": "騷擾",
+      "reasonSpam": "垃圾訊息",
+      "reasonOther": "其他原因"
     },
     "reportReceipts": {
       "title": "檢舉記錄",
@@ -555,7 +566,10 @@
     "changelogFixesPolish": "整個應用程式的修正與改進。",
     "changelogAreas": {
       "signIn": "登入",
-      "profileOrganizations": "個人資料與組織"
+      "profileOrganizations": "個人資料與組織",
+      "chat": "聊天",
+      "notifications": "通知",
+      "integrations": "整合"
     }
   },
   "preferences": {
@@ -649,6 +663,8 @@
       "emptyTitle": "尚無通知",
       "emptyCategoryTitle": "此類別尚無通知",
       "emptyBody": "此帳戶收到的通知會顯示在這裡。通知會保留 {{days}} 天。",
+      "emptyBody_one": "此帳戶收到的通知會顯示在這裡。通知會保留 {{days}} 天。",
+      "emptyBody_other": "此帳戶收到的通知會顯示在這裡。通知會保留 {{days}} 天。",
       "capped": "顯示最近的通知。",
       "loadError": "無法載入通知歷史。",
       "openFailed": "此通知已無法開啟。"
@@ -729,6 +745,7 @@
       "manageAccess": "管理存取權限",
       "bitbucketNoRepositoriesDescription": "此 Bitbucket 工作區中沒有可用的存放庫。",
       "gitlabNoRepositoriesDescription": "你可能需要授權存取 GitLab 上的更多群組或專案。",
+      "githubNoRepositoriesDescription": "請檢查 Kilo GitHub 應用程式的儲存庫存取權限，再重新整理。",
       "installGithubApp": "為存放庫安裝 GitHub App",
       "installGithubAppDescription": "請授權 Kilo GitHub App 存取要審查的存放庫。",
       "repositoryAccess": "存放庫存取權限",
@@ -749,6 +766,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} 的 Bitbucket 連線需在電腦上透過網頁版管理。",
+      "deniedManagedByOwner": "請洽詢 {{organization}} 的擁有者來變更您無法變更的連結。",
+      "deniedConnectRole": "只有 {{organization}} 的擁有者、管理員和帳單管理員可以設定連結。",
+      "deniedReconnectRole": "請要求 {{organization}} 的擁有者、管理員或帳單管理員重新連結。",
       "managedOnWebTitle": "在網頁版管理",
       "managedOnWebShort": "此連線需在電腦上透過網頁版管理。",
       "managedOnWebRepositories": "請在電腦上透過網頁版為 {{organization}} 選擇儲存庫。",
@@ -820,7 +840,7 @@
       "findingsInProgress": "此審查仍在進行中。完成後，發現的問題會顯示在這裡。",
       "findingsEndedWithoutResults": "此審查在發現任何問題前即已結束。",
       "serviceUnavailable": "無法連線至程式碼審查服務。請在服務可用時重新嘗試審查。",
-      "reviewFailed": "審查失敗。請再試一次。",
+      "reviewFailed": "審查失敗。",
       "retryMessage": "這會重新執行程式碼審查。",
       "retryReview": "重新嘗試審查",
       "retryNeedsSettings": "程式碼審查助手已關閉，或其設定需要處理。請修正設定，然後重新嘗試此審查。",
@@ -1021,7 +1041,9 @@
       "unavailablePersonallySwitchAction": "切換組織",
       "unavailableOrganizationTitle": "審查小組審查目前無法使用",
       "unavailableForOrganization": "審查小組審查需要具備使用中的訂閱或試用的 Enterprise 方案。此組織目前並未具備此功能。",
-      "unavailableForOrganizationNeutral": "此組織目前無法使用審查小組審查。請稍後再試。",
+      "unavailablePlanCheck": "審查小組審查無法檢查此組織的方案。請再試一次以重新檢查。",
+      "unavailableFlagRollout": "審查小組審查尚未開放給此組織使用。將應用程式更新至最新版本即可取得。",
+      "unavailableForOrganizationMember": "審查小組審查需要具備使用中的訂閱或試用的 Enterprise 方案。組織擁有者可以變更方案。",
       "unavailableOnBitbucket": "審查小組審查不適用於 Bitbucket 存放庫。",
       "noRepositories": "尚未選取任何存放庫。請先在存放庫設定中選取存放庫。",
       "specialists": "專家",
@@ -1996,8 +2018,7 @@
       "searchPlaceholder": "搜尋存放庫",
       "noMatches": "沒有相符項目",
       "noRepositories": "沒有可用的儲存庫",
-      "noRepositoriesDescription": "你的帳戶尚未連結任何儲存庫。",
-      "loading": "載入中…",
+      "noRepositoriesDescription": "若要載入儲存庫，請連結 GitHub 或 GitLab。",
       "accessibility": "儲存庫：{{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -2875,8 +2896,9 @@
       "checkActiveConnection": "連線已啟用，但此項目仍無法載入。",
       "bitbucketOrgOnlyDescription": "將上方的帳戶切換為某個組織，以便審查其 Bitbucket 提取請求。",
       "bitbucketOrgOnlyNoOrganizationDescription": "此帳戶尚無任何組織。建立或加入組織後，即可審查 Bitbucket 提取請求。",
-      "gitlabReconnectAdminOnlyDescription": "請要求組織的擁有者、管理員或帳單管理員重新連結。",
+      "reconnectAdminOnlyDescription": "請要求組織的擁有者、管理員或帳單管理員重新連結。",
       "bitbucketNotConnectedTitle": "尚未連結 Bitbucket",
+      "bitbucketAdminOnlyDescription": "請要求組織的擁有者、管理員或帳單管理員進行連結。",
       "adminOnlyConnectDescription": "只有組織擁有者、管理員和帳單管理員可以設定連結。",
       "contextLine": "適用於 {{organization}}",
       "contextLinePersonal": "適用於您的個人帳戶"
@@ -3449,7 +3471,7 @@
       "manageOnWeb": "網頁版帳單設定",
       "changePlan": "變更套餐",
       "buySeats": "購買席次",
-      "managedOnWeb": "套餐、席次和自動儲值是在網頁版上管理。",
+      "managedOnWeb": "套餐、席次和自動儲值是在 kilo.ai 上管理。",
       "setupAutoTopUp": "設定自動儲值",
       "manageAutoTopUp": "管理自動儲值",
       "opensOnWeb": "在網頁上開啟"
@@ -3647,10 +3669,10 @@
       "nameLabel": "模式名稱",
       "nameRequired": "請輸入模式名稱。",
       "notFound": "此模式已不存在。",
-      "restrictionHint": "僅能編輯符合此樣式的檔案。留空則允許所有檔案。",
-      "restrictionInvalid": "請輸入有效的樣式。",
+      "restrictionHint": "正規表示式選擇此模式可以編輯哪些檔案，例如 `\\.md$` 僅符合 markdown 檔案。留空則允許所有檔案。",
+      "restrictionInvalid": "請輸入有效的正規表示式。",
       "restrictionLabel": "限制標籤",
-      "restrictionPattern": "檔案樣式",
+      "restrictionPattern": "檔案限制",
       "roleLabel": "角色定義",
       "roleRequired": "請描述此模式的用途。",
       "tool": {
@@ -4403,6 +4425,7 @@
       "promptPlaceholder": "你是一個…",
       "tools": "工具",
       "wholeToolRule": "此代理會一次將一條規則套用到所有工具：{{rule}}。這些開關為唯讀。",
+      "toolRule": "已儲存的規則：{{rule}}",
       "visibility": "可見性",
       "visibilityPrimary": "主要 — 顯示在選擇器中",
       "visibilitySubagent": "子代理程式 — 只能從其他人調用",
@@ -4512,20 +4535,34 @@
       "deductionFallback": "點數扣除",
       "emptyDescription": "點數購買、收據與使用情況會顯示在這裡。",
       "emptyTitle": "尚無點數紀錄",
+      "expiredGrant": "已過期：{{description}}",
       "googlePlayReceipt": "Google Play 收據",
       "kind": {
         "adjustment": "調整",
         "balanceNeutral": "餘額不變",
         "deduction": "扣除",
         "grant": "贈送點數",
+        "promotionalCredits": "推廣點數",
         "welcomeCredits": "歡迎點數",
         "purchase": "購買"
+      },
+      "program": {
+        "adminBulkGrant": "管理員點數發放",
+        "contributorChampion": "貢獻者冠軍點數",
+        "feedback": "意見回饋點數",
+        "influencer": "網紅點數",
+        "ossMonthlyReset": "開源贊助重設",
+        "ossSponsorship": "開源贊助點數",
+        "pullRequest": "提取要求點數",
+        "usageIssue": "用量問題點數",
+        "vibeDay": "Vibe day 點數"
       },
       "purchaseFallback": "點數購買",
       "receipt": "收據",
       "receiptA11y": "開啟「{{description}}」，{{amount}}，{{date}} 的收據",
       "receiptUnavailable": "此筆購買沒有可用的收據。",
-      "retentionLimit": "顯示最近的點數紀錄。"
+      "retentionLimit": "顯示最近的點數紀錄。",
+      "voidedGrant": "已作廢：{{description}}"
     },
     "title": "購買點數",
     "description": "點數是一次性購買，會加入你的 Kilo 餘額，用於在 Kilo App 中執行 AI 程式設計工作階段。商店會向你的帳戶收費，商店確認付款後點數才會入帳。",
@@ -4861,6 +4898,9 @@
       "runAsCreator": "以我的身分執行",
       "runAsCreatorDescription": "每次執行都會使用你的帳戶，因此必須提供密鑰標頭。",
       "saveFailedTitle": "無法儲存觸發器",
+      "nameTaken": "名為「{{name}}」的觸發器已存在。",
+      "saveFailedRetry": "無法連線到伺服器。請檢查連線後再試一次。",
+      "saveFailedCheck": "請檢查表單中的值，然後再試一次。",
       "deleteTitle": "要刪除此觸發器嗎？",
       "deleteMessage": "對 {{name}} 的呼叫將會失敗。此動作無法復原。",
       "deleteMessageScheduled": "{{name}} 觸發器的已排程執行將會停止。此動作無法復原。",
@@ -5105,6 +5145,20 @@
       "eu": "歐盟",
       "au": "澳洲",
       "jp": "日本"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "搜尋偏好設定",
+    "noMatches": "找不到符合的偏好設定",
+    "emptyDescription": "試試其他設定名稱或關鍵字。",
+    "resultsStatus": "已找到 {{resultCount}} 項偏好設定",
+    "keywords": {
+      "signOut": "登出|退出帳號",
+      "appearance": "主題|配色|深色模式",
+      "appUnlock": "生物辨識|臉部辨識|指紋",
+      "language": "語言|翻譯",
+      "notifications": "提醒|推播|通知",
+      "privacy": "分析|追蹤|隱私"
     }
   }
 }

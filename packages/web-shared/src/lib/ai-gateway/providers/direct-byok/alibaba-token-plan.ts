@@ -5,8 +5,10 @@ import {
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
+const id = 'alibaba-token-plan';
+
 export default {
-  id: 'alibaba-token-plan',
+  id,
   openrouter_inference_provider_id: 'alibaba',
   models_dev_id: 'alibaba-token-plan',
   ...apiKeyUpstream({
@@ -14,5 +16,5 @@ export default {
     supportedChatApis: ['chat_completions'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,
   }),
-  models: cachedDirectByokModelList('alibaba-token-plan'),
+  models: cachedDirectByokModelList(id),
 } satisfies DirectByokProvider;

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   BRIEFING_MAX_EXCERPT_BYTES,
+  BRIEFING_MAX_TITLE_BYTES,
+  briefingContextPreferencesSchema,
+  briefingEstimateSchema,
   briefingHasActivity,
   briefingSourceSchema,
   briefingSummarySchema,
@@ -158,6 +161,65 @@ describe('scheduled briefing contracts', () => {
     ).toBe(false);
     expect(briefingSummarySchema.shape.status.safeParse('outdated').success).toBe(false);
     expect(briefingHasActivity({ sessions: 0, pullRequests: 0, blockers: 0 })).toBe(false);
+  });
+  it('accepts only whole microdollars and whole seconds', () => {
+    const summary = {
+      status: 'ready',
+      text: 'Briefing',
+      model: 'model-a',
+      costMicrodollars: 0,
+      chargeStatus: 'settled',
+      estimatedCostMicrodollars: null,
+      startedAt: null,
+      finishedAt: null,
+      error: null,
+    };
+    expect(briefingSummarySchema.safeParse(summary).success).toBe(true);
+    expect(briefingSummarySchema.safeParse({ ...summary, costMicrodollars: 0.5 }).success).toBe(
+      false
+    );
+    expect(
+      briefingSummarySchema.safeParse({ ...summary, estimatedCostMicrodollars: 1.5 }).success
+    ).toBe(false);
+    expect(
+      briefingSummarySchema.safeParse({ ...summary, estimatedCostMicrodollars: 7 }).success
+    ).toBe(true);
+    const estimate = {
+      model: 'model-a',
+      estimatedCostMicrodollars: 1000,
+      maximumCostMicrodollars: 2_000_000,
+      maxDurationSeconds: 600,
+      estimateToken: 'token',
+      canGenerate: true,
+      unavailableReason: null,
+    };
+    expect(briefingEstimateSchema.safeParse(estimate).success).toBe(true);
+    for (const fractional of [
+      { estimatedCostMicrodollars: 1000.5 },
+      { maximumCostMicrodollars: 2.5 },
+      { maxDurationSeconds: 0.5 },
+    ]) {
+      expect(briefingEstimateSchema.safeParse({ ...estimate, ...fractional }).success).toBe(false);
+    }
+    const preferences = {
+      context: { id: 'personal', organizationId: null, name: 'Personal' },
+      enabled: true,
+      model: 'model-a',
+      maxDurationSeconds: 600,
+      maxSpendMicrodollars: 2_000_000,
+    };
+    expect(briefingContextPreferencesSchema.safeParse(preferences).success).toBe(true);
+    for (const fractional of [{ maxDurationSeconds: 1.5 }, { maxSpendMicrodollars: 1.5 }]) {
+      expect(
+        briefingContextPreferencesSchema.safeParse({ ...preferences, ...fractional }).success
+      ).toBe(false);
+    }
+  });
+  it('budgets a title in UTF-8 bytes by default', () => {
+    // Only holds when the default budget is the byte constant, not the character bound.
+    const title = redactBriefingTitle('é'.repeat(200));
+    expect(title).toBe('é'.repeat(80));
+    expect(utf8ByteLength(title ?? '')).toBe(BRIEFING_MAX_TITLE_BYTES);
   });
 });
 

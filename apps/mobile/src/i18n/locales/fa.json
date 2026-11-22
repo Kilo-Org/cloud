@@ -309,6 +309,7 @@
     "hideBalance": "پنهان کردن موجودی",
     "showBalance": "نمایش موجودی",
     "balanceHidden": "موجودی پنهان است",
+    "availableToSpendInOrganization": "برای خرج کردن در این سازمان در دسترس است",
     "signOutTitle": "از حساب خود خارج می‌شوید؟",
     "signOutMessage": "برای دسترسی به فضای کاری خود باید دوباره وارد شوید.",
     "deleteAccountTitle": "حساب حذف شود؟",
@@ -538,7 +539,17 @@
       "nextStepInReview": "نتیجه در همین صفحه نمایش داده می‌شود و پس از تصمیم می‌توانید درخواست تجدیدنظر ارسال کنید.",
       "nextStepAppeal": "نتیجه درخواست تجدیدنظر در همین صفحه نمایش داده می‌شود.",
       "nextStepFinal": "تصمیم مربوط به درخواست تجدیدنظر قطعی است. امکان ارسال درخواست تجدیدنظر دیگری وجود ندارد.",
-      "viewReceipt": "مشاهده رسید"
+      "viewReceipt": "مشاهده رسید",
+      "targetLabel": "مورد گزارش‌شده",
+      "reasonLabel": "دلیل گزارش",
+      "targetMessage": "پاسخ هوش مصنوعی",
+      "targetComment": "نظر درخواست ادغام",
+      "targetUser": "کاربر",
+      "reasonHarmful": "محتوای مضر",
+      "reasonIllegal": "محتوای غیرقانونی",
+      "reasonHarassment": "آزار و اذیت",
+      "reasonSpam": "هرزنامه",
+      "reasonOther": "دلیل دیگر"
     },
     "reportReceipts": {
       "title": "گزارش‌ها",
@@ -555,7 +566,10 @@
     "changelogFixesPolish": "رفع اشکالات و بهبودها در سراسر برنامه.",
     "changelogAreas": {
       "signIn": "ورود",
-      "profileOrganizations": "نمایه & سازمان‌ها"
+      "profileOrganizations": "نمایه & سازمان‌ها",
+      "chat": "گفت‌وگو",
+      "notifications": "اعلان‌ها",
+      "integrations": "یکپارچه‌سازی‌ها"
     }
   },
   "preferences": {
@@ -996,8 +1010,9 @@
       "checkActiveConnection": "اتصال فعال است، اما این مورد هنوز قابل بارگذاری نیست.",
       "bitbucketOrgOnlyDescription": "حساب بالا را به یک سازمان تغییر دهید تا پول ریکوئست‌های Bitbucket آن را بازبینی کنید.",
       "bitbucketOrgOnlyNoOrganizationDescription": "این حساب هنوز سازمانی ندارد. پول ریکوئست‌های Bitbucket را می‌توانید پس از ایجاد یک سازمان یا پیوستن به آن بازبینی کنید.",
-      "gitlabReconnectAdminOnlyDescription": "از مالک، مدیر یا مدیر صورتحساب سازمان بخواهید آن را دوباره متصل کند.",
+      "reconnectAdminOnlyDescription": "از مالک، مدیر یا مدیر صورتحساب سازمان بخواهید آن را دوباره متصل کند.",
       "bitbucketNotConnectedTitle": "Bitbucket متصل نیست",
+      "bitbucketAdminOnlyDescription": "از مالک، مدیر یا مدیر صورتحساب سازمان بخواهید آن را متصل کند.",
       "adminOnlyConnectDescription": "فقط مالکان سازمان، مدیران و مدیران صورتحساب می‌توانند آن را متصل کنند.",
       "contextLine": "برای {{organization}}",
       "contextLinePersonal": "برای حساب شخصی شما"
@@ -1210,6 +1225,8 @@
       "emptyTitle": "هنوز اعلانی وجود ندارد",
       "emptyCategoryTitle": "هیچ اعلانی در این دسته وجود ندارد",
       "emptyBody": "اعلان‌هایی که این حساب دریافت می‌کند در اینجا نمایش داده می‌شوند. آن‌ها به مدت {{days}} روز نگهداری می‌شوند.",
+      "emptyBody_one": "اعلان‌هایی که این حساب دریافت می‌کند در اینجا نمایش داده می‌شوند. آن‌ها به مدت {{days}} روز نگهداری می‌شوند.",
+      "emptyBody_other": "اعلان‌هایی که این حساب دریافت می‌کند در اینجا نمایش داده می‌شوند. آن‌ها به مدت {{days}} روز نگهداری می‌شوند.",
       "capped": "جدیدترین اعلان‌ها نمایش داده می‌شوند.",
       "loadError": "بارگذاری تاریخچه اعلان‌ها ممکن نشد.",
       "openFailed": "این اعلان دیگر در هیچ‌جا باز نمی‌شود."
@@ -1290,6 +1307,7 @@
       "manageAccess": "مدیریت دسترسی",
       "bitbucketNoRepositoriesDescription": "در این فضای کاری Bitbucket مخزنی در دسترس نیست.",
       "gitlabNoRepositoriesDescription": "ممکن است لازم باشد در GitLab به گروه‌ها یا پروژه‌های بیشتری دسترسی بدهید.",
+      "githubNoRepositoriesDescription": "دسترسی برنامهٔ Kilo در GitHub به مخزن‌ها را بررسی کنید، سپس فهرست را تازه‌سازی کنید.",
       "installGithubApp": "برنامه GitHub را روی مخازن نصب کنید",
       "installGithubAppDescription": "به برنامه Kilo در GitHub اجازه دسترسی به مخازنی را بدهید که می‌خواهید بررسی شوند.",
       "repositoryAccess": "دسترسی به مخزن",
@@ -1323,7 +1341,7 @@
       "findingsInProgress": "این بررسی هنوز در جریان است. پس از پایان آن، یافته‌ها در این بخش نمایش داده می‌شوند.",
       "findingsEndedWithoutResults": "این بررسی پیش از ایجاد هر یافته‌ای به پایان رسید.",
       "serviceUnavailable": "اتصال به سرویس بررسی کد ممکن نشد. وقتی سرویس در دسترس بود، بررسی را دوباره انجام دهید.",
-      "reviewFailed": "بررسی ناموفق بود. لطفاً دوباره تلاش کنید.",
+      "reviewFailed": "بررسی ناموفق بود.",
       "showMore": "نمایش بیشتر",
       "created": "زمان ایجاد",
       "started": "زمان شروع",
@@ -1445,6 +1463,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "اتصال Bitbucket به {{organization}} از طریق وب و با رایانه مدیریت می‌شود.",
+      "deniedManagedByOwner": "برای تغییر اتصالی که نمی‌توانید تغییر دهید، از مالک {{organization}} درخواست کنید.",
+      "deniedConnectRole": "فقط مالکان {{organization}}، مدیران و مدیران صورتحساب می‌توانند آن را متصل کنند.",
+      "deniedReconnectRole": "از مالک، مدیر یا مدیر صورتحساب {{organization}} بخواهید آن را دوباره متصل کند.",
       "managedOnWebTitle": "از طریق وب مدیریت می‌شود",
       "managedOnWebShort": "این اتصال از طریق وب و با رایانه مدیریت می‌شود.",
       "managedOnWebRepositories": "مخزن‌های {{organization}} را از طریق وب و با رایانه انتخاب کنید.",
@@ -1582,7 +1603,9 @@
       "unavailablePersonallySwitchAction": "تغییر سازمان",
       "unavailableOrganizationTitle": "بازبینی شورایی در حال حاضر در دسترس نیست",
       "unavailableForOrganization": "بازبینی شورایی به طرح Enterprise با اشتراک فعال یا دوره آزمایشی نیاز دارد. این سازمان در حال حاضر آن را ندارد.",
-      "unavailableForOrganizationNeutral": "بازبینی شورایی برای این سازمان در حال حاضر در دسترس نیست. لطفاً بعداً دوباره تلاش کنید.",
+      "unavailablePlanCheck": "بازبینی شورایی نتوانست طرح این سازمان را بررسی کند. برای بررسی دوباره، تلاش مجدد کنید.",
+      "unavailableFlagRollout": "بازبینی شورایی هنوز برای این سازمان در دسترس نیست. برای دریافت آن، برنامه را به آخرین نسخه به‌روزرسانی کنید.",
+      "unavailableForOrganizationMember": "بازبینی شورایی به طرح Enterprise با اشتراک فعال یا دوره آزمایشی نیاز دارد. مالک سازمان می‌تواند طرح را تغییر دهد.",
       "unavailableOnBitbucket": "بازبینی شورایی برای مخازن Bitbucket در دسترس نیست.",
       "noRepositories": "هنوز مخزنی انتخاب نشده است. ابتدا در تنظیمات مخزن، مخازن را انتخاب کنید.",
       "specialists": "متخصصان",
@@ -2557,8 +2580,7 @@
       "searchPlaceholder": "جست‌وجوی مخازن",
       "noMatches": "موردی پیدا نشد",
       "noRepositories": "هیچ مخزنی در دسترس نیست",
-      "noRepositoriesDescription": "هیچ مخزنی به حساب شما وصل نیست.",
-      "loading": "در حال بارگذاری…",
+      "noRepositoriesDescription": "برای بارگذاری مخازن، GitHub یا GitLab را وصل کنید.",
       "accessibility": "مخزن: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3457,7 +3479,7 @@
       "manageOnWeb": "تنظیمات صورت‌حساب در وب",
       "changePlan": "تغییر طرح",
       "buySeats": "خرید مجوز کاربری",
-      "managedOnWeb": "طرح، مجوزهای کاربری و شارژ خودکار در وب مدیریت می‌شوند.",
+      "managedOnWeb": "طرح، مجوزهای کاربری و شارژ خودکار در kilo.ai مدیریت می‌شوند.",
       "setupAutoTopUp": "راه‌اندازی شارژ خودکار",
       "manageAutoTopUp": "مدیریت شارژ خودکار",
       "opensOnWeb": "در وب باز می‌شود"
@@ -3643,10 +3665,10 @@
       "nameLabel": "نام حالت",
       "nameRequired": "نام حالت را وارد کنید.",
       "notFound": "این حالت دیگر وجود ندارد.",
-      "restrictionHint": "فقط فایل‌هایی که با این الگو مطابقت دارند قابل ویرایش هستند. برای اجازه دادن به همه فایل‌ها آن را خالی بگذارید.",
-      "restrictionInvalid": "الگوی معتبر وارد کنید.",
+      "restrictionHint": "یک عبارت باقاعده تعیین می‌کند این حالت کدام فایل‌ها را می‌تواند ویرایش کند، برای نمونه `\\.md$` فقط برای فایل‌های markdown. برای اجازه دادن به همه فایل‌ها آن را خالی بگذارید.",
+      "restrictionInvalid": "یک عبارت باقاعده معتبر وارد کنید.",
       "restrictionLabel": "برچسب محدودیت",
-      "restrictionPattern": "الگوی فایل",
+      "restrictionPattern": "محدودیت فایل",
       "roleLabel": "تعریف نقش",
       "roleRequired": "کارکرد این حالت را توضیح دهید.",
       "tool": {
@@ -4403,6 +4425,7 @@
       "promptPlaceholder": "شما یک …",
       "tools": "ابزار",
       "wholeToolRule": "این عامل یک قاعده را به‌طور همزمان به همهٔ ابزارها اعمال می‌کند: {{rule}}. این کلیدها فقط‌خواندنی هستند.",
+      "toolRule": "قاعدهٔ ذخیره‌شده: {{rule}}",
       "visibility": "دید",
       "visibilityPrimary": "اولیه — در انتخابگر نشان داده شده است",
       "visibilitySubagent": "Subagent — فقط از دیگران قابل تماس است",
@@ -4512,20 +4535,34 @@
       "deductionFallback": "کسر اعتبار",
       "emptyDescription": "خریدهای اعتبار، رسیدها و مصرف در اینجا نمایش داده می‌شوند.",
       "emptyTitle": "تاریخچهٔ اعتباری وجود ندارد",
+      "expiredGrant": "منقضی شد: {{description}}",
       "googlePlayReceipt": "رسید از Google Play",
       "kind": {
         "adjustment": "اصلاحیه",
         "balanceNeutral": "بدون تأثیر بر موجودی",
         "deduction": "کسر",
         "grant": "اعطای اعتبار",
+        "promotionalCredits": "اعتبار ترویجی",
         "welcomeCredits": "اعتبار خوش‌آمد",
         "purchase": "خرید"
+      },
+      "program": {
+        "adminBulkGrant": "اعطای اعتبار توسط مدیر",
+        "contributorChampion": "اعتبار قهرمان مشارکت‌کنندگان",
+        "feedback": "اعتبار بازخورد",
+        "influencer": "اعتبار اینفلوئنسر",
+        "ossMonthlyReset": "بازنشانی حمایت مالی متن‌باز",
+        "ossSponsorship": "اعتبار حمایت مالی متن‌باز",
+        "pullRequest": "اعتبار پول ریکوئست",
+        "usageIssue": "اعتبار مشکل مصرف",
+        "vibeDay": "اعتبار روز وایب"
       },
       "purchaseFallback": "خرید اعتبار",
       "receipt": "رسید",
       "receiptA11y": "باز کردن رسید {{description}}، {{amount}}، از {{date}}",
       "receiptUnavailable": "رسیدی برای این خرید موجود نیست.",
-      "retentionLimit": "جدیدترین تاریخچهٔ اعتباری نمایش داده می‌شود."
+      "retentionLimit": "جدیدترین تاریخچهٔ اعتباری نمایش داده می‌شود.",
+      "voidedGrant": "باطل شد: {{description}}"
     },
     "title": "خرید اعتبار",
     "description": "اعتبار یک خرید یکباره است که برای اجرای جلسات کدنویسی هوش مصنوعی در Kilo App به موجودی Kilo شما اضافه می‌شود. فروشگاه مبلغ را از حساب شما دریافت می‌کند و اعتبار پس از تأیید پرداخت توسط فروشگاه اضافه می‌شود.",
@@ -4861,6 +4898,9 @@
       "runAsCreator": "اجرا با هویت من",
       "runAsCreatorDescription": "هر اجرا از حساب شما استفاده می‌کند، بنابراین سرآیند محرمانه لازم است.",
       "saveFailedTitle": "ذخیره تریگر ناموفق بود",
+      "nameTaken": "تریگری با نام «{{name}}» از قبل وجود دارد.",
+      "saveFailedRetry": "اتصال به سرور برقرار نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
+      "saveFailedCheck": "مقادیر فرم را بررسی کنید و دوباره تلاش کنید.",
       "deleteTitle": "این تریگر حذف شود؟",
       "deleteMessage": "فراخوانی‌های {{name}} ناموفق خواهند شد. این کار قابل بازگشت نیست.",
       "deleteMessageScheduled": "اجراهای زمان‌بندی‌شدهٔ {{name}} متوقف می‌شوند. این کار قابل بازگشت نیست.",
@@ -5105,6 +5145,20 @@
       "eu": "اتحادیه اروپا",
       "au": "استرالیا",
       "jp": "ژاپن"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "جست‌وجوی تنظیمات دلخواه",
+    "noMatches": "تنظیمات موردنظر پیدا نشد",
+    "emptyDescription": "نام تنظیم یا کلیدواژهٔ دیگری را امتحان کنید.",
+    "resultsStatus": "تنظیمات یافت‌شده: {{resultCount}}",
+    "keywords": {
+      "signOut": "خروج|خروج از حساب",
+      "appearance": "پوسته|رنگ‌بندی|حالت تاریک",
+      "appUnlock": "زیست‌سنجی|تشخیص چهره|اثر انگشت",
+      "language": "زبان|ترجمه",
+      "notifications": "اعلان|هشدار",
+      "privacy": "تحلیل داده‌ها|ردیابی"
     }
   }
 }

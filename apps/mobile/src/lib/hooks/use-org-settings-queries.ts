@@ -80,6 +80,18 @@ export function useOrgModelCatalog(enabled: boolean) {
   return useQuery(trpc.models.list.queryOptions(undefined, { enabled, ...SETTLE_WHILE_OFFLINE }));
 }
 
+/**
+ * The gateway's display name for each inference provider, by the slug the
+ * organization's own lists store. An empty answer means the gateway has no
+ * snapshot stored, so every caller falls back to the slug it already holds.
+ */
+export function useProviderDisplayNames(enabled: boolean) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.models.providerNames.queryOptions(undefined, { enabled, ...SETTLE_WHILE_OFFLINE })
+  );
+}
+
 /** The gateway's own two settings; `available` says whether the organization may change them. */
 export function useOrgGatewaySettings(organizationId: string | null, enabled: boolean) {
   const trpc = useTRPC();

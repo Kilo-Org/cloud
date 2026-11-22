@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "نتيجة أمان جديدة ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "حرج",
+      "high": "عالٍ",
+      "medium": "متوسط",
+      "low": "منخفض"
+    },
     "securityFindingSlaWarning": {
       "title": "تحذير SLA"
     },

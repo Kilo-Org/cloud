@@ -132,7 +132,7 @@ const integrationDetailRegistry = {
     title: 'Linear Integration',
     userSubtitle: 'Connect your Linear workspace so Kilo can respond to @-mentions on issues',
     organizationSubtitle: organizationName => `Manage Linear integration for ${organizationName}`,
-    render: async ({ organizationId, search }) => {
+    render: async ({ organizationId, search, role }) => {
       const { LinearIntegrationDetails } =
         await import('@/components/integrations/LinearIntegrationDetails');
       return (
@@ -140,6 +140,7 @@ const integrationDetailRegistry = {
           organizationId={organizationId}
           success={search.success === 'installed'}
           error={search.error}
+          canManage={!role || canManageOrganizationBilling(role)}
         />
       );
     },

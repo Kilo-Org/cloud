@@ -309,6 +309,7 @@
     "hideBalance": "ቀሪ ሂሳብ ደብቅ",
     "showBalance": "ቀሪ ሂሳብ አሳይ",
     "balanceHidden": "ቀሪ ሂሳብ ተደብቋል",
+    "availableToSpendInOrganization": "በዚህ ድርጅት ውስጥ ለወጪ የሚገኝ",
     "signOutTitle": "ከመለያዎ መውጣት ይፈልጋሉ?",
     "signOutMessage": "የሥራ ቦታህን ለመጠቀም እንደገና መግባት ያስፈልግሃል።",
     "deleteAccountTitle": "መለያዎን መሰረዝ ይፈልጋሉ?",
@@ -526,8 +527,8 @@
       "triageActioned": "ተቀባይነት አግኝቷል",
       "triageRejected": "ተቀባይነት አላገኘም",
       "appealNone": "ምንም አልቀረበም",
-      "appealSubmitted": "በግምገማ ላይ",
-      "appealAccepted": "ተቀባይነት አግኝቷል",
+      "appealSubmitted": "ይግባኝ በግምገማ ላይ",
+      "appealAccepted": "ይግባኝ ተቀባይነት አግኝቷል",
       "appealRejected": "ውድቅ ተደርጓል",
       "appeal": "በዚህ ውሳኔ ላይ ይግባኝ ይበሉ",
       "appealTitle": "በዚህ ውሳኔ ላይ ይግባኝ ማለት ይፈልጋሉ?",
@@ -538,7 +539,17 @@
       "nextStepInReview": "ውጤቱ በዚህ ማያ ላይ ይታያል፣ ከውሳኔ በኋላም ይግባኝ ማለት ይችላሉ።",
       "nextStepAppeal": "የይግባኝዎ ውጤት በዚህ ማያ ላይ ይታያል።",
       "nextStepFinal": "የይግባኙ ውሳኔ የመጨረሻ ነው። ተጨማሪ ይግባኝ ማቅረብ አይቻልም።",
-      "viewReceipt": "ደረሰኙን ይመልከቱ"
+      "viewReceipt": "ደረሰኙን ይመልከቱ",
+      "targetLabel": "ሪፖርት የተደረገበት ንጥል",
+      "reasonLabel": "የሪፖርት ምክንያት",
+      "targetMessage": "የAI ምላሽ",
+      "targetComment": "የማዋሃድ ጥያቄ አስተያየት",
+      "targetUser": "ተጠቃሚ",
+      "reasonHarmful": "ጎጂ ይዘት",
+      "reasonIllegal": "ሕገ-ወጥ ይዘት",
+      "reasonHarassment": "ትንኮሳ",
+      "reasonSpam": "አይፈለጌ ማስታወቂያ",
+      "reasonOther": "ሌላ ምክንያት"
     },
     "reportReceipts": {
       "title": "ሪፖርቶች",
@@ -555,7 +566,10 @@
     "changelogFixesPolish": "በመተግበሪያው ውስጥ በሙሉ ጥገናዎች እና ማሻሻያዎች ተደርገዋል።",
     "changelogAreas": {
       "signIn": "መግቢያ",
-      "profileOrganizations": "መገለጫና ድርጅቶች"
+      "profileOrganizations": "መገለጫና ድርጅቶች",
+      "chat": "ውይይት",
+      "notifications": "ማሳወቂያዎች",
+      "integrations": "ውህደቶች"
     }
   },
   "preferences": {
@@ -996,8 +1010,9 @@
       "checkActiveConnection": "ግንኙነቱ ገባሪ ነው፣ ነገር ግን ይህ ንጥል አሁንም ሊጫን አይችልም።",
       "bitbucketOrgOnlyDescription": "ከላይ ያለውን መለያ ወደ ድርጅት ይቀይሩ፣ የዚህ ድርጅት የBitbucket የማዋሃድ ጥያቄዎችን ለመገምገም።",
       "bitbucketOrgOnlyNoOrganizationDescription": "ይህ መለያ እስካሁን ድርጅቶች የለውም። ድርጅት ሲፈጥሩ ወይም ሲቀላቀሉ የBitbucket የማዋሃድ ጥያቄዎችን ማገምገም ይቻላል።",
-      "gitlabReconnectAdminOnlyDescription": "የድርጅት ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ እንዲያገናኙት ይጠይቁ።",
+      "reconnectAdminOnlyDescription": "የድርጅት ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ እንዲያገናኙት ይጠይቁ።",
       "bitbucketNotConnectedTitle": "Bitbucket አልተገናኘም",
+      "bitbucketAdminOnlyDescription": "የድርጅት ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ እንዲያገናኙት ይጠይቁ።",
       "adminOnlyConnectDescription": "ሊያገናኙት የሚችሉት የድርጅት ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
       "contextLine": "ለ{{organization}}",
       "contextLinePersonal": "ለግል መለያዎ"
@@ -1210,6 +1225,8 @@
       "emptyTitle": "እስካሁን ማሳወቂያዎች የሉም",
       "emptyCategoryTitle": "በዚህ ምድብ ውስጥ ማሳወቂያዎች የሉም",
       "emptyBody": "ይህ መለያ የሚቀበላቸው ማሳወቂያዎች እዚህ ይታያሉ። ለ{{days}} ቀናት ይቀመጣሉ።",
+      "emptyBody_one": "ይህ መለያ የሚቀበላቸው ማሳወቂያዎች እዚህ ይታያሉ። ለ{{days}} ቀናት ይቀመጣሉ።",
+      "emptyBody_other": "ይህ መለያ የሚቀበላቸው ማሳወቂያዎች እዚህ ይታያሉ። ለ{{days}} ቀናት ይቀመጣሉ።",
       "capped": "የቅርብ ጊዜ ማሳወቂያዎችን በማሳየት ላይ።",
       "loadError": "የማሳወቂያ ታሪክን መጫን አልተቻለም።",
       "openFailed": "ይህ ማሳወቂያ ከእንግዲህ በየትኛውም ቦታ አይከፈትም።"
@@ -1290,6 +1307,7 @@
       "manageAccess": "መዳረሻን ያስተዳድሩ",
       "bitbucketNoRepositoriesDescription": "በዚህ የBitbucket የሥራ ቦታ ውስጥ ማከማቻዎች የሉም።",
       "gitlabNoRepositoriesDescription": "በGitLab ላይ ወደ ተጨማሪ ቡድኖች ወይም ፕሮጀክቶች የመድረስ ፈቃድ መስጠት ሊያስፈልግዎ ይችላል።",
+      "githubNoRepositoriesDescription": "የKilo GitHub መተግበሪያ ማከማቻዎቹን የመድረስ ፈቃድ እንዳለው ያረጋግጡ፣ ከዚያ ያድሱ።",
       "installGithubApp": "የGitHub መተግበሪያን በማከማቻዎች ላይ ይጫኑ",
       "installGithubAppDescription": "ለKilo የGitHub መተግበሪያ እንዲገመገሙ ወደሚፈልጓቸው ማከማቻዎች የመድረስ ፈቃድ ይስጡ።",
       "repositoryAccess": "የማከማቻ መዳረሻ",
@@ -1323,7 +1341,7 @@
       "findingsInProgress": "ይህ ግምገማ እስካሁን በሂደት ላይ ነው። ሲጠናቀቅ ግኝቶች እዚህ ይታያሉ።",
       "findingsEndedWithoutResults": "ይህ ግምገማ ምንም ግኝቶች ሳያመነጭ አብቅቷል።",
       "serviceUnavailable": "ከኮድ ግምገማ አገልግሎቱ ጋር መገናኘት አልተቻለም። አገልግሎቱ ሲገኝ ግምገማውን እንደገና ይሞክሩ።",
-      "reviewFailed": "ግምገማው አልተሳካም። እባክዎ እንደገና ይሞክሩ።",
+      "reviewFailed": "ግምገማው አልተሳካም።",
       "showMore": "ተጨማሪ ያሳዩ",
       "created": "የተፈጠረበት ጊዜ",
       "started": "የተጀመረበት ጊዜ",
@@ -1445,6 +1463,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "የ{{organization}} የBitbucket ግንኙነት ከኮምፒውተር በድር ላይ ይተዳደራል።",
+      "deniedManagedByOwner": "መቀየር የማይችሉትን ግንኙነት ለመቀየር የ{{organization}} ባለቤትን ይጠይቁ።",
+      "deniedConnectRole": "ሊያገናኙት የሚችሉት የ{{organization}} ባለቤቶች፣ አስተዳዳሪዎች እና የክፍያ አስተዳዳሪዎች ብቻ ናቸው።",
+      "deniedReconnectRole": "የ{{organization}} ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ እንዲያገናኙት ይጠይቁ።",
       "managedOnWebTitle": "በድር ላይ ይተዳደራል",
       "managedOnWebShort": "ይህ ግንኙነት ከኮምፒውተር በድር ላይ ይተዳደራል።",
       "managedOnWebRepositories": "ለ{{organization}} ማከማቻዎችን ከኮምፒውተር በድር ላይ ይምረጡ።",
@@ -1582,7 +1603,9 @@
       "unavailablePersonallySwitchAction": "ድርጅት ይቀይሩ",
       "unavailableOrganizationTitle": "የጉባኤ ግምገማ አሁን አይገኝም",
       "unavailableForOrganization": "የጉባኤ ግምገማ ንቁ የደንበኝነት ምዝገባ ወይም የሙከራ ጊዜ ያለው የEnterprise ዕቅድ ይፈልጋል። ይህ ድርጅት አሁን የለውም።",
-      "unavailableForOrganizationNeutral": "የጉባኤ ግምገማ ለዚህ ድርጅት አሁን አይገኝም። በኋላ እንደገና ይሞክሩ።",
+      "unavailablePlanCheck": "የጉባኤ ግምገማ የዚህን ድርጅት ዕቅድ መመርመር አልቻለም። እንደገና ለመመርመር ይሞክሩ።",
+      "unavailableFlagRollout": "የጉባኤ ግምገማ ለዚህ ድርጅት ገና አይገኝም። እሱን ለማግኘት መተግበሪያውን ወደ አዲሱ ስሪት ያዘምኑ።",
+      "unavailableForOrganizationMember": "የጉባኤ ግምገማ ንቁ የደንበኝነት ምዝገባ ወይም የሙከራ ጊዜ ያለው የEnterprise ዕቅድ ይፈልጋል። የድርጅት ባለቤት ዕቅዱን መቀየር ይችላል።",
       "unavailableOnBitbucket": "የጉባኤ ግምገማ ለBitbucket ማከማቻዎች አይገኝም።",
       "noRepositories": "እስካሁን ምንም ማከማቻ አልተመረጠም። መጀመሪያ በማከማቻ ቅንብሮች ውስጥ ማከማቻዎችን ይምረጡ።",
       "specialists": "ባለሙያዎች",
@@ -2557,8 +2580,7 @@
       "searchPlaceholder": "የማከማቻ ፍለጋ",
       "noMatches": "ምንም ተዛማጆች የሉም",
       "noRepositories": "ምንም ማከማቻዎች አይገኙም",
-      "noRepositoriesDescription": "ከመለያዎ ጋር ምንም ማከማቻዎች አልተገናኙም።",
-      "loading": "በመጫን ላይ…",
+      "noRepositoriesDescription": "ማከማቻዎችን ለመጫን GitHub ወይም GitLabን አገናኝ።",
       "accessibility": "ማከማቻ፦ {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3457,7 +3479,7 @@
       "manageOnWeb": "የክፍያ ቅንብሮች በድር ላይ",
       "changePlan": "ዕቅድ ይቀይሩ",
       "buySeats": "የተጠቃሚ ፈቃዶችን ይግዙ",
-      "managedOnWeb": "ዕቅዱ፣ የተጠቃሚ ፈቃዶች እና ራስ-ሰር መሙላት የሚተዳደሩት በድር ላይ ነው።",
+      "managedOnWeb": "ዕቅዱ፣ የተጠቃሚ ፈቃዶች እና ራስ-ሰር መሙላት የሚተዳደሩት በkilo.ai ላይ ነው።",
       "setupAutoTopUp": "ራስ-ሰር መሙላትን ያዋቅሩ",
       "manageAutoTopUp": "ራስ-ሰር መሙላትን አስተዳድር",
       "opensOnWeb": "በድር ላይ ይከፈታል"
@@ -3643,10 +3665,10 @@
       "nameLabel": "የሁነታ ስም",
       "nameRequired": "የሁነታ ስም አስገባ።",
       "notFound": "ይህ ሁነታ ከእንግዲህ የለም።",
-      "restrictionHint": "ከዚህ ንድፍ ጋር የሚዛመዱ ፋይሎች ብቻ ሊታረሙ ይችላሉ። ሁሉንም ፋይሎች ለመፍቀድ ባዶ ተወው።",
-      "restrictionInvalid": "ትክክለኛ ንድፍ አስገባ።",
+      "restrictionHint": "መደበኛ አገላለጽ ይህ ሁነታ ማርትዕ የሚችላቸውን ፋይሎች ይመርጣል፣ ለምሳሌ `\\.md$` ለማርክዳውን ፋይሎች ብቻ። ሁሉንም ፋይሎች ለመፍቀድ ባዶ ተወው።",
+      "restrictionInvalid": "ትክክለኛ መደበኛ አገላለጽ አስገባ።",
       "restrictionLabel": "የገደብ መለያ",
-      "restrictionPattern": "የፋይል ንድፍ",
+      "restrictionPattern": "የፋይል ገደብ",
       "roleLabel": "የሚና ፍቺ",
       "roleRequired": "ይህ ሁነታ ምን እንደሚሰራ ግለጽ።",
       "tool": {
@@ -4403,6 +4425,7 @@
       "promptPlaceholder": "አንተ የ…",
       "tools": "መሳሪያዎች",
       "wholeToolRule": "ይህ ወኪል በአንድ ጊዜ በሁሉም መሳሪያዎች ላይ አንድ ደንብ ይተገብራል፦ {{rule}}። እነዚህ ማብሪያ ማጥፊያዎች ለንባብ ብቻ ናቸው።",
+      "toolRule": "የተከማቸ ደንብ፦ {{rule}}",
       "visibility": "ታይነት",
       "visibilityPrimary": "ዋና — በቃሚው ውስጥ ይታያል",
       "visibilitySubagent": "ሱባጀንት — ከሌሎች ብቻ የሚጠራ",
@@ -4512,20 +4535,34 @@
       "deductionFallback": "የክሬዲት ቅነሳ",
       "emptyDescription": "የክሬዲት ግዢዎች፣ ደረሰኞች እና አጠቃቀም እዚህ ይታያሉ።",
       "emptyTitle": "የክሬዲት ታሪክ የለም",
+      "expiredGrant": "ጊዜው አልፏል፦ {{description}}",
       "googlePlayReceipt": "ደረሰኝ ከGoogle Play",
       "kind": {
         "adjustment": "ማስተካከያ",
         "balanceNeutral": "ቀሪ ሂሳብን የማይቀይር",
         "deduction": "ቅነሳ",
         "grant": "የክሬዲት ስጦታ",
+        "promotionalCredits": "የማስተዋወቂያ ክሬዲት",
         "welcomeCredits": "የእንኳን ደህና መጡ ክሬዲት",
         "purchase": "ግዢ"
+      },
+      "program": {
+        "adminBulkGrant": "የአስተዳዳሪ ክሬዲት ስጦታ",
+        "contributorChampion": "የአስተዋጽኦ ሻምፒዮን ክሬዲት",
+        "feedback": "የግብረ-መልስ ክሬዲት",
+        "influencer": "የኢንፍሉዌንሰር ክሬዲት",
+        "ossMonthlyReset": "የክፍት ምንጭ ሶፍትዌር ክሬዲት ወርሃዊ እድሳት",
+        "ossSponsorship": "የክፍት ምንጭ ሶፍትዌር ድጋፍ ክሬዲት",
+        "pullRequest": "የማዋሃድ ጥያቄ ክሬዲት",
+        "usageIssue": "የአጠቃቀም ችግር ክሬዲት",
+        "vibeDay": "የVibe Day ክሬዲት"
       },
       "purchaseFallback": "የክሬዲት ግዢ",
       "receipt": "ደረሰኝ",
       "receiptA11y": "የ{{description}}፣ {{amount}}፣ ከ{{date}} ደረሰኝን ክፈት",
       "receiptUnavailable": "ለዚህ ግዢ ደረሰኝ አይገኝም።",
-      "retentionLimit": "የቅርብ ጊዜ የክሬዲት ታሪክን በማሳየት ላይ።"
+      "retentionLimit": "የቅርብ ጊዜ የክሬዲት ታሪክን በማሳየት ላይ።",
+      "voidedGrant": "ተሰርዟል፦ {{description}}"
     },
     "title": "ክሬዲት ይግዙ",
     "description": "ክሬዲት በKilo App ውስጥ የAI ኮዲንግ ክፍለ-ጊዜዎችን ለማስኬድ ወደ Kilo ቀሪ ሂሳብዎ የሚጨመር የአንድ ጊዜ ግዢ ነው። መደብሩ ሂሳብዎን ይከፍላል፣ እና መደብሩ ክፍያውን ካረጋገጠ በኋላ ክሬዲት ይጨመራል።",
@@ -4861,6 +4898,9 @@
       "runAsCreator": "በእኔ ስም ያስኪዱ",
       "runAsCreatorDescription": "እያንዳንዱ ሩጫ የእርስዎን መለያ ይጠቀማል፣ ስለዚህ ምስጢራዊው ራስጌ ያስፈልጋል።",
       "saveFailedTitle": "ቀስቅሴውን ማስቀመጥ አልተቻለም",
+      "nameTaken": "«{{name}}» የሚባል ቀስቅሴ አስቀድሞ አለ።",
+      "saveFailedRetry": "ወደ ሰርቨሩ መድረስ አልተቻለም። ግንኙነትዎን ያረጋግጡ እና እንደገና ይሞክሩ።",
+      "saveFailedCheck": "በቅጹ ውስጥ ያሉትን እሴቶች ያረጋግጡ እና እንደገና ይሞክሩ።",
       "deleteTitle": "ይህን ቀስቅሴ ይሰርዙ፧",
       "deleteMessage": "ወደ {{name}} የሚደረጉ ጥሪዎች ይከሽፋሉ። ይህ ሊቀለበስ አይችልም።",
       "deleteMessageScheduled": "የ{{name}} የተያዙ ሩጫዎች ይቆማሉ። ይህ ሊቀለበስ አይችልም።",
@@ -5105,6 +5145,20 @@
       "eu": "የአውሮፓ ህብረት",
       "au": "አውስትራሊያ",
       "jp": "ጃፓን"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "የምርጫዎች ፍለጋ",
+    "noMatches": "የሚዛመዱ ምርጫዎች የሉም",
+    "emptyDescription": "ሌላ የምርጫ ስም ወይም ቁልፍ ቃል ሞክር።",
+    "resultsStatus": "የተገኙ ምርጫዎች፦ {{resultCount}}",
+    "keywords": {
+      "signOut": "መውጣት|ዘግቶ መውጣት",
+      "appearance": "ገጽታ|ቀለም|ጨለማ",
+      "appUnlock": "ባዮሜትሪክስ|የፊት መለያ|የጣት አሻራ",
+      "language": "ቋንቋ|ትርጉም",
+      "notifications": "ማንቂያዎች|ማሳወቂያዎች",
+      "privacy": "ትንታኔ|ክትትል"
     }
   }
 }

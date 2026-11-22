@@ -165,13 +165,27 @@ export function readTrpcServerMessage(error: unknown): string | undefined {
 
 const TERMINAL_TRPC_CODES = [
   'BAD_REQUEST',
+  'CONFLICT',
   'FORBIDDEN',
   'UNAUTHORIZED',
   'NOT_FOUND',
   'UNPROCESSABLE_CONTENT',
 ] as const;
 
-/** True only for tRPC codes the user cannot recover from by retrying. */
+/**
+ * True only for tRPC codes the user cannot recover from by retrying.
+ *
+ * Each terminal code names a state the same request cannot change: a payload
+ * the input contract refuses, a record that is gone, a role or account session
+ * the caller has lost, an input the server will not accept, or a conflict with
+ * a state that already exists, such as a duplicate name. The action that
+ * produced the failure stays on screen, so the surface keeps its explanation
+ * and offers no Retry, and the copy beside the form is what the person acts on.
+ *
+ * `PRECONDITION_FAILED` stays retryable: the person can satisfy the
+ * precondition, then send the same request again. `TOO_MANY_REQUESTS` stays
+ * retryable too, because waiting resolves it.
+ */
 export function isTerminalTrpcCode(code: string | undefined): boolean {
   return TERMINAL_TRPC_CODES.includes(code as (typeof TERMINAL_TRPC_CODES)[number]);
 }

@@ -309,6 +309,7 @@
     "hideBalance": "ਬੈਲੰਸ ਲੁਕਾਓ",
     "showBalance": "ਬੈਲੰਸ ਵਿਖਾਓ",
     "balanceHidden": "ਬੈਲੰਸ ਲੁਕਾਇਆ ਗਿਆ",
+    "availableToSpendInOrganization": "ਇਸ ਸੰਸਥਾ ਵਿੱਚ ਖਰਚ ਕਰਨ ਲਈ ਉਪਲਬਧ",
     "signOutTitle": "ਕੀ ਸਾਈਨ ਆਉਟ ਕਰਨਾ ਹੈ?",
     "signOutMessage": "ਆਪਣਾ ਵਰਕਸਪੇਸ ਵਰਤਣ ਲਈ ਤੁਹਾਨੂੰ ਦੁਬਾਰਾ ਸਾਈਨ ਇਨ ਕਰਨਾ ਪਵੇਗਾ।",
     "deleteAccountTitle": "ਕੀ ਖਾਤਾ ਮਿਟਾਉਣਾ ਹੈ?",
@@ -538,7 +539,17 @@
       "nextStepInReview": "ਨਤੀਜਾ ਇਸ ਸਕ੍ਰੀਨ ਉੱਤੇ ਦਿਖੇਗਾ, ਅਤੇ ਫ਼ੈਸਲੇ ਤੋਂ ਬਾਅਦ ਤੁਸੀਂ ਅਪੀਲ ਕਰ ਸਕਦੇ ਹੋ।",
       "nextStepAppeal": "ਅਪੀਲ ਦਾ ਨਤੀਜਾ ਇਸ ਸਕ੍ਰੀਨ ਉੱਤੇ ਦਿਖੇਗਾ।",
       "nextStepFinal": "ਅਪੀਲ ਦਾ ਫ਼ੈਸਲਾ ਅੰਤਿਮ ਹੈ। ਹੋਰ ਅਪੀਲ ਦਰਜ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ।",
-      "viewReceipt": "ਰਸੀਦ ਦੇਖੋ"
+      "viewReceipt": "ਰਸੀਦ ਦੇਖੋ",
+      "targetLabel": "ਰਿਪੋਰਟ ਕੀਤੀ ਚੀਜ਼",
+      "reasonLabel": "ਰਿਪੋਰਟ ਦਾ ਕਾਰਨ",
+      "targetMessage": "AI ਦਾ ਜਵਾਬ",
+      "targetComment": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਟਿੱਪਣੀ",
+      "targetUser": "ਵਰਤੋਂਕਾਰ",
+      "reasonHarmful": "ਨੁਕਸਾਨਦਾਇਕ ਸਮੱਗਰੀ",
+      "reasonIllegal": "ਗੈਰ-ਕਾਨੂੰਨੀ ਸਮੱਗਰੀ",
+      "reasonHarassment": "ਛੇੜਛਾੜ",
+      "reasonSpam": "ਅਣਚਾਹੀ ਇਸ਼ਤਿਹਾਰਬਾਜ਼ੀ",
+      "reasonOther": "ਹੋਰ ਕਾਰਨ"
     },
     "reportReceipts": {
       "title": "ਰਿਪੋਰਟਾਂ",
@@ -555,7 +566,10 @@
     "changelogFixesPolish": "ਪੂਰੀ ਐਪ ਵਿੱਚ ਫਿਕਸ ਅਤੇ ਸੁਧਾਰ।",
     "changelogAreas": {
       "signIn": "ਸਾਈਨ ਇਨ",
-      "profileOrganizations": "ਪ੍ਰੋਫਾਈਲ ਤੇ ਸੰਸਥਾਵਾਂ"
+      "profileOrganizations": "ਪ੍ਰੋਫਾਈਲ ਤੇ ਸੰਸਥਾਵਾਂ",
+      "chat": "ਚੈਟ",
+      "notifications": "ਸੂਚਨਾਵਾਂ",
+      "integrations": "ਇੰਟੀਗ੍ਰੇਸ਼ਨ"
     }
   },
   "preferences": {
@@ -996,8 +1010,9 @@
       "checkActiveConnection": "ਕਨੈਕਸ਼ਨ ਸਰਗਰਮ ਹੈ, ਪਰ ਇਹ ਆਈਟਮ ਅਜੇ ਵੀ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਦੀ।",
       "bitbucketOrgOnlyDescription": "ਇਸ ਦੇ Bitbucket ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਉੱਪਰ ਦਿੱਤੇ ਖਾਤੇ ਨੂੰ ਇੱਕ ਸੰਗਠਨ ਵਿੱਚ ਬਦਲੋ।",
       "bitbucketOrgOnlyNoOrganizationDescription": "ਇਸ ਖਾਤੇ ਵਿੱਚ ਹਾਲੇ ਕੋਈ ਸੰਗਠਨ ਨਹੀਂ ਹੈ। ਇੱਕ ਸੰਗਠਨ ਬਣਾਉਣ ਜਾਂ ਉਸ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਣ ਤੋਂ ਬਾਅਦ ਹੀ Bitbucket ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕੀਤੀ ਜਾ ਸਕਦੀ ਹੈ।",
-      "gitlabReconnectAdminOnlyDescription": "ਕਿਸੇ ਸੰਗਠਨ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਨੂੰ ਇਸ ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਹੋ।",
+      "reconnectAdminOnlyDescription": "ਕਿਸੇ ਸੰਗਠਨ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਨੂੰ ਇਸ ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਹੋ।",
       "bitbucketNotConnectedTitle": "Bitbucket ਕਨੈਕਟ ਨਹੀਂ ਹੈ",
+      "bitbucketAdminOnlyDescription": "ਕਿਸੇ ਸੰਗਠਨ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਨੂੰ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਹੋ।",
       "adminOnlyConnectDescription": "ਸਿਰਫ਼ ਸੰਸਥਾ ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਅਤੇ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰ ਸਕਦੇ ਹਨ।",
       "contextLine": "{{organization}} ਲਈ",
       "contextLinePersonal": "ਤੁਹਾਡੇ ਨਿੱਜੀ ਖਾਤੇ ਲਈ"
@@ -1210,6 +1225,8 @@
       "emptyTitle": "ਹਾਲੇ ਕੋਈ ਸੂਚਨਾ ਨਹੀਂ",
       "emptyCategoryTitle": "ਇਸ ਸ਼੍ਰੇਣੀ ਵਿੱਚ ਕੋਈ ਸੂਚਨਾ ਨਹੀਂ",
       "emptyBody": "ਇਸ ਖਾਤੇ ਨੂੰ ਮਿਲਣ ਵਾਲੀਆਂ ਸੂਚਨਾਵਾਂ ਇੱਥੇ ਦਿਖਾਈ ਦਿੰਦੀਆਂ ਹਨ। ਇਹਨਾਂ ਨੂੰ {{days}} ਦਿਨਾਂ ਲਈ ਰੱਖਿਆ ਜਾਂਦਾ ਹੈ।",
+      "emptyBody_one": "ਇਸ ਖਾਤੇ ਨੂੰ ਮਿਲਣ ਵਾਲੀਆਂ ਸੂਚਨਾਵਾਂ ਇੱਥੇ ਦਿਖਾਈ ਦਿੰਦੀਆਂ ਹਨ। ਇਹਨਾਂ ਨੂੰ {{days}} ਦਿਨਾਂ ਲਈ ਰੱਖਿਆ ਜਾਂਦਾ ਹੈ।",
+      "emptyBody_other": "ਇਸ ਖਾਤੇ ਨੂੰ ਮਿਲਣ ਵਾਲੀਆਂ ਸੂਚਨਾਵਾਂ ਇੱਥੇ ਦਿਖਾਈ ਦਿੰਦੀਆਂ ਹਨ। ਇਹਨਾਂ ਨੂੰ {{days}} ਦਿਨਾਂ ਲਈ ਰੱਖਿਆ ਜਾਂਦਾ ਹੈ।",
       "capped": "ਸਭ ਤੋਂ ਨਵੀਆਂ ਸੂਚਨਾਵਾਂ ਦਿਖਾਈਆਂ ਜਾ ਰਹੀਆਂ ਹਨ।",
       "loadError": "ਸੂਚਨਾਵਾਂ ਦਾ ਇਤਿਹਾਸ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
       "openFailed": "ਇਹ ਸੂਚਨਾ ਹੁਣ ਕਿਤੇ ਵੀ ਨਹੀਂ ਖੁੱਲ੍ਹਦੀ।"
@@ -1290,6 +1307,7 @@
       "manageAccess": "ਪਹੁੰਚ ਦਾ ਪ੍ਰਬੰਧ ਕਰੋ",
       "bitbucketNoRepositoriesDescription": "ਇਸ Bitbucket ਵਰਕਸਪੇਸ ਵਿੱਚ ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
       "gitlabNoRepositoriesDescription": "ਤੁਹਾਨੂੰ GitLab 'ਤੇ ਹੋਰ ਸਮੂਹਾਂ ਜਾਂ ਪ੍ਰੋਜੈਕਟਾਂ ਤੱਕ ਪਹੁੰਚ ਦੇਣ ਦੀ ਲੋੜ ਹੋ ਸਕਦੀ ਹੈ।",
+      "githubNoRepositoriesDescription": "ਜਾਂਚੋ ਕਿ Kilo GitHub ਐਪ ਨੂੰ ਰਿਪੋਜ਼ਟਰੀਆਂ ਤੱਕ ਪਹੁੰਚ ਹੈ, ਫਿਰ ਰਿਫਰੈਸ਼ ਕਰੋ।",
       "installGithubApp": "ਰਿਪੋਜ਼ਟਰੀਆਂ 'ਤੇ GitHub ਐਪ ਸਥਾਪਤ ਕਰੋ",
       "installGithubAppDescription": "Kilo GitHub ਐਪ ਨੂੰ ਉਨ੍ਹਾਂ ਰਿਪੋਜ਼ਟਰੀਆਂ ਤੱਕ ਪਹੁੰਚ ਦਿਓ ਜਿਨ੍ਹਾਂ ਦੀ ਤੁਸੀਂ ਸਮੀਖਿਆ ਕਰਵਾਉਣੀ ਚਾਹੁੰਦੇ ਹੋ।",
       "repositoryAccess": "ਰਿਪੋਜ਼ਟਰੀ ਤੱਕ ਪਹੁੰਚ",
@@ -1323,7 +1341,7 @@
       "findingsInProgress": "ਇਹ ਸਮੀਖਿਆ ਹਾਲੇ ਚੱਲ ਰਹੀ ਹੈ। ਪੂਰੀ ਹੋਣ 'ਤੇ ਸਮੱਸਿਆਵਾਂ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੀਆਂ।",
       "findingsEndedWithoutResults": "ਇਹ ਸਮੀਖਿਆ ਸਮੇਂ ਤੋਂ ਪਹਿਲਾਂ ਖ਼ਤਮ ਹੋ ਗਈ — ਇਸ ਨੇ ਕੋਈ ਸਮੱਸਿਆ ਨਹੀਂ ਮਿਲੀ।",
       "serviceUnavailable": "ਕੋਡ ਸਮੀਖਿਆ ਸੇਵਾ ਨਾਲ ਸੰਪਰਕ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਸੇਵਾ ਉਪਲਬਧ ਹੋਣ 'ਤੇ ਸਮੀਖਿਆ ਦੁਬਾਰਾ ਕਰੋ।",
-      "reviewFailed": "ਸਮੀਖਿਆ ਅਸਫਲ ਹੋ ਗਈ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "reviewFailed": "ਸਮੀਖਿਆ ਅਸਫਲ ਹੋ ਗਈ।",
       "showMore": "ਹੋਰ ਦਿਖਾਓ",
       "created": "ਬਣਾਇਆ ਗਿਆ",
       "started": "ਸ਼ੁਰੂ ਕੀਤਾ ਗਿਆ",
@@ -1445,6 +1463,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} ਦਾ Bitbucket ਕਨੈਕਸ਼ਨ ਕੰਪਿਊਟਰ ਤੋਂ ਵੈੱਬ ਉੱਤੇ ਪ੍ਰਬੰਧਿਤ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।",
+      "deniedManagedByOwner": "ਜੋ ਕਨੈਕਸ਼ਨ ਤੁਸੀਂ ਨਹੀਂ ਬਦਲ ਸਕਦੇ, ਉਸ ਨੂੰ ਬਦਲਣ ਲਈ {{organization}} ਦੇ ਮਾਲਕ ਨੂੰ ਕਹੋ।",
+      "deniedConnectRole": "ਸਿਰਫ਼ {{organization}} ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਅਤੇ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰ ਸਕਦੇ ਹਨ।",
+      "deniedReconnectRole": "ਕਿਸੇ {{organization}} ਦੇ ਮਾਲਕ, ਐਡਮਿਨ ਜਾਂ ਬਿਲਿੰਗ ਮੈਨੇਜਰ ਨੂੰ ਇਸ ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਹੋ।",
       "managedOnWebTitle": "ਵੈੱਬ ਉੱਤੇ ਪ੍ਰਬੰਧਿਤ",
       "managedOnWebShort": "ਇਹ ਕਨੈਕਸ਼ਨ ਕੰਪਿਊਟਰ ਤੋਂ ਵੈੱਬ ਉੱਤੇ ਪ੍ਰਬੰਧਿਤ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।",
       "managedOnWebRepositories": "ਕੰਪਿਊਟਰ ਤੋਂ ਵੈੱਬ ਉੱਤੇ {{organization}} ਲਈ ਰਿਪੋਜ਼ਟਰੀਆਂ ਚੁਣੋ।",
@@ -1582,7 +1603,9 @@
       "unavailablePersonallySwitchAction": "ਸੰਸਥਾ ਬਦਲੋ",
       "unavailableOrganizationTitle": "ਕੌਂਸਲ ਸਮੀਖਿਆ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ",
       "unavailableForOrganization": "ਕੌਂਸਲ ਸਮੀਖਿਆ ਲਈ ਸਰਗਰਮ ਸਬਸਕ੍ਰਿਪਸ਼ਨ ਜਾਂ ਟ੍ਰਾਇਲ ਵਾਲੀ Enterprise ਯੋਜਨਾ ਦੀ ਲੋੜ ਹੈ। ਇਸ ਸੰਸਥਾ ਕੋਲ ਇਹ ਹੁਣ ਨਹੀਂ ਹੈ।",
-      "unavailableForOrganizationNeutral": "ਕੌਂਸਲ ਸਮੀਖਿਆ ਇਸ ਸੰਸਥਾ ਲਈ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਬਾਅਦ ਵਿੱਚ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "unavailablePlanCheck": "ਕੌਂਸਲ ਸਮੀਖਿਆ ਇਸ ਸੰਸਥਾ ਦੀ ਯੋਜਨਾ ਦੀ ਜਾਂਚ ਨਹੀਂ ਕਰ ਸਕੀ। ਦੁਬਾਰਾ ਜਾਂਚ ਕਰਨ ਲਈ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "unavailableFlagRollout": "ਕੌਂਸਲ ਸਮੀਖਿਆ ਇਸ ਸੰਸਥਾ ਲਈ ਅਜੇ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਇਸਨੂੰ ਪ੍ਰਾਪਤ ਕਰਨ ਲਈ ਐਪ ਨੂੰ ਨਵੀਨਤਮ ਸੰਸਕਰਣ ਵਿੱਚ ਅੱਪਡੇਟ ਕਰੋ।",
+      "unavailableForOrganizationMember": "ਕੌਂਸਲ ਸਮੀਖਿਆ ਲਈ ਸਰਗਰਮ ਸਬਸਕ੍ਰਿਪਸ਼ਨ ਜਾਂ ਟ੍ਰਾਇਲ ਵਾਲੀ Enterprise ਯੋਜਨਾ ਦੀ ਲੋੜ ਹੈ। ਸੰਸਥਾ ਦਾ ਮਾਲਕ ਯੋਜਨਾ ਬਦਲ ਸਕਦਾ ਹੈ।",
       "unavailableOnBitbucket": "ਕੌਂਸਲ ਸਮੀਖਿਆ Bitbucket ਰਿਪੋਜ਼ਿਟਰੀਆਂ ਲਈ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
       "noRepositories": "ਹਾਲੇ ਕੋਈ ਰਿਪੋਜ਼ਿਟਰੀ ਨਹੀਂ ਚੁਣੀ ਗਈ। ਪਹਿਲਾਂ ਰਿਪੋਜ਼ਿਟਰੀ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਰਿਪੋਜ਼ਿਟਰੀਆਂ ਚੁਣੋ।",
       "specialists": "ਮਾਹਰ",
@@ -2557,8 +2580,7 @@
       "searchPlaceholder": "ਰਿਪੋਜ਼ਿਟਰੀਆਂ ਖੋਜੋ",
       "noMatches": "ਕੋਈ ਮੇਲ ਨਹੀਂ",
       "noRepositories": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਉਪਲਬਧ ਨਹੀਂ",
-      "noRepositoriesDescription": "ਤੁਹਾਡੇ ਖਾਤੇ ਨਾਲ ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਕਨੈਕਟ ਨਹੀਂ ਹੈ।",
-      "loading": "ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ…",
+      "noRepositoriesDescription": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਕਰਨ ਲਈ GitHub ਜਾਂ GitLab ਖਾਤਾ ਜੋੜੋ।",
       "accessibility": "ਰਿਪੋਜ਼ਟਰੀ: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3457,7 +3479,7 @@
       "manageOnWeb": "ਵੈੱਬ 'ਤੇ ਬਿਲਿੰਗ ਸੈਟਿੰਗਾਂ",
       "changePlan": "ਪਲਾਨ ਬਦਲੋ",
       "buySeats": "ਸੀਟਾਂ ਖਰੀਦੋ",
-      "managedOnWeb": "ਪਲਾਨ, ਸੀਟਾਂ ਅਤੇ ਆਟੋ ਟੌਪ-ਅੱਪ ਦਾ ਪ੍ਰਬੰਧਨ ਵੈੱਬ ਉੱਤੇ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।",
+      "managedOnWeb": "ਪਲਾਨ, ਸੀਟਾਂ ਅਤੇ ਆਟੋ ਟੌਪ-ਅੱਪ ਦਾ ਪ੍ਰਬੰਧਨ kilo.ai 'ਤੇ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।",
       "setupAutoTopUp": "ਆਟੋ ਟੌਪ-ਅੱਪ ਸੈੱਟ ਕਰੋ",
       "manageAutoTopUp": "ਆਟੋ ਟੌਪ-ਅੱਪ ਪ੍ਰਬੰਧ ਕਰੋ",
       "opensOnWeb": "ਵੈੱਬ 'ਤੇ ਖੁੱਲ੍ਹਦਾ ਹੈ"
@@ -3643,10 +3665,10 @@
       "nameLabel": "ਮੋਡ ਦਾ ਨਾਮ",
       "nameRequired": "ਮੋਡ ਦਾ ਨਾਮ ਦਰਜ ਕਰੋ।",
       "notFound": "ਇਹ ਮੋਡ ਹੁਣ ਮੌਜੂਦ ਨਹੀਂ ਹੈ।",
-      "restrictionHint": "ਸਿਰਫ਼ ਉਹ ਫ਼ਾਈਲਾਂ ਸੋਧੀਆਂ ਜਾ ਸਕਦੀਆਂ ਹਨ ਜੋ ਇਸ ਪੈਟਰਨ ਨਾਲ ਮੇਲ ਖਾਂਦੀਆਂ ਹਨ। ਹਰ ਫ਼ਾਈਲ ਦੀ ਆਗਿਆ ਦੇਣ ਲਈ ਇਸ ਨੂੰ ਖਾਲੀ ਛੱਡੋ।",
-      "restrictionInvalid": "ਵੈਧ ਪੈਟਰਨ ਦਰਜ ਕਰੋ।",
+      "restrictionHint": "ਇੱਕ ਰੈਗੂਲਰ ਐਕਸਪ੍ਰੈਸ਼ਨ ਉਹ ਫ਼ਾਈਲਾਂ ਚੁਣਦਾ ਹੈ ਜੋ ਇਹ ਮੋਡ ਸੋਧ ਸਕਦਾ ਹੈ, ਉਦਾਹਰਨ ਲਈ ਸਿਰਫ਼ markdown ਫ਼ਾਈਲਾਂ ਲਈ `\\.md$`। ਹਰ ਫ਼ਾਈਲ ਦੀ ਆਗਿਆ ਦੇਣ ਲਈ ਇਸ ਨੂੰ ਖਾਲੀ ਛੱਡੋ।",
+      "restrictionInvalid": "ਵੈਧ ਰੈਗੂਲਰ ਐਕਸਪ੍ਰੈਸ਼ਨ ਦਰਜ ਕਰੋ।",
       "restrictionLabel": "ਪਾਬੰਦੀ ਲੇਬਲ",
-      "restrictionPattern": "ਫ਼ਾਈਲ ਪੈਟਰਨ",
+      "restrictionPattern": "ਫ਼ਾਈਲ ਪਾਬੰਦੀ",
       "roleLabel": "ਭੂਮਿਕਾ ਦੀ ਪਰਿਭਾਸ਼ਾ",
       "roleRequired": "ਦੱਸੋ ਕਿ ਇਹ ਮੋਡ ਕੀ ਕਰਦਾ ਹੈ।",
       "tool": {
@@ -4403,6 +4425,7 @@
       "promptPlaceholder": "ਤੁਸੀਂ ਇੱਕ…",
       "tools": "ਸੰਦ",
       "wholeToolRule": "ਇਹ ਏਜੰਟ ਹਰ ਸੰਦ ਉੱਤੇ ਇੱਕੋ ਸਮੇਂ ਇੱਕ ਨਿਯਮ ਲਾਗੂ ਕਰਦਾ ਹੈ: {{rule}}। ਇਹ ਸਵਿੱਚਾਂ ਸਿਰਫ਼-ਪੜ੍ਹਨ ਲਈ ਹਨ।",
+      "toolRule": "ਸੰਭਾਲਿਆ ਨਿਯਮ: {{rule}}",
       "visibility": "ਦਿੱਖ",
       "visibilityPrimary": "ਪ੍ਰਾਇਮਰੀ — ਚੋਣਕਾਰ ਵਿੱਚ ਦਿਖਾਇਆ ਗਿਆ ਹੈ",
       "visibilitySubagent": "ਸਬਜੈਂਟ — ਸਿਰਫ਼ ਦੂਜਿਆਂ ਤੋਂ ਕਾਲ ਕਰਨ ਯੋਗ",
@@ -4512,20 +4535,34 @@
       "deductionFallback": "ਕ੍ਰੈਡਿਟ ਕਟੌਤੀ",
       "emptyDescription": "ਕ੍ਰੈਡਿਟ ਖਰੀਦਾਂ, ਰਸੀਦਾਂ ਅਤੇ ਵਰਤੋਂ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੀਆਂ।",
       "emptyTitle": "ਕੋਈ ਕ੍ਰੈਡਿਟ ਇਤਿਹਾਸ ਨਹੀਂ",
+      "expiredGrant": "ਮਿਆਦ ਪੁੱਗ ਗਈ: {{description}}",
       "googlePlayReceipt": "Google Play ਤੋਂ ਰਸੀਦ",
       "kind": {
         "adjustment": "ਸਮਾਯੋਜਨ",
         "balanceNeutral": "ਬਕਾਇਆ ਅਪਰਿਵਰਤਿਤ",
         "deduction": "ਕਟੌਤੀ",
         "grant": "ਕ੍ਰੈਡਿਟ ਗ੍ਰਾਂਟ",
+        "promotionalCredits": "ਪ੍ਰੋਮੋਸ਼ਨਲ ਕ੍ਰੈਡਿਟ",
         "welcomeCredits": "ਸੁਆਗਤ ਕ੍ਰੈਡਿਟ",
         "purchase": "ਖਰੀਦ"
+      },
+      "program": {
+        "adminBulkGrant": "ਐਡਮਿਨ ਕ੍ਰੈਡਿਟ ਗ੍ਰਾਂਟ",
+        "contributorChampion": "ਯੋਗਦਾਨੀ ਚੈਂਪੀਅਨ ਕ੍ਰੈਡਿਟ",
+        "feedback": "ਫੀਡਬੈਕ ਕ੍ਰੈਡਿਟ",
+        "influencer": "ਇਨਫਲੂਐਂਸਰ ਕ੍ਰੈਡਿਟ",
+        "ossMonthlyReset": "ਓਪਨ ਸੋਰਸ ਸਪਾਂਸਰਸ਼ਿਪ ਦਾ ਮਹੀਨਾਵਾਰ ਰੀਸੈਟ",
+        "ossSponsorship": "ਓਪਨ ਸੋਰਸ ਸਪਾਂਸਰਸ਼ਿਪ ਕ੍ਰੈਡਿਟ",
+        "pullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਕ੍ਰੈਡਿਟ",
+        "usageIssue": "ਵਰਤੋਂ ਸਮੱਸਿਆ ਕ੍ਰੈਡਿਟ",
+        "vibeDay": "Vibe day ਕ੍ਰੈਡਿਟ"
       },
       "purchaseFallback": "ਕ੍ਰੈਡਿਟ ਖਰੀਦ",
       "receipt": "ਰਸੀਦ",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} ਲਈ ਰਸੀਦ ਖੋਲ੍ਹੋ",
       "receiptUnavailable": "ਇਸ ਖਰੀਦ ਲਈ ਕੋਈ ਰਸੀਦ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
-      "retentionLimit": "ਸਭ ਤੋਂ ਨਵਾਂ ਕ੍ਰੈਡਿਟ ਇਤਿਹਾਸ ਦਿਖਾਇਆ ਜਾ ਰਿਹਾ ਹੈ।"
+      "retentionLimit": "ਸਭ ਤੋਂ ਨਵਾਂ ਕ੍ਰੈਡਿਟ ਇਤਿਹਾਸ ਦਿਖਾਇਆ ਜਾ ਰਿਹਾ ਹੈ।",
+      "voidedGrant": "ਰੱਦ ਕੀਤਾ: {{description}}"
     },
     "title": "ਕ੍ਰੈਡਿਟ ਖਰੀਦੋ",
     "description": "ਕ੍ਰੈਡਿਟ ਇੱਕ-ਵਾਰ ਦੀ ਖਰੀਦ ਹੈ ਜੋ Kilo ਐਪ ਵਿੱਚ AI ਕੋਡਿੰਗ ਸੈਸ਼ਨ ਚਲਾਉਣ ਲਈ ਤੁਹਾਡੇ Kilo ਬੈਲੰਸ ਵਿੱਚ ਜੋੜੀ ਜਾਂਦੀ ਹੈ। ਸਟੋਰ ਤੁਹਾਡੇ ਖਾਤੇ ਤੋਂ ਚਾਰਜ ਲੈਂਦਾ ਹੈ ਅਤੇ ਸਟੋਰ ਵੱਲੋਂ ਭੁਗਤਾਨ ਦੀ ਪੁਸ਼ਟੀ ਕਰਨ ਤੋਂ ਬਾਅਦ ਕ੍ਰੈਡਿਟ ਜੋੜੇ ਜਾਂਦੇ ਹਨ।",
@@ -4861,6 +4898,9 @@
       "runAsCreator": "ਮੇਰੇ ਵਜੋਂ ਚਲਾਓ",
       "runAsCreatorDescription": "ਹਰ ਰਨ ਤੁਹਾਡੇ ਖਾਤੇ ਦੀ ਵਰਤੋਂ ਕਰਦਾ ਹੈ, ਇਸ ਲਈ ਗੁਪਤ ਹੈਡਰ ਲਾਜ਼ਮੀ ਹੈ।",
       "saveFailedTitle": "ਟ੍ਰਿਗਰ ਸੰਭਾਲਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ",
+      "nameTaken": "“{{name}}” ਨਾਮ ਦਾ ਟ੍ਰਿਗਰ ਪਹਿਲਾਂ ਹੀ ਮੌਜੂਦ ਹੈ।",
+      "saveFailedRetry": "ਸਰਵਰ ਤੱਕ ਨਹੀਂ ਪਹੁੰਚ ਸਕੇ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "saveFailedCheck": "ਫ਼ਾਰਮ ਵਿੱਚ ਦਿੱਤੇ ਮੁੱਲ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "deleteTitle": "ਇਹ ਟ੍ਰਿਗਰ ਮਿਟਾਉਣਾ ਹੈ?",
       "deleteMessage": "{{name}} ਲਈ ਕਾਲਾਂ ਫੇਲ੍ਹ ਹੋਣਗੀਆਂ। ਇਸਨੂੰ ਵਾਪਸ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ।",
       "deleteMessageScheduled": "{{name}} ਟ੍ਰਿਗਰ ਦੇ ਨਿਰਧਾਰਿਤ ਰਨ ਰੁਕ ਜਾਣਗੇ। ਇਸਨੂੰ ਵਾਪਸ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ।",
@@ -5105,6 +5145,20 @@
       "eu": "ਯੂਰਪੀ ਸੰਘ",
       "au": "ਆਸਟ੍ਰੇਲੀਆ",
       "jp": "ਜਾਪਾਨ"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "ਤਰਜੀਹਾਂ ਦੀ ਖੋਜ",
+    "noMatches": "ਕੋਈ ਮੇਲ ਖਾਂਦੀ ਤਰਜੀਹ ਨਹੀਂ",
+    "emptyDescription": "ਕਿਸੇ ਹੋਰ ਤਰਜੀਹ ਦੇ ਨਾਮ ਜਾਂ ਮੁੱਖ ਸ਼ਬਦ ਨਾਲ ਖੋਜੋ।",
+    "resultsStatus": "ਮਿਲੀਆਂ ਤਰਜੀਹਾਂ: {{resultCount}}",
+    "keywords": {
+      "signOut": "ਸਾਈਨ ਆਊਟ|ਬਾਹਰ ਨਿਕਲੋ",
+      "appearance": "ਦਿੱਖ|ਥੀਮ|ਰੰਗ",
+      "appUnlock": "ਬਾਇਓਮੈਟ੍ਰਿਕਸ|ਚਿਹਰਾ|ਉਂਗਲ ਦੀ ਛਾਪ",
+      "language": "ਭਾਸ਼ਾ|ਅਨੁਵਾਦ",
+      "notifications": "ਸੂਚਨਾਵਾਂ|ਚੇਤਾਵਨੀਆਂ",
+      "privacy": "ਵਿਸ਼ਲੇਸ਼ਣ|ਨਿਗਰਾਨੀ|ਗੋਪਨੀਯਤਾ"
     }
   }
 }

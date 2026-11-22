@@ -13,7 +13,10 @@ import {
 const THINKING_BINDING_BETA = 'thinking-binding-controls-2026-08-01';
 
 /**
- * Claude models of every family from version 5.1 on, including `-latest` aliases, are matched.
+ * Two rules decide the match. A Claude id that ends in `-latest` is admitted with no version check,
+ * because the alias names whichever model is current. Every other Claude id must have version 5.1
+ * or newer.
+ *
  * The models known to bind each thinking block to its system prompt, tools, and earlier messages are Fable
  * 5.1 and Opus, Sonnet, and Haiku 5.5, and newer models are assumed to keep doing so. Provider
  * accounts created on or after 2026-08-31 reject a replayed block whose prefix changed, failing the

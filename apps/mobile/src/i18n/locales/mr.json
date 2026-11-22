@@ -309,6 +309,7 @@
     "hideBalance": "शिल्लक लपवा",
     "showBalance": "शिल्लक दाखवा",
     "balanceHidden": "शिल्लक लपवली आहे",
+    "availableToSpendInOrganization": "या संस्थेत खर्च करण्यासाठी उपलब्ध",
     "signOutTitle": "साइन आउट करायचे?",
     "signOutMessage": "तुमच्या वर्कस्पेसमध्ये प्रवेश करण्यासाठी तुम्हाला पुन्हा साइन इन करावे लागेल.",
     "deleteAccountTitle": "खाते हटवायचे?",
@@ -538,7 +539,17 @@
       "nextStepInReview": "या तक्रारीचा निर्णय या स्क्रीनवर दिसेल आणि निर्णयानंतर तुम्ही अपील करू शकता.",
       "nextStepAppeal": "अपीलचा निर्णय या स्क्रीनवर दिसेल.",
       "nextStepFinal": "अपीलचा निर्णय अंतिम आहे. आता पुढील अपील दाखल करता येणार नाही.",
-      "viewReceipt": "पावती पहा"
+      "viewReceipt": "पावती पहा",
+      "targetLabel": "तक्रार केलेली बाब",
+      "reasonLabel": "तक्रारीचे कारण",
+      "targetMessage": "कृत्रिम बुद्धिमत्तेचे उत्तर",
+      "targetComment": "पुल रिक्वेस्टमधील टिप्पणी",
+      "targetUser": "व्यक्ती",
+      "reasonHarmful": "हानिकारक सामग्री",
+      "reasonIllegal": "बेकायदेशीर सामग्री",
+      "reasonHarassment": "छळवणूक",
+      "reasonSpam": "अवांछित जाहिरात",
+      "reasonOther": "इतर कारण"
     },
     "reportReceipts": {
       "title": "तक्रारी",
@@ -555,7 +566,10 @@
     "changelogFixesPolish": "संपूर्ण अ‍ॅपमध्ये दुरुस्त्या आणि सुधारणा.",
     "changelogAreas": {
       "signIn": "साइन इन",
-      "profileOrganizations": "प्रोफाइल व संस्था"
+      "profileOrganizations": "प्रोफाइल व संस्था",
+      "chat": "चॅट",
+      "notifications": "सूचना",
+      "integrations": "इंटिग्रेशन्स"
     }
   },
   "preferences": {
@@ -996,8 +1010,9 @@
       "checkActiveConnection": "कनेक्शन सक्रिय आहे, परंतु हा आयटम अजूनही लोड करता येत नाही.",
       "bitbucketOrgOnlyDescription": "त्याच्या Bitbucket पुल रिक्वेस्ट तपासण्यासाठी वरील खाते एका संस्थेत बदला.",
       "bitbucketOrgOnlyNoOrganizationDescription": "या खात्याशी अजून कोणतीही संस्था जोडलेली नाही. संस्था तयार केल्यानंतर किंवा त्यात सामील झाल्यानंतर तुम्ही Bitbucket पुल रिक्वेस्ट तपासू शकता.",
-      "gitlabReconnectAdminOnlyDescription": "संस्थेच्या मालक, प्रशासक किंवा बिलिंग व्यवस्थापकाला ते पुन्हा जोडण्यास सांगा.",
+      "reconnectAdminOnlyDescription": "संस्थेच्या मालक, प्रशासक किंवा बिलिंग व्यवस्थापकाला ते पुन्हा जोडण्यास सांगा.",
       "bitbucketNotConnectedTitle": "Bitbucket जोडलेले नाही",
+      "bitbucketAdminOnlyDescription": "संस्थेच्या मालक, प्रशासक किंवा बिलिंग व्यवस्थापकाला ते जोडण्यास सांगा.",
       "adminOnlyConnectDescription": "केवळ संस्थेचे मालक, प्रशासक आणि बिलिंग व्यवस्थापक ते जोडू शकतात.",
       "contextLine": "{{organization}} साठी",
       "contextLinePersonal": "तुमच्या वैयक्तिक खात्यासाठी"
@@ -1210,6 +1225,8 @@
       "emptyTitle": "अद्याप सूचना नाहीत",
       "emptyCategoryTitle": "या श्रेणीत सूचना नाहीत",
       "emptyBody": "या खात्याला मिळणाऱ्या सूचना येथे दिसतात. त्या {{days}} दिवसांसाठी ठेवल्या जातात.",
+      "emptyBody_one": "या खात्याला मिळणाऱ्या सूचना येथे दिसतात. त्या {{days}} दिवसांसाठी ठेवल्या जातात.",
+      "emptyBody_other": "या खात्याला मिळणाऱ्या सूचना येथे दिसतात. त्या {{days}} दिवसांसाठी ठेवल्या जातात.",
       "capped": "सर्वात अलीकडच्या सूचना दाखवल्या जात आहेत.",
       "loadError": "सूचनांचा इतिहास लोड करता आला नाही.",
       "openFailed": "ही सूचना आता कुठेही उघडत नाही."
@@ -1290,6 +1307,7 @@
       "manageAccess": "प्रवेश व्यवस्थापित करा",
       "bitbucketNoRepositoriesDescription": "या Bitbucket वर्कस्पेसमध्ये कोणतीही रिपॉझिटरी उपलब्ध नाही.",
       "gitlabNoRepositoriesDescription": "GitLab वरील आणखी गट किंवा प्रकल्पांसाठी प्रवेशाची परवानगी द्यावी लागू शकते.",
+      "githubNoRepositoriesDescription": "Kilo GitHub अ‍ॅपला रिपॉझिटरी वापरण्याची परवानगी आहे का ते तपासा, नंतर रिफ्रेश करा.",
       "installGithubApp": "रिपॉझिटरींसाठी GitHub ॲप इन्स्टॉल करा",
       "installGithubAppDescription": "ज्या रिपॉझिटरींचे पुनरावलोकन हवे आहे, त्यांमध्ये Kilo GitHub ॲपला प्रवेश द्या.",
       "repositoryAccess": "रिपॉझिटरीमधील प्रवेश",
@@ -1323,7 +1341,7 @@
       "findingsInProgress": "हे पुनरावलोकन अजून सुरू आहे. ते पूर्ण झाल्यावर निष्कर्ष येथे दिसतील.",
       "findingsEndedWithoutResults": "हे पुनरावलोकन कोणतेही निष्कर्ष निर्माण होण्यापूर्वीच संपले.",
       "serviceUnavailable": "कोड पुनरावलोकन सेवेशी संपर्क साधता आला नाही. सेवा उपलब्ध झाल्यावर पुनरावलोकन पुन्हा करा.",
-      "reviewFailed": "पुनरावलोकन अयशस्वी झाले. कृपया पुन्हा प्रयत्न करा.",
+      "reviewFailed": "पुनरावलोकन अयशस्वी झाले.",
       "showMore": "आणखी दाखवा",
       "created": "तयार केले",
       "started": "सुरू झाले",
@@ -1445,6 +1463,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} चे Bitbucket कनेक्शन संगणकावरून वेबवर व्यवस्थापित केले जाते.",
+      "deniedManagedByOwner": "जे कनेक्शन तुम्ही बदलू शकत नाही ते बदलण्यासाठी {{organization}} च्या मालकाला विचारा.",
+      "deniedConnectRole": "केवळ {{organization}} चे मालक, प्रशासक आणि बिलिंग व्यवस्थापक ते जोडू शकतात.",
+      "deniedReconnectRole": "{{organization}} च्या मालक, प्रशासक किंवा बिलिंग व्यवस्थापकाला ते पुन्हा जोडण्यास सांगा.",
       "managedOnWebTitle": "वेबवर व्यवस्थापित",
       "managedOnWebShort": "हे कनेक्शन संगणकावरून वेबवर व्यवस्थापित केले जाते.",
       "managedOnWebRepositories": "{{organization}} साठीच्या रेपॉजिटरीज संगणकावरून वेबवर निवडा.",
@@ -1582,7 +1603,9 @@
       "unavailablePersonallySwitchAction": "संस्था बदला",
       "unavailableOrganizationTitle": "पुनरावलोकन मंडळ सध्या उपलब्ध नाही",
       "unavailableForOrganization": "पुनरावलोकन मंडळासाठी सक्रिय सदस्यता किंवा चाचणी असलेला Enterprise प्लॅन आवश्यक आहे. या संस्थेकडे सध्या तो नाही.",
-      "unavailableForOrganizationNeutral": "पुनरावलोकन मंडळ या संस्थेसाठी सध्या उपलब्ध नाही. कृपया नंतर पुन्हा प्रयत्न करा.",
+      "unavailablePlanCheck": "पुनरावलोकन मंडळ या संस्थेचा प्लॅन तपासू शकले नाही. पुन्हा तपासण्यासाठी पुन्हा प्रयत्न करा.",
+      "unavailableFlagRollout": "पुनरावलोकन मंडळ या संस्थेसाठी अद्याप उपलब्ध नाही. ते मिळवण्यासाठी अॅप नवीनतम आवृत्तीवर अपडेट करा.",
+      "unavailableForOrganizationMember": "पुनरावलोकन मंडळासाठी सक्रिय सदस्यता किंवा चाचणी असलेला Enterprise प्लॅन आवश्यक आहे. संस्थेचा मालक प्लॅन बदलू शकतो.",
       "unavailableOnBitbucket": "पुनरावलोकन मंडळ Bitbucket रिपॉझिटरीसाठी उपलब्ध नाही.",
       "noRepositories": "अद्याप कोणत्याही रिपॉझिटरी निवडल्या नाहीत. प्रथम रिपॉझिटरी सेटिंग्जमध्ये रिपॉझिटरी निवडा.",
       "specialists": "तज्ज्ञ",
@@ -2557,8 +2580,7 @@
       "searchPlaceholder": "रिपॉझिटरी शोधा",
       "noMatches": "जुळणारे परिणाम नाहीत",
       "noRepositories": "रिपॉझिटरी उपलब्ध नाहीत",
-      "noRepositoriesDescription": "तुमच्या खात्याशी कोणतीही रिपॉझिटरी जोडलेली नाही.",
-      "loading": "लोड होत आहे…",
+      "noRepositoriesDescription": "रिपॉझिटरी लोड करण्यासाठी GitHub किंवा GitLab खाते जोडा.",
       "accessibility": "रिपॉझिटरी: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3457,7 +3479,7 @@
       "manageOnWeb": "वेबवरील बिलिंग सेटिंग्ज",
       "changePlan": "प्लॅन बदला",
       "buySeats": "जागा खरेदी करा",
-      "managedOnWeb": "प्लॅन, जागा आणि ऑटो टॉप-अप वेबवर व्यवस्थापित केले जातात.",
+      "managedOnWeb": "प्लॅन, जागा आणि ऑटो टॉप-अप kilo.ai वर व्यवस्थापित केले जातात.",
       "setupAutoTopUp": "ऑटो टॉप-अप सेट करा",
       "manageAutoTopUp": "ऑटो टॉप-अप व्यवस्थापित करा",
       "opensOnWeb": "वेबवर उघडते"
@@ -3643,10 +3665,10 @@
       "nameLabel": "मोडचे नाव",
       "nameRequired": "मोडचे नाव प्रविष्ट करा.",
       "notFound": "हा मोड आता अस्तित्वात नाही.",
-      "restrictionHint": "फक्त या पॅटर्नशी जुळणाऱ्या फाइल्स संपादित करता येतील. प्रत्येक फाइलला परवानगी देण्यासाठी ते रिकामे ठेवा.",
-      "restrictionInvalid": "वैध पॅटर्न प्रविष्ट करा.",
+      "restrictionHint": "रेग्युलर एक्सप्रेशन हा मोड कोणत्या फाइल्स संपादित करू शकतो ते निवडते, उदाहरणार्थ फक्त markdown फाइल्ससाठी `\\.md$`. प्रत्येक फाइलला परवानगी देण्यासाठी ते रिकामे ठेवा.",
+      "restrictionInvalid": "वैध रेग्युलर एक्सप्रेशन प्रविष्ट करा.",
       "restrictionLabel": "निर्बंधाचे लेबल",
-      "restrictionPattern": "फाइल पॅटर्न",
+      "restrictionPattern": "फाइल निर्बंध",
       "roleLabel": "भूमिकेची व्याख्या",
       "roleRequired": "हा मोड काय करतो त्याचे वर्णन करा.",
       "tool": {
@@ -4403,6 +4425,7 @@
       "promptPlaceholder": "तुम्ही एक…",
       "tools": "साधने",
       "wholeToolRule": "हा एजंट एकाच वेळी प्रत्येक साधनावर एक नियम लागू करतो: {{rule}}. हे स्विचेस केवळ वाचनासाठी आहेत.",
+      "toolRule": "साठवलेला नियम: {{rule}}",
       "visibility": "दृश्यमानता",
       "visibilityPrimary": "प्राथमिक — पिकरमध्ये दाखवले आहे",
       "visibilitySubagent": "उपएजंट — फक्त इतरांकडून कॉल करण्यायोग्य",
@@ -4512,20 +4535,34 @@
       "deductionFallback": "क्रेडिट वजावट",
       "emptyDescription": "क्रेडिट खरेदी, पावत्या आणि वापर येथे दिसतील.",
       "emptyTitle": "क्रेडिट इतिहास नाही",
+      "expiredGrant": "कालबाह्य: {{description}}",
       "googlePlayReceipt": "Google Play कडून पावती",
       "kind": {
         "adjustment": "समायोजन",
         "balanceNeutral": "शिलकीवर परिणाम नाही",
         "deduction": "वजावट",
         "grant": "क्रेडिट अनुदान",
+        "promotionalCredits": "प्रोमोशनल क्रेडिट",
         "welcomeCredits": "स्वागत क्रेडिट",
         "purchase": "खरेदी"
+      },
+      "program": {
+        "adminBulkGrant": "प्रशासकाकडून क्रेडिट अनुदान",
+        "contributorChampion": "योगदानकर्ता चॅम्पियन क्रेडिट",
+        "feedback": "अभिप्रायासाठी क्रेडिट",
+        "influencer": "इन्फ्लुएन्सर क्रेडिट",
+        "ossMonthlyReset": "OSS प्रायोजकत्वाचा मासिक रीसेट",
+        "ossSponsorship": "OSS प्रायोजकत्व क्रेडिट",
+        "pullRequest": "पुल रिक्वेस्टसाठी क्रेडिट",
+        "usageIssue": "वापर समस्येसाठी क्रेडिट",
+        "vibeDay": "Vibe दिवस क्रेडिट"
       },
       "purchaseFallback": "क्रेडिट खरेदी",
       "receipt": "पावती",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} ची पावती उघडा",
       "receiptUnavailable": "या खरेदीसाठी पावती उपलब्ध नाही.",
-      "retentionLimit": "सर्वात अलीकडचा क्रेडिट इतिहास दाखवला जात आहे."
+      "retentionLimit": "सर्वात अलीकडचा क्रेडिट इतिहास दाखवला जात आहे.",
+      "voidedGrant": "रद्द केले: {{description}}"
     },
     "title": "क्रेडिट्स खरेदी करा",
     "description": "क्रेडिट्स ही Kilo App मध्ये AI कोडिंग सत्रे चालवण्यासाठी तुमच्या Kilo शिल्लकीत जोडली जाणारी एक-वेळची खरेदी आहे. स्टोअर तुमच्या खात्यातून शुल्क घेते आणि स्टोअर पेमेंटची पुष्टी केल्यानंतर क्रेडिट्स जोडली जातात.",
@@ -4861,6 +4898,9 @@
       "runAsCreator": "माझ्या रूपात चालवा",
       "runAsCreatorDescription": "प्रत्येक रन तुमचे खाते वापरते, त्यामुळे सीक्रेट हेडर आवश्यक आहे.",
       "saveFailedTitle": "ट्रिगर जतन करता आला नाही",
+      "nameTaken": "“{{name}}” नावाचा ट्रिगर आधीच अस्तित्वात आहे.",
+      "saveFailedRetry": "सर्व्हरपर्यंत पोहोचता आले नाही. तुमचे कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
+      "saveFailedCheck": "फॉर्ममधील मूल्ये तपासा आणि पुन्हा प्रयत्न करा.",
       "deleteTitle": "हा ट्रिगर हटवायचा?",
       "deleteMessage": "{{name}} वरचे कॉल अयशस्वी होतील. हे पूर्ववत करता येणार नाही.",
       "deleteMessageScheduled": "{{name}} चे नियोजित रन थांबतील. हे पूर्ववत करता येणार नाही.",
@@ -5105,6 +5145,20 @@
       "eu": "युरोपीय संघ",
       "au": "ऑस्ट्रेलिया",
       "jp": "जपान"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "प्राधान्यांचा शोध",
+    "noMatches": "जुळणारी प्राधान्ये नाहीत",
+    "emptyDescription": "प्राधान्याचे वेगळे नाव किंवा शोधशब्द वापरून पाहा.",
+    "resultsStatus": "सापडलेली प्राधान्ये: {{resultCount}}",
+    "keywords": {
+      "signOut": "बाहेर पडा|सत्र समाप्ती",
+      "appearance": "स्वरूप|रंगसंगती|गडद मोड",
+      "appUnlock": "बायोमेट्रिक्स|चेहरा|बोटाचा ठसा",
+      "language": "भाषा|भाषांतर",
+      "notifications": "सूचना|इशारे",
+      "privacy": "विश्लेषण|मागोवा"
     }
   }
 }

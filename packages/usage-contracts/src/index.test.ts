@@ -167,6 +167,30 @@ describe('UsageRecordRequestSchema', () => {
     expect(UsageRecordRequestSchema.safeParse(request).success).toBe(true);
   });
 
+  test('rejects a fractional market_cost', () => {
+    const request = validRequest();
+    (request.metadata as Record<string, unknown>).market_cost = 12.5;
+    expect(UsageRecordRequestSchema.safeParse(request).success).toBe(false);
+  });
+
+  test('rejects a market_cost beyond safe integer range', () => {
+    const request = validRequest();
+    (request.metadata as Record<string, unknown>).market_cost = Number.MAX_SAFE_INTEGER + 2;
+    expect(UsageRecordRequestSchema.safeParse(request).success).toBe(false);
+  });
+
+  test('rejects a fractional prior_microdollar_usage', () => {
+    const request = validRequest();
+    request.prior_microdollar_usage = 12.5;
+    expect(UsageRecordRequestSchema.safeParse(request).success).toBe(false);
+  });
+
+  test('rejects a prior_microdollar_usage beyond safe integer range', () => {
+    const request = validRequest();
+    request.prior_microdollar_usage = Number.MAX_SAFE_INTEGER + 2;
+    expect(UsageRecordRequestSchema.safeParse(request).success).toBe(false);
+  });
+
   test('accepts System One usage for primary-region billing', () => {
     const request = validRequest();
     request.metadata.api_kind = 'systemone';
@@ -238,6 +262,27 @@ describe('UsageRecordResponseSchema', () => {
       status: 'not_recorded',
       result: null,
     });
+  });
+
+  test('rejects a recorded reply with a null result', () => {
+    expect(UsageRecordResponseSchema.safeParse({ status: 'recorded', result: null }).success).toBe(
+      false
+    );
+  });
+
+  test('rejects a duplicate reply with a null result', () => {
+    expect(UsageRecordResponseSchema.safeParse({ status: 'duplicate', result: null }).success).toBe(
+      false
+    );
+  });
+
+  test('rejects a not_recorded reply that carries a result', () => {
+    expect(
+      UsageRecordResponseSchema.safeParse({
+        status: 'not_recorded',
+        result: validResponse().result,
+      }).success
+    ).toBe(false);
   });
 
   test('rejects a non-UUID usageId in the result', () => {

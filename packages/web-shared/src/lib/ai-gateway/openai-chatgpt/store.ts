@@ -39,13 +39,11 @@ const NO_USAGE_LIMIT = {
  * connector is gone is not served by routing (the caller's own connection
  * serves instead) and reads as needing a reconnect on the organization's
  * settings.
- */
-
-/**
- * The account a connection belongs to. A member connection is the
- * `(kiloUserId, organizationId)` pair. The organization's shared-services
- * connection is its own single row, so no owner matches on the person who
- * connected it; routing revalidates that person from the row's `created_by`.
+ *
+ * The account a member connection belongs to is that pair; the organization's
+ * shared-services connection is its own single row, so no owner matches on the
+ * person who connected it. Routing revalidates that person from the row's
+ * `created_by`.
  */
 export type OpenAiChatGptOwner =
   | { kiloUserId: string; organizationId: string | null; scope?: undefined }
@@ -67,6 +65,17 @@ export function openAiChatGptOwnerKey(owner: OpenAiChatGptOwner): string {
 }
 
 /**
+ * The owner predicate of a shape: at least two column conditions, never absent.
+ * drizzle types `and()` as possibly absent because it accepts optional
+ * conditions; an owner shape always names its columns, so the predicate exists
+ * here. Asserting it once keeps an absent predicate, which would make a
+ * `delete(...).where(...)` unfiltered, out of every caller's reach.
+ */
+function ownerRowWhere(...conditions: [SQL, SQL, ...SQL[]]): SQL {
+  return and(...conditions) as SQL;
+}
+
+/**
  * What one owner shape contributes to the row predicate, the identity columns a
  * save writes and the upsert target. All three describe the same shape, so they
  * are returned together: a new shape that adds only some of them upserts
@@ -74,7 +83,7 @@ export function openAiChatGptOwnerKey(owner: OpenAiChatGptOwner): string {
  */
 type OpenAiChatGptOwnerShape = {
   /** Matches the owner's row for reads, updates and deletes. */
-  row: SQL | undefined;
+  row: SQL;
   /** The identity columns a save writes for this shape. */
   identity: (createdBy: string) => {
     kilo_user_id: string;
@@ -94,7 +103,7 @@ function openAiChatGptOwnerShape(owner: OpenAiChatGptOwner): OpenAiChatGptOwnerS
   if (owner.scope === 'shared_services') {
     const organizationId = owner.organizationId;
     return {
-      row: and(
+      row: ownerRowWhere(
         eq(openai_chatgpt_connections.organization_id, organizationId),
         eq(openai_chatgpt_connections.is_shared_services, true)
       ),
@@ -113,7 +122,7 @@ function openAiChatGptOwnerShape(owner: OpenAiChatGptOwner): OpenAiChatGptOwnerS
   const kiloUserId = owner.kiloUserId;
   if (owner.organizationId === null) {
     return {
-      row: and(
+      row: ownerRowWhere(
         eq(openai_chatgpt_connections.kilo_user_id, kiloUserId),
         eq(openai_chatgpt_connections.is_shared_services, false),
         isNull(openai_chatgpt_connections.organization_id)
@@ -132,7 +141,7 @@ function openAiChatGptOwnerShape(owner: OpenAiChatGptOwner): OpenAiChatGptOwnerS
 
   const organizationId = owner.organizationId;
   return {
-    row: and(
+    row: ownerRowWhere(
       eq(openai_chatgpt_connections.kilo_user_id, kiloUserId),
       eq(openai_chatgpt_connections.is_shared_services, false),
       eq(openai_chatgpt_connections.organization_id, organizationId)
@@ -150,7 +159,7 @@ function openAiChatGptOwnerShape(owner: OpenAiChatGptOwner): OpenAiChatGptOwnerS
 }
 
 /** Matches the owner's row for reads, updates and deletes. */
-export function openAiChatGptOwnerWhere(owner: OpenAiChatGptOwner): SQL | undefined {
+export function openAiChatGptOwnerWhere(owner: OpenAiChatGptOwner): SQL {
   return openAiChatGptOwnerShape(owner).row;
 }
 
@@ -210,16 +219,49 @@ export function decryptOpenAiChatGptConnection(
 }
 
 /**
+ * The payload a save and a successful refresh both write: connected, with the
+ * previous error cleared.
+ */
+export function healthyOpenAiChatGptConnection(
+  connection: OpenAiChatGptConnection
+): OpenAiChatGptConnection {
+  return { ...connection, status: 'connected', error_message: undefined, error_at: undefined };
+}
+
+/** The stored form of a connection payload. */
+export function serializeOpenAiChatGptConnection(
+  connection: OpenAiChatGptConnection
+): EncryptedData {
+  return encryptApiKey(JSON.stringify(connection), BYOK_ENCRYPTION_KEY);
+}
+
+/**
+ * The payload columns a write of the owner's connection sets: the healthy
+ * payload, encrypted, on an enabled row. One definition so a reconnect and a
+ * token rotation cannot drift apart in which columns they leave alone.
+ */
+function connectionWriteColumns(connection: OpenAiChatGptConnection) {
+  return {
+    encrypted_connection: serializeOpenAiChatGptConnection(
+      healthyOpenAiChatGptConnection(connection)
+    ),
+    is_enabled: true,
+  };
+}
+
+/**
  * The stored payload alone, without the row's `is_enabled`. The status and
  * reconnect-message path reads it: a disabled row must still report the stored
  * status. Routing must use `getOpenAiChatGptStoredConnection` instead, because
  * the ordinary BYOK toggle can disable the row without rewriting the payload.
+ *
+ * A missing row and a payload that does not decrypt both read as null, so the
+ * absent row and the unreadable credential are deliberately indistinguishable.
  */
 export async function getOpenAiChatGptConnection(
   owner: OpenAiChatGptOwner
 ): Promise<OpenAiChatGptConnection | null> {
-  const row = await readOpenAiChatGptConnectionRow(db, owner);
-  return row ? decryptOpenAiChatGptConnection(row.encrypted_connection) : null;
+  return (await getStoredConnection(db, owner))?.connection ?? null;
 }
 
 /** The stored payload together with the row's own enabled flag. */
@@ -231,6 +273,13 @@ export type OpenAiChatGptStoredConnection = {
    * not nullable, so every row records a connector.
    */
   createdBy: string;
+};
+
+/** The plan limit a row records, as the read normalizes it. */
+export type OpenAiChatGptRecordedUsageLimit = {
+  reachedAt: string;
+  resetsAt: string | null;
+  code: string | null;
 };
 
 /**
@@ -274,6 +323,25 @@ async function getStoredConnection(
 }
 
 /**
+ * Writes the owner's connection payload over the owner's row. The caller's
+ * connection is used on purpose, so a refresh can write inside the transaction
+ * that already holds the `SELECT ... FOR UPDATE` row lock. The write touches
+ * only the payload and `is_enabled`: the usage-limit columns and `created_by`
+ * are left alone, so a reconnect's connector and recorded limit survive a token
+ * rotation.
+ */
+export async function writeOpenAiChatGptConnection(
+  fromDb: OpenAiChatGptDatabase,
+  owner: OpenAiChatGptOwner,
+  connection: OpenAiChatGptConnection
+): Promise<void> {
+  await fromDb
+    .update(openai_chatgpt_connections)
+    .set(connectionWriteColumns(connection))
+    .where(openAiChatGptOwnerWhere(owner));
+}
+
+/**
  * Inserts or replaces the owner's connection. The upsert targets the owner's
  * unique index, so reconnecting never leaves a second row behind. The row is
  * always left enabled and connected with any previous error state cleared.
@@ -284,20 +352,13 @@ export async function saveOpenAiChatGptConnection(
   connection: OpenAiChatGptConnection,
   createdBy: string
 ): Promise<void> {
-  const stored: OpenAiChatGptConnection = {
-    ...connection,
-    status: 'connected',
-    error_message: undefined,
-    error_at: undefined,
-  };
-  const encrypted_connection = encryptApiKey(JSON.stringify(stored), BYOK_ENCRYPTION_KEY);
+  const columns = connectionWriteColumns(connection);
   const shape = openAiChatGptOwnerShape(owner);
   // The shared-services row records the connecting person in `created_by`; its
   // reads never match on `kilo_user_id`.
   const values = {
     ...shape.identity(createdBy),
-    encrypted_connection,
-    is_enabled: true,
+    ...columns,
     created_by: createdBy,
     ...NO_USAGE_LIMIT,
   };
@@ -316,7 +377,7 @@ export async function saveOpenAiChatGptConnection(
       set: {
         kilo_user_id: values.kilo_user_id,
         created_by: values.created_by,
-        encrypted_connection,
+        encrypted_connection: columns.encrypted_connection,
         is_enabled: true,
         ...NO_USAGE_LIMIT,
       },
@@ -335,7 +396,7 @@ export async function clearOpenAiChatGptConnection(owner: OpenAiChatGptOwner): P
 export async function readOpenAiChatGptUsageLimit(
   owner: OpenAiChatGptOwner,
   now: number = Date.now()
-): Promise<{ reachedAt: string; resetsAt: string | null; code: string | null } | null> {
+): Promise<OpenAiChatGptRecordedUsageLimit | null> {
   const rows = await db
     .select({
       usage_limit_reached_at: openai_chatgpt_connections.usage_limit_reached_at,
@@ -498,10 +559,7 @@ export async function markOpenAiChatGptConnectionErrored(
 
   await fromDb
     .update(openai_chatgpt_connections)
-    .set({
-      encrypted_connection: encryptApiKey(JSON.stringify(errored), BYOK_ENCRYPTION_KEY),
-      is_enabled: false,
-    })
+    .set({ encrypted_connection: serializeOpenAiChatGptConnection(errored), is_enabled: false })
     .where(openAiChatGptOwnerWhere(owner));
 }
 

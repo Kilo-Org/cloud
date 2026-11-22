@@ -45,7 +45,7 @@ const entries: readonly Entry[] = [
   },
   {
     subpath: './plugins/tools',
-    promises: ['questionTool', 'subagentTool', 'timeTool', 'todoTool'],
+    promises: ['questionTool', 'settingsTools', 'subagentTool', 'timeTool', 'todoTool'],
   },
   { subpath: './plugins/store/node', promises: ['layerNodeStore'] },
   { subpath: './plugins/store/expo', promises: ['layerExpoStore'] },

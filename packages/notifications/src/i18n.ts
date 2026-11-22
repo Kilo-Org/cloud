@@ -208,7 +208,7 @@ void i18n.init({
 });
 
 /** The locale tags a push catalog is registered under: every tag the resolver can return. */
-type PushLocale = keyof typeof pushCatalogs;
+export type PushLocale = keyof typeof pushCatalogs;
 
 /** Runtime membership in `pushCatalogs`, which is also the compile-time boundary of `PushLocale`. */
 function isPushLocale(locale: string): locale is PushLocale {

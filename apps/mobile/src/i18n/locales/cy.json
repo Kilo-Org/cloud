@@ -313,6 +313,7 @@
     "hideBalance": "Cuddio'r balans",
     "showBalance": "Dangos y balans",
     "balanceHidden": "Balans wedi'i guddio",
+    "availableToSpendInOrganization": "Ar gael i'w wario yn y sefydliad hwn",
     "signOutTitle": "Allgofnodi?",
     "signOutMessage": "Bydd angen i ti fewngofnodi eto i gael mynediad i dy weithle.",
     "deleteAccountTitle": "Dileu cyfrif?",
@@ -530,8 +531,8 @@
       "triageActioned": "Wedi'i gadarnhau",
       "triageRejected": "Heb ei gadarnhau",
       "appealNone": "Dim un wedi'i chyflwyno",
-      "appealSubmitted": "Wrthi'n cael ei adolygu",
-      "appealAccepted": "Wedi'i dderbyn",
+      "appealSubmitted": "Apêl yn cael ei hadolygu",
+      "appealAccepted": "Apêl wedi'i dderbyn",
       "appealRejected": "Wedi'i gwrthod",
       "appeal": "Apelio yn erbyn y penderfyniad hwn",
       "appealTitle": "Apelio yn erbyn y penderfyniad hwn?",
@@ -542,7 +543,17 @@
       "nextStepInReview": "Bydd y canlyniad yn ymddangos ar y sgrin hon, ac fe allwch apelio ar ôl penderfyniad.",
       "nextStepAppeal": "Bydd canlyniad eich apêl yn ymddangos ar y sgrin hon.",
       "nextStepFinal": "Mae penderfyniad yr apêl yn derfynol. Ni ellir cyflwyno apêl bellach.",
-      "viewReceipt": "Gweld y dderbynneb"
+      "viewReceipt": "Gweld y dderbynneb",
+      "targetLabel": "Eitem a adroddir",
+      "reasonLabel": "Rheswm yr adroddiad",
+      "targetMessage": "Ymateb AI",
+      "targetComment": "Sylw cais tynnu",
+      "targetUser": "Defnyddiwr",
+      "reasonHarmful": "Cynnwys niweidiol",
+      "reasonIllegal": "Cynnwys anghyfreithlon",
+      "reasonHarassment": "Aflonyddu",
+      "reasonSpam": "Sbam",
+      "reasonOther": "Rheswm arall"
     },
     "reportReceipts": {
       "title": "Adroddiadau",
@@ -558,8 +569,11 @@
     "changelogFixesIn": "Atgyweiriadau a gwelliannau i'r canlynol: {{areas}}.",
     "changelogFixesPolish": "Atgyweiriadau a gwelliannau ar draws yr ap.",
     "changelogAreas": {
-      "signIn": "Mewngofnodi",
-      "profileOrganizations": "Proffil a sefydliadau"
+      "signIn": "mewngofnodi",
+      "profileOrganizations": "proffil a sefydliadau",
+      "chat": "sgwrs",
+      "notifications": "hysbysiadau",
+      "integrations": "integreiddiadau"
     }
   },
   "preferences": {
@@ -1072,8 +1086,9 @@
       "checkActiveConnection": "Mae'r cysylltiad yn weithredol, ond ni ellir llwytho'r eitem hon o hyd.",
       "bitbucketOrgOnlyDescription": "Newidiwch y cyfrif uchod i sefydliad i adolygu ei geisiadau tynnu ar Bitbucket.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Nid oes unrhyw sefydliadau gyda'r cyfrif hwn eto. Gallwch adolygu ceisiadau tynnu Bitbucket unwaith y byddwch yn creu sefydliad neu'n ymuno ag un.",
-      "gitlabReconnectAdminOnlyDescription": "Gofynnwch i berchennog sefydliad, gweinyddwr neu reolwr bilio ei ailgysylltu.",
+      "reconnectAdminOnlyDescription": "Gofynnwch i berchennog sefydliad, gweinyddwr neu reolwr bilio ei ailgysylltu.",
       "bitbucketNotConnectedTitle": "Nid yw Bitbucket wedi'i gysylltu",
+      "bitbucketAdminOnlyDescription": "Gofynnwch i berchennog sefydliad, gweinyddwr neu reolwr bilio ei gysylltu.",
       "adminOnlyConnectDescription": "Dim ond perchnogion, gweinyddwyr a rheolwyr bilio'r sefydliad sy'n gallu ei gysylltu.",
       "contextLine": "Ar gyfer {{organization}}",
       "contextLinePersonal": "Ar gyfer eich cyfrif personol"
@@ -1318,6 +1333,12 @@
       "emptyTitle": "Dim hysbysiadau eto",
       "emptyCategoryTitle": "Dim hysbysiadau yn y categori hwn",
       "emptyBody": "Bydd hysbysiadau a ddaw i'r cyfrif hwn yn ymddangos yma. Cânt eu cadw am {{days}} diwrnod.",
+      "emptyBody_zero": "Bydd hysbysiadau a ddaw i'r cyfrif hwn yn ymddangos yma. Cânt eu cadw am {{days}} diwrnod.",
+      "emptyBody_one": "Bydd hysbysiadau a ddaw i'r cyfrif hwn yn ymddangos yma. Cânt eu cadw am {{days}} diwrnod.",
+      "emptyBody_two": "Bydd hysbysiadau a ddaw i'r cyfrif hwn yn ymddangos yma. Cânt eu cadw am {{days}} diwrnod.",
+      "emptyBody_few": "Bydd hysbysiadau a ddaw i'r cyfrif hwn yn ymddangos yma. Cânt eu cadw am {{days}} diwrnod.",
+      "emptyBody_many": "Bydd hysbysiadau a ddaw i'r cyfrif hwn yn ymddangos yma. Cânt eu cadw am {{days}} diwrnod.",
+      "emptyBody_other": "Bydd hysbysiadau a ddaw i'r cyfrif hwn yn ymddangos yma. Cânt eu cadw am {{days}} diwrnod.",
       "capped": "Yn dangos y hysbysiadau diweddaraf.",
       "loadError": "Methu llwytho hanes hysbysiadau.",
       "openFailed": "Nid yw'r hysbysiad hwn yn agor yn unman mwyach."
@@ -1398,6 +1419,7 @@
       "manageAccess": "Rheoli mynediad",
       "bitbucketNoRepositoriesDescription": "Nid oes unrhyw ystorfeydd ar gael yn y gweithle Bitbucket hwn.",
       "gitlabNoRepositoriesDescription": "Efallai y bydd angen i chi ganiatáu mynediad i fwy o grwpiau neu brosiectau ar GitLab.",
+      "githubNoRepositoriesDescription": "Gwiriwch fod gan ap GitHub Kilo fynediad i'r ystorfeydd, yna adnewyddwch.",
       "installGithubApp": "Gosod yr ap GitHub ar ystorfeydd",
       "installGithubAppDescription": "Rhowch fynediad i ap GitHub Kilo at yr ystorfeydd rydych am eu hadolygu.",
       "repositoryAccess": "mynediad i ystorfa",
@@ -1431,7 +1453,7 @@
       "findingsInProgress": "Mae'r adolygiad hwn dal ar waith. Bydd y canfyddiadau'n ymddangos yma pan fydd wedi gorffen.",
       "findingsEndedWithoutResults": "Gorffennodd yr adolygiad hwn cyn iddo gynhyrchu unrhyw ganfyddiadau.",
       "serviceUnavailable": "Ni ellid cysylltu â'r gwasanaeth adolygu cod. Rhowch gynnig arall ar yr adolygiad pan fydd y gwasanaeth ar gael.",
-      "reviewFailed": "Methodd yr adolygiad. Rhowch gynnig arall arni.",
+      "reviewFailed": "Methodd yr adolygiad.",
       "showMore": "Dangos mwy",
       "created": "Crëwyd",
       "started": "Dechreuwyd",
@@ -1553,6 +1575,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Caiff cysylltiad Bitbucket ag {{organization}} ei reoli ar y we o gyfrifiadur.",
+      "deniedManagedByOwner": "Gofynnwch i berchennog {{organization}} newid cysylltiad na allwch ei newid.",
+      "deniedConnectRole": "Dim ond perchnogion, gweinyddwyr a rheolwyr bilio {{organization}} sy'n gallu ei gysylltu.",
+      "deniedReconnectRole": "Gofynnwch i berchennog {{organization}}, gweinyddwr neu reolwr bilio ei ailgysylltu.",
       "managedOnWebTitle": "Yn cael ei reoli ar y we",
       "managedOnWebShort": "Mae'r cysylltiad hwn yn cael ei reoli ar y we o gyfrifiadur.",
       "managedOnWebRepositories": "Dewiswch ystorfeydd ar gyfer {{organization}} ar y we o gyfrifiadur.",
@@ -1698,7 +1723,9 @@
       "unavailablePersonallySwitchAction": "Newid sefydliad",
       "unavailableOrganizationTitle": "Nid yw adolygiad cyngor ar gael",
       "unavailableForOrganization": "Mae angen y cynllun Enterprise gyda thanysgrifiad gweithredol neu dreial ar gyfer adolygiad cyngor. Nid oes gan y sefydliad hwn ef ar hyn o bryd.",
-      "unavailableForOrganizationNeutral": "Nid yw adolygiad cyngor ar gael i'r sefydliad hwn ar hyn o bryd. Ceisiwch eto yn nes ymlaen.",
+      "unavailablePlanCheck": "Ni allai adolygiad cyngor wirio cynllun y sefydliad hwn. Ceisiwch eto i wirio eto.",
+      "unavailableFlagRollout": "Nid yw adolygiad cyngor ar gael i'r sefydliad hwn eto. Diweddarwch yr ap i'r fersiwn ddiweddaraf i'w gael.",
+      "unavailableForOrganizationMember": "Mae angen y cynllun Enterprise gyda thanysgrifiad gweithredol neu dreial ar gyfer adolygiad cyngor. Gall perchennog sefydliad newid y cynllun.",
       "unavailableOnBitbucket": "Nid yw adolygiad cyngor ar gael ar gyfer ystorfeydd Bitbucket.",
       "noRepositories": "Dim ystorfeydd wedi'u dewis eto. Dewiswch ystorfeydd yng ngosodiadau'r ystorfeydd yn gyntaf.",
       "specialists": "Arbenigwyr",
@@ -2765,8 +2792,7 @@
       "searchPlaceholder": "Chwilio am ystorfeydd",
       "noMatches": "Dim canlyniadau cyfatebol",
       "noRepositories": "Dim ystorfeydd ar gael",
-      "noRepositoriesDescription": "Nid oes ystorfeydd wedi'u cysylltu â'ch cyfrif.",
-      "loading": "Yn llwytho…",
+      "noRepositoriesDescription": "I lwytho ystorfeydd, cysylltwch â GitHub neu GitLab.",
       "accessibility": "Ystorfa: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3705,7 +3731,7 @@
       "manageOnWeb": "Gosodiadau bilio ar y we",
       "changePlan": "Newid cynllun",
       "buySeats": "Prynu seddau",
-      "managedOnWeb": "Caiff y cynllun, y seddau ac ail-lenwi awtomatig eu rheoli ar y we.",
+      "managedOnWeb": "Caiff y cynllun, y seddau ac ail-lenwi awtomatig eu rheoli ar kilo.ai.",
       "setupAutoTopUp": "Gosod ail-lenwi awtomatig",
       "manageAutoTopUp": "Rheoli ail-lenwi awtomatig",
       "opensOnWeb": "Yn agor ar y we"
@@ -3891,10 +3917,10 @@
       "nameLabel": "Enw'r modd",
       "nameRequired": "Rhowch enw modd.",
       "notFound": "Nid yw'r modd hwn yn bodoli mwyach.",
-      "restrictionHint": "Dim ond ffeiliau sy'n cyfateb i'r patrwm hwn y gellir eu golygu. Gadewch ef yn wag i ganiatáu pob ffeil.",
-      "restrictionInvalid": "Rhowch batrwm dilys.",
+      "restrictionHint": "Mae mynegiad rheolaidd yn dewis pa ffeiliau y caiff y modd hwn eu golygu, er enghraifft `\\.md$` ar gyfer ffeiliau markdown yn unig. Gadewch ef yn wag i ganiatáu pob ffeil.",
+      "restrictionInvalid": "Rhowch fynegiad rheolaidd dilys.",
       "restrictionLabel": "Label cyfyngiad",
-      "restrictionPattern": "Patrwm ffeil",
+      "restrictionPattern": "Cyfyngiad ffeil",
       "roleLabel": "Diffiniad rôl",
       "roleRequired": "Disgrifiwch beth mae'r modd hwn yn ei wneud.",
       "tool": {
@@ -4719,6 +4745,7 @@
       "promptPlaceholder": "Rydych chi'n …",
       "tools": "Offer",
       "wholeToolRule": "Mae'r asiant hwn yn cymhwyso un rheol i bob offeryn ar unwaith: {{rule}}. Mae'r switshis hyn yn ddarllen yn unig.",
+      "toolRule": "Rheol wedi'i storio: {{rule}}",
       "visibility": "Gwelededd",
       "visibilityPrimary": "Cynradd — a ddangosir yn y codwr",
       "visibilitySubagent": "Subagent — dim ond ei alw gan eraill",
@@ -4828,20 +4855,34 @@
       "deductionFallback": "Didyniad credyd",
       "emptyDescription": "Bydd pryniannau credyd, derbynebau a defnydd yn ymddangos yma.",
       "emptyTitle": "Dim hanes credydau",
+      "expiredGrant": "Wedi dod i ben: {{description}}",
       "googlePlayReceipt": "Derbynneb gan Google Play",
       "kind": {
         "adjustment": "Addasiad",
         "balanceNeutral": "Dim effaith ar y balans",
         "deduction": "Didyniad",
         "grant": "Credyd am ddim",
+        "promotionalCredits": "Credydau hyrwyddo",
         "welcomeCredits": "Credydau croeso",
         "purchase": "Pryniant"
+      },
+      "program": {
+        "adminBulkGrant": "Credydau gweinyddwr",
+        "contributorChampion": "Credyd pencampwr cyfrannwyr",
+        "feedback": "Credyd adborth",
+        "influencer": "Credyd dylanwadwr",
+        "ossMonthlyReset": "Ailosodiad misol nawdd OSS",
+        "ossSponsorship": "Credyd nawdd OSS",
+        "pullRequest": "Credyd cais tynnu",
+        "usageIssue": "Credyd problem defnydd",
+        "vibeDay": "Credyd Diwrnod Vibe"
       },
       "purchaseFallback": "Pryniant credyd",
       "receipt": "Derbynneb",
       "receiptA11y": "Agor y dderbynneb ar gyfer {{description}}, {{amount}}, o {{date}}",
       "receiptUnavailable": "Nid oes derbynneb ar gael ar gyfer y pryniant hwn.",
-      "retentionLimit": "Yn dangos yr hanes credydau diweddaraf."
+      "retentionLimit": "Yn dangos yr hanes credydau diweddaraf.",
+      "voidedGrant": "Wedi'i ddirymu: {{description}}"
     },
     "title": "Prynu credydau",
     "description": "Mae credydau yn bryniant un-tro sy'n cael ei ychwanegu at eich balans Kilo ar gyfer rhedeg sesiynau codio AI yn Kilo App. Mae'r siop yn codi eich cyfrif ac mae credydau'n cael eu hychwanegu ar ôl i'r siop gadarnhau'r taliad.",
@@ -5209,6 +5250,9 @@
       "runAsCreator": "Rhedeg fel fi",
       "runAsCreatorDescription": "Mae pob rhediad yn defnyddio’ch cyfrif, felly mae’r pennawd cyfrinachol yn ofynnol.",
       "saveFailedTitle": "Methwyd cadw’r sbardun",
+      "nameTaken": "Mae sbardun o’r enw ‘{{name}}’ eisoes yn bodoli.",
+      "saveFailedRetry": "Methu cyrraedd y gweinydd. Gwiriwch eich cysylltiad a rhowch gynnig eto.",
+      "saveFailedCheck": "Gwiriwch y gwerthoedd yn y ffurflen a rhowch gynnig eto.",
       "deleteTitle": "Dileu’r sbardun hwn?",
       "deleteMessage": "Bydd galwadau i {{name}} yn methu. Ni ellir dad-wneud hyn.",
       "deleteMessageScheduled": "Bydd rhediadau'r sbardun {{name}} sydd wedi'u trefnu yn stopio. Ni ellir dad-wneud hyn.",
@@ -5453,6 +5497,20 @@
       "eu": "Undeb Ewropeaidd",
       "au": "Awstralia",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Chwilio am ddewisiadau",
+    "noMatches": "Dim dewisiadau cyfatebol",
+    "emptyDescription": "Rhowch gynnig ar enw dewis neu allweddair gwahanol.",
+    "resultsStatus": "Dewisiadau wedi'u canfod: {{resultCount}}",
+    "keywords": {
+      "signOut": "allgofnodi|gadael cyfrif",
+      "appearance": "thema|cynllun lliwiau",
+      "appUnlock": "biometreg|adnabod wyneb|ôl bys",
+      "language": "iaith|cyfieithu",
+      "notifications": "rhybuddion|hysbysiadau gwthio",
+      "privacy": "dadansoddeg|olrhain"
     }
   }
 }

@@ -41,6 +41,14 @@ function emitClose(socket: MockWebSocket, close: Partial<CloseEvent>): void {
   );
 }
 
+function requireLastSocket(sockets: MockWebSocket[]): MockWebSocket {
+  const socket = sockets[sockets.length - 1];
+  if (socket === undefined) {
+    throw new Error('Expected a WebSocket to be created');
+  }
+  return socket;
+}
+
 describe('createConnection', () => {
   let sockets: MockWebSocket[];
   let webSocketMock: jest.Mock;
@@ -192,5 +200,66 @@ describe('createConnection', () => {
     connection.destroy();
 
     expect(webSocketMock).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['auth service unavailable', 'ticket reissued'])(
+    'keeps reconnecting after repeated 1006 closes mentioning %j',
+    async reason => {
+      jest.spyOn(Math, 'random').mockReturnValue(0);
+      const onRefreshTicket = jest.fn().mockResolvedValue('fresh-ticket');
+      const onReconnectExhaustionChange = jest.fn();
+
+      const connection = createConnection({
+        websocketUrl: 'ws://localhost:9999/stream',
+        ticket: 'test-ticket',
+        onEvent: jest.fn(),
+        onConnected: jest.fn(),
+        onDisconnected: jest.fn(),
+        onRefreshTicket,
+        onReconnectExhaustionChange,
+      });
+
+      connection.connect();
+      expect(webSocketMock).toHaveBeenCalledTimes(1);
+
+      const backoffMs = [500, 1000, 2000];
+      for (const [index, delay] of backoffMs.entries()) {
+        emitClose(requireLastSocket(sockets), { code: 1006, reason });
+        await jest.advanceTimersByTimeAsync(delay);
+
+        expect(webSocketMock).toHaveBeenCalledTimes(index + 2);
+        expect(sockets[index + 1]?.url).toContain('ticket=fresh-ticket');
+      }
+
+      expect(onReconnectExhaustionChange).not.toHaveBeenCalledWith(true);
+
+      connection.destroy();
+    }
+  );
+
+  it('treats a 1006 close naming an explicit rejection as an auth failure', async () => {
+    const onRefreshTicket = jest.fn().mockResolvedValue('new-ticket');
+
+    const connection = createConnection({
+      websocketUrl: 'ws://localhost:9999/stream',
+      ticket: 'old-ticket',
+      onEvent: jest.fn(),
+      onConnected: jest.fn(),
+      onDisconnected: jest.fn(),
+      onRefreshTicket,
+    });
+
+    connection.connect();
+    emitClose(requireLastSocket(sockets), { code: 1006, reason: '401 Unauthorized' });
+
+    expect(onRefreshTicket).toHaveBeenCalledTimes(1);
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(webSocketMock).toHaveBeenCalledTimes(2);
+    expect(sockets[1]?.url).toContain('ticket=new-ticket');
+
+    connection.destroy();
   });
 });

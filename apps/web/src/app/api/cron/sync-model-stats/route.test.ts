@@ -53,7 +53,7 @@ import { syncOpenRouterModels } from '@/lib/model-stats/sync-openrouter';
 import type { SyncOpenRouterResult } from '@/lib/model-stats/sync-openrouter';
 import { invalidateModelStatsCache } from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
 import { syncEnkryptBenchmarks } from '@/lib/model-stats/sync-enkrypt';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
   buildScheduledJobFailureEvent,
   createScheduledJobRun,
@@ -63,7 +63,7 @@ import { GET } from './route';
 
 const mockEmitScheduledJobEvent = jest.mocked(emitScheduledJobEvent);
 
-function catalogModel(id: string): OpenRouterModel {
+function catalogModel(id: string): OpenRouterCatalogModel {
   return {
     id,
     name: `Synthetic ${id}`,

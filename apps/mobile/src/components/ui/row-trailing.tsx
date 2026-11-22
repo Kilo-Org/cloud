@@ -48,6 +48,48 @@ function textActionBoxStyle() {
 }
 
 /**
+ * The box a placeholder takes when it holds a row's trailing action space
+ * before that action is known — a pending read that decides between two
+ * buttons.
+ *
+ * Two placeholders, chosen by whether a cell will land. `TEXT_ACTION_SKELETON_CLASS`
+ * holds the one rule the compact button also renders — the `min-h-[36px]`
+ * minimum `COMPACT_BUTTON_FRAME_CLASS` names — for the case where the settled
+ * row renders that button, so the row does not move when it lands: 36 plus
+ * `py-3`'s 21 lays out the same 57pt band. The placeholder keeps its own width
+ * and radius and takes none of the button's padding, which an empty block has no
+ * content to use. The mounted suite compiles both classes and asserts the two
+ * heights agree, so a change to the compact frame cannot desynchronise them
+ * silently. The frame is a minimum because it lets a label scaled by large
+ * Dynamic Type grow the button instead of clipping it; the placeholder has no
+ * label of its own, so it cannot grow with Dynamic Type, and the row still moves
+ * by the difference at a large font scale.
+ * `TEXT_ACTION_PENDING_BAND_CLASS` holds the row's own content band, for the
+ * case where the settled row renders no cell at all (a viewer whose role cannot
+ * manage): such a row settles on its text column, which a 36px placeholder
+ * would have exceeded, so the row would shrink when the read landed. The band
+ * placeholder contributes 27 + 21 = 48pt, the row's own `min-h` floor, so it
+ * leaves the settled height to that column instead of growing the row.
+ *
+ * Explicit px, because NativeWind's rem is 14pt here and `h-9` would measure
+ * 31.5pt against the button's 36pt frame.
+ */
+export const TEXT_ACTION_SKELETON_CLASS = 'min-h-[36px] w-24 rounded-md';
+
+/**
+ * The placeholder for a pending read that settles without a cell. The flat row
+ * is `min-h-[48px] px-4 py-3`, and `py-3` is 10.5pt a side, so its content band
+ * is `48 - 2 * 10.5 = 27pt`; the placeholder matches that band, so a row with
+ * no settled cell neither grows while pending nor shrinks when the read lands.
+ * This is the one band `ROW_FRAME_CONTENT_DP` names, and the mounted suite
+ * asserts the two agree. Spelled as a literal, in px, because the bundler's
+ * scanner only emits a utility it reads in source, so an interpolated
+ * `h-[27px]` would never reach the stylesheet, and because an `h-6`/`h-7` rem
+ * height does not land on 27pt.
+ */
+export const TEXT_ACTION_PENDING_BAND_CLASS = 'h-[27px] w-24 rounded-md';
+
+/**
  * The trailing cell of a row. Every variant shares the row's height, so a mark,
  * a switch, a value or a text action never grows the row it sits in; a wrapper
  * that already builds its own control passes it as `node`.
@@ -92,7 +134,21 @@ export type RowTrailingSpec =
       accessibilityHint?: string;
       testID?: string;
     }>
-  | Readonly<{ kind: 'node'; node: ReactNode }>
+  | Readonly<{
+      kind: 'node';
+      node: ReactNode;
+      /**
+       * The cell must be delivered at the platform target in a stacked row:
+       * either a control that reaches it — through its own box, or through the
+       * compact `hitSlop` the shared `Button` gives its `sm` size — or the
+       * placeholder that reserves the same line so the row does not move when
+       * the real cell lands. A stacked frame must host such a cell at the
+       * target, or Android delivers its touches through the wrapper's band
+       * (`rowTargetHostClass`); the flat frame ignores this, because the cell
+       * then sits inside the row's own padding and its bounds.
+       */
+      target?: boolean;
+    }>
   | Readonly<{ kind: 'nodes'; nodes: readonly ReactNode[] }>;
 
 /**

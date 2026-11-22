@@ -1,0 +1,24 @@
+{
+  // `dev/` owns the programs a developer runs directly (tsx scripts that talk to
+  // a local stack). They are not imported by any workspace, so without a program
+  // of their own they would only be typechecked as a side effect of a workspace
+  // that happens to list them, and a script that stops being listed quietly
+  // stops being checked. This program covers the scripts at the top of `dev/`.
+  //
+  // The `local/` and `seed/` subtrees are deliberately outside this program. They
+  // carry long-standing type errors under its settings and need their own
+  // clean-up before they can join it. Until then `test:dev-local` runs them
+  // through `tsx`, which does not typecheck.
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "target": "ES2022",
+    "strict": true,
+    "noEmit": true,
+    "types": ["node"],
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true
+  },
+  "include": ["*.ts"]
+}

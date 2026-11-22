@@ -65,6 +65,11 @@ export const CandidatePricingSchema = z.object({
 });
 export type CandidatePricing = z.infer<typeof CandidatePricingSchema>;
 
+/** A cached input token is charged the cache-read rate when the entry publishes one, the prompt rate otherwise. */
+function cacheInputUsdPerToken(pricing: CandidatePricing): number {
+  return pricing.cacheReadUsdPerToken ?? pricing.promptUsdPerToken;
+}
+
 export function estimateRequestCostUsd(
   candidate: { avgCostUsd: number; pricing?: CandidatePricing | null },
   profile: ProductionTokenProfile | null
@@ -73,9 +78,34 @@ export function estimateRequestCostUsd(
   return (
     candidate.avgCostUsd +
     profile.uncachedInputTokens * candidate.pricing.promptUsdPerToken +
-    profile.cachedInputTokens *
-      (candidate.pricing.cacheReadUsdPerToken ?? candidate.pricing.promptUsdPerToken)
+    profile.cachedInputTokens * cacheInputUsdPerToken(candidate.pricing)
   );
+}
+
+type RequestCostCandidate = {
+  avgCostUsd: number;
+  pricing?: CandidatePricing | null;
+  estimatedRequestCostUsd?: number | null;
+};
+
+/**
+ * Request cost for ranking, in the order the `requestTokens` doc states: a priced
+ * candidate is charged cold input at the measured prompt size, an unpriced one keeps
+ * its published estimate, and everything else falls back to profile pricing.
+ */
+function resolveRequestCostUsd(
+  candidate: RequestCostCandidate,
+  requestTokens: number | null,
+  profile: ProductionTokenProfile | null
+): number {
+  if (requestTokens === null) return estimateRequestCostUsd(candidate, profile);
+  if (candidate.pricing != null) {
+    return estimateRequestCostUsd(candidate, {
+      uncachedInputTokens: requestTokens,
+      cachedInputTokens: 0,
+    });
+  }
+  return candidate.estimatedRequestCostUsd ?? estimateRequestCostUsd(candidate, profile);
 }
 
 // Industry-standard blended price weighting (3 input : 1 output) for summaries without tokens.
@@ -119,7 +149,7 @@ export function linkedAvgCostUsd(
   ) {
     return (
       avgInputTokens * ownerPricing.promptUsdPerToken +
-      avgCachedInputTokens * (ownerPricing.cacheReadUsdPerToken ?? ownerPricing.promptUsdPerToken) +
+      avgCachedInputTokens * cacheInputUsdPerToken(ownerPricing) +
       (avgOutputTokens + avgReasoningTokens) * ownerPricing.completionUsdPerToken
     );
   }
@@ -192,8 +222,8 @@ const routingTableFields = {
   ),
   productionTokenProfile: ProductionTokenProfileSchema.nullable().optional(),
   effortByComplexity: EffortByComplexitySchema.optional(),
-  switchHorizonTurns: z.number().int().positive().nullable().optional(),
-  lowConfidenceThreshold: z.number().min(0).max(1).nullable().optional(),
+  switchHorizonTurns: POLICY_SETTING_VALUE_SCHEMAS.switchHorizonTurns.nullable().optional(),
+  lowConfidenceThreshold: POLICY_SETTING_VALUE_SCHEMAS.lowConfidenceThreshold.nullable().optional(),
   source: z.enum(['benchmark']),
 } as const;
 
@@ -332,12 +362,11 @@ export function rankCandidates(
   ) => y.accuracy - x.accuracy || x.avgCostUsd - y.avgCostUsd;
   return candidates
     .map(({ p50LatencyMs, ...c }) => {
-      const estimatedRequestCostUsd =
-        requestTokens !== null && c.pricing != null
-          ? estimateRequestCostUsd(c, { uncachedInputTokens: requestTokens, cachedInputTokens: 0 })
-          : requestTokens !== null && c.estimatedRequestCostUsd != null
-            ? c.estimatedRequestCostUsd
-            : estimateRequestCostUsd(c, options?.profile ?? null);
+      const estimatedRequestCostUsd = resolveRequestCostUsd(
+        c,
+        requestTokens,
+        options?.profile ?? null
+      );
       const competes = c.accuracy > 0 && c.accuracy >= floor;
       const free = estimatedRequestCostUsd === 0;
       return {

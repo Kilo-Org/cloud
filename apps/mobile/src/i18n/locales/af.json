@@ -309,6 +309,7 @@
     "hideBalance": "Versteek saldo",
     "showBalance": "Wys saldo",
     "balanceHidden": "Saldo versteek",
+    "availableToSpendInOrganization": "Beskikbaar om in hierdie organisasie te bestee",
     "signOutTitle": "Teken uit?",
     "signOutMessage": "Jy sal weer moet aanmeld om toegang tot jou werkruimte te kry.",
     "deleteAccountTitle": "Skrap rekening?",
@@ -526,7 +527,7 @@
       "triageActioned": "Gehandhaaf",
       "triageRejected": "Nie gehandhaaf nie",
       "appealNone": "Niks ingedien nie",
-      "appealSubmitted": "Word hersien",
+      "appealSubmitted": "Appèl word hersien",
       "appealAccepted": "Aanvaar",
       "appealRejected": "Afgewys",
       "appeal": "Teken appèl teen hierdie besluit aan",
@@ -538,7 +539,17 @@
       "nextStepInReview": "Die uitkoms sal op hierdie skerm verskyn, en jy kan ná 'n besluit appèl aanteken.",
       "nextStepAppeal": "Die uitkoms van jou appèl sal op hierdie skerm verskyn.",
       "nextStepFinal": "Die appèlbesluit is finaal. Geen verdere appèl kan ingedien word nie.",
-      "viewReceipt": "Bekyk ontvangsbewys"
+      "viewReceipt": "Bekyk ontvangsbewys",
+      "targetLabel": "Gerapporteerde item",
+      "reasonLabel": "Rede vir verslag",
+      "targetMessage": "KI-antwoord",
+      "targetComment": "PR-kommentaar",
+      "targetUser": "Persoon",
+      "reasonHarmful": "Skadelike inhoud",
+      "reasonIllegal": "Onwettige inhoud",
+      "reasonHarassment": "Teistering",
+      "reasonSpam": "Ongewenste advertensies",
+      "reasonOther": "Ander rede"
     },
     "reportReceipts": {
       "title": "Verslae",
@@ -554,8 +565,11 @@
     "changelogFixesIn": "Regstellings en verbeterings in {{areas}}.",
     "changelogFixesPolish": "Regstellings en verbeterings regdeur die app.",
     "changelogAreas": {
-      "signIn": "Aanmelding",
-      "profileOrganizations": "Profiel & organisasies"
+      "signIn": "aanmelding",
+      "profileOrganizations": "profiel & organisasies",
+      "chat": "klets",
+      "notifications": "kennisgewings",
+      "integrations": "integrasies"
     }
   },
   "preferences": {
@@ -996,8 +1010,9 @@
       "checkActiveConnection": "Die koppeling is aktief, maar hierdie item kan steeds nie gelaai word nie.",
       "bitbucketOrgOnlyDescription": "Skakel die rekening hierbo oor na 'n organisasie om sy Bitbucket-trekversoeke te hersien.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Hierdie rekening het nog geen organisasies nie. Bitbucket-trekversoeke kan hersien word sodra jy 'n organisasie skep of by een aansluit.",
-      "gitlabReconnectAdminOnlyDescription": "Vra 'n organisasie-eienaar, administrateur of faktureringsbestuurder om dit weer te koppel.",
+      "reconnectAdminOnlyDescription": "Vra 'n organisasie-eienaar, administrateur of faktureringsbestuurder om dit weer te koppel.",
       "bitbucketNotConnectedTitle": "Bitbucket is nie gekoppel nie",
+      "bitbucketAdminOnlyDescription": "Vra 'n organisasie-Eienaar, Administrateur of Faktureringsbestuurder om dit te koppel.",
       "adminOnlyConnectDescription": "Slegs organisasie-eienaars, administrateurs en faktureringsbestuurders kan dit koppel.",
       "contextLine": "Vir {{organization}}",
       "contextLinePersonal": "Vir jou persoonlike rekening"
@@ -1210,6 +1225,8 @@
       "emptyTitle": "Nog geen kennisgewings nie",
       "emptyCategoryTitle": "Geen kennisgewings in hierdie kategorie nie",
       "emptyBody": "Kennisgewings wat hierdie rekening ontvang, verskyn hier. Hulle word vir {{days}} dae bewaar.",
+      "emptyBody_one": "Kennisgewings wat hierdie rekening ontvang, verskyn hier. Hulle word vir {{days}} dae bewaar.",
+      "emptyBody_other": "Kennisgewings wat hierdie rekening ontvang, verskyn hier. Hulle word vir {{days}} dae bewaar.",
       "capped": "Die mees onlangse kennisgewings word gewys.",
       "loadError": "Kon nie kennisgewingsgeskiedenis laai nie.",
       "openFailed": "Hierdie kennisgewing open nêrens meer nie."
@@ -1290,6 +1307,7 @@
       "manageAccess": "Bestuur toegang",
       "bitbucketNoRepositoriesDescription": "Geen bewaarplekke is in hierdie Bitbucket-werkruimte beskikbaar nie.",
       "gitlabNoRepositoriesDescription": "Jy moet dalk toegang tot meer groepe of projekte op GitLab verleen.",
+      "githubNoRepositoriesDescription": "Gaan die Kilo GitHub-toep se toegang tot bewaarplekke na en verfris dan die lys.",
       "installGithubApp": "Installeer die GitHub-app op bewaarplekke",
       "installGithubAppDescription": "Gee die Kilo GitHub-app toegang tot die bewaarplekke wat jy wil laat hersien.",
       "repositoryAccess": "bewaarplektoegang",
@@ -1323,7 +1341,7 @@
       "findingsInProgress": "Hierdie hersiening is nog besig. Bevindings verskyn hier wanneer dit klaar is.",
       "findingsEndedWithoutResults": "Hierdie hersiening het geëindig voordat dit enige bevindings opgelewer het.",
       "serviceUnavailable": "Die kodehersieningsdiens kon nie bereik word nie. Probeer die hersiening weer wanneer die diens beskikbaar is.",
-      "reviewFailed": "Die hersiening het misluk. Probeer asseblief weer.",
+      "reviewFailed": "Die hersiening het misluk.",
       "showMore": "Wys meer",
       "created": "Geskep",
       "started": "Begin",
@@ -1445,6 +1463,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Die Bitbucket-verbinding vir {{organization}} word op die web vanaf 'n rekenaar bestuur.",
+      "deniedManagedByOwner": "Vra 'n eienaar van {{organization}} om die koppeling te verander wat jy nie kan verander nie.",
+      "deniedConnectRole": "Slegs eienaars, administrateurs en faktureringsbestuurders van {{organization}} kan dit koppel.",
+      "deniedReconnectRole": "Vra 'n eienaar, administrateur of faktureringsbestuurder van {{organization}} om dit weer te koppel.",
       "managedOnWebTitle": "Op die web bestuur",
       "managedOnWebShort": "Hierdie verbinding word op die web vanaf 'n rekenaar bestuur.",
       "managedOnWebRepositories": "Kies die repositories vir {{organization}} op die web vanaf 'n rekenaar.",
@@ -1582,7 +1603,9 @@
       "unavailablePersonallySwitchAction": "Wissel organisasie",
       "unavailableOrganizationTitle": "Raadhersiening is nie op die oomblik beskikbaar nie",
       "unavailableForOrganization": "Raadhersiening verg die Enterprise-plan met 'n aktiewe intekening of proefperiode. Hierdie organisasie het dit nie op die oomblik nie.",
-      "unavailableForOrganizationNeutral": "Raadhersiening is nie op die oomblik vir hierdie organisasie beskikbaar nie. Probeer later weer.",
+      "unavailablePlanCheck": "Raadhersiening kon nie hierdie organisasie se plan nagaan nie. Probeer weer om dit na te gaan.",
+      "unavailableFlagRollout": "Raadhersiening is nog nie vir hierdie organisasie beskikbaar nie. Dateer die app op na die nuutste weergawe om dit te kry.",
+      "unavailableForOrganizationMember": "Raadhersiening verg die Enterprise-plan met 'n aktiewe intekening of proefperiode. 'n Organisasie-eienaar kan die plan verander.",
       "unavailableOnBitbucket": "Raadhersiening is nie beskikbaar vir Bitbucket-bewaarplekke nie.",
       "noRepositories": "Nog geen bewaarplekke gekies nie. Kies eers bewaarplekke in die bewaarplekinstellings.",
       "specialists": "Spesialiste",
@@ -2557,8 +2580,7 @@
       "searchPlaceholder": "Soek bewaarplekke",
       "noMatches": "Geen treffers nie",
       "noRepositories": "Geen bewaarplekke beskikbaar nie",
-      "noRepositoriesDescription": "Geen bewaarplekke is aan jou rekening gekoppel nie.",
-      "loading": "Laai…",
+      "noRepositoriesDescription": "Koppel GitHub of GitLab om bewaarplekke te laai.",
       "accessibility": "Bewaarplek: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3457,7 +3479,7 @@
       "manageOnWeb": "Fakturering-instellings op die web",
       "changePlan": "Verander plan",
       "buySeats": "Koop gebruikersplekke",
-      "managedOnWeb": "Die plan, gebruikersplekke en outomatiese aanvulling word op die web bestuur.",
+      "managedOnWeb": "Die plan, gebruikersplekke en outomatiese aanvulling word by kilo.ai bestuur.",
       "setupAutoTopUp": "Stel outomatiese aanvulling op",
       "manageAutoTopUp": "Bestuur outomatiese aanvulling",
       "opensOnWeb": "Maak op die web oop"
@@ -3643,10 +3665,10 @@
       "nameLabel": "Modusnaam",
       "nameRequired": "Voer 'n modusnaam in.",
       "notFound": "Hierdie modus bestaan nie meer nie.",
-      "restrictionHint": "Slegs lêers wat by hierdie patroon pas, kan geredigeer word. Laat dit leeg om alle lêers toe te laat.",
-      "restrictionInvalid": "Voer 'n geldige patroon in.",
+      "restrictionHint": "'n Gereelde uitdrukking kies watter lêers hierdie modus mag redigeer, byvoorbeeld `\\.md$` vir slegs markdown-lêers. Laat dit leeg om alle lêers toe te laat.",
+      "restrictionInvalid": "Voer 'n geldige gereelde uitdrukking in.",
       "restrictionLabel": "Beperkingsetiket",
-      "restrictionPattern": "Lêerpatroon",
+      "restrictionPattern": "Lêerbeperking",
       "roleLabel": "Roldefinisie",
       "roleRequired": "Beskryf wat hierdie modus doen.",
       "tool": {
@@ -4403,6 +4425,7 @@
       "promptPlaceholder": "Jy is 'n…",
       "tools": "Gereedskap",
       "wholeToolRule": "Hierdie agent pas een reël gelyktydig op alle gereedskap toe: {{rule}}. Hierdie skakelaars is slegs-lees.",
+      "toolRule": "Gestoor reël: {{rule}}",
       "visibility": "Sigbaarheid",
       "visibilityPrimary": "Primêr — gewys in die kieser",
       "visibilitySubagent": "Subagent — slegs oproepbaar vanaf ander",
@@ -4512,20 +4535,34 @@
       "deductionFallback": "Kredietaftrekking",
       "emptyDescription": "Kredietaankope, kwitansies en gebruik sal hier verskyn.",
       "emptyTitle": "Geen kredietgeskiedenis nie",
+      "expiredGrant": "Verval: {{description}}",
       "googlePlayReceipt": "Kwitansie van Google Play",
       "kind": {
         "adjustment": "Aanpassing",
         "balanceNeutral": "Saldoneutraal",
         "deduction": "Aftrekking",
         "grant": "Kredniettoekenning",
+        "promotionalCredits": "Promosiekrediete",
         "welcomeCredits": "Welkomkrediete",
         "purchase": "Aankoop"
+      },
+      "program": {
+        "adminBulkGrant": "Administrateur-krediettoekenning",
+        "contributorChampion": "Bydraer-kampioenkrediet",
+        "feedback": "Terugvoerkrediet",
+        "influencer": "Influënserkrediet",
+        "ossMonthlyReset": "Herstel van oopbronborgskap",
+        "ossSponsorship": "Oopbronborgskapkrediet",
+        "pullRequest": "Trekversoekkrediet",
+        "usageIssue": "Gebruiksprobleemkrediet",
+        "vibeDay": "Vibe-dagkrediet"
       },
       "purchaseFallback": "Kredietaankoop",
       "receipt": "Kwitansie",
       "receiptA11y": "Maak die kwitansie vir {{description}}, {{amount}}, vanaf {{date}} oop",
       "receiptUnavailable": "Geen kwitansie is vir hierdie aankoop beskikbaar nie.",
-      "retentionLimit": "Die mees onlangse kredietgeskiedenis word gewys."
+      "retentionLimit": "Die mees onlangse kredietgeskiedenis word gewys.",
+      "voidedGrant": "Nietig gemaak: {{description}}"
     },
     "title": "Koop krediete",
     "description": "Krediete is 'n eenmalige aankoop wat by jou Kilo-saldo gevoeg word om AI-koderingsessies in Kilo App te laat loop. Die winkel hef jou rekening en krediete word bygevoeg nadat die winkel betaling bevestig.",
@@ -4861,6 +4898,9 @@
       "runAsCreator": "Loop as ek",
       "runAsCreatorDescription": "Elke lopie gebruik jou rekening, so die geheime-opskrif is nodig.",
       "saveFailedTitle": "Kon nie die sneller stoor nie",
+      "nameTaken": "’n Sneller met die naam “{{name}}” bestaan reeds.",
+      "saveFailedRetry": "Kon nie die bediener bereik nie. Kyk jou verbinding na en probeer weer.",
+      "saveFailedCheck": "Kontroleer die waardes in die vorm en probeer weer.",
       "deleteTitle": "Vee hierdie sneller uit?",
       "deleteMessage": "Oproepe na {{name}} sal misluk. Dit kan nie ongedaan gemaak word nie.",
       "deleteMessageScheduled": "Geskeduleerde lopies van die sneller {{name}} stop. Dit kan nie ongedaan gemaak word nie.",
@@ -5105,6 +5145,20 @@
       "eu": "Europese Unie",
       "au": "Australië",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Soek voorkeure",
+    "noMatches": "Geen ooreenstemmende voorkeure",
+    "emptyDescription": "Probeer ’n ander voorkeurnaam of sleutelwoord.",
+    "resultsStatus": "Voorkeure gevind: {{resultCount}}",
+    "keywords": {
+      "signOut": "afmeld|meld af",
+      "appearance": "tema|kleurskema",
+      "appUnlock": "biometrie|gesigherkenning|vingerafdruk",
+      "language": "taal|vertaling",
+      "notifications": "waarskuwings|stootkennisgewings",
+      "privacy": "ontleding|nasporing"
     }
   }
 }

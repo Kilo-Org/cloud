@@ -313,6 +313,29 @@ describe('RowFrame trailing cell', () => {
     expect(textOf(root, '0.0041')).toBeTruthy();
   });
 
+  it('puts a trailing cell on the stack\u2019s top line when the press is the content', () => {
+    // A row whose press covers only its content keeps the stack's shape: the
+    // tile and the switch share the top line, the press owns the text under
+    // them, and a tap on the switch never reaches that press.
+    const root = renderFrame({
+      title: 'nightly-build',
+      icon: Globe,
+      onPress: () => undefined,
+      pressTarget: 'content',
+      stack: true,
+      trailing: { kind: 'switch', value: true, onValueChange: () => undefined },
+    });
+    const content = root.find(node => Object.is(node.type, 'Pressable'));
+
+    expect(
+      root
+        .findAll(node => ['IconTile', 'Switch', 'Text'].includes(String(node.type)))
+        .map(node => node.type)
+    ).toEqual(['IconTile', 'Switch', 'Text']);
+    expect(content.findAllByType('Switch' as never)).toHaveLength(0);
+    expect(classesOf(content)).toContain('w-full');
+  });
+
   it('groups several trailing nodes on one line', () => {
     const root = renderFrame({
       title: 'Host',

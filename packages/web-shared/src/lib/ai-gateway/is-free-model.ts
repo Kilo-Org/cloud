@@ -8,9 +8,10 @@ import { findCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/cu
 import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
 /**
- * Whether Kilo charges nothing for the model, judged by its id alone. Custom
- * LLMs follow the same rule; the admin router rejects pricing on a custom LLM
- * whose id matches it.
+ * Whether Kilo charges nothing for the model. The judgement reads the model id plus one
+ * process-wide input, `isLocalFakeLlmEnabled()` (the local fake LLM's enablement), so the same
+ * id can answer differently when local-fake mode is toggled. Custom LLMs follow the same rule;
+ * the admin router rejects pricing on a custom LLM whose id matches it.
  */
 export function isFreeModel(model: string): boolean {
   return (

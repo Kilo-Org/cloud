@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Új biztonsági találat ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Kritikus",
+      "high": "Magas",
+      "medium": "Közepes",
+      "low": "Alacsony"
+    },
     "securityFindingSlaWarning": {
       "title": "SLA figyelmeztetés"
     },

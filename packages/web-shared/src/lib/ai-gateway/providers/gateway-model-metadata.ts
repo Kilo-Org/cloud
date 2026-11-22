@@ -41,7 +41,10 @@ export function getOpenRouterAliasTarget(
 }
 
 export const NO_ENDPOINTS_RESOURCE = 'no-endpoints-resource';
-const NoEndpointsResourceSchema = z.strictObject({ status: z.literal(404) });
+const NO_ENDPOINTS_RESOURCE_RESPONSE = { status: 404 } as const;
+const NoEndpointsResourceSchema = z.strictObject({
+  status: z.literal(NO_ENDPOINTS_RESOURCE_RESPONSE.status),
+});
 
 export type GatewayModelList = { data: GatewayModel[] };
 
@@ -51,7 +54,8 @@ export type GatewayModelsSource = MetadataSource<GatewayModelList> & {
 };
 export type GatewayModelEndpoints = Endpoint[] | typeof NO_ENDPOINTS_RESOURCE;
 
-const MINIMUM_GATEWAY_MODEL_COUNT = 100;
+const MINIMUM_LISTED_MODEL_COUNT = 100;
+const MINIMUM_SERVABLE_MODEL_COUNT = 100;
 const LOGGED_MODEL_ID_LIMIT = 20;
 
 function gatewayHeaders(gateway: Provider) {
@@ -74,7 +78,7 @@ export function gatewayModelsSource(
     modelKeys: modelSchema.keyof().options,
     parse: raw => {
       const models: GatewayModelList = listSchema.parse(raw);
-      assertMinimumCount(url, models.data.length, MINIMUM_GATEWAY_MODEL_COUNT);
+      assertMinimumCount(url, models.data.length, MINIMUM_LISTED_MODEL_COUNT);
       return models;
     },
   };
@@ -130,7 +134,9 @@ export function gatewayModelEndpointsSource(
     headers: () => gatewayHeaders(gateway),
     // Gateways list some models (e.g. Vercel's `*-batch` variants) that have no endpoints resource.
     // Storing the 404 as a row keeps sync-providers from fetching those models live on every run.
-    rawWhenNotFound: { status: 404 } satisfies z.infer<typeof NoEndpointsResourceSchema>,
+    rawWhenNotFound: NO_ENDPOINTS_RESOURCE_RESPONSE satisfies z.infer<
+      typeof NoEndpointsResourceSchema
+    >,
     parse: parseGatewayModelEndpoints,
   };
 }
@@ -191,13 +197,17 @@ export function formatModelIds(modelIds: readonly string[]) {
     : listed;
 }
 
+/** The jsonb key one model's stored endpoints are projected under. */
+const STORED_ENDPOINTS_KEY = 'endpoints';
+const StoredEndpointsSchema = z.strictObject({
+  [STORED_ENDPOINTS_KEY]: z.array(EndpointSchema),
+});
+
 function parseStoredGatewayModelEndpoints(raw: unknown): GatewayModelEndpoints | undefined {
   if (raw === null) return undefined;
-  try {
-    return parseGatewayModelEndpoints(raw);
-  } catch {
-    return undefined;
-  }
+  if (NoEndpointsResourceSchema.safeParse(raw).success) return NO_ENDPOINTS_RESOURCE;
+  const stored = StoredEndpointsSchema.safeParse(raw);
+  return stored.success ? stored.data[STORED_ENDPOINTS_KEY] : undefined;
 }
 
 /**
@@ -234,7 +244,7 @@ export async function readStoredGatewayModels(
         ) AS models,
         jsonb_agg(
           CASE WHEN jsonb_typeof(${endpointsList}) = 'array'
-            THEN jsonb_build_object('data', jsonb_build_object('endpoints', (
+            THEN jsonb_build_object(${STORED_ENDPOINTS_KEY}::text, (
               SELECT coalesce(jsonb_agg(
                 ${pickJsonbKeys(
                   sql`endpoints.endpoint`,
@@ -245,7 +255,7 @@ export async function readStoredGatewayModels(
                 ORDER BY endpoints.ordinality
               ), '[]'::jsonb)
               FROM jsonb_array_elements(${endpointsList}) WITH ORDINALITY AS endpoints(endpoint, ordinality)
-            )))
+            ))
             ELSE coalesce(${endpointsData}, 'null'::jsonb)
           END
           ORDER BY items.ordinality
@@ -273,7 +283,9 @@ export type JoinedGatewayModels = {
 
 /**
  * Models without an endpoints resource, or whose endpoints are unknown, are left out. Throws when
- * fewer than 100 models remain, the check that guarded every stored snapshot before.
+ * fewer than 100 models with usable endpoints remain, naming the models it excluded. `listedModels`
+ * carries stored endpoints on the request path and live-fetched ones on the refresh path, so the
+ * count and the message describe usable endpoints rather than where they came from.
  */
 export function joinGatewayModelEndpoints(
   gateway: Provider,
@@ -293,9 +305,11 @@ export function joinGatewayModelEndpoints(
   }
 
   const count = Object.keys(joined).length;
-  if (count < MINIMUM_GATEWAY_MODEL_COUNT) {
+  if (count < MINIMUM_SERVABLE_MODEL_COUNT) {
+    const excluded = [...withoutEndpointsResource, ...withoutStoredEndpoints].sort();
     throw new Error(
-      `Suspicious: total number of ${gateway.type} models is ${count} < ${MINIMUM_GATEWAY_MODEL_COUNT}`
+      `Suspicious: only ${count} ${gateway.type} models have usable endpoints, fewer than ` +
+        `${MINIMUM_SERVABLE_MODEL_COUNT}; excluded: ${formatModelIds(excluded)}`
     );
   }
   return {
@@ -331,7 +345,6 @@ export function retainPreviousEntries(
       const previousTarget = previousEntry?.alias_target?.slug;
       if (
         previousEntry !== undefined &&
-        previousEntry !== model &&
         (previousTarget === undefined || Object.hasOwn(models, previousTarget))
       ) {
         models[modelId] = previousEntry;

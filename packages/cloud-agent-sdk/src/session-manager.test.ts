@@ -2956,6 +2956,43 @@ describe('createSessionManager', () => {
       });
     });
 
+    it('keeps a cli-catalog override through an empty-catalog error that retains the catalog', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-a',
+        protocol: 'v1',
+        catalog: remoteCatalog,
+        refresh: 'idle',
+      });
+      mgr.setRemoteModelOverride({
+        source: 'cli-catalog',
+        selection: {
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          variant: 'high',
+        },
+      });
+
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-a',
+        protocol: 'v1',
+        catalog: remoteCatalog,
+        refresh: 'error',
+        error: 'Remote model catalog is empty',
+      });
+
+      expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toEqual({
+        source: 'cli-catalog',
+        selection: {
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          variant: 'high',
+        },
+      });
+    });
+
     it('clears remote model state and override immediately when switching sessions', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
@@ -6423,8 +6460,34 @@ describe('createSessionManager', () => {
         config.store,
         mgr.atoms.childSessionHydrationState
       );
-      expect(state('child-fail')).toEqual(expect.objectContaining({ status: 'error' }));
+      // A retryable read keeps the retry copy every app already classifies as
+      // transient, so its Retry stays.
+      expect(state('child-fail')).toEqual({
+        status: 'error',
+        message: 'Something went wrong. Please retry in a moment.',
+      });
     });
+
+    it.each(['invalid_data', 'too_large'] as const)(
+      'names a terminal %s first child page as unavailable history',
+      async kind => {
+        const fetchSnapshotPage = createPageFetchMock(async () => ({ kind }));
+        const config = createMockConfig({ fetchSnapshotPage });
+        const mgr = createSessionManager(config);
+
+        await mgr.switchSession(kiloId('ses-root'));
+        await mgr.hydrateChildSession(kiloId(`child-${kind}`));
+
+        const state = atomValue<(childSessionId: string) => { status: string; message?: string }>(
+          config.store,
+          mgr.atoms.childSessionHydrationState
+        );
+        expect(state(`child-${kind}`)).toEqual({
+          status: 'error',
+          message: sessionSnapshotFailureMessage(kind).message,
+        });
+      }
+    );
 
     it('clears a stored first-page hydration error when a live child chat event arrives', async () => {
       const fetchSnapshotPage = createPageFetchMock(async () => ({

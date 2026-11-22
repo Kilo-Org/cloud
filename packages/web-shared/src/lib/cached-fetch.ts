@@ -25,15 +25,24 @@ import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export const FAILURE_BACKOFF_MS = 30_000;
 
-type CacheWrite<T> = {
-  value: T;
-  /** When the value was stored; `-Infinity` for a fallback, which is never fresh. */
-  at: number;
-  /** Earliest time at which the next refresh may start; `-Infinity` after a success. */
-  retryAfterMs: number;
-  /** Whether `value` came from a successful fetch rather than a failure fallback. */
-  knownGood: boolean;
-};
+/**
+ * One cache entry: either a value a successful fetch stored, or the fallback
+ * served until a failed refresh's backoff window passes.
+ */
+type CacheWrite<T> = { value: T } & (
+  | {
+      state: 'fresh';
+      /** When the successful fetch stored the value. */
+      at: number;
+    }
+  | {
+      state: 'failed';
+      /** Earliest time at which the next refresh may start. */
+      retryAfterMs: number;
+      /** The value this failure served instead of a fresh result. */
+      served: 'default' | 'last-known-good';
+    }
+);
 
 /** What a failed refresh reports to `onRefreshFailure`. */
 export type RefreshFailureInfo = {
@@ -83,10 +92,10 @@ export function createCachedFetch<T>(
 
   return async function get(): Promise<T> {
     const nowMs = now();
-    if (cached && nowMs - cached.at < ttlMs) {
+    if (cached?.state === 'fresh' && nowMs - cached.at < ttlMs) {
       return cached.value;
     }
-    if (cached && nowMs < cached.retryAfterMs) {
+    if (cached?.state === 'failed' && nowMs < cached.retryAfterMs) {
       return cached.value;
     }
     if (inFlight) {
@@ -96,22 +105,25 @@ export function createCachedFetch<T>(
     const refresh = (async (): Promise<T> => {
       try {
         const value = await fetcher();
-        cached = {
-          value,
-          at: now(),
-          retryAfterMs: Number.NEGATIVE_INFINITY,
-          knownGood: true,
-        };
+        cached = { value, state: 'fresh', at: now() };
         return value;
       } catch (error) {
         // Concurrent callers share this promise, so the refresh never rejects.
         // The attempt runs at most once per backoff window, so reporting here
-        // reports each failure window once. The stored timestamp makes the
-        // fallback permanently stale, so the freshness check cannot mask the
+        // reports each failure window once. The stored entry is a failure
+        // state, not a fresh one, so the freshness check cannot mask the
         // backoff window with a still-fresh last-known-good value, whatever
         // origin the clock has.
-        const knownGood = cached?.knownGood ?? false;
-        const served = knownGood ? 'last-known-good' : 'default';
+        // A failure keeps serving what the entry already served: a value a
+        // successful fetch stored is the last-known-good one, and a previous
+        // failure's fallback is still whatever it served, so a repeated failure
+        // after its window reports the same thing.
+        const served: RefreshFailureInfo['served'] =
+          cached === null
+            ? 'default'
+            : cached.state === 'fresh'
+              ? 'last-known-good'
+              : cached.served;
         const reason = (error instanceof Error ? error.message : String(error))
           .replace(/\s+/g, ' ')
           .trim();
@@ -123,9 +135,9 @@ export function createCachedFetch<T>(
         const value = cached === null ? defaultValue : cached.value;
         cached = {
           value,
-          at: Number.NEGATIVE_INFINITY,
+          state: 'failed',
           retryAfterMs: now() + failureBackoffMs,
-          knownGood,
+          served,
         };
         if (onRefreshFailure) {
           try {

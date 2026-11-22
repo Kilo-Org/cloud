@@ -309,6 +309,7 @@
     "hideBalance": "بیلانس پټ کړئ",
     "showBalance": "بیلانس ښکاره کړئ",
     "balanceHidden": "بیلانس پټ دی",
+    "availableToSpendInOrganization": "په دې سازمان کې د لګښت لپاره شته",
     "signOutTitle": "له حسابه ووځم؟",
     "signOutMessage": "خپل کاري ځای ته د لاسرسي لپاره به بیا ننوتلو ته اړتیا ولرئ.",
     "deleteAccountTitle": "حساب ړنګ کړم؟",
@@ -526,7 +527,7 @@
       "triageActioned": "تایید شو",
       "triageRejected": "تایید نه شو",
       "appealNone": "هېڅ نه دی سپارل شوی",
-      "appealSubmitted": "تر بیاکتنې لاندې",
+      "appealSubmitted": "استیناف تر بیاکتنې لاندې",
       "appealAccepted": "ومنل شو",
       "appealRejected": "رد شو",
       "appeal": "پر دې پرېکړې استیناف وکړئ",
@@ -538,7 +539,17 @@
       "nextStepInReview": "پایله به په دې پرده کې ښکاره شي، او تاسو کولی شئ له پرېکړې وروسته استیناف وکړئ.",
       "nextStepAppeal": "د استیناف پایله به په دې پرده کې ښکاره شي.",
       "nextStepFinal": "د استیناف پرېکړه قطعي ده. نور استیناف نه شي سپارل کېدای.",
-      "viewReceipt": "رسید وګورئ"
+      "viewReceipt": "رسید وګورئ",
+      "targetLabel": "راپور شوی توکی",
+      "reasonLabel": "د راپور دلیل",
+      "targetMessage": "د مصنوعي ځیرکتیا ځواب",
+      "targetComment": "د پل ریکویسټ تبصره",
+      "targetUser": "کارن",
+      "reasonHarmful": "زیانمنه منځپانګه",
+      "reasonIllegal": "غیرقانوني منځپانګه",
+      "reasonHarassment": "ځورونه",
+      "reasonSpam": "ناغوښتلې اعلانات",
+      "reasonOther": "بل دلیل"
     },
     "reportReceipts": {
       "title": "راپورونه",
@@ -555,7 +566,10 @@
     "changelogFixesPolish": "په ټول اپ کې سمونې او ښه والی.",
     "changelogAreas": {
       "signIn": "ننوتل",
-      "profileOrganizations": "پروفایل و سازمانونه"
+      "profileOrganizations": "پروفایل و سازمانونه",
+      "chat": "خبرې اترې",
+      "notifications": "خبرتیاوې",
+      "integrations": "ادغامونه"
     }
   },
   "preferences": {
@@ -996,8 +1010,9 @@
       "checkActiveConnection": "نښلون فعال دی، مګر دا توکی لا هم نه شي بارول کېدای.",
       "bitbucketOrgOnlyDescription": "د هغې د Bitbucket پل ریکویسټونو د بیاکتنې لپاره پورته حساب یو سازمان ته وبدلئ.",
       "bitbucketOrgOnlyNoOrganizationDescription": "دا حساب تر اوسه هېڅ سازمان نه لري. د Bitbucket پل ریکویسټونو بیاکتنه به وشي چې یو وخت تاسو یو سازمان جوړ کړئ یا یو سازمان ته ورشئ.",
-      "gitlabReconnectAdminOnlyDescription": "له یو سازمان مالک، مدیر، یا د بلونو مدیر څخه وغواړئ چې دا بیا ونښلوي.",
+      "reconnectAdminOnlyDescription": "له یو سازمان مالک، مدیر، یا د بلونو مدیر څخه وغواړئ چې دا بیا ونښلوي.",
       "bitbucketNotConnectedTitle": "Bitbucket نښلول شوی نه دی",
+      "bitbucketAdminOnlyDescription": "له یو سازمان مالک، مدیر، یا د بلونو مدیر څخه وغواړئ چې دا ونښلوي.",
       "adminOnlyConnectDescription": "یوازې د سازمان مالکان، مدیران او د بلونو مدیران کولی شي دا ونښلوي.",
       "contextLine": "{{organization}} لپاره",
       "contextLinePersonal": "ستاسو د شخصي حساب لپاره"
@@ -1210,6 +1225,8 @@
       "emptyTitle": "تر اوسه هېڅ خبرتیاوې نشته",
       "emptyCategoryTitle": "په دې کټګورۍ کې هېڅ خبرتیاوې نشته",
       "emptyBody": "هغه خبرتیاوې چې دا حساب ترلاسه کوي دلته ښکاري. دوی د {{days}} ورځو لپاره ساتل کېږي.",
+      "emptyBody_one": "هغه خبرتیاوې چې دا حساب ترلاسه کوي دلته ښکاري. دوی د {{days}} ورځو لپاره ساتل کېږي.",
+      "emptyBody_other": "هغه خبرتیاوې چې دا حساب ترلاسه کوي دلته ښکاري. دوی د {{days}} ورځو لپاره ساتل کېږي.",
       "capped": "تر ټولو وروستي خبرتیاوې ښودل کېږي.",
       "loadError": "د خبرتیاوو تاریخچه بار نه شوه.",
       "openFailed": "دا خبرتیا نوره هېچیرته نه خلاصیږي."
@@ -1290,6 +1307,7 @@
       "manageAccess": "لاسرسی مدیریت کړئ",
       "bitbucketNoRepositoriesDescription": "د Bitbucket په دې کاري چاپېریال کې هېڅ زېرمتون نشته.",
       "gitlabNoRepositoriesDescription": "ښايي په GitLab کې نورو ډلو یا پروژو ته هم د لاسرسي اجازه ورکړئ.",
+      "githubNoRepositoriesDescription": "وګورئ چې د Kilo GitHub اپلیکیشن زېرمتونونو ته لاسرسی لري، بیا لېست تازه کړئ.",
       "installGithubApp": "د GitHub اپ نصب کړئ",
       "installGithubAppDescription": "د Kilo د GitHub اپ ته هغو زېرمتونونو ته لاسرسی ورکړئ چې غواړئ بیاکتنه یې وشي.",
       "repositoryAccess": "زېرمتون ته لاسرسی",
@@ -1323,7 +1341,7 @@
       "findingsInProgress": "دا بیاکتنه لاهم روانه ده. کله چې پای ته ورسېږي، موندنې به دلته ښکاره شي.",
       "findingsEndedWithoutResults": "دا بیاکتنه پرته له دې چې کومه موندنه رامنځته کړي، پای ته ورسېده.",
       "serviceUnavailable": "د کوډ د بیاکتنې له خدمت سره اړیکه ټینګه نه شوه. کله چې خدمت د لاسرسي وړ شي، د بیاکتنې بیا هڅه وکړئ.",
-      "reviewFailed": "بیاکتنه ناکامه شوه. مهرباني وکړئ بیا هڅه وکړئ.",
+      "reviewFailed": "بیاکتنه ناکامه شوه.",
       "showMore": "نور وښایئ",
       "created": "جوړ شوی",
       "started": "پیل شوی",
@@ -1445,6 +1463,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "د {{organization}} د Bitbucket اړیکه له کمپیوټر څخه په وېب کې اداره کېږي.",
+      "deniedManagedByOwner": "د {{organization}} له مالک څخه وغواړئ چې هغه اړیکه بدله کړي چې تاسو یې نشئ کولی بدله کړئ.",
+      "deniedConnectRole": "یوازې د {{organization}} مالکان، مدیران او د بلونو مدیران کولی شي دا ونښلوي.",
+      "deniedReconnectRole": "د {{organization}} له یو مالک، مدیر، یا د بلونو مدیر څخه وغواړئ چې دا بیا ونښلوي.",
       "managedOnWebTitle": "په وېب کې اداره کېږي",
       "managedOnWebShort": "دا اړیکه له کمپیوټر څخه په وېب کې اداره کېږي.",
       "managedOnWebRepositories": "له کمپیوټر څخه په وېب کې د {{organization}} لپاره مخزنونه وټاکئ.",
@@ -1582,7 +1603,9 @@
       "unavailablePersonallySwitchAction": "سازمان بدل کړئ",
       "unavailableOrganizationTitle": "د شورا بیاکتنه اوس نشته",
       "unavailableForOrganization": "د شورا بیاکتنې ته د فعال سبسکرېپشن یا ازمویښتې مودې سره Enterprise پلان ته اړتیا لري. دا سازمان دا اوس نه لري.",
-      "unavailableForOrganizationNeutral": "د شورا بیاکتنې ته د دې سازمان لپاره اوس لاسرسی نشته. وروسته بیا هڅه وکړئ.",
+      "unavailablePlanCheck": "د شورا بیاکتنې ونه توانیدله چې د دې سازمان پلان وګوري. د بیا کتلو لپاره بیا هڅه وکړئ.",
+      "unavailableFlagRollout": "د شورا بیاکتنه د دې سازمان لپاره تر اوسه شتون نه لري. د ترلاسه کولو لپاره اپلیکیشن وروستۍ نسخې ته تازه کړئ.",
+      "unavailableForOrganizationMember": "د شورا بیاکتنې ته د فعال سبسکرېپشن یا ازمویښتې مودې سره Enterprise پلان ته اړتیا لري. د سازمان مالک کولی شي پلان بدل کړي.",
       "unavailableOnBitbucket": "د شورا بیاکتنه د Bitbucket زېرمتونونو لپاره شتون نه لري.",
       "noRepositories": "تر اوسه هېڅ زېرمتون نه دی ټاکل شوی. لومړی په زېرمتون تنظیماتو کې زېرمتونونه وټاکئ.",
       "specialists": "متخصصین",
@@ -2557,8 +2580,7 @@
       "searchPlaceholder": "د زېرمتونونو لټون",
       "noMatches": "هېڅ پایله ونه موندل شوه",
       "noRepositories": "هېڅ زېرمتون نشته",
-      "noRepositoriesDescription": "ستاسو له حساب سره هېڅ زېرمتون نه دی نښلول شوی.",
-      "loading": "بارېږي…",
+      "noRepositoriesDescription": "د زېرمتونونو د بارولو لپاره، GitHub یا GitLab حساب ونښلوئ.",
       "accessibility": "زېرمتون: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3457,7 +3479,7 @@
       "manageOnWeb": "په ویب کې د بیلینګ ترتیبات",
       "changePlan": "پلان بدل کړئ",
       "buySeats": "د غړیتوب ځایونه واخلئ",
-      "managedOnWeb": "پلان، د غړیتوب ځایونه او اتومات بیا ډکول په ویب کې اداره کېږي.",
+      "managedOnWeb": "پلان، د غړیتوب ځایونه او اتومات بیا ډکول په kilo.ai کې اداره کېږي.",
       "setupAutoTopUp": "اتومات بیا ډکول تنظیم کړئ",
       "manageAutoTopUp": "اتومات بیا ډکول اداره کړئ",
       "opensOnWeb": "په وېب کې پرانیستل کېږي"
@@ -3643,10 +3665,10 @@
       "nameLabel": "د حالت نوم",
       "nameRequired": "د حالت نوم ولیکئ.",
       "notFound": "دا حالت نور نشته.",
-      "restrictionHint": "یوازې هغه فایلونه چې دا بڼه سره سمون لري سم کېدای شي. خالي یې پرېږدئ ترڅو هر فایل ته اجازه وي.",
-      "restrictionInvalid": "سمه بڼه ولیکئ.",
+      "restrictionHint": "یوه منظمه څرګندونه هغه فایلونه ټاکي چې دا حالت یې سمولای شي، د بېلګې په توګه یوازې د markdown فایلونو لپاره `\\.md$`. خالي یې پرېږدئ ترڅو هر فایل ته اجازه وي.",
+      "restrictionInvalid": "سمه منظمه څرګندونه ولیکئ.",
       "restrictionLabel": "د محدودیت نښه",
-      "restrictionPattern": "د فایل بڼه",
+      "restrictionPattern": "د فایل محدودیت",
       "roleLabel": "د رول تعریف",
       "roleRequired": "تشریح کړئ چې دا حالت څه کوي.",
       "tool": {
@@ -4403,6 +4425,7 @@
       "promptPlaceholder": "تاسو یو…",
       "tools": "وسیلې",
       "wholeToolRule": "دا اجنټ په یو وخت کې پر هرې وسیلې یوه قاعده پلي کوي: {{rule}}. دا سویچونه یوازې د لوستلو وړ دي.",
+      "toolRule": "زېرمه شوې قاعده: {{rule}}",
       "visibility": "لید",
       "visibilityPrimary": "لومړني — په غوره کونکي کې ښودل شوي",
       "visibilitySubagent": "فرعي اجنټ — یوازې د نورو څخه د غوښتنې وړ",
@@ -4512,20 +4535,34 @@
       "deductionFallback": "د کریډیټ کسر",
       "emptyDescription": "د کریډیټ پېرودنې، رسیدونه، او کارونه به دلته ښکاره شي.",
       "emptyTitle": "د کریډیټ تاریخچه نشته",
+      "expiredGrant": "مهلت یې تېر شو: {{description}}",
       "googlePlayReceipt": "له Google Play څخه رسید",
       "kind": {
         "adjustment": "سمون",
         "balanceNeutral": "په بیلانس بې اغېزې",
         "deduction": "کسر",
         "grant": "د کریډیټ ورکړه",
+        "promotionalCredits": "پروموشنل کریډیټ",
         "welcomeCredits": "د ښه راغلاست کریډیټ",
         "purchase": "پېرود"
+      },
+      "program": {
+        "adminBulkGrant": "د اډمین د کریډیټ ورکړه",
+        "contributorChampion": "د ونډه اخیستونکي اتل کریډیټ",
+        "feedback": "د نظر کریډیټ",
+        "influencer": "د انفلوینسر کریډیټ",
+        "ossMonthlyReset": "د پرانیستې سرچینې د کریډیټ میاشتنی بیا تنظیم",
+        "ossSponsorship": "د پرانیستې سرچینې د مالي ملاتړ کریډیټ",
+        "pullRequest": "د پل ریکویسټ کریډیټ",
+        "usageIssue": "د کارونې ستونزې کریډیټ",
+        "vibeDay": "د Vibe Day کریډیټ"
       },
       "purchaseFallback": "د کریډیټ پېرود",
       "receipt": "رسید",
       "receiptA11y": "د {{description}}، {{amount}}، {{date}} رسید پرانیزئ",
       "receiptUnavailable": "د دې پېرود لپاره رسید نشته.",
-      "retentionLimit": "تر ټولو وروستې د کریډیټ تاریخچه ښودل کېږي."
+      "retentionLimit": "تر ټولو وروستې د کریډیټ تاریخچه ښودل کېږي.",
+      "voidedGrant": "لغوه شوی: {{description}}"
     },
     "title": "کریډیټ وپېرئ",
     "description": "کریډیټ یو ځل پېرود دی چې ستاسو Kilo توازن ته په Kilo App کې د AI کوډ کولو ناستو چلولو لپاره زیاتېږي. پلورنځی ستاسو له حساب څخه پیسې اخلي او کریډیټ وروسته له هغه زیاتېږي چې پلورنځی تادیه تایید کړي.",
@@ -4861,6 +4898,9 @@
       "runAsCreator": "زما په توګه چل کړه",
       "runAsCreatorDescription": "هره چلېدنه ستاسو حساب کاروي، نو پټ سرلیک اړین دی.",
       "saveFailedTitle": "ټرېګر خوندي نشو",
+      "nameTaken": "د «{{name}}» په نوم ټرېګر لا دمخه شته.",
+      "saveFailedRetry": "له سرور سره اړیکه ونه شوه. خپله اړیکه وګورئ او بیا هڅه وکړئ.",
+      "saveFailedCheck": "په فورم کې ارزښتونه وګورئ او بیا هڅه وکړئ.",
       "deleteTitle": "دا ټرېګر ړنګ کړو؟",
       "deleteMessage": "{{name}} ته غوښتنې به ناکامې شي. دا بېرته نه‌شی ګرځول کېدای.",
       "deleteMessageScheduled": "د {{name}} مهال ویش شوې چلېدنې به ودرېږي. دا بېرته نه‌شی ګرځول کېدای.",
@@ -5105,6 +5145,20 @@
       "eu": "اروپایي اتحادیه",
       "au": "آسټرالیا",
       "jp": "جاپان"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "د غوره توبونو لټون",
+    "noMatches": "سمون لرونکي غوره توبونه ونه موندل شول",
+    "emptyDescription": "د غوره توب بل نوم یا بله کلیدي کلمه وازمویئ.",
+    "resultsStatus": "موندل شوي غوره توبونه: {{resultCount}}",
+    "keywords": {
+      "signOut": "وتل|له حسابه وتل",
+      "appearance": "بڼه|رنګونه|تیاره بڼه",
+      "appUnlock": "بایومیټریک|د مخ پېژندنه|د ګوتې نښه",
+      "language": "ژبه|ژباړه",
+      "notifications": "خبرتیاوې|فوري خبرتیاوې",
+      "privacy": "شننه|تعقیب|محرمیت"
     }
   }
 }

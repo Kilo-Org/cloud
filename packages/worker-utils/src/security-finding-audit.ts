@@ -511,13 +511,11 @@ function auditJsonKeyTokens(key: string): string[] {
 export function isDisallowedAuditJsonKey(key: string): boolean {
   if (DISALLOWED_AUDIT_JSON_KEY_PATTERN.test(key)) return true;
 
-  const tokens = auditJsonKeyTokens(key);
-  // A digit run is not a qualifier, so `key2` and `keys_2` stay bare names.
-  const unqualified = tokens.filter(token => !/^[0-9]+$/.test(token));
-  if (
-    unqualified.length > 0 &&
-    unqualified.every(token => BARE_AUDIT_JSON_KEY_TOKENS[token] === true)
-  ) {
+  // A digit run is not a qualifier: `key2` stays a bare name, and `api2Key`
+  // still states the same thing as `apiKey`. Strip digit runs once, then read
+  // both rules from the remaining words.
+  const tokens = auditJsonKeyTokens(key).filter(token => !/^[0-9]+$/.test(token));
+  if (tokens.length > 0 && tokens.every(token => BARE_AUDIT_JSON_KEY_TOKENS[token] === true)) {
     return true;
   }
   for (let index = 0; index < tokens.length; index += 1) {

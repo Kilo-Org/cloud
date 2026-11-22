@@ -277,6 +277,16 @@ describe('security finding audit contract', () => {
       'keys3',
       'KEY_2',
       'keys123',
+      'api2Key',
+      'API2_KEY',
+      'api_2_key',
+      'access2Key',
+      'access_2_key',
+      'private2Key',
+      'private_2_key',
+      'signing2Key',
+      'encryption2Key',
+      'client2Secret',
     ];
 
     for (const key of disallowedKeys) {

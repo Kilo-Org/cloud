@@ -1223,6 +1223,11 @@ describe('buildSecurityAgentAuditReportFromRows', () => {
               pat: 'c',
               passphrase: 'd',
               key: 'e',
+              api2Key: 'f',
+              private_2_key: 'g',
+              key2: 'h',
+              key2Id: 'kept',
+              keys2Count: 3,
               attempt: 2,
             },
           },
@@ -1234,7 +1239,7 @@ describe('buildSecurityAgentAuditReportFromRows', () => {
     expect(report.findings[0].events[0].metadata).toEqual({
       origin: 'manual',
       pr_url: 'https://example.test/pr/1',
-      validation_count: { attempt: 2 },
+      validation_count: { key2Id: 'kept', keys2Count: 3, attempt: 2 },
     });
     expect(report.findings[0].events[0].beforeState).toEqual({
       remediation_status: { attempt: 1 },

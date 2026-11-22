@@ -31,10 +31,17 @@ function flagValue(name: string, fallback?: string): string {
 const ownerId = flagValue('--owner');
 const storedSlug = flagValue('--slug');
 const organizationId = flagValue('--org', randomUUID());
+/**
+ * The catalog-side slug for the first served provider. The allow list and the
+ * catalog can disagree on case, so a run can put the mixed-case form on either
+ * side: `--slug OPENAI` mismatches a canonical catalog, `--snapshot-slug OPENAI`
+ * mismatches a canonical allow list.
+ */
+const snapshotSlug = flagValue('--snapshot-slug', 'openai');
 
 const CATALOGUE_URL = 'https://openrouter.ai/api/v1/models';
 const SERVED = [
-  { modelId: 'fixture-openai/model', provider: 'OpenAI', providerSlug: 'openai' },
+  { modelId: 'fixture-openai/model', provider: 'OpenAI', providerSlug: snapshotSlug },
   { modelId: 'fixture-anthropic/model', provider: 'Anthropic', providerSlug: 'anthropic' },
 ];
 

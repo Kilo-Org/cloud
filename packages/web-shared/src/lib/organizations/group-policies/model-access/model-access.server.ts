@@ -9,7 +9,10 @@ import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import { TRPCError } from '@trpc/server';
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
-import { normalizeInferenceProviderIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import {
+  normalizeInferenceProviderId,
+  normalizeInferenceProviderIds,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
   VIRTUAL_PROVIDER,
@@ -134,11 +137,11 @@ export function evaluateEffectiveModelAccessPolicy(
  * per request. Allowing `virtual` lets them route to every real provider that
  * the same allow list permits; without one, they have nowhere to route.
  *
- * Both sets hold canonical provider slugs, as
- * `evaluateEffectiveModelAccessPolicy` builds them and the catalog side already
- * stores them, so the membership test is an exact match and needs no
- * normalization of its own. Normalizing here would repeat the work once per
- * model, and this runs for every model in the catalog.
+ * Both sets hold canonical provider slugs by construction:
+ * `evaluateEffectiveModelAccessPolicy` normalizes every allow set, and the
+ * provider index (`buildModelIdToProviderSlugsIndex`) normalizes each snapshot
+ * slug before storing it. The membership test is therefore an exact match, and
+ * normalizing here would instead repeat that work once per catalog model.
  */
 function getEligibleProviderRoutes(
   modelProviders: ReadonlySet<string>,
@@ -258,6 +261,9 @@ export function allowsInferenceProviderUserByok(decision: EffectiveModelDecision
  * a catalog-mode direct BYOK key serves it. The key's provider is the only route, whichever
  * providers the snapshot lists for the model, so provider allow-lists and grants are checked
  * against it alone. A policy that requires the model in the current snapshot still does.
+ *
+ * `providerSlug` may be the snapshot's own slug, which is stored verbatim, so it is
+ * normalized here before it joins the canonical lookup set.
  */
 export async function isModelAllowedForProviderKey(
   policy: EffectiveOrganizationModelPolicy,
@@ -265,8 +271,9 @@ export async function isModelAllowedForProviderKey(
   providerSlug: string,
   providerLookup: ProviderLookup = getProviderSlugsForModel
 ): Promise<boolean> {
+  const canonicalProviderSlug = normalizeInferenceProviderId(providerSlug);
   const decision = await getEffectiveModelDecision(policy, modelId, async lookupModelId =>
-    (await providerLookup(lookupModelId)).size > 0 ? new Set([providerSlug]) : new Set()
+    (await providerLookup(lookupModelId)).size > 0 ? new Set([canonicalProviderSlug]) : new Set()
   );
   return decision.allowed;
 }
@@ -280,7 +287,8 @@ export async function isModelRouteAllowed(
   const decision = await getEffectiveModelDecision(policy, modelId, providerLookup);
   return (
     decision.allowed &&
-    (!decision.eligibleProviderRoutes || decision.eligibleProviderRoutes.has(providerSlug))
+    (!decision.eligibleProviderRoutes ||
+      decision.eligibleProviderRoutes.has(normalizeInferenceProviderId(providerSlug)))
   );
 }
 

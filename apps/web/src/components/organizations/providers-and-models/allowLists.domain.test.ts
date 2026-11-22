@@ -1,7 +1,9 @@
 import { describe, expect, test } from '@jest/globals';
 import {
+  buildModelProvidersIndex,
   canonicalizeDenyList,
   canonicalizeProviderAllowList,
+  computeAllProviderSlugsWithEndpoints,
   computeAllowedModelIds,
   computeEnabledProviderSlugs,
   deriveProviderAllowListFromLegacyDenyList,
@@ -19,6 +21,44 @@ describe('allowLists.domain', () => {
   test('empty provider allow list means no providers enabled', () => {
     const enabled = computeEnabledProviderSlugs([], ['a', 'b']);
     expect([...enabled]).toEqual([]);
+  });
+
+  test('computeAllProviderSlugsWithEndpoints returns the canonical form of a mixed-case slug', () => {
+    const slugs = computeAllProviderSlugsWithEndpoints([
+      { slug: 'OpenAI', models: [{ slug: 'openai/gpt-4.1', endpoint: 'chat' }] },
+      { slug: 'anthropic', models: [{ slug: 'anthropic/claude-3-opus' }] },
+    ]);
+
+    expect(slugs).toEqual(['openai']);
+  });
+
+  test('computeEnabledProviderSlugs matches a legacy mixed-case draft value to the canonical catalog slug', () => {
+    const enabled = computeEnabledProviderSlugs(['OpenAI'], ['openai', 'anthropic']);
+    expect([...enabled]).toEqual(['openai']);
+  });
+
+  test('computeEnabledProviderSlugs matches a canonical draft value to a mixed-case catalog slug', () => {
+    const enabled = computeEnabledProviderSlugs(['openai'], ['OpenAI', 'anthropic']);
+    expect([...enabled]).toEqual(['openai']);
+  });
+
+  test('buildModelProvidersIndex keys the model to the canonical provider slug', () => {
+    const index = buildModelProvidersIndex([
+      { slug: 'OpenAI', models: [{ slug: 'openai/gpt-4.1', endpoint: 'chat' }] },
+      { slug: 'openai', models: [{ slug: 'openai/gpt-4o', endpoint: 'chat' }] },
+    ]);
+
+    expect(index.get('openai/gpt-4.1')).toEqual(new Set(['openai']));
+    expect(index.get('openai/gpt-4o')).toEqual(new Set(['openai']));
+  });
+
+  test('toggleProviderEnabled(enable) replaces a legacy mixed-case entry instead of duplicating it', () => {
+    const next = toggleProviderEnabled({
+      providerSlug: 'openai',
+      nextEnabled: true,
+      draftProviderAllowList: ['OpenAI', 'anthropic'],
+    });
+    expect(next).toEqual(['anthropic', 'openai']);
   });
 
   test('model deny list does not exclude newly synced models', () => {

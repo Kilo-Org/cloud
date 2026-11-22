@@ -7,7 +7,10 @@ import {
 import * as z from 'zod';
 
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
-import { normalizeInferenceProviderIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import {
+  normalizeInferenceProviderId,
+  normalizeInferenceProviderIds,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   findOrganizationGroupPolicy,
   type OrganizationGroupPolicies,
@@ -181,12 +184,15 @@ function buildCatalogIndex(snapshot: z.infer<typeof NormalizedOpenRouterResponse
   const providerSlugs = new Set<string>();
   const providersByModelId = new Map<string, Set<string>>();
   for (const provider of snapshot.providers) {
-    providerSlugs.add(provider.slug);
+    // Snapshot slugs are stored verbatim; canonical slugs let the provider
+    // ceiling and the model-access policy compare the same form on both sides.
+    const providerSlug = normalizeInferenceProviderId(provider.slug);
+    providerSlugs.add(providerSlug);
     for (const model of provider.models) {
       const modelId = normalizeModelId(model.slug);
       modelIds.add(modelId);
       const providers = providersByModelId.get(modelId) ?? new Set<string>();
-      providers.add(provider.slug);
+      providers.add(providerSlug);
       providersByModelId.set(modelId, providers);
     }
   }

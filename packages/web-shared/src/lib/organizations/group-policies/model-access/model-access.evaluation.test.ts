@@ -12,6 +12,7 @@ import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
   isModelAllowedForProviderKey,
+  isModelRouteAllowed,
 } from './model-access.server';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@kilocode/web-shared/lib/ai-gateway/latest-model-aliases';
 import { VIRTUAL_PROVIDER } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
@@ -365,6 +366,32 @@ describe('effective organization model access', () => {
     await expect(
       getEffectiveModelDecision(policy, 'meta/llama', canonicalProviderLookup)
     ).resolves.toEqual({ allowed: false, denialSource: 'organization_provider' });
+  });
+
+  it('admits a mixed-case snapshot provider slug against a canonical allow list', async () => {
+    // The provider index canonicalizes the snapshot's `Z-AI` slug, so a model lookup
+    // yields `z-ai`; a caller may still hand in the raw mixed-case slug.
+    const canonicalLookup = async (modelId: string) =>
+      new Set(modelId === 'z-ai/glm-6' ? ['z-ai'] : []);
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        organization: {
+          ...context().organization,
+          settings: { provider_allow_list: ['z-ai'], model_deny_list: [] },
+        },
+        defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
+      })
+    );
+
+    await expect(getEffectiveModelDecision(policy, 'z-ai/glm-6', canonicalLookup)).resolves.toEqual(
+      { allowed: true, eligibleProviderRoutes: new Set(['z-ai']) }
+    );
+    await expect(isModelRouteAllowed(policy, 'z-ai/glm-6', 'Z-AI', canonicalLookup)).resolves.toBe(
+      true
+    );
+    await expect(
+      isModelAllowedForProviderKey(policy, 'z-ai/glm-6', 'Z-AI', canonicalLookup)
+    ).resolves.toBe(true);
   });
 
   it('requires an explicit none policy to grant no models', async () => {

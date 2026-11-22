@@ -1,5 +1,8 @@
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
-import { normalizeInferenceProviderIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import {
+  normalizeInferenceProviderId,
+  normalizeInferenceProviderIds,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 export type OpenRouterModelSlugSnapshot = {
   slug: string;
@@ -42,7 +45,9 @@ export function deriveProviderAllowListFromLegacyDenyList(
   providerDenyList: ReadonlyArray<string> | undefined,
   allProviderSlugsWithEndpoints: ReadonlyArray<string>
 ): string[] {
-  const denied = new Set(providerDenyList ?? []);
+  const denied = new Set(
+    (providerDenyList ?? []).map(entry => normalizeInferenceProviderId(entry))
+  );
   return sortUniqueStrings(allProviderSlugsWithEndpoints.filter(slug => !denied.has(slug)));
 }
 
@@ -54,11 +59,12 @@ export function buildModelProvidersIndex(
     for (const model of provider.models) {
       if (!model.endpoint) continue;
       const normalizedModelId = normalizeModelId(model.slug);
+      const providerSlug = normalizeInferenceProviderId(provider.slug);
       const existing = index.get(normalizedModelId);
       if (existing) {
-        existing.add(provider.slug);
+        existing.add(providerSlug);
       } else {
-        index.set(normalizedModelId, new Set([provider.slug]));
+        index.set(normalizedModelId, new Set([providerSlug]));
       }
     }
   }
@@ -70,7 +76,7 @@ export function computeAllProviderSlugsWithEndpoints(
 ): string[] {
   return openRouterProviders
     .filter(provider => provider.models.some(model => model.endpoint))
-    .map(provider => provider.slug)
+    .map(provider => normalizeInferenceProviderId(provider.slug))
     .sort((a, b) => a.localeCompare(b));
 }
 
@@ -78,8 +84,14 @@ export function computeEnabledProviderSlugs(
   draftProviderAllowList: ReadonlyArray<string>,
   allProviderSlugsWithEndpoints: ReadonlyArray<string>
 ): Set<string> {
-  const known = new Set(allProviderSlugsWithEndpoints);
-  return new Set(draftProviderAllowList.filter(slug => known.has(slug)));
+  const known = new Set(
+    allProviderSlugsWithEndpoints.map(slug => normalizeInferenceProviderId(slug))
+  );
+  return new Set(
+    draftProviderAllowList
+      .map(slug => normalizeInferenceProviderId(slug))
+      .filter(slug => known.has(slug))
+  );
 }
 
 export function computeAllowedModelIds(
@@ -110,12 +122,13 @@ export function toggleProviderEnabled(params: {
   draftProviderAllowList: ReadonlyArray<string>;
 }): string[] {
   const { providerSlug, nextEnabled, draftProviderAllowList } = params;
-  const allowed = new Set(draftProviderAllowList);
+  const canonicalSlug = normalizeInferenceProviderId(providerSlug);
+  const allowed = new Set(draftProviderAllowList.map(entry => normalizeInferenceProviderId(entry)));
   if (nextEnabled) {
-    allowed.add(providerSlug);
+    allowed.add(canonicalSlug);
     return sortUniqueStrings([...allowed]);
   }
-  allowed.delete(providerSlug);
+  allowed.delete(canonicalSlug);
   return sortUniqueStrings([...allowed]);
 }
 

@@ -5,7 +5,7 @@ import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { i18n } from '@/i18n';
 
-import { ProviderAllowList } from './model-access-lists';
+import { ModelDenyList, ProviderAllowList } from './model-access-lists';
 
 // FlashList renders through callbacks, so a host-string mock would drop both the
 // rows and the empty state. This mock mirrors the real list: the header always,
@@ -31,9 +31,20 @@ vi.mock('@shopify/flash-list', async () => {
   };
 });
 vi.mock('react-native', () => ({ View: 'View' }));
-// The frame's tab-bar clearance needs the tabs layout; these lists only use it
-// as bottom padding, which no assertion here reads.
-vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
+const frame = vi.hoisted(() => ({
+  band: 312,
+  measure: () => undefined,
+}));
+// The frame reserves the tab bar's band, or the IME while the keyboard is up.
+// Its measurement needs the tabs layout, so the mock supplies both halves and
+// the frame test below reads them back from the rendered list body.
+vi.mock('@/components/tab-screen', () => ({
+  TAB_SCREEN_TRAILING_GAP: 16,
+  useTabScreenFrame: () => ({
+    frameStyle: { marginBottom: frame.band },
+    measureFrame: frame.measure,
+  }),
+}));
 // The search field is driven through its own `onChangeText`, the query the
 // component keeps in state; the field's own layout has its own suite.
 vi.mock('@/components/ui/search-field', () => ({ SearchField: 'SearchField' }));
@@ -99,6 +110,37 @@ beforeEach(() => {
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
+});
+
+describe('Model Access list frame', () => {
+  // With the search field focused, the keyboard covers the body's bottom. The
+  // list body must reserve that band, or the centered no-match copy is drawn
+  // behind the keyboard where a search that matches nothing explains nothing.
+  it('reserves the keyboard-and-tab-bar band on the provider list body', async () => {
+    const root = await mount(['anthropic']);
+
+    const body = root.findAll(node => Object.is(node.type, 'View'))[0];
+
+    expect(body?.props.style).toEqual({ marginBottom: frame.band });
+    expect(body?.props.onLayout).toBe(frame.measure);
+  });
+
+  it('reserves the same band on the model list body', async () => {
+    const view = await renderWithProviders(
+      createElement(ModelDenyList, {
+        models: [{ id: 'anthropic/claude', name: 'Claude' }],
+        draft: DRAFT,
+        onChange: () => undefined,
+        disabled: false,
+      })
+    );
+    renderer = view.renderer;
+
+    const body = view.renderer.root.findAll(node => Object.is(node.type, 'View'))[0];
+
+    expect(body?.props.style).toEqual({ marginBottom: frame.band });
+    expect(body?.props.onLayout).toBe(frame.measure);
+  });
 });
 
 describe('ProviderAllowList empty state', () => {

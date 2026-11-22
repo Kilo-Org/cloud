@@ -4667,20 +4667,34 @@
       "deductionFallback": "Pobranie kredytów",
       "emptyDescription": "Tutaj pojawią się zakupy kredytów, potwierdzenia i wykorzystanie.",
       "emptyTitle": "Brak historii kredytów",
+      "expiredGrant": "Wygasło: {{description}}",
       "googlePlayReceipt": "Potwierdzenie w Google Play",
       "kind": {
         "adjustment": "Korekta",
         "balanceNeutral": "Bez wpływu na saldo",
         "deduction": "Pobranie",
         "grant": "Przyznane kredyty",
+        "promotionalCredits": "Kredyty promocyjne",
         "welcomeCredits": "Kredyty powitalne",
         "purchase": "Zakup"
+      },
+      "program": {
+        "adminBulkGrant": "Kredyty przyznane przez administratora",
+        "contributorChampion": "Kredyty czempiona współtwórców",
+        "feedback": "Kredyty za opinię",
+        "influencer": "Kredyty dla influencerów",
+        "ossMonthlyReset": "Odnowienie sponsoringu OSS",
+        "ossSponsorship": "Kredyty sponsoringu OSS",
+        "pullRequest": "Kredyty za PR",
+        "usageIssue": "Kredyty za problem z użyciem",
+        "vibeDay": "Kredyty Vibe day"
       },
       "purchaseFallback": "Zakup kredytów",
       "receipt": "Potwierdzenie",
       "receiptA11y": "Otwórz potwierdzenie dla: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Potwierdzenie dla tego zakupu nie jest dostępne.",
-      "retentionLimit": "Wyświetlana jest najnowsza historia kredytów."
+      "retentionLimit": "Wyświetlana jest najnowsza historia kredytów.",
+      "voidedGrant": "Unieważniono: {{description}}"
     },
     "title": "Kup kredyty",
     "description": "Kredyty to jednorazowy zakup dodawany do Twojego salda Kilo na potrzeby sesji kodowania AI w aplikacji Kilo. Sklep obciąża Twoje konto, a kredyty są dodawane po potwierdzeniu płatności przez sklep.",

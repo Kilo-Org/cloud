@@ -4825,20 +4825,34 @@
       "deductionFallback": "Didyniad credyd",
       "emptyDescription": "Bydd pryniannau credyd, derbynebau a defnydd yn ymddangos yma.",
       "emptyTitle": "Dim hanes credydau",
+      "expiredGrant": "Wedi dod i ben: {{description}}",
       "googlePlayReceipt": "Derbynneb gan Google Play",
       "kind": {
         "adjustment": "Addasiad",
         "balanceNeutral": "Dim effaith ar y balans",
         "deduction": "Didyniad",
         "grant": "Credyd am ddim",
+        "promotionalCredits": "Credydau hyrwyddo",
         "welcomeCredits": "Credydau croeso",
         "purchase": "Pryniant"
+      },
+      "program": {
+        "adminBulkGrant": "Credydau gweinyddwr",
+        "contributorChampion": "Credyd pencampwr cyfrannwyr",
+        "feedback": "Credyd adborth",
+        "influencer": "Credyd dylanwadwr",
+        "ossMonthlyReset": "Ailosodiad misol nawdd OSS",
+        "ossSponsorship": "Credyd nawdd OSS",
+        "pullRequest": "Credyd cais tynnu",
+        "usageIssue": "Credyd problem defnydd",
+        "vibeDay": "Credyd Diwrnod Vibe"
       },
       "purchaseFallback": "Pryniant credyd",
       "receipt": "Derbynneb",
       "receiptA11y": "Agor y dderbynneb ar gyfer {{description}}, {{amount}}, o {{date}}",
       "receiptUnavailable": "Nid oes derbynneb ar gael ar gyfer y pryniant hwn.",
-      "retentionLimit": "Yn dangos yr hanes credydau diweddaraf."
+      "retentionLimit": "Yn dangos yr hanes credydau diweddaraf.",
+      "voidedGrant": "Wedi'i ddirymu: {{description}}"
     },
     "title": "Prynu credydau",
     "description": "Mae credydau yn bryniant un-tro sy'n cael ei ychwanegu at eich balans Kilo ar gyfer rhedeg sesiynau codio AI yn Kilo App. Mae'r siop yn codi eich cyfrif ac mae credydau'n cael eu hychwanegu ar ôl i'r siop gadarnhau'r taliad.",

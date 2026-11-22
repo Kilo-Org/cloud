@@ -4588,20 +4588,34 @@
       "deductionFallback": "ניכוי קרדיטים",
       "emptyDescription": "רכישות קרדיטים, קבלות ושימוש יופיעו כאן.",
       "emptyTitle": "אין היסטוריית קרדיטים",
+      "expiredGrant": "פג התוקף: {{description}}",
       "googlePlayReceipt": "קבלה מ-Google Play",
       "kind": {
         "adjustment": "התאמה",
         "balanceNeutral": "ללא השפעה על היתרה",
         "deduction": "ניכוי",
         "grant": "הענקת קרדיטים",
+        "promotionalCredits": "קרדיטים לקידום",
         "welcomeCredits": "קרדיטי ברוכים הבאים",
         "purchase": "רכישה"
+      },
+      "program": {
+        "adminBulkGrant": "הענקת קרדיטים ממנהל",
+        "contributorChampion": "קרדיט לאלוף תורמים",
+        "feedback": "קרדיט בגין משוב",
+        "influencer": "קרדיט משפיענים",
+        "ossMonthlyReset": "איפוס חודשי של חסות קוד פתוח",
+        "ossSponsorship": "קרדיט חסות לקוד פתוח",
+        "pullRequest": "קרדיט בגין PR",
+        "usageIssue": "קרדיט בגין בעיית שימוש",
+        "vibeDay": "קרדיט ליום Vibe"
       },
       "purchaseFallback": "רכישת קרדיטים",
       "receipt": "קבלה",
       "receiptA11y": "פתיחת הקבלה עבור {{description}}, {{amount}}, מתאריך {{date}}",
       "receiptUnavailable": "אין קבלה זמינה עבור רכישה זו.",
-      "retentionLimit": "מוצגת היסטוריית הקרדיטים העדכנית ביותר."
+      "retentionLimit": "מוצגת היסטוריית הקרדיטים העדכנית ביותר.",
+      "voidedGrant": "בוטל: {{description}}"
     },
     "title": "קניית קרדיטים",
     "description": "קרדיטים הם רכישה חד-פעמית שמתווספת ליתרת ה-Kilo שלך להרצת מפגשי קידוד בינה מלאכותית ב-Kilo App. החנות מחייבת את החשבון שלך והקרדיטים מתווספים לאחר שהחנות מאשרת את התשלום.",

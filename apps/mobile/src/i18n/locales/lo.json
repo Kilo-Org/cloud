@@ -4509,20 +4509,34 @@
       "deductionFallback": "ການຫັກເຄຣດິດ",
       "emptyDescription": "ການຊື້ເຄຣດິດ, ໃບຮັບເງິນ ແລະ ການນຳໃຊ້ຈະສະແດງຢູ່ບ່ອນນີ້.",
       "emptyTitle": "ບໍ່ມີປະຫວັດເຄຣດິດ",
+      "expiredGrant": "ໝົດອາຍຸແລ້ວ: {{description}}",
       "googlePlayReceipt": "ໃບຮັບເງິນຈາກ Google Play",
       "kind": {
         "adjustment": "ການປັບປຸງ",
         "balanceNeutral": "ບໍ່ກະທົບຍອດເງິນ",
         "deduction": "ການຫັກ",
         "grant": "ເຄຣດິດທີ່ໄດ້ຮັບ",
+        "promotionalCredits": "ເຄຣດິດໂປຣໂມຊັນ",
         "welcomeCredits": "ເຄຣດິດຕ້ອນຮັບ",
         "purchase": "ການຊື້"
+      },
+      "program": {
+        "adminBulkGrant": "ການມອບເຄຣດິດໂດຍຜູ້ດູແລລະບົບ",
+        "contributorChampion": "ເຄຣດິດຜູ້ສະໜັບສະໜູນດີເດັ່ນ",
+        "feedback": "ເຄຣດິດຄຳຕິຊົມ",
+        "influencer": "ເຄຣດິດອິນຟລູເອນເຊີ",
+        "ossMonthlyReset": "ການຕັ້ງຍອດການສະໜັບສະໜູນ OSS ໃໝ່",
+        "ossSponsorship": "ເຄຣດິດການສະໜັບສະໜູນ OSS",
+        "pullRequest": "ເຄຣດິດຈາກຄຳຂໍລວມໂຄ້ດ",
+        "usageIssue": "ເຄຣດິດບັນຫາການນຳໃຊ້",
+        "vibeDay": "ເຄຣດິດວັນ Vibe"
       },
       "purchaseFallback": "ການຊື້ເຄຣດິດ",
       "receipt": "ໃບຮັບເງິນ",
       "receiptA11y": "ເປີດໃບຮັບເງິນສຳລັບ {{description}}, {{amount}}, ຈາກ {{date}}",
       "receiptUnavailable": "ບໍ່ມີໃບຮັບເງິນສຳລັບການຊື້ນີ້.",
-      "retentionLimit": "ກຳລັງສະແດງບັນທຶກເຄຣດິດຫຼ້າສຸດ."
+      "retentionLimit": "ກຳລັງສະແດງບັນທຶກເຄຣດິດຫຼ້າສຸດ.",
+      "voidedGrant": "ຍົກເລີກແລ້ວ: {{description}}"
     },
     "title": "ຊື້ເຄຣດິດ",
     "description": "ເຄຣດິດເປັນການຊື້ຄັ້ງດຽວທີ່ເພີ່ມໃສ່ຍອດ Kilo ຂອງທ່ານສຳລັບການແລ່ນເຊດຊັນການຂຽນໂຄ້ດ AI ໃນ Kilo App. ຮ້ານຄ້າຄິດຄ່າຈາກບັນຊີຂອງທ່ານ ແລະ ເຄຣດິດຈະຖືກເພີ່ມຫຼັງຈາກຮ້ານຄ້າຢືນຢັນການຊຳລະ.",

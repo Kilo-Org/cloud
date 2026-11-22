@@ -4667,20 +4667,34 @@
       "deductionFallback": "Odečtení kreditů",
       "emptyDescription": "Zde se zobrazí nákupy kreditů, účtenky a využití.",
       "emptyTitle": "Žádná historie kreditů",
+      "expiredGrant": "Platnost vypršela: {{description}}",
       "googlePlayReceipt": "Účtenka z Google Play",
       "kind": {
         "adjustment": "Úprava",
         "balanceNeutral": "Bez vlivu na zůstatek",
         "deduction": "Odečtení",
         "grant": "Přidělení kreditů",
+        "promotionalCredits": "Propagační kredity",
         "welcomeCredits": "Uvítací kredity",
         "purchase": "Nákup"
+      },
+      "program": {
+        "adminBulkGrant": "Přidělení kreditů správcem",
+        "contributorChampion": "Kredit pro šampiona přispěvatelů",
+        "feedback": "Kredit za zpětnou vazbu",
+        "influencer": "Kredit pro influencery",
+        "ossMonthlyReset": "Měsíční obnovení kreditů OSS",
+        "ossSponsorship": "Kredit za sponzorství OSS",
+        "pullRequest": "Kredit za PR",
+        "usageIssue": "Kredit za problém s využitím",
+        "vibeDay": "Kredit Vibe day"
       },
       "purchaseFallback": "Nákup kreditů",
       "receipt": "Účtenka",
       "receiptA11y": "Otevřít účtenku pro {{description}}, {{amount}}, ze dne {{date}}",
       "receiptUnavailable": "Pro tento nákup není účtenka k dispozici.",
-      "retentionLimit": "Zobrazuje se nejnovější historie kreditů."
+      "retentionLimit": "Zobrazuje se nejnovější historie kreditů.",
+      "voidedGrant": "Stornováno: {{description}}"
     },
     "title": "Koupit kredity",
     "description": "Kredity jsou jednorázový nákup přidaný do vašeho zůstatku Kilo pro spouštění AI programovacích relací v aplikaci Kilo. Obchod vám strhne platbu z účtu a kredity se přidají po potvrzení platby obchodem.",

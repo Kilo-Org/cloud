@@ -4509,20 +4509,34 @@
       "deductionFallback": "Кредит шегерімі",
       "emptyDescription": "Кредит сатып алулары, түбіртектер және пайдалану осында көрсетіледі.",
       "emptyTitle": "Кредиттер тарихы жоқ",
+      "expiredGrant": "Мерзімі өтті: {{description}}",
       "googlePlayReceipt": "Google Play түбіртегі",
       "kind": {
         "adjustment": "Түзету",
         "balanceNeutral": "Балансқа әсер етпейді",
         "deduction": "Шегерім",
         "grant": "Берілген кредит",
+        "promotionalCredits": "Промоциялық кредиттер",
         "welcomeCredits": "Қош келу кредиттері",
         "purchase": "Сатып алу"
+      },
+      "program": {
+        "adminBulkGrant": "Әкімшіден берілген кредит",
+        "contributorChampion": "Үздік үлес қосушы кредиті",
+        "feedback": "Пікір үшін кредит",
+        "influencer": "Инфлюенсер кредиті",
+        "ossMonthlyReset": "Ашық кодты жобалар демеушілігінің ай сайынғы жаңаруы",
+        "ossSponsorship": "Ашық кодты жобаларға демеушілік кредиті",
+        "pullRequest": "Біріктіру сұрауы үшін кредит",
+        "usageIssue": "Пайдалану мәселесі үшін кредит",
+        "vibeDay": "Vibe күні кредиті"
       },
       "purchaseFallback": "Кредит сатып алу",
       "receipt": "Түбіртек",
       "receiptA11y": "Түбіртекті ашу: {{description}}, {{amount}}, {{date}} күні",
       "receiptUnavailable": "Бұл сатып алу үшін түбіртек қолжетімді емес.",
-      "retentionLimit": "Кредиттердің ең соңғы тарихы көрсетілуде."
+      "retentionLimit": "Кредиттердің ең соңғы тарихы көрсетілуде.",
+      "voidedGrant": "Күші жойылды: {{description}}"
     },
     "title": "Кредит сатып алу",
     "description": "Кредиттер — Kilo App-те AI бағдарламалау сессияларын жүргізу үшін Kilo балансына қосылатын бір реттік сатып алу. Дүкен шотыңыздан ақша алады және дүкен төлемді растағаннан кейін кредиттер қосылады.",

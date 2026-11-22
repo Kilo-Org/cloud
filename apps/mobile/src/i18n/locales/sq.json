@@ -4509,20 +4509,34 @@
       "deductionFallback": "Zbritje kredish",
       "emptyDescription": "Blerjet e kredive, dëftesat dhe përdorimi do të shfaqen këtu.",
       "emptyTitle": "Nuk ka historik kredish",
+      "expiredGrant": "Skaduar: {{description}}",
       "googlePlayReceipt": "Dëftesë nga Google Play",
       "kind": {
         "adjustment": "Rregullim",
         "balanceNeutral": "Pa ndikim në bilanc",
         "deduction": "Zbritje",
         "grant": "Kredi të dhuruara",
+        "promotionalCredits": "Kredite promocionale",
         "welcomeCredits": "Kredi mirëseardhjeje",
         "purchase": "Blerje"
+      },
+      "program": {
+        "adminBulkGrant": "Kredi të dhuruara nga administratori",
+        "contributorChampion": "Kredi për kampionin e kontribuesve",
+        "feedback": "Kredi për përshtypje",
+        "influencer": "Kredi influencuesi",
+        "ossMonthlyReset": "Rivendosje mujore OSS",
+        "ossSponsorship": "Kredi sponsorizimi OSS",
+        "pullRequest": "Kredi për kërkesë bashkimi",
+        "usageIssue": "Kredi për problem përdorimi",
+        "vibeDay": "Kredi Vibe day"
       },
       "purchaseFallback": "Blerje kredish",
       "receipt": "Dëftesë",
       "receiptA11y": "Hap dëftesën për {{description}}, {{amount}}, nga {{date}}",
       "receiptUnavailable": "Nuk ka dëftesë për këtë blerje.",
-      "retentionLimit": "Po shfaqet historiku i kredive më i fundit."
+      "retentionLimit": "Po shfaqet historiku i kredive më i fundit.",
+      "voidedGrant": "Anuluar: {{description}}"
     },
     "title": "Bli kredite",
     "description": "Kreditet janë një blerje e njëhershme që shtohet në bilancin tuaj Kilo për të drejtuar seanca kodimi me AI në Kilo App. Dyqani të faturova llogarinë dhe kreditet shtohen pasi dyqani konfirmon pagesën.",

@@ -4509,20 +4509,34 @@
       "deductionFallback": "Bawas sa credit",
       "emptyDescription": "Lalabas dito ang mga pagbili, resibo, at paggamit ng credit.",
       "emptyTitle": "Walang kasaysayan ng credit",
+      "expiredGrant": "Nag-expire: {{description}}",
       "googlePlayReceipt": "Resibo mula sa Google Play",
       "kind": {
         "adjustment": "Adjustment",
         "balanceNeutral": "Walang epekto sa balanse",
         "deduction": "Bawas",
         "grant": "Libreng credit",
+        "promotionalCredits": "Promosyonal na kredito",
         "welcomeCredits": "Panimulang credit",
         "purchase": "Pagbili"
+      },
+      "program": {
+        "adminBulkGrant": "Kredito mula sa admin",
+        "contributorChampion": "Kredito ng contributor champion",
+        "feedback": "Kredito para sa puna",
+        "influencer": "Kredito ng influencer",
+        "ossMonthlyReset": "Buwanang pag-reset ng pagtangkilik sa OSS",
+        "ossSponsorship": "Kredito sa pagtangkilik sa OSS",
+        "pullRequest": "Kredito para sa PR",
+        "usageIssue": "Kredito para sa isyu sa paggamit",
+        "vibeDay": "Kredito ng Vibe day"
       },
       "purchaseFallback": "Pagbili ng credit",
       "receipt": "Resibo",
       "receiptA11y": "Buksan ang resibo para sa {{description}}, {{amount}}, mula noong {{date}}",
       "receiptUnavailable": "Walang available na resibo para sa pagbiling ito.",
-      "retentionLimit": "Ipinapakita ang pinakabagong kasaysayan ng credit."
+      "retentionLimit": "Ipinapakita ang pinakabagong kasaysayan ng credit.",
+      "voidedGrant": "Kinansela: {{description}}"
     },
     "title": "Bumili ng kredito",
     "description": "Ang kredito ay isang besesang pagbili na idinaragdag sa iyong Kilo balance para sa pagpapatakbo ng mga AI coding session sa Kilo App. Sinisingil ng store ang iyong account at idinaragdag ang kredito pagkatapos kumpirmahin ng store ang bayad.",

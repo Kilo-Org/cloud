@@ -4588,20 +4588,34 @@
       "deductionFallback": "Odbitak kredita",
       "emptyDescription": "Kupovine kredita, potvrde i potrošnja pojavit će se ovdje.",
       "emptyTitle": "Nema historije kredita",
+      "expiredGrant": "Isteklo: {{description}}",
       "googlePlayReceipt": "Potvrda iz trgovine Google Play",
       "kind": {
         "adjustment": "Korekcija",
         "balanceNeutral": "Bez uticaja na stanje",
         "deduction": "Odbitak",
         "grant": "Dodjela kredita",
+        "promotionalCredits": "Promotivni krediti",
         "welcomeCredits": "Krediti dobrodošlice",
         "purchase": "Kupovina"
+      },
+      "program": {
+        "adminBulkGrant": "Dodjela kredita od administratora",
+        "contributorChampion": "Kredit za šampiona doprinosa",
+        "feedback": "Kredit za povratne informacije",
+        "influencer": "Influencer krediti",
+        "ossMonthlyReset": "Mjesečna obnova kredita za softver otvorenog koda",
+        "ossSponsorship": "Kredit sponzorstva softvera otvorenog koda",
+        "pullRequest": "Kredit za zahtjev za spajanje",
+        "usageIssue": "Kredit za problem s korištenjem",
+        "vibeDay": "Vibe Day kredit"
       },
       "purchaseFallback": "Kupovina kredita",
       "receipt": "Potvrda",
       "receiptA11y": "Otvori potvrdu za {{description}}, {{amount}}, od {{date}}",
       "receiptUnavailable": "Potvrda nije dostupna za ovu kupovinu.",
-      "retentionLimit": "Prikazuje se najnovija historija kredita."
+      "retentionLimit": "Prikazuje se najnovija historija kredita.",
+      "voidedGrant": "Poništeno: {{description}}"
     },
     "title": "Kupi kredite",
     "description": "Krediti su jednokratna kupovina koja se dodaje na tvoj Kilo saldo za pokretanje AI sesija kodiranja u Kilo App. Trgovina naplaćuje tvoj račun, a krediti se dodaju nakon što trgovina potvrdi plaćanje.",

@@ -4509,20 +4509,34 @@
       "deductionFallback": "Frádráttur inneignar",
       "emptyDescription": "Kaup á inneign, kvittanir og notkun birtast hér.",
       "emptyTitle": "Enginn inneignarferill",
+      "expiredGrant": "Útrunnið: {{description}}",
       "googlePlayReceipt": "Kvittun frá Google Play",
       "kind": {
         "adjustment": "Leiðrétting",
         "balanceNeutral": "Hefur ekki áhrif á stöðu",
         "deduction": "Frádráttur",
         "grant": "Úthlutuð inneign",
+        "promotionalCredits": "Kynningarinnieign",
         "welcomeCredits": "Velkomuinneign",
         "purchase": "Kaup"
+      },
+      "program": {
+        "adminBulkGrant": "Inneignarúthlutun stjórnanda",
+        "contributorChampion": "Inneign framlagsmeistara",
+        "feedback": "Inneign fyrir ábendingar",
+        "influencer": "Inneign áhrifavalds",
+        "ossMonthlyReset": "Mánaðarleg endurstilling OSS-inneignar",
+        "ossSponsorship": "Inneign OSS-styrks",
+        "pullRequest": "Inneign samrunabeiðni",
+        "usageIssue": "Inneign vegna notkunarvandamáls",
+        "vibeDay": "Vibe day inneign"
       },
       "purchaseFallback": "Kaup á inneign",
       "receipt": "Kvittun",
       "receiptA11y": "Opna kvittun fyrir {{description}}, {{amount}}, frá {{date}}",
       "receiptUnavailable": "Engin kvittun er tiltæk fyrir þessi kaup.",
-      "retentionLimit": "Nýjasti inneignarferillinn er sýndur."
+      "retentionLimit": "Nýjasti inneignarferillinn er sýndur.",
+      "voidedGrant": "Ógilt: {{description}}"
     },
     "title": "Kaupa inneign",
     "description": "Inneign er einstakt kaup sem bætist við Kilo-stöðuna þína til að keyra AI-forritunarlotur í Kilo App. Verslunin rukkar reikninginn þinn og inneign bætist við eftir að verslunin staðfestir greiðsluna.",

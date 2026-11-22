@@ -4667,20 +4667,34 @@
       "deductionFallback": "Kreditų nurašymas",
       "emptyDescription": "Čia bus rodomi kreditų pirkimai, kvitai ir naudojimas.",
       "emptyTitle": "Kreditų istorijos nėra",
+      "expiredGrant": "Galiojimas baigėsi: {{description}}",
       "googlePlayReceipt": "Kvitas iš Google Play",
       "kind": {
         "adjustment": "Koregavimas",
         "balanceNeutral": "Balanso nekeičia",
         "deduction": "Nurašymas",
         "grant": "Kreditų suteikimas",
+        "promotionalCredits": "Promociniai kreditai",
         "welcomeCredits": "Sveikinimo kreditai",
         "purchase": "Pirkimas"
+      },
+      "program": {
+        "adminBulkGrant": "Administratoriaus suteikti kreditai",
+        "contributorChampion": "Prisidėjusiųjų čempiono kreditai",
+        "feedback": "Atsiliepimų kreditai",
+        "influencer": "Nuomonės formuotojo kreditai",
+        "ossMonthlyReset": "Atvirojo kodo kreditų atkūrimas kas mėnesį",
+        "ossSponsorship": "Atvirojo kodo rėmimo kreditai",
+        "pullRequest": "Pakeitimų užklausos kreditai",
+        "usageIssue": "Naudojimo problemos kreditai",
+        "vibeDay": "Vibe Day kreditai"
       },
       "purchaseFallback": "Kreditų pirkimas",
       "receipt": "Kvitas",
       "receiptA11y": "Atidaryti kvitą: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Šiam pirkimui kvito nėra.",
-      "retentionLimit": "Rodoma naujausia kreditų istorija."
+      "retentionLimit": "Rodoma naujausia kreditų istorija.",
+      "voidedGrant": "Anuliuota: {{description}}"
     },
     "title": "Pirkti kreditus",
     "description": "Kreditai yra vienkartinis pirkinys, pridedamas prie jūsų Kilo balanso AI kodavimo sesijoms Kilo programoje vykdyti. Parduotuvė nuskaito lėšas iš jūsų paskyros, o kreditai pridedami po to, kai parduotuvė patvirtina mokėjimą.",

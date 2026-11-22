@@ -4667,20 +4667,34 @@
       "deductionFallback": "Dedução de créditos",
       "emptyDescription": "Compras, recibos e uso de créditos aparecerão aqui.",
       "emptyTitle": "Nenhum histórico de créditos",
+      "expiredGrant": "Expirado: {{description}}",
       "googlePlayReceipt": "Recibo do Google Play",
       "kind": {
         "adjustment": "Ajuste",
         "balanceNeutral": "Sem efeito no saldo",
         "deduction": "Dedução",
         "grant": "Concessão de créditos",
+        "promotionalCredits": "Créditos promocionais",
         "welcomeCredits": "Créditos de boas-vindas",
         "purchase": "Compra"
+      },
+      "program": {
+        "adminBulkGrant": "Concessão de créditos pelo administrador",
+        "contributorChampion": "Crédito de campeão contribuidor",
+        "feedback": "Crédito por comentários",
+        "influencer": "Crédito de influencer",
+        "ossMonthlyReset": "Renovação do patrocínio de código aberto",
+        "ossSponsorship": "Crédito de patrocínio de código aberto",
+        "pullRequest": "Crédito por PR",
+        "usageIssue": "Crédito por problema de utilização",
+        "vibeDay": "Crédito por Vibe Day"
       },
       "purchaseFallback": "Compra de créditos",
       "receipt": "Recibo",
       "receiptA11y": "Abrir o recibo de {{description}}, {{amount}}, de {{date}}",
       "receiptUnavailable": "Não há recibo disponível para esta compra.",
-      "retentionLimit": "A mostrar o histórico de créditos mais recente."
+      "retentionLimit": "A mostrar o histórico de créditos mais recente.",
+      "voidedGrant": "Anulado: {{description}}"
     },
     "title": "Comprar créditos",
     "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de programação com IA na aplicação Kilo. A loja cobra na sua conta e os créditos são adicionados depois de a loja confirmar o pagamento.",

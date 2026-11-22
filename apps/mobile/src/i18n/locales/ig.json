@@ -4509,20 +4509,34 @@
       "deductionFallback": "Mwepụ kredit",
       "emptyDescription": "Ịzụ kredit, rịsịt, na ojiji ga-apụta ebe a.",
       "emptyTitle": "Enweghị akụkọ kredit",
+      "expiredGrant": "Oge agwụla: {{description}}",
       "googlePlayReceipt": "Rịsịt sitere na Google Play",
       "kind": {
         "adjustment": "Mmezi",
         "balanceNeutral": "Enweghị mmetụta n'ego fọdụrụ",
         "deduction": "Mwepụ",
         "grant": "Onyinye kredit",
+        "promotionalCredits": "Kredit nkwalite",
         "welcomeCredits": "Kredit nnabata",
         "purchase": "Ịzụ ahịa"
+      },
+      "program": {
+        "adminBulkGrant": "Onyinye kredit onye nchịkwa",
+        "contributorChampion": "Kredit onye mmeri ntinye aka",
+        "feedback": "Kredit nzaghachi",
+        "influencer": "Kredit influencer",
+        "ossMonthlyReset": "Mmeghari nkwado ngwanrọ mepere emepe",
+        "ossSponsorship": "Kredit nkwado ngwanrọ mepere emepe",
+        "pullRequest": "Kredit arịrịọ ijikọ koodu",
+        "usageIssue": "Kredit nsogbu ojiji",
+        "vibeDay": "Kredit Vibe Day"
       },
       "purchaseFallback": "Ịzụ kredit",
       "receipt": "Rịsịt",
       "receiptA11y": "Mepee rịsịt maka {{description}}, {{amount}}, site na {{date}}",
       "receiptUnavailable": "Enweghị rịsịt maka ihe a zụrụ a.",
-      "retentionLimit": "Na-egosi akụkọ kredit kachasị ọhụrụ."
+      "retentionLimit": "Na-egosi akụkọ kredit kachasị ọhụrụ.",
+      "voidedGrant": "E kagbuola: {{description}}"
     },
     "title": "Zụta ego ojiji",
     "description": "Ego ojiji bụ azụmahịa otu oge nke a na-agbakwunye na nguzozi Kilo gị maka ịgba nnọkọ ịde koodu AI na Kilo App. Ụlọ ahịa na-akwụ ụgwọ na akaụntụ gị, a na-agbakwunye ego ojiji mgbe ụlọ ahịa kwadoro ịkwụ ụgwọ ahụ.",

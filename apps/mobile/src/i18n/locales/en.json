@@ -4601,20 +4601,34 @@
       "deductionFallback": "Credit deduction",
       "emptyDescription": "Credit purchases, receipts, and usage will appear here.",
       "emptyTitle": "No credit history",
+      "expiredGrant": "Expired: {{description}}",
       "googlePlayReceipt": "Receipt from Google Play",
       "kind": {
         "adjustment": "Adjustment",
         "balanceNeutral": "Balance neutral",
         "deduction": "Deduction",
         "grant": "Credit grant",
+        "promotionalCredits": "Promotional credits",
         "welcomeCredits": "Welcome credits",
         "purchase": "Purchase"
+      },
+      "program": {
+        "adminBulkGrant": "Admin credit grant",
+        "contributorChampion": "Contributor champion credit",
+        "feedback": "Feedback credit",
+        "influencer": "Influencer credit",
+        "ossMonthlyReset": "OSS sponsorship reset",
+        "ossSponsorship": "OSS sponsorship credit",
+        "pullRequest": "Pull request credit",
+        "usageIssue": "Usage issue credit",
+        "vibeDay": "Vibe day credit"
       },
       "purchaseFallback": "Credit purchase",
       "receipt": "Receipt",
       "receiptA11y": "Open the receipt for {{description}}, {{amount}}, from {{date}}",
       "receiptUnavailable": "A receipt is not available for this purchase.",
-      "retentionLimit": "Showing the most recent credit history."
+      "retentionLimit": "Showing the most recent credit history.",
+      "voidedGrant": "Voided: {{description}}"
     },
     "title": "Buy credits",
     "description": "Credits are a one-time purchase added to your Kilo balance for running AI coding sessions in Kilo App. The store charges your account and credits are added after the store confirms payment.",

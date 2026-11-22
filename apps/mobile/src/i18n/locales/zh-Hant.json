@@ -4509,20 +4509,34 @@
       "deductionFallback": "點數扣除",
       "emptyDescription": "點數購買、收據與使用情況會顯示在這裡。",
       "emptyTitle": "尚無點數紀錄",
+      "expiredGrant": "已過期：{{description}}",
       "googlePlayReceipt": "Google Play 收據",
       "kind": {
         "adjustment": "調整",
         "balanceNeutral": "餘額不變",
         "deduction": "扣除",
         "grant": "贈送點數",
+        "promotionalCredits": "推廣點數",
         "welcomeCredits": "歡迎點數",
         "purchase": "購買"
+      },
+      "program": {
+        "adminBulkGrant": "管理員點數發放",
+        "contributorChampion": "貢獻者冠軍點數",
+        "feedback": "意見回饋點數",
+        "influencer": "網紅點數",
+        "ossMonthlyReset": "開源贊助重設",
+        "ossSponsorship": "開源贊助點數",
+        "pullRequest": "提取要求點數",
+        "usageIssue": "用量問題點數",
+        "vibeDay": "Vibe day 點數"
       },
       "purchaseFallback": "點數購買",
       "receipt": "收據",
       "receiptA11y": "開啟「{{description}}」，{{amount}}，{{date}} 的收據",
       "receiptUnavailable": "此筆購買沒有可用的收據。",
-      "retentionLimit": "顯示最近的點數紀錄。"
+      "retentionLimit": "顯示最近的點數紀錄。",
+      "voidedGrant": "已作廢：{{description}}"
     },
     "title": "購買點數",
     "description": "點數是一次性購買，會加入你的 Kilo 餘額，用於在 Kilo App 中執行 AI 程式設計工作階段。商店會向你的帳戶收費，商店確認付款後點數才會入帳。",

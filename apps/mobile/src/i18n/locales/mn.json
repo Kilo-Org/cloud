@@ -4509,20 +4509,34 @@
       "deductionFallback": "Кредитийн хасалт",
       "emptyDescription": "Кредитийн худалдан авалт, баримт, хэрэглээ энд харагдана.",
       "emptyTitle": "Кредитийн түүх алга",
+      "expiredGrant": "Хугацаа нь дууссан: {{description}}",
       "googlePlayReceipt": "Google Play-н баримт",
       "kind": {
         "adjustment": "Залруулга",
         "balanceNeutral": "Үлдэгдэлд нөлөөгүй",
         "deduction": "Хасалт",
         "grant": "Кредит олголт",
+        "promotionalCredits": "Урамшууллын кредит",
         "welcomeCredits": "Тавтай морилын кредит",
         "purchase": "Худалдан авалт"
+      },
+      "program": {
+        "adminBulkGrant": "Админы кредит олголт",
+        "contributorChampion": "Хувь нэмэр оруулагчийн аваргын кредит",
+        "feedback": "Санал хүсэлтийн кредит",
+        "influencer": "Инфлюенсер кредит",
+        "ossMonthlyReset": "Нээлттэй эхийн кредитийг сар бүр шинэчлэх",
+        "ossSponsorship": "Нээлттэй эхийн ивээн тэтгэлгийн кредит",
+        "pullRequest": "Нэгтгэх хүсэлтийн кредит",
+        "usageIssue": "Хэрэглээний асуудлын кредит",
+        "vibeDay": "Vibe Day кредит"
       },
       "purchaseFallback": "Кредит худалдан авалт",
       "receipt": "Баримт",
       "receiptA11y": "Баримтыг нээх: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Энэ худалдан авалтад баримт байхгүй байна.",
-      "retentionLimit": "Кредитийн хамгийн сүүлийн түүхийг харуулж байна."
+      "retentionLimit": "Кредитийн хамгийн сүүлийн түүхийг харуулж байна.",
+      "voidedGrant": "Хүчингүй болгосон: {{description}}"
     },
     "title": "Кредит худалдан авах",
     "description": "Кредит нь Kilo App дээр AI кодчилолын сессүүдийг ажиллуулахын тулд таны Kilo үлдэгдэлд нэмэгддэг нэг удаагийн худалдан авалт юм. Дэлгүүр таны данснаас төлбөр авч, дэлгүүр төлбөрийг баталгаажуулсны дараа кредит нэмэгдэнэ.",

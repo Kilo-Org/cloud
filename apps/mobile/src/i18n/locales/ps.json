@@ -4509,20 +4509,34 @@
       "deductionFallback": "د کریډیټ کسر",
       "emptyDescription": "د کریډیټ پېرودنې، رسیدونه، او کارونه به دلته ښکاره شي.",
       "emptyTitle": "د کریډیټ تاریخچه نشته",
+      "expiredGrant": "مهلت یې تېر شو: {{description}}",
       "googlePlayReceipt": "له Google Play څخه رسید",
       "kind": {
         "adjustment": "سمون",
         "balanceNeutral": "په بیلانس بې اغېزې",
         "deduction": "کسر",
         "grant": "د کریډیټ ورکړه",
+        "promotionalCredits": "پروموشنل کریډیټ",
         "welcomeCredits": "د ښه راغلاست کریډیټ",
         "purchase": "پېرود"
+      },
+      "program": {
+        "adminBulkGrant": "د اډمین د کریډیټ ورکړه",
+        "contributorChampion": "د ونډه اخیستونکي اتل کریډیټ",
+        "feedback": "د نظر کریډیټ",
+        "influencer": "د انفلوینسر کریډیټ",
+        "ossMonthlyReset": "د پرانیستې سرچینې د کریډیټ میاشتنی بیا تنظیم",
+        "ossSponsorship": "د پرانیستې سرچینې د مالي ملاتړ کریډیټ",
+        "pullRequest": "د پل ریکویسټ کریډیټ",
+        "usageIssue": "د کارونې ستونزې کریډیټ",
+        "vibeDay": "د Vibe Day کریډیټ"
       },
       "purchaseFallback": "د کریډیټ پېرود",
       "receipt": "رسید",
       "receiptA11y": "د {{description}}، {{amount}}، {{date}} رسید پرانیزئ",
       "receiptUnavailable": "د دې پېرود لپاره رسید نشته.",
-      "retentionLimit": "تر ټولو وروستې د کریډیټ تاریخچه ښودل کېږي."
+      "retentionLimit": "تر ټولو وروستې د کریډیټ تاریخچه ښودل کېږي.",
+      "voidedGrant": "لغوه شوی: {{description}}"
     },
     "title": "کریډیټ وپېرئ",
     "description": "کریډیټ یو ځل پېرود دی چې ستاسو Kilo توازن ته په Kilo App کې د AI کوډ کولو ناستو چلولو لپاره زیاتېږي. پلورنځی ستاسو له حساب څخه پیسې اخلي او کریډیټ وروسته له هغه زیاتېږي چې پلورنځی تادیه تایید کړي.",

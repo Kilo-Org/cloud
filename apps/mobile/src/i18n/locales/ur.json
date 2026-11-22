@@ -4509,20 +4509,34 @@
       "deductionFallback": "کریڈٹ کی کٹوتی",
       "emptyDescription": "کریڈٹ کی خریداریاں، رسیدیں اور استعمال یہاں نظر آئیں گے۔",
       "emptyTitle": "کریڈٹ کی کوئی تاریخچہ نہیں",
+      "expiredGrant": "میعاد ختم ہو گئی: {{description}}",
       "googlePlayReceipt": "Google Play کی رسید",
       "kind": {
         "adjustment": "ترمیم",
         "balanceNeutral": "بیلنس پر اثر نہیں",
         "deduction": "کٹوتی",
         "grant": "مفت کریڈٹ",
+        "promotionalCredits": "پروموشنل کریڈٹس",
         "welcomeCredits": "خوش آمدید کریڈٹ",
         "purchase": "خریداری"
+      },
+      "program": {
+        "adminBulkGrant": "منتظم کا کریڈٹ عطیہ",
+        "contributorChampion": "شراکت دار چیمپئن کریڈٹ",
+        "feedback": "رائے کا کریڈٹ",
+        "influencer": "انفلوئنسر کریڈٹ",
+        "ossMonthlyReset": "اوپن سورس کریڈٹس کا ماہانہ ری سیٹ",
+        "ossSponsorship": "اوپن سورس کفالت کا کریڈٹ",
+        "pullRequest": "پل ریکویسٹ کریڈٹ",
+        "usageIssue": "استعمال کے مسئلے کا کریڈٹ",
+        "vibeDay": "Vibe Day کریڈٹ"
       },
       "purchaseFallback": "کریڈٹ کی خریداری",
       "receipt": "رسید",
       "receiptA11y": "{{description}}، {{amount}}، {{date}} کی رسید کھولیں",
       "receiptUnavailable": "اس خریداری کی رسید دستیاب نہیں ہے۔",
-      "retentionLimit": "کریڈٹ کی حالیہ ترین تاریخچہ دکھائی جا رہی ہے۔"
+      "retentionLimit": "کریڈٹ کی حالیہ ترین تاریخچہ دکھائی جا رہی ہے۔",
+      "voidedGrant": "منسوخ: {{description}}"
     },
     "title": "کریڈٹس خریدیں",
     "description": "کریڈٹس ایک بار کی خریداری ہیں جو Kilo App میں AI کوڈنگ سیشن چلانے کے لیے آپ کے Kilo بیلنس میں شامل کیے جاتے ہیں۔ اسٹور آپ کے اکاؤنٹ سے رقم وصول کرتا ہے اور اسٹور کے ادائیگی کی تصدیق کرنے کے بعد کریڈٹس شامل کیے جاتے ہیں۔",

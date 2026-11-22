@@ -4509,20 +4509,34 @@
       "deductionFallback": "ක්‍රෙඩිට් අඩු කිරීම",
       "emptyDescription": "ක්‍රෙඩිට් මිලදී ගැනීම්, රිසිට්පත් සහ භාවිතය මෙහි දිස් වේ.",
       "emptyTitle": "ක්‍රෙඩිට් ඉතිහාසයක් නැත",
+      "expiredGrant": "කල් ඉකුත් වී ඇත: {{description}}",
       "googlePlayReceipt": "Google Play වෙතින් ලැබුණු රිසිට්පත",
       "kind": {
         "adjustment": "ගැලපීම",
         "balanceNeutral": "ශේෂයට බලපෑමක් නැත",
         "deduction": "අඩු කිරීම",
         "grant": "ක්‍රෙඩිට් ප්‍රදානය",
+        "promotionalCredits": "ප්‍රවර්ධන ක්‍රෙඩිට්",
         "welcomeCredits": "පිළිගැනීමේ ක්‍රෙඩිට්",
         "purchase": "මිලදී ගැනීම"
+      },
+      "program": {
+        "adminBulkGrant": "පරිපාලක ක්‍රෙඩිට් ප්‍රදානය",
+        "contributorChampion": "දායක ශූර ක්‍රෙඩිට්",
+        "feedback": "ප්‍රතිපෝෂණ ක්‍රෙඩිට්",
+        "influencer": "ඉන්ෆ්ලුවෙන්සර් ක්‍රෙඩිට්",
+        "ossMonthlyReset": "OSS අනුග්‍රහය යළි සැකසීම",
+        "ossSponsorship": "OSS අනුග්‍රහ ක්‍රෙඩිට්",
+        "pullRequest": "පුල් ඉල්ලීම් ක්‍රෙඩිට්",
+        "usageIssue": "භාවිත ගැටලු ක්‍රෙඩිට්",
+        "vibeDay": "Vibe day ක්‍රෙඩිට්"
       },
       "purchaseFallback": "ක්‍රෙඩිට් මිලදී ගැනීම",
       "receipt": "රිසිට්පත",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} සඳහා රිසිට්පත විවෘත කරන්න",
       "receiptUnavailable": "මෙම මිලදී ගැනීම සඳහා රිසිට්පතක් නොමැත.",
-      "retentionLimit": "නවතම ක්‍රෙඩිට් ඉතිහාසය පෙන්වයි."
+      "retentionLimit": "නවතම ක්‍රෙඩිට් ඉතිහාසය පෙන්වයි.",
+      "voidedGrant": "අවලංගු කර ඇත: {{description}}"
     },
     "title": "ක්‍රෙඩිට් මිලදී ගන්න",
     "description": "ක්‍රෙඩිට් යනු Kilo App හි AI කේතීකරණ සැසි ක්‍රියාත්මක කිරීම සඳහා ඔබේ Kilo ශේෂයට එක් කරන එක්-වරක් මිලදී ගැනීමකි. ගබඩාව ඔබේ ගිණුමෙන් අය කරන අතර ගබඩාව ගෙවීම තහවුරු කිරීමෙන් පසු ක්‍රෙඩිට් එක් කෙරේ.",

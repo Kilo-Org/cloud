@@ -4509,20 +4509,34 @@
       "deductionFallback": "Hir'isa kireeditii",
       "emptyDescription": "Bittaan kireeditii, nagaheewwanii fi itti fayyadamni asitti mul'atu.",
       "emptyTitle": "Seenaan kireeditii hin jiru",
+      "expiredGrant": "Yeroon isaa darbeera: {{description}}",
       "googlePlayReceipt": "Nagahee Google Play irraa",
       "kind": {
         "adjustment": "Sirreeffama",
         "balanceNeutral": "Haftee hin jijjiirre",
         "deduction": "Hir'isa",
         "grant": "Kireeditii kenname",
+        "promotionalCredits": "Kiriiditii beeksisaa",
         "welcomeCredits": "Kireeditii simannaa",
         "purchase": "Bittaa"
+      },
+      "program": {
+        "adminBulkGrant": "Kireeditii bulchaa kenname",
+        "contributorChampion": "Kireeditii hayyuu gumaachaa",
+        "feedback": "Kireeditii yaadaa",
+        "influencer": "Kireeditii infiluwensarii",
+        "ossMonthlyReset": "Haaromsa deeggarsa maallaqaa koodii banaa",
+        "ossSponsorship": "Kireeditii deeggarsa maallaqaa koodii banaa",
+        "pullRequest": "Kireeditii gaaffii walitti makuu",
+        "usageIssue": "Kireeditii rakkoo itti fayyadamaa",
+        "vibeDay": "Kireeditii Vibe Day"
       },
       "purchaseFallback": "Bittaa kireeditii",
       "receipt": "Nagahee",
       "receiptA11y": "Nagahee {{description}}, {{amount}}, {{date}} bani",
       "receiptUnavailable": "Bittaa kanaaf nagaheen hin jiru.",
-      "retentionLimit": "Seenaan kireeditii haaraan agarsiifamaa jira."
+      "retentionLimit": "Seenaan kireeditii haaraan agarsiifamaa jira.",
+      "voidedGrant": "Haqameera: {{description}}"
     },
     "title": "Kireedita bituu",
     "description": "Kireeditiin bittaa yeroo tokkoo kan baalansii Kilo kee irratti dabalame ta'ee, shumarra code AI Kilo App keessatti hojjechuuf oola. Suuqii ammaataa kee irraa kaffaltii fudhata, suuqiin kaffaltii erga mirkaneesse booda kireeditiin dabalama.",

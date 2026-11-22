@@ -4509,20 +4509,34 @@
       "deductionFallback": "Dedución de créditos",
       "emptyDescription": "As compras de créditos, os recibos e o uso aparecerán aquí.",
       "emptyTitle": "Sen historial de créditos",
+      "expiredGrant": "Caducado: {{description}}",
       "googlePlayReceipt": "Recibo de Google Play",
       "kind": {
         "adjustment": "Axuste",
         "balanceNeutral": "Sen efecto no saldo",
         "deduction": "Dedución",
         "grant": "Concesión de créditos",
+        "promotionalCredits": "Créditos promocionais",
         "welcomeCredits": "Créditos de benvida",
         "purchase": "Compra"
+      },
+      "program": {
+        "adminBulkGrant": "Créditos concedidos polo administrador",
+        "contributorChampion": "Crédito de campión de colaboradores",
+        "feedback": "Crédito de comentarios",
+        "influencer": "Crédito de influenciador",
+        "ossMonthlyReset": "Restablecemento mensual do patrocinio de código aberto",
+        "ossSponsorship": "Crédito de patrocinio de código aberto",
+        "pullRequest": "Crédito de solicitude de cambios",
+        "usageIssue": "Crédito por problema de uso",
+        "vibeDay": "Crédito do día Vibe"
       },
       "purchaseFallback": "Compra de créditos",
       "receipt": "Recibo",
       "receiptA11y": "Abrir o recibo de {{description}}, {{amount}}, do {{date}}",
       "receiptUnavailable": "Non hai ningún recibo dispoñible para esta compra.",
-      "retentionLimit": "Mostrando o historial de créditos máis recente."
+      "retentionLimit": "Mostrando o historial de créditos máis recente.",
+      "voidedGrant": "Anulado: {{description}}"
     },
     "title": "Mercar créditos",
     "description": "Os créditos son unha compra única que se engade ao teu saldo de Kilo para executar sesións de codificación con IA na app de Kilo. A tenda cobra na túa conta e os créditos engádense despois de que a tenda confirme o pagamento.",

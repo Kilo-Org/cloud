@@ -4509,20 +4509,34 @@
       "deductionFallback": "ការកាត់ក្រេឌីត",
       "emptyDescription": "ការទិញក្រេឌីត បង្កាន់ដៃ និងការប្រើប្រាស់នឹងបង្ហាញនៅទីនេះ។",
       "emptyTitle": "គ្មានប្រវត្តិក្រេឌីត",
+      "expiredGrant": "បានផុតកំណត់៖ {{description}}",
       "googlePlayReceipt": "បង្កាន់ដៃពី Google Play",
       "kind": {
         "adjustment": "ការកែតម្រូវ",
         "balanceNeutral": "មិនប៉ះពាល់សមតុល្យ",
         "deduction": "ការកាត់",
         "grant": "ការផ្តល់ក្រេឌីត",
+        "promotionalCredits": "ឥណទានផ្សព្វផ្សាយ",
         "welcomeCredits": "ក្រេឌីតស្វាគមន៍",
         "purchase": "ការទិញ"
+      },
+      "program": {
+        "adminBulkGrant": "ការផ្តល់ឥណទានដោយអ្នកគ្រប់គ្រង",
+        "contributorChampion": "ឥណទានជើងឯកអ្នកចូលរួម",
+        "feedback": "ឥណទានមតិកែលម្អ",
+        "influencer": "ឥណទានអ្នកមានឥទ្ធិពល",
+        "ossMonthlyReset": "ការបន្តឧបត្ថម្ភកម្មវិធីប្រភពបើកចំហ",
+        "ossSponsorship": "ឥណទានឧបត្ថម្ភកម្មវិធីប្រភពបើកចំហ",
+        "pullRequest": "ឥណទានសំណើបញ្ចូលកូដ",
+        "usageIssue": "ឥណទានបញ្ហាការប្រើប្រាស់",
+        "vibeDay": "ឥណទាន Vibe Day"
       },
       "purchaseFallback": "ការទិញក្រេឌីត",
       "receipt": "បង្កាន់ដៃ",
       "receiptA11y": "បើកបង្កាន់ដៃសម្រាប់ {{description}}, {{amount}}, ពី {{date}}",
       "receiptUnavailable": "មិនមានបង្កាន់ដៃសម្រាប់ការទិញនេះទេ។",
-      "retentionLimit": "បង្ហាញប្រវត្តិឥណទានថ្មីៗបំផុត។"
+      "retentionLimit": "បង្ហាញប្រវត្តិឥណទានថ្មីៗបំផុត។",
+      "voidedGrant": "បានលុបចោល៖ {{description}}"
     },
     "title": "ទិញឥណទាន",
     "description": "ឥណទានគឺជាការទិញតែម្តងដែលបន្ថែមទៅសមតុល្យ Kilo របស់អ្នកសម្រាប់ដំណើរការវគ្គសរសេរកូដ AI នៅក្នុង Kilo App។ ហាងគិតប្រាក់ពីគណនីរបស់អ្នក ហើយឥណទានត្រូវបានបន្ថែមបន្ទាប់ពីហាងបញ្ជាក់ការបង់ប្រាក់។",

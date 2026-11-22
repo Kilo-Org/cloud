@@ -4509,20 +4509,34 @@
       "deductionFallback": "ક્રેડિટ કપાત",
       "emptyDescription": "ક્રેડિટ ખરીદીઓ, રસીદો અને વપરાશ અહીં દેખાશે.",
       "emptyTitle": "કોઈ ક્રેડિટ ઇતિહાસ નથી",
+      "expiredGrant": "સમયસીમા સમાપ્ત: {{description}}",
       "googlePlayReceipt": "Google Playની રસીદ",
       "kind": {
         "adjustment": "સમાયોજન",
         "balanceNeutral": "બેલેન્સ પર અસર નહીં",
         "deduction": "કપાત",
         "grant": "ક્રેડિટ અનુદાન",
+        "promotionalCredits": "પ્રમોશનલ ક્રેડિટ",
         "welcomeCredits": "સ્વાગત ક્રેડિટ",
         "purchase": "ખરીદી"
+      },
+      "program": {
+        "adminBulkGrant": "એડમિન ક્રેડિટ અનુદાન",
+        "contributorChampion": "ફાળો આપનાર ચેમ્પિયન ક્રેડિટ",
+        "feedback": "પ્રતિસાદ ક્રેડિટ",
+        "influencer": "ઇન્ફ્લુઅન્સર ક્રેડિટ",
+        "ossMonthlyReset": "ઓપન સોર્સ પ્રાયોજક સહાય રીસેટ",
+        "ossSponsorship": "ઓપન સોર્સ પ્રાયોજક સહાય ક્રેડિટ",
+        "pullRequest": "પુલ રિક્વેસ્ટ ક્રેડિટ",
+        "usageIssue": "વપરાશ સમસ્યા ક્રેડિટ",
+        "vibeDay": "વાઇબ ડે ક્રેડિટ"
       },
       "purchaseFallback": "ક્રેડિટ ખરીદી",
       "receipt": "રસીદ",
       "receiptA11y": "{{description}}, {{amount}}, {{date}}ની રસીદ ખોલો",
       "receiptUnavailable": "આ ખરીદી માટે રસીદ ઉપલબ્ધ નથી.",
-      "retentionLimit": "સૌથી તાજેતરનો ક્રેડિટ ઇતિહાસ દર્શાવવામાં આવે છે."
+      "retentionLimit": "સૌથી તાજેતરનો ક્રેડિટ ઇતિહાસ દર્શાવવામાં આવે છે.",
+      "voidedGrant": "રદ કરેલ: {{description}}"
     },
     "title": "ક્રેડિટ ખરીદો",
     "description": "ક્રેડિટ એ Kilo એપમાં AI કોડિંગ સત્રો ચલાવવા માટે તમારા Kilo બેલેન્સમાં ઉમેરાતી એકવારની ખરીદી છે. સ્ટોર તમારા ખાતામાંથી ચાર્જ લે છે અને સ્ટોર ચુકવણીની પુષ્ટિ કર્યા પછી ક્રેડિટ ઉમેરાય છે.",

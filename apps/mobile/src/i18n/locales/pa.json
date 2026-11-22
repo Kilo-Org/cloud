@@ -4509,20 +4509,34 @@
       "deductionFallback": "ਕ੍ਰੈਡਿਟ ਕਟੌਤੀ",
       "emptyDescription": "ਕ੍ਰੈਡਿਟ ਖਰੀਦਾਂ, ਰਸੀਦਾਂ ਅਤੇ ਵਰਤੋਂ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੀਆਂ।",
       "emptyTitle": "ਕੋਈ ਕ੍ਰੈਡਿਟ ਇਤਿਹਾਸ ਨਹੀਂ",
+      "expiredGrant": "ਮਿਆਦ ਪੁੱਗ ਗਈ: {{description}}",
       "googlePlayReceipt": "Google Play ਤੋਂ ਰਸੀਦ",
       "kind": {
         "adjustment": "ਸਮਾਯੋਜਨ",
         "balanceNeutral": "ਬਕਾਇਆ ਅਪਰਿਵਰਤਿਤ",
         "deduction": "ਕਟੌਤੀ",
         "grant": "ਕ੍ਰੈਡਿਟ ਗ੍ਰਾਂਟ",
+        "promotionalCredits": "ਪ੍ਰੋਮੋਸ਼ਨਲ ਕ੍ਰੈਡਿਟ",
         "welcomeCredits": "ਸੁਆਗਤ ਕ੍ਰੈਡਿਟ",
         "purchase": "ਖਰੀਦ"
+      },
+      "program": {
+        "adminBulkGrant": "ਐਡਮਿਨ ਕ੍ਰੈਡਿਟ ਗ੍ਰਾਂਟ",
+        "contributorChampion": "ਯੋਗਦਾਨੀ ਚੈਂਪੀਅਨ ਕ੍ਰੈਡਿਟ",
+        "feedback": "ਫੀਡਬੈਕ ਕ੍ਰੈਡਿਟ",
+        "influencer": "ਇਨਫਲੂਐਂਸਰ ਕ੍ਰੈਡਿਟ",
+        "ossMonthlyReset": "ਓਪਨ ਸੋਰਸ ਸਪਾਂਸਰਸ਼ਿਪ ਦਾ ਮਹੀਨਾਵਾਰ ਰੀਸੈਟ",
+        "ossSponsorship": "ਓਪਨ ਸੋਰਸ ਸਪਾਂਸਰਸ਼ਿਪ ਕ੍ਰੈਡਿਟ",
+        "pullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਕ੍ਰੈਡਿਟ",
+        "usageIssue": "ਵਰਤੋਂ ਸਮੱਸਿਆ ਕ੍ਰੈਡਿਟ",
+        "vibeDay": "Vibe day ਕ੍ਰੈਡਿਟ"
       },
       "purchaseFallback": "ਕ੍ਰੈਡਿਟ ਖਰੀਦ",
       "receipt": "ਰਸੀਦ",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} ਲਈ ਰਸੀਦ ਖੋਲ੍ਹੋ",
       "receiptUnavailable": "ਇਸ ਖਰੀਦ ਲਈ ਕੋਈ ਰਸੀਦ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
-      "retentionLimit": "ਸਭ ਤੋਂ ਨਵਾਂ ਕ੍ਰੈਡਿਟ ਇਤਿਹਾਸ ਦਿਖਾਇਆ ਜਾ ਰਿਹਾ ਹੈ।"
+      "retentionLimit": "ਸਭ ਤੋਂ ਨਵਾਂ ਕ੍ਰੈਡਿਟ ਇਤਿਹਾਸ ਦਿਖਾਇਆ ਜਾ ਰਿਹਾ ਹੈ।",
+      "voidedGrant": "ਰੱਦ ਕੀਤਾ: {{description}}"
     },
     "title": "ਕ੍ਰੈਡਿਟ ਖਰੀਦੋ",
     "description": "ਕ੍ਰੈਡਿਟ ਇੱਕ-ਵਾਰ ਦੀ ਖਰੀਦ ਹੈ ਜੋ Kilo ਐਪ ਵਿੱਚ AI ਕੋਡਿੰਗ ਸੈਸ਼ਨ ਚਲਾਉਣ ਲਈ ਤੁਹਾਡੇ Kilo ਬੈਲੰਸ ਵਿੱਚ ਜੋੜੀ ਜਾਂਦੀ ਹੈ। ਸਟੋਰ ਤੁਹਾਡੇ ਖਾਤੇ ਤੋਂ ਚਾਰਜ ਲੈਂਦਾ ਹੈ ਅਤੇ ਸਟੋਰ ਵੱਲੋਂ ਭੁਗਤਾਨ ਦੀ ਪੁਸ਼ਟੀ ਕਰਨ ਤੋਂ ਬਾਅਦ ਕ੍ਰੈਡਿਟ ਜੋੜੇ ਜਾਂਦੇ ਹਨ।",

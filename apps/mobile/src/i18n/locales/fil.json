@@ -399,7 +399,7 @@
       "title": "Mga key ng provider",
       "rowSubtitle": "Gamitin ang sarili mong billing sa provider",
       "orgDescription": "Ibinabahagi ang mga key na ito sa lahat ng nasa organisasyon at sinisingil sa mga akawnt nito sa provider.",
-      "viewOnly": "Ang may-ari, admin, o billing manager lang ng organisasyon ang makakapagpalit ng mga key nito.",
+      "viewOnly": "Ang may-ari, admin, o tagapamahala ng pagsingil lang ng organisasyon ang makakapagpalit ng mga key nito.",
       "description": "Ang mga request na dumadaan sa mga key na ito ay sisingilin sa akawnt mo sa provider sa halip na sa balanse mo sa Kilo.",
       "managedByPlan": "Pinamamahalaan ng iyong coding plan",
       "enableKey": "I-enable ang key ng {{provider}}",
@@ -3407,7 +3407,7 @@
   "organization": {
     "auditLog": {
       "title": "Audit log",
-      "permissionDenied": "Ang may-ari, admin o billing manager lang ng organisasyon na nasa Enterprise plan ang puwedeng magbasa ng audit log nito.",
+      "permissionDenied": "Ang may-ari, admin o tagapamahala ng pagsingil lang ng organisasyon na nasa Enterprise plan ang puwedeng magbasa ng audit log nito.",
       "emptyTitle": "Walang audit event",
       "emptyDescription": "Dito lalabas ang mga aksyong ginawa sa organisasyong ito.",
       "truncated": "Ipinapakita ang mga pinakabagong event.",
@@ -3461,7 +3461,7 @@
     },
     "billing": {
       "title": "Pagsingil",
-      "permissionDenied": "Ang may-ari, admin o billing manager lang ng organisasyon ang makakakita ng pagsingil nito.",
+      "permissionDenied": "Ang may-ari, admin o tagapamahala ng pagsingil lang ng organisasyon ang makakakita ng pagsingil nito.",
       "subscription": "Subscription",
       "state": "Katayuan",
       "stateNone": "Walang subscription",
@@ -3539,7 +3539,7 @@
       "pendingInvitation": "May nakabinbing imbitasyon na ang email na ito.",
       "alreadyMember": "Miembro na ng organisasyong ito ang taong ito.",
       "seatsFull": "Ginagamit na ang lahat ng seat ({{used}}/{{total}}). Hilingin sa isang may-ari ng organisasyon na magdagdag ng mga seat bago mag-imbita ng mas maraming miyembro.",
-      "seatsFullCanInviteBilling": "Ginagamit na ang lahat ng seat ({{used}}/{{total}}). Maaari ka pa ring mag-imbita ng mga billing manager, na hindi gumagamit ng seat.",
+      "seatsFullCanInviteBilling": "Ginagamit na ang lahat ng seat ({{used}}/{{total}}). Maaari ka pa ring mag-imbita ng mga tagapamahala ng pagsingil, na hindi gumagamit ng seat.",
       "noSeatsAvailable": "Ginagamit na ang lahat ng seat. Hilingin sa isang may-ari ng organisasyon na magdagdag ng mga seat bago mag-imbita ng mas maraming miyembro."
     },
     "invoices": {
@@ -3638,7 +3638,7 @@
       "emptyDescription": "Gamitin ang \"Mas lumang oras\" para makita ang mga naunang request.",
       "emptyBoundDescription": "Hanggang dito na lang ang kasaysayan ng mga request.",
       "loadError": "Hindi ma-load ang mga request log.",
-      "permissionDenied": "Ang may-ari, admin o billing manager lang ng organisasyon ang puwedeng magbasa ng mga request log nito.",
+      "permissionDenied": "Ang may-ari, admin o tagapamahala ng pagsingil lang ng organisasyon ang puwedeng magbasa ng mga request log nito.",
       "tokens": "{{input}} input · {{output}} output",
       "byok": "BYOK"
     },
@@ -4977,7 +4977,7 @@
   },
   "organizationGuardrails": {
     "title": "Mga AI Guardrail",
-    "permissionDenied": "Ang mga owner at admin lang ng organisasyon ang puwedeng mamahala ng Mga AI Guardrail. $t(organization.boundary.accessDeniedDescription)",
+    "permissionDenied": "Ang mga may-ari at admin lang ng organisasyon ang puwedeng mamahala ng Mga AI Guardrail. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Hindi naka-enable ang Mga AI Guardrail",
     "unavailable": "Ini-enable ng Kilo ang Mga AI Guardrail para sa isang organisasyon kapag hiniling. Makipag-ugnayan sa {{supportEmail}}, at i-on ito ng Kilo team para sa iyong organisasyon.",
     "contactSupport": "Makipag-ugnayan sa suporta",
@@ -5119,7 +5119,7 @@
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Feature ng Enterprise",
     "enterpriseOnly": "Makukuha ang mga provider at modelo sa Enterprise plan.",
-    "readOnly": "Ang mga owner at admin lang ng organisasyon ang puwedeng magbago ng mga setting na ito.",
+    "readOnly": "Ang mga may-ari at admin lang ng organisasyon ang puwedeng magbago ng mga setting na ito.",
     "loadError": "Hindi ma-load ang mga provider at modelo",
     "tabModels": "Mga modelo",
     "tabProviders": "Mga provider",

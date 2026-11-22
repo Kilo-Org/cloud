@@ -1,11 +1,10 @@
 /**
- * The line under the file-name field has to stay one line tall, and what it
- * truncates is the stored file name. The rule sentence reserves the row, so a
- * preview that wrapped would move the content field; a preview cut at its tail
- * would hide the end of the name a save writes, which is the only new
- * information the line carries. These cases pin one line, cut in the middle so
- * both ends of the name stay readable, and the rule stated in the same row when
- * the fold leaves nothing to store.
+ * What the row under the file-name field shows, and how the preview inside it is
+ * cut. The row is reserved by the rule sentence, so the preview must stay inside
+ * that room; the preview carries the only new information on the line, so it is
+ * cut in the middle rather than at its tail, which would hide the end of the
+ * name a save writes. These cases pin one preview line cut in the middle, and
+ * the rule stated in the same row when the fold leaves nothing to store.
  */
 import { createElement, type ReactNode, type Ref } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';

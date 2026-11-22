@@ -47,9 +47,11 @@ export function sessionLiveActivityTitle(raw: string | null | undefined): string
  * row that does not carry the fact omits it, and the card then keeps the value
  * it already shows, because a tray rebuild carries only what the tray knows.
  * `failure` is the one such fact whose explicit `null` means something,
- * because it reports that nothing failed. `title` is read only from the row,
- * so it accepts `null` from producers that serialize an absent value and never
- * falls back to the previous build.
+ * because it reports that nothing failed. `permissionCommand` is the one fact
+ * whose carry is scoped: it answers the request the approval key names, so a
+ * row that omits it keeps the remembered command only under that same key.
+ * `title` is read only from the row, so it accepts `null` from producers that
+ * serialize an absent value and never falls back to the previous build.
  */
 export type SessionLiveActivityRow = GlanceableSessionRow & {
   id: string;
@@ -96,7 +98,9 @@ function maxCost(
  * row value for these facts; the `failure` fact below is the one exception —
  * it reports "no failure" with `null`, so its caller passes the remembered
  * kind as `previous` and an explicit `null` clears it while an absent key
- * keeps it.
+ * keeps it. A caller whose fact answers one specific request narrows what it
+ * passes as `previous` instead, so the remembered value is only eligible while
+ * that request is still the one the card shows (`permissionCommand`).
  */
 function carried<T>(value: T | undefined, previous: T | null | undefined): T | null {
   return value === undefined ? (previous ?? null) : value;

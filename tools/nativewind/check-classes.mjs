@@ -1724,19 +1724,30 @@ function compareLayoutBaseline(findings, baseline) {
  *   the failure that skips it, so a run never compares against a file it could
  *   not read.
  * - `readTheme` supplies the `@theme inline` tokens and their failure.
+ *
+ * The theme read and the ban list are scoped to the run: the memos are seeded
+ * from this run's reader, and the caches the module held before it are
+ * restored when it ends, so a theme a caller injects serves that run alone.
  */
-export function run({
+export function run({ readTheme = readThemeTokens, ...options } = {}) {
+  const previousTheme = themeTokenCache;
+  const previousRules = ruleCache;
+  themeTokenCache = readTheme();
+  ruleCache = undefined;
+  try {
+    return auditRun(options);
+  } finally {
+    themeTokenCache = previousTheme;
+    ruleCache = previousRules;
+  }
+}
+
+/** The audit body `run` drives, with this run's theme memo already seeded. */
+function auditRun({
   read = readFileSync,
   writeBaseline = process.argv.includes('--write-layout-baseline') ? writeLayoutBaseline : null,
   readBaseline = readLayoutBaseline,
-  readTheme = readThemeTokens,
 } = {}) {
-  // The two memos exist so one run reads the theme once, not so a later run
-  // inherits an earlier one's read: seeding both from this run's reader (and
-  // dropping the ban list built from the previous tokens) keeps a run's tokens
-  // its own.
-  themeTokenCache = readTheme();
-  ruleCache = undefined;
   const problems = [];
   // The layout contract's findings as records: their counts are compared to the
   // baseline, so the printable line is built only where the report is printed.

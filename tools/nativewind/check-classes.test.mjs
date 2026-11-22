@@ -2094,6 +2094,61 @@ test('a second run reads the theme through its own seam instead of the first run
   assert.match(errors.join('\n'), /boom/);
 });
 
+test('restores the theme memo after a run so a later direct check reads the real tokens', async context => {
+  // A run seeds the module-level memos from its own reader. Left there, an
+  // injected theme would decide what a direct check after the run reports, so
+  // the run restores the caches the module held before it.
+  const root = makeFixture(context, {
+    'apps/mobile/src/screen.tsx': screen('<View />'),
+  });
+  const { run, checkParsedFile } = await import(
+    pathToFileURL(join(root, 'tools/nativewind/check-classes.mjs')).href
+  );
+  const { parseSourceEntry } = await import(
+    pathToFileURL(join(root, 'tools/lib/source-files.mjs')).href
+  );
+  const appSrc = join(root, 'apps/mobile/src');
+  const probe = () =>
+    checkParsedFile(
+      parseSourceEntry(
+        appSrc,
+        root,
+        join(appSrc, 'panel.tsx'),
+        'export const a = <View className="bg-primary/50" />;\n'
+      )
+    ).problems;
+  // The control: the theme rule reports before any run, so an empty result
+  // after one says the memo leaked and not that the rule never fires here.
+  const before = probe();
+  assert.match(before.join('\n'), /\/opacity modifier is dropped/);
+  const errors = [];
+  const originalError = console.error;
+  const originalLog = console.log;
+  const previousExitCode = process.exitCode;
+  process.exitCode = undefined;
+  console.error = message => {
+    errors.push(String(message));
+  };
+  console.log = () => {};
+  let exitCode;
+  try {
+    run({
+      readTheme: () => ({ tokens: null, failure: 'boom' }),
+      readBaseline: () => ({ baseline: {}, failure: null }),
+    });
+    exitCode = process.exitCode;
+  } finally {
+    console.error = originalError;
+    console.log = originalLog;
+    process.exitCode = previousExitCode;
+  }
+  // The seam was used: the run reports the injected failure and fails.
+  assert.equal(exitCode, 1);
+  assert.match(errors.join('\n'), /boom/);
+  // The direct check reads global.css again, exactly as it did before the run.
+  assert.deepEqual(probe(), before);
+});
+
 test('run writes and reads the baseline through its injected seams', async context => {
   const root = makeFixture(context, {
     'apps/mobile/src/screen.tsx': screen('<View className="mt-[6px]" />'),

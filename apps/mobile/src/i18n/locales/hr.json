@@ -4968,7 +4968,7 @@
       "runAsCreator": "Pokreni kao ja",
       "runAsCreatorDescription": "Svako pokretanje upotrebljava vaš račun, pa je zaglavlje s tajnom obavezno.",
       "saveFailedTitle": "Nije moguće spremiti okidač",
-      "nameTaken": "Okidač s nazivom „{{name}}\" već postoji.",
+      "nameTaken": "Okidač s nazivom „{{name}}” već postoji.",
       "saveFailedRetry": "Nije moguće doći do poslužitelja. Provjerite vezu i pokušajte ponovno.",
       "saveFailedCheck": "Provjerite vrijednosti u obrascu i pokušajte ponovno.",
       "deleteTitle": "Izbrisati ovaj okidač?",

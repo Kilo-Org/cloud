@@ -353,10 +353,12 @@ const SECURITY_REMEDIATION_PUSH_DENIED_PATTERNS = [
   `${SECURITY_REMEDIATION_PUSH_HEAD}*\t-*`,
   `${SECURITY_REMEDIATION_PUSH_HEAD}* +*`,
   `${SECURITY_REMEDIATION_PUSH_HEAD}*\t+*`,
-  // A quote changes how one token is read, so a quoted push argument is refused
-  // rather than classified.
-  `${SECURITY_REMEDIATION_PUSH_HEAD} *'*`,
-  `${SECURITY_REMEDIATION_PUSH_HEAD} *"*`,
+  // A quote changes how one token is read. The quote has to start the token, so
+  // an ordinary message that merely carries the word `push` is unaffected.
+  `${SECURITY_REMEDIATION_PUSH_HEAD}* '-*`,
+  `${SECURITY_REMEDIATION_PUSH_HEAD}* "-*`,
+  `${SECURITY_REMEDIATION_PUSH_HEAD}*\t'-*`,
+  `${SECURITY_REMEDIATION_PUSH_HEAD}*\t"-*`,
 ];
 
 const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [

@@ -474,6 +474,8 @@ describe('security-remediation push command guard policy', () => {
       'git -c core.pager=cat config push.default current',
       "git push '--force'",
       'git push "--force"',
+      "git push\t'--force'",
+      'git push\t"--force"',
       "git push 'origin +main'",
       'git config remote.origin.mirror true',
       'git -C . config remote.origin.mirror true',
@@ -505,6 +507,8 @@ describe('security-remediation push command guard policy', () => {
       'git -C . config user.email',
       'git switch -c fix/thing',
       'git commit -m "tidy the retry path"',
+      'git commit -m "fix push handling"',
+      'git commit -m "mention --force in the guide"',
     ]) {
       expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('allow');
     }

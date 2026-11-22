@@ -1282,8 +1282,11 @@ test('a drop naming an absent local file is still the upload step, and the page 
     const reads = z.array(z.string()).parse(await agentPage.evaluate('window.__droppedReads'));
 
     expect(reads).toStrictEqual([expect.stringContaining('NotFoundError')]);
-    // The page ran and named the file the browser described, with no contents behind it.
-    expect(fixture.dropReceived()).toStrictEqual([['absent-proof.txt']]);
+    // The page ran and named the file the browser described, with no contents behind it. The report is a
+    // Fire-and-forget fetch, so it fills independently of the call that returned: poll it like the drop spec above.
+    await expect
+      .poll(() => fixture.dropReceived(), { timeout: 20_000 })
+      .toStrictEqual([['absent-proof.txt']]);
   } finally {
     await launch.close();
     await hub.close();

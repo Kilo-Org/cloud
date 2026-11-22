@@ -125,12 +125,12 @@ function claimFence(claim: BouncerCreditEventClaim) {
 // ----- enqueue ------------------------------------------------------------------
 
 /**
- * Enqueues one credit event, idempotently on the stable `event_id`. A replay of
- * the same source event (Stripe webhook redelivery, Apple/Google notification
- * redelivery, or a replayed store-purchase completion) inserts nothing and
- * returns `{ enqueued: false }`. Passing a transaction makes the enqueue atomic
- * with the caller's primary write; a DB error propagates so the caller can let
- * the provider retry.
+ * Enqueues one credit event, idempotently on the stable `event_id` and its `event_type`. A replay
+ * of the same source event and event type (Stripe webhook redelivery, Apple/Google notification
+ * redelivery, or a replayed store-purchase completion) inserts nothing and returns
+ * `{ enqueued: false }`; the same `event_id` with a different `event_type` is a new row. Passing a
+ * transaction makes the enqueue atomic with the caller's primary write; a DB error propagates so
+ * the caller can let the provider retry.
  */
 export async function enqueueBouncerCreditEvent(
   database: BouncerCreditEventOutboxDatabase,

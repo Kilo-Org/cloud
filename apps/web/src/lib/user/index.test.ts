@@ -5453,9 +5453,7 @@ describe('User', () => {
       expect(own?.details).toEqual({ id: 'invite.accepted' });
       // A row about another member keeps that member's address: redaction is by
       // the address a detail names, not by who authored the row.
-      const [otherSubject] = logs.filter(
-        log => log.action === 'organization.user.send_invite'
-      );
+      const [otherSubject] = logs.filter(log => log.action === 'organization.user.send_invite');
       expect(otherSubject.details).toEqual({
         id: 'invite.sent',
         email: otherUser.google_user_email,

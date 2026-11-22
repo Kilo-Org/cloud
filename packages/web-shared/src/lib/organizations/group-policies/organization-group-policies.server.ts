@@ -86,3 +86,15 @@ export function parseOrganizationGroupPolicies(
   }
   return parsed.data;
 }
+
+/** Parse the stored policies of one group. */
+export function parseGroupPolicies(
+  group: { id: string; policies: unknown },
+  organizationId: string
+): OrganizationGroupPolicies {
+  return parseOrganizationGroupPolicies(group.policies, {
+    organizationId,
+    groupId: group.id,
+    source: 'group',
+  });
+}

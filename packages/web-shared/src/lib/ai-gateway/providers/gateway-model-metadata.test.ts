@@ -484,14 +484,14 @@ describe('joinGatewayModelEndpoints', () => {
     expect(joined.withoutStoredEndpoints).toEqual(['vendor/b', 'vendor/c']);
   });
 
-  it('throws when fewer than 100 models have usable stored endpoints', () => {
+  it('throws when fewer than 100 models have usable endpoints', () => {
     expect(() =>
       joinGatewayModelEndpoints(gateway, [
         { model: { id: 'vendor/a-batch', name: 'A batch' }, endpoints: NO_ENDPOINTS_RESOURCE },
         ...listedFillers.slice(1),
       ])
     ).toThrow(
-      'Suspicious: only 99 vercel models have usable stored endpoints, fewer than 100; excluded: vendor/a-batch'
+      'Suspicious: only 99 vercel models have usable endpoints, fewer than 100; excluded: vendor/a-batch'
     );
   });
 });

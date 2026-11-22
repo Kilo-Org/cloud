@@ -169,7 +169,7 @@ describe('fetchGatewayModels', () => {
     jest.spyOn(console, 'warn').mockImplementation(() => {});
 
     await expect(fetchGatewayModels(gateway, modelsSource)).rejects.toThrow(
-      'Suspicious: only 98 vercel models have usable stored endpoints, fewer than 100; excluded: test/model-0-batch, test/model-1, test/model-2'
+      'Suspicious: only 98 vercel models have usable endpoints, fewer than 100; excluded: test/model-0-batch, test/model-1, test/model-2'
     );
   });
 
@@ -277,7 +277,7 @@ describe('fetchGatewayModels', () => {
     ]);
 
     await expect(fetchGatewayModels(gateway, modelsSource)).rejects.toThrow(
-      'Suspicious: only 98 vercel models have usable stored endpoints, fewer than 100; excluded: test/model-0-batch, test/model-1, test/model-2'
+      'Suspicious: only 98 vercel models have usable endpoints, fewer than 100; excluded: test/model-0-batch, test/model-1, test/model-2'
     );
     expect(fetchedUrls(fetchSpy)).toEqual([]);
   });

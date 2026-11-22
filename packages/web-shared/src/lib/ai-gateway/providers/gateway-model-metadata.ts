@@ -283,7 +283,9 @@ export type JoinedGatewayModels = {
 
 /**
  * Models without an endpoints resource, or whose endpoints are unknown, are left out. Throws when
- * fewer than 100 models with usable stored endpoints remain, naming the models it excluded.
+ * fewer than 100 models with usable endpoints remain, naming the models it excluded. `listedModels`
+ * carries stored endpoints on the request path and live-fetched ones on the refresh path, so the
+ * count and the message describe usable endpoints rather than where they came from.
  */
 export function joinGatewayModelEndpoints(
   gateway: Provider,
@@ -306,7 +308,7 @@ export function joinGatewayModelEndpoints(
   if (count < MINIMUM_SERVABLE_MODEL_COUNT) {
     const excluded = [...withoutEndpointsResource, ...withoutStoredEndpoints].sort();
     throw new Error(
-      `Suspicious: only ${count} ${gateway.type} models have usable stored endpoints, fewer than ` +
+      `Suspicious: only ${count} ${gateway.type} models have usable endpoints, fewer than ` +
         `${MINIMUM_SERVABLE_MODEL_COUNT}; excluded: ${formatModelIds(excluded)}`
     );
   }

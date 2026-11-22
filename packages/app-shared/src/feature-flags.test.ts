@@ -24,6 +24,11 @@ const KEYS = CROSS_APP_FEATURE_FLAG_KEYS;
 // instead of agreeing with itself. The member names are part of the expectation,
 // so swapping two values between members fails too; a sorted comparison of
 // values would accept that swap.
+//
+// The `typeof` annotation is deliberate: adding a fifth key to the object makes
+// this declaration fail to compile until the key is pinned here, which is the
+// step that key needs anyway. That red is the guard asking for the new string,
+// not a defect in the guard.
 const EXPECTED_KEYS: typeof CROSS_APP_FEATURE_FLAG_KEYS = {
   codeReviewMdConversion: 'code-review-md-conversion',
   codeReviewCouncil: 'code-review-council',

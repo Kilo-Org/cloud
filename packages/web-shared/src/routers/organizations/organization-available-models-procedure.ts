@@ -1,5 +1,4 @@
 import { captureException } from '@sentry/nextjs';
-import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import {
   ORGANIZATION_MODEL_AUDIENCES,
@@ -48,12 +47,6 @@ export async function loadAvailableModelsForOrganization(params: {
       fromDb,
     }
   );
-  if (!result) {
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Organization not found',
-    });
-  }
   const routers = await listUsableCustomRouters({
     userId,
     organizationId,

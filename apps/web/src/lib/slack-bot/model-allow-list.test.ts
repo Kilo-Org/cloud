@@ -59,8 +59,7 @@ function usePolicy(
   const context: OrganizationGroupPolicyContext = {
     organization: organization(organizationSettings, plan),
     defaultPolicies,
-    groupIds: [],
-    groupPolicies: [],
+    groups: [],
     policyRevision: 1,
   };
   jest

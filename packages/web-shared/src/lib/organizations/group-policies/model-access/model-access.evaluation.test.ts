@@ -17,6 +17,8 @@ import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@kilocode/web-shared/lib/ai-ga
 import { VIRTUAL_PROVIDER } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 
 const RESTRICTED_PUBLIC_MODEL = 'test/restricted-public';
+const GROUP_ID = '00000000-0000-4000-8000-0000000000b1';
+const SECOND_GROUP_ID = '00000000-0000-4000-8000-0000000000b2';
 
 function context(
   overrides: Partial<OrganizationGroupPolicyContext> = {}
@@ -50,8 +52,7 @@ function context(
       anthropic_user_profile_id: null,
     },
     defaultPolicies: [{ type: 'model_access', data: { mode: 'none' } }],
-    groupIds: [],
-    groupPolicies: [],
+    groups: [],
     policyRevision: 1,
     ...overrides,
   };
@@ -171,7 +172,6 @@ describe('effective organization model access', () => {
 
   describe('custom LLMs', () => {
     const ORG_ID = '00000000-0000-4000-8000-0000000000a1';
-    const GROUP_ID = '00000000-0000-4000-8000-0000000000b1';
     const organization = { ...context().organization, id: ORG_ID };
 
     beforeAll(async () => {
@@ -207,7 +207,7 @@ describe('effective organization model access', () => {
 
     it('exempts a custom LLM granted to one of the member groups', async () => {
       const policy = evaluateEffectiveModelAccessPolicy(
-        context({ organization, groupIds: [GROUP_ID] })
+        context({ organization, groups: [{ id: GROUP_ID, policies: [] }] })
       );
 
       await expect(
@@ -267,9 +267,7 @@ describe('effective organization model access', () => {
   );
 
   it('allows known snapshot models when no model access policy is configured', async () => {
-    const policy = evaluateEffectiveModelAccessPolicy(
-      context({ defaultPolicies: [], groupPolicies: [] })
-    );
+    const policy = evaluateEffectiveModelAccessPolicy(context({ defaultPolicies: [], groups: [] }));
     expect(
       (await getEffectiveModelDecision(policy, 'anthropic/claude', currentSnapshotLookup)).allowed
     ).toBe(true);
@@ -370,17 +368,20 @@ describe('effective organization model access', () => {
   it('unions selected model grants across groups', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({
-        groupPolicies: [
-          [
-            {
-              type: 'model_access',
-              data: {
-                mode: 'selected',
-                model_allow_list: ['anthropic/claude'],
-                provider_allow_list: [],
+        groups: [
+          {
+            id: GROUP_ID,
+            policies: [
+              {
+                type: 'model_access',
+                data: {
+                  mode: 'selected',
+                  model_allow_list: ['anthropic/claude'],
+                  provider_allow_list: [],
+                },
               },
-            },
-          ],
+            ],
+          },
         ],
       })
     );
@@ -394,7 +395,9 @@ describe('effective organization model access', () => {
 
   it('lets group all grant the complete organization baseline', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
-      context({ groupPolicies: [[{ type: 'model_access', data: { mode: 'all' } }]] })
+      context({
+        groups: [{ id: GROUP_ID, policies: [{ type: 'model_access', data: { mode: 'all' } }] }],
+      })
     );
     expect(
       (await getEffectiveModelDecision(policy, 'anthropic/claude', currentSnapshotLookup)).allowed
@@ -405,13 +408,20 @@ describe('effective organization model access', () => {
   it('fails closed when a provider-derived grant has no metadata', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({
-        groupPolicies: [
-          [
-            {
-              type: 'model_access',
-              data: { mode: 'selected', model_allow_list: [], provider_allow_list: ['anthropic'] },
-            },
-          ],
+        groups: [
+          {
+            id: GROUP_ID,
+            policies: [
+              {
+                type: 'model_access',
+                data: {
+                  mode: 'selected',
+                  model_allow_list: [],
+                  provider_allow_list: ['anthropic'],
+                },
+              },
+            ],
+          },
         ],
       })
     );
@@ -427,13 +437,20 @@ describe('effective organization model access', () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({
         defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
-        groupPolicies: [
-          [
-            {
-              type: 'model_access',
-              data: { mode: 'selected', model_allow_list: [], provider_allow_list: ['google'] },
-            },
-          ],
+        groups: [
+          {
+            id: GROUP_ID,
+            policies: [
+              {
+                type: 'model_access',
+                data: {
+                  mode: 'selected',
+                  model_allow_list: [],
+                  provider_allow_list: ['google'],
+                },
+              },
+            ],
+          },
         ],
       })
     );
@@ -449,17 +466,20 @@ describe('effective organization model access', () => {
   it('allows selected model grants beyond the organization baseline', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({
-        groupPolicies: [
-          [
-            {
-              type: 'model_access',
-              data: {
-                mode: 'selected',
-                model_allow_list: ['google/gemini'],
-                provider_allow_list: [],
+        groups: [
+          {
+            id: GROUP_ID,
+            policies: [
+              {
+                type: 'model_access',
+                data: {
+                  mode: 'selected',
+                  model_allow_list: ['google/gemini'],
+                  provider_allow_list: [],
+                },
               },
-            },
-          ],
+            ],
+          },
         ],
       })
     );
@@ -475,17 +495,20 @@ describe('effective organization model access', () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({
         defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
-        groupPolicies: [
-          [
-            {
-              type: 'model_access',
-              data: {
-                mode: 'selected',
-                model_allow_list: ['openai/o3'],
-                provider_allow_list: [],
+        groups: [
+          {
+            id: GROUP_ID,
+            policies: [
+              {
+                type: 'model_access',
+                data: {
+                  mode: 'selected',
+                  model_allow_list: ['openai/o3'],
+                  provider_allow_list: [],
+                },
               },
-            },
-          ],
+            ],
+          },
         ],
       })
     );
@@ -515,18 +538,24 @@ describe('effective organization model access', () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({
         defaultPolicies: [{ type: 'model_access', data: { mode: 'none' } }],
-        groupPolicies: [
-          [{ type: 'model_access', data: { mode: 'all' } }],
-          [
-            {
-              type: 'model_access',
-              data: {
-                mode: 'selected',
-                model_allow_list: ['google/gemini'],
-                provider_allow_list: [],
+        groups: [
+          {
+            id: GROUP_ID,
+            policies: [{ type: 'model_access', data: { mode: 'all' } }],
+          },
+          {
+            id: SECOND_GROUP_ID,
+            policies: [
+              {
+                type: 'model_access',
+                data: {
+                  mode: 'selected',
+                  model_allow_list: ['google/gemini'],
+                  provider_allow_list: [],
+                },
               },
-            },
-          ],
+            ],
+          },
         ],
       })
     );
@@ -662,7 +691,7 @@ describe('effective organization model access', () => {
         decide(
           {
             defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
-            groupPolicies: [[selectedGrant]],
+            groups: [{ id: GROUP_ID, policies: [selectedGrant] }],
           },
           'google/gemini'
         )
@@ -682,8 +711,11 @@ describe('effective organization model access', () => {
     });
 
     it.each([
-      ['no grant', { groupPolicies: [] }],
-      ['a selected grant for other models', { groupPolicies: [[selectedGrant]] }],
+      ['no grant', { groups: [] }],
+      [
+        'a selected grant for other models',
+        { groups: [{ id: GROUP_ID, policies: [selectedGrant] }] },
+      ],
     ])('keeps denying members with %s', async (_name, overrides) => {
       await expect(decide(overrides, 'google/gemini')).resolves.toEqual({
         decision: { allowed: false, denialSource: 'no_grant' },
@@ -740,13 +772,20 @@ describe('effective organization model access', () => {
 
     it('admits a key provider that a selected grant names', async () => {
       const grant: Partial<OrganizationGroupPolicyContext> = {
-        groupPolicies: [
-          [
-            {
-              type: 'model_access',
-              data: { mode: 'selected', model_allow_list: [], provider_allow_list: ['synthetic'] },
-            },
-          ],
+        groups: [
+          {
+            id: GROUP_ID,
+            policies: [
+              {
+                type: 'model_access',
+                data: {
+                  mode: 'selected',
+                  model_allow_list: [],
+                  provider_allow_list: ['synthetic'],
+                },
+              },
+            ],
+          },
         ],
       };
 
@@ -756,17 +795,20 @@ describe('effective organization model access', () => {
 
     it('admits any key provider for a model a selected grant names', async () => {
       const grant: Partial<OrganizationGroupPolicyContext> = {
-        groupPolicies: [
-          [
-            {
-              type: 'model_access',
-              data: {
-                mode: 'selected',
-                model_allow_list: ['anthropic/claude'],
-                provider_allow_list: [],
+        groups: [
+          {
+            id: GROUP_ID,
+            policies: [
+              {
+                type: 'model_access',
+                data: {
+                  mode: 'selected',
+                  model_allow_list: ['anthropic/claude'],
+                  provider_allow_list: [],
+                },
               },
-            },
-          ],
+            ],
+          },
         ],
       };
 
@@ -829,17 +871,20 @@ describe('effective organization model access', () => {
     it('routes member provider grants through the granted real providers', async () => {
       const policy = evaluateEffectiveModelAccessPolicy(
         context({
-          groupPolicies: [
-            [
-              {
-                type: 'model_access',
-                data: {
-                  mode: 'selected',
-                  model_allow_list: [],
-                  provider_allow_list: [VIRTUAL_PROVIDER.slug, 'google'],
+          groups: [
+            {
+              id: GROUP_ID,
+              policies: [
+                {
+                  type: 'model_access',
+                  data: {
+                    mode: 'selected',
+                    model_allow_list: [],
+                    provider_allow_list: [VIRTUAL_PROVIDER.slug, 'google'],
+                  },
                 },
-              },
-            ],
+              ],
+            },
           ],
         })
       );

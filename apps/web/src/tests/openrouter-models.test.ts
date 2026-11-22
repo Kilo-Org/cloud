@@ -288,7 +288,7 @@ beforeEach(() => {
     .mockImplementation(realDirectByok.getDirectByokModelsForUser);
   jest.mocked(getUserByokProviderIds).mockReset().mockResolvedValue([]);
   jest.mocked(getEnabledByokProviders).mockReset().mockResolvedValue([]);
-  jest.mocked(getAvailableModelsForOrganization).mockReset().mockResolvedValue(null);
+  jest.mocked(getAvailableModelsForOrganization).mockReset().mockResolvedValue({ data: [] });
   jest.mocked(getCustomLlmsById).mockReset().mockResolvedValue(new Map());
   invalidateModelStatsCache();
   resetOpenRouterModelsCaches();

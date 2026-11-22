@@ -2,9 +2,14 @@ import { createTimer } from '@kilocode/web-shared/lib/timer';
 import { processLocalExpirations } from '@kilocode/web-shared/lib/creditExpiration';
 import type { UserForBalance } from '@kilocode/web-shared/lib/user/balance-types';
 import { accountBalanceMicrodollars } from '@kilocode/worker-utils/account-access';
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { subHours } from 'date-fns';
 
-export type BalanceForUser = { balance: number };
+export type BalanceForUser = {
+  balance: number;
+  microdollars_used: number;
+  total_microdollars_acquired: number;
+};
 export async function getBalanceForUser(
   user: UserForBalance,
   options: {
@@ -15,7 +20,7 @@ export async function getBalanceForUser(
     /** How many hours the cut-off trails `now` by. Defaults to no jitter. */
     expiryJitterHours?: number;
   } = {}
-) {
+): Promise<BalanceForUser> {
   const { forceRefresh = false, quiet = false, now = new Date(), expiryJitterHours = 0 } = options;
   const expireBefore = subHours(now, expiryJitterHours);
 
@@ -30,7 +35,7 @@ export async function getBalanceForUser(
     user = { ...user, ...result };
   }
 
-  const balance = accountBalanceMicrodollars(user) / 1_000_000;
+  const balance = fromMicrodollars(accountBalanceMicrodollars(user));
   return {
     balance,
     microdollars_used: user.microdollars_used,

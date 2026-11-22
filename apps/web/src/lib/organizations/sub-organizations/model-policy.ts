@@ -12,7 +12,10 @@ import {
   findOrganizationGroupPolicy,
   type OrganizationGroupPolicies,
 } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
-import { parseOrganizationGroupPolicies } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies.server';
+import {
+  parseGroupPolicies,
+  parseOrganizationGroupPolicies,
+} from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies.server';
 import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
@@ -231,8 +234,7 @@ async function calculateCatalogAccess(
   const policy = evaluateEffectiveModelAccessPolicy({
     organization,
     defaultPolicies,
-    groupIds: [],
-    groupPolicies: [],
+    groups: [],
     policyRevision: 0,
   });
   const models = new Set<string>();
@@ -373,11 +375,7 @@ export async function summarizeSubOrganizationModelPolicies(
     groups.push({
       groupId: row.groupId,
       groupName: row.groupName,
-      policies: parseOrganizationGroupPolicies(row.policies, {
-        organizationId: row.organizationId,
-        groupId: row.groupId,
-        source: 'group',
-      }),
+      policies: parseGroupPolicies({ id: row.groupId, policies: row.policies }, row.organizationId),
     });
     groupsByOrganization.set(row.organizationId, groups);
   }

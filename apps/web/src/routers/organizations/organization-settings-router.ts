@@ -154,7 +154,7 @@ function assertOrganizationAutoRouteCount(routes: Record<string, string>): void 
 async function assertActiveOrganizationAutoTargetsAllowed(
   organization: Pick<NonNullable<Awaited<ReturnType<typeof getOrganizationById>>>, 'id' | 'plan'>,
   settings: OrganizationSettings,
-  dbClient: typeof db | DrizzleTransaction
+  tx: DrizzleTransaction
 ): Promise<void> {
   if (settings.default_model !== ORG_AUTO_MODEL.id || !settings.org_auto_model) {
     return;
@@ -169,7 +169,7 @@ async function assertActiveOrganizationAutoTargetsAllowed(
 
   for (const [slug, targetModelId] of Object.entries(settings.org_auto_model.routes)) {
     const validation = await validateOrganizationAutoTarget(validationOrganization, targetModelId, {
-      dbClient,
+      read: { tx },
     });
     if (validation.kind === 'error') {
       throw new TRPCError({
@@ -182,7 +182,7 @@ async function assertActiveOrganizationAutoTargetsAllowed(
   const fallbackValidation = await validateOrganizationAutoTarget(
     validationOrganization,
     settings.org_auto_model.fallback_model,
-    { dbClient }
+    { read: { tx } }
   );
   if (fallbackValidation.kind === 'error') {
     throw new TRPCError({
@@ -265,7 +265,7 @@ async function validateOrganizationDefaultReplacement(
         'Replacement default model could not be validated against the current model catalog.',
     });
   }
-  const availableModel = availableModels?.data.find(
+  const availableModel = availableModels.data.find(
     model => model.id.trim().toLowerCase() === validatedReplacementModel.toLowerCase()
   );
   if (!availableModel) {
@@ -662,7 +662,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
           async organization => {
             assertOrganizationAutoEligible(organization);
             const validation = await validateOrganizationAutoTarget(organization, model_id, {
-              dbClient: tx,
+              read: { tx },
             });
             if (validation.kind === 'error') {
               throw new TRPCError({ code: 'BAD_REQUEST', message: validation.message });
@@ -827,7 +827,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
                 const routeValidation = await validateOrganizationAutoTarget(
                   organization,
                   targetModelId,
-                  { dbClient: tx }
+                  { read: { tx } }
                 );
                 if (routeValidation.kind === 'error') {
                   throw new TRPCError({
@@ -843,9 +843,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
             const validation = await validateOrganizationAutoTarget(
               organization,
               requestedFallback,
-              {
-                dbClient: tx,
-              }
+              { read: { tx } }
             );
             if (validation.kind === 'error') {
               throw new TRPCError({ code: 'BAD_REQUEST', message: validation.message });

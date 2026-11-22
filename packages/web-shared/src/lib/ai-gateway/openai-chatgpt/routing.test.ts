@@ -189,7 +189,7 @@ afterAll(() => {
 
 describe('getOpenAiChatGptByokModelIds', () => {
   it('tags only the served OpenAI models among the candidates', async () => {
-    jest.mocked(isOpenAiModelServed).mockImplementation(async (_apiKey, modelId) => {
+    jest.mocked(isOpenAiModelServed).mockImplementation(async modelId => {
       return modelId === 'gpt-5-nano';
     });
 
@@ -201,8 +201,8 @@ describe('getOpenAiChatGptByokModelIds', () => {
       ])
     ).resolves.toEqual(new Set(['openai/gpt-5-nano']));
     expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(USER_OWNER);
-    expect(isOpenAiModelServed).toHaveBeenCalledWith(PARTNER_KEY, 'gpt-5-nano');
-    expect(isOpenAiModelServed).toHaveBeenCalledWith(PARTNER_KEY, 'gpt-5.6-luna-pro');
+    expect(isOpenAiModelServed).toHaveBeenCalledWith('gpt-5-nano');
+    expect(isOpenAiModelServed).toHaveBeenCalledWith('gpt-5.6-luna-pro');
   });
 
   it('returns null without a usable connection so the list stays untouched', async () => {
@@ -234,6 +234,9 @@ describe('getOpenAiChatGptByokModelIds', () => {
     await expect(
       getOpenAiChatGptByokModelIds(USER_OWNER, ['openai/gpt-5-nano'])
     ).resolves.toBeNull();
+    // The key decides first, as in routing: an unconfigured deployment must not
+    // read and decrypt the stored row to learn it cannot tag anything.
+    expect(getOpenAiChatGptStoredConnection).not.toHaveBeenCalled();
   });
 
   it('never tags a gpt-oss model', async () => {
@@ -246,7 +249,7 @@ describe('getOpenAiChatGptByokModelIds', () => {
 
 describe('tagOpenAiChatGptByokModels', () => {
   it('marks the served models and leaves the rest untouched', async () => {
-    jest.mocked(isOpenAiModelServed).mockImplementation(async (_apiKey, modelId) => {
+    jest.mocked(isOpenAiModelServed).mockImplementation(async modelId => {
       return modelId === 'gpt-5-nano';
     });
 
@@ -299,7 +302,7 @@ describe('latest-model aliases', () => {
     await expect(checkOpenAiChatGptByok(aliasInput(ALIAS))).resolves.toMatchObject({
       kind: 'provider',
     });
-    expect(isOpenAiModelServed).toHaveBeenCalledWith(PARTNER_KEY, 'gpt-5.6-luna');
+    expect(isOpenAiModelServed).toHaveBeenCalledWith('gpt-5.6-luna');
   });
 
   it.each(['~openai/gpt-oss-latest', '~anthropic/claude-sonnet-latest', '~openai/unknown-latest'])(
@@ -817,11 +820,12 @@ describe('checkOpenAiChatGptByok', () => {
     await expect(checkOpenAiChatGptByok(routingInput())).resolves.toBeNull();
   });
 
-  it('returns no provider without the deployment partner key, keeping the existing route', async () => {
+  it('returns no provider without the deployment partner key, without touching the stored connection', async () => {
     process.env.OPENAI_CHATGPT_API_KEY = '   ';
 
     await expect(checkOpenAiChatGptByok(routingInput())).resolves.toBeNull();
-    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(USER_OWNER);
+    expect(getOpenAiChatGptStoredConnection).not.toHaveBeenCalled();
+    expect(resolveOpenAiChatGptAccessToken).not.toHaveBeenCalled();
   });
 
   it('builds no provider without the deployment partner key', () => {
@@ -892,7 +896,7 @@ describe('checkOpenAiChatGptByok', () => {
     jest.mocked(isOpenAiModelServed).mockResolvedValue(false);
 
     await expect(checkOpenAiChatGptByok(routingInput())).resolves.toBeNull();
-    expect(isOpenAiModelServed).toHaveBeenCalledWith(PARTNER_KEY, 'gpt-5-nano');
+    expect(isOpenAiModelServed).toHaveBeenCalledWith('gpt-5-nano');
   });
 
   it('keeps a `-pro` reasoning-mode slug off the delegated route', async () => {
@@ -908,7 +912,7 @@ describe('checkOpenAiChatGptByok', () => {
         })
       )
     ).resolves.toBeNull();
-    expect(isOpenAiModelServed).toHaveBeenCalledWith(PARTNER_KEY, 'gpt-5.6-luna-pro');
+    expect(isOpenAiModelServed).toHaveBeenCalledWith('gpt-5.6-luna-pro');
   });
 
   it('is not eligible when no connection is stored', async () => {
@@ -1266,6 +1270,16 @@ describe('shared-services routing', () => {
     expect(result?.kind).toBe('provider');
     expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(SHARED_OWNER);
     expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(SHARED_OWNER);
+  });
+
+  it('returns no provider before consulting the shared connection without the deployment partner key', async () => {
+    process.env.OPENAI_CHATGPT_API_KEY = '';
+
+    await expect(
+      checkOpenAiChatGptByok(routingInput({ organizationId: ORG_ID, botId: 'reviewer' }))
+    ).resolves.toBeNull();
+    expect(getOpenAiChatGptStoredConnection).not.toHaveBeenCalled();
+    expect(resolveOpenAiChatGptAccessToken).not.toHaveBeenCalled();
   });
 
   it('falls back to the caller own connection when the organization has no shared connection', async () => {

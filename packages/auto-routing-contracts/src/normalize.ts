@@ -170,7 +170,7 @@ type CommonBody = {
 // Values the caller captured before the body was mutated (the gateway
 // rewrites `model` and provider fields in place during routing). When
 // provided they are used verbatim and the body's own values are ignored.
-type NormalizeOverrides = {
+export type NormalizeOverrides = {
   requestedModel: string;
   providerHints: NormalizedClassifierInput['providerHints'];
 };
@@ -630,8 +630,10 @@ function isSensitiveToken(token: string) {
   return false;
 }
 
+// True only for a non-array object, so the narrowed type matches what the
+// predicate promises: an array is not a string-keyed record.
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 // ---------- Capability-aware routing helpers ----------

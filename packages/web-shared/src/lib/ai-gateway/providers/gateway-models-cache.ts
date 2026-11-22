@@ -128,28 +128,35 @@ export function extractVercelInferenceProviderIdsFromModel(
 }
 
 /**
- * Inference provider ids per model id, projected from the cached Vercel metadata map. Nothing is
- * keyed by the queried id, so the retained set is bounded by the catalog rather than by lookups.
+ * Inference provider ids per model id, projected once from the cached Vercel metadata map. Nothing
+ * is keyed by the queried id, so the retained set is bounded by the catalog rather than by lookups.
  */
-const getVercelInferenceProviderIdsByModel = createCachedFetch<ReadonlyMap<string, string[]>>(
-  async () => {
-    const models = await getVercelModelsMetadataFromDatabase();
-    return new Map(
-      Object.entries(models).map(([modelId, model]) => [
-        modelId,
-        extractVercelInferenceProviderIdsFromModel(model),
-      ])
-    );
-  },
-  TTL_MS,
-  new Map(),
-  { name: 'vercelInferenceProviderIdsByModel' }
-);
+function projectVercelInferenceProviderIds(models: GatewayModelMap): ReadonlyMap<string, string[]> {
+  return new Map(
+    Object.entries(models).map(([modelId, model]) => [
+      modelId,
+      extractVercelInferenceProviderIdsFromModel(model),
+    ])
+  );
+}
+
+// The cached metadata map is a new object per refresh and is never mutated in place, so a
+// projection memoized on it has exactly the metadata snapshot's lifetime.
+const vercelInferenceProviderIdsByModel = new WeakMap<
+  GatewayModelMap,
+  ReadonlyMap<string, string[]>
+>();
 
 export async function getCachedVercelInferenceProviderIdsForModel(
   modelId: string
 ): Promise<string[] | null> {
-  return (await getVercelInferenceProviderIdsByModel()).get(modelId) ?? null;
+  const models = await getVercelModelsMetadataFromDatabase();
+  let inferenceProviderIdsByModel = vercelInferenceProviderIdsByModel.get(models);
+  if (inferenceProviderIdsByModel === undefined) {
+    inferenceProviderIdsByModel = projectVercelInferenceProviderIds(models);
+    vercelInferenceProviderIdsByModel.set(models, inferenceProviderIdsByModel);
+  }
+  return inferenceProviderIdsByModel.get(modelId) ?? null;
 }
 
 function createModelIdsFetcher(

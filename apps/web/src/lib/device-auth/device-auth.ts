@@ -7,7 +7,11 @@ import { randomInt, randomBytes } from 'node:crypto';
 import { createDeviceSessionWithCredentials } from '@/lib/auth/device-sessions';
 import { hashOpaqueSecret } from '@/lib/auth/secret-hash';
 import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
-import { requestingClientOfRow, type RequestingClient } from './requesting-client';
+import {
+  requestingClientColumns,
+  requestingClientOfRow,
+  type RequestingClient,
+} from './requesting-client';
 import {
   getLivePendingLinkByHash,
   hashPendingLinkSecret,
@@ -282,18 +286,6 @@ function isLockWaitTimeout(error: unknown): boolean {
     current = current.cause;
   }
   return false;
-}
-
-function requestingClientColumns(client: RequestingClient | null): {
-  requesting_client_id: string | null;
-  requesting_client_name: string | null;
-  requesting_redirect_origin: string | null;
-} {
-  return {
-    requesting_client_id: client?.clientId ?? null,
-    requesting_client_name: client?.clientName ?? null,
-    requesting_redirect_origin: client?.redirectOrigin ?? null,
-  };
 }
 
 /**

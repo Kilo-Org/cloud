@@ -2,6 +2,7 @@ import {
   genericPushContentForPushData,
   SECURITY_FINDING_PUSH_TITLE_KEYS,
   SECURITY_LIFECYCLE_I18N_KEY,
+  securityFindingSeverityLabel,
   type DispatchPushInput,
   type DispatchPushOutcome,
   type InternalDispatchRequest,
@@ -27,13 +28,19 @@ export type InternalDispatchDeps = {
   readPreferences: (userId: string) => Promise<UserNotificationPreferences | null>;
 };
 
+/**
+ * The stored title for a security finding push, which the reader shows verbatim
+ * when the catalog key does not resolve. The level comes from the same lookup
+ * the catalog path uses, so the fallback and the translated copy spell it the
+ * same way, and a level this build does not know stays raw.
+ */
 function securityFindingTitle(
   notificationKind: 'new_finding' | 'sla_warning' | 'sla_breach',
   severity: string
 ): string {
   switch (notificationKind) {
     case 'new_finding':
-      return `New security finding (${severity})`;
+      return `New security finding (${securityFindingSeverityLabel('en', severity)})`;
     case 'sla_warning':
       return 'SLA warning';
     case 'sla_breach':

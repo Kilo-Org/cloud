@@ -16,7 +16,11 @@ import {
   type SessionLiveStep,
 } from '@kilocode/session-ingest-contracts/session-live-summary';
 
-import { LIVE_ACTIVITY_RELEVANCE, LIVE_ACTIVITY_TIE_BREAK_LIMIT } from './push-presentation';
+import {
+  agentNotificationKindForGlanceableSnapshot,
+  LIVE_ACTIVITY_RELEVANCE,
+  LIVE_ACTIVITY_TIE_BREAK_LIMIT,
+} from './push-presentation';
 import {
   isFinishedSessionCardStatus,
   SESSION_CARD_QUIET_AFTER_MS,
@@ -252,13 +256,15 @@ export function sessionLiveActivityRelevance(
 /**
  * The aggregate card relevance score: the needs-input band while unfollowed
  * work waits, then a newer `changedAt` (the newest agent state change) first.
+ * The band comes from `agentNotificationKindForGlanceableSnapshot`, not a local
+ * retest, so the card order and the notification kind cannot disagree.
  */
 export function aggregateLiveActivityRelevance(
   needsInput: number,
   changedAt: string | null
 ): number {
   const band =
-    needsInput > 0
+    agentNotificationKindForGlanceableSnapshot({ needsInput }) === 'needs-input'
       ? LIVE_ACTIVITY_RELEVANCE.aggregateNeedsInput
       : LIVE_ACTIVITY_RELEVANCE.aggregate;
   return band + recencyTerm(changedAt);

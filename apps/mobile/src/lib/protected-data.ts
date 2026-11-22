@@ -23,6 +23,7 @@
 
 let available = true;
 const waiters = new Set<() => void>();
+const listeners = new Set<() => void>();
 
 /** Thrown instead of calling the keychain while protected data is unavailable. */
 export class ProtectedDataUnavailableError extends Error {
@@ -44,8 +45,21 @@ export function assertProtectedDataAvailable(): void {
   }
 }
 
-/** Records the native state; a change to available releases every waiter. */
+/** Calls `listener` when protected data comes back. A consumer that must re-read
+ *  after an unlock subscribes here instead of awaiting a one-shot waiter: an
+ *  unlock that lands after that consumer gave up is still observed. The listener
+ *  hears only a change to available, never a repeated report. */
+export function subscribeToProtectedDataAvailable(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+/** Records the native state; a change to available releases every waiter and
+ *  notifies every subscriber. */
 export function setProtectedDataAvailable(next: boolean): void {
+  const becameAvailable = next && !available;
   available = next;
   if (!next) {
     return;
@@ -54,6 +68,15 @@ export function setProtectedDataAvailable(next: boolean): void {
   waiters.clear();
   for (const release of released) {
     release();
+  }
+  if (!becameAvailable) {
+    return;
+  }
+  // Snapshot first: a listener may unsubscribe (or subscribe) while it runs,
+  // and the notification describes the set as it stood at the transition.
+  const notified = [...listeners];
+  for (const listener of notified) {
+    listener();
   }
 }
 

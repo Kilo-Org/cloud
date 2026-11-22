@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { i18n } from '@/i18n';
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
+import { sessionBranchLabel } from '@/lib/session-branch-label';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 import {
@@ -45,30 +46,44 @@ function makeActive(over: Partial<ActiveSession> = {}): ActiveSession {
 }
 
 describe('composeSessionProvenanceSubtitle', () => {
-  it('returns "branch · #N" when both branch and PR number exist', () => {
-    expect(composeSessionProvenanceSubtitle({ branch: 'feature/x', prNumber: 42 })).toBe(
+  it('returns "label · #N" when both a branch label and a PR number exist', () => {
+    expect(composeSessionProvenanceSubtitle({ branchLabel: 'feature/x', prNumber: 42 })).toBe(
       'feature/x · #42'
     );
   });
 
-  it('returns the branch when only branch is present', () => {
-    expect(composeSessionProvenanceSubtitle({ branch: 'feature/x', prNumber: null })).toBe(
+  it('returns the label when only a branch label is present', () => {
+    expect(composeSessionProvenanceSubtitle({ branchLabel: 'feature/x', prNumber: null })).toBe(
       'feature/x'
     );
-    expect(composeSessionProvenanceSubtitle({ branch: 'feature/x', prNumber: undefined })).toBe(
-      'feature/x'
-    );
+    expect(
+      composeSessionProvenanceSubtitle({ branchLabel: 'feature/x', prNumber: undefined })
+    ).toBe('feature/x');
   });
 
   it('returns "#N" when only a PR number is present', () => {
-    expect(composeSessionProvenanceSubtitle({ branch: null, prNumber: 7 })).toBe('#7');
-    expect(composeSessionProvenanceSubtitle({ branch: undefined, prNumber: 7 })).toBe('#7');
+    expect(composeSessionProvenanceSubtitle({ branchLabel: null, prNumber: 7 })).toBe('#7');
   });
 
-  it('returns null when neither branch nor PR number is present', () => {
-    expect(composeSessionProvenanceSubtitle({ branch: null, prNumber: null })).toBeNull();
-    expect(composeSessionProvenanceSubtitle({ branch: undefined, prNumber: undefined })).toBeNull();
-    expect(composeSessionProvenanceSubtitle({ branch: '', prNumber: null })).toBeNull();
+  it('returns null when neither a branch label nor a PR number is present', () => {
+    expect(composeSessionProvenanceSubtitle({ branchLabel: null, prNumber: null })).toBeNull();
+    expect(composeSessionProvenanceSubtitle({ branchLabel: null, prNumber: undefined })).toBeNull();
+    expect(composeSessionProvenanceSubtitle({ branchLabel: '', prNumber: null })).toBeNull();
+    expect(composeSessionProvenanceSubtitle({ branchLabel: '', prNumber: 7 })).toBe('#7');
+  });
+
+  it('joins the label without decoding it again', () => {
+    // One decode: `a%2520b` decodes to `a%20b`, and composing the label must
+    // never turn that into `a b` while the spoken label still says `a%20b`.
+    expect(
+      composeSessionProvenanceSubtitle({
+        branchLabel: sessionBranchLabel('a%2520b'),
+        prNumber: null,
+      })
+    ).toBe('a%20b');
+    expect(composeSessionProvenanceSubtitle({ branchLabel: 'a%2520b', prNumber: null })).toBe(
+      'a%2520b'
+    );
   });
 });
 

@@ -20,12 +20,6 @@ const store = createSecureStorePreference<StoredModelPreference>({
   mergeOnLoad: (disk, pending) => ({ ...disk, ...pending }),
 });
 
-// Warm the disk read at module scope, the way the sibling preference modules
-// do: the settings registry reads and writes this store with no React tree, so
-// the map has to be loaded before an agent read (or a write that would
-// otherwise replace the other contexts with the empty default).
-store.preload();
-
 export function clearAgentModelPreference() {
   store.clear();
 }

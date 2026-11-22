@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { RepoPickerSheet } from '@/components/profiles/repo-picker-sheet';
+import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
 import { ProfileRowIdentity, profileRowLabel } from '@/components/profiles/profile-row-identity';
 import {
   bindingsForProfile,
@@ -28,6 +29,8 @@ import {
   useRepoOptions,
 } from '@/lib/hooks/use-repo-bindings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { connectedServicesHref } from '@/lib/profile-navigation';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import {
   COMPACT_CONTROL_BOX_CLASS,
   COMPACT_CONTROL_HIT_SLOP_DP,
@@ -70,11 +73,27 @@ export function ProfileRepoPinsSection({
   const { t } = useTranslation();
   const colors = useThemeColors();
   const bindingsQuery = useRepoBindings(organizationId);
+  const committedConnectivity = useCommittedConnectivityStatus();
+  const readError = selectProfileReadErrorView({
+    error: bindingsQuery.error,
+    connectivity: committedConnectivity,
+  });
   const { bind, unbind } = useRepoBindingMutations(organizationId);
   const [pickerOpen, setPickerOpen] = useState(false);
   const repoOptions = useRepoOptions(organizationId, pickerOpen);
 
   const pinned = bindingsForProfile(bindingsQuery.bindings, profileId);
+
+  // A terminal read failure means the section is not showing this profile's
+  // pins at all, so its action and the sheet it opens are withheld. The sheet's
+  // own state closes with the read that offered it: leaving it set would
+  // reopen it without a tap if the same key later answered successfully.
+  const readErrorTerminal = bindingsQuery.isError && !readError.showRetry;
+  useEffect(() => {
+    if (readErrorTerminal) {
+      setPickerOpen(false);
+    }
+  }, [readErrorTerminal]);
 
   const handlePin = async (repo: RepoOption) => {
     setPickerOpen(false);
@@ -113,10 +132,11 @@ export function ProfileRepoPinsSection({
   if (bindingsQuery.isError) {
     body = (
       <QueryError
-        variant="server"
+        variant={readError.variant}
         placement="top"
-        title={t('profiles.loadFailed')}
-        onRetry={() => void bindingsQuery.refetch()}
+        title={readError.titleKey ? t(readError.titleKey) : undefined}
+        message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
+        onRetry={readError.showRetry ? () => void bindingsQuery.refetch() : undefined}
         isRetrying={bindingsQuery.isRefetching}
       />
     );
@@ -183,7 +203,7 @@ export function ProfileRepoPinsSection({
     <Section
       label={t('profiles.repoBindings.pinnedTitle')}
       actionLabel={t('profiles.repoBindings.pinRepo')}
-      actionHidden={!canManage}
+      actionHidden={!canManage || readErrorTerminal}
       actionDisabled={bind.isPending}
       onActionPress={() => {
         if (!bind.isPending) {
@@ -193,11 +213,12 @@ export function ProfileRepoPinsSection({
     >
       <Text variant="caption">{t('profiles.repoBindings.pinnedDescription')}</Text>
       {body}
-      {pickerOpen ? (
+      {pickerOpen && !readErrorTerminal ? (
         <RepoPickerSheet
           repositories={repoOptions.repositories}
           isLoading={repoOptions.isLoading}
           isError={repoOptions.isError}
+          error={repoOptions.error}
           onRetry={() => {
             repoOptions.refetch();
           }}
@@ -208,6 +229,7 @@ export function ProfileRepoPinsSection({
           onClose={() => {
             setPickerOpen(false);
           }}
+          connectedServicesHref={connectedServicesHref(organizationId)}
         />
       ) : null}
     </Section>

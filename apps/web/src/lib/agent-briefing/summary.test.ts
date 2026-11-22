@@ -1,6 +1,6 @@
 import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
 import type {
-  OpenRouterModel,
+  OpenRouterCatalogModel,
   OpenRouterModelsResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -36,7 +36,10 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-pricing-config', () => ({
   getCustomPricingConfig: jest.fn(),
 }));
 
-function catalogModel(id: string, pricing: OpenRouterModel['pricing']): OpenRouterModel {
+function catalogModel(
+  id: string,
+  pricing: OpenRouterCatalogModel['pricing']
+): OpenRouterCatalogModel {
   return {
     id,
     name: id,

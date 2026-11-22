@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "కొత్త భద్రతా ఫైండింగ్ ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "అత్యంత తీవ్రమైనది",
+      "high": "అధికం",
+      "medium": "మధ్యస్థం",
+      "low": "తక్కువ"
+    },
     "securityFindingSlaWarning": {
       "title": "SLA హెచ్చరిక"
     },

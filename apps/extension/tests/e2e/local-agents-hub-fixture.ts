@@ -33,6 +33,8 @@ export type FakeHub = {
   pageUrl: string;
   pairingUrl(hubId: string, token: string): string;
   port: number;
+  /** A destination on this hub's origin that answers with a redirect to `target`. */
+  redirectUrl(target: string): string;
   send(frame: FakeHubFrame): void;
   setAllowedOrigin(origin: string): void;
   setPairing(input: { key: string; token: string }): void;
@@ -195,6 +197,16 @@ const startServer = async (state: PairingState): Promise<Server> => {
       return;
     }
 
+    // A destination that answers with a redirect to `to`, so the browser loads that address.
+    if (url.pathname === '/redirect') {
+      const target = url.searchParams.get('to') ?? '';
+
+      response.writeHead(302, { location: target });
+      response.end();
+
+      return;
+    }
+
     response.writeHead(404);
     response.end();
   };
@@ -241,6 +253,7 @@ export const startFakeHub = async (): Promise<FakeHub> => {
     pairingUrl: (hubId, token) =>
       `http://127.0.0.1:${port}/__kilo_browser_pair#v=1&hub=${hubId}&t=${encodeURIComponent(token)}&ws=${encodeURIComponent(hub.wsUrl)}`,
     port,
+    redirectUrl: target => `http://127.0.0.1:${port}/redirect?to=${encodeURIComponent(target)}`,
     send: () => {
       /* Rebound to the socket once it opens. */
     },

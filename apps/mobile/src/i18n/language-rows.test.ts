@@ -37,6 +37,13 @@ describe('languageRows', () => {
     expect(languageRows('arabisch', 'de').map(row => row.tag)).toContain('ar');
   });
 
+  it('matches a query whose letters are a compatibility form', () => {
+    // A CJK input method or a paste produces full-width Latin; the row the
+    // reader sees must still be the one that stays in the list.
+    expect(languageRows('ＥＳＰＡＮＯＬ').map(row => row.tag)).toContain('es');
+    expect(languageRows('ｔｕｒｋｃｅ').map(row => row.tag)).toContain('tr');
+  });
+
   it('answers by endonym and English name under a UI language ICU cannot fully name', () => {
     expect(languageRows('espanol', 'mg').map(row => row.tag)).toContain('es');
   });

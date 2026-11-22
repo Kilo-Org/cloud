@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "လုံခြုံရေး တွေ့ရှိချက် အသစ် ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "အလွန်ပြင်းထန်",
+      "high": "မြင့်",
+      "medium": "အလယ်အလတ်",
+      "low": "နိမ့်"
+    },
     "securityFindingSlaWarning": {
       "title": "SLA သတိပေးချက်"
     },

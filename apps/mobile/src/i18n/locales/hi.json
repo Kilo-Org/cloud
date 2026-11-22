@@ -309,6 +309,7 @@
     "hideBalance": "बैलेंस छिपाएँ",
     "showBalance": "बैलेंस दिखाएँ",
     "balanceHidden": "बैलेंस छिपा हुआ है",
+    "availableToSpendInOrganization": "इस संगठन में खर्च करने के लिए उपलब्ध",
     "signOutTitle": "साइन आउट करें?",
     "signOutMessage": "अपने कार्यक्षेत्र तक पहुँचने के लिए आपको फिर से साइन इन करना होगा।",
     "deleteAccountTitle": "खाता हटाएँ?",
@@ -652,6 +653,8 @@
       "emptyTitle": "अभी तक कोई सूचना नहीं",
       "emptyCategoryTitle": "इस श्रेणी में कोई सूचना नहीं",
       "emptyBody": "इस खाते को मिलने वाली सूचनाएँ यहाँ दिखाई देती हैं। इन्हें {{days}} दिनों तक रखा जाता है।",
+      "emptyBody_one": "इस खाते को मिलने वाली सूचनाएँ यहाँ दिखाई देती हैं। इन्हें {{days}} दिनों तक रखा जाता है।",
+      "emptyBody_other": "इस खाते को मिलने वाली सूचनाएँ यहाँ दिखाई देती हैं। इन्हें {{days}} दिनों तक रखा जाता है।",
       "capped": "सबसे हाल की सूचनाएँ दिखाई जा रही हैं।",
       "loadError": "सूचनाओं का इतिहास लोड नहीं हो सका।",
       "openFailed": "यह सूचना अब कहीं नहीं खुलती।"
@@ -752,6 +755,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} का Bitbucket कनेक्शन कंप्यूटर से वेब पर प्रबंधित किया जाता है.",
+      "deniedManagedByOwner": "जिस कनेक्शन को आप नहीं बदल सकते, उसे बदलने के लिए {{organization}} के किसी मालिक से कहें।",
+      "deniedConnectRole": "केवल {{organization}} के मालिक, एडमिन और बिलिंग प्रबंधक ही इसे कनेक्ट कर सकते हैं।",
+      "deniedReconnectRole": "इसे फिर से कनेक्ट करने के लिए {{organization}} के मालिक, एडमिन या बिलिंग प्रबंधक से अनुरोध करें।",
       "managedOnWebTitle": "वेब पर प्रबंधित",
       "managedOnWebShort": "यह कनेक्शन कंप्यूटर से वेब पर प्रबंधित किया जाता है।",
       "managedOnWebRepositories": "{{organization}} के लिए कंप्यूटर से वेब पर रिपॉज़िटरी चुनें।",
@@ -1024,7 +1030,9 @@
       "unavailablePersonallySwitchAction": "संगठन बदलें",
       "unavailableOrganizationTitle": "काउंसिल समीक्षा उपलब्ध नहीं है",
       "unavailableForOrganization": "काउंसिल समीक्षा के लिए सक्रिय सब्सक्रिप्शन या ट्रायल वाला Enterprise प्लान चाहिए। इस संगठन के पास यह अभी नहीं है।",
-      "unavailableForOrganizationNeutral": "इस संगठन के लिए काउंसिल समीक्षा अभी उपलब्ध नहीं है। कृपया बाद में पुनः प्रयास करें।",
+      "unavailablePlanCheck": "काउंसिल समीक्षा इस संगठन की योजना की जाँच नहीं कर सकी। दोबारा जाँचने के लिए फिर से कोशिश करें।",
+      "unavailableFlagRollout": "काउंसिल समीक्षा इस संगठन के लिए अभी उपलब्ध नहीं है। इसे पाने के लिए ऐप को नवीनतम संस्करण में अपडेट करें।",
+      "unavailableForOrganizationMember": "काउंसिल समीक्षा के लिए सक्रिय सब्सक्रिप्शन या ट्रायल वाला Enterprise प्लान चाहिए। संगठन का मालिक योजना बदल सकता है।",
       "unavailableOnBitbucket": "काउंसिल समीक्षा Bitbucket रिपॉज़िटरी के लिए उपलब्ध नहीं है।",
       "noRepositories": "अभी तक कोई रिपॉज़िटरी नहीं चुनी गई है। पहले रिपॉज़िटरी सेटिंग में रिपॉज़िटरी चुनें।",
       "specialists": "विशेषज्ञ",
@@ -1959,9 +1967,8 @@
       "searchPlaceholder": "रिपॉज़िटरी खोजें…",
       "noMatches": "कोई मिलान नहीं",
       "noRepositories": "कोई रिपॉज़िटरी उपलब्ध नहीं",
-      "noRepositoriesDescription": "आपके खाते से कोई रिपॉज़िटरी कनेक्ट नहीं है।",
+      "noRepositoriesDescription": "रिपॉज़िटरी लोड करने के लिए GitHub या GitLab जोड़ें।",
       "accessibility": "रिपॉज़िटरी: {{label}}",
-      "loading": "लोड हो रहा है…",
       "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
@@ -3644,10 +3651,10 @@
       "nameLabel": "मोड नाम",
       "nameRequired": "मोड नाम दर्ज करें।",
       "notFound": "यह मोड अब मौजूद नहीं है।",
-      "restrictionHint": "केवल इस पैटर्न से मेल खाने वाली फ़ाइलें संपादित की जा सकती हैं। हर फ़ाइल को अनुमति देने के लिए इसे खाली छोड़ें।",
-      "restrictionInvalid": "मान्य पैटर्न दर्ज करें।",
+      "restrictionHint": "एक रेगुलर एक्सप्रेशन तय करता है कि यह मोड किन फ़ाइलों को संपादित कर सकता है, उदाहरण के लिए `\\.md$` केवल markdown फ़ाइलों के लिए। हर फ़ाइल को अनुमति देने के लिए इसे खाली छोड़ें।",
+      "restrictionInvalid": "मान्य रेगुलर एक्सप्रेशन दर्ज करें।",
       "restrictionLabel": "प्रतिबंध लेबल",
-      "restrictionPattern": "फ़ाइल पैटर्न",
+      "restrictionPattern": "फ़ाइल प्रतिबंध",
       "roleLabel": "भूमिका परिभाषा",
       "roleRequired": "बताएँ कि यह मोड क्या करता है।",
       "tool": {
@@ -4400,6 +4407,7 @@
       "promptPlaceholder": "तुम एक …",
       "tools": "औजार",
       "wholeToolRule": "यह एजेंट एक साथ सभी औजारों पर एक नियम लागू करता है: {{rule}}। ये स्विच केवल-पढ़ने योग्य हैं।",
+      "toolRule": "संग्रहित नियम: {{rule}}",
       "visibility": "दृश्यता",
       "visibilityPrimary": "प्राथमिक — पिकर में दिखाया गया है",
       "visibilitySubagent": "सबएजेंट — केवल दूसरों से कॉल करने योग्य",
@@ -4507,7 +4515,7 @@
       "activityUnavailable": "क्रेडिट गतिविधि लोड नहीं हो सकी।",
       "appStoreReceipt": "App Store की रसीद",
       "deductionFallback": "क्रेडिट कटौती",
-      "emptyDescription": "क्रेडिट की खरीदारी, रसीदें और इस्तेमाल यहां दिखेंगे।",
+      "emptyDescription": "क्रेडिट की खरीदारी, रसीदें और इस्तेमाल यहाँ दिखेंगे।",
       "emptyTitle": "कोई क्रेडिट इतिहास नहीं",
       "expiredGrant": "समय समाप्त: {{description}}",
       "googlePlayReceipt": "Google Play की रसीद",
@@ -4797,7 +4805,7 @@
     "connectFailed": "कनेक्शन पेज नहीं खोला जा सका"
   },
   "invoices": {
-    "personalEmptyDescription": "आपसे बिलिंग होने के बाद, आपकी अपनी खरीदारी के इनवॉइस यहां दिखते हैं। App Store और Google Play की रसीदें क्रेडिट इतिहास में हैं।",
+    "personalEmptyDescription": "आपसे बिलिंग होने के बाद, आपकी अपनी खरीदारी के इनवॉइस यहाँ दिखते हैं। App Store और Google Play की रसीदें क्रेडिट इतिहास में हैं।",
     "personalPeriod": "पिछले 12 महीने"
   },
   "cloudAgent": {

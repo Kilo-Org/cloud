@@ -553,17 +553,20 @@ const RouterIdSchema = z.uuid();
 const CaseIdSchema = z.string().trim().min(1);
 const RepetitionSchema = z.number().int().nonnegative();
 
+/** The measured identity of one plan item; an upload echoes exactly this. */
+const ClientEvalItemIdentityShape = {
+  entry: CustomRouterEntryRefSchema,
+  variant: VariantSchema,
+  caseId: CaseIdSchema,
+  rep: RepetitionSchema,
+};
+
 export const ClientEvalPlanRequestSchema = z.object({
   routerId: RouterIdSchema,
 });
 export type ClientEvalPlanRequest = z.infer<typeof ClientEvalPlanRequestSchema>;
 
-export const ClientEvalPlanItemSchema = z.object({
-  entry: CustomRouterEntryRefSchema,
-  variant: VariantSchema,
-  caseId: CaseIdSchema,
-  rep: RepetitionSchema,
-});
+export const ClientEvalPlanItemSchema = z.object(ClientEvalItemIdentityShape);
 export type ClientEvalPlanItem = z.infer<typeof ClientEvalPlanItemSchema>;
 
 export const ClientEvalPairSchema = z.object({
@@ -602,10 +605,7 @@ export type ClientEvalCaseResponse = z.infer<typeof ClientEvalCaseResponseSchema
 export const ClientEvalResultUploadSchema = z.object({
   routerId: RouterIdSchema,
   engineIdentity: z.string().min(1),
-  entry: CustomRouterEntryRefSchema,
-  variant: VariantSchema,
-  caseId: CaseIdSchema,
-  rep: RepetitionSchema,
+  ...ClientEvalItemIdentityShape,
   output: z.string().max(MAX_CLIENT_EVAL_OUTPUT_LENGTH),
   costUsd: z.number().nonnegative(),
   durationMs: z.number().nonnegative(),

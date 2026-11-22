@@ -4,6 +4,7 @@ import {
   isRecord,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { forEachToolSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/tool-schema-walk';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 // Gemini allows only these keys beside `anyOf`.
@@ -19,7 +20,7 @@ const NUMERIC_KEYWORDS = [
 ];
 
 // Keywords that constrain a single JSON type. A branch of that type gets only its own.
-const TYPE_KEYWORDS: Record<string, Set<string>> = {
+const TYPE_KEYWORDS = {
   string: new Set([
     'format',
     'pattern',
@@ -53,18 +54,18 @@ const TYPE_KEYWORDS: Record<string, Set<string>> = {
     'dependentRequired',
     'dependentSchemas',
   ]),
-};
+} satisfies Record<string, ReadonlySet<string>>;
+
+type JsonType = keyof typeof TYPE_KEYWORDS;
 
 const TYPED_KEYWORDS = new Set(Object.values(TYPE_KEYWORDS).flatMap(keywords => [...keywords]));
 
-const JSON_TYPES = new Set(Object.keys(TYPE_KEYWORDS));
-
 // Restricting types to the seven JSON types bounds a repaired node to seven branches.
-function isJsonType(type: unknown): type is string {
-  return typeof type === 'string' && JSON_TYPES.has(type);
+function isJsonType(type: unknown): type is JsonType {
+  return typeof type === 'string' && Object.hasOwn(TYPE_KEYWORDS, type);
 }
 
-function matchesType(type: string, value: unknown): boolean {
+function matchesType(type: JsonType, value: unknown): boolean {
   switch (type) {
     case 'null':
       return value === null;
@@ -80,9 +81,9 @@ function matchesType(type: string, value: unknown): boolean {
       return Array.isArray(value);
     case 'object':
       return isRecord(value);
-    default:
-      return true;
   }
+  // Every JSON type is handled above; a new type fails to compile here.
+  return type satisfies never;
 }
 
 /**
@@ -94,12 +95,12 @@ function copyKeywordsForType(
   target: Record<string, unknown>,
   source: Record<string, unknown>,
   keys: string[],
-  type: string
+  type: JsonType
 ): boolean {
   for (const key of keys) {
     if (key in target) continue;
     const value = source[key];
-    if (TYPED_KEYWORDS.has(key) && !TYPE_KEYWORDS[type]?.has(key)) continue;
+    if (TYPED_KEYWORDS.has(key) && !TYPE_KEYWORDS[type].has(key)) continue;
     if ((key === 'enum' || key === 'examples') && Array.isArray(value)) {
       const values = value.filter(item => matchesType(type, item));
       if (key === 'enum' && values.length === 0) return false;
@@ -160,16 +161,17 @@ function lowerMixedTypeArray(node: Record<string, unknown>): boolean {
   if (values.length === 0) return false;
   const keys = Object.keys(node).filter(key => key !== 'type' && key !== 'description');
   if (!movesWithoutCopies(node, keys)) return false;
+  const branchTypes = new Set<JsonType>(types);
   const branches: Record<string, unknown>[] = [];
-  for (const type of new Set(types)) {
+  for (const type of branchTypes) {
     if (type === 'null') continue;
     // Every integer is a number, so the number branch already covers it.
-    if (type === 'integer' && types.includes('number')) continue;
+    if (type === 'integer' && branchTypes.has('number')) continue;
     const branch: Record<string, unknown> = { type };
     if (copyKeywordsForType(branch, node, keys, type)) branches.push(branch);
   }
   if (branches.length < 2) return false;
-  if (types.includes('null') && values.includes(null)) branches.push({ type: 'null' });
+  if (branchTypes.has('null') && values.includes(null)) branches.push({ type: 'null' });
   replaceContents(node, { anyOf: branches, ...descriptionOf(node) });
   return true;
 }
@@ -196,8 +198,8 @@ function distributeAnyOfSiblings(node: Record<string, unknown>): boolean {
   const keys = Object.keys(node).filter(key => !ANY_OF_KEYS.has(key));
   if (keys.length === 0) return false;
   const anyOf = node.anyOf as unknown[];
-  if (anyOf.length > JSON_TYPES.size) return false;
-  const types = anyOf.map(branch =>
+  if (anyOf.length > Object.keys(TYPE_KEYWORDS).length) return false;
+  const types: (JsonType | undefined)[] = anyOf.map(branch =>
     isRecord(branch) && isJsonType(branch.type) ? branch.type : undefined
   );
   if (types.some(type => type === undefined) || new Set(types).size !== types.length) {
@@ -224,7 +226,9 @@ function distributeAnyOfSiblings(node: Record<string, unknown>): boolean {
   const branches: Record<string, unknown>[] = [];
   const seen = new Set<string>();
   for (const branch of anyOf as Record<string, unknown>[]) {
-    let type = branch.type as string;
+    const branchType = branch.type;
+    if (!isJsonType(branchType)) continue;
+    let type = branchType;
     const out: Record<string, unknown> = { ...branch };
     if (stringEnum && (type === 'integer' || type === 'number')) {
       type = 'string';
@@ -275,23 +279,7 @@ export function repairGeminiToolSchemas(request: GatewayRequest): void {
     if (nodes > 0) repairedTools.push({ name, nodes });
   };
 
-  switch (request.kind) {
-    case 'chat_completions':
-      for (const tool of request.body.tools ?? []) {
-        if (tool.type === 'function') repair(tool.function.name, tool.function.parameters);
-      }
-      break;
-    case 'responses':
-      for (const tool of request.body.tools ?? []) {
-        if (tool.type === 'function') repair(tool.name, tool.parameters);
-      }
-      break;
-    case 'messages':
-      for (const tool of request.body.tools ?? []) {
-        if ('input_schema' in tool) repair(tool.name, tool.input_schema);
-      }
-      break;
-  }
+  forEachToolSchema(request, repair);
 
   if (repairedTools.length > 0) {
     warnExceptInTest('[repairGeminiToolSchemas] repaired tool schemas Gemini rejects', {

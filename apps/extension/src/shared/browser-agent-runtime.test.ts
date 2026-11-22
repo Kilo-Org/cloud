@@ -26,6 +26,7 @@ import {
   ORIGIN_CHANGED_ERROR,
   SENSITIVE_REASON,
 } from './browser-agent-checks';
+import type { BrowserGrant } from './browser-agent-checks';
 import { createRuntimeBrowserBridge } from './local-agents/browser-bridge';
 import { LOCAL_AGENT_ERROR_CODES } from './local-agents/jsonrpc';
 import { createDownloadHold } from './browser-download-hold';
@@ -3316,6 +3317,249 @@ describe('agent browser calls', () => {
     ).toContain('report.txt: The file was downloaded; the page did not change.');
   });
 
+  it('answers an approved repeat with the navigation result of the tab it drove', async () => {
+    const downloads = createFakeDownloads();
+    const created: Record<string, unknown>[] = [];
+    const openedListeners: ((tab: {
+      readonly id?: number;
+      readonly openerTabId?: number;
+    }) => void)[] = [];
+    const newTab = TAB_ID + 6;
+    const landing = 'https://accounts.example.org/login';
+    let navigates = 0;
+    /**
+     * The opened tab's url, as the browser reports it: the step's destination until the repeat's navigation commits,
+     * then the url that navigation landed on.
+     */
+    let tabUrl = `${MAIN_ORIGIN}/report.txt`;
+
+    const tabsApi = {
+      create: async (properties: { readonly url?: string } = {}) => {
+        created.push({ ...properties });
+
+        // The browser opens the tab, so the call owns it.
+        for (const listener of openedListeners) {
+          listener({ id: newTab, openerTabId: TAB_ID });
+        }
+
+        return { id: newTab, title: '', url: properties.url ?? 'about:blank', windowId: 1 };
+      },
+      get: async (tabId: number) =>
+        tabId === newTab
+          ? { id: newTab, title: '', url: tabUrl, windowId: 1 }
+          : { id: TAB_ID, title: 'Example', url: MAIN_ORIGIN },
+      onCreated: {
+        addListener: (
+          listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+        ) => {
+          openedListeners.push(listener);
+        },
+        removeListener: (
+          listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+        ) => {
+          const index = openedListeners.indexOf(listener);
+
+          if (index !== -1) {
+            openedListeners.splice(index, 1);
+          }
+        },
+      },
+      query: async () => [
+        { active: true, id: TAB_ID, title: 'Example', url: MAIN_ORIGIN, windowId: 1 },
+      ],
+    };
+    const { controller } = createGroups();
+    const { cdp, runtime } = await createHarness({
+      downloadsApi: downloads.api,
+      tabGroups: controller,
+      tabsApi,
+    });
+
+    // The step's navigate answers with an aborted load and names the download it started; the approved repeat's
+    // Navigate loads a page, so no file exists for the approval to claim and the result is the page it landed on.
+    cdp.setHandlers({
+      'Page.navigate': () => {
+        navigates += 1;
+
+        if (navigates === 1) {
+          downloads.emit({ id: 71, tabId: newTab, url });
+
+          return { errorText: 'net::ERR_ABORTED' };
+        }
+
+        return { frameId: 'main' };
+      },
+    });
+
+    const url = `${MAIN_ORIGIN}/report.txt`;
+    const openTab = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: {
+          authorized: [readGrant, actGrant, { class: 'navigate', origin: MAIN_ORIGIN }],
+          sensitive: [...sensitive],
+        },
+        arguments: { action: 'new', url },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_tabs',
+      });
+
+    const guarded = await openTab([]);
+
+    if (guarded.kind !== 'needs_permission') {
+      throw new Error(`expected a refusal, got ${JSON.stringify(guarded)}`);
+    }
+
+    expect([created.length, created[0]?.['url'], downloads.cancelled]).toStrictEqual([
+      1,
+      'about:blank',
+      [71],
+    ]);
+
+    // The repeat's navigation commits on the url it loaded, so the frame tree and the tab the browser reports both
+    // Show where the repeat settled.
+    cdp.setFrameUrl(landing);
+    tabUrl = landing;
+
+    // The repeat runs on a later instant than the file the guarded call created: a download search's window is
+    // Millisecond-granular, so the two calls only stay apart if the clock does. Only `Date` is faked, so every guard
+    // Window still runs on the real timers it waits with.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.now() + 1000);
+
+    try {
+      const approved = await openTab([expectStepToken(guarded)]);
+
+      expect(approved).toMatchObject({
+        from: MAIN_ORIGIN,
+        kind: 'origin_changed',
+        to: 'https://accounts.example.org',
+      });
+      // The repeat navigated the tab the refused step opened, not the caller's, and it opened no second tab.
+      expect(cdp.sent().findLast(command => command.method === 'Page.navigate')).toStrictEqual({
+        method: 'Page.navigate',
+        params: { url },
+        tabId: newTab,
+        url,
+      });
+      expect([created.length, downloads.cancelled]).toStrictEqual([1, [71]]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("answers an approved repeat on its approved destination with the browser's refusal", async () => {
+    const downloads = createFakeDownloads();
+    const created: Record<string, unknown>[] = [];
+    const openedListeners: ((tab: {
+      readonly id?: number;
+      readonly openerTabId?: number;
+    }) => void)[] = [];
+    const newTab = TAB_ID + 6;
+    // The opened tab's url, as the browser reports it: the step's destination, which the repeat stays on when the
+    // Browser refuses its file instead of loading a page.
+    const tabUrl = `${MAIN_ORIGIN}/report.txt`;
+
+    const tabsApi = {
+      create: async (properties: { readonly url?: string } = {}) => {
+        created.push({ ...properties });
+
+        // The browser opens the tab, so the call owns it.
+        for (const listener of openedListeners) {
+          listener({ id: newTab, openerTabId: TAB_ID });
+        }
+
+        return { id: newTab, title: '', url: properties.url ?? 'about:blank', windowId: 1 };
+      },
+      get: async (tabId: number) =>
+        tabId === newTab
+          ? { id: newTab, title: '', url: tabUrl, windowId: 1 }
+          : { id: TAB_ID, title: 'Example', url: MAIN_ORIGIN },
+      onCreated: {
+        addListener: (
+          listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+        ) => {
+          openedListeners.push(listener);
+        },
+        removeListener: (
+          listener: (tab: { readonly id?: number; readonly openerTabId?: number }) => void
+        ) => {
+          const index = openedListeners.indexOf(listener);
+
+          if (index !== -1) {
+            openedListeners.splice(index, 1);
+          }
+        },
+      },
+      query: async () => [
+        { active: true, id: TAB_ID, title: 'Example', url: MAIN_ORIGIN, windowId: 1 },
+      ],
+    };
+    const { controller } = createGroups();
+    const { cdp, runtime } = await createHarness({
+      downloadsApi: downloads.api,
+      tabGroups: controller,
+      tabsApi,
+    });
+
+    // The step's navigate answers with an aborted load and names the download it started; the approved repeat stays on
+    // Its approved destination, so no page changed and the browser's own limiter is what refused the file.
+    let navigates = 0;
+
+    cdp.setHandlers({
+      'Page.navigate': () => {
+        navigates += 1;
+
+        if (navigates === 1) {
+          downloads.emit({ id: 71, tabId: newTab, url });
+
+          return { errorText: 'net::ERR_ABORTED' };
+        }
+
+        return { frameId: 'main' };
+      },
+    });
+
+    const url = `${MAIN_ORIGIN}/report.txt`;
+    const openTab = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: {
+          authorized: [readGrant, actGrant, { class: 'navigate', origin: MAIN_ORIGIN }],
+          sensitive: [...sensitive],
+        },
+        arguments: { action: 'new', url },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_tabs',
+      });
+
+    const guarded = await openTab([]);
+
+    if (guarded.kind !== 'needs_permission') {
+      throw new Error(`expected a refusal, got ${JSON.stringify(guarded)}`);
+    }
+
+    expect([created.length, created[0]?.['url'], downloads.cancelled]).toStrictEqual([
+      1,
+      'about:blank',
+      [71],
+    ]);
+
+    const approved = await openTab([expectStepToken(guarded)]);
+
+    // The tab never left the origin the call was approved for, so the answer is the browser's download refusal with
+    // The step token a repeat needs, not a navigation result that would hide it.
+    expect(approved.kind).toBe('needs_permission');
+    expect(approved.kind === 'needs_permission' && !approved.result.ok).toBe(true);
+    expect(
+      approved.kind === 'needs_permission' && !approved.result.ok ? approved.result.error : ''
+    ).toContain(DOWNLOAD_BLOCKED_BY_BROWSER_ERROR);
+    expect(approved.kind === 'needs_permission' ? approved.stepToken !== undefined : false).toBe(
+      true
+    );
+    expect([created.length, downloads.cancelled]).toStrictEqual([1, [71]]);
+  });
+
   it('leaves a later download of the same url alone when the record for it is stale', async () => {
     const downloads = createFakeDownloads();
     const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
@@ -4104,6 +4348,10 @@ describe('agent browser calls', () => {
       readonly leases?: TabLeaseRegistry;
       /** A navigate that loads a page instead of becoming the download the guard stops. */
       readonly plain?: boolean;
+      /** Extra grants for a case about an origin the step may already open or read. */
+      readonly extraGrants?: readonly BrowserGrant[];
+      /** The url the opened tab reports, when a case's navigation lands somewhere other than the step's destination. */
+      readonly tabUrl?: () => string;
       /** The Downloads permission is gone by the time the guard is armed: revoked after the pre-open check. */
       readonly revokeAfterOpen?: boolean;
       /** The opened tab reports an empty url, as Chrome does without the `tabs` permission. */
@@ -4161,9 +4409,16 @@ describe('agent browser calls', () => {
         }
 
         // A tab Chrome will not describe without the `tabs` permission: the url is empty, not `about:blank`.
-        return options.unreadableTabUrl === true
-          ? { id: newTab, title: '', url: '' }
-          : { id: newTab, title: '', url: `${MAIN_ORIGIN}/report.txt` };
+        if (options.unreadableTabUrl === true) {
+          return { id: newTab, title: '', url: '' };
+        }
+
+        // A case whose navigation lands elsewhere: the tab reports the url it really committed, once that has happened.
+        return {
+          id: newTab,
+          title: '',
+          url: options.tabUrl?.() ?? `${MAIN_ORIGIN}/report.txt`,
+        };
       },
       onCreated: {
         addListener: (
@@ -4303,7 +4558,12 @@ describe('agent browser calls', () => {
     const run = (caller: BrowserCaller, sensitive: readonly string[] = [], tabId = TAB_ID) =>
       harness.runtime.runTool({
         agent: {
-          authorized: [readGrant, actGrant, { class: 'navigate', origin: MAIN_ORIGIN }],
+          authorized: [
+            readGrant,
+            actGrant,
+            { class: 'navigate', origin: MAIN_ORIGIN },
+            ...(options.extraGrants ?? []),
+          ],
           sensitive: [...sensitive],
         },
         arguments: { action: 'new', url },
@@ -4922,6 +5182,70 @@ describe('agent browser calls', () => {
     }
 
     expect(outcome.withheldFrames).toStrictEqual([FRAME_ORIGIN]);
+  });
+
+  it('answers the opened tab for a tabs-new that settles on its approved destination', async () => {
+    const fixture = await tabsNewFixture({ plain: true });
+    const outcome = await fixture.run(agent());
+
+    // The tab the step opened is the answer, at the url the step navigated to.
+    expect(expectResult(outcome).result.value).toStrictEqual({
+      selected: true,
+      tabId: fixture.newTab,
+      title: '',
+      url: `${MAIN_ORIGIN}/report.txt`,
+    });
+  });
+
+  it('reports origin_changed for a tabs-new that redirects to another origin', async () => {
+    const fixture = await tabsNewFixture({ plain: true });
+
+    // The approved destination answered with a redirect: the tab commits on another origin than the one the step was approved for.
+    fixture.cdp.setFrameUrl('https://accounts.example.org/login');
+
+    const outcome = await fixture.run(agent());
+
+    expect(outcome).toMatchObject({
+      from: MAIN_ORIGIN,
+      kind: 'origin_changed',
+      to: 'https://accounts.example.org',
+    });
+    // The step's own answer is the refusal, not a claim that the tab opened where it was asked to.
+    expect(originChangedResultOf(outcome)).toMatchObject({ ok: true });
+  });
+
+  it('completes a tabs-new redirect that lands on an origin the step may already read', async () => {
+    const landing = 'https://accounts.example.org';
+    // The tab reports the landing url only once its navigation has committed it, as a browser does.
+    let committed = `${MAIN_ORIGIN}/report.txt`;
+    const fixture = await tabsNewFixture({
+      extraGrants: [{ class: 'read', origin: landing }],
+      // The step loads a page, so no file exists for the guard to claim from the browser's history.
+      noSeededFile: true,
+      plain: true,
+      tabUrl: () => committed,
+    });
+
+    fixture.cdp.setHandlers({
+      'Page.navigate': () => {
+        committed = `${landing}/login`;
+        fixture.cdp.setFrameUrl(committed);
+
+        return { frameId: 'main' };
+      },
+    });
+
+    const outcome = await fixture.run(agent());
+
+    // `postAgentNavigate` is the only judge: a landing origin the session may read is the redirect's answer, and the
+    // Tab the step opened is what the caller gets back, at the url it really committed.
+    expect(outcome.kind).toBe('result');
+    expect(expectResult(outcome).result.value).toStrictEqual({
+      selected: true,
+      tabId: fixture.newTab,
+      title: '',
+      url: `${landing}/login`,
+    });
   });
 
   it('names the tab a guarded tabs-new opened when the navigation leaves a dialog open on it', async () => {

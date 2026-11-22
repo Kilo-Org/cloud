@@ -89,11 +89,7 @@ export function updateLatestAliasTargets(params: {
     const stored = previous.get(alias);
     const model = Object.hasOwn(models, alias) ? models[alias] : undefined;
     const liveTarget = model?.alias_target?.slug;
-    if (liveTarget === undefined) {
-      if (stored) entries.push(stored);
-      continue;
-    }
-    if (!Object.hasOwn(models, liveTarget)) {
+    if (liveTarget === undefined || !Object.hasOwn(models, liveTarget)) {
       if (stored) entries.push(stored);
       continue;
     }

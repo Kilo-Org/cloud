@@ -47,6 +47,7 @@ import {
   connectVerifiedGitHubInstallation,
   GITHUB_INSTALLATION_DELIVERY_STALE_CLAIM_MS,
   getGitHubInstallationDeliveryStatus,
+  lockGitHubInstallationIdentity,
   materializeGitHubInstallationIdentity,
   disconnectGitHubInstallation,
   observeGitHubInstallationLifecycle,
@@ -56,7 +57,10 @@ import {
   updateGitHubInstallationRepositories,
   updateGitHubInstallationAccountIdentity,
 } from './github-installations';
-import { backfillGitHubInstallations } from './github-installations-backfill';
+import {
+  backfillGitHubInstallations,
+  type GitHubInstallationBackfillResult,
+} from './github-installations-backfill';
 import { assertGitHubInstallationRuntimeAuthorized } from '../github/runtime-authorization';
 import { upsertAgentConfig } from '@/lib/agent-config/db/agent-configs';
 import { getPlatformIntegration } from '../../bot/platform-helpers';
@@ -1370,6 +1374,40 @@ describe('GitHub installation persistence', () => {
       .from(platform_integrations)
       .where(eq(platform_integrations.owned_by_organization_id, organization.id));
     expect(associations).toHaveLength(2);
+  });
+
+  test('refuses to uninstall the forge fixture installation before any local or upstream write', async () => {
+    const organization = await createTestOrganization('Forge fixture pool GitHub', ownerId, 0);
+    process.env.GITHUB_FORGE_INSTALLATION_IDS = '175846100,175846101';
+    try {
+      const connected = await connectVerifiedGitHubInstallation(
+        { type: 'org', id: organization.id },
+        data('175846100')
+      );
+      if (!connected.ok) throw new Error('Expected canonical connection');
+      let upstreamDeletes = 0;
+      await expect(
+        uninstallExclusiveGitHubInstallation({
+          owner: { type: 'org', id: organization.id },
+          integrationId: connected.integrationId,
+          deleteUpstream: async () => {
+            upstreamDeletes += 1;
+          },
+        })
+      ).rejects.toThrow('belongs to the local forge fixture app');
+      expect(upstreamDeletes).toBe(0);
+      const [row] = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, connected.integrationId));
+      expect(row).toMatchObject({
+        github_disconnected_at: null,
+        integration_status: 'active',
+        platform_installation_id: '175846100',
+      });
+    } finally {
+      delete process.env.GITHUB_FORGE_INSTALLATION_IDS;
+    }
   });
 
   test('serializes upstream uninstall against a concurrent shared attach', async () => {
@@ -3668,6 +3706,99 @@ describe('GitHub installation persistence', () => {
     });
     await expect(getPrimaryGitHubIntegrationForOrganization(organization.id)).resolves.toBeNull();
   });
+
+  test('serializes the backfill with another writer of the same installation', async () => {
+    const [legacy] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: ownerId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '990011',
+        platform_account_login: 'acme',
+        integration_status: 'active',
+        github_app_type: 'standard',
+        github_installation_id: null,
+        repository_access: 'all',
+      })
+      .returning();
+    const lockHeld = Promise.withResolvers<number>();
+    const releaseHolder = Promise.withResolvers<void>();
+    const holder = db.transaction(async tx => {
+      await lockGitHubInstallationIdentity(tx, 'standard', '990011');
+      const backend = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
+      lockHeld.resolve(backend.rows[0]!.pid);
+      await releaseHolder.promise;
+    });
+    let backfill: Promise<GitHubInstallationBackfillResult> | undefined;
+    let observationError: unknown;
+    try {
+      const holderPid = await githubTestTimeout(lockHeld.promise, 'backfill lock holder');
+      backfill = backfillGitHubInstallations();
+      await githubTestTimeout(
+        waitForBlockedGitHubOwnerLock(holderPid, 'standard:990011'),
+        'backfill lock wait'
+      );
+    } catch (error) {
+      observationError = error;
+    } finally {
+      releaseHolder.resolve();
+    }
+    await githubTestTimeout(holder, 'backfill lock release');
+    const result = backfill ? await backfill : undefined;
+    if (observationError) throw observationError;
+    if (!result) throw new Error('Backfill did not start');
+
+    await expect(
+      db.query.platform_integrations.findFirst({ where: eq(platform_integrations.id, legacy.id) })
+    ).resolves.toMatchObject({ github_installation_id: expect.any(String) });
+    await expect(
+      db
+        .select()
+        .from(github_app_installations)
+        .where(eq(github_app_installations.installation_id, '990011'))
+    ).resolves.toHaveLength(1);
+    expect(result).toMatchObject({ linked: 1 });
+  });
+
+  test('bounds the backfill lock wait and stays retryable', async () => {
+    const [legacy] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: ownerId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '990013',
+        platform_account_login: 'acme',
+        integration_status: 'active',
+        github_app_type: 'standard',
+        github_installation_id: null,
+        repository_access: 'all',
+      })
+      .returning();
+    const lockHeld = Promise.withResolvers<number>();
+    const releaseHolder = Promise.withResolvers<void>();
+    const holder = db.transaction(async tx => {
+      await lockGitHubInstallationIdentity(tx, 'standard', '990013');
+      const backend = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
+      lockHeld.resolve(backend.rows[0]!.pid);
+      await releaseHolder.promise;
+    });
+    try {
+      await githubTestTimeout(lockHeld.promise, 'backfill lock holder');
+      await expect(backfillGitHubInstallations()).rejects.toMatchObject({
+        cause: expect.objectContaining({ code: '55P03' }),
+      });
+    } finally {
+      releaseHolder.resolve();
+    }
+    await githubTestTimeout(holder, 'backfill lock release');
+
+    await expect(backfillGitHubInstallations()).resolves.toMatchObject({ linked: 1 });
+    await expect(
+      db.query.platform_integrations.findFirst({ where: eq(platform_integrations.id, legacy.id) })
+    ).resolves.toMatchObject({ github_installation_id: expect.any(String) });
+  }, 30_000);
 });
 
 async function waitForBlockedGitHubOwnerLock(

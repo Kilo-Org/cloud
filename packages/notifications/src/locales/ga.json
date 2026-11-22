@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Tátal slándála nua ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Criticiúil",
+      "high": "Ard",
+      "medium": "Meánach",
+      "low": "Íseal"
+    },
     "securityFindingSlaWarning": {
       "title": "Rabhadh SLA"
     },

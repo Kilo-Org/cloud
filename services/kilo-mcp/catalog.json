@@ -17191,6 +17191,17 @@
     ],
     "searchBlob": "models.preferred Return the ordered list of preferred AI models for the app, including free/auto models and top paid models. Use it to populate model pickers or determine default model selection order. models preferred"
   },
+  "models.providerNames": {
+    "path": "models.providerNames",
+    "kind": "query",
+    "summary": "List all AI model providers available in Kilo, returning each provider's slug and human-readable display name. Useful for populating provider pickers, filters, or labels when selecting a model.",
+    "inputSchema": {},
+    "tags": [
+      "models",
+      "providernames"
+    ],
+    "searchBlob": "models.providerNames List all AI model providers available in Kilo, returning each provider's slug and human-readable display name. Useful for populating provider pickers, filters, or labels when selecting a model. models providernames"
+  },
   "models.selectorList": {
     "path": "models.selectorList",
     "kind": "query",

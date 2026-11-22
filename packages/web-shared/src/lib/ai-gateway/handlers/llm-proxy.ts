@@ -176,7 +176,9 @@ export async function handleLlmProxyRequest(
   const enkryptAdmission = await Promise.all([callerPromise, balanceAndSettingsPromise]).then(
     ([caller, account]) =>
       admitEnkryptGuardrail(caller, account, () =>
-        organizationGroupContextPromise.then(context => context?.groupIds ?? [])
+        organizationGroupContextPromise.then(
+          context => context?.groups.map(group => group.id) ?? []
+        )
       )
   );
   if (enkryptAdmission.kind === 'rejected') return enkryptAdmission.response;

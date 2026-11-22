@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { GitBranch } from 'lucide-react';
 import { AnimatedLogo } from '@/components/AnimatedLogo';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { decodePercentEncodedSegments } from '@kilocode/app-shared/percent-encoded-segments';
 import {
   fetchSharedSessionMetadata,
   fetchSharedSessionSnapshot,
@@ -42,6 +43,7 @@ export default async function SharedSessionPage({
   const transcriptUnavailable = !snapshotResult.ok;
   const ownerName = session.ownerName ?? 'Someone';
   const repo = formatRepoFromGitUrl(session.gitUrl);
+  const branch = session.gitBranch ? decodePercentEncodedSegments(session.gitBranch) : null;
 
   return (
     <div className="ph-no-capture bg-background min-h-screen">
@@ -65,13 +67,13 @@ export default async function SharedSessionPage({
             {session.title && (
               <p className="text-muted-foreground text-sm">Shared by {ownerName}</p>
             )}
-            {(repo || session.gitBranch || session.createdAt) && (
+            {(repo || branch || session.createdAt) && (
               <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                 {repo && <span>{repo}</span>}
-                {session.gitBranch && (
+                {branch && (
                   <span className="inline-flex items-center gap-1">
                     <GitBranch className="size-3.5" aria-hidden />
-                    {session.gitBranch}
+                    {branch}
                   </span>
                 )}
                 <SharedSessionDate isoDate={session.createdAt} />

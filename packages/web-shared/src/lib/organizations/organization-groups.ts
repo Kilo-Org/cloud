@@ -29,7 +29,9 @@ import {
 import {
   assertOrganizationPermissionPolicyFits,
   assertOrganizationPermissionPolicyWriteEnabled,
+  permissionPolicies,
 } from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.server';
+import { isOrganizationPermissionPolicyType } from '@kilocode/web-shared/lib/organizations/group-policies/permission-policy/permission-policy.schema';
 import { and, asc, count, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
@@ -45,11 +47,12 @@ import {
 import { normalizeRegisteredOrganizationGroupPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/registry.server';
 import {
   DEFAULT_ORGANIZATION_GROUP_POLICIES,
-  parseOrganizationGroupPolicies,
+  parseGroupPolicies,
   canonicalSettingsFrom,
+  readOrganizationGroupPolicySettingsRow,
   type CanonicalOrganizationGroupPolicySettings,
-  type OrganizationGroupPolicySettingsRow,
 } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies.server';
+import { readLiveOrganization } from '@kilocode/web-shared/lib/organizations/organization-read.server';
 
 type OrganizationGroupActor = {
   id: string;
@@ -141,15 +144,7 @@ async function assertEnterpriseOrganization(
   organizationId: string,
   client: typeof db | DrizzleTransaction = db
 ): Promise<Organization> {
-  const [organization] = await client
-    .select()
-    .from(organizations)
-    .where(and(eq(organizations.id, organizationId), sql`${organizations.deleted_at} IS NULL`))
-    .limit(1);
-
-  if (!organization) {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
-  }
+  const organization = await readLiveOrganization(client, { organizationId });
   if (organization.plan !== 'enterprise') {
     throw new TRPCError({
       code: 'FORBIDDEN',
@@ -165,18 +160,6 @@ export async function lockOrganizationGroupPolicy(tx: DrizzleTransaction, organi
       pg_catalog.hashtextextended(${`organization-group-policy:${organizationId.toLowerCase()}`}, 0)
     )
   `);
-}
-
-async function getSettingsRow(
-  organizationId: string,
-  client: typeof db | DrizzleTransaction = db
-): Promise<OrganizationGroupPolicySettingsRow | undefined> {
-  const [settings] = await client
-    .select()
-    .from(organization_group_policy_settings)
-    .where(eq(organization_group_policy_settings.organization_id, organizationId))
-    .limit(1);
-  return settings;
 }
 
 /** Create the settings row at revision 1. Callers hold the policy advisory lock. */
@@ -216,7 +199,7 @@ export async function bumpOrganizationGroupPolicyRevision(
   actorUserId: string | null
 ) {
   await lockOrganizationGroupPolicy(tx, organizationId);
-  const existing = await getSettingsRow(organizationId, tx);
+  const existing = await readOrganizationGroupPolicySettingsRow(tx, organizationId);
   if (!existing) {
     await createOrganizationGroupPolicySettingsRow(tx, organizationId, actorUserId);
     return 1;
@@ -231,7 +214,10 @@ export async function getOrganizationGroupPolicySettings(
   client: typeof db | DrizzleTransaction = db
 ): Promise<CanonicalOrganizationGroupPolicySettings> {
   await assertEnterpriseOrganization(organizationId, client);
-  return canonicalSettingsFrom(await getSettingsRow(organizationId, client), organizationId);
+  return canonicalSettingsFrom(
+    await readOrganizationGroupPolicySettingsRow(client, organizationId),
+    organizationId
+  );
 }
 
 /**
@@ -259,7 +245,7 @@ export async function withOrganizationGroupPolicyMutation<T>(
   return await db.transaction(async tx => {
     await lockOrganizationGroupPolicy(tx, organizationId);
     const organization = await assertEnterpriseOrganization(organizationId, tx);
-    const existingSettings = await getSettingsRow(organizationId, tx);
+    const existingSettings = await readOrganizationGroupPolicySettingsRow(tx, organizationId);
     const currentSettings = canonicalSettingsFrom(existingSettings, organizationId);
     const nextPolicyRevision = existingSettings ? existingSettings.policy_revision + 1 : 1;
 
@@ -338,6 +324,27 @@ async function listOrganizationGroupMemberIds(
   return rows.map(({ userId }) => userId);
 }
 
+type GroupMembershipRow = typeof organization_group_memberships.$inferInsert;
+
+function groupMembershipRow(params: {
+  organizationId: string;
+  groupId: string;
+  userId: string;
+  actorId: string;
+}): GroupMembershipRow {
+  return {
+    organization_id: params.organizationId,
+    group_id: params.groupId,
+    kilo_user_id: params.userId,
+    assigned_by_kilo_user_id: params.actorId,
+  };
+}
+
+async function insertGroupMemberships(tx: DrizzleTransaction, rows: GroupMembershipRow[]) {
+  if (rows.length === 0) return;
+  await tx.insert(organization_group_memberships).values(rows).onConflictDoNothing();
+}
+
 /** Delete only the removed ids and insert only the added ids, keeping unchanged rows intact. */
 async function applyOrganizationGroupMemberDiff(
   tx: DrizzleTransaction,
@@ -357,16 +364,10 @@ async function applyOrganizationGroupMemberDiff(
         )
       );
   }
-  if (diff.added.length > 0) {
-    await tx.insert(organization_group_memberships).values(
-      diff.added.map(userId => ({
-        organization_id: organizationId,
-        group_id: groupId,
-        kilo_user_id: userId,
-        assigned_by_kilo_user_id: actorId,
-      }))
-    );
-  }
+  await insertGroupMemberships(
+    tx,
+    diff.added.map(userId => groupMembershipRow({ organizationId, groupId, userId, actorId }))
+  );
 }
 
 function diffMemberIds(current: string[], next: string[]) {
@@ -378,19 +379,13 @@ function diffMemberIds(current: string[], next: string[]) {
 }
 
 function permissionPolicyTypes(policies: OrganizationGroupPolicies) {
-  return policies.map(policy => policy.type).filter(type => type !== 'model_access');
+  return permissionPolicies(policies).map(policy => policy.type);
 }
 
 function groupPermissionPolicyTypes(
   group: Pick<OrganizationGroup, 'id' | 'organization_id' | 'policies'>
 ) {
-  return permissionPolicyTypes(
-    parseOrganizationGroupPolicies(group.policies, {
-      organizationId: group.organization_id,
-      groupId: group.id,
-      source: 'group',
-    })
-  );
+  return permissionPolicyTypes(parseGroupPolicies(group, group.organization_id));
 }
 
 async function getActiveNamedGroupPolicyLinks(
@@ -556,11 +551,7 @@ export async function listOrganizationGroupsForManager(
 
   return groups.map(group => ({
     ...group,
-    policies: parseOrganizationGroupPolicies(group.policies, {
-      organizationId,
-      groupId: group.id,
-      source: 'group',
-    }),
+    policies: parseGroupPolicies(group, organizationId),
     memberIds: memberIdsByGroupId.get(group.id) ?? [],
   }));
 }
@@ -777,14 +768,10 @@ export async function setOrganizationGroupPolicy(params: {
     params.actor.id,
     async ({ tx, pendingPolicyRevision }) => {
       const group = await getGroupForUpdate(tx, params.organizationId, params.groupId);
-      if (params.policy.type !== 'model_access') {
+      if (isOrganizationPermissionPolicyType(params.policy.type)) {
         await assertOrganizationPermissionPolicyWriteEnabled(params.organizationId, tx);
       }
-      const currentPolicies = parseOrganizationGroupPolicies(group.policies, {
-        organizationId: params.organizationId,
-        groupId: group.id,
-        source: 'group',
-      });
+      const currentPolicies = parseGroupPolicies(group, params.organizationId);
       const policies = upsertPolicy(currentPolicies, params.policy);
       const policyStateChanged = !samePolicies(policies, currentPolicies);
       await tx
@@ -796,7 +783,7 @@ export async function setOrganizationGroupPolicy(params: {
             eq(organization_groups.id, params.groupId)
           )
         );
-      if (params.policy.type !== 'model_access') {
+      if (isOrganizationPermissionPolicyType(params.policy.type)) {
         await assertOrganizationPermissionPolicyFits(params.organizationId, tx);
       }
       await createAuditLog({
@@ -824,14 +811,10 @@ export async function removeOrganizationGroupPolicy(params: {
     params.actor.id,
     async ({ tx, pendingPolicyRevision }) => {
       const group = await getGroupForUpdate(tx, params.organizationId, params.groupId);
-      if (params.policyType !== 'model_access') {
+      if (isOrganizationPermissionPolicyType(params.policyType)) {
         await assertOrganizationPermissionPolicyWriteEnabled(params.organizationId, tx);
       }
-      const currentPolicies = parseOrganizationGroupPolicies(group.policies, {
-        organizationId: params.organizationId,
-        groupId: group.id,
-        source: 'group',
-      });
+      const currentPolicies = parseGroupPolicies(group, params.organizationId);
       const policies = currentPolicies.filter(policy => policy.type !== params.policyType);
       const policyStateChanged = !samePolicies(policies, currentPolicies);
       await tx
@@ -987,22 +970,20 @@ export async function setOrganizationMemberGroups(params: {
             )
           );
       }
-      if (memberGroupDiff.added.length > 0) {
-        // No group row lock serializes this path, so a concurrent write for the
-        // same member can insert the same row between the read above and this
-        // insert. A duplicate add is a no-op, not a conflict.
-        await tx
-          .insert(organization_group_memberships)
-          .values(
-            memberGroupDiff.added.map(groupId => ({
-              organization_id: params.organizationId,
-              group_id: groupId,
-              kilo_user_id: params.userId,
-              assigned_by_kilo_user_id: params.actor.id,
-            }))
-          )
-          .onConflictDoNothing();
-      }
+      // No group row lock serializes this path, so a concurrent write for the
+      // same member can insert the same row between the read above and this
+      // insert. A duplicate add is a no-op, not a conflict.
+      await insertGroupMemberships(
+        tx,
+        memberGroupDiff.added.map(groupId =>
+          groupMembershipRow({
+            organizationId: params.organizationId,
+            groupId,
+            userId: params.userId,
+            actorId: params.actor.id,
+          })
+        )
+      );
       await createAuditLog({
         action: 'organization.group.member_groups.set',
         ...actorAudit(params.actor),
@@ -1111,7 +1092,7 @@ export async function setDefaultOrganizationGroupPolicy(params: {
     params.organizationId,
     params.actor.id,
     async ({ tx, currentSettings, pendingPolicyRevision }) => {
-      if (params.policy.type !== 'model_access') {
+      if (isOrganizationPermissionPolicyType(params.policy.type)) {
         await assertOrganizationPermissionPolicyWriteEnabled(params.organizationId, tx);
       }
       const defaultPolicies = upsertPolicy(currentSettings.defaultPolicies, params.policy);
@@ -1120,7 +1101,7 @@ export async function setDefaultOrganizationGroupPolicy(params: {
         .update(organization_group_policy_settings)
         .set({ default_policies: defaultPolicies, updated_at: sql`now()` })
         .where(eq(organization_group_policy_settings.organization_id, params.organizationId));
-      if (params.policy.type !== 'model_access') {
+      if (isOrganizationPermissionPolicyType(params.policy.type)) {
         await assertOrganizationPermissionPolicyFits(params.organizationId, tx);
       }
       await createAuditLog({
@@ -1146,7 +1127,7 @@ export async function removeDefaultOrganizationGroupPolicy(params: {
     params.organizationId,
     params.actor.id,
     async ({ tx, currentSettings, pendingPolicyRevision }) => {
-      if (params.policyType !== 'model_access') {
+      if (isOrganizationPermissionPolicyType(params.policyType)) {
         await assertOrganizationPermissionPolicyWriteEnabled(params.organizationId, tx);
       }
       const defaultPolicies = currentSettings.defaultPolicies.filter(

@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, type ReactTestInstance, TestRenderer } from '@/test/renderer';
 
 import { i18n } from '@/i18n';
+import { KeyboardLiftView } from '@/components/keyboard-lift-view';
 import { ModelAccessForm } from './model-access-form';
 import {
   type AvailableModel,
@@ -25,6 +26,12 @@ import {
 import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 
 const saved = vi.hoisted(() => ({ mutateAsync: vi.fn<(input: unknown) => Promise<void>>() }));
+
+/**
+ * The window and the keyboard the form reads. The lift's pad is a clamp against
+ * the room the list has, so a suite that asserts the pad drives both numbers.
+ */
+const geometry = vi.hoisted(() => ({ windowHeight: 800, keyboardHeight: 0 }));
 
 /**
  * What the durable draft answers. Both states carry `save`/`clear`: the real
@@ -68,9 +75,17 @@ vi.mock('@/lib/persist/drafts', () => ({
 
 vi.mock('react-native', () => ({
   View: 'View',
-  // The keyboard lift clamps its pad against the window it measured in; this
-  // suite drives the save contract, so it reports the setup file's frame.
-  useWindowDimensions: () => ({ width: 400, height: 800 }),
+  // The list-band clamp compares a frame against the window it was measured in,
+  // so this suite serves the window a test sets and nothing else.
+  useWindowDimensions: () => ({ width: 400, height: geometry.windowHeight }),
+}));
+// The form reads one keyboard number: this store drives it, as the real
+// `useKeyboardState` selector would deliver it.
+vi.mock('react-native-keyboard-controller', () => ({
+  useKeyboardState: <T,>(selector?: (state: { height: number }) => T) => {
+    const snapshot = { height: geometry.keyboardHeight };
+    return selector ? selector(snapshot) : snapshot;
+  },
 }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/button', async () => {
@@ -285,6 +300,48 @@ function buttonWithLabel(root: ReactTestInstance, label: string) {
   return button;
 }
 
+/** A host view's layout reporter, as the form's measuring views take one. */
+type LayoutHandler = (event: { nativeEvent: { layout: { height: number } } }) => void;
+
+/** The one host view the form measures its own frame from. */
+function frameLayout(root: ReactTestInstance) {
+  const node = root
+    .findAllByType('View' as never)
+    .find(candidate => candidate.props.className === 'flex-1' && 'onLayout' in candidate.props);
+  if (node === undefined) {
+    throw new Error('the form renders no frame layout handler');
+  }
+  return node.props.onLayout as LayoutHandler;
+}
+
+/** The header block above the list, which the form measures itself. */
+function headerLayout(root: ReactTestInstance) {
+  const node = root
+    .findAllByType('View' as never)
+    .find(candidate => candidate.props.className === 'gap-3 px-4 pt-3');
+  if (node === undefined) {
+    throw new Error('the form renders no header block');
+  }
+  return node.props.onLayout as LayoutHandler;
+}
+
+/** The pinned bar below the list, which the form measures itself. */
+function footerLayout(root: ReactTestInstance) {
+  return root.findByType('ScreenFooter' as never).props.onLayout as LayoutHandler;
+}
+
+/** Report a laid-out height, the way the native layout pass does. */
+function layout(handler: LayoutHandler, height: number) {
+  act(() => {
+    handler({ nativeEvent: { layout: { height } } });
+  });
+}
+
+/** The lift the form asks for: the pad its `KeyboardLiftView` reserves. */
+function liftPad(root: ReactTestInstance): number {
+  return root.findByType(KeyboardLiftView as never).props.height as number;
+}
+
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
@@ -293,6 +350,8 @@ afterEach(() => {
   draftStore.value = null;
   draftStore.save.mockReset();
   draftStore.clear.mockReset();
+  geometry.windowHeight = 800;
+  geometry.keyboardHeight = 0;
 });
 
 describe('ModelAccessForm save', () => {
@@ -1130,5 +1189,22 @@ describe('ModelAccessForm durable draft', () => {
       });
       expect(draftStore.clear).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('ModelAccessForm keyboard lift', () => {
+  it("caps the pad at the list's own band, because the header and the bar claim part of the frame", () => {
+    // A 272pt form with a 162pt keyboard. Clamped against the whole frame the
+    // pad would be the entire band (162 < 272 - 88), and the header and the
+    // 104pt bar would then leave the list nothing at all. The band the list
+    // has is 272 - 60 - 104 = 108, so the pad stops at 108 - 88 = 20 and the
+    // list keeps the shared viewport minimum (`@/lib/body-viewport`).
+    geometry.keyboardHeight = 162;
+    const root = render(undefined);
+    layout(frameLayout(root), 272);
+    layout(headerLayout(root), 60);
+    layout(footerLayout(root), 104);
+
+    expect(liftPad(root)).toBe(20);
   });
 });

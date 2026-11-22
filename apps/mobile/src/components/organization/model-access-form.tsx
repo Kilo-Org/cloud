@@ -1,11 +1,11 @@
 /* eslint-disable max-lines -- one form owns the draft, both list policies and the leave guard; the Providers tab's display names add a prop to that whole, and splitting it would duplicate the shared state. */
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { type LayoutChangeEvent, useWindowDimensions, View } from 'react-native';
 import { useKeyboardState } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useKeyboardLiftPad } from '@/components/agents/owned-keyboard-lift';
+import { clampLiftPad, type LiftFrameMeasurement } from '@/components/agents/owned-keyboard-lift';
 import { KeyboardLiftView } from '@/components/keyboard-lift-view';
 import { ModelDenyList, ProviderAllowList } from '@/components/organization/model-access-lists';
 import { GatewaySettingsSection } from '@/components/organization/providers-gateways-section';
@@ -106,13 +106,47 @@ export function ModelAccessForm({
   // The pinned footer rides the keyboard: the lift around the body and the bar
   // is the keyboard's own measured height, less the bottom inset the footer
   // already pads, so the actions sit just above the IME. The pad is clamped by
-  // the room the form measured, because an unclamped pad on a short window
-  // fills the frame: the list then renders nothing and the bar lands under the
-  // IME (`@/lib/body-viewport`). The clamp keeps the body's viewport and gives
-  // up the band's last points instead.
+  // the room the list has, not by the whole form: the header block and the
+  // pinned bar already claim part of the measured frame, so the clamp bounds the
+  // pad by what is left once they are taken out, which keeps
+  // `MIN_BODY_VIEWPORT` of the list on screen (`@/lib/body-viewport`).
   const { bottom } = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const keyboardHeight = useKeyboardState(state => state.height);
-  const keyboardLift = useKeyboardLiftPad(Math.max(0, keyboardHeight - bottom));
+  const [frame, setFrame] = useState<LiftFrameMeasurement | null>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const [footerHeight, setFooterHeight] = useState(0);
+  const handleFrameLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const { height } = event.nativeEvent.layout;
+      setFrame(previous =>
+        previous?.height === height && previous.windowHeight === windowHeight
+          ? previous
+          : { height, windowHeight }
+      );
+    },
+    [windowHeight]
+  );
+  const handleHeaderLayout = useCallback((event: LayoutChangeEvent) => {
+    const { height } = event.nativeEvent.layout;
+    setHeaderHeight(previous => (previous === height ? previous : height));
+  }, []);
+  const handleFooterLayout = useCallback((event: LayoutChangeEvent) => {
+    const { height } = event.nativeEvent.layout;
+    setFooterHeight(previous => (previous === height ? previous : height));
+  }, []);
+  // The list's own band: the frame with the header above it and the pinned bar
+  // below it taken out. Those two already claim their points of the frame, so
+  // clamping the pad against the frame alone would spend the viewport minimum
+  // on them and leave the list at zero height.
+  const bodyBand = frame === null ? null : Math.max(0, frame.height - headerHeight - footerHeight);
+  const keyboardLiftPad = clampLiftPad(
+    Math.max(0, keyboardHeight - bottom),
+    frame === null || bodyBand === null
+      ? null
+      : { height: bodyBand, windowHeight: frame.windowHeight },
+    windowHeight
+  );
   // The screen resolves the reader's role once and hands it down: this form
   // renders no billing step beside the failure line, so a money role reads the
   // sentence that names the destination instead of one that claims an owner
@@ -314,14 +348,14 @@ export function ModelAccessForm({
   const denyRows = denyListModels({ catalog, available: models, denyList: draft.modelDenyList });
 
   return (
-    <View className="flex-1" onLayout={keyboardLift.handleLayout}>
+    <View className="flex-1" onLayout={handleFrameLayout}>
       {/* The keyboard lifts the whole surface, not just the bar: the body shrinks
           and the pinned footer rises with it. The lift is the keyboard's own
           measured height less the bottom inset the footer already pads, and it
           follows the keyboard instead of depending on a frame the platform
           reports late — the same reasoning as the new-session form. */}
-      <KeyboardLiftView className="flex-1" height={keyboardLift.pad}>
-        <View className="gap-3 px-4 pt-3">
+      <KeyboardLiftView className="flex-1" height={keyboardLiftPad}>
+        <View className="gap-3 px-4 pt-3" onLayout={handleHeaderLayout}>
           {/* The warning tile marks missing data; the message takes the body
               ink, because the muted neutral fails body-text contrast on it. */}
           {notice === null ? null : (
@@ -412,7 +446,7 @@ export function ModelAccessForm({
             The bar pins itself to the bottom edge, because the Providers tab
             renders no `flex-1` list while its rows are missing. */}
         {tab === 'gateways' ? null : (
-          <ScreenFooter keyboard="host" className="mt-auto">
+          <ScreenFooter keyboard="host" className="mt-auto" onLayout={handleFooterLayout}>
             <View className="gap-3">
               {/* The status line keeps its place while the draft is clean, so a
                   save that settles never moves the bar: the reservation sits

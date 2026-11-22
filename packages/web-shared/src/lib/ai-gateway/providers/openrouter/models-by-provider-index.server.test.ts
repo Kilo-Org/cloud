@@ -112,6 +112,24 @@ describe('buildModelIdToProviderSlugsIndex', () => {
     expect(index.get(MODEL)).toEqual(new Set(['deepinfra', 'coreweave', 'nvidia']));
     expect(index.has('only/byok')).toBe(false);
   });
+
+  it('indexes a mixed-case snapshot provider slug under its canonical slug', () => {
+    const snapshot = makeSnapshot();
+    snapshot.providers = [
+      {
+        name: 'Z-AI',
+        displayName: 'Z-AI',
+        slug: 'Z-AI',
+        dataPolicy: { training: false, retainsPrompts: false, canPublish: false },
+        models: [snapshotModel('z-ai/glm-6', 'standard')],
+      },
+    ];
+
+    const index = buildModelIdToProviderSlugsIndex(snapshot);
+
+    expect(index.get('z-ai/glm-6')).toEqual(new Set(['z-ai']));
+    expect(index.get('z-ai/glm-6')?.has('Z-AI')).toBe(false);
+  });
 });
 
 describe('buildDataCollectionRequiredModelIds', () => {

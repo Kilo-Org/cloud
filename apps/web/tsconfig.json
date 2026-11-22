@@ -56,8 +56,7 @@
     "jest.config.ts",
     "knip.ts",
     "sentry.edge.config.ts",
-    ".next/dev/types/**/*.ts",
-    "../../dev/discord-gateway-cron.ts"
+    ".next/dev/types/**/*.ts"
   ],
   "exclude": ["node_modules", ".next"]
 }

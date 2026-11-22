@@ -85,6 +85,21 @@ vi.mock('@tanstack/react-query', () => ({
 
 const CREATED_AT = '2026-11-17T15:52:00.000Z';
 
+const ISOLATE_OPEN = '\u2068';
+const ISOLATE_CLOSE = '\u2069';
+
+// The subtitle wraps each segment in the first-strong isolate pair itself, so
+// the expected line spells the marks out rather than reusing the helper.
+function isolated(text: string): string {
+  return `${ISOLATE_OPEN}${text}${ISOLATE_CLOSE}`;
+}
+
+function sharedByLabel(ownerName: string): string {
+  // The screen isolates the interpolated owner inside the sentence, so a
+  // catalog that puts the placeholder first keeps the sentence's direction.
+  return i18n.t('sharedSession.sharedBy', { owner: isolated(ownerName) });
+}
+
 function sharedSession(metadata: Record<string, unknown>): Record<string, unknown> {
   return { metadata, messages: [], transcriptUnavailable: false };
 }
@@ -112,6 +127,12 @@ function startedAtLabel(createdAt: string): string {
 /** The read's failure face; the stub keeps the props the screen passed it. */
 function queryErrors(renderer: TestRenderer.ReactTestRenderer) {
   return renderer.root.findAll(node => Object.is(node.type, 'QueryError'));
+}
+
+// The date the subtitle prints for the same payload timestamp, in the language
+// the screen formats with.
+function subtitleDateLabel(createdAt: string): string {
+  return formatDate(new Date(createdAt), i18n.language, { month: 'short', day: 'numeric' });
 }
 
 beforeEach(() => {
@@ -251,6 +272,72 @@ describe('shared session read failure', () => {
     const [failure] = queryErrors(renderer);
     expect(failure?.props.variant).toBe('server');
     expect(failure?.props.onRetry).toBeTypeOf('function');
+    renderer.unmount();
+  });
+});
+
+describe('shared session subtitle', () => {
+  it('shows the decoded branch, not the stored percent-encoded one', () => {
+    query.data = sharedSession({
+      title: 'Fix login',
+      ownerName: 'alice',
+      gitUrl: 'Kilo-Org/cloud',
+      gitBranch: 'fix/%E8%AB%8B%E6%B1%82%E6%9B%B8',
+      createdAt: CREATED_AT,
+    });
+    const renderer = renderScreen();
+
+    expect(headers.rendered).toHaveLength(1);
+    expect(headers.rendered[0]?.subtitle).toContain('fix/請求書');
+    expect(headers.rendered[0]?.subtitle).not.toContain('%E8%AB%8B');
+    renderer.unmount();
+  });
+
+  it('isolates the sharer, the branch and the date so a right-to-left date cannot split', () => {
+    query.data = sharedSession({
+      title: 'Fix login',
+      ownerName: 'alice',
+      gitUrl: 'Kilo-Org/cloud',
+      gitBranch: 'fix/%E8%AB%8B%E6%B1%82%E6%9B%B8',
+      createdAt: CREATED_AT,
+    });
+    const renderer = renderScreen();
+
+    // Every segment carries its own isolate pair, so the paragraph direction
+    // cannot move the date's day number next to the sharer or its month past
+    // the branch: the three segments stay sharer, branch, date.
+    const expected = [
+      isolated(sharedByLabel('alice')),
+      isolated('fix/請求書'),
+      isolated(subtitleDateLabel(CREATED_AT)),
+    ].join(' · ');
+    expect(headers.rendered[0]?.subtitle).toBe(expected);
+    renderer.unmount();
+  });
+
+  it('leaves no empty isolate pair when the payload has no branch', () => {
+    query.data = sharedSession({
+      title: 'Fix login',
+      ownerName: 'alice',
+      gitUrl: 'Kilo-Org/cloud',
+      gitBranch: null,
+      createdAt: CREATED_AT,
+    });
+    const renderer = renderScreen();
+
+    const subtitle = headers.rendered[0]?.subtitle ?? '';
+    // The dropped branch leaves two segments and no pair of marks with nothing
+    // between them: each of the two carries its own outer pair, and the sharer's
+    // inner pair holds the interpolated owner.
+    expect(subtitle).toBe(
+      [isolated(sharedByLabel('alice')), isolated(subtitleDateLabel(CREATED_AT))].join(' · ')
+    );
+    const segments = subtitle.split(' · ');
+    expect(segments).toHaveLength(2);
+    for (const segment of segments) {
+      expect(segment.startsWith(ISOLATE_OPEN)).toBe(true);
+      expect(segment.endsWith(ISOLATE_CLOSE)).toBe(true);
+    }
     renderer.unmount();
   });
 });

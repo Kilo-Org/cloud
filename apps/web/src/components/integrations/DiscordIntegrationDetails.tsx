@@ -14,6 +14,20 @@ import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/pro
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { useConfirm } from '@/components/ui/confirm';
+import { resolveConnectionErrorMessage } from '@/components/integrations/connection-error-message';
+
+const discordConnectionErrorMessages: Record<string, string> = {
+  bot_not_in_server:
+    'The Kilo bot is not in that Discord server, so nothing was saved. Connect again and add the bot to the server.',
+};
+
+function getDiscordConnectionErrorMessage(error: string): string {
+  return resolveConnectionErrorMessage(
+    discordConnectionErrorMessages,
+    error,
+    `Connection failed: ${error}`
+  );
+}
 
 type DiscordIntegrationDetailsProps = {
   organizationId?: string;
@@ -105,7 +119,7 @@ export function DiscordIntegrationDetails({
       toast.success('Discord connected successfully!');
     }
     if (error) {
-      toast.error(`Connection failed: ${error}`);
+      toast.error(getDiscordConnectionErrorMessage(error));
     }
   }, [success, error]);
 
@@ -139,7 +153,8 @@ export function DiscordIntegrationDetails({
     if (
       await confirm({
         title: 'Disconnect Discord?',
-        description: 'Kilo will stop responding in your Discord server. You can reconnect later.',
+        description:
+          'The Kilo bot leaves your Discord server and Kilo stops responding there. You can reconnect later.',
         confirmLabel: 'Disconnect',
         destructive: true,
       })
@@ -341,6 +356,27 @@ export function DiscordIntegrationDetails({
                   the Slack integration instead.
                 </AlertDescription>
               </Alert>
+              {installation ? (
+                // Disconnect is also offered for a connection that is not
+                // active: the action ends the bot's membership in the server.
+                <div className="space-y-3 rounded-lg border p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Server:</span>
+                    <span className="text-sm">{installation.guildName}</span>
+                  </div>
+                  <p className="text-muted-foreground text-sm">
+                    This connection is not active. Disconnect to remove the Kilo bot from the
+                    server.
+                  </p>
+                  <Button
+                    variant="destructive"
+                    onClick={handleUninstall}
+                    disabled={uninstallApp.isPending}
+                  >
+                    {uninstallApp.isPending ? 'Disconnecting...' : 'Disconnect'}
+                  </Button>
+                </div>
+              ) : null}
             </>
           )}
         </CardContent>

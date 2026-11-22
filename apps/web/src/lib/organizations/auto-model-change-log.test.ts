@@ -94,6 +94,38 @@ describe('computeRelevantChangesForOrg', () => {
     expect(changes.removedFromAllowedProviders).toEqual([]);
   });
 
+  test('allow-list mode: a stored mixed-case slug names the same provider as the catalog', () => {
+    const org = buildEnterpriseOrg({
+      settings: {
+        provider_allow_list: ['Z-AI'],
+      },
+    });
+    const oldSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5'] }]);
+    const newSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5', 'z-ai/glm-5.1'] }]);
+
+    const diff = computeSnapshotDiff(oldSnapshot, newSnapshot);
+    const changes = computeRelevantChangesForOrg(org, diff);
+
+    expect(changes.addedByReasonProvider.get('z-ai')).toEqual(['z-ai/glm-5.1']);
+    expect(relevantChangesIsEmpty(changes)).toBe(false);
+  });
+
+  test('allow-list mode: a snapshot provider slug in another case still matches the allow list', () => {
+    const org = buildEnterpriseOrg({
+      settings: {
+        provider_allow_list: ['z-ai'],
+      },
+    });
+    const oldSnapshot = buildSnapshot([{ slug: 'Z-AI', models: ['z-ai/glm-5'] }]);
+    const newSnapshot = buildSnapshot([{ slug: 'Z-AI', models: ['z-ai/glm-5', 'z-ai/glm-5.1'] }]);
+
+    const diff = computeSnapshotDiff(oldSnapshot, newSnapshot);
+    const changes = computeRelevantChangesForOrg(org, diff);
+
+    expect(changes.addedByReasonProvider.get('Z-AI')).toEqual(['z-ai/glm-5.1']);
+    expect(relevantChangesIsEmpty(changes)).toBe(false);
+  });
+
   test('allow-list mode: new model from non-allowed provider is NOT relevant', () => {
     const org = buildEnterpriseOrg({
       settings: {
@@ -251,6 +283,37 @@ describe('computeRelevantChangesForOrg', () => {
     const changes = computeRelevantChangesForOrg(org, diff);
 
     expect(changes.addedByReasonProvider.get('azure')).toEqual(['openai/gpt-5']);
+    expect(changes.addedByReasonProvider.has('openai')).toBe(false);
+  });
+
+  test('allow-list mode: virtual-only router under a virtual-only allow list is NOT accessible', () => {
+    const org = buildEnterpriseOrg({
+      settings: {
+        provider_allow_list: ['virtual'],
+      },
+    });
+    const oldSnapshot = buildSnapshot([{ slug: 'virtual', models: [] }]);
+    const newSnapshot = buildSnapshot([{ slug: 'virtual', models: ['router/auto'] }]);
+
+    const diff = computeSnapshotDiff(oldSnapshot, newSnapshot);
+    const changes = computeRelevantChangesForOrg(org, diff);
+
+    expect(relevantChangesIsEmpty(changes)).toBe(true);
+  });
+
+  test('allow-list mode: virtual router keeps the virtual provider label when the allow list also names a real provider', () => {
+    const org = buildEnterpriseOrg({
+      settings: {
+        provider_allow_list: ['virtual', 'openai'],
+      },
+    });
+    const oldSnapshot = buildSnapshot([{ slug: 'virtual', models: [] }]);
+    const newSnapshot = buildSnapshot([{ slug: 'virtual', models: ['router/auto'] }]);
+
+    const diff = computeSnapshotDiff(oldSnapshot, newSnapshot);
+    const changes = computeRelevantChangesForOrg(org, diff);
+
+    expect(changes.addedByReasonProvider.get('virtual')).toEqual(['router/auto']);
     expect(changes.addedByReasonProvider.has('openai')).toBe(false);
   });
 });

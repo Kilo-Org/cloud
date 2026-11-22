@@ -235,16 +235,19 @@ function applyCapabilityFilters(
   return { filtered: maxContextFallback, reason: 'ok' };
 }
 
+// The single capability gate for candidates: a candidate is routable only with a capability
+// row that is explicitly active. Missing data and a null `isActive` both fail closed.
+export function isCapabilityActive(caps: ModelCapabilities | undefined): boolean {
+  return caps != null && caps.isActive === true;
+}
+
 function applyActiveFilter(
   candidates: ReadonlyArray<RankedCandidate>,
   capabilityMap: ModelCapabilitiesMap | undefined,
   failClosedOnInactive: boolean
 ): ReadonlyArray<RankedCandidate> {
   if (!failClosedOnInactive) return candidates;
-  return candidates.filter(c => {
-    const caps = capabilityMap?.get(c.model);
-    return caps != null && caps.isActive === true;
-  });
+  return candidates.filter(c => isCapabilityActive(capabilityMap?.get(c.model)));
 }
 
 // A route's accuracy is graded on 10 distinct benchmark cases

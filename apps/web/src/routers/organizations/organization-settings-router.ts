@@ -24,6 +24,7 @@ import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/orga
 import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { normalizeInferenceProviderIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   MAX_ORGANIZATION_BROWSER_ALLOWED_ORIGINS,
@@ -85,8 +86,10 @@ function createAccessListsDiffMessage(
   }
 
   if (old.provider_allow_list !== newSettings.provider_allow_list) {
-    const oldProviders = new Set(old.provider_allow_list || []);
-    const newProviders = new Set(newSettings.provider_allow_list || []);
+    const oldProviders = new Set(normalizeInferenceProviderIds(old.provider_allow_list || []));
+    const newProviders = new Set(
+      normalizeInferenceProviderIds(newSettings.provider_allow_list || [])
+    );
 
     const added = [...newProviders].filter(provider => !oldProviders.has(provider));
     const removed = [...oldProviders].filter(provider => !newProviders.has(provider));
@@ -196,10 +199,6 @@ const UpdateAllowListsInputSchema = OrganizationIdInputSchema.extend({
 
 function dedupeModels(values: string[]): string[] {
   return [...new Set(values.map(value => normalizeModelId(value)))];
-}
-
-function dedupeStrings(values: string[]): string[] {
-  return [...new Set(values)];
 }
 
 async function validateOrganizationDefaultModel(
@@ -532,7 +531,8 @@ export const organizationsSettingsRouter = createTRPCRouter({
             const currentSettings = organization.settings || {};
             const settingsUpdate: OrganizationSettings = { ...currentSettings };
             if (provider_allow_list !== undefined) {
-              settingsUpdate.provider_allow_list = dedupeStrings(provider_allow_list);
+              settingsUpdate.provider_allow_list =
+                normalizeInferenceProviderIds(provider_allow_list);
             }
             if (model_deny_list !== undefined) {
               settingsUpdate.model_deny_list = dedupeModels(model_deny_list);

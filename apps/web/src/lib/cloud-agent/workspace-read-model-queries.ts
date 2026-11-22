@@ -125,11 +125,17 @@ function directoryCtes(scope: WorkspaceReadScope, worktreeIds?: readonly string[
       WHERE cardinality(ancestors.path) < ${MAX_STACK_ANCESTRY}
         AND NOT parent.worktree_id = ANY(ancestors.path)
     ),
+    workspace_descendants AS (
+      SELECT DISTINCT worktree_id, ARRAY[worktree_id] AS path FROM workspace_ancestors
+      UNION ALL
+      SELECT child.worktree_id, descendants.path || child.worktree_id
+      FROM scoped_workspaces child
+      INNER JOIN workspace_descendants descendants ON child.parent_worktree_id = descendants.worktree_id
+      WHERE cardinality(descendants.path) < ${MAX_STACK_ANCESTRY}
+        AND NOT child.worktree_id = ANY(descendants.path)
+    ),
     workspace_family AS (
-      SELECT worktree_id FROM workspace_ancestors
-      UNION
-      SELECT child.worktree_id FROM scoped_workspaces child
-      INNER JOIN workspace_family family ON child.parent_worktree_id = family.worktree_id
+      SELECT DISTINCT worktree_id FROM workspace_descendants
     ),
     workspace_pr_base_refs AS (
       SELECT git_url, pr_base_ref AS branch FROM github_branch_pull_requests

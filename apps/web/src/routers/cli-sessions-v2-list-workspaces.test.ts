@@ -20,6 +20,7 @@ import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import { cliSessionsV2Router } from './cli-sessions-v2-router';
 import { cloudAgentSettingsRouter } from './cloud-agent-settings-router';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
+import { MAX_STACK_ANCESTRY } from '@/components/cloud-agent-next/workspace-stacks';
 import {
   hydrateWorkspaceChats,
   readWorkspaceStackDirectory,
@@ -1082,6 +1083,40 @@ describe('cliSessionsV2 workspace read model', () => {
       includeAncestors: true,
     });
     expect(summary.workspaces.map(row => row.worktreeId)).toEqual([root, child, layer]);
+  });
+
+  it('bounds explicit descendant depth without capping the number of stack candidates', async () => {
+    const root = await insertWorkspace([
+      makeSession('ses_family_depth_root', worktreeId(), { git_url: `${GIT_URL}-depth-root` }),
+    ]);
+    const chain = [root];
+    let parent = root;
+    for (let depth = 1; depth <= MAX_STACK_ANCESTRY; depth++) {
+      parent = await insertWorkspace(
+        [
+          makeSession(`ses_family_depth_${depth}`, worktreeId(), {
+            git_url: `${GIT_URL}-depth-${depth}`,
+          }),
+        ],
+        { parent_worktree_id: parent }
+      );
+      chain.push(parent);
+    }
+    const sibling = await insertWorkspace(
+      [
+        makeSession('ses_family_depth_sibling', worktreeId(), {
+          git_url: `${GIT_URL}-depth-sibling`,
+        }),
+      ],
+      { parent_worktree_id: root }
+    );
+
+    const directory = await readWorkspaceStackDirectory({ userId: USER_ID, organizationId: null }, [
+      root,
+    ]);
+    expect(directory.map(row => row.worktreeId).sort()).toEqual(
+      [...chain.slice(0, MAX_STACK_ANCESTRY), sibling].sort()
+    );
   });
 
   it('drops busy status at three hours and normalizes PostgreSQL timestamps', async () => {

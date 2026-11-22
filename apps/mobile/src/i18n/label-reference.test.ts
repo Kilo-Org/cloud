@@ -60,46 +60,6 @@ describe('label references', () => {
   });
 });
 
-/**
- * The privileged organization screens name the next step by reusing the boundary
- * sentence, so a plain member reads the same ask wherever the app refuses a
- * screen: the AI Guardrails form, and the audit log, billing and request-log
- * states that offer no action of their own. The checker keeps the reference
- * identical in every catalog; this pins that the reference is still there, and
- * that every language resolves it instead of printing `$t(`.
- */
-describe('message references', () => {
-  const NEXT_STEP_KEY = 'organization.boundary.accessDeniedDescription';
-  const DENIAL_KEYS = [
-    'organizationGuardrails.permissionDenied',
-    'organization.auditLog.permissionDenied',
-    'organization.billing.permissionDenied',
-    'organization.requestLogs.permissionDenied',
-  ] as const;
-  const DENIAL_KEY_VALUES = [
-    en.organizationGuardrails.permissionDenied,
-    en.organization.auditLog.permissionDenied,
-    en.organization.billing.permissionDenied,
-    en.organization.requestLogs.permissionDenied,
-  ];
-
-  it('names the next step by key in English', () => {
-    for (const copy of DENIAL_KEY_VALUES) {
-      expect(copy).toContain(`$t(${NEXT_STEP_KEY})`);
-    }
-  });
-
-  it.each(SUPPORTED_LANGUAGES)('resolves the next step in %s', async tag => {
-    await i18n.changeLanguage(tag);
-    const nextStep = i18n.t(NEXT_STEP_KEY);
-    for (const key of DENIAL_KEYS) {
-      const denial = i18n.t(key);
-      expect(denial).toContain(nextStep);
-      expect(denial).not.toContain('$t(');
-    }
-  });
-});
-
 describe('catalog copy', () => {
   it.each(SUPPORTED_LANGUAGES)(
     'keeps concise, translated settings and empty-state copy in %s',

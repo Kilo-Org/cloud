@@ -555,8 +555,11 @@
     "changelogFixesIn": "Remedieri și îmbunătățiri în {{areas}}.",
     "changelogFixesPolish": "Remedieri și îmbunătățiri în întreaga aplicație.",
     "changelogAreas": {
-      "signIn": "Autentificare",
-      "profileOrganizations": "Profil & organizații"
+      "signIn": "autentificare",
+      "profileOrganizations": "profil & organizații",
+      "chat": "conversații",
+      "notifications": "notificări",
+      "integrations": "integrări"
     }
   },
   "preferences": {
@@ -4585,20 +4588,34 @@
       "deductionFallback": "Deducere de credite",
       "emptyDescription": "Achizițiile de credite, chitanțele și utilizarea vor apărea aici.",
       "emptyTitle": "Niciun istoric de credite",
+      "expiredGrant": "Expirat: {{description}}",
       "googlePlayReceipt": "Chitanță din Google Play",
       "kind": {
         "adjustment": "Ajustare",
         "balanceNeutral": "Fără impact asupra soldului",
         "deduction": "Deducere",
         "grant": "Credite acordate",
+        "promotionalCredits": "Credite promoționale",
         "welcomeCredits": "Credite de bun venit",
         "purchase": "Achiziție"
+      },
+      "program": {
+        "adminBulkGrant": "Credite acordate de administrator",
+        "contributorChampion": "Credit pentru campionul contribuitorilor",
+        "feedback": "Credit pentru păreri",
+        "influencer": "Credit pentru influenceri",
+        "ossMonthlyReset": "Resetare lunară OSS",
+        "ossSponsorship": "Credit de sponsorizare OSS",
+        "pullRequest": "Credit pentru PR",
+        "usageIssue": "Credit pentru problemă de utilizare",
+        "vibeDay": "Credit Vibe day"
       },
       "purchaseFallback": "Achiziție de credite",
       "receipt": "Chitanță",
       "receiptA11y": "Deschide chitanța pentru {{description}}, {{amount}}, din {{date}}",
       "receiptUnavailable": "Nu există o chitanță disponibilă pentru această achiziție.",
-      "retentionLimit": "Se afișează cel mai recent istoric de credite."
+      "retentionLimit": "Se afișează cel mai recent istoric de credite.",
+      "voidedGrant": "Anulat: {{description}}"
     },
     "title": "Cumpără credite",
     "description": "Creditele sunt o achiziție unică adăugată la soldul tău Kilo pentru rularea sesiunilor de codare AI în Kilo App. Magazinul îți debitează contul, iar creditele sunt adăugate după ce magazinul confirmă plata.",
@@ -5186,6 +5203,20 @@
       "eu": "Uniunea Europeană",
       "au": "Australia",
       "jp": "Japonia"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Căutare preferințe",
+    "noMatches": "Nu s-au găsit preferințe",
+    "emptyDescription": "Încearcă alt nume de preferință sau alt cuvânt-cheie.",
+    "resultsStatus": "Preferințe găsite: {{resultCount}}",
+    "keywords": {
+      "signOut": "deconectare|ieșire din cont",
+      "appearance": "temă|schemă de culori",
+      "appUnlock": "biometrie|recunoaștere facială|amprentă",
+      "language": "limbă|traducere",
+      "notifications": "alerte|notificări",
+      "privacy": "statistici|urmărire"
     }
   }
 }

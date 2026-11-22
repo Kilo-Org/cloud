@@ -111,10 +111,14 @@ export const GatewayOrganizationFeaturesConfigSchema = z.object({
   organization_features: OrganizationFeaturesSchema.prefault({}),
 });
 
-const organizationIdsInput = z
-  .array(z.guid())
-  .max(ORGANIZATION_FEATURE_ORGANIZATIONS_MAX_COUNT)
-  .transform(ids => [...new Set(ids.map(id => id.toLowerCase()))]);
+/** A bound-checked organization-id list input: guids, deduped and lowercased. */
+const organizationIdsListInput = (max: number) =>
+  z
+    .array(z.guid())
+    .max(max)
+    .transform(ids => [...new Set(ids.map(id => id.toLowerCase()))]);
+
+const organizationIdsInput = organizationIdsListInput(ORGANIZATION_FEATURE_ORGANIZATIONS_MAX_COUNT);
 
 /** Schema for the admin organization-features mutation input. */
 export const OrganizationFeaturesInputSchema = z.object({
@@ -145,9 +149,9 @@ export const AnthropicUserProfilesSettingsSchema = z.object({
   enabled: z.boolean().default(false),
   start_at: z.string().nullable().default(null),
   opted_in_user_ids: storedIds,
-  opted_in_organization_ids: storedIds.transform(ids => ids.map(id => id.toLowerCase())),
+  opted_in_organization_ids: storedOrganizationIds,
   opted_out_user_ids: storedIds,
-  opted_out_organization_ids: storedIds.transform(ids => ids.map(id => id.toLowerCase())),
+  opted_out_organization_ids: storedOrganizationIds,
 });
 
 export type AnthropicUserProfilesSettings = z.infer<typeof AnthropicUserProfilesSettingsSchema>;
@@ -165,10 +169,9 @@ const userIdsInput = z
   .max(ANTHROPIC_USER_PROFILE_LIST_MAX_COUNT)
   .transform(ids => [...new Set(ids)]);
 
-const anthropicOrganizationIdsInput = z
-  .array(z.guid())
-  .max(ANTHROPIC_USER_PROFILE_LIST_MAX_COUNT)
-  .transform(ids => [...new Set(ids.map(id => id.toLowerCase()))]);
+const anthropicOrganizationIdsInput = organizationIdsListInput(
+  ANTHROPIC_USER_PROFILE_LIST_MAX_COUNT
+);
 
 function overlap(a: string[], b: string[]): string[] {
   const set = new Set(a);

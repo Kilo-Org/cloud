@@ -555,7 +555,10 @@
     "changelogFixesPolish": "संपूर्ण अ‍ॅपमध्ये दुरुस्त्या आणि सुधारणा.",
     "changelogAreas": {
       "signIn": "साइन इन",
-      "profileOrganizations": "प्रोफाइल व संस्था"
+      "profileOrganizations": "प्रोफाइल व संस्था",
+      "chat": "चॅट",
+      "notifications": "सूचना",
+      "integrations": "इंटिग्रेशन्स"
     }
   },
   "preferences": {
@@ -4506,20 +4509,34 @@
       "deductionFallback": "क्रेडिट वजावट",
       "emptyDescription": "क्रेडिट खरेदी, पावत्या आणि वापर येथे दिसतील.",
       "emptyTitle": "क्रेडिट इतिहास नाही",
+      "expiredGrant": "कालबाह्य: {{description}}",
       "googlePlayReceipt": "Google Play कडून पावती",
       "kind": {
         "adjustment": "समायोजन",
         "balanceNeutral": "शिलकीवर परिणाम नाही",
         "deduction": "वजावट",
         "grant": "क्रेडिट अनुदान",
+        "promotionalCredits": "प्रोमोशनल क्रेडिट",
         "welcomeCredits": "स्वागत क्रेडिट",
         "purchase": "खरेदी"
+      },
+      "program": {
+        "adminBulkGrant": "प्रशासकाकडून क्रेडिट अनुदान",
+        "contributorChampion": "योगदानकर्ता चॅम्पियन क्रेडिट",
+        "feedback": "अभिप्रायासाठी क्रेडिट",
+        "influencer": "इन्फ्लुएन्सर क्रेडिट",
+        "ossMonthlyReset": "OSS प्रायोजकत्वाचा मासिक रीसेट",
+        "ossSponsorship": "OSS प्रायोजकत्व क्रेडिट",
+        "pullRequest": "पुल रिक्वेस्टसाठी क्रेडिट",
+        "usageIssue": "वापर समस्येसाठी क्रेडिट",
+        "vibeDay": "Vibe दिवस क्रेडिट"
       },
       "purchaseFallback": "क्रेडिट खरेदी",
       "receipt": "पावती",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} ची पावती उघडा",
       "receiptUnavailable": "या खरेदीसाठी पावती उपलब्ध नाही.",
-      "retentionLimit": "सर्वात अलीकडचा क्रेडिट इतिहास दाखवला जात आहे."
+      "retentionLimit": "सर्वात अलीकडचा क्रेडिट इतिहास दाखवला जात आहे.",
+      "voidedGrant": "रद्द केले: {{description}}"
     },
     "title": "क्रेडिट्स खरेदी करा",
     "description": "क्रेडिट्स ही Kilo App मध्ये AI कोडिंग सत्रे चालवण्यासाठी तुमच्या Kilo शिल्लकीत जोडली जाणारी एक-वेळची खरेदी आहे. स्टोअर तुमच्या खात्यातून शुल्क घेते आणि स्टोअर पेमेंटची पुष्टी केल्यानंतर क्रेडिट्स जोडली जातात.",
@@ -5099,6 +5116,20 @@
       "eu": "युरोपीय संघ",
       "au": "ऑस्ट्रेलिया",
       "jp": "जपान"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "प्राधान्यांचा शोध",
+    "noMatches": "जुळणारी प्राधान्ये नाहीत",
+    "emptyDescription": "प्राधान्याचे वेगळे नाव किंवा शोधशब्द वापरून पाहा.",
+    "resultsStatus": "सापडलेली प्राधान्ये: {{resultCount}}",
+    "keywords": {
+      "signOut": "बाहेर पडा|सत्र समाप्ती",
+      "appearance": "स्वरूप|रंगसंगती|गडद मोड",
+      "appUnlock": "बायोमेट्रिक्स|चेहरा|बोटाचा ठसा",
+      "language": "भाषा|भाषांतर",
+      "notifications": "सूचना|इशारे",
+      "privacy": "विश्लेषण|मागोवा"
     }
   }
 }

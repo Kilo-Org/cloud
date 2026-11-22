@@ -554,8 +554,11 @@
     "changelogFixesIn": "Quyidagi bo‘limlarda tuzatishlar va yaxshilanishlar: {{areas}}.",
     "changelogFixesPolish": "Butun ilova bo‘ylab tuzatishlar va yaxshilanishlar.",
     "changelogAreas": {
-      "signIn": "Kirish",
-      "profileOrganizations": "Profil hamda tashkilotlar"
+      "signIn": "kirish",
+      "profileOrganizations": "profil hamda tashkilotlar",
+      "chat": "suhbat",
+      "notifications": "bildirishnomalar",
+      "integrations": "integratsiyalar"
     }
   },
   "preferences": {
@@ -4506,20 +4509,34 @@
       "deductionFallback": "Kredit yechilishi",
       "emptyDescription": "Kredit xaridlari, cheklar va sarflar shu yerda ko‘rinadi.",
       "emptyTitle": "Kreditlar tarixi yo‘q",
+      "expiredGrant": "Muddati tugagan: {{description}}",
       "googlePlayReceipt": "Chek Google Play’da",
       "kind": {
         "adjustment": "Tuzatish",
         "balanceNeutral": "Balansga ta’sir qilmaydi",
         "deduction": "Yechib olish",
         "grant": "Bepul kredit",
+        "promotionalCredits": "Rag'bat kreditlari",
         "welcomeCredits": "Xush kelibsiz krediti",
         "purchase": "Xarid"
+      },
+      "program": {
+        "adminBulkGrant": "Administrator tomonidan berilgan kredit",
+        "contributorChampion": "Hissa qo'shuvchilar chempioni krediti",
+        "feedback": "Fikr-mulohaza uchun kredit",
+        "influencer": "Influencer krediti",
+        "ossMonthlyReset": "Ochiq kodli loyihalar homiyligining oylik yangilanishi",
+        "ossSponsorship": "Ochiq kodli loyihalarga homiylik krediti",
+        "pullRequest": "PR uchun kredit",
+        "usageIssue": "Foydalanish muammosi uchun kredit",
+        "vibeDay": "Vibe kuni krediti"
       },
       "purchaseFallback": "Kredit xaridi",
       "receipt": "Chek",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} chekini ochish",
       "receiptUnavailable": "Bu xarid uchun chek mavjud emas.",
-      "retentionLimit": "Kreditlarning eng so'nggi tarixi ko'rsatilmoqda."
+      "retentionLimit": "Kreditlarning eng so'nggi tarixi ko'rsatilmoqda.",
+      "voidedGrant": "Bekor qilingan: {{description}}"
     },
     "title": "Kredit sotib olish",
     "description": "Kreditlar Kilo App'da AI kodlash sessiyalarini ishga tushirish uchun Kilo balansingizga qo'shiladigan bir martalik xariddir. Do'kon hisobingizdan to'lov oladi va do'kon to'lovni tasdiqlaganidan keyin kreditlar qo'shiladi.",
@@ -5099,6 +5116,20 @@
       "eu": "Yevropa Ittifoqi",
       "au": "Avstraliya",
       "jp": "Yaponiya"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Sozlamalarni qidirish",
+    "noMatches": "Mos sozlamalar topilmadi",
+    "emptyDescription": "Boshqa sozlama nomi yoki kalit so'z bilan qidiring.",
+    "resultsStatus": "Topilgan sozlamalar: {{resultCount}}",
+    "keywords": {
+      "signOut": "chiqish|seans",
+      "appearance": "mavzu|rang|uslub",
+      "appUnlock": "biometriya|yuz|barmoq",
+      "language": "til|tarjima",
+      "notifications": "bildirishnomalar|ogohlantirishlar",
+      "privacy": "tahlil|kuzatuv"
     }
   }
 }

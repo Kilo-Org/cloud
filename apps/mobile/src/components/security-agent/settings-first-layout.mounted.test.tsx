@@ -265,7 +265,9 @@ const CASES: { name: string; Screen: ComponentType<{ scope: string }>; settled: 
         { label: i18n.t('securityAgent.analysisMode.shallow'), checked: false },
         { label: i18n.t('securityAgent.analysisMode.deep'), checked: true },
       ],
-      rows: ['vendor/triage', 'vendor/analysis', 'vendor/remediation'],
+      // Model rows name the stored slug readably: the catalogue is empty here,
+      // so each row shows the reference's last segment, never `vendor/triage`.
+      rows: ['triage', 'analysis', 'remediation'],
       inputs: [],
     },
   },

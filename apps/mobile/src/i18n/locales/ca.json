@@ -555,8 +555,11 @@
     "changelogFixesIn": "Correccions i millores a {{areas}}.",
     "changelogFixesPolish": "Correccions i millores a tota l'aplicació.",
     "changelogAreas": {
-      "signIn": "Inici de sessió",
-      "profileOrganizations": "Perfil & organitzacions"
+      "signIn": "inici de sessió",
+      "profileOrganizations": "perfil & organitzacions",
+      "chat": "xat",
+      "notifications": "notificacions",
+      "integrations": "integracions"
     }
   },
   "preferences": {
@@ -4585,20 +4588,34 @@
       "deductionFallback": "Deducció de crèdits",
       "emptyDescription": "Les compres de crèdits, els rebuts i l'ús apareixeran aquí.",
       "emptyTitle": "No hi ha historial de crèdits",
+      "expiredGrant": "Caducat: {{description}}",
       "googlePlayReceipt": "Rebut de Google Play",
       "kind": {
         "adjustment": "Ajust",
         "balanceNeutral": "Sense efecte en el saldo",
         "deduction": "Deducció",
         "grant": "Concessió de crèdits",
+        "promotionalCredits": "Crèdits promocionals",
         "welcomeCredits": "Crèdits de benvinguda",
         "purchase": "Compra"
+      },
+      "program": {
+        "adminBulkGrant": "Concessió de crèdits de l'administrador",
+        "contributorChampion": "Crèdit de campió dels col·laboradors",
+        "feedback": "Crèdit per comentaris",
+        "influencer": "Crèdit d'influencer",
+        "ossMonthlyReset": "Renovació mensual del patrocini de codi obert",
+        "ossSponsorship": "Crèdit de patrocini de codi obert",
+        "pullRequest": "Crèdit per PR",
+        "usageIssue": "Crèdit per problema d'ús",
+        "vibeDay": "Crèdit del dia Vibe"
       },
       "purchaseFallback": "Compra de crèdits",
       "receipt": "Rebut",
       "receiptA11y": "Obre el rebut de {{description}}, {{amount}}, del {{date}}",
       "receiptUnavailable": "No hi ha cap rebut disponible per a aquesta compra.",
-      "retentionLimit": "Es mostra l'historial de crèdits més recent."
+      "retentionLimit": "Es mostra l'historial de crèdits més recent.",
+      "voidedGrant": "Anul·lat: {{description}}"
     },
     "title": "Compra crèdits",
     "description": "Els crèdits són una compra única que s'afegeix al teu saldo de Kilo per executar sessions de programació amb IA a l'aplicació Kilo. La botiga cobra al teu compte i els crèdits s'afegeixen quan la botiga confirma el pagament.",
@@ -5186,6 +5203,20 @@
       "eu": "Unió Europea",
       "au": "Austràlia",
       "jp": "Japó"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Cerca a les preferències",
+    "noMatches": "No s'ha trobat cap preferència",
+    "emptyDescription": "Prova amb un altre nom de preferència o una altra paraula clau.",
+    "resultsStatus": "Preferències trobades: {{resultCount}}",
+    "keywords": {
+      "signOut": "tancar sessió|sortir",
+      "appearance": "tema|colors",
+      "appUnlock": "biometria|reconeixement facial|empremta digital",
+      "language": "idioma|traducció",
+      "notifications": "avisos|alertes|notificacions",
+      "privacy": "analítica|seguiment"
     }
   }
 }

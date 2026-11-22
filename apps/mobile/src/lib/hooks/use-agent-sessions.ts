@@ -289,11 +289,17 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     if (departedId) {
       scheduleCacheMaintenance(() => {
         if (isCurrentAuthEpoch(epoch) && !isSignOutActive()) {
-          void reconcileFirstPage(queryClient, trpc.cliSessionsV2.list.pathFilter().queryKey);
+          // Through the coordinator, like every other stored reconcile. Naming
+          // the entry directly joins whatever fetch is already in flight on
+          // the same infinite query instead of queueing behind it, so a page-one
+          // reconcile raised during a next-page fetch would never run and the
+          // just-terminated session would not reach history until a later
+          // refresh.
+          void storedReconcile();
         }
       });
     }
-  }, [active.canRead, activeSessionIds, queryClient, trpc]);
+  }, [active.canRead, activeSessionIds, storedReconcile]);
 
   // App-foreground edge. The native window-focus refetch is off (see the
   // builder), so the hook owns the OS-foreground refresh and reconciles page

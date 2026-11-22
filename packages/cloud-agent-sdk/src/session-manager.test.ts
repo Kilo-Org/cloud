@@ -6423,8 +6423,34 @@ describe('createSessionManager', () => {
         config.store,
         mgr.atoms.childSessionHydrationState
       );
-      expect(state('child-fail')).toEqual(expect.objectContaining({ status: 'error' }));
+      // A retryable read keeps the retry copy every app already classifies as
+      // transient, so its Retry stays.
+      expect(state('child-fail')).toEqual({
+        status: 'error',
+        message: 'Something went wrong. Please retry in a moment.',
+      });
     });
+
+    it.each(['invalid_data', 'too_large'] as const)(
+      'names a terminal %s first child page as unavailable history',
+      async kind => {
+        const fetchSnapshotPage = createPageFetchMock(async () => ({ kind }));
+        const config = createMockConfig({ fetchSnapshotPage });
+        const mgr = createSessionManager(config);
+
+        await mgr.switchSession(kiloId('ses-root'));
+        await mgr.hydrateChildSession(kiloId(`child-${kind}`));
+
+        const state = atomValue<(childSessionId: string) => { status: string; message?: string }>(
+          config.store,
+          mgr.atoms.childSessionHydrationState
+        );
+        expect(state(`child-${kind}`)).toEqual({
+          status: 'error',
+          message: sessionSnapshotFailureMessage(kind).message,
+        });
+      }
+    );
 
     it('clears a stored first-page hydration error when a live child chat event arrives', async () => {
       const fetchSnapshotPage = createPageFetchMock(async () => ({

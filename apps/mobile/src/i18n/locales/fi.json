@@ -554,8 +554,11 @@
     "changelogFixesIn": "Korjauksia ja parannuksia seuraaviin osioihin: {{areas}}.",
     "changelogFixesPolish": "Korjauksia ja parannuksia koko sovellukseen.",
     "changelogAreas": {
-      "signIn": "Kirjautuminen",
-      "profileOrganizations": "Profiili & organisaatiot"
+      "signIn": "kirjautuminen",
+      "profileOrganizations": "profiili & organisaatiot",
+      "chat": "keskustelu",
+      "notifications": "ilmoitukset",
+      "integrations": "integraatiot"
     }
   },
   "preferences": {
@@ -4506,20 +4509,34 @@
       "deductionFallback": "Krediittien veloitus",
       "emptyDescription": "Krediittien ostot, kuitit ja käyttö näkyvät täällä.",
       "emptyTitle": "Ei krediittihistoriaa",
+      "expiredGrant": "Vanhentunut: {{description}}",
       "googlePlayReceipt": "Kuitti Google Playssa",
       "kind": {
         "adjustment": "Oikaisu",
         "balanceNeutral": "Ei vaikuta saldoon",
         "deduction": "Veloitus",
         "grant": "Myönnetyt krediitit",
+        "promotionalCredits": "Promootiokrediitit",
         "welcomeCredits": "Tervetulokrediitit",
         "purchase": "Osto"
+      },
+      "program": {
+        "adminBulkGrant": "Ylläpitäjän krediittimyönnös",
+        "contributorChampion": "Avustajamestarikrediitit",
+        "feedback": "Palautekrediitit",
+        "influencer": "Vaikuttajakrediitit",
+        "ossMonthlyReset": "Avoimen lähdekoodin krediittien kuukausittainen nollaus",
+        "ossSponsorship": "Avoimen lähdekoodin sponsorointikrediitit",
+        "pullRequest": "Pull request -krediitit",
+        "usageIssue": "Käyttöongelmakrediitit",
+        "vibeDay": "Vibe Day -krediitit"
       },
       "purchaseFallback": "Krediittiosto",
       "receipt": "Kuitti",
       "receiptA11y": "Avaa kuitti: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Tälle ostolle ei ole saatavilla kuittia.",
-      "retentionLimit": "Näytetään uusin krediittihistoria."
+      "retentionLimit": "Näytetään uusin krediittihistoria.",
+      "voidedGrant": "Mitätöity: {{description}}"
     },
     "title": "Osta krediittejä",
     "description": "Krediitit ovat kertaostos, joka lisätään Kilo-saldoosi AI-koodausistuntojen ajamista varten Kilo-sovelluksessa. Kauppa veloittaa tiliäsi ja krediitit lisätään, kun kauppa vahvistaa maksun.",
@@ -5099,6 +5116,20 @@
       "eu": "Euroopan unioni",
       "au": "Australia",
       "jp": "Japani"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Hae asetuksia",
+    "noMatches": "Ei vastaavia asetuksia",
+    "emptyDescription": "Kokeile toista asetuksen nimeä tai hakusanaa.",
+    "resultsStatus": "Asetuksia löytyi: {{resultCount}}",
+    "keywords": {
+      "signOut": "kirjaudu ulos|uloskirjautuminen",
+      "appearance": "teema|värimaailma",
+      "appUnlock": "biometrinen tunnistus|kasvojentunnistus|sormenjälki",
+      "language": "kieli|käännös",
+      "notifications": "ilmoitukset|hälytykset|push-ilmoitukset",
+      "privacy": "analytiikka|seuranta"
     }
   }
 }

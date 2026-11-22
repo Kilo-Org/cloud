@@ -1,10 +1,9 @@
 /* eslint-disable max-lines -- the placeholder suites share the sections' mock harness and card readers in this file */
-// The dashboard sections read the same sync state the filter row paints under
-// "All repositories". Before the first sync nothing has been measured, so the
-// priority card must not report the empty result as a clean codebase: the
-// green check and the all-clear line gave a never-synced organization a
-// verified look. The card explains what it will hold instead, and opens
-// nothing.
+// The dashboard sections describe what this scope has recorded. A scope that
+// has recorded nothing measured nothing, so the priority card must not report
+// the empty result as a clean codebase: the green check and the all-clear line
+// gave an unmeasured organization a verified look. The card explains what it
+// will hold instead, and opens nothing.
 
 import { type ComponentProps } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
@@ -123,7 +122,7 @@ type Instance = TestRenderer.ReactTestInstance;
 function renderSections(props: {
   data?: DashboardData;
   slaEnabled?: boolean;
-  neverSynced?: boolean;
+  nothingRecorded?: boolean;
   emptyGrant?: boolean;
   emptyGrantAction?: SectionAction | null;
 }): TestRenderer.ReactTestRenderer {
@@ -136,7 +135,7 @@ function renderSections(props: {
         data={props.data ?? dashboardData()}
         slaEnabled={props.slaEnabled ?? true}
         repoFullName={undefined}
-        neverSynced={props.neverSynced ?? false}
+        nothingRecorded={props.nothingRecorded ?? false}
         emptyGrant={props.emptyGrant ?? false}
         emptyGrantAction={props.emptyGrantAction ?? null}
       />
@@ -176,8 +175,8 @@ function coverageCard(renderer: TestRenderer.ReactTestRenderer): Instance {
 }
 
 describe('DashboardSections priority card', () => {
-  it('reports no measurement while the scope has never synced', () => {
-    const card = priorityCard(renderSections({ neverSynced: true }));
+  it('reports no measurement while the scope has recorded nothing', () => {
+    const card = priorityCard(renderSections({ nothingRecorded: true }));
 
     // The card is a content section, so it explains what it will hold instead
     // of showing the lone dash a measurement row shows or repeating the status
@@ -191,8 +190,8 @@ describe('DashboardSections priority card', () => {
     expect(card.findAllByType('Pressable')).toHaveLength(0);
   });
 
-  it('keeps the all-clear row for a synced organization with no open findings', () => {
-    const card = priorityCard(renderSections({ neverSynced: false }));
+  it('keeps the all-clear row for a measured scope with no open findings', () => {
+    const card = priorityCard(renderSections({ nothingRecorded: false }));
 
     expect(copy(card)).toContain('securityAgent.dashboard.noOpenFindings');
     expect(card.findAllByType('ShieldCheck')).toHaveLength(1);
@@ -205,7 +204,7 @@ describe('DashboardSections priority card', () => {
   // floor has to sit on the row's own class — `hitSlop` would not move the rect
   // a control-size audit measures.
   it('carries the shared row floor on the card it opens', () => {
-    const card = priorityCard(renderSections({ neverSynced: false }));
+    const card = priorityCard(renderSections({ nothingRecorded: false }));
 
     for (const pressable of card.findAllByType('Pressable')) {
       expect(String(pressable.props.className).split(' ')).toContain(ROW_TARGET_CLASS);
@@ -216,7 +215,7 @@ describe('DashboardSections priority card', () => {
   it('carries the shared row floor on the priority finding it opens', () => {
     const card = priorityCard(
       renderSections({
-        neverSynced: false,
+        nothingRecorded: false,
         data: dashboardData({
           priorityFinding: {
             id: 'finding-1',
@@ -240,11 +239,11 @@ describe('DashboardSections priority card', () => {
 });
 
 describe('DashboardSections stat rows', () => {
-  // The counts below the priority card are read from the same sync the filter
-  // dates; before the first one they were zeros, and two of them carried a
-  // success dot. A dash and a neutral dot state that nothing was measured.
-  it('reports every stat row as unmeasured while the scope has never synced', () => {
-    const rows = renderSections({ neverSynced: true }).root.findAllByType('KvRow');
+  // The counts below the priority card describe findings the scope recorded;
+  // a scope with none had zeros here, and two of them carried a success dot. A
+  // dash and a neutral dot state that nothing was measured.
+  it('reports every stat row as unmeasured while the scope has recorded nothing', () => {
+    const rows = renderSections({ nothingRecorded: true }).root.findAllByType('KvRow');
 
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.every(row => row.props.value === '—')).toBe(true);
@@ -253,16 +252,16 @@ describe('DashboardSections stat rows', () => {
     ).toBe(true);
   });
 
-  it('keeps the measured counts for a synced organization', () => {
-    const rows = renderSections({ neverSynced: false }).root.findAllByType('KvRow');
+  it('keeps the measured counts for a scope that has recorded findings', () => {
+    const rows = renderSections({ nothingRecorded: false }).root.findAllByType('KvRow');
 
     // The SLA figures live on the metric tiles above these rows, so every row
     // here is a measured coverage count: a number, never the unmeasured dash.
     expect(rows.map(row => row.props.value)).not.toContain('—');
     expect(rows.map(row => row.props.value)).toContain('0');
-    // Synced, so the counts are real numbers rather than dashes — and with
-    // nothing counted in any of them the dots stay neutral, because a zero is
-    // a satisfied row rather than a severity.
+    // The scope recorded findings, so the counts are real numbers rather than
+    // dashes — and with nothing counted in any of them the dots stay neutral,
+    // because a zero is a satisfied row rather than a severity.
     expect(
       rows.every(row => row.props.dotTone === 'muted' || row.props.dotTone === undefined)
     ).toBe(true);
@@ -277,7 +276,7 @@ describe('DashboardSections repository row', () => {
   it('names each bucket through its own counted phrase', () => {
     severityCountPhrase.mockClear();
     renderSections({
-      neverSynced: false,
+      nothingRecorded: false,
       data: dashboardData({
         repoHealth: [
           {
@@ -323,7 +322,7 @@ describe('DashboardSections repository row', () => {
       slaComplianceMeasured: true,
     }));
     const rows = renderSections({
-      neverSynced: false,
+      nothingRecorded: false,
       data: dashboardData({ repoHealth }),
     })
       .root.findAllByType('Pressable')
@@ -423,10 +422,10 @@ describe('DashboardSections repository card with an empty grant', () => {
     expect(action.props.loading).toBe(true);
   });
 
-  // A scope whose grant holds repositories but has not synced yet has not found
-  // nothing: priorities are still to come, and there is no grant to fix.
+  // A scope whose grant holds repositories but has recorded nothing has not
+  // found nothing: priorities are still to come, and there is no grant to fix.
   it('keeps the pending copy and no action while the grant holds repositories', () => {
-    const state = emptyState(renderSections({ neverSynced: true, emptyGrant: false }));
+    const state = emptyState(renderSections({ nothingRecorded: true, emptyGrant: false }));
 
     expect(state.props.description).toBe('securityAgent.dashboard.noRepositoryDataDescription');
     expect(state.props.action).toBeUndefined();
@@ -439,7 +438,7 @@ describe('DashboardSections SLA posture', () => {
   // repeated them, so it is gone while SLA tracking is on; the analysis posture
   // it still shows is the part the tiles leave out.
   it('leaves the SLA figures to the tiles while SLA tracking is on', () => {
-    const labels = renderSections({ neverSynced: false, slaEnabled: true })
+    const labels = renderSections({ nothingRecorded: false, slaEnabled: true })
       .root.findAllByType('KvRow')
       .map(row => row.props.label);
 
@@ -450,7 +449,7 @@ describe('DashboardSections SLA posture', () => {
   });
 
   it('keeps the analysis posture for a scope without SLA tracking', () => {
-    const labels = renderSections({ neverSynced: false, slaEnabled: false })
+    const labels = renderSections({ nothingRecorded: false, slaEnabled: false })
       .root.findAllByType('KvRow')
       .map(row => row.props.label);
 
@@ -466,12 +465,12 @@ describe('DashboardSectionsSkeleton', () => {
   // loading state taller than the content that replaced it.
   function renderSkeleton(
     slaEnabled: boolean,
-    neverSynced = false
+    nothingRecorded = false
   ): TestRenderer.ReactTestRenderer {
     const slot: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
     act(() => {
       slot.current = TestRenderer.create(
-        <DashboardSectionsSkeleton slaEnabled={slaEnabled} neverSynced={neverSynced} />
+        <DashboardSectionsSkeleton slaEnabled={slaEnabled} nothingRecorded={nothingRecorded} />
       );
     });
     const renderer = slot.current;
@@ -515,20 +514,22 @@ describe('DashboardSectionsSkeleton', () => {
     expect(placeholders.every(block => block.findAllByType(RowSkeleton).length > 0)).toBe(true);
   });
 
-  it('draws the Act-first placeholder at the height of the card a never-synced scope loads', () => {
-    // Before the first sync that card holds one line of pending copy instead of
-    // a title over its repository, so the placeholder that has the read's
-    // answer draws that single row and does not lose a second one when the
-    // cards replace it.
-    const placeholderLines = (neverSynced: boolean) => {
-      const block = placeholderBlocks(renderSkeleton(true, neverSynced).root)[0];
+  it('draws the Act-first placeholder at the height of the card an unrecorded scope loads', () => {
+    // A scope that has recorded nothing holds one line of pending copy in that
+    // card instead of a title over its repository, so the placeholder that has
+    // the reads' answer draws that single row and does not lose a second one
+    // when the cards replace it.
+    const placeholderLines = (nothingRecorded: boolean) => {
+      const block = placeholderBlocks(renderSkeleton(true, nothingRecorded).root)[0];
       if (!block) {
         throw new Error('priority placeholder not found');
       }
       return reservedLines(block);
     };
-    const loadedLines = (neverSynced: boolean) => {
-      const card = renderSections({ slaEnabled: true, neverSynced }).root.findAllByType(Section)[0];
+    const loadedLines = (nothingRecorded: boolean) => {
+      const card = renderSections({ slaEnabled: true, nothingRecorded }).root.findAllByType(
+        Section
+      )[0];
       if (!card) {
         throw new Error('priority card not found');
       }
@@ -576,7 +577,7 @@ describe('DashboardSections Codebase risk card', () => {
     const labels = (slaEnabled: boolean) =>
       coverageCard(
         renderSections({
-          neverSynced: false,
+          nothingRecorded: false,
           slaEnabled,
           data: dashboardData({
             sla: {

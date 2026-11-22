@@ -22,7 +22,7 @@ export function getOrganizationAutoRoute(
 }
 
 export function isOrganizationAutoTargetModel(modelId: string): boolean {
-  return (ORGANIZATION_AUTO_TARGET_MODELS as readonly string[]).includes(modelId);
+  return ORGANIZATION_AUTO_TARGET_MODELS.includes(modelId);
 }
 
 // Organization Auto may route to the organization's own custom routers, never to a member's

@@ -65,7 +65,7 @@ function terminalError(): Error {
 type CleanupSpies = {
   getKey: Mock<(fingerprint: string) => string>;
   rotateKey: Mock<() => void>;
-  removeOutboxRow: Mock<(fingerprint: string) => Promise<void>>;
+  removeOutboxRow: Mock<(fingerprint: string) => Promise<boolean>>;
   invalidate: Mock<() => Promise<void>>;
 };
 
@@ -75,7 +75,7 @@ function createDeps(): PrepareAgentSessionDeps & CleanupSpies {
     rotateKey: vi.fn(),
     getStoredOperationKey: vi.fn(() => null),
     writeSafeRetry: vi.fn(async () => undefined),
-    removeOutboxRow: vi.fn(async () => undefined),
+    removeOutboxRow: vi.fn(async () => true),
     whenLoaded: vi.fn(async () => true),
     invalidate: vi.fn(async () => undefined),
   };

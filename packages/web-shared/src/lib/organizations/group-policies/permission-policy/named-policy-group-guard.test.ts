@@ -403,7 +403,9 @@ describe('named organization policy group guard', () => {
     );
     expect(after.memberships).toHaveLength(3);
     expect(after.groupLinks).toEqual(before.groupLinks);
-    expect(after.settings[0].policy_revision).toBe(before.settings[0].policy_revision + 3);
+    // The first two writes repeat the stored member set, so only the third one,
+    // which adds the unlinked group to the member, changes policy state.
+    expect(after.settings[0].policy_revision).toBe(before.settings[0].policy_revision + 1);
     expect(after.audits).toHaveLength(3);
     expect(after.audits.map(audit => audit.message).join('\n')).not.toContain('named policies:');
   });
@@ -429,6 +431,7 @@ describe('named organization policy group guard', () => {
         lockHeld.resolve(backend.pid);
         await allowAttachment.promise;
         await tx.insert(organization_group_policy_links).values(link);
+        return { result: undefined, policyStateChanged: true };
       }
     );
     void attachment.catch(lockHeld.reject);

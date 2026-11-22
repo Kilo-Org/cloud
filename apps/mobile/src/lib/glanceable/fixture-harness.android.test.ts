@@ -124,7 +124,9 @@ describe('session card fixtures on Android', () => {
   it('follow every listed row: two sessions, two cards, one each', async () => {
     await applyFixture('session-card-android-pair');
 
-    const posted = mocks.postSessionCard.mock.calls.map(([card]) => card as Record<string, unknown>);
+    const posted = mocks.postSessionCard.mock.calls.map(
+      ([card]) => card as Record<string, unknown>
+    );
     expect(posted).toHaveLength(2);
     expect(posted.map(card => card.sessionId)).toEqual([
       'ses_01JQ8ZK4M2XW3T7YB6NCV0000',

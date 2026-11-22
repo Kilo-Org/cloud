@@ -69,6 +69,11 @@ const FIXTURE_APPROVAL_KEY = 'a'.repeat(64);
  */
 const FIXTURE_PERMISSION_ID = 'perm_fixture';
 
+/** A fixture that follows several rows lists their indices; a single row names one. */
+function isIndexList(index: number | readonly number[]): index is readonly number[] {
+  return Array.isArray(index);
+}
+
 /** The signed-in scope the publisher mount runs under, or null while none. */
 let scope: GlanceablePublisherContext | null = null;
 /** A fixture requested before a scope existed (cold launch, restore in flight). */
@@ -110,7 +115,8 @@ async function applySessionCardFixture(input: {
     return;
   }
   const index = follow.index;
-  if (typeof index !== 'number') {
+  // A listed index follows each row it names; a bare number is the single-row case below.
+  if (isIndexList(index)) {
     // Several followed sessions, one card each: the rows as they stand, with no
     // content push and no finish.
     for (const rowIndex of index) {

@@ -76,4 +76,18 @@ describe('truncateText', () => {
     expect(result).toBe(`${'x'.repeat(200)}\u2026`);
     expect(/^x+\u2026$/.test(result)).toBe(true);
   });
+
+  it('bounds the read when the label has far fewer characters than the cap', () => {
+    // Thirty characters of 1 000 code units each: 30 000 code units in all, so
+    // the value holds far fewer than the 60-character cap. Without the probe
+    // ceiling the read grows to the whole value, comes back with all 30
+    // characters and no ellipsis, and the polyfill on device pays the length
+    // squared; the ceiling stops the read after three whole characters.
+    const cluster = `a${'\u0301'.repeat(999)}`;
+    const value = cluster.repeat(30);
+    const result = truncateText(value, 60);
+    expect(result.endsWith('\u2026')).toBe(true);
+    expect(result.length).toBeLessThanOrEqual(60 * 64 + 1);
+    expect(result).toBe(`${cluster.repeat(3)}\u2026`);
+  });
 });

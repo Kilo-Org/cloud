@@ -40,8 +40,8 @@ export const READ_CODE_CHARACTER_CAP = 50_000;
 
 /**
  * The cap a block actually applies: the caller's when given, the default
- * otherwise. Kept out of `prepareMonoScrollContent` so that function stays a
- * pure slice and callers can still ask for an uncapped string.
+ * otherwise. Kept out of `prepareMonoScrollContent` so callers can still ask for
+ * an uncapped string.
  */
 export function resolveMonoScrollMaxLength(maxLength?: number): number {
   return maxLength ?? DEFAULT_MONO_SCROLL_MAX_LENGTH;

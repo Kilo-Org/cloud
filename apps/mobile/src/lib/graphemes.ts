@@ -8,6 +8,9 @@ import { segmenter } from '@/lib/intl-cache';
  */
 const PROBE_STEP = 256;
 
+/** How many code units the probe allows one user-perceived character before it stops growing. */
+const MAX_CLUSTER_UNITS = 64;
+
 /**
  * The first `count` user-perceived characters of `value`, and whether the value
  * holds more.
@@ -20,14 +23,22 @@ const PROBE_STEP = 256;
  * Hermes has no `Intl.Segmenter`; `@formatjs/intl-segmenter` steps by copying
  * the rest of the string it was given, so segmenting a long command line would
  * cost its length per character. The probe starts short and grows only while it
- * ends before `count` whole characters, so a long value still costs the cap.
+ * ends before `count` whole characters, and it stops at `count *
+ * MAX_CLUSTER_UNITS` code units (never below `PROBE_STEP`). A value holding
+ * fewer characters than `count` therefore never reads more than that many code
+ * units, and comes back as the whole characters before the cut plus the
+ * ellipsis, instead of being read whole in steps whose copies add up to its
+ * length squared.
  *
  * A cluster that touches the probe's edge may be cut by the probe itself, so
  * the segment ending at that edge is not read as a character: it is only whole
- * when the probe reached the end of the value.
+ * when the probe reached the end of the value. One cluster longer than the
+ * ceiling leaves no whole character before the cut, so `text` is empty and
+ * `more` is true: the label is the ellipsis alone.
  */
 export function firstGraphemes(value: string, count: number) {
-  let probe = Math.min(value.length, Math.max(PROBE_STEP, count * 2));
+  const limit = Math.min(value.length, Math.max(PROBE_STEP, count * MAX_CLUSTER_UNITS));
+  let probe = Math.min(limit, Math.max(PROBE_STEP, count * 2));
   for (;;) {
     const truncated = probe < value.length;
     let text = '';
@@ -50,7 +61,10 @@ export function firstGraphemes(value: string, count: number) {
     if (!truncated) {
       return { text, more: false };
     }
-    probe = Math.min(value.length, probe * 4);
+    if (probe === limit) {
+      return { text, more: true };
+    }
+    probe = Math.min(limit, probe * 4);
   }
 }
 

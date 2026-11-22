@@ -91,10 +91,14 @@ const THIRD_TEXT = 'Now I search for the release notes.';
 const FOURTH_TEXT = 'Last I summarise the release checklist.';
 const FIFTH_TEXT = 'Finally I dump the audit log the release checks wrote.';
 
-// Each tool row truncates its label to 60 UTF-16 code units (`truncateText` in
-// tool-card-display.ts), so every label below puts one grapheme cluster exactly
-// across that cut. The ASCII prefix of each label is counted in code units, and
-// each label sits in its own assistant message, so the first four rows show the
+// Each tool row truncates its label to 60 characters: `truncateText` in
+// tool-card-display.ts counts user-perceived characters and ends the cut on a
+// whole cluster. The build before that change cut at 60 UTF-16 code units
+// instead, and this fixture exists to show both. Every label below puts one
+// grapheme cluster exactly across the 60-code-unit boundary, so the two builds
+// differ there: the code-unit cut splits the cluster, the character cut keeps
+// it whole. The ASCII prefix of each label is counted in code units, and each
+// label sits in its own assistant message, so the first four rows show the
 // label cut; the fifth row keeps a short label and puts its cluster across the
 // 20 000-code-unit mono output cap instead.
 //
@@ -146,7 +150,7 @@ function printUsage(): void {
   console.log('');
   console.log('Seeds one read-only session through the local cloudflare-session-ingest');
   console.log('worker whose four completed tool rows each put a grapheme cluster across the');
-  console.log('60-code-unit truncation cut: a ZWJ family emoji, a Devanagari conjunct, a');
+  console.log('60-character label cut (60 code units on the old build): a ZWJ family emoji, a');
   console.log('regional-indicator flag, and a combining acute, plus a fifth row whose mono');
   console.log('output puts the same family emoji across the 20 000-code-unit output cap.');
   console.log('Resets only its own session.');
@@ -388,7 +392,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   await waitForParts(baseUrl, token);
 
   console.log(
-    'This fixture represents: one read-only session whose four completed tool rows put a ZWJ family emoji, a Devanagari conjunct, a regional-indicator flag, and a combining acute across the 60-code-unit label cut.'
+    'This fixture represents: one read-only session whose four completed tool rows put a ZWJ family emoji, a Devanagari conjunct, a regional-indicator flag, and a combining acute across the 60-character label cut (60 UTF-16 code units on the old build).'
   );
   console.log(
     'The fifth row is the 20 000-code-unit mono output cap (DEFAULT_MONO_SCROLL_MAX_LENGTH in apps/mobile/src/components/agents/mono-scroll-block-model.ts): its bash output is 19 999 x, the same family emoji at code units 19 999-20 006, and a 4 200-character audit tail.'

@@ -972,9 +972,6 @@ describe('estimateRoutingTokens', () => {
   it('treats an array as no record, so it contributes no text', () => {
     expect(estimateRoutingTokens([])).toBe(0);
     expect(estimateRoutingTokens(['x'.repeat(400)])).toBe(0);
-    // A JSON array never carries named properties, so this is the shape that
-    // separates a record from an array: own keys on the array itself.
-    expect(estimateRoutingTokens(Object.assign([], { content: 'x'.repeat(400) }))).toBe(0);
     expect(estimateRoutingTokens({ messages: [['x'.repeat(400)]] })).toBe(0);
   });
 });

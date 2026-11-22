@@ -1,5 +1,6 @@
 import {
   agent_environment_profile_agents,
+  agent_environment_profile_instructions,
   agent_environment_profiles,
   kilocode_users,
   organization_memberships,
@@ -20,6 +21,7 @@ const MEMBER_ORGANIZATION_NAME = 'Permission lab member';
 const OWNER_AGENTS_PROFILE_NAME = 'Owner agents';
 const MEMBER_AGENTS_PROFILE_NAME = 'Member agents';
 const MEMBER_EMPTY_PROFILE_NAME = 'Member empty';
+const MEMBER_INSTRUCTIONS_PROFILE_NAME = 'Member instructions';
 /**
  * Stable, so the deep links a previous run printed keep opening the same
  * screens against the rows this run replaces.
@@ -29,6 +31,7 @@ const MEMBER_ORGANIZATION_ID = '1b7e4c20-6a3d-4f81-9c05-d2e3f4a5b602';
 const OWNER_AGENTS_PROFILE_ID = '1b7e4c20-6a3d-4f81-9c05-d2e3f4a5b603';
 const MEMBER_AGENTS_PROFILE_ID = '1b7e4c20-6a3d-4f81-9c05-d2e3f4a5b604';
 const MEMBER_EMPTY_PROFILE_ID = '1b7e4c20-6a3d-4f81-9c05-d2e3f4a5b605';
+const MEMBER_INSTRUCTIONS_PROFILE_ID = '1b7e4c20-6a3d-4f81-9c05-d2e3f4a5b606';
 
 /**
  * The three label variants the profile Agents list renders: a short name with a
@@ -71,14 +74,18 @@ function printUsage(): void {
   console.log('Seeds a local-only fake account that owns one organization and is a plain');
   console.log('member of another. The owned organization has one profile with three agents');
   console.log('covering the Agents list label variants; the member organization has one');
-  console.log('profile with two agents and one profile with no agents. The member cannot');
-  console.log('manage either profile, so the mobile profile screens render them read-only.');
-  console.log('Re-running replaces the profiles and their agents, so reruns are idempotent.');
+  console.log('profile with two agents, one profile with no agents, and one profile with two');
+  console.log('rules files, one of them a full-length file name. The member cannot manage any');
+  console.log('of them, so the mobile profile screens render them read-only.');
+  console.log('Re-running replaces the profiles and their rows, so reruns are idempotent.');
   console.log('Requires a localhost database and SKIP_STRIPE_API=true.');
   console.log('');
   console.log('The deep links it prints open the screens in a signed-in mobile dev client:');
   console.log(
     '  kiloapp:///(app)/(tabs)/(3_profile)/profiles/<profileId>/agents?organizationId=<orgId>'
+  );
+  console.log(
+    '  kiloapp:///(app)/(tabs)/(3_profile)/profiles/<profileId>/instructions?organizationId=<orgId>'
   );
   console.log('  kiloapp:///(app)/(tabs)/(3_profile)/profiles/<profileId>?organizationId=<orgId>');
 }
@@ -199,12 +206,13 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       });
   }
 
-  // Replace each profile wholesale; its agents cascade with the profile row, so
-  // a rerun cannot leave an agent from an earlier run behind.
+  // Replace each profile wholesale; its agents and rules files cascade with the
+  // profile row, so a rerun cannot leave a row from an earlier run behind.
   for (const profileId of [
     OWNER_AGENTS_PROFILE_ID,
     MEMBER_AGENTS_PROFILE_ID,
     MEMBER_EMPTY_PROFILE_ID,
+    MEMBER_INSTRUCTIONS_PROFILE_ID,
   ]) {
     await db.delete(agent_environment_profiles).where(eq(agent_environment_profiles.id, profileId));
   }
@@ -231,6 +239,15 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       name: MEMBER_EMPTY_PROFILE_NAME,
       description: 'A profile with no agents, so the member sees an empty list it cannot change.',
     },
+    {
+      id: MEMBER_INSTRUCTIONS_PROFILE_ID,
+      owned_by_organization_id: MEMBER_ORGANIZATION_ID,
+      // Another organization admin created this one, so the member is not its
+      // author either.
+      created_by_user_id: null,
+      name: MEMBER_INSTRUCTIONS_PROFILE_NAME,
+      description: 'Rules files the plain member reads on the profile Instructions screen.',
+    },
   ]);
 
   await db.insert(agent_environment_profile_agents).values(
@@ -250,21 +267,53 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     }))
   );
 
+  await db.insert(agent_environment_profile_instructions).values([
+    {
+      profile_id: MEMBER_INSTRUCTIONS_PROFILE_ID,
+      name: 'team-release-checklist',
+      content: [
+        '# Team release checklist',
+        '',
+        '- Run the checks the change names before the release branch.',
+        '- List the commits the release carries.',
+        '',
+      ].join('\n'),
+      enabled: true,
+    },
+    {
+      // Exactly the server's `MAX_IMPORT_INSTRUCTION_NAME_LENGTH` and the mobile
+      // form's `INSTRUCTION_NAME_MAX_LENGTH`, so a read-only row wraps in full.
+      profile_id: MEMBER_INSTRUCTIONS_PROFILE_ID,
+      name: 'release-checklist-for-the-hindi-and-urdu-partner-team-handoff-before-every-partner-session-check-now',
+      content: [
+        '# Partner session release checklist',
+        '',
+        '- Confirm the Hindi and Urdu partner handoff notes are current.',
+        '- Run the partner session check before every session.',
+        '',
+      ].join('\n'),
+      enabled: true,
+    },
+  ] satisfies (typeof agent_environment_profile_instructions.$inferInsert)[]);
+
   const ownerAgentsDeepLink = `kiloapp:///(app)/(tabs)/(3_profile)/profiles/${OWNER_AGENTS_PROFILE_ID}/agents?organizationId=${OWNER_ORGANIZATION_ID}`;
   const memberAgentsDeepLink = `kiloapp:///(app)/(tabs)/(3_profile)/profiles/${MEMBER_AGENTS_PROFILE_ID}/agents?organizationId=${MEMBER_ORGANIZATION_ID}`;
   const memberEmptyAgentsDeepLink = `kiloapp:///(app)/(tabs)/(3_profile)/profiles/${MEMBER_EMPTY_PROFILE_ID}/agents?organizationId=${MEMBER_ORGANIZATION_ID}`;
   const memberEmptyOverviewDeepLink = `kiloapp:///(app)/(tabs)/(3_profile)/profiles/${MEMBER_EMPTY_PROFILE_ID}?organizationId=${MEMBER_ORGANIZATION_ID}`;
+  const memberInstructionsDeepLink = `kiloapp:///(app)/(tabs)/(3_profile)/profiles/${MEMBER_INSTRUCTIONS_PROFILE_ID}/instructions?organizationId=${MEMBER_ORGANIZATION_ID}`;
 
   console.log(
     'This fixture represents: an owner who manages a profile with three agents, and a plain'
   );
   console.log(
-    'member who reads two profiles it cannot manage, one with two agents and one with none.'
+    'member who reads three profiles it cannot manage: one with two agents, one with none,'
   );
+  console.log('and one with two rules files, one of them a full-length file name.');
   console.log(`Deep link: ${ownerAgentsDeepLink}`);
   console.log(`Deep link: ${memberAgentsDeepLink}`);
   console.log(`Deep link: ${memberEmptyAgentsDeepLink}`);
   console.log(`Deep link: ${memberEmptyOverviewDeepLink}`);
+  console.log(`Deep link: ${memberInstructionsDeepLink}`);
 
   return {
     userId,
@@ -274,9 +323,11 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     ownerAgentsProfileId: OWNER_AGENTS_PROFILE_ID,
     memberAgentsProfileId: MEMBER_AGENTS_PROFILE_ID,
     memberEmptyProfileId: MEMBER_EMPTY_PROFILE_ID,
+    memberInstructionsProfileId: MEMBER_INSTRUCTIONS_PROFILE_ID,
     ownerAgentsDeepLink,
     memberAgentsDeepLink,
     memberEmptyAgentsDeepLink,
     memberEmptyOverviewDeepLink,
+    memberInstructionsDeepLink,
   };
 }

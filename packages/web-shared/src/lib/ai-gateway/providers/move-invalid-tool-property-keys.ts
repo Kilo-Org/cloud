@@ -1,6 +1,7 @@
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { clearRewrittenToolSchemaStrict } from '@kilocode/web-shared/lib/ai-gateway/providers/tool-schema-walk';
 
 // Anthropic checks only the root `properties` of a tool schema against this pattern.
 const VALID_PROPERTY_KEY = /^[a-zA-Z0-9_.-]{1,64}$/;
@@ -50,27 +51,7 @@ export function moveInvalidToolPropertyKeys(request: GatewayRequest): void {
     return true;
   };
 
-  switch (request.kind) {
-    case 'chat_completions':
-      for (const tool of request.body.tools ?? []) {
-        if (tool.type !== 'function') continue;
-        const { name, parameters, strict } = tool.function;
-        if (move(name, parameters, strict) && strict) delete tool.function.strict;
-      }
-      break;
-    case 'responses':
-      for (const tool of request.body.tools ?? []) {
-        if (tool.type !== 'function') continue;
-        if (move(tool.name, tool.parameters, tool.strict) && tool.strict) tool.strict = false;
-      }
-      break;
-    case 'messages':
-      for (const tool of request.body.tools ?? []) {
-        if (!('input_schema' in tool)) continue;
-        if (move(tool.name, tool.input_schema, tool.strict) && tool.strict) delete tool.strict;
-      }
-      break;
-  }
+  clearRewrittenToolSchemaStrict(request, move);
 
   if (changedTools.length > 0) {
     warnExceptInTest(

@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Nový nález zabezpečení ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Kritické",
+      "high": "Vysoké",
+      "medium": "Střední",
+      "low": "Nízké"
+    },
     "securityFindingSlaWarning": {
       "title": "Varování o SLA"
     },

@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "نوې امنیتي موندنه ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "خورا جدي",
+      "high": "لوړ",
+      "medium": "منځنی",
+      "low": "ټیټ"
+    },
     "securityFindingSlaWarning": {
       "title": "د SLA خبرداری"
     },

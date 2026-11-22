@@ -15,13 +15,13 @@ import {
   normalizeShareIntent,
   peekSharePayload,
   persistPendingShareIdDraft,
-  persistSharePayloadsNow,
   putSharePayload,
   restoreSharePayloads,
   type ShareId,
   type SharePayload,
+  subscribeAccountStagedShareClear,
 } from '@/lib/share-payload';
-import { persistShareNavigationNow, restoreShareNavigation } from '@/lib/share-navigation';
+import { restoreShareNavigation } from '@/lib/share-navigation';
 
 /**
  * Owns the pending-share slot: the in-memory id the share gate opens on, and
@@ -64,24 +64,32 @@ export function usePendingShareIntake(input: {
   // detect any live arm/consume during its async reads and skip the fill.
   const pendingShareIdEpochRef = useRef(0);
 
-  // Flush a share staged while the account id was still loading: the ingest
-  // effect persisted nothing (userId was falsy), so once userId resolves the
-  // staged payload map, navigation queue, and pending id are written to durable
-  // drafts. A signed-out share never reaches this branch (userId stays null),
-  // so it remains in-memory only. Declared after `pendingShareIdRef` so the
-  // closure references an already-declared const.
-  useEffect(() => {
-    if (userId && pendingShareIdRef.current !== null) {
-      void persistSharePayloadsNow();
-      void persistShareNavigationNow();
-      void persistPendingShareIdDraft(userId, pendingShareIdRef.current);
-    }
-  }, [userId]);
+  // Staged share deliveries belong to the account that staged them. The shared
+  // account boundary drops them and names the dropped ids, so this
+  // subscription resets the pending slot only when that slot names one of
+  // them: the slot then always describes a staged share that exists, and a
+  // share staged before an account resolves keeps its slot for a same-process
+  // sign-in (DEC-01). The epoch bump also abandons a cold-start restore that is
+  // in flight.
+  useEffect(
+    () =>
+      subscribeAccountStagedShareClear(droppedIds => {
+        const pendingId = pendingShareIdRef.current;
+        if (pendingId === null || !droppedIds.includes(pendingId)) {
+          return;
+        }
+        pendingShareIdEpochRef.current += 1;
+        setPendingShareId(null);
+      }),
+    []
+  );
 
-  // Cold-start share restore. Order matters: payloads first, then the
-  // navigation queue (deliveries point at restored payloads), then the pending
-  // id — and only when its payload still exists. A restored id with an empty
-  // map is the existing stale-share empty path, so it must not re-arm the gate.
+  // Cold-start share restore. The pending-share hint is read first: it is the
+  // only thing that re-opens the gate after process death, so both restores
+  // select the entry it names before anything else. Payloads still restore
+  // before the navigation queue, because deliveries point at restored payloads.
+  // The gate arms only when the hinted payload still exists; a restored id with
+  // an empty map is the existing stale-share empty path.
   useEffect(() => {
     let cancelled = false;
 
@@ -90,18 +98,19 @@ export function usePendingShareIntake(input: {
       if (!userId) {
         return;
       }
-      await restoreSharePayloads(userId);
-      if (cancelled || pendingShareIdEpochRef.current !== startEpoch) {
-        return;
-      }
-      await restoreShareNavigation(userId);
+      const pendingId = await loadPendingShareIdDraft(userId);
       // `cancelled` is set by the cleanup below; the previous check narrows the
       // fall-through path, but the variable is genuinely mutable.
       // oxlint-disable-next-line typescript-eslint/no-unnecessary-condition
       if (cancelled || pendingShareIdEpochRef.current !== startEpoch) {
         return;
       }
-      const pendingId = await loadPendingShareIdDraft(userId);
+      await restoreSharePayloads(userId, pendingId);
+      // oxlint-disable-next-line typescript-eslint/no-unnecessary-condition
+      if (cancelled || pendingShareIdEpochRef.current !== startEpoch) {
+        return;
+      }
+      await restoreShareNavigation(userId, pendingId);
       // oxlint-disable-next-line typescript-eslint/no-unnecessary-condition
       if (cancelled || pendingShareIdEpochRef.current !== startEpoch) {
         return;

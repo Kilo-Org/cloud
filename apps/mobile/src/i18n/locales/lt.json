@@ -311,6 +311,7 @@
     "hideBalance": "Slėpti likutį",
     "showBalance": "Rodyti likutį",
     "balanceHidden": "Likutis paslėptas",
+    "availableToSpendInOrganization": "Galima išleisti šioje organizacijoje",
     "signOutTitle": "Atsijungti?",
     "signOutMessage": "Kad galėtum pasiekti savo darbo sritį, turėsi prisijungti iš naujo.",
     "deleteAccountTitle": "Ištrinti paskyrą?",
@@ -452,6 +453,17 @@
       "location": "Vertex vieta",
       "clientEmail": "Paslaugos paskyros el. paštas",
       "privateKey": "Paslaugos paskyros privatusis raktas",
+      "privateKeyBlockRequired": "Įklijuokite visą rakto bloką nuo BEGIN eilutės iki END eilutės.",
+      "privateKeyEncrypted": "Šis rakto blokas apsaugotas slaptafraze. Įklijuokite paslaugos paskyros raktą be slaptafrazės.",
+      "names": {
+        "codestral": "Tik pasenęs Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Prisijungti per ChatGPT)",
+        "xiaomi": "Xiaomi (mokama pagal naudojimą)",
+        "zai": "Z.ai (mokama pagal naudojimą)",
+        "bedrockByok": "Amazon Bedrock (tiesiogiai)",
+        "vertexByok": "Google Vertex AI (tiesiogiai)"
+      },
       "modelMappings": "Modelių susiejimai",
       "modelMappingsDescription": "Nukreipkite šliuzo modelį į pasirinktinį diegimo pavadinimą.",
       "mappingTitle": "Susiejimas {{number}}",
@@ -512,12 +524,13 @@
       "receiptLabel": "Patvirtinimas",
       "copyReceiptId": "Kopijuoti patvirtinimo ID",
       "appealLabel": "Apskundimas",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Gautas",
       "triageOpen": "Peržiūrimas",
       "triageActioned": "Pagrįstas",
       "triageRejected": "Nepagrįstas",
       "appealNone": "Nepateiktas",
-      "appealSubmitted": "Peržiūrimas",
+      "appealSubmitted": "Apskundimas peržiūrimas",
       "appealAccepted": "Priimtas",
       "appealRejected": "Atmestas",
       "appeal": "Apskųsti šį sprendimą",
@@ -529,13 +542,23 @@
       "nextStepInReview": "Rezultatas pasirodys šiame ekrane, o priėmus sprendimą galėsite pateikti apskundimą.",
       "nextStepAppeal": "Apskundimo rezultatas pasirodys šiame ekrane.",
       "nextStepFinal": "Sprendimas dėl apskundimo yra galutinis. Kito apskundimo pateikti negalima.",
-      "viewReceipt": "Peržiūrėti patvirtinimą"
+      "viewReceipt": "Peržiūrėti patvirtinimą",
+      "targetLabel": "Pranešimo objektas",
+      "reasonLabel": "Pranešimo priežastis",
+      "targetMessage": "DI atsakymas",
+      "targetComment": "Pakeitimų užklausos komentaras",
+      "targetUser": "Naudotojas",
+      "reasonHarmful": "Kenksmingas turinys",
+      "reasonIllegal": "Neteisėtas turinys",
+      "reasonHarassment": "Priekabiavimas",
+      "reasonSpam": "Nepageidaujama reklama",
+      "reasonOther": "Kita priežastis"
     },
     "reportReceipts": {
       "title": "Pranešimai",
       "rowSubtitle": "Jūsų pateikti pranešimai ir jų rezultatai",
       "emptyTitle": "Kol kas pranešimų nėra",
-      "emptyDescription": "Pranešimai, kuriuos pateikiate iš komentaro arba AI atsakymo, rodomi čia.",
+      "emptyDescription": "Pranešimai, kuriuos pateikiate iš komentaro PR diskusijoje arba iš DI atsakymo agento sesijoje, rodomi čia kartu su savo rezultatu.",
       "couldNotLoad": "Nepavyko įkelti jūsų pranešimų",
       "capped": "Rodomi naujausi jūsų pranešimai."
     },
@@ -545,8 +568,11 @@
     "changelogFixesIn": "Pataisymai ir patobulinimai šiose srityse: {{areas}}.",
     "changelogFixesPolish": "Pataisymai ir patobulinimai visoje programėlėje.",
     "changelogAreas": {
-      "signIn": "Prisijungimas",
-      "profileOrganizations": "Profilis bei organizacijos"
+      "signIn": "prisijungimas",
+      "profileOrganizations": "profilis bei organizacijos",
+      "chat": "pokalbis",
+      "notifications": "pranešimai",
+      "integrations": "integracijos"
     }
   },
   "preferences": {
@@ -1023,8 +1049,9 @@
       "checkActiveConnection": "Ryšys aktyvus, bet šio elemento vis tiek nepavyksta įkelti.",
       "bitbucketOrgOnlyDescription": "Perjunk aukščiau esančią paskyrą į organizaciją, kad galėtum peržiūrėti jos Bitbucket pakeitimų užklausas.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Ši paskyra dar neturi jokių organizacijų. Sukūręs arba prisijungęs prie organizacijos galėsi peržiūrėti Bitbucket pakeitimų užklausas.",
-      "gitlabReconnectAdminOnlyDescription": "Paprašyk organizacijos savininko, administratoriaus ar atsiskaitymų administratoriaus jį prijungti iš naujo.",
+      "reconnectAdminOnlyDescription": "Paprašyk organizacijos savininko, administratoriaus ar atsiskaitymų administratoriaus jį prijungti iš naujo.",
       "bitbucketNotConnectedTitle": "Bitbucket neprijungtas",
+      "bitbucketAdminOnlyDescription": "Paprašykite organizacijos savininko, administratoriaus ar atsiskaitymų administratoriaus jį prijungti.",
       "adminOnlyConnectDescription": "Jį prijungti gali tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai.",
       "contextLine": "Skirta {{organization}}",
       "contextLinePersonal": "Skirta asmeninei paskyrai"
@@ -1253,6 +1280,10 @@
       "emptyTitle": "Kol kas pranešimų nėra",
       "emptyCategoryTitle": "Šioje kategorijoje pranešimų nėra",
       "emptyBody": "Pranešimai, kuriuos gauna ši paskyra, rodomi čia. Jie saugomi {{days}} dienų.",
+      "emptyBody_one": "Pranešimai, kuriuos gauna ši paskyra, rodomi čia. Jie saugomi {{days}} dienų.",
+      "emptyBody_few": "Pranešimai, kuriuos gauna ši paskyra, rodomi čia. Jie saugomi {{days}} dienų.",
+      "emptyBody_many": "Pranešimai, kuriuos gauna ši paskyra, rodomi čia. Jie saugomi {{days}} dienų.",
+      "emptyBody_other": "Pranešimai, kuriuos gauna ši paskyra, rodomi čia. Jie saugomi {{days}} dienų.",
       "capped": "Rodomi naujausi pranešimai.",
       "loadError": "Nepavyko įkelti pranešimų istorijos.",
       "openFailed": "Šio pranešimo nebegalima atidaryti niekur."
@@ -1333,6 +1364,7 @@
       "manageAccess": "Tvarkyti prieigą",
       "bitbucketNoRepositoriesDescription": "Šioje Bitbucket darbo srityje nėra pasiekiamų saugyklų.",
       "gitlabNoRepositoriesDescription": "Gali reikėti suteikti prieigą prie daugiau GitLab grupių ar projektų.",
+      "githubNoRepositoriesDescription": "Patikrinkite, ar „Kilo GitHub App“ turi prieigą prie GitHub saugyklų, tada atnaujinkite sąrašą.",
       "installGithubApp": "Įdiek GitHub programėlę saugyklose",
       "installGithubAppDescription": "Suteik Kilo GitHub programėlei prieigą prie saugyklų, kurių kodą nori peržiūrėti.",
       "repositoryAccess": "prieiga prie saugyklų",
@@ -1366,7 +1398,7 @@
       "findingsInProgress": "Ši peržiūra vis dar vyksta. Radiniai čia atsiras jai pasibaigus.",
       "findingsEndedWithoutResults": "Ši peržiūra baigėsi, nespėjusi pateikti jokių radinių.",
       "serviceUnavailable": "Nepavyko prisijungti prie kodo peržiūros paslaugos. Pakartokite peržiūrą, kai paslauga bus pasiekiama.",
-      "reviewFailed": "Peržiūra nepavyko. Bandyk dar kartą.",
+      "reviewFailed": "Peržiūra nepavyko.",
       "showMore": "Rodyti daugiau",
       "created": "Sukurta",
       "started": "Pradėta",
@@ -1488,6 +1520,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} Bitbucket ryšys valdomas žiniatinklyje naudojant kompiuterį.",
+      "deniedManagedByOwner": "Paprašykite {{organization}} savininko pakeisti jungtį, kurios negalite pakeisti.",
+      "deniedConnectRole": "Jį prijungti gali tik {{organization}} savininkai, administratoriai ir atsiskaitymų administratoriai.",
+      "deniedReconnectRole": "Paprašyk {{organization}} savininko, administratoriaus ar atsiskaitymų administratoriaus jį prijungti iš naujo.",
       "managedOnWebTitle": "Valdoma žiniatinklyje",
       "managedOnWebShort": "Šis ryšys valdomas žiniatinklyje naudojant kompiuterį.",
       "managedOnWebRepositories": "Pasirinkite {{organization}} saugyklas žiniatinklyje naudodami kompiuterį.",
@@ -1629,7 +1664,9 @@
       "unavailablePersonallySwitchAction": "Perjungti organizaciją",
       "unavailableOrganizationTitle": "Tarybos peržiūra neprieinama",
       "unavailableForOrganization": "Tarybos peržiūrai reikia Enterprise plano su aktyviu prenumerata ar bandomuoju laikotarpiu. Ši organizacija jo šiuo metu neturi.",
-      "unavailableForOrganizationNeutral": "Tarybos peržiūra šiai organizacijai šiuo metu neprieinama. Bandykite dar kartą vėliau.",
+      "unavailablePlanCheck": "Tarybos peržiūra negalėjo patikrinti šios organizacijos plano. Bandykite dar kartą, kad patikrinimas būtų atliktas iš naujo.",
+      "unavailableFlagRollout": "Tarybos peržiūra šiai organizacijai dar neprieinama. Atnaujinkite programėlę į naujausią versiją, kad ją gautumėte.",
+      "unavailableForOrganizationMember": "Tarybos peržiūrai reikia Enterprise plano su aktyvia prenumerata arba bandomuoju laikotarpiu. Organizacijos savininkas gali pakeisti planą.",
       "unavailableOnBitbucket": "Tarybos peržiūra nepasiekiama Bitbucket saugykloms.",
       "noRepositories": "Dar nepasirinkta nė viena saugykla. Pirmiausia pasirink saugyklas saugyklų nustatymuose.",
       "specialists": "Specialistai",
@@ -2650,8 +2687,7 @@
       "searchPlaceholder": "Ieškoti saugyklų",
       "noMatches": "Atitikčių nėra",
       "noRepositories": "Nėra prieinamų saugyklų",
-      "noRepositoriesDescription": "Prie jūsų paskyros neprijungta jokių saugyklų.",
-      "loading": "Įkeliama…",
+      "noRepositoriesDescription": "Kad įkeltum saugyklas, prijunk GitHub arba GitLab.",
       "accessibility": "Saugykla: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3181,6 +3217,12 @@
     "retryLoadingAccount": "Bandyti įkelti paskyrą dar kartą",
     "retryLoadingPrivacy": "Bandyti įkelti privatumo parinktis dar kartą"
   },
+  "accountBlocked": {
+    "title": "Paskyra užblokuota",
+    "description": "Kilo užblokavo šią paskyrą, ir pakartotinis prisijungimas blokavimo nepanaikins. Pagalbos tarnyba gali patikrinti blokavimą gavusi prašymą.",
+    "domainDescription": "Kilo neleidžia paskyrų šiame el. pašto domene, ir pakartotinis prisijungimas blokavimo nepanaikins. Pagalbos tarnyba gali patikrinti domeną gavusi prašymą.",
+    "contactSupport": "Kreiptis į pagalbos tarnybą"
+  },
   "addCredits": {
     "cta": "Papildyti kreditus",
     "billingPage": "atsiskaitymų puslapis"
@@ -3564,7 +3606,7 @@
       "manageOnWeb": "Atsiskaitymo nustatymai žiniatinklyje",
       "changePlan": "Keisti planą",
       "buySeats": "Pirkti vietų",
-      "managedOnWeb": "Planas, vietos ir automatinis papildymas valdomi žiniatinklyje.",
+      "managedOnWeb": "Planas, vietos ir automatinis papildymas valdomi adresu kilo.ai.",
       "setupAutoTopUp": "Nustatyti automatinį papildymą",
       "manageAutoTopUp": "Tvarkyti automatinį papildymą",
       "opensOnWeb": "Atidaroma žiniatinklyje"
@@ -3750,10 +3792,10 @@
       "nameLabel": "Režimo pavadinimas",
       "nameRequired": "Įveskite režimo pavadinimą.",
       "notFound": "Šio režimo nebėra.",
-      "restrictionHint": "Redaguoti galima tik failus, atitinkančius šį šabloną. Palikite jį tuščią, kad būtų leidžiami visi failai.",
-      "restrictionInvalid": "Įveskite tinkamą šabloną.",
+      "restrictionHint": "Reguliarusis reiškinys parenka failus, kuriuos šis režimas gali redaguoti, pavyzdžiui, `\\.md$` – tik markdown failams. Palikite jį tuščią, kad būtų leidžiami visi failai.",
+      "restrictionInvalid": "Įveskite tinkamą reguliarųjį reiškinį.",
       "restrictionLabel": "Apribojimo žymė",
-      "restrictionPattern": "Failo šablonas",
+      "restrictionPattern": "Failų apribojimas",
       "roleLabel": "Vaidmens aprašymas",
       "roleRequired": "Aprašykite, ką daro šis režimas.",
       "tool": {
@@ -3841,7 +3883,7 @@
     "emailDeliveryFailed": "Šiuo metu el. laiškų pristatyti negalima. Bandyk dar kartą vėliau.",
     "admissionRequired": "Nepavyksta patikrinti tavo įrenginio. Pasirink „$t(login.moreSignInOptions)“, kad prisijungtum kitame įrenginyje arba svetainėje.",
     "default": "Įvyko klaida. Bandyk dar kartą.",
-    "retryableAdmission": "Nepavyko patikrinti šio įrenginio. Patikrink ryšį ir bandyk dar kartą.",
+    "retryableAdmission": "Nepavyko patikrinti šio įrenginio. Bandyk dar kartą.",
     "startSignInFailed": "Nepavyko pradėti prisijungimo. Bandyk dar kartą.",
     "couldNotOpenBrowser": "Nepavyko atidaryti naršyklės. Bandyk dar kartą.",
     "signInTimedOut": "Prisijungimui skirtas laikas baigėsi. Bandyk dar kartą.",
@@ -4204,7 +4246,8 @@
         "space": "Šiam modeliui nepakanka laisvos vietos. Atlaisvinkite vietos ir bandykite dar kartą.",
         "network": "Atsisiuntimas nebaigtas. Patikrinkite ryšį ir bandykite dar kartą.",
         "invalidFile": "Atsisiųstas failas nėra modelis, kurį ši programa gali paleisti, todėl jis buvo pašalintas.",
-        "checksum": "Atsisiųstas failas neatitinka paskelbtos kontrolinės sumos, todėl jis buvo pašalintas. Pabandykite atsisiųsti dar kartą."
+        "checksum": "Atsisiųstas failas neatitinka paskelbtos kontrolinės sumos, todėl jis buvo pašalintas. Pabandykite atsisiųsti dar kartą.",
+        "writeFailed": "Šis įrenginys negalėjo išsaugoti modelio. Pabandykite atsisiųsti dar kartą."
       }
     },
     "catalog": {
@@ -4543,6 +4586,7 @@
       "promptPlaceholder": "Tu esi…",
       "tools": "Įrankiai",
       "wholeToolRule": "Šis agentas vienu metu taiko vieną taisyklę visiems įrankiams: {{rule}}. Šie jungikliai yra tik skaitomi.",
+      "toolRule": "Išsaugota taisyklė: {{rule}}",
       "visibility": "Matomumas",
       "visibilityPrimary": "Pagrindinis — rodomas rinkiklyje",
       "visibilitySubagent": "Subagentas — kviečiamas tik iš kitų",
@@ -4652,20 +4696,34 @@
       "deductionFallback": "Kreditų nurašymas",
       "emptyDescription": "Čia bus rodomi kreditų pirkimai, kvitai ir naudojimas.",
       "emptyTitle": "Kreditų istorijos nėra",
+      "expiredGrant": "Galiojimas baigėsi: {{description}}",
       "googlePlayReceipt": "Kvitas iš Google Play",
       "kind": {
         "adjustment": "Koregavimas",
         "balanceNeutral": "Balanso nekeičia",
         "deduction": "Nurašymas",
         "grant": "Kreditų suteikimas",
+        "promotionalCredits": "Promociniai kreditai",
         "welcomeCredits": "Sveikinimo kreditai",
         "purchase": "Pirkimas"
+      },
+      "program": {
+        "adminBulkGrant": "Administratoriaus suteikti kreditai",
+        "contributorChampion": "Prisidėjusiųjų čempiono kreditai",
+        "feedback": "Atsiliepimų kreditai",
+        "influencer": "Nuomonės formuotojo kreditai",
+        "ossMonthlyReset": "Atvirojo kodo kreditų atkūrimas kas mėnesį",
+        "ossSponsorship": "Atvirojo kodo rėmimo kreditai",
+        "pullRequest": "Pakeitimų užklausos kreditai",
+        "usageIssue": "Naudojimo problemos kreditai",
+        "vibeDay": "Vibe Day kreditai"
       },
       "purchaseFallback": "Kreditų pirkimas",
       "receipt": "Kvitas",
       "receiptA11y": "Atidaryti kvitą: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Šiam pirkimui kvito nėra.",
-      "retentionLimit": "Rodoma naujausia kreditų istorija."
+      "retentionLimit": "Rodoma naujausia kreditų istorija.",
+      "voidedGrant": "Anuliuota: {{description}}"
     },
     "title": "Pirkti kreditus",
     "description": "Kreditai yra vienkartinis pirkinys, pridedamas prie jūsų Kilo balanso AI kodavimo sesijoms Kilo programoje vykdyti. Parduotuvė nuskaito lėšas iš jūsų paskyros, o kreditai pridedami po to, kai parduotuvė patvirtina mokėjimą.",
@@ -5017,6 +5075,9 @@
       "runAsCreator": "Paleisti kaip mane",
       "runAsCreatorDescription": "Kiekvienas paleidimas naudoja jūsų paskyrą, todėl slaptoji antraštė yra privaloma.",
       "saveFailedTitle": "Nepavyko išsaugoti trigerio",
+      "nameTaken": "Trigeris pavadinimu „{{name}}“ jau yra.",
+      "saveFailedRetry": "Nepavyko pasiekti serverio. Patikrinkite ryšį ir bandykite dar kartą.",
+      "saveFailedCheck": "Patikrinkite formos reikšmes ir bandykite dar kartą.",
       "deleteTitle": "Ištrinti šį trigerį?",
       "deleteMessage": "Iškvietimai į {{name}} bus nesėkmingi. To atšaukti negalima.",
       "deleteMessageScheduled": "Suplanuoti trigerio {{name}} paleidimai sustos. To atšaukti negalima.",
@@ -5261,6 +5322,20 @@
       "eu": "Europos Sąjunga",
       "au": "Australija",
       "jp": "Japonija"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Nuostatų paieška",
+    "noMatches": "Atitinkančių nuostatų nerasta",
+    "emptyDescription": "Pabandykite kitą nuostatos pavadinimą arba raktažodį.",
+    "resultsStatus": "Rasta nuostatų: {{resultCount}}",
+    "keywords": {
+      "signOut": "atsijungti|atsijungimas",
+      "appearance": "tema|spalvų schema",
+      "appUnlock": "biometriniai duomenys|veido atpažinimas|piršto atspaudas",
+      "language": "kalba|vertimas",
+      "notifications": "įspėjimai|tiesioginiai pranešimai",
+      "privacy": "analitika|sekimas"
     }
   }
 }

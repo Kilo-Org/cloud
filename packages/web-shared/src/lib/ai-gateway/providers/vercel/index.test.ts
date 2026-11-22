@@ -8,8 +8,9 @@ import {
   applyVercelSettings,
   convertProviderOptions,
   getAnthropicProviderOptionsForVercel,
+  getVercelInferenceProviderConfigForUserByok,
   getVercelInferenceProvidersExcludingIgnored,
-  hasCompatibleVercelInferenceProvider,
+  hasVercelInferenceProviderFor,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import type {
   GatewayRequest,
@@ -78,35 +79,69 @@ describe('getAnthropicProviderOptionsForVercel', () => {
   });
 });
 
-describe('hasCompatibleVercelInferenceProvider', () => {
+describe('hasVercelInferenceProviderFor', () => {
   it('accepts when a translated OpenRouter provider is available on Vercel', () => {
-    expect(hasCompatibleVercelInferenceProvider(['amazon-bedrock'], ['anthropic', 'bedrock'])).toBe(
-      true
-    );
+    expect(hasVercelInferenceProviderFor(['amazon-bedrock'], ['anthropic', 'bedrock'])).toBe(true);
   });
 
   it('accepts Google Vertex preferences for Vertex Anthropic endpoint metadata', () => {
-    expect(hasCompatibleVercelInferenceProvider(['google-vertex'], ['vertexAnthropic'])).toBe(true);
+    expect(hasVercelInferenceProviderFor(['google-vertex'], ['vertexAnthropic'])).toBe(true);
   });
 
   it('accepts providers outside the known provider registry', () => {
-    expect(hasCompatibleVercelInferenceProvider(['future-provider'], ['future-provider'])).toBe(
-      true
-    );
+    expect(hasVercelInferenceProviderFor(['future-provider'], ['future-provider'])).toBe(true);
   });
 
   it('rejects when none of the requested providers are available on Vercel', () => {
-    expect(hasCompatibleVercelInferenceProvider(['google-vertex'], ['anthropic', 'bedrock'])).toBe(
-      false
-    );
+    expect(hasVercelInferenceProviderFor(['google-vertex'], ['anthropic', 'bedrock'])).toBe(false);
   });
 
   it('rejects an empty only list when provider data is available', () => {
-    expect(hasCompatibleVercelInferenceProvider([], ['anthropic'])).toBe(false);
+    expect(hasVercelInferenceProviderFor([], ['anthropic'])).toBe(false);
   });
 
-  it('accepts when the model has no cached provider entry', () => {
-    expect(hasCompatibleVercelInferenceProvider(['google-vertex'], null)).toBe(true);
+  it('returns undefined when the model has no cached provider entry', () => {
+    expect(hasVercelInferenceProviderFor(['google-vertex'], null)).toBeUndefined();
+  });
+});
+
+describe('getVercelInferenceProviderConfigForUserByok', () => {
+  it('sends a zai key to the Coding Plan endpoint first and the plain credential second', () => {
+    expect(
+      getVercelInferenceProviderConfigForUserByok({ providerId: 'zai', decryptedAPIKey: 'k' })
+    ).toEqual([
+      'zai',
+      [{ apiKey: 'k', baseURL: 'https://api.z.ai/api/coding/paas/v4' }, { apiKey: 'k' }],
+    ]);
+  });
+
+  it.each([
+    ['azure', { apiKey: 'k', resourceName: 'resource' }, { apiKey: 'k', resourceName: 'resource' }],
+    ['bedrock', { apiKey: 'k', region: 'us-east-1' }, { apiKey: 'k', region: 'us-east-1' }],
+    [
+      'vertex',
+      {
+        project: 'project',
+        location: 'us-east5',
+        googleCredentials: { privateKey: 'private-key', clientEmail: 'gateway@example.com' },
+      },
+      {
+        project: 'project',
+        location: 'us-east5',
+        googleCredentials: { privateKey: 'private-key', clientEmail: 'gateway@example.com' },
+      },
+    ],
+    ['openai', 'sk-openai', { apiKey: 'sk-openai' }],
+  ] as const)('produces exactly one credential for a %s key', (providerId, stored, expected) => {
+    const decryptedAPIKey = typeof stored === 'string' ? stored : JSON.stringify(stored);
+
+    const [key, list] = getVercelInferenceProviderConfigForUserByok({
+      providerId,
+      decryptedAPIKey,
+    });
+
+    expect(key).toBe(providerId);
+    expect(list).toEqual([expected]);
   });
 });
 
@@ -271,9 +306,7 @@ describe('convertProviderOptions', () => {
       },
     };
 
-    expect(hasCompatibleVercelInferenceProvider(['google-vertex'], ['anthropic', 'bedrock'])).toBe(
-      false
-    );
+    expect(hasVercelInferenceProviderFor(['google-vertex'], ['anthropic', 'bedrock'])).toBe(false);
     expect(convertProviderOptions(request, ['anthropic', 'bedrock']).gateway?.only).toEqual([
       'vertex',
     ]);
@@ -710,10 +743,13 @@ describe('isValidVercelModelId', () => {
       const overrideMap = new Map(overrides);
       return {
         ...actual,
-        getVercelModelIdOverrides: jest.fn(async () => overrideMap),
-        mapModelIdToVercel: jest.fn(async (modelId: string) =>
-          actual.mapResolvedModelIdToVercel(aliases[modelId] ?? modelId, overrideMap)
-        ),
+        resolveVercelModelId: jest.fn(async (modelId: string) => ({
+          vercelModelId: actual.mapResolvedModelIdToVercel(
+            aliases[modelId] ?? modelId,
+            overrideMap
+          ),
+          overrides: overrideMap,
+        })),
       };
     });
     return (await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel'))
@@ -852,6 +888,28 @@ describe('applyVercelSettings BYOK pinning', () => {
       privateKey: '-----BEGIN PRIVATE KEY-----\nsecret\n-----END PRIVATE KEY-----\n',
       clientEmail: 'gateway@example-project.iam.gserviceaccount.com',
     },
+  });
+
+  it('rejects an empty userByok before touching the request', async () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        // Vercel serves this model under `alibaba/qwen3-max`, so a mutated request is detectable.
+        model: 'qwen/qwen3-max',
+        messages: [{ role: 'user', content: 'hello' }],
+        provider: { ignore: [] },
+      },
+    };
+    const before = structuredClone(request);
+
+    await expect(applyVercelSettings('qwen/qwen3-max', request, [], null)).rejects.toThrow(
+      new Error('Invalid state: userByok should be null or not empty')
+    );
+
+    expect(request).toEqual(before);
+    expect(request.body.model).toBe('qwen/qwen3-max');
+    expect(request.body.provider).toEqual({ ignore: [] });
+    expect(request.body).not.toHaveProperty('providerOptions');
   });
 
   it.each([

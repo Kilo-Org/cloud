@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AUTH_REQUEST_TIMEOUT_MS, postAuth } from '@/lib/auth/auth-fetch';
+import { clearAttestKeyOnRefusal } from '@/lib/auth/admission';
 import { resetAuthTerminalReports } from '@/lib/auth/auth-response-class';
 import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
 import { createNetworkErrorFetch } from '@/lib/telemetry/network-errors';
@@ -182,6 +183,139 @@ describe('postAuth', () => {
       errorCode: undefined,
       ssoOrganizationId: undefined,
       terminal: false,
+    });
+  });
+
+  describe('App Attest token POST transport diagnostic', () => {
+    const appleProofBody = {
+      provider: 'email',
+      admission: {
+        platform: 'ios',
+        kind: 'assertion',
+        challenge: 'server-challenge',
+        payload: 'assertion-b64',
+        keyId: 'key-1',
+      },
+    };
+
+    /** The events filed through the installed sink during one call. */
+    async function eventsDuring(run: () => Promise<unknown>): Promise<TelemetryEvent[]> {
+      const events: TelemetryEvent[] = [];
+      setTelemetrySink(event => {
+        events.push(event);
+      });
+      try {
+        await run();
+      } finally {
+        setTelemetrySink(null);
+      }
+      return events;
+    }
+
+    it('files the timeout step when an Apple-proof token POST hits the deadline', async () => {
+      vi.useFakeTimers();
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+        const stalled = Promise.withResolvers<unknown>();
+        init?.signal?.addEventListener('abort', () => {
+          stalled.resolve(undefined);
+        });
+        await stalled.promise;
+        throw new Error('aborted');
+      });
+
+      const events = await eventsDuring(async () => {
+        const promise = postAuth('/api/auth/native/token', appleProofBody);
+        await vi.advanceTimersByTimeAsync(AUTH_REQUEST_TIMEOUT_MS);
+        await promise;
+      });
+
+      expect(events).toHaveLength(1);
+      expect(events[0]).toEqual({
+        level: 'error',
+        message: 'App Attest failure',
+        tags: {
+          'app_attest.step': 'post',
+          'app_attest.error_domain': 'js_transport',
+          'app_attest.error_code': 'timeout',
+        },
+      });
+    });
+
+    it('files the network step when an Apple-proof token POST is rejected', async () => {
+      vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new TypeError('Network request failed'));
+
+      const events = await eventsDuring(() => postAuth('/api/auth/native/token', appleProofBody));
+
+      expect(events.map(event => event.tags)).toEqual([
+        {
+          'app_attest.step': 'post',
+          'app_attest.error_domain': 'js_transport',
+          'app_attest.error_code': 'network',
+        },
+      ]);
+      // The payload the POST carried never reaches the event.
+      const text = JSON.stringify(events);
+      expect(text).not.toContain('assertion-b64');
+      expect(text).not.toContain('server-challenge');
+      expect(text).not.toContain('key-1');
+    });
+
+    it('keeps an Android proof out of the App Attest diagnostic', async () => {
+      vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new TypeError('offline'));
+
+      const events = await eventsDuring(() =>
+        postAuth('/api/auth/native/token', {
+          provider: 'email',
+          admission: { platform: 'android', kind: 'assertion' },
+        })
+      );
+
+      expect(events).toEqual([]);
+    });
+
+    it('keeps a proof-less token POST out of the App Attest diagnostic', async () => {
+      vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new TypeError('offline'));
+
+      const events = await eventsDuring(() =>
+        postAuth('/api/auth/native/token', { provider: 'email' })
+      );
+
+      expect(events).toEqual([]);
+    });
+
+    it('does not report a server refusal as a transport failure', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+        Response.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 })
+      );
+
+      const events = await eventsDuring(() => postAuth('/api/auth/native/token', appleProofBody));
+
+      expect(events.map(event => event.fingerprint)).toEqual([
+        ['auth-terminal', '/api/auth/native/token', '403'],
+      ]);
+    });
+
+    it('does not report local keychain cleanup as a transport failure', async () => {
+      // A keychain failure while clearing the refused key id is a local fault,
+      // not the POST's transport: it must never become a `post` diagnostic.
+      vi.mocked(clearAttestKeyOnRefusal).mockRejectedValueOnce(new Error('keychain unavailable'));
+      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+        Response.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 })
+      );
+
+      const events = await eventsDuring(() => postAuth('/api/auth/native/token', appleProofBody));
+
+      // The keychain rejection leaves the POST's `catch` and keeps its generic
+      // failure; only the report above is wrong, and there is none.
+      expect(events).toEqual([]);
+    });
+
+    it('does not report a non-token route carrying an iOS admission shape', async () => {
+      vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new TypeError('offline'));
+
+      const events = await eventsDuring(() => postAuth('/api/auth/native/otp', appleProofBody));
+
+      expect(events).toEqual([]);
     });
   });
 

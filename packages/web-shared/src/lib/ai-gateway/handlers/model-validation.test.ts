@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { TRPCError } from '@trpc/server';
 import { NextRequest, NextResponse } from 'next/server';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getDirectByokModelsForUser } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
@@ -48,7 +48,7 @@ const mockedListUsableCustomRouters = jest.mocked(listUsableCustomRouters);
 const mockedGetAvailableModelsForOrganization = jest.mocked(getAvailableModelsForOrganization);
 const mockedAddAutoRoutingModels = jest.mocked(addAutoRoutingModels);
 
-function makeModel(id: string): OpenRouterModel {
+function makeModel(id: string): OpenRouterCatalogModel {
   return {
     id,
     name: id,

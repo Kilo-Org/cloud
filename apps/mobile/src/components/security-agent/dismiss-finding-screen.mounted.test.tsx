@@ -92,10 +92,6 @@ const findingRetry = vi.hoisted(() => ({
   retry: vi.fn(),
   isRetrying: false,
 }));
-const capabilityRetry = vi.hoisted(() => ({
-  retry: vi.fn(),
-  isRetrying: false,
-}));
 const pillGroup = vi.hoisted(() => ({
   onChange: (() => undefined) as (value: string) => void,
 }));
@@ -156,7 +152,6 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentCapability: () => capability,
-  useRetrySecurityAgentCapability: () => capabilityRetry,
 }));
 const connectivity = vi.hoisted(() => ({
   committed: 'online' as 'online' | 'offline' | 'unknown',
@@ -313,8 +308,6 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     capability.isPending = false;
     capability.fetchStatus = 'idle';
     capability.refetch.mockReset();
-    capabilityRetry.retry.mockClear();
-    capabilityRetry.isRetrying = false;
     finding.isLoading = false;
     finding.isFetching = false;
     finding.isError = false;
@@ -449,64 +442,81 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       expect(tree.root.findAllByType(ScrollView)).toHaveLength(0);
       expect(tree.root.findAllByType(SettingsRecoveryStatus)).toHaveLength(0);
       const error = renderFailure(tree);
+      // Both failures name a server answer in this setup: the sheet's own
+      // title differs, the classified cause does not.
+      expect(error.props.variant).toBe('server');
       if (source === 'finding') {
         // The sheet's own failure keeps its screen title, and the description
         // comes from the classified variant rather than a repeated message.
         expect(error.props.title).toBe(i18n.t('securityAgent.dismiss.couldNotLoad'));
         expect(error.props.message).toBeUndefined();
-        expect(error.props.variant).toBe('server');
-      } else {
-        expect(error.props.variant).toBeUndefined();
       }
       act(error.props.onRetry as () => void);
       expect(query.refetch).toHaveBeenCalledOnce();
     }
   );
 
-  it.each(['finding', 'permissions'] as const)(
-    'names the connection and offers Retry for a paused %s read',
-    source => {
-      const query = source === 'finding' ? finding : capability;
-      const otherQuery = source === 'finding' ? capability : finding;
-      finding.data = undefined;
-      query.isPending = true;
-      query.fetchStatus = 'paused';
-      connectivity.committed = 'offline';
-      const tree = renderScreen();
+  it('names the connection and offers Retry for a paused finding read', () => {
+    // The finding read is the only read the form waits on that can pause: the
+    // capability read comes through the hook that owns the shared organizations
+    // options, which settle offline.
+    finding.data = undefined;
+    finding.isPending = true;
+    finding.fetchStatus = 'paused';
+    connectivity.committed = 'offline';
+    const tree = renderScreen();
 
-      expect(tree.root.findAllByType(ScrollView)).toHaveLength(0);
-      const error = renderFailure(tree);
-      expect(error.props.variant).toBe('offline');
-      expect(error.props.message).toBe(
-        source === 'finding'
-          ? i18n.t('securityAgent.dismiss.couldNotLoad')
-          : i18n.t('securityAgent.dismiss.couldNotCheckPermissions')
-      );
-      const retryRecord = source === 'finding' ? findingRetry : capabilityRetry;
-      const otherRetryRecord = source === 'finding' ? capabilityRetry : findingRetry;
-      // The paused branch offers the deliberate paused-read retry, not the
-      // plain query refetch, for whichever read the form waits on.
-      expect(error.props.isRetrying).toBe(false);
-      act(error.props.onRetry as () => void);
-      expect(retryRecord.retry).toHaveBeenCalledOnce();
-      expect(otherRetryRecord.retry).not.toHaveBeenCalled();
-      expect(query.refetch).not.toHaveBeenCalled();
-      expect(otherQuery.refetch).not.toHaveBeenCalled();
-    }
-  );
+    expect(tree.root.findAllByType(ScrollView)).toHaveLength(0);
+    const error = renderFailure(tree);
+    expect(error.props.variant).toBe('offline');
+    expect(error.props.message).toBe(i18n.t('securityAgent.dismiss.couldNotLoad'));
+    // The paused branch offers the deliberate paused-read retry, not the plain
+    // query refetch.
+    expect(error.props.isRetrying).toBe(false);
+    act(error.props.onRetry as () => void);
+    expect(findingRetry.retry).toHaveBeenCalledOnce();
+    expect(capability.refetch).not.toHaveBeenCalled();
+    expect(finding.refetch).not.toHaveBeenCalled();
+  });
 
-  it('keeps the skeleton when a capability read pauses with the finding loaded', () => {
-    // The form's own read settled, then the capability read pauses in the
-    // unsettled window: not a connection failure yet, and no data can close
-    // it. `capability.isLoading` is `isPending && isFetching`, which stays
-    // false for a paused read, so the pre-fix gate fell through to the
-    // cannot-dismiss empty state; `status === 'loading'` holds the skeleton.
+  it('treats a paused capability read as the settled failure it can only be', () => {
+    // The capability read settles offline, so it never reaches the paused
+    // branch above: a failed role read names its own failure instead of the
+    // connection, and Retry re-reads that read.
+    finding.data = { status: 'open', ...FINDING_IDENTITY };
+    finding.isPending = false;
+    finding.fetchStatus = 'idle';
+    capability.status = 'error';
+    capability.isError = true;
+    capability.isPending = true;
+    capability.fetchStatus = 'paused';
+    connectivity.committed = 'offline';
+    const tree = renderScreen();
+
+    const error = renderFailure(tree);
+    // Confirmed offline with no server answer: the failure names the
+    // connection rather than the default server wording.
+    expect(error.props.variant).toBe('offline');
+    expect(error.props.message).toBe(i18n.t('securityAgent.dismiss.couldNotCheckPermissions'));
+    act(error.props.onRetry as () => void);
+    expect(capability.refetch).toHaveBeenCalledOnce();
+    expect(findingRetry.retry).not.toHaveBeenCalled();
+  });
+
+  it('keeps the skeleton when the capability read has not resolved with the finding loaded', () => {
+    // The form's own read settled, then the capability read is still in flight
+    // with no data: not a failure yet, and no data can close it.
+    // `capability.isLoading` is `isPending && isFetching`, so the pre-fix gate
+    // fell through to the cannot-dismiss empty state; `status === 'loading'`
+    // is the state the hook reports for a read without data and holds the
+    // skeleton.
     finding.data = { status: 'open', ...FINDING_IDENTITY };
     finding.isPending = false;
     finding.fetchStatus = 'idle';
     capability.status = 'loading';
     capability.isPending = true;
-    capability.fetchStatus = 'paused';
+    capability.isFetching = true;
+    capability.fetchStatus = 'fetching';
     capability.canManage = false;
     connectivity.committed = 'unknown';
     const tree = renderScreen();
@@ -515,7 +525,6 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     expect(
       tree.root.findAllByProps({ title: i18n.t('securityAgent.dismiss.cannotDismissTitle') })
     ).toHaveLength(0);
-    expect(capabilityRetry.retry).not.toHaveBeenCalled();
   });
 
   it('keeps the skeleton for a pause while connectivity is unsettled', () => {

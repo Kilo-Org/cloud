@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import type { EffectiveOrganizationModelPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
+import type * as ModelAllowModule from '@kilocode/web-shared/lib/model-allow.server';
 
 // The snapshot cache belongs to the handler module, so every test loads its own
 // instance through `loadHandlers` and starts from a cold cache. The factories
@@ -20,6 +21,9 @@ jest.mock('@sentry/nextjs', () => ({ captureException: mockCaptureException }));
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: mockReadDb, db: {} }));
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: mockGetUserFromAuth }));
 jest.mock('@kilocode/web-shared/lib/model-allow.server', () => ({
+  getEligibleProviderRoutes: jest.requireActual<typeof ModelAllowModule>(
+    '@kilocode/web-shared/lib/model-allow.server'
+  ).getEligibleProviderRoutes,
   isModelRestrictionExempt: jest.fn(async () => false),
   getModelInferenceProviders: jest.fn(async () => undefined),
 }));

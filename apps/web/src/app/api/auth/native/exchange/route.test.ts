@@ -18,6 +18,9 @@ jest.mock('@/lib/auth/native-admission', () => ({
   requireAdmissionPayload: jest.fn(),
   verifyAdmissionAsync: jest.fn(),
 }));
+jest.mock('@/lib/auth/native-token-rate-limit', () => ({
+  isNativeTokenAddressRateLimited: jest.fn(),
+}));
 jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
@@ -46,6 +49,7 @@ import {
   resetAdmissionCountersForTests,
 } from '@/lib/auth/native-admission';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { isNativeTokenAddressRateLimited } from '@/lib/auth/native-token-rate-limit';
 import { captureMessage } from '@sentry/nextjs';
 import type { User } from '@kilocode/db/schema';
 
@@ -56,6 +60,7 @@ const mockCreateDeviceSessionWithCredentials = jest.mocked(createDeviceSessionWi
 const mockIssueSessionCredentials = jest.mocked(issueSessionCredentials);
 const mockRequireAdmissionPayload = jest.mocked(requireAdmissionPayload);
 const mockVerifyAdmissionAsync = jest.mocked(verifyAdmissionAsync);
+const mockAddressRateLimited = jest.mocked(isNativeTokenAddressRateLimited);
 const mockCaptureMessage = jest.mocked(captureMessage);
 
 const fakeUser = { id: 'user-1', api_token_pepper: 'pepper' } as User;
@@ -97,6 +102,36 @@ describe('POST /api/auth/native/exchange', () => {
       payload: 'integrity-token',
     });
     mockVerifyAdmissionAsync.mockResolvedValue({ ok: true, platform: 'android' });
+    mockAddressRateLimited.mockResolvedValue(false);
+  });
+
+  it('answers 429 to a limited address before the admission gate and any credential read', async () => {
+    mockAddressRateLimited.mockResolvedValue(true);
+    const request = createRequest(bearerHeaders);
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(429);
+    expect(await response.json()).toEqual({ error: 'RATE_LIMITED' });
+    expect(mockAddressRateLimited).toHaveBeenCalledWith(request);
+    expect(mockRequireAdmissionPayload).not.toHaveBeenCalled();
+    expect(mockVerifyAdmissionAsync).not.toHaveBeenCalled();
+    expect(mockGetUserFromBearer).not.toHaveBeenCalled();
+    expect(mockGetUserFromSession).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithAttestedKey).not.toHaveBeenCalled();
+    expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+  });
+
+  it('lets a limiter failure surface instead of reading a credential', async () => {
+    mockAddressRateLimited.mockRejectedValue(new Error('firewall transport failed'));
+
+    await expect(POST(createRequest(bearerHeaders))).rejects.toThrow('firewall transport failed');
+
+    expect(mockRequireAdmissionPayload).not.toHaveBeenCalled();
+    expect(mockVerifyAdmissionAsync).not.toHaveBeenCalled();
+    expect(mockGetUserFromBearer).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
   });
 
   it('refuses a request with no proof before reading any credential', async () => {
@@ -161,6 +196,7 @@ describe('POST /api/auth/native/exchange', () => {
       refreshToken: 'refresh-abc',
       expiresIn: 3600,
     });
+    expect(mockAddressRateLimited).toHaveBeenCalledTimes(1);
     expect(mockCreateDeviceSessionWithCredentials).toHaveBeenCalledWith({
       userId: fakeUser.id,
       userAgent: undefined,

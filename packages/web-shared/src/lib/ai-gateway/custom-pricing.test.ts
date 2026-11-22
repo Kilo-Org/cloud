@@ -1,7 +1,7 @@
 import { describe, expect, test } from '@jest/globals';
 import { captureMessage } from '@sentry/nextjs';
 import type { CustomPricingConfig, CustomPricingTiers } from '@kilocode/db/schema-types';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { GEMINI_4_ARGON_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import {
   applyCustomPricingToPricing,
@@ -14,7 +14,7 @@ import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/c
 
 jest.mock('@sentry/nextjs', () => ({ captureMessage: jest.fn() }));
 
-function makeModel(id: string): OpenRouterModel {
+function makeModel(id: string): OpenRouterCatalogModel {
   return {
     id,
     name: 'Test model',

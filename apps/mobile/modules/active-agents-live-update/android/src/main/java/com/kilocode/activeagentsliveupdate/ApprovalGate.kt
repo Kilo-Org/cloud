@@ -5,6 +5,7 @@ import android.app.Notification
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
@@ -20,6 +21,11 @@ import androidx.work.WorkManager
  * platform has one (API 31+), so the keyguard appears before the intent is even
  * sent. Dismissal and Open keep their own transports.
  *
+ * One record per request: a session card's Approve record is named by the
+ * session and the ask it answers, so a newer ask is a different record and can
+ * never rewrite the one a card in the shade still shows. A post that does not
+ * land therefore leaves the card answering the request it shows.
+ *
  * Android-only by capability: an iOS Live Activity's control performs inside
  * the app's process (`src/glanceable-ios/interaction.ts`), which only runs on an
  * unlocked device in the first place.
@@ -30,8 +36,20 @@ internal object ApprovalGate {
     val intent = Intent(context, ActiveAgentsApprovalActivity::class.java)
     // A session card answers its own session and the exact request it shows;
     // the aggregate card passes neither, and the headless body reads the
-    // recorded ask for that case.
+    // recorded ask for that case. The data URI is what names the action record,
+    // and for a session card it carries the ask as well as the session
+    // (`SessionNotificationIdentity.askData`), so a newer ask is a different
+    // record and cannot rewrite the one a card in the shade still shows. A
+    // session with no ask keeps the session alone, and the aggregate card,
+    // which passes no session, keeps its single record.
     if (sessionId != null) {
+      intent.data = Uri.parse(
+        if (approvalKey == null) {
+          SessionNotificationIdentity.sessionData(sessionId)
+        } else {
+          SessionNotificationIdentity.askData(sessionId, approvalKey)
+        }
+      )
       intent.putExtra(ActiveAgentsApproveWorker.KEY_SESSION_ID, sessionId)
       intent.putExtra(ActiveAgentsApproveWorker.KEY_APPROVAL_KEY, approvalKey)
     }
@@ -51,6 +69,21 @@ internal object ApprovalGate {
       intent(context, sessionId, approvalKey),
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
+
+  /**
+   * Cancel the Approve record of one card. The record is found by the same
+   * request code and intent `pendingIntent` built it from, and `FLAG_NO_CREATE`
+   * answers null instead of making one, so a card that was never posted leaves
+   * nothing behind.
+   */
+  fun cancel(context: Context, requestCode: Int, sessionId: String?, approvalKey: String?) {
+    PendingIntent.getActivity(
+      context,
+      requestCode,
+      intent(context, sessionId, approvalKey),
+      PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+    )?.cancel()
+  }
 
   /**
    * The Approve action. From API 31 the platform holds the tap until the device

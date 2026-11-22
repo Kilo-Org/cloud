@@ -326,6 +326,33 @@ describe('Home-only widget policy', () => {
     });
   });
 
+  it('withholds Approve and its key from a terminal snapshot that still carries an approvable permission row', () => {
+    const approvalKey = 'a'.repeat(64);
+    // A built terminal payload has empty details, so the gate is only reachable by
+    // forcing the status on a payload whose counts and key survived.
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'permission', title: 'Approve', approvalKey }],
+    });
+    expect(data.snapshot.needsApproval).toBe(1);
+    expect(data.snapshot.needsInput).toBe(1);
+    expect(data.details.approvalKey).toBe(approvalKey);
+    expect(buildHomeWidgetPresentation(data, now)).toMatchObject({
+      canApprove: true,
+      approvalKey,
+    });
+    for (const status of ['signed_out', 'privacy'] as const) {
+      data.snapshot.status = status;
+      expect(buildHomeWidgetPresentation(data, now)).toMatchObject({
+        status,
+        canApprove: false,
+        approvalKey: null,
+      });
+      // The details survive; only the presentation gate drops them.
+      expect(data.details.approvalKey).toBe(approvalKey);
+    }
+  });
+
   it('offers Approve only from a permission row and keeps the count key-independent', () => {
     const questionKey = 'a'.repeat(64);
     // Both rows need input, only the permission row can be approved. The
@@ -589,6 +616,41 @@ describe('native Home presentation timeline', () => {
     expect(buildHomeWidgetPresentationTimeline(data, now + GLANCEABLE_STALE_MS)).toHaveLength(2);
     data.snapshot.status = 'privacy';
     expect(buildHomeWidgetPresentationTimeline(data, now)).toHaveLength(1);
+  });
+
+  it('publishes one wake and its strictly later retry, never a duplicate instant', () => {
+    // The retry is the wake plus the scheduler floor, so it cannot equal the
+    // wake. Publish both and assert the ordering the timeline relies on
+    // instead of a dedupe comparison that could never be false.
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [{ status: 'scheduled', scheduledAt: '2026-10-09T10:05:00Z' }],
+    });
+    const wake = now + 5 * 60 * 1000;
+    expect(buildHomeWidgetPresentationTimeline(data, now).map(entry => entry.at)).toEqual([
+      now,
+      wake,
+      wake + 15 * 60 * 1000,
+      now + GLANCEABLE_STALE_MS,
+    ]);
+  });
+
+  it('drops the retry when it lands on the stale instant', () => {
+    // A wake fifteen minutes after the snapshot write puts the retry on the
+    // stale deadline exactly (active cadence is thirty minutes), so the two
+    // boundaries coincide and the timeline publishes the instant once.
+    const data = buildHomeWidgetData({
+      ...scope,
+      sessions: [
+        { status: 'scheduled', scheduledAt: new Date(now + 15 * 60 * 1000).toISOString() },
+      ],
+    });
+    const wake = now + 15 * 60 * 1000;
+    expect(buildHomeWidgetPresentationTimeline(data, now).map(entry => entry.at)).toEqual([
+      now,
+      wake,
+      now + GLANCEABLE_STALE_MS,
+    ]);
   });
 
   it('keeps every built timeline inside the response schema the client parses', () => {

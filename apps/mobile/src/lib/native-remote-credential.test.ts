@@ -17,7 +17,7 @@ vi.mock('@/lib/auth/credentials', () => ({
 }));
 vi.mock('@/lib/auth/token-owner', () => ({
   getAuthTokenForRequest: mocks.token,
-  getActiveTokenSnapshot: () => ({ expiresAtMs: mocks.expiresAtMs }),
+  getActiveToken: () => ({ expiresAtMs: mocks.expiresAtMs }),
   isSignOutTeardownActive: () => mocks.tearingDown,
 }));
 

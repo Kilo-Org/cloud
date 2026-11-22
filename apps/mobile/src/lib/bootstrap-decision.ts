@@ -124,6 +124,46 @@ export function shouldShowBootstrapLoading(input: {
   return input.startupFinished && (input.hidden || input.signingOut);
 }
 
+/**
+ * Whether the wait surface may mount behind the tree.
+ *
+ * The restore and blocked surfaces are opaque full-screen overlays that own the
+ * screen, so the wait surface must not mount under them: its
+ * `accessibilityRole="progressbar"` would stay in the accessibility tree behind
+ * an overlay the reader cannot see it through. The three surfaces are therefore
+ * exclusive.
+ */
+export function shouldShowBootstrapLoadingSurface(input: {
+  readonly showBootstrapLoading: boolean;
+  readonly showRestoreError: boolean;
+  readonly showBlockedAccountError: boolean;
+}): boolean {
+  return input.showBootstrapLoading && !input.showRestoreError && !input.showBlockedAccountError;
+}
+
+/**
+ * Whether the hidden → visible transition announces the app as ready and
+ * focuses the wrapper.
+ *
+ * `wasHidden` makes it a transition, and the wrapper must actually be revealed:
+ * a bootstrap error unmounts it, and a full-screen overlay that owns the screen
+ * (the blocked explanation) keeps it out of both accessibility trees, so in
+ * both cases the announcement would describe a tree the reader cannot reach.
+ */
+export function shouldAnnounceContentReady(input: {
+  readonly wasHidden: boolean;
+  readonly wrapperObscured: boolean;
+  readonly hasBootstrapError: boolean;
+  readonly showBlockedAccountError: boolean;
+}): boolean {
+  return (
+    input.wasHidden &&
+    !input.wrapperObscured &&
+    !input.hasBootstrapError &&
+    !input.showBlockedAccountError
+  );
+}
+
 export function resolveBootstrapDecision(input: BootstrapDecisionInput): BootstrapDecision {
   const hasUserBootstrapError = input.hasToken && input.userIdError;
   const hasConsentBootstrapError = input.hasToken && input.consentCheckError;

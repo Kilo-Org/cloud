@@ -312,6 +312,7 @@
     "hideBalance": "Folaigh an t-iarmhéid",
     "showBalance": "Taispeáin an t-iarmhéid",
     "balanceHidden": "Tá an t-iarmhéid folaithe",
+    "availableToSpendInOrganization": "Ar fáil le caitheamh san eagraíocht seo",
     "signOutTitle": "Ar mhaith leat síniú amach?",
     "signOutMessage": "Beidh ort síniú isteach arís chun rochtain a fháil ar do spás oibre.",
     "deleteAccountTitle": "An scriosfar an cuntas?",
@@ -453,6 +454,17 @@
       "location": "Suíomh Vertex",
       "clientEmail": "Ríomhphost an chuntais seirbhíse",
       "privateKey": "Eochair phríobháideach an chuntais seirbhíse",
+      "privateKeyBlockRequired": "Greamaigh an bloc eochrach iomlán, ón líne BEGIN go dtí an líne END.",
+      "privateKeyEncrypted": "Tá an bloc eochrach seo cosanta ag pasfhrása. Greamaigh eochair chuntais seirbhíse nach bhfuil pasfhrása uirthi.",
+      "names": {
+        "codestral": "Codestral oidhreachta amháin",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (Sínigh isteach le ChatGPT)",
+        "xiaomi": "Xiaomi (íoc de réir úsáide)",
+        "zai": "Z.ai (íoc de réir úsáide)",
+        "bedrockByok": "Amazon Bedrock (díreach)",
+        "vertexByok": "Google Vertex AI (díreach)"
+      },
       "modelMappings": "Mapálacha samhlacha",
       "modelMappingsDescription": "Seol samhail ón ngeata chuig ainm imscartha saincheaptha.",
       "mappingTitle": "Mapáil {{number}}",
@@ -513,12 +525,13 @@
       "receiptLabel": "Admháil",
       "copyReceiptId": "Cóipeáil aitheantas na hadmhála",
       "appealLabel": "Achomharc",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Faighte",
       "triageOpen": "Á athbhreithniú",
       "triageActioned": "Seasadh leis",
       "triageRejected": "Níor seasadh leis",
       "appealNone": "Níor cuireadh aon cheann isteach",
-      "appealSubmitted": "Á athbhreithniú",
+      "appealSubmitted": "Achomharc á athbhreithniú",
       "appealAccepted": "Glacadh leis",
       "appealRejected": "Diúltaíodh dó",
       "appeal": "Déan achomharc i gcoinne an chinnidh seo",
@@ -530,13 +543,23 @@
       "nextStepInReview": "Beidh an toradh le feiceáil ar an scáileán seo, agus is féidir leat achomharc a dhéanamh tar éis an chinnidh.",
       "nextStepAppeal": "Beidh toradh an achomhairc le feiceáil ar an scáileán seo.",
       "nextStepFinal": "Tá cinneadh an achomhairc críochnaitheach. Ní féidir aon achomharc breise a chur isteach.",
-      "viewReceipt": "Féach ar an admháil"
+      "viewReceipt": "Féach ar an admháil",
+      "targetLabel": "Mír a tuairiscíodh",
+      "reasonLabel": "Cúis na tuairisce",
+      "targetMessage": "Freagra intleachta saorga",
+      "targetComment": "Trácht ar iarratas",
+      "targetUser": "Úsáideoir",
+      "reasonHarmful": "Ábhar díobhálach",
+      "reasonIllegal": "Ábhar mídhleathach",
+      "reasonHarassment": "Ciapadh",
+      "reasonSpam": "Turscar",
+      "reasonOther": "Cúis eile"
     },
     "reportReceipts": {
       "title": "Tuairiscí",
       "rowSubtitle": "Na tuairiscí a chuir tú isteach agus a dtorthaí",
       "emptyTitle": "Níl aon tuairiscí ann fós",
-      "emptyDescription": "Taispeántar anseo tuairiscí a chuireann tú isteach ó thrácht nó ó fhreagra AI.",
+      "emptyDescription": "Taispeántar anseo tuairiscí a chuireann tú isteach ó thrácht i bplé ar iarratas tarraingthe nó ó fhreagra AI i seisiún gníomhaire, mar aon lena dtoradh.",
       "couldNotLoad": "Níorbh fhéidir do chuid tuairiscí a lódáil",
       "capped": "Ag taispeáint do chuid tuairiscí is déanaí."
     },
@@ -546,8 +569,11 @@
     "changelogFixesIn": "Ceartúcháin agus feabhsuithe sna réimsí seo: {{areas}}.",
     "changelogFixesPolish": "Ceartúcháin agus feabhsuithe ar fud na haipe.",
     "changelogAreas": {
-      "signIn": "Síniú isteach",
-      "profileOrganizations": "Próifíl & eagraíochtaí"
+      "signIn": "síniú isteach",
+      "profileOrganizations": "próifíl & eagraíochtaí",
+      "chat": "comhrá",
+      "notifications": "fógraí",
+      "integrations": "comhtháthuithe"
     }
   },
   "preferences": {
@@ -1042,8 +1068,9 @@
       "checkActiveConnection": "Tá an nasc gníomhach, ach ní féidir an mhír seo a lódáil fós.",
       "bitbucketOrgOnlyDescription": "Athraigh an cuntas thuas go heagraíocht chun iarratais tharraingthe Bitbucket na heagraíochta sin a athbhreithniú.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Níl aon eagraíocht ag an gcuntas seo fós. Is féidir iarratais tharraingthe Bitbucket a athbhreithniú nuair a chruthaíonn tú eagraíocht nó nuair a thagann tú isteach i gceann acu.",
-      "gitlabReconnectAdminOnlyDescription": "Iarr ar Úinéir eagraíochta, Riarthóir, nó Bainisteoir billeála é a athnascadh.",
+      "reconnectAdminOnlyDescription": "Iarr ar Úinéir eagraíochta, Riarthóir, nó Bainisteoir billeála é a athnascadh.",
       "bitbucketNotConnectedTitle": "Níl Bitbucket nasctha",
+      "bitbucketAdminOnlyDescription": "Iarr ar Úinéir eagraíochta, Riarthóir, nó Bainisteoir billeála é a cheangal.",
       "adminOnlyConnectDescription": "Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála eagraíochta é a cheangal.",
       "contextLine": "Do {{organization}}",
       "contextLinePersonal": "Do do chuntas pearsanta"
@@ -1280,6 +1307,11 @@
       "emptyTitle": "Níl aon fhógraí fós",
       "emptyCategoryTitle": "Níl aon fhógraí sa chatagóir seo",
       "emptyBody": "Taispeántar na fógraí a fhaigheann an cuntas seo anseo. Coimeádtar iad ar feadh {{days}} lá.",
+      "emptyBody_one": "Taispeántar na fógraí a fhaigheann an cuntas seo anseo. Coimeádtar iad ar feadh {{days}} lá.",
+      "emptyBody_two": "Taispeántar na fógraí a fhaigheann an cuntas seo anseo. Coimeádtar iad ar feadh {{days}} lá.",
+      "emptyBody_few": "Taispeántar na fógraí a fhaigheann an cuntas seo anseo. Coimeádtar iad ar feadh {{days}} lá.",
+      "emptyBody_many": "Taispeántar na fógraí a fhaigheann an cuntas seo anseo. Coimeádtar iad ar feadh {{days}} lá.",
+      "emptyBody_other": "Taispeántar na fógraí a fhaigheann an cuntas seo anseo. Coimeádtar iad ar feadh {{days}} lá.",
       "capped": "Taispeántar na fógraí is déanaí.",
       "loadError": "Níorbh fhéidir stair fógraí a lódáil.",
       "openFailed": "Ní osclaíonn an fógra seo in áit ar bith a thuilleadh."
@@ -1360,6 +1392,7 @@
       "manageAccess": "Bainistigh rochtain",
       "bitbucketNoRepositoriesDescription": "Níl aon stór ar fáil sa spás oibre Bitbucket seo.",
       "gitlabNoRepositoriesDescription": "Seans go mbeidh ort rochtain ar thuilleadh grúpaí nó tionscadal a thabhairt ar GitLab.",
+      "githubNoRepositoriesDescription": "Seiceáil an rochtain atá ag aip GitHub Kilo ar na stórtha, ansin athnuaigh an liosta.",
       "installGithubApp": "Suiteáil an aip GitHub ar stórtha",
       "installGithubAppDescription": "Tabhair rochtain d'aip GitHub Kilo ar na stórtha ar mhaith leat go ndéanfaí athbhreithniú orthu.",
       "repositoryAccess": "rochtain ar stórtha",
@@ -1393,7 +1426,7 @@
       "findingsInProgress": "Tá an athbhreithniú seo ar siúl fós. Tiocfaidh na torthaí le feiceáil anseo nuair a bheidh sé críochnaithe.",
       "findingsEndedWithoutResults": "Críochnaíodh an athbhreithniú seo sular ndearnadh aon torthaí.",
       "serviceUnavailable": "Níorbh fhéidir ceangal leis an tseirbhís athbhreithnithe cóid. Bain triail as an athbhreithniú arís nuair a bheidh an tseirbhís ar fáil.",
-      "reviewFailed": "Theip ar an athbhreithniú. Bain triail eile as, le do thoil.",
+      "reviewFailed": "Theip ar an athbhreithniú.",
       "showMore": "Taispeáin níos mó",
       "created": "Cruthaithe",
       "started": "Tosaithe",
@@ -1515,6 +1548,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Bainistítear nasc Bitbucket le {{organization}} ar an ngréasán ó ríomhaire.",
+      "deniedManagedByOwner": "Iarr ar úinéir {{organization}} an ceangal nach féidir leat a chur in eagar a athrú.",
+      "deniedConnectRole": "Ní féidir ach le húinéirí, riarthóirí agus bainisteoirí billeála {{organization}} é a cheangal.",
+      "deniedReconnectRole": "Iarr ar úinéir {{organization}}, riarthóir, nó bainisteoir billeála é a athnascadh.",
       "managedOnWebTitle": "Bainistithe ar an ngréasán",
       "managedOnWebShort": "Bainistítear an nasc seo ar an ngréasán ó ríomhaire.",
       "managedOnWebRepositories": "Roghnaigh stórais do {{organization}} ar an ngréasán ó ríomhaire.",
@@ -1658,7 +1694,9 @@
       "unavailablePersonallySwitchAction": "Athraigh eagraíocht",
       "unavailableOrganizationTitle": "Níl athbhreithniú comhairle ar fáil faoi láthair",
       "unavailableForOrganization": "Teastaíonn an plean Enterprise ó athbhreithniú comhairle le síntiús gníomhach nó le triail. Níl sé ag an eagraíocht seo faoi láthair.",
-      "unavailableForOrganizationNeutral": "Níl athbhreithniú comhairle ar fáil don eagraíocht seo faoi láthair. Bain triail eile as níos déanaí.",
+      "unavailablePlanCheck": "Níorbh fhéidir le hathbhreithniú comhairle plean na heagraíochta seo a sheiceáil. Bain triail eile as chun seiceáil arís.",
+      "unavailableFlagRollout": "Níl athbhreithniú comhairle ar fáil don eagraíocht seo fós. Nuashonraigh an aip go dtí an leagan is déanaí chun é a fháil.",
+      "unavailableForOrganizationMember": "Teastaíonn an plean Enterprise ó athbhreithniú comhairle le síntiús gníomhach nó le triail. Is féidir le húinéir eagraíochta an plean a athrú.",
       "unavailableOnBitbucket": "Níl athbhreithniú comhairle ar fáil do stóir Bitbucket.",
       "noRepositories": "Níl aon stór roghnaithe fós. Roghnaigh stóir i socruithe na stór ar dtús.",
       "specialists": "Speisialtóirí",
@@ -2706,8 +2744,7 @@
       "searchPlaceholder": "Cuardach stór",
       "noMatches": "Níl aon toradh ann",
       "noRepositories": "Níl aon stór ar fáil",
-      "noRepositoriesDescription": "Níl aon stór ceangailte le do chuntas.",
-      "loading": "Ag lódáil…",
+      "noRepositoriesDescription": "Ceangail le GitHub nó le GitLab chun stór a lódáil.",
       "accessibility": "Stór: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3241,6 +3278,12 @@
     "retryLoadingAccount": "Bain triail as an gcuntas a lódáil arís",
     "retryLoadingPrivacy": "Bain triail as na roghanna príobháideachta a lódáil arís"
   },
+  "accountBlocked": {
+    "title": "Cuntas blocáilte",
+    "description": "Chuir Kilo bac ar an gcuntas seo, agus ní bhainfidh tú an bac trí logáil isteach arís. Is féidir leis an bhfoireann tacaíochta an bac a athbhreithniú ar iarratas.",
+    "domainDescription": "Cuireann Kilo bac ar chuntais a bhaineann leis an bhfearann ríomhphoist seo, agus ní bhainfidh tú an bac trí logáil isteach arís. Is féidir leis an bhfoireann tacaíochta an fearann a athbhreithniú ar iarratas.",
+    "contactSupport": "Déan teagmháil leis an bhfoireann tacaíochta"
+  },
   "addCredits": {
     "cta": "Cuir creidmheasanna leis",
     "billingPage": "leathanach billeála"
@@ -3626,7 +3669,7 @@
       "manageOnWeb": "Socruithe billeála ar an ngréasán",
       "changePlan": "Athraigh an plean",
       "buySeats": "Ceannaigh suíocháin",
-      "managedOnWeb": "Bainistítear an plean, na suíocháin agus an breisiú uathoibríoch ar an ngréasán.",
+      "managedOnWeb": "Bainistítear an plean, na suíocháin agus an breisiú uathoibríoch ag kilo.ai.",
       "setupAutoTopUp": "Socraigh breisiú uathoibríoch",
       "manageAutoTopUp": "Bainistigh breisiú uathoibríoch",
       "opensOnWeb": "Osclaítear ar an ngréasán"
@@ -3812,10 +3855,10 @@
       "nameLabel": "Ainm an mhóid",
       "nameRequired": "Cuir isteach ainm móid.",
       "notFound": "Níl an mód seo ann a thuilleadh.",
-      "restrictionHint": "Ní féidir ach comhaid a mheaitseálann an patrún seo a chur in eagar. Fág folamh é chun gach comhad a cheadú.",
-      "restrictionInvalid": "Cuir isteach patrún bailí.",
+      "restrictionHint": "Roghnaíonn slonn ionadaíoch na comhaid ar féidir leis an mód seo iad a chur in eagar, mar shampla `\\.md$` le haghaidh comhaid markdown amháin. Fág folamh é chun gach comhad a cheadú.",
+      "restrictionInvalid": "Cuir isteach slonn ionadaíoch bailí.",
       "restrictionLabel": "Lipéad srianta",
-      "restrictionPattern": "Patrún comhaid",
+      "restrictionPattern": "Srian comhaid",
       "roleLabel": "Sainmhíniú róil",
       "roleRequired": "Cuir síos ar a dhéanann an mód seo.",
       "tool": {
@@ -3905,7 +3948,7 @@
     "emailDeliveryFailed": "Níl seachadadh ríomhphoist ar fáil go sealadach. Bain triail as arís níos déanaí le do thoil.",
     "admissionRequired": "Ní féidir do ghléas a fhíorú. Úsáid '$t(login.moreSignInOptions)' chun síniú isteach ar ghléas eile nó ar an ngréasán.",
     "default": "Tharla earráid. Bain triail eile as.",
-    "retryableAdmission": "Níorbh fhéidir linn an gléas seo a fhíorú. Seiceáil do nasc agus bain triail as arís.",
+    "retryableAdmission": "Níorbh fhéidir an gléas seo a fhíorú. Bain triail eile as.",
     "startSignInFailed": "Theip ar an síniú isteach a thosú. Bain triail as arís le do thoil.",
     "couldNotOpenBrowser": "Níorbh fhéidir an brabhsálaí a oscailt. Bain triail as arís le do thoil.",
     "signInTimedOut": "Chuaigh an síniú isteach thar am. Bain triail as arís le do thoil.",
@@ -4277,7 +4320,8 @@
         "space": "Níl go leor stórála saor don tsamhail seo. Saor roinnt spáis agus triail arís.",
         "network": "Níor críochnaíodh an íoslódáil. Seiceáil do cheangal agus triail arís.",
         "invalidFile": "Ní samhail é an comhad íoslódáilte ar féidir leis an aip seo a rith, mar sin baineadh é.",
-        "checksum": "Ní mheaitseálann an comhad íoslódáilte a shuim seiceála foilsithe, mar sin baineadh é. Bain triail as an íoslódáil arís."
+        "checksum": "Ní mheaitseálann an comhad íoslódáilte a shuim seiceála foilsithe, mar sin baineadh é. Bain triail as an íoslódáil arís.",
+        "writeFailed": "Níorbh fhéidir leis an ngléas seo an tsamhail a shábháil. Bain triail as an íoslódáil arís."
       }
     },
     "catalog": {
@@ -4622,6 +4666,7 @@
       "promptPlaceholder": "Is duine thú…",
       "tools": "Uirlisí",
       "wholeToolRule": "Cuireann an gníomhaire seo riail amháin i bhfeidhm ar gach uirlis ag an am céanna: {{rule}}. Tá na lasca seo inléite amháin.",
+      "toolRule": "Riail stóráilte: {{rule}}",
       "visibility": "Infheictheacht",
       "visibilityPrimary": "Bunscoile — a thaispeántar sa roghnóir",
       "visibilitySubagent": "Fo-ghníomhaire — inghlaoite ó dhaoine eile amháin",
@@ -4731,20 +4776,34 @@
       "deductionFallback": "Asbhaint chreidmheasa",
       "emptyDescription": "Taispeánfar ceannacháin chreidmheasa, admhálacha agus úsáid anseo.",
       "emptyTitle": "Gan stair chreidmheasa",
+      "expiredGrant": "Imithe in éag: {{description}}",
       "googlePlayReceipt": "Admháil ó Google Play",
       "kind": {
         "adjustment": "Coigeartú",
         "balanceNeutral": "Neodrach don iarmhéid",
         "deduction": "Asbhaint",
         "grant": "Deontas creidmheasa",
+        "promotionalCredits": "Creidmheasanna poiblíochta",
         "welcomeCredits": "Creidmheas fáilte",
         "purchase": "Ceannach"
+      },
+      "program": {
+        "adminBulkGrant": "Deontas creidmheasa ó riarthóir",
+        "contributorChampion": "Creidmheas curadh na rannpháirtithe",
+        "feedback": "Creidmheas aiseolais",
+        "influencer": "Creidmheas tionchaire",
+        "ossMonthlyReset": "Athshocrú míosúil OSS",
+        "ossSponsorship": "Creidmheas urraíochta OSS",
+        "pullRequest": "Creidmheas iarratais tarraingthe",
+        "usageIssue": "Creidmheas fadhb úsáide",
+        "vibeDay": "Creidmheas Vibe day"
       },
       "purchaseFallback": "Ceannach creidmheasa",
       "receipt": "Admháil",
       "receiptA11y": "Oscail an admháil do {{description}}, {{amount}}, ó {{date}}",
       "receiptUnavailable": "Níl admháil ar fáil don cheannach seo.",
-      "retentionLimit": "Taispeántar an stair chreidmheasa is déanaí."
+      "retentionLimit": "Taispeántar an stair chreidmheasa is déanaí.",
+      "voidedGrant": "Cealaithe: {{description}}"
     },
     "title": "Ceannaigh creidmheasanna",
     "description": "Is ceannach aonuaire iad creidmheasanna a chuirtear le do chothromas Kilo chun seisiúin chódaithe AI a rith in Kilo App. Gearrann an siopa do chuntas agus cuirtear creidmheasanna leis tar éis don siopa an íocaíocht a dhearbhú.",
@@ -5104,6 +5163,9 @@
       "runAsCreator": "Rith mar mise",
       "runAsCreatorDescription": "Úsáideann gach rith do chuntas, mar sin tá an ceanntásc rúnda riachtanach.",
       "saveFailedTitle": "Níorbh fhéidir an truicear a shábháil",
+      "nameTaken": "Tá truicear darb ainm “{{name}}” ann cheana.",
+      "saveFailedRetry": "Níorbh fhéidir teacht ar an bhfreastalaí. Seiceáil do nasc agus bain triail eile as.",
+      "saveFailedCheck": "Seiceáil na luachanna san fhoirm agus bain triail eile as.",
       "deleteTitle": "Scrios an truicear seo?",
       "deleteMessage": "Teipfidh glaonna chuig {{name}}. Ní féidir é seo a chealú.",
       "deleteMessageScheduled": "Stopfaidh ritheanna sceidealaithe an truicir {{name}}. Ní féidir é seo a chealú.",
@@ -5348,6 +5410,20 @@
       "eu": "An tAontas Eorpach",
       "au": "An Astráil",
       "jp": "An tSeapáin"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Cuardach roghanna",
+    "noMatches": "Níl aon roghanna ag teacht leis an gcuardach",
+    "emptyDescription": "Bain triail as ainm rogha eile nó eochairfhocal eile.",
+    "resultsStatus": "Roghanna aimsithe: {{resultCount}}",
+    "keywords": {
+      "signOut": "sínigh amach|logáil amach",
+      "appearance": "téama|scéim dathanna",
+      "appUnlock": "bithmhéadracht|aghaidh|méarlorg",
+      "language": "teanga|aistriúchán",
+      "notifications": "foláirimh|fógraí",
+      "privacy": "anailísíocht|rianú"
     }
   }
 }

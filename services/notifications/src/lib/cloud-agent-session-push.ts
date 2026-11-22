@@ -1,5 +1,6 @@
 import { presenceContextForCliSession, presenceContextForPlatform } from '@kilocode/event-service';
 import {
+  SESSION_READY_I18N_KEY,
   classifyCloudAgentSessionPush,
   cloudAgentSessionCategorySchema,
   sendCloudAgentSessionNotificationInputSchema,
@@ -283,7 +284,7 @@ export async function dispatchSessionReadyPush(
         idempotencyKey: `cloud-agent:${parsed.cliSessionId}:session-ready`,
         title,
         body: 'Your Kilo session is ready to control from your phone',
-        i18nKey: 'sessionReady',
+        i18nKey: SESSION_READY_I18N_KEY,
         i18nParams: { sessionTitle: title },
         category: 'status',
       };

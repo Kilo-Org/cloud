@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one form owns the draft, both list policies and the leave guard; the Providers tab's display names add a prop to that whole, and splitting it would duplicate the shared state. */
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -15,9 +16,11 @@ import {
   useSaveOrgModelAccess,
 } from '@/lib/hooks/use-org-settings-queries';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { knownServerErrorMessage } from '@/lib/server-error-copy';
 import {
   type AvailableModel,
+  canonicalDraft,
   type CatalogModel,
   catalogProviderSlugs,
   denyListModels,
@@ -68,6 +71,7 @@ export function ModelAccessForm({
   onRetryCatalog,
   providerAllowList,
   modelDenyList,
+  providerNames,
   gateway,
   gatewayIsError,
   gatewayIsFetching,
@@ -89,12 +93,17 @@ export function ModelAccessForm({
   onRetryCatalog: () => void;
   providerAllowList: readonly string[] | undefined;
   modelDenyList: readonly string[] | undefined;
+  providerNames: Readonly<Record<string, string>>;
   gateway: OrgGatewaySettings | undefined;
   gatewayIsError: boolean;
   gatewayIsFetching: boolean;
   onRetryGateway: () => void;
 }>) {
   const { t } = useTranslation();
+  // The lists take the tab-screen frame, which also carries the window side
+  // insets; the header above them takes the same ones so the controls and the
+  // rows stay in one column on a landscape display cutout.
+  const sideInsetStyle = useSideInsetStyle();
   // The screen resolves the reader's role once and hands it down: this form
   // renders no billing step beside the failure line, so a money role reads the
   // sentence that names the destination instead of one that claims an owner
@@ -136,7 +145,16 @@ export function ModelAccessForm({
   if (synced !== form) {
     setForm(synced);
   }
-  const { baseline, draft } = form;
+  // A role that fails the manage check mid-session — a refetch delivering a
+  // demotion — turns the screen read-only without remounting it, and the screen
+  // must then present the organization's saved policy alone. So the displayed
+  // draft is the saved one for that viewer while `form.draft` keeps the person's
+  // edits untouched: Save is disabled and `onSave` refuses, the draft is clean
+  // so Cancel is disabled and no viewer press can clear the account's stored
+  // copy, and a role that comes back within the same mount shows the edits again
+  // instead of discarding them.
+  const { baseline } = form;
+  const draft = canEdit ? form.draft : baseline;
 
   // The lists also live in the account-scoped encrypted store: a device language
   // change that flips the text direction reloads the bundle, which kills this
@@ -155,9 +173,19 @@ export function ModelAccessForm({
   // replaces what the person already moved, and a restore runs once per mount.
   const touchedRef = useRef(false);
   const restoredRef = useRef(false);
-  const restoredDraft = formDraft.kind === 'ready' ? formDraft.value : null;
+  const restoredValue = formDraft.kind === 'ready' ? formDraft.value : null;
+  // A viewer who may not manage the organization never adopts a stored draft.
+  // The displayed list is already the saved baseline for that viewer, and this
+  // gate keeps `form.draft` clean too, so a role that returns within the same
+  // mount shows the person's own edits rather than a stored draft written under
+  // a viewer. The stored value stays where it is instead of being cleared: it is
+  // the account's own unfinished work from a session that held the role, a
+  // person may hold it again, and the durable draft exists to survive exactly
+  // that reload. Nothing is lost for the viewer, who reads the saved policy, and
+  // the next editor mount restores the draft as before.
+  const restoredDraft = restoredValue === null ? null : canonicalDraft(restoredValue);
   useEffect(() => {
-    if (restoredDraft === null || touchedRef.current || restoredRef.current) {
+    if (!canEdit || restoredDraft === null || touchedRef.current || restoredRef.current) {
       return;
     }
     restoredRef.current = true;
@@ -170,7 +198,9 @@ export function ModelAccessForm({
       draft: restoredDraft,
       providerListEdited: providerListEditedBy(previous, restoredDraft),
     }));
-  }, [restoredDraft]);
+    // The role is a dependency too: a draft that lands while the role is still
+    // unknown restores once the role arrives and says this person may edit.
+  }, [canEdit, restoredDraft]);
 
   const dirty = !draftsEqual(draft, baseline);
   const saving = feedback.status === 'pending';
@@ -203,7 +233,10 @@ export function ModelAccessForm({
   });
   const blockingIssue =
     savePayload.kind === 'ready' ? null : t(BLOCKING_ISSUE_KEYS[savePayload.kind]);
-  const cannotSave = !dirty || saving || savePayload.kind !== 'ready';
+  // A viewer who may not manage the organization cannot write, so Save is
+  // disabled for the same reason the two lists are; the rest of the reading —
+  // a clean draft, a save in flight, a refused payload — holds either way.
+  const cannotSave = !canEdit || !dirty || saving || savePayload.kind !== 'ready';
   const noticeFacts = { catalogUnavailable, catalogProvidersEmpty, providersEmpty };
   const noticeKey = providerDataNotice(noticeFacts);
   const notice = noticeKey === null ? null : t(noticeKey);
@@ -221,7 +254,9 @@ export function ModelAccessForm({
   };
 
   const onSave = async () => {
-    if (savePayload.kind !== 'ready') {
+    // The disabled control already refuses a viewer's press; this guard keeps a
+    // stale one from reaching the mutation.
+    if (!canEdit || savePayload.kind !== 'ready') {
       return;
     }
     const attempt = begin();
@@ -272,67 +307,78 @@ export function ModelAccessForm({
 
   return (
     <View className="flex-1">
-      <View className="gap-3 px-4 pt-3">
-        {/* The warning tile marks missing data; the message takes the body
+      {/* The inset rides on this wrapper: inline padding on the padded block
+          would replace the page gutter its class draws. */}
+      <View style={sideInsetStyle}>
+        <View className="gap-3 px-4 pt-3">
+          {/* The warning tile marks missing data; the message takes the body
             ink, because the muted neutral fails body-text contrast on it. */}
-        {notice === null ? null : (
-          <View className="flex-row items-center gap-3 rounded-xl border border-warn-tile-border bg-warn-tile-bg px-3 py-2">
-            <Text className="flex-1 text-foreground">{notice}</Text>
+          {notice === null ? null : (
+            <View className="flex-row items-center gap-3 rounded-xl border border-warn-tile-border bg-warn-tile-bg px-3 py-2">
+              <Text className="flex-1 text-foreground">{notice}</Text>
+              <Button
+                variant="outline"
+                size="sm"
+                loading={catalogIsFetching}
+                onPress={onRetryCatalog}
+              >
+                <Text>{t('common.retry')}</Text>
+              </Button>
+            </View>
+          )}
+          <SegmentedControl
+            options={[
+              { value: 'models' as const, label: t('organizationModelAccess.tabModels') },
+              { value: 'providers' as const, label: t('organizationModelAccess.tabProviders') },
+              { value: 'gateways' as const, label: t('organizationModelAccess.tabGateways') },
+            ]}
+            value={tab}
+            onChange={nextTab => {
+              // A tab change is the person looking elsewhere: a draft that lands
+              // after it must not move the lists under the tab they chose. A
+              // viewer has no edits of their own on the form, because the lists
+              // show the saved policy either way, so looking at another tab is
+              // not the person touching anything: marking the form touched would
+              // keep a stored draft from being adopted if the role arrives later
+              // in the same mount, and the person's next edit would overwrite it.
+              if (canEdit) {
+                touchedRef.current = true;
+              }
+              setTab(nextTab);
+            }}
+            accessibilityLabel={t('organization.settingsOnWeb.providersAndModels')}
+          />
+          {canEdit ? null : <Text variant="caption">{t('organizationModelAccess.readOnly')}</Text>}
+          {/* The buttons keep their place while the draft is clean, so a save
+            that settles never moves the list below them. */}
+          <View className="flex-row items-center gap-2">
+            <View className="min-h-5 flex-1 justify-center">
+              <AccessibleStatus
+                message={statusMessage}
+                tone={feedback.status === 'failed' ? 'error' : 'status'}
+                className="text-sm"
+              />
+            </View>
             <Button
               variant="outline"
               size="sm"
-              loading={catalogIsFetching}
-              onPress={onRetryCatalog}
+              disabled={!dirty || saving}
+              onPress={() => {
+                clearWhere(() => true);
+                // Cancel is a deliberate discard: the stored copy goes with the
+                // screen's, or a language-direction reload would restore exactly
+                // the edits the person just threw away.
+                touchedRef.current = true;
+                formDraft.clear();
+                setForm(previous => ({ ...previous, draft: previous.baseline }));
+              }}
             >
-              <Text>{t('common.retry')}</Text>
+              <Text>{t('common.cancel')}</Text>
+            </Button>
+            <Button size="sm" loading={saving} disabled={cannotSave} onPress={() => void onSave()}>
+              <Text>{t('common.save')}</Text>
             </Button>
           </View>
-        )}
-        <SegmentedControl
-          options={[
-            { value: 'models' as const, label: t('organizationModelAccess.tabModels') },
-            { value: 'providers' as const, label: t('organizationModelAccess.tabProviders') },
-            { value: 'gateways' as const, label: t('organizationModelAccess.tabGateways') },
-          ]}
-          value={tab}
-          onChange={nextTab => {
-            // A tab change is the person looking elsewhere: a draft that lands
-            // after it must not move the lists under the tab they chose.
-            touchedRef.current = true;
-            setTab(nextTab);
-          }}
-          accessibilityLabel={t('organization.settingsOnWeb.providersAndModels')}
-        />
-        {canEdit ? null : <Text variant="caption">{t('organizationModelAccess.readOnly')}</Text>}
-        {/* The buttons keep their place while the draft is clean, so a save
-            that settles never moves the list below them. */}
-        <View className="flex-row items-center gap-2">
-          <View className="min-h-5 flex-1 justify-center">
-            <AccessibleStatus
-              message={statusMessage}
-              tone={feedback.status === 'failed' ? 'error' : 'status'}
-              className="text-sm"
-            />
-          </View>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!dirty || saving}
-            onPress={() => {
-              clearWhere(() => true);
-              // Cancel is a deliberate discard: the stored copy goes with the
-              // screen's, or a language-direction reload would restore exactly
-              // the edits the person just threw away.
-              touchedRef.current = true;
-              formDraft.clear();
-              setForm(previous => ({ ...previous, draft: previous.baseline }));
-            }}
-          >
-            <Text>{t('common.cancel')}</Text>
-          </Button>
-          <Button size="sm" loading={saving} disabled={cannotSave} onPress={() => void onSave()}>
-            <Text>{t('common.save')}</Text>
-          </Button>
         </View>
       </View>
 
@@ -353,12 +399,17 @@ export function ModelAccessForm({
               caption stays to keep the read-only explanation on screen. */}
           {providerRowsIncomplete &&
           !(savePayload.kind === 'provider-catalog-unavailable' && feedback.status !== 'failed') ? (
-            <Text variant="caption" className="px-4 pb-2">
-              {t('organizationModelAccess.providersNeedCatalog')}
-            </Text>
+            // The inset rides on this wrapper: an inline padding on the text
+            // would replace the page gutter its class draws.
+            <View style={sideInsetStyle}>
+              <Text variant="caption" className="px-4 pb-2">
+                {t('organizationModelAccess.providersNeedCatalog')}
+              </Text>
+            </View>
           ) : null}
           <ProviderAllowList
             providers={providers}
+            names={providerNames}
             draft={draft}
             onChange={onDraftChange}
             disabled={!canEdit || saving || providerRowsIncomplete}

@@ -23,9 +23,23 @@ import {
   COMPACT_CONTROL_HIT_SLOP_DP,
   STATE_ACTION_CLASS,
 } from '@/lib/a11y/tap-target';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
-import { APPEAL_KEYS, statusLabel, TRIAGE_KEYS } from '@/lib/report-receipt-status';
+import {
+  classifyReadFailureKind,
+  readFailureKindIsRetryable,
+  readFailureKindVariant,
+} from '@/lib/query/read-failure-variant';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
+import {
+  APPEAL_KEYS,
+  REASON_KEYS,
+  statusLabel,
+  TARGET_KEYS,
+  TRIAGE_KEYS,
+} from '@/lib/report-receipt-status';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -91,7 +105,13 @@ export function ReportReceiptScreen() {
   const receipt = useQuery({
     ...trpc.moderation.getReportReceipt.queryOptions({ receiptId: receiptId ?? '' }),
     enabled: receiptId !== null,
+    // A paused first read leaves the skeleton on screen with no retry: the
+    // read neither answers nor fails while the online manager holds the device
+    // offline. It settles instead, and the reconnect refetch comes with it.
+    ...SETTLE_WHILE_OFFLINE,
   });
+  // Reactive: a connectivity commit re-picks the failure's variant.
+  const committedConnectivity = useCommittedConnectivityStatus();
 
   const appeal = useMutation(
     trpc.moderation.appealReport.mutationOptions({
@@ -126,13 +146,25 @@ export function ReportReceiptScreen() {
   if (receipt.isError) {
     // A receipt the server does not hold for this reader is not retryable; a
     // failure that could pass keeps its retry.
-    if (receipt.error.data?.code === 'NOT_FOUND') {
+    if (readTrpcErrorField(receipt.error, 'code') === 'NOT_FOUND') {
       return <InvalidRouteState backTo={ACCOUNT_ROUTE} />;
     }
+    // The read settles offline (`SETTLE_WHILE_OFFLINE`), so a failure the
+    // server never answered names the connection, and only a failure that can
+    // pass on a second attempt offers the retry.
+    const kind = classifyReadFailureKind({
+      errors: [receipt.error],
+      isPaused: receipt.fetchStatus === 'paused',
+      connectivity: committedConnectivity,
+    });
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('profile.reportReceipt.title')} />
-        <QueryError onRetry={() => void receipt.refetch()} isRetrying={receipt.isFetching} />
+        <QueryError
+          variant={readFailureKindVariant(kind)}
+          onRetry={readFailureKindIsRetryable(kind) ? () => void receipt.refetch() : undefined}
+          isRetrying={receipt.isFetching}
+        />
       </View>
     );
   }
@@ -170,6 +202,18 @@ export function ReportReceiptScreen() {
                   <Copy size={16} color={colors.mutedForeground} />
                 </Pressable>
               }
+            />
+            <KvRow
+              label={t('profile.reportReceipt.targetLabel')}
+              value={statusLabel(TARGET_KEYS, receipt.data.targetKind)}
+              valueFace="text"
+              valueEllipsizeMode="tail"
+            />
+            <KvRow
+              label={t('profile.reportReceipt.reasonLabel')}
+              value={statusLabel(REASON_KEYS, receipt.data.reason)}
+              valueFace="text"
+              valueEllipsizeMode="tail"
             />
             <KvRow
               label={t('common.status')}

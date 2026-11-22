@@ -4,6 +4,7 @@ import {
   type WorkspaceSnapshotIdentity,
 } from '../sandbox/workspace-snapshot.js';
 import { readCustomerBillingFailure } from '../../persistence/customer-billing-failure.js';
+import { sameHostedGitHubRepositories } from '../../persistence/hosted-github-repositories.js';
 import { DurableObject } from 'cloudflare:workers';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
@@ -139,7 +140,7 @@ import {
   type ControlPlaneWorktreeCaptureInput,
   type ControlPlaneWorkspaceStoppedPayload,
 } from '../../shared/control-plane-protocol.js';
-import { projectStoredRouteSpecSkills } from '../../shared/runtime-profile.js';
+import { projectStoredRouteSpec } from '../../shared/runtime-profile.js';
 import {
   worktreeBranchOperationResultSchema,
   type ControlPlaneWorktreeGitInput,
@@ -469,13 +470,14 @@ export type ControlPlaneSessionRegistration = z.infer<typeof controlPlaneSession
 
 /**
  * A registration read back from storage carries the runtime skills written
- * under an earlier path rule; it keeps the entries the current rule accepts so
- * the session still loads its identity and spec. The registration that arrives
- * from the Worker is parsed with the strict schema above.
+ * under an earlier path rule and runtime agents whose slug the CLI owns; it
+ * keeps the entries the current rules accept so the session still loads its
+ * identity and spec. The registration that arrives from the Worker is parsed
+ * with the strict schema above.
  */
 const storedControlPlaneSessionRegistrationSchema = z.preprocess(raw => {
   if (typeof raw !== 'object' || raw === null || !('spec' in raw)) return raw;
-  return { ...raw, spec: projectStoredRouteSpecSkills(raw.spec) };
+  return { ...raw, spec: projectStoredRouteSpec(raw.spec) };
 }, controlPlaneSessionRegistrationSchema);
 
 function statusWorkspaceIdentity(registration: ControlPlaneSessionRegistration | null) {
@@ -1835,6 +1837,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       (existing.allowSubagentSessions ?? false) === (metadata.allowSubagentSessions ?? false) &&
       existing.parentCloudAgentSessionId === metadata.parentCloudAgentSessionId &&
       sameRepository(existing.repository, metadata.repository) &&
+      sameHostedGitHubRepositories(
+        existing.hostedGitHubRepositories,
+        metadata.hostedGitHubRepositories
+      ) &&
+      (existing.hostedGitHubRepositories === undefined ||
+        existing.workspace?.generatedBranchName === metadata.workspace?.generatedBranchName) &&
       sameSandboxProviderBinding(
         getSandboxProviderBinding(existing),
         getSandboxProviderBinding(metadata)

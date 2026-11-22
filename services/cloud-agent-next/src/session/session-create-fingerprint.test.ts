@@ -109,3 +109,33 @@ describe('session create intent fingerprint and the environment selection', () =
     expect(sorted).not.toBe(bare);
   });
 });
+
+describe('hosted repository create fingerprint', () => {
+  const manifest = {
+    integrationId: '22222222-2222-4222-8222-222222222222',
+    primary: { id: 12, fullName: 'acme/widgets' },
+    additional: [{ id: 34, fullName: 'acme/api' }],
+  };
+
+  it('keeps existing single-repository operation keys compatible', async () => {
+    expect(
+      await sessionCreateIntentFingerprint({ ...REQUEST, hostedGitHubRepositories: undefined })
+    ).toBe(FINGERPRINT_AT_HEAD);
+  });
+
+  it('binds each stable ID and resolved checkout name to the operation', async () => {
+    const fingerprint = (hostedGitHubRepositories: typeof manifest) =>
+      sessionCreateIntentFingerprint({ ...REQUEST, hostedGitHubRepositories });
+    const original = await fingerprint(manifest);
+    expect(original).not.toBe(FINGERPRINT_AT_HEAD);
+    expect(
+      await fingerprint({ ...manifest, additional: [{ id: 56, fullName: 'acme/api' }] })
+    ).not.toBe(original);
+    expect(
+      await fingerprint({ ...manifest, additional: [{ id: 34, fullName: 'acme/renamed' }] })
+    ).not.toBe(original);
+    expect(
+      await fingerprint({ ...manifest, primary: { id: 56, fullName: 'acme/widgets' } })
+    ).not.toBe(original);
+  });
+});

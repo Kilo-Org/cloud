@@ -1,9 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
 import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 
 import { useContextPicker } from '@/components/context-control';
-import { useTRPC } from '@/lib/trpc';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 
 /**
  * The Home header's account picker, opened. A design-gate run cannot press the
@@ -22,10 +21,12 @@ import { useTRPC } from '@/lib/trpc';
  * `src/app/+native-intent.tsx`.
  */
 export function AccountPickerSheetFixture() {
-  const trpc = useTRPC();
   const router = useRouter();
   const navigation = useNavigation();
-  const organizations = useQuery(trpc.organizations.list.queryOptions());
+  // Reads the shared memberships entry through the hook that owns its options:
+  // a second observer with defaulted options would replace them while this
+  // route is mounted and leave every other consumer's read paused with no data.
+  const organizations = useOrganizationsList();
   const { openPicker } = useContextPicker(organizations.data);
   // The header's control refuses to open while the list is still loading, so
   // opening on mount would measure nothing. Open once, the first time the rows

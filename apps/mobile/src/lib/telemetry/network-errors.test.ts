@@ -556,6 +556,58 @@ describe('createNetworkErrorFetch', () => {
     expect(JSON.stringify(event?.fingerprint)).not.toContain('access_token');
   });
 
+  it('(d4) leaves a breadcrumb and no event for a 403 carrying the blocked-account marker', async () => {
+    // The blocked-account refusal is the state the app renders deliberately
+    // (the blocked-account explanation): before the dedicated error shape it
+    // answered 401, which EXPECTED_HTTP_STATUSES already exempted. A 403
+    // without the marker still reports — see (d6).
+    const response = Response.json(
+      {
+        error: {
+          code: -32_600,
+          data: { code: 'FORBIDDEN', httpStatus: 403, accountBlocked: true },
+        },
+      },
+      { status: 403, statusText: 'Forbidden' }
+    );
+    const wrapped = createNetworkErrorFetch(resolvingFetch(response), {
+      source: 'trpc',
+      readResponseError: readTrpcResponseError,
+    });
+
+    const result = await wrapped('https://example.com/api/trpc/user.getMe');
+
+    expect(result).toBe(response);
+    expect(events).toHaveLength(0);
+    expect(breadcrumbs).toHaveLength(1);
+    expect(breadcrumbs[0]).toMatchObject({
+      category: 'network',
+      message: 'GET /api/trpc/user.getMe -> 403',
+    });
+  });
+
+  it('(d6) still reports a 403 whose body names no blocked-account marker', async () => {
+    const response = Response.json(
+      { error: { code: -32_600, data: { code: 'FORBIDDEN', httpStatus: 403 } } },
+      { status: 403, statusText: 'Forbidden' }
+    );
+    const wrapped = createNetworkErrorFetch(resolvingFetch(response), {
+      source: 'trpc',
+      readResponseError: readTrpcResponseError,
+    });
+
+    await wrapped('https://example.com/api/trpc/session.list');
+
+    expect(events).toHaveLength(1);
+    expect(breadcrumbs).toHaveLength(0);
+    expect(reportedEvent()?.fingerprint).toEqual([
+      'network-error',
+      'trpc',
+      'session.list',
+      'http.403',
+    ]);
+  });
+
   it('(e) does not report a 200 response', async () => {
     const response = new Response('ok', { status: 200 });
     const wrapped = createNetworkErrorFetch(resolvingFetch(response));

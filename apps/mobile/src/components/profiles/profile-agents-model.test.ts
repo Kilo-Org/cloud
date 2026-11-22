@@ -69,26 +69,27 @@ describe('mergePermissions', () => {
 
   it('keeps every stored rule the edit does not change', () => {
     const loaded: AgentPermissionMap = {
+      bash: { 'git *': 'allow', '*': 'ask' },
       read: 'ask',
-      bash: { 'git *': 'allow' },
       external_directory: null,
     };
 
-    expect(mergePermissions(loaded, readDisabledTools(loaded))).toEqual(loaded);
-    expect(mergePermissions(undefined, [])).toBeUndefined();
-  });
-
-  it('restores a stored rule once the switch returns to where it started', () => {
-    const loaded: AgentPermissionMap = { read: 'ask' };
-    const off = [...readDisabledTools(loaded), 'read'];
-
-    expect(mergePermissions(loaded, off)).toEqual({ read: 'deny' });
+    expect(mergePermissions(loaded, [...readDisabledTools(loaded), 'read'])).toEqual({
+      bash: { 'git *': 'allow', '*': 'ask' },
+      read: 'deny',
+      external_directory: null,
+    });
+    // `bash` holds a per-pattern map, so its switch starts on; off and back on is
+    // the cycle the sheet saves, so the loaded rules must survive it.
+    const cycle = [...readDisabledTools(loaded), 'bash'];
+    expect(mergePermissions(loaded, cycle)).toMatchObject({ bash: 'deny' });
     expect(
       mergePermissions(
         loaded,
-        off.filter(tool => tool !== 'read')
+        cycle.filter(t => t !== 'bash')
       )
     ).toEqual(loaded);
+    expect(mergePermissions(undefined, [])).toBeUndefined();
   });
 
   it('keeps a whole-agent action as the stored value', () => {
@@ -206,6 +207,11 @@ describe('validateAgentForm', () => {
 
   it('refuses a reserved or already-taken slug and allows a free one', () => {
     expect(validateAgentForm(formState({ slug: 'code' }))).toBe('slug-conflict');
+    expect(validateAgentForm(formState({ slug: 'general' }))).toBe('slug-conflict');
+    expect(validateAgentForm(formState({ slug: 'explore' }))).toBe('slug-conflict');
+    expect(validateAgentForm(formState({ slug: 'compaction' }))).toBe('slug-conflict');
+    expect(validateAgentForm(formState({ slug: 'title' }))).toBe('slug-conflict');
+    expect(validateAgentForm(formState({ slug: 'summary' }))).toBe('slug-conflict');
     expect(validateAgentForm(formState({ slug: 'reviewer' }), ['reviewer'])).toBe('slug-conflict');
     expect(validateAgentForm(formState({ slug: 'reviewer' }), ['plan'])).toBeNull();
   });

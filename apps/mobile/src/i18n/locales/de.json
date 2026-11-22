@@ -309,6 +309,7 @@
     "hideBalance": "Guthaben ausblenden",
     "showBalance": "Guthaben anzeigen",
     "balanceHidden": "Guthaben ausgeblendet",
+    "availableToSpendInOrganization": "In dieser Organisation zum Ausgeben verfügbar",
     "signOutTitle": "Abmelden?",
     "signOutMessage": "Du musst dich erneut anmelden, um auf deinen Arbeitsbereich zuzugreifen.",
     "deleteAccountTitle": "Konto löschen?",
@@ -450,6 +451,17 @@
       "location": "Vertex-Standort",
       "clientEmail": "E-Mail-Adresse des Dienstkontos",
       "privateKey": "Privater Schlüssel des Dienstkontos",
+      "privateKeyBlockRequired": "Füge den gesamten Schlüsselblock ein, von der BEGIN-Zeile bis zur END-Zeile.",
+      "privateKeyEncrypted": "Dieser Schlüsselblock ist mit einer Passphrase geschützt. Füge einen Schlüssel des Dienstkontos ein, der keine Passphrase hat.",
+      "names": {
+        "codestral": "Nur veraltetes Codestral",
+        "openai": "OpenAI-API",
+        "openaiChatgpt": "OpenAI (Mit ChatGPT anmelden)",
+        "xiaomi": "Xiaomi (Nutzungsbasierte Abrechnung)",
+        "zai": "Z.ai (Nutzungsbasierte Abrechnung)",
+        "bedrockByok": "Amazon Bedrock (direkt)",
+        "vertexByok": "Google Vertex AI (direkt)"
+      },
       "modelMappings": "Modellzuordnungen",
       "modelMappingsDescription": "Leite ein Gateway-Modell an einen benutzerdefinierten Deployment-Namen weiter.",
       "mappingTitle": "Zuordnung {{number}}",
@@ -510,6 +522,7 @@
       "receiptLabel": "Bestätigung",
       "copyReceiptId": "Bestätigungs-ID kopieren",
       "appealLabel": "Einspruch",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Eingegangen",
       "triageOpen": "In Prüfung",
       "triageActioned": "Stattgegeben",
@@ -527,13 +540,23 @@
       "nextStepInReview": "Das Ergebnis erscheint auf diesem Bildschirm, und nach einer Entscheidung kannst du Einspruch einlegen.",
       "nextStepAppeal": "Das Ergebnis deines Einspruchs erscheint auf diesem Bildschirm.",
       "nextStepFinal": "Die Entscheidung über den Einspruch ist endgültig. Ein weiterer Einspruch ist nicht möglich.",
-      "viewReceipt": "Bestätigung anzeigen"
+      "viewReceipt": "Bestätigung anzeigen",
+      "targetLabel": "Gemeldetes Element",
+      "reasonLabel": "Meldegrund",
+      "targetMessage": "KI-Antwort",
+      "targetComment": "PR-Kommentar",
+      "targetUser": "Benutzer",
+      "reasonHarmful": "Schädlicher Inhalt",
+      "reasonIllegal": "Rechtswidriger Inhalt",
+      "reasonHarassment": "Belästigung",
+      "reasonSpam": "Unerwünschte Werbung",
+      "reasonOther": "Sonstiger Grund"
     },
     "reportReceipts": {
       "title": "Meldungen",
       "rowSubtitle": "Eingereichte Meldungen und ihre Ergebnisse",
       "emptyTitle": "Noch keine Meldungen",
-      "emptyDescription": "Meldungen, die du zu einem Kommentar oder einer KI-Antwort einreichst, erscheinen hier.",
+      "emptyDescription": "Meldungen, die du zu einem Kommentar in einer Pull-Request-Diskussion oder zu einer KI-Antwort in einer Agentensitzung einreichst, erscheinen hier mit ihrem Ergebnis.",
       "couldNotLoad": "Deine Meldungen konnten nicht geladen werden",
       "capped": "Deine neuesten Meldungen werden angezeigt."
     },
@@ -544,7 +567,10 @@
     "changelogFixesPolish": "Fehlerbehebungen und Verbesserungen in der gesamten App.",
     "changelogAreas": {
       "signIn": "Anmeldung",
-      "profileOrganizations": "Profil & Organisationen"
+      "profileOrganizations": "Profil & Organisationen",
+      "chat": "Unterhaltung",
+      "notifications": "Benachrichtigungen",
+      "integrations": "Integrationen"
     }
   },
   "preferences": {
@@ -638,6 +664,8 @@
       "emptyTitle": "Noch keine Benachrichtigungen",
       "emptyCategoryTitle": "Noch keine Benachrichtigungen in dieser Kategorie",
       "emptyBody": "Benachrichtigungen, die dieses Konto erhält, erscheinen hier. Sie werden {{days}} Tage lang aufbewahrt.",
+      "emptyBody_one": "Benachrichtigungen, die dieses Konto erhält, erscheinen hier. Sie werden {{days}} Tage lang aufbewahrt.",
+      "emptyBody_other": "Benachrichtigungen, die dieses Konto erhält, erscheinen hier. Sie werden {{days}} Tage lang aufbewahrt.",
       "capped": "Es werden die neuesten Benachrichtigungen angezeigt.",
       "loadError": "Der Benachrichtigungsverlauf konnte nicht geladen werden.",
       "openFailed": "Diese Benachrichtigung lässt sich nirgendwo mehr öffnen."
@@ -718,6 +746,7 @@
       "manageAccess": "Zugriff verwalten",
       "bitbucketNoRepositoriesDescription": "In diesem Bitbucket-Workspace sind keine Repositories verfügbar.",
       "gitlabNoRepositoriesDescription": "Du musst möglicherweise Zugriff auf weitere Gruppen oder Projekte in GitLab gewähren.",
+      "githubNoRepositoriesDescription": "Prüfe, ob die GitHub-App von Kilo Zugriff auf deine Repositorys hat, und aktualisiere dann die Liste.",
       "installGithubApp": "GitHub-App auf Repositories installieren",
       "installGithubAppDescription": "Gewähre der Kilo-GitHub-App Zugriff auf die Repositories, die du prüfen lassen möchtest.",
       "repositoryAccess": "repository-Zugriff",
@@ -738,6 +767,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "Die Bitbucket-Verbindung für {{organization}} wird im Web über einen Computer verwaltet.",
+      "deniedManagedByOwner": "Bitte einen Inhaber von {{organization}}, die Verbindung zu ändern, die du nicht ändern kannst.",
+      "deniedConnectRole": "Nur Inhaber, Admins und Abrechnungsmanager von {{organization}} können die Verbindung herstellen.",
+      "deniedReconnectRole": "Bitte einen Inhaber, Admin oder Abrechnungsmanager von {{organization}}, sie wiederherzustellen.",
       "managedOnWebTitle": "Im Web verwaltet",
       "managedOnWebShort": "Diese Verbindung wird im Web über einen Computer verwaltet.",
       "managedOnWebRepositories": "Wähle die Repositories für {{organization}} im Web über einen Computer aus.",
@@ -809,7 +841,7 @@
       "findingsInProgress": "Dieses Review läuft noch. Befunde erscheinen hier, sobald es abgeschlossen ist.",
       "findingsEndedWithoutResults": "Dieses Review wurde beendet, bevor Befunde entstanden sind.",
       "serviceUnavailable": "Der Code-Review-Dienst konnte nicht erreicht werden. Führe das Review erneut aus, wenn der Dienst verfügbar ist.",
-      "reviewFailed": "Das Review ist fehlgeschlagen. Bitte versuche es erneut.",
+      "reviewFailed": "Das Review ist fehlgeschlagen.",
       "retryMessage": "Das Code-Review wird erneut ausgeführt.",
       "retryReview": "Review erneut ausführen",
       "retryNeedsSettings": "Der Code-Prüfer ist ausgeschaltet oder seine Einstellungen erfordern Aufmerksamkeit. Korrigiere die Einstellungen und führe dieses Review dann erneut aus.",
@@ -841,7 +873,7 @@
       "toolNameError": "Beim Werkzeug {{name}} ist ein Fehler aufgetreten.",
       "cancelReasonSuperseded": "Es wurde ein neuerer Commit gepusht, daher wurde dieses Review ersetzt.",
       "cancelReasonIntegrationDisconnected": "{{platform}} ist nicht verbunden, daher wurde dieses Review abgebrochen. Stelle die Verbindung wieder her und führe das Review erneut aus.",
-      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer wurde für Bitbucket deaktiviert, daher wurde dieses Review abgebrochen. Aktiviere es wieder und führe das Review erneut aus.",
+      "cancelReasonBitbucketReviewerDisabled": "Der Code-Prüfer wurde für Bitbucket deaktiviert, daher wurde dieses Review abgebrochen. Aktiviere ihn wieder und führe das Review erneut aus.",
       "cancelReasonBitbucketPullRequestChanged": "Der Bitbucket-Pull-Request wurde geändert, daher wurde dieses Review ersetzt.",
       "cancelReasonCancelled": "Dieses Review wurde abgebrochen.",
       "cancelReasonInterrupted": "Dieses Review wurde unterbrochen."
@@ -851,7 +883,7 @@
       "connectOwnerOnly": "Bitte einen Organisationsinhaber oder Admin, einen Anbieter zu verbinden.",
       "couldNotLoad": "Die Reviews konnten nicht geladen werden.",
       "noReviews": "Noch keine Reviews",
-      "noReviewsDescription": "Hier erscheinen Reviews, sobald Code Reviewer einen Pull-Request prüft.",
+      "noReviewsDescription": "Hier erscheinen Reviews, sobald der Code-Prüfer einen Pull-Request prüft.",
       "startManualReview": "Manuelles Review starten",
       "title": "Letzte Reviews"
     },
@@ -925,7 +957,7 @@
       "set": "Festgelegt",
       "notSet": "Nicht festgelegt"
     },
-    "updateFailed": "Code Reviewer konnte nicht aktualisiert werden.",
+    "updateFailed": "Der Code-Prüfer konnte nicht aktualisiert werden.",
     "configSaveFailed": "Die Review-Einstellungen konnten nicht gespeichert werden.",
     "status": {
       "interrupted": "Unterbrochen"
@@ -948,26 +980,26 @@
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "description": "Code Reviewer wurde deaktiviert, weil Kilo über keine aktive GitHub-App-Installation auf dieses Repository zugreifen kann. Aktualisiere die GitHub-App-Installation und aktiviere Code Reviewer anschließend wieder.",
+        "description": "Der Code-Prüfer wurde deaktiviert, weil Kilo über keine aktive GitHub-App-Installation auf dieses Repository zugreifen kann. Aktualisiere die GitHub-App-Installation und aktiviere ihn anschließend wieder.",
         "recoveryLabel": "GitHub-App aktualisieren"
       },
       "githubIpAllowList": {
-        "description": "Code Reviewer wurde deaktiviert, weil die Liste zulässiger IP-Adressen dieser GitHub-Organisation Kilo blockiert. Wende dich an {{supportEmail}}, um Hilfe zu erhalten. Aktiviere Code Reviewer anschließend wieder."
+        "description": "Der Code-Prüfer wurde deaktiviert, weil die Liste zulässiger IP-Adressen dieser GitHub-Organisation Kilo blockiert. Wende dich an {{supportEmail}}, um Hilfe zu erhalten. Aktiviere ihn anschließend wieder."
       },
       "gitlabProjectAccessRequired": {
-        "description": "Code Reviewer wurde deaktiviert, weil Kilo für dieses GitLab-Projekt kein Projektzugriffstoken erstellen kann. Gewähre Zugriff mit der Rolle Maintainer oder aktiviere Projektzugriffstoken. Aktiviere Code Reviewer anschließend wieder.",
+        "description": "Der Code-Prüfer wurde deaktiviert, weil Kilo für dieses GitLab-Projekt kein Projektzugriffstoken erstellen kann. Gewähre Zugriff mit der Rolle Maintainer oder aktiviere Projektzugriffstoken. Aktiviere ihn anschließend wieder.",
         "recoveryLabel": "GitLab-Integration aktualisieren"
       },
       "byokInvalidKey": {
-        "description": "Code Reviewer wurde deaktiviert, weil der ausgewählte BYOK-API-Schlüssel ungültig ist, widerrufen wurde oder nicht die nötigen Berechtigungen hat. Aktualisiere den Schlüssel oder wähle ein anderes Modell. Aktiviere Code Reviewer anschließend wieder.",
+        "description": "Der Code-Prüfer wurde deaktiviert, weil der ausgewählte BYOK-API-Schlüssel ungültig ist, widerrufen wurde oder nicht die nötigen Berechtigungen hat. Aktualisiere den Schlüssel oder wähle ein anderes Modell. Aktiviere den Code-Prüfer anschließend wieder.",
         "recoveryLabel": "BYOK-Einstellungen aktualisieren"
       },
       "selectedModelUnavailable": {
-        "description": "Code Reviewer wurde deaktiviert, weil das ausgewählte Modell für Cloud-Agent-Sitzungen nicht verfügbar ist. Wähle ein verfügbares Modell und aktiviere Code Reviewer anschließend wieder.",
-        "recoveryLabel": "Code-Reviewer-Einstellungen aktualisieren"
+        "description": "Der Code-Prüfer wurde deaktiviert, weil das ausgewählte Modell für Cloud-Agent-Sitzungen nicht verfügbar ist. Wähle ein verfügbares Modell und aktiviere ihn anschließend wieder.",
+        "recoveryLabel": "Code-Prüfer-Einstellungen aktualisieren"
       },
       "repeatedRepositoryCloneTimeout": {
-        "description": "Code Reviewer wurde deaktiviert, weil heute beim Klonen des Repositorys dreimal das Zeitlimit überschritten wurde. Wende dich an {{supportEmail}}, um Hilfe zu erhalten. Aktiviere Code Reviewer anschließend wieder."
+        "description": "Der Code-Prüfer wurde deaktiviert, weil heute beim Klonen des Repositorys dreimal das Zeitlimit überschritten wurde. Wende dich an {{supportEmail}}, um Hilfe zu erhalten. Aktiviere ihn anschließend wieder."
       },
       "title": "Beim Code-Prüfer musst du eingreifen.",
       "recoveryLabel": "Support kontaktieren"
@@ -1010,7 +1042,9 @@
       "unavailablePersonallySwitchAction": "Organisation wechseln",
       "unavailableOrganizationTitle": "Gremium-Review ist derzeit nicht verfügbar",
       "unavailableForOrganization": "Gremium-Review benötigt den Enterprise-Plan mit einem aktiven Abo oder einer Testphase. Diese Organisation hat es derzeit nicht.",
-      "unavailableForOrganizationNeutral": "Gremium-Review ist derzeit für diese Organisation nicht verfügbar. Versuchen Sie es später erneut.",
+      "unavailablePlanCheck": "Gremium-Review konnte den Plan dieser Organisation nicht prüfen. Versuche es erneut, um die Prüfung zu wiederholen.",
+      "unavailableFlagRollout": "Gremium-Review ist für diese Organisation noch nicht verfügbar. Aktualisiere die App auf die neueste Version, um es zu erhalten.",
+      "unavailableForOrganizationMember": "Gremium-Review benötigt den Enterprise-Plan mit einem aktiven Abo oder einer Testphase. Ein Organisationsinhaber kann den Plan ändern.",
       "unavailableOnBitbucket": "Gremium-Review ist für Bitbucket-Repositories nicht verfügbar.",
       "noRepositories": "Noch keine Code-Repositories ausgewählt. Wähle zuerst Code-Repositories in den Repository-Einstellungen aus.",
       "specialists": "Spezialisten",
@@ -1985,8 +2019,7 @@
       "searchPlaceholder": "Code-Repositories suchen",
       "noMatches": "Keine Treffer",
       "noRepositories": "Keine Repositorys verfügbar",
-      "noRepositoriesDescription": "Mit deinem Konto sind keine Repositorys verbunden.",
-      "loading": "Wird geladen…",
+      "noRepositoriesDescription": "Verbinde GitHub oder GitLab, um Repositorys zu laden.",
       "accessibility": "Code-Repository: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -2500,6 +2533,12 @@
     "retryLoadingAccount": "Konto erneut laden",
     "retryLoadingPrivacy": "Datenschutzeinstellungen erneut laden"
   },
+  "accountBlocked": {
+    "title": "Konto gesperrt",
+    "description": "Kilo hat dieses Konto gesperrt, und eine erneute Anmeldung hebt die Sperre nicht auf. Der Support kann die Sperre auf Anfrage prüfen.",
+    "domainDescription": "Kilo sperrt Konten auf dieser E-Mail-Domain, und eine erneute Anmeldung hebt die Sperre nicht auf. Der Support kann die Domain auf Anfrage prüfen.",
+    "contactSupport": "Support kontaktieren"
+  },
   "addCredits": {
     "cta": "Guthaben aufladen",
     "billingPage": "abrechnungsseite"
@@ -2858,8 +2897,9 @@
       "checkActiveConnection": "Die Verbindung ist aktiv, aber dieses Element kann weiterhin nicht geladen werden.",
       "bitbucketOrgOnlyDescription": "Wechsle das Konto oben zu einer Organisation, um deren Pull-Requests in Bitbucket zu prüfen.",
       "bitbucketOrgOnlyNoOrganizationDescription": "Diesem Konto ist noch keine Organisation zugeordnet. Du kannst Bitbucket-Pull-Requests prüfen, sobald du eine Organisation erstellst oder einer beitrittst.",
-      "gitlabReconnectAdminOnlyDescription": "Bitte einen Inhaber, Admin oder Abrechnungsmanager, sie wiederherzustellen.",
+      "reconnectAdminOnlyDescription": "Bitte einen Inhaber, Admin oder Abrechnungsmanager, sie wiederherzustellen.",
       "bitbucketNotConnectedTitle": "Bitbucket ist nicht verbunden",
+      "bitbucketAdminOnlyDescription": "Bitte einen Inhaber, Admin oder Abrechnungsmanager, es zu verbinden.",
       "adminOnlyConnectDescription": "Nur Organisationsinhaber, Admins und Abrechnungsmanager können die Verbindung herstellen.",
       "contextLine": "Für {{organization}}",
       "contextLinePersonal": "Für den persönlichen Bereich"
@@ -3432,7 +3472,7 @@
       "manageOnWeb": "Abrechnungseinstellungen im Web",
       "changePlan": "Plan ändern",
       "buySeats": "Nutzerplätze kaufen",
-      "managedOnWeb": "Plan, Nutzerplätze und automatische Aufladung werden im Web verwaltet.",
+      "managedOnWeb": "Plan, Nutzerplätze und automatische Aufladung werden unter kilo.ai verwaltet.",
       "setupAutoTopUp": "Automatische Aufladung einrichten",
       "manageAutoTopUp": "Automatische Aufladung verwalten",
       "opensOnWeb": "Wird im Web geöffnet"
@@ -3630,10 +3670,10 @@
       "nameLabel": "Modusname",
       "nameRequired": "Modusnamen eingeben.",
       "notFound": "Dieser Modus existiert nicht mehr.",
-      "restrictionHint": "Nur Dateien, die diesem Muster entsprechen, können bearbeitet werden. Leer lassen, um alle Dateien zuzulassen.",
-      "restrictionInvalid": "Gültiges Muster eingeben.",
+      "restrictionHint": "Ein regulärer Ausdruck legt fest, welche Dateien dieser Modus bearbeiten darf, zum Beispiel `\\.md$` nur für Markdown-Dateien. Lass das Feld leer, um alle Dateien zuzulassen.",
+      "restrictionInvalid": "Gib einen gültigen regulären Ausdruck ein.",
       "restrictionLabel": "Bezeichnung der Einschränkung",
-      "restrictionPattern": "Dateimuster",
+      "restrictionPattern": "Dateieinschränkung",
       "roleLabel": "Rollendefinition",
       "roleRequired": "Beschreiben, was dieser Modus tut.",
       "tool": {
@@ -3713,7 +3753,7 @@
     "emailDeliveryFailed": "Die E-Mail-Zustellung ist vorübergehend nicht verfügbar. Bitte versuche es später erneut.",
     "admissionRequired": "Dein Gerät kann nicht verifiziert werden. Wähle „$t(login.moreSignInOptions)“, um dich auf einem anderen Gerät oder im Browser anzumelden.",
     "default": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
-    "retryableAdmission": "Wir konnten dieses Gerät nicht verifizieren. Prüfe deine Verbindung und versuche es erneut.",
+    "retryableAdmission": "Dieses Gerät konnte nicht bestätigt werden. Versuche es erneut.",
     "startSignInFailed": "Die Anmeldung konnte nicht gestartet werden. Bitte versuche es erneut.",
     "couldNotOpenBrowser": "Der Browser konnte nicht geöffnet werden. Bitte versuche es erneut.",
     "signInTimedOut": "Die Zeit für die Anmeldung ist abgelaufen. Bitte versuche es erneut.",
@@ -4058,7 +4098,8 @@
         "space": "Es ist nicht genügend freier Speicherplatz für dieses Modell vorhanden. Gib Speicherplatz frei und versuche es erneut.",
         "network": "Der Download wurde nicht abgeschlossen. Prüfe deine Verbindung und versuche es erneut.",
         "invalidFile": "Die heruntergeladene Datei ist kein Modell, das diese App ausführen kann, und wurde daher entfernt.",
-        "checksum": "Die heruntergeladene Datei stimmt nicht mit ihrer veröffentlichten Prüfsumme überein und wurde daher entfernt. Versuche den Download erneut."
+        "checksum": "Die heruntergeladene Datei stimmt nicht mit ihrer veröffentlichten Prüfsumme überein und wurde daher entfernt. Versuche den Download erneut.",
+        "writeFailed": "Dieses Gerät konnte das Modell nicht speichern. Versuche den Download erneut."
       }
     },
     "catalog": {
@@ -4385,7 +4426,8 @@
       "promptPlaceholder": "Du bist ein…",
       "tools": "Werkzeuge",
       "wholeToolRule": "Dieser Agent wendet eine Regel gleichzeitig auf jedes Werkzeug an: {{rule}}. Diese Schalter sind schreibgeschützt.",
-      "visibility": "Sichtweite",
+      "toolRule": "Gespeicherte Regel: {{rule}}",
+      "visibility": "Sichtbarkeit",
       "visibilityPrimary": "Primär — wird im Picker angezeigt",
       "visibilitySubagent": "Subagent — nur von anderen aufrufbar",
       "visibilityAll": "Alle — beides",
@@ -4494,20 +4536,34 @@
       "deductionFallback": "Credit-Abzug",
       "emptyDescription": "Credit-Käufe, Belege und Nutzung werden hier angezeigt.",
       "emptyTitle": "Kein Credit-Verlauf",
+      "expiredGrant": "Abgelaufen: {{description}}",
       "googlePlayReceipt": "Beleg bei Google Play",
       "kind": {
         "adjustment": "Anpassung",
         "balanceNeutral": "Saldoneutral",
         "deduction": "Abzug",
         "grant": "Credit-Gutschrift",
+        "promotionalCredits": "Aktions-Credits",
         "welcomeCredits": "Willkommens-Credits",
         "purchase": "Kauf"
+      },
+      "program": {
+        "adminBulkGrant": "Admin-Credit-Gutschrift",
+        "contributorChampion": "Credits für Beitrags-Champions",
+        "feedback": "Feedback-Credits",
+        "influencer": "Influencer-Credits",
+        "ossMonthlyReset": "Monatliches Zurücksetzen des Open-Source-Guthabens",
+        "ossSponsorship": "Credits für Open-Source-Förderung",
+        "pullRequest": "Pull-Request-Credits",
+        "usageIssue": "Credits für Nutzungsprobleme",
+        "vibeDay": "Vibe-Day-Credits"
       },
       "purchaseFallback": "Credit-Kauf",
       "receipt": "Beleg",
       "receiptA11y": "Beleg für {{description}}, {{amount}}, vom {{date}} öffnen",
       "receiptUnavailable": "Für diesen Kauf ist kein Beleg verfügbar.",
-      "retentionLimit": "Es wird der neueste Credit-Verlauf angezeigt."
+      "retentionLimit": "Es wird der neueste Credit-Verlauf angezeigt.",
+      "voidedGrant": "Storniert: {{description}}"
     },
     "title": "Guthaben kaufen",
     "description": "Guthaben ist ein einmaliger Kauf, der deinem Kilo-Guthaben für AI-Codierungssitzungen in der Kilo App hinzugefügt wird. Der Store belastet dein Konto, und das Guthaben wird gutgeschrieben, sobald der Store die Zahlung bestätigt.",
@@ -4840,9 +4896,12 @@
       "condenseOnComplete": "Kontext verdichten, wenn der Lauf endet",
       "activeTitle": "Auslöser aktiv",
       "activeDescription": "Pausierte Webhooks antworten mit 404.",
-      "runAsCreator": "Als ich ausführen",
+      "runAsCreator": "In meinem Namen ausführen",
       "runAsCreatorDescription": "Jeder Lauf verwendet dein Konto, daher ist der geheime Header erforderlich.",
       "saveFailedTitle": "Der Auslöser konnte nicht gespeichert werden",
+      "nameTaken": "Ein Auslöser mit dem Namen „{{name}}“ existiert bereits.",
+      "saveFailedRetry": "Der Server konnte nicht erreicht werden. Prüfe deine Verbindung und versuche es erneut.",
+      "saveFailedCheck": "Prüfe die Werte im Formular und versuche es erneut.",
       "deleteTitle": "Diesen Auslöser löschen?",
       "deleteMessage": "Aufrufe an {{name}} schlagen fehl. Dies kann nicht rückgängig gemacht werden.",
       "deleteMessageScheduled": "Geplante Ausführungen von {{name}} werden gestoppt. Dies kann nicht rückgängig gemacht werden.",
@@ -5087,6 +5146,20 @@
       "eu": "Europäische Union",
       "au": "Australien",
       "jp": "Japan"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "Einstellungen suchen",
+    "noMatches": "Keine passenden Einstellungen",
+    "emptyDescription": "Versuche es mit einem anderen Einstellungsnamen oder Suchbegriff.",
+    "resultsStatus": "Gefundene Einstellungen: {{resultCount}}",
+    "keywords": {
+      "signOut": "abmelden|ausloggen|Abmeldung",
+      "appearance": "Farbschema|Dunkelmodus|Darstellung",
+      "appUnlock": "Biometrie|Gesichtserkennung|Fingerabdruck",
+      "language": "Sprache|Übersetzung|App-Sprache",
+      "notifications": "Mitteilungen|Hinweise|Push-Benachrichtigungen",
+      "privacy": "Nutzungsanalyse|Nachverfolgung|Datenschutz"
     }
   }
 }

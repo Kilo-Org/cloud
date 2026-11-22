@@ -1,5 +1,6 @@
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { ExternalLink } from '@/components/ui/icons';
+import { type TFunction } from 'i18next';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
@@ -18,7 +19,7 @@ import {
   type CreditPurchaseEntry,
 } from '@/lib/credits/credit-history';
 import { keepZoneWithDate } from '@/lib/credits/expiry-zone';
-import { formatDate, formatPrefixedMoney } from '@/lib/format';
+import { formatDate, formatSignedPrefixedMoney } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
@@ -45,9 +46,9 @@ function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | un
   return (dictionary as Readonly<Record<string, V | undefined>>)[key];
 }
 
-function deductionTypeLabel(kind: CreditDeduction['kind']): string {
+function deductionTypeLabel(t: TFunction, kind: CreditDeduction['kind']): string {
   const key = lookup(DEDUCTION_LABEL_KEYS, kind);
-  return key ? i18n.t(key) : kind;
+  return key ? t(key) : kind;
 }
 
 /**
@@ -60,8 +61,11 @@ const GRANT_LABEL_KEYS = {
   grant: 'credits.history.kind.grant',
 } satisfies Record<CreditGrantKind, string>;
 
-function grantTypeLabel(grant: { credit_source: string | null; is_free: boolean }): string {
-  return i18n.t(
+function grantTypeLabel(
+  t: TFunction,
+  grant: { credit_source: string | null; is_free: boolean }
+): string {
+  return t(
     GRANT_LABEL_KEYS[creditGrantKind({ creditSource: grant.credit_source, isFree: grant.is_free })]
   );
 }
@@ -71,18 +75,32 @@ const GRANT_TITLE_KEYS = {
   referral: 'kiloPass.bonusReferral',
   welcome: 'credits.history.kind.welcomeCredits',
   kilo_pass: 'kiloPass.title',
-  grant: 'credits.history.kind.grant',
+  promotional: 'credits.history.kind.promotionalCredits',
+  influencer: 'credits.history.program.influencer',
+  usage_issue: 'credits.history.program.usageIssue',
+  pull_request: 'credits.history.program.pullRequest',
+  vibe_day: 'credits.history.program.vibeDay',
+  feedback: 'credits.history.program.feedback',
+  admin_bulk_grant: 'credits.history.program.adminBulkGrant',
+  oss_sponsorship: 'credits.history.program.ossSponsorship',
+  oss_monthly_reset: 'credits.history.program.ossMonthlyReset',
+  contributor_champion: 'credits.history.program.contributorChampion',
   adjustment: 'credits.history.kind.adjustment',
 } satisfies Record<CreditGrantReason, string>;
 
+/**
+ * The row title a grant reason renders, in the reader's language. The catalog
+ * is read through the row's own translator, so React Compiler cannot cache one
+ * language's title across an in-place language switch.
+ */
+function grantTitle(t: TFunction, reason: CreditGrantReason): string {
+  return t(lookup(GRANT_TITLE_KEYS, reason) ?? 'credits.history.kind.grant');
+}
+
 /** A signed credit amount, kept in its own left-to-right run. */
 function creditAmountLabel(amountMicrodollars: number): string {
-  const isPositive = amountMicrodollars >= 0;
   return isolateLtrBidiText(
-    `${isPositive ? '+' : '-'}${formatPrefixedMoney(
-      Math.abs(fromMicrodollars(amountMicrodollars)),
-      i18n.language
-    )}`
+    formatSignedPrefixedMoney(fromMicrodollars(amountMicrodollars), i18n.language)
   );
 }
 
@@ -250,24 +268,57 @@ export const LedgerHistoryRow = memo(function LedgerHistoryRow({
   const { t } = useTranslation();
   // The purchase row carries the grant, its receipt, and its expiry date, so a
   // grant printed again here would read as a second purchase.
-  const purchase = grantListed ? null : deduction.purchase;
+  const grant = deduction.purchase;
+  const purchase = grantListed ? null : grant;
+  // The grant's own name: a free grant is titled from the reason the server
+  // recorded, so the row reads in the reader's language, while a paid grant
+  // keeps the description its receipts record. An empty stored description
+  // still names the row, the way the purchase list already falls back.
+  let grantName: string | null = null;
+  if (grant != null) {
+    grantName = grant.is_free
+      ? grantTitle(t, grant.kind)
+      : firstNonEmpty(grant.description, t('credits.history.purchaseFallback'));
+  }
+  const storedDescription = firstNonEmpty(
+    deduction.description,
+    t('credits.history.deductionFallback')
+  );
+  // Only a row whose own category is an expiry or a voidance, and whose grant
+  // is loaded, gets the framed line: anything else keeps the ledger's own
+  // description, which already names what happened. A voided grant was
+  // cancelled rather than left to run out, so it never reads as expired.
+  const expiryTitle =
+    deduction.expiry == null || grant == null
+      ? null
+      : t(
+          deduction.expiry === 'voided'
+            ? 'credits.history.voidedGrant'
+            : 'credits.history.expiredGrant',
+          { description: firstNonEmpty(grantName, storedDescription) }
+        );
+  // A paid grant keeps the description its receipt records, but an empty one
+  // still names the row.
+  const rowTitle = firstNonEmpty(grantName, storedDescription);
+  // Alone, the expiry line is the whole event: the grant it ended already has
+  // its own purchase row above.
+  const mainTitle = purchase != null ? rowTitle : (expiryTitle ?? rowTitle);
 
   return (
     <View className={cn('gap-2 px-4 py-3', !last && 'border-b-[0.5px] border-hair-soft')}>
       <LedgerLine
-        title={firstNonEmpty(
-          purchase?.description,
-          deduction.description,
-          t('credits.history.deductionFallback')
-        )}
-        typeLabel={purchase ? grantTypeLabel(purchase) : deductionTypeLabel(deduction.kind)}
+        title={mainTitle}
+        typeLabel={purchase ? grantTypeLabel(t, purchase) : deductionTypeLabel(t, deduction.kind)}
         amountMicrodollars={purchase ? purchase.amount_mUsd : deduction.amount_mUsd}
         date={purchase?.date ?? deduction.date}
       />
       {purchase != null && (
         <LedgerLine
-          title={firstNonEmpty(deduction.description, deductionTypeLabel(deduction.kind))}
-          typeLabel={deductionTypeLabel(deduction.kind)}
+          title={
+            expiryTitle ??
+            firstNonEmpty(deduction.description, deductionTypeLabel(t, deduction.kind))
+          }
+          typeLabel={deductionTypeLabel(t, deduction.kind)}
           amountMicrodollars={deduction.amount_mUsd}
           date={null}
           muted
@@ -293,7 +344,7 @@ export const GrantHistoryRow = memo(function GrantHistoryRow({
   const { t } = useTranslation();
   // A kind this app predates still paints a title: the generic grant label is
   // the row name, and an empty one reads as a broken row.
-  const title = t(lookup(GRANT_TITLE_KEYS, grant.kind) ?? 'credits.history.kind.grant');
+  const title = grantTitle(t, grant.kind);
 
   return (
     <View className={cn('gap-2 px-4 py-3', !last && 'border-b-[0.5px] border-hair-soft')}>

@@ -9,7 +9,7 @@ import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { NativeDownloadProgress } from '@/lib/native-transfer-progress';
 
 import { localTargetId } from './backend-target';
-import { ggufModelClient, loadProjector } from './gguf-client';
+import { ggufModelClient, projectorReadsImages } from './gguf-client';
 import { ggufDownloads } from './gguf-downloads';
 import {
   type GgufDownloadSource,
@@ -96,7 +96,9 @@ const downloads = ggufDownloads({
   storage,
   // The vocabulary and the template are enough for the window and the tool
   // rule. A projector checks its size against the model's weights, so a vision
-  // model loads in full to prove it reads images.
+  // model loads in full to prove it reads images. A projector llama.cpp cannot
+  // load throws, which verification reads as a refused read and runs again: only
+  // a projector that loads and reads no images is the verdict about the bytes.
   inspect: async (path, projector) => {
     const context = await initLlama({
       model: path,
@@ -107,7 +109,7 @@ const downloads = ggufDownloads({
       return {
         contextWindow: contextWindowFor(context.model.metadata),
         tools: templateSupportsTools(context.model.chatTemplates),
-        vision: projector !== undefined && (await loadProjector(context, projector, GPU)),
+        vision: projector !== undefined && (await projectorReadsImages(context, projector, GPU)),
         thinking: templateSupportsThinking(context.model.metadata),
       };
     } finally {

@@ -126,6 +126,7 @@ vi.mock('@/lib/telemetry/posthog-storage', () => ({
 }));
 vi.mock('react-native', () => ({
   AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+  Platform: { OS: 'ios' },
 }));
 // sonner-native is imported by secure-store-preference, which the remote MCP
 // store and the settings-tools switch warm at module scope. It resolves
@@ -186,6 +187,17 @@ vi.mock('@/lib/agent-attachments/clipboard-image', () => ({
 
 vi.mock('@/lib/temp-file-registry', () => ({
   reapTempFiles: vi.fn(),
+}));
+
+// The staged share deliveries read expo-file-system / expo-crypto on import.
+// This suite asserts the credential deletes; the boundary behavior lives in
+// `lib/share-*.test.ts`.
+vi.mock('@/lib/share-payload', () => ({
+  clearAccountStagedSharePayloads: vi.fn(),
+}));
+
+vi.mock('@/lib/share-navigation', () => ({
+  clearAccountStagedShareNavigation: vi.fn(),
 }));
 
 // The artifact mirror members of the same teardown read expo-file-system and
@@ -618,6 +630,38 @@ describe('refresh rotation', () => {
         sessionVersion: currentAuthEpoch(),
       });
       expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('releases a 429 answer instead of leaving its body on the wire', async () => {
+    store.set(AUTH_TOKEN_KEY, 'live-token');
+    store.set(REFRESH_TOKEN_KEY, 'live-refresh');
+    vi.mocked(SecureStore.getItemAsync).mockImplementation(async (key: string) => {
+      await Promise.resolve();
+      return store.get(key) ?? null;
+    });
+    // A 429 is classified on its status and `Retry-After` alone, so the refresh
+    // never reads this body: it must hand the unread response back rather than
+    // leave it holding the connection for the life of the app. Releasing is the
+    // caller's job — the transport only offers `release()` — so deleting that
+    // call in `doRefresh` has to fail here.
+    const response = Response.json({ error: 'RATE_LIMITED' }, { status: 429 });
+    const body = response.body;
+    if (body === null) {
+      throw new Error('a 429 fixture must carry a body to observe the release');
+    }
+    const cancel = vi.spyOn(body, 'cancel');
+    const fetchMock = vi.fn().mockResolvedValue(response);
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const outcome = await performRefresh();
+
+      expect(outcome).toMatchObject({ kind: 'transient' });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(cancel).toHaveBeenCalledTimes(1);
     } finally {
       vi.unstubAllGlobals();
     }

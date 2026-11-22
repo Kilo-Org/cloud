@@ -309,6 +309,7 @@
     "hideBalance": "ශේෂය සඟවන්න",
     "showBalance": "ශේෂය පෙන්වන්න",
     "balanceHidden": "ශේෂය සඟවා ඇත",
+    "availableToSpendInOrganization": "මෙම සංවිධානය තුළ වියදම් කිරීමට ලබා ගත හැක",
     "signOutTitle": "පිටවන්නද?",
     "signOutMessage": "ඔබේ වැඩබිමට පිවිසීමට නැවත පුරනය විය යුතුය.",
     "deleteAccountTitle": "ගිණුම මකන්නද?",
@@ -450,6 +451,17 @@
       "location": "Vertex ස්ථානය",
       "clientEmail": "සේවා ගිණුමේ ඊමේල් ලිපිනය",
       "privateKey": "සේවා ගිණුමේ පුද්ගලික යතුර",
+      "privateKeyBlockRequired": "BEGIN පේළියේ සිට END පේළිය දක්වා සම්පූර්ණ යතුරු කොටස අලවන්න.",
+      "privateKeyEncrypted": "මෙම යතුරු කොටස මුරපද වැකියකින් ආරක්ෂා කර ඇත. මුරපද වැකියක් නොමැති සේවා ගිණුමේ යතුරක් අලවන්න.",
+      "names": {
+        "codestral": "පැරණි Codestral පමණක්",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI (ChatGPT හරහා පිවිසෙන්න)",
+        "xiaomi": "Xiaomi (භාවිතය අනුව ගෙවන්න)",
+        "zai": "Z.ai (භාවිතය අනුව ගෙවන්න)",
+        "bedrockByok": "Amazon Bedrock (සෘජු)",
+        "vertexByok": "Google Vertex AI (සෘජු)"
+      },
       "modelMappings": "මාදිලි සිතියම්ගත කිරීම්",
       "modelMappingsDescription": "Gateway මාදිලියක් අභිරුචි deployment නාමයකට යවන්න.",
       "mappingTitle": "සිතියම්ගත කිරීම {{number}}",
@@ -510,12 +522,13 @@
       "receiptLabel": "රිසිට්පත",
       "copyReceiptId": "රිසිට්පතේ ID පිටපත් කරන්න",
       "appealLabel": "අභියාචනය",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "ලැබුණි",
       "triageOpen": "සමාලෝචනය වෙමින් පවතී",
       "triageActioned": "තහවුරු කරන ලදී",
       "triageRejected": "තහවුරු නොකෙරිණි",
       "appealNone": "කිසිවක් ඉදිරිපත් කර නැත",
-      "appealSubmitted": "සමාලෝචනය වෙමින් පවතී",
+      "appealSubmitted": "අභියාචනය සමාලෝචනය වෙමින් පවතී",
       "appealAccepted": "පිළිගන්නා ලදී",
       "appealRejected": "ප්‍රතික්ෂේප කරන ලදී",
       "appeal": "මෙම තීරණයට එරෙහිව අභියාචනා කරන්න",
@@ -527,13 +540,23 @@
       "nextStepInReview": "ප්‍රතිඵලය මෙම තිරයේ දිස්වනු ඇති අතර, තීරණයක් ගත් පසු ඔබට අභියාචනා කළ හැක.",
       "nextStepAppeal": "අභියාචනයේ ප්‍රතිඵලය මෙම තිරයේ දිස්වනු ඇත.",
       "nextStepFinal": "අභියාචන තීරණය අවසාන ය. තවදුරටත් අභියාචනයක් ඉදිරිපත් කළ නොහැක.",
-      "viewReceipt": "රිසිට්පත බලන්න"
+      "viewReceipt": "රිසිට්පත බලන්න",
+      "targetLabel": "වාර්තා කළ අයිතමය",
+      "reasonLabel": "වාර්තාවට හේතුව",
+      "targetMessage": "AI පිළිතුර",
+      "targetComment": "පුල් ඉල්ලීම් අදහස",
+      "targetUser": "පරිශීලකයා",
+      "reasonHarmful": "හානිකර අන්තර්ගතය",
+      "reasonIllegal": "නීති විරෝධී අන්තර්ගතය",
+      "reasonHarassment": "හිරිහැර කිරීම",
+      "reasonSpam": "අනවශ්‍ය පණිවිඩ",
+      "reasonOther": "වෙනත් හේතුවක්"
     },
     "reportReceipts": {
       "title": "වාර්තා",
       "rowSubtitle": "ඔබ ඉදිරිපත් කළ වාර්තා සහ ඒවායේ ප්‍රතිඵල",
       "emptyTitle": "තවම වාර්තා නැත",
-      "emptyDescription": "ඔබ අදහසකින් හෝ AI ප්‍රතිචාරයකින් ඉදිරිපත් කරන වාර්තා මෙහි දිස්වේ.",
+      "emptyDescription": "ඔබ pull request සාකච්ඡාවක ඇති අදහසකින් හෝ නියෝජිත සැසියක AI පිළිතුරකින් ඉදිරිපත් කරන වාර්තා ඒවායේ ප්‍රතිඵලය සමඟ මෙහි දිස්වේ.",
       "couldNotLoad": "ඔබේ වාර්තා පූරණය කළ නොහැකි විය",
       "capped": "ඔබේ නවතම වාර්තා පෙන්වමින් පවතී."
     },
@@ -544,7 +567,10 @@
     "changelogFixesPolish": "සම්පූර්ණ යෙදුම පුරා නිවැරදි කිරීම් සහ වැඩිදියුණු කිරීම්.",
     "changelogAreas": {
       "signIn": "පුරනය වීම",
-      "profileOrganizations": "පැතිකඩ හා සංවිධාන"
+      "profileOrganizations": "පැතිකඩ හා සංවිධාන",
+      "chat": "කතාබස්",
+      "notifications": "දැනුම්දීම්",
+      "integrations": "ඒකාබද්ධ කිරීම්"
     }
   },
   "preferences": {
@@ -985,8 +1011,9 @@
       "checkActiveConnection": "සම්බන්ධතාව සක්‍රීයයි, නමුත් මෙම අයිතමය තවමත් පූරණය කළ නොහැක.",
       "bitbucketOrgOnlyDescription": "එහි Bitbucket පුල් ඉල්ලීම් සමාලෝචනය කිරීමට ඉහත ගිණුම සංවිධානයකට මාරු කරන්න.",
       "bitbucketOrgOnlyNoOrganizationDescription": "මෙම ගිණුමට තවම සංවිධාන කිසිවක් නොමැත. සංවිධානයක් සෑදීමෙන් හෝ එකකට සම්බන්ධ වීමෙන් පසු Bitbucket පුල් ඉල්ලීම් සමාලෝචනය කළ හැක.",
-      "gitlabReconnectAdminOnlyDescription": "එය නැවත සම්බන්ධ කරන ලෙස සංවිධානයේ හිමිකරු, පරිපාලක හෝ බිල්පත් කළමනාකරුවෙකුගෙන් ඉල්ලන්න.",
+      "reconnectAdminOnlyDescription": "එය නැවත සම්බන්ධ කරන ලෙස සංවිධානයේ හිමිකරු, පරිපාලක හෝ බිල්පත් කළමනාකරුවෙකුගෙන් ඉල්ලන්න.",
       "bitbucketNotConnectedTitle": "Bitbucket සම්බන්ධ වී නොමැත",
+      "bitbucketAdminOnlyDescription": "එය සම්බන්ධ කරන ලෙස සංවිධානයේ හිමිකරු, පරිපාලක හෝ බිල්පත් කළමනාකරුවෙකුගෙන් ඉල්ලන්න.",
       "adminOnlyConnectDescription": "එය සම්බන්ධ කළ හැක්කේ සංවිධාන හිමිකරුවන්ට, පරිපාලකවරුන්ට සහ බිල්පත් කළමනාකරුවන්ට පමණි.",
       "contextLine": "{{organization}} සඳහා",
       "contextLinePersonal": "ඔබේ පෞද්ගලික ගිණුම සඳහා"
@@ -1199,6 +1226,8 @@
       "emptyTitle": "තවම දැනුම්දීම් නැත",
       "emptyCategoryTitle": "මෙම කාණ්ඩයේ දැනුම්දීම් නැත",
       "emptyBody": "මෙම ගිණුමට ලැබෙන දැනුම්දීම් මෙහි දිස්වේ. ඒවා දින {{days}} ක් තබා ගනු ලැබේ.",
+      "emptyBody_one": "මෙම ගිණුමට ලැබෙන දැනුම්දීම් මෙහි දිස්වේ. ඒවා දින {{days}} ක් තබා ගනු ලැබේ.",
+      "emptyBody_other": "මෙම ගිණුමට ලැබෙන දැනුම්දීම් මෙහි දිස්වේ. ඒවා දින {{days}} ක් තබා ගනු ලැබේ.",
       "capped": "නවතම දැනුම්දීම් පෙන්වයි.",
       "loadError": "දැනුම්දීම් ඉතිහාසය පූරණය කිරීමට නොහැකි විය.",
       "openFailed": "මෙම දැනුම්දීම තවදුරටත් කිසිදු තැනක විවෘත නොවේ."
@@ -1279,6 +1308,7 @@
       "manageAccess": "ප්‍රවේශය කළමනාකරණය කරන්න",
       "bitbucketNoRepositoriesDescription": "මෙම Bitbucket වැඩබිමේ ගබඩා නොමැත.",
       "gitlabNoRepositoriesDescription": "GitLab හි තවත් කණ්ඩායම් හෝ ව්‍යාපෘති වෙත ප්‍රවේශ වීමට අවසර දීමට ඔබට සිදු විය හැක.",
+      "githubNoRepositoriesDescription": "Kilo GitHub යෙදුමට ගබඩා වෙත ප්‍රවේශ වීමට අවසර තිබේදැයි පරීක්ෂා කර නැවුම් කරන්න.",
       "installGithubApp": "ගබඩා සඳහා GitHub යෙදුම ස්ථාපනය කරන්න",
       "installGithubAppDescription": "සමාලෝචනය කිරීමට අවශ්‍ය ගබඩාවලට ප්‍රවේශ වීමට Kilo GitHub යෙදුමට අවසර දෙන්න.",
       "repositoryAccess": "ගබඩා ප්‍රවේශය",
@@ -1312,7 +1342,7 @@
       "findingsInProgress": "මෙම සමාලෝචනය තවමත් සිදු වෙමින් පවතී. එය අවසන් වන විට සොයාගැනීම් මෙහි දිස් වේ.",
       "findingsEndedWithoutResults": "මෙම සමාලෝචනය කිසිදු සොයාගැනීමක් නිපදවීමට පෙර අවසන් විය.",
       "serviceUnavailable": "කේත සමාලෝචන සේවාවට සම්බන්ධ විය නොහැකි විය. සේවාව ලබා ගත හැකි වූ විට සමාලෝචනය කිරීමට නැවත උත්සාහ කරන්න.",
-      "reviewFailed": "සමාලෝචනය අසාර්ථක විය. කරුණාකර නැවත උත්සාහ කරන්න.",
+      "reviewFailed": "සමාලෝචනය අසාර්ථක විය.",
       "showMore": "තවත් පෙන්වන්න",
       "created": "සෑදූ දිනය",
       "started": "ආරම්භ කළ වේලාව",
@@ -1434,6 +1464,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} හි Bitbucket සම්බන්ධතාවය පරිගණකයකින් වෙබය හරහා කළමනාකරණය කෙරේ.",
+      "deniedManagedByOwner": "ඔබට වෙනස් කළ නොහැකි සම්බන්ධතාව වෙනස් කිරීමට {{organization}} හි හිමිකරුවෙකුගෙන් ඉල්ලා සිටින්න.",
+      "deniedConnectRole": "එය සම්බන්ධ කළ හැක්කේ {{organization}} හි හිමිකරුවන්ට, පරිපාලකවරුන්ට සහ බිල්පත් කළමනාකරුවන්ට පමණි.",
+      "deniedReconnectRole": "එය නැවත සම්බන්ධ කරන ලෙස {{organization}} හි හිමිකරු, පරිපාලක හෝ බිල්පත් කළමනාකරුවෙකුගෙන් ඉල්ලන්න.",
       "managedOnWebTitle": "වෙබය හරහා කළමනාකරණය කෙරේ",
       "managedOnWebShort": "මෙම සම්බන්ධතාවය පරිගණකයකින් වෙබය හරහා කළමනාකරණය කෙරේ.",
       "managedOnWebRepositories": "{{organization}} සඳහා පරිගණකයකින් වෙබය හරහා රෙපොසිටරි තෝරන්න.",
@@ -1571,7 +1604,9 @@
       "unavailablePersonallySwitchAction": "සංවිධානය මාරු කරන්න",
       "unavailableOrganizationTitle": "කවුන්සිල සමාලෝචනය දැනට නොමැත",
       "unavailableForOrganization": "කවුන්සිල සමාලෝචනයට සක්‍රීය දායකත්වයක් හෝ පරීක්ෂණ කාලයක් සහිත Enterprise සැලැස්මක් අවශ්‍ය වේ. මෙම සංවිධානයට එය දැනට නොමැත.",
-      "unavailableForOrganizationNeutral": "මෙම සංවිධානයට කවුන්සිල සමාලෝචනය දැනට නොමැත. පසුව නැවත උත්සාහ කරන්න.",
+      "unavailablePlanCheck": "කවුන්සිල සමාලෝචනයට මෙම සංවිධානයේ සැලැස්ම පරීක්ෂා කිරීමට නොහැකි විය. නැවත පරීක්ෂා කිරීමට නැවත උත්සාහ කරන්න.",
+      "unavailableFlagRollout": "කවුන්සිල සමාලෝචනය මෙම සංවිධානය සඳහා තවම ලබාගත නොහැක. එය ලබාගැනීමට යෙදුම නවතම අනුවාදයට යාවත්කාලීන කරන්න.",
+      "unavailableForOrganizationMember": "කවුන්සිල සමාලෝචනයට සක්‍රීය දායකත්වයක් හෝ පරීක්ෂණ කාලයක් සහිත Enterprise සැලැස්මක් අවශ්‍ය වේ. සංවිධාන හිමිකරුට සැලැස්ම වෙනස් කළ හැක.",
       "unavailableOnBitbucket": "කවුන්සිල සමාලෝචනය Bitbucket කේත ගබඩා සඳහා ලබාගත නොහැක.",
       "noRepositories": "තවම කේත ගබඩා තෝරා නැත. පළමුව කේත ගබඩා සැකසීම්වල කේත ගබඩා තෝරන්න.",
       "specialists": "විශේෂඥයින්",
@@ -2546,8 +2581,7 @@
       "searchPlaceholder": "කේත ගබඩා සොයන්න",
       "noMatches": "ගැළපීම් නැත",
       "noRepositories": "ලබාගත හැකි ගබඩා නැත",
-      "noRepositoriesDescription": "ඔබේ ගිණුමට සම්බන්ධ වූ ගබඩා නොමැත.",
-      "loading": "පූරණය වෙමින්…",
+      "noRepositoriesDescription": "ගබඩා පූරණය කිරීමට GitHub හෝ GitLab සම්බන්ධ කරන්න.",
       "accessibility": "ගබඩාව: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -3061,6 +3095,12 @@
     "retryLoadingAccount": "ගිණුම පූරණය කිරීමට නැවත උත්සාහ කරන්න",
     "retryLoadingPrivacy": "රහස්‍යතා තේරීම් පූරණය කිරීමට නැවත උත්සාහ කරන්න"
   },
+  "accountBlocked": {
+    "title": "ගිණුම අවහිර කර ඇත",
+    "description": "Kilo මෙම ගිණුම අවහිර කර ඇති අතර නැවත පිවිසීමෙන් එය ඉවත් නොවේ. ඉල්ලීමක් කරන විට සහාය කණ්ඩායමට අවහිර කිරීම සමාලෝචනය කළ හැක.",
+    "domainDescription": "Kilo මෙම ඊමේල් වසමේ ගිණුම් අවහිර කර ඇති අතර නැවත පිවිසීමෙන් එය වෙනස් නොවේ. ඉල්ලීමක් කරන විට සහාය කණ්ඩායමට වසම සමාලෝචනය කළ හැක.",
+    "contactSupport": "සහාය කණ්ඩායම අමතන්න"
+  },
   "addCredits": {
     "cta": "ක්‍රෙඩිට් එක් කරන්න",
     "billingPage": "බිල්පත් පිටුව"
@@ -3440,7 +3480,7 @@
       "manageOnWeb": "වෙබයේ බිල්පත් සැකසීම්",
       "changePlan": "සැලැස්ම වෙනස් කරන්න",
       "buySeats": "සාමාජික ස්ථාන මිලදී ගන්න",
-      "managedOnWeb": "සැලැස්ම, සාමාජික ස්ථාන සහ ස්වයංක්‍රීය ටොප්-අප් වෙබයේ කළමනාකරණය කෙරේ.",
+      "managedOnWeb": "සැලැස්ම, සාමාජික ස්ථාන සහ ස්වයංක්‍රීය ටොප්-අප් kilo.ai හි කළමනාකරණය කෙරේ.",
       "setupAutoTopUp": "ස්වයංක්‍රීය ටොප්-අප් සකසන්න",
       "manageAutoTopUp": "ස්වයංක්‍රීය ටොප්-අප් කළමනාකරණය කරන්න",
       "opensOnWeb": "වෙබයේ විවෘත වේ"
@@ -3626,10 +3666,10 @@
       "nameLabel": "ප්‍රකාරයේ නම",
       "nameRequired": "ප්‍රකාරයේ නමක් ඇතුළත් කරන්න.",
       "notFound": "මෙම ප්‍රකාරය තවදුරටත් නොපවතී.",
-      "restrictionHint": "මෙම රටාවට ගැළපෙන ගොනු පමණක් සංස්කරණය කළ හැක. සියලු ගොනුවලට ඉඩ දීමට එය හිස්ව තබන්න.",
-      "restrictionInvalid": "වලංගු රටාවක් ඇතුළත් කරන්න.",
+      "restrictionHint": "සාමාන්‍ය ප්‍රකාශනයක් මෙම ප්‍රකාරයට සංස්කරණය කළ හැකි ගොනු තෝරයි, උදාහරණයක් ලෙස markdown ගොනු සඳහා පමණක් `\\.md$`. සියලු ගොනුවලට ඉඩ දීමට එය හිස්ව තබන්න.",
+      "restrictionInvalid": "වලංගු සාමාන්‍ය ප්‍රකාශනයක් ඇතුළත් කරන්න.",
       "restrictionLabel": "සීමා කිරීමේ ලේබලය",
-      "restrictionPattern": "ගොනු රටාව",
+      "restrictionPattern": "ගොනු සීමාව",
       "roleLabel": "භූමිකා නිර්වචනය",
       "roleRequired": "මෙම ප්‍රකාරය කරන දේ විස්තර කරන්න.",
       "tool": {
@@ -3713,7 +3753,7 @@
     "emailDeliveryFailed": "ඊමේල් පණිවිඩ යැවීම තාවකාලිකව අක්‍රීයයි. කරුණාකර පසුව නැවත උත්සාහ කරන්න.",
     "admissionRequired": "ඔබේ උපාංගය තහවුරු කළ නොහැක. වෙනත් උපාංගයකින් හෝ වෙබ් අඩවිය හරහා පිවිසීමට '$t(login.moreSignInOptions)' භාවිතා කරන්න.",
     "default": "දෝෂයක් ඇති විය. කරුණාකර නැවත උත්සාහ කරන්න.",
-    "retryableAdmission": "මෙම උපාංගය තහවුරු කළ නොහැකි විය. ඔබේ සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+    "retryableAdmission": "මෙම උපාංගය සත්‍යාපනය කළ නොහැකි විය. නැවත උත්සාහ කරන්න.",
     "startSignInFailed": "පිවිසීම ආරම්භ කිරීමට නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
     "couldNotOpenBrowser": "බ්‍රවුසරය විවෘත කිරීමට නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
     "signInTimedOut": "පිවිසීමට නියමිත කාලය ඉකුත් විය. කරුණාකර නැවත උත්සාහ කරන්න.",
@@ -4058,7 +4098,8 @@
         "space": "මෙම ආකෘතිය සඳහා ප්‍රමාණවත් නිදහස් ගබඩා ඉඩක් නොමැත. ඉඩ නිදහස් කර නැවත උත්සාහ කරන්න.",
         "network": "බාගැනීම අවසන් නොවීය. ඔබගේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
         "invalidFile": "බාගත කළ ගොනුව මෙම යෙදුමට ක්‍රියාත්මක කළ හැකි ආකෘතියක් නොවේ, එබැවින් එය ඉවත් කරන ලදී.",
-        "checksum": "බාගත කළ ගොනුව එහි ප්‍රකාශිත චෙක්සම් අගයට නොගැළපේ, එබැවින් එය ඉවත් කරන ලදී. නැවත බාගත කිරීමට උත්සාහ කරන්න."
+        "checksum": "බාගත කළ ගොනුව එහි ප්‍රකාශිත චෙක්සම් අගයට නොගැළපේ, එබැවින් එය ඉවත් කරන ලදී. නැවත බාගත කිරීමට උත්සාහ කරන්න.",
+        "writeFailed": "මෙම උපාංගයට ආකෘතිය සුරැකීමට නොහැකි විය. නැවත බාගත කිරීමට උත්සාහ කරන්න."
       }
     },
     "catalog": {
@@ -4385,6 +4426,7 @@
       "promptPlaceholder": "ඔබ කෙනෙක්…",
       "tools": "මෙවලම්",
       "wholeToolRule": "මෙම නියෝජිතයා සියලු මෙවලම් සඳහා එකවර එකම රීතිය යොදයි: {{rule}}. මෙම ස්විච කියවීමට පමණක් වේ.",
+      "toolRule": "ගබඩා කළ රීතිය: {{rule}}",
       "visibility": "දෘශ්‍යතාව",
       "visibilityPrimary": "ප්‍රාථමික — පිකර් තුළ පෙන්වා ඇත",
       "visibilitySubagent": "Subagen — අන් අයගෙන් පමණක් ඇමතිය හැකිය",
@@ -4494,20 +4536,34 @@
       "deductionFallback": "ක්‍රෙඩිට් අඩු කිරීම",
       "emptyDescription": "ක්‍රෙඩිට් මිලදී ගැනීම්, රිසිට්පත් සහ භාවිතය මෙහි දිස් වේ.",
       "emptyTitle": "ක්‍රෙඩිට් ඉතිහාසයක් නැත",
+      "expiredGrant": "කල් ඉකුත් වී ඇත: {{description}}",
       "googlePlayReceipt": "Google Play වෙතින් ලැබුණු රිසිට්පත",
       "kind": {
         "adjustment": "ගැලපීම",
         "balanceNeutral": "ශේෂයට බලපෑමක් නැත",
         "deduction": "අඩු කිරීම",
         "grant": "ක්‍රෙඩිට් ප්‍රදානය",
+        "promotionalCredits": "ප්‍රවර්ධන ක්‍රෙඩිට්",
         "welcomeCredits": "පිළිගැනීමේ ක්‍රෙඩිට්",
         "purchase": "මිලදී ගැනීම"
+      },
+      "program": {
+        "adminBulkGrant": "පරිපාලක ක්‍රෙඩිට් ප්‍රදානය",
+        "contributorChampion": "දායක ශූර ක්‍රෙඩිට්",
+        "feedback": "ප්‍රතිපෝෂණ ක්‍රෙඩිට්",
+        "influencer": "ඉන්ෆ්ලුවෙන්සර් ක්‍රෙඩිට්",
+        "ossMonthlyReset": "OSS අනුග්‍රහය යළි සැකසීම",
+        "ossSponsorship": "OSS අනුග්‍රහ ක්‍රෙඩිට්",
+        "pullRequest": "පුල් ඉල්ලීම් ක්‍රෙඩිට්",
+        "usageIssue": "භාවිත ගැටලු ක්‍රෙඩිට්",
+        "vibeDay": "Vibe day ක්‍රෙඩිට්"
       },
       "purchaseFallback": "ක්‍රෙඩිට් මිලදී ගැනීම",
       "receipt": "රිසිට්පත",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} සඳහා රිසිට්පත විවෘත කරන්න",
       "receiptUnavailable": "මෙම මිලදී ගැනීම සඳහා රිසිට්පතක් නොමැත.",
-      "retentionLimit": "නවතම ක්‍රෙඩිට් ඉතිහාසය පෙන්වයි."
+      "retentionLimit": "නවතම ක්‍රෙඩිට් ඉතිහාසය පෙන්වයි.",
+      "voidedGrant": "අවලංගු කර ඇත: {{description}}"
     },
     "title": "ක්‍රෙඩිට් මිලදී ගන්න",
     "description": "ක්‍රෙඩිට් යනු Kilo App හි AI කේතීකරණ සැසි ක්‍රියාත්මක කිරීම සඳහා ඔබේ Kilo ශේෂයට එක් කරන එක්-වරක් මිලදී ගැනීමකි. ගබඩාව ඔබේ ගිණුමෙන් අය කරන අතර ගබඩාව ගෙවීම තහවුරු කිරීමෙන් පසු ක්‍රෙඩිට් එක් කෙරේ.",
@@ -4843,6 +4899,9 @@
       "runAsCreator": "මා ලෙස ධාවනය කරන්න",
       "runAsCreatorDescription": "සෑම ධාවනයක්ම ඔබගේ ගිණුම භාවිත කරන බැවින් රහස් ශීර්ෂය අවශ්‍ය වේ෴",
       "saveFailedTitle": "ට්‍රිගර් සුරැකිය නොහැකි විය",
+      "nameTaken": "“{{name}}” නමින් ට්‍රිගර් එකක් දැනටමත් පවතී෴",
+      "saveFailedRetry": "සේවාදායකය වෙත ළඟා විය නොහැකි විය. ඔබගේ සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කරන්න෴",
+      "saveFailedCheck": "පෝරමයේ අගයන් පරීක්ෂා කර නැවත උත්සාහ කරන්න෴",
       "deleteTitle": "මෙම ට්‍රිගර් මකන්නද?",
       "deleteMessage": "{{name}} වෙත කරන ඇමතුම් අසාර්ථක වේ෴ මෙය ආපසු හැරවිය නොහැක෴",
       "deleteMessageScheduled": "{{name}} ට්‍රිගර් හි නියමිත ධාවනයන් නතර වේ෴ මෙය ආපසු හැරවිය නොහැක෴",
@@ -5087,6 +5146,20 @@
       "eu": "යුරෝපීය සංගමය",
       "au": "ඕස්ට්‍රේලියාව",
       "jp": "ජපානය"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "මනාප සොයන්න",
+    "noMatches": "ගැළපෙන මනාප නැත",
+    "emptyDescription": "වෙනත් මනාපයක නමක් හෝ මූලපදයක් යොදා බලන්න.",
+    "resultsStatus": "හමු වූ මනාප: {{resultCount}}",
+    "keywords": {
+      "signOut": "පිටවන්න|ගිණුමෙන් පිටවීම",
+      "appearance": "තේමාව|වර්ණ පටිපාටිය",
+      "appUnlock": "ජෛවමිතික|මුහුණ|ඇඟිලි සලකුණ",
+      "language": "භාෂාව|පරිවර්තනය",
+      "notifications": "ඇඟවීම්|දැනුම්දීම්",
+      "privacy": "විශ්ලේෂණ|ලුහුබැඳීම"
     }
   }
 }

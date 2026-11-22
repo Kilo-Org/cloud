@@ -124,13 +124,6 @@ export const ORG_AUTO_MODEL: AutoModel = {
   description: "Routes requests using your organization's mode-specific model settings.",
 };
 
-export const ORGANIZATION_AUTO_TARGET_MODELS = [
-  KILO_AUTO_FREE_MODEL.id,
-  KILO_AUTO_SMALL_MODEL.id,
-  KILO_AUTO_BALANCED_MODEL.id,
-  KILO_AUTO_FRONTIER_MODEL.id,
-] as const;
-
 export const AUTO_MODELS = [
   KILO_AUTO_FRONTIER_MODEL,
   KILO_AUTO_BALANCED_MODEL,
@@ -138,6 +131,16 @@ export const AUTO_MODELS = [
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_SMALL_MODEL,
 ];
+
+// Auto tiers an organization may route to. `AUTO_MODELS` is the served catalog; the efficient tier
+// stays out of organization routes, so its exclusion is named here instead of implied by a copied id list.
+const ORGANIZATION_AUTO_ROUTE_EXCLUDED_MODEL_IDS: ReadonlySet<string> = new Set([
+  KILO_AUTO_EFFICIENT_MODEL.id,
+]);
+
+export const ORGANIZATION_AUTO_TARGET_MODELS: readonly string[] = AUTO_MODELS.map(
+  model => model.id
+).filter(modelId => !ORGANIZATION_AUTO_ROUTE_EXCLUDED_MODEL_IDS.has(modelId));
 
 // Every auto model this gateway serves, in catalog order: the router-backed models plus the
 // organization model, which routes by organization settings and is not a row in AUTO_MODELS.

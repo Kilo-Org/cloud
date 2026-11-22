@@ -16,6 +16,7 @@ import {
   buildAgentPayload,
   initialAgentFormState,
   PERMISSION_TOOLS,
+  readToolRules,
   readWholeToolAction,
   validateAgentForm,
 } from '@/components/profiles/profile-agents-model';
@@ -140,6 +141,9 @@ export function AgentFormSheet({
   // A whole-agent rule applies to every tool at once, so the per-tool switches
   // below cannot express a change to it; they render the loaded state instead.
   const wholeToolAction = readWholeToolAction(agent?.config.permission);
+  // A switch can only say "off", so a stored per-tool `ask` or per-pattern map is
+  // the only rule the row cannot show through its switch; the note names it.
+  const toolRules = readToolRules(agent?.config.permission);
   const { models } = useAvailableModels(organizationId);
   const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<
     'slug' | 'name' | 'description'
@@ -374,6 +378,9 @@ export function AgentFormSheet({
           <RowGroup>
             {PERMISSION_TOOLS.map(tool => {
               const enabled = !disabledTools.includes(tool);
+              const rule = toolRules.get(tool);
+              const noteText =
+                rule === undefined ? undefined : t('profiles.agents.toolRule', { rule });
               return (
                 <RowFrame
                   key={tool}
@@ -382,6 +389,7 @@ export function AgentFormSheet({
                     value: enabled,
                     disabled: isSaving || wholeToolAction !== undefined,
                     accessibilityLabel: tool,
+                    accessibilityHint: noteText,
                     onValueChange: next => {
                       setDisabledTools(current =>
                         next ? current.filter(item => item !== tool) : [...current, tool]
@@ -396,6 +404,19 @@ export function AgentFormSheet({
                   >
                     {tool}
                   </Text>
+                  {noteText === undefined ? null : (
+                    // The painted note repeats the switch's hint, so the text
+                    // stays out of the accessibility tree: the switch names it.
+                    <Text
+                      variant="mono"
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      {...HIDDEN_LABEL_PROPS}
+                      className="mt-0.5 text-xs text-muted-foreground"
+                    >
+                      {noteText}
+                    </Text>
+                  )}
                 </RowFrame>
               );
             })}

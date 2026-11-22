@@ -204,11 +204,17 @@ export function glanceableSpokenLabelKeys(
   return parts;
 }
 
-/** Translated status, numeric counts in rank order, then the Open agents action. */
+/**
+ * Translated status, numeric counts in rank order, then the Open agents action.
+ * The surface's own formatter draws the counts, and the catalog's list joiner
+ * separates the parts.
+ */
+// eslint-disable-next-line max-params -- the surface supplies its own translator and count formatter so a label cannot disagree with the row it describes
 export function glanceableSpokenLabel(
   snapshot: GlanceableAgentsSnapshot,
   flags: GlanceableSurfaceFlags,
-  translate: (key: string) => string
+  translate: (key: string) => string,
+  formatCount: GlanceableCountFormat
 ): string {
   const status = resolveGlanceableStatus(snapshot, flags);
   const parts: string[] = [];
@@ -217,9 +223,9 @@ export function glanceableSpokenLabel(
   }
   if (status === 'happy' || status === 'stale') {
     for (const { key, count } of glanceableCountLines(snapshot).filter(line => line.count > 0)) {
-      parts.push(`${count} ${translate(key)}`);
+      parts.push(`${formatCount(count)} ${translate(key)}`);
     }
   }
   parts.push(translate('glanceable.openAgents'));
-  return parts.join(', ');
+  return parts.join(translate('common.listJoiner'));
 }

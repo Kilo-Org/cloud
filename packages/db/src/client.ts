@@ -29,8 +29,8 @@ export type CreateDrizzleClientOptions = {
    * pool is created with the module's `databaseTypeParsers`, which raw results and the export paths
    * expect. Every connection key is left out too: the pool is built from this client's
    * `connectionString` argument (`user`, `password`, `host`, `port`, `database`) and from its
-   * dedicated `ssl` option, and both stay authoritative. Like `GetWorkerDbOptions`, this is a
-   * type-level reservation: a value widened to `pg.PoolConfig` still assigns.
+   * dedicated `ssl` option, and both stay authoritative: a value widened to `pg.PoolConfig` still
+   * assigns, and the pool applies its own values after it.
    */
   poolConfig?: Omit<
     Partial<pg.PoolConfig>,
@@ -55,10 +55,13 @@ export function createDrizzleClient(options: CreateDrizzleClientOptions) {
     baseConfig.ssl = ssl;
   }
 
+  // The option type reserves these keys; a value widened to `pg.PoolConfig` is overridden here.
+  // pg applies a `connectionString` after the explicit fields, so keep it undefined.
   const pool = new pg.Pool({
+    ...poolConfig,
     ...baseConfig,
     types: databaseTypeParsers,
-    ...poolConfig,
+    connectionString: undefined,
   });
 
   const db = drizzle(pool, { schema, logger });

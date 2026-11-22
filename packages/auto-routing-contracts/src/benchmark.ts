@@ -32,12 +32,14 @@ export type BenchmarkKind = z.infer<typeof BenchmarkKindSchema>;
  * independently; both draw on the shared container budget. Classifier runs
  * are always 'platform'.
  */
-export const BenchmarkRunPurposeSchema = z.enum(['platform', 'user']);
-export type BenchmarkRunPurpose = z.infer<typeof BenchmarkRunPurposeSchema>;
+export const BENCHMARK_RUN_PURPOSES = ['platform', 'user'] as const;
+export const BenchmarkRunPurposeSchema = z.enum(BENCHMARK_RUN_PURPOSES);
+export type BenchmarkRunPurpose = (typeof BENCHMARK_RUN_PURPOSES)[number];
 
 /** Queue selector for a manual decider run. 'both' starts one run per queue. */
-export const BenchmarkQueueSelectorSchema = z.enum(['platform', 'user', 'both']);
-export type BenchmarkQueueSelector = z.infer<typeof BenchmarkQueueSelectorSchema>;
+export const BENCHMARK_QUEUE_SELECTORS = [...BENCHMARK_RUN_PURPOSES, 'both'] as const;
+export const BenchmarkQueueSelectorSchema = z.enum(BENCHMARK_QUEUE_SELECTORS);
+export type BenchmarkQueueSelector = (typeof BENCHMARK_QUEUE_SELECTORS)[number];
 
 /**
  * Total live decider containers the benchmark runner may hold, shared by every
@@ -152,9 +154,10 @@ export const BenchmarkConfigSchema = z
     minAccuracy,
     accuracyNoiseBand: accuracyNoiseBand.default(POLICY_SETTING_VALUE_DEFAULTS.accuracyNoiseBand),
     // Optional override for the Kilo user whose identity/billing the decider
-    // CLI runs execute under. Null means the worker uses DEFAULT_BENCHMARK_USER_ID.
-    // The effective user must be an internal bot (`bot-internal-*`).
-    benchmarkUserId: z.string().trim().min(1).nullable(),
+    // CLI runs execute under. Absent or null means the worker uses
+    // DEFAULT_BENCHMARK_USER_ID. The effective user must be an internal bot
+    // (`bot-internal-*`).
+    benchmarkUserId: z.string().trim().min(1).nullable().default(null),
     // Optional override for the organization context. Null means the worker
     // uses DEFAULT_BENCHMARK_ORG_ID.
     benchmarkOrgId: z.string().trim().min(1).nullable().default(null),
@@ -522,6 +525,13 @@ export const BenchmarkRegistryQueueSchema = z.object({
 });
 export type BenchmarkRegistryQueue = z.infer<typeof BenchmarkRegistryQueueSchema>;
 
+// One row-count schema per queue purpose: a new purpose is a compile error here, and the
+// response below spreads this shape so it cannot be served without it.
+const BenchmarkRegistryQueueCountsShape = {
+  platform: BenchmarkRegistryQueueSchema,
+  user: BenchmarkRegistryQueueSchema,
+} satisfies Record<BenchmarkRunPurpose, typeof BenchmarkRegistryQueueSchema>;
+
 /**
  * Snapshot of the global decider registry. A pair wanted by both the platform
  * list and an owner pool is counted in both queues — it is one row, measured
@@ -531,8 +541,7 @@ export const BenchmarkRegistryResponseSchema = z.object({
   engineIdentity: z.string(),
   router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
   repetitions: z.number().int(),
-  platform: BenchmarkRegistryQueueSchema,
-  user: BenchmarkRegistryQueueSchema,
+  ...BenchmarkRegistryQueueCountsShape,
   platformEntries: z
     .array(
       z.object({
@@ -635,6 +644,14 @@ export type ClassifierWinnerResponse = z.infer<typeof ClassifierWinnerResponseSc
 
 // Benchmark profile registry (global per exact measurement pair + engine).
 
+/**
+ * One row per requested profile. `failure` is the structured failure and wins when
+ * present; `failureReason` is the bounded flat text and is the fallback, null even on a
+ * failed row when the stored row has no reason. A reader shows `failure.reason` first,
+ * then `failureReason`. A pending or ready row carries neither. Both stay valid on the
+ * wire because the registry reports a profile that was never admitted (and a
+ * subscription resolution error) as `failed` with the flat text only.
+ */
 export const BenchmarkProfileEntryStatusSchema = z.object({
   entry: BenchmarkPairSchema,
   status: BenchmarkProfileStatusSchema,

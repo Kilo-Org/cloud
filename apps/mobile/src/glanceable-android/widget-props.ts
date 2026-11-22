@@ -112,7 +112,7 @@ export function buildAndroidWidgetProps(
       approveLabel: translate('common.approve'),
       newAgentLabel: translate('glanceable.newAgent'),
     },
-    accessibilityLabel: glanceableSpokenLabel(snapshot, flags, copy),
+    accessibilityLabel: glanceableSpokenLabel(snapshot, flags, copy, formatCount),
   };
 }
 

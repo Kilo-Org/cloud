@@ -48,8 +48,8 @@ type SectionProps = Readonly<{
   data: DashboardStats;
   slaEnabled: boolean;
   repoFullName: string | undefined;
-  /** No sync has completed yet, so nothing here counts a measured result. */
-  neverSynced: boolean;
+  /** This scope has recorded no finding, so nothing here counts a measured result. */
+  nothingRecorded: boolean;
   /**
    * The GitHub App grant is a settled empty list: no repository can be scanned
    * until the grant holds one, so the repository card names that state instead
@@ -92,19 +92,20 @@ function findingsHref(
 }
 
 /**
- * A row's value before the first sync: the counts below it are not measured,
- * so a dash replaces each number the row would otherwise claim as zero.
+ * A row's value in a scope that has recorded nothing: the counts below it are
+ * not measured, so a dash replaces each number the row would otherwise claim as
+ * zero.
  */
-function rowValue(neverSynced: boolean, rendered: string): string {
-  return neverSynced ? UNMEASURED_VALUE : rendered;
+function rowValue(nothingRecorded: boolean, rendered: string): string {
+  return nothingRecorded ? UNMEASURED_VALUE : rendered;
 }
 
 /** The status dot an unmeasured row shows: neutral, never a success or alarm colour. */
 function rowTone(
-  neverSynced: boolean,
+  nothingRecorded: boolean,
   measured: 'good' | 'warn' | 'danger' | 'muted'
 ): 'good' | 'warn' | 'danger' | 'muted' {
-  return neverSynced ? 'muted' : measured;
+  return nothingRecorded ? 'muted' : measured;
 }
 
 /**
@@ -116,19 +117,19 @@ function SectionCard({ title, children }: Readonly<{ title: string; children: Re
   return <Section label={title}>{children}</Section>;
 }
 
-function PriorityFindingSection({ scope, data, slaEnabled, neverSynced }: SectionProps) {
+function PriorityFindingSection({ scope, data, slaEnabled, nothingRecorded }: SectionProps) {
   const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
   const finding = data.priorityFinding;
 
-  // A scope that has never synced has found nothing yet because nothing ran,
-  // not because the codebase is clean: the green check and the all-clear line
-  // read as a verified result. The filter above already states that nothing
-  // has synced, so this card explains what it will hold instead of repeating
-  // the status, and it opens nothing: a lone dash left a content section
-  // looking broken.
-  if (neverSynced) {
+  // A scope that has recorded nothing has found nothing yet because nothing
+  // ran, not because the codebase is clean: the green check and the all-clear
+  // line read as a verified result. The filter above already states that
+  // nothing has synced, so this card explains what it will hold instead of
+  // repeating the status, and it opens nothing: a lone dash left a content
+  // section looking broken.
+  if (nothingRecorded) {
     return (
       <SectionCard title={t('securityAgent.dashboard.actFirst')}>
         <Card>
@@ -205,7 +206,7 @@ function PriorityFindingSection({ scope, data, slaEnabled, neverSynced }: Sectio
   );
 }
 
-function PostureSection({ data, slaEnabled, neverSynced }: SectionProps) {
+function PostureSection({ data, slaEnabled, nothingRecorded }: SectionProps) {
   const { t } = useTranslation();
   // With SLA deadlines on, the metric tiles above already carry this breakdown:
   // the compliance tile captions how many findings are within their deadline and
@@ -227,38 +228,38 @@ function PostureSection({ data, slaEnabled, neverSynced }: SectionProps) {
       <RowGroup>
         <KvRow
           label={t('securityAgent.dashboard.confirmedExploitable')}
-          value={rowValue(neverSynced, formatNumber(data.analysis.exploitable, i18n.language))}
+          value={rowValue(nothingRecorded, formatNumber(data.analysis.exploitable, i18n.language))}
           valueTone="muted"
           valueFace="numeric"
-          dotTone={rowTone(neverSynced, data.analysis.exploitable > 0 ? 'danger' : 'muted')}
+          dotTone={rowTone(nothingRecorded, data.analysis.exploitable > 0 ? 'danger' : 'muted')}
         />
         <KvRow
           label={t('securityAgent.dashboard.needsEvidenceReview')}
-          value={rowValue(neverSynced, formatNumber(data.analysis.needsReview, i18n.language))}
+          value={rowValue(nothingRecorded, formatNumber(data.analysis.needsReview, i18n.language))}
           valueTone="muted"
           valueFace="numeric"
-          dotTone={rowTone(neverSynced, data.analysis.needsReview > 0 ? 'warn' : 'muted')}
+          dotTone={rowTone(nothingRecorded, data.analysis.needsReview > 0 ? 'warn' : 'muted')}
         />
         <KvRow
           label={t('securityAgent.dashboard.analysisNotComplete')}
-          value={rowValue(neverSynced, formatNumber(analysisIncomplete, i18n.language))}
+          value={rowValue(nothingRecorded, formatNumber(analysisIncomplete, i18n.language))}
           valueTone="muted"
           valueFace="numeric"
           dotTone="muted"
         />
         <KvRow
           label={t('securityAgent.dashboard.noImmediateAction')}
-          value={rowValue(neverSynced, formatNumber(noImmediateAction, i18n.language))}
+          value={rowValue(nothingRecorded, formatNumber(noImmediateAction, i18n.language))}
           valueTone="muted"
           valueFace="numeric"
-          dotTone={rowTone(neverSynced, noImmediateAction > 0 ? 'good' : 'muted')}
+          dotTone={rowTone(nothingRecorded, noImmediateAction > 0 ? 'good' : 'muted')}
         />
       </RowGroup>
     </SectionCard>
   );
 }
 
-function CoverageSection({ scope, data, repoFullName, neverSynced }: SectionProps) {
+function CoverageSection({ scope, data, repoFullName, nothingRecorded }: SectionProps) {
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const analysisIncomplete = getAnalysisIncompleteCount(data.analysis);
@@ -314,10 +315,10 @@ function CoverageSection({ scope, data, repoFullName, neverSynced }: SectionProp
           >
             <KvRow
               label={row.label}
-              value={rowValue(neverSynced, formatNumber(row.value, i18n.language))}
+              value={rowValue(nothingRecorded, formatNumber(row.value, i18n.language))}
               valueTone="muted"
               valueFace="numeric"
-              dotTone={rowTone(neverSynced, row.value > 0 ? row.tone : 'muted')}
+              dotTone={rowTone(nothingRecorded, row.value > 0 ? row.tone : 'muted')}
             />
           </Pressable>
         ))}
@@ -459,16 +460,17 @@ function SectionCardSkeleton({ rows }: Readonly<{ rows: readonly SkeletonRow[] }
  */
 export function DashboardSectionsSkeleton({
   slaEnabled,
-  neverSynced = false,
-}: Readonly<{ slaEnabled: boolean; neverSynced?: boolean }>) {
+  nothingRecorded = false,
+}: Readonly<{ slaEnabled: boolean; nothingRecorded?: boolean }>) {
   return (
     <>
-      {/* The Act-first card is the one section whose shape the sync-status read
-          decides on its own: before the first sync it holds a single line of
-          pending copy instead of a title over its repository, so the
-          placeholder drops that second line once the read has settled to that
-          scope. Without the answer the synced shape (the common one) stays. */}
-      <SectionCardSkeleton rows={neverSynced ? [1] : [2]} />
+      {/* The Act-first card is the one section whose shape the stats and
+          sync-status reads decide together: a scope that has recorded nothing
+          holds a single line of pending copy instead of a title over its
+          repository, so the placeholder drops that second line once the reads
+          have settled to that scope. Without the answer the measured shape
+          (the common one) stays. */}
+      <SectionCardSkeleton rows={nothingRecorded ? [1] : [2]} />
       {slaEnabled ? null : <SectionCardSkeleton rows={[1, 1, 1, 1]} />}
       <SectionCardSkeleton rows={[1, 1, 1, 1]} />
       <SectionCardSkeleton rows={[2, 2, 2]} />

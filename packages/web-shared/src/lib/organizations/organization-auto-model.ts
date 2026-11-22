@@ -39,16 +39,21 @@ export {
   isOrganizationAutoTargetModel,
   MAX_ORGANIZATION_AUTO_ROUTES,
 } from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
-import { isOrganizationAutoTargetModel } from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
+import {
+  isOrganizationAutoTargetModel,
+  organizationCustomRouterTargetReference,
+} from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
 import { ORGANIZATION_AUTO_MODEL_FLAG } from '@kilocode/app-shared/feature-flags';
 import {
   isCustomRouterModelId,
   ORG_CUSTOM_ROUTER_MODEL_PREFIX,
-  parseCustomRouterModelId,
 } from '@kilocode/auto-routing-contracts';
 import { findCustomRouter } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 
 type OrganizationAutoPolicyOrganization = Pick<Organization, 'id' | 'plan' | 'settings'>;
+
+/** The connection the auto-target checks read through: an open transaction, or a replica read. */
+export type OrganizationAutoRead = { tx: DrizzleTransaction } | { fromDb: typeof readDb };
 
 export const DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS: OrganizationAutoModelSettings = {
   routes: {},
@@ -101,12 +106,12 @@ export function getOrganizationAutoSettings(
 /** The organization's default model access policy, using the organization settings being validated. */
 async function resolveDefaultModelPolicy(
   organization: OrganizationAutoPolicyOrganization,
-  dbClient: typeof readDb | DrizzleTransaction
+  read: OrganizationAutoRead
 ): Promise<EffectiveOrganizationModelPolicy> {
   const context = await getOrganizationGroupPolicyContext({
     organizationId: organization.id,
     subject: { type: 'defaultAccess' },
-    ...('rollback' in dbClient ? { tx: dbClient } : { fromDb: dbClient }),
+    ...read,
   });
   return evaluateEffectiveModelAccessPolicy({
     ...context,
@@ -128,11 +133,11 @@ async function isAllowedAutoTarget(
   organization: OrganizationAutoPolicyOrganization,
   restrictions: ModelRestrictions,
   modelId: string,
-  dbClient: typeof readDb | DrizzleTransaction
+  read: OrganizationAutoRead
 ): Promise<boolean> {
   if (await createAllowPredicateFromRestrictions(restrictions)(modelId)) return true;
   if (!restrictions.providerAllowList) return false;
-  const policy = await resolveDefaultModelPolicy(organization, dbClient);
+  const policy = await resolveDefaultModelPolicy(organization, read);
   if ((await getEffectiveModelDecision(policy, modelId)).allowed) return true;
   if ((await getAllowedDirectByokCatalogModelIds(organization.id, policy)).has(modelId))
     return true;
@@ -156,9 +161,11 @@ export async function validateOrganizationAutoTarget(
   targetModelId: string,
   options: {
     apiKind?: 'chat_completions' | 'responses' | 'messages';
-    dbClient?: typeof readDb | DrizzleTransaction;
+    read?: OrganizationAutoRead;
   } = {}
 ): Promise<OrganizationAutoTargetValidationResult> {
+  const read = options.read ?? { fromDb: readDb };
+  const connection = 'tx' in read ? read.tx : read.fromDb;
   const rawModelId = targetModelId.trim().toLowerCase();
   const normalizedModelId = normalizeModelId(rawModelId);
 
@@ -185,8 +192,8 @@ export async function validateOrganizationAutoTarget(
   }
 
   if (isCustomRouterModelId(rawModelId)) {
-    const reference = parseCustomRouterModelId(rawModelId);
-    if (reference?.scope !== 'org') {
+    const reference = organizationCustomRouterTargetReference(rawModelId);
+    if (!reference) {
       return {
         kind: 'error',
         message: `Organization Auto route target '${targetModelId}' must be one of this organization's custom routers (${ORG_CUSTOM_ROUTER_MODEL_PREFIX}<slug>).`,
@@ -195,7 +202,7 @@ export async function validateOrganizationAutoTarget(
     const router = await findCustomRouter(
       { type: 'org', id: organization.id },
       reference.slug,
-      options.dbClient ?? readDb
+      connection
     );
     if (!router) {
       return {
@@ -209,7 +216,7 @@ export async function validateOrganizationAutoTarget(
   const directByokTarget = await getDirectByokModel(rawModelId);
   if (directByokTarget) {
     const key = (
-      await getEnabledByokProviders(options.dbClient ?? readDb, {
+      await getEnabledByokProviders(connection, {
         type: 'organization',
         id: organization.id,
       })
@@ -277,7 +284,13 @@ export async function validateOrganizationAutoTarget(
 
   let models;
   try {
-    models = await getEnhancedOpenRouterModels({ countryCode: null });
+    // The catalog's model-stats snapshot follows the seam only when the caller names one: a
+    // transaction caller reads the primary, and a replica read sends the snapshot to that replica.
+    // A caller that names no seam keeps the catalog's documented primary default.
+    models = await getEnhancedOpenRouterModels({
+      countryCode: null,
+      fromDb: options.read && 'fromDb' in options.read ? options.read.fromDb : undefined,
+    });
   } catch {
     return {
       kind: 'error',
@@ -293,14 +306,7 @@ export async function validateOrganizationAutoTarget(
     };
   }
 
-  if (
-    !(await isAllowedAutoTarget(
-      organization,
-      restrictions,
-      catalogModel.id,
-      options.dbClient ?? readDb
-    ))
-  ) {
+  if (!(await isAllowedAutoTarget(organization, restrictions, catalogModel.id, read))) {
     return {
       kind: 'error',
       message: `Organization Auto route target '${targetModelId}' is not allowed by the organization's model policy.`,

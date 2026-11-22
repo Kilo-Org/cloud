@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "He kitenga haumaru hōu ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Tino kino",
+      "high": "Teitei",
+      "medium": "Waenga",
+      "low": "Iti"
+    },
     "securityFindingSlaWarning": {
       "title": "Te whakatūpato SLA"
     },

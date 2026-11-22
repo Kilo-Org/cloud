@@ -4,8 +4,8 @@ import {
 } from '@kilocode/app-shared/home-widget';
 import { parseTimestamp } from '@kilocode/app-shared/utils';
 
+import { type GlanceableCountFormat } from '@/lib/glanceable/count-format';
 import {
-  type GlanceableCountFormat,
   type GlanceableCountKind,
   glanceableCountMessage,
   glanceableCountNoun,
@@ -212,6 +212,6 @@ export function buildAndroidHomeCopy(
       translate('glanceable.openAgents'),
     ]
       .filter(Boolean)
-      .join(', '),
+      .join(translate('common.listJoiner')),
   };
 }

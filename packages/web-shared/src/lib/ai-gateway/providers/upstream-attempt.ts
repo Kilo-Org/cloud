@@ -120,20 +120,20 @@ export async function sendUpstreamAttempt({
   }
 
   const extraHeaders: Record<string, string> = {};
-  await applyProviderSpecificLogic(
-    providerContext.provider,
+  await applyProviderSpecificLogic({
+    provider: providerContext.provider,
     requestedModel,
-    request,
+    requestToMutate: request,
     extraHeaders,
-    providerContext.userByok,
-    fraudHeaders,
+    userByok: providerContext.userByok,
+    originalHeaders: fraudHeaders,
     userId,
     organizationId,
     sessionId,
     taskId,
     isNonTrialEnterprise,
-    dataRegion
-  );
+    dataRegion,
+  });
   if (
     anthropicUserProfileId &&
     isAnthropicUserProfileRoute(providerContext) &&

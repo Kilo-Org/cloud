@@ -21,6 +21,7 @@ import {
 } from './browser-agent-checks';
 import type {
   BrowserGrant,
+  BrowserOriginChanged,
   BrowserPermissionItem,
   DownloadTier,
   StepTokenNeed,
@@ -3567,6 +3568,26 @@ export const createBrowserRuntime = ({
         const runIsTranslation = reusedTab !== undefined || openedForStep !== undefined;
         const runToolName = runIsTranslation ? 'browser_navigate' : toolName;
         const runArguments = runIsTranslation ? { url: stepUrl ?? '' } : toolArguments;
+        /**
+         * The origin this call's navigation was approved for, or `undefined` when the call sent none: a
+         * `browser_navigate` call, or a `browser_tabs new` the runtime ran as one on the tab it opened or reused. The
+         * gate answers the destination's origin for both spellings, so a redirect away from it is judged against the
+         * origin the call really asked to open, never against the tab it happened to start on.
+         */
+        const navigatedOrigin =
+          preflight !== undefined &&
+          preflight.ok &&
+          (runIsTranslation || preflight.class === 'navigate')
+            ? preflight.origin
+            : undefined;
+        /**
+         * The navigation result this call answers with, when the tab it drove settled on an origin the call may not open or
+         * read. One spelling for every call whose answer is about the navigation it sent, whichever tool carried it.
+         */
+        const stepNavigationResult = (): Promise<BrowserOriginChanged | undefined> | undefined =>
+          agentContext === undefined || navigatedOrigin === undefined
+            ? undefined
+            : postAgentNavigate(runSession, navigatedOrigin, agentContext.authorized);
 
         if (downloadCapable) {
           takeOverDownloads(tabId);
@@ -4104,6 +4125,16 @@ export const createBrowserRuntime = ({
             downloadHold.needOf(sessionKey)?.kind === 'armed'
           ) {
             const approvedNeed = approvedFile?.need;
+            const changed = await stepNavigationResult();
+
+            if (changed !== undefined) {
+              return {
+                from: changed.from,
+                kind: 'origin_changed',
+                result: settled,
+                to: changed.to,
+              };
+            }
 
             return browserBlockedRefusal({
               need:
@@ -4265,6 +4296,19 @@ export const createBrowserRuntime = ({
             return { kind: 'result', result: settled };
           }
 
+          // The navigation this call sent is the one the check is about, whichever tool carried it: a redirect that
+          // Left the tab on an origin this call may not open or read is reported before the tab is answered as opened.
+          const changed = await stepNavigationResult();
+
+          if (changed !== undefined) {
+            return {
+              from: changed.from,
+              kind: 'origin_changed',
+              result: settled,
+              to: changed.to,
+            };
+          }
+
           const info = await tabInfo(runTabId);
           const opened = {
             selected: true,
@@ -4325,6 +4369,11 @@ export const createBrowserRuntime = ({
           const approvedUrl =
             approvedFile?.need.url ??
             settlement.stoppedItems?.find(item => item.url !== undefined)?.url;
+          const changed = await stepNavigationResult();
+
+          if (changed !== undefined) {
+            return { from: changed.from, kind: 'origin_changed', result: settled, to: changed.to };
+          }
 
           return browserBlockedRefusal({
             need:
@@ -4343,16 +4392,8 @@ export const createBrowserRuntime = ({
 
         // A download is not a document, so a navigate that became one never moved the tab.
         // An opaque or older origin there is the file's answer, not the redirect this check looks for.
-        if (
-          agentContext !== undefined &&
-          preflight?.class === 'navigate' &&
-          successText === undefined
-        ) {
-          const changed = await postAgentNavigate(
-            runSession,
-            preflight.origin,
-            agentContext.authorized
-          );
+        if (successText === undefined) {
+          const changed = await stepNavigationResult();
 
           if (changed !== undefined) {
             return { from: changed.from, kind: 'origin_changed', result: settled, to: changed.to };

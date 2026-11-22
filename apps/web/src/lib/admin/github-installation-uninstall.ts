@@ -7,6 +7,7 @@ import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { verifyAndDeleteGitHubOrganizationInstallation } from '@/lib/integrations/platforms/github/adapter';
+import { GitHubAppInstallationProtectedError } from '@/lib/integrations/platforms/github/protected-installation';
 import { observeGitHubInstallationLifecycle } from '@/lib/integrations/db/github-installations';
 import {
   github_app_installations,
@@ -251,6 +252,11 @@ export async function uninstallGitHubOrganizationInstallation(params: {
     return { status: 'uninstalled', localCleanup: 'complete' };
   } catch (error) {
     if (error instanceof TRPCError && error.code === 'FORBIDDEN') throw error;
+    // The fixture guard fired before any GitHub call, so the install is intact;
+    // tell the admin why instead of the generic unconfirmed retry.
+    if (error instanceof GitHubAppInstallationProtectedError) {
+      throw new TRPCError({ code: 'CONFLICT', message: error.message, cause: error });
+    }
     if (upstreamDeleted) {
       await tryWriteAudit({
         actor: params.actor,

@@ -24,6 +24,7 @@ import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/orga
 import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { normalizeInferenceProviderIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   MAX_ORGANIZATION_BROWSER_ALLOWED_ORIGINS,
@@ -85,8 +86,10 @@ function createAccessListsDiffMessage(
   }
 
   if (old.provider_allow_list !== newSettings.provider_allow_list) {
-    const oldProviders = new Set(old.provider_allow_list || []);
-    const newProviders = new Set(newSettings.provider_allow_list || []);
+    const oldProviders = new Set(normalizeInferenceProviderIds(old.provider_allow_list || []));
+    const newProviders = new Set(
+      normalizeInferenceProviderIds(newSettings.provider_allow_list || [])
+    );
 
     const added = [...newProviders].filter(provider => !oldProviders.has(provider));
     const removed = [...oldProviders].filter(provider => !newProviders.has(provider));
@@ -151,7 +154,7 @@ function assertOrganizationAutoRouteCount(routes: Record<string, string>): void 
 async function assertActiveOrganizationAutoTargetsAllowed(
   organization: Pick<NonNullable<Awaited<ReturnType<typeof getOrganizationById>>>, 'id' | 'plan'>,
   settings: OrganizationSettings,
-  dbClient: typeof db | DrizzleTransaction
+  tx: DrizzleTransaction
 ): Promise<void> {
   if (settings.default_model !== ORG_AUTO_MODEL.id || !settings.org_auto_model) {
     return;
@@ -166,7 +169,7 @@ async function assertActiveOrganizationAutoTargetsAllowed(
 
   for (const [slug, targetModelId] of Object.entries(settings.org_auto_model.routes)) {
     const validation = await validateOrganizationAutoTarget(validationOrganization, targetModelId, {
-      dbClient,
+      read: { tx },
     });
     if (validation.kind === 'error') {
       throw new TRPCError({
@@ -179,7 +182,7 @@ async function assertActiveOrganizationAutoTargetsAllowed(
   const fallbackValidation = await validateOrganizationAutoTarget(
     validationOrganization,
     settings.org_auto_model.fallback_model,
-    { dbClient }
+    { read: { tx } }
   );
   if (fallbackValidation.kind === 'error') {
     throw new TRPCError({
@@ -196,10 +199,6 @@ const UpdateAllowListsInputSchema = OrganizationIdInputSchema.extend({
 
 function dedupeModels(values: string[]): string[] {
   return [...new Set(values.map(value => normalizeModelId(value)))];
-}
-
-function dedupeStrings(values: string[]): string[] {
-  return [...new Set(values)];
 }
 
 async function validateOrganizationDefaultModel(
@@ -266,7 +265,7 @@ async function validateOrganizationDefaultReplacement(
         'Replacement default model could not be validated against the current model catalog.',
     });
   }
-  const availableModel = availableModels?.data.find(
+  const availableModel = availableModels.data.find(
     model => model.id.trim().toLowerCase() === validatedReplacementModel.toLowerCase()
   );
   if (!availableModel) {
@@ -532,7 +531,8 @@ export const organizationsSettingsRouter = createTRPCRouter({
             const currentSettings = organization.settings || {};
             const settingsUpdate: OrganizationSettings = { ...currentSettings };
             if (provider_allow_list !== undefined) {
-              settingsUpdate.provider_allow_list = dedupeStrings(provider_allow_list);
+              settingsUpdate.provider_allow_list =
+                normalizeInferenceProviderIds(provider_allow_list);
             }
             if (model_deny_list !== undefined) {
               settingsUpdate.model_deny_list = dedupeModels(model_deny_list);
@@ -662,7 +662,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
           async organization => {
             assertOrganizationAutoEligible(organization);
             const validation = await validateOrganizationAutoTarget(organization, model_id, {
-              dbClient: tx,
+              read: { tx },
             });
             if (validation.kind === 'error') {
               throw new TRPCError({ code: 'BAD_REQUEST', message: validation.message });
@@ -827,7 +827,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
                 const routeValidation = await validateOrganizationAutoTarget(
                   organization,
                   targetModelId,
-                  { dbClient: tx }
+                  { read: { tx } }
                 );
                 if (routeValidation.kind === 'error') {
                   throw new TRPCError({
@@ -843,9 +843,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
             const validation = await validateOrganizationAutoTarget(
               organization,
               requestedFallback,
-              {
-                dbClient: tx,
-              }
+              { read: { tx } }
             );
             if (validation.kind === 'error') {
               throw new TRPCError({ code: 'BAD_REQUEST', message: validation.message });

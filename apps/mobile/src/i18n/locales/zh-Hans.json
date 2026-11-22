@@ -309,6 +309,7 @@
     "hideBalance": "隐藏余额",
     "showBalance": "显示余额",
     "balanceHidden": "余额已隐藏",
+    "availableToSpendInOrganization": "可用于此组织内支出",
     "signOutTitle": "退出登录？",
     "signOutMessage": "退出后，需要重新登录才能访问工作区。",
     "deleteAccountTitle": "删除账户？",
@@ -450,6 +451,17 @@
       "location": "Vertex 位置",
       "clientEmail": "服务账号邮箱",
       "privateKey": "服务账号私钥",
+      "privateKeyBlockRequired": "请粘贴完整密钥块，从 BEGIN 行到 END 行。",
+      "privateKeyEncrypted": "此密钥块受口令保护。请粘贴不含口令的服务账号密钥。",
+      "names": {
+        "codestral": "旧版仅 Codestral",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI（使用 ChatGPT 登录）",
+        "xiaomi": "Xiaomi（按量付费）",
+        "zai": "Z.ai（按量付费）",
+        "bedrockByok": "Amazon Bedrock（直连）",
+        "vertexByok": "Google Vertex AI（直连）"
+      },
       "modelMappings": "模型映射",
       "modelMappingsDescription": "将网关模型映射到自定义部署名称。",
       "mappingTitle": "映射 {{number}}",
@@ -510,12 +522,13 @@
       "receiptLabel": "回执",
       "copyReceiptId": "复制回执 ID",
       "appealLabel": "申诉",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel)：{{status}}",
       "triageReceived": "已收到",
       "triageOpen": "审核中",
       "triageActioned": "举报成立",
       "triageRejected": "举报不成立",
       "appealNone": "未提交",
-      "appealSubmitted": "审核中",
+      "appealSubmitted": "申诉审核中",
       "appealAccepted": "已通过",
       "appealRejected": "已驳回",
       "appeal": "对此决定提出申诉",
@@ -527,13 +540,23 @@
       "nextStepInReview": "结果将显示在此页面，作出决定后你可以提出申诉。",
       "nextStepAppeal": "申诉结果将显示在此页面。",
       "nextStepFinal": "申诉决定为最终结果，不可再次申诉。",
-      "viewReceipt": "查看回执"
+      "viewReceipt": "查看回执",
+      "targetLabel": "举报对象",
+      "reasonLabel": "举报原因",
+      "targetMessage": "AI 回复",
+      "targetComment": "PR 评论",
+      "targetUser": "用户",
+      "reasonHarmful": "有害内容",
+      "reasonIllegal": "违法内容",
+      "reasonHarassment": "骚扰",
+      "reasonSpam": "垃圾信息",
+      "reasonOther": "其他原因"
     },
     "reportReceipts": {
       "title": "举报记录",
       "rowSubtitle": "你提交的举报及其处理结果",
       "emptyTitle": "暂无举报",
-      "emptyDescription": "你从评论或 AI 回复中提交的举报将显示在这里。",
+      "emptyDescription": "你从拉取请求讨论中的评论或智能体会话中的 AI 回复提交的举报会连同处理结果显示在这里。",
       "couldNotLoad": "无法加载你的举报",
       "capped": "仅显示你最近的举报。"
     },
@@ -544,7 +567,10 @@
     "changelogFixesPolish": "全应用范围的修复与改进。",
     "changelogAreas": {
       "signIn": "登录",
-      "profileOrganizations": "个人资料与组织"
+      "profileOrganizations": "个人资料与组织",
+      "chat": "聊天",
+      "notifications": "通知",
+      "integrations": "集成"
     }
   },
   "preferences": {
@@ -638,6 +664,8 @@
       "emptyTitle": "暂无通知",
       "emptyCategoryTitle": "此类别中暂无通知",
       "emptyBody": "此账户收到的通知会显示在这里。通知会保留 {{days}} 天。",
+      "emptyBody_one": "此账户收到的通知会显示在这里。通知会保留 {{days}} 天。",
+      "emptyBody_other": "此账户收到的通知会显示在这里。通知会保留 {{days}} 天。",
       "capped": "仅显示最近的通知。",
       "loadError": "无法加载通知历史。",
       "openFailed": "此通知已无法在任何位置打开。"
@@ -718,6 +746,7 @@
       "manageAccess": "管理访问权限",
       "bitbucketNoRepositoriesDescription": "此 Bitbucket 工作区中没有可用的仓库。",
       "gitlabNoRepositoriesDescription": "你可能需要授予对 GitLab 上更多群组或项目的访问权限。",
+      "githubNoRepositoriesDescription": "请检查 Kilo GitHub 应用的仓库访问权限，然后刷新。",
       "installGithubApp": "为仓库安装 GitHub 应用",
       "installGithubAppDescription": "请授予 Kilo GitHub 应用访问待审查仓库的权限。",
       "repositoryAccess": "仓库访问权限",
@@ -738,6 +767,9 @@
     },
     "bitbucketConnect": {
       "managedOnWeb": "{{organization}} 的 Bitbucket 连接需在电脑上通过网页版进行管理。",
+      "deniedManagedByOwner": "请联系 {{organization}} 的组织所有者更改你无法更改的连接。",
+      "deniedConnectRole": "只有 {{organization}} 的组织所有者、管理员和账单管理员可以完成连接。",
+      "deniedReconnectRole": "请让 {{organization}} 的组织所有者、管理员或账单管理员重新连接。",
       "managedOnWebTitle": "在网页版管理",
       "managedOnWebShort": "此连接需在电脑上通过网页版进行管理。",
       "managedOnWebRepositories": "请在电脑上通过网页版为 {{organization}} 选择仓库。",
@@ -809,7 +841,7 @@
       "findingsInProgress": "本次审查仍在进行中，完成后问题将显示在这里。",
       "findingsEndedWithoutResults": "本次审查提前结束，未产生任何问题。",
       "serviceUnavailable": "无法连接到代码审查服务。请在服务可用时重试审查。",
-      "reviewFailed": "审查失败。请重试。",
+      "reviewFailed": "审查失败。",
       "retryMessage": "这将重新执行代码审查。",
       "retryReview": "重试审查",
       "retryNeedsSettings": "代码审查器已关闭，或其设置需要处理。请修复设置，然后重试此审查。",
@@ -1010,7 +1042,9 @@
       "unavailablePersonallySwitchAction": "切换组织",
       "unavailableOrganizationTitle": "评审团审查目前无法使用",
       "unavailableForOrganization": "评审团审查需要具备生效订阅或试用期的企业套餐。此组织目前不具备此项。",
-      "unavailableForOrganizationNeutral": "此组织目前无法使用评审团审查。请稍后再试。",
+      "unavailablePlanCheck": "评审团审查无法检查此组织的套餐。请重试以再次检查。",
+      "unavailableFlagRollout": "此组织目前尚无法使用评审团审查。请将应用更新到最新版本以获取此功能。",
+      "unavailableForOrganizationMember": "评审团审查需要具备生效订阅或试用期的企业套餐。组织所有者可以更改套餐。",
       "unavailableOnBitbucket": "评审团审查不适用于 Bitbucket 仓库。",
       "noRepositories": "尚未选择任何仓库。请先在仓库设置中选择仓库。",
       "specialists": "专家",
@@ -1985,8 +2019,7 @@
       "searchPlaceholder": "搜索仓库",
       "noMatches": "未找到匹配项",
       "noRepositories": "暂无可用仓库",
-      "noRepositoriesDescription": "你的账户尚未连接任何仓库。",
-      "loading": "正在加载……",
+      "noRepositoriesDescription": "要加载仓库，请连接 GitHub 或 GitLab。",
       "accessibility": "仓库：{{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -2500,6 +2533,12 @@
     "retryLoadingAccount": "重新加载账号信息",
     "retryLoadingPrivacy": "重新加载隐私选项"
   },
+  "accountBlocked": {
+    "title": "账号已被封禁",
+    "description": "Kilo 已封禁此账号，重新登录也不会解除封禁。如有请求，技术支持可以复核封禁。",
+    "domainDescription": "Kilo 已封禁此邮箱域名上的账号，重新登录也不会解除封禁。如有请求，技术支持可以复核此域名。",
+    "contactSupport": "联系技术支持"
+  },
   "addCredits": {
     "cta": "充值额度",
     "billingPage": "账单页面"
@@ -2858,8 +2897,9 @@
       "checkActiveConnection": "连接已激活，但此项仍无法加载。",
       "bitbucketOrgOnlyDescription": "将上方的账户切换为某个组织，以便审查其 Bitbucket 拉取请求。",
       "bitbucketOrgOnlyNoOrganizationDescription": "此账户尚未加入任何组织。创建或加入组织后，即可审查 Bitbucket 拉取请求。",
-      "gitlabReconnectAdminOnlyDescription": "请让组织所有者、管理员或账单管理员重新连接。",
+      "reconnectAdminOnlyDescription": "请让组织所有者、管理员或账单管理员重新连接。",
       "bitbucketNotConnectedTitle": "尚未连接 Bitbucket",
+      "bitbucketAdminOnlyDescription": "请让组织所有者、管理员或账单管理员进行连接。",
       "adminOnlyConnectDescription": "只有组织所有者、管理员和账单管理员可以完成连接。",
       "contextLine": "适用于 {{organization}}",
       "contextLinePersonal": "适用于个人账户"
@@ -3432,7 +3472,7 @@
       "manageOnWeb": "网页版账单设置",
       "changePlan": "更改套餐",
       "buySeats": "购买席位",
-      "managedOnWeb": "套餐、席位和自动充值在网页版中管理。",
+      "managedOnWeb": "套餐、席位和自动充值在 kilo.ai 中管理。",
       "setupAutoTopUp": "设置自动充值",
       "manageAutoTopUp": "管理自动充值",
       "opensOnWeb": "在网页中打开"
@@ -3630,10 +3670,10 @@
       "nameLabel": "模式名称",
       "nameRequired": "请输入模式名称。",
       "notFound": "此模式已不存在。",
-      "restrictionHint": "只能编辑匹配此文件模式的文件。留空则允许所有文件。",
-      "restrictionInvalid": "请输入有效的文件模式。",
+      "restrictionHint": "正则表达式选择此模式可以编辑哪些文件，例如 `\\.md$` 仅匹配 markdown 文件。留空则允许所有文件。",
+      "restrictionInvalid": "请输入有效的正则表达式。",
       "restrictionLabel": "限制标签",
-      "restrictionPattern": "文件模式",
+      "restrictionPattern": "文件限制",
       "roleLabel": "角色定义",
       "roleRequired": "描述此模式的用途。",
       "tool": {
@@ -3713,7 +3753,7 @@
     "emailDeliveryFailed": "暂时无法发送邮件。请稍后重试。",
     "admissionRequired": "无法验证你的设备。请选择“$t(login.moreSignInOptions)”，在其他设备或网页端登录。",
     "default": "出了点问题。请重试。",
-    "retryableAdmission": "无法验证此设备。请检查网络连接后重试。",
+    "retryableAdmission": "无法验证此设备。请重试。",
     "startSignInFailed": "无法发起登录。请重试。",
     "couldNotOpenBrowser": "无法打开浏览器。请重试。",
     "signInTimedOut": "登录超时。请重试。",
@@ -4058,7 +4098,8 @@
         "space": "没有足够的可用存储空间来存放此模型。请释放空间后重试。",
         "network": "下载未完成。请检查你的网络连接后重试。",
         "invalidFile": "下载的文件不是此应用可以运行的模型，因此已被移除。",
-        "checksum": "下载的文件与其公布的校验和不匹配，因此已被移除。请重新下载。"
+        "checksum": "下载的文件与其公布的校验和不匹配，因此已被移除。请重新下载。",
+        "writeFailed": "此设备无法保存该模型。请重试下载。"
       }
     },
     "catalog": {
@@ -4385,6 +4426,7 @@
       "promptPlaceholder": "你是一个…",
       "tools": "工具",
       "wholeToolRule": "此智能体会同时对每个工具应用一条规则：{{rule}}。这些开关为只读状态。",
+      "toolRule": "已存储的规则：{{rule}}",
       "visibility": "可见性",
       "visibilityPrimary": "主代理 — 显示在选择器中",
       "visibilitySubagent": "子代理 — 仅可由其他代理调用",
@@ -4494,20 +4536,34 @@
       "deductionFallback": "积分扣除",
       "emptyDescription": "积分购买、收据和使用情况将显示在这里。",
       "emptyTitle": "暂无积分记录",
+      "expiredGrant": "已过期：{{description}}",
       "googlePlayReceipt": "收据位于 Google Play",
       "kind": {
         "adjustment": "调整",
         "balanceNeutral": "余额不变",
         "deduction": "扣除",
         "grant": "赠送积分",
+        "promotionalCredits": "促销积分",
         "welcomeCredits": "欢迎积分",
         "purchase": "购买"
+      },
+      "program": {
+        "adminBulkGrant": "管理员发放的积分",
+        "contributorChampion": "贡献者冠军积分",
+        "feedback": "反馈积分",
+        "influencer": "网红积分",
+        "ossMonthlyReset": "开源赞助重置",
+        "ossSponsorship": "开源赞助积分",
+        "pullRequest": "拉取请求积分",
+        "usageIssue": "用量问题积分",
+        "vibeDay": "Vibe Day 积分"
       },
       "purchaseFallback": "积分购买",
       "receipt": "收据",
       "receiptA11y": "打开 {{description}}，{{amount}}，{{date}} 的收据",
       "receiptUnavailable": "此购买暂无可用收据。",
-      "retentionLimit": "仅显示最近的积分记录。"
+      "retentionLimit": "仅显示最近的积分记录。",
+      "voidedGrant": "已作废：{{description}}"
     },
     "title": "购买额度",
     "description": "额度是一次性购买，会添加到你的 Kilo 余额中，用于在 Kilo App 中运行 AI 编程会话。商店会向你的账户收费，商店确认付款后额度才会到账。",
@@ -4843,6 +4899,9 @@
       "runAsCreator": "以我的身份运行",
       "runAsCreatorDescription": "每次运行都会使用你的账号，因此必须填写密钥请求头。",
       "saveFailedTitle": "无法保存触发器",
+      "nameTaken": "名为“{{name}}”的触发器已存在。",
+      "saveFailedRetry": "无法连接到服务器。请检查连接后重试。",
+      "saveFailedCheck": "请检查表单中的内容后重试。",
       "deleteTitle": "删除此触发器？",
       "deleteMessage": "对 {{name}} 的调用将失败。此操作无法撤销。",
       "deleteMessageScheduled": "{{name}} 的已计划运行将停止。此操作无法撤销。",
@@ -5087,6 +5146,20 @@
       "eu": "欧盟",
       "au": "澳大利亚",
       "jp": "日本"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "搜索偏好设置",
+    "noMatches": "未找到匹配的偏好设置",
+    "emptyDescription": "请尝试其他设置名称或关键词。",
+    "resultsStatus": "已找到{{resultCount}}项偏好设置",
+    "keywords": {
+      "signOut": "退出登录|登出",
+      "appearance": "主题|配色|外观",
+      "appUnlock": "生物识别|人脸|指纹",
+      "language": "语言|翻译",
+      "notifications": "提醒|推送|通知",
+      "privacy": "数据分析|跟踪|隐私"
     }
   }
 }

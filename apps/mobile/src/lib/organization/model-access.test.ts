@@ -166,9 +166,9 @@ describe('initialDraft', () => {
 });
 
 describe('toggles', () => {
-  it('adds and removes a provider while keeping the list sorted', () => {
+  it('adds and removes a provider, canonicalizing a restored legacy slug', () => {
     const allowed = toggleProvider(
-      { providerAllowList: ['openai'], modelDenyList: [] },
+      { providerAllowList: ['OpenAI'], modelDenyList: [] },
       'anthropic',
       true
     );
@@ -189,7 +189,7 @@ describe('toggles', () => {
 
   it('applies one decision to every listed entry, as the bulk actions do', () => {
     const providers = setProvidersAllowed(
-      { providerAllowList: ['openai'], modelDenyList: [] },
+      { providerAllowList: ['OpenAI'], modelDenyList: [] },
       ['openai', 'anthropic'],
       false
     );

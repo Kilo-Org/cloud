@@ -30,6 +30,12 @@
     "securityFindingNew": {
       "title": "Nchọpụta nchekwa ọhụrụ ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Dị oké njọ",
+      "high": "Elu",
+      "medium": "Ọkara",
+      "low": "Ala"
+    },
     "securityFindingSlaWarning": {
       "title": "Ịdọ aka na ntị SLA"
     },

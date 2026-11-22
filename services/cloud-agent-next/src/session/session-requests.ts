@@ -9,6 +9,7 @@ import type {
 } from '../execution/types.js';
 import type { SessionProfileBundle } from '../session-profile.js';
 import type { EnvironmentScope } from '../environment-build/reference.js';
+import type { HostedGitHubRepositories } from '../persistence/hosted-github-repositories.js';
 
 export type ProfileOverrides = {
   envVars?: Record<string, string>;
@@ -73,6 +74,7 @@ export type SessionCreateRequest = {
   initialTurn?: ExecutionTurnSubmission;
   agent: AgentSelection;
   repository: SessionRepositoryRequest;
+  hostedGitHubRepositories?: HostedGitHubRepositories;
   runtime?: SessionRuntimeIntent;
   /**
    * The allocation that the owner's saved settings resolved for this create,

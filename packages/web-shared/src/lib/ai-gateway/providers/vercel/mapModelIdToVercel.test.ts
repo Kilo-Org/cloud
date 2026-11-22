@@ -1,4 +1,4 @@
-import { beforeAll, describe, it, expect } from '@jest/globals';
+import { beforeAll, beforeEach, describe, it, expect } from '@jest/globals';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config } from '@kilocode/db/schema';
 import {
@@ -179,4 +179,28 @@ describe('mapVercelModelIdToOpenRouter', () => {
       expect(mapResolvedModelIdToVercel(openRouterModelId ?? '', overrideMap)).toBe(vercelModelId);
     }
   );
+});
+
+describe('readVercelModelIdOverrides', () => {
+  // The uncached reader is the unit under test: the cached getter would serve its last value for a
+  // minute and hide a reseed.
+  beforeEach(async () => {
+    await cleanupDbForTest();
+  });
+
+  it('resolves an empty map when no config row exists', async () => {
+    await expect(readVercelModelIdOverrides()).resolves.toEqual(new Map());
+  });
+
+  it('resolves an empty map when the column is NULL', async () => {
+    await db.insert(ai_gateway_config).values({ config: {} });
+    await expect(readVercelModelIdOverrides()).resolves.toEqual(new Map());
+  });
+
+  it('resolves the stored mapping', async () => {
+    await db.insert(ai_gateway_config).values({ vercel_model_id_overrides: { overrides } });
+    await expect(readVercelModelIdOverrides()).resolves.toEqual(
+      new Map(overrides.map(o => [o.openrouter_model_id, o.vercel_model_id]))
+    );
+  });
 });

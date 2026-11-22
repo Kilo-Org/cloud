@@ -146,8 +146,7 @@ function convertModel(
     opencode: withLegacyVariants({
       ai_sdk_provider: getDirectByokAiSdkProvider(provider, model, id),
       reasoning_options:
-        model.reasoning_options ??
-        (hasReasoning ? getFallbackReasoningOptions(id) : undefined),
+        model.reasoning_options ?? (hasReasoning ? getFallbackReasoningOptions(id) : undefined),
     }),
   };
 }

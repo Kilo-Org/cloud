@@ -1,23 +1,20 @@
 /**
- * The trigger detail's URL card: the address, and a copy control a finger can
+ * The trigger detail's URL field: the address, and a copy control a finger can
  * reach.
  *
- * The copy control is the shared compact box, which is smaller than the
- * platform's touch target. It declares the rest of its reach through `hitSlop`,
- * and React Native clips that reach at the parent view. The host asserted here
- * is that parent: it carries the platform target on both axes, so the declared
- * reach is delivered. A control mounted against a shorter parent would pass a
- * control-size audit and still lose most of its touch area.
+ * The control is the field itself, not the glyph beside the address. React
+ * Native confines a touch to every ancestor view's bounds, so a control sized
+ * to the address line can never reach the platform target: the field carries
+ * `TOUCH_TARGET_CLASS` on its own node and declares no `hitSlop`, so nothing
+ * promises reach the layout cannot deliver. It is also in flow with no
+ * negative margin, which is what kept the label beside its value and the field
+ * on the section's own gap.
  */
 
 import { createElement, type ElementType } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  COMPACT_CONTROL_BOX_CLASS,
-  COMPACT_CONTROL_HIT_SLOP_DP,
-  textActionTargetClass,
-} from '@/lib/a11y/tap-target';
+import { TOUCH_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { i18n } from '@/i18n';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -31,18 +28,21 @@ const copyWebhookUrl = vi.hoisted(() => vi.fn());
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
-  // `textActionTargetClass` reads the platform to pick the shared frame.
+  // The card imports the shared tap-target module, which reads the platform.
   Platform: { OS: 'android', select: (options: Record<string, unknown>) => options.android },
 }));
 vi.mock('@/lib/cloud-triggers/copy-webhook-url', () => ({ copyWebhookUrl }));
 vi.mock('@/components/ui/icons', () => ({ Copy: 'Copy' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/form-field-label', () => ({ FormFieldLabel: 'FormFieldLabel' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => new Proxy({}, { get: () => '#000000' }),
 }));
 
 const PRESSABLE = 'Pressable' as ElementType;
 const TEXT = 'Text' as ElementType;
+const FORM_FIELD_LABEL = 'FormFieldLabel' as ElementType;
+const COPY = 'Copy' as ElementType;
 
 let renderer: ReactTestRenderer | undefined = undefined;
 
@@ -53,10 +53,9 @@ async function mount(): Promise<ReactTestInstance> {
 }
 
 function copyControl(root: ReactTestInstance): ReactTestInstance {
-  const [control] = root.findAll(
-    node =>
-      Object.is(node.type, PRESSABLE) && node.props.accessibilityLabel === i18n.t('common.copyLink')
-  );
+  const pressables = root.findAll(node => Object.is(node.type, PRESSABLE));
+  expect(pressables).toHaveLength(1);
+  const [control] = pressables;
   if (!control) {
     throw new Error('missing copy control');
   }
@@ -70,36 +69,44 @@ afterEach(() => {
 });
 
 describe('TriggerUrlCard copy control', () => {
-  it('renders the URL beside a copy control hosted at the platform target', async () => {
-    const root = await mount();
+  it('makes the whole field the copy control, at the shared target floor', async () => {
+    const control = copyControl(await mount());
 
-    expect(
-      root.findAll(node => Object.is(node.type, TEXT)).map(node => node.props.children)
-    ).toContain(URL);
-
-    const control = copyControl(root);
-    // The control keeps the compact box and declares its reach as slop.
-    expect(String(control.props.className).split(' ')).toEqual(
-      expect.arrayContaining(COMPACT_CONTROL_BOX_CLASS.split(' '))
-    );
-    expect(control.props.hitSlop).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
-
-    // The host is the control's parent, so it is the view React Native clips
-    // the slop at: it must carry the platform target on both axes.
-    const host = control.parent;
-    if (!host) {
-      throw new Error('copy control has no host');
-    }
-    expect(String(host.props.className).split(' ')).toEqual(
-      expect.arrayContaining([...textActionTargetClass().split(' '), 'shrink-0'])
-    );
+    expect(control.props.accessibilityRole).toBe('button');
+    // The action and the address it copies, so a reader hears both.
+    expect(control.props.accessibilityLabel).toContain(i18n.t('common.copyLink'));
+    expect(control.props.accessibilityLabel).toContain(URL);
+    // The target is the field's own box: a declared reach would be clipped at
+    // the address line, which is the shorter ancestor.
+    expect(control.props.hitSlop).toBeUndefined();
+    const classes = String(control.props.className).split(' ');
+    expect(classes).toEqual(expect.arrayContaining(TOUCH_TARGET_CLASS.split(' ')));
+    // In flow: a negative margin is what pulled the label away from its value.
+    expect(classes.filter(name => name.startsWith('-m'))).toEqual([]);
   });
 
-  it('copies the URL when the control is pressed', async () => {
-    const root = await mount();
+  it('keeps the label and the address inside the control', async () => {
+    const control = copyControl(await mount());
+
+    expect(
+      control.findAll(node => Object.is(node.type, FORM_FIELD_LABEL)).map(node => node.props.label)
+    ).toEqual([i18n.t('cloudAgent.triggers.webhookUrl')]);
+    expect(
+      control.findAll(node => Object.is(node.type, TEXT)).map(node => node.props.children)
+    ).toContain(URL);
+  });
+
+  it('paints the copy glyph as decoration inside the control', async () => {
+    const control = copyControl(await mount());
+
+    expect(control.findAll(node => Object.is(node.type, COPY))).toHaveLength(1);
+  });
+
+  it('copies the URL when the field is pressed', async () => {
+    const control = copyControl(await mount());
 
     act(() => {
-      (copyControl(root).props.onPress as () => void)();
+      (control.props.onPress as () => void)();
     });
 
     expect(copyWebhookUrl).toHaveBeenCalledWith(URL);

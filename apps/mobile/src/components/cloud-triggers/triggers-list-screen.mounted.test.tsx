@@ -14,7 +14,6 @@ import { createElement, type ElementType } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { COMPACT_CONTROL_BOX_CLASS, textActionTargetClass } from '@/lib/a11y/tap-target';
 import { triggerDetailHref } from '@/lib/cloud-triggers/trigger-routes';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -162,33 +161,29 @@ describe('TriggersListScreen rows', () => {
     expect(shown).toContain('https://Inbound.example/trigger-a');
     expect(shown).not.toContain('https://Inbound.example/trigger-b');
 
-    const copyButtons = root.findAll(
+    const copyControls = root.findAll(
       node =>
         Object.is(node.type, PRESSABLE) &&
-        node.props.accessibilityLabel === i18n.t('common.copyLink') &&
+        String(node.props.accessibilityLabel ?? '').includes('https://Inbound.example/trigger-a') &&
         typeof node.props.onPress === 'function'
     );
-    expect(copyButtons).toHaveLength(1);
-    const [copyButton] = copyButtons;
-    if (!copyButton) {
+    expect(copyControls).toHaveLength(1);
+    const [copyControl] = copyControls;
+    if (!copyControl) {
       throw new Error('missing copy control');
     }
-    // The control is the shared compact box, and it declares its reach as slop.
-    // React Native clips that reach at the parent view, so the control's parent
-    // must carry the platform target on both axes; the row's own content height
-    // is the box alone.
-    expect(String(copyButton.props.className).split(' ')).toEqual(
-      expect.arrayContaining(COMPACT_CONTROL_BOX_CLASS.split(' '))
-    );
-    const host = copyButton.parent;
-    if (!host) {
-      throw new Error('copy control has no host');
-    }
-    expect(String(host.props.className).split(' ')).toEqual(
-      expect.arrayContaining([...textActionTargetClass().split(' '), 'shrink-0'])
-    );
+    // The URL line itself is the control: React Native confines a touch to every
+    // ancestor's bounds, so a control on this one-text-line row must carry the
+    // target on its own box and declare no reach it cannot deliver.
+    expect(copyControl.props.accessibilityRole).toBe('button');
+    expect(copyControl.props.accessibilityLabel).toContain(i18n.t('common.copyLink'));
+    expect(copyControl.props.hitSlop).toBeUndefined();
+    // The glyph is decoration inside the line, not a nested pressable of its own.
+    expect(
+      copyControl.findAll(node => !Object.is(node, copyControl) && Object.is(node.type, PRESSABLE))
+    ).toEqual([]);
     act(() => {
-      (copyButton.props.onPress as () => void)();
+      (copyControl.props.onPress as () => void)();
     });
     expect(copyWebhookUrl).toHaveBeenCalledWith('https://Inbound.example/trigger-a');
   });

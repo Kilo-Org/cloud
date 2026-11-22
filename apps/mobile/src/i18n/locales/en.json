@@ -4069,6 +4069,7 @@
       "discoveryNoModels": "The endpoint listed no models. Enter models manually.",
       "connectionIncomplete": "The model answered but did not finish. Try again, or check the model ID and protocol.",
       "invalidInput": "Enter a backend name, valid headers, and at least one model with a unique ID and name. Token limits must be positive whole numbers.",
+      "invalidApiKey": "The API key contains a character that cannot be sent. Use letters, digits, and standard symbols only, with no line breaks.",
       "invalidUrl": "Enter an HTTP or HTTPS API root without credentials, a query, or a fragment.",
       "publicHttp": "Public HTTP endpoints are not allowed. Use HTTPS, or a private local endpoint.",
       "httpApprovalRequired": "Approve this local HTTP endpoint before saving or connecting.",

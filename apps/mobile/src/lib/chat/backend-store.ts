@@ -36,6 +36,7 @@ export type StoredChatBackend = {
 export type ChatBackendDraft = Omit<StoredChatBackend, 'id' | 'revision'>;
 export type BackendInputProblem =
   | 'invalidInput'
+  | 'invalidApiKey'
   | 'invalidUrl'
   | 'publicHttp'
   | 'httpApprovalRequired'
@@ -45,6 +46,7 @@ export type BackendInputProblem =
 
 export const BACKEND_INPUT_ERROR_KEYS = {
   invalidInput: 'modelChat.backends.invalidInput',
+  invalidApiKey: 'modelChat.backends.invalidApiKey',
   invalidUrl: 'modelChat.backends.invalidUrl',
   publicHttp: 'modelChat.backends.publicHttp',
   httpApprovalRequired: 'modelChat.backends.httpApprovalRequired',
@@ -160,7 +162,10 @@ const draftSchema = z
     completionTokenField: z
       .enum(['max_completion_tokens', 'max_tokens'])
       .default('max_completion_tokens'),
-    apiKey: z.string().refine(value => /^[\u0020-\u007E\u0080-\u00FF]*$/.test(value)),
+    apiKey: z
+      .string()
+      .trim()
+      .refine(value => /^[\u0020-\u007E\u0080-\u00FF]*$/.test(value)),
     headers: backendHeadersSchema,
     models: z
       .array(backendModelSchema)
@@ -170,10 +175,18 @@ const draftSchema = z
   })
   .strip();
 
+/**
+ * The problem a failed draft names. Read the issue PATH, never its message: an
+ * issue can quote a credential or a custom header.
+ */
+function inputProblem(error: z.ZodError): BackendInputProblem {
+  return error.issues.some(issue => issue.path[0] === 'apiKey') ? 'invalidApiKey' : 'invalidInput';
+}
+
 export function validateChatBackendDraft(input: unknown): ChatBackendDraft {
   const parsed = draftSchema.safeParse(input);
   if (!parsed.success) {
-    throw new BackendInputError('invalidInput');
+    throw new BackendInputError(inputProblem(parsed.error));
   }
   try {
     return {
@@ -193,7 +206,7 @@ export type BackendConnection = Pick<
 export function validateBackendConnection(input: unknown): BackendConnection {
   const parsed = draftSchema.omit({ name: true, models: true }).safeParse(input);
   if (!parsed.success) {
-    throw new BackendInputError('invalidInput');
+    throw new BackendInputError(inputProblem(parsed.error));
   }
   try {
     return {

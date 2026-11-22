@@ -4045,6 +4045,7 @@
       "discoveryNoModels": "Wurin haɗi bai lissafa wani samfuri ba. Shigar da samfura da hannu.",
       "connectionIncomplete": "Samfurin ya amsa amma bai kammala ba. Sake gwadawa, ko duba ID na samfurin da ƙa'idar.",
       "invalidInput": "Shigar da sunan uwar garke, ingantattun kanun buƙata, da aƙalla samfurin guda ɗaya mai ID da suna da ba a maimaita ba. Iyakokin gutsuren rubutu dole ne su zama cikakkun lambobi masu girma fiye da sifili.",
+      "invalidApiKey": "Maɓallin API yana ɗauke da harafi da ba za a iya aikawa ba. Yi amfani da haruffa, lambobi, da daidaitattun alamomi kawai, ba tare da karyewar layi ba.",
       "invalidUrl": "Shigar da tushen API na HTTP ko HTTPS ba tare da bayanan shiga, tambayar URL, ko ɓangaren URL ba.",
       "publicHttp": "Ba a yarda da wuraren haɗin HTTP na jama'a ba. Yi amfani da HTTPS, ko wurin haɗi na cikin gida mai zaman kansa.",
       "httpApprovalRequired": "Amince da wannan wurin haɗin HTTP na cikin gida kafin ajiyewa ko haɗawa.",

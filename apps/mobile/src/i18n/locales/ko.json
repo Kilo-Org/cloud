@@ -4045,6 +4045,7 @@
       "discoveryNoModels": "엔드포인트에 모델이 없습니다. 모델을 직접 입력하세요.",
       "connectionIncomplete": "모델이 응답했지만 완료하지 못했습니다. 다시 시도하거나 모델 ID와 프로토콜을 확인하세요.",
       "invalidInput": "백엔드 이름, 유효한 헤더, 고유한 ID와 이름이 있는 모델을 하나 이상 입력하세요. 토큰 한도는 양의 정수여야 합니다.",
+      "invalidApiKey": "API 키에 전송할 수 없는 문자가 포함되어 있습니다. 줄바꿈 없이 문자, 숫자 및 표준 기호만 사용하세요.",
       "invalidUrl": "인증 정보, 쿼리 또는 프래그먼트가 없는 HTTP 또는 HTTPS API 루트를 입력하세요.",
       "publicHttp": "공개 HTTP 엔드포인트는 허용되지 않습니다. HTTPS 또는 비공개 로컬 엔드포인트를 사용하세요.",
       "httpApprovalRequired": "저장하거나 연결하기 전에 이 로컬 HTTP 엔드포인트를 승인하세요.",

@@ -4045,6 +4045,7 @@
       "discoveryNoModels": "端點未列出任何模型。請手動輸入模型。",
       "connectionIncomplete": "模型已回應但未完成。請再試一次，或檢查模型 ID 與協定。",
       "invalidInput": "請輸入後端名稱、有效的標頭，以及至少一個具有唯一 ID 和名稱的模型。詞元上限必須為正整數。",
+      "invalidApiKey": "API 金鑰含有無法傳送的字元。請僅使用字母、數字與標準符號，且不得包含換行。",
       "invalidUrl": "請輸入 HTTP 或 HTTPS API 根 URL，且不得包含驗證憑證、查詢參數或片段識別碼。",
       "publicHttp": "不允許使用公開的 HTTP 端點。請使用 HTTPS 或私有的本機端點。",
       "httpApprovalRequired": "儲存或連線前，請先核准此本機 HTTP 端點。",

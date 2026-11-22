@@ -4045,6 +4045,7 @@
       "discoveryNoModels": "Päätepiste ei luetellut malleja. Lisää mallit käsin.",
       "connectionIncomplete": "Malli vastasi mutta ei suorittanut pyyntöä loppuun. Yritä uudelleen tai tarkista mallin tunniste ja protokolla.",
       "invalidInput": "Anna taustapalvelun nimi, kelvolliset otsakkeet ja vähintään yksi malli, jolla on yksilöllinen tunniste ja nimi. Tokenrajojen on oltava positiivisia kokonaislukuja.",
+      "invalidApiKey": "API-avain sisältää merkin, jota ei voi lähettää. Käytä vain kirjaimia, numeroita ja tavallisia symboleja ilman rivinvaihtoja.",
       "invalidUrl": "Anna API:n HTTP- tai HTTPS-juuriosoite ilman tunnistetietoja, kyselyä tai fragmenttia.",
       "publicHttp": "Julkisia HTTP-päätepisteitä ei sallita. Käytä HTTPS-yhteyttä tai yksityistä paikallista päätepistettä.",
       "httpApprovalRequired": "Hyväksy tämä paikallinen HTTP-päätepiste ennen tallentamista tai yhteyden muodostamista.",

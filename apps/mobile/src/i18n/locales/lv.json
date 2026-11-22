@@ -4119,6 +4119,7 @@
       "discoveryNoModels": "Galapunkts neuzrādīja nevienu modeli. Ievadi modeļus manuāli.",
       "connectionIncomplete": "Modelis atbildēja, bet nepabeidza pieprasījumu. Mēģini vēlreiz vai pārbaudi modeļa ID un protokolu.",
       "invalidInput": "Ievadi aizmugursistēmas nosaukumu, derīgas galvenes un vismaz vienu modeli ar unikālu ID un nosaukumu. Tokenu ierobežojumiem jābūt pozitīviem veseliem skaitļiem.",
+      "invalidApiKey": "API atslēga satur rakstzīmi, kuru nevar nosūtīt. Izmanto tikai burtus, ciparus un standarta simbolus, bez rindas pārtraukumiem.",
       "invalidUrl": "Ievadi HTTP vai HTTPS API saknes adresi bez piekļuves datiem, vaicājuma vai fragmenta.",
       "publicHttp": "Publiski HTTP galapunkti nav atļauti. Izmanto HTTPS vai privātu lokālu galapunktu.",
       "httpApprovalRequired": "Pirms saglabāšanas vai savienošanās apstiprini šo lokālo HTTP galapunktu.",

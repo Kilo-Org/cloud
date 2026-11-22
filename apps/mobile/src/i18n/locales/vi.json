@@ -4045,6 +4045,7 @@
       "discoveryNoModels": "Điểm cuối không liệt kê mô hình nào. Hãy nhập mô hình thủ công.",
       "connectionIncomplete": "Mô hình đã phản hồi nhưng không hoàn tất. Hãy thử lại, hoặc kiểm tra ID mô hình và giao thức.",
       "invalidInput": "Nhập tên máy chủ, các trường tiêu đề hợp lệ và ít nhất một mô hình có ID và tên không trùng lặp. Giới hạn token phải là số nguyên dương.",
+      "invalidApiKey": "Khóa API chứa ký tự không thể gửi. Chỉ sử dụng chữ cái, chữ số và ký hiệu tiêu chuẩn, không có ngắt dòng.",
       "invalidUrl": "Nhập URL gốc của API dùng HTTP hoặc HTTPS, không có thông tin xác thực, chuỗi truy vấn hoặc phần định danh đoạn.",
       "publicHttp": "Không cho phép các điểm cuối HTTP công khai. Hãy dùng HTTPS hoặc một điểm cuối riêng trong mạng cục bộ.",
       "httpApprovalRequired": "Chấp thuận điểm cuối HTTP cục bộ này trước khi lưu hoặc kết nối.",

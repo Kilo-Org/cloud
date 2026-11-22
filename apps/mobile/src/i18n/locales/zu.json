@@ -4045,6 +4045,7 @@
       "discoveryNoModels": "Indawo yokuxhumana ayibonisanga mamodeli. Faka amamodeli ngokwakho.",
       "connectionIncomplete": "Imodeli iphendulile kodwa ayiqedanga. Zama futhi, noma uhlole i-ID yemodeli nephrothokholi.",
       "invalidInput": "Faka igama lohlelo olungemuva, izihloko ezivumelekile, kanye nemodeli okungenani eyodwa ene-ID negama okungaphindiwe. Imikhawulo yamathokheni kufanele ibe izinombolo eziphelele ezingaphezu kukaqanda.",
+      "invalidApiKey": "Ukhiye we-API unehlamvu elingakwazi ukuthunyelwa. Sebenzisa izinhlamvu, izinombolo, nezimpawu ezijwayelekile kuphela, ngaphandle kokweqa imigqa.",
       "invalidUrl": "Faka i-URL eyisisekelo ye-API ye-HTTP noma ye-HTTPS engenayo imininingwane yokungena, umbuzo, noma ingxenye yokugcina ye-URL.",
       "publicHttp": "Izindawo zokuxhumana ze-HTTP zomphakathi azivunyelwe. Sebenzisa i-HTTPS, noma indawo yokuxhumana yangasese yasendaweni.",
       "httpApprovalRequired": "Vumela le ndawo yokuxhumana ye-HTTP yasendaweni ngaphambi kokulondoloza noma ukuxhuma.",

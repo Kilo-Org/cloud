@@ -27,6 +27,16 @@ const draft: ChatBackendDraft = {
 const firstId = '00000000-0000-4000-8000-000000000001';
 const secondId = '00000000-0000-4000-8000-000000000002';
 
+/** The error a call throws, so an assertion can read a typed problem instead of the message. */
+function captureError(run: () => unknown): Error {
+  try {
+    run();
+  } catch (error) {
+    return error instanceof Error ? error : new Error(String(error));
+  }
+  throw new Error('Expected the call to throw');
+}
+
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
@@ -144,12 +154,44 @@ describe('secure backend profiles', () => {
     { apiKind: 'unknown' },
     { completionTokenField: 'max_output_tokens' },
     { completionTokenField: null },
-    { apiKey: 'secret\n' },
     { headers: { Authorization: 'invalid-\u0100' } },
     { models: [{ id: 'bad\nid', name: 'Bad', tools: false }] },
   ])('rejects invalid user input without leaking secrets: %j', async patch => {
     const store = await import('./backend-store');
     expect(() => store.validateChatBackendDraft({ ...draft, ...patch })).toThrow(/^invalidInput$/u);
+  });
+
+  it('trims whitespace around the API key and keeps the key body intact', async () => {
+    const store = await import('./backend-store');
+    const parsed = store.validateChatBackendDraft({ ...draft, apiKey: ' new-secret\n' });
+    expect(parsed.apiKey).toBe('new-secret');
+  });
+
+  it('names a control character inside the API key without quoting the key', async () => {
+    const store = await import('./backend-store');
+    const failure = captureError(() =>
+      store.validateChatBackendDraft({ ...draft, apiKey: 'sec\nret' })
+    );
+    expect(failure).toBeInstanceOf(store.BackendInputError);
+    expect((failure as InstanceType<typeof store.BackendInputError>).problem).toBe('invalidApiKey');
+    expect(failure.message).toBe('invalidApiKey');
+    expect(failure.message).not.toContain('sec');
+    expect(failure.message).not.toContain('ret');
+
+    const connection = captureError(() =>
+      store.validateBackendConnection({ ...draft, apiKey: 'sec\nret' })
+    );
+    expect((connection as InstanceType<typeof store.BackendInputError>).problem).toBe(
+      'invalidApiKey'
+    );
+  });
+
+  it('reports a failure that names no field as invalidInput', async () => {
+    const store = await import('./backend-store');
+    const failure = captureError(() => store.validateChatBackendDraft({ ...draft, name: ' ' }));
+    expect(failure).toBeInstanceOf(store.BackendInputError);
+    expect((failure as InstanceType<typeof store.BackendInputError>).problem).toBe('invalidInput');
+    expect(failure.message).toBe('invalidInput');
   });
 
   it('persists the selected limit field and defaults profiles that predate the setting', async () => {

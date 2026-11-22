@@ -4045,6 +4045,7 @@
       "discoveryNoModels": "Ulanish manzili hech qanday model koʻrsatmadi. Modellarni qoʻlda kiriting.",
       "connectionIncomplete": "Model javob berdi, lekin tugatmadi. Qaytadan urinib koʻring yoki model ID si va protokolni tekshiring.",
       "invalidInput": "Server nomi, yaroqli sarlavhalar va takrorlanmaydigan ID hamda nomga ega kamida bitta modelni kiriting. Token chegaralari musbat butun sonlar boʻlishi kerak.",
+      "invalidApiKey": "API kaliti yuborib boʻlmaydigan belgini oʻz ichiga oladi. Faqat harflar, raqamlar va standart belgilardan foydalaning, qator uzilishlarisiz.",
       "invalidUrl": "Kirish maʼlumotlari, soʻrov parametrlari yoki fragmentsiz HTTP yoki HTTPS API asosiy manzilini kiriting.",
       "publicHttp": "Ommaviy HTTP ulanish manzillariga ruxsat berilmaydi. HTTPS yoki xususiy mahalliy ulanish manzilidan foydalaning.",
       "httpApprovalRequired": "Saqlash yoki ulanishdan oldin bu mahalliy HTTP ulanish manzilini tasdiqlang.",

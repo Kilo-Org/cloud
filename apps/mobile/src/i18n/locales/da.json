@@ -4045,6 +4045,7 @@
       "discoveryNoModels": "Endepunktet angav ingen modeller. Tilføj modeller manuelt.",
       "connectionIncomplete": "Modellen svarede, men blev ikke færdig. Prøv igen, eller tjek model-ID'et og protokollen.",
       "invalidInput": "Indtast et servernavn, gyldige headere og mindst én model med et entydigt ID og navn. Tokengrænser skal være positive heltal.",
+      "invalidApiKey": "API-nøglen indeholder et tegn, som ikke kan sendes. Brug kun bogstaver, tal og standardtegn, uden linjeskift.",
       "invalidUrl": "Indtast en HTTP- eller HTTPS-API-rod uden loginoplysninger, forespørgselsparametre eller et fragment.",
       "publicHttp": "Offentlige HTTP-endepunkter er ikke tilladt. Brug HTTPS eller et privat lokalt endepunkt.",
       "httpApprovalRequired": "Godkend dette lokale HTTP-endepunkt, før du gemmer eller opretter forbindelse.",

@@ -4045,6 +4045,7 @@
       "discoveryNoModels": "Ibi ìsopọ̀ kò ṣe àkójọ awoṣe kankan. Tẹ àwọn awoṣe sí fúnra rẹ.",
       "connectionIncomplete": "Awoṣe náà dáhùn ṣùgbọ́n kò parí. Gbìyànjú lẹ́ẹ̀kan sí i, tàbí ṣàyẹ̀wò ID awoṣe àti ìlànà.",
       "invalidInput": "Tẹ orúkọ ètò ẹ̀yìn, àwọn akọlé tó tọ́, àti ó kéré tán awoṣe kan tí ó ní ID àti orúkọ tí kò tún ara wọn ṣe sí. Ààlà iye àwọn àmì gbọ́dọ̀ jẹ́ odindi nọ́ńbà tí ó tóbi ju òdo lọ.",
+      "invalidApiKey": "Kọ́kọ́rọ́ API ní àmì kan tí a kò lè fi ránṣẹ́. Lo àwọn lẹ́tà, àwọn nọ́ńbà àti àwọn àmì deede nìkan, láìsí ìdá ìlà kankan.",
       "invalidUrl": "Tẹ ìpìlẹ̀ API HTTP tàbí HTTPS tí kò ní àwọn ẹ̀rí ìwọlé, ìbéèrè inú URL, tàbí àjákù URL sí.",
       "publicHttp": "A kò gba àwọn ibi ìsopọ̀ HTTP ti gbogbogbò láàyè. Lo HTTPS tàbí ibi ìsopọ̀ àdáni lórí nẹ́tíwọ́ọ̀kì agbègbè.",
       "httpApprovalRequired": "Fọwọ́ sí ibi ìsopọ̀ HTTP agbègbè yìí kí o tó fi pamọ́ tàbí sopọ̀.",

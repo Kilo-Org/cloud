@@ -368,6 +368,20 @@ describe('MarkdownHtml unknown tags', () => {
 
     expect(allText(renderer)).toContain('An unknown tag: stays HTML.');
   });
+
+  it('drops a direction class the content wrote on an unknown tag it renames', async () => {
+    const renderer = await mountHtml(
+      '<p>Latin text <custom-note class="kilo-block-rtl">and more</custom-note> here.</p>'
+    );
+    const texts = hostStyles(renderer, 'Text');
+
+    // The visitor renames the unknown tag to `span` and returns early, so the
+    // strip that drops content-written direction classes runs before that
+    // branch: the paragraph keeps the direction its own text names and no run
+    // inside it is flipped by a class the content wrote.
+    expect(texts.some(entry => entry.style.writingDirection === 'rtl')).toBe(false);
+    expect(texts.every(entry => entry.style.direction !== 'rtl')).toBe(true);
+  });
 });
 
 // These elements reach the HTML renderer only when markdown cannot express

@@ -142,6 +142,14 @@ function blockDirectionClass(element: HtmlDomElement): string | undefined {
 function htmlDomVisitors(namesBlockDirection: boolean): DomVisitorCallbacks {
   return {
     onElement(element) {
+      // A direction class the content wrote is never a direction: a block's own
+      // class is recomputed from its own text on every parse, so a stale mark
+      // from an earlier parse of the same element (a streaming publish
+      // re-parses the source) is dropped, and a container of blocks must never
+      // carry one at all. Strip first, before any branch below clears, hoists
+      // or renames the element, so the rule holds for every element the visitor
+      // sees: an unknown tag becomes a `span`, and that path returns early.
+      stripContentDirectionClass(element);
       if (REMOVED_HTML_TAG_SET.has(element.name)) {
         element.children.splice(0);
       } else if (element.name === 'picture' && element.parent !== null) {
@@ -158,26 +166,31 @@ function htmlDomVisitors(namesBlockDirection: boolean): DomVisitorCallbacks {
         return;
       }
       const directionClass = namesBlockDirection ? blockDirectionClass(element) : undefined;
-      // A direction class the content wrote is always dropped, whether or not
-      // this element names one: a container of blocks must never carry one, and
-      // a block's own class is recomputed from its own text on every parse.
-      const classes = element.attribs.class?.split(/\s+/).filter(Boolean) ?? [];
-      const kept = classes.filter(name => !isDirectionClass(name));
       if (directionClass !== undefined) {
+        // The strip above already removed every content-written direction class,
+        // so the element's remaining classes plus the computed one is its class.
+        const kept = element.attribs.class?.split(/\s+/).filter(Boolean) ?? [];
         kept.push(directionClass);
-      }
-      if (kept.length !== classes.length || directionClass !== undefined) {
         element.attribs.class = kept.join(' ');
       }
     },
   };
 }
 
-// A content class the content itself wrote is not a direction: the block's own
-// first letter names it, so a stale mark from an earlier parse of the same
-// element (a streaming publish re-parses the source) is dropped.
-function isDirectionClass(name: string): boolean {
-  return name === DIRECTION_CLASSES.ltr || name === DIRECTION_CLASSES.rtl;
+/**
+ * Drop every content-written direction class from an element. A class the
+ * content itself wrote is not a direction: the block's own first strong
+ * character names it, so a stale mark from an earlier parse of the same element
+ * (a streaming publish re-parses the source) is dropped.
+ */
+function stripContentDirectionClass(element: HtmlDomElement): void {
+  const classes = element.attribs.class?.split(/\s+/).filter(Boolean) ?? [];
+  const kept = classes.filter(
+    name => name !== DIRECTION_CLASSES.ltr && name !== DIRECTION_CLASSES.rtl
+  );
+  if (kept.length !== classes.length) {
+    element.attribs.class = kept.join(' ');
+  }
 }
 
 const CONTENT_DOM_VISITORS = htmlDomVisitors(true);

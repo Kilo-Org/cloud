@@ -173,9 +173,16 @@ export function OrganizationRequestLogsScreen() {
             placement="top"
             inset="gutter"
             variant={readFailureKindVariant(failure)}
-            // Every kind but the retryable one carries its own copy: the
-            // shared "couldn't load" line would only restate it.
-            message={failure === 'retryable' ? t('organization.requestLogs.loadError') : undefined}
+            // A retryable or terminal failure keeps the screen's own sentence:
+            // the shared server copy would ask for a retry the terminal state
+            // withholds, and the retryable one already points at this read. The
+            // other kinds carry the refusal, the missing item, the wait or the
+            // connection in their own words.
+            message={
+              failure === 'retryable' || failure === 'terminal'
+                ? t('organization.requestLogs.loadError')
+                : undefined
+            }
             onRetry={readFailureKindIsRetryable(failure) ? () => void logs.refetch() : undefined}
             isRetrying={logs.isFetching}
           />

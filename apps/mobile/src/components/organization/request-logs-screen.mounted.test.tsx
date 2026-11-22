@@ -330,6 +330,21 @@ describe('OrganizationRequestLogsScreen', () => {
     unmount();
   });
 
+  it('keeps its own copy for a terminal failure that no retry can fix', async () => {
+    // The procedure rejects a start time outside its own bound with a bad
+    // request, and the device clock supplies that time, so this branch is
+    // reachable from the screen. Its state withholds the retry, so the copy
+    // must not promise one.
+    logsQuery.error = { data: { code: 'BAD_REQUEST', message: 'Start time must be recent' } };
+    const { renderer, unmount } = await mount();
+
+    const [error] = renderer.root.findAllByType('QueryError');
+    expect(error?.props.variant).toBe('server');
+    expect(error?.props.message).toBe("Couldn't load request logs.");
+    expect(error?.props.onRetry).toBeUndefined();
+    unmount();
+  });
+
   it('shows the empty state when the hour has no requests', async () => {
     logsQuery.data = [];
     const { renderer, unmount } = await mount();

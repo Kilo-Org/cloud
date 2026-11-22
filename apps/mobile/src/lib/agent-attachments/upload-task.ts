@@ -83,25 +83,15 @@ function uploadStallWindow() {
     }, AGENT_ATTACHMENT_UPLOAD_STALL_MS);
   };
 
-  const source: ForegroundSource | undefined = uploadForegroundSource();
-  const subscription = source?.addEventListener('change', next => {
-    if (!running) {
-      return;
-    }
-    if (next === 'active') {
-      suspended = false;
-      touch();
-      return;
-    }
-    suspended = true;
-    disarm();
-  });
-
   /**
    * Runs `task.uploadAsync()` under the window. A stall settles the awaited
    * promise first with `Upload stalled` and only then cancels the native
    * request, so a late native outcome cannot win and its rejection is already
    * handled by the race below rather than escaping as an unhandled rejection.
+   *
+   * The foreground subscription is registered and removed here, on this one
+   * path: a caller that throws between building the window and calling `run()`
+   * would otherwise leave a listener registered with nothing holding it.
    */
   const run = async <T>(task: {
     uploadAsync: () => Promise<T>;
@@ -114,6 +104,19 @@ function uploadStallWindow() {
     };
     running = true;
     suspended = false;
+    const source: ForegroundSource | undefined = uploadForegroundSource();
+    const subscription = source?.addEventListener('change', next => {
+      if (!running) {
+        return;
+      }
+      if (next === 'active') {
+        suspended = false;
+        touch();
+        return;
+      }
+      suspended = true;
+      disarm();
+    });
     try {
       const transfer = task.uploadAsync();
       touch();

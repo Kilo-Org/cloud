@@ -372,4 +372,40 @@ describe('uploadOne', () => {
     expect(await outcome).toEqual(new Error('Upload stalled'));
     setUploadForegroundSource({ addEventListener: () => ({ remove: () => undefined }) });
   });
+
+  it('registers no foreground listener when building the native task throws', async () => {
+    // A cache-owned file can disappear between the cancel check and the task
+    // construction, so `createUploadTask` may throw. The window's listener must
+    // be added and removed on one path, or it outlives the failed setup for the
+    // rest of the app session with nothing holding a handle to remove it.
+    const listeners = new Set<(state: string) => void>();
+    setUploadForegroundSource({
+      addEventListener: (_type, handler) => {
+        listeners.add(handler);
+        return {
+          remove: () => {
+            listeners.delete(handler);
+          },
+        };
+      },
+    });
+    createUploadTaskMock.mockImplementationOnce(() => {
+      throw new Error('file no longer exists');
+    });
+
+    await expect(
+      uploadOne({
+        attachmentId: 'att-11',
+        path: 'path-11',
+        extension: 'pdf',
+        contentType: 'application/pdf',
+        contentLength: 100,
+        localUri: 'file:///cache/vanished.pdf',
+        onProgress: () => undefined,
+      })
+    ).rejects.toThrow('file no longer exists');
+
+    expect(listeners.size).toBe(0);
+    setUploadForegroundSource({ addEventListener: () => ({ remove: () => undefined }) });
+  });
 });

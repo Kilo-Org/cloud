@@ -9,43 +9,62 @@ type FakeImage = {
   saveAsync: Mock;
 };
 
+/** A resize requested from a rendered image, in pixels. */
+type FakeResize = { width: number; height: number };
+
 const manipulator = vi.hoisted(() => ({
   renders: [] as FakeImage[],
   sources: [] as unknown[],
   options: [] as (Record<string, number> | undefined)[],
+  resizes: [] as FakeResize[],
+  /** When set, the next render rejects as the loader would, before any ref. */
+  rejectNextRender: undefined as Error | undefined,
   captureException: vi.fn(),
 }));
 
 /** A rendered image whose save resolves to `uri` unless the test overrides it. */
-function makeImage(uri: string): FakeImage {
+function makeImage(uri: string, width = 1568, height = 1176): FakeImage {
   const image: FakeImage = {
-    width: 1568,
-    height: 1176,
+    width,
+    height,
     release: vi.fn(),
-    saveAsync: vi.fn(async () => ({ uri, width: 1568, height: 1176 })),
+    saveAsync: vi.fn(async () => ({ uri, width, height })),
   };
   manipulator.renders.push(image);
   return image;
 }
 
-vi.mock('expo-image-manipulator', () => ({
-  SaveFormat: { PNG: 'png', WEBP: 'webp', JPEG: 'jpeg' },
-  ImageManipulator: {
-    manipulate: (source: unknown, options?: Record<string, number>) => {
-      manipulator.sources.push(source);
-      manipulator.options.push(options);
-      return {
-        renderAsync: async () => {
-          const next = manipulator.renders.shift();
-          if (!next) {
-            throw new Error('no rendered image queued');
-          }
-          return next;
-        },
-      };
+vi.mock('expo-image-manipulator', () => {
+  /** The native render: a load failure rejects here, with no ref at all. */
+  const render = async () => {
+    const failure = manipulator.rejectNextRender;
+    if (failure) {
+      manipulator.rejectNextRender = undefined;
+      throw failure;
+    }
+    const next = manipulator.renders.shift();
+    if (!next) {
+      throw new Error('no rendered image queued');
+    }
+    return next;
+  };
+  return {
+    SaveFormat: { PNG: 'png', WEBP: 'webp', JPEG: 'jpeg' },
+    ImageManipulator: {
+      manipulate: (source: unknown, options?: Record<string, number>) => {
+        manipulator.sources.push(source);
+        manipulator.options.push(options);
+        return {
+          resize: (size: FakeResize) => {
+            manipulator.resizes.push(size);
+            return { renderAsync: render };
+          },
+          renderAsync: render,
+        };
+      },
     },
-  },
-}));
+  };
+});
 
 vi.mock('@sentry/react-native', () => ({
   captureException: manipulator.captureException,
@@ -90,6 +109,8 @@ describe('stripImageMetadata', () => {
     manipulator.renders.length = 0;
     manipulator.sources.length = 0;
     manipulator.options.length = 0;
+    manipulator.resizes.length = 0;
+    manipulator.rejectNextRender = undefined;
     manipulator.captureException.mockReset();
   });
 
@@ -102,11 +123,14 @@ describe('stripImageMetadata', () => {
     expect(manipulator.options).toEqual([BOUNDED_OPTIONS]);
     expect(image.saveAsync).toHaveBeenCalledWith({ compress: 1, format: 'png' });
     expect(image.release).toHaveBeenCalledOnce();
+    // `saveAsync` writes a new cache file, so the saved URI is that file and
+    // never the input URI.
     expect(result).toEqual({
       ok: true,
       uri: 'file:///cache/stripped.png',
       extension: 'png',
     });
+    expect(result.ok && result.uri).not.toBe('file:///cache/original.png');
   });
 
   it('re-encodes heic and heif with the JPEG save format', async () => {
@@ -146,6 +170,50 @@ describe('stripImageMetadata', () => {
     // A failed save releases its own decode, and so does the retry.
     expect(first.release).toHaveBeenCalledOnce();
     expect(retried.release).toHaveBeenCalledOnce();
+    expect(result).toEqual({ ok: true, uri: 'file:///cache/stripped.jpg', extension: 'jpg' });
+    expect(manipulator.captureException).not.toHaveBeenCalled();
+  });
+
+  it('resizes from the rendered image when the loader ignores the bound', async () => {
+    const loaded = makeImage('file:///cache/original.png', 4000, 3000);
+    const resized = makeImage('file:///cache/stripped.png');
+
+    const result = await stripImageMetadata('file:///cache/original.png', 'png');
+
+    // The second render asks for the bound from the rendered image, not the URI:
+    // the pixels are already decoded and the file is not read again.
+    expect(manipulator.sources).toEqual(['file:///cache/original.png', loaded]);
+    expect(manipulator.options).toEqual([BOUNDED_OPTIONS, undefined]);
+    expect(manipulator.resizes).toEqual([{ width: 1568, height: 1176 }]);
+    expect(loaded.release).toHaveBeenCalledOnce();
+    expect(resized.saveAsync).toHaveBeenCalledWith({ compress: 1, format: 'png' });
+    expect(resized.release).toHaveBeenCalledOnce();
+    expect(result).toEqual({ ok: true, uri: 'file:///cache/stripped.png', extension: 'png' });
+  });
+
+  it('resizes the retry too when its loader also ignores the bound', async () => {
+    const firstLoad = makeImage('file:///cache/unused.webp', 4000, 3000);
+    const firstResize = makeImage('file:///cache/unused.webp');
+    firstResize.saveAsync.mockRejectedValue(new Error('webp encode failed'));
+    const retryLoad = makeImage('file:///cache/unused.webp', 4000, 3000);
+    const retryResize = makeImage('file:///cache/stripped.jpg');
+
+    const result = await stripImageMetadata('file:///cache/original.webp', 'webp');
+
+    expect(manipulator.sources).toEqual([
+      'file:///cache/original.webp',
+      firstLoad,
+      'file:///cache/original.webp',
+      retryLoad,
+    ]);
+    expect(manipulator.options).toEqual([BOUNDED_OPTIONS, undefined, BOUNDED_OPTIONS, undefined]);
+    expect(manipulator.resizes).toEqual([
+      { width: 1568, height: 1176 },
+      { width: 1568, height: 1176 },
+    ]);
+    expect(firstLoad.release).toHaveBeenCalledOnce();
+    expect(retryLoad.release).toHaveBeenCalledOnce();
+    expect(retryResize.saveAsync).toHaveBeenCalledWith({ compress: 1, format: 'jpeg' });
     expect(result).toEqual({ ok: true, uri: 'file:///cache/stripped.jpg', extension: 'jpg' });
     expect(manipulator.captureException).not.toHaveBeenCalled();
   });
@@ -190,32 +258,32 @@ describe('stripImageMetadata', () => {
     expect(reported.cause).toMatchObject({ message: 'jpeg encode failed' });
   });
 
-  it('releases the decode and reports when the encoder cannot even load the image', async () => {
-    const image = makeImage('file:///cache/unused.heic');
-    image.saveAsync.mockRejectedValue(
-      Object.assign(new Error('Could not load the image: file:///cache/original.heic'), {
-        code: 'ERR_IMAGE_MANIPULATOR_IMAGE_LOADING_FAILED',
-      })
+  it('reports a load failure and releases nothing when the render cannot load the image', async () => {
+    manipulator.rejectNextRender = Object.assign(
+      new Error('Could not load the image: file:///cache/original.heic'),
+      { code: 'ERR_IMAGE_MANIPULATOR_IMAGE_LOADING_FAILED' }
     );
 
     const result = await stripImageMetadata('file:///cache/original.heic', 'heic');
 
     expect(result).toEqual({ ok: false });
-    expect(image.release).toHaveBeenCalledOnce();
+    // The contextual API loads the image in `renderAsync`, so a load failure
+    // hands back no image at all and there is nothing to release.
+    expect(manipulator.sources).toEqual(['file:///cache/original.heic']);
+    expect(manipulator.renders).toEqual([]);
     expect(captureOptions(0).fingerprint).toEqual([
       'agent-attachments-strip-image-metadata',
       'heic',
       'encoder',
       'ERR_IMAGE_MANIPULATOR_IMAGE_LOADING_FAILED',
     ]);
+    expect(captureOptions(0).fingerprint.join(' ')).not.toContain('file://');
   });
 
   it('keeps two encoder error codes for one extension in separate issues without a file URI', async () => {
-    const loadFailed = makeImage('file:///cache/unused.heic');
-    loadFailed.saveAsync.mockRejectedValue(
-      Object.assign(new Error('Could not load the image: file:///cache/original.heic'), {
-        code: 'ERR_IMAGE_MANIPULATOR_IMAGE_LOADING_FAILED',
-      })
+    manipulator.rejectNextRender = Object.assign(
+      new Error('Could not load the image: file:///cache/original.heic'),
+      { code: 'ERR_IMAGE_MANIPULATOR_IMAGE_LOADING_FAILED' }
     );
     await stripImageMetadata('file:///cache/original.heic', 'heic');
     const writeFailed = makeImage('file:///cache/unused.jpg');

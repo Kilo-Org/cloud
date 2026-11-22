@@ -3,7 +3,7 @@ import { cloudSessionMessagesPageSchema, cloudSessionMessagesPageWireSchema } fr
 import type { CloudAgentEvent } from './cloud-conversation-schemas';
 import type { MessageInfo } from './types';
 import {
-  hasWithheldKilo2Assets,
+  hasIncompleteKilo2Assets,
   hasUnresolvedKilo2Assets,
   isCompactionSummaryPart,
   kilo2AssetKey,
@@ -1094,9 +1094,10 @@ describe('absolute remote native attachments display without their file part', (
   });
 
   it('carries the message without its file part in history and in live events', () => {
-    // No snapshot can ever authorize an absolute remote reference, so its file part is
-    // withheld while the rest of the message displays, and it is not a recovery gap.
-    expect(hasWithheldKilo2Assets(remoteFileTool)).toBe(true);
+    // An absolute remote reference is never fetched on purpose, so its file part is
+    // withheld while the rest of the message displays. It is neither a recovery gap nor
+    // an incomplete transcript: content storage was never expected to provide it.
+    expect(hasIncompleteKilo2Assets(remoteFileTool)).toBe(false);
     expect(hasUnresolvedKilo2Assets(remoteFileTool)).toBe(false);
 
     const display = cloudSessionMessagesPageSchema.parse({
@@ -1147,9 +1148,9 @@ describe('absolute remote native attachments display without their file part', (
     expect(next).toHaveLength(2);
   });
 
-  it('reports an unmapped media reference as withheld now and still recoverable', () => {
-    // Every recoverable reference is also withheld: a snapshot can still authorize
-    // this one, so the message waits on recovery with no display yet.
+  it('reports an unmapped media reference as incomplete now and still recoverable', () => {
+    // Every recoverable reference is also reported incomplete: a snapshot can still
+    // authorize this one, so the message waits on recovery with no display yet.
     const unmappedMediaTool = kilo2MessageSchema.parse({
       id: 'msg_unmapped_media',
       type: 'assistant',
@@ -1167,7 +1168,7 @@ describe('absolute remote native attachments display without their file part', (
         },
       ],
     });
-    expect(hasWithheldKilo2Assets(unmappedMediaTool)).toBe(true);
+    expect(hasIncompleteKilo2Assets(unmappedMediaTool)).toBe(true);
     expect(hasUnresolvedKilo2Assets(unmappedMediaTool)).toBe(true);
   });
 });

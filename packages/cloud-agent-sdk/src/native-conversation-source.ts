@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import {
   hasUnresolvedKilo2Assets,
-  hasWithheldKilo2Assets,
+  hasIncompleteKilo2Assets,
   readKilo2Messages,
 } from './kilo2-source-messages';
 import type { NativeEvent, NativeSessionState } from './native-sync';
@@ -213,18 +213,22 @@ export function readNativeConversation(state: NativeSessionState): NativeConvers
   const complete = state.messages.filter(item => !item.incomplete);
   const unavailable = new Set(state.unavailableAssetKeys ?? []);
   // A reference a later snapshot can still authorize withholds the message and is a
-  // recovery gap. A reference no authorization can bind only withholds its own file part:
-  // the message displays, and its id stays reported so the omission is never silent.
+  // recovery gap. A reference content storage was expected to provide only withholds its
+  // own file part: the message displays and its id stays reported, so the omission is
+  // never silent. An absolute `http(s)` reference is never fetched on purpose, so it is
+  // withheld from the display without ever being reported as missing content.
   const blocked = complete.filter(item =>
     hasUnresolvedKilo2Assets(item.message, state.assetURLs, unavailable)
   );
-  const withheld = complete.filter(item => hasWithheldKilo2Assets(item.message, state.assetURLs));
+  const incompleteReferenced = complete.filter(item =>
+    hasIncompleteKilo2Assets(item.message, state.assetURLs)
+  );
   const incompleteMessageIDs = [
     ...new Set([
       ...state.messages.filter(item => item.incomplete).map(item => item.message.id),
       ...(state.pendingSnapshotMessageIDs ?? []),
       ...blocked.map(item => item.message.id),
-      ...withheld.map(item => item.message.id),
+      ...incompleteReferenced.map(item => item.message.id),
     ]),
   ];
   const session = state.session && withDisplayLocation(state.session);

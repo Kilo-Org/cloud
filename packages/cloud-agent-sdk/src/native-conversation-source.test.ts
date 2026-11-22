@@ -946,11 +946,12 @@ test('a native message whose attachment can never display keeps its text and rep
     },
   ];
   const conversation = readNativeConversation({ ...state, messages });
-  // No snapshot can authorize this reference, so only its file part is withheld: the
-  // message still displays, its id reports the omission, and it is not a recovery gap.
+  // An absolute `http(s)` reference is never fetched on purpose, so only its file part is
+  // withheld: the message still displays and the transcript is NOT reported incomplete,
+  // because that reference was never expected from content storage.
   expect(conversation.messages.map(item => item.info.id)).toEqual(['msg_remote_file', 'msg_after']);
   expect(conversation.messages[0]?.parts.map(part => part.type)).toEqual(['text', 'tool']);
-  expect(conversation.incompleteMessageIDs).toEqual(['msg_remote_file']);
+  expect(conversation.incompleteMessageIDs).toEqual([]);
   expect(conversation.recoveryGaps).toBe(0);
   expect(conversation.error).toBeUndefined();
   expect(JSON.stringify(conversation.messages)).not.toContain('https://example.test/report.png');

@@ -982,8 +982,10 @@ test('a transport failure keeps its retry budget without the asset shortcut', as
   expect(snapshot).toHaveBeenCalledTimes(3);
   // An asset code no longer short-circuits the budget: three asset-coded read failures cost
   // the same three cycles as any other failure before the transport latches.
+  // `blob_hash_mismatch` is still thrown by the snapshot asset resolver, so this exercises a
+  // reachable path whose retry budget is not short-circuited.
   snapshot.mockRejectedValue(
-    Object.assign(new Error('asset file is not readable'), { code: 'native_asset_not_found' })
+    Object.assign(new Error('asset file is not readable'), { code: 'blob_hash_mismatch' })
   );
   connection.refresh();
   await flush();

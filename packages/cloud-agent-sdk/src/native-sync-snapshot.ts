@@ -7,7 +7,7 @@ import {
 } from '@kilocode/session-ingest-contracts';
 import {
   hasUnresolvedKilo2Assets,
-  hasWithheldKilo2Assets,
+  hasIncompleteKilo2Assets,
   kilo2AssetKey,
   readKilo2FileReferences,
   readKilo2Messages,
@@ -190,9 +190,10 @@ export function projectNativeSnapshot(snapshot: NativeSnapshot): NativeSnapshotP
       incompleteMessageIDs.push(item.message.id);
       continue;
     }
-    // A message that only carries references no authorization can bind still displays its
+    // A message whose attachment content storage was expected to provide still displays its
     // text, reasoning and tool output; its withheld attachment is reported, never hidden.
-    if (hasWithheldKilo2Assets(item.message, snapshot.assetURLs))
+    // An absolute `http(s)` reference is never fetched on purpose, so it is not reported.
+    if (hasIncompleteKilo2Assets(item.message, snapshot.assetURLs))
       incompleteMessageIDs.push(item.message.id);
     messages.push(item.message);
   }
@@ -348,8 +349,7 @@ async function resolveSnapshotAssets(
       if (
         !mapping ||
         mapping.reference !== file.uri ||
-        // An absent mapping MIME makes no claim about the type; a stated one must agree.
-        (mapping.mime !== undefined && mapping.mime !== file.mime) ||
+        mapping.mime !== file.mime ||
         (file.uri.startsWith('media:') && file.uri !== `media:${mapping.blob.hash}`)
       ) {
         unavailable.add(kilo2AssetKey(file.id, file.uri, file.mime));

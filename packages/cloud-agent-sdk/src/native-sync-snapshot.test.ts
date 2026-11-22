@@ -1082,9 +1082,9 @@ describe('canonical native snapshot projection', () => {
     expect(snapshot.entities).toContainEqual(sessionBlob);
 
     const projection = projectNativeSnapshot(snapshot);
-    // An absolute remote reference has no possible display, so only its file part is
-    // withheld: the message still projects, and its id is reported as incomplete
-    // instead of the message disappearing from the transcript.
+    // An absolute remote reference is never fetched on purpose, so only its file part is
+    // withheld: the message still projects, and the transcript is NOT reported incomplete
+    // for it because that reference was never expected from content storage.
     expect(projection).toEqual({
       session: projectedSession,
       position: 20,
@@ -1092,7 +1092,7 @@ describe('canonical native snapshot projection', () => {
       messages: readKilo2Messages(projectedSession, messages, {
         assetURLs: snapshot.assetURLs,
       }),
-      incompleteMessageIDs: ['msg_remote_result'],
+      incompleteMessageIDs: [],
     });
     // A shell record has no display part of its own, so it is absent from the
     // projection for the same reason it always was.
@@ -1612,6 +1612,19 @@ describe('authorized native snapshot attachments', () => {
           3,
           'application/pdf'
         ),
+      ],
+    ],
+    // The resolver requires the mapping MIME to match the file's own type, so a mapping
+    // that states none cannot be bound to this attachment.
+    [
+      'absent MIME',
+      [
+        entity('asset', 'bad', {
+          entity: { kind: 'message', id: brokenUser.id },
+          pointer: '/message/files/0',
+          reference: `media:${brokenHash}`,
+          blob: { hash: brokenHash, bytes: 3 },
+        }),
       ],
     ],
     [

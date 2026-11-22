@@ -1308,7 +1308,7 @@ transcript, or a new connection. A stored reference with no authorized asset map
 not fail the read: the producer stores a message and its asset mappings in one batch, so
 such an attachment can never resolve. The snapshot reports its key in
 `unavailableAssetKeys`, that file part is withheld from the display, and the message keeps
-its text, reasoning and tool output. The withheld message stays in `incompleteMessageIDs`
+its text, reasoning and tool output. Such a message stays in `incompleteMessageIDs`
 and in the reader's incomplete count, and it is never a recovery gap, because no retry can
 bind it.
 
@@ -1320,11 +1320,14 @@ identity, native URI and MIME. Replacing non-content-addressed local file result
 invalidates previously resolved bytes until a newer authoritative snapshot
 reauthorizes them. Unresolved live attachments remain visibly incomplete; they do
 not crash the transcript or silently expose local paths as fetchable display URLs.
-A reference no authorization can bind — an absolute `http(s)` reference, or one the
-snapshot reported as unmapped — withholds only its own file part. The containing
-message still displays. The snapshot projection and the live reader report such a
-message in `incompleteMessageIDs`, so their surfaces show an incomplete transcript,
-while the paged history reader keeps only its existing omitted-item count.
+A reference no authorization can bind withholds only its own file part, and the
+containing message still displays. A reference content storage was expected to
+provide — a stored `media:`/workspace reference, or one the snapshot reported as
+unmapped — is reported by the snapshot projection and the live reader in
+`incompleteMessageIDs`, so those surfaces show an incomplete transcript. An absolute
+`http(s)` reference is never fetched on purpose, so only its own file part is withheld
+and the transcript is not reported incomplete. The paged history reader keeps only
+its existing omitted-item count.
 
 Snapshot fetching, relay cursors, replay and recovery remain native-owned.
 `session.moved` requires an authoritative canonical snapshot because its event does

@@ -6,10 +6,10 @@ import {
   type ModeToolGroup,
 } from '@/components/organization/org-mode-form-model';
 import { FormField } from '@/components/ui/form-field';
+import { InlineCodeText } from '@/components/ui/inline-code-text';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
 import { Section } from '@/components/ui/section';
-import { Text } from '@/components/ui/text';
 
 const TOOL_LABEL_KEYS = {
   read: 'organization.modes.tool.read',
@@ -82,7 +82,7 @@ export function ModeToolsFields({
               error={filePatternError}
               onChangeText={onChangeFilePattern}
             />
-            <Text variant="caption">{t('organization.modes.restrictionHint')}</Text>
+            <InlineCodeText variant="caption" codeClassName="text-muted-foreground" value={t('organization.modes.restrictionHint')} />
           </View>
           <FormField
             label={t('organization.modes.restrictionLabel')}

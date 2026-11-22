@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { clearPersistedResetNotice, readPersistedResetNotice } from '@/lib/persist/encrypted-kv';
 
 /** The notice's own state: a read that has not answered, no loss, or a loss to explain. */
-export type LocalResetNotice =
+type LocalResetNotice =
   | { readonly kind: 'loading' }
   | { readonly kind: 'absent' }
   | { readonly kind: 'present' };

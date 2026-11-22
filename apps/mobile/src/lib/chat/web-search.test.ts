@@ -24,6 +24,8 @@ const world = vi.hoisted(() => ({
   transportFailures: 0,
   // Whether the next request hangs until the search times out.
   hang: false,
+  // Whether the response body read fails instead of returning the body.
+  unreadable: false,
   settings: new Map<string, string>(),
   toastError: vi.fn(),
 }));
@@ -56,6 +58,9 @@ vi.mock('./fetch', () => ({
       status,
       text: async () => {
         await Promise.resolve();
+        if (world.unreadable) {
+          throw new Error('stream closed');
+        }
         return body;
       },
     };
@@ -96,6 +101,7 @@ beforeEach(() => {
   world.requests.length = 0;
   world.transportFailures = 0;
   world.hang = false;
+  world.unreadable = false;
   world.settings.clear();
   world.toastError.mockClear();
 });
@@ -257,7 +263,7 @@ describe('a web search', () => {
     expect(spent.used).toBe(0);
   });
 
-  it('charges a search Kilo answered even when the body cannot be read', async () => {
+  it('charges a search Kilo answered whose body is not the results shape', async () => {
     world.response = { status: 200, body: '{"unexpected":true}' };
 
     const { spent, answers } = askQuestion(1);
@@ -265,6 +271,18 @@ describe('a web search', () => {
 
     expect(Result.isFailure(answer ?? Result.fail(undefined))).toBe(true);
     // Kilo ran the search and billed the account, so the allowance still moved.
+    expect(spent.used).toBe(1);
+  });
+
+  it('charges a search Kilo answered even when the body read fails', async () => {
+    world.response = { status: 200, body: '{"results":[]}' };
+    world.unreadable = true;
+
+    const { spent, answers } = askQuestion(1);
+    const [answer] = await answers;
+
+    expect(Result.isFailure(answer ?? Result.fail(undefined))).toBe(true);
+    // Kilo billed the account for the search, so a body lost mid-stream still counts.
     expect(spent.used).toBe(1);
   });
 

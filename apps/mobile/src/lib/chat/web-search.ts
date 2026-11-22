@@ -163,24 +163,24 @@ async function search(argumentsText: string, context: SearchContext): Promise<Se
       'Web search could not reach Kilo. Tell the person, and answer from what you know.'
     );
   }
-  const text = await response.text();
   if (response.status === 402) {
     announcingToast.error(i18n.t('modelChat.webSearch.allowanceExhausted'));
     return failed(ALLOWANCE_EXHAUSTED);
   }
   if (!response.ok) {
-    const detail = parsedBody(text, errorSchema);
+    const detail = parsedBody(await response.text(), errorSchema);
     return failed(
       `Web search failed with status ${String(response.status)}.${detail === undefined ? '' : ` ${detail.error}`}`
     );
   }
   /* Kilo answered, so the search draws on the account's allowance even when it
-     found nothing. A transport failure, a refusal or a timeout above answers
-     nothing and costs nothing. */
-  if (response.status < 400 && spent !== undefined) {
+     found nothing or the body cannot be read. Charging before the read keeps a
+     body that fails mid-stream from hiding a search Kilo billed. A transport
+     failure, a refusal or a timeout above answers nothing and costs nothing. */
+  if (spent !== undefined) {
     spent.used += 1;
   }
-  return resultsBody(text);
+  return resultsBody(await response.text());
 }
 
 /** The tool, paid for by the organization the chat is in when there is one. */

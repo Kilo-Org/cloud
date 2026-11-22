@@ -31,23 +31,24 @@ function coveredSourceIndex(
   sourceName: string,
   guardBelow: string
 ): number | null {
-  for (let sourceIndex = state.index - 1; sourceIndex >= 0; sourceIndex -= 1) {
-    if (state.routes[sourceIndex]?.name !== sourceName) {
-      continue;
-    }
-    // The nearest entry of the source's name: its own shape decides, so a
-    // nearer source in an unrecognized shape never lets a farther one move.
-    // The source has to sit directly under the destination, or - for the
-    // repair's splice - directly under the guard the destination landed on.
-    const beneathDestination = sourceIndex === state.index - 1;
-    const directlyAboveSource = state.routes[sourceIndex + 1];
-    if (
-      (beneathDestination && state.routes[sourceIndex - 1]?.name === guardBelow) ||
-      (sourceIndex === state.index - 2 && directlyAboveSource?.name === guardBelow)
-    ) {
-      return sourceIndex;
-    }
+  let sourceIndex = state.index - 1;
+  while (sourceIndex >= 0 && state.routes[sourceIndex]?.name !== sourceName) {
+    sourceIndex -= 1;
+  }
+  if (sourceIndex < 0) {
     return null;
+  }
+  // The nearest entry of the source's name: its own shape decides, so a nearer
+  // source in an unrecognized shape never lets a farther one move. The source
+  // has to sit directly under the destination, or - for the repair's splice -
+  // directly under the guard the destination landed on.
+  const beneathDestination = sourceIndex === state.index - 1;
+  const directlyAboveSource = state.routes[sourceIndex + 1];
+  if (
+    (beneathDestination && state.routes[sourceIndex - 1]?.name === guardBelow) ||
+    (sourceIndex === state.index - 2 && directlyAboveSource?.name === guardBelow)
+  ) {
+    return sourceIndex;
   }
   return null;
 }

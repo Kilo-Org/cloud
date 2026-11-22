@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "रिपोजिटरीको खोजी",
       "noMatches": "मिल्ने नतिजा छैन",
       "noRepositories": "कुनै रिपोजिटरी उपलब्ध छैन",
-      "noRepositoriesDescription": "तपाईंको खातामा कुनै रिपोजिटरी जडान भएको छैन।",
+      "noRepositoriesDescription": "रिपोजिटरीहरू लोड गर्न GitHub वा GitLab खाता जडान गर्नुहोस्।",
       "loading": "लोड गर्दै…",
       "accessibility": "रिपोजिटरी: {{label}}",
       "platformBitbucket": "Bitbucket"

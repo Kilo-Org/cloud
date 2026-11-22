@@ -2565,7 +2565,7 @@
       "searchPlaceholder": "Binciken ma'ajiyoyi",
       "noMatches": "Babu abin da ya dace",
       "noRepositories": "Babu ma'ajiyoyin da za a zaɓa",
-      "noRepositoriesDescription": "Babu ma'ajiyoyi da aka haɗa da asusunka.",
+      "noRepositoriesDescription": "Haɗa GitHub ko GitLab don loda ma'ajiyoyi.",
       "loading": "Ana loda…",
       "accessibility": "Ma'ajiya: {{label}}",
       "platformBitbucket": "Bitbucket"

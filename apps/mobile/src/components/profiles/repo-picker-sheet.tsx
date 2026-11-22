@@ -1,10 +1,11 @@
-import { useDeferredValue, useMemo, useState } from 'react';
+import { type Href, useRouter } from 'expo-router';
+import { useDeferredValue, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import {
   filterRepositoryOptions,
   type RepoOption,
@@ -14,7 +15,7 @@ import { QueryError } from '@/components/query-error';
 import { SheetHeader } from '@/components/sheet-header';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { Eyebrow } from '@/components/ui/eyebrow';
-import { GitBranch, Lock, SearchX, Unlock } from '@/components/ui/icons';
+import { GitBranch, Lock, Plug, SearchX, Unlock } from '@/components/ui/icons';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { SearchField } from '@/components/ui/search-field';
 import { Text } from '@/components/ui/text';
@@ -29,6 +30,12 @@ type RepoPickerSheetProps = Readonly<{
   selectedKey: string | null;
   onSelect: (repo: RepoOption) => void;
   onClose: () => void;
+  /**
+   * Where the empty state sends the reader to connect a repository service: the
+   * Connected services screen for this scope, so a person with no repository to
+   * pick is not left with an empty list and no way forward.
+   */
+  connectedServicesHref: Href;
 }>;
 
 /** Content-shaped rows in the same slot and height as a loaded repo row. */
@@ -104,12 +111,43 @@ export function RepoPickerSheet({
   selectedKey,
   onSelect,
   onClose,
+  connectedServicesHref,
 }: Readonly<RepoPickerSheetProps>) {
   const { t } = useTranslation();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
-  const visible = useMemo(
+  // The sheet presents in place and the caller unmounts it from `onClose`, so
+  // the dismissal animation needs a `visible` of its own: closing sets it false,
+  // the native sheet slides out, and the caller's close runs from the dismissal
+  // report. The sheet therefore stays mounted through that animation.
+  const [visible, setVisible] = useState(true);
+  // A navigation waits for the same report: pushing while the native sheet is
+  // still presented leaves the tap looking dead, because the push lands under a
+  // sheet the reader cannot see past (`review-memory-proposal-sheet` and
+  // `backend-settings-sheet` hand a route over this way too).
+  const afterDismissRef = useRef<Href | null>(null);
+  // `Sheet` forwards its own close edge — the finish of the close asked for
+  // here — before the finished-dismissal report, so that edge only withdraws
+  // the sheet. Clearing the queued route there would drop the navigation the
+  // press asked for; `dismissed` owns it.
+  const hide = () => {
+    setVisible(false);
+  };
+  const close = (then?: Href) => {
+    afterDismissRef.current = then ?? null;
+    hide();
+  };
+  const dismissed = () => {
+    const then = afterDismissRef.current;
+    afterDismissRef.current = null;
+    onClose();
+    if (then !== null) {
+      router.push(then);
+    }
+  };
+  const visibleRepos = useMemo(
     () => filterRepositoryOptions(repositories, deferredSearch),
     [repositories, deferredSearch]
   );
@@ -128,7 +166,7 @@ export function RepoPickerSheet({
         onRetry={onRetry}
       />
     );
-  } else if (visible.length === 0) {
+  } else if (visibleRepos.length === 0) {
     body = (
       <EmptyState
         placement="top"
@@ -143,10 +181,21 @@ export function RepoPickerSheet({
             ? t('agents.sessionList.tryDifferentSearch')
             : t('agentChat.repoPicker.noRepositoriesDescription')
         }
+        action={
+          isSearching ? undefined : (
+            <StateAction
+              label={t('integrations.sectionTitle')}
+              icon={Plug}
+              onPress={() => {
+                close(connectedServicesHref);
+              }}
+            />
+          )
+        }
       />
     );
   } else {
-    body = visible.map(repo => (
+    body = visibleRepos.map(repo => (
       <RepoOptionRow
         key={repositoryOptionKey(repo)}
         repo={repo}
@@ -160,11 +209,15 @@ export function RepoPickerSheet({
   }
 
   return (
-    <SessionPageSheet visible onClose={onClose}>
+    <SessionPageSheet visible={visible} onClose={hide} onDismiss={dismissed}>
       <SheetHeader
         title={t('profiles.repoBindings.repo')}
-        onDone={onClose}
-        onCancel={onClose}
+        onDone={() => {
+          close();
+        }}
+        onCancel={() => {
+          close();
+        }}
         doneLabel={t('common.done')}
         cancelLabel={t('common.cancel')}
         topInset="ios-page-sheet"

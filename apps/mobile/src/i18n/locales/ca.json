@@ -2613,7 +2613,7 @@
       "searchPlaceholder": "Cerca de repositoris",
       "noMatches": "Cap coincidència",
       "noRepositories": "Cap repositori disponible",
-      "noRepositoriesDescription": "No hi ha cap repositori connectat al teu compte.",
+      "noRepositoriesDescription": "Connecta GitHub o GitLab per carregar repositoris.",
       "loading": "Carregant…",
       "accessibility": "Repositori: {{label}}",
       "platformBitbucket": "Bitbucket"

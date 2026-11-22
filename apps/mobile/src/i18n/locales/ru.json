@@ -2052,7 +2052,7 @@
       "searchPlaceholder": "Поиск репозиториев",
       "noMatches": "Нет совпадений",
       "noRepositories": "Нет доступных репозиториев",
-      "noRepositoriesDescription": "К вашему аккаунту не подключены репозитории.",
+      "noRepositoriesDescription": "Чтобы загрузить репозитории, подключите GitHub или GitLab.",
       "loading": "Загрузка…",
       "accessibility": "Репозиторий: {{label}}",
       "platformBitbucket": "Bitbucket"

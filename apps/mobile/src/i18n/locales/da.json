@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "Søg efter kodelagre",
       "noMatches": "Ingen resultater",
       "noRepositories": "Ingen tilgængelige kodelagre",
-      "noRepositoriesDescription": "Der er ingen kodelagre tilknyttet din konto.",
+      "noRepositoriesDescription": "Tilknyt GitHub eller GitLab for at indlæse kodelagre.",
       "loading": "Indlæser…",
       "accessibility": "Kodelager: {{label}}",
       "platformBitbucket": "Bitbucket"

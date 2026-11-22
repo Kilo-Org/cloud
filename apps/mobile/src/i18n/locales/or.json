@@ -2561,7 +2561,7 @@
       "searchPlaceholder": "ରିପୋଜିଟୋରୀ ସନ୍ଧାନ",
       "noMatches": "କୌଣସି ମେଳ ନାହିଁ",
       "noRepositories": "କୌଣସି ରିପୋଜିଟୋରୀ ଉପଲବ୍ଧ ନାହିଁ",
-      "noRepositoriesDescription": "ଆପଣଙ୍କ ଆକାଉଣ୍ଟ ସହିତ କୌଣସି ରିପୋଜିଟୋରୀ ସଂଯୋଜିତ ନାହିଁ।",
+      "noRepositoriesDescription": "ରିପୋଜିଟୋରୀ ଲୋଡ୍ କରିବାକୁ GitHub କିମ୍ବା GitLab ଆକାଉଣ୍ଟ ସଂଯୋଗ କରନ୍ତୁ।",
       "loading": "ଲୋଡ୍ ହେଉଛି…",
       "accessibility": "ରିପୋଜିଟୋରୀ: {{label}}",
       "platformBitbucket": "Bitbucket"

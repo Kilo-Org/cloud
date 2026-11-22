@@ -21,7 +21,12 @@ const EDGE_QUOTES =
 const TRAILING_SENTENCE_PUNCT = /[.,;:!?\u2026\u3002\uFF0C\uFF01\uFF1F]$/;
 const DIGIT_END = /\d$/;
 
-/** Whitespace as `\s` defines it, tested one code unit at a time. */
+/**
+ * Whitespace as `\s` defines it, tested one code unit at a time. The code
+ * points stay hexadecimal so the ranges read as Unicode, and oxfmt writes them
+ * lowercase, which `unicorn/number-literal-case` rejects.
+ */
+/* oxlint-disable unicorn/number-literal-case -- oxfmt writes lowercase hex */
 function isWhitespaceChar(char: string): boolean {
   const code = char.codePointAt(0);
   if (code === undefined) {
@@ -42,41 +47,52 @@ function isWhitespaceChar(char: string): boolean {
     code === 0xfeff
   );
 }
+/* oxlint-enable unicorn/number-literal-case */
+
+/** The outcome of scanning a markdown target from the `(` at `open`. */
+type TargetScan =
+  | Readonly<{ kind: 'target'; target: string }>
+  | Readonly<{ kind: 'dead'; whitespaceAt: number }>
+  | Readonly<{ kind: 'end' }>;
+
+/** The one outcome that carries no position: the text ended first. */
+const SCAN_END: TargetScan = { kind: 'end' };
 
 /**
- * The target of the `(` that opens at `open`, up to the first `)` or
- * whitespace. Returns null when whitespace or the end of the text stops it.
+ * Scan the markdown target that starts after the `(` at `open`, up to the
+ * first `)` or whitespace, and report why the scan stopped. A `)` closes the
+ * target, a whitespace character makes it dead at that index, and the end of
+ * the text ends the scan with no `)`.
  */
-function markdownTargetAt(text: string, open: number): string | null {
+function scanMarkdownTarget(text: string, open: number): TargetScan {
   let end = open + 1;
   for (;;) {
     const char = text[end];
-    if (char === undefined || char === ')' || isWhitespaceChar(char)) {
-      break;
+    if (char === undefined) {
+      return SCAN_END;
+    }
+    if (char === ')') {
+      return { kind: 'target', target: text.slice(open + 1, end) };
+    }
+    if (isWhitespaceChar(char)) {
+      return { kind: 'dead', whitespaceAt: end };
     }
     end += 1;
   }
-  return text[end] === ')' ? text.slice(open + 1, end) : null;
-}
-
-/**
- * The target of the `]` at `close`, when the first `[` of its run opened a
- * link: `[...](target)`, with no `)` and no whitespace in the target.
- */
-function closeMarkdownAt(text: string, close: number, runStart: number): string | null {
-  if (runStart < 0 || text[close + 1] !== '(') {
-    return null;
-  }
-  return markdownTargetAt(text, close + 1);
 }
 
 /**
  * The target of the first `[title](target)` link in free text, where the
  * target holds no `)` and no whitespace. One left-to-right pass over the text,
- * with no rescan per candidate.
+ * with each failed suffix visited once.
  */
 function embeddedMarkdownTarget(text: string): string | null {
   let runStart = -1;
+  // Index of the whitespace that ended the last dead scan. That scan covered
+  // every character from its `(` up to the whitespace, and a later `(` at or
+  // before it would read the same characters, so its scan is skipped. Scans
+  // therefore cover disjoint ranges and the whole walk costs one pass.
+  let deadAt = -1;
   for (let index = 0; index < text.length; index += 1) {
     const char = text[index];
     if (char === '\n') {
@@ -88,12 +104,21 @@ function embeddedMarkdownTarget(text: string): string | null {
         runStart = index;
       }
     } else if (char === ']') {
-      const closed = closeMarkdownAt(text, index, runStart);
+      const open = index + 1;
       // A `]` always ends the run it closes.
-      runStart = -1;
-      if (closed !== null) {
-        return closed;
+      if (runStart >= 0 && text[open] === '(' && open > deadAt) {
+        const scan = scanMarkdownTarget(text, open);
+        if (scan.kind === 'target') {
+          return scan.target;
+        }
+        if (scan.kind === 'end') {
+          // No `)` follows this `(`, and a later candidate starts further
+          // right, so it reaches the same end and cannot match either.
+          return null;
+        }
+        deadAt = scan.whitespaceAt;
       }
+      runStart = -1;
     }
   }
   return null;

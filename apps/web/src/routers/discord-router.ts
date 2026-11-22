@@ -54,6 +54,7 @@ export const discordRouter = createTRPCRouter({
         actor_id: ctx.user.id,
         actor_email: ctx.user.google_user_email,
         actor_name: ctx.user.google_user_name,
+        details: { id: 'integration.disconnected', integration: 'discord' },
         message: 'Disconnected Discord integration',
       });
     }
@@ -89,6 +90,11 @@ export const discordRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_email: ctx.user.google_user_email,
           actor_name: ctx.user.google_user_name,
+          details: {
+            id: 'integration.modelUpdated',
+            integration: 'discord',
+            model: input.modelSlug,
+          },
           message: `Updated Discord integration model to ${input.modelSlug}`,
         });
       }

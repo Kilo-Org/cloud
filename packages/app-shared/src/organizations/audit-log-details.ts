@@ -26,16 +26,30 @@ import * as z from 'zod';
 export const AUDIT_ROLE_TAGS = ['owner', 'admin', 'billing_manager', 'member'] as const;
 export type AuditRoleTag = (typeof AUDIT_ROLE_TAGS)[number];
 
-export const AUDIT_REGION_TAGS = ['global', 'eu', 'us'] as const;
+/**
+ * The inference region an organization can pin.
+ *
+ * Read from the stored column's own schema rather than restated: a region this
+ * module lacked would be written as a value the reader's validator rejects, and
+ * the row would silently lose its detail. `OrganizationDataRegion` is the type
+ * of `OrganizationSettings['data_region']`.
+ */
+export const AUDIT_REGION_TAGS = ['us', 'eu', 'au', 'jp'] as const satisfies readonly string[];
 export type AuditRegionTag = (typeof AUDIT_REGION_TAGS)[number];
 
 export const AUDIT_PLATFORM_TAGS = ['github', 'gitlab', 'bitbucket'] as const;
 export type AuditPlatformTag = (typeof AUDIT_PLATFORM_TAGS)[number];
 
+/** A stored `allow`/`deny`/unset, as the audit reader's three tags. */
 export const AUDIT_DATA_COLLECTION_TAGS = ['allowed', 'denied', 'followSetting'] as const;
 export type AuditDataCollectionTag = (typeof AUDIT_DATA_COLLECTION_TAGS)[number];
 
-export const AUDIT_BROWSER_POLICY_TAGS = ['disabled', 'allowlist', 'all'] as const;
+/** The browser policy the organization stores in `browserControl`. */
+export const AUDIT_BROWSER_POLICY_TAGS = [
+  'allow',
+  'playwright_only',
+  'off',
+] as const satisfies readonly string[];
 export type AuditBrowserPolicyTag = (typeof AUDIT_BROWSER_POLICY_TAGS)[number];
 
 export const AUDIT_INTEGRATION_TAGS = [
@@ -122,6 +136,8 @@ const AuditDetailSchema = z.discriminatedUnion('id', [
     name: z.string(),
     policyType: z.string(),
   }),
+  z.strictObject({ id: z.literal('group.defaultPolicySet'), policyType: z.string() }),
+  z.strictObject({ id: z.literal('group.defaultPolicyRemoved'), policyType: z.string() }),
 
   z.strictObject({
     id: z.literal('guardrail.identity'),
@@ -173,8 +189,15 @@ const AuditDetailSchema = z.discriminatedUnion('id', [
 
   // The organization settings, where the row's event name is generic and the
   // detail line is the only place that can say which setting moved.
-  z.strictObject({ id: z.literal('setting.openRouter'), enabled: z.boolean() }),
-  z.strictObject({ id: z.literal('setting.dataRegion'), region: RegionTag }),
+  //
+  // One row records both advanced gateway policies, so the detail names
+  // whichever of them changed: a region move alone, an OpenRouter change alone,
+  // or both in one save.
+  z.strictObject({
+    id: z.literal('setting.advancedPolicies'),
+    openRouter: z.boolean().optional(),
+    region: RegionTag.optional(),
+  }),
   z.strictObject({
     id: z.literal('setting.defaultModel'),
     previous: z.string().optional(),
@@ -275,6 +298,10 @@ const AuditDetailSchema = z.discriminatedUnion('id', [
 
   z.strictObject({ id: z.literal('webhookTrigger.updated'), trigger: z.string() }),
 
+  z.strictObject({ id: z.literal('token.user') }),
+  z.strictObject({ id: z.literal('token.resource') }),
+
+  z.strictObject({ id: z.literal('organization.created'), name: z.string() }),
   z.strictObject({ id: z.literal('organization.renamed'), previous: z.string(), next: z.string() }),
 ]);
 
@@ -287,6 +314,16 @@ export type AuditDetail = z.infer<typeof AuditDetailSchema>;
  * check at the map that holds the templates.
  */
 export type AuditDetailId = AuditDetail['id'];
+
+/**
+ * Every event id, at runtime, from the schema's own discriminators.
+ *
+ * The coverage test walks this list, so an id that gains no template is caught
+ * even where the compiler cannot see the map.
+ */
+export const AUDIT_DETAIL_IDS = AuditDetailSchema.options.map(
+  option => option.shape.id.value
+) as readonly AuditDetailId[];
 
 /** A stored row's payload; `null` when the row predates the contract. */
 export const AuditDetailColumnSchema = AuditDetailSchema.nullable();

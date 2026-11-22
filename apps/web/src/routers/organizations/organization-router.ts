@@ -246,6 +246,7 @@ export const organizationsRouter = createTRPCRouter({
       actor_name: user.google_user_name,
       actor_email: user.google_user_email,
       actor_id: user.id,
+      details: { id: 'organization.created', name: org.name },
       message: `Organization ${org.name} created`,
     });
 
@@ -506,6 +507,11 @@ export const organizationsRouter = createTRPCRouter({
             actor_email: opts.ctx.user.google_user_email,
             actor_id: opts.ctx.user.id,
             actor_name: opts.ctx.user.google_user_name,
+            details: {
+              id: 'setting.name',
+              previous: oldName,
+              next: opts.input.name,
+            },
             message: `Renamed organization from "${oldName}" to "${opts.input.name}"`,
             tx,
           });

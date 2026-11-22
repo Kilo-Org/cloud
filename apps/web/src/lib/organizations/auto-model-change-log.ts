@@ -250,6 +250,14 @@ export async function logAutoModelChangesForAllOrgs(
         actor_id: null,
         actor_email: null,
         actor_name: null,
+        details: {
+          id: 'autoRouting.models',
+          added: [...changes.addedByReasonProvider].map(([provider, models]) => ({
+            provider,
+            models,
+          })),
+          removed: [...changes.removedFromCatalog, ...changes.removedFromAllowedProviders],
+        },
         message,
         organization_id: organization.id,
       });

@@ -54,6 +54,7 @@ async function writeAudit(
       actor_id: actor.id,
       actor_email: actor.email,
       actor_name: actor.name,
+      details: { id: 'integration.uninstalled', integration: 'github' },
       message: auditMessage(record, status),
     } as const;
     if (executor === db) await createAuditLog(audit);

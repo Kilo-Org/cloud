@@ -44,11 +44,15 @@ export function TriggerUrlCard({ url }: Readonly<{ url: string }>) {
       className={cn('gap-1.5 active:opacity-70', TOUCH_TARGET_CLASS)}
     >
       <FormFieldLabel label={t('cloudAgent.triggers.webhookUrl')} />
-      <View className="flex-row items-center gap-2">
+      <View className="flex-row">
         <Text variant="mono" className="min-w-0 flex-1 text-xs">
           {url}
         </Text>
-        <View className="shrink-0">
+        {/* The end band the field has always reserved for the control: 49 dp,
+            so the address wraps before the glyph and the glyph centres where
+            the base screen painted it. It is decoration inside the pressable,
+            not a control of its own. */}
+        <View className="w-14 shrink-0 items-center justify-center">
           <Copy size={16} color={colors.mutedForeground} />
         </View>
       </View>

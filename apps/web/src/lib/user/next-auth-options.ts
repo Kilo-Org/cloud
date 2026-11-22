@@ -116,6 +116,7 @@ import type { UUID } from 'node:crypto';
 import { logExceptInTest, sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { processSSOUserLogin } from '@/lib/user/sso';
 import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
+import { reportedAuthError } from '@/lib/user/reported-auth-error';
 import { z } from 'zod';
 import {
   getUserFromSession,
@@ -1541,7 +1542,9 @@ export const authOptions: NextAuthOptions = {
       } catch (error) {
         const operation = isAccountLinking ? 'account_linking' : 'user_creation';
         const reportedError =
-          account?.provider === 'openai' ? new Error('OpenAI sign-in failed') : error;
+          account?.provider === 'openai'
+            ? reportedAuthError('OpenAI sign-in failed', error)
+            : error;
         console.error(`[AUTH][${operation}] Unexpected error:`, reportedError);
         captureException(reportedError, {
           tags: {
@@ -1630,7 +1633,9 @@ export const authOptions: NextAuthOptions = {
         }
       } catch (error) {
         const reportedError =
-          account?.provider === 'openai' ? new Error('OpenAI session creation failed') : error;
+          account?.provider === 'openai'
+            ? reportedAuthError('OpenAI session creation failed', error)
+            : error;
         captureException(reportedError, {
           tags: {
             operation: 'user_sync_jwt',

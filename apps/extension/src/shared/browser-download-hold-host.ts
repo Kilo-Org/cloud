@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the host is one lifecycle: the read that hydrates the mirror, the mirror itself, and the close that ends both share the closed/detached sets every writer consults, so splitting them would separate each guard from the state it checks. */
 /**
  * Where the download hold lives in the service worker: one hold, one
  * `onDeterminingFilename` listener, and the session storage that keeps a woken
@@ -74,7 +75,10 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
   const storageOf = (): SessionStorageApi | undefined => globals.sessionStorage?.();
   /** The record as this worker knows it: every write replaces it whole. */
   const state: HoldState = {};
-  /** Sessions this worker closed before its record was read: restoring one would bring back a tab that is gone. */
+  /**
+   * Sessions this worker closed. A closed session stays closed for this worker's life: an agent gets a new handle from
+   * `session.open` each time, so a handle this set holds is never a session a caller may use again.
+   */
   const closed = new Set<string>();
   /** Tabs this worker forgot before its record was read: restoring one would re-register a page that is gone. */
   const detached = new Set<number>();
@@ -91,8 +95,16 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
     | { readonly kind: 'restoring'; readonly record: Promise<void> }
     | { readonly kind: 'ready' } = { kind: 'restoring', record: hydration };
 
-  /** The session's mirror entry, created empty: what a report or a registration is recorded into. */
-  const recordOf = (session: string) => {
+  /**
+   * The session's mirror entry, created empty: what a report, a spend or a registration is recorded into. A session
+   * that has closed has none: that is the one place an entry is created, so the record holds a session's facts only
+   * while the session is live.
+   */
+  const recordOf = (session: string): HoldState[string] | undefined => {
+    if (closed.has(session)) {
+      return undefined;
+    }
+
     const existing = state[session];
 
     if (existing !== undefined) {
@@ -145,13 +157,26 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
       await api.cancel(itemId);
     },
     onReport: (report, session) => {
-      recordOf(session).owed = [...recordOf(session).owed, report];
+      const record = recordOf(session);
+
+      if (record === undefined) {
+        // A closed session keeps no report: there is no model left to read it, and the record is a live session's.
+        return;
+      }
+
+      record.owed = [...record.owed, report];
       void write();
     },
     onSpent: need => {
+      const record = recordOf(need.session);
+
+      if (record === undefined) {
+        return;
+      }
+
       // The record keeps the approval exactly as the hold now holds it: spent. A worker that restarts inside the
       // Token's lifetime then refuses the second file instead of arming the approval the first file already spent.
-      recordOf(need.session).need = need;
+      record.need = need;
       void write();
     },
     search: async itemId => (await globals.downloads()?.search?.({ id: itemId })) ?? [],
@@ -211,12 +236,19 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
       hold.announce(download);
     },
     arm: need => {
-      if (!closed.has(need.session)) {
-        hold.arm(need);
+      // A closed session holds no approval, and keeps none in the record.
+      if (closed.has(need.session)) {
+        return;
       }
 
+      hold.arm(need);
+
       register(need.session, () => {
-        recordOf(need.session).need = need;
+        const record = recordOf(need.session);
+
+        if (record !== undefined) {
+          record.need = need;
+        }
       });
     },
     closeSession: session => {
@@ -285,7 +317,9 @@ export const startDownloadHold = (globals: DownloadHoldGlobals): DownloadHold | 
         () => {
           const record = recordOf(input.session);
 
-          record.tabs = [...record.tabs.filter(tab => tab.tabId !== input.tabId), input];
+          if (record !== undefined) {
+            record.tabs = [...record.tabs.filter(tab => tab.tabId !== input.tabId), input];
+          }
         },
         input.tabId
       );

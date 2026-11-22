@@ -45,6 +45,11 @@ function nodeOfType(root: ReactTestInstance, type: string): ReactTestInstance | 
   return root.findAll(node => node.type === type)[0];
 }
 
+/** How many host nodes of a mocked component type the tree holds. */
+function countOfType(root: ReactTestInstance, type: string): number {
+  return root.findAll(node => node.type === type).length;
+}
+
 type QueryErrorNode = { props: { title?: string; onRetry?: () => void } };
 
 function queryErrorOf(root: ReactTestInstance): QueryErrorNode {
@@ -71,7 +76,7 @@ describe('repo picker sheet', () => {
       })
     );
 
-    expect(renderer.root.findAll(node => node.type === 'QueryError')).toHaveLength(1);
+    expect(countOfType(renderer.root, 'QueryError')).toBe(1);
     expect(queryErrorOf(renderer.root).props.title).toBe(i18n.t('common.couldNotLoadRepositories'));
     expect(queryErrorOf(renderer.root).props.title).toBe('Could not load repositories');
     expect(queryErrorOf(renderer.root).props.title).not.toBe(i18n.t('profiles.loadFailed'));
@@ -97,8 +102,8 @@ describe('repo picker sheet', () => {
       })
     );
 
-    expect(renderer.root.findAll(node => node.type === 'RowSkeleton').length).toBeGreaterThan(0);
-    expect(renderer.root.findAll(node => node.type === 'QueryError')).toHaveLength(0);
+    expect(countOfType(renderer.root, 'RowSkeleton')).toBeGreaterThan(0);
+    expect(countOfType(renderer.root, 'QueryError')).toBe(0);
 
     unmount();
   });
@@ -117,7 +122,7 @@ describe('repo picker sheet', () => {
       })
     );
 
-    expect(renderer.root.findAll(node => node.type === 'ChoiceRow')).toHaveLength(1);
+    expect(countOfType(renderer.root, 'ChoiceRow')).toBe(1);
 
     const row = nodeOfType(renderer.root, 'ChoiceRow');
     if (!row) {

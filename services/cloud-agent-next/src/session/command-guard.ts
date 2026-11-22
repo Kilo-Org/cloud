@@ -447,17 +447,13 @@ const SECURITY_REMEDIATION_PUSH_DENIED_PATTERNS = [
 // glob spelling a shell would resolve to the same directory.
 const SECURITY_REMEDIATION_GIT_DIR_SPELLINGS = ['.git', '.g?t', '.g*t'];
 
-// The separator between the directory and its file, written as one path
-// component, a run of slashes, and the same with a dot segment. A shell resolves
-// each to the directory itself.
-const SECURITY_REMEDIATION_GIT_DIR_SEPARATORS = ['/', '//', '///', '/./', '//./', '/.//', '/././'];
-
 // The allowed programs that take the file they write as an argument. `uniq`
-// writes its second argument. The general-purpose programs this policy also
-// admits are handled separately: the search options that run another program or
-// write a named file are refused below, `sort` has its own output option rule,
-// and a program run from inside one of them stays outside a text rule.
-const SECURITY_REMEDIATION_CONFIG_WRITE_TOOLS = ['cp', 'mv', 'sed', 'uniq'];
+// writes its second argument and `sort` writes the file named by its output
+// option. The general-purpose programs this policy also admits are handled
+// separately: the search options that run another program or write a named file
+// are refused below, `sort` has its own output option rules, and a program run
+// from inside one of them stays outside a text rule.
+const SECURITY_REMEDIATION_CONFIG_WRITE_TOOLS = ['cp', 'mv', 'sed', 'uniq', 'sort'];
 
 // A shell joins adjacent quoted pieces into one argument, so the file name can
 // carry a quote at any boundary between its letters and the shell still writes
@@ -538,18 +534,16 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   // each quote character, and the three rules below then cover the same names
   // plus a quote before the name or inside it. A name that carries two quote
   // pairs at once stays outside these rules.
-  // A repeated or dot separator reaches the same file, so each spelling is
-  // named with a run of slashes and with dot segments between the directory and
-  // the file name. The run is enumerated rather than taken as a `*`, because a
-  // wildcard there would also reach a file inside a directory whose name merely
-  // starts with the same characters.
-  ...SECURITY_REMEDIATION_GIT_DIR_SPELLINGS.flatMap(spelling =>
-    SECURITY_REMEDIATION_GIT_DIR_SEPARATORS.flatMap(separator => [
-      `*${spelling}${separator}c*`,
-      `*${spelling}${separator}"c*`,
-      `*${spelling}${separator}'c*`,
-    ])
-  ),
+  // A repeated or dot separator reaches the same file, so the slash directly
+  // after the directory spelling is written literally and the run after it is
+  // taken as a `*`, which covers any number of slashes, any dot segment and any
+  // length. The separator cannot be a `*` itself: that would also reach
+  // `.github/…` and any plain `git/…` source directory.
+  ...SECURITY_REMEDIATION_GIT_DIR_SPELLINGS.flatMap(spelling => [
+    `*${spelling}/*c*`,
+    `*${spelling}/*"c*`,
+    `*${spelling}/*'c*`,
+  ]),
   // A `cd` node is never evaluated, so a write whose target is the bare name
   // cannot be classified by its directory. These rules refuse that target by
   // name, at the cost of refusing a legitimate write to a file or directory
@@ -598,8 +592,17 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   // The option may take its file attached, as `-oconfig` and `-o\tconfig`.
   'sort -o?*',
   'sort * -o?*',
+  // The option takes its file from the next word, so inside a short-option
+  // bundle it is the last letter, as in `sort -rno <file>`; the builder's own
+  // variant of these rules then covers the file that follows.
+  'sort -*o',
+  'sort * -*o',
   'sort --output*',
   'sort * --output*',
+  // The only long option of `sort` that starts with `o` is `--output`, so the
+  // abbreviation has exactly one meaning and a prefix is refused here.
+  'sort --o*',
+  'sort * --o*',
   'find *-exec*',
   'find *-execdir*',
   'find *-ok*',

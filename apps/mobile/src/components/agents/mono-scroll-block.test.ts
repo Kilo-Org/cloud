@@ -50,7 +50,7 @@ describe('prepareMonoScrollContent', () => {
   // A cap inside a surrogate pair drops the pair instead of emitting a lone high surrogate.
   it('cuts a surrogate pair whole when the cap lands inside it', () => {
     const family = '\u{1F468}\u200D\u{1F469}';
-    const result = prepareMonoScrollContent('ab' + family, 3);
+    const result = prepareMonoScrollContent(`ab${family}`, 3);
     expect(result.displayText).toBe('ab');
     expect(result.isTruncated).toBe(true);
   });
@@ -73,7 +73,7 @@ describe('prepareMonoScrollContent', () => {
 
   // The cluster is excluded whole: the combining acute is never left behind without its base.
   it('excludes a base letter plus combining acute as one cluster', () => {
-    const result = prepareMonoScrollContent('a' + 'e\u0301', 2);
+    const result = prepareMonoScrollContent('ae\u0301', 2);
     expect(result.displayText).toBe('a');
     expect(result.isTruncated).toBe(true);
   });
@@ -89,8 +89,8 @@ describe('prepareMonoScrollContent', () => {
   // A cap landing exactly after a whole cluster keeps that cluster.
   it('keeps a cluster the cap ends exactly after', () => {
     const family = '\u{1F468}\u200D\u{1F469}';
-    const result = prepareMonoScrollContent('ab' + family, 2 + family.length);
-    expect(result.displayText).toBe('ab' + family);
+    const result = prepareMonoScrollContent(`ab${family}`, 2 + family.length);
+    expect(result.displayText).toBe(`ab${family}`);
     expect(result.isTruncated).toBe(false);
   });
 
@@ -114,7 +114,7 @@ describe('prepareMonoScrollContent', () => {
   // A run of text is one cluster, so a cap inside it backs off to that run's end,
   // which is the last boundary before the cap — never the cap itself.
   it('backs off to the run boundary a cap lands inside', () => {
-    const content = 'x'.repeat(1900) + '\u{1F468}\u200D\u{1F469}' + 'y'.repeat(3000);
+    const content = `${'x'.repeat(1900)}\u{1F468}\u200D\u{1F469}${'y'.repeat(3000)}`;
     const result = prepareMonoScrollContent(content, 1902);
     expect(result.displayText).toBe('x'.repeat(1900));
     expect(result.isTruncated).toBe(true);
@@ -123,7 +123,7 @@ describe('prepareMonoScrollContent', () => {
   // The window starts mid-value: segmenting it must not report a boundary that
   // only exists because the window began there, and the cut never emits half a pair.
   it('never ends on a lone surrogate in a payload cut mid-window', () => {
-    const content = 'a' + '\u0301'.repeat(3000) + '\u{1F468}\u200D\u{1F469}'.repeat(500);
+    const content = `a${'\u0301'.repeat(3000)}${'\u{1F468}\u200D\u{1F469}'.repeat(500)}`;
     const result = prepareMonoScrollContent(content, 2000);
     expect(/[\uD800-\uDBFF]$/u.test(result.displayText)).toBe(false);
     expect(result.isTruncated).toBe(true);

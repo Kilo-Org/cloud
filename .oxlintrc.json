@@ -5,6 +5,18 @@
   "options": {
     "typeAware": true
   },
+  // oxlint turns `correctness` on by default. Switching it off here is a
+  // relaxation, and this comment gives the reason.
+  // A category covers every file. An individual rule covers only the files its
+  // entry matches. This file names the checks it wants per tree, in `rules` and
+  // in the overrides below, and keeps the category off. Turning the category
+  // back on would start every correctness rule the file does not name. It would
+  // also apply the named rules to files their entries do not match, for example
+  // the .mts suites, which no `**/*.ts` override reaches. Measured on this tree,
+  // that switch adds several hundred diagnostics.
+  // The explicit list is the reviewed set. A rule reaches this repository by
+  // being added here. An oxlint upgrade re-checks the category against the list,
+  // so a new upstream check is adopted or skipped on purpose.
   "categories": {
     "correctness": "off"
   },

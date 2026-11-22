@@ -305,6 +305,7 @@ import {
   getItem,
   isValidDbKey,
   listEntries,
+  listEntryValues,
   listValues,
   MissingSQLCipherError,
   removeItem,
@@ -1551,6 +1552,26 @@ describe('kv behavior', () => {
       await expect(listValues('missing')).resolves.toEqual([]);
     } finally {
       clock.mockRestore();
+    }
+  });
+
+  it('listEntryValues pairs each key with its stored value oldest-first', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(1000);
+      await setItem('s', 'older', 'a');
+      vi.setSystemTime(2000);
+      await setItem('s', 'newer', 'b');
+      await setItem('other', 'elsewhere', 'c');
+
+      const entries = await listEntryValues('s');
+
+      expect(entries).toEqual([
+        { k: 'older', v: 'a', updatedAt: 1000 },
+        { k: 'newer', v: 'b', updatedAt: 2000 },
+      ]);
+    } finally {
+      vi.useRealTimers();
     }
   });
 });

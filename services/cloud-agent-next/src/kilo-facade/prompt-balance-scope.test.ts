@@ -377,7 +377,8 @@ describe('prompt payer scope', () => {
   });
 
   it('reports a slow payer read failure without repeating it', async () => {
-    vi.useFakeTimers();
+    // Only the clock is faked: the request path still awaits real timers.
+    vi.useFakeTimers({ toFake: ['Date'] });
     try {
       const env = envStub();
       const admitPrompt = vi.fn();

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, type ReactTestInstance, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 
 import { defineSetting, type SettingsSearchSource } from '@/lib/settings-search/definitions';
+import { PREFERENCE_SETTINGS_SOURCES } from '@/lib/settings-search/preference-sources';
 import { SettingsSearchField, SettingsSearchResults } from './settings-search';
 import { useSettingsSearch } from './use-settings-search';
 
@@ -17,8 +18,10 @@ const copy = vi.hoisted(() => {
     'settingsSearch.resultsStatus': 'Settings found: {{resultCount}}',
     'settingsSearch.keywords.appearance': 'theme|color scheme',
     'settingsSearch.keywords.privacy': 'analytics|tracking',
+    'common.preferences': 'Preferences',
     'preferences.appearance': 'Appearance',
     'preferences.appearanceSystem': 'System',
+    'preferences.appearanceLight': 'Light',
     'preferences.appearanceDark': 'Dark',
     'common.language': 'Language',
     'consent.helpImprove': 'Help improve Kilo',
@@ -77,11 +80,17 @@ vi.mock('@/lib/font-scale/system-font-scale-context', () => ({
 
 const SOURCES: readonly SettingsSearchSource[] = [
   {
-    context: ['preferences.appearance'],
+    context: ['common.preferences'],
     settings: [
-      defineSetting('appearance.system', 'preferences.appearanceSystem', 'appearance'),
-      defineSetting('appearance.dark', 'preferences.appearanceDark'),
+      defineSetting('appearance', 'preferences.appearance', 'appearance'),
       defineSetting('language', 'common.language'),
+    ],
+  },
+  {
+    context: ['common.preferences', 'preferences.appearance'],
+    settings: [
+      defineSetting('appearance.system', 'preferences.appearanceSystem'),
+      defineSetting('appearance.dark', 'preferences.appearanceDark'),
     ],
   },
   {
@@ -114,9 +123,12 @@ function Harness({
   );
 }
 
-function render(onSelect: (entry: object) => void = () => undefined) {
+function render(
+  onSelect: (entry: object) => void = () => undefined,
+  sources: readonly SettingsSearchSource[] = SOURCES
+) {
   act(() => {
-    renderer = TestRenderer.create(createElement(Harness, { sources: SOURCES, onSelect }));
+    renderer = TestRenderer.create(createElement(Harness, { sources, onSelect }));
   });
   if (renderer === undefined) {
     throw new Error('Missing renderer');
@@ -161,34 +173,85 @@ describe('useSettingsSearch with SettingsSearchField/Results', () => {
     expect(rows(root)).toEqual([]);
   });
 
-  it('indexes labels through t() and bolds only the matched label range', () => {
+  it('indexes labels through t() and marks only the matched label range', () => {
     const root = render();
     typeQuery(root, 'dark');
 
     const [row] = rows(root);
     expect(row?.props.accessibilityLabel).toBe('Dark');
-    expect(row?.props.accessibilityHint).toBe('Appearance');
-    const bold = row?.findAll(
+    expect(row?.props.accessibilityHint).toBe('Preferences · Appearance');
+    const label = row?.findAll(
+      node => Object.is(node.type, 'Text') && String(node.props.className).includes('font-medium')
+    )[0];
+    expect(label?.props.className).toContain('text-foreground');
+    expect(label?.props.className).not.toContain('text-muted-foreground');
+    expect(label?.props.numberOfLines).toBe(1);
+    const marked = row?.findAll(
       node => Object.is(node.type, 'Text') && String(node.props.className).includes('font-semibold')
     );
-    expect(bold).toHaveLength(1);
-    expect(bold?.[0]?.props.children).toBe('Dark');
+    expect(marked).toHaveLength(1);
+    expect(marked?.[0]?.props.className).toContain('underline');
+    expect(marked?.[0]?.props.className).toContain('text-foreground');
+    expect(marked?.[0]?.props.className).not.toContain('text-muted-foreground');
+    expect(marked?.[0]?.props.children).toBe('Dark');
     const breadcrumb = row?.findAll(
-      node => Object.is(node.type, 'Text') && node.props.children === 'Appearance'
+      node => Object.is(node.type, 'Text') && node.props.children === 'Preferences · Appearance'
     );
     expect(breadcrumb).toHaveLength(1);
   });
 
-  it('matches a localized keyword and keeps the label plain', () => {
+  it('underlines only the matched substring while the whole title stays full strength', () => {
     const root = render();
-    typeQuery(root, 'theme');
+    typeQuery(root, 'sys');
 
     const [row] = rows(root);
     expect(row?.props.accessibilityLabel).toBe('System');
-    const bold = root.findAll(
+    const marked = row?.findAll(
       node => Object.is(node.type, 'Text') && String(node.props.className).includes('font-semibold')
     );
-    expect(bold).toEqual([]);
+    expect(marked).toHaveLength(1);
+    expect(marked?.[0]?.props.children).toBe('Sys');
+    expect(marked?.[0]?.props.className).toContain('underline');
+    const remainder = row?.findAll(
+      node => Object.is(node.type, 'Text') && node.props.children === 'tem'
+    );
+    expect(remainder).toHaveLength(1);
+    expect(remainder?.[0]?.props.className).toContain('text-foreground');
+  });
+
+  it('keeps the theme synonym on the Appearance group only', () => {
+    const root = render();
+    typeQuery(root, 'theme');
+
+    const themedRows = rows(root);
+    expect(themedRows).toHaveLength(1);
+    expect(themedRows[0]?.props.accessibilityLabel).toBe('Appearance');
+    const marked = root.findAll(
+      node => Object.is(node.type, 'Text') && String(node.props.className).includes('font-semibold')
+    );
+    expect(marked).toEqual([]);
+  });
+
+  it('finds one themed result and all three options by name in the real hub index', () => {
+    const root = render(() => undefined, PREFERENCE_SETTINGS_SOURCES);
+    typeQuery(root, 'theme');
+    expect(rows(root).map(row => row.props.accessibilityLabel)).toEqual(['Appearance']);
+
+    typeQuery(root, 'appearance');
+    const appearanceRows = rows(root);
+    expect(appearanceRows).toHaveLength(4);
+    expect(appearanceRows.map(row => row.props.accessibilityLabel).sort()).toEqual([
+      'Appearance',
+      'Dark',
+      'Light',
+      'System',
+    ]);
+    for (const appearanceRow of appearanceRows) {
+      if (appearanceRow.props.accessibilityLabel === 'Appearance') {
+        continue;
+      }
+      expect(appearanceRow.props.accessibilityHint).toBe('Preferences · Appearance');
+    }
   });
 
   it('resolves each keyword catalog entry once per index, not per keystroke', () => {

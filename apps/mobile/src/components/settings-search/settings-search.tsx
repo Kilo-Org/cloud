@@ -119,9 +119,9 @@ export function SettingsSearchResults({ results, onSelect }: Readonly<SettingsSe
 }
 
 /**
- * The visible row title with the matched spans set in a heavier weight. The
- * row's accessible name stays the plain label, so the spoken text is never the
- * marked-up children.
+ * The visible row title with the matched spans set in a heavier weight and
+ * underlined. The row's accessible name stays the plain label, so the spoken
+ * text is never the marked-up children.
  */
 function HighlightedSettingLabel({
   label,
@@ -139,7 +139,12 @@ function HighlightedSettingLabel({
   );
 }
 
-/** Split the label at the matched ranges; only the matched pieces take the heavier weight. */
+/**
+ * Split the label at the matched ranges; only the matched pieces take the
+ * heavier weight. The matched run also carries an underline: at this size the
+ * weight step alone is too subtle to read, and the underline marks the match
+ * without dimming the rest of the title or moving any glyph.
+ */
 function renderHighlightedLabel(
   label: string,
   ranges: readonly SettingsMatchRange[]
@@ -154,7 +159,7 @@ function renderHighlightedLabel(
     }
     if (end > start) {
       segments.push(
-        <Text key={`${start}-${end}`} className="text-sm font-semibold">
+        <Text key={`${start}-${end}`} className="text-sm font-semibold text-foreground underline">
           {label.slice(start, end)}
         </Text>
       );

@@ -152,14 +152,14 @@ describe('PreferencesScreen hub', () => {
 
   it('keeps every rendered row and segment paired with its source definition', async () => {
     const renderer = await mountPreferences();
-    const source = PREFERENCE_SETTINGS_SOURCES.find(
+    const hubSettings = PREFERENCE_SETTINGS_SOURCES.filter(
       candidate => candidate.path === '/(app)/(tabs)/(3_profile)/preferences'
-    );
-    if (!source) {
-      throw new Error('preferences hub source missing');
+    ).flatMap(source => source.settings);
+    if (hubSettings.length === 0) {
+      throw new Error('preferences hub sources missing');
     }
     const sourceByLabel = new Map(
-      source.settings.map(setting => [i18n.t(setting.label), setting] as const)
+      hubSettings.map(setting => [i18n.t(setting.label), setting] as const)
     );
 
     // Each rendered navigation row: the target names the same definition the
@@ -203,7 +203,7 @@ describe('PreferencesScreen hub', () => {
       ...sectionLabels,
     ];
     expect(new Set(visibleLabels)).toEqual(
-      new Set(source.settings.map(setting => i18n.t(setting.label)))
+      new Set(hubSettings.map(setting => i18n.t(setting.label)))
     );
 
     const renderedIds: string[] = [];
@@ -214,6 +214,6 @@ describe('PreferencesScreen hub', () => {
       renderedIds.push(props.item.id, ...(props.targetIds ?? []));
     }
 
-    expect(renderedIds).toEqual(source.settings.map(setting => setting.id));
+    expect(renderedIds).toEqual(hubSettings.map(setting => setting.id));
   });
 });

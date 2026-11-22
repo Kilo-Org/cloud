@@ -349,9 +349,10 @@ export async function exchangeNativeGoogleAuthCode(
   // signer/network fault would arrive with the code already spent, and the
   // client's retry would re-submit a spent code and get a 401 instead of the
   // retryable 5xx. Fetched here, the same fault throws while the code is still
-  // unspent. The module client caches the certificate set, so the fetch that
-  // verifies a request normally costs no network round trip, and the set is
-  // reused across requests until it expires.
+  // unspent, and the set fetched here is the set verification uses, so no
+  // fetch can follow the redemption. The shared client keeps the set only for
+  // as long as the certificate response allows, so treat this as one fetch
+  // per request, not a cache the next request can rely on.
   const certs = (await getGoogleClient().getFederatedSignonCertsAsync()).certs;
 
   let tokenResponse;

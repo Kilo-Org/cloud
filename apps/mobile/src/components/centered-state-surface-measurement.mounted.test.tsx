@@ -5,6 +5,7 @@ import {
   createElement,
   type ReactNode,
   useImperativeHandle,
+  useLayoutEffect,
   useState,
 } from 'react';
 import { type View, type ViewInstance } from 'react-native';
@@ -76,9 +77,20 @@ function createHarness(initialOptions: Options) {
     children: ReactNode;
     nativeProps?: Options['unstable_nativeProps'];
   }): ReactNode {
-    // React re-invokes a callback ref only when its identity changes, so the
-    // harness keys the handle on the ref it was given, as the navigator does.
-    useImperativeHandle(nativeProps?.ref, () => node, [nativeProps?.ref]);
+    // A callback ref is called on attach and nulled on detach, and React only
+    // repeats that when its identity changes; the harness does the same so the
+    // hook sees the navigator's real attach/detach rhythm.
+    const installed = nativeProps?.ref;
+    useLayoutEffect(() => {
+      if (typeof installed === 'function') {
+        installed(node);
+      }
+      return () => {
+        if (typeof installed === 'function') {
+          installed(null);
+        }
+      };
+    }, [installed]);
     return children;
   }
   function Harness() {

@@ -3641,10 +3641,10 @@
       "nameLabel": "Anaran'ny fomba fiasa",
       "nameRequired": "Ampidiro ny anaran'ny fomba fiasa.",
       "notFound": "Tsy misy intsony ity fomba fiasa ity.",
-      "restrictionHint": "Ny rakitra mifanaraka amin'ity lamina ity ihany no azo ovaina. Avelao foana izany mba hamela ny rakitra rehetra.",
-      "restrictionInvalid": "Ampidiro ny lamina mety.",
+      "restrictionHint": "Ny regex no mifidy izay rakitra azon'ity fomba fiasa ovaina, ohatra `\\.md$` ho an'ny rakitra markdown ihany. Avelao foana izany mba hamela ny rakitra rehetra.",
+      "restrictionInvalid": "Ampidiro ny regex mety.",
       "restrictionLabel": "Etikety famerana",
-      "restrictionPattern": "Lamina rakitra",
+      "restrictionPattern": "Famerana rakitra (regex)",
       "roleLabel": "Famaritana ny anjara asa",
       "roleRequired": "Lazao izay ataon'ity fomba fiasa ity.",
       "tool": {

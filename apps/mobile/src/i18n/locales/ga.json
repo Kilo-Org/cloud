@@ -3827,10 +3827,10 @@
       "nameLabel": "Ainm an mhóid",
       "nameRequired": "Cuir isteach ainm móid.",
       "notFound": "Níl an mód seo ann a thuilleadh.",
-      "restrictionHint": "Ní féidir ach comhaid a mheaitseálann an patrún seo a chur in eagar. Fág folamh é chun gach comhad a cheadú.",
-      "restrictionInvalid": "Cuir isteach patrún bailí.",
+      "restrictionHint": "Roghnaíonn slonn ionadaíoch na comhaid ar féidir leis an mód seo iad a chur in eagar, mar shampla `\\.md$` le haghaidh comhaid markdown amháin. Fág folamh é chun gach comhad a cheadú.",
+      "restrictionInvalid": "Cuir isteach slonn ionadaíoch bailí.",
       "restrictionLabel": "Lipéad srianta",
-      "restrictionPattern": "Patrún comhaid",
+      "restrictionPattern": "Srian comhaid (slonn ionadaíoch)",
       "roleLabel": "Sainmhíniú róil",
       "roleRequired": "Cuir síos ar a dhéanann an mód seo.",
       "tool": {

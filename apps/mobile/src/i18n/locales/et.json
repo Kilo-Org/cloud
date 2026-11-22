@@ -3641,10 +3641,10 @@
       "nameLabel": "Režiimi nimi",
       "nameRequired": "Sisesta režiimi nimi.",
       "notFound": "Seda režiimi enam ei ole.",
-      "restrictionHint": "Muuta saab ainult faile, mis vastavad sellele mustrile. Jäta väli tühjaks, et lubada kõiki faile.",
-      "restrictionInvalid": "Sisesta kehtiv muster.",
+      "restrictionHint": "Regulaaravaldis valib, milliseid faile see režiim võib muuta, näiteks `\\.md$` ainult markdown-failide jaoks. Jäta väli tühjaks, et lubada kõiki faile.",
+      "restrictionInvalid": "Sisesta kehtiv regulaaravaldis.",
       "restrictionLabel": "Piirangu silt",
-      "restrictionPattern": "Faili muster",
+      "restrictionPattern": "Faili piirang (regulaaravaldis)",
       "roleLabel": "Rolli määratlus",
       "roleRequired": "Kirjelda, mida see režiim teeb.",
       "tool": {

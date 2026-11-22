@@ -3827,10 +3827,10 @@
       "nameLabel": "Isem il-mod",
       "nameRequired": "Daħħal isem il-mod.",
       "notFound": "Dan il-mod m'għadux jeżisti.",
-      "restrictionHint": "Jistgħu jiġu editjati biss fajls li jaqblu ma' dan il-mudell. Ħallih vojt biex tippermetti kull fajl.",
-      "restrictionInvalid": "Daħħal mudell validu.",
+      "restrictionHint": "Espressjoni regolari tagħżel il-fajls li dan il-mod jista' jeditja, pereżempju `\\.md$` għall-fajls markdown biss. Ħallih vojt biex tippermetti kull fajl.",
+      "restrictionInvalid": "Daħħal espressjoni regolari valida.",
       "restrictionLabel": "Tikketta tar-restrizzjoni",
-      "restrictionPattern": "Mudell tal-fajl",
+      "restrictionPattern": "Restrizzjoni tal-fajl (espressjoni regolari)",
       "roleLabel": "Definizzjoni tar-rwol",
       "roleRequired": "Iddeskrivi x'jagħmel dan il-mod.",
       "tool": {

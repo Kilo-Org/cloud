@@ -3641,10 +3641,10 @@
       "nameLabel": "Maqaa haalaa",
       "nameRequired": "Maqaa haalaa galchi.",
       "notFound": "Haalni kun amma hin jiru.",
-      "restrictionHint": "Faayiloonni faakkii kana waliin walsiman qofa gulaalamuu danda'u. Faayilii hundaaf hayyamuu yoo barbaadde duwwaa dhiisi.",
-      "restrictionInvalid": "Faakkii sirrii galchi.",
+      "restrictionHint": "Ibsi idilee faayiloonni haalni kun gulaalamuu danda'u filata, fakkeenyaaf `\\.md$` faayilii markdown qofaaf. Faayilii hundaaf hayyamuu yoo barbaadde duwwaa dhiisi.",
+      "restrictionInvalid": "Ibsa idilee sirrii galchi.",
       "restrictionLabel": "Mallattoo daangaa",
-      "restrictionPattern": "Faakkii faayilii",
+      "restrictionPattern": "Daangaa faayilii (ibsa idilee)",
       "roleLabel": "Hiika gahee",
       "roleRequired": "Haalni kun maal akka hojjetu ibsi.",
       "tool": {

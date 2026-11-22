@@ -3645,10 +3645,10 @@
       "nameLabel": "Tên chế độ",
       "nameRequired": "Nhập tên chế độ.",
       "notFound": "Chế độ này không còn tồn tại.",
-      "restrictionHint": "Chỉ có thể sửa các tệp khớp với mẫu này. Để trống để cho phép mọi tệp.",
-      "restrictionInvalid": "Nhập mẫu hợp lệ.",
+      "restrictionHint": "Biểu thức chính quy chọn các tệp mà chế độ này được phép sửa, ví dụ `\\.md$` chỉ cho tệp markdown. Để trống để cho phép mọi tệp.",
+      "restrictionInvalid": "Nhập biểu thức chính quy hợp lệ.",
       "restrictionLabel": "Nhãn giới hạn",
-      "restrictionPattern": "Mẫu tệp",
+      "restrictionPattern": "Giới hạn tệp (biểu thức chính quy)",
       "roleLabel": "Định nghĩa vai trò",
       "roleRequired": "Mô tả chức năng của chế độ này.",
       "tool": {

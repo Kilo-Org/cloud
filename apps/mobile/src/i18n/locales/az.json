@@ -3641,10 +3641,10 @@
       "nameLabel": "Rejim adı",
       "nameRequired": "Rejim adı daxil edin.",
       "notFound": "Bu rejim artıq mövcud deyil.",
-      "restrictionHint": "Yalnız bu şablona uyğun fayllar redaktə edilə bilər. Bütün fayllara icazə vermək üçün onu boş buraxın.",
-      "restrictionInvalid": "Düzgün şablon daxil edin.",
+      "restrictionHint": "Müntəzəm ifadə bu rejimin redaktə edə biləcəyi faylları seçir, məsələn yalnız markdown faylları üçün `\\.md$`. Bütün fayllara icazə vermək üçün onu boş buraxın.",
+      "restrictionInvalid": "Düzgün müntəzəm ifadə daxil edin.",
       "restrictionLabel": "Məhdudiyyət etiketi",
-      "restrictionPattern": "Fayl şablonu",
+      "restrictionPattern": "Fayl məhdudiyyəti (müntəzəm ifadə)",
       "roleLabel": "Rol tərifi",
       "roleRequired": "Bu rejimin nə etdiyini təsvir edin.",
       "tool": {

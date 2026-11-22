@@ -3641,10 +3641,10 @@
       "nameLabel": "Sunan yanayi",
       "nameRequired": "Shigar da sunan yanayi.",
       "notFound": "Wannan yanayin ba ya wanzu kuma.",
-      "restrictionHint": "Fayiloli da suka yi daidai da wannan tsari ne kawai za a iya gyara. Bar shi fanko don ba da damar kowane fayil.",
-      "restrictionInvalid": "Shigar da ingantaccen tsari.",
+      "restrictionHint": "Kalmar tsari ta yau da kullun (regular expression) tana zaɓar waɗanne fayiloli wannan yanayi zai iya gyara, misali `\\.md$` don fayilolin markdown kawai. Bar shi fanko don ba da damar kowane fayil.",
+      "restrictionInvalid": "Shigar da ingantacciyar kalmar tsari ta yau da kullun (regular expression).",
       "restrictionLabel": "Lakabin ƙuntatawa",
-      "restrictionPattern": "Tsarin fayil",
+      "restrictionPattern": "Ƙuntatawar fayil (regular expression)",
       "roleLabel": "Ma'anar rawa",
       "roleRequired": "Bayyana abin da wannan yanayi ke yi.",
       "tool": {

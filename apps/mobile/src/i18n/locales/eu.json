@@ -3641,10 +3641,10 @@
       "nameLabel": "Moduaren izena",
       "nameRequired": "Sartu moduaren izena.",
       "notFound": "Modu hau ez da jada existitzen.",
-      "restrictionHint": "Eredu honekin bat datozen fitxategiak soilik editatu daitezke. Utzi hutsik fitxategi guztiak onartzeko.",
-      "restrictionInvalid": "Sartu baliozko eredu bat.",
+      "restrictionHint": "Adierazpen erregular batek hautatzen du zein fitxategi edita ditzakeen modu honek, adibidez `\\.md$` markdown fitxategietarako soilik. Utzi hutsik fitxategi guztiak onartzeko.",
+      "restrictionInvalid": "Sartu baliozko adierazpen erregular bat.",
       "restrictionLabel": "Murrizketaren etiketa",
-      "restrictionPattern": "Fitxategi-eredua",
+      "restrictionPattern": "Fitxategi-murrizketa (adierazpen erregularra)",
       "roleLabel": "Rolaren definizioa",
       "roleRequired": "Deskribatu modu honek zer egiten duen.",
       "tool": {

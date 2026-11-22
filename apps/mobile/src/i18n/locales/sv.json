@@ -3641,10 +3641,10 @@
       "nameLabel": "Lägesnamn",
       "nameRequired": "Ange ett lägesnamn.",
       "notFound": "Det här läget finns inte längre.",
-      "restrictionHint": "Endast filer som matchar det här mönstret kan redigeras. Lämna det tomt för att tillåta alla filer.",
-      "restrictionInvalid": "Ange ett giltigt mönster.",
+      "restrictionHint": "Ett reguljärt uttryck väljer vilka filer det här läget får redigera, till exempel `\\.md$` för endast markdown-filer. Lämna det tomt för att tillåta alla filer.",
+      "restrictionInvalid": "Ange ett giltigt reguljärt uttryck.",
       "restrictionLabel": "Begränsningsetikett",
-      "restrictionPattern": "Filmönster",
+      "restrictionPattern": "Filbegränsning (reguljärt uttryck)",
       "roleLabel": "Rolldefinition",
       "roleRequired": "Beskriv vad det här läget gör.",
       "tool": {

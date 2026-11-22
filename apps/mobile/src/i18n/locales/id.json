@@ -3645,10 +3645,10 @@
       "nameLabel": "Nama mode",
       "nameRequired": "Masukkan nama mode.",
       "notFound": "Mode ini sudah tidak ada.",
-      "restrictionHint": "Hanya file yang cocok dengan pola ini yang dapat diedit. Biarkan kosong untuk mengizinkan semua file.",
-      "restrictionInvalid": "Masukkan pola yang valid.",
+      "restrictionHint": "Ekspresi reguler memilih file yang boleh diedit mode ini, misalnya `\\.md$` hanya untuk file markdown. Biarkan kosong untuk mengizinkan semua file.",
+      "restrictionInvalid": "Masukkan ekspresi reguler yang valid.",
       "restrictionLabel": "Label batasan",
-      "restrictionPattern": "Pola file",
+      "restrictionPattern": "Batasan file (ekspresi reguler)",
       "roleLabel": "Definisi peran",
       "roleRequired": "Jelaskan fungsi mode ini.",
       "tool": {

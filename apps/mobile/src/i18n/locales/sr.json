@@ -3703,10 +3703,10 @@
       "nameLabel": "Naziv režima",
       "nameRequired": "Unesi naziv režima.",
       "notFound": "Ovaj režim više ne postoji.",
-      "restrictionHint": "Mogu se uređivati samo datoteke koje odgovaraju ovom obrascu. Ostavi prazno da dozvoliš sve datoteke.",
-      "restrictionInvalid": "Unesi ispravan obrazac.",
+      "restrictionHint": "Regularni izraz bira koje datoteke ovaj režim sme da uređuje, na primer `\\.md$` samo za markdown datoteke. Ostavi prazno da dozvoliš sve datoteke.",
+      "restrictionInvalid": "Unesi ispravan regularni izraz.",
       "restrictionLabel": "Oznaka ograničenja",
-      "restrictionPattern": "Obrazac datoteke",
+      "restrictionPattern": "Ograničenje datoteka (regularni izraz)",
       "roleLabel": "Definicija uloge",
       "roleRequired": "Opiši šta ovaj režim radi.",
       "tool": {

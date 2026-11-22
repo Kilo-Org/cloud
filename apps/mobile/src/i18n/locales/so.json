@@ -3641,10 +3641,10 @@
       "nameLabel": "Magaca qaabka",
       "nameRequired": "Geli magaca qaabka.",
       "notFound": "Qaabkani mar dambe ma jiro.",
-      "restrictionHint": "Kaliya faylasha u dhigma naqshaddan ayaa la tafatiran karaa. Ka tag madhan si fayl walba loo oggolaado.",
-      "restrictionInvalid": "Geli naqshad sax ah.",
+      "restrictionHint": "Tibaax caadi ah ayaa doorata faylasha qaabkani tafatiran karo, tusaale ahaan `\\.md$` kaliya faylasha markdown. Ka tag madhan si fayl walba loo oggolaado.",
+      "restrictionInvalid": "Geli tibaax caadi ah oo sax ah.",
       "restrictionLabel": "Summada xaddidka",
-      "restrictionPattern": "Naqshadda faylka",
+      "restrictionPattern": "Xaddidka faylka (tibaax caadi ah)",
       "roleLabel": "Qeexitaanka doorka",
       "roleRequired": "Sharax waxa qaabkani qabto.",
       "tool": {

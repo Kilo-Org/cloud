@@ -3645,10 +3645,10 @@
       "nameLabel": "Mod adı",
       "nameRequired": "Bir mod adı girin.",
       "notFound": "Bu mod artık mevcut değil.",
-      "restrictionHint": "Yalnızca bu desenle eşleşen dosyalar düzenlenebilir. Tüm dosyalara izin vermek için boş bırakın.",
-      "restrictionInvalid": "Geçerli bir desen girin.",
+      "restrictionHint": "Düzenli ifade, bu modun düzenleyebileceği dosyaları seçer; örneğin yalnızca markdown dosyaları için `\\.md$`. Tüm dosyalara izin vermek için boş bırakın.",
+      "restrictionInvalid": "Geçerli bir düzenli ifade girin.",
       "restrictionLabel": "Kısıtlama etiketi",
-      "restrictionPattern": "Dosya deseni",
+      "restrictionPattern": "Dosya kısıtlaması (düzenli ifade)",
       "roleLabel": "Rol tanımı",
       "roleRequired": "Bu modun ne yaptığını açıklayın.",
       "tool": {

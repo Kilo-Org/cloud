@@ -3889,10 +3889,10 @@
       "nameLabel": "Enw'r modd",
       "nameRequired": "Rhowch enw modd.",
       "notFound": "Nid yw'r modd hwn yn bodoli mwyach.",
-      "restrictionHint": "Dim ond ffeiliau sy'n cyfateb i'r patrwm hwn y gellir eu golygu. Gadewch ef yn wag i ganiatáu pob ffeil.",
-      "restrictionInvalid": "Rhowch batrwm dilys.",
+      "restrictionHint": "Mae mynegiad rheolaidd yn dewis pa ffeiliau y caiff y modd hwn eu golygu, er enghraifft `\\.md$` ar gyfer ffeiliau markdown yn unig. Gadewch ef yn wag i ganiatáu pob ffeil.",
+      "restrictionInvalid": "Rhowch fynegiad rheolaidd dilys.",
       "restrictionLabel": "Label cyfyngiad",
-      "restrictionPattern": "Patrwm ffeil",
+      "restrictionPattern": "Cyfyngiad ffeil (mynegiad rheolaidd)",
       "roleLabel": "Diffiniad rôl",
       "roleRequired": "Disgrifiwch beth mae'r modd hwn yn ei wneud.",
       "tool": {

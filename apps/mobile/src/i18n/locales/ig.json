@@ -3641,10 +3641,10 @@
       "nameLabel": "Aha ụdị ọrụ",
       "nameRequired": "Tinye aha ụdị ọrụ.",
       "notFound": "Ụdị ọrụ a adịkwaghị.",
-      "restrictionHint": "Naanị faịlụ kwekọrọ n'ụkpụrụ a ka enwere ike ịdezi. Hapụ ya tọfụ ka faịlụ niile kweere.",
-      "restrictionInvalid": "Tinye ụkpụrụ ziri ezi.",
+      "restrictionHint": "Regular expression na-ahọrọ faịlụ ndị ọnọdụ a nwere ike idezi, dịka ọmụmaatụ `\\.md$` maka naanị faịlụ markdown. Hapụ ya tọfụ ka faịlụ niile kweere.",
+      "restrictionInvalid": "Tinye regular expression ziri ezi.",
       "restrictionLabel": "Akara mmachi",
-      "restrictionPattern": "Ụkpụrụ faịlụ",
+      "restrictionPattern": "Mmachi faịlụ (regular expression)",
       "roleLabel": "Nkọwa ọrụ",
       "roleRequired": "Kọwaa ihe ụdị ọrụ a na-eme.",
       "tool": {

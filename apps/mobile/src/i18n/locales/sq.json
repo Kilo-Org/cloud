@@ -3641,10 +3641,10 @@
       "nameLabel": "Emri i mënyrës",
       "nameRequired": "Vendos një emër mënyre.",
       "notFound": "Kjo mënyrë nuk ekziston më.",
-      "restrictionHint": "Mund të redaktohen vetëm skedarët që përputhen me këtë model. Lëre bosh për të lejuar çdo skedar.",
-      "restrictionInvalid": "Vendos një model të vlefshëm.",
+      "restrictionHint": "Një shprehje e rregullt zgjedh skedarët që kjo mënyrë mund të redaktojë, për shembull `\\.md$` vetëm për skedarët markdown. Lëre bosh për të lejuar çdo skedar.",
+      "restrictionInvalid": "Vendos një shprehje të rregullt të vlefshme.",
       "restrictionLabel": "Etiketa e kufizimit",
-      "restrictionPattern": "Modeli i skedarit",
+      "restrictionPattern": "Kufizim skedarësh (shprehje e rregullt)",
       "roleLabel": "Përkufizimi i rolit",
       "roleRequired": "Përshkruaj çfarë bën kjo mënyrë.",
       "tool": {

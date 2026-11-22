@@ -3641,10 +3641,10 @@
       "nameLabel": "Jina la hali",
       "nameRequired": "Weka jina la hali.",
       "notFound": "Hali hii haipo tena.",
-      "restrictionHint": "Faili zinazolingana na muundo huu pekee zinaweza kuhaririwa. Iache wazi ili kuruhusu kila faili.",
-      "restrictionInvalid": "Weka muundo sahihi.",
+      "restrictionHint": "Usemi wa kawaida huchagua faili ambazo hali hii inaweza kuhariri, kwa mfano `\\.md$` kwa faili za markdown pekee. Iache wazi ili kuruhusu kila faili.",
+      "restrictionInvalid": "Weka usemi wa kawaida sahihi.",
       "restrictionLabel": "Lebo ya kizuizi",
-      "restrictionPattern": "Muundo wa faili",
+      "restrictionPattern": "Kizuizi cha faili (usemi wa kawaida)",
       "roleLabel": "Ufafanuzi wa jukumu",
       "roleRequired": "Eleza kazi ya hali hii.",
       "tool": {

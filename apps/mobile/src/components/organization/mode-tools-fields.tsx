@@ -82,7 +82,13 @@ export function ModeToolsFields({
               error={filePatternError}
               onChangeText={onChangeFilePattern}
             />
-            <InlineCodeText variant="caption" codeClassName="text-muted-foreground" value={t('organization.modes.restrictionHint')} />
+            <InlineCodeText
+              variant="caption"
+              // The mono variant is a step larger than the caption it sits in;
+              // the example keeps the caption's size and muted color.
+              codeClassName="text-muted-foreground text-xs"
+              value={t('organization.modes.restrictionHint')}
+            />
           </View>
           <FormField
             label={t('organization.modes.restrictionLabel')}

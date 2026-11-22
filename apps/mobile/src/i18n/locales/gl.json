@@ -3641,10 +3641,10 @@
       "nameLabel": "Nome do modo",
       "nameRequired": "Introduce un nome de modo.",
       "notFound": "Este modo xa non existe.",
-      "restrictionHint": "Só se poden editar os ficheiros que coincidan con este patrón. Deixa o campo baleiro para permitir todos os ficheiros.",
-      "restrictionInvalid": "Introduce un patrón válido.",
+      "restrictionHint": "Unha expresión regular selecciona que ficheiros pode editar este modo, por exemplo `\\.md$` só para ficheiros markdown. Deixa o campo baleiro para permitir todos os ficheiros.",
+      "restrictionInvalid": "Introduce unha expresión regular válida.",
       "restrictionLabel": "Etiqueta de restrición",
-      "restrictionPattern": "Patrón de ficheiros",
+      "restrictionPattern": "Restrición de ficheiros (expresión regular)",
       "roleLabel": "Definición do rol",
       "roleRequired": "Describe o que fai este modo.",
       "tool": {

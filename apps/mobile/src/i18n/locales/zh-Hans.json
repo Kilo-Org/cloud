@@ -3645,10 +3645,10 @@
       "nameLabel": "模式名称",
       "nameRequired": "请输入模式名称。",
       "notFound": "此模式已不存在。",
-      "restrictionHint": "只能编辑匹配此文件模式的文件。留空则允许所有文件。",
-      "restrictionInvalid": "请输入有效的文件模式。",
+      "restrictionHint": "正则表达式选择此模式可以编辑哪些文件，例如 `\\.md$` 仅匹配 markdown 文件。留空则允许所有文件。",
+      "restrictionInvalid": "请输入有效的正则表达式。",
       "restrictionLabel": "限制标签",
-      "restrictionPattern": "文件模式",
+      "restrictionPattern": "文件限制（正则表达式）",
       "roleLabel": "角色定义",
       "roleRequired": "描述此模式的用途。",
       "tool": {

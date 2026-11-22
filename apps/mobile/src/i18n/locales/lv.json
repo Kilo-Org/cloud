@@ -3703,10 +3703,10 @@
       "nameLabel": "Režīma nosaukums",
       "nameRequired": "Ievadiet režīma nosaukumu.",
       "notFound": "Šis režīms vairs neeksistē.",
-      "restrictionHint": "Rediģēt var tikai failus, kas atbilst šim šablonam. Atstājiet tukšu, lai atļautu visus failus.",
-      "restrictionInvalid": "Ievadiet derīgu šablonu.",
+      "restrictionHint": "Regulārā izteiksme izvēlas failus, ko šis režīms drīkst rediģēt, piemēram, `\\.md$` tikai markdown failiem. Atstājiet to tukšu, lai atļautu visus failus.",
+      "restrictionInvalid": "Ievadiet derīgu regulāro izteiksmi.",
       "restrictionLabel": "Ierobežojuma apzīmējums",
-      "restrictionPattern": "Faila šablons",
+      "restrictionPattern": "Failu ierobežojums (regulārā izteiksme)",
       "roleLabel": "Lomas definīcija",
       "roleRequired": "Aprakstiet, ko šis režīms dara.",
       "tool": {

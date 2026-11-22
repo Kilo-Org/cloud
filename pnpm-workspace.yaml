@@ -78,6 +78,10 @@ catalog:
   # its own instead of a second pin here.
   typescript: 7.0.2
   ulid: 3.0.2
+  # Named in both the web-shared manifest and the `overrides` block below, and
+  # the overrides note there requires one reviewed version per literal: the
+  # catalog pin is that one place, so both readers take it from here.
+  undici: 7.30.1
   # vitest 4; the `catalogs.vitest5` note below says which workspaces take
   # `catalog:vitest5` instead.
   vitest: 4.1.12
@@ -88,11 +92,18 @@ catalog:
 catalogs:
   # Active test stack: vitest 5 plus its companions at the same version. Take it
   # with `catalog:vitest5`.
-  # Two kinds of workspace still read the default `catalog:` pins at vitest 4:
-  # the suites whose config loads `cloudflareTest` from
-  # @cloudflare/vitest-pool-workers, which peers only `^4.1.0` and so cannot run
-  # vitest 5; and the excluded-feature and node-environment workspaces that have
-  # not moved, where nothing in the config needs vitest 4.
+  # Two kinds of workspace still read the default `catalog:` pins at vitest 4.
+  # The suites whose config loads `cloudflareTest` from
+  # @cloudflare/vitest-pool-workers cannot run vitest 5: that package peers only
+  # `^4.1.0`, so its pool fails at startup on 5. Its successor,
+  # @cloudflare/vitest-plugin, accepts both majors, so a suite can leave this
+  # group by loading that package and taking `catalog:vitest5`.
+  # The remaining workspaces have not been migrated yet: plain node-environment
+  # suites and the excluded-feature ones. They move to `catalog:vitest5` when
+  # their suites are migrated, and a workspace that still declares
+  # @cloudflare/vitest-pool-workers drops that dependency first, because its
+  # peer range would reject the new major. Point a workspace at vitest5 as soon
+  # as it moves, so this note stays the whole exception set.
   vitest5:
     '@vitest/coverage-v8': 5.1.0
     '@vitest/ui': 5.1.0
@@ -247,7 +258,7 @@ overrides:
   picomatch@^2: 2.3.2
   picomatch@^4: 4.0.7
   yaml: 2.9.1
-  undici@^7: 7.30.1
+  undici@^7: 'catalog:'
   path-to-regexp: 8.4.2
   ip-address: 10.7.1
   image-size@^1: npm:image-size-next@1.2.2
@@ -258,9 +269,6 @@ overrides:
   qs: 6.16.1
   smol-toml: 1.9.0
   uuid@<11.1.1: 11.1.1
-  # Nothing in the tree depends on serialize-javascript today; the spec stays for a
-  # future dependent, bounded to the reviewed major.
-  serialize-javascript: '>=7.0.3 <8'
   hono: 'catalog:'
   # openclaw depends on @modelcontextprotocol/sdk 1.29.0 exactly, and
   # @google/genai then peers onto that copy; lift both onto the 1.32.2 that

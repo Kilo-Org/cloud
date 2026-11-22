@@ -565,4 +565,221 @@ describe('GitHub connection attempt persistence', () => {
       reason: 'installation_unavailable',
     });
   });
+
+  // Creates an attempt that is discovered and selected for `candidate`, so the
+  // only thing left before completion is the call itself.
+  const prepareSelectedAttempt = async (githubUserId = '456') => {
+    const attemptId = await createGitHubConnectionAttempt({
+      kiloUserId: userId,
+      owner: { type: 'user', id: userId },
+      githubAppType: 'standard',
+      returnTo: null,
+    });
+    await recordGitHubConnectionDiscovery({
+      attemptId,
+      userId,
+      githubUserId,
+      candidates: [candidate],
+    });
+    await selectGitHubConnectionInstallation({
+      attemptId,
+      userId,
+      installationId: candidate.installationId,
+    });
+    return attemptId;
+  };
+
+  test('returns installation_unavailable when the candidate installation is not a recorded eligible entry', async () => {
+    mockedFetchInstallation.mockClear();
+    mockedFetchRepositories.mockClear();
+    const attemptId = await prepareSelectedAttempt();
+    // Set the stored selection directly, so completion must resolve both the
+    // selection and the candidate against the recorded eligible entries.
+    await db
+      .update(github_connection_attempts)
+      .set({ selected_installation_id: '999' })
+      .where(eq(github_connection_attempts.id, attemptId));
+    await expect(
+      completeGitHubConnectionAttempt({
+        attemptId,
+        userId,
+        githubUserId: '456',
+        candidate: { ...candidate, installationId: '999' },
+        authorizeOwner: async () => {},
+      })
+    ).resolves.toEqual({ ok: false, reason: 'installation_unavailable' });
+    expect(mockedFetchInstallation).not.toHaveBeenCalled();
+    expect(mockedFetchRepositories).not.toHaveBeenCalled();
+  });
+
+  test('returns installation_unavailable when the candidate account fields differ from the recorded entry', async () => {
+    mockedFetchInstallation.mockClear();
+    mockedFetchRepositories.mockClear();
+    const attemptId = await prepareSelectedAttempt();
+    const mismatches = [
+      { ...candidate, accountId: '789' },
+      { ...candidate, accountLogin: 'evil' },
+      { ...candidate, accountType: 'User' as const },
+    ];
+    for (const submitted of mismatches) {
+      await expect(
+        completeGitHubConnectionAttempt({
+          attemptId,
+          userId,
+          githubUserId: '456',
+          candidate: submitted,
+          authorizeOwner: async () => {},
+        })
+      ).resolves.toEqual({ ok: false, reason: 'installation_unavailable' });
+    }
+    expect(mockedFetchInstallation).not.toHaveBeenCalled();
+    expect(mockedFetchRepositories).not.toHaveBeenCalled();
+  });
+
+  test('returns installation_unavailable when the attempt belongs to a different GitHub identity', async () => {
+    mockedFetchInstallation.mockClear();
+    mockedFetchRepositories.mockClear();
+    const attemptId = await prepareSelectedAttempt('456');
+    await expect(
+      completeGitHubConnectionAttempt({
+        attemptId,
+        userId,
+        githubUserId: '999',
+        candidate,
+        authorizeOwner: async () => {},
+      })
+    ).resolves.toEqual({ ok: false, reason: 'installation_unavailable' });
+    expect(mockedFetchInstallation).not.toHaveBeenCalled();
+    expect(mockedFetchRepositories).not.toHaveBeenCalled();
+  });
+
+  test('returns installation_unavailable when the attempt belongs to a different Kilo user', async () => {
+    mockedFetchInstallation.mockClear();
+    mockedFetchRepositories.mockClear();
+    const otherUserId = 'oauth/github-picker-other-user';
+    await db.insert(kilocode_users).values({
+      id: otherUserId,
+      google_user_email: 'other@example.com',
+      google_user_name: 'Other',
+      google_user_image_url: '',
+      stripe_customer_id: 'cus_other',
+    });
+    const attemptId = await createGitHubConnectionAttempt({
+      kiloUserId: otherUserId,
+      owner: { type: 'user', id: otherUserId },
+      githubAppType: 'standard',
+      returnTo: null,
+    });
+    await recordGitHubConnectionDiscovery({
+      attemptId,
+      userId: otherUserId,
+      githubUserId: '456',
+      candidates: [candidate],
+    });
+    await selectGitHubConnectionInstallation({
+      attemptId,
+      userId: otherUserId,
+      installationId: candidate.installationId,
+    });
+    await expect(
+      completeGitHubConnectionAttempt({
+        attemptId,
+        userId,
+        githubUserId: '456',
+        candidate,
+        authorizeOwner: async () => {},
+      })
+    ).resolves.toEqual({ ok: false, reason: 'installation_unavailable' });
+    expect(mockedFetchInstallation).not.toHaveBeenCalled();
+    expect(mockedFetchRepositories).not.toHaveBeenCalled();
+  });
+
+  test('returns installation_unavailable for a consumed attempt without a completed connection', async () => {
+    mockedFetchInstallation.mockClear();
+    mockedFetchRepositories.mockClear();
+    const attemptId = await prepareSelectedAttempt();
+    await db
+      .update(github_connection_attempts)
+      .set({ consumed_at: new Date().toISOString() })
+      .where(eq(github_connection_attempts.id, attemptId));
+    await expect(
+      completeGitHubConnectionAttempt({
+        attemptId,
+        userId,
+        githubUserId: '456',
+        candidate,
+        authorizeOwner: async () => {},
+      })
+    ).resolves.toEqual({ ok: false, reason: 'installation_unavailable' });
+    expect(mockedFetchInstallation).not.toHaveBeenCalled();
+    expect(mockedFetchRepositories).not.toHaveBeenCalled();
+  });
+
+  test('returns installation_unavailable when the recorded installation id is not canonical', async () => {
+    mockedFetchInstallation.mockClear();
+    mockedFetchRepositories.mockClear();
+    const nonCanonical = { ...candidate, installationId: '0123' };
+    const attemptId = await createGitHubConnectionAttempt({
+      kiloUserId: userId,
+      owner: { type: 'user', id: userId },
+      githubAppType: 'standard',
+      returnTo: null,
+    });
+    await recordGitHubConnectionDiscovery({
+      attemptId,
+      userId,
+      githubUserId: '456',
+      candidates: [nonCanonical],
+    });
+    await selectGitHubConnectionInstallation({
+      attemptId,
+      userId,
+      installationId: nonCanonical.installationId,
+    });
+    await expect(
+      completeGitHubConnectionAttempt({
+        attemptId,
+        userId,
+        githubUserId: '456',
+        candidate: nonCanonical,
+        authorizeOwner: async () => {},
+      })
+    ).resolves.toEqual({ ok: false, reason: 'installation_unavailable' });
+    expect(mockedFetchInstallation).not.toHaveBeenCalled();
+    expect(mockedFetchRepositories).not.toHaveBeenCalled();
+  });
+
+  test('returns installation_unavailable when the submitted installation id is not canonical', async () => {
+    mockedFetchInstallation.mockClear();
+    mockedFetchRepositories.mockClear();
+    const nonCanonical = { ...candidate, installationId: '12a' };
+    const attemptId = await createGitHubConnectionAttempt({
+      kiloUserId: userId,
+      owner: { type: 'user', id: userId },
+      githubAppType: 'standard',
+      returnTo: null,
+    });
+    await recordGitHubConnectionDiscovery({
+      attemptId,
+      userId,
+      githubUserId: '456',
+      candidates: [nonCanonical],
+    });
+    await selectGitHubConnectionInstallation({
+      attemptId,
+      userId,
+      installationId: nonCanonical.installationId,
+    });
+    await expect(
+      completeGitHubConnectionAttempt({
+        attemptId,
+        userId,
+        githubUserId: '456',
+        candidate: nonCanonical,
+        authorizeOwner: async () => {},
+      })
+    ).resolves.toEqual({ ok: false, reason: 'installation_unavailable' });
+    expect(mockedFetchInstallation).not.toHaveBeenCalled();
+    expect(mockedFetchRepositories).not.toHaveBeenCalled();
+  });
 });

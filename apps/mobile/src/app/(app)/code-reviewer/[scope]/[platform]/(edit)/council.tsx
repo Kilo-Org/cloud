@@ -134,9 +134,10 @@ function CouncilScreen({
     // An in-flight entitlement read keeps the surface blank rather than telling
     // an entitled organization that council is unavailable while it resolves.
     // A settled refusal names the reason the reader can act on: a personal
-    // account never carries council, an organization's plan can lack it, and
-    // Bitbucket has no council on either client. The personal scope offers the
-    // one step that changes the answer: creating the organization.
+    // account never carries council, an organization's plan can lack it, a
+    // plan check can have failed (the surface offers the retry), and Bitbucket
+    // has no council on either client. The personal scope offers the one step
+    // that changes the answer: creating the organization.
     const refusalReason = gate.refusalReason ?? 'flagUnavailable';
     return (
       <View className="flex-1 bg-background">
@@ -147,6 +148,8 @@ function CouncilScreen({
             platformSupportsCouncil={capabilities.council}
             refusalReason={refusalReason}
             membershipState={membershipState}
+            retryEntitlement={gate.retryEntitlement}
+            entitlementFetching={gate.entitlementFetching}
           />
         ) : (
           <View className={SCREEN_BODY_CLASS}>

@@ -54,6 +54,9 @@ export function preserveCacheControl(
     };
   }
   if (!Array.isArray(previousMessage.content)) return previousMessage;
+  // The role branch is deliberate: `MessageParam` is a union discriminated by `role` whose
+  // `system` variant allows only text blocks, and `cache_control` is not on every
+  // `ContentBlockParam` member, so one role-agnostic guard and return cannot be typed.
   if (previousMessage.role === 'system') {
     const target = previousMessage.content.at(-1);
     if (!target || target.cache_control) return previousMessage;

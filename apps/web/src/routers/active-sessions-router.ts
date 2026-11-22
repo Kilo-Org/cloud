@@ -11,6 +11,7 @@ import {
 } from '@/lib/bounded-service-fetch';
 import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
 import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { gitBranchValueSchema } from '@kilocode/session-ingest-contracts';
 import {
   ensureMemberOrganizationAccess,
   ensureOrganizationAccess,
@@ -43,7 +44,9 @@ const connectedInstanceSchema = z.object({
   // only after all supported metadata-free producers and attachments have retired.
   kind: z.enum(['cli', 'remote']).default('cli'),
   startedAt: z.string().datetime({ precision: 3 }).length(24).nullable().default(null),
-  gitBranch: z.string().max(24).nullable().default(null),
+  // The shared contract shortens a long branch to its own bound, so a long
+  // branch cannot fail the snapshot.
+  gitBranch: gitBranchValueSchema.nullable().default(null),
   /**
    * Capabilities advertised by this connected CLI instance. Omitted when the
    * CLI's latest attachment did not include a capabilities object (legacy CLI
@@ -119,6 +122,23 @@ const listInputSchema = z
   .optional();
 
 /**
+ * The configured Session Ingest worker, or the one terminal refusal this router
+ * reports for a missing configuration.
+ *
+ * A missing URL is a deployment fault. Every caller reports it as
+ * PRECONDITION_FAILED, so no caller can drift to another code.
+ */
+function sessionIngestWorkerUrl(): string {
+  if (!SESSION_INGEST_WORKER_URL) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'Session ingest is not configured',
+    });
+  }
+  return SESSION_INGEST_WORKER_URL;
+}
+
+/**
  * Mint a one-use web ticket from Session Ingest for the given user. The
  * returned `token` is the opaque ticket; `expiresAt` is the Unix-seconds
  * expiry from the worker body.
@@ -131,18 +151,12 @@ const listInputSchema = z
  * BAD_GATEWAY.
  */
 async function mintWebTicket(userId: string): Promise<{ token: string; expiresAt: number }> {
-  if (!SESSION_INGEST_WORKER_URL) {
-    throw new TRPCError({
-      code: 'PRECONDITION_FAILED',
-      message: 'Session ingest is not configured',
-    });
-  }
-
+  const workerUrl = sessionIngestWorkerUrl();
   const token = generateBoundedInternalServiceToken(userId, {
     audience: SESSION_INGEST_AUDIENCE,
     expiresIn: 60 * 60,
   });
-  const url = `${SESSION_INGEST_WORKER_URL}/api/user/web-ticket`;
+  const url = `${workerUrl}/api/user/web-ticket`;
   const startedAt = Date.now();
 
   let response: Response;
@@ -269,21 +283,17 @@ export const activeSessionsRouter = createTRPCRouter({
    * "nothing runs". This procedure classifies failures exactly like
    * `mintWebTicket` — transport failure or 503/504 stays retryable as
    * `SERVICE_UNAVAILABLE`, any other non-2xx or malformed body is
-   * `BAD_GATEWAY`. The companion `getToken` call is owned by C2.
+   * `BAD_GATEWAY`. A missing worker URL is `PRECONDITION_FAILED` and therefore
+   * terminal, like `mintWebTicket`. The companion `getToken` call is owned by
+   * C2.
    */
   listInstances: baseProcedure.query(async ({ ctx }) => {
-    if (!SESSION_INGEST_WORKER_URL) {
-      throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'SESSION_INGEST_WORKER_URL is not configured',
-      });
-    }
-
+    const workerUrl = sessionIngestWorkerUrl();
     const token = generateBoundedInternalServiceToken(ctx.user.id, {
       audience: SESSION_INGEST_AUDIENCE,
       expiresIn: 60 * 60,
     });
-    const url = `${SESSION_INGEST_WORKER_URL}/api/instances/active`;
+    const url = `${workerUrl}/api/instances/active`;
     const startedAt = Date.now();
     // What the headers left of the one budget both the fetch and the body read
     // must fit in: a worker that stalls mid-body cannot hold the poll open.

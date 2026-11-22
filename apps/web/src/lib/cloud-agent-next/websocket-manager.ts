@@ -48,6 +48,7 @@ function parseMessage(data: unknown): ParsedMessage | null {
 const MAX_RECONNECT_ATTEMPTS = 8;
 const BACKOFF_BASE_MS = 1000;
 const BACKOFF_CAP_MS = 30000;
+const STABLE_CONNECTION_MS = 10000;
 
 /**
  * Calculate reconnect delay with exponential backoff and jitter.
@@ -94,6 +95,8 @@ export function createWebSocketManager(config: WebSocketManagerConfig): {
   let state: ConnectionState = { status: 'disconnected' };
   let ws: WebSocket | null = null;
   let lastEventId = 0;
+  let reconnectAttempt = 0;
+  let socketOpenedAt: number | null = null;
   let reconnectTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let intentionalDisconnect = false;
   let currentTicket = config.ticket;
@@ -136,7 +139,7 @@ export function createWebSocketManager(config: WebSocketManagerConfig): {
       console.log('[WebSocketManager] Got new ticket, reconnecting...');
       currentTicket = newTicket;
       ticketRefreshAttempted = true;
-      connectInternal(0);
+      connectInternal();
     } catch (err) {
       console.error('[WebSocketManager] Failed to refresh ticket:', err);
       setState({
@@ -158,6 +161,7 @@ export function createWebSocketManager(config: WebSocketManagerConfig): {
     }
 
     const delay = calculateBackoffDelay(attempt);
+    reconnectAttempt = attempt + 1;
     setState({
       status: 'reconnecting',
       lastEventId,
@@ -166,11 +170,11 @@ export function createWebSocketManager(config: WebSocketManagerConfig): {
 
     reconnectTimeoutId = setTimeout(() => {
       reconnectTimeoutId = null;
-      connectInternal(attempt + 1);
+      connectInternal();
     }, delay);
   }
 
-  function connectInternal(_attempt = 0) {
+  function connectInternal() {
     // Close existing socket if any - store reference so onclose handler can ignore it
     const oldWs = ws;
     if (oldWs !== null) {
@@ -181,6 +185,7 @@ export function createWebSocketManager(config: WebSocketManagerConfig): {
     // Always include lastEventId if we have one - this enables replay after any reconnection
     // (whether from network issues, ticket refresh, or other disconnects)
     const urlWithReplay = lastEventId ? buildUrl(lastEventId) : buildUrl();
+    socketOpenedAt = Date.now();
     setState({ status: 'connecting' });
 
     const newWs = new WebSocket(urlWithReplay);
@@ -204,8 +209,6 @@ export function createWebSocketManager(config: WebSocketManagerConfig): {
       if (event.eventId > lastEventId) {
         lastEventId = event.eventId;
       }
-
-      ticketRefreshAttempted = false;
 
       if (state.status !== 'connected') {
         setState({
@@ -249,6 +252,14 @@ export function createWebSocketManager(config: WebSocketManagerConfig): {
         return;
       }
 
+      const wasStable =
+        socketOpenedAt !== null && Date.now() - socketOpenedAt >= STABLE_CONNECTION_MS;
+      socketOpenedAt = null;
+      if (wasStable) {
+        reconnectAttempt = 0;
+        ticketRefreshAttempted = false;
+      }
+
       const isAuthFailure = isAuthFailureClose(event);
       const isAmbiguousAbnormal = isAmbiguousAbnormalClose(event);
       const shouldRefreshTicket = isAuthFailure || isAmbiguousAbnormal;
@@ -281,11 +292,7 @@ export function createWebSocketManager(config: WebSocketManagerConfig): {
         return;
       }
 
-      if (state.status === 'connecting' || state.status === 'connected') {
-        scheduleReconnect(0);
-      } else if (state.status === 'reconnecting') {
-        scheduleReconnect(state.attempt);
-      }
+      scheduleReconnect(reconnectAttempt);
     };
   }
 
@@ -293,12 +300,16 @@ export function createWebSocketManager(config: WebSocketManagerConfig): {
     console.log('[WebSocketManager] connect() called - resetting state');
     intentionalDisconnect = false;
     lastEventId = 0;
+    reconnectAttempt = 0;
+    socketOpenedAt = null;
     ticketRefreshAttempted = false;
-    connectInternal(0);
+    connectInternal();
   }
 
   function disconnect() {
     intentionalDisconnect = true;
+    reconnectAttempt = 0;
+    socketOpenedAt = null;
 
     if (reconnectTimeoutId !== null) {
       clearTimeout(reconnectTimeoutId);

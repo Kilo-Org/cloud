@@ -1,11 +1,8 @@
 /**
- * Fixture shared by two tests and the generator that rendered the golden file:
- *
- * - `src/routing-table-builder.test.ts` shuffles these rows in memory and asserts
- *   `buildCustomRoutingTable` ignores their order.
- * - `src/custom-routing-table-deployed-order.test.ts` seeds them into the migrated
- *   SQLite database in a fixed shuffled order and compares the assembled table to
- *   the golden file rendered by the DEPLOYED code (commit 0487d998).
+ * Fixture shared by `src/custom-routing-table-deployed-order.test.ts` and the generator
+ * that rendered its golden file (`scripts/render-deployed-custom-table.ts`). The test seeds
+ * these rows into the migrated SQLite database in a fixed shuffled order and compares the
+ * assembled table to the golden file rendered by the DEPLOYED code (commit 0487d998).
  *
  * The rows are exactly tied: two single-variant models on every ranking key, and
  * one model whose two variants tie with each other. Identical values are the

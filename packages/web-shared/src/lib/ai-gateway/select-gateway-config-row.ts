@@ -9,10 +9,8 @@ export type GatewayConfigRowDb = Pick<typeof db | DrizzleTransaction, 'select'>;
  * The read for the organization features and the preferred models, so those two readers share one
  * selection, primary-key match and `limit(1)` instead of two copies.
  *
- * Four other readers still carry their own copy of this read for the columns they own
- * (`unavailable-models.ts`, `custom-pricing-config.ts`, `auto-model/auto-free-config.ts` and
- * `providers/latest-alias-targets.ts`). Moving them is a separate change, so this comment does not
- * claim they already use it.
+ * Other readers of this singleton row still query it directly, each for the column it owns. They
+ * are outside this change's scope, so this helper is not yet the only copy of the read.
  *
  * Two absences reach the caller, and a reader decides what each one means. An absent row returns
  * `undefined`. A stored NULL in a nullable column returns `null`, which is why the result is

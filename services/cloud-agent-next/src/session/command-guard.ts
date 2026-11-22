@@ -349,12 +349,10 @@ const SECURITY_REMEDIATION_ALLOWED_COMMANDS = [
 // those keys: a rule that admits a read would also admit a write appended to it,
 // because a trailing `*` cannot stop before the next argument.
 //
-// The repository's own configuration file is refused by the directory spelling
-// and the file-name prefix, for the literal spelling and the one-character glob
-// spelling, and a command that enters that directory is refused as well so a
-// relative write of the file cannot follow. The bound: a command that writes the
-// configuration through a differently spelled path is not covered by these
-// rules; the edit tool's own map denies the same file separately.
+// The git configuration files decide what a push does, so a shell write to the
+// repository's own file or to the user's own file is refused, by the directory
+// spelling and by the file-name prefix, and the edit tool refuses the same files
+// through its own map.
 //
 // The denies are installed after the `git push` allow, and the last matching
 // rule decides. A ref that is deleted by name, with `--delete` or with an empty

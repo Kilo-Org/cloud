@@ -364,3 +364,23 @@ export function __resetToolCardImageCacheForTests(): void {
   cacheDirectory = undefined;
   subscriptions.notifyAll();
 }
+
+/**
+ * Development-only seam: hold one part in the in-flight state until the next
+ * reset.
+ *
+ * The pending surface is a real state the card paints, but it exists only while
+ * a native write is in flight, and that write completes in under one frame on
+ * the emulator, so no device capture can reach it. This marks the part exactly
+ * as `cacheToolAttachment` does before its write starts — pending and subscribed
+ * — and records nothing else, so a card mounted for the part paints the busy
+ * placeholder. A reset clears the mark, like any other in-memory state.
+ *
+ * Only the development fixtures call it, and the fixture route itself is behind
+ * `__DEV__`, so no production path reaches this seam.
+ */
+export function __holdToolCardImagePendingForDev(partId: string): void {
+  inFlightOrDone.add(partId);
+  pendingPartIds.add(partId);
+  emitChange(partId);
+}

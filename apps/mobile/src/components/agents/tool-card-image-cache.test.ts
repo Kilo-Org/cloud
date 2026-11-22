@@ -4,6 +4,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  __holdToolCardImagePendingForDev,
   __resetToolCardImageCacheForTests,
   cacheToolAttachment,
   cacheToolCardImage,
@@ -453,6 +454,30 @@ describe('clearToolCardImageCache', () => {
       clearToolCardImageCache();
     }).not.toThrow();
     expect(expoFileSystemMock.directoryDelete).not.toHaveBeenCalled();
+  });
+});
+
+describe('__holdToolCardImagePendingForDev', () => {
+  it('holds the part pending with no write and no URI, so the card paints its busy surface', () => {
+    __holdToolCardImagePendingForDev('part-held');
+
+    expect(isToolCardImagePending('part-held')).toBe(true);
+    expect(getToolCardImageUri('part-held')).toBeUndefined();
+    // No file-system work runs for a held part: the write never starts.
+    expect(expoFileSystemMock.directoryCreate).not.toHaveBeenCalled();
+    expect(fileInstances.filter(instance => instance.written !== undefined)).toHaveLength(0);
+  });
+
+  it('is cleared by a cache reset, so the part can be written afterwards', async () => {
+    __holdToolCardImagePendingForDev('part-held');
+    clearToolCardImageCache();
+
+    expect(isToolCardImagePending('part-held')).toBe(false);
+
+    cacheToolCardImage('part-held', 'image/png', 'data:image/png;base64,AAA');
+    await vi.waitFor(() => {
+      expect(getToolCardImageUri('part-held')).toBe('file:///cache/tool-card-images/part-held.png');
+    });
   });
 });
 

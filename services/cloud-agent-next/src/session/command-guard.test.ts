@@ -585,6 +585,9 @@ describe('security-remediation push command guard policy', () => {
       'sort -o out.txt src/a.ts',
       'sort src/a.ts -o out.txt',
       'sort --output=out.txt src/a.ts',
+      // The option may take its file attached, with a space or a tab.
+      'sort -oconfig /tmp/payload',
+      'sort -o\tconfig /tmp/payload',
       'sort --output=.git//config /tmp/payload',
       'sort -o .git/./config /tmp/payload',
       'uniq /tmp/payload .git//config',

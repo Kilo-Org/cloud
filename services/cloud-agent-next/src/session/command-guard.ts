@@ -120,6 +120,11 @@ const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
   // a bare `-o` inside a file name is not an option.
   'sort -o *',
   'sort * -o *',
+  'sort -o\t*',
+  'sort * -o\t*',
+  // The option may take its file attached, as `-oconfig` and `-o\tconfig`.
+  'sort -o?*',
+  'sort * -o?*',
   'sort --output*',
   'sort * --output*',
   'find *-exec*',
@@ -588,6 +593,11 @@ const SECURITY_REMEDIATION_GIT_CONFIG_DENIED_PATTERNS = [
   // a bare `-o` inside a file name is not an option.
   'sort -o *',
   'sort * -o *',
+  'sort -o\t*',
+  'sort * -o\t*',
+  // The option may take its file attached, as `-oconfig` and `-o\tconfig`.
+  'sort -o?*',
+  'sort * -o?*',
   'sort --output*',
   'sort * --output*',
   'find *-exec*',
@@ -804,6 +814,13 @@ export function getCommandGuardPermissions(
           '.g*t/*': 'deny',
           '*gitconfig*': 'deny',
           '*/.git/config*': 'deny',
+          // The user-level file is refused by its own name, so the repository
+          // directory stays the only `.git` path this map singles out.
+          '*gitconfig*': 'deny',
+          // The user-level file also lives under the XDG config directory, which
+          // is named with its dot so an ordinary `git/` source directory stays
+          // editable.
+          '*/.config/git/config*': 'deny',
         }
       : bitbucketReviewPolicy && bitbucketReviewId
         ? {

@@ -20,6 +20,7 @@ export const activeSessionSchema = z.object({
   connectionId: z.string(),
   gitUrl: z.string().optional(),
   gitBranch: z.string().optional(),
+  worktreeId: z.string().optional(),
   createdOnPlatform: z.string().optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
@@ -129,6 +130,7 @@ export const CLOUD_AGENT_CANDIDATE_LIMIT = 500;
 
 type EnrichmentRow = {
   session_id: string;
+  cloud_agent_worktree_id: string | null;
   created_on_platform: string | null;
   created_at: string;
   updated_at: string;
@@ -273,6 +275,7 @@ function mapEnrichedHeartbeatSession(
     title: row.title ?? session.title,
     organizationId: row.organization_id,
     createdOnPlatform: row.created_on_platform ?? undefined,
+    worktreeId: row.cloud_agent_worktree_id ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -308,6 +311,7 @@ function mapCloudCandidateRow(row: CloudCandidateRow): ActiveSession {
     gitUrl: row.git_url ?? undefined,
     gitBranch: row.git_branch ?? undefined,
     createdOnPlatform: row.created_on_platform ?? undefined,
+    worktreeId: row.cloud_agent_worktree_id ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     // Key ALWAYS emitted, null included (D21) — mobile filter treats an
@@ -576,6 +580,7 @@ export async function listActiveSessions({
             db
               .select({
                 session_id: cli_sessions_v2.session_id,
+                cloud_agent_worktree_id: cli_sessions_v2.cloud_agent_worktree_id,
                 created_on_platform: cli_sessions_v2.created_on_platform,
                 created_at: cli_sessions_v2.created_at,
                 updated_at: cli_sessions_v2.updated_at,
@@ -662,6 +667,7 @@ export async function listActiveSessions({
         db
           .select({
             session_id: cli_sessions_v2.session_id,
+            cloud_agent_worktree_id: cli_sessions_v2.cloud_agent_worktree_id,
             created_on_platform: cli_sessions_v2.created_on_platform,
             created_at: cli_sessions_v2.created_at,
             updated_at: cli_sessions_v2.updated_at,

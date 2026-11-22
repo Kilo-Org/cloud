@@ -1,10 +1,32 @@
-import { useMemo, useState } from 'react';
-import { skipToken, useInfiniteQuery } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { skipToken, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
+import type { inferRouterOutputs } from '@trpc/server';
+import type { RootRouter } from '@/routers/root-router';
 import type { StoredSession } from '../types';
 import type { WorkspaceSummary } from './useWorkspaceSummaries';
-import { workspaceChatToStoredSession, workspaceSummaryChats } from './sidebar-workspace-model';
+
+type ChatPage = inferRouterOutputs<RootRouter>['cliSessionsV2']['workspaceChats'];
+const WORKSPACE_CHAT_PAGE_SIZE = 200;
+
+function withWorkspaceChatPages(workspace: WorkspaceSummary, pages: readonly ChatPage[]) {
+  const chats = [
+    ...new Map(
+      pages.flatMap(page => page.chats.map(chat => [chat.sessionId, chat] as const))
+    ).values(),
+  ];
+  const position = (value: number | null) => value ?? Number.MAX_SAFE_INTEGER;
+  return {
+    ...workspace,
+    openChats: chats
+      .filter(chat => chat.closedPosition === null)
+      .sort((a, b) => position(a.tabPosition) - position(b.tabPosition)),
+    closedChats: chats
+      .filter(chat => chat.closedPosition !== null)
+      .sort((a, b) => position(a.closedPosition) - position(b.closedPosition)),
+  };
+}
 
 export function mergeWorkspaceChats(
   worktreeId: string | null,
@@ -24,44 +46,65 @@ export function useWorkspaceChats({
   organizationId,
   worktreeId,
   workspace,
-  pendingChats,
 }: {
   organizationId: string | null;
   worktreeId: CloudAgentWorktreeId | null;
   workspace: WorkspaceSummary | undefined;
-  pendingChats: readonly StoredSession[];
 }) {
   const trpc = useTRPC();
-  const [requestedHistoryId, setRequestedHistoryId] = useState<string | null>(null);
-  const query = useInfiniteQuery({
-    ...trpc.cliSessionsV2.workspaceChats.infiniteQueryOptions(
-      worktreeId ? { organizationId, worktreeId, limit: 50 } : skipToken,
-      { getNextPageParam: page => page.nextCursor ?? undefined }
-    ),
-    enabled: Boolean(worktreeId && requestedHistoryId === worktreeId),
-    staleTime: 5_000,
-  });
-  const serverChats = useMemo(() => {
-    if (!workspace) return [];
-    const byId = new Map(workspaceSummaryChats(workspace).map(chat => [chat.sessionId, chat]));
-    for (const chat of query.data?.pages.flatMap(page => page.chats) ?? []) {
-      if (!byId.has(chat.sessionId))
-        byId.set(chat.sessionId, workspaceChatToStoredSession(workspace, chat));
-    }
-    return [...byId.values()];
-  }, [query.data?.pages, workspace]);
-  const chats = useMemo(
-    () => mergeWorkspaceChats(worktreeId, serverChats, pendingChats),
-    [pendingChats, serverChats, worktreeId]
-  );
-  return {
-    chats,
-    serverChats,
-    isLoading: query.isLoading,
-    hasNextPage: query.hasNextPage,
-    loadMore: () => {
-      if (requestedHistoryId !== worktreeId) setRequestedHistoryId(worktreeId);
-      else void query.fetchNextPage();
+  const queryClient = useQueryClient();
+  const needsPages = Boolean(worktreeId && workspace?.chatTabsTruncated);
+  const { data, fetchNextPage, hasNextPage, isError, isFetchNextPageError, isFetching, refetch } =
+    useInfiniteQuery({
+      ...trpc.cliSessionsV2.workspaceChats.infiniteQueryOptions(
+        worktreeId ? { organizationId, worktreeId, limit: WORKSPACE_CHAT_PAGE_SIZE } : skipToken,
+        { getNextPageParam: page => page.nextCursor ?? undefined }
+      ),
+      enabled: needsPages,
+      gcTime: 60_000,
+    });
+  useEffect(() => {
+    if (needsPages && hasNextPage && !isFetching && !isError) void fetchNextPage();
+  }, [fetchNextPage, hasNextPage, isError, isFetching, needsPages]);
+
+  const snapshot = useRef<{ key: string; revision: string } | null>(null);
+  const key = JSON.stringify([organizationId, worktreeId]);
+  const revision = `${workspace?.chatTabsRevision}:${workspace?.chatCount}`;
+  useEffect(() => {
+    const previous = snapshot.current;
+    snapshot.current = needsPages ? { key, revision } : null;
+    if (needsPages && previous?.key === key && previous.revision !== revision) void refetch();
+  }, [key, needsPages, refetch, revision]);
+
+  const refresh = useCallback(
+    async (worktreeIds: readonly string[]) => {
+      if (!needsPages || !worktreeId || !worktreeIds.includes(worktreeId)) return;
+      await queryClient.invalidateQueries(
+        trpc.cliSessionsV2.workspaceChats.infiniteQueryFilter({
+          organizationId,
+          worktreeId,
+          limit: WORKSPACE_CHAT_PAGE_SIZE,
+        })
+      );
     },
+    [needsPages, organizationId, queryClient, trpc, worktreeId]
+  );
+  const waitingForPages = needsPages && (!data || hasNextPage);
+  const workspaceWithTabs = useMemo(
+    () =>
+      needsPages && workspace && data && !hasNextPage
+        ? withWorkspaceChatPages(workspace, data.pages)
+        : workspace,
+    [data, hasNextPage, needsPages, workspace]
+  );
+  const retry = useCallback(() => {
+    void (isFetchNextPageError ? fetchNextPage() : refetch());
+  }, [fetchNextPage, isFetchNextPageError, refetch]);
+  return {
+    workspaceWithTabs,
+    waitingForPages,
+    hasError: needsPages && isError,
+    retry,
+    refresh,
   };
 }

@@ -1360,6 +1360,19 @@ describe('ChatSidebar row rendering', () => {
     expect(dom.container.textContent).not.toContain(sessions[0]!.prompt);
   });
 
+  it('does not repeat a live workspace chat omitted from its sidebar preview', () => {
+    const summary = workspaceSummaryFixture({ chatCount: 2001, chatTabsTruncated: true });
+    const omitted = activeSession(makeSession(1, { prompt: 'Omitted live chat' }), 'busy');
+    const standalone = activeSession(makeSession(2, { prompt: 'Standalone live chat' }), 'busy');
+    renderSidebar({
+      sessions: [],
+      workspaceGroups: groupSidebarWorkspaces([], {}, [summary]),
+      activeSessions: [{ ...omitted, worktreeId: summary.worktreeId }, standalone],
+    });
+    expect(dom.container.textContent).toContain('Standalone live chat');
+    expect(dom.container.textContent).not.toContain('Omitted live chat');
+  });
+
   it('updates the visible status of a live row without touching its siblings', () => {
     const sessions = [
       makeSession(0, { sessionStatus: 'busy' }),

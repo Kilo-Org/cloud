@@ -21,6 +21,7 @@ import { WORKSPACE_STALE_STATUS_MS } from '@/lib/cloud-agent/workspace-activity'
  * the live-row filters read `createdOnPlatform` and `organizationId`.
  */
 export type ActiveSession = ActiveSessionWithConnectionData & {
+  worktreeId?: string;
   createdOnPlatform?: string;
   organizationId?: string | null;
   createdAt?: string;
@@ -76,6 +77,7 @@ function getCliConnectionPayload(value: unknown): CliConnectionPayload | null {
  * `cli_sessions_v2` and a connection payload never carries.
  */
 const ENRICHED_FIELDS = [
+  'worktreeId',
   'createdOnPlatform',
   'createdAt',
   'updatedAt',

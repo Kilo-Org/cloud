@@ -166,7 +166,7 @@ export function useClosedWorktreeChatTabs(
         for (const filter of filters) {
           for (const [queryKey, data] of queryClient.getQueriesData<WorkspaceCacheData>(filter)) {
             const previous = cachedWorkspaces(data).find(row => row.worktreeId === worktreeId);
-            if (!data || !previous) continue;
+            if (!data || !previous || previous.chatTabsTruncated) continue;
             const patched = patchWorkspaceChatTabs(previous, action);
             const result = queryClient.setQueryData<WorkspaceCacheData>(
               queryKey,

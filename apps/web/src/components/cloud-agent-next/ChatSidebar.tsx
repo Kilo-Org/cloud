@@ -1158,8 +1158,10 @@ export function ChatSidebar({
         activeS =>
           !sessions.some(s => s.sessionId === activeS.id) &&
           !workspaceGroups.some(group =>
-            [group, ...(group.stackLayers ?? [])].some(member =>
-              member.sessions.some(chat => chat.sessionId === activeS.id)
+            [group, ...(group.stackLayers ?? [])].some(
+              member =>
+                member.worktreeId === activeS.worktreeId ||
+                member.sessions.some(chat => chat.sessionId === activeS.id)
             )
           )
       ),

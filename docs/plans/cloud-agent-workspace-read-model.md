@@ -37,8 +37,8 @@ Follow `packages/db/AGENTS.md` and the `database-migrations` skill.
 
 | Read model | Contents | Load trigger |
 |---|---|---|
-| **Workspace summary** | Name, repository, branch, folder, sidebar destination, ordering, PR, activity, status source chat, open chats in tab order, closed chats, `hasOpenRun`, navigation IDs | Sidebar load |
-| **Workspace chats** | Paginated chat summaries for one workspace | Open workspace |
+| **Workspace summary** | Name, repository, branch, folder, sidebar destination, ordering, PR, activity, status source chat, bounded tab preview, exact chat count, `hasOpenRun`, navigation IDs | Sidebar load |
+| **Workspace chats** | Paginated chat summaries and tab positions for one workspace | Open a workspace whose preview omits tabs |
 | **Standalone sessions** | Session summaries without workspace membership | Sidebar load |
 | **Chat content** | Messages and runtime details | Open chat |
 
@@ -136,7 +136,7 @@ Move closed tabs and tab order from `localStorage` (`useClosedWorktreeChatTabs.t
 
 - Add mutations to close, reopen, and reorder tabs. Each mutation changes the arrays in one SQL statement, so concurrent windows do not lose writes.
 - Reopening a chat removes it from `closed_session_ids`. Deleting a chat removes it from both arrays.
-- The workspace summary returns open chats in tab order and closed chats, most recently closed first.
+- The workspace summary orders its preview by tab position and close order. The selected workspace reads missing tabs through the paginated chat endpoint.
 - Server prefetch includes this state, so closed tabs do not show before the first paint.
 - On first load, import the closed tabs and order from this browser's `localStorage` once, then delete the key.
 - Keep the navigation fixes from `4ef5578a75` and `4713a9c6f6`. Server storage does not replace them.
@@ -210,7 +210,7 @@ Verify the running local app and capture request counts.
 - Migration `0378_workspace_read_model` adds tab state and activity. Its four concurrent indexes are on `cli_sessions_v2` and `cloud_agent_session_runs`. Existing rows need no backfill because reads also use the newest root chat.
 - Workspace reads classify compact directory signals before loading selected tab summaries. PR reads run per workspace, not per chat.
 - Summary refresh reads status and run signals only for the requested connected stacks. Chat pagination uses creation time and the session ID, including PostgreSQL microseconds.
-- Summaries retain all open and closed tabs for navigation and synchronization. Chats in workspaces outside the result do not affect payload size, but a single returned workspace's tab payload can grow without bound. Bounding that payload requires loading tabs separately without hiding open tabs or changing their order.
+- Summaries return at most 50 recent chats plus the root, latest open chat, and activity source. They report the exact total and whether the preview omits tabs. The selected workspace uses paged chat data to restore the full open and closed tab order. Activity polling does not reload those pages unless tab state or membership changes.
 - The workspace checkout owns its PR. The read model does not restore the former chat-link fallback or orphan chats without workspace rows.
 - The local heavy fixture has 2,000 workspaces, 10,000 root chats, a 600-row folder, and a 20-layer stack.
 - The first baseline HTTP workspace read took 341 ms and returned 200 rows. The final comparison below calls both implementations directly against the same local database. It excludes the first iteration.

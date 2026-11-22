@@ -20,7 +20,10 @@ import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import { cliSessionsV2Router } from './cli-sessions-v2-router';
 import { cloudAgentSettingsRouter } from './cloud-agent-settings-router';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
-import { readWorkspaceStackDirectory } from '@/lib/cloud-agent/workspace-read-model-queries';
+import {
+  hydrateWorkspaceChats,
+  readWorkspaceStackDirectory,
+} from '@/lib/cloud-agent/workspace-read-model-queries';
 import { triggerBatchReviewDecisionFetchIfNeeded } from '@/lib/integrations/platforms/github/batch-review-decisions';
 
 jest.mock('next/server', () => ({ after: (callback: () => void) => callback() }));
@@ -280,6 +283,7 @@ describe('cliSessionsV2 workspace read model', () => {
       latestOpenSessionId: unordered.session_id,
       cloudAgentSessionId: unordered.cloud_agent_session_id,
       chatCount: 4,
+      chatTabsTruncated: false,
       baseBranch: 'main',
       baseSha: 'base-sha',
       gitUrl: GIT_URL,
@@ -304,6 +308,116 @@ describe('cliSessionsV2 workspace read model', () => {
       sessionStatusUpdatedAt: now,
     });
     expect(result.workspaces[0]?.status).not.toHaveProperty('latestRunStatus');
+  });
+
+  it('bounds both workspace reads while retaining older navigation and status chats', async () => {
+    const worktree = worktreeId();
+    const root = 'ses_large_root';
+    const latestOpen = 'ses_large_latest_open';
+    const statusSource = 'ses_large_status';
+    const historyId = (index: number) => `ses_large_history_${index.toString().padStart(3, '0')}`;
+    const oldTime = (offset: number) => new Date(Date.parse(OLD) + offset * 1000).toISOString();
+    const orderedOpen = historyId(56);
+    const history = Array.from({ length: 180 }, (_, index) =>
+      makeSession(historyId(index), worktree, {
+        created_at: oldTime(index + 3),
+        last_activity_at: index === 56 ? OLD : oldTime(index + 3),
+      })
+    );
+    const closed = [
+      statusSource,
+      ...history
+        .toReversed()
+        .map(chat => chat.session_id)
+        .filter(id => id !== orderedOpen),
+    ];
+    const navigation = makeSession(latestOpen, worktree, {
+      created_at: oldTime(1),
+      last_activity_at: oldTime(1),
+    });
+    await insertWorkspace(
+      [
+        makeSession(root, worktree, {
+          title: 'Original chat title',
+          created_at: OLD,
+          last_activity_at: OLD,
+        }),
+        navigation,
+        makeSession(statusSource, worktree, {
+          created_at: oldTime(2),
+          last_activity_at: oldTime(2),
+          status: 'question',
+        }),
+        ...history,
+        makeSession('ses_large_placeholder', worktree, {
+          title: null,
+          created_on_platform: 'unknown',
+        }),
+        makeSession('ses_large_cross_scope', worktree, { organization_id: ORGANIZATION_ID }),
+      ],
+      { closed_session_ids: closed, tab_order: [latestOpen, orderedOpen, root] }
+    );
+
+    const scope = { userId: USER_ID, organizationId: null };
+    const [hydrated] = await hydrateWorkspaceChats(scope, [
+      { worktreeId: worktree, statusSessionId: statusSource },
+    ]);
+    expect(hydrated?.chats).toHaveLength(53);
+    expect(hydrated?.chatCount).toBe(183);
+
+    const caller = sessionCaller();
+    const summaryInput = { organizationId: null, worktreeIds: [worktree] };
+    const list = (await caller.listWorkspaces({ organizationId: null })).workspaces;
+    expect(list).toHaveLength(1);
+    expect((await caller.workspaceSummaries(summaryInput)).workspaces).toEqual(list);
+    const [workspace] = list;
+    expect(workspace).toMatchObject({
+      chatCount: 183,
+      chatTabsTruncated: true,
+      chatTabsRevision: expect.any(String),
+      defaultTitle: 'Original chat title',
+      rootSessionId: root,
+      latestSessionId: historyId(179),
+      latestOpenSessionId: latestOpen,
+      cloudAgentSessionId: navigation.cloud_agent_session_id,
+      status: { kind: 'attention', sessionId: statusSource },
+    });
+    expect(workspace?.openChats.map(chat => chat.sessionId)).toEqual([latestOpen, root]);
+    expect(workspace?.closedChats.map(chat => chat.sessionId)).toEqual([
+      statusSource,
+      ...closed.slice(1, 51),
+    ]);
+
+    const pageInput = { organizationId: null, worktreeId: worktree, limit: 50 };
+    const first = await caller.workspaceChats(pageInput);
+    expect(first.chats.at(-1)?.sessionId).toBe(historyId(46));
+    expect(first.nextCursor).not.toBeNull();
+    const second = await caller.workspaceChats({
+      ...pageInput,
+      cursor: first.nextCursor ?? undefined,
+    });
+    expect(second.chats.map(chat => chat.sessionId)).toEqual(
+      Array.from({ length: 50 }, (_, index) => historyId(index + 47))
+    );
+    expect(second.chats.find(chat => chat.sessionId === historyId(55))).toMatchObject({
+      closedPosition: closed.indexOf(historyId(55)) + 1,
+      tabPosition: null,
+    });
+    expect(second.chats.find(chat => chat.sessionId === orderedOpen)).toMatchObject({
+      closedPosition: null,
+      tabPosition: 2,
+    });
+
+    await db
+      .update(cloud_agent_worktrees)
+      .set({
+        closed_session_ids: [...closed.slice(0, -2), ...closed.slice(-2).reverse()],
+      })
+      .where(eq(cloud_agent_worktrees.worktree_id, worktree));
+    const [updated] = (await caller.workspaceSummaries(summaryInput)).workspaces;
+    expect(updated?.chatTabsRevision).not.toBe(workspace?.chatTabsRevision);
+    expect(updated?.closedChats).toEqual(workspace?.closedChats);
+    expect(updated?.openChats).toEqual(workspace?.openChats);
   });
 
   it.each([

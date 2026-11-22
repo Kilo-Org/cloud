@@ -35,6 +35,11 @@ const activitySchema = workspaceChatSummarySchema.extend({
   latestRunTerminalAt: timestamp.nullable(),
 });
 
+const workspaceChatWithPositionsSchema = workspaceChatSummarySchema.extend({
+  closedPosition: z.int().positive().nullable(),
+  tabPosition: z.int().positive().nullable(),
+});
+
 const prSchema = z.object({
   pr_url: z.string().nullable(),
   pr_number: z.number().nullable(),
@@ -62,8 +67,6 @@ const directoryRowSchema = z.object({
   baseSha: z.string().nullable(),
   createdAt: timestamp,
   lastActivityAt: timestamp,
-  closedSessionIds: z.array(z.string()),
-  tabOrder: z.array(z.string()),
   latest: activitySchema,
   active: z.array(activitySchema),
   pr: prSchema.nullable(),
@@ -197,12 +200,23 @@ function platformCondition(createdOnPlatform?: string | string[]): SQL {
 const visibleChat = sql`(s.title IS NOT NULL OR s.status IS NOT NULL
   OR s.created_on_platform != 'unknown' OR s.total_cost_microdollars IS NOT NULL)`;
 
+const visibleWorkspaceChat = sql`s.kilo_user_id = w.kilo_user_id
+  AND s.cloud_agent_worktree_id = w.worktree_id AND s.cloud_agent_worktree_id IS NOT NULL
+  AND s.organization_id IS NOT DISTINCT FROM w.organization_id
+  AND s.parent_session_id IS NULL AND ${visibleChat}`;
+
+const chatActivityOrder = sql`coalesce(s.last_activity_at, s.created_at) DESC, s.session_id DESC NULLS LAST`;
+
 const chatJson = sql`jsonb_build_object(
   'sessionId', s.session_id, 'title', s.title,
   'createdAt', s.created_at, 'updatedAt', s.updated_at,
   'lastActivityAt', s.last_activity_at, 'cloudAgentSessionId', s.cloud_agent_session_id,
-  'sessionStatus', s.status, 'sessionStatusUpdatedAt', s.status_updated_at,
-  'gitUrl', s.git_url, 'branch', s.git_branch
+  'sessionStatus', s.status, 'sessionStatusUpdatedAt', s.status_updated_at
+)`;
+
+const positionedChatJson = sql`${chatJson} || jsonb_build_object(
+  'closedPosition', array_position(w.closed_session_ids, s.session_id),
+  'tabPosition', array_position(w.tab_order, s.session_id)
 )`;
 
 const latestRun = sql`SELECT status, failure_code, terminal_at
@@ -211,6 +225,7 @@ const latestRun = sql`SELECT status, failure_code, terminal_at
   ORDER BY queued_at DESC NULLS LAST, message_id DESC NULLS LAST LIMIT 1`;
 
 const activityJson = sql`${chatJson} || jsonb_build_object(
+  'gitUrl', s.git_url, 'branch', s.git_branch,
   'latestRunFailureKind', CASE
     WHEN run.status = 'failed' THEN 'failed'
     WHEN run.status = 'interrupted' AND run.failure_code IN ('system_interrupt', 'container_shutdown')
@@ -265,7 +280,6 @@ export function workspaceDirectoryQuery(
       w.base_branch AS "baseBranch", w.base_sha AS "baseSha", w.created_at::text AS "createdAt",
       greatest(w.last_activity_at, coalesce((latest.activity->>'lastActivityAt')::timestamptz,
         (latest.activity->>'createdAt')::timestamptz, w.created_at))::text AS "lastActivityAt",
-      w.closed_session_ids AS "closedSessionIds", w.tab_order AS "tabOrder",
       latest.activity AS latest, coalesce(active.sessions, '[]'::jsonb) AS active,
       to_jsonb(pr) AS pr, coalesce(${searchMatch}, false) AS "searchMatch"
     FROM workspace_directory w
@@ -275,10 +289,8 @@ export function workspaceDirectoryQuery(
     INNER JOIN LATERAL (
       SELECT ${activityJson} AS activity FROM (
         SELECT * FROM cli_sessions_v2 s
-        WHERE s.kilo_user_id = w.kilo_user_id AND s.cloud_agent_worktree_id = w.worktree_id
-          AND s.organization_id IS NOT DISTINCT FROM w.organization_id
-          AND s.parent_session_id IS NULL AND s.cloud_agent_worktree_id IS NOT NULL AND ${visibleChat}
-        ORDER BY coalesce(s.last_activity_at, s.created_at) DESC, s.session_id DESC NULLS LAST LIMIT 1
+        WHERE ${visibleWorkspaceChat}
+        ORDER BY ${chatActivityOrder} LIMIT 1
       ) s LEFT JOIN LATERAL (${latestRun}) run ON true
     ) latest ON true
     LEFT JOIN LATERAL (
@@ -351,13 +363,30 @@ export async function readWorkspaceStackDirectory(
 
 const hydratedRowSchema = z.object({
   worktreeId: z.string(),
-  chats: z.array(workspaceChatSummarySchema),
+  rootSessionId: z.string(),
+  latestSessionId: z.string(),
+  latestOpenSessionId: z.string().nullable(),
+  chatCount: z.coerce.number().int().positive(),
+  chatTabsRevision: z.string(),
+  chats: z.array(workspaceChatWithPositionsSchema),
   hasOpenRun: z.boolean(),
   observations: z.unknown(),
 });
 
-export function workspaceChatHydrationQuery(scope: WorkspaceReadScope, worktreeIds: string[]) {
+const WORKSPACE_CHAT_PREVIEW_LIMIT = 50;
+type WorkspaceChatHydrationInput = { worktreeId: string; statusSessionId: string | null };
+
+export function workspaceChatHydrationQuery(
+  scope: WorkspaceReadScope,
+  workspaces: readonly WorkspaceChatHydrationInput[]
+) {
+  const worktreeIds = workspaces.map(workspace => workspace.worktreeId);
+  const statusSessionIds = workspaces.map(workspace => workspace.statusSessionId);
   return sql`WITH scoped_workspaces AS (${scopedDirectory(scope)}),
+    requested_workspaces AS (
+      SELECT * FROM unnest(${sql.param(worktreeIds)}::text[], ${sql.param(statusSessionIds)}::text[])
+        AS requested(worktree_id, status_session_id)
+    ),
     workspace_open_runs AS (
       SELECT DISTINCT s.cloud_agent_worktree_id AS worktree_id
       FROM cli_sessions_v2 s INNER JOIN cloud_agent_session_runs open_run
@@ -375,24 +404,49 @@ export function workspaceChatHydrationQuery(scope: WorkspaceReadScope, worktreeI
               OR (newer.queued_at = open_run.queued_at AND newer.message_id > open_run.message_id))
         )
     )
-    SELECT w.worktree_id AS "worktreeId", chats.chats, open_runs.worktree_id IS NOT NULL AS "hasOpenRun",
+    SELECT w.worktree_id AS "worktreeId", tabs.*,
+      (SELECT count(*) FROM cli_sessions_v2 s WHERE ${visibleWorkspaceChat}) AS "chatCount",
+      md5(jsonb_build_array(w.closed_session_ids, w.tab_order)::text) AS "chatTabsRevision",
+      open_runs.worktree_id IS NOT NULL AS "hasOpenRun",
       pr.pr_observations AS observations
     FROM scoped_workspaces w
+    INNER JOIN requested_workspaces requested USING (worktree_id)
     LEFT JOIN workspace_open_runs open_runs ON open_runs.worktree_id = w.worktree_id
     LEFT JOIN LATERAL (${workspacePrQuery(sql`${workspacePrFields}, pr_observations`)}) pr ON true
     INNER JOIN LATERAL (
-      SELECT jsonb_agg(${chatJson} ORDER BY s.created_at, s.session_id) AS chats
-      FROM cli_sessions_v2 s
-      WHERE s.kilo_user_id = w.kilo_user_id AND s.cloud_agent_worktree_id = w.worktree_id
-        AND s.organization_id IS NOT DISTINCT FROM w.organization_id
-        AND s.parent_session_id IS NULL AND ${visibleChat}
-    ) chats ON chats.chats IS NOT NULL
-    WHERE w.worktree_id = ANY(${sql.param(worktreeIds)}::text[])`;
+      WITH root AS (
+        SELECT s.session_id FROM cli_sessions_v2 s WHERE ${visibleWorkspaceChat}
+        ORDER BY s.created_at, s.session_id LIMIT 1
+      ), latest_open AS (
+        SELECT s.session_id FROM cli_sessions_v2 s WHERE ${visibleWorkspaceChat}
+          AND s.session_id NOT IN (
+            SELECT id FROM unnest(w.closed_session_ids) AS closed(id) WHERE id IS NOT NULL
+          )
+        ORDER BY ${chatActivityOrder} LIMIT 1
+      ), preview AS (
+        SELECT s.session_id FROM cli_sessions_v2 s WHERE ${visibleWorkspaceChat}
+        ORDER BY ${chatActivityOrder} LIMIT ${WORKSPACE_CHAT_PREVIEW_LIMIT}
+      ), preview_ids AS (
+        SELECT session_id FROM preview
+        UNION SELECT session_id FROM root
+        UNION SELECT session_id FROM latest_open
+        UNION SELECT requested.status_session_id
+      )
+      SELECT jsonb_agg(${positionedChatJson} ORDER BY s.created_at, s.session_id) AS chats,
+        (array_agg(s.session_id ORDER BY ${chatActivityOrder}))[1] AS "latestSessionId",
+        (SELECT session_id FROM root) AS "rootSessionId",
+        (SELECT session_id FROM latest_open) AS "latestOpenSessionId"
+      FROM preview_ids ids
+      INNER JOIN cli_sessions_v2 s ON s.session_id = ids.session_id AND ${visibleWorkspaceChat}
+    ) tabs ON tabs.chats IS NOT NULL`;
 }
 
-export async function hydrateWorkspaceChats(scope: WorkspaceReadScope, worktreeIds: string[]) {
-  if (worktreeIds.length === 0) return [];
-  const { rows } = await db.execute(workspaceChatHydrationQuery(scope, worktreeIds));
+export async function hydrateWorkspaceChats(
+  scope: WorkspaceReadScope,
+  workspaces: readonly WorkspaceChatHydrationInput[]
+) {
+  if (workspaces.length === 0) return [];
+  const { rows } = await db.execute(workspaceChatHydrationQuery(scope, workspaces));
   return z.array(hydratedRowSchema).parse(rows);
 }
 
@@ -405,7 +459,7 @@ export async function readWorkspaceChatPage(
   }
 ) {
   const { rows } = await db.execute(sql`WITH scoped_workspaces AS (${scopedDirectory(scope)})
-    SELECT ${chatJson} AS chat,
+    SELECT ${positionedChatJson} AS chat,
       to_char(s.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "cursorCreatedAt"
     FROM cli_sessions_v2 s
     INNER JOIN scoped_workspaces w ON w.worktree_id = s.cloud_agent_worktree_id
@@ -415,7 +469,7 @@ export async function readWorkspaceChatPage(
       AND ${input.cursor ? sql`(s.created_at, s.session_id) > (${input.cursor.createdAt}::timestamptz, ${input.cursor.sessionId})` : sql`true`}
     ORDER BY s.created_at, s.session_id LIMIT ${input.limit + 1}`);
   const parsed = z
-    .array(z.object({ chat: workspaceChatSummarySchema, cursorCreatedAt: z.iso.datetime() }))
+    .array(z.object({ chat: workspaceChatWithPositionsSchema, cursorCreatedAt: z.iso.datetime() }))
     .parse(rows);
   const hasMore = parsed.length > input.limit;
   const page = hasMore ? parsed.slice(0, input.limit) : parsed;

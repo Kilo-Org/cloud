@@ -38,6 +38,8 @@ export function workspaceSummaryFixture(
     stackRootId: worktreeId,
     stackDepth: 0,
     chatCount: 1,
+    chatTabsTruncated: false,
+    chatTabsRevision: 'initial',
     hasOpenRun: false,
     openChats: [
       {

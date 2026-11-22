@@ -26,7 +26,6 @@ import {
   type WorkspaceDirectoryRow,
   type WorkspaceStackDirectoryRow,
   type WorkspaceReadScope,
-  type WorkspaceChatSummary,
 } from './workspace-read-model-queries';
 
 export type { WorkspaceChatSummary } from './workspace-read-model-queries';
@@ -216,44 +215,42 @@ function workspaceComparator(order: WorkspaceOrder) {
   };
 }
 
-function activityComparator(a: WorkspaceChatSummary, b: WorkspaceChatSummary) {
-  return (
-    Date.parse(b.lastActivityAt ?? b.createdAt) - Date.parse(a.lastActivityAt ?? a.createdAt) ||
-    b.sessionId.localeCompare(a.sessionId)
-  );
-}
-
 async function hydrateWorkspaces(scope: WorkspaceReadScope, rows: ClassifiedWorkspace[]) {
   const hydration = new Map(
     (
       await hydrateWorkspaceChats(
         scope,
-        rows.map(row => row.worktreeId)
+        rows.map(row => ({ worktreeId: row.worktreeId, statusSessionId: row.status.sessionId }))
       )
     ).map(row => [row.worktreeId, row])
   );
   const workspaces = rows.flatMap(row => {
     const hydrated = hydration.get(row.worktreeId);
     if (!hydrated) return [];
-    const chats = hydrated.chats;
-    const root = chats[0];
-    if (!root) return [];
-    const closedIds = new Set(row.closedSessionIds);
-    const tabPositions = new Map(row.tabOrder.map((id, index) => [id, index]));
+    const chats = hydrated.chats.map(({ closedPosition, tabPosition, ...chat }) => ({
+      closedPosition,
+      tabPosition,
+      chat,
+    }));
+    const chatsById = new Map(chats.map(({ chat }) => [chat.sessionId, chat]));
+    const root = chatsById.get(hydrated.rootSessionId);
+    const latest = chatsById.get(hydrated.latestSessionId);
+    if (!root || !latest) return [];
+    const latestOpen = hydrated.latestOpenSessionId
+      ? chatsById.get(hydrated.latestOpenSessionId)
+      : undefined;
     const openChats = chats
-      .filter(chat => !closedIds.has(chat.sessionId))
-      .sort((a, b) => {
-        const position =
-          (tabPositions.get(a.sessionId) ?? Infinity) - (tabPositions.get(b.sessionId) ?? Infinity);
-        return Number.isNaN(position) ? 0 : position;
-      });
-    const chatsById = new Map(chats.map(chat => [chat.sessionId, chat]));
-    const closedChats = [...new Set(row.closedSessionIds)].flatMap(id => {
-      const chat = chatsById.get(id);
-      return chat ? [chat] : [];
-    });
-    const latest = [...chats].sort(activityComparator)[0] ?? root;
-    const latestOpen = [...openChats].sort(activityComparator)[0];
+      .flatMap(({ closedPosition, tabPosition, chat }) =>
+        closedPosition === null ? [{ position: tabPosition ?? Number.MAX_SAFE_INTEGER, chat }] : []
+      )
+      .sort((a, b) => a.position - b.position)
+      .map(({ chat }) => chat);
+    const closedChats = chats
+      .flatMap(({ closedPosition, chat }) =>
+        closedPosition === null ? [] : [{ position: closedPosition, chat }]
+      )
+      .sort((a, b) => a.position - b.position)
+      .map(({ chat }) => chat);
     const pr = row.pr
       ? formatAssociatedPr(
           {
@@ -291,7 +288,9 @@ async function hydrateWorkspaces(scope: WorkspaceReadScope, rows: ClassifiedWork
         destination: row.destination,
         stackRootId: row.stackRootId,
         stackDepth: row.stackDepth,
-        chatCount: chats.length,
+        chatCount: hydrated.chatCount,
+        chatTabsTruncated: hydrated.chatCount > chats.length,
+        chatTabsRevision: hydrated.chatTabsRevision,
         hasOpenRun: hydrated.hasOpenRun,
         openChats,
         closedChats,

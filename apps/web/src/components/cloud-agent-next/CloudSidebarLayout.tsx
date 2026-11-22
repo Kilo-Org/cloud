@@ -37,7 +37,7 @@ import {
 import { useActiveSessions } from './hooks/useActiveSessions';
 import { dbSessionsAtom } from './store/db-session-atoms';
 import { useWorkspaceSummaryLookup } from './hooks/useWorkspaceSummaries';
-import { mergeWorkspaceChats } from './hooks/useWorkspaceChats';
+import { mergeWorkspaceChats, useWorkspaceChats } from './hooks/useWorkspaceChats';
 import { latestOpenWorkspaceChat, workspaceSummaryChats } from './hooks/sidebar-workspace-model';
 import {
   getDeletionErrorMessage,
@@ -105,6 +105,8 @@ type WorktreeChatTabs = {
   worktreeChats: StoredSession[];
   openWorktreeChats: StoredSession[];
   closedWorktreeChats: StoredSession[];
+  workspaceTabsStatus: 'loading' | 'error' | null;
+  retryWorkspaceTabs: () => void;
   openSession: (sessionId: string) => void;
   composerFocusRequest: ComposerFocusRequest | null;
   closeSession: (sessionId: string) => void;
@@ -159,6 +161,8 @@ const SidebarLayoutContext = createContext<SidebarLayoutContextValue>({
   worktreeChats: [],
   openWorktreeChats: [],
   closedWorktreeChats: [],
+  workspaceTabsStatus: null,
+  retryWorkspaceTabs: () => {},
   openSession: () => {},
   composerFocusRequest: null,
   closeSession: () => {},
@@ -186,6 +190,8 @@ export function useWorktreeChatTabs(): WorktreeChatTabs {
     worktreeChats,
     openWorktreeChats,
     closedWorktreeChats,
+    workspaceTabsStatus,
+    retryWorkspaceTabs,
     openSession,
     composerFocusRequest,
     closeSession,
@@ -200,6 +206,8 @@ export function useWorktreeChatTabs(): WorktreeChatTabs {
     worktreeChats,
     openWorktreeChats,
     closedWorktreeChats,
+    workspaceTabsStatus,
+    retryWorkspaceTabs,
     openSession,
     composerFocusRequest,
     closeSession,
@@ -507,6 +515,25 @@ function CloudSidebarLayoutContent({
     workspace => workspace.worktreeId === selectedWorktreeId
   );
   const {
+    workspaceWithTabs,
+    waitingForPages,
+    hasError: workspaceTabsError,
+    retry: retryWorkspaceTabs,
+    refresh: refreshWorkspaceTabs,
+  } = useWorkspaceChats({
+    organizationId: organizationId ?? null,
+    worktreeId: selectedWorktreeId,
+    workspace: selectedWorkspace,
+  });
+  const workspacesWithTabs = useMemo(
+    () =>
+      workspaceWithTabs && workspaceWithTabs !== selectedWorkspace
+        ? loadedWorkspaceSummaries.map(row => (row === selectedWorkspace ? workspaceWithTabs : row))
+        : loadedWorkspaceSummaries,
+    [loadedWorkspaceSummaries, selectedWorkspace, workspaceWithTabs]
+  );
+  const workspaceTabsStatus = workspaceTabsError ? 'error' : waitingForPages ? 'loading' : null;
+  const {
     closedSessionIds,
     sessionOrderByWorktree,
     openChatTab,
@@ -518,12 +545,13 @@ function CloudSidebarLayoutContent({
     getClosedWorktreeChatTabsStorageKey(currentUserId, organizationId),
     {
       organizationId: organizationId ?? null,
-      workspaces: loadedWorkspaceSummaries,
+      workspaces: workspacesWithTabs,
+      onChanged: refreshWorkspaceTabs,
     }
   );
   const serverWorkspaceChats = useMemo(
-    () => (selectedWorkspace ? workspaceSummaryChats(selectedWorkspace) : []),
-    [selectedWorkspace]
+    () => (workspaceWithTabs ? workspaceSummaryChats(workspaceWithTabs) : []),
+    [workspaceWithTabs]
   );
   const selectedWorkspaceChats = useMemo(
     () => mergeWorkspaceChats(selectedWorktreeId, serverWorkspaceChats, cachedSessions),
@@ -676,7 +704,7 @@ function CloudSidebarLayoutContent({
 
   const openWorktreeFromSidebar = useCallback(
     (worktreeId: string, latestOpenSessionId: string | null) => {
-      const workspace = loadedWorkspaceSummaries.find(row => row.worktreeId === worktreeId);
+      const workspace = workspacesWithTabs.find(row => row.worktreeId === worktreeId);
       const sessionId = workspace
         ? latestOpenWorkspaceChat(workspace, closedSessionIds)
         : latestOpenSessionId && !closedSessionIds.includes(latestOpenSessionId)
@@ -688,7 +716,7 @@ function CloudSidebarLayoutContent({
         openWorktree(worktreeId);
       }
     },
-    [closedSessionIds, loadedWorkspaceSummaries, openWorktree, selectSession]
+    [closedSessionIds, workspacesWithTabs, openWorktree, selectSession]
   );
 
   // Arriving at a chat's address from elsewhere (a link, history) reopens its
@@ -709,6 +737,7 @@ function CloudSidebarLayoutContent({
       }
     }
     if (
+      waitingForPages ||
       !shownSessionId ||
       !selectedWorktreeId ||
       getActiveChatSessionId(pendingNavigationRef.current, shownSessionId) !== shownSessionId ||
@@ -733,6 +762,7 @@ function CloudSidebarLayoutContent({
     openWorktreeChats,
     selectedWorktreeId,
     worktreeChats,
+    waitingForPages,
   ]);
 
   const closeSession = useCallback(
@@ -741,6 +771,7 @@ function CloudSidebarLayoutContent({
         return;
       }
       closeChatTab(sessionId);
+      if (waitingForPages) return;
       // The tab may already be the target of a navigation the router has not shown yet.
       const activeSessionId = getActiveChatSessionId(
         pendingNavigationRef.current,
@@ -766,6 +797,7 @@ function CloudSidebarLayoutContent({
       openWorktree,
       openWorktreeChats,
       selectedWorktreeId,
+      waitingForPages,
       worktreeChats,
     ]
   );
@@ -1083,13 +1115,15 @@ function CloudSidebarLayoutContent({
     [workspaceRows, worktreePendingDeletion]
   );
   const toggleMobileSidebar = useCallback(() => setMobileSheetOpen(prev => !prev), []);
-  const sidebarContext = useMemo(
+  const sidebarContext = useMemo<SidebarLayoutContextValue>(
     () => ({
       currentSessionId: currentSessionId ?? null,
       selectedWorktreeId,
       worktreeChats,
       openWorktreeChats,
       closedWorktreeChats,
+      workspaceTabsStatus,
+      retryWorkspaceTabs,
       openSession: selectSession,
       composerFocusRequest,
       closeSession,
@@ -1106,6 +1140,8 @@ function CloudSidebarLayoutContent({
       worktreeChats,
       openWorktreeChats,
       closedWorktreeChats,
+      workspaceTabsStatus,
+      retryWorkspaceTabs,
       selectSession,
       composerFocusRequest,
       closeSession,

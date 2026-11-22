@@ -630,8 +630,10 @@ repository.
     devices. They MUST remain scoped to the current user and personal or
     organization context. Concurrent tab changes MUST preserve unrelated changes.
     The initial server-rendered summary MUST include tab state, so closed tabs
-    MUST NOT appear open before hydration. A browser MUST import its legacy local
-    tab preferences once and delete the local key only after successful import.
+    MUST NOT appear open before hydration. For a large worktree, the summary MAY
+    contain a preview; the selected worktree MUST load the remaining tabs in pages.
+    A browser MUST import its legacy local tab preferences once and delete the
+    local key only after successful import.
     Existing server preferences MUST take precedence over imported preferences.
     A closed chat MUST reopen only when the user opens that chat
     itself, for example from the Sessions list or its own link. Selecting its
